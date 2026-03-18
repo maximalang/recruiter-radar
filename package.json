@@ -6,6 +6,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace @recruiter-radar/web"
+    "dev": "npm run dev --workspace @recruiter-radar/web",
+    "hh:fetch": "node packages/db/scripts/fetch-hh.mjs"
   }
 }
