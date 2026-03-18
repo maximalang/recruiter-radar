@@ -13,6 +13,7 @@
     "hh:metrics": "node packages/db/scripts/report-hh-metrics.mjs",
     "hh:score": "node packages/db/scripts/report-hh-score.mjs",
     "hh:top": "node packages/db/scripts/report-hh-top.mjs",
-    "hh:why-now": "node packages/db/scripts/report-hh-why-now.mjs"
+    "hh:why-now": "node packages/db/scripts/report-hh-why-now.mjs",
+    "hh:opener": "node packages/db/scripts/report-hh-opener.mjs"
   }
 }
