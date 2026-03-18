@@ -91,6 +91,21 @@ CREATE TABLE signals (
   CONSTRAINT signals_headline_not_blank CHECK (BTRIM(headline) <> '')
 );
 
+CREATE TABLE hh_vacancies (
+  id BIGSERIAL PRIMARY KEY,
+  hh_vacancy_id TEXT NOT NULL UNIQUE,
+  hh_employer_id TEXT,
+  employer_name TEXT,
+  vacancy_name TEXT NOT NULL,
+  area_name TEXT,
+  published_at TIMESTAMPTZ,
+  alternate_url TEXT,
+  payload JSONB NOT NULL,
+  fetched_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE leads (
   id BIGSERIAL PRIMARY KEY,
   user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -171,6 +186,11 @@ CREATE UNIQUE INDEX signals_source_external_id_uidx
   ON signals (source, external_id)
   WHERE external_id IS NOT NULL;
 
+CREATE INDEX hh_vacancies_hh_employer_id_idx
+  ON hh_vacancies (hh_employer_id);
+CREATE INDEX hh_vacancies_published_at_idx
+  ON hh_vacancies (published_at DESC);
+
 CREATE INDEX leads_user_status_idx
   ON leads (user_id, status);
 CREATE INDEX leads_org_status_idx
@@ -211,6 +231,11 @@ EXECUTE FUNCTION set_updated_at();
 
 CREATE TRIGGER signals_set_updated_at
 BEFORE UPDATE ON signals
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER hh_vacancies_set_updated_at
+BEFORE UPDATE ON hh_vacancies
 FOR EACH ROW
 EXECUTE FUNCTION set_updated_at();
 
