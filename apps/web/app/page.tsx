@@ -1,4 +1,5 @@
-import { getLeads } from "../lib/db";
+import { updateLeadStatusAction } from "./actions";
+import { ACTIONABLE_LEAD_STATUSES, getLeads, type LeadStatus } from "../lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,62 @@ function formatDate(value: string | null): string {
   }).format(date);
 }
 
+function getStatusStyles(status: LeadStatus) {
+  switch (status) {
+    case "won":
+      return {
+        backgroundColor: "#dcfce7",
+        color: "#166534"
+      };
+    case "replied":
+      return {
+        backgroundColor: "#dbeafe",
+        color: "#1d4ed8"
+      };
+    case "contacted":
+      return {
+        backgroundColor: "#e0f2fe",
+        color: "#075985"
+      };
+    case "badfit":
+    case "dismissed":
+      return {
+        backgroundColor: "#fee2e2",
+        color: "#991b1b"
+      };
+    case "snooze":
+      return {
+        backgroundColor: "#f3e8ff",
+        color: "#7e22ce"
+      };
+    case "saved":
+      return {
+        backgroundColor: "#fef3c7",
+        color: "#92400e"
+      };
+    case "new":
+    default:
+      return {
+        backgroundColor: "#e5e7eb",
+        color: "#374151"
+      };
+  }
+}
+
+function getActionButtonStyle(isActive: boolean) {
+  return {
+    padding: "6px 10px",
+    borderRadius: "999px",
+    border: isActive ? "1px solid #111827" : "1px solid #d1d5db",
+    backgroundColor: isActive ? "#111827" : "#ffffff",
+    color: isActive ? "#ffffff" : "#374151",
+    fontSize: "0.85rem",
+    lineHeight: 1.2,
+    cursor: isActive ? "default" : "pointer",
+    opacity: isActive ? 1 : 0.92
+  } as const;
+}
+
 export default async function HomePage() {
   const { rows, error } = await getLeads();
 
@@ -35,7 +92,7 @@ export default async function HomePage() {
       <header style={{ marginBottom: "24px" }}>
         <h1 style={{ margin: 0, fontSize: "2rem" }}>Recruiter Radar</h1>
         <p style={{ margin: "8px 0 0", color: "#4b5563" }}>
-          Leads from PostgreSQL
+          Leads from PostgreSQL with inline status updates
         </p>
       </header>
 
@@ -79,7 +136,7 @@ export default async function HomePage() {
             style={{
               width: "100%",
               borderCollapse: "collapse",
-              minWidth: "760px"
+              minWidth: "980px"
             }}
           >
             <thead>
@@ -99,6 +156,9 @@ export default async function HomePage() {
                 <th style={{ padding: "14px 16px", borderBottom: "1px solid #e5e7eb" }}>
                   User
                 </th>
+                <th style={{ padding: "14px 16px", borderBottom: "1px solid #e5e7eb" }}>
+                  Change status
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -108,7 +168,20 @@ export default async function HomePage() {
                     {lead.orgName}
                   </td>
                   <td style={{ padding: "14px 16px", borderBottom: "1px solid #f3f4f6" }}>
-                    {lead.status}
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        padding: "4px 10px",
+                        borderRadius: "999px",
+                        fontSize: "0.85rem",
+                        fontWeight: 600,
+                        textTransform: "lowercase",
+                        ...getStatusStyles(lead.status)
+                      }}
+                    >
+                      {lead.status}
+                    </span>
                   </td>
                   <td style={{ padding: "14px 16px", borderBottom: "1px solid #f3f4f6" }}>
                     {lead.score ?? "-"}
@@ -118,6 +191,34 @@ export default async function HomePage() {
                   </td>
                   <td style={{ padding: "14px 16px", borderBottom: "1px solid #f3f4f6" }}>
                     {lead.userName}
+                  </td>
+                  <td style={{ padding: "14px 16px", borderBottom: "1px solid #f3f4f6" }}>
+                    <form
+                      action={updateLeadStatusAction}
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: "8px"
+                      }}
+                    >
+                      <input type="hidden" name="leadId" value={lead.id} />
+                      {ACTIONABLE_LEAD_STATUSES.map((status) => {
+                        const isActive = lead.status === status;
+
+                        return (
+                          <button
+                            key={status}
+                            type="submit"
+                            name="status"
+                            value={status}
+                            disabled={isActive}
+                            style={getActionButtonStyle(isActive)}
+                          >
+                            {status}
+                          </button>
+                        );
+                      })}
+                    </form>
                   </td>
                 </tr>
               ))}

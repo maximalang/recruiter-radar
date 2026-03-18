@@ -1,0 +1,4 @@
+ALTER TYPE lead_state ADD VALUE IF NOT EXISTS 'replied';
+ALTER TYPE lead_state ADD VALUE IF NOT EXISTS 'won';
+ALTER TYPE lead_state ADD VALUE IF NOT EXISTS 'badfit';
+ALTER TYPE lead_state ADD VALUE IF NOT EXISTS 'snooze';

@@ -12,6 +12,10 @@ CREATE TYPE lead_state AS ENUM (
   'new',
   'saved',
   'contacted',
+  'replied',
+  'won',
+  'badfit',
+  'snooze',
   'dismissed'
 );
 
