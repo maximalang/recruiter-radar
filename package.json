@@ -10,6 +10,7 @@
     "hh:fetch": "node packages/db/scripts/fetch-hh.mjs",
     "hh:ingest": "node packages/db/scripts/ingest-hh.mjs",
     "hh:report": "node packages/db/scripts/report-hh-orgs.mjs",
-    "hh:metrics": "node packages/db/scripts/report-hh-metrics.mjs"
+    "hh:metrics": "node packages/db/scripts/report-hh-metrics.mjs",
+    "hh:score": "node packages/db/scripts/report-hh-score.mjs"
   }
 }
