@@ -9,6 +9,7 @@
     "dev": "npm run dev --workspace @recruiter-radar/web",
     "hh:fetch": "node packages/db/scripts/fetch-hh.mjs",
     "hh:ingest": "node packages/db/scripts/ingest-hh.mjs",
-    "hh:report": "node packages/db/scripts/report-hh-orgs.mjs"
+    "hh:report": "node packages/db/scripts/report-hh-orgs.mjs",
+    "hh:metrics": "node packages/db/scripts/report-hh-metrics.mjs"
   }
 }
