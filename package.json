@@ -15,6 +15,7 @@
     "hh:top": "node packages/db/scripts/report-hh-top.mjs",
     "hh:why-now": "node packages/db/scripts/report-hh-why-now.mjs",
     "hh:opener": "node packages/db/scripts/report-hh-opener.mjs",
-    "hh:digest": "node packages/db/scripts/report-hh-digest.mjs"
+    "hh:digest": "node packages/db/scripts/report-hh-digest.mjs",
+    "hh:pipeline": "node packages/db/scripts/run-hh-pipeline.mjs"
   }
 }
