@@ -1,7 +1,12 @@
-import { updateLeadStatusAction } from "./actions";
+import { sendLeadToTelegramAction, updateLeadStatusAction } from "./actions";
 import { ACTIONABLE_LEAD_STATUSES, getLeads, type LeadStatus } from "../lib/db";
+import { getTelegramConfigError } from "../lib/telegram";
 
 export const dynamic = "force-dynamic";
+
+type HomePageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
 
 function formatDate(value: string | null): string {
   if (!value) {
@@ -76,8 +81,33 @@ function getActionButtonStyle(isActive: boolean) {
   } as const;
 }
 
-export default async function HomePage() {
+function getSearchParamValue(
+  searchParams: Record<string, string | string[] | undefined>,
+  key: string
+): string | null {
+  const value = searchParams[key];
+
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value[0] ?? null;
+  }
+
+  return null;
+}
+
+export default async function HomePage({ searchParams }: HomePageProps) {
+  const resolvedSearchParams = (await searchParams) ?? {};
   const { rows, error } = await getLeads();
+  const telegramConfigError = getTelegramConfigError();
+  const telegramNoticeStatus = getSearchParamValue(resolvedSearchParams, "telegramStatus");
+  const telegramNoticeMessage = getSearchParamValue(resolvedSearchParams, "telegramMessage");
+  const hasTelegramNotice =
+    telegramNoticeStatus !== null &&
+    telegramNoticeMessage !== null &&
+    (telegramNoticeStatus === "success" || telegramNoticeStatus === "error");
 
   return (
     <main
@@ -107,6 +137,36 @@ export default async function HomePage() {
           }}
         >
           {error}
+        </section>
+      ) : null}
+
+      {!error && hasTelegramNotice ? (
+        <section
+          style={{
+            marginBottom: "16px",
+            padding: "16px",
+            border: telegramNoticeStatus === "success" ? "1px solid #86efac" : "1px solid #fca5a5",
+            borderRadius: "12px",
+            backgroundColor: telegramNoticeStatus === "success" ? "#f0fdf4" : "#fef2f2",
+            color: telegramNoticeStatus === "success" ? "#166534" : "#991b1b"
+          }}
+        >
+          {telegramNoticeMessage}
+        </section>
+      ) : null}
+
+      {!error && telegramConfigError ? (
+        <section
+          style={{
+            marginBottom: "16px",
+            padding: "16px",
+            border: "1px solid #fca5a5",
+            borderRadius: "12px",
+            backgroundColor: "#fff7ed",
+            color: "#9a3412"
+          }}
+        >
+          {telegramConfigError}
         </section>
       ) : null}
 
@@ -158,6 +218,9 @@ export default async function HomePage() {
                 </th>
                 <th style={{ padding: "14px 16px", borderBottom: "1px solid #e5e7eb" }}>
                   Change status
+                </th>
+                <th style={{ padding: "14px 16px", borderBottom: "1px solid #e5e7eb" }}>
+                  Telegram
                 </th>
               </tr>
             </thead>
@@ -218,6 +281,27 @@ export default async function HomePage() {
                           </button>
                         );
                       })}
+                    </form>
+                  </td>
+                  <td style={{ padding: "14px 16px", borderBottom: "1px solid #f3f4f6" }}>
+                    <form action={sendLeadToTelegramAction}>
+                      <input type="hidden" name="leadId" value={lead.id} />
+                      <button
+                        type="submit"
+                        disabled={Boolean(telegramConfigError)}
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: "10px",
+                          border: telegramConfigError ? "1px solid #d1d5db" : "1px solid #0f172a",
+                          backgroundColor: telegramConfigError ? "#f3f4f6" : "#0f172a",
+                          color: telegramConfigError ? "#9ca3af" : "#ffffff",
+                          fontSize: "0.9rem",
+                          lineHeight: 1.2,
+                          cursor: telegramConfigError ? "not-allowed" : "pointer"
+                        }}
+                      >
+                        Send to Telegram
+                      </button>
                     </form>
                   </td>
                 </tr>
