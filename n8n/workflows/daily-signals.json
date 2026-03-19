@@ -5,7 +5,10 @@
       "parameters": {
         "rule": {
           "interval": [
-            {}
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
           ]
         }
       },
@@ -49,6 +52,15 @@
     {
       "parameters": {
         "url": "http://host.docker.internal:3000/api/hh/digest",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "recruiter-radar-local-secret"
+            }
+          ]
+        },
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
@@ -144,7 +156,7 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "ae2a8d5a-7583-410a-8dd8-f1ef2504b35a",
+  "versionId": "aa363d3d-8b85-4514-988e-e74b1649a12a",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "84653d17ed330d6f66dfc59ddf38cfdf3ec273c3c0517689c825e2c8b564f489"
