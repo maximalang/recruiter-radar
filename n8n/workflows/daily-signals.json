@@ -3,45 +3,6 @@
   "nodes": [
     {
       "parameters": {
-        "operation": "executeQuery",
-        "query": "WITH picked AS (\n  SELECT\n    l.id::text AS lead_id,\n    l.id,\n    l.user_id,\n    o.name AS org_name,\n    l.status::text AS status,\n    l.score,\n    COALESCE(NULLIF(u.full_name, ''), u.email) AS user_name,\n    l.last_signal_at\n  FROM leads l\n  JOIN orgs o ON o.id = l.org_id\n  JOIN users u ON u.id = l.user_id\n  LEFT JOIN sent_leads s ON s.lead_id = l.id::text\n  WHERE l.status::text IN ('new', 'contacted', 'replied')\n    AND s.lead_id IS NULL\n  ORDER BY l.score DESC NULLS LAST, l.last_signal_at DESC NULLS LAST\n  LIMIT 3\n),\ninserted AS (\n  INSERT INTO sent_leads (lead_id)\n  SELECT lead_id\n  FROM picked\n  ON CONFLICT (lead_id) DO NOTHING\n  RETURNING lead_id\n)\nSELECT\n  p.id,\n  p.org_name,\n  p.status,\n  p.score,\n  p.user_name\nFROM picked p\nJOIN inserted i ON i.lead_id = p.lead_id\nORDER BY p.score DESC NULLS LAST, p.last_signal_at DESC NULLS LAST;",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.6,
-      "position": [
-        -160,
-        144
-      ],
-      "id": "59e77c1b-5c97-44e8-97eb-610baf68a214",
-      "name": "Execute a SQL query",
-      "credentials": {
-        "postgres": {
-          "id": "PD4uY1z4VJVpjNNp",
-          "name": "Postgres account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.telegram.org/bot8711895424:AAEh1wlbY7j_xG7D41dUZoA7nSQnm-KFLK8/sendMessage",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"chat_id\": \"1256122537\",\n  \"text\": \"Lead from n8n\\nCompany: {{$json.org_name}}\\nStatus: {{$json.status}}\\nScore: {{$json.score}}\\nUser: {{$json.user_name}}\"\n}",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
-      "position": [
-        16,
-        144
-      ],
-      "id": "f57602ad-65d6-47f3-9846-bea8fedc69aa",
-      "name": "HTTP Request"
-    },
-    {
-      "parameters": {
         "rule": {
           "interval": [
             {}
@@ -51,63 +12,126 @@
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.3,
       "position": [
-        -336,
-        144
+        -976,
+        96
       ],
       "id": "f5012bed-1eeb-4478-be1f-ac011f5a905f",
       "name": "Schedule Trigger"
     },
     {
       "parameters": {
-        "operation": "executeQuery",
-        "query": "INSERT INTO deliveries (\n  lead_id,\n  user_id,\n  telegram_chat_id,\n  telegram_message_id,\n  status,\n  delivered_at\n)\nVALUES (\n  {{$node[\"Postgres\"].json[\"id\"]}},\n  {{$node[\"Postgres\"].json[\"user_id\"]}},\n  '1256122537',\n  {{$json[\"result\"][\"message_id\"]}},\n  'sent',\n  NOW()\n);",
+        "method": "POST",
+        "url": "https://api.telegram.org/bot8711895424:AAEh1wlbY7j_xG7D41dUZoA7nSQnm-KFLK8/sendMessage",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "1256122537"
+            },
+            {
+              "name": "text",
+              "value": "={{$json.text}}"
+            }
+          ]
+        },
         "options": {}
       },
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.6,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
       "position": [
-        176,
-        144
+        -176,
+        96
       ],
-      "id": "d927cf57-39cf-4a0f-9eec-8ef2d4088480",
-      "name": "Execute a SQL query1",
-      "credentials": {
-        "postgres": {
-          "id": "PD4uY1z4VJVpjNNp",
-          "name": "Postgres account"
-        }
-      }
+      "id": "71b7de05-62ad-4624-8f45-29d0701c0672",
+      "name": "tg"
+    },
+    {
+      "parameters": {
+        "url": "http://host.docker.internal:3000/api/hh/digest",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -752,
+        96
+      ],
+      "id": "5ad61993-a974-4f71-8fbd-3ce7831c4887",
+      "name": "hh"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $json.items ?? [];\nreturn items.map((item) => ({ json: item }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -528,
+        96
+      ],
+      "id": "1552a390-dea8-46a3-b615-9ba6cd8d958d",
+      "name": "Code (item)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const lines = items.slice(0, 3).map((item) => {\n  const x = item.json;\n  return `${x.rank}. ${x.employer_name}\nScore: ${x.total_score}\n- ${x.reasons[0]}\n- ${x.reasons[1]}\n\n${x.opener}`;\n});\n\nconst text = `Recruiter Radar Digest\\n\\n${lines.join(\"\\n\\n--------------------\\n\\n\")}`;\n\nreturn [{ json: { text } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -384,
+        96
+      ],
+      "id": "37902932-d461-495f-8715-46b483857ec7",
+      "name": "Code (digest text)"
     }
   ],
   "pinData": {},
   "connections": {
-    "Execute a SQL query": {
-      "main": [
-        [
-          {
-            "node": "HTTP Request",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Schedule Trigger": {
       "main": [
         [
           {
-            "node": "Execute a SQL query",
+            "node": "hh",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "HTTP Request": {
+    "tg": {
+      "main": [
+        []
+      ]
+    },
+    "hh": {
       "main": [
         [
           {
-            "node": "Execute a SQL query1",
+            "node": "Code (item)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code (item)": {
+      "main": [
+        [
+          {
+            "node": "Code (digest text)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code (digest text)": {
+      "main": [
+        [
+          {
+            "node": "tg",
             "type": "main",
             "index": 0
           }
@@ -120,7 +144,7 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "ed79af4b-b468-41b6-94d2-3cb869185eab",
+  "versionId": "ae2a8d5a-7583-410a-8dd8-f1ef2504b35a",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "84653d17ed330d6f66dfc59ddf38cfdf3ec273c3c0517689c825e2c8b564f489"
