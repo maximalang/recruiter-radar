@@ -33,3 +33,4 @@
 - HTTP Request использует правильный Telegram bot token
 - chat_id указан верно
 - workflow активирован
+- в HTTP Request к `/api/hh/digest` передаётся заголовок `x-api-key` со значением из `DIGEST_API_KEY`
