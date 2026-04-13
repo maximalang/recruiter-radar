@@ -7,6 +7,10 @@
   ],
   "scripts": {
     "dev": "npm run dev --workspace @recruiter-radar/web",
+    "clean": "rm -rf apps/web/.next apps/web/.next-dev.out.log apps/web/.next-dev.err.log apps/web/tsconfig.tsbuildinfo",
+    "db:validate": "npm run validate --workspace @recruiter-radar/db",
+    "web:check": "npm run check --workspace @recruiter-radar/web",
+    "web:validate": "npm run validate --workspace @recruiter-radar/web",
     "hh:fetch": "node packages/db/scripts/fetch-hh.mjs",
     "hh:ingest": "node packages/db/scripts/ingest-hh.mjs",
     "hh:report": "node packages/db/scripts/report-hh-orgs.mjs",
