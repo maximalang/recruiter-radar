@@ -17,7 +17,7 @@ Company-controlled hiring or company presence surfaces.
 - `career-pages`
 - `company-site`
 
-Rule: highest operational priority for proof quality. `career-pages` are top-tier primary evidence. Generic `company-site` data is corroboration unless it exposes an explicit hiring surface.
+Rule: highest operational priority for proof quality. `career-pages` are top-tier primary evidence and can originate leads. `company-site` is enrichment/corroboration by default and must not be treated as a lead-originating source unless it exposes an explicit hiring surface.
 
 ### 3. Registry reference
 Legal/reference records.
@@ -34,13 +34,14 @@ Rule: context only. Can boost explanation quality, but must not outrank direct h
 ## Order of operations
 1. Start from one active primary source for MVP ingestion (`hh` today).
 2. Normalize company identity.
-3. Look for better company-owned confirmation next: `career-pages` first, then explicit hiring sections on `company-site`.
+3. Look for better company-owned confirmation next: `career-pages` first, then explicit hiring sections on `company-site`. Generic `company-site` context stays enrichment/corroboration only.
 4. Use `egrul-fns` to verify legal entity and reduce false joins.
 5. Add `funding-business-signals` only after the hiring case already exists.
 6. Rank leads by evidence quality first, coverage second, narrative/context last.
 
 ## Ranking principles
 - Direct company hiring proof beats platform aggregation.
+- `company-site` counts as direct hiring proof only when it exposes an explicit hiring surface.
 - Higher evidence tier beats broader source count.
 - Multiple weak signals do not override one strong direct signal.
 - Registry data increases trust, not hiring intent.
@@ -69,4 +70,4 @@ Rule: context only. Can boost explanation quality, but must not outrank direct h
 5. Add `funding-business-signals` last for explanation/context layering.
 
 ## Decision rule
-If two sources disagree, trust the source closest to the company-controlled hiring surface. If no direct hiring evidence exists, do not let enrichment or market context manufacture a lead.
+If two sources disagree, trust the source closest to the company-controlled hiring surface. If no explicit hiring surface exists, do not let `company-site` enrichment/corroboration or market context manufacture a lead.
