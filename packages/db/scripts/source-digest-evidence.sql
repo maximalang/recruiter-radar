@@ -4,15 +4,42 @@ WITH source_signal_rows AS (
     signal.source,
     signal.headline AS evidence_title,
     signal.occurred_at AS published_at,
-    NULLIF(signal.payload ->> 'hh_employer_id', '') AS payload_external_id,
-    NULLIF(BTRIM(signal.payload ->> 'employer_name'), '') AS payload_display_name,
     COALESCE(
+      NULLIF(signal.payload ->> 'source_entity_external_id', ''),
+      NULLIF(signal.payload ->> 'hh_employer_id', '')
+    ) AS payload_external_id,
+    COALESCE(
+      NULLIF(BTRIM(signal.payload ->> 'source_entity_display_name'), ''),
+      NULLIF(BTRIM(signal.payload ->> 'source_entity_name'), ''),
+      NULLIF(BTRIM(signal.payload ->> 'employer_name'), '')
+    ) AS payload_display_name,
+    COALESCE(
+      NULLIF(signal.payload ->> 'source_entity_key', ''),
       NULLIF(signal.payload ->> 'org_source_key', ''),
       CASE
-        WHEN NULLIF(signal.payload ->> 'hh_employer_id', '') IS NOT NULL THEN
-          'employer:' || NULLIF(signal.payload ->> 'hh_employer_id', '')
-        WHEN NULLIF(BTRIM(signal.payload ->> 'employer_name'), '') IS NOT NULL THEN
-          'employer-name:' || LOWER(REGEXP_REPLACE(BTRIM(signal.payload ->> 'employer_name'), '\s+', ' ', 'g'))
+        WHEN COALESCE(
+          NULLIF(signal.payload ->> 'source_entity_external_id', ''),
+          NULLIF(signal.payload ->> 'hh_employer_id', '')
+        ) IS NOT NULL THEN
+          'employer:' || COALESCE(
+            NULLIF(signal.payload ->> 'source_entity_external_id', ''),
+            NULLIF(signal.payload ->> 'hh_employer_id', '')
+          )
+        WHEN COALESCE(
+          NULLIF(BTRIM(signal.payload ->> 'source_entity_display_name'), ''),
+          NULLIF(BTRIM(signal.payload ->> 'source_entity_name'), ''),
+          NULLIF(BTRIM(signal.payload ->> 'employer_name'), '')
+        ) IS NOT NULL THEN
+          'employer-name:' || LOWER(REGEXP_REPLACE(
+            COALESCE(
+              NULLIF(BTRIM(signal.payload ->> 'source_entity_display_name'), ''),
+              NULLIF(BTRIM(signal.payload ->> 'source_entity_name'), ''),
+              NULLIF(BTRIM(signal.payload ->> 'employer_name'), '')
+            ),
+            '\s+',
+            ' ',
+            'g'
+          ))
         ELSE NULL
       END
     ) AS payload_source_key
