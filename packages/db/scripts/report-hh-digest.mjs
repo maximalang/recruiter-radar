@@ -26,7 +26,7 @@ try {
   console.log(JSON.stringify(report, null, 2));
 } catch (error) {
   const message = error instanceof Error ? error.message : String(error);
-  console.error(`HH digest report failed: ${message}`);
+  console.error(`Source digest report failed: ${message}`);
   process.exit(1);
 }
 
@@ -51,7 +51,7 @@ function buildDigestRow(row) {
 
   return {
     rank: row.rank,
-    hh_employer_id: row.source_external_id ?? '',
+    source_external_id: row.source_external_id ?? '',
     employer_name: row.source_display_name ?? '',
     vacancies_count: row.vacancies_count,
     distinct_vacancy_names_count: row.distinct_vacancy_names_count,

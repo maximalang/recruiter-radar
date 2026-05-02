@@ -6,46 +6,79 @@ WITH source_signal_rows AS (
     signal.occurred_at AS published_at,
     COALESCE(
       NULLIF(signal.payload ->> 'source_entity_external_id', ''),
+      NULLIF(signal.payload ->> 'org_external_id', ''),
+      NULLIF(signal.payload ->> 'company_id', ''),
+      NULLIF(signal.payload ->> 'employer_id', ''),
       NULLIF(signal.payload ->> 'hh_employer_id', '')
     ) AS payload_external_id,
     COALESCE(
       NULLIF(BTRIM(signal.payload ->> 'source_entity_display_name'), ''),
       NULLIF(BTRIM(signal.payload ->> 'source_entity_name'), ''),
+      NULLIF(BTRIM(signal.payload ->> 'company_name'), ''),
       NULLIF(BTRIM(signal.payload ->> 'employer_name'), '')
     ) AS payload_display_name,
-    COALESCE(
-      NULLIF(signal.payload ->> 'source_entity_key', ''),
-      NULLIF(signal.payload ->> 'org_source_key', ''),
-      CASE
-        WHEN COALESCE(
-          NULLIF(signal.payload ->> 'source_entity_external_id', ''),
-          NULLIF(signal.payload ->> 'hh_employer_id', '')
-        ) IS NOT NULL THEN
-          'employer:' || COALESCE(
-            NULLIF(signal.payload ->> 'source_entity_external_id', ''),
-            NULLIF(signal.payload ->> 'hh_employer_id', '')
-          )
-        WHEN COALESCE(
-          NULLIF(BTRIM(signal.payload ->> 'source_entity_display_name'), ''),
-          NULLIF(BTRIM(signal.payload ->> 'source_entity_name'), ''),
-          NULLIF(BTRIM(signal.payload ->> 'employer_name'), '')
-        ) IS NOT NULL THEN
-          'employer-name:' || LOWER(REGEXP_REPLACE(
-            COALESCE(
+    ARRAY(
+      SELECT DISTINCT source_key
+      FROM UNNEST(
+        ARRAY[
+          NULLIF(signal.payload ->> 'source_entity_key', ''),
+          NULLIF(signal.payload ->> 'org_source_key', ''),
+          NULLIF(signal.payload ->> 'company_domain', ''),
+          CASE
+            WHEN NULLIF(signal.payload ->> 'company_domain', '') IS NOT NULL THEN
+              'domain:' || LOWER(NULLIF(signal.payload ->> 'company_domain', ''))
+            ELSE NULL
+          END,
+          CASE
+            WHEN COALESCE(
+              NULLIF(signal.payload ->> 'source_entity_external_id', ''),
+              NULLIF(signal.payload ->> 'org_external_id', ''),
+              NULLIF(signal.payload ->> 'company_id', ''),
+              NULLIF(signal.payload ->> 'employer_id', ''),
+              NULLIF(signal.payload ->> 'hh_employer_id', '')
+            ) IS NOT NULL THEN
+              'org:' || COALESCE(
+                NULLIF(signal.payload ->> 'source_entity_external_id', ''),
+                NULLIF(signal.payload ->> 'org_external_id', ''),
+                NULLIF(signal.payload ->> 'company_id', ''),
+                NULLIF(signal.payload ->> 'employer_id', ''),
+                NULLIF(signal.payload ->> 'hh_employer_id', '')
+              )
+            ELSE NULL
+          END,
+          CASE
+            WHEN COALESCE(
               NULLIF(BTRIM(signal.payload ->> 'source_entity_display_name'), ''),
               NULLIF(BTRIM(signal.payload ->> 'source_entity_name'), ''),
+              NULLIF(BTRIM(signal.payload ->> 'company_name'), ''),
               NULLIF(BTRIM(signal.payload ->> 'employer_name'), '')
-            ),
-            '\s+',
-            ' ',
-            'g'
-          ))
-        ELSE NULL
-      END
-    ) AS payload_source_key
+            ) IS NOT NULL THEN
+              'company-name:' || LOWER(REGEXP_REPLACE(
+                COALESCE(
+                  NULLIF(BTRIM(signal.payload ->> 'source_entity_display_name'), ''),
+                  NULLIF(BTRIM(signal.payload ->> 'source_entity_name'), ''),
+                  NULLIF(BTRIM(signal.payload ->> 'company_name'), ''),
+                  NULLIF(BTRIM(signal.payload ->> 'employer_name'), '')
+                ),
+                '\s+',
+                ' ',
+                'g'
+              ))
+            ELSE NULL
+          END
+        ] || COALESCE(
+          ARRAY(
+            SELECT NULLIF(BTRIM(alias_key), '')
+            FROM jsonb_array_elements_text(COALESCE(signal.payload -> 'source_entity_alias_keys', '[]'::jsonb)) AS alias_key
+          ),
+          ARRAY[]::text[]
+        )
+      ) AS source_key
+      WHERE source_key IS NOT NULL
+    ) AS payload_source_keys
   FROM signals AS signal
   WHERE signal.signal_type = 'job_posting'
-    AND signal.source = 'hh'
+    AND signal.source IN ('hh', 'career-pages')
 ),
 normalized_signal_rows AS (
   SELECT
@@ -62,6 +95,7 @@ normalized_signal_rows AS (
     signal.evidence_title,
     signal.published_at,
     CASE
+      WHEN signal.source = 'career-pages' THEN 'direct_hiring_proof'
       WHEN signal.payload_external_id IS NOT NULL THEN 'direct_hiring_proof'
       WHEN source_ref.matched_by IS NOT NULL THEN 'platform_aggregation'
       ELSE 'enrichment_context'
@@ -76,11 +110,20 @@ normalized_signal_rows AS (
       CASE
         WHEN signal.payload_external_id IS NOT NULL
           AND external_id = signal.payload_external_id THEN 'external_id'
-        WHEN signal.payload_source_key IS NOT NULL
-          AND metadata ->> 'source_alias_key' = signal.payload_source_key
+        WHEN COALESCE(array_length(signal.payload_source_keys, 1), 0) > 0
+          AND EXISTS (
+            SELECT 1
+            FROM unnest(signal.payload_source_keys) AS payload_source_key
+            WHERE metadata ->> 'source_alias_key' = payload_source_key
+              OR EXISTS (
+                SELECT 1
+                FROM jsonb_array_elements_text(COALESCE(metadata -> 'source_alias_keys', '[]'::jsonb)) AS alias_key
+                WHERE alias_key = payload_source_key
+              )
+          )
           AND NULLIF(external_id, '') IS NOT NULL THEN 'source_alias_key'
-        WHEN signal.payload_source_key IS NOT NULL
-          AND source_key = signal.payload_source_key THEN 'source_key'
+        WHEN COALESCE(array_length(signal.payload_source_keys, 1), 0) > 0
+          AND source_key = ANY(signal.payload_source_keys) THEN 'source_key'
         WHEN NULLIF(external_id, '') IS NOT NULL THEN 'fallback_external_id'
         ELSE NULL
       END AS matched_by
@@ -91,11 +134,20 @@ normalized_signal_rows AS (
       CASE
         WHEN signal.payload_external_id IS NOT NULL
           AND external_id = signal.payload_external_id THEN 0
-        WHEN signal.payload_source_key IS NOT NULL
-          AND metadata ->> 'source_alias_key' = signal.payload_source_key
+        WHEN COALESCE(array_length(signal.payload_source_keys, 1), 0) > 0
+          AND EXISTS (
+            SELECT 1
+            FROM unnest(signal.payload_source_keys) AS payload_source_key
+            WHERE metadata ->> 'source_alias_key' = payload_source_key
+              OR EXISTS (
+                SELECT 1
+                FROM jsonb_array_elements_text(COALESCE(metadata -> 'source_alias_keys', '[]'::jsonb)) AS alias_key
+                WHERE alias_key = payload_source_key
+              )
+          )
           AND NULLIF(external_id, '') IS NOT NULL THEN 1
-        WHEN signal.payload_source_key IS NOT NULL
-          AND source_key = signal.payload_source_key THEN 2
+        WHEN COALESCE(array_length(signal.payload_source_keys, 1), 0) > 0
+          AND source_key = ANY(signal.payload_source_keys) THEN 2
         WHEN NULLIF(external_id, '') IS NOT NULL THEN 3
         ELSE 4
       END,
