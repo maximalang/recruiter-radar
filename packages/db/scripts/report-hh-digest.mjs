@@ -47,7 +47,7 @@ async function fetchTopEmployers(connectionString) {
 }
 
 function buildDigestRow(row) {
-  const reasons = buildReasons(row);
+  const reasons = getReasonLabels(row);
 
   return {
     rank: row.rank,
@@ -57,34 +57,27 @@ function buildDigestRow(row) {
     distinct_vacancy_names_count: row.distinct_vacancy_names_count,
     latest_published_at: formatTimestamp(row.latest_published_at),
     total_score: row.total_score,
+    quality: {
+      code: row.quality_code ?? '',
+      label: row.quality_label ?? '',
+      weight: row.quality_weight,
+    },
+    score_components: row.score_components,
+    reason_details: row.reason_details,
     reasons,
-    opener: buildOpener(row.source_display_name ?? '', reasons),
+    opener: buildOpener(row.source_display_name ?? '', row.reason_details, reasons),
   };
 }
 
-function buildReasons(row) {
-  const reasons = [
-    row.vacancies_count >= 3
-      ? 'У компании несколько активных вакансий одновременно'
-      : 'У компании есть активная вакансия по рекрутингу',
-  ];
-
-  if (row.is_recent) {
-    reasons.push('Вакансия опубликована совсем недавно');
-  } else {
-    reasons.push(
-      row.distinct_vacancy_names_count >= 2
-        ? 'Есть несколько разных ролей, значит найм не точечный'
-        : 'Роль опубликована недавно, это хороший момент для контакта',
-    );
-  }
-
-  return reasons.slice(0, 2);
+function getReasonLabels(row) {
+  return [row.primary_reason_label, row.secondary_reason_label].filter(
+    (reason) => typeof reason === 'string' && reason.length > 0,
+  );
 }
 
-function buildOpener(employerName, reasons) {
+function buildOpener(employerName, reasonDetails, reasons) {
   const safeEmployerName = shortenEmployerName(employerName);
-  const [firstReason, secondReason] = reasons.map(toReasonFragment);
+  const [firstReason, secondReason] = getReasonFragments(reasonDetails, reasons);
 
   const opener =
     `Здравствуйте! По ${safeEmployerName} видно, что ${firstReason}, а также ${secondReason}. ` +
@@ -112,21 +105,26 @@ function shortenEmployerName(value) {
   return `${name.slice(0, 77)}...`;
 }
 
-function toReasonFragment(reason) {
-  switch (reason) {
-    case 'У компании несколько активных вакансий одновременно':
-      return 'идет несколько активных вакансий одновременно';
-    case 'У компании есть активная вакансия по рекрутингу':
-      return 'есть активная вакансия по рекрутингу';
-    case 'Есть несколько разных ролей, значит найм не точечный':
-      return 'найм выглядит не точечным';
-    case 'Роль опубликована недавно, это хороший момент для контакта':
-      return 'роль опубликована недавно';
-    case 'Вакансия опубликована совсем недавно':
-      return 'вакансия опубликована совсем недавно';
-    default:
-      return 'найм выглядит актуальным';
+function getReasonFragments(reasonDetails, reasons) {
+  const fragmentsByCode = new Map([
+    ['multi_open_roles', 'идет несколько активных вакансий одновременно'],
+    ['active_recruiting_role', 'есть активная вакансия по рекрутингу'],
+    ['multi_role_hiring', 'найм выглядит не точечным'],
+    ['recent_contact_window', 'роль опубликована недавно'],
+    ['very_recent_post', 'вакансия опубликована совсем недавно'],
+  ]);
+
+  const fragments = Array.isArray(reasonDetails)
+    ? reasonDetails
+        .map((reason) => fragmentsByCode.get(reason?.code) ?? null)
+        .filter((reason) => typeof reason === 'string' && reason.length > 0)
+    : [];
+
+  while (fragments.length < 2) {
+    fragments.push(reasons[fragments.length] ?? 'найм выглядит актуальным');
   }
+
+  return fragments.slice(0, 2);
 }
 
 function formatTimestamp(value) {

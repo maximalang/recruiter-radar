@@ -26,7 +26,7 @@ try {
     hh_employer_id: row.source_external_id ?? '',
     employer_name: row.source_display_name ?? '',
     total_score: row.total_score,
-    reasons: buildReasons(row),
+    reasons: getReasonLabels(row),
   }));
 
   console.log(JSON.stringify(report, null, 2));
@@ -52,24 +52,10 @@ async function fetchTopEmployers(connectionString) {
   }
 }
 
-function buildReasons(row) {
-  const reasons = [
-    row.vacancies_count >= 3
-      ? 'У компании несколько активных вакансий одновременно'
-      : 'У компании есть активная вакансия по рекрутингу',
-  ];
-
-  if (row.is_recent) {
-    reasons.push('Вакансия опубликована совсем недавно');
-  } else {
-    reasons.push(
-      row.distinct_vacancy_names_count >= 2
-        ? 'Есть несколько разных ролей, значит найм не точечный'
-        : 'Роль опубликована недавно, это хороший момент для контакта',
-    );
-  }
-
-  return reasons.slice(0, 2);
+function getReasonLabels(row) {
+  return [row.primary_reason_label, row.secondary_reason_label].filter(
+    (reason) => typeof reason === 'string' && reason.length > 0,
+  );
 }
 
 function loadEnvFile(filePath) {

@@ -98,6 +98,13 @@ scored AS (
     vacancies_count,
     distinct_vacancy_names_count,
     latest_published_at,
+    LEAST(vacancies_count * 10, 50)::INT AS vacancies_score,
+    LEAST(distinct_vacancy_names_count * 5, 25)::INT AS role_diversity_score,
+    CASE
+      WHEN latest_published_at >= NOW() - interval '3 days' THEN 20
+      WHEN latest_published_at >= NOW() - interval '7 days' THEN 10
+      ELSE 0
+    END::INT AS recency_score,
     LEAST(
       vacancies_count * 10
       + distinct_vacancy_names_count * 5
@@ -113,7 +120,22 @@ scored AS (
       WHEN 'platform_aggregation' THEN 200
       ELSE 0
     END::INT AS quality_weight,
-    (latest_published_at >= NOW() - interval '3 days') AS is_recent
+    CASE evidence_quality
+      WHEN 'direct_hiring_proof' THEN 'high_confidence_employer_match'
+      WHEN 'platform_aggregation' THEN 'aggregated_employer_match'
+      ELSE 'context_only'
+    END AS quality_code,
+    CASE evidence_quality
+      WHEN 'direct_hiring_proof' THEN 'Прямой работодатель'
+      WHEN 'platform_aggregation' THEN 'Платформенная агрегация'
+      ELSE 'Контекстное обогащение'
+    END AS quality_label,
+    (latest_published_at >= NOW() - interval '3 days') AS is_recent,
+    CASE
+      WHEN latest_published_at >= NOW() - interval '3 days' THEN 'hot'
+      WHEN latest_published_at >= NOW() - interval '7 days' THEN 'fresh'
+      ELSE 'active'
+    END AS recency_code
   FROM aggregated
   WHERE evidence_quality <> 'enrichment_context'
 ),
@@ -133,8 +155,34 @@ ranked AS (
     vacancies_count,
     distinct_vacancy_names_count,
     latest_published_at,
+    vacancies_score,
+    role_diversity_score,
+    recency_score,
+    activity_score,
+    quality_weight,
+    quality_code,
+    quality_label,
+    is_recent,
+    recency_code,
     (quality_weight + activity_score)::INT AS total_score,
-    is_recent
+    CASE
+      WHEN vacancies_count >= 3 THEN 'multi_open_roles'
+      ELSE 'active_recruiting_role'
+    END AS primary_reason_code,
+    CASE
+      WHEN vacancies_count >= 3 THEN 'У компании несколько активных вакансий одновременно'
+      ELSE 'У компании есть активная вакансия по рекрутингу'
+    END AS primary_reason_label,
+    CASE
+      WHEN latest_published_at >= NOW() - interval '3 days' THEN 'very_recent_post'
+      WHEN distinct_vacancy_names_count >= 2 THEN 'multi_role_hiring'
+      ELSE 'recent_contact_window'
+    END AS secondary_reason_code,
+    CASE
+      WHEN latest_published_at >= NOW() - interval '3 days' THEN 'Вакансия опубликована совсем недавно'
+      WHEN distinct_vacancy_names_count >= 2 THEN 'Есть несколько разных ролей, значит найм не точечный'
+      ELSE 'Роль опубликована недавно, это хороший момент для контакта'
+    END AS secondary_reason_label
   FROM scored
 )
 SELECT
@@ -144,7 +192,39 @@ SELECT
   vacancies_count,
   distinct_vacancy_names_count,
   latest_published_at,
+  quality_code,
+  quality_label,
+  quality_weight,
+  vacancies_score,
+  role_diversity_score,
+  recency_score,
+  activity_score,
   total_score,
-  is_recent
+  is_recent,
+  recency_code,
+  primary_reason_code,
+  primary_reason_label,
+  secondary_reason_code,
+  secondary_reason_label,
+  jsonb_build_object(
+    'quality_weight', quality_weight,
+    'vacancies_score', vacancies_score,
+    'role_diversity_score', role_diversity_score,
+    'recency_score', recency_score,
+    'activity_score', activity_score,
+    'total_score', total_score
+  ) AS score_components,
+  jsonb_build_array(
+    jsonb_build_object(
+      'slot', 1,
+      'code', primary_reason_code,
+      'label', primary_reason_label
+    ),
+    jsonb_build_object(
+      'slot', 2,
+      'code', secondary_reason_code,
+      'label', secondary_reason_label
+    )
+  ) AS reason_details
 FROM ranked
 ORDER BY rank ASC
