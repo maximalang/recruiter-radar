@@ -58,7 +58,7 @@ export async function getHhDigestItems(): Promise<HhDigestItem[]> {
     throw new Error("DATABASE_URL is not set.")
   }
 
-  const result = await pool.query<SourceDigestRow>(digestEvidenceQuery)
+  const result = await pool.query<SourceDigestRow>(`${digestEvidenceQuery}\nLIMIT 10`)
 
   return result.rows.map(buildDigestItem)
 }

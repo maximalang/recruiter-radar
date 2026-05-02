@@ -6,6 +6,7 @@ import pg from 'pg';
 const { Client } = pg;
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const rootEnvPath = resolve(scriptDir, '../../../.env');
+const digestEvidenceQuery = readFileSync(resolve(scriptDir, './source-digest-evidence.sql'), 'utf8');
 
 loadEnvFile(rootEnvPath);
 
@@ -25,8 +26,8 @@ try {
   console.table(
     rows.map((row) => ({
       rank: row.rank,
-      hh_employer_id: row.hh_employer_id ?? '',
-      employer_name: row.employer_name ?? '',
+      hh_employer_id: row.source_external_id ?? '',
+      employer_name: row.source_display_name ?? '',
       vacancies_count: row.vacancies_count,
       distinct_vacancy_names_count: row.distinct_vacancy_names_count,
       latest_published_at: formatTimestamp(row.latest_published_at),
@@ -47,63 +48,7 @@ async function fetchTopEmployers(connectionString) {
   await client.connect();
 
   try {
-    const result = await client.query(`
-      WITH aggregated AS (
-        SELECT
-          hh_employer_id,
-          employer_name,
-          COUNT(*)::INT AS vacancies_count,
-          COUNT(DISTINCT vacancy_name)::INT AS distinct_vacancy_names_count,
-          MAX(published_at) AS latest_published_at
-        FROM hh_vacancies
-        GROUP BY hh_employer_id, employer_name
-      ),
-      scored AS (
-        SELECT
-          hh_employer_id,
-          employer_name,
-          vacancies_count,
-          distinct_vacancy_names_count,
-          latest_published_at,
-          (
-            vacancies_count * 10
-            + distinct_vacancy_names_count * 5
-            + CASE
-              WHEN latest_published_at >= NOW() - interval '3 days' THEN 20
-              WHEN latest_published_at >= NOW() - interval '7 days' THEN 10
-              ELSE 0
-            END
-          )::INT AS total_score
-        FROM aggregated
-      ),
-      ranked AS (
-        SELECT
-          ROW_NUMBER() OVER (
-            ORDER BY
-              total_score DESC,
-              vacancies_count DESC,
-              latest_published_at DESC NULLS LAST
-          )::INT AS rank,
-          hh_employer_id,
-          employer_name,
-          vacancies_count,
-          distinct_vacancy_names_count,
-          latest_published_at,
-          total_score
-        FROM scored
-      )
-      SELECT
-        rank,
-        hh_employer_id,
-        employer_name,
-        vacancies_count,
-        distinct_vacancy_names_count,
-        latest_published_at,
-        total_score
-      FROM ranked
-      ORDER BY rank ASC
-      LIMIT 10
-    `);
+    const result = await client.query(`${digestEvidenceQuery}\nLIMIT 10`);
 
     return result.rows;
   } finally {

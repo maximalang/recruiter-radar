@@ -38,7 +38,7 @@ async function fetchTopEmployers(connectionString) {
   await client.connect();
 
   try {
-    const result = await client.query(digestEvidenceQuery);
+    const result = await client.query(`${digestEvidenceQuery}\nLIMIT 10`);
 
     return result.rows;
   } finally {
