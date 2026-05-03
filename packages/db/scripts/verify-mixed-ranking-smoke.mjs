@@ -31,14 +31,17 @@ try {
   const rows = result.rows;
 
   assert.equal(rows.length, 3, 'expected three ranked rows from the smoke fixture');
-  assert.equal(rows[0].source_external_id, 'career-1', 'career-pages row should rank first');
-  assert.deepEqual(rows[0].source_families, ['career-pages']);
-  assert.equal(rows[1].source_external_id, 'hh-1', 'hh direct row should rank second');
-  assert.deepEqual(rows[1].source_families, ['hh']);
+  assert.equal(rows[0].source_external_id, 'hh-1', 'higher-activity hh direct row should rank first');
+  assert.deepEqual(rows[0].source_families, ['hh']);
+  assert.equal(rows[1].source_external_id, 'career-1', 'career-pages direct row should rank second');
+  assert.deepEqual(rows[1].source_families, ['career-pages']);
   assert.equal(rows[2].source_external_id, 'hh-agg-1', 'aggregated hh row should rank after direct proofs');
   assert.deepEqual(rows[2].source_families, ['hh']);
-  assert.ok(rows[0].total_score > rows[1].total_score, 'career-pages direct proof should outrank older hh direct proof');
-  assert.ok(rows[1].total_score > rows[2].total_score, 'direct hh proof should outrank hh aggregation');
+  assert.equal(rows[0].quality_code, 'high_confidence_employer_match');
+  assert.equal(rows[1].quality_code, 'high_confidence_employer_match');
+  assert.equal(rows[2].quality_code, 'aggregated_employer_match');
+  assert.ok(rows[0].total_score > rows[1].total_score, 'more active hh direct proof should outrank newer but lower-activity career-pages proof');
+  assert.ok(rows[1].total_score > rows[2].total_score, 'direct proof should outrank hh aggregation');
 
   console.log('mixed ranking smoke passed');
   console.table(
