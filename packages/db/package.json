@@ -1,4 +1,7 @@
 {
   "name": "@recruiter-radar/db",
-  "private": true
+  "private": true,
+  "dependencies": {
+    "pg": "^8.16.3"
+  }
 }

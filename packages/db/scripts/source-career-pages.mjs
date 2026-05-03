@@ -6,6 +6,7 @@ import pg from 'pg';
 const { Client } = pg;
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const rootEnvPath = resolve(scriptDir, '../../../.env');
+const dbConnectionTimeoutMillis = resolveDbConnectionTimeoutMillis();
 const defaultTargetsFilePath = resolve(scriptDir, './career-pages-targets.json');
 const defaultFetchOutputPath = resolve(scriptDir, './.cache/career-pages-fetch.json');
 const SOURCE_ID = 'career-pages';
@@ -398,6 +399,7 @@ function parseInputRecords(rawContent, inputFilePath) {
 async function ingestCareerPages({ connectionString, input }) {
   const client = new Client({
     connectionString,
+    connectionTimeoutMillis: dbConnectionTimeoutMillis,
   });
 
   const signalUpsertQuery = `
@@ -470,8 +472,8 @@ async function upsertOrgSourceRef(client, record) {
     `
       SELECT org_id
       FROM org_source_refs
-      WHERE source = $1
-        AND source_key = ANY($2)
+      WHERE source = $1::text
+        AND source_key = ANY($2::text[])
       ORDER BY
         CASE
           WHEN source_key = $3 THEN 0
@@ -546,21 +548,21 @@ async function upsertOrgSourceRef(client, record) {
       UPDATE orgs
       SET
         name = CASE
-          WHEN $2 IS NULL OR BTRIM($2) = '' THEN name
-          WHEN name IS NULL OR BTRIM(name) = '' OR name = $5 THEN $2
+          WHEN $2::text IS NULL OR BTRIM($2::text) = '' THEN name
+          WHEN name IS NULL OR BTRIM(name) = '' OR name = $5::text THEN $2::text
           ELSE name
         END,
         domain = CASE
-          WHEN $3 IS NULL OR BTRIM($3) = '' THEN domain
-          WHEN domain IS NULL OR BTRIM(domain) = '' THEN $3
+          WHEN $3::text IS NULL OR BTRIM($3::text) = '' THEN domain
+          WHEN domain IS NULL OR BTRIM(domain) = '' THEN $3::text
           ELSE domain
         END,
         website_url = CASE
-          WHEN $4 IS NULL OR BTRIM($4) = '' THEN website_url
-          WHEN website_url IS NULL OR BTRIM(website_url) = '' THEN $4
+          WHEN $4::text IS NULL OR BTRIM($4::text) = '' THEN website_url
+          WHEN website_url IS NULL OR BTRIM(website_url) = '' THEN $4::text
           ELSE website_url
         END
-      WHERE id = $1
+      WHERE id = $1::bigint
     `,
     [
       orgId,
@@ -579,7 +581,7 @@ async function upsertOrgSourceRef(client, record) {
 
 async function lockOrgSourceKeys(client, sourceKeys) {
   for (const sourceKey of [...sourceKeys].sort()) {
-    await client.query('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', [
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1::text), hashtext($2::text))', [
       SOURCE_ID,
       sourceKey,
     ]);
@@ -818,6 +820,17 @@ export function parseJson(value, label) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`Unable to parse JSON from ${label}: ${message}`);
   }
+}
+
+function resolveDbConnectionTimeoutMillis() {
+  const rawValue = process.env.DB_CONNECTION_TIMEOUT_MS?.trim();
+
+  if (!rawValue) {
+    return 5000;
+  }
+
+  const parsedValue = Number.parseInt(rawValue, 10);
+  return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : 5000;
 }
 
 export function loadEnvFile(filePath) {

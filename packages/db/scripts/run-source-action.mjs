@@ -4,15 +4,19 @@ import { SOURCE_ACTIONS } from './source-contract.mjs';
 import { executeSourceAction, listSourceSummaries } from './source-registry.mjs';
 
 export function formatSourceActionResult(command, source, result) {
-  if (command !== 'pipeline') {
-    return [];
+  if (source.id === 'hh' && command === 'pipeline') {
+    return [
+      `source: ${source.id}`,
+      `vacancies ingested: ${result.summary.vacanciesIngested}`,
+      `digest companies count: ${result.summary.digestCompaniesCount}`,
+    ];
   }
 
-  return [
-    `source: ${source.id}`,
-    `vacancies ingested: ${result.summary.vacanciesIngested}`,
-    `digest companies count: ${result.summary.digestCompaniesCount}`,
-  ];
+  if (source.id === 'career-pages' && result.summary && typeof result.summary === 'object') {
+    return [JSON.stringify(result.summary, null, 2)];
+  }
+
+  return [];
 }
 
 export async function runSourceActionCli(argv = process.argv.slice(2)) {

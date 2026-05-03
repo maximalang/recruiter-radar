@@ -59,6 +59,24 @@ CREATE TABLE orgs (
     CHECK (website_url IS NULL OR BTRIM(website_url) <> '')
 );
 
+CREATE TABLE org_source_refs (
+  id BIGSERIAL PRIMARY KEY,
+  org_id BIGINT NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+  source TEXT NOT NULL,
+  source_key TEXT NOT NULL,
+  external_id TEXT,
+  display_name TEXT,
+  metadata JSONB NOT NULL DEFAULT '{}'::JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT org_source_refs_source_not_blank CHECK (BTRIM(source) <> ''),
+  CONSTRAINT org_source_refs_source_key_not_blank CHECK (BTRIM(source_key) <> ''),
+  CONSTRAINT org_source_refs_external_id_not_blank
+    CHECK (external_id IS NULL OR BTRIM(external_id) <> ''),
+  CONSTRAINT org_source_refs_display_name_not_blank
+    CHECK (display_name IS NULL OR BTRIM(display_name) <> '')
+);
+
 CREATE TABLE subscriptions (
   id BIGSERIAL PRIMARY KEY,
   user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -170,6 +188,14 @@ CREATE UNIQUE INDEX orgs_domain_uidx
   ON orgs (LOWER(domain))
   WHERE domain IS NOT NULL;
 
+CREATE UNIQUE INDEX org_source_refs_source_key_uidx
+  ON org_source_refs (source, source_key);
+CREATE UNIQUE INDEX org_source_refs_source_external_id_uidx
+  ON org_source_refs (source, external_id)
+  WHERE external_id IS NOT NULL;
+CREATE INDEX org_source_refs_org_source_idx
+  ON org_source_refs (org_id, source);
+
 CREATE INDEX subscriptions_user_status_idx
   ON subscriptions (user_id, status);
 CREATE INDEX subscriptions_period_end_idx
@@ -183,8 +209,7 @@ CREATE INDEX signals_org_occurred_at_idx
 CREATE INDEX signals_type_occurred_at_idx
   ON signals (signal_type, occurred_at DESC);
 CREATE UNIQUE INDEX signals_source_external_id_uidx
-  ON signals (source, external_id)
-  WHERE external_id IS NOT NULL;
+  ON signals (source, external_id);
 
 CREATE INDEX hh_vacancies_hh_employer_id_idx
   ON hh_vacancies (hh_employer_id);
@@ -221,6 +246,11 @@ EXECUTE FUNCTION set_updated_at();
 
 CREATE TRIGGER orgs_set_updated_at
 BEFORE UPDATE ON orgs
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER org_source_refs_set_updated_at
+BEFORE UPDATE ON org_source_refs
 FOR EACH ROW
 EXECUTE FUNCTION set_updated_at();
 
