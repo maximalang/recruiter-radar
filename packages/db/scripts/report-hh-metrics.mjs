@@ -6,6 +6,7 @@ import pg from 'pg';
 const { Client } = pg;
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const rootEnvPath = resolve(scriptDir, '../../../.env');
+const digestEvidenceQuery = readFileSync(resolve(scriptDir, './source-digest-evidence.sql'), 'utf8');
 
 loadEnvFile(rootEnvPath);
 
@@ -21,15 +22,17 @@ if (!databaseUrl) {
 try {
   const rows = await fetchEmployerMetrics(databaseUrl);
 
-  console.log('top 20 hh employer metrics:');
+  console.log('top 20 normalized source metrics:');
   console.table(
     rows.map((row) => ({
-      hh_employer_id: row.hh_employer_id ?? '',
-      employer_name: row.employer_name ?? '',
+      source_external_id: row.source_external_id ?? '',
+      employer_name: row.source_display_name ?? '',
+      source_families: Array.isArray(row.source_families) ? row.source_families.join(', ') : '',
+      quality: row.quality_code ?? '',
       vacancies_count: row.vacancies_count,
       distinct_vacancy_names_count: row.distinct_vacancy_names_count,
-      first_published_at: formatTimestamp(row.first_published_at),
       latest_published_at: formatTimestamp(row.latest_published_at),
+      total_score: row.total_score,
     })),
   );
 } catch (error) {
@@ -46,22 +49,7 @@ async function fetchEmployerMetrics(connectionString) {
   await client.connect();
 
   try {
-    const result = await client.query(`
-      SELECT
-        hh_employer_id,
-        employer_name,
-        COUNT(*)::INT AS vacancies_count,
-        COUNT(DISTINCT vacancy_name)::INT AS distinct_vacancy_names_count,
-        MIN(published_at) AS first_published_at,
-        MAX(published_at) AS latest_published_at
-      FROM hh_vacancies
-      GROUP BY hh_employer_id, employer_name
-      ORDER BY
-        vacancies_count DESC,
-        distinct_vacancy_names_count DESC,
-        latest_published_at DESC NULLS LAST
-      LIMIT 20
-    `);
+    const result = await client.query(`${digestEvidenceQuery}\nLIMIT 20`);
 
     return result.rows;
   } finally {

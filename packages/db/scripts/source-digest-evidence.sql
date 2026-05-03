@@ -83,6 +83,7 @@ WITH source_signal_rows AS (
 normalized_signal_rows AS (
   SELECT
     signal.org_id,
+    signal.source,
     COALESCE(
       NULLIF(source_ref.external_id, ''),
       signal.payload_external_id
@@ -162,6 +163,7 @@ aggregated AS (
     source_external_id,
     source_display_name,
     evidence_quality,
+    ARRAY_AGG(DISTINCT source ORDER BY source) AS source_families,
     COUNT(*)::INT AS vacancies_count,
     COUNT(DISTINCT evidence_title)::INT AS distinct_vacancy_names_count,
     MAX(published_at) AS latest_published_at
@@ -174,6 +176,7 @@ scored AS (
     source_external_id,
     source_display_name,
     evidence_quality,
+    source_families,
     vacancies_count,
     distinct_vacancy_names_count,
     latest_published_at,
@@ -231,6 +234,7 @@ ranked AS (
     source_external_id,
     source_display_name,
     evidence_quality,
+    source_families,
     vacancies_count,
     distinct_vacancy_names_count,
     latest_published_at,
@@ -268,6 +272,7 @@ SELECT
   rank,
   source_external_id,
   source_display_name,
+  source_families,
   vacancies_count,
   distinct_vacancy_names_count,
   latest_published_at,
