@@ -30,18 +30,16 @@ try {
   const result = await client.query(`${digestEvidenceQuery}\nLIMIT 5`);
   const rows = result.rows;
 
-  assert.equal(rows.length, 3, 'expected three ranked rows from the smoke fixture');
-  assert.equal(rows[0].source_external_id, 'hh-1', 'higher-activity hh direct row should rank first');
-  assert.deepEqual(rows[0].source_families, ['hh']);
-  assert.equal(rows[1].source_external_id, 'career-1', 'career-pages direct row should rank second');
-  assert.deepEqual(rows[1].source_families, ['career-pages']);
-  assert.equal(rows[2].source_external_id, 'hh-agg-1', 'aggregated hh row should rank after direct proofs');
-  assert.deepEqual(rows[2].source_families, ['hh']);
+  assert.equal(rows.length, 2, 'expected two ranked rows from the smoke fixture');
+  assert.equal(rows[0].source_external_id, 'career-1', 'mixed-source org should keep a direct proof identity');
+  assert.deepEqual(rows[0].source_families, ['career-pages', 'hh']);
+  assert.equal(rows[0].vacancies_count, 3, 'mixed-source org should combine hh and career-pages vacancy evidence');
+  assert.equal(rows[0].distinct_vacancy_names_count, 3, 'mixed-source org should keep distinct role counting across sources');
+  assert.equal(rows[1].source_external_id, 'hh-agg-1', 'aggregated hh row should rank after direct mixed-source proof');
+  assert.deepEqual(rows[1].source_families, ['hh']);
   assert.equal(rows[0].quality_code, 'high_confidence_employer_match');
-  assert.equal(rows[1].quality_code, 'high_confidence_employer_match');
-  assert.equal(rows[2].quality_code, 'aggregated_employer_match');
-  assert.ok(rows[0].total_score > rows[1].total_score, 'more active hh direct proof should outrank newer but lower-activity career-pages proof');
-  assert.ok(rows[1].total_score > rows[2].total_score, 'direct proof should outrank hh aggregation');
+  assert.equal(rows[1].quality_code, 'aggregated_employer_match');
+  assert.ok(rows[0].total_score > rows[1].total_score, 'combined direct proof should outrank hh aggregation');
 
   console.log('mixed ranking smoke passed');
   console.table(
@@ -97,8 +95,7 @@ async function setupFixture(client) {
   await client.query(`
     INSERT INTO orgs (id, name)
     VALUES
-      ('org-hh-direct', 'HH Direct Co'),
-      ('org-career-direct', 'Career Direct Co'),
+      ('org-mixed-direct', 'Mixed Direct Co'),
       ('org-hh-agg', 'HH Aggregated Co');
 
     INSERT INTO org_source_refs (org_id, source, external_id, display_name, source_key, metadata)
@@ -114,28 +111,28 @@ async function setupFixture(client) {
     INSERT INTO signals (org_id, source, signal_type, headline, occurred_at, payload)
     VALUES
       (
-        'org-hh-direct',
+        'org-mixed-direct',
         'hh',
         'job_posting',
         'Senior Recruiter',
         NOW() - interval '5 days',
-        '{"hh_employer_id": "hh-1", "employer_name": "HH Direct Co"}'::jsonb
+        '{"hh_employer_id": "hh-1", "employer_name": "Mixed Direct Co"}'::jsonb
       ),
       (
-        'org-hh-direct',
+        'org-mixed-direct',
         'hh',
         'job_posting',
         'Talent Partner',
         NOW() - interval '5 days',
-        '{"hh_employer_id": "hh-1", "employer_name": "HH Direct Co"}'::jsonb
+        '{"hh_employer_id": "hh-1", "employer_name": "Mixed Direct Co"}'::jsonb
       ),
       (
-        'org-career-direct',
+        'org-mixed-direct',
         'career-pages',
         'job_posting',
         'People Ops Lead',
         NOW() - interval '1 day',
-        '{"source_entity_external_id": "career-1", "source_entity_display_name": "Career Direct Co"}'::jsonb
+        '{"source_entity_external_id": "career-1", "source_entity_display_name": "Mixed Direct Co"}'::jsonb
       ),
       (
         'org-hh-agg',

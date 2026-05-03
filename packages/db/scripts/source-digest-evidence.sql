@@ -160,15 +160,47 @@ normalized_signal_rows AS (
 aggregated AS (
   SELECT
     org_id,
-    source_external_id,
-    source_display_name,
-    evidence_quality,
+    (
+      ARRAY_AGG(source_external_id ORDER BY
+        CASE evidence_quality
+          WHEN 'direct_hiring_proof' THEN 2
+          WHEN 'platform_aggregation' THEN 1
+          ELSE 0
+        END DESC,
+        (source = 'career-pages') DESC,
+        published_at DESC NULLS LAST,
+        source_external_id ASC NULLS LAST
+      ) FILTER (WHERE source_external_id IS NOT NULL)
+    )[1] AS source_external_id,
+    (
+      ARRAY_AGG(source_display_name ORDER BY
+        CASE evidence_quality
+          WHEN 'direct_hiring_proof' THEN 2
+          WHEN 'platform_aggregation' THEN 1
+          ELSE 0
+        END DESC,
+        (source = 'career-pages') DESC,
+        published_at DESC NULLS LAST,
+        source_display_name ASC NULLS LAST
+      ) FILTER (WHERE source_display_name IS NOT NULL)
+    )[1] AS source_display_name,
+    CASE MAX(
+      CASE evidence_quality
+        WHEN 'direct_hiring_proof' THEN 2
+        WHEN 'platform_aggregation' THEN 1
+        ELSE 0
+      END
+    )
+      WHEN 2 THEN 'direct_hiring_proof'
+      WHEN 1 THEN 'platform_aggregation'
+      ELSE 'enrichment_context'
+    END AS evidence_quality,
     ARRAY_AGG(DISTINCT source ORDER BY source) AS source_families,
     COUNT(*)::INT AS vacancies_count,
     COUNT(DISTINCT evidence_title)::INT AS distinct_vacancy_names_count,
     MAX(published_at) AS latest_published_at
   FROM normalized_signal_rows
-  GROUP BY org_id, source_external_id, source_display_name, evidence_quality
+  GROUP BY org_id
 ),
 scored AS (
   SELECT
