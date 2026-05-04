@@ -12,7 +12,7 @@
 3. Считать простой score.
 4. Собирать per-client digest без дублей и повторов по одному и тому же org.
 5. Отправлять лиды в Telegram.
-6. Давать возможность менять статус лида.
+6. Давать возможность менять статус лида и feedback state дайджеста (`accepted`, `badfit`, `dismissed`, `snooze`).
 
 ## Phased expansion strategy
 

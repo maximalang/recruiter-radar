@@ -187,7 +187,7 @@ export async function runDigestForClientProfile(input: {
           OR (
             COALESCE(state.suppressed_until, '-infinity'::timestamptz) <= NOW()
             AND COALESCE(state.cooldown_until, '-infinity'::timestamptz) <= NOW()
-            AND COALESCE(state.feedback_status, 'none') NOT IN ('won', 'badfit', 'dismissed')
+            AND COALESCE(state.feedback_status, 'none') NOT IN ('contacted', 'replied', 'won', 'badfit', 'dismissed')
           )
         )
       ORDER BY ranked_candidates.rank ASC

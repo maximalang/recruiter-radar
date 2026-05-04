@@ -44,7 +44,7 @@
   4. Сохранить в БД
   5. Посчитать score
   6. Для каждого client_profile собрать per-client digest run
-  7. Отфильтровать повторы через client-level cooldown / suppression / feedback state
+  7. Отфильтровать повторы через client-level cooldown / suppression / feedback state; состояния `contacted`, `replied`, `won`, `badfit`, `dismissed` не должны снова попадать в digest
   8. Отправить в Telegram
   9. Записать факт доставки
 
@@ -60,11 +60,12 @@
 - Получает дайджест
 - Показывает карточки лидов
 - Принимает действия по кнопкам:
-  - contacted
+  - accepted / contacted
   - replied
   - won
   - badfit
   - snooze
+  - dismissed
 
 ## Логика MVP
 

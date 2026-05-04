@@ -36,6 +36,8 @@ Planned expansion остаётся phased:
 - `digest_candidates` фиксирует фактически отобранные компании
 - `client_digest_org_state` держит cooldown / suppression / feedback state по клиенту и компании
 - `GET /api/digest?clientProfileId=<id>` запускает один digest run и возвращает выбранные кандидаты
+- `POST /api/digest/feedback` пишет feedback/suppression state (`accepted`, `badfit`, `dismissed`, `snooze`, а также `contacted` / `replied` / `won`) по `clientProfileId + orgId` или `digestCandidateId`
+- `npm run verify:digest:feedback` прогоняет DB-backed smoke для mutation path, если доступен `DATABASE_URL`
 
 Старый `GET /api/hh/digest` сохранён как preview-совместимый top list без записи состояния.
 

@@ -35,6 +35,7 @@
     "career-pages:smoke": "CAREER_PAGES_TARGETS_FILE=packages/db/scripts/career-pages-smoke-targets.json node packages/db/scripts/source-career-pages.mjs fetch",
     "verify:career-pages:smoke": "node packages/db/scripts/verify-career-pages-smoke.mjs",
     "verify:career-pages:ingest": "node packages/db/scripts/verify-career-pages-ingest.mjs",
+    "verify:digest:feedback": "node packages/db/scripts/verify-digest-feedback-smoke.mjs",
     "hh:fetch": "npm run source:fetch:hh",
     "hh:ingest": "npm run source:ingest:hh",
     "hh:report": "node packages/db/scripts/report-hh-orgs.mjs",
