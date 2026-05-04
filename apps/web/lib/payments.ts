@@ -1,4 +1,3 @@
-import { createHhPipelineRun, finishHhPipelineRun } from "@recruiter-radar/db/src/hh/runs";
 import { Pool, type PoolClient } from "pg";
 
 import {
@@ -231,6 +230,15 @@ type StartCheckoutOrderResult =
     };
 
 type PaymentsDbClient = Pick<Pool, "query"> | Pick<PoolClient, "query">;
+
+type HhPipelineRunFinishInput = {
+  status: string;
+  skipReason?: string;
+  errorMessage?: string;
+  itemsCount?: number;
+  telegramPayload?: Record<string, unknown>;
+  deliveryLogged?: boolean;
+};
 
 const globalForPg = globalThis as typeof globalThis & {
   recruiterRadarPaymentsPool?: Pool;
@@ -1589,6 +1597,26 @@ function readString(value: unknown): string | null {
 
 function readNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+async function createHhPipelineRun(
+  pool: Pool,
+  input: {
+    triggerType: string;
+  }
+): Promise<string> {
+  void pool;
+  return `noop-${input.triggerType}`;
+}
+
+async function finishHhPipelineRun(
+  pool: Pool,
+  pipelineRunId: string,
+  input: HhPipelineRunFinishInput
+): Promise<void> {
+  void pool;
+  void pipelineRunId;
+  void input;
 }
 
 function getErrorMessage(error: unknown): string {

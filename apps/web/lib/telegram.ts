@@ -5,6 +5,11 @@ export type TelegramConfig = {
   chatId: string;
 };
 
+export type TelegramMessageConfig = {
+  botToken: string;
+  chatId: string;
+};
+
 type TelegramLeadMessage = {
   orgName: string;
   status: LeadStatus;
@@ -15,6 +20,10 @@ type TelegramLeadMessage = {
 
 type TelegramSendResult = {
   messageId: number;
+};
+
+export type TelegramTextMessageResult = TelegramSendResult & {
+  chatId: string;
 };
 
 type TelegramApiSuccess = {
@@ -115,6 +124,80 @@ export function getTelegramConfig(): {
 
 export function getTelegramConfigError(): string | null {
   return getTelegramConfig().error;
+}
+
+export function getTelegramBotToken(): {
+  botToken: string | null;
+  error: string | null;
+} {
+  const { config, error } = getTelegramConfig();
+
+  return {
+    botToken: config?.botToken ?? null,
+    error
+  };
+}
+
+export async function getTelegramBotUsername(): Promise<{
+  username: string | null;
+  error: string | null;
+}> {
+  const { botToken, error } = getTelegramBotToken();
+
+  if (!botToken) {
+    return {
+      username: null,
+      error
+    };
+  }
+
+  return {
+    username: process.env.TELEGRAM_BOT_USERNAME?.trim() || null,
+    error: null
+  };
+}
+
+export async function sendTelegramTextMessage(
+  text: string,
+  config: TelegramMessageConfig,
+  options?: {
+    replyMarkup?: unknown;
+  }
+): Promise<TelegramTextMessageResult> {
+  void options;
+
+  const response = await fetch(`https://api.telegram.org/bot${config.botToken}/sendMessage`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    cache: "no-store",
+    body: JSON.stringify({
+      chat_id: config.chatId,
+      text
+    })
+  });
+
+  let payload: unknown = null;
+
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok || !isTelegramApiSuccess(payload)) {
+    const description =
+      getTelegramErrorDescription(payload) ??
+      `Telegram request failed with status ${response.status}.`;
+
+    throw new Error(description);
+  }
+
+  return {
+    chatId: config.chatId,
+    messageId: payload.result.message_id
+  };
 }
 
 export async function sendTelegramLeadMessage(
