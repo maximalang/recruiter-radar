@@ -302,6 +302,7 @@ ranked AS (
 )
 SELECT
   rank,
+  org_id,
   source_external_id,
   source_display_name,
   source_families,

@@ -29,6 +29,16 @@ Planned expansion остаётся phased:
 
 Никакого scoring refactor здесь ещё нет: это stage 1 vocabulary/model prep для будущего quality-aware ranking.
 
+## Per-client digest core
+
+Добавлен минимальный per-client digest core поверх source-agnostic evidence query:
+- `digest_runs` хранит запуск дайджеста по конкретному `client_profile`
+- `digest_candidates` фиксирует фактически отобранные компании
+- `client_digest_org_state` держит cooldown / suppression / feedback state по клиенту и компании
+- `GET /api/digest?clientProfileId=<id>` запускает один digest run и возвращает выбранные кандидаты
+
+Старый `GET /api/hh/digest` сохранён как preview-совместимый top list без записи состояния.
+
 ## Локальный запуск
 
 1. Создать `.env` на основе `.env.example`.

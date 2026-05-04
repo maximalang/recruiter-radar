@@ -30,6 +30,10 @@
   - signals
   - lead_status
   - deliveries
+  - client_profiles
+  - digest_runs
+  - digest_candidates
+  - client_digest_org_state
 
 ### 2. Orchestration
 - n8n
@@ -39,9 +43,10 @@
   3. При наличии подтянуть enrichment data
   4. Сохранить в БД
   5. Посчитать score
-  6. Выбрать top лиды
-  7. Отправить в Telegram
-  8. Записать факт доставки
+  6. Для каждого client_profile собрать per-client digest run
+  7. Отфильтровать повторы через client-level cooldown / suppression / feedback state
+  8. Отправить в Telegram
+  9. Записать факт доставки
 
 ### 3. Backend
 - Next.js / Node.js API
