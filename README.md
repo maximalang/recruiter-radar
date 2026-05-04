@@ -43,7 +43,7 @@ Planned expansion остаётся phased:
 - `npm run verify:mixed-ranking` держит ranking invariant для mixed-source direct proof vs HH aggregation
 - `npm run verify:smoke` собирает strongest-available smoke chain: mixed ranking + career pages fixture/discovery всегда, а digest selection / digest feedback / career pages ingest добавляет автоматически, когда `DATABASE_URL` указывает на БД с актуальной digest schema
 
-Старый `GET /api/hh/digest` сохранён как preview-совместимый top list без записи состояния.
+`GET /api/hh/digest` теперь должен использовать `clientProfileId` (или `DAILY_DIGEST_CLIENT_PROFILE_ID`) и тем самым гонит старый HH-совместимый payload уже через DB-backed per-client digest path вместо legacy preview selection.
 
 ## Локальный запуск
 
