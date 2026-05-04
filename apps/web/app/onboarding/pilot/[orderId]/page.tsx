@@ -30,7 +30,6 @@ import {
   getClientProfileById
 } from "../../../../lib/clientProfiles";
 import { getHhDigestItems } from "../../../../lib/hhDigest";
-import { buildHhRadarProbabilitySummary } from "../../../../lib/hhProbabilities";
 import { getClientProfileWebPushStatuses } from "../../../../lib/webPushSubscriptions";
 import {
   ensurePilotOrderOnboardingReady,
@@ -618,24 +617,9 @@ function OnboardingPreviewCard(props: {
   item: OnboardingPreviewItem;
 }) {
   const { item } = props;
-  const probability = buildHhRadarProbabilitySummary({
-    totalScore: item.total_score,
-    priorityScore: item.priorityScore,
-    relevanceScore: item.relevanceScore,
-    timingScore: item.timingScore,
-    replyLikelihoodScore: item.replyLikelihoodScore,
-    confidenceScore: item.confidenceScore,
-    confidenceLabel: item.confidenceLabel,
-    sourceCount: item.sourceCount,
-    sourceKeys: item.sourceKeys,
-    structuredSignalCount: item.structuredSignalCount,
-    growthSignalCount: item.growthSignalCount,
-    vacanciesCount: item.vacancies_count,
-    latestPublishedAt: item.latest_published_at
-  });
   const primaryReason = item.reasons[0] ?? "Сейчас по компании есть повод выйти в контакт.";
   const secondaryReason = item.reasons[1] ?? null;
-  const hasExtraContext = Boolean(secondaryReason) || item.curationLabels.length > 0;
+  const hasExtraContext = Boolean(secondaryReason) || item.sourceFamilies.length > 0;
 
   return (
     <article style={previewCardStyle}>
@@ -644,7 +628,7 @@ function OnboardingPreviewCard(props: {
           <strong style={{ fontSize: "1rem" }}>
             {item.rank}. {item.employer_name}
           </strong>
-          <span style={scorePillStyle}>{probability.workNowText}</span>
+          <span style={scorePillStyle}>score {item.total_score.toFixed(1)}</span>
         </div>
         <span style={{ color: "#64748b", fontSize: "0.9rem" }}>{formatVacanciesCount(item.vacancies_count)}</span>
       </div>
@@ -664,9 +648,9 @@ function OnboardingPreviewCard(props: {
           <summary style={disclosureSummaryStyle}>Что ещё видно</summary>
           <div style={disclosureBodyStyle}>
             {secondaryReason ? <div style={helperTextStyle}>{secondaryReason}</div> : null}
-            {item.curationLabels.length > 0 ? (
+            {item.sourceFamilies.length > 0 ? (
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                {item.curationLabels.slice(0, 2).map((label) => (
+                {item.sourceFamilies.slice(0, 2).map((label) => (
                   <span key={`${item.orgId}-${label}`} style={previewChipStyle}>
                     {label}
                   </span>
