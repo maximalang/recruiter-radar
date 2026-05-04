@@ -9,6 +9,8 @@ const rootEnvPath = resolve(scriptDir, '../../../.env');
 const dbConnectionTimeoutMillis = resolveDbConnectionTimeoutMillis();
 const defaultTargetsFilePath = resolve(scriptDir, './career-pages-targets.json');
 const defaultFetchOutputPath = resolve(scriptDir, './.cache/career-pages-fetch.json');
+const defaultDiscoveredTargetsOutputPath = resolve(scriptDir, './.cache/career-pages-discovered-targets.json');
+const defaultDiscoveryReviewOutputPath = resolve(scriptDir, './.cache/career-pages-discovery-review.json');
 const SOURCE_ID = 'career-pages';
 const SUPPORTED_ACTIONS = new Set(['fetch', 'ingest', 'pipeline']);
 
@@ -21,7 +23,7 @@ export async function runCareerPagesCli(argv = process.argv.slice(2)) {
   if (!SUPPORTED_ACTIONS.has(requestedAction)) {
     console.error(
       'Usage: node packages/db/scripts/source-career-pages.mjs <fetch|ingest|pipeline>\n'
-        + 'Input options: set CAREER_PAGES_INPUT_FILE to a JSON/JSONL snapshot, or configure CAREER_PAGES_TARGETS_FILE for live fetch targets.',
+        + 'Input options: set CAREER_PAGES_INPUT_FILE to a JSON/JSONL snapshot, configure CAREER_PAGES_TARGETS_FILE for manual targets, or set DATABASE_URL for repo-native auto-discovery.',
     );
     process.exit(1);
   }
@@ -60,6 +62,7 @@ export async function runCareerPagesCli(argv = process.argv.slice(2)) {
           inputFilePath: input.inputFilePath,
           targetsFilePath: input.targetsFilePath,
           fetchOutputPath: input.fetchOutputPath,
+          discoverySummary: input.discoverySummary,
           targetsProcessed: input.targetsProcessed,
           recordsReceived: input.recordsReceived,
           normalizedRecords: input.normalizedRecords.length,
@@ -107,12 +110,12 @@ function loadCareerPagesInputFromFile(inputFilePath, inputMode = 'file') {
     targetsFilePath: null,
     fetchOutputPath: null,
     targetResults: [],
+    discoverySummary: null,
   });
 }
 
 export async function fetchCareerPagesInput({ persistSnapshot }) {
-  const targetsFilePath = resolveCareerPagesTargetsFilePath();
-  const targetsConfig = loadCareerPagesTargetsConfig(targetsFilePath);
+  const targetsConfig = await resolveCareerPagesTargetsConfig({ persistSnapshot });
   const targetResults = [];
   const records = [];
 
@@ -126,9 +129,10 @@ export async function fetchCareerPagesInput({ persistSnapshot }) {
     records,
     inputMode: 'fetch',
     inputFilePath: null,
-    targetsFilePath,
+    targetsFilePath: targetsConfig.targetsFilePath,
     fetchOutputPath: null,
     targetResults,
+    discoverySummary: targetsConfig.discoverySummary ?? null,
   });
 
   if (!persistSnapshot) {
@@ -149,8 +153,38 @@ export async function fetchCareerPagesInput({ persistSnapshot }) {
   };
 }
 
-function resolveCareerPagesTargetsFilePath() {
+async function resolveCareerPagesTargetsConfig({ persistSnapshot }) {
   const configuredPath = process.env.CAREER_PAGES_TARGETS_FILE?.trim();
+
+  if (configuredPath) {
+    const targetsFilePath = resolveCareerPagesTargetsFilePath(configuredPath);
+    return {
+      ...loadCareerPagesTargetsConfig(targetsFilePath),
+      targetsFilePath,
+      discoverySummary: null,
+    };
+  }
+
+  if (existsSync(defaultTargetsFilePath)) {
+    return {
+      ...loadCareerPagesTargetsConfig(defaultTargetsFilePath),
+      targetsFilePath: defaultTargetsFilePath,
+      discoverySummary: null,
+    };
+  }
+
+  const databaseUrl = process.env.DATABASE_URL?.trim();
+
+  if (!databaseUrl) {
+    throw new Error(
+      `CAREER_PAGES_TARGETS_FILE is not set and default targets file is missing: ${defaultTargetsFilePath}. Create it from packages/db/scripts/career-pages-targets.example.json, set CAREER_PAGES_INPUT_FILE, or set DATABASE_URL for auto-discovery.`,
+    );
+  }
+
+  return discoverCareerPagesTargets({ connectionString: databaseUrl, persistSnapshot });
+}
+
+function resolveCareerPagesTargetsFilePath(configuredPath = process.env.CAREER_PAGES_TARGETS_FILE?.trim()) {
   const resolvedPath = resolve(process.cwd(), configuredPath || defaultTargetsFilePath);
 
   if (!existsSync(resolvedPath)) {
@@ -173,6 +207,408 @@ function loadCareerPagesTargetsConfig(targetsFilePath) {
   return {
     targets: targets.filter(Boolean),
   };
+}
+
+async function discoverCareerPagesTargets({ connectionString, persistSnapshot }) {
+  const seeds = await loadCareerPagesDiscoverySeeds(connectionString);
+  const discovery = await discoverCareerPageTargetsFromSeeds(seeds);
+  const targetsFilePath = persistSnapshot ? resolveCareerPagesDiscoveredTargetsOutputPath() : null;
+  const reviewFilePath = persistSnapshot ? resolveCareerPagesDiscoveryReviewOutputPath() : null;
+
+  if (persistSnapshot) {
+    mkdirSync(dirname(targetsFilePath), { recursive: true });
+    writeFileSync(targetsFilePath, `${JSON.stringify({ targets: discovery.targets }, null, 2)}\n`, 'utf8');
+    writeFileSync(
+      reviewFilePath,
+      `${JSON.stringify({ generated_at: new Date().toISOString(), summary: discovery.summary, review: discovery.review }, null, 2)}\n`,
+      'utf8',
+    );
+  }
+
+  return {
+    targets: discovery.targets,
+    targetsFilePath,
+    discoverySummary: {
+      ...discovery.summary,
+      reviewFilePath,
+    },
+  };
+}
+
+async function loadCareerPagesDiscoverySeeds(connectionString) {
+  const client = new Client({
+    connectionString,
+    connectionTimeoutMillis: dbConnectionTimeoutMillis,
+  });
+
+  await client.connect();
+
+  try {
+    const result = await client.query(
+      `
+        SELECT
+          orgs.id,
+          orgs.name,
+          orgs.domain,
+          orgs.website_url,
+          MAX(CASE WHEN refs.source = 'hh' THEN refs.display_name END) AS hh_display_name,
+          MAX(CASE WHEN refs.source = 'hh' THEN refs.external_id END) AS hh_employer_id,
+          COUNT(DISTINCT signals.id) FILTER (WHERE signals.source = 'hh') AS hh_signal_count,
+          MAX(signals.occurred_at) FILTER (WHERE signals.source = 'hh') AS last_hh_signal_at
+        FROM orgs
+        LEFT JOIN org_source_refs AS refs
+          ON refs.org_id = orgs.id
+        LEFT JOIN signals
+          ON signals.org_id = orgs.id
+         AND signals.source = 'hh'
+        WHERE COALESCE(NULLIF(BTRIM(orgs.domain), ''), NULLIF(BTRIM(orgs.website_url), '')) IS NOT NULL
+        GROUP BY orgs.id, orgs.name, orgs.domain, orgs.website_url
+        HAVING COUNT(DISTINCT signals.id) FILTER (WHERE signals.source = 'hh') > 0
+        ORDER BY MAX(signals.occurred_at) FILTER (WHERE signals.source = 'hh') DESC NULLS LAST, orgs.id DESC
+        LIMIT $1
+      `,
+      [resolveCareerPagesDiscoveryLimit()],
+    );
+
+    return result.rows
+      .map((row) => ({
+        orgId: Number(row.id),
+        orgName: toNonEmptyText(row.name),
+        domain: normalizeDomain(row.domain),
+        websiteUrl: toUrlOrNull(row.website_url) ?? deriveWebsiteUrlFromDomain(row.domain),
+        hhDisplayName: toNonEmptyText(row.hh_display_name),
+        hhEmployerId: toNonEmptyText(row.hh_employer_id),
+        hhSignalCount: Number(row.hh_signal_count ?? 0),
+        lastHhSignalAt:
+          typeof row.last_hh_signal_at === 'string'
+            ? row.last_hh_signal_at
+            : row.last_hh_signal_at?.toISOString?.() ?? null,
+      }))
+      .filter((seed) => seed.domain || seed.websiteUrl);
+  } finally {
+    await client.end();
+  }
+}
+
+async function discoverCareerPageTargetsFromSeeds(seeds) {
+  const targetMap = new Map();
+  const review = [];
+
+  for (const seed of seeds) {
+    const probe = await probeCareerPageSeed(seed);
+
+    for (const target of probe.targets) {
+      const dedupeKey = `${target.adapter}:${target.source_url}`;
+      const existingTarget = targetMap.get(dedupeKey);
+
+      if (!existingTarget) {
+        targetMap.set(dedupeKey, target);
+        continue;
+      }
+
+      if (!existingTarget.company_domain && target.company_domain) {
+        existingTarget.company_domain = target.company_domain;
+      }
+
+      if (!existingTarget.company_website_url && target.company_website_url) {
+        existingTarget.company_website_url = target.company_website_url;
+      }
+    }
+
+    review.push({
+      org_id: seed.orgId,
+      org_name: seed.orgName,
+      company_domain: seed.domain,
+      company_website_url: seed.websiteUrl,
+      hh_display_name: seed.hhDisplayName,
+      hh_employer_id: seed.hhEmployerId,
+      hh_signal_count: seed.hhSignalCount,
+      last_hh_signal_at: seed.lastHhSignalAt,
+      detected_targets: probe.targets.length,
+      review_status: probe.targets.length > 0 ? 'resolved' : 'needs_review',
+      attempted_urls: probe.attemptedUrls,
+      detected_same_domain_career_page_url: probe.sameDomainCareerPageUrl,
+      notes: probe.notes,
+    });
+  }
+
+  return {
+    targets: [...targetMap.values()].sort((left, right) => left.id.localeCompare(right.id)),
+    review,
+    summary: {
+      seedsConsidered: seeds.length,
+      targetsResolved: targetMap.size,
+      unresolvedSeeds: review.filter((item) => item.review_status !== 'resolved').length,
+    },
+  };
+}
+
+async function probeCareerPageSeed(seed) {
+  const attemptedUrls = buildCareerPageProbeUrls(seed);
+  const pages = [];
+
+  for (const url of attemptedUrls) {
+    const page = await fetchHtmlPage(url);
+
+    if (page) {
+      pages.push(page);
+    }
+  }
+
+  const targets = [];
+  const notes = [];
+  let sameDomainCareerPageUrl = null;
+
+  for (const page of pages) {
+    const detection = detectCareerPageTargetFromHtml(page.html, {
+      baseUrl: page.url,
+      orgName: seed.hhDisplayName ?? seed.orgName,
+      domain: seed.domain,
+      websiteUrl: seed.websiteUrl,
+    });
+
+    targets.push(...detection.targets);
+
+    if (!sameDomainCareerPageUrl && detection.sameDomainCareerPageUrl) {
+      sameDomainCareerPageUrl = detection.sameDomainCareerPageUrl;
+    }
+
+    if (detection.notes.length > 0) {
+      notes.push(...detection.notes);
+    }
+  }
+
+  return {
+    targets: dedupeDiscoveryTargets(targets, seed),
+    attemptedUrls,
+    sameDomainCareerPageUrl,
+    notes: [...new Set(notes)],
+  };
+}
+
+function dedupeDiscoveryTargets(targets, seed) {
+  const targetMap = new Map();
+
+  for (const target of targets) {
+    const normalizedTarget = {
+      ...target,
+      company_name: target.company_name ?? seed.hhDisplayName ?? seed.orgName,
+      company_domain: target.company_domain ?? seed.domain,
+      company_website_url: target.company_website_url ?? seed.websiteUrl,
+    };
+    const dedupeKey = `${normalizedTarget.adapter}:${normalizedTarget.source_url}`;
+
+    if (!targetMap.has(dedupeKey)) {
+      targetMap.set(dedupeKey, normalizedTarget);
+    }
+  }
+
+  return [...targetMap.values()];
+}
+
+function buildCareerPageProbeUrls(seed) {
+  const baseUrl = seed.websiteUrl ?? deriveWebsiteUrlFromDomain(seed.domain);
+
+  if (!baseUrl) {
+    return [];
+  }
+
+  return [...new Set([
+    baseUrl,
+    new URL('/careers', baseUrl).toString(),
+    new URL('/jobs', baseUrl).toString(),
+    new URL('/vacancies', baseUrl).toString(),
+    new URL('/about/careers', baseUrl).toString(),
+  ])];
+}
+
+async function fetchHtmlPage(url) {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.1',
+        'user-agent': 'RecruiterRadarCareerPages/1.0',
+      },
+      redirect: 'follow',
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const contentType = response.headers.get('content-type') ?? '';
+
+    if (!/html|text\//i.test(contentType)) {
+      return null;
+    }
+
+    return {
+      url: response.url,
+      html: await response.text(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function detectCareerPageTargetFromHtml(html, seed) {
+  const text = typeof html === 'string' ? html : '';
+  const targets = [];
+  const notes = [];
+  const greenhouseLink = matchFirstUrl(
+    text,
+    /https?:\/\/(?:boards\.)?greenhouse\.io\/[A-Za-z0-9_-]+|https?:\/\/boards-api\.greenhouse\.io\/v1\/boards\/[A-Za-z0-9_-]+\/jobs\?content=true/gi,
+  );
+  const leverLink = matchFirstUrl(
+    text,
+    /https?:\/\/jobs\.lever\.co\/[A-Za-z0-9_-]+|https?:\/\/api\.lever\.co\/v0\/postings\/[A-Za-z0-9_-]+\?mode=json/gi,
+  );
+  const sameDomainCareerPageUrl = extractSameDomainCareerPageUrl(text, seed.baseUrl ?? seed.websiteUrl ?? null);
+
+  if (greenhouseLink) {
+    const slug = extractGreenhouseSlug(greenhouseLink);
+
+    if (slug) {
+      targets.push(buildDiscoveredTarget({
+        adapter: 'greenhouse-board',
+        providerSlug: slug,
+        companyName: seed.orgName,
+        companyDomain: seed.domain,
+        companyWebsiteUrl: seed.websiteUrl,
+        careerPageUrl: normalizeGreenhouseCareerPageUrl(greenhouseLink, slug),
+        sourceUrl: `https://boards-api.greenhouse.io/v1/boards/${slug}/jobs?content=true`,
+      }));
+    }
+  }
+
+  if (leverLink) {
+    const slug = extractLeverSlug(leverLink);
+
+    if (slug) {
+      targets.push(buildDiscoveredTarget({
+        adapter: 'lever-postings',
+        providerSlug: slug,
+        companyName: seed.orgName,
+        companyDomain: seed.domain,
+        companyWebsiteUrl: seed.websiteUrl,
+        careerPageUrl: `https://jobs.lever.co/${slug}`,
+        sourceUrl: `https://api.lever.co/v0/postings/${slug}?mode=json`,
+      }));
+    }
+  }
+
+  if (!greenhouseLink && !leverLink && sameDomainCareerPageUrl) {
+    notes.push(`same-domain-careers:${sameDomainCareerPageUrl}`);
+  }
+
+  return {
+    targets,
+    sameDomainCareerPageUrl,
+    notes,
+  };
+}
+
+function buildDiscoveredTarget({ adapter, providerSlug, companyName, companyDomain, companyWebsiteUrl, careerPageUrl, sourceUrl }) {
+  return {
+    id: `${normalizeSourceKeyText(companyDomain ?? companyName ?? providerSlug) ?? providerSlug}-${adapter}`,
+    adapter,
+    company_name: companyName,
+    company_domain: companyDomain,
+    company_website_url: companyWebsiteUrl,
+    career_page_url: careerPageUrl,
+    source_url: sourceUrl,
+  };
+}
+
+function matchFirstUrl(value, pattern) {
+  const match = value.match(pattern);
+  return match?.[0] ? decodeHtmlUrl(match[0]) : null;
+}
+
+function decodeHtmlUrl(value) {
+  return value.replace(/&amp;/g, '&');
+}
+
+function extractGreenhouseSlug(value) {
+  const match = value.match(/(?:boards-api\.greenhouse\.io\/v1\/boards\/|greenhouse\.io\/)([A-Za-z0-9_-]+)/i);
+  return match?.[1]?.toLowerCase() ?? null;
+}
+
+function extractLeverSlug(value) {
+  const match = value.match(/jobs\.lever\.co\/([A-Za-z0-9_-]+)|api\.lever\.co\/v0\/postings\/([A-Za-z0-9_-]+)/i);
+  return match?.[1]?.toLowerCase() ?? match?.[2]?.toLowerCase() ?? null;
+}
+
+function normalizeGreenhouseCareerPageUrl(url, slug) {
+  return /boards-api\.greenhouse\.io/i.test(url) ? `https://boards.greenhouse.io/${slug}` : url;
+}
+
+function extractSameDomainCareerPageUrl(value, baseUrl) {
+  if (!baseUrl) {
+    return null;
+  }
+
+  const baseHostname = extractHostname(baseUrl);
+
+  if (!baseHostname) {
+    return null;
+  }
+
+  const hrefPattern = /https?:\/\/[^"'\s<>]+|href=["']([^"']+)["']/gi;
+  let match;
+
+  while ((match = hrefPattern.exec(value)) !== null) {
+    const href = decodeHtmlUrl(match[1] ?? match[0]);
+    const absoluteUrl = toAbsoluteUrlOrNull(href, baseUrl);
+
+    if (!absoluteUrl || extractHostname(absoluteUrl) !== baseHostname) {
+      continue;
+    }
+
+    if (/career|jobs|vacanc/i.test(absoluteUrl)) {
+      return absoluteUrl;
+    }
+  }
+
+  return null;
+}
+
+function toAbsoluteUrlOrNull(value, baseUrl) {
+  if (typeof value !== 'string' || value.trim() === '') {
+    return null;
+  }
+
+  try {
+    return new URL(value, baseUrl).toString();
+  } catch {
+    return null;
+  }
+}
+
+function deriveWebsiteUrlFromDomain(value) {
+  const domain = normalizeDomain(value);
+  return domain ? `https://${domain}/` : null;
+}
+
+function resolveCareerPagesDiscoveryLimit() {
+  const rawValue = process.env.CAREER_PAGES_DISCOVERY_LIMIT?.trim();
+
+  if (!rawValue) {
+    return 50;
+  }
+
+  const parsedValue = Number.parseInt(rawValue, 10);
+  return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : 50;
+}
+
+export function resolveCareerPagesDiscoveredTargetsOutputPath() {
+  const configuredPath = process.env.CAREER_PAGES_DISCOVERED_TARGETS_FILE?.trim();
+  return resolve(process.cwd(), configuredPath || defaultDiscoveredTargetsOutputPath);
+}
+
+export function resolveCareerPagesDiscoveryReviewOutputPath() {
+  const configuredPath = process.env.CAREER_PAGES_DISCOVERY_REVIEW_FILE?.trim();
+  return resolve(process.cwd(), configuredPath || defaultDiscoveryReviewOutputPath);
 }
 
 async function fetchCareerPageTarget(target, index) {
@@ -335,7 +771,7 @@ async function fetchJson(url, targetId) {
   return parseJson(responseText, url);
 }
 
-function buildNormalizedInput({ records, inputMode, inputFilePath, targetsFilePath, fetchOutputPath, targetResults }) {
+function buildNormalizedInput({ records, inputMode, inputFilePath, targetsFilePath, fetchOutputPath, targetResults, discoverySummary }) {
   const fetchedAt = new Date().toISOString();
   const normalizedRecords = [];
   let skippedRecords = 0;
@@ -358,6 +794,7 @@ function buildNormalizedInput({ records, inputMode, inputFilePath, targetsFilePa
     fetchOutputPath,
     targetsProcessed: targetResults.length,
     targetResults,
+    discoverySummary: discoverySummary ?? null,
     recordsReceived: records.length,
     normalizedRecords,
     skippedRecords,
@@ -677,6 +1114,7 @@ export function buildFetchSummary(input) {
     inputFilePath: input.inputFilePath,
     targetsFilePath: input.targetsFilePath,
     fetchOutputPath: input.fetchOutputPath,
+    discoverySummary: input.discoverySummary,
     targetsProcessed: input.targetsProcessed,
     targetResults: input.targetResults,
     recordsReceived: input.recordsReceived,
@@ -693,6 +1131,7 @@ function buildIngestSummary(input, stats) {
     inputFilePath: input.inputFilePath,
     targetsFilePath: input.targetsFilePath,
     fetchOutputPath: input.fetchOutputPath,
+    discoverySummary: input.discoverySummary,
     targetsProcessed: input.targetsProcessed,
     recordsReceived: input.recordsReceived,
     normalizedRecords: input.normalizedRecords.length,

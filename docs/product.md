@@ -22,7 +22,7 @@
 
 ### Phase 2, расширить primary hiring-signal sources
 После подтверждения MVP добавляем новые источники, которые прямо показывают найм:
-- career pages компаний
+- career pages компаний, в том числе через repo-native auto-discovery от уже найденных компаний
 - LinkedIn jobs и company pages, либо аналогичные внешние jobs/company sources, если нужен более осторожный запуск
 - отдельные tech job boards
 

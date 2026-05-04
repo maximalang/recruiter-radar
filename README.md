@@ -59,20 +59,23 @@ Planned expansion остаётся phased:
 `career-pages` теперь умеет не только ingest готового файла, но и самостоятельный fetch вакансий из конфигурации таргетов.
 
 Минимальная конфигурация:
-1. Скопировать `packages/db/scripts/career-pages-targets.example.json` в `packages/db/scripts/career-pages-targets.json`.
-2. Добавить targets с adapter-ами:
+1. Либо скопировать `packages/db/scripts/career-pages-targets.example.json` в `packages/db/scripts/career-pages-targets.json` и заполнить targets вручную,
+2. Либо оставить manual targets пустыми и запустить source с `DATABASE_URL`: тогда включится repo-native auto-discovery по уже сохранённым `hh` org/signal seed-данным.
+3. Поддерживаемые adapter-ы:
    - `greenhouse-board` — для Greenhouse board API (`https://boards-api.greenhouse.io/v1/boards/<token>/jobs?content=true`)
    - `lever-postings` — для Lever postings API (`https://api.lever.co/v0/postings/<token>?mode=json`)
    - `json-feed` — для собственного JSON feed в shape array / `{ records: [...] }`
-3. Опционально переопределить путь через `CAREER_PAGES_TARGETS_FILE`.
-4. Опционально задать `CAREER_PAGES_FETCH_OUTPUT_FILE`, если snapshot fetch нужно писать не в `packages/db/scripts/.cache/career-pages-fetch.json`.
+4. Опционально переопределить путь через `CAREER_PAGES_TARGETS_FILE`.
+5. Опционально задать `CAREER_PAGES_FETCH_OUTPUT_FILE`, если snapshot fetch нужно писать не в `packages/db/scripts/.cache/career-pages-fetch.json`.
+6. Для auto-discovery можно ограничить размер выборки через `CAREER_PAGES_DISCOVERY_LIMIT`; найденные runnable targets пишутся в `packages/db/scripts/.cache/career-pages-discovered-targets.json`, а unresolved review boundary — в `packages/db/scripts/.cache/career-pages-discovery-review.json`.
 
 Команды:
-- `npm run source:fetch:career-pages` — fetch + нормализация без записи в БД
+- `npm run source:fetch:career-pages` — fetch + нормализация без записи в БД; без manual targets попробует auto-discovery из БД и company-site probe
 - `npm run source:ingest:career-pages` — ingest в БД; если `CAREER_PAGES_INPUT_FILE` не задан, сначала читается targets-конфиг
 - `npm run source:pipeline:career-pages` — fetch/normalize + ingest в одном запуске
 - `npm run career-pages:smoke` — детерминированный smoke через локальный static target fixture
 - `npm run verify:career-pages:smoke` — read-only verifier для smoke fixture без БД
+- `npm run verify:career-pages:discovery` — read-only smoke на HTML detection / target generation для auto-discovery
 - `npm run verify:career-pages:ingest` — явный DB-backed verify ingest path на временном fixture с cleanup после проверки
 
 Для обратной совместимости `CAREER_PAGES_INPUT_FILE` по-прежнему поддерживается как snapshot/input override для ingest и pipeline.

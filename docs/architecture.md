@@ -8,7 +8,7 @@
 ### Контур 1, primary hiring-signal sources
 Источники, которые напрямую дают сигнал, что компания сейчас нанимает:
 1. one primary jobs source для первого релиза, например hh.ru API
-2. career pages компаний
+2. career pages компаний, включая repo-native auto-discovery из уже сохранённых org/signal seed-данных с company-site probe
 3. LinkedIn jobs и company pages, либо аналогичные внешние jobs/company sources
 4. отдельные tech job boards как следующая волна
 
