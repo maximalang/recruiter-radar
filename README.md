@@ -36,8 +36,12 @@ Planned expansion остаётся phased:
 - `digest_candidates` фиксирует фактически отобранные компании
 - `client_digest_org_state` держит cooldown / suppression / feedback state по клиенту и компании
 - `GET /api/digest?clientProfileId=<id>` запускает один digest run и возвращает выбранные кандидаты
+- `sourceKey=hh|career-pages|domain:<...>|company-name:<...>|org:<...>` теперь реально режет candidate pool либо по source family, либо по нормализованному source key, а `default` оставляет общий quality-ranked digest
 - `POST /api/digest/feedback` пишет feedback/suppression state (`accepted`, `badfit`, `dismissed`, `snooze`, а также `contacted` / `replied` / `won`) по `clientProfileId + orgId` или `digestCandidateId`
 - `npm run verify:digest:feedback` прогоняет DB-backed smoke для mutation path, если доступен `DATABASE_URL`
+- `npm run verify:digest:selection` прогоняет DB-backed smoke на per-client sourceKey selection и мягкий scoped rerank по `targetCity` / `specialization`
+- `npm run verify:mixed-ranking` держит ranking invariant для mixed-source direct proof vs HH aggregation
+- `npm run verify:smoke` собирает strongest-available smoke chain: mixed ranking + career pages fixture/discovery всегда, а digest selection / digest feedback / career pages ingest добавляет автоматически, когда `DATABASE_URL` указывает на БД с актуальной digest schema
 
 Старый `GET /api/hh/digest` сохранён как preview-совместимый top list без записи состояния.
 
@@ -68,6 +72,8 @@ Planned expansion остаётся phased:
 4. Опционально переопределить путь через `CAREER_PAGES_TARGETS_FILE`.
 5. Опционально задать `CAREER_PAGES_FETCH_OUTPUT_FILE`, если snapshot fetch нужно писать не в `packages/db/scripts/.cache/career-pages-fetch.json`.
 6. Для auto-discovery можно ограничить размер выборки через `CAREER_PAGES_DISCOVERY_LIMIT`; найденные runnable targets пишутся в `packages/db/scripts/.cache/career-pages-discovered-targets.json`, а unresolved review boundary — в `packages/db/scripts/.cache/career-pages-discovery-review.json`.
+
+Client targeting теперь мягко приоритизирует совпадения по `targetCity` и `specialization` через location/title evidence из signals, но не превращает их в hard filter: digest сначала старается поднять scoped matches, а потом добирает remaining high-signal orgs без деградации suppression/dedupe логики.
 
 Команды:
 - `npm run source:fetch:career-pages` — fetch + нормализация без записи в БД; без manual targets попробует auto-discovery из БД и company-site probe

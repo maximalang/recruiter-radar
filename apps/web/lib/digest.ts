@@ -13,6 +13,9 @@ type DigestEvidenceRow = {
   source_external_id: string | null;
   source_display_name: string | null;
   source_families: string[] | null;
+  evidence_titles: string[] | null;
+  candidate_source_keys: string[] | null;
+  location_names: string[] | null;
   vacancies_count: number;
   distinct_vacancy_names_count: number;
   latest_published_at: string | Date | null;
@@ -54,6 +57,9 @@ export type DigestItem = {
   sourceExternalId: string;
   sourceDisplayName: string;
   sourceFamilies: string[];
+  evidenceTitles: string[];
+  candidateSourceKeys: string[];
+  locationNames: string[];
   vacanciesCount: number;
   distinctVacancyNamesCount: number;
   latestPublishedAt: string;
@@ -171,6 +177,9 @@ export async function runDigestForClientProfile(input: {
         ranked_candidates.source_external_id,
         ranked_candidates.source_display_name,
         ranked_candidates.source_families,
+        ranked_candidates.evidence_titles,
+        ranked_candidates.candidate_source_keys,
+        ranked_candidates.location_names,
         ranked_candidates.vacancies_count,
         ranked_candidates.distinct_vacancy_names_count,
         ranked_candidates.latest_published_at,
@@ -190,13 +199,19 @@ export async function runDigestForClientProfile(input: {
             AND COALESCE(state.feedback_status, 'none') NOT IN ('contacted', 'replied', 'won', 'badfit', 'dismissed')
           )
         )
+        AND (
+          $2 = 'default'
+          OR $2 = ANY(ranked_candidates.source_families)
+          OR $2 = ANY(COALESCE(ranked_candidates.candidate_source_keys, ARRAY[]::text[]))
+        )
       ORDER BY ranked_candidates.rank ASC
-      LIMIT $2
-    `, [clientProfile.id, requestedLimit * 5]);
+      LIMIT $3
+    `, [clientProfile.id, sourceKey, requestedLimit * 5]);
 
     const items = evidenceResult.rows
       .map(mapDigestEvidenceRow)
       .filter((item) => matchesClientProfile(item, clientProfile))
+      .sort((left, right) => compareDigestItemsForClient(left, right, clientProfile))
       .slice(0, requestedLimit);
 
     for (const item of items) {
@@ -365,6 +380,9 @@ function mapDigestEvidenceRow(row: DigestEvidenceRow): DigestItem {
     sourceExternalId: row.source_external_id ?? "",
     sourceDisplayName: row.source_display_name ?? "",
     sourceFamilies: Array.isArray(row.source_families) ? row.source_families : [],
+    evidenceTitles: normalizeTextArray(row.evidence_titles),
+    candidateSourceKeys: normalizeTextArray(row.candidate_source_keys),
+    locationNames: normalizeTextArray(row.location_names),
     vacanciesCount: row.vacancies_count,
     distinctVacancyNamesCount: row.distinct_vacancy_names_count,
     latestPublishedAt: formatTimestamp(row.latest_published_at),
@@ -375,9 +393,7 @@ function mapDigestEvidenceRow(row: DigestEvidenceRow): DigestItem {
 }
 
 function matchesClientProfile(item: DigestItem, clientProfile: ClientProfile): boolean {
-  const haystack = [item.sourceDisplayName, ...item.reasons, item.opener]
-    .join(" ")
-    .toLocaleLowerCase("ru-RU");
+  const haystack = buildDigestHaystack(item);
 
   if (clientProfile.includeKeywords.length > 0) {
     const hasIncludedKeyword = clientProfile.includeKeywords.some((keyword) => haystack.includes(keyword));
@@ -392,6 +408,91 @@ function matchesClientProfile(item: DigestItem, clientProfile: ClientProfile): b
   }
 
   return true;
+}
+
+function compareDigestItemsForClient(left: DigestItem, right: DigestItem, clientProfile: ClientProfile): number {
+  const leftScopeScore = getClientScopeScore(left, clientProfile);
+  const rightScopeScore = getClientScopeScore(right, clientProfile);
+
+  if (leftScopeScore !== rightScopeScore) {
+    return rightScopeScore - leftScopeScore;
+  }
+
+  if (left.totalScore !== right.totalScore) {
+    return right.totalScore - left.totalScore;
+  }
+
+  return left.rank - right.rank;
+}
+
+function getClientScopeScore(item: DigestItem, clientProfile: ClientProfile): number {
+  let score = 0;
+
+  score += getScopedFieldScore(clientProfile.targetCity, item.locationNames, {
+    exactMatch: 5,
+    phraseMatch: 3,
+    tokenMatch: 1,
+  });
+
+  score += getScopedFieldScore(clientProfile.specialization, item.evidenceTitles, {
+    exactMatch: 5,
+    phraseMatch: 3,
+    tokenMatch: 1,
+  });
+
+  return score;
+}
+
+function getScopedFieldScore(
+  value: string | null,
+  fields: readonly string[],
+  weights: { exactMatch: number; phraseMatch: number; tokenMatch: number }
+): number {
+  const normalizedValue = normalizeSearchText(value ?? "");
+
+  if (!normalizedValue) {
+    return 0;
+  }
+
+  const normalizedFields = fields
+    .map((field) => normalizeSearchText(field))
+    .filter((field) => field.length > 0);
+
+  if (normalizedFields.length === 0) {
+    return 0;
+  }
+
+  if (normalizedFields.some((field) => field === normalizedValue)) {
+    return weights.exactMatch;
+  }
+
+  if (normalizedFields.some((field) => field.includes(normalizedValue) || normalizedValue.includes(field))) {
+    return weights.phraseMatch;
+  }
+
+  const scopedTokens = getMeaningfulSearchTokens(normalizedValue);
+
+  if (scopedTokens.length === 0) {
+    return 0;
+  }
+
+  const matchingTokenCount = scopedTokens.filter((token) =>
+    normalizedFields.some((field) => field.includes(token))
+  ).length;
+
+  return matchingTokenCount * weights.tokenMatch;
+}
+
+function buildDigestHaystack(item: DigestItem): string {
+  return [
+    item.sourceDisplayName,
+    ...item.reasons,
+    item.opener,
+    ...item.evidenceTitles,
+    ...item.locationNames
+  ]
+    .join(" ")
+    .toLocaleLowerCase("ru-RU");
 }
 
 function buildOpener(employerName: string, reasons: readonly [string, string]): string {
@@ -439,6 +540,48 @@ function toReasonFragment(reason: string): string {
     default:
       return "найм выглядит актуальным";
   }
+}
+
+function normalizeTextArray(value: string[] | null | undefined): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const uniqueValues = new Set<string>();
+
+  for (const item of value) {
+    if (typeof item !== "string") {
+      continue;
+    }
+
+    const normalizedItem = item.trim();
+
+    if (normalizedItem === "") {
+      continue;
+    }
+
+    uniqueValues.add(normalizedItem);
+  }
+
+  return Array.from(uniqueValues.values());
+}
+
+function normalizeSearchText(value: string): string {
+  return value
+    .toLocaleLowerCase("ru-RU")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getMeaningfulSearchTokens(value: string): string[] {
+  return Array.from(
+    new Set(
+      normalizeSearchText(value)
+        .split(" ")
+        .filter((token) => token.length >= 3)
+    )
+  );
 }
 
 function formatTimestamp(value: string | Date | null): string {

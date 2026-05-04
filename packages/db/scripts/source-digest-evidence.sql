@@ -17,6 +17,12 @@ WITH source_signal_rows AS (
       NULLIF(BTRIM(signal.payload ->> 'company_name'), ''),
       NULLIF(BTRIM(signal.payload ->> 'employer_name'), '')
     ) AS payload_display_name,
+    COALESCE(
+      NULLIF(BTRIM(signal.payload ->> 'area_name'), ''),
+      NULLIF(BTRIM(signal.payload ->> 'city'), ''),
+      NULLIF(BTRIM(signal.payload ->> 'location_name'), ''),
+      NULLIF(BTRIM(signal.payload ->> 'location'), '')
+    ) AS location_name,
     ARRAY(
       SELECT DISTINCT source_key
       FROM UNNEST(
@@ -84,6 +90,7 @@ normalized_signal_rows AS (
   SELECT
     signal.org_id,
     signal.source,
+    signal.payload_source_keys,
     COALESCE(
       NULLIF(source_ref.external_id, ''),
       signal.payload_external_id
@@ -94,6 +101,7 @@ normalized_signal_rows AS (
       org.name
     ) AS source_display_name,
     signal.evidence_title,
+    signal.location_name,
     signal.published_at,
     CASE
       WHEN signal.source = 'career-pages' THEN 'direct_hiring_proof'
@@ -196,6 +204,16 @@ aggregated AS (
       ELSE 'enrichment_context'
     END AS evidence_quality,
     ARRAY_AGG(DISTINCT source ORDER BY source) AS source_families,
+    ARRAY_REMOVE(ARRAY_AGG(DISTINCT NULLIF(BTRIM(evidence_title), '')), NULL) AS evidence_titles,
+    ARRAY(
+      SELECT DISTINCT NULLIF(BTRIM(ref.source_key), '')
+      FROM org_source_refs AS ref
+      WHERE ref.org_id = normalized_signal_rows.org_id
+        AND ref.source = ANY(ARRAY_AGG(DISTINCT normalized_signal_rows.source))
+        AND NULLIF(BTRIM(ref.source_key), '') IS NOT NULL
+      ORDER BY NULLIF(BTRIM(ref.source_key), '')
+    ) AS candidate_source_keys,
+    ARRAY_REMOVE(ARRAY_AGG(DISTINCT NULLIF(BTRIM(location_name), '')), NULL) AS location_names,
     COUNT(*)::INT AS vacancies_count,
     COUNT(DISTINCT evidence_title)::INT AS distinct_vacancy_names_count,
     MAX(published_at) AS latest_published_at
@@ -209,6 +227,9 @@ scored AS (
     source_display_name,
     evidence_quality,
     source_families,
+    evidence_titles,
+    candidate_source_keys,
+    location_names,
     vacancies_count,
     distinct_vacancy_names_count,
     latest_published_at,
@@ -267,6 +288,9 @@ ranked AS (
     source_display_name,
     evidence_quality,
     source_families,
+    evidence_titles,
+    candidate_source_keys,
+    location_names,
     vacancies_count,
     distinct_vacancy_names_count,
     latest_published_at,
@@ -306,6 +330,9 @@ SELECT
   source_external_id,
   source_display_name,
   source_families,
+  evidence_titles,
+  candidate_source_keys,
+  location_names,
   vacancies_count,
   distinct_vacancy_names_count,
   latest_published_at,
