@@ -1,6 +1,9 @@
 {
   "name": "@recruiter-radar/db",
   "private": true,
+  "scripts": {
+    "validate": "node --check scripts/*.mjs"
+  },
   "dependencies": {
     "pg": "^8.16.3"
   }

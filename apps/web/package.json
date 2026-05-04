@@ -4,7 +4,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "check": "tsc --noEmit",
+    "validate": "npm run check && npm run build"
   },
   "dependencies": {
     "next": "^16.0.0",
