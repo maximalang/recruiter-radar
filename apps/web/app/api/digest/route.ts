@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { runDigestForClientProfile } from "../../../lib/digest";
+import { hasClientProfilePremiumEntitlement } from "../../../lib/db";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -51,6 +52,15 @@ export async function GET(request: Request) {
   const sourceKey = searchParams.get("sourceKey");
 
   try {
+    const entitlement = await hasClientProfilePremiumEntitlement(clientProfileId);
+
+    if (!entitlement.allowed) {
+      return NextResponse.json(
+        { error: entitlement.reason ?? "Premium entitlement is required for digest." },
+        { status: 403 }
+      );
+    }
+
     const result = await runDigestForClientProfile({
       clientProfileId,
       sourceKey,

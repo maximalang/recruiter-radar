@@ -5,9 +5,9 @@ Landing → preview → pilot activation → Telegram connection → daily diges
 
 ## Implemented
 - `apps/web/lib/db.ts` migrated from legacy `leads/lead_status/deliveries` reads to digest model (`digest_candidates`, `client_profiles`, `client_digest_org_state`) for list/status/send actions.
-- Telegram webhook `/api/telegram/webhook` now enforces `TELEGRAM_WEBHOOK_SECRET`, writes to `webhook_events`, is replay-safe via deterministic idempotency key, persists processed/failed statuses, and answers callback queries.
+- Telegram webhook `/api/telegram/webhook` now enforces `TELEGRAM_WEBHOOK_SECRET`, writes to `webhook_events`, is replay-safe via deterministic idempotency key, skips duplicate `processed/ignored` events without re-running feedback mutation, answers callback queries (`Уже обработано` for duplicates), and returns `ok + duplicate` response for replays.
 - Billing webhook `/api/billing/webhook`: secret validation + idempotent billing event ledger.
-- Self-serve foundations migration aligned to digest model: `digest_delivery_attempts` references `digest_candidates` (not legacy `deliveries`).
+- Self-serve foundations migration aligned to digest model: `digest_delivery_attempts` references `digest_candidates` (not legacy `deliveries`). Runtime delivery now records `queued/sent/failed/skipped` attempts. Duplicate send attempts are marked `skipped` and returned as non-successful `skipped` results, while failed attempts can be retried with a new runtime attempt row.
 
 ## Required env vars
 `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_WEBHOOK_SECRET`, `DIGEST_API_KEY`, `RR_APP_BASE_URL`, `BILLING_WEBHOOK_SECRET`.
@@ -22,10 +22,10 @@ Landing → preview → pilot activation → Telegram connection → daily diges
 - Replays are safe: duplicated updates are deduplicated by `webhook_events(provider,idempotency_key)`.
 
 ## n8n setup
-- Use `n8n/workflows/daily-signals.json` template only with env-backed config (`RR_APP_BASE_URL`, `DIGEST_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, optional `TELEGRAM_API_BASE_URL`).
+- Use `n8n/workflows/daily-signals.json` template only with app API delivery call (`POST /api/digest/delivery`) and env-backed config (`RR_APP_BASE_URL`, `DIGEST_API_KEY`, `DAILY_DIGEST_CLIENT_PROFILE_ID`). Production flow must not call Telegram Bot API directly from n8n.
 - Do not move scoring/billing/feedback business logic into n8n; keep it in app APIs.
 
 ## Launch blockers
-- Entitlement gate must be mandatory for all premium digest deliveries server-side (no optional path).
+- Mandatory entitlement gate is enforced server-side in digest APIs (`/api/digest`, `/api/hh/digest`, and `/api/digest/delivery`) before digest generation/delivery.
 - Legacy naming (`leadId` in actions/UI) still exists in web layer and should be renamed to `digestCandidateId` for full consistency.
 - Existing historical schema/docs still include legacy lead tables; needs explicit deprecation plan.

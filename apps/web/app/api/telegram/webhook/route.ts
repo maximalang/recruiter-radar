@@ -13,9 +13,7 @@ type ParsedDigestFeedbackCallback = { clientProfileId: string; orgId: string; ac
 export async function POST(request: Request) {
   const secret = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
   const providedSecret = request.headers.get("x-telegram-bot-api-secret-token")?.trim();
-  if (!secret || providedSecret !== secret) {
-    return NextResponse.json({ error: "Unauthorized webhook request." }, { status: 401 });
-  }
+  if (!secret || providedSecret !== secret) return NextResponse.json({ error: "Unauthorized webhook request." }, { status: 401 });
 
   const { botToken, error } = getTelegramBotToken();
   if (!botToken) return NextResponse.json({ error: error ?? "TELEGRAM_BOT_TOKEN is not configured." }, { status: 500 });
@@ -31,16 +29,28 @@ export async function POST(request: Request) {
   const pool = getPool();
   if (!pool) return NextResponse.json({ error: "DATABASE_URL is not set." }, { status: 500 });
 
-  const insertEvent = await pool.query<{ id: number; status: string }>(`
+  await pool.query(`
     INSERT INTO webhook_events (provider, event_type, external_event_id, idempotency_key, payload, status)
     VALUES ('telegram', 'callback_query', $1, $2, $3::jsonb, 'received')
-    ON CONFLICT (provider, idempotency_key)
-    DO UPDATE SET payload = EXCLUDED.payload
-    RETURNING id, status
+    ON CONFLICT (provider, idempotency_key) DO UPDATE SET payload = EXCLUDED.payload
   `, [callbackQueryId ?? idempotencyKey, idempotencyKey, JSON.stringify(body)]);
 
+  const eventRow = await pool.query<{ id: number; status: string }>(`SELECT id, status FROM webhook_events WHERE provider='telegram' AND idempotency_key=$1 LIMIT 1`, [idempotencyKey]);
+  const event = eventRow.rows[0];
+
+  if (!event || event.status === "processed" || event.status === "ignored") {
+    if (callbackQueryId) await answerTelegramCallbackQuery({ callbackQueryId, botToken, text: "Уже обработано" }).catch(() => {});
+    return NextResponse.json({ ok: true, duplicate: true });
+  }
+
+  const claimed = await pool.query(`UPDATE webhook_events SET status='processing' WHERE id=$1 AND status IN ('received','failed') RETURNING id`, [event.id]);
+  if (claimed.rowCount !== 1) {
+    if (callbackQueryId) await answerTelegramCallbackQuery({ callbackQueryId, botToken, text: "Уже обработано" }).catch(() => {});
+    return NextResponse.json({ ok: true, duplicate: true });
+  }
+
   if (!callbackQueryId || !parsedCallback) {
-    await pool.query(`UPDATE webhook_events SET status = 'ignored', processed_at = NOW() WHERE id = $1`, [insertEvent.rows[0].id]);
+    await pool.query(`UPDATE webhook_events SET status='ignored', processed_at=NOW(), error_message=NULL WHERE id = $1`, [event.id]);
     return NextResponse.json({ ok: true, ignored: true });
   }
 
@@ -49,11 +59,11 @@ export async function POST(request: Request) {
       await updateDigestOrgStateFeedback({ clientProfileId: parsedCallback.clientProfileId, orgId: parsedCallback.orgId, action: parsedCallback.action });
     }
     await answerTelegramCallbackQuery({ callbackQueryId, botToken, text: parsedCallback.action === "shown" ? undefined : getDigestFeedbackConfirmationText(parsedCallback.action) });
-    await pool.query(`UPDATE webhook_events SET status = 'processed', processed_at = NOW(), error_message = NULL WHERE id = $1`, [insertEvent.rows[0].id]);
+    await pool.query(`UPDATE webhook_events SET status='processed', processed_at=NOW(), error_message=NULL WHERE id = $1`, [event.id]);
     return NextResponse.json({ ok: true, replaySafe: true });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to process Telegram callback feedback.";
-    await pool.query(`UPDATE webhook_events SET status = 'failed', processed_at = NOW(), error_message = LEFT($2, 1000) WHERE id = $1`, [insertEvent.rows[0].id, sanitizeError(message)]);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Failed to process Telegram callback feedback.";
+    await pool.query(`UPDATE webhook_events SET status='failed', processed_at=NOW(), error_message=LEFT($2, 1000) WHERE id = $1`, [event.id, sanitizeError(message)]);
     await answerTelegramCallbackQuery({ callbackQueryId, botToken, text: "Не удалось сохранить фидбек" }).catch(() => {});
     return NextResponse.json({ error: message }, { status: message.startsWith("Invalid ") || message.includes("is required") ? 400 : 500 });
   }
