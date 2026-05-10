@@ -124,6 +124,19 @@ export async function sendLeadToTelegram(leadId: number): Promise<TelegramDelive
   }
 }
 
+
+export async function hasClientProfilePremiumEntitlement(clientProfileId: string | number): Promise<EntitlementResult> {
+  const pool = getPool();
+  if (!pool) throw new Error("DATABASE_URL is not set.");
+  const profile = await pool.query<{ userId: number }>(`SELECT user_id AS "userId" FROM client_profiles WHERE id = $1 LIMIT 1`, [clientProfileId]);
+  if ((profile.rowCount ?? 0) !== 1) return { allowed: false, reason: "Client profile not found." };
+  const userId = profile.rows[0].userId;
+  const activeSubscription = await pool.query<{ ok: boolean }>(`SELECT TRUE AS ok FROM subscriptions WHERE user_id = $1 AND status = 'active' LIMIT 1`, [userId]);
+  if ((activeSubscription.rowCount ?? 0) === 1) return { allowed: true, reason: null };
+  const activePilot = await pool.query<{ ok: boolean }>(`SELECT TRUE AS ok FROM pilot_enrollments WHERE user_id = $1 AND status = 'active' AND (ends_at IS NULL OR ends_at > NOW()) LIMIT 1`, [userId]);
+  if ((activePilot.rowCount ?? 0) === 1) return { allowed: true, reason: null };
+  return { allowed: false, reason: "No active subscription or pilot." };
+}
 export async function hasPremiumEntitlement(userId: number): Promise<EntitlementResult> {
   const pool = getPool();
   if (!pool) throw new Error("DATABASE_URL is not set.");

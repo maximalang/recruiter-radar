@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getHhDigestItems } from "../../../../lib/hhDigest";
+import { hasClientProfilePremiumEntitlement } from "../../../../lib/db";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -51,6 +52,11 @@ export async function GET(request: Request) {
         status: 400
       }
     );
+  }
+
+  const entitlement = await hasClientProfilePremiumEntitlement(clientProfileId);
+  if (!entitlement.allowed) {
+    return NextResponse.json({ error: entitlement.reason ?? "Premium entitlement is required." }, { status: 403 });
   }
 
   try {

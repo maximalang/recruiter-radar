@@ -1,8 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { runDigestForClientProfile } from "../../../../lib/digest";
-import { getPool } from "../../../../lib/db";
+import { getPool, hasClientProfilePremiumEntitlement } from "../../../../lib/db";
 import { getTelegramBotToken, sendTelegramTextMessage } from "../../../../lib/telegram";
+import { buildTelegramDigestFeedbackReplyMarkup } from "../../../../lib/telegramDigestFeedback";
+import type { HhDigestItem } from "../../../../lib/hhDigest";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -14,6 +16,9 @@ export async function POST(request: Request) {
 
   const payload = (await request.json().catch(() => ({}))) as { clientProfileId?: string; limit?: number; cooldownDays?: number; sourceKey?: string };
   if (!payload.clientProfileId) return NextResponse.json({ error: "clientProfileId is required." }, { status: 400 });
+
+  const entitlement = await hasClientProfilePremiumEntitlement(payload.clientProfileId);
+  if (!entitlement.allowed) return NextResponse.json({ error: entitlement.reason ?? "Premium entitlement is required.", retryable: false }, { status: 403 });
 
   const pool = getPool();
   if (!pool) return NextResponse.json({ error: "DATABASE_URL is not set." }, { status: 500 });
@@ -27,8 +32,8 @@ export async function POST(request: Request) {
     cooldownDays: payload.cooldownDays,
     sourceKey: payload.sourceKey
   });
-  const candidates = await pool.query<{ id: string; orgName: string; opener: string; score: number; chatId: string | null }>(`
-    SELECT dc.id::text AS id, o.name AS "orgName", dc.opener, dc.total_score AS score, cp.telegram_chat_id::text AS "chatId"
+  const candidates = await pool.query<{ id: string; orgId: string; orgName: string; opener: string; score: number; rank: number; reasons: [string, string]; chatId: string | null }>(`
+    SELECT dc.id::text AS id, dc.org_id::text AS "orgId", o.name AS "orgName", dc.opener, dc.total_score AS score, ROW_NUMBER() OVER (ORDER BY dc.id ASC) AS rank, dc.reasons, cp.telegram_chat_id::text AS "chatId"
     FROM digest_candidates dc
     INNER JOIN orgs o ON o.id = dc.org_id
     INNER JOIN client_profiles cp ON cp.id = dc.client_profile_id
@@ -61,7 +66,24 @@ export async function POST(request: Request) {
     }
 
     try {
-      await sendTelegramTextMessage(`Recruiter Radar\n\nКомпания: ${candidate.orgName}\nScore: ${candidate.score}\n\n${candidate.opener}`, { botToken, chatId: candidate.chatId });
+      const feedbackItem: HhDigestItem = {
+        rank: candidate.rank,
+        orgId: candidate.orgId,
+        hh_employer_id: candidate.orgId,
+        employer_name: candidate.orgName,
+        vacancies_count: 0,
+        distinct_vacancy_names_count: 0,
+        latest_published_at: new Date().toISOString(),
+        total_score: candidate.score,
+        reasons: candidate.reasons,
+        opener: candidate.opener,
+        sourceFamilies: [],
+        evidenceTitles: [],
+        candidateSourceKeys: [],
+        locationNames: []
+      };
+      const replyMarkup = buildTelegramDigestFeedbackReplyMarkup({ clientProfileId: payload.clientProfileId as string, items: [feedbackItem] });
+      await sendTelegramTextMessage(`Recruiter Radar\n\n${candidate.rank}. ${candidate.orgName}\nScore: ${candidate.score}\n- ${candidate.reasons[0]}\n- ${candidate.reasons[1]}\n\n${candidate.opener}`, { botToken, chatId: candidate.chatId }, { replyMarkup: replyMarkup ?? undefined });
       sent += 1;
       await pool.query(`UPDATE digest_delivery_attempts SET status = 'sent', error_message = NULL, attempted_at = NOW() WHERE id = $1`, [queued.rows[0].id]);
     } catch (e) {
