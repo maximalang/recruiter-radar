@@ -31,17 +31,24 @@ export async function POST(request: Request) {
   const pool = getPool();
   if (!pool) return NextResponse.json({ error: "DATABASE_URL is not set." }, { status: 500 });
 
-  const insertEvent = await pool.query<{ id: number; status: string }>(`
+  const insertEvent = await pool.query<{ id: number; status: string; isNew: boolean }>(`
     INSERT INTO webhook_events (provider, event_type, external_event_id, idempotency_key, payload, status)
     VALUES ('telegram', 'callback_query', $1, $2, $3::jsonb, 'received')
     ON CONFLICT (provider, idempotency_key)
     DO UPDATE SET payload = EXCLUDED.payload
-    RETURNING id, status
+    RETURNING id, status, (xmax = 0) AS "isNew"
   `, [callbackQueryId ?? idempotencyKey, idempotencyKey, JSON.stringify(body)]);
 
   if (!callbackQueryId || !parsedCallback) {
     await pool.query(`UPDATE webhook_events SET status = 'ignored', processed_at = NOW() WHERE id = $1`, [insertEvent.rows[0].id]);
     return NextResponse.json({ ok: true, ignored: true });
+  }
+
+  const eventRow = insertEvent.rows[0];
+
+  if (!eventRow.isNew && (eventRow.status === "processed" || eventRow.status === "ignored")) {
+    await answerTelegramCallbackQuery({ callbackQueryId, botToken, text: "Уже обработано" }).catch(() => {});
+    return NextResponse.json({ ok: true, duplicate: true });
   }
 
   try {

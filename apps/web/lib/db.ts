@@ -108,17 +108,62 @@ async function getLeadDeliveryRow(leadId: number): Promise<LeadDeliveryRow | nul
   return result.rowCount === 1 ? result.rows[0] : null;
 }
 
+
+async function insertDigestDeliveryAttempt(input: {
+  digestCandidateId: number;
+  idempotencyKey: string;
+  channel: string;
+  status: "queued" | "sent" | "failed" | "skipped";
+  errorMessage?: string | null;
+}): Promise<boolean> {
+  const pool = getPool();
+  if (!pool) throw new Error("DATABASE_URL is not set.");
+  const result = await pool.query(`
+    INSERT INTO digest_delivery_attempts (digest_candidate_id, idempotency_key, channel, status, error_message)
+    VALUES ($1, $2, $3, $4, LEFT($5, 1000))
+    ON CONFLICT (digest_candidate_id, idempotency_key) DO NOTHING
+    RETURNING id
+  `, [input.digestCandidateId, input.idempotencyKey, input.channel, input.status, input.errorMessage ?? null]);
+  return result.rowCount === 1;
+}
+
+export async function hasClientProfilePremiumEntitlement(clientProfileId: string | number): Promise<EntitlementResult> {
+  const pool = getPool();
+  if (!pool) throw new Error("DATABASE_URL is not set.");
+  const profile = await pool.query<{ userId: number }>(`SELECT user_id AS "userId" FROM client_profiles WHERE id = $1 LIMIT 1`, [clientProfileId]);
+  if (profile.rowCount !== 1) return { allowed: false, reason: "Client profile not found." };
+  return hasPremiumEntitlement(profile.rows[0].userId);
+}
+
 export async function sendLeadToTelegram(leadId: number): Promise<TelegramDeliveryResult> {
   const lead = await getLeadDeliveryRow(leadId);
   if (!lead) return { ok: false, error: "Digest candidate not found." };
+
+  const channel = "telegram";
   const { config, error } = getTelegramConfig();
-  if (!config) return { ok: false, error: error ?? "Telegram is not configured." };
+  const target = config?.chatId ?? "unknown";
+  const idempotencyKey = `${leadId}:${channel}:${target}`;
+
+  const isQueued = await insertDigestDeliveryAttempt({ digestCandidateId: leadId, idempotencyKey, channel, status: "queued" });
+  if (!isQueued) {
+    await insertDigestDeliveryAttempt({ digestCandidateId: leadId, idempotencyKey: `${idempotencyKey}:duplicate`, channel, status: "skipped", errorMessage: "Duplicate delivery attempt skipped." });
+    logEvent("telegram.delivery.skipped", { digestCandidateId: leadId, clientProfileId: lead.clientProfileId, orgId: lead.orgId, reason: "duplicate" });
+    return { ok: true };
+  }
+
+  if (!config) {
+    await insertDigestDeliveryAttempt({ digestCandidateId: leadId, idempotencyKey: `${idempotencyKey}:config`, channel, status: "failed", errorMessage: error ?? "Telegram is not configured." });
+    return { ok: false, error: error ?? "Telegram is not configured." };
+  }
+
   try {
     await sendTelegramLeadMessage({ orgName: lead.orgName, status: lead.status, score: lead.score, lastSignalAt: lead.lastSignalAt, userName: lead.userName }, config);
+    await insertDigestDeliveryAttempt({ digestCandidateId: leadId, idempotencyKey: `${idempotencyKey}:sent`, channel, status: "sent" });
     logEvent("telegram.delivery.sent", { digestCandidateId: leadId, clientProfileId: lead.clientProfileId, orgId: lead.orgId });
     return { ok: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown Telegram delivery error.";
+    await insertDigestDeliveryAttempt({ digestCandidateId: leadId, idempotencyKey: `${idempotencyKey}:failed`, channel, status: "failed", errorMessage: message });
     logError("telegram.delivery.failed", error, { digestCandidateId: leadId, clientProfileId: lead.clientProfileId, orgId: lead.orgId });
     return { ok: false, error: message };
   }
