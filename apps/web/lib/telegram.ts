@@ -29,7 +29,7 @@ export type TelegramTextMessageResult = TelegramSendResult & {
 type TelegramApiSuccess = {
   ok: true;
   result: {
-    message_id: number;
+    message_id?: number;
   };
 };
 
@@ -72,7 +72,7 @@ function isTelegramApiSuccess(value: unknown): value is TelegramApiSuccess {
 
   const result = value as Partial<TelegramApiSuccess>;
 
-  return result.ok === true && typeof result.result?.message_id === "number";
+  return result.ok === true && !!result.result && typeof result.result === "object";
 }
 
 function getTelegramErrorDescription(value: unknown): string | null {
@@ -130,11 +130,18 @@ export function getTelegramBotToken(): {
   botToken: string | null;
   error: string | null;
 } {
-  const { config, error } = getTelegramConfig();
+  const botToken = process.env.TELEGRAM_BOT_TOKEN?.trim();
+
+  if (!botToken) {
+    return {
+      botToken: null,
+      error: "Telegram is not configured. Missing TELEGRAM_BOT_TOKEN."
+    };
+  }
 
   return {
-    botToken: config?.botToken ?? null,
-    error
+    botToken,
+    error: null
   };
 }
 
@@ -157,25 +164,18 @@ export async function getTelegramBotUsername(): Promise<{
   };
 }
 
-export async function sendTelegramTextMessage(
-  text: string,
-  config: TelegramMessageConfig,
-  options?: {
-    replyMarkup?: unknown;
-  }
-): Promise<TelegramTextMessageResult> {
-  void options;
-
-  const response = await fetch(`https://api.telegram.org/bot${config.botToken}/sendMessage`, {
+async function callTelegramApi<T>(
+  method: string,
+  config: Pick<TelegramMessageConfig, "botToken">,
+  body: Record<string, unknown>
+): Promise<T> {
+  const response = await fetch(`https://api.telegram.org/bot${config.botToken}/${method}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
     },
     cache: "no-store",
-    body: JSON.stringify({
-      chat_id: config.chatId,
-      text
-    })
+    body: JSON.stringify(body)
   });
 
   let payload: unknown = null;
@@ -194,48 +194,49 @@ export async function sendTelegramTextMessage(
     throw new Error(description);
   }
 
+  return payload.result as T;
+}
+
+export async function sendTelegramTextMessage(
+  text: string,
+  config: TelegramMessageConfig,
+  options?: {
+    replyMarkup?: unknown;
+  }
+): Promise<TelegramTextMessageResult> {
+  const result = await callTelegramApi<{ message_id: number }>("sendMessage", config, {
+    chat_id: config.chatId,
+    text,
+    ...(options?.replyMarkup ? { reply_markup: options.replyMarkup } : {})
+  });
+
   return {
     chatId: config.chatId,
-    messageId: payload.result.message_id
+    messageId: result.message_id
   };
+}
+
+export async function answerTelegramCallbackQuery(input: {
+  callbackQueryId: string;
+  botToken: string;
+  text?: string;
+}): Promise<void> {
+  await callTelegramApi("answerCallbackQuery", { botToken: input.botToken }, {
+    callback_query_id: input.callbackQueryId,
+    ...(input.text ? { text: input.text } : {})
+  });
 }
 
 export async function sendTelegramLeadMessage(
   lead: TelegramLeadMessage,
   config: TelegramConfig
 ): Promise<TelegramSendResult> {
-  const response = await fetch(
-    `https://api.telegram.org/bot${config.botToken}/sendMessage`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      cache: "no-store",
-      body: JSON.stringify({
-        chat_id: config.chatId,
-        text: formatTelegramLeadMessage(lead)
-      })
-    }
-  );
-
-  let payload: unknown = null;
-
-  try {
-    payload = await response.json();
-  } catch {
-    payload = null;
-  }
-
-  if (!response.ok || !isTelegramApiSuccess(payload)) {
-    const description =
-      getTelegramErrorDescription(payload) ??
-      `Telegram request failed with status ${response.status}.`;
-
-    throw new Error(description);
-  }
+  const result = await callTelegramApi<{ message_id: number }>("sendMessage", config, {
+    chat_id: config.chatId,
+    text: formatTelegramLeadMessage(lead)
+  });
 
   return {
-    messageId: payload.result.message_id
+    messageId: result.message_id
   };
 }

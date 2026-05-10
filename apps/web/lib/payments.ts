@@ -8,7 +8,8 @@ import {
   saveClientProfile,
   type ClientProfile
 } from "./clientProfiles";
-import { buildHhDigestText, getHhDigestItems } from "./hhDigest";
+import { runDigestForClientProfile, type DigestItem } from "./digest";
+import { buildHhDigestText, type HhDigestItem } from "./hhDigest";
 import {
   buildCheckoutHref,
   buildPilotApplicationComment,
@@ -24,12 +25,8 @@ import {
   humanizeCustomerDeliveryIssue
 } from "./copy/customer";
 import { getTelegramBotToken, sendTelegramTextMessage } from "./telegram";
-import {
-  buildTelegramDigestAuditItems,
-  buildTelegramDigestFeedbackReplyMarkup
-} from "./telegramDigestFeedback";
+import { buildTelegramDigestFeedbackReplyMarkup } from "./telegramDigestFeedback";
 import { recordClientProfileDigestShownOutcomes } from "./clientProfileSignalOutcomes";
-import { buildRecruiterRadarChannelStrategyMetadata } from "./notificationChannels";
 
 const CHECKOUT_ORDER_STATUSES = [
   "created",
@@ -230,15 +227,6 @@ type StartCheckoutOrderResult =
     };
 
 type PaymentsDbClient = Pick<Pool, "query"> | Pick<PoolClient, "query">;
-
-type HhPipelineRunFinishInput = {
-  status: string;
-  skipReason?: string;
-  errorMessage?: string;
-  itemsCount?: number;
-  telegramPayload?: Record<string, unknown>;
-  deliveryLogged?: boolean;
-};
 
 const globalForPg = globalThis as typeof globalThis & {
   recruiterRadarPaymentsPool?: Pool;
@@ -580,36 +568,18 @@ export async function sendPilotOrderTestDigest(
     throw new Error(CUSTOMER_CHECKOUT_COPY.connectTelegramFirst);
   }
 
-  let pipelineRunId: string | null = null;
-  const pool = getPool();
-
-  if (pool) {
-    try {
-      pipelineRunId = await createHhPipelineRun(pool, {
-        triggerType: "manual"
-      });
-    } catch (error) {
-      console.error("Failed to create onboarding test digest run history.", error);
-    }
-  }
-
-  const items = await getHhDigestItems({
-    clientProfileId: profile.id
+  const digestRun = await runDigestForClientProfile({
+    clientProfileId: profile.id,
+    sourceKey: "telegram",
+    limit: profile.dailyDigestLimit
   });
+  const items = digestRun.items.map(mapDigestItemToTelegramDigestItem);
 
   if (items.length === 0) {
-    await finishPilotOrderTestDigestRun(pool, pipelineRunId, {
-      status: "skipped",
-      skipReason: "No digest items for onboarding test.",
-      itemsCount: 0,
-      telegramPayload: buildPilotTestDigestRunMetadata({
-        orderId: order.id,
-        clientProfileId: profile.id,
-        chatId: profile.telegramChatId,
-        items,
-        empty: true
-      }),
-      deliveryLogged: false
+    order = await updateCheckoutOrder(order.id, {
+      payloadPatch: {
+        customerDigestLastEmptyAt: new Date().toISOString()
+      }
     });
 
     return {
@@ -624,18 +594,10 @@ export async function sendPilotOrderTestDigest(
     humanizeCustomerDeliveryIssue(error) ?? CUSTOMER_CHECKOUT_COPY.telegramNotConfigured;
 
   if (!botToken) {
-    await finishPilotOrderTestDigestRun(pool, pipelineRunId, {
-      status: "failed",
-      errorMessage: telegramConfigMessage,
-      itemsCount: items.length,
-      telegramPayload: buildPilotTestDigestRunMetadata({
-        orderId: order.id,
-        clientProfileId: profile.id,
-        chatId: profile.telegramChatId,
-        items,
-        errorMessage: telegramConfigMessage
-      }),
-      deliveryLogged: false
+    await updateCheckoutOrder(order.id, {
+      payloadPatch: {
+        customerDigestLastFailedAt: new Date().toISOString()
+      }
     });
 
     throw new Error(telegramConfigMessage);
@@ -656,25 +618,12 @@ export async function sendPilotOrderTestDigest(
     });
     const sentAt = new Date().toISOString();
 
-    await finishPilotOrderTestDigestRun(pool, pipelineRunId, {
-      status: "success",
-      itemsCount: items.length,
-      telegramPayload: buildPilotTestDigestRunMetadata({
-        orderId: order.id,
-        clientProfileId: profile.id,
-        chatId: telegramResult.chatId,
-        messageId: telegramResult.messageId,
-        items,
-        text: digestText
-      }),
-      deliveryLogged: true
-    });
     try {
       await recordClientProfileDigestShownOutcomes({
         clientProfileId: profile.id,
         deliveryKind: "onboarding_test_digest",
         items,
-        pipelineRunId,
+        pipelineRunId: digestRun.run.id,
         messageId: telegramResult.messageId,
         feedbackSource: "telegram"
       });
@@ -690,7 +639,8 @@ export async function sendPilotOrderTestDigest(
         onboardingActivatedAt: order.payload.onboardingActivatedAt ?? sentAt,
         onboardingCompletedAt: sentAt,
         onboardingTestDigestSentAt: sentAt,
-        onboardingTestDigestTelegramMessageId: String(telegramResult.messageId)
+        onboardingTestDigestTelegramMessageId: String(telegramResult.messageId),
+        customerDigestLastSentAt: sentAt
       }
     });
 
@@ -706,19 +656,10 @@ export async function sendPilotOrderTestDigest(
       error instanceof Error ? error.message : null
     ) ?? CUSTOMER_CHECKOUT_COPY.telegramNotConfigured;
 
-    await finishPilotOrderTestDigestRun(pool, pipelineRunId, {
-      status: "failed",
-      errorMessage: message,
-      itemsCount: items.length,
-      telegramPayload: buildPilotTestDigestRunMetadata({
-        orderId: order.id,
-        clientProfileId: profile.id,
-        chatId: profile.telegramChatId,
-        items,
-        text: digestText,
-        errorMessage: message
-      }),
-      deliveryLogged: false
+    await updateCheckoutOrder(order.id, {
+      payloadPatch: {
+        customerDigestLastFailedAt: new Date().toISOString()
+      }
     });
 
     throw new Error(message);
@@ -1531,50 +1472,6 @@ function normalizeKeywordList(value: unknown): string[] {
   return [];
 }
 
-async function finishPilotOrderTestDigestRun(
-  pool: Pool | null,
-  pipelineRunId: string | null,
-  input: Parameters<typeof finishHhPipelineRun>[2]
-): Promise<void> {
-  if (!pool || !pipelineRunId) {
-    return;
-  }
-
-  try {
-    await finishHhPipelineRun(pool, pipelineRunId, input);
-  } catch (error) {
-    console.error("Failed to finalize onboarding test digest run history.", error);
-  }
-}
-
-function buildPilotTestDigestRunMetadata(input: {
-  orderId: string;
-  clientProfileId: string;
-  chatId?: string | null;
-  messageId?: number | null;
-  items: Awaited<ReturnType<typeof getHhDigestItems>>;
-  text?: string | null;
-  errorMessage?: string | null;
-  empty?: boolean;
-}): Record<string, unknown> {
-  const digestItems = buildTelegramDigestAuditItems(input.items);
-
-  return {
-    kind: "onboarding_test_digest",
-    onboardingTest: true,
-    channelStrategy: buildRecruiterRadarChannelStrategyMetadata(),
-    orderId: input.orderId,
-    clientProfileId: input.clientProfileId,
-    digestDelivered: typeof input.messageId === "number",
-    digestItems,
-    ...(input.chatId ? { chatId: input.chatId } : {}),
-    ...(typeof input.messageId === "number" ? { messageId: input.messageId } : {}),
-    ...(typeof input.text === "string" && input.text.trim() !== "" ? { text: input.text } : {}),
-    ...(input.empty ? { empty: true } : {}),
-    ...(input.errorMessage ? { errorMessage: input.errorMessage } : {})
-  };
-}
-
 function areKeywordListsEqual(left: readonly string[], right: readonly string[]): boolean {
   if (left.length !== right.length) {
     return false;
@@ -1599,24 +1496,23 @@ function readNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-async function createHhPipelineRun(
-  pool: Pool,
-  input: {
-    triggerType: string;
-  }
-): Promise<string> {
-  void pool;
-  return `noop-${input.triggerType}`;
-}
-
-async function finishHhPipelineRun(
-  pool: Pool,
-  pipelineRunId: string,
-  input: HhPipelineRunFinishInput
-): Promise<void> {
-  void pool;
-  void pipelineRunId;
-  void input;
+function mapDigestItemToTelegramDigestItem(item: DigestItem): HhDigestItem {
+  return {
+    rank: item.rank,
+    orgId: item.orgId,
+    hh_employer_id: item.sourceExternalId,
+    employer_name: item.sourceDisplayName,
+    vacancies_count: item.vacanciesCount,
+    distinct_vacancy_names_count: item.distinctVacancyNamesCount,
+    latest_published_at: item.latestPublishedAt,
+    total_score: item.totalScore,
+    reasons: item.reasons,
+    opener: item.opener,
+    sourceFamilies: item.sourceFamilies,
+    evidenceTitles: item.evidenceTitles,
+    candidateSourceKeys: item.candidateSourceKeys,
+    locationNames: item.locationNames
+  };
 }
 
 function getErrorMessage(error: unknown): string {
