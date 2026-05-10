@@ -1,152 +1,66 @@
 import { NextResponse } from "next/server";
 
-import {
-  isDigestFeedbackAction,
-  updateDigestOrgStateFeedback,
-  type DigestFeedbackAction
-} from "../../../../lib/digestFeedback";
+import { getPool } from "../../../../lib/db";
+import { isDigestFeedbackAction, updateDigestOrgStateFeedback, type DigestFeedbackAction } from "../../../../lib/digestFeedback";
 import { answerTelegramCallbackQuery, getTelegramBotToken } from "../../../../lib/telegram";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-type TelegramWebhookUpdate = {
-  callback_query?: {
-    id?: string;
-    data?: string;
-  };
-};
-
-type ParsedDigestFeedbackCallback = {
-  clientProfileId: string;
-  orgId: string;
-  action: DigestFeedbackAction | "shown";
-};
+type TelegramWebhookUpdate = { update_id?: number; callback_query?: { id?: string; data?: string } };
+type ParsedDigestFeedbackCallback = { clientProfileId: string; orgId: string; action: DigestFeedbackAction | "shown" };
 
 export async function POST(request: Request) {
-  const { botToken, error } = getTelegramBotToken();
-
-  if (!botToken) {
-    return NextResponse.json({ error: error ?? "TELEGRAM_BOT_TOKEN is not configured." }, { status: 500 });
+  const secret = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
+  const providedSecret = request.headers.get("x-telegram-bot-api-secret-token")?.trim();
+  if (!secret || providedSecret !== secret) {
+    return NextResponse.json({ error: "Unauthorized webhook request." }, { status: 401 });
   }
+
+  const { botToken, error } = getTelegramBotToken();
+  if (!botToken) return NextResponse.json({ error: error ?? "TELEGRAM_BOT_TOKEN is not configured." }, { status: 500 });
 
   let body: unknown;
-
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
-  }
+  try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 }); }
 
   const update = body as TelegramWebhookUpdate;
   const callbackQueryId = normalizeNonEmptyString(update?.callback_query?.id);
   const parsedCallback = parseDigestFeedbackCallbackData(update?.callback_query?.data);
+  const idempotencyKey = `tg:${update?.update_id ?? "na"}:${callbackQueryId ?? "na"}`;
+
+  const pool = getPool();
+  if (!pool) return NextResponse.json({ error: "DATABASE_URL is not set." }, { status: 500 });
+
+  const insertEvent = await pool.query<{ id: number; status: string }>(`
+    INSERT INTO webhook_events (provider, event_type, external_event_id, idempotency_key, payload, status)
+    VALUES ('telegram', 'callback_query', $1, $2, $3::jsonb, 'received')
+    ON CONFLICT (provider, idempotency_key)
+    DO UPDATE SET payload = EXCLUDED.payload
+    RETURNING id, status
+  `, [callbackQueryId ?? idempotencyKey, idempotencyKey, JSON.stringify(body)]);
 
   if (!callbackQueryId || !parsedCallback) {
+    await pool.query(`UPDATE webhook_events SET status = 'ignored', processed_at = NOW() WHERE id = $1`, [insertEvent.rows[0].id]);
     return NextResponse.json({ ok: true, ignored: true });
   }
 
-  if (parsedCallback.action === "shown") {
-    await answerTelegramCallbackQuery({
-      callbackQueryId,
-      botToken
-    });
-
-    return NextResponse.json({ ok: true, ignored: true, action: parsedCallback.action });
-  }
-
   try {
-    const state = await updateDigestOrgStateFeedback({
-      clientProfileId: parsedCallback.clientProfileId,
-      orgId: parsedCallback.orgId,
-      action: parsedCallback.action
-    });
-
-    await answerTelegramCallbackQuery({
-      callbackQueryId,
-      botToken,
-      text: getDigestFeedbackConfirmationText(parsedCallback.action)
-    });
-
-    return NextResponse.json({ ok: true, state });
+    if (parsedCallback.action !== "shown") {
+      await updateDigestOrgStateFeedback({ clientProfileId: parsedCallback.clientProfileId, orgId: parsedCallback.orgId, action: parsedCallback.action });
+    }
+    await answerTelegramCallbackQuery({ callbackQueryId, botToken, text: parsedCallback.action === "shown" ? undefined : getDigestFeedbackConfirmationText(parsedCallback.action) });
+    await pool.query(`UPDATE webhook_events SET status = 'processed', processed_at = NOW(), error_message = NULL WHERE id = $1`, [insertEvent.rows[0].id]);
+    return NextResponse.json({ ok: true, replaySafe: true });
   } catch (error) {
-    await answerTelegramCallbackQuery({
-      callbackQueryId,
-      botToken,
-      text: "Не удалось сохранить фидбек"
-    }).catch(() => {});
-
     const message = error instanceof Error ? error.message : "Failed to process Telegram callback feedback.";
-    const status = message.startsWith("Invalid ") || message.includes("is required") ? 400 : 500;
-
-    return NextResponse.json({ error: message }, { status });
+    await pool.query(`UPDATE webhook_events SET status = 'failed', processed_at = NOW(), error_message = LEFT($2, 1000) WHERE id = $1`, [insertEvent.rows[0].id, sanitizeError(message)]);
+    await answerTelegramCallbackQuery({ callbackQueryId, botToken, text: "Не удалось сохранить фидбек" }).catch(() => {});
+    return NextResponse.json({ error: message }, { status: message.startsWith("Invalid ") || message.includes("is required") ? 400 : 500 });
   }
 }
 
-export function parseDigestFeedbackCallbackData(value: string | null | undefined): ParsedDigestFeedbackCallback | null {
-  const normalizedValue = normalizeNonEmptyString(value);
-
-  if (!normalizedValue) {
-    return null;
-  }
-
-  const [prefix, clientProfileId, orgId, action, ...rest] = normalizedValue.split(":");
-
-  if (prefix !== "dgf" || rest.length > 0) {
-    return null;
-  }
-
-  if (!isPositiveIntegerString(clientProfileId) || !isPositiveIntegerString(orgId)) {
-    return null;
-  }
-
-  if (action === "shown") {
-    return {
-      clientProfileId,
-      orgId,
-      action
-    };
-  }
-
-  if (!isDigestFeedbackAction(action)) {
-    return null;
-  }
-
-  return {
-    clientProfileId,
-    orgId,
-    action
-  };
-}
-
-function getDigestFeedbackConfirmationText(action: DigestFeedbackAction): string {
-  switch (action) {
-    case "accepted":
-      return "Отмечено: беру";
-    case "badfit":
-      return "Отмечено: мимо";
-    case "snooze":
-      return "Отмечено: позже";
-    case "dismissed":
-      return "Отмечено: скрыто";
-    case "contacted":
-      return "Отмечено: contacted";
-    case "replied":
-      return "Отмечено: replied";
-    case "won":
-      return "Отмечено: won";
-  }
-}
-
-function isPositiveIntegerString(value: string | null | undefined): value is string {
-  return typeof value === "string" && /^\d+$/.test(value);
-}
-
-function normalizeNonEmptyString(value: string | null | undefined): string | null {
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const normalizedValue = value.trim();
-  return normalizedValue === "" ? null : normalizedValue;
-}
+export function parseDigestFeedbackCallbackData(value: string | null | undefined): ParsedDigestFeedbackCallback | null { const normalizedValue = normalizeNonEmptyString(value); if (!normalizedValue) return null; const [prefix, clientProfileId, orgId, action, ...rest] = normalizedValue.split(":"); if (prefix !== "dgf" || rest.length > 0) return null; if (!isPositiveIntegerString(clientProfileId) || !isPositiveIntegerString(orgId)) return null; if (action === "shown") return { clientProfileId, orgId, action }; if (!isDigestFeedbackAction(action)) return null; return { clientProfileId, orgId, action }; }
+function getDigestFeedbackConfirmationText(action: DigestFeedbackAction): string { switch (action) { case "accepted": return "Отмечено: беру"; case "badfit": return "Отмечено: мимо"; case "snooze": return "Отмечено: позже"; case "dismissed": return "Отмечено: скрыто"; case "contacted": return "Отмечено: contacted"; case "replied": return "Отмечено: replied"; case "won": return "Отмечено: won"; } }
+function isPositiveIntegerString(value: string | null | undefined): value is string { return typeof value === "string" && /^\d+$/.test(value); }
+function normalizeNonEmptyString(value: string | null | undefined): string | null { if (typeof value !== "string") return null; const normalizedValue = value.trim(); return normalizedValue === "" ? null : normalizedValue; }
+function sanitizeError(value: string): string { return value.replace(/bot\d+:[A-Za-z0-9_-]+/g, "[redacted-token]"); }
