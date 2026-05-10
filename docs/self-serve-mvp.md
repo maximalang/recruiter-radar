@@ -29,3 +29,5 @@ Landing → preview → pilot activation → Telegram connection → daily diges
 - Entitlement gate must be mandatory for all premium digest deliveries server-side (no optional path).
 - Legacy naming (`leadId` in actions/UI) still exists in web layer and should be renamed to `digestCandidateId` for full consistency.
 - Existing historical schema/docs still include legacy lead tables; needs explicit deprecation plan.
+
+> См. также root-level `AGENTS.md` для обязательных правил работы Codex (ветки, PR, проверки, продуктовые и архитектурные границы).
