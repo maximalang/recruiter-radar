@@ -18,6 +18,7 @@ CREATE TABLE webhook_events (
   status TEXT NOT NULL DEFAULT 'received',
   error_message TEXT,
   processed_at TIMESTAMPTZ,
+  processing_claimed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT webhook_events_provider_not_blank CHECK (BTRIM(provider) <> ''),
   CONSTRAINT webhook_events_event_type_not_blank CHECK (BTRIM(event_type) <> ''),

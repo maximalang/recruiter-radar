@@ -24,34 +24,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{$env.TELEGRAM_API_BASE_URL || 'https://api.telegram.org'}}/bot{{$env.TELEGRAM_BOT_TOKEN}}/sendMessage",
-        "sendBody": true,
-        "bodyParameters": {
-          "parameters": [
-            {
-              "name": "chat_id",
-              "value": "={{$env.TELEGRAM_CHAT_ID}}"
-            },
-            {
-              "name": "text",
-              "value": "={{$json.text}}"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
-      "position": [
-        -176,
-        96
-      ],
-      "id": "71b7de05-62ad-4624-8f45-29d0701c0672",
-      "name": "tg"
-    },
-    {
-      "parameters": {
-        "url": "={{$env.RR_APP_BASE_URL}}/api/hh/digest",
+        "url": "={{$env.RR_APP_BASE_URL}}/api/digest/delivery",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -61,7 +34,16 @@
             }
           ]
         },
-        "options": {}
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={{ { clientProfileId: $env.DAILY_DIGEST_CLIENT_PROFILE_ID || $json.clientProfileId } }}",
+        "options": {
+          "retry": {
+            "enabled": true,
+            "maxTries": 3,
+            "waitBetweenTries": 2000
+          }
+        }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
@@ -71,32 +53,6 @@
       ],
       "id": "5ad61993-a974-4f71-8fbd-3ce7831c4887",
       "name": "hh"
-    },
-    {
-      "parameters": {
-        "jsCode": "const items = $json.items ?? [];\nreturn items.map((item) => ({ json: item }));"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        -528,
-        96
-      ],
-      "id": "1552a390-dea8-46a3-b615-9ba6cd8d958d",
-      "name": "Code (item)"
-    },
-    {
-      "parameters": {
-        "jsCode": "const lines = items.slice(0, 3).map((item) => {\n  const x = item.json;\n  return `${x.rank}. ${x.employer_name}\nScore: ${x.total_score}\n- ${x.reasons[0]}\n- ${x.reasons[1]}\n\n${x.opener}`;\n});\n\nconst text = `Recruiter Radar Digest\\n\\n${lines.join(\"\\n\\n--------------------\\n\\n\")}`;\n\nreturn [{ json: { text } }];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        -384,
-        96
-      ],
-      "id": "37902932-d461-495f-8715-46b483857ec7",
-      "name": "Code (digest text)"
     }
   ],
   "pinData": {},
@@ -106,44 +62,6 @@
         [
           {
             "node": "hh",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "tg": {
-      "main": [
-        []
-      ]
-    },
-    "hh": {
-      "main": [
-        [
-          {
-            "node": "Code (item)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Code (item)": {
-      "main": [
-        [
-          {
-            "node": "Code (digest text)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Code (digest text)": {
-      "main": [
-        [
-          {
-            "node": "tg",
             "type": "main",
             "index": 0
           }
