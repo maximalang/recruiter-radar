@@ -7,15 +7,15 @@ import { answerTelegramCallbackQuery, getTelegramBotToken } from "../../../../li
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+const PROCESSING_STALE_MS = 5 * 60 * 1000;
+
 type TelegramWebhookUpdate = { update_id?: number; callback_query?: { id?: string; data?: string } };
 type ParsedDigestFeedbackCallback = { clientProfileId: string; orgId: string; action: DigestFeedbackAction | "shown" };
 
 export async function POST(request: Request) {
   const secret = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
   const providedSecret = request.headers.get("x-telegram-bot-api-secret-token")?.trim();
-  if (!secret || providedSecret !== secret) {
-    return NextResponse.json({ error: "Unauthorized webhook request." }, { status: 401 });
-  }
+  if (!secret || providedSecret !== secret) return NextResponse.json({ error: "Unauthorized webhook request." }, { status: 401 });
 
   const { botToken, error } = getTelegramBotToken();
   if (!botToken) return NextResponse.json({ error: error ?? "TELEGRAM_BOT_TOKEN is not configured." }, { status: 500 });
@@ -31,16 +31,27 @@ export async function POST(request: Request) {
   const pool = getPool();
   if (!pool) return NextResponse.json({ error: "DATABASE_URL is not set." }, { status: 500 });
 
-  const insertEvent = await pool.query<{ id: number; status: string }>(`
-    INSERT INTO webhook_events (provider, event_type, external_event_id, idempotency_key, payload, status)
-    VALUES ('telegram', 'callback_query', $1, $2, $3::jsonb, 'received')
-    ON CONFLICT (provider, idempotency_key)
-    DO UPDATE SET payload = EXCLUDED.payload
-    RETURNING id, status
-  `, [callbackQueryId ?? idempotencyKey, idempotencyKey, JSON.stringify(body)]);
+  const existing = await pool.query<{ id: number; status: string; createdAt: string }>(`SELECT id, status, created_at::text AS "createdAt" FROM webhook_events WHERE provider = 'telegram' AND idempotency_key = $1 LIMIT 1`, [idempotencyKey]);
+  let eventId: number;
+  if (existing.rowCount === 1) {
+    const row = existing.rows[0];
+    const createdAtMs = new Date(row.createdAt).getTime();
+    const isStaleProcessing = row.status === "processing" && Number.isFinite(createdAtMs) && (Date.now() - createdAtMs) > PROCESSING_STALE_MS;
+    if (row.status === "processed" || row.status === "ignored") {
+      return NextResponse.json({ ok: true, duplicate: true });
+    }
+    if (row.status === "processing" && !isStaleProcessing) {
+      return NextResponse.json({ ok: false, retryable: true, reason: "Webhook event is already processing." }, { status: 409 });
+    }
+    await pool.query(`UPDATE webhook_events SET status = 'processing', payload = $2::jsonb, processed_at = NULL, error_message = NULL WHERE id = $1`, [row.id, JSON.stringify(body)]);
+    eventId = row.id;
+  } else {
+    const inserted = await pool.query<{ id: number }>(`INSERT INTO webhook_events (provider, event_type, external_event_id, idempotency_key, payload, status) VALUES ('telegram', 'callback_query', $1, $2, $3::jsonb, 'processing') RETURNING id`, [callbackQueryId ?? idempotencyKey, idempotencyKey, JSON.stringify(body)]);
+    eventId = inserted.rows[0].id;
+  }
 
   if (!callbackQueryId || !parsedCallback) {
-    await pool.query(`UPDATE webhook_events SET status = 'ignored', processed_at = NOW() WHERE id = $1`, [insertEvent.rows[0].id]);
+    await pool.query(`UPDATE webhook_events SET status = 'ignored', processed_at = NOW() WHERE id = $1`, [eventId]);
     return NextResponse.json({ ok: true, ignored: true });
   }
 
@@ -49,13 +60,13 @@ export async function POST(request: Request) {
       await updateDigestOrgStateFeedback({ clientProfileId: parsedCallback.clientProfileId, orgId: parsedCallback.orgId, action: parsedCallback.action });
     }
     await answerTelegramCallbackQuery({ callbackQueryId, botToken, text: parsedCallback.action === "shown" ? undefined : getDigestFeedbackConfirmationText(parsedCallback.action) });
-    await pool.query(`UPDATE webhook_events SET status = 'processed', processed_at = NOW(), error_message = NULL WHERE id = $1`, [insertEvent.rows[0].id]);
+    await pool.query(`UPDATE webhook_events SET status = 'processed', processed_at = NOW(), error_message = NULL WHERE id = $1`, [eventId]);
     return NextResponse.json({ ok: true, replaySafe: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to process Telegram callback feedback.";
-    await pool.query(`UPDATE webhook_events SET status = 'failed', processed_at = NOW(), error_message = LEFT($2, 1000) WHERE id = $1`, [insertEvent.rows[0].id, sanitizeError(message)]);
+    await pool.query(`UPDATE webhook_events SET status = 'failed', processed_at = NOW(), error_message = LEFT($2, 1000) WHERE id = $1`, [eventId, sanitizeError(message)]);
     await answerTelegramCallbackQuery({ callbackQueryId, botToken, text: "Не удалось сохранить фидбек" }).catch(() => {});
-    return NextResponse.json({ error: message }, { status: message.startsWith("Invalid ") || message.includes("is required") ? 400 : 500 });
+    return NextResponse.json({ error: message, retryable: true }, { status: 500 });
   }
 }
 

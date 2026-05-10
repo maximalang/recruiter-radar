@@ -1,5 +1,5 @@
 {
-  "name": "My workflow",
+  "name": "Daily Digest Delivery",
   "nodes": [
     {
       "parameters": {
@@ -14,153 +14,40 @@
       },
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.3,
-      "position": [
-        -976,
-        96
-      ],
-      "id": "f5012bed-1eeb-4478-be1f-ac011f5a905f",
+      "position": [-420, 80],
+      "id": "schedule-trigger",
       "name": "Schedule Trigger"
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{$env.TELEGRAM_API_BASE_URL || 'https://api.telegram.org'}}/bot{{$env.TELEGRAM_BOT_TOKEN}}/sendMessage",
-        "sendBody": true,
-        "bodyParameters": {
-          "parameters": [
-            {
-              "name": "chat_id",
-              "value": "={{$env.TELEGRAM_CHAT_ID}}"
-            },
-            {
-              "name": "text",
-              "value": "={{$json.text}}"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
-      "position": [
-        -176,
-        96
-      ],
-      "id": "71b7de05-62ad-4624-8f45-29d0701c0672",
-      "name": "tg"
-    },
-    {
-      "parameters": {
-        "url": "={{$env.RR_APP_BASE_URL}}/api/hh/digest",
+        "url": "={{$env.RR_APP_BASE_URL}}/api/digest/delivery",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "x-api-key",
-              "value": "={{$env.DIGEST_API_KEY}}"
-            }
+            { "name": "x-api-key", "value": "={{$env.DIGEST_API_KEY}}" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
         },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"clientProfileId\": $env.DAILY_DIGEST_CLIENT_PROFILE_ID}",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
-      "position": [
-        -752,
-        96
-      ],
-      "id": "5ad61993-a974-4f71-8fbd-3ce7831c4887",
-      "name": "hh"
-    },
-    {
-      "parameters": {
-        "jsCode": "const items = $json.items ?? [];\nreturn items.map((item) => ({ json: item }));"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        -528,
-        96
-      ],
-      "id": "1552a390-dea8-46a3-b615-9ba6cd8d958d",
-      "name": "Code (item)"
-    },
-    {
-      "parameters": {
-        "jsCode": "const lines = items.slice(0, 3).map((item) => {\n  const x = item.json;\n  return `${x.rank}. ${x.employer_name}\nScore: ${x.total_score}\n- ${x.reasons[0]}\n- ${x.reasons[1]}\n\n${x.opener}`;\n});\n\nconst text = `Recruiter Radar Digest\\n\\n${lines.join(\"\\n\\n--------------------\\n\\n\")}`;\n\nreturn [{ json: { text } }];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        -384,
-        96
-      ],
-      "id": "37902932-d461-495f-8715-46b483857ec7",
-      "name": "Code (digest text)"
+      "position": [-120, 80],
+      "id": "digest-delivery",
+      "name": "Digest delivery"
     }
   ],
   "pinData": {},
   "connections": {
     "Schedule Trigger": {
-      "main": [
-        [
-          {
-            "node": "hh",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "tg": {
-      "main": [
-        []
-      ]
-    },
-    "hh": {
-      "main": [
-        [
-          {
-            "node": "Code (item)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Code (item)": {
-      "main": [
-        [
-          {
-            "node": "Code (digest text)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Code (digest text)": {
-      "main": [
-        [
-          {
-            "node": "tg",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Digest delivery", "type": "main", "index": 0 }]]
     }
   },
   "active": true,
-  "settings": {
-    "executionOrder": "v1",
-    "binaryMode": "separate"
-  },
-  "versionId": "aa363d3d-8b85-4514-988e-e74b1649a12a",
-  "meta": {
-    "templateCredsSetupCompleted": true,
-    "instanceId": "84653d17ed330d6f66dfc59ddf38cfdf3ec273c3c0517689c825e2c8b564f489"
-  },
-  "id": "uZ85pVxodzsOk4qF",
+  "settings": { "executionOrder": "v1", "binaryMode": "separate" },
   "tags": []
 }

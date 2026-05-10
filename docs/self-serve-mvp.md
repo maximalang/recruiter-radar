@@ -1,7 +1,7 @@
 # Self-serve MVP launch note
 
 ## Flow
-Landing → preview → pilot activation → Telegram connection → daily digest → callback feedback → suppression/reweighting.
+Landing → live preview → pilot activation → client profile → Telegram connection → daily digest delivery via app endpoint → callback feedback → suppression/reweighting.
 
 ## Implemented
 - `apps/web/lib/db.ts` migrated from legacy `leads/lead_status/deliveries` reads to digest model (`digest_candidates`, `client_profiles`, `client_digest_org_state`) for list/status/send actions.
@@ -22,8 +22,9 @@ Landing → preview → pilot activation → Telegram connection → daily diges
 - Replays are safe: duplicated updates are deduplicated by `webhook_events(provider,idempotency_key)`.
 
 ## n8n setup
-- Use `n8n/workflows/daily-signals.json` template only with env-backed config (`RR_APP_BASE_URL`, `DIGEST_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, optional `TELEGRAM_API_BASE_URL`).
-- Do not move scoring/billing/feedback business logic into n8n; keep it in app APIs.
+- Production flow must call only `${RR_APP_BASE_URL}/api/digest/delivery` from n8n (with `x-api-key`).
+- Telegram Bot API calls are handled by the app, not by n8n.
+- Keep scoring/billing/feedback/suppression logic in app APIs.
 
 ## Launch blockers
 - Entitlement gate must be mandatory for all premium digest deliveries server-side (no optional path).
