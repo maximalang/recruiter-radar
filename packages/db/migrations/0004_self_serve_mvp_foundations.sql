@@ -31,18 +31,18 @@ CREATE INDEX webhook_events_provider_event_type_idx
 
 CREATE TABLE digest_delivery_attempts (
   id BIGSERIAL PRIMARY KEY,
-  delivery_id BIGINT NOT NULL REFERENCES deliveries(id) ON DELETE CASCADE,
+  digest_candidate_id BIGINT NOT NULL REFERENCES digest_candidates(id) ON DELETE CASCADE,
   idempotency_key TEXT NOT NULL,
   channel TEXT NOT NULL DEFAULT 'telegram',
-  status delivery_status NOT NULL,
+  status TEXT NOT NULL,
   error_message TEXT,
   attempted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT digest_delivery_attempts_idempotency_key_not_blank CHECK (BTRIM(idempotency_key) <> ''),
   CONSTRAINT digest_delivery_attempts_channel_not_blank CHECK (BTRIM(channel) <> '')
 );
-CREATE UNIQUE INDEX digest_delivery_attempts_delivery_idempotency_uidx
-  ON digest_delivery_attempts (delivery_id, idempotency_key);
+CREATE UNIQUE INDEX digest_delivery_attempts_candidate_idempotency_uidx
+  ON digest_delivery_attempts (digest_candidate_id, idempotency_key);
 
 CREATE TABLE billing_webhook_events (
   id BIGSERIAL PRIMARY KEY,
