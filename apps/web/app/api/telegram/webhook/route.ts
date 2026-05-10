@@ -51,6 +51,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, duplicate: true });
   }
 
+  const claimedEvent = await pool.query(`
+    UPDATE webhook_events
+    SET status = 'processing'
+    WHERE id = $1 AND status = 'received'
+    RETURNING id
+  `, [eventRow.id]);
+
+  if (claimedEvent.rowCount !== 1) {
+    await answerTelegramCallbackQuery({ callbackQueryId, botToken, text: "Уже обработано" }).catch(() => {});
+    return NextResponse.json({ ok: true, duplicate: true, inFlight: true });
+  }
+
   try {
     if (parsedCallback.action !== "shown") {
       await updateDigestOrgStateFeedback({ clientProfileId: parsedCallback.clientProfileId, orgId: parsedCallback.orgId, action: parsedCallback.action });

@@ -127,6 +127,24 @@ async function insertDigestDeliveryAttempt(input: {
   return result.rowCount === 1;
 }
 
+async function acquireTelegramDeliveryAttempt(digestCandidateId: number, idempotencyKey: string, channel: string): Promise<"acquired" | "duplicate"> {
+  const pool = getPool();
+  if (!pool) throw new Error("DATABASE_URL is not set.");
+  const result = await pool.query(`
+    INSERT INTO digest_delivery_attempts (digest_candidate_id, idempotency_key, channel, status)
+    VALUES ($1, $2, $3, 'queued')
+    ON CONFLICT (digest_candidate_id, idempotency_key)
+    DO UPDATE SET
+      status = 'queued',
+      error_message = NULL,
+      created_at = NOW()
+    WHERE digest_delivery_attempts.status = 'failed'
+    RETURNING id
+  `, [digestCandidateId, idempotencyKey, channel]);
+
+  return result.rowCount === 1 ? 'acquired' : 'duplicate';
+}
+
 export async function hasClientProfilePremiumEntitlement(clientProfileId: string | number): Promise<EntitlementResult> {
   const pool = getPool();
   if (!pool) throw new Error("DATABASE_URL is not set.");
@@ -144,8 +162,8 @@ export async function sendLeadToTelegram(leadId: number): Promise<TelegramDelive
   const target = config?.chatId ?? "unknown";
   const idempotencyKey = `${leadId}:${channel}:${target}`;
 
-  const isQueued = await insertDigestDeliveryAttempt({ digestCandidateId: leadId, idempotencyKey, channel, status: "queued" });
-  if (!isQueued) {
+  const queueState = await acquireTelegramDeliveryAttempt(leadId, idempotencyKey, channel);
+  if (queueState !== "acquired") {
     await insertDigestDeliveryAttempt({ digestCandidateId: leadId, idempotencyKey: `${idempotencyKey}:duplicate`, channel, status: "skipped", errorMessage: "Duplicate delivery attempt skipped." });
     logEvent("telegram.delivery.skipped", { digestCandidateId: leadId, clientProfileId: lead.clientProfileId, orgId: lead.orgId, reason: "duplicate" });
     return { ok: true };
