@@ -22,6 +22,11 @@ services:
       N8N_PROTOCOL: ${N8N_PROTOCOL:-http}
       N8N_EDITOR_BASE_URL: ${N8N_EDITOR_BASE_URL:-http://localhost:5678}
       N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:-change-me-local-n8n-key}
+      DIGEST_API_KEY: ${DIGEST_API_KEY}
+      RR_APP_BASE_URL: ${RR_APP_BASE_URL:-http://localhost:3000}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
+      TELEGRAM_API_BASE_URL: ${TELEGRAM_API_BASE_URL:-https://api.telegram.org}
     volumes:
       - n8n_data:/home/node/.n8n
 

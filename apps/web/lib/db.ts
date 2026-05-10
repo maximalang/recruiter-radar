@@ -1,6 +1,7 @@
 import { Pool } from "pg";
 
 import { getTelegramConfig, sendTelegramLeadMessage } from "./telegram";
+import { logError, logEvent } from "./runtime";
 
 export const ACTIONABLE_LEAD_STATUSES = [
   "new",
@@ -39,6 +40,11 @@ export type TelegramDeliveryResult =
       error: string;
     };
 
+export type EntitlementResult = {
+  allowed: boolean;
+  reason: string | null;
+};
+
 type LeadsResult = {
   rows: LeadRow[];
   error: string | null;
@@ -52,7 +58,7 @@ export function isActionableLeadStatus(value: FormDataEntryValue | null): value 
   return typeof value === "string" && ACTIONABLE_LEAD_STATUSES.includes(value as ActionableLeadStatus);
 }
 
-function getPool(): Pool | null {
+export function getPool(): Pool | null {
   const connectionString = process.env.DATABASE_URL;
 
   if (!connectionString) {
@@ -258,6 +264,12 @@ export async function sendLeadToTelegram(
   }
 
   let telegramMessageId: number;
+  const idempotencyKey = `telegram:${lead.id}:${lead.status}:${deliveryId}`;
+  await pool.query(
+    `INSERT INTO digest_delivery_attempts (delivery_id, idempotency_key, channel, status)
+     VALUES ($1, $2, 'telegram', 'queued')`,
+    [deliveryId, idempotencyKey]
+  );
 
   try {
     const telegramResult = await sendTelegramLeadMessage(
@@ -274,6 +286,7 @@ export async function sendLeadToTelegram(
     telegramMessageId = telegramResult.messageId;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown Telegram delivery error.";
+    logError("telegram.delivery.failed", error, { leadId, deliveryId });
 
     await pool.query(
       `
@@ -284,6 +297,10 @@ export async function sendLeadToTelegram(
         WHERE id = $1
       `,
       [deliveryId, message]
+    );
+    await pool.query(
+      `UPDATE digest_delivery_attempts SET status = 'failed', error_message = $2 WHERE delivery_id = $1 AND idempotency_key = $3`,
+      [deliveryId, message, idempotencyKey]
     );
 
     return {
@@ -303,8 +320,44 @@ export async function sendLeadToTelegram(
     `,
     [deliveryId, telegramMessageId]
   );
+  await pool.query(
+    `UPDATE digest_delivery_attempts SET status = 'sent' WHERE delivery_id = $1 AND idempotency_key = $2`,
+    [deliveryId, idempotencyKey]
+  );
+  logEvent("telegram.delivery.sent", { leadId, deliveryId });
 
   return {
     ok: true
   };
+}
+
+export async function hasPremiumEntitlement(userId: number): Promise<EntitlementResult> {
+  const pool = getPool();
+  if (!pool) {
+    throw new Error("DATABASE_URL is not set.");
+  }
+
+  const activeSubscription = await pool.query<{ ok: boolean }>(
+    `SELECT TRUE AS ok FROM subscriptions
+     WHERE user_id = $1 AND status IN ('trial', 'active', 'past_due')
+     LIMIT 1`,
+    [userId]
+  );
+  if (activeSubscription.rowCount === 1) {
+    return { allowed: true, reason: null };
+  }
+
+  const activePilot = await pool.query<{ ok: boolean }>(
+    `SELECT TRUE AS ok FROM pilot_enrollments
+     WHERE user_id = $1 AND status = 'active'
+       AND (ends_at IS NULL OR ends_at > NOW())
+     LIMIT 1`,
+    [userId]
+  );
+
+  if (activePilot.rowCount === 1) {
+    return { allowed: true, reason: null };
+  }
+
+  return { allowed: false, reason: "No active subscription or pilot." };
 }

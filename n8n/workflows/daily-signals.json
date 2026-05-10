@@ -24,13 +24,13 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://api.telegram.org/bot8711895424:AAEh1wlbY7j_xG7D41dUZoA7nSQnm-KFLK8/sendMessage",
+        "url": "={{$env.TELEGRAM_API_BASE_URL || 'https://api.telegram.org'}}/bot{{$env.TELEGRAM_BOT_TOKEN}}/sendMessage",
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
             {
               "name": "chat_id",
-              "value": "1256122537"
+              "value": "={{$env.TELEGRAM_CHAT_ID}}"
             },
             {
               "name": "text",
@@ -51,13 +51,13 @@
     },
     {
       "parameters": {
-        "url": "http://host.docker.internal:3000/api/hh/digest",
+        "url": "={{$env.RR_APP_BASE_URL}}/api/hh/digest",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "x-api-key",
-              "value": "recruiter-radar-local-secret"
+              "value": "={{$env.DIGEST_API_KEY}}"
             }
           ]
         },
