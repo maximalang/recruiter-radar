@@ -114,7 +114,15 @@ export async function sendLeadToTelegram(leadId: number): Promise<TelegramDelive
   const { config, error } = getTelegramConfig();
   if (!config) return { ok: false, error: error ?? "Telegram is not configured." };
   try {
-    await sendTelegramLeadMessage({ orgName: lead.orgName, status: lead.status, score: lead.score, lastSignalAt: lead.lastSignalAt, userName: lead.userName }, config);
+    const callbackPrefix = `dgf:${lead.clientProfileId}:${lead.orgId}`;
+    const replyMarkup = {
+      inline_keyboard: [[
+        { text: "✅ Беру", callback_data: `${callbackPrefix}:accepted` },
+        { text: "👎 Мимо", callback_data: `${callbackPrefix}:badfit` },
+        { text: "⏸ Позже", callback_data: `${callbackPrefix}:snooze` }
+      ]]
+    };
+    await sendTelegramLeadMessage({ orgName: lead.orgName, status: lead.status, score: lead.score, lastSignalAt: lead.lastSignalAt, userName: lead.userName }, config, { replyMarkup });
     logEvent("telegram.delivery.sent", { digestCandidateId: leadId, clientProfileId: lead.clientProfileId, orgId: lead.orgId });
     return { ok: true };
   } catch (error) {
@@ -122,6 +130,15 @@ export async function sendLeadToTelegram(leadId: number): Promise<TelegramDelive
     logError("telegram.delivery.failed", error, { digestCandidateId: leadId, clientProfileId: lead.clientProfileId, orgId: lead.orgId });
     return { ok: false, error: message };
   }
+}
+
+
+export async function assertDigestEntitlementByClientProfileId(clientProfileId: string | number): Promise<void> {
+  const pool = getPool();
+  if (!pool) throw new Error("DATABASE_URL is not set.");
+  const result = await pool.query<{ isActive: boolean }>(`SELECT is_active AS "isActive" FROM client_profiles WHERE id = $1 LIMIT 1`, [clientProfileId]);
+  if (result.rowCount !== 1) throw new Error("Client profile not found.");
+  if (!result.rows[0].isActive) throw new Error("Client profile is inactive.");
 }
 
 export async function hasPremiumEntitlement(userId: number): Promise<EntitlementResult> {

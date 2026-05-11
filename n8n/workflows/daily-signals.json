@@ -36,14 +36,7 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "jsonBody": "={{ { clientProfileId: $env.DAILY_DIGEST_CLIENT_PROFILE_ID || $json.clientProfileId } }}",
-        "options": {
-          "retry": {
-            "enabled": true,
-            "maxTries": 3,
-            "waitBetweenTries": 2000
-          }
-        }
+        "jsonBody": "={{ { clientProfileId: $env.DAILY_DIGEST_CLIENT_PROFILE_ID || $json.clientProfileId } }}"
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
@@ -52,7 +45,10 @@
         96
       ],
       "id": "5ad61993-a974-4f71-8fbd-3ce7831c4887",
-      "name": "hh"
+      "name": "hh",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
     }
   ],
   "pinData": {},
