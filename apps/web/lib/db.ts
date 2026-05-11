@@ -114,7 +114,15 @@ export async function sendLeadToTelegram(leadId: number): Promise<TelegramDelive
   const { config, error } = getTelegramConfig();
   if (!config) return { ok: false, error: error ?? "Telegram is not configured." };
   try {
-    await sendTelegramLeadMessage({ orgName: lead.orgName, status: lead.status, score: lead.score, lastSignalAt: lead.lastSignalAt, userName: lead.userName }, config);
+    const callbackPrefix = `dgf:${lead.clientProfileId}:${lead.orgId}`;
+    const replyMarkup = {
+      inline_keyboard: [[
+        { text: "✅ Беру", callback_data: `${callbackPrefix}:accepted` },
+        { text: "👎 Мимо", callback_data: `${callbackPrefix}:badfit` },
+        { text: "⏸ Позже", callback_data: `${callbackPrefix}:snooze` }
+      ]]
+    };
+    await sendTelegramLeadMessage({ orgName: lead.orgName, status: lead.status, score: lead.score, lastSignalAt: lead.lastSignalAt, userName: lead.userName }, config, { replyMarkup });
     logEvent("telegram.delivery.sent", { digestCandidateId: leadId, clientProfileId: lead.clientProfileId, orgId: lead.orgId });
     return { ok: true };
   } catch (error) {
@@ -122,6 +130,48 @@ export async function sendLeadToTelegram(leadId: number): Promise<TelegramDelive
     logError("telegram.delivery.failed", error, { digestCandidateId: leadId, clientProfileId: lead.clientProfileId, orgId: lead.orgId });
     return { ok: false, error: message };
   }
+}
+
+
+export async function assertDigestEntitlementByClientProfileId(clientProfileId: string | number): Promise<void> {
+  const pool = getPool();
+  if (!pool) throw new Error("DATABASE_URL is not set.");
+  const profile = await pool.query<{ isActive: boolean }>(`SELECT is_active AS "isActive" FROM client_profiles WHERE id = $1 LIMIT 1`, [clientProfileId]);
+  if (profile.rowCount !== 1) throw new Error("Client profile not found.");
+  if (!profile.rows[0].isActive) throw new Error("Client profile is inactive.");
+
+  const hasUserIdColumn = await pool.query<{ exists: boolean }>(`
+    SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_name = 'client_profiles'
+        AND column_name = 'user_id'
+    ) AS "exists"
+  `);
+
+  let userId: number | null = null;
+  if (hasUserIdColumn.rows[0]?.exists) {
+    const ownerFromProfile = await pool.query<{ userId: string }>(
+      `SELECT user_id::TEXT AS "userId" FROM client_profiles WHERE id = $1 AND user_id IS NOT NULL LIMIT 1`,
+      [clientProfileId]
+    );
+    if (ownerFromProfile.rowCount === 1) userId = Number(ownerFromProfile.rows[0].userId);
+  }
+
+  if (userId == null) {
+    const ownerFallback = await pool.query<{ userId: string }>(`
+      SELECT user_id::TEXT AS "userId"
+      FROM checkout_orders
+      WHERE payload ->> 'clientProfileId' = $1
+      ORDER BY created_at DESC
+      LIMIT 1
+    `, [String(clientProfileId)]);
+    if (ownerFallback.rowCount === 1) userId = Number(ownerFallback.rows[0].userId);
+  }
+
+  if (userId == null) throw new Error("Client profile entitlement owner not found.");
+  const entitlement = await hasPremiumEntitlement(userId);
+  if (!entitlement.allowed) throw new Error(entitlement.reason ?? "No active subscription or pilot.");
 }
 
 export async function hasPremiumEntitlement(userId: number): Promise<EntitlementResult> {

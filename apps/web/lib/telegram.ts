@@ -229,11 +229,13 @@ export async function answerTelegramCallbackQuery(input: {
 
 export async function sendTelegramLeadMessage(
   lead: TelegramLeadMessage,
-  config: TelegramConfig
+  config: TelegramConfig,
+  options?: { replyMarkup?: unknown }
 ): Promise<TelegramSendResult> {
   const result = await callTelegramApi<{ message_id: number }>("sendMessage", config, {
     chat_id: config.chatId,
-    text: formatTelegramLeadMessage(lead)
+    text: formatTelegramLeadMessage(lead),
+    ...(options?.replyMarkup ? { reply_markup: options.replyMarkup } : {})
   });
 
   return {
