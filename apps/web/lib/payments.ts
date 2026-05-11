@@ -132,6 +132,14 @@ export type PilotOrderTestDigestResult =
       itemsCount: 0;
     };
 
+export type PilotActivationReadiness = {
+  profileExists: boolean;
+  profileActive: boolean;
+  telegramConnected: boolean;
+  entitlementActive: boolean;
+  canRequestFirstDigest: boolean;
+};
+
 export type PaymentCheckoutSessionInput = {
   order: CheckoutOrder;
   successUrl: string;
@@ -426,6 +434,32 @@ export async function ensurePilotOrderOnboardingReady(
   }
 
   return ensurePaidPilotOrderReady(order);
+}
+
+export async function getPilotActivationReadiness(
+  orderId: string | number
+): Promise<PilotActivationReadiness | null> {
+  const order = await ensurePilotOrderOnboardingReady(orderId);
+
+  if (!order || order.productCode !== "pilot") {
+    return null;
+  }
+
+  const profile = order.payload.clientProfileId
+    ? await getClientProfileById(order.payload.clientProfileId).catch(() => null)
+    : null;
+  const profileExists = profile !== null;
+  const profileActive = profile?.isActive === true;
+  const telegramConnected = Boolean(profile?.telegramChatId);
+  const entitlementActive = order.status === "paid";
+
+  return {
+    profileExists,
+    profileActive,
+    telegramConnected,
+    entitlementActive,
+    canRequestFirstDigest: profileExists && profileActive && telegramConnected && entitlementActive
+  };
 }
 
 export async function confirmPilotOrderProfile(input: {
