@@ -37,6 +37,7 @@ import {
   type CheckoutOrderOnboardingStep
 } from "../../../../lib/payments";
 import { getTelegramConnectLinkState } from "../../../../lib/telegramConnect";
+import { getTelegramBotToken } from "../../../../lib/telegram";
 import { getWebPushConnectLinkState } from "../../../../lib/webPushConnect";
 import {
   completePilotOnboardingAction,
@@ -154,6 +155,10 @@ export default async function PilotOnboardingPage({
   }
 
   const hasTestDigestSent = Boolean(order.payload.onboardingTestDigestSentAt);
+  const deliveryPrerequisitesReady = Boolean(profile) && Boolean(profile?.telegramChatId);
+  const firstDigestHasCandidates = previewItems.length > 0;
+  const telegramBotDeliveryConfigured = getTelegramBotToken().botToken !== null;
+  const firstDigestReady = deliveryPrerequisitesReady && firstDigestHasCandidates && telegramBotDeliveryConfigured;
   const visiblePreviewItems = previewItems.slice(0, VISIBLE_PREVIEW_ITEMS);
   const hiddenPreviewItems = previewItems.slice(VISIBLE_PREVIEW_ITEMS);
   const telegramDeliveryLabel = telegramConnectState?.botUsername
@@ -507,11 +512,32 @@ export default async function PilotOnboardingPage({
                   description={
                     hasTestDigestSent
                       ? telegramConnectState?.botUsername
-                        ? `Следующие радары будут приходить в тот же чат через @${telegramConnectState.botUsername}.`
-                        : "Следующие радары будут приходить в тот же подключённый чат."
-                      : "Пилот уже активен. Как только появятся подходящие компании, они будут приходить автоматически."
+                        ? `Откройте Telegram: первый радар уже отправлен через @${telegramConnectState.botUsername}.`
+                        : "Откройте Telegram: первый радар уже отправлен в подключённый чат."
+                      : firstDigestReady
+                        ? "Первый радар можно отправить сразу."
+                        : !telegramBotDeliveryConfigured
+                          ? "Чтобы получить первый радар, завершите настройку доставки Telegram в системе Recruiter Radar."
+                          : "Дождитесь сильного сигнала, уточните профиль или завершите настройку и вернитесь позже."
                   }
                 />
+
+                <div style={{ display: "grid", gap: "8px" }}>
+                  <SummaryRow label="Профиль создан" value={profile ? "Да" : "Нет"} />
+                  <SummaryRow label="Telegram подключён" value={profile?.telegramChatId ? "Да" : "Нет"} />
+                  <SummaryRow
+                    label="Первый радар готов"
+                    value={
+                      firstDigestReady
+                        ? "Да"
+                        : !telegramBotDeliveryConfigured
+                          ? "Нужна настройка доставки Telegram"
+                          : firstDigestHasCandidates
+                            ? "Ещё нет"
+                            : "Ждём сильный сигнал"
+                    }
+                  />
+                </div>
 
                 {showPushRadarView ? (
                   previewItems.length > 0 ? (
