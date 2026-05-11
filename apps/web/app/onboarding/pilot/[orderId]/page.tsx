@@ -200,13 +200,13 @@ export default async function PilotOnboardingPage({
           />
 
           <div style={{ display: "grid", gap: "8px" }}>
-            <SummaryRow label="Client profile created" value={readiness?.profileExists ? "да" : "нет"} />
+            <SummaryRow label="Профиль клиента создан" value={readiness?.profileExists ? "да" : "нет"} />
             <SummaryRow
-              label="Telegram connected"
+              label="Telegram подключён"
               value={readiness?.telegramConnected ? "да" : "нет"}
             />
             <SummaryRow
-              label="First digest ready"
+              label="Первая подборка готова"
               value={readiness?.canRequestFirstDigest ? "да" : "ждёт предыдущие шаги"}
             />
           </div>
