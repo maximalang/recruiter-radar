@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false }, { status: 500 });
   }
 
-  const inserted = await pool.query<{ id: string }>(
+  await pool.query<{ id: string }>(
     `INSERT INTO billing_webhook_events (provider, external_event_id, idempotency_key, payload)
      VALUES ($1, $2, $3, $4::jsonb)
      ON CONFLICT (provider, idempotency_key) DO NOTHING
@@ -34,7 +34,17 @@ export async function POST(request: Request) {
     [provider, externalEventId, idempotencyKey, JSON.stringify(body)]
   );
 
-  if (inserted.rowCount === 0) {
+  const claimed = await pool.query<{ status: string }>(
+    `UPDATE billing_webhook_events
+     SET status = 'processing', error_message = NULL, processed_at = NULL
+     WHERE provider = $1
+       AND idempotency_key = $2
+       AND status IN ('received', 'failed')
+     RETURNING status`,
+    [provider, idempotencyKey]
+  );
+
+  if (claimed.rowCount === 0) {
     const existing = await pool.query<{ status: string }>(
       `SELECT status FROM billing_webhook_events
        WHERE provider = $1 AND idempotency_key = $2
@@ -42,10 +52,7 @@ export async function POST(request: Request) {
       [provider, idempotencyKey]
     );
     const status = existing.rowCount === 1 ? existing.rows[0].status : "received";
-
-    if (status === "processed") {
-      return NextResponse.json({ ok: true, duplicate: true, status });
-    }
+    return NextResponse.json({ ok: true, duplicate: true, status });
   }
 
   const event = await processPaymentWebhook(provider, webhookRequest);

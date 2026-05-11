@@ -1,4 +1,5 @@
 ﻿import Link from "next/link";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 
 import { FormSubmitButton } from "../../../ui/form-submit-button";
@@ -39,7 +40,6 @@ import {
 } from "../../../../lib/payments";
 import { getTelegramConnectLinkState } from "../../../../lib/telegramConnect";
 import { getWebPushConnectLinkState } from "../../../../lib/webPushConnect";
-import { resolveCheckoutOwnerId } from "../../../../lib/publicProduct";
 import {
   completePilotOnboardingAction,
   confirmPilotProfileAction,
@@ -108,7 +108,7 @@ export default async function PilotOnboardingPage({
   const resolvedSearchParams = (await searchParams) ?? {};
   const errorMessage = getSearchParamValue(resolvedSearchParams, "error");
   const notice = getSearchParamValue(resolvedSearchParams, "notice");
-  const ownerId = resolveCheckoutOwnerId();
+  const ownerId = (await cookies()).get("rr_user_id")?.value?.trim() ?? null;
 
   if (!ownerId) {
     notFound();

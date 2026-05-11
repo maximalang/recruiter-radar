@@ -1,15 +1,16 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { startCheckoutOrder } from "../../lib/payments";
-import { buildCheckoutHref, readPublicPreviewInput, resolveCheckoutOwnerId } from "../../lib/publicProduct";
+import { buildCheckoutHref, readPublicPreviewInput } from "../../lib/publicProduct";
 
 export const dynamic = "force-dynamic";
 
 export default async function CheckoutPage({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
   const input = readPublicPreviewInput(searchParams);
   const restartHref = buildCheckoutHref(input);
-  const ownerId = resolveCheckoutOwnerId();
+  const ownerId = (await cookies()).get("rr_user_id")?.value?.trim() ?? null;
 
   async function startCheckoutAction() {
     "use server";
@@ -38,7 +39,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Rec
     <main style={{ maxWidth: 720, margin: "40px auto", padding: "0 16px", fontFamily: "Inter, sans-serif" }}>
       <h1>Checkout</h1>
       <p>Оплата запускается только после явного подтверждения.</p>
-      {!ownerId ? <p>Не удалось определить владельца заказа. Обновите параметры пилота.</p> : null}
+      {!ownerId ? <p>Войдите в аккаунт, чтобы запустить пилот на свой профиль.</p> : null}
       <form action={startCheckoutAction}>
         <button type="submit" disabled={!ownerId}>Перейти к оплате</button>
       </form>
