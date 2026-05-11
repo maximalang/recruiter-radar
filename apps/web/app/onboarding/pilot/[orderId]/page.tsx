@@ -31,6 +31,7 @@ import {
 } from "../../../../lib/clientProfiles";
 import { getHhDigestItems } from "../../../../lib/hhDigest";
 import { getClientProfileWebPushStatuses } from "../../../../lib/webPushSubscriptions";
+import { getTelegramBotToken } from "../../../../lib/telegram";
 import {
   ensurePilotOrderOnboardingReady,
   getPilotActivationReadiness,
@@ -156,6 +157,11 @@ export default async function PilotOnboardingPage({
   }
 
   const hasTestDigestSent = Boolean(order.payload.onboardingTestDigestSentAt);
+  const { botToken: normalizedTelegramBotToken } = getTelegramBotToken();
+  const deliveryPrerequisitesReady = Boolean(profile?.telegramChatId) && Boolean(normalizedTelegramBotToken);
+  const firstDigestHasCandidates = previewItems.length > 0;
+  const firstDigestReady = hasTestDigestSent || (deliveryPrerequisitesReady && firstDigestHasCandidates);
+  const previewUnavailableMessage = "Не удалось обновить текущий радар. Попробуйте позже.";
   const confirmPilotProfileBoundAction = confirmPilotProfileAction.bind(null, order.id);
   const sendPilotTestDigestBoundAction = sendPilotTestDigestAction.bind(null, order.id);
   const completePilotOnboardingBoundAction = completePilotOnboardingAction.bind(null, order.id);
@@ -210,7 +216,15 @@ export default async function PilotOnboardingPage({
             />
             <SummaryRow
               label="Первая подборка готова"
-              value={readiness?.canRequestFirstDigest ? "да" : "ждёт предыдущие шаги"}
+              value={
+                hasTestDigestSent
+                  ? "отправлен"
+                  : firstDigestReady
+                    ? "готово"
+                    : readiness?.canRequestFirstDigest
+                      ? "да"
+                      : "ждёт предыдущие шаги"
+              }
             />
           </div>
 
@@ -435,7 +449,7 @@ export default async function PilotOnboardingPage({
                 />
 
                 {previewError ? (
-                  <NoticeBox tone="danger" title="Не удалось собрать подборку" description={previewError} />
+                  <NoticeBox tone="danger" title="Не удалось собрать подборку" description={previewUnavailableMessage} />
                 ) : previewItems.length === 0 ? (
                   <>
                     <NoticeBox
@@ -533,7 +547,17 @@ export default async function PilotOnboardingPage({
                 <NoticeBox
                   tone="info"
                   title="Что делать дальше"
-                  description="Откройте первую подборку в Telegram, отметьте релевантность карточек и используйте обратную связь. Это улучшает, какие компании и почему сейчас мы показываем в следующих радарах."
+                  description={
+                    hasTestDigestSent
+                      ? "Откройте отправленный радар в Telegram, отмечайте релевантность карточек и используйте обратную связь."
+                      : previewError
+                        ? "Не удалось обновить текущий радар. Попробуйте позже."
+                        : !deliveryPrerequisitesReady
+                          ? "Вернитесь к шагу подключения Telegram, чтобы включить доставку радара."
+                          : firstDigestHasCandidates
+                            ? "Вернитесь к шагу просмотра радара, чтобы отправить первую подборку в Telegram."
+                            : "Пилот уже активен. Дождитесь автоматической доставки, когда появятся подходящие компании."
+                  }
                 />
 
                 {showPushRadarView ? (
@@ -575,7 +599,11 @@ export default async function PilotOnboardingPage({
                     <NoticeBox
                       tone="neutral"
                       title="Сегодня радар спокоен"
-                      description="Сильных компаний по текущему профилю пока нет. Можно вернуться позже."
+                      description={
+                        previewError
+                          ? previewUnavailableMessage
+                          : "Сильных компаний по текущему профилю пока нет. Можно вернуться позже."
+                      }
                     />
                   )
                 ) : null}
@@ -748,4 +776,3 @@ function buildOnboardingStepFocus(input: {
     next: "вернуться позже или включить быстрый возврат в браузере"
   };
 }
-
