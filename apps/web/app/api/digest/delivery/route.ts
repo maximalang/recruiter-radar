@@ -6,6 +6,8 @@ import { assertDigestEntitlementByClientProfileId, getPool, sendLeadToTelegram }
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+const PROCESSING_STALE_AFTER_MINUTES = 10;
+
 export async function POST(request: Request) {
   const digestApiKey = process.env.DIGEST_API_KEY;
   if (!digestApiKey) return NextResponse.json({ error: "DIGEST_API_KEY is not configured." }, { status: 500 });
@@ -70,7 +72,7 @@ export async function POST(request: Request) {
           [row.id, attemptKey]
         );
         const existingStatus = existingAttempt.rows[0]?.status;
-        if (existingStatus === 'sent' || existingStatus === 'processing') {
+        if (existingStatus === 'sent') {
           skipped += 1;
           continue;
         }
@@ -78,8 +80,13 @@ export async function POST(request: Request) {
         const reclaimed = await pool.query(
           `UPDATE digest_delivery_attempts
            SET status = 'processing', error_message = NULL, attempted_at = NOW()
-           WHERE digest_candidate_id = $1 AND idempotency_key = $2 AND status = 'failed'`,
-          [row.id, attemptKey]
+           WHERE digest_candidate_id = $1
+             AND idempotency_key = $2
+             AND (
+               status = 'failed'
+               OR (status = 'processing' AND attempted_at < NOW() - ($3::INT * INTERVAL '1 minute'))
+             )`,
+          [row.id, attemptKey, PROCESSING_STALE_AFTER_MINUTES]
         );
         if (reclaimed.rowCount !== 1) {
           skipped += 1;
@@ -87,7 +94,20 @@ export async function POST(request: Request) {
         }
       }
 
-      const result = await sendLeadToTelegram(row.id);
+      let result: Awaited<ReturnType<typeof sendLeadToTelegram>>;
+      try {
+        result = await sendLeadToTelegram(row.id);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown delivery error';
+        failed += 1;
+        failures.push({ digestCandidateId: row.id, error: message });
+        await pool.query(
+          `UPDATE digest_delivery_attempts SET status = 'failed', error_message = LEFT($3, 1000), attempted_at = NOW() WHERE digest_candidate_id = $1 AND idempotency_key = $2`,
+          [row.id, attemptKey, message]
+        );
+        continue;
+      }
+
       if (result.ok) {
         sent += 1;
         await pool.query(
