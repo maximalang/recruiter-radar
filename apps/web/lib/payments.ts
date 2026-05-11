@@ -427,10 +427,48 @@ export async function getCheckoutOrderById(
   return result.rowCount === 1 ? mapCheckoutOrderRow(result.rows[0]) : null;
 }
 
-export async function ensurePilotOrderOnboardingReady(
-  orderId: string | number
+
+async function getCheckoutOrderByIdForOwner(
+  orderId: string | number,
+  ownerId: string | number
 ): Promise<CheckoutOrder | null> {
-  const order = await getCheckoutOrderById(orderId);
+  const normalizedOrderId = normalizeCheckoutOrderId(orderId);
+  const pool = getPool();
+
+  if (!pool) {
+    throw new Error("DATABASE_URL is not set.");
+  }
+
+  const result = await pool.query<CheckoutOrderRow>(`
+    SELECT
+      id::TEXT AS id,
+      plan_code AS "productCode",
+      (amount_rub * 100) AS "amountMinor",
+      currency,
+      status,
+      customer_name AS "customerName",
+      customer_contact AS "customerContact",
+      payload,
+      provider,
+      provider_payment_id AS "providerPaymentId",
+      created_at::TEXT AS "createdAt",
+      updated_at::TEXT AS "updatedAt",
+      paid_at::TEXT AS "paidAt"
+    FROM checkout_orders
+    WHERE id = $1 AND user_id::TEXT = $2
+    LIMIT 1
+  `, [normalizedOrderId, String(ownerId)]);
+
+  return result.rowCount === 1 ? mapCheckoutOrderRow(result.rows[0]) : null;
+}
+export async function ensurePilotOrderOnboardingReady(
+  orderId: string | number,
+  options?: { ownerId?: string | number | null }
+): Promise<CheckoutOrder | null> {
+  const normalizedOwnerId = options?.ownerId == null ? null : normalizeCheckoutOrderUserId(options.ownerId);
+  const order = normalizedOwnerId
+    ? await getCheckoutOrderByIdForOwner(orderId, normalizedOwnerId)
+    : await getCheckoutOrderById(orderId);
 
   if (!order) {
     return null;

@@ -39,6 +39,7 @@ import {
 } from "../../../../lib/payments";
 import { getTelegramConnectLinkState } from "../../../../lib/telegramConnect";
 import { getWebPushConnectLinkState } from "../../../../lib/webPushConnect";
+import { resolveCheckoutOwnerId } from "../../../../lib/publicProduct";
 import {
   completePilotOnboardingAction,
   confirmPilotProfileAction,
@@ -107,7 +108,13 @@ export default async function PilotOnboardingPage({
   const resolvedSearchParams = (await searchParams) ?? {};
   const errorMessage = getSearchParamValue(resolvedSearchParams, "error");
   const notice = getSearchParamValue(resolvedSearchParams, "notice");
-  const order = await ensurePilotOrderOnboardingReady(resolvedParams.orderId);
+  const ownerId = resolveCheckoutOwnerId();
+
+  if (!ownerId) {
+    notFound();
+  }
+
+  const order = await ensurePilotOrderOnboardingReady(resolvedParams.orderId, { ownerId });
 
   if (!order) {
     notFound();
