@@ -1,4 +1,4 @@
-import { getDigestPreviewItems, runDigestForClientProfile } from "./digest"
+import { getDigestPreviewItems } from "./digest"
 
 export type HhDigestItem = {
   rank: number
@@ -20,9 +20,7 @@ export type HhDigestItem = {
 export async function getHhDigestItems(input?: {
   clientProfileId?: string | null
 }): Promise<HhDigestItem[]> {
-  const items = input?.clientProfileId
-    ? (await runDigestForClientProfile({ clientProfileId: input.clientProfileId })).items
-    : await getDigestPreviewItems(10)
+  const items = await getDigestPreviewItems(10)
 
   return items.map((item) => ({
     rank: item.rank,

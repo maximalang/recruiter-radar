@@ -45,9 +45,15 @@ function readOptionalNumber(formData: FormData, key: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-export async function confirmPilotProfileAction(formData: FormData) {
+export async function confirmPilotProfileAction(expectedOrderId: string, formData: FormData) {
+  const formOrderId = readRequiredText(formData, "orderId");
+
+  if (formOrderId !== expectedOrderId) {
+    throw new Error("Order mismatch.");
+  }
+
   await confirmPilotOrderProfile({
-    orderId: readRequiredText(formData, "orderId"),
+    orderId: expectedOrderId,
     agencyName: readRequiredText(formData, "agencyName"),
     targetCity: readOptionalText(formData, "targetCity"),
     specialization: readOptionalText(formData, "specialization"),
@@ -57,10 +63,22 @@ export async function confirmPilotProfileAction(formData: FormData) {
   });
 }
 
-export async function sendPilotTestDigestAction(formData: FormData) {
-  await sendPilotOrderTestDigest(readRequiredText(formData, "orderId"));
+export async function sendPilotTestDigestAction(expectedOrderId: string, formData: FormData) {
+  const formOrderId = readRequiredText(formData, "orderId");
+
+  if (formOrderId !== expectedOrderId) {
+    throw new Error("Order mismatch.");
+  }
+
+  await sendPilotOrderTestDigest(expectedOrderId);
 }
 
-export async function completePilotOnboardingAction(formData: FormData) {
-  await completePilotOrderOnboarding(readRequiredText(formData, "orderId"));
+export async function completePilotOnboardingAction(expectedOrderId: string, formData: FormData) {
+  const formOrderId = readRequiredText(formData, "orderId");
+
+  if (formOrderId !== expectedOrderId) {
+    throw new Error("Order mismatch.");
+  }
+
+  await completePilotOrderOnboarding(expectedOrderId);
 }

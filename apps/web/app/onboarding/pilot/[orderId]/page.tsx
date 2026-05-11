@@ -156,6 +156,9 @@ export default async function PilotOnboardingPage({
   }
 
   const hasTestDigestSent = Boolean(order.payload.onboardingTestDigestSentAt);
+  const confirmPilotProfileBoundAction = confirmPilotProfileAction.bind(null, order.id);
+  const sendPilotTestDigestBoundAction = sendPilotTestDigestAction.bind(null, order.id);
+  const completePilotOnboardingBoundAction = completePilotOnboardingAction.bind(null, order.id);
   const visiblePreviewItems = previewItems.slice(0, VISIBLE_PREVIEW_ITEMS);
   const hiddenPreviewItems = previewItems.slice(VISIBLE_PREVIEW_ITEMS);
   const telegramDeliveryLabel = telegramConnectState?.botUsername
@@ -272,7 +275,7 @@ export default async function PilotOnboardingPage({
                   description="Оставьте только то, что реально меняет подборку."
                 />
 
-                <form action={confirmPilotProfileAction} style={formStyle}>
+                <form action={confirmPilotProfileBoundAction} style={formStyle}>
                   <input type="hidden" name="orderId" value={order.id} />
 
                   <label style={fieldStyle}>
@@ -448,7 +451,7 @@ export default async function PilotOnboardingPage({
                       >
                         Вернуться к профилю
                       </Link>
-                      <form action={completePilotOnboardingAction} style={{ margin: 0 }}>
+                      <form action={completePilotOnboardingBoundAction} style={{ margin: 0 }}>
                         <input type="hidden" name="orderId" value={order.id} />
                         <FormSubmitButton
                           idleLabel="Закончить и вернуться позже"
@@ -461,7 +464,7 @@ export default async function PilotOnboardingPage({
                 ) : (
                   <>
                     <div style={{ display: "grid", gap: "10px" }}>
-                      <form action={sendPilotTestDigestAction} style={{ margin: 0 }}>
+                      <form action={sendPilotTestDigestBoundAction} style={{ margin: 0 }}>
                         <input type="hidden" name="orderId" value={order.id} />
                         <FormSubmitButton
                           idleLabel="Отправить первый радар"
