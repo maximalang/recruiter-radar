@@ -159,14 +159,24 @@ export async function assertDigestEntitlementByClientProfileId(clientProfileId: 
   }
 
   if (userId == null) {
-    const ownerFallback = await pool.query<{ userId: string }>(`
-      SELECT user_id::TEXT AS "userId"
-      FROM checkout_orders
-      WHERE payload ->> 'clientProfileId' = $1
-      ORDER BY created_at DESC
-      LIMIT 1
-    `, [String(clientProfileId)]);
-    if (ownerFallback.rowCount === 1) userId = Number(ownerFallback.rows[0].userId);
+    const hasCheckoutOwnerColumn = await pool.query<{ exists: boolean }>(`
+      SELECT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'checkout_orders'
+          AND column_name = 'user_id'
+      ) AS "exists"
+    `);
+
+    if (hasCheckoutOwnerColumn.rows[0]?.exists) {
+      const ownerFallback = await pool.query<{ userId: string }>(`
+        SELECT user_id::TEXT AS "userId"
+        FROM checkout_orders
+        ORDER BY created_at DESC
+        LIMIT 1
+      `);
+      if (ownerFallback.rowCount === 1) userId = Number(ownerFallback.rows[0].userId);
+    }
   }
 
   if (userId == null) throw new Error("Client profile entitlement owner not found.");
@@ -177,9 +187,18 @@ export async function assertDigestEntitlementByClientProfileId(clientProfileId: 
 export async function hasPremiumEntitlement(userId: number): Promise<EntitlementResult> {
   const pool = getPool();
   if (!pool) throw new Error("DATABASE_URL is not set.");
-  const activeSubscription = await pool.query<{ ok: boolean }>(`SELECT TRUE AS ok FROM subscriptions WHERE user_id = $1 AND status IN ('trial', 'active', 'past_due') LIMIT 1`, [userId]);
-  if (activeSubscription.rowCount === 1) return { allowed: true, reason: null };
-  const activePilot = await pool.query<{ ok: boolean }>(`SELECT TRUE AS ok FROM pilot_enrollments WHERE user_id = $1 AND status = 'active' AND (ends_at IS NULL OR ends_at > NOW()) LIMIT 1`, [userId]);
-  if (activePilot.rowCount === 1) return { allowed: true, reason: null };
+
+  const hasSubscriptions = await pool.query<{ exists: boolean }>(`SELECT TO_REGCLASS('public.subscriptions') IS NOT NULL AS "exists"`);
+  if (hasSubscriptions.rows[0]?.exists) {
+    const activeSubscription = await pool.query<{ ok: boolean }>(`SELECT TRUE AS ok FROM subscriptions WHERE user_id = $1 AND status IN ('trial', 'active', 'past_due') LIMIT 1`, [userId]);
+    if (activeSubscription.rowCount === 1) return { allowed: true, reason: null };
+  }
+
+  const hasPilotEnrollments = await pool.query<{ exists: boolean }>(`SELECT TO_REGCLASS('public.pilot_enrollments') IS NOT NULL AS "exists"`);
+  if (hasPilotEnrollments.rows[0]?.exists) {
+    const activePilot = await pool.query<{ ok: boolean }>(`SELECT TRUE AS ok FROM pilot_enrollments WHERE user_id = $1 AND status = 'active' AND (ends_at IS NULL OR ends_at > NOW()) LIMIT 1`, [userId]);
+    if (activePilot.rowCount === 1) return { allowed: true, reason: null };
+  }
+
   return { allowed: false, reason: "No active subscription or pilot." };
 }

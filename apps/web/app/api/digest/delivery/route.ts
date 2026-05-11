@@ -46,29 +46,32 @@ export async function POST(request: Request) {
     const failures: Array<{ digestCandidateId: number; error: string }> = [];
 
     for (const row of candidates.rows) {
-      const priorSent = await pool.query<{ ok: boolean }>(
-        `SELECT TRUE AS ok FROM digest_delivery_attempts WHERE digest_candidate_id = $1 AND channel = 'telegram' AND status = 'sent' LIMIT 1`,
-        [row.id]
+      const attemptKey = `dg:${runId}:candidate:${row.id}:delivery`;
+      const claim = await pool.query<{ id: string }>(
+        `INSERT INTO digest_delivery_attempts (digest_candidate_id, idempotency_key, channel, status)
+         VALUES ($1, $2, 'telegram', 'queued')
+         ON CONFLICT (digest_candidate_id, idempotency_key) DO NOTHING
+         RETURNING id::TEXT AS "id"`,
+        [row.id, attemptKey]
       );
-      if (priorSent.rowCount === 1) {
+      if (claim.rowCount !== 1) {
         skipped += 1;
         continue;
       }
 
-      const attemptKey = `dg:${runId}:candidate:${row.id}:ts:${Date.now()}`;
       const result = await sendLeadToTelegram(row.id);
       if (result.ok) {
         sent += 1;
         await pool.query(
-          `INSERT INTO digest_delivery_attempts (digest_candidate_id, idempotency_key, channel, status) VALUES ($1, $2, 'telegram', 'sent')`,
-          [row.id, attemptKey]
+          `UPDATE digest_delivery_attempts SET status = 'sent', attempted_at = NOW(), error_message = NULL WHERE id = $1`,
+          [claim.rows[0].id]
         );
       } else {
         failed += 1;
         failures.push({ digestCandidateId: row.id, error: result.error });
         await pool.query(
-          `INSERT INTO digest_delivery_attempts (digest_candidate_id, idempotency_key, channel, status, error_message) VALUES ($1, $2, 'telegram', 'failed', LEFT($3, 1000))`,
-          [row.id, attemptKey, result.error]
+          `UPDATE digest_delivery_attempts SET status = 'failed', attempted_at = NOW(), error_message = LEFT($2, 1000) WHERE id = $1`,
+          [claim.rows[0].id, result.error]
         );
       }
     }
