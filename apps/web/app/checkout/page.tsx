@@ -9,9 +9,18 @@ export const dynamic = "force-dynamic";
 export default async function CheckoutPage({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
   const input = readPublicPreviewInput(searchParams);
   const restartHref = buildCheckoutHref(input);
+  const rawOwnerId = searchParams.ownerId;
+  const ownerId = typeof rawOwnerId === "string" && rawOwnerId.trim() !== "" ? rawOwnerId : null;
 
-  try {
+  async function startCheckoutAction() {
+    "use server";
+
+    if (!ownerId) {
+      redirect(`${restartHref}${restartHref.includes("?") ? "&" : "?"}checkoutError=missing-owner`);
+    }
+
     const result = await startCheckoutOrder({
+      userId: ownerId,
       productCode: "pilot",
       customerName: "Self-serve pilot checkout",
       customerContact: "checkout@recruiter-radar.local",
@@ -24,13 +33,17 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Rec
     });
 
     redirect(result.redirectUrl);
-  } catch {
-    return (
-      <main style={{ maxWidth: 720, margin: "40px auto", padding: "0 16px", fontFamily: "Inter, sans-serif" }}>
-        <h1>Checkout</h1>
-        <p>Не удалось запустить оплату. Попробуйте снова после обновления параметров.</p>
-        <p><Link href={restartHref}>Обновить параметры пилота</Link></p>
-      </main>
-    );
   }
+
+  return (
+    <main style={{ maxWidth: 720, margin: "40px auto", padding: "0 16px", fontFamily: "Inter, sans-serif" }}>
+      <h1>Checkout</h1>
+      <p>Оплата запускается только после явного подтверждения.</p>
+      {!ownerId ? <p>Не удалось определить владельца заказа. Обновите параметры пилота.</p> : null}
+      <form action={startCheckoutAction}>
+        <button type="submit" disabled={!ownerId}>Перейти к оплате</button>
+      </form>
+      <p><Link href={restartHref}>Обновить параметры пилота</Link></p>
+    </main>
+  );
 }

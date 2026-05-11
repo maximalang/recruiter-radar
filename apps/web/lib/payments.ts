@@ -201,7 +201,7 @@ export type PaymentProviderSetupState = {
 };
 
 type StartCheckoutOrderInput = {
-  userId?: string | number | null;
+  userId: string | number;
   productCode: PublicPlan["code"];
   customerName: string;
   customerContact: string;
@@ -283,9 +283,10 @@ export function getPaymentProviderSetupState(): PaymentProviderSetupState {
 }
 
 export async function startCheckoutOrder(input: StartCheckoutOrderInput): Promise<StartCheckoutOrderResult> {
+  const checkoutOwnerId = normalizeCheckoutOrderUserId(input.userId);
   const plan = getPublicPlanByCode(input.productCode);
   let order = await createCheckoutOrder({
-    userId: input.userId ?? 1,
+    userId: checkoutOwnerId,
     productCode: input.productCode,
     amountMinor: plan.amountMinor,
     currency: plan.currency,
