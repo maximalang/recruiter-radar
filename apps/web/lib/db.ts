@@ -17,7 +17,7 @@ type LeadRow = {
   userName: string;
 };
 
-type LeadDeliveryRow = LeadRow & { clientProfileId: number; orgId: number };
+type LeadDeliveryRow = LeadRow & { clientProfileId: number; orgId: number; telegramChatId: string | null };
 export type TelegramDeliveryResult = { ok: true } | { ok: false; error: string };
 export type EntitlementResult = { allowed: boolean; reason: string | null };
 type LeadsResult = { rows: LeadRow[]; error: string | null };
@@ -97,7 +97,8 @@ async function getLeadDeliveryRow(leadId: number): Promise<LeadDeliveryRow | nul
       COALESCE(cdos.feedback_status::text, 'new') AS "status",
       dc.total_score AS "score",
       dc.created_at::text AS "lastSignalAt",
-      cp.agency_name AS "userName"
+      cp.agency_name AS "userName",
+      cp.telegram_chat_id::text AS "telegramChatId"
     FROM digest_candidates dc
     INNER JOIN orgs o ON o.id = dc.org_id
     INNER JOIN client_profiles cp ON cp.id = dc.client_profile_id
@@ -111,6 +112,7 @@ async function getLeadDeliveryRow(leadId: number): Promise<LeadDeliveryRow | nul
 export async function sendLeadToTelegram(leadId: number): Promise<TelegramDeliveryResult> {
   const lead = await getLeadDeliveryRow(leadId);
   if (!lead) return { ok: false, error: "Digest candidate not found." };
+  if (!lead.telegramChatId) return { ok: false, error: "Client profile has no linked Telegram chat." };
   const { config, error } = getTelegramConfig();
   if (!config) return { ok: false, error: error ?? "Telegram is not configured." };
   try {
@@ -122,7 +124,11 @@ export async function sendLeadToTelegram(leadId: number): Promise<TelegramDelive
         { text: "⏸ Позже", callback_data: `${callbackPrefix}:snooze` }
       ]]
     };
-    await sendTelegramLeadMessage({ orgName: lead.orgName, status: lead.status, score: lead.score, lastSignalAt: lead.lastSignalAt, userName: lead.userName }, config, { replyMarkup });
+    await sendTelegramLeadMessage(
+      { orgName: lead.orgName, status: lead.status, score: lead.score, lastSignalAt: lead.lastSignalAt, userName: lead.userName },
+      { ...config, chatId: lead.telegramChatId },
+      { replyMarkup }
+    );
     logEvent("telegram.delivery.sent", { digestCandidateId: leadId, clientProfileId: lead.clientProfileId, orgId: lead.orgId });
     return { ok: true };
   } catch (error) {

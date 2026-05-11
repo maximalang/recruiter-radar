@@ -6,7 +6,8 @@ import {
   buildCheckoutHref,
   getPublicSampleDigestState,
   hasPublicPreviewInput,
-  readPublicPreviewInput
+  readPublicPreviewInput,
+  resolveCheckoutOwnerId
 } from "../lib/publicProduct";
 import { buildHhRadarProbabilitySummary } from "../lib/hhProbabilities";
 import {
@@ -161,7 +162,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const previewInput = readPublicPreviewInput(resolvedSearchParams);
   const previewState = await getPublicSampleDigestState(previewInput);
   const hasPreview = hasPublicPreviewInput(previewInput);
-  const checkoutHref = buildCheckoutHref(previewInput);
+  const checkoutHref = buildCheckoutHref({ ...previewInput, ownerId: resolveCheckoutOwnerId() });
   const paymentSetup = getPaymentProviderSetupState();
   const faqItems = buildFaqItems(paymentSetup.configured);
   const visiblePreviewItems = previewState.items.slice(0, VISIBLE_PREVIEW_ITEMS);

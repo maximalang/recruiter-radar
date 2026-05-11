@@ -112,6 +112,7 @@ export function buildCheckoutHref(input: {
   includeKeywords?: string | null
   excludeKeywords?: string | null
   dailyDigestLimit?: number | null
+  ownerId?: string | number | null
 }): string {
   const params = new URLSearchParams()
 
@@ -122,9 +123,17 @@ export function buildCheckoutHref(input: {
   if (typeof input.dailyDigestLimit === "number") {
     params.set("dailyDigestLimit", String(input.dailyDigestLimit))
   }
+  if (input.ownerId != null && String(input.ownerId).trim() !== "") {
+    params.set("ownerId", String(input.ownerId).trim())
+  }
 
   const query = params.toString()
   return query === "" ? "/checkout" : `/checkout?${query}`
+}
+
+export function resolveCheckoutOwnerId(): string | null {
+  const ownerId = process.env.CHECKOUT_DEFAULT_OWNER_ID?.trim()
+  return ownerId ? ownerId : null
 }
 
 export function buildPilotApplicationComment(input: {
