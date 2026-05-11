@@ -38,6 +38,8 @@ const CHECKOUT_ORDER_STATUSES = [
 ] as const;
 
 type CheckoutOrderStatusTuple = typeof CHECKOUT_ORDER_STATUSES;
+const PILOT_ENTITLEMENT_DAYS = 30;
+
 
 export type CheckoutOrderStatus = CheckoutOrderStatusTuple[number];
 
@@ -1110,18 +1112,22 @@ async function ensurePilotEntitlementForPaidOrder(
       user_id,
       status,
       starts_at,
+      ends_at,
       activated_by,
       notes
     )
-    VALUES ($1, 'active', $2::timestamptz, 'payment_webhook', $3)
+    VALUES ($1, 'active', $2::timestamptz, ($2::timestamptz + ($3::int * INTERVAL '1 day')), 'payment_webhook', $4)
     ON CONFLICT (user_id) WHERE status = 'active'
     DO UPDATE SET
       starts_at = LEAST(pilot_enrollments.starts_at, EXCLUDED.starts_at),
-      ends_at = NULL,
+      ends_at = GREATEST(
+        COALESCE(pilot_enrollments.ends_at, '-infinity'::timestamptz),
+        EXCLUDED.ends_at
+      ),
       updated_at = NOW(),
       activated_by = EXCLUDED.activated_by,
       notes = EXCLUDED.notes
-  `, [userId, paidAtIso, `checkout_order:${order.id}`]);
+  `, [userId, paidAtIso, PILOT_ENTITLEMENT_DAYS, `checkout_order:${order.id}`]);
 }
 
 async function ensurePilotApplicationForOrder(

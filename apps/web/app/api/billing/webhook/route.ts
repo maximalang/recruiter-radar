@@ -6,6 +6,8 @@ import { requireServerEnv } from "../../../../lib/runtime";
 
 export const runtime = "nodejs";
 
+const PROCESSING_RECLAIM_TIMEOUT_MINUTES = 10;
+
 export async function POST(request: Request) {
   const secret = requireServerEnv("BILLING_WEBHOOK_SECRET");
   if (request.headers.get("x-billing-secret") !== secret) {
@@ -34,14 +36,28 @@ export async function POST(request: Request) {
     [provider, externalEventId, idempotencyKey, JSON.stringify(body)]
   );
 
+  const claimToken = crypto.randomUUID();
   const claimed = await pool.query<{ status: string }>(
     `UPDATE billing_webhook_events
-     SET status = 'processing', error_message = NULL, processed_at = NULL
+     SET status = 'processing',
+         error_message = NULL,
+         processed_at = NULL,
+         claimed_at = NOW(),
+         claim_token = $3
      WHERE provider = $1
        AND idempotency_key = $2
-       AND status IN ('received', 'failed')
+       AND (
+         status IN ('received', 'failed')
+         OR (
+           status = 'processing'
+           AND (
+             claimed_at IS NULL
+             OR claimed_at <= NOW() - ($4::int * INTERVAL '1 minute')
+           )
+         )
+       )
      RETURNING status`,
-    [provider, idempotencyKey]
+    [provider, idempotencyKey, claimToken, PROCESSING_RECLAIM_TIMEOUT_MINUTES]
   );
 
   if (claimed.rowCount === 0) {
@@ -62,9 +78,9 @@ export async function POST(request: Request) {
 
     await pool.query(
       `UPDATE billing_webhook_events
-       SET status = $3, error_message = $4, processed_at = NOW()
-       WHERE provider = $1 AND idempotency_key = $2`,
-      [provider, idempotencyKey, nextStatus, errorMessage]
+       SET status = $3, error_message = $4, processed_at = NOW(), claim_token = NULL
+       WHERE provider = $1 AND idempotency_key = $2 AND claim_token = $5`,
+      [provider, idempotencyKey, nextStatus, errorMessage, claimToken]
     );
 
     return NextResponse.json({ ok: event.status >= 200 && event.status < 300, reconciled: event.status >= 200 && event.status < 300, status: nextStatus }, { status: event.status });
@@ -73,9 +89,9 @@ export async function POST(request: Request) {
 
     await pool.query(
       `UPDATE billing_webhook_events
-       SET status = 'failed', error_message = $3, processed_at = NOW()
-       WHERE provider = $1 AND idempotency_key = $2`,
-      [provider, idempotencyKey, errorMessage]
+       SET status = 'failed', error_message = $3, processed_at = NOW(), claim_token = NULL
+       WHERE provider = $1 AND idempotency_key = $2 AND claim_token = $4`,
+      [provider, idempotencyKey, errorMessage, claimToken]
     );
 
     return NextResponse.json({ ok: false, reconciled: false, status: "failed", error: "reconciliation_error" }, { status: 500 });
