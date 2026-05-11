@@ -140,16 +140,37 @@ export async function assertDigestEntitlementByClientProfileId(clientProfileId: 
   if (profile.rowCount !== 1) throw new Error("Client profile not found.");
   if (!profile.rows[0].isActive) throw new Error("Client profile is inactive.");
 
-  const owner = await pool.query<{ userId: string }>(`
-    SELECT user_id::TEXT AS "userId"
-    FROM checkout_orders
-    WHERE payload ->> 'clientProfileId' = $1
-    ORDER BY created_at DESC
-    LIMIT 1
-  `, [String(clientProfileId)]);
-  if (owner.rowCount !== 1) throw new Error("Client profile entitlement owner not found.");
+  const hasUserIdColumn = await pool.query<{ exists: boolean }>(`
+    SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_name = 'client_profiles'
+        AND column_name = 'user_id'
+    ) AS "exists"
+  `);
 
-  const entitlement = await hasPremiumEntitlement(Number(owner.rows[0].userId));
+  let userId: number | null = null;
+  if (hasUserIdColumn.rows[0]?.exists) {
+    const ownerFromProfile = await pool.query<{ userId: string }>(
+      `SELECT user_id::TEXT AS "userId" FROM client_profiles WHERE id = $1 AND user_id IS NOT NULL LIMIT 1`,
+      [clientProfileId]
+    );
+    if (ownerFromProfile.rowCount === 1) userId = Number(ownerFromProfile.rows[0].userId);
+  }
+
+  if (userId == null) {
+    const ownerFallback = await pool.query<{ userId: string }>(`
+      SELECT user_id::TEXT AS "userId"
+      FROM checkout_orders
+      WHERE payload ->> 'clientProfileId' = $1
+      ORDER BY created_at DESC
+      LIMIT 1
+    `, [String(clientProfileId)]);
+    if (ownerFallback.rowCount === 1) userId = Number(ownerFallback.rows[0].userId);
+  }
+
+  if (userId == null) throw new Error("Client profile entitlement owner not found.");
+  const entitlement = await hasPremiumEntitlement(userId);
   if (!entitlement.allowed) throw new Error(entitlement.reason ?? "No active subscription or pilot.");
 }
 

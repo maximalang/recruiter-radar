@@ -20,6 +20,8 @@ export async function POST(request: Request) {
   const clientProfileId = payload.clientProfileId?.trim();
   const digestRunId = payload.digestRunId?.trim();
   if (!clientProfileId && !digestRunId) return NextResponse.json({ error: "clientProfileId or digestRunId is required." }, { status: 400 });
+  if (clientProfileId && !isPositiveIntegerString(clientProfileId)) return NextResponse.json({ error: "Invalid clientProfileId." }, { status: 400 });
+  if (digestRunId && !isPositiveIntegerString(digestRunId)) return NextResponse.json({ error: "Invalid digestRunId." }, { status: 400 });
 
   try {
     let runId = digestRunId;
@@ -44,11 +46,30 @@ export async function POST(request: Request) {
     const failures: Array<{ digestCandidateId: number; error: string }> = [];
 
     for (const row of candidates.rows) {
+      const priorSent = await pool.query<{ ok: boolean }>(
+        `SELECT TRUE AS ok FROM digest_delivery_attempts WHERE digest_candidate_id = $1 AND channel = 'telegram' AND status = 'sent' LIMIT 1`,
+        [row.id]
+      );
+      if (priorSent.rowCount === 1) {
+        skipped += 1;
+        continue;
+      }
+
+      const attemptKey = `dg:${runId}:candidate:${row.id}:ts:${Date.now()}`;
       const result = await sendLeadToTelegram(row.id);
-      if (result.ok) sent += 1;
-      else {
+      if (result.ok) {
+        sent += 1;
+        await pool.query(
+          `INSERT INTO digest_delivery_attempts (digest_candidate_id, idempotency_key, channel, status) VALUES ($1, $2, 'telegram', 'sent')`,
+          [row.id, attemptKey]
+        );
+      } else {
         failed += 1;
         failures.push({ digestCandidateId: row.id, error: result.error });
+        await pool.query(
+          `INSERT INTO digest_delivery_attempts (digest_candidate_id, idempotency_key, channel, status, error_message) VALUES ($1, $2, 'telegram', 'failed', LEFT($3, 1000))`,
+          [row.id, attemptKey, result.error]
+        );
       }
     }
 
@@ -56,7 +77,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok, digestRunId: runId, clientProfileId: resolvedClientProfileId, counters: { sent, failed, skipped }, failures }, { status: ok ? 200 : 503 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to deliver digest.";
-    const status = message.includes("not found") ? 404 : message.includes("inactive") ? 403 : 500;
+    const status = message.includes("not found") ? 404 : message.includes("inactive") || message.includes("No active subscription") || message.includes("entitlement") ? 403 : 500;
     return NextResponse.json({ error: message }, { status });
   }
+}
+
+function isPositiveIntegerString(value: string): boolean {
+  return /^\d+$/.test(value);
 }
