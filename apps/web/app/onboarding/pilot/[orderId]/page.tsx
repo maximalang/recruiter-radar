@@ -156,6 +156,9 @@ export default async function PilotOnboardingPage({
   }
 
   const hasTestDigestSent = Boolean(order.payload.onboardingTestDigestSentAt);
+  const deliveryPrerequisitesReady = Boolean(readiness?.telegramConnected && process.env.TELEGRAM_BOT_TOKEN);
+  const firstDigestHasCandidates = previewItems.length > 0;
+  const firstDigestReady = deliveryPrerequisitesReady && firstDigestHasCandidates;
   const visiblePreviewItems = previewItems.slice(0, VISIBLE_PREVIEW_ITEMS);
   const hiddenPreviewItems = previewItems.slice(VISIBLE_PREVIEW_ITEMS);
   const telegramDeliveryLabel = telegramConnectState?.botUsername
@@ -200,14 +203,14 @@ export default async function PilotOnboardingPage({
           />
 
           <div style={{ display: "grid", gap: "8px" }}>
-            <SummaryRow label="Профиль клиента создан" value={readiness?.profileExists ? "да" : "нет"} />
+            <SummaryRow label="Профиль создан" value={readiness?.profileExists ? "да" : "нет"} />
             <SummaryRow
               label="Telegram подключён"
               value={readiness?.telegramConnected ? "да" : "нет"}
             />
             <SummaryRow
-              label="Первая подборка готова"
-              value={readiness?.canRequestFirstDigest ? "да" : "ждёт предыдущие шаги"}
+              label="Первый радар готов"
+              value={firstDigestReady ? "да" : "нет"}
             />
           </div>
 
@@ -530,7 +533,15 @@ export default async function PilotOnboardingPage({
                 <NoticeBox
                   tone="info"
                   title="Что делать дальше"
-                  description="Откройте первую подборку в Telegram, отметьте релевантность карточек и используйте обратную связь. Это улучшает, какие компании и почему сейчас мы показываем в следующих радарах."
+                  description={
+                    !deliveryPrerequisitesReady
+                      ? "Доставка в Telegram ещё не настроена до конца. Проверьте подключение чата и конфигурацию доставки, затем вернитесь к запуску первого радара."
+                      : hasTestDigestSent
+                        ? "Откройте Telegram, отметьте релевантность карточек и используйте обратную связь — это улучшит следующие радары."
+                        : !firstDigestHasCandidates
+                          ? "Сейчас сильных кандидатов нет: уточните профиль, дождитесь более сильного сигнала или завершите настройку и вернитесь позже."
+                          : "Отправьте первый радар в Telegram и после отправки отметьте релевантность карточек, чтобы улучшить следующие радары."
+                  }
                 />
 
                 {showPushRadarView ? (
