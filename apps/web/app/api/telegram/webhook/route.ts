@@ -31,7 +31,7 @@ export async function POST(request: Request) {
   const pool = getPool();
   if (!pool) return NextResponse.json({ error: "DATABASE_URL is not set." }, { status: 500 });
 
-  const claim = await pool.query<{ id: number; ownsClaim: boolean }>(`
+  const claim = await pool.query<{ id: number; ownsClaim: boolean; status: string }>(`
     INSERT INTO webhook_events (
       provider, event_type, external_event_id, idempotency_key, payload, status, processing_claimed_at, processing_claim_token
     )
@@ -51,11 +51,16 @@ export async function POST(request: Request) {
         WHEN webhook_events.status IN ('received', 'failed')
           OR (webhook_events.status = 'processing' AND webhook_events.processing_claimed_at < NOW() - ($5::int * INTERVAL '1 second'))
         THEN 'processing' ELSE webhook_events.status END
-    RETURNING id, processing_claim_token = $4 AS "ownsClaim"
+    RETURNING id, status::TEXT AS status, processing_claim_token = $4 AS "ownsClaim"
   `, [callbackQueryId ?? idempotencyKey, idempotencyKey, JSON.stringify(body), claimToken, STALE_CLAIM_SECONDS]);
 
   const eventRow = claim.rows[0];
-  if (!eventRow.ownsClaim) return NextResponse.json({ ok: true, replaySafe: true, duplicate: true });
+  if (!eventRow.ownsClaim) {
+    if (eventRow.status === "processed" || eventRow.status === "ignored") {
+      return NextResponse.json({ ok: true, replaySafe: true, duplicate: true });
+    }
+    return NextResponse.json({ ok: false, retryable: true, error: "Event is already processing." }, { status: 409 });
+  }
 
   if (!callbackQueryId || !parsedCallback) {
     await pool.query(`UPDATE webhook_events SET status = 'ignored', processed_at = NOW() WHERE id = $1 AND processing_claim_token = $2`, [eventRow.id, claimToken]);
