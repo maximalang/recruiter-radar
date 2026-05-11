@@ -1,6 +1,8 @@
 # AGENTS.md — Recruiter Radar Engineering Instructions
 
-## Project identity
+Этот файл задаёт обязательные правила для Codex-агентов и любых agent-assisted изменений в `maximalang/recruiter-radar`.
+
+## 1) Project identity
 
 Recruiter Radar is a premium, Russia-first client-intelligence radar for recruitment agencies.
 
@@ -19,9 +21,55 @@ It is:
 
 The core product loop is:
 
-Landing → live preview → pilot activation → client profile → Telegram connection → daily digest → feedback buttons → suppression/reweighting → better future digests.
+`Landing → live preview → pilot activation → client profile → Telegram connection → daily digest → feedback buttons → suppression/reweighting → better future digests`
 
-## Product quality principles
+## 2) Codex / GitHub workflow
+
+- `main` is the protected/stable branch. Do not open intermediate Codex PRs directly into `main`; do not push directly to `main`.
+- `refresh-self-serve-mvp` is the active integration branch for the self-serve MVP workstream.
+- Task branches must use `codex/<task>`.
+- All intermediate Codex PRs must target `base=refresh-self-serve-mvp`.
+- The only mainline PR for this epic is `refresh-self-serve-mvp -> main`.
+- If an existing Codex PR cannot be updated because it was changed outside Codex, create a superseding PR with the same base and clearly state which PR it replaces.
+- Do not create duplicate PRs. First check whether a matching open PR already exists for the same head/base.
+- Do not claim that a PR, push, commit, or check succeeded unless the final report includes verifiable evidence: PR URL, commit SHA, and check/build logs or output.
+- If the shell has no `origin`/push access, do not pretend a PR was created. Use the Codex/GitHub integration; if that is unavailable, provide the full patch and the exact reason.
+
+## 3) Required preflight
+
+Before code changes and before creating a PR, report:
+
+1. current branch: `git branch --show-current`
+2. working tree status: `git status --short`
+3. remotes: `git remote -v`
+4. whether a matching open PR already exists for the current head/base
+5. which checks will be run
+
+## 4) Required checks
+
+After code changes, run and report:
+
+- `npm run web:check`
+- `npm run web:build`
+
+If database migrations changed, inspect schema consistency and mention how to apply them.
+If n8n workflow changed, confirm no secrets are present in exported JSON.
+If Telegram webhook changed, describe authentication, idempotency, replay-safety, and callback acknowledgement.
+
+## 5) Definition of done
+
+A task is done only when:
+
+- the patch is minimal and scoped to the task;
+- required checks pass, or failures are reported honestly;
+- the final report includes:
+  - changed files;
+  - commit SHA;
+  - check results;
+  - PR URL or a complete patch fallback;
+- no hidden runtime, migration, n8n, or package changes are included outside the task scope.
+
+## 6) Product quality principles
 
 Always optimize for trust and clarity over feature volume.
 
@@ -35,11 +83,11 @@ Every lead recommendation should answer:
 6. What is the safest lawful contact path?
 7. What should the user do next?
 
-Do not create features that produce more leads without improving evidence, confidence, dedupe, feedback, or delivery reliability.
+Do not create features that produce more leads without improving evidence, confidence, dedupe, feedback, billing, delivery reliability, trust, security, activation, or conversion.
 
-Avoid generic AI outputs. AI may summarize, classify, and draft, but deterministic code and stored evidence are the source of truth.
+Avoid generic AI outputs. AI may summarize, classify, generate `why_now`, generate `best_angle`, and draft an opener, but deterministic code and stored evidence are the source of truth.
 
-## Architecture rules
+## 7) Architecture rules
 
 The product core must remain in Next.js + Postgres.
 
@@ -62,7 +110,7 @@ Do not put core business logic in n8n:
 
 Core business logic belongs in application code and database migrations.
 
-## Data model expectations
+## 8) Data model expectations
 
 Prefer explicit, auditable entities:
 
@@ -106,11 +154,11 @@ Recommended lead card fields:
 - ai_model;
 - ai_trace_id.
 
-## Scoring model
+## 9) Scoring model
 
-Use FIUR scoring as the default mental model:
+Use FIUR scoring as the default model:
 
-Total Score = 0.30 × Fit + 0.35 × Intent + 0.20 × Urgency + 0.15 × Reachability
+`Total Score = 0.30 × Fit + 0.35 × Intent + 0.20 × Urgency + 0.15 × Reachability`
 
 Fit:
 - agency ICP match;
@@ -143,27 +191,27 @@ Reachability:
 
 Do not treat “company is hiring an internal recruiter” as a hot signal by itself. It is only a supporting signal when combined with broader external hiring activity.
 
-## Confidence gates
+## 10) Confidence gates
 
 A:
 - 2+ independent evidence layers;
 - clean entity match;
-- direct company surface or official API evidence.
-- Can be auto-delivered.
+- direct company surface or official API evidence;
+- can be auto-delivered.
 
 B:
-- 1 strong source + enrichment layer.
-- Can be auto-delivered with confidence label.
+- 1 strong source + enrichment layer;
+- can be auto-delivered with confidence label.
 
 C:
-- platform-only aggregation or questionable entity match.
-- Should not be delivered as a hot lead without review or stronger evidence.
+- platform-only aggregation or questionable entity match;
+- should not be delivered as a hot lead without review or stronger evidence.
 
 D:
-- context without direct hiring proof.
-- Do not create a lead; store as supporting context only.
+- context without direct hiring proof;
+- do not create a lead; store as supporting context only.
 
-## Telegram UX
+## 11) Telegram UX and feedback loop
 
 Telegram digest must be short, actionable, and stateful.
 
@@ -195,7 +243,7 @@ Telegram callback handling must be:
 
 The bot must answer callback queries so the user gets immediate feedback.
 
-## Security rules
+## 12) Security rules
 
 Never commit secrets.
 
@@ -219,9 +267,9 @@ n8n workflow JSON must not contain raw tokens, chat IDs, API keys, or local-only
 
 Use `.env.example` for variable names only.
 
-If you find a committed secret, remove it and mention that rotation is required. Do not print the secret in final summaries.
+If a committed secret is found, remove it and mention that rotation is required. Do not print the secret in final summaries.
 
-## Privacy and legal design for Russia
+## 13) Privacy and legal design for Russia
 
 Default to company-level data.
 
@@ -240,7 +288,7 @@ Outreach generation must remain draft/assist by default.
 
 Keep data minimization, suppression, retention, and auditability in mind.
 
-## Billing and entitlement rules
+## 14) Billing and entitlement rules
 
 Self-serve delivery must be entitlement-gated.
 
@@ -255,7 +303,7 @@ Billing webhooks must be idempotent and stored in a webhook/event ledger.
 
 Do not rely only on client-side state for plan access.
 
-## Code style and implementation standards
+## 15) Code style and implementation standards
 
 Use TypeScript strictly.
 
@@ -265,7 +313,7 @@ Avoid broad rewrites unless necessary.
 
 Do not add dependencies without a clear reason.
 
-Do not introduce UI-only changes that do not support product activation, evidence, delivery, feedback, billing, or trust.
+Do not introduce UI-only changes that do not support product activation, evidence, delivery, feedback, billing, trust, or security.
 
 Keep user-facing Russian copy concise, premium, and specific.
 
@@ -283,20 +331,7 @@ Preferred language:
 - “безопасный путь контакта”;
 - “ежедневный радар”.
 
-## Required checks
-
-After code changes, run the relevant checks and report results:
-
-- `npm run web:check`
-- `npm run web:build`
-
-If database migrations changed, inspect schema consistency and mention how to apply them.
-
-If n8n workflow changed, confirm no secrets are present in exported JSON.
-
-If Telegram webhook changed, describe how callback idempotency and authentication are handled.
-
-## Pull request expectations
+## 16) Pull request expectations
 
 Every PR summary must include:
 
