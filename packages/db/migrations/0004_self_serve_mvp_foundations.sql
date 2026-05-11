@@ -33,7 +33,7 @@ CREATE INDEX webhook_events_provider_event_type_idx
 
 CREATE TABLE digest_delivery_attempts (
   id BIGSERIAL PRIMARY KEY,
-  digest_candidate_id BIGINT NOT NULL REFERENCES digest_candidates(id) ON DELETE CASCADE,
+  digest_candidate_id BIGINT NOT NULL,
   idempotency_key TEXT NOT NULL,
   channel TEXT NOT NULL DEFAULT 'telegram',
   status TEXT NOT NULL,

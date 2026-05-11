@@ -181,4 +181,18 @@ BEGIN
 END;
 $$;
 
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'digest_delivery_attempts_digest_candidate_id_fkey'
+  ) THEN
+    ALTER TABLE digest_delivery_attempts
+      ADD CONSTRAINT digest_delivery_attempts_digest_candidate_id_fkey
+      FOREIGN KEY (digest_candidate_id) REFERENCES digest_candidates(id) ON DELETE CASCADE;
+  END IF;
+END;
+$$;
 COMMIT;

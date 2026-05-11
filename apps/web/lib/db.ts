@@ -1,7 +1,7 @@
 import { Pool } from "pg";
 
 import { updateDigestOrgStateFeedback, type DigestFeedbackAction } from "./digestFeedback";
-import { getTelegramConfig, sendTelegramLeadMessage } from "./telegram";
+import { getTelegramBotToken, sendTelegramLeadMessage } from "./telegram";
 import { logError, logEvent } from "./runtime";
 
 export const ACTIONABLE_LEAD_STATUSES = ["contacted", "replied", "won", "badfit", "snooze"] as const;
@@ -113,8 +113,8 @@ export async function sendLeadToTelegram(leadId: number): Promise<TelegramDelive
   const lead = await getLeadDeliveryRow(leadId);
   if (!lead) return { ok: false, error: "Digest candidate not found." };
   if (!lead.telegramChatId) return { ok: false, error: "Client profile has no linked Telegram chat." };
-  const { config, error } = getTelegramConfig();
-  if (!config) return { ok: false, error: error ?? "Telegram is not configured." };
+  const { botToken, error } = getTelegramBotToken();
+  if (!botToken) return { ok: false, error: error ?? "Telegram is not configured." };
   try {
     const callbackPrefix = `dgf:${lead.clientProfileId}:${lead.orgId}`;
     const replyMarkup = {
@@ -126,7 +126,7 @@ export async function sendLeadToTelegram(leadId: number): Promise<TelegramDelive
     };
     await sendTelegramLeadMessage(
       { orgName: lead.orgName, status: lead.status, score: lead.score, lastSignalAt: lead.lastSignalAt, userName: lead.userName },
-      { ...config, chatId: lead.telegramChatId },
+      { botToken, chatId: lead.telegramChatId },
       { replyMarkup }
     );
     logEvent("telegram.delivery.sent", { digestCandidateId: leadId, clientProfileId: lead.clientProfileId, orgId: lead.orgId });
