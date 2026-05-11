@@ -38,6 +38,7 @@ import {
 } from "../../../../lib/payments";
 import { getTelegramConnectLinkState } from "../../../../lib/telegramConnect";
 import { getWebPushConnectLinkState } from "../../../../lib/webPushConnect";
+import { getTelegramBotToken } from "../../../../lib/telegram";
 import {
   completePilotOnboardingAction,
   confirmPilotProfileAction,
@@ -154,6 +155,15 @@ export default async function PilotOnboardingPage({
   }
 
   const hasTestDigestSent = Boolean(order.payload.onboardingTestDigestSentAt);
+  const { botToken: telegramBotToken } = getTelegramBotToken();
+  const deliveryPrerequisitesReady = Boolean(profile?.telegramChatId) && Boolean(telegramBotToken);
+  const firstDigestHasCandidates = previewItems.length > 0;
+  const firstDigestReady = deliveryPrerequisitesReady && firstDigestHasCandidates;
+  const readinessItems = [
+    { label: "Профиль создан", ready: Boolean(profile) },
+    { label: "Telegram подключён", ready: Boolean(profile?.telegramChatId) },
+    { label: "Первый радар готов", ready: firstDigestReady }
+  ];
   const visiblePreviewItems = previewItems.slice(0, VISIBLE_PREVIEW_ITEMS);
   const hiddenPreviewItems = previewItems.slice(VISIBLE_PREVIEW_ITEMS);
   const telegramDeliveryLabel = telegramConnectState?.botUsername
@@ -235,6 +245,17 @@ export default async function PilotOnboardingPage({
           <UnpaidState order={order} />
         ) : (
           <>
+            <div style={{ display: "grid", gap: "8px" }}>
+              {readinessItems.map((item) => (
+                <div key={item.label} style={{ display: "flex", justifyContent: "space-between", gap: "12px", padding: "10px 12px", borderRadius: "12px", border: "1px solid rgba(15, 23, 42, 0.08)", backgroundColor: "#fff" }}>
+                  <span>{item.label}</span>
+                  <span style={{ color: item.ready ? "#166534" : "#64748b", fontWeight: 600 }}>
+                    {item.ready ? "Готово" : "Не готово"}
+                  </span>
+                </div>
+              ))}
+            </div>
+
             <div style={stepRailStyle}>
               {stepItems.map((step) => (
                 <div
@@ -489,14 +510,16 @@ export default async function PilotOnboardingPage({
               <section style={wizardSectionStyle}>
                 <div style={{ display: "grid", gap: "10px" }}>
                   <StatusBadge tone="success">
-                    {hasTestDigestSent ? "Первый радар отправлен" : "Пилот включён"}
+                    {hasTestDigestSent ? "Первый радар отправлен" : firstDigestReady ? "Первый радар готов" : "Пилот включён"}
                   </StatusBadge>
                   <SectionIntro
-                    title={hasTestDigestSent ? "Пилот запущен" : "Всё готово"}
+                    title={hasTestDigestSent ? "Пилот запущен" : firstDigestReady ? "Первый радар готов к отправке" : "Настройка завершена"}
                     description={
                       hasTestDigestSent
                         ? "Первый радар уже в чате. Дальше новые компании будут приходить автоматически."
-                        : "Профиль и Telegram готовы. Новые компании будут приходить автоматически."
+                        : firstDigestReady
+                          ? "Профиль и доставка готовы, есть кандидаты для первого радара."
+                          : "Профиль сохранён. Первый радар появится, когда будут кандидаты и настроена доставка."
                     }
                   />
                 </div>
@@ -504,14 +527,21 @@ export default async function PilotOnboardingPage({
                 <NoticeBox
                   tone="neutral"
                   title="Как это будет работать дальше"
-                  description={
-                    hasTestDigestSent
-                      ? telegramConnectState?.botUsername
-                        ? `Следующие радары будут приходить в тот же чат через @${telegramConnectState.botUsername}.`
-                        : "Следующие радары будут приходить в тот же подключённый чат."
-                      : "Пилот уже активен. Как только появятся подходящие компании, они будут приходить автоматически."
-                  }
+                  description={buildNextActionMessage({
+                    hasTestDigestSent,
+                    firstDigestHasCandidates,
+                    deliveryPrerequisitesReady,
+                    telegramBotUsername: telegramConnectState?.botUsername ?? null
+                  })}
                 />
+
+                {!telegramBotToken ? (
+                  <NoticeBox
+                    tone="warning"
+                    title="Доставка в Telegram пока не настроена"
+                    description="Подключите TELEGRAM_BOT_TOKEN в конфигурации сервиса, чтобы отправка в чат работала надёжно."
+                  />
+                ) : null}
 
                 {showPushRadarView ? (
                   previewItems.length > 0 ? (
@@ -662,6 +692,30 @@ function OnboardingPreviewCard(props: {
       ) : null}
     </article>
   );
+}
+
+
+function buildNextActionMessage(input: {
+  hasTestDigestSent: boolean;
+  firstDigestHasCandidates: boolean;
+  deliveryPrerequisitesReady: boolean;
+  telegramBotUsername: string | null;
+}) {
+  if (input.hasTestDigestSent) {
+    return input.telegramBotUsername
+      ? `Откройте Telegram: следующие радары будут приходить в тот же чат через @${input.telegramBotUsername}.`
+      : "Откройте Telegram: следующие радары будут приходить в тот же подключённый чат.";
+  }
+
+  if (!input.deliveryPrerequisitesReady) {
+    return "Завершите настройку доставки и вернитесь позже: после этого радар сможет отправляться автоматически.";
+  }
+
+  if (!input.firstDigestHasCandidates) {
+    return "Сейчас дождитесь сильного сигнала или уточните профиль — как только появятся кандидаты, радар отправится автоматически.";
+  }
+
+  return "Откройте Telegram и отправьте первый радар, затем новые сигналы будут приходить автоматически.";
 }
 
 function buildOnboardingStepFocus(input: {
