@@ -129,6 +129,7 @@ export async function getClientProfileById(
 }
 
 export async function findMatchingClientProfileForCheckoutOrder(input: {
+  checkoutOrderId?: string | number | null;
   agencyName: string;
   telegramChatId?: string | null;
   targetCity?: string | null;
@@ -144,12 +145,28 @@ export async function findMatchingClientProfileForCheckoutOrder(input: {
   }
 
   const agencyName = normalizeRequiredText(input.agencyName, "Agency name is required.");
+  const checkoutOrderId =
+    input.checkoutOrderId == null ? null : normalizeCheckoutOrderId(input.checkoutOrderId);
   const telegramChatId = normalizeTelegramChatId(input.telegramChatId);
   const targetCity = normalizeOptionalText(input.targetCity);
   const specialization = normalizeOptionalText(input.specialization);
   const includeKeywords = normalizeKeywordList(input.includeKeywords);
   const excludeKeywords = normalizeKeywordList(input.excludeKeywords);
   const dailyDigestLimit = normalizeDailyDigestLimit(input.dailyDigestLimit);
+
+  const ownershipClause = checkoutOrderId
+    ? `
+      AND EXISTS (
+        SELECT 1
+        FROM checkout_orders candidate_order
+        JOIN checkout_orders current_order
+          ON current_order.id = $2
+        WHERE
+          candidate_order.user_id = current_order.user_id
+          AND candidate_order.payload ->> 'clientProfileId' = client_profiles.id::TEXT
+      )
+    `
+    : "";
 
   if (telegramChatId) {
     const directMatchResult = await pool.query<ClientProfileRow>(`
@@ -167,9 +184,10 @@ export async function findMatchingClientProfileForCheckoutOrder(input: {
         updated_at::TEXT AS "updatedAt"
       FROM client_profiles
       WHERE telegram_chat_id::TEXT = $1
+      ${ownershipClause}
       ORDER BY updated_at DESC, id DESC
       LIMIT 2
-    `, [telegramChatId]);
+    `, checkoutOrderId ? [telegramChatId, checkoutOrderId] : [telegramChatId]);
 
     if (directMatchResult.rowCount === 1) {
       return mapClientProfileRow(directMatchResult.rows[0]);
@@ -191,9 +209,10 @@ export async function findMatchingClientProfileForCheckoutOrder(input: {
       updated_at::TEXT AS "updatedAt"
     FROM client_profiles
     WHERE LOWER(BTRIM(agency_name)) = LOWER(BTRIM($1))
+    ${ownershipClause}
     ORDER BY updated_at DESC, id DESC
     LIMIT 20
-  `, [agencyName]);
+  `, checkoutOrderId ? [agencyName, checkoutOrderId] : [agencyName]);
 
   const candidates = candidateResult.rows.map(mapClientProfileRow);
   const exactMatches = candidates.filter((candidate) =>
@@ -471,6 +490,16 @@ function normalizeClientProfileId(value: string | number): number {
 
   if (!Number.isInteger(normalizedValue) || normalizedValue <= 0) {
     throw new Error("Invalid client profile id.");
+  }
+
+  return normalizedValue;
+}
+
+function normalizeCheckoutOrderId(value: string | number): number {
+  const normalizedValue = typeof value === "number" ? value : Number(value);
+
+  if (!Number.isInteger(normalizedValue) || normalizedValue <= 0) {
+    throw new Error("Invalid checkout order id.");
   }
 
   return normalizedValue;

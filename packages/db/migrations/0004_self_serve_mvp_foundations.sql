@@ -72,6 +72,12 @@ CREATE TABLE checkout_orders (
   amount_rub INTEGER NOT NULL,
   currency TEXT NOT NULL DEFAULT 'RUB',
   status TEXT NOT NULL DEFAULT 'created',
+  customer_name TEXT,
+  customer_contact TEXT,
+  payload JSONB NOT NULL DEFAULT '{}'::JSONB,
+  provider TEXT,
+  provider_payment_id TEXT,
+  paid_at TIMESTAMPTZ,
   external_order_id TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -96,6 +102,19 @@ CREATE TABLE pilot_enrollments (
 CREATE UNIQUE INDEX pilot_enrollments_active_user_uidx
   ON pilot_enrollments (user_id)
   WHERE status = 'active';
+
+CREATE TABLE telegram_connect_tokens (
+  id BIGSERIAL PRIMARY KEY,
+  token TEXT NOT NULL UNIQUE,
+  order_id BIGINT NOT NULL REFERENCES checkout_orders(id) ON DELETE CASCADE,
+  client_profile_id BIGINT REFERENCES client_profiles(id) ON DELETE SET NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT telegram_connect_tokens_token_not_blank CHECK (BTRIM(token) <> '')
+);
+CREATE INDEX telegram_connect_tokens_order_created_idx
+  ON telegram_connect_tokens (order_id, created_at DESC);
 
 ALTER TABLE subscriptions
   ADD COLUMN IF NOT EXISTS billing_provider TEXT,

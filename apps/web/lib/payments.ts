@@ -405,8 +405,8 @@ export async function getCheckoutOrderById(
   const result = await pool.query<CheckoutOrderRow>(`
     SELECT
       id::TEXT AS id,
-      product_code AS "productCode",
-      amount_minor AS "amountMinor",
+      plan_code AS "productCode",
+      (amount_rub * 100) AS "amountMinor",
       currency,
       status,
       customer_name AS "customerName",
@@ -888,19 +888,19 @@ async function createCheckoutOrder(input: {
   const customerContact = normalizeRequiredText(input.customerContact, "Contact is required.");
   const result = await pool.query<CheckoutOrderRow>(`
     INSERT INTO checkout_orders (
-      product_code,
-      amount_minor,
+      plan_code,
+      amount_rub,
       currency,
       status,
       customer_name,
       customer_contact,
       payload
     )
-    VALUES ($1, $2, $3, 'created', $4, $5, $6::jsonb)
+    VALUES ($1, ($2 / 100), $3, 'created', $4, $5, $6::jsonb)
     RETURNING
       id::TEXT AS id,
-      product_code AS "productCode",
-      amount_minor AS "amountMinor",
+      plan_code AS "productCode",
+      (amount_rub * 100) AS "amountMinor",
       currency,
       status,
       customer_name AS "customerName",
@@ -968,8 +968,8 @@ async function updateCheckoutOrder(
     WHERE id = $1
     RETURNING
       id::TEXT AS id,
-      product_code AS "productCode",
-      amount_minor AS "amountMinor",
+      plan_code AS "productCode",
+      (amount_rub * 100) AS "amountMinor",
       currency,
       status,
       customer_name AS "customerName",
@@ -1014,8 +1014,8 @@ async function getCheckoutOrderByProviderPaymentId(
   const result = await pool.query<CheckoutOrderRow>(`
     SELECT
       id::TEXT AS id,
-      product_code AS "productCode",
-      amount_minor AS "amountMinor",
+      plan_code AS "productCode",
+      (amount_rub * 100) AS "amountMinor",
       currency,
       status,
       customer_name AS "customerName",
@@ -1122,6 +1122,7 @@ async function ensureClientProfileForPaidOrder(
   const matchedProfile =
     linkedProfile ??
     (await findMatchingClientProfileForCheckoutOrder({
+      checkoutOrderId: order.id,
       agencyName: profileSeed.agencyName,
       telegramChatId: profileSeed.telegramChatId,
       targetCity: profileSeed.targetCity,
