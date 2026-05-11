@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { runDigestForClientProfile } from "../../../../lib/digest";
@@ -58,12 +59,13 @@ export async function POST(request: Request) {
       }
 
       const attemptKey = `dg:${runId}:candidate:${row.id}`;
+      const claimToken = randomUUID();
       const claimedAttempt = await pool.query<{ id: number }>(
-        `INSERT INTO digest_delivery_attempts (digest_candidate_id, idempotency_key, channel, status)
-         VALUES ($1, $2, 'telegram', 'processing')
+        `INSERT INTO digest_delivery_attempts (digest_candidate_id, idempotency_key, channel, status, processing_claim_token, attempted_at)
+         VALUES ($1, $2, 'telegram', 'processing', $3, NOW())
          ON CONFLICT (digest_candidate_id, idempotency_key) DO NOTHING
          RETURNING id`,
-        [row.id, attemptKey]
+        [row.id, attemptKey, claimToken]
       );
 
       if (claimedAttempt.rowCount === 0) {
@@ -79,14 +81,14 @@ export async function POST(request: Request) {
 
         const reclaimed = await pool.query(
           `UPDATE digest_delivery_attempts
-           SET status = 'processing', error_message = NULL, attempted_at = NOW()
+           SET status = 'processing', error_message = NULL, processing_claim_token = $3, attempted_at = NOW()
            WHERE digest_candidate_id = $1
              AND idempotency_key = $2
              AND (
                status = 'failed'
-               OR (status = 'processing' AND attempted_at < NOW() - ($3::INT * INTERVAL '1 minute'))
+               OR (status = 'processing' AND attempted_at < NOW() - ($4::INT * INTERVAL '1 minute'))
              )`,
-          [row.id, attemptKey, PROCESSING_STALE_AFTER_MINUTES]
+          [row.id, attemptKey, claimToken, PROCESSING_STALE_AFTER_MINUTES]
         );
         if (reclaimed.rowCount !== 1) {
           skipped += 1;
@@ -102,8 +104,10 @@ export async function POST(request: Request) {
         failed += 1;
         failures.push({ digestCandidateId: row.id, error: message });
         await pool.query(
-          `UPDATE digest_delivery_attempts SET status = 'failed', error_message = LEFT($3, 1000), attempted_at = NOW() WHERE digest_candidate_id = $1 AND idempotency_key = $2`,
-          [row.id, attemptKey, message]
+          `UPDATE digest_delivery_attempts
+           SET status = 'failed', error_message = LEFT($3, 1000), attempted_at = NOW()
+           WHERE digest_candidate_id = $1 AND idempotency_key = $2 AND processing_claim_token = $4`,
+          [row.id, attemptKey, message, claimToken]
         );
         continue;
       }
@@ -111,15 +115,19 @@ export async function POST(request: Request) {
       if (result.ok) {
         sent += 1;
         await pool.query(
-          `UPDATE digest_delivery_attempts SET status = 'sent', error_message = NULL, attempted_at = NOW() WHERE digest_candidate_id = $1 AND idempotency_key = $2`,
-          [row.id, attemptKey]
+          `UPDATE digest_delivery_attempts
+           SET status = 'sent', error_message = NULL, attempted_at = NOW()
+           WHERE digest_candidate_id = $1 AND idempotency_key = $2 AND processing_claim_token = $3`,
+          [row.id, attemptKey, claimToken]
         );
       } else {
         failed += 1;
         failures.push({ digestCandidateId: row.id, error: result.error });
         await pool.query(
-          `UPDATE digest_delivery_attempts SET status = 'failed', error_message = LEFT($3, 1000), attempted_at = NOW() WHERE digest_candidate_id = $1 AND idempotency_key = $2`,
-          [row.id, attemptKey, result.error]
+          `UPDATE digest_delivery_attempts
+           SET status = 'failed', error_message = LEFT($3, 1000), attempted_at = NOW()
+           WHERE digest_candidate_id = $1 AND idempotency_key = $2 AND processing_claim_token = $4`,
+          [row.id, attemptKey, result.error, claimToken]
         );
       }
     }
