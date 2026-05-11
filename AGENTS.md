@@ -8,6 +8,7 @@
 - `refresh-self-serve-mvp` — основная integration branch.
 - Рабочие ветки задач: `codex/<task>` (например, `codex/add-agents-md`).
 - Все промежуточные Codex PR должны быть **только** с base=`refresh-self-serve-mvp`.
+- Запрещены ложные утверждения о PR/проверках: любое заявление о созданном PR, commit SHA или статусе checks должно сопровождаться проверяемыми URL/SHA/логами.
 - Единственный основной PR в `main`: `refresh-self-serve-mvp -> main`.
 - Если существующий PR был обновлён вне Codex и не может быть безопасно продолжен в Codex, нужно:
   1. создать superseding PR в тот же base (`refresh-self-serve-mvp`),
