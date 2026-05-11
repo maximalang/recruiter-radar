@@ -55,19 +55,50 @@ export async function POST(request: Request) {
         continue;
       }
 
-      const attemptKey = `dg:${runId}:candidate:${row.id}:ts:${Date.now()}`;
+      const attemptKey = `dg:${runId}:candidate:${row.id}`;
+      const claimedAttempt = await pool.query<{ id: number }>(
+        `INSERT INTO digest_delivery_attempts (digest_candidate_id, idempotency_key, channel, status)
+         VALUES ($1, $2, 'telegram', 'processing')
+         ON CONFLICT (digest_candidate_id, idempotency_key) DO NOTHING
+         RETURNING id`,
+        [row.id, attemptKey]
+      );
+
+      if (claimedAttempt.rowCount === 0) {
+        const existingAttempt = await pool.query<{ status: string }>(
+          `SELECT status::TEXT AS status FROM digest_delivery_attempts WHERE digest_candidate_id = $1 AND idempotency_key = $2 LIMIT 1`,
+          [row.id, attemptKey]
+        );
+        const existingStatus = existingAttempt.rows[0]?.status;
+        if (existingStatus === 'sent' || existingStatus === 'processing') {
+          skipped += 1;
+          continue;
+        }
+
+        const reclaimed = await pool.query(
+          `UPDATE digest_delivery_attempts
+           SET status = 'processing', error_message = NULL, attempted_at = NOW()
+           WHERE digest_candidate_id = $1 AND idempotency_key = $2 AND status = 'failed'`,
+          [row.id, attemptKey]
+        );
+        if (reclaimed.rowCount !== 1) {
+          skipped += 1;
+          continue;
+        }
+      }
+
       const result = await sendLeadToTelegram(row.id);
       if (result.ok) {
         sent += 1;
         await pool.query(
-          `INSERT INTO digest_delivery_attempts (digest_candidate_id, idempotency_key, channel, status) VALUES ($1, $2, 'telegram', 'sent')`,
+          `UPDATE digest_delivery_attempts SET status = 'sent', error_message = NULL, attempted_at = NOW() WHERE digest_candidate_id = $1 AND idempotency_key = $2`,
           [row.id, attemptKey]
         );
       } else {
         failed += 1;
         failures.push({ digestCandidateId: row.id, error: result.error });
         await pool.query(
-          `INSERT INTO digest_delivery_attempts (digest_candidate_id, idempotency_key, channel, status, error_message) VALUES ($1, $2, 'telegram', 'failed', LEFT($3, 1000))`,
+          `UPDATE digest_delivery_attempts SET status = 'failed', error_message = LEFT($3, 1000), attempted_at = NOW() WHERE digest_candidate_id = $1 AND idempotency_key = $2`,
           [row.id, attemptKey, result.error]
         );
       }
