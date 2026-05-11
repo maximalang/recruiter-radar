@@ -4,11 +4,16 @@ import { NextResponse } from "next/server";
 import { getPool } from "../../../../lib/db";
 import { isDigestFeedbackAction, updateDigestOrgStateFeedback, type DigestFeedbackAction } from "../../../../lib/digestFeedback";
 import { answerTelegramCallbackQuery, getTelegramBotToken } from "../../../../lib/telegram";
+import { consumeTelegramConnectToken } from "../../../../lib/telegramConnect";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-type TelegramWebhookUpdate = { update_id?: number; callback_query?: { id?: string; data?: string } };
+type TelegramWebhookUpdate = {
+  update_id?: number;
+  callback_query?: { id?: string; data?: string };
+  message?: { chat?: { id?: number | string }; text?: string }
+};
 type ParsedDigestFeedbackCallback = { clientProfileId: string; orgId: string; action: DigestFeedbackAction | "shown" };
 const STALE_CLAIM_SECONDS = 90;
 
@@ -63,6 +68,15 @@ export async function POST(request: Request) {
   }
 
   if (!callbackQueryId || !parsedCallback) {
+    const startToken = parseStartToken(update?.message?.text);
+    const chatId = normalizeTelegramChatId(update?.message?.chat?.id);
+
+    if (startToken && chatId) {
+      const consume = await consumeTelegramConnectToken({ token: startToken, telegramChatId: chatId });
+      await pool.query(`UPDATE webhook_events SET status = 'processed', processed_at = NOW(), error_message = NULL WHERE id = $1 AND processing_claim_token = $2`, [eventRow.id, claimToken]);
+      return NextResponse.json({ ok: true, startHandled: true, connectStatus: consume.status });
+    }
+
     await pool.query(`UPDATE webhook_events SET status = 'ignored', processed_at = NOW() WHERE id = $1 AND processing_claim_token = $2`, [eventRow.id, claimToken]);
     return NextResponse.json({ ok: true, ignored: true });
   }
@@ -85,3 +99,17 @@ function getDigestFeedbackConfirmationText(action: DigestFeedbackAction): string
 function isPositiveIntegerString(value: string | null | undefined): value is string { return typeof value === "string" && /^\d+$/.test(value); }
 function normalizeNonEmptyString(value: string | null | undefined): string | null { if (typeof value !== "string") return null; const normalizedValue = value.trim(); return normalizedValue === "" ? null : normalizedValue; }
 function sanitizeError(value: string): string { return value.replace(/bot\d+:[A-Za-z0-9_-]+/g, "[redacted-token]"); }
+
+function parseStartToken(value: string | null | undefined): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  if (!normalized.startsWith("/start")) return null;
+  const token = normalized.slice(6).trim();
+  return token === "" ? null : token;
+}
+
+function normalizeTelegramChatId(value: string | number | null | undefined): string | null {
+  if (typeof value === "number" && Number.isFinite(value)) return String(Math.trunc(value));
+  if (typeof value === "string" && value.trim() !== "") return value.trim();
+  return null;
+}

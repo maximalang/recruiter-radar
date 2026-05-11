@@ -107,7 +107,7 @@ CREATE TABLE telegram_connect_tokens (
   id BIGSERIAL PRIMARY KEY,
   token TEXT NOT NULL UNIQUE,
   order_id BIGINT NOT NULL REFERENCES checkout_orders(id) ON DELETE CASCADE,
-  client_profile_id BIGINT REFERENCES client_profiles(id) ON DELETE SET NULL,
+  client_profile_id BIGINT,
   expires_at TIMESTAMPTZ NOT NULL,
   used_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

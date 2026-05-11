@@ -201,6 +201,7 @@ export type PaymentProviderSetupState = {
 };
 
 type StartCheckoutOrderInput = {
+  userId?: string | number | null;
   productCode: PublicPlan["code"];
   customerName: string;
   customerContact: string;
@@ -284,6 +285,7 @@ export function getPaymentProviderSetupState(): PaymentProviderSetupState {
 export async function startCheckoutOrder(input: StartCheckoutOrderInput): Promise<StartCheckoutOrderResult> {
   const plan = getPublicPlanByCode(input.productCode);
   let order = await createCheckoutOrder({
+    userId: input.userId ?? 1,
     productCode: input.productCode,
     amountMinor: plan.amountMinor,
     currency: plan.currency,
@@ -871,6 +873,7 @@ export function buildCheckoutRetryHref(order: CheckoutOrder): string {
 }
 
 async function createCheckoutOrder(input: {
+  userId: string | number;
   productCode: PublicPlan["code"];
   amountMinor: number;
   currency: string;
@@ -888,6 +891,7 @@ async function createCheckoutOrder(input: {
   const customerContact = normalizeRequiredText(input.customerContact, "Contact is required.");
   const result = await pool.query<CheckoutOrderRow>(`
     INSERT INTO checkout_orders (
+      user_id,
       plan_code,
       amount_rub,
       currency,
@@ -896,7 +900,7 @@ async function createCheckoutOrder(input: {
       customer_contact,
       payload
     )
-    VALUES ($1, ($2 / 100), $3, 'created', $4, $5, $6::jsonb)
+    VALUES ($1, $2, ($3 / 100), $4, 'created', $5, $6, $7::jsonb)
     RETURNING
       id::TEXT AS id,
       plan_code AS "productCode",
@@ -912,6 +916,7 @@ async function createCheckoutOrder(input: {
       updated_at::TEXT AS "updatedAt",
       paid_at::TEXT AS "paidAt"
   `, [
+    normalizeCheckoutOrderUserId(input.userId),
     input.productCode,
     input.amountMinor,
     normalizeCurrency(input.currency),
@@ -919,6 +924,7 @@ async function createCheckoutOrder(input: {
     customerContact,
     JSON.stringify(input.payload)
   ]);
+
 
   if (result.rowCount !== 1) {
     throw new Error("Failed to create checkout order.");
@@ -1557,4 +1563,10 @@ function getErrorMessage(error: unknown): string {
   }
 
   return "Не получилось открыть оплату.";
+}
+
+function normalizeCheckoutOrderUserId(value: string | number): number {
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) throw new Error("Invalid checkout order owner.");
+  return parsed;
 }
