@@ -28,9 +28,7 @@ export type TelegramTextMessageResult = TelegramSendResult & {
 
 type TelegramApiSuccess = {
   ok: true;
-  result: {
-    message_id?: number;
-  };
+  result: unknown;
 };
 
 type TelegramApiFailure = {
@@ -72,7 +70,7 @@ function isTelegramApiSuccess(value: unknown): value is TelegramApiSuccess {
 
   const result = value as Partial<TelegramApiSuccess>;
 
-  return result.ok === true && !!result.result && typeof result.result === "object";
+  return result.ok === true && "result" in result;
 }
 
 function getTelegramErrorDescription(value: unknown): string | null {
