@@ -2,15 +2,14 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { startCheckoutOrder } from "../../lib/payments";
-import { buildCheckoutHref, readPublicPreviewInput } from "../../lib/publicProduct";
+import { buildCheckoutHref, readPublicPreviewInput, resolveCheckoutOwnerId } from "../../lib/publicProduct";
 
 export const dynamic = "force-dynamic";
 
 export default async function CheckoutPage({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
   const input = readPublicPreviewInput(searchParams);
   const restartHref = buildCheckoutHref(input);
-  const rawOwnerId = searchParams.ownerId;
-  const ownerId = typeof rawOwnerId === "string" && rawOwnerId.trim() !== "" ? rawOwnerId : null;
+  const ownerId = resolveCheckoutOwnerId();
 
   async function startCheckoutAction() {
     "use server";

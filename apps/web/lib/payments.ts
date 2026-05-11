@@ -1040,6 +1040,52 @@ async function getCheckoutOrderByProviderPaymentId(
   return result.rowCount === 1 ? mapCheckoutOrderRow(result.rows[0]) : null;
 }
 
+
+async function ensurePilotEntitlementForPaidOrder(
+  order: CheckoutOrder,
+  db?: PaymentsDbClient
+): Promise<void> {
+  if (order.productCode !== "pilot" || order.status !== "paid") {
+    return;
+  }
+
+  const pool = db ?? getPool();
+
+  if (!pool) {
+    throw new Error("DATABASE_URL is not set.");
+  }
+
+  const paidAtIso = order.paidAt ?? new Date().toISOString();
+  const ownerResult = await pool.query<{ userId: string }>(
+    `SELECT user_id::TEXT AS "userId" FROM checkout_orders WHERE id = $1 LIMIT 1`,
+    [normalizeCheckoutOrderId(order.id)]
+  );
+
+  if (ownerResult.rowCount !== 1) {
+    throw new Error("Checkout order owner not found.");
+  }
+
+  const userId = normalizeCheckoutOrderUserId(ownerResult.rows[0].userId);
+
+  await pool.query(`
+    INSERT INTO pilot_enrollments (
+      user_id,
+      status,
+      starts_at,
+      activated_by,
+      notes
+    )
+    VALUES ($1, 'active', $2::timestamptz, 'payment_webhook', $3)
+    ON CONFLICT (user_id) WHERE status = 'active'
+    DO UPDATE SET
+      starts_at = LEAST(pilot_enrollments.starts_at, EXCLUDED.starts_at),
+      ends_at = NULL,
+      updated_at = NOW(),
+      activated_by = EXCLUDED.activated_by,
+      notes = EXCLUDED.notes
+  `, [userId, paidAtIso, `checkout_order:${order.id}`]);
+}
+
 async function ensurePilotApplicationForOrder(
   order: CheckoutOrder,
   db?: PaymentsDbClient
@@ -1076,6 +1122,7 @@ async function ensurePaidPilotOrderReady(
     return order;
   }
 
+  await ensurePilotEntitlementForPaidOrder(order, db);
   order = await ensurePilotApplicationForOrder(order, db);
 
   const profile = await ensureClientProfileForPaidOrder(order, db);
