@@ -33,6 +33,7 @@ import { getHhDigestItems } from "../../../../lib/hhDigest";
 import { getClientProfileWebPushStatuses } from "../../../../lib/webPushSubscriptions";
 import {
   ensurePilotOrderOnboardingReady,
+  getPilotActivationReadiness,
   type CheckoutOrder,
   type CheckoutOrderOnboardingStep
 } from "../../../../lib/payments";
@@ -115,6 +116,7 @@ export default async function PilotOnboardingPage({
   const profile = order.payload.clientProfileId
     ? await getClientProfileById(order.payload.clientProfileId).catch(() => null)
     : null;
+  const readiness = await getPilotActivationReadiness(order.id);
   const currentStep = getCurrentStep(order, getRequestedStep(resolvedSearchParams, order));
   const isPushEntry = getSearchParamValue(resolvedSearchParams, "entry") === "push";
   const requestedView = getSearchParamValue(resolvedSearchParams, "view");
@@ -196,6 +198,18 @@ export default async function PilotOnboardingPage({
             whyValue={stepFocus.why}
             nextValue={stepFocus.next}
           />
+
+          <div style={{ display: "grid", gap: "8px" }}>
+            <SummaryRow label="Профиль клиента создан" value={readiness?.profileExists ? "да" : "нет"} />
+            <SummaryRow
+              label="Telegram подключён"
+              value={readiness?.telegramConnected ? "да" : "нет"}
+            />
+            <SummaryRow
+              label="Первая подборка готова"
+              value={readiness?.canRequestFirstDigest ? "да" : "ждёт предыдущие шаги"}
+            />
+          </div>
 
           {errorMessage ? (
             <NoticeBox tone="danger" title="Не получилось открыть следующий шаг" description={errorMessage} />
@@ -404,7 +418,7 @@ export default async function PilotOnboardingPage({
                 <SectionIntro
                   eyebrow="Шаг 3"
                   title="Посмотрите первый радар"
-                  description="Посмотрите, кто в фокусе сегодня, и отправьте первый радар в Telegram."
+                  description="Проверьте компании, которым стоит написать сегодня: с доказательствами и объяснением почему сейчас."
                 />
 
                 <NoticeBox
@@ -456,7 +470,7 @@ export default async function PilotOnboardingPage({
                         />
                       </form>
                       <div style={helperTextStyle}>
-                        После этого новые компании будут приходить автоматически.
+                        Это тестовый запуск. Дальше ежедневный радар будет приходить автоматически при активном пилоте.
                       </div>
                     </div>
 
@@ -511,6 +525,12 @@ export default async function PilotOnboardingPage({
                         : "Следующие радары будут приходить в тот же подключённый чат."
                       : "Пилот уже активен. Как только появятся подходящие компании, они будут приходить автоматически."
                   }
+                />
+
+                <NoticeBox
+                  tone="info"
+                  title="Что делать дальше"
+                  description="Откройте первую подборку в Telegram, отметьте релевантность карточек и используйте обратную связь. Это улучшает, какие компании и почему сейчас мы показываем в следующих радарах."
                 />
 
                 {showPushRadarView ? (

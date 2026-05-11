@@ -3,6 +3,17 @@
 ## Flow
 Landing → preview → pilot activation → Telegram connection → daily digest → callback feedback → suppression/reweighting.
 
+## Activation readiness (pilot → Telegram → first digest)
+- Readiness is evaluated server-side from paid pilot order + linked client profile state.
+- Required checkpoints:
+  - client profile exists;
+  - client profile active;
+  - Telegram connected;
+  - pilot entitlement active (paid order);
+  - first test digest can be requested.
+- UI only reflects readiness and next steps; delivery logic remains server-side.
+- First test digest should be triggered through existing delivery path (conceptually `/api/digest/delivery` / server delivery functions), without duplicating business logic in onboarding UI.
+
 ## Implemented
 - `apps/web/lib/db.ts` migrated from legacy `leads/lead_status/deliveries` reads to digest model (`digest_candidates`, `client_profiles`, `client_digest_org_state`) for list/status/send actions.
 - Telegram webhook `/api/telegram/webhook` now enforces `TELEGRAM_WEBHOOK_SECRET`, writes to `webhook_events`, is replay-safe via deterministic idempotency key, persists processed/failed statuses, and answers callback queries.
@@ -11,6 +22,11 @@ Landing → preview → pilot activation → Telegram connection → daily diges
 
 ## Required env vars
 `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_WEBHOOK_SECRET`, `DIGEST_API_KEY`, `RR_APP_BASE_URL`, `BILLING_WEBHOOK_SECRET`.
+
+Additional onboarding/runtime prerequisites:
+- `DATABASE_URL` for checkout orders, profiles, and Telegram connect tokens.
+- Payment provider env for active pilot entitlement (`PAYMENTS_PROVIDER`, provider-specific keys).
+- Configured Telegram bot username/token so connect links can be generated and test digest can be delivered.
 
 ## Migration
 - Apply `packages/db/migrations/0004_self_serve_mvp_foundations.sql`.
