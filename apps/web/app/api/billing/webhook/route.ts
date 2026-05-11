@@ -55,16 +55,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, duplicate: true, status });
   }
 
-  const event = await processPaymentWebhook(provider, webhookRequest);
-  const nextStatus = event.status >= 200 && event.status < 300 ? "processed" : "failed";
-  const errorMessage = nextStatus === "failed" ? event.body.slice(0, 500) : null;
+  try {
+    const event = await processPaymentWebhook(provider, webhookRequest);
+    const nextStatus = event.status >= 200 && event.status < 300 ? "processed" : "failed";
+    const errorMessage = nextStatus === "failed" ? event.body.slice(0, 500) : null;
 
-  await pool.query(
-    `UPDATE billing_webhook_events
-     SET status = $3, error_message = $4, processed_at = NOW()
-     WHERE provider = $1 AND idempotency_key = $2`,
-    [provider, idempotencyKey, nextStatus, errorMessage]
-  );
+    await pool.query(
+      `UPDATE billing_webhook_events
+       SET status = $3, error_message = $4, processed_at = NOW()
+       WHERE provider = $1 AND idempotency_key = $2`,
+      [provider, idempotencyKey, nextStatus, errorMessage]
+    );
 
-  return NextResponse.json({ ok: event.status >= 200 && event.status < 300, reconciled: event.status >= 200 && event.status < 300, status: nextStatus }, { status: event.status });
+    return NextResponse.json({ ok: event.status >= 200 && event.status < 300, reconciled: event.status >= 200 && event.status < 300, status: nextStatus }, { status: event.status });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message.slice(0, 500) : "reconciliation_error";
+
+    await pool.query(
+      `UPDATE billing_webhook_events
+       SET status = 'failed', error_message = $3, processed_at = NOW()
+       WHERE provider = $1 AND idempotency_key = $2`,
+      [provider, idempotencyKey, errorMessage]
+    );
+
+    return NextResponse.json({ ok: false, reconciled: false, status: "failed", error: "reconciliation_error" }, { status: 500 });
+  }
 }
