@@ -38,6 +38,7 @@ import {
   type CheckoutOrder,
   type CheckoutOrderOnboardingStep
 } from "../../../../lib/payments";
+import { getTelegramBotToken } from "../../../../lib/telegram";
 import { getTelegramConnectLinkState } from "../../../../lib/telegramConnect";
 import { getWebPushConnectLinkState } from "../../../../lib/webPushConnect";
 import {
@@ -124,6 +125,8 @@ export default async function PilotOnboardingPage({
     ? await getClientProfileById(order.payload.clientProfileId).catch(() => null)
     : null;
   const readiness = await getPilotActivationReadiness(order.id);
+  const normalizedTelegramBotToken = getTelegramBotToken().botToken?.trim() ?? "";
+  const deliveryPrerequisitesReady = Boolean(profile?.telegramChatId) && normalizedTelegramBotToken.length > 0;
   const currentStep = getCurrentStep(order, getRequestedStep(resolvedSearchParams, order));
   const isPushEntry = getSearchParamValue(resolvedSearchParams, "entry") === "push";
   const requestedView = getSearchParamValue(resolvedSearchParams, "view");
@@ -163,6 +166,8 @@ export default async function PilotOnboardingPage({
   }
 
   const hasTestDigestSent = Boolean(order.payload.onboardingTestDigestSentAt);
+  const firstDigestHasCandidates = previewItems.length > 0;
+  const firstDigestReady = deliveryPrerequisitesReady && firstDigestHasCandidates;
   const confirmPilotProfileBoundAction = confirmPilotProfileAction.bind(null, order.id);
   const sendPilotTestDigestBoundAction = sendPilotTestDigestAction.bind(null, order.id);
   const completePilotOnboardingBoundAction = completePilotOnboardingAction.bind(null, order.id);
@@ -179,7 +184,7 @@ export default async function PilotOnboardingPage({
         ? "подключён"
         : "не подключён"
       : "готовим";
-  const previewUnavailableMessage = previewError ?? "Попробуйте обновить страницу чуть позже.";
+  const previewUnavailableMessage = "Не удалось обновить текущий радар. Попробуйте позже.";
   const stepFocus = buildOnboardingStepFocus({
     currentStep,
     previewCount: previewItems.length,
@@ -218,7 +223,7 @@ export default async function PilotOnboardingPage({
             />
             <SummaryRow
               label="Первая подборка готова"
-              value={readiness?.canRequestFirstDigest ? "да" : "ждёт предыдущие шаги"}
+              value={firstDigestReady ? "да" : readiness?.canRequestFirstDigest ? "собираем" : "ждёт предыдущие шаги"}
             />
           </div>
 
@@ -541,7 +546,11 @@ export default async function PilotOnboardingPage({
                 <NoticeBox
                   tone="info"
                   title="Что делать дальше"
-                  description="Откройте первую подборку в Telegram, отметьте релевантность карточек и используйте обратную связь. Это улучшает, какие компании и почему сейчас мы показываем в следующих радарах."
+                  description={
+                    firstDigestHasCandidates
+                      ? "Откройте первую подборку в Telegram, отметьте релевантность карточек и используйте обратную связь. Это улучшает, какие компании и почему сейчас мы показываем в следующих радарах."
+                      : "Проверьте радар позже: как только появятся компании с сильным сигналом, подборка придёт автоматически."
+                  }
                 />
 
                 {showPushRadarView ? (
