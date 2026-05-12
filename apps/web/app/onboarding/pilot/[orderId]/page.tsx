@@ -179,6 +179,7 @@ export default async function PilotOnboardingPage({
         ? "подключён"
         : "не подключён"
       : "готовим";
+  const previewUnavailableMessage = previewError ?? "Попробуйте обновить страницу чуть позже.";
   const stepFocus = buildOnboardingStepFocus({
     currentStep,
     previewCount: previewItems.length,
@@ -578,6 +579,12 @@ export default async function PilotOnboardingPage({
                         ) : null}
                       </div>
                     </div>
+                  ) : previewError ? (
+                    <NoticeBox
+                      tone="danger"
+                      title="Не удалось обновить радар"
+                      description={previewUnavailableMessage}
+                    />
                   ) : (
                     <NoticeBox
                       tone="neutral"
