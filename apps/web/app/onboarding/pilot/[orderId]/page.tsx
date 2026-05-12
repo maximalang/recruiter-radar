@@ -167,7 +167,7 @@ export default async function PilotOnboardingPage({
 
   const hasTestDigestSent = Boolean(order.payload.onboardingTestDigestSentAt);
   const firstDigestHasCandidates = previewItems.length > 0;
-  const firstDigestReady = deliveryPrerequisitesReady && firstDigestHasCandidates;
+  const firstDigestReady = hasTestDigestSent || (deliveryPrerequisitesReady && firstDigestHasCandidates);
   const confirmPilotProfileBoundAction = confirmPilotProfileAction.bind(null, order.id);
   const sendPilotTestDigestBoundAction = sendPilotTestDigestAction.bind(null, order.id);
   const completePilotOnboardingBoundAction = completePilotOnboardingAction.bind(null, order.id);
@@ -223,7 +223,15 @@ export default async function PilotOnboardingPage({
             />
             <SummaryRow
               label="Первая подборка готова"
-              value={firstDigestReady ? "да" : readiness?.canRequestFirstDigest ? "собираем" : "ждёт предыдущие шаги"}
+              value={
+                hasTestDigestSent
+                  ? "отправлен"
+                  : firstDigestReady
+                    ? "готово"
+                    : readiness?.canRequestFirstDigest
+                      ? "собираем"
+                      : "ждёт предыдущие шаги"
+              }
             />
           </div>
 
@@ -547,9 +555,15 @@ export default async function PilotOnboardingPage({
                   tone="info"
                   title="Что делать дальше"
                   description={
-                    firstDigestHasCandidates
-                      ? "Откройте первую подборку в Telegram, отметьте релевантность карточек и используйте обратную связь. Это улучшает, какие компании и почему сейчас мы показываем в следующих радарах."
-                      : "Проверьте радар позже: как только появятся компании с сильным сигналом, подборка придёт автоматически."
+                    hasTestDigestSent
+                      ? "Откройте отправленный радар в Telegram, отмечайте релевантность карточек и используйте обратную связь."
+                      : previewError
+                        ? "Не удалось обновить текущий радар. Попробуйте позже."
+                        : !deliveryPrerequisitesReady
+                          ? "Вернитесь к шагу подключения Telegram, чтобы включить доставку радара."
+                          : firstDigestHasCandidates
+                            ? "Откройте первую подборку в Telegram, отметьте релевантность карточек и используйте обратную связь."
+                            : "Пилот уже активен. Как только появятся компании с сильным сигналом, подборка придёт автоматически."
                   }
                 />
 
