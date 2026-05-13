@@ -42,7 +42,13 @@ export async function POST(request: Request) {
       resolvedClientProfileId = runResult.clientProfile.id;
     }
 
-    const candidates = await pool.query<{ id: number }>(`SELECT id FROM digest_candidates WHERE digest_run_id = $1 ORDER BY id ASC`, [runId]);
+    const candidates = await pool.query<{ id: number }>(`
+      SELECT id
+      FROM digest_candidates
+      WHERE digest_run_id = $1
+        AND (payload->>'confidenceGate' NOT IN ('C', 'D') OR payload->>'confidenceGate' IS NULL)
+      ORDER BY id ASC
+    `, [runId]);
     let sent = 0;
     let failed = 0;
     let skipped = 0;
