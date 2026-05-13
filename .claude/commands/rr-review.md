@@ -1,78 +1,35 @@
 # rr-review
 
-Review current changes before committing. Run after completing a task or before creating a commit.
+Review current changes before committing.
 
-## Usage
+## Process
 
-`/rr-review`
+1. `git diff --stat` — changed files summary
+2. `git diff` — unstaged changes
+3. `git diff --cached` — staged changes
+4. `npm run web:check` — TypeScript check
+5. `npm run web:build` — production build
 
-## What it does
-
-1. **Show diff** — `git diff` and `git diff --cached`
-2. **Run validation**:
-   - `npm run web:check`
-   - `npm run web:build`
-3. **Check for issues**:
-   - Secrets accidentally included?
-   - Unintended changes?
-   - Missing error/loading states?
-   - TypeScript errors?
-4. **Generate report** with:
-   - Changed files
-   - Check results
-   - Potential risks
-   - Suggested commit message
-
-## Report format
+## Report
 
 ```
 === REVIEW REPORT ===
 
 CHANGED FILES:
-<list of files>
+<list>
 
 CHECK RESULTS:
 - web:check: <pass|fail>
 - web:build: <pass|fail>
 
 RISKS:
-- <risk description>
-- <risk description>
+- <if any>
 
-SUGGESTED COMMIT MESSAGE:
+SUGGESTED COMMIT:
 <type>: <short description>
-
-<optional body>
-
-SUGGESTED COMMIT TYPE:
-- fix: bug fix
-- feat: new feature
-- refactor: code refactoring
-- docs: documentation only
-- test: test additions
-- chore: maintenance tasks
 ```
-
-## When to run
-
-- After completing a task (before committing)
-- Before running `/rr-review` (to see what would be committed)
-- When unsure about changes
-- Before using `git add`
-
-## Common issues to catch
-
-- Secrets in code (API keys, tokens, passwords)
-- Console.log statements left in code
-- Unused imports or variables
-- Missing TypeScript types
-- Incomplete error handling
-- Build failures
-- Type check failures
-- Changes outside task scope
 
 ## Do NOT
 
 - Do NOT run `git add` or `git commit` without review
-- Do NOT push after review (pushing is denied by settings.json)
-- Do NOT create PRs (not configured for this project)
+- Do NOT push (pushing is denied by settings.json)

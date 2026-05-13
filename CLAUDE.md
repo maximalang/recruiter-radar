@@ -143,7 +143,17 @@ A task is done only when:
 2. Required checks pass, or failures are reported honestly
 3. The final report includes: changed files, check results, risks, suggested commit message
 
-## 12. Available Skills
+## 12. Token / context discipline
+
+- Start new sessions for unrelated tasks
+- Use /context before broad tasks
+- Use /compact after long sessions with focused instructions
+- Use /clear when switching product areas
+- Read only relevant files; prefer summaries over dumping whole files
+- Use installed skills selectively; avoid loading multiple skills for simple tasks
+- Use subagents or tasks for broad codebase research so large reads do not pollute the main session
+
+## 13. Available Skills
 
 Use these personal skills as needed:
 - `using-agent-skills` — meta-skill for skill discovery
