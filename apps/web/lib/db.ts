@@ -17,7 +17,7 @@ type LeadRow = {
   userName: string;
 };
 
-type LeadDeliveryRow = LeadRow & { clientProfileId: number; orgId: number; telegramChatId: string | null };
+type LeadDeliveryRow = LeadRow & { clientProfileId: number; orgId: number; telegramChatId: string | null; payload: unknown };
 export type TelegramDeliveryResult = { ok: true } | { ok: false; error: string };
 export type EntitlementResult = { allowed: boolean; reason: string | null };
 type LeadsResult = { rows: LeadRow[]; error: string | null };
@@ -98,7 +98,8 @@ async function getLeadDeliveryRow(leadId: number): Promise<LeadDeliveryRow | nul
       dc.total_score AS "score",
       dc.created_at::text AS "lastSignalAt",
       cp.agency_name AS "userName",
-      cp.telegram_chat_id::text AS "telegramChatId"
+      cp.telegram_chat_id::text AS "telegramChatId",
+      dc.payload
     FROM digest_candidates dc
     INNER JOIN orgs o ON o.id = dc.org_id
     INNER JOIN client_profiles cp ON cp.id = dc.client_profile_id
@@ -116,6 +117,7 @@ export async function sendLeadToTelegram(leadId: number): Promise<TelegramDelive
   const { botToken, error } = getTelegramBotToken();
   if (!botToken) return { ok: false, error: error ?? "Telegram is not configured." };
   try {
+    const confidenceGate = extractConfidenceGate(lead.payload);
     const callbackPrefix = `dgf:${lead.clientProfileId}:${lead.orgId}`;
     const replyMarkup = {
       inline_keyboard: [[
@@ -125,7 +127,7 @@ export async function sendLeadToTelegram(leadId: number): Promise<TelegramDelive
       ]]
     };
     await sendTelegramLeadMessage(
-      { orgName: lead.orgName, status: lead.status, score: lead.score, lastSignalAt: lead.lastSignalAt, userName: lead.userName },
+      { orgName: lead.orgName, status: lead.status, score: lead.score, lastSignalAt: lead.lastSignalAt, userName: lead.userName, confidenceGate },
       { botToken, chatId: lead.telegramChatId },
       { replyMarkup }
     );
@@ -136,6 +138,21 @@ export async function sendLeadToTelegram(leadId: number): Promise<TelegramDelive
     logError("telegram.delivery.failed", error, { digestCandidateId: leadId, clientProfileId: lead.clientProfileId, orgId: lead.orgId });
     return { ok: false, error: message };
   }
+}
+
+function extractConfidenceGate(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== "object") {
+    return undefined;
+  }
+
+  const payloadObj = payload as Record<string, unknown>;
+  const confidenceGate = payloadObj.confidenceGate;
+
+  if (typeof confidenceGate === "string" && confidenceGate.length > 0) {
+    return confidenceGate;
+  }
+
+  return undefined;
 }
 
 

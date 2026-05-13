@@ -16,6 +16,7 @@ type TelegramLeadMessage = {
   score: number | null;
   lastSignalAt: string | null;
   userName: string;
+  confidenceGate?: string;
 };
 
 type TelegramSendResult = {
