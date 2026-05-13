@@ -20,6 +20,21 @@ Landing → preview → pilot activation → Telegram connection → daily diges
 - Billing webhook `/api/billing/webhook`: secret validation + idempotent billing event ledger.
 - Self-serve foundations migration aligned to digest model: `digest_delivery_attempts` references `digest_candidates` (not legacy `deliveries`).
 
+## Confidence-gated delivery
+Digest candidates are assigned confidence gates (A/B/C/D) based on evidence quality and entity resolution confidence. Delivery behavior:
+
+- **A/B gates**: auto-delivered to Telegram (2+ independent sources or 1 strong source + enrichment)
+- **C/D gates**: held from Telegram delivery (single-source aggregation or context-only enrichment)
+- **Missing/null gate**: treated as allowed (backward compatibility)
+
+Held candidates are filtered at query level in `/api/digest/delivery` before delivery loop, preventing retry noise.
+
+**Operator inspection**: `npm run digest:held` lists up to 100 most recent C/D candidates with id, digest_run_id, client_profile_id, org_id, confidence_gate, total_score, source_families, created_at.
+
+**Known limitation**: no approval UI yet. Held candidates remain in `digest_candidates` but never create `digest_delivery_attempts` records.
+
+**Next step**: review queue v1 with operator approval workflow (requires schema for review state tracking).
+
 ## Required env vars
 `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_WEBHOOK_SECRET`, `DIGEST_API_KEY`, `RR_APP_BASE_URL`, `BILLING_WEBHOOK_SECRET`.
 
