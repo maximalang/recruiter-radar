@@ -6,132 +6,36 @@
   "includeGitInstructions": false,
   "permissions": {
     "allow": [
-      {
-        "command": "git status",
-        "reason": "Inspect working tree state"
-      },
-      {
-        "command": "git branch",
-        "reason": "Check current branch"
-      },
-      {
-        "command": "git branch --show-current",
-        "reason": "Get current branch name"
-      },
-      {
-        "command": "git diff",
-        "reason": "Review unstaged changes"
-      },
-      {
-        "command": "git diff --cached",
-        "reason": "Review staged changes"
-      },
-      {
-        "command": "git log",
-        "reason": "Inspect commit history"
-      },
-      {
-        "command": "git log --oneline -10",
-        "reason": "Quick commit history"
-      },
-      {
-        "command": "git remote -v",
-        "reason": "Check remotes for preflight"
-      },
-      {
-        "command": "npm run web:check",
-        "reason": "TypeScript type check for web app"
-      },
-      {
-        "command": "npm run web:build",
-        "reason": "Build web app for production validation"
-      },
-      {
-        "command": "npm run web:validate",
-        "reason": "Full validation for web app"
-      },
-      {
-        "command": "npm run db:validate",
-        "reason": "Validate database schema"
-      },
-      {
-        "command": "npm run verify:smoke",
-        "reason": "Run smoke tests"
-      },
-      {
-        "command": "npm run clean",
-        "reason": "Clean build artifacts"
-      },
-      {
-        "command": "ls",
-        "reason": "List directory contents"
-      },
-      {
-        "command": "ls -la",
-        "reason": "List directory with details"
-      }
+      "Bash(git status)",
+      "Bash(git branch)",
+      "Bash(git branch --show-current)",
+      "Bash(git diff)",
+      "Bash(git diff --cached)",
+      "Bash(git log)",
+      "Bash(git log --oneline -10)",
+      "Bash(git remote -v)",
+      "Bash(npm run web:check)",
+      "Bash(npm run web:build)",
+      "Bash(npm run web:validate)",
+      "Bash(npm run db:validate)",
+      "Bash(npm run verify:smoke)",
+      "Bash(npm run clean)",
+      "Bash(ls)",
+      "Bash(ls -la)"
     ],
     "deny": [
-      {
-        "command": "git push",
-        "reason": "No remote push. Local development only."
-      },
-      {
-        "command": "git push origin *",
-        "reason": "No remote push. Local development only."
-      },
-      {
-        "command": "git push --force",
-        "reason": "No force push. Local development only."
-      },
-      {
-        "command": "git merge",
-        "reason": "Merge requires explicit approval. Use /rr-review first."
-      },
-      {
-        "command": "gh pr",
-        "reason": "No GitHub PRs. Local development only."
-      },
-      {
-        "command": "gh issue",
-        "reason": "No GitHub. Local development only."
-      },
-      {
-        "command": "git reset --hard",
-        "reason": "Hard reset destroys uncommitted work. Ask for confirmation."
-      },
-      {
-        "command": "git clean -fd",
-        "reason": "Clean removes untracked files. Ask for confirmation."
-      },
-      {
-        "command": "rm -rf",
-        "reason": "Recursive delete is destructive. Ask for confirmation."
-      },
-      {
-        "command": "Remove-Item -Recurse",
-        "reason": "PowerShell recursive delete is destructive. Ask for confirmation."
-      },
-      {
-        "command": "npm install",
-        "reason": "Installing dependencies requires explicit approval."
-      },
-      {
-        "command": "npm audit",
-        "reason": "Audit requires explicit approval to review results."
-      },
-      {
-        "command": "npm audit fix",
-        "reason": "Audit fix modifies node_modules. Ask for confirmation."
-      },
-      {
-        "command": "curl",
-        "reason": "No external HTTP requests without explicit reason."
-      },
-      {
-        "command": "wget",
-        "reason": "No external downloads without explicit reason."
-      }
+      "Bash(git push*)",
+      "Bash(git merge*)",
+      "Bash(gh pr*)",
+      "Bash(gh issue*)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean -fd*)",
+      "Bash(rm -rf*)",
+      "Bash(Remove-Item -Recurse*)",
+      "Bash(npm install*)",
+      "Bash(npm audit*)",
+      "Bash(curl*)",
+      "Bash(wget*)"
     ],
     "allowRead": [
       {
