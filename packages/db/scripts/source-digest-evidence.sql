@@ -103,10 +103,29 @@ normalized_signal_rows AS (
     signal.evidence_title,
     signal.location_name,
     signal.published_at,
+    -- evidence_quality: classifies how close this signal is to a company-controlled hiring surface.
+    --
+    -- direct_hiring_proof  — company-owned surface (career-pages) or a matched org-level external ID
+    --                        that indicates a verified employer entity, not a platform aggregator ID.
+    --                        source_entity_external_id / org_external_id are org-level identifiers.
+    --                        employer_id / hh_employer_id are NOT org-level: they are platform (HH)
+    --                        aggregator IDs and do NOT grant direct_hiring_proof status on their own.
+    -- platform_aggregation  — signal from a platform (HH) with a company match in org_source_refs,
+    --                        but no company-owned surface. HH/employer_id alone → platform_aggregation.
+    -- enrichment_context    — no match found; signal provides background context only.
     CASE
-      WHEN signal.source = 'career-pages' THEN 'direct_hiring_proof'
-      WHEN signal.payload_external_id IS NOT NULL THEN 'direct_hiring_proof'
-      WHEN source_ref.matched_by IS NOT NULL THEN 'platform_aggregation'
+      WHEN signal.source = 'career-pages'
+        THEN 'direct_hiring_proof'
+      WHEN signal.payload_external_id IS NOT NULL
+        AND signal.payload_external_id NOT IN (
+          -- employer_id and hh_employer_id are HH platform IDs, not org identifiers.
+          -- Their presence alone does not constitute a direct hiring proof.
+          (signal.payload ->> 'employer_id'),
+          (signal.payload ->> 'hh_employer_id')
+        )
+        THEN 'direct_hiring_proof'
+      WHEN source_ref.matched_by IS NOT NULL
+        THEN 'platform_aggregation'
       ELSE 'enrichment_context'
     END AS evidence_quality
   FROM source_signal_rows AS signal
