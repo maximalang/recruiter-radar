@@ -289,7 +289,26 @@ scored AS (
       WHEN latest_published_at >= NOW() - interval '3 days' THEN 'hot'
       WHEN latest_published_at >= NOW() - interval '7 days' THEN 'fresh'
       ELSE 'active'
-    END AS recency_code
+    END AS recency_code,
+    -- confidence_gate: A/B/C/D based on evidence layers and source diversity.
+    -- A: direct proof + 2+ independent source families
+    -- B: direct proof (single source) OR 2+ source families with platform_aggregation
+    -- C: single-source platform_aggregation
+    -- D: enrichment_context / fallback
+    CASE
+      WHEN evidence_quality = 'direct_hiring_proof'
+        AND array_length(source_families, 1) >= 2
+        THEN 'A'
+      WHEN evidence_quality = 'direct_hiring_proof'
+        OR (
+          evidence_quality = 'platform_aggregation'
+          AND array_length(source_families, 1) >= 2
+        )
+        THEN 'B'
+      WHEN evidence_quality = 'platform_aggregation'
+        THEN 'C'
+      ELSE 'D'
+    END AS confidence_gate
   FROM aggregated
   WHERE evidence_quality <> 'enrichment_context'
 ),
@@ -323,6 +342,7 @@ ranked AS (
     is_recent,
     recency_code,
     (quality_weight + activity_score)::INT AS total_score,
+    confidence_gate,
     CASE
       WHEN vacancies_count >= 3 THEN 'multi_open_roles'
       ELSE 'active_recruiting_role'
@@ -375,7 +395,8 @@ SELECT
     'role_diversity_score', role_diversity_score,
     'recency_score', recency_score,
     'activity_score', activity_score,
-    'total_score', total_score
+    'total_score', total_score,
+    'confidence_gate', confidence_gate
   ) AS score_components,
   jsonb_build_array(
     jsonb_build_object(
