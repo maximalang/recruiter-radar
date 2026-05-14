@@ -40,6 +40,8 @@ try {
         delivery_decision: formatDeliveryDecision(row.confidence_gate),
         total_score: row.total_score,
         source_families: formatSourceFamilies(row.source_families),
+        feedback_status: row.feedback_status ?? '',
+        feedback_note: row.feedback_note ?? '',
         created_at: formatTimestamp(row.created_at),
       })),
     );
@@ -67,8 +69,13 @@ async function fetchHeldCandidates(connectionString) {
         dc.total_score,
         dc.source_families,
         dc.created_at,
-        dc.payload->>'confidenceGate' AS confidence_gate
+        dc.payload->>'confidenceGate' AS confidence_gate,
+        cos.feedback_status,
+        cos.feedback_note
       FROM digest_candidates dc
+      LEFT JOIN client_digest_org_state cos
+        ON cos.org_id = dc.org_id
+       AND cos.client_profile_id = dc.client_profile_id
       WHERE dc.payload->>'confidenceGate' IN ('C', 'D')
       ORDER BY dc.created_at DESC, dc.id DESC
       LIMIT 100
