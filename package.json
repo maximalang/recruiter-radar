@@ -27,7 +27,7 @@
     "source:top": "npm run hh:top",
     "source:why-now": "npm run hh:why-now",
     "source:opener": "npm run hh:opener",
-    "source:digest": "npm run hh:digest",
+    "source:digest": "npm run digest",
     "source:run": "npm run source:pipeline:primary",
     "source:pipeline": "npm run source:pipeline:primary",
     "source:pipeline:primary": "npm run source:pipeline:hh",
@@ -51,6 +51,8 @@
     "hh:opener": "node packages/db/scripts/report-hh-opener.mjs",
     "hh:digest": "node packages/db/scripts/report-hh-digest.mjs",
     "hh:pipeline": "node packages/db/scripts/run-source-action.mjs pipeline hh",
-    "digest:held": "node packages/db/scripts/report-digest-held.mjs"
+    "digest:held": "node packages/db/scripts/report-digest-held.mjs",
+    "digest": "node packages/db/scripts/report-digest.mjs",
+    "digest:run": "node packages/db/scripts/report-digest.mjs"
   }
 }
