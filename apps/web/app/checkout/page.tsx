@@ -3,14 +3,14 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { startCheckoutOrder } from "../../lib/payments";
-import { buildCheckoutHref, readPublicPreviewInput } from "../../lib/publicProduct";
+import { buildCheckoutHref, readPublicPreviewInput, resolveCheckoutOwnerId } from "../../lib/publicProduct";
 
 export const dynamic = "force-dynamic";
 
 export default async function CheckoutPage({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
   const input = readPublicPreviewInput(searchParams);
   const restartHref = buildCheckoutHref(input);
-  const ownerId = (await cookies()).get("rr_user_id")?.value?.trim() ?? null;
+  const ownerId = (await cookies()).get("rr_user_id")?.value?.trim() || resolveCheckoutOwnerId();
 
   async function startCheckoutAction() {
     "use server";
@@ -32,6 +32,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Rec
       siteUrl: process.env.PAYMENTS_SITE_URL ?? "http://localhost:3000"
     });
 
+    (await cookies()).set("rr_user_id", ownerId, { httpOnly: true, sameSite: "lax", path: "/" });
     redirect(result.redirectUrl);
   }
 
