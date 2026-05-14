@@ -38,7 +38,19 @@ async function fetchTopEmployers(connectionString) {
   await client.connect();
 
   try {
-    const result = await client.query(`${digestEvidenceQuery}\nLIMIT 10`);
+    const result = await client.query(`
+      SELECT
+        r.*,
+        cos.feedback_status,
+        cos.feedback_note
+      FROM (
+        ${digestEvidenceQuery}
+        LIMIT 10
+      ) r
+      LEFT JOIN client_digest_org_state cos
+        ON cos.org_id = r.org_id
+       AND cos.client_profile_id = r.client_profile_id
+    `);
 
     return result.rows;
   } finally {
@@ -66,6 +78,8 @@ function buildDigestRow(row) {
     reason_details: row.reason_details,
     reasons,
     opener: buildOpener(row.source_display_name ?? '', row.reason_details, reasons),
+    feedback_status: row.feedback_status ?? '',
+    feedback_note: row.feedback_note ?? '',
   };
 }
 
