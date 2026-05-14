@@ -22,8 +22,14 @@ if (!databaseUrl) {
 try {
   const rows = await fetchTopEmployers(databaseUrl);
   const report = rows.map(buildDigestRow);
-
   console.log(JSON.stringify(report, null, 2));
+
+  const summary = buildQualitySummary(report);
+  if (summary.total > 0) {
+    console.log('\n--- Operator Quality Summary ---');
+    console.table(summary.counts);
+    console.log(`Total delivered: ${summary.total}`);
+  }
 } catch (error) {
   const message = error instanceof Error ? error.message : String(error);
   console.error(`Source digest report failed: ${message}`);
@@ -148,6 +154,32 @@ function formatTimestamp(value) {
 
   const date = value instanceof Date ? value : new Date(value);
   return Number.isNaN(date.getTime()) ? '' : date.toISOString();
+}
+
+function buildQualitySummary(report) {
+  const statusLabels = {
+    interested: 'Интерес',
+    not_interested: 'Не интересно',
+    no_reply: 'Нет ответа',
+    replied: 'Ответили',
+    meeting: 'Созвон',
+    suppress: 'Подавлены',
+    client: 'Клиент',
+  };
+
+  const counts = {};
+  let total = 0;
+
+  for (const row of report) {
+    const status = row.feedback_status;
+    if (!status) continue;
+
+    const label = statusLabels[status] ?? status;
+    counts[label] = (counts[label] ?? 0) + 1;
+    total++;
+  }
+
+  return { counts, total };
 }
 
 function loadEnvFile(filePath) {
