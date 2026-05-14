@@ -882,22 +882,41 @@ export async function processPaymentWebhook(
     };
   }
 
-  order = await updateCheckoutOrder(order.id, {
-    status: parsedWebhook.status ?? order.status,
-    provider: provider.code,
-    providerPaymentId: parsedWebhook.providerPaymentId ?? order.providerPaymentId,
-    paidAt:
-      parsedWebhook.status === "paid"
-        ? parsedWebhook.paidAt ?? new Date().toISOString()
-        : order.paidAt,
-    payloadPatch: {
-      paymentMessage: parsedWebhook.message ?? order.payload.paymentMessage,
-      paymentProviderPayload: parsedWebhook.payload ?? order.payload.paymentProviderPayload
-    }
-  });
+  const pool = getPool();
 
-  if (order.status === "paid") {
-    await ensurePaidPilotOrderReady(order);
+  if (!pool) {
+    return { status: 500, body: "DATABASE_URL is not set." };
+  }
+
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    order = await updateCheckoutOrder(order.id, {
+      status: parsedWebhook.status ?? order.status,
+      provider: provider.code,
+      providerPaymentId: parsedWebhook.providerPaymentId ?? order.providerPaymentId,
+      paidAt:
+        parsedWebhook.status === "paid"
+          ? parsedWebhook.paidAt ?? new Date().toISOString()
+          : order.paidAt,
+      payloadPatch: {
+        paymentMessage: parsedWebhook.message ?? order.payload.paymentMessage,
+        paymentProviderPayload: parsedWebhook.payload ?? order.payload.paymentProviderPayload
+      }
+    }, client);
+
+    if (order.status === "paid") {
+      await ensurePaidPilotOrderReady(order, client);
+    }
+
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
   }
 
   return {
@@ -1109,6 +1128,16 @@ async function ensurePilotEntitlementForPaidOrder(
   }
 
   const userId = normalizeCheckoutOrderUserId(ownerResult.rows[0].userId);
+  const enrollmentNote = `checkout_order:${order.id}`;
+
+  const existing = await pool.query<{ id: number }>(
+    `SELECT id FROM pilot_enrollments WHERE user_id = $1 AND notes = $2 LIMIT 1`,
+    [userId, enrollmentNote]
+  );
+
+  if (existing.rowCount === 1) {
+    return;
+  }
 
   await pool.query(`
     INSERT INTO pilot_enrollments (
@@ -1130,7 +1159,7 @@ async function ensurePilotEntitlementForPaidOrder(
       updated_at = NOW(),
       activated_by = EXCLUDED.activated_by,
       notes = EXCLUDED.notes
-  `, [userId, paidAtIso, PILOT_ENTITLEMENT_DAYS, `checkout_order:${order.id}`]);
+  `, [userId, paidAtIso, PILOT_ENTITLEMENT_DAYS, enrollmentNote]);
 }
 
 async function ensurePilotApplicationForOrder(
