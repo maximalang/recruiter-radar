@@ -86,7 +86,21 @@ function buildDigestRow(row) {
     opener: buildOpener(row.source_display_name ?? '', row.reason_details, reasons),
     feedback_status: row.feedback_status ?? '',
     feedback_note: row.feedback_note ?? '',
+    action_hint: getActionHint(row.feedback_status ?? ''),
   };
+}
+
+function getActionHint(status) {
+  const hints = {
+    none: null,
+    contacted: 'Написали — ждать ответ',
+    replied: 'Ответили — запросить созвон',
+    won: 'Клиент',
+    badfit: 'Не подходит',
+    snooze: 'Отложено',
+    dismissed: 'Скрыто',
+  };
+  return hints[status] ?? null;
 }
 
 function getReasonLabels(row) {
