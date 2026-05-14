@@ -1,3 +1,5 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
+
 import type { HhDigestItem } from "./hhDigest";
 
 const TELEGRAM_DIGEST_FEEDBACK_ACTIONS = [
@@ -14,6 +16,19 @@ const TELEGRAM_DIGEST_FEEDBACK_ACTIONS = [
     label: "⏸ Позже"
   }
 ] as const;
+
+export type SignedDigestFeedbackCallback = {
+  clientProfileId: string;
+  orgId: string;
+  action: "shown" | "accepted" | "badfit" | "snooze";
+  sig: string;
+};
+
+export type UnsignedDigestFeedbackCallback = {
+  clientProfileId: string;
+  orgId: string;
+  action: "shown" | "accepted" | "badfit" | "snooze";
+};
 
 export function buildTelegramDigestAuditItems(items: readonly HhDigestItem[]) {
   return items.map((item) => ({
@@ -80,7 +95,65 @@ function buildFeedbackCallbackData(input: {
   orgId: string;
   action: "shown" | "accepted" | "badfit" | "snooze";
 }): string {
-  return `dgf:${input.clientProfileId}:${input.orgId}:${input.action}`;
+  const unsigned: UnsignedDigestFeedbackCallback = {
+    clientProfileId: input.clientProfileId,
+    orgId: input.orgId,
+    action: input.action,
+  };
+  const sig = signDigestFeedbackCallback(unsigned);
+  return `dgf:${input.clientProfileId}:${input.orgId}:${input.action}:${sig}`;
+}
+
+function signDigestFeedbackCallback(unsigned: UnsignedDigestFeedbackCallback): string {
+  const secret = process.env.DIGEST_CALLBACK_SECRET ?? "";
+  if (!secret) {
+    throw new Error("DIGEST_CALLBACK_SECRET is not configured.");
+  }
+  const payload = `${unsigned.clientProfileId}:${unsigned.orgId}:${unsigned.action}`;
+  const hmac = createHmac("sha256", secret);
+  hmac.update(payload);
+  return hmac.digest("base64url");
+}
+
+export function verifyDigestFeedbackCallback(data: string | null): SignedDigestFeedbackCallback | null {
+  if (!data) return null;
+  const parts = data.split(":");
+  if (parts.length !== 5 || parts[0] !== "dgf") return null;
+  const [, clientProfileId, orgId, action, sig] = parts;
+  if (!isPositiveIntegerString(clientProfileId) || !isPositiveIntegerString(orgId)) return null;
+  if (
+    action !== "shown" &&
+    action !== "accepted" &&
+    action !== "badfit" &&
+    action !== "snooze"
+  ) return null;
+
+  const unsigned: UnsignedDigestFeedbackCallback = {
+    clientProfileId,
+    orgId,
+    action: action as UnsignedDigestFeedbackCallback["action"],
+  };
+
+  const expectedSig = signDigestFeedbackCallback(unsigned);
+  const secret = process.env.DIGEST_CALLBACK_SECRET ?? "";
+  if (!secret) return null;
+
+  // timing-safe compare to prevent brute-force of the HMAC
+  const expectedBuf = Buffer.from(expectedSig, "utf8");
+  const receivedBuf = Buffer.from(sig, "utf8");
+  if (expectedBuf.length !== receivedBuf.length) return null;
+  if (!timingSafeEqual(expectedBuf, receivedBuf)) return null;
+
+  return { ...unsigned, sig };
+}
+
+export function parseDigestFeedbackCallbackData(_value: string | null | undefined): null {
+  // Unsigned parser is deprecated; all feedback paths must use verifyDigestFeedbackCallback.
+  return null;
+}
+
+function isPositiveIntegerString(value: string | null | undefined): value is string {
+  return typeof value === "string" && /^\d+$/.test(value);
 }
 
 function normalizePositiveIntegerString(value: string | null | undefined): string | null {

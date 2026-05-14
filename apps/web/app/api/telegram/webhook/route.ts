@@ -5,6 +5,7 @@ import { getPool } from "../../../../lib/db";
 import { isDigestFeedbackAction, updateDigestOrgStateFeedback, type DigestFeedbackAction } from "../../../../lib/digestFeedback";
 import { answerTelegramCallbackQuery, getTelegramBotToken } from "../../../../lib/telegram";
 import { consumeTelegramConnectToken } from "../../../../lib/telegramConnect";
+import { verifyDigestFeedbackCallback, type SignedDigestFeedbackCallback } from "../../../../lib/telegramDigestFeedback";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -14,7 +15,6 @@ type TelegramWebhookUpdate = {
   callback_query?: { id?: string; data?: string };
   message?: { chat?: { id?: number | string }; text?: string }
 };
-type ParsedDigestFeedbackCallback = { clientProfileId: string; orgId: string; action: DigestFeedbackAction | "shown" };
 const STALE_CLAIM_SECONDS = 90;
 
 export async function POST(request: Request) {
@@ -28,8 +28,8 @@ export async function POST(request: Request) {
   try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 }); }
 
   const update = body as TelegramWebhookUpdate;
-  const callbackQueryId = normalizeNonEmptyString(update?.callback_query?.id);
-  const parsedCallback = parseDigestFeedbackCallbackData(update?.callback_query?.data);
+  const callbackQueryId: string | null = normalizeNonEmptyString(update?.callback_query?.id ?? null);
+  const parsedCallback = verifyDigestFeedbackCallback(update?.callback_query?.data ?? null);
   const idempotencyKey = `tg:${update?.update_id ?? "na"}:${callbackQueryId ?? "na"}`;
   const claimToken = randomUUID();
 
@@ -82,7 +82,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    if (parsedCallback.action !== "shown") await updateDigestOrgStateFeedback({ clientProfileId: parsedCallback.clientProfileId, orgId: parsedCallback.orgId, action: parsedCallback.action });
+    if (parsedCallback.action !== "shown") {
+      await updateDigestOrgStateFeedback({ clientProfileId: parsedCallback.clientProfileId, orgId: parsedCallback.orgId, action: parsedCallback.action as DigestFeedbackAction });
+    }
     await answerTelegramCallbackQuery({ callbackQueryId, botToken, text: parsedCallback.action === "shown" ? undefined : getDigestFeedbackConfirmationText(parsedCallback.action) });
     await pool.query(`UPDATE webhook_events SET status = 'processed', processed_at = NOW(), error_message = NULL WHERE id = $1 AND processing_claim_token = $2`, [eventRow.id, claimToken]);
     return NextResponse.json({ ok: true, replaySafe: true });
@@ -94,7 +96,7 @@ export async function POST(request: Request) {
   }
 }
 
-export function parseDigestFeedbackCallbackData(value: string | null | undefined): ParsedDigestFeedbackCallback | null { const normalizedValue = normalizeNonEmptyString(value); if (!normalizedValue) return null; const [prefix, clientProfileId, orgId, action, ...rest] = normalizedValue.split(":"); if (prefix !== "dgf" || rest.length > 0) return null; if (!isPositiveIntegerString(clientProfileId) || !isPositiveIntegerString(orgId)) return null; if (action === "shown") return { clientProfileId, orgId, action }; if (!isDigestFeedbackAction(action)) return null; return { clientProfileId, orgId, action }; }
+export function parseDigestFeedbackCallbackData(value: string | null | undefined): null { return null; }
 function getDigestFeedbackConfirmationText(action: DigestFeedbackAction): string { switch (action) { case "accepted": return "Отмечено: беру"; case "badfit": return "Отмечено: мимо"; case "snooze": return "Отмечено: позже"; case "dismissed": return "Отмечено: скрыто"; case "contacted": return "Отмечено: contacted"; case "replied": return "Отмечено: replied"; case "won": return "Отмечено: won"; } }
 function isPositiveIntegerString(value: string | null | undefined): value is string { return typeof value === "string" && /^\d+$/.test(value); }
 function normalizeNonEmptyString(value: string | null | undefined): string | null { if (typeof value !== "string") return null; const normalizedValue = value.trim(); return normalizedValue === "" ? null : normalizedValue; }
