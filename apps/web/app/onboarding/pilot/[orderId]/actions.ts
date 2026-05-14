@@ -1,5 +1,7 @@
 "use server";
 
+import { cookies } from "next/headers";
+
 import {
   completePilotOrderOnboarding,
   confirmPilotOrderProfile,
@@ -45,12 +47,20 @@ function readOptionalNumber(formData: FormData, key: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+async function requireOwnerId(): Promise<string> {
+  const ownerId = (await cookies()).get("rr_user_id")?.value?.trim() ?? null;
+  if (!ownerId) throw new Error("Owner identification is required.");
+  return ownerId;
+}
+
 export async function confirmPilotProfileAction(expectedOrderId: string, formData: FormData) {
   const formOrderId = readRequiredText(formData, "orderId");
 
   if (formOrderId !== expectedOrderId) {
     throw new Error("Order mismatch.");
   }
+
+  const ownerId = await requireOwnerId();
 
   await confirmPilotOrderProfile({
     orderId: expectedOrderId,
@@ -59,7 +69,8 @@ export async function confirmPilotProfileAction(expectedOrderId: string, formDat
     specialization: readOptionalText(formData, "specialization"),
     includeKeywords: readOptionalStringList(formData, "includeKeywords"),
     excludeKeywords: readOptionalStringList(formData, "excludeKeywords"),
-    dailyDigestLimit: readOptionalNumber(formData, "dailyDigestLimit")
+    dailyDigestLimit: readOptionalNumber(formData, "dailyDigestLimit"),
+    ownerId
   });
 }
 
@@ -70,7 +81,9 @@ export async function sendPilotTestDigestAction(expectedOrderId: string, formDat
     throw new Error("Order mismatch.");
   }
 
-  await sendPilotOrderTestDigest(expectedOrderId);
+  const ownerId = await requireOwnerId();
+
+  await sendPilotOrderTestDigest(expectedOrderId, { ownerId });
 }
 
 export async function completePilotOnboardingAction(expectedOrderId: string, formData: FormData) {
@@ -80,5 +93,7 @@ export async function completePilotOnboardingAction(expectedOrderId: string, for
     throw new Error("Order mismatch.");
   }
 
-  await completePilotOrderOnboarding(expectedOrderId);
+  const ownerId = await requireOwnerId();
+
+  await completePilotOrderOnboarding(expectedOrderId, { ownerId });
 }
