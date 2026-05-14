@@ -428,6 +428,8 @@ CREATE TABLE billing_webhook_events (
   status TEXT NOT NULL DEFAULT 'received',
   error_message TEXT,
   processed_at TIMESTAMPTZ,
+  claimed_at TIMESTAMPTZ,
+  claim_token TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT billing_webhook_provider_not_blank CHECK (BTRIM(provider) <> ''),
   CONSTRAINT billing_webhook_external_event_id_not_blank CHECK (BTRIM(external_event_id) <> ''),
