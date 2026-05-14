@@ -32,6 +32,7 @@ try {
         client_profile_id: row.client_profile_id,
         org_id: row.org_id,
         confidence_gate: row.confidence_gate ?? '',
+        delivery_decision: formatDeliveryDecision(row.confidence_gate),
         total_score: row.total_score,
         source_families: formatSourceFamilies(row.source_families),
         created_at: formatTimestamp(row.created_at),
@@ -128,4 +129,10 @@ function formatSourceFamilies(value) {
   }
 
   return value.join(', ');
+}
+
+function formatDeliveryDecision(gate) {
+  if (gate === 'C') return 'Требует проверки — агрегация или неуверенное сопоставление';
+  if (gate === 'D') return 'Контекст — нет прямого сигнала найма';
+  return '';
 }
