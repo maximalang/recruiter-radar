@@ -28,6 +28,7 @@ try {
       rank: row.rank,
       hh_employer_id: row.source_external_id ?? '',
       employer_name: row.source_display_name ?? '',
+      confidence_gate: row.confidence_gate ?? '',
       total_score: row.total_score,
       reasons,
       opener: buildOpener(row.source_display_name ?? '', reasons),

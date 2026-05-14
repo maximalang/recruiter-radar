@@ -28,6 +28,7 @@ try {
       source_external_id: row.source_external_id ?? '',
       employer_name: row.source_display_name ?? '',
       source_families: Array.isArray(row.source_families) ? row.source_families.join(', ') : '',
+      confidence_gate: row.confidence_gate ?? '',
       quality: row.quality_code ?? '',
       vacancies_count: row.vacancies_count,
       distinct_vacancy_names_count: row.distinct_vacancy_names_count,

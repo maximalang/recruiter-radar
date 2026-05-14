@@ -28,6 +28,7 @@ try {
       rank: row.rank,
       hh_employer_id: row.source_external_id ?? '',
       employer_name: row.source_display_name ?? '',
+      confidence_gate: row.confidence_gate ?? '',
       vacancies_count: row.vacancies_count,
       distinct_vacancy_names_count: row.distinct_vacancy_names_count,
       latest_published_at: formatTimestamp(row.latest_published_at),

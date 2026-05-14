@@ -28,6 +28,7 @@ try {
       org_external_id: row.source_external_id ?? '',
       org_name: row.source_display_name ?? '',
       source_families: formatSourceFamilies(row.source_families),
+      confidence_gate: row.confidence_gate ?? '',
       quality: row.quality_label ?? '',
       vacancies_count: row.vacancies_count,
       distinct_vacancy_names_count: row.distinct_vacancy_names_count,

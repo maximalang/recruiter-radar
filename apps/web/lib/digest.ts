@@ -23,6 +23,7 @@ type DigestEvidenceRow = {
   is_recent: boolean;
   primary_reason_label: string;
   secondary_reason_label: string;
+  confidence_gate: string;
 };
 
 type DigestCandidateInsertRow = {
@@ -66,6 +67,7 @@ export type DigestItem = {
   totalScore: number;
   reasons: [string, string];
   opener: string;
+  confidenceGate: string;
 };
 
 export type DigestRunResult = {
@@ -186,7 +188,8 @@ export async function runDigestForClientProfile(input: {
         ranked_candidates.total_score,
         ranked_candidates.is_recent,
         ranked_candidates.primary_reason_label,
-        ranked_candidates.secondary_reason_label
+        ranked_candidates.secondary_reason_label,
+        ranked_candidates.confidence_gate
       FROM ranked_candidates
       LEFT JOIN client_digest_org_state AS state
         ON state.client_profile_id = $1
@@ -274,7 +277,8 @@ export async function runDigestForClientProfile(input: {
         item.opener,
         JSON.stringify({
           rank: item.rank,
-          sourceFamilies: item.sourceFamilies
+          sourceFamilies: item.sourceFamilies,
+          confidenceGate: item.confidenceGate,
         })
       ]);
 
@@ -388,7 +392,8 @@ function mapDigestEvidenceRow(row: DigestEvidenceRow): DigestItem {
     latestPublishedAt: formatTimestamp(row.latest_published_at),
     totalScore: row.total_score,
     reasons,
-    opener: buildOpener(row.source_display_name ?? "", reasons)
+    opener: buildOpener(row.source_display_name ?? "", reasons),
+    confidenceGate: row.confidence_gate ?? "",
   };
 }
 
