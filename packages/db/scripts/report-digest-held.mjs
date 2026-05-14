@@ -21,6 +21,11 @@ if (!databaseUrl) {
 try {
   const rows = await fetchHeldCandidates(databaseUrl);
 
+  console.log('Confidence gate legend:');
+  console.log('  A / B — доставлены автоматически (не показаны здесь)');
+  console.log('  C / D — требуют проверки оператором перед доставкой');
+  console.log('');
+
   if (rows.length === 0) {
     console.log('No held digest candidates (confidence gate C/D) found.');
   } else {
