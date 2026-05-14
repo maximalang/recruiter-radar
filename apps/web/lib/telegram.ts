@@ -54,14 +54,21 @@ function formatDate(value: string | null): string {
   }).format(date);
 }
 
+function formatConfidenceGateLabel(gate: string | undefined): string {
+  if (!gate) return "";
+  const labels: Record<string, string> = { A: "Высокая", B: "Средняя", C: "Низкая", D: "Контекст" };
+  return `\nУверенность: ${labels[gate] ?? gate} (${gate})`;
+}
+
 function formatTelegramLeadMessage(lead: TelegramLeadMessage): string {
-  return [
+  const parts = [
     `Компания: ${lead.orgName}`,
     `Статус: ${lead.status}`,
-    `Score: ${lead.score ?? "-"}`,
+    `Score: ${lead.score ?? "-"}${formatConfidenceGateLabel(lead.confidenceGate)}`,
     `Last signal at: ${formatDate(lead.lastSignalAt)}`,
     `Пользователь: ${lead.userName}`
-  ].join("\n");
+  ];
+  return parts.join("\n");
 }
 
 function isTelegramApiSuccess(value: unknown): value is TelegramApiSuccess {
