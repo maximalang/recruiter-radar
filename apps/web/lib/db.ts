@@ -1,7 +1,9 @@
-import { Pool } from "pg";
+﻿import { Pool } from "pg";
 
 import { updateDigestOrgStateFeedback, type DigestFeedbackAction } from "./digestFeedback";
+import type { HhDigestItem } from "./hhDigest";
 import { getTelegramBotToken, sendTelegramLeadMessage } from "./telegram";
+import { buildTelegramDigestFeedbackReplyMarkup } from "./telegramDigestFeedback";
 import { logError, logEvent } from "./runtime";
 
 export const ACTIONABLE_LEAD_STATUSES = ["contacted", "replied", "won", "badfit", "snooze"] as const;
@@ -118,14 +120,27 @@ export async function sendLeadToTelegram(leadId: number): Promise<TelegramDelive
   if (!botToken) return { ok: false, error: error ?? "Telegram is not configured." };
   try {
     const confidenceGate = extractConfidenceGate(lead.payload);
-    const callbackPrefix = `dgf:${lead.clientProfileId}:${lead.orgId}`;
-    const replyMarkup = {
-      inline_keyboard: [[
-        { text: "✅ Беру", callback_data: `${callbackPrefix}:accepted` },
-        { text: "👎 Мимо", callback_data: `${callbackPrefix}:badfit` },
-        { text: "⏸ Позже", callback_data: `${callbackPrefix}:snooze` }
-      ]]
+    const feedbackItem: HhDigestItem = {
+      rank: 1,
+      orgId: String(lead.orgId),
+      hh_employer_id: "",
+      employer_name: lead.orgName,
+      vacancies_count: 0,
+      distinct_vacancy_names_count: 0,
+      latest_published_at: lead.lastSignalAt ?? "",
+      total_score: lead.score ?? 0,
+      reasons: ["", ""],
+      opener: "",
+      sourceFamilies: [],
+      evidenceTitles: [],
+      candidateSourceKeys: [],
+      locationNames: []
     };
+
+    const replyMarkup = buildTelegramDigestFeedbackReplyMarkup({
+      clientProfileId: String(lead.clientProfileId),
+      items: [feedbackItem]
+    });
     await sendTelegramLeadMessage(
       { orgName: lead.orgName, status: lead.status, score: lead.score, lastSignalAt: lead.lastSignalAt, userName: lead.userName, confidenceGate },
       { botToken, chatId: lead.telegramChatId },
