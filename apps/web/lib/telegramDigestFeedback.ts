@@ -128,6 +128,9 @@ export function verifyDigestFeedbackCallback(data: string | null): SignedDigestF
     action !== "snooze"
   ) return null;
 
+  const secret = (process.env.DIGEST_CALLBACK_SECRET ?? "").trim();
+  if (!secret) return null;
+
   const unsigned: UnsignedDigestFeedbackCallback = {
     clientProfileId,
     orgId,
@@ -135,8 +138,6 @@ export function verifyDigestFeedbackCallback(data: string | null): SignedDigestF
   };
 
   const expectedSig = signDigestFeedbackCallback(unsigned);
-  const secret = process.env.DIGEST_CALLBACK_SECRET ?? "";
-  if (!secret) return null;
 
   // timing-safe compare to prevent brute-force of the HMAC
   const expectedBuf = Buffer.from(expectedSig, "utf8");
