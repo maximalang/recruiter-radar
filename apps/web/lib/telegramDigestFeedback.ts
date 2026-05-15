@@ -17,6 +17,25 @@ const TELEGRAM_DIGEST_FEEDBACK_ACTIONS = [
   }
 ] as const;
 
+// Telegram limits callback_data to 64 bytes. We use 1-char action codes and a
+// 22-char base64url HMAC tag (128 bits) to stay well under that ceiling.
+const TELEGRAM_CALLBACK_DATA_LIMIT = 64;
+const DIGEST_FEEDBACK_SIG_LENGTH = 22;
+
+const ACTION_TO_CODE = {
+  shown: "v",
+  accepted: "a",
+  badfit: "b",
+  snooze: "s",
+} as const;
+
+const CODE_TO_ACTION: Record<string, "shown" | "accepted" | "badfit" | "snooze"> = {
+  v: "shown",
+  a: "accepted",
+  b: "badfit",
+  s: "snooze",
+};
+
 export type SignedDigestFeedbackCallback = {
   clientProfileId: string;
   orgId: string;
@@ -101,32 +120,36 @@ function buildFeedbackCallbackData(input: {
     action: input.action,
   };
   const sig = signDigestFeedbackCallback(unsigned);
-  return `dgf:${input.clientProfileId}:${input.orgId}:${input.action}:${sig}`;
+  const code = ACTION_TO_CODE[input.action];
+  const data = `d:${input.clientProfileId}:${input.orgId}:${code}:${sig}`;
+  if (Buffer.byteLength(data, "utf8") > TELEGRAM_CALLBACK_DATA_LIMIT) {
+    throw new Error("digest feedback callback_data exceeds Telegram limit");
+  }
+  return data;
 }
 
 function signDigestFeedbackCallback(unsigned: UnsignedDigestFeedbackCallback): string {
-  const secret = process.env.DIGEST_CALLBACK_SECRET ?? "";
+  const secret = (process.env.DIGEST_CALLBACK_SECRET ?? "").trim();
   if (!secret) {
     throw new Error("DIGEST_CALLBACK_SECRET is not configured.");
   }
-  const payload = `${unsigned.clientProfileId}:${unsigned.orgId}:${unsigned.action}`;
+  const code = ACTION_TO_CODE[unsigned.action];
+  const payload = `${unsigned.clientProfileId}:${unsigned.orgId}:${code}`;
   const hmac = createHmac("sha256", secret);
   hmac.update(payload);
-  return hmac.digest("base64url");
+  return hmac.digest("base64url").slice(0, DIGEST_FEEDBACK_SIG_LENGTH);
 }
 
 export function verifyDigestFeedbackCallback(data: string | null): SignedDigestFeedbackCallback | null {
   if (!data) return null;
+  if (Buffer.byteLength(data, "utf8") > TELEGRAM_CALLBACK_DATA_LIMIT) return null;
   const parts = data.split(":");
-  if (parts.length !== 5 || parts[0] !== "dgf") return null;
-  const [, clientProfileId, orgId, action, sig] = parts;
+  if (parts.length !== 5 || parts[0] !== "d") return null;
+  const [, clientProfileId, orgId, code, sig] = parts;
   if (!isPositiveIntegerString(clientProfileId) || !isPositiveIntegerString(orgId)) return null;
-  if (
-    action !== "shown" &&
-    action !== "accepted" &&
-    action !== "badfit" &&
-    action !== "snooze"
-  ) return null;
+  const action = CODE_TO_ACTION[code];
+  if (!action) return null;
+  if (sig.length !== DIGEST_FEEDBACK_SIG_LENGTH) return null;
 
   const secret = (process.env.DIGEST_CALLBACK_SECRET ?? "").trim();
   if (!secret) return null;
@@ -134,7 +157,7 @@ export function verifyDigestFeedbackCallback(data: string | null): SignedDigestF
   const unsigned: UnsignedDigestFeedbackCallback = {
     clientProfileId,
     orgId,
-    action: action as UnsignedDigestFeedbackCallback["action"],
+    action,
   };
 
   const expectedSig = signDigestFeedbackCallback(unsigned);
