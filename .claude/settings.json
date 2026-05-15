@@ -1,7 +1,7 @@
 {
   "env": {
     "CLAUDE_CODE_DISABLE_GIT_INSTRUCTIONS": "1",
-    "SLASH_COMMAND_TOOL_CHAR_BUDGET": "6000"
+    "SLASH_COMMAND_TOOL_CHAR_BUDGET": "4096"
   },
   "includeGitInstructions": false,
   "permissions": {
