@@ -1,6 +1,10 @@
 # recruiter-radar
 
-Recruiter Radar — сервис для поиска компаний с активными hiring signals и отправки готовых лидов в Telegram.
+Recruiter Radar — premium Russia-first client-intelligence radar для рекрутинговых агентств.
+
+Продукт помогает агентствам находить компании, которым стоит написать сейчас: по hiring signals, evidence bundles, FIUR scoring, Telegram delivery и feedback-based suppression/reweighting.
+
+Recruiter Radar — не ATS, не CRM, не generic job parser, не mass outreach tool и не candidate sourcing product. Это evidence-first и quality-first радар клиентских возможностей.
 
 ## Source model: quality-first evidence
 
