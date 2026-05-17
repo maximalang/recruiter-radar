@@ -1,12 +1,11 @@
 "use server";
 
-import { cookies } from "next/headers";
-
 import {
   completePilotOrderOnboarding,
   confirmPilotOrderProfile,
   sendPilotOrderTestDigest
 } from "../../../../lib/payments";
+import { readOwnerSession } from "../../../../lib/session";
 
 function readRequiredText(formData: FormData, key: string): string {
   const value = formData.get(key);
@@ -48,7 +47,7 @@ function readOptionalNumber(formData: FormData, key: string): number | null {
 }
 
 async function requireOwnerId(): Promise<string> {
-  const ownerId = (await cookies()).get("rr_user_id")?.value?.trim() ?? null;
+  const ownerId = await readOwnerSession();
   if (!ownerId) throw new Error("Owner identification is required.");
   return ownerId;
 }

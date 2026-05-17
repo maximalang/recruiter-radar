@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 
 import {
@@ -7,6 +6,7 @@ import {
   ensurePilotOrderOnboardingReady,
   markCheckoutOrderCanceled
 } from "../../../../../lib/payments";
+import { readOwnerSession } from "../../../../../lib/session";
 import {
   NoticeBox,
   PageFrame,
@@ -49,7 +49,7 @@ function describeReason(reason: string | null): string {
 export default async function CheckoutCancelPage({ params, searchParams }: CheckoutCancelPageProps) {
   const resolvedParams = await params;
   const resolvedSearchParams = (await searchParams) ?? {};
-  const ownerId = (await cookies()).get("rr_user_id")?.value?.trim() ?? null;
+  const ownerId = await readOwnerSession();
 
   if (!ownerId) {
     notFound();
@@ -64,7 +64,7 @@ export default async function CheckoutCancelPage({ params, searchParams }: Check
   const reason = readReason(resolvedSearchParams);
 
   if (order.status !== "paid") {
-    await markCheckoutOrderCanceled(order.id, reason).catch(() => null);
+    await markCheckoutOrderCanceled(order.id, reason, { ownerId }).catch(() => null);
   }
 
   const retryHref = buildCheckoutRetryHref(order);

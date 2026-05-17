@@ -1,11 +1,11 @@
 import Link from "next/link";
-import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 
 import {
   ensurePilotOrderOnboardingReady,
   syncCheckoutOrderAfterSuccessReturn
 } from "../../../../../lib/payments";
+import { readOwnerSession } from "../../../../../lib/session";
 import {
   NoticeBox,
   PageFrame,
@@ -30,7 +30,7 @@ type CheckoutSuccessPageProps = {
 export default async function CheckoutSuccessPage({ params, searchParams }: CheckoutSuccessPageProps) {
   const resolvedParams = await params;
   const resolvedSearchParams = (await searchParams) ?? {};
-  const ownerId = (await cookies()).get("rr_user_id")?.value?.trim() ?? null;
+  const ownerId = await readOwnerSession();
 
   if (!ownerId) {
     notFound();
@@ -47,6 +47,7 @@ export default async function CheckoutSuccessPage({ params, searchParams }: Chec
       ? ownedOrder
       : (await syncCheckoutOrderAfterSuccessReturn({
           orderId: ownedOrder.id,
+          ownerId,
           searchParams: resolvedSearchParams
         })) ?? ownedOrder;
 

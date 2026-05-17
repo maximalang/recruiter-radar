@@ -480,9 +480,10 @@ export async function ensurePilotOrderOnboardingReady(
 }
 
 export async function getPilotActivationReadiness(
-  orderId: string | number
+  orderId: string | number,
+  options: { ownerId: string | number }
 ): Promise<PilotActivationReadiness | null> {
-  const order = await ensurePilotOrderOnboardingReady(orderId);
+  const order = await ensurePilotOrderOnboardingReady(orderId, { ownerId: options.ownerId });
 
   if (!order || order.productCode !== "pilot") {
     return null;
@@ -791,9 +792,10 @@ export async function completePilotOrderOnboarding(
 
 export async function syncCheckoutOrderAfterSuccessReturn(input: {
   orderId: string | number;
+  ownerId: string | number;
   searchParams?: Record<string, string | string[] | undefined>;
 }): Promise<CheckoutOrder | null> {
-  let order = await getCheckoutOrderById(input.orderId);
+  let order = await getCheckoutOrderByIdForOwner(input.orderId, input.ownerId);
 
   if (!order) {
     return null;
@@ -838,9 +840,11 @@ export async function syncCheckoutOrderAfterSuccessReturn(input: {
 
 export async function markCheckoutOrderCanceled(
   orderId: string | number,
-  reason: string | null = null
+  reason: string | null = null,
+  options: { ownerId: string | number }
 ): Promise<CheckoutOrder | null> {
-  const order = await getCheckoutOrderById(orderId);
+  const normalizedOwnerId = normalizeCheckoutOrderUserId(options.ownerId);
+  const order = await getCheckoutOrderByIdForOwner(orderId, normalizedOwnerId);
 
   if (!order || order.status === "paid") {
     return order;

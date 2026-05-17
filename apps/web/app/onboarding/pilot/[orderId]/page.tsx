@@ -1,5 +1,4 @@
 ﻿import Link from "next/link";
-import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 
 import { FormSubmitButton } from "../../../ui/form-submit-button";
@@ -41,6 +40,7 @@ import {
 import { getTelegramBotToken } from "../../../../lib/telegram";
 import { getTelegramConnectLinkState } from "../../../../lib/telegramConnect";
 import { getWebPushConnectLinkState } from "../../../../lib/webPushConnect";
+import { readOwnerSession } from "../../../../lib/session";
 import {
   completePilotOnboardingAction,
   confirmPilotProfileAction,
@@ -109,7 +109,7 @@ export default async function PilotOnboardingPage({
   const resolvedSearchParams = (await searchParams) ?? {};
   const errorMessage = getSearchParamValue(resolvedSearchParams, "error");
   const notice = getSearchParamValue(resolvedSearchParams, "notice");
-  const ownerId = (await cookies()).get("rr_user_id")?.value?.trim() ?? null;
+  const ownerId = await readOwnerSession();
 
   if (!ownerId) {
     notFound();
@@ -124,7 +124,7 @@ export default async function PilotOnboardingPage({
   const profile = order.payload.clientProfileId
     ? await getClientProfileById(order.payload.clientProfileId).catch(() => null)
     : null;
-  const readiness = await getPilotActivationReadiness(order.id);
+  const readiness = await getPilotActivationReadiness(order.id, { ownerId });
   const normalizedTelegramBotToken = getTelegramBotToken().botToken?.trim() ?? "";
   const deliveryPrerequisitesReady = Boolean(profile?.telegramChatId) && normalizedTelegramBotToken.length > 0;
   const currentStep = getCurrentStep(order, getRequestedStep(resolvedSearchParams, order));

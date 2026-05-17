@@ -1,22 +1,27 @@
 import Link from "next/link";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { startCheckoutOrder } from "../../lib/payments";
-import { buildCheckoutHref, readPublicPreviewInput, resolveCheckoutOwnerId } from "../../lib/publicProduct";
+import { buildCheckoutHref, readPublicPreviewInput } from "../../lib/publicProduct";
+import { generateOwnerId, readOwnerSession, writeOwnerSession } from "../../lib/session";
 
 export const dynamic = "force-dynamic";
 
 export default async function CheckoutPage({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
   const input = readPublicPreviewInput(searchParams);
   const restartHref = buildCheckoutHref(input);
-  const ownerId = (await cookies()).get("rr_user_id")?.value?.trim() || resolveCheckoutOwnerId();
+
+  // Read existing session — do NOT fall back to CHECKOUT_DEFAULT_OWNER_ID for public customers.
+  const existingOwnerId = await readOwnerSession();
 
   async function startCheckoutAction() {
     "use server";
 
+    // Resolve or mint a per-visitor owner ID inside the action (write path only).
+    let ownerId = await readOwnerSession();
+
     if (!ownerId) {
-      redirect(`${restartHref}${restartHref.includes("?") ? "&" : "?"}checkoutError=missing-owner`);
+      ownerId = generateOwnerId();
     }
 
     const result = await startCheckoutOrder({
@@ -32,7 +37,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Rec
       siteUrl: process.env.PAYMENTS_SITE_URL ?? "http://localhost:3000"
     });
 
-    (await cookies()).set("rr_user_id", ownerId, { httpOnly: true, sameSite: "lax", path: "/" });
+    await writeOwnerSession(ownerId);
     redirect(result.redirectUrl);
   }
 
@@ -40,9 +45,9 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Rec
     <main style={{ maxWidth: 720, margin: "40px auto", padding: "0 16px", fontFamily: "Inter, sans-serif" }}>
       <h1>Checkout</h1>
       <p>Оплата запускается только после явного подтверждения.</p>
-      {!ownerId ? <p>Войдите в аккаунт, чтобы запустить пилот на свой профиль.</p> : null}
+      {!existingOwnerId ? <p>Нажмите кнопку ниже, чтобы запустить пилот.</p> : null}
       <form action={startCheckoutAction}>
-        <button type="submit" disabled={!ownerId}>Перейти к оплате</button>
+        <button type="submit">Перейти к оплате</button>
       </form>
       <p><Link href={restartHref}>Обновить параметры пилота</Link></p>
     </main>
