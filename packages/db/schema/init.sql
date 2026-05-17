@@ -345,12 +345,6 @@ CREATE INDEX deliveries_lead_status_idx
 
 CREATE INDEX client_profiles_active_updated_at_idx
   ON client_profiles (is_active, updated_at DESC);
-CREATE UNIQUE INDEX client_profiles_agency_name_scope_uidx
-  ON client_profiles (
-    LOWER(agency_name),
-    LOWER(COALESCE(target_city, '')),
-    LOWER(COALESCE(specialization, ''))
-  );
 CREATE INDEX pilot_applications_created_at_idx
   ON pilot_applications (created_at DESC);
 

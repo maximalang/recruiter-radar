@@ -154,16 +154,25 @@ export async function findMatchingClientProfileForCheckoutOrder(input: {
   const excludeKeywords = normalizeKeywordList(input.excludeKeywords);
   const dailyDigestLimit = normalizeDailyDigestLimit(input.dailyDigestLimit);
 
+  // Restrict to profiles already linked to this specific order, or to profiles
+  // owned by the same user via any of their orders. The primary guard is the
+  // direct link (payload->>'clientProfileId'); the user-scoped fallback allows
+  // find-or-create to reuse an existing profile on the first order that created
+  // it, but only when that order belongs to the same user.
   const ownershipClause = checkoutOrderId
     ? `
-      AND EXISTS (
-        SELECT 1
-        FROM checkout_orders candidate_order
-        JOIN checkout_orders current_order
-          ON current_order.id = $2
-        WHERE
-          candidate_order.user_id = current_order.user_id
-          AND candidate_order.payload ->> 'clientProfileId' = client_profiles.id::TEXT
+      AND (
+        EXISTS (
+          SELECT 1 FROM checkout_orders co
+          WHERE co.id = $2
+            AND co.payload ->> 'clientProfileId' = client_profiles.id::TEXT
+        )
+        OR EXISTS (
+          SELECT 1 FROM checkout_orders co
+          JOIN checkout_orders current_order ON current_order.id = $2
+          WHERE co.user_id = current_order.user_id
+            AND co.payload ->> 'clientProfileId' = client_profiles.id::TEXT
+        )
       )
     `
     : "";
@@ -271,82 +280,101 @@ export async function saveClientProfile(input: {
   const dailyDigestLimit = normalizeDailyDigestLimit(input.dailyDigestLimit);
   const isActive = input.isActive ?? true;
 
-  const result = normalizedId
-    ? await pool.query<ClientProfileRow>(`
-        UPDATE client_profiles
-        SET
-          agency_name = $2,
-          telegram_chat_id = $3,
-          target_city = $4,
-          specialization = $5,
-          include_keywords = $6::jsonb,
-          exclude_keywords = $7::jsonb,
-          daily_digest_limit = $8,
-          is_active = $9
-        WHERE id = $1
-        RETURNING
-          id::TEXT AS id,
-          agency_name AS "agencyName",
-          telegram_chat_id::TEXT AS "telegramChatId",
-          target_city AS "targetCity",
+  let result: Awaited<ReturnType<typeof pool.query<ClientProfileRow>>>;
+
+  try {
+    result = normalizedId
+      ? await pool.query<ClientProfileRow>(`
+          UPDATE client_profiles
+          SET
+            agency_name = $2,
+            telegram_chat_id = $3,
+            target_city = $4,
+            specialization = $5,
+            include_keywords = $6::jsonb,
+            exclude_keywords = $7::jsonb,
+            daily_digest_limit = $8,
+            is_active = $9
+          WHERE id = $1
+          RETURNING
+            id::TEXT AS id,
+            agency_name AS "agencyName",
+            telegram_chat_id::TEXT AS "telegramChatId",
+            target_city AS "targetCity",
+            specialization,
+            include_keywords AS "includeKeywords",
+            exclude_keywords AS "excludeKeywords",
+            daily_digest_limit AS "dailyDigestLimit",
+            is_active AS "isActive",
+            created_at::TEXT AS "createdAt",
+            updated_at::TEXT AS "updatedAt"
+        `, [
+          normalizedId,
+          agencyName,
+          telegramChatId,
+          targetCity,
           specialization,
-          include_keywords AS "includeKeywords",
-          exclude_keywords AS "excludeKeywords",
-          daily_digest_limit AS "dailyDigestLimit",
-          is_active AS "isActive",
-          created_at::TEXT AS "createdAt",
-          updated_at::TEXT AS "updatedAt"
-      `, [
-        normalizedId,
-        agencyName,
-        telegramChatId,
-        targetCity,
-        specialization,
-        includeKeywords.length > 0 ? JSON.stringify(includeKeywords) : null,
-        excludeKeywords.length > 0 ? JSON.stringify(excludeKeywords) : null,
-        dailyDigestLimit,
-        isActive
-      ])
-    : await pool.query<ClientProfileRow>(`
-        INSERT INTO client_profiles (
-          agency_name,
-          telegram_chat_id,
-          target_city,
+          includeKeywords.length > 0 ? JSON.stringify(includeKeywords) : null,
+          excludeKeywords.length > 0 ? JSON.stringify(excludeKeywords) : null,
+          dailyDigestLimit,
+          isActive
+        ])
+      : await pool.query<ClientProfileRow>(`
+          INSERT INTO client_profiles (
+            agency_name,
+            telegram_chat_id,
+            target_city,
+            specialization,
+            include_keywords,
+            exclude_keywords,
+            daily_digest_limit,
+            is_active
+          )
+          VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7, $8)
+          RETURNING
+            id::TEXT AS id,
+            agency_name AS "agencyName",
+            telegram_chat_id::TEXT AS "telegramChatId",
+            target_city AS "targetCity",
+            specialization,
+            include_keywords AS "includeKeywords",
+            exclude_keywords AS "excludeKeywords",
+            daily_digest_limit AS "dailyDigestLimit",
+            is_active AS "isActive",
+            created_at::TEXT AS "createdAt",
+            updated_at::TEXT AS "updatedAt"
+        `, [
+          agencyName,
+          telegramChatId,
+          targetCity,
           specialization,
-          include_keywords,
-          exclude_keywords,
-          daily_digest_limit,
-          is_active
-        )
-        VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7, $8)
-        RETURNING
-          id::TEXT AS id,
-          agency_name AS "agencyName",
-          telegram_chat_id::TEXT AS "telegramChatId",
-          target_city AS "targetCity",
-          specialization,
-          include_keywords AS "includeKeywords",
-          exclude_keywords AS "excludeKeywords",
-          daily_digest_limit AS "dailyDigestLimit",
-          is_active AS "isActive",
-          created_at::TEXT AS "createdAt",
-          updated_at::TEXT AS "updatedAt"
-      `, [
-        agencyName,
-        telegramChatId,
-        targetCity,
-        specialization,
-        includeKeywords.length > 0 ? JSON.stringify(includeKeywords) : null,
-        excludeKeywords.length > 0 ? JSON.stringify(excludeKeywords) : null,
-        dailyDigestLimit,
-        isActive
-      ]);
+          includeKeywords.length > 0 ? JSON.stringify(includeKeywords) : null,
+          excludeKeywords.length > 0 ? JSON.stringify(excludeKeywords) : null,
+          dailyDigestLimit,
+          isActive
+        ]);
+  } catch (err) {
+    if (isUniqueViolation(err, "client_profiles_telegram_chat_id_unique")) {
+      throw new Error(
+        "Этот Telegram-аккаунт уже привязан к другому профилю. Отвяжите его там или обратитесь в поддержку."
+      );
+    }
+    throw err;
+  }
 
   if (result.rowCount !== 1) {
     throw new Error("Failed to save client profile.");
   }
 
   return mapClientProfileRow(result.rows[0]);
+}
+
+function isUniqueViolation(error: unknown, constraintName?: string): boolean {
+  if (!error || typeof error !== "object") return false;
+  const e = error as Record<string, unknown>;
+  if (e["code"] !== "23505") return false;
+  if (constraintName && e["constraint"] !== constraintName) return false;
+  return true;
 }
 
 export async function createPilotApplication(input: {
