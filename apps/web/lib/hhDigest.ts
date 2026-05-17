@@ -64,19 +64,28 @@ export async function getHhDigestItems(input?: {
   }))
 }
 
+const TELEGRAM_MESSAGE_CHAR_LIMIT = 4096
+
 export function buildHhDigestText(items: readonly HhDigestItem[]): string {
-  const lines = items.flatMap((item) => {
+  const header = "HH digest"
+  const itemTexts = items.map((item) => {
     const reasonLines = item.reasons
       .filter((reason) => reason.trim() !== "")
       .map((reason) => `• ${reason}`)
-
     return [
       `${item.rank}. ${item.employer_name}`,
       `${item.vacancies_count} вакансий · score ${item.total_score.toFixed(1)}`,
       ...reasonLines,
       `Что делать: ${item.opener}`
-    ]
+    ].join("\n")
   })
 
-  return ["HH digest", "", ...lines].join("\n")
+  let result = header
+  for (const itemText of itemTexts) {
+    const candidate = result + "\n\n" + itemText
+    if (candidate.length > TELEGRAM_MESSAGE_CHAR_LIMIT) break
+    result = candidate
+  }
+
+  return result
 }

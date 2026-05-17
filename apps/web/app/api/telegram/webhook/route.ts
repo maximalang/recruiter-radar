@@ -78,6 +78,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, startHandled: true, connectStatus: consume.status });
     }
 
+    if (callbackQueryId) {
+      await answerTelegramCallbackQuery({ callbackQueryId, botToken }).catch(() => {});
+    }
+
     await pool.query(`UPDATE webhook_events SET status = 'ignored', processed_at = NOW() WHERE id = $1 AND processing_claim_token = $2`, [eventRow.id, claimToken]);
     return NextResponse.json({ ok: true, ignored: true });
   }

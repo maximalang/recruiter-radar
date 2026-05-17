@@ -164,8 +164,17 @@ export async function getTelegramBotUsername(): Promise<{
     };
   }
 
+  const username = process.env.TELEGRAM_BOT_USERNAME?.trim() || null;
+
+  if (!username) {
+    return {
+      username: null,
+      error: "TELEGRAM_BOT_USERNAME is not configured. Set it to your bot's @username (without @) to enable Telegram connect deep links."
+    };
+  }
+
   return {
-    username: process.env.TELEGRAM_BOT_USERNAME?.trim() || null,
+    username,
     error: null
   };
 }
@@ -203,6 +212,8 @@ async function callTelegramApi<T>(
   return payload.result as T;
 }
 
+const TELEGRAM_MESSAGE_CHAR_LIMIT = 4096;
+
 export async function sendTelegramTextMessage(
   text: string,
   config: TelegramMessageConfig,
@@ -210,9 +221,12 @@ export async function sendTelegramTextMessage(
     replyMarkup?: unknown;
   }
 ): Promise<TelegramTextMessageResult> {
+  const safeText = text.length > TELEGRAM_MESSAGE_CHAR_LIMIT
+    ? text.slice(0, TELEGRAM_MESSAGE_CHAR_LIMIT - 1) + "…"
+    : text;
   const result = await callTelegramApi<{ message_id: number }>("sendMessage", config, {
     chat_id: config.chatId,
-    text,
+    text: safeText,
     ...(options?.replyMarkup ? { reply_markup: options.replyMarkup } : {})
   });
 
