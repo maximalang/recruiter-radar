@@ -119,6 +119,7 @@ export async function runDigestForClientProfile(input: {
   sourceKey?: string | null;
   cooldownDays?: number | null;
   limit?: number | null;
+  skipStateWrite?: boolean;
 }): Promise<DigestRunResult> {
   const pool = getPool();
 
@@ -288,50 +289,52 @@ export async function runDigestForClientProfile(input: {
         continue;
       }
 
-      await client.query(`
-        INSERT INTO client_digest_org_state (
-          client_profile_id,
-          org_id,
-          last_digest_run_id,
-          last_digest_candidate_id,
-          last_digest_at,
-          cooldown_until,
-          feedback_status,
-          last_source_external_id,
-          last_source_display_name
-        )
-        VALUES (
-          $1,
-          $2,
-          $3,
-          $4,
-          NOW(),
-          NOW() + ($5::TEXT || ' days')::interval,
-          'none',
-          $6,
-          $7
-        )
-        ON CONFLICT (client_profile_id, org_id) DO UPDATE
-        SET
-          last_digest_run_id = EXCLUDED.last_digest_run_id,
-          last_digest_candidate_id = EXCLUDED.last_digest_candidate_id,
-          last_digest_at = EXCLUDED.last_digest_at,
-          cooldown_until = GREATEST(
-            COALESCE(client_digest_org_state.cooldown_until, '-infinity'::timestamptz),
-            EXCLUDED.cooldown_until
-          ),
-          last_source_external_id = COALESCE(EXCLUDED.last_source_external_id, client_digest_org_state.last_source_external_id),
-          last_source_display_name = COALESCE(EXCLUDED.last_source_display_name, client_digest_org_state.last_source_display_name),
-          updated_at = NOW()
-      `, [
-        clientProfile.id,
-        item.orgId,
-        run.id,
-        insertedCandidate.id,
-        cooldownDays,
-        item.sourceExternalId || null,
-        item.sourceDisplayName
-      ]);
+      if (!input.skipStateWrite) {
+        await client.query(`
+          INSERT INTO client_digest_org_state (
+            client_profile_id,
+            org_id,
+            last_digest_run_id,
+            last_digest_candidate_id,
+            last_digest_at,
+            cooldown_until,
+            feedback_status,
+            last_source_external_id,
+            last_source_display_name
+          )
+          VALUES (
+            $1,
+            $2,
+            $3,
+            $4,
+            NOW(),
+            NOW() + ($5::TEXT || ' days')::interval,
+            'none',
+            $6,
+            $7
+          )
+          ON CONFLICT (client_profile_id, org_id) DO UPDATE
+          SET
+            last_digest_run_id = EXCLUDED.last_digest_run_id,
+            last_digest_candidate_id = EXCLUDED.last_digest_candidate_id,
+            last_digest_at = EXCLUDED.last_digest_at,
+            cooldown_until = GREATEST(
+              COALESCE(client_digest_org_state.cooldown_until, '-infinity'::timestamptz),
+              EXCLUDED.cooldown_until
+            ),
+            last_source_external_id = COALESCE(EXCLUDED.last_source_external_id, client_digest_org_state.last_source_external_id),
+            last_source_display_name = COALESCE(EXCLUDED.last_source_display_name, client_digest_org_state.last_source_display_name),
+            updated_at = NOW()
+        `, [
+          clientProfile.id,
+          item.orgId,
+          run.id,
+          insertedCandidate.id,
+          cooldownDays,
+          item.sourceExternalId || null,
+          item.sourceDisplayName
+        ]);
+      }
     }
 
     const completedRunResult = await client.query<DigestRunRow>(`

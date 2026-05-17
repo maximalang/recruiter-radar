@@ -647,10 +647,15 @@ export async function sendPilotOrderTestDigest(
     throw new Error(CUSTOMER_CHECKOUT_COPY.connectTelegramFirst);
   }
 
+  if (order.payload.onboardingTestDigestSentAt) {
+    throw new Error("Тестовый дайджест уже был отправлен для этого заказа.");
+  }
+
   const digestRun = await runDigestForClientProfile({
     clientProfileId: profile.id,
     sourceKey: "telegram",
-    limit: profile.dailyDigestLimit
+    limit: profile.dailyDigestLimit,
+    skipStateWrite: true
   });
   const items = digestRun.items.map(mapDigestItemToTelegramDigestItem);
 
