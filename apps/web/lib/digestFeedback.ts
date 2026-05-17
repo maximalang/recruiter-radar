@@ -75,7 +75,8 @@ export async function updateDigestOrgStateFeedback(input: {
   const digestCandidateId = input.digestCandidateId == null ? null : normalizePositiveInteger(input.digestCandidateId, "Invalid digest candidate id.");
   const explicitOrgId = input.orgId == null ? null : normalizePositiveInteger(input.orgId, "Invalid org id.");
   const note = normalizeOptionalText(input.note);
-  const actionConfig = getDigestFeedbackActionConfig(input.action, input.snoozeDays);
+  const extraParams: unknown[] = [];
+  const actionConfig = getDigestFeedbackActionConfig(input.action, input.snoozeDays, extraParams);
   const candidateContext = digestCandidateId == null
     ? null
     : await getDigestCandidateContext({ clientProfileId, digestCandidateId }, pool);
@@ -143,7 +144,8 @@ export async function updateDigestOrgStateFeedback(input: {
     actionConfig.feedbackStatus,
     note,
     candidateContext?.sourceExternalId ?? null,
-    candidateContext?.sourceDisplayName ?? null
+    candidateContext?.sourceDisplayName ?? null,
+    ...extraParams
   ]);
 
   return result.rows[0];
@@ -166,7 +168,7 @@ async function getDigestCandidateContext(input: {
   return result.rowCount === 1 ? result.rows[0] : null;
 }
 
-function getDigestFeedbackActionConfig(action: DigestFeedbackAction, snoozeDays: number | null | undefined) {
+function getDigestFeedbackActionConfig(action: DigestFeedbackAction, snoozeDays: number | null | undefined, params: unknown[]) {
   switch (action) {
     case "accepted":
     case "contacted":
@@ -197,13 +199,15 @@ function getDigestFeedbackActionConfig(action: DigestFeedbackAction, snoozeDays:
       };
     case "snooze": {
       const normalizedSnoozeDays = normalizeSnoozeDays(snoozeDays);
+      params.push(normalizedSnoozeDays);
+      const idx = params.length;
 
       return {
         feedbackStatus: "snooze",
         cooldownSql: "NULL",
-        suppressedSql: `NOW() + interval '${normalizedSnoozeDays} days'`,
+        suppressedSql: `NOW() + ($${idx} * INTERVAL '1 day')`,
         cooldownUpdateSql: "NULL",
-        suppressedUpdateSql: `GREATEST(COALESCE(client_digest_org_state.suppressed_until, '-infinity'::timestamptz), NOW() + interval '${normalizedSnoozeDays} days')`
+        suppressedUpdateSql: `GREATEST(COALESCE(client_digest_org_state.suppressed_until, '-infinity'::timestamptz), NOW() + ($${idx} * INTERVAL '1 day'))`
       };
     }
   }

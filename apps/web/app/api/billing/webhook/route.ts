@@ -15,9 +15,11 @@ export async function POST(request: Request) {
   }
 
   const webhookRequest = request.clone();
-  const body = await request.json();
-  const provider = String(body?.provider ?? "manual");
-  const externalEventId = String(body?.event_id ?? "");
+  let body: unknown;
+  try { body = await request.json(); } catch { return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 }); }
+  const bodyObj = body as Record<string, unknown>;
+  const provider = String(bodyObj?.provider ?? "manual");
+  const externalEventId = String(bodyObj?.event_id ?? "");
   if (!externalEventId) {
     return NextResponse.json({ ok: false, error: "missing_event_id" }, { status: 400 });
   }

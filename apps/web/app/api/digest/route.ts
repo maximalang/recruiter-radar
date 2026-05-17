@@ -19,6 +19,20 @@ export async function GET(request: Request) {
   const cooldownDaysParam = searchParams.get("cooldownDays");
   const sourceKey = searchParams.get("sourceKey");
 
+  if (limitParam !== null) {
+    const parsed = Number(limitParam);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      return NextResponse.json({ error: "limit must be a positive integer." }, { status: 400 });
+    }
+  }
+
+  if (cooldownDaysParam !== null) {
+    const parsed = Number(cooldownDaysParam);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      return NextResponse.json({ error: "cooldownDays must be a positive integer." }, { status: 400 });
+    }
+  }
+
   try {
     await assertDigestEntitlementByClientProfileId(clientProfileId);
     const result = await runDigestForClientProfile({ clientProfileId, sourceKey, limit: limitParam ? Number(limitParam) : undefined, cooldownDays: cooldownDaysParam ? Number(cooldownDaysParam) : undefined });
