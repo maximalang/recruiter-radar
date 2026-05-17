@@ -514,7 +514,7 @@ export async function confirmPilotOrderProfile(input: {
   includeKeywords?: readonly string[] | null;
   excludeKeywords?: readonly string[] | null;
   dailyDigestLimit?: number | null;
-  ownerId?: string | number | null;
+  ownerId: string | number;
 }): Promise<CheckoutOrder> {
   let order = await ensurePilotOrderOnboardingReady(input.orderId, { ownerId: input.ownerId });
 
@@ -626,9 +626,9 @@ export async function savePilotOrderTelegramChat(input: {
 
 export async function sendPilotOrderTestDigest(
   orderId: string | number,
-  options?: { ownerId?: string | number | null }
+  options: { ownerId: string | number }
 ): Promise<PilotOrderTestDigestResult> {
-  let order = await ensurePilotOrderOnboardingReady(orderId, { ownerId: options?.ownerId });
+  let order = await ensurePilotOrderOnboardingReady(orderId, { ownerId: options.ownerId });
 
   if (!order) {
     throw new Error(CUSTOMER_CHECKOUT_COPY.orderNotFound);
@@ -755,9 +755,9 @@ export async function sendPilotOrderTestDigest(
 
 export async function completePilotOrderOnboarding(
   orderId: string | number,
-  options?: { ownerId?: string | number | null }
+  options: { ownerId: string | number }
 ): Promise<CheckoutOrder> {
-  let order = await ensurePilotOrderOnboardingReady(orderId, { ownerId: options?.ownerId });
+  let order = await ensurePilotOrderOnboardingReady(orderId, { ownerId: options.ownerId });
 
   if (!order) {
     throw new Error(CUSTOMER_CHECKOUT_COPY.orderNotFound);
