@@ -349,7 +349,7 @@ ranked AS (
     END AS primary_reason_code,
     CASE
       WHEN vacancies_count >= 3 THEN 'У компании несколько активных вакансий одновременно'
-      ELSE 'У компании есть активная вакансия по рекрутингу'
+      ELSE 'Компания активно нанимает'
     END AS primary_reason_label,
     CASE
       WHEN latest_published_at >= NOW() - interval '3 days' THEN 'very_recent_post'

@@ -287,6 +287,7 @@ export async function runDigestForClientProfile(input: {
 
     const items = evidenceResult.rows
       .map(mapDigestEvidenceRow)
+      .filter((item) => item.confidenceGate !== "C" && item.confidenceGate !== "D")
       .filter((item) => matchesClientProfile(item, clientProfile))
       .sort((left, right) => compareDigestItemsForClient(left, right, clientProfile))
       .slice(0, requestedLimit);
@@ -619,7 +620,7 @@ function toReasonFragment(reason: string): string {
     case "Вакансия опубликована совсем недавно":
       return "вакансия опубликована совсем недавно";
     default:
-      return "найм выглядит актуальным";
+      return reason.length > 0 && reason.length <= 120 ? reason.toLowerCase() : "активно нанимает";
   }
 }
 
