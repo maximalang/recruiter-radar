@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 
-import { getPool } from "../../../../lib/db";
+import { checkTelegramChatOwnsClientProfile, getPool } from "../../../../lib/db";
 import { isDigestFeedbackAction, updateDigestOrgStateFeedback, type DigestFeedbackAction } from "../../../../lib/digestFeedback";
 import { answerTelegramCallbackQuery, getTelegramBotToken } from "../../../../lib/telegram";
 import { consumeTelegramConnectToken } from "../../../../lib/telegramConnect";
@@ -12,7 +12,7 @@ export const runtime = "nodejs";
 
 type TelegramWebhookUpdate = {
   update_id?: number;
-  callback_query?: { id?: string; data?: string };
+  callback_query?: { id?: string; data?: string; from?: { id?: number | string } };
   message?: { chat?: { id?: number | string }; text?: string }
 };
 const STALE_CLAIM_SECONDS = 90;
@@ -30,6 +30,7 @@ export async function POST(request: Request) {
   const update = body as TelegramWebhookUpdate;
   const callbackQueryId: string | null = normalizeNonEmptyString(update?.callback_query?.id ?? null);
   const parsedCallback = verifyDigestFeedbackCallback(update?.callback_query?.data ?? null);
+  const senderChatId = normalizeTelegramChatId(update?.callback_query?.from?.id ?? null);
   const idempotencyKey = `tg:${update?.update_id ?? "na"}:${callbackQueryId ?? "na"}`;
   const claimToken = randomUUID();
 
@@ -81,7 +82,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, ignored: true });
   }
 
+  if (!senderChatId) {
+    await pool.query(`UPDATE webhook_events SET status = 'ignored', processed_at = NOW() WHERE id = $1 AND processing_claim_token = $2`, [eventRow.id, claimToken]);
+    await answerTelegramCallbackQuery({ callbackQueryId, botToken }).catch(() => {});
+    return NextResponse.json({ ok: true, ignored: true });
+  }
+
   try {
+    const ownsProfile = await checkTelegramChatOwnsClientProfile(senderChatId, parsedCallback.clientProfileId);
+    if (!ownsProfile) {
+      await pool.query(`UPDATE webhook_events SET status = 'ignored', processed_at = NOW() WHERE id = $1 AND processing_claim_token = $2`, [eventRow.id, claimToken]);
+      await answerTelegramCallbackQuery({ callbackQueryId, botToken }).catch(() => {});
+      return NextResponse.json({ ok: true, ignored: true });
+    }
     if (parsedCallback.action !== "shown") {
       await updateDigestOrgStateFeedback({ clientProfileId: parsedCallback.clientProfileId, orgId: parsedCallback.orgId, action: parsedCallback.action as DigestFeedbackAction });
     }
@@ -92,7 +105,7 @@ export async function POST(request: Request) {
     const message = error instanceof Error ? error.message : "Failed to process Telegram callback feedback.";
     await pool.query(`UPDATE webhook_events SET status = 'failed', processed_at = NOW(), error_message = LEFT($2, 1000) WHERE id = $1 AND processing_claim_token = $3`, [eventRow.id, sanitizeError(message), claimToken]);
     await answerTelegramCallbackQuery({ callbackQueryId, botToken, text: "Не удалось сохранить фидбек" }).catch(() => {});
-    return NextResponse.json({ error: message }, { status: message.startsWith("Invalid ") || message.includes("is required") ? 400 : 500 });
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 

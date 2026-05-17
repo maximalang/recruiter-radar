@@ -199,6 +199,26 @@ export async function assertDigestEntitlementByClientProfileId(clientProfileId: 
   if (!entitlement.allowed) throw new Error(entitlement.reason ?? "No active subscription or pilot.");
 }
 
+export async function assertTelegramChatOwnsClientProfile(telegramChatId: string, clientProfileId: string): Promise<void> {
+  const pool = getPool();
+  if (!pool) throw new Error("DATABASE_URL is not set.");
+  const result = await pool.query<{ ok: boolean }>(
+    `SELECT TRUE AS ok FROM client_profiles WHERE id = $1 AND telegram_chat_id::text = $2 LIMIT 1`,
+    [clientProfileId, telegramChatId]
+  );
+  if (result.rowCount !== 1) throw new Error("Chat is not authorized for this client profile.");
+}
+
+export async function checkTelegramChatOwnsClientProfile(telegramChatId: string, clientProfileId: string): Promise<boolean> {
+  const pool = getPool();
+  if (!pool) throw new Error("DATABASE_URL is not set.");
+  const result = await pool.query<{ ok: boolean }>(
+    `SELECT TRUE AS ok FROM client_profiles WHERE id = $1 AND telegram_chat_id::text = $2 LIMIT 1`,
+    [clientProfileId, telegramChatId]
+  );
+  return result.rowCount === 1;
+}
+
 export async function hasPremiumEntitlement(userId: number): Promise<EntitlementResult> {
   const pool = getPool();
   if (!pool) throw new Error("DATABASE_URL is not set.");
