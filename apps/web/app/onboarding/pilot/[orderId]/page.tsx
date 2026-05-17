@@ -388,7 +388,7 @@ export default async function PilotOnboardingPage({
 
             {currentStep === "telegram" ? (
               <section style={wizardSectionStyle}>
-                <TelegramStepAutoRefresh />
+                <TelegramStepAutoRefresh orderId={String(order.id)} />
 
                 <SectionIntro
                   eyebrow="Шаг 2"
