@@ -25,7 +25,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ clientProfileId, items });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to load HH digest.";
-    const status = message.includes("not found") ? 404 : message.includes("inactive") ? 403 : 500;
+    const status = message.includes("inactive") || message.includes("No active subscription") || message.includes("entitlement") ? 403 : message.includes("not found") ? 404 : 500;
     return NextResponse.json({ error: message }, { status });
   }
 }

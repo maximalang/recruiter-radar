@@ -126,7 +126,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok, digestRunId: runId, clientProfileId: resolvedClientProfileId, counters: { sent, failed, skipped }, failures }, { status: ok ? 200 : 503 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to deliver digest.";
-    const status = message.includes("Invalid") ? 400 : message.includes("not found") ? 404 : message.includes("inactive") || message.includes("No active subscription") || message.includes("entitlement") ? 403 : 500;
+    const status = message.includes("Invalid") ? 400 : message.includes("inactive") || message.includes("No active subscription") || message.includes("entitlement") ? 403 : message.includes("not found") ? 404 : 500;
     return NextResponse.json({ error: message }, { status });
   }
 }
