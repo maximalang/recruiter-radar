@@ -101,11 +101,10 @@ All secrets must be referenced through environment variables or credentials. Use
 
 Before code changes: run preflight via `/rr-preflight`
 
-After code changes, run and report:
-```bash
-npm run web:check
-npm run web:build
-```
+After code changes:
+- Always run: `npm run web:check`
+- Run `npm run web:build` only when: routes, middleware, `next.config.*`, or other build-sensitive code changed; OR `web:check` passed and the patch is commit-ready
+- Do NOT run repeated check/build loops. If check fails, do one focused fix pass and stop.
 
 If database migrations changed: inspect schema consistency and mention how to apply them.
 If n8n workflow changed: confirm no secrets are present in exported JSON.
@@ -121,7 +120,8 @@ If Telegram webhook changed: describe authentication, idempotency, replay-safety
 
 Use `/rr-preflight` before starting work.
 Use `/rr-task` to start a scoped task.
-Use `/rr-review` after changes.
+Use `/rr-review-lite` after small/local changes (git-only, no build).
+Use `/rr-review` after TS/JS changes or before committing.
 Use `/rr-ux` for UX/conversion review.
 
 ## 10. Code Standards

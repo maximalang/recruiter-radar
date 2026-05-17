@@ -15,7 +15,7 @@ Start a scoped development task. Use before writing any code.
    - Increment 1: [smallest complete piece]
    - Increment 2: [next piece]
 5. **Start with first increment only**
-6. **Verify each increment** — `npm run web:check && npm run web:build`
+6. **Verify each increment** — `npm run web:check` (run `web:build` only if routes/runtime/build config changed)
 
 ## Scope rules
 
