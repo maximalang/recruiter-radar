@@ -1,4 +1,4 @@
-import { getDigestPreviewItems } from "./digest"
+import { getDigestPreviewItems, getDigestItemsForClientProfile } from "./digest"
 
 export type HhDigestItem = {
   rank: number
@@ -20,6 +20,30 @@ export type HhDigestItem = {
 export async function getHhDigestItems(input?: {
   clientProfileId?: string | null
 }): Promise<HhDigestItem[]> {
+  const clientProfileId = input?.clientProfileId?.trim() || null
+
+  if (clientProfileId) {
+    const items = await getDigestItemsForClientProfile({ clientProfileId })
+    return items
+      .filter((item) => item.confidenceGate !== "C" && item.confidenceGate !== "D")
+      .map((item) => ({
+        rank: item.rank,
+        orgId: item.orgId,
+        hh_employer_id: item.sourceExternalId,
+        employer_name: item.sourceDisplayName,
+        vacancies_count: item.vacanciesCount,
+        distinct_vacancy_names_count: item.distinctVacancyNamesCount,
+        latest_published_at: item.latestPublishedAt,
+        total_score: item.totalScore,
+        reasons: item.reasons,
+        opener: item.opener,
+        sourceFamilies: item.sourceFamilies,
+        evidenceTitles: item.evidenceTitles,
+        candidateSourceKeys: item.candidateSourceKeys,
+        locationNames: item.locationNames
+      }))
+  }
+
   const items = await getDigestPreviewItems(10)
 
   return items.map((item) => ({

@@ -86,6 +86,10 @@ export async function updateDigestOrgStateFeedback(input: {
     throw new Error("Digest candidate not found for this client profile.");
   }
 
+  if (digestCandidateId != null && candidateContext && explicitOrgId != null && String(explicitOrgId) !== String(candidateContext.orgId)) {
+    throw new Error("orgId does not match the digest candidate's org.");
+  }
+
   if (!orgId) {
     throw new Error("orgId or digestCandidateId is required.");
   }

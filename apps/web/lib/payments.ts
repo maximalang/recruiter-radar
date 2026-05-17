@@ -657,7 +657,9 @@ export async function sendPilotOrderTestDigest(
     limit: profile.dailyDigestLimit,
     skipStateWrite: true
   });
-  const items = digestRun.items.map(mapDigestItemToTelegramDigestItem);
+  const items = digestRun.items
+    .filter((item) => item.confidenceGate !== "C" && item.confidenceGate !== "D")
+    .map(mapDigestItemToTelegramDigestItem);
 
   if (items.length === 0) {
     order = await updateCheckoutOrder(order.id, {

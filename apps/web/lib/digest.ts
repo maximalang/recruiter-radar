@@ -114,6 +114,79 @@ export async function getDigestPreviewItems(limit = 10): Promise<DigestItem[]> {
   return result.rows.map(mapDigestEvidenceRow);
 }
 
+export async function getDigestItemsForClientProfile(input: {
+  clientProfileId: string | number;
+  sourceKey?: string | null;
+  limit?: number | null;
+}): Promise<DigestItem[]> {
+  const pool = getPool();
+
+  if (!pool) {
+    throw new Error("DATABASE_URL is not set.");
+  }
+
+  const clientProfile = await getClientProfileById(input.clientProfileId, pool);
+
+  if (!clientProfile) {
+    throw new Error("Client profile not found.");
+  }
+
+  if (!clientProfile.isActive) {
+    throw new Error("Client profile is inactive.");
+  }
+
+  const sourceKey = normalizeSourceKey(input.sourceKey);
+  const requestedLimit = normalizeLimit(input.limit ?? clientProfile.dailyDigestLimit);
+
+  const evidenceResult = await pool.query<DigestEvidenceRow>(`
+    WITH ranked_candidates AS (
+      ${digestEvidenceQuery}
+    )
+    SELECT
+      ranked_candidates.rank,
+      ranked_candidates.org_id,
+      ranked_candidates.source_external_id,
+      ranked_candidates.source_display_name,
+      ranked_candidates.source_families,
+      ranked_candidates.evidence_titles,
+      ranked_candidates.candidate_source_keys,
+      ranked_candidates.location_names,
+      ranked_candidates.vacancies_count,
+      ranked_candidates.distinct_vacancy_names_count,
+      ranked_candidates.latest_published_at,
+      ranked_candidates.total_score,
+      ranked_candidates.is_recent,
+      ranked_candidates.primary_reason_label,
+      ranked_candidates.secondary_reason_label,
+      ranked_candidates.confidence_gate
+    FROM ranked_candidates
+    LEFT JOIN client_digest_org_state AS state
+      ON state.client_profile_id = $1
+     AND state.org_id = ranked_candidates.org_id
+    WHERE (
+        state.client_profile_id IS NULL
+        OR (
+          COALESCE(state.suppressed_until, '-infinity'::timestamptz) <= NOW()
+          AND COALESCE(state.cooldown_until, '-infinity'::timestamptz) <= NOW()
+          AND COALESCE(state.feedback_status, 'none') NOT IN ('contacted', 'replied', 'won', 'badfit', 'dismissed')
+        )
+      )
+      AND (
+        $2 = 'default'
+        OR $2 = ANY(ranked_candidates.source_families)
+        OR $2 = ANY(COALESCE(ranked_candidates.candidate_source_keys, ARRAY[]::text[]))
+      )
+    ORDER BY ranked_candidates.rank ASC
+    LIMIT $3
+  `, [clientProfile.id, sourceKey, requestedLimit * 5]);
+
+  return evidenceResult.rows
+    .map(mapDigestEvidenceRow)
+    .filter((item) => matchesClientProfile(item, clientProfile))
+    .sort((left, right) => compareDigestItemsForClient(left, right, clientProfile))
+    .slice(0, requestedLimit);
+}
+
 export async function runDigestForClientProfile(input: {
   clientProfileId: string | number;
   sourceKey?: string | null;
