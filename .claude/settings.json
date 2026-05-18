@@ -1,0 +1,145 @@
+{
+  "env": {
+    "CLAUDE_CODE_DISABLE_GIT_INSTRUCTIONS": "1",
+    "SLASH_COMMAND_TOOL_CHAR_BUDGET": "4096"
+  },
+  "includeGitInstructions": false,
+  "permissions": {
+    "allow": [
+      "Bash(git status)",
+      "Bash(git branch)",
+      "Bash(git branch --show-current)",
+      "Bash(git diff)",
+      "Bash(git diff --cached)",
+      "Bash(git log)",
+      "Bash(git log --oneline -10)",
+      "Bash(git remote -v)",
+      "Bash(npm run web:check)",
+      "Bash(npm run web:build)",
+      "Bash(npm run web:validate)",
+      "Bash(npm run db:validate)",
+      "Bash(npm run verify:smoke)",
+      "Bash(npm run clean)",
+      "Bash(ls)",
+      "Bash(ls -la)"
+    ],
+    "deny": [
+      "Bash(git push*)",
+      "Bash(git merge*)",
+      "Bash(gh pr*)",
+      "Bash(gh issue*)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean -fd*)",
+      "Bash(rm -rf*)",
+      "Bash(Remove-Item -Recurse*)",
+      "Bash(npm install*)",
+      "Bash(npm audit*)",
+      "Bash(curl*)",
+      "Bash(wget*)"
+    ],
+    "allowRead": [
+      {
+        "path": ".claude/",
+        "reason": "Project Claude Code configuration"
+      },
+      {
+        "path": "apps/",
+        "reason": "Application source code"
+      },
+      {
+        "path": "packages/",
+        "reason": "Shared packages"
+      },
+      {
+        "path": "scripts/",
+        "reason": "Build and utility scripts"
+      },
+      {
+        "path": "*.md",
+        "reason": "Documentation files"
+      },
+      {
+        "path": "*.json",
+        "reason": "Configuration files"
+      },
+      {
+        "path": "*.ts",
+        "reason": "TypeScript source files"
+      },
+      {
+        "path": "*.tsx",
+        "reason": "React/Next.js source files"
+      },
+      {
+        "path": "*.sql",
+        "reason": "Database migrations"
+      },
+      {
+        "path": "tsconfig.json",
+        "reason": "TypeScript configuration"
+      },
+      {
+        "path": "next.config.*",
+        "reason": "Next.js configuration"
+      }
+    ],
+    "denyRead": [
+      {
+        "path": ".env",
+        "reason": "Environment files contain secrets"
+      },
+      {
+        "path": ".env.local",
+        "reason": "Environment files contain secrets"
+      },
+      {
+        "path": ".env.production",
+        "reason": "Environment files contain secrets"
+      },
+      {
+        "path": ".env.*",
+        "reason": "All .env.* files contain secrets"
+      },
+      {
+        "path": "node_modules/",
+        "reason": "Do not read node_modules directly"
+      },
+      {
+        "path": ".next/",
+        "reason": "Build cache, not source"
+      },
+      {
+        "path": "build/",
+        "reason": "Build artifacts, not source"
+      },
+      {
+        "path": "dist/",
+        "reason": "Build artifacts, not source"
+      },
+      {
+        "path": "*.pem",
+        "reason": "Private keys contain secrets"
+      },
+      {
+        "path": "*.key",
+        "reason": "Private keys contain secrets"
+      },
+      {
+        "path": "credentials.json",
+        "reason": "Credentials files contain secrets"
+      },
+      {
+        "path": "secrets.json",
+        "reason": "Secrets files contain secrets"
+      },
+      {
+        "path": "~/.npm/",
+        "reason": "Global npm cache"
+      },
+      {
+        "path": "~/.claude/",
+        "reason": "User-level Claude config may contain secrets"
+      }
+    ]
+  }
+}

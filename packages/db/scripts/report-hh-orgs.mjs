@@ -6,6 +6,7 @@ import pg from 'pg';
 const { Client } = pg;
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const rootEnvPath = resolve(scriptDir, '../../../.env');
+const digestEvidenceQuery = readFileSync(resolve(scriptDir, './source-digest-evidence.sql'), 'utf8');
 
 loadEnvFile(rootEnvPath);
 
@@ -19,14 +20,18 @@ if (!databaseUrl) {
 }
 
 try {
-  const rows = await fetchTopEmployers(databaseUrl);
+  const rows = await fetchTopOrganizations(databaseUrl);
 
-  console.log('top 20 hh orgs:');
+  console.log('top 20 normalized hiring orgs:');
   console.table(
     rows.map((row) => ({
-      hh_employer_id: row.hh_employer_id ?? '',
-      employer_name: row.employer_name ?? '',
+      org_external_id: row.source_external_id ?? '',
+      org_name: row.source_display_name ?? '',
+      source_families: formatSourceFamilies(row.source_families),
+      confidence_gate: row.confidence_gate ?? '',
+      quality: row.quality_label ?? '',
       vacancies_count: row.vacancies_count,
+      distinct_vacancy_names_count: row.distinct_vacancy_names_count,
       latest_published_at: formatTimestamp(row.latest_published_at),
     })),
   );
@@ -36,7 +41,7 @@ try {
   process.exit(1);
 }
 
-async function fetchTopEmployers(connectionString) {
+async function fetchTopOrganizations(connectionString) {
   const client = new Client({
     connectionString,
   });
@@ -44,22 +49,16 @@ async function fetchTopEmployers(connectionString) {
   await client.connect();
 
   try {
-    const result = await client.query(`
-      SELECT
-        hh_employer_id,
-        employer_name,
-        COUNT(*)::INT AS vacancies_count,
-        MAX(published_at) AS latest_published_at
-      FROM hh_vacancies
-      GROUP BY hh_employer_id, employer_name
-      ORDER BY vacancies_count DESC, latest_published_at DESC NULLS LAST
-      LIMIT 20
-    `);
+    const result = await client.query(`${digestEvidenceQuery}\nLIMIT 20`);
 
     return result.rows;
   } finally {
     await client.end();
   }
+}
+
+function formatSourceFamilies(value) {
+  return Array.isArray(value) ? value.join(', ') : '';
 }
 
 function loadEnvFile(filePath) {

@@ -6,6 +6,7 @@ import pg from 'pg';
 const { Client } = pg;
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const rootEnvPath = resolve(scriptDir, '../../../.env');
+const digestEvidenceQuery = readFileSync(resolve(scriptDir, './source-digest-evidence.sql'), 'utf8');
 
 loadEnvFile(rootEnvPath);
 
@@ -22,10 +23,11 @@ try {
   const rows = await fetchTopEmployers(databaseUrl);
   const report = rows.map((row) => ({
     rank: row.rank,
-    hh_employer_id: row.hh_employer_id ?? '',
-    employer_name: row.employer_name ?? '',
+    hh_employer_id: row.source_external_id ?? '',
+    employer_name: row.source_display_name ?? '',
+    confidence_gate: row.confidence_gate ?? '',
     total_score: row.total_score,
-    reasons: buildReasons(row),
+    reasons: getReasonLabels(row),
   }));
 
   console.log(JSON.stringify(report, null, 2));
@@ -43,66 +45,7 @@ async function fetchTopEmployers(connectionString) {
   await client.connect();
 
   try {
-    const result = await client.query(`
-      WITH aggregated AS (
-        SELECT
-          hh_employer_id,
-          employer_name,
-          COUNT(*)::INT AS vacancies_count,
-          COUNT(DISTINCT vacancy_name)::INT AS distinct_vacancy_names_count,
-          MAX(published_at) AS latest_published_at
-        FROM hh_vacancies
-        GROUP BY hh_employer_id, employer_name
-      ),
-      scored AS (
-        SELECT
-          hh_employer_id,
-          employer_name,
-          vacancies_count,
-          distinct_vacancy_names_count,
-          latest_published_at,
-          (
-            vacancies_count * 10
-            + distinct_vacancy_names_count * 5
-            + CASE
-              WHEN latest_published_at >= NOW() - interval '3 days' THEN 20
-              WHEN latest_published_at >= NOW() - interval '7 days' THEN 10
-              ELSE 0
-            END
-          )::INT AS total_score,
-          (latest_published_at >= NOW() - interval '3 days') AS is_recent
-        FROM aggregated
-      ),
-      ranked AS (
-        SELECT
-          ROW_NUMBER() OVER (
-            ORDER BY
-              total_score DESC,
-              vacancies_count DESC,
-              latest_published_at DESC NULLS LAST
-          )::INT AS rank,
-          hh_employer_id,
-          employer_name,
-          vacancies_count,
-          distinct_vacancy_names_count,
-          latest_published_at,
-          total_score,
-          is_recent
-        FROM scored
-      )
-      SELECT
-        rank,
-        hh_employer_id,
-        employer_name,
-        vacancies_count,
-        distinct_vacancy_names_count,
-        latest_published_at,
-        total_score,
-        is_recent
-      FROM ranked
-      ORDER BY rank ASC
-      LIMIT 10
-    `);
+    const result = await client.query(`${digestEvidenceQuery}\nLIMIT 10`);
 
     return result.rows;
   } finally {
@@ -110,24 +53,10 @@ async function fetchTopEmployers(connectionString) {
   }
 }
 
-function buildReasons(row) {
-  const reasons = [
-    row.vacancies_count >= 3
-      ? 'У компании несколько активных вакансий одновременно'
-      : 'У компании есть активная вакансия по рекрутингу',
-  ];
-
-  if (row.is_recent) {
-    reasons.push('Вакансия опубликована совсем недавно');
-  } else {
-    reasons.push(
-      row.distinct_vacancy_names_count >= 2
-        ? 'Есть несколько разных ролей, значит найм не точечный'
-        : 'Роль опубликована недавно, это хороший момент для контакта',
-    );
-  }
-
-  return reasons.slice(0, 2);
+function getReasonLabels(row) {
+  return [row.primary_reason_label, row.secondary_reason_label].filter(
+    (reason) => typeof reason === 'string' && reason.length > 0,
+  );
 }
 
 function loadEnvFile(filePath) {

@@ -6,8 +6,9 @@ import pg from 'pg';
 const { Client } = pg;
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const rootEnvPath = resolve(scriptDir, '../../../.env');
-const searchText = '\u0440\u0435\u043a\u0440\u0443\u0442\u0435\u0440';
+const searchText = 'рекрутер';
 const fetchUrl = new URL('https://api.hh.ru/vacancies');
+const hhSource = 'hh';
 
 fetchUrl.searchParams.set('text', searchText);
 fetchUrl.searchParams.set('per_page', '20');
@@ -40,11 +41,18 @@ if (!databaseUrl) {
 try {
   const vacancies = await fetchVacancies(hhUserAgent);
   const normalizedVacancies = normalizeVacancies(vacancies);
-  const upsertCount =
-    normalizedVacancies.length === 0 ? 0 : await upsertVacancies(databaseUrl, normalizedVacancies);
+  const stats =
+    normalizedVacancies.length === 0
+      ? { hhVacancyUpsertCount: 0, signalUpsertCount: 0, skippedSignalCount: 0 }
+      : await upsertVacancies(databaseUrl, normalizedVacancies);
 
   console.log(`vacancies received: ${vacancies.length}`);
-  console.log(`upserts completed: ${upsertCount}`);
+  console.log(`hh vacancy upserts completed: ${stats.hhVacancyUpsertCount}`);
+  console.log(`normalized signal upserts completed: ${stats.signalUpsertCount}`);
+
+  if (stats.skippedSignalCount > 0) {
+    console.log(`vacancies skipped for normalized layer: ${stats.skippedSignalCount}`);
+  }
 } catch (error) {
   const message = error instanceof Error ? error.message : String(error);
   const causeMessage =
@@ -105,10 +113,23 @@ function normalizeVacancy(vacancy, fetchedAt) {
     return null;
   }
 
+  const hhEmployerId = toNonEmptyText(vacancy.employer?.id);
+  const employerName = toNonEmptyText(vacancy.employer?.name);
+  const employerIdSourceKey = buildEmployerIdSourceKey(hhEmployerId);
+  const employerNameSourceKey = buildEmployerNameSourceKey(employerName);
+  const orgSourceKey = buildOrgSourceKey(hhEmployerId, employerName);
+
   return {
     hhVacancyId,
-    hhEmployerId: toNonEmptyText(vacancy.employer?.id),
-    employerName: toNonEmptyText(vacancy.employer?.name),
+    hhEmployerId,
+    employerName,
+    orgName: employerName ?? buildFallbackEmployerName(hhEmployerId),
+    orgDisplayName: employerName,
+    orgSourceKey,
+    orgSourceAliasKey:
+      employerIdSourceKey && employerNameSourceKey && employerIdSourceKey !== employerNameSourceKey
+        ? employerNameSourceKey
+        : null,
     vacancyName,
     areaName: toNonEmptyText(vacancy.area?.name),
     publishedAt: toTimestampOrNull(vacancy.published_at),
@@ -123,7 +144,7 @@ async function upsertVacancies(connectionString, vacancies) {
     connectionString,
   });
 
-  const upsertQuery = `
+  const hhVacancyUpsertQuery = `
     INSERT INTO hh_vacancies (
       hh_vacancy_id,
       hh_employer_id,
@@ -148,7 +169,32 @@ async function upsertVacancies(connectionString, vacancies) {
       fetched_at = EXCLUDED.fetched_at
   `;
 
-  let upsertCount = 0;
+  const signalUpsertQuery = `
+    INSERT INTO signals (
+      org_id,
+      signal_type,
+      source,
+      external_id,
+      headline,
+      summary,
+      source_url,
+      occurred_at,
+      payload
+    )
+    VALUES ($1, 'job_posting', $2, $3, $4, $5, $6, $7, $8)
+    ON CONFLICT (source, external_id) DO UPDATE
+    SET
+      org_id = EXCLUDED.org_id,
+      headline = EXCLUDED.headline,
+      summary = EXCLUDED.summary,
+      source_url = EXCLUDED.source_url,
+      occurred_at = EXCLUDED.occurred_at,
+      payload = EXCLUDED.payload
+  `;
+
+  let hhVacancyUpsertCount = 0;
+  let signalUpsertCount = 0;
+  let skippedSignalCount = 0;
 
   await client.connect();
 
@@ -156,7 +202,7 @@ async function upsertVacancies(connectionString, vacancies) {
     await client.query('BEGIN');
 
     for (const vacancy of vacancies) {
-      const result = await client.query(upsertQuery, [
+      const hhVacancyResult = await client.query(hhVacancyUpsertQuery, [
         vacancy.hhVacancyId,
         vacancy.hhEmployerId,
         vacancy.employerName,
@@ -168,17 +214,268 @@ async function upsertVacancies(connectionString, vacancies) {
         vacancy.fetchedAt,
       ]);
 
-      upsertCount += result.rowCount ?? 0;
+      hhVacancyUpsertCount += hhVacancyResult.rowCount ?? 0;
+
+      if (!vacancy.orgSourceKey || !vacancy.orgName) {
+        skippedSignalCount += 1;
+        continue;
+      }
+
+      const orgId = await upsertOrgSourceRef(client, vacancy);
+      const signalResult = await client.query(signalUpsertQuery, [
+        orgId,
+        hhSource,
+        vacancy.hhVacancyId,
+        vacancy.vacancyName,
+        buildSignalSummary(vacancy),
+        vacancy.alternateUrl,
+        vacancy.publishedAt ?? vacancy.fetchedAt,
+        buildSignalPayload(vacancy),
+      ]);
+
+      signalUpsertCount += signalResult.rowCount ?? 0;
     }
 
     await client.query('COMMIT');
-    return upsertCount;
+
+    return {
+      hhVacancyUpsertCount,
+      signalUpsertCount,
+      skippedSignalCount,
+    };
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
   } finally {
     await client.end();
   }
+}
+
+async function upsertOrgSourceRef(client, vacancy) {
+  const sourceKeys = buildOrgSourceKeys(vacancy);
+
+  await lockOrgSourceKeys(client, sourceKeys);
+
+  const existingRefResult = await client.query(
+    `
+      SELECT org_id
+      FROM org_source_refs
+      WHERE source = $1
+        AND source_key = ANY($2)
+      ORDER BY
+        CASE
+          WHEN source_key = $3 THEN 0
+          WHEN source_key = $4 THEN 1
+          ELSE 2
+        END,
+        id ASC
+      LIMIT 1
+    `,
+    [hhSource, sourceKeys, vacancy.orgSourceKey, vacancy.orgSourceAliasKey],
+  );
+
+  let orgId = existingRefResult.rows[0]?.org_id;
+
+  if (!orgId) {
+    const insertedOrgResult = await client.query(
+      `
+        INSERT INTO orgs (name)
+        VALUES ($1)
+        RETURNING id
+      `,
+      [vacancy.orgName],
+    );
+
+    orgId = insertedOrgResult.rows[0].id;
+  }
+
+  await upsertOrgSourceKeys(client, orgId, vacancy);
+  await updateOrgSourceRef(client, orgId, vacancy);
+
+  return orgId;
+}
+
+async function updateOrgSourceRef(client, orgId, vacancy) {
+  await client.query(
+    `
+      UPDATE orgs
+      SET name = $2
+      WHERE id = $1
+        AND $2 IS NOT NULL
+        AND BTRIM($2) <> ''
+        AND (
+          name IS NULL
+          OR BTRIM(name) = ''
+          OR name = $3
+        )
+    `,
+    [orgId, vacancy.orgDisplayName, buildFallbackEmployerName(vacancy.hhEmployerId)],
+  );
+
+  await client.query(
+    `
+      UPDATE org_source_refs
+      SET
+        display_name = CASE
+          WHEN $4 IS NULL OR BTRIM($4) = '' THEN display_name
+          WHEN display_name IS NULL OR BTRIM(display_name) = '' THEN $4
+          ELSE display_name
+        END
+      WHERE org_id = $1
+        AND source = $2
+        AND source_key = ANY($3)
+    `,
+    [orgId, hhSource, buildOrgSourceKeys(vacancy), vacancy.orgDisplayName],
+  );
+}
+
+async function lockOrgSourceKeys(client, sourceKeys) {
+  for (const sourceKey of [...sourceKeys].sort()) {
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', [
+      hhSource,
+      sourceKey,
+    ]);
+  }
+}
+
+async function upsertOrgSourceKeys(client, orgId, vacancy) {
+  const sourceRefs = [
+    {
+      sourceKey: vacancy.orgSourceKey,
+      externalId: vacancy.hhEmployerId,
+      displayName: vacancy.orgDisplayName,
+    },
+  ];
+
+  if (vacancy.orgSourceAliasKey) {
+    sourceRefs.push({
+      sourceKey: vacancy.orgSourceAliasKey,
+      externalId: null,
+      displayName: vacancy.orgDisplayName,
+    });
+  }
+
+  for (const sourceRef of sourceRefs) {
+    await client.query(
+      `
+        INSERT INTO org_source_refs (
+          org_id,
+          source,
+          source_key,
+          external_id,
+          display_name,
+          metadata
+        )
+        VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (source, source_key) DO UPDATE
+        SET
+          external_id = COALESCE(EXCLUDED.external_id, org_source_refs.external_id),
+          display_name = CASE
+            WHEN EXCLUDED.display_name IS NULL OR BTRIM(EXCLUDED.display_name) = '' THEN org_source_refs.display_name
+            WHEN org_source_refs.display_name IS NULL OR BTRIM(org_source_refs.display_name) = '' THEN EXCLUDED.display_name
+            ELSE org_source_refs.display_name
+          END,
+          metadata = COALESCE(org_source_refs.metadata, '{}'::jsonb) || EXCLUDED.metadata
+      `,
+      [
+        orgId,
+        hhSource,
+        sourceRef.sourceKey,
+        sourceRef.externalId,
+        sourceRef.displayName,
+        buildOrgSourceMetadata(vacancy, sourceRef.sourceKey, sourceRef.externalId),
+      ],
+    );
+  }
+}
+
+function buildOrgSourceMetadata(vacancy, sourceKey = vacancy.orgSourceKey, externalId = vacancy.hhEmployerId) {
+  return {
+    source: hhSource,
+    source_key: sourceKey,
+    source_alias_key:
+      sourceKey === vacancy.orgSourceAliasKey ? vacancy.orgSourceKey : vacancy.orgSourceAliasKey,
+    external_id: externalId,
+    display_name: vacancy.orgDisplayName,
+    employer_name: vacancy.employerName,
+    org_name: vacancy.orgName,
+  };
+}
+
+function buildSignalPayload(vacancy) {
+  return {
+    source: hhSource,
+    source_entity_type: 'employer',
+    source_entity_key: vacancy.orgSourceKey,
+    source_entity_alias_key: vacancy.orgSourceAliasKey,
+    source_entity_external_id: vacancy.hhEmployerId,
+    source_entity_display_name: vacancy.employerName,
+    source_entity_name: vacancy.orgName,
+    source_record_type: 'job_posting',
+    source_record_id: vacancy.hhVacancyId,
+    source_record_title: vacancy.vacancyName,
+    source_record_url: vacancy.alternateUrl,
+    source_record_published_at: vacancy.publishedAt,
+    org_source_key: vacancy.orgSourceKey,
+    hh_vacancy_id: vacancy.hhVacancyId,
+    hh_employer_id: vacancy.hhEmployerId,
+    employer_name: vacancy.employerName,
+    vacancy_name: vacancy.vacancyName,
+    area_name: vacancy.areaName,
+    published_at: vacancy.publishedAt,
+    alternate_url: vacancy.alternateUrl,
+    fetched_at: vacancy.fetchedAt,
+  };
+}
+
+function buildSignalSummary(vacancy) {
+  const fragments = [];
+
+  if (vacancy.employerName) {
+    fragments.push(vacancy.employerName);
+  }
+
+  if (vacancy.areaName) {
+    fragments.push(`регион: ${vacancy.areaName}`);
+  }
+
+  if (fragments.length === 0) {
+    return 'Новая вакансия из hh.ru';
+  }
+
+  return `Вакансия hh.ru (${fragments.join(', ')})`;
+}
+
+function buildOrgSourceKey(hhEmployerId, employerName) {
+  return buildEmployerIdSourceKey(hhEmployerId) ?? buildEmployerNameSourceKey(employerName);
+}
+
+function buildEmployerIdSourceKey(hhEmployerId) {
+  return hhEmployerId ? `employer:${hhEmployerId}` : null;
+}
+
+function buildEmployerNameSourceKey(employerName) {
+  const normalizedEmployerName = normalizeSourceKeyText(employerName);
+  return normalizedEmployerName ? `employer-name:${normalizedEmployerName}` : null;
+}
+
+function buildOrgSourceKeys(vacancy) {
+  return [vacancy.orgSourceKey, vacancy.orgSourceAliasKey].filter(
+    (sourceKey, index, sourceKeys) => Boolean(sourceKey) && sourceKeys.indexOf(sourceKey) === index,
+  );
+}
+
+function normalizeSourceKeyText(value) {
+  if (!value) {
+    return null;
+  }
+
+  const normalizedValue = value.trim().replace(/\s+/g, ' ').toLowerCase();
+  return normalizedValue === '' ? null : normalizedValue;
+}
+
+function buildFallbackEmployerName(hhEmployerId) {
+  return hhEmployerId ? `Работодатель HH ${hhEmployerId}` : null;
 }
 
 function loadEnvFile(filePath) {
