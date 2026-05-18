@@ -1,17 +1,5 @@
 export function buildHhRadarProbabilitySummary(input: {
   totalScore: number
-  priorityScore?: number
-  relevanceScore?: number
-  timingScore?: number
-  replyLikelihoodScore?: number
-  confidenceScore?: number
-  confidenceLabel?: string
-  sourceCount?: number
-  sourceKeys?: string[]
-  structuredSignalCount?: number
-  growthSignalCount?: number
-  vacanciesCount?: number
-  latestPublishedAt?: string | null
 }): {
   workNowText: string
 } {

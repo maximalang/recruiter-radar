@@ -311,6 +311,8 @@ scored AS (
     END AS confidence_gate
   FROM aggregated
   WHERE evidence_quality <> 'enrichment_context'
+    AND latest_published_at IS NOT NULL
+    AND latest_published_at >= NOW() - interval '30 days'
 ),
 ranked AS (
   SELECT
@@ -348,8 +350,13 @@ ranked AS (
       ELSE 'active_recruiting_role'
     END AS primary_reason_code,
     CASE
-      WHEN vacancies_count >= 3 THEN 'У компании несколько активных вакансий одновременно'
-      ELSE 'Компания активно нанимает'
+      WHEN vacancies_count >= 3 AND evidence_titles[1] IS NOT NULL
+        THEN vacancies_count || ' вакансий, включая «' || evidence_titles[1] || '»'
+      WHEN vacancies_count >= 3
+        THEN vacancies_count || ' активных вакансий одновременно'
+      WHEN evidence_titles[1] IS NOT NULL
+        THEN 'Открыта вакансия «' || evidence_titles[1] || '»'
+      ELSE 'Есть активная вакансия'
     END AS primary_reason_label,
     CASE
       WHEN latest_published_at >= NOW() - interval '3 days' THEN 'very_recent_post'
@@ -357,9 +364,11 @@ ranked AS (
       ELSE 'recent_contact_window'
     END AS secondary_reason_code,
     CASE
-      WHEN latest_published_at >= NOW() - interval '3 days' THEN 'Вакансия опубликована совсем недавно'
-      WHEN distinct_vacancy_names_count >= 2 THEN 'Есть несколько разных ролей, значит найм не точечный'
-      ELSE 'Роль опубликована недавно, это хороший момент для контакта'
+      WHEN latest_published_at >= NOW() - interval '3 days'
+        THEN 'Опубликовано ' || TO_CHAR(latest_published_at, 'DD.MM')
+      WHEN distinct_vacancy_names_count >= 2
+        THEN distinct_vacancy_names_count || ' разных ролей — найм не точечный'
+      ELSE 'Опубликовано в пределах месяца'
     END AS secondary_reason_label
   FROM scored
 )

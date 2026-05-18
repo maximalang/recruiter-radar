@@ -22,16 +22,10 @@ export type PublicPreviewInput = {
 }
 
 export type PublicPreviewItem = HhDigestItem & {
-  priorityScore: number
-  relevanceScore: number
-  timingScore: number
-  replyLikelihoodScore: number
-  confidenceScore: number
   confidenceLabel: string
   sourceCount: number
   sourceKeys: string[]
   structuredSignalCount: number
-  growthSignalCount: number
   curationLabels: string[]
 }
 
@@ -156,18 +150,18 @@ export function buildPilotApplicationComment(input: {
 function toPublicPreviewItem(item: HhDigestItem): PublicPreviewItem {
   return {
     ...item,
-    priorityScore: item.total_score,
-    relevanceScore: item.total_score,
-    timingScore: item.total_score,
-    replyLikelihoodScore: item.total_score,
-    confidenceScore: item.total_score,
-    confidenceLabel: "medium",
+    confidenceLabel: deriveConfidenceLabel(item.total_score),
     sourceCount: item.sourceFamilies.length,
     sourceKeys: item.candidateSourceKeys,
     structuredSignalCount: item.evidenceTitles.length,
-    growthSignalCount: item.locationNames.length,
     curationLabels: item.sourceFamilies
   }
+}
+
+function deriveConfidenceLabel(totalScore: number): string {
+  if (totalScore >= 80) return "high"
+  if (totalScore >= 50) return "medium"
+  return "low"
 }
 
 function matchesPreviewInput(item: HhDigestItem, input: PublicPreviewInput): boolean {

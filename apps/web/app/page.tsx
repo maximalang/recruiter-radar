@@ -579,19 +579,7 @@ function PreviewDigestCard(props: {
 }) {
   const { item } = props;
   const probability = buildHhRadarProbabilitySummary({
-    totalScore: item.total_score,
-    priorityScore: item.priorityScore,
-    relevanceScore: item.relevanceScore,
-    timingScore: item.timingScore,
-    replyLikelihoodScore: item.replyLikelihoodScore,
-    confidenceScore: item.confidenceScore,
-    confidenceLabel: item.confidenceLabel,
-    sourceCount: item.sourceCount,
-    sourceKeys: item.sourceKeys,
-    structuredSignalCount: item.structuredSignalCount,
-    growthSignalCount: item.growthSignalCount,
-    vacanciesCount: item.vacancies_count,
-    latestPublishedAt: item.latest_published_at
+    totalScore: item.total_score
   });
   const primaryReason = item.reasons[0] ?? "Сейчас по компании есть повод выйти в контакт.";
   const secondaryReason = item.reasons[1] ?? null;
