@@ -1,0 +1,57 @@
+{
+  "records": [
+    {
+      "external_id": "tjb-smoke-1",
+      "board": "habr-career",
+      "company_name": "CloudNine Systems",
+      "company_domain": "cloudnine.example",
+      "company_website_url": "https://cloudnine.example/",
+      "job_title": "DevOps Engineer",
+      "job_posting_url": "https://career.habr.com/vacancies/123456",
+      "location": "Москва",
+      "employment_type": "full-time",
+      "salary": "300 000 — 450 000 ₽",
+      "tags": ["kubernetes", "terraform", "aws"],
+      "published_at": "2026-05-10T10:00:00.000Z"
+    },
+    {
+      "external_id": "tjb-smoke-2",
+      "board": "habr-career",
+      "company_name": "CloudNine Systems",
+      "company_domain": "cloudnine.example",
+      "job_title": "Senior Go Developer",
+      "job_posting_url": "https://career.habr.com/vacancies/123457",
+      "location": "Remote",
+      "salary": "400 000 — 600 000 ₽",
+      "tags": ["go", "microservices"],
+      "published_at": "2026-05-11T12:00:00.000Z"
+    },
+    {
+      "external_id": "tjb-smoke-3",
+      "board": "getmatch",
+      "company_name": "FinTech Pro",
+      "company_domain": "fintechpro.example",
+      "job_title": "Frontend React Developer",
+      "job_posting_url": "https://getmatch.ru/vacancies/789",
+      "location": "Санкт-Петербург",
+      "tags": ["react", "typescript"],
+      "published_at": "2026-05-12T09:00:00.000Z"
+    },
+    {
+      "external_id": "tjb-smoke-2",
+      "board": "habr-career",
+      "company_name": "CloudNine Systems",
+      "company_domain": "cloudnine.example",
+      "job_title": "Senior Go Developer (DUPLICATE)",
+      "job_posting_url": "https://career.habr.com/vacancies/123457",
+      "location": "Remote",
+      "published_at": "2026-05-11T12:00:00.000Z"
+    },
+    {
+      "company_name": "Minimal Board Co",
+      "job_title": "Python Developer",
+      "location": "Новосибирск",
+      "published_at": "2026-05-13T07:00:00.000Z"
+    }
+  ]
+}

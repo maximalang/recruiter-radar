@@ -12,8 +12,12 @@ export function formatSourceActionResult(command, source, result) {
     ];
   }
 
-  if (source.id === 'career-pages' && result.summary && typeof result.summary === 'object') {
+  if (result.summary && typeof result.summary === 'object') {
     return [JSON.stringify(result.summary, null, 2)];
+  }
+
+  if (typeof result.stdout === 'string' && result.stdout.trim() !== '') {
+    return [result.stdout.trimEnd()];
   }
 
   return [];

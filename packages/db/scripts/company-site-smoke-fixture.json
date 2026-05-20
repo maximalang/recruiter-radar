@@ -1,0 +1,44 @@
+{
+  "records": [
+    {
+      "external_id": "cs-smoke-1",
+      "company_name": "Smoke Corp",
+      "company_domain": "smokecorp.example",
+      "company_website_url": "https://smokecorp.example/",
+      "page_url": "https://smokecorp.example/about",
+      "page_title": "О компании Smoke Corp",
+      "summary": "Smoke Corp — технологическая компания, 200 сотрудников, офис в Москве.",
+      "signals": ["рост команды", "новый офис"],
+      "detected_at": "2026-05-01T10:00:00.000Z"
+    },
+    {
+      "external_id": "cs-smoke-2",
+      "company_name": "Smoke Corp",
+      "company_domain": "smokecorp.example",
+      "company_website_url": "https://smokecorp.example/",
+      "page_url": "https://smokecorp.example/team",
+      "page_title": "Команда",
+      "summary": "Страница команды с упоминанием расширения отдела разработки.",
+      "keywords": "разработка,расширение,найм",
+      "detected_at": "2026-05-02T12:00:00.000Z"
+    },
+    {
+      "external_id": "cs-smoke-3",
+      "company_name": "Another Smoke LLC",
+      "company_domain": "another-smoke.example",
+      "company_website_url": "https://another-smoke.example/",
+      "page_url": "https://another-smoke.example/news/expansion",
+      "page_title": "Расширение бизнеса",
+      "summary": "Компания открывает новый филиал в Санкт-Петербурге.",
+      "signals": ["новый филиал", "Санкт-Петербург"],
+      "detected_at": "2026-05-03T08:30:00.000Z"
+    },
+    {
+      "page_url": "https://url-only-smoke.example/company/news",
+      "page_title": "URL-only company context",
+      "summary": "A URL-only company site record should still normalize through inferred domain.",
+      "keywords": "expansion,team growth",
+      "detected_at": "2026-05-04T09:15:00.000Z"
+    }
+  ]
+}

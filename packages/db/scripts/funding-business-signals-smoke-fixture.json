@@ -1,0 +1,59 @@
+{
+  "records": [
+    {
+      "external_id": "fund-smoke-1",
+      "company_name": "RocketScale",
+      "company_domain": "rocketscale.example",
+      "company_website_url": "https://rocketscale.example/",
+      "headline": "RocketScale привлекает $15M Series A",
+      "summary": "Стартап RocketScale закрыл раунд Series A на $15M для расширения команды разработки.",
+      "source_url": "https://news.example/rocketscale-series-a",
+      "event_type": "series_a",
+      "amount": "15000000",
+      "currency": "USD",
+      "investors": ["Sequoia Capital", "Y Combinator"],
+      "detected_at": "2026-05-05T10:00:00.000Z"
+    },
+    {
+      "external_id": "fund-smoke-2",
+      "company_name": "RocketScale",
+      "company_domain": "rocketscale.example",
+      "headline": "RocketScale открывает офис в Москве",
+      "summary": "Компания расширяет присутствие на российском рынке.",
+      "source_url": "https://news.example/rocketscale-moscow",
+      "event_type": "expansion",
+      "detected_at": "2026-05-08T14:00:00.000Z"
+    },
+    {
+      "external_id": "fund-smoke-3",
+      "company_name": "GreenTech Labs",
+      "company_domain": "greentech.example",
+      "headline": "GreenTech Labs получает грант на разработку",
+      "summary": "Грант от фонда Сколково на 50M ₽ для R&D.",
+      "source_url": "https://news.example/greentech-grant",
+      "event_type": "grant",
+      "amount": "50000000",
+      "currency": "RUB",
+      "investors": ["Сколково"],
+      "detected_at": "2026-05-10T09:00:00.000Z"
+    },
+    {
+      "company_name": "NoType Signal Corp",
+      "company_domain": "notype.example",
+      "headline": "NoType Signal Corp упоминается в прессе",
+      "summary": "Общее упоминание без конкретного события финансирования.",
+      "event_type": "press_mention",
+      "detected_at": "2026-05-12T16:00:00.000Z"
+    },
+    {
+      "external_id": "fund-smoke-5",
+      "company_name": "HeadlessCorp",
+      "company_domain": "headless.example",
+      "summary": "Компания получила инвестиции, но заголовок не указан.",
+      "event_type": "series_b",
+      "amount": "20000000",
+      "currency": "USD",
+      "detected_at": "2026-05-14T10:00:00.000Z"
+    }
+  ]
+}

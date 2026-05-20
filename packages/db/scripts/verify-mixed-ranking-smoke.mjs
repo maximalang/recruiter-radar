@@ -41,6 +41,12 @@ try {
   assert.equal(rows[1].quality_code, 'aggregated_employer_match');
   assert.ok(rows[0].total_score > rows[1].total_score, 'combined direct proof should outrank hh aggregation');
 
+  assert.equal(rows[0].confidence_gate, 'A', 'direct proof + 2 source families should yield gate A');
+  assert.equal(rows[1].confidence_gate, 'C', 'single-source platform aggregation should yield gate C');
+  for (const row of rows) {
+    assert.ok(['A', 'B', 'C', 'D'].includes(row.confidence_gate), `confidence_gate must be A/B/C/D, got: ${row.confidence_gate}`);
+  }
+
   console.log('mixed ranking smoke passed');
   console.table(
     rows.map((row) => ({

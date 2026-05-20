@@ -1,0 +1,28 @@
+{
+  "name": "Test Company",
+  "jobs": [
+    {
+      "id": 4012345,
+      "title": "Senior Backend Engineer",
+      "absolute_url": "https://boards.greenhouse.io/testco/jobs/4012345",
+      "updated_at": "2026-05-10T12:00:00Z",
+      "location": { "name": "Moscow, Russia" },
+      "departments": [{ "name": "Engineering" }, { "name": "Backend" }]
+    },
+    {
+      "id": 4012346,
+      "title": "Product Manager",
+      "absolute_url": "https://boards.greenhouse.io/testco/jobs/4012346",
+      "updated_at": "2026-05-12T09:00:00Z",
+      "location": { "name": "Remote" },
+      "departments": [{ "name": "Product" }]
+    },
+    {
+      "id": null,
+      "title": null,
+      "absolute_url": null,
+      "location": {},
+      "departments": []
+    }
+  ]
+}

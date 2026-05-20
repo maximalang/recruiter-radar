@@ -20,6 +20,32 @@ export const EVIDENCE_TIERS = Object.freeze([
   'context-only',
 ]);
 
+export const FETCH_MODES = Object.freeze([
+  'file',
+  'live-public',
+  'provider-token',
+  'unsupported',
+]);
+
+export const FETCH_MODE_SEMANTICS = Object.freeze({
+  'file': Object.freeze({
+    description: 'Reads pre-collected data from a local JSON file.',
+    liveCapable: false,
+  }),
+  'live-public': Object.freeze({
+    description: 'Fetches data from stable public APIs without authentication.',
+    liveCapable: true,
+  }),
+  'provider-token': Object.freeze({
+    description: 'Fetches data via a configured paid/compliant provider API token.',
+    liveCapable: true,
+  }),
+  'unsupported': Object.freeze({
+    description: 'No compliant live fetch path exists; requires manual data collection.',
+    liveCapable: false,
+  }),
+});
+
 export const SOURCE_STATUSES = Object.freeze(['active', 'planned']);
 export const SOURCE_STATUS_SEMANTICS = Object.freeze({
   active: Object.freeze({
@@ -60,6 +86,7 @@ export function defineSource(source) {
   const actionMap = freezeActionMap(
     source.actionMap ?? createActionMap({ status, capabilities, scripts }),
   );
+  const fetchModes = Object.freeze([...(source.fetchModes ?? ['file'])]);
 
   return Object.freeze({
     ...source,
@@ -67,6 +94,8 @@ export function defineSource(source) {
     sourceClass,
     evidenceTier,
     defaultConfidence,
+    fetchModes,
+    liveCapable: fetchModes.some((mode) => FETCH_MODE_SEMANTICS[mode]?.liveCapable),
     runnable: SOURCE_STATUS_SEMANTICS[status].runnable,
     capabilities: Object.freeze([...capabilities]),
     scripts,
@@ -144,6 +173,20 @@ export function assertSource(source) {
   if (source.runner) {
     for (const [action, hook] of Object.entries(source.runner)) {
       assertRunnerHook(source.id, hook, action);
+    }
+  }
+
+  const fetchModes = source.fetchModes ?? ['file'];
+
+  if (!Array.isArray(fetchModes)) {
+    throw new TypeError(`Source ${source.id} fetchModes must be an array.`);
+  }
+
+  for (const mode of fetchModes) {
+    if (!FETCH_MODES.includes(mode)) {
+      throw new TypeError(
+        `Source ${source.id} fetchModes contains unknown mode "${mode}". Allowed: ${FETCH_MODES.join(', ')}.`,
+      );
     }
   }
 

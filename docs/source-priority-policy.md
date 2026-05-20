@@ -57,17 +57,38 @@ Rule: context only. Can boost explanation quality, but must not outrank direct h
 
 ## Rollout guidance
 
-### MVP now
-- Keep `hh` as the only runnable default primary source.
-- Preserve quality-first ranking semantics even with one active source.
-- Use planned sources as policy targets, not as fake implemented coverage.
+### Active now
+- `hh` - primary platform source (job-board, runnable). Lead-originating.
+- `career-pages` - company-surface high-signal source (career-page, runnable). Lead-originating.
+- `company-site` - company-surface enrichment/corroboration source (company-site, runnable; not lead-originating by default).
+- `linkedin-company-pages` - secondary platform evidence (professional-network, runnable). Normalized and runnable but not a sole lead-originating source. Not in digest selection.
+- `tech-job-boards` - tech job board coverage (job-board, runnable). Normalized with input-level dedupe. Not in digest selection until confidence-gate tests prove it cannot degrade source quality.
+- `egrul-fns` - registry reference for entity verification (company-registry, runnable). Enrichment-only, never lead-originating. Not in digest selection.
+- `funding-business-signals` - context-only business signals (business-signal, runnable). Context-only, never lead-originating. Not in digest selection.
+- Preserve quality-first ranking semantics across active sources.
 
-### Next implementation priorities
-1. Add `career-pages` as the first high-signal expansion.
-2. Add `linkedin-company-pages` or another cautious secondary platform source.
-3. Add `egrul-fns` as standard entity verification/enrichment.
-4. Test `tech-job-boards` only after normalization quality is stable.
-5. Add `funding-business-signals` last for explanation/context layering.
+### Evidence boundaries
+- `company-site`, `egrul-fns`, `funding-business-signals`, `linkedin-company-pages` are NOT in `source-digest-evidence.sql` lead selection.
+- `tech-job-boards` is NOT in `source-digest-evidence.sql` until explicit confidence-gate tests are added.
+- Only `hh` and `career-pages` participate in digest lead selection today.
+
+### Runtime readiness guardrails
+- All source HTTP calls go through the shared `source-http` adapter for timeout, retry, and secret-safe error messages.
+- `hh` supports configurable search text, pagination, and HH query parameters via environment variables while keeping the old defaults.
+- `company-site` live crawl must return at least one usable and normalized page; all-failed crawls are treated as source failures.
+- Source smokes cover file mode for every family plus live/provider branches for `company-site`, `tech-job-boards`, `linkedin-company-pages`, `egrul-fns`, and `funding-business-signals`.
+- `verify:smoke` still includes the source smokes; the known non-source failure is the legacy `digestFeedback.ts` parameter typing issue.
+- `verify:sources:readiness` checks source registry/action contracts, provider response contracts, digest source boundaries, and centralized HTTP usage without requiring secrets.
+- `verify:sources:live-config` is the deploy-time gate: it requires live env configuration for every source but reports only env variable names, never values.
+
+### Future priorities
+1. Add `tech-job-boards` to digest selection after confidence-gate validation.
+2. Add `linkedin-company-pages` as corroborating evidence layer in digest (not sole source).
+3. Expand `egrul-fns` coverage for automated entity resolution.
+4. Use `funding-business-signals` for explanation/context layering in digest narratives.
+
+## API-mega-list usage
+Use API-mega-list as a candidate catalog, not as a runtime quality guarantee. Actors from the LinkedIn, jobs, lead-generation, and news folders need source-specific validation, fixture coverage, and source-class boundaries before they can be promoted to active. Lead-generation/email/phone enrichment must not become lead-originating evidence.
 
 ## Decision rule
 If two sources disagree, trust the source closest to the company-controlled hiring surface. If no explicit hiring surface exists, do not let `company-site` enrichment/corroboration or market context manufacture a lead.

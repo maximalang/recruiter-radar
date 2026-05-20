@@ -48,9 +48,13 @@ async function fetchDigestRows(connectionString) {
         ${digestEvidenceQuery}
         LIMIT 10
       ) r
-      LEFT JOIN client_digest_org_state cos
-        ON cos.org_id = r.org_id
-       AND cos.client_profile_id = r.client_profile_id
+      LEFT JOIN LATERAL (
+        SELECT feedback_status, feedback_note
+        FROM client_digest_org_state
+        WHERE org_id = r.org_id
+        ORDER BY last_digest_at DESC NULLS LAST
+        LIMIT 1
+      ) cos ON TRUE
     `);
 
     return result.rows;
@@ -70,6 +74,7 @@ export function buildDigestRow(row) {
     distinct_vacancy_names_count: row.distinct_vacancy_names_count,
     latest_published_at: formatTimestamp(row.latest_published_at),
     total_score: row.total_score,
+    confidence_gate: row.confidence_gate ?? '',
     quality: {
       code: row.quality_code ?? '',
       label: row.quality_label ?? '',
