@@ -80,8 +80,10 @@ Rule: context only. Can boost explanation quality, but must not outrank direct h
 - `company-site` live crawl must return at least one usable and normalized page; all-failed crawls are treated as source failures.
 - Active source families report `duplicateRecords` in fetch/ingest summaries after post-normalization dedupe.
 - Shared source file readers strip UTF-8 BOM and common mojibake BOM prefixes before JSON/env parsing.
+- Russian legal-form names (`ООО`, `АО`, `ПАО`, etc.) are normalized into weak `ru-legal-name:*` alias keys only when a stronger source key already exists; they are not used as merge/upsert keys, and sole-proprietor (`ИП`) names do not produce company aliases.
 - `egrul-fns` is company-level only: public/live input accepts 10-digit legal-entity INNs, and normalization skips 12-digit INN/IP records plus director/person-name fields.
-- `funding-business-signals` can run free live-public context mode through GDELT with `FUNDING_SIGNALS_GDELT_QUERIES` or `FUNDING_SIGNALS_GDELT_QUERIES_JSON`; it remains context-only and does not create digest leads.
+- `company-site` stores safe contact paths only: generic corporate/HR emails and same-site contact pages; personal emails and phone numbers are intentionally excluded.
+- `funding-business-signals` can run free live-public context mode through GDELT with `FUNDING_SIGNALS_GDELT_QUERIES` or `FUNDING_SIGNALS_GDELT_QUERIES_JSON`; it remains context-only and does not create digest leads. GDELT publisher/article domains are stored as publisher context, not company identity.
 - Source smokes cover file mode for every family plus live/provider branches for `company-site`, `tech-job-boards`, `linkedin-company-pages`, `egrul-fns`, and `funding-business-signals`.
 - `verify:smoke` always runs source smokes and skips DB-backed smokes when `DATABASE_URL` is missing, unreachable, or pointed at a database without the digest tables.
 - `verify:sources:readiness` checks source registry/action contracts, provider response contracts, digest source boundaries, and centralized HTTP usage without requiring secrets.

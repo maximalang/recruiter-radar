@@ -108,6 +108,12 @@ async function runLiveCrawlSmoke() {
           <body>
             <main>
               We are hiring. Join our team. Open positions for backend engineers.
+              <a href=mailto:hr@livesmoke.example>HR</a>
+              <a href=mailto:hr.ivan@livesmoke.example>HR Ivan</a>
+              <a href=mailto:ivan.petrov@livesmoke.example>Ivan Petrov</a>
+              <a href=tel:+79990000000>Phone</a>
+              <a href=/kontakty>Contacts</a>
+              Write careers@livesmoke.example.
             </main>
           </body>
         </html>
@@ -167,6 +173,11 @@ async function runLiveCrawlSmoke() {
       liveRecord.signals.includes('open_positions'),
       'live crawl should detect open positions evidence',
     );
+    assert.deepEqual(liveRecord.contactPaths, [
+      { type: 'generic_email', value: 'hr@livesmoke.example', source: 'mailto' },
+      { type: 'contact_page', url: `${baseUrl}/kontakty`, source: 'link' },
+      { type: 'generic_email', value: 'careers@livesmoke.example', source: 'text' },
+    ]);
 
     await assert.rejects(
       () => resolveCompanySiteLiveInput({ targetsFilePath: failedTargetsPath }),

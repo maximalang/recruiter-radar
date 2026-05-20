@@ -11,7 +11,14 @@ import {
 } from './hh.mjs';
 import { parseGreenhouseJobs } from './greenhouse.mjs';
 import { parseLeverPostings } from './lever.mjs';
-import { dedupeNormalizedRecords, stripBom } from './source-records.mjs';
+import {
+  buildRussianLegalNameSourceKey,
+  buildSourceKeyAliases,
+  dedupeNormalizedRecords,
+  isRussianSoleProprietorName,
+  normalizeRussianLegalName,
+  stripBom,
+} from './source-records.mjs';
 import { fetchJson, fetchText } from './source-http.mjs';
 
 const scriptDir = fileURLToPath(new URL('.', import.meta.url));
@@ -84,6 +91,17 @@ function runSourceRecordsSmoke() {
   assert.equal(stripBom('\uFEFF{ok:true}'), '{ok:true}');
   assert.equal(stripBom('\u00EF\u00BB\u00BF{ok:true}'), '{ok:true}');
   assert.equal(stripBom('\u043F\u00BB\u0457{ok:true}'), '{ok:true}');
+  assert.equal(normalizeRussianLegalName('\u041e\u041e\u041e \u0420\u043e\u043c\u0430\u0448\u043a\u0430'), '\u0440\u043e\u043c\u0430\u0448\u043a\u0430');
+  assert.equal(
+    buildRussianLegalNameSourceKey('\u041e\u0431\u0449\u0435\u0441\u0442\u0432\u043e \u0441 \u043e\u0433\u0440\u0430\u043d\u0438\u0447\u0435\u043d\u043d\u043e\u0439 \u043e\u0442\u0432\u0435\u0442\u0441\u0442\u0432\u0435\u043d\u043d\u043e\u0441\u0442\u044c\u044e \u0420\u043e\u043c\u0430\u0448\u043a\u0430'),
+    'ru-legal-name:\u0440\u043e\u043c\u0430\u0448\u043a\u0430',
+  );
+  assert.equal(isRussianSoleProprietorName('\u0418\u041f \u0418\u0432\u0430\u043d\u043e\u0432 \u0418\u0432\u0430\u043d'), true);
+  assert.equal(buildRussianLegalNameSourceKey('\u0418\u041f \u0418\u0432\u0430\u043d\u043e\u0432 \u0418\u0432\u0430\u043d'), null);
+  assert.deepEqual(
+    buildSourceKeyAliases(['domain:romashka.ru', 'company-name:ooo romashka'], ['ru-legal-name:romashka'], 'domain:romashka.ru'),
+    ['company-name:ooo romashka', 'ru-legal-name:romashka'],
+  );
 
   const dedupeResult = dedupeNormalizedRecords([
     { signalExternalId: 'one', value: 1 },
@@ -100,6 +118,7 @@ function runSourceRecordsSmoke() {
   return {
     bomStripVerified: true,
     dedupeVerified: true,
+    russianLegalNameVerified: true,
     duplicateRecords: dedupeResult.duplicateRecords,
   };
 }

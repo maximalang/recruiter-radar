@@ -7,7 +7,12 @@ import {
   assertProviderNormalization,
   extractProviderRecords,
 } from './adapters/provider-contract.mjs';
-import { dedupeNormalizedRecords, stripBom } from './adapters/source-records.mjs';
+import {
+  buildRussianLegalNameSourceKey,
+  buildSourceKeyAliases,
+  dedupeNormalizedRecords,
+  stripBom,
+} from './adapters/source-records.mjs';
 import { fetchJson } from './adapters/source-http.mjs';
 
 const { Client } = pg;
@@ -227,7 +232,7 @@ function mapGdeltArticle(article, queryConfig, index) {
   return {
     external_id: toNonEmptyText(article?.url) ?? `gdelt:${queryConfig.query}:${index + 1}`,
     company_name: queryConfig.companyName,
-    company_domain: queryConfig.companyDomain ?? domain,
+    company_domain: queryConfig.companyDomain,
     headline: title,
     summary: toNonEmptyText(article?.seendate)
       ? `GDELT news context, seen at ${article.seendate}`
@@ -236,6 +241,7 @@ function mapGdeltArticle(article, queryConfig, index) {
     event_type: eventType,
     published_at: parseGdeltDate(article?.seendate),
     source: 'gdelt-doc-api',
+    publisher_domain: domain,
     raw: article,
   };
 }
@@ -384,6 +390,7 @@ function normalizeFundingRecord(record, fetchedAt, lineNumber) {
   const headline = toNonEmptyText(record.headline ?? record.title);
   const summary = toNonEmptyText(record.summary ?? record.description);
   const sourceUrl = toUrlOrNull(record.source_url ?? record.url ?? record.article_url);
+  const publisherDomain = normalizeDomain(record.publisher_domain ?? record.source_domain ?? record.publisher);
   const eventType = toNonEmptyText(record.event_type ?? record.signal_type ?? record.type);
   const amount = toNonEmptyText(record.amount ?? record.funding_amount);
   const currency = toNonEmptyText(record.currency) ?? 'USD';
@@ -392,7 +399,7 @@ function normalizeFundingRecord(record, fetchedAt, lineNumber) {
   const detectedAt = toTimestampOrNull(record.detected_at ?? record.occurred_at ?? record.published_at) ?? fetchedAt;
   const signalType = resolveSignalType(record);
 
-  const inferredDomain = companyDomain ?? extractHostname(companyWebsiteUrl) ?? extractHostname(sourceUrl);
+  const inferredDomain = companyDomain ?? extractHostname(companyWebsiteUrl);
 
   if (!companyName && !inferredDomain) {
     return null;
@@ -408,9 +415,14 @@ function normalizeFundingRecord(record, fetchedAt, lineNumber) {
   const primarySourceKey = buildPrimarySourceKey({ inferredDomain, companyName });
   const domainSourceKey = inferredDomain ? `domain:${inferredDomain}` : null;
   const companyNameSourceKey = companyName ? `company-name:${normalizeSourceKeyText(companyName)}` : null;
-  const orgSourceKeys = [primarySourceKey, domainSourceKey, companyNameSourceKey].filter(
+  const russianLegalNameSourceKey = primarySourceKey !== companyNameSourceKey
+    ? buildRussianLegalNameSourceKey(companyName)
+    : null;
+  const strongCompanyNameSourceKey = primarySourceKey === companyNameSourceKey ? companyNameSourceKey : null;
+  const orgSourceKeys = [primarySourceKey, domainSourceKey, strongCompanyNameSourceKey].filter(
     (value, idx, values) => Boolean(value) && values.indexOf(value) === idx,
   );
+  const orgSourceAliasKeys = buildSourceKeyAliases(orgSourceKeys, [companyNameSourceKey, russianLegalNameSourceKey]);
 
   if (orgSourceKeys.length === 0) {
     return null;
@@ -429,6 +441,7 @@ function normalizeFundingRecord(record, fetchedAt, lineNumber) {
     headline: resolvedHeadline,
     summary,
     sourceUrl,
+    publisherDomain,
     eventType,
     signalType,
     amount,
@@ -439,7 +452,9 @@ function normalizeFundingRecord(record, fetchedAt, lineNumber) {
     primarySourceKey,
     domainSourceKey,
     companyNameSourceKey,
+    russianLegalNameSourceKey,
     orgSourceKeys,
+    orgSourceAliasKeys,
     signalExternalId,
   };
 }
@@ -798,7 +813,7 @@ function buildSignalPayload(record) {
     evidence_role: 'context',
     source_entity_type: 'company',
     source_entity_key: record.primarySourceKey,
-    source_entity_alias_keys: record.orgSourceKeys.filter((v) => v !== record.primarySourceKey),
+    source_entity_alias_keys: buildSourceKeyAliases(record.orgSourceKeys, record.orgSourceAliasKeys, record.primarySourceKey),
     source_entity_external_id: null,
     source_entity_display_name: record.orgDisplayName,
     source_entity_name: record.orgName,
@@ -817,6 +832,7 @@ function buildSignalPayload(record) {
     currency: record.currency,
     investors: record.investors,
     source_url: record.sourceUrl,
+    publisher_domain: record.publisherDomain,
     fetched_at: record.fetchedAt,
   };
 }
@@ -825,7 +841,7 @@ function buildOrgSourceMetadata(record, sourceKey) {
   return {
     source: SOURCE_ID,
     source_key: sourceKey,
-    source_alias_keys: record.orgSourceKeys.filter((v) => v !== sourceKey),
+    source_alias_keys: buildSourceKeyAliases(record.orgSourceKeys, record.orgSourceAliasKeys, sourceKey),
     display_name: record.orgDisplayName,
     company_name: record.companyName,
     company_domain: record.companyDomain,

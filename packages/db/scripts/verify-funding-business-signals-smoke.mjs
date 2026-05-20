@@ -182,7 +182,7 @@ async function runGdeltModeSmoke() {
   process.env.FUNDING_SIGNALS_GDELT_QUERIES_JSON = JSON.stringify([
     {
       query: 'RocketScale Series B hiring',
-      company_name: 'RocketScale',
+      company_name: '\u041e\u041e\u041e RocketScale',
       company_domain: 'rocketscale.example',
       max_records: 2,
       timespan: '7d',
@@ -213,7 +213,7 @@ async function runGdeltModeSmoke() {
     const pendingInput = resolveFundingInput();
     assert.equal(pendingInput.inputMode, 'gdelt-pending');
     assert.equal(pendingInput.gdeltQueries.length, 1);
-    assert.equal(pendingInput.gdeltQueries[0].companyName, 'RocketScale');
+    assert.equal(pendingInput.gdeltQueries[0].companyName, '\u041e\u041e\u041e RocketScale');
     assert.equal(pendingInput.gdeltQueries[0].companyDomain, 'rocketscale.example');
     assert.equal(pendingInput.gdeltQueries[0].maxRecords, 2);
     assert.equal(pendingInput.gdeltQueries[0].timespan, '7d');
@@ -230,14 +230,21 @@ async function runGdeltModeSmoke() {
     assert.equal(gdeltSummary.skippedRecords, 0);
 
     const gdeltRecord = gdeltInput.normalizedRecords[0];
-    assert.equal(gdeltRecord.companyName, 'RocketScale');
+    assert.equal(gdeltRecord.companyName, '\u041e\u041e\u041e RocketScale');
     assert.equal(gdeltRecord.companyDomain, 'rocketscale.example');
+    assert.equal(gdeltRecord.orgSourceKeys.includes('ru-legal-name:rocketscale'), false);
+    assert.ok(gdeltRecord.orgSourceAliasKeys.includes('ru-legal-name:rocketscale'));
     assert.equal(gdeltRecord.eventType, 'series_b');
     assert.equal(gdeltRecord.signalType, 'funding');
     assert.equal(gdeltRecord.detectedAt, '2026-05-01T12:30:00.000Z');
 
     globalThis.fetch = async () => jsonResponse({
-      articles: [{ title: 'Unusable story without entity', seendate: '20260501123000' }],
+      articles: [{
+        title: 'Unusable story without entity',
+        url: 'https://media.example/entityless-funding-story',
+        domain: 'media.example',
+        seendate: '20260501123000',
+      }],
     });
     await assert.rejects(
       () => resolveFundingGdeltInput({

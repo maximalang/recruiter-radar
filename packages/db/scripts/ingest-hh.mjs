@@ -7,7 +7,12 @@ import {
   fetchHhVacancyPages,
   resolveHhVacancySearchConfig,
 } from './adapters/hh.mjs';
-import { dedupeNormalizedRecords, stripBom } from './adapters/source-records.mjs';
+import {
+  buildRussianLegalNameSourceKey,
+  buildSourceKeyAliases,
+  dedupeNormalizedRecords,
+  stripBom,
+} from './adapters/source-records.mjs';
 
 const { Client } = pg;
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -117,6 +122,9 @@ function normalizeVacancy(vacancy, fetchedAt) {
   const employerIdSourceKey = buildEmployerIdSourceKey(hhEmployerId);
   const employerNameSourceKey = buildEmployerNameSourceKey(employerName);
   const orgSourceKey = buildOrgSourceKey(hhEmployerId, employerName);
+  const russianLegalNameSourceKey = orgSourceKey !== employerNameSourceKey
+    ? buildRussianLegalNameSourceKey(employerName)
+    : null;
 
   return {
     hhVacancyId,
@@ -125,10 +133,13 @@ function normalizeVacancy(vacancy, fetchedAt) {
     orgName: employerName ?? buildFallbackEmployerName(hhEmployerId),
     orgDisplayName: employerName,
     orgSourceKey,
-    orgSourceAliasKey:
-      employerIdSourceKey && employerNameSourceKey && employerIdSourceKey !== employerNameSourceKey
-        ? employerNameSourceKey
-        : null,
+    orgSourceAliasKey: employerIdSourceKey && employerNameSourceKey && employerIdSourceKey !== employerNameSourceKey
+      ? employerNameSourceKey
+      : null,
+    orgSourceAliasKeys: [employerNameSourceKey].filter(
+      (sourceKey, index, sourceKeys) => Boolean(sourceKey) && sourceKey !== orgSourceKey && sourceKeys.indexOf(sourceKey) === index,
+    ),
+    orgSourceWeakAliasKeys: [russianLegalNameSourceKey].filter(Boolean),
     vacancyName,
     areaName: toNonEmptyText(vacancy.area?.name),
     publishedAt: toTimestampOrNull(vacancy.published_at),
@@ -346,9 +357,9 @@ async function upsertOrgSourceKeys(client, orgId, vacancy) {
     },
   ];
 
-  if (vacancy.orgSourceAliasKey) {
+  for (const sourceKey of vacancy.orgSourceAliasKeys ?? []) {
     sourceRefs.push({
-      sourceKey: vacancy.orgSourceAliasKey,
+      sourceKey,
       externalId: null,
       displayName: vacancy.orgDisplayName,
     });
@@ -392,8 +403,8 @@ function buildOrgSourceMetadata(vacancy, sourceKey = vacancy.orgSourceKey, exter
   return {
     source: hhSource,
     source_key: sourceKey,
-    source_alias_key:
-      sourceKey === vacancy.orgSourceAliasKey ? vacancy.orgSourceKey : vacancy.orgSourceAliasKey,
+    source_alias_key: sourceKey === vacancy.orgSourceKey ? vacancy.orgSourceAliasKey : vacancy.orgSourceKey,
+    source_alias_keys: buildSourceKeyAliases(buildOrgSourceKeys(vacancy), vacancy.orgSourceWeakAliasKeys, sourceKey),
     external_id: externalId,
     display_name: vacancy.orgDisplayName,
     employer_name: vacancy.employerName,
@@ -407,6 +418,7 @@ function buildSignalPayload(vacancy) {
     source_entity_type: 'employer',
     source_entity_key: vacancy.orgSourceKey,
     source_entity_alias_key: vacancy.orgSourceAliasKey,
+    source_entity_alias_keys: buildSourceKeyAliases(buildOrgSourceKeys(vacancy), vacancy.orgSourceWeakAliasKeys, vacancy.orgSourceKey),
     source_entity_external_id: vacancy.hhEmployerId,
     source_entity_display_name: vacancy.employerName,
     source_entity_name: vacancy.orgName,
@@ -459,7 +471,7 @@ function buildEmployerNameSourceKey(employerName) {
 }
 
 function buildOrgSourceKeys(vacancy) {
-  return [vacancy.orgSourceKey, vacancy.orgSourceAliasKey].filter(
+  return [vacancy.orgSourceKey, ...(vacancy.orgSourceAliasKeys ?? [])].filter(
     (sourceKey, index, sourceKeys) => Boolean(sourceKey) && sourceKeys.indexOf(sourceKey) === index,
   );
 }

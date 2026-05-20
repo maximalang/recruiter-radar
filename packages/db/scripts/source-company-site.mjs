@@ -3,7 +3,12 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import pg from 'pg';
 
-import { dedupeNormalizedRecords, stripBom } from './adapters/source-records.mjs';
+import {
+  buildRussianLegalNameSourceKey,
+  buildSourceKeyAliases,
+  dedupeNormalizedRecords,
+  stripBom,
+} from './adapters/source-records.mjs';
 
 const { Client } = pg;
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -229,6 +234,7 @@ function normalizeCompanySiteRecord(record, fetchedAt, lineNumber) {
   const pageTitle = toNonEmptyText(record.page_title ?? record.title);
   const summary = toNonEmptyText(record.summary ?? record.description);
   const signals = Array.isArray(record.signals) ? record.signals : parseKeywords(record.keywords);
+  const contactPaths = normalizeContactPaths(record.contact_paths ?? record.contactPaths);
   const detectedAt = toTimestampOrNull(record.detected_at ?? record.occurred_at) ?? fetchedAt;
   const externalId = toNonEmptyText(record.external_id ?? record.id);
   const inferredDomain = companyDomain
@@ -243,9 +249,14 @@ function normalizeCompanySiteRecord(record, fetchedAt, lineNumber) {
   const primarySourceKey = buildPrimarySourceKey({ externalId, inferredDomain, companyName });
   const domainSourceKey = inferredDomain ? `domain:${inferredDomain}` : null;
   const companyNameSourceKey = companyName ? `company-name:${normalizeSourceKeyText(companyName)}` : null;
-  const orgSourceKeys = [primarySourceKey, domainSourceKey, companyNameSourceKey].filter(
+  const russianLegalNameSourceKey = primarySourceKey !== companyNameSourceKey
+    ? buildRussianLegalNameSourceKey(companyName)
+    : null;
+  const strongCompanyNameSourceKey = primarySourceKey === companyNameSourceKey ? companyNameSourceKey : null;
+  const orgSourceKeys = [primarySourceKey, domainSourceKey, strongCompanyNameSourceKey].filter(
     (value, idx, values) => Boolean(value) && values.indexOf(value) === idx,
   );
+  const orgSourceAliasKeys = buildSourceKeyAliases(orgSourceKeys, [companyNameSourceKey, russianLegalNameSourceKey]);
 
   if (orgSourceKeys.length === 0) {
     return null;
@@ -265,12 +276,15 @@ function normalizeCompanySiteRecord(record, fetchedAt, lineNumber) {
     pageTitle,
     summary,
     signals,
+    contactPaths,
     orgName,
     orgDisplayName: companyName ?? inferredDomain,
     primarySourceKey,
     domainSourceKey,
     companyNameSourceKey,
+    russianLegalNameSourceKey,
     orgSourceKeys,
+    orgSourceAliasKeys,
     signalExternalId,
   };
 }
@@ -582,7 +596,7 @@ function buildSignalPayload(record) {
     evidence_role: 'enrichment',
     source_entity_type: 'company',
     source_entity_key: record.primarySourceKey,
-    source_entity_alias_keys: record.orgSourceKeys.filter((v) => v !== record.primarySourceKey),
+    source_entity_alias_keys: buildSourceKeyAliases(record.orgSourceKeys, record.orgSourceAliasKeys, record.primarySourceKey),
     source_entity_external_id: record.externalId,
     source_entity_display_name: record.orgDisplayName,
     source_entity_name: record.orgName,
@@ -599,6 +613,7 @@ function buildSignalPayload(record) {
     page_title: record.pageTitle,
     summary: record.summary,
     signals: record.signals,
+    contact_paths: record.contactPaths,
     fetched_at: record.fetchedAt,
   };
 }
@@ -607,7 +622,7 @@ function buildOrgSourceMetadata(record, sourceKey) {
   return {
     source: SOURCE_ID,
     source_key: sourceKey,
-    source_alias_keys: record.orgSourceKeys.filter((v) => v !== sourceKey),
+    source_alias_keys: buildSourceKeyAliases(record.orgSourceKeys, record.orgSourceAliasKeys, sourceKey),
     external_id: sourceKey === record.primarySourceKey ? record.externalId : null,
     display_name: record.orgDisplayName,
     company_name: record.companyName,
@@ -627,6 +642,163 @@ function parseKeywords(value) {
 
   return [];
 }
+
+function normalizeContactPaths(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const contactPaths = [];
+  const seen = new Set();
+
+  for (const item of value) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      continue;
+    }
+
+    const email = normalizeContactEmail(item.value ?? item.email);
+
+    if ((item.type === 'generic_email' || email) && isSafeGenericContactEmail(email)) {
+      pushContactPath(contactPaths, seen, {
+        type: 'generic_email',
+        value: email,
+        source: toNonEmptyText(item.source) ?? 'source',
+      });
+      continue;
+    }
+
+    const url = toUrlOrNull(item.url ?? item.value ?? item.href);
+
+    if (url && (item.type === 'contact_page' || isContactPageUrl(url))) {
+      pushContactPath(contactPaths, seen, {
+        type: 'contact_page',
+        url,
+        source: toNonEmptyText(item.source) ?? 'source',
+      });
+    }
+  }
+
+  return contactPaths;
+}
+
+function pushContactPath(contactPaths, seen, contactPath) {
+  const key = contactPath.type === 'generic_email'
+    ? `${contactPath.type}:${contactPath.value}`
+    : `${contactPath.type}:${contactPath.url}`;
+
+  if (seen.has(key)) {
+    return;
+  }
+
+  seen.add(key);
+  contactPaths.push(contactPath);
+}
+
+function normalizeContactEmail(value) {
+  const text = toNonEmptyText(value);
+
+  if (!text) {
+    return null;
+  }
+
+  const email = trimEmailBoundaryChars(text.split('?')[0].trim().toLowerCase());
+  const parts = email.split('@');
+
+  if (parts.length !== 2 || !parts[0] || !parts[1] || !parts[1].includes('.')) {
+    return null;
+  }
+
+  if (email.includes(' ') || email.includes('/') || email.includes('\\')) {
+    return null;
+  }
+
+  return email;
+}
+
+function trimEmailBoundaryChars(value) {
+  let text = value;
+
+  while (text.length > 0 && EMAIL_BOUNDARY_CHARS.has(text.charAt(text.length - 1))) {
+    text = text.slice(0, -1);
+  }
+
+  return text;
+}
+
+function isSafeGenericContactEmail(email) {
+  if (!email) {
+    return false;
+  }
+
+  const localPart = email.split('@')[0].replace(/[._+]+/g, '-');
+
+  if (GENERIC_CONTACT_EMAIL_LOCAL_PARTS.has(localPart)) {
+    return true;
+  }
+
+  const parts = localPart.split('-').filter(Boolean);
+  return parts.length === 2
+    && GENERIC_CONTACT_EMAIL_LOCAL_PARTS.has(parts[0])
+    && GENERIC_CONTACT_EMAIL_SUFFIXES.has(parts[1]);
+}
+
+function isContactPageUrl(value) {
+  try {
+    const url = new URL(value);
+    const searchablePath = `${url.pathname} ${url.search}`.toLowerCase();
+    return CONTACT_PAGE_PATH_KEYWORDS.some((keyword) => searchablePath.includes(keyword));
+  } catch {
+    return false;
+  }
+}
+
+const GENERIC_CONTACT_EMAIL_LOCAL_PARTS = new Set([
+  'career',
+  'careers',
+  'contact',
+  'hello',
+  'hr',
+  'info',
+  'job',
+  'jobs',
+  'kadry',
+  'office',
+  'people',
+  'rabota',
+  'recruiting',
+  'recruitment',
+  'talent',
+  'vacancy',
+  'vacancies',
+  'work',
+]);
+
+const EMAIL_BOUNDARY_CHARS = new Set(['.', ',', ';', ':', ')', ']', '}']);
+
+const GENERIC_CONTACT_EMAIL_SUFFIXES = new Set([
+  'career',
+  'careers',
+  'contact',
+  'department',
+  'group',
+  'jobs',
+  'office',
+  'recruiting',
+  'recruitment',
+  'team',
+  'vacancy',
+  'work',
+]);
+
+const CONTACT_PAGE_PATH_KEYWORDS = [
+  'contact',
+  'contacts',
+  'feedback',
+  'kontakty',
+  'kontakt',
+  'rekvizity',
+  'requisites',
+];
 
 export function parseJson(value, label) {
   try {
