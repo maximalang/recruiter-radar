@@ -3,6 +3,8 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import pg from 'pg';
 
+import { dedupeNormalizedRecords, stripBom } from './adapters/source-records.mjs';
+
 const { Client } = pg;
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const rootEnvPath = resolve(scriptDir, '../../../.env');
@@ -33,7 +35,7 @@ export async function runCompanySiteCli(argv = process.argv.slice(2)) {
 
     if (requestedAction === 'fetch') {
       console.log(JSON.stringify(buildFetchSummary(input), null, 2));
-      process.exit(0);
+      return;
     }
 
     if (!databaseUrl) {
@@ -50,7 +52,7 @@ export async function runCompanySiteCli(argv = process.argv.slice(2)) {
 
     if (requestedAction === 'ingest') {
       console.log(JSON.stringify(buildIngestSummary(input, stats), null, 2));
-      process.exit(0);
+      return;
     }
 
     console.log(JSON.stringify(buildPipelineSummary(input, stats), null, 2));
@@ -89,7 +91,7 @@ export async function resolveCompanySiteLiveInput({ targetsFilePath }) {
     throw new Error(`COMPANY_SITE_TARGETS_FILE does not exist: ${resolvedPath}`);
   }
 
-  const rawContent = readFileSync(resolvedPath, 'utf8').replace(/^﻿/, '');
+  const rawContent = stripBom(readFileSync(resolvedPath, 'utf8'));
   const targets = JSON.parse(rawContent);
 
   if (!Array.isArray(targets)) {
@@ -136,7 +138,9 @@ export async function resolveCompanySiteLiveInput({ targetsFilePath }) {
     normalizedRecords.push(normalized);
   }
 
-  if (normalizedRecords.length === 0) {
+  const dedupeResult = dedupeNormalizedRecords(normalizedRecords);
+
+  if (dedupeResult.records.length === 0) {
     throw new Error(
       `company-site live crawl normalized 0 records from ${crawlSuccesses} crawled pages.`,
     );
@@ -149,7 +153,8 @@ export async function resolveCompanySiteLiveInput({ targetsFilePath }) {
     recordsReceived: targets.length,
     crawlSuccesses,
     crawlErrors,
-    normalizedRecords,
+    duplicateRecords: dedupeResult.duplicateRecords,
+    normalizedRecords: dedupeResult.records,
     skippedRecords,
   };
 }
@@ -161,7 +166,7 @@ function resolveFileInput(inputFilePath) {
     throw new Error(`COMPANY_SITE_INPUT_FILE does not exist: ${resolvedPath}`);
   }
 
-  const rawContent = readFileSync(resolvedPath, 'utf8').replace(/^﻿/, '');
+  const rawContent = stripBom(readFileSync(resolvedPath, 'utf8'));
   const records = parseInputRecords(rawContent, resolvedPath);
   const fetchedAt = new Date().toISOString();
   const normalizedRecords = [];
@@ -178,11 +183,14 @@ function resolveFileInput(inputFilePath) {
     normalizedRecords.push(normalized);
   }
 
+  const dedupeResult = dedupeNormalizedRecords(normalizedRecords);
+
   return {
     inputMode: 'file',
     inputFilePath: resolvedPath,
     recordsReceived: records.length,
-    normalizedRecords,
+    duplicateRecords: dedupeResult.duplicateRecords,
+    normalizedRecords: dedupeResult.records,
     skippedRecords,
   };
 }
@@ -484,6 +492,7 @@ export function buildFetchSummary(input) {
     inputFilePath: input.inputFilePath,
     ...buildLiveCrawlSummary(input),
     recordsReceived: input.recordsReceived,
+    duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
   };
@@ -497,6 +506,7 @@ function buildIngestSummary(input, stats) {
     inputFilePath: input.inputFilePath,
     ...buildLiveCrawlSummary(input),
     recordsReceived: input.recordsReceived,
+    duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
     orgsCreated: stats.orgUpsertCount,
@@ -512,6 +522,7 @@ function buildPipelineSummary(input, stats) {
     inputFilePath: input.inputFilePath,
     ...buildLiveCrawlSummary(input),
     recordsReceived: input.recordsReceived,
+    duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
     orgsCreated: stats.orgUpsertCount,
@@ -642,7 +653,7 @@ function loadEnvFile(filePath) {
     return;
   }
 
-  const envFile = readFileSync(filePath, 'utf8').replace(/^﻿/, '');
+  const envFile = stripBom(readFileSync(filePath, 'utf8'));
 
   for (const rawLine of envFile.split(/\r?\n/)) {
     const trimmedLine = rawLine.trim();

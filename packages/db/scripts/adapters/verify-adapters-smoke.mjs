@@ -11,6 +11,7 @@ import {
 } from './hh.mjs';
 import { parseGreenhouseJobs } from './greenhouse.mjs';
 import { parseLeverPostings } from './lever.mjs';
+import { dedupeNormalizedRecords, stripBom } from './source-records.mjs';
 import { fetchJson, fetchText } from './source-http.mjs';
 
 const scriptDir = fileURLToPath(new URL('.', import.meta.url));
@@ -66,6 +67,7 @@ const leverIncomplete = leverRecords.find((r) => r.external_id === null && r.job
 assert.ok(leverIncomplete, 'incomplete lever record must still be returned for downstream filtering');
 
 const hhSmoke = await runHhAdapterSmoke();
+const sourceRecordsSmoke = runSourceRecordsSmoke();
 const sourceHttpSmoke = await runSourceHttpSmoke();
 
 console.log(JSON.stringify({
@@ -74,8 +76,33 @@ console.log(JSON.stringify({
   hh: hhSmoke,
   greenhouse: { parsed: ghRecords.length, validJobs: ghRecords.filter((r) => r.job_title).length },
   lever: { parsed: leverRecords.length, validJobs: leverRecords.filter((r) => r.job_title).length },
+  sourceRecords: sourceRecordsSmoke,
   sourceHttp: sourceHttpSmoke,
 }, null, 2));
+
+function runSourceRecordsSmoke() {
+  assert.equal(stripBom('\uFEFF{ok:true}'), '{ok:true}');
+  assert.equal(stripBom('\u00EF\u00BB\u00BF{ok:true}'), '{ok:true}');
+  assert.equal(stripBom('\u043F\u00BB\u0457{ok:true}'), '{ok:true}');
+
+  const dedupeResult = dedupeNormalizedRecords([
+    { signalExternalId: 'one', value: 1 },
+    { signalExternalId: 'one', value: 2 },
+    { signal_external_id: 'two', value: 3 },
+    { signalExternalID: 'two', value: 4 },
+    { value: 5 },
+  ]);
+
+  assert.equal(dedupeResult.records.length, 3);
+  assert.equal(dedupeResult.duplicateRecords, 2);
+  assert.deepEqual(dedupeResult.records.map((record) => record.value), [1, 3, 5]);
+
+  return {
+    bomStripVerified: true,
+    dedupeVerified: true,
+    duplicateRecords: dedupeResult.duplicateRecords,
+  };
+}
 
 async function runHhAdapterSmoke() {
   const config = resolveHhVacancySearchConfig({
@@ -134,6 +161,7 @@ async function runHhAdapterSmoke() {
 
 async function runSourceHttpSmoke() {
   let jsonRetryRequests = 0;
+  let fallbackRequests = 0;
 
   const server = createServer((req, res) => {
     const url = new URL(req.url, 'http://127.0.0.1');
@@ -149,6 +177,13 @@ async function runSourceHttpSmoke() {
 
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ ok: true, attempts: jsonRetryRequests }));
+      return;
+    }
+
+    if (url.pathname === '/json-fallback') {
+      fallbackRequests += 1;
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, transport: 'node-http-fallback' }));
       return;
     }
 
@@ -176,6 +211,26 @@ async function runSourceHttpSmoke() {
     assert.equal(json.ok, true);
     assert.equal(json.attempts, 2);
 
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => {
+      throw new TypeError('fetch failed');
+    };
+
+    try {
+      const fallbackJson = await fetchJson(`${baseUrl}/json-fallback?token=secret-value`, {
+        sourceName: 'source-http-smoke',
+        retries: 0,
+        timeoutMs: 1000,
+        nodeHttpFallback: true,
+      });
+
+      assert.equal(fallbackJson.ok, true);
+      assert.equal(fallbackJson.transport, 'node-http-fallback');
+      assert.equal(fallbackRequests, 1);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
     const text = await fetchText(`${baseUrl}/text`, {
       sourceName: 'source-http-smoke',
       retries: 0,
@@ -197,8 +252,23 @@ async function runSourceHttpSmoke() {
       },
     );
 
+    await assert.rejects(
+      () => fetchJson(`${baseUrl}/error?password=secret-value`, {
+        sourceName: 'source-http-smoke',
+        preferNodeHttpFallback: true,
+        retries: 0,
+        timeoutMs: 1000,
+      }),
+      (error) => {
+        assert.match(error.message, /HTTP 500/);
+        assert.equal(error.message.includes('secret-value'), false);
+        return true;
+      },
+    );
+
     return {
       retryRequests: jsonRetryRequests,
+      fallbackRequests,
       textFetchVerified: true,
       errorRedactionVerified: true,
     };

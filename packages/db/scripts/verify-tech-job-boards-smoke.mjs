@@ -23,6 +23,7 @@ assert.equal(summary.inputMode, 'file');
 assert.equal(summary.inputFilePath, fixturePath);
 assert.equal(summary.recordsReceived, 5);
 assert.equal(summary.recordsAfterDedupe, 4, 'duplicate record should be removed by dedupe');
+assert.equal(summary.duplicateRecords, 1);
 assert.equal(summary.normalizedRecords, 4);
 assert.equal(summary.skippedRecords, 0);
 
@@ -74,6 +75,7 @@ console.log(JSON.stringify({
   fixturePath,
   recordsReceived: summary.recordsReceived,
   recordsAfterDedupe: summary.recordsAfterDedupe,
+  duplicateRecords: summary.duplicateRecords,
   normalizedRecords: summary.normalizedRecords,
   skippedRecords: summary.skippedRecords,
   dedupeVerified: true,
@@ -136,6 +138,7 @@ async function runLiveModeSmoke() {
     assert.equal(liveSummary.inputMode, 'live-public');
     assert.equal(liveSummary.recordsReceived, 2);
     assert.equal(liveSummary.recordsAfterDedupe, 2);
+    assert.equal(liveSummary.duplicateRecords, 0);
     assert.equal(liveSummary.normalizedRecords, 2);
     assert.equal(liveSummary.skippedRecords, 0);
     assert.ok(

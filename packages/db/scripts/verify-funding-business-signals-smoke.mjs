@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   buildFetchSummary,
+  resolveFundingGdeltInput,
   resolveFundingInput,
   resolveFundingProviderInput,
 } from './source-funding-business-signals.mjs';
@@ -22,6 +23,7 @@ assert.equal(summary.action, 'fetch');
 assert.equal(summary.inputMode, 'file');
 assert.equal(summary.inputFilePath, fixturePath);
 assert.equal(summary.recordsReceived, 5);
+assert.equal(summary.duplicateRecords, 0);
 assert.equal(summary.normalizedRecords, 5);
 assert.equal(summary.skippedRecords, 0);
 
@@ -75,6 +77,7 @@ for (const record of input.normalizedRecords) {
 }
 
 const providerMode = await runProviderModeSmoke();
+const gdeltMode = await runGdeltModeSmoke();
 
 console.log(JSON.stringify({
   ok: true,
@@ -82,10 +85,12 @@ console.log(JSON.stringify({
   mode: 'read-only-smoke',
   fixturePath,
   recordsReceived: summary.recordsReceived,
+  duplicateRecords: summary.duplicateRecords,
   normalizedRecords: summary.normalizedRecords,
   skippedRecords: summary.skippedRecords,
   evidenceBoundary: 'context-only, never lead-originating',
   providerMode,
+  gdeltMode,
   signalTypeDistribution: {
     funding: input.normalizedRecords.filter((r) => r.signalType === 'funding').length,
     other: input.normalizedRecords.filter((r) => r.signalType === 'other').length,
@@ -127,6 +132,7 @@ async function runProviderModeSmoke() {
 
     assert.equal(providerSummary.inputMode, 'provider-token');
     assert.equal(providerSummary.recordsReceived, 1);
+    assert.equal(providerSummary.duplicateRecords, 0);
     assert.equal(providerSummary.normalizedRecords, 1);
     assert.equal(providerSummary.skippedRecords, 0);
     assert.equal(providerInput.normalizedRecords[0].primarySourceKey, 'domain:funding-provider.example');
@@ -162,6 +168,106 @@ async function runProviderModeSmoke() {
   } finally {
     globalThis.fetch = originalFetch;
   }
+}
+
+async function runGdeltModeSmoke() {
+  const originalFetch = globalThis.fetch;
+  const originalInputFile = process.env.FUNDING_BUSINESS_SIGNALS_INPUT_FILE;
+  const originalQueriesJson = process.env.FUNDING_SIGNALS_GDELT_QUERIES_JSON;
+  const originalTransport = process.env.FUNDING_SIGNALS_GDELT_TRANSPORT;
+  const requestedUrls = [];
+
+  delete process.env.FUNDING_BUSINESS_SIGNALS_INPUT_FILE;
+  process.env.FUNDING_SIGNALS_GDELT_TRANSPORT = 'fetch';
+  process.env.FUNDING_SIGNALS_GDELT_QUERIES_JSON = JSON.stringify([
+    {
+      query: 'RocketScale Series B hiring',
+      company_name: 'RocketScale',
+      company_domain: 'rocketscale.example',
+      max_records: 2,
+      timespan: '7d',
+    },
+  ]);
+
+  globalThis.fetch = async (url) => {
+    const requestUrl = String(url);
+    requestedUrls.push(requestUrl);
+
+    if (!requestUrl.includes('api.gdeltproject.org/api/v2/doc/doc')) {
+      return jsonResponse({ error: 'unexpected url' }, { status: 404 });
+    }
+
+    return jsonResponse({
+      articles: [
+        {
+          title: 'RocketScale raises Series B to expand hiring',
+          url: 'https://news.example/rocketscale-series-b',
+          domain: 'news.example',
+          seendate: '20260501123000',
+        },
+      ],
+    });
+  };
+
+  try {
+    const pendingInput = resolveFundingInput();
+    assert.equal(pendingInput.inputMode, 'gdelt-pending');
+    assert.equal(pendingInput.gdeltQueries.length, 1);
+    assert.equal(pendingInput.gdeltQueries[0].companyName, 'RocketScale');
+    assert.equal(pendingInput.gdeltQueries[0].companyDomain, 'rocketscale.example');
+    assert.equal(pendingInput.gdeltQueries[0].maxRecords, 2);
+    assert.equal(pendingInput.gdeltQueries[0].timespan, '7d');
+
+    const gdeltInput = await resolveFundingGdeltInput(pendingInput);
+    const gdeltSummary = buildFetchSummary(gdeltInput);
+
+    assert.equal(gdeltSummary.inputMode, 'live-public');
+    assert.equal(gdeltSummary.liveProvider, 'gdelt-doc-api');
+    assert.equal(gdeltSummary.queriesReceived, 1);
+    assert.equal(gdeltSummary.recordsReceived, 1);
+    assert.equal(gdeltSummary.duplicateRecords, 0);
+    assert.equal(gdeltSummary.normalizedRecords, 1);
+    assert.equal(gdeltSummary.skippedRecords, 0);
+
+    const gdeltRecord = gdeltInput.normalizedRecords[0];
+    assert.equal(gdeltRecord.companyName, 'RocketScale');
+    assert.equal(gdeltRecord.companyDomain, 'rocketscale.example');
+    assert.equal(gdeltRecord.eventType, 'series_b');
+    assert.equal(gdeltRecord.signalType, 'funding');
+    assert.equal(gdeltRecord.detectedAt, '2026-05-01T12:30:00.000Z');
+
+    globalThis.fetch = async () => jsonResponse({
+      articles: [{ title: 'Unusable story without entity', seendate: '20260501123000' }],
+    });
+    await assert.rejects(
+      () => resolveFundingGdeltInput({
+        gdeltQueries: [{ query: 'entityless funding', maxRecords: 1, timespan: '7d' }],
+      }),
+      /0 normalized records/,
+    );
+
+    return {
+      inputMode: gdeltSummary.inputMode,
+      liveProvider: gdeltSummary.liveProvider,
+      requestedUrls: requestedUrls.length,
+      normalizedRecords: gdeltSummary.normalizedRecords,
+      allSkippedRejected: true,
+    };
+  } finally {
+    globalThis.fetch = originalFetch;
+    restoreEnv('FUNDING_BUSINESS_SIGNALS_INPUT_FILE', originalInputFile);
+    restoreEnv('FUNDING_SIGNALS_GDELT_QUERIES_JSON', originalQueriesJson);
+    restoreEnv('FUNDING_SIGNALS_GDELT_TRANSPORT', originalTransport);
+  }
+}
+
+function restoreEnv(name, value) {
+  if (value === undefined) {
+    delete process.env[name];
+    return;
+  }
+
+  process.env[name] = value;
 }
 
 function jsonResponse(body, init = {}) {

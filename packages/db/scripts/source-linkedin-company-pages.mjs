@@ -7,6 +7,7 @@ import {
   assertProviderNormalization,
   extractProviderRecords,
 } from './adapters/provider-contract.mjs';
+import { dedupeNormalizedRecords, stripBom } from './adapters/source-records.mjs';
 import { fetchJson } from './adapters/source-http.mjs';
 
 const { Client } = pg;
@@ -39,7 +40,7 @@ export async function runLinkedinCompanyPagesCli(argv = process.argv.slice(2)) {
 
     if (requestedAction === 'fetch') {
       console.log(JSON.stringify(buildFetchSummary(input), null, 2));
-      process.exit(0);
+      return;
     }
 
     if (!databaseUrl) {
@@ -56,7 +57,7 @@ export async function runLinkedinCompanyPagesCli(argv = process.argv.slice(2)) {
 
     if (requestedAction === 'ingest') {
       console.log(JSON.stringify(buildIngestSummary(input, stats), null, 2));
-      process.exit(0);
+      return;
     }
 
     console.log(JSON.stringify(buildPipelineSummary(input, stats), null, 2));
@@ -123,10 +124,12 @@ export async function resolveLinkedinProviderInput({ providerUrl, providerToken 
     normalizedRecords.push(normalized);
   }
 
+  const dedupeResult = dedupeNormalizedRecords(normalizedRecords);
+
   assertProviderNormalization({
     sourceId: SOURCE_ID,
     recordsReceived: records.length,
-    normalizedRecords,
+    normalizedRecords: dedupeResult.records,
     skippedRecords,
   });
 
@@ -134,7 +137,8 @@ export async function resolveLinkedinProviderInput({ providerUrl, providerToken 
     inputMode: 'provider-token',
     inputFilePath: null,
     recordsReceived: records.length,
-    normalizedRecords,
+    duplicateRecords: dedupeResult.duplicateRecords,
+    normalizedRecords: dedupeResult.records,
     skippedRecords,
   };
 }
@@ -146,7 +150,7 @@ function resolveLinkedinFileInput(inputFilePath) {
     throw new Error(`LINKEDIN_COMPANY_PAGES_INPUT_FILE does not exist: ${resolvedPath}`);
   }
 
-  const rawContent = readFileSync(resolvedPath, 'utf8').replace(/^﻿/, '');
+  const rawContent = stripBom(readFileSync(resolvedPath, 'utf8'));
   const records = parseInputRecords(rawContent, resolvedPath);
   const fetchedAt = new Date().toISOString();
   const normalizedRecords = [];
@@ -163,11 +167,14 @@ function resolveLinkedinFileInput(inputFilePath) {
     normalizedRecords.push(normalized);
   }
 
+  const dedupeResult = dedupeNormalizedRecords(normalizedRecords);
+
   return {
     inputMode: 'file',
     inputFilePath: resolvedPath,
     recordsReceived: records.length,
-    normalizedRecords,
+    duplicateRecords: dedupeResult.duplicateRecords,
+    normalizedRecords: dedupeResult.records,
     skippedRecords,
   };
 }
@@ -477,6 +484,7 @@ export function buildFetchSummary(input) {
     inputMode: input.inputMode,
     inputFilePath: input.inputFilePath,
     recordsReceived: input.recordsReceived,
+    duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
   };
@@ -489,6 +497,7 @@ function buildIngestSummary(input, stats) {
     inputMode: input.inputMode,
     inputFilePath: input.inputFilePath,
     recordsReceived: input.recordsReceived,
+    duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
     orgsCreated: stats.orgUpsertCount,
@@ -503,6 +512,7 @@ function buildPipelineSummary(input, stats) {
     inputMode: input.inputMode,
     inputFilePath: input.inputFilePath,
     recordsReceived: input.recordsReceived,
+    duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
     orgsCreated: stats.orgUpsertCount,
@@ -598,7 +608,7 @@ function loadEnvFile(filePath) {
     return;
   }
 
-  const envFile = readFileSync(filePath, 'utf8').replace(/^﻿/, '');
+  const envFile = stripBom(readFileSync(filePath, 'utf8'));
 
   for (const rawLine of envFile.split(/\r?\n/)) {
     const trimmedLine = rawLine.trim();

@@ -25,6 +25,7 @@ assert.equal(summary.action, 'fetch');
 assert.equal(summary.inputMode, 'file');
 assert.equal(summary.inputFilePath, fixturePath);
 assert.equal(summary.recordsReceived, 4);
+assert.equal(summary.duplicateRecords, 0);
 assert.equal(summary.normalizedRecords, 4);
 assert.equal(summary.skippedRecords, 0);
 
@@ -75,6 +76,7 @@ console.log(JSON.stringify({
   mode: 'read-only-smoke',
   fixturePath,
   recordsReceived: summary.recordsReceived,
+  duplicateRecords: summary.duplicateRecords,
   normalizedRecords: summary.normalizedRecords,
   skippedRecords: summary.skippedRecords,
   verifiedExternalIds: [
@@ -146,6 +148,7 @@ async function runLiveCrawlSmoke() {
     assert.equal(liveSummary.inputMode, 'live-public');
     assert.equal(liveSummary.targetsFilePath, targetsPath);
     assert.equal(liveSummary.recordsReceived, 1);
+    assert.equal(liveSummary.duplicateRecords, 0);
     assert.equal(liveSummary.crawlSuccesses, 1);
     assert.equal(liveSummary.crawlErrors, 0);
     assert.equal(liveSummary.normalizedRecords, 1);

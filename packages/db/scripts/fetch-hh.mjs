@@ -6,6 +6,7 @@ import {
   fetchHhVacancyPages,
   resolveHhVacancySearchConfig,
 } from './adapters/hh.mjs';
+import { stripBom } from './adapters/source-records.mjs';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const rootEnvPath = resolve(scriptDir, '../../../.env');
@@ -65,7 +66,7 @@ function loadEnvFile(filePath) {
     return;
   }
 
-  const envFile = readFileSync(filePath, 'utf8').replace(/^\uFEFF/, '');
+  const envFile = stripBom(readFileSync(filePath, 'utf8'));
 
   for (const rawLine of envFile.split(/\r?\n/)) {
     const trimmedLine = rawLine.trim();

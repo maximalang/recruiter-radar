@@ -5,6 +5,7 @@ import pg from 'pg';
 
 import { fetchGreenhouseBoards, parseGreenhouseJobs } from './adapters/greenhouse.mjs';
 import { fetchLeverCompanies, parseLeverPostings } from './adapters/lever.mjs';
+import { dedupeNormalizedRecords, stripBom } from './adapters/source-records.mjs';
 
 const { Client } = pg;
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -36,7 +37,7 @@ export async function runTechJobBoardsCli(argv = process.argv.slice(2)) {
 
     if (requestedAction === 'fetch') {
       console.log(JSON.stringify(buildFetchSummary(input), null, 2));
-      process.exit(0);
+      return;
     }
 
     if (!databaseUrl) {
@@ -53,7 +54,7 @@ export async function runTechJobBoardsCli(argv = process.argv.slice(2)) {
 
     if (requestedAction === 'ingest') {
       console.log(JSON.stringify(buildIngestSummary(input, stats), null, 2));
-      process.exit(0);
+      return;
     }
 
     console.log(JSON.stringify(buildPipelineSummary(input, stats), null, 2));
@@ -114,12 +115,15 @@ export async function resolveTechJobBoardsLiveInput({ greenhouseTokens, leverSlu
     normalizedRecords.push(normalized);
   }
 
+  const normalizedDedupeResult = dedupeNormalizedRecords(normalizedRecords);
+
   return {
     inputMode: 'live-public',
     inputFilePath: null,
     recordsReceived: records.length,
     recordsAfterDedupe: deduped.length,
-    normalizedRecords,
+    duplicateRecords: records.length - deduped.length + normalizedDedupeResult.duplicateRecords,
+    normalizedRecords: normalizedDedupeResult.records,
     skippedRecords,
   };
 }
@@ -131,7 +135,7 @@ function resolveFileInput(inputFilePath) {
     throw new Error(`TECH_JOB_BOARDS_INPUT_FILE does not exist: ${resolvedPath}`);
   }
 
-  const rawContent = readFileSync(resolvedPath, 'utf8').replace(/^﻿/, '');
+  const rawContent = stripBom(readFileSync(resolvedPath, 'utf8'));
   const records = parseInputRecords(rawContent, resolvedPath);
   const fetchedAt = new Date().toISOString();
   const deduped = dedupeRecords(records);
@@ -149,12 +153,15 @@ function resolveFileInput(inputFilePath) {
     normalizedRecords.push(normalized);
   }
 
+  const normalizedDedupeResult = dedupeNormalizedRecords(normalizedRecords);
+
   return {
     inputMode: 'file',
     inputFilePath: resolvedPath,
     recordsReceived: records.length,
     recordsAfterDedupe: deduped.length,
-    normalizedRecords,
+    duplicateRecords: records.length - deduped.length + normalizedDedupeResult.duplicateRecords,
+    normalizedRecords: normalizedDedupeResult.records,
     skippedRecords,
   };
 }
@@ -516,6 +523,7 @@ export function buildFetchSummary(input) {
     inputFilePath: input.inputFilePath,
     recordsReceived: input.recordsReceived,
     recordsAfterDedupe: input.recordsAfterDedupe,
+    duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
   };
@@ -529,6 +537,7 @@ function buildIngestSummary(input, stats) {
     inputFilePath: input.inputFilePath,
     recordsReceived: input.recordsReceived,
     recordsAfterDedupe: input.recordsAfterDedupe,
+    duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
     orgsCreated: stats.orgUpsertCount,
@@ -544,6 +553,7 @@ function buildPipelineSummary(input, stats) {
     inputFilePath: input.inputFilePath,
     recordsReceived: input.recordsReceived,
     recordsAfterDedupe: input.recordsAfterDedupe,
+    duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
     orgsCreated: stats.orgUpsertCount,
@@ -638,7 +648,7 @@ function loadEnvFile(filePath) {
     return;
   }
 
-  const envFile = readFileSync(filePath, 'utf8').replace(/^﻿/, '');
+  const envFile = stripBom(readFileSync(filePath, 'utf8'));
 
   for (const rawLine of envFile.split(/\r?\n/)) {
     const trimmedLine = rawLine.trim();

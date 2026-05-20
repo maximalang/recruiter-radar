@@ -26,30 +26,35 @@ const providerTokenSources = [
 ];
 const requireLiveConfig = process.argv.includes('--require-live-config')
   || process.env.SOURCE_READINESS_REQUIRE_LIVE_CONFIG === '1';
+const includeProviderRequired = process.argv.includes('--include-provider-required')
+  || process.env.SOURCE_READINESS_INCLUDE_PROVIDER_REQUIRED === '1';
 const liveConfigRules = {
   hh: [
-    ['HH_USER_AGENT'],
+    liveRule(['HH_USER_AGENT']),
   ],
   'career-pages': [
-    ['CAREER_PAGES_INPUT_FILE'],
-    ['CAREER_PAGES_TARGETS_FILE'],
-    ['DATABASE_URL'],
+    liveRule(['CAREER_PAGES_INPUT_FILE']),
+    liveRule(['CAREER_PAGES_TARGETS_FILE']),
+    liveRule(['DATABASE_URL']),
   ],
   'linkedin-company-pages': [
-    ['LINKEDIN_PROVIDER_API_URL', 'LINKEDIN_PROVIDER_API_TOKEN'],
+    providerRule(['LINKEDIN_PROVIDER_API_URL', 'LINKEDIN_PROVIDER_API_TOKEN']),
   ],
   'tech-job-boards': [
-    ['TECH_JOB_BOARDS_GREENHOUSE_TOKENS'],
-    ['TECH_JOB_BOARDS_LEVER_SLUGS'],
+    liveRule(['TECH_JOB_BOARDS_GREENHOUSE_TOKENS']),
+    liveRule(['TECH_JOB_BOARDS_LEVER_SLUGS']),
   ],
   'egrul-fns': [
-    ['EGRUL_FNS_PROVIDER_API_URL', 'EGRUL_FNS_PROVIDER_API_TOKEN'],
+    liveRule(['EGRUL_FNS_INNS']),
+    providerRule(['EGRUL_FNS_PROVIDER_API_URL', 'EGRUL_FNS_PROVIDER_API_TOKEN']),
   ],
   'company-site': [
-    ['COMPANY_SITE_TARGETS_FILE'],
+    liveRule(['COMPANY_SITE_TARGETS_FILE']),
   ],
   'funding-business-signals': [
-    ['FUNDING_SIGNALS_PROVIDER_API_URL', 'FUNDING_SIGNALS_PROVIDER_API_TOKEN'],
+    liveRule(['FUNDING_SIGNALS_GDELT_QUERIES']),
+    liveRule(['FUNDING_SIGNALS_GDELT_QUERIES_JSON']),
+    providerRule(['FUNDING_SIGNALS_PROVIDER_API_URL', 'FUNDING_SIGNALS_PROVIDER_API_TOKEN']),
   ],
 };
 
@@ -120,19 +125,31 @@ assert.deepEqual(
 
 const liveConfigSummary = expectedSources.map((sourceId) => {
   const rules = liveConfigRules[sourceId] ?? [];
-  const configured = rules.some((rule) => rule.every((envName) => hasEnvValue(envName)));
-  const acceptedEnvSets = rules.map((rule) => rule.join(' + '));
+  const configured = rules.some((rule) => isRuleConfigured(rule));
+  const launchRequired = rules.some((rule) => rule.kind === 'launch');
+  const providerRequired = rules.some((rule) => rule.kind === 'provider');
+  const providerConfigured = rules.some((rule) => rule.kind === 'provider' && isRuleConfigured(rule));
+  const acceptedEnvSets = rules.map((rule) => formatRule(rule));
+  const status = configured ? 'configured' : launchRequired ? 'missing' : 'provider-required';
 
   return {
     sourceId,
+    status,
     configured,
+    launchRequired,
+    providerRequired,
+    providerConfigured,
     acceptedEnvSets,
   };
 });
-const missingLiveConfig = liveConfigSummary.filter((item) => !item.configured);
+const missingLiveConfig = liveConfigSummary.filter((item) => item.status === 'missing');
+const providerRequiredLiveConfig = liveConfigSummary.filter((item) => item.status === 'provider-required');
+const blockingLiveConfig = includeProviderRequired
+  ? [...missingLiveConfig, ...providerRequiredLiveConfig]
+  : missingLiveConfig;
 
-if (requireLiveConfig && missingLiveConfig.length > 0) {
-  const formatted = missingLiveConfig
+if (requireLiveConfig && blockingLiveConfig.length > 0) {
+  const formatted = blockingLiveConfig
     .map((item) => `${item.sourceId}: ${item.acceptedEnvSets.join(' OR ')}`)
     .join('; ');
 
@@ -147,14 +164,38 @@ console.log(JSON.stringify({
   digestLeadSources,
   providerTokenSources,
   liveConfigRequired: requireLiveConfig,
+  providerConfigRequired: includeProviderRequired,
   liveConfigConfigured: liveConfigSummary.filter((item) => item.configured).length,
   liveConfigMissing: missingLiveConfig
     .map((item) => ({
       sourceId: item.sourceId,
+      status: item.status,
+      acceptedEnvSets: item.acceptedEnvSets,
+    })),
+  liveConfigProviderRequired: providerRequiredLiveConfig
+    .map((item) => ({
+      sourceId: item.sourceId,
+      status: item.status,
       acceptedEnvSets: item.acceptedEnvSets,
     })),
   directFetchCallers,
 }, null, 2));
+
+function liveRule(envNames) {
+  return { kind: 'launch', envNames };
+}
+
+function providerRule(envNames) {
+  return { kind: 'provider', envNames };
+}
+
+function isRuleConfigured(rule) {
+  return rule.envNames.every((envName) => hasEnvValue(envName));
+}
+
+function formatRule(rule) {
+  return rule.envNames.join(' + ');
+}
 
 function findMjsFiles(dirPath) {
   const results = [];

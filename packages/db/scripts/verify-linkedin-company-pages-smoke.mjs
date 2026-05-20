@@ -22,6 +22,7 @@ assert.equal(summary.action, 'fetch');
 assert.equal(summary.inputMode, 'file');
 assert.equal(summary.inputFilePath, fixturePath);
 assert.equal(summary.recordsReceived, 4);
+assert.equal(summary.duplicateRecords, 0);
 assert.equal(summary.normalizedRecords, 4);
 assert.equal(summary.skippedRecords, 0);
 
@@ -77,6 +78,7 @@ console.log(JSON.stringify({
   mode: 'read-only-smoke',
   fixturePath,
   recordsReceived: summary.recordsReceived,
+  duplicateRecords: summary.duplicateRecords,
   normalizedRecords: summary.normalizedRecords,
   skippedRecords: summary.skippedRecords,
   providerMode,
@@ -119,6 +121,7 @@ async function runProviderModeSmoke() {
 
     assert.equal(providerSummary.inputMode, 'provider-token');
     assert.equal(providerSummary.recordsReceived, 1);
+    assert.equal(providerSummary.duplicateRecords, 0);
     assert.equal(providerSummary.normalizedRecords, 1);
     assert.equal(providerSummary.skippedRecords, 0);
     assert.equal(providerInput.normalizedRecords[0].primarySourceKey, 'linkedin:555001');

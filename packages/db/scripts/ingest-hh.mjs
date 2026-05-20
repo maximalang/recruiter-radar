@@ -7,6 +7,7 @@ import {
   fetchHhVacancyPages,
   resolveHhVacancySearchConfig,
 } from './adapters/hh.mjs';
+import { dedupeNormalizedRecords, stripBom } from './adapters/source-records.mjs';
 
 const { Client } = pg;
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -41,7 +42,8 @@ try {
   const searchConfig = resolveHhVacancySearchConfig();
   const hhFetch = await fetchVacancies(hhUserAgent, searchConfig);
   const vacancies = hhFetch.items;
-  const normalizedVacancies = normalizeVacancies(vacancies);
+  const normalizedVacancyResult = normalizeVacancies(vacancies);
+  const normalizedVacancies = normalizedVacancyResult.records;
   const stats =
     normalizedVacancies.length === 0
       ? { hhVacancyUpsertCount: 0, signalUpsertCount: 0, skippedSignalCount: 0 }
@@ -50,6 +52,7 @@ try {
   console.log(`hh search text: ${searchConfig.searchText}`);
   console.log(`hh pages fetched: ${hhFetch.pagesFetched}`);
   console.log(`vacancies received: ${vacancies.length}`);
+  console.log(`duplicate vacancies skipped before upsert: ${normalizedVacancyResult.duplicateRecords}`);
   console.log(`hh vacancy upserts completed: ${stats.hhVacancyUpsertCount}`);
   console.log(`normalized signal upserts completed: ${stats.signalUpsertCount}`);
 
@@ -89,7 +92,12 @@ function normalizeVacancies(vacancies) {
     }
   }
 
-  return normalizedVacancies;
+  const dedupeResult = dedupeNormalizedRecords(normalizedVacancies, (vacancy) => vacancy.hhVacancyId);
+
+  return {
+    records: dedupeResult.records,
+    duplicateRecords: dedupeResult.duplicateRecords,
+  };
 }
 
 function normalizeVacancy(vacancy, fetchedAt) {
@@ -474,7 +482,7 @@ function loadEnvFile(filePath) {
     return;
   }
 
-  const envFile = readFileSync(filePath, 'utf8').replace(/^\uFEFF/, '');
+  const envFile = stripBom(readFileSync(filePath, 'utf8'));
 
   for (const rawLine of envFile.split(/\r?\n/)) {
     const trimmedLine = rawLine.trim();

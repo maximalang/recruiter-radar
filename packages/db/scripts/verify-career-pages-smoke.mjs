@@ -32,6 +32,7 @@ assert.equal(summary.targetsFilePath, fixturePath);
 assert.equal(summary.fetchOutputPath, null);
 assert.equal(summary.targetsProcessed, expectedTargets.length);
 assert.equal(summary.recordsReceived, expectedRecords.length);
+assert.equal(summary.duplicateRecords, 0);
 assert.equal(summary.normalizedRecords, expectedRecords.length);
 assert.equal(summary.skippedRecords, 0);
 assert.equal(summary.targetResults.length, expectedTargets.length);
@@ -73,6 +74,7 @@ console.log(JSON.stringify({
   fixturePath,
   targetsProcessed: summary.targetsProcessed,
   recordsReceived: summary.recordsReceived,
+  duplicateRecords: summary.duplicateRecords,
   normalizedRecords: summary.normalizedRecords,
   skippedRecords: summary.skippedRecords,
   verifiedExternalIds: expectedRecords.map((record) => record.external_id),

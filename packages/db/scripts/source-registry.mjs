@@ -182,7 +182,7 @@ registerSource(
     evidenceTier: 'high-signal',
     defaultConfidence: 0.9,
     status: 'active',
-    fetchModes: ['file', 'provider-token'],
+    fetchModes: ['file', 'live-public', 'provider-token'],
     description: 'EGRUL/FNS company registry data for legal entity verification and enrichment.',
     capabilities: SOURCE_ACTIONS,
     scripts: {
@@ -248,7 +248,7 @@ registerSource(
     evidenceTier: 'context-only',
     defaultConfidence: 0.58,
     status: 'active',
-    fetchModes: ['file', 'provider-token'],
+    fetchModes: ['file', 'live-public', 'provider-token'],
     description: 'Funding, hiring, growth, and other business signals for supporting context only.',
     capabilities: SOURCE_ACTIONS,
     scripts: {

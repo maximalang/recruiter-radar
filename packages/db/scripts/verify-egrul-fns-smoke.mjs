@@ -6,6 +6,7 @@ import {
   buildFetchSummary,
   resolveEgrulFnsInput,
   resolveEgrulProviderInput,
+  resolveEgrulPublicInput,
 } from './source-egrul-fns.mjs';
 
 const scriptDir = fileURLToPath(new URL('.', import.meta.url));
@@ -22,8 +23,9 @@ assert.equal(summary.action, 'fetch');
 assert.equal(summary.inputMode, 'file');
 assert.equal(summary.inputFilePath, fixturePath);
 assert.equal(summary.recordsReceived, 3);
-assert.equal(summary.normalizedRecords, 3);
-assert.equal(summary.skippedRecords, 0);
+assert.equal(summary.normalizedRecords, 2);
+assert.equal(summary.skippedRecords, 1);
+assert.equal(summary.duplicateRecords, 0);
 
 const rec1 = input.normalizedRecords.find((r) => r.signalExternalId === 'egrul-smoke-1');
 assert.ok(rec1, 'missing normalized record egrul-smoke-1');
@@ -35,7 +37,7 @@ assert.equal(rec1.companyDomain, 'techfuture.example');
 assert.equal(rec1.status, 'active');
 assert.equal(rec1.legalAddress, 'г. Москва, ул. Тверская, д. 1');
 assert.equal(rec1.okved, '62.01');
-assert.equal(rec1.headName, 'Иванов Иван Иванович');
+assert.equal(rec1.headName, undefined, 'EGRUL must not keep director/person names');
 assert.equal(rec1.primarySourceKey, 'inn:7701234567');
 
 const rec2 = input.normalizedRecords.find((r) => r.signalExternalId === 'egrul-smoke-2');
@@ -44,11 +46,8 @@ assert.equal(rec2.companyName, 'АО Дата Системс');
 assert.equal(rec2.inn, '7702345678');
 assert.equal(rec2.primarySourceKey, 'inn:7702345678');
 
-const rec3 = input.normalizedRecords.find((r) => r.inn === '770312345678');
-assert.ok(rec3, 'missing normalized record for ИП Петров');
-assert.equal(rec3.companyName, 'ИП Петров');
-assert.equal(rec3.primarySourceKey, 'inn:770312345678');
-assert.equal(rec3.signalExternalId, 'egrul:inn:770312345678');
+const soleProprietorRecord = input.normalizedRecords.find((r) => r.inn === '770312345678');
+assert.equal(soleProprietorRecord, undefined, '12-digit INN/IP records must be skipped');
 
 for (const record of input.normalizedRecords) {
   assert.equal(record.orgSourceKeys.length > 0, true, `record ${record.signalExternalId} must have orgSourceKeys`);
@@ -65,6 +64,7 @@ for (const record of input.normalizedRecords) {
 }
 
 const providerMode = await runProviderModeSmoke();
+const livePublicMode = await runLivePublicModeSmoke();
 
 console.log(JSON.stringify({
   ok: true,
@@ -76,7 +76,8 @@ console.log(JSON.stringify({
   skippedRecords: summary.skippedRecords,
   evidenceBoundary: 'enrichment-only, never lead-originating',
   providerMode,
-  verifiedExternalIds: ['egrul-smoke-1', 'egrul-smoke-2', 'egrul:inn:770312345678'],
+  livePublicMode,
+  verifiedExternalIds: ['egrul-smoke-1', 'egrul-smoke-2'],
   sideEffects: { databaseUrlUsed: false },
 }, null, 2));
 
@@ -146,6 +147,81 @@ async function runProviderModeSmoke() {
   } finally {
     globalThis.fetch = originalFetch;
   }
+}
+
+async function runLivePublicModeSmoke() {
+  const originalFetch = globalThis.fetch;
+  const originalInputFile = process.env.EGRUL_FNS_INPUT_FILE;
+  const originalInns = process.env.EGRUL_FNS_INNS;
+  const originalBaseUrl = process.env.EGRUL_FNS_PUBLIC_BASE_URL;
+
+  delete process.env.EGRUL_FNS_INPUT_FILE;
+  process.env.EGRUL_FNS_INNS = '7709000002';
+  process.env.EGRUL_FNS_PUBLIC_BASE_URL = 'https://egrul.example/';
+
+  globalThis.fetch = async (url) => {
+    const requestUrl = String(url);
+
+    if (!requestUrl.endsWith('/7709000002.json')) {
+      return jsonResponse({ error: 'unexpected url' }, { status: 404 });
+    }
+
+    return jsonResponse({
+      '\u0421\u0432\u042e\u041b': {
+        '@attributes': {
+          '\u0414\u0430\u0442\u0430\u0412\u044b\u043f': '2026-05-08',
+          '\u041e\u0413\u0420\u041d': '1027709000002',
+          '\u0414\u0430\u0442\u0430\u041e\u0413\u0420\u041d': '2002-08-16',
+          '\u0418\u041d\u041d': '7709000002',
+          '\u041a\u041f\u041f': '770901001',
+        },
+        '\u0421\u0432\u041d\u0430\u0438\u043c\u042e\u041b': {
+          '@attributes': { '\u041d\u0430\u0438\u043c\u042e\u041b\u041f\u043e\u043b\u043d': 'LIVE EGRUL LLC' },
+          '\u0421\u0432\u041d\u0430\u0438\u043c\u042e\u041b\u0421\u043e\u043a\u0440': { '@attributes': { '\u041d\u0430\u0438\u043c\u0421\u043e\u043a\u0440': 'LIVE EGRUL' } },
+        },
+      },
+    });
+  };
+
+  try {
+    const pendingInput = resolveEgrulFnsInput();
+    assert.equal(pendingInput.inputMode, 'public-pending');
+    assert.deepEqual(pendingInput.inns, ['7709000002']);
+
+    const liveInput = await resolveEgrulPublicInput(pendingInput);
+    const liveSummary = buildFetchSummary(liveInput);
+
+    assert.equal(liveSummary.inputMode, 'live-public');
+    assert.equal(liveSummary.liveProvider, 'egrul-public-json');
+    assert.equal(liveSummary.innsRequested, 1);
+    assert.equal(liveSummary.recordsReceived, 1);
+    assert.equal(liveSummary.normalizedRecords, 1);
+    assert.equal(liveSummary.skippedRecords, 0);
+    assert.equal(liveInput.normalizedRecords[0].companyName, 'LIVE EGRUL');
+    assert.equal(liveInput.normalizedRecords[0].inn, '7709000002');
+    assert.equal(liveInput.normalizedRecords[0].ogrn, '1027709000002');
+    assert.equal(liveInput.normalizedRecords[0].primarySourceKey, 'inn:7709000002');
+
+    return {
+      inputMode: liveSummary.inputMode,
+      liveProvider: liveSummary.liveProvider,
+      normalizedRecords: liveSummary.normalizedRecords,
+    };
+  } finally {
+    globalThis.fetch = originalFetch;
+    restoreEnv('EGRUL_FNS_INPUT_FILE', originalInputFile);
+    restoreEnv('EGRUL_FNS_INNS', originalInns);
+    restoreEnv('EGRUL_FNS_PUBLIC_BASE_URL', originalBaseUrl);
+  }
+}
+
+function restoreEnv(name, value) {
+  if (value === undefined) {
+    delete process.env[name];
+    return;
+  }
+
+  process.env[name] = value;
 }
 
 function jsonResponse(body, init = {}) {

@@ -1,3 +1,6 @@
+import http from 'node:http';
+import https from 'node:https';
+
 const DEFAULT_TIMEOUT_MS = 15000;
 const DEFAULT_RETRIES = 2;
 const DEFAULT_RETRY_DELAY_MS = 250;
@@ -15,13 +18,28 @@ export class SourceHttpError extends Error {
 }
 
 export async function fetchJson(url, options = {}) {
-  const response = await fetchWithSourcePolicy(url, {
+  const requestOptions = {
     ...options,
     headers: {
       accept: 'application/json',
       ...(options.headers ?? {}),
     },
-  });
+  };
+  let response;
+
+  if (options.preferNodeHttpFallback) {
+    return fetchJsonWithNodeHttpFallback(url, requestOptions);
+  }
+
+  try {
+    response = await fetchWithSourcePolicy(url, requestOptions);
+  } catch (error) {
+    if (!options.nodeHttpFallback || !isFetchTransportFailure(error)) {
+      throw error;
+    }
+
+    return fetchJsonWithNodeHttpFallback(url, requestOptions, error);
+  }
 
   if (!response.ok) {
     throw await buildStatusError(response, options.sourceName);
@@ -60,6 +78,8 @@ export async function fetchWithSourcePolicy(url, options = {}) {
     retries = DEFAULT_RETRIES,
     retryDelayMs = DEFAULT_RETRY_DELAY_MS,
     retryStatuses = DEFAULT_RETRY_STATUSES,
+    nodeHttpFallback: _nodeHttpFallback,
+    preferNodeHttpFallback: _preferNodeHttpFallback,
     ...fetchOptions
   } = options;
 
@@ -90,7 +110,7 @@ export async function fetchWithSourcePolicy(url, options = {}) {
         return response;
       }
 
-        lastError = await buildStatusError(response, sourceName, attempt);
+      lastError = await buildStatusError(response, sourceName, attempt);
     } catch (error) {
       if (signal?.aborted && !timedOut) {
         throw new SourceHttpError(
@@ -131,6 +151,101 @@ async function buildStatusError(response, sourceName = 'source', attempt) {
       attempt,
     },
   );
+}
+
+function isFetchTransportFailure(error) {
+  return error instanceof SourceHttpError
+    && (error.cause?.message === 'fetch failed'
+      || error.cause?.name === 'AbortError'
+      || error.message.includes('fetch failed'));
+}
+
+async function fetchJsonWithNodeHttpFallback(url, options, originalError) {
+  const retries = Number.isFinite(options.retries) ? options.retries : DEFAULT_RETRIES;
+  const retryStatuses = options.retryStatuses ?? DEFAULT_RETRY_STATUSES;
+  const maxAttempts = Math.max(1, retries + 1);
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await fetchJsonOnceWithNodeHttpFallback(url, options, originalError, attempt);
+    } catch (error) {
+      lastError = error;
+
+      if (!isRetryableNodeHttpFallbackError(error, retryStatuses) || attempt === maxAttempts) {
+        throw error;
+      }
+
+      await delay((options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS) * attempt);
+    }
+  }
+
+  throw lastError ?? new SourceHttpError(`${options.sourceName ?? 'source'} node-http fallback failed for ${redactUrl(url)}`);
+}
+
+function isRetryableNodeHttpFallbackError(error, retryStatuses) {
+  if (!(error instanceof SourceHttpError)) {
+    return false;
+  }
+
+  return retryStatuses.has(error.status)
+    || error.message.includes('node-http fallback failed')
+    || error.message.includes('node-http fallback timed out');
+}
+
+function fetchJsonOnceWithNodeHttpFallback(url, options, originalError, attempt) {
+  return new Promise((resolvePromise, rejectPromise) => {
+    const sourceName = options.sourceName ?? 'source';
+    const safeUrl = redactUrl(url);
+    const requestUrl = new URL(url);
+    const transport = requestUrl.protocol === 'http:' ? http : https;
+    const request = transport.request(requestUrl, {
+      method: options.method ?? 'GET',
+      headers: options.headers,
+      timeout: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    }, (response) => {
+      let body = '';
+      response.setEncoding('utf8');
+      response.on('data', (chunk) => {
+        body += chunk;
+      });
+      response.on('end', () => {
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          rejectPromise(new SourceHttpError(
+            `${sourceName} returned HTTP ${response.statusCode} for ${safeUrl}`
+              + (body.trim() ? `: ${redactText(body.trim()).slice(0, 500)}` : ''),
+            { url: safeUrl, status: response.statusCode, statusText: response.statusMessage, attempt, cause: originalError },
+          ));
+          return;
+        }
+
+        try {
+          resolvePromise(JSON.parse(body));
+        } catch (error) {
+          rejectPromise(new SourceHttpError(
+            `${sourceName} returned invalid JSON for ${safeUrl}: ${error?.message ?? String(error)}`,
+            { url: safeUrl, cause: error },
+          ));
+        }
+      });
+    });
+
+    request.on('timeout', () => {
+      request.destroy(new SourceHttpError(
+        `${sourceName} node-http fallback timed out for ${safeUrl}`,
+        { url: safeUrl, cause: originalError },
+      ));
+    });
+    request.on('error', (error) => {
+      rejectPromise(error instanceof SourceHttpError
+        ? error
+        : new SourceHttpError(
+          `${sourceName} node-http fallback failed for ${safeUrl}: ${error?.message ?? String(error)}`,
+          { url: safeUrl, cause: error },
+        ));
+    });
+    request.end(options.body);
+  });
 }
 
 function combineSignals(...signals) {
@@ -185,6 +300,14 @@ async function readErrorBody(response) {
 function redactUrl(value) {
   try {
     const url = new URL(value);
+
+    if (url.username) {
+      url.username = '[redacted]';
+    }
+
+    if (url.password) {
+      url.password = '[redacted]';
+    }
 
     for (const key of [...url.searchParams.keys()]) {
       if (/(token|key|secret|password|signature|auth)/i.test(key)) {

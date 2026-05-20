@@ -7,6 +7,7 @@ import {
   assertProviderNormalization,
   extractProviderRecords,
 } from './adapters/provider-contract.mjs';
+import { dedupeNormalizedRecords, stripBom } from './adapters/source-records.mjs';
 import { fetchJson } from './adapters/source-http.mjs';
 
 const { Client } = pg;
@@ -40,7 +41,7 @@ export async function runFundingBusinessSignalsCli(argv = process.argv.slice(2))
 
     if (requestedAction === 'fetch') {
       console.log(JSON.stringify(buildFetchSummary(input), null, 2));
-      process.exit(0);
+      return;
     }
 
     if (!databaseUrl) {
@@ -57,7 +58,7 @@ export async function runFundingBusinessSignalsCli(argv = process.argv.slice(2))
 
     if (requestedAction === 'ingest') {
       console.log(JSON.stringify(buildIngestSummary(input, stats), null, 2));
-      process.exit(0);
+      return;
     }
 
     console.log(JSON.stringify(buildPipelineSummary(input, stats), null, 2));
@@ -130,10 +131,12 @@ export async function resolveFundingProviderInput({ providerUrl, providerToken }
     normalizedRecords.push(normalized);
   }
 
+  const dedupeResult = dedupeNormalizedRecords(normalizedRecords);
+
   assertProviderNormalization({
     sourceId: SOURCE_ID,
     recordsReceived: records.length,
-    normalizedRecords,
+    normalizedRecords: dedupeResult.records,
     skippedRecords,
   });
 
@@ -141,7 +144,8 @@ export async function resolveFundingProviderInput({ providerUrl, providerToken }
     inputMode: 'provider-token',
     inputFilePath: null,
     recordsReceived: records.length,
-    normalizedRecords,
+    duplicateRecords: dedupeResult.duplicateRecords,
+    normalizedRecords: dedupeResult.records,
     skippedRecords,
   };
 }
@@ -169,7 +173,9 @@ export async function resolveFundingGdeltInput({ gdeltQueries }) {
     normalizedRecords.push(normalized);
   }
 
-  if (records.length > 0 && normalizedRecords.length === 0) {
+  const dedupeResult = dedupeNormalizedRecords(normalizedRecords);
+
+  if (records.length > 0 && dedupeResult.records.length === 0) {
     throw new Error(
       `${SOURCE_ID} GDELT returned ${records.length} records but 0 normalized records`
         + ` (${skippedRecords} skipped). Check GDELT query mapping.`,
@@ -182,7 +188,8 @@ export async function resolveFundingGdeltInput({ gdeltQueries }) {
     liveProvider: 'gdelt-doc-api',
     queriesReceived: gdeltQueries.length,
     recordsReceived: records.length,
-    normalizedRecords,
+    duplicateRecords: dedupeResult.duplicateRecords,
+    normalizedRecords: dedupeResult.records,
     skippedRecords,
   };
 }
@@ -197,9 +204,11 @@ async function fetchGdeltRecords(queryConfig) {
 
   const body = await fetchJson(url, {
     sourceName: 'funding-business-signals gdelt',
+    nodeHttpFallback: true,
+    preferNodeHttpFallback: process.env.FUNDING_SIGNALS_GDELT_TRANSPORT !== 'fetch',
     retries: 2,
     retryDelayMs: 6000,
-    timeoutMs: 30000,
+    timeoutMs: resolveGdeltTimeoutMs(),
     headers: {
       'user-agent': 'RecruiterRadar/1.0 (funding-business-signals)',
     },
@@ -238,7 +247,7 @@ function resolveFundingFileInput(inputFilePath) {
     throw new Error(`FUNDING_BUSINESS_SIGNALS_INPUT_FILE does not exist: ${resolvedPath}`);
   }
 
-  const rawContent = readFileSync(resolvedPath, 'utf8').replace(/^﻿/, '');
+  const rawContent = stripBom(readFileSync(resolvedPath, 'utf8'));
   const records = parseInputRecords(rawContent, resolvedPath);
   const fetchedAt = new Date().toISOString();
   const normalizedRecords = [];
@@ -255,11 +264,14 @@ function resolveFundingFileInput(inputFilePath) {
     normalizedRecords.push(normalized);
   }
 
+  const dedupeResult = dedupeNormalizedRecords(normalizedRecords);
+
   return {
     inputMode: 'file',
     inputFilePath: resolvedPath,
     recordsReceived: records.length,
-    normalizedRecords,
+    duplicateRecords: dedupeResult.duplicateRecords,
+    normalizedRecords: dedupeResult.records,
     skippedRecords,
   };
 }
@@ -643,7 +655,9 @@ export function buildFetchSummary(input) {
     action: 'fetch',
     inputMode: input.inputMode,
     inputFilePath: input.inputFilePath,
+    ...buildLiveFundingSummary(input),
     recordsReceived: input.recordsReceived,
+    duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
   };
@@ -655,7 +669,9 @@ function buildIngestSummary(input, stats) {
     action: 'ingest',
     inputMode: input.inputMode,
     inputFilePath: input.inputFilePath,
+    ...buildLiveFundingSummary(input),
     recordsReceived: input.recordsReceived,
+    duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
     orgsCreated: stats.orgUpsertCount,
@@ -669,7 +685,9 @@ function buildPipelineSummary(input, stats) {
     action: 'pipeline',
     inputMode: input.inputMode,
     inputFilePath: input.inputFilePath,
+    ...buildLiveFundingSummary(input),
     recordsReceived: input.recordsReceived,
+    duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
     orgsCreated: stats.orgUpsertCount,
@@ -677,10 +695,81 @@ function buildPipelineSummary(input, stats) {
   };
 }
 
+function buildLiveFundingSummary(input) {
+  if (input.inputMode !== 'live-public') {
+    return {};
+  }
+
+  return {
+    liveProvider: input.liveProvider,
+    queriesReceived: input.queriesReceived,
+  };
+}
+
 function buildFallbackHeadline({ companyName, eventType, inferredDomain }) {
   const subject = companyName ?? inferredDomain ?? 'Компания';
   const event = eventType ? ` — ${eventType}` : '';
   return `${subject}${event}`;
+}
+
+function inferGdeltEventType(title) {
+  const normalizedTitle = normalizeSourceKeyText(title) ?? '';
+
+  if (/\bseries\s*a\b/.test(normalizedTitle)) return 'series_a';
+  if (/\bseries\s*b\b/.test(normalizedTitle)) return 'series_b';
+  if (/\bseries\s*c\b/.test(normalizedTitle)) return 'series_c';
+  if (/\bseries\s*d\b/.test(normalizedTitle)) return 'series_d';
+  if (/pre[-\s]?seed/.test(normalizedTitle)) return 'pre_seed';
+  if (/\bseed\b/.test(normalizedTitle)) return 'seed';
+  if (/\bgrant\b/.test(normalizedTitle)) return 'grant';
+  if (/\bipo\b|initial public offering/.test(normalizedTitle)) return 'ipo';
+  if (/acquir|acquisition|takeover/.test(normalizedTitle)) return 'acquisition';
+  if (/\bmerger\b|\bmerges\b/.test(normalizedTitle)) return 'merger';
+  if (/funding|raises|raised|investment|invests|venture|capital/.test(normalizedTitle)) return 'funding_round';
+  if (/hiring|recruit|vacanc|jobs|open positions/.test(normalizedTitle)) return 'hiring_context';
+  if (/expands|expansion|launches|opens office|new office/.test(normalizedTitle)) return 'expansion';
+
+  return 'press_mention';
+}
+
+function parseGdeltDate(value) {
+  const text = toNonEmptyText(value);
+
+  if (!text) {
+    return null;
+  }
+
+  const compactMatch = text.match(/^(\d{4})(\d{2})(\d{2})(?:(\d{2})(\d{2})(\d{2}))?$/);
+
+  if (compactMatch) {
+    const [, year, month, day, hour = '00', minute = '00', second = '00'] = compactMatch;
+    const date = new Date(Date.UTC(
+      Number.parseInt(year, 10),
+      Number.parseInt(month, 10) - 1,
+      Number.parseInt(day, 10),
+      Number.parseInt(hour, 10),
+      Number.parseInt(minute, 10),
+      Number.parseInt(second, 10),
+    ));
+
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  }
+
+  return toTimestampOrNull(text);
+}
+
+function clampInteger(value, fallback, min, max) {
+  const parsed = Number.parseInt(String(value ?? ''), 10);
+
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+
+  return Math.min(Math.max(parsed, min), max);
+}
+
+function resolveGdeltTimeoutMs() {
+  return clampInteger(process.env.FUNDING_SIGNALS_GDELT_TIMEOUT_MS, 60000, 5000, 120000);
 }
 
 function buildSignalSummaryText(record) {
@@ -710,7 +799,7 @@ function buildSignalPayload(record) {
     source_entity_type: 'company',
     source_entity_key: record.primarySourceKey,
     source_entity_alias_keys: record.orgSourceKeys.filter((v) => v !== record.primarySourceKey),
-    source_entity_external_id: record.externalId,
+    source_entity_external_id: null,
     source_entity_display_name: record.orgDisplayName,
     source_entity_name: record.orgName,
     source_record_type: 'business_signal',
@@ -769,7 +858,7 @@ function loadEnvFile(filePath) {
     return;
   }
 
-  const envFile = readFileSync(filePath, 'utf8').replace(/^﻿/, '');
+  const envFile = stripBom(readFileSync(filePath, 'utf8'));
 
   for (const rawLine of envFile.split(/\r?\n/)) {
     const trimmedLine = rawLine.trim();
