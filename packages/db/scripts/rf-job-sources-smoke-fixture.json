@@ -1,0 +1,30 @@
+{
+  "records": [
+    {
+      "id": "job-smoke-1",
+      "job_title": "Backend Developer",
+      "company_name": "Tech RF Smoke",
+      "company_domain": "tech-rf-smoke.example",
+      "job_posting_url": "https://jobs.example/vacancies/job-smoke-1",
+      "location": "Moscow",
+      "salary": "250000",
+      "tags": ["go", "postgres"]
+    },
+    {
+      "id": "job-smoke-1",
+      "job_title": "Backend Developer",
+      "company_name": "Tech RF Smoke",
+      "company_domain": "tech-rf-smoke.example",
+      "job_posting_url": "https://jobs.example/vacancies/job-smoke-1"
+    },
+    {
+      "id": "job-skipped",
+      "company_name": "No Title Smoke"
+    },
+    {
+      "id": "job-board-url-only",
+      "job_title": "Board-only Developer",
+      "job_posting_url": "https://jobs.example/vacancies/job-board-url-only"
+    }
+  ]
+}

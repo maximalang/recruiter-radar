@@ -28,6 +28,22 @@ const egrulFnsScriptPath = './packages/db/scripts/source-egrul-fns.mjs';
 const egrulFnsAbsoluteScriptPath = resolve(scriptDir, './source-egrul-fns.mjs');
 const fundingScriptPath = './packages/db/scripts/source-funding-business-signals.mjs';
 const fundingAbsoluteScriptPath = resolve(scriptDir, './source-funding-business-signals.mjs');
+const rabotaRossiiScriptPath = './packages/db/scripts/source-rabota-rossii.mjs';
+const rabotaRossiiAbsoluteScriptPath = resolve(scriptDir, './source-rabota-rossii.mjs');
+const transparentBusinessFnsScriptPath = './packages/db/scripts/source-transparent-business-fns.mjs';
+const transparentBusinessFnsAbsoluteScriptPath = resolve(scriptDir, './source-transparent-business-fns.mjs');
+const fedresursScriptPath = './packages/db/scripts/source-fedresurs.mjs';
+const fedresursAbsoluteScriptPath = resolve(scriptDir, './source-fedresurs.mjs');
+const superjobScriptPath = './packages/db/scripts/source-superjob.mjs';
+const superjobAbsoluteScriptPath = resolve(scriptDir, './source-superjob.mjs');
+const habrCareerScriptPath = './packages/db/scripts/source-habr-career.mjs';
+const habrCareerAbsoluteScriptPath = resolve(scriptDir, './source-habr-career.mjs');
+const companyNewsroomsScriptPath = './packages/db/scripts/source-company-newsrooms.mjs';
+const companyNewsroomsAbsoluteScriptPath = resolve(scriptDir, './source-company-newsrooms.mjs');
+const industryMediaScriptPath = './packages/db/scripts/source-industry-media.mjs';
+const industryMediaAbsoluteScriptPath = resolve(scriptDir, './source-industry-media.mjs');
+const regionalJobBoardsScriptPath = './packages/db/scripts/source-regional-job-boards.mjs';
+const regionalJobBoardsAbsoluteScriptPath = resolve(scriptDir, './source-regional-job-boards.mjs');
 const registry = new Map();
 
 registerSource(
@@ -74,6 +90,18 @@ registerSource(
     },
   }),
 );
+
+registerRunnableScriptSource({
+  id: 'rabota-rossii',
+  kind: 'job-board',
+  sourceClass: 'primary-platform',
+  evidenceTier: 'medium-signal',
+  defaultConfidence: 0.7,
+  fetchModes: ['file', 'live-public'],
+  description: 'Official Rabota Rossii open-data vacancies for regional and public-adjacent hiring coverage.',
+  scriptPath: rabotaRossiiScriptPath,
+  absoluteScriptPath: rabotaRossiiAbsoluteScriptPath,
+});
 
 registerSource(
   defineSource({
@@ -149,8 +177,8 @@ registerSource(
     evidenceTier: 'medium-signal',
     defaultConfidence: 0.68,
     status: 'active',
-    fetchModes: ['file', 'live-public'],
-    description: 'Specialized tech job boards beyond HH for additional market coverage.',
+    fetchModes: ['file', 'live-public', 'provider-token'],
+    description: 'Specialized tech job boards and compliant job snapshot providers beyond HH for additional market coverage.',
     capabilities: SOURCE_ACTIONS,
     scripts: {
       fetch: techJobBoardsScriptPath,
@@ -273,6 +301,90 @@ registerSource(
   }),
 );
 
+registerRunnableScriptSource({
+  id: 'transparent-business-fns',
+  kind: 'company-registry',
+  sourceClass: 'registry-reference',
+  evidenceTier: 'high-signal',
+  defaultConfidence: 0.86,
+  fetchModes: ['file', 'provider-token'],
+  description: 'Transparent Business/FNS company context for size, risk, registry and exclusion enrichment only.',
+  scriptPath: transparentBusinessFnsScriptPath,
+  absoluteScriptPath: transparentBusinessFnsAbsoluteScriptPath,
+});
+
+registerRunnableScriptSource({
+  id: 'fedresurs',
+  kind: 'business-signal',
+  sourceClass: 'market-signal',
+  evidenceTier: 'context-only',
+  defaultConfidence: 0.62,
+  fetchModes: ['file', 'provider-token'],
+  description: 'Fedresurs corporate events, audit, license and asset context; never lead-originating.',
+  scriptPath: fedresursScriptPath,
+  absoluteScriptPath: fedresursAbsoluteScriptPath,
+});
+
+registerRunnableScriptSource({
+  id: 'superjob',
+  kind: 'job-board',
+  sourceClass: 'primary-platform',
+  evidenceTier: 'medium-signal',
+  defaultConfidence: 0.66,
+  fetchModes: ['file', 'provider-token'],
+  description: 'SuperJob vacancy coverage through app-key/provider mode; not promoted to digest until confidence gates pass.',
+  scriptPath: superjobScriptPath,
+  absoluteScriptPath: superjobAbsoluteScriptPath,
+});
+
+registerRunnableScriptSource({
+  id: 'habr-career',
+  kind: 'job-board',
+  sourceClass: 'primary-platform',
+  evidenceTier: 'medium-signal',
+  defaultConfidence: 0.69,
+  fetchModes: ['file', 'provider-token'],
+  description: 'Habr Career IT vacancy coverage via snapshots/provider until a lawful public live path is approved.',
+  scriptPath: habrCareerScriptPath,
+  absoluteScriptPath: habrCareerAbsoluteScriptPath,
+});
+
+registerRunnableScriptSource({
+  id: 'company-newsrooms',
+  kind: 'company-site',
+  sourceClass: 'company-surface',
+  evidenceTier: 'context-only',
+  defaultConfidence: 0.6,
+  fetchModes: ['file', 'live-public', 'provider-token'],
+  description: 'Company newsroom and press-center context from curated targets or provider snapshots; supporting evidence only.',
+  scriptPath: companyNewsroomsScriptPath,
+  absoluteScriptPath: companyNewsroomsAbsoluteScriptPath,
+});
+
+registerRunnableScriptSource({
+  id: 'industry-media',
+  kind: 'business-signal',
+  sourceClass: 'market-signal',
+  evidenceTier: 'context-only',
+  defaultConfidence: 0.52,
+  fetchModes: ['file', 'provider-token'],
+  description: 'Curated industry media context after manual/legal source review; never lead-originating.',
+  scriptPath: industryMediaScriptPath,
+  absoluteScriptPath: industryMediaAbsoluteScriptPath,
+});
+
+registerRunnableScriptSource({
+  id: 'regional-job-boards',
+  kind: 'job-board',
+  sourceClass: 'primary-platform',
+  evidenceTier: 'medium-signal',
+  defaultConfidence: 0.58,
+  fetchModes: ['file', 'provider-token'],
+  description: 'Regional job-board snapshots/provider feeds after legal and robots review; not in digest by default.',
+  scriptPath: regionalJobBoardsScriptPath,
+  absoluteScriptPath: regionalJobBoardsAbsoluteScriptPath,
+});
+
 export function listSources() {
   return [...registry.values()];
 }
@@ -332,6 +444,51 @@ function registerSource(source) {
   }
 
   registry.set(source.id, source);
+}
+
+function registerRunnableScriptSource({
+  id,
+  kind,
+  sourceClass,
+  evidenceTier,
+  defaultConfidence,
+  fetchModes,
+  description,
+  scriptPath,
+  absoluteScriptPath,
+}) {
+  registerSource(
+    defineSource({
+      id,
+      kind,
+      sourceClass,
+      evidenceTier,
+      defaultConfidence,
+      status: 'active',
+      fetchModes,
+      description,
+      capabilities: SOURCE_ACTIONS,
+      scripts: {
+        fetch: scriptPath,
+        ingest: scriptPath,
+        pipeline: scriptPath,
+      },
+      actionMap: createActionMap({
+        status: 'active',
+        capabilities: SOURCE_ACTIONS,
+        scripts: {
+          fetch: scriptPath,
+          ingest: scriptPath,
+          pipeline: scriptPath,
+        },
+      }),
+      runner: {
+        fetch: () => runSourceScript(absoluteScriptPath, 'fetch'),
+        ingest: () => runSourceScript(absoluteScriptPath, 'ingest'),
+        pipeline: () => runSourceScript(absoluteScriptPath, 'pipeline'),
+      },
+    }),
+  );
 }
 
 function registerPlannedSource({ id, kind, sourceClass, evidenceTier, defaultConfidence, description }) {

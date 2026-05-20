@@ -11,18 +11,34 @@ const repoRoot = resolve(scriptDir, '../../..');
 const sourceScriptsDir = resolve(repoRoot, 'packages/db/scripts');
 const expectedSources = [
   'hh',
+  'rabota-rossii',
   'career-pages',
   'linkedin-company-pages',
   'tech-job-boards',
   'egrul-fns',
   'company-site',
   'funding-business-signals',
+  'transparent-business-fns',
+  'fedresurs',
+  'superjob',
+  'habr-career',
+  'company-newsrooms',
+  'industry-media',
+  'regional-job-boards',
 ];
 const digestLeadSources = ['career-pages', 'hh'];
 const providerTokenSources = [
   'linkedin-company-pages',
+  'tech-job-boards',
   'egrul-fns',
   'funding-business-signals',
+  'transparent-business-fns',
+  'fedresurs',
+  'superjob',
+  'habr-career',
+  'company-newsrooms',
+  'industry-media',
+  'regional-job-boards',
 ];
 const requireLiveConfig = process.argv.includes('--require-live-config')
   || process.env.SOURCE_READINESS_REQUIRE_LIVE_CONFIG === '1';
@@ -31,6 +47,10 @@ const includeProviderRequired = process.argv.includes('--include-provider-requir
 const liveConfigRules = {
   hh: [
     liveRule(['HH_USER_AGENT']),
+  ],
+  'rabota-rossii': [
+    liveRule(['RABOTA_ROSSII_SEARCH_TEXT']),
+    liveRule(['RABOTA_ROSSII_INPUT_FILE']),
   ],
   'career-pages': [
     liveRule(['CAREER_PAGES_INPUT_FILE']),
@@ -43,6 +63,7 @@ const liveConfigRules = {
   'tech-job-boards': [
     liveRule(['TECH_JOB_BOARDS_GREENHOUSE_TOKENS']),
     liveRule(['TECH_JOB_BOARDS_LEVER_SLUGS']),
+    providerRule(['TECH_JOB_BOARDS_PROVIDER_API_URL', 'TECH_JOB_BOARDS_PROVIDER_API_TOKEN']),
   ],
   'egrul-fns': [
     liveRule(['EGRUL_FNS_INNS']),
@@ -55,6 +76,35 @@ const liveConfigRules = {
     liveRule(['FUNDING_SIGNALS_GDELT_QUERIES']),
     liveRule(['FUNDING_SIGNALS_GDELT_QUERIES_JSON']),
     providerRule(['FUNDING_SIGNALS_PROVIDER_API_URL', 'FUNDING_SIGNALS_PROVIDER_API_TOKEN']),
+  ],
+  'transparent-business-fns': [
+    providerRule(['TRANSPARENT_BUSINESS_FNS_PROVIDER_API_URL', 'TRANSPARENT_BUSINESS_FNS_PROVIDER_API_TOKEN']),
+    liveRule(['TRANSPARENT_BUSINESS_FNS_INPUT_FILE']),
+  ],
+  fedresurs: [
+    providerRule(['FEDRESURS_PROVIDER_API_URL', 'FEDRESURS_PROVIDER_API_TOKEN']),
+    liveRule(['FEDRESURS_INPUT_FILE']),
+  ],
+  superjob: [
+    providerRule(['SUPERJOB_PROVIDER_API_URL', 'SUPERJOB_API_APP_ID']),
+    liveRule(['SUPERJOB_INPUT_FILE']),
+  ],
+  'habr-career': [
+    providerRule(['HABR_CAREER_PROVIDER_API_URL', 'HABR_CAREER_PROVIDER_API_TOKEN']),
+    liveRule(['HABR_CAREER_INPUT_FILE']),
+  ],
+  'company-newsrooms': [
+    providerRule(['COMPANY_NEWSROOMS_PROVIDER_API_URL', 'COMPANY_NEWSROOMS_PROVIDER_API_TOKEN']),
+    liveRule(['COMPANY_NEWSROOMS_INPUT_FILE']),
+    liveRule(['COMPANY_NEWSROOMS_TARGETS_FILE']),
+  ],
+  'industry-media': [
+    providerRule(['INDUSTRY_MEDIA_PROVIDER_API_URL', 'INDUSTRY_MEDIA_PROVIDER_API_TOKEN']),
+    liveRule(['INDUSTRY_MEDIA_INPUT_FILE']),
+  ],
+  'regional-job-boards': [
+    providerRule(['REGIONAL_JOB_BOARDS_PROVIDER_API_URL', 'REGIONAL_JOB_BOARDS_PROVIDER_API_TOKEN']),
+    liveRule(['REGIONAL_JOB_BOARDS_INPUT_FILE']),
   ],
 };
 
@@ -92,10 +142,12 @@ for (const sourceId of providerTokenSources) {
 
   const scriptPath = resolve(repoRoot, source.actionMap.fetch.script);
   const scriptText = readFileSync(scriptPath, 'utf8');
-  assert.match(
-    scriptText,
-    /provider-contract\.mjs/,
-    `${sourceId} must use the shared provider contract parser`,
+  const runtimeText = readFileSync(resolve(sourceScriptsDir, 'adapters/rf-source-runtime.mjs'), 'utf8');
+  assert.equal(
+    /provider-contract\.mjs/.test(scriptText)
+      || (/rf-source-runtime\.mjs/.test(scriptText) && /provider-contract\.mjs/.test(runtimeText)),
+    true,
+    `${sourceId} must use the shared provider contract parser directly or through rf-source-runtime`,
   );
 }
 

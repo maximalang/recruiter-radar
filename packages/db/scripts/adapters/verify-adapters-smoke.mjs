@@ -20,6 +20,7 @@ import {
   stripBom,
 } from './source-records.mjs';
 import { fetchJson, fetchText } from './source-http.mjs';
+import { buildCompanyIdentity } from './rf-source-runtime.mjs';
 
 const scriptDir = fileURLToPath(new URL('.', import.meta.url));
 
@@ -102,6 +103,18 @@ function runSourceRecordsSmoke() {
     buildSourceKeyAliases(['domain:romashka.ru', 'company-name:ooo romashka'], ['ru-legal-name:romashka'], 'domain:romashka.ru'),
     ['company-name:ooo romashka', 'ru-legal-name:romashka'],
   );
+  assert.equal(
+    buildCompanyIdentity({
+      companyName: null,
+      companyDomain: null,
+      companyWebsiteUrl: null,
+      sourceUrl: 'https://jobs.example/vacancies/1',
+      fallbackName: null,
+      lineNumber: 1,
+    }),
+    null,
+    'RF source identity must not infer company domain from job/article/source URLs',
+  );
 
   const dedupeResult = dedupeNormalizedRecords([
     { signalExternalId: 'one', value: 1 },
@@ -119,6 +132,7 @@ function runSourceRecordsSmoke() {
     bomStripVerified: true,
     dedupeVerified: true,
     russianLegalNameVerified: true,
+    sourceUrlIdentityRejected: true,
     duplicateRecords: dedupeResult.duplicateRecords,
   };
 }

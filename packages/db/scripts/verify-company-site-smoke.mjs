@@ -107,7 +107,8 @@ async function runLiveCrawlSmoke() {
           </head>
           <body>
             <main>
-              We are hiring. Join our team. Open positions for backend engineers.
+              \u0412\u0430\u043a\u0430\u043d\u0441\u0438\u0438: \u043c\u044b \u0438\u0449\u0435\u043c backend engineers.
+              \u041e\u0442\u043a\u0440\u044b\u0442\u044b\u0435 \u043f\u043e\u0437\u0438\u0446\u0438\u0438 \u0434\u043b\u044f \u043f\u0440\u043e\u0434\u0443\u043a\u0442\u043e\u0432\u044b\u0445 \u0438\u043d\u0436\u0435\u043d\u0435\u0440\u043e\u0432.
               <a href=mailto:hr@livesmoke.example>HR</a>
               <a href=mailto:hr.ivan@livesmoke.example>HR Ivan</a>
               <a href=mailto:ivan.petrov@livesmoke.example>Ivan Petrov</a>
@@ -166,12 +167,16 @@ async function runLiveCrawlSmoke() {
     assert.equal(liveRecord.pageUrl, `${baseUrl}/careers`);
     assert.equal(liveRecord.pageTitle, 'Live Smoke Careers');
     assert.ok(
+      liveRecord.signals.includes('hiring_section'),
+      'live crawl should detect Russian vacancies evidence',
+    );
+    assert.ok(
       liveRecord.signals.includes('active_hiring'),
-      'live crawl should detect active hiring evidence',
+      'live crawl should detect Russian active hiring evidence',
     );
     assert.ok(
       liveRecord.signals.includes('open_positions'),
-      'live crawl should detect open positions evidence',
+      'live crawl should detect Russian open positions evidence',
     );
     assert.deepEqual(liveRecord.contactPaths, [
       { type: 'generic_email', value: 'hr@livesmoke.example', source: 'mailto' },

@@ -6,11 +6,16 @@ import pg from 'pg';
 import { fetchGreenhouseBoards, parseGreenhouseJobs } from './adapters/greenhouse.mjs';
 import { fetchLeverCompanies, parseLeverPostings } from './adapters/lever.mjs';
 import {
+  assertProviderNormalization,
+  extractProviderRecords,
+} from './adapters/provider-contract.mjs';
+import {
   buildRussianLegalNameSourceKey,
   buildSourceKeyAliases,
   dedupeNormalizedRecords,
   stripBom,
 } from './adapters/source-records.mjs';
+import { fetchJson } from './adapters/source-http.mjs';
 
 const { Client } = pg;
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -36,7 +41,9 @@ export async function runTechJobBoardsCli(argv = process.argv.slice(2)) {
   try {
     let input = resolveTechJobBoardsInput();
 
-    if (input.inputMode === 'live-pending') {
+    if (input.inputMode === 'provider-pending') {
+      input = await resolveTechJobBoardsProviderInput(input);
+    } else if (input.inputMode === 'live-pending') {
       input = await resolveTechJobBoardsLiveInput(input);
     }
 
@@ -77,6 +84,13 @@ export function resolveTechJobBoardsInput() {
     return resolveFileInput(inputFilePath);
   }
 
+  const providerUrl = process.env.TECH_JOB_BOARDS_PROVIDER_API_URL?.trim();
+  const providerToken = process.env.TECH_JOB_BOARDS_PROVIDER_API_TOKEN?.trim();
+
+  if (providerUrl && providerToken) {
+    return { inputMode: 'provider-pending', providerUrl, providerToken };
+  }
+
   const greenhouseTokens = parseCommaSeparated(process.env.TECH_JOB_BOARDS_GREENHOUSE_TOKENS);
   const leverSlugs = parseCommaSeparated(process.env.TECH_JOB_BOARDS_LEVER_SLUGS);
 
@@ -87,8 +101,45 @@ export function resolveTechJobBoardsInput() {
   throw new Error(
     'No input configured for tech-job-boards.\n'
       + 'Set TECH_JOB_BOARDS_INPUT_FILE for file mode, or\n'
+      + 'set TECH_JOB_BOARDS_PROVIDER_API_URL and TECH_JOB_BOARDS_PROVIDER_API_TOKEN for provider mode, or\n'
       + 'set TECH_JOB_BOARDS_GREENHOUSE_TOKENS and/or TECH_JOB_BOARDS_LEVER_SLUGS for live mode.',
   );
+}
+
+export async function resolveTechJobBoardsProviderInput({ providerUrl, providerToken }) {
+  let body;
+
+  try {
+    body = await fetchJson(providerUrl, {
+      sourceName: 'tech-job-boards provider',
+      headers: {
+        authorization: `Bearer ${providerToken}`,
+      },
+    });
+  } catch (error) {
+    throw new Error(
+      `${error instanceof Error ? error.message : String(error)}\n`
+        + 'Verify TECH_JOB_BOARDS_PROVIDER_API_URL and TECH_JOB_BOARDS_PROVIDER_API_TOKEN are correct.',
+      { cause: error },
+    );
+  }
+
+  const records = extractProviderRecords(body, SOURCE_ID);
+  const input = buildNormalizedInput({
+    inputMode: 'provider-token',
+    inputFilePath: null,
+    records,
+    rejectAllSkipped: true,
+  });
+
+  assertProviderNormalization({
+    sourceId: SOURCE_ID,
+    recordsReceived: records.length,
+    normalizedRecords: input.normalizedRecords,
+    skippedRecords: input.skippedRecords,
+  });
+
+  return input;
 }
 
 export async function resolveTechJobBoardsLiveInput({ greenhouseTokens, leverSlugs }) {
@@ -104,33 +155,11 @@ export async function resolveTechJobBoardsLiveInput({ greenhouseTokens, leverSlu
     records.push(...leverJobs);
   }
 
-  const fetchedAt = new Date().toISOString();
-  const deduped = dedupeRecords(records);
-  const normalizedRecords = [];
-  let skippedRecords = 0;
-
-  for (const [index, record] of deduped.entries()) {
-    const normalized = normalizeTechJobBoardRecord(record, fetchedAt, index + 1);
-
-    if (!normalized) {
-      skippedRecords += 1;
-      continue;
-    }
-
-    normalizedRecords.push(normalized);
-  }
-
-  const normalizedDedupeResult = dedupeNormalizedRecords(normalizedRecords);
-
-  return {
+  return buildNormalizedInput({
     inputMode: 'live-public',
     inputFilePath: null,
-    recordsReceived: records.length,
-    recordsAfterDedupe: deduped.length,
-    duplicateRecords: records.length - deduped.length + normalizedDedupeResult.duplicateRecords,
-    normalizedRecords: normalizedDedupeResult.records,
-    skippedRecords,
-  };
+    records,
+  });
 }
 
 function resolveFileInput(inputFilePath) {
@@ -142,6 +171,14 @@ function resolveFileInput(inputFilePath) {
 
   const rawContent = stripBom(readFileSync(resolvedPath, 'utf8'));
   const records = parseInputRecords(rawContent, resolvedPath);
+  return buildNormalizedInput({
+    inputMode: 'file',
+    inputFilePath: resolvedPath,
+    records,
+  });
+}
+
+function buildNormalizedInput({ inputMode, inputFilePath, records, rejectAllSkipped = false }) {
   const fetchedAt = new Date().toISOString();
   const deduped = dedupeRecords(records);
   const normalizedRecords = [];
@@ -160,9 +197,16 @@ function resolveFileInput(inputFilePath) {
 
   const normalizedDedupeResult = dedupeNormalizedRecords(normalizedRecords);
 
+  if (rejectAllSkipped && records.length > 0 && normalizedDedupeResult.records.length === 0) {
+    throw new Error(
+      `${SOURCE_ID} provider returned ${records.length} records but 0 normalized records`
+        + ` (${skippedRecords} skipped). Check provider response mapping before running in production.`,
+    );
+  }
+
   return {
-    inputMode: 'file',
-    inputFilePath: resolvedPath,
+    inputMode,
+    inputFilePath,
     recordsReceived: records.length,
     recordsAfterDedupe: deduped.length,
     duplicateRecords: records.length - deduped.length + normalizedDedupeResult.duplicateRecords,
@@ -266,7 +310,7 @@ function normalizeTechJobBoardRecord(record, fetchedAt, lineNumber) {
   const salary = toNonEmptyText(record.salary ?? record.compensation);
   const tags = Array.isArray(record.tags) ? record.tags.map((t) => String(t).trim()).filter(Boolean) : [];
 
-  const inferredDomain = companyDomain ?? extractHostname(companyWebsiteUrl) ?? extractHostname(jobPostingUrl);
+  const inferredDomain = companyDomain ?? extractHostname(companyWebsiteUrl);
 
   if (!companyName && !inferredDomain) {
     return null;
@@ -600,7 +644,7 @@ function buildSignalPayload(record) {
     source_entity_type: 'company',
     source_entity_key: record.primarySourceKey,
     source_entity_alias_keys: buildSourceKeyAliases(record.orgSourceKeys, record.orgSourceAliasKeys, record.primarySourceKey),
-    source_entity_external_id: record.externalId,
+    source_entity_external_id: null,
     source_entity_display_name: record.orgDisplayName,
     source_entity_name: record.orgName,
     source_record_type: 'job_posting',
@@ -613,6 +657,7 @@ function buildSignalPayload(record) {
     company_domain: record.companyDomain,
     company_website_url: record.companyWebsiteUrl,
     job_posting_url: record.jobPostingUrl,
+    vacancy_id: record.externalId,
     job_title: record.jobTitle,
     location: record.location,
     employment_type: record.employmentType,
