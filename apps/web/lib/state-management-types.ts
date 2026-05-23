@@ -269,17 +269,43 @@ export interface AsyncAction extends BaseAction {
   };
 }
 
-// Middleware Types
-export interface MiddlewareAPI<S> {
-  dispatch: Dispatch<S>;
-  getState: () => S;
+// Enhanced middleware types with configuration support
+export interface EnhancedMiddleware<S = unknown> {
+  (store: MiddlewareAPI<S>, next: Dispatch<S>): Dispatch<S>;
 }
 
-export interface Middleware<S = unknown> {
-  (action: BaseAction, next: Dispatch<S>): unknown;
+export interface MiddlewareAPI<S = unknown> {
+  dispatch: Dispatch<S>;
+  getState: () => S;
+  config?: Record<string, any>;
+}
+
+export interface Middleware {
+  (action: BaseAction, next: Dispatch): unknown;
 }
 
 export type Dispatch<S> = (action: BaseAction) => unknown;
+
+// Enhanced action types
+export interface BaseEnhancedAction extends BaseAction {
+  timestamp?: string;
+  error?: string;
+  meta?: {
+    timestamp?: string;
+    originalAction?: BaseAction;
+    data?: unknown;
+  };
+}
+
+// Action types for enhanced middleware
+export const ACTION_TYPES = {
+  VALIDATION_ERROR: 'VALIDATION_ERROR',
+  RATE_LIMIT_EXCEEDED: 'RATE_LIMIT_EXCEEDED',
+  MIDDLEWARE_ERROR: 'MIDDLEWARE_ERROR',
+  ASYNC_ACTION_STARTED: 'ASYNC_ACTION_STARTED',
+  ASYNC_ACTION_FULFILLED: 'ASYNC_ACTION_FULFILLED',
+  ASYNC_ACTION_REJECTED: 'ASYNC_ACTION_REJECTED'
+} as const;
 
 // Context Provider Props
 export interface ProviderProps {

@@ -264,7 +264,7 @@ export function useFormValidation<T extends Record<string, any>>(
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Validate a single field
-  const validateField = useCallback((name: string, value: unknown): void => {
+  const validateFieldInternal = useCallback((name: string, value: unknown): void => {
     const rule = initialRules[name];
     if (!rule) return;
 
@@ -301,10 +301,11 @@ export function useFormValidation<T extends Record<string, any>>(
     });
   }, []);
 
+  // Return the public API
   return {
     valid: Object.values(errors).every(error => !error),
     errors,
-    validateField,
+    validateField: validateFieldInternal,
     validateForm: validateFormCallback,
     clearErrors,
     setError,
