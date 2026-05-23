@@ -47,6 +47,10 @@ function decode(token: string): string | null {
   }
 }
 
+export async function getOwnerIdFromSession(): Promise<string | null> {
+  return readOwnerSession();
+}
+
 export function generateOwnerId(): string {
   // 8 random bytes → 16-char hex, used as anonymous visitor ID
   return randomBytes(8).toString("hex");

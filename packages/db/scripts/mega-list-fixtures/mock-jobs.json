@@ -1,0 +1,20 @@
+[
+  {
+    "id": "mock-1",
+    "job_title": "Senior Software Engineer",
+    "company_name": "TechCorp",
+    "company_domain": "techcorp.example",
+    "location": "San Francisco",
+    "salary": "150000-200000",
+    "published_at": "2026-05-21T12:18:00.985Z"
+  },
+  {
+    "id": "mock-2",
+    "job_title": "Product Manager",
+    "company_name": "Innovate Inc",
+    "company_domain": "innovate.example",
+    "location": "New York",
+    "salary": "120000-160000",
+    "published_at": "2026-05-21T12:18:00.986Z"
+  }
+]

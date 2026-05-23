@@ -1,0 +1,26 @@
+[
+  {
+    "external_id": "habr-conf-1",
+    "job_title": "Backend Developer (Python)",
+    "company_name": "IT Solutions",
+    "company_domain": "itsolutions.ru",
+    "inn": "5401234567",
+    "location": "Нижний Новгород",
+    "salary": "160 000 — 220 000 ₽",
+    "published_at": "2026-05-21T10:00:00.000Z",
+    "board": "habr-career",
+    "tags": ["python", "fastapi", "postgresql"]
+  },
+  {
+    "external_id": "habr-conf-2",
+    "job_title": "DevOps Engineer",
+    "company_name": "CloudTech",
+    "company_domain": "cloudtech.ru",
+    "inn": "5407654321",
+    "location": "Екатеринбург",
+    "salary": "180 000 — 250 000 ₽",
+    "published_at": "2026-05-20T10:00:00.000Z",
+    "board": "habr-career",
+    "tags": ["kubernetes", "terraform", "aws"]
+  }
+]

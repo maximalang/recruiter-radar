@@ -16,7 +16,7 @@ type TelegramLeadMessage = {
   score: number | null;
   lastSignalAt: string | null;
   userName: string;
-  confidenceGate?: string;
+  confidence_gate?: string;
 };
 
 type TelegramSendResult = {
@@ -64,7 +64,7 @@ function formatTelegramLeadMessage(lead: TelegramLeadMessage): string {
   const parts = [
     `Компания: ${lead.orgName}`,
     `Статус: ${lead.status}`,
-    `Score: ${lead.score ?? "-"}${formatConfidenceGateLabel(lead.confidenceGate)}`,
+    `Score: ${lead.score ?? "-"}${formatConfidenceGateLabel(lead.confidence_gate)}`,
     `Last signal at: ${formatDate(lead.lastSignalAt)}`,
     `Пользователь: ${lead.userName}`
   ];

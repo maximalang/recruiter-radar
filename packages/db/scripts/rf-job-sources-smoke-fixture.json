@@ -8,6 +8,8 @@
       "job_posting_url": "https://jobs.example/vacancies/job-smoke-1",
       "location": "Moscow",
       "salary": "250000",
+      "email": "must-drop@example.com",
+      "contact_person": "Must Drop",
       "tags": ["go", "postgres"]
     },
     {

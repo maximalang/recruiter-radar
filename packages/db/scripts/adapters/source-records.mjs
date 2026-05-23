@@ -47,6 +47,58 @@ export function buildSourceKeyAliases(sourceKeys, aliasKeys = [], currentSourceK
   );
 }
 
+export function countSensitiveFields(value) {
+  if (Array.isArray(value)) {
+    return value.reduce((total, item) => total + countSensitiveFields(item), 0);
+  }
+
+  if (!value || typeof value !== 'object') {
+    return 0;
+  }
+
+  let total = 0;
+
+  for (const [key, nestedValue] of Object.entries(value)) {
+    if (isSensitiveFieldName(key)) {
+      total += 1;
+      continue;
+    }
+
+    total += countSensitiveFields(nestedValue);
+  }
+
+  return total;
+}
+
+export function dropSensitiveFields(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => dropSensitiveFields(item));
+  }
+
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key]) => !isSensitiveFieldName(key))
+      .map(([key, nestedValue]) => [key, dropSensitiveFields(nestedValue)]),
+  );
+}
+
+export function isSensitiveFieldName(value) {
+  const normalizedKey = normalizeFieldName(value);
+
+  if (!normalizedKey) {
+    return false;
+  }
+
+  return SENSITIVE_FIELD_NAMES.has(normalizedKey)
+    || normalizedKey.endsWith('_email')
+    || normalizedKey.endsWith('_phone')
+    || normalizedKey.endsWith('_profile_url');
+}
+
 export function normalizeRussianLegalName(value) {
   const normalizedText = normalizeLegalNameText(value);
 
@@ -137,6 +189,32 @@ const RUSSIAN_LEGAL_FORMS = Object.freeze([
   '\u0430\u043e',
 ]);
 
+const SENSITIVE_FIELD_NAMES = new Set([
+  'contact',
+  'contact_email',
+  'contact_name',
+  'contact_person',
+  'contact_phone',
+  'email',
+  'emails',
+  'employee',
+  'employee_email',
+  'employee_name',
+  'employees',
+  'linkedin_profile_url',
+  'mobile_phone',
+  'person',
+  'person_name',
+  'phone',
+  'phone_number',
+  'phones',
+  'profile_url',
+  'recruiter_email',
+  'recruiter_name',
+  'telegram',
+  'whatsapp',
+]);
+
 function stripLegalForm(value, legalForm) {
   return (' ' + value + ' ').replaceAll(' ' + legalForm + ' ', ' ').trim();
 }
@@ -155,6 +233,21 @@ function normalizeLegalNameText(value) {
   }
 
   return compactLegalNameText(normalized);
+}
+
+function normalizeFieldName(value) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const normalizedValue = value
+    .trim()
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replace(/[^A-Za-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .toLowerCase();
+
+  return normalizedValue === '' ? null : normalizedValue;
 }
 
 function compactLegalNameText(value) {

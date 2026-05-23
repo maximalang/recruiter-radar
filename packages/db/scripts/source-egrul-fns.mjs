@@ -12,6 +12,8 @@ import {
   buildSourceKeyAliases,
   dedupeNormalizedRecords,
   stripBom,
+  loadEnvFile,
+  normalizeDomain,
 } from './adapters/source-records.mjs';
 import { fetchJson } from './adapters/source-http.mjs';
 
@@ -53,7 +55,6 @@ const EGRUL_KEYS = Object.freeze({
   okvedName: '\u041d\u0430\u0438\u043c\u041e\u041a\u0412\u042d\u0414',
 });
 
-loadEnvFile(rootEnvPath);
 
 export async function runEgrulFnsCli(argv = process.argv.slice(2)) {
   const requestedAction = argv[0]?.trim() || 'pipeline';
@@ -861,50 +862,6 @@ function resolveDbConnectionTimeoutMillis() {
 
   const parsedValue = Number.parseInt(rawValue, 10);
   return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : 5000;
-}
-
-function loadEnvFile(filePath) {
-  if (!existsSync(filePath)) {
-    return;
-  }
-
-  const envFile = stripBom(readFileSync(filePath, 'utf8'));
-
-  for (const rawLine of envFile.split(/\r?\n/)) {
-    const trimmedLine = rawLine.trim();
-
-    if (!trimmedLine || trimmedLine.startsWith('#')) {
-      continue;
-    }
-
-    const separatorIndex = rawLine.indexOf('=');
-
-    if (separatorIndex === -1) {
-      continue;
-    }
-
-    const key = rawLine.slice(0, separatorIndex).trim();
-
-    if (!key || process.env[key] !== undefined) {
-      continue;
-    }
-
-    let value = rawLine.slice(separatorIndex + 1).trim();
-
-    if (
-      (value.startsWith('"') && value.endsWith('"'))
-      || (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
-    }
-
-    process.env[key] = value;
-  }
-}
-
-export function normalizeDomain(value) {
-  const normalizedValue = normalizeSourceKeyText(value);
-  return normalizedValue ? normalizedValue.replace(/^www\./, '') : null;
 }
 
 export function normalizeSourceKeyText(value) {

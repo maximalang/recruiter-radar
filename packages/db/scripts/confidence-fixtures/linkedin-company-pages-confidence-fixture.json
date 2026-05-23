@@ -1,0 +1,29 @@
+[
+  {
+    "external_id": "linkedin-conf-1",
+    "job_title": "Product Manager",
+    "company_name": "BigTech Co",
+    "company_domain": "bigtech.com",
+    "company_website_url": "https://bigtech.com",
+    "inn": "9876543210",
+    "location": "Remote",
+    "salary": "250 000 — 350 000 ₽",
+    "published_at": "2026-05-21T10:00:00.000Z",
+    "board": "linkedin",
+    "industry": "Technology",
+    "employee_count": 1000
+  },
+  {
+    "external_id": "linkedin-conf-2",
+    "job_title": "Data Scientist",
+    "company_name": "AI Innovations",
+    "company_domain": "ai-innovations.com",
+    "inn": "7712345678",
+    "location": "San Francisco",
+    "salary": "300 000 — 400 000 ₽",
+    "published_at": "2026-05-20T10:00:00.000Z",
+    "board": "linkedin",
+    "industry": "Artificial Intelligence",
+    "employee_count": 500
+  }
+]

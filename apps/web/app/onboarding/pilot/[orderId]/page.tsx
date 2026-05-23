@@ -500,7 +500,7 @@ export default async function PilotOnboardingPage({
 
                     <div style={{ display: "grid", gap: "12px" }}>
                       {visiblePreviewItems.map((item) => (
-                        <OnboardingPreviewCard key={`${item.orgId}-${item.rank}`} item={item} />
+                        <OnboardingPreviewCard key={`${item.org_id}-${item.rank}`} item={item} />
                       ))}
 
                       {hiddenPreviewItems.length > 0 ? (
@@ -511,7 +511,7 @@ export default async function PilotOnboardingPage({
                           <div style={disclosureBodyStyle}>
                             <div style={{ display: "grid", gap: "12px" }}>
                               {hiddenPreviewItems.map((item) => (
-                                <OnboardingPreviewCard key={`${item.orgId}-${item.rank}`} item={item} />
+                                <OnboardingPreviewCard key={`${item.org_id}-${item.rank}`} item={item} />
                               ))}
                             </div>
                           </div>
@@ -583,7 +583,7 @@ export default async function PilotOnboardingPage({
 
                       <div style={{ display: "grid", gap: "12px" }}>
                         {visiblePreviewItems.map((item) => (
-                          <OnboardingPreviewCard key={`reentry-${item.orgId}-${item.rank}`} item={item} />
+                          <OnboardingPreviewCard key={`reentry-${item.org_id}-${item.rank}`} item={item} />
                         ))}
 
                         {hiddenPreviewItems.length > 0 ? (
@@ -594,7 +594,7 @@ export default async function PilotOnboardingPage({
                             <div style={disclosureBodyStyle}>
                               <div style={{ display: "grid", gap: "12px" }}>
                                 {hiddenPreviewItems.map((item) => (
-                                  <OnboardingPreviewCard key={`reentry-hidden-${item.orgId}-${item.rank}`} item={item} />
+                                  <OnboardingPreviewCard key={`reentry-hidden-${item.org_id}-${item.rank}`} item={item} />
                                 ))}
                               </div>
                             </div>
@@ -679,7 +679,7 @@ function OnboardingPreviewCard(props: {
   const { item } = props;
   const primaryReason = item.reasons[0] ?? "Сейчас по компании есть повод выйти в контакт.";
   const secondaryReason = item.reasons[1] ?? null;
-  const hasExtraContext = Boolean(secondaryReason) || item.sourceFamilies.length > 0;
+  const hasExtraContext = Boolean(secondaryReason) || item.source_families.length > 0;
 
   return (
     <article style={previewCardStyle}>
@@ -708,10 +708,10 @@ function OnboardingPreviewCard(props: {
           <summary style={disclosureSummaryStyle}>Что ещё видно</summary>
           <div style={disclosureBodyStyle}>
             {secondaryReason ? <div style={helperTextStyle}>{secondaryReason}</div> : null}
-            {item.sourceFamilies.length > 0 ? (
+            {item.source_families.length > 0 ? (
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                {item.sourceFamilies.slice(0, 2).map((label) => (
-                  <span key={`${item.orgId}-${label}`} style={previewChipStyle}>
+                {item.source_families.slice(0, 2).map((label) => (
+                  <span key={`${item.org_id}-${label}`} style={previewChipStyle}>
                     {label}
                   </span>
                 ))}

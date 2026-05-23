@@ -2,10 +2,12 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import {
+  buildRfJobQuality,
+} from './adapters/rf-source-normalizers.mjs';
+import {
   buildCompanyIdentity,
   clampInteger,
   createStandardSourceRuntime,
-  loadEnvFile,
   normalizeDomain,
   normalizeLegalInn,
   normalizeLegalOgrn,
@@ -14,6 +16,7 @@ import {
   toTimestampOrNull,
   toUrlOrNull,
 } from './adapters/rf-source-runtime.mjs';
+import { runScriptCli } from './lib/common-utils.mjs';
 import { fetchJson } from './adapters/source-http.mjs';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -21,7 +24,6 @@ const rootEnvPath = resolve(scriptDir, '../../../.env');
 const SOURCE_ID = 'rabota-rossii';
 const API_URL = 'https://opendata.trudvsem.ru/api/v1/vacancies';
 
-loadEnvFile(rootEnvPath);
 
 const runtime = createStandardSourceRuntime({
   sourceId: SOURCE_ID,
@@ -116,7 +118,9 @@ export function buildFetchSummary(input) {
 }
 
 export async function runRabotaRossiiCli(argv = process.argv.slice(2)) {
-  await runtime.runCli(argv, resolveRabotaRossiiConfiguredInput);
+  await runScriptCli('source-rabota-rossii', async () => {
+    await runtime.runCli(argv, resolveRabotaRossiiConfiguredInput);
+  });
 }
 
 function extractRabotaRossiiRecords(body) {
@@ -158,6 +162,16 @@ function normalizeRabotaRossiiRecord(record, { fetchedAt, lineNumber }) {
   const currency = toNonEmptyText(record.currency);
   const schedule = toNonEmptyText(record.schedule);
   const category = toNonEmptyText(record.category?.specialisation ?? record.category);
+  const rfQuality = buildRfJobQuality({
+    companyName,
+    jobTitle,
+    location,
+    salary: salaryText ?? [salaryMin, salaryMax, currency].filter(Boolean).join(' '),
+    employmentType: schedule,
+    occurredAt,
+    fetchedAt,
+    board: SOURCE_ID,
+  });
 
   if (!jobTitle) {
     return null;
@@ -206,6 +220,16 @@ function normalizeRabotaRossiiRecord(record, { fetchedAt, lineNumber }) {
       schedule,
       category,
       employer_url: toUrlOrNull(company.url),
+      region_raw: location,
+      region_canonical: rfQuality.regionCanonical,
+      salary_rub_min: rfQuality.salaryRub.min,
+      salary_rub_max: rfQuality.salaryRub.max,
+      salary_currency: rfQuality.salaryRub.currency ?? currency,
+      is_remote: rfQuality.workModeFlags.remote,
+      is_hybrid: rfQuality.workModeFlags.hybrid,
+      is_rotational: rfQuality.workModeFlags.rotational,
+      vacancy_freshness: rfQuality.freshness,
+      quality_penalties: rfQuality.qualityPenalties,
     },
   };
 }

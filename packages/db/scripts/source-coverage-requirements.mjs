@@ -1,0 +1,109 @@
+export const SOURCE_COVERAGE_TIERS = Object.freeze({
+  P1: Object.freeze({
+    description: 'Core production-ready sources for MVP',
+    required: true,
+    sources: ['hh', 'rabota-rossii', 'career-pages', 'egrul-fns', 'transparent-business-fns', 'fedresurs'],
+    leadEligibilityRequirements: {
+      hh: 'digest-lead-originating',
+      'rabota-rossii': 'confidence-gated-evidence',
+      'career-pages': 'digest-lead-originating',
+      'egrul-fns': 'enrichment-only',
+      'transparent-business-fns': 'enrichment-only',
+      'fedresurs': 'context-only'
+    },
+    minMaturity: 'controlled-live-ready'
+  }),
+  P2: Object.freeze({
+    description: 'Secondary sources with confidence gates',
+    required: true,
+    sources: ['company-site', 'funding-business-signals', 'linkedin-company-pages', 'tech-job-boards', 'superjob', 'habr-career'],
+    leadEligibilityRequirements: {
+      'company-site': 'enrichment-only',
+      'funding-business-signals': 'context-only',
+      'linkedin-company-pages': 'confidence-gated-evidence',
+      'tech-job-boards': 'confidence-gated-evidence',
+      'superjob': 'confidence-gated-evidence',
+      'habr-career': 'confidence-gated-evidence'
+    },
+    minMaturity: 'curated-live-ready'
+  }),
+  P3: Object.freeze({
+    description: 'Context sources with supporting role',
+    required: true,
+    sources: ['company-newsrooms', 'industry-media', 'regional-job-boards'],
+    leadEligibilityRequirements: {
+      'company-newsrooms': 'context-only',
+      'industry-media': 'context-only',
+      'regional-job-boards': 'confidence-gated-evidence'
+    },
+    minMaturity: 'curated-context-only'
+  })
+});
+
+export const DIGEST_SOURCES = Object.freeze(['hh', 'career-pages']);
+
+export const PROMOTION_STATUSES = Object.freeze({
+  'digest-allowed': 'Allowed in digest selection',
+  'digest-allowed-with-confidence-gate': 'Allowed with confidence gate validation',
+  'blocked-from-digest-pending-confidence-tests': 'Blocked until confidence tests pass',
+  'never-lead-originating': 'Never creates leads, context only',
+  'supporting-evidence-only': 'Only supports existing evidence'
+});
+
+export function validateSourceCoverage(sources) {
+  const results = {
+    P1: { present: [], missing: [], compliant: [], nonCompliant: [] },
+    P2: { present: [], missing: [], compliant: [], nonCompliant: [] },
+    P3: { present: [], missing: [], compliant: [], nonCompliant: [] },
+    errors: [],
+    warnings: []
+  };
+
+  // Check each required source
+  for (const [tier, config] of Object.entries(SOURCE_COVERAGE_TIERS)) {
+    for (const sourceId of config.sources) {
+      const source = sources.find(s => s.id === sourceId);
+
+      if (!source) {
+        results[tier].missing.push(sourceId);
+        results.errors.push(`Missing required ${tier} source: ${sourceId}`);
+        continue;
+      }
+
+      results[tier].present.push(sourceId);
+
+      // Check maturity
+      if (source.maturity && source.maturity < config.minMaturity) {
+        results[tier].nonCompliant.push({
+          source: sourceId,
+          reason: `Maturity ${source.maturity} < required ${config.minMaturity}`
+        });
+        results.errors.push(`${sourceId} maturity below required ${config.minMaturity}`);
+      }
+
+      // Check lead eligibility match
+      const expectedEligibility = config.leadEligibilityRequirements[sourceId];
+      if (expectedEligibility && source.leadEligibility !== expectedEligibility) {
+        results[tier].nonCompliant.push({
+          source: sourceId,
+          reason: `Lead eligibility mismatch: expected ${expectedEligibility}, got ${source.leadEligibility}`
+        });
+        results.errors.push(`${sourceId} lead eligibility mismatch`);
+      }
+
+      if (!results[tier].nonCompliant.find(n => n.source === sourceId)) {
+        results[tier].compliant.push(sourceId);
+      }
+    }
+  }
+
+  // Check digest sources are properly gated
+  for (const sourceId of DIGEST_SOURCES) {
+    const source = sources.find(s => s.id === sourceId);
+    if (source && source.promotionStatus !== 'digest-allowed') {
+      results.warnings.push(`Digest source ${sourceId} should have promotionStatus 'digest-allowed'`);
+    }
+  }
+
+  return results;
+}

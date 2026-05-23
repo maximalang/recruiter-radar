@@ -1,0 +1,26 @@
+[
+  {
+    "external_id": "sj-conf-1",
+    "job_title": "Middle Python Developer",
+    "company_name": "DataSoft",
+    "company_domain": "datasoft.ru",
+    "inn": "7701234567",
+    "location": "Москва",
+    "salary": "150 000 — 200 000 ₽",
+    "published_at": "2026-05-21T10:00:00.000Z",
+    "board": "superjob",
+    "tags": ["python", "django", "postgresql"]
+  },
+  {
+    "external_id": "sj-conf-2",
+    "job_title": "Frontend Developer",
+    "company_name": "WebTech Solutions",
+    "company_domain": "webtech.ru",
+    "inn": "7707654321",
+    "location": "Санкт-Петербург",
+    "salary": "160 000 — 220 000 ₽",
+    "published_at": "2026-05-19T10:00:00.000Z",
+    "board": "superjob",
+    "tags": ["javascript", "vue", "react"]
+  }
+]

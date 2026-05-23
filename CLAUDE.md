@@ -1,6 +1,41 @@
-# Recruiter Radar — Claude Code Project Rules
+<!-- CODEGRAPH_START -->
+## CodeGraph
 
-## 1. Product Identity
+This project has a CodeGraph MCP server (`codegraph_*` tools) configured. CodeGraph is a tree-sitter-parsed knowledge graph of every symbol, edge, and file. Reads are sub-millisecond and return structural information grep cannot.
+
+### When to prefer codegraph over native search
+
+Use codegraph for **structural** questions — what calls what, what would break, where is X defined, what is X's signature. Use native grep/read only for **literal text** queries (string contents, comments, log messages) or after you already have a specific file open.
+
+| Question | Tool |
+|---|---|
+| "Where is X defined?" / "Find symbol named X" | `codegraph_search` |
+| "What calls function Y?" | `codegraph_callers` |
+| "What does Y call?" | `codegraph_callees` |
+| "What would break if I changed Z?" | `codegraph_impact` |
+| "Show me Y's signature / source / docstring" | `codegraph_node` |
+| "Give me focused context for a task/area" | `codegraph_context` |
+| "See several related symbols' source at once" | `codegraph_explore` |
+| "What files exist under path/" | `codegraph_files` |
+| "Is the index healthy?" | `codegraph_status` |
+
+### Rules of thumb
+
+- **Answer directly — don't delegate exploration.** For "how does X work" / architecture / trace questions, answer with 2-3 codegraph calls: `codegraph_context` first, then ONE `codegraph_explore` for the source of the symbols it surfaces. CodeGraph IS the pre-built index, so spawning a separate file-reading sub-task/agent — or running a grep + read loop — repeats work codegraph already did and costs more for the same answer.
+- **Trust codegraph results.** They come from a full AST parse. Do NOT re-verify them with grep — that's slower, less accurate, and wastes context.
+- **Don't grep first** when looking up a symbol by name. `codegraph_search` is faster and returns kind + location + signature in one call.
+- **Don't chain `codegraph_search` + `codegraph_node`** when you just want context — `codegraph_context` is one call.
+- **Don't loop `codegraph_node` over many symbols** — one `codegraph_explore` call returns several symbols' source grouped in a single capped call, while each separate node/Read call re-reads the whole context and costs far more.
+- **Index lag**: the file watcher debounces ~500ms behind writes; don't re-query immediately after editing a file in the same turn.
+
+### If `.codegraph/` doesn't exist
+
+The MCP server returns "not initialized." Ask the user: *"I notice this project doesn't have CodeGraph initialized. Want me to run `codegraph init -i` to build the index?"*
+<!-- CODEGRAPH_END -->
+
+## Recruiter Radar — Claude Code Project
+
+### Product Identity
 
 Recruiter Radar is a premium, Russia-first client-intelligence radar for recruitment agencies.
 
@@ -17,20 +52,20 @@ Recruiter Radar is a premium, Russia-first client-intelligence radar for recruit
 - a quality-first product that prioritizes trust, dedupe, confidence, and feedback loops
 - a Telegram-first delivery product with web onboarding and pilot activation
 
-**Core product loop:**
+### Core Product Loop
 
 ```
 Landing → live preview → pilot activation → client profile → Telegram connection →
 daily digest → feedback buttons → suppression/reweighting → better future digests
 ```
 
-## 2. Tech Stack
+### Tech Stack
 
 - **Product core:** Next.js + Postgres
 - **Orchestration only:** n8n (schedules, retries, webhook fan-out, operational alerts, calling product APIs)
 - **Do NOT** put core business logic in n8n (scoring, entity resolution, confidence gates, billing, suppression, digest state, feedback state, prompt versioning)
 
-## 3. Quality Principles
+### Quality Principles
 
 Always optimize for trust and clarity over feature volume.
 
@@ -45,7 +80,7 @@ Every lead recommendation must answer:
 
 **Do NOT create features** that produce more leads without improving evidence, confidence, dedupe, feedback, billing, delivery reliability, trust, security, activation, or conversion.
 
-## 4. FIUR Scoring Model
+### FIUR Scoring Model
 
 ```
 Total Score = 0.30 × Fit + 0.35 × Intent + 0.20 × Urgency + 0.15 × Reachability
@@ -58,7 +93,7 @@ Total Score = 0.30 × Fit + 0.35 × Intent + 0.20 × Urgency + 0.15 × Reachabil
 
 Do NOT treat "company is hiring an internal recruiter" as a hot signal by itself.
 
-## 5. Confidence Gates
+### Confidence Gates
 
 | Gate | Criteria | Delivery |
 |------|----------|----------|
@@ -67,7 +102,7 @@ Do NOT treat "company is hiring an internal recruiter" as a hot signal by itself
 | **C** | Platform-only aggregation or questionable entity match | Review required before delivery |
 | **D** | Context without direct hiring proof | Do not create lead; store as supporting context |
 
-## 6. Telegram Digest Requirements
+### Telegram Digest Requirements
 
 Telegram digest must be short, actionable, and stateful.
 
@@ -80,7 +115,7 @@ Inline buttons: Беру / Мимо / Позже / Уже написал / От�
 
 Callback handling must be: authenticated, idempotent, logged, replay-safe, connected to digest candidate state, reflected in future suppression/reweighting.
 
-## 7. Security Rules
+### Security Rules
 
 **NEVER commit secrets.**
 
@@ -97,9 +132,9 @@ All secrets must be referenced through environment variables or credentials. Use
 - `node_modules/`
 - `.next/` or `build/` or `dist/`
 
-## 8. Local Validation Commands
+### Local Validation Commands
 
-Before code changes: run preflight via `/rr-preflight`
+Before code changes: run preflight via standard agent tools
 
 After code changes:
 - Always run: `npm run web:check`
@@ -110,21 +145,7 @@ If database migrations changed: inspect schema consistency and mention how to ap
 If n8n workflow changed: confirm no secrets are present in exported JSON.
 If Telegram webhook changed: describe authentication, idempotency, replay-safety, and callback acknowledgement.
 
-## 9. Workflow
-
-**Local development only:**
-- Do NOT push
-- Do NOT create PRs
-- Do NOT touch `main`
-- Do NOT use `gh` commands
-
-Use `/rr-preflight` before starting work.
-Use `/rr-task` to start a scoped task.
-Use `/rr-review-lite` after small/local changes (git-only, no build).
-Use `/rr-review` after TS/JS changes or before committing.
-Use `/rr-ux` for UX/conversion review.
-
-## 10. Code Standards
+### Code Standards
 
 - Use TypeScript strictly
 - Prefer small, explicit functions over large hidden logic
@@ -136,26 +157,19 @@ Use `/rr-ux` for UX/conversion review.
 
 **Preferred:** "компании, которым стоит написать сегодня", "сигналы найма", "доказательства", "почему сейчас", "безопасный путь контакта", "ежедневный радар"
 
-## 11. Definition of Done
+### Definition of Done
 
 A task is done only when:
 1. The patch is minimal and scoped to the task
 2. Required checks pass, or failures are reported honestly
 3. The final report includes: changed files, check results, risks, suggested commit message
 
-## 12. Token / context discipline
+### Memory System
 
-- Start new sessions for unrelated tasks
-- Use /context before broad tasks
-- Use /compact after long sessions with focused instructions
-- Use /clear when switching product areas
-- Read only relevant files; prefer summaries over dumping whole files
-- Use installed skills selectively; avoid loading multiple skills for simple tasks
-- Use subagents or tasks for broad codebase research so large reads do not pollute the main session
+This project uses auto-memory to store project context, user preferences, and workflow patterns. Memory files are stored in `memory/` directory.
 
-## 13. Available Skills
+### Available Skills
 
-Use these personal skills as needed:
 - `using-agent-skills` — meta-skill for skill discovery
 - `context-engineering` — right context at the right time
 - `incremental-implementation` — thin vertical slices, test each before expanding

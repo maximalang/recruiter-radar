@@ -93,14 +93,14 @@ export async function POST(request: Request) {
   }
 
   try {
-    const ownsProfile = await checkTelegramChatOwnsClientProfile(senderChatId, parsedCallback.clientProfileId);
+    const ownsProfile = await checkTelegramChatOwnsClientProfile(senderChatId, parsedCallback.client_profile_id);
     if (!ownsProfile) {
       await pool.query(`UPDATE webhook_events SET status = 'ignored', processed_at = NOW() WHERE id = $1 AND processing_claim_token = $2`, [eventRow.id, claimToken]);
       await answerTelegramCallbackQuery({ callbackQueryId, botToken }).catch(() => {});
       return NextResponse.json({ ok: true, ignored: true });
     }
     if (parsedCallback.action !== "shown") {
-      await updateDigestOrgStateFeedback({ clientProfileId: parsedCallback.clientProfileId, orgId: parsedCallback.orgId, action: parsedCallback.action as DigestFeedbackAction });
+      await updateDigestOrgStateFeedback({ clientProfileId: parsedCallback.client_profile_id, orgId: parsedCallback.org_id, action: parsedCallback.action as DigestFeedbackAction });
     }
     await answerTelegramCallbackQuery({ callbackQueryId, botToken, text: parsedCallback.action === "shown" ? undefined : getDigestFeedbackConfirmationText(parsedCallback.action) });
     await pool.query(`UPDATE webhook_events SET status = 'processed', processed_at = NOW(), error_message = NULL WHERE id = $1 AND processing_claim_token = $2`, [eventRow.id, claimToken]);

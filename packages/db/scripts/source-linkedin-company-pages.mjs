@@ -7,13 +7,17 @@ import {
   assertProviderNormalization,
   extractProviderRecords,
 } from './adapters/provider-contract.mjs';
+import { buildRfJobQuality } from './adapters/rf-source-normalizers.mjs';
 import {
   buildRussianLegalNameSourceKey,
   buildSourceKeyAliases,
+  countSensitiveFields,
   dedupeNormalizedRecords,
+  dropSensitiveFields,
   stripBom,
 } from './adapters/source-records.mjs';
 import { fetchJson } from './adapters/source-http.mjs';
+import { loadEnvFile, runScriptCli } from './lib/common-utils.mjs';
 
 const { Client } = pg;
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -115,10 +119,12 @@ export async function resolveLinkedinProviderInput({ providerUrl, providerToken 
 
   const records = extractProviderRecords(body, SOURCE_ID);
   const fetchedAt = new Date().toISOString();
+  const sensitiveFieldsDropped = records.reduce((total, record) => total + countSensitiveFields(record), 0);
+  const sanitizedRecords = records.map((record) => dropSensitiveFields(record));
   const normalizedRecords = [];
   let skippedRecords = 0;
 
-  for (const [index, record] of records.entries()) {
+  for (const [index, record] of sanitizedRecords.entries()) {
     const normalized = normalizeLinkedinRecord(record, fetchedAt, index + 1);
 
     if (!normalized) {
@@ -142,9 +148,11 @@ export async function resolveLinkedinProviderInput({ providerUrl, providerToken 
     inputMode: 'provider-token',
     inputFilePath: null,
     recordsReceived: records.length,
+    recordsAfterDedupe: dedupeResult.records.length,
     duplicateRecords: dedupeResult.duplicateRecords,
     normalizedRecords: dedupeResult.records,
     skippedRecords,
+    sensitiveFieldsDropped,
   };
 }
 
@@ -158,10 +166,12 @@ function resolveLinkedinFileInput(inputFilePath) {
   const rawContent = stripBom(readFileSync(resolvedPath, 'utf8'));
   const records = parseInputRecords(rawContent, resolvedPath);
   const fetchedAt = new Date().toISOString();
+  const sensitiveFieldsDropped = records.reduce((total, record) => total + countSensitiveFields(record), 0);
+  const sanitizedRecords = records.map((record) => dropSensitiveFields(record));
   const normalizedRecords = [];
   let skippedRecords = 0;
 
-  for (const [index, record] of records.entries()) {
+  for (const [index, record] of sanitizedRecords.entries()) {
     const normalized = normalizeLinkedinRecord(record, fetchedAt, index + 1);
 
     if (!normalized) {
@@ -178,9 +188,11 @@ function resolveLinkedinFileInput(inputFilePath) {
     inputMode: 'file',
     inputFilePath: resolvedPath,
     recordsReceived: records.length,
+    recordsAfterDedupe: dedupeResult.records.length,
     duplicateRecords: dedupeResult.duplicateRecords,
     normalizedRecords: dedupeResult.records,
     skippedRecords,
+    sensitiveFieldsDropped,
   };
 }
 
@@ -219,9 +231,20 @@ function normalizeLinkedinRecord(record, fetchedAt, lineNumber) {
   const jobPostingUrl = toUrlOrNull(record.job_posting_url ?? record.job_url);
   const location = toNonEmptyText(record.location ?? record.city);
   const employmentType = toNonEmptyText(record.employment_type);
+  const salary = toNonEmptyText(record.salary ?? record.compensation);
   const linkedinCompanyId = toNonEmptyText(record.linkedin_company_id ?? record.company_id);
   const externalId = toNonEmptyText(record.external_id ?? record.id ?? record.job_id);
   const occurredAt = toTimestampOrNull(record.occurred_at ?? record.published_at ?? record.posted_at) ?? fetchedAt;
+  const rfQuality = buildRfJobQuality({
+    companyName,
+    jobTitle,
+    location,
+    salary,
+    employmentType,
+    occurredAt,
+    fetchedAt,
+    board: 'linkedin',
+  });
 
   const inferredDomain = companyDomain ?? extractHostname(companyWebsiteUrl);
 
@@ -267,6 +290,12 @@ function normalizeLinkedinRecord(record, fetchedAt, lineNumber) {
     jobPostingUrl,
     location,
     employmentType,
+    salary,
+    regionCanonical: rfQuality.regionCanonical,
+    salaryRub: rfQuality.salaryRub,
+    workModeFlags: rfQuality.workModeFlags,
+    freshness: rfQuality.freshness,
+    qualityPenalties: rfQuality.qualityPenalties,
     orgName,
     orgDisplayName: companyName ?? inferredDomain,
     primarySourceKey,
@@ -496,9 +525,11 @@ export function buildFetchSummary(input) {
     inputMode: input.inputMode,
     inputFilePath: input.inputFilePath,
     recordsReceived: input.recordsReceived,
+    recordsAfterDedupe: input.recordsAfterDedupe ?? input.normalizedRecords.length,
     duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
+    sensitiveFieldsDropped: input.sensitiveFieldsDropped ?? 0,
   };
 }
 
@@ -509,9 +540,11 @@ function buildIngestSummary(input, stats) {
     inputMode: input.inputMode,
     inputFilePath: input.inputFilePath,
     recordsReceived: input.recordsReceived,
+    recordsAfterDedupe: input.recordsAfterDedupe ?? input.normalizedRecords.length,
     duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
+    sensitiveFieldsDropped: input.sensitiveFieldsDropped ?? 0,
     orgsCreated: stats.orgUpsertCount,
     signalUpsertsCompleted: stats.signalUpsertCount,
   };
@@ -524,9 +557,11 @@ function buildPipelineSummary(input, stats) {
     inputMode: input.inputMode,
     inputFilePath: input.inputFilePath,
     recordsReceived: input.recordsReceived,
+    recordsAfterDedupe: input.recordsAfterDedupe ?? input.normalizedRecords.length,
     duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
+    sensitiveFieldsDropped: input.sensitiveFieldsDropped ?? 0,
     orgsCreated: stats.orgUpsertCount,
     signalUpsertsCompleted: stats.signalUpsertCount,
   };
@@ -576,7 +611,17 @@ function buildSignalPayload(record) {
     job_posting_url: record.jobPostingUrl,
     job_title: record.jobTitle,
     location: record.location,
+    region_canonical: record.regionCanonical,
     employment_type: record.employmentType,
+    salary: record.salary,
+    salary_rub_min: record.salaryRub.min,
+    salary_rub_max: record.salaryRub.max,
+    salary_currency: record.salaryRub.currency,
+    is_remote: record.workModeFlags.remote,
+    is_hybrid: record.workModeFlags.hybrid,
+    is_rotational: record.workModeFlags.rotational,
+    vacancy_freshness: record.freshness,
+    quality_penalties: record.qualityPenalties,
     fetched_at: record.fetchedAt,
   };
 }
@@ -615,49 +660,8 @@ function resolveDbConnectionTimeoutMillis() {
   return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : 5000;
 }
 
-function loadEnvFile(filePath) {
-  if (!existsSync(filePath)) {
-    return;
-  }
-
-  const envFile = stripBom(readFileSync(filePath, 'utf8'));
-
-  for (const rawLine of envFile.split(/\r?\n/)) {
-    const trimmedLine = rawLine.trim();
-
-    if (!trimmedLine || trimmedLine.startsWith('#')) {
-      continue;
-    }
-
-    const separatorIndex = rawLine.indexOf('=');
-
-    if (separatorIndex === -1) {
-      continue;
-    }
-
-    const key = rawLine.slice(0, separatorIndex).trim();
-
-    if (!key || process.env[key] !== undefined) {
-      continue;
-    }
-
-    let value = rawLine.slice(separatorIndex + 1).trim();
-
-    if (
-      (value.startsWith('"') && value.endsWith('"'))
-      || (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
-    }
-
-    process.env[key] = value;
-  }
-}
-
-export function normalizeDomain(value) {
-  const normalizedValue = normalizeSourceKeyText(value);
-  return normalizedValue ? normalizedValue.replace(/^www\./, '') : null;
-}
+// loadEnvFile moved to ./lib/common-utils.mjs
+// normalizeDomain moved to ./lib/common-utils.mjs
 
 export function normalizeSourceKeyText(value) {
   if (typeof value !== 'string') {
@@ -721,5 +725,5 @@ export function extractHostname(value) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  await runLinkedinCompanyPagesCli();
+  await runScriptCli('source-linkedin-company-pages', runLinkedinCompanyPagesCli);
 }

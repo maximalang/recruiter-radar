@@ -1,9 +1,8 @@
 {
   "env": {
-    "CLAUDE_CODE_DISABLE_GIT_INSTRUCTIONS": "1",
-    "SLASH_COMMAND_TOOL_CHAR_BUDGET": "4096"
+    "CLAUDE_CODE_DISABLE_GIT_INSTRUCTIONS": "0"
   },
-  "includeGitInstructions": false,
+  "includeGitInstructions": true,
   "permissions": {
     "allow": [
       "Bash(git status)",
@@ -14,12 +13,7 @@
       "Bash(git log)",
       "Bash(git log --oneline -10)",
       "Bash(git remote -v)",
-      "Bash(npm run web:check)",
-      "Bash(npm run web:build)",
-      "Bash(npm run web:validate)",
-      "Bash(npm run db:validate)",
-      "Bash(npm run verify:smoke)",
-      "Bash(npm run clean)",
+      "Bash(npm run *)",
       "Bash(ls)",
       "Bash(ls -la)"
     ],
@@ -81,6 +75,14 @@
       {
         "path": "next.config.*",
         "reason": "Next.js configuration"
+      },
+      {
+        "path": "agent-skills/",
+        "reason": "Agent skills plugin"
+      },
+      {
+        "path": "agent-skills/skills/",
+        "reason": "Agent skills source code"
       }
     ],
     "denyRead": [
@@ -139,6 +141,21 @@
       {
         "path": "~/.claude/",
         "reason": "User-level Claude config may contain secrets"
+      }
+    ]
+  },
+  "autoMemoryEnabled": true,
+  "autoMemoryDirectory": "memory",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash(npm run *)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'Команда выполнена'"
+          }
+        ]
       }
     ]
   }

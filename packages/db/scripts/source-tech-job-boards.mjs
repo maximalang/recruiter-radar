@@ -9,13 +9,17 @@ import {
   assertProviderNormalization,
   extractProviderRecords,
 } from './adapters/provider-contract.mjs';
+import { buildRfJobQuality } from './adapters/rf-source-normalizers.mjs';
 import {
   buildRussianLegalNameSourceKey,
   buildSourceKeyAliases,
+  countSensitiveFields,
   dedupeNormalizedRecords,
+  dropSensitiveFields,
   stripBom,
 } from './adapters/source-records.mjs';
 import { fetchJson } from './adapters/source-http.mjs';
+import { loadEnvFile, runScriptCli } from './lib/common-utils.mjs';
 
 const { Client } = pg;
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -180,7 +184,9 @@ function resolveFileInput(inputFilePath) {
 
 function buildNormalizedInput({ inputMode, inputFilePath, records, rejectAllSkipped = false }) {
   const fetchedAt = new Date().toISOString();
-  const deduped = dedupeRecords(records);
+  const sensitiveFieldsDropped = records.reduce((total, record) => total + countSensitiveFields(record), 0);
+  const sanitizedRecords = records.map((record) => dropSensitiveFields(record));
+  const deduped = dedupeRecords(sanitizedRecords);
   const normalizedRecords = [];
   let skippedRecords = 0;
 
@@ -212,6 +218,7 @@ function buildNormalizedInput({ inputMode, inputFilePath, records, rejectAllSkip
     duplicateRecords: records.length - deduped.length + normalizedDedupeResult.duplicateRecords,
     normalizedRecords: normalizedDedupeResult.records,
     skippedRecords,
+    sensitiveFieldsDropped,
   };
 }
 
@@ -309,6 +316,17 @@ function normalizeTechJobBoardRecord(record, fetchedAt, lineNumber) {
   const occurredAt = toTimestampOrNull(record.occurred_at ?? record.published_at ?? record.posted_at) ?? fetchedAt;
   const salary = toNonEmptyText(record.salary ?? record.compensation);
   const tags = Array.isArray(record.tags) ? record.tags.map((t) => String(t).trim()).filter(Boolean) : [];
+  const rfQuality = buildRfJobQuality({
+    companyName,
+    jobTitle,
+    location,
+    salary,
+    employmentType,
+    occurredAt,
+    fetchedAt,
+    board,
+    tags,
+  });
 
   const inferredDomain = companyDomain ?? extractHostname(companyWebsiteUrl);
 
@@ -354,6 +372,11 @@ function normalizeTechJobBoardRecord(record, fetchedAt, lineNumber) {
     board,
     salary,
     tags,
+    regionCanonical: rfQuality.regionCanonical,
+    salaryRub: rfQuality.salaryRub,
+    workModeFlags: rfQuality.workModeFlags,
+    freshness: rfQuality.freshness,
+    qualityPenalties: rfQuality.qualityPenalties,
     orgName,
     orgDisplayName: companyName ?? inferredDomain,
     primarySourceKey,
@@ -582,6 +605,7 @@ export function buildFetchSummary(input) {
     duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
+    sensitiveFieldsDropped: input.sensitiveFieldsDropped ?? 0,
   };
 }
 
@@ -596,6 +620,7 @@ function buildIngestSummary(input, stats) {
     duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
+    sensitiveFieldsDropped: input.sensitiveFieldsDropped ?? 0,
     orgsCreated: stats.orgUpsertCount,
     signalUpsertsCompleted: stats.signalUpsertCount,
   };
@@ -612,6 +637,7 @@ function buildPipelineSummary(input, stats) {
     duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
+    sensitiveFieldsDropped: input.sensitiveFieldsDropped ?? 0,
     orgsCreated: stats.orgUpsertCount,
     signalUpsertsCompleted: stats.signalUpsertCount,
   };
@@ -660,9 +686,18 @@ function buildSignalPayload(record) {
     vacancy_id: record.externalId,
     job_title: record.jobTitle,
     location: record.location,
+    region_canonical: record.regionCanonical,
     employment_type: record.employmentType,
     board: record.board,
     salary: record.salary,
+    salary_rub_min: record.salaryRub.min,
+    salary_rub_max: record.salaryRub.max,
+    salary_currency: record.salaryRub.currency,
+    is_remote: record.workModeFlags.remote,
+    is_hybrid: record.workModeFlags.hybrid,
+    is_rotational: record.workModeFlags.rotational,
+    vacancy_freshness: record.freshness,
+    quality_penalties: record.qualityPenalties,
     tags: record.tags,
     fetched_at: record.fetchedAt,
   };
@@ -700,49 +735,8 @@ function resolveDbConnectionTimeoutMillis() {
   return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : 5000;
 }
 
-function loadEnvFile(filePath) {
-  if (!existsSync(filePath)) {
-    return;
-  }
-
-  const envFile = stripBom(readFileSync(filePath, 'utf8'));
-
-  for (const rawLine of envFile.split(/\r?\n/)) {
-    const trimmedLine = rawLine.trim();
-
-    if (!trimmedLine || trimmedLine.startsWith('#')) {
-      continue;
-    }
-
-    const separatorIndex = rawLine.indexOf('=');
-
-    if (separatorIndex === -1) {
-      continue;
-    }
-
-    const key = rawLine.slice(0, separatorIndex).trim();
-
-    if (!key || process.env[key] !== undefined) {
-      continue;
-    }
-
-    let value = rawLine.slice(separatorIndex + 1).trim();
-
-    if (
-      (value.startsWith('"') && value.endsWith('"'))
-      || (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
-    }
-
-    process.env[key] = value;
-  }
-}
-
-export function normalizeDomain(value) {
-  const normalizedValue = normalizeSourceKeyText(value);
-  return normalizedValue ? normalizedValue.replace(/^www\./, '') : null;
-}
+// loadEnvFile moved to ./lib/common-utils.mjs
+// normalizeDomain moved to ./lib/common-utils.mjs
 
 export function normalizeSourceKeyText(value) {
   if (typeof value !== 'string') {
@@ -806,5 +800,5 @@ export function extractHostname(value) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  await runTechJobBoardsCli();
+  await runScriptCli('source-tech-job-boards', runTechJobBoardsCli);
 }
