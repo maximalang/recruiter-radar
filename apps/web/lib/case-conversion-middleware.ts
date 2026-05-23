@@ -9,7 +9,7 @@ export const createCaseConversionMiddleware = (): EnhancedMiddleware => {
     const result = next(action);
 
     // Log the conversion
-    if (store.getState().config?.enableLogging) {
+    if (typeof store.getState() === 'object' && (store.getState() as any).config?.enableLogging) {
       console.log('Case conversion middleware processed action:', action.type);
     }
 
@@ -21,14 +21,14 @@ export const createCaseConversionMiddleware = (): EnhancedMiddleware => {
 // Converts snake_case responses from API to camelCase for frontend
 export const apiResponseConversionMiddleware: EnhancedMiddleware = (store, next) => (action) => {
   // Handle API responses (typically FULFILLED actions)
-  if (action.type.includes('_FULFILLED')) {
+  if (typeof action.type === 'string' && action.type.includes('_FULFILLED')) {
     try {
       const convertedAction = {
         ...action,
-        payload: ObjectConverter.apiToApp(action.payload)
+        payload: ObjectConverter.apiToApp(action.payload as Record<string, any>)
       };
 
-      if (store.getState().config?.enableLogging) {
+      if (typeof store.getState() === 'object' && (store.getState() as any).config?.enableLogging) {
         console.log('API response converted to camelCase:', action.type);
       }
 
@@ -38,7 +38,7 @@ export const apiResponseConversionMiddleware: EnhancedMiddleware = (store, next)
       return next({
         ...action,
         error: 'Case conversion failed'
-      } as any);
+      });
     }
   }
 
@@ -50,18 +50,21 @@ export const apiResponseConversionMiddleware: EnhancedMiddleware = (store, next)
 export const apiRequestConversionMiddleware: EnhancedMiddleware = (store, next) => (action) => {
   // Handle API requests (typically async actions)
   if (
-    action.type.includes('FETCH_') ||
-    action.type.includes('CREATE_') ||
-    action.type.includes('UPDATE_') ||
-    action.type.includes('DELETE_')
+    typeof action.type === 'string' &&
+    (
+      action.type.includes('FETCH_') ||
+      action.type.includes('CREATE_') ||
+      action.type.includes('UPDATE_') ||
+      action.type.includes('DELETE_')
+    )
   ) {
     try {
       const convertedAction = {
         ...action,
-        payload: action.payload ? ObjectConverter.appToApi(action.payload) : action.payload
+        payload: action.payload ? ObjectConverter.appToApi(action.payload as Record<string, any>) : action.payload
       };
 
-      if (store.getState().config?.enableLogging) {
+      if (typeof store.getState() === 'object' && (store.getState() as any).config?.enableLogging) {
         console.log('API request converted to snake_case:', action.type);
       }
 
@@ -71,7 +74,7 @@ export const apiRequestConversionMiddleware: EnhancedMiddleware = (store, next) 
       return next({
         ...action,
         error: 'Case conversion failed'
-      } as any);
+      });
     }
   }
 
@@ -81,14 +84,14 @@ export const apiRequestConversionMiddleware: EnhancedMiddleware = (store, next) 
 // Form Input Conversion Middleware
 // Converts form inputs (camelCase) to snake_case for submission
 export const formInputConversionMiddleware: EnhancedMiddleware = (store, next) => (action) => {
-  if (action.type === 'FORM.SUBMIT') {
+  if (typeof action.type === 'string' && action.type === 'FORM.SUBMIT') {
     try {
       const convertedAction = {
         ...action,
-        payload: ObjectConverter.appToApi(action.payload)
+        payload: ObjectConverter.appToApi(action.payload as Record<string, any>)
       };
 
-      if (store.getState().config?.enableLogging) {
+      if (typeof store.getState() === 'object' && (store.getState() as any).config?.enableLogging) {
         console.log('Form input converted to snake_case:', action.type);
       }
 
@@ -98,7 +101,7 @@ export const formInputConversionMiddleware: EnhancedMiddleware = (store, next) =
       return next({
         ...action,
         error: 'Form conversion failed'
-      });
+      } as BaseAction);
     }
   }
 
@@ -108,9 +111,9 @@ export const formInputConversionMiddleware: EnhancedMiddleware = (store, next) =
 // Query Parameter Conversion Middleware
 // Handles query parameter case conversion
 export const queryParamConversionMiddleware: EnhancedMiddleware = (store, next) => (action) => {
-  if (action.type === 'ROUTER.NAVIGATE') {
+  if (typeof action.type === 'string' && action.type === 'ROUTER.NAVIGATE') {
     try {
-      const convertedParams = ObjectConverter.camelToSnakeKeys(action.payload?.query);
+      const convertedParams = ObjectConverter.camelToSnakeKeys(action.payload?.query as Record<string, any>);
 
       const convertedAction = {
         ...action,
@@ -120,7 +123,7 @@ export const queryParamConversionMiddleware: EnhancedMiddleware = (store, next) 
         }
       };
 
-      if (store.getState().config?.enableLogging) {
+      if (typeof store.getState() === 'object' && (store.getState() as any).config?.enableLogging) {
         console.log('Query parameters converted to snake_case:', action.type);
       }
 
@@ -139,9 +142,19 @@ export const caseConversionMiddleware = [
   apiResponseConversionMiddleware,
   apiRequestConversionMiddleware,
   formInputConversionMiddleware,
-  queryParamConversionMiddleware,
-  loggingWithCaseConversionMiddleware
+  queryParamConversionMiddleware
 ];
+
+// Logging middleware with case conversion (standalone)
+export const loggingWithCaseConversionMiddleware: EnhancedMiddleware = (store, next) => (action) => {
+  const result = next(action);
+
+  if (typeof store.getState() === 'object' && (store.getState() as any).config?.enableLogging) {
+    console.log('Action processed:', action.type);
+  }
+
+  return result;
+};
 
 // Type-safe action creators with case conversion
 export const caseAwareActions = {

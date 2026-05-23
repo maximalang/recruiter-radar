@@ -9,7 +9,7 @@ import { EnhancedMiddleware, MiddlewareAPI, Dispatch } from './state-management-
 
 // Create enhanced validation middleware with error handling
 export const createValidationMiddleware = (): EnhancedMiddleware => {
-  return (store: MiddlewareAPI, next) => (action) => {
+  return (store: any, next: any) => (action: any) => {
     try {
       // Validate action structure
       const result = validateActionInternal(action);
@@ -18,7 +18,7 @@ export const createValidationMiddleware = (): EnhancedMiddleware => {
         console.error('Action validation failed:', result.errors);
 
         // Dispatch validation error if enabled
-        if (store.getState().config?.enableValidationErrors) {
+        if (typeof store.getState() === 'object' && (store.getState() as any).config?.enableValidationErrors) {
           return next({
             type: 'VALIDATION_ERROR',
             payload: createValidationError('action', 'Invalid action structure'),
@@ -26,7 +26,7 @@ export const createValidationMiddleware = (): EnhancedMiddleware => {
               timestamp: new Date().toISOString(),
               data: result.errors
             }
-          } as any);
+          });
         }
 
         // Otherwise, log and continue

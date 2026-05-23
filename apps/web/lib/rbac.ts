@@ -1,10 +1,9 @@
 // Role-Based Access Control (RBAC) Implementation
 // Provides authorization middleware and permission checking
 
-import type { user_role, permission_type } from "../../packages/db/schema/init";
+import type { UserRole } from './user-types';
 
-export type UserRole = user_role;
-export type Permission = permission_type;
+export type Permission = string;
 
 export interface PermissionCheck {
   hasPermission(permission: Permission): boolean;
@@ -183,19 +182,19 @@ export function checkPermission(permission: Permission): boolean {
 // Get current user's permissions
 export function getCurrentPermissions(): Permission[] {
   const rbac = getRBACInstance();
-  return rbac ? rbac.permissions : [];
+  return rbac ? (rbac as any).permissions : [];
 }
 
 // Get current user's roles
 export function getCurrentRoles(): UserRole[] {
   const rbac = getRBACInstance();
-  return rbac ? rbac.userRoles : [];
+  return rbac ? (rbac as any).userRoles : [];
 }
 
 // Check if user has role
 export function hasRole(role: UserRole): boolean {
   const rbac = getRBACInstance();
-  return rbac ? rbac.userRoles.includes(role) : false;
+  return rbac ? (rbac as any).userRoles.includes(role) : false;
 }
 
 // Audit log helper

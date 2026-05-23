@@ -4,7 +4,7 @@
 import type { BaseAction, Middleware, MiddlewareAPI } from './state-management-types';
 
 // Logging middleware
-export const loggerMiddleware: Middleware = (store) => (next) => (action) => {
+export const loggerMiddleware: Middleware = (store: any) => (next: any) => (action: any) => {
   console.group(`Action: ${action.type}`);
   console.log('Previous state:', store.getState());
   console.log('Action:', action);
@@ -18,7 +18,7 @@ export const loggerMiddleware: Middleware = (store) => (next) => (action) => {
 };
 
 // Crash reporting middleware
-export const crashReportingMiddleware: Middleware = (store) => (next) => (action) => {
+export const crashReportingMiddleware: Middleware = (store: any) => (next: any) => (action: any) => {
   try {
     return next(action);
   } catch (error) {
@@ -34,7 +34,7 @@ export const crashReportingMiddleware: Middleware = (store) => (next) => (action
 };
 
 // Thunk middleware for async actions
-export const thunkMiddleware: Middleware = (store) => (next) => (action) => {
+export const thunkMiddleware: Middleware = (store: any) => (next: any) => (action: any) => {
   if (typeof action === 'function') {
     return action(store.dispatch, store.getState);
   }
@@ -43,7 +43,7 @@ export const thunkMiddleware: Middleware = (store) => (next) => (action) => {
 };
 
 // Async middleware for handling async actions with lifecycle
-export const asyncMiddleware: Middleware = (store) => (next) => (action) => {
+export const asyncMiddleware: Middleware = (store: any) => (next: any) => (action: any) => {
   if (action.meta?.async) {
     const { requestId } = action.meta;
 
@@ -99,16 +99,16 @@ export function createAsyncAction<T = unknown>(
 // Action creator for thunks
 export function createThunkAction(
   type: string,
-  asyncAction: (dispatch: any, getState: any) => Promise<unknown> | unknown
+  asyncAction: (dispatch: (action: any) => void, getState: () => any) => Promise<unknown> | unknown
 ) {
-  return (dispatch: any, getState: any) => {
+  return (dispatch: (action: any) => void, getState: () => any) => {
     dispatch({ type, meta: { thunk: true } });
     return asyncAction(dispatch, getState);
   };
 }
 
 // Retry middleware
-export const retryMiddleware: Middleware = (store) => (next) => (action) => {
+export const retryMiddleware: Middleware = (store: any) => (next: any) => (action: any) => {
   if (action.meta?.retry) {
     const { maxRetries = 3, delay = 1000 } = action.meta.retry;
     let retryCount = 0;

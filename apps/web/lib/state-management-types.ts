@@ -247,17 +247,8 @@ export interface Notification {
 }
 
 // Action Types
-export interface BaseAction {
-  type: string;
-  payload?: unknown;
-  meta?: {
-    timestamp: string;
-    requestId?: string;
-    data?: unknown;
-  };
-}
-
-export interface AsyncAction extends BaseAction {
+export type BaseAction = import('./core-types').BaseAction;
+export type AsyncAction = BaseAction & {
   meta: {
     timestamp: string;
     requestId: string;
@@ -267,7 +258,7 @@ export interface AsyncAction extends BaseAction {
     data?: unknown;
     error?: Error;
   };
-}
+};
 
 // Enhanced middleware types with configuration support
 export interface EnhancedMiddleware<S = unknown> {
@@ -287,15 +278,7 @@ export interface Middleware {
 export type Dispatch<S> = (action: BaseAction) => unknown;
 
 // Enhanced action types
-export interface BaseEnhancedAction extends BaseAction {
-  timestamp?: string;
-  error?: string;
-  meta?: {
-    timestamp?: string;
-    originalAction?: BaseAction;
-    data?: unknown;
-  };
-}
+export type BaseEnhancedAction = import('./core-types').BaseEnhancedAction;
 
 // Action types for enhanced middleware
 export const ACTION_TYPES = {

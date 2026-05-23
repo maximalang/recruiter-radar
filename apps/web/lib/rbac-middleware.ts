@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createRBAC, getRBACInstance } from './rbac';
-import type { UserRole } from '../../packages/db/schema/init';
+import type { UserRole } from './user-types';
 
 export interface RBACOptions {
   requireAuth?: boolean;
