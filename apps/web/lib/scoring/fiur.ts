@@ -9,8 +9,14 @@
  * resolved in favour of product.md per docs/plan.md v2.0 §Риски-1.
  */
 
-export type EvidenceTier = 'direct' | 'corroboration' | 'context'
+import type { EvidenceTier } from '@/lib/db/evidence'
+export type { EvidenceTier }
 
+/**
+ * The minimal evidence shape FIUR scoring reads. Structurally a subset
+ * of EvidenceItemInput from lib/db/evidence — callers may pass full
+ * evidence records here without adapters.
+ */
 export interface FiurEvidenceItem {
   tier: EvidenceTier
   source: string
