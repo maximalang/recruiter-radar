@@ -104,8 +104,8 @@ describe('gate distribution percentages', () => {
     const totalPct = result.reduce((sum, r) => sum + r.percentage, 0)
     // May not equal 100 due to rounding — that's intentional per Math.round
     expect(result).toHaveLength(4)
-    expect(result.map((r) => r.percentage)).toEqual([22, 40, 30, 10])
-    expect(totalPct).toBe(102) // rounding artifacts are expected
+    expect(result.map((r) => r.percentage)).toEqual([20, 40, 30, 10])
+    expect(totalPct).toBe(100) // 2/10=20%, 4/10=40%, 3/10=30%, 1/10=10%
   })
 
   it('handles empty input', () => {

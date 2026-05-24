@@ -83,7 +83,7 @@ export function evidenceContentHash(input: EvidenceItemInput): string {
     toIso(input.fetchedAt),
     input.tier,
   ]
-  return createHash('sha256').update(parts.join('')).digest('hex')
+  return createHash('sha256').update(parts.join('')).digest('hex')
 }
 
 export function buildEvidenceRecord(input: EvidenceItemInput): EvidenceItemRecord {
