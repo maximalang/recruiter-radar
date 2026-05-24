@@ -159,6 +159,10 @@ function toPublicPreviewItem(item: HhDigestItem): PublicPreviewItem {
 }
 
 function deriveConfidenceLabel(totalScore: number): string {
+  // NOTE: preview-only score band for the public landing page — NOT the
+  // confidence gate from lib/scoring/gates. Gates classify evidence
+  // quality (A/B/C/D); this helper buckets a numeric score into
+  // high/medium/low for marketing copy. Do not conflate the two.
   if (totalScore >= 80) return "high"
   if (totalScore >= 50) return "medium"
   return "low"
