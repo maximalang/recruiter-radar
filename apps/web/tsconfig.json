@@ -37,6 +37,30 @@
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "**/*.test.{ts,tsx}",
+    "**/*.spec.{ts,tsx}",
+    "**/__tests__/**",
+    "jest.config.ts",
+    "jest.setup.ts",
+    "jest.coverage.config.ts",
+    "lib/app-context.tsx",
+    "lib/case-conversion-middleware.ts",
+    "lib/hooks.ts",
+    "lib/hooks/useFormValidation.ts",
+    "lib/middleware/system.ts",
+    "lib/rbac-middleware.ts",
+    "lib/rbac.ts",
+    "lib/redux-middleware.ts",
+    "lib/secure-app-context.tsx",
+    "lib/secure-case-converter.ts",
+    "lib/secure-validation-middleware.ts",
+    "lib/secure-validation-schemas.ts",
+    "lib/state-management-types.ts",
+    "lib/typed-db.ts",
+    "lib/unified-middleware.ts",
+    "lib/validation-middleware.ts",
+    "lib/validation-schemas.ts",
+    "lib/validation/validation-system.ts"
   ]
 }
