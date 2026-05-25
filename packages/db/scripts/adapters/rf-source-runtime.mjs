@@ -13,10 +13,11 @@ import {
   dedupeNormalizedRecords,
   dropSensitiveFields,
   stripBom,
-  loadEnvFile,
-  normalizeDomain,
 } from './source-records.mjs';
+import { loadEnvFile, normalizeDomain } from '../lib/common-utils.mjs';
 import { fetchJson } from './source-http.mjs';
+
+export { loadEnvFile, normalizeDomain };
 
 const { Client } = pg;
 const SUPPORTED_ACTIONS = new Set(['fetch', 'ingest', 'pipeline']);

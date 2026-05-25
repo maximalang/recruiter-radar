@@ -15,7 +15,7 @@ import {
   stripBom,
 } from './adapters/source-records.mjs';
 import { fetchJson as fetchJsonWithPolicy, fetchText } from './adapters/source-http.mjs';
-import { loadEnvFile, runScriptCli } from './lib/common-utils.mjs';
+import { loadEnvFile, normalizeDomain, runScriptCli } from './lib/common-utils.mjs';
 
 const { Client } = pg;
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -31,6 +31,8 @@ const SUPPORTED_ACTIONS = new Set(['fetch', 'ingest', 'pipeline']);
 loadEnvFile(rootEnvPath);
 
 export { loadEnvFile };
+
+export async function runCareerPagesCli(argv = process.argv.slice(2)) {
   const requestedAction = argv[0]?.trim() || 'pipeline';
   const databaseUrl = process.env.DATABASE_URL?.trim();
 

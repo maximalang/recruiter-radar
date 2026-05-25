@@ -33,13 +33,15 @@ export function loadEnvFile(filePath) {
 }
 
 /**
- * Normalize domain name
+ * Normalize domain name. Returns null for empty/invalid input so that
+ * `normalizeDomain(x) ?? fallback` falls through correctly.
  * @param {string} domain - Domain to normalize
- * @returns {string} Normalized domain
+ * @returns {string|null} Normalized domain or null
  */
 export function normalizeDomain(domain) {
-  if (!domain) return '';
-  return domain.toLowerCase().trim().replace(/^https?:\/\//, '');
+  if (typeof domain !== 'string') return null;
+  const normalized = domain.trim().replace(/\s+/g, ' ').toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '');
+  return normalized === '' ? null : normalized;
 }
 
 /**
