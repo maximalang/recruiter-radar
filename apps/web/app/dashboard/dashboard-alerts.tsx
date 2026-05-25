@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import styles from './dashboard.module.css';
 
 interface Alert {
   id: string;
@@ -12,195 +13,145 @@ interface Alert {
   resolved: boolean;
 }
 
-export default function DashboardAlerts() {
+interface DashboardAlertsProps {
+  loading?: boolean;
+}
+
+function AlertsSkeleton() {
+  return (
+    <section aria-labelledby="alerts-heading" aria-busy="true" className={styles.alertsSection}>
+      <div className={styles.alertsHeader}>
+        <div className={styles.skeletonBase} style={{ width: '120px', height: '18px', borderRadius: '4px' }} />
+        <div className={styles.skeletonBase} style={{ width: '80px', height: '12px', borderRadius: '4px' }} />
+      </div>
+      <ul className={styles.alertsList} role="list" aria-label="Загрузка алертов">
+        {[1, 2, 3].map((i) => (
+          <li key={i} className={`${styles.skeletonAlertItem} ${styles.skeletonBase}`}>
+            <div className={styles.skeletonAlertIcon} />
+            <div className={styles.skeletonAlertSource} />
+            <div className={styles.skeletonAlertMessage} />
+            <div className={styles.skeletonAlertTime} />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+const ALERT_CONFIG: Record<Alert['type'], { icon: string; colorClass: string }> = {
+  critical: { icon: '🚨', colorClass: styles.alertCritical },
+  warning:  { icon: '⚠️',  colorClass: styles.alertWarning },
+  info:     { icon: 'ℹ️',  colorClass: styles.alertInfo },
+};
+
+export default function DashboardAlerts({ loading = false }: DashboardAlertsProps) {
   const [alerts, setAlerts] = useState<Alert[]>([
-    {
-      id: '1',
-      type: 'critical',
-      source: 'linkedin-company-pages',
-      message: 'Источник не отвечает уже 30 минут',
-      timestamp: '2026-05-21 14:30:00',
-      recommendation: 'Проверить конфигурацию API LinkedIn',
-      resolved: false
-    },
-    {
-      id: '2',
-      type: 'warning',
-      source: 'company-site',
-      message: 'Увеличение ошибок на 40% за последний час',
-      timestamp: '2026-05-21 14:15:00',
-      recommendation: 'Проверить доступность целевых сайтов',
-      resolved: false
-    },
-    {
-      id: '3',
-      type: 'info',
-      source: 'hh',
-      message: 'Доступен новый метод API для поиска',
-      timestamp: '2026-05-21 13:45:00',
-      recommendation: 'Рассмотреть обновление для повышения производительности',
-      resolved: true
-    }
+    { id: '1', type: 'critical', source: 'linkedin-company-pages', message: 'Источник не отвечает уже 30 минут', timestamp: '2026-05-21 14:30:00', recommendation: 'Проверить конфигурацию API LinkedIn', resolved: false },
+    { id: '2', type: 'warning', source: 'company-site', message: 'Увеличение ошибок на 40% за последний час', timestamp: '2026-05-21 14:15:00', recommendation: 'Проверить доступность целевых сайтов', resolved: false },
+    { id: '3', type: 'info', source: 'hh', message: 'Доступен новый метод API для поиска', timestamp: '2026-05-21 13:45:00', recommendation: 'Рассмотреть обновление для повышения производительности', resolved: true }
   ]);
 
-  const getAlertIcon = (type: string): string => {
-    switch (type) {
-      case 'critical': return '🚨';
-      case 'warning': return '⚠️';
-      case 'info': return 'ℹ️';
-      default: return '❓';
-    }
-  };
+  if (loading) {
+    return <AlertsSkeleton />;
+  }
 
-  const getAlertColor = (type: string): string => {
-    switch (type) {
-      case 'critical': return 'border-red-200 bg-red-50';
-      case 'warning': return 'border-yellow-200 bg-yellow-50';
-      case 'info': return 'border-blue-200 bg-blue-50';
-      default: return 'border-gray-200 bg-gray-50';
-    }
-  };
+  const resolveAlert = (id: string) =>
+    setAlerts(prev => prev.map(a => a.id === id ? { ...a, resolved: true } : a));
 
-  const resolveAlert = (id: string): void => {
-    setAlerts(alerts.map(alert =>
-      alert.id === id ? { ...alert, resolved: true } : alert
-    ));
-  };
-
-  const activeAlerts = alerts.filter(alert => !alert.resolved);
+  const activeAlerts = alerts.filter(a => !a.resolved);
+  const resolvedAlerts = alerts.filter(a => a.resolved);
 
   return (
-    <div style={{
-      backgroundColor: 'white',
-      border: '1px solid #e5e7eb',
-      borderRadius: '8px',
-      padding: '24px',
-      boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
-    }}>
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '20px'
-      }}>
-        <div style={{
-          fontSize: '18px',
-          fontWeight: '600',
-          color: '#111827'
-        }}>
+    <section aria-labelledby="alerts-heading" className={styles.alertsSection}>
+      <div className={styles.alertsHeader}>
+        <h2 id="alerts-heading" className={styles.alertsTitle}>
           🚨 Активные алерты
-        </div>
-        <div style={{
-          fontSize: '12px',
-          color: '#6b7280'
-        }}>
+        </h2>
+        <span
+          className={styles.alertsCount}
+          aria-live="polite"
+          aria-atomic="true"
+        >
           {activeAlerts.length} активных
-        </div>
+        </span>
       </div>
+
       {activeAlerts.length === 0 ? (
-        <div style={{
-          textAlign: 'center',
-          padding: '32px',
-          color: '#6b7280'
-        }}>
+        <div className={styles.alertsEmpty}>
           ✅ Все системы в порядке
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {activeAlerts.map((alert: Alert) => (
-            <div
-              key={alert.id}
-              style={{
-                padding: '16px',
-                borderRadius: '8px',
-                border: `1px solid ${alert.type === 'critical' ? '#fecaca' :
-                                      alert.type === 'warning' ? '#fed7aa' : '#bfdbfe'}`,
-                backgroundColor: alert.type === 'critical' ? '#fef2f2' :
-                                 alert.type === 'warning' ? '#fffbeb' : '#eff6ff'
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', gap: '12px' }}>
-                  <span style={{ fontSize: '18px' }}>{getAlertIcon(alert.type)}</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '16px', fontWeight: '500', color: '#111827' }}>
-                      {alert.source}
-                    </div>
-                    <div style={{ fontSize: '14px', color: '#6b7280', marginTop: '4px' }}>
-                      {alert.message}
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '8px' }}>
-                      {alert.timestamp}
-                    </div>
+        <ul
+          className={styles.alertsList}
+          role="list"
+          aria-label="Активные алерты"
+        >
+          {activeAlerts.map((alert: Alert) => {
+            const config = ALERT_CONFIG[alert.type];
+            return (
+              <li
+                key={alert.id}
+                className={`${styles.alertItem} ${config.colorClass}`}
+              >
+                <div className={styles.alertItemContent}>
+                  <span className={styles.alertItemIcon} aria-hidden="true">
+                    {config.icon}
+                  </span>
+                  <div className={styles.alertItemBody}>
+                    <div className={styles.alertItemSource}>{alert.source}</div>
+                    <div className={styles.alertItemMessage}>{alert.message}</div>
+                    <div className={styles.alertItemTime}>{alert.timestamp}</div>
                     {alert.recommendation && (
-                      <div style={{ marginTop: '12px', padding: '12px', backgroundColor: 'white', borderRadius: '6px', border: '1px solid #e5e7eb' }}>
-                        <div style={{ fontSize: '14px', fontWeight: '500', color: '#374151' }}>
-                          💡 Рекомендация
-                        </div>
-                        <div style={{ fontSize: '14px', color: '#6b7280', marginTop: '4px' }}>
-                          {alert.recommendation}
-                        </div>
+                      <div className={styles.alertItemRecommendation}>
+                        <div className={styles.alertItemRecommendationTitle}>💡 Рекомендация</div>
+                        <div className={styles.alertItemRecommendationText}>{alert.recommendation}</div>
                       </div>
                     )}
                   </div>
+                  <button
+                    className={styles.alertItemAction}
+                    onClick={() => resolveAlert(alert.id)}
+                    aria-describedby={`alert-action-${alert.id}`}
+                  >
+                    <span id={`alert-action-${alert.id}`} className="sr-only">Отметить алерт как решённый</span>
+                    ✅ Решить
+                  </button>
                 </div>
-                <button
-                  onClick={() => resolveAlert(alert.id)}
-                  style={{
-                    padding: '8px 16px',
-                    fontSize: '14px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    backgroundColor: 'white',
-                    cursor: 'pointer',
-                    color: '#374151'
-                  }}
-                >
-                  ✅ Решить
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+              </li>
+            );
+          })}
+        </ul>
       )}
 
-      {alerts.filter((a: Alert) => a.resolved).length > 0 && (
-        <div style={{ marginTop: '24px', paddingTop: '24px', borderTop: '1px solid #e5e7eb' }}>
-          <div style={{
-            fontSize: '14px',
-            fontWeight: '500',
-            color: '#374151',
-            marginBottom: '12px'
-          }}>
+      {resolvedAlerts.length > 0 && (
+        <div className={styles.alertsResolved}>
+          <div className={styles.alertsResolvedTitle}>
             📋 Решенные алерты
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {alerts
-              .filter((alert: Alert) => alert.resolved)
-              .slice(0, 3)
-              .map((alert: Alert) => (
-                <div key={alert.id} style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  padding: '12px',
-                  backgroundColor: '#f9fafb',
-                  borderRadius: '6px'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ color: '#10b981' }}>✅</span>
-                    <span style={{ fontSize: '14px', color: '#6b7280' }}>
-                      {alert.source} - {alert.message}
-                    </span>
-                  </div>
-                  <span style={{ fontSize: '12px', color: '#9ca3af' }}>
-                    {alert.timestamp}
+          <ul
+            className={styles.alertsResolvedList}
+            role="list"
+            aria-label="Решенные алерты"
+          >
+            {resolvedAlerts.slice(0, 3).map((alert: Alert) => (
+              <li
+                key={alert.id}
+                className={styles.resolvedItem}
+              >
+                <div className={styles.resolvedItemContent}>
+                  <span className={styles.resolvedItemIcon} aria-hidden="true">✅</span>
+                  <span className={styles.resolvedItemText}>
+                    {alert.source} — {alert.message}
                   </span>
                 </div>
-              ))}
-          </div>
+                <time className={styles.resolvedItemTime} dateTime={alert.timestamp}>
+                  {alert.timestamp}
+                </time>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
-    </div>
+    </section>
   );
 }
