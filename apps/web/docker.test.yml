@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  web-app:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: npm run test:coverage
+    environment:
+      - NODE_ENV=test
+      - CI=true

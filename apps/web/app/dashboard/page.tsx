@@ -3,6 +3,7 @@ import DashboardHeader from './dashboard-header';
 import DashboardOverview from './dashboard-overview';
 import DashboardSources from './dashboard-sources';
 import DashboardAlerts from './dashboard-alerts';
+import DashboardQuality from './dashboard-quality';
 
 export default function DashboardPage() {
   return (
@@ -18,6 +19,7 @@ export default function DashboardPage() {
         <Suspense fallback={<div>Загрузка...</div>}>
           <DashboardHeader />
           <div style={{ marginTop: '32px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
+            <DashboardQuality />
             <DashboardOverview />
             <DashboardSources />
             <DashboardAlerts />

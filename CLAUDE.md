@@ -170,8 +170,25 @@ This project uses auto-memory to store project context, user preferences, and wo
 
 ### Available Skills
 
+**Agent Skills (agent-skills/addy-agent-skills):**
 - `using-agent-skills` — meta-skill for skill discovery
 - `context-engineering` — right context at the right time
 - `incremental-implementation` — thin vertical slices, test each before expanding
 - `security-and-hardening` — OWASP prevention, input validation, secrets
 - `frontend-ui-engineering` — production-quality UI with accessibility
+
+**Modern Web Guidance (Google Chrome):**
+- `modern-web-guidance` — MANDATORY for all HTML/CSS/clientside JS tasks. Use FIRST for UI/Layout, Scroll/Motion, Performance (CWV), Forms, and modern web APIs
+- `chrome-extensions` — Chrome extension development guidance
+
+### When to use Modern Web Guidance
+
+**Must invoke `modern-web-guidance` skill for:**
+- UI/Layout: Modals, dialogs, popovers, Glassmorphism/backdrop-filters, anchor positioning, container queries, `:has()`, `:user-valid`
+- Scroll/Motion: View Transitions, Scroll-driven animations, scroll parallax/reveals
+- Performance: CWV (LCP, INP), content-visibility, Fetch Priority, image optimization
+- System/APIs: Local filesystem access, WebUSB, WebSockets, WebAssembly widgets
+- Frameworks: Adapting layout/styles in React, Vue, Angular
+- General Frontend: Forms, autofill, advanced inputs, custom scrollbars, modern component states
+
+**Do NOT use for:** Backend (SQL, ORMs, Express), CI/CD, Docker, generic scripts

@@ -107,5 +107,11 @@
     "digest:held": "node packages/db/scripts/report-digest-held.mjs",
     "digest": "node packages/db/scripts/report-digest.mjs",
     "digest:run": "node packages/db/scripts/report-digest.mjs"
+  },
+  "devDependencies": {
+    "ts-node": "^10.9.2"
+  },
+  "overrides": {
+    "postcss": "^8.5.10"
   }
 }

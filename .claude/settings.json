@@ -13,7 +13,7 @@
       "Bash(git log)",
       "Bash(git log --oneline -10)",
       "Bash(git remote -v)",
-      "Bash(npm run *)",
+      "Bash(npm *)",
       "Bash(ls)",
       "Bash(ls -la)"
     ],
@@ -25,124 +25,51 @@
       "Bash(git reset --hard*)",
       "Bash(git clean -fd*)",
       "Bash(rm -rf*)",
-      "Bash(Remove-Item -Recurse*)",
-      "Bash(npm install*)",
-      "Bash(npm audit*)",
-      "Bash(curl*)",
-      "Bash(wget*)"
+      "Bash(Remove-Item -Recurse*)"
     ],
     "allowRead": [
-      {
-        "path": ".claude/",
-        "reason": "Project Claude Code configuration"
-      },
-      {
-        "path": "apps/",
-        "reason": "Application source code"
-      },
-      {
-        "path": "packages/",
-        "reason": "Shared packages"
-      },
-      {
-        "path": "scripts/",
-        "reason": "Build and utility scripts"
-      },
-      {
-        "path": "*.md",
-        "reason": "Documentation files"
-      },
-      {
-        "path": "*.json",
-        "reason": "Configuration files"
-      },
-      {
-        "path": "*.ts",
-        "reason": "TypeScript source files"
-      },
-      {
-        "path": "*.tsx",
-        "reason": "React/Next.js source files"
-      },
-      {
-        "path": "*.sql",
-        "reason": "Database migrations"
-      },
-      {
-        "path": "tsconfig.json",
-        "reason": "TypeScript configuration"
-      },
-      {
-        "path": "next.config.*",
-        "reason": "Next.js configuration"
-      },
-      {
-        "path": "agent-skills/",
-        "reason": "Agent skills plugin"
-      },
-      {
-        "path": "agent-skills/skills/",
-        "reason": "Agent skills source code"
-      }
+      { "path": ".claude/", "reason": "Project Claude Code configuration" },
+      { "path": "apps/", "reason": "Application source code" },
+      { "path": "packages/", "reason": "Shared packages" },
+      { "path": "scripts/", "reason": "Build and utility scripts" },
+      { "path": "*.md", "reason": "Documentation files" },
+      { "path": "*.json", "reason": "Configuration files" },
+      { "path": "*.ts", "reason": "TypeScript source files" },
+      { "path": "*.tsx", "reason": "React/Next.js source files" },
+      { "path": "*.sql", "reason": "Database migrations" },
+      { "path": "tsconfig.json", "reason": "TypeScript configuration" },
+      { "path": "next.config.*", "reason": "Next.js configuration" },
+      { "path": "agent-skills/", "reason": "Agent skills plugin" },
+      { "path": "agent-skills/skills/", "reason": "Agent skills source code" }
     ],
     "denyRead": [
-      {
-        "path": ".env",
-        "reason": "Environment files contain secrets"
-      },
-      {
-        "path": ".env.local",
-        "reason": "Environment files contain secrets"
-      },
-      {
-        "path": ".env.production",
-        "reason": "Environment files contain secrets"
-      },
-      {
-        "path": ".env.*",
-        "reason": "All .env.* files contain secrets"
-      },
-      {
-        "path": "node_modules/",
-        "reason": "Do not read node_modules directly"
-      },
-      {
-        "path": ".next/",
-        "reason": "Build cache, not source"
-      },
-      {
-        "path": "build/",
-        "reason": "Build artifacts, not source"
-      },
-      {
-        "path": "dist/",
-        "reason": "Build artifacts, not source"
-      },
-      {
-        "path": "*.pem",
-        "reason": "Private keys contain secrets"
-      },
-      {
-        "path": "*.key",
-        "reason": "Private keys contain secrets"
-      },
-      {
-        "path": "credentials.json",
-        "reason": "Credentials files contain secrets"
-      },
-      {
-        "path": "secrets.json",
-        "reason": "Secrets files contain secrets"
-      },
-      {
-        "path": "~/.npm/",
-        "reason": "Global npm cache"
-      },
-      {
-        "path": "~/.claude/",
-        "reason": "User-level Claude config may contain secrets"
-      }
+      { "path": ".env", "reason": "Environment files contain secrets" },
+      { "path": ".env.local", "reason": "Environment files contain secrets" },
+      { "path": ".env.production", "reason": "Environment files contain secrets" },
+      { "path": ".env.*", "reason": "All .env.* files contain secrets" },
+      { "path": "node_modules/", "reason": "Do not read node_modules directly" },
+      { "path": ".next/", "reason": "Build cache, not source" },
+      { "path": "build/", "reason": "Build artifacts, not source" },
+      { "path": "dist/", "reason": "Build artifacts, not source" },
+      { "path": "*.pem", "reason": "Private keys contain secrets" },
+      { "path": "*.key", "reason": "Private keys contain secrets" },
+      { "path": "credentials.json", "reason": "Credentials files contain secrets" },
+      { "path": "secrets.json", "reason": "Secrets files contain secrets" },
+      { "path": "~/.npm/", "reason": "Global npm cache" },
+      { "path": "~/.claude/", "reason": "User-level Claude config may contain secrets" }
     ]
+  },
+  "extraKnownMarketplaces": {
+    "googlechrome": {
+      "source": {
+        "source": "git",
+        "url": "https://github.com/GoogleChrome/modern-web-guidance.git"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "chrome-extensions@googlechrome": true,
+    "modern-web-guidance@googlechrome": true
   },
   "autoMemoryEnabled": true,
   "autoMemoryDirectory": "memory",

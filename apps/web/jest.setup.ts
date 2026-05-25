@@ -6,6 +6,13 @@ try {
   // jest-dom not installed; skip matchers — unit tests will still run
 }
 
+// Polyfill TextEncoder/TextDecoder (needed by pg in node environment)
+if (typeof globalThis.TextEncoder === 'undefined') {
+  const { TextEncoder, TextDecoder } = require('util');
+  globalThis.TextEncoder = TextEncoder;
+  globalThis.TextDecoder = TextDecoder;
+}
+
 // Mock Next.js router (jsdom only — skip in node environment)
 if (typeof window !== 'undefined') {
   jest.mock('next/router', () => ({

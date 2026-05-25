@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import styles from './dashboard.module.css';
 
 interface DashboardHeaderProps {
   lastUpdated?: string;
@@ -16,67 +17,38 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ lastUpdated }) => {
   }, []);
 
   return (
-    <div style={{
-      borderBottom: '1px solid #e5e7eb',
-      paddingBottom: '24px'
-    }}>
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start'
-      }}>
+    <header className={styles.header}>
+      <div className={styles.headerContent}>
         <div>
-          <h1 style={{
-            fontSize: '32px',
-            fontWeight: 'bold',
-            color: '#111827'
-          }}>
+          <h1 className={styles.headerTitle}>
             📊 Радар источников
           </h1>
-          <p style={{
-            marginTop: '8px',
-            color: '#6b7280'
-          }}>
+          <p className={styles.headerSubtitle}>
             Мониторинг производительности и состояние источников в реальном времени
           </p>
         </div>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '16px'
-        }}>
-          <div style={{
-            fontSize: '14px',
-            color: '#6b7280'
-          }}>
+        <nav className={styles.headerActions} aria-label="Действия на панели">
+          <time
+            className={styles.headerTime}
+            dateTime={currentTime.toISOString()}
+            aria-label={`Текущее время: ${currentTime.toLocaleTimeString('ru-RU')}`}
+          >
             Обновлено: {currentTime.toLocaleTimeString('ru-RU')}
-          </div>
+          </time>
           {lastUpdated && (
-            <div style={{
-              fontSize: '14px',
-              color: '#6b7280'
-            }}>
+            <span className={styles.headerSync}>
               Последний sync: {new Date(lastUpdated).toLocaleString('ru-RU')}
-            </div>
+            </span>
           )}
           <Link
             href="/"
-            style={{
-              padding: '8px 16px',
-              fontSize: '14px',
-              fontWeight: '500',
-              color: '#374151',
-              backgroundColor: 'white',
-              border: '1px solid #d1d5db',
-              borderRadius: '6px',
-              textDecoration: 'none'
-            }}
+            className={styles.headerLink}
           >
             На главную
           </Link>
-        </div>
+        </nav>
       </div>
-    </div>
+    </header>
   );
 };
 

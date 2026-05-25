@@ -22,8 +22,8 @@ const config: Config = {
     '<rootDir>/src/__tests__/middleware/validation-middleware.test.ts',
   ],
   moduleNameMapper: {
-    // test-utils stub (no @testing-library/react installed)
-    '^@/__tests__/utils/test-utils$': '<rootDir>/src/__tests__/utils/test-utils.tsx',
+    // test-utils moved to src/test-utils/ to avoid being picked as test file
+    '^@/__tests__/utils/test-utils$': '<rootDir>/src/test-utils/render.tsx',
     '^@/__tests__/(.*)$': '<rootDir>/src/__tests__/$1',
     '^@/(.*)$': '<rootDir>/$1',
     '^lib/db$': '<rootDir>/lib/db.ts',

@@ -1,0 +1,110 @@
+# Implementation Plan: Deployment Preparation
+
+## Overview
+
+Prepare Recruiter Radar for production deployment. Current state: TypeScript clean, build succeeds, tests pass (86/89). Missing: production Docker setup, security hardening, environment documentation, CI/CD enhancements.
+
+## Architecture Decisions
+
+- **Docker strategy**: Multi-stage build for minimal image size; separate web service from n8n/postgres
+- **Environment management**: `.env.example` is complete; need production-ready `.env.production.example`
+- **Security approach**: Address npm audit findings, add security headers, validate all env vars at startup
+
+## Task List
+
+### Phase 1: Security Hardening
+- [ ] **Task 1**: Fix npm audit vulnerabilities
+  - Run `npm audit fix` for postcss
+  - Monitor Next.js canary vulnerabilities; document known-risk items
+  - **Verification**: `npm audit` shows 0 vulnerabilities
+
+- [ ] **Task 2**: Add security headers to Next.js
+  - Content-Security-Policy, X-Frame-Options, X-Content-Type-Options, Referrer-Policy
+  - Add to `next.config.ts`
+  - **Verification**: Headers present in build output
+
+- [ ] **Task 3**: Environment variable validation at startup
+  - Add validation for required secrets (SESSION_SECRET, DATABASE_URL, TELEGRAM_BOT_TOKEN)
+  - Fail fast with clear error messages
+  - **Verification**: App fails with clear error if required env missing
+
+### Phase 2: Infrastructure
+- [ ] **Task 4**: Production-ready Dockerfile
+  - Multi-stage build (builder → runner)
+  - Non-root user for security
+  - Health check endpoint
+  - **Verification**: Image builds successfully, runs with `docker run`
+
+- [ ] **Task 5**: Production docker-compose.yml
+  - Separate services: web, db, n8n
+  - Resource limits
+  - Proper restart policies
+  - **Verification**: `docker-compose up` starts all services
+
+- [ ] **Task 6**: Production environment template
+  - Create `.env.production.example` with all required vars
+  - Document which vars are secrets vs config
+  - **Verification**: Template matches .env.example completeness
+
+### Phase 3: CI/CD Enhancement
+- [ ] **Task 7**: Enhance GitHub Actions workflow
+  - Add build step to CI
+  - Add Docker build/push for registry
+  - Add deployment trigger (manual or on tag)
+  - **Verification**: CI passes, Docker image builds in GitHub Actions
+
+- [ ] **Task 8**: Add pre-deploy smoke test
+  - Health check endpoint test
+  - Critical API endpoint test
+  - **Verification**: Smoke tests run in CI
+
+### Phase 4: Testing Coverage
+- [ ] **Task 9**: Fix skipped test
+  - Investigate why 1 test is skipped
+  - Fix or document if not applicable
+  - **Verification**: All tests pass (0 skipped)
+
+- [ ] **Task 10**: Add missing critical path tests
+  - Checkout flow tests
+  - Telegram webhook handler tests
+  - **Verification**: Coverage report shows >80% on critical paths
+
+### Checkpoint: Infrastructure Ready
+- [ ] All services start via docker-compose
+- [ ] CI passes all checks
+- [ ] Security headers present
+- [ ] No npm vulnerabilities
+
+### Phase 5: Final Review
+- [ ] **Task 11**: Review unstaged changes
+  - Audit `.claude/settings.json`, `CLAUDE.md`, dashboard components
+  - Commit or discard appropriately
+  - **Verification**: Clean working directory
+
+- [ ] **Task 12**: Final build verification
+  - Run full `npm run validate`
+  - Run full test suite
+  - **Verification**: All checks pass
+
+## Risks and Mitigations
+
+| Risk | Impact | Mitigation |
+|------|--------|------------|
+| Next.js vulnerabilities | High | Document known risks; plan upgrade path to stable release |
+| Missing secrets in CI | Medium | Add GitHub Actions secrets documentation |
+| Docker image too large | Low | Use multi-stage build; minimal base image |
+
+## Open Questions
+
+- What is the target deployment environment? (VPS, Kubernetes, managed container service)
+- Is there an existing Docker registry for storing images?
+- What domain(s) will the app run on? (affects CORS and security headers)
+
+## Files Likely to Change
+
+- `apps/web/next.config.ts` — security headers
+- `apps/web/Dockerfile.test` → `apps/web/Dockerfile` — production build
+- `docker-compose.yml` — production configuration
+- `.github/workflows/test.yml` — CI enhancements
+- New: `.env.production.example`
+- New: `apps/web/src/lib/env-validation.ts`

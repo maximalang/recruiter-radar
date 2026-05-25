@@ -51,6 +51,19 @@ export interface FiurClientProfile {
   exclusions?: string[]
 }
 
+/**
+ * Minimal client-side reweighting overrides derived from badfit history.
+ * Filled by the pipeline when 3+ badfits are recorded for a pattern.
+ * Stored client-side; not persisted in digest_candidates table.
+ */
+export interface FiurClientOverrides {
+  /**
+   * Industry → penalty multiplier (0.3–1.0).
+   * e.g. { 'fintech': 0.5 } halves the industry fit contribution.
+   */
+  industryFitPenalty?: Record<string, number>
+}
+
 export interface FiurInput {
   company: FiurCompany
   vacancies: FiurVacancy[]
@@ -58,6 +71,8 @@ export interface FiurInput {
   evidence: FiurEvidenceItem[]
   /** Optional clock injection for tests. */
   now?: () => number
+  /** Optional reweighting overrides from badfit history. */
+  clientOverrides?: FiurClientOverrides
 }
 
 export interface FiurBreakdown {
@@ -74,7 +89,7 @@ export interface FiurBreakdown {
   }
 }
 
-const clamp01 = (n: number): number => (n < 0 ? 0 : n > 1 ? 1 : n)
+const clamp01 = (n: number, min = 0): number => Math.max(min, n < 0 ? 0 : n > 1 ? 1 : n)
 
 const normalize = (s: string): string => s.trim().toLowerCase()
 
@@ -107,7 +122,8 @@ function isExcluded(company: FiurCompany, profile: FiurClientProfile): boolean {
 function computeFit(
   company: FiurCompany,
   vacancies: FiurVacancy[],
-  profile: FiurClientProfile
+  profile: FiurClientProfile,
+  overrides?: FiurClientOverrides
 ): { score: number; reasons: string[] } {
   const reasons: string[] = []
 
@@ -121,10 +137,22 @@ function computeFit(
   let score = 0
 
   const industries = profile.industries.map(normalize)
-  if (company.industry && industries.length > 0) {
-    if (industries.includes(normalize(company.industry))) {
-      score += 0.35
-      reasons.push(`industry "${company.industry}" matches ICP`)
+  const companyIndustryKey = company.industry ? normalize(company.industry) : ''
+  if (companyIndustryKey && industries.length > 0) {
+    if (industries.includes(companyIndustryKey)) {
+      // Apply industry penalty if override exists (3+ badfits recorded)
+      // Penalty clamped to min 0.3 so industry never fully zeroed out
+      const rawPenalty = overrides?.industryFitPenalty?.[companyIndustryKey]
+      const penalty = rawPenalty != null ? clamp01(rawPenalty, 0.3) : 1.0
+      const industryScore = penalty < 1
+        ? clamp01(0.35 * penalty)
+        : 0.35
+      score += industryScore
+      if (penalty != null && penalty < 1) {
+        reasons.push(`industry "${company.industry}" matches ICP (reweighted by ${Math.round((1 - penalty) * 100)}% badfit history)`)
+      } else {
+        reasons.push(`industry "${company.industry}" matches ICP`)
+      }
     } else {
       reasons.push(`industry "${company.industry}" outside ICP`)
     }
@@ -291,7 +319,7 @@ function computeReachability(
 
 export function computeFiur(input: FiurInput): FiurBreakdown {
   const now = (input.now ?? Date.now)()
-  const fit = computeFit(input.company, input.vacancies, input.clientProfile)
+  const fit = computeFit(input.company, input.vacancies, input.clientProfile, input.clientOverrides)
   const intent = computeIntent(input.vacancies, input.evidence, now)
   const urgency = computeUrgency(input.vacancies, now)
   const reachability = computeReachability(input.company, input.evidence)

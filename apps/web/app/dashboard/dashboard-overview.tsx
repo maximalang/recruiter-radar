@@ -1,187 +1,158 @@
 'use client';
 
 import React from 'react';
+import styles from './dashboard.module.css';
 
 interface DashboardOverviewProps {
   totalSources?: number;
   activeSources?: number;
   overallHealth?: number;
   totalAlerts?: number;
+  loading?: boolean;
+}
+
+function OverviewSkeleton() {
+  return (
+    <section aria-labelledby="overview-heading" aria-busy="true">
+      <h2 id="overview-heading" className={styles.srOnly}>
+        Обзор метрик
+      </h2>
+      <div className={styles.overviewSection} role="list" aria-label="Загрузка метрик">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className={styles.skeletonCard}>
+            <div className={styles.skeletonCardHeader}>
+              <div className={`${styles.skeletonBase} ${styles.skeletonCardHeaderLeft}`} />
+              <div className={`${styles.skeletonBase} ${styles.skeletonCardHeaderRight}`} />
+            </div>
+            <div className={`${styles.skeletonBase} ${styles.skeletonCardValue}`} />
+            <div className={`${styles.skeletonBase} ${styles.skeletonCardSubtext}`} />
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   totalSources = 12,
   activeSources = 10,
   overallHealth = 85,
-  totalAlerts = 2
+  totalAlerts = 2,
+  loading = false
 }) => {
+  if (loading) {
+    return <OverviewSkeleton />;
+  }
+
   const healthPercentage = overallHealth;
   const activePercentage = (activeSources / totalSources) * 100;
 
+  const getProgressColor = (value: number) => {
+    if (value >= 80) return styles.progressBarGreen;
+    if (value >= 60) return styles.progressBarYellow;
+    return styles.progressBarRed;
+  };
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      <div style={{
-        backgroundColor: 'white',
-        border: '1px solid #e5e7eb',
-        borderRadius: '8px',
-        padding: '20px',
-        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
-      }}>
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          marginBottom: '12px'
-        }}>
-          <div style={{
-            fontSize: '14px',
-            fontWeight: '500',
-            color: '#374151'
-          }}>
-            Всего источников
+    <section aria-labelledby="overview-heading">
+      <h2 id="overview-heading" className={styles.srOnly}>
+        Обзор метрик
+      </h2>
+      <div className={styles.overviewSection} role="list">
+        {/* Карточка: Всего источников */}
+        <article
+          className={styles.metricCard}
+          role="listitem"
+          aria-label={`Всего источников: ${totalSources}, ${activeSources} активных`}
+        >
+          <div className={styles.cardHeader}>
+            <span className={styles.cardLabel}>Всего источников</span>
+            <span className={styles.cardIcon} aria-hidden="true">🎯</span>
           </div>
-          <span style={{ fontSize: '24px' }}>🎯</span>
-        </div>
-        <div>
-          <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{totalSources}</div>
-          <p style={{
-            fontSize: '12px',
-            color: '#6b7280',
-            marginTop: '4px'
-          }}>
-            {activeSources} активных
-          </p>
-        </div>
-      </div>
+          <div>
+            <div className={styles.cardValue}>{totalSources}</div>
+            <p className={styles.cardSubtext}>{activeSources} активных</p>
+          </div>
+        </article>
 
-      <div style={{
-        backgroundColor: 'white',
-        border: '1px solid #e5e7eb',
-        borderRadius: '8px',
-        padding: '20px',
-        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
-      }}>
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          marginBottom: '12px'
-        }}>
-          <div style={{
-            fontSize: '14px',
-            fontWeight: '500',
-            color: '#374151'
-          }}>
-            Общее здоровье
+        {/* Карточка: Общее здоровье */}
+        <article
+          className={styles.metricCard}
+          role="listitem"
+          aria-label={`Общее здоровье системы: ${healthPercentage}%`}
+        >
+          <div className={styles.cardHeader}>
+            <span className={styles.cardLabel}>Общее здоровье</span>
+            <span className={styles.cardIcon} aria-hidden="true">💪</span>
           </div>
-          <span style={{ fontSize: '24px' }}>💪</span>
-        </div>
-        <div>
-          <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{healthPercentage}%</div>
-          <div
-            style={{
-              width: '100%',
-              height: '8px',
-              backgroundColor: '#e5e7eb',
-              borderRadius: '4px',
-              overflow: 'hidden',
-              marginTop: '8px'
-            }}
-          >
+          <div>
+            <div className={styles.cardValue}>{healthPercentage}%</div>
             <div
-              style={{
-                width: `${healthPercentage}%`,
-                height: '100%',
-                backgroundColor: healthPercentage >= 80 ? '#10b981' :
-                                 healthPercentage >= 60 ? '#f59e0b' : '#ef4444',
-                transition: 'width 0.3s ease'
-              }}
-            />
+              className={styles.progressTrack}
+              role="progressbar"
+              aria-valuenow={healthPercentage}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={`Здоровье системы: ${healthPercentage}%`}
+            >
+              <div
+                className={`${styles.progressBar} ${getProgressColor(healthPercentage)}`}
+                style={{ width: `${healthPercentage}%` }}
+              />
+            </div>
           </div>
-        </div>
-      </div>
+        </article>
 
-      <div style={{
-        backgroundColor: 'white',
-        border: '1px solid #e5e7eb',
-        borderRadius: '8px',
-        padding: '20px',
-        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
-      }}>
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          marginBottom: '12px'
-        }}>
-          <div style={{
-            fontSize: '14px',
-            fontWeight: '500',
-            color: '#374151'
-          }}>
-            Активные источники
+        {/* Карточка: Активные источники */}
+        <article
+          className={styles.metricCard}
+          role="listitem"
+          aria-label={`Активные источники: ${activePercentage.toFixed(0)}%`}
+        >
+          <div className={styles.cardHeader}>
+            <span className={styles.cardLabel}>Активные источники</span>
+            <span className={styles.cardIcon} aria-hidden="true">⚡</span>
           </div>
-          <span style={{ fontSize: '24px' }}>⚡</span>
-        </div>
-        <div>
-          <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{activePercentage.toFixed(0)}%</div>
-          <div
-            style={{
-              width: '100%',
-              height: '8px',
-              backgroundColor: '#e5e7eb',
-              borderRadius: '4px',
-              overflow: 'hidden',
-              marginTop: '8px'
-            }}
-          >
+          <div>
+            <div className={styles.cardValue}>{activePercentage.toFixed(0)}%</div>
             <div
-              style={{
-                width: `${activePercentage}%`,
-                height: '100%',
-                backgroundColor: activePercentage >= 80 ? '#10b981' :
-                                 activePercentage >= 60 ? '#f59e0b' : '#ef4444',
-                transition: 'width 0.3s ease'
-              }}
-            />
+              className={styles.progressTrack}
+              role="progressbar"
+              aria-valuenow={activePercentage}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={`Активность источников: ${activePercentage.toFixed(0)}%`}
+            >
+              <div
+                className={`${styles.progressBar} ${getProgressColor(activePercentage)}`}
+                style={{ width: `${activePercentage}%` }}
+              />
+            </div>
           </div>
-        </div>
-      </div>
+        </article>
 
-      <div style={{
-        backgroundColor: 'white',
-        border: '1px solid #e5e7eb',
-        borderRadius: '8px',
-        padding: '20px',
-        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
-      }}>
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          marginBottom: '12px'
-        }}>
-          <div style={{
-            fontSize: '14px',
-            fontWeight: '500',
-            color: '#374151'
-          }}>
-            Активные алерты
+        {/* Карточка: Активные алерты */}
+        <article
+          className={styles.metricCard}
+          role="listitem"
+          aria-label={`Активных алертов: ${totalAlerts}, требуют внимания`}
+        >
+          <div className={styles.cardHeader}>
+            <span className={styles.cardLabel}>Активные алерты</span>
+            <span className={styles.cardIcon} aria-hidden="true">🚨</span>
           </div>
-          <span style={{ fontSize: '24px' }}>🚨</span>
-        </div>
-        <div>
-          <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#ef4444' }}>{totalAlerts}</div>
-          <p style={{
-            fontSize: '12px',
-            color: '#6b7280',
-            marginTop: '4px'
-          }}>
-            Требуют внимания
-          </p>
-        </div>
+          <div>
+            <div
+              className={styles.cardValue}
+              style={{ color: totalAlerts > 0 ? '#ef4444' : '#111827' }}
+            >
+              {totalAlerts}
+            </div>
+            <p className={styles.cardSubtext}>Требуют внимания</p>
+          </div>
+        </article>
       </div>
-    </div>
+    </section>
   );
 };
 
