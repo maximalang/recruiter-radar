@@ -37,6 +37,7 @@ function mockDigestItem(overrides: Partial<{
     reasons: ['Есть активная вакансия', 'Опубликовано в пределах месяца'] as [string, string],
     opener: 'Здравствуйте! По Test Company видно...',
     confidence_gate: 'A',
+    evidence_titles: [] as string[],
     ...overrides,
   }
 }
