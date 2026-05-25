@@ -1,7 +1,7 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
-import { isAbsolute, resolve, normalize, join, dirname, basename } from 'node:path';
+import { isAbsolute, normalize, join, basename } from 'node:path';
 import {
   SOURCE_ACTIONS,
   SOURCE_STATUS_SEMANTICS,
