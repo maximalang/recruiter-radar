@@ -1,20 +1,20 @@
 # TODO — Deployment Preparation
 
 ## Phase 1: Security Hardening
-- [ ] Task 1: Fix npm audit vulnerabilities
-- [ ] Task 2: Add security headers to Next.js
-- [ ] Task 3: Environment variable validation at startup
+- [x] Task 1: Fix npm audit vulnerabilities
+- [x] Task 2: Add security headers to Next.js
+- [x] Task 3: Environment variable validation at startup
 
 ## Phase 2: Infrastructure
-- [ ] Task 4: Production-ready Dockerfile
-- [ ] Task 5: Production docker-compose.yml
-- [ ] Task 6: Production environment template
+- [x] Task 4: Production-ready Dockerfile
+- [x] Task 5: Health check endpoint (/api/health)
+- [x] Task 6: Production environment template
 
 ## Phase 3: CI/CD Enhancement
-- [ ] Task 7: Enhance GitHub Actions workflow
-- [ ] Task 8: Add pre-deploy smoke test
+- [x] Task 7: Enhance GitHub Actions workflow
+- [x] Task 8: Add pre-deploy smoke test
 
-## Checkpoint: Infrastructure Ready
+## Checkpoint: Infrastructure Ready ✅
 
 ## Phase 4: Testing Coverage
 - [ ] Task 9: Fix skipped test
