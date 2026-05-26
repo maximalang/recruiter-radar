@@ -27,17 +27,17 @@
 ## P1 — расширение источников (дедлайн 30.05.2026)
 
 ### Фаза C. Career Pages + Rabota Rossii
-- [ ] Создать `packages/db/scripts/career-pages-smoke-targets.json` (10 РФ-компаний)
-- [ ] `npm run career-pages:smoke` → `npm run source:ingest:career-pages`
-- [ ] `npm run verify:rabota-rossii:smoke` → `npm run source:ingest:rabota-rossii`
-- [ ] `npm run verify:dedupe:metrics` — один `org_id` для компании из двух источников
+- ✅ Создать `packages/db/scripts/career-pages-smoke-targets.json` (10 РФ-компаний)
+- ✅ `npm run career-pages:smoke` → `npm run source:ingest:career-pages`
+- ✅ `npm run verify:rabota-rossii:smoke` → `npm run source:ingest:rabota-rossii`
+- ✅ `npm run verify:dedupe:metrics` — один `org_id` для компании из двух источников
 
 ### Фаза D. n8n orchestration
-- [ ] HH daily workflow (06:00 MSK)
-- [ ] Career Pages daily workflow (07:00 MSK)
-- [ ] Digest delivery workflow (08:00 MSK)
-- [ ] Operational alerts на failures
-- [ ] Двое суток подряд успешных executions
+- ✅ HH daily workflow (06:00 MSK)
+- ✅ Career Pages daily workflow (07:00 MSK)
+- ✅ Digest delivery workflow (08:00 MSK)
+- ✅ Operational alerts на failures
+- ✅ Двое суток подряд успешных executions
 
 ---
 

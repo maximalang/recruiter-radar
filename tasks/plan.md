@@ -68,30 +68,30 @@
 **Цель:** добавить два независимых evidence-слоя поверх HH.
 
 Шаги:
-1. `packages/db/scripts/career-pages-smoke-targets.json` — 10 российских компаний с Greenhouse / Lever boards (Яндекс, VK, Сбер, Тинькофф, Ozon и аналогичные)
-2. `npm run career-pages:smoke` → `npm run source:ingest:career-pages` против БД
-3. `npm run verify:rabota-rossii:smoke` → `npm run source:ingest:rabota-rossii`
-4. `npm run verify:dedupe:metrics` — убедиться, что одинаковая компания из разных источников склеивается в один `org_id`
+1. ✅ `packages/db/scripts/career-pages-smoke-targets.json` — 10 российских компаний с Greenhouse / Lever boards
+2. ✅ `npm run career-pages:smoke` → `npm run source:ingest:career-pages` против БД
+3. ✅ `npm run verify:rabota-rossii:smoke` → `npm run source:ingest:rabota-rossii`
+4. ✅ `npm run verify:dedupe:metrics` — убедиться, что одинаковая компания из разных источников склеивается в один `org_id`
 
 Критерии приёмки:
-- Лиды из career-pages попадают в дайджест
-- Rabota Rossii ingest проходит без ошибок
-- Нет дублей между HH и career-pages по `org_id`
+- ✅ Лиды из career-pages попадают в дайджест
+- ✅ Rabota Rossii ingest проходит без ошибок
+- ✅ Нет дублей между HH и career-pages по `org_id`
 
 #### Фаза D. n8n orchestration
 **Цель:** daily workflows запускают source pipelines и digest по расписанию.
 
 Шаги:
-1. Поднять n8n с теми же credentials, что в production
-2. Workflow: HH daily (06:00 MSK)
-3. Workflow: Career Pages daily (07:00 MSK)
-4. Workflow: Digest delivery (08:00 MSK)
-5. Operational alerts на failures (как минимум — на Telegram operator channel)
+1. ✅ Поднять n8n с теми же credentials, что в production
+2. ✅ Workflow: HH daily (06:00 MSK)
+3. ✅ Workflow: Career Pages daily (07:00 MSK)
+4. ✅ Workflow: Digest delivery (08:00 MSK)
+5. ✅ Operational alerts на failures (как минимум — на Telegram operator channel)
 
 Критерии приёмки:
-- Workflow в `executions` UI показывает успешные запуски за двое суток подряд
-- Падение workflow генерирует alert в operator-канал
-- Никаких бизнес-данных решений не появилось внутри n8n (только schedule / webhook / retry / alert)
+- ✅ Workflow в `executions` UI показывает успешные запуски за двое суток подряд
+- ✅ Падение workflow генерирует alert в operator-канал
+- ✅ Никаких бизнес-данных решений не появилось внутри n8n (только schedule / webhook / retry / alert)
 
 ---
 
