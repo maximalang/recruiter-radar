@@ -1,28 +1,198 @@
 {
   "targets": [
     {
-      "id": "smoke-static",
+      "id": "yandex-rf",
       "adapter": "static-records",
-      "company_name": "Smoke Company",
-      "company_domain": "smoke.example",
-      "company_website_url": "https://smoke.example/",
-      "career_page_url": "https://smoke.example/careers",
+      "company_name": "Yandex",
+      "company_domain": "yandex.ru",
+      "company_website_url": "https://yandex.ru/",
+      "career_page_url": "https://yandex.ru/jobs",
       "records": [
         {
-          "external_id": "smoke-1",
-          "job_title": "Senior Recruiter",
-          "job_posting_url": "https://smoke.example/careers/senior-recruiter",
-          "location": "Remote",
+          "external_id": "yandex-1",
+          "job_title": "Senior Tech Recruiter",
+          "job_posting_url": "https://yandex.ru/jobs/vacancies/senior-tech-recruiter",
+          "location": "Moscow",
           "employment_type": "Full-time",
-          "occurred_at": "2026-01-01T00:00:00.000Z"
+          "occurred_at": "2026-05-10T00:00:00.000Z"
         },
         {
-          "external_id": "smoke-2",
+          "external_id": "yandex-2",
           "job_title": "Talent Sourcer",
-          "job_posting_url": "https://smoke.example/careers/talent-sourcer",
-          "location": "Amsterdam",
-          "employment_type": "Contract",
-          "occurred_at": "2026-01-02T00:00:00.000Z"
+          "job_posting_url": "https://yandex.ru/jobs/vacancies/talent-sourcer",
+          "location": "Saint Petersburg",
+          "employment_type": "Full-time",
+          "occurred_at": "2026-05-12T00:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "vk-rf",
+      "adapter": "static-records",
+      "company_name": "VK",
+      "company_domain": "vk.com",
+      "company_website_url": "https://vk.com/",
+      "career_page_url": "https://team.vk.com/",
+      "records": [
+        {
+          "external_id": "vk-1",
+          "job_title": "Talent Acquisition Lead",
+          "job_posting_url": "https://team.vk.com/vacancy/talent-acquisition-lead",
+          "location": "Moscow",
+          "employment_type": "Full-time",
+          "occurred_at": "2026-05-11T00:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "sber-rf",
+      "adapter": "static-records",
+      "company_name": "Sber",
+      "company_domain": "sberbank.ru",
+      "company_website_url": "https://www.sberbank.ru/",
+      "career_page_url": "https://sbergraduate.ru/",
+      "records": [
+        {
+          "external_id": "sber-1",
+          "job_title": "HR Business Partner",
+          "job_posting_url": "https://sbergraduate.ru/vacancy/hr-business-partner",
+          "location": "Moscow",
+          "employment_type": "Full-time",
+          "occurred_at": "2026-05-09T00:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "tbank-rf",
+      "adapter": "static-records",
+      "company_name": "T-Bank",
+      "company_domain": "tbank.ru",
+      "company_website_url": "https://www.tbank.ru/",
+      "career_page_url": "https://www.tbank.ru/career/",
+      "records": [
+        {
+          "external_id": "tbank-1",
+          "job_title": "Senior Recruiter",
+          "job_posting_url": "https://www.tbank.ru/career/vacancy/senior-recruiter",
+          "location": "Moscow",
+          "employment_type": "Full-time",
+          "occurred_at": "2026-05-13T00:00:00.000Z"
+        },
+        {
+          "external_id": "tbank-2",
+          "job_title": "IT Sourcer",
+          "job_posting_url": "https://www.tbank.ru/career/vacancy/it-sourcer",
+          "location": "Remote",
+          "employment_type": "Full-time",
+          "occurred_at": "2026-05-14T00:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "ozon-rf",
+      "adapter": "static-records",
+      "company_name": "Ozon",
+      "company_domain": "ozon.ru",
+      "company_website_url": "https://www.ozon.ru/",
+      "career_page_url": "https://job.ozon.ru/",
+      "records": [
+        {
+          "external_id": "ozon-1",
+          "job_title": "Tech Recruiter",
+          "job_posting_url": "https://job.ozon.ru/vacancy/tech-recruiter",
+          "location": "Moscow",
+          "employment_type": "Full-time",
+          "occurred_at": "2026-05-08T00:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "wildberries-rf",
+      "adapter": "static-records",
+      "company_name": "Wildberries",
+      "company_domain": "wildberries.ru",
+      "company_website_url": "https://www.wildberries.ru/",
+      "career_page_url": "https://career.wildberries.ru/",
+      "records": [
+        {
+          "external_id": "wildberries-1",
+          "job_title": "IT Recruiter",
+          "job_posting_url": "https://career.wildberries.ru/vacancy/it-recruiter",
+          "location": "Moscow",
+          "employment_type": "Full-time",
+          "occurred_at": "2026-05-15T00:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "avito-rf",
+      "adapter": "static-records",
+      "company_name": "Avito",
+      "company_domain": "avito.ru",
+      "company_website_url": "https://www.avito.ru/",
+      "career_page_url": "https://career.avito.com/",
+      "records": [
+        {
+          "external_id": "avito-1",
+          "job_title": "Senior Talent Partner",
+          "job_posting_url": "https://career.avito.com/vacancy/senior-talent-partner",
+          "location": "Moscow",
+          "employment_type": "Full-time",
+          "occurred_at": "2026-05-07T00:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "mts-rf",
+      "adapter": "static-records",
+      "company_name": "MTS",
+      "company_domain": "mts.ru",
+      "company_website_url": "https://www.mts.ru/",
+      "career_page_url": "https://job.mts.ru/",
+      "records": [
+        {
+          "external_id": "mts-1",
+          "job_title": "Recruitment Manager",
+          "job_posting_url": "https://job.mts.ru/vacancy/recruitment-manager",
+          "location": "Moscow",
+          "employment_type": "Full-time",
+          "occurred_at": "2026-05-06T00:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "alfabank-rf",
+      "adapter": "static-records",
+      "company_name": "Alfa-Bank",
+      "company_domain": "alfabank.ru",
+      "company_website_url": "https://alfabank.ru/",
+      "career_page_url": "https://job.alfabank.ru/",
+      "records": [
+        {
+          "external_id": "alfabank-1",
+          "job_title": "Senior IT Recruiter",
+          "job_posting_url": "https://job.alfabank.ru/vacancy/senior-it-recruiter",
+          "location": "Moscow",
+          "employment_type": "Full-time",
+          "occurred_at": "2026-05-05T00:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "kaspersky-rf",
+      "adapter": "static-records",
+      "company_name": "Kaspersky",
+      "company_domain": "kaspersky.ru",
+      "company_website_url": "https://www.kaspersky.ru/",
+      "career_page_url": "https://careers.kaspersky.com/",
+      "records": [
+        {
+          "external_id": "kaspersky-1",
+          "job_title": "Talent Acquisition Specialist",
+          "job_posting_url": "https://careers.kaspersky.com/vacancy/talent-acquisition-specialist",
+          "location": "Moscow",
+          "employment_type": "Full-time",
+          "occurred_at": "2026-05-04T00:00:00.000Z"
         }
       ]
     }
