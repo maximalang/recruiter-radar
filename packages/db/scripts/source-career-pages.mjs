@@ -254,6 +254,34 @@ async function discoverCareerPagesTargets({ connectionString, persistSnapshot })
   };
 }
 
+export function buildCareerPagesDiscoverySeedsQuery() {
+  return `
+        SELECT
+          orgs.id,
+          orgs.name,
+          orgs.domain,
+          orgs.website_url,
+          MAX(CASE WHEN refs.source = 'hh' THEN refs.display_name END) AS hh_display_name,
+          MAX(CASE WHEN refs.source = 'hh' THEN refs.external_id END) AS hh_employer_id,
+          COUNT(DISTINCT signals.id) FILTER (WHERE signals.source = 'hh') AS hh_signal_count,
+          MAX(signals.occurred_at) FILTER (WHERE signals.source = 'hh') AS last_hh_signal_at,
+          COUNT(DISTINCT signals.id) AS signal_count,
+          MAX(signals.occurred_at) AS last_signal_at
+        FROM orgs
+        LEFT JOIN org_source_refs AS refs
+          ON refs.org_id = orgs.id
+         AND refs.source <> 'career-pages'
+        LEFT JOIN signals
+          ON signals.org_id = orgs.id
+         AND signals.source <> 'career-pages'
+        WHERE COALESCE(NULLIF(BTRIM(orgs.domain), ''), NULLIF(BTRIM(orgs.website_url), '')) IS NOT NULL
+        GROUP BY orgs.id, orgs.name, orgs.domain, orgs.website_url
+        HAVING COUNT(DISTINCT signals.id) > 0
+        ORDER BY MAX(signals.occurred_at) DESC NULLS LAST, orgs.id DESC
+        LIMIT $1
+      `;
+}
+
 async function loadCareerPagesDiscoverySeeds(connectionString) {
   const client = new Client({
     connectionString,
@@ -264,28 +292,7 @@ async function loadCareerPagesDiscoverySeeds(connectionString) {
 
   try {
     const result = await client.query(
-      `
-        SELECT
-          orgs.id,
-          orgs.name,
-          orgs.domain,
-          orgs.website_url,
-          MAX(CASE WHEN refs.source = 'hh' THEN refs.display_name END) AS hh_display_name,
-          MAX(CASE WHEN refs.source = 'hh' THEN refs.external_id END) AS hh_employer_id,
-          COUNT(DISTINCT signals.id) FILTER (WHERE signals.source = 'hh') AS hh_signal_count,
-          MAX(signals.occurred_at) FILTER (WHERE signals.source = 'hh') AS last_hh_signal_at
-        FROM orgs
-        LEFT JOIN org_source_refs AS refs
-          ON refs.org_id = orgs.id
-        LEFT JOIN signals
-          ON signals.org_id = orgs.id
-         AND signals.source = 'hh'
-        WHERE COALESCE(NULLIF(BTRIM(orgs.domain), ''), NULLIF(BTRIM(orgs.website_url), '')) IS NOT NULL
-        GROUP BY orgs.id, orgs.name, orgs.domain, orgs.website_url
-        HAVING COUNT(DISTINCT signals.id) FILTER (WHERE signals.source = 'hh') > 0
-        ORDER BY MAX(signals.occurred_at) FILTER (WHERE signals.source = 'hh') DESC NULLS LAST, orgs.id DESC
-        LIMIT $1
-      `,
+      buildCareerPagesDiscoverySeedsQuery(),
       [resolveCareerPagesDiscoveryLimit()],
     );
 
@@ -302,6 +309,11 @@ async function loadCareerPagesDiscoverySeeds(connectionString) {
           typeof row.last_hh_signal_at === 'string'
             ? row.last_hh_signal_at
             : row.last_hh_signal_at?.toISOString?.() ?? null,
+        signalCount: Number(row.signal_count ?? 0),
+        lastSignalAt:
+          typeof row.last_signal_at === 'string'
+            ? row.last_signal_at
+            : row.last_signal_at?.toISOString?.() ?? null,
       }))
       .filter((seed) => seed.domain || seed.websiteUrl);
   } finally {
@@ -343,6 +355,8 @@ async function discoverCareerPageTargetsFromSeeds(seeds) {
       hh_employer_id: seed.hhEmployerId,
       hh_signal_count: seed.hhSignalCount,
       last_hh_signal_at: seed.lastHhSignalAt,
+      signal_count: seed.signalCount,
+      last_signal_at: seed.lastSignalAt,
       detected_targets: probe.targets.length,
       review_status: probe.targets.length > 0 ? 'resolved' : 'needs_review',
       attempted_urls: probe.attemptedUrls,

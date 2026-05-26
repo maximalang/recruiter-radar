@@ -1,10 +1,31 @@
 import assert from 'node:assert/strict';
 
 import {
+  buildCareerPagesDiscoverySeedsQuery,
   detectCareerPageTargetFromHtml,
   resolveCareerPagesDiscoveredTargetsOutputPath,
   resolveCareerPagesDiscoveryReviewOutputPath,
 } from './source-career-pages.mjs';
+
+const seedsQuery = buildCareerPagesDiscoverySeedsQuery();
+assert.equal(typeof seedsQuery, 'string', 'seeds query must be a string');
+assert.ok(seedsQuery.includes('FROM orgs'), 'seeds query must select FROM orgs');
+assert.ok(
+  !/AND\s+signals\.source\s*=\s*'hh'/i.test(seedsQuery),
+  'seeds query must not restrict signals to HH only',
+);
+assert.ok(
+  /signals\.source\s*(<>|!=)\s*'career-pages'/i.test(seedsQuery),
+  'seeds query must exclude career-pages signals to prevent recursion',
+);
+assert.ok(
+  !/HAVING[\s\S]*FILTER\s*\(\s*WHERE\s+signals\.source\s*=\s*'hh'\s*\)/i.test(seedsQuery),
+  'HAVING clause must not be HH-only',
+);
+assert.ok(
+  /COUNT\(DISTINCT\s+signals\.id\)\s*>\s*0/i.test(seedsQuery),
+  'HAVING clause must require at least one non-career-pages signal',
+);
 
 const greenhouseHtml = `
   <html>
