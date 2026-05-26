@@ -14,28 +14,16 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-// Import types
-import type {
-  DedupeServiceConfig,
-  SignalIdentity,
-  EntityIdentity,
-  DuplicateResult
-} from '../lib/business-logic-types';
-
-// Constants
 const CACHE_DIR = resolve(process.cwd(), '.cache/dedupe');
 const SUPPRESSIONS_FILE = resolve(CACHE_DIR, 'suppressions.json');
 const METRICS_FILE = resolve(CACHE_DIR, 'metrics.json');
-const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+const CACHE_TTL = 24 * 60 * 60 * 1000;
 
-// Initialize cache directory
 if (!existsSync(CACHE_DIR)) {
   mkdirSync(CACHE_DIR, { recursive: true });
 }
 
-// Dedupe keys generation
-export function buildSignalExternalId(sourceId: string, externalId: string | null, sourceUrl: string, primarySourceKey: string, lineNumber?: number): string {
-  // Create a unique identifier for this signal
+export function buildSignalExternalId(sourceId, externalId, sourceUrl, primarySourceKey, lineNumber) {
   const idParts = [
     sourceId,
     externalId,
@@ -45,8 +33,7 @@ export function buildSignalExternalId(sourceId: string, externalId: string | nul
   return idParts.join(':');
 }
 
-// Entity identity hash for cross-source dedupe
-export function buildEntityIdentityHash(companyName: string, companyDomain?: string, inn?: string, ogrn?: string): string {
+export function buildEntityIdentityHash(companyName, companyDomain, inn, ogrn) {
   const normalized = {
     company: companyName?.toLowerCase().trim(),
     domain: normalizeDomain(companyDomain),
@@ -54,7 +41,6 @@ export function buildEntityIdentityHash(companyName: string, companyDomain?: str
     ogrn: normalizeOgrn(ogrn),
   };
 
-  // Create hash for efficient comparison
   const hashInput = [
     normalized.company,
     normalized.domain,
@@ -65,45 +51,32 @@ export function buildEntityIdentityHash(companyName: string, companyDomain?: str
   return createHash('sha256').update(hashInput).digest('hex');
 }
 
-// Normalization helpers
-function normalizeDomain(domain?: string): string | null {
+function normalizeDomain(domain) {
   if (!domain) return null;
   return domain.toLowerCase().replace(/^www\./, '');
 }
 
-function normalizeInn(inn?: string): string | null {
+function normalizeInn(inn) {
   if (!inn) return null;
   const cleaned = inn.toString().replace(/\D/g, '');
   return cleaned.length === 10 ? cleaned : null;
 }
 
-function normalizeOgrn(ogrn?: string): string | null {
+function normalizeOgrn(ogrn) {
   if (!ogrn) return null;
   const cleaned = ogrn.toString().replace(/\D/g, '');
   return cleaned.length === 13 ? cleaned : null;
 }
 
-// Main dedupe service
 export class DedupeService {
-  private suppressions: Map<string, { timestamp: string; reason?: string }>;
-  private metrics: {
-    totalSignals: number;
-    duplicatesFound: number;
-    falsePositives: number;
-    lastUpdated: string;
-  };
-  private entityCache: Map<string, { id: string; timestamp: number }>;
-  private signalCache: Map<string, { id: string; timestamp: number }>;
-
-  constructor(config: DedupeServiceConfig = {}) {
+  constructor(config = {}) {
     this.suppressions = this.loadSuppressions();
     this.metrics = this.loadMetrics();
     this.entityCache = new Map();
     this.signalCache = new Map();
   }
 
-  // Load suppression list from file
-  private loadSuppressions(): Map<string, { timestamp: string; reason?: string }> {
+  loadSuppressions() {
     try {
       if (existsSync(SUPPRESSIONS_FILE)) {
         const data = JSON.parse(readFileSync(SUPPRESSIONS_FILE, 'utf8'));
@@ -115,21 +88,17 @@ export class DedupeService {
     return new Map();
   }
 
-  // Load metrics from file
   loadMetrics() {
     try {
       if (existsSync(METRICS_FILE)) {
         const data = readFileSync(METRICS_FILE, 'utf8');
-        // Safe JSON parsing with prototype pollution protection
         const parsed = JSON.parse(data, (key, value) => {
-          // Skip prototype properties
           if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
             return undefined;
           }
           return value;
         });
 
-        // Validate metrics structure
         if (typeof parsed !== 'object' || Array.isArray(parsed)) {
           console.warn('Invalid metrics format, using defaults');
           return this.getDefaultMetrics();
@@ -143,7 +112,6 @@ export class DedupeService {
     return this.getDefaultMetrics();
   }
 
-  // Get default metrics structure
   getDefaultMetrics() {
     return {
       totalSignals: 0,
@@ -154,7 +122,6 @@ export class DedupeService {
     };
   }
 
-  // Save state to files
   saveState() {
     try {
       writeFileSync(SUPPRESSIONS_FILE, JSON.stringify(Object.fromEntries(this.suppressions), null, 2));
@@ -164,22 +131,19 @@ export class DedupeService {
     }
   }
 
-  // Check if signal is duplicate
-  isDuplicate(signal: { signalExternalId: string; entityIdentityHash: string; entityIdentity: EntityIdentity }): DuplicateResult {
+  isDuplicate(signal) {
     const signalId = signal.signalExternalId;
     const entityHash = signal.entityIdentityHash;
 
-    // Check exact signal duplicate
     if (this.signalCache.has(signalId)) {
       this.metrics.duplicatesDetected++;
       return {
         isDuplicate: true,
         duplicateOf: signalId,
-        confidence: 1.0
+        confidence: 1.0,
       };
     }
 
-    // Check entity-level duplicate
     if (this.entityCache.has(entityHash)) {
       const existingSignal = this.entityCache.get(entityHash);
       if (this.isSameEntity(signal, existingSignal)) {
@@ -187,33 +151,29 @@ export class DedupeService {
         return {
           isDuplicate: true,
           duplicateOf: entityHash,
-          confidence: 0.9
+          confidence: 0.9,
         };
       }
     }
 
-    // Update cache
     this.signalCache.set(signalId, signal);
     this.entityCache.set(entityHash, signal);
 
     return {
       isDuplicate: false,
-      confidence: 0.0
+      confidence: 0.0,
     };
   }
 
-  // Check if two signals represent the same entity
-  private isSameEntity(a: EntityIdentity, b: EntityIdentity): number {
+  isSameEntity(a, b) {
     const score = this.calculateEntityMatchScore(a, b);
-    return score >= 0.8; // 80% threshold for entity match
+    return score >= 0.8;
   }
 
-  // Calculate entity similarity score
   calculateEntityMatchScore(a, b) {
     let score = 0;
     let maxScore = 0;
 
-    // Domain match (highest weight)
     if (a.companyDomain && b.companyDomain) {
       if (normalizeDomain(a.companyDomain) === normalizeDomain(b.companyDomain)) {
         score += 0.5;
@@ -221,13 +181,11 @@ export class DedupeService {
       maxScore += 0.5;
     }
 
-    // INN match (high weight)
     if (a.inn && b.inn && normalizeInn(a.inn) === normalizeInn(b.inn)) {
       score += 0.4;
       maxScore += 0.4;
     }
 
-    // Company name match
     if (a.companyName && b.companyName) {
       const normA = a.companyName.toLowerCase().trim();
       const normB = b.companyName.toLowerCase().trim();
@@ -242,7 +200,6 @@ export class DedupeService {
     return maxScore > 0 ? score / maxScore : 0;
   }
 
-  // Suppress duplicate signal
   suppressDuplicate(signal, reason = 'duplicate') {
     const suppression = {
       signalId: signal.signalExternalId,
@@ -259,18 +216,15 @@ export class DedupeService {
     return suppression;
   }
 
-  // Check if signal is suppressed
   isSuppressed(signalId) {
     return this.suppressions.has(signalId);
   }
 
-  // Get suppression reason
   getSuppressionReason(signalId) {
     const suppression = this.suppressions.get(signalId);
     return suppression?.reason || 'unknown';
   }
 
-  // Add feedback-based suppression
   addFeedbackSuppression(signalId, feedbackType) {
     const suppression = {
       signalId,
@@ -287,27 +241,29 @@ export class DedupeService {
     return suppression;
   }
 
-  // Update metrics
   updateMetrics(sourceId, processedCount, duplicateCount) {
     this.metrics.totalSignals += processedCount;
     this.metrics.duplicatesDetected += duplicateCount;
-    this.metrics.duplicateRate = this.metrics.duplicatesDetected / this.metrics.totalSignals;
+    this.metrics.duplicateRate = this.metrics.totalSignals > 0
+      ? this.metrics.duplicatesDetected / this.metrics.totalSignals
+      : 0;
     this.metrics.lastUpdated = new Date().toISOString();
 
     this.saveState();
   }
 
-  // Get quality report
   getQualityReport() {
+    const total = this.metrics.totalSignals;
     return {
       ...this.metrics,
-      suppressionRate: this.metrics.suppressedSignals / this.metrics.totalSignals || 0,
-      uniqueSignals: this.metrics.totalSignals - this.metrics.duplicatesDetected,
-      effectiveness: (this.metrics.duplicatesDetected / this.metrics.totalSignals * 100).toFixed(2) + '%',
+      suppressionRate: total > 0 ? this.metrics.suppressedSignals / total : 0,
+      uniqueSignals: total - this.metrics.duplicatesDetected,
+      effectiveness: total > 0
+        ? `${(this.metrics.duplicatesDetected / total * 100).toFixed(2)}%`
+        : '0.00%',
     };
   }
 
-  // Clear old suppressions
   clearOldSuppressions(olderThanDays = 30) {
     const cutoff = new Date(Date.now() - olderThanDays * 24 * 60 * 60 * 1000);
     let cleared = 0;
@@ -322,13 +278,12 @@ export class DedupeService {
 
     if (cleared > 0) {
       this.saveState();
-      console.log(`🧹 Cleared ${cleared} old suppressions`);
+      console.log(`Cleared ${cleared} old suppressions`);
     }
 
     return cleared;
   }
 
-  // Export dedupe statistics
   exportStats() {
     return {
       bySource: this.groupMetricsBySource(),
@@ -337,7 +292,6 @@ export class DedupeService {
     };
   }
 
-  // Group metrics by source
   groupMetricsBySource() {
     const bySource = {};
 
@@ -353,7 +307,6 @@ export class DedupeService {
     return bySource;
   }
 
-  // Group suppressions by reason
   groupSuppressionsByReason() {
     const byReason = {};
 
@@ -369,7 +322,6 @@ export class DedupeService {
     return byReason;
   }
 
-  // Calculate daily trend (simplified)
   calculateDailyTrend() {
     const now = new Date();
     const days = 7;
@@ -380,7 +332,7 @@ export class DedupeService {
       day.setDate(day.getDate() - i);
       const dayKey = day.toISOString().split('T')[0];
 
-      const daySuppressions = Array.from(this.suppressions.values()).filter(s =>
+      const daySuppressions = Array.from(this.suppressions.values()).filter((s) =>
         s.timestamp.startsWith(dayKey)
       );
 
@@ -394,7 +346,6 @@ export class DedupeService {
   }
 }
 
-// Initialize global dedupe service instance
 let dedupeService = null;
 
 export function getDedupeService() {
@@ -404,13 +355,12 @@ export function getDedupeService() {
   return dedupeService;
 }
 
-// Cleanup function for periodic maintenance
 export function cleanupDedupeService() {
   const service = getDedupeService();
   const cleared = service.clearOldSuppressions(30);
 
   if (cleared > 0) {
-    console.log(`🧹 Dedupe cleanup completed: ${cleared} old suppressions removed`);
+    console.log(`Dedupe cleanup completed: ${cleared} old suppressions removed`);
   }
 
   return cleared;
