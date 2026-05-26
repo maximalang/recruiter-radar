@@ -94,6 +94,7 @@
     "verify:sources:live-config": "node packages/db/scripts/verify-sources-live-config.mjs",
     "verify:sources:coverage": "node packages/db/scripts/verify-sources-coverage.mjs",
     "verify:smoke": "node packages/db/scripts/verify-smoke.mjs",
+    "verify:smoke:career-pages:read-only": "node packages/db/scripts/verify-career-pages-smoke-read-only.mjs",
     "hh:fetch": "npm run source:fetch:hh",
     "hh:ingest": "npm run source:ingest:hh",
     "hh:report": "node packages/db/scripts/report-hh-orgs.mjs",

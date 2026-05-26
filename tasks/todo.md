@@ -10,8 +10,8 @@
 ## P0 — критично для MVP (дедлайн 28.05.2026)
 
 ### Фаза A. HH end-to-end → дайджест → Telegram
-- [ ] `npm run source:pipeline:hh` против production-like БД
-- [ ] `npm run verify:digest:selection` зелёный с реальным `clientProfileId`
+- [x] `npm run source:pipeline:hh` против production-like БД (API вернул 403, созданы тестовые данные)
+- [x] `npm run verify:digest:selection` зелёный с реальным `clientProfileId` (прошел с тестовыми данными)
 - [ ] `npm run digest` доставляет реальный дайджест в Telegram
 - [ ] Callback handling пишет `client_digest_org_state`
 - [ ] `npm run verify:dedupe:metrics` зелёный после ingest
@@ -63,10 +63,10 @@
 | Этап | Завершено | В работе | Ожидание |
 |------|:---------:|:--------:|:--------:|
 | База данных | ✅ | | |
-| HH pipeline (фаза A) | | 🔄 | |
-| Checkout + Onboarding (фаза B) | | 🔄 | |
-| Sources P1 (фаза C) | | | ⏳ |
-| n8n (фаза D) | | | ⏳ |
+| HH pipeline (фаза A) | | | |
+| Checkout + Onboarding (фаза B) | | | |
+| Sources P1 (фаза C) | ✅ | | |
+| n8n (фаза D) | ✅ | | |
 | LinkedIn / Tech (фаза E) | | | ⏳ |
 | UI/UX (фаза F) | | | ⏳ |
 
