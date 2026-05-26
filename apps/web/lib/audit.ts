@@ -3,7 +3,14 @@
 
 import { getPool } from './db';
 import { logEvent } from './runtime';
-import type { Pool } from 'pg';
+
+export type AuditMetadata = Record<string, unknown> & {
+  ipAddress?: string | null;
+  userAgent?: string | null;
+  source?: string;
+  error?: string;
+  timestamp?: string;
+};
 
 export interface AuditLogEntry {
   id?: number;
@@ -11,12 +18,12 @@ export interface AuditLogEntry {
   action: string;
   resourceType?: string;
   resourceId?: string;
-  oldValues?: any;
-  newValues?: any;
+  oldValues?: unknown;
+  newValues?: unknown;
   ipAddress?: string | null;
   userAgent?: string | null;
   timestamp?: Date;
-  metadata?: Record<string, unknown>;
+  metadata?: AuditMetadata;
 }
 
 export interface AuditEvent {
@@ -25,16 +32,10 @@ export interface AuditEvent {
   resourceId?: string;
   userId?: string | null;
   changes?: {
-    before?: any;
-    after?: any;
+    before?: unknown;
+    after?: unknown;
   };
-  metadata?: {
-    ipAddress?: string | null;
-    userAgent?: string | null;
-    source?: string;
-    error?: string;
-    timestamp?: string;
-  };
+  metadata?: AuditMetadata;
 }
 
 export class AuditLogger {
@@ -106,7 +107,7 @@ export class AuditLogger {
   }
 
   // Convenience methods for common actions
-  async logCreate(resourceType: string, resourceId: string, userId: string, newData: any, metadata?: any): Promise<void> {
+  async logCreate(resourceType: string, resourceId: string, userId: string, newData: unknown, metadata?: AuditMetadata): Promise<void> {
     await this.log({
       action: 'create',
       resourceType,
@@ -117,7 +118,7 @@ export class AuditLogger {
     });
   }
 
-  async logUpdate(resourceType: string, resourceId: string, userId: string, oldData: any, newData: any, metadata?: any): Promise<void> {
+  async logUpdate(resourceType: string, resourceId: string, userId: string, oldData: unknown, newData: unknown, metadata?: AuditMetadata): Promise<void> {
     await this.log({
       action: 'update',
       resourceType,
@@ -128,7 +129,7 @@ export class AuditLogger {
     });
   }
 
-  async logDelete(resourceType: string, resourceId: string, userId: string, oldData: any, metadata?: any): Promise<void> {
+  async logDelete(resourceType: string, resourceId: string, userId: string, oldData: unknown, metadata?: AuditMetadata): Promise<void> {
     await this.log({
       action: 'delete',
       resourceType,
@@ -139,7 +140,7 @@ export class AuditLogger {
     });
   }
 
-  async logView(resourceType: string, resourceId: string, userId: string, metadata?: any): Promise<void> {
+  async logView(resourceType: string, resourceId: string, userId: string, metadata?: AuditMetadata): Promise<void> {
     await this.log({
       action: 'view',
       resourceType,
@@ -149,7 +150,7 @@ export class AuditLogger {
     });
   }
 
-  async logPermissionChange(userId: string, targetUserId: string, oldRoles: string[], newRoles: string[], metadata?: any): Promise<void> {
+  async logPermissionChange(userId: string, targetUserId: string, oldRoles: string[], newRoles: string[], metadata?: AuditMetadata): Promise<void> {
     await this.log({
       action: 'permission_change',
       resourceType: 'user',
@@ -163,11 +164,11 @@ export class AuditLogger {
     });
   }
 
-  async logClientProfileUpdate(clientProfileId: string, userId: string, oldData: any, newData: any, metadata?: any): Promise<void> {
+  async logClientProfileUpdate(clientProfileId: string, userId: string, oldData: unknown, newData: unknown, metadata?: AuditMetadata): Promise<void> {
     await this.logUpdate('client_profile', clientProfileId, userId, oldData, newData, metadata);
   }
 
-  async logDigestRun(digestRunId: string, clientProfileId: string, userId: string, metadata?: any): Promise<void> {
+  async logDigestRun(digestRunId: string, clientProfileId: string, userId: string, metadata?: AuditMetadata): Promise<void> {
     await this.log({
       action: 'digest_run',
       resourceType: 'digest_run',
@@ -180,7 +181,7 @@ export class AuditLogger {
     });
   }
 
-  async logDigestFeedback(candidateId: string, action: string, userId: string, metadata?: any): Promise<void> {
+  async logDigestFeedback(candidateId: string, action: string, userId: string, metadata?: AuditMetadata): Promise<void> {
     await this.log({
       action: 'digest_feedback',
       resourceType: 'digest_candidate',
@@ -196,19 +197,21 @@ export class AuditLogger {
 
 // Decorator for automatic audit logging
 export function Auditable(action?: string, resourceType?: string) {
-  return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+  return function (_target: unknown, propertyKey: string, descriptor: PropertyDescriptor) {
     const originalMethod = descriptor.value;
 
-    descriptor.value = async function (...args: any[]) {
+    descriptor.value = async function (...args: unknown[]) {
       const audit = AuditLogger.getInstance();
       const userId = getCurrentUserId();
 
       // Extract resource ID if possible
-      let resourceId;
-      if (args.length > 0 && typeof args[0] === 'object' && args[0].id) {
-        resourceId = args[0].id;
-      } else if (args.length > 0) {
-        resourceId = args[0];
+      let resourceId: string | undefined;
+      const first = args[0];
+      if (first && typeof first === 'object' && 'id' in first) {
+        const idValue = (first as { id: unknown }).id;
+        resourceId = typeof idValue === 'string' ? idValue : String(idValue);
+      } else if (typeof first === 'string') {
+        resourceId = first;
       }
 
       const metadata = {

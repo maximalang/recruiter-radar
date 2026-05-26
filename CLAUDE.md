@@ -83,8 +83,10 @@ Every lead recommendation must answer:
 ### FIUR Scoring Model
 
 ```
-Total Score = 0.30 × Fit + 0.35 × Intent + 0.20 × Urgency + 0.15 × Reachability
+Total Score = Fit + Intent + Urgency + Reachability
 ```
+
+Each component is clamped to [0, 1]; total ∈ [0, 4]. The additive form is the product contract — see `docs/product.md` §FIUR and the implementation in `apps/web/lib/scoring/fiur.ts`.
 
 - **Fit:** agency ICP match, role/function match, industry match, geography, company size, exclusions
 - **Intent:** relevant vacancies, freshness, hiring burst, independent source confirmation, direct career page evidence

@@ -19,7 +19,7 @@ import {
   stripBom,
 } from './adapters/source-records.mjs';
 import { fetchJson } from './adapters/source-http.mjs';
-import { loadEnvFile, runScriptCli } from './lib/common-utils.mjs';
+import { loadEnvFile, normalizeDomain, runScriptCli } from './lib/common-utils.mjs';
 
 const { Client } = pg;
 const scriptDir = dirname(fileURLToPath(import.meta.url));

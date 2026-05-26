@@ -139,6 +139,7 @@ export async function runDigestForClientProfile(input: {
   cooldownDays?: number | null;
   limit?: number | null;
   skipStateWrite?: boolean;
+  userId?: string | number;
 }): Promise<DigestRunResult> {
   const pool = getPool();
 
@@ -161,11 +162,15 @@ export async function runDigestForClientProfile(input: {
       throw new Error("Client profile is inactive.");
     }
 
-    // TODO: Add ownership validation when userId is available
-    // if (input.userId) {
-    //   const { assertClientProfileOwnership } = await import("../db");
-    //   await assertClientProfileOwnership(input.clientProfileId, input.userId);
-    // }
+    if (input.userId !== undefined && input.userId !== null) {
+      const ownership = await client.query<{ ok: boolean }>(
+        `SELECT 1 AS ok FROM client_profiles WHERE id = $1 AND owner_id = $2 LIMIT 1`,
+        [input.clientProfileId, input.userId],
+      );
+      if (ownership.rowCount !== 1) {
+        throw new Error("Access denied: ownership check failed for this client profile.");
+      }
+    }
 
     const sourceKey = normalizeSourceKey(input.sourceKey);
     const cooldownDays = normalizeCooldownDays(input.cooldownDays);

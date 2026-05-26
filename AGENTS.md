@@ -169,7 +169,7 @@ Recommended lead card fields:
 
 Use FIUR scoring as the default model:
 
-`Total Score = 0.30 × Fit + 0.35 × Intent + 0.20 × Urgency + 0.15 × Reachability`
+`Total Score = Fit + Intent + Urgency + Reachability` (each component clamped to [0, 1]; total ∈ [0, 4]). Implementation: `apps/web/lib/scoring/fiur.ts`. Product contract: `docs/product.md` §FIUR.
 
 Fit:
 - agency ICP match;

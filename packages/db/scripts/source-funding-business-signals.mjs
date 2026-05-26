@@ -12,9 +12,8 @@ import {
   buildSourceKeyAliases,
   dedupeNormalizedRecords,
   stripBom,
-  loadEnvFile,
-  normalizeDomain,
 } from './adapters/source-records.mjs';
+import { loadEnvFile, normalizeDomain } from './lib/common-utils.mjs';
 import { fetchJson } from './adapters/source-http.mjs';
 
 const { Client } = pg;
