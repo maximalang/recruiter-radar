@@ -10,6 +10,7 @@
  */
 
 import type { EvidenceTier } from '@/lib/db/evidence'
+import { detectHiringBurst } from '@/lib/scoring/hiring-burst'
 export type { EvidenceTier }
 
 /**
@@ -268,12 +269,18 @@ function computeUrgency(
   const realRoles = vacancies.filter((v) => !v.isInternalRecruiter)
   let score = 0
 
-  if (realRoles.length >= 3) {
-    score += 0.4
-    reasons.push(`hiring burst — ${realRoles.length} concurrent roles`)
-  } else if (realRoles.length === 2) {
-    score += 0.2
-    reasons.push('two concurrent roles')
+  const burst = detectHiringBurst({
+    vacancies: vacancies.map((v) => ({
+      id: v.id,
+      role: v.role,
+      publishedAt: v.publishedAt,
+      isInternalRecruiter: v.isInternalRecruiter,
+    })),
+    now: () => now,
+  })
+  if (burst.score > 0) {
+    score += burst.score * 0.6
+    for (const reason of burst.reasons) reasons.push(reason)
   }
 
   const hardToFill = realRoles.filter((v) => v.isHardToFill).length
@@ -282,10 +289,12 @@ function computeUrgency(
     reasons.push(`${hardToFill} hard-to-fill role(s) raise urgency`)
   }
 
-  const freshHits = realRoles.filter((v) => ageDays(v.publishedAt, now) <= 14).length
-  if (freshHits >= 2) {
-    score += 0.2
-    reasons.push('multiple fresh postings within 14 days')
+  if (!burst.isBurst) {
+    const freshHits = realRoles.filter((v) => ageDays(v.publishedAt, now) <= 14).length
+    if (freshHits >= 2) {
+      score += 0.2
+      reasons.push('multiple fresh postings within 14 days')
+    }
   }
 
   return { score: clamp01(score), reasons }
