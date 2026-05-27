@@ -215,4 +215,77 @@ describe('computeFiur', () => {
     expect(result.total).toBeGreaterThanOrEqual(0)
     expect(result.total).toBeLessThanOrEqual(4)
   })
+
+  describe('SMB sweet-spot fit bonus (50–500 employees)', () => {
+    const profileWithoutSizes: FiurInput['clientProfile'] = {
+      industries: ['fintech'],
+      roles: ['backend engineer'],
+      locations: ['Moscow'],
+    }
+
+    it('rewards companies with 50–500 employees when ICP has no size preference', () => {
+      const sweetSpot = computeFiur({
+        company: { ...baseCompany, size: undefined, employeeCount: 200 },
+        vacancies: [vacancy()],
+        clientProfile: profileWithoutSizes,
+        evidence: [{ tier: 'direct', source: 'career-page' }],
+      })
+      const tooSmall = computeFiur({
+        company: { ...baseCompany, size: undefined, employeeCount: 10 },
+        vacancies: [vacancy()],
+        clientProfile: profileWithoutSizes,
+        evidence: [{ tier: 'direct', source: 'career-page' }],
+      })
+      const tooLarge = computeFiur({
+        company: { ...baseCompany, size: undefined, employeeCount: 5000 },
+        vacancies: [vacancy()],
+        clientProfile: profileWithoutSizes,
+        evidence: [{ tier: 'direct', source: 'career-page' }],
+      })
+
+      expect(sweetSpot.fit).toBeGreaterThan(tooSmall.fit)
+      expect(sweetSpot.fit).toBeGreaterThan(tooLarge.fit)
+      expect(
+        sweetSpot.reasons.fit.some((r) => /sweet spot|smb|50.?500|optimal/i.test(r))
+      ).toBe(true)
+    })
+
+    it('falls back to categorical size when employeeCount is missing', () => {
+      const small = computeFiur({
+        company: { ...baseCompany, size: 'small', employeeCount: undefined },
+        vacancies: [vacancy()],
+        clientProfile: profileWithoutSizes,
+        evidence: [{ tier: 'direct', source: 'career-page' }],
+      })
+      const enterprise = computeFiur({
+        company: { ...baseCompany, size: 'enterprise', employeeCount: undefined },
+        vacancies: [vacancy()],
+        clientProfile: profileWithoutSizes,
+        evidence: [{ tier: 'direct', source: 'career-page' }],
+      })
+
+      expect(small.fit).toBeGreaterThan(enterprise.fit)
+      expect(
+        small.reasons.fit.some((r) => /sweet spot|smb|50.?500|optimal/i.test(r))
+      ).toBe(true)
+    })
+
+    it('does not double-count the bonus when ICP companySizes is specified', () => {
+      const explicitProfile: FiurInput['clientProfile'] = {
+        ...profileWithoutSizes,
+        companySizes: ['medium'],
+      }
+      const explicit = computeFiur({
+        company: { ...baseCompany, size: 'medium', employeeCount: 200 },
+        vacancies: [vacancy()],
+        clientProfile: explicitProfile,
+        evidence: [{ tier: 'direct', source: 'career-page' }],
+      })
+
+      const sweetSpotReasons = explicit.reasons.fit.filter((r) =>
+        /sweet spot|smb|50.?500|optimal/i.test(r)
+      )
+      expect(sweetSpotReasons.length).toBe(0)
+    })
+  })
 })

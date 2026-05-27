@@ -41,6 +41,7 @@ export interface FiurCompany {
   industry?: string
   location?: string
   size?: 'startup' | 'small' | 'medium' | 'large' | 'enterprise'
+  employeeCount?: number
   hasCareerPage?: boolean
   hasCorporateContactPath?: boolean
 }
@@ -121,6 +122,16 @@ function isExcluded(company: FiurCompany, profile: FiurClientProfile): boolean {
   })
 }
 
+const SMB_MIN_EMPLOYEES = 50
+const SMB_MAX_EMPLOYEES = 500
+
+function isSmbSweetSpot(company: FiurCompany): boolean {
+  if (typeof company.employeeCount === 'number') {
+    return company.employeeCount >= SMB_MIN_EMPLOYEES && company.employeeCount <= SMB_MAX_EMPLOYEES
+  }
+  return company.size === 'small' || company.size === 'medium'
+}
+
 function computeFit(
   company: FiurCompany,
   vacancies: FiurVacancy[],
@@ -191,6 +202,14 @@ function computeFit(
       score += 0.15
       reasons.push(`company size "${company.size}" matches ICP`)
     }
+  } else if (isSmbSweetSpot(company)) {
+    score += 0.1
+    const detail = typeof company.employeeCount === 'number'
+      ? `${company.employeeCount} employees`
+      : `size "${company.size}"`
+    reasons.push(
+      `SMB sweet spot (${detail}, 50–500 employees) — optimal agency budget`
+    )
   }
 
   return { score: clamp01(score), reasons }
