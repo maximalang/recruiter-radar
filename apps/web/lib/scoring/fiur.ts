@@ -11,6 +11,7 @@
 
 import type { EvidenceTier } from '@/lib/db/evidence'
 import { detectHiringBurst } from '@/lib/scoring/hiring-burst'
+import { summarizeRoleMix } from '@/lib/scoring/role-category'
 export type { EvidenceTier }
 
 /**
@@ -252,6 +253,16 @@ function computeIntent(
   if (realRoles.length >= 3) {
     score += 0.15
     reasons.push(`multiple open roles (${realRoles.length}) suggest active hiring`)
+  }
+
+  if (realRoles.length >= 2) {
+    const mix = summarizeRoleMix(realRoles.map((v) => v.role))
+    if (mix.nonTechCount >= 2 && mix.nonTechShare >= 0.5) {
+      score += 0.1
+      reasons.push(
+        `non-tech role mix (${mix.nonTechCount}/${mix.total}) — outsourcing-likely roles strengthen the lead`
+      )
+    }
   }
 
   return { score: clamp01(score), reasons }
