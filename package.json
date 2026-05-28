@@ -108,6 +108,7 @@
     "digest:held": "node packages/db/scripts/report-digest-held.mjs",
     "digest": "node packages/db/scripts/report-digest.mjs",
     "digest:run": "node packages/db/scripts/report-digest.mjs",
+    "lead:generate": "npm run test --workspace @recruiter-radar/web -- --testPathPattern=src/__tests__/scripts/lead-generate.smoke.test.ts",
     "prepare": "husky"
   },
   "devDependencies": {

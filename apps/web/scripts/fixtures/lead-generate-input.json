@@ -1,0 +1,72 @@
+{
+  "leadId": "fixture-acme-fintech",
+  "company": {
+    "id": "co-acme-fintech",
+    "name": "Acme Fintech",
+    "website": "https://acme-fintech.example.ru",
+    "industry": "fintech",
+    "industries": ["fintech", "banking"],
+    "locations": ["Москва"],
+    "size": "medium",
+    "employeeCount": 230,
+    "hasCareerPage": true,
+    "hasCorporateContactPath": true
+  },
+  "vacancies": [
+    {
+      "id": "v-acme-1",
+      "title": "Senior Backend Engineer",
+      "role": "backend engineer",
+      "location": "Москва",
+      "publishedAtHoursAgo": 2,
+      "sourceTier": "direct",
+      "salaryFrom": 350000,
+      "salaryTo": 500000,
+      "salaryCurrency": "RUB"
+    },
+    {
+      "id": "v-acme-2",
+      "title": "ML Engineer",
+      "role": "ml engineer",
+      "location": "Москва",
+      "publishedAtHoursAgo": 6,
+      "sourceTier": "corroboration",
+      "salaryFrom": 400000,
+      "salaryTo": 600000,
+      "salaryCurrency": "RUB"
+    },
+    {
+      "id": "v-acme-3",
+      "title": "Product Manager",
+      "role": "product",
+      "location": "Москва",
+      "publishedAtHoursAgo": 10,
+      "sourceTier": "direct",
+      "salaryFrom": 280000,
+      "salaryTo": 380000,
+      "salaryCurrency": "RUB"
+    }
+  ],
+  "evidence": [
+    { "source": "career_page", "tier": "direct", "fetchedAtHoursAgo": 1 },
+    { "source": "hh", "tier": "direct", "fetchedAtHoursAgo": 3 },
+    { "source": "rabota_rossii", "tier": "corroboration", "fetchedAtHoursAgo": 5 }
+  ],
+  "contactPaths": [
+    { "category": "hr-email", "value": "hr@acme-fintech.example.ru", "confidence": "high" },
+    { "category": "careers-email", "value": "careers@acme-fintech.example.ru", "confidence": "high" },
+    { "category": "contact-form", "value": "https://acme-fintech.example.ru/contact", "confidence": "medium" },
+    { "category": "phone", "value": "+7 495 000 00 00", "confidence": "medium" }
+  ],
+  "agencyProfile": {
+    "industries": ["fintech"],
+    "locations": ["Москва"],
+    "roles": ["backend engineer", "ml engineer", "product"],
+    "companySizes": ["medium", "large"]
+  },
+  "marketContext": {
+    "industryTrend": "growing",
+    "growthSignals": ["funding-round", "office-expansion"]
+  },
+  "careerPageHtml": "<h2>Engineering</h2><ul><li>Backend Engineer</li><li>ML Engineer</li></ul><h2>Product</h2><ul><li>Product Manager</li></ul>"
+}

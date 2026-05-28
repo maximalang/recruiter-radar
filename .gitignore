@@ -27,3 +27,4 @@ docker-data/
 
 # Smoke runner artefacts
 packages/db/scripts/test-sources-results.json
+apps/web/.cache/
