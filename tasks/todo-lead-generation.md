@@ -1,8 +1,7 @@
-# TODO — Lead Generation Platform для Рекрутинговых Агентств
+# TODO: Lead Generation Platform для Рекрутинговых Агентств
 
-**Связано:** `SPEC.md` (продуктовый контракт), `tasks/plan.md` (разработка и фазы), `tasks/runbook.md` (пошаговый runbook)
+**Связано:** `SPEC.md` (обновленная спецификация), `tasks/plan-lead-generation.md` (стратегический план)
 **Обновлено:** 2026-05-26
-**Фокус:** Полноценная платформа генерации лидов для рекрутинговых агентств
 
 ---
 
@@ -31,10 +30,10 @@
   - [ ] Push notifications for mobile
 
 **Acceptance Criteria:**
-- [ ] 50+ qualified leads per day
-- [ ] 80%+ match with agency ICP
-- [ ] <2 hour freshness for A/B leads
-- [ ] Signal accuracy >90%
+- 50+ qualified leads per day
+- 80%+ match with agency ICP
+- <2 hour freshness for A/B leads
+- Signal accuracy >90%
 
 ---
 
@@ -61,10 +60,10 @@
   - [ ] Contact method preference
 
 **Acceptance Criteria:**
-- [ ] Score correlates with conversion rate (>0.7)
-- [ ] 70%+ leads are actionable
-- [ ] Clear next action for each lead
-- [ ] Explainable score breakdown
+- Score correlates with conversion rate (>0.7)
+- 70%+ leads are actionable
+- Clear next action for each lead
+- Explainable score breakdown
 
 ---
 
@@ -87,10 +86,10 @@
   - [ ] Real-time adjustments
 
 **Acceptance Criteria:**
-- [ ] Individual lead scoring per agency
-- [ ] 30% improvement in relevance
-- [ ] <5 min ICP configuration
-- [ ] Performance-based optimization
+- Individual lead scoring per agency
+- 30% improvement in relevance
+- <5 min ICP configuration
+- Performance-based optimization
 
 ---
 
@@ -119,10 +118,10 @@
   - [ ] Permissions system
 
 **Acceptance Criteria:**
-- [ ] 80% agencies can use as primary CRM
-- [ ] Seamless lead-to-client workflow
-- [ ] Mobile-responsive
-- [ ] Data export capabilities
+- 80% agencies can use as primary CRM
+- Seamless lead-to-client workflow
+- Mobile-responsive
+- Data export capabilities
 
 ---
 
@@ -149,10 +148,10 @@
   - [ ] ROI calculation
 
 **Acceptance Criteria:**
-- [ ] 30%+ response rate
-- [ ] 80%+ deliverability
-- [ ] Personalized at scale
-- [ ] Reduced manual effort by 50%
+- 30%+ response rate
+- 80%+ deliverability
+- Personalized at scale
+- Reduced manual effort by 50%
 
 ---
 
@@ -179,10 +178,10 @@
   - [ ] Competitive intelligence
 
 **Acceptance Criteria:**
-- [ ] Clear ROI demonstration
-- [ ] Actionable insights
-- [ ] Executive-ready reports
-- [ ] Real-time data
+- Clear ROI demonstration
+- Actionable insights
+- Executive-ready reports
+- Real-time data
 
 ---
 
@@ -211,10 +210,10 @@
   - [ ] Agent-specific weights
 
 **Acceptance Criteria:**
-- [ ] 80% conversion prediction accuracy
-- [ ] 20% improvement in lead quality
-- [ ] Adaptive to market changes
-- [ ] Explainable predictions
+- 80% conversion prediction accuracy
+- 20% improvement in lead quality
+- Adaptive to market changes
+- Explainable predictions
 
 ---
 
@@ -241,10 +240,10 @@
   - [ ] Competitive positioning
 
 **Acceptance Criteria:**
-- [ ] Become go-to market intelligence source
-- [ ] Differentiation for agencies
-- [ ] High-value insights
-- [ ] Regular actionable content
+- Become go-to market intelligence source
+- Differentiation for agencies
+- High-value insights
+- Regular actionable content
 
 ---
 
@@ -273,10 +272,10 @@
   - [ ] Success metrics
 
 **Acceptance Criteria:**
-- [ ] Multiple agencies on same platform
-- [ ] No data leakage
-- [ ] Enterprise-grade security
-- [ ] Scalable performance
+- Multiple agencies on same platform
+- No data leakage
+- Enterprise-grade security
+- Scalable performance
 
 ---
 
@@ -303,10 +302,10 @@
   - [ ] Training programs
 
 **Acceptance Criteria:**
-- [ ] Enterprise-ready platform
-- [ ] Customization capabilities
-- [ ] High scalability
-- [ ] Premium support
+- Enterprise-ready platform
+- Customization capabilities
+- High scalability
+- Premium support
 
 ---
 

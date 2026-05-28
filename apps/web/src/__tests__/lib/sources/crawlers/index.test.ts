@@ -1,12 +1,28 @@
 import { createDefaultRouter } from '@/lib/sources/crawlers'
 
+// Mock fetchText for these tests too
+const mockFetchText = jest.fn()
+jest.mock('@/../../packages/db/scripts/adapters/source-http.mjs', () => ({
+  fetchText: mockFetchText
+}))
+
 describe('createDefaultRouter', () => {
+  beforeEach(() => {
+    mockFetchText.mockClear()
+  })
+
   it('returns a router that serves static URLs out of the box', async () => {
-    const router = createDefaultRouter({
-      staticEngine: {
-        fetcher: async (url) => new Response(`<html><h1>${url}</h1></html>`, { status: 200 }),
-      },
-    })
+    mockFetchText.mockImplementation((url) => Promise.resolve({
+      response: {
+        ok: true,
+        status: 200,
+        url,
+        headers: new Map()
+      } as any,
+      body: `<html><h1>${url}</h1></html>`
+    }))
+
+    const router = createDefaultRouter()
     const result = await router.fetch({ url: 'https://acme.example/careers' })
     expect(result.engine).toBe('static')
     expect(result.html).toContain('https://acme.example/careers')

@@ -34,6 +34,8 @@ const SPA_HOSTS = [
   'ashbyhq.com',
   'myworkdayjobs.com',
   'smartrecruiters.com',
+  'jobvite.com',
+  'workable.com',
 ] as const
 
 function getHostname(rawUrl: string): string | null {

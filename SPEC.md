@@ -1,66 +1,75 @@
-# Спецификация: Recruiter Radar
+# Спецификация: Recruiter Radar — Lead Generation для Рекрутинговых Агентств
 
-**Версия:** 3.0
-**Обновлено:** 2026-05-26
-**Статус:** MVP в работе — primary source (HH) активен, остальные источники в стадии включения
+**Версия:** 4.0  
+**Обновлено:** 2026-05-26  
+**Статус:** MVP в работе — lead generation system для агентств
 
 ---
 
 ## 1. Objective
 
-Recruiter Radar — premium Russia-first client-intelligence radar для рекрутинговых агентств.
+Recruiter Radar — **premium B2B lead generation platform** для рекрутинговых агентств.
 
-**Что мы строим:** ежедневный радар, который находит компании, которым агентству стоит написать сегодня, и доставляет короткий, объяснимый дайджест в Telegram.
+**Что мы строим:** ежедневный радар, который находит **компании-клиенты** (не кандидатов!), которым агентству стоит предложить свои услуги прямо сейчас. Каждый лид — это теплый контакт с компанией, активно нанимающей сотрудников.
 
-**Что мы НЕ строим:** ATS, CRM, generic job parser, mass outreach, candidate sourcing.
+**Что мы НЕ строим:** ATS, CRM, candidate sourcing, job parser, mass outreach tool.
 
-**Целевой пользователь:** российское рекрутинговое агентство (1–30 человек), которое работает по hiring signals и хочет evidence-first путь к новым клиентам без ручного скрапинга.
+**Целевой пользователь:** российское рекрутинговое агентство (1–30 человек), которое хочет систематизировать поиск новых клиентов и увеличить pipeline за счет hiring intelligence.
 
 **Каждая рекомендация лида обязана отвечать на 7 вопросов:**
-1. Кто компания?
-2. Что изменилось?
-3. Почему это важно сейчас?
-4. Почему это подходит профилю агентства?
-5. Какие доказательства поддерживают сигнал?
-6. Какой безопасный лавфул-путь контакта?
-7. Что сделать следующим шагом?
+1. Кто компания? (изучение клиента)
+2. Что изменилось? (trigger для outreach)
+3. Почему это важно сейчас? (urgency)
+4. Почему это подходит профилю агентства? (ICP match)
+5. Какие доказательства поддерживают сигнал? (evidence)
+6. Какой безопасный лавфул-путь контакта? (reachability)
+7. Что сделать следующим шагом? (clear call-to-action)
 
 **Продуктовый цикл:**
 ```
-Landing → live preview → pilot activation → client profile →
-Telegram connection → daily digest → feedback buttons →
-suppression / reweighting → better future digests
+Landing → demo → pilot activation → agency profile → 
+daily radar → lead review → outreach → 
+feedback → lead scoring → better future leads
 ```
 
 ---
 
-## 2. Tech Stack
+## 2. Lead Generation Model
 
-| Слой | Технология | Версия |
-|------|-----------|--------|
-| Frontend / API | Next.js (App Router) | 16.x |
-| UI | React | 19.x |
-| Язык | TypeScript strict | 5.9.x |
-| База данных | PostgreSQL | 15 |
-| DB driver | `pg` | 8.x |
-| Тесты | Jest + Testing Library | 29 / 16 |
-| Оркестрация | n8n (только webhook fan-out, schedules, alerts) | self-hosted |
-| Деплой | Docker Compose | — |
+### Target Companies Ideal Profile
+- **Size**: 50-500 employees (оптимальный бюджет на услуги)
+- **Industry**: IT/FinTech/E-commerce/Manufacturing (high hiring needs)
+- **Hiring Signals**: 
+  - 3+ открытых вакансий (сигнал роста)
+  - Вакансии в разных отделах (широка потребность)
+  - Non-tech roles (HR, Sales, Accounting - больше рекрутмент需求)
+  - Fresh postings (<7 дней)
 
-n8n используется **только** как оркестратор. Бизнес-логика (scoring, entity resolution, confidence gates, billing, suppression, digest state, feedback, prompt versioning) живёт в Next.js / Postgres.
+### Lead Quality Gates
+| Gate | Критерии | Действие |
+|------|----------|----------|
+| **A** | Multiple hiring signals, direct HR contact, high budget | Автоматическая продажа |
+| **B** | Clear expansion pattern, company website with careers | Теплый лид, персонализация |
+| **C** | Indirect signals, need verification | Требует additional research |
+| **D** | Only one vacancy, no clear contact | Не является лидом, контекст |
+
+### Monetization
+- **Pilot**: Бесплатный试用 с ограниченными лидами
+- **Pro**: $X/месяц за неограниченный radar + advanced analytics
+- **Enterprise**: Custom pricing, API access, dedicated support
 
 ---
 
 ## 3. Commands
 
-### Разработка
+### Development
 ```bash
 npm install
 docker compose up -d                        # Postgres + n8n
 npm run dev                                 # Next.js на http://localhost:3000
 ```
 
-### Проверки качества
+### Quality Checks
 ```bash
 npm run web:check                           # tsc --noEmit
 npm run web:validate                        # check + build
@@ -68,34 +77,30 @@ npm run --workspace=@recruiter-radar/web test
 npm run web:build                           # next build
 ```
 
-### Источники данных
+### Lead Generation Pipeline
 ```bash
 npm run source:list                         # реестр sources + tier + status
-npm run source:pipeline                     # = pipeline:primary = HH (fetch + ingest)
-npm run source:pipeline:hh
-npm run source:pipeline:career-pages
-npm run source:pipeline:<source-id>         # любой из 15 sources в реестре
+npm run source:pipeline                     # pipeline для всех активных sources
+npm run lead:generate                       # основной генерация лидов
+npm run lead:quality                       # проверка качества лидов
+npm run analytics:performance               # метрики по лидам и конверсиям
 ```
 
-### Smoke / verifier
+### Agency Management
+```bash
+npm run agency:profile                      # настройка профиля агентства
+npm run outreach:templates                  # шаблоны для outreach
+npm run pipeline:track                      # отслеживание воронки продаж
+npm run reporting:roi                       # ROI отчет для агентств
+```
+
+### Verification
 ```bash
 npm run verify:smoke                        # composite chain
-npm run verify:career-pages:smoke
-npm run verify:career-pages:discovery
-npm run verify:career-pages:ingest          # требует DATABASE_URL
-npm run verify:digest:feedback              # требует DATABASE_URL
-npm run verify:digest:selection             # требует DATABASE_URL
-npm run verify:mixed-ranking
-npm run verify:sources:coverage
-npm run verify:source:confidence
-npm run verify:dedupe:metrics
-```
-
-### Дайджест и отчёты
-```bash
-npm run digest                              # report-digest.mjs
-npm run digest:held
-npm run hh:report | hh:metrics | hh:score | hh:top | hh:why-now | hh:opener
+npm run verify:lead:quality                 # проверка качества лидов
+npm run verify:lead:conversion               # метрики конверсии
+npm run verify:agency:performance            # performance агентств
+npm run verify:lead:duplicates              # проверка дублей лидов
 ```
 
 ---
@@ -106,163 +111,162 @@ npm run hh:report | hh:metrics | hh:score | hh:top | hh:why-now | hh:opener
 apps/web/                       # Next.js приложение (frontend + API + бизнес-логика)
 ├── app/                        # App Router
 │   ├── actions.ts              # server actions
-│   ├── api/                    # /api/digest, /api/digest/feedback, /api/health, /api/hh/*
-│   ├── checkout/               # checkout flow
+│   ├── api/                    # /api/leads, /api/outreach, /api/analytics, /api/agencies
+│   ├── checkout/               # onboarding + billing
 │   ├── dashboard/              # личный кабинет агентства
-│   ├── onboarding/             # onboarding + Telegram connect
 │   └── ui/                     # UI primitives
 ├── lib/                        # бизнес-логика и доменные модули
-│   ├── scoring/                # FIUR scoring, gates, client overrides
+│   ├── scoring/                # Lead scoring, ICP matching, conversion prediction
 │   ├── db/                     # типизированный доступ к Postgres, evidence builder
-│   ├── middleware/             # rbac, validation, case conversion, security
-│   ├── digest*.ts              # digest pipeline + feedback state
-│   ├── telegram*.ts            # Telegram delivery + connect tokens
-│   └── session.ts              # signed rr_sid cookies
+│   ├── middleware/             # rbac, validation, security
+│   ├── lead-generation.ts      # основной engine генерации лидов
+│   ├── outreach.ts             # email/telegram outreach automation
+│   ├── analytics.ts            # performance metrics, ROI tracking
+│   └── agency-profile.ts       # агентские профили и ICP
 ├── src/__tests__/              # Jest unit / integration тесты
-├── src/test-utils/             # фикстуры и утилиты для тестов
-└── next.config.ts              # security headers, redirects
+└── src/test-utils/             # фикстуры и утилиты для тестов
 
 packages/db/
 ├── lib/                        # shared TS-типы между web и scripts
 ├── migrations/                 # *.sql, нумерованные миграции
-└── scripts/                    # source fetch / ingest / verifier / monitoring
-    ├── run-source-action.mjs   # единая точка входа для source:* команд
-    ├── fetch-hh.mjs ingest-hh.mjs ...
-    ├── source-<id>.mjs         # 15 source adapters
-    ├── verify-*-smoke.mjs      # верификаторы качества и pipeline
-    └── report-*.mjs            # отчёты (digest, hh, ...)
+└── scripts/                    # lead generation pipeline
+    ├── run-lead-gen.mjs       # единый entry point
+    ├── fetch-*.mjs            # sources для lead discovery
+    ├── score-*.mjs            # lead scoring engine
+    ├── outreach-*.mjs         # outreach automation
+    └── verify-*.mjs          # verification and metrics
 
-docker-compose.yml              # Postgres + n8n локально
+docker-compose.yml              # Postgres + n8n
 .github/workflows/test.yml      # CI: check + build + tests + smoke
-
 docs/                           # архитектура, продукт, security, migration guides
-tasks/                          # rolling план и todo для активной фазы
-SPEC.md                         # этот документ — single source of truth по продукту
-CLAUDE.md                       # инструкции для AI-агентов; не дублирует SPEC
-README.md                       # entrypoint для новых разработчиков
+tasks/                          # rolling план и todo
+SPEC.md                         # этот документ — single source of truth
+CLAUDE.md                       # инструкции для AI-агентов
 ```
 
 ---
 
-## 5. Code Style
+## 5. Lead Generation Engine
+
+### Lead Scoring System
+```
+Total Score = ICP Match + Hiring Intensity + Market Fit + Contact Quality
+              ∈ [0, 4] - чем выше, тем лучше
+```
+
+- **ICP Match** (40%): соответствие профилю агентства
+  - Industry alignment
+  - Company size preference
+  - Geography fit
+  - Historical conversion
+  
+- **Hiring Intensity** (30%): насколько активно компания нанимает
+  - Number of open positions
+  - Variety of roles
+  - Posting frequency
+  - Salary levels
+  
+- **Market Fit** (20%): насколько компания в тренде
+  - Industry growth
+  - Funding rounds
+  - Expansion signals
+  - Competitor activity
+  
+- **Contact Quality** (10%): как легко достучаться
+  - Public contact info
+  - Career page quality
+  - Social media presence
+  - Response history
+
+### Lead Status Workflow
+```
+New → Qualified → Contacted → Meeting → Proposal → Client → Lost
+  ↓         ↓         ↓         ↓
+ Nurture   Requalify  Follow-up  Archive
+```
+
+### Lead Enrichment
+Each lead includes:
+- Company profile with financials/employees/funding
+- Contact information (HR, hiring managers)
+- Competitive intelligence
+- Market context
+- Personalized outreach templates
+- Next action recommendations
+
+---
+
+## 6. Code Style
 
 TypeScript strict. Маленькие явные функции. Документация — только там, где WHY неочевиден.
 
 ```typescript
-// apps/web/lib/scoring/fiur.ts — образец стиля
-import type { EvidenceTier } from '@/lib/db/evidence'
+// apps/web/lib/scoring/lead-scoring.ts — образец стиля
+import type { ICPProfile, Company, Lead } from '@/lib/db/types'
 
-export interface FiurEvidenceItem {
-  tier: EvidenceTier
-  source: string
+export interface LeadScore {
+  total: number
+  breakdown: {
+    icpMatch: number
+    hiringIntensity: number  
+    marketFit: number
+    contactQuality: number
+  }
+  confidence: 'high' | 'medium' | 'low'
+  reasons: string[]
+  nextAction: LeadAction
 }
 
-export interface FiurVacancy {
-  id: string
-  title: string
-  role: string
-  location?: string
-  publishedAt: string
-  isInternalRecruiter?: boolean
-  isHardToFill?: boolean
-  sourceTier?: EvidenceTier
+export interface LeadAction {
+  type: 'call' | 'email' | 'linkedin' | 'wait'
+  contact: ContactInfo
+  template: string
+  timing: string
+  priority: 'high' | 'medium' | 'low'
 }
 
 /**
- * Аддитивный FIUR: Total = Fit + Intent + Urgency + Reachability,
- * каждая компонента clamp'ится в [0, 1], итоговый score ∈ [0, 4].
- * Источник истины — docs/product.md §FIUR.
+ * Scoring system specifically designed for recruitment agencies.
+ * Focuses on client acquisition, not candidate matching.
+ * 
+ * Key insight: Companies hiring multiple roles = best leads
+ * Companies hiring HR recruiters = hottest leads
  */
-export function scoreFiur(input: FiurInput): FiurScore {
-  const fit = clamp01(computeFit(input))
-  const intent = clamp01(computeIntent(input))
-  const urgency = clamp01(computeUrgency(input))
-  const reachability = clamp01(computeReachability(input))
-  return { fit, intent, urgency, reachability, total: fit + intent + urgency + reachability }
+export function scoreLead(company: Company, vacancies: Vacancy[], icp: ICPProfile): LeadScore {
+  // Implementation...
 }
 ```
 
 **Соглашения:**
 - TypeScript strict, без `any` без явной причины
-- Имена компонентов — `PascalCase`, функции и переменные — `camelCase`, файлы — `kebab-case` (с исключением для React-компонентов в `PascalCase.tsx`)
-- API типы — в `lib/api-types.ts`, бизнес-логика — в `lib/business-logic-types.ts`, БД — в `lib/database-types.ts` или `lib/db/`
-- Server-side input — валидировать через `lib/validation-schemas.ts` / `lib/secure-validation-schemas.ts`
-- Не добавлять inline стили; не вводить новые зависимости без обоснования
-- Русские строки в UI — конкретные и premium, без обещаний типа «гарантированные клиенты»
+- Имена — `PascalCase` для компонентов/типов, `camelCase` для функций
+- API типы — в `lib/api-types.ts`, бизнес-логика — в `lib/business-logic-types.ts`
+- Input validation через `lib/validation-schemas.ts`
+- Русские строки — конкретные и premium, без ложных обещаний
 
 ---
 
-## 6. Testing Strategy
+## 7. Testing Strategy
 
-| Уровень | Где | Когда писать |
-|---------|-----|--------------|
-| Unit | `apps/web/src/__tests__/lib/**` | для каждой функции в `lib/`, для каждой scoring-компоненты |
-| Integration (web) | `apps/web/src/__tests__/app/**`, `src/__tests__/middleware/**` | для API routes, middleware, RBAC, validation, dashboard |
-| DB-backed smoke | `packages/db/scripts/verify-*-smoke.mjs` | для source ingest, digest selection, digest feedback, dedupe |
-| Pipeline gates | `__tests__/lib/scoring/gate-pipeline*.ts`, `__tests__/lib/digest/pipeline-gates.test.ts` | для confidence gates A/B/C/D и suppression |
-| CI smoke | `.github/workflows/test.yml` | composite `verify:smoke` + careers/digest verifiers с реальной БД |
+| Уровень | Где | Что тестируем |
+|---------|-----|----------------|
+| Unit | `apps/web/src/__tests__/lib/**` | Каждая функция в lib/, scoring logic |
+| Integration | `apps/web/src/__tests__/app/**` | API routes, middleware, lead flow |
+| Agency Flow | `apps/web/src/__tests__/agency/**` | dashboard, outreach, analytics |
+| Lead Quality | `packages/db/scripts/verify-lead-*.mjs` | dedupe, scoring, enrichment |
 
 **Стандарты:**
-- Тест проверяет поведение, а не реализацию. Имя теста описывает что и при каких условиях.
-- Новая фича попадает в `main` только с покрытием на unit + (если есть боковой эффект на БД) DB-backed smoke.
-- Баг-фикс приходит с regression-тестом, который падал бы до фикса.
-- Не мокать БД в integration-тестах — использовать реальный Postgres через `DATABASE_URL`.
-- Snapshot-тесты — только для стабильного UI; всё остальное — explicit assertions.
+- Тест проверяет поведение, а не реализацию
+- Новая фича — с unit + integration тестами
+- Lead generation pipeline — с smoke тестами
+- Не мокать БД в integration-тестах
+- Snapshot-тесты только для стабильного UI
 
 **Запуск:**
 ```bash
 npm run --workspace=@recruiter-radar/web test                     # все Jest-тесты
-npm run --workspace=@recruiter-radar/web test -- --watch
-npm run --workspace=@recruiter-radar/web test -- <pattern>
-DATABASE_URL=... npm run verify:smoke                             # composite smoke с БД
+DATABASE_URL=... npm run verify:lead:quality                      # smoke с реальной БД
 ```
-
----
-
-## 7. Domain Model
-
-### FIUR Scoring
-
-Аддитивная форма (источник истины — `docs/product.md`, реализация — `apps/web/lib/scoring/fiur.ts`):
-
-```
-Total = Fit + Intent + Urgency + Reachability       // каждая в [0, 1], total ∈ [0, 4]
-```
-
-- **Fit** — ICP match, role/function, industry, geography, size, exclusions
-- **Intent** — релевантные вакансии, freshness, hiring burst, independent source confirmation, прямое доказательство с career page
-- **Urgency** — burst, hard-to-fill, новый регион, корпоративное событие, повторяющиеся stale roles
-- **Reachability** — корпоративный сайт, career page, generic HR-путь, безопасный non-personal route
-
-«Компания нанимает внутреннего рекрутёра» сам по себе **не** считается hot signal.
-
-Источники, согласованные на 2026-05-26: `apps/web/lib/scoring/fiur.ts`, `docs/product.md` §FIUR, `CLAUDE.md` §FIUR Scoring Model.
-
-### Source Model
-
-`sourceClass`: `primary-platform` / `company-surface` / `registry-reference` / `market-signal`
-`evidenceTier`: `high-signal` / `medium-signal` / `context-only`
-`status`: `active` / `planned`
-`defaultConfidence`: baseline confidence для будущего score layering.
-
-Сейчас активны как минимум `hh` (primary) и `career-pages` (company-surface). Полный реестр — `npm run source:list`.
-
-### Confidence Gates
-
-| Gate | Условия | Доставка |
-|------|---------|----------|
-| **A** | ≥2 независимых evidence-слоя, чистый entity match, прямой company surface | автодоставка |
-| **B** | 1 strong source + enrichment layer | автодоставка с confidence label |
-| **C** | platform-only aggregation или сомнительный entity match | review required |
-| **D** | контекст без прямого hiring proof | лид не создаётся, остаётся supporting context |
-
-### Telegram Digest
-
-Каждый лид содержит: company name, score, confidence, why now, evidence summary, best angle, safe next action.
-
-Inline buttons: `Беру` / `Мимо` / `Позже` / `Уже написал` / `Ответили` / `Созвон` / `Клиент` / `Скрыть похожие`.
-
-Callback handling: authenticated, idempotent, logged, replay-safe, влияет на suppression и reweighting следующего дайджеста.
 
 ---
 
@@ -270,75 +274,78 @@ Callback handling: authenticated, idempotent, logged, replay-safe, влияет 
 
 ### Всегда делать
 - TypeScript strict; никаких `any` без явной причины
-- Валидировать любой external input на границе (API, webhook, n8n, файл, scraper)
-- Парам-биндинг для SQL; никакой конкатенации
+- Валидировать любой external input
+- Параметризованный SQL для безопасности
 - Подписанные сессии (`rr_sid` через `SESSION_SECRET`)
-- Перед коммитом: `npm run web:check`. Если изменились routes / middleware / `next.config.*` или патч на грани merge — дополнительно `npm run web:build`
-- Любая бизнес-логика — в `apps/web/lib/**` или `packages/db/scripts/**`, **не** в n8n workflows
+- Перед коммитом: `npm run web:check`
+- Бизнес-логика только в `apps/web/lib/**` и `packages/db/scripts/**`
 - Русский UI: конкретный, premium, evidence-first
-- Каждая фича попадает с тестом
+- Каждая фича — с тестами
 
 ### Спрашивать первым
 - Изменения схемы БД (новые миграции)
-- Новые npm-зависимости > 100KB или с transitive прав на network/fs
-- Изменение API контракта (`/api/digest*`, `/api/hh/*`, webhook-и)
-- Изменения CI / workflow / Dockerfile
-- Изменения в FIUR-модели или confidence gates
-- Затрагивает биллинг, suppression state, prompt versioning
+- Новые npm-зависимости > 100KB
+- Изменение API контракта (`/api/leads/*`, `/api/outreach/*`)
+- Изменения в lead scoring модели
+- Ценообразование и биллинг
+- Изменения в воронке продаж
 
 ### Никогда
-- Не коммитить `.env`, `.env.local`, `.env.production`, ключи, токены, дампы
-- Не читать `.env*`, `node_modules/`, `.next/`, `build/`, `dist/`
-- Не экспортировать n8n workflow с реальными credentials
-- Не использовать destructive git (`reset --hard`, `push --force`, `branch -D`) без явного разрешения
-- Не помещать бизнес-логику в n8n
-- Не подавать «компания ищет внутреннего рекрутёра» как hot signal
-- Не использовать формулировки «гарантированные клиенты», «100% результат», «автоматически закрываем продажи», «готовые сделки»
-- Не выкладывать UI без accessibility-минимума и без мобильной адаптации
+- Не коммитить `.env*`, токены, дампы
+- Не читать `node_modules/`, `.next/`, `build/`
+- Не экспортировать n8n workflow с credentials
+- Не размещать бизнес-логику в n8n
+- Не обещать "гарантированные лиды" или "100% конверсию"
+- Не использовать продукт без минимального уровня accessibility
+- Не делать lead generation для_candidate sourcing
 
 ---
 
-## 9. Success Criteria
+## 9. Lead Generation Quality Standards
 
-Конкретные, тестируемые критерии «MVP готов»:
+### Data Sources
+- **HH**: Primary source (vacancies, company info)
+- **Career Pages**: Direct evidence of hiring
+- **Rabota Rossii**: Government hiring data
+- **Company Registries**: Legal entity data
+- **News/Media**: Market intelligence
 
-| # | Критерий | Verification |
-|---|---------|--------------|
-| 1 | Postgres поднят, миграции применены, 20 таблиц на месте | `docker exec recruiter-radar-db-1 psql -U postgres -d recruiter_radar -c "\dt"` возвращает ≥20 строк |
-| 2 | `npm run web:check` без ошибок | exit code 0 |
-| 3 | `npm run --workspace=@recruiter-radar/web test` зелёный | exit code 0, ≥85 пройденных тестов |
-| 4 | `npm run verify:smoke` зелёный против БД с актуальной digest schema | exit code 0 |
-| 5 | HH pipeline создаёт org_source_refs и hh_signals | `SELECT count(*) FROM org_source_refs WHERE source='hh'` > 0 после `npm run source:pipeline:hh` |
-| 6 | Career Pages source ingestится без дублей с HH | `npm run verify:dedupe:metrics` зелёный |
-| 7 | `/api/digest?clientProfileId=…` возвращает кандидатов и пишет `digest_runs` + `digest_candidates` | DB-backed smoke `verify:digest:selection` |
-| 8 | `/api/digest/feedback` обновляет `client_digest_org_state` и влияет на следующий дайджест | `verify:digest:feedback` зелёный |
-| 9 | Confidence gates C/D исключают лиды из доставки | `pipeline-gates.test.ts` + `gate-pipeline.test.ts` зелёные |
-| 10 | Checkout создаёт `client_profiles` и trial subscription | manual smoke: оформить заказ из лендинга → запись в `client_profiles` |
-| 11 | Telegram connect token issuance + activation работает | `telegram-connect.test.ts` зелёный + manual: подключение бота за один шаг |
-| 12 | `npm run digest` доставляет дайджест по реальному `clientProfileId` | manual: бот шлёт сообщение с лидами и inline-кнопками; callback пишет state |
-| 13 | Lighthouse mobile (Performance + Accessibility) ≥ 85 на landing и dashboard | manual: lighthouse run |
-| 14 | n8n запускает HH daily workflow + digest workflow по расписанию | проверка `executions` в n8n UI |
+### Quality Metrics
+- **Lead Freshness**: <24 hours for A leads, <72 hours for B
+- **Deduplication Rate**: <1% duplicate companies
+- **ICP Match Rate**: >80% relevance to agency profile
+- **Contact Info Availability**: >70% for A/B leads
+- **Delivery Success**: >95% email/telegram delivery
 
----
-
-## 10. Open Questions
-
-1. **Целевая инфраструктура деплоя.** VPS / Kubernetes / managed container service? От этого зависят CSP, CORS, healthcheck-частота, registry для образов.
-2. **LinkedIn provider.** Apollo, Clearbit, или own scraping infra? Выбор определяет, какой `LINKEDIN_PROVIDER_API_TOKEN` и какой rate-limit ожидать.
-3. **n8n credentials storage.** Где хранить продакшен-credentials для n8n: его встроенный store или внешний secret manager?
-4. **Schedule MSK.** Подтвердить окно daily digest (текущее предположение — 08:00 MSK). Для агентств на других часовых поясах нужен per-client override?
-5. **Lighthouse / a11y таргет.** Текущий критерий ≥ 85 — это MVP-минимум. Какой таргет на v1 release?
+### Agency Success Metrics
+- **Lead-to-Client Conversion**: 15-20%
+- **Average Deal Size**: $5k-20k
+- **Sales Cycle**: 30-60 days
+- **Monthly Pipeline**: $50k-200k per agency
+- **ROI**: 300%+ (based on pilot data)
 
 ---
 
-## 11. Roadmap (по фазам, для активной работы)
+## 10. Future Roadmap
 
-Детальная разбивка задач и дедлайнов — в `tasks/plan.md`. Краткая карта приоритетов:
+### Phase 1 (Now): Core Lead Generation
+- [ ] Multi-source lead aggregation
+- [ ] Agency ICP matching
+- [ ] Lead scoring and quality gates
+- [ ] Basic outreach automation
 
-- **P0 (критично для MVP):** HH end-to-end → лиды в дайджесте → доставка в Telegram; checkout + onboarding
-- **P1 (расширение источников):** Career Pages + Rabota Rossii с дедупом; n8n daily workflows
-- **P2 (рост покрытия):** LinkedIn (когда есть провайдер) + Tech Job Boards; UI/UX polish
+### Phase 2 (Q3 2026): Agency Features
+- [ ] Multi-team support
+- [ ] Advanced analytics
+- [ ] Template marketplace
+- [ ] Integration with existing CRM
+
+### Phase 3 (Q4 2026): Enterprise
+- [ ] White-label solution
+- [ ] API for custom integrations
+- [ ] Advanced competitive intelligence
+- [ ] Predictive lead scoring
 
 ---
 
-**Следующий шаг:** см. `tasks/plan.md` — первый незавершённый таск из P0.
+**Примечание**: Эта спецификация — single source of truth. Все изменения должны проходить review и обновление здесь.

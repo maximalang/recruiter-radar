@@ -1,16 +1,18 @@
 import { createStaticEngine } from '@/lib/sources/crawlers/crawler-static'
 import type { CrawlerResult } from '@/lib/sources/crawlers/crawler-contract'
 
-function fakeResponse(opts: {
-  status?: number
-  body?: string
-  headers?: Record<string, string>
-} = {}): Response {
-  const { status = 200, body = '<html></html>', headers = {} } = opts
-  return new Response(body, { status, headers })
-}
+// Mock fetchText
+jest.mock('@/../../packages/db/scripts/adapters/source-http.mjs', () => ({
+  fetchText: jest.fn()
+}))
+
+const mockFetchText = require('@/../../packages/db/scripts/adapters/source-http.mjs').fetchText
 
 describe('createStaticEngine', () => {
+  beforeEach(() => {
+    mockFetchText.mockClear()
+  })
+
   describe('contract', () => {
     it('exposes id "static" and capability flags for raw HTML', () => {
       const engine = createStaticEngine()
@@ -21,9 +23,17 @@ describe('createStaticEngine', () => {
     })
 
     it('returns a CrawlerResult with html, status, and engine id', async () => {
-      const engine = createStaticEngine({
-        fetcher: async () => fakeResponse({ body: '<html><body>ok</body></html>' }),
+      mockFetchText.mockResolvedValueOnce({
+        response: {
+          ok: true,
+          status: 200,
+          url: 'https://acme.example/careers',
+          headers: new Map([['content-type', 'text/html']])
+        } as any,
+        body: '<html><body>ok</body></html>'
       })
+
+      const engine = createStaticEngine()
       const result: CrawlerResult = await engine.fetch({ url: 'https://acme.example/careers' })
       expect(result.url).toBe('https://acme.example/careers')
       expect(result.status).toBe(200)
@@ -35,66 +45,103 @@ describe('createStaticEngine', () => {
 
   describe('headers and options', () => {
     it('passes a default User-Agent identifying the radar', async () => {
-      let observed: Headers | undefined
-      const engine = createStaticEngine({
-        fetcher: async (_url, init) => {
-          observed = new Headers(init?.headers)
-          return fakeResponse()
-        },
+      let observedHeaders: Map<string, string> | null = null
+
+      mockFetchText.mockImplementationOnce((url, options) => {
+        observedHeaders = new Map(Object.entries(options.headers || {}))
+        return Promise.resolve({
+          response: {
+            ok: true,
+            status: 200,
+            url,
+            headers: new Map()
+          } as any,
+          body: '<html></html>'
+        })
       })
+
+      const engine = createStaticEngine()
       await engine.fetch({ url: 'https://acme.example' })
-      expect(observed?.get('user-agent')?.toLowerCase()).toContain('recruiter-radar')
+
+      expect(observedHeaders?.get('user-agent')?.toLowerCase()).toContain('recruiter-radar')
     })
 
     it('lets caller override headers', async () => {
-      let observed: Headers | undefined
-      const engine = createStaticEngine({
-        fetcher: async (_url, init) => {
-          observed = new Headers(init?.headers)
-          return fakeResponse()
-        },
+      let observedHeaders: Map<string, string> | null = null
+
+      mockFetchText.mockImplementationOnce((url, options) => {
+        observedHeaders = new Map(Object.entries(options.headers || {}))
+        return Promise.resolve({
+          response: {
+            ok: true,
+            status: 200,
+            url,
+            headers: new Map()
+          } as any,
+          body: '<html></html>'
+        })
       })
+
+      const engine = createStaticEngine()
       await engine.fetch({
         url: 'https://acme.example',
-        options: { headers: { 'user-agent': 'override-agent/1.0' } },
+        options: { headers: { 'user-agent': 'override-agent/1.0' } }
       })
-      expect(observed?.get('user-agent')).toBe('override-agent/1.0')
+
+      expect(observedHeaders?.get('user-agent')).toBe('override-agent/1.0')
     })
   })
 
   describe('error handling', () => {
     it('returns the response with non-2xx status without throwing', async () => {
-      const engine = createStaticEngine({
-        fetcher: async () => fakeResponse({ status: 404, body: 'not found' }),
+      mockFetchText.mockResolvedValueOnce({
+        response: {
+          ok: false,
+          status: 404,
+          url: 'https://acme.example/missing',
+          headers: new Map()
+        } as any,
+        body: 'not found'
       })
+
+      const engine = createStaticEngine()
       const result = await engine.fetch({ url: 'https://acme.example/missing' })
       expect(result.status).toBe(404)
       expect(result.html).toBe('not found')
     })
 
     it('propagates network errors from the fetcher', async () => {
-      const engine = createStaticEngine({
-        fetcher: async () => {
-          throw new Error('econnreset')
-        },
-      })
+      mockFetchText.mockRejectedValueOnce(new Error('ECONNRESET'))
+
+      const engine = createStaticEngine()
       await expect(
-        engine.fetch({ url: 'https://acme.example' }),
-      ).rejects.toThrow(/econnreset/)
+        engine.fetch({ url: 'https://acme.example' })
+      ).rejects.toThrow('ECONNRESET')
     })
   })
 
   describe('headers in result', () => {
     it('exposes response headers in rawHeaders as a flat record', async () => {
-      const engine = createStaticEngine({
-        fetcher: async () =>
-          fakeResponse({
-            body: '<html></html>',
-            headers: { 'content-type': 'text/html; charset=utf-8' },
-          }),
+      mockFetchText.mockResolvedValueOnce({
+        response: {
+          ok: true,
+          status: 200,
+          url: 'https://acme.example',
+          headers: new Map([
+            ['content-type', 'text/html'],
+            ['x-custom-header', 'custom-value'],
+            ['content-length', '123']
+          ])
+        } as any,
+        body: '<html></html>'
       })
+
+      const engine = createStaticEngine()
       const result = await engine.fetch({ url: 'https://acme.example' })
+
       expect(result.rawHeaders['content-type']).toContain('text/html')
+      expect(result.rawHeaders['x-custom-header']).toBe('custom-value')
+      expect(result.rawHeaders['content-length']).toBe('123')
     })
   })
 })

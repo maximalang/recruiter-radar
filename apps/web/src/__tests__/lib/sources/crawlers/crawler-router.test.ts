@@ -38,12 +38,14 @@ describe('chooseEngine', () => {
   })
 
   describe('SPA allow-list', () => {
-    it('returns spa for greenhouse, lever, ashby, workday, smartrecruiters', () => {
+    it('returns spa for greenhouse, lever, ashby, workday, smartrecruiters, jobvite, workable', () => {
       expect(chooseEngine('https://boards.greenhouse.io/acme')).toBe('spa')
       expect(chooseEngine('https://jobs.lever.co/acme')).toBe('spa')
       expect(chooseEngine('https://jobs.ashbyhq.com/acme')).toBe('spa')
       expect(chooseEngine('https://acme.wd1.myworkdayjobs.com/External')).toBe('spa')
       expect(chooseEngine('https://jobs.smartrecruiters.com/Acme')).toBe('spa')
+      expect(chooseEngine('https://jobs.jobvite.com/acme')).toBe('spa')
+      expect(chooseEngine('https://apply.workable.com/acme')).toBe('spa')
     })
 
     it('matches subdomains of SPA hosts', () => {

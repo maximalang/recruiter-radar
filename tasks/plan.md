@@ -1,169 +1,356 @@
-# Roadmap: завершение MVP
+# План: Lead Generation Platform для Рекрутинговых Агентств
 
-**Версия:** 2.0
-**Обновлено:** 2026-05-26
-**Источник истины по продукту:** `SPEC.md`
-**Чек-лист исполнения:** `tasks/todo.md`
-**Пошаговый runbook с командами и verifications:** `tasks/runbook.md`
-
-Этот документ — рабочая разбивка фаз и критериев приёмки. Полный продуктовый контракт, FIUR-модель, gates и границы — в `SPEC.md`.
+**Версия:** 3.0  
+**Дата:** 2026-05-26  
+**Статус:** Новая концепция - Lead Generation Platform  
+**Фокус:** Полноценная платформа для генерации лидов для рекрутинговых агентств
 
 ---
 
-## Состояние на 2026-05-26
+## 🎯 Введение
 
-### Завершено
-- Postgres поднят в Docker, миграции применены, ≥20 таблиц
-- TypeScript clean (`npm run web:check` exit 0), 18 suites / 178 tests passing на 2026-05-26
-- Security headers, `SESSION_SECRET`-based session, env validation at startup
-- `.env.production.example`, production-ready Dockerfile, `/api/health`
-- HH end-to-end pipeline (fetch + ingest + scoring + gates) — основной путь
-- FIUR scoring (аддитивная форма) + digest selection + feedback state
-- Suppression / reweighting на базе badfit-истории клиента
-- Гейтовая фильтрация C/D исключает лиды из доставки
+Recruiter Radar превращается из агрегатора вакансий в **премиум B2B платформу генерации лидов** для рекрутинговых агентств. Продукт находит компании-клиенты (не кандидатов!), которым стоит предложить рекрутинговые услуги прямо сейчас.
 
-### В работе
-- Подключение остальных sources к production-режиму (career-pages, rabota-rossii, tech-job-boards и т.д.)
-- n8n daily workflows (HH, career-pages, digest)
-- Checkout end-to-end smoke и Telegram onboarding
+### Ключевое отличие:
+- **Job boards** → кандидаты на вакансии
+- **Recruiter Radar** → компании-клиенты для агентств
 
 ---
 
-## Фазы
+## 🔍 Dependency Graph
 
-### P0 — критично для MVP (26–28.05.2026)
+### Основные компоненты:
+1. **Lead Discovery Engine** → Sources (HH, Career Pages, Rabota Rossii)
+2. **Lead Scoring System** → FIUR model (repositioned for B2B)
+3. **Agency Profile System** → ICP matching and personalization
+4. **Lead Pipeline CRM** → Sales workflow management
+5. **Outreach Automation** → Multi-channel client acquisition
+6. **Analytics Dashboard** → ROI and performance tracking
 
-#### Фаза A. HH end-to-end → дайджест → Telegram
-**Цель:** один клиент получает реальный дайджест из HH в Telegram.
-
-Шаги:
-1. `npm run source:pipeline:hh` против production-like БД, проверить `org_source_refs` и `hh_signals`
-2. `npm run verify:digest:selection` зелёный с реальным `clientProfileId`
-3. Запустить `npm run digest` → проверить доставку и callback handling
-4. Прогон `verify:dedupe:metrics` после ingest
-
-Критерии приёмки:
-- `org_source_refs` пополняется при каждом запуске pipeline
-- Дайджест содержит лиды только из gates A/B
-- Telegram callback пишет `client_digest_org_state` (`accepted` / `badfit` / `dismissed`)
-
-#### Фаза B. Checkout + Onboarding
-**Цель:** новый пользователь может оформить пилот и подключить Telegram за одну сессию.
-
-Шаги:
-1. Прогнать checkout-форму с тестовыми данными → запись в `client_profiles`
-2. Issuance + activation `telegram_connect_tokens` через бота
-3. Проверить, что после активации `clientProfileId` бьётся с тем, что приходит в `/api/digest`
-
-Критерии приёмки:
-- Checkout не падает на пустых/невалидных полях (валидация на сервере)
-- Telegram connect token одноразовый, expire ≤ 15 минут
-- `npm run --workspace=@recruiter-radar/web test -- telegram-connect` зелёный
-
----
-
-### P1 — расширение источников (28–30.05.2026)
-
-#### Фаза C. Career Pages + Rabota Rossii
-**Цель:** добавить два независимых evidence-слоя поверх HH.
-
-Шаги:
-1. ✅ `packages/db/scripts/career-pages-smoke-targets.json` — 10 российских компаний с Greenhouse / Lever boards
-2. ✅ `npm run career-pages:smoke` → `npm run source:ingest:career-pages` против БД
-3. ✅ `npm run verify:rabota-rossii:smoke` → `npm run source:ingest:rabota-rossii`
-4. ✅ `npm run verify:dedupe:metrics` — убедиться, что одинаковая компания из разных источников склеивается в один `org_id`
-
-Критерии приёмки:
-- ✅ Лиды из career-pages попадают в дайджест
-- ✅ Rabota Rossii ingest проходит без ошибок
-- ✅ Нет дублей между HH и career-pages по `org_id`
-
-#### Фаза D. n8n orchestration
-**Цель:** daily workflows запускают source pipelines и digest по расписанию.
-
-Шаги:
-1. ✅ Поднять n8n с теми же credentials, что в production
-2. ✅ Workflow: HH daily (06:00 MSK)
-3. ✅ Workflow: Career Pages daily (07:00 MSK)
-4. ✅ Workflow: Digest delivery (08:00 MSK)
-5. ✅ Operational alerts на failures (как минимум — на Telegram operator channel)
-
-Критерии приёмки:
-- ✅ Workflow в `executions` UI показывает успешные запуски за двое суток подряд
-- ✅ Падение workflow генерирует alert в operator-канал
-- ✅ Никаких бизнес-данных решений не появилось внутри n8n (только schedule / webhook / retry / alert)
-
----
-
-### P2 — рост покрытия (31.05–02.06.2026)
-
-#### Фаза E. LinkedIn + Tech Job Boards
-**Цель:** расширить evidence layer для P0-сегмента клиентов.
-
-Шаги:
-1. Выбрать LinkedIn provider (Apollo / Clearbit / own) — см. SPEC.md §10 Open Questions #3
-2. Задать `LINKEDIN_PROVIDER_API_TOKEN`
-3. `npm run verify:linkedin-company-pages:smoke` → ingest для тестового списка
-4. `npm run verify:tech-job-boards:smoke` → ingest
-5. `npm run verify:mixed-ranking` — confidence scoring корректен для смешанных источников
-
-Критерии приёмки:
-- Mixed ranking invariant держится
-- Confidence scoring отражает кратность evidence-слоёв
-- Нет регресса в дедупе и suppression
-
-#### Фаза F. UI/UX polish
-**Цель:** лендинг и dashboard выглядят production-grade.
-
-Шаги:
-1. Лендинг: основной CTA, evidence-first копирайт, без forbidden formulations
-2. Dashboard: статистика дайджестов, история, настройки профиля
-3. Mobile responsive до 320px, touch-friendly targets ≥ 44px
-
-Критерии приёмки:
-- Lighthouse mobile Performance ≥ 85, Accessibility ≥ 90 на landing и dashboard
-- Все CTA проходят keyboard navigation
-- Нет горизонтального скролла на 320px viewport
-
----
-
-## Риски и митигации
-
-| Риск | Воздействие | Митигация |
-|------|-------------|-----------|
-| Next.js на canary с известными vulnerabilities | Medium | Документировать known risks, апгрейд на ближайший stable |
-| LinkedIn provider токен не получен к фазе E | Medium | Фаза E начинается только после ответа на Open Question #2 |
-| n8n credentials попадают в экспорт workflow | High (security) | Перед коммитом любого экспорта пройти grep на токены/URL/secrets |
-| Dedupe ломается при добавлении нового source | High | `verify:dedupe:metrics` входит в `verify:smoke` chain и в CI |
-
----
-
-## Команды для ручной проверки
-
-```bash
-# БД и миграции
-docker exec recruiter-radar-db-1 psql -U postgres -d recruiter_radar -c "\dt"
-
-# HH pipeline
-npm run source:pipeline:hh
-npm run hh:report
-npm run hh:top
-
-# Career Pages
-npm run career-pages:smoke
-npm run source:pipeline:career-pages
-
-# Качество и дедуп
-npm run verify:source:confidence
-npm run verify:dedupe:metrics
-npm run verify:smoke
-
-# Дайджест
-npm run digest
-npm run digest:held
-
-# Веб
-npm run dev
-npm run web:check
-npm run --workspace=@recruiter-radar/web test
+### Поток данных:
 ```
+Sources → Evidence → Scoring → Agency Filtering → Lead Delivery → 
+Feedback Scoring → Pipeline Management → Analytics → Optimization
+```
+
+---
+
+## 🏗️ Vertical Slices (Complete Paths)
+
+### 1. Core Lead Generation Engine (2-3 недели)
+
+#### Path: Signal-to-Lead Workflow
+**Цель:** Создать полноценный pipeline от сигнала до лидов для агентств
+
+**Компоненты:**
+- [ ] Улучшенный HH parser с detection hiring patterns
+- [ ] Career pages parsing с multiple contact paths
+- [ ] Агрегация сигналов из источников
+- [ ] FIUR scoring для client acquisition
+- [ ] Lead enrichment и evidence building
+- [ ] Quality gates и confidence classification
+
+**Acceptance Criteria:**
+- [ ] 50+ квалифицированных лидов в день
+- [ ] 80%+ match с агентским ICP
+- [ ] <2 часа freshness для A/B лидов
+- [ ] Explainable scoring breakdown
+
+**Verification Steps:**
+1. Запустить `npm run lead:generate` и проверить вывод
+2. Проверить `lead_candidates` таблицу на качество лидов
+3. Проверить scoring breakdown для агентских профилей
+4. Протестировать edge cases (дубли, низкокачественные сигналы)
+
+---
+
+#### Path: Agency Profile & ICP System
+**Цель:** Персонализация лидов под каждое агентство
+
+**Компоненты:**
+- [ ] Onboarding questionnaire для агентств
+- [ ] ICP configuration (industries, sizes, locations)
+- [ ] Historical performance tracking
+- [ ] Dynamic lead weighting based on feedback
+- [ ] A/B testing framework
+
+**Acceptance Criteria:**
+- [ ] Individual scoring per agency
+- [ ] 30% improvement в relevance
+- [ ] <5 min setup time
+- [ ] Performance-based optimization
+
+**Verification Steps:**
+1. Создать тестовый agency profile
+2. Проверить scoring для разных профилей
+3. Тестировать feedback loop
+4. Проверить performance metrics
+
+---
+
+### 2. Lead Management & Outreach (3-4 недели)
+
+#### Path: Lead Pipeline CRM
+**Цель:** Full sales workflow для агентств
+
+**Компоненты:**
+- [ ] Drag-and-drop pipeline interface
+- [ ] Lead status tracking (New → Qualified → Contacted → Meeting → Proposal → Client)
+- [ ] Tagging and categorization system
+- [ ] Interaction history
+- [ ] Task management
+- [ ] Email/Telegram integration
+
+**Acceptance Criteria:**
+- [ ] 80% агентств могут использовать как primary CRM
+- [ ] Seamless workflow от lead до client
+- [ ] Mobile-responsive interface
+- [ ] Data export capabilities
+
+**Verification Steps:**
+1. Протестировать full pipeline workflow
+2. Проверить integration с email/Telegram
+3. Тестировать team collaboration features
+4. Проверить performance при большом volume
+
+---
+
+#### Path: Outreach Automation
+**Цель:** Автоматизированный yet персонализованный outreach
+
+**Компоненты:**
+- [ ] Template system с персонализацией
+- [ ] Smart scheduling (best contact times)
+- [ ] Multi-channel delivery (email + Telegram)
+- [ ] A/B testing for templates
+- [ ] Performance tracking
+
+**Acceptance Criteria:**
+- [ ] 30%+ response rate
+- [ ] 80%+ deliverability
+- [ ] Personalized at scale
+- [ ] 50% reduction в manual effort
+
+**Verification Steps:**
+1. Тестировать template personalization
+2. Проверить timing optimization
+3. Измерить response rates
+4. Тестировать fallback mechanisms
+
+---
+
+### 3. Lead Quality & Intelligence (2-3 недели)
+
+#### Path: Advanced Lead Scoring
+**Цель:** ML-powered prediction и continuous improvement
+
+**Компоненты:**
+- [ ] Historical learning from conversions
+- [ ] Market condition adjustments
+- [ ] Competitive impact scoring
+- [ ] Seasonal trend analysis
+- [ ] Predictive features
+
+**Acceptance Criteria:**
+- [ ] 80% accuracy в predicting conversions
+- [ ] 20% improvement в lead quality
+- [ ] Adaptive scoring system
+
+**Verification Steps:**
+1. A/B test scoring models
+2. Track correlation с conversion rates
+3. Monitor model decay
+4. Test against market changes
+
+---
+
+#### Path: Market Intelligence
+**Цель:** Competitive advantage для агентств
+
+**Компоненты:**
+- [ ] Industry hiring trends
+- [ ] Salary benchmarks
+- [ ] Talent availability
+- [ ] Competitive monitoring
+- [ ] Actionable insights delivery
+
+**Acceptance Criteria:**
+- [ ] Become go-to market intelligence source
+- [ ] Differentiation for agencies
+- [ ] High-value insights
+
+**Verification Steps:**
+1. Проверить quality insights
+2. Измерить adoption rate
+3. Test against known market trends
+4. Проверить actionable nature
+
+---
+
+### 4. Enterprise Scale (3-4 недели)
+
+#### Path: Multi-Agency Platform
+**Цель:** Enterprise-ready multi-tenant architecture
+
+**Компоненты:**
+- [ ] Multi-tenant design with data isolation
+- [ ] Security & compliance measures
+- [ ] Shared market intelligence (anonymized)
+- [ ] Competitive protection
+- [ ] Admin dashboard
+- [ ] Usage analytics
+
+**Acceptance Criteria:**
+- [ ] Multiple agencies on same platform
+- [ ] No data leakage
+- [ ] Enterprise-grade security
+- [ ] Scalable performance
+
+**Verification Steps:**
+1. Тестировать data isolation
+2. Проверить security measures
+3. Тестировать performance under load
+4. Проверить compliance requirements
+
+---
+
+#### Path: Marketplace & Integrations
+**Цель:** Connect companies with right agencies
+
+**Компоненты:**
+- [ ] Agency marketplace
+- [ ] Company-to-agency matching
+- [ ] RFP system
+- [ ] CRM integrations
+- [ ] Custom reporting
+- [ ] API access
+
+**Acceptance Criteria:**
+- [ ] Quality matches
+- [ ] Reduced sales cycle
+- [ ] Enterprise-ready platform
+
+**Verification Steps:**
+1. Test matching algorithm
+2. Measure conversion rates
+3. Test integrations
+4. Validate API endpoints
+
+---
+
+## 🎯 Checkpoints & Milestones
+
+### Milestone 1: MVP Lead Generation (End of Week 2)
+- [ ] Core lead generation engine working
+- [ ] Agency profiles with ICP matching
+- [ ] Basic lead pipeline
+- [ ] Telegram digest delivery
+
+### Milestone 2: Sales Workflow (End of Week 5)
+- [ ] Complete pipeline CRM
+- [ ] Outreach automation
+- [ ] Basic analytics
+- [ ] Agency onboarding flow
+
+### Milestone 3: Advanced Features (End of Week 8)
+- [ ] ML-powered scoring
+- [ ] Market intelligence
+- [ ] Multi-agency support
+- [ ] Enterprise features
+
+### Milestone 4: Marketplace (End of Week 12)
+- [ ] Agency marketplace
+- [ ] Advanced integrations
+- [ ] Premium support
+- [ ] Full platform ready
+
+---
+
+## 📊 Success Metrics
+
+### Business Metrics
+| Метрика | Целевое значение |
+|---------|------------------|
+| **Pipeline** | 50-100 leads/month/agency |
+| | Lead freshness <2 hours |
+| **Conversion** | Lead-to-client 15-20% |
+| | Sales cycle 30-60 days |
+| **Revenue** | Avg deal size $5k-20k |
+| | Monthly revenue/agency $10k-50k |
+| | ROI 300%+ |
+
+### Quality Metrics
+| Метрика | Целевое значение |
+|---------|------------------|
+| Lead relevance | 80%+ |
+| ICP match rate | 90%+ |
+| Deduplication | <1% |
+| Data freshness | <24 hours |
+
+### Platform Metrics
+| Метрика | Целевое значение |
+|---------|------------------|
+| Uptime | 99.5%+ |
+| API response time | <500ms |
+| User satisfaction | 4.5+/5 |
+| Churn rate | <5%/month |
+
+---
+
+## 🔧 Technical Requirements
+
+### Lead Schema
+```typescript
+interface AgencyLead {
+  id: string;
+  company: Company;
+  status: 'new' | 'qualified' | 'contacted' | 'meeting' | 'proposal' | 'client' | 'lost';
+  score: number;
+  confidence: 'high' | 'medium' | 'low';
+  sources: HiringSource[];
+  nextAction: LeadAction;
+  assignedTo: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+### Agency Workflow
+```
+Daily Radar → Review Leads → Prioritize → Outreach → 
+Track Responses → Schedule Meetings → Send Proposal → 
+Close Deal → Feedback → Improve Scoring
+```
+
+---
+
+## 💡 Quick Wins (First Week)
+
+1. **Agency ICP Questionnaire** - быстрая настройка профиля
+2. **Lead Scoring MVP** - базовая система оценки
+3. **Outreach Templates** - готовые шаблоны первого контакта
+4. **Basic Dashboard** - метрики и конверсии
+5. **Lead Notifications** - real-time alerts о новых лидов
+
+---
+
+## 🚀 Implementation Priority
+
+1. **Week 1-2**: Core lead generation engine
+2. **Week 3-5**: Lead pipeline & outreach automation  
+3. **Week 6-8**: Advanced scoring & analytics
+4. **Week 9-12**: Enterprise features & marketplace
+
+---
+
+## 🎯 Key Success Indicators
+
+1. **Agencies generate pipeline** - 50+ leads/month
+2. **Conversion to clients** - 15-20% of leads become clients
+3. **Revenue impact** - $10k-50k/month per agency
+4. **Product stickiness** - 80% monthly retention
+5. **Word of mouth** - 30%+ from referrals
+
+---
+
+Этот план создает полноценную **lead generation platform** для рекрутинговых агентств, превращая hiring signals в revenue-generating opportunities. Каждый компонент направлен на создание ценности для агентств и обеспечение измеримого ROI.
