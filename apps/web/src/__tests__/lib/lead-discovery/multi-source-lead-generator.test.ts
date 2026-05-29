@@ -1,122 +1,181 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals'
-import { MultiSourceLeadGenerator } from '@/lib/lead-discovery/multi-source-lead-generator'
+import {
+  MultiSourceLeadGenerator,
+  type MultiSourceLeadGeneratorDeps,
+  type CareerPageFetchResult,
+  type BusinessSignalEvidence,
+  type RegistryEvidence,
+  type MultiSourceLead,
+} from '@/lib/lead-discovery/multi-source-lead-generator'
+import type { CrawlerRouter, CrawlerResult } from '@/lib/sources/crawlers'
+import type { HhDigestItem } from '@/lib/hhDigest'
+
+function fakeDigestItem(overrides: Partial<HhDigestItem> = {}): HhDigestItem {
+  return {
+    rank: 1,
+    org_id: 'org-1',
+    hh_employer_id: 'emp-1',
+    employer_name: 'AcmeCorp',
+    vacancies_count: 5,
+    distinct_vacancy_names_count: 3,
+    latest_published_at: '2026-05-25T10:00:00Z',
+    total_score: 350,
+    reasons: ['high hiring activity', 'diverse roles'],
+    opener: 'Компания активно нанимает',
+    source_families: ['hh'],
+    evidence_titles: ['Frontend Developer', 'Backend Developer', 'Product Manager'],
+    candidate_source_keys: [],
+    location_names: ['Москва'],
+    ...overrides,
+  }
+}
+
+function stubCrawler(result?: Partial<CrawlerResult>): CrawlerRouter {
+  return {
+    async fetch() {
+      return {
+        url: result?.url ?? 'https://example.com',
+        status: result?.status ?? 200,
+        html: result?.html ?? '<html></html>',
+        rawHeaders: result?.rawHeaders ?? {},
+        fetchedAt: result?.fetchedAt ?? new Date().toISOString(),
+        engine: result?.engine ?? 'static',
+        warnings: result?.warnings ?? [],
+      }
+    },
+  } as unknown as CrawlerRouter
+}
 
 describe('MultiSourceLeadGenerator', () => {
   let generator: MultiSourceLeadGenerator
 
   beforeEach(() => {
-    generator = new MultiSourceLeadGenerator()
+    generator = new MultiSourceLeadGenerator({ crawler: stubCrawler() })
   })
 
   afterEach(() => {
     jest.clearAllMocks()
   })
 
-  describe('initializeSources', () => {
-    it('should initialize all available sources', () => {
-      const sources = generator['sources']
+  it('returns an empty array when no digest items are provided', async () => {
+    const leads = await generator.generateLeads({ digestItems: [] })
+    expect(leads).toEqual([])
+  })
 
-      expect(sources.length).toBeGreaterThan(10)
-      expect(sources.some(s => s.id === 'hh')).toBe(true)
-      expect(sources.some(s => s.id === 'career-pages')).toBe(true)
-      expect(sources.some(s => s.id === 'egrul-fns')).toBe(true)
+  it('converts digest items into multi-source leads with HH evidence', async () => {
+    const leads = await generator.generateLeads({
+      digestItems: [fakeDigestItem()],
     })
 
-    it('should categorize sources by priority', () => {
-      const sources = generator['sources']
+    expect(leads.length).toBeGreaterThan(0)
+    const lead = leads[0]
+    expect(lead.id).toMatch(/^multi-/)
+    expect(lead.companyId).toBe('org-1')
+    expect(lead.companyName).toBe('AcmeCorp')
+    expect(lead.sources.map(s => s.sourceId)).toContain('hh')
+  })
 
-      const p1Sources = sources.filter(s => s.priority === 'P1')
-      const p2Sources = sources.filter(s => s.priority === 'P2')
-      const p3Sources = sources.filter(s => s.priority === 'P3')
+  it('filters leads by minimum score', async () => {
+    const leads = await generator.generateLeads({
+      digestItems: [fakeDigestItem()],
+      minScore: 999,
+    })
+    expect(leads).toEqual([])
+  })
 
-      expect(p1Sources.length).toBeGreaterThan(2) // HH, Career Pages, Rabota Rossii
-      expect(p2Sources.length).toBeGreaterThan(5) // Multiple secondary sources
-      expect(p3Sources.length).toBeGreaterThan(0) // Enrichment sources
+  it('uses the injected career-page fetcher in parallel and adds evidence', async () => {
+    const fetchCareerPage = jest.fn(
+      async (lead: MultiSourceLead): Promise<CareerPageFetchResult> => ({
+        url: `https://${lead.companyName}.com/careers`,
+        fetchedAt: new Date('2026-05-26T10:00:00Z'),
+        rawData: { vacancies: 3 },
+      }),
+    )
+    const resolveCareerPageUrl = (lead: MultiSourceLead) => `https://${lead.companyName}.com/careers`
+
+    const deps: MultiSourceLeadGeneratorDeps = {
+      crawler: stubCrawler(),
+      resolveCareerPageUrl,
+      fetchCareerPage,
+    }
+    const gen = new MultiSourceLeadGenerator(deps)
+    const leads = await gen.generateLeads({
+      digestItems: [
+        fakeDigestItem({ org_id: 'org-1' }),
+        fakeDigestItem({ org_id: 'org-2', employer_name: 'Beta Inc' }),
+      ],
+      sources: ['hh', 'career-pages'],
+    })
+
+    expect(fetchCareerPage).toHaveBeenCalledTimes(2)
+    leads.forEach(lead => {
+      expect(lead.sources.map(s => s.sourceId)).toEqual(expect.arrayContaining(['hh', 'career-pages']))
     })
   })
 
-  describe('getActiveSources', () => {
-    it('should filter out non-eligible sources', () => {
-      const activeSources = generator['activeSources']
+  it('skips registry adapter when source is not requested', async () => {
+    const fetchRegistryData = jest.fn<
+      (lead: MultiSourceLead) => Promise<RegistryEvidence>
+    >(async () => ({ rawData: { inn: 'X' }, enrichment: { companySize: 'medium' } }))
 
-      expect(activeSources).toContain('hh')
-      expect(activeSources).toContain('career-pages')
-      expect(activeSources).toContain('egrul-fns') // Even though enrichment-only, it's P1
-      expect(activeSources).not.toContain('industry-media') // Context-only, P3
+    const gen = new MultiSourceLeadGenerator({ crawler: stubCrawler(), fetchRegistryData })
+    await gen.generateLeads({
+      digestItems: [fakeDigestItem()],
+      sources: ['hh'],
+    })
+
+    expect(fetchRegistryData).not.toHaveBeenCalled()
+  })
+
+  it('logs and continues when an enrichment adapter throws', async () => {
+    const warn = jest.fn()
+    const fetchBusinessSignals = jest.fn<
+      (lead: MultiSourceLead) => Promise<BusinessSignalEvidence>
+    >(async () => {
+      throw new Error('upstream timeout')
+    })
+    const gen = new MultiSourceLeadGenerator({
+      crawler: stubCrawler(),
+      fetchBusinessSignals,
+      logger: { warn },
+    })
+    const leads = await gen.generateLeads({
+      digestItems: [fakeDigestItem()],
+      sources: ['hh', 'funding-business-signals'],
+    })
+
+    expect(leads.length).toBeGreaterThan(0)
+    expect(warn).toHaveBeenCalledWith(
+      'business-signal enrichment failed',
+      expect.objectContaining({ companyId: 'org-1' }),
+    )
+  })
+
+  it('produces source analytics with safe averages on empty input', () => {
+    const analytics = generator.getSourceAnalytics([])
+    expect(analytics).toEqual({
+      totalLeads: 0,
+      sources: [],
+      coverage: {
+        totalCompanies: 0,
+        avgSourcesPerLead: 0,
+        highConfidenceLeads: 0,
+        enrichedLeads: 0,
+      },
     })
   })
 
-  describe('generateLeads', () => {
-    it('should generate HH-based leads', async () => {
-      const leads = await generator.generateLeads()
-
-      expect(leads.length).toBeGreaterThan(0)
-      expect(leads[0]).toMatchObject({
-        id: expect.stringMatching(/^multi-/),
-        companyId: expect.any(String),
-        companyName: expect.any(String),
-        score: expect.number.greaterThan(0),
-        confidence: expect.any(String),
-        sources: expect.any(Array),
-        signals: expect.any(Array)
-      })
+  it('reports per-source averages across leads', async () => {
+    const leads = await generator.generateLeads({
+      digestItems: [
+        fakeDigestItem({ org_id: 'org-1' }),
+        fakeDigestItem({ org_id: 'org-2', employer_name: 'Beta Inc' }),
+      ],
     })
-
-    it('should filter leads by minimum score', async () => {
-      const leads = await generator.generateLeads({ minScore: 2.0 })
-
-      leads.forEach(lead => {
-        expect(lead.score).toBeGreaterThanOrEqual(2.0)
-      })
-    })
-
-    it('should limit sources when specified', async () => {
-      const leads = await generator.generateLeads({
-        sources: ['hh', 'career-pages']
-      })
-
-      leads.forEach(lead => {
-        const sourceIds = lead.sources.map(s => s.sourceId)
-        expect(sourceIds).toEqual(expect.arrayContaining(['hh']))
-      })
-    })
-  })
-
-  describe('getSourceAnalytics', () => {
-    it('should calculate source statistics', async () => {
-      const leads = await generator.generateLeads()
-      const analytics = generator.getSourceAnalytics(leads)
-
-      expect(analytics).toMatchObject({
-        totalLeads: expect.any(Number),
-        sources: expect.any(Array),
-        coverage: expect.any(Object)
-      })
-
-      expect(analytics.sources[0]).toMatchObject({
-        id: expect.any(String),
-        count: expect.any(Number),
-        avgConfidence: expect.any(Number),
-        totalRelevance: expect.any(Number)
-      })
-    })
-  })
-
-  describe('real-time crawling', () => {
-    it('should enable real-time crawling when specified', async () => {
-      // Mock the crawler
-      const mockCrawl = jest.fn().mockResolvedValue({
-        status: 200,
-        html: '<html><body><h1>Careers</h1></body></html>',
-        url: 'https://example.com/careers',
-        fetchedAt: new Date().toISOString()
-      })
-
-      // This would require mocking the crawler instance
-      // For now, we just test that the option is accepted
-      const leads = await generator.generateLeads({ enableRealTime: true })
-
-      expect(leads.length).toBeGreaterThan(0)
-    })
+    const analytics = generator.getSourceAnalytics(leads)
+    expect(analytics.totalLeads).toBe(leads.length)
+    const hhStats = analytics.sources.find(s => s.id === 'hh')
+    expect(hhStats?.count).toBe(leads.length)
+    expect(hhStats?.avgConfidence).toBeGreaterThan(0)
   })
 })

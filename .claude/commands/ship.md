@@ -63,10 +63,19 @@ Produce a single output:
 - [test-engineer report]
 ```
 
-## Rules
+## Recruiter Radar — additional infrastructure checks (Phase B)
 
-1. The three Phase A personas run in parallel — never sequentially.
-2. Personas do not call each other. The main agent merges in Phase B.
-3. The rollback plan is mandatory before any GO decision.
-4. If any persona returns a Critical finding, the default verdict is NO-GO unless the user explicitly accepts the risk.
-5. **Skip the fan-out only if all of the following are true:** the change touches 2 files or fewer, the diff is under 50 lines, and it does not touch auth, payments, data access, or config/env. Otherwise, default to fan-out. `/ship` is designed for production-bound changes — when the blast radius is non-trivial, run the parallel review even if the diff looks small.
+When merging the three persona reports, also verify directly:
+
+- **Migrations:** any new `packages/db/migrations/*.sql` is forward-only, idempotent where possible, and reviewed for production safety. Note rollback approach.
+- **n8n boundary:** any change in `n8n/` does not move scoring, entity resolution, confidence gates, billing, suppression, digest state, feedback state, or prompt versioning into n8n. n8n exports must not contain real credentials.
+- **Telegram:** webhook auth (Telegram secret token), idempotency, replay safety, callback acknowledgement.
+- **Env vars:** new env vars added to `.env.example` and documented; production secrets are not committed.
+- **FIUR contract:** scoring stays additive `Total = F + I + U + R`, components clamped to [0,1], total ∈ [0,4]. Test file `apps/web/src/__tests__/lib/scoring/fiur.test.ts` is green.
+- **Confidence gates:** A and B auto-deliver, C requires review, D never delivered. Lead pipeline respects this.
+- **Russian copy:** no «гарантированные клиенты», «100% результат», «автоматически закрываем продажи», «готовые сделки».
+- **Verification:** `npm run web:check` green; `npm run web:build` green when routes/middleware/`next.config.*` changed; Jest run from `apps/web/` cwd.
+
+## Persona resolution
+
+This project ships local versions of `code-reviewer` and `security-auditor` in `.claude/agents/` with RR-specific invariants pre-loaded. Claude Code picks them up automatically (project scope > plugin scope). `test-engineer` falls back to the plugin version.

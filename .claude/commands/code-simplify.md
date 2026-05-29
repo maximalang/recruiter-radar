@@ -20,3 +20,11 @@ Simplify recently changed code (or the specified scope) while preserving exact b
 6. Verify all tests pass, the build succeeds, and the diff is clean
 
 If tests fail after a simplification, revert that change and reconsider. Use `code-review-and-quality` to review the result.
+
+## Recruiter Radar — simplification guardrails
+
+- **Do not simplify away product invariants.** FIUR's additive form, confidence gates, evidence-first lead surfaces, and the n8n/product-core boundary are intentional — even if they look like complexity.
+- **Use codegraph before refactoring.** `codegraph_callers` / `codegraph_impact` reveal blast radius faster than grep.
+- **After each simplification:** `npm run web:check`. Jest must run from `apps/web/` cwd.
+- **Do not introduce new abstractions for a single use site.** Three similar lines is better than a premature helper.
+

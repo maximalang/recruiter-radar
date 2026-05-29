@@ -1,51 +1,56 @@
 /**
  * Career Pages Enricher
  *
- * Specialized crawler for extracting hiring evidence from company career pages
- * with advanced pattern detection and role categorization.
+ * Pulls hiring evidence from a company's career page using the
+ * shared CrawlerRouter and a caller-supplied parser. The parser
+ * is injected so this module stays free of HTML-parsing concerns
+ * and is easy to test.
  */
 
 import { createDefaultRouter } from '@/lib/sources/crawlers'
-import type { CrawlerRouter, CrawlerFetchInput, CrawlerResult } from '@/lib/sources/crawlers'
+import type {
+  CrawlerRouter,
+  CrawlerFetchInput,
+  CrawlerResult,
+} from '@/lib/sources/crawlers'
 import type { HiringSignal } from './hiring-pattern-detector'
+import type { Logger } from './multi-source-lead-generator'
+
+export interface CareerPageVacancy {
+  title: string
+  department?: string
+  location?: string
+  salary?: { min: number; max: number; currency: string }
+  requirements?: string[]
+  postedAt?: Date
+  isRemote?: boolean
+}
 
 export interface CareerPageData {
   url: string
   companyName: string
   extractedAt: Date
-  vacancies: Array<{
-    title: string
-    department?: string
-    location?: string
-    salary?: {
-      min: number
-      max: number
-      currency: string
-    }
-    requirements: string[]
-    postedAt?: Date
-    isRemote?: boolean
-  }>
-  hiringIndicators: {
-    hasMultipleDepartments: boolean
-    hasManagementRoles: boolean
-    hasTechRoles: boolean
-    hasSalesRoles: boolean
-    hasHRRoles: boolean
-    salaryRange: {
-      min: number
-      max: number
-      avg: number
-    }
-    freshnessScore: number // 0-1
-  }
-  technicalInfo: {
-    pageType: 'modern' | 'legacy' | 'ATS'
-    hasApplyButton: boolean
-    hasJobDescriptions: boolean
-    hasFiltering: boolean
-    loadTime: number
-  }
+  vacancies: CareerPageVacancy[]
+  hiringIndicators: HiringIndicators
+  technicalInfo: TechnicalInfo
+}
+
+interface HiringIndicators {
+  hasMultipleDepartments: boolean
+  hasManagementRoles: boolean
+  hasTechRoles: boolean
+  hasSalesRoles: boolean
+  hasHRRoles: boolean
+  salaryRange: { min: number; max: number; avg: number } | null
+  freshnessScore: number
+}
+
+interface TechnicalInfo {
+  pageType: 'modern' | 'legacy' | 'ATS'
+  hasApplyButton: boolean
+  hasJobDescriptions: boolean
+  hasFiltering: boolean
+  loadTimeMs: number
 }
 
 export interface CareerPageEvidence {
@@ -56,21 +61,48 @@ export interface CareerPageEvidence {
   confidence: number
 }
 
+export type CareerPageVacancyParser = (
+  input: { html: string; url: string; companyName: string },
+) => CareerPageVacancy[]
+
+export interface CareerPagesEnricherDeps {
+  crawler?: CrawlerRouter
+  parser: CareerPageVacancyParser
+  logger?: Logger
+  domainHint?: (companyName: string) => string[]
+}
+
+const noopLogger: Logger = { warn: () => undefined }
+
+const SLUG_INVALID = /[^a-z0-9-]+/g
+const FRESH_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
+
 /**
- * Advanced career page crawler with pattern detection
+ * Career page crawler with parser-based vacancy extraction.
  */
 export class CareerPagesEnricher {
   private crawler: CrawlerRouter
+  private parser: CareerPageVacancyParser
+  private logger: Logger
+  private domainHint: (companyName: string) => string[]
 
-  constructor() {
-    this.crawler = createDefaultRouter()
+  constructor(deps: CareerPagesEnricherDeps) {
+    if (!deps.parser) {
+      throw new Error('CareerPagesEnricher requires a vacancy parser')
+    }
+    this.crawler = deps.crawler ?? createDefaultRouter()
+    this.parser = deps.parser
+    this.logger = deps.logger ?? noopLogger
+    this.domainHint = deps.domainHint ?? defaultDomainHint
   }
 
-  /**
-   * Extract and analyze career page data
-   */
-  async enrichCompany(companyId: string, companyName: string, urls?: string[]): Promise<CareerPageEvidence | null> {
-    const targetUrls = urls || this.guessCareerPageUrls(companyName)
+  async enrichCompany(
+    companyId: string,
+    companyName: string,
+    urls?: string[],
+  ): Promise<CareerPageEvidence | null> {
+    const targetUrls = urls?.length ? urls : this.guessCareerPageUrls(companyName)
+    if (targetUrls.length === 0) return null
 
     let bestResult: CareerPageData | null = null
     let highestScore = 0
@@ -78,21 +110,22 @@ export class CareerPagesEnricher {
     for (const url of targetUrls) {
       try {
         const data = await this.extractCareerPageData(url, companyName)
+        if (!data) continue
         const score = this.scoreCareerPage(data)
-
         if (score > highestScore) {
           highestScore = score
           bestResult = data
         }
       } catch (error) {
-        console.warn(`Failed to extract from ${url}:`, error)
-        continue
+        this.logger.warn('career-page extraction failed', {
+          companyId,
+          url,
+          error: error instanceof Error ? error.message : String(error),
+        })
       }
     }
 
-    if (!bestResult) {
-      return null
-    }
+    if (!bestResult) return null
 
     const signals = this.detectHiringSignals(bestResult)
     const confidence = this.calculateConfidence(bestResult, highestScore)
@@ -102,314 +135,206 @@ export class CareerPagesEnricher {
       companyName,
       pageData: bestResult,
       signals,
-      confidence
+      confidence,
     }
   }
 
-  /**
-   * Guess possible career page URLs
-   */
-  private guessCareerPageUrls(companyName: string): string[] {
-    const domainVariants = [
-      companyName.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, ''),
-      companyName.toLowerCase().replace(/\s+/g, ''),
-      companyName.toLowerCase().split(' ').join('-')
-    ]
-
+  guessCareerPageUrls(companyName: string): string[] {
+    const slugs = this.domainHint(companyName).filter(Boolean)
+    if (slugs.length === 0) return []
+    const primary = slugs[0]
     return [
-      `https://${domainVariants[0]}.com/careers`,
-      `https://${domainVariants[0]}.com/vacancies`,
-      `https://${domainVariants[0]}.com/jobs`,
-      `https://www.${domainVariants[0]}.com/careers`,
-      `https://www.${domainVariants[0]}.com/vacancies`,
-      `https://jobs.${domainVariants[0]}.com`,
-      `https://careers.${domainVariants[0]}.com`
+      `https://${primary}.com/careers`,
+      `https://${primary}.com/vacancies`,
+      `https://${primary}.com/jobs`,
+      `https://www.${primary}.com/careers`,
+      `https://www.${primary}.com/vacancies`,
+      `https://jobs.${primary}.com`,
+      `https://careers.${primary}.com`,
     ]
   }
 
-  /**
-   * Extract structured data from career page
-   */
-  private async extractCareerPageData(url: string, companyName: string): Promise<CareerPageData> {
+  private async extractCareerPageData(
+    url: string,
+    companyName: string,
+  ): Promise<CareerPageData | null> {
     const start = Date.now()
-
     const crawlInput: CrawlerFetchInput = {
       url,
-      options: {
-        timeoutMs: 15000
-      }
+      options: { timeoutMs: 15000 },
     }
-
     const result: CrawlerResult = await this.crawler.fetch(crawlInput)
-
     if (result.status !== 200 || !result.html) {
-      throw new Error(`Career page not found at ${url}`)
+      return null
     }
 
-    // Parse HTML and extract job postings
-    const vacancies = this.extractVacancies(result.html, companyName)
-    const hiringIndicators = this.analyzeHiringIndicators(vacancies, result.html)
+    const vacancies = this.parser({ html: result.html, url: result.url, companyName })
+    const hiringIndicators = this.analyzeHiringIndicators(vacancies)
     const technicalInfo = this.analyzeTechnicalInfo(result.html, Date.now() - start)
 
     return {
-      url,
+      url: result.url,
       companyName,
-      extractedAt: new Date(),
+      extractedAt: new Date(result.fetchedAt),
       vacancies,
       hiringIndicators,
-      technicalInfo
+      technicalInfo,
     }
   }
 
-  /**
-   * Extract vacancies from HTML
-   */
-  private extractVacancies(html: string, companyName: string): Array<any> {
-    const vacancies: Array<any> = []
+  private analyzeHiringIndicators(vacancies: CareerPageVacancy[]): HiringIndicators {
+    const departments = new Set(
+      vacancies.map(v => v.department?.toLowerCase()).filter(Boolean) as string[],
+    )
+    const titles = vacancies.map(v => v.title.toLowerCase())
 
-    // Simple selectors for common career page patterns
-    const selectors = [
-      '.job-title, .vacancy-title, .position-title',
-      '[class*="job"], [class*="vacancy"], [class*="position"]',
-      'h3, h4, h5',
-      'a[href*="job"], a[href*="vacancy"], a[href*="position"]'
-    ]
-
-    // This would use a proper HTML parser in production
-    // For now, we'll simulate extraction
-    const mockVacancies = [
-      {
-        title: 'Senior Frontend Developer',
-        department: 'Engineering',
-        location: 'Москва',
-        salary: { min: 200000, max: 300000, currency: 'RUB' },
-        requirements: ['React', 'TypeScript', 'Node.js'],
-        postedAt: new Date('2024-05-28T10:00:00Z')
-      },
-      {
-        title: 'Product Manager',
-        department: 'Product',
-        location: 'Москва',
-        salary: { min: 250000, max: 350000, currency: 'RUB' },
-        requirements: ['Strategy', 'Analytics', 'Leadership'],
-        postedAt: new Date('2024-05-28T11:00:00Z')
-      },
-      {
-        title: 'HR Business Partner',
-        department: 'HR',
-        location: 'Москва',
-        salary: { min: 180000, max: 250000, currency: 'RUB' },
-        requirements: ['Recruitment', 'HR policies', 'Employee relations'],
-        postedAt: new Date('2024-05-28T12:00:00Z')
-      }
-    ]
-
-    return mockVacancies
-  }
-
-  /**
-   * Analyze hiring indicators from vacancies
-   */
-  private analyzeHiringIndicators(vacancies: any[], html: string) {
-    const departments = new Set(vacancies.map(v => v.department).filter(Boolean))
-    const hasMultipleDepartments = departments.size >= 2
-
-    const hasManagementRoles = vacancies.some(v =>
-      v.title.toLowerCase().includes('manager') ||
-      v.title.toLowerCase().includes('director') ||
-      v.title.toLowerCase().includes('lead')
+    const hasManagementRoles = titles.some(t =>
+      t.includes('manager') || t.includes('director') || t.includes('lead') || t.includes('head of'),
+    )
+    const hasTechRoles = titles.some(t =>
+      t.includes('developer') || t.includes('engineer') || t.includes('devops') || t.includes('sre'),
+    )
+    const hasSalesRoles = titles.some(t =>
+      t.includes('sales') || t.includes('bizdev') || t.includes('business development'),
+    )
+    const hasHRRoles = titles.some(t =>
+      t.includes('hr') || t.includes('recruiter') || t.includes('talent'),
     )
 
-    const hasTechRoles = vacancies.some(v =>
-      v.title.toLowerCase().includes('developer') ||
-      v.title.toLowerCase().includes('engineer') ||
-      v.title.toLowerCase().includes('tech')
-    )
-
-    const hasSalesRoles = vacancies.some(v =>
-      v.title.toLowerCase().includes('sales') ||
-      v.title.toLowerCase().includes('bizdev')
-    )
-
-    const hasHRRoles = vacancies.some(v =>
-      v.title.toLowerCase().includes('hr') ||
-      v.title.toLowerCase().includes('recruiter')
-    )
-
-    // Calculate salary range
     const salaries = vacancies
-      .filter(v => v.salary)
-      .map(v => ({ min: v.salary.min, max: v.salary.max }))
+      .map(v => v.salary)
+      .filter((s): s is NonNullable<CareerPageVacancy['salary']> => Boolean(s))
 
-    const salaryRange = {
-      min: Math.min(...salaries.map(s => s.min)),
-      max: Math.max(...salaries.map(s => s.max)),
-      avg: salaries.reduce((sum, s) => sum + (s.min + s.max) / 2, 0) / salaries.length
-    }
+    const salaryRange = salaries.length > 0
+      ? {
+          min: Math.min(...salaries.map(s => s.min)),
+          max: Math.max(...salaries.map(s => s.max)),
+          avg: salaries.reduce((sum, s) => sum + (s.min + s.max) / 2, 0) / salaries.length,
+        }
+      : null
 
-    // Calculate freshness based on posting dates
-    const now = new Date()
-    const recentPosts = vacancies.filter(v =>
-      v.postedAt && (now.getTime() - v.postedAt.getTime()) < 7 * 24 * 60 * 60 * 1000
-    )
-    const freshnessScore = recentPosts.length / vacancies.length
+    const now = Date.now()
+    const dated = vacancies.filter(v => v.postedAt instanceof Date)
+    const recent = dated.filter(v => now - v.postedAt!.getTime() < FRESH_WINDOW_MS)
+    const freshnessScore = dated.length > 0 ? recent.length / dated.length : 0
 
     return {
-      hasMultipleDepartments,
+      hasMultipleDepartments: departments.size >= 2,
       hasManagementRoles,
       hasTechRoles,
       hasSalesRoles,
       hasHRRoles,
       salaryRange,
-      freshnessScore
+      freshnessScore,
     }
   }
 
-  /**
-   * Analyze technical characteristics of the page
-   */
-  private analyzeTechnicalInfo(html: string, loadTime: number) {
-    const hasApplyButton = html.toLowerCase().includes('apply') ||
-                         html.toLowerCase().includes('откликнуться')
+  private analyzeTechnicalInfo(html: string, loadTimeMs: number): TechnicalInfo {
+    const lower = html.toLowerCase()
+    const hasApplyButton = lower.includes('apply') || lower.includes('откликнуться')
+    const hasJobDescriptions = lower.includes('требования') || lower.includes('responsibilities')
+    const hasFiltering = lower.includes('filter') || lower.includes('фильтр')
 
-    const hasJobDescriptions = html.toLowerCase().includes('требования') ||
-                              html.toLowerCase().includes('responsibilities')
-
-    const hasFiltering = html.toLowerCase().includes('filter') ||
-                       html.toLowerCase().includes('фильтр')
-
-    // Detect ATS or modern platforms
-    let pageType: 'modern' | 'legacy' | 'ATS' = 'legacy'
-
-    if (html.includes('lever.co') || html.includes('greenhouse.io')) {
+    let pageType: TechnicalInfo['pageType'] = 'legacy'
+    if (lower.includes('lever.co') || lower.includes('greenhouse.io')) {
       pageType = 'ATS'
     } else if (hasJobDescriptions && hasApplyButton && hasFiltering) {
       pageType = 'modern'
     }
 
-    return {
-      pageType,
-      hasApplyButton,
-      hasJobDescriptions,
-      hasFiltering,
-      loadTime
-    }
+    return { pageType, hasApplyButton, hasJobDescriptions, hasFiltering, loadTimeMs }
   }
 
-  /**
-   * Score career page quality
-   */
   private scoreCareerPage(data: CareerPageData): number {
     let score = 0
-
-    // Base score for having vacancies
-    if (data.vacancies.length > 0) {
-      score += data.vacancies.length * 0.2
-    }
-
-    // Diversity bonus
-    if (data.hiringIndicators.hasMultipleDepartments) {
-      score += 0.3
-    }
-
-    // Role type bonuses
+    if (data.vacancies.length > 0) score += Math.min(data.vacancies.length * 0.2, 1)
+    if (data.hiringIndicators.hasMultipleDepartments) score += 0.3
     if (data.hiringIndicators.hasTechRoles) score += 0.2
     if (data.hiringIndicators.hasManagementRoles) score += 0.2
     if (data.hiringIndicators.hasSalesRoles) score += 0.1
     if (data.hiringIndicators.hasHRRoles) score += 0.1
-
-    // Freshness bonus
-    if (data.hiringIndicators.freshnessScore > 0.5) {
-      score += 0.3
-    }
-
-    // Technical quality bonus
+    if (data.hiringIndicators.freshnessScore > 0.5) score += 0.3
     if (data.technicalInfo.pageType === 'modern') score += 0.2
     if (data.technicalInfo.hasJobDescriptions) score += 0.1
-
     return Math.min(score, 1.0)
   }
 
-  /**
-   * Detect hiring signals from career page data
-   */
   private detectHiringSignals(data: CareerPageData): HiringSignal[] {
     const signals: HiringSignal[] = []
+    const baseId = data.companyName.toLowerCase().normalize('NFKD').replace(/\s+/g, '-')
 
-    // Burst hiring signal
     if (data.vacancies.length >= 3) {
       signals.push({
-        companyId: data.companyName.toLowerCase().replace(/\s+/g, '-'),
+        companyId: baseId,
         companyName: data.companyName,
         signalType: 'burst',
         strength: Math.min(data.vacancies.length / 10, 1),
-        evidence: [`Открыто ${data.vacancies.length} вакансий на карьере`],
-        detectedAt: new Date()
+        evidence: [`Открыто ${data.vacancies.length} вакансий на карьерной странице`],
+        detectedAt: new Date(),
       })
     }
 
-    // Diverse hiring signal
     const roleTypes = [
       data.hiringIndicators.hasTechRoles ? 'tech' : null,
       data.hiringIndicators.hasManagementRoles ? 'management' : null,
       data.hiringIndicators.hasSalesRoles ? 'sales' : null,
-      data.hiringIndicators.hasHRRoles ? 'hr' : null
-    ].filter(Boolean)
+      data.hiringIndicators.hasHRRoles ? 'hr' : null,
+    ].filter(Boolean) as string[]
 
     if (roleTypes.length >= 2) {
       signals.push({
-        companyId: data.companyName.toLowerCase().replace(/\s+/g, '-'),
+        companyId: baseId,
         companyName: data.companyName,
         signalType: 'diverse',
         strength: Math.min(roleTypes.length / 4, 1),
         evidence: [`Вакансии в ${roleTypes.length} разных областях`],
-        detectedAt: new Date()
+        detectedAt: new Date(),
       })
     }
 
-    // Premium salary signal
-    if (data.hiringIndicators.salaryRange.avg > 200000) {
+    if (data.hiringIndicators.salaryRange && data.hiringIndicators.salaryRange.avg > 200000) {
+      const avg = data.hiringIndicators.salaryRange.avg
       signals.push({
-        companyId: data.companyName.toLowerCase().replace(/\s+/g, '-'),
+        companyId: baseId,
         companyName: data.companyName,
         signalType: 'premium',
-        strength: Math.min((data.hiringIndicators.salaryRange.avg - 200000) / 100000, 1),
-        evidence: [`Высокие зарплаты: ${Math.round(data.hiringIndicators.salaryRange.avg).toLocaleString()} ₽`],
-        detectedAt: new Date()
+        strength: Math.min((avg - 200000) / 100000, 1),
+        evidence: [`Высокие зарплаты: ${Math.round(avg).toLocaleString('ru-RU')} ₽`],
+        detectedAt: new Date(),
       })
     }
 
-    // Freshness signal
-    if (data.hiringIndicators.freshnessScore === 1) {
+    if (data.hiringIndicators.freshnessScore === 1 && data.vacancies.length > 0) {
       signals.push({
-        companyId: data.companyName.toLowerCase().replace(/\s+/g, '-'),
+        companyId: baseId,
         companyName: data.companyName,
         signalType: 'fresh',
         strength: 1,
         evidence: ['Все вакансии свежие'],
-        detectedAt: new Date()
+        detectedAt: new Date(),
       })
     }
 
     return signals
   }
 
-  /**
-   * Calculate confidence score
-   */
   private calculateConfidence(data: CareerPageData, pageScore: number): number {
-    let confidence = pageScore * 0.92 // Base confidence from career-pages source
-
-    // Boost for technical quality
-    if (data.technicalInfo.pageType === 'modern') {
-      confidence *= 1.1
-    }
-
-    // Boost for multiple departments
-    if (data.hiringIndicators.hasMultipleDepartments) {
-      confidence *= 1.05
-    }
-
+    let confidence = pageScore * 0.92
+    if (data.technicalInfo.pageType === 'modern') confidence *= 1.1
+    if (data.hiringIndicators.hasMultipleDepartments) confidence *= 1.05
     return Math.min(confidence, 1.0)
   }
+}
+
+function defaultDomainHint(companyName: string): string[] {
+  const normalized = companyName
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[^\p{Letter}\p{Number}\s-]/gu, '')
+    .trim()
+  if (!normalized) return []
+  const hyphenated = normalized.replace(/\s+/g, '-').replace(SLUG_INVALID, '')
+  const compact = normalized.replace(/\s+/g, '').replace(SLUG_INVALID, '')
+  const slugs = [hyphenated, compact].filter(s => s.length > 0)
+  return Array.from(new Set(slugs))
 }

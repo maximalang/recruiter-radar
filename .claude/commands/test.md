@@ -17,3 +17,15 @@ For bug fixes (Prove-It pattern):
 5. Run the full test suite for regressions
 
 For browser-related issues, also invoke agent-skills:browser-testing-with-devtools to verify with Chrome DevTools MCP.
+
+## Recruiter Radar — testing notes
+
+- **Always run Jest from `apps/web/`.** Running from repo root strips TS syntax and breaks every `import type`.
+  ```
+  cd apps/web && npm test -- <pattern>
+  ```
+- **FIUR contract tests** live in `apps/web/src/__tests__/lib/scoring/fiur.test.ts` — every scoring change must keep these green.
+- **Lead aggregation tests** in `apps/web/src/__tests__/lib/lead-discovery/` — touch when changing aggregation/scoring/multi-source logic.
+- **Telegram callback tests** must cover: auth, idempotency, replay safety, suppression propagation.
+- **External data is untrusted** — write tests that feed malformed hh.ru / EGRUL / career-page payloads and assert graceful handling, not crashes.
+

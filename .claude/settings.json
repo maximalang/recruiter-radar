@@ -19,13 +19,24 @@
     ],
     "deny": [
       "Bash(git push*)",
+      "Bash(git push -f*)",
+      "Bash(git push --force*)",
+      "Bash(git push --tags*)",
       "Bash(git merge*)",
+      "Bash(git rebase*)",
+      "Bash(git tag -f*)",
+      "Bash(git tag --force*)",
       "Bash(gh pr*)",
       "Bash(gh issue*)",
+      "Bash(gh release*)",
       "Bash(git reset --hard*)",
       "Bash(git clean -fd*)",
+      "Bash(git checkout -- *)",
+      "Bash(git restore --staged*)",
       "Bash(rm -rf*)",
-      "Bash(Remove-Item -Recurse*)"
+      "Bash(Remove-Item -Recurse*)",
+      "Bash(npm publish*)",
+      "Bash(npm version*)"
     ],
     "allowRead": [
       { "path": ".claude/", "reason": "Project Claude Code configuration" },
@@ -53,8 +64,17 @@
       { "path": "dist/", "reason": "Build artifacts, not source" },
       { "path": "*.pem", "reason": "Private keys contain secrets" },
       { "path": "*.key", "reason": "Private keys contain secrets" },
+      { "path": "*.p12", "reason": "Certificate keystores contain secrets" },
+      { "path": "*.pfx", "reason": "Certificate keystores contain secrets" },
       { "path": "credentials.json", "reason": "Credentials files contain secrets" },
       { "path": "secrets.json", "reason": "Secrets files contain secrets" },
+      { "path": "n8n/exports/*.json", "reason": "n8n workflow exports may contain credentials" },
+      { "path": "n8n-exports/", "reason": "n8n workflow exports may contain credentials" },
+      { "path": "*.zip", "reason": "Archives may contain dumps or secrets" },
+      { "path": "*.tar.gz", "reason": "Archives may contain dumps or secrets" },
+      { "path": "*.dump", "reason": "DB dumps may contain PII and secrets" },
+      { "path": "*.sql.gz", "reason": "Compressed SQL dumps may contain PII" },
+      { "path": "*telegram*token*", "reason": "Telegram tokens are secrets" },
       { "path": "~/.npm/", "reason": "Global npm cache" },
       { "path": "~/.claude/", "reason": "User-level Claude config may contain secrets" }
     ]
@@ -72,18 +92,5 @@
     "modern-web-guidance@googlechrome": true
   },
   "autoMemoryEnabled": true,
-  "autoMemoryDirectory": "memory",
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Bash(npm run *)",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "echo 'Команда выполнена'"
-          }
-        ]
-      }
-    ]
-  }
+  "autoMemoryDirectory": "memory"
 }

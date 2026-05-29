@@ -6,6 +6,13 @@ on:
   pull_request:
     branches: [ main ]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -30,7 +37,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '20'
         cache: 'npm'
 
     - name: Install dependencies
@@ -39,8 +46,12 @@ jobs:
     - name: Type check
       run: npm run web:check
 
+    - name: DB validate
+      run: npm run db:validate
+
     - name: Run tests
-      run: npm run --workspace @recruiter-radar/web test
+      working-directory: apps/web
+      run: npm test
 
   build:
     needs: test
@@ -53,7 +64,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '20'
         cache: 'npm'
 
     - name: Install dependencies
@@ -63,14 +74,20 @@ jobs:
       run: docker build -f apps/web/Dockerfile -t ${{ github.repository }}:latest apps/web
 
     - name: Run smoke tests
+      env:
+        SMOKE_SESSION_SECRET: ${{ secrets.SMOKE_SESSION_SECRET }}
       run: |
+        if [ -z "$SMOKE_SESSION_SECRET" ]; then
+          echo "SMOKE_SESSION_SECRET secret is not configured" >&2
+          exit 1
+        fi
+
         docker run -d --name smoke-test -p 3001:3000 \
           -e DATABASE_URL=postgres://postgres:postgres@localhost:5432/test \
-          -e SESSION_SECRET=test-session-secret-at-least-32-chars-long \
+          -e SESSION_SECRET="$SMOKE_SESSION_SECRET" \
           -e NEXT_PUBLIC_APP_URL=http://localhost:3001 \
           ${{ github.repository }}:latest
 
-        # Wait for health check
         for i in {1..30}; do
           if curl -f http://localhost:3001/api/health > /dev/null 2>&1; then
             echo "Health check passed"
