@@ -16,20 +16,8 @@ import type {
   CrawlerFetchInput,
   CrawlerResult,
 } from './crawler-contract'
+// @ts-expect-error — adapter is .mjs without typings; structural use is safe
 import { fetchText } from '@/../../packages/db/scripts/adapters/source-http.mjs'
-
-// Wrapper to transform fetchText response to what our crawler expects
-interface FetchTextResponse {
-  response: {
-    ok: boolean
-    status: number
-    url: string
-    headers: {
-      get: (name: string) => string | null
-    }
-  }
-  body: string
-}
 
 const DEFAULT_USER_AGENT = 'recruiter-radar/1.0 (+https://recruiter-radar.local)'
 const DEFAULT_TIMEOUT_MS = 15_000
@@ -100,24 +88,23 @@ export function createStaticEngine(
       }
 
       try {
-        const { response, body: html } = await fetchText(url, {
+        const { response, body: html } = (await fetchText(url, {
           sourceName: `static crawler fetch`,
           headers: init.headers as Record<string, string>,
           signal: init.signal,
           redirect: 'follow',
-        })
+        })) as { response: Response; body: string }
 
-        // Create Headers-compatible object
-        const headers = new Map()
-        response.headers.forEach((value: string, key: string) => {
-          headers.set(key.toLowerCase(), value)
+        const rawHeaders: Record<string, string> = {}
+        response.headers.forEach((value, key) => {
+          rawHeaders[key.toLowerCase()] = value
         })
 
         return {
           url,
           status: response.status,
           html,
-          rawHeaders: headersToRecord(headers as Headers),
+          rawHeaders,
           fetchedAt: new Date().toISOString(),
           engine: 'static',
           warnings: [],

@@ -150,7 +150,11 @@ export function createDefaultPlaywrightLauncher(
   return async () => {
     let playwrightModule: { chromium: { launch(opts: unknown): Promise<PlaywrightBrowserLike> } }
     try {
-      playwrightModule = (await import(/* webpackIgnore: true */ 'playwright')) as never
+      // playwright is an optional opt-in dep (see CRAWLER_PLAYWRIGHT env). The
+      // dynamic import string keeps tsc from resolving it when the package is
+      // not installed in static-only environments.
+      const moduleName = 'playwright'
+      playwrightModule = (await import(/* webpackIgnore: true */ moduleName)) as never
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error)
       throw new Error(
