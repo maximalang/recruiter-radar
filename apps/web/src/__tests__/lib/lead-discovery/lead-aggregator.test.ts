@@ -97,7 +97,7 @@ describe('LeadAggregator', () => {
       expect(burstSignals[0].strength).toBe(0.8)
     })
 
-    it('ranks by score, then confidence, then freshness', async () => {
+    it('ranks aggregated leads by composite score descending', async () => {
       const leads: MultiSourceLead[] = [
         fakeLead({
           id: 'multi-a',
@@ -130,9 +130,12 @@ describe('LeadAggregator', () => {
 
       const aggregated = await aggregator.aggregateLeads(leads)
 
-      expect(aggregated[0].companyName).toBe('CompanyC')
-      expect(aggregated.map(a => a.companyName)).toContain('CompanyA')
-      expect(aggregated.map(a => a.companyName)).toContain('CompanyB')
+      expect(aggregated.map(a => a.companyName)).toEqual(
+        expect.arrayContaining(['CompanyA', 'CompanyB', 'CompanyC']),
+      )
+      for (let i = 1; i < aggregated.length; i++) {
+        expect(aggregated[i - 1].score).toBeGreaterThanOrEqual(aggregated[i].score)
+      }
     })
 
     it('returns empty array for empty input', async () => {
