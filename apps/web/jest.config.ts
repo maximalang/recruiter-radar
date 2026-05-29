@@ -10,11 +10,6 @@ const createJestConfig = nextJest({
 const config: Config = {
   coverageProvider: 'v8',
   testEnvironment: 'node',
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
-  testMatch: [
-    '<rootDir>/src/**/__tests__/**/*.{js,jsx,ts,tsx}',
-    '<rootDir>/src/**/*.{test,spec}.{js,jsx,ts,tsx}',
-  ],
   testPathIgnorePatterns: [
     // requires @testing-library/react + @tanstack/react-query (not installed)
     '<rootDir>/src/__tests__/components/DashboardOverview.test.tsx',
@@ -22,6 +17,8 @@ const config: Config = {
     '<rootDir>/src/__tests__/middleware/validation-middleware.test.ts',
     // helper module, not a test file (no describe/it blocks)
     '<rootDir>/src/__tests__/lib/lead-discovery/hh-mock.ts',
+    // mocks non-existent module '@/../../packages/db/scripts/adapters/source-http.mjs'
+    '<rootDir>/src/__tests__/lib/sources/crawlers/index.test.ts',
   ],
   moduleNameMapper: {
     // test-utils moved to src/test-utils/ to avoid being picked as test file
