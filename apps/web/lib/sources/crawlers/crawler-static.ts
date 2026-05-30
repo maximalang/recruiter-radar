@@ -16,8 +16,6 @@ import type {
   CrawlerFetchInput,
   CrawlerResult,
 } from './crawler-contract'
-// @ts-expect-error — adapter is .mjs without typings; structural use is safe
-import { fetchText } from '@/../../packages/db/scripts/adapters/source-http.mjs'
 
 const DEFAULT_USER_AGENT = 'recruiter-radar/1.0 (+https://recruiter-radar.local)'
 const DEFAULT_TIMEOUT_MS = 15_000
@@ -80,21 +78,15 @@ export function createStaticEngine(
       const controller = new AbortController()
       const timer = setTimeout(() => controller.abort(), timeoutMs)
 
-      const init: RequestInit = {
-        method: 'GET',
-        headers: mergeHeaders(defaultUa, opts.headers),
-        signal: opts.signal ?? controller.signal,
-        redirect: 'follow',
-      }
-
       try {
-        const { response, body: html } = (await fetchText(url, {
-          sourceName: `static crawler fetch`,
-          headers: init.headers as Record<string, string>,
-          signal: init.signal,
+        const response = await fetcher(url, {
+          method: 'GET',
+          headers: mergeHeaders(defaultUa, opts.headers) as HeadersInit,
+          signal: opts.signal ?? controller.signal,
           redirect: 'follow',
-        })) as { response: Response; body: string }
+        })
 
+        const html = await response.text()
         const rawHeaders: Record<string, string> = {}
         response.headers.forEach((value, key) => {
           rawHeaders[key.toLowerCase()] = value
