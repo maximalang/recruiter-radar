@@ -35,6 +35,17 @@ The core product loop is:
 - Do not claim that a PR, push, commit, or check succeeded unless the final report includes verifiable evidence: PR URL, commit SHA, and check/build logs or output.
 - If the shell has no `origin`/push access, do not pretend a PR was created. Use the Codex/GitHub integration; if that is unavailable, provide the full patch and the exact reason.
 
+### Git discipline for agents
+
+- Start every git task with `git status --short --branch`, `git remote -v`, and a duplicate-PR check for the intended head/base pair.
+- Keep commits atomic: one logical product/runtime/docs change per commit. Do not mix broad formatting with behavior changes.
+- Before staging, review `git diff --stat` and the relevant `git diff`. Before committing, review `git diff --staged`.
+- Stage only intentional files. Never add `.env`, `.env.*`, `.next`, `node_modules`, local caches, dumps, ZIPs, or private credentials.
+- Run a staged secret scan before committing. If a real secret is found, stop, remove it, and report that rotation is required.
+- Use descriptive commit messages in `<type>: <short description>` format, for example `feat: add source readiness checks`.
+- Push task work to the task branch, not directly to `main`. Open intermediate PRs into `refresh-self-serve-mvp` unless the user explicitly chooses another route.
+- Final reports for git tasks must include changed files, commit SHA, push target, PR URL or exact PR blocker, and check results.
+
 ## 3) Required preflight
 
 Before code changes and before creating a PR, report:

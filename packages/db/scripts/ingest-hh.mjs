@@ -3,16 +3,15 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 
+import {
+  fetchHhVacancyPages,
+  resolveHhVacancySearchConfig,
+} from './adapters/hh.mjs';
+
 const { Client } = pg;
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const rootEnvPath = resolve(scriptDir, '../../../.env');
-const searchText = 'рекрутер';
-const fetchUrl = new URL('https://api.hh.ru/vacancies');
 const hhSource = 'hh';
-
-fetchUrl.searchParams.set('text', searchText);
-fetchUrl.searchParams.set('per_page', '20');
-fetchUrl.searchParams.set('page', '0');
 
 loadEnvFile(rootEnvPath);
 
@@ -39,13 +38,17 @@ if (!databaseUrl) {
 }
 
 try {
-  const vacancies = await fetchVacancies(hhUserAgent);
+  const searchConfig = resolveHhVacancySearchConfig();
+  const hhFetch = await fetchVacancies(hhUserAgent, searchConfig);
+  const vacancies = hhFetch.items;
   const normalizedVacancies = normalizeVacancies(vacancies);
   const stats =
     normalizedVacancies.length === 0
       ? { hhVacancyUpsertCount: 0, signalUpsertCount: 0, skippedSignalCount: 0 }
       : await upsertVacancies(databaseUrl, normalizedVacancies);
 
+  console.log(`hh search text: ${searchConfig.searchText}`);
+  console.log(`hh pages fetched: ${hhFetch.pagesFetched}`);
   console.log(`vacancies received: ${vacancies.length}`);
   console.log(`hh vacancy upserts completed: ${stats.hhVacancyUpsertCount}`);
   console.log(`normalized signal upserts completed: ${stats.signalUpsertCount}`);
@@ -64,26 +67,14 @@ try {
     console.error(`cause: ${causeMessage}`);
   }
 
-  process.exit(1);
+  process.exitCode = 1;
 }
 
-async function fetchVacancies(userAgent) {
-  const response = await fetch(fetchUrl, {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-      'User-Agent': userAgent,
-    },
+async function fetchVacancies(userAgent, config) {
+  return fetchHhVacancyPages({
+    userAgent,
+    config,
   });
-
-  if (!response.ok) {
-    const details = await safeReadBody(response);
-    const suffix = details ? `: ${details}` : '';
-    throw new Error(`HH request failed with ${response.status} ${response.statusText}${suffix}`);
-  }
-
-  const payload = await response.json();
-  return Array.isArray(payload.items) ? payload.items : [];
 }
 
 function normalizeVacancies(vacancies) {
@@ -538,13 +529,4 @@ function toTimestampOrNull(value) {
   }
 
   return date.toISOString();
-}
-
-async function safeReadBody(response) {
-  try {
-    const body = await response.text();
-    return body.trim();
-  } catch {
-    return '';
-  }
 }

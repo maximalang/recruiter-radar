@@ -1,0 +1,30 @@
+[
+  {
+    "id": "lever-abc-001",
+    "text": "Frontend Engineer",
+    "hostedUrl": "https://jobs.lever.co/testco/lever-abc-001",
+    "createdAt": 1715500000000,
+    "categories": {
+      "team": "LeverCo",
+      "location": "Saint Petersburg",
+      "department": "Engineering",
+      "commitment": "Full-time"
+    }
+  },
+  {
+    "id": "lever-abc-002",
+    "text": "Data Analyst",
+    "hostedUrl": "https://jobs.lever.co/testco/lever-abc-002",
+    "createdAt": 1715600000000,
+    "categories": {
+      "team": "LeverCo",
+      "location": "Remote",
+      "department": "Analytics"
+    }
+  },
+  {
+    "id": null,
+    "text": null,
+    "categories": {}
+  }
+]

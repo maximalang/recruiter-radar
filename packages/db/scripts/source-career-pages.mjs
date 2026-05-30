@@ -3,6 +3,8 @@ import { dirname, extname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import pg from 'pg';
 
+import { fetchJson as fetchJsonWithPolicy, fetchText } from './adapters/source-http.mjs';
+
 const { Client } = pg;
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const rootEnvPath = resolve(scriptDir, '../../../.env');
@@ -424,7 +426,8 @@ function buildCareerPageProbeUrls(seed) {
 
 async function fetchHtmlPage(url) {
   try {
-    const response = await fetch(url, {
+    const { response, body: html } = await fetchText(url, {
+      sourceName: 'career-pages discovery',
       headers: {
         accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.1',
         'user-agent': 'RecruiterRadarCareerPages/1.0',
@@ -444,7 +447,7 @@ async function fetchHtmlPage(url) {
 
     return {
       url: response.url,
-      html: await response.text(),
+      html,
     };
   } catch {
     return null;
@@ -756,19 +759,20 @@ async function fetchJsonFeedRecords(target) {
 }
 
 async function fetchJson(url, targetId) {
-  const response = await fetch(url, {
-    headers: {
-      accept: 'application/json, text/plain;q=0.9, */*;q=0.1',
-      'user-agent': 'RecruiterRadarCareerPages/1.0',
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`career-pages target ${targetId} fetch failed with HTTP ${response.status} for ${url}`);
+  try {
+    return await fetchJsonWithPolicy(url, {
+      sourceName: `career-pages target ${targetId}`,
+      headers: {
+        accept: 'application/json, text/plain;q=0.9, */*;q=0.1',
+        'user-agent': 'RecruiterRadarCareerPages/1.0',
+      },
+    });
+  } catch (error) {
+    throw new Error(
+      `career-pages target ${targetId} fetch failed: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
+    );
   }
-
-  const responseText = await response.text();
-  return parseJson(responseText, url);
 }
 
 function buildNormalizedInput({ records, inputMode, inputFilePath, targetsFilePath, fetchOutputPath, targetResults, discoverySummary }) {

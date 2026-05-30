@@ -1,0 +1,46 @@
+{
+  "records": [
+    {
+      "external_id": "li-smoke-1",
+      "company_name": "TechFlow Solutions",
+      "company_domain": "techflow.example",
+      "company_website_url": "https://techflow.example/",
+      "linkedin_url": "https://www.linkedin.com/company/techflow-solutions",
+      "linkedin_company_id": "12345678",
+      "job_title": "Senior Backend Developer",
+      "job_posting_url": "https://www.linkedin.com/jobs/view/12345",
+      "location": "Москва",
+      "employment_type": "full-time",
+      "published_at": "2026-05-10T09:00:00.000Z"
+    },
+    {
+      "external_id": "li-smoke-2",
+      "company_name": "TechFlow Solutions",
+      "company_domain": "techflow.example",
+      "linkedin_company_id": "12345678",
+      "job_title": "Product Manager",
+      "job_posting_url": "https://www.linkedin.com/jobs/view/12346",
+      "location": "Санкт-Петербург",
+      "employment_type": "full-time",
+      "published_at": "2026-05-11T14:00:00.000Z"
+    },
+    {
+      "external_id": "li-smoke-3",
+      "company_name": "DataVerse Inc",
+      "company_domain": "dataverse.example",
+      "company_website_url": "https://dataverse.example/",
+      "linkedin_url": "https://www.linkedin.com/company/dataverse-inc",
+      "linkedin_company_id": "87654321",
+      "job_title": "ML Engineer",
+      "job_posting_url": "https://www.linkedin.com/jobs/view/99001",
+      "location": "Remote",
+      "published_at": "2026-05-12T11:30:00.000Z"
+    },
+    {
+      "company_name": "NoId Corp",
+      "job_title": "QA Engineer",
+      "location": "Казань",
+      "published_at": "2026-05-13T08:00:00.000Z"
+    }
+  ]
+}

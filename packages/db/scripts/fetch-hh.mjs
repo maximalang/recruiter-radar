@@ -2,9 +2,13 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import {
+  fetchHhVacancyPages,
+  resolveHhVacancySearchConfig,
+} from './adapters/hh.mjs';
+
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const rootEnvPath = resolve(scriptDir, '../../../.env');
-const searchText = '\u0440\u0435\u043a\u0440\u0443\u0442\u0435\u0440';
 
 loadEnvFile(rootEnvPath);
 
@@ -20,30 +24,18 @@ if (!hhUserAgent) {
   process.exit(1);
 }
 
-const url = new URL('https://api.hh.ru/vacancies');
-url.searchParams.set('text', searchText);
-url.searchParams.set('per_page', '20');
-url.searchParams.set('page', '0');
-
 try {
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-      'User-Agent': hhUserAgent,
-    },
+  const searchConfig = resolveHhVacancySearchConfig();
+  const result = await fetchHhVacancyPages({
+    userAgent: hhUserAgent,
+    config: searchConfig,
   });
+  const vacancies = result.items.slice(0, 5);
 
-  if (!response.ok) {
-    const details = await safeReadBody(response);
-    const suffix = details ? `: ${details}` : '';
-    throw new Error(`HH request failed with ${response.status} ${response.statusText}${suffix}`);
-  }
-
-  const payload = await response.json();
-  const vacancies = Array.isArray(payload.items) ? payload.items.slice(0, 5) : [];
-
-  console.log(`found count: ${payload.found ?? 0}`);
+  console.log(`search text: ${searchConfig.searchText}`);
+  console.log(`pages fetched: ${result.pagesFetched}`);
+  console.log(`vacancies received: ${result.items.length}`);
+  console.log(`found count: ${result.found ?? 0}`);
   console.log('first 5 vacancies:');
 
   if (vacancies.length === 0) {
@@ -65,7 +57,7 @@ try {
   if (causeMessage) {
     console.error(`cause: ${causeMessage}`);
   }
-  process.exit(1);
+  process.exitCode = 1;
 }
 
 function loadEnvFile(filePath) {
@@ -104,14 +96,5 @@ function loadEnvFile(filePath) {
     }
 
     process.env[key] = value;
-  }
-}
-
-async function safeReadBody(response) {
-  try {
-    const body = await response.text();
-    return body.trim();
-  } catch {
-    return '';
   }
 }

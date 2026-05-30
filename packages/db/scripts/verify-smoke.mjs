@@ -15,6 +15,13 @@ const alwaysScripts = [
   './verify-mixed-ranking-smoke.mjs',
   './verify-career-pages-smoke.mjs',
   './verify-career-pages-discovery-smoke.mjs',
+  './verify-company-site-smoke.mjs',
+  './verify-linkedin-company-pages-smoke.mjs',
+  './verify-tech-job-boards-smoke.mjs',
+  './verify-egrul-fns-smoke.mjs',
+  './verify-funding-business-signals-smoke.mjs',
+  './adapters/verify-adapters-smoke.mjs',
+  './verify-source-readiness.mjs',
 ];
 const dbBackedScripts = [
   './verify-digest-selection-smoke.mjs',

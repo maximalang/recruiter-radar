@@ -1,0 +1,41 @@
+{
+  "records": [
+    {
+      "external_id": "egrul-smoke-1",
+      "company_name": "ООО Технологии Будущего",
+      "inn": "7701234567",
+      "ogrn": "1027700123456",
+      "kpp": "770101001",
+      "company_domain": "techfuture.example",
+      "company_website_url": "https://techfuture.example/",
+      "registration_date": "2015-03-15",
+      "status": "active",
+      "legal_address": "г. Москва, ул. Тверская, д. 1",
+      "okved": "62.01",
+      "okved_description": "Разработка компьютерного программного обеспечения",
+      "head_name": "Иванов Иван Иванович",
+      "detected_at": "2026-05-01T00:00:00.000Z"
+    },
+    {
+      "external_id": "egrul-smoke-2",
+      "company_name": "АО Дата Системс",
+      "inn": "7702345678",
+      "ogrn": "1027700234567",
+      "company_domain": "datasystems.example",
+      "registration_date": "2018-07-20",
+      "status": "active",
+      "legal_address": "г. Санкт-Петербург, Невский пр., д. 100",
+      "okved": "63.11",
+      "okved_description": "Деятельность по обработке данных",
+      "detected_at": "2026-05-02T00:00:00.000Z"
+    },
+    {
+      "company_name": "ИП Петров",
+      "inn": "770312345678",
+      "status": "active",
+      "legal_address": "г. Казань, ул. Баумана, д. 5",
+      "okved": "62.02",
+      "detected_at": "2026-05-03T00:00:00.000Z"
+    }
+  ]
+}

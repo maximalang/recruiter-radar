@@ -81,7 +81,9 @@ WITH source_signal_rows AS (
         )
       ) AS source_key
       WHERE source_key IS NOT NULL
-    ) AS payload_source_keys
+    ) AS payload_source_keys,
+    NULLIF(signal.payload ->> 'employer_id', '') AS payload_employer_id,
+    NULLIF(signal.payload ->> 'hh_employer_id', '') AS payload_hh_employer_id
   FROM signals AS signal
   WHERE signal.signal_type = 'job_posting'
     AND signal.source IN ('hh', 'career-pages')
@@ -120,8 +122,8 @@ normalized_signal_rows AS (
         AND signal.payload_external_id NOT IN (
           -- employer_id and hh_employer_id are HH platform IDs, not org identifiers.
           -- Their presence alone does not constitute a direct hiring proof.
-          (signal.payload ->> 'employer_id'),
-          (signal.payload ->> 'hh_employer_id')
+          COALESCE(signal.payload_employer_id, ''),
+          COALESCE(signal.payload_hh_employer_id, '')
         )
         THEN 'direct_hiring_proof'
       WHEN source_ref.matched_by IS NOT NULL
@@ -394,6 +396,7 @@ SELECT
   total_score,
   is_recent,
   recency_code,
+  confidence_gate,
   primary_reason_code,
   primary_reason_label,
   secondary_reason_code,
