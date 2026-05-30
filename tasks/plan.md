@@ -1,356 +1,197 @@
-# План: Lead Generation Platform для Рекрутинговых Агентств
+# План исправлений — Recruiter Radar
 
-**Версия:** 3.0  
-**Дата:** 2026-05-26  
-**Статус:** Новая концепция - Lead Generation Platform  
-**Фокус:** Полноценная платформа для генерации лидов для рекрутинговых агентств
-
----
-
-## 🎯 Введение
-
-Recruiter Radar превращается из агрегатора вакансий в **премиум B2B платформу генерации лидов** для рекрутинговых агентств. Продукт находит компании-клиенты (не кандидатов!), которым стоит предложить рекрутинговые услуги прямо сейчас.
-
-### Ключевое отличие:
-- **Job boards** → кандидаты на вакансии
-- **Recruiter Radar** → компании-клиенты для агентств
+**Версия:** 1.0
+**Дата:** 2026-05-30
+**Статус:** В работе
+**Основание:** `/plan составь план исправления проблем`
 
 ---
 
-## 🔍 Dependency Graph
+## 🔍 Что нужно исправить
 
-### Основные компоненты:
-1. **Lead Discovery Engine** → Sources (HH, Career Pages, Rabota Rossii)
-2. **Lead Scoring System** → FIUR model (repositioned for B2B)
-3. **Agency Profile System** → ICP matching and personalization
-4. **Lead Pipeline CRM** → Sales workflow management
-5. **Outreach Automation** → Multi-channel client acquisition
-6. **Analytics Dashboard** → ROI and performance tracking
+Из self-serve-mvp.md и контекста проекта:
 
-### Поток данных:
+1. **PR chain manual merges** — цепочка 4 PR (1 мержнут, 3 готовы к мержу)
+2. **leadId → digestCandidateId rename** — launch blocker (web layer)
+3. **Stale docs cleanup** — устаревшие документы на 1600+ строк
+4. **Source adapters audit** — 72 .mjs скрипта требуют ревью
+5. **Stale branches cleanup** — ~20 `codex/*` remote branches
+
+---
+
+## 📊 Dependency Graph
+
 ```
-Sources → Evidence → Scoring → Agency Filtering → Lead Delivery → 
-Feedback Scoring → Pipeline Management → Analytics → Optimization
-```
-
----
-
-## 🏗️ Vertical Slices (Complete Paths)
-
-### 1. Core Lead Generation Engine (2-3 недели)
-
-#### Path: Signal-to-Lead Workflow
-**Цель:** Создать полноценный pipeline от сигнала до лидов для агентств
-
-**Компоненты:**
-- [ ] Улучшенный HH parser с detection hiring patterns
-- [ ] Career pages parsing с multiple contact paths
-- [ ] Агрегация сигналов из источников
-- [ ] FIUR scoring для client acquisition
-- [ ] Lead enrichment и evidence building
-- [ ] Quality gates и confidence classification
-
-**Acceptance Criteria:**
-- [ ] 50+ квалифицированных лидов в день
-- [ ] 80%+ match с агентским ICP
-- [ ] <2 часа freshness для A/B лидов
-- [ ] Explainable scoring breakdown
-
-**Verification Steps:**
-1. Запустить `npm run lead:generate` и проверить вывод
-2. Проверить `lead_candidates` таблицу на качество лидов
-3. Проверить scoring breakdown для агентских профилей
-4. Протестировать edge cases (дубли, низкокачественные сигналы)
-
----
-
-#### Path: Agency Profile & ICP System
-**Цель:** Персонализация лидов под каждое агентство
-
-**Компоненты:**
-- [ ] Onboarding questionnaire для агентств
-- [ ] ICP configuration (industries, sizes, locations)
-- [ ] Historical performance tracking
-- [ ] Dynamic lead weighting based on feedback
-- [ ] A/B testing framework
-
-**Acceptance Criteria:**
-- [ ] Individual scoring per agency
-- [ ] 30% improvement в relevance
-- [ ] <5 min setup time
-- [ ] Performance-based optimization
-
-**Verification Steps:**
-1. Создать тестовый agency profile
-2. Проверить scoring для разных профилей
-3. Тестировать feedback loop
-4. Проверить performance metrics
-
----
-
-### 2. Lead Management & Outreach (3-4 недели)
-
-#### Path: Lead Pipeline CRM
-**Цель:** Full sales workflow для агентств
-
-**Компоненты:**
-- [ ] Drag-and-drop pipeline interface
-- [ ] Lead status tracking (New → Qualified → Contacted → Meeting → Proposal → Client)
-- [ ] Tagging and categorization system
-- [ ] Interaction history
-- [ ] Task management
-- [ ] Email/Telegram integration
-
-**Acceptance Criteria:**
-- [ ] 80% агентств могут использовать как primary CRM
-- [ ] Seamless workflow от lead до client
-- [ ] Mobile-responsive interface
-- [ ] Data export capabilities
-
-**Verification Steps:**
-1. Протестировать full pipeline workflow
-2. Проверить integration с email/Telegram
-3. Тестировать team collaboration features
-4. Проверить performance при большом volume
-
----
-
-#### Path: Outreach Automation
-**Цель:** Автоматизированный yet персонализованный outreach
-
-**Компоненты:**
-- [ ] Template system с персонализацией
-- [ ] Smart scheduling (best contact times)
-- [ ] Multi-channel delivery (email + Telegram)
-- [ ] A/B testing for templates
-- [ ] Performance tracking
-
-**Acceptance Criteria:**
-- [ ] 30%+ response rate
-- [ ] 80%+ deliverability
-- [ ] Personalized at scale
-- [ ] 50% reduction в manual effort
-
-**Verification Steps:**
-1. Тестировать template personalization
-2. Проверить timing optimization
-3. Измерить response rates
-4. Тестировать fallback mechanisms
-
----
-
-### 3. Lead Quality & Intelligence (2-3 недели)
-
-#### Path: Advanced Lead Scoring
-**Цель:** ML-powered prediction и continuous improvement
-
-**Компоненты:**
-- [ ] Historical learning from conversions
-- [ ] Market condition adjustments
-- [ ] Competitive impact scoring
-- [ ] Seasonal trend analysis
-- [ ] Predictive features
-
-**Acceptance Criteria:**
-- [ ] 80% accuracy в predicting conversions
-- [ ] 20% improvement в lead quality
-- [ ] Adaptive scoring system
-
-**Verification Steps:**
-1. A/B test scoring models
-2. Track correlation с conversion rates
-3. Monitor model decay
-4. Test against market changes
-
----
-
-#### Path: Market Intelligence
-**Цель:** Competitive advantage для агентств
-
-**Компоненты:**
-- [ ] Industry hiring trends
-- [ ] Salary benchmarks
-- [ ] Talent availability
-- [ ] Competitive monitoring
-- [ ] Actionable insights delivery
-
-**Acceptance Criteria:**
-- [ ] Become go-to market intelligence source
-- [ ] Differentiation for agencies
-- [ ] High-value insights
-
-**Verification Steps:**
-1. Проверить quality insights
-2. Измерить adoption rate
-3. Test against known market trends
-4. Проверить actionable nature
-
----
-
-### 4. Enterprise Scale (3-4 недели)
-
-#### Path: Multi-Agency Platform
-**Цель:** Enterprise-ready multi-tenant architecture
-
-**Компоненты:**
-- [ ] Multi-tenant design with data isolation
-- [ ] Security & compliance measures
-- [ ] Shared market intelligence (anonymized)
-- [ ] Competitive protection
-- [ ] Admin dashboard
-- [ ] Usage analytics
-
-**Acceptance Criteria:**
-- [ ] Multiple agencies on same platform
-- [ ] No data leakage
-- [ ] Enterprise-grade security
-- [ ] Scalable performance
-
-**Verification Steps:**
-1. Тестировать data isolation
-2. Проверить security measures
-3. Тестировать performance under load
-4. Проверить compliance requirements
-
----
-
-#### Path: Marketplace & Integrations
-**Цель:** Connect companies with right agencies
-
-**Компоненты:**
-- [ ] Agency marketplace
-- [ ] Company-to-agency matching
-- [ ] RFP system
-- [ ] CRM integrations
-- [ ] Custom reporting
-- [ ] API access
-
-**Acceptance Criteria:**
-- [ ] Quality matches
-- [ ] Reduced sales cycle
-- [ ] Enterprise-ready platform
-
-**Verification Steps:**
-1. Test matching algorithm
-2. Measure conversion rates
-3. Test integrations
-4. Validate API endpoints
-
----
-
-## 🎯 Checkpoints & Milestones
-
-### Milestone 1: MVP Lead Generation (End of Week 2)
-- [ ] Core lead generation engine working
-- [ ] Agency profiles with ICP matching
-- [ ] Basic lead pipeline
-- [ ] Telegram digest delivery
-
-### Milestone 2: Sales Workflow (End of Week 5)
-- [ ] Complete pipeline CRM
-- [ ] Outreach automation
-- [ ] Basic analytics
-- [ ] Agency onboarding flow
-
-### Milestone 3: Advanced Features (End of Week 8)
-- [ ] ML-powered scoring
-- [ ] Market intelligence
-- [ ] Multi-agency support
-- [ ] Enterprise features
-
-### Milestone 4: Marketplace (End of Week 12)
-- [ ] Agency marketplace
-- [ ] Advanced integrations
-- [ ] Premium support
-- [ ] Full platform ready
-
----
-
-## 📊 Success Metrics
-
-### Business Metrics
-| Метрика | Целевое значение |
-|---------|------------------|
-| **Pipeline** | 50-100 leads/month/agency |
-| | Lead freshness <2 hours |
-| **Conversion** | Lead-to-client 15-20% |
-| | Sales cycle 30-60 days |
-| **Revenue** | Avg deal size $5k-20k |
-| | Monthly revenue/agency $10k-50k |
-| | ROI 300%+ |
-
-### Quality Metrics
-| Метрика | Целевое значение |
-|---------|------------------|
-| Lead relevance | 80%+ |
-| ICP match rate | 90%+ |
-| Deduplication | <1% |
-| Data freshness | <24 hours |
-
-### Platform Metrics
-| Метрика | Целевое значение |
-|---------|------------------|
-| Uptime | 99.5%+ |
-| API response time | <500ms |
-| User satisfaction | 4.5+/5 |
-| Churn rate | <5%/month |
-
----
-
-## 🔧 Technical Requirements
-
-### Lead Schema
-```typescript
-interface AgencyLead {
-  id: string;
-  company: Company;
-  status: 'new' | 'qualified' | 'contacted' | 'meeting' | 'proposal' | 'client' | 'lost';
-  score: number;
-  confidence: 'high' | 'medium' | 'low';
-  sources: HiringSource[];
-  nextAction: LeadAction;
-  assignedTo: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-```
-
-### Agency Workflow
-```
-Daily Radar → Review Leads → Prioritize → Outreach → 
-Track Responses → Schedule Meetings → Send Proposal → 
-Close Deal → Feedback → Improve Scoring
+PR chain merge (manual, блокирует все)
+    ↓
+leadId rename (web layer, launch blocker)
+    ↓
+Stale docs cleanup (не блокирует, но мешает навигации)
+    ↓
+Source adapters audit (следующий этап)
+    ↓
+Stale branches cleanup (ветки codex/*)
 ```
 
 ---
 
-## 💡 Quick Wins (First Week)
+## 🏗️ Vertical Slices
 
-1. **Agency ICP Questionnaire** - быстрая настройка профиля
-2. **Lead Scoring MVP** - базовая система оценки
-3. **Outreach Templates** - готовые шаблоны первого контакта
-4. **Basic Dashboard** - метрики и конверсии
-5. **Lead Notifications** - real-time alerts о новых лидов
+### Slice 1: PR chain manual merge
 
----
+**Цель:** Merged-состояние 4 PR в main
 
-## 🚀 Implementation Priority
+**Merge order:**
+```
+#22 (chore/remove-stale-review-docs-v2 → main) MERGE
+    ↓
+#24 (feat/lead-discovery-infra → #22) MERGE
+    ↓
+#25 (feat/leads-api-routes → #24) MERGE
+    ↓
+main
+```
 
-1. **Week 1-2**: Core lead generation engine
-2. **Week 3-5**: Lead pipeline & outreach automation  
-3. **Week 6-8**: Advanced scoring & analytics
-4. **Week 9-12**: Enterprise features & marketplace
+**Также:**
+- `refresh-self-serve-mvp` → main (5 security commits)
+- `work/local-mvp` → main (6 commits, source adapters)
 
----
-
-## 🎯 Key Success Indicators
-
-1. **Agencies generate pipeline** - 50+ leads/month
-2. **Conversion to clients** - 15-20% of leads become clients
-3. **Revenue impact** - $10k-50k/month per agency
-4. **Product stickiness** - 80% monthly retention
-5. **Word of mouth** - 30%+ from referrals
+**Verification:**
+- All 4 PRs show "Merged" in GitHub UI
+- `main` содержит все коммиты через chain
 
 ---
 
-Этот план создает полноценную **lead generation platform** для рекрутинговых агентств, превращая hiring signals в revenue-generating opportunities. Каждый компонент направлен на создание ценности для агентств и обеспечение измеримого ROI.
+### Slice 2: leadId → digestCandidateId rename (Launch Blocker #1)
+
+**Цель:** Убрать legacy naming в web layer
+
+**Файлы (из grep leadId - web layer):**
+- `apps/web/app/onboarding/pilot/[orderId]/actions.ts` — UI actions
+- `apps/web/lib/digestFeedback.ts` — feedback lib
+- `apps/web/app/api/digest/feedback/route.ts` — API route
+- `apps/web/app/api/digest/delivery/route.ts` — delivery API route
+- `apps/web/app/digest/page.tsx` — digest UI page
+- `apps/web/app/digest/[digestCandidateId]/page.tsx` — detail page
+- `apps/web/app/api/digest/delivery/actions.ts` — delivery actions
+
+**Acceptance Criteria:**
+- [ ] Все встречающиеся `leadId` в web layer переименованы в `digestCandidateId`
+- [ ] Проверка `grep -r "leadId" apps/web/` возвращает пустой результат
+- [ ] `npm run web:check` проходит
+- [ ] Routing URLs используют `digestCandidateId` как параметр
+
+**Verification Steps:**
+1. `grep -rn "leadId" apps/web/` — должен вернуть 0 результатов
+2. `npm run web:check` — должен пройти без ошибок
+3. Проверить routes и navigation links
+
+---
+
+### Slice 3: Stale docs cleanup
+
+**Цель:** Удалить или заменить устаревшую документацию
+
+**Удалить:**
+- `docs/инфо о проекте.md` (494 строки, stale с 2026-05-26)
+- `docs/инфоclaude.md` (1163 строки, stale с 2026-05-26)
+
+**Обновить/переписать:**
+- `tasks/plan.md` — заменить старый Lead Generation Plan (2026-05-26) на текущий fix plan
+- `tasks/todo.md` — заменить старый TODO (2026-05-26) на текущие задачи
+
+**Также:**
+- `memory/slash-commands-translations.md` — проверить актуальность
+- `memory/enterprise-readiness-comprehensive-plan.md` — проверить актуальность
+
+**Verification:**
+- `docs/инфо о проекте.md` не существует
+- `docs/инфоclaude.md` не существует
+- `tasks/plan.md` содержит текущий fix plan
+- `tasks/todo.md` содержит текущие задачи
+
+---
+
+### Slice 4: Source adapters production-readiness audit
+
+**Цель:** Проверить все 72 .mjs source-скрипта на продакшен readiness
+
+**Локации:**
+- `packages/db/scripts/work/local-mvp/` — HH adapter, EGRUL, Greenhouse, Lever
+- `packages/db/scripts/` — career pages, company sites, funding, tech boards, russian rabota
+
+**Checklist per adapter:**
+- [ ] Source name and family correctly defined
+- [ ] Entity resolution confidence logic
+- [ ] Evidence tier classification (hire_intent / enrich / context)
+- [ ] Error handling (network, parse, validation)
+- [ ] Rate limiting compliance
+- [ ] Logging with structured output
+- [ ] No hardcoded secrets
+- [ ] TypeScript interfaces aligned
+
+**Acceptance Criteria:**
+- [ ] Audit report для каждого адаптера
+- [ ] Confidence-gated evidence classification validated
+- [ ] Production blockers identified and filed as issues
+
+---
+
+### Slice 5: Stale remote branches cleanup
+
+**Цель:** Удалить ~20 устаревших `codex/*` remote branches
+
+**Команда:**
+```bash
+git branch -r --list 'codex/*' | while read b; do
+  echo "$b" | grep -v HEAD | cut -d/ -f2-
+done | xargs -r git push origin --delete
+```
+
+**Acceptance Criteria:**
+- [ ] `git branch -r --list 'codex/*'` возвращает пустой результат
+
+---
+
+## 🎯 Checkpoints
+
+### CP1: PR chain merged
+- All 3 remaining PRs merged to main
+- `refresh-self-serve-mvp` merged
+- `work/local-mvp` merged
+
+### CP2: launch blockers resolved
+- `leadId` rename complete
+- `npm run web:check` passes
+
+### CP3: Docs clean
+- Stale docs deleted
+- `tasks/plan.md` and `tasks/todo.md` up to date
+
+### CP4: Source adapters audited
+- Audit report written
+- Production blockers identified
+
+### CP5: Branches cleaned
+- All codex/* remote branches deleted
+
+---
+
+## 🚀 Quick Wins
+
+1. **Merge PRs** — просто GitHub UI, no code
+2. **Delete stale docs** — 2 команды rm, убирает 1657 строк мусора
+3. **leadId rename** — grep → edit → check
+
+---
+
+## Reference: PR Chain (из memory/pr-split-progress.md)
+
+| # | Branch | Base | PR | Status |
+|---|--------|------|-----|--------|
+| 1 | `chore/crawler-typecheck-fix` | `main` | #21 | ✅ MERGED |
+| 2 | `chore/remove-stale-review-docs-v2` | PR-1 | #22 | ✅ COMPLETE |
+| 3 | `feat/lead-discovery-infra` | PR-2 | #24 | ✅ COMPLETE |
+| 4 | `feat/leads-api-routes` | PR-3 | #25 | ✅ COMPLETE |
+
+**Merge sequence:** #22 → #24 → #25 → main

@@ -1,385 +1,113 @@
-# TODO — Lead Generation Platform для Рекрутинговых Агентств
+# TODO — Recruiter Radar Fix Plan
 
-**Связано:** `SPEC.md` (продуктовый контракт), `tasks/plan.md` (разработка и фазы), `tasks/runbook.md` (пошаговый runbook)
-**Обновлено:** 2026-05-26
-**Фокус:** Полноценная платформа генерации лидов для рекрутинговых агентств
-
----
-
-## 🎯 P0: Core Lead Generation Engine (дедлайн 28.05.2026)
-
-### Задача 1.1: Lead Discovery System
-- [ ] Улучшить HH parser для detection hiring patterns
-  - [ ] Добавить detection companies hiring 3+ roles
-  - [ ] Implement non-tech roles detection (HR, Sales, Accounting)
-  - [ ] Add company size analysis (50-500 employees optimal)
-  - [ ] Create hiring burst detection algorithm
-- [ ] Улучшить career pages parsing
-  - [ ] Extract multiple contact paths
-  - [ ] Detect HR hiring (recruiter vacancies = HOT signal)
-  - [ ] Parse department structure
-  - [ ] Extract career page quality metrics
-- [ ] Implement signal aggregation
-  - [ ] Combine HH + Career Pages + Rabota Rossii signals
-  - [ ] Weight evidence by source reliability
-  - [ ] Create unified lead format
-  - [ ] Implement lead freshness tracking
-- [ ] Real-time lead notifications
-  - [ ] Telegram bot for new leads
-  - [ ] Email digests
-  - [ ] Webhook notifications
-  - [ ] Push notifications for mobile
-
-**Acceptance Criteria:**
-- [ ] 50+ qualified leads per day
-- [ ] 80%+ match with agency ICP
-- [ ] <2 hour freshness for A/B leads
-- [ ] Signal accuracy >90%
+**Обновлено:** 2026-05-30
+**Основание:** `/plan составь план исправления проблем`
 
 ---
 
-### Задача 1.2: Lead Scoring for Agencies
-- [ ] Implement ICP Match scoring (40%)
-  - [ ] Industry alignment algorithm
-  - [ ] Company size preference matching
-  - [ ] Geographic fit scoring
-  - [ ] Historical conversion weight
-- [ ] Hiring Intensity scoring (30%)
-  - [ ] Position count algorithm (>3 = high)
-  - [ ] Role diversity scoring
-  - [ ] Salary level analysis
-  - [ ] Posting frequency detection
-- [ ] Market Fit scoring (20%)
-  - [ ] Industry growth indicators
-  - [ ] Expansion signal detection
-  - [ ] Competitive position analysis
-  - [ ] Market trend integration
-- [ ] Contact Quality scoring (10%)
-  - [ ] Contact info availability
-  - [ ] Response history scoring
-  - [ ] Multiple contact paths
-  - [ ] Contact method preference
+## 📋 Проверка: Что уже сделано
 
-**Acceptance Criteria:**
-- [ ] Score correlates with conversion rate (>0.7)
-- [ ] 70%+ leads are actionable
-- [ ] Clear next action for each lead
-- [ ] Explainable score breakdown
+| Задача | Статус |
+|--------|--------|
+| 4 stacked PRs созданы | ✅ (PRs #21, #22, #24, #25) |
+| PR-23 (старый, wrong base) закрыт | ✅ |
+| Remote branches использованы для PR heads | ✅ |
 
 ---
 
-### Задача 1.3: Agency Profile System
-- [ ] ICP Configuration
-  - [ ] Onboarding questionnaire
-  - [ ] Industry selection
-  - [ ] Company size preferences
-  - [ ] Geographic targeting
-  - [ ] Role specialization
-- [ ] Performance Tracking
-  - [ ] Lead conversion tracking
-  - [ ] Deal size analysis
-  - [ ] Sales cycle monitoring
-  - [ ] Channel effectiveness
-- [ ] Dynamic Lead Weighting
-  - [ ] Historical performance data
-  - [ ] A/B testing framework
-  - [ ] Personalization engine
-  - [ ] Real-time adjustments
+## 🎯 Текущий фокус: Исправления
 
-**Acceptance Criteria:**
-- [ ] Individual lead scoring per agency
-- [ ] 30% improvement in relevance
-- [ ] <5 min ICP configuration
-- [ ] Performance-based optimization
+### 🔴 P0: Критические (блокируют релиз)
+
+#### 1.1: PR chain manual merge
+- [ ] Merge PR-22 → main
+- [ ] Merge PR-24 → main (автоматически получит base от PR-22)
+- [ ] Merge PR-25 → main (автоматически получит base от PR-24)
+- [ ] Merge `refresh-self-serve-mvp` → main (5 security commits)
+- [ ] Merge `work/local-mvp` → main (6 commits, source adapters)
+
+**Где:** GitHub UI — https://github.com/maximalang/recruiter-radar/pulls
 
 ---
 
-## 📈 P1: Lead Management & Outreach (29.05-11.06.2026)
+#### 1.2: leadId → digestCandidateId rename (Launch Blocker #1)
+- [ ] Переименовать `leadId` → `digestCandidateId` в `apps/web/app/onboarding/pilot/[orderId]/actions.ts`
+- [ ] Переименовать в `apps/web/lib/digestFeedback.ts`
+- [ ] Переименовать в `apps/web/app/api/digest/feedback/route.ts`
+- [ ] Переименовать в `apps/web/app/api/digest/delivery/route.ts`
+- [ ] Переименовать в `apps/web/app/digest/page.tsx`
+- [ ] Переименовать в `apps/web/app/digest/[digestCandidateId]/page.tsx`
+- [ ] Переименовать в `apps/web/app/api/digest/delivery/actions.ts`
+- [ ] Запустить `grep -rn "leadId" apps/web/` — должен вернуть 0
+- [ ] Запустить `npm run web:check`
 
-### Задача 2.1: Lead Pipeline CRM
-- [ ] Pipeline Implementation
-  - [ ] Drag-and-drop interface
-  - [ ] Status transitions tracking
-  - [ ] Stage definitions
-  - [ ] Conversion funnels
-- [ ] Lead Management
-  - [ ] Tagging system
-  - [ ] Lead enrichment
-  - [ ] Notes and history
-  - [ ] Task assignment
-- [ ] Integration Layer
-  - [ ] Email integration
-  - [ ] Telegram integration
-  - [ ] Calendar sync
-  - [ ] Document storage
-- [ ] Team Features
-  - [ ] User roles
-  - [ ] Team dashboard
-  - [ ] Collaboration tools
-  - [ ] Permissions system
-
-**Acceptance Criteria:**
-- [ ] 80% agencies can use as primary CRM
-- [ ] Seamless lead-to-client workflow
-- [ ] Mobile-responsive
-- [ ] Data export capabilities
+**Из docs/self-serve-mvp.md:**
+> "Legacy naming (`leadId` in actions/UI) still exists in web layer and should be renamed to `digestCandidateId` for full consistency."
 
 ---
 
-### Задача 2.2: Outreach Automation
-- [ ] Template System
-  - [ ] Personalized template builder
-  - [ ] Variable insertion (company-specific)
-  - [ ] A/B testing framework
-  - [ ] Performance analytics
-- [ ] Smart Scheduling
-  - [ ] Best contact time detection
-  - [ ] Follow-up sequences
-  - [ ] Priority queuing
-  - [ ] Time zone handling
-- [ ] Multi-Channel
-  - [ ] Email automation
-  - [ ] Telegram bot
-  - [ ] LinkedIn integration
-  - [ ] SMS capabilities
-- [ ] Analytics & Tracking
-  - [ ] Open/click tracking
-  - [ ] Response rates
-  - [ ] Conversion tracking
-  - [ ] ROI calculation
+### 🟡 P1: Документация и навигация
 
-**Acceptance Criteria:**
-- [ ] 30%+ response rate
-- [ ] 80%+ deliverability
-- [ ] Personalized at scale
-- [ ] Reduced manual effort by 50%
+#### 2.1: Stale docs cleanup
+- [ ] Удалить `docs/инфо о проекте.md` (494 строки, stale)
+- [ ] Удалить `docs/инфоclaude.md` (1163 строки, stale)
+- [ ] Обновить `tasks/todo.md` (этот файл)
+- [ ] Проверить `memory/slash-commands-translations.md`
+- [ ] Проверить `memory/enterprise-readiness-comprehensive-plan.md`
 
 ---
 
-### Задача 2.3: Analytics Dashboard
-- [ ] Core Metrics
-  - [ ] Lead-to-client conversion
-  - [ ] Average deal size
-  - [ ] Sales cycle length
-  - [ ] Cost per acquisition
-- [ ] Visualizations
-  - [ ] Pipeline funnels
-  - [ ] Lead quality trends
-  - [ ] Revenue forecasting
-  - [ ] Agency benchmarking
-- [ ] Reports
-  - [ ] Daily/weekly/monthly reports
-  - [ ] Custom report builder
-  - [ ] Export to Excel/CSV
-  - [ ] Automated delivery
-- [ ] Insights
-  - [ ] Actionable recommendations
-  - [ ] Performance alerts
-  - [ ] Trend analysis
-  - [ ] Competitive intelligence
-
-**Acceptance Criteria:**
-- [ ] Clear ROI demonstration
-- [ ] Actionable insights
-- [ ] Executive-ready reports
-- [ ] Real-time data
+#### 2.2: Source adapters audit
+- [ ] Проаудить HH adapter в `packages/db/scripts/work/local-mvp/`
+- [ ] Проаудить EGRUL, Greenhouse, Lever adapters
+- [ ] Проаудить career pages adapter
+- [ ] Проаудить company sites adapter
+- [ ] Проаудить funding adapter
+- [ ] Проаудить tech job boards adapter
+- [ ] Проаудить Rabota Rossii adapter
+- [ ] Проверить entity resolution confidence logic
+- [ ] Проверить evidence tier classification
+- [ ] Создать audit report с production blockers
 
 ---
 
-## 🎯 P2: Lead Quality & Intelligence (12.06-25.06.2026)
+### 🟢 P2: Cleanup
 
-### Задача 3.1: Advanced Lead Scoring
-- [ ] ML Implementation
-  - [ ] Random Forest model
-  - [ ] Training data collection
-  - [ ] Feature engineering
-  - [ ] Model validation
-- [ ] Learning System
-  - [ ] Feedback loop from conversions
-  - [ ] A/B testing framework
-  - [ ] Continuous improvement
-  - [ ] Model decay detection
-- [ ] Predictive Features
-  - [ ] Conversion probability
-  - [ ] Deal size prediction
-  - [ ] Sales cycle forecasting
-  - [ ] Response likelihood
-- [ ] Adaptive Scoring
-  - [ ] Market condition adjustments
-  - [ ] Seasonal trend integration
-  - [ ] Competitive impact
-  - [ ] Agent-specific weights
-
-**Acceptance Criteria:**
-- [ ] 80% conversion prediction accuracy
-- [ ] 20% improvement in lead quality
-- [ ] Adaptive to market changes
-- [ ] Explainable predictions
+#### 3.1: Stale branches cleanup
+- [ ] Список remote branches: `git branch -r --list 'codex/*'`
+- [ ] Удалить все `codex/*` remote branches
+- [ ] Проверить `git branch -r --list 'codex/*'` = пусто
 
 ---
 
-### Задача 3.2: Market Intelligence
-- [ ] Data Sources
-  - [ ] Industry news aggregation
-  - [ ] Market trend tracking
-  - [ ] Competitive monitoring
-  - [ ] Salary benchmarking
-- [ ] Analysis Engine
-  - [ ] Trend detection
-  - [ ] Pattern recognition
-  - [ ] Anomaly detection
-  - [ ] Predictive analysis
-- [ ] Delivery System
-  - [ ] Weekly executive reports
-  - [ ] Custom alerts
-  - [ ] API access
-  - [ ] Data export
-- [ ] Actionable Insights
-  - [ ] Strategic recommendations
-  - [ ] Opportunity identification
-  - [ ] Threat detection
-  - [ ] Competitive positioning
+## 📊 Progress Tracker
 
-**Acceptance Criteria:**
-- [ ] Become go-to market intelligence source
-- [ ] Differentiation for agencies
-- [ ] High-value insights
-- [ ] Regular actionable content
+| Phase | Задача | Статус | Примечание |
+|-------|--------|--------|------------|
+| P0 | PR chain merge | 🔴 Pending | Ручной GitHub merge |
+| P0 | leadId rename | 🔴 Pending | Web layer files |
+| P1 | Stale docs delete | 🟡 Pending | 2 docs + memory check |
+| P1 | Source adapters audit | 🟡 Pending | 72 scripts, нужно чеклист |
+| P2 | Stale branches | 🟢 Pending | ~20 codex/* branches |
 
 ---
 
-## 💼 P3: Enterprise Scale (26.06-16.07.2026)
+## 📝 Reference
 
-### Задача 4.1: Multi-Agency Platform
-- [ ] Architecture
-  - [ ] Multi-tenant design
-  - [ ] Data isolation
-  - [ ] Performance optimization
-  - [ ] Scalability planning
-- [ ] Security & Compliance
-  - [ ] Data encryption
-  - [ ] Access control
-  - [ ] Audit logging
-  - [ ] GDPR compliance
-- [ ] Features
-  - [ ] Shared market intelligence (anonymized)
-  - [ ] Competitive protection
-  - [ ] Admin dashboard
-  - [ ] Usage analytics
-- [ ] Onboarding
-  - [ ] Agency setup workflow
-  - [ ] Training materials
-  - [ ] Support integration
-  - [ ] Success metrics
+**PR Chain (из memory/pr-split-progress.md):**
+- PR-21: `chore/crawler-typecheck-fix` → main — ✅ MERGED
+- PR-22: `chore/remove-stale-review-docs-v2` → main — ✅ COMPLETE
+- PR-24: `feat/lead-discovery-infra` → PR-22 — ✅ COMPLETE
+- PR-25: `feat/leads-api-routes` → PR-24 — ✅ COMPLETE
 
-**Acceptance Criteria:**
-- [ ] Multiple agencies on same platform
-- [ ] No data leakage
-- [ ] Enterprise-grade security
-- [ ] Scalable performance
+**Launch blockers (из docs/self-serve-mvp.md):**
+1. Entitlement gate must be mandatory (⚠️ проверить)
+2. `leadId` → `digestCandidateId` rename (в этом todo)
+3. Legacy schema deprecation plan (⚠️ нужен explicit plan)
 
----
-
-### Задача 4.2: Advanced Features
-- [ ] Marketplace
-  - [ ] Company-to-agency matching
-  - [ ] RFP system
-  - [ ] Reviews and ratings
-  - [ ] Commission tracking
-- [ ] Integrations
-  - [ ] CRM integrations
-  - [ ] Marketing automation
-  - [ ] Accounting software
-  - [ ] HR platforms
-- [ ] Customization
-  - [ ] White-label option
-  - [ ] Custom workflows
-  - [ ] Branded reports
-  - [ ] API access
-- [ ] Enterprise Support
-  - [ ] Dedicated support
-  - [ ] SLAs
-  - [ ] Custom development
-  - [ ] Training programs
-
-**Acceptance Criteria:**
-- [ ] Enterprise-ready platform
-- [ ] Customization capabilities
-- [ ] High scalability
-- [ ] Premium support
-
----
-
-## 📊 Metrics Tracking
-
-| Категория | Метрика | Целевое | Статус |
-|-----------|---------|---------|--------|
-| **Pipeline** | Leads/day | 50-100 | 🔴 0 |
-| | New companies/week | 20-30 | 🔴 0 |
-| | Lead freshness | <2h | 🔴 Н/Д |
-| **Conversion** | Lead-to-client | 15-20% | 🔴 Н/Д |
-| | Sales cycle | 30-60d | 🔴 Н/Д |
-| | Response rate | 30%+ | 🔴 Н/Д |
-| **Revenue** | Avg deal size | $5k-20k | 🔴 Н/Д |
-| | Monthly rev/agency | $10k-50k | 🔴 Н/Д |
-| | ROI | 300%+ | 🔴 Н/Д |
-| **Quality** | Lead relevance | 80%+ | 🔴 Н/Д |
-| | ICP match | 90%+ | 🔴 Н/Д |
-| | Deduplication | <1% | 🔴 5% |
-
----
-
-## 🔧 Technical Implementation
-
-### Lead Schema
-```typescript
-interface AgencyLead {
-  id: string;
-  company: Company;
-  status: 'new' | 'qualified' | 'contacted' | 'meeting' | 'proposal' | 'client' | 'lost';
-  score: number;
-  confidence: 'high' | 'medium' | 'low';
-  sources: HiringSource[];
-  nextAction: LeadAction;
-  assignedTo: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
+**Merge sequence:**
 ```
-
-### Agency Workflow
+gh pr merge #22 → gh pr merge #24 → gh pr merge #25 → main
+gh pr merge refresh-self-serve-mvp → main
+gh pr merge work/local-mvp → main
 ```
-Daily Radar → Review Leads → Prioritize → Outreach → 
-Track Responses → Schedule Meetings → Send Proposal → 
-Close Deal → Feedback → Improve Scoring
-```
-
----
-
-## 🚀 Quick Wins
-
-### This Week
-- [ ] Create agency ICP questionnaire
-- [ ] Implement basic lead scoring
-- [ ] Build outreach template library
-- [ ] Set up HH parser for hiring patterns
-
-### Next Week  
-- [ ] Add career pages evidence
-- [ ] Create lead pipeline UI
-- [ ] Implement notification system
-- [ ] Build basic dashboard
-
----
-
-## 🎯 Key Success Indicators
-
-1. **Agencies generate pipeline** - 50+ leads/month
-2. **Conversion to clients** - 15-20% of leads become clients
-3. **Revenue impact** - $10k-50k/month per agency
-4. **Product stickiness** - 80% monthly retention
-5. **Word of mouth** - 30%+ from referrals
-
----
-
-Этот TODO фокусируется на создании полноценной **lead generation platform** для рекрутинговых агентств, а не просто job parser. Каждый элемент направлен на превращение hiring signals в revenue-generating opportunities.
