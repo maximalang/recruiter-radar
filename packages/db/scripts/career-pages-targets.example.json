@@ -1,0 +1,22 @@
+{
+  "targets": [
+    {
+      "id": "acme-greenhouse",
+      "adapter": "greenhouse-board",
+      "company_name": "Acme",
+      "company_domain": "acme.example",
+      "company_website_url": "https://acme.example/",
+      "career_page_url": "https://boards.greenhouse.io/acme",
+      "source_url": "https://boards-api.greenhouse.io/v1/boards/acme/jobs?content=true"
+    },
+    {
+      "id": "acme-lever",
+      "adapter": "lever-postings",
+      "company_name": "Acme",
+      "company_domain": "acme.example",
+      "company_website_url": "https://acme.example/",
+      "career_page_url": "https://jobs.lever.co/acme",
+      "source_url": "https://api.lever.co/v0/postings/acme?mode=json"
+    }
+  ]
+}

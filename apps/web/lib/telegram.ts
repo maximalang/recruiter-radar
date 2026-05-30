@@ -5,23 +5,31 @@ export type TelegramConfig = {
   chatId: string;
 };
 
+export type TelegramMessageConfig = {
+  botToken: string;
+  chatId: string;
+};
+
 type TelegramLeadMessage = {
   orgName: string;
   status: LeadStatus;
   score: number | null;
   lastSignalAt: string | null;
   userName: string;
+  confidenceGate?: string;
 };
 
 type TelegramSendResult = {
   messageId: number;
 };
 
+export type TelegramTextMessageResult = TelegramSendResult & {
+  chatId: string;
+};
+
 type TelegramApiSuccess = {
   ok: true;
-  result: {
-    message_id: number;
-  };
+  result: unknown;
 };
 
 type TelegramApiFailure = {
@@ -46,14 +54,21 @@ function formatDate(value: string | null): string {
   }).format(date);
 }
 
+function formatConfidenceGateLabel(gate: string | undefined): string {
+  if (!gate) return "";
+  const labels: Record<string, string> = { A: "Высокая", B: "Средняя", C: "Низкая", D: "Контекст" };
+  return `\nУверенность: ${labels[gate] ?? gate} (${gate})`;
+}
+
 function formatTelegramLeadMessage(lead: TelegramLeadMessage): string {
-  return [
+  const parts = [
     `Компания: ${lead.orgName}`,
     `Статус: ${lead.status}`,
-    `Score: ${lead.score ?? "-"}`,
+    `Score: ${lead.score ?? "-"}${formatConfidenceGateLabel(lead.confidenceGate)}`,
     `Last signal at: ${formatDate(lead.lastSignalAt)}`,
     `Пользователь: ${lead.userName}`
-  ].join("\n");
+  ];
+  return parts.join("\n");
 }
 
 function isTelegramApiSuccess(value: unknown): value is TelegramApiSuccess {
@@ -63,7 +78,7 @@ function isTelegramApiSuccess(value: unknown): value is TelegramApiSuccess {
 
   const result = value as Partial<TelegramApiSuccess>;
 
-  return result.ok === true && typeof result.result?.message_id === "number";
+  return result.ok === true && "result" in result;
 }
 
 function getTelegramErrorDescription(value: unknown): string | null {
@@ -117,24 +132,66 @@ export function getTelegramConfigError(): string | null {
   return getTelegramConfig().error;
 }
 
-export async function sendTelegramLeadMessage(
-  lead: TelegramLeadMessage,
-  config: TelegramConfig
-): Promise<TelegramSendResult> {
-  const response = await fetch(
-    `https://api.telegram.org/bot${config.botToken}/sendMessage`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      cache: "no-store",
-      body: JSON.stringify({
-        chat_id: config.chatId,
-        text: formatTelegramLeadMessage(lead)
-      })
-    }
-  );
+export function getTelegramBotToken(): {
+  botToken: string | null;
+  error: string | null;
+} {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN?.trim();
+
+  if (!botToken) {
+    return {
+      botToken: null,
+      error: "Telegram is not configured. Missing TELEGRAM_BOT_TOKEN."
+    };
+  }
+
+  return {
+    botToken,
+    error: null
+  };
+}
+
+export async function getTelegramBotUsername(): Promise<{
+  username: string | null;
+  error: string | null;
+}> {
+  const { botToken, error } = getTelegramBotToken();
+
+  if (!botToken) {
+    return {
+      username: null,
+      error
+    };
+  }
+
+  const username = process.env.TELEGRAM_BOT_USERNAME?.trim() || null;
+
+  if (!username) {
+    return {
+      username: null,
+      error: "TELEGRAM_BOT_USERNAME is not configured. Set it to your bot's @username (without @) to enable Telegram connect deep links."
+    };
+  }
+
+  return {
+    username,
+    error: null
+  };
+}
+
+async function callTelegramApi<T>(
+  method: string,
+  config: Pick<TelegramMessageConfig, "botToken">,
+  body: Record<string, unknown>
+): Promise<T> {
+  const response = await fetch(`https://api.telegram.org/bot${config.botToken}/${method}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    cache: "no-store",
+    body: JSON.stringify(body)
+  });
 
   let payload: unknown = null;
 
@@ -152,7 +209,56 @@ export async function sendTelegramLeadMessage(
     throw new Error(description);
   }
 
+  return payload.result as T;
+}
+
+const TELEGRAM_MESSAGE_CHAR_LIMIT = 4096;
+
+export async function sendTelegramTextMessage(
+  text: string,
+  config: TelegramMessageConfig,
+  options?: {
+    replyMarkup?: unknown;
+  }
+): Promise<TelegramTextMessageResult> {
+  const safeText = text.length > TELEGRAM_MESSAGE_CHAR_LIMIT
+    ? text.slice(0, TELEGRAM_MESSAGE_CHAR_LIMIT - 1) + "…"
+    : text;
+  const result = await callTelegramApi<{ message_id: number }>("sendMessage", config, {
+    chat_id: config.chatId,
+    text: safeText,
+    ...(options?.replyMarkup ? { reply_markup: options.replyMarkup } : {})
+  });
+
   return {
-    messageId: payload.result.message_id
+    chatId: config.chatId,
+    messageId: result.message_id
+  };
+}
+
+export async function answerTelegramCallbackQuery(input: {
+  callbackQueryId: string;
+  botToken: string;
+  text?: string;
+}): Promise<void> {
+  await callTelegramApi("answerCallbackQuery", { botToken: input.botToken }, {
+    callback_query_id: input.callbackQueryId,
+    ...(input.text ? { text: input.text } : {})
+  });
+}
+
+export async function sendTelegramLeadMessage(
+  lead: TelegramLeadMessage,
+  config: TelegramConfig,
+  options?: { replyMarkup?: unknown }
+): Promise<TelegramSendResult> {
+  const result = await callTelegramApi<{ message_id: number }>("sendMessage", config, {
+    chat_id: config.chatId,
+    text: formatTelegramLeadMessage(lead),
+    ...(options?.replyMarkup ? { reply_markup: options.replyMarkup } : {})
+  });
+
+  return {
+    messageId: result.message_id
   };
 }

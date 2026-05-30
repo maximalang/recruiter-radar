@@ -11,6 +11,9 @@ coverage/
 .env.production.local
 
 *.log
+.next-dev.out.log
+.next-dev.err.log
+*.tsbuildinfo
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

@@ -1,0 +1,30 @@
+{
+  "targets": [
+    {
+      "id": "smoke-static",
+      "adapter": "static-records",
+      "company_name": "Smoke Company",
+      "company_domain": "smoke.example",
+      "company_website_url": "https://smoke.example/",
+      "career_page_url": "https://smoke.example/careers",
+      "records": [
+        {
+          "external_id": "smoke-1",
+          "job_title": "Senior Recruiter",
+          "job_posting_url": "https://smoke.example/careers/senior-recruiter",
+          "location": "Remote",
+          "employment_type": "Full-time",
+          "occurred_at": "2026-01-01T00:00:00.000Z"
+        },
+        {
+          "external_id": "smoke-2",
+          "job_title": "Talent Sourcer",
+          "job_posting_url": "https://smoke.example/careers/talent-sourcer",
+          "location": "Amsterdam",
+          "employment_type": "Contract",
+          "occurred_at": "2026-01-02T00:00:00.000Z"
+        }
+      ]
+    }
+  ]
+}

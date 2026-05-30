@@ -164,8 +164,7 @@ CREATE INDEX signals_org_occurred_at_idx
 CREATE INDEX signals_type_occurred_at_idx
   ON signals (signal_type, occurred_at DESC);
 CREATE UNIQUE INDEX signals_source_external_id_uidx
-  ON signals (source, external_id)
-  WHERE external_id IS NOT NULL;
+  ON signals (source, external_id);
 
 CREATE INDEX leads_user_status_idx
   ON leads (user_id, status);
