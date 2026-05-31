@@ -103,7 +103,7 @@ export function createStaticEngine(
         const { response, body: html } = await fetchText(url, {
           sourceName: `static crawler fetch`,
           headers: init.headers as Record<string, string>,
-          signal: init.signal,
+          signal: init.signal ?? undefined,
           redirect: 'follow',
         })
 
@@ -117,7 +117,7 @@ export function createStaticEngine(
           url,
           status: response.status,
           html,
-          rawHeaders: headersToRecord(headers as Headers),
+          rawHeaders: headersToRecord(headers as unknown as Headers),
           fetchedAt: new Date().toISOString(),
           engine: 'static',
           warnings: [],
