@@ -1,196 +1,121 @@
 <!-- CODEGRAPH_START -->
-## CodeGraph
+## CodeGraph (mandatory — primary search engine)
 
-This project has a CodeGraph MCP server (`codegraph_*` tools) configured. CodeGraph is a tree-sitter-parsed knowledge graph of every symbol, edge, and file. Reads are sub-millisecond and return structural information grep cannot.
+CodeGraph (`codegraph_*`) is the **primary** way to read this codebase. Detailed rules ship with the MCP server's SessionStart instructions; project-specific overrides only:
 
-### When to prefer codegraph over native search
-
-Use codegraph for **structural** questions — what calls what, what would break, where is X defined, what is X's signature. Use native grep/read only for **literal text** queries (string contents, comments, log messages) or after you already have a specific file open.
-
-| Question | Tool |
-|---|---|
-| "Where is X defined?" / "Find symbol named X" | `codegraph_search` |
-| "What calls function Y?" | `codegraph_callers` |
-| "What does Y call?" | `codegraph_callees` |
-| "What would break if I changed Z?" | `codegraph_impact` |
-| "Show me Y's signature / source / docstring" | `codegraph_node` |
-| "Give me focused context for a task/area" | `codegraph_context` |
-| "See several related symbols' source at once" | `codegraph_explore` |
-| "What files exist under path/" | `codegraph_files` |
-| "Is the index healthy?" | `codegraph_status` |
-
-### Rules of thumb
-
-- **Answer directly — don't delegate exploration.** For "how does X work" / architecture / trace questions, answer with 2-3 codegraph calls: `codegraph_context` first, then ONE `codegraph_explore` for the source of the symbols it surfaces. CodeGraph IS the pre-built index, so spawning a separate file-reading sub-task/agent — or running a grep + read loop — repeats work codegraph already did and costs more for the same answer.
-- **Trust codegraph results.** They come from a full AST parse. Do NOT re-verify them with grep — that's slower, less accurate, and wastes context.
-- **Don't grep first** when looking up a symbol by name. `codegraph_search` is faster and returns kind + location + signature in one call.
-- **Don't chain `codegraph_search` + `codegraph_node`** when you just want context — `codegraph_context` is one call.
-- **Don't loop `codegraph_node` over many symbols** — one `codegraph_explore` call returns several symbols' source grouped in a single capped call, while each separate node/Read call re-reads the whole context and costs far more.
-- **Index lag**: the file watcher debounces ~500ms behind writes; don't re-query immediately after editing a file in the same turn.
-
-### If `.codegraph/` doesn't exist
-
-The MCP server returns "not initialized." Ask the user: *"I notice this project doesn't have CodeGraph initialized. Want me to run `codegraph init -i` to build the index?"*
+- **Default search tool is CodeGraph, not grep/Read.** Before any `Grep` / `Glob` / `Read` to locate a symbol, file, or trace usage, you MUST first try `codegraph_context` / `codegraph_search` / `codegraph_callers`. Use grep/Read only for: literal string/comment/log lookups; confirming a single detail in a file already located via CodeGraph; non-indexable files (binary, generated, markdown, `.env.example`).
+- **Never delegate codebase exploration to a sub-agent** when CodeGraph can answer. Spawning `Agent` / `Explore` for "how does X work" or "where is Y" repeats indexed work and costs 5–10× the tokens. Sub-agents are for genuinely open-ended research across non-code artifacts (docs, web, multiple repos).
+- **Index health first.** If CodeGraph returns "not initialized" or stale, run `codegraph_status` and report — never silently fall back to grep.
+- **Fallback contract:** if MCP SessionStart instructions are absent, treat the rules above as the full contract — do not fall back to grep/Read as default.
 <!-- CODEGRAPH_END -->
 
-## Recruiter Radar — Claude Code Project
+## Recruiter Radar — Product Identity
 
-### Product Identity
+Russia-first, evidence-first, premium client-intelligence radar for recruitment agencies.
 
-Recruiter Radar is a premium, Russia-first client-intelligence radar for recruitment agencies.
+**It IS:** self-serve radar that surfaces companies worth contacting now, with evidence and confidence; Telegram-first delivery; quality-first (trust, dedupe, confidence, feedback loops).
 
-**It is NOT:**
-- an ATS
-- a CRM
-- a generic job parser
-- a mass outreach/spam tool
-- a candidate sourcing product
+**It is NOT:** ATS, CRM, generic job parser, mass outreach/spam tool, candidate sourcing.
 
-**It IS:**
-- a self-serve radar that helps recruitment agencies find companies worth contacting now
-- an evidence-first product that explains why a company is relevant
-- a quality-first product that prioritizes trust, dedupe, confidence, and feedback loops
-- a Telegram-first delivery product with web onboarding and pilot activation
+**Core loop:** Landing → live preview → pilot activation → client profile → Telegram → daily digest → feedback buttons → suppression/reweighting → better digests.
 
-### Core Product Loop
+**Tech:** Next.js + Postgres for product core. n8n for orchestration only (schedules, retries, webhook fan-out, alerts). Core business logic (scoring, entity resolution, confidence gates, billing, suppression, digest/feedback state, prompt versioning) **never** lives in n8n.
 
-```
-Landing → live preview → pilot activation → client profile → Telegram connection →
-daily digest → feedback buttons → suppression/reweighting → better future digests
-```
+## Quality Principles
 
-### Tech Stack
+Optimize for trust and clarity over feature volume. Every lead must answer: who is the company, what changed, why now, why fit this agency, what evidence, safest contact path, next action.
 
-- **Product core:** Next.js + Postgres
-- **Orchestration only:** n8n (schedules, retries, webhook fan-out, operational alerts, calling product APIs)
-- **Do NOT** put core business logic in n8n (scoring, entity resolution, confidence gates, billing, suppression, digest state, feedback state, prompt versioning)
+Do NOT add features that produce more leads without improving evidence, confidence, dedupe, feedback, billing, delivery reliability, trust, security, activation, or conversion.
 
-### Quality Principles
+## FIUR Scoring Model
 
-Always optimize for trust and clarity over feature volume.
+`Total = Fit + Intent + Urgency + Reachability`. Each component clamped to [0, 1]; total ∈ [0, 4]. Additive form is the product contract — see `docs/product.md` §FIUR and `apps/web/lib/scoring/fiur.ts`.
 
-Every lead recommendation must answer:
-1. Who is the company?
-2. What changed?
-3. Why does it matter now?
-4. Why does it fit this agency profile?
-5. What evidence supports it?
-6. What is the safest lawful contact path?
-7. What should the user do next?
+- **Fit:** ICP, role/function, industry, geography, size, exclusions
+- **Intent:** relevant vacancies, freshness, hiring burst, independent confirmation, direct career page
+- **Urgency:** burst, hard-to-fill, new region, corporate event, repeated/stale roles
+- **Reachability:** corporate website, career page, generic HR contact, safe non-personal route
 
-**Do NOT create features** that produce more leads without improving evidence, confidence, dedupe, feedback, billing, delivery reliability, trust, security, activation, or conversion.
+A company hiring an internal recruiter is NOT a hot signal by itself.
 
-### FIUR Scoring Model
-
-```
-Total Score = Fit + Intent + Urgency + Reachability
-```
-
-Each component is clamped to [0, 1]; total ∈ [0, 4]. The additive form is the product contract — see `docs/product.md` §FIUR and the implementation in `apps/web/lib/scoring/fiur.ts`.
-
-- **Fit:** agency ICP match, role/function match, industry match, geography, company size, exclusions
-- **Intent:** relevant vacancies, freshness, hiring burst, independent source confirmation, direct career page evidence
-- **Urgency:** burst pattern, hard-to-fill roles, new region, corporate event, repeated/stale roles
-- **Reachability:** corporate website, career page, generic HR contact path, safe non-personal contact route
-
-Do NOT treat "company is hiring an internal recruiter" as a hot signal by itself.
-
-### Confidence Gates
+## Confidence Gates
 
 | Gate | Criteria | Delivery |
-|------|----------|----------|
+|---|---|---|
 | **A** | 2+ independent evidence layers, clean entity match, direct company surface | Auto-deliver |
-| **B** | 1 strong source + enrichment layer | Auto-deliver with confidence label |
-| **C** | Platform-only aggregation or questionable entity match | Review required before delivery |
-| **D** | Context without direct hiring proof | Do not create lead; store as supporting context |
+| **B** | 1 strong source + enrichment | Auto-deliver with confidence label |
+| **C** | Platform-only aggregation or questionable entity match | Review required |
+| **D** | Context without direct hiring proof | No lead; supporting context only |
 
-### Telegram Digest Requirements
+## Telegram Digest
 
-Telegram digest must be short, actionable, and stateful.
+Short, actionable, stateful. Each lead: company, score, confidence, why now, evidence summary, best angle, safe next action.
 
-Each lead includes:
-- company name, score, confidence
-- why now, evidence summary
-- best angle, safe next action
+Inline buttons: `Беру / Мимо / Позже / Уже написал / Ответили / Созвон / Клиент / Скрыть похожие`.
 
-Inline buttons: Беру / Мимо / Позже / Уже написал / Ответили / Созвон / Клиент / Скрыть похожие
+Callback handling: authenticated, idempotent, logged, replay-safe, connected to digest candidate state, reflected in future suppression/reweighting.
 
-Callback handling must be: authenticated, idempotent, logged, replay-safe, connected to digest candidate state, reflected in future suppression/reweighting.
+## Security Rules
 
-### Security Rules
+NEVER commit secrets. Forbidden in repo: real Telegram tokens, API keys, DB URLs, `.env*`, n8n production exports with secrets, `.next/`, `node_modules/`, ZIP archives, dumps. Use `.env.example` for variable names only.
 
-**NEVER commit secrets.**
+NEVER read `.env*`, `node_modules/`, `.next/`, `build/`, `dist/`. (Also enforced via `.claude/settings.json` denyRead.)
 
-Forbidden in repository:
-- real Telegram bot tokens, API keys, database URLs
-- `.env`, `.env.local`, `.env.production`
-- production n8n workflow exports containing secrets
-- build caches, `.next`, `node_modules`, ZIP archives, private dumps
-
-All secrets must be referenced through environment variables or credentials. Use `.env.example` for variable names only.
-
-**NEVER read:**
-- `.env` or `.env.*` files
-- `node_modules/`
-- `.next/` or `build/` or `dist/`
-
-### Local Validation Commands
-
-Before code changes: run preflight via standard agent tools
+## Validation Commands
 
 After code changes:
-- Always run: `npm run web:check`
-- Run `npm run web:build` only when: routes, middleware, `next.config.*`, or other build-sensitive code changed; OR `web:check` passed and the patch is commit-ready
-- Do NOT run repeated check/build loops. If check fails, do one focused fix pass and stop.
+- Always: `npm run web:check`
+- Run `npm run web:build` only if routes/middleware/`next.config.*` changed, OR `web:check` passed and patch is commit-ready
+- Do NOT loop check/build. If check fails: one focused fix pass, then stop.
 
-If database migrations changed: inspect schema consistency and mention how to apply them.
-If n8n workflow changed: confirm no secrets are present in exported JSON.
-If Telegram webhook changed: describe authentication, idempotency, replay-safety, and callback acknowledgement.
+If migrations changed: inspect schema consistency, mention how to apply. If n8n workflow changed: confirm no secrets in JSON. If Telegram webhook changed: describe auth, idempotency, replay-safety, callback ack.
 
-### Code Standards
+## Code Standards
 
-- Use TypeScript strictly
-- Prefer small, explicit functions over large hidden logic
-- Avoid broad rewrites unless necessary
-- Do not add dependencies without a clear reason
-- Keep Russian copy concise, premium, and specific
+TypeScript strictly. Small explicit functions. Avoid broad rewrites. No deps without clear reason. Russian copy: concise, premium, specific.
 
-**Avoid:** "гарантированные клиенты", "100% результат", "автоматически закрываем продажи", "готовые сделки"
+**Avoid:** «гарантированные клиенты», «100% результат», «автоматически закрываем продажи», «готовые сделки».
 
-**Preferred:** "компании, которым стоит написать сегодня", "сигналы найма", "доказательства", "почему сейчас", "безопасный путь контакта", "ежедневный радар"
+**Preferred:** «компании, которым стоит написать сегодня», «сигналы найма», «доказательства», «почему сейчас», «безопасный путь контакта», «ежедневный радар».
 
-### Definition of Done
+## Definition of Done
 
-A task is done only when:
-1. The patch is minimal and scoped to the task
+1. Patch is minimal and scoped to the task
 2. Required checks pass, or failures are reported honestly
-3. The final report includes: changed files, check results, risks, suggested commit message
+3. Final report includes: changed files, check results, risks, suggested commit message
 
-### Memory System
+## Pre-merge gate (MANDATORY)
 
-This project uses auto-memory to store project context, user preferences, and workflow patterns. Memory files are stored in `memory/` directory.
+Before any `git merge`, `git push` to a shared branch, or PR finalize. No exceptions.
 
-### Available Skills
+**Step 1 — `/review`.** Run the five-axis skill (correctness, readability, architecture, security, performance). Resolve every Critical finding before proceeding. Important findings: fix or explicitly acknowledge in commit/PR description.
 
-**Agent Skills (agent-skills/addy-agent-skills):**
-- `using-agent-skills` — meta-skill for skill discovery
-- `context-engineering` — right context at the right time
-- `incremental-implementation` — thin vertical slices, test each before expanding
-- `security-and-hardening` — OWASP prevention, input validation, secrets
-- `frontend-ui-engineering` — production-quality UI with accessibility
+**Step 2 — Verify nothing is silently lost.**
+- No exported function/class/route removed or replaced without an explicit migration note
+- No public signature changes shape without callers updated in the same patch
+- Run `codegraph_impact` on every modified exported symbol — orphaned downstream callers = Critical
 
-**Modern Web Guidance (Google Chrome):**
-- `modern-web-guidance` — MANDATORY for all HTML/CSS/clientside JS tasks. Use FIRST for UI/Layout, Scroll/Motion, Performance (CWV), Forms, and modern web APIs
-- `chrome-extensions` — Chrome extension development guidance
+**Step 3 — CodeGraph signature diff.** For every touched function/method:
+- Capture current signature via `codegraph_node`
+- Compare against pre-edit signature: working-tree diff for unstaged work; `git show <base>:<path>` for already-committed patches
+- Any change to params, return type, async-ness, or visibility must be intentional and noted in the commit
+- If `codegraph_status` shows the index is stale, wait before trusting the diff
 
-### When to use Modern Web Guidance
+**Step 4 — `doubt-driven-development` for critical merges.** Walk **CLAIM → EXTRACT → DOUBT → RECONCILE → STOP** for any patch touching:
 
-**Must invoke `modern-web-guidance` skill for:**
-- UI/Layout: Modals, dialogs, popovers, Glassmorphism/backdrop-filters, anchor positioning, container queries, `:has()`, `:user-valid`
-- Scroll/Motion: View Transitions, Scroll-driven animations, scroll parallax/reveals
-- Performance: CWV (LCP, INP), content-visibility, Fetch Priority, image optimization
-- System/APIs: Local filesystem access, WebUSB, WebSockets, WebAssembly widgets
-- Frameworks: Adapting layout/styles in React, Vue, Angular
-- General Frontend: Forms, autofill, advanced inputs, custom scrollbars, modern component states
+- auth / session boundary (`apps/web/lib/security/`, `apps/web/middleware.ts`)
+- billing
+- FIUR scoring (`apps/web/lib/scoring/`)
+- confidence gates
+- entity resolution / dedupe
+- suppression / feedback state
+- Telegram callback handling
+- rate limiting
+- secrets rotation
+- database migrations
 
-**Do NOT use for:** Backend (SQL, ORMs, Express), CI/CD, Docker, generic scripts
+If any step fails or is skipped, the patch is NOT ready to merge — report honestly and stop.
+
+## Memory
+
+Auto-memory files live in `memory/`. Index is `MEMORY.md`. See user-level instructions for memory protocol.
