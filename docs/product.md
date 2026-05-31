@@ -104,27 +104,26 @@ Total Score = Fit + Intent + Urgency + Reachability
 
 ## Phased expansion strategy
 
-### Phase 1 — доказать ценность на one primary jobs source
+### Phase 1 — доказать ценность на primary platform + company surface (реализовано)
 
-- Стартуем с одним основным runnable source, чтобы быстро проверить scoring, delivery и полезность лидов.
-- Источник запуска может быть hh.ru или другой jobs source с достаточным покрытием.
-- Даже при одном runnable source сохраняем quality-first semantics: evidence tier, confidence, dedupe, suppression.
+Два параллельных runnable source в production:
+- `hh` — primary platform source, участвует в digest selection
+- `career-pages` — company-surface high-signal source, участвует в digest selection
 
-### Phase 2 — расширить primary hiring-signal sources
+Оба прошли quality-first semantics: evidence tier, confidence, dedupe, suppression, entity resolution.
 
-После подтверждения MVP добавляем источники, которые прямо показывают найм:
+### Phase 2 — растёт покрытие и добавляется evidence layering
 
-- career pages компаний, включая repo-native auto-discovery от уже найденных компаний
-- LinkedIn jobs/company pages или аналогичные external jobs/company sources, если они допустимы для выбранного контура
-- отдельные tech job boards
+Источники runnable, но ещё не в digest selection — на этапе роста покрытия:
+- `linkedin-company-pages` — secondary platform evidence, corroborating layer в digest
+- `tech-job-boards` — tech job board coverage, планируется включение после confidence-gate валидации
 
-### Phase 3 — добавить enrichment/context sources
+### Phase 3 — добавить enrichment/context sources (реализовано, не в selection)
 
-После этого подключаем источники, которые не создают лид сами по себе, но улучшают приоритизацию и объяснение:
-
-- ЕГРЮЛ / ФНС для юридических данных компании
-- сайт компании для контекста и безопасного contact path
-- funding/business signals и другие внешние business events
+Источники, которые не создают лид сами по себе, но улучшают приоритизацию и объяснение:
+- `company-site` — сайт компании для контактов, ICP-контекста и дополнительного подтверждения
+- `egrul-fns` — ЕГРЮЛ / ФНС для юридических данных компании и entity validation
+- `funding-business-signals` — funding, growth и другие business signals для explanation/context layering
 
 ## Monetization posture
 

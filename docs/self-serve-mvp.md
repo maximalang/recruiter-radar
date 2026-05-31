@@ -57,8 +57,8 @@ Additional onboarding/runtime prerequisites:
 - Do not move scoring/billing/feedback business logic into n8n; keep it in app APIs.
 
 ## Launch blockers
-- Entitlement gate must be mandatory for all premium digest deliveries server-side (no optional path).
-- Legacy naming (`leadId` in actions/UI) still exists in web layer and should be renamed to `digestCandidateId` for full consistency.
-- Existing historical schema/docs still include legacy lead tables; needs explicit deprecation plan.
+- Entitlement gate must be mandatory for all premium digest deliveries server-side (no optional path). ✅ **RESOLVED** — gate is enforced in `apps/web/lib/payments.ts` (`hasPremiumEntitlement`) and in digest API routes (returns 403 if not allowed).
+- Legacy naming (`leadId` in actions/UI) still exists in web layer and should be renamed to `digestCandidateId` for full consistency. 🔄 **PARTIALLY DONE** — logging/context uses `digestCandidateId`, but function parameter names in `apps/web/lib/db.ts` (`updateLeadStatus`, `getLeadDeliveryRow`, `sendLeadToTelegram`) still use `leadId`, and the API layer (`apps/web/app/api/digest/delivery/route.ts:94`) actively calls `sendLeadToTelegram(row.id)`. Function params + callers still need rename.
+- Existing historical schema/docs still include legacy lead tables; needs explicit deprecation plan. ❌ **OPEN** — no deprecation plan for `leads`, `lead_status`, `deliveries` tables yet.
 
 > См. также root-level `AGENTS.md` для обязательных правил работы Codex (ветки, PR, проверки, продуктовые и архитектурные границы).
