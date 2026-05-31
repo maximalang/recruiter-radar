@@ -1,10 +1,12 @@
 import { createDefaultRouter } from '@/lib/sources/crawlers'
 
-// Mock fetchText for these tests too
-const mockFetchText = jest.fn()
 jest.mock('@/../../packages/db/scripts/adapters/source-http.mjs', () => ({
-  fetchText: mockFetchText
+  fetchText: jest.fn()
 }))
+
+const { fetchText: mockFetchText } = jest.requireMock(
+  '@/../../packages/db/scripts/adapters/source-http.mjs'
+) as { fetchText: jest.Mock }
 
 describe('createDefaultRouter', () => {
   beforeEach(() => {

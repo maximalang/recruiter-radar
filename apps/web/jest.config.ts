@@ -20,6 +20,8 @@ const config: Config = {
     '<rootDir>/src/__tests__/components/DashboardOverview.test.tsx',
     // requires jest-environment-jsdom + React hooks (validation-system.ts uses useState/useCallback)
     '<rootDir>/src/__tests__/middleware/validation-middleware.test.ts',
+    // mock fixture imported by hh-pattern-detection.test.ts, not a test
+    '<rootDir>/src/__tests__/lib/lead-discovery/hh-mock.ts',
   ],
   moduleNameMapper: {
     // test-utils moved to src/test-utils/ to avoid being picked as test file

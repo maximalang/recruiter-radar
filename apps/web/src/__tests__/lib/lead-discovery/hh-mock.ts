@@ -32,7 +32,7 @@ function toNonEmptyText(value) {
   return normalizedValue === '' ? null : normalizedValue
 }
 
-export function resolveHhVacancySearchConfig(env = {}) {
+export function resolveHhVacancySearchConfig(env = process.env) {
   const searchText = toNonEmptyText(env.HH_SEARCH_TEXT) ?? 'рекрутер'
   const perPage = clampInteger(env.HH_PER_PAGE, 20, 1, 100)
   const pages = clampInteger(env.HH_PAGES, 1, 1, 20)

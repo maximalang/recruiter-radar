@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from 'jest'
-import { fetchHhVacancyPages, resolveHhVacancySearchConfig } from './hh-mock'
+import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals'
+import { resolveHhVacancySearchConfig, fetchHhVacancyPages } from './hh-mock'
 
 // Test data to avoid making real API calls
 const mockHhResponse = {
@@ -30,19 +30,22 @@ const mockHhResponse = {
 }
 
 describe('Hiring Pattern Detection', () => {
-  let mockFetch
-  let mockConsoleLog
+  let mockFetch: jest.Mock | undefined
+  let mockConsoleLog: typeof console.log | undefined
 
   beforeEach(() => {
-    mockFetch = global.fetch
+    mockFetch = global.fetch as jest.Mock
     global.fetch = jest.fn()
     mockConsoleLog = console.log
     console.log = jest.fn()
+    for (const key of Object.keys(process.env)) {
+      if (key.startsWith('HH_')) delete process.env[key]
+    }
   })
 
   afterEach(() => {
-    global.fetch = mockFetch
-    console.log = mockConsoleLog
+    global.fetch = mockFetch as typeof fetch
+    console.log = mockConsoleLog as typeof console.log
   })
 
   describe('resolveHhVacancySearchConfig', () => {
