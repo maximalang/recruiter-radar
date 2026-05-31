@@ -659,7 +659,7 @@ export async function sendPilotOrderTestDigest(
     skipStateWrite: true
   });
   const items = digestRun.items
-    .filter((item) => item.confidenceGate !== "C" && item.confidenceGate !== "D")
+    .filter((item) => item.confidence_gate !== "C" && item.confidence_gate !== "D")
     .map(mapDigestItemToTelegramDigestItem);
 
   if (items.length === 0) {
@@ -1675,19 +1675,19 @@ function readNumber(value: unknown): number | null {
 function mapDigestItemToTelegramDigestItem(item: DigestItem): HhDigestItem {
   return {
     rank: item.rank,
-    orgId: item.orgId,
-    hh_employer_id: item.sourceExternalId,
-    employer_name: item.sourceDisplayName,
-    vacancies_count: item.vacanciesCount,
-    distinct_vacancy_names_count: item.distinctVacancyNamesCount,
-    latest_published_at: item.latestPublishedAt,
-    total_score: item.totalScore,
+    org_id: item.org_id,
+    hh_employer_id: item.source_external_id,
+    employer_name: item.source_display_name,
+    vacancies_count: item.vacancies_count,
+    distinct_vacancy_names_count: item.distinct_vacancy_names_count,
+    latest_published_at: item.latest_published_at,
+    total_score: item.total_score,
     reasons: item.reasons,
     opener: item.opener,
-    sourceFamilies: item.sourceFamilies,
-    evidenceTitles: item.evidenceTitles,
-    candidateSourceKeys: item.candidateSourceKeys,
-    locationNames: item.locationNames
+    source_families: item.source_families,
+    evidence_titles: item.evidence_titles,
+    candidate_source_keys: item.candidate_source_keys,
+    location_names: item.location_names
   };
 }
 

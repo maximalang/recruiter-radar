@@ -1,0 +1,15 @@
+# Default: text auto-detect, normalize line endings on commit
+* text=auto
+
+# Shell scripts and husky hooks must keep LF on all platforms
+*.sh text eol=lf
+.husky/* text eol=lf
+
+# Binary fixtures and assets should not be touched
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary

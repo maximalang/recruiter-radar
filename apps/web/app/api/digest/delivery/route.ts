@@ -34,10 +34,11 @@ export async function POST(request: Request) {
       const runMeta = await pool.query<{ clientProfileId: string }>(`SELECT client_profile_id::TEXT AS "clientProfileId" FROM digest_runs WHERE id = $1 LIMIT 1`, [runId]);
       if (runMeta.rowCount !== 1) return NextResponse.json({ error: "digestRunId not found." }, { status: 404 });
       resolvedClientProfileId = runMeta.rows[0].clientProfileId;
-      await assertDigestEntitlementByClientProfileId(resolvedClientProfileId);
+      await assertDigestEntitlementByClientProfileId(resolvedClientProfileId || '');
     } else {
-      await assertDigestEntitlementByClientProfileId(resolvedClientProfileId as string);
-      const runResult = await runDigestForClientProfile({ clientProfileId: resolvedClientProfileId as string });
+      if (!resolvedClientProfileId) throw new Error("clientProfileId is required when digestRunId is not provided");
+      await assertDigestEntitlementByClientProfileId(resolvedClientProfileId || '');
+      const runResult = await runDigestForClientProfile({ clientProfileId: resolvedClientProfileId });
       runId = runResult.run.id;
       resolvedClientProfileId = runResult.clientProfile.id;
     }

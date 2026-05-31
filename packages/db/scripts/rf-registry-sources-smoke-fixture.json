@@ -1,0 +1,30 @@
+{
+  "records": [
+    {
+      "id": "registry-smoke-1",
+      "company_name": "OOO Transparent Smoke",
+      "inn": "7712345678",
+      "ogrn": "1027700132195",
+      "msp_category": "small",
+      "employee_count": "42",
+      "okved": "62.01",
+      "risk_flags": ["mass_address_review"],
+      "exclusion_flags": ["liquidation_absent"]
+    },
+    {
+      "id": "registry-smoke-1",
+      "company_name": "OOO Transparent Smoke",
+      "inn": "7712345678",
+      "ogrn": "1027700132195"
+    },
+    {
+      "id": "registry-skipped",
+      "company_name": "No Legal Id Smoke"
+    },
+    {
+      "id": "registry-ip-skipped",
+      "company_name": "IP Registry Smoke",
+      "inn": "770312345678"
+    }
+  ]
+}

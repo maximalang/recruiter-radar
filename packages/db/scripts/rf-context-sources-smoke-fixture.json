@@ -1,0 +1,30 @@
+{
+  "records": [
+    {
+      "id": "context-smoke-1",
+      "company_name": "Context RF Smoke",
+      "company_domain": "context-rf-smoke.example",
+      "headline": "New regional launch",
+      "event_type": "expansion",
+      "summary": "Company opens a new regional unit",
+      "source_url": "https://context-rf-smoke.example/news/regional-launch",
+      "published_at": "2026-05-01T00:00:00.000Z",
+      "publisher": "Company newsroom"
+    },
+    {
+      "id": "context-smoke-1",
+      "company_name": "Context RF Smoke",
+      "company_domain": "context-rf-smoke.example",
+      "headline": "New regional launch"
+    },
+    {
+      "id": "context-skipped",
+      "headline": "No company identity"
+    },
+    {
+      "id": "publisher-url-only",
+      "headline": "Publisher-only article",
+      "source_url": "https://media.example/news/publisher-only"
+    }
+  ]
+}

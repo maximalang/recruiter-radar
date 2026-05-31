@@ -4,77 +4,16 @@ import { fileURLToPath } from "node:url";
 import { Pool, type PoolClient } from "pg";
 
 import { getClientProfileById, type ClientProfile } from "./clientProfiles";
+import type {
+  DigestItem,
+  DigestRun,
+  DigestRunRow,
+  DigestEvidenceRow,
+  DigestCandidateInsertRow
+} from "./db-types";
 
 type DigestDbClient = Pick<Pool, "query"> | Pick<PoolClient, "query">;
 
-type DigestEvidenceRow = {
-  rank: number;
-  org_id: string | number;
-  source_external_id: string | null;
-  source_display_name: string | null;
-  source_families: string[] | null;
-  evidence_titles: string[] | null;
-  candidate_source_keys: string[] | null;
-  location_names: string[] | null;
-  vacancies_count: number;
-  distinct_vacancy_names_count: number;
-  latest_published_at: string | Date | null;
-  total_score: number;
-  is_recent: boolean;
-  primary_reason_label: string;
-  secondary_reason_label: string;
-  confidence_gate: string;
-};
-
-type DigestCandidateInsertRow = {
-  id: string;
-  orgId: string;
-  sourceExternalId: string | null;
-  sourceDisplayName: string;
-  sourceFamilies: string[];
-  vacanciesCount: number;
-  distinctVacancyNamesCount: number;
-  latestPublishedAt: string;
-  totalScore: number;
-  reasons: [string, string];
-  opener: string;
-};
-
-type DigestRunRow = {
-  id: string;
-  clientProfileId: string;
-  sourceKey: string;
-  status: string;
-  requestedLimit: number;
-  selectedCount: number;
-  cooldownDays: number;
-  createdAt: string;
-  completedAt: string | null;
-};
-
-export type DigestItem = {
-  rank: number;
-  orgId: string;
-  sourceExternalId: string;
-  sourceDisplayName: string;
-  sourceFamilies: string[];
-  evidenceTitles: string[];
-  candidateSourceKeys: string[];
-  locationNames: string[];
-  vacanciesCount: number;
-  distinctVacancyNamesCount: number;
-  latestPublishedAt: string;
-  totalScore: number;
-  reasons: [string, string];
-  opener: string;
-  confidenceGate: string;
-};
-
-export type DigestRunResult = {
-  run: DigestRunRow;
-  clientProfile: ClientProfile;
-  items: DigestItem[];
-};
 
 const digestEvidenceQuery = readFileSync(
   resolve(dirname(fileURLToPath(import.meta.url)), "../../../packages/db/scripts/source-digest-evidence.sql"),
@@ -113,6 +52,13 @@ export async function getDigestPreviewItems(limit = 10): Promise<DigestItem[]> {
 
   return result.rows.map(mapDigestEvidenceRow);
 }
+
+export type { DigestItem };
+export type DigestRunResult = {
+  run: DigestRun;
+  clientProfile: ClientProfile;
+  items: DigestItem[];
+};
 
 export async function getDigestItemsForClientProfile(input: {
   clientProfileId: string | number;
@@ -168,7 +114,7 @@ export async function getDigestItemsForClientProfile(input: {
         OR (
           COALESCE(state.suppressed_until, '-infinity'::timestamptz) <= NOW()
           AND COALESCE(state.cooldown_until, '-infinity'::timestamptz) <= NOW()
-          AND COALESCE(state.feedback_status, 'none') NOT IN ('contacted', 'replied', 'won', 'badfit', 'dismissed')
+          AND COALESCE(state.feedback_status, 'none') NOT IN ('contacted', 'replied', 'won')
         )
       )
       AND (
@@ -193,6 +139,7 @@ export async function runDigestForClientProfile(input: {
   cooldownDays?: number | null;
   limit?: number | null;
   skipStateWrite?: boolean;
+  userId?: string | number;
 }): Promise<DigestRunResult> {
   const pool = getPool();
 
@@ -213,6 +160,16 @@ export async function runDigestForClientProfile(input: {
 
     if (!clientProfile.isActive) {
       throw new Error("Client profile is inactive.");
+    }
+
+    if (input.userId !== undefined && input.userId !== null) {
+      const ownership = await client.query<{ ok: boolean }>(
+        `SELECT 1 AS ok FROM client_profiles WHERE id = $1 AND owner_id = $2 LIMIT 1`,
+        [input.clientProfileId, input.userId],
+      );
+      if (ownership.rowCount !== 1) {
+        throw new Error("Access denied: ownership check failed for this client profile.");
+      }
     }
 
     const sourceKey = normalizeSourceKey(input.sourceKey);
@@ -273,7 +230,7 @@ export async function runDigestForClientProfile(input: {
           OR (
             COALESCE(state.suppressed_until, '-infinity'::timestamptz) <= NOW()
             AND COALESCE(state.cooldown_until, '-infinity'::timestamptz) <= NOW()
-            AND COALESCE(state.feedback_status, 'none') NOT IN ('contacted', 'replied', 'won', 'badfit', 'dismissed')
+            AND COALESCE(state.feedback_status, 'none') NOT IN ('contacted', 'replied', 'won')
           )
         )
         AND (
@@ -287,7 +244,7 @@ export async function runDigestForClientProfile(input: {
 
     const items = evidenceResult.rows
       .map(mapDigestEvidenceRow)
-      .filter((item) => item.confidenceGate !== "C" && item.confidenceGate !== "D")
+      .filter((item) => item.confidence_gate !== "C" && item.confidence_gate !== "D")
       .filter((item) => matchesClientProfile(item, clientProfile))
       .sort((left, right) => compareDigestItemsForClient(left, right, clientProfile))
       .slice(0, requestedLimit);
@@ -327,33 +284,33 @@ export async function runDigestForClientProfile(input: {
         ON CONFLICT (digest_run_id, org_id) DO NOTHING
         RETURNING
           id::TEXT AS id,
-          org_id::TEXT AS "orgId",
-          source_external_id AS "sourceExternalId",
-          source_display_name AS "sourceDisplayName",
+          org_id::TEXT AS "org_id",
+          source_external_id AS "source_external_id",
+          source_display_name AS "source_display_name",
           source_families,
-          vacancies_count AS "vacanciesCount",
-          distinct_vacancy_names_count AS "distinctVacancyNamesCount",
-          latest_published_at::TEXT AS "latestPublishedAt",
-          total_score AS "totalScore",
+          vacancies_count AS "vacancies_count",
+          distinct_vacancy_names_count AS "distinct_vacancy_names_count",
+          latest_published_at::TEXT AS "latest_published_at",
+          total_score AS "total_score",
           reasons,
           opener
       `, [
         run.id,
         clientProfile.id,
-        item.orgId,
-        item.sourceExternalId || null,
-        item.sourceDisplayName,
-        JSON.stringify(item.sourceFamilies),
-        item.vacanciesCount,
-        item.distinctVacancyNamesCount,
-        item.latestPublishedAt,
-        item.totalScore,
+        item.org_id,
+        item.source_external_id || null,
+        item.source_display_name,
+        JSON.stringify(item.source_families),
+        item.vacancies_count,
+        item.distinct_vacancy_names_count,
+        item.latest_published_at,
+        item.total_score,
         JSON.stringify(item.reasons),
         item.opener,
         JSON.stringify({
           rank: item.rank,
-          sourceFamilies: item.sourceFamilies,
-          confidenceGate: item.confidenceGate,
+          source_families: item.source_families,
+          confidence_gate: item.confidence_gate,
         })
       ]);
 
@@ -401,12 +358,12 @@ export async function runDigestForClientProfile(input: {
             updated_at = NOW()
         `, [
           clientProfile.id,
-          item.orgId,
+          item.org_id,
           run.id,
           insertedCandidate.id,
           cooldownDays,
-          item.sourceExternalId || null,
-          item.sourceDisplayName
+          item.source_external_id || null,
+          item.source_display_name
         ]);
       }
     }
@@ -449,28 +406,28 @@ export async function runDigestForClientProfile(input: {
   }
 }
 
-function mapDigestEvidenceRow(row: DigestEvidenceRow): DigestItem {
+function mapDigestEvidenceRow(row: DigestEvidenceRow): any {
   const reasons: [string, string] = [
-    row.primary_reason_label,
-    row.secondary_reason_label
+    row.primary_reason_label || '',
+    row.secondary_reason_label || ''
   ];
 
   return {
     rank: row.rank,
-    orgId: String(row.org_id),
-    sourceExternalId: row.source_external_id ?? "",
-    sourceDisplayName: row.source_display_name ?? "",
-    sourceFamilies: Array.isArray(row.source_families) ? row.source_families : [],
-    evidenceTitles: normalizeTextArray(row.evidence_titles),
-    candidateSourceKeys: normalizeTextArray(row.candidate_source_keys),
-    locationNames: normalizeTextArray(row.location_names),
-    vacanciesCount: row.vacancies_count,
-    distinctVacancyNamesCount: row.distinct_vacancy_names_count,
-    latestPublishedAt: formatTimestamp(row.latest_published_at),
-    totalScore: row.total_score,
+    org_id: String(row.org_id),
+    source_external_id: row.source_external_id ?? "",
+    source_display_name: row.source_display_name ?? "",
+    source_families: Array.isArray(row.source_families) ? row.source_families : [],
+    evidence_titles: normalizeTextArray(row.evidence_titles),
+    candidate_source_keys: normalizeTextArray(row.candidate_source_keys),
+    location_names: normalizeTextArray(row.location_names),
+    vacancies_count: row.vacancies_count,
+    distinct_vacancy_names_count: row.distinct_vacancy_names_count,
+    latest_published_at: formatTimestamp(row.latest_published_at),
+    total_score: row.total_score,
     reasons,
     opener: buildOpener(row.source_display_name ?? "", reasons),
-    confidenceGate: row.confidence_gate ?? "",
+    confidence_gate: row.confidence_gate ?? "",
   };
 }
 
@@ -500,8 +457,8 @@ function compareDigestItemsForClient(left: DigestItem, right: DigestItem, client
     return rightScopeScore - leftScopeScore;
   }
 
-  if (left.totalScore !== right.totalScore) {
-    return right.totalScore - left.totalScore;
+  if (left.total_score !== right.total_score) {
+    return right.total_score - left.total_score;
   }
 
   return left.rank - right.rank;
@@ -510,13 +467,13 @@ function compareDigestItemsForClient(left: DigestItem, right: DigestItem, client
 function getClientScopeScore(item: DigestItem, clientProfile: ClientProfile): number {
   let score = 0;
 
-  score += getScopedFieldScore(clientProfile.targetCity, item.locationNames, {
+  score += getScopedFieldScore(clientProfile.targetCity, item.location_names, {
     exactMatch: 5,
     phraseMatch: 3,
     tokenMatch: 1,
   });
 
-  score += getScopedFieldScore(clientProfile.specialization, item.evidenceTitles, {
+  score += getScopedFieldScore(clientProfile.specialization, item.evidence_titles, {
     exactMatch: 5,
     phraseMatch: 3,
     tokenMatch: 1,
@@ -567,11 +524,11 @@ function getScopedFieldScore(
 
 function buildDigestHaystack(item: DigestItem): string {
   return [
-    item.sourceDisplayName,
+    item.source_display_name,
     ...item.reasons,
     item.opener,
-    ...item.evidenceTitles,
-    ...item.locationNames
+    ...item.evidence_titles,
+    ...item.location_names
   ]
     .join(" ")
     .toLocaleLowerCase("ru-RU");

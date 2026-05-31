@@ -5,6 +5,21 @@ import pg from 'pg';
 
 import { fetchGreenhouseBoards, parseGreenhouseJobs } from './adapters/greenhouse.mjs';
 import { fetchLeverCompanies, parseLeverPostings } from './adapters/lever.mjs';
+import {
+  assertProviderNormalization,
+  extractProviderRecords,
+} from './adapters/provider-contract.mjs';
+import { buildRfJobQuality } from './adapters/rf-source-normalizers.mjs';
+import {
+  buildRussianLegalNameSourceKey,
+  buildSourceKeyAliases,
+  countSensitiveFields,
+  dedupeNormalizedRecords,
+  dropSensitiveFields,
+  stripBom,
+} from './adapters/source-records.mjs';
+import { fetchJson } from './adapters/source-http.mjs';
+import { loadEnvFile, normalizeDomain, runScriptCli } from './lib/common-utils.mjs';
 
 const { Client } = pg;
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -30,13 +45,15 @@ export async function runTechJobBoardsCli(argv = process.argv.slice(2)) {
   try {
     let input = resolveTechJobBoardsInput();
 
-    if (input.inputMode === 'live-pending') {
+    if (input.inputMode === 'provider-pending') {
+      input = await resolveTechJobBoardsProviderInput(input);
+    } else if (input.inputMode === 'live-pending') {
       input = await resolveTechJobBoardsLiveInput(input);
     }
 
     if (requestedAction === 'fetch') {
       console.log(JSON.stringify(buildFetchSummary(input), null, 2));
-      process.exit(0);
+      return;
     }
 
     if (!databaseUrl) {
@@ -53,7 +70,7 @@ export async function runTechJobBoardsCli(argv = process.argv.slice(2)) {
 
     if (requestedAction === 'ingest') {
       console.log(JSON.stringify(buildIngestSummary(input, stats), null, 2));
-      process.exit(0);
+      return;
     }
 
     console.log(JSON.stringify(buildPipelineSummary(input, stats), null, 2));
@@ -71,6 +88,13 @@ export function resolveTechJobBoardsInput() {
     return resolveFileInput(inputFilePath);
   }
 
+  const providerUrl = process.env.TECH_JOB_BOARDS_PROVIDER_API_URL?.trim();
+  const providerToken = process.env.TECH_JOB_BOARDS_PROVIDER_API_TOKEN?.trim();
+
+  if (providerUrl && providerToken) {
+    return { inputMode: 'provider-pending', providerUrl, providerToken };
+  }
+
   const greenhouseTokens = parseCommaSeparated(process.env.TECH_JOB_BOARDS_GREENHOUSE_TOKENS);
   const leverSlugs = parseCommaSeparated(process.env.TECH_JOB_BOARDS_LEVER_SLUGS);
 
@@ -81,8 +105,45 @@ export function resolveTechJobBoardsInput() {
   throw new Error(
     'No input configured for tech-job-boards.\n'
       + 'Set TECH_JOB_BOARDS_INPUT_FILE for file mode, or\n'
+      + 'set TECH_JOB_BOARDS_PROVIDER_API_URL and TECH_JOB_BOARDS_PROVIDER_API_TOKEN for provider mode, or\n'
       + 'set TECH_JOB_BOARDS_GREENHOUSE_TOKENS and/or TECH_JOB_BOARDS_LEVER_SLUGS for live mode.',
   );
+}
+
+export async function resolveTechJobBoardsProviderInput({ providerUrl, providerToken }) {
+  let body;
+
+  try {
+    body = await fetchJson(providerUrl, {
+      sourceName: 'tech-job-boards provider',
+      headers: {
+        authorization: `Bearer ${providerToken}`,
+      },
+    });
+  } catch (error) {
+    throw new Error(
+      `${error instanceof Error ? error.message : String(error)}\n`
+        + 'Verify TECH_JOB_BOARDS_PROVIDER_API_URL and TECH_JOB_BOARDS_PROVIDER_API_TOKEN are correct.',
+      { cause: error },
+    );
+  }
+
+  const records = extractProviderRecords(body, SOURCE_ID);
+  const input = buildNormalizedInput({
+    inputMode: 'provider-token',
+    inputFilePath: null,
+    records,
+    rejectAllSkipped: true,
+  });
+
+  assertProviderNormalization({
+    sourceId: SOURCE_ID,
+    recordsReceived: records.length,
+    normalizedRecords: input.normalizedRecords,
+    skippedRecords: input.skippedRecords,
+  });
+
+  return input;
 }
 
 export async function resolveTechJobBoardsLiveInput({ greenhouseTokens, leverSlugs }) {
@@ -98,30 +159,11 @@ export async function resolveTechJobBoardsLiveInput({ greenhouseTokens, leverSlu
     records.push(...leverJobs);
   }
 
-  const fetchedAt = new Date().toISOString();
-  const deduped = dedupeRecords(records);
-  const normalizedRecords = [];
-  let skippedRecords = 0;
-
-  for (const [index, record] of deduped.entries()) {
-    const normalized = normalizeTechJobBoardRecord(record, fetchedAt, index + 1);
-
-    if (!normalized) {
-      skippedRecords += 1;
-      continue;
-    }
-
-    normalizedRecords.push(normalized);
-  }
-
-  return {
+  return buildNormalizedInput({
     inputMode: 'live-public',
     inputFilePath: null,
-    recordsReceived: records.length,
-    recordsAfterDedupe: deduped.length,
-    normalizedRecords,
-    skippedRecords,
-  };
+    records,
+  });
 }
 
 function resolveFileInput(inputFilePath) {
@@ -131,10 +173,20 @@ function resolveFileInput(inputFilePath) {
     throw new Error(`TECH_JOB_BOARDS_INPUT_FILE does not exist: ${resolvedPath}`);
   }
 
-  const rawContent = readFileSync(resolvedPath, 'utf8').replace(/^﻿/, '');
+  const rawContent = stripBom(readFileSync(resolvedPath, 'utf8'));
   const records = parseInputRecords(rawContent, resolvedPath);
+  return buildNormalizedInput({
+    inputMode: 'file',
+    inputFilePath: resolvedPath,
+    records,
+  });
+}
+
+function buildNormalizedInput({ inputMode, inputFilePath, records, rejectAllSkipped = false }) {
   const fetchedAt = new Date().toISOString();
-  const deduped = dedupeRecords(records);
+  const sensitiveFieldsDropped = records.reduce((total, record) => total + countSensitiveFields(record), 0);
+  const sanitizedRecords = records.map((record) => dropSensitiveFields(record));
+  const deduped = dedupeRecords(sanitizedRecords);
   const normalizedRecords = [];
   let skippedRecords = 0;
 
@@ -149,13 +201,24 @@ function resolveFileInput(inputFilePath) {
     normalizedRecords.push(normalized);
   }
 
+  const normalizedDedupeResult = dedupeNormalizedRecords(normalizedRecords);
+
+  if (rejectAllSkipped && records.length > 0 && normalizedDedupeResult.records.length === 0) {
+    throw new Error(
+      `${SOURCE_ID} provider returned ${records.length} records but 0 normalized records`
+        + ` (${skippedRecords} skipped). Check provider response mapping before running in production.`,
+    );
+  }
+
   return {
-    inputMode: 'file',
-    inputFilePath: resolvedPath,
+    inputMode,
+    inputFilePath,
     recordsReceived: records.length,
     recordsAfterDedupe: deduped.length,
-    normalizedRecords,
+    duplicateRecords: records.length - deduped.length + normalizedDedupeResult.duplicateRecords,
+    normalizedRecords: normalizedDedupeResult.records,
     skippedRecords,
+    sensitiveFieldsDropped,
   };
 }
 
@@ -253,8 +316,19 @@ function normalizeTechJobBoardRecord(record, fetchedAt, lineNumber) {
   const occurredAt = toTimestampOrNull(record.occurred_at ?? record.published_at ?? record.posted_at) ?? fetchedAt;
   const salary = toNonEmptyText(record.salary ?? record.compensation);
   const tags = Array.isArray(record.tags) ? record.tags.map((t) => String(t).trim()).filter(Boolean) : [];
+  const rfQuality = buildRfJobQuality({
+    companyName,
+    jobTitle,
+    location,
+    salary,
+    employmentType,
+    occurredAt,
+    fetchedAt,
+    board,
+    tags,
+  });
 
-  const inferredDomain = companyDomain ?? extractHostname(companyWebsiteUrl) ?? extractHostname(jobPostingUrl);
+  const inferredDomain = companyDomain ?? extractHostname(companyWebsiteUrl);
 
   if (!companyName && !inferredDomain) {
     return null;
@@ -268,9 +342,14 @@ function normalizeTechJobBoardRecord(record, fetchedAt, lineNumber) {
   const primarySourceKey = buildPrimarySourceKey({ inferredDomain, companyName });
   const domainSourceKey = inferredDomain ? `domain:${inferredDomain}` : null;
   const companyNameSourceKey = companyName ? `company-name:${normalizeSourceKeyText(companyName)}` : null;
-  const orgSourceKeys = [primarySourceKey, domainSourceKey, companyNameSourceKey].filter(
+  const russianLegalNameSourceKey = primarySourceKey !== companyNameSourceKey
+    ? buildRussianLegalNameSourceKey(companyName)
+    : null;
+  const strongCompanyNameSourceKey = primarySourceKey === companyNameSourceKey ? companyNameSourceKey : null;
+  const orgSourceKeys = [primarySourceKey, domainSourceKey, strongCompanyNameSourceKey].filter(
     (value, idx, values) => Boolean(value) && values.indexOf(value) === idx,
   );
+  const orgSourceAliasKeys = buildSourceKeyAliases(orgSourceKeys, [companyNameSourceKey, russianLegalNameSourceKey]);
 
   if (orgSourceKeys.length === 0) {
     return null;
@@ -293,12 +372,19 @@ function normalizeTechJobBoardRecord(record, fetchedAt, lineNumber) {
     board,
     salary,
     tags,
+    regionCanonical: rfQuality.regionCanonical,
+    salaryRub: rfQuality.salaryRub,
+    workModeFlags: rfQuality.workModeFlags,
+    freshness: rfQuality.freshness,
+    qualityPenalties: rfQuality.qualityPenalties,
     orgName,
     orgDisplayName: companyName ?? inferredDomain,
     primarySourceKey,
     domainSourceKey,
     companyNameSourceKey,
+    russianLegalNameSourceKey,
     orgSourceKeys,
+    orgSourceAliasKeys,
     signalExternalId,
   };
 }
@@ -516,8 +602,10 @@ export function buildFetchSummary(input) {
     inputFilePath: input.inputFilePath,
     recordsReceived: input.recordsReceived,
     recordsAfterDedupe: input.recordsAfterDedupe,
+    duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
+    sensitiveFieldsDropped: input.sensitiveFieldsDropped ?? 0,
   };
 }
 
@@ -529,8 +617,10 @@ function buildIngestSummary(input, stats) {
     inputFilePath: input.inputFilePath,
     recordsReceived: input.recordsReceived,
     recordsAfterDedupe: input.recordsAfterDedupe,
+    duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
+    sensitiveFieldsDropped: input.sensitiveFieldsDropped ?? 0,
     orgsCreated: stats.orgUpsertCount,
     signalUpsertsCompleted: stats.signalUpsertCount,
   };
@@ -544,8 +634,10 @@ function buildPipelineSummary(input, stats) {
     inputFilePath: input.inputFilePath,
     recordsReceived: input.recordsReceived,
     recordsAfterDedupe: input.recordsAfterDedupe,
+    duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
+    sensitiveFieldsDropped: input.sensitiveFieldsDropped ?? 0,
     orgsCreated: stats.orgUpsertCount,
     signalUpsertsCompleted: stats.signalUpsertCount,
   };
@@ -577,8 +669,8 @@ function buildSignalPayload(record) {
     evidence_role: 'primary_platform',
     source_entity_type: 'company',
     source_entity_key: record.primarySourceKey,
-    source_entity_alias_keys: record.orgSourceKeys.filter((v) => v !== record.primarySourceKey),
-    source_entity_external_id: record.externalId,
+    source_entity_alias_keys: buildSourceKeyAliases(record.orgSourceKeys, record.orgSourceAliasKeys, record.primarySourceKey),
+    source_entity_external_id: null,
     source_entity_display_name: record.orgDisplayName,
     source_entity_name: record.orgName,
     source_record_type: 'job_posting',
@@ -591,11 +683,21 @@ function buildSignalPayload(record) {
     company_domain: record.companyDomain,
     company_website_url: record.companyWebsiteUrl,
     job_posting_url: record.jobPostingUrl,
+    vacancy_id: record.externalId,
     job_title: record.jobTitle,
     location: record.location,
+    region_canonical: record.regionCanonical,
     employment_type: record.employmentType,
     board: record.board,
     salary: record.salary,
+    salary_rub_min: record.salaryRub.min,
+    salary_rub_max: record.salaryRub.max,
+    salary_currency: record.salaryRub.currency,
+    is_remote: record.workModeFlags.remote,
+    is_hybrid: record.workModeFlags.hybrid,
+    is_rotational: record.workModeFlags.rotational,
+    vacancy_freshness: record.freshness,
+    quality_penalties: record.qualityPenalties,
     tags: record.tags,
     fetched_at: record.fetchedAt,
   };
@@ -605,7 +707,7 @@ function buildOrgSourceMetadata(record, sourceKey) {
   return {
     source: SOURCE_ID,
     source_key: sourceKey,
-    source_alias_keys: record.orgSourceKeys.filter((v) => v !== sourceKey),
+    source_alias_keys: buildSourceKeyAliases(record.orgSourceKeys, record.orgSourceAliasKeys, sourceKey),
     display_name: record.orgDisplayName,
     company_name: record.companyName,
     company_domain: record.companyDomain,
@@ -633,49 +735,8 @@ function resolveDbConnectionTimeoutMillis() {
   return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : 5000;
 }
 
-function loadEnvFile(filePath) {
-  if (!existsSync(filePath)) {
-    return;
-  }
-
-  const envFile = readFileSync(filePath, 'utf8').replace(/^﻿/, '');
-
-  for (const rawLine of envFile.split(/\r?\n/)) {
-    const trimmedLine = rawLine.trim();
-
-    if (!trimmedLine || trimmedLine.startsWith('#')) {
-      continue;
-    }
-
-    const separatorIndex = rawLine.indexOf('=');
-
-    if (separatorIndex === -1) {
-      continue;
-    }
-
-    const key = rawLine.slice(0, separatorIndex).trim();
-
-    if (!key || process.env[key] !== undefined) {
-      continue;
-    }
-
-    let value = rawLine.slice(separatorIndex + 1).trim();
-
-    if (
-      (value.startsWith('"') && value.endsWith('"'))
-      || (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
-    }
-
-    process.env[key] = value;
-  }
-}
-
-export function normalizeDomain(value) {
-  const normalizedValue = normalizeSourceKeyText(value);
-  return normalizedValue ? normalizedValue.replace(/^www\./, '') : null;
-}
+// loadEnvFile moved to ./lib/common-utils.mjs
+// normalizeDomain moved to ./lib/common-utils.mjs
 
 export function normalizeSourceKeyText(value) {
   if (typeof value !== 'string') {
@@ -739,5 +800,5 @@ export function extractHostname(value) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  await runTechJobBoardsCli();
+  await runScriptCli('source-tech-job-boards', runTechJobBoardsCli);
 }

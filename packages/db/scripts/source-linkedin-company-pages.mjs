@@ -7,7 +7,17 @@ import {
   assertProviderNormalization,
   extractProviderRecords,
 } from './adapters/provider-contract.mjs';
+import { buildRfJobQuality } from './adapters/rf-source-normalizers.mjs';
+import {
+  buildRussianLegalNameSourceKey,
+  buildSourceKeyAliases,
+  countSensitiveFields,
+  dedupeNormalizedRecords,
+  dropSensitiveFields,
+  stripBom,
+} from './adapters/source-records.mjs';
 import { fetchJson } from './adapters/source-http.mjs';
+import { loadEnvFile, normalizeDomain, runScriptCli } from './lib/common-utils.mjs';
 
 const { Client } = pg;
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -39,7 +49,7 @@ export async function runLinkedinCompanyPagesCli(argv = process.argv.slice(2)) {
 
     if (requestedAction === 'fetch') {
       console.log(JSON.stringify(buildFetchSummary(input), null, 2));
-      process.exit(0);
+      return;
     }
 
     if (!databaseUrl) {
@@ -56,7 +66,7 @@ export async function runLinkedinCompanyPagesCli(argv = process.argv.slice(2)) {
 
     if (requestedAction === 'ingest') {
       console.log(JSON.stringify(buildIngestSummary(input, stats), null, 2));
-      process.exit(0);
+      return;
     }
 
     console.log(JSON.stringify(buildPipelineSummary(input, stats), null, 2));
@@ -109,10 +119,12 @@ export async function resolveLinkedinProviderInput({ providerUrl, providerToken 
 
   const records = extractProviderRecords(body, SOURCE_ID);
   const fetchedAt = new Date().toISOString();
+  const sensitiveFieldsDropped = records.reduce((total, record) => total + countSensitiveFields(record), 0);
+  const sanitizedRecords = records.map((record) => dropSensitiveFields(record));
   const normalizedRecords = [];
   let skippedRecords = 0;
 
-  for (const [index, record] of records.entries()) {
+  for (const [index, record] of sanitizedRecords.entries()) {
     const normalized = normalizeLinkedinRecord(record, fetchedAt, index + 1);
 
     if (!normalized) {
@@ -123,10 +135,12 @@ export async function resolveLinkedinProviderInput({ providerUrl, providerToken 
     normalizedRecords.push(normalized);
   }
 
+  const dedupeResult = dedupeNormalizedRecords(normalizedRecords);
+
   assertProviderNormalization({
     sourceId: SOURCE_ID,
     recordsReceived: records.length,
-    normalizedRecords,
+    normalizedRecords: dedupeResult.records,
     skippedRecords,
   });
 
@@ -134,8 +148,11 @@ export async function resolveLinkedinProviderInput({ providerUrl, providerToken 
     inputMode: 'provider-token',
     inputFilePath: null,
     recordsReceived: records.length,
-    normalizedRecords,
+    recordsAfterDedupe: dedupeResult.records.length,
+    duplicateRecords: dedupeResult.duplicateRecords,
+    normalizedRecords: dedupeResult.records,
     skippedRecords,
+    sensitiveFieldsDropped,
   };
 }
 
@@ -146,13 +163,15 @@ function resolveLinkedinFileInput(inputFilePath) {
     throw new Error(`LINKEDIN_COMPANY_PAGES_INPUT_FILE does not exist: ${resolvedPath}`);
   }
 
-  const rawContent = readFileSync(resolvedPath, 'utf8').replace(/^﻿/, '');
+  const rawContent = stripBom(readFileSync(resolvedPath, 'utf8'));
   const records = parseInputRecords(rawContent, resolvedPath);
   const fetchedAt = new Date().toISOString();
+  const sensitiveFieldsDropped = records.reduce((total, record) => total + countSensitiveFields(record), 0);
+  const sanitizedRecords = records.map((record) => dropSensitiveFields(record));
   const normalizedRecords = [];
   let skippedRecords = 0;
 
-  for (const [index, record] of records.entries()) {
+  for (const [index, record] of sanitizedRecords.entries()) {
     const normalized = normalizeLinkedinRecord(record, fetchedAt, index + 1);
 
     if (!normalized) {
@@ -163,12 +182,17 @@ function resolveLinkedinFileInput(inputFilePath) {
     normalizedRecords.push(normalized);
   }
 
+  const dedupeResult = dedupeNormalizedRecords(normalizedRecords);
+
   return {
     inputMode: 'file',
     inputFilePath: resolvedPath,
     recordsReceived: records.length,
-    normalizedRecords,
+    recordsAfterDedupe: dedupeResult.records.length,
+    duplicateRecords: dedupeResult.duplicateRecords,
+    normalizedRecords: dedupeResult.records,
     skippedRecords,
+    sensitiveFieldsDropped,
   };
 }
 
@@ -207,9 +231,20 @@ function normalizeLinkedinRecord(record, fetchedAt, lineNumber) {
   const jobPostingUrl = toUrlOrNull(record.job_posting_url ?? record.job_url);
   const location = toNonEmptyText(record.location ?? record.city);
   const employmentType = toNonEmptyText(record.employment_type);
+  const salary = toNonEmptyText(record.salary ?? record.compensation);
   const linkedinCompanyId = toNonEmptyText(record.linkedin_company_id ?? record.company_id);
   const externalId = toNonEmptyText(record.external_id ?? record.id ?? record.job_id);
   const occurredAt = toTimestampOrNull(record.occurred_at ?? record.published_at ?? record.posted_at) ?? fetchedAt;
+  const rfQuality = buildRfJobQuality({
+    companyName,
+    jobTitle,
+    location,
+    salary,
+    employmentType,
+    occurredAt,
+    fetchedAt,
+    board: 'linkedin',
+  });
 
   const inferredDomain = companyDomain ?? extractHostname(companyWebsiteUrl);
 
@@ -226,9 +261,14 @@ function normalizeLinkedinRecord(record, fetchedAt, lineNumber) {
   const domainSourceKey = inferredDomain ? `domain:${inferredDomain}` : null;
   const companyNameSourceKey = companyName ? `company-name:${normalizeSourceKeyText(companyName)}` : null;
   const linkedinSourceKey = linkedinCompanyId ? `linkedin:${linkedinCompanyId}` : null;
-  const orgSourceKeys = [primarySourceKey, domainSourceKey, companyNameSourceKey, linkedinSourceKey].filter(
+  const russianLegalNameSourceKey = primarySourceKey !== companyNameSourceKey
+    ? buildRussianLegalNameSourceKey(companyName)
+    : null;
+  const strongCompanyNameSourceKey = primarySourceKey === companyNameSourceKey ? companyNameSourceKey : null;
+  const orgSourceKeys = [primarySourceKey, domainSourceKey, linkedinSourceKey, strongCompanyNameSourceKey].filter(
     (value, idx, values) => Boolean(value) && values.indexOf(value) === idx,
   );
+  const orgSourceAliasKeys = buildSourceKeyAliases(orgSourceKeys, [companyNameSourceKey, russianLegalNameSourceKey]);
 
   if (orgSourceKeys.length === 0) {
     return null;
@@ -250,13 +290,21 @@ function normalizeLinkedinRecord(record, fetchedAt, lineNumber) {
     jobPostingUrl,
     location,
     employmentType,
+    salary,
+    regionCanonical: rfQuality.regionCanonical,
+    salaryRub: rfQuality.salaryRub,
+    workModeFlags: rfQuality.workModeFlags,
+    freshness: rfQuality.freshness,
+    qualityPenalties: rfQuality.qualityPenalties,
     orgName,
     orgDisplayName: companyName ?? inferredDomain,
     primarySourceKey,
     domainSourceKey,
     companyNameSourceKey,
     linkedinSourceKey,
+    russianLegalNameSourceKey,
     orgSourceKeys,
+    orgSourceAliasKeys,
     signalExternalId,
   };
 }
@@ -477,8 +525,11 @@ export function buildFetchSummary(input) {
     inputMode: input.inputMode,
     inputFilePath: input.inputFilePath,
     recordsReceived: input.recordsReceived,
+    recordsAfterDedupe: input.recordsAfterDedupe ?? input.normalizedRecords.length,
+    duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
+    sensitiveFieldsDropped: input.sensitiveFieldsDropped ?? 0,
   };
 }
 
@@ -489,8 +540,11 @@ function buildIngestSummary(input, stats) {
     inputMode: input.inputMode,
     inputFilePath: input.inputFilePath,
     recordsReceived: input.recordsReceived,
+    recordsAfterDedupe: input.recordsAfterDedupe ?? input.normalizedRecords.length,
+    duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
+    sensitiveFieldsDropped: input.sensitiveFieldsDropped ?? 0,
     orgsCreated: stats.orgUpsertCount,
     signalUpsertsCompleted: stats.signalUpsertCount,
   };
@@ -503,8 +557,11 @@ function buildPipelineSummary(input, stats) {
     inputMode: input.inputMode,
     inputFilePath: input.inputFilePath,
     recordsReceived: input.recordsReceived,
+    recordsAfterDedupe: input.recordsAfterDedupe ?? input.normalizedRecords.length,
+    duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
+    sensitiveFieldsDropped: input.sensitiveFieldsDropped ?? 0,
     orgsCreated: stats.orgUpsertCount,
     signalUpsertsCompleted: stats.signalUpsertCount,
   };
@@ -536,7 +593,7 @@ function buildSignalPayload(record) {
     evidence_role: 'secondary_platform',
     source_entity_type: 'company',
     source_entity_key: record.primarySourceKey,
-    source_entity_alias_keys: record.orgSourceKeys.filter((v) => v !== record.primarySourceKey),
+    source_entity_alias_keys: buildSourceKeyAliases(record.orgSourceKeys, record.orgSourceAliasKeys, record.primarySourceKey),
     source_entity_external_id: record.linkedinCompanyId ?? record.externalId,
     source_entity_display_name: record.orgDisplayName,
     source_entity_name: record.orgName,
@@ -554,7 +611,17 @@ function buildSignalPayload(record) {
     job_posting_url: record.jobPostingUrl,
     job_title: record.jobTitle,
     location: record.location,
+    region_canonical: record.regionCanonical,
     employment_type: record.employmentType,
+    salary: record.salary,
+    salary_rub_min: record.salaryRub.min,
+    salary_rub_max: record.salaryRub.max,
+    salary_currency: record.salaryRub.currency,
+    is_remote: record.workModeFlags.remote,
+    is_hybrid: record.workModeFlags.hybrid,
+    is_rotational: record.workModeFlags.rotational,
+    vacancy_freshness: record.freshness,
+    quality_penalties: record.qualityPenalties,
     fetched_at: record.fetchedAt,
   };
 }
@@ -563,7 +630,7 @@ function buildOrgSourceMetadata(record, sourceKey) {
   return {
     source: SOURCE_ID,
     source_key: sourceKey,
-    source_alias_keys: record.orgSourceKeys.filter((v) => v !== sourceKey),
+    source_alias_keys: buildSourceKeyAliases(record.orgSourceKeys, record.orgSourceAliasKeys, sourceKey),
     external_id: sourceKey === record.primarySourceKey ? record.linkedinCompanyId ?? null : null,
     display_name: record.orgDisplayName,
     company_name: record.companyName,
@@ -593,49 +660,8 @@ function resolveDbConnectionTimeoutMillis() {
   return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : 5000;
 }
 
-function loadEnvFile(filePath) {
-  if (!existsSync(filePath)) {
-    return;
-  }
-
-  const envFile = readFileSync(filePath, 'utf8').replace(/^﻿/, '');
-
-  for (const rawLine of envFile.split(/\r?\n/)) {
-    const trimmedLine = rawLine.trim();
-
-    if (!trimmedLine || trimmedLine.startsWith('#')) {
-      continue;
-    }
-
-    const separatorIndex = rawLine.indexOf('=');
-
-    if (separatorIndex === -1) {
-      continue;
-    }
-
-    const key = rawLine.slice(0, separatorIndex).trim();
-
-    if (!key || process.env[key] !== undefined) {
-      continue;
-    }
-
-    let value = rawLine.slice(separatorIndex + 1).trim();
-
-    if (
-      (value.startsWith('"') && value.endsWith('"'))
-      || (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
-    }
-
-    process.env[key] = value;
-  }
-}
-
-export function normalizeDomain(value) {
-  const normalizedValue = normalizeSourceKeyText(value);
-  return normalizedValue ? normalizedValue.replace(/^www\./, '') : null;
-}
+// loadEnvFile moved to ./lib/common-utils.mjs
+// normalizeDomain moved to ./lib/common-utils.mjs
 
 export function normalizeSourceKeyText(value) {
   if (typeof value !== 'string') {
@@ -699,5 +725,5 @@ export function extractHostname(value) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  await runLinkedinCompanyPagesCli();
+  await runScriptCli('source-linkedin-company-pages', runLinkedinCompanyPagesCli);
 }

@@ -1,0 +1,93 @@
+{
+  "name": "operational-alerts",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowName": "recruiter-radar-failure-alerts"
+      },
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1.1,
+      "position": [-976, 96],
+      "id": "manual-trigger",
+      "name": "Manual Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "const now = new Date();\nconst message = `⚠️ Recruiter Radar Operational Alert at ${now.toISOString()}`;"
+      },
+      "type": "n8n-nodes-code.evaluateJavascript",
+      "typeVersion": 1.1,
+      "position": [-752, 96],
+      "id": "prepare-message",
+      "name": "Prepare Message"
+    },
+    {
+      "parameters": {
+        "mode": "telegram",
+        "options": {
+          "telegram": {
+            "channelId": "{{$env.TELEGRAM_OPERATOR_CHANNEL_ID}}",
+            "message": "={{ $json.message }}"
+          }
+        }
+      },
+      "type": "n8n-nodes-base.notification",
+      "typeVersion": 1.1,
+      "position": [-528, 96],
+      "id": "telegram-alert",
+      "name": "Send Telegram Alert"
+    },
+    {
+      "parameters": {
+        "mode": "slack",
+        "options": {
+          "slack": {
+            "channel": "{{$env.SLACK_OPERATOR_CHANNEL}}",
+            "message": "={{ $json.message }}"
+          }
+        }
+      },
+      "type": "n8n-nodes-base.notification",
+      "typeVersion": 1.1,
+      "position": [-528, 240],
+      "id": "slack-alert",
+      "name": "Send Slack Alert"
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Prepare Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Message": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram Alert",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "type": "main",
+            "index": 0,
+            "node": "Send Slack Alert"
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1",
+  "id": "operational-alerts",
+  "tags": ["recruiter-radar", "alerts", "operational"]
+}

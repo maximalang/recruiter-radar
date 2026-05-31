@@ -37,23 +37,23 @@ const CODE_TO_ACTION: Record<string, "shown" | "accepted" | "badfit" | "snooze">
 };
 
 export type SignedDigestFeedbackCallback = {
-  clientProfileId: string;
-  orgId: string;
+  client_profile_id: string;
+  org_id: string;
   action: "shown" | "accepted" | "badfit" | "snooze";
   sig: string;
 };
 
 export type UnsignedDigestFeedbackCallback = {
-  clientProfileId: string;
-  orgId: string;
+  client_profile_id: string;
+  org_id: string;
   action: "shown" | "accepted" | "badfit" | "snooze";
 };
 
 export function buildTelegramDigestAuditItems(items: readonly HhDigestItem[]) {
   return items.map((item) => ({
-    orgId: item.orgId,
+    org_id: item.org_id,
     rank: item.rank,
-    employerName: item.employer_name
+    employer_name: item.employer_name
   }));
 }
 
@@ -81,9 +81,9 @@ export function buildTelegramDigestFeedbackReplyMarkup(input: {
 }
 
 function buildItemFeedbackRows(clientProfileId: string, item: HhDigestItem) {
-  const orgId = normalizePositiveIntegerString(item.orgId);
+  const org_id = normalizePositiveIntegerString(item.org_id);
 
-  if (!orgId) {
+  if (!org_id) {
     return [];
   }
 
@@ -93,7 +93,7 @@ function buildItemFeedbackRows(clientProfileId: string, item: HhDigestItem) {
         text: `${item.rank}. ${truncateLabel(item.employer_name)}`,
         callback_data: buildFeedbackCallbackData({
           clientProfileId,
-          orgId,
+          org_id,
           action: "shown"
         })
       }
@@ -102,7 +102,7 @@ function buildItemFeedbackRows(clientProfileId: string, item: HhDigestItem) {
       text: action.label,
       callback_data: buildFeedbackCallbackData({
         clientProfileId,
-        orgId,
+        org_id,
         action: action.key
       })
     }))
@@ -111,17 +111,17 @@ function buildItemFeedbackRows(clientProfileId: string, item: HhDigestItem) {
 
 function buildFeedbackCallbackData(input: {
   clientProfileId: string;
-  orgId: string;
+  org_id: string;
   action: "shown" | "accepted" | "badfit" | "snooze";
 }): string {
   const unsigned: UnsignedDigestFeedbackCallback = {
-    clientProfileId: input.clientProfileId,
-    orgId: input.orgId,
+    client_profile_id: input.clientProfileId,
+    org_id: input.org_id,
     action: input.action,
   };
   const sig = signDigestFeedbackCallback(unsigned);
   const code = ACTION_TO_CODE[input.action];
-  const data = `d:${input.clientProfileId}:${input.orgId}:${code}:${sig}`;
+  const data = `d:${input.clientProfileId}:${input.org_id}:${code}:${sig}`;
   if (Buffer.byteLength(data, "utf8") > TELEGRAM_CALLBACK_DATA_LIMIT) {
     throw new Error("digest feedback callback_data exceeds Telegram limit");
   }
@@ -134,7 +134,7 @@ function signDigestFeedbackCallback(unsigned: UnsignedDigestFeedbackCallback): s
     throw new Error("DIGEST_CALLBACK_SECRET is not configured.");
   }
   const code = ACTION_TO_CODE[unsigned.action];
-  const payload = `${unsigned.clientProfileId}:${unsigned.orgId}:${code}`;
+  const payload = `${unsigned.client_profile_id}:${unsigned.org_id}:${code}`;
   const hmac = createHmac("sha256", secret);
   hmac.update(payload);
   return hmac.digest("base64url").slice(0, DIGEST_FEEDBACK_SIG_LENGTH);
@@ -155,8 +155,8 @@ export function verifyDigestFeedbackCallback(data: string | null): SignedDigestF
   if (!secret) return null;
 
   const unsigned: UnsignedDigestFeedbackCallback = {
-    clientProfileId,
-    orgId,
+    client_profile_id: clientProfileId,
+    org_id: orgId,
     action,
   };
 

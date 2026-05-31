@@ -50,7 +50,7 @@ export async function recordClientProfileDigestShownOutcomes(input: {
   const orgIds = Array.from(
     new Set(
       input.items
-        .map((item) => normalizePositiveIntegerOrNull(item.orgId))
+        .map((item) => normalizePositiveIntegerOrNull(item.org_id))
         .filter((value): value is number => value !== null)
     )
   );

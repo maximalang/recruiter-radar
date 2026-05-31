@@ -3,7 +3,19 @@ import { dirname, extname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import pg from 'pg';
 
+import {
+  buildRfJobQuality,
+} from './adapters/rf-source-normalizers.mjs';
+import {
+  buildRussianLegalNameSourceKey,
+  buildSourceKeyAliases,
+  countSensitiveFields,
+  dedupeNormalizedRecords,
+  dropSensitiveFields,
+  stripBom,
+} from './adapters/source-records.mjs';
 import { fetchJson as fetchJsonWithPolicy, fetchText } from './adapters/source-http.mjs';
+import { loadEnvFile, normalizeDomain, runScriptCli } from './lib/common-utils.mjs';
 
 const { Client } = pg;
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -17,6 +29,8 @@ const SOURCE_ID = 'career-pages';
 const SUPPORTED_ACTIONS = new Set(['fetch', 'ingest', 'pipeline']);
 
 loadEnvFile(rootEnvPath);
+
+export { loadEnvFile };
 
 export async function runCareerPagesCli(argv = process.argv.slice(2)) {
   const requestedAction = argv[0]?.trim() || 'pipeline';
@@ -35,7 +49,7 @@ export async function runCareerPagesCli(argv = process.argv.slice(2)) {
 
     if (requestedAction === 'fetch') {
       console.log(JSON.stringify(buildFetchSummary(input), null, 2));
-      process.exit(0);
+      return;
     }
 
     if (!databaseUrl) {
@@ -52,7 +66,7 @@ export async function runCareerPagesCli(argv = process.argv.slice(2)) {
 
     if (requestedAction === 'ingest') {
       console.log(JSON.stringify(buildIngestSummary(input, stats), null, 2));
-      process.exit(0);
+      return;
     }
 
     console.log(
@@ -67,8 +81,11 @@ export async function runCareerPagesCli(argv = process.argv.slice(2)) {
           discoverySummary: input.discoverySummary,
           targetsProcessed: input.targetsProcessed,
           recordsReceived: input.recordsReceived,
+          recordsAfterDedupe: input.recordsAfterDedupe ?? input.normalizedRecords.length,
+          duplicateRecords: input.duplicateRecords,
           normalizedRecords: input.normalizedRecords.length,
           skippedRecords: input.skippedRecords,
+          sensitiveFieldsDropped: input.sensitiveFieldsDropped ?? 0,
           orgsCreated: stats.orgUpsertCount,
           signalUpsertsCompleted: stats.signalUpsertCount,
         },
@@ -102,7 +119,7 @@ function loadCareerPagesInputFromFile(inputFilePath, inputMode = 'file') {
     throw new Error(`CAREER_PAGES_INPUT_FILE does not exist: ${resolvedPath}`);
   }
 
-  const rawContent = readFileSync(resolvedPath, 'utf8').replace(/^\uFEFF/, '');
+  const rawContent = stripBom(readFileSync(resolvedPath, 'utf8'));
   const records = parseInputRecords(rawContent, resolvedPath);
 
   return buildNormalizedInput({
@@ -199,7 +216,7 @@ function resolveCareerPagesTargetsFilePath(configuredPath = process.env.CAREER_P
 }
 
 function loadCareerPagesTargetsConfig(targetsFilePath) {
-  const parsed = parseJson(readFileSync(targetsFilePath, 'utf8').replace(/^\uFEFF/, ''), targetsFilePath);
+  const parsed = parseJson(stripBom(readFileSync(targetsFilePath, 'utf8')), targetsFilePath);
   const targets = Array.isArray(parsed) ? parsed : parsed?.targets;
 
   if (!Array.isArray(targets)) {
@@ -237,6 +254,34 @@ async function discoverCareerPagesTargets({ connectionString, persistSnapshot })
   };
 }
 
+export function buildCareerPagesDiscoverySeedsQuery() {
+  return `
+        SELECT
+          orgs.id,
+          orgs.name,
+          orgs.domain,
+          orgs.website_url,
+          MAX(CASE WHEN refs.source = 'hh' THEN refs.display_name END) AS hh_display_name,
+          MAX(CASE WHEN refs.source = 'hh' THEN refs.external_id END) AS hh_employer_id,
+          COUNT(DISTINCT signals.id) FILTER (WHERE signals.source = 'hh') AS hh_signal_count,
+          MAX(signals.occurred_at) FILTER (WHERE signals.source = 'hh') AS last_hh_signal_at,
+          COUNT(DISTINCT signals.id) AS signal_count,
+          MAX(signals.occurred_at) AS last_signal_at
+        FROM orgs
+        LEFT JOIN org_source_refs AS refs
+          ON refs.org_id = orgs.id
+         AND refs.source <> 'career-pages'
+        LEFT JOIN signals
+          ON signals.org_id = orgs.id
+         AND signals.source <> 'career-pages'
+        WHERE COALESCE(NULLIF(BTRIM(orgs.domain), ''), NULLIF(BTRIM(orgs.website_url), '')) IS NOT NULL
+        GROUP BY orgs.id, orgs.name, orgs.domain, orgs.website_url
+        HAVING COUNT(DISTINCT signals.id) > 0
+        ORDER BY MAX(signals.occurred_at) DESC NULLS LAST, orgs.id DESC
+        LIMIT $1
+      `;
+}
+
 async function loadCareerPagesDiscoverySeeds(connectionString) {
   const client = new Client({
     connectionString,
@@ -247,28 +292,7 @@ async function loadCareerPagesDiscoverySeeds(connectionString) {
 
   try {
     const result = await client.query(
-      `
-        SELECT
-          orgs.id,
-          orgs.name,
-          orgs.domain,
-          orgs.website_url,
-          MAX(CASE WHEN refs.source = 'hh' THEN refs.display_name END) AS hh_display_name,
-          MAX(CASE WHEN refs.source = 'hh' THEN refs.external_id END) AS hh_employer_id,
-          COUNT(DISTINCT signals.id) FILTER (WHERE signals.source = 'hh') AS hh_signal_count,
-          MAX(signals.occurred_at) FILTER (WHERE signals.source = 'hh') AS last_hh_signal_at
-        FROM orgs
-        LEFT JOIN org_source_refs AS refs
-          ON refs.org_id = orgs.id
-        LEFT JOIN signals
-          ON signals.org_id = orgs.id
-         AND signals.source = 'hh'
-        WHERE COALESCE(NULLIF(BTRIM(orgs.domain), ''), NULLIF(BTRIM(orgs.website_url), '')) IS NOT NULL
-        GROUP BY orgs.id, orgs.name, orgs.domain, orgs.website_url
-        HAVING COUNT(DISTINCT signals.id) FILTER (WHERE signals.source = 'hh') > 0
-        ORDER BY MAX(signals.occurred_at) FILTER (WHERE signals.source = 'hh') DESC NULLS LAST, orgs.id DESC
-        LIMIT $1
-      `,
+      buildCareerPagesDiscoverySeedsQuery(),
       [resolveCareerPagesDiscoveryLimit()],
     );
 
@@ -285,6 +309,11 @@ async function loadCareerPagesDiscoverySeeds(connectionString) {
           typeof row.last_hh_signal_at === 'string'
             ? row.last_hh_signal_at
             : row.last_hh_signal_at?.toISOString?.() ?? null,
+        signalCount: Number(row.signal_count ?? 0),
+        lastSignalAt:
+          typeof row.last_signal_at === 'string'
+            ? row.last_signal_at
+            : row.last_signal_at?.toISOString?.() ?? null,
       }))
       .filter((seed) => seed.domain || seed.websiteUrl);
   } finally {
@@ -326,6 +355,8 @@ async function discoverCareerPageTargetsFromSeeds(seeds) {
       hh_employer_id: seed.hhEmployerId,
       hh_signal_count: seed.hhSignalCount,
       last_hh_signal_at: seed.lastHhSignalAt,
+      signal_count: seed.signalCount,
+      last_signal_at: seed.lastSignalAt,
       detected_targets: probe.targets.length,
       review_status: probe.targets.length > 0 ? 'resolved' : 'needs_review',
       attempted_urls: probe.attemptedUrls,
@@ -777,10 +808,12 @@ async function fetchJson(url, targetId) {
 
 function buildNormalizedInput({ records, inputMode, inputFilePath, targetsFilePath, fetchOutputPath, targetResults, discoverySummary }) {
   const fetchedAt = new Date().toISOString();
+  const sensitiveFieldsDropped = records.reduce((total, record) => total + countSensitiveFields(record), 0);
+  const sanitizedRecords = records.map((record) => dropSensitiveFields(record));
   const normalizedRecords = [];
   let skippedRecords = 0;
 
-  for (const [index, record] of records.entries()) {
+  for (const [index, record] of sanitizedRecords.entries()) {
     const normalizedRecord = normalizeCareerPageRecord(record, fetchedAt, index + 1);
 
     if (!normalizedRecord) {
@@ -791,6 +824,8 @@ function buildNormalizedInput({ records, inputMode, inputFilePath, targetsFilePa
     normalizedRecords.push(normalizedRecord);
   }
 
+  const dedupeResult = dedupeNormalizedRecords(normalizedRecords);
+
   return {
     inputMode,
     inputFilePath,
@@ -800,8 +835,11 @@ function buildNormalizedInput({ records, inputMode, inputFilePath, targetsFilePa
     targetResults,
     discoverySummary: discoverySummary ?? null,
     recordsReceived: records.length,
-    normalizedRecords,
+    recordsAfterDedupe: dedupeResult.records.length,
+    duplicateRecords: dedupeResult.duplicateRecords,
+    normalizedRecords: dedupeResult.records,
     skippedRecords,
+    sensitiveFieldsDropped,
   };
 }
 
@@ -1050,7 +1088,18 @@ function normalizeCareerPageRecord(record, fetchedAt, lineNumber) {
   const location = toNonEmptyText(record.location ?? record.city ?? record.area_name);
   const pageTitle = toNonEmptyText(record.page_title);
   const employmentType = toNonEmptyText(record.employment_type);
+  const salary = toNonEmptyText(record.salary ?? record.compensation);
   const orgExternalId = toNonEmptyText(record.org_external_id ?? record.company_id ?? record.employer_id);
+  const rfQuality = buildRfJobQuality({
+    companyName,
+    jobTitle,
+    location,
+    salary,
+    employmentType,
+    occurredAt,
+    fetchedAt,
+    board: SOURCE_ID,
+  });
 
   if (!companyName && !companyDomain && !careerPageUrl) {
     return null;
@@ -1068,9 +1117,14 @@ function normalizeCareerPageRecord(record, fetchedAt, lineNumber) {
   const primarySourceKey = buildPrimarySourceKey({ orgExternalId, inferredDomain, companyName, careerPageUrl });
   const domainSourceKey = inferredDomain ? `domain:${inferredDomain}` : null;
   const companyNameSourceKey = companyName ? `company-name:${normalizeSourceKeyText(companyName)}` : null;
-  const orgSourceKeys = [primarySourceKey, domainSourceKey, companyNameSourceKey].filter(
+  const russianLegalNameSourceKey = primarySourceKey !== companyNameSourceKey
+    ? buildRussianLegalNameSourceKey(companyName)
+    : null;
+  const strongCompanyNameSourceKey = primarySourceKey === companyNameSourceKey ? companyNameSourceKey : null;
+  const orgSourceKeys = [primarySourceKey, domainSourceKey, strongCompanyNameSourceKey].filter(
     (value, idx, values) => Boolean(value) && values.indexOf(value) === idx,
   );
+  const orgSourceAliasKeys = buildSourceKeyAliases(orgSourceKeys, [companyNameSourceKey, russianLegalNameSourceKey]);
 
   if (orgSourceKeys.length === 0) {
     return null;
@@ -1100,12 +1154,20 @@ function normalizeCareerPageRecord(record, fetchedAt, lineNumber) {
     location,
     pageTitle,
     employmentType,
+    salary,
+    regionCanonical: rfQuality.regionCanonical,
+    salaryRub: rfQuality.salaryRub,
+    workModeFlags: rfQuality.workModeFlags,
+    freshness: rfQuality.freshness,
+    qualityPenalties: rfQuality.qualityPenalties,
     orgName,
     orgDisplayName: companyName ?? inferredDomain,
     primarySourceKey,
     domainSourceKey,
     companyNameSourceKey,
+    russianLegalNameSourceKey,
     orgSourceKeys,
+    orgSourceAliasKeys,
     signalExternalId,
   };
 }
@@ -1122,8 +1184,11 @@ export function buildFetchSummary(input) {
     targetsProcessed: input.targetsProcessed,
     targetResults: input.targetResults,
     recordsReceived: input.recordsReceived,
+    recordsAfterDedupe: input.recordsAfterDedupe ?? input.normalizedRecords.length,
+    duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
+    sensitiveFieldsDropped: input.sensitiveFieldsDropped ?? 0,
   };
 }
 
@@ -1138,8 +1203,11 @@ function buildIngestSummary(input, stats) {
     discoverySummary: input.discoverySummary,
     targetsProcessed: input.targetsProcessed,
     recordsReceived: input.recordsReceived,
+    recordsAfterDedupe: input.recordsAfterDedupe ?? input.normalizedRecords.length,
+    duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
+    sensitiveFieldsDropped: input.sensitiveFieldsDropped ?? 0,
     orgsCreated: stats.orgUpsertCount,
     signalUpsertsCompleted: stats.signalUpsertCount,
   };
@@ -1185,7 +1253,7 @@ function buildOrgSourceMetadata(record, sourceKey) {
   return {
     source: SOURCE_ID,
     source_key: sourceKey,
-    source_alias_keys: record.orgSourceKeys.filter((value) => value !== sourceKey),
+    source_alias_keys: buildSourceKeyAliases(record.orgSourceKeys, record.orgSourceAliasKeys, sourceKey),
     external_id: sourceKey === record.primarySourceKey ? record.orgExternalId : null,
     display_name: record.orgDisplayName,
     company_name: record.companyName,
@@ -1200,7 +1268,7 @@ function buildSignalPayload(record) {
     source: SOURCE_ID,
     source_entity_type: 'company',
     source_entity_key: record.primarySourceKey,
-    source_entity_alias_keys: record.orgSourceKeys.filter((value) => value !== record.primarySourceKey),
+    source_entity_alias_keys: buildSourceKeyAliases(record.orgSourceKeys, record.orgSourceAliasKeys, record.primarySourceKey),
     source_entity_external_id: record.orgExternalId,
     source_entity_display_name: record.orgDisplayName,
     source_entity_name: record.orgName,
@@ -1217,8 +1285,18 @@ function buildSignalPayload(record) {
     job_posting_url: record.jobPostingUrl,
     job_title: record.jobTitle,
     location: record.location,
+    region_canonical: record.regionCanonical,
     page_title: record.pageTitle,
     employment_type: record.employmentType,
+    salary: record.salary,
+    salary_rub_min: record.salaryRub.min,
+    salary_rub_max: record.salaryRub.max,
+    salary_currency: record.salaryRub.currency,
+    is_remote: record.workModeFlags.remote,
+    is_hybrid: record.workModeFlags.hybrid,
+    is_rotational: record.workModeFlags.rotational,
+    vacancy_freshness: record.freshness,
+    quality_penalties: record.qualityPenalties,
     fetched_at: record.fetchedAt,
     raw: record.rawRecord,
   };
@@ -1276,54 +1354,14 @@ function resolveDbConnectionTimeoutMillis() {
   return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : 5000;
 }
 
-export function loadEnvFile(filePath) {
-  if (!existsSync(filePath)) {
-    return;
-  }
-
-  const envFile = readFileSync(filePath, 'utf8').replace(/^\uFEFF/, '');
-
-  for (const rawLine of envFile.split(/\r?\n/)) {
-    const trimmedLine = rawLine.trim();
-
-    if (!trimmedLine || trimmedLine.startsWith('#')) {
-      continue;
-    }
-
-    const separatorIndex = rawLine.indexOf('=');
-
-    if (separatorIndex === -1) {
-      continue;
-    }
-
-    const key = rawLine.slice(0, separatorIndex).trim();
-
-    if (!key || process.env[key] !== undefined) {
-      continue;
-    }
-
-    let value = rawLine.slice(separatorIndex + 1).trim();
-
-    if (
-      (value.startsWith('"') && value.endsWith('"'))
-      || (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
-    }
-
-    process.env[key] = value;
-  }
-}
+// loadEnvFile moved to ./lib/common-utils.mjs
 
 export function resolveCareerPagesFetchOutputPath() {
   const configuredPath = process.env.CAREER_PAGES_FETCH_OUTPUT_FILE?.trim();
   return resolve(process.cwd(), configuredPath || defaultFetchOutputPath);
 }
 
-export function normalizeDomain(value) {
-  const normalizedValue = normalizeSourceKeyText(value);
-  return normalizedValue ? normalizedValue.replace(/^www\./, '') : null;
-}
+// normalizeDomain moved to ./lib/common-utils.mjs
 
 export function normalizeSourceKeyText(value) {
   if (typeof value !== 'string') {
@@ -1392,5 +1430,5 @@ export function stringifyExternalId(value, targetId, index) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  await runCareerPagesCli();
+  await runScriptCli('source-career-pages', runCareerPagesCli);
 }

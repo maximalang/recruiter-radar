@@ -86,7 +86,7 @@ WITH source_signal_rows AS (
     NULLIF(signal.payload ->> 'hh_employer_id', '') AS payload_hh_employer_id
   FROM signals AS signal
   WHERE signal.signal_type = 'job_posting'
-    AND signal.source IN ('hh', 'career-pages')
+    AND signal.source IN ('hh', 'career-pages', 'rabota-rossii', 'superjob', 'habr-career', 'tech-job-boards', 'linkedin-company-pages')
 ),
 normalized_signal_rows AS (
   SELECT
@@ -112,11 +112,15 @@ normalized_signal_rows AS (
     --                        source_entity_external_id / org_external_id are org-level identifiers.
     --                        employer_id / hh_employer_id are NOT org-level: they are platform (HH)
     --                        aggregator IDs and do NOT grant direct_hiring_proof status on their own.
-    -- platform_aggregation  — signal from a platform (HH) with a company match in org_source_refs,
-    --                        but no company-owned surface. HH/employer_id alone → platform_aggregation.
+    --                        For rabota-rossii, INN-based org_external_id IS org-level → direct proof.
+    -- platform_aggregation  — signal from a platform (HH, superjob, etc.) with a company match in
+    --                        org_source_refs, but no company-owned surface.
     -- enrichment_context    — no match found; signal provides background context only.
     CASE
       WHEN signal.source = 'career-pages'
+        THEN 'direct_hiring_proof'
+      WHEN signal.source = 'rabota-rossii'
+        AND signal.payload_external_id IS NOT NULL
         THEN 'direct_hiring_proof'
       WHEN signal.payload_external_id IS NOT NULL
         AND signal.payload_external_id NOT IN (

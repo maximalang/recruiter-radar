@@ -7,6 +7,13 @@ import {
   assertProviderNormalization,
   extractProviderRecords,
 } from './adapters/provider-contract.mjs';
+import {
+  buildRussianLegalNameSourceKey,
+  buildSourceKeyAliases,
+  dedupeNormalizedRecords,
+  stripBom,
+} from './adapters/source-records.mjs';
+import { loadEnvFile, normalizeDomain } from './lib/common-utils.mjs';
 import { fetchJson } from './adapters/source-http.mjs';
 
 const { Client } = pg;
@@ -15,8 +22,38 @@ const rootEnvPath = resolve(scriptDir, '../../../.env');
 const SOURCE_ID = 'egrul-fns';
 const SIGNAL_TYPE = 'other';
 const SUPPORTED_ACTIONS = new Set(['fetch', 'ingest', 'pipeline']);
+const DEFAULT_PUBLIC_BASE_URL = 'https://egrul.org/';
+const PUBLIC_PROVIDER = 'egrul-public-json';
+const EGRUL_ATTRS = '@attributes';
+const EGRUL_KEYS = Object.freeze({
+  legalEntity: '\u0421\u0432\u042e\u041b',
+  ceasedLegalEntity: '\u0421\u0432\u041f\u0440\u0435\u043a\u0440\u042e\u041b',
+  issueDate: '\u0414\u0430\u0442\u0430\u0412\u044b\u043f',
+  ogrn: '\u041e\u0413\u0420\u041d',
+  ogrnDate: '\u0414\u0430\u0442\u0430\u041e\u0413\u0420\u041d',
+  inn: '\u0418\u041d\u041d',
+  kpp: '\u041a\u041f\u041f',
+  name: '\u0421\u0432\u041d\u0430\u0438\u043c\u042e\u041b',
+  fullName: '\u041d\u0430\u0438\u043c\u042e\u041b\u041f\u043e\u043b\u043d',
+  shortNameBlock: '\u0421\u0432\u041d\u0430\u0438\u043c\u042e\u041b\u0421\u043e\u043a\u0440',
+  shortName: '\u041d\u0430\u0438\u043c\u0421\u043e\u043a\u0440',
+  address: '\u0421\u0432\u0410\u0434\u0440\u0435\u0441\u042e\u041b',
+  addressRf: '\u0410\u0434\u0440\u0435\u0441\u0420\u0424',
+  postalCode: '\u0418\u043d\u0434\u0435\u043a\u0441',
+  region: '\u0420\u0435\u0433\u0438\u043e\u043d',
+  regionName: '\u041d\u0430\u0438\u043c\u0420\u0435\u0433\u0438\u043e\u043d',
+  street: '\u0423\u043b\u0438\u0446\u0430',
+  streetType: '\u0422\u0438\u043f\u0423\u043b\u0438\u0446\u0430',
+  streetName: '\u041d\u0430\u0438\u043c\u0423\u043b\u0438\u0446\u0430',
+  house: '\u0414\u043e\u043c',
+  okvedReport: '\u0421\u0432\u041e\u041a\u0412\u042d\u0414\u041e\u0442\u0447',
+  okvedReportMain: '\u0421\u0432\u041e\u041a\u0412\u042d\u0414\u041e\u0442\u0447\u041e\u0441\u043d',
+  okved: '\u0421\u0432\u041e\u041a\u0412\u042d\u0414',
+  okvedMain: '\u0421\u0432\u041e\u041a\u0412\u042d\u0414\u041e\u0441\u043d',
+  okvedCode: '\u041a\u043e\u0434\u041e\u041a\u0412\u042d\u0414',
+  okvedName: '\u041d\u0430\u0438\u043c\u041e\u041a\u0412\u042d\u0414',
+});
 
-loadEnvFile(rootEnvPath);
 
 export async function runEgrulFnsCli(argv = process.argv.slice(2)) {
   const requestedAction = argv[0]?.trim() || 'pipeline';
@@ -35,11 +72,13 @@ export async function runEgrulFnsCli(argv = process.argv.slice(2)) {
 
     if (input.inputMode === 'provider-pending') {
       input = await resolveEgrulProviderInput(input);
+    } else if (input.inputMode === 'public-pending') {
+      input = await resolveEgrulPublicInput(input);
     }
 
     if (requestedAction === 'fetch') {
       console.log(JSON.stringify(buildFetchSummary(input), null, 2));
-      process.exit(0);
+      return;
     }
 
     if (!databaseUrl) {
@@ -56,7 +95,7 @@ export async function runEgrulFnsCli(argv = process.argv.slice(2)) {
 
     if (requestedAction === 'ingest') {
       console.log(JSON.stringify(buildIngestSummary(input, stats), null, 2));
-      process.exit(0);
+      return;
     }
 
     console.log(JSON.stringify(buildPipelineSummary(input, stats), null, 2));
@@ -81,11 +120,22 @@ export function resolveEgrulFnsInput() {
     return { inputMode: 'provider-pending', providerUrl, providerToken };
   }
 
+  const inns = parsePublicInns();
+
+  if (inns.length > 0) {
+    return {
+      inputMode: 'public-pending',
+      inns,
+      publicBaseUrl: process.env.EGRUL_FNS_PUBLIC_BASE_URL?.trim() || DEFAULT_PUBLIC_BASE_URL,
+    };
+  }
+
   throw new Error(
     'No input configured for egrul-fns.\n'
       + 'Set EGRUL_FNS_INPUT_FILE for file mode, or\n'
-      + 'set EGRUL_FNS_PROVIDER_API_URL and EGRUL_FNS_PROVIDER_API_TOKEN for provider mode.\n'
-      + 'Direct FNS scraping is not supported — a compliant official/paid provider is required.',
+      + 'set EGRUL_FNS_INNS for public JSON mirror mode, or\n'
+      + 'set EGRUL_FNS_PROVIDER_API_URL and EGRUL_FNS_PROVIDER_API_TOKEN for provider mode. '
+      + 'Direct FNS scraping is not supported.',
   );
 }
 
@@ -123,10 +173,12 @@ export async function resolveEgrulProviderInput({ providerUrl, providerToken }) 
     normalizedRecords.push(normalized);
   }
 
+  const dedupeResult = dedupeNormalizedRecords(normalizedRecords);
+
   assertProviderNormalization({
     sourceId: SOURCE_ID,
     recordsReceived: records.length,
-    normalizedRecords,
+    normalizedRecords: dedupeResult.records,
     skippedRecords,
   });
 
@@ -134,9 +186,129 @@ export async function resolveEgrulProviderInput({ providerUrl, providerToken }) 
     inputMode: 'provider-token',
     inputFilePath: null,
     recordsReceived: records.length,
-    normalizedRecords,
+    duplicateRecords: dedupeResult.duplicateRecords,
+    normalizedRecords: dedupeResult.records,
     skippedRecords,
   };
+}
+
+export async function resolveEgrulPublicInput({ inns, publicBaseUrl = DEFAULT_PUBLIC_BASE_URL }) {
+  const records = [];
+
+  for (const inn of inns) {
+    const body = await fetchPublicEgrulRecord({ inn, publicBaseUrl });
+    records.push(mapPublicEgrulRecord(body, inn));
+  }
+
+  const fetchedAt = new Date().toISOString();
+  const normalizedRecords = [];
+  let skippedRecords = 0;
+
+  for (const [index, record] of records.entries()) {
+    const normalized = normalizeEgrulRecord(record, fetchedAt, index + 1);
+
+    if (!normalized) {
+      skippedRecords += 1;
+      continue;
+    }
+
+    normalizedRecords.push(normalized);
+  }
+
+  const dedupeResult = dedupeNormalizedRecords(normalizedRecords);
+
+  if (records.length > 0 && dedupeResult.records.length === 0) {
+    throw new Error(
+      `${SOURCE_ID} public EGRUL returned ${records.length} records but 0 normalized records`
+        + ` (${skippedRecords} skipped). Check public EGRUL mapping and INN list.`,
+    );
+  }
+
+  return {
+    inputMode: 'live-public',
+    inputFilePath: null,
+    liveProvider: PUBLIC_PROVIDER,
+    innsRequested: inns.length,
+    recordsReceived: records.length,
+    duplicateRecords: dedupeResult.duplicateRecords,
+    normalizedRecords: dedupeResult.records,
+    skippedRecords,
+  };
+}
+
+async function fetchPublicEgrulRecord({ inn, publicBaseUrl }) {
+  const url = new URL(`${inn}.json`, ensureTrailingSlash(publicBaseUrl));
+
+  return fetchJson(url, {
+    sourceName: 'egrul-fns public json',
+    timeoutMs: 30000,
+    retries: 2,
+    retryDelayMs: 1000,
+    headers: {
+      'user-agent': 'RecruiterRadar/1.0 (egrul-fns)',
+    },
+  });
+}
+
+function mapPublicEgrulRecord(body, requestedInn) {
+  const legalEntity = body?.[EGRUL_KEYS.legalEntity] ?? body?.[EGRUL_KEYS.ceasedLegalEntity];
+
+  if (!legalEntity || typeof legalEntity !== 'object') {
+    return null;
+  }
+
+  const attrs = attrsOf(legalEntity);
+  const nameBlock = legalEntity[EGRUL_KEYS.name] ?? {};
+  const nameAttrs = attrsOf(nameBlock);
+  const shortNameAttrs = attrsOf(nameBlock[EGRUL_KEYS.shortNameBlock]);
+  const okvedAttrs = attrsOf(
+    legalEntity[EGRUL_KEYS.okvedReport]?.[EGRUL_KEYS.okvedReportMain]
+      ?? legalEntity[EGRUL_KEYS.okved]?.[EGRUL_KEYS.okvedMain],
+  );
+  const inn = toNonEmptyText(attrs[EGRUL_KEYS.inn]) ?? requestedInn;
+  const ogrn = toNonEmptyText(attrs[EGRUL_KEYS.ogrn]);
+
+  return {
+    external_id: ogrn ? `egrul:ogrn:${ogrn}` : `egrul:inn:${inn}`,
+    company_name: toNonEmptyText(shortNameAttrs[EGRUL_KEYS.shortName])
+      ?? toNonEmptyText(nameAttrs[EGRUL_KEYS.fullName]),
+    inn,
+    ogrn,
+    kpp: toNonEmptyText(attrs[EGRUL_KEYS.kpp]),
+    registration_date: toNonEmptyText(attrs[EGRUL_KEYS.ogrnDate]),
+    status: body?.[EGRUL_KEYS.ceasedLegalEntity] ? 'inactive' : 'active',
+    legal_address: buildPublicEgrulAddress(legalEntity),
+    okved: toNonEmptyText(okvedAttrs[EGRUL_KEYS.okvedCode]),
+    okved_description: toNonEmptyText(okvedAttrs[EGRUL_KEYS.okvedName]),
+    detected_at: toTimestampOrNull(attrs[EGRUL_KEYS.issueDate]) ?? new Date().toISOString(),
+  };
+}
+
+function buildPublicEgrulAddress(legalEntity) {
+  const addressRf = legalEntity[EGRUL_KEYS.address]?.[EGRUL_KEYS.addressRf];
+  const addressAttrs = attrsOf(addressRf);
+  const regionAttrs = attrsOf(addressRf?.[EGRUL_KEYS.region]);
+  const streetAttrs = attrsOf(addressRf?.[EGRUL_KEYS.street]);
+  const street = [streetAttrs[EGRUL_KEYS.streetType], streetAttrs[EGRUL_KEYS.streetName]]
+    .map(toNonEmptyText)
+    .filter(Boolean)
+    .join(' ');
+  const parts = [
+    addressAttrs[EGRUL_KEYS.postalCode],
+    regionAttrs[EGRUL_KEYS.regionName],
+    street,
+    addressAttrs[EGRUL_KEYS.house],
+  ]
+    .map(toNonEmptyText)
+    .filter(Boolean);
+
+  return parts.length > 0 ? parts.join(', ') : null;
+}
+
+function attrsOf(value) {
+  return value?.[EGRUL_ATTRS] && typeof value[EGRUL_ATTRS] === 'object'
+    ? value[EGRUL_ATTRS]
+    : {};
 }
 
 function resolveEgrulFileInput(inputFilePath) {
@@ -146,7 +318,7 @@ function resolveEgrulFileInput(inputFilePath) {
     throw new Error(`EGRUL_FNS_INPUT_FILE does not exist: ${resolvedPath}`);
   }
 
-  const rawContent = readFileSync(resolvedPath, 'utf8').replace(/^﻿/, '');
+  const rawContent = stripBom(readFileSync(resolvedPath, 'utf8'));
   const records = parseInputRecords(rawContent, resolvedPath);
   const fetchedAt = new Date().toISOString();
   const normalizedRecords = [];
@@ -163,13 +335,35 @@ function resolveEgrulFileInput(inputFilePath) {
     normalizedRecords.push(normalized);
   }
 
+  const dedupeResult = dedupeNormalizedRecords(normalizedRecords);
+
   return {
     inputMode: 'file',
     inputFilePath: resolvedPath,
     recordsReceived: records.length,
-    normalizedRecords,
+    duplicateRecords: dedupeResult.duplicateRecords,
+    normalizedRecords: dedupeResult.records,
     skippedRecords,
   };
+}
+
+function parsePublicInns() {
+  const rawInns = process.env.EGRUL_FNS_INNS?.trim();
+
+  if (!rawInns) {
+    return [];
+  }
+
+  return rawInns
+    .split(/\r?\n|,|;/)
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .map((value) => value.replace(/\D/g, ''))
+    .filter((value, index, values) => value.length === 10 && values.indexOf(value) === index);
+}
+
+function ensureTrailingSlash(value) {
+  return value.endsWith('/') ? value : `${value}/`;
 }
 
 function parseInputRecords(rawContent, inputFilePath) {
@@ -200,8 +394,8 @@ function normalizeEgrulRecord(record, fetchedAt, lineNumber) {
   }
 
   const companyName = toNonEmptyText(record.company_name ?? record.org_name ?? record.full_name ?? record.short_name);
-  const inn = toNonEmptyText(record.inn);
-  const ogrn = toNonEmptyText(record.ogrn);
+  const inn = normalizeLegalInn(record.inn);
+  const ogrn = normalizeLegalOgrn(record.ogrn);
   const kpp = toNonEmptyText(record.kpp);
   const companyDomain = normalizeDomain(record.company_domain ?? record.domain);
   const companyWebsiteUrl = toUrlOrNull(record.company_website_url ?? record.website_url);
@@ -210,24 +404,26 @@ function normalizeEgrulRecord(record, fetchedAt, lineNumber) {
   const legalAddress = toNonEmptyText(record.legal_address ?? record.address);
   const okved = toNonEmptyText(record.okved ?? record.main_okved);
   const okvedDescription = toNonEmptyText(record.okved_description ?? record.activity_description);
-  const headName = toNonEmptyText(record.head_name ?? record.director);
   const externalId = toNonEmptyText(record.external_id ?? record.id);
   const detectedAt = toTimestampOrNull(record.detected_at ?? record.occurred_at ?? record.fetched_at) ?? fetchedAt;
 
-  if (!companyName && !inn && !ogrn) {
+  if (!inn && !ogrn) {
     return null;
   }
 
   const inferredDomain = companyDomain ?? extractHostname(companyWebsiteUrl);
-  const orgName = companyName ?? `ИНН ${inn ?? ogrn ?? lineNumber}`;
+  const fallbackName = buildLegalEntityFallbackName({ inn, ogrn, lineNumber });
+  const orgName = companyName ?? fallbackName;
   const primarySourceKey = buildPrimarySourceKey({ inn, ogrn, inferredDomain, companyName });
   const innSourceKey = inn ? `inn:${inn}` : null;
   const ogrnSourceKey = ogrn ? `ogrn:${ogrn}` : null;
   const domainSourceKey = inferredDomain ? `domain:${inferredDomain}` : null;
   const companyNameSourceKey = companyName ? `company-name:${normalizeSourceKeyText(companyName)}` : null;
-  const orgSourceKeys = [primarySourceKey, innSourceKey, ogrnSourceKey, domainSourceKey, companyNameSourceKey].filter(
+  const russianLegalNameSourceKey = buildRussianLegalNameSourceKey(companyName);
+  const orgSourceKeys = [primarySourceKey, innSourceKey, ogrnSourceKey, domainSourceKey].filter(
     (value, idx, values) => Boolean(value) && values.indexOf(value) === idx,
   );
+  const orgSourceAliasKeys = buildSourceKeyAliases(orgSourceKeys, [companyNameSourceKey, russianLegalNameSourceKey]);
 
   if (orgSourceKeys.length === 0) {
     return null;
@@ -251,15 +447,16 @@ function normalizeEgrulRecord(record, fetchedAt, lineNumber) {
     legalAddress,
     okved,
     okvedDescription,
-    headName,
     orgName,
-    orgDisplayName: companyName ?? `ИНН ${inn}`,
+    orgDisplayName: companyName ?? fallbackName,
     primarySourceKey,
     innSourceKey,
     ogrnSourceKey,
     domainSourceKey,
     companyNameSourceKey,
+    russianLegalNameSourceKey,
     orgSourceKeys,
+    orgSourceAliasKeys,
     signalExternalId,
   };
 }
@@ -298,6 +495,33 @@ function buildSignalExternalId({ externalId, inn, ogrn, primarySourceKey, lineNu
   }
 
   return `derived:${primarySourceKey}:${lineNumber}`;
+}
+
+function normalizeLegalInn(value) {
+  const digits = toDigits(value);
+  return digits?.length === 10 ? digits : null;
+}
+
+function normalizeLegalOgrn(value) {
+  const digits = toDigits(value);
+  return digits?.length === 13 ? digits : null;
+}
+
+function toDigits(value) {
+  const text = toNonEmptyText(value);
+  return text ? text.replace(/\D/g, '') : null;
+}
+
+function buildLegalEntityFallbackName({ inn, ogrn, lineNumber }) {
+  if (inn) {
+    return `INN ${inn}`;
+  }
+
+  if (ogrn) {
+    return `OGRN ${ogrn}`;
+  }
+
+  return `Registry entity ${lineNumber}`;
 }
 
 async function ingestEgrulFns({ connectionString, input }) {
@@ -487,7 +711,9 @@ export function buildFetchSummary(input) {
     action: 'fetch',
     inputMode: input.inputMode,
     inputFilePath: input.inputFilePath,
+    ...buildLiveEgrulSummary(input),
     recordsReceived: input.recordsReceived,
+    duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
   };
@@ -499,7 +725,9 @@ function buildIngestSummary(input, stats) {
     action: 'ingest',
     inputMode: input.inputMode,
     inputFilePath: input.inputFilePath,
+    ...buildLiveEgrulSummary(input),
     recordsReceived: input.recordsReceived,
+    duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
     orgsCreated: stats.orgUpsertCount,
@@ -513,11 +741,24 @@ function buildPipelineSummary(input, stats) {
     action: 'pipeline',
     inputMode: input.inputMode,
     inputFilePath: input.inputFilePath,
+    ...buildLiveEgrulSummary(input),
     recordsReceived: input.recordsReceived,
+    duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
     orgsCreated: stats.orgUpsertCount,
     signalUpsertsCompleted: stats.signalUpsertCount,
+  };
+}
+
+function buildLiveEgrulSummary(input) {
+  if (input.inputMode !== 'live-public') {
+    return {};
+  }
+
+  return {
+    liveProvider: input.liveProvider,
+    innsRequested: input.innsRequested,
   };
 }
 
@@ -565,7 +806,7 @@ function buildSignalPayload(record) {
     evidence_role: 'enrichment',
     source_entity_type: 'legal_entity',
     source_entity_key: record.primarySourceKey,
-    source_entity_alias_keys: record.orgSourceKeys.filter((v) => v !== record.primarySourceKey),
+    source_entity_alias_keys: buildSourceKeyAliases(record.orgSourceKeys, record.orgSourceAliasKeys, record.primarySourceKey),
     source_entity_external_id: record.inn ?? record.ogrn ?? record.externalId,
     source_entity_display_name: record.orgDisplayName,
     source_entity_name: record.orgName,
@@ -584,7 +825,6 @@ function buildSignalPayload(record) {
     legal_address: record.legalAddress,
     okved: record.okved,
     okved_description: record.okvedDescription,
-    head_name: record.headName,
     fetched_at: record.fetchedAt,
   };
 }
@@ -593,7 +833,7 @@ function buildOrgSourceMetadata(record, sourceKey) {
   return {
     source: SOURCE_ID,
     source_key: sourceKey,
-    source_alias_keys: record.orgSourceKeys.filter((v) => v !== sourceKey),
+    source_alias_keys: buildSourceKeyAliases(record.orgSourceKeys, record.orgSourceAliasKeys, sourceKey),
     external_id: sourceKey === record.primarySourceKey ? (record.inn ?? record.ogrn ?? record.externalId) : null,
     display_name: record.orgDisplayName,
     company_name: record.companyName,
@@ -621,50 +861,6 @@ function resolveDbConnectionTimeoutMillis() {
 
   const parsedValue = Number.parseInt(rawValue, 10);
   return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : 5000;
-}
-
-function loadEnvFile(filePath) {
-  if (!existsSync(filePath)) {
-    return;
-  }
-
-  const envFile = readFileSync(filePath, 'utf8').replace(/^﻿/, '');
-
-  for (const rawLine of envFile.split(/\r?\n/)) {
-    const trimmedLine = rawLine.trim();
-
-    if (!trimmedLine || trimmedLine.startsWith('#')) {
-      continue;
-    }
-
-    const separatorIndex = rawLine.indexOf('=');
-
-    if (separatorIndex === -1) {
-      continue;
-    }
-
-    const key = rawLine.slice(0, separatorIndex).trim();
-
-    if (!key || process.env[key] !== undefined) {
-      continue;
-    }
-
-    let value = rawLine.slice(separatorIndex + 1).trim();
-
-    if (
-      (value.startsWith('"') && value.endsWith('"'))
-      || (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
-    }
-
-    process.env[key] = value;
-  }
-}
-
-export function normalizeDomain(value) {
-  const normalizedValue = normalizeSourceKeyText(value);
-  return normalizedValue ? normalizedValue.replace(/^www\./, '') : null;
 }
 
 export function normalizeSourceKeyText(value) {

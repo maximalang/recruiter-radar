@@ -1,0 +1,9 @@
+- [Recruiter Radar Project](project.md) — Russia-first client intelligence radar for recruitment agencies
+- [User Profile](user.md) — Developer profile and preferences for Recruiter Radar
+- [Development Workflow](workflow.md) — Standard workflow and coding practices
+- [Systematic Slash Commands Translations](slash-commands-translations.md) — Complete systematic Russian translations of all Claude slash commands
+- [Official Commands Guide](official-commands-guide.md) — Official guide to slash commands with full Russian translations
+- [Commands Cheat Sheet](commands-cheatsheet.md) — Quick reference cheat sheet for all slash commands
+- [Command Examples](command-examples.md) — Practical examples using slash commands in Russian
+- [Quick Reference](quick-reference.md) - Quick reference sheet for main slash commands
+- [Agent Skills Commands](agent-skills-commands.md) — Slash commands from agent-skills package by addyosmani

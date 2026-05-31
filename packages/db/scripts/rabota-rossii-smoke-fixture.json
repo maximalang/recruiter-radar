@@ -1,0 +1,48 @@
+{
+  "records": [
+    {
+      "vacancy": {
+        "id": "rr-smoke-1",
+        "job-name": "Python Developer",
+        "creation-date": "2026-05-01T09:00:00+03:00",
+        "salary": "from 180000",
+        "company": {
+          "name": "OOO RDP Smoke",
+          "inn": "7729670341",
+          "ogrn": "5107746005494",
+          "site": "https://rdp-smoke.example/",
+          "email": "person.name@rdp-smoke.example"
+        },
+        "region": { "region_code": "7700000000000", "name": "Moscow" },
+        "vac_url": "https://trudvsem.ru/vacancy/card/5107746005494/rr-smoke-1",
+        "contact_person": "Personal Contact Must Not Persist"
+      }
+    },
+    {
+      "vacancy": {
+        "id": "rr-smoke-2",
+        "job-name": "Industrial Engineer",
+        "creation-date": "2026-05-02T09:00:00+03:00",
+        "company": { "name": "Turbulentnost Smoke", "site": "https://turbo-smoke.example/" },
+        "region": { "name": "Rostov region" },
+        "vac_url": "https://trudvsem.ru/vacancy/card/1036141003865/rr-smoke-2"
+      }
+    },
+    {
+      "vacancy": {
+        "id": "rr-smoke-2",
+        "job-name": "Industrial Engineer",
+        "company": { "name": "Turbulentnost Smoke", "site": "https://turbo-smoke.example/" },
+        "vac_url": "https://trudvsem.ru/vacancy/card/1036141003865/rr-smoke-2"
+      }
+    },
+    { "vacancy": { "id": "rr-skipped", "job-name": "" } },
+    {
+      "vacancy": {
+        "id": "rr-board-only",
+        "job-name": "Board-only Engineer",
+        "vac_url": "https://trudvsem.ru/vacancy/card/0000000000/rr-board-only"
+      }
+    }
+  ]
+}

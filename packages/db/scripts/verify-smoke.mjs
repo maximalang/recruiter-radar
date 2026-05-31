@@ -12,18 +12,20 @@ const rootEnvPath = resolve(scriptDir, '../../../.env');
 loadEnvFile(rootEnvPath);
 
 const alwaysScripts = [
-  './verify-mixed-ranking-smoke.mjs',
   './verify-career-pages-smoke.mjs',
   './verify-career-pages-discovery-smoke.mjs',
+  './verify-rabota-rossii-smoke.mjs',
   './verify-company-site-smoke.mjs',
   './verify-linkedin-company-pages-smoke.mjs',
   './verify-tech-job-boards-smoke.mjs',
   './verify-egrul-fns-smoke.mjs',
   './verify-funding-business-signals-smoke.mjs',
+  './verify-rf-source-expansion-smoke.mjs',
   './adapters/verify-adapters-smoke.mjs',
   './verify-source-readiness.mjs',
 ];
 const dbBackedScripts = [
+  './verify-mixed-ranking-smoke.mjs',
   './verify-digest-selection-smoke.mjs',
   './verify-digest-feedback-smoke.mjs',
   './verify-career-pages-ingest.mjs',
@@ -34,7 +36,10 @@ for (const scriptPath of alwaysScripts) {
 }
 
 const databaseUrl = process.env.DATABASE_URL?.trim();
-const schemaReady = databaseUrl ? await hasRequiredDigestTables(databaseUrl) : false;
+const schemaCheck = databaseUrl
+  ? await checkRequiredDigestTables(databaseUrl)
+  : { ready: false, reason: 'DATABASE_URL is not set.' };
+const schemaReady = schemaCheck.ready;
 
 if (schemaReady) {
   for (const scriptPath of dbBackedScripts) {
@@ -44,9 +49,7 @@ if (schemaReady) {
   console.log(JSON.stringify({
     ok: true,
     smoke: 'db-backed-skipped',
-    reason: databaseUrl
-      ? 'DATABASE_URL is set but digest schema tables are missing in the target database.'
-      : 'DATABASE_URL is not set.',
+    reason: schemaCheck.reason,
     skipped: dbBackedScripts.map((scriptPath) => scriptPath.replace('./', 'packages/db/scripts/')),
   }, null, 2));
 }
@@ -62,6 +65,49 @@ function runScript(relativePath) {
   if (result.status !== 0) {
     process.exit(result.status ?? 1);
   }
+}
+
+async function checkRequiredDigestTables(connectionString) {
+  try {
+    const ready = await hasRequiredDigestTables(connectionString);
+
+    return {
+      ready,
+      reason: ready
+        ? null
+        : 'DATABASE_URL is set but digest schema tables are missing in the target database.',
+    };
+  } catch (error) {
+    return {
+      ready: false,
+      reason: `DATABASE_URL is set but database connection/schema check failed: ${formatSafeError(error)}`,
+    };
+  }
+}
+
+function formatSafeError(error) {
+  if (!(error instanceof Error)) {
+    return String(error);
+  }
+
+  const parts = [error.name].filter(Boolean);
+  const errorCode = typeof error.code === 'string' ? error.code : null;
+
+  if (errorCode) {
+    parts.push(errorCode);
+  }
+
+  if (Array.isArray(error.errors)) {
+    const nestedCodes = Array.from(new Set(error.errors
+      .map((nestedError) => nestedError?.code ?? nestedError?.name)
+      .filter(Boolean)));
+
+    if (nestedCodes.length > 0) {
+      parts.push(nestedCodes.join(','));
+    }
+  }
+
+  return parts.length > 0 ? parts.join(': ') : 'database connection check failed';
 }
 
 async function hasRequiredDigestTables(connectionString) {

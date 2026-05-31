@@ -1,5 +1,5 @@
 {
-  "name": "My workflow",
+  "name": "digest-daily-delivery",
   "nodes": [
     {
       "parameters": {
@@ -45,7 +45,7 @@
         96
       ],
       "id": "5ad61993-a974-4f71-8fbd-3ce7831c4887",
-      "name": "hh",
+      "name": "POST /api/digest/delivery",
       "retryOnFail": true,
       "maxTries": 3,
       "waitBetweenTries": 2000
@@ -57,7 +57,7 @@
       "main": [
         [
           {
-            "node": "hh",
+            "node": "POST /api/digest/delivery",
             "type": "main",
             "index": 0
           }

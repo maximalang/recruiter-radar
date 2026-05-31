@@ -7,6 +7,12 @@ import {
   fetchHhVacancyPages,
   resolveHhVacancySearchConfig,
 } from './adapters/hh.mjs';
+import {
+  buildRussianLegalNameSourceKey,
+  buildSourceKeyAliases,
+  dedupeNormalizedRecords,
+  stripBom,
+} from './adapters/source-records.mjs';
 
 const { Client } = pg;
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -41,7 +47,8 @@ try {
   const searchConfig = resolveHhVacancySearchConfig();
   const hhFetch = await fetchVacancies(hhUserAgent, searchConfig);
   const vacancies = hhFetch.items;
-  const normalizedVacancies = normalizeVacancies(vacancies);
+  const normalizedVacancyResult = normalizeVacancies(vacancies);
+  const normalizedVacancies = normalizedVacancyResult.records;
   const stats =
     normalizedVacancies.length === 0
       ? { hhVacancyUpsertCount: 0, signalUpsertCount: 0, skippedSignalCount: 0 }
@@ -50,6 +57,7 @@ try {
   console.log(`hh search text: ${searchConfig.searchText}`);
   console.log(`hh pages fetched: ${hhFetch.pagesFetched}`);
   console.log(`vacancies received: ${vacancies.length}`);
+  console.log(`duplicate vacancies skipped before upsert: ${normalizedVacancyResult.duplicateRecords}`);
   console.log(`hh vacancy upserts completed: ${stats.hhVacancyUpsertCount}`);
   console.log(`normalized signal upserts completed: ${stats.signalUpsertCount}`);
 
@@ -89,7 +97,12 @@ function normalizeVacancies(vacancies) {
     }
   }
 
-  return normalizedVacancies;
+  const dedupeResult = dedupeNormalizedRecords(normalizedVacancies, (vacancy) => vacancy.hhVacancyId);
+
+  return {
+    records: dedupeResult.records,
+    duplicateRecords: dedupeResult.duplicateRecords,
+  };
 }
 
 function normalizeVacancy(vacancy, fetchedAt) {
@@ -109,6 +122,9 @@ function normalizeVacancy(vacancy, fetchedAt) {
   const employerIdSourceKey = buildEmployerIdSourceKey(hhEmployerId);
   const employerNameSourceKey = buildEmployerNameSourceKey(employerName);
   const orgSourceKey = buildOrgSourceKey(hhEmployerId, employerName);
+  const russianLegalNameSourceKey = orgSourceKey !== employerNameSourceKey
+    ? buildRussianLegalNameSourceKey(employerName)
+    : null;
 
   return {
     hhVacancyId,
@@ -117,10 +133,13 @@ function normalizeVacancy(vacancy, fetchedAt) {
     orgName: employerName ?? buildFallbackEmployerName(hhEmployerId),
     orgDisplayName: employerName,
     orgSourceKey,
-    orgSourceAliasKey:
-      employerIdSourceKey && employerNameSourceKey && employerIdSourceKey !== employerNameSourceKey
-        ? employerNameSourceKey
-        : null,
+    orgSourceAliasKey: employerIdSourceKey && employerNameSourceKey && employerIdSourceKey !== employerNameSourceKey
+      ? employerNameSourceKey
+      : null,
+    orgSourceAliasKeys: [employerNameSourceKey].filter(
+      (sourceKey, index, sourceKeys) => Boolean(sourceKey) && sourceKey !== orgSourceKey && sourceKeys.indexOf(sourceKey) === index,
+    ),
+    orgSourceWeakAliasKeys: [russianLegalNameSourceKey].filter(Boolean),
     vacancyName,
     areaName: toNonEmptyText(vacancy.area?.name),
     publishedAt: toTimestampOrNull(vacancy.published_at),
@@ -338,9 +357,9 @@ async function upsertOrgSourceKeys(client, orgId, vacancy) {
     },
   ];
 
-  if (vacancy.orgSourceAliasKey) {
+  for (const sourceKey of vacancy.orgSourceAliasKeys ?? []) {
     sourceRefs.push({
-      sourceKey: vacancy.orgSourceAliasKey,
+      sourceKey,
       externalId: null,
       displayName: vacancy.orgDisplayName,
     });
@@ -384,8 +403,8 @@ function buildOrgSourceMetadata(vacancy, sourceKey = vacancy.orgSourceKey, exter
   return {
     source: hhSource,
     source_key: sourceKey,
-    source_alias_key:
-      sourceKey === vacancy.orgSourceAliasKey ? vacancy.orgSourceKey : vacancy.orgSourceAliasKey,
+    source_alias_key: sourceKey === vacancy.orgSourceKey ? vacancy.orgSourceAliasKey : vacancy.orgSourceKey,
+    source_alias_keys: buildSourceKeyAliases(buildOrgSourceKeys(vacancy), vacancy.orgSourceWeakAliasKeys, sourceKey),
     external_id: externalId,
     display_name: vacancy.orgDisplayName,
     employer_name: vacancy.employerName,
@@ -399,6 +418,7 @@ function buildSignalPayload(vacancy) {
     source_entity_type: 'employer',
     source_entity_key: vacancy.orgSourceKey,
     source_entity_alias_key: vacancy.orgSourceAliasKey,
+    source_entity_alias_keys: buildSourceKeyAliases(buildOrgSourceKeys(vacancy), vacancy.orgSourceWeakAliasKeys, vacancy.orgSourceKey),
     source_entity_external_id: vacancy.hhEmployerId,
     source_entity_display_name: vacancy.employerName,
     source_entity_name: vacancy.orgName,
@@ -451,7 +471,7 @@ function buildEmployerNameSourceKey(employerName) {
 }
 
 function buildOrgSourceKeys(vacancy) {
-  return [vacancy.orgSourceKey, vacancy.orgSourceAliasKey].filter(
+  return [vacancy.orgSourceKey, ...(vacancy.orgSourceAliasKeys ?? [])].filter(
     (sourceKey, index, sourceKeys) => Boolean(sourceKey) && sourceKeys.indexOf(sourceKey) === index,
   );
 }
@@ -474,7 +494,7 @@ function loadEnvFile(filePath) {
     return;
   }
 
-  const envFile = readFileSync(filePath, 'utf8').replace(/^\uFEFF/, '');
+  const envFile = stripBom(readFileSync(filePath, 'utf8'));
 
   for (const rawLine of envFile.split(/\r?\n/)) {
     const trimmedLine = rawLine.trim();

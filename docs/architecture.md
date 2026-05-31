@@ -18,18 +18,20 @@ Recruiter Radar каждый день находит компании с док�
 
 ### Контур 1, primary hiring-signal sources
 Источники, которые напрямую дают сигнал, что компания сейчас нанимает:
-1. one primary jobs source для первого релиза, например hh.ru API
-2. career pages компаний, включая repo-native auto-discovery из уже сохранённых org/signal seed-данных с company-site probe
-3. LinkedIn jobs и company pages, либо аналогичные внешние jobs/company sources
-4. отдельные tech job boards как следующая волна
+1. `hh` — primary platform source, runnable, lead-originating, участвует в digest selection
+2. `career-pages` — company-surface high-signal source, runnable, lead-originating, участвует в digest selection
+3. `linkedin-company-pages` — secondary platform evidence, runnable, not a sole lead-originating source, НЕ в digest selection
+4. `tech-job-boards` — tech job board coverage, runnable, not в digest selection до подтверждения confidence-gate
 
 ### Контур 2, enrichment sources
 Источники, которые не создают лид сами по себе, но повышают качество score, confidence и контекста:
-1. ФНС / ЕГРЮЛ для юридических данных компании и entity validation
-2. сайт компании для контактов, ICP-контекста и дополнительного подтверждения активности
-3. funding signals и другие внешние business signals как следующий контекстный слой
+1. `company-site` — company-surface enrichment/corroboration, runnable, не lead-originating по умолчанию
+2. `egrul-fns` — ФНС / ЕГРЮЛ для юридических данных компании и entity validation
+3. `funding-business-signals` — funding, hiring, growth и другие business signals, context-only
 
 Enrichment/context sources не должны создавать лид без direct hiring evidence.
+
+**Текущее состояние**: 7 источников в registry (`source-registry.mjs`), все со `status: active`. В digest lead selection (`source-digest-evidence.sql`) участвуют только `hh` и `career-pages`. Остальные пять — на этапе роста покрытия и валидации перед включением в selection.
 
 ## Основные части системы
 

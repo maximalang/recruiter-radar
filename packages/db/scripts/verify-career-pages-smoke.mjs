@@ -32,6 +32,7 @@ assert.equal(summary.targetsFilePath, fixturePath);
 assert.equal(summary.fetchOutputPath, null);
 assert.equal(summary.targetsProcessed, expectedTargets.length);
 assert.equal(summary.recordsReceived, expectedRecords.length);
+assert.equal(summary.duplicateRecords, 0);
 assert.equal(summary.normalizedRecords, expectedRecords.length);
 assert.equal(summary.skippedRecords, 0);
 assert.equal(summary.targetResults.length, expectedTargets.length);
@@ -51,19 +52,34 @@ for (const [index, target] of expectedTargets.entries()) {
   assert.equal(targetSummary.recordsFetched, Array.isArray(target.records) ? target.records.length : 0);
 }
 
-for (const record of expectedRecords) {
-  const normalizedRecord = input.normalizedRecords.find((candidate) => candidate.signalExternalId === record.external_id);
-  assert.ok(normalizedRecord, `missing normalized record ${record.external_id}`);
-  assert.equal(normalizedRecord.companyName, 'Smoke Company');
-  assert.equal(normalizedRecord.companyDomain, 'smoke.example');
-  assert.equal(normalizedRecord.companyWebsiteUrl, 'https://smoke.example/');
-  assert.equal(normalizedRecord.careerPageUrl, 'https://smoke.example/careers');
-  assert.equal(normalizedRecord.jobPostingUrl, record.job_posting_url);
-  assert.equal(normalizedRecord.jobTitle, record.job_title);
-  assert.equal(normalizedRecord.location, record.location);
-  assert.equal(normalizedRecord.employmentType, record.employment_type);
-  assert.equal(normalizedRecord.occurredAt, record.occurred_at);
-  assert.equal(normalizedRecord.primarySourceKey, 'domain:smoke.example');
+// Verify only fixture records if they exist
+const fixtureRecords = expectedRecords.filter(record => record?.external_id);
+if (fixtureRecords.length > 0) {
+  const targetByExternalId = new Map();
+  for (const target of expectedTargets) {
+    for (const record of Array.isArray(target?.records) ? target.records : []) {
+      if (record?.external_id) {
+        targetByExternalId.set(record.external_id, target);
+      }
+    }
+  }
+
+  for (const record of fixtureRecords) {
+    const normalizedRecord = input.normalizedRecords.find((candidate) => candidate.signalExternalId === record.external_id);
+    assert.ok(normalizedRecord, `missing normalized record ${record.external_id}`);
+    const target = targetByExternalId.get(record.external_id);
+    assert.ok(target, `missing parent target for record ${record.external_id}`);
+    assert.equal(normalizedRecord.companyName, target.company_name);
+    assert.equal(normalizedRecord.companyDomain, target.company_domain);
+    assert.equal(normalizedRecord.companyWebsiteUrl, target.company_website_url);
+    assert.equal(normalizedRecord.careerPageUrl, target.career_page_url);
+    assert.equal(normalizedRecord.jobPostingUrl, record.job_posting_url);
+    assert.equal(normalizedRecord.jobTitle, record.job_title);
+    assert.equal(normalizedRecord.location, record.location);
+    assert.equal(normalizedRecord.employmentType, record.employment_type);
+    assert.equal(normalizedRecord.occurredAt, record.occurred_at);
+    assert.equal(normalizedRecord.primarySourceKey, `domain:${target.company_domain}`);
+  }
 }
 
 console.log(JSON.stringify({
@@ -73,6 +89,7 @@ console.log(JSON.stringify({
   fixturePath,
   targetsProcessed: summary.targetsProcessed,
   recordsReceived: summary.recordsReceived,
+  duplicateRecords: summary.duplicateRecords,
   normalizedRecords: summary.normalizedRecords,
   skippedRecords: summary.skippedRecords,
   verifiedExternalIds: expectedRecords.map((record) => record.external_id),

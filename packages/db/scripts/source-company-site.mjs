@@ -3,6 +3,14 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import pg from 'pg';
 
+import {
+  buildRussianLegalNameSourceKey,
+  buildSourceKeyAliases,
+  dedupeNormalizedRecords,
+  stripBom,
+} from './adapters/source-records.mjs';
+import { loadEnvFile, normalizeDomain } from './lib/common-utils.mjs';
+
 const { Client } = pg;
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const rootEnvPath = resolve(scriptDir, '../../../.env');
@@ -10,7 +18,6 @@ const SOURCE_ID = 'company-site';
 const SIGNAL_TYPE = 'other';
 const SUPPORTED_ACTIONS = new Set(['fetch', 'ingest', 'pipeline']);
 
-loadEnvFile(rootEnvPath);
 
 export async function runCompanySiteCli(argv = process.argv.slice(2)) {
   const requestedAction = argv[0]?.trim() || 'pipeline';
@@ -33,7 +40,7 @@ export async function runCompanySiteCli(argv = process.argv.slice(2)) {
 
     if (requestedAction === 'fetch') {
       console.log(JSON.stringify(buildFetchSummary(input), null, 2));
-      process.exit(0);
+      return;
     }
 
     if (!databaseUrl) {
@@ -50,7 +57,7 @@ export async function runCompanySiteCli(argv = process.argv.slice(2)) {
 
     if (requestedAction === 'ingest') {
       console.log(JSON.stringify(buildIngestSummary(input, stats), null, 2));
-      process.exit(0);
+      return;
     }
 
     console.log(JSON.stringify(buildPipelineSummary(input, stats), null, 2));
@@ -89,7 +96,7 @@ export async function resolveCompanySiteLiveInput({ targetsFilePath }) {
     throw new Error(`COMPANY_SITE_TARGETS_FILE does not exist: ${resolvedPath}`);
   }
 
-  const rawContent = readFileSync(resolvedPath, 'utf8').replace(/^﻿/, '');
+  const rawContent = stripBom(readFileSync(resolvedPath, 'utf8'));
   const targets = JSON.parse(rawContent);
 
   if (!Array.isArray(targets)) {
@@ -136,7 +143,9 @@ export async function resolveCompanySiteLiveInput({ targetsFilePath }) {
     normalizedRecords.push(normalized);
   }
 
-  if (normalizedRecords.length === 0) {
+  const dedupeResult = dedupeNormalizedRecords(normalizedRecords);
+
+  if (dedupeResult.records.length === 0) {
     throw new Error(
       `company-site live crawl normalized 0 records from ${crawlSuccesses} crawled pages.`,
     );
@@ -149,7 +158,8 @@ export async function resolveCompanySiteLiveInput({ targetsFilePath }) {
     recordsReceived: targets.length,
     crawlSuccesses,
     crawlErrors,
-    normalizedRecords,
+    duplicateRecords: dedupeResult.duplicateRecords,
+    normalizedRecords: dedupeResult.records,
     skippedRecords,
   };
 }
@@ -161,7 +171,7 @@ function resolveFileInput(inputFilePath) {
     throw new Error(`COMPANY_SITE_INPUT_FILE does not exist: ${resolvedPath}`);
   }
 
-  const rawContent = readFileSync(resolvedPath, 'utf8').replace(/^﻿/, '');
+  const rawContent = stripBom(readFileSync(resolvedPath, 'utf8'));
   const records = parseInputRecords(rawContent, resolvedPath);
   const fetchedAt = new Date().toISOString();
   const normalizedRecords = [];
@@ -178,11 +188,14 @@ function resolveFileInput(inputFilePath) {
     normalizedRecords.push(normalized);
   }
 
+  const dedupeResult = dedupeNormalizedRecords(normalizedRecords);
+
   return {
     inputMode: 'file',
     inputFilePath: resolvedPath,
     recordsReceived: records.length,
-    normalizedRecords,
+    duplicateRecords: dedupeResult.duplicateRecords,
+    normalizedRecords: dedupeResult.records,
     skippedRecords,
   };
 }
@@ -221,6 +234,7 @@ function normalizeCompanySiteRecord(record, fetchedAt, lineNumber) {
   const pageTitle = toNonEmptyText(record.page_title ?? record.title);
   const summary = toNonEmptyText(record.summary ?? record.description);
   const signals = Array.isArray(record.signals) ? record.signals : parseKeywords(record.keywords);
+  const contactPaths = normalizeContactPaths(record.contact_paths ?? record.contactPaths);
   const detectedAt = toTimestampOrNull(record.detected_at ?? record.occurred_at) ?? fetchedAt;
   const externalId = toNonEmptyText(record.external_id ?? record.id);
   const inferredDomain = companyDomain
@@ -235,9 +249,14 @@ function normalizeCompanySiteRecord(record, fetchedAt, lineNumber) {
   const primarySourceKey = buildPrimarySourceKey({ externalId, inferredDomain, companyName });
   const domainSourceKey = inferredDomain ? `domain:${inferredDomain}` : null;
   const companyNameSourceKey = companyName ? `company-name:${normalizeSourceKeyText(companyName)}` : null;
-  const orgSourceKeys = [primarySourceKey, domainSourceKey, companyNameSourceKey].filter(
+  const russianLegalNameSourceKey = primarySourceKey !== companyNameSourceKey
+    ? buildRussianLegalNameSourceKey(companyName)
+    : null;
+  const strongCompanyNameSourceKey = primarySourceKey === companyNameSourceKey ? companyNameSourceKey : null;
+  const orgSourceKeys = [primarySourceKey, domainSourceKey, strongCompanyNameSourceKey].filter(
     (value, idx, values) => Boolean(value) && values.indexOf(value) === idx,
   );
+  const orgSourceAliasKeys = buildSourceKeyAliases(orgSourceKeys, [companyNameSourceKey, russianLegalNameSourceKey]);
 
   if (orgSourceKeys.length === 0) {
     return null;
@@ -257,12 +276,15 @@ function normalizeCompanySiteRecord(record, fetchedAt, lineNumber) {
     pageTitle,
     summary,
     signals,
+    contactPaths,
     orgName,
     orgDisplayName: companyName ?? inferredDomain,
     primarySourceKey,
     domainSourceKey,
     companyNameSourceKey,
+    russianLegalNameSourceKey,
     orgSourceKeys,
+    orgSourceAliasKeys,
     signalExternalId,
   };
 }
@@ -484,6 +506,7 @@ export function buildFetchSummary(input) {
     inputFilePath: input.inputFilePath,
     ...buildLiveCrawlSummary(input),
     recordsReceived: input.recordsReceived,
+    duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
   };
@@ -497,6 +520,7 @@ function buildIngestSummary(input, stats) {
     inputFilePath: input.inputFilePath,
     ...buildLiveCrawlSummary(input),
     recordsReceived: input.recordsReceived,
+    duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
     orgsCreated: stats.orgUpsertCount,
@@ -512,6 +536,7 @@ function buildPipelineSummary(input, stats) {
     inputFilePath: input.inputFilePath,
     ...buildLiveCrawlSummary(input),
     recordsReceived: input.recordsReceived,
+    duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
     orgsCreated: stats.orgUpsertCount,
@@ -571,7 +596,7 @@ function buildSignalPayload(record) {
     evidence_role: 'enrichment',
     source_entity_type: 'company',
     source_entity_key: record.primarySourceKey,
-    source_entity_alias_keys: record.orgSourceKeys.filter((v) => v !== record.primarySourceKey),
+    source_entity_alias_keys: buildSourceKeyAliases(record.orgSourceKeys, record.orgSourceAliasKeys, record.primarySourceKey),
     source_entity_external_id: record.externalId,
     source_entity_display_name: record.orgDisplayName,
     source_entity_name: record.orgName,
@@ -588,6 +613,7 @@ function buildSignalPayload(record) {
     page_title: record.pageTitle,
     summary: record.summary,
     signals: record.signals,
+    contact_paths: record.contactPaths,
     fetched_at: record.fetchedAt,
   };
 }
@@ -596,7 +622,7 @@ function buildOrgSourceMetadata(record, sourceKey) {
   return {
     source: SOURCE_ID,
     source_key: sourceKey,
-    source_alias_keys: record.orgSourceKeys.filter((v) => v !== sourceKey),
+    source_alias_keys: buildSourceKeyAliases(record.orgSourceKeys, record.orgSourceAliasKeys, sourceKey),
     external_id: sourceKey === record.primarySourceKey ? record.externalId : null,
     display_name: record.orgDisplayName,
     company_name: record.companyName,
@@ -617,6 +643,163 @@ function parseKeywords(value) {
   return [];
 }
 
+function normalizeContactPaths(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const contactPaths = [];
+  const seen = new Set();
+
+  for (const item of value) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      continue;
+    }
+
+    const email = normalizeContactEmail(item.value ?? item.email);
+
+    if ((item.type === 'generic_email' || email) && isSafeGenericContactEmail(email)) {
+      pushContactPath(contactPaths, seen, {
+        type: 'generic_email',
+        value: email,
+        source: toNonEmptyText(item.source) ?? 'source',
+      });
+      continue;
+    }
+
+    const url = toUrlOrNull(item.url ?? item.value ?? item.href);
+
+    if (url && (item.type === 'contact_page' || isContactPageUrl(url))) {
+      pushContactPath(contactPaths, seen, {
+        type: 'contact_page',
+        url,
+        source: toNonEmptyText(item.source) ?? 'source',
+      });
+    }
+  }
+
+  return contactPaths;
+}
+
+function pushContactPath(contactPaths, seen, contactPath) {
+  const key = contactPath.type === 'generic_email'
+    ? `${contactPath.type}:${contactPath.value}`
+    : `${contactPath.type}:${contactPath.url}`;
+
+  if (seen.has(key)) {
+    return;
+  }
+
+  seen.add(key);
+  contactPaths.push(contactPath);
+}
+
+function normalizeContactEmail(value) {
+  const text = toNonEmptyText(value);
+
+  if (!text) {
+    return null;
+  }
+
+  const email = trimEmailBoundaryChars(text.split('?')[0].trim().toLowerCase());
+  const parts = email.split('@');
+
+  if (parts.length !== 2 || !parts[0] || !parts[1] || !parts[1].includes('.')) {
+    return null;
+  }
+
+  if (email.includes(' ') || email.includes('/') || email.includes('\\')) {
+    return null;
+  }
+
+  return email;
+}
+
+function trimEmailBoundaryChars(value) {
+  let text = value;
+
+  while (text.length > 0 && EMAIL_BOUNDARY_CHARS.has(text.charAt(text.length - 1))) {
+    text = text.slice(0, -1);
+  }
+
+  return text;
+}
+
+function isSafeGenericContactEmail(email) {
+  if (!email) {
+    return false;
+  }
+
+  const localPart = email.split('@')[0].replace(/[._+]+/g, '-');
+
+  if (GENERIC_CONTACT_EMAIL_LOCAL_PARTS.has(localPart)) {
+    return true;
+  }
+
+  const parts = localPart.split('-').filter(Boolean);
+  return parts.length === 2
+    && GENERIC_CONTACT_EMAIL_LOCAL_PARTS.has(parts[0])
+    && GENERIC_CONTACT_EMAIL_SUFFIXES.has(parts[1]);
+}
+
+function isContactPageUrl(value) {
+  try {
+    const url = new URL(value);
+    const searchablePath = `${url.pathname} ${url.search}`.toLowerCase();
+    return CONTACT_PAGE_PATH_KEYWORDS.some((keyword) => searchablePath.includes(keyword));
+  } catch {
+    return false;
+  }
+}
+
+const GENERIC_CONTACT_EMAIL_LOCAL_PARTS = new Set([
+  'career',
+  'careers',
+  'contact',
+  'hello',
+  'hr',
+  'info',
+  'job',
+  'jobs',
+  'kadry',
+  'office',
+  'people',
+  'rabota',
+  'recruiting',
+  'recruitment',
+  'talent',
+  'vacancy',
+  'vacancies',
+  'work',
+]);
+
+const EMAIL_BOUNDARY_CHARS = new Set(['.', ',', ';', ':', ')', ']', '}']);
+
+const GENERIC_CONTACT_EMAIL_SUFFIXES = new Set([
+  'career',
+  'careers',
+  'contact',
+  'department',
+  'group',
+  'jobs',
+  'office',
+  'recruiting',
+  'recruitment',
+  'team',
+  'vacancy',
+  'work',
+]);
+
+const CONTACT_PAGE_PATH_KEYWORDS = [
+  'contact',
+  'contacts',
+  'feedback',
+  'kontakty',
+  'kontakt',
+  'rekvizity',
+  'requisites',
+];
+
 export function parseJson(value, label) {
   try {
     return JSON.parse(value);
@@ -635,50 +818,6 @@ function resolveDbConnectionTimeoutMillis() {
 
   const parsedValue = Number.parseInt(rawValue, 10);
   return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : 5000;
-}
-
-function loadEnvFile(filePath) {
-  if (!existsSync(filePath)) {
-    return;
-  }
-
-  const envFile = readFileSync(filePath, 'utf8').replace(/^﻿/, '');
-
-  for (const rawLine of envFile.split(/\r?\n/)) {
-    const trimmedLine = rawLine.trim();
-
-    if (!trimmedLine || trimmedLine.startsWith('#')) {
-      continue;
-    }
-
-    const separatorIndex = rawLine.indexOf('=');
-
-    if (separatorIndex === -1) {
-      continue;
-    }
-
-    const key = rawLine.slice(0, separatorIndex).trim();
-
-    if (!key || process.env[key] !== undefined) {
-      continue;
-    }
-
-    let value = rawLine.slice(separatorIndex + 1).trim();
-
-    if (
-      (value.startsWith('"') && value.endsWith('"'))
-      || (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
-    }
-
-    process.env[key] = value;
-  }
-}
-
-export function normalizeDomain(value) {
-  const normalizedValue = normalizeSourceKeyText(value);
-  return normalizedValue ? normalizedValue.replace(/^www\./, '') : null;
 }
 
 export function normalizeSourceKeyText(value) {

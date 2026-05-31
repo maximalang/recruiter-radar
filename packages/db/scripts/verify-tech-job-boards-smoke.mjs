@@ -6,6 +6,7 @@ import {
   buildFetchSummary,
   resolveTechJobBoardsInput,
   resolveTechJobBoardsLiveInput,
+  resolveTechJobBoardsProviderInput,
 } from './source-tech-job-boards.mjs';
 
 const scriptDir = fileURLToPath(new URL('.', import.meta.url));
@@ -21,10 +22,11 @@ assert.equal(summary.source, 'tech-job-boards');
 assert.equal(summary.action, 'fetch');
 assert.equal(summary.inputMode, 'file');
 assert.equal(summary.inputFilePath, fixturePath);
-assert.equal(summary.recordsReceived, 5);
-assert.equal(summary.recordsAfterDedupe, 4, 'duplicate record should be removed by dedupe');
+assert.equal(summary.recordsReceived, 6);
+assert.equal(summary.recordsAfterDedupe, 5, 'duplicate record should be removed by dedupe');
+assert.equal(summary.duplicateRecords, 1);
 assert.equal(summary.normalizedRecords, 4);
-assert.equal(summary.skippedRecords, 0);
+assert.equal(summary.skippedRecords, 1);
 
 const rec1 = input.normalizedRecords.find((r) => r.signalExternalId === 'habr-career:tjb-smoke-1');
 assert.ok(rec1, 'missing normalized record tjb-smoke-1');
@@ -52,6 +54,11 @@ const rec4 = input.normalizedRecords.find((r) => r.companyName === 'Minimal Boar
 assert.ok(rec4, 'missing normalized record for Minimal Board Co');
 assert.equal(rec4.board, 'unknown');
 assert.equal(rec4.jobTitle, 'Python Developer');
+assert.equal(
+  input.normalizedRecords.some((r) => r.primarySourceKey === 'domain:jobs.example'),
+  false,
+  'tech-job-boards must not use job-board URL domains as company identity',
+);
 
 for (const record of input.normalizedRecords) {
   assert.equal(record.orgSourceKeys.length > 0, true, `record ${record.signalExternalId} must have orgSourceKeys`);
@@ -66,6 +73,7 @@ for (const record of input.normalizedRecords) {
 }
 
 const liveMode = await runLiveModeSmoke();
+const providerMode = await runProviderModeSmoke();
 
 console.log(JSON.stringify({
   ok: true,
@@ -74,10 +82,12 @@ console.log(JSON.stringify({
   fixturePath,
   recordsReceived: summary.recordsReceived,
   recordsAfterDedupe: summary.recordsAfterDedupe,
+  duplicateRecords: summary.duplicateRecords,
   normalizedRecords: summary.normalizedRecords,
   skippedRecords: summary.skippedRecords,
   dedupeVerified: true,
   liveMode,
+  providerMode,
   verifiedExternalIds: ['tjb-smoke-1', 'tjb-smoke-2', 'tjb-smoke-3', 'Minimal Board Co derived'],
   sideEffects: { databaseUrlUsed: false },
 }, null, 2));
@@ -136,6 +146,7 @@ async function runLiveModeSmoke() {
     assert.equal(liveSummary.inputMode, 'live-public');
     assert.equal(liveSummary.recordsReceived, 2);
     assert.equal(liveSummary.recordsAfterDedupe, 2);
+    assert.equal(liveSummary.duplicateRecords, 0);
     assert.equal(liveSummary.normalizedRecords, 2);
     assert.equal(liveSummary.skippedRecords, 0);
     assert.ok(
@@ -151,6 +162,87 @@ async function runLiveModeSmoke() {
       inputMode: liveSummary.inputMode,
       requestedUrls: requestedUrls.length,
       normalizedRecords: liveSummary.normalizedRecords,
+    };
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+}
+
+async function runProviderModeSmoke() {
+  const originalFetch = globalThis.fetch;
+  const requested = [];
+
+  globalThis.fetch = async (url, options = {}) => {
+    requested.push({ url: String(url), headers: options.headers ?? {} });
+    return jsonResponse({
+      records: [
+        {
+          external_id: 'provider-job-1',
+          board: 'api-mega-list-provider',
+          company_name: 'Provider Jobs Co',
+          company_domain: 'provider-jobs.example',
+          job_title: 'Provider Platform Engineer',
+          job_posting_url: 'https://jobs.example/provider-job-1',
+          location: 'Moscow',
+          email: 'must-not-persist@example.com',
+        },
+        {
+          external_id: 'provider-board-only',
+          board: 'api-mega-list-provider',
+          job_title: 'Board-only Provider Engineer',
+          job_posting_url: 'https://jobs.example/provider-board-only',
+        },
+      ],
+    });
+  };
+
+  try {
+    const providerInput = await resolveTechJobBoardsProviderInput({
+      providerUrl: 'https://provider.example/jobs',
+      providerToken: 'provider-smoke-token',
+    });
+    const providerSummary = buildFetchSummary(providerInput);
+
+    assert.equal(providerSummary.inputMode, 'provider-token');
+    assert.equal(providerSummary.recordsReceived, 2);
+    assert.equal(providerSummary.recordsAfterDedupe, 2);
+    assert.equal(providerSummary.normalizedRecords, 1);
+    assert.equal(providerSummary.skippedRecords, 1);
+    assert.equal(requested[0].headers.authorization, 'Bearer provider-smoke-token');
+    assert.equal(providerInput.normalizedRecords[0].primarySourceKey, 'domain:provider-jobs.example');
+    assert.equal(providerInput.normalizedRecords[0].externalId, 'provider-job-1');
+    assert.equal(providerInput.normalizedRecords[0].email, undefined);
+    assert.equal(
+      providerInput.normalizedRecords.some((record) => record.primarySourceKey === 'domain:jobs.example'),
+      false,
+      'provider mode must not use provider/job-board URL domains as company identity',
+    );
+
+    globalThis.fetch = async () => jsonResponse({
+      records: [
+        {
+          external_id: 'bad-provider-job',
+          board: 'api-mega-list-provider',
+          job_title: 'No Company Identity',
+          job_posting_url: 'https://jobs.example/bad-provider-job',
+        },
+      ],
+    });
+
+    await assert.rejects(
+      () => resolveTechJobBoardsProviderInput({
+        providerUrl: 'https://provider.example/jobs-bad',
+        providerToken: 'provider-smoke-token',
+      }),
+      /0 normalized records/,
+    );
+
+    return {
+      inputMode: providerSummary.inputMode,
+      authHeaderVerified: true,
+      normalizedRecords: providerSummary.normalizedRecords,
+      skippedRecords: providerSummary.skippedRecords,
+      allSkippedRejected: true,
     };
   } finally {
     globalThis.fetch = originalFetch;

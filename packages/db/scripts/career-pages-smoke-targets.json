@@ -1,28 +1,200 @@
 {
   "targets": [
     {
-      "id": "smoke-static",
-      "adapter": "static-records",
-      "company_name": "Smoke Company",
-      "company_domain": "smoke.example",
-      "company_website_url": "https://smoke.example/",
-      "career_page_url": "https://smoke.example/careers",
+      "id": "discord-greenhouse",
+      "adapter": "greenhouse-board",
+      "company_name": "Discord",
+      "company_domain": "discord.com",
+      "company_website_url": "https://discord.com/",
+      "career_page_url": "https://boards.greenhouse.io/discord",
+      "source_url": "https://boards-api.greenhouse.io/v1/boards/discord/jobs?content=true",
       "records": [
         {
-          "external_id": "smoke-1",
-          "job_title": "Senior Recruiter",
-          "job_posting_url": "https://smoke.example/careers/senior-recruiter",
-          "location": "Remote",
-          "employment_type": "Full-time",
-          "occurred_at": "2026-01-01T00:00:00.000Z"
+          "external_id": "discord-123",
+          "job_posting_url": "https://boards.greenhouse.io/discord/jobs/123",
+          "job_title": "Software Engineer",
+          "location": "San Francisco",
+          "employment_type": "FULL_TIME",
+          "occurred_at": "2026-05-26T00:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "dnb-lever",
+      "adapter": "lever-postings",
+      "company_name": "Dun & Bradstreet",
+      "company_domain": "dnb.com",
+      "company_website_url": "https://www.dnb.com/",
+      "career_page_url": "https://jobs.lever.co/dnb",
+      "source_url": "https://api.lever.co/v0/postings/dnb?mode=json",
+      "records": [
+        {
+          "external_id": "dnb-456",
+          "job_posting_url": "https://jobs.lever.co/dnb/456",
+          "job_title": "Data Analyst",
+          "location": "New York",
+          "employment_type": "FULL_TIME",
+          "occurred_at": "2026-05-26T00:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "yandex-static",
+      "adapter": "static-records",
+      "company_name": "Yandex",
+      "company_domain": "yandex.ru",
+      "company_website_url": "https://yandex.ru/",
+      "career_page_url": "https://yandex.ru/jobs/",
+      "records": [
+        {
+          "external_id": "yandex-be-101",
+          "job_posting_url": "https://yandex.ru/jobs/vacancies/101",
+          "job_title": "Backend разработчик (Go)",
+          "location": "Москва",
+          "employment_type": "FULL_TIME",
+          "occurred_at": "2026-05-25T08:30:00.000Z"
         },
         {
-          "external_id": "smoke-2",
-          "job_title": "Talent Sourcer",
-          "job_posting_url": "https://smoke.example/careers/talent-sourcer",
-          "location": "Amsterdam",
-          "employment_type": "Contract",
-          "occurred_at": "2026-01-02T00:00:00.000Z"
+          "external_id": "yandex-ml-102",
+          "job_posting_url": "https://yandex.ru/jobs/vacancies/102",
+          "job_title": "ML инженер (NLP)",
+          "location": "Санкт-Петербург",
+          "employment_type": "FULL_TIME",
+          "occurred_at": "2026-05-25T09:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "vk-static",
+      "adapter": "static-records",
+      "company_name": "VK",
+      "company_domain": "vk.com",
+      "company_website_url": "https://vk.com/",
+      "career_page_url": "https://hh.ru/employer/15478",
+      "records": [
+        {
+          "external_id": "vk-fe-201",
+          "job_posting_url": "https://team.vk.company/career/vacancies/201",
+          "job_title": "Frontend разработчик (TypeScript, React)",
+          "location": "Москва",
+          "employment_type": "FULL_TIME",
+          "occurred_at": "2026-05-26T07:15:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "sber-static",
+      "adapter": "static-records",
+      "company_name": "Sber",
+      "company_domain": "sber.ru",
+      "company_website_url": "https://sber.ru/",
+      "career_page_url": "https://rabota.sber.ru/",
+      "records": [
+        {
+          "external_id": "sber-ds-301",
+          "job_posting_url": "https://rabota.sber.ru/vacancies/301",
+          "job_title": "Data Scientist",
+          "location": "Москва",
+          "employment_type": "FULL_TIME",
+          "occurred_at": "2026-05-24T11:00:00.000Z"
+        },
+        {
+          "external_id": "sber-pm-302",
+          "job_posting_url": "https://rabota.sber.ru/vacancies/302",
+          "job_title": "Product Manager (B2C)",
+          "location": "Москва",
+          "employment_type": "FULL_TIME",
+          "occurred_at": "2026-05-25T12:30:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "tbank-static",
+      "adapter": "static-records",
+      "company_name": "T-Bank",
+      "company_domain": "tbank.ru",
+      "company_website_url": "https://www.tbank.ru/",
+      "career_page_url": "https://www.tbank.ru/career/",
+      "records": [
+        {
+          "external_id": "tbank-be-401",
+          "job_posting_url": "https://www.tbank.ru/career/vacancies/401",
+          "job_title": "Senior Backend Engineer (Java)",
+          "location": "Москва",
+          "employment_type": "FULL_TIME",
+          "occurred_at": "2026-05-26T10:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "avito-static",
+      "adapter": "static-records",
+      "company_name": "Avito",
+      "company_domain": "avito.ru",
+      "company_website_url": "https://www.avito.ru/",
+      "career_page_url": "https://career.avito.com/",
+      "records": [
+        {
+          "external_id": "avito-go-501",
+          "job_posting_url": "https://career.avito.com/vacancies/501",
+          "job_title": "Go Backend Developer",
+          "location": "Москва",
+          "employment_type": "FULL_TIME",
+          "occurred_at": "2026-05-23T14:20:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "ozon-static",
+      "adapter": "static-records",
+      "company_name": "Ozon",
+      "company_domain": "ozon.ru",
+      "company_website_url": "https://www.ozon.ru/",
+      "career_page_url": "https://job.ozon.ru/",
+      "records": [
+        {
+          "external_id": "ozon-de-601",
+          "job_posting_url": "https://job.ozon.ru/vacancies/601",
+          "job_title": "Data Engineer",
+          "location": "Москва",
+          "employment_type": "FULL_TIME",
+          "occurred_at": "2026-05-25T15:45:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "wildberries-static",
+      "adapter": "static-records",
+      "company_name": "Wildberries",
+      "company_domain": "wildberries.ru",
+      "company_website_url": "https://www.wildberries.ru/",
+      "career_page_url": "https://wbcareer.com/",
+      "records": [
+        {
+          "external_id": "wb-mob-701",
+          "job_posting_url": "https://wbcareer.com/vacancies/701",
+          "job_title": "Mobile разработчик (Kotlin)",
+          "location": "Москва",
+          "employment_type": "FULL_TIME",
+          "occurred_at": "2026-05-22T09:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "kaspersky-static",
+      "adapter": "static-records",
+      "company_name": "Kaspersky",
+      "company_domain": "kaspersky.com",
+      "company_website_url": "https://www.kaspersky.com/",
+      "career_page_url": "https://www.kaspersky.com/about/careers",
+      "records": [
+        {
+          "external_id": "kl-sec-801",
+          "job_posting_url": "https://www.kaspersky.com/about/careers/vacancies/801",
+          "job_title": "Security Researcher (Threat Intel)",
+          "location": "Москва",
+          "employment_type": "FULL_TIME",
+          "occurred_at": "2026-05-26T08:00:00.000Z"
         }
       ]
     }

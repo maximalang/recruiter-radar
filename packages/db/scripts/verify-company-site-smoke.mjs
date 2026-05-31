@@ -25,6 +25,7 @@ assert.equal(summary.action, 'fetch');
 assert.equal(summary.inputMode, 'file');
 assert.equal(summary.inputFilePath, fixturePath);
 assert.equal(summary.recordsReceived, 4);
+assert.equal(summary.duplicateRecords, 0);
 assert.equal(summary.normalizedRecords, 4);
 assert.equal(summary.skippedRecords, 0);
 
@@ -75,6 +76,7 @@ console.log(JSON.stringify({
   mode: 'read-only-smoke',
   fixturePath,
   recordsReceived: summary.recordsReceived,
+  duplicateRecords: summary.duplicateRecords,
   normalizedRecords: summary.normalizedRecords,
   skippedRecords: summary.skippedRecords,
   verifiedExternalIds: [
@@ -105,7 +107,14 @@ async function runLiveCrawlSmoke() {
           </head>
           <body>
             <main>
-              We are hiring. Join our team. Open positions for backend engineers.
+              \u0412\u0430\u043a\u0430\u043d\u0441\u0438\u0438: \u043c\u044b \u0438\u0449\u0435\u043c backend engineers.
+              \u041e\u0442\u043a\u0440\u044b\u0442\u044b\u0435 \u043f\u043e\u0437\u0438\u0446\u0438\u0438 \u0434\u043b\u044f \u043f\u0440\u043e\u0434\u0443\u043a\u0442\u043e\u0432\u044b\u0445 \u0438\u043d\u0436\u0435\u043d\u0435\u0440\u043e\u0432.
+              <a href=mailto:hr@livesmoke.example>HR</a>
+              <a href=mailto:hr.ivan@livesmoke.example>HR Ivan</a>
+              <a href=mailto:ivan.petrov@livesmoke.example>Ivan Petrov</a>
+              <a href=tel:+79990000000>Phone</a>
+              <a href=/kontakty>Contacts</a>
+              Write careers@livesmoke.example.
             </main>
           </body>
         </html>
@@ -146,6 +155,7 @@ async function runLiveCrawlSmoke() {
     assert.equal(liveSummary.inputMode, 'live-public');
     assert.equal(liveSummary.targetsFilePath, targetsPath);
     assert.equal(liveSummary.recordsReceived, 1);
+    assert.equal(liveSummary.duplicateRecords, 0);
     assert.equal(liveSummary.crawlSuccesses, 1);
     assert.equal(liveSummary.crawlErrors, 0);
     assert.equal(liveSummary.normalizedRecords, 1);
@@ -157,13 +167,22 @@ async function runLiveCrawlSmoke() {
     assert.equal(liveRecord.pageUrl, `${baseUrl}/careers`);
     assert.equal(liveRecord.pageTitle, 'Live Smoke Careers');
     assert.ok(
+      liveRecord.signals.includes('hiring_section'),
+      'live crawl should detect Russian vacancies evidence',
+    );
+    assert.ok(
       liveRecord.signals.includes('active_hiring'),
-      'live crawl should detect active hiring evidence',
+      'live crawl should detect Russian active hiring evidence',
     );
     assert.ok(
       liveRecord.signals.includes('open_positions'),
-      'live crawl should detect open positions evidence',
+      'live crawl should detect Russian open positions evidence',
     );
+    assert.deepEqual(liveRecord.contactPaths, [
+      { type: 'generic_email', value: 'hr@livesmoke.example', source: 'mailto' },
+      { type: 'contact_page', url: `${baseUrl}/kontakty`, source: 'link' },
+      { type: 'generic_email', value: 'careers@livesmoke.example', source: 'text' },
+    ]);
 
     await assert.rejects(
       () => resolveCompanySiteLiveInput({ targetsFilePath: failedTargetsPath }),

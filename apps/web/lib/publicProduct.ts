@@ -151,14 +151,18 @@ function toPublicPreviewItem(item: HhDigestItem): PublicPreviewItem {
   return {
     ...item,
     confidenceLabel: deriveConfidenceLabel(item.total_score),
-    sourceCount: item.sourceFamilies.length,
-    sourceKeys: item.candidateSourceKeys,
-    structuredSignalCount: item.evidenceTitles.length,
-    curationLabels: item.sourceFamilies
+    sourceCount: item.source_families.length,
+    sourceKeys: item.candidate_source_keys,
+    structuredSignalCount: item.evidence_titles.length,
+    curationLabels: item.source_families
   }
 }
 
 function deriveConfidenceLabel(totalScore: number): string {
+  // NOTE: preview-only score band for the public landing page — NOT the
+  // confidence gate from lib/scoring/gates. Gates classify evidence
+  // quality (A/B/C/D); this helper buckets a numeric score into
+  // high/medium/low for marketing copy. Do not conflate the two.
   if (totalScore >= 80) return "high"
   if (totalScore >= 50) return "medium"
   return "low"
@@ -169,9 +173,9 @@ function matchesPreviewInput(item: HhDigestItem, input: PublicPreviewInput): boo
     item.employer_name,
     ...item.reasons,
     item.opener,
-    ...item.sourceFamilies,
-    ...item.evidenceTitles,
-    ...item.locationNames
+    ...item.source_families,
+    ...item.evidence_titles,
+    ...item.location_names
   ].join(" ").toLocaleLowerCase("ru-RU")
 
   const includeTerms = [input.specialization, input.targetCity, input.includeKeywords]

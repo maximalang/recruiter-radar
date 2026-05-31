@@ -1,8 +1,9 @@
 import { getDigestPreviewItems, getDigestItemsForClientProfile } from "./digest"
+import type { DigestItem } from "./db-types"
 
 export type HhDigestItem = {
   rank: number
-  orgId: string
+  org_id: string
   hh_employer_id: string
   employer_name: string
   vacancies_count: number
@@ -11,10 +12,11 @@ export type HhDigestItem = {
   total_score: number
   reasons: [string, string]
   opener: string
-  sourceFamilies: string[]
-  evidenceTitles: string[]
-  candidateSourceKeys: string[]
-  locationNames: string[]
+  source_families: string[]
+  evidence_titles: string[]
+  candidate_source_keys: string[]
+  location_names: string[]
+  confidence_gate?: 'A' | 'B' | 'C' | 'D'
 }
 
 export async function getHhDigestItems(input?: {
@@ -25,22 +27,23 @@ export async function getHhDigestItems(input?: {
   if (clientProfileId) {
     const items = await getDigestItemsForClientProfile({ clientProfileId })
     return items
-      .filter((item) => item.confidenceGate !== "C" && item.confidenceGate !== "D")
+      .filter((item) => item.confidence_gate !== "C" && item.confidence_gate !== "D")
       .map((item) => ({
         rank: item.rank,
-        orgId: item.orgId,
-        hh_employer_id: item.sourceExternalId,
-        employer_name: item.sourceDisplayName,
-        vacancies_count: item.vacanciesCount,
-        distinct_vacancy_names_count: item.distinctVacancyNamesCount,
-        latest_published_at: item.latestPublishedAt,
-        total_score: item.totalScore,
+        org_id: item.org_id,
+        hh_employer_id: item.source_external_id,
+        employer_name: item.source_display_name,
+        vacancies_count: item.vacancies_count,
+        distinct_vacancy_names_count: item.distinct_vacancy_names_count,
+        latest_published_at: item.latest_published_at,
+        total_score: item.total_score,
         reasons: item.reasons,
         opener: item.opener,
-        sourceFamilies: item.sourceFamilies,
-        evidenceTitles: item.evidenceTitles,
-        candidateSourceKeys: item.candidateSourceKeys,
-        locationNames: item.locationNames
+        source_families: item.source_families,
+        evidence_titles: item.evidence_titles,
+        candidate_source_keys: item.candidate_source_keys,
+        location_names: item.location_names,
+        confidence_gate: item.confidence_gate
       }))
   }
 
@@ -48,19 +51,20 @@ export async function getHhDigestItems(input?: {
 
   return items.map((item) => ({
     rank: item.rank,
-    orgId: item.orgId,
-    hh_employer_id: item.sourceExternalId,
-    employer_name: item.sourceDisplayName,
-    vacancies_count: item.vacanciesCount,
-    distinct_vacancy_names_count: item.distinctVacancyNamesCount,
-    latest_published_at: item.latestPublishedAt,
-    total_score: item.totalScore,
+    org_id: item.org_id,
+    hh_employer_id: item.source_external_id,
+    employer_name: item.source_display_name,
+    vacancies_count: item.vacancies_count,
+    distinct_vacancy_names_count: item.distinct_vacancy_names_count,
+    latest_published_at: item.latest_published_at,
+    total_score: item.total_score,
     reasons: item.reasons,
     opener: item.opener,
-    sourceFamilies: item.sourceFamilies,
-    evidenceTitles: item.evidenceTitles,
-    candidateSourceKeys: item.candidateSourceKeys,
-    locationNames: item.locationNames
+    source_families: item.source_families,
+    evidence_titles: item.evidence_titles,
+    candidate_source_keys: item.candidate_source_keys,
+    location_names: item.location_names,
+    confidence_gate: item.confidence_gate
   }))
 }
 

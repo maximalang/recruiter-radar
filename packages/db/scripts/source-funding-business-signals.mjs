@@ -7,6 +7,13 @@ import {
   assertProviderNormalization,
   extractProviderRecords,
 } from './adapters/provider-contract.mjs';
+import {
+  buildRussianLegalNameSourceKey,
+  buildSourceKeyAliases,
+  dedupeNormalizedRecords,
+  stripBom,
+} from './adapters/source-records.mjs';
+import { loadEnvFile, normalizeDomain } from './lib/common-utils.mjs';
 import { fetchJson } from './adapters/source-http.mjs';
 
 const { Client } = pg;
@@ -15,7 +22,6 @@ const rootEnvPath = resolve(scriptDir, '../../../.env');
 const SOURCE_ID = 'funding-business-signals';
 const SUPPORTED_ACTIONS = new Set(['fetch', 'ingest', 'pipeline']);
 
-loadEnvFile(rootEnvPath);
 
 export async function runFundingBusinessSignalsCli(argv = process.argv.slice(2)) {
   const requestedAction = argv[0]?.trim() || 'pipeline';
@@ -40,7 +46,7 @@ export async function runFundingBusinessSignalsCli(argv = process.argv.slice(2))
 
     if (requestedAction === 'fetch') {
       console.log(JSON.stringify(buildFetchSummary(input), null, 2));
-      process.exit(0);
+      return;
     }
 
     if (!databaseUrl) {
@@ -57,7 +63,7 @@ export async function runFundingBusinessSignalsCli(argv = process.argv.slice(2))
 
     if (requestedAction === 'ingest') {
       console.log(JSON.stringify(buildIngestSummary(input, stats), null, 2));
-      process.exit(0);
+      return;
     }
 
     console.log(JSON.stringify(buildPipelineSummary(input, stats), null, 2));
@@ -130,10 +136,12 @@ export async function resolveFundingProviderInput({ providerUrl, providerToken }
     normalizedRecords.push(normalized);
   }
 
+  const dedupeResult = dedupeNormalizedRecords(normalizedRecords);
+
   assertProviderNormalization({
     sourceId: SOURCE_ID,
     recordsReceived: records.length,
-    normalizedRecords,
+    normalizedRecords: dedupeResult.records,
     skippedRecords,
   });
 
@@ -141,7 +149,8 @@ export async function resolveFundingProviderInput({ providerUrl, providerToken }
     inputMode: 'provider-token',
     inputFilePath: null,
     recordsReceived: records.length,
-    normalizedRecords,
+    duplicateRecords: dedupeResult.duplicateRecords,
+    normalizedRecords: dedupeResult.records,
     skippedRecords,
   };
 }
@@ -169,7 +178,9 @@ export async function resolveFundingGdeltInput({ gdeltQueries }) {
     normalizedRecords.push(normalized);
   }
 
-  if (records.length > 0 && normalizedRecords.length === 0) {
+  const dedupeResult = dedupeNormalizedRecords(normalizedRecords);
+
+  if (records.length > 0 && dedupeResult.records.length === 0) {
     throw new Error(
       `${SOURCE_ID} GDELT returned ${records.length} records but 0 normalized records`
         + ` (${skippedRecords} skipped). Check GDELT query mapping.`,
@@ -182,7 +193,8 @@ export async function resolveFundingGdeltInput({ gdeltQueries }) {
     liveProvider: 'gdelt-doc-api',
     queriesReceived: gdeltQueries.length,
     recordsReceived: records.length,
-    normalizedRecords,
+    duplicateRecords: dedupeResult.duplicateRecords,
+    normalizedRecords: dedupeResult.records,
     skippedRecords,
   };
 }
@@ -197,9 +209,11 @@ async function fetchGdeltRecords(queryConfig) {
 
   const body = await fetchJson(url, {
     sourceName: 'funding-business-signals gdelt',
+    nodeHttpFallback: true,
+    preferNodeHttpFallback: process.env.FUNDING_SIGNALS_GDELT_TRANSPORT !== 'fetch',
     retries: 2,
     retryDelayMs: 6000,
-    timeoutMs: 30000,
+    timeoutMs: resolveGdeltTimeoutMs(),
     headers: {
       'user-agent': 'RecruiterRadar/1.0 (funding-business-signals)',
     },
@@ -218,7 +232,7 @@ function mapGdeltArticle(article, queryConfig, index) {
   return {
     external_id: toNonEmptyText(article?.url) ?? `gdelt:${queryConfig.query}:${index + 1}`,
     company_name: queryConfig.companyName,
-    company_domain: queryConfig.companyDomain ?? domain,
+    company_domain: queryConfig.companyDomain,
     headline: title,
     summary: toNonEmptyText(article?.seendate)
       ? `GDELT news context, seen at ${article.seendate}`
@@ -227,6 +241,7 @@ function mapGdeltArticle(article, queryConfig, index) {
     event_type: eventType,
     published_at: parseGdeltDate(article?.seendate),
     source: 'gdelt-doc-api',
+    publisher_domain: domain,
     raw: article,
   };
 }
@@ -238,7 +253,7 @@ function resolveFundingFileInput(inputFilePath) {
     throw new Error(`FUNDING_BUSINESS_SIGNALS_INPUT_FILE does not exist: ${resolvedPath}`);
   }
 
-  const rawContent = readFileSync(resolvedPath, 'utf8').replace(/^﻿/, '');
+  const rawContent = stripBom(readFileSync(resolvedPath, 'utf8'));
   const records = parseInputRecords(rawContent, resolvedPath);
   const fetchedAt = new Date().toISOString();
   const normalizedRecords = [];
@@ -255,11 +270,14 @@ function resolveFundingFileInput(inputFilePath) {
     normalizedRecords.push(normalized);
   }
 
+  const dedupeResult = dedupeNormalizedRecords(normalizedRecords);
+
   return {
     inputMode: 'file',
     inputFilePath: resolvedPath,
     recordsReceived: records.length,
-    normalizedRecords,
+    duplicateRecords: dedupeResult.duplicateRecords,
+    normalizedRecords: dedupeResult.records,
     skippedRecords,
   };
 }
@@ -372,6 +390,7 @@ function normalizeFundingRecord(record, fetchedAt, lineNumber) {
   const headline = toNonEmptyText(record.headline ?? record.title);
   const summary = toNonEmptyText(record.summary ?? record.description);
   const sourceUrl = toUrlOrNull(record.source_url ?? record.url ?? record.article_url);
+  const publisherDomain = normalizeDomain(record.publisher_domain ?? record.source_domain ?? record.publisher);
   const eventType = toNonEmptyText(record.event_type ?? record.signal_type ?? record.type);
   const amount = toNonEmptyText(record.amount ?? record.funding_amount);
   const currency = toNonEmptyText(record.currency) ?? 'USD';
@@ -380,7 +399,7 @@ function normalizeFundingRecord(record, fetchedAt, lineNumber) {
   const detectedAt = toTimestampOrNull(record.detected_at ?? record.occurred_at ?? record.published_at) ?? fetchedAt;
   const signalType = resolveSignalType(record);
 
-  const inferredDomain = companyDomain ?? extractHostname(companyWebsiteUrl) ?? extractHostname(sourceUrl);
+  const inferredDomain = companyDomain ?? extractHostname(companyWebsiteUrl);
 
   if (!companyName && !inferredDomain) {
     return null;
@@ -396,9 +415,14 @@ function normalizeFundingRecord(record, fetchedAt, lineNumber) {
   const primarySourceKey = buildPrimarySourceKey({ inferredDomain, companyName });
   const domainSourceKey = inferredDomain ? `domain:${inferredDomain}` : null;
   const companyNameSourceKey = companyName ? `company-name:${normalizeSourceKeyText(companyName)}` : null;
-  const orgSourceKeys = [primarySourceKey, domainSourceKey, companyNameSourceKey].filter(
+  const russianLegalNameSourceKey = primarySourceKey !== companyNameSourceKey
+    ? buildRussianLegalNameSourceKey(companyName)
+    : null;
+  const strongCompanyNameSourceKey = primarySourceKey === companyNameSourceKey ? companyNameSourceKey : null;
+  const orgSourceKeys = [primarySourceKey, domainSourceKey, strongCompanyNameSourceKey].filter(
     (value, idx, values) => Boolean(value) && values.indexOf(value) === idx,
   );
+  const orgSourceAliasKeys = buildSourceKeyAliases(orgSourceKeys, [companyNameSourceKey, russianLegalNameSourceKey]);
 
   if (orgSourceKeys.length === 0) {
     return null;
@@ -417,6 +441,7 @@ function normalizeFundingRecord(record, fetchedAt, lineNumber) {
     headline: resolvedHeadline,
     summary,
     sourceUrl,
+    publisherDomain,
     eventType,
     signalType,
     amount,
@@ -427,7 +452,9 @@ function normalizeFundingRecord(record, fetchedAt, lineNumber) {
     primarySourceKey,
     domainSourceKey,
     companyNameSourceKey,
+    russianLegalNameSourceKey,
     orgSourceKeys,
+    orgSourceAliasKeys,
     signalExternalId,
   };
 }
@@ -643,7 +670,9 @@ export function buildFetchSummary(input) {
     action: 'fetch',
     inputMode: input.inputMode,
     inputFilePath: input.inputFilePath,
+    ...buildLiveFundingSummary(input),
     recordsReceived: input.recordsReceived,
+    duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
   };
@@ -655,7 +684,9 @@ function buildIngestSummary(input, stats) {
     action: 'ingest',
     inputMode: input.inputMode,
     inputFilePath: input.inputFilePath,
+    ...buildLiveFundingSummary(input),
     recordsReceived: input.recordsReceived,
+    duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
     orgsCreated: stats.orgUpsertCount,
@@ -669,7 +700,9 @@ function buildPipelineSummary(input, stats) {
     action: 'pipeline',
     inputMode: input.inputMode,
     inputFilePath: input.inputFilePath,
+    ...buildLiveFundingSummary(input),
     recordsReceived: input.recordsReceived,
+    duplicateRecords: input.duplicateRecords,
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
     orgsCreated: stats.orgUpsertCount,
@@ -677,10 +710,81 @@ function buildPipelineSummary(input, stats) {
   };
 }
 
+function buildLiveFundingSummary(input) {
+  if (input.inputMode !== 'live-public') {
+    return {};
+  }
+
+  return {
+    liveProvider: input.liveProvider,
+    queriesReceived: input.queriesReceived,
+  };
+}
+
 function buildFallbackHeadline({ companyName, eventType, inferredDomain }) {
   const subject = companyName ?? inferredDomain ?? 'Компания';
   const event = eventType ? ` — ${eventType}` : '';
   return `${subject}${event}`;
+}
+
+function inferGdeltEventType(title) {
+  const normalizedTitle = normalizeSourceKeyText(title) ?? '';
+
+  if (/\bseries\s*a\b/.test(normalizedTitle)) return 'series_a';
+  if (/\bseries\s*b\b/.test(normalizedTitle)) return 'series_b';
+  if (/\bseries\s*c\b/.test(normalizedTitle)) return 'series_c';
+  if (/\bseries\s*d\b/.test(normalizedTitle)) return 'series_d';
+  if (/pre[-\s]?seed/.test(normalizedTitle)) return 'pre_seed';
+  if (/\bseed\b/.test(normalizedTitle)) return 'seed';
+  if (/\bgrant\b/.test(normalizedTitle)) return 'grant';
+  if (/\bipo\b|initial public offering/.test(normalizedTitle)) return 'ipo';
+  if (/acquir|acquisition|takeover/.test(normalizedTitle)) return 'acquisition';
+  if (/\bmerger\b|\bmerges\b/.test(normalizedTitle)) return 'merger';
+  if (/funding|raises|raised|investment|invests|venture|capital/.test(normalizedTitle)) return 'funding_round';
+  if (/hiring|recruit|vacanc|jobs|open positions/.test(normalizedTitle)) return 'hiring_context';
+  if (/expands|expansion|launches|opens office|new office/.test(normalizedTitle)) return 'expansion';
+
+  return 'press_mention';
+}
+
+function parseGdeltDate(value) {
+  const text = toNonEmptyText(value);
+
+  if (!text) {
+    return null;
+  }
+
+  const compactMatch = text.match(/^(\d{4})(\d{2})(\d{2})(?:(\d{2})(\d{2})(\d{2}))?$/);
+
+  if (compactMatch) {
+    const [, year, month, day, hour = '00', minute = '00', second = '00'] = compactMatch;
+    const date = new Date(Date.UTC(
+      Number.parseInt(year, 10),
+      Number.parseInt(month, 10) - 1,
+      Number.parseInt(day, 10),
+      Number.parseInt(hour, 10),
+      Number.parseInt(minute, 10),
+      Number.parseInt(second, 10),
+    ));
+
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  }
+
+  return toTimestampOrNull(text);
+}
+
+function clampInteger(value, fallback, min, max) {
+  const parsed = Number.parseInt(String(value ?? ''), 10);
+
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+
+  return Math.min(Math.max(parsed, min), max);
+}
+
+function resolveGdeltTimeoutMs() {
+  return clampInteger(process.env.FUNDING_SIGNALS_GDELT_TIMEOUT_MS, 60000, 5000, 120000);
 }
 
 function buildSignalSummaryText(record) {
@@ -709,8 +813,8 @@ function buildSignalPayload(record) {
     evidence_role: 'context',
     source_entity_type: 'company',
     source_entity_key: record.primarySourceKey,
-    source_entity_alias_keys: record.orgSourceKeys.filter((v) => v !== record.primarySourceKey),
-    source_entity_external_id: record.externalId,
+    source_entity_alias_keys: buildSourceKeyAliases(record.orgSourceKeys, record.orgSourceAliasKeys, record.primarySourceKey),
+    source_entity_external_id: null,
     source_entity_display_name: record.orgDisplayName,
     source_entity_name: record.orgName,
     source_record_type: 'business_signal',
@@ -728,6 +832,7 @@ function buildSignalPayload(record) {
     currency: record.currency,
     investors: record.investors,
     source_url: record.sourceUrl,
+    publisher_domain: record.publisherDomain,
     fetched_at: record.fetchedAt,
   };
 }
@@ -736,7 +841,7 @@ function buildOrgSourceMetadata(record, sourceKey) {
   return {
     source: SOURCE_ID,
     source_key: sourceKey,
-    source_alias_keys: record.orgSourceKeys.filter((v) => v !== sourceKey),
+    source_alias_keys: buildSourceKeyAliases(record.orgSourceKeys, record.orgSourceAliasKeys, sourceKey),
     display_name: record.orgDisplayName,
     company_name: record.companyName,
     company_domain: record.companyDomain,
@@ -762,50 +867,6 @@ function resolveDbConnectionTimeoutMillis() {
 
   const parsedValue = Number.parseInt(rawValue, 10);
   return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : 5000;
-}
-
-function loadEnvFile(filePath) {
-  if (!existsSync(filePath)) {
-    return;
-  }
-
-  const envFile = readFileSync(filePath, 'utf8').replace(/^﻿/, '');
-
-  for (const rawLine of envFile.split(/\r?\n/)) {
-    const trimmedLine = rawLine.trim();
-
-    if (!trimmedLine || trimmedLine.startsWith('#')) {
-      continue;
-    }
-
-    const separatorIndex = rawLine.indexOf('=');
-
-    if (separatorIndex === -1) {
-      continue;
-    }
-
-    const key = rawLine.slice(0, separatorIndex).trim();
-
-    if (!key || process.env[key] !== undefined) {
-      continue;
-    }
-
-    let value = rawLine.slice(separatorIndex + 1).trim();
-
-    if (
-      (value.startsWith('"') && value.endsWith('"'))
-      || (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
-    }
-
-    process.env[key] = value;
-  }
-}
-
-export function normalizeDomain(value) {
-  const normalizedValue = normalizeSourceKeyText(value);
-  return normalizedValue ? normalizedValue.replace(/^www\./, '') : null;
 }
 
 export function normalizeSourceKeyText(value) {

@@ -1,12 +1,17 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
+import { isAbsolute, normalize, join, basename } from 'node:path';
 import {
   SOURCE_ACTIONS,
   SOURCE_STATUS_SEMANTICS,
   createActionMap,
   defineSource,
 } from './source-contract.mjs';
+import {
+  SOURCE_COVERAGE_TIERS,
+  validateSourceCoverage,
+} from './source-coverage-requirements.mjs';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, '../../..');
@@ -28,7 +33,161 @@ const egrulFnsScriptPath = './packages/db/scripts/source-egrul-fns.mjs';
 const egrulFnsAbsoluteScriptPath = resolve(scriptDir, './source-egrul-fns.mjs');
 const fundingScriptPath = './packages/db/scripts/source-funding-business-signals.mjs';
 const fundingAbsoluteScriptPath = resolve(scriptDir, './source-funding-business-signals.mjs');
+const rabotaRossiiScriptPath = './packages/db/scripts/source-rabota-rossii.mjs';
+const rabotaRossiiAbsoluteScriptPath = resolve(scriptDir, './source-rabota-rossii.mjs');
+const transparentBusinessFnsScriptPath = './packages/db/scripts/source-transparent-business-fns.mjs';
+const transparentBusinessFnsAbsoluteScriptPath = resolve(scriptDir, './source-transparent-business-fns.mjs');
+const fedresursScriptPath = './packages/db/scripts/source-fedresurs.mjs';
+const fedresursAbsoluteScriptPath = resolve(scriptDir, './source-fedresurs.mjs');
+const superjobScriptPath = './packages/db/scripts/source-superjob.mjs';
+const superjobAbsoluteScriptPath = resolve(scriptDir, './source-superjob.mjs');
+const habrCareerScriptPath = './packages/db/scripts/source-habr-career.mjs';
+const habrCareerAbsoluteScriptPath = resolve(scriptDir, './source-habr-career.mjs');
+const companyNewsroomsScriptPath = './packages/db/scripts/source-company-newsrooms.mjs';
+const companyNewsroomsAbsoluteScriptPath = resolve(scriptDir, './source-company-newsrooms.mjs');
+const industryMediaScriptPath = './packages/db/scripts/source-industry-media.mjs';
+const industryMediaAbsoluteScriptPath = resolve(scriptDir, './source-industry-media.mjs');
+const regionalJobBoardsScriptPath = './packages/db/scripts/source-regional-job-boards.mjs';
+const regionalJobBoardsAbsoluteScriptPath = resolve(scriptDir, './source-regional-job-boards.mjs');
 const registry = new Map();
+const sourceReadinessPolicy = Object.freeze({
+  hh: sourcePolicy({
+    priority: 'P1',
+    leadEligibility: 'digest-lead-originating',
+    maturity: 'controlled-live-ready',
+    productionBlockers: [
+      'HH_USER_AGENT must identify a real registered app/contact before production live checks.',
+      'Controlled live matrix for roles, regions, and pages must be recorded before broad expansion.',
+    ],
+    promotionStatus: 'digest-allowed',
+  }),
+  'rabota-rossii': sourcePolicy({
+    priority: 'P1',
+    leadEligibility: 'confidence-gated-evidence',
+    maturity: 'official-live-public-gated',
+    productionBlockers: [
+      'RF query matrix, salary/region/freshness assertions, and HH dedupe checks must pass before digest promotion.',
+    ],
+    promotionStatus: 'blocked-from-digest-pending-confidence-tests',
+  }),
+  'career-pages': sourcePolicy({
+    priority: 'P1',
+    leadEligibility: 'digest-lead-originating',
+    maturity: 'controlled-live-ready',
+    productionBlockers: [
+      'RF discovery targets, JobPosting/HTML extraction, stale-page warnings, and direct-company proof scoring need controlled live coverage.',
+    ],
+    promotionStatus: 'digest-allowed',
+  }),
+  'egrul-fns': sourcePolicy({
+    priority: 'P1',
+    leadEligibility: 'enrichment-only',
+    maturity: 'entity-enrichment-ready',
+    productionBlockers: [
+      'Use only 10-digit legal entity INN inputs; 12-digit IP/person records must stay skipped.',
+    ],
+    promotionStatus: 'never-lead-originating',
+  }),
+  'transparent-business-fns': sourcePolicy({
+    priority: 'P1',
+    leadEligibility: 'enrichment-only',
+    maturity: 'provider-or-snapshot-only',
+    productionBlockers: [
+      'No confirmed stable lawful public API is approved; do not scrape pb.nalog.ru.',
+    ],
+    promotionStatus: 'never-lead-originating',
+  }),
+  fedresurs: sourcePolicy({
+    priority: 'P1',
+    leadEligibility: 'context-only',
+    maturity: 'provider-or-snapshot-only',
+    productionBlockers: [
+      'Public site is blocked by Qrator/401 patterns; use an official or compliant provider endpoint.',
+    ],
+    promotionStatus: 'never-lead-originating',
+  }),
+  'company-site': sourcePolicy({
+    priority: 'P2',
+    leadEligibility: 'enrichment-only',
+    maturity: 'curated-live-ready',
+    productionBlockers: [
+      'Generic company pages remain enrichment; only explicit hiring surfaces can corroborate lead evidence.',
+    ],
+    promotionStatus: 'supporting-evidence-only',
+  }),
+  'funding-business-signals': sourcePolicy({
+    priority: 'P2',
+    leadEligibility: 'context-only',
+    maturity: 'curated-live-ready',
+    productionBlockers: [
+      'Funding/news context must not create leads without direct hiring evidence.',
+    ],
+    promotionStatus: 'never-lead-originating',
+  }),
+  'linkedin-company-pages': sourcePolicy({
+    priority: 'P2',
+    leadEligibility: 'confidence-gated-evidence',
+    maturity: 'provider-or-snapshot-only',
+    productionBlockers: [
+      'Use compliant provider snapshots only; discard employee, profile, email, and phone fields.',
+    ],
+    promotionStatus: 'blocked-from-digest-pending-confidence-tests',
+  }),
+  'tech-job-boards': sourcePolicy({
+    priority: 'P2',
+    leadEligibility: 'confidence-gated-evidence',
+    maturity: 'provider-fixture-ready',
+    productionBlockers: [
+      'API-mega-list providers must pass fixture shape, sensitive-field rejection, freshness, region, salary, and org-identity gates.',
+    ],
+    promotionStatus: 'blocked-from-digest-pending-confidence-tests',
+  }),
+  superjob: sourcePolicy({
+    priority: 'P2',
+    leadEligibility: 'confidence-gated-evidence',
+    maturity: 'provider-or-snapshot-only',
+    productionBlockers: [
+      'SUPERJOB_API_APP_ID or compliant provider snapshot is required; anonymous API is not a production path.',
+    ],
+    promotionStatus: 'blocked-from-digest-pending-confidence-tests',
+  }),
+  'habr-career': sourcePolicy({
+    priority: 'P2',
+    leadEligibility: 'confidence-gated-evidence',
+    maturity: 'provider-or-snapshot-only',
+    productionBlockers: [
+      'Direct HTML mode requires robots/legal review; use provider or snapshots until approved.',
+    ],
+    promotionStatus: 'blocked-from-digest-pending-confidence-tests',
+  }),
+  'company-newsrooms': sourcePolicy({
+    priority: 'P3',
+    leadEligibility: 'context-only',
+    maturity: 'curated-context-only',
+    productionBlockers: [
+      'Curated targets only; supporting context must never originate a lead alone.',
+    ],
+    promotionStatus: 'never-lead-originating',
+  }),
+  'industry-media': sourcePolicy({
+    priority: 'P3',
+    leadEligibility: 'context-only',
+    maturity: 'provider-or-curated-context-only',
+    productionBlockers: [
+      'Article publisher domains must never become company identity; source review is required.',
+    ],
+    promotionStatus: 'never-lead-originating',
+  }),
+  'regional-job-boards': sourcePolicy({
+    priority: 'P3',
+    leadEligibility: 'confidence-gated-evidence',
+    maturity: 'provider-or-snapshot-only',
+    productionBlockers: [
+      'Each board requires legal/robots/provider review and confidence gates before digest use.',
+    ],
+    promotionStatus: 'blocked-from-digest-pending-confidence-tests',
+  }),
+});
 
 registerSource(
   defineSource({
@@ -74,6 +233,18 @@ registerSource(
     },
   }),
 );
+
+registerRunnableScriptSource({
+  id: 'rabota-rossii',
+  kind: 'job-board',
+  sourceClass: 'primary-platform',
+  evidenceTier: 'medium-signal',
+  defaultConfidence: 0.7,
+  fetchModes: ['file', 'live-public'],
+  description: 'Official Rabota Rossii open-data vacancies for regional and public-adjacent hiring coverage.',
+  scriptPath: rabotaRossiiScriptPath,
+  absoluteScriptPath: rabotaRossiiAbsoluteScriptPath,
+});
 
 registerSource(
   defineSource({
@@ -149,8 +320,8 @@ registerSource(
     evidenceTier: 'medium-signal',
     defaultConfidence: 0.68,
     status: 'active',
-    fetchModes: ['file', 'live-public'],
-    description: 'Specialized tech job boards beyond HH for additional market coverage.',
+    fetchModes: ['file', 'live-public', 'provider-token'],
+    description: 'Specialized tech job boards and compliant job snapshot providers beyond HH for additional market coverage.',
     capabilities: SOURCE_ACTIONS,
     scripts: {
       fetch: techJobBoardsScriptPath,
@@ -182,7 +353,7 @@ registerSource(
     evidenceTier: 'high-signal',
     defaultConfidence: 0.9,
     status: 'active',
-    fetchModes: ['file', 'provider-token'],
+    fetchModes: ['file', 'live-public', 'provider-token'],
     description: 'EGRUL/FNS company registry data for legal entity verification and enrichment.',
     capabilities: SOURCE_ACTIONS,
     scripts: {
@@ -248,7 +419,7 @@ registerSource(
     evidenceTier: 'context-only',
     defaultConfidence: 0.58,
     status: 'active',
-    fetchModes: ['file', 'provider-token'],
+    fetchModes: ['file', 'live-public', 'provider-token'],
     description: 'Funding, hiring, growth, and other business signals for supporting context only.',
     capabilities: SOURCE_ACTIONS,
     scripts: {
@@ -273,6 +444,90 @@ registerSource(
   }),
 );
 
+registerRunnableScriptSource({
+  id: 'transparent-business-fns',
+  kind: 'company-registry',
+  sourceClass: 'registry-reference',
+  evidenceTier: 'high-signal',
+  defaultConfidence: 0.86,
+  fetchModes: ['file', 'provider-token'],
+  description: 'Transparent Business/FNS company context for size, risk, registry and exclusion enrichment only.',
+  scriptPath: transparentBusinessFnsScriptPath,
+  absoluteScriptPath: transparentBusinessFnsAbsoluteScriptPath,
+});
+
+registerRunnableScriptSource({
+  id: 'fedresurs',
+  kind: 'business-signal',
+  sourceClass: 'market-signal',
+  evidenceTier: 'context-only',
+  defaultConfidence: 0.62,
+  fetchModes: ['file', 'provider-token'],
+  description: 'Fedresurs corporate events, audit, license and asset context; never lead-originating.',
+  scriptPath: fedresursScriptPath,
+  absoluteScriptPath: fedresursAbsoluteScriptPath,
+});
+
+registerRunnableScriptSource({
+  id: 'superjob',
+  kind: 'job-board',
+  sourceClass: 'primary-platform',
+  evidenceTier: 'medium-signal',
+  defaultConfidence: 0.66,
+  fetchModes: ['file', 'provider-token'],
+  description: 'SuperJob vacancy coverage through app-key/provider mode; not promoted to digest until confidence gates pass.',
+  scriptPath: superjobScriptPath,
+  absoluteScriptPath: superjobAbsoluteScriptPath,
+});
+
+registerRunnableScriptSource({
+  id: 'habr-career',
+  kind: 'job-board',
+  sourceClass: 'primary-platform',
+  evidenceTier: 'medium-signal',
+  defaultConfidence: 0.69,
+  fetchModes: ['file', 'provider-token'],
+  description: 'Habr Career IT vacancy coverage via snapshots/provider until a lawful public live path is approved.',
+  scriptPath: habrCareerScriptPath,
+  absoluteScriptPath: habrCareerAbsoluteScriptPath,
+});
+
+registerRunnableScriptSource({
+  id: 'company-newsrooms',
+  kind: 'company-site',
+  sourceClass: 'company-surface',
+  evidenceTier: 'context-only',
+  defaultConfidence: 0.6,
+  fetchModes: ['file', 'live-public', 'provider-token'],
+  description: 'Company newsroom and press-center context from curated targets or provider snapshots; supporting evidence only.',
+  scriptPath: companyNewsroomsScriptPath,
+  absoluteScriptPath: companyNewsroomsAbsoluteScriptPath,
+});
+
+registerRunnableScriptSource({
+  id: 'industry-media',
+  kind: 'business-signal',
+  sourceClass: 'market-signal',
+  evidenceTier: 'context-only',
+  defaultConfidence: 0.52,
+  fetchModes: ['file', 'provider-token'],
+  description: 'Curated industry media context after manual/legal source review; never lead-originating.',
+  scriptPath: industryMediaScriptPath,
+  absoluteScriptPath: industryMediaAbsoluteScriptPath,
+});
+
+registerRunnableScriptSource({
+  id: 'regional-job-boards',
+  kind: 'job-board',
+  sourceClass: 'primary-platform',
+  evidenceTier: 'medium-signal',
+  defaultConfidence: 0.58,
+  fetchModes: ['file', 'provider-token'],
+  description: 'Regional job-board snapshots/provider feeds after legal and robots review; not in digest by default.',
+  scriptPath: regionalJobBoardsScriptPath,
+  absoluteScriptPath: regionalJobBoardsAbsoluteScriptPath,
+});
+
 export function listSources() {
   return [...registry.values()];
 }
@@ -294,6 +549,11 @@ export function listSourceSummaries() {
     sourceClass: source.sourceClass,
     evidenceTier: source.evidenceTier,
     defaultConfidence: source.defaultConfidence,
+    priority: source.priority,
+    leadEligibility: source.leadEligibility,
+    maturity: source.maturity,
+    productionBlockers: source.productionBlockers,
+    promotionStatus: source.promotionStatus,
     status: source.status,
     runnable: source.runnable,
     fetchModes: source.fetchModes,
@@ -331,7 +591,71 @@ function registerSource(source) {
     throw new Error(`Duplicate source registration: ${source.id}`);
   }
 
-  registry.set(source.id, source);
+  const policy = sourceReadinessPolicy[source.id];
+
+  if (!policy) {
+    throw new Error(`Missing source readiness policy metadata: ${source.id}`);
+  }
+
+  registry.set(source.id, Object.freeze({
+    ...source,
+    ...policy,
+  }));
+}
+
+function sourcePolicy({ priority, leadEligibility, maturity, productionBlockers, promotionStatus }) {
+  return Object.freeze({
+    priority,
+    leadEligibility,
+    maturity,
+    productionBlockers: Object.freeze([...productionBlockers]),
+    promotionStatus,
+  });
+}
+
+function registerRunnableScriptSource({
+  id,
+  kind,
+  sourceClass,
+  evidenceTier,
+  defaultConfidence,
+  fetchModes,
+  description,
+  scriptPath,
+  absoluteScriptPath,
+}) {
+  registerSource(
+    defineSource({
+      id,
+      kind,
+      sourceClass,
+      evidenceTier,
+      defaultConfidence,
+      status: 'active',
+      fetchModes,
+      description,
+      capabilities: SOURCE_ACTIONS,
+      scripts: {
+        fetch: scriptPath,
+        ingest: scriptPath,
+        pipeline: scriptPath,
+      },
+      actionMap: createActionMap({
+        status: 'active',
+        capabilities: SOURCE_ACTIONS,
+        scripts: {
+          fetch: scriptPath,
+          ingest: scriptPath,
+          pipeline: scriptPath,
+        },
+      }),
+      runner: {
+        fetch: () => runSourceScript(absoluteScriptPath, 'fetch'),
+        ingest: () => runSourceScript(absoluteScriptPath, 'ingest'),
+        pipeline: () => runSourceScript(absoluteScriptPath, 'pipeline'),
+      },
+    }),
+  );
 }
 
 function registerPlannedSource({ id, kind, sourceClass, evidenceTier, defaultConfidence, description }) {
@@ -355,12 +679,44 @@ function registerPlannedSource({ id, kind, sourceClass, evidenceTier, defaultCon
 
 function runScript(scriptPath, args = []) {
   return new Promise((resolvePromise, rejectPromise) => {
+    // Validate and sanitize script path
+    if (!scriptPath || typeof scriptPath !== 'string') {
+      rejectPromise(new Error('Invalid script path'));
+      return;
+    }
+
+    // Resolve to absolute path and normalize to prevent traversal
+    const resolvedPath = isAbsolute(scriptPath)
+      ? normalize(scriptPath)
+      : normalize(join(repoRoot, scriptPath));
+
+    // Ensure path is within the repository
+    if (!resolvedPath.startsWith(repoRoot)) {
+      rejectPromise(new Error('Script path must be within the repository'));
+      return;
+    }
+
+    // Validate script is a .mjs file
+    if (!resolvedPath.endsWith('.mjs')) {
+      rejectPromise(new Error('Only .mjs scripts are allowed'));
+      return;
+    }
+
+    // Validate arguments
+    const validArgs = args.filter(arg => {
+      if (typeof arg !== 'string') return false;
+      // Remove shell metacharacters that could lead to command injection
+      const sanitized = arg.replace(/[;&|`$(){}[\]\\]/g, '');
+      return sanitized !== '';
+    });
+
     const stdoutChunks = [];
     const stderrChunks = [];
-    const child = spawn(process.execPath, [scriptPath, ...args], {
+    const child = spawn(process.execPath, [resolvedPath, ...validArgs], {
       cwd: repoRoot,
       env: process.env,
       stdio: ['inherit', 'pipe', 'pipe'],
+      shell: false, // Disable shell to prevent additional injection risks
     });
 
     child.stdout.on('data', (chunk) => {
@@ -389,7 +745,7 @@ function runScript(scriptPath, args = []) {
         : `exit code ${code ?? 'unknown'}`;
       const stderrDetails = stderr.trim();
       const errorSuffix = stderrDetails ? `: ${stderrDetails}` : '';
-      rejectPromise(new Error(`${scriptPath} failed with ${details}${errorSuffix}`));
+      rejectPromise(new Error(`${resolvedPath} failed with ${details}${errorSuffix}`));
     });
   });
 }
@@ -434,4 +790,73 @@ function parseDigestCompaniesCount(output) {
   }
 
   return parsed.length;
+}
+
+export function validateSourceCoverageReport() {
+  const allSources = listSources();
+  const coverageReport = validateSourceCoverage(allSources);
+
+  return {
+    allSources,
+    coverageReport,
+    requiredTiers: SOURCE_COVERAGE_TIERS,
+    timestamp: new Date().toISOString(),
+    passed: coverageReport.errors.length === 0,
+    summary: {
+      P1: {
+        total: SOURCE_COVERAGE_TIERS.P1.sources.length,
+        present: coverageReport.P1.present.length,
+        compliant: coverageReport.P1.compliant.length,
+        missing: coverageReport.P1.missing,
+        nonCompliant: coverageReport.P1.nonCompliant,
+      },
+      P2: {
+        total: SOURCE_COVERAGE_TIERS.P2.sources.length,
+        present: coverageReport.P2.present.length,
+        compliant: coverageReport.P2.compliant.length,
+        missing: coverageReport.P2.missing,
+        nonCompliant: coverageReport.P2.nonCompliant,
+      },
+      P3: {
+        total: SOURCE_COVERAGE_TIERS.P3.sources.length,
+        present: coverageReport.P3.present.length,
+        compliant: coverageReport.P3.compliant.length,
+        missing: coverageReport.P3.missing,
+        nonCompliant: coverageReport.P3.nonCompliant,
+      },
+      errors: coverageReport.errors,
+      warnings: coverageReport.warnings,
+    },
+  };
+}
+
+export function exportSourceCoverageDetails() {
+  const allSources = listSources();
+  const coverageReport = validateSourceCoverage(allSources);
+
+  return {
+    sources: allSources.map(source => ({
+      id: source.id,
+      kind: source.kind,
+      sourceClass: source.sourceClass,
+      evidenceTier: source.evidenceTier,
+      defaultConfidence: source.defaultConfidence,
+      priority: source.priority,
+      leadEligibility: source.leadEligibility,
+      maturity: source.maturity,
+      productionBlockers: source.productionBlockers,
+      promotionStatus: source.promotionStatus,
+      status: source.status,
+      runnable: source.runnable,
+      fetchModes: source.fetchModes,
+      liveCapable: source.liveCapable,
+      description: source.description,
+      requiredTier: Object.entries(SOURCE_COVERAGE_TIERS).find(([_, config]) =>
+        config.sources.includes(source.id)
+      )?.[0] || 'none',
+      inDigest: ['hh', 'career-pages'].includes(source.id),
+    })),
+    coverage: coverageReport,
+    requirements: SOURCE_COVERAGE_TIERS,
+  };
 }

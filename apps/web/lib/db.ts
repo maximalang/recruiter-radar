@@ -5,6 +5,15 @@ import type { HhDigestItem } from "./hhDigest";
 import { getTelegramBotToken, sendTelegramLeadMessage } from "./telegram";
 import { buildTelegramDigestFeedbackReplyMarkup } from "./telegramDigestFeedback";
 import { logError, logEvent } from "./runtime";
+import type {
+  ClientProfile,
+  Org,
+  DigestItem,
+  Lead,
+  DigestRun,
+  QueryResult,
+  DigestDbClient
+} from "./db-types";
 
 export const ACTIONABLE_LEAD_STATUSES = ["contacted", "replied", "won", "badfit", "snooze"] as const;
 export type ActionableLeadStatus = (typeof ACTIONABLE_LEAD_STATUSES)[number];
@@ -122,7 +131,7 @@ export async function sendLeadToTelegram(leadId: number): Promise<TelegramDelive
     const confidenceGate = extractConfidenceGate(lead.payload);
     const feedbackItem: HhDigestItem = {
       rank: 1,
-      orgId: String(lead.orgId),
+      org_id: String(lead.orgId),
       hh_employer_id: "",
       employer_name: lead.orgName,
       vacancies_count: 0,
@@ -131,10 +140,10 @@ export async function sendLeadToTelegram(leadId: number): Promise<TelegramDelive
       total_score: lead.score ?? 0,
       reasons: ["", ""],
       opener: "",
-      sourceFamilies: [],
-      evidenceTitles: [],
-      candidateSourceKeys: [],
-      locationNames: []
+      source_families: [],
+      evidence_titles: [],
+      candidate_source_keys: [],
+      location_names: []
     };
 
     const replyMarkup = buildTelegramDigestFeedbackReplyMarkup({
@@ -142,7 +151,7 @@ export async function sendLeadToTelegram(leadId: number): Promise<TelegramDelive
       items: [feedbackItem]
     });
     await sendTelegramLeadMessage(
-      { orgName: lead.orgName, status: lead.status, score: lead.score, lastSignalAt: lead.lastSignalAt, userName: lead.userName, confidenceGate },
+      { orgName: lead.orgName, status: lead.status, score: lead.score, lastSignalAt: lead.lastSignalAt, userName: lead.userName, confidence_gate: extractConfidenceGate(lead.payload) },
       { botToken, chatId: lead.telegramChatId },
       { replyMarkup }
     );
@@ -198,6 +207,7 @@ export async function assertDigestEntitlementByClientProfileId(clientProfileId: 
   const entitlement = await hasPremiumEntitlement(userId);
   if (!entitlement.allowed) throw new Error(entitlement.reason ?? "No active subscription or pilot.");
 }
+
 
 export async function assertTelegramChatOwnsClientProfile(telegramChatId: string, clientProfileId: string): Promise<void> {
   const pool = getPool();

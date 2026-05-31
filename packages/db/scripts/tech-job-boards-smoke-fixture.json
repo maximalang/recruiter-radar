@@ -52,6 +52,12 @@
       "job_title": "Python Developer",
       "location": "Новосибирск",
       "published_at": "2026-05-13T07:00:00.000Z"
+    },
+    {
+      "external_id": "board-url-only",
+      "board": "external-provider",
+      "job_title": "Board-only Developer",
+      "job_posting_url": "https://jobs.example/vacancies/board-url-only"
     }
   ]
 }

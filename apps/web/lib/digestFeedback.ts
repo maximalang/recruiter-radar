@@ -57,6 +57,113 @@ export function isDigestFeedbackAction(value: unknown): value is DigestFeedbackA
   return typeof value === "string" && DIGEST_FEEDBACK_ACTIONS.includes(value as DigestFeedbackAction);
 }
 
+export const DEFAULT_BADFIT_SUPPRESSION_DAYS = 30
+const MAX_SUPPRESSION_DAYS = 365
+const DEFAULT_SNOOZE_DAYS = 7
+const MAX_SNOOZE_DAYS = 90
+
+export type DigestFeedbackActionPlan = {
+  feedbackStatus: string
+  cooldownSql: string
+  suppressedSql: string
+  cooldownUpdateSql: string
+  suppressedUpdateSql: string
+  extraParams: unknown[]
+}
+
+/**
+ * Pure SQL-fragment plan for a digest feedback action. Lifted out of
+ * updateDigestOrgStateFeedback so the time-bounded suppression contract
+ * (badfit/dismissed default 30 days) can be unit-tested without a DB.
+ *
+ * paramOffset = number of $N placeholders already consumed by the caller's
+ * static params, so generated $N indices are unique inside the prepared
+ * statement.
+ */
+export function buildDigestFeedbackActionPlan(input: {
+  action: DigestFeedbackAction
+  snoozeDays?: number | null
+  suppressionDays?: number | null
+  paramOffset?: number
+}): DigestFeedbackActionPlan {
+  const offset = input.paramOffset ?? 0
+  switch (input.action) {
+    case 'accepted':
+    case 'contacted':
+      return {
+        feedbackStatus: 'contacted',
+        cooldownSql: 'NULL',
+        suppressedSql: "'infinity'::timestamptz",
+        cooldownUpdateSql: 'NULL',
+        suppressedUpdateSql: "'infinity'::timestamptz",
+        extraParams: [],
+      }
+    case 'replied':
+      return {
+        feedbackStatus: 'replied',
+        cooldownSql: 'NULL',
+        suppressedSql: "'infinity'::timestamptz",
+        cooldownUpdateSql: 'NULL',
+        suppressedUpdateSql: "'infinity'::timestamptz",
+        extraParams: [],
+      }
+    case 'won':
+      return {
+        feedbackStatus: 'won',
+        cooldownSql: 'NULL',
+        suppressedSql: "'infinity'::timestamptz",
+        cooldownUpdateSql: 'NULL',
+        suppressedUpdateSql: "'infinity'::timestamptz",
+        extraParams: [],
+      }
+    case 'badfit':
+    case 'dismissed': {
+      const days = clampSuppressionDays(input.suppressionDays)
+      const idx = offset + 1
+      return {
+        feedbackStatus: input.action,
+        cooldownSql: 'NULL',
+        suppressedSql: `NOW() + ($${idx} * INTERVAL '1 day')`,
+        cooldownUpdateSql: 'NULL',
+        suppressedUpdateSql: `GREATEST(COALESCE(client_digest_org_state.suppressed_until, '-infinity'::timestamptz), NOW() + ($${idx} * INTERVAL '1 day'))`,
+        extraParams: [days],
+      }
+    }
+    case 'snooze': {
+      const days = clampSnoozeDays(input.snoozeDays)
+      const idx = offset + 1
+      return {
+        feedbackStatus: 'snooze',
+        cooldownSql: 'NULL',
+        suppressedSql: `NOW() + ($${idx} * INTERVAL '1 day')`,
+        cooldownUpdateSql: 'NULL',
+        suppressedUpdateSql: `GREATEST(COALESCE(client_digest_org_state.suppressed_until, '-infinity'::timestamptz), NOW() + ($${idx} * INTERVAL '1 day'))`,
+        extraParams: [days],
+      }
+    }
+  }
+}
+
+function clampSuppressionDays(value: number | null | undefined): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return DEFAULT_BADFIT_SUPPRESSION_DAYS
+  }
+  const v = Math.trunc(value)
+  if (v <= 0) return DEFAULT_BADFIT_SUPPRESSION_DAYS
+  if (v > MAX_SUPPRESSION_DAYS) return MAX_SUPPRESSION_DAYS
+  return v
+}
+
+function clampSnoozeDays(value: number | null | undefined): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return DEFAULT_SNOOZE_DAYS
+  }
+  const v = Math.trunc(value)
+  if (v <= 0) return DEFAULT_SNOOZE_DAYS
+  if (v > MAX_SNOOZE_DAYS) return MAX_SNOOZE_DAYS
+  return v
+}
+
 export async function updateDigestOrgStateFeedback(input: {
   clientProfileId: string | number;
   orgId?: string | number | null;
@@ -64,6 +171,7 @@ export async function updateDigestOrgStateFeedback(input: {
   action: DigestFeedbackAction;
   note?: string | null;
   snoozeDays?: number | null;
+  suppressionDays?: number | null;
 }, db?: DigestFeedbackDbClient): Promise<DigestOrgStateRow> {
   const pool = db ?? getPool();
 
@@ -75,8 +183,14 @@ export async function updateDigestOrgStateFeedback(input: {
   const digestCandidateId = input.digestCandidateId == null ? null : normalizePositiveInteger(input.digestCandidateId, "Invalid digest candidate id.");
   const explicitOrgId = input.orgId == null ? null : normalizePositiveInteger(input.orgId, "Invalid org id.");
   const note = normalizeOptionalText(input.note);
-  const extraParams: unknown[] = [];
-  const actionConfig = getDigestFeedbackActionConfig(input.action, input.snoozeDays, extraParams);
+  // Static placeholders below: $1..$7. Action-specific extras start at $8.
+  const STATIC_PARAM_COUNT = 7;
+  const actionConfig = buildDigestFeedbackActionPlan({
+    action: input.action,
+    snoozeDays: input.snoozeDays,
+    suppressionDays: input.suppressionDays,
+    paramOffset: STATIC_PARAM_COUNT,
+  });
   const candidateContext = digestCandidateId == null
     ? null
     : await getDigestCandidateContext({ clientProfileId, digestCandidateId }, pool);
@@ -149,7 +263,7 @@ export async function updateDigestOrgStateFeedback(input: {
     note,
     candidateContext?.sourceExternalId ?? null,
     candidateContext?.sourceDisplayName ?? null,
-    ...extraParams
+    ...actionConfig.extraParams
   ]);
 
   return result.rows[0];
@@ -172,51 +286,6 @@ async function getDigestCandidateContext(input: {
   return result.rowCount === 1 ? result.rows[0] : null;
 }
 
-function getDigestFeedbackActionConfig(action: DigestFeedbackAction, snoozeDays: number | null | undefined, params: unknown[]) {
-  switch (action) {
-    case "accepted":
-    case "contacted":
-      return {
-        feedbackStatus: "contacted",
-        cooldownSql: "NULL",
-        suppressedSql: "'infinity'::timestamptz",
-        cooldownUpdateSql: "NULL",
-        suppressedUpdateSql: "'infinity'::timestamptz"
-      };
-    case "replied":
-      return {
-        feedbackStatus: "replied",
-        cooldownSql: "NULL",
-        suppressedSql: "'infinity'::timestamptz",
-        cooldownUpdateSql: "NULL",
-        suppressedUpdateSql: "'infinity'::timestamptz"
-      };
-    case "won":
-    case "badfit":
-    case "dismissed":
-      return {
-        feedbackStatus: action,
-        cooldownSql: "NULL",
-        suppressedSql: "'infinity'::timestamptz",
-        cooldownUpdateSql: "NULL",
-        suppressedUpdateSql: "'infinity'::timestamptz"
-      };
-    case "snooze": {
-      const normalizedSnoozeDays = normalizeSnoozeDays(snoozeDays);
-      params.push(normalizedSnoozeDays);
-      const idx = params.length;
-
-      return {
-        feedbackStatus: "snooze",
-        cooldownSql: "NULL",
-        suppressedSql: `NOW() + ($${idx} * INTERVAL '1 day')`,
-        cooldownUpdateSql: "NULL",
-        suppressedUpdateSql: `GREATEST(COALESCE(client_digest_org_state.suppressed_until, '-infinity'::timestamptz), NOW() + ($${idx} * INTERVAL '1 day'))`
-      };
-    }
-  }
-}
-
 function normalizePositiveInteger(value: string | number, message: string): number {
   const normalizedValue = typeof value === "number" ? value : Number(value);
 
@@ -234,13 +303,4 @@ function normalizeOptionalText(value: string | null | undefined): string | null 
 
   const normalizedValue = value.trim();
   return normalizedValue === "" ? null : normalizedValue;
-}
-
-function normalizeSnoozeDays(value: number | null | undefined): number {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    return 7;
-  }
-
-  const normalizedValue = Math.trunc(value);
-  return normalizedValue > 0 ? Math.min(normalizedValue, 90) : 7;
 }

@@ -1,0 +1,2 @@
+npm run web:check
+npm run --workspace=@recruiter-radar/web test

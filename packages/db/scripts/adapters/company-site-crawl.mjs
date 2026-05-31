@@ -12,12 +12,14 @@ export function parseCompanyPage(html, url) {
 
   const bodyText = extractVisibleText(html);
   const signals = detectSignals(bodyText);
+  const contactPaths = extractContactPaths(html, url, bodyText);
 
   return {
     page_url: url,
     page_title: ogTitle ?? title ?? null,
     summary: ogDescription ?? metaDescription ?? truncate(bodyText, 500) ?? null,
     signals,
+    contact_paths: contactPaths,
     _meta: { crawled: true },
   };
 }
@@ -128,14 +130,17 @@ function detectSignals(text) {
   const lower = text.toLowerCase();
   const signals = [];
   const patterns = [
-    { keyword: 'вакансии', signal: 'hiring_section' },
     { keyword: 'careers', signal: 'hiring_section' },
-    { keyword: 'мы ищем', signal: 'active_hiring' },
+    { keyword: '\u0432\u0430\u043a\u0430\u043d\u0441\u0438\u0438', signal: 'hiring_section' },
+    { keyword: '\u043a\u0430\u0440\u044c\u0435\u0440\u0430', signal: 'hiring_section' },
     { keyword: 'we are hiring', signal: 'active_hiring' },
     { keyword: 'join our team', signal: 'active_hiring' },
-    { keyword: 'присоединяйтесь', signal: 'active_hiring' },
-    { keyword: 'открытые позиции', signal: 'open_positions' },
+    { keyword: '\u043c\u044b \u0438\u0449\u0435\u043c', signal: 'active_hiring' },
+    { keyword: '\u043f\u0440\u0438\u0441\u043e\u0435\u0434\u0438\u043d\u044f\u0439\u0442\u0435\u0441\u044c', signal: 'active_hiring' },
+    { keyword: '\u043d\u0430\u0431\u0438\u0440\u0430\u0435\u043c \u043a\u043e\u043c\u0430\u043d\u0434\u0443', signal: 'active_hiring' },
     { keyword: 'open positions', signal: 'open_positions' },
+    { keyword: '\u043e\u0442\u043a\u0440\u044b\u0442\u044b\u0435 \u043f\u043e\u0437\u0438\u0446\u0438\u0438', signal: 'open_positions' },
+    { keyword: '\u043e\u0442\u043a\u0440\u044b\u0442\u044b\u0435 \u0432\u0430\u043a\u0430\u043d\u0441\u0438\u0438', signal: 'open_positions' },
   ];
 
   for (const { keyword, signal } of patterns) {
@@ -146,6 +151,266 @@ function detectSignals(text) {
 
   return signals;
 }
+
+function extractContactPaths(html, baseUrl, visibleText) {
+  const contactPaths = [];
+  const seen = new Set();
+
+  for (const href of extractHrefValues(html)) {
+    const lowerHref = href.toLowerCase();
+
+    if (lowerHref.startsWith('mailto:')) {
+      addGenericEmailPath(contactPaths, seen, href.slice('mailto:'.length), 'mailto');
+      continue;
+    }
+
+    if (!lowerHref.startsWith('tel:')) {
+      addContactPagePath(contactPaths, seen, href, baseUrl);
+    }
+  }
+
+  for (const token of String(visibleText ?? '').split(' ')) {
+    addGenericEmailPath(contactPaths, seen, token, 'text');
+  }
+
+  return contactPaths;
+}
+
+function extractHrefValues(html) {
+  const hrefValues = [];
+  let searchFrom = 0;
+  const lowerHtml = html.toLowerCase();
+
+  while (searchFrom < html.length) {
+    const anchorStart = lowerHtml.indexOf('<a', searchFrom);
+
+    if (anchorStart === -1) {
+      break;
+    }
+
+    const anchorEnd = html.indexOf('>', anchorStart);
+
+    if (anchorEnd === -1) {
+      break;
+    }
+
+    const hrefValue = extractHrefFromTag(html.slice(anchorStart, anchorEnd + 1));
+
+    if (hrefValue) {
+      hrefValues.push(hrefValue);
+    }
+
+    searchFrom = anchorEnd + 1;
+  }
+
+  return hrefValues;
+}
+
+function extractHrefFromTag(tag) {
+  const lowerTag = tag.toLowerCase();
+  const hrefIndex = lowerTag.indexOf('href');
+
+  if (hrefIndex === -1) {
+    return null;
+  }
+
+  const separatorIndex = tag.indexOf('=', hrefIndex);
+
+  if (separatorIndex === -1) {
+    return null;
+  }
+
+  const rawValue = tag.slice(separatorIndex + 1).trimStart();
+  const quote = rawValue.charAt(0);
+
+  if (quote !== String.fromCharCode(34) && quote !== String.fromCharCode(39)) {
+    let unquotedValue = rawValue.split(' ')[0];
+
+    if (unquotedValue.endsWith('>')) {
+      unquotedValue = unquotedValue.slice(0, -1);
+    }
+
+    return decodeHtmlAttribute(unquotedValue);
+  }
+
+  const endIndex = rawValue.indexOf(quote, 1);
+  return decodeHtmlAttribute(endIndex === -1 ? rawValue.slice(1) : rawValue.slice(1, endIndex));
+}
+
+function addGenericEmailPath(contactPaths, seen, value, source) {
+  const email = normalizeEmail(value);
+
+  if (!email || !isSafeGenericEmail(email)) {
+    return;
+  }
+
+  const key = `generic_email:${email}`;
+
+  if (seen.has(key)) {
+    return;
+  }
+
+  seen.add(key);
+  contactPaths.push({ type: 'generic_email', value: email, source });
+}
+
+function addContactPagePath(contactPaths, seen, href, baseUrl) {
+  const contactUrl = normalizeContactUrl(href, baseUrl);
+
+  if (!contactUrl || !isContactPageUrl(contactUrl, baseUrl)) {
+    return;
+  }
+
+  const key = `contact_page:${contactUrl}`;
+
+  if (seen.has(key)) {
+    return;
+  }
+
+  seen.add(key);
+  contactPaths.push({ type: 'contact_page', url: contactUrl, source: 'link' });
+}
+
+function normalizeEmail(value) {
+  if (!value || typeof value !== 'string') {
+    return null;
+  }
+
+  let email = trimEmailBoundaryChars(decodeUriComponent(value).split('?')[0].trim().toLowerCase());
+
+  if (email.startsWith('<') && email.endsWith('>')) {
+    email = email.slice(1, -1);
+  }
+
+  const parts = email.split('@');
+
+  if (parts.length !== 2 || !parts[0] || !parts[1] || !parts[1].includes('.')) {
+    return null;
+  }
+
+  if (email.includes(' ') || email.includes('/') || email.includes('\\')) {
+    return null;
+  }
+
+  return email;
+}
+
+function trimEmailBoundaryChars(value) {
+  let text = value;
+
+  while (text.length > 0 && EMAIL_BOUNDARY_CHARS.has(text.charAt(text.length - 1))) {
+    text = text.slice(0, -1);
+  }
+
+  return text;
+}
+
+function isSafeGenericEmail(email) {
+  const localPart = email.split('@')[0].replace(/[._+]+/g, '-');
+
+  if (GENERIC_EMAIL_LOCAL_PARTS.has(localPart)) {
+    return true;
+  }
+
+  const parts = localPart.split('-').filter(Boolean);
+  return parts.length === 2
+    && GENERIC_EMAIL_LOCAL_PARTS.has(parts[0])
+    && GENERIC_EMAIL_SUFFIXES.has(parts[1]);
+}
+
+function normalizeContactUrl(href, baseUrl) {
+  try {
+    const url = new URL(decodeHtmlAttribute(href), baseUrl);
+
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      return null;
+    }
+
+    url.hash = '';
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+function isContactPageUrl(value, baseUrl) {
+  try {
+    const url = new URL(value);
+    const base = new URL(baseUrl);
+
+    if (url.origin !== base.origin) {
+      return false;
+    }
+
+    const searchablePath = `${url.pathname} ${url.search}`.toLowerCase();
+    return CONTACT_PAGE_PATH_KEYWORDS.some((keyword) => searchablePath.includes(keyword));
+  } catch {
+    return false;
+  }
+}
+
+function decodeHtmlAttribute(value) {
+  return String(value)
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, String.fromCharCode(34))
+    .replace(/&#39;/g, String.fromCharCode(39));
+}
+
+function decodeUriComponent(value) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+const GENERIC_EMAIL_LOCAL_PARTS = new Set([
+  'career',
+  'careers',
+  'contact',
+  'hello',
+  'hr',
+  'info',
+  'job',
+  'jobs',
+  'kadry',
+  'office',
+  'people',
+  'rabota',
+  'recruiting',
+  'recruitment',
+  'talent',
+  'vacancy',
+  'vacancies',
+  'work',
+]);
+
+const EMAIL_BOUNDARY_CHARS = new Set(['.', ',', ';', ':', ')', ']', '}']);
+
+const GENERIC_EMAIL_SUFFIXES = new Set([
+  'career',
+  'careers',
+  'contact',
+  'department',
+  'group',
+  'jobs',
+  'office',
+  'recruiting',
+  'recruitment',
+  'team',
+  'vacancy',
+  'work',
+]);
+
+const CONTACT_PAGE_PATH_KEYWORDS = [
+  'contact',
+  'contacts',
+  'feedback',
+  'kontakty',
+  'kontakt',
+  'rekvizity',
+  'requisites',
+];
 
 function truncate(text, maxLength) {
   if (!text) return null;

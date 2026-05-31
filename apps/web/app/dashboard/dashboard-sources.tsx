@@ -1,0 +1,201 @@
+'use client';
+
+import React from 'react';
+import styles from './dashboard.module.css';
+
+interface SourceHealth {
+  id: string;
+  name: string;
+  overall: number;
+  lastRun: string;
+  recordsProcessed: number;
+  errors: number;
+  status: 'excellent' | 'good' | 'warning' | 'critical';
+}
+
+interface DashboardSourcesProps {
+  sources?: SourceHealth[];
+  loading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
+}
+
+function SourcesErrorState({ error, onRetry }: { error: string; onRetry?: () => void }) {
+  return (
+    <section aria-labelledby="sources-heading" className={styles.sourcesSection}>
+      <div className={styles.sourcesHeader}>
+        <h2 id="sources-heading" className={styles.sourcesTitle}>
+          🎯 Статистика источников
+        </h2>
+      </div>
+      <div className={styles.errorState} role="alert" aria-live="assertive">
+        <div className={styles.errorStateIcon}>⚠️</div>
+        <div className={styles.errorStateTitle}>Ошибка загрузки</div>
+        <div className={styles.errorStateDescription}>{error}</div>
+        {onRetry && (
+          <button className={styles.errorStateRetry} onClick={onRetry}>
+            Повторить
+          </button>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function SourcesEmptyState() {
+  return (
+    <section aria-labelledby="sources-heading" className={styles.sourcesSection}>
+      <div className={styles.sourcesHeader}>
+        <h2 id="sources-heading" className={styles.sourcesTitle}>
+          🎯 Статистика источников
+        </h2>
+      </div>
+      <div className={styles.sourcesEmpty}>
+        <div className={styles.sourcesEmptyIcon}>📭</div>
+        <div className={styles.sourcesEmptyTitle}>Нет источников данных</div>
+        <div className={styles.sourcesEmptyDescription}>
+          Источники данных ещё не настроены. Добавьте первый источник для начала мониторинга.
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SourcesSkeleton() {
+  return (
+    <section aria-labelledby="sources-heading" aria-busy="true" className={styles.skeletonSourcesSection}>
+      <div className={styles.skeletonSourcesHeader}>
+        <div className={`${styles.skeletonBase} ${styles.skeletonSourcesTitle}`} />
+        <div className={`${styles.skeletonBase} ${styles.skeletonSourcesCount}`} />
+      </div>
+      <ul role="list" aria-label="Загрузка источников" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', listStyle: 'none', padding: 0, margin: 0 }}>
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <li key={i} className={styles.skeletonSourceItem}>
+            <div className={styles.skeletonSourceInfo}>
+              <div className={`${styles.skeletonBase} ${styles.skeletonSourceIcon}`} />
+              <div>
+                <div className={`${styles.skeletonBase} ${styles.skeletonSourceName}`} />
+                <div className={`${styles.skeletonBase} ${styles.skeletonSourceMeta}`} />
+              </div>
+            </div>
+            <div className={styles.skeletonSourceStats}>
+              <div className={`${styles.skeletonBase} ${styles.skeletonSourceScore}`} />
+              <div className={`${styles.skeletonBase} ${styles.skeletonSourceProgress}`} />
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+const DEFAULT_SOURCES: SourceHealth[] = [
+  { id: 'hh', name: 'HeadHunter', overall: 95, lastRun: '2 минуты назад', recordsProcessed: 1250, errors: 0, status: 'excellent' },
+  { id: 'career-pages', name: 'Career Pages', overall: 88, lastRun: '5 минут назад', recordsProcessed: 890, errors: 2, status: 'good' },
+  { id: 'rabota-rossii', name: 'Rabota Rossii', overall: 92, lastRun: '1 минута назад', recordsProcessed: 2100, errors: 1, status: 'excellent' },
+  { id: 'company-site', name: 'Company Site', overall: 76, lastRun: '15 минут назад', recordsProcessed: 450, errors: 5, status: 'warning' },
+  { id: 'tech-job-boards', name: 'Tech Job Boards', overall: 83, lastRun: '8 минут назад', recordsProcessed: 670, errors: 3, status: 'good' },
+  { id: 'linkedin-company-pages', name: 'LinkedIn', overall: 70, lastRun: '30 минут назад', recordsProcessed: 340, errors: 8, status: 'warning' },
+];
+
+const DashboardSources: React.FC<DashboardSourcesProps> = ({
+  sources = DEFAULT_SOURCES,
+  loading = false,
+  error,
+  onRetry
+}) => {
+  if (loading) {
+    return <SourcesSkeleton />;
+  }
+
+  if (error) {
+    return <SourcesErrorState error={error} onRetry={onRetry} />;
+  }
+
+  if (!sources || sources.length === 0) {
+    return <SourcesEmptyState />;
+  }
+
+  const STATUS_CONFIG: Record<SourceHealth['status'], { label: string; icon: string; colorClass: string }> = {
+  excellent: { label: 'отлично', icon: '✅', colorClass: styles.sourceItemScoreGreen },
+  good:      { label: 'хорошо',    icon: '⚠️', colorClass: styles.sourceItemScoreYellow },
+  warning:   { label: 'внимание',  icon: '⚠️', colorClass: styles.sourceItemScoreYellow },
+  critical:  { label: 'критично',  icon: '❌', colorClass: styles.sourceItemScoreRed },
+};
+
+const getBarColor = (overall: number) =>
+  overall >= 80 ? styles.sourceItemScoreGreen :
+  overall >= 60 ? styles.sourceItemScoreYellow :
+  styles.sourceItemScoreRed;
+
+const sortedSources = [...sources].sort((a, b) => b.overall - a.overall);
+
+  return (
+    <section aria-labelledby="sources-heading" className={styles.sourcesSection}>
+      <div className={styles.sourcesHeader}>
+        <h2 id="sources-heading" className={styles.sourcesTitle}>
+          🎯 Статистика источников
+        </h2>
+        <span className={styles.sourcesCount}>
+          {sources.length} источников
+        </span>
+      </div>
+      <ul
+        className={styles.sourcesList}
+        role="list"
+        aria-label="Список источников данных"
+      >
+        {sortedSources.map((source) => {
+            const config = STATUS_CONFIG[source.status];
+            return (
+              <li
+                key={source.id}
+                className={styles.sourceItem}
+                aria-label={`${source.name}: ${source.overall}%, статус ${config.label}, ${source.recordsProcessed} записей${source.errors > 0 ? `, ${source.errors} ошибок` : ''}`}
+              >
+                <div className={styles.sourceItemInfo}>
+                  <span className={styles.sourceItemIcon} aria-hidden="true">
+                    {config.icon}
+                  </span>
+                  <div>
+                    <div className={styles.sourceItemName}>{source.name}</div>
+                    <div className={styles.sourceItemMeta}>
+                      {source.lastRun} • {source.recordsProcessed} записей
+                    </div>
+                  </div>
+                </div>
+                <div className={styles.sourceItemStats}>
+                  <div className={styles.sourceItemScore}>
+                    <div className={`${styles.sourceItemScoreValue} ${config.colorClass}`}>
+                      {source.overall}%
+                    </div>
+                    <div
+                      className={styles.sourceItemProgress}
+                      role="progressbar"
+                      aria-valuenow={source.overall}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-label={`${source.name}: ${source.overall}%`}
+                    >
+                      <div
+                        className={`${styles.sourceItemProgressBar} ${getBarColor(source.overall)}`}
+                        style={{ width: `${source.overall}%` }}
+                      />
+                    </div>
+                  </div>
+                  {source.errors > 0 && (
+                    <span className={styles.sourceItemErrors}>
+                      {source.errors} ошибок
+                    </span>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+      </ul>
+    </section>
+  );
+};
+
+export default DashboardSources;
+export type { SourceHealth };

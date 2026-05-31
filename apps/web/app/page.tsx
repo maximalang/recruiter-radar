@@ -448,7 +448,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             ) : (
               <div style={{ display: "grid", gap: "12px" }}>
                 {visiblePreviewItems.map((item) => (
-                  <PreviewDigestCard key={`${item.orgId}-${item.rank}`} item={item} />
+                  <PreviewDigestCard key={`${item.org_id}-${item.rank}`} item={item} />
                 ))}
 
                 {hiddenPreviewItems.length > 0 ? (
@@ -459,7 +459,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                     <div style={disclosureBodyStyle}>
                       <div style={{ display: "grid", gap: "12px" }}>
                         {hiddenPreviewItems.map((item) => (
-                          <PreviewDigestCard key={`${item.orgId}-${item.rank}`} item={item} />
+                          <PreviewDigestCard key={`${item.org_id}-${item.rank}`} item={item} />
                         ))}
                       </div>
                     </div>
@@ -615,7 +615,7 @@ function PreviewDigestCard(props: {
             {item.curationLabels.length > 0 ? (
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                 {item.curationLabels.slice(0, 2).map((label) => (
-                  <span key={`${item.orgId}-${label}`} style={chipToneStyle}>
+                  <span key={`${item.org_id}-${label}`} style={chipToneStyle}>
                     {label}
                   </span>
                 ))}
