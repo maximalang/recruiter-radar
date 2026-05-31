@@ -1,6 +1,6 @@
 // User types for Recruiter Radar
 
-export type UserRole = 'super_admin' | 'agency_admin' | 'admin' | 'manager' | 'recruiter' | 'user' | 'viewer';
+export type UserRole = 'super_admin' | 'agency_admin' | 'owner' | 'admin' | 'manager' | 'recruiter' | 'user' | 'viewer';
 
 export interface User {
   id: string;

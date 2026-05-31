@@ -9,11 +9,12 @@ import { createDefaultRouter } from '@/lib/sources/crawlers'
 import type { CrawlerRouter, CrawlerFetchInput, CrawlerResult } from '@/lib/sources/crawlers'
 import { HiringPatternDetector, type HiringPattern, type LeadCandidate, type HiringSignal } from './hiring-pattern-detector'
 import type { HhDigestItem } from '@/lib/hhDigest'
+import { selectConfidenceGate } from '@/lib/scoring/gates'
+import type { ConfidenceGateInput, EntityMatchQuality } from '@/lib/scoring/gates'
+import type { EvidenceTier } from '@/lib/db/evidence'
 
-// Extend the interface to include confidence_gate
-export interface HhDigestItemWithConfidence extends HhDigestItem {
-  confidence_gate?: string
-}
+// Extend the interface to include confidence_gate (now in base type, kept for compatibility)
+export type HhDigestItemWithConfidence = HhDigestItem
 
 export type { AggregatedLead } from './lead-aggregator'
 export type { HiringSignal } from './hiring-pattern-detector'
@@ -66,6 +67,40 @@ export interface EvidenceSource {
 }
 
 /**
+ * Map EvidenceSource.evidenceType to Fiur evidence tier.
+ * Career pages and company profiles are direct hiring proof.
+ * Vacancies from job boards are corroboration.
+ * News and registry data are context.
+ */
+function evidenceTypeToTier(type: EvidenceSource['evidenceType']): EvidenceTier {
+  switch (type) {
+    case 'career-page':
+    case 'company-profile':
+      return 'direct'
+    case 'vacancy':
+      return 'corroboration'
+    case 'news':
+    case 'registry':
+    default:
+      return 'context'
+  }
+}
+
+/**
+ * Recalculate confidence gate from current evidence sources.
+ * Uses selectConfidenceGate as the sole authority.
+ */
+function recalculateConfidence(lead: MultiSourceLead): void {
+  const evidence = lead.sources.map(s => ({
+    tier: evidenceTypeToTier(s.evidenceType),
+    source: s.sourceId,
+  }))
+  const entityMatch: EntityMatchQuality = lead.companyId ? 'clean' : 'questionable'
+  const gateInput: ConfidenceGateInput = { evidence, entityMatch }
+  lead.confidence = selectConfidenceGate(gateInput)
+}
+
+/**
  * Multi-source lead generator that aggregates evidence from all available sources
  */
 export class MultiSourceLeadGenerator {
@@ -77,6 +112,21 @@ export class MultiSourceLeadGenerator {
     this.crawler = createDefaultRouter()
     this.sources = this.initializeSources()
     this.activeSources = this.getActiveSources()
+  }
+
+  /** Get Postgres pool from shared db module */
+  private getDbPool() {
+    const { getPool } = require('@/lib/db') as { getPool: () => import('pg').Pool | null }
+    return getPool()
+  }
+
+  /** Categorize employee count into size bucket */
+  private categorizeCompanySize(count: number): string {
+    if (count < 10) return '1-10'
+    if (count < 50) return '10-50'
+    if (count < 500) return '50-500'
+    if (count < 5000) return '500-5000'
+    return '5000+'
   }
 
   /**
@@ -221,6 +271,7 @@ export class MultiSourceLeadGenerator {
     minScore?: number
     sources?: string[]
     enableRealTime?: boolean
+    clientProfileId?: string
   } = {}): Promise<MultiSourceLead[]> {
     const {
       companies = [],
@@ -228,14 +279,16 @@ export class MultiSourceLeadGenerator {
       regions = [],
       minScore = 1.0,
       sources = this.activeSources,
-      enableRealTime = false
+      enableRealTime = false,
+      clientProfileId
     } = options
 
     const allLeads: MultiSourceLead[] = []
 
-    // Step 1: Generate HH-based leads
-    const hhLeads = await this.generateHHLeads(companies, minScore)
-    allLeads.push(...hhLeads)
+    // Step 1: Generate leads from all job board sources via DB pipeline
+    // (HH, Rabota Rossii, SuperJob, Habr Career, etc. — all sources in source-digest-evidence.sql)
+    const jobBoardLeads = await this.generateJobBoardLeads(clientProfileId)
+    allLeads.push(...jobBoardLeads)
 
     // Step 2: Fetch career pages for enrichment
     if (sources.includes('career-pages')) {
@@ -252,13 +305,14 @@ export class MultiSourceLeadGenerator {
       await this.enrichWithRegistryData(allLeads)
     }
 
-    // Step 5: Apply real-time crawling if enabled
-    if (enableRealTime) {
-      await this.realTimeCrawl(allLeads)
-    }
+    // Step 5: Real-time crawling is handled by n8n scheduler via source scripts
+    // (enableRealTime is kept as no-op for API backward compatibility)
 
-    // Step 6: Filter and rank final leads
-    return this.filterAndRankLeads(allLeads, {
+    // Step 6: Aggregate leads — entity resolution and deduplication
+    const aggregatedLeads = await this.deduplicateLeads(allLeads)
+
+    // Step 7: Filter and rank final leads
+    return this.filterAndRankLeads(aggregatedLeads, {
       industries,
       regions,
       minScore
@@ -266,66 +320,123 @@ export class MultiSourceLeadGenerator {
   }
 
   /**
-   * Generate leads from HH data
+   * Generate leads from all job board sources via the real DB pipeline.
+   * Reads from signals → source-digest-evidence.sql → digest items.
+   * Now covers HH, Rabota Rossii, SuperJob, Habr Career, etc.
    */
-  private async generateHHLeads(companyIds?: string[], minScore?: number): Promise<MultiSourceLead[]> {
-    // This would integrate with the existing HH ingestion pipeline
-    // For now, we'll simulate HH digest items
-    const mockDigestItems: HhDigestItem[] = [
-      {
-        rank: 1,
-        org_id: 'company1',
-        hh_employer_id: 'emp1',
-        employer_name: 'TechCorp',
-        vacancies_count: 5,
-        distinct_vacancy_names_count: 3,
-        latest_published_at: '2024-05-28T10:00:00Z',
-        total_score: 350,
-        // Removed confidence_gate to match HhDigestItem interface
-        reasons: ['high hiring activity', 'diverse roles'],
-        opener: 'Компания активно нанимает',
-        source_families: ['hh'],
-        evidence_titles: ['Frontend Developer', 'Backend Developer', 'Product Manager'],
-        candidate_source_keys: [],
-        location_names: ['Москва']
-      }
-    ]
+  private async generateJobBoardLeads(clientProfileId?: string): Promise<MultiSourceLead[]> {
+    const { getHhDigestItems } = await import('@/lib/hhDigest')
 
-    // Convert HH digest items to candidates
-    const hhCandidates = HiringPatternDetector.digestToLeadCandidates(mockDigestItems as HhDigestItemWithConfidence[])
+    // Fetch real digest items from DB — client-scoped or preview
+    const digestItems = await getHhDigestItems({
+      clientProfileId: clientProfileId || null
+    })
 
-    // Convert to MultiSourceLead format
-    return hhCandidates.map(candidate => ({
-      id: `multi-${candidate.id}`,
-      companyId: candidate.companyId,
-      companyName: candidate.companyName,
-      score: candidate.score,
-      confidence: candidate.confidence,
-      sources: [{
-        sourceId: 'hh',
-        sourceName: 'HeadHunter',
-        evidenceType: 'vacancy',
-        confidence: 0.74,
-        rawData: mockDigestItems.find(item => item.org_id === candidate.companyId),
+    if (digestItems.length === 0) {
+      return []
+    }
+
+    // Convert digest items to candidates via the detector
+    const candidates = HiringPatternDetector.digestToLeadCandidates(
+      digestItems as HhDigestItemWithConfidence[]
+    )
+
+    // Source name lookup for mapping source families to evidence sources
+    const sourceNameMap: Record<string, string> = {
+      'hh': 'HeadHunter',
+      'rabota-rossii': 'Rabota Rossii',
+      'career-pages': 'Career Pages',
+      'superjob': 'SuperJob',
+      'habr-career': 'Habr Career',
+      'tech-job-boards': 'Tech Job Boards',
+      'linkedin-company-pages': 'LinkedIn',
+    }
+
+    // Convert to MultiSourceLead format — one evidence source per source family
+    return candidates.map(candidate => {
+      const matchingItem = digestItems.find(item => item.org_id === candidate.companyId)
+      const sourceFamilies = matchingItem?.source_families || ['hh']
+
+      // Build evidence sources from all contributing source families
+      const evidenceSources: EvidenceSource[] = sourceFamilies.map(sourceId => ({
+        sourceId,
+        sourceName: sourceNameMap[sourceId] || sourceId,
+        evidenceType: (sourceId === 'career-pages' ? 'career-page' : 'vacancy') as EvidenceSource['evidenceType'],
+        confidence: this.sources.find(s => s.id === sourceId)?.confidence ?? 0.5,
+        rawData: matchingItem,
         extractedAt: new Date(),
         relevanceScore: candidate.score / 4
-      }],
-      signals: candidate.signals,
-      nextAction: candidate.nextAction,
-      reasons: candidate.reasons,
-      detectedAt: candidate.detectedAt,
-      enrichment: {}
-    }))
+      }))
+
+      // Blocked sources (provider-or-snapshot-only) get capped at confidence C
+      const blockedSources = new Set([
+        'superjob', 'habr-career', 'linkedin-company-pages',
+        'tech-job-boards', 'regional-job-boards'
+      ])
+      const hasBlockedSource = sourceFamilies.some(s => blockedSources.has(s))
+      // If ALL sources are blocked, cap confidence at C (review required)
+      // If at least one P1 digest-allowed source is present, use the gate from SQL
+      const allBlocked = sourceFamilies.every(s => blockedSources.has(s))
+
+      return {
+        id: `multi-${candidate.id}`,
+        companyId: candidate.companyId,
+        companyName: candidate.companyName,
+        score: candidate.score,
+        confidence: allBlocked
+          ? (candidate.confidence === 'A' || candidate.confidence === 'B' ? 'C' as const : candidate.confidence)
+          : candidate.confidence,
+        sources: evidenceSources,
+        signals: candidate.signals,
+        nextAction: candidate.nextAction,
+        reasons: candidate.reasons,
+        detectedAt: candidate.detectedAt,
+        enrichment: {}
+      }
+    })
   }
 
   /**
-   * Enrich leads with career page evidence
+   * Enrich leads with career page evidence.
+   * Uses real website URL from orgs table when available, falls back to slug-based URL.
    */
   private async enrichWithCareerPages(leads: MultiSourceLead[]): Promise<void> {
+    // Build org_id → website_url map from DB
+    const pool = this.getDbPool()
+    const websiteMap = new Map<string, string>()
+
+    if (pool) {
+      try {
+        const orgIds = leads.map(l => l.companyId).filter(Boolean)
+        if (orgIds.length > 0) {
+          const result = await pool.query(
+            `SELECT id, website_url FROM orgs WHERE id = ANY($1) AND website_url IS NOT NULL`,
+            [orgIds]
+          )
+          for (const row of result.rows as Array<Record<string, unknown>>) {
+            websiteMap.set(String(row.id), String(row.website_url))
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to fetch website URLs from orgs:', error)
+      }
+    }
+
     for (const lead of leads) {
       try {
+        // Use real website URL from DB, or fall back to slug-based guess
+        const websiteUrl = websiteMap.get(lead.companyId)
+        let careerUrl: string
+        if (websiteUrl) {
+          // Try common career page paths
+          careerUrl = `${websiteUrl.replace(/\/$/, '')}/careers`
+          lead.enrichment.website = websiteUrl
+        } else {
+          careerUrl = `https://${lead.companyName.toLowerCase().replace(/\s+/g, '-')}.com/careers`
+        }
+
         const crawlInput: CrawlerFetchInput = {
-          url: `https://${lead.companyName.toLowerCase().replace(/\s+/g, '-')}.com/careers`,
+          url: careerUrl,
           options: {
             timeoutMs: 10000
           }
@@ -352,10 +463,9 @@ export class MultiSourceLeadGenerator {
           if (!lead.sources.find(s => s.sourceId === 'career-pages')) {
             lead.sources.push(evidence)
 
-            // Boost confidence for direct career page evidence
-            if (lead.confidence === 'B') {
-              lead.confidence = 'A'
-            }
+            // Recalculate confidence gate via selectConfidenceGate
+            // (career-page is 'direct' tier, which can promote B→A)
+            recalculateConfidence(lead)
 
             // Add signal for direct career page
             lead.signals.push({
@@ -375,98 +485,184 @@ export class MultiSourceLeadGenerator {
   }
 
   /**
-   * Add business signals to leads
+   * Add business signals from real data in the signals table.
+   * Context-only sources (funding, news, media) enrich but never originate leads.
+   * If no data exists for an org, skip enrichment (no fake data).
    */
   private async addBusinessSignals(leads: MultiSourceLead[]): Promise<void> {
-    // Simulate business signal enrichment
+    const pool = this.getDbPool()
+    if (!pool) return
+
+    const contextSources = ['funding-business-signals', 'company-newsrooms', 'industry-media']
+
     for (const lead of leads) {
-      const businessSignal: EvidenceSource = {
-        sourceId: 'funding-business-signals',
-        sourceName: 'Funding Signals',
-        evidenceType: 'news',
-        confidence: 0.58,
-        rawData: {
-          lastFunding: '2024-Q1',
-          employeeGrowth: '15%',
-          newsCount: 3
-        },
-        extractedAt: new Date(),
-        relevanceScore: 0.6
-      }
+      try {
+        const result = await pool.query(
+          `SELECT source, payload, headline, occurred_at FROM signals
+           WHERE org_id = $1 AND source = ANY($2)
+           ORDER BY occurred_at DESC LIMIT 5`,
+          [lead.companyId, contextSources]
+        )
 
-      lead.sources.push(businessSignal)
+        for (const row of result.rows as Array<Record<string, unknown>>) {
+          const rowSource = String(row.source)
+          const sourceConfig = this.sources.find(s => s.id === rowSource)
+          if (!sourceConfig) continue
 
-      // Add context signal if no strong signals present
-      if (lead.signals.length < 2) {
-        lead.signals.push({
-          companyId: lead.companyId,
-          companyName: lead.companyName,
-          signalType: 'burst',
-          strength: 0.3,
-          evidence: ['Признаки роста бизнеса'],
-          detectedAt: new Date()
-        })
+          // Skip if already present
+          if (lead.sources.find(s => s.sourceId === rowSource)) continue
+
+          const evidence: EvidenceSource = {
+            sourceId: rowSource,
+            sourceName: sourceConfig.name,
+            evidenceType: 'news',
+            confidence: sourceConfig.confidence,
+            rawData: row.payload,
+            extractedAt: new Date(String(row.occurred_at)),
+            relevanceScore: sourceConfig.confidence
+          }
+
+          lead.sources.push(evidence)
+
+          // Add context signal from headline
+          const headline = row.headline ? String(row.headline) : null
+          if (headline) {
+            lead.signals.push({
+              companyId: lead.companyId,
+              companyName: lead.companyName,
+              signalType: 'burst',
+              strength: sourceConfig.confidence,
+              evidence: [headline],
+              detectedAt: new Date(String(row.occurred_at))
+            })
+          }
+        }
+      } catch (error) {
+        console.warn(`Failed to fetch business signals for ${lead.companyName}:`, error)
       }
+    }
+
+    // Recalculate confidence after adding evidence
+    for (const lead of leads) {
+      recalculateConfidence(lead)
     }
   }
 
   /**
-   * Enrich with company registry data
+   * Enrich with company registry data from real signals in the DB.
+   * If no EGRUL data exists for an org, skip enrichment (no fake data).
    */
   private async enrichWithRegistryData(leads: MultiSourceLead[]): Promise<void> {
-    // Simulate registry data enrichment
-    for (const lead of leads) {
-      const registryData: EvidenceSource = {
-        sourceId: 'egrul-fns',
-        sourceName: 'EGRUL/FNS',
-        evidenceType: 'registry',
-        confidence: 0.9,
-        rawData: {
-          inn: '1234567890',
-          registrationDate: '2020-01-01',
-          employeesCount: 250,
-          legalForm: 'ООО'
-        },
-        extractedAt: new Date(),
-        relevanceScore: 0.8
-      }
+    const pool = this.getDbPool()
+    if (!pool) return
 
-      lead.sources.push(registryData)
-      lead.enrichment.companySize = '50-500'
-      lead.enrichment.lastHiringActivity = new Date('2024-05-28')
+    for (const lead of leads) {
+      try {
+        const result = await pool.query(
+          `SELECT payload FROM signals
+           WHERE org_id = $1 AND source = 'egrul-fns'
+           ORDER BY occurred_at DESC LIMIT 1`,
+          [lead.companyId]
+        )
+
+        if (result.rows.length > 0) {
+          const payload = result.rows[0].payload
+          const registryData: EvidenceSource = {
+            sourceId: 'egrul-fns',
+            sourceName: 'EGRUL/FNS',
+            evidenceType: 'registry',
+            confidence: 0.9,
+            rawData: payload,
+            extractedAt: new Date(),
+            relevanceScore: 0.8
+          }
+
+          lead.sources.push(registryData)
+
+          // Extract enrichment fields from payload
+          const p = payload as Record<string, unknown>
+          if (p?.employee_count || p?.employeesCount) {
+            const count = Number(p.employee_count || p.employeesCount) || 0
+            lead.enrichment.companySize = this.categorizeCompanySize(count)
+            lead.enrichment.employeeCount = count
+          }
+          if (p?.legal_form || p?.legalForm) {
+            lead.enrichment.industry = lead.enrichment.industry || []
+          }
+        }
+      } catch (error) {
+        console.warn(`Failed to fetch EGRUL data for ${lead.companyName}:`, error)
+      }
+    }
+
+    // Recalculate confidence after adding evidence
+    for (const lead of leads) {
+      recalculateConfidence(lead)
     }
   }
 
   /**
-   * Perform real-time crawling for additional evidence
+   * Deduplicate leads using EntityResolver from LeadAggregator.
+   * Groups leads by canonicalCompanyId, merges sources, and keeps the highest-scored lead.
    */
-  private async realTimeCrawl(leads: MultiSourceLead[]): Promise<void> {
-    // Simulate real-time crawling of other sources
-    const secondarySources = ['linkedin-company-pages', 'tech-job-boards']
+  private async deduplicateLeads(leads: MultiSourceLead[]): Promise<MultiSourceLead[]> {
+    if (leads.length === 0) return []
 
-    for (const lead of leads) {
-      for (const sourceId of secondarySources) {
-        try {
-          const source = this.sources.find(s => s.id === sourceId)
-          if (source && source.leadEligibility === 'confidence-gated-evidence') {
-            // Add placeholder for real-time evidence
-            const evidence: EvidenceSource = {
-              sourceId,
-              sourceName: source.name,
-              evidenceType: 'vacancy',
-              confidence: source.confidence,
-              rawData: { timestamp: new Date().toISOString() },
-              extractedAt: new Date(),
-              relevanceScore: 0.5
-            }
+    const { EntityResolver } = await import('./lead-aggregator')
+    const resolver = new EntityResolver()
 
-            lead.sources.push(evidence)
+    // Resolve entity IDs for all leads
+    const resolved = await resolver.resolveAll(leads)
+
+    // Group by canonicalCompanyId
+    const groups = new Map<string, (typeof resolved)[number][]>()
+    for (const lead of resolved) {
+      const key = lead.canonicalCompanyId
+      if (!groups.has(key)) {
+        groups.set(key, [])
+      }
+      groups.get(key)!.push(lead)
+    }
+
+    // Merge each group: keep highest-scored lead, combine sources
+    const deduplicated: MultiSourceLead[] = []
+    for (const [, group] of groups) {
+      // Sort by score descending, take the best lead as representative
+      group.sort((a: typeof group[number], b: typeof group[number]) => b.score - a.score)
+      const best = group[0]
+
+      // Merge sources from all leads in the group (deduplicate by sourceId)
+      const seenSourceIds = new Set(best.sources.map((s: EvidenceSource) => s.sourceId))
+      for (const other of group.slice(1)) {
+        for (const source of other.sources) {
+          if (!seenSourceIds.has(source.sourceId)) {
+            best.sources.push(source)
+            seenSourceIds.add(source.sourceId)
           }
-        } catch (error) {
-          console.warn(`Real-time crawl failed for ${sourceId}:`, error)
+        }
+        // Merge signals too
+        for (const signal of other.signals) {
+          if (!best.signals.some((s: HiringSignal) => s.signalType === signal.signalType && s.strength === signal.strength)) {
+            best.signals.push(signal)
+          }
+        }
+        // Merge enrichment
+        if (other.enrichment) {
+          for (const [key, value] of Object.entries(other.enrichment)) {
+            if (value !== undefined && (best.enrichment as Record<string, unknown>)[key] === undefined) {
+              (best.enrichment as Record<string, unknown>)[key] = value
+            }
+          }
         }
       }
+
+      // Recalculate confidence after merging sources
+      recalculateConfidence(best)
+
+      deduplicated.push(best)
     }
+
+    return deduplicated
   }
 
   /**
@@ -478,25 +674,10 @@ export class MultiSourceLeadGenerator {
   ): MultiSourceLead[] {
     let filtered = leads
 
-    // Apply score filter
+    // Apply score filter — score comes from DB/FIUR, do NOT recalculate here
     if (options.minScore) {
       filtered = filtered.filter(lead => lead.score >= (options.minScore || 0))
     }
-
-    // Calculate composite score based on multiple sources
-    filtered = filtered.map(lead => {
-      const sourceCount = lead.sources.length
-      const avgSourceConfidence = lead.sources.reduce((sum, s) => sum + s.confidence, 0) / sourceCount
-
-      // Boost score for multiple high-confidence sources
-      const scoreMultiplier = 1 + (sourceCount - 1) * 0.1
-      const adjustedScore = lead.score * scoreMultiplier * avgSourceConfidence
-
-      return {
-        ...lead,
-        score: Math.min(adjustedScore, 4) // Cap at 4
-      }
-    })
 
     // Sort by score descending
     return filtered.sort((a, b) => b.score - a.score)

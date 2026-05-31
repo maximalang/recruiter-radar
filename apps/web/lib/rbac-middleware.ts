@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRBAC, getRBACInstance } from './rbac';
 import type { UserRole } from './user-types';
+import { readOwnerSession } from './session';
 
 export interface RBACOptions {
   requireAuth?: boolean;
@@ -26,7 +27,7 @@ export function withRBAC(handler: (req: NextRequest, context: any) => Promise<Ne
       return handler(req, context);
     }
 
-    // Get user from session (placeholder implementation)
+    // Get user from signed session cookie
     const user = await getUserFromSession(req);
 
     // Check authentication
@@ -74,28 +75,26 @@ export function withRBAC(handler: (req: NextRequest, context: any) => Promise<Ne
   };
 }
 
-// Simulate getting user from session
+/**
+ * Get user from signed session cookie (HMAC-SHA256).
+ * Reads the rr_sid cookie via readOwnerSession() from session.ts.
+ * Maps ownerId → roles (currently all owners get 'owner' role).
+ */
 async function getUserFromSession(req: NextRequest) {
-  // This would normally extract user from session/cookie
-  // For now, we'll check for a header that indicates user roles
-  const authHeader = req.headers.get('x-user-roles');
+  const ownerId = await readOwnerSession();
 
-  if (!authHeader) {
+  if (!ownerId) {
     return null;
   }
 
-  try {
-    const roles = JSON.parse(authHeader) as UserRole[];
-
-    return {
-      id: 'current-user-id', // This would come from session
-      email: 'current@example.com', // This would come from session
-      roles: roles
-    };
-  } catch (error) {
-    console.error('Error parsing user roles:', error);
-    return null;
-  }
+  // Map ownerId → roles.
+  // Currently the system only has owner-level access;
+  // when a roles table is added, this should query it.
+  return {
+    id: ownerId,
+    email: '', // Not stored in session cookie; enrich from DB if needed
+    roles: ['owner'] as UserRole[],
+  };
 }
 
 // Middleware factory for permission checks

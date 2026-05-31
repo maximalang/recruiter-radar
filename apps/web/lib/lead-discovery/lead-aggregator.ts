@@ -309,7 +309,7 @@ export class LeadAggregator {
 /**
  * Entity resolver for handling company name variations
  */
-class EntityResolver {
+export class EntityResolver {
   private nameNormalizationCache = new Map<string, string>()
 
   async resolveAll(leads: MultiSourceLead[]): Promise<Array<MultiSourceLead & { canonicalCompanyId: string }>> {

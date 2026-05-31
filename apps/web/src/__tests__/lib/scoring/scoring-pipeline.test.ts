@@ -93,7 +93,7 @@ describe('runScoringPipeline', () => {
   describe('strong signals → high confidence', () => {
     it('produces an A-lead-grade output for ICP-matching, fresh, multi-source, well-contacted company', () => {
       const result = runScoringPipeline(baseInput)
-      expect(result.lead.confidence).toBe('high')
+      expect(result.lead.confidence).toBe('A')
       expect(result.breakdown.fiur.total).toBeGreaterThan(2.0)
       expect(result.breakdown.industryAlignment.match).toBe('exact')
       expect(result.breakdown.geographicFit.match).toBe('city')
@@ -124,7 +124,7 @@ describe('runScoringPipeline', () => {
         agencyProfile: { industries: ['edtech'], locations: ['Berlin'] },
         marketContext: { industryTrend: 'declining' },
       })
-      expect(result.lead.confidence).toBe('low')
+      expect(result.lead.confidence).toBe('D')
       expect(result.breakdown.freshness.status).toBe('expired')
       expect(result.breakdown.sourceAggregation.hasMultiSourceConfirmation).toBe(false)
       expect(result.lead.nextAction.kind === 'review' || result.lead.nextAction.kind === 'enrich-contacts').toBe(true)
@@ -143,7 +143,7 @@ describe('runScoringPipeline', () => {
         },
       })
       expect(result.breakdown.industryAlignment.match).toBe('excluded')
-      expect(result.lead.confidence).not.toBe('high')
+      expect(result.lead.confidence).toBe('D')
     })
   })
 

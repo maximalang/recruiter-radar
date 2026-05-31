@@ -11,6 +11,7 @@
 import type { AggregationResult, SourceBreakdownEntry } from './source-aggregation'
 import type { FreshnessResult } from './lead-freshness'
 import type { ContactQualityResult } from './contact-quality'
+import { selectConfidenceGate, type ConfidenceGateInput } from './gates'
 
 export type LeadStatus =
   | 'new'
@@ -21,7 +22,7 @@ export type LeadStatus =
   | 'client'
   | 'lost'
 
-export type LeadConfidence = 'high' | 'medium' | 'low'
+export type LeadConfidence = 'A' | 'B' | 'C' | 'D'
 
 export type LeadActionKind = 'outreach' | 'enrich-contacts' | 'review' | 'wait'
 
@@ -59,6 +60,8 @@ export interface AgencyLeadInput {
   sourceAggregation: AggregationResult
   freshness: FreshnessResult
   contactQuality: ContactQualityResult
+  evidence: ConfidenceGateInput['evidence']
+  entityMatch: ConfidenceGateInput['entityMatch']
   status?: LeadStatus
   assignedTo?: string
   now?: Date | (() => number)
@@ -82,30 +85,6 @@ function resolveNowDate(now: AgencyLeadInput['now']): Date {
   if (now instanceof Date) return now
   if (typeof now === 'function') return new Date(now())
   return new Date()
-}
-
-function deriveConfidence(
-  fiurTotal: number,
-  freshness: FreshnessResult,
-  aggregation: AggregationResult,
-  contactQuality: ContactQualityResult
-): LeadConfidence {
-  let points = 0
-  if (fiurTotal >= 2.5) points += 2
-  else if (fiurTotal >= 1.8) points += 1
-
-  if (aggregation.hasMultiSourceConfirmation) points += 2
-  else if (aggregation.independentSources >= 1) points += 1
-
-  if (freshness.meetsSla) points += 2
-  else if (freshness.status === 'fresh' || freshness.status === 'aging') points += 1
-
-  if (contactQuality.tier === 'rich') points += 1
-  else if (contactQuality.tier === 'ok') points += 0
-
-  if (points >= 6) return 'high'
-  if (points >= 3) return 'medium'
-  return 'low'
 }
 
 function deriveNextAction(
@@ -147,12 +126,10 @@ function aggregateReasons(input: AgencyLeadInput): string[] {
 
 export function buildAgencyLead(input: AgencyLeadInput): AgencyLead {
   const now = resolveNowDate(input.now)
-  const confidence = deriveConfidence(
-    input.fiur.total,
-    input.freshness,
-    input.sourceAggregation,
-    input.contactQuality
-  )
+  const confidence = selectConfidenceGate({
+    evidence: input.evidence,
+    entityMatch: input.entityMatch,
+  })
   const nextAction = deriveNextAction(input.freshness, input.contactQuality)
 
   return {

@@ -29,6 +29,7 @@ export interface LeadScoringOptions {
   sources?: string[]
   minScore?: number
   enableRealTime?: boolean
+  clientProfileId?: string
   marketContext?: {
     industryGrowth?: Record<string, number>
     marketConditions?: 'boom' | 'normal' | 'bust'
@@ -64,6 +65,7 @@ export class LeadScoringService {
       minScore: options.minScore || 1.0,
       sources: options.sources || [],
       enableRealTime: options.enableRealTime || false,
+      clientProfileId: options.clientProfileId,
     })
 
     // Score each lead
@@ -99,7 +101,7 @@ export class LeadScoringService {
       companyName: lead.companyName,
       displayName: lead.companyName,
       score: enhancement.finalScore,
-      confidence: this.mapConfidence(result.lead.confidence),
+      confidence: result.lead.confidence,
       sources: [],
       allSignals: lead.signals,
       deduplication: {
@@ -113,11 +115,7 @@ export class LeadScoringService {
         sourceCount: lead.sources.length,
         uniqueSignals: new Set(lead.signals.map(s => `${s.signalType}-${s.strength}`)).size
       },
-      qualityMetrics: {
-        completeness: 1,
-        freshness: 1,
-        reliability: 1
-      },
+      qualityMetrics: this.computeQualityMetrics(lead),
       signals: lead.signals,
       nextAction: lead.nextAction,
       reasons: lead.reasons,
@@ -130,20 +128,98 @@ export class LeadScoringService {
     }
   }
 
+
   /**
-   * Map confidence from scoring pipeline to lead format
+   * T2.1: Compute qualityMetrics from real enrichment data
    */
-  private mapConfidence(confidence: string): 'A' | 'B' | 'C' | 'D' {
-    const map: Record<string, 'A' | 'B' | 'C' | 'D'> = {
-      'high': 'A',
-      'medium': 'B',
-      'low': 'C',
-      'A': 'A',
-      'B': 'B',
-      'C': 'C',
-      'D': 'D'
+  computeQualityMetrics(lead: MultiSourceLead): { completeness: number; freshness: number; reliability: number } {
+    // completeness: fraction of enrichment fields filled (out of 10 possible)
+    const enrichment = lead.enrichment
+    const fields: (unknown)[] = [
+      enrichment.companySize,
+      enrichment.industry,
+      enrichment.locations,
+      enrichment.hiringVelocity,
+      enrichment.lastHiringActivity,
+      enrichment.website,
+      enrichment.employeeCount,
+      enrichment.hasCareerPage,
+      enrichment.hasContactPath,
+      enrichment.careerPageUrl,
+    ]
+    const filledCount = fields.filter(f => f !== undefined && f !== null && f !== '' && !(Array.isArray(f) && f.length === 0)).length
+    const completeness = filledCount / fields.length
+
+    // reliability: independent sources / 3, clamped to [0, 1]
+    const independentSources = lead.sources.length
+    const reliability = Math.min(independentSources / 3, 1)
+
+    // freshness: derived from pipeline breakdown if available, otherwise from detectedAt
+    // Use the most recent source extraction time as a proxy
+    const now = Date.now()
+    const latestExtraction = lead.sources.reduce((max: number, s) => {
+      const t = s.extractedAt?.getTime?.() ?? 0
+      return t > max ? t : max
+    }, 0)
+    const hoursAgo = latestExtraction ? (now - latestExtraction) / (60 * 60 * 1000) : 999
+    let freshness: number
+    if (hoursAgo <= 24) freshness = 1.0
+    else if (hoursAgo <= 72) freshness = 0.7
+    else if (hoursAgo <= 168) freshness = 0.4
+    else freshness = 0.1
+
+    return { completeness, freshness, reliability }
+  }
+
+  /**
+   * T2.2: Count signals with timestamps within the last 7 days
+   */
+  countRecentSignals(signals: HiringSignal[]): number {
+    const now = Date.now()
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000
+
+    return signals.filter(signal => {
+      if (!signal.timestamp) return false // Safe fallback: no timestamp → no boost
+      return (now - signal.timestamp.getTime()) <= sevenDaysMs
+    }).length
+  }
+
+  /**
+   * T3.3: Map marketContext to MarketFitInput — no 'as any' cast
+   */
+  mapMarketContext(ctx: LeadScoringOptions['marketContext']): ScoringPipelineInput['marketContext'] {
+    if (!ctx) return undefined
+
+    let industryTrend: 'growing' | 'stable' | 'declining' = 'stable'
+    if (ctx.marketConditions === 'boom') industryTrend = 'growing'
+    else if (ctx.marketConditions === 'bust') industryTrend = 'declining'
+
+    return {
+      industryTrend,
+      growthSignals: Object.keys(ctx.industryGrowth || {}),
+      expandingIntoNewMarket: false,
     }
-    return map[confidence] || 'D'
+  }
+
+  /**
+   * T2.3: Convert signals to vacancies using real publishedAt and location
+   */
+  convertSignalsToVacancies(signals: HiringSignal[]): PipelineVacancy[] {
+    return signals
+      .filter(signal => signal.signalType === 'burst' || signal.signalType === 'fresh')
+      .map((signal, index) => ({
+        id: `signal-${index}`,
+        title: this.extractRoleTitle(signal),
+        role: this.normalizeRole(signal),
+        location: signal.location ?? '', // T2.3: real location from signal
+        publishedAt: signal.publishedAt ?? signal.detectedAt.toISOString(), // T2.3: real date from signal
+        isInternalRecruiter: signal.evidence?.includes('internal'),
+        isHardToFill: signal.evidence?.includes('hard_to_fill'),
+        sourceTier: this.mapEvidenceTier(signal),
+        salaryFrom: this.extractSalary(signal, 'min'),
+        salaryTo: this.extractSalary(signal, 'max'),
+        salaryCurrency: 'RUB',
+      }))
   }
 
   /**
@@ -167,22 +243,8 @@ export class LeadScoringService {
       hasCorporateContactPath: lead.enrichment.hasContactPath,
     }
 
-    // Convert signals to vacancies
-    const vacancies: PipelineVacancy[] = lead.signals
-      .filter(signal => signal.signalType === 'burst' || signal.signalType === 'fresh')
-      .map((signal, index) => ({
-        id: `signal-${index}`,
-        title: this.extractRoleTitle(signal),
-        role: this.normalizeRole(signal),
-        location: '', // signal.location not available in current type
-        publishedAt: new Date().toISOString(), // signal.timestamp not available
-        isInternalRecruiter: signal.evidence?.includes('internal'),
-        isHardToFill: signal.evidence?.includes('hard_to_fill'),
-        sourceTier: this.mapEvidenceTier(signal),
-        salaryFrom: this.extractSalary(signal, 'min'),
-        salaryTo: this.extractSalary(signal, 'max'),
-        salaryCurrency: 'RUB',
-      }))
+    // Convert signals to vacancies (T2.3: uses real publishedAt and location)
+    const vacancies: PipelineVacancy[] = this.convertSignalsToVacancies(lead.signals)
 
     // Convert sources to evidence
     const evidence: PipelineEvidence[] = lead.sources.map(source => ({
@@ -201,11 +263,7 @@ export class LeadScoringService {
       evidence,
       contactPaths,
       agencyProfile: options.agencyProfile,
-      marketContext: options.marketContext ? {
-        industryTrend: 'normal' as any, // Placeholder - should be mapped from market conditions
-        growthSignals: Object.keys(options.marketContext.industryGrowth || {}),
-        expandingIntoNewMarket: false // Should be determined from market data
-      } : undefined,
+      marketContext: this.mapMarketContext(options.marketContext),
     }
   }
 
@@ -228,14 +286,10 @@ export class LeadScoringService {
       improvementSuggestions.push('Multiple independent sources increase reliability')
     }
 
-    // Boost score for recent signals
-    const recentSignals = lead.signals.filter(signal => {
-      const signalDate = new Date()
-      const daysOld = (Date.now() - signalDate.getTime()) / (24 * 60 * 60 * 1000)
-      return daysOld <= 7
-    })
+    // Boost score for recent signals (T2.2: uses signal.timestamp, safe fallback)
+    const recentSignalCount = this.countRecentSignals(lead.signals)
 
-    if (recentSignals.length >= 3) {
+    if (recentSignalCount >= 3) {
       finalScore += 0.15
       confidenceBoost += 0.2
       improvementSuggestions.push('Recent hiring signals indicate active hiring')

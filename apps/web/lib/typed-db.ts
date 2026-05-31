@@ -15,29 +15,13 @@ import type {
 import { Pool } from "pg";
 
 // Validate input parameters to prevent SQL injection
-function validateInput(column: string, value: unknown, operator: '=' | '>' | '<' | '>=' | '<=' | 'LIKE' | 'IN' | 'NOT IN' | '!=' | 'ILIKE'): void {
+// Note: value validation via regex has been removed — parameterized queries
+// already protect against injection. The old regex blocked legitimate data
+// like "O'Reilly" or "IT AND Telecom". Column names are validated separately
+// via validateColumnName().
+function validateInput(column: string, _value: unknown, operator: '=' | '>' | '<' | '>=' | '<=' | 'LIKE' | 'IN' | 'NOT IN' | '!=' | 'ILIKE'): void {
   if (typeof column !== 'string' || !column.trim()) {
     throw new Error('Column name must be a non-empty string');
-  }
-
-  if (typeof value === 'string') {
-    // Basic SQL injection detection
-    const sqlInjectionPatterns = [
-      /(--)/,
-      /(\b(?:OR|AND)\b)/i,
-      /(\bSELECT\b|\bINSERT\b|\bUPDATE\b|\bDELETE\b|\bDROP\b|\bCREATE\b|\bALTER\b)/i,
-      /(['"])/,
-      /(;)/,
-      /(\bEXEC\b|\bEXECUTE\b)/i,
-      /(\bUNION\b)/i,
-      /(\bSCRIPT\b|\bJS\b)/i
-    ];
-
-    for (const pattern of sqlInjectionPatterns) {
-      if (pattern.test(value)) {
-        throw new Error(`Potential SQL injection detected in value for column ${column}`);
-      }
-    }
   }
 
   // Validate operator
@@ -47,12 +31,22 @@ function validateInput(column: string, value: unknown, operator: '=' | '>' | '<'
   }
 }
 
+// Validate column name against whitelist to prevent SQL injection via interpolation
+function validateColumnName(name: string): void {
+  if (typeof name !== 'string' || !name.trim()) {
+    throw new Error('Column name must be a non-empty string');
+  }
+  // Only allow alphanumeric + underscore, must start with letter or underscore
+  const columnNamePattern = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+  if (!columnNamePattern.test(name)) {
+    throw new Error(`Invalid column name: ${name}`);
+  }
+}
+
 // Validate order by clause
 function validateOrderByClause(orderBy: Array<{ column: string; direction: 'ASC' | 'DESC' }>): void {
   for (const order of orderBy) {
-    if (typeof order.column !== 'string' || !order.column.trim()) {
-      throw new Error('Order by column must be a non-empty string');
-    }
+    validateColumnName(order.column);
     if (order.direction !== 'ASC' && order.direction !== 'DESC') {
       throw new Error('Order direction must be either ASC or DESC');
     }
@@ -127,7 +121,7 @@ export async function getDigestItemsByDigestRunId(
 ): Promise<DigestItem[]> {
   const { where, orderBy, limit = 100 } = options;
 
-  let query = `
+  let sql = `
     SELECT id, digest_run_id, rank, org_id, source_external_id, source_display_name,
            source_families, evidence_titles, candidate_source_keys, location_names,
            vacancies_count, distinct_vacancy_names_count, latest_published_at,
@@ -140,8 +134,9 @@ export async function getDigestItemsByDigestRunId(
 
   if (where && where.length > 0) {
     for (const condition of where) {
+      validateColumnName(condition.column);
       validateInput(condition.column, condition.value, condition.operator);
-      query += ` AND ${condition.column} ${condition.operator} $${paramIndex}`;
+      sql += ` AND ${condition.column} ${condition.operator} $${paramIndex}`;
       params.push(condition.value);
       paramIndex++;
     }
@@ -152,17 +147,17 @@ export async function getDigestItemsByDigestRunId(
     const orderByClause = orderBy.map(order =>
       `"${order.column}" ${order.direction}`
     ).join(', ');
-    query += ` ORDER BY ${orderByClause}`;
+    sql += ` ORDER BY ${orderByClause}`;
   }
 
   if (limit) {
     if (typeof limit !== 'number' || limit <= 0) {
       throw new Error('Limit must be a positive number');
     }
-    query += ` LIMIT ${limit}`;
+    sql += ` LIMIT ${limit}`;
   }
 
-  return await (query as any)<DigestItem>(query, params);
+  return await query<DigestItem>(sql, params);
 }
 
 // Get leads for a client profile
@@ -172,7 +167,7 @@ export async function getLeadsByClientProfile(
 ): Promise<Lead[]> {
   const { where, orderBy, limit = 50 } = options;
 
-  let query = `
+  let sql = `
     SELECT id, client_profile_id, signal_id, state, score, feedback_status, created_at, updated_at, metadata
     FROM leads
     WHERE client_profile_id = $1`;
@@ -182,8 +177,9 @@ export async function getLeadsByClientProfile(
 
   if (where && where.length > 0) {
     for (const condition of where) {
+      validateColumnName(condition.column);
       validateInput(condition.column, condition.value, condition.operator);
-      query += ` AND ${condition.column} ${condition.operator} $${paramIndex}`;
+      sql += ` AND ${condition.column} ${condition.operator} $${paramIndex}`;
       params.push(condition.value);
       paramIndex++;
     }
@@ -194,17 +190,17 @@ export async function getLeadsByClientProfile(
     const orderByClause = orderBy.map(order =>
       `"${order.column}" ${order.direction}`
     ).join(', ');
-    query += ` ORDER BY ${orderByClause}`;
+    sql += ` ORDER BY ${orderByClause}`;
   }
 
   if (limit) {
     if (typeof limit !== 'number' || limit <= 0) {
       throw new Error('Limit must be a positive number');
     }
-    query += ` LIMIT ${limit}`;
+    sql += ` LIMIT ${limit}`;
   }
 
-  return await (query as any)<Lead>(query, params);
+  return await query<Lead>(sql, params);
 }
 
 // Paginated query helper
@@ -291,6 +287,11 @@ export async function batchInsert<T extends Record<string, unknown>>(
     throw new Error('No fields to insert');
   }
 
+  // Validate column names to prevent SQL injection
+  for (const field of fields) {
+    validateColumnName(field);
+  }
+
   // Validate all items have the same structure
   for (const item of data) {
     const itemFields = Object.keys(item);
@@ -304,21 +305,24 @@ export async function batchInsert<T extends Record<string, unknown>>(
     }
   }
 
-  const placeholders = fields.map((_, i) => `$${i + 1}`).join(', ');
+  const fieldCount = fields.length;
 
   for (let i = 0; i < data.length; i += batchSize) {
     const batch = data.slice(i, i + batchSize);
-    const values = batch.flatMap((item: any) => {
-      const itemValues = Object.values(item);
-      // Validate all values are safe
-      itemValues.forEach((value, idx) => {
-        if (typeof value === 'string') {
-          validateInput(fields[idx], value, '=');
-        }
-      });
-      return itemValues;
-    });
 
-    await pool.query(`INSERT INTO ${tableName} (${fields.join(', ')}) VALUES (${placeholders})`, values);
+    // Generate per-row placeholders: ($1,$2,$3), ($4,$5,$6), ...
+    const rowPlaceholders = batch.map((_, rowIdx) => {
+      const offset = rowIdx * fieldCount;
+      const cols = fields.map((_, colIdx) => `$${offset + colIdx + 1}`);
+      return `(${cols.join(', ')})`;
+    }).join(', ');
+
+    // Flatten values in order: [row1.val1, row1.val2, row2.val1, row2.val2, ...]
+    const values = batch.flatMap((item: any) => fields.map(f => item[f]));
+
+    await pool.query(
+      `INSERT INTO ${tableName} (${fields.join(', ')}) VALUES ${rowPlaceholders}`,
+      values
+    );
   }
 }

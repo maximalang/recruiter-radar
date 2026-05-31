@@ -2,7 +2,32 @@ import { NextRequest, NextResponse } from 'next/server'
 import { LeadScoringService } from '@/lib/lead-discovery/lead-scoring-service'
 import type { LeadScoringOptions, ScoredLead } from '@/lib/lead-discovery/lead-scoring-service'
 
+// Module-level singleton — one instance per process
+let _scoringService: LeadScoringService | null = null
+function getLeadScoringService(): LeadScoringService {
+  if (!_scoringService) {
+    _scoringService = new LeadScoringService()
+  }
+  return _scoringService
+}
+
 export async function POST(request: NextRequest) {
+  // Auth check — LEAD_API_KEY with fallback to DIGEST_API_KEY
+  const apiKey = process.env.LEAD_API_KEY || process.env.DIGEST_API_KEY
+  if (!apiKey) {
+    return NextResponse.json(
+      { success: false, error: 'LEAD_API_KEY is not configured.' },
+      { status: 500 }
+    )
+  }
+  const authHeader = request.headers.get('x-api-key')
+  if (authHeader !== apiKey) {
+    return NextResponse.json(
+      { success: false, error: 'Invalid or missing x-api-key header.' },
+      { status: 401 }
+    )
+  }
+
   try {
     const body = await request.json()
     const {
@@ -11,7 +36,8 @@ export async function POST(request: NextRequest) {
       minScore = 1.0,
       enableRealTime = false,
       marketContext,
-      maxResults = 100
+      maxResults = 100,
+      clientProfileId
     } = body
 
     // Validate required fields
@@ -25,8 +51,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Initialize scoring service
-    const scoringService = new LeadScoringService()
+    // Get singleton scoring service
+    const scoringService = getLeadScoringService()
 
     // Generate and score leads
     console.log(`Generating and scoring leads for agency...`)
@@ -36,6 +62,7 @@ export async function POST(request: NextRequest) {
       minScore,
       enableRealTime,
       marketContext,
+      clientProfileId,
     })
 
     console.log(`Generated ${scoredLeads.length} scored leads`)
@@ -55,9 +82,10 @@ export async function POST(request: NextRequest) {
           totalLeads: limitedLeads.length,
           avgScore: limitedLeads.reduce((sum, lead) => sum + lead.finalScore, 0) / limitedLeads.length,
           confidenceBreakdown: {
-            high: limitedLeads.filter(lead => lead.confidence === 'A').length,
-            medium: limitedLeads.filter(lead => lead.confidence === 'B').length,
-            low: limitedLeads.filter(lead => lead.confidence === 'C').length,
+            A: limitedLeads.filter(lead => lead.confidence === 'A').length,
+            B: limitedLeads.filter(lead => lead.confidence === 'B').length,
+            C: limitedLeads.filter(lead => lead.confidence === 'C').length,
+            D: limitedLeads.filter(lead => lead.confidence === 'D').length,
           },
           sourceCoverage: insights?.averageBySource || {},
           improvementSuggestions: limitedLeads.flatMap(lead => lead.improvementSuggestions)
@@ -69,8 +97,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to score leads',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        error: 'Failed to score leads'
       },
       { status: 500 }
     )

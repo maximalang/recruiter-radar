@@ -65,7 +65,7 @@ describe('lead:generate runtime entry', () => {
 
     expect(result.lead.id).toBe(raw.leadId)
     expect(result.lead.score).toBeGreaterThan(0)
-    expect(result.lead.confidence).toMatch(/^(high|medium|low)$/)
+    expect(result.lead.confidence).toMatch(/^[ABCD]$/)
     expect(['outreach', 'enrich-contacts', 'review', 'wait']).toContain(
       result.lead.nextAction.kind
     )
@@ -93,7 +93,7 @@ describe('lead:generate runtime entry', () => {
     const raw: RawInput = JSON.parse(readFileSync(FIXTURE_PATH, 'utf8'))
     const result = runScoringPipeline(hydrate(raw, FIXED_NOW))
 
-    expect(result.lead.confidence).toBe('high')
+    expect(result.lead.confidence).toBe('A')
     expect(result.lead.nextAction.kind).toBe('outreach')
     expect(result.breakdown.sourceAggregation.hasMultiSourceConfirmation).toBe(true)
     expect(result.breakdown.freshness.meetsSla).toBe(true)

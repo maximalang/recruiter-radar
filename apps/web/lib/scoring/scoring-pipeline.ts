@@ -246,13 +246,15 @@ export function runScoringPipeline(input: ScoringPipelineInput): ScoringPipeline
     sourceAggregation,
     freshness,
     contactQuality,
+    evidence: toFiurEvidence(input.evidence),
+    entityMatch: 'clean' as const,
     status: input.status,
     assignedTo: input.assignedTo,
     now: nowDate,
   })
 
   if (industryAlignment.match === 'excluded' || geographicFit.match === 'excluded') {
-    lead.confidence = 'low'
+    lead.confidence = 'D'
     lead.nextAction = {
       kind: 'review',
       hint: 'Company touches an excluded industry or geography — review ICP before outreach',

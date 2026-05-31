@@ -1,10 +1,69 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals'
+
+// Mock getHhDigestItems before importing the generator
+const mockGetHhDigestItems = jest.fn()
+jest.mock('@/lib/hhDigest', () => ({
+  getHhDigestItems: mockGetHhDigestItems,
+}))
+
+// Mock the crawler to avoid real HTTP requests
+jest.mock('@/lib/sources/crawlers', () => ({
+  createDefaultRouter: () => ({
+    fetch: jest.fn().mockResolvedValue({
+      status: 404,
+      html: undefined,
+      url: '',
+      fetchedAt: new Date().toISOString(),
+      warnings: [],
+    }),
+  }),
+}))
+
 import { MultiSourceLeadGenerator } from '@/lib/lead-discovery/multi-source-lead-generator'
+
+const SAMPLE_DIGEST_ITEMS = [
+  {
+    rank: 1,
+    org_id: 'org-1',
+    hh_employer_id: 'emp-1',
+    employer_name: 'TechCorp',
+    vacancies_count: 5,
+    distinct_vacancy_names_count: 3,
+    latest_published_at: '2024-05-28T10:00:00Z',
+    total_score: 350,
+    reasons: ['high hiring activity', 'diverse roles'] as [string, string],
+    opener: 'Компания активно нанимает',
+    source_families: ['hh'],
+    evidence_titles: ['Frontend Developer', 'Backend Developer', 'Product Manager'],
+    candidate_source_keys: [],
+    location_names: ['Москва'],
+    confidence_gate: 'A' as const,
+  },
+  {
+    rank: 2,
+    org_id: 'org-2',
+    hh_employer_id: 'emp-2',
+    employer_name: 'DataFlow',
+    vacancies_count: 2,
+    distinct_vacancy_names_count: 2,
+    latest_published_at: '2024-05-27T08:00:00Z',
+    total_score: 200,
+    reasons: ['moderate hiring', 'relevant roles'] as [string, string],
+    opener: 'Стоит рассмотреть',
+    source_families: ['hh'],
+    evidence_titles: ['Data Engineer', 'ML Engineer'],
+    candidate_source_keys: [],
+    location_names: ['Санкт-Петербург'],
+    confidence_gate: 'B' as const,
+  },
+]
 
 describe('MultiSourceLeadGenerator', () => {
   let generator: MultiSourceLeadGenerator
 
   beforeEach(() => {
+    jest.clearAllMocks()
+    mockGetHhDigestItems.mockResolvedValue(SAMPLE_DIGEST_ITEMS)
     generator = new MultiSourceLeadGenerator()
   })
 
@@ -47,9 +106,10 @@ describe('MultiSourceLeadGenerator', () => {
   })
 
   describe('generateLeads', () => {
-    it('should generate HH-based leads', async () => {
+    it('should generate HH-based leads from real DB data', async () => {
       const leads = await generator.generateLeads()
 
+      expect(mockGetHhDigestItems).toHaveBeenCalledWith({ clientProfileId: null })
       expect(leads.length).toBeGreaterThan(0)
       expect(leads[0]).toMatchObject({
         id: expect.stringMatching(/^multi-/),
@@ -60,6 +120,12 @@ describe('MultiSourceLeadGenerator', () => {
         sources: expect.any(Array),
         signals: expect.any(Array)
       })
+    })
+
+    it('should pass clientProfileId to getHhDigestItems', async () => {
+      await generator.generateLeads({ clientProfileId: 'profile-123' })
+
+      expect(mockGetHhDigestItems).toHaveBeenCalledWith({ clientProfileId: 'profile-123' })
     })
 
     it('should filter leads by minimum score', async () => {
@@ -79,6 +145,25 @@ describe('MultiSourceLeadGenerator', () => {
         const sourceIds = lead.sources.map(s => s.sourceId)
         expect(sourceIds).toEqual(expect.arrayContaining(['hh']))
       })
+    })
+
+    it('should return empty array when no digest items found', async () => {
+      mockGetHhDigestItems.mockResolvedValue([])
+
+      const leads = await generator.generateLeads()
+
+      expect(leads).toEqual([])
+    })
+
+    it('should not recalculate score in filterAndRankLeads', async () => {
+      // Score should come from DB/detector, not from a multiplier formula
+      const leads = await generator.generateLeads()
+
+      // The score from digestToLeadCandidates is total_score/100
+      // For sample items: 350/100 = 3.5, 200/100 = 2.0
+      const scores = leads.map(l => l.score)
+      expect(scores).toContain(3.5)
+      expect(scores).toContain(2.0)
     })
   })
 
@@ -103,17 +188,7 @@ describe('MultiSourceLeadGenerator', () => {
   })
 
   describe('real-time crawling', () => {
-    it('should enable real-time crawling when specified', async () => {
-      // Mock the crawler
-      const mockCrawl = jest.fn().mockResolvedValue({
-        status: 200,
-        html: '<html><body><h1>Careers</h1></body></html>',
-        url: 'https://example.com/careers',
-        fetchedAt: new Date().toISOString()
-      })
-
-      // This would require mocking the crawler instance
-      // For now, we just test that the option is accepted
+    it('should accept enableRealTime option', async () => {
       const leads = await generator.generateLeads({ enableRealTime: true })
 
       expect(leads.length).toBeGreaterThan(0)

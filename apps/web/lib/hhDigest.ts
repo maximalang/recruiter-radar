@@ -16,6 +16,7 @@ export type HhDigestItem = {
   evidence_titles: string[]
   candidate_source_keys: string[]
   location_names: string[]
+  confidence_gate?: 'A' | 'B' | 'C' | 'D'
 }
 
 export async function getHhDigestItems(input?: {
@@ -41,7 +42,8 @@ export async function getHhDigestItems(input?: {
         source_families: item.source_families,
         evidence_titles: item.evidence_titles,
         candidate_source_keys: item.candidate_source_keys,
-        location_names: item.location_names
+        location_names: item.location_names,
+        confidence_gate: item.confidence_gate
       }))
   }
 
@@ -61,7 +63,8 @@ export async function getHhDigestItems(input?: {
     source_families: item.source_families,
     evidence_titles: item.evidence_titles,
     candidate_source_keys: item.candidate_source_keys,
-    location_names: item.location_names
+    location_names: item.location_names,
+    confidence_gate: item.confidence_gate
   }))
 }
 

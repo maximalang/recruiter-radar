@@ -42,6 +42,11 @@ const baseInput: AgencyLeadInput = {
     hasHrChannel: true,
     reasons: ['HR or careers contact path available', '4 independent channel categories'],
   },
+  evidence: [
+    { tier: 'direct', source: 'career_page' },
+    { tier: 'direct', source: 'hh' },
+  ],
+  entityMatch: 'clean',
   now: new Date('2026-05-26T12:00:00Z'),
 }
 
@@ -77,47 +82,45 @@ describe('buildAgencyLead', () => {
       expect(lead.score).toBe(2.6)
     })
 
-    it('maps strong signals (fresh + multi-source + good contact + high FIUR) to confidence "high"', () => {
+    it('maps strong signals (2+ direct evidence + clean entity) to confidence "A"', () => {
       const lead = buildAgencyLead(baseInput)
-      expect(lead.confidence).toBe('high')
+      expect(lead.confidence).toBe('A')
     })
 
-    it('maps single-source stale data to confidence "low"', () => {
+    it('maps no evidence to confidence "D"', () => {
       const lead = buildAgencyLead({
         ...baseInput,
-        sourceAggregation: {
-          ...baseInput.sourceAggregation,
-          independentSources: 1,
-          hasMultiSourceConfirmation: false,
-        },
-        freshness: {
-          newestAgeHours: 200,
-          oldestAgeHours: 200,
-          status: 'stale',
-          meetsSla: false,
-        },
-        fiur: { ...baseInput.fiur, total: 1.2 },
+        evidence: [],
+        entityMatch: 'clean',
       })
-      expect(lead.confidence).toBe('low')
+      expect(lead.confidence).toBe('D')
     })
 
-    it('maps moderate signals to confidence "medium"', () => {
+    it('maps single direct source with clean entity to confidence "B"', () => {
       const lead = buildAgencyLead({
         ...baseInput,
-        sourceAggregation: {
-          ...baseInput.sourceAggregation,
-          independentSources: 1,
-          hasMultiSourceConfirmation: false,
-        },
-        freshness: {
-          newestAgeHours: 12,
-          oldestAgeHours: 30,
-          status: 'aging',
-          meetsSla: false,
-        },
-        fiur: { ...baseInput.fiur, total: 2.0 },
+        evidence: [{ tier: 'direct', source: 'hh' }],
+        entityMatch: 'clean',
       })
-      expect(lead.confidence).toBe('medium')
+      expect(lead.confidence).toBe('B')
+    })
+
+    it('maps questionable entity match to confidence "C"', () => {
+      const lead = buildAgencyLead({
+        ...baseInput,
+        evidence: [{ tier: 'direct', source: 'hh' }],
+        entityMatch: 'questionable',
+      })
+      expect(lead.confidence).toBe('C')
+    })
+
+    it('maps corroboration-only evidence to confidence "C"', () => {
+      const lead = buildAgencyLead({
+        ...baseInput,
+        evidence: [{ tier: 'corroboration', source: 'news' }],
+        entityMatch: 'clean',
+      })
+      expect(lead.confidence).toBe('C')
     })
   })
 

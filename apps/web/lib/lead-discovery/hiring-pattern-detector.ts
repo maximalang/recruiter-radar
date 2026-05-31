@@ -14,6 +14,9 @@ export interface HiringSignal {
   strength: number // 0-1
   evidence: string[]
   detectedAt: Date
+  timestamp?: Date        // When the underlying hiring event occurred (e.g. vacancy published_at)
+  publishedAt?: string    // ISO date of the vacancy posting
+  location?: string       // Location of the vacancy (e.g. "Москва")
 }
 
 export interface HiringPattern {
@@ -120,20 +123,31 @@ export class HiringPatternDetector {
     // Tech roles (checked first as they're most specific)
     if (title.includes('developer') || title.includes('programmer') ||
         title.includes('backend') || title.includes('frontend') ||
-        title.includes('fullstack') || title.includes('devops')) {
+        title.includes('fullstack') || title.includes('devops') ||
+        title.includes('разработчик') || title.includes('программист') ||
+        title.includes('архитектор')) {
       return 'tech'
     }
 
     // Engineering roles (but not management)
-    if ((title.includes('engineer') && !title.includes('director') && !title.includes('vp')) ||
-        title.includes('tech') || title.includes('architect')) {
+    if ((title.includes('engineer') && !title.includes('director') && !title.includes('vp') && !title.includes('директор')) ||
+        title.includes('architect') ||
+        title.includes('инженер')) {
       return 'tech'
+    }
+
+    // Sales-specific roles that contain management words — must be checked before management
+    // "коммерческий директор" contains "директор", "менеджер по продажам" contains "manager"
+    if (title.includes('менеджер по продажам') || title.includes('коммерческий директор')) {
+      return 'sales'
     }
 
     // Management roles
     if (title.includes('director') || title.includes('head') ||
         title.includes('vp') || title.includes('principal') ||
-        title.includes('lead')) {
+        title.includes('lead') ||
+        title.includes('руководитель') || title.includes('директор') ||
+        title.includes('заведующий') || title.includes('начальник')) {
       return 'management'
     }
 
@@ -145,7 +159,9 @@ export class HiringPatternDetector {
     // HR roles (checked before general manager)
     if (title.includes('hr') || title.includes('recruiter') ||
         title.includes('hr business partner') || title.includes('hr manager') ||
-        title.includes('talent acquisition') || title.includes('chro')) {
+        title.includes('talent acquisition') || title.includes('chro') ||
+        title.includes('рекрутер') || title.includes('hr-менеджер') ||
+        title.includes('специалист по подбору') || title.includes('кадровик')) {
       return 'hr'
     }
 
@@ -168,7 +184,9 @@ export class HiringPatternDetector {
     // Finance roles
     if (title.includes('finance') || title.includes('accountant') ||
         title.includes('cfo') || title.includes('controller') ||
-        title.includes('financial') || title.includes('accountant')) {
+        title.includes('financial') ||
+        title.includes('бухгалтер') || title.includes('финансовый') ||
+        title.includes('аудитор')) {
       return 'finance'
     }
 
@@ -268,7 +286,7 @@ export class HiringPatternDetector {
    */
   static digestToLeadCandidates(digestItems: HhDigestItem[]): LeadCandidate[] {
     return digestItems
-      .filter((item: any) => !item.confidence_gate || item.confidence_gate !== 'C' && item.confidence_gate !== 'D')
+      .filter((item: any) => !item.confidence_gate || (item.confidence_gate !== 'C' && item.confidence_gate !== 'D'))
       .map((item: any) => ({
         id: `lead-${item.org_id}-${Date.now()}`,
         companyId: item.org_id,
@@ -288,7 +306,10 @@ export class HiringPatternDetector {
   private static mapConfidenceGate(hhGate: string): 'A' | 'B' | 'C' | 'D' {
     switch (hhGate) {
       case 'A': return 'A'
-      default: return 'B' // Default to B for non-A items
+      case 'B': return 'B'
+      case 'C': return 'C'
+      case 'D': return 'D'
+      default: return 'B' // Default to B for unknown gate values
     }
   }
 

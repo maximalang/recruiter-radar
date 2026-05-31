@@ -39,6 +39,18 @@ export class RBACService {
         'billing_view',
         'billing_edit'
       ],
+      owner: [
+        'dashboard_view',
+        'dashboard_edit',
+        'digest_view',
+        'digest_edit',
+        'client_edit',
+        'client_create',
+        'client_delete',
+        'source_config',
+        'billing_view',
+        'billing_edit'
+      ],
       agency_admin: [
         'dashboard_view',
         'dashboard_edit',
