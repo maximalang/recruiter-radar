@@ -30,6 +30,33 @@ services:
     volumes:
       - n8n_data:/home/node/.n8n
 
+  firecrawl:
+    image: ghcr.io/firecrawl/firecrawl:latest
+    restart: unless-stopped
+    ports:
+      - "${FIRECRAWL_PORT:-3002}:3002"
+    environment:
+      # WARNING: Default key is for local dev only. For non-local deployments,
+      # set FIRECRAWL_API_KEY in .env — do NOT use the default on a network-accessible host.
+      FIRECRAWL_API_KEY: ${FIRECRAWL_API_KEY:-change-me-local-firecrawl-key}
+      # LLM provider for structured extraction — requires OPENAI_API_KEY in .env
+      LLM_MODEL: ${FIRECRAWL_LLM_MODEL:-gpt-4o-mini}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY is required for Firecrawl LLM extraction}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      # Playwright browser for JS rendering
+      PLAYWRIGHT_MICROSERVICE_URL: ${PLAYWRIGHT_MICROSERVICE_URL:-}
+      # Storage
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+
 volumes:
   postgres_data:
   n8n_data:
+  redis_data:

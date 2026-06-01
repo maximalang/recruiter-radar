@@ -13,6 +13,7 @@ import {
   dedupeNormalizedRecords,
   stripBom,
 } from './adapters/source-records.mjs';
+import { toUrlOrNull } from './adapters/rf-source-runtime.mjs';
 
 const { Client } = pg;
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -126,10 +127,16 @@ function normalizeVacancy(vacancy, fetchedAt) {
     ? buildRussianLegalNameSourceKey(employerName)
     : null;
 
+  // Only use employer.site_url — the employer's self-declared corporate website.
+  // Do NOT fall back to employer.url / alternate_url as those are HH platform pages
+  // (e.g. https://hh.ru/employer/12345), not actual company websites.
+  const employerSiteUrl = toUrlOrNull(vacancy.employer?.site_url);
+
   return {
     hhVacancyId,
     hhEmployerId,
     employerName,
+    employerSiteUrl,
     orgName: employerName ?? buildFallbackEmployerName(hhEmployerId),
     orgDisplayName: employerName,
     orgSourceKey,
@@ -289,11 +296,11 @@ async function upsertOrgSourceRef(client, vacancy) {
   if (!orgId) {
     const insertedOrgResult = await client.query(
       `
-        INSERT INTO orgs (name)
-        VALUES ($1)
+        INSERT INTO orgs (name, website_url)
+        VALUES ($1, $2)
         RETURNING id
       `,
-      [vacancy.orgName],
+      [vacancy.orgName, vacancy.employerSiteUrl || null],
     );
 
     orgId = insertedOrgResult.rows[0].id;
@@ -306,20 +313,24 @@ async function upsertOrgSourceRef(client, vacancy) {
 }
 
 async function updateOrgSourceRef(client, orgId, vacancy) {
+  // Single UPDATE for both name and website_url — avoids double round-trip per vacancy
   await client.query(
     `
       UPDATE orgs
-      SET name = $2
+      SET
+        name = CASE
+          WHEN $2 IS NOT NULL AND BTRIM($2) <> '' AND (name IS NULL OR BTRIM(name) = '' OR name = $3)
+            THEN $2
+          ELSE name
+        END,
+        website_url = CASE
+          WHEN $4 IS NOT NULL AND BTRIM($4) <> '' AND (website_url IS NULL OR BTRIM(website_url) = '')
+            THEN $4
+          ELSE website_url
+        END
       WHERE id = $1
-        AND $2 IS NOT NULL
-        AND BTRIM($2) <> ''
-        AND (
-          name IS NULL
-          OR BTRIM(name) = ''
-          OR name = $3
-        )
     `,
-    [orgId, vacancy.orgDisplayName, buildFallbackEmployerName(vacancy.hhEmployerId)],
+    [orgId, vacancy.orgDisplayName, buildFallbackEmployerName(vacancy.hhEmployerId), vacancy.employerSiteUrl || null],
   );
 
   await client.query(

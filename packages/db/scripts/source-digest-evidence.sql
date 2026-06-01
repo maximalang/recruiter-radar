@@ -86,7 +86,7 @@ WITH source_signal_rows AS (
     NULLIF(signal.payload ->> 'hh_employer_id', '') AS payload_hh_employer_id
   FROM signals AS signal
   WHERE signal.signal_type = 'job_posting'
-    AND signal.source IN ('hh', 'career-pages', 'rabota-rossii', 'superjob', 'habr-career', 'tech-job-boards', 'linkedin-company-pages')
+    AND signal.source IN ('hh', 'career-pages', 'rabota-rossii', 'superjob', 'habr-career', 'tech-job-boards', 'linkedin-company-pages', 'company-newsrooms', 'industry-media')
 ),
 normalized_signal_rows AS (
   SELECT
@@ -114,7 +114,9 @@ normalized_signal_rows AS (
     --                        aggregator IDs and do NOT grant direct_hiring_proof status on their own.
     --                        For rabota-rossii, INN-based org_external_id IS org-level → direct proof.
     -- platform_aggregation  — signal from a platform (HH, superjob, etc.) with a company match in
-    --                        org_source_refs, but no company-owned surface.
+    --                        org_source_refs, but no company-owned surface. Also includes news signals
+    --                        whose headline directly references hiring (Russian keywords: найм, ваканси,
+    --                        рекрутер, ищут сотрудник, расширение команды, рост штата).
     -- enrichment_context    — no match found; signal provides background context only.
     CASE
       WHEN signal.source = 'career-pages'
@@ -130,6 +132,10 @@ normalized_signal_rows AS (
           COALESCE(signal.payload_hh_employer_id, '')
         )
         THEN 'direct_hiring_proof'
+      WHEN signal.source IN ('company-newsrooms', 'industry-media')
+        AND signal.evidence_title ~* 'найм|ваканси|рекрутер|ищут\s+сотрудник|расширени[ея]\s+команд|рост\s+штат|подбор\s+персонал|массовый\s+найм|ханти'
+        AND source_ref.matched_by IS NOT NULL
+        THEN 'platform_aggregation'
       WHEN source_ref.matched_by IS NOT NULL
         THEN 'platform_aggregation'
       ELSE 'enrichment_context'
@@ -260,19 +266,13 @@ scored AS (
     latest_published_at,
     LEAST(vacancies_count * 10, 50)::INT AS vacancies_score,
     LEAST(distinct_vacancy_names_count * 5, 25)::INT AS role_diversity_score,
-    CASE
-      WHEN latest_published_at >= NOW() - interval '3 days' THEN 20
-      WHEN latest_published_at >= NOW() - interval '7 days' THEN 10
-      ELSE 0
-    END::INT AS recency_score,
+    -- Sliding recency_score: 20 at 0 days → 10 at 7 days → 0 at 45 days.
+    -- Linear gradient avoids the binary cliff at day 3/7 boundaries.
+    GREATEST(0, LEAST(20, (20 * (1.0 - EXTRACT(EPOCH FROM (NOW() - latest_published_at)) / (45.0 * 86400)))::INT))::INT AS recency_score,
     LEAST(
       vacancies_count * 10
       + distinct_vacancy_names_count * 5
-      + CASE
-        WHEN latest_published_at >= NOW() - interval '3 days' THEN 20
-        WHEN latest_published_at >= NOW() - interval '7 days' THEN 10
-        ELSE 0
-      END,
+      + GREATEST(0, LEAST(20, (20 * (1.0 - EXTRACT(EPOCH FROM (NOW() - latest_published_at)) / (45.0 * 86400)))::INT)),
       90
     )::INT AS activity_score,
     CASE evidence_quality
@@ -294,6 +294,7 @@ scored AS (
     CASE
       WHEN latest_published_at >= NOW() - interval '3 days' THEN 'hot'
       WHEN latest_published_at >= NOW() - interval '7 days' THEN 'fresh'
+      WHEN latest_published_at >= NOW() - interval '14 days' THEN 'recent'
       ELSE 'active'
     END AS recency_code,
     -- confidence_gate: A/B/C/D based on evidence layers and source diversity.
@@ -318,7 +319,7 @@ scored AS (
   FROM aggregated
   WHERE evidence_quality <> 'enrichment_context'
     AND latest_published_at IS NOT NULL
-    AND latest_published_at >= NOW() - interval '30 days'
+    AND latest_published_at >= NOW() - interval '45 days'
 ),
 ranked AS (
   SELECT
@@ -374,7 +375,7 @@ ranked AS (
         THEN 'Опубликовано ' || TO_CHAR(latest_published_at, 'DD.MM')
       WHEN distinct_vacancy_names_count >= 2
         THEN distinct_vacancy_names_count || ' разных ролей — найм не точечный'
-      ELSE 'Опубликовано в пределах месяца'
+      ELSE 'Опубликовано за последние 45 дней'
     END AS secondary_reason_label
   FROM scored
 )

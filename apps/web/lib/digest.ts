@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Pool, type PoolClient } from "pg";
-
+import { isDigestEligibleGate } from "./scoring/gate-pipeline";
 import { getClientProfileById, type ClientProfile } from "./clientProfiles";
 import type {
   DigestItem,
@@ -246,7 +246,7 @@ export async function runDigestForClientProfile(input: {
 
     const items = evidenceResult.rows
       .map(mapDigestEvidenceRow)
-      .filter((item) => item.confidence_gate !== "C" && item.confidence_gate !== "D")
+      .filter(isDigestEligibleGate)
       .filter((item) => matchesClientProfile(item, clientProfile))
       .sort((left, right) => compareDigestItemsForClient(left, right, clientProfile))
       .slice(0, requestedLimit);

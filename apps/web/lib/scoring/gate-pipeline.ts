@@ -126,8 +126,40 @@ export function auditDigestGate(
  *   2. The C/D exclusion is a hard rule that doesn't need re-evaluation
  *   3. Entity match quality is checked at ingest time via matched_by
  */
+/**
+ * Generic confidence-gate filter for digest eligibility.
+ *
+ * Preserves the original "not-C-and-not-D" semantics:
+ *   - A, B → eligible (auto-deliver)
+ *   - C, D → excluded (review / no-lead)
+ *   - undefined / null / empty → eligible (pre-gate items scored downstream)
+ *   - Any other unexpected value → eligible with a warning (backward compat)
+ *
+ * Use this as a drop-in replacement for the inline filter:
+ *   `.filter(item => item.confidence_gate !== 'C' && item.confidence_gate !== 'D')`
+ */
+export function isDigestEligibleGate<T extends { confidence_gate?: string | null }>(
+  item: T,
+): boolean {
+  const gate = item.confidence_gate
+  if (!gate) return true // no gate yet → eligible, will be scored downstream
+  if (gate === 'C' || gate === 'D') return false
+  // Unexpected gate values (not A/B/C/D/empty) pass with a warning.
+  // This preserves backward compat with the old inline filter that would
+  // have passed any non-C/non-D value.
+  if (gate !== 'A' && gate !== 'B') {
+    console.warn(`isDigestEligibleGate: unexpected confidence_gate "${gate}" — passing (backward compat)`)
+  }
+  return true
+}
+
+/**
+ * @deprecated Use isDigestEligibleGate instead — this function only accepts DigestEvidenceRow
+ * and excludes items with no confidence_gate, which is incorrect for pre-gate items.
+ * Kept for backward compat with existing tests.
+ */
 export function filterGatesForDigest(items: DigestEvidenceRow[]): DigestEvidenceRow[] {
-  return items.filter((item) => item.confidence_gate === 'A' || item.confidence_gate === 'B');
+  return items.filter(isDigestEligibleGate)
 }
 
 /**

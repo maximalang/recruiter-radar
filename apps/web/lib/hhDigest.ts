@@ -1,5 +1,6 @@
 import { getDigestPreviewItems, getDigestItemsForClientProfile } from "./digest"
 import type { DigestItem } from "./db-types"
+import { isDigestEligibleGate } from "./scoring/gate-pipeline"
 
 export type HhDigestItem = {
   rank: number
@@ -27,7 +28,7 @@ export async function getHhDigestItems(input?: {
   if (clientProfileId) {
     const items = await getDigestItemsForClientProfile({ clientProfileId })
     return items
-      .filter((item) => item.confidence_gate !== "C" && item.confidence_gate !== "D")
+      .filter(isDigestEligibleGate)
       .map((item) => ({
         rank: item.rank,
         org_id: item.org_id,

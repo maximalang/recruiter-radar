@@ -6,6 +6,7 @@
  */
 
 import type { HhDigestItem } from '@/lib/hhDigest'
+import { isDigestEligibleGate } from '@/lib/scoring/gate-pipeline'
 
 export interface HiringSignal {
   companyId: string
@@ -286,7 +287,7 @@ export class HiringPatternDetector {
    */
   static digestToLeadCandidates(digestItems: HhDigestItem[]): LeadCandidate[] {
     return digestItems
-      .filter((item: any) => !item.confidence_gate || (item.confidence_gate !== 'C' && item.confidence_gate !== 'D'))
+      .filter((item: any) => isDigestEligibleGate(item))
       .map((item: any) => ({
         id: `lead-${item.org_id}-${Date.now()}`,
         companyId: item.org_id,

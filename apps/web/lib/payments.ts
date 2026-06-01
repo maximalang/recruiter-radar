@@ -27,6 +27,7 @@ import {
 import { getTelegramBotToken, sendTelegramTextMessage } from "./telegram";
 import { buildTelegramDigestFeedbackReplyMarkup } from "./telegramDigestFeedback";
 import { recordClientProfileDigestShownOutcomes } from "./clientProfileSignalOutcomes";
+import { isDigestEligibleGate } from "./scoring/gate-pipeline";
 
 const CHECKOUT_ORDER_STATUSES = [
   "created",
@@ -659,7 +660,7 @@ export async function sendPilotOrderTestDigest(
     skipStateWrite: true
   });
   const items = digestRun.items
-    .filter((item) => item.confidence_gate !== "C" && item.confidence_gate !== "D")
+    .filter(isDigestEligibleGate)
     .map(mapDigestItemToTelegramDigestItem);
 
   if (items.length === 0) {
