@@ -25,7 +25,7 @@ function validateInput(column: string, _value: unknown, operator: '=' | '>' | '<
   }
 
   // Validate operator
-  const validOperators = ['=', '>', '<', '>=', '<=', 'LIKE', 'IN', 'NOT IN'];
+  const validOperators = ['=', '!=', '>', '<', '>=', '<=', 'LIKE', 'ILIKE', 'IN', 'NOT IN'];
   if (!validOperators.includes(operator)) {
     throw new Error(`Invalid operator: ${operator}`);
   }

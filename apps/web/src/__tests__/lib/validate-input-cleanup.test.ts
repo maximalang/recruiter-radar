@@ -47,3 +47,34 @@ describe('T4.1: Legitimate values pass through validateInput', () => {
     expect(params).toContain("it's a test")
   })
 })
+
+describe('validateInput operator whitelist includes != and ILIKE', () => {
+  it('allows != operator in query options', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [] })
+    // getLeadsByClientProfile with != condition — must not throw
+    const { getLeadsByClientProfile } = await import('@/lib/typed-db')
+    await getLeadsByClientProfile('test-id', {
+      where: [{ column: 'state', operator: '!=', value: 'deleted' }]
+    })
+    // Should reach the query call, not throw "Invalid operator"
+    expect(mockQuery).toHaveBeenCalled()
+  })
+
+  it('allows ILIKE operator in query options', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [] })
+    const { getDigestItemsByDigestRunId } = await import('@/lib/typed-db')
+    await getDigestItemsByDigestRunId('run-id', {
+      where: [{ column: 'source_display_name', operator: 'ILIKE', value: '%tech%' }]
+    })
+    expect(mockQuery).toHaveBeenCalled()
+  })
+
+  it('rejects unknown operators', async () => {
+    const { getLeadsByClientProfile } = await import('@/lib/typed-db')
+    await expect(
+      getLeadsByClientProfile('test-id', {
+        where: [{ column: 'state', operator: 'DROP' as any, value: 'x' }]
+      })
+    ).rejects.toThrow(/Invalid operator/)
+  })
+})

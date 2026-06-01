@@ -498,16 +498,32 @@ export class MultiSourceLeadGenerator {
 
     const contextSources = ['funding-business-signals', 'company-newsrooms', 'industry-media']
 
-    for (const lead of leads) {
-      try {
-        const result = await pool.query(
-          `SELECT source, payload, headline, occurred_at FROM signals
-           WHERE org_id = $1 AND source = ANY($2)
-           ORDER BY occurred_at DESC LIMIT 5`,
-          [lead.companyId, contextSources]
-        )
+    // Batch query: fetch business signals for all leads in one round-trip
+    const orgIds = leads.map(l => l.companyId).filter(Boolean)
+    if (orgIds.length === 0) return
 
-        for (const row of result.rows as Array<Record<string, unknown>>) {
+    try {
+      const result = await pool.query(
+        `SELECT org_id, source, payload, headline, occurred_at FROM signals
+         WHERE org_id = ANY($1) AND source = ANY($2)
+         ORDER BY org_id, occurred_at DESC`,
+        [orgIds, contextSources]
+      )
+
+      // Index results by org_id
+      const signalsByOrg = new Map<string, Array<Record<string, unknown>>>()
+      for (const row of result.rows as Array<Record<string, unknown>>) {
+        const orgId = String(row.org_id)
+        if (!signalsByOrg.has(orgId)) signalsByOrg.set(orgId, [])
+        signalsByOrg.get(orgId)!.push(row)
+      }
+
+      for (const lead of leads) {
+        const rows = signalsByOrg.get(lead.companyId)
+        if (!rows) continue
+
+        // Take top 5 per org (already ordered by occurred_at DESC)
+        for (const row of rows.slice(0, 5)) {
           const rowSource = String(row.source)
           const sourceConfig = this.sources.find(s => s.id === rowSource)
           if (!sourceConfig) continue
@@ -540,9 +556,9 @@ export class MultiSourceLeadGenerator {
             })
           }
         }
-      } catch (error) {
-        console.warn(`Failed to fetch business signals for ${lead.companyName}:`, error)
       }
+    } catch (error) {
+      console.warn('Failed to fetch business signals:', error)
     }
 
     // Recalculate confidence after adding evidence
@@ -559,43 +575,53 @@ export class MultiSourceLeadGenerator {
     const pool = this.getDbPool()
     if (!pool) return
 
-    for (const lead of leads) {
-      try {
-        const result = await pool.query(
-          `SELECT payload FROM signals
-           WHERE org_id = $1 AND source = 'egrul-fns'
-           ORDER BY occurred_at DESC LIMIT 1`,
-          [lead.companyId]
-        )
+    // Batch query: fetch EGRUL data for all leads in one round-trip
+    const orgIds = leads.map(l => l.companyId).filter(Boolean)
+    if (orgIds.length === 0) return
 
-        if (result.rows.length > 0) {
-          const payload = result.rows[0].payload
-          const registryData: EvidenceSource = {
-            sourceId: 'egrul-fns',
-            sourceName: 'EGRUL/FNS',
-            evidenceType: 'registry',
-            confidence: 0.9,
-            rawData: payload,
-            extractedAt: new Date(),
-            relevanceScore: 0.8
-          }
+    try {
+      const result = await pool.query(
+        `SELECT DISTINCT ON (org_id) org_id, payload
+         FROM signals
+         WHERE org_id = ANY($1) AND source = 'egrul-fns'
+         ORDER BY org_id, occurred_at DESC`,
+        [orgIds]
+      )
 
-          lead.sources.push(registryData)
-
-          // Extract enrichment fields from payload
-          const p = payload as Record<string, unknown>
-          if (p?.employee_count || p?.employeesCount) {
-            const count = Number(p.employee_count || p.employeesCount) || 0
-            lead.enrichment.companySize = this.categorizeCompanySize(count)
-            lead.enrichment.employeeCount = count
-          }
-          if (p?.legal_form || p?.legalForm) {
-            lead.enrichment.industry = lead.enrichment.industry || []
-          }
-        }
-      } catch (error) {
-        console.warn(`Failed to fetch EGRUL data for ${lead.companyName}:`, error)
+      // Index results by org_id for O(1) lookup
+      const registryByOrg = new Map<string, Record<string, unknown>>()
+      for (const row of result.rows as Array<Record<string, unknown>>) {
+        registryByOrg.set(String(row.org_id), row.payload as Record<string, unknown>)
       }
+
+      for (const lead of leads) {
+        const payload = registryByOrg.get(lead.companyId)
+        if (!payload) continue
+
+        const registryData: EvidenceSource = {
+          sourceId: 'egrul-fns',
+          sourceName: 'EGRUL/FNS',
+          evidenceType: 'registry',
+          confidence: 0.9,
+          rawData: payload,
+          extractedAt: new Date(),
+          relevanceScore: 0.8
+        }
+
+        lead.sources.push(registryData)
+
+        // Extract enrichment fields from payload
+        if (payload.employee_count || payload.employeesCount) {
+          const count = Number(payload.employee_count || payload.employeesCount) || 0
+          lead.enrichment.companySize = this.categorizeCompanySize(count)
+          lead.enrichment.employeeCount = count
+        }
+        if (payload.legal_form || payload.legalForm) {
+          lead.enrichment.industry = lead.enrichment.industry || []
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to fetch EGRUL registry data:', error)
     }
 
     // Recalculate confidence after adding evidence

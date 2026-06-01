@@ -148,3 +148,89 @@ describe('Lead Scoring Service Integration', () => {
     expect(insights).toBeNull()
   })
 })
+
+describe('scoreExistingLeads — score pre-generated leads without re-generating', () => {
+  let scoringService: LeadScoringService
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    scoringService = new LeadScoringService()
+  })
+
+  it('returns empty array for empty input', async () => {
+    const result = await scoringService.scoreExistingLeads([], {
+      agencyProfile: { industries: ['IT'], locations: ['Moscow'] }
+    })
+    expect(result).toEqual([])
+  })
+
+  it('scores pre-generated leads without calling generateLeads', async () => {
+    const rawLeads = [
+      {
+        id: 'lead-1',
+        companyId: 'org-1',
+        companyName: 'TestCorp',
+        canonicalCompanyId: 'org-1',
+        score: 2.5,
+        confidence: 'B' as const,
+        sources: [
+          { sourceId: 'hh', sourceName: 'HH.ru', evidenceType: 'vacancy', confidence: 0.8, rawData: {}, extractedAt: new Date(), relevanceScore: 0.8 }
+        ],
+        signals: [
+          { companyId: 'org-1', companyName: 'TestCorp', signalType: 'burst', strength: 0.8, evidence: ['5 вакансий'], detectedAt: new Date() }
+        ],
+        nextAction: 'outreach',
+        reasons: ['Active hiring'],
+        detectedAt: new Date(),
+        enrichment: {
+          companySize: 'medium',
+          industry: ['IT'],
+          locations: ['Moscow'],
+          hiringVelocity: 3,
+          lastHiringActivity: new Date(),
+          website: 'https://testcorp.ru',
+          employeeCount: 150,
+          hasCareerPage: true,
+          hasContactPath: true,
+          careerPageUrl: 'https://testcorp.ru/careers',
+        }
+      }
+    ]
+
+    const result = await scoringService.scoreExistingLeads(rawLeads, {
+      agencyProfile: { industries: ['IT'], locations: ['Moscow'] },
+      minScore: 1.0,
+    })
+
+    expect(result.length).toBeGreaterThan(0)
+    expect(result[0]).toHaveProperty('finalScore')
+    expect(result[0]).toHaveProperty('scoringBreakdown')
+    expect(result[0].companyName).toBe('TestCorp')
+  })
+
+  it('filters leads below minScore', async () => {
+    const rawLeads = [
+      {
+        id: 'lead-low',
+        companyId: 'org-low',
+        companyName: 'LowScore Corp',
+        canonicalCompanyId: 'org-low',
+        score: 0.3,
+        confidence: 'D' as const,
+        sources: [],
+        signals: [],
+        nextAction: 'wait',
+        reasons: [],
+        detectedAt: new Date(),
+        enrichment: {}
+      }
+    ]
+
+    const result = await scoringService.scoreExistingLeads(rawLeads, {
+      agencyProfile: { industries: ['IT'], locations: ['Moscow'] },
+      minScore: 2.0,
+    })
+
+    expect(result).toEqual([])
+  })
+})
