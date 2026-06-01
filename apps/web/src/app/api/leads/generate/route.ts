@@ -70,10 +70,12 @@ export async function POST(request: NextRequest) {
     console.log(`Generated ${rawLeads.length} raw leads`)
 
     // Apply FIUR scoring if agencyProfile is provided
+    // Uses scoreExistingLeads to avoid regenerating leads (which would
+    // create a second MultiSourceLeadGenerator and hit the DB again)
     let scoredLeads: ScoredLead[] | MultiSourceLead[] = rawLeads
     if (agencyProfile && rawLeads.length > 0) {
       const scoringService = getLeadScoringService()
-      scoredLeads = await scoringService.generateAndScoreLeads({
+      scoredLeads = await scoringService.scoreExistingLeads(rawLeads, {
         agencyProfile,
         sources,
         minScore,

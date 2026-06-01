@@ -55,7 +55,8 @@ export class LeadScoringService {
   }
 
   /**
-   * Generate and score leads from multiple sources
+   * Generate and score leads from multiple sources.
+   * Used by /api/leads/score which doesn't have pre-generated leads.
    */
   async generateAndScoreLeads(options: LeadScoringOptions): Promise<ScoredLead[]> {
     // Generate raw leads from specified sources
@@ -69,6 +70,29 @@ export class LeadScoringService {
     })
 
     // Score each lead
+    const scoredLeads = await Promise.all(
+      rawLeads.map(lead => this.scoreLead(lead, options))
+    )
+
+    // Filter by minimum score and sort
+    return scoredLeads
+      .filter(lead => lead.finalScore >= (options.minScore || 1.0))
+      .sort((a, b) => b.finalScore - a.finalScore)
+  }
+
+  /**
+   * Score already-generated leads without re-generating them.
+   * Used by /api/leads/generate which already has rawLeads from the generator.
+   * Avoids the double-generation problem where route generates leads
+   * and then generateAndScoreLeads would generate them again.
+   */
+  async scoreExistingLeads(
+    rawLeads: MultiSourceLead[],
+    options: LeadScoringOptions
+  ): Promise<ScoredLead[]> {
+    if (rawLeads.length === 0) return []
+
+    // Score each lead using the FIUR pipeline
     const scoredLeads = await Promise.all(
       rawLeads.map(lead => this.scoreLead(lead, options))
     )

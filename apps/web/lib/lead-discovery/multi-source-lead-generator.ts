@@ -9,6 +9,7 @@ import { createDefaultRouter } from '@/lib/sources/crawlers'
 import type { CrawlerRouter, CrawlerFetchInput, CrawlerResult } from '@/lib/sources/crawlers'
 import { HiringPatternDetector, type HiringPattern, type LeadCandidate, type HiringSignal } from './hiring-pattern-detector'
 import type { HhDigestItem } from '@/lib/hhDigest'
+import pLimit from 'p-limit'
 import { selectConfidenceGate } from '@/lib/scoring/gates'
 import type { ConfidenceGateInput, EntityMatchQuality } from '@/lib/scoring/gates'
 import type { EvidenceTier } from '@/lib/db/evidence'
@@ -422,17 +423,19 @@ export class MultiSourceLeadGenerator {
       }
     }
 
-    for (const lead of leads) {
+    // Parallel crawl with concurrency limit (5 concurrent requests)
+    const limit = pLimit(5)
+    await Promise.all(leads.map(lead => limit(async () => {
       try {
         // Use real website URL from DB, or fall back to slug-based guess
         const websiteUrl = websiteMap.get(lead.companyId)
         let careerUrl: string
         if (websiteUrl) {
-          // Try common career page paths
           careerUrl = `${websiteUrl.replace(/\/$/, '')}/careers`
           lead.enrichment.website = websiteUrl
         } else {
-          careerUrl = `https://${lead.companyName.toLowerCase().replace(/\s+/g, '-')}.com/careers`
+          const slug = lead.companyName.toLowerCase().replace(/[^a-zа-яё0-9\s-]/gi, '').replace(/\s+/g, '-')
+          careerUrl = `https://${slug}.com/careers`
         }
 
         const crawlInput: CrawlerFetchInput = {
@@ -481,7 +484,7 @@ export class MultiSourceLeadGenerator {
       } catch (error) {
         console.warn(`Failed to crawl career page for ${lead.companyName}:`, error)
       }
-    }
+    })))
   }
 
   /**
@@ -603,7 +606,9 @@ export class MultiSourceLeadGenerator {
 
   /**
    * Deduplicate leads using EntityResolver from LeadAggregator.
-   * Groups leads by canonicalCompanyId, merges sources, and keeps the highest-scored lead.
+   * Two-level grouping: first by companyId (org_id from DB), then by
+   * canonicalCompanyId (name hash) for leads without matching org_id.
+   * Merges sources and keeps the highest-scored lead per group.
    */
   private async deduplicateLeads(leads: MultiSourceLead[]): Promise<MultiSourceLead[]> {
     if (leads.length === 0) return []
@@ -614,24 +619,36 @@ export class MultiSourceLeadGenerator {
     // Resolve entity IDs for all leads
     const resolved = await resolver.resolveAll(leads)
 
-    // Group by canonicalCompanyId
-    const groups = new Map<string, (typeof resolved)[number][]>()
+    // Level 1: Group by companyId (org_id) — definitive match from DB
+    const orgGroups = new Map<string, (typeof resolved)[number][]>()
+    const unresolved: (typeof resolved)[number][] = []
+
     for (const lead of resolved) {
-      const key = lead.canonicalCompanyId
-      if (!groups.has(key)) {
-        groups.set(key, [])
+      if (lead.companyId) {
+        if (!orgGroups.has(lead.companyId)) {
+          orgGroups.set(lead.companyId, [])
+        }
+        orgGroups.get(lead.companyId)!.push(lead)
+      } else {
+        unresolved.push(lead)
       }
-      groups.get(key)!.push(lead)
     }
 
-    // Merge each group: keep highest-scored lead, combine sources
-    const deduplicated: MultiSourceLead[] = []
-    for (const [, group] of groups) {
-      // Sort by score descending, take the best lead as representative
+    // Level 2: For leads without companyId, group by canonicalCompanyId (name hash)
+    const nameGroups = new Map<string, (typeof resolved)[number][]>()
+    for (const lead of unresolved) {
+      const key = lead.canonicalCompanyId
+      if (!nameGroups.has(key)) {
+        nameGroups.set(key, [])
+      }
+      nameGroups.get(key)!.push(lead)
+    }
+
+    // Merge helper — combine sources, signals, enrichment from group into best lead
+    const mergeGroup = (group: (typeof resolved)[number][]): MultiSourceLead => {
       group.sort((a: typeof group[number], b: typeof group[number]) => b.score - a.score)
       const best = group[0]
 
-      // Merge sources from all leads in the group (deduplicate by sourceId)
       const seenSourceIds = new Set(best.sources.map((s: EvidenceSource) => s.sourceId))
       for (const other of group.slice(1)) {
         for (const source of other.sources) {
@@ -640,13 +657,11 @@ export class MultiSourceLeadGenerator {
             seenSourceIds.add(source.sourceId)
           }
         }
-        // Merge signals too
         for (const signal of other.signals) {
           if (!best.signals.some((s: HiringSignal) => s.signalType === signal.signalType && s.strength === signal.strength)) {
             best.signals.push(signal)
           }
         }
-        // Merge enrichment
         if (other.enrichment) {
           for (const [key, value] of Object.entries(other.enrichment)) {
             if (value !== undefined && (best.enrichment as Record<string, unknown>)[key] === undefined) {
@@ -656,10 +671,17 @@ export class MultiSourceLeadGenerator {
         }
       }
 
-      // Recalculate confidence after merging sources
       recalculateConfidence(best)
+      return best
+    }
 
-      deduplicated.push(best)
+    // Merge all groups
+    const deduplicated: MultiSourceLead[] = []
+    for (const [, group] of orgGroups) {
+      deduplicated.push(mergeGroup(group))
+    }
+    for (const [, group] of nameGroups) {
+      deduplicated.push(mergeGroup(group))
     }
 
     return deduplicated
