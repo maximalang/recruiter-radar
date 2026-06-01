@@ -51,7 +51,7 @@ export async function getHhDigestItems(input?: {
   const items = await getDigestPreviewItems(10)
 
   return items
-    .filter((item) => item.confidence_gate !== "C" && item.confidence_gate !== "D")
+    .filter(isDigestEligibleGate)
     .map((item) => ({
     rank: item.rank,
     org_id: item.org_id,

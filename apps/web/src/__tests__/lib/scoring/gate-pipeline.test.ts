@@ -130,6 +130,38 @@ describe('filterGatesForDigest — pipeline filter', () => {
     const result = filterGatesForDigest(rows);
     expect(result).toHaveLength(4);
   });
+
+  it('passes items with null confidence_gate (eligible, scored downstream)', () => {
+    const rows = [
+      { org_id: '1', rank: 1, confidence_gate: null, evidence_quality: 'direct_hiring_proof', source_families: ['hh'], source_external_id: null, source_display_name: null, evidence_titles: [], latest_published_at: null },
+      { org_id: '2', rank: 2, confidence_gate: 'A', evidence_quality: 'direct_hiring_proof', source_families: ['hh'], source_external_id: null, source_display_name: null, evidence_titles: [], latest_published_at: null },
+      { org_id: '3', rank: 3, confidence_gate: 'C', evidence_quality: 'platform_aggregation', source_families: ['hh'], source_external_id: null, source_display_name: null, evidence_titles: [], latest_published_at: null },
+    ];
+    const result = filterGatesForDigest(rows);
+    expect(result).toHaveLength(2);
+    expect(result.map((r) => r.org_id)).toEqual(['1', '2']);
+  });
+
+  it('passes items with empty string confidence_gate (eligible, scored downstream)', () => {
+    const rows = [
+      { org_id: '1', rank: 1, confidence_gate: '', evidence_quality: 'direct_hiring_proof', source_families: ['hh'], source_external_id: null, source_display_name: null, evidence_titles: [], latest_published_at: null },
+      { org_id: '2', rank: 2, confidence_gate: 'D', evidence_quality: 'enrichment_context', source_families: ['unknown'], source_external_id: null, source_display_name: null, evidence_titles: [], latest_published_at: null },
+    ];
+    const result = filterGatesForDigest(rows);
+    expect(result).toHaveLength(1);
+    expect(result[0].org_id).toBe('1');
+  });
+
+  it('passes unexpected gate values with warning (backward compat)', () => {
+    const spy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const rows = [
+      { org_id: '1', rank: 1, confidence_gate: 'X', evidence_quality: 'direct_hiring_proof', source_families: ['hh'], source_external_id: null, source_display_name: null, evidence_titles: [], latest_published_at: null },
+    ];
+    const result = filterGatesForDigest(rows);
+    expect(result).toHaveLength(1);
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining('unexpected confidence_gate'));
+    spy.mockRestore();
+  });
 });
 
 describe('needsGateReview — review flagging', () => {
