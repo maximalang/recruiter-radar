@@ -11,7 +11,7 @@ import { HiringPatternDetector, type HiringPattern, type LeadCandidate, type Hir
 import type { HhDigestItem } from '@/lib/hhDigest'
 import pLimit from 'p-limit'
 import { selectConfidenceGate } from '@/lib/scoring/gates'
-import type { ConfidenceGateInput, EntityMatchQuality } from '@/lib/scoring/gates'
+import type { ConfidenceGateInput, ConfidenceGate, EntityMatchQuality } from '@/lib/scoring/gates'
 import type { EvidenceTier } from '@/lib/db/evidence'
 
 // Extend the interface to include confidence_gate (now in base type, kept for compatibility)
@@ -78,10 +78,12 @@ function evidenceTypeToTier(type: EvidenceSource['evidenceType']): EvidenceTier 
     case 'career-page':
     case 'company-profile':
       return 'direct'
+    case 'registry':
+      // Government registry (EGRUL) is a corroborating source, not just context
+      return 'corroboration'
     case 'vacancy':
       return 'corroboration'
     case 'news':
-    case 'registry':
     default:
       return 'context'
   }
@@ -89,7 +91,12 @@ function evidenceTypeToTier(type: EvidenceSource['evidenceType']): EvidenceTier 
 
 /**
  * Recalculate confidence gate from current evidence sources.
- * Uses selectConfidenceGate as the sole authority.
+ * Uses selectConfidenceGate to compute the type-based gate, then
+ * takes the best (highest) of the SQL-originated gate and the
+ * type-based gate. This prevents enrichment from *downgrading*
+ * a gate that was already correct from the SQL pipeline (e.g. HH
+ * with 2+ independent evidence layers → A, but evidenceType alone
+ * would yield C because vacancy→corroboration tier).
  */
 function recalculateConfidence(lead: MultiSourceLead): void {
   const evidence = lead.sources.map(s => ({
@@ -98,7 +105,14 @@ function recalculateConfidence(lead: MultiSourceLead): void {
   }))
   const entityMatch: EntityMatchQuality = lead.companyId ? 'clean' : 'questionable'
   const gateInput: ConfidenceGateInput = { evidence, entityMatch }
-  lead.confidence = selectConfidenceGate(gateInput)
+  const typeBasedGate = selectConfidenceGate(gateInput)
+
+  // Take the best gate — enrichment can only promote, never demote
+  const gateOrder: Record<ConfidenceGate, number> = { 'A': 4, 'B': 3, 'C': 2, 'D': 1 }
+  const currentGate = lead.confidence
+  lead.confidence = gateOrder[typeBasedGate] > gateOrder[currentGate]
+    ? typeBasedGate
+    : currentGate
 }
 
 /**

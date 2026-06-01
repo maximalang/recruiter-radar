@@ -309,7 +309,7 @@ export class HiringPatternDetector {
       case 'B': return 'B'
       case 'C': return 'C'
       case 'D': return 'D'
-      default: return 'B' // Default to B for unknown gate values
+      default: return 'C' // Unknown gate → review required (safe default for autonomous operation)
     }
   }
 

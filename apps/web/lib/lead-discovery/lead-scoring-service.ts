@@ -119,13 +119,22 @@ export class LeadScoringService {
     // Enhance with additional scoring insights
     const enhancement = this.enhanceScoring(result, lead, options)
 
+    // Take best confidence gate — the SQL/DB pipeline may have assigned
+    // a higher gate (e.g. A from 2+ independent evidence layers in digest_items)
+    // than the type-based selectConfidenceGate (vacancy→corroboration→C).
+    // Enrichment/promotion only, never demotion.
+    const gateOrder: Record<string, number> = { 'A': 4, 'B': 3, 'C': 2, 'D': 1 }
+    const bestConfidence = gateOrder[lead.confidence] > gateOrder[result.lead.confidence]
+      ? lead.confidence
+      : result.lead.confidence
+
     return {
       id: lead.id,
       canonicalCompanyId: lead.companyId,
       companyName: lead.companyName,
       displayName: lead.companyName,
       score: enhancement.finalScore,
-      confidence: result.lead.confidence,
+      confidence: bestConfidence,
       sources: [],
       allSignals: lead.signals,
       deduplication: {
@@ -366,13 +375,21 @@ export class LeadScoringService {
   }
 
   private mapEvidenceTierFromSource(source: EvidenceSource): PipelineEvidence['tier'] {
-    // Map source to evidence tier based on reliability
-    const highTierSources = ['career-pages', 'hh', 'rabota-rossii']
-    const corroborationSources = ['linkedin-company-pages', 'superjob']
-
-    if (highTierSources.includes(source.sourceId)) return 'direct' as const
-    if (corroborationSources.includes(source.sourceId)) return 'corroboration' as const
-    return 'context' as const
+    // Tier mapping must be consistent with evidenceTypeToTier in multi-source-lead-generator.ts.
+    // Career page = direct, vacancy/job-board = corroboration, registry = corroboration, news/context = context.
+    // Source ID alone is NOT sufficient — two sources can produce different evidence types.
+    // Use the evidenceType from the source object for canonical tier mapping.
+    switch (source.evidenceType) {
+      case 'career-page':
+      case 'company-profile':
+        return 'direct' as const
+      case 'registry':
+      case 'vacancy':
+        return 'corroboration' as const
+      case 'news':
+      default:
+        return 'context' as const
+    }
   }
 
   private extractRoleTitle(signal: HiringSignal): string {
