@@ -44,7 +44,8 @@ export async function getDigestPreviewItems(limit = 10): Promise<DigestItem[]> {
   const pool = getPool();
 
   if (!pool) {
-    throw new Error("DATABASE_URL is not set.");
+    console.warn('getDigestPreviewItems: DATABASE_URL not set, returning empty digest');
+    return [];
   }
 
   const normalizedLimit = normalizeLimit(limit);
@@ -68,7 +69,8 @@ export async function getDigestItemsForClientProfile(input: {
   const pool = getPool();
 
   if (!pool) {
-    throw new Error("DATABASE_URL is not set.");
+    console.warn('getDigestItemsForClientProfile: DATABASE_URL not set, returning empty digest');
+    return [];
   }
 
   const clientProfile = await getClientProfileById(input.clientProfileId, pool);

@@ -448,8 +448,13 @@ export class MultiSourceLeadGenerator {
           careerUrl = `${websiteUrl.replace(/\/$/, '')}/careers`
           lead.enrichment.website = websiteUrl
         } else {
-          const slug = lead.companyName.toLowerCase().replace(/[^a-zа-яё0-9\s-]/gi, '').replace(/\s+/g, '-')
-          careerUrl = `https://${slug}.com/careers`
+          // Slug fallback: strip non-ASCII, transliterate to ASCII-safe form.
+          // Cyrillic characters in DNS hostnames require punycode which is fragile.
+          // If no real website in DB, skip career page crawl rather than guess a
+          // broken URL — crawling `https://яндекс.com/careers` is a DNS error.
+          // Mark enrichment as missing website for the scoring pipeline.
+          lead.enrichment.hasCareerPage = false
+          return
         }
 
         const crawlInput: CrawlerFetchInput = {

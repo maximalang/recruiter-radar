@@ -8,6 +8,7 @@
 
 import { runScoringPipeline } from '@/lib/scoring/scoring-pipeline'
 import { MultiSourceLeadGenerator } from './multi-source-lead-generator'
+import pLimit from 'p-limit'
 import type {
   MultiSourceLead,
   AggregatedLead,
@@ -92,9 +93,11 @@ export class LeadScoringService {
   ): Promise<ScoredLead[]> {
     if (rawLeads.length === 0) return []
 
-    // Score each lead using the FIUR pipeline
+    // Score each lead using the FIUR pipeline with bounded concurrency
+    // (1000 leads → 1000 parallel runScoringPipeline would spike CPU)
+    const limit = pLimit(10)
     const scoredLeads = await Promise.all(
-      rawLeads.map(lead => this.scoreLead(lead, options))
+      rawLeads.map(lead => limit(() => this.scoreLead(lead, options)))
     )
 
     // Filter by minimum score and sort
