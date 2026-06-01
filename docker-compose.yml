@@ -46,13 +46,14 @@ services:
       # Playwright browser for JS rendering
       PLAYWRIGHT_MICROSERVICE_URL: ${PLAYWRIGHT_MICROSERVICE_URL:-}
       # Storage
-      REDIS_URL: redis://redis:6379
+      REDIS_URL: redis://:${REDIS_PASSWORD:-local-dev-only}@redis:6379
     depends_on:
       - redis
 
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD:-local-dev-only}
     volumes:
       - redis_data:/data
 

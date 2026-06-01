@@ -136,32 +136,24 @@ async function fetchWithFirecrawl(
 
   const app = new FirecrawlApp({ apiKey, apiUrl })
 
-  // scrapeUrl returns ScrapeResponse | ErrorResponse — both have .success
-  const scrapeResult: any = await app.scrapeUrl(input.url, {
-    formats: ['markdown', 'html'],
+  // scrapeUrl returns Document on success, throws SdkError on failure
+  const doc = await app.scrapeUrl(input.url, {
+    formats: ['markdown'],
     timeout: input.options?.timeoutMs ?? 30_000,
   })
 
-  if (!scrapeResult.success) {
-    throw new Error(
-      `Firecrawl scrape failed: ${scrapeResult.error ?? 'unknown error'}`,
-    )
-  }
-
-  // Extract data from scrapeResult — the SDK returns an object with
-  // markdown, html, metadata, etc.
-  const markdown: string = scrapeResult.markdown ?? ''
-  const metadata: any = scrapeResult.metadata ?? {}
+  const markdown: string = doc.markdown ?? ''
+  const metadata = doc.metadata ?? {}
 
   return {
     url: input.url,
-    status: metadata.statusCode ?? 200,
+    status: (metadata as Record<string, unknown>).statusCode as number ?? 200,
     html: undefined, // Firecrawl's value is clean markdown, not raw HTML
     markdown,
     text: markdown, // text as alias for markdown
     rawHeaders: {},
     fetchedAt: new Date().toISOString(),
     engine: 'llm-markdown',
-    warnings: scrapeResult.warning ? [scrapeResult.warning] : [],
+    warnings: [],
   }
 }
