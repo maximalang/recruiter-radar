@@ -5,8 +5,12 @@
  * and applies sophisticated deduplication strategies.
  */
 
+import { createHash } from 'node:crypto'
 import type { MultiSourceLead, EvidenceSource } from './multi-source-lead-generator'
 import type { HiringSignal } from './hiring-pattern-detector'
+import { selectConfidenceGate, type ConfidenceGate, type EntityMatchQuality } from '@/lib/scoring/gates'
+import type { EvidenceTier } from '@/lib/scoring/fiur'
+import { evidenceTypeToTier } from '@/lib/db/evidence'
 
 export interface AggregatedLead {
   id: string
@@ -149,17 +153,21 @@ export class LeadAggregator {
     // Calculate composite score
     const score = this.calculateCompositeScore(group, Array.from(allSources.values()))
 
-    // Determine confidence based on source diversity
-    const confidence = this.determineConfidence(Array.from(allSources.values()))
+    // Determine confidence based on evidence tiers and entity match quality
+    const entityMatch: EntityMatchQuality = group.some(l => !l.companyId) ? 'questionable' : 'clean'
+    const confidence = this.determineConfidence(Array.from(allSources.values()), entityMatch)
+
+    // Build the aggregated lead ID first so dedup can exclude it
+    const aggregatedId = `agg-${canonicalCompanyId}-${Date.now()}`
 
     // Apply deduplication metadata
-    const deduplication = this.deduplicator.getGroupMetadata(canonicalCompanyId, group.map(l => l.id))
+    const deduplication = this.deduplicator.getGroupMetadata(canonicalCompanyId, group.map(l => l.id), aggregatedId)
 
     // Calculate quality metrics
     const qualityMetrics = this.calculateQualityMetrics(group, Array.from(allSources.values()))
 
     return {
-      id: `agg-${canonicalCompanyId}-${Date.now()}`,
+      id: aggregatedId,
       canonicalCompanyId,
       companyName: firstLead.companyName,
       displayName: this.generateDisplayName(firstLead.companyName, Array.from(allSources.values())),
@@ -169,7 +177,10 @@ export class LeadAggregator {
       allSignals: this.deduplicateSignals(allSignals),
       deduplication,
       metadata: {
-        firstSeen: new Date(Math.min(...group.map(l => l.detectedAt.getTime()))),
+        firstSeen: (() => {
+          const ts = group.map(l => l.detectedAt.getTime()).filter(t => !Number.isNaN(t))
+          return ts.length > 0 ? new Date(Math.min(...ts)) : new Date()
+        })(),
         lastUpdated: new Date(),
         sourceCount: allSources.size,
         uniqueSignals: new Set(allSignals.map(s => `${s.signalType}-${s.strength}`)).size
@@ -184,45 +195,42 @@ export class LeadAggregator {
   }
 
   /**
-   * Calculate composite score from multiple sources
+   * Calculate composite score from multiple sources.
+   *
+   * FIUR contract: additive. Total ∈ [0, 4].
+   * No multiplicative adjustments — each bonus is added to the base FIUR score.
    */
   private calculateCompositeScore(leads: MultiSourceLead[], sources: AggregatedSource[]): number {
-    // Base score from highest individual lead
-    const baseScore = Math.max(...leads.map(l => l.score))
+    // Base score from highest individual lead (already a FIUR total ∈ [0, 4])
+    const scores = leads.map(l => l.score).filter(s => !Number.isNaN(s))
+    const fiurBase = scores.length > 0 ? Math.max(...scores) : 0
 
-    // Source diversity multiplier
-    const sourceDiversity = sources.length
-    const diversityMultiplier = 1 + (sourceDiversity - 1) * 0.15
+    // Source diversity bonus — additive
+    const diversityBonus = Math.min((sources.length - 1) * 0.15, 0.45)
 
-    // Confidence multiplier
-    const avgConfidence = sources.reduce((sum, s) => sum + s.confidence, 0) / sources.length
-    const confidenceMultiplier = 0.8 + (avgConfidence * 0.4)
-
-    // Signal diversity bonus
+    // Signal diversity bonus — additive
     const uniqueSignals = new Set(leads.flatMap(l => l.signals.map(s => s.signalType))).size
     const signalBonus = Math.min(uniqueSignals * 0.1, 0.5)
 
-    return Math.min(baseScore * diversityMultiplier * confidenceMultiplier + signalBonus, 4.0)
+    return Math.min(fiurBase + diversityBonus + signalBonus, 4.0)
   }
 
   /**
-   * Determine confidence level based on sources
+   * Determine confidence gate using the unified selectConfidenceGate algorithm.
+   *
+   * Maps AggregatedSource.evidenceType → EvidenceTier (same mapping as
+   * evidenceTypeToTier in multi-source-lead-generator.ts) and delegates
+   * to selectConfidenceGate for a single source-of-truth gate computation.
    */
-  private determineConfidence(sources: AggregatedSource[]): 'A' | 'B' | 'C' | 'D' {
-    const primarySources = ['hh', 'career-pages']
-    const hasPrimary = sources.some(s => primarySources.includes(s.sourceId))
-    const sourceCount = sources.length
-    const avgConfidence = sources.reduce((sum, s) => sum + s.confidence, 0) / sources.length
-
-    if (hasPrimary && sourceCount >= 2 && avgConfidence > 0.8) {
-      return 'A'
-    } else if (hasPrimary && sourceCount >= 1) {
-      return 'B'
-    } else if (sourceCount >= 2) {
-      return 'C'
-    } else {
-      return 'D'
-    }
+  private determineConfidence(
+    sources: AggregatedSource[],
+    entityMatch: EntityMatchQuality = 'clean',
+  ): ConfidenceGate {
+    const evidence = sources.map(s => ({
+      tier: evidenceTypeToTier(s.evidenceType),
+      source: s.sourceId,
+    }))
+    return selectConfidenceGate({ evidence, entityMatch })
   }
 
   /**
@@ -270,11 +278,13 @@ export class LeadAggregator {
 
     // Freshness: how recent the data is
     const now = new Date()
-    const maxAge = Math.max(...leads.map(l => now.getTime() - l.detectedAt.getTime()))
+    const ages = leads.map(l => now.getTime() - l.detectedAt.getTime()).filter(t => !Number.isNaN(t))
+    const maxAge = ages.length > 0 ? Math.max(...ages) : 0
     const freshness = Math.max(0, 1 - (maxAge / (7 * 24 * 60 * 60 * 1000))) // 7-day decay
 
-    // Reliability: source confidence
-    const avgSourceConfidence = sources.reduce((sum, s) => sum + s.confidence, 0) / sources.length
+    // Reliability: source confidence (guard division by zero when no sources)
+    const totalConfidence = sources.reduce((sum, s) => sum + s.confidence, 0)
+    const avgSourceConfidence = sources.length > 0 ? totalConfidence / sources.length : 0
     const reliability = avgSourceConfidence
 
     return {
@@ -307,6 +317,22 @@ export class LeadAggregator {
 }
 
 /**
+ * Validate Russian INN format: 10 digits (ЮЛ) or 12 digits (ИП).
+ * Rejects empty, non-numeric, or wrong-length strings.
+ */
+function isValidInn(inn: string): boolean {
+  if (!inn || typeof inn !== 'string') return false
+  const digits = inn.replace(/\s/g, '')
+  return /^\d{10}$/.test(digits) || /^\d{12}$/.test(digits)
+}
+
+/** Strip whitespace from INN for use in canonical IDs. Returns empty string if not a valid INN. */
+function cleanInn(inn: string): string {
+  const digits = inn.replace(/\s/g, '')
+  return /^\d{10}$/.test(digits) || /^\d{12}$/.test(digits) ? digits : ''
+}
+
+/**
  * Entity resolver for handling company name variations
  */
 export class EntityResolver {
@@ -314,10 +340,15 @@ export class EntityResolver {
 
   async resolveAll(leads: MultiSourceLead[]): Promise<Array<MultiSourceLead & { canonicalCompanyId: string }>> {
     return Promise.all(
-      leads.map(async lead => ({
-        ...lead,
-        canonicalCompanyId: await this.normalizeCompanyNameToId(lead.companyName, lead.companyId)
-      }))
+      leads.map(async lead => {
+        const cleanedInn = lead.inn ? cleanInn(lead.inn) : ''
+        return {
+          ...lead,
+          canonicalCompanyId: cleanedInn
+            ? `inn-${cleanedInn}`
+            : await this.normalizeCompanyNameToId(lead.companyName, lead.companyId)
+        }
+      })
     )
   }
 
@@ -329,22 +360,38 @@ export class EntityResolver {
     }
 
     // Apply normalization rules
+    // Using Unicode property escapes (\p{L} for letters, \p{N} for numbers)
+    // to preserve Cyrillic and other non-ASCII characters.
+    // /[^\p{L}\p{N}\s]/gu strips punctuation but keeps letters/numbers/whitespace.
     let normalized = name
       .toLowerCase()
       .replace(/\s+/g, ' ')
-      .replace(/[^\w\s]/g, '')
+      .replace(/[^\p{L}\p{N}\s]/gu, '')
       .trim()
 
-    // Common abbreviations
+    // Common abbreviations (both Latin and Cyrillic forms — Russian company names
+    // use Cyrillic ООО/АО/ОАО/ИП, which survive the Unicode-aware punctuation strip).
     const abbreviations: Record<string, string> = {
       'oao': 'open joint stock company',
       'ooo': 'limited liability company',
       'ip': 'individual entrepreneur',
-      'ao': 'joint stock company'
+      'ao': 'joint stock company',
+      // Cyrillic equivalents (lowercased)
+      'ооо': 'limited liability company',
+      'оао': 'open joint stock company',
+      'ао': 'joint stock company',
+      'ип': 'individual entrepreneur',
     }
 
     for (const [abbr, full] of Object.entries(abbreviations)) {
-      normalized = normalized.replace(new RegExp(`\\b${abbr}\\b`, 'gi'), full)
+      // Use lookbehind/lookahead with Unicode property escapes instead of \b,
+      // which doesn't work for Cyrillic word boundaries.
+      // Match abbreviation when preceded by start-of-string or non-word char,
+      // and followed by end-of-string or non-word char.
+      normalized = normalized.replace(
+        new RegExp(`(?<=^|[\\s])${abbr}(?=[\\s]|$)`, 'giu'),
+        full
+      )
     }
 
     this.nameNormalizationCache.set(cacheKey, normalized)
@@ -358,14 +405,8 @@ export class EntityResolver {
   }
 
   private hashString(str: string): string {
-    // Simple hash function for demonstration
-    let hash = 0
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i)
-      hash = ((hash << 5) - hash) + char
-      hash = hash & hash // Convert to 32-bit integer
-    }
-    return `co-${Math.abs(hash).toString(36)}`
+    // Deterministic SHA-256 — same pattern as evidenceContentHash in @/lib/db/evidence
+    return `co-${createHash('sha256').update(str).digest('hex').slice(0, 12)}`
   }
 }
 
@@ -375,11 +416,11 @@ export class EntityResolver {
 class LeadDeduplicator {
   private similarityCache = new Map<string, number>()
 
-  getGroupMetadata(canonicalCompanyId: string, leadIds: string[]) {
+  getGroupMetadata(canonicalCompanyId: string, leadIds: string[], aggregatedId: string) {
     // For now, use exact matching strategy
     return {
       strategy: 'exact' as const,
-      matchedWith: leadIds.filter(id => id !== `agg-${canonicalCompanyId}-${Date.now()}`),
+      matchedWith: leadIds.filter(id => id !== aggregatedId),
       confidence: 1.0
     }
   }

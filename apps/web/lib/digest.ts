@@ -40,7 +40,7 @@ function getPool(): Pool | null {
   return globalForPg.recruiterRadarDigestPool;
 }
 
-export async function getDigestPreviewItems(limit = 10): Promise<DigestItem[]> {
+export async function getDigestPreviewItems(limit = 10): Promise<DigestItemInput[]> {
   const pool = getPool();
 
   if (!pool) {
@@ -55,17 +55,18 @@ export async function getDigestPreviewItems(limit = 10): Promise<DigestItem[]> {
 }
 
 export type { DigestItem };
+export type { DigestItemInput };
 export type DigestRunResult = {
   run: DigestRun;
   clientProfile: ClientProfile;
-  items: DigestItem[];
+  items: DigestItemInput[];
 };
 
 export async function getDigestItemsForClientProfile(input: {
   clientProfileId: string | number;
   sourceKey?: string | null;
   limit?: number | null;
-}): Promise<DigestItem[]> {
+}): Promise<DigestItemInput[]> {
   const pool = getPool();
 
   if (!pool) {
@@ -251,8 +252,42 @@ export async function runDigestForClientProfile(input: {
       .sort((left, right) => compareDigestItemsForClient(left, right, clientProfile))
       .slice(0, requestedLimit);
 
-    for (const item of items) {
-      const candidateInsert = await client.query<DigestCandidateInsertRow>(`
+    // Batch INSERT candidates — single query with multi-row VALUES list
+    if (items.length > 0) {
+      const candidateValues: string[] = []
+      const candidateParams: unknown[] = []
+      let paramIdx = 1
+
+      for (const item of items) {
+        candidateValues.push(`($${paramIdx}, $${paramIdx+1}, $${paramIdx+2}, $${paramIdx+3}, $${paramIdx+4}, $${paramIdx+5}::jsonb, $${paramIdx+6}, $${paramIdx+7}, NULLIF($${paramIdx+8}, '')::timestamptz, $${paramIdx+9}, $${paramIdx+10}::jsonb, $${paramIdx+11}, $${paramIdx+12}::jsonb)`)
+        candidateParams.push(
+          run.id,
+          clientProfile.id,
+          item.org_id,
+          item.source_external_id || null,
+          item.source_display_name,
+          JSON.stringify(item.source_families),
+          item.vacancies_count,
+          item.distinct_vacancy_names_count,
+          item.latest_published_at,
+          item.total_score,
+          JSON.stringify(item.reasons),
+          item.opener,
+          JSON.stringify({
+            rank: item.rank,
+            source_families: item.source_families,
+            confidence_gate: item.confidence_gate,
+          })
+        )
+        paramIdx += 13
+      }
+
+      const insertedCandidates = await client.query<{
+        id: string
+        org_id: string
+        source_external_id: string | null
+        source_display_name: string
+      }>(`
         INSERT INTO digest_candidates (
           digest_run_id,
           client_profile_id,
@@ -268,105 +303,73 @@ export async function runDigestForClientProfile(input: {
           opener,
           payload
         )
-        VALUES (
-          $1,
-          $2,
-          $3,
-          $4,
-          $5,
-          $6::jsonb,
-          $7,
-          $8,
-          NULLIF($9, '')::timestamptz,
-          $10,
-          $11::jsonb,
-          $12,
-          $13::jsonb
-        )
+        VALUES ${candidateValues.join(',\n')}
         ON CONFLICT (digest_run_id, org_id) DO NOTHING
         RETURNING
           id::TEXT AS id,
-          org_id::TEXT AS "org_id",
-          source_external_id AS "source_external_id",
-          source_display_name AS "source_display_name",
-          source_families,
-          vacancies_count AS "vacancies_count",
-          distinct_vacancy_names_count AS "distinct_vacancy_names_count",
-          latest_published_at::TEXT AS "latest_published_at",
-          total_score AS "total_score",
-          reasons,
-          opener
-      `, [
-        run.id,
-        clientProfile.id,
-        item.org_id,
-        item.source_external_id || null,
-        item.source_display_name,
-        JSON.stringify(item.source_families),
-        item.vacancies_count,
-        item.distinct_vacancy_names_count,
-        item.latest_published_at,
-        item.total_score,
-        JSON.stringify(item.reasons),
-        item.opener,
-        JSON.stringify({
-          rank: item.rank,
-          source_families: item.source_families,
-          confidence_gate: item.confidence_gate,
-        })
-      ]);
+          org_id::TEXT AS org_id,
+          source_external_id,
+          source_display_name
+      `, candidateParams)
 
-      const insertedCandidate = candidateInsert.rows[0];
+      // Batch INSERT org state for all successfully inserted candidates
+      if (!input.skipStateWrite && insertedCandidates.rows.length > 0) {
+        // Build O(1) lookup map by org_id — avoids O(n²) items.find() in the loop
+        // and prevents misassociation on duplicate org_id entries
+        const itemsByOrgId = new Map<string, DigestItemInput>()
+        for (const item of items) {
+          itemsByOrgId.set(item.org_id, item)
+        }
 
-      if (!insertedCandidate) {
-        continue;
-      }
+        const stateValues: string[] = []
+        const stateParams: unknown[] = []
+        let stateParamIdx = 1
 
-      if (!input.skipStateWrite) {
-        await client.query(`
-          INSERT INTO client_digest_org_state (
-            client_profile_id,
-            org_id,
-            last_digest_run_id,
-            last_digest_candidate_id,
-            last_digest_at,
-            cooldown_until,
-            feedback_status,
-            last_source_external_id,
-            last_source_display_name
+        for (const candidate of insertedCandidates.rows) {
+          const item = itemsByOrgId.get(candidate.org_id)
+          if (!item) continue
+
+          stateValues.push(`($${stateParamIdx}, $${stateParamIdx+1}, $${stateParamIdx+2}, $${stateParamIdx+3}, NOW(), NOW() + ($${stateParamIdx+4}::TEXT || ' days')::interval, 'none', $${stateParamIdx+5}, $${stateParamIdx+6})`)
+          stateParams.push(
+            clientProfile.id,
+            candidate.org_id,
+            run.id,
+            candidate.id,
+            cooldownDays,
+            candidate.source_external_id,
+            candidate.source_display_name
           )
-          VALUES (
-            $1,
-            $2,
-            $3,
-            $4,
-            NOW(),
-            NOW() + ($5::TEXT || ' days')::interval,
-            'none',
-            $6,
-            $7
-          )
-          ON CONFLICT (client_profile_id, org_id) DO UPDATE
-          SET
-            last_digest_run_id = EXCLUDED.last_digest_run_id,
-            last_digest_candidate_id = EXCLUDED.last_digest_candidate_id,
-            last_digest_at = EXCLUDED.last_digest_at,
-            cooldown_until = GREATEST(
-              COALESCE(client_digest_org_state.cooldown_until, '-infinity'::timestamptz),
-              EXCLUDED.cooldown_until
-            ),
-            last_source_external_id = COALESCE(EXCLUDED.last_source_external_id, client_digest_org_state.last_source_external_id),
-            last_source_display_name = COALESCE(EXCLUDED.last_source_display_name, client_digest_org_state.last_source_display_name),
-            updated_at = NOW()
-        `, [
-          clientProfile.id,
-          item.org_id,
-          run.id,
-          insertedCandidate.id,
-          cooldownDays,
-          item.source_external_id || null,
-          item.source_display_name
-        ]);
+          stateParamIdx += 7
+        }
+
+        if (stateValues.length > 0) {
+          await client.query(`
+            INSERT INTO client_digest_org_state (
+              client_profile_id,
+              org_id,
+              last_digest_run_id,
+              last_digest_candidate_id,
+              last_digest_at,
+              cooldown_until,
+              feedback_status,
+              last_source_external_id,
+              last_source_display_name
+            )
+            VALUES ${stateValues.join(',\n')}
+            ON CONFLICT (client_profile_id, org_id) DO UPDATE
+            SET
+              last_digest_run_id = EXCLUDED.last_digest_run_id,
+              last_digest_candidate_id = EXCLUDED.last_digest_candidate_id,
+              last_digest_at = EXCLUDED.last_digest_at,
+              cooldown_until = GREATEST(
+                COALESCE(client_digest_org_state.cooldown_until, '-infinity'::timestamptz),
+                EXCLUDED.cooldown_until
+              ),
+              last_source_external_id = COALESCE(EXCLUDED.last_source_external_id, client_digest_org_state.last_source_external_id),
+              last_source_display_name = COALESCE(EXCLUDED.last_source_display_name, client_digest_org_state.last_source_display_name),
+              updated_at = NOW()
+          `, stateParams)
+        }
       }
     }
 
@@ -408,7 +411,14 @@ export async function runDigestForClientProfile(input: {
   }
 }
 
-function mapDigestEvidenceRow(row: DigestEvidenceRow): any {
+/**
+ * DigestItem minus DB-generated fields (id, digest_run_id, created_at) that
+ * are only present after INSERT. Used as the return type of mapDigestEvidenceRow
+ * and as the input type for internal helpers that don't need those fields.
+ */
+type DigestItemInput = Omit<DigestItem, 'id' | 'digest_run_id' | 'created_at'>
+
+function mapDigestEvidenceRow(row: DigestEvidenceRow): DigestItemInput {
   const reasons: [string, string] = [
     row.primary_reason_label || '',
     row.secondary_reason_label || ''
@@ -433,7 +443,7 @@ function mapDigestEvidenceRow(row: DigestEvidenceRow): any {
   };
 }
 
-function matchesClientProfile(item: DigestItem, clientProfile: ClientProfile): boolean {
+function matchesClientProfile(item: DigestItemInput, clientProfile: ClientProfile): boolean {
   const haystack = buildDigestHaystack(item);
 
   if (clientProfile.includeKeywords.length > 0) {
@@ -451,7 +461,7 @@ function matchesClientProfile(item: DigestItem, clientProfile: ClientProfile): b
   return true;
 }
 
-function compareDigestItemsForClient(left: DigestItem, right: DigestItem, clientProfile: ClientProfile): number {
+function compareDigestItemsForClient(left: DigestItemInput, right: DigestItemInput, clientProfile: ClientProfile): number {
   const leftScopeScore = getClientScopeScore(left, clientProfile);
   const rightScopeScore = getClientScopeScore(right, clientProfile);
 
@@ -466,7 +476,7 @@ function compareDigestItemsForClient(left: DigestItem, right: DigestItem, client
   return left.rank - right.rank;
 }
 
-function getClientScopeScore(item: DigestItem, clientProfile: ClientProfile): number {
+function getClientScopeScore(item: DigestItemInput, clientProfile: ClientProfile): number {
   let score = 0;
 
   score += getScopedFieldScore(clientProfile.targetCity, item.location_names, {
@@ -524,7 +534,7 @@ function getScopedFieldScore(
   return matchingTokenCount * weights.tokenMatch;
 }
 
-function buildDigestHaystack(item: DigestItem): string {
+function buildDigestHaystack(item: DigestItemInput): string {
   return [
     item.source_display_name,
     ...item.reasons,

@@ -76,6 +76,10 @@ export interface FiurInput {
   now?: () => number
   /** Optional reweighting overrides from badfit history. */
   clientOverrides?: FiurClientOverrides
+  /** Market context — additive ±0.1 to fit component. */
+  marketConditions?: 'boom' | 'bust' | 'neutral'
+  /** Count of recent hiring signals (last 7 days). Used for urgency boost. */
+  recentSignalCount?: number
 }
 
 export interface FiurBreakdown {
@@ -92,6 +96,7 @@ export interface FiurBreakdown {
   }
 }
 
+/** Clamp to [min, 1]. Default min=0 → standard [0, 1] clamp. `min` is used by industry-fit penalty (min 0.3 so industry contribution never fully zeroed). */
 const clamp01 = (n: number, min = 0): number => Math.max(min, n < 0 ? 0 : n > 1 ? 1 : n)
 
 const normalize = (s: string): string => s.trim().toLowerCase()
@@ -136,7 +141,8 @@ function computeFit(
   company: FiurCompany,
   vacancies: FiurVacancy[],
   profile: FiurClientProfile,
-  overrides?: FiurClientOverrides
+  overrides?: FiurClientOverrides,
+  marketConditions?: 'boom' | 'bust' | 'neutral'
 ): { score: number; reasons: string[] } {
   const reasons: string[] = []
 
@@ -212,6 +218,15 @@ function computeFit(
     )
   }
 
+  // Market context — additive ±0.1 adjustment to fit
+  if (marketConditions === 'boom') {
+    score += 0.1
+    reasons.push('high market demand increases lead fit value')
+  } else if (marketConditions === 'bust') {
+    score -= 0.1
+    reasons.push('low market demand reduces lead fit value')
+  }
+
   return { score: clamp01(score), reasons }
 }
 
@@ -284,12 +299,23 @@ function computeIntent(
     }
   }
 
+  // Source diversity — independent sources boost confidence in hiring intent
+  const uniqueSources = new Set(evidence.map(e => e.source))
+  if (uniqueSources.size >= 3) {
+    score += 0.1
+    reasons.push(`${uniqueSources.size} independent sources increase intent confidence`)
+  } else if (uniqueSources.size >= 2) {
+    score += 0.05
+    reasons.push('2 independent sources strengthen intent')
+  }
+
   return { score: clamp01(score), reasons }
 }
 
 function computeUrgency(
   vacancies: FiurVacancy[],
-  now: number
+  now: number,
+  recentSignalCount?: number
 ): { score: number; reasons: string[] } {
   const reasons: string[] = []
   if (vacancies.length === 0) {
@@ -327,6 +353,12 @@ function computeUrgency(
     }
   }
 
+  // Recent signal burst — high recent activity boosts urgency
+  if (recentSignalCount != null && recentSignalCount >= 3) {
+    score += 0.15
+    reasons.push(`${recentSignalCount} recent hiring signals (last 7 days) indicate active urgency`)
+  }
+
   return { score: clamp01(score), reasons }
 }
 
@@ -358,9 +390,9 @@ function computeReachability(
 
 export function computeFiur(input: FiurInput): FiurBreakdown {
   const now = (input.now ?? Date.now)()
-  const fit = computeFit(input.company, input.vacancies, input.clientProfile, input.clientOverrides)
+  const fit = computeFit(input.company, input.vacancies, input.clientProfile, input.clientOverrides, input.marketConditions)
   const intent = computeIntent(input.vacancies, input.evidence, now)
-  const urgency = computeUrgency(input.vacancies, now)
+  const urgency = computeUrgency(input.vacancies, now, input.recentSignalCount)
   const reachability = computeReachability(input.company, input.evidence)
 
   return {

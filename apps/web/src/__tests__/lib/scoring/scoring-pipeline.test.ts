@@ -156,6 +156,24 @@ describe('runScoringPipeline', () => {
     })
   })
 
+  describe('entityMatch quality', () => {
+    it('questionable entityMatch forces gate C even with strong multi-source evidence', () => {
+      // baseInput would normally produce gate A (2+ direct evidence, career page, etc.)
+      const result = runScoringPipeline({ ...baseInput, entityMatch: 'questionable' })
+      expect(result.lead.confidence).toBe('C')
+    })
+
+    it('clean entityMatch preserves normal gate computation', () => {
+      const result = runScoringPipeline({ ...baseInput, entityMatch: 'clean' })
+      expect(result.lead.confidence).toBe('A')
+    })
+
+    it('default (no entityMatch) is treated as clean', () => {
+      const result = runScoringPipeline(baseInput)
+      expect(result.lead.confidence).toBe('A')
+    })
+  })
+
   describe('optional inputs', () => {
     it('handles missing careerPageHtml by returning empty departments', () => {
       const { careerPageHtml: _omit, ...rest } = baseInput

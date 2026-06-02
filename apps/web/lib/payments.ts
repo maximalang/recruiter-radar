@@ -8,7 +8,7 @@ import {
   saveClientProfile,
   type ClientProfile
 } from "./clientProfiles";
-import { runDigestForClientProfile, type DigestItem } from "./digest";
+import { runDigestForClientProfile, type DigestItemInput } from "./digest";
 import { buildHhDigestText, type HhDigestItem } from "./hhDigest";
 import {
   buildCheckoutHref,
@@ -1673,7 +1673,7 @@ function readNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-function mapDigestItemToTelegramDigestItem(item: DigestItem): HhDigestItem {
+function mapDigestItemToTelegramDigestItem(item: DigestItemInput): HhDigestItem {
   return {
     rank: item.rank,
     org_id: item.org_id,

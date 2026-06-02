@@ -108,6 +108,10 @@ export interface ScoringPipelineInput {
   status?: LeadStatus
   assignedTo?: string
   clientOverrides?: FiurClientOverrides
+  /** Entity match quality — 'questionable' forces gate C even with strong evidence. */
+  entityMatch?: 'clean' | 'questionable'
+  /** Count of recent hiring signals (last 7 days) — boosts urgency in FIUR. */
+  recentSignalCount?: number
   now?: Date | (() => number)
 }
 
@@ -219,6 +223,10 @@ export function runScoringPipeline(input: ScoringPipelineInput): ScoringPipeline
     evidence: toFiurEvidence(input.evidence),
     now: () => nowMs,
     clientOverrides: input.clientOverrides,
+    marketConditions: input.marketContext?.industryTrend === 'growing' ? 'boom'
+      : input.marketContext?.industryTrend === 'declining' ? 'bust'
+      : 'neutral',
+    recentSignalCount: input.recentSignalCount,
   })
 
   const fiurReasons: string[] = [
@@ -247,7 +255,7 @@ export function runScoringPipeline(input: ScoringPipelineInput): ScoringPipeline
     freshness,
     contactQuality,
     evidence: toFiurEvidence(input.evidence),
-    entityMatch: 'clean' as const,
+    entityMatch: input.entityMatch ?? 'clean',
     status: input.status,
     assignedTo: input.assignedTo,
     now: nowDate,

@@ -119,8 +119,9 @@ export class LeadScoringService {
     // Run the scoring pipeline
     const result = runScoringPipeline(pipelineInput)
 
-    // Enhance with additional scoring insights
-    const enhancement = this.enhanceScoring(result, lead, options)
+    // FIUR total is the canonical score ∈ [0, 4].
+    // All scoring factors (source diversity, market context, recent signals)
+    // are now handled inside computeFiur — no post-hoc adjustments.
 
     // Take best confidence gate — the SQL/DB pipeline may have assigned
     // a higher gate (e.g. A from 2+ independent evidence layers in digest_items)
@@ -131,12 +132,14 @@ export class LeadScoringService {
       ? lead.confidence
       : result.lead.confidence
 
+    const finalScore = result.lead.score
+
     return {
       id: lead.id,
       canonicalCompanyId: lead.companyId,
       companyName: lead.companyName,
       displayName: lead.companyName,
-      score: enhancement.finalScore,
+      score: finalScore,
       confidence: bestConfidence,
       sources: [],
       allSignals: lead.signals,
@@ -158,9 +161,9 @@ export class LeadScoringService {
       detectedAt: lead.detectedAt,
       enrichment: lead.enrichment,
       scoringBreakdown: result.breakdown,
-      finalScore: enhancement.finalScore,
-      confidenceBoost: enhancement.confidenceBoost,
-      improvementSuggestions: enhancement.improvementSuggestions,
+      finalScore,
+      confidenceBoost: 0,
+      improvementSuggestions: [],
     }
   }
 
@@ -300,53 +303,8 @@ export class LeadScoringService {
       contactPaths,
       agencyProfile: options.agencyProfile,
       marketContext: this.mapMarketContext(options.marketContext),
-    }
-  }
-
-  /**
-   * Enhance scoring with additional insights
-   */
-  private enhanceScoring(
-    result: ScoringPipelineResult,
-    lead: MultiSourceLead,
-    options: LeadScoringOptions
-  ) {
-    let finalScore = result.lead.score
-    let confidenceBoost = 0
-    const improvementSuggestions: string[] = []
-
-    // Boost score for source diversity
-    if (lead.sources.length > 2) {
-      finalScore += 0.2
-      confidenceBoost += 0.3
-      improvementSuggestions.push('Multiple independent sources increase reliability')
-    }
-
-    // Boost score for recent signals (T2.2: uses signal.timestamp, safe fallback)
-    const recentSignalCount = this.countRecentSignals(lead.signals)
-
-    if (recentSignalCount >= 3) {
-      finalScore += 0.15
-      confidenceBoost += 0.2
-      improvementSuggestions.push('Recent hiring signals indicate active hiring')
-    }
-
-    // Apply market context adjustments
-    if (options.marketContext?.marketConditions === 'boom') {
-      finalScore *= 1.1 // 10% boost in boom times
-      improvementSuggestions.push('High market demand increases lead value')
-    } else if (options.marketContext?.marketConditions === 'bust') {
-      finalScore *= 0.9 // 10% reduction in bust times
-      improvementSuggestions.push('Consider focusing on recession-resistant industries')
-    }
-
-    // Clamp score to [0, 4]
-    finalScore = Math.max(0, Math.min(4, finalScore))
-
-    return {
-      finalScore,
-      confidenceBoost,
-      improvementSuggestions,
+      entityMatch: lead.companyId ? 'clean' : 'questionable',
+      recentSignalCount: this.countRecentSignals(lead.signals),
     }
   }
 

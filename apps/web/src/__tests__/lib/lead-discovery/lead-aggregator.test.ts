@@ -1,6 +1,7 @@
 import { describe, it, expect } from '@jest/globals'
 import { LeadAggregator } from '@/lib/lead-discovery/lead-aggregator'
 import type { MultiSourceLead } from '@/lib/lead-discovery/multi-source-lead-generator'
+import type { HiringSignal } from '@/lib/lead-discovery/hiring-pattern-detector'
 
 describe('LeadAggregator', () => {
   let aggregator: LeadAggregator
@@ -42,7 +43,7 @@ describe('LeadAggregator', () => {
       expect(burstSignals[0].strength).toBe(0.8)
     })
 
-    it('should rank leads by composite score (multi-source bonus + confidence)', async () => {
+    it('should rank leads by composite score (additive: FIUR base + diversity bonus)', async () => {
       const mockLeads: MultiSourceLead[] = [
         createMockLead('company1', 'CompanyA', 3.0, 'B', ['hh']),
         createMockLead('company2', 'CompanyB', 2.8, 'A', ['hh', 'career-pages']),
@@ -51,14 +52,13 @@ describe('LeadAggregator', () => {
 
       const aggregated = await aggregator.aggregateLeads(mockLeads)
 
-      // CompanyB wins via diversity multiplier (2 sources × 1.15 = 3.48)
-      expect(aggregated[0].companyName).toBe('CompanyB')
-
-      // CompanyC second (3.2 single-source = 3.456)
-      expect(aggregated[1].companyName).toBe('CompanyC')
-
-      // CompanyA third (3.0 single-source = 3.24)
-      expect(aggregated[2].companyName).toBe('CompanyA')
+      // Additive formula: fiurBase + diversityBonus + signalBonus, clamped to [0,4]
+      // CompanyC: 3.2 + 0 diversity = 3.2
+      // CompanyA: 3.0 + 0 diversity = 3.0
+      // CompanyB: 2.8 + 0.15 diversity = 2.95
+      expect(aggregated[0].companyName).toBe('CompanyC')
+      expect(aggregated[1].companyName).toBe('CompanyA')
+      expect(aggregated[2].companyName).toBe('CompanyB')
     })
   })
 
@@ -79,21 +79,82 @@ describe('LeadAggregator', () => {
     })
   })
 
-  describe('determineConfidence', () => {
-    it('should return A confidence for primary sources with high confidence', () => {
-      const sources = [
-        { sourceId: 'hh', confidence: 0.8 },
-        { sourceId: 'career-pages', confidence: 0.9 }
+  describe('INN-based entity resolution', () => {
+    it('should merge leads with same INN even if company names differ', async () => {
+      const mockLeads: MultiSourceLead[] = [
+        createMockLead('company1', 'ООО "ТехКорп"', 2.5, 'B', ['hh']),
+        createMockLead('company2', 'TechCorp LLC', 2.8, 'B', ['career-pages']),
       ]
+      mockLeads[0].inn = '7701234567'
+      mockLeads[1].inn = '7701234567'
 
-      // Again, testing through aggregateLeads
-      expect(async () => {
-        const mockLeads: MultiSourceLead[] = [
-          createMockLead('company1', 'TechCorp', 2.5, 'A', ['hh', 'career-pages'])
-        ]
-        const aggregated = await aggregator.aggregateLeads(mockLeads)
-        return aggregated[0].confidence === 'A'
-      }).toBeTruthy()
+      const aggregated = await aggregator.aggregateLeads(mockLeads)
+
+      // Same INN → same canonical ID → merged into one lead
+      expect(aggregated.length).toBe(1)
+      expect(aggregated[0].sources.length).toBe(2)
+    })
+
+    it('should not merge leads with different INNs even if names are similar', async () => {
+      const mockLeads: MultiSourceLead[] = [
+        createMockLead('company1', 'ООО "ТехКорп"', 2.5, 'B', ['hh']),
+        createMockLead('company2', 'ООО "ТехКорп"', 2.8, 'B', ['career-pages']),
+      ]
+      mockLeads[0].inn = '7701234567'
+      mockLeads[1].inn = '7707654321'
+
+      const aggregated = await aggregator.aggregateLeads(mockLeads)
+
+      // Different INNs → different canonical IDs → separate leads
+      expect(aggregated.length).toBe(2)
+    })
+
+    it('should fall back to name-hash matching when INN is absent', async () => {
+      const mockLeads: MultiSourceLead[] = [
+        createMockLead('company1', 'TechCorp', 2.5, 'B', ['hh']),
+        createMockLead('company1', 'TechCorp', 2.8, 'B', ['career-pages']),
+      ]
+      // No INN set on either lead
+
+      const aggregated = await aggregator.aggregateLeads(mockLeads)
+
+      // Same companyId → same name-hash → merged
+      expect(aggregated.length).toBe(1)
+    })
+  })
+
+  describe('determineConfidence', () => {
+    it('should return A confidence for 2+ direct evidence sources with clean entity match', async () => {
+      const mockLeads: MultiSourceLead[] = [
+        createMockLead('company1', 'TechCorp', 2.5, 'A', ['hh', 'career-pages'], [], {
+          'hh': { evidenceType: 'career-page' },
+          'career-pages': { evidenceType: 'career-page' },
+        }),
+      ]
+      const aggregated = await aggregator.aggregateLeads(mockLeads)
+      expect(aggregated[0].confidence).toBe('A')
+    })
+
+    it('should return C confidence for questionable entity match even with strong evidence', async () => {
+      // No companyId → questionable entity match → forces gate C
+      const mockLeads: MultiSourceLead[] = [
+        createMockLead('', 'TechCorp', 2.5, 'A', ['hh', 'career-pages'], [], {
+          'hh': { evidenceType: 'career-page' },
+          'career-pages': { evidenceType: 'career-page' },
+        }),
+      ]
+      const aggregated = await aggregator.aggregateLeads(mockLeads)
+      expect(aggregated[0].confidence).toBe('C')
+    })
+
+    it('should return B for 1 direct + 0 corroboration', async () => {
+      const mockLeads: MultiSourceLead[] = [
+        createMockLead('company1', 'TechCorp', 2.5, 'B', ['career-pages'], [], {
+          'career-pages': { evidenceType: 'career-page' },
+        }),
+      ]
+      const aggregated = await aggregator.aggregateLeads(mockLeads)
+      expect(aggregated[0].confidence).toBe('B')
     })
   })
 
@@ -103,7 +164,8 @@ describe('LeadAggregator', () => {
     score: number,
     confidence: string,
     sources: string[],
-    signals = []
+    signals: HiringSignal[] = [],
+    sourceOverrides: Record<string, Partial<{ evidenceType: string }>> = {},
   ): MultiSourceLead {
     return {
       id: `lead-${companyId}`,
@@ -114,7 +176,7 @@ describe('LeadAggregator', () => {
       sources: sources.map(sourceId => ({
         sourceId,
         sourceName: sourceId,
-        evidenceType: 'vacancy',
+        evidenceType: (sourceOverrides[sourceId]?.evidenceType ?? 'vacancy') as any,
         confidence: 0.7,
         extractedAt: new Date(),
         relevanceScore: 0.8

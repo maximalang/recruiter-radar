@@ -7,12 +7,14 @@
 
 import { createDefaultRouter } from '@/lib/sources/crawlers'
 import type { CrawlerRouter, CrawlerFetchInput, CrawlerResult } from '@/lib/sources/crawlers'
+import { validateCrawlerUrl } from '@/lib/sources/crawlers/url-validator'
 import { HiringPatternDetector, type HiringPattern, type LeadCandidate, type HiringSignal } from './hiring-pattern-detector'
 import type { HhDigestItem } from '@/lib/hhDigest'
 import pLimit from 'p-limit'
 import { selectConfidenceGate } from '@/lib/scoring/gates'
 import type { ConfidenceGateInput, ConfidenceGate, EntityMatchQuality } from '@/lib/scoring/gates'
 import type { EvidenceTier } from '@/lib/db/evidence'
+import { evidenceTypeToTier } from '@/lib/db/evidence'
 
 // Extend the interface to include confidence_gate (now in base type, kept for compatibility)
 export type HhDigestItemWithConfidence = HhDigestItem
@@ -34,6 +36,8 @@ export interface MultiSourceLead {
   id: string
   companyId: string
   companyName: string
+  /** Russian tax ID (ИНН). When present, used as primary key for entity resolution. */
+  inn?: string
   score: number
   confidence: 'A' | 'B' | 'C' | 'D'
   sources: EvidenceSource[]
@@ -68,28 +72,6 @@ export interface EvidenceSource {
 }
 
 /**
- * Map EvidenceSource.evidenceType to Fiur evidence tier.
- * Career pages and company profiles are direct hiring proof.
- * Vacancies from job boards are corroboration.
- * News and registry data are context.
- */
-function evidenceTypeToTier(type: EvidenceSource['evidenceType']): EvidenceTier {
-  switch (type) {
-    case 'career-page':
-    case 'company-profile':
-      return 'direct'
-    case 'registry':
-      // Government registry (EGRUL) is a corroborating source, not just context
-      return 'corroboration'
-    case 'vacancy':
-      return 'corroboration'
-    case 'news':
-    default:
-      return 'context'
-  }
-}
-
-/**
  * Recalculate confidence gate from current evidence sources.
  * Uses selectConfidenceGate to compute the type-based gate, then
  * takes the best (highest) of the SQL-originated gate and the
@@ -113,6 +95,36 @@ function recalculateConfidence(lead: MultiSourceLead): void {
   lead.confidence = gateOrder[typeBasedGate] > gateOrder[currentGate]
     ? typeBasedGate
     : currentGate
+}
+
+/**
+ * Map a sourceId to its canonical EvidenceSourceType.
+ *
+ * Aligns with `evidenceTypeToTier` in @/lib/db/evidence:
+ *   career-page, company-profile → direct
+ *   registry, vacancy            → corroboration
+ *   news                         → context
+ *
+ * Single mapping point — used by MultiSourceLeadGenerator and LeadAggregator.
+ */
+const SOURCE_ID_TO_EVIDENCE_TYPE: Record<string, EvidenceSource['evidenceType']> = {
+  'career-pages': 'career-page',
+  'company-site': 'company-profile',
+  'linkedin-company-pages': 'company-profile',
+  'hh': 'vacancy',
+  'rabota-rossii': 'vacancy',
+  'superjob': 'vacancy',
+  'habr-career': 'vacancy',
+  'tech-job-boards': 'vacancy',
+  'regional-job-boards': 'vacancy',
+  'egrul-fns': 'registry',
+  'funding-business-signals': 'news',
+  'company-newsrooms': 'news',
+  'industry-media': 'news',
+}
+
+function sourceIdToEvidenceType(sourceId: string): EvidenceSource['evidenceType'] {
+  return SOURCE_ID_TO_EVIDENCE_TYPE[sourceId] ?? 'vacancy'
 }
 
 /**
@@ -364,7 +376,13 @@ export class MultiSourceLeadGenerator {
       'superjob': 'SuperJob',
       'habr-career': 'Habr Career',
       'tech-job-boards': 'Tech Job Boards',
+      'regional-job-boards': 'Regional Job Boards',
       'linkedin-company-pages': 'LinkedIn',
+      'company-site': 'Company Website',
+      'egrul-fns': 'EGRUL/FNS Registry',
+      'funding-business-signals': 'Funding Signals',
+      'company-newsrooms': 'Company Newsrooms',
+      'industry-media': 'Industry Media',
     }
 
     // Convert to MultiSourceLead format — one evidence source per source family
@@ -376,7 +394,7 @@ export class MultiSourceLeadGenerator {
       const evidenceSources: EvidenceSource[] = sourceFamilies.map(sourceId => ({
         sourceId,
         sourceName: sourceNameMap[sourceId] || sourceId,
-        evidenceType: (sourceId === 'career-pages' ? 'career-page' : 'vacancy') as EvidenceSource['evidenceType'],
+        evidenceType: sourceIdToEvidenceType(sourceId),
         confidence: this.sources.find(s => s.id === sourceId)?.confidence ?? 0.5,
         rawData: matchingItem,
         extractedAt: new Date(),
@@ -462,6 +480,16 @@ export class MultiSourceLeadGenerator {
           options: {
             timeoutMs: 10000
           }
+        }
+
+        // C5: Validate URL before crawl — reject private IPs / bad schemes early.
+        // The crawler router also validates, but checking here avoids a network
+        // round-trip and provides a clearer warning in the lead's reasons.
+        const urlValidation = validateCrawlerUrl(careerUrl)
+        if (!urlValidation.valid) {
+          lead.enrichment.hasCareerPage = false
+          lead.reasons.push(`career page URL rejected: ${urlValidation.reason}`)
+          return
         }
 
         const result: CrawlerResult = await this.crawler.fetch(crawlInput)

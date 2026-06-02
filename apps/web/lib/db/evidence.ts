@@ -13,6 +13,35 @@ import { createHash } from 'node:crypto'
 
 export type EvidenceTier = 'direct' | 'corroboration' | 'context'
 
+/**
+ * Source-level evidence type — the kind of surface the evidence was found on.
+ * Mapped to EvidenceTier by `evidenceTypeToTier`.
+ */
+export type EvidenceSourceType = 'vacancy' | 'career-page' | 'company-profile' | 'news' | 'registry'
+
+/**
+ * Map a source-level evidence type to its EvidenceTier.
+ *
+ *   - career-page, company-profile → direct     (first-party company surface)
+ *   - registry, vacancy            → corroboration (independent confirmation)
+ *   - news                          → context      (supporting context only)
+ *
+ * Single source-of-truth — used by lead-aggregator and multi-source-lead-generator.
+ */
+export function evidenceTypeToTier(type: EvidenceSourceType): EvidenceTier {
+  switch (type) {
+    case 'career-page':
+    case 'company-profile':
+      return 'direct'
+    case 'registry':
+    case 'vacancy':
+      return 'corroboration'
+    case 'news':
+    default:
+      return 'context'
+  }
+}
+
 export interface EvidenceItemInput {
   source: string
   url: string
