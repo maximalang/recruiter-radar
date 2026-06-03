@@ -20,7 +20,7 @@
 - [x] All component scorers: industry-alignment, geographic-fit, hiring-burst,
       salary-level, role-category, departments, contact-quality,
       career-page-quality, lead-freshness, market-fit, source-aggregation
-- [x] Scoring pipeline with client overrides
+- [x] Scoring pipeline with client overrides (badfit reweighting from feedback)
 - [x] Confidence gates (A/B/C/D) with `selectConfidenceGate`
 - [x] Gate pipeline with `isDigestEligibleGate` (DRY)
 - [x] Market conditions & recent signal count in FIUR
@@ -31,7 +31,18 @@
 - [x] Firecrawl LLM-markdown engine (optional dep)
 - [x] Crawler router with circuit breaker + rate limiter + retry
 - [x] SSRF-safe URL validator (IPv4, IPv6, IPv4-mapped IPv6)
-- [x] **Split** circuit-breaker/rate-limiter/retry into separate modules
+- [x] Split circuit-breaker/rate-limiter/retry into separate modules
+
+### Source Ingestion
+- [x] HH.ru API adapter (реальный HTTP) — `packages/db/scripts/adapters/hh.mjs`
+- [x] HH ingestion pipeline — `packages/db/scripts/ingest-hh.mjs`
+- [x] SuperJob adapter — `packages/db/scripts/adapters/superjob.mjs`
+- [x] Habr Career adapter — `packages/db/scripts/adapters/habr-career.mjs`
+- [x] Source ingestion API route — `/api/sources/ingest` (POST)
+- [x] Source ingest service — `lib/lead-discovery/source-ingest.ts`
+- [x] Source registry — `lib/sources/source-registry.ts` (single source of truth)
+- [x] Env injection whitelist (security)
+- [x] Rate limiting per HH API limits (30 req/min) — `adapters/rate-limiter.mjs`
 
 ### Digest & Delivery
 - [x] Digest SQL pipeline (evidence → candidates → org state)
@@ -39,6 +50,19 @@
 - [x] Client-profile matching (include/exclude keywords, location, specialization)
 - [x] Digest opener builder (Russian, premium tone)
 - [x] Telegram webhook + connect-status API routes
+- [x] Shared delivery logic — `lib/digest/deliver-candidates.ts`
+- [x] Daily radar pipeline endpoint — `/api/cron/daily-radar` (ingest → digest → delivery)
+- [x] n8n workflows (HH, career-pages, daily-signals, operational-alerts)
+- [x] Callback button handling (Беру / Мимо / Позже) — signed HMAC callbacks
+- [x] Feedback → state update → `client_digest_org_state`
+
+### Agency Onboarding
+- [x] Pilot onboarding page — `/onboarding/pilot/[orderId]`
+- [x] Profile form: agencyName, dailyDigestLimit, targetCity, specialization,
+      includeKeywords, excludeKeywords
+- [x] `confirmPilotOrderProfile` saves to `client_profiles`
+- [x] `sendPilotOrderTestDigest` — first digest after profile setup
+- [x] Telegram connect step in onboarding
 
 ### Security & Infrastructure
 - [x] Session boundary hardening (signed `rr_sid`)
@@ -48,65 +72,75 @@
 - [x] Secure case conversion middleware
 
 ### Test Coverage
-- [x] 620 tests passing (scoring, lead-discovery, crawlers, digest, security, source-ingest)
+- [x] 620 tests passing
 
 ---
 
-## 🎯 P0: Core Lead Generation — Что осталось (до 08.06.2026)
+## 🎯 P0: На завтра (04.06.2026) — ICP Profile Fields
 
-### Задача 1.1: Source Adapters — Живые данные ✅ MOSTLY DONE
-- [x] HH.ru API adapter (реальный HTTP, не моки) — `packages/db/scripts/adapters/hh.mjs`
-- [x] HH ingestion pipeline — `packages/db/scripts/ingest-hh.mjs` (fetch → normalize → upsert signals/orgs)
-- [x] SuperJob adapter — `packages/db/scripts/adapters/superjob.mjs`
-- [x] Habr Career adapter — `packages/db/scripts/adapters/habr-career.mjs`
-- [x] Source ingestion API route — `/api/sources/ingest` (POST)
-- [x] Source ingest service — `lib/lead-discovery/source-ingest.ts`
-- [x] Env injection whitelist (security fix)
-- [x] Rate limiting per HH API limits (30 req/min) — `adapters/rate-limiter.mjs`
-- [ ] HH OAuth2 авторизация (currently uses HH_USER_AGENT only)
+### Задача 1.3: Agency ICP Fields — industries + companySizes
+
+**Проблема:** `FiurClientProfile.industries` и `FiurClientProfile.companySizes`
+используются в скоринге (`computeFit`), но `ClientProfile` в БД и форме
+не имеет этих полей. Сейчас `industries` всегда `[]`, `companySizes` всегда
+`undefined` — скоринг по индустрии и размеру не работает.
+
+**Что сделать (3 шага):**
+
+#### Шаг 1: Добавить поля в ClientProfile + DB migration
+- `industries TEXT[] DEFAULT '{}'` — массив индустрий (lowercase ключи)
+- `company_sizes TEXT[] DEFAULT '{}'` — массив: startup/small/medium/large/enterprise
+- Обновить `ClientProfile` type в `lib/clientProfiles.ts`
+- Обновить `getClientProfileById`, `upsertClientProfile` SQL
+- Migration: `ALTER TABLE client_profiles ADD COLUMN ...`
+
+#### Шаг 2: Добавить поля в onboarding форму
+- Industry multi-select ( predefined список: it, finance, manufacturing, retail,
+  healthcare, construction, logistics, consulting, education, media)
+- Company size checkboxes (startup 1-10, small 10-50, medium 50-250, large 250-1000, enterprise 1000+)
+- Обновить `confirmPilotProfileAction` и `confirmPilotOrderProfile` — парсинг новых полей
+- Обновить `PilotProfileSeed` / `normalizeDailyDigestLimit` в payments.ts
+
+#### Шаг 3: Подключить поля к скорингу
+- В `scoring-pipeline.ts` — маппинг `ClientProfile.industries` → `FiurClientProfile.industries`
+- В `scoring-pipeline.ts` — маппинг `ClientProfile.companySizes` → `FiurClientProfile.companySizes`
+- Проверить что `computeFit` получает реальные данные
+
+**Файлы которые нужно тронуть:**
+```
+apps/web/lib/clientProfiles.ts           — тип + SQL
+apps/web/lib/scoring/scoring-pipeline.ts — маппинг полей
+apps/web/app/onboarding/pilot/[orderId]/page.tsx          — UI форма
+apps/web/app/onboarding/pilot/[orderId]/actions.ts        — парсинг
+apps/web/lib/payments.ts                 — PilotProfileSeed + confirmPilotOrderProfile
+packages/db/migrations/                  — ALTER TABLE
+```
 
 **Acceptance Criteria:**
-- [x] Ingestion scripts work with HH_USER_AGENT + DATABASE_URL
-- [ ] `npm run lead:generate` produces real leads from HH API (needs DB populated first)
+- [ ] Agency может выбрать индустрии и размеры компаний при онбординге
+- [ ] `computeFit` получает непустой `industries` массив для профилей с выбранными индустриями
+- [ ] `computeFit` получает непустой `companySizes` для профилей с выбранными размерами
+- [ ] <5 мин ICP configuration
 
 ---
 
-### Задача 1.2: Lead Persistence & Delivery ✅ MOSTLY DONE
-- [x] Digest candidates → DB (batch INSERT with ON CONFLICT)
-- [x] Client digest org state (cooldown, suppression, feedback)
-- [x] Telegram digest delivery pipeline — `/api/digest/delivery`
-  - [x] Idempotent delivery attempts with claim tokens
-  - [x] Confidence gate filtering (C/D excluded from delivery)
-  - [x] Telegram send via Bot API
-- [x] Callback button handling (Беру / Мимо / Позже) — signed HMAC callbacks
-- [x] Feedback → state update → `client_digest_org_state`
-- [x] Daily digest scheduler (n8n workflows + `/api/cron/daily-radar`)
-- [x] Daily radar pipeline endpoint — ingest → digest → delivery
-- [ ] Agency onboarding flow
-  - [ ] Save to `client_profiles` with `daily_digest_limit`
-  - [ ] First digest generation after profile save
+### Задача 1.3b: Feedback reweighting — УЖЕ РАБОТАЕТ ✅
 
-**Acceptance Criteria:**
-- [ ] Daily Telegram digest with 5-10 A/B leads
-- [x] Feedback buttons update lead state
-- [ ] New agency gets first digest within 24h of profile setup
+`client-overrides.ts` уже читает `client_digest_org_state` с `feedback_status='badfit'`
+и строит штрафы, которые подаются в FIUR scoring. Это не требует доработок.
 
 ---
 
-### Задача 1.3: Agency Profile System
-- [ ] ICP Configuration UI
-  - [ ] Industry selection (multi-select)
-  - [ ] Company size preferences
-  - [ ] Geographic targeting
-  - [ ] Role specialization
-  - [ ] Include/exclude keywords
-- [ ] Dynamic Lead Weighting
-  - [ ] Feedback-driven reweighting (from Telegram callbacks)
-  - [ ] Client override pipeline integration
+### Задача 1.1b: E2E smoke test — `npm run lead:generate`
 
-**Acceptance Criteria:**
-- [ ] <5 min ICP configuration
-- [ ] Scoring adjusts based on feedback
+**Проблема:** Lead generation работает, но не производит реальные лиды
+без заполненной БД. Нужен скрипт для end-to-end проверки.
+
+**Что сделать:**
+1. Создать `scripts/smoke-e2e.mjs` — запускает HH ingest → lead:generate → score
+2. Требует `DATABASE_URL` + `HH_USER_AGENT` (реальные креды)
+3. Выводит: сколько сигналов, сколько лидов, скоринг первого лида
+4. Добавить `npm run smoke:e2e` в package.json
 
 ---
 
@@ -142,16 +176,27 @@
 
 ## 🔧 Technical Debt (from code review 2026-06-03)
 
-- [x] ~~C1/P1: Unbounded Promise.all in generateAndScoreLeads~~ → Fixed (delegates to scoreExistingLeads)
-- [x] ~~S2: IPv4-mapped IPv6 SSRF bypass~~ → Fixed (hex + dotted-decimal detection)
-- [x] ~~A1: Crawler-router god module~~ → Fixed (split into circuit-breaker, rate-limiter, retry)
-- [x] ~~I5: Duplicate delivery logic in daily-radar + digest/delivery~~ → Fixed (shared deliverCandidatesForRun)
-- [x] ~~I7: withRetry imported from crawler-router in lead-gen~~ → Fixed (shared lib/utils/retry.ts)
-- [x] ~~I9: Cross-route API key fallback~~ → Fixed (INGEST_API_KEY only)
-- [x] ~~I10: Operational-alerts webhook unauthenticated~~ → Fixed (OPERATIONAL_WEBHOOK_KEY)
-- [x] ~~C1: n8n Check Failure never fires on real HTTP errors~~ → Fixed (continueOnFail + enhanced condition)
+- [x] ~~C1/P1: Unbounded Promise.all in generateAndScoreLeads~~ → Fixed
+- [x] ~~S2: IPv4-mapped IPv6 SSRF bypass~~ → Fixed
+- [x] ~~A1: Crawler-router god module~~ → Fixed (split)
+- [x] ~~I5: Duplicate delivery logic~~ → Fixed (shared deliverCandidatesForRun)
+- [x] ~~I7: withRetry from wrong module~~ → Fixed (lib/utils/retry.ts)
+- [x] ~~I9: Cross-route API key fallback~~ → Fixed
+- [x] ~~I10: Webhook unauthenticated~~ → Fixed
+- [x] ~~C1: n8n Check Failure never fires~~ → Fixed (continueOnFail)
 - [x] ~~I4: Dead RUNTIME_OK guard~~ → Removed
-- [x] ~~C3: marketConditions/recentSignalCount not clamped~~ → Already safe (parent scores clamped via clamp01)
-- [ ] A3: Source config hardcoded in multi-source-lead-generator → registry pattern
+- [x] ~~C3: marketConditions/recentSignalCount clamp~~ → Already safe
+- [x] ~~A3: Source config hardcoded~~ → Fixed (source-registry)
 - [ ] S3: Rate limiter in-memory → Redis-backed for multi-instance
 - [ ] R1: Dead CSS classes from CSS Modules migration cleanup
+
+---
+
+## 🗂 Состояние на конец 03.06.2026
+
+**Коммитов впереди origin:** 0 (всё запушено)
+**Тестов:** 620 passing
+**Ветки:** только main (мёртвые удалены, remotes прунены)
+**GC:** выполнен (aggressive + prune=now)
+
+**Завтра начать с:** Задача 1.3 — ICP fields (industries + companySizes) → DB → форма → скоринг
