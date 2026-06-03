@@ -85,6 +85,32 @@ function checkIpLiteral(hostname: string): { allowed: boolean; reason?: string }
   if (hostname.includes(':')) {
     // Strip brackets that URL parser adds around IPv6 literals
     const bare = hostname.replace(/^\[|\]$/g, '')
+
+    // IPv4-mapped IPv6 in dotted-decimal form (e.g. ::ffff:127.0.0.1).
+    // Note: Node's URL parser normalises this to hex (::ffff:7f00:1),
+    // so this branch only fires when the caller passes a raw hostname
+    // (e.g. from a non-URL source) or when the browser doesn't normalise.
+    const mappedDotted = /^::ffff:(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/i.exec(bare)
+    if (mappedDotted) {
+      const octets = [mappedDotted[1], mappedDotted[2], mappedDotted[3], mappedDotted[4]].map(Number)
+      if (octets.some(o => o > 255)) {
+        return { allowed: true } // Invalid IPv4 octet — treat as domain
+      }
+      return checkIpv4(octets)
+    }
+
+    // IPv4-mapped IPv6 in hex form (e.g. ::ffff:7f00:1).
+    // Node's URL parser normalises all mapped addresses to this format.
+    // The last two 16-bit groups encode the IPv4 address:
+    //   ::ffff:AABB:CCDD → AA.BB.CC.DD
+    const mappedHex = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i.exec(bare)
+    if (mappedHex) {
+      const hi = parseInt(mappedHex[1], 16)
+      const lo = parseInt(mappedHex[2], 16)
+      const octets = [(hi >> 8) & 0xff, hi & 0xff, (lo >> 8) & 0xff, lo & 0xff]
+      return checkIpv4(octets)
+    }
+
     return checkIpv6(bare)
   }
 

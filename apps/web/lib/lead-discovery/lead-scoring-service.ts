@@ -68,15 +68,7 @@ export class LeadScoringService {
       clientProfileId: options.clientProfileId,
     })
 
-    // Score each lead
-    const scoredLeads = await Promise.all(
-      rawLeads.map(lead => this.scoreLead(lead, options))
-    )
-
-    // Filter by minimum score and sort
-    return scoredLeads
-      .filter(lead => lead.finalScore >= (options.minScore || 1.0))
-      .sort((a, b) => b.finalScore - a.finalScore)
+    return this.scoreExistingLeads(rawLeads, options)
   }
 
   /**
