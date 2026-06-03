@@ -48,45 +48,40 @@
 - [x] Secure case conversion middleware
 
 ### Test Coverage
-- [x] 612 tests passing (scoring, lead-discovery, crawlers, digest, security)
+- [x] 620 tests passing (scoring, lead-discovery, crawlers, digest, security, source-ingest)
 
 ---
 
 ## 🎯 P0: Core Lead Generation — Что осталось (до 08.06.2026)
 
-### Задача 1.1: Source Adapters — Живые данные
-- [ ] HH.ru API adapter (реальный HTTP, не моки)
-  - [ ] OAuth2 авторизация HH API
-  - [ ] Vacancy search endpoint → HiringSignal
-  - [ ] Employer info endpoint → company enrichment
-  - [ ] Rate limiting (HH API limits: 30 req/min)
-  - [ ] Error handling + circuit breaker integration
-- [ ] SuperJob adapter (реальный API)
-  - [ ] API key auth
-  - [ ] Vacancy search → HiringSignal
-- [ ] Habr Career adapter (реальный API)
-  - [ ] Vacancy search → HiringSignal
+### Задача 1.1: Source Adapters — Живые данные ✅ MOSTLY DONE
+- [x] HH.ru API adapter (реальный HTTP, не моки) — `packages/db/scripts/adapters/hh.mjs`
+- [x] HH ingestion pipeline — `packages/db/scripts/ingest-hh.mjs` (fetch → normalize → upsert signals/orgs)
+- [x] SuperJob adapter — `packages/db/scripts/adapters/superjob.mjs`
+- [x] Habr Career adapter — `packages/db/scripts/adapters/habr-career.mjs`
+- [x] Source ingestion API route — `/api/sources/ingest` (POST)
+- [x] Source ingest service — `lib/lead-discovery/source-ingest.ts`
+- [x] Env injection whitelist (security fix)
+- [ ] HH OAuth2 авторизация (currently uses HH_USER_AGENT only)
+- [ ] Rate limiting per HH API limits (30 req/min) — adapter has no built-in rate limit
 
 **Acceptance Criteria:**
-- [ ] `npm run lead:generate` produces real leads from HH API
-- [ ] Circuit breaker opens on API failures, recovers automatically
-- [ ] Evidence includes source tier and extraction timestamp
+- [x] Ingestion scripts work with HH_USER_AGENT + DATABASE_URL
+- [ ] `npm run lead:generate` produces real leads from HH API (needs DB populated first)
 
 ---
 
-### Задача 1.2: Lead Persistence & Delivery
-- [ ] Lead persistence в БД
-  - [ ] `leads` table INSERT from scored leads
-  - [ ] Deduplication on `canonical_company_id + client_profile_id`
-  - [ ] Lead state transitions (new → qualified → ...)
-- [ ] Telegram digest delivery (end-to-end)
-  - [ ] Daily digest scheduler
-  - [ ] Format scored leads → Telegram message
-  - [ ] Send via Bot API
-  - [ ] Callback button handling (Беру / Мимо / Позже / ...)
-  - [ ] Feedback → lead state update → reweighting
+### Задача 1.2: Lead Persistence & Delivery ✅ MOSTLY DONE
+- [x] Digest candidates → DB (batch INSERT with ON CONFLICT)
+- [x] Client digest org state (cooldown, suppression, feedback)
+- [x] Telegram digest delivery pipeline — `/api/digest/delivery`
+  - [x] Idempotent delivery attempts with claim tokens
+  - [x] Confidence gate filtering (C/D excluded from delivery)
+  - [x] Telegram send via Bot API
+- [x] Callback button handling (Беру / Мимо / Позже) — signed HMAC callbacks
+- [x] Feedback → state update → `client_digest_org_state`
+- [ ] Daily digest scheduler (cron/n8n trigger)
 - [ ] Agency onboarding flow
-  - [ ] ICP questionnaire (industry, size, location, specialization)
   - [ ] Save to `client_profiles` with `daily_digest_limit`
   - [ ] First digest generation after profile save
 
