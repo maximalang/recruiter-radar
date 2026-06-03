@@ -62,8 +62,8 @@
 - [x] Source ingestion API route — `/api/sources/ingest` (POST)
 - [x] Source ingest service — `lib/lead-discovery/source-ingest.ts`
 - [x] Env injection whitelist (security fix)
+- [x] Rate limiting per HH API limits (30 req/min) — `adapters/rate-limiter.mjs`
 - [ ] HH OAuth2 авторизация (currently uses HH_USER_AGENT only)
-- [ ] Rate limiting per HH API limits (30 req/min) — adapter has no built-in rate limit
 
 **Acceptance Criteria:**
 - [x] Ingestion scripts work with HH_USER_AGENT + DATABASE_URL
@@ -80,14 +80,15 @@
   - [x] Telegram send via Bot API
 - [x] Callback button handling (Беру / Мимо / Позже) — signed HMAC callbacks
 - [x] Feedback → state update → `client_digest_org_state`
-- [ ] Daily digest scheduler (cron/n8n trigger)
+- [x] Daily digest scheduler (n8n workflows + `/api/cron/daily-radar`)
+- [x] Daily radar pipeline endpoint — ingest → digest → delivery
 - [ ] Agency onboarding flow
   - [ ] Save to `client_profiles` with `daily_digest_limit`
   - [ ] First digest generation after profile save
 
 **Acceptance Criteria:**
 - [ ] Daily Telegram digest with 5-10 A/B leads
-- [ ] Feedback buttons update lead state
+- [x] Feedback buttons update lead state
 - [ ] New agency gets first digest within 24h of profile setup
 
 ---
