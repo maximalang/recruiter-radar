@@ -1,80 +1,109 @@
 {
-  "name": "digest-daily-delivery",
+  "name": "Daily Signals Digest",
   "nodes": [
     {
       "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "field": "minutes",
-              "minutesInterval": 15
-            }
+        "rule": { "interval": [{ "field": "hours", "expression": "8" }] }
+      },
+      "id": "schedule-trigger",
+      "name": "Daily Schedule (08:00 MSK)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            { "name": "BASE_URL", "value": "={{ $env.RR_APP_BASE_URL || 'https://recruiter-radar.vercel.app' }}" },
+            { "name": "DIGEST_API_KEY", "value": "={{ $env.DIGEST_API_KEY || $env.CRON_API_KEY }}" },
+            { "name": "TELEGRAM_OPERATOR_CHANNEL_ID", "value": "={{ $env.TELEGRAM_OPERATOR_CHANNEL_ID }}" }
           ]
         }
       },
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.3,
-      "position": [
-        -976,
-        96
-      ],
-      "id": "f5012bed-1eeb-4478-be1f-ac011f5a905f",
-      "name": "Schedule Trigger"
+      "id": "set-env",
+      "name": "Set Environment",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [100, 300]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{$env.RR_APP_BASE_URL}}/api/digest/delivery",
+        "url": "={{ $json.BASE_URL }}/api/digest/delivery",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "x-api-key",
-              "value": "={{$env.DIGEST_API_KEY}}"
-            }
+            { "name": "x-api-key", "value": "={{ $json.DIGEST_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
         },
-        "sendBody": true,
-        "contentType": "json",
-        "jsonBody": "={{ { clientProfileId: $env.DAILY_DIGEST_CLIENT_PROFILE_ID || $json.clientProfileId } }}"
+        "sendBody": false,
+        "retries": 3,
+        "retryDelay": 2000
       },
+      "id": "http-request",
+      "name": "Call Digest Delivery API",
       "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
-      "position": [
-        -752,
-        96
-      ],
-      "id": "5ad61993-a974-4f71-8fbd-3ce7831c4887",
-      "name": "POST /api/digest/delivery",
-      "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 2000
+      "typeVersion": 4,
+      "position": [450, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [{ "value1": "={{ $json.success === false || $json.error || ($json.statusCode >= 400) }}", "operation": "equals", "value2": true }]
+        }
+      },
+      "id": "check-failure",
+      "name": "Check Failure",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.TELEGRAM_OPERATOR_CHANNEL_ID }}",
+        "text": "=❌ Digest Delivery FAILED\n\nError: {{ $json.error || $json.message || 'Unknown error' }}\nHTTP Status: {{ $json.statusCode || 'N/A' }}",
+        "additionalFields": {}
+      },
+      "id": "telegram-alert",
+      "name": "Send Telegram Alert",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [850, 200]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.TELEGRAM_OPERATOR_CHANNEL_ID }}",
+        "text": "=✅ Digest Delivery OK\n\nProfiles: {{ $json.profilesProcessed || 'N/A' }}\nLeads sent: {{ $json.totalSent || 0 }}\nDuration: {{ $json.durationMs || 'N/A' }}ms",
+        "additionalFields": {}
+      },
+      "id": "telegram-success",
+      "name": "Send Telegram Success",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [850, 400]
     }
   ],
-  "pinData": {},
   "connections": {
-    "Schedule Trigger": {
+    "Daily Schedule (08:00 MSK)": {
+      "main": [[{ "node": "Set Environment", "type": "main", "index": 0 }]]
+    },
+    "Set Environment": {
+      "main": [[{ "node": "Call Digest Delivery API", "type": "main", "index": 0 }]]
+    },
+    "Call Digest Delivery API": {
+      "main": [[{ "node": "Check Failure", "type": "main", "index": 0 }]]
+    },
+    "Check Failure": {
       "main": [
-        [
-          {
-            "node": "POST /api/digest/delivery",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        [{ "node": "Send Telegram Alert", "type": "main", "index": 0 }],
+        [{ "node": "Send Telegram Success", "type": "main", "index": 0 }]
       ]
     }
   },
-  "active": true,
-  "settings": {
-    "executionOrder": "v1",
-    "binaryMode": "separate"
-  },
-  "versionId": "aa363d3d-8b85-4514-988e-e74b1649a12a",
-  "meta": {
-    "templateCredsSetupCompleted": true,
-    "instanceId": "84653d17ed330d6f66dfc59ddf38cfdf3ec273c3c0517689c825e2c8b564f489"
-  },
-  "id": "uZ85pVxodzsOk4qF",
-  "tags": []
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "tags": ["recruiter-radar", "daily", "digest"]
 }

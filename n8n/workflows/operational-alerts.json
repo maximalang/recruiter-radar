@@ -1,93 +1,76 @@
 {
-  "name": "operational-alerts",
+  "name": "Operational Alerts",
   "nodes": [
     {
       "parameters": {
-        "workflowName": "recruiter-radar-failure-alerts"
-      },
-      "type": "n8n-nodes-base.manualTrigger",
-      "typeVersion": 1.1,
-      "position": [-976, 96],
-      "id": "manual-trigger",
-      "name": "Manual Trigger"
-    },
-    {
-      "parameters": {
-        "jsCode": "const now = new Date();\nconst message = `⚠️ Recruiter Radar Operational Alert at ${now.toISOString()}`;"
-      },
-      "type": "n8n-nodes-code.evaluateJavascript",
-      "typeVersion": 1.1,
-      "position": [-752, 96],
-      "id": "prepare-message",
-      "name": "Prepare Message"
-    },
-    {
-      "parameters": {
-        "mode": "telegram",
-        "options": {
-          "telegram": {
-            "channelId": "{{$env.TELEGRAM_OPERATOR_CHANNEL_ID}}",
-            "message": "={{ $json.message }}"
-          }
+        "httpMethod": "POST",
+        "path": "operational-alert",
+        "options": {},
+        "authentication": "headerAuth",
+        "headerAuth": {
+          "name": "x-webhook-key",
+          "value": "={{ $env.OPERATIONAL_WEBHOOK_KEY }}"
         }
       },
-      "type": "n8n-nodes-base.notification",
-      "typeVersion": 1.1,
-      "position": [-528, 96],
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "operational-alert"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            { "name": "TELEGRAM_OPERATOR_CHANNEL_ID", "value": "={{ $env.TELEGRAM_OPERATOR_CHANNEL_ID }}" },
+            { "name": "SLACK_OPERATOR_CHANNEL", "value": "={{ $env.SLACK_OPERATOR_CHANNEL }}" }
+          ]
+        }
+      },
+      "id": "set-env",
+      "name": "Set Environment",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [100, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.TELEGRAM_OPERATOR_CHANNEL_ID }}",
+        "text": "={{ $json.message || 'Operational Alert' }}",
+        "additionalFields": {}
+      },
       "id": "telegram-alert",
-      "name": "Send Telegram Alert"
+      "name": "Send Telegram Alert",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [450, 200]
     },
     {
       "parameters": {
-        "mode": "slack",
-        "options": {
-          "slack": {
-            "channel": "{{$env.SLACK_OPERATOR_CHANNEL}}",
-            "message": "={{ $json.message }}"
-          }
-        }
+        "channel": "={{ $json.SLACK_OPERATOR_CHANNEL }}",
+        "text": "={{ $json.message || 'Operational Alert' }}",
+        "otherOptions": {}
       },
-      "type": "n8n-nodes-base.notification",
-      "typeVersion": 1.1,
-      "position": [-528, 240],
       "id": "slack-alert",
-      "name": "Send Slack Alert"
+      "name": "Send Slack Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 1,
+      "position": [450, 400]
     }
   ],
   "connections": {
-    "Manual Trigger": {
-      "main": [
-        [
-          {
-            "node": "Prepare Message",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Webhook Trigger": {
+      "main": [[{ "node": "Set Environment", "type": "main", "index": 0 }]]
     },
-    "Prepare Message": {
+    "Set Environment": {
       "main": [
-        [
-          {
-            "node": "Send Telegram Alert",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "type": "main",
-            "index": 0,
-            "node": "Send Slack Alert"
-          }
-        ]
+        [{ "node": "Send Telegram Alert", "type": "main", "index": 0 }],
+        [{ "node": "Send Slack Alert", "type": "main", "index": 0 }]
       ]
     }
   },
-  "active": true,
-  "settings": {
-    "executionOrder": "v1"
-  },
-  "versionId": "1",
-  "id": "operational-alerts",
-  "tags": ["recruiter-radar", "alerts", "operational"]
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "tags": ["recruiter-radar", "alerts", "operations"]
 }

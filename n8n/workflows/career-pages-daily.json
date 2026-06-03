@@ -1,104 +1,112 @@
 {
-  "name": "career-pages-daily-pipeline",
+  "name": "Career Pages Daily Pipeline",
   "nodes": [
     {
       "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "field": "minutes",
-              "minutesInterval": 0
-            },
-            {
-              "field": "hours",
-              "hours": 7
-            },
-            {
-              "field": "days",
-              "days": 0
-            }
+        "rule": { "interval": [{ "field": "hours", "expression": "7" }] }
+      },
+      "id": "schedule-trigger",
+      "name": "Daily Schedule (07:00 MSK)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            { "name": "BASE_URL", "value": "={{ $env.RR_APP_BASE_URL || 'https://recruiter-radar.vercel.app' }}" },
+            { "name": "INGEST_API_KEY", "value": "={{ $env.INGEST_API_KEY || $env.CRON_API_KEY }}" },
+            { "name": "TELEGRAM_OPERATOR_CHANNEL_ID", "value": "={{ $env.TELEGRAM_OPERATOR_CHANNEL_ID }}" }
           ]
         }
       },
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.3,
-      "position": [-976, 96],
-      "id": "schedule-trigger",
-      "name": "07:00 MSK Daily"
+      "id": "set-env",
+      "name": "Set Environment",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [100, 300]
     },
     {
       "parameters": {
-        "command": "CAREER_PAGES_TARGETS_FILE=packages/db/scripts/career-pages-smoke-targets.json npm run source:pipeline:career-pages",
-        "options": {}
-      },
-      "type": "n8n-nodes-bash.executeCommand",
-      "typeVersion": 1.2,
-      "position": [-752, 96],
-      "id": "run-career-pages-pipeline",
-      "name": "Run Career Pages Pipeline"
-    },
-    {
-      "parameters": {
-        "mode": "manual",
-        "message": "Career Pages Pipeline completed successfully"
-      },
-      "type": "n8n-nodes-base.notification",
-      "typeVersion": 1.1,
-      "position": [-528, 96],
-      "id": "success-notification",
-      "name": "Success Notification"
-    },
-    {
-      "parameters": {
-        "mode": "telegram",
-        "options": {
-          "telegram": {
-            "channelId": "{{$env.TELEGRAM_OPERATOR_CHANNEL_ID}}",
-            "message": "❌ Career Pages Pipeline Failed\n\nError: {{$json.error}}\n\nTime: {{$json.now}}"
-          }
+        "method": "POST",
+        "url": "={{ $json.BASE_URL }}/api/sources/ingest",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{ $json.INGEST_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "source", "value": "career-pages" }
+          ]
         }
       },
-      "type": "n8n-nodes-base.notification",
-      "typeVersion": 1.1,
-      "position": [-528, 240],
-      "id": "error-notification",
-      "name": "Error Notification"
+      "id": "http-request",
+      "name": "Call Career Pages Ingest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [450, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [{ "value1": "={{ $json.success === false || $json.error || ($json.statusCode >= 400) }}", "operation": "equals", "value2": true }]
+        }
+      },
+      "id": "check-failure",
+      "name": "Check Failure",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.TELEGRAM_OPERATOR_CHANNEL_ID }}",
+        "text": "=❌ Career Pages Pipeline FAILED\n\nError: {{ $json.error || $json.message || 'Unknown error' }}\nHTTP Status: {{ $json.statusCode || 'N/A' }}",
+        "additionalFields": {}
+      },
+      "id": "telegram-alert",
+      "name": "Send Telegram Alert",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [850, 200]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.TELEGRAM_OPERATOR_CHANNEL_ID }}",
+        "text": "=✅ Career Pages Pipeline OK\n\nSource: career-pages\nFetched: {{ $json.fetchedCount }}\nUpserted: {{ $json.upsertedCount }}",
+        "additionalFields": {}
+      },
+      "id": "telegram-success",
+      "name": "Send Telegram Success",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [850, 400]
     }
   ],
   "connections": {
-    "Schedule Trigger": {
-      "main": [
-        [
-          {
-            "node": "Run Career Pages Pipeline",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Daily Schedule (07:00 MSK)": {
+      "main": [[{ "node": "Set Environment", "type": "main", "index": 0 }]]
     },
-    "Run Career Pages Pipeline": {
+    "Set Environment": {
+      "main": [[{ "node": "Call Career Pages Ingest", "type": "main", "index": 0 }]]
+    },
+    "Call Career Pages Ingest": {
+      "main": [[{ "node": "Check Failure", "type": "main", "index": 0 }]]
+    },
+    "Check Failure": {
       "main": [
-        [
-          {
-            "node": "Success Notification",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "type": "main",
-            "index": 0,
-            "node": "Error Notification"
-          }
-        ]
+        [{ "node": "Send Telegram Alert", "type": "main", "index": 0 }],
+        [{ "node": "Send Telegram Success", "type": "main", "index": 0 }]
       ]
     }
   },
-  "active": true,
-  "settings": {
-    "executionOrder": "v1"
-  },
-  "versionId": "1",
-  "id": "career-pages-daily-pipeline",
+  "active": false,
+  "settings": { "executionOrder": "v1" },
   "tags": ["recruiter-radar", "daily", "career-pages"]
 }

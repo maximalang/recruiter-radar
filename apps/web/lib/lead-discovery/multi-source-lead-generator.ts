@@ -16,7 +16,7 @@ import type { ConfidenceGateInput, ConfidenceGate, EntityMatchQuality } from '@/
 import type { EvidenceTier } from '@/lib/db/evidence'
 import { evidenceTypeToTier } from '@/lib/db/evidence'
 import { getPool } from '@/lib/db'
-import { withRetry } from '@/lib/sources/crawlers/crawler-router'
+import { withRetry } from '@/lib/utils/retry'
 
 // Extend the interface to include confidence_gate (now in base type, kept for compatibility)
 export type HhDigestItemWithConfidence = HhDigestItem
