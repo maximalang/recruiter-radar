@@ -12,9 +12,14 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { ingestAllPrimarySources, type IngestResult } from '@/lib/lead-discovery/source-ingest'
+import { runDigestForClientProfile } from '@/lib/digest'
+import { getPool, sendLeadToTelegram } from '@/lib/db'
+import { randomUUID } from 'node:crypto'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+
+const DELIVERY_STALE_SECONDS = 120
 
 export async function POST(request: NextRequest) {
   // Auth — dedicated CRON_API_KEY, fallback to INGEST_API_KEY
@@ -33,7 +38,7 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const startedAt = new Date().toISOString()
+  const startMs = Date.now()
 
   try {
     // Step 1: Ingest all primary sources
@@ -47,9 +52,8 @@ export async function POST(request: NextRequest) {
       upsertedTotal: ingestResults.reduce((sum, r) => sum + (r.upsertedCount ?? 0), 0),
     }
 
-    // Step 2: Generate digests for active client profiles
-    // Uses the existing /api/digest/delivery endpoint internally
-    const digestResults = await generateDigestsForActiveProfiles()
+    // Step 2: Generate and deliver digests for active client profiles
+    const digestResults = await generateAndDeliverDigests()
     const digestOk = digestResults.every(r => r.ok)
     const digestSummary = {
       total: digestResults.length,
@@ -60,8 +64,7 @@ export async function POST(request: NextRequest) {
 
     // Step 3: Log summary
     const allOk = ingestOk && digestOk
-    const completedAt = new Date().toISOString()
-    const durationMs = Date.now() - new Date(startedAt).getTime()
+    const durationMs = Date.now() - startMs
 
     console.log(
       `[daily-radar] ${allOk ? 'OK' : 'PARTIAL'}: ` +
@@ -74,8 +77,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: allOk,
       data: {
-        startedAt,
-        completedAt,
+        startedAt: new Date(startMs).toISOString(),
+        completedAt: new Date().toISOString(),
         durationMs,
         ingest: { ok: ingestOk, ...ingestSummary, details: ingestResults },
         digest: { ok: digestOk, ...digestSummary, details: digestResults },
@@ -84,7 +87,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('[daily-radar] pipeline failed:', error)
     return NextResponse.json(
-      { success: false, error: 'Daily radar pipeline failed', startedAt },
+      { success: false, error: 'Daily radar pipeline failed' },
       { status: 500 }
     )
   }
@@ -103,11 +106,11 @@ interface DigestDeliveryResult {
 /**
  * Generate and deliver digests for all active client profiles.
  *
- * Queries active profiles from DB, then calls the delivery pipeline
- * for each one sequentially (to avoid overloading the Telegram API).
+ * Calls the digest + delivery logic directly (no self-fetch).
+ * Processes profiles sequentially to avoid overloading the
+ * Telegram Bot API rate limits.
  */
-async function generateDigestsForActiveProfiles(): Promise<DigestDeliveryResult[]> {
-  const { getPool } = await import('@/lib/db')
+async function generateAndDeliverDigests(): Promise<DigestDeliveryResult[]> {
   const pool = getPool()
   if (!pool) {
     return [{ clientProfileId: 'none', ok: false, sent: 0, failed: 0, skipped: 0, error: 'DATABASE_URL not set' }]
@@ -127,29 +130,77 @@ async function generateDigestsForActiveProfiles(): Promise<DigestDeliveryResult[
   }
 
   const results: DigestDeliveryResult[] = []
-  const digestApiKey = process.env.DIGEST_API_KEY
 
   for (const profile of profiles.rows) {
     try {
-      // Run digest + delivery in one call via the existing API
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || `http://localhost:${process.env.PORT || 3000}`
-      const response = await fetch(`${baseUrl}/api/digest/delivery`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(digestApiKey ? { 'x-api-key': digestApiKey } : {}),
-        },
-        body: JSON.stringify({ clientProfileId: profile.id }),
-      })
+      // Run digest generation directly
+      const { run } = await runDigestForClientProfile({ clientProfileId: profile.id })
+      const runId = run.id
 
-      const data = await response.json() as { ok?: boolean; counters?: { sent: number; failed: number; skipped: number } }
-      results.push({
-        clientProfileId: profile.id,
-        ok: data.ok ?? false,
-        sent: data.counters?.sent ?? 0,
-        failed: data.counters?.failed ?? 0,
-        skipped: data.counters?.skipped ?? 0,
-      })
+      // Get candidates for delivery (A/B gates only, same filter as delivery route)
+      const candidates = await pool.query<{ id: number }>(`
+        SELECT id
+        FROM digest_candidates
+        WHERE digest_run_id = $1
+          AND (payload->>'confidenceGate' NOT IN ('C', 'D') OR payload->>'confidenceGate' IS NULL)
+        ORDER BY id ASC
+      `, [runId])
+
+      let sent = 0
+      let failed = 0
+      let skipped = 0
+
+      for (const row of candidates.rows) {
+        // Claim the delivery attempt (idempotent)
+        const claimToken = randomUUID()
+        const idempotencyKey = `digest:${runId}:candidate:${row.id}:telegram`
+
+        const claim = await pool.query<{ id: number; status: string; ownsClaim: boolean }>(`
+          INSERT INTO digest_delivery_attempts (
+            digest_candidate_id, idempotency_key, channel, status, processing_claimed_at, processing_claim_token
+          )
+          VALUES ($1, $2, 'telegram', 'processing', NOW(), $3)
+          ON CONFLICT (digest_candidate_id, idempotency_key)
+          DO UPDATE SET
+            processing_claimed_at = CASE
+              WHEN digest_delivery_attempts.status = 'failed'
+                OR (digest_delivery_attempts.status = 'processing' AND digest_delivery_attempts.processing_claimed_at < NOW() - ($4::int * INTERVAL '1 second'))
+              THEN NOW() ELSE digest_delivery_attempts.processing_claimed_at END,
+            processing_claim_token = CASE
+              WHEN digest_delivery_attempts.status = 'failed'
+                OR (digest_delivery_attempts.status = 'processing' AND digest_delivery_attempts.processing_claimed_at < NOW() - ($4::int * INTERVAL '1 second'))
+              THEN EXCLUDED.processing_claim_token ELSE digest_delivery_attempts.processing_claim_token END,
+            status = CASE
+              WHEN digest_delivery_attempts.status = 'failed'
+                OR (digest_delivery_attempts.status = 'processing' AND digest_delivery_attempts.processing_claimed_at < NOW() - ($4::int * INTERVAL '1 second'))
+              THEN 'processing' ELSE digest_delivery_attempts.status END
+          RETURNING id, status::TEXT AS status, processing_claim_token = $3 AS "ownsClaim"
+        `, [row.id, idempotencyKey, claimToken, DELIVERY_STALE_SECONDS])
+
+        const attempt = claim.rows[0]
+        if (attempt.status === 'sent' || !attempt.ownsClaim) {
+          skipped += 1
+          continue
+        }
+
+        // Send directly via Telegram
+        const result = await sendLeadToTelegram(row.id)
+        if (result.ok) {
+          await pool.query(
+            `UPDATE digest_delivery_attempts SET status = 'sent', error_message = NULL WHERE id = $1 AND processing_claim_token = $2`,
+            [attempt.id, claimToken]
+          )
+          sent += 1
+        } else {
+          await pool.query(
+            `UPDATE digest_delivery_attempts SET status = 'failed', error_message = LEFT($3, 1000) WHERE id = $1 AND processing_claim_token = $2`,
+            [attempt.id, claimToken, result.error]
+          )
+          failed += 1
+        }
+      }
+
+      results.push({ clientProfileId: profile.id, ok: failed === 0, sent, failed, skipped })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
       results.push({

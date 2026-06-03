@@ -74,11 +74,8 @@ export async function POST(request: NextRequest) {
       // Single source ingestion
       results = [await ingestSource(source, extraEnv)]
     } else if (sources && sources.length > 0) {
-      // Multiple sources in sequence
-      results = []
-      for (const s of sources) {
-        results.push(await ingestSource(s, extraEnv))
-      }
+      // Multiple sources in parallel (same as default behavior)
+      results = await Promise.all(sources.map(s => ingestSource(s, extraEnv)))
     } else {
       // Default: ingest all primary sources
       results = await ingestAllPrimarySources(extraEnv)
