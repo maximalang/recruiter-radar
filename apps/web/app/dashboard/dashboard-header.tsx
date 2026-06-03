@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import styles from './dashboard.module.css';
 
@@ -10,10 +10,64 @@ interface DashboardHeaderProps {
 
 const DashboardHeader: React.FC<DashboardHeaderProps> = ({ lastUpdated }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
+  const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    const tick = () => {
+      if (!document.hidden) {
+        setCurrentTime(new Date());
+      }
+    };
+
+    const scheduleNext = () => {
+      if (document.hidden) {
+        intervalId = setInterval(() => {
+          if (!document.hidden) {
+            tick();
+            startActiveLoop();
+          }
+        }, 1000);
+      }
+    };
+
+    const startActiveLoop = () => {
+      tick();
+      rafRef.current = requestAnimationFrame(() => {
+        const now = Date.now();
+        const delay = 1000 - (now % 1000);
+        intervalId = setTimeout(() => {
+          tick();
+          if (!document.hidden) {
+            startActiveLoop();
+          } else {
+            scheduleNext();
+          }
+        }, delay);
+      });
+    };
+
+    const onVisibilityChange = () => {
+      if (!document.hidden) {
+        tick();
+        startActiveLoop();
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    startActiveLoop();
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+      }
+      if (intervalId !== null) {
+        clearTimeout(intervalId);
+        clearInterval(intervalId);
+      }
+    };
   }, []);
 
   return (

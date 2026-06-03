@@ -232,6 +232,7 @@ describe('circuit breaker', () => {
     const engine = failingEngine('static', 10) // always fails
     const router = createCrawlerRouter({ static: engine }, {
       circuitBreaker: { failureThreshold: 3, resetMs: 60_000 },
+      retry: { enabled: false },
     })
 
     // First 3 failures pass through to the engine
@@ -253,6 +254,7 @@ describe('circuit breaker', () => {
     const engine = failingEngine('static', 10)
     const router = createCrawlerRouter({ static: engine }, {
       circuitBreaker: { failureThreshold: 2, resetMs: 60_000 },
+      retry: { enabled: false },
     })
 
     // Break circuit on acme.ru
@@ -271,6 +273,7 @@ describe('circuit breaker', () => {
     const engine = failingEngine('static', 2) // fails 2 times then recovers
     const router = createCrawlerRouter({ static: engine }, {
       circuitBreaker: { failureThreshold: 2, resetMs: 5_000 },
+      retry: { enabled: false },
     })
 
     // Trigger 2 failures → circuit opens
@@ -303,6 +306,7 @@ describe('circuit breaker', () => {
     const engine = failingEngine('static', 100) // always fails
     const router = createCrawlerRouter({ static: engine }, {
       circuitBreaker: { failureThreshold: 2, resetMs: 5_000 },
+      retry: { enabled: false },
     })
 
     // Open the circuit
@@ -354,6 +358,7 @@ describe('circuit breaker', () => {
     const engine = httpErrorEngine('static', 500, 2) // returns 500 twice then recovers
     const router = createCrawlerRouter({ static: engine }, {
       circuitBreaker: { failureThreshold: 2, resetMs: 5_000 },
+      retry: { enabled: false },
     })
 
     // Trigger 2 HTTP errors → circuit opens
@@ -411,10 +416,14 @@ describe('circuit breaker', () => {
   })
 
   it('only lets one probe through in half-open state; concurrent requests get 503', async () => {
-    jest.useFakeTimers()
+    // Mock Date.now to control circuit breaker timing
+    const realNow = Date.now()
+    let now = realNow
+    const dateSpy = jest.spyOn(Date, 'now').mockImplementation(() => now)
+
+    let calls = 0
     let resolveProbe: (() => void) | null = null
     const probePromise = new Promise<void>(r => { resolveProbe = r })
-    let fetchCalls = 0
 
     const engine: CrawlerEngine = {
       id: 'static',
@@ -426,67 +435,14 @@ describe('circuit breaker', () => {
         selfHosted: true,
       },
       async fetch({ url }): Promise<CrawlerResult> {
-        fetchCalls++
-        // First probe succeeds slowly (simulates a slow response)
-        if (fetchCalls === 1) {
-          await probePromise
-        }
-        return {
-          url,
-          status: 200,
-          html: `<from-static>`,
-          rawHeaders: {},
-          fetchedAt: '2026-05-26T12:00:00.000Z',
-          engine: 'static',
-          warnings: [],
-        }
-      },
-    }
-
-    const router = createCrawlerRouter({ static: engine }, {
-      circuitBreaker: { failureThreshold: 1, resetMs: 5_000 },
-    })
-
-    // Open the circuit with 1 failure
-    const failEngine = failingEngine('static', 1)
-    const failRouter = createCrawlerRouter({ static: failEngine }, {
-      circuitBreaker: { failureThreshold: 1, resetMs: 5_000 },
-    })
-    await expect(failRouter.fetch({ url: 'https://acme.ru/careers' }))
-      .rejects.toThrow(/simulated failure/)
-
-    // Circuit is open → 503
-    let result = await failRouter.fetch({ url: 'https://acme.ru/careers' })
-    expect(result.status).toBe(503)
-
-    // We can't reuse failRouter because its engine is different.
-    // Instead, manually build a scenario with the slow engine:
-    // We need a fresh router with the slow engine. Let's trigger the circuit
-    // open state differently — by using a router that tracks failures itself.
-
-    // Reset — use a single router with an engine that fails first then succeeds slowly
-    let calls2 = 0
-    let resolveProbe2: (() => void) | null = null
-    const probePromise2 = new Promise<void>(r => { resolveProbe2 = r })
-
-    const slowRecoveryEngine: CrawlerEngine = {
-      id: 'static',
-      capabilities: {
-        rendersJs: false,
-        bypassesCloudflare: false,
-        returnsMarkdown: false,
-        supportsPdf: false,
-        selfHosted: true,
-      },
-      async fetch({ url }): Promise<CrawlerResult> {
-        calls2++
-        if (calls2 <= 1) {
-          // First call: throw to trigger circuit open
+        calls++
+        // First call: throw to trigger circuit open
+        if (calls === 1) {
           throw new Error('initial failure')
         }
-        // Subsequent calls: succeed slowly
-        if (calls2 === 2) {
-          await probePromise2
+        // Second call (the probe in half-open): succeed slowly
+        if (calls === 2) {
+          await probePromise
         }
         return {
           url,
@@ -500,46 +456,48 @@ describe('circuit breaker', () => {
       },
     }
 
-    const router2 = createCrawlerRouter({ static: slowRecoveryEngine }, {
+    const router = createCrawlerRouter({ static: engine }, {
       circuitBreaker: { failureThreshold: 1, resetMs: 5_000 },
+      retry: { enabled: false },
     })
 
-    // Trigger circuit open
-    await expect(router2.fetch({ url: 'https://acme.ru/careers' }))
+    // Trigger circuit open — first call throws
+    await expect(router.fetch({ url: 'https://acme.ru/careers' }))
       .rejects.toThrow(/initial failure/)
 
     // Circuit is open → 503
-    result = await router2.fetch({ url: 'https://acme.ru/careers' })
+    let result = await router.fetch({ url: 'https://acme.ru/careers' })
     expect(result.status).toBe(503)
 
     // Advance past resetMs → circuit transitions to half-open
-    jest.advanceTimersByTime(5_001)
+    now = realNow + 5_001
+    dateSpy.mockImplementation(() => now)
 
     // Fire 3 concurrent requests while half-open.
     // Only the FIRST should be the probe; the other 2 should get 503 immediately.
-    const probe = router2.fetch({ url: 'https://acme.ru/careers' })
-    const concurrent1 = router2.fetch({ url: 'https://acme.ru/careers' })
-    const concurrent2 = router2.fetch({ url: 'https://acme.ru/careers' })
+    const probe = router.fetch({ url: 'https://acme.ru/careers' })
+    const concurrent1 = router.fetch({ url: 'https://acme.ru/careers' })
+    const concurrent2 = router.fetch({ url: 'https://acme.ru/careers' })
 
-    // The concurrent requests should be rejected with 503 (not passed to engine)
+    // The concurrent requests should get 503 (not passed to engine)
     const [r1, r2] = await Promise.all([concurrent1, concurrent2])
     expect(r1.status).toBe(503)
     expect(r2.status).toBe(503)
 
     // Now resolve the probe
-    resolveProbe2!()
+    resolveProbe!()
     const probeResult = await probe
     expect(probeResult.status).toBe(200)
 
     // After probe success, circuit is closed — new requests go through
-    const afterResult = await router2.fetch({ url: 'https://acme.ru/careers' })
+    const afterResult = await router.fetch({ url: 'https://acme.ru/careers' })
     expect(afterResult.status).toBe(200)
 
     // Engine should have been called exactly 3 times:
     // 1x initial failure + 1x probe + 1x post-closure
-    expect(calls2).toBe(3)
+    expect(calls).toBe(3)
 
-    jest.useRealTimers()
+    dateSpy.mockRestore()
   })
 })
 
@@ -589,6 +547,7 @@ describe('rate limiter', () => {
     const router = createCrawlerRouter({ static: engine }, {
       circuitBreaker: { failureThreshold: 2, resetMs: 60_000 },
       rateLimiter: { maxRequestsPerHostPerMinute: 10 },
+      retry: { enabled: false },
     })
 
     // Open circuit on acme.ru

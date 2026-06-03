@@ -1,11 +1,12 @@
 import Link from "next/link";
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import type { CheckoutOrder, CheckoutOrderOnboardingStep } from "../../../../lib/payments";
 import { NoticeBox } from "../../../ui/page-primitives";
+import styles from "./pilot-onboarding-components.module.css";
 
 export function InstructionCard(props: { children: ReactNode }) {
-  return <div style={instructionCardStyle}>{props.children}</div>;
+  return <div className={styles.instructionCard}>{props.children}</div>;
 }
 
 export function UnpaidState(props: { order: CheckoutOrder }) {
@@ -15,8 +16,8 @@ export function UnpaidState(props: { order: CheckoutOrder }) {
       title="Оплата ещё не подтверждена"
       description={props.order.payload.paymentMessage ?? "Завершите оплату, чтобы открыть онбординг."}
     >
-      <div style={actionsStyle}>
-        <Link href="/checkout" style={primaryLinkFallbackStyle}>Перейти к оплате</Link>
+      <div className={styles.actions}>
+        <Link href="/checkout" className={styles.primaryLinkFallback}>Перейти к оплате</Link>
       </div>
     </NoticeBox>
   );
@@ -88,22 +89,3 @@ export function isStepComplete(step: CheckoutOrderOnboardingStep, currentStep: C
   const steps: CheckoutOrderOnboardingStep[] = ["confirm-profile", "telegram", "preview", "complete"];
   return steps.indexOf(step) <= steps.indexOf(currentStep);
 }
-
-export const actionsStyle: CSSProperties = { display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "center" };
-export const formStyle: CSSProperties = { display: "grid", gap: "14px" };
-export const instructionCardStyle: CSSProperties = { padding: "14px 16px", borderRadius: "16px", border: "1px solid rgba(15, 23, 42, 0.08)", backgroundColor: "#fbfcfd" };
-export const instructionGridStyle: CSSProperties = { display: "grid", gap: "12px", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" };
-export const openerLabelStyle: CSSProperties = { fontSize: "0.78rem", fontWeight: 700, color: "#667085" };
-export const openerStyle: CSSProperties = { display: "grid", gap: "6px" };
-export const previewCardStyle: CSSProperties = { display: "grid", gap: "12px", padding: "16px", borderRadius: "18px", border: "1px solid rgba(15, 23, 42, 0.08)", backgroundColor: "#fff" };
-export const previewChipStyle: CSSProperties = { display: "inline-flex", padding: "4px 8px", borderRadius: "999px", backgroundColor: "#f8fafc", border: "1px solid rgba(15, 23, 42, 0.08)" };
-export const previewHeaderStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" };
-export const previewReasonListStyle: CSSProperties = { display: "grid", gap: "6px" };
-export const scorePillStyle: CSSProperties = { display: "inline-flex", padding: "4px 8px", borderRadius: "999px", backgroundColor: "#eef2ff", color: "#3730a3", fontSize: "0.82rem", fontWeight: 700 };
-export const stepNumberStyle: CSSProperties = { fontVariantNumeric: "tabular-nums", fontWeight: 700 };
-export const stepPillStyle = (isCurrent: boolean, isComplete: boolean): CSSProperties => ({ display: "inline-flex", gap: "8px", padding: "10px 12px", borderRadius: "999px", border: "1px solid rgba(15, 23, 42, 0.08)", backgroundColor: isCurrent ? "#111827" : isComplete ? "#eefbf3" : "#fff", color: isCurrent ? "#fff" : "#111827" });
-export const stepRailStyle: CSSProperties = { display: "flex", gap: "10px", flexWrap: "wrap" };
-export const submitRowStyle: CSSProperties = { display: "grid", gap: "10px" };
-export const wizardSectionStyle: CSSProperties = { display: "grid", gap: "16px" };
-
-const primaryLinkFallbackStyle: CSSProperties = { display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "12px 18px", borderRadius: "14px", border: "1px solid rgba(15, 23, 42, 0.9)", background: "linear-gradient(135deg, #111827 0%, #1f3a8a 100%)", color: "#fff", textDecoration: "none", fontWeight: 700 };

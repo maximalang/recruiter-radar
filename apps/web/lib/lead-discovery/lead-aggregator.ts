@@ -333,10 +333,48 @@ function cleanInn(inn: string): string {
 }
 
 /**
+ * Simple LRU cache with a fixed max size.
+ * On get(), the key is moved to the "most recently used" position.
+ * On set(), if the cache is at capacity the oldest entry is evicted.
+ */
+class LRUCache<K, V> {
+  private readonly max: number
+  private readonly cache = new Map<K, V>()
+
+  constructor(max: number) {
+    this.max = max
+  }
+
+  has(key: K): boolean {
+    return this.cache.has(key)
+  }
+
+  get(key: K): V | undefined {
+    const v = this.cache.get(key)
+    if (v !== undefined) {
+      // Refresh: delete then re-insert to move to MRU position
+      this.cache.delete(key)
+      this.cache.set(key, v)
+    }
+    return v
+  }
+
+  set(key: K, value: V): void {
+    if (this.cache.has(key)) {
+      this.cache.delete(key)
+    } else if (this.cache.size >= this.max) {
+      // Evict oldest entry (first key in insertion-order iteration)
+      this.cache.delete(this.cache.keys().next().value!)
+    }
+    this.cache.set(key, value)
+  }
+}
+
+/**
  * Entity resolver for handling company name variations
  */
 export class EntityResolver {
-  private nameNormalizationCache = new Map<string, string>()
+  private nameNormalizationCache = new LRUCache<string, string>(5000)
 
   async resolveAll(leads: MultiSourceLead[]): Promise<Array<MultiSourceLead & { canonicalCompanyId: string }>> {
     return Promise.all(
@@ -414,7 +452,7 @@ export class EntityResolver {
  * Deduplicator for handling similar leads
  */
 class LeadDeduplicator {
-  private similarityCache = new Map<string, number>()
+  private similarityCache = new LRUCache<string, number>(10000)
 
   getGroupMetadata(canonicalCompanyId: string, leadIds: string[], aggregatedId: string) {
     // For now, use exact matching strategy

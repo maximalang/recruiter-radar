@@ -41,8 +41,6 @@ export interface LeadScoringOptions {
 export interface ScoredLead extends AggregatedLead {
   scoringBreakdown: ScoringPipelineResult['breakdown']
   finalScore: number
-  confidenceBoost: number
-  improvementSuggestions: string[]
 }
 
 /**
@@ -93,12 +91,19 @@ export class LeadScoringService {
   ): Promise<ScoredLead[]> {
     if (rawLeads.length === 0) return []
 
-    // Score each lead using the FIUR pipeline with bounded concurrency
-    // (1000 leads → 1000 parallel runScoringPipeline would spike CPU)
+    // Score in batches to bound total promise creation (1000 leads would
+    // create 1000 promises at once without batching).
+    const BATCH = 50
     const limit = pLimit(10)
-    const scoredLeads = await Promise.all(
-      rawLeads.map(lead => limit(() => this.scoreLead(lead, options)))
-    )
+    const scoredLeads: ScoredLead[] = []
+
+    for (let i = 0; i < rawLeads.length; i += BATCH) {
+      const batch = rawLeads.slice(i, i + BATCH)
+      const results = await Promise.all(
+        batch.map(lead => limit(() => this.scoreLead(lead, options)))
+      )
+      scoredLeads.push(...results)
+    }
 
     // Filter by minimum score and sort
     return scoredLeads
@@ -141,7 +146,15 @@ export class LeadScoringService {
       displayName: lead.companyName,
       score: finalScore,
       confidence: bestConfidence,
-      sources: [],
+      sources: lead.sources.map(s => ({
+        sourceId: s.sourceId,
+        sourceName: s.sourceName,
+        evidenceType: s.evidenceType,
+        confidence: s.confidence,
+        relevanceScore: s.relevanceScore,
+        contributedSignals: [],
+        extractedAt: s.extractedAt,
+      })),
       allSignals: lead.signals,
       deduplication: {
         strategy: 'exact',
@@ -162,8 +175,6 @@ export class LeadScoringService {
       enrichment: lead.enrichment,
       scoringBreakdown: result.breakdown,
       finalScore,
-      confidenceBoost: 0,
-      improvementSuggestions: [],
     }
   }
 

@@ -88,7 +88,6 @@ export async function POST(request: NextRequest) {
             D: limitedLeads.filter(lead => lead.confidence === 'D').length,
           },
           sourceCoverage: insights?.averageBySource || {},
-          improvementSuggestions: limitedLeads.flatMap(lead => lead.improvementSuggestions)
         }
       }
     })

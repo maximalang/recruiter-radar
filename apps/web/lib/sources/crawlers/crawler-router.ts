@@ -41,6 +41,32 @@ import type {
 import { validateCrawlerUrl } from './url-validator'
 
 /* ------------------------------------------------------------------ */
+/*  Retry helper (exponential backoff)                                */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Retry an async function up to `retries` times with exponential backoff.
+ * Only retries on network-level errors (thrown exceptions), NOT on HTTP
+ * error statuses — those are handled by the circuit breaker.
+ */
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  retries = 3,
+  baseMs = 200,
+): Promise<T> {
+  for (let i = 0; i <= retries; i++) {
+    try {
+      return await fn()
+    } catch (err) {
+      if (i === retries) throw err
+      const delay = baseMs * 2 ** i
+      await new Promise(r => setTimeout(r, delay))
+    }
+  }
+  throw new Error('unreachable')
+}
+
+/* ------------------------------------------------------------------ */
 /*  Engine selection                                                   */
 /* ------------------------------------------------------------------ */
 
@@ -93,6 +119,14 @@ interface CircuitRecord {
   openedAt: number // Date.now() when the circuit last opened
   /** True while a half-open probe is in-flight; prevents concurrent probes. */
   probing: boolean
+  /** Total successful requests for this host. */
+  successCount: number
+  /** Total failed requests for this host. */
+  failureCount: number
+  /** Sum of latencies (ms) for successful requests. */
+  totalLatencyMs: number
+  /** Count of errors by type: 'timeout' | '403' | '429' | '5xx' | 'dns' | 'other'. */
+  errorTypes: Record<string, number>
 }
 
 export interface CircuitBreakerConfig {
@@ -118,26 +152,19 @@ class CircuitBreaker {
   /**
    * Check whether a request to `host` is allowed.
    * Returns the current circuit state (may transition from open → half-open).
-   *
-   * When the circuit transitions to half-open, only ONE request (the probe)
-   * is allowed through. While the probe is in-flight, subsequent concurrent
-   * requests see the circuit as effectively open (returns 'open') and get 503.
    */
   check(host: string): CircuitState {
     const rec = this.hosts.get(host)
     if (!rec) return 'closed'
 
-    // Transition from open → half-open if resetMs elapsed
     if (rec.state === 'open' && Date.now() - rec.openedAt >= this.config.resetMs) {
       rec.state = 'half-open'
     }
 
-    // If a probe is already in-flight, block concurrent requests
     if (rec.state === 'half-open' && rec.probing) {
       return 'open'
     }
 
-    // Mark that we are now probing (only reached for the first half-open request)
     if (rec.state === 'half-open') {
       rec.probing = true
     }
@@ -145,34 +172,43 @@ class CircuitBreaker {
     return rec.state
   }
 
-  /** Record a successful fetch — closes the circuit, clears the probing flag, and evicts stale entries. */
-  onSuccess(host: string): void {
+  /** Record a successful fetch — closes the circuit and clears the probing flag. */
+  onSuccess(host: string, latencyMs?: number): void {
     const rec = this.hosts.get(host)
     if (!rec) return
     rec.state = 'closed'
     rec.consecutiveFailures = 0
     rec.probing = false
+    rec.successCount++
 
-    // I9: Evict stale entries — circuit is closed and healthy, safe to remove
-    // if it's been around for a while. Prevents unbounded Map growth.
+    if (latencyMs !== undefined) {
+      rec.totalLatencyMs += latencyMs
+    }
+
     if (this.hosts.size > 1000) {
       this.evictStaleEntries()
     }
   }
 
   /** Record a failure — may open or re-open the circuit. Clears the probing flag. */
-  onFailure(host: string): void {
+  onFailure(host: string, errorType?: string): void {
     let rec = this.hosts.get(host)
     if (!rec) {
-      rec = { state: 'closed', consecutiveFailures: 0, openedAt: 0, probing: false }
+      rec = {
+        state: 'closed', consecutiveFailures: 0, openedAt: 0, probing: false,
+        successCount: 0, failureCount: 0, totalLatencyMs: 0, errorTypes: {},
+      }
       this.hosts.set(host, rec)
     }
 
     rec.consecutiveFailures++
+    rec.failureCount++
     rec.probing = false
 
+    const type = errorType || 'other'
+    rec.errorTypes[type] = (rec.errorTypes[type] || 0) + 1
+
     if (rec.state === 'half-open') {
-      // Half-open probe failed → re-open
       rec.state = 'open'
       rec.openedAt = Date.now()
     } else if (rec.consecutiveFailures >= this.config.failureThreshold) {
@@ -181,7 +217,7 @@ class CircuitBreaker {
     }
   }
 
-  /** I15: Reset the probing flag when a request is rejected by rate limiter (not by circuit). */
+  /** Reset the probing flag when a request is rejected by rate limiter (not by circuit). */
   resetProbe(host: string): void {
     const rec = this.hosts.get(host)
     if (rec && rec.state === 'half-open') {
@@ -189,7 +225,7 @@ class CircuitBreaker {
     }
   }
 
-  /** I9: Evict closed, healthy circuit records older than 5 minutes. */
+  /** Evict closed, healthy circuit records older than 5 minutes. */
   private evictStaleEntries(): void {
     const cutoff = Date.now() - 5 * 60_000
     for (const [host, rec] of this.hosts) {
@@ -197,6 +233,36 @@ class CircuitBreaker {
         this.hosts.delete(host)
       }
     }
+  }
+
+  /**
+   * Get per-host metrics for quality reporting.
+   * Returns success rate, average latency, and error type breakdown.
+   */
+  getMetrics(): Record<string, {
+    successRate: number
+    avgLatencyMs: number
+    totalRequests: number
+    errorTypes: Record<string, number>
+  }> {
+    const result: Record<string, {
+      successRate: number
+      avgLatencyMs: number
+      totalRequests: number
+      errorTypes: Record<string, number>
+    }> = {}
+
+    for (const [host, rec] of this.hosts) {
+      const total = rec.successCount + rec.failureCount
+      result[host] = {
+        successRate: total > 0 ? rec.successCount / total : 0,
+        avgLatencyMs: rec.successCount > 0 ? rec.totalLatencyMs / rec.successCount : 0,
+        totalRequests: total,
+        errorTypes: { ...rec.errorTypes },
+      }
+    }
+
+    return result
   }
 }
 
@@ -228,7 +294,6 @@ class HostRateLimiter {
     const windowStart = now - this.windowMs
     let timestamps = this.buckets.get(host) ?? []
 
-    // Evict expired entries
     timestamps = timestamps.filter((t) => t > windowStart)
 
     if (timestamps.length >= this.maxRequests) {
@@ -236,11 +301,8 @@ class HostRateLimiter {
       return false
     }
 
-    // Add current request timestamp
     timestamps.push(now)
 
-    // I9: Remove empty buckets to prevent unbounded Map growth
-    // (won't happen here since we just pushed, but defensive for future callers)
     if (timestamps.length === 0) {
       this.buckets.delete(host)
     } else {
@@ -255,9 +317,19 @@ class HostRateLimiter {
 /*  Router config                                                      */
 /* ------------------------------------------------------------------ */
 
+export interface RetryConfig {
+  /** Enable retry with exponential backoff. Default true. */
+  enabled?: boolean
+  /** Max retry attempts (default 3). */
+  retries?: number
+  /** Base delay in ms for exponential backoff (default 200). */
+  baseMs?: number
+}
+
 export interface RouterConfig {
   circuitBreaker?: Partial<CircuitBreakerConfig>
   rateLimiter?: Partial<RateLimiterConfig>
+  retry?: RetryConfig
 }
 
 /* ------------------------------------------------------------------ */
@@ -266,8 +338,16 @@ export interface RouterConfig {
 
 export type EngineRegistry = Partial<Record<CrawlerEngineId, CrawlerEngine>>
 
+export interface CrawlerRouterMetrics {
+  successRate: number
+  avgLatencyMs: number
+  totalRequests: number
+  errorTypes: Record<string, number>
+}
+
 export interface CrawlerRouter {
   fetch(input: CrawlerFetchInput): Promise<CrawlerResult>
+  getMetrics(): Record<string, CrawlerRouterMetrics>
 }
 
 export function createCrawlerRouter(
@@ -279,6 +359,10 @@ export function createCrawlerRouter(
     resetMs: config?.circuitBreaker?.resetMs ?? DEFAULT_CB.resetMs,
   }
   const rlMax = config?.rateLimiter?.maxRequestsPerHostPerMinute ?? DEFAULT_RL.maxRequestsPerHostPerMinute
+  const retryCfg = config?.retry
+  const retryEnabled = retryCfg?.enabled ?? true
+  const retryAttempts = retryCfg?.retries ?? 3
+  const retryBaseMs = retryCfg?.baseMs ?? 200
 
   const circuitBreaker = new CircuitBreaker(cbConfig)
   const rateLimiter = new HostRateLimiter(rlMax)
@@ -304,9 +388,6 @@ export function createCrawlerRouter(
 
       // --- Rate limiter gate (429) ---
       if (!rateLimiter.isAllowed(host)) {
-        // I15: Reset probing flag — this request was rejected by rate limiter,
-        // not by circuit breaker. Without reset, the circuit would stay stuck
-        // in half-open with probing=true indefinitely.
         circuitBreaker.resetProbe(host)
         return {
           url: input.url,
@@ -345,18 +426,26 @@ export function createCrawlerRouter(
         )
       }
 
-      // --- Execute fetch (half-open lets one probe through) ---
+      // --- Execute fetch with optional retry ---
       try {
-        const result = await engine.fetch(input)
+        const fetchStart = Date.now()
+        const result = retryEnabled
+          ? await withRetry(() => engine.fetch(input), retryAttempts, retryBaseMs)
+          : await engine.fetch(input)
+        const latencyMs = Date.now() - fetchStart
 
         // I10: Distinguish client errors from server failures for circuit breaker.
         // 404/410 = page removed (not a server problem) → CB success, not failure.
         // 403 = blocked, 429 = upstream rate limit, 5xx = server error → CB failure.
         const isCbFailure = result.status === 403 || result.status === 429 || result.status >= 500
         if (isCbFailure) {
-          circuitBreaker.onFailure(host)
+          const errorType = result.status === 403 ? '403'
+            : result.status === 429 ? '429'
+            : result.status >= 500 ? '5xx'
+            : 'other'
+          circuitBreaker.onFailure(host, errorType)
         } else {
-          circuitBreaker.onSuccess(host)
+          circuitBreaker.onSuccess(host, latencyMs)
         }
 
         if (fallbackWarnings.length > 0) {
@@ -364,12 +453,21 @@ export function createCrawlerRouter(
         }
         return result
       } catch (err) {
-        circuitBreaker.onFailure(host)
+        // Classify network-level errors
+        let errorType = 'other'
+        if (err instanceof Error) {
+          const msg = err.message.toLowerCase()
+          if (msg.includes('timeout') || msg.includes('etimedout')) errorType = 'timeout'
+          else if (msg.includes('enotfound') || msg.includes('dns')) errorType = 'dns'
+        }
+        circuitBreaker.onFailure(host, errorType)
 
         // In half-open state, the probe failed — re-throw so the caller
         // knows the engine itself errored (circuit will be re-opened by onFailure)
         throw err
       }
     },
+
+    getMetrics: () => circuitBreaker.getMetrics(),
   }
 }

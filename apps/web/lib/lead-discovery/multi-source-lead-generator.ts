@@ -15,6 +15,8 @@ import { selectConfidenceGate } from '@/lib/scoring/gates'
 import type { ConfidenceGateInput, ConfidenceGate, EntityMatchQuality } from '@/lib/scoring/gates'
 import type { EvidenceTier } from '@/lib/db/evidence'
 import { evidenceTypeToTier } from '@/lib/db/evidence'
+import { getPool } from '@/lib/db'
+import { withRetry } from '@/lib/sources/crawlers/crawler-router'
 
 // Extend the interface to include confidence_gate (now in base type, kept for compatibility)
 export type HhDigestItemWithConfidence = HhDigestItem
@@ -139,12 +141,6 @@ export class MultiSourceLeadGenerator {
     this.crawler = createDefaultRouter()
     this.sources = this.initializeSources()
     this.activeSources = this.getActiveSources()
-  }
-
-  /** Get Postgres pool from shared db module */
-  private getDbPool() {
-    const { getPool } = require('@/lib/db') as { getPool: () => import('pg').Pool | null }
-    return getPool()
   }
 
   /** Categorize employee count into size bucket */
@@ -312,38 +308,50 @@ export class MultiSourceLeadGenerator {
 
     const allLeads: MultiSourceLead[] = []
 
-    // Step 1: Generate leads from all job board sources via DB pipeline
-    // (HH, Rabota Rossii, SuperJob, Habr Career, etc. — all sources in source-digest-evidence.sql)
-    const jobBoardLeads = await this.generateJobBoardLeads(clientProfileId)
-    allLeads.push(...jobBoardLeads)
+    try {
+      // Step 1: Generate leads from all job board sources via DB pipeline
+      // (HH, Rabota Rossii, SuperJob, Habr Career, etc. — all sources in source-digest-evidence.sql)
+      const jobBoardLeads = await this.generateJobBoardLeads(clientProfileId)
+      allLeads.push(...jobBoardLeads)
 
-    // Step 2: Fetch career pages for enrichment
-    if (sources.includes('career-pages')) {
-      await this.enrichWithCareerPages(allLeads)
+      // Step 2: Fetch career pages for enrichment
+      if (sources.includes('career-pages')) {
+        await this.enrichWithCareerPages(allLeads)
+      }
+
+      // Step 3: Add business signals from secondary sources
+      if (sources.includes('funding-business-signals')) {
+        await this.addBusinessSignals(allLeads)
+      }
+
+      // Step 4: Enrich with company registry data
+      if (sources.includes('egrul-fns')) {
+        await this.enrichWithRegistryData(allLeads)
+      }
+
+      // Step 5: Real-time crawling is handled by n8n scheduler via source scripts
+      // (enableRealTime is kept as no-op for API backward compatibility)
+
+      // Step 6: Aggregate leads — entity resolution and deduplication
+      const aggregatedLeads = await this.deduplicateLeads(allLeads)
+
+      // Step 7: Filter and rank final leads
+      return this.filterAndRankLeads(aggregatedLeads, {
+        industries,
+        regions,
+        minScore
+      })
+    } catch (err) {
+      console.error('[generateLeads] pipeline failed, returning partial results:', err)
+      if (allLeads.length > 0) {
+        const aggregatedLeads = await this.deduplicateLeads(allLeads).catch(() => allLeads)
+        return this.filterAndRankLeads(
+          Array.isArray(aggregatedLeads) ? aggregatedLeads : allLeads,
+          { industries, regions, minScore }
+        )
+      }
+      return []
     }
-
-    // Step 3: Add business signals from secondary sources
-    if (sources.includes('funding-business-signals')) {
-      await this.addBusinessSignals(allLeads)
-    }
-
-    // Step 4: Enrich with company registry data
-    if (sources.includes('egrul-fns')) {
-      await this.enrichWithRegistryData(allLeads)
-    }
-
-    // Step 5: Real-time crawling is handled by n8n scheduler via source scripts
-    // (enableRealTime is kept as no-op for API backward compatibility)
-
-    // Step 6: Aggregate leads — entity resolution and deduplication
-    const aggregatedLeads = await this.deduplicateLeads(allLeads)
-
-    // Step 7: Filter and rank final leads
-    return this.filterAndRankLeads(aggregatedLeads, {
-      industries,
-      regions,
-      minScore
-    })
   }
 
   /**
@@ -352,12 +360,13 @@ export class MultiSourceLeadGenerator {
    * Now covers HH, Rabota Rossii, SuperJob, Habr Career, etc.
    */
   private async generateJobBoardLeads(clientProfileId?: string): Promise<MultiSourceLead[]> {
-    const { getHhDigestItems } = await import('@/lib/hhDigest')
+    try {
+      const { getHhDigestItems } = await import('@/lib/hhDigest')
 
-    // Fetch real digest items from DB — client-scoped or preview
-    const digestItems = await getHhDigestItems({
-      clientProfileId: clientProfileId || null
-    })
+      // Fetch real digest items from DB — client-scoped or preview
+      const digestItems = await getHhDigestItems({
+        clientProfileId: clientProfileId || null
+      })
 
     if (digestItems.length === 0) {
       return []
@@ -427,6 +436,10 @@ export class MultiSourceLeadGenerator {
         enrichment: {}
       }
     })
+    } catch (err) {
+      console.error('[generateJobBoardLeads] failed:', err)
+      return []
+    }
   }
 
   /**
@@ -435,17 +448,17 @@ export class MultiSourceLeadGenerator {
    */
   private async enrichWithCareerPages(leads: MultiSourceLead[]): Promise<void> {
     // Build org_id → website_url map from DB
-    const pool = this.getDbPool()
+    const pool = getPool()
     const websiteMap = new Map<string, string>()
 
     if (pool) {
       try {
         const orgIds = leads.map(l => l.companyId).filter(Boolean)
         if (orgIds.length > 0) {
-          const result = await pool.query(
+          const result = await withRetry(() => pool.query(
             `SELECT id, website_url FROM orgs WHERE id = ANY($1) AND website_url IS NOT NULL`,
             [orgIds]
-          )
+          ))
           for (const row of result.rows as Array<Record<string, unknown>>) {
             websiteMap.set(String(row.id), String(row.website_url))
           }
@@ -540,7 +553,7 @@ export class MultiSourceLeadGenerator {
    * If no data exists for an org, skip enrichment (no fake data).
    */
   private async addBusinessSignals(leads: MultiSourceLead[]): Promise<void> {
-    const pool = this.getDbPool()
+    const pool = getPool()
     if (!pool) return
 
     const contextSources = ['funding-business-signals', 'company-newsrooms', 'industry-media']
@@ -550,12 +563,12 @@ export class MultiSourceLeadGenerator {
     if (orgIds.length === 0) return
 
     try {
-      const result = await pool.query(
+      const result = await withRetry(() => pool.query(
         `SELECT org_id, source, payload, headline, occurred_at FROM signals
          WHERE org_id = ANY($1) AND source = ANY($2)
          ORDER BY org_id, occurred_at DESC`,
         [orgIds, contextSources]
-      )
+      ))
 
       // Index results by org_id
       const signalsByOrg = new Map<string, Array<Record<string, unknown>>>()
@@ -619,7 +632,7 @@ export class MultiSourceLeadGenerator {
    * If no EGRUL data exists for an org, skip enrichment (no fake data).
    */
   private async enrichWithRegistryData(leads: MultiSourceLead[]): Promise<void> {
-    const pool = this.getDbPool()
+    const pool = getPool()
     if (!pool) return
 
     // Batch query: fetch EGRUL data for all leads in one round-trip
@@ -627,13 +640,13 @@ export class MultiSourceLeadGenerator {
     if (orgIds.length === 0) return
 
     try {
-      const result = await pool.query(
+      const result = await withRetry(() => pool.query(
         `SELECT DISTINCT ON (org_id) org_id, payload
          FROM signals
          WHERE org_id = ANY($1) AND source = 'egrul-fns'
          ORDER BY org_id, occurred_at DESC`,
         [orgIds]
-      )
+      ))
 
       // Index results by org_id for O(1) lookup
       const registryByOrg = new Map<string, Record<string, unknown>>()

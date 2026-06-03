@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import styles from './dashboard.module.css';
 
 interface SourceHealth {
@@ -12,6 +12,18 @@ interface SourceHealth {
   errors: number;
   status: 'excellent' | 'good' | 'warning' | 'critical';
 }
+
+const STATUS_CONFIG: Record<SourceHealth['status'], { label: string; icon: string; colorClass: string }> = {
+  excellent: { label: 'отлично', icon: '✅', colorClass: styles.sourceItemScoreGreen },
+  good:      { label: 'хорошо',    icon: '⚠️', colorClass: styles.sourceItemScoreYellow },
+  warning:   { label: 'внимание',  icon: '⚠️', colorClass: styles.sourceItemScoreYellow },
+  critical:  { label: 'критично',  icon: '❌', colorClass: styles.sourceItemScoreRed },
+};
+
+const getBarColor = (overall: number) =>
+  overall >= 80 ? styles.sourceItemScoreGreen :
+  overall >= 60 ? styles.sourceItemScoreYellow :
+  styles.sourceItemScoreRed;
 
 interface DashboardSourcesProps {
   sources?: SourceHealth[];
@@ -116,19 +128,7 @@ const DashboardSources: React.FC<DashboardSourcesProps> = ({
     return <SourcesEmptyState />;
   }
 
-  const STATUS_CONFIG: Record<SourceHealth['status'], { label: string; icon: string; colorClass: string }> = {
-  excellent: { label: 'отлично', icon: '✅', colorClass: styles.sourceItemScoreGreen },
-  good:      { label: 'хорошо',    icon: '⚠️', colorClass: styles.sourceItemScoreYellow },
-  warning:   { label: 'внимание',  icon: '⚠️', colorClass: styles.sourceItemScoreYellow },
-  critical:  { label: 'критично',  icon: '❌', colorClass: styles.sourceItemScoreRed },
-};
-
-const getBarColor = (overall: number) =>
-  overall >= 80 ? styles.sourceItemScoreGreen :
-  overall >= 60 ? styles.sourceItemScoreYellow :
-  styles.sourceItemScoreRed;
-
-const sortedSources = [...sources].sort((a, b) => b.overall - a.overall);
+  const sortedSources = useMemo(() => [...sources].sort((a, b) => b.overall - a.overall), [sources]);
 
   return (
     <section aria-labelledby="sources-heading" className={styles.sourcesSection}>

@@ -14,11 +14,8 @@ import {
   StatusBadge,
   SummaryRow,
   SurfaceCard,
-  backLinkStyle,
-  primaryActionStyle,
-  secondaryActionStyle,
-  summaryBoxStyle
 } from "../../../../ui/page-primitives";
+import ppStyles from "../../../../ui/page-primitives.module.css";
 import { translateOrderStatus } from "../../../../onboarding/pilot/[orderId]/pilot-onboarding-components";
 
 export const dynamic = "force-dynamic";
@@ -71,7 +68,7 @@ export default async function CheckoutCancelPage({ params, searchParams }: Check
 
   return (
     <PageFrame maxWidth="720px">
-      <Link href="/" style={backLinkStyle}>
+      <Link href="/" className={ppStyles.backLink}>
         На главную
       </Link>
 
@@ -89,16 +86,16 @@ export default async function CheckoutCancelPage({ params, searchParams }: Check
           description="Вернитесь к настройкам пилота и повторите оплату. Параметры профиля сохранятся."
         />
 
-        <div style={summaryBoxStyle}>
+        <div className={ppStyles.summaryBox}>
           <SummaryRow label="Тариф" value={order.payload.planName} />
           <SummaryRow label="Статус оплаты" value={translateOrderStatus(order.status)} />
         </div>
 
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-          <Link href={retryHref} style={primaryActionStyle}>
+          <Link href={retryHref} className={ppStyles.primaryAction}>
             Повторить оплату
           </Link>
-          <Link href="/" style={secondaryActionStyle}>
+          <Link href="/" className={ppStyles.secondaryAction}>
             На главную
           </Link>
         </div>

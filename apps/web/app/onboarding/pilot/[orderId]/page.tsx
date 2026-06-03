@@ -10,21 +10,8 @@ import {
   SummaryRow,
   ThreeQuestionPanel,
   NoticeBox,
-  backLinkStyle,
-  chipStyle,
-  disclosureBodyStyle,
-  disclosureStyle,
-  disclosureSummaryStyle,
-  fieldStyle,
-  fieldLabelStyle,
-  helperTextStyle,
-  inputStyle,
-  textareaStyle,
-  primaryActionStyle,
-  secondaryActionStyle,
-  mutedActionStyle,
-  summaryBoxStyle
 } from "../../../ui/page-primitives";
+import ppStyles from "../../../ui/page-primitives.module.css";
 import {
   formatKeywordText,
   getClientProfileById
@@ -51,31 +38,16 @@ import { TelegramStepAutoRefresh } from "./telegram-step-auto-refresh";
 import {
   InstructionCard,
   UnpaidState,
-  actionsStyle,
-  formStyle,
   formatCompanyCount,
   formatDateTime,
   formatVacanciesCount,
-  instructionCardStyle,
-  instructionGridStyle,
-  openerLabelStyle,
-  openerStyle,
-  previewCardStyle,
-  previewChipStyle,
-  previewHeaderStyle,
-  previewReasonListStyle,
-  scorePillStyle,
-  stepNumberStyle,
-  stepPillStyle,
-  stepRailStyle,
-  submitRowStyle,
   translateOrderStatus,
   getCurrentStep,
   getRequestedStep,
   getSearchParamValue,
-  isStepComplete,
-  wizardSectionStyle
+  isStepComplete
 } from "./pilot-onboarding-components";
+import styles from "./pilot-onboarding-components.module.css";
 
 export const dynamic = "force-dynamic";
 
@@ -195,7 +167,7 @@ export default async function PilotOnboardingPage({
 
   return (
     <PageFrame maxWidth="860px">
-      <Link href="/" style={backLinkStyle}>
+      <Link href="/" className={ppStyles.backLink}>
         На главную
       </Link>
 
@@ -247,10 +219,10 @@ export default async function PilotOnboardingPage({
             />
           ) : null}
 
-          <details style={disclosureStyle}>
-            <summary style={disclosureSummaryStyle}>Детали запуска</summary>
-            <div style={disclosureBodyStyle}>
-              <div style={summaryBoxStyle}>
+          <details className={ppStyles.disclosure}>
+            <summary className={ppStyles.disclosureSummary}>Детали запуска</summary>
+            <div className={ppStyles.disclosureBody}>
+              <div className={ppStyles.summaryBox}>
                 <SummaryRow label="Тариф" value={order.payload.planName} />
                 <SummaryRow label="Оплата" value={translateOrderStatus(order.status)} />
                 <SummaryRow label="Контакт" value={order.customerContact ?? "не указан"} />
@@ -273,112 +245,111 @@ export default async function PilotOnboardingPage({
           <UnpaidState order={order} />
         ) : (
           <>
-            <div style={stepRailStyle}>
+            <div className={styles.stepRail}>
               {stepItems.map((step) => (
                 <div
                   key={step.key}
-                  style={stepPillStyle(
-                    step.key === currentStep,
-                    isStepComplete(step.key, currentStep)
-                  )}
+                  className={styles.stepPill}
+                  data-current={step.key === currentStep}
+                  data-complete={isStepComplete(step.key, currentStep)}
                 >
-                  <span style={stepNumberStyle}>{step.number}</span>
+                  <span className={styles.stepNumber}>{step.number}</span>
                   <span>{step.label}</span>
                 </div>
               ))}
             </div>
 
             {currentStep === "confirm-profile" ? (
-              <section style={wizardSectionStyle}>
+              <section className={styles.wizardSection}>
                 <SectionIntro
                   eyebrow="Шаг 1"
                   title="Проверьте профиль поиска"
                   description="Оставьте только то, что реально меняет подборку."
                 />
 
-                <form action={confirmPilotProfileBoundAction} style={formStyle}>
+                <form action={confirmPilotProfileBoundAction} className={styles.form}>
                   <input type="hidden" name="orderId" value={order.id} />
 
-                  <label style={fieldStyle}>
-                    <span style={fieldLabelStyle}>Название профиля</span>
+                  <label className={ppStyles.field}>
+                    <span className={ppStyles.fieldLabel}>Название профиля</span>
                     <input
                       name="agencyName"
                       required
                       defaultValue={profile?.agencyName ?? order.customerName ?? "Клиент Recruiter Radar"}
                       placeholder="Название профиля"
-                      style={inputStyle}
+                      className={ppStyles.input}
                     />
                   </label>
 
-                  <details style={{ ...disclosureStyle, gridColumn: "1 / -1" }}>
-                    <summary style={disclosureSummaryStyle}>Уточнить профиль</summary>
-                    <div style={disclosureBodyStyle}>
-                      <label style={fieldStyle}>
-                        <span style={fieldLabelStyle}>Компаний в день</span>
+                  <details className={ppStyles.disclosure} style={{ gridColumn: "1 / -1" }}>
+                    <summary className={ppStyles.disclosureSummary}>Уточнить профиль</summary>
+                    <div className={ppStyles.disclosureBody}>
+                      <label className={ppStyles.field}>
+                        <span className={ppStyles.fieldLabel}>Компаний в день</span>
                         <input
                           name="dailyDigestLimit"
                           type="number"
                           min={1}
                           max={10}
                           defaultValue={profile?.dailyDigestLimit ?? order.payload.dailyDigestLimit}
-                          style={inputStyle}
+                          className={ppStyles.input}
                         />
-                        <span style={helperTextStyle}>От 1 до 10 компаний в одной подборке.</span>
+                        <span className={ppStyles.helperText}>От 1 до 10 компаний в одной подборке.</span>
                       </label>
 
-                      <label style={fieldStyle}>
-                        <span style={fieldLabelStyle}>Где искать (необязательно)</span>
+                      <label className={ppStyles.field}>
+                        <span className={ppStyles.fieldLabel}>Где искать (необязательно)</span>
                         <input
                           name="targetCity"
                           defaultValue={profile?.targetCity ?? order.payload.city ?? ""}
                           placeholder="Москва / Берлин / удалённо"
-                          style={inputStyle}
+                          className={ppStyles.input}
                         />
                       </label>
 
-                      <label style={fieldStyle}>
-                        <span style={fieldLabelStyle}>Что искать (необязательно)</span>
+                      <label className={ppStyles.field}>
+                        <span className={ppStyles.fieldLabel}>Что искать (необязательно)</span>
                         <input
                           name="specialization"
                           defaultValue={profile?.specialization ?? order.payload.specialization ?? ""}
                           placeholder="IT-рекрутмент / подбор в продажи"
-                          style={inputStyle}
+                          className={ppStyles.input}
                         />
                       </label>
 
-                      <label style={{ ...fieldStyle, gridColumn: "1 / -1" }}>
-                        <span style={fieldLabelStyle}>Что важно (необязательно)</span>
+                      <label className={ppStyles.field} style={{ gridColumn: "1 / -1" }}>
+                        <span className={ppStyles.fieldLabel}>Что важно (необязательно)</span>
                         <textarea
                           name="includeKeywords"
                           rows={4}
                           defaultValue={formatKeywordText(profile?.includeKeywords ?? order.payload.includeKeywords)}
                           placeholder={"рекрутер\nсорсинг\nагентство"}
-                          style={textareaStyle}
+                          className={ppStyles.textarea}
                         />
-                        <span style={helperTextStyle}>По одной фразе на строку.</span>
+                        <span className={ppStyles.helperText}>По одной фразе на строку.</span>
                       </label>
 
-                      <label style={{ ...fieldStyle, gridColumn: "1 / -1" }}>
-                        <span style={fieldLabelStyle}>Что исключить (необязательно)</span>
+                      <label className={ppStyles.field} style={{ gridColumn: "1 / -1" }}>
+                        <span className={ppStyles.fieldLabel}>Что исключить (необязательно)</span>
                         <textarea
                           name="excludeKeywords"
                           rows={4}
                           defaultValue={formatKeywordText(profile?.excludeKeywords ?? order.payload.excludeKeywords)}
                           placeholder={"вахта\nзавод\nстажировка"}
-                          style={textareaStyle}
+                          className={ppStyles.textarea}
                         />
-                        <span style={helperTextStyle}>По одной фразе на строку.</span>
+                        <span className={ppStyles.helperText}>По одной фразе на строку.</span>
                       </label>
                     </div>
                   </details>
 
-                  <div style={submitRowStyle}>
+                  <div className={styles.submitRow}>
                     <FormSubmitButton
                       idleLabel="Сохранить и продолжить"
                       pendingLabel="Сохраняем..."
-                      style={primaryActionStyle}
+                      className={ppStyles.primaryAction}
                     />
-                    <div style={helperTextStyle}>
+                    <div className={ppStyles.helperText}>
                       Дальше подключим Telegram.
                     </div>
                   </div>
@@ -387,7 +358,7 @@ export default async function PilotOnboardingPage({
             ) : null}
 
             {currentStep === "telegram" ? (
-              <section style={wizardSectionStyle}>
+              <section className={styles.wizardSection}>
                 <TelegramStepAutoRefresh orderId={String(order.id)} />
 
                 <SectionIntro
@@ -412,7 +383,7 @@ export default async function PilotOnboardingPage({
                   />
                 ) : (
                   <>
-                    <div style={instructionGridStyle}>
+                    <div className={styles.instructionGrid}>
                       <InstructionCard>
                         1. Откройте {telegramConnectState?.botUsername ? `@${telegramConnectState.botUsername}` : "бот Recruiter Radar"}.
                       </InstructionCard>
@@ -422,12 +393,12 @@ export default async function PilotOnboardingPage({
 
                     {telegramConnectState?.connectUrl ? (
                       <div style={{ display: "grid", gap: "10px" }}>
-                        <div style={actionsStyle}>
-                          <a href={telegramConnectState.connectUrl} style={primaryActionStyle}>
+                        <div className={styles.actions}>
+                          <a href={telegramConnectState.connectUrl} className={ppStyles.primaryAction}>
                             Открыть Telegram
                           </a>
                         </div>
-                        <div style={helperTextStyle}>
+                        <div className={ppStyles.helperText}>
                           Если ссылка устареет, просто обновите страницу.
                         </div>
                       </div>
@@ -438,7 +409,7 @@ export default async function PilotOnboardingPage({
             ) : null}
 
             {currentStep === "preview" ? (
-              <section style={wizardSectionStyle}>
+              <section className={styles.wizardSection}>
                 <SectionIntro
                   eyebrow="Шаг 3"
                   title="Посмотрите первый радар"
@@ -465,10 +436,10 @@ export default async function PilotOnboardingPage({
                       description="По текущему профилю пока нет компаний с сильным сигналом. Можно уточнить профиль или закончить настройку и вернуться позже."
                     />
 
-                    <div style={actionsStyle}>
+                    <div className={styles.actions}>
                       <Link
                         href={`/onboarding/pilot/${order.id}?step=confirm-profile`}
-                        style={primaryActionStyle}
+                        className={ppStyles.primaryAction}
                       >
                         Вернуться к профилю
                       </Link>
@@ -477,7 +448,7 @@ export default async function PilotOnboardingPage({
                         <FormSubmitButton
                           idleLabel="Закончить и вернуться позже"
                           pendingLabel="Завершаем..."
-                          style={mutedActionStyle}
+                          className={ppStyles.mutedAction}
                         />
                       </form>
                     </div>
@@ -490,10 +461,10 @@ export default async function PilotOnboardingPage({
                         <FormSubmitButton
                           idleLabel="Отправить первый радар"
                           pendingLabel="Отправляем в Telegram..."
-                          style={primaryActionStyle}
+                          className={ppStyles.primaryAction}
                         />
                       </form>
-                      <div style={helperTextStyle}>
+                      <div className={ppStyles.helperText}>
                         Это тестовый запуск. Дальше ежедневный радар будет приходить автоматически при активном пилоте.
                       </div>
                     </div>
@@ -504,11 +475,11 @@ export default async function PilotOnboardingPage({
                       ))}
 
                       {hiddenPreviewItems.length > 0 ? (
-                        <details style={disclosureStyle}>
-                          <summary style={disclosureSummaryStyle}>
+                        <details className={ppStyles.disclosure}>
+                          <summary className={ppStyles.disclosureSummary}>
                             Остальные компании: ещё {hiddenPreviewItems.length}
                           </summary>
-                          <div style={disclosureBodyStyle}>
+                          <div className={ppStyles.disclosureBody}>
                             <div style={{ display: "grid", gap: "12px" }}>
                               {hiddenPreviewItems.map((item) => (
                                 <OnboardingPreviewCard key={`${item.org_id}-${item.rank}`} item={item} />
@@ -524,7 +495,7 @@ export default async function PilotOnboardingPage({
             ) : null}
 
             {currentStep === "complete" ? (
-              <section style={wizardSectionStyle}>
+              <section className={styles.wizardSection}>
                 <div style={{ display: "grid", gap: "10px" }}>
                   <StatusBadge tone="success">
                     {hasTestDigestSent ? "Первый радар отправлен" : "Пилот включён"}
@@ -577,8 +548,8 @@ export default async function PilotOnboardingPage({
                       />
 
                       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                        <span style={chipStyle}>{formatCompanyCount(previewItems.length)}</span>
-                        <span style={chipStyle}>сильнее всего сегодня</span>
+                        <span className={ppStyles.chip}>{formatCompanyCount(previewItems.length)}</span>
+                        <span className={ppStyles.chip}>сильнее всего сегодня</span>
                       </div>
 
                       <div style={{ display: "grid", gap: "12px" }}>
@@ -587,11 +558,11 @@ export default async function PilotOnboardingPage({
                         ))}
 
                         {hiddenPreviewItems.length > 0 ? (
-                          <details style={disclosureStyle}>
-                            <summary style={disclosureSummaryStyle}>
+                          <details className={ppStyles.disclosure}>
+                            <summary className={ppStyles.disclosureSummary}>
                               Остальные компании: ещё {hiddenPreviewItems.length}
                             </summary>
-                            <div style={disclosureBodyStyle}>
+                            <div className={ppStyles.disclosureBody}>
                               <div style={{ display: "grid", gap: "12px" }}>
                                 {hiddenPreviewItems.map((item) => (
                                   <OnboardingPreviewCard key={`reentry-hidden-${item.org_id}-${item.rank}`} item={item} />
@@ -618,9 +589,9 @@ export default async function PilotOnboardingPage({
                 ) : null}
 
                 {webPushConnectState ? (
-                  <details style={disclosureStyle}>
-                    <summary style={disclosureSummaryStyle}>Быстрый возврат в радар</summary>
-                    <div style={disclosureBodyStyle}>
+                  <details className={ppStyles.disclosure}>
+                    <summary className={ppStyles.disclosureSummary}>Быстрый возврат в радар</summary>
+                    <div className={ppStyles.disclosureBody}>
                       <BrowserPushCard
                         configured={webPushConnectState.configured}
                         publicKey={webPushConnectState.publicKey}
@@ -634,10 +605,10 @@ export default async function PilotOnboardingPage({
                   </details>
                 ) : null}
 
-                <details style={disclosureStyle}>
-                  <summary style={disclosureSummaryStyle}>Детали пилота</summary>
-                  <div style={disclosureBodyStyle}>
-                    <div style={summaryBoxStyle}>
+                <details className={ppStyles.disclosure}>
+                  <summary className={ppStyles.disclosureSummary}>Детали пилота</summary>
+                  <div className={ppStyles.disclosureBody}>
+                    <div className={ppStyles.summaryBox}>
                       <SummaryRow label="Агентство" value={profile?.agencyName ?? order.customerName ?? "не указано"} />
                       <SummaryRow label="Telegram" value={telegramDeliveryLabel} />
                       <SummaryRow label="Браузер" value={browserDeliveryLabel} />
@@ -659,8 +630,8 @@ export default async function PilotOnboardingPage({
                   </div>
                 </details>
 
-                <div style={actionsStyle}>
-                  <Link href="/" style={secondaryActionStyle}>
+                <div className={styles.actions}>
+                  <Link href="/" className={ppStyles.secondaryAction}>
                     На главную
                   </Link>
                 </div>
@@ -682,36 +653,36 @@ function OnboardingPreviewCard(props: {
   const hasExtraContext = Boolean(secondaryReason) || item.source_families.length > 0;
 
   return (
-    <article style={previewCardStyle}>
-      <div style={previewHeaderStyle}>
+    <article className={styles.previewCard}>
+      <div className={styles.previewHeader}>
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
           <strong style={{ fontSize: "1rem" }}>
             {item.rank}. {item.employer_name}
           </strong>
-          <span style={scorePillStyle}>score {item.total_score.toFixed(1)}</span>
+          <span className={styles.scorePill}>score {item.total_score.toFixed(1)}</span>
         </div>
         <span style={{ color: "#64748b", fontSize: "0.9rem" }}>{formatVacanciesCount(item.vacancies_count)}</span>
       </div>
 
-      <div style={previewReasonListStyle}>
+      <div className={styles.previewReasonList}>
         <div style={{ color: "#667085", fontSize: "0.78rem", fontWeight: 700 }}>Почему это важно</div>
         <div>{primaryReason}</div>
       </div>
 
-      <div style={openerStyle}>
-        <div style={openerLabelStyle}>Что делать дальше</div>
+      <div className={styles.opener}>
+        <div className={styles.openerLabel}>Что делать дальше</div>
         <div>{item.opener}</div>
       </div>
 
       {hasExtraContext ? (
-        <details style={disclosureStyle}>
-          <summary style={disclosureSummaryStyle}>Что ещё видно</summary>
-          <div style={disclosureBodyStyle}>
-            {secondaryReason ? <div style={helperTextStyle}>{secondaryReason}</div> : null}
+        <details className={ppStyles.disclosure}>
+          <summary className={ppStyles.disclosureSummary}>Что ещё видно</summary>
+          <div className={ppStyles.disclosureBody}>
+            {secondaryReason ? <div className={ppStyles.helperText}>{secondaryReason}</div> : null}
             {item.source_families.length > 0 ? (
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                 {item.source_families.slice(0, 2).map((label) => (
-                  <span key={`${item.org_id}-${label}`} style={previewChipStyle}>
+                  <span key={`${item.org_id}-${label}`} className={styles.previewChip}>
                     {label}
                   </span>
                 ))}
