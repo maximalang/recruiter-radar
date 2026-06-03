@@ -145,7 +145,13 @@
 - [x] ~~C1/P1: Unbounded Promise.all in generateAndScoreLeads~~ → Fixed (delegates to scoreExistingLeads)
 - [x] ~~S2: IPv4-mapped IPv6 SSRF bypass~~ → Fixed (hex + dotted-decimal detection)
 - [x] ~~A1: Crawler-router god module~~ → Fixed (split into circuit-breaker, rate-limiter, retry)
+- [x] ~~I5: Duplicate delivery logic in daily-radar + digest/delivery~~ → Fixed (shared deliverCandidatesForRun)
+- [x] ~~I7: withRetry imported from crawler-router in lead-gen~~ → Fixed (shared lib/utils/retry.ts)
+- [x] ~~I9: Cross-route API key fallback~~ → Fixed (INGEST_API_KEY only)
+- [x] ~~I10: Operational-alerts webhook unauthenticated~~ → Fixed (OPERATIONAL_WEBHOOK_KEY)
+- [x] ~~C1: n8n Check Failure never fires on real HTTP errors~~ → Fixed (continueOnFail + enhanced condition)
+- [x] ~~I4: Dead RUNTIME_OK guard~~ → Removed
+- [x] ~~C3: marketConditions/recentSignalCount not clamped~~ → Already safe (parent scores clamped via clamp01)
 - [ ] A3: Source config hardcoded in multi-source-lead-generator → registry pattern
 - [ ] S3: Rate limiter in-memory → Redis-backed for multi-instance
-- [ ] C3: marketConditions/recentSignalCount not clamped to [0,1]
 - [ ] R1: Dead CSS classes from CSS Modules migration cleanup

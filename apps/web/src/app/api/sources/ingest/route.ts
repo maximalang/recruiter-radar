@@ -5,11 +5,16 @@ import {
   type SourceId,
   type IngestResult,
 } from '@/lib/lead-discovery/source-ingest'
+import {
+  getSourceRegistry,
+  getAllSourceIds,
+  getPrimarySourceIds,
+} from '@/lib/sources/source-registry'
 
 // Force Node.js runtime — ingestion requires child_process (no Edge/serverless)
 export const runtime = 'nodejs'
 
-const VALID_SOURCES: Set<SourceId> = new Set(['hh', 'superjob', 'habr-career', 'career-pages', 'egrul-fns'])
+const VALID_SOURCES: Set<SourceId> = new Set(getAllSourceIds())
 
 export async function POST(request: NextRequest) {
   // Auth check — INGEST_API_KEY only (no cross-route key fallback)
@@ -89,6 +94,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET() {
+  const registry = getSourceRegistry()
+  const primaryIds = getPrimarySourceIds()
+
   return NextResponse.json({
     success: true,
     message: 'POST to trigger source ingestion',
@@ -101,39 +109,14 @@ export async function GET() {
           sources: 'Array of source IDs to ingest in parallel (optional)',
           env: 'Extra environment variables for the ingestion script (optional)',
         },
-        availableSources: [
-          {
-            id: 'hh',
-            name: 'HeadHunter',
-            requires: 'HH_USER_AGENT',
-            description: 'Primary Russian job board — fetch vacancies and upsert signals',
-          },
-          {
-            id: 'superjob',
-            name: 'SuperJob',
-            requires: 'SUPERJOB_API_KEY',
-            description: 'Secondary Russian job board',
-          },
-          {
-            id: 'habr-career',
-            name: 'Habr Career',
-            requires: 'None',
-            description: 'IT-focused job board',
-          },
-          {
-            id: 'career-pages',
-            name: 'Career Pages',
-            requires: 'None',
-            description: 'Company career page crawl and enrichment',
-          },
-          {
-            id: 'egrul-fns',
-            name: 'EGRUL/FNS Registry',
-            requires: 'None',
-            description: 'Russian company registry data',
-          },
-        ],
-        default: 'If no source/sources specified, ingests all primary sources (hh, superjob, habr-career)',
+        availableSources: registry.map(s => ({
+          id: s.id,
+          name: s.name,
+          category: s.category,
+          requires: s.requiredEnvVars.length > 0 ? s.requiredEnvVars.join(', ') : 'None',
+          description: s.description,
+        })),
+        default: `If no source/sources specified, ingests all primary sources (${primaryIds.join(', ')})`,
       },
     },
   })

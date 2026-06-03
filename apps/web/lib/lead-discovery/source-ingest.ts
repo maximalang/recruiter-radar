@@ -5,19 +5,15 @@
  * this module invokes the existing CLI scripts via child_process.
  * The scripts handle: API auth → fetch → normalize → upsert → signals.
  *
- * Available sources:
- *   - hh: HeadHunter vacancy ingestion (HH_USER_AGENT required)
- *   - superjob: SuperJob vacancy ingestion (SUPERJOB_API_KEY required)
- *   - habr-career: Habr Career vacancy ingestion
- *   - career-pages: Career page crawl + enrichment
- *   - egrul-fns: Company registry data
+ * Source configuration lives in `lib/sources/source-registry.ts`.
+ * Adding a new source = one registry entry + the ingestion script.
  *
  * Ingestion is idempotent — re-running for the same source upserts
  * (INSERT ON CONFLICT UPDATE) without creating duplicates.
  *
  * SECURITY: Extra env vars passed via `env` are filtered through a
- * whitelist (ALLOWED_ENV_PREFIXES) to prevent injection of dangerous
- * keys like DATABASE_URL, NODE_OPTIONS, or PATH.
+ * whitelist (prefixes from source-registry) to prevent injection of
+ * dangerous keys like DATABASE_URL, NODE_OPTIONS, or PATH.
  *
  * RUNTIME: Requires Node.js runtime (child_process). Will not work
  * in Edge/serverless runtimes (Vercel Edge, Cloudflare Workers).
@@ -26,13 +22,19 @@
 import { execFile } from 'node:child_process'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import {
+  getSourceConfig,
+  getPrimarySourceIds,
+  getAllEnvPrefixes,
+  type SourceId,
+} from '@/lib/sources/source-registry'
+
+export type { SourceId } from '@/lib/sources/source-registry'
 
 const SCRIPT_DIR = resolve(
   dirname(fileURLToPath(import.meta.url)),
   '../../../../packages/db/scripts'
 )
-
-export type SourceId = 'hh' | 'superjob' | 'habr-career' | 'career-pages' | 'egrul-fns'
 
 export interface IngestResult {
   source: SourceId
@@ -48,25 +50,17 @@ export interface IngestResult {
 }
 
 /**
- * Allowed env var prefixes for the `env` parameter.
+ * Filter env vars through the whitelist from the source registry.
  *
  * Only source-specific config keys are permitted — never infrastructure
  * keys (DATABASE_URL, NODE_OPTIONS, PATH, HOME, etc.) which could be
  * used to redirect DB connections or execute arbitrary code.
  */
-const ALLOWED_ENV_PREFIXES = [
-  'HH_',
-  'SUPERJOB_',
-  'HABR_',
-  'CRAWLER_',
-  'FIRECRAWL_',
-  'SOURCE_',
-]
-
 function filterEnvVars(env: Record<string, string>): Record<string, string> {
+  const allowedPrefixes = getAllEnvPrefixes()
   const filtered: Record<string, string> = {}
   for (const [key, value] of Object.entries(env)) {
-    if (ALLOWED_ENV_PREFIXES.some(prefix => key.startsWith(prefix))) {
+    if (allowedPrefixes.some(prefix => key.startsWith(prefix))) {
       filtered[key] = value
     }
   }
@@ -84,16 +78,17 @@ export async function ingestSource(
   source: SourceId,
   env?: Record<string, string>
 ): Promise<IngestResult> {
-  const scriptName = SCRIPT_MAP[source]
-  if (!scriptName) {
+  let config: import('@/lib/sources/source-registry').SourceConfig
+  try {
+    config = getSourceConfig(source)
+  } catch {
     return { source, success: false, error: `Unknown source: ${source}` }
   }
-
-  const scriptPath = resolve(SCRIPT_DIR, scriptName)
+  const scriptPath = resolve(SCRIPT_DIR, config.script)
 
   // Guard: ensure resolved path doesn't escape scripts dir (path traversal)
   if (!scriptPath.startsWith(SCRIPT_DIR)) {
-    return { source, success: false, error: `Script path escapes scripts directory: ${scriptName}` }
+    return { source, success: false, error: `Script path escapes scripts directory: ${config.script}` }
   }
 
   return new Promise<IngestResult>((resolvePromise) => {
@@ -147,17 +142,8 @@ export async function ingestSource(
 export async function ingestAllPrimarySources(
   env?: Record<string, string>
 ): Promise<IngestResult[]> {
-  const sources: SourceId[] = ['hh', 'superjob', 'habr-career']
+  const sources = getPrimarySourceIds()
   return Promise.all(sources.map(source => ingestSource(source, env)))
-}
-
-/** Map source ID to ingestion script filename. */
-const SCRIPT_MAP: Record<SourceId, string> = {
-  'hh': 'ingest-hh.mjs',
-  'superjob': 'source-superjob.mjs',
-  'habr-career': 'source-habr-career.mjs',
-  'career-pages': 'source-career-pages.mjs',
-  'egrul-fns': 'source-egrul-fns.mjs',
 }
 
 /** Extract structured metrics from the last JSON line of stdout. */
