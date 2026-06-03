@@ -22,8 +22,8 @@ export const dynamic = 'force-dynamic'
 const DELIVERY_STALE_SECONDS = 120
 
 export async function POST(request: NextRequest) {
-  // Auth — dedicated CRON_API_KEY, fallback to INGEST_API_KEY
-  const apiKey = process.env.CRON_API_KEY || process.env.INGEST_API_KEY || process.env.DIGEST_API_KEY
+  // Auth — CRON_API_KEY only, no fallback to other keys
+  const apiKey = process.env.CRON_API_KEY
   if (!apiKey) {
     return NextResponse.json(
       { success: false, error: 'CRON_API_KEY is not configured.' },

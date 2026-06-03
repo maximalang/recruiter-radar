@@ -113,7 +113,7 @@ export async function GET() {
         description: 'Trigger data ingestion for lead sources',
         parameters: {
           source: 'Single source ID to ingest (optional)',
-          sources: 'Array of source IDs to ingest in sequence (optional)',
+          sources: 'Array of source IDs to ingest in parallel (optional)',
           env: 'Extra environment variables for the ingestion script (optional)',
         },
         availableSources: [

@@ -15,8 +15,14 @@ describe('source-ingest', () => {
 
   describe('ingestSource', () => {
     it('returns success for HH ingestion with valid output', async () => {
+      const jsonMetrics = JSON.stringify({
+        source: 'hh',
+        action: 'pipeline',
+        recordsReceived: 25,
+        signalUpsertsCompleted: 20,
+      })
       mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
-        callback(null, 'hh search text: рекрутер\npages fetched: 1\nvacancies received: 25\nnormalized signal upserts completed: 20', '')
+        callback(null, `hh search text: рекрутер\npages fetched: 1\nvacancies received: 25\nnormalized signal upserts completed: 20\n${jsonMetrics}`, '')
       })
 
       const result = await ingestSource('hh')
@@ -26,7 +32,7 @@ describe('source-ingest', () => {
         success: true,
         fetchedCount: 25,
         upsertedCount: 20,
-        log: 'hh search text: рекрутер\npages fetched: 1\nvacancies received: 25\nnormalized signal upserts completed: 20',
+        log: expect.any(String),
       })
     })
 
@@ -57,10 +63,12 @@ describe('source-ingest', () => {
         // Verify dangerous env was filtered out
         expect(opts.env.NODE_OPTIONS).toBeUndefined()
         expect(opts.env.DATABASE_URL).toBe(process.env.DATABASE_URL) // process.env wins, not injected
-        callback(null, 'vacancies received: 10', '')
+        callback(null, JSON.stringify({ source: 'hh', recordsReceived: 10, signalUpsertsCompleted: 8 }), '')
       })
 
-      await ingestSource('hh', { HH_SEARCH_TEXT: 'разработчик', NODE_OPTIONS: '--require=/evil.js', DATABASE_URL: 'postgres://attacker' })
+      const result = await ingestSource('hh', { HH_SEARCH_TEXT: 'разработчик', NODE_OPTIONS: '--require=/evil.js', DATABASE_URL: 'postgres://attacker' })
+      expect(result.fetchedCount).toBe(10)
+      expect(result.upsertedCount).toBe(8)
     })
 
     it('filters out dangerous env vars', async () => {
@@ -68,15 +76,17 @@ describe('source-ingest', () => {
         // NODE_OPTIONS, PATH, HOME, DATABASE_URL must not come from user input
         expect(opts.env.NODE_OPTIONS).toBeUndefined()
         expect(opts.env.PATH).toBe(process.env.PATH) // process.env only
-        callback(null, 'vacancies received: 5', '')
+        callback(null, JSON.stringify({ source: 'hh', recordsReceived: 5, signalUpsertsCompleted: 3 }), '')
       })
 
-      await ingestSource('hh', { NODE_OPTIONS: '--inspect=0.0.0.0', PATH: '/evil', HOME: '/evil', DATABASE_URL: 'postgres://evil' })
+      const result = await ingestSource('hh', { NODE_OPTIONS: '--inspect=0.0.0.0', PATH: '/evil', HOME: '/evil', DATABASE_URL: 'postgres://evil' })
+      expect(result.fetchedCount).toBe(5)
+      expect(result.upsertedCount).toBe(3)
     })
 
-    it('parses fetchedCount from "pages fetched" when no vacancies received', async () => {
+    it('parses metrics from JSON output', async () => {
       mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
-        callback(null, 'pages fetched: 3\nsignal upserts completed: 15', '')
+        callback(null, `some text\n${JSON.stringify({ source: 'hh', recordsReceived: 3, signalUpsertsCompleted: 15 })}`, '')
       })
 
       const result = await ingestSource('hh')
@@ -91,11 +101,11 @@ describe('source-ingest', () => {
       mockExecFile.mockImplementation((_cmd, args: any, opts: any, callback: any) => {
         const script = args[0] as string
         if (script.includes('ingest-hh')) {
-          callback(null, 'vacancies received: 20\nsignal upserts completed: 18', '')
+          callback(null, JSON.stringify({ source: 'hh', recordsReceived: 20, signalUpsertsCompleted: 18 }), '')
         } else if (script.includes('superjob')) {
-          callback(null, 'items ingested: 10', '')
+          callback(null, JSON.stringify({ source: 'superjob', recordsReceived: 10, signalUpsertsCompleted: 8 }), '')
         } else if (script.includes('habr-career')) {
-          callback(null, 'items ingested: 5', '')
+          callback(null, JSON.stringify({ source: 'habr-career', recordsReceived: 5, signalUpsertsCompleted: 4 }), '')
         } else {
           callback(null, '', '')
         }
@@ -109,6 +119,8 @@ describe('source-ingest', () => {
       expect(sources).toContain('superjob')
       expect(sources).toContain('habr-career')
       expect(results.every(r => r.success)).toBe(true)
+      expect(results[0].fetchedCount).toBe(20)
+      expect(results[0].upsertedCount).toBe(18)
     })
 
     it('continues after a source fails', async () => {
@@ -117,7 +129,7 @@ describe('source-ingest', () => {
         if (script.includes('ingest-hh')) {
           callback(new Error('API error'), '', 'API error')
         } else {
-          callback(null, 'vacancies received: 5', '')
+          callback(null, JSON.stringify({ source: 'superjob', recordsReceived: 5, signalUpsertsCompleted: 3 }), '')
         }
       })
 

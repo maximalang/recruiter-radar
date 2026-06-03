@@ -1,6 +1,9 @@
 import { fetchJson } from './source-http.mjs';
+import { RateLimiter } from './rate-limiter.mjs';
 
 const HH_VACANCIES_URL = 'https://api.hh.ru/vacancies';
+const HH_RATE_LIMIT = 30; // HH API: 30 requests/minute
+const hhRateLimiter = new RateLimiter(HH_RATE_LIMIT);
 const DEFAULT_SEARCH_TEXT = '\u0440\u0435\u043a\u0440\u0443\u0442\u0435\u0440';
 const DEFAULT_PER_PAGE = 20;
 const DEFAULT_PAGES = 1;
@@ -82,7 +85,15 @@ export async function fetchHhVacancyPages({ userAgent, config = resolveHhVacancy
   let pagesAvailable = null;
 
   for (let page = 0; page < config.pages; page += 1) {
+    // Rate limiting: wait if we've exceeded 30 req/min
     const url = buildHhVacanciesUrl(config, page);
+    const host = new URL(url).hostname;
+    while (!hhRateLimiter.allow(host)) {
+      const waitMs = hhRateLimiter.msUntilNextAllowed(host);
+      if (waitMs > 0) {
+        await new Promise(resolve => setTimeout(resolve, waitMs));
+      }
+    }
     const payload = await fetchJson(url, {
       sourceName: 'hh',
       headers: {

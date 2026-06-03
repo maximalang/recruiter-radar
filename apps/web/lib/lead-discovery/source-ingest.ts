@@ -123,11 +123,10 @@ export async function ingestSource(
           return
         }
 
-        // Parse key metrics from stdout
-        const fetchedCount = parseMetric(stdout, /vacancies received:\s*(\d+)/)
-          ?? parseMetric(stdout, /pages fetched:\s*(\d+)/)
-        const upsertedCount = parseMetric(stdout, /signal upserts completed:\s*(\d+)/)
-          ?? parseMetric(stdout, /normalized signal upserts completed:\s*(\d+)/)
+        // Parse JSON metrics from last line of stdout
+        const metrics = parseJsonMetrics(stdout)
+        const fetchedCount = metrics?.fetchedCount
+        const upsertedCount = metrics?.upsertedCount
 
         resolvePromise({
           source,
@@ -161,10 +160,32 @@ const SCRIPT_MAP: Record<SourceId, string> = {
   'egrul-fns': 'source-egrul-fns.mjs',
 }
 
-/** Extract an integer from stdout matching a regex pattern. */
-function parseMetric(output: string, pattern: RegExp): number | undefined {
-  const match = pattern.exec(output)
-  if (!match) return undefined
-  const value = parseInt(match[1], 10)
-  return Number.isFinite(value) ? value : undefined
+/** Extract structured metrics from the last JSON line of stdout. */
+function parseJsonMetrics(output: string): { fetchedCount?: number; upsertedCount?: number } | undefined {
+  if (!output) return undefined
+  const lines = output.trim().split('\n')
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i].trim()
+    if (!line) continue
+    try {
+      const parsed = JSON.parse(line)
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        // Map known output formats to unified metrics
+        const fetchedCount =
+          typeof parsed.fetchedCount === 'number' ? parsed.fetchedCount
+          : typeof parsed.recordsReceived === 'number' ? parsed.recordsReceived
+          : undefined
+        const upsertedCount =
+          typeof parsed.upsertedCount === 'number' ? parsed.upsertedCount
+          : typeof parsed.signalUpsertsCompleted === 'number' ? parsed.signalUpsertsCompleted
+          : undefined
+        if (fetchedCount !== undefined || upsertedCount !== undefined) {
+          return { fetchedCount, upsertedCount }
+        }
+      }
+    } catch {
+      // not JSON, keep scanning
+    }
+  }
+  return undefined
 }

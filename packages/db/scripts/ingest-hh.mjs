@@ -62,6 +62,18 @@ try {
   console.log(`hh vacancy upserts completed: ${stats.hhVacancyUpsertCount}`);
   console.log(`normalized signal upserts completed: ${stats.signalUpsertCount}`);
 
+  // JSON metrics for programmatic parsing by source-ingest.ts
+  console.log(JSON.stringify({
+    source: 'hh',
+    action: 'pipeline',
+    recordsReceived: vacancies.length,
+    recordsAfterDedupe: normalizedVacancies.length,
+    duplicateRecords: normalizedVacancyResult.duplicateRecords,
+    normalizedRecords: normalizedVacancies.length,
+    skippedRecords: normalizedVacancyResult.duplicateRecords + (stats.skippedSignalCount || 0),
+    signalUpsertsCompleted: stats.signalUpsertCount,
+  }));
+
   if (stats.skippedSignalCount > 0) {
     console.log(`vacancies skipped for normalized layer: ${stats.skippedSignalCount}`);
   }
