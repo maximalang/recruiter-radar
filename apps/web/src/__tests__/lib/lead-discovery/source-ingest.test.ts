@@ -50,14 +50,28 @@ describe('source-ingest', () => {
       expect(result.error).toContain('HH_USER_AGENT')
     })
 
-    it('passes extra env vars to the script', async () => {
+    it('passes whitelisted env vars to the script', async () => {
       mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
-        // Verify env was merged
+        // Verify allowed env was merged
         expect(opts.env.HH_SEARCH_TEXT).toBe('разработчик')
+        // Verify dangerous env was filtered out
+        expect(opts.env.NODE_OPTIONS).toBeUndefined()
+        expect(opts.env.DATABASE_URL).toBe(process.env.DATABASE_URL) // process.env wins, not injected
         callback(null, 'vacancies received: 10', '')
       })
 
-      await ingestSource('hh', { HH_SEARCH_TEXT: 'разработчик' })
+      await ingestSource('hh', { HH_SEARCH_TEXT: 'разработчик', NODE_OPTIONS: '--require=/evil.js', DATABASE_URL: 'postgres://attacker' })
+    })
+
+    it('filters out dangerous env vars', async () => {
+      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
+        // NODE_OPTIONS, PATH, HOME, DATABASE_URL must not come from user input
+        expect(opts.env.NODE_OPTIONS).toBeUndefined()
+        expect(opts.env.PATH).toBe(process.env.PATH) // process.env only
+        callback(null, 'vacancies received: 5', '')
+      })
+
+      await ingestSource('hh', { NODE_OPTIONS: '--inspect=0.0.0.0', PATH: '/evil', HOME: '/evil', DATABASE_URL: 'postgres://evil' })
     })
 
     it('parses fetchedCount from "pages fetched" when no vacancies received', async () => {
@@ -73,7 +87,7 @@ describe('source-ingest', () => {
   })
 
   describe('ingestAllPrimarySources', () => {
-    it('runs all three primary sources in sequence', async () => {
+    it('runs all three primary sources in parallel', async () => {
       mockExecFile.mockImplementation((_cmd, args: any, opts: any, callback: any) => {
         const script = args[0] as string
         if (script.includes('ingest-hh')) {
@@ -90,10 +104,11 @@ describe('source-ingest', () => {
       const results = await ingestAllPrimarySources()
 
       expect(results).toHaveLength(3)
-      expect(results[0].source).toBe('hh')
-      expect(results[0].success).toBe(true)
-      expect(results[1].source).toBe('superjob')
-      expect(results[2].source).toBe('habr-career')
+      const sources = results.map(r => r.source)
+      expect(sources).toContain('hh')
+      expect(sources).toContain('superjob')
+      expect(sources).toContain('habr-career')
+      expect(results.every(r => r.success)).toBe(true)
     })
 
     it('continues after a source fails', async () => {
@@ -109,9 +124,9 @@ describe('source-ingest', () => {
       const results = await ingestAllPrimarySources()
 
       expect(results).toHaveLength(3)
-      expect(results[0].success).toBe(false)
-      expect(results[1].success).toBe(true)
-      expect(results[2].success).toBe(true)
+      const failed = results.find(r => r.source === 'hh')
+      expect(failed?.success).toBe(false)
+      expect(results.filter(r => r.success).length).toBe(2)
     })
   })
 })

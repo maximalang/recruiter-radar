@@ -6,9 +6,27 @@ import {
   type IngestResult,
 } from '@/lib/lead-discovery/source-ingest'
 
+// Force Node.js runtime — ingestion requires child_process (no Edge/serverless)
+export const runtime = 'nodejs'
+
 const VALID_SOURCES: Set<SourceId> = new Set(['hh', 'superjob', 'habr-career', 'career-pages', 'egrul-fns'])
 
+/**
+ * Runtime guard: ingestion uses child_process.execFile which requires
+ * Node.js runtime. This route will not work in Edge/serverless runtimes
+ * that lack file system and process spawning.
+ */
+const RUNTIME_OK = typeof process !== 'undefined' && typeof process.env !== 'undefined'
+
 export async function POST(request: NextRequest) {
+  // Runtime guard
+  if (!RUNTIME_OK) {
+    return NextResponse.json(
+      { success: false, error: 'Ingestion requires Node.js runtime (not Edge/serverless).' },
+      { status: 501 }
+    )
+  }
+
   // Auth check — INGEST_API_KEY with fallback to LEAD_API_KEY and DIGEST_API_KEY
   const apiKey = process.env.INGEST_API_KEY || process.env.LEAD_API_KEY || process.env.DIGEST_API_KEY
   if (!apiKey) {
