@@ -1,0 +1,136 @@
+/**
+ * Source ingestion service — triggers data-fetch pipelines for lead sources.
+ *
+ * Instead of duplicating the ingestion logic from packages/db/scripts,
+ * this module invokes the existing CLI scripts via child_process.
+ * The scripts handle: API auth → fetch → normalize → upsert → signals.
+ *
+ * Available sources:
+ *   - hh: HeadHunter vacancy ingestion (HH_USER_AGENT required)
+ *   - superjob: SuperJob vacancy ingestion (SUPERJOB_API_KEY required)
+ *   - habr-career: Habr Career vacancy ingestion
+ *   - career-pages: Career page crawl + enrichment
+ *   - egrul-fns: Company registry data
+ *
+ * Ingestion is idempotent — re-running for the same source upserts
+ * (INSERT ON CONFLICT UPDATE) without creating duplicates.
+ */
+
+import { execFile } from 'node:child_process'
+import { resolve, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const SCRIPT_DIR = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  '../../../../packages/db/scripts'
+)
+
+export type SourceId = 'hh' | 'superjob' | 'habr-career' | 'career-pages' | 'egrul-fns'
+
+export interface IngestResult {
+  source: SourceId
+  success: boolean
+  /** Items fetched from the API. */
+  fetchedCount?: number
+  /** Items upserted into signals table. */
+  upsertedCount?: number
+  /** Stdout lines (for diagnostics). */
+  log?: string
+  /** Error message if success is false. */
+  error?: string
+}
+
+/**
+ * Run a source ingestion script.
+ *
+ * Returns a promise that resolves when the script finishes.
+ * The script runs with the current process environment (DATABASE_URL, etc.)
+ * plus any extra env vars passed in `env`.
+ */
+export async function ingestSource(
+  source: SourceId,
+  env?: Record<string, string>
+): Promise<IngestResult> {
+  const scriptName = SCRIPT_MAP[source]
+  if (!scriptName) {
+    return { source, success: false, error: `Unknown source: ${source}` }
+  }
+
+  const scriptPath = resolve(SCRIPT_DIR, scriptName)
+
+  return new Promise<IngestResult>((resolvePromise) => {
+    const mergedEnv = { ...process.env, ...env }
+
+    execFile(
+      'node',
+      [scriptPath],
+      {
+        env: mergedEnv,
+        timeout: 120_000, // 2 min timeout — API + DB round-trips
+        maxBuffer: 1024 * 1024, // 1 MB output buffer
+        windowsHide: true,
+      },
+      (error, stdout, stderr) => {
+        if (error) {
+          const message = stderr?.trim() || error.message
+          resolvePromise({
+            source,
+            success: false,
+            error: message,
+            log: stdout?.trim() || undefined,
+          })
+          return
+        }
+
+        // Parse key metrics from stdout
+        const fetchedCount = parseMetric(stdout, /vacancies received:\s*(\d+)/)
+          ?? parseMetric(stdout, /pages fetched:\s*(\d+)/)
+        const upsertedCount = parseMetric(stdout, /signal upserts completed:\s*(\d+)/)
+          ?? parseMetric(stdout, /normalized signal upserts completed:\s*(\d+)/)
+
+        resolvePromise({
+          source,
+          success: true,
+          fetchedCount,
+          upsertedCount,
+          log: stdout?.trim() || undefined,
+        })
+      }
+    )
+  })
+}
+
+/**
+ * Run ingestion for all primary sources in sequence.
+ * Returns results for each source, including failures.
+ */
+export async function ingestAllPrimarySources(
+  env?: Record<string, string>
+): Promise<IngestResult[]> {
+  const sources: SourceId[] = ['hh', 'superjob', 'habr-career']
+  const results: IngestResult[] = []
+
+  for (const source of sources) {
+    const result = await ingestSource(source, env)
+    results.push(result)
+  }
+
+  return results
+}
+
+/** Map source ID to ingestion script filename. */
+const SCRIPT_MAP: Record<SourceId, string> = {
+  'hh': 'ingest-hh.mjs',
+  'superjob': 'source-superjob.mjs',
+  'habr-career': 'source-habr-career.mjs',
+  'career-pages': 'source-career-pages.mjs',
+  'egrul-fns': 'source-egrul-fns.mjs',
+}
+
+/** Extract an integer from stdout matching a regex pattern. */
+function parseMetric(output: string, pattern: RegExp): number | undefined {
+  const match = pattern.exec(output)
+  if (!match) return undefined
+  const value = parseInt(match[1], 10)
+  return Number.isFinite(value) ? value : undefined
+}
