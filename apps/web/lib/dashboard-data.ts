@@ -272,3 +272,130 @@ function emptyQualityMetrics(): QualityMetrics {
     overallHealth: 0,
   };
 }
+
+// ─── Analytics: Feedback Funnel ─────────────────────────────────
+
+export interface FeedbackFunnelItem {
+  status: string;
+  count: number;
+  label: string;
+}
+
+const FEEDBACK_LABELS: Record<string, string> = {
+  accepted: 'Беру',
+  dismissed: 'Мимо',
+  later: 'Позже',
+  contacted: 'Написал',
+  replied: 'Ответили',
+  call: 'Созвон',
+  client: 'Клиент',
+  badfit: 'Не подходит',
+};
+
+export async function getDashboardFeedbackFunnel(): Promise<FeedbackFunnelItem[]> {
+  const pool = getPool();
+  if (!pool) {
+    return [];
+  }
+
+  try {
+    const result = await pool.query<{ feedback_status: string; count: string }>(`
+      SELECT
+        cdos.feedback_status,
+        COUNT(*)::TEXT AS count
+      FROM client_digest_org_state cdos
+      WHERE cdos.feedback_status IS NOT NULL
+        AND cdos.feedback_status != 'none'
+      GROUP BY cdos.feedback_status
+      ORDER BY COUNT(*) DESC
+    `);
+
+    return result.rows
+      .map((row) => ({
+        status: row.feedback_status,
+        count: parseInt(row.count, 10),
+        label: FEEDBACK_LABELS[row.feedback_status] ?? row.feedback_status,
+      }));
+  } catch {
+    return [];
+  }
+}
+
+// ─── Analytics: Lead Metrics ────────────────────────────────────
+
+export interface LeadMetrics {
+  totalLeads: number;
+  todayLeads: number;
+  avgScore: number;
+}
+
+export async function getDashboardLeadMetrics(): Promise<LeadMetrics> {
+  const pool = getPool();
+  if (!pool) {
+    return { totalLeads: 0, todayLeads: 0, avgScore: 0 };
+  }
+
+  try {
+    const result = await pool.query<{
+      total: string;
+      today: string;
+      avg_score: number | null;
+    }>(`
+      SELECT
+        COUNT(*)::TEXT AS total,
+        COUNT(*) FILTER (WHERE dc.created_at >= CURRENT_DATE)::TEXT AS today,
+        ROUND(AVG(dc.total_score), 1) AS avg_score
+      FROM digest_candidates dc
+    `);
+
+    const row = result.rows[0];
+    return {
+      totalLeads: parseInt(row?.total ?? "0", 10),
+      todayLeads: parseInt(row?.today ?? "0", 10),
+      avgScore: row?.avg_score ? Math.round(row.avg_score * 10) / 10 : 0,
+    };
+  } catch {
+    return { totalLeads: 0, todayLeads: 0, avgScore: 0 };
+  }
+}
+
+// ─── Analytics: Source Performance ──────────────────────────────
+
+export interface SourcePerformanceItem {
+  source: string;
+  leads: number;
+  avgScore: number;
+}
+
+export async function getDashboardSourcePerformance(): Promise<SourcePerformanceItem[]> {
+  const pool = getPool();
+  if (!pool) {
+    return [];
+  }
+
+  try {
+    // unnest source_families array to count leads per source
+    const result = await pool.query<{
+      source: string;
+      leads: string;
+      avg_score: number | null;
+    }>(`
+      SELECT
+        sf.element AS source,
+        COUNT(*)::TEXT AS leads,
+        ROUND(AVG(dc.total_score), 1) AS avg_score
+      FROM digest_candidates dc
+      CROSS JOIN LATERAL unnest(dc.source_families) AS sf(element)
+      GROUP BY sf.element
+      ORDER BY COUNT(*) DESC
+    `);
+
+    return result.rows.map((row) => ({
+      source: row.source,
+      leads: parseInt(row.leads, 10),
+      avgScore: row.avg_score ? Math.round(row.avg_score * 10) / 10 : 0,
+    }));
+  } catch {
+    return [];
+  }
+}

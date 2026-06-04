@@ -4,20 +4,27 @@ import DashboardOverview from './dashboard-overview';
 import DashboardSources from './dashboard-sources';
 import DashboardAlerts from './dashboard-alerts';
 import DashboardQuality from './dashboard-quality';
+import DashboardAnalytics from './dashboard-analytics';
 import {
   getDashboardOverviewMetrics,
   getDashboardQualityMetrics,
   getDashboardSourceHealth,
+  getDashboardFeedbackFunnel,
+  getDashboardLeadMetrics,
+  getDashboardSourcePerformance,
 } from '@/lib/dashboard-data';
 
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
   // Fetch all dashboard data in parallel on the server
-  const [overview, quality, sources] = await Promise.all([
+  const [overview, quality, sources, feedbackFunnel, leadMetrics, sourcePerformance] = await Promise.all([
     getDashboardOverviewMetrics(),
     getDashboardQualityMetrics(),
     getDashboardSourceHealth(),
+    getDashboardFeedbackFunnel(),
+    getDashboardLeadMetrics(),
+    getDashboardSourcePerformance(),
   ]);
 
   return (
@@ -34,6 +41,11 @@ export default async function DashboardPage() {
           <DashboardHeader />
           <div style={{ marginTop: '32px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
             <DashboardQuality data={quality} />
+            <DashboardAnalytics
+              feedbackFunnel={feedbackFunnel}
+              leadMetrics={leadMetrics}
+              sourcePerformance={sourcePerformance}
+            />
             <DashboardOverview
               totalSources={overview.totalSources}
               activeSources={overview.activeSources}
