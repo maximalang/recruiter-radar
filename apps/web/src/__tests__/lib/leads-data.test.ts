@@ -45,6 +45,7 @@ describe('getLeadDetail', () => {
 
     const candidateRow = {
       id: '42',
+      client_profile_id: '5',
       org_id: '10',
       org_name: 'Яндекс',
       org_website: 'https://yandex.ru',
@@ -74,6 +75,7 @@ describe('getLeadDetail', () => {
 
     expect(result).not.toBeNull();
     expect(result!.id).toBe('42');
+    expect(result!.clientProfileId).toBe('5');
     expect(result!.orgId).toBe('10');
     expect(result!.orgName).toBe('Яндекс');
     expect(result!.orgWebsite).toBe('https://yandex.ru');
@@ -97,6 +99,7 @@ describe('getLeadDetail', () => {
     mockQuery.mockResolvedValueOnce({
       rows: [{
         id: '1',
+        client_profile_id: '3',
         org_id: '5',
         org_name: 'Тест',
         org_website: null,

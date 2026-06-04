@@ -9,6 +9,13 @@ import { getPool } from "./db";
 
 // ─── Types ──────────────────────────────────────────────────────
 
+/** Valid feedback status values matching the DB enum digest_feedback_status */
+export const VALID_FEEDBACK_STATUSES = new Set([
+  'none', 'accepted', 'dismissed', 'later', 'contacted', 'replied', 'call', 'client', 'badfit',
+] as const);
+
+export type FeedbackStatus = Exclude<typeof VALID_FEEDBACK_STATUSES extends Set<infer T> ? T : never, 'none'>;
+
 export interface LeadItem {
   id: string;
   orgId: string;
@@ -35,6 +42,7 @@ export interface LeadsListResult {
 }
 
 export interface LeadDetail extends LeadItem {
+  clientProfileId: string;
   orgWebsite: string | null;
   feedbackNote: string | null;
   cooldownUntil: string | null;
@@ -173,6 +181,7 @@ export async function getLeadDetail(input: {
 
   const result = await pool.query<{
     id: string;
+    client_profile_id: string;
     org_id: string;
     org_name: string;
     org_website: string | null;
@@ -197,6 +206,7 @@ export async function getLeadDetail(input: {
   }>(`
     SELECT
       dc.id::TEXT AS id,
+      dc.client_profile_id::TEXT AS client_profile_id,
       dc.org_id::TEXT AS org_id,
       dc.source_display_name AS org_name,
       o.website_url AS org_website,
@@ -235,6 +245,7 @@ export async function getLeadDetail(input: {
 
   return {
     id: row.id,
+    clientProfileId: row.client_profile_id,
     orgId: row.org_id,
     orgName: row.org_name ?? "Неизвестная компания",
     orgWebsite: row.org_website,
@@ -256,5 +267,85 @@ export async function getLeadDetail(input: {
     locationNames: Array.isArray(row.location_names) ? row.location_names.filter((l: unknown): l is string => typeof l === "string") : [],
     candidateSourceKeys: Array.isArray(row.candidate_source_keys) ? row.candidate_source_keys.filter((k: unknown): k is string => typeof k === "string") : [],
     payload: (typeof row.payload === 'object' && row.payload !== null && !Array.isArray(row.payload)) ? row.payload as Record<string, unknown> : {},
+  };
+}
+
+// ─── Lead Feedback ──────────────────────────────────────────────
+
+export interface FeedbackUpdateResult {
+  ok: true;
+  data: {
+    clientProfileId: string;
+    orgId: string;
+    feedbackStatus: string;
+    feedbackNote: string | null;
+    feedbackAt: string | null;
+  };
+}
+
+export interface FeedbackUpdateError {
+  ok: false;
+  error: string;
+}
+
+export async function updateLeadFeedback(input: {
+  orgId: string | number;
+  clientProfileId: string | number;
+  feedbackStatus: string;
+  feedbackNote?: string | null;
+}): Promise<FeedbackUpdateResult | FeedbackUpdateError> {
+  const pool = getPool();
+  if (!pool) {
+    return { ok: false, error: "Database not configured." };
+  }
+
+  // Validate feedback status
+  const status = input.feedbackStatus;
+  if (!VALID_FEEDBACK_STATUSES.has(status as never) || status === 'none') {
+    return { ok: false, error: `Invalid feedback status: "${status}". Must be one of: accepted, dismissed, later, contacted, replied, call, client, badfit.` };
+  }
+
+  // feedback_note is only allowed for 'badfit' status (matches DB constraint)
+  const feedbackNote = input.feedbackStatus === 'badfit' && input.feedbackNote
+    ? input.feedbackNote.trim() || null
+    : null;
+
+  const result = await pool.query<{
+    client_profile_id: string;
+    org_id: string;
+    feedback_status: string;
+    feedback_note: string | null;
+    feedback_at: string | null;
+  }>(`
+    INSERT INTO client_digest_org_state (client_profile_id, org_id, feedback_status, feedback_note, feedback_at)
+    VALUES ($1, $2, $3, $4, NOW())
+    ON CONFLICT (client_profile_id, org_id)
+    DO UPDATE SET
+      feedback_status = EXCLUDED.feedback_status,
+      feedback_note = EXCLUDED.feedback_note,
+      feedback_at = EXCLUDED.feedback_at,
+      updated_at = NOW()
+    RETURNING
+      client_profile_id::TEXT AS client_profile_id,
+      org_id::TEXT AS org_id,
+      feedback_status,
+      feedback_note,
+      feedback_at::TEXT AS feedback_at
+  `, [input.clientProfileId, input.orgId, input.feedbackStatus, feedbackNote]);
+
+  if (result.rows.length === 0) {
+    return { ok: false, error: "Failed to update feedback state." };
+  }
+
+  const row = result.rows[0];
+  return {
+    ok: true,
+    data: {
+      clientProfileId: row.client_profile_id,
+      orgId: row.org_id,
+      feedbackStatus: row.feedback_status,
+      feedbackNote: row.feedback_note,
+      feedbackAt: row.feedback_at,
+    },
   };
 }

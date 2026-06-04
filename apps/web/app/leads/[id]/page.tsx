@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import Link from 'next/link';
 import { getLeadDetail } from '@/lib/leads-data';
+import FeedbackButtons from './feedback-buttons';
 
 export const dynamic = 'force-dynamic';
 
@@ -189,17 +190,22 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             <div style={{ backgroundColor: '#fff', borderRadius: '8px', padding: '20px', border: '1px solid #e5e7eb' }}>
               <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500, marginBottom: '8px' }}>Обратная связь</div>
               {feedback ? (
-                <div style={{ fontSize: '0.9rem', color: '#111827' }}>
+                <div style={{ fontSize: '0.9rem', color: '#111827', marginBottom: '12px' }}>
                   {feedback.icon} {feedback.label}
                 </div>
               ) : (
-                <div style={{ fontSize: '0.85rem', color: '#9ca3af' }}>Ещё нет обратной связи</div>
+                <div style={{ fontSize: '0.85rem', color: '#9ca3af', marginBottom: '12px' }}>Ещё нет обратной связи</div>
               )}
               {lead.feedbackNote && (
-                <p style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '8px', fontStyle: 'italic' }}>
+                <p style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '4px', fontStyle: 'italic', marginBottom: '12px' }}>
                   {lead.feedbackNote}
                 </p>
               )}
+              <FeedbackButtons
+                orgId={lead.orgId}
+                clientProfileId={lead.clientProfileId}
+                currentStatus={lead.feedbackStatus ?? 'none'}
+              />
             </div>
 
             {/* Sources */}
