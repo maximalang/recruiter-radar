@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import Link from 'next/link';
-import { getLeadsForProfile, type LeadItem } from '@/lib/leads-data';
+import { getLeadsForProfile, type LeadItem, VALID_FEEDBACK_STATUSES } from '@/lib/leads-data';
 import { listClientProfiles, type ClientProfile } from '@/lib/clientProfiles';
 import LeadsFilters from './leads-filters';
 
@@ -202,7 +202,9 @@ export default async function LeadsPage({
   const confidenceGate = filters.gate && ['A', 'B', 'C', 'D'].includes(filters.gate)
     ? filters.gate
     : null;
-  const feedbackStatus = filters.feedback || null;
+  const feedbackStatus = filters.feedback && VALID_FEEDBACK_STATUSES.has(filters.feedback as never)
+    ? filters.feedback
+    : null;
 
   let profiles: ClientProfile[];
   try {

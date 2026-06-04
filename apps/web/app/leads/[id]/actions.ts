@@ -3,6 +3,25 @@
 import { updateLeadFeedback } from "@/lib/leads-data";
 import { getPool } from "@/lib/db";
 import { getTelegramBotToken, sendTelegramTextMessage } from "@/lib/telegram";
+import { getOwnerIdFromSession } from "@/lib/session";
+
+/**
+ * Verify the current session owns the given client profile.
+ * Returns true if ownership is confirmed, false otherwise.
+ */
+async function verifyProfileOwnership(clientProfileId: string): Promise<boolean> {
+  const ownerId = await getOwnerIdFromSession();
+  if (!ownerId) return false;
+
+  const pool = getPool();
+  if (!pool) return false;
+
+  const result = await pool.query<{ ok: boolean }>(
+    "SELECT 1 AS ok FROM client_profiles WHERE id = $1 AND owner_id = $2 LIMIT 1",
+    [clientProfileId, ownerId],
+  );
+  return result.rowCount === 1;
+}
 
 export async function updateLeadFeedbackAction(
   orgId: string,
@@ -10,6 +29,11 @@ export async function updateLeadFeedbackAction(
   feedbackStatus: string,
   feedbackNote?: string | null,
 ) {
+  const isOwner = await verifyProfileOwnership(clientProfileId);
+  if (!isOwner) {
+    throw new Error("Access denied: ownership check failed for this client profile.");
+  }
+
   const result = await updateLeadFeedback({
     orgId,
     clientProfileId,
@@ -28,7 +52,7 @@ export async function updateLeadFeedbackAction(
  * Send an outreach message to the client's Telegram chat.
  *
  * Looks up the telegram_chat_id for the given client profile,
- * then sends the text message via the Telegram Bot API.
+ * verifies ownership, then sends the text message via the Telegram Bot API.
  */
 export async function sendOutreachToTelegramAction(
   clientProfileId: string,
@@ -36,6 +60,11 @@ export async function sendOutreachToTelegramAction(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!message || message.trim().length === 0) {
     return { ok: false, error: "Message is empty." };
+  }
+
+  const isOwner = await verifyProfileOwnership(clientProfileId);
+  if (!isOwner) {
+    return { ok: false, error: "Access denied: ownership check failed." };
   }
 
   const pool = getPool();

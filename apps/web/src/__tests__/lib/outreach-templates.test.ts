@@ -110,6 +110,28 @@ describe('outreach templates', () => {
       const result = renderOutreachTemplate(template, baseContext);
       expect(result.length).toBeLessThanOrEqual(500);
     });
+
+    it('prefers sentence boundary when truncating', () => {
+      const template: OutreachTemplate = {
+        id: 'test',
+        label: 'Test',
+        body: 'Short sentence. ' + 'B'.repeat(550) + '. More text.',
+      };
+      const result = renderOutreachTemplate(template, baseContext);
+      expect(result.length).toBeLessThanOrEqual(500);
+      // Should break at the first sentence, not mid-word
+      expect(result).toContain('Short sentence.');
+    });
+
+    it('adds ellipsis when no sentence boundary found in second half', () => {
+      const template: OutreachTemplate = {
+        id: 'test',
+        label: 'Test',
+        body: 'X'.repeat(600),
+      };
+      const result = renderOutreachTemplate(template, baseContext);
+      expect(result).toContain('…');
+    });
   });
 
   describe('OUTREACH_TEMPLATES', () => {

@@ -91,9 +91,21 @@ export function renderOutreachTemplate(
     result = result.replaceAll(placeholder, value);
   }
 
-  // Truncate if exceeds max length
+  // Truncate if exceeds max length, preferring sentence boundary
   if (result.length > MAX_OUTREACH_LENGTH) {
-    result = result.slice(0, MAX_OUTREACH_LENGTH);
+    const truncated = result.slice(0, MAX_OUTREACH_LENGTH);
+    // Try to break at last sentence end (. ! ?) within limit
+    const lastSentenceEnd = Math.max(
+      truncated.lastIndexOf('. '),
+      truncated.lastIndexOf('! '),
+      truncated.lastIndexOf('? '),
+    );
+    if (lastSentenceEnd > MAX_OUTREACH_LENGTH * 0.5) {
+      result = truncated.slice(0, lastSentenceEnd + 1);
+    } else {
+      // Reserve space for ellipsis
+      result = result.slice(0, MAX_OUTREACH_LENGTH - 1) + '…';
+    }
   }
 
   return result;

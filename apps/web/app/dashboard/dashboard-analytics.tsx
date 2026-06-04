@@ -1,7 +1,5 @@
 'use client';
 
-import styles from './dashboard.module.css';
-
 interface FeedbackFunnelItem {
   status: string;
   count: number;

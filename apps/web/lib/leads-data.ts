@@ -80,9 +80,14 @@ export async function getLeadsForProfile(input: {
   }
 
   if (input.feedbackStatus) {
-    conditions.push(`cdos.feedback_status = $${paramIdx}`);
-    params.push(input.feedbackStatus);
-    paramIdx++;
+    if (input.feedbackStatus === 'none') {
+      // "none" matches rows with no feedback (NULL from LEFT JOIN) or literal 'none'
+      conditions.push(`(cdos.feedback_status IS NULL OR cdos.feedback_status = 'none')`);
+    } else {
+      conditions.push(`cdos.feedback_status = $${paramIdx}`);
+      params.push(input.feedbackStatus);
+      paramIdx++;
+    }
   }
 
   const whereClause = conditions.join(" AND ");
