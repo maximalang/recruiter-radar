@@ -72,7 +72,7 @@
 - [x] Secure case conversion middleware
 
 ### Test Coverage
-- [x] 700 tests passing
+- [x] 711 tests passing
 
 ---
 
@@ -189,6 +189,7 @@
 - [x] ~~C3: marketConditions/recentSignalCount clamp~~ → Already safe
 - [x] ~~A3: Source config hardcoded~~ → Fixed (source-registry)
 - [ ] S3: Rate limiter in-memory → Redis-backed for multi-instance
+- [x] I4: N+1 queries in leads page → Fixed (getLeadsForAllProfiles)
 - [ ] R1: Dead CSS classes from CSS Modules migration cleanup
 
 ---
