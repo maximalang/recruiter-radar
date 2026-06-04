@@ -95,6 +95,12 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ lastUpdated }) => {
             </span>
           )}
           <Link
+            href="/leads"
+            className={styles.headerLink}
+          >
+            🎯 Лиды
+          </Link>
+          <Link
             href="/"
             className={styles.headerLink}
           >

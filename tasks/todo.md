@@ -72,7 +72,7 @@
 - [x] Secure case conversion middleware
 
 ### Test Coverage
-- [x] 620 tests passing
+- [x] 653 tests passing
 
 ---
 
@@ -80,14 +80,14 @@
 
 ### Задача 1.3: Agency ICP Fields — industries + companySizes ✅ DONE
 
-**Что сделано (коммит f196950):**
+**Что сделано (коммит f196950 + 5cb25ee):**
 
 #### Шаг 1: DB + ClientProfile type ✅
 - Added `industries JSONB NOT NULL DEFAULT '[]'` and `company_sizes JSONB NOT NULL DEFAULT '[]'` to client_profiles
 - Migration: `20260604000000_add_icp_industries_company_sizes.sql`
 - Updated ClientProfileRow, ClientProfile, mapClientProfileRow
-- Added `normalizeCompanySizeList()` with whitelist validation
-- Exported `VALID_COMPANY_SIZES` set
+- Added `normalizeCompanySizeList()` + `normalizeIndustryList()` with whitelist validation
+- Exported `VALID_COMPANY_SIZES`, `VALID_INDUSTRIES`, `INDUSTRY_KEYWORDS` sets
 - Updated all SELECT queries (5 variants) with new columns
 - Updated saveClientProfile (INSERT + UPDATE) with new params
 - Updated isPlaceholderClientProfile
@@ -95,13 +95,17 @@
 #### Шаг 2: Onboarding form ✅
 - Added INDUSTRY_OPTIONS (10 industries) and COMPANY_SIZE_OPTIONS (5 sizes)
 - Added checkbox groups for industries and companySizes in the form
-- Added `readCheckboxGroup()` helper in actions.ts
-- Passing industries/companySizes through confirmPilotProfileAction
+- Added `readCheckboxGroup()` helper with whitelist validation in actions.ts
+- Runtime assertions that option keys match VALID_INDUSTRIES/VALID_COMPANY_SIZES
 
-#### Шаг 3: Scoring bridge + payload wiring ✅
-- Added `clientProfileToAgencyProfile()` bridge function
+#### Шаг 3: Scoring bridge + digest pipeline integration ✅
+- Added `clientProfileToAgencyProfile()` bridge function with whitelist filtering
+- Connected industries to digest pipeline:
+  - `matchesClientProfile` now filters by industry keywords
+  - `getClientScopeScore` boosts candidates matching client industries
+  - `INDUSTRY_KEYWORDS` maps industry keys to Russian search terms
 - Added industries/companySizes to CheckoutOrderPayload type
-- Updated normalizeCheckoutOrderPayload and mergeCheckoutOrderPayload
+- Updated normalizeCheckoutOrderPayload and mergeCheckoutOrderPayload with whitelist
 - Updated confirmPilotOrderProfile to save ICP fields to both profile and order payload
 
 **Acceptance Criteria:**
@@ -109,6 +113,7 @@
 - [x] `computeFit` получает непустой `industries` массив для профилей с выбранными индустриями
 - [x] `computeFit` получает непустой `companySizes` для профилей с выбранными размерами
 - [x] <5 мин ICP configuration
+- [x] Digest фильтрует/рейтит кандидатов по ICP индустриям
 
 ---
 
@@ -127,6 +132,16 @@
 - Prints: fetched count, upserted count, scoring pipeline test result
 - Added `npm run smoke:e2e` to root package.json
 - Exit 0 if signals produced, 1 otherwise
+
+---
+
+### Задача 2.3b: Dashboard live data ✅ DONE
+
+**Что сделано (коммит c5efca9):**
+- Added `lib/dashboard-data.ts`: server-side data fetching using real DB tables
+- Fixed non-existent `data_sources` table references — uses `signals` table + source-registry
+- Dashboard page now passes real data to all client components
+- Refactored `/api/dashboard/metrics` to use shared data function
 
 ---
 
@@ -180,8 +195,8 @@
 
 ## 🗂 Состояние на конец 04.06.2026
 
-**Коммитов впереди origin:** 2 (review fix + ICP fields)
-**Тестов:** 620 passing
+**Коммитов впереди origin:** 5 (review fix + ICP fields + pipeline integration + dashboard wiring)
+**Тестов:** 653 passing
 **Ветки:** только main
 
-**Завтра:** Задача 1.1b — E2E smoke test (`npm run smoke:e2e`)
+**Следующий приоритет:** Задача 2.1 — Lead Pipeline UI (список лидов + скоринг + фильтрация)
