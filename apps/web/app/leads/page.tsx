@@ -2,7 +2,7 @@ import { Suspense } from 'react';
 import Link from 'next/link';
 import { getLeadsForProfile, type LeadItem } from '@/lib/leads-data';
 import { listClientProfiles, type ClientProfile } from '@/lib/clientProfiles';
-import ppStyles from '../ui/page-primitives.module.css';
+import LeadsFilters from './leads-filters';
 
 export const dynamic = 'force-dynamic';
 
@@ -191,7 +191,19 @@ function LeadsTable({ leads }: { leads: LeadItem[] }) {
   );
 }
 
-export default async function LeadsPage() {
+export default async function LeadsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ gate?: string; feedback?: string; page?: string }>;
+}) {
+  const filters = await searchParams;
+
+  // Validate and normalize filter params
+  const confidenceGate = filters.gate && ['A', 'B', 'C', 'D'].includes(filters.gate)
+    ? filters.gate
+    : null;
+  const feedbackStatus = filters.feedback || null;
+
   let profiles: ClientProfile[];
   try {
     profiles = await listClientProfiles();
@@ -201,11 +213,15 @@ export default async function LeadsPage() {
 
   const activeProfiles = profiles.filter((p) => p.isActive);
 
-  // Fetch leads for each active profile
+  // Fetch leads for each active profile with filters
   const profileLeads = await Promise.all(
     activeProfiles.map(async (profile) => {
       try {
-        const result = await getLeadsForProfile({ clientProfileId: profile.id });
+        const result = await getLeadsForProfile({
+          clientProfileId: profile.id,
+          confidenceGate,
+          feedbackStatus,
+        });
         return { profile, leads: result.leads, total: result.total };
       } catch {
         return { profile, leads: [], total: 0 };
@@ -215,6 +231,7 @@ export default async function LeadsPage() {
 
   // Flatten all leads for display
   const allLeads = profileLeads.flatMap((pl) => pl.leads);
+  const hasFilters = confidenceGate !== null || feedbackStatus !== null;
 
   return (
     <main style={{ backgroundColor: '#f9fafb', minHeight: '100vh' }}>
@@ -228,6 +245,11 @@ export default async function LeadsPage() {
               </h1>
               <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '4px' }}>
                 Компании, которым стоит написать сегодня
+                {hasFilters && (
+                  <span style={{ marginLeft: '8px', fontSize: '0.75rem', color: '#3b82f6' }}>
+                    (фильтр активен)
+                  </span>
+                )}
               </p>
             </div>
             <nav style={{ display: 'flex', gap: '12px' }}>
@@ -274,6 +296,9 @@ export default async function LeadsPage() {
 
         {/* Leads table */}
         <div style={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+          <Suspense fallback={<div style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>Загрузка...</div>}>
+            <LeadsFilters />
+          </Suspense>
           <Suspense fallback={<div style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>Загрузка...</div>}>
             <LeadsTable leads={allLeads} />
           </Suspense>
