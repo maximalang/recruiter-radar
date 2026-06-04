@@ -1,4 +1,5 @@
 import { Pool, type PoolClient } from "pg";
+import type { AgencyProfile } from "./scoring/scoring-pipeline";
 
 type ClientProfilesDbClient = Pick<Pool, "query"> | Pick<PoolClient, "query">;
 
@@ -10,6 +11,8 @@ type ClientProfileRow = {
   specialization: string | null;
   includeKeywords: unknown;
   excludeKeywords: unknown;
+  industries: unknown;
+  companySizes: unknown;
   dailyDigestLimit: number;
   isActive: boolean;
   createdAt: string;
@@ -24,6 +27,8 @@ export type ClientProfile = {
   specialization: string | null;
   includeKeywords: string[];
   excludeKeywords: string[];
+  industries: string[];
+  companySizes: string[];
   dailyDigestLimit: number;
   isActive: boolean;
   createdAt: string;
@@ -86,6 +91,8 @@ export async function listClientProfiles(): Promise<ClientProfile[]> {
       specialization,
       include_keywords AS "includeKeywords",
       exclude_keywords AS "excludeKeywords",
+      industries AS "industries",
+      company_sizes AS "companySizes",
       daily_digest_limit AS "dailyDigestLimit",
       is_active AS "isActive",
       created_at::TEXT AS "createdAt",
@@ -117,6 +124,8 @@ export async function getClientProfileById(
       specialization,
       include_keywords AS "includeKeywords",
       exclude_keywords AS "excludeKeywords",
+      industries AS "industries",
+      company_sizes AS "companySizes",
       daily_digest_limit AS "dailyDigestLimit",
       is_active AS "isActive",
       created_at::TEXT AS "createdAt",
@@ -212,6 +221,8 @@ export async function findMatchingClientProfileForCheckoutOrder(input: {
       specialization,
       include_keywords AS "includeKeywords",
       exclude_keywords AS "excludeKeywords",
+      industries AS "industries",
+      company_sizes AS "companySizes",
       daily_digest_limit AS "dailyDigestLimit",
       is_active AS "isActive",
       created_at::TEXT AS "createdAt",
@@ -261,6 +272,8 @@ export async function saveClientProfile(input: {
   specialization?: string | null;
   includeKeywords?: readonly string[] | null;
   excludeKeywords?: readonly string[] | null;
+  industries?: readonly string[] | null;
+  companySizes?: readonly string[] | null;
   dailyDigestLimit?: number | null;
   isActive?: boolean;
 }, db?: ClientProfilesDbClient): Promise<ClientProfile> {
@@ -277,6 +290,8 @@ export async function saveClientProfile(input: {
   const specialization = normalizeOptionalText(input.specialization);
   const includeKeywords = normalizeKeywordList(input.includeKeywords);
   const excludeKeywords = normalizeKeywordList(input.excludeKeywords);
+  const industries = normalizeKeywordList(input.industries);
+  const companySizes = normalizeCompanySizeList(input.companySizes);
   const dailyDigestLimit = normalizeDailyDigestLimit(input.dailyDigestLimit);
   const isActive = input.isActive ?? true;
 
@@ -293,8 +308,10 @@ export async function saveClientProfile(input: {
             specialization = $5,
             include_keywords = $6::jsonb,
             exclude_keywords = $7::jsonb,
-            daily_digest_limit = $8,
-            is_active = $9
+            industries = $8::jsonb,
+            company_sizes = $9::jsonb,
+            daily_digest_limit = $10,
+            is_active = $11
           WHERE id = $1
           RETURNING
             id::TEXT AS id,
@@ -304,6 +321,8 @@ export async function saveClientProfile(input: {
             specialization,
             include_keywords AS "includeKeywords",
             exclude_keywords AS "excludeKeywords",
+            industries AS "industries",
+            company_sizes AS "companySizes",
             daily_digest_limit AS "dailyDigestLimit",
             is_active AS "isActive",
             created_at::TEXT AS "createdAt",
@@ -316,6 +335,8 @@ export async function saveClientProfile(input: {
           specialization,
           includeKeywords.length > 0 ? JSON.stringify(includeKeywords) : null,
           excludeKeywords.length > 0 ? JSON.stringify(excludeKeywords) : null,
+          industries.length > 0 ? JSON.stringify(industries) : null,
+          companySizes.length > 0 ? JSON.stringify(companySizes) : null,
           dailyDigestLimit,
           isActive
         ])
@@ -327,10 +348,12 @@ export async function saveClientProfile(input: {
             specialization,
             include_keywords,
             exclude_keywords,
+            industries,
+            company_sizes,
             daily_digest_limit,
             is_active
           )
-          VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7, $8)
+          VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8::jsonb, $9, $10)
           RETURNING
             id::TEXT AS id,
             agency_name AS "agencyName",
@@ -339,6 +362,8 @@ export async function saveClientProfile(input: {
             specialization,
             include_keywords AS "includeKeywords",
             exclude_keywords AS "excludeKeywords",
+            industries AS "industries",
+            company_sizes AS "companySizes",
             daily_digest_limit AS "dailyDigestLimit",
             is_active AS "isActive",
             created_at::TEXT AS "createdAt",
@@ -350,6 +375,8 @@ export async function saveClientProfile(input: {
           specialization,
           includeKeywords.length > 0 ? JSON.stringify(includeKeywords) : null,
           excludeKeywords.length > 0 ? JSON.stringify(excludeKeywords) : null,
+          industries.length > 0 ? JSON.stringify(industries) : null,
+          companySizes.length > 0 ? JSON.stringify(companySizes) : null,
           dailyDigestLimit,
           isActive
         ]);
@@ -506,11 +533,45 @@ function mapClientProfileRow(row: ClientProfileRow): ClientProfile {
     specialization: normalizeOptionalText(row.specialization),
     includeKeywords: normalizeKeywordList(row.includeKeywords),
     excludeKeywords: normalizeKeywordList(row.excludeKeywords),
+    industries: normalizeKeywordList(row.industries),
+    companySizes: normalizeCompanySizeList(row.companySizes),
     dailyDigestLimit: normalizeDailyDigestLimit(row.dailyDigestLimit),
     isActive: row.isActive,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt
   };
+}
+
+/**
+ * Convert a ClientProfile (DB row) to an AgencyProfile (scoring pipeline input).
+ *
+ * Maps ICP fields from the DB to the shape expected by runScoringPipeline:
+ *   industries    → industries   (for computeFit / industryAlignment)
+ *   companySizes  → companySizes (for computeFit / size matching)
+ *   targetCity    → locations    (for geographicFit)
+ *   excludeKeywords → exclusions (for computeFit / exclusion check)
+ *
+ * This is the bridge between persisted client preferences and the pure
+ * scoring helpers. When a digest or cron pipeline needs to score a lead
+ * for a specific client, this mapping ensures the real ICP data flows in.
+ */
+export function clientProfileToAgencyProfile(profile: ClientProfile): AgencyProfile {
+  const locations: string[] = []
+  if (profile.targetCity) {
+    locations.push(profile.targetCity)
+  }
+
+  return {
+    industries: profile.industries,
+    locations,
+    companySizes: profile.companySizes.filter(
+      (s): s is 'startup' | 'small' | 'medium' | 'large' | 'enterprise' =>
+        VALID_COMPANY_SIZES.has(s)
+    ),
+    excludedIndustries: [],
+    excludedLocations: [],
+    exclusions: profile.excludeKeywords,
+  }
 }
 
 function normalizeClientProfileId(value: string | number): number {
@@ -605,6 +666,8 @@ function isPlaceholderClientProfile(profile: ClientProfile): boolean {
     profile.specialization === null &&
     profile.includeKeywords.length === 0 &&
     profile.excludeKeywords.length === 0 &&
+    profile.industries.length === 0 &&
+    profile.companySizes.length === 0 &&
     profile.dailyDigestLimit === 5
   );
 }
@@ -655,3 +718,35 @@ function normalizeKeywordList(value: unknown): string[] {
 
   return Array.from(uniqueKeywords.values());
 }
+
+const VALID_COMPANY_SIZES = new Set(['startup', 'small', 'medium', 'large', 'enterprise'])
+
+/**
+ * Normalize company size list — only known values survive.
+ * Accepts arrays of strings like ['startup', 'medium', 'large'].
+ */
+function normalizeCompanySizeList(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const uniqueSizes = new Set<string>();
+
+  for (const item of value) {
+    if (typeof item !== "string") {
+      continue;
+    }
+
+    const normalizedItem = item.trim().toLowerCase();
+
+    if (!VALID_COMPANY_SIZES.has(normalizedItem)) {
+      continue;
+    }
+
+    uniqueSizes.add(normalizedItem);
+  }
+
+  return Array.from(uniqueSizes.values());
+}
+
+export { VALID_COMPANY_SIZES }

@@ -35,6 +35,15 @@ function readOptionalStringList(formData: FormData, key: string): string[] {
     .filter((item) => item !== "");
 }
 
+function readCheckboxGroup(formData: FormData, key: string): string[] {
+  const values = formData.getAll(key);
+
+  return values
+    .filter((v): v is string => typeof v === "string")
+    .map((v) => v.trim().toLowerCase())
+    .filter((v) => v !== "");
+}
+
 function readOptionalNumber(formData: FormData, key: string): number | null {
   const value = formData.get(key);
 
@@ -68,6 +77,8 @@ export async function confirmPilotProfileAction(expectedOrderId: string, formDat
     specialization: readOptionalText(formData, "specialization"),
     includeKeywords: readOptionalStringList(formData, "includeKeywords"),
     excludeKeywords: readOptionalStringList(formData, "excludeKeywords"),
+    industries: readCheckboxGroup(formData, "industries"),
+    companySizes: readCheckboxGroup(formData, "companySizes"),
     dailyDigestLimit: readOptionalNumber(formData, "dailyDigestLimit"),
     ownerId
   });

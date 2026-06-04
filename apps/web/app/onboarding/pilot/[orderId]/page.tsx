@@ -14,7 +14,8 @@ import {
 import ppStyles from "../../../ui/page-primitives.module.css";
 import {
   formatKeywordText,
-  getClientProfileById
+  getClientProfileById,
+  VALID_COMPANY_SIZES
 } from "../../../../lib/clientProfiles";
 import { getHhDigestItems } from "../../../../lib/hhDigest";
 import { getClientProfileWebPushStatuses } from "../../../../lib/webPushSubscriptions";
@@ -70,6 +71,27 @@ const stepItems: Array<{
 ] as const;
 
 const VISIBLE_PREVIEW_ITEMS = 2;
+
+const INDUSTRY_OPTIONS = [
+  { key: "it", label: "IT" },
+  { key: "finance", label: "Финансы" },
+  { key: "manufacturing", label: "Производство" },
+  { key: "retail", label: "Ритейл" },
+  { key: "healthcare", label: "Здравоохранение" },
+  { key: "construction", label: "Строительство" },
+  { key: "logistics", label: "Логистика" },
+  { key: "consulting", label: "Консалтинг" },
+  { key: "education", label: "Образование" },
+  { key: "media", label: "Медиа" },
+] as const;
+
+const COMPANY_SIZE_OPTIONS = [
+  { key: "startup", label: "Стартап (1–10)" },
+  { key: "small", label: "Малая (10–50)" },
+  { key: "medium", label: "Средняя (50–250)" },
+  { key: "large", label: "Крупная (250–1000)" },
+  { key: "enterprise", label: "Корпорация (1000+)" },
+] as const;
 
 type OnboardingPreviewItem = Awaited<ReturnType<typeof getHhDigestItems>>[number];
 
@@ -316,6 +338,42 @@ export default async function PilotOnboardingPage({
                           className={ppStyles.input}
                         />
                       </label>
+
+                      <fieldset className={ppStyles.field} style={{ border: "none", padding: 0 }}>
+                        <legend className={ppStyles.fieldLabel}>Отрасли компаний</legend>
+                        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                          {INDUSTRY_OPTIONS.map((industry) => (
+                            <label key={industry.key} style={{ display: "flex", gap: "4px", alignItems: "center", fontSize: "0.88rem", cursor: "pointer" }}>
+                              <input
+                                type="checkbox"
+                                name="industries"
+                                value={industry.key}
+                                defaultChecked={(profile?.industries ?? order.payload.industries ?? []).includes(industry.key)}
+                              />
+                              {industry.label}
+                            </label>
+                          ))}
+                        </div>
+                        <span className={ppStyles.helperText}>Выберите отрасли, в которых вы ищете клиентов.</span>
+                      </fieldset>
+
+                      <fieldset className={ppStyles.field} style={{ border: "none", padding: 0 }}>
+                        <legend className={ppStyles.fieldLabel}>Размер компаний</legend>
+                        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                          {COMPANY_SIZE_OPTIONS.map((size) => (
+                            <label key={size.key} style={{ display: "flex", gap: "4px", alignItems: "center", fontSize: "0.88rem", cursor: "pointer" }}>
+                              <input
+                                type="checkbox"
+                                name="companySizes"
+                                value={size.key}
+                                defaultChecked={(profile?.companySizes ?? order.payload.companySizes ?? []).includes(size.key)}
+                              />
+                              {size.label}
+                            </label>
+                          ))}
+                        </div>
+                        <span className={ppStyles.helperText}>Выберите размеры компаний, с которыми хотите работать.</span>
+                      </fieldset>
 
                       <label className={ppStyles.field} style={{ gridColumn: "1 / -1" }}>
                         <span className={ppStyles.fieldLabel}>Что важно (необязательно)</span>

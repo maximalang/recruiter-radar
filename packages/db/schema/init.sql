@@ -205,6 +205,8 @@ CREATE TABLE client_profiles (
   specialization TEXT,
   include_keywords JSONB,
   exclude_keywords JSONB,
+  industries JSONB NOT NULL DEFAULT '[]'::jsonb,
+  company_sizes JSONB NOT NULL DEFAULT '[]'::jsonb,
   daily_digest_limit INTEGER NOT NULL DEFAULT 5,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

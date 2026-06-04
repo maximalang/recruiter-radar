@@ -6,6 +6,7 @@ import {
   getClientProfileById,
   parseKeywordText,
   saveClientProfile,
+  VALID_COMPANY_SIZES,
   type ClientProfile
 } from "./clientProfiles";
 import { runDigestForClientProfile, type DigestItemInput } from "./digest";
@@ -72,6 +73,8 @@ export type CheckoutOrderPayload = {
   city: string | null;
   includeKeywords: string[];
   excludeKeywords: string[];
+  industries: string[];
+  companySizes: string[];
   dailyDigestLimit: number;
   comment: string | null;
   pilotApplicationId: string | null;
@@ -302,6 +305,8 @@ export async function startCheckoutOrder(input: StartCheckoutOrderInput): Promis
       city: normalizeOptionalText(input.city),
       includeKeywords: parseKeywordText(input.includeKeywords),
       excludeKeywords: parseKeywordText(input.excludeKeywords),
+      industries: [],
+      companySizes: [],
       dailyDigestLimit: normalizeDailyDigestLimit(input.dailyDigestLimit),
       comment: normalizeOptionalText(input.comment),
       pilotApplicationId: null,
@@ -514,6 +519,8 @@ export async function confirmPilotOrderProfile(input: {
   specialization?: string | null;
   includeKeywords?: readonly string[] | null;
   excludeKeywords?: readonly string[] | null;
+  industries?: readonly string[] | null;
+  companySizes?: readonly string[] | null;
   dailyDigestLimit?: number | null;
   ownerId: string | number;
 }): Promise<CheckoutOrder> {
@@ -540,6 +547,8 @@ export async function confirmPilotOrderProfile(input: {
     specialization: normalizeOptionalText(input.specialization),
     includeKeywords: normalizeKeywordList(input.includeKeywords),
     excludeKeywords: normalizeKeywordList(input.excludeKeywords),
+    industries: normalizeKeywordList(input.industries),
+    companySizes: input.companySizes?.filter((s): s is string => VALID_COMPANY_SIZES.has(s)) ?? [],
     dailyDigestLimit: normalizeDailyDigestLimit(input.dailyDigestLimit),
     isActive: true
   });
@@ -551,6 +560,8 @@ export async function confirmPilotOrderProfile(input: {
       city: savedProfile.targetCity,
       includeKeywords: savedProfile.includeKeywords,
       excludeKeywords: savedProfile.excludeKeywords,
+      industries: savedProfile.industries,
+      companySizes: savedProfile.companySizes,
       dailyDigestLimit: savedProfile.dailyDigestLimit,
       onboardingStatus: "in_progress",
       onboardingStep: savedProfile.telegramChatId ? "preview" : "telegram",
@@ -1423,6 +1434,10 @@ function normalizeCheckoutOrderPayload(
     city: normalizeOptionalText(readString(payload.city)),
     includeKeywords: normalizeKeywordList(payload.includeKeywords),
     excludeKeywords: normalizeKeywordList(payload.excludeKeywords),
+    industries: normalizeKeywordList(payload.industries),
+    companySizes: Array.isArray(payload.companySizes)
+      ? payload.companySizes.filter((s: unknown): s is string => typeof s === 'string' && VALID_COMPANY_SIZES.has(s))
+      : [],
     dailyDigestLimit: normalizeDailyDigestLimit(readNumber(payload.dailyDigestLimit)),
     comment: normalizeOptionalText(readString(payload.comment)),
     pilotApplicationId: normalizeOptionalText(readString(payload.pilotApplicationId)),
@@ -1502,6 +1517,16 @@ function mergeCheckoutOrderPayload(
       payloadPatch.excludeKeywords === undefined
         ? currentPayload.excludeKeywords
         : normalizeKeywordList(payloadPatch.excludeKeywords),
+    industries:
+      payloadPatch.industries === undefined
+        ? currentPayload.industries
+        : normalizeKeywordList(payloadPatch.industries),
+    companySizes:
+      payloadPatch.companySizes === undefined
+        ? currentPayload.companySizes
+        : Array.isArray(payloadPatch.companySizes)
+          ? payloadPatch.companySizes.filter((s: unknown): s is string => typeof s === 'string' && VALID_COMPANY_SIZES.has(s))
+          : [],
     dailyDigestLimit:
       payloadPatch.dailyDigestLimit === undefined
         ? currentPayload.dailyDigestLimit
