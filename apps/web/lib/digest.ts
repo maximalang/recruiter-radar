@@ -3,7 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Pool, type PoolClient } from "pg";
 import { isDigestEligibleGate } from "./scoring/gate-pipeline";
-import { getClientProfileById, type ClientProfile } from "./clientProfiles";
+import { getClientProfileById, INDUSTRY_KEYWORDS, type ClientProfile } from "./clientProfiles";
 import type {
   DigestItem,
   DigestRun,
@@ -446,6 +446,21 @@ function mapDigestEvidenceRow(row: DigestEvidenceRow): DigestItemInput {
 function matchesClientProfile(item: DigestItemInput, clientProfile: ClientProfile): boolean {
   const haystack = buildDigestHaystack(item);
 
+  // Industry filter: when the client selected specific industries, the
+  // candidate must match at least one. We check industry keywords against
+  // the haystack (employer name, evidence titles, location names).
+  if (clientProfile.industries.length > 0) {
+    const matchesIndustry = clientProfile.industries.some((industryKey) => {
+      const keywords = INDUSTRY_KEYWORDS.get(industryKey);
+      if (!keywords) return false;
+      return keywords.some((kw) => haystack.includes(kw));
+    });
+
+    if (!matchesIndustry) {
+      return false;
+    }
+  }
+
   if (clientProfile.includeKeywords.length > 0) {
     const hasIncludedKeyword = clientProfile.includeKeywords.some((keyword) => haystack.includes(keyword));
 
@@ -490,6 +505,19 @@ function getClientScopeScore(item: DigestItemInput, clientProfile: ClientProfile
     phraseMatch: 3,
     tokenMatch: 1,
   });
+
+  // Industry relevance: when the client selected industries, boost candidates
+  // whose haystack matches industry keywords.
+  if (clientProfile.industries.length > 0) {
+    const haystack = buildDigestHaystack(item);
+    const matchingIndustries = clientProfile.industries.filter((industryKey) => {
+      const keywords = INDUSTRY_KEYWORDS.get(industryKey);
+      if (!keywords) return false;
+      return keywords.some((kw) => haystack.includes(kw));
+    });
+    // 3 points per matching industry, capped at 6 to avoid domination
+    score += Math.min(matchingIndustries.length * 3, 6);
+  }
 
   return score;
 }

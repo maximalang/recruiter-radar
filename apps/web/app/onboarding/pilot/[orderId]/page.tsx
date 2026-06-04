@@ -15,7 +15,8 @@ import ppStyles from "../../../ui/page-primitives.module.css";
 import {
   formatKeywordText,
   getClientProfileById,
-  VALID_COMPANY_SIZES
+  VALID_COMPANY_SIZES,
+  VALID_INDUSTRIES
 } from "../../../../lib/clientProfiles";
 import { getHhDigestItems } from "../../../../lib/hhDigest";
 import { getClientProfileWebPushStatuses } from "../../../../lib/webPushSubscriptions";
@@ -72,6 +73,7 @@ const stepItems: Array<{
 
 const VISIBLE_PREVIEW_ITEMS = 2;
 
+/** Industry options for onboarding form — keys must match VALID_INDUSTRIES in clientProfiles.ts */
 const INDUSTRY_OPTIONS = [
   { key: "it", label: "IT" },
   { key: "finance", label: "Финансы" },
@@ -85,6 +87,14 @@ const INDUSTRY_OPTIONS = [
   { key: "media", label: "Медиа" },
 ] as const;
 
+// Compile-time guard: every option key must be in the canonical VALID_INDUSTRIES set
+void (function _assertIndustryKeys(): void {
+  for (const opt of INDUSTRY_OPTIONS) {
+    if (!VALID_INDUSTRIES.has(opt.key)) throw new Error(`INDUSTRY_OPTIONS key "${opt.key}" not in VALID_INDUSTRIES`);
+  }
+})();
+
+/** Company size options for onboarding form — keys must match VALID_COMPANY_SIZES in clientProfiles.ts */
 const COMPANY_SIZE_OPTIONS = [
   { key: "startup", label: "Стартап (1–10)" },
   { key: "small", label: "Малая (10–50)" },
@@ -92,6 +102,13 @@ const COMPANY_SIZE_OPTIONS = [
   { key: "large", label: "Крупная (250–1000)" },
   { key: "enterprise", label: "Корпорация (1000+)" },
 ] as const;
+
+// Compile-time guard: every option key must be in the canonical VALID_COMPANY_SIZES set
+void (function _assertCompanySizeKeys(): void {
+  for (const opt of COMPANY_SIZE_OPTIONS) {
+    if (!VALID_COMPANY_SIZES.has(opt.key)) throw new Error(`COMPANY_SIZE_OPTIONS key "${opt.key}" not in VALID_COMPANY_SIZES`);
+  }
+})();
 
 type OnboardingPreviewItem = Awaited<ReturnType<typeof getHhDigestItems>>[number];
 

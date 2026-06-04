@@ -9,6 +9,7 @@
  */
 
 import { selectConfidenceGate } from '@/lib/scoring/gates'
+import { INDUSTRY_KEYWORDS } from '@/lib/clientProfiles'
 import type { FiurEvidenceItem } from '@/lib/scoring/fiur'
 
 // ---------------------------------------------------------------------------
@@ -47,11 +48,28 @@ function mockDigestItem(overrides: Partial<{
 // ---------------------------------------------------------------------------
 function filterDigestItems(
   items: Record<string, unknown>[],
-  clientProfile: { includeKeywords: string[]; excludeKeywords: string[] }
+  clientProfile: { includeKeywords: string[]; excludeKeywords: string[]; industries?: string[] }
 ): Record<string, unknown>[] {
   const result = items
     // Gate C and D are filtered out — they must not appear in the digest
     .filter((item) => item.confidence_gate !== 'C' && item.confidence_gate !== 'D')
+    // Industry filter (mirrors matchesClientProfile in digest.ts)
+    .filter((item) => {
+      const industries = clientProfile.industries ?? []
+      if (industries.length === 0) return true
+
+      const haystack = [
+        String(item.source_display_name ?? ''),
+        ...(item.evidence_titles as string[] ?? []),
+        ...(item.location_names as string[] ?? []),
+      ].join(' ').toLowerCase('ru-RU')
+
+      return industries.some((industryKey) => {
+        const keywords = INDUSTRY_KEYWORDS.get(industryKey)
+        if (!keywords) return false
+        return keywords.some((kw) => haystack.includes(kw))
+      })
+    })
     // Keyword matching (simplified from matchesClientProfile in digest.ts)
     .filter((item) => {
       const haystack = [
@@ -98,7 +116,7 @@ describe('digest pipeline — gate filtering', () => {
       mockDigestItem({ org_id: '2', confidence_gate: 'D', total_score: 30 }),
       mockDigestItem({ org_id: '3', confidence_gate: 'B', total_score: 60 }),
     ]
-    const profile = { includeKeywords: [], excludeKeywords: [] }
+    const profile = { includeKeywords: [], excludeKeywords: [], industries: [] }
     const result = filterDigestItems(items, profile)
 
     expect(result).toHaveLength(2)
@@ -112,7 +130,7 @@ describe('digest pipeline — gate filtering', () => {
       mockDigestItem({ org_id: '2', confidence_gate: 'C' }),
       mockDigestItem({ org_id: '3', confidence_gate: 'B' }),
     ]
-    const profile = { includeKeywords: [], excludeKeywords: [] }
+    const profile = { includeKeywords: [], excludeKeywords: [], industries: [] }
     const result = filterDigestItems(items, profile)
 
     expect(result).toHaveLength(2)
@@ -127,7 +145,7 @@ describe('digest pipeline — gate filtering', () => {
       mockDigestItem({ org_id: '3', confidence_gate: 'C', total_score: 50 }),
       mockDigestItem({ org_id: '4', confidence_gate: 'D', total_score: 20 }),
     ]
-    const profile = { includeKeywords: [], excludeKeywords: [] }
+    const profile = { includeKeywords: [], excludeKeywords: [], industries: [] }
     const result = filterDigestItems(items, profile)
 
     expect(result).toHaveLength(2)
@@ -153,7 +171,7 @@ describe('digest pipeline — gate filtering', () => {
       mockDigestItem({ org_id: '2', confidence_gate: 'B', evidence_titles: ['Sales Manager'] }),
       mockDigestItem({ org_id: '3', confidence_gate: 'D', evidence_titles: ['Data Scientist'] }),
     ]
-    const profile = { includeKeywords: ['backend', 'engineer'], excludeKeywords: [] }
+    const profile = { includeKeywords: ['backend', 'engineer'], excludeKeywords: [], industries: [] }
     const result = filterDigestItems(items, profile)
 
     expect(result).toHaveLength(1)
@@ -166,11 +184,59 @@ describe('digest pipeline — gate filtering', () => {
       mockDigestItem({ org_id: '2', confidence_gate: 'B', evidence_titles: ['Gambling Sales'] }),
       mockDigestItem({ org_id: '3', confidence_gate: 'D', evidence_titles: ['Logistics Data'] }),
     ]
-    const profile = { includeKeywords: [], excludeKeywords: ['gambling'] }
+    const profile = { includeKeywords: [], excludeKeywords: ['gambling'], industries: [] }
     const result = filterDigestItems(items, profile)
 
     expect(result).toHaveLength(1)
     expect(result[0].org_id).toBe('1')
+  })
+
+  it('filters by industry — IT company matches IT industry', () => {
+    const items = [
+      mockDigestItem({ org_id: '1', confidence_gate: 'A', source_display_name: 'Яндекс', evidence_titles: ['Разработчик Python'] }),
+      mockDigestItem({ org_id: '2', confidence_gate: 'B', source_display_name: 'Сбербанк', evidence_titles: ['Финансовый аналитик'] }),
+    ]
+    const profile = { includeKeywords: [], excludeKeywords: [], industries: ['it'] }
+    const result = filterDigestItems(items, profile)
+
+    expect(result).toHaveLength(1)
+    expect(result[0].org_id).toBe('1')
+  })
+
+  it('filters by industry — finance company matches finance industry', () => {
+    const items = [
+      mockDigestItem({ org_id: '1', confidence_gate: 'A', source_display_name: 'Тинькофф Банк', evidence_titles: ['Backend Developer'] }),
+      mockDigestItem({ org_id: '2', confidence_gate: 'B', source_display_name: 'Логистик Про', evidence_titles: ['Водитель'] }),
+    ]
+    const profile = { includeKeywords: [], excludeKeywords: [], industries: ['finance'] }
+    const result = filterDigestItems(items, profile)
+
+    expect(result).toHaveLength(1)
+    expect(result[0].org_id).toBe('1')
+  })
+
+  it('no industry filter allows all companies through', () => {
+    const items = [
+      mockDigestItem({ org_id: '1', confidence_gate: 'A', source_display_name: 'Яндекс', evidence_titles: ['Инженер'] }),
+      mockDigestItem({ org_id: '2', confidence_gate: 'B', source_display_name: 'Сбербанк', evidence_titles: ['Аналитик'] }),
+    ]
+    const profile = { includeKeywords: [], excludeKeywords: [], industries: [] }
+    const result = filterDigestItems(items, profile)
+
+    expect(result).toHaveLength(2)
+  })
+
+  it('multiple industries — matches any selected industry', () => {
+    const items = [
+      mockDigestItem({ org_id: '1', confidence_gate: 'A', source_display_name: 'Яндекс', evidence_titles: ['Разработчик'] }),
+      mockDigestItem({ org_id: '2', confidence_gate: 'B', source_display_name: 'Сбербанк', evidence_titles: ['Аналитик'] }),
+      mockDigestItem({ org_id: '3', confidence_gate: 'A', source_display_name: 'Завод Мастер', evidence_titles: ['Инженер-технолог'] }),
+    ]
+    const profile = { includeKeywords: [], excludeKeywords: [], industries: ['it', 'finance'] }
+    const result = filterDigestItems(items, profile)
+
+    expect(result).toHaveLength(2)
+    expect(result.map((i) => i.org_id)).toEqual(['1', '2'])
   })
 })
 

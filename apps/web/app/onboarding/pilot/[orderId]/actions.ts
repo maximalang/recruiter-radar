@@ -5,6 +5,7 @@ import {
   confirmPilotOrderProfile,
   sendPilotOrderTestDigest
 } from "../../../../lib/payments";
+import { VALID_INDUSTRIES, VALID_COMPANY_SIZES } from "../../../../lib/clientProfiles";
 import { readOwnerSession } from "../../../../lib/session";
 
 function readRequiredText(formData: FormData, key: string): string {
@@ -35,13 +36,13 @@ function readOptionalStringList(formData: FormData, key: string): string[] {
     .filter((item) => item !== "");
 }
 
-function readCheckboxGroup(formData: FormData, key: string): string[] {
+function readCheckboxGroup(formData: FormData, key: string, allowed?: ReadonlySet<string>): string[] {
   const values = formData.getAll(key);
 
   return values
     .filter((v): v is string => typeof v === "string")
     .map((v) => v.trim().toLowerCase())
-    .filter((v) => v !== "");
+    .filter((v) => v !== "" && (allowed === undefined || allowed.has(v)));
 }
 
 function readOptionalNumber(formData: FormData, key: string): number | null {
@@ -77,8 +78,8 @@ export async function confirmPilotProfileAction(expectedOrderId: string, formDat
     specialization: readOptionalText(formData, "specialization"),
     includeKeywords: readOptionalStringList(formData, "includeKeywords"),
     excludeKeywords: readOptionalStringList(formData, "excludeKeywords"),
-    industries: readCheckboxGroup(formData, "industries"),
-    companySizes: readCheckboxGroup(formData, "companySizes"),
+    industries: readCheckboxGroup(formData, "industries", VALID_INDUSTRIES),
+    companySizes: readCheckboxGroup(formData, "companySizes", VALID_COMPANY_SIZES),
     dailyDigestLimit: readOptionalNumber(formData, "dailyDigestLimit"),
     ownerId
   });

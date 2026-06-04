@@ -7,6 +7,7 @@ import {
   parseKeywordText,
   saveClientProfile,
   VALID_COMPANY_SIZES,
+  VALID_INDUSTRIES,
   type ClientProfile
 } from "./clientProfiles";
 import { runDigestForClientProfile, type DigestItemInput } from "./digest";
@@ -547,7 +548,7 @@ export async function confirmPilotOrderProfile(input: {
     specialization: normalizeOptionalText(input.specialization),
     includeKeywords: normalizeKeywordList(input.includeKeywords),
     excludeKeywords: normalizeKeywordList(input.excludeKeywords),
-    industries: normalizeKeywordList(input.industries),
+    industries: input.industries?.filter((s): s is string => VALID_INDUSTRIES.has(s)) ?? [],
     companySizes: input.companySizes?.filter((s): s is string => VALID_COMPANY_SIZES.has(s)) ?? [],
     dailyDigestLimit: normalizeDailyDigestLimit(input.dailyDigestLimit),
     isActive: true
@@ -1434,7 +1435,9 @@ function normalizeCheckoutOrderPayload(
     city: normalizeOptionalText(readString(payload.city)),
     includeKeywords: normalizeKeywordList(payload.includeKeywords),
     excludeKeywords: normalizeKeywordList(payload.excludeKeywords),
-    industries: normalizeKeywordList(payload.industries),
+    industries: Array.isArray(payload.industries)
+      ? payload.industries.filter((s: unknown): s is string => typeof s === 'string' && VALID_INDUSTRIES.has(s))
+      : [],
     companySizes: Array.isArray(payload.companySizes)
       ? payload.companySizes.filter((s: unknown): s is string => typeof s === 'string' && VALID_COMPANY_SIZES.has(s))
       : [],
@@ -1520,7 +1523,9 @@ function mergeCheckoutOrderPayload(
     industries:
       payloadPatch.industries === undefined
         ? currentPayload.industries
-        : normalizeKeywordList(payloadPatch.industries),
+        : Array.isArray(payloadPatch.industries)
+          ? payloadPatch.industries.filter((s: unknown): s is string => typeof s === 'string' && VALID_INDUSTRIES.has(s))
+          : [],
     companySizes:
       payloadPatch.companySizes === undefined
         ? currentPayload.companySizes

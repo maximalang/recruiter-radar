@@ -290,7 +290,7 @@ export async function saveClientProfile(input: {
   const specialization = normalizeOptionalText(input.specialization);
   const includeKeywords = normalizeKeywordList(input.includeKeywords);
   const excludeKeywords = normalizeKeywordList(input.excludeKeywords);
-  const industries = normalizeKeywordList(input.industries);
+  const industries = normalizeIndustryList(input.industries);
   const companySizes = normalizeCompanySizeList(input.companySizes);
   const dailyDigestLimit = normalizeDailyDigestLimit(input.dailyDigestLimit);
   const isActive = input.isActive ?? true;
@@ -533,7 +533,7 @@ function mapClientProfileRow(row: ClientProfileRow): ClientProfile {
     specialization: normalizeOptionalText(row.specialization),
     includeKeywords: normalizeKeywordList(row.includeKeywords),
     excludeKeywords: normalizeKeywordList(row.excludeKeywords),
-    industries: normalizeKeywordList(row.industries),
+    industries: normalizeIndustryList(row.industries),
     companySizes: normalizeCompanySizeList(row.companySizes),
     dailyDigestLimit: normalizeDailyDigestLimit(row.dailyDigestLimit),
     isActive: row.isActive,
@@ -562,7 +562,7 @@ export function clientProfileToAgencyProfile(profile: ClientProfile): AgencyProf
   }
 
   return {
-    industries: profile.industries,
+    industries: profile.industries.filter((s): s is string => VALID_INDUSTRIES.has(s)),
     locations,
     companySizes: profile.companySizes.filter(
       (s): s is 'startup' | 'small' | 'medium' | 'large' | 'enterprise' =>
@@ -722,6 +722,36 @@ function normalizeKeywordList(value: unknown): string[] {
 const VALID_COMPANY_SIZES = new Set(['startup', 'small', 'medium', 'large', 'enterprise'])
 
 /**
+ * Canonical industry keys — the single source of truth for:
+ *   - normalizeIndustryList whitelist
+ *   - onboarding form checkbox values
+ *   - digest filtering/scoring keyword lookups
+ */
+const VALID_INDUSTRIES = new Set([
+  'it', 'finance', 'manufacturing', 'retail', 'healthcare',
+  'construction', 'logistics', 'consulting', 'education', 'media',
+])
+
+/**
+ * Industry keyword map — maps canonical industry keys to Russian search
+ * terms used for digest haystack matching. Each industry has one or more
+ * keywords that commonly appear in employer names, vacancy titles, and
+ * evidence_titles.
+ */
+const INDUSTRY_KEYWORDS: ReadonlyMap<string, readonly string[]> = new Map([
+  ['it',            ['it', 'айти', 'информационные технологии', 'разработ', 'программ', 'digital', 'софт', 'tech', 'цифров']],
+  ['finance',       ['финанс', 'банк', 'инвестицион', 'страхован', 'finance', 'credit', 'кредит']],
+  ['manufacturing', ['производств', 'завод', 'фабрик', 'manufacturing', 'промышленн']],
+  ['retail',        ['ритейл', 'retail', 'торговл', 'магазин', 'commerc', 'маркет', 'market']],
+  ['healthcare',    ['здравоохранен', 'медицин', 'клиник', 'больниц', 'фарм', 'healthcare', 'pharma']],
+  ['construction',  ['строительств', 'строит', 'construction', 'застройщик']],
+  ['logistics',     ['логистик', 'транспорт', 'доставк', 'logistics', 'cargo', 'склад', 'перевозк']],
+  ['consulting',    ['консалтинг', 'consulting', 'консультаци']],
+  ['education',     ['образован', 'учеб', 'школ', 'вуз', 'университет', 'education']],
+  ['media',         ['медиа', 'телеканал', 'издани', 'media', 'журнал', 'новост']],
+])
+
+/**
  * Normalize company size list — only known values survive.
  * Accepts arrays of strings like ['startup', 'medium', 'large'].
  */
@@ -749,4 +779,32 @@ function normalizeCompanySizeList(value: unknown): string[] {
   return Array.from(uniqueSizes.values());
 }
 
-export { VALID_COMPANY_SIZES }
+/**
+ * Normalize industry list — only known keys survive.
+ * Accepts arrays of strings like ['it', 'finance', 'manufacturing'].
+ */
+function normalizeIndustryList(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const uniqueIndustries = new Set<string>();
+
+  for (const item of value) {
+    if (typeof item !== "string") {
+      continue;
+    }
+
+    const normalizedItem = item.trim().toLowerCase();
+
+    if (!VALID_INDUSTRIES.has(normalizedItem)) {
+      continue;
+    }
+
+    uniqueIndustries.add(normalizedItem);
+  }
+
+  return Array.from(uniqueIndustries.values());
+}
+
+export { VALID_COMPANY_SIZES, VALID_INDUSTRIES, INDUSTRY_KEYWORDS }
