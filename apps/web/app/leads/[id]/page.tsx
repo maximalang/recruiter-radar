@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import Link from 'next/link';
 import { getLeadDetail } from '@/lib/leads-data';
 import FeedbackButtons from './feedback-buttons';
+import OutreachPicker from './outreach-picker';
 
 export const dynamic = 'force-dynamic';
 
@@ -157,6 +158,25 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               <p style={{ fontSize: '0.9rem', lineHeight: 1.6, color: '#374151', whiteSpace: 'pre-wrap' }}>
                 {lead.opener}
               </p>
+            </section>
+
+            {/* Outreach templates */}
+            <section style={{ backgroundColor: '#fff', borderRadius: '8px', padding: '20px', border: '1px solid #e5e7eb' }}>
+              <h2 style={{ fontSize: '0.875rem', fontWeight: 600, color: '#374151', marginBottom: '12px' }}>
+                ✉️ Шаблоны сообщения
+              </h2>
+              <OutreachPicker
+                clientProfileId={lead.clientProfileId}
+                context={{
+                  orgName: lead.orgName,
+                  reasons: lead.reasons,
+                  vacancyCount: lead.vacanciesCount,
+                  roleNames: lead.evidenceTitles,
+                  sourceFamily: lead.sourceFamilies[0] ?? '',
+                  locationName: lead.locationNames[0] ?? '',
+                  confidenceGate: lead.confidenceGate,
+                }}
+              />
             </section>
           </div>
 
