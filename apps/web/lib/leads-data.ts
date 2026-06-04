@@ -34,6 +34,14 @@ export interface LeadsListResult {
   total: number;
 }
 
+export interface LeadDetail extends LeadItem {
+  orgWebsite: string | null;
+  feedbackNote: string | null;
+  cooldownUntil: string | null;
+  candidateSourceKeys: string[];
+  payload: Record<string, unknown>;
+}
+
 // ─── Data Fetching ──────────────────────────────────────────────
 
 export async function getLeadsForProfile(input: {
@@ -151,4 +159,102 @@ export async function getLeadsForProfile(input: {
   }));
 
   return { leads, total };
+}
+
+// ─── Lead Detail ────────────────────────────────────────────────
+
+export async function getLeadDetail(input: {
+  candidateId: string | number;
+}): Promise<LeadDetail | null> {
+  const pool = getPool();
+  if (!pool) {
+    return null;
+  }
+
+  const result = await pool.query<{
+    id: string;
+    org_id: string;
+    org_name: string;
+    org_website: string | null;
+    source_external_id: string | null;
+    score: number;
+    confidence_gate: string;
+    vacancies_count: number;
+    distinct_vacancy_names_count: number;
+    latest_published_at: string | null;
+    reasons: unknown;
+    opener: string;
+    feedback_status: string | null;
+    feedback_note: string | null;
+    suppressed_until: string | null;
+    cooldown_until: string | null;
+    created_at: string;
+    source_families: unknown;
+    evidence_titles: unknown;
+    location_names: unknown;
+    candidate_source_keys: unknown;
+    payload: unknown;
+  }>(`
+    SELECT
+      dc.id::TEXT AS id,
+      dc.org_id::TEXT AS org_id,
+      dc.source_display_name AS org_name,
+      o.website_url AS org_website,
+      dc.source_external_id,
+      dc.total_score AS score,
+      dc.confidence_gate,
+      dc.vacancies_count,
+      dc.distinct_vacancy_names_count,
+      dc.latest_published_at,
+      dc.reasons,
+      dc.opener,
+      cdos.feedback_status,
+      cdos.feedback_note,
+      cdos.suppressed_until,
+      cdos.cooldown_until,
+      dc.created_at::TEXT AS created_at,
+      dc.source_families,
+      dc.evidence_titles,
+      dc.location_names,
+      dc.candidate_source_keys,
+      dc.payload
+    FROM digest_candidates dc
+    LEFT JOIN client_digest_org_state cdos
+      ON cdos.org_id = dc.org_id
+      AND cdos.client_profile_id = dc.client_profile_id
+    LEFT JOIN orgs o
+      ON o.id = dc.org_id
+    WHERE dc.id = $1
+  `, [input.candidateId]);
+
+  if (result.rows.length === 0) {
+    return null;
+  }
+
+  const row = result.rows[0];
+
+  return {
+    id: row.id,
+    orgId: row.org_id,
+    orgName: row.org_name ?? "Неизвестная компания",
+    orgWebsite: row.org_website,
+    sourceExternalId: row.source_external_id,
+    score: row.score,
+    confidenceGate: row.confidence_gate ?? "",
+    vacanciesCount: row.vacancies_count,
+    distinctVacancyNamesCount: row.distinct_vacancy_names_count,
+    latestPublishedAt: row.latest_published_at,
+    reasons: Array.isArray(row.reasons) ? row.reasons.filter((r: unknown): r is string => typeof r === "string") : [],
+    opener: row.opener ?? "",
+    feedbackStatus: row.feedback_status,
+    feedbackNote: row.feedback_note,
+    suppressedUntil: row.suppressed_until,
+    cooldownUntil: row.cooldown_until,
+    createdAt: row.created_at,
+    sourceFamilies: Array.isArray(row.source_families) ? row.source_families.filter((s: unknown): s is string => typeof s === "string") : [],
+    evidenceTitles: Array.isArray(row.evidence_titles) ? row.evidence_titles.filter((e: unknown): e is string => typeof e === "string") : [],
+    locationNames: Array.isArray(row.location_names) ? row.location_names.filter((l: unknown): l is string => typeof l === "string") : [],
+    candidateSourceKeys: Array.isArray(row.candidate_source_keys) ? row.candidate_source_keys.filter((k: unknown): k is string => typeof k === "string") : [],
+    payload: (typeof row.payload === 'object' && row.payload !== null && !Array.isArray(row.payload)) ? row.payload as Record<string, unknown> : {},
+  };
 }

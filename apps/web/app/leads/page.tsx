@@ -99,9 +99,11 @@ function LeadRow({ lead }: { lead: LeadItem }) {
   return (
     <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
       <td style={{ padding: '12px 16px', verticalAlign: 'top' }}>
-        <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#111827' }}>
-          {lead.orgName}
-        </div>
+        <Link href={`/leads/${lead.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+          <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#111827' }}>
+            {lead.orgName}
+          </div>
+        </Link>
         {lead.locationNames.length > 0 && (
           <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '2px' }}>
             📍 {lead.locationNames.slice(0, 2).join(', ')}
