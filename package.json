@@ -109,6 +109,7 @@
     "digest": "node packages/db/scripts/report-digest.mjs",
     "digest:run": "node packages/db/scripts/report-digest.mjs",
     "lead:generate": "npm run test --workspace @recruiter-radar/web -- --testPathPattern=src/__tests__/scripts/lead-generate.smoke.test.ts",
+    "smoke:e2e": "node scripts/smoke-e2e.mjs",
     "prepare": "husky"
   },
   "devDependencies": {
