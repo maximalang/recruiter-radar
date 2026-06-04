@@ -5,7 +5,7 @@
  * are applied correctly in the SQL query.
  */
 
-import { getLeadsForProfile } from '@/lib/leads-data';
+import { getLeadsForProfile, getLeadsForAllProfiles } from '@/lib/leads-data';
 import { getPool } from '@/lib/db';
 
 jest.mock('@/lib/db', () => ({
@@ -116,5 +116,63 @@ describe('getLeadsForProfile filtering', () => {
     const countParams = mockQuery.mock.calls[0][1] as unknown[];
     // Only clientProfileId param, no extra param for 'none'
     expect(countParams).toEqual(['1']);
+  });
+});
+
+describe('getLeadsForAllProfiles', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('returns empty when pool is null', async () => {
+    mockGetPool.mockReturnValue(null);
+    const result = await getLeadsForAllProfiles({ profileIds: ['1', '2'] });
+    expect(result.leads).toEqual([]);
+    expect(result.total).toBe(0);
+  });
+
+  it('returns empty when profileIds is empty', async () => {
+    makeMockPool();
+    const result = await getLeadsForAllProfiles({ profileIds: [] });
+    expect(result.leads).toEqual([]);
+    expect(result.total).toBe(0);
+  });
+
+  it('uses IN clause for multiple profile IDs', async () => {
+    makeMockPool();
+
+    mockQuery.mockResolvedValueOnce({ rows: [{ count: '15' }] });
+    mockQuery.mockResolvedValueOnce({ rows: [] });
+
+    await getLeadsForAllProfiles({ profileIds: ['1', '2', '3'] });
+
+    const countSql = mockQuery.mock.calls[0][0] as string;
+    expect(countSql).toContain("client_profile_id = ANY(");
+    // Only 1 query pair (count + data), not 3
+    expect(mockQuery).toHaveBeenCalledTimes(2);
+  });
+
+  it('applies confidenceGate filter', async () => {
+    makeMockPool();
+
+    mockQuery.mockResolvedValueOnce({ rows: [{ count: '5' }] });
+    mockQuery.mockResolvedValueOnce({ rows: [] });
+
+    await getLeadsForAllProfiles({ profileIds: ['1', '2'], confidenceGate: 'A' });
+
+    const countSql = mockQuery.mock.calls[0][0] as string;
+    expect(countSql).toContain("confidence_gate");
+  });
+
+  it('applies feedbackStatus filter', async () => {
+    makeMockPool();
+
+    mockQuery.mockResolvedValueOnce({ rows: [{ count: '3' }] });
+    mockQuery.mockResolvedValueOnce({ rows: [] });
+
+    await getLeadsForAllProfiles({ profileIds: ['1'], feedbackStatus: 'accepted' });
+
+    const countSql = mockQuery.mock.calls[0][0] as string;
+    expect(countSql).toContain("feedback_status");
   });
 });

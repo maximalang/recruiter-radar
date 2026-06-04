@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import Link from 'next/link';
-import { getLeadsForProfile, type LeadItem, VALID_FEEDBACK_STATUSES } from '@/lib/leads-data';
+import { getLeadsForAllProfiles, type LeadItem, VALID_FEEDBACK_STATUSES } from '@/lib/leads-data';
 import { listClientProfiles, type ClientProfile } from '@/lib/clientProfiles';
 import LeadsFilters from './leads-filters';
 
@@ -215,24 +215,24 @@ export default async function LeadsPage({
 
   const activeProfiles = profiles.filter((p) => p.isActive);
 
-  // Fetch leads for each active profile with filters
-  const profileLeads = await Promise.all(
-    activeProfiles.map(async (profile) => {
-      try {
-        const result = await getLeadsForProfile({
-          clientProfileId: profile.id,
-          confidenceGate,
-          feedbackStatus,
-        });
-        return { profile, leads: result.leads, total: result.total };
-      } catch {
-        return { profile, leads: [], total: 0 };
-      }
-    }),
-  );
+  // Fetch leads for all active profiles in a single query (not N+1)
+  const profileIds = activeProfiles.map((p) => p.id);
+  let allLeads: LeadItem[] = [];
+  let totalLeads = 0;
 
-  // Flatten all leads for display
-  const allLeads = profileLeads.flatMap((pl) => pl.leads);
+  try {
+    const result = await getLeadsForAllProfiles({
+      profileIds,
+      confidenceGate,
+      feedbackStatus,
+    });
+    allLeads = result.leads;
+    totalLeads = result.total;
+  } catch {
+    allLeads = [];
+    totalLeads = 0;
+  }
+
   const hasFilters = confidenceGate !== null || feedbackStatus !== null;
 
   return (
@@ -276,7 +276,7 @@ export default async function LeadsPage({
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '32px' }}>
           <div style={{ backgroundColor: '#fff', borderRadius: '8px', padding: '16px', border: '1px solid #e5e7eb' }}>
             <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500 }}>Всего лидов</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#111827', marginTop: '4px' }}>{allLeads.length}</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#111827', marginTop: '4px' }}>{totalLeads}</div>
           </div>
           <div style={{ backgroundColor: '#fff', borderRadius: '8px', padding: '16px', border: '1px solid #e5e7eb' }}>
             <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500 }}>Gate A/B</div>

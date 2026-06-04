@@ -2,7 +2,7 @@
  * Tests for sendOutreachToTelegramAction.
  *
  * Verifies that the server action validates input,
- * checks ownership, looks up the Telegram chat ID, and sends the message.
+ * checks ownership + chat_id in one query, and sends the message.
  */
 
 import { sendOutreachToTelegramAction } from '@/app/leads/[id]/actions';
@@ -34,10 +34,17 @@ function makeMockPool() {
   mockGetPool.mockReturnValue({ query: mockQuery } as never);
 }
 
-function mockOwnerVerified() {
+/**
+ * Mock the combined ownership + chat_id lookup query.
+ * Returns a single row with { ok: true, telegram_chat_id: chatId }.
+ */
+function mockOwnerWithChat(chatId: string | null) {
   mockGetOwnerIdFromSession.mockResolvedValue('owner123');
-  // Ownership check query returns a row
-  mockQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ ok: true }] });
+  makeMockPool();
+  mockQuery.mockResolvedValueOnce({
+    rowCount: 1,
+    rows: [{ ok: true, telegram_chat_id: chatId }],
+  });
 }
 
 describe('sendOutreachToTelegramAction', () => {
@@ -61,13 +68,21 @@ describe('sendOutreachToTelegramAction', () => {
     mockGetOwnerIdFromSession.mockResolvedValue(null);
     const result = await sendOutreachToTelegramAction('1', 'Hello');
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toContain('Access denied');
+    if (!result.ok) expect(result.error).toContain('no active session');
   });
 
-  it('rejects when ownership check fails', async () => {
+  it('rejects when pool is not available', async () => {
+    mockGetOwnerIdFromSession.mockResolvedValue('owner123');
+    mockGetPool.mockReturnValue(null);
+    const result = await sendOutreachToTelegramAction('1', 'Hello');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain('Database');
+  });
+
+  it('rejects when ownership check fails (profile not found or wrong owner)', async () => {
     makeMockPool();
     mockGetOwnerIdFromSession.mockResolvedValue('owner123');
-    // Ownership check returns no rows
+    // Combined query returns no rows
     mockQuery.mockResolvedValueOnce({ rowCount: 0, rows: [] });
 
     const result = await sendOutreachToTelegramAction('1', 'Hello');
@@ -75,26 +90,8 @@ describe('sendOutreachToTelegramAction', () => {
     if (!result.ok) expect(result.error).toContain('Access denied');
   });
 
-  it('returns error when pool is not available for chat lookup', async () => {
-    mockGetOwnerIdFromSession.mockResolvedValue('owner123');
-    // Pool exists for ownership check
-    makeMockPool();
-    mockQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ ok: true }] });
-    // After ownership check, getPool is called again for chat lookup
-    // But it returns the same mock pool, so we just add another query mock
-    mockQuery.mockResolvedValueOnce({ rows: [{ telegram_chat_id: '12345' }] });
-    mockGetTelegramBotToken.mockReturnValue({ botToken: null, error: 'No token' });
-
-    const result = await sendOutreachToTelegramAction('1', 'Hello');
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toContain('Telegram');
-  });
-
   it('returns error when profile has no telegram chat id', async () => {
-    makeMockPool();
-    mockOwnerVerified();
-    // chat_id lookup (second query after ownership)
-    mockQuery.mockResolvedValueOnce({ rows: [{ telegram_chat_id: null }] });
+    mockOwnerWithChat(null);
 
     const result = await sendOutreachToTelegramAction('1', 'Hello');
     expect(result.ok).toBe(false);
@@ -102,9 +99,7 @@ describe('sendOutreachToTelegramAction', () => {
   });
 
   it('returns error when bot token is not configured', async () => {
-    makeMockPool();
-    mockOwnerVerified();
-    mockQuery.mockResolvedValueOnce({ rows: [{ telegram_chat_id: '12345' }] });
+    mockOwnerWithChat('12345');
     mockGetTelegramBotToken.mockReturnValue({ botToken: null, error: 'No token' });
 
     const result = await sendOutreachToTelegramAction('1', 'Hello');
@@ -113,9 +108,7 @@ describe('sendOutreachToTelegramAction', () => {
   });
 
   it('sends message successfully', async () => {
-    makeMockPool();
-    mockOwnerVerified();
-    mockQuery.mockResolvedValueOnce({ rows: [{ telegram_chat_id: '12345' }] });
+    mockOwnerWithChat('12345');
     mockGetTelegramBotToken.mockReturnValue({ botToken: 'test-token', error: null });
     mockSendTelegramTextMessage.mockResolvedValueOnce({ chatId: '12345', messageId: 42 });
 
@@ -125,17 +118,32 @@ describe('sendOutreachToTelegramAction', () => {
       'Здравствуйте!',
       { botToken: 'test-token', chatId: '12345' },
     );
+    // Only 1 query (combined ownership + chat_id)
+    expect(mockQuery).toHaveBeenCalledTimes(1);
   });
 
   it('handles telegram send failure', async () => {
-    makeMockPool();
-    mockOwnerVerified();
-    mockQuery.mockResolvedValueOnce({ rows: [{ telegram_chat_id: '12345' }] });
+    mockOwnerWithChat('12345');
     mockGetTelegramBotToken.mockReturnValue({ botToken: 'test-token', error: null });
     mockSendTelegramTextMessage.mockRejectedValueOnce(new Error('Network error'));
 
     const result = await sendOutreachToTelegramAction('1', 'Hello');
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toContain('Network error');
+  });
+
+  it('allows access when owner_id IS NULL (pilot/anonymous profile)', async () => {
+    mockGetOwnerIdFromSession.mockResolvedValue('owner123');
+    makeMockPool();
+    // Query returns row with chat_id — the SQL handles OR owner_id IS NULL
+    mockQuery.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ ok: true, telegram_chat_id: '12345' }],
+    });
+    mockGetTelegramBotToken.mockReturnValue({ botToken: 'test-token', error: null });
+    mockSendTelegramTextMessage.mockResolvedValueOnce({ chatId: '12345', messageId: 42 });
+
+    const result = await sendOutreachToTelegramAction('1', 'Hello');
+    expect(result.ok).toBe(true);
   });
 });
