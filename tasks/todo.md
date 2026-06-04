@@ -72,7 +72,7 @@
 - [x] Secure case conversion middleware
 
 ### Test Coverage
-- [x] 653 tests passing
+- [x] 700 tests passing
 
 ---
 
@@ -147,21 +147,21 @@
 
 ## 📈 P1: Lead Management & Outreach (09.06-22.06.2026)
 
-### Задача 2.1: Lead Pipeline UI
-- [ ] Dashboard: lead list with scores, confidence, reasons
-- [ ] Lead detail view (evidence, contact paths, next action)
-- [ ] Lead state transitions (manual)
-- [ ] Filtering by score, confidence, source, freshness
+### Задача 2.1: Lead Pipeline UI ✅ DONE
+- [x] Dashboard: lead list with scores, confidence, reasons
+- [x] Lead detail view (evidence, contact paths, next action)
+- [x] Lead state transitions (manual)
+- [x] Filtering by score, confidence, source, freshness
 
-### Задача 2.2: Outreach Templates
-- [ ] Template builder with personalization variables
-- [ ] Pre-built templates (Russian, premium tone)
-- [ ] Template → Telegram message integration
+### Задача 2.2: Outreach Templates ✅ DONE
+- [x] Template builder with personalization variables
+- [x] Pre-built templates (Russian, premium tone)
+- [x] Template → Telegram message integration
 
-### Задача 2.3: Analytics Dashboard
-- [ ] Daily/weekly metrics (leads generated, avg score, confidence split)
-- [ ] Source performance comparison
-- [ ] Feedback funnel (Беру / Мимо / Позже)
+### Задача 2.3: Analytics Dashboard ✅ DONE
+- [x] Daily/weekly metrics (leads generated, avg score, confidence split)
+- [x] Source performance comparison
+- [x] Feedback funnel (Беру / Мимо / Позже)
 
 ---
 
@@ -195,8 +195,13 @@
 
 ## 🗂 Состояние на конец 04.06.2026
 
-**Коммитов впереди origin:** 5 (review fix + ICP fields + pipeline integration + dashboard wiring)
-**Тестов:** 653 passing
+**Коммитов впереди origin:** 8
+**Тестов:** 700 passing
 **Ветки:** только main
 
-**Следующий приоритет:** Задача 2.1 — Lead Pipeline UI (список лидов + скоринг + фильтрация)
+**P1 Задачи выполнены:**
+- ✅ 2.1: Lead Pipeline UI — список лидов + детальный просмотр + фильтрация
+- ✅ 2.2: Outreach Templates — шаблоны + Telegram интеграция
+- ✅ 2.3: Analytics Dashboard — воронка обратной связи + метрики + источники
+
+**Следующий приоритет:** P2 Enterprise Features или техдолг (S3, R1)
