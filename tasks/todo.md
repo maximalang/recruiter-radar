@@ -76,51 +76,39 @@
 
 ---
 
-## 🎯 P0: На завтра (04.06.2026) — ICP Profile Fields
+## 🎯 P0: На сегодня (04.06.2026) — ICP Profile Fields
 
-### Задача 1.3: Agency ICP Fields — industries + companySizes
+### Задача 1.3: Agency ICP Fields — industries + companySizes ✅ DONE
 
-**Проблема:** `FiurClientProfile.industries` и `FiurClientProfile.companySizes`
-используются в скоринге (`computeFit`), но `ClientProfile` в БД и форме
-не имеет этих полей. Сейчас `industries` всегда `[]`, `companySizes` всегда
-`undefined` — скоринг по индустрии и размеру не работает.
+**Что сделано (коммит f196950):**
 
-**Что сделать (3 шага):**
+#### Шаг 1: DB + ClientProfile type ✅
+- Added `industries JSONB NOT NULL DEFAULT '[]'` and `company_sizes JSONB NOT NULL DEFAULT '[]'` to client_profiles
+- Migration: `20260604000000_add_icp_industries_company_sizes.sql`
+- Updated ClientProfileRow, ClientProfile, mapClientProfileRow
+- Added `normalizeCompanySizeList()` with whitelist validation
+- Exported `VALID_COMPANY_SIZES` set
+- Updated all SELECT queries (5 variants) with new columns
+- Updated saveClientProfile (INSERT + UPDATE) with new params
+- Updated isPlaceholderClientProfile
 
-#### Шаг 1: Добавить поля в ClientProfile + DB migration
-- `industries TEXT[] DEFAULT '{}'` — массив индустрий (lowercase ключи)
-- `company_sizes TEXT[] DEFAULT '{}'` — массив: startup/small/medium/large/enterprise
-- Обновить `ClientProfile` type в `lib/clientProfiles.ts`
-- Обновить `getClientProfileById`, `upsertClientProfile` SQL
-- Migration: `ALTER TABLE client_profiles ADD COLUMN ...`
+#### Шаг 2: Onboarding form ✅
+- Added INDUSTRY_OPTIONS (10 industries) and COMPANY_SIZE_OPTIONS (5 sizes)
+- Added checkbox groups for industries and companySizes in the form
+- Added `readCheckboxGroup()` helper in actions.ts
+- Passing industries/companySizes through confirmPilotProfileAction
 
-#### Шаг 2: Добавить поля в onboarding форму
-- Industry multi-select ( predefined список: it, finance, manufacturing, retail,
-  healthcare, construction, logistics, consulting, education, media)
-- Company size checkboxes (startup 1-10, small 10-50, medium 50-250, large 250-1000, enterprise 1000+)
-- Обновить `confirmPilotProfileAction` и `confirmPilotOrderProfile` — парсинг новых полей
-- Обновить `PilotProfileSeed` / `normalizeDailyDigestLimit` в payments.ts
-
-#### Шаг 3: Подключить поля к скорингу
-- В `scoring-pipeline.ts` — маппинг `ClientProfile.industries` → `FiurClientProfile.industries`
-- В `scoring-pipeline.ts` — маппинг `ClientProfile.companySizes` → `FiurClientProfile.companySizes`
-- Проверить что `computeFit` получает реальные данные
-
-**Файлы которые нужно тронуть:**
-```
-apps/web/lib/clientProfiles.ts           — тип + SQL
-apps/web/lib/scoring/scoring-pipeline.ts — маппинг полей
-apps/web/app/onboarding/pilot/[orderId]/page.tsx          — UI форма
-apps/web/app/onboarding/pilot/[orderId]/actions.ts        — парсинг
-apps/web/lib/payments.ts                 — PilotProfileSeed + confirmPilotOrderProfile
-packages/db/migrations/                  — ALTER TABLE
-```
+#### Шаг 3: Scoring bridge + payload wiring ✅
+- Added `clientProfileToAgencyProfile()` bridge function
+- Added industries/companySizes to CheckoutOrderPayload type
+- Updated normalizeCheckoutOrderPayload and mergeCheckoutOrderPayload
+- Updated confirmPilotOrderProfile to save ICP fields to both profile and order payload
 
 **Acceptance Criteria:**
-- [ ] Agency может выбрать индустрии и размеры компаний при онбординге
-- [ ] `computeFit` получает непустой `industries` массив для профилей с выбранными индустриями
-- [ ] `computeFit` получает непустой `companySizes` для профилей с выбранными размерами
-- [ ] <5 мин ICP configuration
+- [x] Agency может выбрать индустрии и размеры компаний при онбординге
+- [x] `computeFit` получает непустой `industries` массив для профилей с выбранными индустриями
+- [x] `computeFit` получает непустой `companySizes` для профилей с выбранными размерами
+- [x] <5 мин ICP configuration
 
 ---
 
@@ -192,11 +180,10 @@ packages/db/migrations/                  — ALTER TABLE
 
 ---
 
-## 🗂 Состояние на конец 03.06.2026
+## 🗂 Состояние на конец 04.06.2026
 
-**Коммитов впереди origin:** 0 (всё запушено)
+**Коммитов впереди origin:** 2 (review fix + ICP fields)
 **Тестов:** 620 passing
-**Ветки:** только main (мёртвые удалены, remotes прунены)
-**GC:** выполнен (aggressive + prune=now)
+**Ветки:** только main
 
-**Завтра начать с:** Задача 1.3 — ICP fields (industries + companySizes) → DB → форма → скоринг
+**Завтра:** Задача 1.1b — E2E smoke test (`npm run smoke:e2e`)
