@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 
-import { runDigestForClientProfile } from "../../../../lib/digest";
-import { deliverCandidatesForRun } from "../../../../lib/digest/deliver-candidates";
-import { assertDigestEntitlementByClientProfileId, getPool } from "../../../../lib/db";
+import { runDigestForClientProfile } from "@/lib/digest";
+import { deliverCandidatesForRun } from "@/lib/digest/deliver-candidates";
+import { assertDigestEntitlementByClientProfileId, getPool } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -59,5 +59,5 @@ export async function POST(request: Request) {
 }
 
 function isPositiveIntegerString(value: string): boolean {
-  return /^\d+$/.test(value);
+  return /^[1-9]\d*$/.test(value);
 }
