@@ -7,6 +7,106 @@
 
 import { getPool } from "./db";
 
+// ─── Lead Card Derivation ────────────────────────────────────────
+
+/**
+ * Derive `why_now` from scoring reasons.
+ * Picks the top 2 urgency/intent reasons, falls back to first reason.
+ */
+export function deriveWhyNow(reasons: string[]): string {
+  if (reasons.length === 0) return 'Повод для контакта есть сейчас';
+  // Prefer urgency/intent signals
+  const priorityReasons = reasons.filter(r =>
+    r.includes('burst') || r.includes('fresh') || r.includes('hard-to-fill') ||
+    r.includes('urgency') || r.includes('active hiring') || r.includes('multiple')
+  );
+  const picked = priorityReasons.length > 0 ? priorityReasons.slice(0, 2) : reasons.slice(0, 2);
+  return picked.join('; ');
+}
+
+/**
+ * Derive `best_angle` — the strongest angle for first contact.
+ * Based on what kind of hiring gap or expansion is visible.
+ */
+export function deriveBestAngle(reasons: string[], opener: string): string {
+  // If there's a geographic expansion signal → angle around new region
+  const hasExpansion = reasons.some(r => r.includes('new region') || r.includes('location'));
+  if (hasExpansion) return 'Поддержать выход в новый регион — компания ищет людей на месте';
+
+  // If hard-to-fill → angle around scarce talent
+  const hasHardToFill = reasons.some(r => r.includes('hard-to-fill'));
+  if (hasHardToFill) return 'Закрыть дефицитную роль, пока внутренний поиск не растянулся';
+
+  // If multi-function hiring → angle around broad hiring need
+  const hasMultiFunction = reasons.some(r => r.includes('non-tech') || r.includes('multiple roles'));
+  if (hasMultiFunction) return 'Несколько открытых ролей — компания активно строит команду';
+
+  // If career page available → angle around direct contact
+  const hasCareerPage = reasons.some(r => r.includes('career page'));
+  if (hasCareerPage) return 'Есть карьерная страница — прямой путь к HR';
+
+  // Default: use opener as fallback
+  return opener || 'Короткий созвон, чтобы сверить задачи по найму';
+}
+
+/**
+ * Derive `lawful_contact_path` from evidence and reasons.
+ * Returns the safest non-personal contact path available.
+ */
+export function deriveLawfulContactPath(reasons: string[], sourceFamilies: string[]): string | null {
+  if (reasons.some(r => r.includes('career page'))) {
+    return 'career-page';
+  }
+  if (reasons.some(r => r.includes('corporate') || r.includes('HR/contact'))) {
+    return 'corporate-contact';
+  }
+  if (sourceFamilies.some(s => s === 'egrul-fns' || s === 'fedresurs')) {
+    return 'registry-data';
+  }
+  return null;
+}
+
+/**
+ * Derive `negative_signals` — risk factors / why not.
+ * Detects stale signals, internal recruiter only, agency reposts, low evidence.
+ */
+export function deriveNegativeSignals(input: {
+  reasons: string[];
+  vacanciesCount: number;
+  distinctVacancyNamesCount: number;
+  sourceFamilies: string[];
+  confidenceGate: string;
+}): string[] {
+  const signals: string[] = [];
+
+  // Internal recruiter only
+  if (input.reasons.some(r => r.includes('internal recruiter'))) {
+    signals.push('Вакансия внутреннего рекрутера — слабый сигнал сам по себе');
+  }
+
+  // Low confidence
+  if (input.confidenceGate === 'C' || input.confidenceGate === 'D') {
+    signals.push('Низкая уверенность в сигнале — требуется проверка');
+  }
+
+  // Single source
+  if (input.sourceFamilies.length <= 1) {
+    signals.push('Только один источник — нет независимого подтверждения');
+  }
+
+  // Stale signals
+  if (input.reasons.some(r => r.includes('stale') || r.includes('older'))) {
+    signals.push('Устаревшие сигналы — активность могла закончиться');
+  }
+
+  // Repeated similar roles (high vacancy count but low distinct names)
+  if (input.vacanciesCount >= 3 && input.distinctVacancyNamesCount <= 1) {
+    signals.push('Повторяющиеся одинаковые вакансии — возможен репост');
+  }
+
+  return signals;
+}
+
 // ─── Types ──────────────────────────────────────────────────────
 
 /** Valid feedback status values matching the DB enum digest_feedback_status */
@@ -27,6 +127,14 @@ export interface LeadItem {
   distinctVacancyNamesCount: number;
   latestPublishedAt: string | null;
   reasons: string[];
+  /** Why now — 1–2 short arguments for why this company is in focus today */
+  whyNow: string;
+  /** Best angle — the strongest angle for first contact */
+  bestAngle: string;
+  /** Lawful contact path — corporate form / generic HR / career page */
+  lawfulContactPath: string | null;
+  /** Negative signals — risk factors / why not */
+  negativeSignals: string[];
   opener: string;
   feedbackStatus: string | null;
   suppressedUntil: string | null;
@@ -44,6 +152,14 @@ export interface LeadsListResult {
 export interface LeadDetail extends LeadItem {
   clientProfileId: string;
   orgWebsite: string | null;
+  /** ИНН from entity resolution */
+  orgInn: string | null;
+  /** ОГРН from entity resolution */
+  orgOgrn: string | null;
+  /** Company domain */
+  orgDomain: string | null;
+  /** Career page URL */
+  careerPageUrl: string | null;
   feedbackNote: string | null;
   cooldownUntil: string | null;
   candidateSourceKeys: string[];
@@ -151,25 +267,39 @@ export async function getLeadsForProfile(input: {
     LIMIT $${paramIdx} OFFSET $${paramIdx + 1}
   `, [...params, limit, offset]);
 
-  const leads: LeadItem[] = leadsResult.rows.map((row) => ({
-    id: row.id,
-    orgId: row.org_id,
-    orgName: row.org_name ?? "Неизвестная компания",
-    sourceExternalId: row.source_external_id,
-    score: row.score,
-    confidenceGate: row.confidence_gate ?? "",
-    vacanciesCount: row.vacancies_count,
-    distinctVacancyNamesCount: row.distinct_vacancy_names_count,
-    latestPublishedAt: row.latest_published_at,
-    reasons: Array.isArray(row.reasons) ? row.reasons.filter((r: unknown): r is string => typeof r === "string") : [],
-    opener: row.opener ?? "",
-    feedbackStatus: row.feedback_status,
-    suppressedUntil: row.suppressed_until,
-    createdAt: row.created_at,
-    sourceFamilies: Array.isArray(row.source_families) ? row.source_families.filter((s: unknown): s is string => typeof s === "string") : [],
-    evidenceTitles: Array.isArray(row.evidence_titles) ? row.evidence_titles.filter((e: unknown): e is string => typeof e === "string") : [],
-    locationNames: Array.isArray(row.location_names) ? row.location_names.filter((l: unknown): l is string => typeof l === "string") : [],
-  }));
+  const leads: LeadItem[] = leadsResult.rows.map((row) => {
+    const reasons = Array.isArray(row.reasons) ? row.reasons.filter((r: unknown): r is string => typeof r === "string") : [];
+    const sourceFamilies = Array.isArray(row.source_families) ? row.source_families.filter((s: unknown): s is string => typeof s === "string") : [];
+    return {
+      id: row.id,
+      orgId: row.org_id,
+      orgName: row.org_name ?? "Неизвестная компания",
+      sourceExternalId: row.source_external_id,
+      score: row.score,
+      confidenceGate: row.confidence_gate ?? "",
+      vacanciesCount: row.vacancies_count,
+      distinctVacancyNamesCount: row.distinct_vacancy_names_count,
+      latestPublishedAt: row.latest_published_at,
+      reasons,
+      whyNow: deriveWhyNow(reasons),
+      bestAngle: deriveBestAngle(reasons, row.opener ?? ""),
+      lawfulContactPath: deriveLawfulContactPath(reasons, sourceFamilies),
+      negativeSignals: deriveNegativeSignals({
+        reasons,
+        vacanciesCount: row.vacancies_count,
+        distinctVacancyNamesCount: row.distinct_vacancy_names_count,
+        sourceFamilies,
+        confidenceGate: row.confidence_gate ?? "",
+      }),
+      opener: row.opener ?? "",
+      feedbackStatus: row.feedback_status,
+      suppressedUntil: row.suppressed_until,
+      createdAt: row.created_at,
+      sourceFamilies,
+      evidenceTitles: Array.isArray(row.evidence_titles) ? row.evidence_titles.filter((e: unknown): e is string => typeof e === "string") : [],
+      locationNames: Array.isArray(row.location_names) ? row.location_names.filter((l: unknown): l is string => typeof l === "string") : [],
+    };
+  });
 
   return { leads, total };
 }
@@ -274,25 +404,39 @@ export async function getLeadsForAllProfiles(input: {
     LIMIT $${paramIdx} OFFSET $${paramIdx + 1}
   `, [...params, limit, offset]);
 
-  const leads: LeadItem[] = leadsResult.rows.map((row) => ({
-    id: row.id,
-    orgId: row.org_id,
-    orgName: row.org_name ?? "Неизвестная компания",
-    sourceExternalId: row.source_external_id,
-    score: row.score,
-    confidenceGate: row.confidence_gate ?? "",
-    vacanciesCount: row.vacancies_count,
-    distinctVacancyNamesCount: row.distinct_vacancy_names_count,
-    latestPublishedAt: row.latest_published_at,
-    reasons: Array.isArray(row.reasons) ? row.reasons.filter((r: unknown): r is string => typeof r === "string") : [],
-    opener: row.opener ?? "",
-    feedbackStatus: row.feedback_status,
-    suppressedUntil: row.suppressed_until,
-    createdAt: row.created_at,
-    sourceFamilies: Array.isArray(row.source_families) ? row.source_families.filter((s: unknown): s is string => typeof s === "string") : [],
-    evidenceTitles: Array.isArray(row.evidence_titles) ? row.evidence_titles.filter((e: unknown): e is string => typeof e === "string") : [],
-    locationNames: Array.isArray(row.location_names) ? row.location_names.filter((l: unknown): l is string => typeof l === "string") : [],
-  }));
+  const leads: LeadItem[] = leadsResult.rows.map((row) => {
+    const reasons = Array.isArray(row.reasons) ? row.reasons.filter((r: unknown): r is string => typeof r === "string") : [];
+    const sourceFamilies = Array.isArray(row.source_families) ? row.source_families.filter((s: unknown): s is string => typeof s === "string") : [];
+    return {
+      id: row.id,
+      orgId: row.org_id,
+      orgName: row.org_name ?? "Неизвестная компания",
+      sourceExternalId: row.source_external_id,
+      score: row.score,
+      confidenceGate: row.confidence_gate ?? "",
+      vacanciesCount: row.vacancies_count,
+      distinctVacancyNamesCount: row.distinct_vacancy_names_count,
+      latestPublishedAt: row.latest_published_at,
+      reasons,
+      whyNow: deriveWhyNow(reasons),
+      bestAngle: deriveBestAngle(reasons, row.opener ?? ""),
+      lawfulContactPath: deriveLawfulContactPath(reasons, sourceFamilies),
+      negativeSignals: deriveNegativeSignals({
+        reasons,
+        vacanciesCount: row.vacancies_count,
+        distinctVacancyNamesCount: row.distinct_vacancy_names_count,
+        sourceFamilies,
+        confidenceGate: row.confidence_gate ?? "",
+      }),
+      opener: row.opener ?? "",
+      feedbackStatus: row.feedback_status,
+      suppressedUntil: row.suppressed_until,
+      createdAt: row.created_at,
+      sourceFamilies,
+      evidenceTitles: Array.isArray(row.evidence_titles) ? row.evidence_titles.filter((e: unknown): e is string => typeof e === "string") : [],
+      locationNames: Array.isArray(row.location_names) ? row.location_names.filter((l: unknown): l is string => typeof l === "string") : [],
+    };
+  });
 
   return { leads, total };
 }
@@ -313,6 +457,10 @@ export async function getLeadDetail(input: {
     org_id: string;
     org_name: string;
     org_website: string | null;
+    org_inn: string | null;
+    org_ogrn: string | null;
+    org_domain: string | null;
+    career_page_url: string | null;
     source_external_id: string | null;
     score: number;
     confidence_gate: string;
@@ -338,6 +486,10 @@ export async function getLeadDetail(input: {
       dc.org_id::TEXT AS org_id,
       dc.source_display_name AS org_name,
       o.website_url AS org_website,
+      o.inn AS org_inn,
+      o.ogrn AS org_ogrn,
+      o.domain AS org_domain,
+      o.career_page_url,
       dc.source_external_id,
       dc.total_score AS score,
       dc.confidence_gate,
@@ -370,6 +522,8 @@ export async function getLeadDetail(input: {
   }
 
   const row = result.rows[0];
+  const reasons = Array.isArray(row.reasons) ? row.reasons.filter((r: unknown): r is string => typeof r === "string") : [];
+  const sourceFamilies = Array.isArray(row.source_families) ? row.source_families.filter((s: unknown): s is string => typeof s === "string") : [];
 
   return {
     id: row.id,
@@ -377,20 +531,34 @@ export async function getLeadDetail(input: {
     orgId: row.org_id,
     orgName: row.org_name ?? "Неизвестная компания",
     orgWebsite: row.org_website,
+    orgInn: row.org_inn,
+    orgOgrn: row.org_ogrn,
+    orgDomain: row.org_domain,
+    careerPageUrl: row.career_page_url,
     sourceExternalId: row.source_external_id,
     score: row.score,
     confidenceGate: row.confidence_gate ?? "",
     vacanciesCount: row.vacancies_count,
     distinctVacancyNamesCount: row.distinct_vacancy_names_count,
     latestPublishedAt: row.latest_published_at,
-    reasons: Array.isArray(row.reasons) ? row.reasons.filter((r: unknown): r is string => typeof r === "string") : [],
+    reasons,
+    whyNow: deriveWhyNow(reasons),
+    bestAngle: deriveBestAngle(reasons, row.opener ?? ""),
+    lawfulContactPath: deriveLawfulContactPath(reasons, sourceFamilies),
+    negativeSignals: deriveNegativeSignals({
+      reasons,
+      vacanciesCount: row.vacancies_count,
+      distinctVacancyNamesCount: row.distinct_vacancy_names_count,
+      sourceFamilies,
+      confidenceGate: row.confidence_gate ?? "",
+    }),
     opener: row.opener ?? "",
     feedbackStatus: row.feedback_status,
     feedbackNote: row.feedback_note,
     suppressedUntil: row.suppressed_until,
     cooldownUntil: row.cooldown_until,
     createdAt: row.created_at,
-    sourceFamilies: Array.isArray(row.source_families) ? row.source_families.filter((s: unknown): s is string => typeof s === "string") : [],
+    sourceFamilies,
     evidenceTitles: Array.isArray(row.evidence_titles) ? row.evidence_titles.filter((e: unknown): e is string => typeof e === "string") : [],
     locationNames: Array.isArray(row.location_names) ? row.location_names.filter((l: unknown): l is string => typeof l === "string") : [],
     candidateSourceKeys: Array.isArray(row.candidate_source_keys) ? row.candidate_source_keys.filter((k: unknown): k is string => typeof k === "string") : [],
