@@ -122,7 +122,7 @@ export class SlidingWindowRateLimiter {
 /* ------------------------------------------------------------------ */
 
 export interface HostRateLimiterConfig {
-  maxRequests: number
+  maxRequestsPerHostPerMinute: number
   windowMs?: number
 }
 
@@ -132,7 +132,7 @@ export class HostRateLimiter {
   private readonly buckets = new Map<string, number[]>()
 
   constructor(config?: Partial<HostRateLimiterConfig>) {
-    this.maxRequests = config?.maxRequests ?? DEFAULT_MAX_REQUESTS
+    this.maxRequests = config?.maxRequestsPerHostPerMinute ?? DEFAULT_MAX_REQUESTS
     this.windowMs = config?.windowMs ?? DEFAULT_WINDOW_MS
   }
 
