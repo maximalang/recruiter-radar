@@ -312,6 +312,7 @@ export const secureActionSchema = {
 };
 
 import { SlidingWindowRateLimiter } from '@/lib/rate-limiter'
+export { SlidingWindowRateLimiter as RateLimiter } from '@/lib/rate-limiter'
 
 // Global rate limiter for validation operations (100 req/min)
 export const validationRateLimiter = new SlidingWindowRateLimiter({ maxRequests: 100 })
