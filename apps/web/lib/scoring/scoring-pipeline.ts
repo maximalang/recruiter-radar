@@ -58,6 +58,7 @@ import {
 } from '@/lib/scoring/market-fit'
 import { extractDepartments, type Department } from '@/lib/scoring/departments'
 import { buildAgencyLead, type AgencyLead, type LeadStatus } from '@/lib/scoring/agency-lead'
+import { filterContactPathsByPolicy } from '@/lib/contact-policy-filter'
 
 export interface PipelineCompany {
   id: string
@@ -93,6 +94,7 @@ export interface AgencyProfile {
   excludedLocations?: string[]
   exclusions?: string[]
   remoteFriendly?: boolean
+  contactPolicy?: 'corporate_only' | 'no_personal' | 'unrestricted'
 }
 
 export interface ScoringPipelineInput {
@@ -183,9 +185,12 @@ export function runScoringPipeline(input: ScoringPipelineInput): ScoringPipeline
   const nowMs = resolveNowMs(input.now)
   const nowDate = new Date(nowMs)
 
+  const filteredContactPaths = input.agencyProfile.contactPolicy
+    ? filterContactPathsByPolicy(input.contactPaths, input.agencyProfile.contactPolicy)
+    : input.contactPaths
   const sourceAggregation = aggregateSourceSignals(toAggregationInputs(input.evidence))
   const freshness = computeLeadFreshness(toFreshnessInputs(input.evidence), { now: () => nowMs })
-  const contactQuality = computeContactQuality(input.contactPaths)
+  const contactQuality = computeContactQuality(filteredContactPaths)
   const industryAlignment = computeIndustryAlignment({
     targetIndustries: input.agencyProfile.industries,
     excludedIndustries: input.agencyProfile.excludedIndustries,
