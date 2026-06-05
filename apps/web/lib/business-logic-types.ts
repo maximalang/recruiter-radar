@@ -182,8 +182,12 @@ export interface SourceReadiness {
 }
 
 // Confidence Gate Types
-export interface ConfidenceGate {
-  gate: 'A' | 'B' | 'C' | 'D';
+// The authoritative ConfidenceGate union type ('A'|'B'|'C'|'D') lives in lib/scoring/gates.ts.
+// This interface documents the gate *policy* (criteria + delivery action) for reference.
+// Import the union type from scoring/gates for actual code; this interface is for
+// documentation and configuration only.
+export interface ConfidenceGatePolicy {
+  gate: import('@/lib/scoring/gates').ConfidenceGate;
   criteria: {
     minEvidenceLayers: number;
     requireDirectHiringProof: boolean;

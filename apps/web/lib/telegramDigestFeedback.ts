@@ -14,6 +14,10 @@ const TELEGRAM_DIGEST_FEEDBACK_ACTIONS = [
   {
     key: "snooze",
     label: "⏸ Позже"
+  },
+  {
+    key: "dismissed",
+    label: "🚫 Скрыть"
   }
 ] as const;
 
@@ -27,26 +31,28 @@ const ACTION_TO_CODE = {
   accepted: "a",
   badfit: "b",
   snooze: "s",
+  dismissed: "d",
 } as const;
 
-const CODE_TO_ACTION: Record<string, "shown" | "accepted" | "badfit" | "snooze"> = {
+const CODE_TO_ACTION: Record<string, "shown" | "accepted" | "badfit" | "snooze" | "dismissed"> = {
   v: "shown",
   a: "accepted",
   b: "badfit",
   s: "snooze",
+  d: "dismissed",
 };
 
 export type SignedDigestFeedbackCallback = {
   client_profile_id: string;
   org_id: string;
-  action: "shown" | "accepted" | "badfit" | "snooze";
+  action: "shown" | "accepted" | "badfit" | "snooze" | "dismissed";
   sig: string;
 };
 
 export type UnsignedDigestFeedbackCallback = {
   client_profile_id: string;
   org_id: string;
-  action: "shown" | "accepted" | "badfit" | "snooze";
+  action: "shown" | "accepted" | "badfit" | "snooze" | "dismissed";
 };
 
 export function buildTelegramDigestAuditItems(items: readonly HhDigestItem[]) {
@@ -112,7 +118,7 @@ function buildItemFeedbackRows(clientProfileId: string, item: HhDigestItem) {
 function buildFeedbackCallbackData(input: {
   clientProfileId: string;
   org_id: string;
-  action: "shown" | "accepted" | "badfit" | "snooze";
+  action: "shown" | "accepted" | "badfit" | "snooze" | "dismissed";
 }): string {
   const unsigned: UnsignedDigestFeedbackCallback = {
     client_profile_id: input.clientProfileId,
@@ -171,6 +177,7 @@ export function verifyDigestFeedbackCallback(data: string | null): SignedDigestF
   return { ...unsigned, sig };
 }
 
+/** @deprecated All feedback paths must use verifyDigestFeedbackCallback. This function is removed. */
 export function parseDigestFeedbackCallbackData(_value: string | null | undefined): null {
   // Unsigned parser is deprecated; all feedback paths must use verifyDigestFeedbackCallback.
   return null;

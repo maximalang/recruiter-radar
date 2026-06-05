@@ -1,5 +1,6 @@
 ﻿import { Pool } from "pg";
 
+import { getPool as getSharedPool } from "./db-pool";
 import { updateDigestOrgStateFeedback, type DigestFeedbackAction } from "./digestFeedback";
 import type { HhDigestItem } from "./hhDigest";
 import { getTelegramBotToken, sendTelegramLeadMessage } from "./telegram";
@@ -39,13 +40,13 @@ export function isActionableLeadStatus(value: FormDataEntryValue | null): value 
   return typeof value === "string" && ACTIONABLE_LEAD_STATUSES.includes(value as ActionableLeadStatus);
 }
 
+/**
+ * Returns the shared Postgres Pool.
+ * @deprecated Import getPool from '@/lib/db-pool' instead.
+ * Kept as a re-export for backward compatibility.
+ */
 export function getPool(): Pool | null {
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) return null;
-  if (!globalForPg.recruiterRadarPool) {
-    globalForPg.recruiterRadarPool = new Pool({ connectionString });
-  }
-  return globalForPg.recruiterRadarPool;
+  return getSharedPool();
 }
 
 export async function getLeads(): Promise<LeadsResult> {

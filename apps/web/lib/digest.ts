@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Pool, type PoolClient } from "pg";
+import { getPool as getSharedPool } from "./db-pool";
 import { isDigestEligibleGate } from "./scoring/gate-pipeline";
 import { getClientProfileById, INDUSTRY_KEYWORDS, type ClientProfile } from "./clientProfiles";
 import type {
@@ -25,19 +26,7 @@ const globalForPg = globalThis as typeof globalThis & {
 };
 
 function getPool(): Pool | null {
-  const connectionString = process.env.DATABASE_URL;
-
-  if (!connectionString) {
-    return null;
-  }
-
-  if (!globalForPg.recruiterRadarDigestPool) {
-    globalForPg.recruiterRadarDigestPool = new Pool({
-      connectionString
-    });
-  }
-
-  return globalForPg.recruiterRadarDigestPool;
+  return getSharedPool();
 }
 
 export async function getDigestPreviewItems(limit = 10): Promise<DigestItemInput[]> {

@@ -13,6 +13,7 @@
 
 import { Pool } from 'pg';
 import type { Pool as PoolType, PoolClient } from 'pg';
+import { getPool as getSharedPool } from '@/lib/db-pool';
 import type { FiurClientOverrides } from './fiur';
 
 type DbClient = Pick<PoolType, 'query'> | Pick<PoolClient, 'query'>;
@@ -115,11 +116,5 @@ const globalForPg = globalThis as typeof globalThis & {
 };
 
 function getPool(): PoolType | null {
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) return null;
-
-  if (!globalForPg.recruiterRadarClientOverridesPool) {
-    globalForPg.recruiterRadarClientOverridesPool = new Pool({ connectionString });
-  }
-  return globalForPg.recruiterRadarClientOverridesPool;
+  return getSharedPool();
 }

@@ -1,4 +1,5 @@
 import { Pool, type PoolClient } from "pg";
+import { getPool as getSharedPool } from "./db-pool";
 
 import type { HhDigestItem } from "./hhDigest";
 
@@ -17,19 +18,7 @@ const globalForPg = globalThis as typeof globalThis & {
 };
 
 function getPool(): Pool | null {
-  const connectionString = process.env.DATABASE_URL;
-
-  if (!connectionString) {
-    return null;
-  }
-
-  if (!globalForPg.recruiterRadarClientProfileSignalOutcomesPool) {
-    globalForPg.recruiterRadarClientProfileSignalOutcomesPool = new Pool({
-      connectionString
-    });
-  }
-
-  return globalForPg.recruiterRadarClientProfileSignalOutcomesPool;
+  return getSharedPool();
 }
 
 export async function recordClientProfileDigestShownOutcomes(input: {

@@ -1,4 +1,5 @@
 import { Pool, type PoolClient } from "pg";
+import { getPool as getSharedPool } from "./db-pool";
 
 import {
   createPilotApplication,
@@ -249,19 +250,7 @@ const globalForPg = globalThis as typeof globalThis & {
 };
 
 function getPool(): Pool | null {
-  const connectionString = process.env.DATABASE_URL;
-
-  if (!connectionString) {
-    return null;
-  }
-
-  if (!globalForPg.recruiterRadarPaymentsPool) {
-    globalForPg.recruiterRadarPaymentsPool = new Pool({
-      connectionString
-    });
-  }
-
-  return globalForPg.recruiterRadarPaymentsPool;
+  return getSharedPool();
 }
 
 export function getPaymentProviderSetupState(): PaymentProviderSetupState {

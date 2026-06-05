@@ -1,4 +1,5 @@
 import { Pool, type PoolClient } from "pg";
+import { getPool as getSharedPool } from "./db-pool";
 import type { AgencyProfile } from "./scoring/scoring-pipeline";
 
 type ClientProfilesDbClient = Pick<Pool, "query"> | Pick<PoolClient, "query">;
@@ -60,19 +61,7 @@ const globalForPg = globalThis as typeof globalThis & {
 };
 
 function getPool(): Pool | null {
-  const connectionString = process.env.DATABASE_URL;
-
-  if (!connectionString) {
-    return null;
-  }
-
-  if (!globalForPg.recruiterRadarClientProfilesPool) {
-    globalForPg.recruiterRadarClientProfilesPool = new Pool({
-      connectionString
-    });
-  }
-
-  return globalForPg.recruiterRadarClientProfilesPool;
+  return getSharedPool();
 }
 
 export async function listClientProfiles(): Promise<ClientProfile[]> {

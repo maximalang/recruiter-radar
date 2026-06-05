@@ -100,7 +100,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, ignored: true });
     }
     if (parsedCallback.action !== "shown") {
-      await updateDigestOrgStateFeedback({ clientProfileId: parsedCallback.client_profile_id, orgId: parsedCallback.org_id, action: parsedCallback.action as DigestFeedbackAction });
+      if (!isDigestFeedbackAction(parsedCallback.action)) {
+        // Unrecognised callback action — ignore safely instead of casting
+        await pool.query(`UPDATE webhook_events SET status = 'ignored', processed_at = NOW(), error_message = 'unrecognised_action' WHERE id = $1 AND processing_claim_token = $2`, [eventRow.id, claimToken]);
+        await answerTelegramCallbackQuery({ callbackQueryId, botToken }).catch(() => {});
+        return NextResponse.json({ ok: true, ignored: true, reason: "unrecognised_action" });
+      }
+      await updateDigestOrgStateFeedback({ clientProfileId: parsedCallback.client_profile_id, orgId: parsedCallback.org_id, action: parsedCallback.action });
     }
     await answerTelegramCallbackQuery({ callbackQueryId, botToken, text: parsedCallback.action === "shown" ? undefined : getDigestFeedbackConfirmationText(parsedCallback.action) });
     await pool.query(`UPDATE webhook_events SET status = 'processed', processed_at = NOW(), error_message = NULL WHERE id = $1 AND processing_claim_token = $2`, [eventRow.id, claimToken]);
@@ -113,8 +119,17 @@ export async function POST(request: Request) {
   }
 }
 
-export function parseDigestFeedbackCallbackData(value: string | null | undefined): null { return null; }
-function getDigestFeedbackConfirmationText(action: DigestFeedbackAction): string { switch (action) { case "accepted": return "Отмечено: беру"; case "badfit": return "Отмечено: мимо"; case "snooze": return "Отмечено: позже"; case "dismissed": return "Отмечено: скрыто"; case "contacted": return "Отмечено: contacted"; case "replied": return "Отмечено: replied"; case "won": return "Отмечено: won"; } }
+function getDigestFeedbackConfirmationText(action: DigestFeedbackAction): string {
+  switch (action) {
+    case "accepted": return "Отмечено: беру";
+    case "badfit": return "Отмечено: мимо";
+    case "snooze": return "Отмечено: позже";
+    case "dismissed": return "Отмечено: скрыто";
+    case "contacted": return "Отмечено: написал";
+    case "replied": return "Отмечено: ответили";
+    case "won": return "Отмечено: клиент";
+  }
+}
 function isPositiveIntegerString(value: string | null | undefined): value is string { return typeof value === "string" && /^\d+$/.test(value); }
 function normalizeNonEmptyString(value: string | null | undefined): string | null { if (typeof value !== "string") return null; const normalizedValue = value.trim(); return normalizedValue === "" ? null : normalizedValue; }
 function sanitizeError(value: string): string { return value.replace(/bot\d+:[A-Za-z0-9_-]+/g, "[redacted-token]"); }

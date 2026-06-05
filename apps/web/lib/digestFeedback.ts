@@ -1,4 +1,5 @@
 import { Pool, type PoolClient } from "pg";
+import { getPool as getSharedPool } from "./db-pool";
 
 type DigestFeedbackDbClient = Pick<Pool, "query"> | Pick<PoolClient, "query">;
 
@@ -38,19 +39,7 @@ const globalForPg = globalThis as typeof globalThis & {
 };
 
 function getPool(): Pool | null {
-  const connectionString = process.env.DATABASE_URL;
-
-  if (!connectionString) {
-    return null;
-  }
-
-  if (!globalForPg.recruiterRadarDigestFeedbackPool) {
-    globalForPg.recruiterRadarDigestFeedbackPool = new Pool({
-      connectionString
-    });
-  }
-
-  return globalForPg.recruiterRadarDigestFeedbackPool;
+  return getSharedPool();
 }
 
 export function isDigestFeedbackAction(value: unknown): value is DigestFeedbackAction {
