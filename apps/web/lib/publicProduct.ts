@@ -32,26 +32,36 @@ export type PublicPreviewItem = HhDigestItem & {
 export const PUBLIC_PLANS: PublicPlan[] = [
   {
     code: "pilot",
-    name: "Pilot",
-    cadence: "7 дней",
-    amountMinor: 100,
+    name: "Пилот",
+    cadence: "7–14 дней",
+    amountMinor: 4900000,
     currency: "RUB",
-    price: "1 ₽",
-    description: "Короткий запуск, чтобы увидеть ежедневный радар на живом профиле.",
-    bullets: ["профиль поиска", "первый радар", "подключение Telegram"],
+    price: "49 000 ₽",
+    description: "Короткий запуск: увидите компании, которым стоит написать, с доказательствами и готовым углом контакта.",
+    bullets: [
+      "профиль поиска под вашу нишу",
+      "ежедневный радар с hiring-proof",
+      "подключение Telegram за 2 минуты",
+      "объяснимый scoring: почему сейчас и почему вам",
+    ],
     ctaLabel: "Запустить пилот",
     isPrimary: true
   },
   {
     code: "monthly",
-    name: "Monthly",
+    name: "Ассистированный радар",
     cadence: "ежемесячно",
-    amountMinor: 29900,
+    amountMinor: 14900000,
     currency: "RUB",
-    price: "299 ₽",
-    description: "Постоянный доступ к радару после пилота.",
-    bullets: ["ежедневные сигналы", "тот же профиль", "без ручного запуска"],
-    ctaLabel: "Выбрать monthly",
+    price: "149 000 ₽/мес",
+    description: "Постоянный радар с weekly-калибровкой, reviewed hot leads и приоритетной доставкой.",
+    bullets: [
+      "20–40 validated leads в месяц",
+      "weekly calibration по вашей обратной связи",
+      "hot lead review — аналитик проверяет верхний слой",
+      "приоритетная доставка и custom exclusions",
+    ],
+    ctaLabel: "Выбрать ассистированный",
     isPrimary: false
   }
 ]
