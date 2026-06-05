@@ -88,8 +88,8 @@ export async function fetchHhVacancyPages({ userAgent, config = resolveHhVacancy
     // Rate limiting: wait if we've exceeded 30 req/min
     const url = buildHhVacanciesUrl(config, page);
     const host = new URL(url).hostname;
-    while (!hhRateLimiter.allow(host)) {
-      const waitMs = hhRateLimiter.msUntilNextAllowed(host);
+    while (!(await hhRateLimiter.allow(host))) {
+      const waitMs = await hhRateLimiter.msUntilNextAllowed(host);
       if (waitMs > 0) {
         await new Promise(resolve => setTimeout(resolve, waitMs));
       }

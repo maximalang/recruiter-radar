@@ -32,11 +32,11 @@ import type {
 } from './crawler-contract'
 import { validateCrawlerUrl } from './url-validator'
 import { CircuitBreaker, type CircuitBreakerConfig } from './circuit-breaker'
-import { HostRateLimiter, type RateLimiterConfig } from './rate-limiter'
+import { HostRateLimiter, type HostRateLimiterConfig as RateLimiterConfig } from '@/lib/rate-limiter'
 import { withRetry, type RetryConfig } from './retry'
 
 export { CircuitBreaker, type CircuitBreakerConfig, type CircuitState } from './circuit-breaker'
-export { HostRateLimiter, type RateLimiterConfig } from './rate-limiter'
+export { HostRateLimiter, type HostRateLimiterConfig as RateLimiterConfig } from '@/lib/rate-limiter'
 export { withRetry, type RetryConfig } from './retry'
 
 /* ------------------------------------------------------------------ */
@@ -144,7 +144,7 @@ export function createCrawlerRouter(
       }
 
       // --- Rate limiter gate (429) ---
-      if (!rateLimiter.isAllowed(host)) {
+      if (!(await rateLimiter.isAllowed(host))) {
         circuitBreaker.resetProbe(host)
         return {
           url: input.url,

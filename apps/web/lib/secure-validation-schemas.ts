@@ -311,49 +311,21 @@ export const secureActionSchema = {
   }
 };
 
-// Rate limiting validation
-export class RateLimiter {
-  private requests: Map<string, number[]> = new Map();
-  private maxRequests = 100; // requests per window
-  private windowMs = 60000; // 1 minute
+import { SlidingWindowRateLimiter } from '@/lib/rate-limiter'
 
-  isAllowed(key: string): boolean {
-    const now = Date.now();
-    const windowStart = now - this.windowMs;
-
-    let requests = this.requests.get(key) || [];
-
-    // Filter out old requests
-    requests = requests.filter(time => time > windowStart);
-
-    if (requests.length >= this.maxRequests) {
-      return false;
-    }
-
-    requests.push(now);
-    this.requests.set(key, requests);
-
-    return true;
-  }
-
-  reset(): void {
-    this.requests.clear();
-  }
-}
-
-// Global rate limiter for validation operations
-export const validationRateLimiter = new RateLimiter();
+// Global rate limiter for validation operations (100 req/min)
+export const validationRateLimiter = new SlidingWindowRateLimiter({ maxRequests: 100 })
 
 // Secure validation with rate limiting
-export function secureValidate<T>(data: unknown, validator: (data: unknown) => data is T): {
+export async function secureValidate<T>(data: unknown, validator: (data: unknown) => data is T): Promise<{
   valid: boolean;
   data?: T;
   error?: string;
-} {
+}> {
   const key = 'validation_' + Date.now();
 
   // Check rate limit
-  if (!validationRateLimiter.isAllowed(key)) {
+  if (!(await validationRateLimiter.isAllowed(key))) {
     return { valid: false, error: 'Too many validation attempts' };
   }
 

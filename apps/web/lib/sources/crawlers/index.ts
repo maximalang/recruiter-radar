@@ -20,7 +20,7 @@ import { createFirecrawlEngine, type FirecrawlEngineOptions } from './crawler-fi
 export type { CrawlerRouter, EngineRegistry } from './crawler-router'
 export { chooseEngine, createCrawlerRouter } from './crawler-router'
 export { CircuitBreaker, type CircuitBreakerConfig, type CircuitState } from './circuit-breaker'
-export { HostRateLimiter, type RateLimiterConfig } from './rate-limiter'
+export { HostRateLimiter, type HostRateLimiterConfig as RateLimiterConfig } from '@/lib/rate-limiter'
 export { withRetry, type RetryConfig } from './retry'
 export { validateCrawlerUrl } from './url-validator'
 export { createStaticEngine } from './crawler-static'

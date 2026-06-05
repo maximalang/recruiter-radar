@@ -41,22 +41,6 @@
   font-weight: 600;
 }
 
-/* Brand link */
-.brandLink {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  width: fit-content;
-  padding: 6px 11px;
-  border-radius: 999px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  background-color: #ffffff;
-  color: #0f172a;
-  text-decoration: none;
-  font-weight: 750;
-  font-size: 0.95rem;
-}
-
 /* Field */
 .field {
   display: grid;
@@ -170,38 +154,6 @@
   border: 1px solid rgba(15, 23, 42, 0.06);
   background-color: #f8fafc;
   color: #667085;
-  text-decoration: none;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-/* Destructive action */
-.destructiveAction {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 10px 14px;
-  border-radius: 12px;
-  border: 1px solid rgba(185, 28, 28, 0.16);
-  background-color: #fff7f7;
-  color: #b42318;
-  text-decoration: none;
-  font-size: 0.9rem;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-/* Inline action */
-.inlineAction {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  width: fit-content;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: #667487;
   text-decoration: none;
   font-size: 0.9rem;
   font-weight: 600;
@@ -405,50 +357,3 @@
   line-height: 1.6;
 }
 
-/* Workspace split */
-.workspaceSplit {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 18px;
-  align-items: start;
-}
-
-/* Workspace side panel */
-.workspaceSidePanel {
-  display: grid;
-  gap: 12px;
-  align-content: start;
-}
-
-/* Workspace panel */
-.workspacePanel {
-  display: grid;
-  gap: 12px;
-  padding: 14px 16px;
-  border-radius: 16px;
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  background-color: #fbfcfd;
-}
-
-/* Workspace panel title */
-.workspacePanelTitle {
-  color: #0f172a;
-  font-size: 0.9rem;
-  font-weight: 700;
-}
-
-/* Workspace panel text */
-.workspacePanelText {
-  color: #5f6b7a;
-  font-size: 0.88rem;
-  line-height: 1.55;
-}
-
-/* Feature dot */
-.featureDot {
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background-color: #101828;
-  flex-shrink: 0;
-}
