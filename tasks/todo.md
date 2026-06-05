@@ -192,17 +192,34 @@
 - [x] I4: N+1 queries in leads page → Fixed (getLeadsForAllProfiles)
 - [ ] R1: Dead CSS classes from CSS Modules migration cleanup
 
+## 🔧 Technical Debt (from code review 2026-06-05)
+
+- [x] ~~C2: Duplicate ConfidenceGate types~~ → Renamed interface to ConfidenceGatePolicy, authoritative type in scoring/gates.ts
+- [x] ~~I13: Multiple DB Pool singletons (8 pools = 80+ connections)~~ → Unified to lib/db-pool.ts shared Pool
+- [x] ~~I1: Missing 'dismissed' callback button in Telegram digest~~ → Added 🚫 Скрыть + ACTION_TO_CODE mapping
+- [x] ~~I11: Unsafe 'as DigestFeedbackAction' cast in webhook~~ → Added isDigestFeedbackAction() whitelist guard
+- [x] ~~I2: Dead parseDigestFeedbackCallbackData export~~ → Removed from webhook route
+- [ ] C1: auditDigestGate lossy SQL→TS mapping — needs signal evidence re-fetch for C-gate items
+- [ ] I4: payments.ts monolith (1739 lines) — split into checkout-orders / pilot-onboarding / payment-normalize
+- [ ] I7: packages/db/lib/ duplicates apps/web/lib/ types — needs shared package import
+- [ ] I8: DedupeService suppression in JSON file → Postgres-backed
+- [ ] I12: sanitizeError regex incomplete for Telegram token format
+- [ ] I15: Redis rate limiter race condition — needs MULTI/EXEC
+- [ ] R1: Dead CSS classes from CSS Modules migration cleanup
+
 ---
 
-## 🗂 Состояние на конец 04.06.2026
+## 🗂 Состояние на 05.06.2026
 
-**Коммитов впереди origin:** 8
-**Тестов:** 700 passing
-**Ветки:** только main
+**Коммитов впереди origin:** 9
+**Тестов:** 711 passing
+**Ветки:** review-p0-confidence-gate-unify (current) + main
 
-**P1 Задачи выполнены:**
-- ✅ 2.1: Lead Pipeline UI — список лидов + детальный просмотр + фильтрация
-- ✅ 2.2: Outreach Templates — шаблоны + Telegram интеграция
-- ✅ 2.3: Analytics Dashboard — воронка обратной связи + метрики + источники
+**P0/P1 Задачи выполнены (05.06 code review):**
+- ✅ Unified DB Pool singleton — lib/db-pool.ts (8→1 pools)
+- ✅ ConfidenceGate type unification — Policy interface renamed
+- ✅ Telegram 'dismissed' callback button — 🚫 Скрыть
+- ✅ Callback action whitelist guard — isDigestFeedbackAction()
+- ✅ Dead code removal — parseDigestFeedbackCallbackData
 
-**Следующий приоритет:** P2 Enterprise Features или техдолг (S3, R1)
+**Следующий приоритет:** P2 Enterprise Features или оставшийся техдолг (C1 auditDigestGate, I4 payments split, I8 dedupe Postgres)
