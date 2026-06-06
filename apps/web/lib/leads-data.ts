@@ -95,7 +95,7 @@ export function deriveNegativeSignals(input: {
   }
 
   // Stale signals
-  if (input.reasons.some(r => r.includes('stale') || r.includes('older'))) {
+  if (input.reasons.some(r => r.includes('stale') || r.includes('older') || r.includes('без обновления'))) {
     signals.push('Устаревшие сигналы — активность могла закончиться');
   }
 

@@ -59,6 +59,7 @@ import {
 import { extractDepartments, type Department } from '@/lib/scoring/departments'
 import { buildAgencyLead, type AgencyLead, type LeadStatus } from '@/lib/scoring/agency-lead'
 import { filterContactPathsByPolicy } from '@/lib/contact-policy-filter'
+import { detectAgencyReposts, type RepostVacancyInput } from '@/lib/lead-discovery/hiring-pattern-detector'
 
 export interface PipelineCompany {
   id: string
@@ -127,6 +128,7 @@ export interface ScoringPipelineBreakdown {
   salaryAnalysis: SalaryAnalysisResult
   marketFit: MarketFitResult
   departments: Department[]
+  negativeSignals: string[]
 }
 
 export interface ScoringPipelineResult {
@@ -181,6 +183,52 @@ function deriveCompanyLocations(company: PipelineCompany, vacancies: PipelineVac
   return out
 }
 
+function generateNegativeSignals(input: ScoringPipelineInput): string[] {
+  const signals: string[] = []
+
+  // 1. Internal recruiter only — no real hiring intent
+  if (input.vacancies.length > 0) {
+    const realRoles = input.vacancies.filter((v) => !v.isInternalRecruiter)
+    if (realRoles.length === 0) {
+      signals.push('Только вакансия внутреннего рекрутера — нет внешнего найма')
+    }
+  }
+
+  // 2. Agency reposts
+  const repostResult = detectAgencyReposts(input.vacancies.map((v) => ({
+    title: v.title,
+    publishedAt: v.publishedAt,
+  } as RepostVacancyInput)))
+  if (repostResult.reasons.length > 0) {
+    signals.push(...repostResult.reasons.map((r) => `Агентский репост: ${r}`))
+  }
+
+  // 3. Stale urgency reasons from FIUR
+  if (input.vacancies.length > 0) {
+    const nowMs = resolveNowMs(input.now)
+    const oldVacancies = input.vacancies.filter((v) => {
+      const t = Date.parse(v.publishedAt)
+      return !isNaN(t) && (nowMs - t) > 60 * 24 * 60 * 60 * 1000 // >60 days
+    })
+    if (oldVacancies.length >= input.vacancies.length / 2) {
+      signals.push('Большинство вакансий старше 60 дней — активность могла закончиться')
+    }
+  }
+
+  // 4. Single source
+  const uniqueSources = new Set(input.evidence.map((e) => e.source))
+  if (uniqueSources.size <= 1) {
+    signals.push('Только один источник данных — нет независимого подтверждения')
+  }
+
+  // 5. Questionable entity match
+  if (input.entityMatch === 'questionable') {
+    signals.push('Совпадение сущности под вопросом — требуется проверка компании')
+  }
+
+  return signals
+}
+
 export function runScoringPipeline(input: ScoringPipelineInput): ScoringPipelineResult {
   const nowMs = resolveNowMs(input.now)
   const nowDate = new Date(nowMs)
@@ -205,6 +253,7 @@ export function runScoringPipeline(input: ScoringPipelineInput): ScoringPipeline
   const salaryAnalysis = analyzeSalaryLevel(toSalaryInputs(input.vacancies), input.salaryRates)
   const marketFit = computeMarketFit(input.marketContext ?? {})
   const departments = input.careerPageHtml ? extractDepartments(input.careerPageHtml) : []
+  const negativeSignals = generateNegativeSignals(input)
 
   const fiur = computeFiur({
     company: {
@@ -286,6 +335,7 @@ export function runScoringPipeline(input: ScoringPipelineInput): ScoringPipeline
       salaryAnalysis,
       marketFit,
       departments,
+      negativeSignals,
     },
   }
 }

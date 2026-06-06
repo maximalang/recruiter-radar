@@ -16,12 +16,19 @@ import {
   StatusBadge,
   SurfaceCard,
 } from "./ui/page-primitives";
-import ppStyles from "./ui/page-primitives.module.css";
+import ppStyles from "./page-primitives.module.css";
 import {
   buildFaqItems,
   formatVacanciesCount,
 } from "./home-page-components";
 import hpStyles from "./home-page-components.module.css";
+
+const GATE_CONFIG: Record<string, { color: string; bg: string; label: string }> = {
+  A: { color: '#065f46', bg: '#d1fae5', label: 'A — авто' },
+  B: { color: '#1e40af', bg: '#dbeafe', label: 'B — авто' },
+  C: { color: '#92400e', bg: '#fef3c7', label: 'C — проверка' },
+  D: { color: '#4b5563', bg: '#f3f4f6', label: 'D — контекст' },
+};
 
 export const dynamic = "force-dynamic";
 
@@ -34,23 +41,23 @@ type HomePageProps = {
 type HomePreviewItem = Awaited<ReturnType<typeof getPublicSampleDigestState>>["items"][number];
 
 const heroProofItems = [
+  "3 минуты — и видно, кому писать сегодня",
   "Живой hiring-proof по каждой компании",
-  "Понятно, почему сейчас и почему вам",
-  "Безопасный путь первого контакта"
+  "Понятно, почему сейчас и готовый угол контакта"
 ] as const;
 
 const heroStats = [
   {
-    value: "1 день",
-    label: "до первого радара"
+    value: "3 минуты",
+    label: "от входа до первого радара"
   },
   {
-    value: "3 шага",
-    label: "от примера до запуска"
+    value: "Без регистрации",
+    label: "просто укажите нишу и регион"
   },
   {
-    value: "0 CRM",
-    label: "лишней настройки и тяжёлой админки"
+    value: "0 настроек",
+    label: "никакой CRM и длинного внедрения"
   }
 ] as const;
 
@@ -60,12 +67,16 @@ const heroSignalRows = [
     value: "живой найм по нескольким ролям, подтверждённый с разных источников"
   },
   {
+    label: "Gate",
+    value: "A — 2+ независимых источника, чистое совпадение"
+  },
+  {
     label: "Почему сейчас",
     value: "hiring burst, новый регион, дефицитная функция — понятный повод для контакта"
   },
   {
-    label: "Следующий шаг",
-    value: "корпоративный контакт и готовый угол первого сообщения"
+    label: "Угол контакта",
+    value: "корпоративная карьерная страница + готовый оупенер"
   }
 ] as const;
 
@@ -130,6 +141,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
   return (
     <PageFrame maxWidth="1160px">
+      <a href="#main-content" className={ppStyles.skipLink}>Перейти к содержанию</a>
       <header className={hpStyles.topBar}>
         <div className={hpStyles.heroBrandName}>
           <div>Recruiter Radar</div>
@@ -143,12 +155,12 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         </a>
       </header>
 
-      <section className={hpStyles.heroGrid}>
+      <section id="main-content" className={hpStyles.heroGrid}>
         <SurfaceCard className={hpStyles.surfaceCardGradient}>
           <StatusBadge tone="success">Сначала пример. Потом решение.</StatusBadge>
 
           <div>
-            <h1 className={hpStyles.heroTitle}>Компании, которым стоит написать сегодня.</h1>
+            <h1 className={hpStyles.heroTitle} style={{ lineHeight: "0.95" }}>Компании, которым стоит написать сегодня.</h1>
             <p className={hpStyles.heroText}>
               Recruiter Radar каждый день находит работодателей с живым наймом, показывает
               причину сигнала и подсказывает лучший угол первого контакта.
@@ -193,7 +205,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             <div className={hpStyles.signalEyebrow}>Пример сигнала</div>
             <div className={hpStyles.signalTitle}>Northline Recruiting Ops</div>
             <div className={hpStyles.signalText}>
-              Компания в активной фазе найма. Есть свежие роли и понятный повод для первого выхода.
+              Свежий найм по 3 ролям, подтверждённый из 2 источников. Gate A — можно работать сразу.
             </div>
           </div>
 
@@ -209,7 +221,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           <div className={hpStyles.whatUserGetsBox}>
             <div className={hpStyles.userGetsLabel}>Что получает пользователь</div>
             <div className={hpStyles.userGetsText}>
-              Не просто список компаний, а уже упакованный повод для контакта и приоритет на сегодня.
+              Компании, которым стоит написать сегодня — с confidence, доказательствами, почему сейчас и готовым углом контакта.
             </div>
           </div>
         </SurfaceCard>
@@ -245,14 +257,15 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         <div className={hpStyles.previewGrid}>
           <SurfaceCard className={hpStyles.previewCardContainer}>
             <div>
-              <div style={{ fontWeight: 700, fontSize: "1.08rem" }}>Параметры профиля</div>
+              <div style={{ fontWeight: 700, fontSize: "var(--fs-lg)" }}>Параметры профиля</div>
               <div className={ppStyles.helperText}>Только то, что реально влияет на подборку.</div>
             </div>
 
             <form method="GET" action="/" style={{ display: "grid", gap: "14px" }}>
-              <label className={ppStyles.field}>
+              <label htmlFor="specialization" className={ppStyles.field}>
                 <span className={ppStyles.fieldLabel}>Специализация</span>
                 <input
+                  id="specialization"
                   name="specialization"
                   defaultValue={previewInput.specialization}
                   placeholder="IT-рекрутмент / подбор в продажи"
@@ -260,9 +273,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                 />
               </label>
 
-              <label className={ppStyles.field}>
+              <label htmlFor="targetCity" className={ppStyles.field}>
                 <span className={ppStyles.fieldLabel}>География</span>
                 <input
+                  id="targetCity"
                   name="targetCity"
                   defaultValue={previewInput.targetCity}
                   placeholder="Москва / Берлин / удалённо"
@@ -273,9 +287,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               <details className={ppStyles.disclosure}>
                 <summary className={ppStyles.disclosureSummary}>Уточнить профиль</summary>
                 <div className={ppStyles.disclosureBody}>
-                  <label className={ppStyles.field}>
+                  <label htmlFor="dailyDigestLimit" className={ppStyles.field}>
                     <span className={ppStyles.fieldLabel}>Компаний в день</span>
                     <input
+                      id="dailyDigestLimit"
                       name="dailyDigestLimit"
                       type="number"
                       min={1}
@@ -286,9 +301,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                     <span className={ppStyles.helperText}>От 1 до 10 компаний в одном радаре.</span>
                   </label>
 
-                  <label className={ppStyles.field}>
+                  <label htmlFor="includeKeywords" className={ppStyles.field}>
                     <span className={ppStyles.fieldLabel}>Усилить фокус</span>
                     <input
+                      id="includeKeywords"
                       name="includeKeywords"
                       defaultValue={previewInput.includeKeywords}
                       placeholder="рекрутер, сорсинг, агентство"
@@ -296,9 +312,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                     />
                   </label>
 
-                  <label className={ppStyles.field}>
+                  <label htmlFor="excludeKeywords" className={ppStyles.field}>
                     <span className={ppStyles.fieldLabel}>Исключить</span>
                     <input
+                      id="excludeKeywords"
                       name="excludeKeywords"
                       defaultValue={previewInput.excludeKeywords}
                       placeholder="вахта, завод, стажировка"
@@ -325,7 +342,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           <SurfaceCard className={hpStyles.previewCardContainer}>
             <div>
               <div className={hpStyles.previewHeaderRow}>
-                <div style={{ fontWeight: 700, fontSize: "1.08rem" }}>
+                <div style={{ fontWeight: 700, fontSize: "var(--fs-lg)" }}>
                   {hasPreview ? "Радар для выбранного профиля" : "Как выглядит ежедневный радар"}
                 </div>
                 <StatusBadge tone={previewState.isPersonalized ? "info" : "neutral"} style={{ justifySelf: "start" }}>
@@ -442,7 +459,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                 <StatusBadge tone={plan.isPrimary ? "info" : "neutral"} style={{ justifySelf: "start" }}>
                   {plan.name}
                 </StatusBadge>
-                <div style={{ fontSize: "2rem", fontWeight: 800 }}>{plan.price}</div>
+                <div className={ppStyles.planPrice}>{plan.price}</div>
                 <div style={{ color: "#64748b" }}>{plan.cadence}</div>
                 <p className={hpStyles.planDescription}>{plan.description}</p>
               </div>
@@ -496,12 +513,17 @@ function PreviewDigestCard(props: {
     <article className={hpStyles.previewCard}>
       <div className={hpStyles.previewCardHeader}>
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
-          <strong style={{ fontSize: "1.02rem" }}>
+          <strong style={{ fontSize: "var(--fs-base)" }}>
             {item.rank}. {item.employer_name}
           </strong>
           <span className={hpStyles.scorePill}>{probability.workNowText}</span>
+          {item.confidence_gate && item.confidence_gate in GATE_CONFIG && (
+            <span className={ppStyles.gateBadge} data-gate={item.confidence_gate}>
+              {GATE_CONFIG[item.confidence_gate].label}
+            </span>
+          )}
         </div>
-        <span style={{ color: "#64748b", fontSize: "0.9rem" }}>{formatVacanciesCount(item.vacancies_count)}</span>
+        <span className={hpStyles.vacanciesCount}>{formatVacanciesCount(item.vacancies_count)}</span>
       </div>
 
       <div className={hpStyles.previewReasonList}>

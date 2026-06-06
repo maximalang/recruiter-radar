@@ -150,6 +150,27 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               </div>
             </section>
 
+            {/* Negative signals */}
+            {lead.negativeSignals.length > 0 && (
+              <section style={{ backgroundColor: '#fff', borderRadius: '8px', padding: '20px', border: '1px solid #fecaca' }}>
+                <h2 style={{ fontSize: '0.875rem', fontWeight: 600, color: '#991b1b', marginBottom: '12px' }}>
+                  ⚠️ Факторы риска
+                </h2>
+                <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                  {lead.negativeSignals.map((signal, i) => (
+                    <li key={i} style={{
+                      padding: '6px 0',
+                      borderBottom: i < lead.negativeSignals.length - 1 ? '1px solid #fee2e2' : 'none',
+                      fontSize: '0.85rem',
+                      color: '#991b1b',
+                    }}>
+                      {signal}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
             {/* Opener card */}
             <section style={{ backgroundColor: '#fff', borderRadius: '8px', padding: '20px', border: '1px solid #e5e7eb' }}>
               <h2 style={{ fontSize: '0.875rem', fontWeight: 600, color: '#374151', marginBottom: '12px' }}>

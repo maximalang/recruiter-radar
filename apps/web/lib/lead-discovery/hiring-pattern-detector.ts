@@ -398,3 +398,70 @@ export class HiringPatternDetector {
     })
   }
 }
+
+// ─── Agency Repost Detection ──────────────────────────────────────
+
+export interface AgencyRepostResult {
+  isAgencyRepost: boolean
+  repostRoleCount: number
+  duplicateGroups: Array<{ role: string; count: number }>
+  score: number
+  reasons: string[]
+}
+
+export interface RepostVacancyInput {
+  title: string
+  publishedAt?: string
+}
+
+/**
+ * Detects agency repost patterns — the same role being posted repeatedly,
+ * suggesting the poster may be a recruitment agency rather than a direct
+ * employer, or that the role is being farmed rather than actively recruited.
+ *
+ * Detection criteria:
+ * - 3+ identical role titles → high-confidence repost
+ * - 2 identical titles with ≥7 day spread → possible repost
+ * - High total-to-distinct ratio → bulk-posting pattern
+ */
+export function detectAgencyReposts(vacancies: RepostVacancyInput[]): AgencyRepostResult {
+  const groups = new Map<string, { role: string; count: number; dates: number[] }>()
+
+  for (const v of vacancies) {
+    const normalized = v.title.trim().toLowerCase()
+    if (!groups.has(normalized)) {
+      groups.set(normalized, { role: v.title, count: 0, dates: [] })
+    }
+    const group = groups.get(normalized)!
+    group.count++
+    if (v.publishedAt) {
+      const t = Date.parse(v.publishedAt)
+      if (!isNaN(t)) group.dates.push(t)
+    }
+  }
+
+  const duplicateGroups: Array<{ role: string; count: number }> = []
+  let repostRoleCount = 0
+  const reasons: string[] = []
+
+  for (const [, group] of groups) {
+    if (group.count >= 3) {
+      duplicateGroups.push({ role: group.role, count: group.count })
+      repostRoleCount += group.count
+      reasons.push(`Роль «${group.role}» опубликована ${group.count} раз — возможен репост`)
+    } else if (group.count >= 2 && group.dates.length >= 2) {
+      const sorted = [...group.dates].sort((a, b) => a - b)
+      const spreadDays = (sorted[sorted.length - 1] - sorted[0]) / (1000 * 60 * 60 * 24)
+      if (spreadDays >= 7) {
+        duplicateGroups.push({ role: group.role, count: group.count })
+        repostRoleCount += group.count
+        reasons.push(`Роль «${group.role}» повторяется через ${Math.round(spreadDays)} дн. — возможен репост`)
+      }
+    }
+  }
+
+  const isAgencyRepost = duplicateGroups.length > 0 && repostRoleCount >= 3
+  const score = isAgencyRepost ? Math.min(repostRoleCount / 10, 1) : 0
+
+  return { isAgencyRepost, repostRoleCount, duplicateGroups, score, reasons }
+}

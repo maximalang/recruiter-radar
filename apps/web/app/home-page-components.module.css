@@ -18,8 +18,8 @@
 /* Hero title */
 .heroTitle {
   margin: 0;
-  font-size: clamp(3.1rem, 7vw, 5.6rem);
-  line-height: 0.9;
+  font-size: var(--fs-3xl);
+  line-height: 0.95;
   letter-spacing: -0.06em;
   max-width: 11ch;
 }
@@ -28,15 +28,15 @@
 .heroText {
   margin: 0;
   max-width: 720px;
-  color: #4b5565;
-  font-size: 1.04rem;
+  color: var(--c-text-secondary);
+  font-size: var(--fs-base);
   line-height: 1.7;
 }
 
 /* Hero footnote */
 .heroFootnote {
-  color: #7b8798;
-  font-size: 0.92rem;
+  color: var(--c-text-muted);
+  font-size: var(--fs-base);
   line-height: 1.62;
   max-width: 72ch;
 }
@@ -50,15 +50,15 @@
 
 /* Hero stat value */
 .heroStatValue {
-  font-size: 1.28rem;
+  font-size: var(--fs-lg);
   font-weight: 800;
-  color: #0f172a;
+  color: var(--c-text-primary);
 }
 
 /* Hero stat label */
 .heroStatLabel {
-  color: #667487;
-  font-size: 0.84rem;
+  color: var(--c-text-muted);
+  font-size: var(--fs-sm);
   line-height: 1.45;
 }
 
@@ -86,10 +86,10 @@
   gap: 10px;
   align-items: center;
   padding: 12px 14px;
-  border-radius: 16px;
-  border: 1px solid rgba(148, 163, 184, 0.14);
-  background-color: rgba(255, 255, 255, 0.78);
-  color: #334155;
+  border-radius: var(--radius-card-sm);
+  border: 1px solid var(--c-border);
+  background-color: var(--c-bg-card);
+  color: var(--c-text-primary);
   font-weight: 600;
   backdrop-filter: blur(8px);
 }
@@ -146,8 +146,8 @@
   border-radius: 999px;
   border: 1px solid rgba(29, 78, 216, 0.12);
   background-color: #f4f8ff;
-  color: #1d4ed8;
-  font-size: 0.76rem;
+  color: var(--c-brand);
+  font-size: var(--fs-xs);
   font-weight: 700;
 }
 
@@ -390,7 +390,13 @@
 }
 
 .heroBrandSubtitle {
-  color: #64748b;
-  font-size: 0.92rem;
+  color: var(--c-text-muted);
+  font-size: var(--fs-base);
+}
+
+/* Vacancies count */
+.vacanciesCount {
+  color: var(--c-text-muted);
+  font-size: var(--fs-sm);
 }
 
