@@ -11,6 +11,7 @@ interface ValidationError {
 const REQUIRED_SECRET_VARS = [
   'DATABASE_URL',
   'SESSION_SECRET',
+  'TELEGRAM_BOT_TOKEN',
 ] as const;
 
 const REQUIRED_CONFIG_VARS = [

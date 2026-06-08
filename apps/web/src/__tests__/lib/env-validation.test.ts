@@ -21,6 +21,7 @@ describe('env-validation', () => {
     it('returns empty array when all required secrets are present', () => {
       process.env.DATABASE_URL = 'postgres://localhost/db';
       process.env.SESSION_SECRET = 'a'.repeat(32);
+      process.env.TELEGRAM_BOT_TOKEN = '123456:ABC-DEF';
 
       const errors = validateSecretVars();
       expect(errors).toHaveLength(0);
@@ -55,12 +56,27 @@ describe('env-validation', () => {
     it('returns error when SESSION_SECRET is too short', () => {
       process.env.DATABASE_URL = 'postgres://localhost/db';
       process.env.SESSION_SECRET = 'short';
+      process.env.TELEGRAM_BOT_TOKEN = '123456:ABC-DEF';
 
       const errors = validateSecretVars();
       expect(errors).toContainEqual(
         expect.objectContaining({
           variable: 'SESSION_SECRET',
           message: expect.stringContaining('32 characters'),
+        })
+      );
+    });
+
+    it('returns error when TELEGRAM_BOT_TOKEN is missing', () => {
+      process.env.DATABASE_URL = 'postgres://localhost/db';
+      process.env.SESSION_SECRET = 'a'.repeat(32);
+      delete process.env.TELEGRAM_BOT_TOKEN;
+
+      const errors = validateSecretVars();
+      expect(errors).toContainEqual(
+        expect.objectContaining({
+          variable: 'TELEGRAM_BOT_TOKEN',
+          message: expect.stringContaining('required'),
         })
       );
     });
@@ -100,6 +116,7 @@ describe('env-validation', () => {
       process.env.NODE_ENV = 'production';
       delete process.env.DATABASE_URL;
       delete process.env.SESSION_SECRET;
+      delete process.env.TELEGRAM_BOT_TOKEN;
       delete process.env.NEXT_PUBLIC_APP_URL;
 
       expect(() => validateEnv()).toThrow(/Environment validation failed/);
