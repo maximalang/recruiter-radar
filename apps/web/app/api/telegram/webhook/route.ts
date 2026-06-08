@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 import { checkTelegramChatOwnsClientProfile, getPool } from "../../../../lib/db";
 import { isDigestFeedbackAction, updateDigestOrgStateFeedback, type DigestFeedbackAction } from "../../../../lib/digestFeedback";
-import { answerTelegramCallbackQuery, getTelegramBotToken } from "../../../../lib/telegram";
+import { answerTelegramCallbackQuery, getTelegramBotToken, sendTelegramTextMessage } from "../../../../lib/telegram";
 import { consumeTelegramConnectToken } from "../../../../lib/telegramConnect";
 import { verifyDigestFeedbackCallback, type SignedDigestFeedbackCallback } from "../../../../lib/telegramDigestFeedback";
 
@@ -76,6 +76,32 @@ export async function POST(request: Request) {
       const consume = await consumeTelegramConnectToken({ token: startToken, telegramChatId: chatId });
       await pool.query(`UPDATE webhook_events SET status = 'processed', processed_at = NOW(), error_message = NULL WHERE id = $1 AND processing_claim_token = $2`, [eventRow.id, claimToken]);
       return NextResponse.json({ ok: true, startHandled: true, connectStatus: consume.status });
+    }
+
+    // /start without token — register chat_id for SaaS multi-user delivery
+    const isPlainStart = update?.message?.text?.trim().startsWith("/start") && !startToken;
+    if (isPlainStart && chatId) {
+      try {
+        const telegramUsername = normalizeNonEmptyString(
+          (update?.message as { from?: { username?: string } } | undefined)?.from?.username ?? null
+        );
+        await pool.query(
+          `INSERT INTO users (telegram_chat_id, telegram_username, email, full_name)
+           VALUES ($1::bigint, $2, $3, $4)
+           ON CONFLICT (telegram_chat_id) WHERE telegram_chat_id IS NOT NULL
+           DO UPDATE SET telegram_username = EXCLUDED.telegram_username, updated_at = NOW()`,
+          [chatId, telegramUsername, `tg:${chatId}@telegram`, telegramUsername]
+        );
+        await sendTelegramTextMessage(
+          "Радар активирован. Ежедневный дайджест будет приходить сюда.\n\nЧтобы подключить профиль агентства, используйте ссылку из личного кабинета.",
+          { botToken, chatId }
+        ).catch(() => {});
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to register Telegram chat.";
+        console.error("Failed to register /start chat_id:", message);
+      }
+      await pool.query(`UPDATE webhook_events SET status = 'processed', processed_at = NOW(), error_message = NULL WHERE id = $1 AND processing_claim_token = $2`, [eventRow.id, claimToken]);
+      return NextResponse.json({ ok: true, startHandled: true, connectStatus: "registered" });
     }
 
     if (callbackQueryId) {
