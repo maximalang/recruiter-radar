@@ -20,10 +20,12 @@ export interface SourceConfig {
   description: string
   /** Ingestion script filename relative to packages/db/scripts/. */
   script: string
-  /** Environment variable names required for this source to work. */
+  /** Environment variable names required for this source to work (technical: API keys, tokens). */
   requiredEnvVars: string[]
   /** Allowed env var prefixes for the `env` parameter of ingestSource(). */
   envPrefixes: string[]
+  /** Search param env var names that should be loaded from user_search_preferences, not ENV. */
+  searchEnvVars: string[]
   /** Whether this source is a primary source (included in daily-radar pipeline). */
   isPrimary: boolean
   /** Source category for routing and filtering. */
@@ -41,6 +43,12 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     script: 'ingest-hh.mjs',
     requiredEnvVars: ['HH_USER_AGENT'],
     envPrefixes: ['HH_'],
+    searchEnvVars: [
+      'HH_SEARCH_TEXT', 'HH_PER_PAGE', 'HH_PAGES',
+      'HH_AREA', 'HH_EMPLOYMENT', 'HH_SCHEDULE', 'HH_EXPERIENCE',
+      'HH_PROFESSIONAL_ROLE', 'HH_INDUSTRY', 'HH_DATE_FROM', 'HH_DATE_TO',
+      'HH_ORDER_BY', 'HH_SEARCH_FIELD', 'HH_SEARCH_PARAMS_JSON',
+    ],
     isPrimary: true,
     category: 'job-board',
   },
@@ -51,6 +59,12 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     script: 'source-superjob.mjs',
     requiredEnvVars: ['SUPERJOB_API_KEY'],
     envPrefixes: ['SUPERJOB_'],
+    searchEnvVars: [
+      'SUPERJOB_KEYWORD', 'SUPERJOB_PER_PAGE', 'SUPERJOB_PAGES',
+      'SUPERJOB_TOWN', 'SUPERJOB_CATALOGUES', 'SUPERJOB_TYPE_OF_WORK',
+      'SUPERJOB_EXPERIENCE', 'SUPERJOB_PAYMENT_FROM', 'SUPERJOB_PAYMENT_TO',
+      'SUPERJOB_PERIOD', 'SUPERJOB_ORDER_FIELD', 'SUPERJOB_ORDER_DIRECTION',
+    ],
     isPrimary: true,
     category: 'job-board',
   },
@@ -61,6 +75,12 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     script: 'source-habr-career.mjs',
     requiredEnvVars: [],
     envPrefixes: ['HABR_'],
+    searchEnvVars: [
+      'HABR_CAREER_KEYWORD', 'HABR_CAREER_PAGES',
+      'HABR_CAREER_TYPE', 'HABR_CAREER_QUALIFICATION', 'HABR_CAREER_REMOTE',
+      'HABR_CAREER_RELOCATION', 'HABR_CAREER_CITY', 'HABR_CAREER_CURRENCY',
+      'HABR_CAREER_SALAY_FROM', 'HABR_CAREER_SALAY_TO',
+    ],
     isPrimary: true,
     category: 'job-board',
   },
@@ -71,6 +91,7 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     script: 'source-career-pages.mjs',
     requiredEnvVars: [],
     envPrefixes: ['CRAWLER_', 'FIRECRAWL_'],
+    searchEnvVars: [],
     isPrimary: false,
     category: 'career-page',
   },
@@ -81,6 +102,7 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     script: 'source-egrul-fns.mjs',
     requiredEnvVars: [],
     envPrefixes: ['SOURCE_'],
+    searchEnvVars: [],
     isPrimary: false,
     category: 'registry',
   },
@@ -122,6 +144,23 @@ export function getAllEnvPrefixes(): string[] {
     }
   }
   return Array.from(prefixes)
+}
+
+/** Get the search env var names for a given source (those loaded from DB, not ENV). */
+export function getSearchEnvVars(id: SourceId): string[] {
+  const config = BY_ID.get(id)
+  return config?.searchEnvVars ?? []
+}
+
+/** All search env var names across all sources. */
+export function getAllSearchEnvVars(): string[] {
+  const vars = new Set<string>()
+  for (const source of SOURCE_REGISTRY) {
+    for (const v of source.searchEnvVars) {
+      vars.add(v)
+    }
+  }
+  return Array.from(vars)
 }
 
 /** Get the full registry (for API docs, etc.). */

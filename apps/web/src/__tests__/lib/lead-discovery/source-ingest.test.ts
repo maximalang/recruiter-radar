@@ -5,12 +5,20 @@ jest.mock('node:child_process', () => ({
   execFile: jest.fn(),
 }))
 
+// Mock db-pool — default: no pool (search prefs skipped, falls back to ENV)
+jest.mock('@/lib/db-pool', () => ({
+  getPool: jest.fn().mockReturnValue(null),
+}))
+
 import { execFile } from 'node:child_process'
+import { getPool } from '@/lib/db-pool'
 const mockExecFile = execFile as jest.MockedFunction<typeof execFile>
+const mockGetPool = getPool as jest.MockedFunction<typeof getPool>
 
 describe('source-ingest', () => {
   beforeEach(() => {
     mockExecFile.mockReset()
+    mockGetPool.mockReturnValue(null)
   })
 
   describe('ingestSource', () => {
@@ -56,19 +64,38 @@ describe('source-ingest', () => {
       expect(result.error).toContain('HH_USER_AGENT')
     })
 
-    it('passes whitelisted env vars to the script', async () => {
+    it('excludes search env vars from caller-provided env (loaded from DB instead)', async () => {
       mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
-        // Verify allowed env was merged
-        expect(opts.env.HH_SEARCH_TEXT).toBe('разработчик')
-        // Verify dangerous env was filtered out
+        // HH_SEARCH_TEXT is a search var — excluded from caller env, only from DB/ENV
+        expect(opts.env.HH_SEARCH_TEXT).toBeUndefined()
+        // Dangerous env vars are also filtered out
         expect(opts.env.NODE_OPTIONS).toBeUndefined()
-        expect(opts.env.DATABASE_URL).toBe(process.env.DATABASE_URL) // process.env wins, not injected
+        expect(opts.env.DATABASE_URL).toBe(process.env.DATABASE_URL)
         callback(null, JSON.stringify({ source: 'hh', recordsReceived: 10, signalUpsertsCompleted: 8 }), '')
       })
 
       const result = await ingestSource('hh', { HH_SEARCH_TEXT: 'разработчик', NODE_OPTIONS: '--require=/evil.js', DATABASE_URL: 'postgres://attacker' })
       expect(result.fetchedCount).toBe(10)
       expect(result.upsertedCount).toBe(8)
+    })
+
+    it('merges DB search prefs into ingestion env', async () => {
+      const mockPool = {
+        query: jest.fn().mockResolvedValue({
+          rows: [{ params: { HH_SEARCH_TEXT: 'менеджер', HH_PAGES: '3' } }],
+        }),
+      }
+      mockGetPool.mockReturnValue(mockPool)
+
+      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
+        // Search params from DB should be in the env
+        expect(opts.env.HH_SEARCH_TEXT).toBe('менеджер')
+        expect(opts.env.HH_PAGES).toBe('3')
+        callback(null, JSON.stringify({ source: 'hh', recordsReceived: 10, signalUpsertsCompleted: 8 }), '')
+      })
+
+      const result = await ingestSource('hh')
+      expect(result.success).toBe(true)
     })
 
     it('filters out dangerous env vars', async () => {

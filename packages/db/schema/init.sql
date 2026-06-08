@@ -485,6 +485,19 @@ CREATE TABLE telegram_connect_tokens (
 CREATE INDEX telegram_connect_tokens_order_created_idx
   ON telegram_connect_tokens (order_id, created_at DESC);
 
+CREATE TABLE user_search_preferences (
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  source TEXT NOT NULL,
+  params JSONB NOT NULL DEFAULT '{}'::JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT user_search_preferences_source_not_blank CHECK (BTRIM(source) <> ''),
+  CONSTRAINT user_search_preferences_params_is_object CHECK (jsonb_typeof(params) = 'object'),
+  PRIMARY KEY (user_id, source)
+);
+
+CREATE INDEX user_search_preferences_source_idx ON user_search_preferences (source);
+
 CREATE INDEX subscriptions_billing_provider_customer_idx
   ON subscriptions (billing_provider, billing_customer_id)
   WHERE billing_provider IS NOT NULL AND billing_customer_id IS NOT NULL;
@@ -554,6 +567,11 @@ EXECUTE FUNCTION set_updated_at();
 
 CREATE TRIGGER pilot_enrollments_set_updated_at
 BEFORE UPDATE ON pilot_enrollments
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER user_search_preferences_set_updated_at
+BEFORE UPDATE ON user_search_preferences
 FOR EACH ROW
 EXECUTE FUNCTION set_updated_at();
 
