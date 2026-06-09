@@ -21,4 +21,4 @@ else
 fi
 
 echo "Starting application..."
-exec node server.js
+exec node apps/web/server.js

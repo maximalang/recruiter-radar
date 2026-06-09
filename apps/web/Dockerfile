@@ -29,7 +29,7 @@ RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
 # Standalone output includes node_modules/pg and all transitive deps
 # Note: public/ directory is only copied if it exists (no static assets yet)
 COPY --from=builder /app/apps/web/.next/standalone ./
-COPY --from=builder /app/apps/web/.next/static ./.next/static
+COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
 
 # Copy migration tooling for startup migrations
 COPY --from=builder /app/packages/db/scripts/migrate.mjs ./packages/db/scripts/migrate.mjs
