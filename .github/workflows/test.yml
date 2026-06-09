@@ -60,7 +60,7 @@ jobs:
       run: npm ci
 
     - name: Build Docker image
-      run: docker build -f apps/web/Dockerfile -t ${{ github.repository }}:latest apps/web
+      run: docker build -f apps/web/Dockerfile -t ${{ github.repository }}:latest .
 
     - name: Run smoke tests
       run: |
