@@ -92,44 +92,22 @@ function getTelegramErrorDescription(value: unknown): string | null {
 }
 
 export function getTelegramConfig(): {
-  config: TelegramConfig | null;
+  botToken: string | null;
   error: string | null;
 } {
   const botToken = process.env.TELEGRAM_BOT_TOKEN?.trim();
-  const chatId = process.env.TELEGRAM_CHAT_ID?.trim();
-  const missingEnvVars = [
-    !botToken ? "TELEGRAM_BOT_TOKEN" : null,
-    !chatId ? "TELEGRAM_CHAT_ID" : null
-  ].filter((value): value is string => value !== null);
 
-  if (missingEnvVars.length > 0) {
+  if (!botToken) {
     return {
-      config: null,
-      error: `Telegram is not configured. Missing ${missingEnvVars.join(" and ")}.`
-    };
-  }
-
-  const resolvedBotToken = botToken ?? "";
-  const resolvedChatId = chatId ?? "";
-
-  if (!/^-?\d+$/.test(resolvedChatId)) {
-    return {
-      config: null,
-      error: "TELEGRAM_CHAT_ID must be a numeric chat id."
+      botToken: null,
+      error: "Telegram is not configured. Missing TELEGRAM_BOT_TOKEN."
     };
   }
 
   return {
-    config: {
-      botToken: resolvedBotToken,
-      chatId: resolvedChatId
-    },
+    botToken,
     error: null
   };
-}
-
-export function getTelegramConfigError(): string | null {
-  return getTelegramConfig().error;
 }
 
 export function getTelegramBotToken(): {

@@ -353,6 +353,34 @@ function computeUrgency(
     }
   }
 
+  // Stale role penalty: repeated identical roles with no recent posting
+  const roleGroups = new Map<string, FiurVacancy[]>()
+  for (const v of realRoles) {
+    const key = normalize(v.role)
+    if (!roleGroups.has(key)) roleGroups.set(key, [])
+    roleGroups.get(key)!.push(v)
+  }
+
+  let staleRoleCount = 0
+  for (const [, group] of roleGroups) {
+    if (group.length < 2) continue
+    const newest = group.reduce((a, b) =>
+      ageDays(a.publishedAt, now) < ageDays(b.publishedAt, now) ? a : b
+    )
+    if (ageDays(newest.publishedAt, now) > 30) {
+      staleRoleCount++
+    }
+  }
+
+  if (staleRoleCount >= 2) {
+    const penalty = Math.min(staleRoleCount * 0.1, 0.3)
+    score -= penalty
+    reasons.push(`${staleRoleCount} повторяющихся ролей без обновления >30 дн. — понижение срочности`)
+  } else if (staleRoleCount === 1) {
+    score -= 0.05
+    reasons.push('повторяющаяся роль без обновления >30 дн. — возможна потеря актуальности')
+  }
+
   // Recent signal burst — high recent activity boosts urgency
   if (recentSignalCount != null && recentSignalCount >= 3) {
     score += 0.15

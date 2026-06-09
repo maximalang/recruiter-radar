@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 
 import { Pool, type PoolClient } from "pg";
+import { getPool as getSharedPool } from "./db-pool";
 
 import {
   CUSTOMER_CHECKOUT_COPY,
@@ -49,19 +50,7 @@ const globalForPg = globalThis as typeof globalThis & {
 };
 
 function getPool(): Pool | null {
-  const connectionString = process.env.DATABASE_URL;
-
-  if (!connectionString) {
-    return null;
-  }
-
-  if (!globalForPg.recruiterRadarTelegramConnectPool) {
-    globalForPg.recruiterRadarTelegramConnectPool = new Pool({
-      connectionString
-    });
-  }
-
-  return globalForPg.recruiterRadarTelegramConnectPool;
+  return getSharedPool();
 }
 
 export async function getTelegramConnectLinkState(input: {

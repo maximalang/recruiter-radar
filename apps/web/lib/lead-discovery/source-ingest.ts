@@ -26,8 +26,10 @@ import {
   getSourceConfig,
   getPrimarySourceIds,
   getAllEnvPrefixes,
+  getSearchEnvVars,
   type SourceId,
 } from '@/lib/sources/source-registry'
+import { getPool } from '@/lib/db-pool'
 
 export type { SourceId } from '@/lib/sources/source-registry'
 
@@ -55,16 +57,43 @@ export interface IngestResult {
  * Only source-specific config keys are permitted — never infrastructure
  * keys (DATABASE_URL, NODE_OPTIONS, PATH, HOME, etc.) which could be
  * used to redirect DB connections or execute arbitrary code.
+ *
+ * Search params (listed in source-registry searchEnvVars) are excluded:
+ * they should come from user_search_preferences in DB, not from ENV.
  */
-function filterEnvVars(env: Record<string, string>): Record<string, string> {
+function filterEnvVars(env: Record<string, string>, searchEnvVars: string[]): Record<string, string> {
   const allowedPrefixes = getAllEnvPrefixes()
+  const searchSet = new Set(searchEnvVars)
   const filtered: Record<string, string> = {}
   for (const [key, value] of Object.entries(env)) {
+    if (searchSet.has(key)) continue
     if (allowedPrefixes.some(prefix => key.startsWith(prefix))) {
       filtered[key] = value
     }
   }
   return filtered
+}
+
+/**
+ * Load search preferences from user_search_preferences for a given source.
+ * Returns env-style key-value pairs ready to merge into the ingestion env.
+ */
+async function loadSearchPrefsFromDb(source: SourceId): Promise<Record<string, string>> {
+  const pool = getPool()
+  if (!pool) return {}
+
+  const searchEnvVars = getSearchEnvVars(source)
+  if (searchEnvVars.length === 0) return {}
+
+  const { rows } = await pool.query<{ params: Record<string, string> }>(`
+    SELECT params
+    FROM user_search_preferences
+    WHERE source = $1
+    LIMIT 1
+  `, [source])
+
+  if (rows.length === 0) return {}
+  return rows[0].params ?? {}
 }
 
 /**
@@ -91,11 +120,17 @@ export async function ingestSource(
     return { source, success: false, error: `Script path escapes scripts directory: ${config.script}` }
   }
 
+  // Load search params from user_search_preferences (DB), falling back to ENV
+  const dbSearchEnv = await loadSearchPrefsFromDb(source)
+  const searchEnvVars = getSearchEnvVars(source)
+
   return new Promise<IngestResult>((resolvePromise) => {
     // Filter env vars through whitelist — prevent injection of
     // DATABASE_URL, NODE_OPTIONS, PATH, etc.
-    const filteredEnv = env ? filterEnvVars(env) : {}
-    const mergedEnv = { ...process.env, ...filteredEnv }
+    // Exclude searchEnvVars from caller-provided env (they come from DB).
+    const filteredEnv = env ? filterEnvVars(env, searchEnvVars) : {}
+    // Merge: process.env → DB search prefs → caller filtered env
+    const mergedEnv = { ...process.env, ...dbSearchEnv, ...filteredEnv }
 
     execFile(
       'node',

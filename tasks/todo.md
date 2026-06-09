@@ -1,15 +1,26 @@
 # TODO — Recruiter Radar: Lead Generation Platform
 
-**Связано:** `SPEC.md` (продуктовый контракт), `tasks/plan.md` (фазы)
-**Обновлено:** 2026-06-03
-**Фокус:** Доведение core lead generation engine до рабочего состояния
+**Связано:** `SPEC.md` (продуктовый контракт), `tasks/plan.md` (фазы), `docs/инфо о проекте.md` (концепция)  
+**Обновлено:** 2026-06-05  
+**Фокус:** Доведение core lead generation engine до рабочего состояния по концепции «инфо о проекте.md»
+
+---
+
+## Концепция (из docs/инфо о проекте.md)
+
+> **Радар компаний, которым стоит написать сегодня.**  
+> Запускается за несколько минут, приносит короткий ежедневный список компаний с живым hiring-proof, объяснением почему сейчас и готовым углом первого контакта.
+
+Бизнес-модель: **Self-serve на входе → paid pilot → assisted radar → premium desk**
+
+Дифференциация: **Russia-first agency client radar** — локальные источники, российский compliance-by-design, работа по corporate contact paths и premium evidence bundles.
 
 ---
 
 ## Реализовано ✅
 
 ### Lead Discovery Engine
-- [x] Multi-source lead generator (HH, SuperJob, Habr Career adapters)
+- [x] Multi-source lead generator (HH, SuperJob, Habr Career, Rabota Rossii adapters)
 - [x] Hiring pattern detector (burst detection, non-tech roles)
 - [x] Entity resolution (SHA-256 + INN-based, Cyrillic normalization)
 - [x] Lead aggregator with confidence gate classification
@@ -38,6 +49,9 @@
 - [x] HH ingestion pipeline — `packages/db/scripts/ingest-hh.mjs`
 - [x] SuperJob adapter — `packages/db/scripts/adapters/superjob.mjs`
 - [x] Habr Career adapter — `packages/db/scripts/adapters/habr-career.mjs`
+- [x] Rabota Rossii adapter — `packages/db/scripts/source-rabota-rossii.mjs`
+- [x] ЕГРЮЛ/ФНС adapter — `packages/db/scripts/source-egrul-fns.mjs`
+- [x] Fedresurs adapter — `packages/db/scripts/source-fedresurs.mjs`
 - [x] Source ingestion API route — `/api/sources/ingest` (POST)
 - [x] Source ingest service — `lib/lead-discovery/source-ingest.ts`
 - [x] Source registry — `lib/sources/source-registry.ts` (single source of truth)
@@ -53,13 +67,13 @@
 - [x] Shared delivery logic — `lib/digest/deliver-candidates.ts`
 - [x] Daily radar pipeline endpoint — `/api/cron/daily-radar` (ingest → digest → delivery)
 - [x] n8n workflows (HH, career-pages, daily-signals, operational-alerts)
-- [x] Callback button handling (Беру / Мимо / Позже) — signed HMAC callbacks
+- [x] Callback button handling (Беру / Мимо / Позже / Скрыть) — signed HMAC callbacks
 - [x] Feedback → state update → `client_digest_org_state`
 
 ### Agency Onboarding
 - [x] Pilot onboarding page — `/onboarding/pilot/[orderId]`
 - [x] Profile form: agencyName, dailyDigestLimit, targetCity, specialization,
-      includeKeywords, excludeKeywords
+      includeKeywords, excludeKeywords, industries, companySizes
 - [x] `confirmPilotOrderProfile` saves to `client_profiles`
 - [x] `sendPilotOrderTestDigest` — first digest after profile setup
 - [x] Telegram connect step in onboarding
@@ -70,108 +84,95 @@
 - [x] Input validation system
 - [x] Stripe billing integration
 - [x] Secure case conversion middleware
+- [x] Unified DB pool singleton — `lib/db-pool.ts`
 
 ### Test Coverage
 - [x] 711 tests passing
 
 ---
 
-## 🎯 P0: На сегодня (04.06.2026) — ICP Profile Fields
+## 🎯 Текущие задачи — по концепции «инфо о проекте.md»
 
-### Задача 1.3: Agency ICP Fields — industries + companySizes ✅ DONE
+### Задача 1: Цены и позиционирование — «0 ₽» → реальные цены
 
-**Что сделано (коммит f196950 + 5cb25ee):**
+**Концепция:** убрать `0 ₽` / `1 ₽` из публичных планов, заменить на реальную pilot-math.  
+**Текущее состояние:** `PUBLIC_PLANS` в `lib/publicProduct.ts` — pilot = `1 ₽` (100 копеек), monthly = `299 ₽`.  
+**Концепция требует:** Self-Serve Pilot 49–79 тыс. ₽, Assisted Radar 149–229 тыс. ₽/мес, Premium Desk 290–450 тыс. ₽/мес.
 
-#### Шаг 1: DB + ClientProfile type ✅
-- Added `industries JSONB NOT NULL DEFAULT '[]'` and `company_sizes JSONB NOT NULL DEFAULT '[]'` to client_profiles
-- Migration: `20260604000000_add_icp_industries_company_sizes.sql`
-- Updated ClientProfileRow, ClientProfile, mapClientProfileRow
-- Added `normalizeCompanySizeList()` + `normalizeIndustryList()` with whitelist validation
-- Exported `VALID_COMPANY_SIZES`, `VALID_INDUSTRIES`, `INDUSTRY_KEYWORDS` sets
-- Updated all SELECT queries (5 variants) with new columns
-- Updated saveClientProfile (INSERT + UPDATE) with new params
-- Updated isPlaceholderClientProfile
+- [ ] 1.1 Обновить `PUBLIC_PLANS` — pilot = 49 000 ₽, monthly = 149 000 ₽/мес
+- [ ] 1.2 Обновить описания пакетов — premium Russian copy по концепции
+- [ ] 1.3 Обновить landing hero-formula: «компании, которым стоит написать сегодня»
+- [ ] 1.4 Проверить checkout flow с новыми ценами
 
-#### Шаг 2: Onboarding form ✅
-- Added INDUSTRY_OPTIONS (10 industries) and COMPANY_SIZE_OPTIONS (5 sizes)
-- Added checkbox groups for industries and companySizes in the form
-- Added `readCheckboxGroup()` helper with whitelist validation in actions.ts
-- Runtime assertions that option keys match VALID_INDUSTRIES/VALID_COMPANY_SIZES
+### Задача 2: Evidence-first lead card — explainable format
 
-#### Шаг 3: Scoring bridge + digest pipeline integration ✅
-- Added `clientProfileToAgencyProfile()` bridge function with whitelist filtering
-- Connected industries to digest pipeline:
-  - `matchesClientProfile` now filters by industry keywords
-  - `getClientScopeScore` boosts candidates matching client industries
-  - `INDUSTRY_KEYWORDS` maps industry keys to Russian search terms
-- Added industries/companySizes to CheckoutOrderPayload type
-- Updated normalizeCheckoutOrderPayload and mergeCheckoutOrderPayload with whitelist
-- Updated confirmPilotOrderProfile to save ICP fields to both profile and order payload
+**Концепция:** каждый лид обязан содержать: company_display_name, ИНН/ОГРН, domain/career_page_url, evidence_bundle[], fit/intent/urgency/reachability breakdown, confidence_gate, why_now, best_angle, lawful_contact_path, negative_signals[], delivery/feedback status.
 
-**Acceptance Criteria:**
-- [x] Agency может выбрать индустрии и размеры компаний при онбординге
-- [x] `computeFit` получает непустой `industries` массив для профилей с выбранными индустриями
-- [x] `computeFit` получает непустой `companySizes` для профилей с выбранными размерами
-- [x] <5 мин ICP configuration
-- [x] Digest фильтрует/рейтит кандидатов по ICP индустриям
+**Текущее состояние:** LeadItem имеет part of этого (score, confidenceGate, reasons, opener, sourceFamilies, evidenceTitles, locationNames). Но нет: why_now как отдельное поле, best_angle, lawful_contact_path, negative_signals, ИНН/ОГРН, domain.
 
----
+- [ ] 2.1 Добавить `why_now` (1–2 коротких аргумента «почему сейчас») в LeadItem и digest candidate
+- [ ] 2.2 Добавить `best_angle` (наилучший угол контакта) — отдельное поле, не то же что opener
+- [ ] 2.3 Добавить `lawful_contact_path` в LeadItem (corporate form / generic HR / switchboard)
+- [ ] 2.4 Добавить `negative_signals[]` — why not / risk factors
+- [ ] 2.5 Добавить `inn`, `ogrn`, `domain`, `career_page_url` в LeadItem / lead detail page
+- [ ] 2.6 Обновить lead detail page — показать все новые поля
 
-### Задача 1.3b: Feedback reweighting — УЖЕ РАБОТАЕТ ✅
+### Задача 3: Human-in-the-loop review queue
 
-`client-overrides.ts` уже читает `client_digest_org_state` с `feedback_status='badfit'`
-и строит штрафы, которые подаются в FIUR scoring. Это не требует доработок.
+**Концепция:** review queue для hot leads при score ≥ 80 и confidence < A, первый lead из нового source, спорный entity match, personal contact data.
 
----
+**Текущее состояние:** Confidence gate C → review, но нет UI review queue, нет отдельного статуса «pending_review», нет reviewer UI.
 
-### Задача 1.1b: E2E smoke test — `npm run smoke:e2e` ✅ DONE
+- [ ] 3.1 Добавить `review_status` enum (pending/approved/rejected) в digest_candidates
+- [ ] 3.2 Миграция: `ALTER TABLE digest_candidates ADD COLUMN review_status`
+- [ ] 3.3 API route `/api/review` — list pending, approve, reject
+- [ ] 3.4 Review UI — список кандидатов на review + approve/reject кнопки
+- [ ] 3.5 Human override rules: score ≥ 80 + gate < A → auto pending_review
 
-**Что сделано (коммит f8ace30):**
-- Created `scripts/smoke-e2e.mjs` — runs HH ingest → lead-generate Jest test → DB metrics report
-- Requires `DATABASE_URL` + `HH_USER_AGENT` (real creds)
-- Prints: fetched count, upserted count, scoring pipeline test result
-- Added `npm run smoke:e2e` to root package.json
-- Exit 0 if signals produced, 1 otherwise
+### Задача 4: Negative signals & recruiter hiring penalty
 
----
+**Концепция:** вакансия internal recruiter — НЕ горячий сигнал сама по себе. Усиливает только в связке с burst. Agency reposts / stale roles — отрицательный фактор. Dedupe должен быть агрессивнее.
 
-### Задача 2.3b: Dashboard live data ✅ DONE
+**Текущее состояние:** `computeIntent` уже даёт 0.05 за internal recruiter (penalty), `computeFiur` считает `isInternalRecruiter`. Но нет отдельного `negative_signals[]` поля, нет penalty за agency reposts, нет stale role penalty.
 
-**Что сделано (коммит c5efca9):**
-- Added `lib/dashboard-data.ts`: server-side data fetching using real DB tables
-- Fixed non-existent `data_sources` table references — uses `signals` table + source-registry
-- Dashboard page now passes real data to all client components
-- Refactored `/api/dashboard/metrics` to use shared data function
+- [ ] 4.1 Добавить `detectAgencyReposts()` в hiring-pattern-detector — выявлять повторные посты
+- [ ] 4.2 Добавить stale role penalty в `computeUrgency` — повторяющиеся роли без обновления > 30 дней → штраф
+- [ ] 4.3 Добавить `negative_signals[]` генерацию в scoring pipeline
+- [ ] 4.4 Отразить negative signals в lead card UI
 
----
+### Задача 5: Lawful contact path — corporate-only default
 
-## 📈 P1: Lead Management & Outreach (09.06-22.06.2026)
+**Концепция:** по умолчанию работать с company-level data и corporate contact paths. Не хранить personal emails/phones без отдельной логики. Contact policy: corporate only / no personal data / no auto message.
 
-### Задача 2.1: Lead Pipeline UI ✅ DONE
-- [x] Dashboard: lead list with scores, confidence, reasons
-- [x] Lead detail view (evidence, contact paths, next action)
-- [x] Lead state transitions (manual)
-- [x] Filtering by score, confidence, source, freshness
+**Текущее состояние:** ContactCategory включает `personal-email`, `phone`, `telegram`, `whatsapp`. Нет фильтрации по policy. Нет `contact_policy` в client_profile.
 
-### Задача 2.2: Outreach Templates ✅ DONE
-- [x] Template builder with personalization variables
-- [x] Pre-built templates (Russian, premium tone)
-- [x] Template → Telegram message integration
+- [ ] 5.1 Добавить `contact_policy` в client_profiles (enum: corporate_only, no_personal, unrestricted)
+- [ ] 5.2 Миграция: `ALTER TABLE client_profiles ADD COLUMN contact_policy`
+- [ ] 5.3 Фильтровать ContactPath по policy в lead scoring
+- [ ] 5.4 UI: выбор contact policy в onboarding
 
-### Задача 2.3: Analytics Dashboard ✅ DONE
-- [x] Daily/weekly metrics (leads generated, avg score, confidence split)
-- [x] Source performance comparison
-- [x] Feedback funnel (Беру / Мимо / Позже)
+### Задача 6: Landing & live preview — «результат за 3 минуты»
+
+**Концепция:** пользователь вводит нишу и регион → сразу видит live preview 3–5 компаний → запускает pilot.
+
+**Текущее состояние:** Landing с preview есть, но hero-formula слабая. Preview фильтрует по keyword matching, не по FIUR. Нет «результат за 3 минуты» narrative.
+
+- [ ] 6.1 Обновить hero copy: «компании, которым стоит написать сегодня»
+- [ ] 6.2 Обновить hero proof items по концепции
+- [ ] 6.3 Preview карточки: показать confidence gate label, why_now, best_angle
+- [ ] 6.4 Проверить preview → pilot conversion flow end-to-end
 
 ---
 
-## 💼 P2: Enterprise Features (23.06+)
+## 💼 P2: Enterprise Features (после P1)
 
 - [ ] Multi-tenant agency isolation hardening
 - [ ] API rate limiting per client
 - [ ] OAuth 2.0 / SAML SSO
 - [ ] Advanced analytics & reporting
 - [ ] White-label customization
+- [ ] AI summarization / angle generation с audit trail
+- [ ] CRM export
 
 ---
 
@@ -188,21 +189,35 @@
 - [x] ~~I4: Dead RUNTIME_OK guard~~ → Removed
 - [x] ~~C3: marketConditions/recentSignalCount clamp~~ → Already safe
 - [x] ~~A3: Source config hardcoded~~ → Fixed (source-registry)
+- [x] ~~I4: N+1 queries in leads page~~ → Fixed (getLeadsForAllProfiles)
 - [ ] S3: Rate limiter in-memory → Redis-backed for multi-instance
-- [x] I4: N+1 queries in leads page → Fixed (getLeadsForAllProfiles)
 - [ ] R1: Dead CSS classes from CSS Modules migration cleanup
+
+## 🔧 Technical Debt (from code review 2026-06-05)
+
+- [x] ~~C2: Duplicate ConfidenceGate types~~ → Renamed to ConfidenceGatePolicy
+- [x] ~~I13: Multiple DB Pool singletons~~ → Unified to lib/db-pool.ts
+- [x] ~~I1: Missing 'dismissed' callback button~~ → Added 🚫 Скрыть
+- [x] ~~I11: Unsafe callback action cast~~ → Added isDigestFeedbackAction() guard
+- [x] ~~I2: Dead parseDigestFeedbackCallbackData~~ → Removed from webhook route
+- [ ] C1: auditDigestGate lossy SQL→TS mapping — needs signal evidence re-fetch for C-gate
+- [ ] I4: payments.ts monolith (1739 lines) — split into 3 modules
+- [ ] I7: packages/db/lib/ duplicates apps/web/lib/ types — shared package import
+- [ ] I8: DedupeService suppression in JSON file → Postgres-backed
+- [ ] I12: sanitizeError regex incomplete for Telegram token format
+- [ ] I15: Redis rate limiter race condition — needs MULTI/EXEC
 
 ---
 
-## 🗂 Состояние на конец 04.06.2026
+## 🗂 Состояние на 05.06.2026
 
-**Коммитов впереди origin:** 8
-**Тестов:** 700 passing
-**Ветки:** только main
+**Тестов:** 711 passing  
+**Ветки:** review-p0-confidence-gate-unify (2 коммита) + main
 
-**P1 Задачи выполнены:**
-- ✅ 2.1: Lead Pipeline UI — список лидов + детальный просмотр + фильтрация
-- ✅ 2.2: Outreach Templates — шаблоны + Telegram интеграция
-- ✅ 2.3: Analytics Dashboard — воронка обратной связи + метрики + источники
-
-**Следующий приоритет:** P2 Enterprise Features или техдолг (S3, R1)
+**P1 Задачи по концепции (текущий приоритет):**
+1. Цены и позиционирование (задача 1)
+2. Evidence-first lead card (задача 2)
+3. Human-in-the-loop review queue (задача 3)
+4. Negative signals & recruiter hiring penalty (задача 4)
+5. Lawful contact path — corporate-only default (задача 5)
+6. Landing & live preview (задача 6)

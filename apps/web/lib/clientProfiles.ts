@@ -1,4 +1,5 @@
 import { Pool, type PoolClient } from "pg";
+import { getPool as getSharedPool } from "./db-pool";
 import type { AgencyProfile } from "./scoring/scoring-pipeline";
 
 type ClientProfilesDbClient = Pick<Pool, "query"> | Pick<PoolClient, "query">;
@@ -17,6 +18,7 @@ type ClientProfileRow = {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  contactPolicy: string;
 };
 
 export type ClientProfile = {
@@ -33,6 +35,7 @@ export type ClientProfile = {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  contactPolicy: 'corporate_only' | 'no_personal' | 'unrestricted';
 };
 
 type PilotApplicationRow = {
@@ -60,19 +63,7 @@ const globalForPg = globalThis as typeof globalThis & {
 };
 
 function getPool(): Pool | null {
-  const connectionString = process.env.DATABASE_URL;
-
-  if (!connectionString) {
-    return null;
-  }
-
-  if (!globalForPg.recruiterRadarClientProfilesPool) {
-    globalForPg.recruiterRadarClientProfilesPool = new Pool({
-      connectionString
-    });
-  }
-
-  return globalForPg.recruiterRadarClientProfilesPool;
+  return getSharedPool();
 }
 
 export async function listClientProfiles(): Promise<ClientProfile[]> {
@@ -96,7 +87,8 @@ export async function listClientProfiles(): Promise<ClientProfile[]> {
       daily_digest_limit AS "dailyDigestLimit",
       is_active AS "isActive",
       created_at::TEXT AS "createdAt",
-      updated_at::TEXT AS "updatedAt"
+      updated_at::TEXT AS "updatedAt",
+      contact_policy AS "contactPolicy"
     FROM client_profiles
     ORDER BY is_active DESC, updated_at DESC, id DESC
   `);
@@ -129,7 +121,8 @@ export async function getClientProfileById(
       daily_digest_limit AS "dailyDigestLimit",
       is_active AS "isActive",
       created_at::TEXT AS "createdAt",
-      updated_at::TEXT AS "updatedAt"
+      updated_at::TEXT AS "updatedAt",
+      contact_policy AS "contactPolicy"
     FROM client_profiles
     WHERE id = $1
   `, [normalizedClientProfileId]);
@@ -199,7 +192,8 @@ export async function findMatchingClientProfileForCheckoutOrder(input: {
         daily_digest_limit AS "dailyDigestLimit",
         is_active AS "isActive",
         created_at::TEXT AS "createdAt",
-        updated_at::TEXT AS "updatedAt"
+        updated_at::TEXT AS "updatedAt",
+        contact_policy AS "contactPolicy"
       FROM client_profiles
       WHERE telegram_chat_id::TEXT = $1
       ${ownershipClause}
@@ -226,7 +220,8 @@ export async function findMatchingClientProfileForCheckoutOrder(input: {
       daily_digest_limit AS "dailyDigestLimit",
       is_active AS "isActive",
       created_at::TEXT AS "createdAt",
-      updated_at::TEXT AS "updatedAt"
+      updated_at::TEXT AS "updatedAt",
+      contact_policy AS "contactPolicy"
     FROM client_profiles
     WHERE LOWER(BTRIM(agency_name)) = LOWER(BTRIM($1))
     ${ownershipClause}
@@ -276,6 +271,7 @@ export async function saveClientProfile(input: {
   companySizes?: readonly string[] | null;
   dailyDigestLimit?: number | null;
   isActive?: boolean;
+  contactPolicy?: 'corporate_only' | 'no_personal' | 'unrestricted' | null;
 }, db?: ClientProfilesDbClient): Promise<ClientProfile> {
   const pool = db ?? getPool();
 
@@ -311,7 +307,8 @@ export async function saveClientProfile(input: {
             industries = $8::jsonb,
             company_sizes = $9::jsonb,
             daily_digest_limit = $10,
-            is_active = $11
+              is_active = $11,
+            contact_policy = $12
           WHERE id = $1
           RETURNING
             id::TEXT AS id,
@@ -326,7 +323,8 @@ export async function saveClientProfile(input: {
             daily_digest_limit AS "dailyDigestLimit",
             is_active AS "isActive",
             created_at::TEXT AS "createdAt",
-            updated_at::TEXT AS "updatedAt"
+            updated_at::TEXT AS "updatedAt",
+            contact_policy AS "contactPolicy"
         `, [
           normalizedId,
           agencyName,
@@ -338,7 +336,8 @@ export async function saveClientProfile(input: {
           industries.length > 0 ? JSON.stringify(industries) : null,
           companySizes.length > 0 ? JSON.stringify(companySizes) : null,
           dailyDigestLimit,
-          isActive
+          isActive,
+          input.contactPolicy ?? 'corporate_only'
         ])
       : await pool.query<ClientProfileRow>(`
           INSERT INTO client_profiles (
@@ -351,9 +350,10 @@ export async function saveClientProfile(input: {
             industries,
             company_sizes,
             daily_digest_limit,
-            is_active
+            is_active,
+            contact_policy
           )
-          VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8::jsonb, $9, $10)
+          VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8::jsonb, $9, $10, $11)
           RETURNING
             id::TEXT AS id,
             agency_name AS "agencyName",
@@ -367,7 +367,8 @@ export async function saveClientProfile(input: {
             daily_digest_limit AS "dailyDigestLimit",
             is_active AS "isActive",
             created_at::TEXT AS "createdAt",
-            updated_at::TEXT AS "updatedAt"
+            updated_at::TEXT AS "updatedAt",
+            contact_policy AS "contactPolicy"
         `, [
           agencyName,
           telegramChatId,
@@ -378,7 +379,8 @@ export async function saveClientProfile(input: {
           industries.length > 0 ? JSON.stringify(industries) : null,
           companySizes.length > 0 ? JSON.stringify(companySizes) : null,
           dailyDigestLimit,
-          isActive
+          isActive,
+          input.contactPolicy ?? 'corporate_only'
         ]);
   } catch (err) {
     if (isUniqueViolation(err, "client_profiles_telegram_chat_id_unique")) {
@@ -538,7 +540,8 @@ function mapClientProfileRow(row: ClientProfileRow): ClientProfile {
     dailyDigestLimit: normalizeDailyDigestLimit(row.dailyDigestLimit),
     isActive: row.isActive,
     createdAt: row.createdAt,
-    updatedAt: row.updatedAt
+    updatedAt: row.updatedAt,
+    contactPolicy: (row.contactPolicy as ClientProfile['contactPolicy']) || 'corporate_only',
   };
 }
 
@@ -571,6 +574,7 @@ export function clientProfileToAgencyProfile(profile: ClientProfile): AgencyProf
     excludedIndustries: [],
     excludedLocations: [],
     exclusions: profile.excludeKeywords,
+    contactPolicy: profile.contactPolicy,
   }
 }
 
