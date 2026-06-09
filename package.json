@@ -241,6 +241,7 @@
     "indent-string": "^4.0.0",
     "inflight": "^1.0.6",
     "inherits": "^2.0.4",
+    "ioredis": "^5.11.1",
     "is-arrayish": "^0.2.1",
     "is-core-module": "^2.16.2",
     "is-fullwidth-code-point": "^3.0.0",

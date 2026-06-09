@@ -455,16 +455,16 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               key={plan.code}
               className={plan.isPrimary ? hpStyles.primaryPlanCard : hpStyles.secondaryPlanCard}
             >
-              <div style={{ display: "grid", gap: "8px" }}>
-                <StatusBadge tone={plan.isPrimary ? "info" : "neutral"} style={{ justifySelf: "start" }}>
+              <div className={ppStyles.planPriceContainer}>
+                <StatusBadge tone={plan.isPrimary ? "info" : "neutral"} className={ppStyles.planBadge}>
                   {plan.name}
                 </StatusBadge>
                 <div className={ppStyles.planPrice}>{plan.price}</div>
-                <div style={{ color: "#64748b" }}>{plan.cadence}</div>
-                <p className={hpStyles.planDescription}>{plan.description}</p>
+                <div className={ppStyles.planPriceCadence}>{plan.cadence}</div>
+                <p className={ppStyles.planDescription}>{plan.description}</p>
               </div>
 
-              <div style={{ display: "grid", gap: "10px" }}>
+              <div className={ppStyles.planFeatures}>
                 {plan.bullets.map((bullet) => (
                   <div key={bullet} className={hpStyles.featureRow}>
                     <span className={hpStyles.featureDot} />

@@ -1,3 +1,36 @@
+/* Design Tokens */
+:root {
+  /* Colors */
+  --c-text-primary: #0f172a;
+  --c-text-secondary: #475569;
+  --c-text-muted: #667085;
+  --c-bg-page: #f8fbff;
+  --c-bg-card: rgba(255, 255, 255, 0.94);
+  --c-border: rgba(15, 23, 42, 0.08);
+  --c-brand: #1d4ed8;
+  --c-accent: #1e40af;
+
+  /* Spacing */
+  --space-section: 18px;
+  --space-card-padding: 24px;
+  --space-card-padding-lg: 32px;
+
+  /* Radius */
+  --radius-card: 24px;
+  --radius-card-sm: 18px;
+  --radius-pill: 999px;
+
+  /* Gate badge colors */
+  --gate-a-color: #065f46;
+  --gate-a-bg: #d1fae5;
+  --gate-b-color: #1e40af;
+  --gate-b-bg: #dbeafe;
+  --gate-c-color: #92400e;
+  --gate-c-bg: #fef3c7;
+  --gate-d-color: #4b5563;
+  --gate-d-bg: #f3f4f6;
+}
+
 /* Page frame */
 .pageFrame {
   min-height: 100vh;
@@ -5,6 +38,20 @@
   background: radial-gradient(circle at top, rgba(59, 130, 246, 0.08), transparent 28%), linear-gradient(180deg, #f8fbff 0%, #f3f6fb 28%, #eef2f7 100%);
   color: #0f172a;
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Tablet breakpoint */
+@media (max-width: 1024px) {
+  .pageFrame {
+    padding: 24px 16px 60px;
+  }
+}
+
+/* Mobile breakpoint */
+@media (max-width: 640px) {
+  .pageFrame {
+    padding: 20px 14px 48px;
+  }
 }
 
 .pageFrameInner {
@@ -17,12 +64,20 @@
 
 /* Surface card */
 .surfaceCard {
+  contain: layout paint;
   border: 1px solid rgba(15, 23, 42, 0.08);
   border-radius: 24px;
   background: rgba(255, 255, 255, 0.94);
   box-shadow: 0 18px 60px rgba(15, 23, 42, 0.08);
   backdrop-filter: blur(10px);
   min-width: 0;
+  will-change: transform;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.surfaceCard:hover {
+  box-shadow: 0 24px 72px rgba(15, 23, 42, 0.12);
+  transform: translateY(-2px);
 }
 
 /* Back link */
@@ -125,6 +180,22 @@
   font-size: 0.94rem;
   font-weight: 700;
   cursor: pointer;
+  transition: box-shadow 0.2s ease, transform 0.15s ease;
+  will-change: transform;
+}
+
+.primaryAction:hover {
+  box-shadow: 0 18px 40px rgba(30, 64, 175, 0.32);
+  transform: translateY(-1px);
+}
+
+.primaryAction:active {
+  transform: translateY(0);
+}
+
+.primaryAction:focus-visible {
+  outline: 2px solid var(--c-brand);
+  outline-offset: 2px;
 }
 
 /* Secondary action */
@@ -142,6 +213,22 @@
   font-weight: 700;
   cursor: pointer;
   backdrop-filter: blur(8px);
+  transition: box-shadow 0.2s ease, transform 0.15s ease;
+  will-change: transform;
+}
+
+.secondaryAction:hover {
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.1);
+  transform: translateY(-1px);
+}
+
+.secondaryAction:active {
+  transform: translateY(0);
+}
+
+.secondaryAction:focus-visible {
+  outline: 2px solid var(--c-brand);
+  outline-offset: 2px;
 }
 
 /* Muted action */
@@ -355,5 +442,176 @@
 
 .noticeText {
   line-height: 1.6;
+}
+
+/* Plan price */
+.planPrice {
+  font-size: 2.5rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--c-text-primary);
+}
+
+/* Plan price cadence */
+.planPriceCadence {
+  color: #64748b;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+/* Plan description */
+.planDescription {
+  color: #445164;
+  line-height: 1.65;
+  margin: 0;
+}
+
+/* Feature row */
+.featureRow {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+/* Feature dot */
+.featureDot {
+  width: 6px;
+  height: 6px;
+  margin-top: 10px;
+  border-radius: var(--radius-pill);
+  background-color: #101828;
+  flex-shrink: 0;
+}
+
+/* Plan card hover effects */
+.primaryPlanCard {
+  position: relative;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.primaryPlanCard:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 24px 56px rgba(37, 99, 235, 0.18);
+}
+
+.secondaryPlanCard {
+  position: relative;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.secondaryPlanCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.1);
+}
+
+/* CTA button enhanced styling */
+.primaryAction {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.primaryAction::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: width 0.5s ease;
+}
+
+.primaryAction:hover::before {
+  width: 100%;
+}
+
+.secondaryAction {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.secondaryAction::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  transition: width 0.5s ease;
+}
+
+.secondaryAction:hover::before {
+  width: 100%;
+}
+
+/* Gradient overlay for primary plan */
+.primaryPlanCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.03) 0%, rgba(147, 197, 253, 0.05) 50%, rgba(219, 234, 254, 0.03) 100%);
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* Plan container */
+.planPriceContainer {
+  display: grid;
+  gap: 8px;
+}
+
+/* Plan badge */
+.planBadge {
+  justify-self: start;
+}
+
+/* Plan features grid */
+.planFeatures {
+  display: grid;
+  gap: 10px;
+}
+
+/* Gate badge */
+.gateBadge {
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Gate badge variants */
+.gateBadge[data-gate="A"] {
+  background: var(--gate-a-bg, #d1fae5);
+  color: var(--gate-a-color, #065f46);
+}
+
+.gateBadge[data-gate="B"] {
+  background: var(--gate-b-bg, #dbeafe);
+  color: var(--gate-b-color, #1e40af);
+}
+
+.gateBadge[data-gate="C"] {
+  background: var(--gate-c-bg, #fef3c7);
+  color: var(--gate-c-color, #92400e);
+}
+
+.gateBadge[data-gate="D"] {
+  background: var(--gate-d-bg, #f3f4f6);
+  color: var(--gate-d-color, #4b5563);
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  .surfaceCard,
+  .primaryAction,
+  .secondaryAction {
+    transition: none;
+  }
 }
 

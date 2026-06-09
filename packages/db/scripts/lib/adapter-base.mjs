@@ -47,7 +47,7 @@ export class BaseAdapter {
 
   async writeJsonFile(path, data, dir = null) {
     // Sanitize path to prevent directory traversal
-    const safePath = path.replace(/\.\.\/g, '').replace(/\//g, '_');
+    const safePath = path.replace(/\.\.\//g, '').replace(/\//g, '_');
     const filePath = dir ? join(dir, safePath) : resolve(this.scriptDir, safePath);
 
     // Ensure final path is within expected directory
