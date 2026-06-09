@@ -7,45 +7,39 @@ git push origin main
        │
        ▼
 GitHub Actions: test.yml
-  ├─ test job (always on push to main)
-  └─ build job (push to main or tag)
-       ├─ docker build -f apps/web/Dockerfile
-       └─ smoke test: container starts, /api/health → 200
+  ├─ test job (Node 22, tsc + jest + 745 tests)
+  └─ build job (Node 22, Postgres service)
+       ├─ migrations: npm run db:migrate (21 migrations)
+       ├─ docker build -f apps/web/Dockerfile (repo root context)
+       └─ smoke test: docker run --network host, /api/health → 200
        │
        ▼  (NO push to container registry — image is discarded)
-Railway: autodeploy(?) on push to main
-  ├─ rebuilds from Dockerfile
-  ├─ starts: node server.js  (PORT=3000)
-  └─ healthcheck: GET /api/health every 30s
+Railway: autodeploy on push to main (railway.toml configured)
+  ├─ rebuilds from Dockerfile (Node 22-alpine)
+  ├─ docker-entrypoint.sh
+  │    ├─ MIGRATE_ON_START=true (default): runs npm run db:migrate
+  │    └─ MIGRATE_ON_START=false: skip (when migrations run externally)
+  ├─ starts: node apps/web/server.js  (standalone output, PORT=3000)
+  └─ healthcheck: GET /api/health every 30s (DB + Redis probes)
 ```
 
-### What actually triggers Railway deploy
+### Railway configuration
 
-**Unconfirmed.** There is no `railway.toml`, no `railway.json`, and no deploy hook in CI.
-The likely scenario: Railway GitHub integration is connected to `maximalang/recruiter-radar`,
-listening on `main` branch with autodeploy ON — but this must be verified in Railway dashboard.
+Defined in `railway.toml` (committed to repo):
+- **Branch:** `main`
+- **Builder:** Dockerfile at `apps/web/Dockerfile`
+- **Healthcheck:** `/api/health` (timeout 120s)
+- **Restart:** ON_FAILURE, max 3 retries
 
-**Verify now:**
-1. `railway status` (if CLI installed) or open Railway dashboard → project → service → Settings
-2. Check "GitHub Repo" points to `maximalang/recruiter-radar`
-3. Check "Branch" = `main`
-4. Check "Auto Deploy" = ON or OFF
-5. Check service type = **production** or **staging**
+### Migration flow (NO duplication)
 
-### Migration gap (CRITICAL)
+| Step | Runs migrations? | Where |
+|---|---|---|
+| CI build job | ✅ Yes — before container start | Outside Docker, directly against CI Postgres |
+| CI smoke container | ❌ No — `MIGRATE_ON_START=false` | Inside Docker, skips entrypoint migration |
+| Railway production | ✅ Yes — on every deploy | Inside Docker, entrypoint runs `migrate.mjs` |
 
-The Dockerfile does **not** run migrations. The app starts against whatever DB schema exists.
-If a deploy includes a migration that adds columns/tables, the new code will fail until migrations
-are run manually.
-
-**Current manual step:**
-```bash
-# Must be run AFTER Railway deploy starts but BEFORE app serves traffic
-# Railway CLI or inside a Railway shell:
-npm run db:migrate
-```
-
-This is the biggest operational risk — see "Target flow" below for fixes.
+Migrations are **idempotent** — safe to run on every deploy. Only one path runs them per environment.
 
 ---
 
@@ -81,14 +75,11 @@ This is the biggest operational risk — see "Target flow" below for fixes.
 | `SESSION_SECURE_COOKIE` | Set `true` in production (HTTPS). Default assumes HTTPS |
 | `DIGEST_API_KEY` | API key for digest endpoints |
 | `DIGEST_CALLBACK_SECRET` | Callback verification |
+| `MIGRATE_ON_START` | `true` (default) or `false` to skip entrypoint migrations |
 
 ### Source-specific (set per source as needed)
 
-| Variable | Description |
-|---|---|
-| `HH_USER_AGENT` | Must be real registered app — placeholder is 403'd |
-| `OPENAI_API_KEY` | Required for Firecrawl structured extraction |
-| `FIRECRAWL_API_KEY` | If using SaaS Firecrawl |
+See `.env.example` for full list of source env vars (HH, LinkedIn, SuperJob, etc.)
 
 ---
 
@@ -100,7 +91,7 @@ Run **before** merging to `main` (which triggers deploy):
 # 1. Type check
 npm run web:check
 
-# 2. Tests
+# 2. Tests (must run from apps/web cwd)
 cd apps/web && npm test
 
 # 3. DB migration validation (ensure SQL syntax is valid)
@@ -126,9 +117,8 @@ Run **after** Railway deployment completes:
 curl -s https://<APP_URL>/api/health
 # Expected: {"status":"healthy","db":"ok","redis":"ok" or "unavailable"}
 
-# 2. Migrations are up to date
-#    Either run: npm run db:migrate
-#    Or check Railway deploy logs for migration output
+# 2. Check Railway deploy logs for migration output
+#    Should see "Migration summary: X applied, Y skipped"
 
 # 3. Smoke: landing page loads
 curl -sf https://<APP_URL>/ -o /dev/null
@@ -143,11 +133,9 @@ curl -sf https://<APP_URL>/ -o /dev/null
 
 ### Option A: Railway re-deploy previous commit (fastest)
 
-```bash
-# 1. Find the last working deploy in Railway dashboard → Deployments
-# 2. Click "Redeploy" on the previous successful deployment
-# This builds the same commit again — takes a few minutes.
-```
+1. Open Railway dashboard → Deployments
+2. Click "Redeploy" on the previous successful deployment
+3. This builds the same commit again — takes a few minutes
 
 ### Option B: Git revert (if re-deploy unavailable)
 
@@ -161,42 +149,66 @@ git push origin main
 # This triggers a new Railway deploy with the reverted code.
 
 # 3. If a migration was applied that needs undoing:
-npm run db:migrate  # won't undo — use down.sql manually:
-# Read packages/db/migrations/<migration>.down.sql
-# Apply manually via psql or Railway shell
+#    Read packages/db/migrations/<migration>.down.sql
+#    Apply manually via psql or Railway shell
 ```
 
 ### Option C: Emergency — disable autodeploy
 
-```bash
-# Railway dashboard → Service → Settings → Auto Deploy → OFF
-# Then fix the issue on a branch, test, re-enable autodeploy.
+1. Railway dashboard → Service → Settings → Auto Deploy → OFF
+2. Fix the issue on a branch, test
+3. Re-enable autodeploy
+
+---
+
+## Key Technical Details
+
+### Docker image structure
+
+- **Base:** `node:22-alpine` (Next.js 16 requires Node >= 20.9.0)
+- **Build context:** repo root (not `apps/web/`) — Dockerfile needs `packages/db/`
+- **Standalone output:** Next.js standalone places `server.js` at `apps/web/server.js`
+- **Static files:** Copied to `./apps/web/.next/static` (matches server's expected path)
+- **No `public/` directory** — no static assets yet (removed COPY)
+
+### Health check endpoint
+
+`GET /api/health` returns:
+```json
+{
+  "status": "healthy",
+  "db": "ok",
+  "redis": "ok" | "unavailable" | "error",
+  "timestamp": "2026-06-09T..."
+}
 ```
+- `redis: "unavailable"` is OK (REDIS_URL not set)
+- `redis: "error"` is unhealthy (REDIS_URL set but connection fails)
+- HTTP 200 = healthy, 503 = unhealthy
 
 ---
 
 ## Target Deployment Flows
 
-### Minimum safe flow (implement now)
+### Current (minimum safe flow)
 
-1. **Add `railway.toml`** to pin deploy config in repo (branch, build, healthcheck)
-2. **Add a `release` npm script** that runs migrations then starts the app:
-   ```
-   "release": "npm run db:migrate && node .next/standalone/server.js"
-   ```
-   Update Dockerfile CMD to use this script (or run migrate in a startup command).
-3. **Verify autodeploy settings** in Railway dashboard — confirm branch = `main`, autodeploy = ON
-4. **Add Railway deploy notification** — set `RAILWAY_DEPLOY_HOOK` or use Railway webhook to alert on deploy success/failure
+- ✅ `railway.toml` pins deploy config in repo
+- ✅ Migrations auto-run on every deploy via docker-entrypoint.sh
+- ✅ CI runs test + build + smoke before Railway deploys
+- ✅ Healthcheck monitors DB + Redis
+- ❌ No separate staging service
+- ❌ No branch protection on main
+- ❌ No deploy notification
 
 ### Ideal flow (later)
 
 1. **Separate staging service** on Railway: `develop` branch → staging, `main` → production
 2. **PR review required** on GitHub: branch protection on `main` requiring 1 approval + passing CI
 3. **Deploy gate**: Railway autodeploy OFF on production; manual deploy button after review
-4. **Pre-deploy migration check**: CI job that verifies migrations can be applied on a DB clone
+4. **Pre-deploy migration check**: CI job that verifies migrations on a DB clone
 5. **Post-deploy smoke test**: automated curl against `/api/health` after each Railway deploy
-6. **Rollback automation**: Railway redeploy previous on healthcheck failure (Railway supports this natively)
-7. **Deploy log**: tag each deploy with git SHA + timestamp in a `deploys` table or log
+6. **Rollback automation**: Railway redeploy previous on healthcheck failure
+7. **Deploy log**: tag each deploy with git SHA + timestamp in a `deploys` table
 
 ---
 
@@ -209,4 +221,4 @@ npm run db:migrate  # won't undo — use down.sql manually:
 | `npm run db:migrate` | Apply pending migrations |
 | `npm run db:validate` | Validate migration SQL syntax |
 | `curl /api/health` | Health check (DB + Redis) |
-| `docker build -f apps/web/Dockerfile .` | Build Docker image |
+| `docker build -f apps/web/Dockerfile .` | Build Docker image (from repo root!) |
