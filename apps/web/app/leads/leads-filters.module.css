@@ -45,3 +45,9 @@
   outline: 2px solid var(--c-brand);
   outline-offset: 2px;
 }
+
+@media (max-width: 640px) {
+  .filterBar {
+    gap: 8px;
+  }
+}

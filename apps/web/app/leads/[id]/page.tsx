@@ -15,8 +15,10 @@ import {
   EvidenceTag,
   SourceChip,
   NotFoundState,
-  internalPageClasses as s,
+  internalPageClasses as ipStyles,
   type NavItem,
+  GATE_DESC,
+  FEEDBACK_LABELS,
 } from '../../ui/internal-page';
 
 export const dynamic = 'force-dynamic';
@@ -26,36 +28,20 @@ const LEAD_DETAIL_NAV: NavItem[] = [
   { href: '/leads', label: '🎯 Лиды' },
 ];
 
-const GATE_DESC: Record<string, string> = {
-  A: '2+ независимых источника, чистое совпадение сущности',
-  B: '1 сильный источник + обогащение',
-  C: 'Только платформенная агрегация, требует ревью',
-  D: 'Контекст без прямого доказательства найма',
-};
-
-const FEEDBACK_LABELS: Record<string, { label: string; icon: string }> = {
-  accepted: { label: 'Беру', icon: '✅' },
-  dismissed: { label: 'Мимо', icon: '👋' },
-  later: { label: 'Позже', icon: '⏰' },
-  contacted: { label: 'Уже написал', icon: '✉️' },
-  replied: { label: 'Ответили', icon: '💬' },
-  call: { label: 'Созвон', icon: '📞' },
-  client: { label: 'Клиент', icon: '🤝' },
-  badfit: { label: 'Не подходит', icon: '❌' },
-};
-
 export default async function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const lead = await getLeadDetail({ candidateId: id });
 
   if (!lead) {
     return (
-      <NotFoundState
-        icon="🔍"
-        title="Лид не найден"
-        backHref="/leads"
-        backLabel="← Назад к списку лидов"
-      />
+      <main>
+        <NotFoundState
+          icon="🔍"
+          title="Лид не найден"
+          backHref="/leads"
+          backLabel="← Назад к списку лидов"
+        />
+      </main>
     );
   }
 
@@ -65,7 +51,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
 
   return (
     <InternalPageFrame navItems={LEAD_DETAIL_NAV}>
-      <div style={{ maxWidth: '960px', margin: '0 auto' }}>
+      <div className={ipStyles.leadDetailContainer}>
         <InternalPageHeader
           title={lead.orgName}
           subtitle={
@@ -83,27 +69,27 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               <ContentCard>
                 <ContentCardTitle>🎯 Почему сейчас</ContentCardTitle>
                 {lead.reasons.length > 0 ? (
-                  <ul className={s.reasonList}>
+                  <ul className={ipStyles.reasonList}>
                     {lead.reasons.map((reason, i) => (
-                      <li key={i} className={s.reasonItem}>{reason}</li>
+                      <li key={i} className={ipStyles.reasonItem}>{reason}</li>
                     ))}
                   </ul>
                 ) : (
-                  <p className={s.bodyTextMuted}>Причины не указаны</p>
+                  <p className={ipStyles.bodyTextMuted}>Причины не указаны</p>
                 )}
               </ContentCard>
 
               {/* Evidence card */}
               <ContentCard>
                 <ContentCardTitle>📋 Доказательства</ContentCardTitle>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
+                <div className={ipStyles.chipWrap}>
                   {lead.evidenceTitles.length > 0 ? lead.evidenceTitles.map((title, i) => (
                     <EvidenceTag key={i}>{title}</EvidenceTag>
                   )) : (
-                    <span className={s.bodyTextMuted}>Нет данных о вакансиях</span>
+                    <span className={ipStyles.bodyTextMuted}>Нет данных о вакансиях</span>
                   )}
                 </div>
-                <div className={s.evidenceStats}>
+                <div className={ipStyles.evidenceStats}>
                   <span>💼 {lead.vacanciesCount} вакансий</span>
                   <span>🔀 {lead.distinctVacancyNamesCount} разных ролей</span>
                   {lead.latestPublishedAt && (
@@ -116,9 +102,9 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               {lead.negativeSignals.length > 0 && (
                 <ContentCard tone="danger">
                   <ContentCardTitle tone="danger">⚠️ Факторы риска</ContentCardTitle>
-                  <ul className={s.reasonList}>
+                  <ul className={ipStyles.reasonList}>
                     {lead.negativeSignals.map((signal, i) => (
-                      <li key={i} className={s.signalItem}>{signal}</li>
+                      <li key={i} className={ipStyles.signalItem}>{signal}</li>
                     ))}
                   </ul>
                 </ContentCard>
@@ -127,7 +113,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               {/* Opener card */}
               <ContentCard>
                 <ContentCardTitle>💬 Текст первого сообщения</ContentCardTitle>
-                <p className={s.openerText}>{lead.opener}</p>
+                <p className={ipStyles.openerText}>{lead.opener}</p>
               </ContentCard>
 
               {/* Outreach templates */}
@@ -157,21 +143,21 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
 
               {/* Confidence gate */}
               <ContentCard>
-                <div className={s.sidebarLabel}>Уровень доверия</div>
+                <div className={ipStyles.sidebarLabel}>Уровень доверия</div>
                 <GateBadgeInline gate={lead.confidenceGate} />
-                <p className={s.gateDescription}>{GATE_DESC[lead.confidenceGate] ?? GATE_DESC.D}</p>
+                <p className={ipStyles.gateDescription}>{GATE_DESC[lead.confidenceGate] ?? GATE_DESC.D}</p>
               </ContentCard>
 
               {/* Feedback status */}
               <ContentCard>
-                <div className={s.sidebarLabel}>Обратная связь</div>
+                <div className={ipStyles.sidebarLabel}>Обратная связь</div>
                 {feedback ? (
-                  <div className={s.sidebarValue}>{feedback.icon} {feedback.label}</div>
+                  <div className={ipStyles.sidebarValue}>{feedback.icon} {feedback.label}</div>
                 ) : (
-                  <div className={s.sidebarValueEmpty}>Ещё нет обратной связи</div>
+                  <div className={ipStyles.sidebarValueEmpty}>Ещё нет обратной связи</div>
                 )}
                 {lead.feedbackNote && (
-                  <p style={{ fontSize: '0.8rem', color: 'var(--c-text-muted)', marginTop: '4px', fontStyle: 'italic', marginBottom: '12px' }}>
+                  <p className={ipStyles.feedbackNote}>
                     {lead.feedbackNote}
                   </p>
                 )}
@@ -184,35 +170,35 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
 
               {/* Sources */}
               <ContentCard>
-                <div className={s.sidebarLabel}>Источники</div>
+                <div className={ipStyles.sidebarLabel}>Источники</div>
                 {lead.sourceFamilies.length > 0 ? (
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  <div className={ipStyles.chipWrapSm}>
                     {lead.sourceFamilies.map((src) => (
                       <SourceChip key={src}>{src}</SourceChip>
                     ))}
                   </div>
                 ) : (
-                  <span className={s.bodyTextMuted}>Нет данных</span>
+                  <span className={ipStyles.bodyTextMuted}>Нет данных</span>
                 )}
               </ContentCard>
 
               {/* Company info */}
               <ContentCard>
-                <div className={s.sidebarLabel}>Компания</div>
+                <div className={ipStyles.sidebarLabel}>Компания</div>
                 {lead.orgWebsite && (
                   <a
                     href={lead.orgWebsite}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={s.sidebarLink}
+                    className={ipStyles.sidebarLink}
                   >
                     🌐 Сайт компании →
                   </a>
                 )}
                 {lead.sourceExternalId && (
-                  <div className={s.sidebarMeta}>ID: {lead.sourceExternalId}</div>
+                  <div className={ipStyles.sidebarMeta}>ID: {lead.sourceExternalId}</div>
                 )}
-                <div className={s.sidebarMeta}>
+                <div className={ipStyles.sidebarMeta}>
                   Добавлен: {new Date(lead.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
                 </div>
               </ContentCard>

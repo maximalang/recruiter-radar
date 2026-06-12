@@ -11,7 +11,7 @@ import {
   ContentCard,
   ContentCardTitle,
   type NavItem,
-  internalPageClasses as s,
+  internalPageClasses as ipStyles,
 } from "../ui/internal-page";
 import ppStyles from "../ui/page-primitives.module.css";
 
@@ -59,24 +59,24 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Rec
   return (
     <InternalPageFrame navItems={CHECKOUT_NAV}>
       <InternalPageHeader title="Оформление пилота" />
-      <div className={s.narrowLayout}>
+      <div className={ipStyles.narrowLayout}>
         <ContentCard>
           <ContentCardTitle>🎯 Пилотный запуск</ContentCardTitle>
-          <p className={s.bodyText}>
+          <p className={ipStyles.bodyText}>
             Оплата запускается только после явного подтверждения. После оплаты мы начнём генерировать ежедневный радар компаний для вашей ниши.
           </p>
           {input.specialization && (
-            <div className={s.fieldRow}>
-              Специализация: <strong className={s.fieldRowStrong}>{input.specialization}</strong>
+            <div className={ipStyles.fieldRow}>
+              Специализация: <strong className={ipStyles.fieldRowStrong}>{input.specialization}</strong>
             </div>
           )}
           {input.targetCity && (
-            <div className={s.fieldRow}>
-              Город: <strong className={s.fieldRowStrong}>{input.targetCity}</strong>
+            <div className={ipStyles.fieldRow}>
+              Город: <strong className={ipStyles.fieldRowStrong}>{input.targetCity}</strong>
             </div>
           )}
           {!existingOwnerId ? (
-            <p className={s.bodyTextMutedBlock}>
+            <p className={ipStyles.bodyTextMutedBlock}>
               Нажмите кнопку ниже, чтобы запустить пилот.
             </p>
           ) : null}

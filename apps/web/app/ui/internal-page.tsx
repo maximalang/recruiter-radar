@@ -2,6 +2,11 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 
 import s from "./internal-page.module.css";
+import { repairPossiblyMojibakeText } from "../../lib/copy/repair";
+
+function repairVisibleNode(value: ReactNode): ReactNode {
+  return typeof value === "string" ? repairPossiblyMojibakeText(value) : value;
+}
 
 /* ── Top navigation bar ── */
 
@@ -67,7 +72,7 @@ export function InternalPageHeader(props: {
     <header className={s.internalPageHeader}>
       <div className={s.internalPageHeaderTop}>
         <div>
-          <h1 className={s.internalPageTitle}>{props.title}</h1>
+          <h1 className={s.internalPageTitle}>{repairVisibleNode(props.title)}</h1>
           {props.subtitle ? (
             <div className={s.internalPageSubtitle}>{props.subtitle}</div>
           ) : null}
@@ -158,7 +163,7 @@ export function ContentCardTitle(props: {
       className={s.contentCardTitle}
       data-tone={props.tone && props.tone !== "neutral" ? props.tone : undefined}
     >
-      {props.children}
+      {repairVisibleNode(props.children)}
     </h2>
   );
 }
@@ -179,37 +184,49 @@ export function DetailLayout(props: {
 
 /* ── Gate badge inline ── */
 
-const GATE_LABELS: Record<string, string> = {
+export const GATE_LABELS: Record<string, string> = {
   A: "Авто (A)",
   B: "Авто с меткой (B)",
   C: "На проверке (C)",
   D: "Не доставлять (D)",
 };
 
+export const GATE_DESC: Record<string, string> = {
+  A: "2+ независимых источника, чистое совпадение сущности",
+  B: "1 сильный источник + обогащение",
+  C: "Только платформенная агрегация, требует ревью",
+  D: "Контекст без прямого доказательства найма",
+};
+
+export const FEEDBACK_LABELS: Record<string, { label: string; icon: string }> = {
+  accepted: { label: "Беру", icon: "✅" },
+  dismissed: { label: "Мимо", icon: "👋" },
+  later: { label: "Позже", icon: "⏰" },
+  contacted: { label: "Уже написал", icon: "✉️" },
+  replied: { label: "Ответили", icon: "💬" },
+  call: { label: "Созвон", icon: "📞" },
+  client: { label: "Клиент", icon: "🤝" },
+  badfit: { label: "Не подходит", icon: "❌" },
+};
+
 export function GateBadgeInline(props: { gate: string }) {
   return (
     <span className={s.gateBadgeInline} data-gate={props.gate} aria-label={`Уровень доверия: ${GATE_LABELS[props.gate] ?? props.gate}`}>
-      {GATE_LABELS[props.gate] ?? props.gate}
+      {repairVisibleNode(GATE_LABELS[props.gate] ?? props.gate)}
     </span>
   );
 }
 
 /* ── Feedback badge ── */
 
-const FEEDBACK_LABELS: Record<string, string> = {
-  accepted: "Беру",
-  dismissed: "Мимо",
-  later: "Позже",
-  contacted: "Уже написал",
-  replied: "Ответили",
-  call: "Созвон",
-  client: "Клиент",
-};
+const FEEDBACK_SHORT_LABELS: Record<string, string> = Object.fromEntries(
+  Object.entries(FEEDBACK_LABELS).map(([k, v]) => [k, v.label])
+);
 
 export function FeedbackBadge(props: { status: string | null }) {
   if (!props.status || props.status === "none") return null;
-  const label = FEEDBACK_LABELS[props.status] ?? props.status;
-  return <span className={s.feedbackBadge}>{label}</span>;
+  const label = FEEDBACK_SHORT_LABELS[props.status] ?? props.status;
+  return <span className={s.feedbackBadge}>{repairVisibleNode(label)}</span>;
 }
 
 /* ── Score tone helper ── */
@@ -296,14 +313,16 @@ export function EmptyState(props: {
   return (
     <div className={s.emptyState}>
       {props.icon ? <div className={s.emptyStateIcon}>{props.icon}</div> : null}
-      <p className={s.emptyStateTitle}>{props.title}</p>
-      {props.text ? <p className={s.emptyStateText}>{props.text}</p> : null}
+      <p className={s.emptyStateTitle}>{repairVisibleNode(props.title)}</p>
+      {props.text ? <p className={s.emptyStateText}>{repairVisibleNode(props.text)}</p> : null}
     </div>
   );
 }
 
 /* ── Not-found state ── */
 
+/** Full-page "not found" state. Use *instead of* InternalPageFrame, not nested inside it —
+ *  otherwise you'd get `<main>` inside `<main>`. */
 export function NotFoundState(props: {
   icon?: string;
   title: string;
@@ -311,13 +330,13 @@ export function NotFoundState(props: {
   backLabel: string;
 }) {
   return (
-    <main className={s.notFoundState}>
+    <div className={s.notFoundState}>
       <div className={s.notFoundContent}>
         {props.icon ? <div className={s.emptyStateIcon}>{props.icon}</div> : null}
         <p className={s.emptyStateTitle}>{props.title}</p>
         <InternalBackLink href={props.backHref}>{props.backLabel}</InternalBackLink>
       </div>
-    </main>
+    </div>
   );
 }
 

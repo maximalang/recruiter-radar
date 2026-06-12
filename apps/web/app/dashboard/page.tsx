@@ -1,16 +1,17 @@
 import { Suspense } from 'react';
-import DashboardHeader from './dashboard-header';
 import DashboardOverview from './dashboard-overview';
 import DashboardSources from './dashboard-sources';
 import DashboardAlerts from './dashboard-alerts';
 import DashboardQuality from './dashboard-quality';
 import DashboardAnalytics from './dashboard-analytics';
-import { InternalPageFrame, type NavItem } from '../ui/internal-page';
+import LiveClock from './live-clock';
+import { InternalPageFrame, InternalPageHeader, type NavItem } from '../ui/internal-page';
 
 const DASHBOARD_NAV: NavItem[] = [
   { href: '/dashboard', label: '📊 Дашборд', active: true },
   { href: '/leads', label: '🎯 Лиды' },
 ];
+
 import {
   getDashboardOverviewMetrics,
   getDashboardQualityMetrics,
@@ -35,8 +36,12 @@ export default async function DashboardPage() {
 
   return (
     <InternalPageFrame navItems={DASHBOARD_NAV}>
+      <InternalPageHeader
+        title="📊 Радар источников"
+        subtitle="Мониторинг производительности и состояние источников в реальном времени"
+        nav={<LiveClock />}
+      />
       <Suspense fallback={<div>Загрузка...</div>}>
-        <DashboardHeader />
         <div style={{ marginTop: '32px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
           <DashboardQuality data={quality} />
           <DashboardAnalytics

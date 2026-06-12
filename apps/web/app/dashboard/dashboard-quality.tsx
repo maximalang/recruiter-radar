@@ -2,6 +2,7 @@
 
 import React from 'react';
 import styles from './dashboard.module.css';
+import { GATE_LABELS } from '../ui/internal-page';
 
 interface AcceptanceRate {
   period: string;
@@ -73,13 +74,6 @@ const GATE_COLORS: Record<string, string> = {
   B: '#3b82f6',
   C: '#f59e0b',
   D: '#6b7280',
-};
-
-const GATE_LABELS: Record<string, string> = {
-  A: 'Авто (A)',
-  B: 'Авто с меткой (B)',
-  C: 'На проверке (C)',
-  D: 'Не доставлять (D)',
 };
 
 const getRateColor = (r: number) =>

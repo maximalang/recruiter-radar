@@ -92,3 +92,9 @@
     transition: none;
   }
 }
+
+@media (max-width: 768px) {
+  .actionBtnGroup {
+    flex-wrap: wrap;
+  }
+}

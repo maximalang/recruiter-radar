@@ -15,7 +15,7 @@ import {
   EmptyState,
   type NavItem,
 } from '../ui/internal-page';
-import { internalPageClasses as s } from '../ui/internal-page';
+import { internalPageClasses as ipStyles } from '../ui/internal-page';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,36 +26,36 @@ const LEADS_NAV: NavItem[] = [
 
 function LeadRow({ lead }: { lead: LeadItem }) {
   return (
-    <tr className={s.dataTableTr}>
-      <td className={s.dataTableTd}>
-        <Link href={`/leads/${lead.id}`} className={s.leadLink}>
-          <div className={s.leadOrgName}>{lead.orgName}</div>
+    <tr className={ipStyles.dataTableTr}>
+      <td className={ipStyles.dataTableTd}>
+        <Link href={`/leads/${lead.id}`} className={ipStyles.leadLink}>
+          <div className={ipStyles.leadOrgName}>{lead.orgName}</div>
         </Link>
         {lead.locationNames.length > 0 && (
-          <div className={s.leadLocation}>📍 {lead.locationNames.slice(0, 2).join(', ')}</div>
+          <div className={ipStyles.leadLocation}>📍 {lead.locationNames.slice(0, 2).join(', ')}</div>
         )}
       </td>
-      <td className={s.dataTableTd} style={{ minWidth: '140px' }}>
+      <td className={ipStyles.dataTableTd} style={{ minWidth: '140px' }}>
         <ScoreBar score={lead.score} />
       </td>
-      <td className={s.dataTableTd}>
+      <td className={ipStyles.dataTableTd}>
         <GateBadgeInline gate={lead.confidenceGate} />
       </td>
-      <td className={s.dataTableTd}>
+      <td className={ipStyles.dataTableTd}>
         <FeedbackBadge status={lead.feedbackStatus} />
       </td>
-      <td className={s.dataTableTd}>
-        <div className={s.leadMeta}>
+      <td className={ipStyles.dataTableTd}>
+        <div className={ipStyles.leadMeta}>
           {lead.vacanciesCount > 0 && <span>💼 {lead.vacanciesCount} вакансий</span>}
           {lead.evidenceTitles.length > 0 && (
-            <div className={s.leadMetaDetail}>
+            <div className={ipStyles.leadMetaDetail}>
               {lead.evidenceTitles.slice(0, 2).join(' · ')}
             </div>
           )}
         </div>
       </td>
-      <td className={s.dataTableTd}>
-        <span className={s.leadDate}>
+      <td className={ipStyles.dataTableTd}>
+        <span className={ipStyles.leadDate}>
           {new Date(lead.createdAt).toLocaleDateString('ru-RU', {
             day: 'numeric',
             month: 'short',
@@ -78,16 +78,16 @@ function LeadsTable({ leads }: { leads: LeadItem[] }) {
   }
 
   return (
-    <div className={s.dataTableWrap}>
-      <table className={s.dataTable}>
+    <div className={ipStyles.dataTableWrap}>
+      <table className={ipStyles.dataTable}>
         <thead>
-          <tr className={s.dataTableHead}>
-            <th className={s.dataTableTh} scope="col">Компания</th>
-            <th className={s.dataTableTh} scope="col">Скоринг</th>
-            <th className={s.dataTableTh} scope="col">Gate</th>
-            <th className={s.dataTableTh} scope="col">Статус</th>
-            <th className={s.dataTableTh} scope="col">Доказательства</th>
-            <th className={s.dataTableTh} scope="col">Дата</th>
+          <tr className={ipStyles.dataTableHead}>
+            <th className={ipStyles.dataTableTh} scope="col">Компания</th>
+            <th className={ipStyles.dataTableTh} scope="col">Скоринг</th>
+            <th className={ipStyles.dataTableTh} scope="col">Gate</th>
+            <th className={ipStyles.dataTableTh} scope="col">Статус</th>
+            <th className={ipStyles.dataTableTh} scope="col">Доказательства</th>
+            <th className={ipStyles.dataTableTh} scope="col">Дата</th>
           </tr>
         </thead>
         <tbody>
@@ -151,7 +151,7 @@ export default async function LeadsPage({
         subtitle={
           <>
             Компании, которым стоит написать сегодня
-            {hasFilters && <span className={s.filterActive}>(фильтр активен)</span>}
+            {hasFilters && <span className={ipStyles.filterActive}>(фильтр активен)</span>}
           </>
         }
       />
@@ -172,10 +172,10 @@ export default async function LeadsPage({
       </MetricGrid>
 
       <TableCard>
-        <Suspense fallback={<div className={s.loadingState}>Загрузка...</div>}>
+        <Suspense fallback={<div className={ipStyles.loadingState}>Загрузка...</div>}>
           <LeadsFilters />
         </Suspense>
-        <Suspense fallback={<div className={s.loadingState}>Загрузка...</div>}>
+        <Suspense fallback={<div className={ipStyles.loadingState}>Загрузка...</div>}>
           <LeadsTable leads={allLeads} />
         </Suspense>
       </TableCard>

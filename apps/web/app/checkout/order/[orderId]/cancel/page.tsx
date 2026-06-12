@@ -17,6 +17,7 @@ import {
 } from "../../../../ui/page-primitives";
 import ppStyles from "../../../../ui/page-primitives.module.css";
 import { translateOrderStatus } from "../../../../onboarding/pilot/[orderId]/pilot-onboarding-components";
+import { internalPageClasses as ipStyles } from "../../../../ui/internal-page";
 
 export const dynamic = "force-dynamic";
 
@@ -91,7 +92,7 @@ export default async function CheckoutCancelPage({ params, searchParams }: Check
           <SummaryRow label="Статус оплаты" value={translateOrderStatus(order.status)} />
         </div>
 
-        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+        <div className={ipStyles.chipWrap}>
           <Link href={retryHref} className={ppStyles.primaryAction}>
             Повторить оплату
           </Link>
