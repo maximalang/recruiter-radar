@@ -284,10 +284,10 @@ export function runScoringPipeline(input: ScoringPipelineInput): ScoringPipeline
   })
 
   const fiurReasons: string[] = [
-    ...fiur.reasons.fit,
-    ...fiur.reasons.intent,
-    ...fiur.reasons.urgency,
-    ...fiur.reasons.reachability,
+    ...fiur.reasonStrings.fit,
+    ...fiur.reasonStrings.intent,
+    ...fiur.reasonStrings.urgency,
+    ...fiur.reasonStrings.reachability,
   ]
 
   const lead = buildAgencyLead({

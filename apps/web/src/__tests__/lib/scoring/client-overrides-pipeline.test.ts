@@ -47,7 +47,7 @@ describe('computeFiur accepts and applies clientOverrides', () => {
     const reweighted = computeFiur(baseInput({ industryFitPenalty: { 'fintech': 0.5 } }));
 
     expect(reweighted.fit).toBeLessThan(normal.fit);
-    expect(reweighted.reasons.fit.some(r => /reweight|badfit|penalty/i.test(r))).toBe(true);
+    expect(reweighted.reasons.fit.some(r => r.key === 'fit.industry.match.reweighted')).toBe(true);
   });
 
   it('clamps penalty to 0.3 minimum', () => {

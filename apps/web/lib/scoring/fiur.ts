@@ -12,7 +12,9 @@
 import type { EvidenceTier } from '@/lib/db/evidence'
 import { detectHiringBurst } from '@/lib/scoring/hiring-burst'
 import { summarizeRoleMix } from '@/lib/scoring/role-category'
+import { formatReason, type ScoringReason, type FiurComponent } from '@/lib/scoring/scoring-reasons'
 export type { EvidenceTier }
+export type { ScoringReason, FiurComponent }
 
 /**
  * The minimal evidence shape FIUR scoring reads. Structurally a subset
@@ -88,7 +90,15 @@ export interface FiurBreakdown {
   urgency: number
   reachability: number
   total: number
+  /** Structured reasons — typed, localisable. Use formatReason() for display. */
   reasons: {
+    fit: ScoringReason[]
+    intent: ScoringReason[]
+    urgency: ScoringReason[]
+    reachability: ScoringReason[]
+  }
+  /** Convenience: all reasons as Russian strings. */
+  reasonStrings: {
     fit: string[]
     intent: string[]
     urgency: string[]
@@ -137,19 +147,25 @@ function isSmbSweetSpot(company: FiurCompany): boolean {
   return company.size === 'small' || company.size === 'medium'
 }
 
+type ComponentResult = { score: number; reasons: ScoringReason[] }
+
+function r(component: FiurComponent, key: string, params?: Record<string, string | number>): ScoringReason {
+  return { component, key, params }
+}
+
 function computeFit(
   company: FiurCompany,
   vacancies: FiurVacancy[],
   profile: FiurClientProfile,
   overrides?: FiurClientOverrides,
   marketConditions?: 'boom' | 'bust' | 'neutral'
-): { score: number; reasons: string[] } {
-  const reasons: string[] = []
+): ComponentResult {
+  const reasons: ScoringReason[] = []
 
   if (isExcluded(company, profile)) {
     return {
       score: 0,
-      reasons: [`company industry "${company.industry ?? ''}" is excluded by ICP`],
+      reasons: [r('fit', 'fit.industry.excluded', { industry: company.industry ?? '' })],
     }
   }
 
@@ -159,8 +175,6 @@ function computeFit(
   const companyIndustryKey = company.industry ? normalize(company.industry) : ''
   if (companyIndustryKey && industries.length > 0) {
     if (industries.includes(companyIndustryKey)) {
-      // Apply industry penalty if override exists (3+ badfits recorded)
-      // Penalty clamped to min 0.3 so industry never fully zeroed out
       const rawPenalty = overrides?.industryFitPenalty?.[companyIndustryKey]
       const penalty = rawPenalty != null ? clamp01(rawPenalty, 0.3) : 1.0
       const industryScore = penalty < 1
@@ -168,12 +182,15 @@ function computeFit(
         : 0.35
       score += industryScore
       if (penalty != null && penalty < 1) {
-        reasons.push(`industry "${company.industry}" matches ICP (reweighted by ${Math.round((1 - penalty) * 100)}% badfit history)`)
+        reasons.push(r('fit', 'fit.industry.match.reweighted', {
+          industry: company.industry ?? '',
+          penaltyPercent: Math.round((1 - penalty) * 100),
+        }))
       } else {
-        reasons.push(`industry "${company.industry}" matches ICP`)
+        reasons.push(r('fit', 'fit.industry.match', { industry: company.industry ?? '' }))
       }
     } else {
-      reasons.push(`industry "${company.industry}" outside ICP`)
+      reasons.push(r('fit', 'fit.industry.outside', { industry: company.industry ?? '-' }))
     }
   }
 
@@ -182,9 +199,9 @@ function computeFit(
     const matched = vacancies.filter((v) => profileRoles.includes(normalize(v.role)))
     if (matched.length > 0) {
       score += 0.3
-      reasons.push(`${matched.length} vacancy/role match ICP`)
+      reasons.push(r('fit', 'fit.role.match', { count: matched.length }))
     } else {
-      reasons.push('no role match between vacancies and ICP')
+      reasons.push(r('fit', 'fit.role.no-match'))
     }
   }
 
@@ -197,34 +214,31 @@ function computeFit(
     const companyMatches = companyLoc && profileLocations.includes(companyLoc)
     if (companyMatches || anyVacancyMatches) {
       score += 0.2
-      reasons.push('location matches ICP')
+      reasons.push(r('fit', 'fit.location.match'))
     } else {
-      reasons.push(`region "${company.location ?? '-'}" outside ICP`)
+      reasons.push(r('fit', 'fit.location.outside', { location: company.location ?? '-' }))
     }
   }
 
   if (profile.companySizes && profile.companySizes.length > 0 && company.size) {
     if (profile.companySizes.includes(company.size)) {
       score += 0.15
-      reasons.push(`company size "${company.size}" matches ICP`)
+      reasons.push(r('fit', 'fit.size.match', { size: company.size }))
     }
   } else if (isSmbSweetSpot(company)) {
     score += 0.1
     const detail = typeof company.employeeCount === 'number'
       ? `${company.employeeCount} employees`
       : `size "${company.size}"`
-    reasons.push(
-      `SMB sweet spot (${detail}, 50–500 employees) — optimal agency budget`
-    )
+    reasons.push(r('fit', 'fit.size.smb-sweet-spot', { detail }))
   }
 
-  // Market context — additive ±0.1 adjustment to fit
   if (marketConditions === 'boom') {
     score += 0.1
-    reasons.push('high market demand increases lead fit value')
+    reasons.push(r('fit', 'fit.market.boom'))
   } else if (marketConditions === 'bust') {
     score -= 0.1
-    reasons.push('low market demand reduces lead fit value')
+    reasons.push(r('fit', 'fit.market.bust'))
   }
 
   return { score: clamp01(score), reasons }
@@ -234,19 +248,17 @@ function computeIntent(
   vacancies: FiurVacancy[],
   evidence: FiurEvidenceItem[],
   now: number
-): { score: number; reasons: string[] } {
-  const reasons: string[] = []
+): ComponentResult {
+  const reasons: ScoringReason[] = []
   if (vacancies.length === 0) {
-    return { score: 0, reasons: ['no vacancies — no hiring intent'] }
+    return { score: 0, reasons: [r('intent', 'intent.no-vacancies')] }
   }
 
   const realRoles = vacancies.filter((v) => !v.isInternalRecruiter)
   const internalOnly = realRoles.length === 0
 
   if (internalOnly) {
-    reasons.push(
-      'only internal recruiter vacancies — does not count as hiring intent per product rules'
-    )
+    reasons.push(r('intent', 'intent.internal-recruiter-only'))
     return { score: 0.05, reasons }
   }
 
@@ -257,56 +269,56 @@ function computeIntent(
     realRoles.length
   if (freshness > 0.6) {
     score += 0.3
-    reasons.push('fresh hiring signals (≤ a few weeks old)')
+    reasons.push(r('intent', 'intent.fresh-signals'))
   } else if (freshness > 0.2) {
     score += 0.15
-    reasons.push('partially fresh hiring signals')
+    reasons.push(r('intent', 'intent.partially-fresh'))
   } else {
-    reasons.push('hiring signals are stale (older than ~60 days)')
+    reasons.push(r('intent', 'intent.stale-signals'))
   }
 
   const directVac = realRoles.some((v) => v.sourceTier === 'direct')
   if (directVac) {
     score += 0.25
-    reasons.push('direct company surface confirms vacancy')
+    reasons.push(r('intent', 'intent.direct-surface'))
   }
 
   const directEvidence = evidence.filter((e) => e.tier === 'direct').length
   const corroboration = evidence.filter((e) => e.tier === 'corroboration').length
   if (directEvidence >= 1 && corroboration >= 1) {
     score += 0.3
-    reasons.push('direct evidence corroborated by independent source')
+    reasons.push(r('intent', 'intent.direct-evidence.corroborated'))
   } else if (directEvidence >= 1) {
     score += 0.2
-    reasons.push('direct evidence present')
+    reasons.push(r('intent', 'intent.direct-evidence.present'))
   } else if (corroboration >= 2) {
     score += 0.15
-    reasons.push('multiple corroborating sources')
+    reasons.push(r('intent', 'intent.multiple-corroborating'))
   }
 
   if (realRoles.length >= 3) {
     score += 0.15
-    reasons.push(`multiple open roles (${realRoles.length}) suggest active hiring`)
+    reasons.push(r('intent', 'intent.multiple-roles', { count: realRoles.length }))
   }
 
   if (realRoles.length >= 2) {
     const mix = summarizeRoleMix(realRoles.map((v) => v.role))
     if (mix.nonTechCount >= 2 && mix.nonTechShare >= 0.5) {
       score += 0.1
-      reasons.push(
-        `non-tech role mix (${mix.nonTechCount}/${mix.total}) — outsourcing-likely roles strengthen the lead`
-      )
+      reasons.push(r('intent', 'intent.non-tech-mix', {
+        nonTech: mix.nonTechCount,
+        total: mix.total,
+      }))
     }
   }
 
-  // Source diversity — independent sources boost confidence in hiring intent
   const uniqueSources = new Set(evidence.map(e => e.source))
   if (uniqueSources.size >= 3) {
     score += 0.1
-    reasons.push(`${uniqueSources.size} independent sources increase intent confidence`)
+    reasons.push(r('intent', 'intent.source-diversity.high', { count: uniqueSources.size }))
   } else if (uniqueSources.size >= 2) {
     score += 0.05
-    reasons.push('2 independent sources strengthen intent')
+    reasons.push(r('intent', 'intent.source-diversity.medium'))
   }
 
   return { score: clamp01(score), reasons }
@@ -316,10 +328,10 @@ function computeUrgency(
   vacancies: FiurVacancy[],
   now: number,
   recentSignalCount?: number
-): { score: number; reasons: string[] } {
-  const reasons: string[] = []
+): ComponentResult {
+  const reasons: ScoringReason[] = []
   if (vacancies.length === 0) {
-    return { score: 0, reasons: ['no vacancies — no urgency signal'] }
+    return { score: 0, reasons: [r('urgency', 'urgency.no-vacancies')] }
   }
 
   const realRoles = vacancies.filter((v) => !v.isInternalRecruiter)
@@ -336,24 +348,27 @@ function computeUrgency(
   })
   if (burst.score > 0) {
     score += burst.score * 0.6
-    for (const reason of burst.reasons) reasons.push(reason)
+    // Burst reasons come from hiring-burst detector — wrap as urgency reasons
+    for (const reason of burst.reasons) {
+      reasons.push(r('urgency', 'urgency.burst', { details: reason }))
+    }
   }
 
   const hardToFill = realRoles.filter((v) => v.isHardToFill).length
   if (hardToFill > 0) {
     score += 0.3
-    reasons.push(`${hardToFill} hard-to-fill role(s) raise urgency`)
+    reasons.push(r('urgency', 'urgency.hard-to-fill', { count: hardToFill }))
   }
 
   if (!burst.isBurst) {
     const freshHits = realRoles.filter((v) => ageDays(v.publishedAt, now) <= 14).length
     if (freshHits >= 2) {
       score += 0.2
-      reasons.push('multiple fresh postings within 14 days')
+      reasons.push(r('urgency', 'urgency.fresh-postings'))
     }
   }
 
-  // Stale role penalty: repeated identical roles with no recent posting
+  // Stale role penalty
   const roleGroups = new Map<string, FiurVacancy[]>()
   for (const v of realRoles) {
     const key = normalize(v.role)
@@ -375,16 +390,15 @@ function computeUrgency(
   if (staleRoleCount >= 2) {
     const penalty = Math.min(staleRoleCount * 0.1, 0.3)
     score -= penalty
-    reasons.push(`${staleRoleCount} повторяющихся ролей без обновления >30 дн. — понижение срочности`)
+    reasons.push(r('urgency', 'urgency.stale-role-repeated', { count: staleRoleCount }))
   } else if (staleRoleCount === 1) {
     score -= 0.05
-    reasons.push('повторяющаяся роль без обновления >30 дн. — возможна потеря актуальности')
+    reasons.push(r('urgency', 'urgency.stale-role-single'))
   }
 
-  // Recent signal burst — high recent activity boosts urgency
   if (recentSignalCount != null && recentSignalCount >= 3) {
     score += 0.15
-    reasons.push(`${recentSignalCount} recent hiring signals (last 7 days) indicate active urgency`)
+    reasons.push(r('urgency', 'urgency.recent-signal-burst', { count: recentSignalCount }))
   }
 
   return { score: clamp01(score), reasons }
@@ -393,25 +407,25 @@ function computeUrgency(
 function computeReachability(
   company: FiurCompany,
   evidence: FiurEvidenceItem[]
-): { score: number; reasons: string[] } {
-  const reasons: string[] = []
+): ComponentResult {
+  const reasons: ScoringReason[] = []
   let score = 0
 
   if (company.hasCareerPage) {
     score += 0.4
-    reasons.push('career page available — direct hiring contact path')
+    reasons.push(r('reachability', 'reachability.career-page'))
   }
   if (company.hasCorporateContactPath) {
     score += 0.4
-    reasons.push('corporate HR/contact path available')
+    reasons.push(r('reachability', 'reachability.corporate-contact'))
   }
   const directEvidence = evidence.some((e) => e.tier === 'direct')
   if (directEvidence) {
     score += 0.2
-    reasons.push('direct company surface in evidence')
+    reasons.push(r('reachability', 'reachability.direct-surface'))
   }
   if (score === 0) {
-    reasons.push('no safe contact path found yet')
+    reasons.push(r('reachability', 'reachability.no-path'))
   }
   return { score: clamp01(score), reasons }
 }
@@ -434,6 +448,12 @@ export function computeFiur(input: FiurInput): FiurBreakdown {
       intent: intent.reasons,
       urgency: urgency.reasons,
       reachability: reachability.reasons,
+    },
+    reasonStrings: {
+      fit: fit.reasons.map(formatReason),
+      intent: intent.reasons.map(formatReason),
+      urgency: urgency.reasons.map(formatReason),
+      reachability: reachability.reasons.map(formatReason),
     },
   }
 }

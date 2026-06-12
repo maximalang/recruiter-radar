@@ -47,7 +47,7 @@ describe('computeFiur with reweighting', () => {
 
     // With 50% penalty on industry (base score ~0.35), fit should be reduced
     expect(reweightedResult.fit).toBeLessThan(normalResult.fit)
-    expect(reweightedResult.reasons.fit.some(r => /penalty|badfit|reweight/i.test(r))).toBe(true)
+    expect(reweightedResult.reasons.fit.some(r => r.key === 'fit.industry.match.reweighted')).toBe(true)
   })
 
   it('clamps fit penalty to minimum 0.3 multiplier — industry component drops below 0.35', () => {
@@ -101,7 +101,7 @@ describe('computeFiur with reweighting', () => {
     })
 
     const hasPenaltyReason = result.reasons.fit.some(r =>
-      /penalty|reweight|client.*override/i.test(r)
+      r.key === 'fit.industry.match.reweighted'
     )
     expect(hasPenaltyReason).toBe(true)
   })

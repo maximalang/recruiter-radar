@@ -252,7 +252,7 @@ describe('FIUR boundary & invariant tests', () => {
       expect(result.fit).toBeGreaterThan(0)
       expect(result.fit).toBeLessThanOrEqual(1)
       // Should mention reweighted
-      expect(result.reasons.fit.some(r => r.includes('reweighted'))).toBe(true)
+      expect(result.reasons.fit.some(r => r.key === 'fit.industry.match.reweighted')).toBe(true)
     })
   })
 
@@ -280,7 +280,7 @@ describe('FIUR boundary & invariant tests', () => {
       })
 
       expect(result.urgency).toBe(0)
-      expect(result.reasons.urgency).toContain('no vacancies — no urgency signal')
+      expect(result.reasons.urgency.some(r => r.key === 'urgency.no-vacancies')).toBe(true)
     })
 
     it('zero intent when no vacancies', () => {
@@ -292,7 +292,7 @@ describe('FIUR boundary & invariant tests', () => {
       })
 
       expect(result.intent).toBe(0)
-      expect(result.reasons.intent).toContain('no vacancies — no hiring intent')
+      expect(result.reasons.intent.some(r => r.key === 'intent.no-vacancies')).toBe(true)
     })
   })
 })

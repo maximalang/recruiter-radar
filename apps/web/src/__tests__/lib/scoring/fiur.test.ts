@@ -97,7 +97,7 @@ describe('computeFiur', () => {
     })
 
     expect(off.fit).toBeLessThan(on.fit)
-    expect(off.reasons.fit.some((r) => /industry/i.test(r))).toBe(true)
+    expect(off.reasons.fit.some((r) => r.key === 'fit.industry.outside')).toBe(true)
   })
 
   it('drops fit to zero when company industry is in exclusions', () => {
@@ -109,7 +109,7 @@ describe('computeFiur', () => {
     })
 
     expect(result.fit).toBe(0)
-    expect(result.reasons.fit.some((r) => /exclud/i.test(r))).toBe(true)
+    expect(result.reasons.fit.some((r) => r.key === 'fit.industry.excluded')).toBe(true)
   })
 
   it('penalises a non-ICP region', () => {
@@ -119,7 +119,7 @@ describe('computeFiur', () => {
       clientProfile: baseProfile,
       evidence: [{ tier: 'direct', source: 'career-page' }],
     })
-    expect(result.reasons.fit.some((r) => /region|location/i.test(r))).toBe(true)
+    expect(result.reasons.fit.some((r) => r.key === 'fit.location.outside')).toBe(true)
   })
 
   it('does not raise intent when the only vacancy is an internal recruiter', () => {
@@ -140,9 +140,7 @@ describe('computeFiur', () => {
 
     expect(internalOnly.intent).toBeLessThan(realRole.intent)
     expect(
-      internalOnly.reasons.intent.some((r) =>
-        /internal recruiter|internal_recruiter|internal/i.test(r)
-      )
+      internalOnly.reasons.intent.some((r) => r.key === 'intent.internal-recruiter-only')
     ).toBe(true)
   })
 
@@ -167,7 +165,7 @@ describe('computeFiur', () => {
 
     expect(burst.urgency).toBeGreaterThan(single.urgency)
     expect(
-      burst.reasons.urgency.some((r) => /burst|multiple|hiring/i.test(r))
+      burst.reasons.urgency.some((r) => r.key.startsWith('urgency.burst'))
     ).toBe(true)
   })
 
@@ -188,7 +186,7 @@ describe('computeFiur', () => {
 
     expect(stale.intent).toBeLessThan(fresh.intent)
     expect(
-      stale.reasons.intent.some((r) => /stale|fresh|days|old/i.test(r))
+      stale.reasons.intent.some((r) => r.key === 'intent.stale-signals')
     ).toBe(true)
   })
 
@@ -246,7 +244,7 @@ describe('computeFiur', () => {
       expect(sweetSpot.fit).toBeGreaterThan(tooSmall.fit)
       expect(sweetSpot.fit).toBeGreaterThan(tooLarge.fit)
       expect(
-        sweetSpot.reasons.fit.some((r) => /sweet spot|smb|50.?500|optimal/i.test(r))
+        sweetSpot.reasons.fit.some((r) => r.key === 'fit.size.smb-sweet-spot')
       ).toBe(true)
     })
 
@@ -266,7 +264,7 @@ describe('computeFiur', () => {
 
       expect(small.fit).toBeGreaterThan(enterprise.fit)
       expect(
-        small.reasons.fit.some((r) => /sweet spot|smb|50.?500|optimal/i.test(r))
+        small.reasons.fit.some((r) => r.key === 'fit.size.smb-sweet-spot')
       ).toBe(true)
     })
 
@@ -283,7 +281,7 @@ describe('computeFiur', () => {
       })
 
       const sweetSpotReasons = explicit.reasons.fit.filter((r) =>
-        /sweet spot|smb|50.?500|optimal/i.test(r)
+        r.key === 'fit.size.smb-sweet-spot'
       )
       expect(sweetSpotReasons.length).toBe(0)
     })
