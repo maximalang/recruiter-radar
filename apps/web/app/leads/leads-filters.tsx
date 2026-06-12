@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback } from 'react';
+import s from './leads-filters.module.css';
 
 const GATE_OPTIONS = [
   { value: '', label: 'Все' },
@@ -48,32 +49,12 @@ export default function LeadsFilters() {
   );
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        gap: '12px',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        padding: '12px 16px',
-        backgroundColor: '#f9fafb',
-        borderBottom: '1px solid #e5e7eb',
-      }}
-    >
-      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#6b7280' }}>
-        Фильтры:
-      </span>
+    <div className={s.filterBar}>
+      <span className={s.filterLabel}>Фильтры:</span>
       <select
         value={currentGate}
         onChange={(e) => updateFilter('gate', e.target.value)}
-        style={{
-          padding: '4px 8px',
-          fontSize: '0.8rem',
-          borderRadius: '6px',
-          border: '1px solid #d1d5db',
-          backgroundColor: '#fff',
-          color: '#374151',
-          cursor: 'pointer',
-        }}
+        className={s.filterSelect}
         aria-label="Фильтр по уровню доверия"
       >
         {GATE_OPTIONS.map((opt) => (
@@ -85,15 +66,7 @@ export default function LeadsFilters() {
       <select
         value={currentFeedback}
         onChange={(e) => updateFilter('feedback', e.target.value)}
-        style={{
-          padding: '4px 8px',
-          fontSize: '0.8rem',
-          borderRadius: '6px',
-          border: '1px solid #d1d5db',
-          backgroundColor: '#fff',
-          color: '#374151',
-          cursor: 'pointer',
-        }}
+        className={s.filterSelect}
         aria-label="Фильтр по обратной связи"
       >
         {FEEDBACK_OPTIONS.map((opt) => (
@@ -105,15 +78,7 @@ export default function LeadsFilters() {
       {(currentGate || currentFeedback) && (
         <button
           onClick={() => router.push('/leads', { scroll: false })}
-          style={{
-            padding: '4px 10px',
-            fontSize: '0.75rem',
-            borderRadius: '6px',
-            border: '1px solid #d1d5db',
-            backgroundColor: '#fff',
-            color: '#6b7280',
-            cursor: 'pointer',
-          }}
+          className={s.filterReset}
         >
           Сбросить
         </button>

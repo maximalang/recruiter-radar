@@ -1,0 +1,47 @@
+/* Leads filters — references :root tokens via internal-page.module.css */
+
+.filterBar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  background-color: var(--c-bg-page);
+  border-bottom: 1px solid var(--c-border);
+}
+
+.filterLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--c-text-muted);
+}
+
+.filterSelect {
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  border-radius: 6px;
+  border: 1px solid var(--c-border);
+  background-color: var(--c-bg-card);
+  color: var(--c-text-secondary);
+  cursor: pointer;
+}
+
+.filterSelect:focus-visible {
+  outline: 2px solid var(--c-brand);
+  outline-offset: 2px;
+}
+
+.filterReset {
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  border-radius: 6px;
+  border: 1px solid var(--c-border);
+  background-color: var(--c-bg-card);
+  color: var(--c-text-muted);
+  cursor: pointer;
+}
+
+.filterReset:focus-visible {
+  outline: 2px solid var(--c-brand);
+  outline-offset: 2px;
+}

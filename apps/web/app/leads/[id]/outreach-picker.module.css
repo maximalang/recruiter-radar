@@ -1,0 +1,94 @@
+/* Outreach picker — references :root tokens via internal-page.module.css */
+
+.templateTabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.templateTab {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border: 1px solid var(--c-border);
+  background-color: var(--c-bg-card);
+  color: var(--c-text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.templateTab[data-active="true"] {
+  border: 2px solid var(--c-brand);
+  background-color: #eff6ff;
+  color: #1e40af;
+}
+
+.templateTab:focus-visible {
+  outline: 2px solid var(--c-brand);
+  outline-offset: 2px;
+}
+
+.renderedTemplate {
+  padding: 12px;
+  border-radius: 6px;
+  background-color: var(--c-bg-page);
+  border: 1px solid var(--c-border);
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--c-text-secondary);
+  white-space: pre-wrap;
+  margin-bottom: 8px;
+}
+
+.actionBtnGroup {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.actionBtn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border: 1px solid var(--c-border);
+  background-color: var(--c-bg-card);
+  color: var(--c-text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.actionBtn:focus-visible {
+  outline: 2px solid var(--c-brand);
+  outline-offset: 2px;
+}
+
+.actionBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.actionBtn[data-state="copied"] {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.actionBtn[data-state="sent"] {
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+
+.errorText {
+  font-size: 0.75rem;
+  color: #ef4444;
+  margin-top: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .templateTab,
+  .actionBtn {
+    transition: none;
+  }
+}

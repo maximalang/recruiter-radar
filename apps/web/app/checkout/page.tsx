@@ -4,6 +4,21 @@ import { redirect } from "next/navigation";
 import { startCheckoutOrder } from "../../lib/payments";
 import { buildCheckoutHref, readPublicPreviewInput } from "../../lib/publicProduct";
 import { generateOwnerId, readOwnerSession, writeOwnerSession } from "../../lib/session";
+import {
+  InternalPageFrame,
+  InternalPageHeader,
+  InternalBackLink,
+  ContentCard,
+  ContentCardTitle,
+  type NavItem,
+  internalPageClasses as s,
+} from "../ui/internal-page";
+import ppStyles from "../ui/page-primitives.module.css";
+
+const CHECKOUT_NAV: NavItem[] = [
+  { href: '/dashboard', label: '📊 Дашборд' },
+  { href: '/leads', label: '🎯 Лиды' },
+];
 
 export const dynamic = "force-dynamic";
 
@@ -42,14 +57,38 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Rec
   }
 
   return (
-    <main style={{ maxWidth: 720, margin: "40px auto", padding: "0 16px", fontFamily: "Inter, sans-serif" }}>
-      <h1>Checkout</h1>
-      <p>Оплата запускается только после явного подтверждения.</p>
-      {!existingOwnerId ? <p>Нажмите кнопку ниже, чтобы запустить пилот.</p> : null}
-      <form action={startCheckoutAction}>
-        <button type="submit">Перейти к оплате</button>
-      </form>
-      <p><Link href={restartHref}>Обновить параметры пилота</Link></p>
-    </main>
+    <InternalPageFrame navItems={CHECKOUT_NAV}>
+      <InternalPageHeader title="Оформление пилота" />
+      <div className={s.narrowLayout}>
+        <ContentCard>
+          <ContentCardTitle>🎯 Пилотный запуск</ContentCardTitle>
+          <p className={s.bodyText}>
+            Оплата запускается только после явного подтверждения. После оплаты мы начнём генерировать ежедневный радар компаний для вашей ниши.
+          </p>
+          {input.specialization && (
+            <div className={s.fieldRow}>
+              Специализация: <strong className={s.fieldRowStrong}>{input.specialization}</strong>
+            </div>
+          )}
+          {input.targetCity && (
+            <div className={s.fieldRow}>
+              Город: <strong className={s.fieldRowStrong}>{input.targetCity}</strong>
+            </div>
+          )}
+          {!existingOwnerId ? (
+            <p className={s.bodyTextMutedBlock}>
+              Нажмите кнопку ниже, чтобы запустить пилот.
+            </p>
+          ) : null}
+          <form action={startCheckoutAction}>
+            <button type="submit" className={ppStyles.primaryAction}>
+              Перейти к оплате
+            </button>
+          </form>
+        </ContentCard>
+
+        <InternalBackLink href={restartHref}>Обновить параметры пилота</InternalBackLink>
+      </div>
+    </InternalPageFrame>
   );
 }

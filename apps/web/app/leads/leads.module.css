@@ -1,0 +1,27 @@
+/* Leads page styles — references :root tokens from page-primitives.module.css
+   via internal-page.module.css */
+
+/* ── Leads page wrapper ── */
+.leadsPage {
+  /* uses InternalPageFrame, no extra wrapper needed */
+}
+
+/* ── Leads header ── */
+.leadsHeader {
+  /* uses InternalPageHeader */
+}
+
+/* ── Summary grid ── */
+.leadsSummaryGrid {
+  /* uses MetricGrid from internal-page */
+}
+
+/* ── Leads table section ── */
+.leadsTableSection {
+  /* uses TableCard from internal-page */
+}
+
+/* ── Loading ── */
+.leadsLoading {
+  /* uses loadingState from internal-page */
+}

@@ -2,13 +2,15 @@
 
 import { useTransition, useState } from 'react';
 import { updateLeadFeedbackAction } from './actions';
+import s from './feedback-buttons.module.css';
+import type { ScoreTone } from '../../ui/internal-page';
 
 const BUTTON_CONFIG = [
-  { status: 'accepted', label: 'Беру', emoji: '✅', color: '#10b981' },
-  { status: 'dismissed', label: 'Мимо', emoji: '👋', color: '#6b7280' },
-  { status: 'later', label: 'Позже', emoji: '⏰', color: '#f59e0b' },
-  { status: 'contacted', label: 'Написал', emoji: '✉️', color: '#3b82f6' },
-  { status: 'badfit', label: 'Не подходит', emoji: '❌', color: '#ef4444' },
+  { status: 'accepted', label: 'Беру', emoji: '✅', tone: 'success' as ScoreTone },
+  { status: 'dismissed', label: 'Мимо', emoji: '👋', tone: 'neutral' as ScoreTone },
+  { status: 'later', label: 'Позже', emoji: '⏰', tone: 'warning' as ScoreTone },
+  { status: 'contacted', label: 'Написал', emoji: '✉️', tone: 'info' as ScoreTone },
+  { status: 'badfit', label: 'Не подходит', emoji: '❌', tone: 'danger' as ScoreTone },
 ] as const;
 
 interface FeedbackButtonsProps {
@@ -36,7 +38,7 @@ export default function FeedbackButtons({ orgId, clientProfileId, currentStatus 
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+      <div className={s.feedbackBtnRow}>
         {BUTTON_CONFIG.map((btn) => {
           const isActive = activeStatus === btn.status;
           return (
@@ -44,18 +46,9 @@ export default function FeedbackButtons({ orgId, clientProfileId, currentStatus 
               key={btn.status}
               onClick={() => handleClick(btn.status)}
               disabled={isPending}
-              style={{
-                padding: '4px 10px',
-                borderRadius: '6px',
-                fontSize: '0.75rem',
-                fontWeight: 500,
-                border: isActive ? `2px solid ${btn.color}` : '1px solid #d1d5db',
-                backgroundColor: isActive ? `${btn.color}18` : '#fff',
-                color: isActive ? btn.color : '#374151',
-                cursor: isPending ? 'not-allowed' : 'pointer',
-                opacity: isPending ? 0.6 : 1,
-                transition: 'all 0.15s',
-              }}
+              className={s.feedbackBtn}
+              data-active={isActive ? "true" : undefined}
+              data-tone={isActive ? btn.tone : undefined}
             >
               {btn.emoji} {btn.label}
             </button>
@@ -63,9 +56,7 @@ export default function FeedbackButtons({ orgId, clientProfileId, currentStatus 
         })}
       </div>
       {error && (
-        <p style={{ fontSize: '0.75rem', color: '#ef4444', marginTop: '6px' }}>
-          {error}
-        </p>
+        <p className={s.errorText}>{error}</p>
       )}
     </div>
   );

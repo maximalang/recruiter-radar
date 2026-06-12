@@ -20,9 +20,9 @@
 
 /* Карточка метрики */
 .metricCard {
-  background-color: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.5rem;
+  background-color: var(--c-bg-card);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-card-sm);
   padding: 1.25rem;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
 }
@@ -37,7 +37,7 @@
 .cardLabel {
   font-size: 0.875rem;
   font-weight: 500;
-  color: #374151;
+  color: var(--c-text-secondary);
 }
 
 .cardIcon {
@@ -48,12 +48,12 @@
 .cardValue {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--c-text-primary);
 }
 
 .cardSubtext {
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--c-text-muted);
   margin-top: 0.25rem;
 }
 
@@ -61,7 +61,7 @@
 .progressTrack {
   width: 100%;
   height: 8px;
-  background-color: #e5e7eb;
+  background-color: var(--c-border);
   border-radius: 4px;
   overflow: hidden;
   margin-top: 0.5rem;
@@ -92,7 +92,7 @@
 .qualityHeading {
   font-size: 1.125rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--c-text-primary);
   margin-bottom: 1rem;
 }
 
@@ -104,9 +104,9 @@
 }
 
 .qualityCard {
-  background-color: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.5rem;
+  background-color: var(--c-bg-card);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-card-sm);
   padding: 1.25rem;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
   flex: 1;
@@ -127,7 +127,7 @@
 .qualityCardLabel {
   font-size: 0.875rem;
   font-weight: 500;
-  color: #374151;
+  color: var(--c-text-secondary);
 }
 
 .qualityCardIcon {
@@ -142,13 +142,13 @@
 
 .qualityRateSubtext {
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--c-text-muted);
   margin-top: 0.25rem;
 }
 
 .qualityRateNoData {
   font-size: 0.6875rem;
-  color: #9ca3af;
+  color: #9ca3af; /* muted-light — no direct token */
   margin-top: 0.25rem;
 }
 
@@ -172,19 +172,19 @@
 
 .gateItemLabel {
   font-size: 0.75rem;
-  color: #374151;
+  color: var(--c-text-secondary);
   font-weight: 600;
 }
 
 .gateItemStats {
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--c-text-muted);
 }
 
 .gateItemBar {
   width: 100%;
   height: 6px;
-  background-color: #e5e7eb;
+  background-color: var(--c-border);
   border-radius: 3px;
   overflow: hidden;
 }
@@ -197,8 +197,8 @@
 /* Loading/Error states */
 .qualityError {
   background-color: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.5rem;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-card-sm);
   padding: 1.5rem;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
 }
@@ -226,12 +226,12 @@
 .headerTitle {
   font-size: 2rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--c-text-primary);
 }
 
 .headerSubtitle {
   margin-top: 0.5rem;
-  color: #6b7280;
+  color: var(--c-text-muted);
 }
 
 .headerActions {
@@ -243,40 +243,40 @@
 
 .headerTime {
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--c-text-muted);
 }
 
 .headerSync {
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--c-text-muted);
 }
 
 .headerLink {
   padding: 0.5rem 1rem;
   font-size: 0.875rem;
   font-weight: 500;
-  color: #374151;
+  color: var(--c-text-secondary);
   background-color: white;
-  border: 1px solid #d1d5db;
-  border-radius: 0.375rem;
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
   text-decoration: none;
   transition: background-color 0.2s;
 }
 
 .headerLink:hover {
-  background-color: #f9fafb;
+  background-color: var(--c-bg-page);
 }
 
-.headerLink:focus {
-  outline: 2px solid #3b82f6;
+.headerLink:focus-visible {
+  outline: 2px solid var(--c-brand);
   outline-offset: 2px;
 }
 
 /* === Sources Section === */
 .sourcesSection {
   background-color: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.5rem;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-card-sm);
   padding: 1.5rem;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
 }
@@ -291,12 +291,12 @@
 .sourcesTitle {
   font-size: 1.125rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--c-text-primary);
 }
 
 .sourcesCount {
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--c-text-muted);
 }
 
 .sourcesList {
@@ -312,8 +312,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 1rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.5rem;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-card-sm);
 }
 
 .sourceItemIcon {
@@ -329,12 +329,12 @@
 .sourceItemName {
   font-size: 1rem;
   font-weight: 500;
-  color: #111827;
+  color: var(--c-text-primary);
 }
 
 .sourceItemMeta {
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--c-text-muted);
   margin-top: 0.25rem;
 }
 
@@ -368,7 +368,7 @@
 .sourceItemProgress {
   width: 96px;
   height: 6px;
-  background-color: #e5e7eb;
+  background-color: var(--c-border);
   border-radius: 3px;
   overflow: hidden;
   margin-top: 0.25rem;
@@ -387,8 +387,8 @@
 /* === Alerts Section === */
 .alertsSection {
   background-color: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.5rem;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-card-sm);
   padding: 1.5rem;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
 }
@@ -403,12 +403,12 @@
 .alertsTitle {
   font-size: 1.125rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--c-text-primary);
 }
 
 .alertsCount {
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--c-text-muted);
 }
 
 .alertsList {
@@ -440,18 +440,18 @@
 .alertItemSource {
   font-size: 1rem;
   font-weight: 500;
-  color: #111827;
+  color: var(--c-text-primary);
 }
 
 .alertItemMessage {
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--c-text-muted);
   margin-top: 0.25rem;
 }
 
 .alertItemTime {
   font-size: 0.75rem;
-  color: #9ca3af;
+  color: #9ca3af; /* muted-light — no direct token */
   margin-top: 0.5rem;
 }
 
@@ -459,40 +459,40 @@
   margin-top: 0.75rem;
   padding: 0.75rem;
   background-color: white;
-  border-radius: 0.375rem;
+  border-radius: 6px;
   border: 1px solid #e5e7eb;
 }
 
 .alertItemRecommendationTitle {
   font-size: 0.875rem;
   font-weight: 500;
-  color: #374151;
+  color: var(--c-text-secondary);
 }
 
 .alertItemRecommendationText {
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--c-text-muted);
   margin-top: 0.25rem;
 }
 
 .alertItemAction {
   padding: 0.5rem 1rem;
   font-size: 0.875rem;
-  border: 1px solid #d1d5db;
-  border-radius: 0.375rem;
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
   background-color: white;
   cursor: pointer;
-  color: #374151;
+  color: var(--c-text-secondary);
   transition: background-color 0.2s;
   align-self: flex-start;
 }
 
 .alertItemAction:hover {
-  background-color: #f9fafb;
+  background-color: var(--c-bg-page);
 }
 
-.alertItemAction:focus {
-  outline: 2px solid #3b82f6;
+.alertItemAction:focus-visible {
+  outline: 2px solid var(--c-brand);
   outline-offset: 2px;
 }
 
@@ -516,7 +516,7 @@
 .alertsEmpty {
   text-align: center;
   padding: 2rem;
-  color: #6b7280;
+  color: var(--c-text-muted);
 }
 
 /* Resolved alerts */
@@ -529,7 +529,7 @@
 .alertsResolvedTitle {
   font-size: 0.875rem;
   font-weight: 500;
-  color: #374151;
+  color: var(--c-text-secondary);
   margin-bottom: 0.75rem;
 }
 
@@ -544,8 +544,8 @@
   justify-content: space-between;
   align-items: center;
   padding: 0.75rem;
-  background-color: #f9fafb;
-  border-radius: 0.375rem;
+  background-color: var(--c-bg-page);
+  border-radius: 6px;
 }
 
 .resolvedItemContent {
@@ -560,12 +560,12 @@
 
 .resolvedItemText {
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--c-text-muted);
 }
 
 .resolvedItemTime {
   font-size: 0.75rem;
-  color: #9ca3af;
+  color: #9ca3af; /* muted-light — no direct token */
 }
 
 /* Visually hidden для ARIA */
@@ -587,7 +587,7 @@
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
   border-radius: 0.25rem;
-  border-radius: 0.375rem;
+  border-radius: 6px;
 }
 
 @keyframes shimmer {
@@ -596,9 +596,9 @@
 }
 
 .skeletonCard {
-  background-color: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.5rem;
+  background-color: var(--c-bg-card);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-card-sm);
   padding: 1.25rem;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
 }
@@ -637,8 +637,8 @@
 
 .skeletonSourcesSection {
   background-color: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.5rem;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-card-sm);
   padding: 1.5rem;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
 }
@@ -667,8 +667,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 1rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.5rem;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-card-sm);
 }
 
 .skeletonSourceInfo {
@@ -751,8 +751,8 @@
   text-align: center;
   padding: 2.5rem 1.5rem;
   background-color: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.5rem;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-card-sm);
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
 }
 
@@ -765,13 +765,13 @@
 .emptyStateTitle {
   font-size: 1.125rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--c-text-primary);
   margin-bottom: 0.5rem;
 }
 
 .emptyStateDescription {
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--c-text-muted);
   max-width: 320px;
   margin: 0 auto;
 }
@@ -819,7 +819,7 @@
 
 .errorStateDescription {
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--c-text-muted);
   max-width: 320px;
   margin: 0 auto 1rem;
 }
@@ -831,7 +831,7 @@
   color: white;
   background-color: #3b82f6;
   border: none;
-  border-radius: 0.375rem;
+  border-radius: 6px;
   cursor: pointer;
   transition: background-color 0.2s;
 }
@@ -840,8 +840,8 @@
   background-color: #2563eb;
 }
 
-.errorStateRetry:focus {
-  outline: 2px solid #3b82f6;
+.errorStateRetry:focus-visible {
+  outline: 2px solid var(--c-brand);
   outline-offset: 2px;
 }
 
@@ -873,6 +873,130 @@
 .skeletonGateItemBar {
   width: 100%;
   height: 6px;
-  background-color: #e5e7eb;
+  background-color: var(--c-border);
   border-radius: 3px;
+}
+
+/* === Analytics Section === */
+.analyticsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.analyticsHeading {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--c-text-primary);
+  margin-bottom: 16px;
+}
+
+.analyticsMetricsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+/* Metric value color variants */
+.metricValueInfo {
+  color: var(--c-brand);
+}
+
+.metricValueWarning {
+  color: #f59e0b;
+}
+
+/* Funnel card */
+.funnelCard {
+  background-color: var(--c-bg-card);
+  border-radius: var(--radius-card-sm);
+  padding: 20px;
+  border: 1px solid var(--c-border);
+}
+
+.funnelTotalLabel {
+  font-size: 0.75rem;
+  color: var(--c-text-muted);
+  margin-bottom: 16px;
+}
+
+.funnelList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.funnelItem {
+  /* container */
+}
+
+.funnelItemHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.funnelItemLabel {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--c-text-secondary);
+}
+
+.funnelItemStats {
+  font-size: 0.8rem;
+  color: var(--c-text-muted);
+}
+
+.funnelBarTrack {
+  height: 8px;
+  border-radius: 4px;
+  background-color: #f3f4f6;
+  overflow: hidden;
+}
+
+.funnelBarFill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.2s;
+}
+
+/* Source performance table */
+.sourcePerfTable {
+  background-color: var(--c-bg-card);
+  border-radius: var(--radius-card-sm);
+  border: 1px solid var(--c-border);
+  overflow: hidden;
+}
+
+.sourcePerfTableInner {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.sourcePerfTd {
+  padding: 10px 16px;
+  font-size: 0.85rem;
+  color: var(--c-text-secondary);
+}
+
+.sourcePerfTdStrong {
+  font-weight: 500;
+  color: var(--c-text-primary);
+}
+
+.analyticsEmpty {
+  background-color: var(--c-bg-card);
+  border-radius: var(--radius-card-sm);
+  padding: 32px;
+  border: 1px solid var(--c-border);
+  text-align: center;
+  color: var(--c-text-muted);
+}
+
+/* Reduce motion for analytics */
+@media (prefers-reduced-motion: reduce) {
+  .funnelBarFill {
+    transition: none;
+  }
 }

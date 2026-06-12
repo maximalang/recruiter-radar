@@ -7,6 +7,7 @@ import {
   type OutreachContext,
 } from '@/lib/outreach-templates';
 import { sendOutreachToTelegramAction } from './actions';
+import s from './outreach-picker.module.css';
 
 interface OutreachPickerProps {
   context: OutreachContext;
@@ -57,82 +58,40 @@ export default function OutreachPicker({ context, clientProfileId }: OutreachPic
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' }}>
+      <div className={s.templateTabs}>
         {OUTREACH_TEMPLATES.map((t) => (
           <button
             key={t.id}
             onClick={() => setSelectedId(t.id)}
-            style={{
-              padding: '4px 10px',
-              borderRadius: '6px',
-              fontSize: '0.75rem',
-              fontWeight: 500,
-              border: t.id === selectedId ? '2px solid #3b82f6' : '1px solid #d1d5db',
-              backgroundColor: t.id === selectedId ? '#eff6ff' : '#fff',
-              color: t.id === selectedId ? '#1e40af' : '#374151',
-              cursor: 'pointer',
-              transition: 'all 0.15s',
-            }}
+            className={s.templateTab}
+            data-active={t.id === selectedId ? "true" : undefined}
           >
             {t.label}
           </button>
         ))}
       </div>
-      <div
-        style={{
-          padding: '12px',
-          borderRadius: '6px',
-          backgroundColor: '#f9fafb',
-          border: '1px solid #e5e7eb',
-          fontSize: '0.85rem',
-          lineHeight: 1.6,
-          color: '#374151',
-          whiteSpace: 'pre-wrap',
-          marginBottom: '8px',
-        }}
-      >
+      <div className={s.renderedTemplate}>
         {rendered}
       </div>
-      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+      <div className={s.actionBtnGroup}>
         <button
           onClick={handleCopy}
-          style={{
-            padding: '6px 14px',
-            borderRadius: '6px',
-            fontSize: '0.8rem',
-            fontWeight: 500,
-            border: '1px solid #d1d5db',
-            backgroundColor: copied ? '#d1fae5' : '#fff',
-            color: copied ? '#065f46' : '#374151',
-            cursor: 'pointer',
-            transition: 'all 0.15s',
-          }}
+          className={s.actionBtn}
+          data-state={copied ? "copied" : undefined}
         >
           {copied ? '✅ Скопировано' : '📋 Копировать'}
         </button>
         <button
           onClick={handleTelegramSend}
           disabled={isPending}
-          style={{
-            padding: '6px 14px',
-            borderRadius: '6px',
-            fontSize: '0.8rem',
-            fontWeight: 500,
-            border: '1px solid #d1d5db',
-            backgroundColor: telegramStatus === 'sent' ? '#dbeafe' : '#fff',
-            color: telegramStatus === 'sent' ? '#1e40af' : '#374151',
-            cursor: isPending ? 'not-allowed' : 'pointer',
-            opacity: isPending ? 0.6 : 1,
-            transition: 'all 0.15s',
-          }}
+          className={s.actionBtn}
+          data-state={telegramStatus === 'sent' ? "sent" : undefined}
         >
           {isPending ? '⏳ Отправка...' : telegramStatus === 'sent' ? '✅ Отправлено в Telegram' : '📩 Отправить в Telegram'}
         </button>
       </div>
       {telegramError && (
-        <p style={{ fontSize: '0.75rem', color: '#ef4444', marginTop: '6px' }}>
-          {telegramError}
-        </p>
+        <p className={s.errorText}>{telegramError}</p>
       )}
     </div>
   );
