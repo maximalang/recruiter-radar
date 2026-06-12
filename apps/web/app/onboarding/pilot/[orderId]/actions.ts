@@ -5,7 +5,7 @@ import {
   confirmPilotOrderProfile,
   sendPilotOrderTestDigest
 } from "../../../../lib/payments";
-import { VALID_INDUSTRIES, VALID_COMPANY_SIZES } from "../../../../lib/clientProfiles";
+import { VALID_INDUSTRIES, VALID_COMPANY_SIZES, VALID_ROLES } from "../../../../lib/clientProfiles";
 import { readOwnerSession } from "../../../../lib/session";
 
 function readRequiredText(formData: FormData, key: string): string {
@@ -81,6 +81,11 @@ export async function confirmPilotProfileAction(expectedOrderId: string, formDat
     industries: readCheckboxGroup(formData, "industries", VALID_INDUSTRIES),
     companySizes: readCheckboxGroup(formData, "companySizes", VALID_COMPANY_SIZES),
     dailyDigestLimit: readOptionalNumber(formData, "dailyDigestLimit"),
+    contactPolicy: readOptionalText(formData, "contactPolicy") as 'corporate_only' | 'no_personal' | 'unrestricted' | null,
+    roles: readCheckboxGroup(formData, "roles", VALID_ROLES),
+    excludedIndustries: readCheckboxGroup(formData, "excludedIndustries", VALID_INDUSTRIES),
+    excludedLocations: readOptionalStringList(formData, "excludedLocations"),
+    remoteFriendly: formData.get("remoteFriendly") === "on",
     ownerId
   });
 }

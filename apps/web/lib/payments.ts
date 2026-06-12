@@ -9,6 +9,7 @@ import {
   saveClientProfile,
   VALID_COMPANY_SIZES,
   VALID_INDUSTRIES,
+  VALID_ROLES,
   type ClientProfile
 } from "./clientProfiles";
 import { runDigestForClientProfile, type DigestItemInput } from "./digest";
@@ -78,6 +79,10 @@ export type CheckoutOrderPayload = {
   industries: string[];
   companySizes: string[];
   dailyDigestLimit: number;
+  roles: string[];
+  excludedIndustries: string[];
+  excludedLocations: string[];
+  remoteFriendly: boolean;
   comment: string | null;
   pilotApplicationId: string | null;
   clientProfileId: string | null;
@@ -298,6 +303,10 @@ export async function startCheckoutOrder(input: StartCheckoutOrderInput): Promis
       industries: [],
       companySizes: [],
       dailyDigestLimit: normalizeDailyDigestLimit(input.dailyDigestLimit),
+      roles: [],
+      excludedIndustries: [],
+      excludedLocations: [],
+      remoteFriendly: false,
       comment: normalizeOptionalText(input.comment),
       pilotApplicationId: null,
       clientProfileId: null,
@@ -512,6 +521,11 @@ export async function confirmPilotOrderProfile(input: {
   industries?: readonly string[] | null;
   companySizes?: readonly string[] | null;
   dailyDigestLimit?: number | null;
+  contactPolicy?: 'corporate_only' | 'no_personal' | 'unrestricted' | null;
+  roles?: readonly string[] | null;
+  excludedIndustries?: readonly string[] | null;
+  excludedLocations?: readonly string[] | null;
+  remoteFriendly?: boolean | null;
   ownerId: string | number;
 }): Promise<CheckoutOrder> {
   let order = await ensurePilotOrderOnboardingReady(input.orderId, { ownerId: input.ownerId });
@@ -540,7 +554,12 @@ export async function confirmPilotOrderProfile(input: {
     industries: input.industries?.filter((s): s is string => VALID_INDUSTRIES.has(s)) ?? [],
     companySizes: input.companySizes?.filter((s): s is string => VALID_COMPANY_SIZES.has(s)) ?? [],
     dailyDigestLimit: normalizeDailyDigestLimit(input.dailyDigestLimit),
-    isActive: true
+    isActive: true,
+    contactPolicy: input.contactPolicy ?? 'corporate_only',
+    roles: input.roles?.filter((s): s is string => VALID_ROLES.has(s)) ?? [],
+    excludedIndustries: input.excludedIndustries?.filter((s): s is string => VALID_INDUSTRIES.has(s)) ?? [],
+    excludedLocations: input.excludedLocations ?? [],
+    remoteFriendly: input.remoteFriendly ?? false,
   });
 
   order = await updateCheckoutOrder(order.id, {
@@ -553,6 +572,10 @@ export async function confirmPilotOrderProfile(input: {
       industries: savedProfile.industries,
       companySizes: savedProfile.companySizes,
       dailyDigestLimit: savedProfile.dailyDigestLimit,
+      roles: savedProfile.roles,
+      excludedIndustries: savedProfile.excludedIndustries,
+      excludedLocations: savedProfile.excludedLocations,
+      remoteFriendly: savedProfile.remoteFriendly,
       onboardingStatus: "in_progress",
       onboardingStep: savedProfile.telegramChatId ? "preview" : "telegram",
       onboardingActivatedAt: order.payload.onboardingActivatedAt ?? new Date().toISOString(),
@@ -1431,6 +1454,16 @@ function normalizeCheckoutOrderPayload(
       ? payload.companySizes.filter((s: unknown): s is string => typeof s === 'string' && VALID_COMPANY_SIZES.has(s))
       : [],
     dailyDigestLimit: normalizeDailyDigestLimit(readNumber(payload.dailyDigestLimit)),
+    roles: Array.isArray(payload.roles)
+      ? payload.roles.filter((s: unknown): s is string => typeof s === 'string' && VALID_ROLES.has(s))
+      : [],
+    excludedIndustries: Array.isArray(payload.excludedIndustries)
+      ? payload.excludedIndustries.filter((s: unknown): s is string => typeof s === 'string' && VALID_INDUSTRIES.has(s))
+      : [],
+    excludedLocations: Array.isArray(payload.excludedLocations)
+      ? payload.excludedLocations.filter((s: unknown): s is string => typeof s === 'string')
+      : [],
+    remoteFriendly: typeof payload.remoteFriendly === 'boolean' ? payload.remoteFriendly : false,
     comment: normalizeOptionalText(readString(payload.comment)),
     pilotApplicationId: normalizeOptionalText(readString(payload.pilotApplicationId)),
     clientProfileId: normalizeOptionalText(readString(payload.clientProfileId)),

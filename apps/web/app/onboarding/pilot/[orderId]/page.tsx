@@ -16,7 +16,8 @@ import {
   formatKeywordText,
   getClientProfileById,
   VALID_COMPANY_SIZES,
-  VALID_INDUSTRIES
+  VALID_INDUSTRIES,
+  VALID_ROLES
 } from "../../../../lib/clientProfiles";
 import { getHhDigestItems } from "../../../../lib/hhDigest";
 import { getClientProfileWebPushStatuses } from "../../../../lib/webPushSubscriptions";
@@ -107,6 +108,28 @@ const COMPANY_SIZE_OPTIONS = [
 void (function _assertCompanySizeKeys(): void {
   for (const opt of COMPANY_SIZE_OPTIONS) {
     if (!VALID_COMPANY_SIZES.has(opt.key)) throw new Error(`COMPANY_SIZE_OPTIONS key "${opt.key}" not in VALID_COMPANY_SIZES`);
+  }
+})();
+
+/** Role options for onboarding form — keys must match VALID_ROLES in clientProfiles.ts */
+const ROLE_OPTIONS = [
+  { key: "it-engineering", label: "IT-инженерия" },
+  { key: "data", label: "Data / ML / AI" },
+  { key: "product", label: "Product / Project" },
+  { key: "sales", label: "Продажи" },
+  { key: "marketing", label: "Маркетинг" },
+  { key: "hr", label: "HR / Люди" },
+  { key: "finance", label: "Финансы / Бухгалтерия" },
+  { key: "operations", label: "Операции / Логистика" },
+  { key: "legal", label: "Юриспруденция" },
+  { key: "executive", label: "C-level / Руководство" },
+  { key: "other", label: "Другое" },
+] as const;
+
+// Compile-time guard: every role option key must be in VALID_ROLES
+void (function _assertRoleKeys(): void {
+  for (const opt of ROLE_OPTIONS) {
+    if (!VALID_ROLES.has(opt.key)) throw new Error(`ROLE_OPTIONS key "${opt.key}" not in VALID_ROLES`);
   }
 })();
 
@@ -357,6 +380,24 @@ export default async function PilotOnboardingPage({
                       </label>
 
                       <fieldset className={ppStyles.field} style={{ border: "none", padding: 0 }}>
+                        <legend className={ppStyles.fieldLabel}>Роли, которые вы закрываете</legend>
+                        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                          {ROLE_OPTIONS.map((role) => (
+                            <label key={role.key} style={{ display: "flex", gap: "4px", alignItems: "center", fontSize: "0.88rem", cursor: "pointer" }}>
+                              <input
+                                type="checkbox"
+                                name="roles"
+                                value={role.key}
+                                defaultChecked={(profile?.roles ?? []).includes(role.key)}
+                              />
+                              {role.label}
+                            </label>
+                          ))}
+                        </div>
+                        <span className={ppStyles.helperText}>Выберите роли, которые ваше агентство закрывает лучше всего. Это влияет на Fit-скоринг.</span>
+                      </fieldset>
+
+                      <fieldset className={ppStyles.field} style={{ border: "none", padding: 0 }}>
                         <legend className={ppStyles.fieldLabel}>Отрасли компаний</legend>
                         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                           {INDUSTRY_OPTIONS.map((industry) => (
@@ -372,6 +413,24 @@ export default async function PilotOnboardingPage({
                           ))}
                         </div>
                         <span className={ppStyles.helperText}>Выберите отрасли, в которых вы ищете клиентов.</span>
+                      </fieldset>
+
+                      <fieldset className={ppStyles.field} style={{ border: "none", padding: 0 }}>
+                        <legend className={ppStyles.fieldLabel}>Исключить отрасли</legend>
+                        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                          {INDUSTRY_OPTIONS.map((industry) => (
+                            <label key={industry.key} style={{ display: "flex", gap: "4px", alignItems: "center", fontSize: "0.88rem", cursor: "pointer" }}>
+                              <input
+                                type="checkbox"
+                                name="excludedIndustries"
+                                value={industry.key}
+                                defaultChecked={(profile?.excludedIndustries ?? []).includes(industry.key)}
+                              />
+                              {industry.label}
+                            </label>
+                          ))}
+                        </div>
+                        <span className={ppStyles.helperText}>Отрасли, с которыми вы точно не работаете.</span>
                       </fieldset>
 
                       <fieldset className={ppStyles.field} style={{ border: "none", padding: 0 }}>
@@ -415,8 +474,45 @@ export default async function PilotOnboardingPage({
                         />
                         <span className={ppStyles.helperText}>По одной фразе на строку.</span>
                       </label>
+
+                      <label className={ppStyles.field} style={{ gridColumn: "1 / -1" }}>
+                        <span className={ppStyles.fieldLabel}>Исключить регионы (необязательно)</span>
+                        <textarea
+                          name="excludedLocations"
+                          rows={3}
+                          defaultValue={formatKeywordText(profile?.excludedLocations)}
+                          placeholder={"Владивосток\nКазань"}
+                          className={ppStyles.textarea}
+                        />
+                        <span className={ppStyles.helperText}>По одному региону на строку. Компании из этих регионов не появятся в радаре.</span>
+                      </label>
+
+                      <label className={ppStyles.field} style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                        <input
+                          type="checkbox"
+                          name="remoteFriendly"
+                          defaultChecked={profile?.remoteFriendly ?? false}
+                        />
+                        <span style={{ fontSize: "0.88rem" }}>Работаем с удалёнными командами</span>
+                      </label>
                     </div>
                   </details>
+
+                  <label className={ppStyles.field} style={{ gridColumn: "1 / -1" }}>
+                    <span className={ppStyles.fieldLabel}>Политика контактов</span>
+                    <select
+                      name="contactPolicy"
+                      defaultValue={profile?.contactPolicy ?? "corporate_only"}
+                      className={ppStyles.input}
+                    >
+                      <option value="corporate_only">Только корпоративные каналы (рекомендуется)</option>
+                      <option value="no_personal">Без персональных данных</option>
+                      <option value="unrestricted">Все каналы</option>
+                    </select>
+                    <span className={ppStyles.helperText}>
+                      Какие контактные данные включать в радар. По умолчанию — только безопасные корпоративные каналы: карьерная страница, HR-email, форма обратной связи.
+                    </span>
+                  </label>
 
                   <div className={styles.submitRow}>
                     <FormSubmitButton

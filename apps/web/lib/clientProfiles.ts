@@ -19,6 +19,10 @@ type ClientProfileRow = {
   createdAt: string;
   updatedAt: string;
   contactPolicy: string;
+  roles: unknown;
+  excludedIndustries: unknown;
+  excludedLocations: unknown;
+  remoteFriendly: boolean;
 };
 
 export type ClientProfile = {
@@ -36,6 +40,14 @@ export type ClientProfile = {
   createdAt: string;
   updatedAt: string;
   contactPolicy: 'corporate_only' | 'no_personal' | 'unrestricted';
+  /** Canonical role keys the agency specialises in (e.g. 'it-engineering', 'data'). */
+  roles: string[];
+  /** Industry keys the agency explicitly does not serve. */
+  excludedIndustries: string[];
+  /** Location/region names the agency explicitly does not cover. */
+  excludedLocations: string[];
+  /** Whether the agency can serve remote-first companies regardless of location. */
+  remoteFriendly: boolean;
 };
 
 type PilotApplicationRow = {
@@ -88,7 +100,11 @@ export async function listClientProfiles(): Promise<ClientProfile[]> {
       is_active AS "isActive",
       created_at::TEXT AS "createdAt",
       updated_at::TEXT AS "updatedAt",
-      contact_policy AS "contactPolicy"
+      contact_policy AS "contactPolicy",
+      roles AS "roles",
+      excluded_industries AS "excludedIndustries",
+      excluded_locations AS "excludedLocations",
+      remote_friendly AS "remoteFriendly"
     FROM client_profiles
     ORDER BY is_active DESC, updated_at DESC, id DESC
   `);
@@ -122,7 +138,11 @@ export async function getClientProfileById(
       is_active AS "isActive",
       created_at::TEXT AS "createdAt",
       updated_at::TEXT AS "updatedAt",
-      contact_policy AS "contactPolicy"
+      contact_policy AS "contactPolicy",
+      roles AS "roles",
+      excluded_industries AS "excludedIndustries",
+      excluded_locations AS "excludedLocations",
+      remote_friendly AS "remoteFriendly"
     FROM client_profiles
     WHERE id = $1
   `, [normalizedClientProfileId]);
@@ -193,7 +213,11 @@ export async function findMatchingClientProfileForCheckoutOrder(input: {
         is_active AS "isActive",
         created_at::TEXT AS "createdAt",
         updated_at::TEXT AS "updatedAt",
-        contact_policy AS "contactPolicy"
+        contact_policy AS "contactPolicy",
+        roles AS "roles",
+        excluded_industries AS "excludedIndustries",
+        excluded_locations AS "excludedLocations",
+        remote_friendly AS "remoteFriendly"
       FROM client_profiles
       WHERE telegram_chat_id::TEXT = $1
       ${ownershipClause}
@@ -221,7 +245,11 @@ export async function findMatchingClientProfileForCheckoutOrder(input: {
       is_active AS "isActive",
       created_at::TEXT AS "createdAt",
       updated_at::TEXT AS "updatedAt",
-      contact_policy AS "contactPolicy"
+      contact_policy AS "contactPolicy",
+      roles AS "roles",
+      excluded_industries AS "excludedIndustries",
+      excluded_locations AS "excludedLocations",
+      remote_friendly AS "remoteFriendly"
     FROM client_profiles
     WHERE LOWER(BTRIM(agency_name)) = LOWER(BTRIM($1))
     ${ownershipClause}
@@ -272,6 +300,10 @@ export async function saveClientProfile(input: {
   dailyDigestLimit?: number | null;
   isActive?: boolean;
   contactPolicy?: 'corporate_only' | 'no_personal' | 'unrestricted' | null;
+  roles?: readonly string[] | null;
+  excludedIndustries?: readonly string[] | null;
+  excludedLocations?: readonly string[] | null;
+  remoteFriendly?: boolean | null;
 }, db?: ClientProfilesDbClient): Promise<ClientProfile> {
   const pool = db ?? getPool();
 
@@ -290,6 +322,31 @@ export async function saveClientProfile(input: {
   const companySizes = normalizeCompanySizeList(input.companySizes);
   const dailyDigestLimit = normalizeDailyDigestLimit(input.dailyDigestLimit);
   const isActive = input.isActive ?? true;
+  const roles = normalizeRoleList(input.roles);
+  const excludedIndustries = normalizeIndustryList(input.excludedIndustries);
+  const excludedLocations = normalizeKeywordList(input.excludedLocations);
+  const remoteFriendly = input.remoteFriendly ?? false;
+
+  const returningClause = `
+    id::TEXT AS id,
+    agency_name AS "agencyName",
+    telegram_chat_id::TEXT AS "telegramChatId",
+    target_city AS "targetCity",
+    specialization,
+    include_keywords AS "includeKeywords",
+    exclude_keywords AS "excludeKeywords",
+    industries AS "industries",
+    company_sizes AS "companySizes",
+    daily_digest_limit AS "dailyDigestLimit",
+    is_active AS "isActive",
+    created_at::TEXT AS "createdAt",
+    updated_at::TEXT AS "updatedAt",
+    contact_policy AS "contactPolicy",
+    roles AS "roles",
+    excluded_industries AS "excludedIndustries",
+    excluded_locations AS "excludedLocations",
+    remote_friendly AS "remoteFriendly"
+  `;
 
   let result: Awaited<ReturnType<typeof pool.query<ClientProfileRow>>>;
 
@@ -307,24 +364,14 @@ export async function saveClientProfile(input: {
             industries = $8::jsonb,
             company_sizes = $9::jsonb,
             daily_digest_limit = $10,
-              is_active = $11,
-            contact_policy = $12
+            is_active = $11,
+            contact_policy = $12,
+            roles = $13,
+            excluded_industries = $14,
+            excluded_locations = $15,
+            remote_friendly = $16
           WHERE id = $1
-          RETURNING
-            id::TEXT AS id,
-            agency_name AS "agencyName",
-            telegram_chat_id::TEXT AS "telegramChatId",
-            target_city AS "targetCity",
-            specialization,
-            include_keywords AS "includeKeywords",
-            exclude_keywords AS "excludeKeywords",
-            industries AS "industries",
-            company_sizes AS "companySizes",
-            daily_digest_limit AS "dailyDigestLimit",
-            is_active AS "isActive",
-            created_at::TEXT AS "createdAt",
-            updated_at::TEXT AS "updatedAt",
-            contact_policy AS "contactPolicy"
+          RETURNING ${returningClause}
         `, [
           normalizedId,
           agencyName,
@@ -337,7 +384,11 @@ export async function saveClientProfile(input: {
           companySizes.length > 0 ? JSON.stringify(companySizes) : null,
           dailyDigestLimit,
           isActive,
-          input.contactPolicy ?? 'corporate_only'
+          input.contactPolicy ?? 'corporate_only',
+          roles,
+          excludedIndustries,
+          excludedLocations,
+          remoteFriendly
         ])
       : await pool.query<ClientProfileRow>(`
           INSERT INTO client_profiles (
@@ -351,24 +402,14 @@ export async function saveClientProfile(input: {
             company_sizes,
             daily_digest_limit,
             is_active,
-            contact_policy
+            contact_policy,
+            roles,
+            excluded_industries,
+            excluded_locations,
+            remote_friendly
           )
-          VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8::jsonb, $9, $10, $11)
-          RETURNING
-            id::TEXT AS id,
-            agency_name AS "agencyName",
-            telegram_chat_id::TEXT AS "telegramChatId",
-            target_city AS "targetCity",
-            specialization,
-            include_keywords AS "includeKeywords",
-            exclude_keywords AS "excludeKeywords",
-            industries AS "industries",
-            company_sizes AS "companySizes",
-            daily_digest_limit AS "dailyDigestLimit",
-            is_active AS "isActive",
-            created_at::TEXT AS "createdAt",
-            updated_at::TEXT AS "updatedAt",
-            contact_policy AS "contactPolicy"
+          VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8::jsonb, $9, $10, $11, $12, $13, $14, $15)
+          RETURNING ${returningClause}
         `, [
           agencyName,
           telegramChatId,
@@ -380,7 +421,11 @@ export async function saveClientProfile(input: {
           companySizes.length > 0 ? JSON.stringify(companySizes) : null,
           dailyDigestLimit,
           isActive,
-          input.contactPolicy ?? 'corporate_only'
+          input.contactPolicy ?? 'corporate_only',
+          roles,
+          excludedIndustries,
+          excludedLocations,
+          remoteFriendly
         ]);
   } catch (err) {
     if (isUniqueViolation(err, "client_profiles_telegram_chat_id_unique")) {
@@ -542,6 +587,10 @@ function mapClientProfileRow(row: ClientProfileRow): ClientProfile {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     contactPolicy: (row.contactPolicy as ClientProfile['contactPolicy']) || 'corporate_only',
+    roles: normalizeRoleList(row.roles),
+    excludedIndustries: normalizeIndustryList(row.excludedIndustries),
+    excludedLocations: normalizeKeywordList(row.excludedLocations),
+    remoteFriendly: row.remoteFriendly ?? false,
   };
 }
 
@@ -565,16 +614,18 @@ export function clientProfileToAgencyProfile(profile: ClientProfile): AgencyProf
   }
 
   return {
-    industries: profile.industries.filter((s): s is string => VALID_INDUSTRIES.has(s)),
+    industries: profile.industries?.filter((s): s is string => VALID_INDUSTRIES.has(s)) ?? [],
     locations,
-    companySizes: profile.companySizes.filter(
+    roles: profile.roles?.filter((s): s is string => VALID_ROLES.has(s)) ?? [],
+    companySizes: profile.companySizes?.filter(
       (s): s is 'startup' | 'small' | 'medium' | 'large' | 'enterprise' =>
         VALID_COMPANY_SIZES.has(s)
-    ),
-    excludedIndustries: [],
-    excludedLocations: [],
-    exclusions: profile.excludeKeywords,
+    ) ?? [],
+    excludedIndustries: profile.excludedIndustries?.filter((s): s is string => VALID_INDUSTRIES.has(s)) ?? [],
+    excludedLocations: profile.excludedLocations ?? [],
+    exclusions: profile.excludeKeywords ?? [],
     contactPolicy: profile.contactPolicy,
+    remoteFriendly: profile.remoteFriendly ?? false,
   }
 }
 
@@ -672,7 +723,11 @@ function isPlaceholderClientProfile(profile: ClientProfile): boolean {
     profile.excludeKeywords.length === 0 &&
     profile.industries.length === 0 &&
     profile.companySizes.length === 0 &&
-    profile.dailyDigestLimit === 5
+    profile.dailyDigestLimit === 5 &&
+    profile.roles.length === 0 &&
+    profile.excludedIndustries.length === 0 &&
+    profile.excludedLocations.length === 0 &&
+    profile.remoteFriendly === false
   );
 }
 
@@ -811,4 +866,43 @@ function normalizeIndustryList(value: unknown): string[] {
   return Array.from(uniqueIndustries.values());
 }
 
-export { VALID_COMPANY_SIZES, VALID_INDUSTRIES, INDUSTRY_KEYWORDS }
+/**
+ * Canonical role keys — the single source of truth for:
+ *   - normalizeRoleList whitelist
+ *   - onboarding form checkbox values
+ *   - computeFit role-match scoring
+ */
+const VALID_ROLES = new Set([
+  'it-engineering', 'data', 'product', 'sales', 'marketing',
+  'hr', 'finance', 'operations', 'legal', 'executive', 'other',
+])
+
+/**
+ * Normalize role list — only known keys survive.
+ * Accepts arrays of strings like ['it-engineering', 'data', 'product'].
+ */
+function normalizeRoleList(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  const uniqueRoles = new Set<string>()
+
+  for (const item of value) {
+    if (typeof item !== 'string') {
+      continue
+    }
+
+    const normalizedItem = item.trim().toLowerCase()
+
+    if (!VALID_ROLES.has(normalizedItem)) {
+      continue
+    }
+
+    uniqueRoles.add(normalizedItem)
+  }
+
+  return Array.from(uniqueRoles.values())
+}
+
+export { VALID_COMPANY_SIZES, VALID_INDUSTRIES, VALID_ROLES, INDUSTRY_KEYWORDS }
