@@ -87,6 +87,55 @@ describe('deriveBestAngle', () => {
     const result = deriveBestAngle([r('fit', 'fit.industry.match', { industry: 'it' })], 'Short sync call about hiring')
     expect(result).toBe('Short sync call about hiring')
   })
+
+  it('falls back to career-pages source family when no reason key matches', () => {
+    const result = deriveBestAngle([r('fit', 'fit.industry.match', { industry: 'it' })], '', ['career-pages'])
+    expect(result).toBe('Карьерная страница — прямой путь к HR')
+  })
+
+  it('falls back to egrul-fns source family when no reason key matches', () => {
+    const result = deriveBestAngle([], '', ['egrul-fns'])
+    expect(result).toBe('Данные реестра — можно найти контакт через официальный сайт')
+  })
+
+  it('falls back to fedresurs source family when no reason key matches', () => {
+    const result = deriveBestAngle([], '', ['fedresurs'])
+    expect(result).toBe('Данные реестра — можно найти контакт через официальный сайт')
+  })
+
+  it('falls back to multi-source when 2+ families present', () => {
+    const result = deriveBestAngle([], '', ['hh', 'superjob'])
+    expect(result).toBe('Несколько независимых источников подтверждают найм')
+  })
+
+  it('falls back to hh-only source family', () => {
+    const result = deriveBestAngle([], '', ['hh'])
+    expect(result).toBe('Активные вакансии на HeadHunter — можно заходить с релевантной ролью')
+  })
+
+  it('source-family fallback is skipped when reasons already matched', () => {
+    const result = deriveBestAngle(
+      [r('urgency', 'urgency.hard-to-fill')],
+      '',
+      ['career-pages', 'hh'],
+    )
+    expect(result).toBe('Закрыть дефицитную роль, пока внутренний поиск не растянулся')
+  })
+
+  it('opener takes precedence over source-family fallback', () => {
+    const result = deriveBestAngle([r('fit', 'fit.industry.match', { industry: 'it' })], 'Use our custom opener', ['career-pages'])
+    expect(result).toBe('Use our custom opener')
+  })
+
+  it('default fallback when no reasons, no opener, no source families', () => {
+    expect(deriveBestAngle([], '')).toBe('Короткий созвон, чтобы сверить задачи по найму')
+  })
+
+  it('works with legacy string[] reasons and source families', () => {
+    // career-pages takes priority over multi-source heuristic
+    const result = deriveBestAngle(['Вакансия в IT'], '', ['hh', 'career-pages'])
+    expect(result).toBe('Карьерная страница — прямой путь к HR')
+  })
 })
 
 describe('deriveLawfulContactPath', () => {

@@ -52,8 +52,9 @@ export function deriveWhyNow(rawReasons: unknown): string {
 /**
  * Derive `best_angle` — the strongest angle for first contact.
  * Uses reason.key for structured matching, not substring search.
+ * Falls back to source-family heuristics when no reason key matches.
  */
-export function deriveBestAngle(rawReasons: unknown, opener: string): string {
+export function deriveBestAngle(rawReasons: unknown, opener: string, sourceFamilies: string[] = []): string {
   const reasons = parseReasons(rawReasons)
   const keys = reasons.map(r => r.key)
 
@@ -82,8 +83,27 @@ export function deriveBestAngle(rawReasons: unknown, opener: string): string {
     return 'Hiring burst — компания массово ищет специалистов'
   }
 
-  // Default: use opener as fallback
-  return opener || 'Короткий созвон, чтобы сверить задачи по найму'
+  // Opener takes precedence over source-family heuristics
+  if (opener) return opener
+
+  // Source-family fallback (for preview where reasons are plain strings)
+  if (sourceFamilies.length > 0) {
+    if (sourceFamilies.includes('career-pages')) {
+      return 'Карьерная страница — прямой путь к HR'
+    }
+    if (sourceFamilies.includes('egrul-fns') || sourceFamilies.includes('fedresurs')) {
+      return 'Данные реестра — можно найти контакт через официальный сайт'
+    }
+    if (sourceFamilies.length >= 2) {
+      return 'Несколько независимых источников подтверждают найм'
+    }
+    if (sourceFamilies.includes('hh')) {
+      return 'Активные вакансии на HeadHunter — можно заходить с релевантной ролью'
+    }
+  }
+
+  // Final fallback
+  return 'Короткий созвон, чтобы сверить задачи по найму'
 }
 
 /**
@@ -340,7 +360,7 @@ export async function getLeadsForProfile(input: {
       latestPublishedAt: row.latest_published_at,
       reasons,
       whyNow: deriveWhyNow(reasonsRaw),
-      bestAngle: deriveBestAngle(reasonsRaw, row.opener ?? ""),
+      bestAngle: deriveBestAngle(reasonsRaw, row.opener ?? "", sourceFamilies),
       lawfulContactPath: deriveLawfulContactPath(reasonsRaw, sourceFamilies),
       negativeSignals: deriveNegativeSignals({
         reasons: reasonsRaw,
@@ -478,7 +498,7 @@ export async function getLeadsForAllProfiles(input: {
       latestPublishedAt: row.latest_published_at,
       reasons,
       whyNow: deriveWhyNow(reasonsRaw),
-      bestAngle: deriveBestAngle(reasonsRaw, row.opener ?? ""),
+      bestAngle: deriveBestAngle(reasonsRaw, row.opener ?? "", sourceFamilies),
       lawfulContactPath: deriveLawfulContactPath(reasonsRaw, sourceFamilies),
       negativeSignals: deriveNegativeSignals({
         reasons: reasonsRaw,
@@ -603,7 +623,7 @@ export async function getLeadDetail(input: {
     latestPublishedAt: row.latest_published_at,
     reasons,
     whyNow: deriveWhyNow(reasonsRaw),
-    bestAngle: deriveBestAngle(reasonsRaw, row.opener ?? ""),
+    bestAngle: deriveBestAngle(reasonsRaw, row.opener ?? "", sourceFamilies),
     lawfulContactPath: deriveLawfulContactPath(reasonsRaw, sourceFamilies),
     negativeSignals: deriveNegativeSignals({
       reasons: reasonsRaw,

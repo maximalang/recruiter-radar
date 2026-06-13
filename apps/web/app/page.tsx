@@ -9,6 +9,7 @@ import {
   readPublicPreviewInput
 } from "../lib/publicProduct";
 import { buildHhRadarProbabilitySummary } from "../lib/hhProbabilities";
+import { deriveBestAngle } from "../lib/leads-data";
 import {
   NoticeBox,
   PageFrame,
@@ -498,22 +499,6 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   );
 }
 
-function derivePreviewBestAngle(sourceFamilies: string[]): string {
-  if (sourceFamilies.includes("career-pages")) {
-    return "Карьерная страница — прямой путь к HR";
-  }
-  if (sourceFamilies.includes("egrul-fns") || sourceFamilies.includes("fedresurs")) {
-    return "Данные реестра — можно найти контакт через официальный сайт";
-  }
-  if (sourceFamilies.length >= 2) {
-    return "Несколько независимых источников подтверждают найм";
-  }
-  if (sourceFamilies.includes("hh")) {
-    return "Активные вакансии на HeadHunter — можно заходить с релевантной ролью";
-  }
-  return "Корпоративный сайт или форма обратной связи";
-}
-
 function PreviewDigestCard(props: {
   item: HomePreviewItem;
 }) {
@@ -522,7 +507,7 @@ function PreviewDigestCard(props: {
     totalScore: item.total_score
   });
   const whyNow = item.reasons[0] || "";
-  const bestAngle = derivePreviewBestAngle(item.source_families);
+  const bestAngle = deriveBestAngle(item.reasons, item.opener ?? "", item.source_families);
   const secondaryReason = item.reasons[1] || null;
   const hasExtraContext = Boolean(secondaryReason) || item.curationLabels.length > 0;
 
