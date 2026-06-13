@@ -200,7 +200,7 @@
 - [x] ~~I1: Missing 'dismissed' callback button~~ → Added 🚫 Скрыть
 - [x] ~~I11: Unsafe callback action cast~~ → Added isDigestFeedbackAction() guard
 - [x] ~~I2: Dead parseDigestFeedbackCallbackData~~ → Removed from webhook route
-- [ ] C1: auditDigestGate lossy SQL→TS mapping — needs signal evidence re-fetch for C-gate
+- [x] ~~C1: auditDigestGate lossy SQL→TS mapping~~ → Removed (dead code, no prod callers; kept isDigestEligibleGate, rewrote tests)
 - [ ] I4: payments.ts monolith (1739 lines) — split into 3 modules
 - [ ] I7: packages/db/lib/ duplicates apps/web/lib/ types — shared package import
 - [ ] I8: DedupeService suppression in JSON file → Postgres-backed
