@@ -498,6 +498,22 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   );
 }
 
+function derivePreviewBestAngle(sourceFamilies: string[]): string {
+  if (sourceFamilies.includes("career-pages")) {
+    return "Карьерная страница — прямой путь к HR";
+  }
+  if (sourceFamilies.includes("egrul-fns") || sourceFamilies.includes("fedresurs")) {
+    return "Данные реестра — можно найти контакт через официальный сайт";
+  }
+  if (sourceFamilies.length >= 2) {
+    return "Несколько независимых источников подтверждают найм";
+  }
+  if (sourceFamilies.includes("hh")) {
+    return "Активные вакансии на HeadHunter — можно заходить с релевантной ролью";
+  }
+  return "Корпоративный сайт или форма обратной связи";
+}
+
 function PreviewDigestCard(props: {
   item: HomePreviewItem;
 }) {
@@ -505,8 +521,9 @@ function PreviewDigestCard(props: {
   const probability = buildHhRadarProbabilitySummary({
     totalScore: item.total_score
   });
-  const primaryReason = item.reasons[0] ?? "Сейчас по компании есть повод выйти в контакт.";
-  const secondaryReason = item.reasons[1] ?? null;
+  const whyNow = item.reasons[0] || "";
+  const bestAngle = derivePreviewBestAngle(item.source_families);
+  const secondaryReason = item.reasons[1] || null;
   const hasExtraContext = Boolean(secondaryReason) || item.curationLabels.length > 0;
 
   return (
@@ -526,13 +543,20 @@ function PreviewDigestCard(props: {
         <span className={hpStyles.vacanciesCount}>{formatVacanciesCount(item.vacancies_count)}</span>
       </div>
 
-      <div className={hpStyles.previewReasonList}>
-        <div style={{ color: "#667085", fontSize: "0.78rem", fontWeight: 700 }}>Почему компания в фокусе</div>
-        <div>{primaryReason}</div>
+      {whyNow ? (
+        <div className={hpStyles.previewReasonList}>
+          <div style={{ color: "#667085", fontSize: "0.78rem", fontWeight: 700 }}>Почему сейчас</div>
+          <div>{whyNow}</div>
+        </div>
+      ) : null}
+
+      <div className={hpStyles.openerBox}>
+        <div className={hpStyles.openerLabel}>Лучший угол контакта</div>
+        <div>{bestAngle}</div>
       </div>
 
       <div className={hpStyles.openerBox}>
-        <div className={hpStyles.openerLabel}>Лучший следующий шаг</div>
+        <div className={hpStyles.openerLabel}>Следующий шаг</div>
         <div>{item.opener}</div>
       </div>
 
