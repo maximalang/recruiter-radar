@@ -31,20 +31,6 @@ function parseReasons(raw: unknown): ScoringReason[] {
   return result
 }
 
-/**
- * Get Russian display strings from reasons (handles both formats).
- * For structured reasons: use formatReason(). For legacy: pass through.
- */
-function reasonStrings(raw: unknown): string[] {
-  if (!Array.isArray(raw)) return []
-  const structured = parseReasons(raw)
-  if (structured.length > 0 && !structured[0].key.startsWith('legacy.')) {
-    return structured.map(formatReason)
-  }
-  // Legacy fallback: return raw strings
-  return raw.filter((r: unknown): r is string => typeof r === 'string')
-}
-
 // ─── Lead Card Derivation ────────────────────────────────────────
 
 /**
