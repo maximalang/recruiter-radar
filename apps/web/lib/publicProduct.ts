@@ -56,7 +56,7 @@ export const PUBLIC_PLANS: PublicPlan[] = [
     price: "149 000 ₽/мес",
     description: "Постоянный радар с weekly-калибровкой, reviewed hot leads и приоритетной доставкой.",
     bullets: [
-      "20–40 validated leads в месяц",
+      "ежедневный радар с релевантными компаниями",
       "weekly calibration по вашей обратной связи",
       "hot lead review — аналитик проверяет верхний слой",
       "приоритетная доставка и custom exclusions",
