@@ -204,9 +204,29 @@ function normalizePositiveIntegerString(value: string | null | undefined): strin
 function truncateLabel(value: string): string {
   const normalizedValue = value.trim();
 
-  if (normalizedValue.length <= 24) {
+  const TELEGRAM_BUTTON_LABEL_BYTE_LIMIT = 24;
+  const ellipsis = "…";
+
+  if (Buffer.byteLength(normalizedValue, "utf8") <= TELEGRAM_BUTTON_LABEL_BYTE_LIMIT) {
     return normalizedValue || "Компания";
   }
 
-  return `${normalizedValue.slice(0, 21)}…`;
+  // Trim by bytes, not chars — Telegram counts bytes in UTF-8
+  // Walk backwards from the full string to find the longest prefix that fits
+  let low = 0;
+  let high = normalizedValue.length;
+  // Ellipsis itself costs 3 bytes in UTF-8
+  const ellipsisBytes = Buffer.byteLength(ellipsis, "utf8");
+  const maxContentBytes = TELEGRAM_BUTTON_LABEL_BYTE_LIMIT - ellipsisBytes;
+
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    if (Buffer.byteLength(normalizedValue.slice(0, mid), "utf8") <= maxContentBytes) {
+      low = mid;
+    } else {
+      high = mid - 1;
+    }
+  }
+
+  return normalizedValue.slice(0, low) + ellipsis;
 }

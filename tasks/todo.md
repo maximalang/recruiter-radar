@@ -99,10 +99,10 @@
 **Текущее состояние:** `PUBLIC_PLANS` в `lib/publicProduct.ts` — pilot = `1 ₽` (100 копеек), monthly = `299 ₽`.  
 **Концепция требует:** Self-Serve Pilot 49–79 тыс. ₽, Assisted Radar 149–229 тыс. ₽/мес, Premium Desk 290–450 тыс. ₽/мес.
 
-- [ ] 1.1 Обновить `PUBLIC_PLANS` — pilot = 49 000 ₽, monthly = 149 000 ₽/мес
-- [ ] 1.2 Обновить описания пакетов — premium Russian copy по концепции
-- [ ] 1.3 Обновить landing hero-formula: «компании, которым стоит написать сегодня»
-- [ ] 1.4 Проверить checkout flow с новыми ценами
+- [x] 1.1 Обновить `PUBLIC_PLANS` — pilot = 49 000 ₽, monthly = 149 000 ₽/мес
+- [x] 1.2 Обновить описания пакетов — premium Russian copy по концепции
+- [x] 1.3 Обновить landing hero-formula: «компании, которым стоит написать сегодня»
+- [x] 1.4 Проверить checkout flow с новыми ценами
 
 ### Задача 2: Evidence-first lead card — explainable format
 
@@ -157,10 +157,10 @@
 
 **Текущее состояние:** Landing с preview есть, но hero-formula слабая. Preview фильтрует по keyword matching, не по FIUR. Нет «результат за 3 минуты» narrative.
 
-- [ ] 6.1 Обновить hero copy: «компании, которым стоит написать сегодня»
-- [ ] 6.2 Обновить hero proof items по концепции
-- [ ] 6.3 Preview карточки: показать confidence gate label, why_now, best_angle
-- [ ] 6.4 Проверить preview → pilot conversion flow end-to-end
+- [x] 6.1 Обновить hero copy: «компании, которым стоит написать сегодня»
+- [x] 6.2 Обновить hero proof items по концепции
+- [x] 6.3 Preview карточки: показать confidence gate label, why_now, best_angle
+- [x] 6.4 Проверить preview → pilot conversion flow end-to-end
 
 ---
 
@@ -190,7 +190,7 @@
 - [x] ~~C3: marketConditions/recentSignalCount clamp~~ → Already safe
 - [x] ~~A3: Source config hardcoded~~ → Fixed (source-registry)
 - [x] ~~I4: N+1 queries in leads page~~ → Fixed (getLeadsForAllProfiles)
-- [ ] S3: Rate limiter in-memory → Redis-backed for multi-instance
+- [x] ~~S3: Rate limiter in-memory → Redis-backed for multi-instance~~ → Fixed (ioredis + REDIS_URL)
 - [ ] R1: Dead CSS classes from CSS Modules migration cleanup
 
 ## 🔧 Technical Debt (from code review 2026-06-05)
@@ -205,7 +205,9 @@
 - [ ] I7: packages/db/lib/ duplicates apps/web/lib/ types — shared package import
 - [ ] I8: DedupeService suppression in JSON file → Postgres-backed
 - [ ] I12: sanitizeError regex incomplete for Telegram token format
-- [ ] I15: Redis rate limiter race condition — needs MULTI/EXEC
+- [x] ~~I15: Redis rate limiter race condition~~ → Fixed (atomic Lua EVAL check-and-add)
+- [x] ~~Telegram API transient failures~~ → Fixed (exp backoff + full jitter, retry 429/5xx)
+- [x] ~~truncateLabel char-based truncation~~ → Fixed (UTF-8 byte-aware, +11 tests)
 
 ---
 

@@ -157,37 +157,95 @@ export async function getTelegramBotUsername(): Promise<{
   };
 }
 
+const TELEGRAM_RETRY_DEFAULTS = {
+  maxRetries: 3,
+  baseDelayMs: 1000,
+  maxDelayMs: 8000,
+} as const;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function computeBackoffDelay(attempt: number, baseDelayMs: number, maxDelayMs: number): number {
+  // Exponential backoff with full jitter: rand(0, min(maxDelay, base * 2^attempt))
+  const cap = Math.min(maxDelayMs, baseDelayMs * Math.pow(2, attempt));
+  return Math.random() * cap;
+}
+
+function isRetryableStatus(status: number): boolean {
+  return status === 429 || status >= 500;
+}
+
+async function callTelegramApiWithRetry<T>(
+  method: string,
+  config: Pick<TelegramMessageConfig, "botToken">,
+  body: Record<string, unknown>,
+  retryOptions?: { maxRetries?: number; baseDelayMs?: number; maxDelayMs?: number }
+): Promise<T> {
+  const { maxRetries, baseDelayMs, maxDelayMs } = {
+    ...TELEGRAM_RETRY_DEFAULTS,
+    ...retryOptions,
+  };
+
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    if (attempt > 0) {
+      const delayMs = computeBackoffDelay(attempt - 1, baseDelayMs, maxDelayMs);
+      await sleep(delayMs);
+    }
+
+    try {
+      const response = await fetch(`https://api.telegram.org/bot${config.botToken}/${method}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        cache: "no-store",
+        body: JSON.stringify(body)
+      });
+
+      let payload: unknown = null;
+
+      try {
+        payload = await response.json();
+      } catch {
+        payload = null;
+      }
+
+      if (isTelegramApiSuccess(payload)) {
+        return payload.result as T;
+      }
+
+      const description =
+        getTelegramErrorDescription(payload) ??
+        `Telegram request failed with status ${response.status}.`;
+
+      // Non-retryable client errors (4xx except 429) fail immediately
+      if (response.ok || (!isRetryableStatus(response.status))) {
+        throw new Error(description);
+      }
+
+      lastError = new Error(description);
+    } catch (error) {
+      if (error instanceof Error) {
+        lastError = error;
+      } else {
+        lastError = new Error("Unknown Telegram API error");
+      }
+    }
+  }
+
+  throw lastError ?? new Error("Telegram API request failed after retries");
+}
+
 async function callTelegramApi<T>(
   method: string,
   config: Pick<TelegramMessageConfig, "botToken">,
   body: Record<string, unknown>
 ): Promise<T> {
-  const response = await fetch(`https://api.telegram.org/bot${config.botToken}/${method}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    cache: "no-store",
-    body: JSON.stringify(body)
-  });
-
-  let payload: unknown = null;
-
-  try {
-    payload = await response.json();
-  } catch {
-    payload = null;
-  }
-
-  if (!response.ok || !isTelegramApiSuccess(payload)) {
-    const description =
-      getTelegramErrorDescription(payload) ??
-      `Telegram request failed with status ${response.status}.`;
-
-    throw new Error(description);
-  }
-
-  return payload.result as T;
+  return callTelegramApiWithRetry<T>(method, config, body);
 }
 
 const TELEGRAM_MESSAGE_CHAR_LIMIT = 4096;

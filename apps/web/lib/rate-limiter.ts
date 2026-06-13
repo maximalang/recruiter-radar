@@ -12,7 +12,10 @@ const DEFAULT_MAX_REQUESTS = 60
 /*  Redis bootstrap (optional — ioredis may not be installed)           */
 /* ------------------------------------------------------------------ */
 
-type RedisClient = { lrange: (k: string, s: number, e: number) => Promise<string[]>; del: (k: string) => Promise<number>; lpush: (k: string, ...v: string[]) => Promise<number>; expire: (k: string, s: number) => Promise<number> }
+type RedisClient = {
+  del: (k: string) => Promise<number>;
+  eval: (script: string, numKeys: number, ...args: (string | number)[]) => Promise<unknown>;
+}
 
 let _redis: RedisClient | null = null
 let _redisInitAttempted = false
@@ -35,28 +38,63 @@ function getRedis(): RedisClient | null {
   }
 }
 
-async function redisGetTimestamps(
-  redis: RedisClient,
-  key: string,
-  windowStart: number,
-): Promise<number[]> {
-  const all = await redis.lrange(key, 0, -1)
-  return all.map(Number).filter((t: number) => !isNaN(t) && t > windowStart)
-}
+/*
+ * Atomic sliding-window check-and-add, executed entirely server-side via a
+ * single EVAL so there is no read-modify-write race between instances (I15).
+ *
+ * KEYS[1] = bucket key
+ * ARGV[1] = now (ms)
+ * ARGV[2] = windowStart (ms) — entries at or before this are expired
+ * ARGV[3] = maxRequests
+ * ARGV[4] = ttlSeconds
+ *
+ * Returns 1 if the request is allowed (and `now` was recorded), 0 if denied.
+ */
+const SLIDING_WINDOW_LUA = `
+local entries = redis.call('LRANGE', KEYS[1], 0, -1)
+local windowStart = tonumber(ARGV[2])
+local surviving = {}
+for i = 1, #entries do
+  local t = tonumber(entries[i])
+  if t ~= nil and t > windowStart then
+    surviving[#surviving + 1] = entries[i]
+  end
+end
+if #surviving >= tonumber(ARGV[3]) then
+  -- Rewrite the cleaned list so expired entries do not accumulate.
+  redis.call('DEL', KEYS[1])
+  if #surviving > 0 then
+    redis.call('RPUSH', KEYS[1], unpack(surviving))
+    redis.call('EXPIRE', KEYS[1], tonumber(ARGV[4]))
+  end
+  return 0
+end
+surviving[#surviving + 1] = ARGV[1]
+redis.call('DEL', KEYS[1])
+redis.call('RPUSH', KEYS[1], unpack(surviving))
+redis.call('EXPIRE', KEYS[1], tonumber(ARGV[4]))
+return 1
+`
 
-async function redisAddTimestamp(
+async function redisCheckAndAdd(
   redis: RedisClient,
   key: string,
   now: number,
   windowStart: number,
+  maxRequests: number,
   windowMs: number,
-): Promise<void> {
-  const all = await redis.lrange(key, 0, -1)
-  const surviving = all.map(Number).filter((t: number) => !isNaN(t) && t > windowStart)
-  if (all.length > 0) await redis.del(key)
-  if (surviving.length > 0) await redis.lpush(key, ...surviving.map(String))
-  await redis.lpush(key, String(now))
-  await redis.expire(key, Math.ceil(windowMs / 1000) + 1)
+): Promise<boolean> {
+  const ttlSeconds = Math.ceil(windowMs / 1000) + 1
+  const result = await redis.eval(
+    SLIDING_WINDOW_LUA,
+    1,
+    key,
+    String(now),
+    String(windowStart),
+    String(maxRequests),
+    String(ttlSeconds),
+  )
+  return result === 1
 }
 
 /* ------------------------------------------------------------------ */
@@ -82,27 +120,18 @@ export class SlidingWindowRateLimiter {
     const now = Date.now()
     const windowStart = now - this.windowMs
     const redis = getRedis()
-    const redisKey = `rl:sw:${key}`
 
-    let timestamps: number[]
     if (redis) {
-      timestamps = await redisGetTimestamps(redis, redisKey, windowStart)
-    } else {
-      timestamps = (this.buckets.get(key) ?? []).filter((t) => t > windowStart)
+      return redisCheckAndAdd(redis, `rl:sw:${key}`, now, windowStart, this.maxRequests, this.windowMs)
     }
 
+    const timestamps = (this.buckets.get(key) ?? []).filter((t) => t > windowStart)
     if (timestamps.length >= this.maxRequests) {
-      if (!redis) this.buckets.set(key, timestamps)
+      this.buckets.set(key, timestamps)
       return false
     }
-
-    if (redis) {
-      await redisAddTimestamp(redis, redisKey, now, windowStart, this.windowMs)
-    } else {
-      timestamps.push(now)
-      this.buckets.set(key, timestamps)
-    }
-
+    timestamps.push(now)
+    this.buckets.set(key, timestamps)
     return true
   }
 
@@ -140,27 +169,18 @@ export class HostRateLimiter {
     const now = Date.now()
     const windowStart = now - this.windowMs
     const redis = getRedis()
-    const redisKey = `rl:host:${host}`
 
-    let timestamps: number[]
     if (redis) {
-      timestamps = await redisGetTimestamps(redis, redisKey, windowStart)
-    } else {
-      timestamps = (this.buckets.get(host) ?? []).filter((t) => t > windowStart)
+      return redisCheckAndAdd(redis, `rl:host:${host}`, now, windowStart, this.maxRequests, this.windowMs)
     }
 
+    const timestamps = (this.buckets.get(host) ?? []).filter((t) => t > windowStart)
     if (timestamps.length >= this.maxRequests) {
-      if (!redis) this.buckets.set(host, timestamps)
+      this.buckets.set(host, timestamps)
       return false
     }
-
-    if (redis) {
-      await redisAddTimestamp(redis, redisKey, now, windowStart, this.windowMs)
-    } else {
-      timestamps.push(now)
-      this.buckets.set(host, timestamps)
-    }
-
+    timestamps.push(now)
+    this.buckets.set(host, timestamps)
     return true
   }
 
