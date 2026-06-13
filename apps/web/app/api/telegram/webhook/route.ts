@@ -158,7 +158,9 @@ function getDigestFeedbackConfirmationText(action: DigestFeedbackAction): string
 }
 function isPositiveIntegerString(value: string | null | undefined): value is string { return typeof value === "string" && /^\d+$/.test(value); }
 function normalizeNonEmptyString(value: string | null | undefined): string | null { if (typeof value !== "string") return null; const normalizedValue = value.trim(); return normalizedValue === "" ? null : normalizedValue; }
-function sanitizeError(value: string): string { return value.replace(/bot\d+:[A-Za-z0-9_-]+/g, "[redacted-token]"); }
+// Redacts Telegram bot tokens in both forms: URL-embedded ("bot<id>:<auth>") and bare ("<id>:<auth>").
+// Token shape: numeric bot id (>= 8 digits) ":" 35-char auth string. Length floors avoid redacting benign "key:value".
+function sanitizeError(value: string): string { return value.replace(/(?:bot)?\d{8,}:[A-Za-z0-9_-]{35,}/g, "[redacted-token]"); }
 
 function parseStartToken(value: string | null | undefined): string | null {
   if (typeof value !== "string") return null;
@@ -173,3 +175,6 @@ function normalizeTelegramChatId(value: string | number | null | undefined): str
   if (typeof value === "string" && value.trim() !== "") return value.trim();
   return null;
 }
+
+/** Internal helpers exposed for unit testing only. Not part of the route's public contract. */
+export const __test = { sanitizeError };

@@ -204,7 +204,7 @@
 - [ ] I4: payments.ts monolith (1739 lines) — split into 3 modules
 - [ ] I7: packages/db/lib/ duplicates apps/web/lib/ types — shared package import
 - [ ] I8: DedupeService suppression in JSON file → Postgres-backed
-- [ ] I12: sanitizeError regex incomplete for Telegram token format
+- [x] ~~I12: sanitizeError regex incomplete for Telegram token format~~ → Fixed (redacts bare + bot-prefixed tokens, length-floored to avoid false positives, +8 tests)
 - [x] ~~I15: Redis rate limiter race condition~~ → Fixed (atomic Lua EVAL check-and-add)
 - [x] ~~Telegram API transient failures~~ → Fixed (exp backoff + full jitter, retry 429/5xx)
 - [x] ~~truncateLabel char-based truncation~~ → Fixed (UTF-8 byte-aware, +11 tests)
