@@ -110,12 +110,12 @@
 
 **Текущее состояние:** LeadItem имеет part of этого (score, confidenceGate, reasons, opener, sourceFamilies, evidenceTitles, locationNames). Но нет: why_now как отдельное поле, best_angle, lawful_contact_path, negative_signals, ИНН/ОГРН, domain.
 
-- [ ] 2.1 Добавить `why_now` (1–2 коротких аргумента «почему сейчас») в LeadItem и digest candidate
-- [ ] 2.2 Добавить `best_angle` (наилучший угол контакта) — отдельное поле, не то же что opener
-- [ ] 2.3 Добавить `lawful_contact_path` в LeadItem (corporate form / generic HR / switchboard)
-- [ ] 2.4 Добавить `negative_signals[]` — why not / risk factors
-- [ ] 2.5 Добавить `inn`, `ogrn`, `domain`, `career_page_url` в LeadItem / lead detail page
-- [ ] 2.6 Обновить lead detail page — показать все новые поля
+- [x] 2.1 Добавить `why_now` (1–2 коротких аргумента «почему сейчас») в LeadItem и digest candidate
+- [x] 2.2 Добавить `best_angle` (наилучший угол контакта) — отдельное поле, не то же что opener
+- [x] 2.3 Добавить `lawful_contact_path` в LeadItem (corporate form / generic HR / switchboard)
+- [x] 2.4 Добавить `negative_signals[]` — why not / risk factors
+- [x] 2.5 Добавить `inn`, `ogrn`, `domain`, `career_page_url` в LeadItem / lead detail page
+- [x] 2.6 Обновить lead detail page — показать все новые поля
 
 ### Задача 3: Human-in-the-loop review queue
 
@@ -123,11 +123,11 @@
 
 **Текущее состояние:** Confidence gate C → review, но нет UI review queue, нет отдельного статуса «pending_review», нет reviewer UI.
 
-- [ ] 3.1 Добавить `review_status` enum (pending/approved/rejected) в digest_candidates
-- [ ] 3.2 Миграция: `ALTER TABLE digest_candidates ADD COLUMN review_status`
-- [ ] 3.3 API route `/api/review` — list pending, approve, reject
-- [ ] 3.4 Review UI — список кандидатов на review + approve/reject кнопки
-- [ ] 3.5 Human override rules: score ≥ 80 + gate < A → auto pending_review
+- [x] 3.1 Добавить `review_status` enum (pending/approved/rejected) в digest_candidates
+- [x] 3.2 Миграция: `ALTER TABLE digest_candidates ADD COLUMN review_status`
+- [x] 3.3 API route `/api/review` — list pending, approve, reject
+- [x] 3.4 Review UI — список кандидатов на review + approve/reject кнопки
+- [x] 3.5 Human override rules: score ≥ 80 + gate < A → auto pending_review
 
 ### Задача 4: Negative signals & recruiter hiring penalty
 
@@ -135,10 +135,10 @@
 
 **Текущее состояние:** `computeIntent` уже даёт 0.05 за internal recruiter (penalty), `computeFiur` считает `isInternalRecruiter`. Но нет отдельного `negative_signals[]` поля, нет penalty за agency reposts, нет stale role penalty.
 
-- [ ] 4.1 Добавить `detectAgencyReposts()` в hiring-pattern-detector — выявлять повторные посты
-- [ ] 4.2 Добавить stale role penalty в `computeUrgency` — повторяющиеся роли без обновления > 30 дней → штраф
-- [ ] 4.3 Добавить `negative_signals[]` генерацию в scoring pipeline
-- [ ] 4.4 Отразить negative signals в lead card UI
+- [x] 4.1 Добавить `detectAgencyReposts()` в hiring-pattern-detector — выявлять повторные посты
+- [x] 4.2 Добавить stale role penalty в `computeUrgency` — повторяющиеся роли без обновления > 30 дней → штраф
+- [x] 4.3 Добавить `negative_signals[]` генерацию в scoring pipeline
+- [x] 4.4 Отразить negative signals в lead card UI
 
 ### Задача 5: Lawful contact path — corporate-only default
 
@@ -146,10 +146,10 @@
 
 **Текущее состояние:** ContactCategory включает `personal-email`, `phone`, `telegram`, `whatsapp`. Нет фильтрации по policy. Нет `contact_policy` в client_profile.
 
-- [ ] 5.1 Добавить `contact_policy` в client_profiles (enum: corporate_only, no_personal, unrestricted)
-- [ ] 5.2 Миграция: `ALTER TABLE client_profiles ADD COLUMN contact_policy`
-- [ ] 5.3 Фильтровать ContactPath по policy в lead scoring
-- [ ] 5.4 UI: выбор contact policy в onboarding
+- [x] 5.1 Добавить `contact_policy` в client_profiles (enum: corporate_only, no_personal, unrestricted)
+- [x] 5.2 Миграция: `ALTER TABLE client_profiles ADD COLUMN contact_policy`
+- [x] 5.3 Фильтровать ContactPath по policy в lead scoring
+- [x] 5.4 UI: выбор contact policy в onboarding
 
 ### Задача 6: Landing & live preview — «результат за 3 минуты»
 

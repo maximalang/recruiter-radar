@@ -65,19 +65,29 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         <DetailLayout
           main={
             <>
-              {/* Reasons card */}
+              {/* Why now card */}
               <ContentCard>
                 <ContentCardTitle>🎯 Почему сейчас</ContentCardTitle>
-                {lead.reasons.length > 0 ? (
-                  <ul className={ipStyles.reasonList}>
-                    {lead.reasons.map((reason, i) => (
-                      <li key={i} className={ipStyles.reasonItem}>{reason}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className={ipStyles.bodyTextMuted}>Причины не указаны</p>
-                )}
+                <p className={ipStyles.bodyText}>{lead.whyNow}</p>
               </ContentCard>
+
+              {/* Best angle card */}
+              <ContentCard>
+                <ContentCardTitle>🔭 Лучший угол контакта</ContentCardTitle>
+                <p className={ipStyles.bodyText}>{lead.bestAngle}</p>
+              </ContentCard>
+
+              {/* Lawful contact path */}
+              {lead.lawfulContactPath && (
+                <ContentCard>
+                  <ContentCardTitle>📬 Безопасный путь контакта</ContentCardTitle>
+                  <p className={ipStyles.bodyText}>
+                    {lead.lawfulContactPath === 'career-page' && 'Карьерная страница компании — прямой путь к HR'}
+                    {lead.lawfulContactPath === 'corporate-contact' && 'Корпоративная форма обратной связи или общий HR- email'}
+                    {lead.lawfulContactPath === 'registry-data' && 'Данные из открытых реестров (ЕГРЮЛ/ФНС)'}
+                  </p>
+                </ContentCard>
+              )}
 
               {/* Evidence card */}
               <ContentCard>
@@ -185,6 +195,10 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               {/* Company info */}
               <ContentCard>
                 <div className={ipStyles.sidebarLabel}>Компания</div>
+
+                {lead.orgDomain && (
+                  <div className={ipStyles.sidebarMeta}>🌐 {lead.orgDomain}</div>
+                )}
                 {lead.orgWebsite && (
                   <a
                     href={lead.orgWebsite}
@@ -192,9 +206,27 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                     rel="noopener noreferrer"
                     className={ipStyles.sidebarLink}
                   >
-                    🌐 Сайт компании →
+                    Сайт компании →
                   </a>
                 )}
+                {lead.careerPageUrl && (
+                  <a
+                    href={lead.careerPageUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={ipStyles.sidebarLink}
+                  >
+                    💼 Карьерная страница →
+                  </a>
+                )}
+
+                {(lead.orgInn || lead.orgOgrn) && (
+                  <div className={ipStyles.sidebarMeta}>
+                    {lead.orgInn && <div>ИНН: {lead.orgInn}</div>}
+                    {lead.orgOgrn && <div>ОГРН: {lead.orgOgrn}</div>}
+                  </div>
+                )}
+
                 {lead.sourceExternalId && (
                   <div className={ipStyles.sidebarMeta}>ID: {lead.sourceExternalId}</div>
                 )}

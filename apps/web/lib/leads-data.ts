@@ -6,105 +6,176 @@
  */
 
 import { getPool } from "./db";
+import { formatReason, type ScoringReason } from "./scoring/scoring-reasons";
+
+// ─── Reason parsing ──────────────────────────────────────────────
+
+/**
+ * Parse the `reasons` column from digest_candidates.
+ * Handles both legacy string[] and new ScoringReason[] format.
+ * Returns structured ScoringReason[] regardless of storage format.
+ */
+function parseReasons(raw: unknown): ScoringReason[] {
+  if (!Array.isArray(raw)) return []
+
+  const result: ScoringReason[] = []
+  for (const item of raw) {
+    if (typeof item === 'object' && item !== null && 'key' in item && 'component' in item) {
+      // New ScoringReason format
+      result.push(item as ScoringReason)
+    } else if (typeof item === 'string' && item.length > 0) {
+      // Legacy string — wrap as a synthetic reason for backward compat
+      result.push({ component: 'fit', key: `legacy.${item.slice(0, 40)}` })
+    }
+  }
+  return result
+}
+
+/**
+ * Get Russian display strings from reasons (handles both formats).
+ * For structured reasons: use formatReason(). For legacy: pass through.
+ */
+function reasonStrings(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return []
+  const structured = parseReasons(raw)
+  if (structured.length > 0 && !structured[0].key.startsWith('legacy.')) {
+    return structured.map(formatReason)
+  }
+  // Legacy fallback: return raw strings
+  return raw.filter((r: unknown): r is string => typeof r === 'string')
+}
 
 // ─── Lead Card Derivation ────────────────────────────────────────
 
 /**
  * Derive `why_now` from scoring reasons.
- * Picks the top 2 urgency/intent reasons, falls back to first reason.
+ * Picks the top urgency/intent reason keys, renders Russian labels.
  */
-export function deriveWhyNow(reasons: string[]): string {
-  if (reasons.length === 0) return 'Повод для контакта есть сейчас';
-  // Prefer urgency/intent signals
+export function deriveWhyNow(rawReasons: unknown): string {
+  const reasons = parseReasons(rawReasons)
+  if (reasons.length === 0) return 'Повод для контакта есть сейчас'
+
+  // Prefer urgency/intent component reasons
   const priorityReasons = reasons.filter(r =>
-    r.includes('burst') || r.includes('fresh') || r.includes('hard-to-fill') ||
-    r.includes('urgency') || r.includes('active hiring') || r.includes('multiple')
-  );
-  const picked = priorityReasons.length > 0 ? priorityReasons.slice(0, 2) : reasons.slice(0, 2);
-  return picked.join('; ');
+    r.component === 'urgency' || r.component === 'intent'
+  )
+  const picked = priorityReasons.length > 0 ? priorityReasons.slice(0, 2) : reasons.slice(0, 2)
+  return picked.map(formatReason).join('; ')
 }
 
 /**
  * Derive `best_angle` — the strongest angle for first contact.
- * Based on what kind of hiring gap or expansion is visible.
+ * Uses reason.key for structured matching, not substring search.
  */
-export function deriveBestAngle(reasons: string[], opener: string): string {
-  // If there's a geographic expansion signal → angle around new region
-  const hasExpansion = reasons.some(r => r.includes('new region') || r.includes('location'));
-  if (hasExpansion) return 'Поддержать выход в новый регион — компания ищет людей на месте';
+export function deriveBestAngle(rawReasons: unknown, opener: string): string {
+  const reasons = parseReasons(rawReasons)
+  const keys = reasons.map(r => r.key)
 
-  // If hard-to-fill → angle around scarce talent
-  const hasHardToFill = reasons.some(r => r.includes('hard-to-fill'));
-  if (hasHardToFill) return 'Закрыть дефицитную роль, пока внутренний поиск не растянулся';
+  // Geographic expansion
+  if (keys.includes('fit.location.outside') || keys.includes('fit.location.match')) {
+    return 'Поддержать выход в новый регион — компания ищет людей на месте'
+  }
 
-  // If multi-function hiring → angle around broad hiring need
-  const hasMultiFunction = reasons.some(r => r.includes('non-tech') || r.includes('multiple roles'));
-  if (hasMultiFunction) return 'Несколько открытых ролей — компания активно строит команду';
+  // Hard-to-fill roles
+  if (keys.includes('urgency.hard-to-fill')) {
+    return 'Закрыть дефицитную роль, пока внутренний поиск не растянулся'
+  }
 
-  // If career page available → angle around direct contact
-  const hasCareerPage = reasons.some(r => r.includes('career page'));
-  if (hasCareerPage) return 'Есть карьерная страница — прямой путь к HR';
+  // Non-tech / multi-role mix
+  if (keys.includes('intent.non-tech-mix') || keys.includes('intent.multiple-roles')) {
+    return 'Несколько открытых ролей — компания активно строит команду'
+  }
+
+  // Career page available
+  if (keys.includes('reachability.career-page')) {
+    return 'Есть карьерная страница — прямой путь к HR'
+  }
+
+  // Hiring burst
+  if (keys.some(k => k.startsWith('urgency.burst'))) {
+    return 'Hiring burst — компания массово ищет специалистов'
+  }
 
   // Default: use opener as fallback
-  return opener || 'Короткий созвон, чтобы сверить задачи по найму';
+  return opener || 'Короткий созвон, чтобы сверить задачи по найму'
 }
 
 /**
  * Derive `lawful_contact_path` from evidence and reasons.
  * Returns the safest non-personal contact path available.
  */
-export function deriveLawfulContactPath(reasons: string[], sourceFamilies: string[]): string | null {
-  if (reasons.some(r => r.includes('career page'))) {
-    return 'career-page';
+export function deriveLawfulContactPath(rawReasons: unknown, sourceFamilies: string[]): string | null {
+  const reasons = parseReasons(rawReasons)
+  const keys = reasons.map(r => r.key)
+
+  if (keys.includes('reachability.career-page')) {
+    return 'career-page'
   }
-  if (reasons.some(r => r.includes('corporate') || r.includes('HR/contact'))) {
-    return 'corporate-contact';
+  if (keys.includes('reachability.corporate-contact')) {
+    return 'corporate-contact'
   }
   if (sourceFamilies.some(s => s === 'egrul-fns' || s === 'fedresurs')) {
-    return 'registry-data';
+    return 'registry-data'
   }
-  return null;
+  if (keys.includes('reachability.direct-surface')) {
+    return 'direct-surface'
+  }
+  return null
 }
 
 /**
  * Derive `negative_signals` — risk factors / why not.
- * Detects stale signals, internal recruiter only, agency reposts, low evidence.
+ * Uses reason.key for structured matching + confidence gate + source count.
  */
 export function deriveNegativeSignals(input: {
-  reasons: string[];
+  reasons: unknown;
   vacanciesCount: number;
   distinctVacancyNamesCount: number;
   sourceFamilies: string[];
   confidenceGate: string;
 }): string[] {
-  const signals: string[] = [];
+  const signals: string[] = []
+  const reasons = parseReasons(input.reasons)
+  const keys = reasons.map(r => r.key)
 
   // Internal recruiter only
-  if (input.reasons.some(r => r.includes('internal recruiter'))) {
-    signals.push('Вакансия внутреннего рекрутера — слабый сигнал сам по себе');
+  if (keys.includes('intent.internal-recruiter-only')) {
+    signals.push('Вакансия внутреннего рекрутера — слабый сигнал сам по себе')
   }
 
   // Low confidence
   if (input.confidenceGate === 'C' || input.confidenceGate === 'D') {
-    signals.push('Низкая уверенность в сигнале — требуется проверка');
+    signals.push('Низкая уверенность в сигнале — требуется проверка')
   }
 
   // Single source
   if (input.sourceFamilies.length <= 1) {
-    signals.push('Только один источник — нет независимого подтверждения');
+    signals.push('Только один источник — нет независимого подтверждения')
   }
 
   // Stale signals
-  if (input.reasons.some(r => r.includes('stale') || r.includes('older') || r.includes('без обновления'))) {
-    signals.push('Устаревшие сигналы — активность могла закончиться');
+  if (keys.includes('intent.stale-signals') ||
+      keys.includes('urgency.stale-role-repeated') ||
+      keys.includes('urgency.stale-role-single')) {
+    signals.push('Устаревшие сигналы — активность могла закончиться')
   }
 
   // Repeated similar roles (high vacancy count but low distinct names)
   if (input.vacanciesCount >= 3 && input.distinctVacancyNamesCount <= 1) {
-    signals.push('Повторяющиеся одинаковые вакансии — возможен репост');
+    signals.push('Повторяющиеся одинаковые вакансии — возможен репост')
   }
 
-  return signals;
+  // Industry excluded by ICP
+  if (keys.includes('fit.industry.excluded')) {
+    signals.push('Индустрия исключена из ICP агентства')
+  }
+
+  // No safe contact path
+  if (keys.includes('reachability.no-path')) {
+    signals.push('Безопасный путь контакта пока не найден')
+  }
+
+  return signals
 }
 
 // ─── Types ──────────────────────────────────────────────────────
@@ -268,7 +339,8 @@ export async function getLeadsForProfile(input: {
   `, [...params, limit, offset]);
 
   const leads: LeadItem[] = leadsResult.rows.map((row) => {
-    const reasons = Array.isArray(row.reasons) ? row.reasons.filter((r: unknown): r is string => typeof r === "string") : [];
+    const reasonsRaw = row.reasons;
+    const reasons = parseReasons(reasonsRaw).map(formatReason);
     const sourceFamilies = Array.isArray(row.source_families) ? row.source_families.filter((s: unknown): s is string => typeof s === "string") : [];
     return {
       id: row.id,
@@ -281,11 +353,11 @@ export async function getLeadsForProfile(input: {
       distinctVacancyNamesCount: row.distinct_vacancy_names_count,
       latestPublishedAt: row.latest_published_at,
       reasons,
-      whyNow: deriveWhyNow(reasons),
-      bestAngle: deriveBestAngle(reasons, row.opener ?? ""),
-      lawfulContactPath: deriveLawfulContactPath(reasons, sourceFamilies),
+      whyNow: deriveWhyNow(reasonsRaw),
+      bestAngle: deriveBestAngle(reasonsRaw, row.opener ?? ""),
+      lawfulContactPath: deriveLawfulContactPath(reasonsRaw, sourceFamilies),
       negativeSignals: deriveNegativeSignals({
-        reasons,
+        reasons: reasonsRaw,
         vacanciesCount: row.vacancies_count,
         distinctVacancyNamesCount: row.distinct_vacancy_names_count,
         sourceFamilies,
@@ -405,7 +477,8 @@ export async function getLeadsForAllProfiles(input: {
   `, [...params, limit, offset]);
 
   const leads: LeadItem[] = leadsResult.rows.map((row) => {
-    const reasons = Array.isArray(row.reasons) ? row.reasons.filter((r: unknown): r is string => typeof r === "string") : [];
+    const reasonsRaw = row.reasons;
+    const reasons = parseReasons(reasonsRaw).map(formatReason);
     const sourceFamilies = Array.isArray(row.source_families) ? row.source_families.filter((s: unknown): s is string => typeof s === "string") : [];
     return {
       id: row.id,
@@ -418,11 +491,11 @@ export async function getLeadsForAllProfiles(input: {
       distinctVacancyNamesCount: row.distinct_vacancy_names_count,
       latestPublishedAt: row.latest_published_at,
       reasons,
-      whyNow: deriveWhyNow(reasons),
-      bestAngle: deriveBestAngle(reasons, row.opener ?? ""),
-      lawfulContactPath: deriveLawfulContactPath(reasons, sourceFamilies),
+      whyNow: deriveWhyNow(reasonsRaw),
+      bestAngle: deriveBestAngle(reasonsRaw, row.opener ?? ""),
+      lawfulContactPath: deriveLawfulContactPath(reasonsRaw, sourceFamilies),
       negativeSignals: deriveNegativeSignals({
-        reasons,
+        reasons: reasonsRaw,
         vacanciesCount: row.vacancies_count,
         distinctVacancyNamesCount: row.distinct_vacancy_names_count,
         sourceFamilies,
@@ -522,7 +595,8 @@ export async function getLeadDetail(input: {
   }
 
   const row = result.rows[0];
-  const reasons = Array.isArray(row.reasons) ? row.reasons.filter((r: unknown): r is string => typeof r === "string") : [];
+  const reasonsRaw = row.reasons;
+  const reasons = parseReasons(reasonsRaw).map(formatReason);
   const sourceFamilies = Array.isArray(row.source_families) ? row.source_families.filter((s: unknown): s is string => typeof s === "string") : [];
 
   return {
@@ -542,11 +616,11 @@ export async function getLeadDetail(input: {
     distinctVacancyNamesCount: row.distinct_vacancy_names_count,
     latestPublishedAt: row.latest_published_at,
     reasons,
-    whyNow: deriveWhyNow(reasons),
-    bestAngle: deriveBestAngle(reasons, row.opener ?? ""),
-    lawfulContactPath: deriveLawfulContactPath(reasons, sourceFamilies),
+    whyNow: deriveWhyNow(reasonsRaw),
+    bestAngle: deriveBestAngle(reasonsRaw, row.opener ?? ""),
+    lawfulContactPath: deriveLawfulContactPath(reasonsRaw, sourceFamilies),
     negativeSignals: deriveNegativeSignals({
-      reasons,
+      reasons: reasonsRaw,
       vacanciesCount: row.vacancies_count,
       distinctVacancyNamesCount: row.distinct_vacancy_names_count,
       sourceFamilies,
