@@ -1,8 +1,34 @@
 import { NextResponse } from "next/server";
 import { getPool } from "../../../lib/db";
+import { formatReason, type ScoringReason } from "../../../lib/scoring/scoring-reasons";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+
+/**
+ * Format reasons from DB (handles both legacy string[] and new ScoringReason[]).
+ * Returns Russian display strings for the review UI.
+ */
+function formatReasonsFromRaw(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+
+  const result: string[] = [];
+  for (const item of raw) {
+    if (typeof item === "string") {
+      // Legacy format — pass through
+      result.push(item);
+    } else if (
+      typeof item === "object" &&
+      item !== null &&
+      "key" in item &&
+      "component" in item
+    ) {
+      // New ScoringReason format — render Russian label
+      result.push(formatReason(item as ScoringReason));
+    }
+  }
+  return result;
+}
 
 /**
  * GET /api/review — list pending review candidates.
@@ -83,9 +109,7 @@ export async function GET(request: Request) {
       vacanciesCount: row.vacancies_count,
       distinctVacancyNamesCount: row.distinct_vacancy_names_count,
       latestPublishedAt: row.latest_published_at,
-      reasons: Array.isArray(row.reasons)
-        ? row.reasons.filter((r: unknown): r is string => typeof r === "string")
-        : [],
+      reasons: formatReasonsFromRaw(row.reasons),
       sourceFamilies: Array.isArray(row.source_families)
         ? row.source_families.filter((s: unknown): s is string => typeof s === "string")
         : [],
