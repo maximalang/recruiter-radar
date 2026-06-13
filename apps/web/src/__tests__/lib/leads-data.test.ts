@@ -55,7 +55,10 @@ describe('getLeadDetail', () => {
       vacancies_count: 5,
       distinct_vacancy_names_count: 3,
       latest_published_at: '2026-06-01T10:00:00Z',
-      reasons: ['Активный найм', 'Несколько ролий'],
+      reasons: [
+        { component: 'intent' as const, key: 'intent.fresh-signals' },
+        { component: 'intent' as const, key: 'intent.multiple-roles', params: { count: 3 } },
+      ],
       opener: 'Здравствуйте! По Яндекс видно...',
       feedback_status: 'accepted',
       feedback_note: null,
@@ -82,7 +85,7 @@ describe('getLeadDetail', () => {
     expect(result!.score).toBe(45);
     expect(result!.confidenceGate).toBe('A');
     expect(result!.vacanciesCount).toBe(5);
-    expect(result!.reasons).toEqual(['Активный найм', 'Несколько ролий']);
+    expect(result!.reasons).toEqual(['Свежие сигналы найма (недели давности)', 'Несколько открытых ролей (3) — активный найм']);
     expect(result!.opener).toBe('Здравствуйте! По Яндекс видно...');
     expect(result!.feedbackStatus).toBe('accepted');
     expect(result!.evidenceTitles).toEqual(['Backend Developer', 'Frontend Engineer', 'Data Analyst']);
