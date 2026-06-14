@@ -9,7 +9,7 @@ import {
   readPublicPreviewInput
 } from "../lib/publicProduct";
 import { buildHhRadarProbabilitySummary } from "../lib/hhProbabilities";
-import { deriveBestAngle } from "../lib/leads-data";
+import { formatLawfulContactPath } from "../lib/leads-data";
 import {
   NoticeBox,
   PageFrame,
@@ -372,8 +372,19 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               />
             ) : (
               <div style={{ display: "grid", gap: "12px" }}>
+                {previewState.isPersonalized && !previewState.hasExactMatches ? (
+                  <NoticeBox
+                    tone="neutral"
+                    title="Точных совпадений по нише пока нет"
+                    description="Показываем ближайшие компании по релевантности вашему ICP. На реальном радаре совпадений будет больше — sample-набор ограничен."
+                  />
+                ) : null}
                 {visiblePreviewItems.map((item) => (
-                  <PreviewDigestCard key={`${item.org_id}-${item.rank}`} item={item} />
+                  <PreviewDigestCard
+                    key={`${item.org_id}-${item.rank}`}
+                    item={item}
+                    showRelevance={previewState.isPersonalized}
+                  />
                 ))}
 
                 {hiddenPreviewItems.length > 0 ? (
@@ -384,7 +395,11 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                     <div className={ppStyles.disclosureBody}>
                       <div style={{ display: "grid", gap: "12px" }}>
                         {hiddenPreviewItems.map((item) => (
-                          <PreviewDigestCard key={`${item.org_id}-${item.rank}`} item={item} />
+                          <PreviewDigestCard
+                    key={`${item.org_id}-${item.rank}`}
+                    item={item}
+                    showRelevance={previewState.isPersonalized}
+                  />
                         ))}
                       </div>
                     </div>
@@ -474,7 +489,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                 ))}
               </div>
 
-              <Link href={checkoutHref} className={plan.isPrimary ? ppStyles.primaryAction : ppStyles.secondaryAction}>
+              <Link
+                href={buildCheckoutHref({ ...previewInput, planCode: plan.code })}
+                className={plan.isPrimary ? ppStyles.primaryAction : ppStyles.secondaryAction}
+              >
                 {plan.ctaLabel}
               </Link>
             </SurfaceCard>
@@ -499,15 +517,67 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   );
 }
 
+const RELEVANCE_AXES: Array<{ key: keyof HomePreviewItem["relevanceSignals"]; label: string }> = [
+  { key: "fit", label: "Соответствие" },
+  { key: "intent", label: "Намерение" },
+  { key: "urgency", label: "Срочность" },
+  { key: "reachability", label: "Доступность" },
+];
+
+function PreviewRelevanceBars(props: { signals: HomePreviewItem["relevanceSignals"] }) {
+  const { signals } = props;
+  const hasAny = RELEVANCE_AXES.some((axis) => signals[axis.key] > 0);
+  if (!hasAny) return null;
+
+  return (
+    <div className={hpStyles.previewReasonList}>
+      <div style={{ color: "#667085", fontSize: "0.78rem", fontWeight: 700 }}>
+        Оценка релевантности вашему ICP
+      </div>
+      <div style={{ display: "grid", gap: "6px" }}>
+        {RELEVANCE_AXES.map((axis) => {
+          const value = Math.round(signals[axis.key] * 100);
+          return (
+            <div
+              key={axis.key}
+              style={{ display: "grid", gridTemplateColumns: "92px 1fr 34px", gap: "8px", alignItems: "center" }}
+            >
+              <span style={{ fontSize: "0.74rem", color: "#475467" }}>{axis.label}</span>
+              <span
+                aria-hidden
+                style={{ height: "6px", borderRadius: "999px", background: "#eaecf0", overflow: "hidden" }}
+              >
+                <span
+                  style={{
+                    display: "block",
+                    height: "100%",
+                    width: `${value}%`,
+                    borderRadius: "999px",
+                    background: "var(--accent, #2563eb)",
+                  }}
+                />
+              </span>
+              <span style={{ fontSize: "0.72rem", color: "#667085", textAlign: "right" }}>{value}%</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function PreviewDigestCard(props: {
   item: HomePreviewItem;
+  showRelevance?: boolean;
 }) {
-  const { item } = props;
+  const { item, showRelevance } = props;
   const probability = buildHhRadarProbabilitySummary({
     totalScore: item.total_score
   });
   const whyNow = item.reasons[0] || "";
-  const bestAngle = deriveBestAngle(item.reasons, item.opener ?? "", item.source_families);
+  const bestAngle = item.bestAngle;
+  const contactPath = formatLawfulContactPath(item.lawfulContactPath);
+  const negativeSignals = item.negativeSignals;
   const secondaryReason = item.reasons[1] || null;
   const hasExtraContext = Boolean(secondaryReason) || item.curationLabels.length > 0;
 
@@ -535,6 +605,8 @@ function PreviewDigestCard(props: {
         </div>
       ) : null}
 
+      {showRelevance ? <PreviewRelevanceBars signals={item.relevanceSignals} /> : null}
+
       <div className={hpStyles.openerBox}>
         <div className={hpStyles.openerLabel}>Лучший угол контакта</div>
         <div>{bestAngle}</div>
@@ -544,6 +616,24 @@ function PreviewDigestCard(props: {
         <div className={hpStyles.openerLabel}>Следующий шаг</div>
         <div>{item.opener}</div>
       </div>
+
+      {contactPath ? (
+        <div className={hpStyles.previewReasonList}>
+          <div style={{ color: "#667085", fontSize: "0.78rem", fontWeight: 700 }}>Безопасный путь контакта</div>
+          <div>{contactPath}</div>
+        </div>
+      ) : null}
+
+      {negativeSignals.length > 0 ? (
+        <div className={hpStyles.previewReasonList}>
+          <div style={{ color: "#b42318", fontSize: "0.78rem", fontWeight: 700 }}>Факторы риска</div>
+          <ul style={{ margin: 0, paddingLeft: "18px", display: "grid", gap: "4px" }}>
+            {negativeSignals.slice(0, 2).map((signal) => (
+              <li key={signal}>{signal}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       {hasExtraContext ? (
         <details className={ppStyles.disclosure}>

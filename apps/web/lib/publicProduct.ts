@@ -1,7 +1,11 @@
 import { getHhDigestItems, type HhDigestItem } from "./hhDigest"
+import { deriveBestAngle, deriveLawfulContactPath, deriveNegativeSignals } from "./leads-data"
+import { rankPreviewItems, type PreviewRelevanceSignals } from "./preview-relevance"
+
+export type PublicPlanCode = "pilot" | "monthly" | "premium"
 
 export type PublicPlan = {
-  code: "pilot" | "monthly"
+  code: PublicPlanCode
   name: string
   cadence: string
   amountMinor: number
@@ -11,6 +15,13 @@ export type PublicPlan = {
   bullets: string[]
   ctaLabel: string
   isPrimary: boolean
+  /**
+   * Recurring plans (monthly, premium) are billed per month. With the billing
+   * provider stubbed there is no real subscription flow, so a checkout for these
+   * is captured as a sales request — NOT a self-serve pilot. Drives whether the
+   * pilot application + pilot onboarding funnel is triggered. See payments.ts.
+   */
+  isRecurring: boolean
 }
 
 export type PublicPreviewInput = {
@@ -27,6 +38,18 @@ export type PublicPreviewItem = HhDigestItem & {
   sourceKeys: string[]
   structuredSignalCount: number
   curationLabels: string[]
+  /** Strongest angle for first contact (derived from source families). */
+  bestAngle: string
+  /** Lawful contact-path key (career-page / registry-data / …) or null. */
+  lawfulContactPath: string | null
+  /** Risk factors / why-not — empty when none apply. */
+  negativeSignals: string[]
+  /**
+   * ICP-relevance breakdown mapped onto the FIUR axes. NOT the output of the
+   * real FIUR engine — derived from aggregated digest fields for an honest,
+   * explainable "relevance to your ICP" signal. See preview-relevance.ts.
+   */
+  relevanceSignals: PreviewRelevanceSignals
 }
 
 export const PUBLIC_PLANS: PublicPlan[] = [
@@ -45,7 +68,8 @@ export const PUBLIC_PLANS: PublicPlan[] = [
       "объяснимый scoring: почему сейчас и почему вам",
     ],
     ctaLabel: "Запустить пилот",
-    isPrimary: true
+    isPrimary: true,
+    isRecurring: false
   },
   {
     code: "monthly",
@@ -61,17 +85,41 @@ export const PUBLIC_PLANS: PublicPlan[] = [
       "hot lead review — аналитик проверяет верхний слой",
       "приоритетная доставка и custom exclusions",
     ],
-    ctaLabel: "Выбрать ассистированный",
-    isPrimary: false
+    ctaLabel: "Обсудить ассистированный",
+    isPrimary: false,
+    isRecurring: true
+  },
+  {
+    code: "premium",
+    name: "Premium Desk",
+    cadence: "ежемесячно",
+    amountMinor: 29000000,
+    currency: "RUB",
+    price: "290 000 ₽/мес",
+    description: "Выделенный аналитик и приоритетный канал: радар собирается и проверяется под вашу воронку вручную.",
+    bullets: [
+      "выделенный аналитик ведёт ваш радар",
+      "ручная проверка hot leads и evidence bundles",
+      "приоритетный SLA на доставку и калибровку",
+      "индивидуальные источники и corporate contact paths",
+    ],
+    ctaLabel: "Обсудить Premium Desk",
+    isPrimary: false,
+    isRecurring: true
   }
 ]
 
 const PUBLIC_PLAN_BY_CODE = Object.fromEntries(
   PUBLIC_PLANS.map((plan) => [plan.code, plan])
-) as Record<PublicPlan["code"], PublicPlan>
+) as Record<PublicPlanCode, PublicPlan>
 
-export function getPublicPlanByCode(code: PublicPlan["code"] | string): PublicPlan {
-  if (code === "pilot" || code === "monthly") {
+/** True when `code` is a known plan code. Single source of truth for plan validation. */
+export function isPublicPlanCode(code: unknown): code is PublicPlanCode {
+  return typeof code === "string" && Object.prototype.hasOwnProperty.call(PUBLIC_PLAN_BY_CODE, code)
+}
+
+export function getPublicPlanByCode(code: PublicPlanCode | string): PublicPlan {
+  if (isPublicPlanCode(code)) {
     return PUBLIC_PLAN_BY_CODE[code]
   }
 
@@ -96,17 +144,31 @@ export function hasPublicPreviewInput(input: PublicPreviewInput): boolean {
 export async function getPublicSampleDigestState(input: PublicPreviewInput): Promise<{
   isLive: boolean
   isPersonalized: boolean
+  /** False when the niche query had no exact ICP match and we fell back to closest companies. */
+  hasExactMatches: boolean
   items: PublicPreviewItem[]
 }> {
   const items = await getHhDigestItems()
-  const filteredItems = hasPublicPreviewInput(input)
-    ? items.filter((item) => matchesPreviewInput(item, input)).slice(0, input.dailyDigestLimit)
-    : items
+  const isPersonalized = hasPublicPreviewInput(input)
+
+  if (!isPersonalized) {
+    return {
+      isLive: true,
+      isPersonalized: false,
+      hasExactMatches: true,
+      items: items.map((item) => toPublicPreviewItem(item, defaultRelevanceSignals())),
+    }
+  }
+
+  const { ranked, hasExactMatches } = rankPreviewItems(items, input, {
+    limit: input.dailyDigestLimit,
+  })
 
   return {
     isLive: true,
-    isPersonalized: hasPublicPreviewInput(input),
-    items: filteredItems.map(toPublicPreviewItem)
+    isPersonalized: true,
+    hasExactMatches,
+    items: ranked.map((entry) => toPublicPreviewItem(entry.item, entry.relevance.signals)),
   }
 }
 
@@ -117,6 +179,7 @@ export function buildCheckoutHref(input: {
   excludeKeywords?: string | null
   dailyDigestLimit?: number | null
   ownerId?: string | number | null
+  planCode?: PublicPlanCode | null
 }): string {
   const params = new URLSearchParams()
 
@@ -130,9 +193,22 @@ export function buildCheckoutHref(input: {
   if (input.ownerId != null && String(input.ownerId).trim() !== "") {
     params.set("ownerId", String(input.ownerId).trim())
   }
+  // Default plan is pilot; only emit the param for non-default plans to keep
+  // existing pilot links unchanged.
+  if (input.planCode && input.planCode !== "pilot") {
+    params.set("plan", input.planCode)
+  }
 
   const query = params.toString()
   return query === "" ? "/checkout" : `/checkout?${query}`
+}
+
+/** Read & validate the `plan` checkout param, defaulting to pilot. */
+export function readCheckoutPlanCode(
+  searchParams: Record<string, string | string[] | undefined>
+): PublicPlanCode {
+  const raw = readSearchParam(searchParams.plan).toLowerCase()
+  return isPublicPlanCode(raw) ? raw : "pilot"
 }
 
 export function resolveCheckoutOwnerId(): string | null {
@@ -157,15 +233,38 @@ export function buildPilotApplicationComment(input: {
   return parts.filter((part) => part !== "").join("\n")
 }
 
-function toPublicPreviewItem(item: HhDigestItem): PublicPreviewItem {
+function toPublicPreviewItem(
+  item: HhDigestItem,
+  relevanceSignals: PreviewRelevanceSignals
+): PublicPreviewItem {
+  const sourceFamilies = item.source_families
   return {
     ...item,
     confidenceLabel: deriveConfidenceLabel(item.total_score),
-    sourceCount: item.source_families.length,
+    sourceCount: sourceFamilies.length,
     sourceKeys: item.candidate_source_keys,
     structuredSignalCount: item.evidence_titles.length,
-    curationLabels: item.source_families
+    curationLabels: sourceFamilies,
+    // On the public preview `reasons` are raw Russian strings, not structured
+    // ScoringReason keys — so these derivations lean on source families, the
+    // confidence gate, and vacancy counts (gate/count-driven, key-agnostic),
+    // never on reason keys that don't exist in preview data.
+    bestAngle: deriveBestAngle(item.reasons, item.opener ?? "", sourceFamilies),
+    lawfulContactPath: deriveLawfulContactPath(item.reasons, sourceFamilies),
+    negativeSignals: deriveNegativeSignals({
+      reasons: item.reasons,
+      vacanciesCount: item.vacancies_count,
+      distinctVacancyNamesCount: item.distinct_vacancy_names_count,
+      sourceFamilies,
+      confidenceGate: item.confidence_gate ?? ""
+    }),
+    relevanceSignals
   }
+}
+
+/** Neutral relevance for the un-personalised preview (no ICP input to score against). */
+function defaultRelevanceSignals(): PreviewRelevanceSignals {
+  return { fit: 0, intent: 0, urgency: 0, reachability: 0 }
 }
 
 function deriveConfidenceLabel(totalScore: number): string {
@@ -176,34 +275,6 @@ function deriveConfidenceLabel(totalScore: number): string {
   if (totalScore >= 80) return "high"
   if (totalScore >= 50) return "medium"
   return "low"
-}
-
-function matchesPreviewInput(item: HhDigestItem, input: PublicPreviewInput): boolean {
-  const haystack = [
-    item.employer_name,
-    ...item.reasons,
-    item.opener,
-    ...item.source_families,
-    ...item.evidence_titles,
-    ...item.location_names
-  ].join(" ").toLocaleLowerCase("ru-RU")
-
-  const includeTerms = [input.specialization, input.targetCity, input.includeKeywords]
-    .flatMap((value) => splitTerms(value))
-  const excludeTerms = splitTerms(input.excludeKeywords)
-
-  if (includeTerms.length > 0 && !includeTerms.some((term) => haystack.includes(term))) {
-    return false
-  }
-
-  return !excludeTerms.some((term) => haystack.includes(term))
-}
-
-function splitTerms(value: string): string[] {
-  return value
-    .split(",")
-    .map((item) => item.trim().toLocaleLowerCase("ru-RU"))
-    .filter((item) => item !== "")
 }
 
 function readSearchParam(value: string | string[] | undefined): string {

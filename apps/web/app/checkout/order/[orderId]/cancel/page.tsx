@@ -35,6 +35,8 @@ function readReason(searchParams: Record<string, string | string[] | undefined>)
 
 function describeReason(reason: string | null): string {
   switch (reason) {
+    case "request-received":
+      return "Заявка на подключение тарифа получена. Мы свяжемся, чтобы согласовать запуск и оплату.";
     case "payment-unavailable":
       return "Оплата сейчас недоступна. Попробуйте ещё раз через несколько минут.";
     case "payment-error":
@@ -65,6 +67,8 @@ export default async function CheckoutCancelPage({ params, searchParams }: Check
     await markCheckoutOrderCanceled(order.id, reason, { ownerId }).catch(() => null);
   }
 
+  // Recurring plans land here as a captured sales request, not a failed payment.
+  const isRequest = reason === "request-received";
   const retryHref = buildCheckoutRetryHref(order);
 
   return (
@@ -74,31 +78,48 @@ export default async function CheckoutCancelPage({ params, searchParams }: Check
       </Link>
 
       <SurfaceCard style={{ display: "grid", gap: "20px" }}>
-        <StatusBadge tone="warning">Оплата не завершена</StatusBadge>
+        <StatusBadge tone={isRequest ? "info" : "warning"}>
+          {isRequest ? "Заявка получена" : "Оплата не завершена"}
+        </StatusBadge>
 
         <SectionIntro
-          title="Платёж не прошёл"
+          title={isRequest ? "Спасибо, заявка сохранена" : "Платёж не прошёл"}
           description={describeReason(reason)}
         />
 
         <NoticeBox
           tone="info"
-          title="Что можно сделать"
-          description="Вернитесь к настройкам пилота и повторите оплату. Параметры профиля сохранятся."
+          title={isRequest ? "Что дальше" : "Что можно сделать"}
+          description={
+            isRequest
+              ? "Мы свяжемся по указанному контакту, чтобы подключить тариф и согласовать оплату. Параметры профиля сохранены."
+              : "Вернитесь к настройкам пилота и повторите оплату. Параметры профиля сохранятся."
+          }
         />
 
         <div className={ppStyles.summaryBox}>
           <SummaryRow label="Тариф" value={order.payload.planName} />
-          <SummaryRow label="Статус оплаты" value={translateOrderStatus(order.status)} />
+          <SummaryRow
+            label={isRequest ? "Статус заявки" : "Статус оплаты"}
+            value={translateOrderStatus(order.status)}
+          />
         </div>
 
         <div className={ipStyles.chipWrap}>
-          <Link href={retryHref} className={ppStyles.primaryAction}>
-            Повторить оплату
-          </Link>
-          <Link href="/" className={ppStyles.secondaryAction}>
-            На главную
-          </Link>
+          {isRequest ? (
+            <Link href="/" className={ppStyles.primaryAction}>
+              На главную
+            </Link>
+          ) : (
+            <>
+              <Link href={retryHref} className={ppStyles.primaryAction}>
+                Повторить оплату
+              </Link>
+              <Link href="/" className={ppStyles.secondaryAction}>
+                На главную
+              </Link>
+            </>
+          )}
         </div>
       </SurfaceCard>
     </PageFrame>

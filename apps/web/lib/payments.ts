@@ -18,7 +18,9 @@ import {
   buildCheckoutHref,
   buildPilotApplicationComment,
   getPublicPlanByCode,
-  type PublicPlan
+  isPublicPlanCode,
+  type PublicPlan,
+  type PublicPlanCode
 } from "./publicProduct";
 import {
   createStripePaymentAdapter,
@@ -327,21 +329,36 @@ export async function startCheckoutOrder(input: StartCheckoutOrderInput): Promis
   const provider = getConfiguredPaymentProvider();
   const successUrl = `${normalizeSiteUrl(input.siteUrl)}/checkout/order/${order.id}/success`;
   const cancelUrl = `${normalizeSiteUrl(input.siteUrl)}/checkout/order/${order.id}/cancel`;
+  // Recurring plans (monthly, premium) have no self-serve subscription flow — we
+  // capture them as a sales request, never as a pilot and never as a payment.
+  const isRecurringPlan = plan.isRecurring;
+  const unavailableReason = isRecurringPlan ? "request-received" : "payment-unavailable";
+  const unavailablePaymentMessage = isRecurringPlan
+    ? "Заявка получена. Мы свяжемся, чтобы подключить тариф и согласовать оплату."
+    : "Оплата пока недоступна. Заявка сохранена, и к ней можно вернуться позже.";
 
-  if (!provider || !provider.isConfigured()) {
+  // Recurring plans must NEVER reach the payment provider: there is no
+  // subscription flow, so createCheckoutSession would attempt a one-off charge
+  // for the full monthly amount. Short-circuit to a saved sales request,
+  // regardless of whether a provider is configured.
+  if (isRecurringPlan || !provider || !provider.isConfigured()) {
     order = await updateCheckoutOrder(order.id, {
       status: "unavailable",
       payloadPatch: {
-        paymentMessage: "Оплата пока недоступна. Заявка сохранена, и к ней можно вернуться позже."
+        paymentMessage: unavailablePaymentMessage
       }
     });
-    order = await ensurePilotApplicationForOrder(order);
+    // Pilot funnel (application + onboarding) is pilot-only. Recurring sales
+    // requests stay as a saved order without a pilot application.
+    if (order.productCode === "pilot") {
+      order = await ensurePilotApplicationForOrder(order);
+    }
 
     return {
       kind: "unavailable",
       order,
-      redirectUrl: `${cancelUrl}?reason=payment-unavailable`,
-      message: "Оплата пока недоступна."
+      redirectUrl: `${cancelUrl}?reason=${unavailableReason}`,
+      message: unavailablePaymentMessage
     };
   }
 
@@ -359,12 +376,14 @@ export async function startCheckoutOrder(input: StartCheckoutOrderInput): Promis
           paymentMessage: checkoutSession.message
         }
       });
-      order = await ensurePilotApplicationForOrder(order);
+      if (order.productCode === "pilot") {
+        order = await ensurePilotApplicationForOrder(order);
+      }
 
       return {
         kind: "unavailable",
         order,
-        redirectUrl: `${cancelUrl}?reason=payment-unavailable`,
+        redirectUrl: `${cancelUrl}?reason=${unavailableReason}`,
         message: checkoutSession.message
       };
     }
@@ -967,7 +986,8 @@ export function buildCheckoutRetryHref(order: CheckoutOrder): string {
     targetCity: order.payload.city ?? "",
     includeKeywords: order.payload.includeKeywords.join(", "),
     excludeKeywords: order.payload.excludeKeywords.join(", "),
-    dailyDigestLimit: order.payload.dailyDigestLimit
+    dailyDigestLimit: order.payload.dailyDigestLimit,
+    planCode: order.productCode
   });
 }
 
@@ -1627,10 +1647,10 @@ function normalizeCheckoutOrderOnboardingStep(
   return "confirm-profile";
 }
 
-function normalizeProductCode(value: string): PublicPlan["code"] {
+function normalizeProductCode(value: string): PublicPlanCode {
   const normalizedValue = value.trim().toLocaleLowerCase("en-US");
 
-  if (normalizedValue === "pilot" || normalizedValue === "monthly") {
+  if (isPublicPlanCode(normalizedValue)) {
     return normalizedValue;
   }
 
