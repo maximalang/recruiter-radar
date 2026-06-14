@@ -1,8 +1,8 @@
 # TODO — Recruiter Radar: Lead Generation Platform
 
-**Связано:** `SPEC.md` (продуктовый контракт), `tasks/plan.md` (фазы), `docs/инфо о проекте.md` (концепция)  
-**Обновлено:** 2026-06-05  
-**Фокус:** Доведение core lead generation engine до рабочего состояния по концепции «инфо о проекте.md»
+**Связано:** `SPEC.md` (продуктовый контракт), `tasks/plan.md` (фазы), `docs/инфо о проекте.md` (концепция), `tasks/todo-agency-refinement.md` (Фаза 2/3 продуктовой доводки)
+**Обновлено:** 2026-06-13
+**Фокус:** P1-концепция закрыта. Активный фронт — agency-refinement (см. отдельный файл) + tech debt I4/I7 ниже.
 
 ---
 
@@ -31,7 +31,9 @@
 - [x] All component scorers: industry-alignment, geographic-fit, hiring-burst,
       salary-level, role-category, departments, contact-quality,
       career-page-quality, lead-freshness, market-fit, source-aggregation
-- [x] Scoring pipeline with client overrides (badfit reweighting from feedback)
+- [~] Scoring pipeline принимает client overrides (применение штрафа работает);
+      `computeClientOverrides` реализована, но НЕ подключена → feedback пока
+      не влияет на digest. См. `todo-agency-refinement.md` T6.2.
 - [x] Confidence gates (A/B/C/D) with `selectConfidenceGate`
 - [x] Gate pipeline with `isDigestEligibleGate` (DRY)
 - [x] Market conditions & recent signal count in FIUR
@@ -191,7 +193,7 @@
 - [x] ~~A3: Source config hardcoded~~ → Fixed (source-registry)
 - [x] ~~I4: N+1 queries in leads page~~ → Fixed (getLeadsForAllProfiles)
 - [x] ~~S3: Rate limiter in-memory → Redis-backed for multi-instance~~ → Fixed (ioredis + REDIS_URL)
-- [ ] R1: Dead CSS classes from CSS Modules migration cleanup
+- [x] ~~R1: Dead CSS classes from CSS Modules migration cleanup~~ → Fixed (removed dead Header Section in dashboard.module.css, deleted unused leads.module.css; 0 dead classes remain)
 
 ## 🔧 Technical Debt (from code review 2026-06-05)
 
@@ -201,9 +203,12 @@
 - [x] ~~I11: Unsafe callback action cast~~ → Added isDigestFeedbackAction() guard
 - [x] ~~I2: Dead parseDigestFeedbackCallbackData~~ → Removed from webhook route
 - [x] ~~C1: auditDigestGate lossy SQL→TS mapping~~ → Removed (dead code, no prod callers; kept isDigestEligibleGate, rewrote tests)
-- [ ] I4: payments.ts monolith (1739 lines) — split into 3 modules
+- [ ] I4: payments.ts monolith (1739 lines) — split into 3 modules (= agency-refinement T11)
 - [ ] I7: packages/db/lib/ duplicates apps/web/lib/ types — shared package import
-- [ ] I8: DedupeService suppression in JSON file → Postgres-backed
+- [x] ~~I8: DedupeService suppression in JSON file → Postgres-backed~~ → ПЕРЕСМОТРЕНО:
+      web-runtime suppression уже в Postgres (`client_digest_org_state`).
+      JSON-suppression относится только к `.mjs` ingest-скриптам в
+      `packages/db/scripts` (offline ETL, не product core). Не блокирует digest loop.
 - [x] ~~I12: sanitizeError regex incomplete for Telegram token format~~ → Fixed (redacts bare + bot-prefixed tokens, length-floored to avoid false positives, +8 tests)
 - [x] ~~I15: Redis rate limiter race condition~~ → Fixed (atomic Lua EVAL check-and-add)
 - [x] ~~Telegram API transient failures~~ → Fixed (exp backoff + full jitter, retry 429/5xx)
@@ -211,15 +216,19 @@
 
 ---
 
-## 🗂 Состояние на 05.06.2026
+## 🗂 Состояние на 13.06.2026
 
-**Тестов:** 711 passing  
-**Ветки:** review-p0-confidence-gate-unify (2 коммита) + main
+**P1-концепция (Задачи 1–6):** ✅ закрыта полностью.
 
-**P1 Задачи по концепции (текущий приоритет):**
-1. Цены и позиционирование (задача 1)
-2. Evidence-first lead card (задача 2)
-3. Human-in-the-loop review queue (задача 3)
-4. Negative signals & recruiter hiring penalty (задача 4)
-5. Lawful contact path — corporate-only default (задача 5)
-6. Landing & live preview (задача 6)
+**Остаточный tech debt (этот файл):**
+- I4 — payments.ts split (≡ agency-refinement T11)
+- I7 — packages/db/lib дублирует apps/web/lib типы
+
+**Активный продуктовый фронт → `tasks/todo-agency-refinement.md`:**
+- ⚠️ T6.2 — feedback→reweighting разорван (core loop не замкнут)
+- T4/T5 — FIUR-based evidence-first preview
+- T8.3 — Premium Desk план (3-я ступень бизнес-модели)
+- T7 — agency dashboard
+- Фаза 3 — cleanup
+
+**Архивировано:** todo-ux-fixes, todo-ux-overhaul + их plan-файлы → `tasks/archive/`.

@@ -2,7 +2,7 @@
 
 **Версия:** 1.0
 **Обновлено:** 2026-05-26
-**Связано:** [tasks/plan-sources-improvement.md](plan-sources-improvement.md)
+**Связано:** [tasks/archive/plan-sources-improvement.md](archive/plan-sources-improvement.md) (архив)
 
 Один файл = один источник истины по тому, что нужно сконфигурировать, чтобы каждый из 15 источников ушёл в зелёную зону.
 
