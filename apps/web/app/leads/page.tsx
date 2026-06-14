@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import Link from 'next/link';
-import { getLeadsForAllProfiles, type LeadItem, VALID_FEEDBACK_STATUSES } from '@/lib/leads-data';
+import { getLeadsForAllProfiles, getPendingReviewCount, type LeadItem, VALID_FEEDBACK_STATUSES } from '@/lib/leads-data';
 import { listClientProfiles, type ClientProfile } from '@/lib/clientProfiles';
 import LeadsFilters from './leads-filters';
 import {
@@ -22,6 +22,7 @@ export const dynamic = 'force-dynamic';
 const LEADS_NAV: NavItem[] = [
   { href: '/dashboard', label: '📊 Дашборд' },
   { href: '/leads', label: '🎯 Лиды', active: true },
+  { href: '/review', label: '🔍 Ревью' },
 ];
 
 function LeadRow({ lead }: { lead: LeadItem }) {
@@ -128,18 +129,24 @@ export default async function LeadsPage({
   const profileIds = activeProfiles.map((p) => p.id);
   let allLeads: LeadItem[] = [];
   let totalLeads = 0;
+  let pendingReview = 0;
 
   try {
-    const result = await getLeadsForAllProfiles({
-      profileIds,
-      confidenceGate,
-      feedbackStatus,
-    });
+    const [result, reviewCount] = await Promise.all([
+      getLeadsForAllProfiles({
+        profileIds,
+        confidenceGate,
+        feedbackStatus,
+      }),
+      getPendingReviewCount({ profileIds }),
+    ]);
     allLeads = result.leads;
     totalLeads = result.total;
+    pendingReview = reviewCount;
   } catch {
     allLeads = [];
     totalLeads = 0;
+    pendingReview = 0;
   }
 
   const hasFilters = confidenceGate !== null || feedbackStatus !== null;
@@ -167,6 +174,15 @@ export default async function LeadsPage({
           label="С обратной связью"
           value={allLeads.filter((l) => l.feedbackStatus && l.feedbackStatus !== 'none').length}
           tone="info"
+        />
+        <MetricCard
+          label="Ожидают проверки"
+          value={
+            <Link href="/review" className={ipStyles.leadLink}>
+              {pendingReview}
+            </Link>
+          }
+          tone={pendingReview > 0 ? 'info' : 'neutral'}
         />
         <MetricCard label="Профилей" value={activeProfiles.length} />
       </MetricGrid>

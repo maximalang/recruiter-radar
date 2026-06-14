@@ -10,6 +10,7 @@ import { InternalPageFrame, InternalPageHeader, type NavItem } from '../ui/inter
 const DASHBOARD_NAV: NavItem[] = [
   { href: '/dashboard', label: '📊 Дашборд', active: true },
   { href: '/leads', label: '🎯 Лиды' },
+  { href: '/review', label: '🔍 Ревью' },
 ];
 
 import {

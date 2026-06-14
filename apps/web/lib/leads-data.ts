@@ -130,6 +130,26 @@ export function deriveLawfulContactPath(rawReasons: unknown, sourceFamilies: str
 }
 
 /**
+ * Format a lawful-contact-path key into Russian copy.
+ * Single source of truth shared by the lead detail page and the public preview.
+ * Returns null for unknown / absent paths so callers can hide the block.
+ */
+export function formatLawfulContactPath(path: string | null): string | null {
+  switch (path) {
+    case 'career-page':
+      return 'Карьерная страница компании — прямой путь к HR'
+    case 'corporate-contact':
+      return 'Корпоративная форма обратной связи или общий HR-email'
+    case 'registry-data':
+      return 'Данные из открытых реестров (ЕГРЮЛ/ФНС)'
+    case 'direct-surface':
+      return 'Прямая поверхность компании — официальный сайт или карьерный раздел'
+    default:
+      return null
+  }
+}
+
+/**
  * Derive `negative_signals` — risk factors / why not.
  * Uses reason.key for structured matching + confidence gate + source count.
  */
@@ -243,6 +263,89 @@ export interface LeadDetail extends LeadItem {
   payload: Record<string, unknown>;
 }
 
+// ─── Row Mapping ─────────────────────────────────────────────────
+
+/** Shape of a digest_candidates row joined with feedback state, as selected by the list queries. */
+interface LeadRow {
+  id: string;
+  org_id: string;
+  org_name: string;
+  source_external_id: string | null;
+  score: number;
+  confidence_gate: string;
+  vacancies_count: number;
+  distinct_vacancy_names_count: number;
+  latest_published_at: string | null;
+  reasons: unknown;
+  opener: string;
+  feedback_status: string | null;
+  suppressed_until: string | null;
+  created_at: string;
+  source_families: unknown;
+  evidence_titles: unknown;
+  location_names: unknown;
+}
+
+/** SELECT column list shared by every list query that maps into a LeadItem. */
+const LEAD_SELECT_COLUMNS = `
+      dc.id::TEXT AS id,
+      dc.org_id::TEXT AS org_id,
+      dc.source_display_name AS org_name,
+      dc.source_external_id,
+      dc.total_score AS score,
+      dc.confidence_gate,
+      dc.vacancies_count,
+      dc.distinct_vacancy_names_count,
+      dc.latest_published_at,
+      dc.reasons,
+      dc.opener,
+      cdos.feedback_status,
+      cdos.suppressed_until,
+      dc.created_at::TEXT AS created_at,
+      dc.source_families,
+      dc.evidence_titles,
+      dc.location_names`;
+
+function toStringArray(raw: unknown): string[] {
+  return Array.isArray(raw) ? raw.filter((v: unknown): v is string => typeof v === "string") : [];
+}
+
+/** Map a raw joined row into the derived LeadItem shape (why-now, best-angle, etc.). */
+function mapLeadRow(row: LeadRow): LeadItem {
+  const reasonsRaw = row.reasons;
+  const reasons = parseReasons(reasonsRaw).map(formatReason);
+  const sourceFamilies = toStringArray(row.source_families);
+  return {
+    id: row.id,
+    orgId: row.org_id,
+    orgName: row.org_name ?? "Неизвестная компания",
+    sourceExternalId: row.source_external_id,
+    score: row.score,
+    confidenceGate: row.confidence_gate ?? "",
+    vacanciesCount: row.vacancies_count,
+    distinctVacancyNamesCount: row.distinct_vacancy_names_count,
+    latestPublishedAt: row.latest_published_at,
+    reasons,
+    whyNow: deriveWhyNow(reasonsRaw),
+    bestAngle: deriveBestAngle(reasonsRaw, row.opener ?? "", sourceFamilies),
+    lawfulContactPath: deriveLawfulContactPath(reasonsRaw, sourceFamilies),
+    negativeSignals: deriveNegativeSignals({
+      reasons: reasonsRaw,
+      vacanciesCount: row.vacancies_count,
+      distinctVacancyNamesCount: row.distinct_vacancy_names_count,
+      sourceFamilies,
+      confidenceGate: row.confidence_gate ?? "",
+    }),
+    opener: row.opener ?? "",
+    feedbackStatus: row.feedback_status,
+    suppressedUntil: row.suppressed_until,
+    createdAt: row.created_at,
+    sourceFamilies,
+    evidenceTitles: toStringArray(row.evidence_titles),
+    locationNames: toStringArray(row.location_names),
+  };
+}
+
 // ─── Data Fetching ──────────────────────────────────────────────
 
 export async function getLeadsForProfile(input: {
@@ -298,43 +401,9 @@ export async function getLeadsForProfile(input: {
   const total = parseInt(countResult.rows[0]?.count ?? "0", 10);
 
   // Fetch leads
-  const leadsResult = await pool.query<{
-    id: string;
-    org_id: string;
-    org_name: string;
-    source_external_id: string | null;
-    score: number;
-    confidence_gate: string;
-    vacancies_count: number;
-    distinct_vacancy_names_count: number;
-    latest_published_at: string | null;
-    reasons: unknown;
-    opener: string;
-    feedback_status: string | null;
-    suppressed_until: string | null;
-    created_at: string;
-    source_families: unknown;
-    evidence_titles: unknown;
-    location_names: unknown;
-  }>(`
+  const leadsResult = await pool.query<LeadRow>(`
     SELECT
-      dc.id::TEXT AS id,
-      dc.org_id::TEXT AS org_id,
-      dc.source_display_name AS org_name,
-      dc.source_external_id,
-      dc.total_score AS score,
-      dc.confidence_gate,
-      dc.vacancies_count,
-      dc.distinct_vacancy_names_count,
-      dc.latest_published_at,
-      dc.reasons,
-      dc.opener,
-      cdos.feedback_status,
-      cdos.suppressed_until,
-      dc.created_at::TEXT AS created_at,
-      dc.source_families,
-      dc.evidence_titles,
-      dc.location_names
+${LEAD_SELECT_COLUMNS}
     FROM digest_candidates dc
     LEFT JOIN client_digest_org_state cdos
       ON cdos.org_id = dc.org_id
@@ -344,40 +413,7 @@ export async function getLeadsForProfile(input: {
     LIMIT $${paramIdx} OFFSET $${paramIdx + 1}
   `, [...params, limit, offset]);
 
-  const leads: LeadItem[] = leadsResult.rows.map((row) => {
-    const reasonsRaw = row.reasons;
-    const reasons = parseReasons(reasonsRaw).map(formatReason);
-    const sourceFamilies = Array.isArray(row.source_families) ? row.source_families.filter((s: unknown): s is string => typeof s === "string") : [];
-    return {
-      id: row.id,
-      orgId: row.org_id,
-      orgName: row.org_name ?? "Неизвестная компания",
-      sourceExternalId: row.source_external_id,
-      score: row.score,
-      confidenceGate: row.confidence_gate ?? "",
-      vacanciesCount: row.vacancies_count,
-      distinctVacancyNamesCount: row.distinct_vacancy_names_count,
-      latestPublishedAt: row.latest_published_at,
-      reasons,
-      whyNow: deriveWhyNow(reasonsRaw),
-      bestAngle: deriveBestAngle(reasonsRaw, row.opener ?? "", sourceFamilies),
-      lawfulContactPath: deriveLawfulContactPath(reasonsRaw, sourceFamilies),
-      negativeSignals: deriveNegativeSignals({
-        reasons: reasonsRaw,
-        vacanciesCount: row.vacancies_count,
-        distinctVacancyNamesCount: row.distinct_vacancy_names_count,
-        sourceFamilies,
-        confidenceGate: row.confidence_gate ?? "",
-      }),
-      opener: row.opener ?? "",
-      feedbackStatus: row.feedback_status,
-      suppressedUntil: row.suppressed_until,
-      createdAt: row.created_at,
-      sourceFamilies,
-      evidenceTitles: Array.isArray(row.evidence_titles) ? row.evidence_titles.filter((e: unknown): e is string => typeof e === "string") : [],
-      locationNames: Array.isArray(row.location_names) ? row.location_names.filter((l: unknown): l is string => typeof l === "string") : [],
-    };
-  });
+  const leads: LeadItem[] = leadsResult.rows.map(mapLeadRow);
 
   return { leads, total };
 }
@@ -436,43 +472,9 @@ export async function getLeadsForAllProfiles(input: {
   const total = parseInt(countResult.rows[0]?.count ?? "0", 10);
 
   // Fetch leads
-  const leadsResult = await pool.query<{
-    id: string;
-    org_id: string;
-    org_name: string;
-    source_external_id: string | null;
-    score: number;
-    confidence_gate: string;
-    vacancies_count: number;
-    distinct_vacancy_names_count: number;
-    latest_published_at: string | null;
-    reasons: unknown;
-    opener: string;
-    feedback_status: string | null;
-    suppressed_until: string | null;
-    created_at: string;
-    source_families: unknown;
-    evidence_titles: unknown;
-    location_names: unknown;
-  }>(`
+  const leadsResult = await pool.query<LeadRow>(`
     SELECT
-      dc.id::TEXT AS id,
-      dc.org_id::TEXT AS org_id,
-      dc.source_display_name AS org_name,
-      dc.source_external_id,
-      dc.total_score AS score,
-      dc.confidence_gate,
-      dc.vacancies_count,
-      dc.distinct_vacancy_names_count,
-      dc.latest_published_at,
-      dc.reasons,
-      dc.opener,
-      cdos.feedback_status,
-      cdos.suppressed_until,
-      dc.created_at::TEXT AS created_at,
-      dc.source_families,
-      dc.evidence_titles,
-      dc.location_names
+${LEAD_SELECT_COLUMNS}
     FROM digest_candidates dc
     LEFT JOIN client_digest_org_state cdos
       ON cdos.org_id = dc.org_id
@@ -482,42 +484,33 @@ export async function getLeadsForAllProfiles(input: {
     LIMIT $${paramIdx} OFFSET $${paramIdx + 1}
   `, [...params, limit, offset]);
 
-  const leads: LeadItem[] = leadsResult.rows.map((row) => {
-    const reasonsRaw = row.reasons;
-    const reasons = parseReasons(reasonsRaw).map(formatReason);
-    const sourceFamilies = Array.isArray(row.source_families) ? row.source_families.filter((s: unknown): s is string => typeof s === "string") : [];
-    return {
-      id: row.id,
-      orgId: row.org_id,
-      orgName: row.org_name ?? "Неизвестная компания",
-      sourceExternalId: row.source_external_id,
-      score: row.score,
-      confidenceGate: row.confidence_gate ?? "",
-      vacanciesCount: row.vacancies_count,
-      distinctVacancyNamesCount: row.distinct_vacancy_names_count,
-      latestPublishedAt: row.latest_published_at,
-      reasons,
-      whyNow: deriveWhyNow(reasonsRaw),
-      bestAngle: deriveBestAngle(reasonsRaw, row.opener ?? "", sourceFamilies),
-      lawfulContactPath: deriveLawfulContactPath(reasonsRaw, sourceFamilies),
-      negativeSignals: deriveNegativeSignals({
-        reasons: reasonsRaw,
-        vacanciesCount: row.vacancies_count,
-        distinctVacancyNamesCount: row.distinct_vacancy_names_count,
-        sourceFamilies,
-        confidenceGate: row.confidence_gate ?? "",
-      }),
-      opener: row.opener ?? "",
-      feedbackStatus: row.feedback_status,
-      suppressedUntil: row.suppressed_until,
-      createdAt: row.created_at,
-      sourceFamilies,
-      evidenceTitles: Array.isArray(row.evidence_titles) ? row.evidence_titles.filter((e: unknown): e is string => typeof e === "string") : [],
-      locationNames: Array.isArray(row.location_names) ? row.location_names.filter((l: unknown): l is string => typeof l === "string") : [],
-    };
-  });
+  const leads: LeadItem[] = leadsResult.rows.map(mapLeadRow);
 
   return { leads, total };
+}
+
+// ─── Pending Review Count ───────────────────────────────────────
+
+/**
+ * Count digest candidates awaiting analyst review (review_status = 'pending_review')
+ * across the given client profiles. Used to surface a "to review" metric on /leads
+ * that links into the review queue. Returns 0 when no pool or no profiles.
+ */
+export async function getPendingReviewCount(input: {
+  profileIds: (string | number)[];
+}): Promise<number> {
+  const pool = getPool();
+  if (!pool || input.profileIds.length === 0) {
+    return 0;
+  }
+
+  const result = await pool.query<{ count: string }>(`
+    SELECT COUNT(*) AS count
+    FROM digest_candidates
+    WHERE client_profile_id = ANY($1) AND review_status = 'pending_review'
+  `, [input.profileIds]);
+
+  return parseInt(result.rows[0]?.count ?? "0", 10);
 }
 
 // ─── Lead Detail ────────────────────────────────────────────────
@@ -530,32 +523,15 @@ export async function getLeadDetail(input: {
     return null;
   }
 
-  const result = await pool.query<{
-    id: string;
+  const result = await pool.query<LeadRow & {
     client_profile_id: string;
-    org_id: string;
-    org_name: string;
     org_website: string | null;
     org_inn: string | null;
     org_ogrn: string | null;
     org_domain: string | null;
     career_page_url: string | null;
-    source_external_id: string | null;
-    score: number;
-    confidence_gate: string;
-    vacancies_count: number;
-    distinct_vacancy_names_count: number;
-    latest_published_at: string | null;
-    reasons: unknown;
-    opener: string;
-    feedback_status: string | null;
     feedback_note: string | null;
-    suppressed_until: string | null;
     cooldown_until: string | null;
-    created_at: string;
-    source_families: unknown;
-    evidence_titles: unknown;
-    location_names: unknown;
     candidate_source_keys: unknown;
     payload: unknown;
   }>(`
@@ -601,47 +577,18 @@ export async function getLeadDetail(input: {
   }
 
   const row = result.rows[0];
-  const reasonsRaw = row.reasons;
-  const reasons = parseReasons(reasonsRaw).map(formatReason);
-  const sourceFamilies = Array.isArray(row.source_families) ? row.source_families.filter((s: unknown): s is string => typeof s === "string") : [];
 
   return {
-    id: row.id,
+    ...mapLeadRow(row),
     clientProfileId: row.client_profile_id,
-    orgId: row.org_id,
-    orgName: row.org_name ?? "Неизвестная компания",
     orgWebsite: row.org_website,
     orgInn: row.org_inn,
     orgOgrn: row.org_ogrn,
     orgDomain: row.org_domain,
     careerPageUrl: row.career_page_url,
-    sourceExternalId: row.source_external_id,
-    score: row.score,
-    confidenceGate: row.confidence_gate ?? "",
-    vacanciesCount: row.vacancies_count,
-    distinctVacancyNamesCount: row.distinct_vacancy_names_count,
-    latestPublishedAt: row.latest_published_at,
-    reasons,
-    whyNow: deriveWhyNow(reasonsRaw),
-    bestAngle: deriveBestAngle(reasonsRaw, row.opener ?? "", sourceFamilies),
-    lawfulContactPath: deriveLawfulContactPath(reasonsRaw, sourceFamilies),
-    negativeSignals: deriveNegativeSignals({
-      reasons: reasonsRaw,
-      vacanciesCount: row.vacancies_count,
-      distinctVacancyNamesCount: row.distinct_vacancy_names_count,
-      sourceFamilies,
-      confidenceGate: row.confidence_gate ?? "",
-    }),
-    opener: row.opener ?? "",
-    feedbackStatus: row.feedback_status,
     feedbackNote: row.feedback_note,
-    suppressedUntil: row.suppressed_until,
     cooldownUntil: row.cooldown_until,
-    createdAt: row.created_at,
-    sourceFamilies,
-    evidenceTitles: Array.isArray(row.evidence_titles) ? row.evidence_titles.filter((e: unknown): e is string => typeof e === "string") : [],
-    locationNames: Array.isArray(row.location_names) ? row.location_names.filter((l: unknown): l is string => typeof l === "string") : [],
-    candidateSourceKeys: Array.isArray(row.candidate_source_keys) ? row.candidate_source_keys.filter((k: unknown): k is string => typeof k === "string") : [],
+    candidateSourceKeys: toStringArray(row.candidate_source_keys),
     payload: (typeof row.payload === 'object' && row.payload !== null && !Array.isArray(row.payload)) ? row.payload as Record<string, unknown> : {},
   };
 }

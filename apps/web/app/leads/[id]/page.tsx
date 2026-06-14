@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import Link from 'next/link';
-import { getLeadDetail } from '@/lib/leads-data';
+import { getLeadDetail, formatLawfulContactPath } from '@/lib/leads-data';
 import FeedbackButtons from './feedback-buttons';
 import OutreachPicker from './outreach-picker';
 import {
@@ -78,13 +78,11 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               </ContentCard>
 
               {/* Lawful contact path */}
-              {lead.lawfulContactPath && (
+              {formatLawfulContactPath(lead.lawfulContactPath) && (
                 <ContentCard>
                   <ContentCardTitle>📬 Безопасный путь контакта</ContentCardTitle>
                   <p className={ipStyles.bodyText}>
-                    {lead.lawfulContactPath === 'career-page' && 'Карьерная страница компании — прямой путь к HR'}
-                    {lead.lawfulContactPath === 'corporate-contact' && 'Корпоративная форма обратной связи или общий HR- email'}
-                    {lead.lawfulContactPath === 'registry-data' && 'Данные из открытых реестров (ЕГРЮЛ/ФНС)'}
+                    {formatLawfulContactPath(lead.lawfulContactPath)}
                   </p>
                 </ContentCard>
               )}
