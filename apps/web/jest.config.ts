@@ -30,7 +30,6 @@ const config: Config = {
     '^@/(.*)$': '<rootDir>/$1',
     '^lib/db$': '<rootDir>/lib/db.ts',
   },
-  transform: {},
   collectCoverageFrom: [
     'src/**/*.{js,jsx,ts,tsx}',
     '!src/**/*.d.ts',

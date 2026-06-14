@@ -7,6 +7,8 @@
  */
 
 import { runScoringPipeline } from '@/lib/scoring/scoring-pipeline'
+import { computeClientOverrides } from '@/lib/scoring/client-overrides'
+import type { FiurClientOverrides } from '@/lib/scoring/fiur'
 import { MultiSourceLeadGenerator } from './multi-source-lead-generator'
 import pLimit from 'p-limit'
 import type {
@@ -83,6 +85,13 @@ export class LeadScoringService {
   ): Promise<ScoredLead[]> {
     if (rawLeads.length === 0) return []
 
+    // T6.2: resolve feedback-driven reweighting overrides ONCE per run.
+    // computeClientOverrides is a single DB query — running it per-lead would
+    // issue one query per lead. The result is identical for every lead in the
+    // batch (it depends only on the client profile's badfit history), so we
+    // hoist it out of the scoring loop.
+    const clientOverrides = await this.resolveClientOverrides(options.clientProfileId)
+
     // Score in batches to bound total promise creation (1000 leads would
     // create 1000 promises at once without batching).
     const BATCH = 50
@@ -92,7 +101,7 @@ export class LeadScoringService {
     for (let i = 0; i < rawLeads.length; i += BATCH) {
       const batch = rawLeads.slice(i, i + BATCH)
       const results = await Promise.all(
-        batch.map(lead => limit(() => this.scoreLead(lead, options)))
+        batch.map(lead => limit(() => this.scoreLead(lead, options, clientOverrides)))
       )
       scoredLeads.push(...results)
     }
@@ -104,14 +113,44 @@ export class LeadScoringService {
   }
 
   /**
+   * T6.2: Resolve feedback-driven reweighting overrides for a client profile.
+   *
+   * Reads badfit history via computeClientOverrides and returns the
+   * FiurClientOverrides to feed into the scoring pipeline. Returns undefined
+   * when there is no client profile, no DB, or no penalties — in which case
+   * scoring proceeds without reweighting.
+   *
+   * DB failures are isolated: a broken overrides query must not abort the
+   * whole scoring run (the core loop degrades to un-reweighted scoring rather
+   * than returning zero leads).
+   */
+  private async resolveClientOverrides(
+    clientProfileId?: string
+  ): Promise<FiurClientOverrides | undefined> {
+    if (!clientProfileId) return undefined
+
+    try {
+      const result = await computeClientOverrides(clientProfileId)
+      if (!result || Object.keys(result.overrides).length === 0) {
+        return undefined
+      }
+      return result.overrides
+    } catch (error) {
+      console.error('Failed to compute client overrides; scoring without reweighting:', error)
+      return undefined
+    }
+  }
+
+  /**
    * Score a single lead using the pipeline
    */
   private async scoreLead(
     lead: MultiSourceLead,
-    options: LeadScoringOptions
+    options: LeadScoringOptions,
+    clientOverrides?: FiurClientOverrides
   ): Promise<ScoredLead> {
     // Convert multi-source lead to scoring pipeline input
-    const pipelineInput = this.convertToScoringInput(lead, options)
+    const pipelineInput = this.convertToScoringInput(lead, options, clientOverrides)
 
     // Run the scoring pipeline
     const result = runScoringPipeline(pipelineInput)
@@ -269,7 +308,8 @@ export class LeadScoringService {
    */
   private convertToScoringInput(
     lead: MultiSourceLead,
-    options: LeadScoringOptions
+    options: LeadScoringOptions,
+    clientOverrides?: FiurClientOverrides
   ): ScoringPipelineInput {
     // Extract company info from lead
     const company: PipelineCompany = {
@@ -308,6 +348,7 @@ export class LeadScoringService {
       marketContext: this.mapMarketContext(options.marketContext),
       entityMatch: lead.companyId ? 'clean' : 'questionable',
       recentSignalCount: this.countRecentSignals(lead.signals),
+      clientOverrides,
     }
   }
 
