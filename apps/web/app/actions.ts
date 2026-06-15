@@ -15,10 +15,12 @@ function redirectWithTelegramNotice(status: "success" | "error", message: string
 }
 
 export async function updateLeadStatusAction(formData: FormData) {
-  const leadId = Number(formData.get("leadId"));
+  // Wire field key stays "leadId" (external form contract); local var renamed
+  // to candidateId to match the digest_candidates.id it actually addresses.
+  const candidateId = Number(formData.get("leadId"));
   const nextStatus = formData.get("status");
 
-  if (!Number.isInteger(leadId) || leadId <= 0) {
+  if (!Number.isInteger(candidateId) || candidateId <= 0) {
     return;
   }
 
@@ -26,18 +28,18 @@ export async function updateLeadStatusAction(formData: FormData) {
     return;
   }
 
-  await updateLeadStatus(leadId, nextStatus);
+  await updateLeadStatus(candidateId, nextStatus);
   revalidatePath("/");
 }
 
 export async function sendLeadToTelegramAction(formData: FormData) {
-  const leadId = Number(formData.get("leadId"));
+  const candidateId = Number(formData.get("leadId"));
 
-  if (!Number.isInteger(leadId) || leadId <= 0) {
+  if (!Number.isInteger(candidateId) || candidateId <= 0) {
     redirectWithTelegramNotice("error", "Invalid lead id.");
   }
 
-  const result = await sendLeadToTelegram(leadId).catch((error): never => {
+  const result = await sendLeadToTelegram(candidateId).catch((error): never => {
     revalidatePath("/");
     const message = error instanceof Error ? error.message : "Failed to send lead to Telegram.";
     return redirectWithTelegramNotice("error", message);

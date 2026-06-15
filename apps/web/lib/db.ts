@@ -81,12 +81,12 @@ function toFeedbackAction(status: ActionableLeadStatus): DigestFeedbackAction {
   return status === "snooze" ? "snooze" : status;
 }
 
-export async function updateLeadStatus(leadId: number, nextStatus: ActionableLeadStatus): Promise<boolean> {
+export async function updateLeadStatus(candidateId: number, nextStatus: ActionableLeadStatus): Promise<boolean> {
   const pool = getPool();
   if (!pool) throw new Error("DATABASE_URL is not set.");
   const row = await pool.query<{ clientProfileId: string; orgId: string }>(
     `SELECT client_profile_id::text AS "clientProfileId", org_id::text AS "orgId" FROM digest_candidates WHERE id = $1 LIMIT 1`,
-    [leadId]
+    [candidateId]
   );
   if (row.rowCount !== 1) return false;
   await updateDigestOrgStateFeedback({
@@ -97,7 +97,7 @@ export async function updateLeadStatus(leadId: number, nextStatus: ActionableLea
   return true;
 }
 
-async function getLeadDeliveryRow(leadId: number): Promise<LeadDeliveryRow | null> {
+async function getLeadDeliveryRow(candidateId: number): Promise<LeadDeliveryRow | null> {
   const pool = getPool();
   if (!pool) throw new Error("DATABASE_URL is not set.");
   const result = await pool.query<LeadDeliveryRow>(`
@@ -118,12 +118,12 @@ async function getLeadDeliveryRow(leadId: number): Promise<LeadDeliveryRow | nul
     LEFT JOIN client_digest_org_state cdos ON cdos.client_profile_id = dc.client_profile_id AND cdos.org_id = dc.org_id
     WHERE dc.id = $1
     LIMIT 1
-  `, [leadId]);
+  `, [candidateId]);
   return result.rowCount === 1 ? result.rows[0] : null;
 }
 
-export async function sendLeadToTelegram(leadId: number): Promise<TelegramDeliveryResult> {
-  const lead = await getLeadDeliveryRow(leadId);
+export async function sendLeadToTelegram(candidateId: number): Promise<TelegramDeliveryResult> {
+  const lead = await getLeadDeliveryRow(candidateId);
   if (!lead) return { ok: false, error: "Digest candidate not found." };
   if (!lead.telegramChatId) return { ok: false, error: "Client profile has no linked Telegram chat." };
   const { botToken, error } = getTelegramBotToken();
@@ -156,11 +156,11 @@ export async function sendLeadToTelegram(leadId: number): Promise<TelegramDelive
       { botToken, chatId: lead.telegramChatId },
       { replyMarkup }
     );
-    logEvent("telegram.delivery.sent", { digestCandidateId: leadId, clientProfileId: lead.clientProfileId, orgId: lead.orgId });
+    logEvent("telegram.delivery.sent", { digestCandidateId: candidateId, clientProfileId: lead.clientProfileId, orgId: lead.orgId });
     return { ok: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown Telegram delivery error.";
-    logError("telegram.delivery.failed", error, { digestCandidateId: leadId, clientProfileId: lead.clientProfileId, orgId: lead.orgId });
+    logError("telegram.delivery.failed", error, { digestCandidateId: candidateId, clientProfileId: lead.clientProfileId, orgId: lead.orgId });
     return { ok: false, error: message };
   }
 }
