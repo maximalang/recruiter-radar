@@ -29,7 +29,9 @@ export const REASON_LABELS: Record<string, string> = {
   'fit.industry.excluded': 'Индустрия «{industry}» исключена из ICP',
   'fit.industry.match': 'Индустрия «{industry}» совпадает с ICP',
   'fit.industry.match.reweighted': 'Индустрия «{industry}» совпадает с ICP (понижен вес на {penaltyPercent}% из истории «мимо»)',
+  'fit.industry.partial': 'Индустрия «{industry}» частично совпадает с ICP',
   'fit.industry.outside': 'Индустрия «{industry}» вне ICP',
+  'fit.icp.match': 'Совпадение с вашей специализацией и ключевыми словами ICP',
   'fit.role.match': '{count} ролей совпадает с вашим профилем',
   'fit.role.no-match': 'Нет совпадений по ролям с вашим ICP',
   'fit.location.match': 'Регион совпадает с ICP',
@@ -67,6 +69,7 @@ export const REASON_LABELS: Record<string, string> = {
   'reachability.career-page': 'Карьерная страница доступна — прямой путь к HR',
   'reachability.corporate-contact': 'Корпоративный HR-контакт доступен',
   'reachability.direct-surface': 'Прямая поверхность компании в evidence',
+  'reachability.policy-no-corporate': 'Нет корпоративного пути контакта, а политика «{policy}» запрещает личные — путь ограничен',
   'reachability.no-path': 'Безопасный путь контакта пока не найден',
 }
 

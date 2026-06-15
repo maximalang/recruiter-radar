@@ -96,6 +96,10 @@ export interface AgencyProfile {
   exclusions?: string[]
   remoteFriendly?: boolean
   contactPolicy?: 'corporate_only' | 'no_personal' | 'unrestricted'
+  /** Free-text ICP specialization (comma-separated) — drives Fit term matching. */
+  specialization?: string
+  /** Extra ICP keywords (industries / niches) — drive Fit term matching. */
+  includeKeywords?: string[]
 }
 
 export interface ScoringPipelineInput {
@@ -273,6 +277,9 @@ export function runScoringPipeline(input: ScoringPipelineInput): ScoringPipeline
       locations: input.agencyProfile.locations,
       companySizes: input.agencyProfile.companySizes,
       exclusions: input.agencyProfile.exclusions,
+      specialization: input.agencyProfile.specialization,
+      includeKeywords: input.agencyProfile.includeKeywords,
+      contactPolicy: input.agencyProfile.contactPolicy,
     },
     evidence: toFiurEvidence(input.evidence),
     now: () => nowMs,

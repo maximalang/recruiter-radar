@@ -286,4 +286,119 @@ describe('computeFiur', () => {
       expect(sweetSpotReasons.length).toBe(0)
     })
   })
+
+  describe('partial industry match', () => {
+    it('scores a partial (substring) industry overlap below an exact match', () => {
+      const exact = computeFiur({
+        company: { ...baseCompany, industry: 'fintech' },
+        vacancies: [vacancy()],
+        clientProfile: baseProfile,
+        evidence: [{ tier: 'direct', source: 'career-page' }],
+      })
+      const partial = computeFiur({
+        company: { ...baseCompany, industry: 'fintech / payments' },
+        vacancies: [vacancy()],
+        clientProfile: baseProfile,
+        evidence: [{ tier: 'direct', source: 'career-page' }],
+      })
+
+      expect(partial.fit).toBeLessThan(exact.fit)
+      expect(partial.fit).toBeGreaterThan(0)
+      expect(
+        partial.reasons.fit.some((r) => r.key === 'fit.industry.partial')
+      ).toBe(true)
+      expect(
+        exact.reasons.fit.some((r) => r.key === 'fit.industry.match')
+      ).toBe(true)
+    })
+  })
+
+  describe('ICP free-text term match', () => {
+    it('rewards a company whose text matches the agency specialization even outside the structured industry', () => {
+      const profile: FiurInput['clientProfile'] = {
+        industries: ['logistics'],
+        roles: ['backend engineer'],
+        locations: ['Moscow'],
+        specialization: 'fintech, платёжные системы',
+      }
+      const withMatch = computeFiur({
+        company: { ...baseCompany, industry: 'logistics', name: 'Acme Fintech Platform' },
+        vacancies: [vacancy()],
+        clientProfile: profile,
+        evidence: [{ tier: 'direct', source: 'career-page' }],
+      })
+      const withoutMatch = computeFiur({
+        company: { ...baseCompany, industry: 'logistics', name: 'Acme Trucking' },
+        vacancies: [vacancy({ title: 'Senior Backend Engineer', role: 'backend engineer' })],
+        clientProfile: profile,
+        evidence: [{ tier: 'direct', source: 'career-page' }],
+      })
+
+      expect(withMatch.fit).toBeGreaterThan(withoutMatch.fit)
+      expect(
+        withMatch.reasons.fit.some((r) => r.key === 'fit.icp.match')
+      ).toBe(true)
+      expect(
+        withoutMatch.reasons.fit.some((r) => r.key === 'fit.icp.match')
+      ).toBe(false)
+    })
+
+    it('matches against includeKeywords as a second ICP dimension', () => {
+      const profile: FiurInput['clientProfile'] = {
+        industries: ['fintech'],
+        roles: ['backend engineer'],
+        locations: ['Moscow'],
+        includeKeywords: ['blockchain'],
+      }
+      const result = computeFiur({
+        company: { ...baseCompany, name: 'Acme Blockchain Labs' },
+        vacancies: [vacancy()],
+        clientProfile: profile,
+        evidence: [{ tier: 'direct', source: 'career-page' }],
+      })
+
+      expect(result.reasons.fit.some((r) => r.key === 'fit.icp.match')).toBe(true)
+    })
+  })
+
+  describe('contact-policy reachability cap', () => {
+    it('caps reachability for a restrictive policy when no corporate surface exists', () => {
+      const restrictive = computeFiur({
+        company: { ...baseCompany, hasCareerPage: false, hasCorporateContactPath: false },
+        vacancies: [vacancy()],
+        clientProfile: { ...baseProfile, contactPolicy: 'corporate_only' },
+        evidence: [{ tier: 'direct', source: 'company-website' }],
+      })
+      const unrestricted = computeFiur({
+        company: { ...baseCompany, hasCareerPage: false, hasCorporateContactPath: false },
+        vacancies: [vacancy()],
+        clientProfile: { ...baseProfile, contactPolicy: 'unrestricted' },
+        evidence: [{ tier: 'direct', source: 'company-website' }],
+      })
+
+      expect(restrictive.reachability).toBeLessThanOrEqual(0.15)
+      expect(restrictive.reachability).toBeLessThan(unrestricted.reachability)
+      expect(
+        restrictive.reasons.reachability.some(
+          (r) => r.key === 'reachability.policy-no-corporate'
+        )
+      ).toBe(true)
+    })
+
+    it('does not cap reachability for a restrictive policy when a corporate surface exists', () => {
+      const result = computeFiur({
+        company: { ...baseCompany, hasCareerPage: true, hasCorporateContactPath: true },
+        vacancies: [vacancy()],
+        clientProfile: { ...baseProfile, contactPolicy: 'corporate_only' },
+        evidence: [{ tier: 'direct', source: 'career-page' }],
+      })
+
+      expect(result.reachability).toBeGreaterThan(0.15)
+      expect(
+        result.reasons.reachability.some(
+          (r) => r.key === 'reachability.policy-no-corporate'
+        )
+      ).toBe(false)
+    })
+  })
 })

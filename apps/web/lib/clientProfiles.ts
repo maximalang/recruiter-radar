@@ -598,10 +598,13 @@ function mapClientProfileRow(row: ClientProfileRow): ClientProfile {
  * Convert a ClientProfile (DB row) to an AgencyProfile (scoring pipeline input).
  *
  * Maps ICP fields from the DB to the shape expected by runScoringPipeline:
- *   industries    → industries   (for computeFit / industryAlignment)
- *   companySizes  → companySizes (for computeFit / size matching)
- *   targetCity    → locations    (for geographicFit)
- *   excludeKeywords → exclusions (for computeFit / exclusion check)
+ *   industries      → industries      (for computeFit / industryAlignment)
+ *   companySizes    → companySizes    (for computeFit / size matching)
+ *   targetCity      → locations       (for geographicFit)
+ *   excludeKeywords → exclusions      (for computeFit / exclusion check)
+ *   specialization  → specialization  (for computeFit ICP term matching)
+ *   includeKeywords → includeKeywords (for computeFit ICP term matching)
+ *   contactPolicy   → contactPolicy   (for computeFit reachability gate)
  *
  * This is the bridge between persisted client preferences and the pure
  * scoring helpers. When a digest or cron pipeline needs to score a lead
@@ -626,6 +629,8 @@ export function clientProfileToAgencyProfile(profile: ClientProfile): AgencyProf
     exclusions: profile.excludeKeywords ?? [],
     contactPolicy: profile.contactPolicy,
     remoteFriendly: profile.remoteFriendly ?? false,
+    specialization: profile.specialization ?? undefined,
+    includeKeywords: profile.includeKeywords ?? [],
   }
 }
 

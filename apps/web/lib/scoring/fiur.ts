@@ -54,6 +54,21 @@ export interface FiurClientProfile {
   locations: string[]
   companySizes?: Array<'startup' | 'small' | 'medium' | 'large' | 'enterprise'>
   exclusions?: string[]
+  /**
+   * Free-text ICP terms the agency specialises in (e.g. "IT, разработка").
+   * Comma-separated; matched against company + vacancy text in computeFit.
+   * Mirrors the public preview engine (lib/preview-relevance.ts).
+   */
+  specialization?: string
+  /** Extra ICP keywords (industries / niches) matched as free text in computeFit. */
+  includeKeywords?: string[]
+  /**
+   * Contact policy — gates Reachability. When restrictive (corporate_only /
+   * no_personal) and the company exposes no corporate surface, the only
+   * remaining paths are personal and the lead is effectively unreachable for
+   * this agency, so Reachability is capped.
+   */
+  contactPolicy?: 'corporate_only' | 'no_personal' | 'unrestricted'
 }
 
 /**
@@ -110,6 +125,45 @@ export interface FiurBreakdown {
 const clamp01 = (n: number, min = 0): number => Math.max(min, n < 0 ? 0 : n > 1 ? 1 : n)
 
 const normalize = (s: string): string => s.trim().toLowerCase()
+
+/**
+ * Split a comma-separated free-text ICP field into normalised terms.
+ * Mirrors lib/preview-relevance.ts splitTerms so the production scorer and
+ * the public preview agree on how specialization / keywords are tokenised.
+ */
+function splitTerms(value: string | undefined): string[] {
+  if (!value) return []
+  return value
+    .split(',')
+    .map((item) => item.trim().toLocaleLowerCase('ru-RU'))
+    .filter((item) => item !== '')
+}
+
+/** Normalise an array of keyword strings into non-empty lowercased terms. */
+function normalizeTerms(values: string[] | undefined): string[] {
+  if (!values || values.length === 0) return []
+  return values
+    .map((v) => v.trim().toLocaleLowerCase('ru-RU'))
+    .filter((v) => v !== '')
+}
+
+function anyTermMatches(haystack: string, terms: string[]): boolean {
+  return terms.some((term) => haystack.includes(term))
+}
+
+/**
+ * Build the lowercased free-text haystack for ICP term matching: company name,
+ * industry, and every vacancy title/role. This is what specialization and
+ * includeKeywords are matched against (the structured industry/role keys are
+ * matched separately against the canonical taxonomy).
+ */
+function buildIcpHaystack(company: FiurCompany, vacancies: FiurVacancy[]): string {
+  const parts: string[] = [company.name, company.industry ?? '']
+  for (const v of vacancies) {
+    parts.push(v.title, v.role)
+  }
+  return parts.join(' ').toLocaleLowerCase('ru-RU')
+}
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -174,18 +228,28 @@ function computeFit(
   const industries = profile.industries.map(normalize)
   const companyIndustryKey = company.industry ? normalize(company.industry) : ''
   if (companyIndustryKey && industries.length > 0) {
-    if (industries.includes(companyIndustryKey)) {
+    // Industry match supports partial (substring) overlap, not just exact key
+    // equality — "fintech" in profile should match company industry
+    // "fintech / payments". Exact match scores full weight; partial scores 60%.
+    const exactMatch = industries.includes(companyIndustryKey)
+    const partialMatch = !exactMatch && industries.some(
+      (ind) => companyIndustryKey.includes(ind) || ind.includes(companyIndustryKey)
+    )
+    if (exactMatch || partialMatch) {
+      const baseWeight = exactMatch ? 0.35 : 0.21 // 0.35 * 0.6 ≈ 0.21 for partial
       const rawPenalty = overrides?.industryFitPenalty?.[companyIndustryKey]
       const penalty = rawPenalty != null ? clamp01(rawPenalty, 0.3) : 1.0
       const industryScore = penalty < 1
-        ? clamp01(0.35 * penalty)
-        : 0.35
+        ? clamp01(baseWeight * penalty)
+        : baseWeight
       score += industryScore
       if (penalty != null && penalty < 1) {
         reasons.push(r('fit', 'fit.industry.match.reweighted', {
           industry: company.industry ?? '',
           penaltyPercent: Math.round((1 - penalty) * 100),
         }))
+      } else if (partialMatch) {
+        reasons.push(r('fit', 'fit.industry.partial', { industry: company.industry ?? '' }))
       } else {
         reasons.push(r('fit', 'fit.industry.match', { industry: company.industry ?? '' }))
       }
@@ -196,12 +260,38 @@ function computeFit(
 
   const profileRoles = profile.roles.map(normalize)
   if (profileRoles.length > 0 && vacancies.length > 0) {
+    // Weighted by the SHARE of vacancies that match the agency's roles, not a
+    // binary has/hasn't. A company where every open role fits the agency is a
+    // stronger lead than one with a single matching role among ten.
     const matched = vacancies.filter((v) => profileRoles.includes(normalize(v.role)))
     if (matched.length > 0) {
-      score += 0.3
+      const share = matched.length / vacancies.length
+      score += 0.3 * share
       reasons.push(r('fit', 'fit.role.match', { count: matched.length }))
     } else {
       reasons.push(r('fit', 'fit.role.no-match'))
+    }
+  }
+
+  // ICP free-text terms (specialization + includeKeywords) — the most
+  // agency-specific signal. Matched against company + vacancy text, mirroring
+  // the public preview engine (lib/preview-relevance.ts). Contributes up to
+  // 0.2, split between the two dimensions the agency actually filled.
+  const specializationTerms = splitTerms(profile.specialization)
+  const includeTerms = normalizeTerms(profile.includeKeywords)
+  if (specializationTerms.length > 0 || includeTerms.length > 0) {
+    const haystack = buildIcpHaystack(company, vacancies)
+    const dimensions: number[] = []
+    if (specializationTerms.length > 0) {
+      dimensions.push(anyTermMatches(haystack, specializationTerms) ? 1 : 0)
+    }
+    if (includeTerms.length > 0) {
+      dimensions.push(anyTermMatches(haystack, includeTerms) ? 1 : 0)
+    }
+    const icpShare = dimensions.reduce((a, b) => a + b, 0) / dimensions.length
+    if (icpShare > 0) {
+      score += 0.2 * icpShare
+      reasons.push(r('fit', 'fit.icp.match'))
     }
   }
 
@@ -404,9 +494,13 @@ function computeUrgency(
   return { score: clamp01(score), reasons }
 }
 
+/** Restrictive policies require a non-personal corporate surface to be reachable. */
+const POLICY_REACH_CAP = 0.15
+
 function computeReachability(
   company: FiurCompany,
-  evidence: FiurEvidenceItem[]
+  evidence: FiurEvidenceItem[],
+  contactPolicy?: 'corporate_only' | 'no_personal' | 'unrestricted'
 ): ComponentResult {
   const reasons: ScoringReason[] = []
   let score = 0
@@ -424,6 +518,20 @@ function computeReachability(
     score += 0.2
     reasons.push(r('reachability', 'reachability.direct-surface'))
   }
+
+  // Contact-policy gate: a corporate_only / no_personal agency cannot use
+  // personal routes. Without a corporate surface (career page or corporate HR
+  // contact) the lead is effectively unreachable for them — cap Reachability so
+  // it can never clear a confidence gate on a personal-only path.
+  const restrictive = contactPolicy === 'corporate_only' || contactPolicy === 'no_personal'
+  const hasCorporateSurface = Boolean(company.hasCareerPage || company.hasCorporateContactPath)
+  if (restrictive && !hasCorporateSurface && score > POLICY_REACH_CAP) {
+    score = POLICY_REACH_CAP
+    reasons.push(r('reachability', 'reachability.policy-no-corporate', {
+      policy: contactPolicy as string,
+    }))
+  }
+
   if (score === 0) {
     reasons.push(r('reachability', 'reachability.no-path'))
   }
@@ -435,7 +543,7 @@ export function computeFiur(input: FiurInput): FiurBreakdown {
   const fit = computeFit(input.company, input.vacancies, input.clientProfile, input.clientOverrides, input.marketConditions)
   const intent = computeIntent(input.vacancies, input.evidence, now)
   const urgency = computeUrgency(input.vacancies, now, input.recentSignalCount)
-  const reachability = computeReachability(input.company, input.evidence)
+  const reachability = computeReachability(input.company, input.evidence, input.clientProfile.contactPolicy)
 
   return {
     fit: fit.score,
