@@ -33,11 +33,11 @@ import type {
 import { validateCrawlerUrl } from './url-validator'
 import { CircuitBreaker, type CircuitBreakerConfig } from './circuit-breaker'
 import { HostRateLimiter, type HostRateLimiterConfig as RateLimiterConfig } from '@/lib/rate-limiter'
-import { withRetry, type RetryConfig } from './retry'
+import { withRetry, type RetryConfig } from '@/lib/utils/retry'
 
 export { CircuitBreaker, type CircuitBreakerConfig, type CircuitState } from './circuit-breaker'
 export { HostRateLimiter, type HostRateLimiterConfig as RateLimiterConfig } from '@/lib/rate-limiter'
-export { withRetry, type RetryConfig } from './retry'
+export { withRetry, type RetryConfig } from '@/lib/utils/retry'
 
 /* ------------------------------------------------------------------ */
 /*  Engine selection                                                   */
