@@ -78,12 +78,20 @@ Honest-fallback: если точных нет — показываем ближ�
 - [x] 6.3 Unit-тест: 3 badfits → penalty (lead-scoring-reweighting.test.ts: happy-path + db-down fallback)
 - [x] 6.4 Integration: feedback → next digest reweighting (покрыто scoreExistingLeads тестом)
 
-### T7: Agency dashboard — «компании, которым стоит написать сегодня» — ❌ НЕ СДЕЛАНА
-- [ ] 7.1 Переименовать заголовок
-- [ ] 7.2 «Сегодняшний радар» секция
-- [ ] 7.3 «Ожидают проверки» счётчик
-- [ ] 7.4 Feedback funnel
-- [ ] 7.5 Обновить nav
+### T7: Agency dashboard — «компании, которым стоит написать сегодня» — ✅ ЗАКРЫТА
+Dashboard теперь открывается agency-facing блоком «🎯 Сегодняшний радар»
+(`dashboard-today-radar.tsx`): топ-лиды по score со «почему сейчас» / «угол
+контакта» / gate-бейджем / ScoreBar и ссылками в `/leads/[id]`, плюс пилюля
+«Ожидают проверки → /review». Данные — `getDashboardTodayRadar()`
+(`dashboard-data.ts`), переиспользует data-слой `/leads` (active profiles →
+`getLeadsForAllProfiles` + `getPendingReviewCount`), fail-safe на пустое
+состояние. Заголовок страницы — «📊 Радар» с agency-subtitle. Feedback funnel
+уже рендерится через `DashboardAnalytics`; nav (Дашборд/Лиды/Ревью) на месте.
+- [x] 7.1 Переименовать заголовок (agency-facing subtitle вместо «Радар источников»)
+- [x] 7.2 «Сегодняшний радар» секция (DashboardTodayRadar, top-5 лидов)
+- [x] 7.3 «Ожидают проверки» счётчик (пилюля-ссылка на /review)
+- [x] 7.4 Feedback funnel (DashboardAnalytics.feedbackFunnel)
+- [x] 7.5 Обновить nav (Дашборд/Лиды/Ревью — уже было)
 
 ### T8: Onboarding — roles + contact policy + 3-й план — ✅ ЗАКРЫТА
 roles + contact_policy в onboarding есть (T1.6). Premium Desk план добавлен:
@@ -129,10 +137,14 @@ recurring-заказ не уйдёт в разовый платёж на пол�
 
 ## Приоритет к следующему заходу
 
-1. **T7** — agency dashboard «компании, которым стоит написать сегодня»
-2. **Фаза 3** — cleanup (T11 = todo.md I4, не дублировать; T9 rename, T10 legacy)
+**Фаза 1 + Фаза 2 — ✅ полностью закрыты.** Остаётся только Фаза 3 (cleanup):
 
-> T4, T5, T6, T8 — ✅ закрыты (preview evidence-first + FIUR-проекция +
-> feedback→reweighting + 3-планный checkout с recurring sales-request guard).
+1. **T11** — payments.ts split (= todo.md I4, не дублировать)
+2. **T9** — legacy rename leadId → candidateId
+3. **T10** — deprecate legacy tables (document, don't drop)
+
+> T4–T8 — ✅ закрыты (preview evidence-first + FIUR-проекция +
+> feedback→reweighting + 3-планный checkout с recurring sales-request guard +
+> agency dashboard «Сегодняшний радар»).
 > preview-relevance.ts покрыт 12 unit-тестами (exclude-drop, exact-first,
 > honest-fallback, ранжирование, clamp-инварианты).
