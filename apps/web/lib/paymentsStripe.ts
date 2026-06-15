@@ -2,7 +2,7 @@ import type {
   PaymentCheckoutSessionInput,
   PaymentCheckoutSessionResult,
   PaymentProviderAdapter
-} from "./payments";
+} from "./paymentsTypes";
 
 export type StripePaymentSetupState = {
   checkoutConfigured: boolean;
