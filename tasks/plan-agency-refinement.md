@@ -48,7 +48,7 @@
 ### P2 — Устойчивость и масштаб
 
 11. **Техдолг: payments.ts 1729 строк** — монолит, тяжело менять checkout и billing.
-12. **Техдолг: `packages/db/lib/` дублирует типы из `apps/web/lib/`** — два source of truth.
+12. **Техдолг: `packages/db/lib/` дублирует типы из `apps/web/lib/`** — два source of truth. ✅ ЗАКРЫТО (I7): мёртвый дубликат удалён, apps/web/lib — единый source of truth.
 13. **DedupeService на JSON-файле** — в проде нужен Postgres.
 14. **Rate limiter in-memory** — не работает для multi-instance.
 15. **Нет третьего плана «Premium Desk»** — концепция требует 3 пакета (pilot / assisted / premium), в PUBLIC_PLANS только 2.

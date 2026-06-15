@@ -111,7 +111,7 @@ recurring-заказ не уйдёт в разовый платёж на пол�
 
 ---
 
-## Фаза 3: Cleanup — ❌ НЕ НАЧАТА
+## Фаза 3: Cleanup — ✅ ЗАКРЫТА
 
 ### T9: Legacy rename leadId → candidateId — ✅ ЗАКРЫТА
 - [x] 9.1 updateLeadStatus param → `candidateId`

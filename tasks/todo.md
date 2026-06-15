@@ -1,8 +1,8 @@
 # TODO — Recruiter Radar: Lead Generation Platform
 
 **Связано:** `SPEC.md` (продуктовый контракт), `tasks/plan.md` (фазы), `docs/инфо о проекте.md` (концепция), `tasks/todo-agency-refinement.md` (Фаза 2/3 продуктовой доводки)
-**Обновлено:** 2026-06-13
-**Фокус:** P1-концепция закрыта. Активный фронт — agency-refinement (см. отдельный файл) + tech debt I4/I7 ниже.
+**Обновлено:** 2026-06-15
+**Фокус:** P1-концепция закрыта. Agency-refinement (T1–T11) закрыт. Tech debt (I1–I15, R1, C1–C2) закрыт полностью.
 
 ---
 
@@ -203,8 +203,8 @@
 - [x] ~~I11: Unsafe callback action cast~~ → Added isDigestFeedbackAction() guard
 - [x] ~~I2: Dead parseDigestFeedbackCallbackData~~ → Removed from webhook route
 - [x] ~~C1: auditDigestGate lossy SQL→TS mapping~~ → Removed (dead code, no prod callers; kept isDigestEligibleGate, rewrote tests)
-- [ ] I4: payments.ts monolith (1739 lines) — split into 3 modules (= agency-refinement T11)
-- [ ] I7: packages/db/lib/ duplicates apps/web/lib/ types — shared package import
+- [x] ~~I4: payments.ts monolith (1739 lines) — split into 3 modules~~ → Fixed (≡ agency-refinement T11: paymentsTypes/Repo/Normalize/Provider + re-export facade)
+- [x] ~~I7: packages/db/lib/ duplicates apps/web/lib/ types — shared package import~~ → Fixed (удалён мёртвый дубликат: packages/db/lib/{db-types,business-logic-types,index}.ts не импортировались нигде; устаревшие обрезанные копии. apps/web/lib — единственный source of truth, 32 потребителя. packages/db остаётся .mjs-рантаймом)
 - [x] ~~I8: DedupeService suppression in JSON file → Postgres-backed~~ → ПЕРЕСМОТРЕНО:
       web-runtime suppression уже в Postgres (`client_digest_org_state`).
       JSON-suppression относится только к `.mjs` ingest-скриптам в
@@ -216,19 +216,18 @@
 
 ---
 
-## 🗂 Состояние на 13.06.2026
+## 🗂 Состояние на 15.06.2026
 
 **P1-концепция (Задачи 1–6):** ✅ закрыта полностью.
 
-**Остаточный tech debt (этот файл):**
-- I4 — payments.ts split (≡ agency-refinement T11)
-- I7 — packages/db/lib дублирует apps/web/lib типы
-
-**Активный продуктовый фронт → `tasks/todo-agency-refinement.md`:**
-- ⚠️ T6.2 — feedback→reweighting разорван (core loop не замкнут)
+**Agency-refinement (`tasks/todo-agency-refinement.md`):** ✅ T1–T11 закрыты.
+- T6.2 — feedback→reweighting замкнут (core loop closed)
 - T4/T5 — FIUR-based evidence-first preview
 - T8.3 — Premium Desk план (3-я ступень бизнес-модели)
-- T7 — agency dashboard
-- Фаза 3 — cleanup
+- T7 — agency dashboard «Сегодняшний радар»
+- Фаза 3 (cleanup) — T9 rename / T10 deprecate legacy / T11 payments split
+
+**Остаточный tech debt (этот файл):**
+- ✅ Нет открытых пунктов. I1–I15, R1, C1–C2 закрыты (I7 — последний, удалён мёртвый дубликат типов в packages/db/lib).
 
 **Архивировано:** todo-ux-fixes, todo-ux-overhaul + их plan-файлы → `tasks/archive/`.

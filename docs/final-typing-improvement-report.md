@@ -44,8 +44,7 @@
 - Реализован типизированный query builder
 
 **Ключевые файлы:**
-- `packages/db/lib/db-types.ts` - Типы базы данных
-- `apps/web/lib/db-types.ts` - Копия типов для веб приложения
+- `apps/web/lib/db-types.ts` - Типы базы данных (единый source of truth; дублирующая копия в `packages/db/lib/` удалена — I7)
 - `apps/web/lib/mappers/` - Мапперы и конвертеры
 
 ### 4. [✅] State Management типизация - Task #26
