@@ -113,35 +113,39 @@ recurring-заказ не уйдёт в разовый платёж на пол�
 
 ## Фаза 3: Cleanup — ❌ НЕ НАЧАТА
 
-### T9: Legacy rename leadId → candidateId
-- [ ] 9.1 updateLeadStatus param
-- [ ] 9.2 getLeadDeliveryRow param
-- [ ] 9.3 sendLeadToTelegram param
-- [ ] 9.4 callers
-- [ ] 9.5 logging
+### T9: Legacy rename leadId → candidateId — ✅ ЗАКРЫТА
+- [x] 9.1 updateLeadStatus param → `candidateId`
+- [x] 9.2 getLeadDeliveryRow param → `candidateId`
+- [x] 9.3 sendLeadToTelegram param → `candidateId`
+- [x] 9.4 callers (actions.ts: локальные vars → `candidateId`; wire-field key `formData.get("leadId")` сохранён — внешний form-контракт, задокументирован)
+- [x] 9.5 logging → `digestCandidateId` keys
 
-### T10: Deprecate legacy tables
-- [ ] 10.1 Deprecation plan document
-- [ ] 10.2 SQL comments на legacy tables
-- [ ] 10.3 Verify no production queries
-- [ ] 10.4 Document but don't drop
+### T10: Deprecate legacy tables — ✅ ЗАКРЫТА
+- [x] 10.1 Deprecation plan document → `docs/legacy-tables-deprecation.md`
+- [x] 10.2 SQL comments на legacy tables → migration `20260615120000_deprecate_legacy_lead_tables.sql` (+ .down)
+- [x] 10.3 Verify no production queries (codegraph_callers: `getLeadsByClientProfile` без вызовов; grep — только этот dead code; `lead_status`/`deliveries` без ссылок)
+- [x] 10.4 Document but don't drop (только COMMENT ON TABLE; drop-план задокументирован на будущее)
 
-### T11: payments.ts split (см. также todo.md I4)
-- [ ] 11.1 payments-checkout.ts
-- [ ] 11.2 payments-billing.ts
-- [ ] 11.3 payments-stripe.ts
-- [ ] 11.4 payments.ts re-export facade
-- [ ] 11.5 Update imports
+### T11: payments.ts split — ✅ ЗАКРЫТА (commit bdfd905)
+Разбит по **слою ответственности**, а не по доменной области (чище: каждый
+модуль — один род работы, нет циклов между checkout/billing):
+`payments.ts` 1154→734 строк, остаётся оркестратором + re-export facade.
+- [x] 11.1 `paymentsTypes.ts` — все type-контракты checkout/order/provider
+- [x] 11.2 `paymentsRepo.ts` — DB-доступ (create/get/update orders, pool, profile lookups)
+- [x] 11.3 `paymentsNormalize.ts` — нормализация входа + getErrorMessage
+- [x] 11.4 `paymentsProvider.ts` — резолв провайдера + setup-state
+- [x] 11.5 `payments.ts` re-export facade (export {} / export type {}), импортёры не тронуты
+- [x] 11.6 `paymentsStripe.ts` импортирует типы из `paymentsTypes`
 
 ---
 
 ## Приоритет к следующему заходу
 
-**Фаза 1 + Фаза 2 — ✅ полностью закрыты.** Остаётся только Фаза 3 (cleanup):
+**Фаза 1 + Фаза 2 + Фаза 3 — ✅ полностью закрыты.**
+Все задачи рефайнмента (T1–T11) завершены.
 
-1. **T11** — payments.ts split (= todo.md I4, не дублировать)
-2. **T9** — legacy rename leadId → candidateId
-3. **T10** — deprecate legacy tables (document, don't drop)
+> Фаза 3 (cleanup): T9 (rename leadId→candidateId), T10 (deprecate legacy
+> tables), T11 (payments.ts split) — все закрыты.
 
 > T4–T8 — ✅ закрыты (preview evidence-first + FIUR-проекция +
 > feedback→reweighting + 3-планный checkout с recurring sales-request guard +
