@@ -7,6 +7,8 @@
 
 import { getPool } from "./db";
 import { getSourceRegistry, type SourceId } from "./sources/source-registry";
+import { getLeadsForAllProfiles, getPendingReviewCount, type LeadItem } from "./leads-data";
+import { listClientProfiles } from "./clientProfiles";
 
 // ─── Types ──────────────────────────────────────────────────────
 
@@ -397,5 +399,41 @@ export async function getDashboardSourcePerformance(): Promise<SourcePerformance
     }));
   } catch {
     return [];
+  }
+}
+
+// ─── Today's Radar — companies worth contacting now ─────────────
+
+export interface TodayRadar {
+  /** Top candidates across all active profiles, ranked by score. */
+  topLeads: LeadItem[];
+  /** Candidates awaiting analyst review (review_status = 'pending_review'). */
+  pendingReview: number;
+}
+
+/**
+ * Build the "Сегодняшний радар" block for the agency dashboard: the highest-score
+ * leads across all active client profiles plus the count awaiting review.
+ *
+ * Resolves active profiles internally (the dashboard has no profileIds to hand),
+ * then reuses the same data layer as /leads so ranking and review-count semantics
+ * stay identical between the two surfaces. Returns empty/zero on any failure.
+ */
+export async function getDashboardTodayRadar(limit = 5): Promise<TodayRadar> {
+  try {
+    const profiles = await listClientProfiles();
+    const profileIds = profiles.filter((p) => p.isActive).map((p) => p.id);
+    if (profileIds.length === 0) {
+      return { topLeads: [], pendingReview: 0 };
+    }
+
+    const [leadsResult, pendingReview] = await Promise.all([
+      getLeadsForAllProfiles({ profileIds, limit }),
+      getPendingReviewCount({ profileIds }),
+    ]);
+
+    return { topLeads: leadsResult.leads, pendingReview };
+  } catch {
+    return { topLeads: [], pendingReview: 0 };
   }
 }
