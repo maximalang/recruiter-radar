@@ -120,6 +120,7 @@ export async function getDigestItemsForClientProfile(input: {
 
   return evidenceResult.rows
     .map(mapDigestEvidenceRow)
+    .filter(isDigestEligibleGate)
     .filter((item) => matchesClientProfile(item, clientProfile))
     .sort((left, right) => compareDigestItemsForClient(left, right, clientProfile))
     .slice(0, requestedLimit);
