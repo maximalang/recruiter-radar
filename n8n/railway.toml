@@ -1,0 +1,16 @@
+# Railway config for the n8n service (separate from the web service).
+# Point this service's "Config-as-code path" at n8n/railway.toml in the
+# Railway Dashboard, or set the service Root Directory to n8n/.
+#
+# NOTE: dockerfilePath is resolved from the repository root, matching the
+# web service convention in the root railway.toml (apps/web/Dockerfile).
+[build]
+  builder = "DOCKERFILE"
+  dockerfilePath = "n8n/Dockerfile"
+
+[deploy]
+  # n8n exposes an unauthenticated liveness endpoint at /healthz.
+  healthcheckPath = "/healthz"
+  healthcheckTimeout = 30
+  restartPolicyType = "ON_FAILURE"
+  restartPolicyMaxRetries = 3
