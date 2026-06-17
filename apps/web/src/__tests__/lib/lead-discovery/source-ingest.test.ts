@@ -1,8 +1,11 @@
 import { ingestSource, ingestAllPrimarySources, isNoActiveProfiles } from '@/lib/lead-discovery/source-ingest'
 
-// Mock child_process.execFile
-jest.mock('node:child_process', () => ({
-  execFile: jest.fn(),
+// Mock the execFile accessor (production resolves execFile via
+// process.getBuiltinModule, which bypasses jest's require-cache mock —
+// so we mock the node-exec seam instead of node:child_process).
+const mockExecFileFn = jest.fn()
+jest.mock('@/lib/lead-discovery/node-exec', () => ({
+  getExecFile: jest.fn(() => mockExecFileFn),
 }))
 
 // Mock db-pool — default: no pool (search prefs skipped, falls back to ENV)
@@ -10,9 +13,8 @@ jest.mock('@/lib/db-pool', () => ({
   getPool: jest.fn().mockReturnValue(null),
 }))
 
-import { execFile } from 'node:child_process'
 import { getPool } from '@/lib/db-pool'
-const mockExecFile = execFile as jest.MockedFunction<typeof execFile>
+const mockExecFile = mockExecFileFn
 const mockGetPool = getPool as jest.MockedFunction<typeof getPool>
 
 describe('source-ingest', () => {

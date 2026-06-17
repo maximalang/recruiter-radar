@@ -19,7 +19,7 @@
  * in Edge/serverless runtimes (Vercel Edge, Cloudflare Workers).
  */
 
-import { execFile } from 'node:child_process'
+import { getExecFile } from './node-exec'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
@@ -174,7 +174,12 @@ export async function ingestSource(
     // Merge: process.env → DB search prefs → caller filtered env
     const mergedEnv = { ...process.env, ...dbSearchEnv, ...filteredEnv }
 
-    execFile(
+    // Resolve execFile via the bundler-opaque accessor so Turbopack does not
+    // statically analyze this spawn as a `<dynamic>` module import (the script
+    // is resolved and path-guarded above, then run in the Node.js runtime —
+    // never bundled). See lib/lead-discovery/node-exec.ts.
+    const spawnNodeScript = getExecFile()
+    spawnNodeScript(
       'node',
       [scriptPath],
       {
