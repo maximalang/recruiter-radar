@@ -36,6 +36,9 @@ jobs:
     - name: Install dependencies
       run: npm ci
 
+    - name: Guard router layout
+      run: npm run guard:router
+
     - name: Type check
       run: npm run web:check
 

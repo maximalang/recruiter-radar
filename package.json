@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "npm run dev --workspace @recruiter-radar/web",
     "clean": "node scripts/clean.mjs",
+    "guard:router": "node scripts/guard-no-src-app.mjs",
     "db:migrate": "node packages/db/scripts/migrate.mjs",
     "db:validate": "npm run validate --workspace @recruiter-radar/db",
     "web:build": "npm run build --workspace @recruiter-radar/web",
