@@ -161,7 +161,7 @@ function pluralizeLeads(n: number): string {
 export default async function LeadsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ gate?: string; feedback?: string; page?: string }>;
+  searchParams: Promise<{ gate?: string; feedback?: string; page?: string; profile?: string }>;
 }) {
   const filters = await searchParams;
 
@@ -182,8 +182,19 @@ export default async function LeadsPage({
 
   const activeProfiles = profiles.filter((p) => p.isActive);
 
-  // Fetch leads for all active profiles in a single query (not N+1)
-  const profileIds = activeProfiles.map((p) => p.id);
+  // Optional profile switcher: narrow to a single practice when ?profile= is a valid active id
+  const selectedProfileId =
+    filters.profile && activeProfiles.some((p) => p.id === filters.profile)
+      ? filters.profile
+      : null;
+  const selectedProfile = selectedProfileId
+    ? activeProfiles.find((p) => p.id === selectedProfileId) ?? null
+    : null;
+
+  // Fetch leads for the selected profile, or all active profiles, in a single query (not N+1)
+  const profileIds = selectedProfileId
+    ? [selectedProfileId]
+    : activeProfiles.map((p) => p.id);
   let allLeads: LeadItem[] = [];
   let totalLeads = 0;
   let pendingReview = 0;
@@ -206,7 +217,7 @@ export default async function LeadsPage({
     pendingReview = 0;
   }
 
-  const hasFilters = confidenceGate !== null || feedbackStatus !== null;
+  const hasFilters = confidenceGate !== null || feedbackStatus !== null || selectedProfileId !== null;
 
   return (
     <InternalPageFrame navItems={LEADS_NAV}>
@@ -214,7 +225,9 @@ export default async function LeadsPage({
         title="🎯 Лиды"
         subtitle={
           <>
-            Компании, которым стоит написать сегодня
+            {selectedProfile
+              ? `Практика: ${selectedProfile.agencyName}`
+              : 'Компании, которым стоит написать сегодня'}
             {hasFilters && <span className={ipStyles.filterActive}>(фильтр активен)</span>}
           </>
         }
@@ -241,12 +254,17 @@ export default async function LeadsPage({
           }
           tone={pendingReview > 0 ? 'info' : 'neutral'}
         />
-        <MetricCard label="Профилей" value={activeProfiles.length} />
+        <MetricCard
+          label={selectedProfile ? 'Профиль' : 'Профилей'}
+          value={selectedProfile ? '1' : activeProfiles.length}
+        />
       </MetricGrid>
 
       <TableCard>
         <Suspense fallback={<div className={ipStyles.loadingState}>Загрузка...</div>}>
-          <LeadsFilters />
+          <LeadsFilters
+            profiles={activeProfiles.map((p) => ({ id: p.id, name: p.agencyName }))}
+          />
         </Suspense>
         <Suspense fallback={<div className={ipStyles.loadingState}>Загрузка...</div>}>
           <LeadsList leads={allLeads} />

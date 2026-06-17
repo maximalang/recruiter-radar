@@ -11,7 +11,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { ingestAllPrimarySources, type IngestResult } from '@/lib/lead-discovery/source-ingest'
+import { ingestAllPrimarySources, isNoActiveProfiles, type IngestResult } from '@/lib/lead-discovery/source-ingest'
 import { runDigestForClientProfile } from '@/lib/digest'
 import { deliverCandidatesForRun, type DeliverRunResult } from '@/lib/digest/deliver-candidates'
 import { getPool } from '@/lib/db'
@@ -41,6 +41,12 @@ export async function POST(request: NextRequest) {
   try {
     // Step 1: Ingest all primary sources
     const ingestResults = await ingestAllPrimarySources()
+    if (isNoActiveProfiles(ingestResults)) {
+      return NextResponse.json(
+        { success: false, error: 'No active client profiles; pipeline skipped.', hint: ingestResults.hint },
+        { status: 422 }
+      )
+    }
     const ingestOk = ingestResults.every(r => r.success)
     const ingestSummary = {
       total: ingestResults.length,

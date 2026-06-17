@@ -25,12 +25,15 @@ const FEEDBACK_OPTIONS = [
   { value: 'badfit', label: 'Не подходит' },
 ] as const;
 
-export default function LeadsFilters() {
+type ProfileOption = { id: string; name: string };
+
+export default function LeadsFilters({ profiles = [] }: { profiles?: ProfileOption[] }) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const currentGate = searchParams.get('gate') ?? '';
   const currentFeedback = searchParams.get('feedback') ?? '';
+  const currentProfile = searchParams.get('profile') ?? '';
 
   const updateFilter = useCallback(
     (key: string, value: string) => {
@@ -51,6 +54,21 @@ export default function LeadsFilters() {
   return (
     <div className={s.filterBar}>
       <span className={s.filterLabel}>Фильтры:</span>
+      {profiles.length > 1 && (
+        <select
+          value={currentProfile}
+          onChange={(e) => updateFilter('profile', e.target.value)}
+          className={s.filterSelect}
+          aria-label="Фильтр по практике"
+        >
+          <option value="">Практика: Все</option>
+          {profiles.map((p) => (
+            <option key={p.id} value={p.id}>
+              Практика: {p.name}
+            </option>
+          ))}
+        </select>
+      )}
       <select
         value={currentGate}
         onChange={(e) => updateFilter('gate', e.target.value)}
@@ -75,7 +93,7 @@ export default function LeadsFilters() {
           </option>
         ))}
       </select>
-      {(currentGate || currentFeedback) && (
+      {(currentGate || currentFeedback || currentProfile) && (
         <button
           onClick={() => router.push('/leads', { scroll: false })}
           className={s.filterReset}

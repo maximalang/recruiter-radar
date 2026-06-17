@@ -1,4 +1,4 @@
-import { ingestSource, ingestAllPrimarySources } from '@/lib/lead-discovery/source-ingest'
+import { ingestSource, ingestAllPrimarySources, isNoActiveProfiles } from '@/lib/lead-discovery/source-ingest'
 
 // Mock child_process.execFile
 jest.mock('node:child_process', () => ({
@@ -139,6 +139,7 @@ describe('source-ingest', () => {
       })
 
       const results = await ingestAllPrimarySources()
+      if (isNoActiveProfiles(results)) throw new Error('unexpected no_active_profiles')
 
       expect(results).toHaveLength(3)
       const sources = results.map(r => r.source)
@@ -148,6 +149,32 @@ describe('source-ingest', () => {
       expect(results.every(r => r.success)).toBe(true)
       expect(results[0].fetchedCount).toBe(20)
       expect(results[0].upsertedCount).toBe(18)
+    })
+
+    it('returns no_active_profiles when DB has zero active profiles', async () => {
+      const mockPool = {
+        query: jest.fn().mockResolvedValue({ rows: [{ count: '0' }] }),
+      }
+      mockGetPool.mockReturnValue(mockPool)
+
+      const result = await ingestAllPrimarySources()
+
+      expect(isNoActiveProfiles(result)).toBe(true)
+      expect(mockExecFile).not.toHaveBeenCalled()
+    })
+
+    it('proceeds when DB has active profiles', async () => {
+      const mockPool = {
+        query: jest.fn().mockResolvedValue({ rows: [{ count: '2' }] }),
+      }
+      mockGetPool.mockReturnValue(mockPool)
+      mockExecFile.mockImplementation((_cmd, _args: any, opts: any, callback: any) => {
+        callback(null, JSON.stringify({ source: 'hh', recordsReceived: 1, signalUpsertsCompleted: 1 }), '')
+      })
+
+      const result = await ingestAllPrimarySources()
+
+      expect(isNoActiveProfiles(result)).toBe(false)
     })
 
     it('continues after a source fails', async () => {
@@ -161,6 +188,7 @@ describe('source-ingest', () => {
       })
 
       const results = await ingestAllPrimarySources()
+      if (isNoActiveProfiles(results)) throw new Error('unexpected no_active_profiles')
 
       expect(results).toHaveLength(3)
       const failed = results.find(r => r.source === 'hh')

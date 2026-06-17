@@ -27,8 +27,8 @@ jest.mock('@/lib/lead-discovery/lead-scoring-service', () => ({
   })),
 }))
 
-import { POST as generatePOST, GET as generateGET } from '@/src/app/api/leads/generate/route'
-import { POST as scorePOST, GET as scoreGET } from '@/src/app/api/leads/score/route'
+import { POST as generatePOST, GET as generateGET } from '@/app/api/leads/generate/route'
+import { POST as scorePOST, GET as scoreGET } from '@/app/api/leads/score/route'
 
 const ORIGINAL_ENV = process.env
 

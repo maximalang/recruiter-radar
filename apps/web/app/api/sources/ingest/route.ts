@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import {
   ingestSource,
   ingestAllPrimarySources,
+  isNoActiveProfiles,
   type SourceId,
   type IngestResult,
 } from '@/lib/lead-discovery/source-ingest'
@@ -68,7 +69,14 @@ export async function POST(request: NextRequest) {
       results = await Promise.all(sources.map(s => ingestSource(s, extraEnv)))
     } else {
       // Default: ingest all primary sources
-      results = await ingestAllPrimarySources(extraEnv)
+      const allResults = await ingestAllPrimarySources(extraEnv)
+      if (isNoActiveProfiles(allResults)) {
+        return NextResponse.json(
+          { success: false, error: 'No active client profiles to ingest for.', hint: allResults.hint },
+          { status: 422 }
+        )
+      }
+      results = allResults
     }
 
     const allSuccess = results.every(r => r.success)

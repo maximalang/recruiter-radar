@@ -52,6 +52,48 @@ export interface IngestResult {
 }
 
 /**
+ * Sentinel returned by ingestAllPrimarySources() when there are no active
+ * client profiles to ingest for. Distinct from IngestResult[] so callers can
+ * short-circuit (e.g. respond HTTP 422) instead of running an empty pipeline.
+ */
+export interface NoActiveProfilesResult {
+  error: 'no_active_profiles'
+  hint: string
+}
+
+/** Type guard: did ingestAllPrimarySources() bail out with no active profiles? */
+export function isNoActiveProfiles(
+  result: IngestResult[] | NoActiveProfilesResult
+): result is NoActiveProfilesResult {
+  return !Array.isArray(result) && result.error === 'no_active_profiles'
+}
+
+const NO_ACTIVE_PROFILES_HINT = 'run scripts/e2e/seed-test-profile.sql'
+
+/**
+ * Count active client profiles.
+ *
+ * "Active" = client_profiles.is_active = TRUE (the only activation flag in
+ * schema; there is no separate status/subscription column). Telegram linkage
+ * is intentionally NOT required here — ingestion fills the signal pool that
+ * any active profile can draw from; delivery-time checks (telegram_chat_id)
+ * live in the digest/delivery step, not in ingestion.
+ *
+ * Returns null when no DB pool is configured — callers should treat that as
+ * "cannot determine, proceed" rather than "zero profiles".
+ */
+async function countActiveProfiles(): Promise<number | null> {
+  const pool = getPool()
+  if (!pool) return null
+  const { rows } = await pool.query<{ count: string }>(`
+    SELECT COUNT(*)::TEXT AS count
+    FROM client_profiles
+    WHERE is_active = TRUE
+  `)
+  return Number(rows[0]?.count ?? '0')
+}
+
+/**
  * Filter env vars through the whitelist from the source registry.
  *
  * Only source-specific config keys are permitted — never infrastructure
@@ -176,7 +218,15 @@ export async function ingestSource(
  */
 export async function ingestAllPrimarySources(
   env?: Record<string, string>
-): Promise<IngestResult[]> {
+): Promise<IngestResult[] | NoActiveProfilesResult> {
+  // Skip the pipeline when a DB is configured but holds zero active profiles.
+  // A null count means no pool (test/dev without DB) — proceed as before, since
+  // we cannot distinguish "no DB" from "empty DB" and downstream scripts handle
+  // the no-DB case themselves.
+  const activeProfiles = await countActiveProfiles()
+  if (activeProfiles === 0) {
+    return { error: 'no_active_profiles', hint: NO_ACTIVE_PROFILES_HINT }
+  }
   const sources = getPrimarySourceIds()
   return Promise.all(sources.map(source => ingestSource(source, env)))
 }
