@@ -69,6 +69,26 @@ export async function POST(request: NextRequest) {
 
     console.log(`Generated ${rawLeads.length} raw leads`)
 
+    // Per-source outcome of this run — surfaced for observability without
+    // altering the existing success/failure response shape.
+    const rawSourceReport = generator.getLastRunSourceReport()
+    for (const [sourceId, outcome] of Object.entries(rawSourceReport)) {
+      const effectiveStatus =
+        outcome.status === 'ok' && outcome.leads_count === 0 ? 'empty' : outcome.status
+      console.log(
+        `[generate] source=${sourceId} status=${effectiveStatus} ` +
+        `leads_count=${outcome.leads_count}` +
+        (outcome.error ? ` error=${outcome.error}` : '')
+      )
+    }
+    // Flatten the keyed report into a stable array for the response body.
+    const sourceReport = Object.entries(rawSourceReport).map(([sourceId, outcome]) => ({
+      sourceId,
+      status: outcome.status,
+      leadsFound: outcome.leads_count,
+      ...(outcome.error ? { error: outcome.error } : {}),
+    }))
+
     // Apply FIUR scoring if agencyProfile is provided
     // Uses scoreExistingLeads to avoid regenerating leads (which would
     // create a second MultiSourceLeadGenerator and hit the DB again)
@@ -107,7 +127,10 @@ export async function POST(request: NextRequest) {
           sourceCoverage: Object.fromEntries(
             analytics.sources.map(source => [source.id, source.count])
           )
-        }
+        },
+        // Per-source run outcome (status/leads_count/error) for this request.
+        // Additive: does not affect existing fields or success/failure status.
+        sourceReport
       }
     })
   } catch (error) {
