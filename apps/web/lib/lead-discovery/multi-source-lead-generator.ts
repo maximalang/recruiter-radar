@@ -73,6 +73,23 @@ export interface EvidenceSource {
   relevanceScore: number
 }
 
+/** Per-source execution outcome for one generateLeads() run. */
+export interface SourceRunStatus {
+  status: 'ok' | 'error'
+  /** Number of leads/evidence contributed by this source on this run. */
+  leads_count: number
+  /** Error message when status === 'error'. */
+  error?: string
+}
+
+/**
+ * Map of sourceName → outcome for the most recent generateLeads() run.
+ * Exposed via getLastRunSourceReport() so callers (API routes, cron) can
+ * surface which sources succeeded vs. failed without changing the array
+ * return shape of generateLeads().
+ */
+export type SourceRunReport = Record<string, SourceRunStatus>
+
 /**
  * Recalculate confidence gate from current evidence sources.
  * Uses selectConfidenceGate to compute the type-based gate, then
@@ -136,11 +153,26 @@ export class MultiSourceLeadGenerator {
   private crawler: CrawlerRouter
   private sources: DataSource[]
   private activeSources: string[]
+  /** Per-source outcome of the most recent generateLeads() run. */
+  private lastRunReport: SourceRunReport = {}
 
   constructor() {
     this.crawler = createDefaultRouter()
     this.sources = this.initializeSources()
     this.activeSources = this.getActiveSources()
+  }
+
+  /**
+   * Per-source status/leads_count/error for the most recent generateLeads()
+   * run. Returns a fresh copy so callers cannot mutate internal state.
+   */
+  getLastRunSourceReport(): SourceRunReport {
+    return { ...this.lastRunReport }
+  }
+
+  /** Record (or merge) the outcome of one source step into the run report. */
+  private recordSource(name: string, status: SourceRunStatus): void {
+    this.lastRunReport[name] = status
   }
 
   /** Categorize employee count into size bucket */
@@ -307,50 +339,116 @@ export class MultiSourceLeadGenerator {
     } = options
 
     const allLeads: MultiSourceLead[] = []
+    // Reset the per-run source report for this invocation.
+    this.lastRunReport = {}
 
+    // Step 1: Generate leads from all job board sources via DB pipeline
+    // (HH, Rabota Rossii, SuperJob, Habr Career, etc. — all in source-digest-evidence.sql).
+    // A failure here must not abort the rest of the pipeline.
+    let jobBoardLeads: MultiSourceLead[] = []
     try {
-      // Step 1: Generate leads from all job board sources via DB pipeline
-      // (HH, Rabota Rossii, SuperJob, Habr Career, etc. — all sources in source-digest-evidence.sql)
-      const jobBoardLeads = await this.generateJobBoardLeads(clientProfileId)
+      jobBoardLeads = await this.generateJobBoardLeads(clientProfileId)
       allLeads.push(...jobBoardLeads)
-
-      // Step 2: Fetch career pages for enrichment
-      if (sources.includes('career-pages')) {
-        await this.enrichWithCareerPages(allLeads)
-      }
-
-      // Step 3: Add business signals from secondary sources
-      if (sources.includes('funding-business-signals')) {
-        await this.addBusinessSignals(allLeads)
-      }
-
-      // Step 4: Enrich with company registry data
-      if (sources.includes('egrul-fns')) {
-        await this.enrichWithRegistryData(allLeads)
-      }
-
-      // Step 5: Real-time crawling is handled by n8n scheduler via source scripts
-      // (enableRealTime is kept as no-op for API backward compatibility)
-
-      // Step 6: Aggregate leads — entity resolution and deduplication
-      const aggregatedLeads = await this.deduplicateLeads(allLeads)
-
-      // Step 7: Filter and rank final leads
-      return this.filterAndRankLeads(aggregatedLeads, {
-        industries,
-        regions,
-        minScore
-      })
+      this.recordJobBoardSources(jobBoardLeads)
     } catch (err) {
-      console.error('[generateLeads] pipeline failed, returning partial results:', err)
-      if (allLeads.length > 0) {
-        const aggregatedLeads = await this.deduplicateLeads(allLeads).catch(() => allLeads)
-        return this.filterAndRankLeads(
-          Array.isArray(aggregatedLeads) ? aggregatedLeads : allLeads,
-          { industries, regions, minScore }
-        )
+      const message = err instanceof Error ? err.message : String(err)
+      console.error('[generateLeads] source failed', { source: 'job-boards', error: message })
+      this.recordSource('job-boards', { status: 'error', leads_count: 0, error: message })
+    }
+
+    // Step 2: Fetch career pages for enrichment
+    if (sources.includes('career-pages')) {
+      const before = this.countSourceEvidence(allLeads, 'career-pages')
+      try {
+        await this.enrichWithCareerPages(allLeads)
+        const added = this.countSourceEvidence(allLeads, 'career-pages') - before
+        this.recordSource('career-pages', { status: 'ok', leads_count: added })
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        console.error('[generateLeads] source failed', { source: 'career-pages', error: message })
+        this.recordSource('career-pages', { status: 'error', leads_count: 0, error: message })
       }
-      return []
+    }
+
+    // Step 3: Add business signals from secondary sources
+    if (sources.includes('funding-business-signals')) {
+      const before = this.countSourceEvidence(allLeads, 'funding-business-signals')
+      try {
+        await this.addBusinessSignals(allLeads)
+        const added = this.countSourceEvidence(allLeads, 'funding-business-signals') - before
+        this.recordSource('funding-business-signals', { status: 'ok', leads_count: added })
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        console.error('[generateLeads] source failed', { source: 'funding-business-signals', error: message })
+        this.recordSource('funding-business-signals', { status: 'error', leads_count: 0, error: message })
+      }
+    }
+
+    // Step 4: Enrich with company registry data
+    if (sources.includes('egrul-fns')) {
+      const before = this.countSourceEvidence(allLeads, 'egrul-fns')
+      try {
+        await this.enrichWithRegistryData(allLeads)
+        const added = this.countSourceEvidence(allLeads, 'egrul-fns') - before
+        this.recordSource('egrul-fns', { status: 'ok', leads_count: added })
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        console.error('[generateLeads] source failed', { source: 'egrul-fns', error: message })
+        this.recordSource('egrul-fns', { status: 'error', leads_count: 0, error: message })
+      }
+    }
+
+    // Step 5: Real-time crawling is handled by n8n scheduler via source scripts
+    // (enableRealTime is kept as no-op for API backward compatibility)
+
+    // Step 6: Aggregate leads — entity resolution and deduplication.
+    // If dedup fails, fall back to the un-deduplicated leads rather than aborting.
+    let aggregatedLeads: MultiSourceLead[]
+    try {
+      aggregatedLeads = await this.deduplicateLeads(allLeads)
+    } catch (err) {
+      console.error('[generateLeads] deduplication failed, using raw leads:', err)
+      aggregatedLeads = allLeads
+    }
+
+    // Step 7: Filter and rank final leads
+    return this.filterAndRankLeads(aggregatedLeads, {
+      industries,
+      regions,
+      minScore
+    })
+  }
+
+  /** Count evidence entries for a given sourceId across all leads. */
+  private countSourceEvidence(leads: MultiSourceLead[], sourceId: string): number {
+    let count = 0
+    for (const lead of leads) {
+      if (lead.sources.some(s => s.sourceId === sourceId)) count++
+    }
+    return count
+  }
+
+  /**
+   * Break out job-board results by source family (hh, superjob, habr-career, …)
+   * so the run report exposes per-board lead counts. A source family that
+   * contributed no leads is still recorded as ok with leads_count: 0.
+   */
+  private recordJobBoardSources(leads: MultiSourceLead[]): void {
+    const jobBoardIds = this.sources
+      .filter(s => s.kind === 'job-board')
+      .map(s => s.id)
+    const counts = new Map<string, number>(jobBoardIds.map(id => [id, 0]))
+    for (const lead of leads) {
+      const seen = new Set<string>()
+      for (const evidence of lead.sources) {
+        if (counts.has(evidence.sourceId) && !seen.has(evidence.sourceId)) {
+          counts.set(evidence.sourceId, counts.get(evidence.sourceId)! + 1)
+          seen.add(evidence.sourceId)
+        }
+      }
+    }
+    for (const [id, leads_count] of counts) {
+      this.recordSource(id, { status: 'ok', leads_count })
     }
   }
 
