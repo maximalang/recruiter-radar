@@ -71,8 +71,8 @@ export async function POST(request: NextRequest) {
 
     // Per-source outcome of this run — surfaced for observability without
     // altering the existing success/failure response shape.
-    const sourceReport = generator.getLastRunSourceReport()
-    for (const [sourceId, outcome] of Object.entries(sourceReport)) {
+    const rawSourceReport = generator.getLastRunSourceReport()
+    for (const [sourceId, outcome] of Object.entries(rawSourceReport)) {
       const effectiveStatus =
         outcome.status === 'ok' && outcome.leads_count === 0 ? 'empty' : outcome.status
       console.log(
@@ -81,6 +81,13 @@ export async function POST(request: NextRequest) {
         (outcome.error ? ` error=${outcome.error}` : '')
       )
     }
+    // Flatten the keyed report into a stable array for the response body.
+    const sourceReport = Object.entries(rawSourceReport).map(([sourceId, outcome]) => ({
+      sourceId,
+      status: outcome.status,
+      leadsFound: outcome.leads_count,
+      ...(outcome.error ? { error: outcome.error } : {}),
+    }))
 
     // Apply FIUR scoring if agencyProfile is provided
     // Uses scoreExistingLeads to avoid regenerating leads (which would
