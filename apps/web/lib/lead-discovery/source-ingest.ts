@@ -33,10 +33,28 @@ import { getPool } from '@/lib/db-pool'
 
 export type { SourceId } from '@/lib/sources/source-registry'
 
-const SCRIPT_DIR = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  '../../../../packages/db/scripts'
-)
+/**
+ * Resolve the db scripts directory lazily.
+ *
+ * WHY lazy: in Next.js's bundled server runtime `import.meta.url` may be
+ * undefined or a non-file URL. Calling `fileURLToPath` on it at module top
+ * level throws, which crashes the whole module load — turning every request
+ * to a route that imports this file into a pre-auth 500 (the symptom we hit
+ * on /api/cron/daily-radar). Deferring to first use keeps module load safe
+ * and lets us fall back to a cwd-relative path when import.meta.url is absent.
+ */
+let cachedScriptDir: string | null = null
+function getScriptDir(): string {
+  if (cachedScriptDir) return cachedScriptDir
+  const metaUrl = import.meta.url
+  if (metaUrl && metaUrl.startsWith('file:')) {
+    cachedScriptDir = resolve(dirname(fileURLToPath(metaUrl)), '../../../../packages/db/scripts')
+  } else {
+    // Bundled runtime: resolve from the web app root (process.cwd() is apps/web).
+    cachedScriptDir = resolve(process.cwd(), '../../packages/db/scripts')
+  }
+  return cachedScriptDir
+}
 
 export interface IngestResult {
   source: SourceId
@@ -155,10 +173,11 @@ export async function ingestSource(
   } catch {
     return { source, success: false, error: `Unknown source: ${source}` }
   }
-  const scriptPath = resolve(SCRIPT_DIR, config.script)
+  const scriptDir = getScriptDir()
+  const scriptPath = resolve(scriptDir, config.script)
 
   // Guard: ensure resolved path doesn't escape scripts dir (path traversal)
-  if (!scriptPath.startsWith(SCRIPT_DIR)) {
+  if (!scriptPath.startsWith(scriptDir)) {
     return { source, success: false, error: `Script path escapes scripts directory: ${config.script}` }
   }
 

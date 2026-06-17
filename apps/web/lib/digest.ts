@@ -16,10 +16,26 @@ import type {
 type DigestDbClient = Pick<Pool, "query"> | Pick<PoolClient, "query">;
 
 
-const digestEvidenceQuery = readFileSync(
-  resolve(dirname(fileURLToPath(import.meta.url)), "../../../packages/db/scripts/source-digest-evidence.sql"),
-  "utf8"
-);
+/**
+ * Lazily read the digest evidence SQL.
+ *
+ * WHY lazy: in Next.js's bundled server runtime `import.meta.url` may be
+ * undefined/non-file, so calling fileURLToPath at module top level throws and
+ * crashes module load (pre-auth 500 on every route importing this file).
+ * Defer to first use and fall back to a cwd-relative path.
+ */
+let cachedDigestEvidenceQuery: string | null = null;
+function getDigestEvidenceQuery(): string {
+  if (cachedDigestEvidenceQuery !== null) return cachedDigestEvidenceQuery;
+  const rel = "packages/db/scripts/source-digest-evidence.sql";
+  const metaUrl = import.meta.url;
+  const path =
+    metaUrl && metaUrl.startsWith("file:")
+      ? resolve(dirname(fileURLToPath(metaUrl)), "../../../" + rel)
+      : resolve(process.cwd(), "../../" + rel);
+  cachedDigestEvidenceQuery = readFileSync(path, "utf8");
+  return cachedDigestEvidenceQuery;
+}
 
 const globalForPg = globalThis as typeof globalThis & {
   recruiterRadarDigestPool?: Pool;
@@ -38,7 +54,7 @@ export async function getDigestPreviewItems(limit = 10): Promise<DigestItemInput
   }
 
   const normalizedLimit = normalizeLimit(limit);
-  const result = await pool.query<DigestEvidenceRow>(`${digestEvidenceQuery}\nLIMIT ${normalizedLimit}`);
+  const result = await pool.query<DigestEvidenceRow>(`${getDigestEvidenceQuery()}\nLIMIT ${normalizedLimit}`);
 
   return result.rows.map(mapDigestEvidenceRow);
 }
@@ -78,7 +94,7 @@ export async function getDigestItemsForClientProfile(input: {
 
   const evidenceResult = await pool.query<DigestEvidenceRow>(`
     WITH ranked_candidates AS (
-      ${digestEvidenceQuery}
+      ${getDigestEvidenceQuery()}
     )
     SELECT
       ranked_candidates.rank,
@@ -195,7 +211,7 @@ export async function runDigestForClientProfile(input: {
 
     const evidenceResult = await client.query<DigestEvidenceRow>(`
       WITH ranked_candidates AS (
-        ${digestEvidenceQuery}
+        ${getDigestEvidenceQuery()}
       )
       SELECT
         ranked_candidates.rank,
