@@ -1,10 +1,8 @@
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { Pool, type PoolClient } from "pg";
 import { getPool as getSharedPool } from "./db-pool";
 import { isDigestEligibleGate } from "./scoring/gate-pipeline";
 import { getClientProfileById, INDUSTRY_KEYWORDS, type ClientProfile } from "./clientProfiles";
+import { DIGEST_EVIDENCE_QUERY } from "./digest-evidence-query";
 import type {
   DigestItem,
   DigestRun,
@@ -15,26 +13,14 @@ import type {
 
 type DigestDbClient = Pick<Pool, "query"> | Pick<PoolClient, "query">;
 
-
-/**
- * Lazily read the digest evidence SQL.
- *
- * WHY lazy: in Next.js's bundled server runtime `import.meta.url` may be
- * undefined/non-file, so calling fileURLToPath at module top level throws and
- * crashes module load (pre-auth 500 on every route importing this file).
- * Defer to first use and fall back to a cwd-relative path.
- */
-let cachedDigestEvidenceQuery: string | null = null;
+// WHY inlined: the digest SQL is imported as a TS constant rather than read from
+// disk at runtime. Next.js's standalone tracer cannot follow a dynamic
+// readFileSync path, so the .sql was never bundled (ENOENT in prod); and
+// fileURLToPath(import.meta.url) is unsafe in the bundled runtime. The constant
+// is mirrored from packages/db/scripts/source-digest-evidence.sql and drift-guarded
+// by digest-evidence-query.test.ts.
 function getDigestEvidenceQuery(): string {
-  if (cachedDigestEvidenceQuery !== null) return cachedDigestEvidenceQuery;
-  const rel = "packages/db/scripts/source-digest-evidence.sql";
-  const metaUrl = import.meta.url;
-  const path =
-    metaUrl && metaUrl.startsWith("file:")
-      ? resolve(dirname(fileURLToPath(metaUrl)), "../../../" + rel)
-      : resolve(process.cwd(), "../../" + rel);
-  cachedDigestEvidenceQuery = readFileSync(path, "utf8");
-  return cachedDigestEvidenceQuery;
+  return DIGEST_EVIDENCE_QUERY;
 }
 
 const globalForPg = globalThis as typeof globalThis & {

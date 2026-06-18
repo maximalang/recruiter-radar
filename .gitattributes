@@ -5,6 +5,12 @@
 *.sh text eol=lf
 .husky/* text eol=lf
 
+# The digest-evidence SQL is inlined into a TS String.raw mirror, which JS
+# normalizes to LF at evaluation. Pin both to LF so the byte-for-byte drift
+# test (digest-evidence-query.test.ts) holds on Windows working trees too.
+packages/db/scripts/source-digest-evidence.sql text eol=lf
+apps/web/lib/digest-evidence-query.ts text eol=lf
+
 # Binary fixtures and assets should not be touched
 *.png binary
 *.jpg binary

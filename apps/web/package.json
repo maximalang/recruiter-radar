@@ -8,6 +8,8 @@
     "check": "tsc --noEmit",
     "test": "jest",
     "test:types": "tsc -p tsconfig.test.json --noEmit",
+    "sync:digest-evidence": "node scripts/sync-digest-evidence-query.mjs",
+    "sync:digest-evidence:check": "node scripts/sync-digest-evidence-query.mjs --check",
     "validate": "npm run check && npm run build"
   },
   "dependencies": {
