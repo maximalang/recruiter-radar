@@ -209,6 +209,8 @@ export async function findMatchingClientProfileForCheckoutOrder(input: {
         specialization,
         include_keywords AS "includeKeywords",
         exclude_keywords AS "excludeKeywords",
+        industries AS "industries",
+        company_sizes AS "companySizes",
         daily_digest_limit AS "dailyDigestLimit",
         is_active AS "isActive",
         created_at::TEXT AS "createdAt",
