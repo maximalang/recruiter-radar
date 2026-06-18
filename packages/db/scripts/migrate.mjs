@@ -31,37 +31,45 @@ try {
   `);
   console.log('schema_migrations table ready.');
 
-  // 2. Check if the database is empty (no user tables) → apply init.sql
-  const { rows: tableCheck } = await client.query(`
-    SELECT COUNT(*) AS cnt
-    FROM information_schema.tables
-    WHERE table_schema = 'public'
-      AND table_type = 'BASE TABLE'
-      AND table_name <> 'schema_migrations'
-  `);
-
+  // 2. Bootstrap policy.
+  // The numbered migration chain (0001_init → latest) is the single
+  // authoritative, self-contained schema: every type/table/column the code
+  // depends on is created exactly once, in order, with no intra-chain
+  // collisions. An empty database is therefore bootstrapped by replaying the
+  // whole chain — NOT by `schema/init.sql`.
+  //
+  // `schema/init.sql` is a stale partial squash (frozen circa 20260608, missing
+  // owner_id / rbac / evidence_bundle / signal pattern / confidence / inn,ogrn /
+  // review_status / contact_policy / icp_roles). Replaying it before 0001_init
+  // also collides on unguarded `CREATE TYPE`/`CREATE TABLE`, which is the
+  // empty-database failure this script previously hit. It is intentionally left
+  // out of the bootstrap path. See docs/legacy-tables-deprecation.md.
+  //
+  // Databases provisioned by the OLD init.sql path carry an 'init-schema' marker
+  // row. Those databases already contain every base table, so the chain loop
+  // below — which keys purely off recorded versions — would try to re-create them
+  // and fail. There is no static way to know which individual ALTER migrations
+  // were already baked into that squash, so such a database must be reconciled by
+  // hand before this migrator can advance it: compare the live schema against the
+  // chain, INSERT the matching versions into schema_migrations (and add any
+  // genuinely-missing columns those skipped migrations would have added), then
+  // delete the 'init-schema' marker. Fail loudly rather than corrupt the schema.
   const initMarker = 'init-schema';
   const { rows: initApplied } = await client.query(
     `SELECT 1 FROM schema_migrations WHERE version = $1`,
     [initMarker]
   );
 
-  if (tableCheck[0].cnt === 0 && initApplied.length === 0) {
-    const initPath = resolve(scriptDir, '..', 'schema', 'init.sql');
-    if (existsSync(initPath)) {
-      const initSql = readFileSync(initPath, 'utf8');
-      console.log('Applying init.sql (empty database)...');
-      await client.query(initSql);
-      await client.query(
-        `INSERT INTO schema_migrations (version) VALUES ($1)`,
-        [initMarker]
-      );
-      console.log('init.sql applied successfully.');
-    } else {
-      console.warn('init.sql not found at', initPath, '— skipping initial schema.');
-    }
-  } else {
-    console.log('Database already has tables — skipping init.sql.');
+  if (initApplied.length > 0) {
+    console.error(
+      "This database was bootstrapped from the deprecated schema/init.sql " +
+        "(it carries an 'init-schema' marker). The migrator cannot advance it " +
+        'automatically because init.sql was a partial squash with no per-version ' +
+        'records. Reconcile schema_migrations to match the live schema and remove ' +
+        "the 'init-schema' marker before re-running. Refusing to proceed to avoid " +
+        'duplicate-object failures or silently skipped columns.'
+    );
+    process.exit(1);
   }
 
   // 3. Discover and apply pending migrations
