@@ -19,6 +19,14 @@ import { getPool } from '@/lib/db'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
+/** GET — health-check for monitors (no pipeline run, no auth required) */
+export async function GET() {
+  return NextResponse.json(
+    { ok: true, route: 'daily-radar', hint: 'Use POST with x-api-key to trigger the pipeline.' },
+    { status: 200 }
+  )
+}
+
 export async function POST(request: NextRequest) {
   // Auth — CRON_API_KEY only, no fallback to other keys
   const apiKey = process.env.CRON_API_KEY
