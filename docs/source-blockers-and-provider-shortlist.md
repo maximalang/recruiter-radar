@@ -81,10 +81,10 @@ This document provides an honest operational report on source readiness, blocker
   - Digest: Blocked until confidence tests
 
 - **habr-career**: Habr Career IT jobs
-  - Status: Provider/snapshot only
-  - Blocker: Direct HTML requires robots/legal review
-  - Ready: Yes with provider
-  - Digest: Blocked until confidence tests
+  - Status: File / live-public / provider
+  - Blocker: Robots/legal review of direct HTML access in progress (live-public enabled ahead of sign-off)
+  - Ready: Yes with provider or live HTML
+  - Digest: Blocked until robots/legal sign-off and confidence tests
 
 ### 🔒 CONTEXT ONLY - Supporting Role Only
 

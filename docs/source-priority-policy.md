@@ -70,7 +70,7 @@ Rule: context only. Can boost explanation quality, but must not outrank direct h
 - `linkedin-company-pages` - secondary platform evidence (professional-network, runnable). Normalized and runnable but not a sole lead-originating source. Not in digest selection.
 - `tech-job-boards` - tech job board coverage (job-board, runnable). Supports Greenhouse/Lever live-public mode, file snapshots, and compliant provider-token job snapshots. Not in digest selection until confidence-gate tests prove it cannot degrade source quality.
 - `superjob` - SuperJob vacancy coverage through app-key/provider or snapshots (job-board, runnable). Not in digest selection until confidence-gate tests pass.
-- `habr-career` - Habr Career IT vacancy coverage through provider/snapshots until lawful public live path is approved (job-board, runnable). Not in digest selection.
+- `habr-career` - Habr Career IT vacancy coverage through file/live-public/provider modes; live-public is enabled while robots/legal review of direct HTML access is in progress (job-board, runnable). Not in digest selection until that review signs off.
 - `regional-job-boards` - regional job-board provider/snapshot coverage after legal/robots review (job-board, runnable). Not in digest selection.
 - `egrul-fns` - registry reference for entity verification (company-registry, runnable). Enrichment-only, never lead-originating. Not in digest selection.
 - `transparent-business-fns` - Transparent Business/FNS size, risk and counterparty context (company-registry, runnable). Enrichment-only, never lead-originating.
@@ -98,7 +98,8 @@ Rule: context only. Can boost explanation quality, but must not outrank direct h
 - `funding-business-signals` can run free live-public context mode through GDELT with `FUNDING_SIGNALS_GDELT_QUERIES` or `FUNDING_SIGNALS_GDELT_QUERIES_JSON`; it remains context-only and does not create digest leads. GDELT publisher/article domains are stored as publisher context, not company identity.
 - `rabota-rossii` uses the official `opendata.trudvsem.ru` vacancies API in live-public mode and stores no personal contact fields from source payloads.
 - `superjob` uses app-key/provider mode or snapshots; direct anonymous API calls are not assumed production-ready.
-- `habr-career`, `fedresurs`, `transparent-business-fns`, `industry-media`, and `regional-job-boards` start as file/provider-token sources unless a lawful stable public endpoint is approved.
+- `fedresurs`, `transparent-business-fns`, `industry-media`, and `regional-job-boards` start as file/provider-token sources unless a lawful stable public endpoint is approved.
+- `habr-career` now exposes file/live-public/provider modes; live-public direct HTML access is enabled while its robots/legal review is in progress and stays out of digest selection until that review signs off.
 - `company-newsrooms` supports curated targets live crawl and provider/snapshot mode; it remains context-only.
 - Source smokes cover file mode for every family plus live/provider branches for `company-site`, `company-newsrooms`, `tech-job-boards`, `linkedin-company-pages`, `egrul-fns`, `funding-business-signals`, `rabota-rossii`, and the RF expansion sources.
 - `verify:smoke` always runs source smokes and skips DB-backed smokes when `DATABASE_URL` is missing, unreachable, or pointed at a database without the digest tables.

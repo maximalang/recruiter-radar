@@ -154,9 +154,9 @@ const sourceReadinessPolicy = Object.freeze({
   'habr-career': sourcePolicy({
     priority: 'P2',
     leadEligibility: 'confidence-gated-evidence',
-    maturity: 'provider-or-snapshot-only',
+    maturity: 'official-live-public-gated',
     productionBlockers: [
-      'Direct HTML mode requires robots/legal review; use provider or snapshots until approved.',
+      'Robots/legal review of career.habr.com direct HTML access is in progress; live-public stays out of digest until that review signs off and confidence tests pass.',
     ],
     promotionStatus: 'blocked-from-digest-pending-confidence-tests',
   }),
@@ -486,8 +486,8 @@ registerRunnableScriptSource({
   sourceClass: 'primary-platform',
   evidenceTier: 'medium-signal',
   defaultConfidence: 0.69,
-  fetchModes: ['file', 'provider-token'],
-  description: 'Habr Career IT vacancy coverage via snapshots/provider until a lawful public live path is approved.',
+  fetchModes: ['file', 'live-public', 'provider-token'],
+  description: 'Habr Career IT vacancy coverage via snapshots/provider/live HTML; live-public pending robots/legal review and confidence gates before digest use.',
   scriptPath: habrCareerScriptPath,
   absoluteScriptPath: habrCareerAbsoluteScriptPath,
 });
