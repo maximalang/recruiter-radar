@@ -152,7 +152,7 @@ export async function fetchHabrCareerPages({ config = resolveHabrCareerSearchCon
   for (let page = 1; page <= config.pages; page += 1) {
     const url = buildHabrCareerSearchUrl(config, page);
 
-    const html = await fetchText(url.toString(), {
+    const { body: html } = await fetchText(url.toString(), {
       sourceName: 'habr-career',
       headers: {
         accept: 'text/html,application/xhtml+xml',
