@@ -148,37 +148,44 @@ function normalizeSuperjobRecord(record, { fetchedAt, lineNumber }) {
     return null;
   }
 
-  // Map SuperJob fields to the generic normalizer's expected field names
+  // Map SuperJob fields to the generic normalizer's expected field names.
+  // Prefer SuperJob-native fields (live API mode), but fall back to the
+  // generic names so file mode (SUPERJOB_INPUT_FILE) and provider mode —
+  // both of which carry generically-shaped records — normalize correctly.
   const mapped = {
     // Company
-    company_name: record.firm_name,
-    inn: record.client ?? undefined,
+    company_name: record.firm_name ?? record.company_name,
+    company_domain: record.company_domain ?? record.domain,
+    company_website_url: record.company_website_url ?? record.website_url,
+    inn: record.client ?? record.inn ?? undefined,
     // Job
-    job_title: record.profession,
-    external_id: record.id,
-    job_posting_url: record.link,
+    job_title: record.profession ?? record.job_title,
+    external_id: record.id ?? record.external_id,
+    job_posting_url: record.link ?? record.job_posting_url,
     published_at: record.date_published
       ? new Date(record.date_published * 1000).toISOString()
-      : undefined,
+      : record.published_at,
     // Location
-    location: record.town?.title,
+    location: record.town?.title ?? record.location,
     // Salary
     salary: record.payment_from || record.payment_to
       ? [record.payment_from, record.payment_to, record.currency].filter(Boolean).join('–')
-      : undefined,
-    salary_from: record.payment_from,
-    salary_to: record.payment_to,
+      : record.salary,
+    salary_from: record.payment_from ?? record.salary_from,
+    salary_to: record.payment_to ?? record.salary_to,
     currency: record.currency,
     // Employment
-    employment_type: record.type_of_work?.title,
+    employment_type: record.type_of_work?.title ?? record.employment_type,
     // Experience
-    experience: record.experience?.title,
+    experience: record.experience?.title ?? record.experience,
     // Agency (direct employer vs recruitment agency)
-    agency: record.agency?.title,
+    agency: record.agency?.title ?? record.agency,
     // Address
-    address: record.address?.city ?? record.address?.street,
+    address: record.address?.city ?? record.address?.street ?? record.address,
+    // Tags
+    tags: record.tags,
     // Source board marker
-    source_board: 'superjob',
+    source_board: record.source_board ?? 'superjob',
   };
 
   return normalizeJobPostingRecord(mapped, { fetchedAt, lineNumber, sourceId: SOURCE_ID }, { defaultBoard: 'superjob' });
