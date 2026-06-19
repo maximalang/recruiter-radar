@@ -86,7 +86,7 @@ WITH source_signal_rows AS (
     NULLIF(signal.payload ->> 'hh_employer_id', '') AS payload_hh_employer_id
   FROM signals AS signal
   WHERE signal.signal_type = 'job_posting'
-    AND signal.source IN ('hh', 'career-pages', 'rabota-rossii', 'superjob', 'habr-career', 'tech-job-boards', 'linkedin-company-pages', 'company-newsrooms', 'industry-media')
+    AND signal.source IN ('hh', 'career-pages', 'rabota-rossii', 'superjob', 'habr-career', 'tech-job-boards', 'linkedin-company-pages', 'regional-job-boards')
 ),
 normalized_signal_rows AS (
   SELECT
@@ -114,9 +114,7 @@ normalized_signal_rows AS (
     --                        aggregator IDs and do NOT grant direct_hiring_proof status on their own.
     --                        For rabota-rossii, INN-based org_external_id IS org-level → direct proof.
     -- platform_aggregation  — signal from a platform (HH, superjob, etc.) with a company match in
-    --                        org_source_refs, but no company-owned surface. Also includes news signals
-    --                        whose headline directly references hiring (Russian keywords: найм, ваканси,
-    --                        рекрутер, ищут сотрудник, расширение команды, рост штата).
+    --                        org_source_refs, but no company-owned surface.
     -- enrichment_context    — no match found; signal provides background context only.
     CASE
       WHEN signal.source = 'career-pages'
@@ -132,10 +130,6 @@ normalized_signal_rows AS (
           COALESCE(signal.payload_hh_employer_id, '')
         )
         THEN 'direct_hiring_proof'
-      WHEN signal.source IN ('company-newsrooms', 'industry-media')
-        AND signal.evidence_title ~* 'найм|ваканси|рекрутер|ищут\s+сотрудник|расширени[ея]\s+команд|рост\s+штат|подбор\s+персонал|массовый\s+найм|ханти'
-        AND source_ref.matched_by IS NOT NULL
-        THEN 'platform_aggregation'
       WHEN source_ref.matched_by IS NOT NULL
         THEN 'platform_aggregation'
       ELSE 'enrichment_context'

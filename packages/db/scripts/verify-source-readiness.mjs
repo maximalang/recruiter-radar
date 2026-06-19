@@ -26,7 +26,22 @@ const expectedSources = [
   'industry-media',
   'regional-job-boards',
 ];
-const digestLeadSources = ['career-pages', 'hh'];
+// Sources whose signals are eligible to ORIGINATE a digest lead. The digest SQL
+// (source-digest-evidence.sql) admits only signal_type = 'job_posting', so this set
+// is exactly the sources whose adapters emit job_posting signals. Final lead status
+// is still gated downstream by evidence_quality + the A/B/C/D confidence gates.
+// News sources (company-newsrooms, industry-media) emit signalType 'other' and are
+// enrichment-context only — they are intentionally NOT lead-originating.
+const digestLeadSources = [
+  'hh',
+  'career-pages',
+  'rabota-rossii',
+  'superjob',
+  'habr-career',
+  'tech-job-boards',
+  'linkedin-company-pages',
+  'regional-job-boards',
+];
 const providerTokenSources = [
   'linkedin-company-pages',
   'tech-job-boards',
