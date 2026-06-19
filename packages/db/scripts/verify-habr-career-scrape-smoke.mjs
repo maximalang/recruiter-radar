@@ -13,9 +13,9 @@ import assert from 'node:assert/strict';
 import { extractVacancyCardsFromHtml } from './adapters/habr-career.mjs';
 import { normalizeJobPostingRecord } from './adapters/rf-source-normalizers.mjs';
 
-// Representative search-results markup: two vacancy cards in the structure the
-// extractor matches (vacancy-card__inner + title/company/salary/location/skill).
-const SAMPLE_HTML = `
+// Legacy markup: the pre-2026 structure (flat title/company/salary/location/skill).
+// Kept so the extractor's fallback selectors stay covered.
+const LEGACY_HTML = `
 <div class="vacancy-card__inner">
   <a class="vacancy-card__title-link" href="/vacancies/1000123?from=search">Senior Recruiter</a>
   <a class="vacancy-card__company-name" href="/companies/acme">Acme Tech</a>
@@ -32,9 +32,84 @@ const SAMPLE_HTML = `
 </div></div></div>
 `;
 
-const records = extractVacancyCardsFromHtml(SAMPLE_HTML);
+// Current career.habr.com markup (2026): nested company link with slug,
+// `predicted-salary` placeholder (real salary in a range or absent),
+// `chip-with-icon__text` location, `vacancy-card__skills-chip` skills.
+const CURRENT_HTML = `
+<div class="vacancy-card__inner">
+  <div class="vacancy-card__info">
+    <div class="vacancy-card__company">
+      <a class="link-comp link-comp--appearance-dark" href="/companies/rwb">RWB (Wildberries &amp; Russ)</a>
+      <div class="vacancy-card__company-rating"><a href="/companies/rwb/scores/2025">4.39</a></div>
+    </div>
+    <div class="vacancy-card__title">
+      <a class="vacancy-card__title-link" href="/vacancies/1000165792">Специалист по подбору персонала</a>
+    </div>
+    <div class="vacancy-card__salary">
+      <div class="predicted-salary">
+        <h4 class="predicted-salary__title">Зарплата не указана</h4>
+        <span class="tooltip">Похожие специалисты получают 113 000 - 205 000 ₽</span>
+      </div>
+    </div>
+    <div class="vacancy-card__meta">
+      <div class="basic-chip">
+        <div class="chip-with-icon__icon"><svg class="svg-icon svg-icon--icon-placemark"></svg></div>
+        <div class="chip-with-icon__text">Москва</div>
+      </div>
+    </div>
+    <div class="vacancy-card__skills">
+      <a class="basic-chip vacancy-card__skills-chip" href="/vacancies/skills/poisk-talantov">Поиск талантов</a>
+    </div>
+  </div>
+</div>
+<div class="vacancy-card__inner">
+  <div class="vacancy-card__info">
+    <div class="vacancy-card__company">
+      <a class="link-comp" href="/companies/aston">Aston</a>
+    </div>
+    <div class="vacancy-card__title">
+      <a class="vacancy-card__title-link" href="/vacancies/1000170001">IT-рекрутер</a>
+    </div>
+    <div class="vacancy-card__salary">
+      <div class="predicted-salary">
+        <h4 class="predicted-salary__title">от 70 000 до 104 000 ₽</h4>
+      </div>
+    </div>
+    <div class="vacancy-card__meta">
+      <div class="basic-chip">
+        <div class="chip-with-icon__icon"><svg class="svg-icon svg-icon--icon-placemark"></svg></div>
+        <div class="chip-with-icon__text">Нижний Новгород</div>
+      </div>
+      <div class="basic-chip">
+        <div class="chip-with-icon__icon"><svg class="svg-icon svg-icon--icon-format"></svg></div>
+        <div class="chip-with-icon__text">Можно удалённо</div>
+      </div>
+    </div>
+  </div>
+</div>
+`;
 
-assert.equal(records.length, 2, 'both cards must be extracted');
+const records = extractVacancyCardsFromHtml(LEGACY_HTML);
+
+assert.equal(records.length, 2, 'both legacy cards must be extracted');
+
+// --- Current-markup coverage: the 2026 layout must extract cleanly ---------
+const currentRecords = extractVacancyCardsFromHtml(CURRENT_HTML);
+assert.equal(currentRecords.length, 2, 'both current-markup cards must be extracted');
+
+const [rwb, aston] = currentRecords;
+
+assert.equal(rwb.job_title, 'Специалист по подбору персонала');
+assert.equal(rwb.company_name, 'RWB (Wildberries & Russ)', 'company name must decode &amp;');
+assert.equal(rwb.company_slug, 'rwb', 'company slug must come from /companies/<slug>');
+assert.equal(rwb.location, 'Москва', 'location must come from the meta icon-chip');
+assert.equal(rwb.salary, null, 'placeholder "Зарплата не указана" must not become a salary');
+assert.deepEqual(rwb.tags, ['Поиск талантов'], 'skills must come from skills-chip');
+
+assert.equal(aston.company_name, 'Aston');
+assert.equal(aston.company_slug, 'aston');
+assert.equal(aston.location, 'Нижний Новгород');
+assert.ok(aston.salary && aston.salary.includes('₽'), 'explicit salary range must be kept');
 
 // Extractor must emit the canonical keys the normalizer reads.
 for (const record of records) {
