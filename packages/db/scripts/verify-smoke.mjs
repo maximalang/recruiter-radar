@@ -13,6 +13,7 @@ loadEnvFile(rootEnvPath);
 
 const alwaysScripts = [
   './verify-career-pages-smoke.mjs',
+  './verify-career-pages-providers-smoke.mjs',
   './verify-career-pages-discovery-smoke.mjs',
   './verify-rabota-rossii-smoke.mjs',
   './verify-company-site-smoke.mjs',

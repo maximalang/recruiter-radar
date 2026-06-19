@@ -2,12 +2,11 @@
   "targets": [
     {
       "id": "discord-greenhouse",
-      "adapter": "greenhouse-board",
+      "adapter": "static-records",
       "company_name": "Discord",
       "company_domain": "discord.com",
       "company_website_url": "https://discord.com/",
       "career_page_url": "https://boards.greenhouse.io/discord",
-      "source_url": "https://boards-api.greenhouse.io/v1/boards/discord/jobs?content=true",
       "records": [
         {
           "external_id": "discord-123",
@@ -21,12 +20,11 @@
     },
     {
       "id": "dnb-lever",
-      "adapter": "lever-postings",
+      "adapter": "static-records",
       "company_name": "Dun & Bradstreet",
       "company_domain": "dnb.com",
       "company_website_url": "https://www.dnb.com/",
       "career_page_url": "https://jobs.lever.co/dnb",
-      "source_url": "https://api.lever.co/v0/postings/dnb?mode=json",
       "records": [
         {
           "external_id": "dnb-456",

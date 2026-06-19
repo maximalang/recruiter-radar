@@ -730,6 +730,10 @@ function normalizeFetchTarget(target, index) {
 
 async function fetchGreenhouseBoardRecords(target) {
   const payload = await fetchJson(target.sourceUrl, target.id);
+  return mapGreenhouseBoardPayload(payload, target);
+}
+
+export function mapGreenhouseBoardPayload(payload, target) {
   const jobs = Array.isArray(payload?.jobs) ? payload.jobs : [];
 
   return jobs.map((job, index) => ({
@@ -752,6 +756,10 @@ async function fetchGreenhouseBoardRecords(target) {
 
 async function fetchLeverPostingsRecords(target) {
   const payload = await fetchJson(target.sourceUrl, target.id);
+  return mapLeverPostingsPayload(payload, target);
+}
+
+export function mapLeverPostingsPayload(payload, target) {
   const jobs = Array.isArray(payload) ? payload : [];
 
   return jobs.map((job, index) => ({
