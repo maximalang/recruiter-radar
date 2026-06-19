@@ -42,10 +42,36 @@ const ENV_PARAM_MAP = [
 ];
 
 /**
+ * Parse a multi-keyword env value into a deduped, order-stable list.
+ * Accepts comma- or newline-separated keywords. Returns [] when empty.
+ */
+function parseKeywordList(raw) {
+  const text = toNonEmptyText(raw);
+  if (!text) return [];
+  const seen = new Set();
+  const list = [];
+  for (const part of text.split(/[,\n]/)) {
+    const kw = part.trim();
+    if (!kw) continue;
+    const dedupeKey = kw.toLowerCase();
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+    list.push(kw);
+  }
+  return list;
+}
+
+/**
  * Resolve search config from env vars.
+ *
+ * Keyword precedence: HABR_CAREER_KEYWORDS (multi, comma/newline-separated) →
+ * HABR_CAREER_KEYWORD (single) → DEFAULT_KEYWORD. `keywords` is the list the
+ * fetcher iterates; `keyword` mirrors the first entry for back-compat summaries.
  */
 export function resolveHabrCareerSearchConfig(env = process.env) {
-  const keyword = toNonEmptyText(env.HABR_CAREER_KEYWORD) ?? DEFAULT_KEYWORD;
+  const multi = parseKeywordList(env.HABR_CAREER_KEYWORDS);
+  const single = toNonEmptyText(env.HABR_CAREER_KEYWORD);
+  const keywords = multi.length > 0 ? multi : single ? [single] : [DEFAULT_KEYWORD];
   const pages = clampInteger(env.HABR_CAREER_PAGES, DEFAULT_PAGES, 1, MAX_PAGES);
   const extraParams = {};
 
@@ -57,7 +83,8 @@ export function resolveHabrCareerSearchConfig(env = process.env) {
   }
 
   return {
-    keyword,
+    keywords,
+    keyword: keywords[0],
     pages,
     extraParams,
   };
@@ -65,10 +92,13 @@ export function resolveHabrCareerSearchConfig(env = process.env) {
 
 /**
  * Build the Habr Career search URL for a given page.
+ *
+ * `keyword` defaults to the config's primary keyword; the multi-keyword fetcher
+ * passes each keyword explicitly so one config can drive several searches.
  */
-export function buildHabrCareerSearchUrl(config, page = 1) {
+export function buildHabrCareerSearchUrl(config, page = 1, keyword = config.keyword) {
   const url = new URL(HABR_CAREER_SEARCH_URL);
-  url.searchParams.set('q', config.keyword);
+  url.searchParams.set('q', keyword);
   if (page > 1) {
     url.searchParams.set('page', String(page));
   }
@@ -144,38 +174,59 @@ export function extractVacancyCardsFromHtml(html) {
 /**
  * Fetch vacancy pages by scraping Habr Career search.
  * Falls back to HTML scraping because no public API exists.
+ *
+ * Iterates every keyword in `config.keywords` (role-derived union from active
+ * profiles, or a single explicit keyword). Vacancies are deduped by id ACROSS
+ * keywords so a vacancy matching two keywords is upserted once. Each keyword is
+ * paged independently and stops early when a page yields nothing.
  */
 export async function fetchHabrCareerPages({ config = resolveHabrCareerSearchConfig() }) {
+  const keywords = config.keywords?.length ? config.keywords : [config.keyword];
   const items = [];
+  const seenIds = new Set();
   const pageSummaries = [];
 
-  for (let page = 1; page <= config.pages; page += 1) {
-    const url = buildHabrCareerSearchUrl(config, page);
+  for (let k = 0; k < keywords.length; k += 1) {
+    const keyword = keywords[k];
 
-    const { body: html } = await fetchText(url.toString(), {
-      sourceName: 'habr-career',
-      headers: {
-        accept: 'text/html,application/xhtml+xml',
-        'user-agent': 'RecruiterRadar/1.0 (habr-career source; contact: ops@example.com)',
-      },
-    });
+    for (let page = 1; page <= config.pages; page += 1) {
+      const url = buildHabrCareerSearchUrl(config, page, keyword);
 
-    const pageItems = extractVacancyCardsFromHtml(html);
+      const { body: html } = await fetchText(url.toString(), {
+        sourceName: 'habr-career',
+        headers: {
+          accept: 'text/html,application/xhtml+xml',
+          'user-agent': 'RecruiterRadar/1.0 (habr-career source; contact: ops@example.com)',
+        },
+      });
 
-    pageSummaries.push({
-      page,
-      items: pageItems.length,
-    });
-    items.push(...pageItems);
+      const pageItems = extractVacancyCardsFromHtml(html);
+      let added = 0;
+      for (const item of pageItems) {
+        if (item.id != null && seenIds.has(item.id)) continue;
+        if (item.id != null) seenIds.add(item.id);
+        items.push(item);
+        added += 1;
+      }
 
-    // No more results
-    if (pageItems.length === 0) {
-      break;
-    }
+      pageSummaries.push({
+        keyword,
+        page,
+        items: pageItems.length,
+        added,
+      });
 
-    // Rate limit — be respectful
-    if (page < config.pages) {
-      await new Promise((resolve) => setTimeout(resolve, SCRAPE_DELAY_MS));
+      // No more results for this keyword
+      if (pageItems.length === 0) {
+        break;
+      }
+
+      // Rate limit — be respectful. Delay between pages, and between keywords.
+      const morePages = page < config.pages;
+      const moreKeywords = k < keywords.length - 1;
+      if (morePages || (page === config.pages && moreKeywords)) {
+        await new Promise((resolve) => setTimeout(resolve, SCRAPE_DELAY_MS));
+      }
     }
   }
 
@@ -191,6 +242,7 @@ export async function fetchHabrCareerPages({ config = resolveHabrCareerSearchCon
 function summarizeHabrCareerSearchConfig(config) {
   return {
     keyword: config.keyword,
+    keywords: config.keywords ?? (config.keyword ? [config.keyword] : []),
     pages: config.pages,
     extraParams: config.extraParams ?? {},
   };

@@ -45,6 +45,7 @@ const runtime = createStandardSourceRuntime({
     ? {
       liveProvider: 'habr-career-scrape',
       keyword: input.keyword,
+      keywords: input.keywords,
       pagesFetched: input.pagesFetched,
     }
     : {},
@@ -91,6 +92,7 @@ export async function resolveHabrCareerLiveInput({ config }) {
     extra: {
       liveProvider: 'habr-career-scrape',
       keyword: config.keyword,
+      keywords: config.keywords,
       pagesFetched: fetchResult.pagesFetched,
     },
   });

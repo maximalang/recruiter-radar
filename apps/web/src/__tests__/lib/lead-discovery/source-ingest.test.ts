@@ -125,6 +125,70 @@ describe('source-ingest', () => {
     })
   })
 
+  describe('habr-career keyword derivation', () => {
+    // Route queries by shape: search-prefs SELECT vs active-profile roles SELECT.
+    function mockPoolWith({ roles, searchParams }: { roles?: string[][]; searchParams?: Record<string, string> }) {
+      const query = jest.fn((sql: string) => {
+        if (sql.includes('user_search_preferences')) {
+          return Promise.resolve({ rows: searchParams ? [{ params: searchParams }] : [] })
+        }
+        if (sql.includes('client_profiles')) {
+          return Promise.resolve({ rows: (roles ?? []).map(r => ({ roles: r })) })
+        }
+        return Promise.resolve({ rows: [] })
+      })
+      return { query }
+    }
+
+    it('injects HABR_CAREER_KEYWORDS derived from active profiles roles', async () => {
+      mockGetPool.mockReturnValue(mockPoolWith({ roles: [['hr'], ['it-engineering']] }))
+
+      let capturedEnv: Record<string, string> | undefined
+      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
+        capturedEnv = opts.env
+        callback(null, JSON.stringify({ source: 'habr-career', recordsReceived: 1, signalUpsertsCompleted: 1 }), '')
+      })
+
+      await ingestSource('habr-career')
+
+      expect(capturedEnv?.HABR_CAREER_KEYWORDS).toBeDefined()
+      const kws = capturedEnv!.HABR_CAREER_KEYWORDS.split(',')
+      expect(kws).toContain('рекрутер') // hr
+      expect(kws).toContain('разработчик') // it-engineering
+    })
+
+    it('does not derive keywords when an explicit search pref keyword is set', async () => {
+      mockGetPool.mockReturnValue(
+        mockPoolWith({ roles: [['hr']], searchParams: { HABR_CAREER_KEYWORD: 'devops' } })
+      )
+
+      let capturedEnv: Record<string, string> | undefined
+      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
+        capturedEnv = opts.env
+        callback(null, JSON.stringify({ source: 'habr-career', recordsReceived: 1, signalUpsertsCompleted: 1 }), '')
+      })
+
+      await ingestSource('habr-career')
+
+      expect(capturedEnv?.HABR_CAREER_KEYWORD).toBe('devops')
+      expect(capturedEnv?.HABR_CAREER_KEYWORDS).toBeUndefined()
+    })
+
+    it('does not derive keywords for non-habr sources', async () => {
+      mockGetPool.mockReturnValue(mockPoolWith({ roles: [['hr']] }))
+
+      let capturedEnv: Record<string, string> | undefined
+      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
+        capturedEnv = opts.env
+        callback(null, JSON.stringify({ source: 'hh', recordsReceived: 1, signalUpsertsCompleted: 1 }), '')
+      })
+
+      await ingestSource('hh')
+
+      expect(capturedEnv?.HABR_CAREER_KEYWORDS).toBeUndefined()
+    })
+  })
+
   describe('ingestAllPrimarySources', () => {
     it('runs all three primary sources in parallel', async () => {
       mockExecFile.mockImplementation((_cmd, args: any, opts: any, callback: any) => {

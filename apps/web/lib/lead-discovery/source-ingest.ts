@@ -30,6 +30,7 @@ import {
   type SourceId,
 } from '@/lib/sources/source-registry'
 import { getPool } from '@/lib/db-pool'
+import { deriveHabrKeywordsFromProfiles } from './habr-keywords'
 
 export type { SourceId } from '@/lib/sources/source-registry'
 
@@ -157,6 +158,46 @@ async function loadSearchPrefsFromDb(source: SourceId): Promise<Record<string, s
 }
 
 /**
+ * Load the `roles` arrays of every active client profile.
+ *
+ * Used only by habr-career keyword derivation: ingestion is global, so the
+ * search must reflect the union of all active profiles' ICP roles, not one
+ * profile's. Returns [] when no pool (test/dev) — caller falls back to ENV.
+ */
+async function loadActiveProfileRoles(): Promise<string[][]> {
+  const pool = getPool()
+  if (!pool) return []
+  const { rows } = await pool.query<{ roles: string[] | null }>(`
+    SELECT roles
+    FROM client_profiles
+    WHERE is_active = TRUE
+  `)
+  return rows.map(r => r.roles ?? [])
+}
+
+/**
+ * Resolve the habr-career keyword search env from active profiles' roles.
+ *
+ * Precedence: an explicit DB/ENV keyword pref (HABR_CAREER_KEYWORD or the
+ * multi-value HABR_CAREER_KEYWORDS already present in `dbSearchEnv`) always
+ * wins — operators can override the heuristic. Otherwise we derive keywords
+ * from the union of active profiles' roles and inject them as
+ * HABR_CAREER_KEYWORDS. When neither yields anything, we inject nothing and the
+ * adapter falls back to its own default keyword.
+ */
+async function resolveHabrKeywordEnv(
+  dbSearchEnv: Record<string, string>
+): Promise<Record<string, string>> {
+  if (dbSearchEnv.HABR_CAREER_KEYWORD || dbSearchEnv.HABR_CAREER_KEYWORDS) return {}
+
+  const roleLists = await loadActiveProfileRoles()
+  const keywords = deriveHabrKeywordsFromProfiles(roleLists)
+  if (keywords.length === 0) return {}
+
+  return { HABR_CAREER_KEYWORDS: keywords.join(',') }
+}
+
+/**
  * Run a source ingestion script.
  *
  * Returns a promise that resolves when the script finishes.
@@ -185,13 +226,18 @@ export async function ingestSource(
   const dbSearchEnv = await loadSearchPrefsFromDb(source)
   const searchEnvVars = getSearchEnvVars(source)
 
+  // habr-career: derive search keywords from the union of active profiles'
+  // roles (ingestion is global), unless an explicit keyword pref is set.
+  const derivedSearchEnv =
+    source === 'habr-career' ? await resolveHabrKeywordEnv(dbSearchEnv) : {}
+
   return new Promise<IngestResult>((resolvePromise) => {
     // Filter env vars through whitelist — prevent injection of
     // DATABASE_URL, NODE_OPTIONS, PATH, etc.
     // Exclude searchEnvVars from caller-provided env (they come from DB).
     const filteredEnv = env ? filterEnvVars(env, searchEnvVars) : {}
-    // Merge: process.env → DB search prefs → caller filtered env
-    const mergedEnv = { ...process.env, ...dbSearchEnv, ...filteredEnv }
+    // Merge: process.env → DB search prefs → derived (role-based) → caller filtered env
+    const mergedEnv = { ...process.env, ...dbSearchEnv, ...derivedSearchEnv, ...filteredEnv }
 
     // Resolve execFile via the bundler-opaque accessor so Turbopack does not
     // statically analyze this spawn as a `<dynamic>` module import (the script
