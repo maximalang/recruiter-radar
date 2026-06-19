@@ -157,8 +157,8 @@ export function extractVacancyCardsFromHtml(html) {
     if (title && id) {
       records.push({
         id,
-        profession: title,
-        firm_name: company,
+        job_title: title,
+        company_name: company,
         link,
         salary,
         location,

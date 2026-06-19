@@ -18,6 +18,7 @@ const alwaysScripts = [
   './verify-company-site-smoke.mjs',
   './verify-linkedin-company-pages-smoke.mjs',
   './verify-tech-job-boards-smoke.mjs',
+  './verify-habr-career-scrape-smoke.mjs',
   './verify-egrul-fns-smoke.mjs',
   './verify-funding-business-signals-smoke.mjs',
   './verify-rf-source-expansion-smoke.mjs',

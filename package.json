@@ -78,6 +78,7 @@
     "verify:rf-source-expansion:smoke": "node packages/db/scripts/verify-rf-source-expansion-smoke.mjs",
     "verify:linkedin-company-pages:smoke": "node packages/db/scripts/verify-linkedin-company-pages-smoke.mjs",
     "verify:tech-job-boards:smoke": "node packages/db/scripts/verify-tech-job-boards-smoke.mjs",
+    "verify:habr-career:smoke": "node packages/db/scripts/verify-habr-career-scrape-smoke.mjs",
     "verify:egrul-fns:smoke": "node packages/db/scripts/verify-egrul-fns-smoke.mjs",
     "verify:source:confidence": "node packages/db/scripts/verify-source-confidence-gates.mjs",
     "verify:dedupe:metrics": "node packages/db/scripts/verify-dedupe-metrics.mjs",
