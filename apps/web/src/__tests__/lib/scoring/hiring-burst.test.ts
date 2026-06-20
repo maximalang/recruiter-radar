@@ -111,6 +111,48 @@ describe('detectHiringBurst', () => {
     expect(sameRole.distinctRoles).toBe(1)
   })
 
+  it('amplifies a burst built from very fresh (0–3 day) postings', () => {
+    const fresh = detectHiringBurst({
+      vacancies: [
+        vac({ id: 'v-1', role: 'backend', publishedAt: new Date(NOW - 0 * DAY_MS).toISOString() }),
+        vac({ id: 'v-2', role: 'frontend', publishedAt: new Date(NOW - 1 * DAY_MS).toISOString() }),
+        vac({ id: 'v-3', role: 'sales', publishedAt: new Date(NOW - 2 * DAY_MS).toISOString() }),
+      ],
+      now: () => NOW,
+    })
+
+    const trailing = detectHiringBurst({
+      vacancies: [
+        vac({ id: 'v-1', role: 'backend', publishedAt: new Date(NOW - 10 * DAY_MS).toISOString() }),
+        vac({ id: 'v-2', role: 'frontend', publishedAt: new Date(NOW - 11 * DAY_MS).toISOString() }),
+        vac({ id: 'v-3', role: 'sales', publishedAt: new Date(NOW - 13 * DAY_MS).toISOString() }),
+      ],
+      now: () => NOW,
+    })
+
+    expect(fresh.isBurst).toBe(true)
+    expect(trailing.isBurst).toBe(true)
+    expect(fresh.freshCount).toBe(3)
+    expect(trailing.freshCount).toBe(0)
+    expect(fresh.score).toBeGreaterThan(trailing.score)
+  })
+
+  it('does not let the recency boost push a sub-threshold signal into burst', () => {
+    // Two postings today: very fresh, but below BURST_THRESHOLD. The recency
+    // amplifier must stay gated behind isBurst so this remains non-burst.
+    const result = detectHiringBurst({
+      vacancies: [
+        vac({ id: 'v-1', publishedAt: new Date(NOW - 0 * DAY_MS).toISOString() }),
+        vac({ id: 'v-2', publishedAt: new Date(NOW - 1 * DAY_MS).toISOString() }),
+      ],
+      now: () => NOW,
+    })
+
+    expect(result.isBurst).toBe(false)
+    expect(result.freshCount).toBe(2)
+    expect(result.score).toBeLessThan(0.4)
+  })
+
   it('clamps the score to [0, 1] even with many fresh diverse vacancies', () => {
     const result = detectHiringBurst({
       vacancies: Array.from({ length: 30 }, (_, i) =>

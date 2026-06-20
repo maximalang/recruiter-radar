@@ -180,15 +180,51 @@ function freshnessWeight(days: number): number {
   return 1 - (days - 7) / (60 - 7)
 }
 
-function isExcluded(company: FiurCompany, profile: FiurClientProfile): boolean {
-  if (!profile.exclusions || profile.exclusions.length === 0) return false
+/**
+ * Baseline exclusions applied to every profile regardless of its own list.
+ *
+ * Recruitment / staffing agencies are structural competitors: a recruitment
+ * agency should never be handed *another* recruitment agency as a client lead.
+ * These terms are normalised (lowercased) the same way profile exclusions are,
+ * and matched as substrings against company name + industry.
+ */
+export const DEFAULT_COMPETITOR_EXCLUSIONS: readonly string[] = [
+  'recruitment agency',
+  'staffing agency',
+  'staffing firm',
+  'кадровое агентство',
+  'рекрутинговое агентство',
+  'агентство по подбору персонала',
+  'аутстаффинг',
+  'кадровое агенство', // common misspelling seen in the wild
+]
+
+type ExclusionHit =
+  | { excluded: false }
+  | { excluded: true; scope: 'profile' | 'competitor'; term: string }
+
+function findExclusion(company: FiurCompany, profile: FiurClientProfile): ExclusionHit {
   const haystacks: string[] = [company.industry, company.name]
     .filter((v): v is string => typeof v === 'string' && v.length > 0)
     .map(normalize)
-  return profile.exclusions.some((ex) => {
+  if (haystacks.length === 0) return { excluded: false }
+
+  // Profile-defined exclusions take precedence in reporting — they reflect an
+  // explicit client decision and map to the established fit.industry.excluded key.
+  for (const ex of profile.exclusions ?? []) {
     const n = normalize(ex)
-    return haystacks.some((h) => h.includes(n))
-  })
+    if (n.length > 0 && haystacks.some((h) => h.includes(n))) {
+      return { excluded: true, scope: 'profile', term: ex }
+    }
+  }
+
+  for (const ex of DEFAULT_COMPETITOR_EXCLUSIONS) {
+    if (haystacks.some((h) => h.includes(ex))) {
+      return { excluded: true, scope: 'competitor', term: ex }
+    }
+  }
+
+  return { excluded: false }
 }
 
 const SMB_MIN_EMPLOYEES = 50
@@ -216,10 +252,18 @@ function computeFit(
 ): ComponentResult {
   const reasons: ScoringReason[] = []
 
-  if (isExcluded(company, profile)) {
+  const exclusion = findExclusion(company, profile)
+  if (exclusion.excluded) {
+    const reasonKey =
+      exclusion.scope === 'competitor' ? 'fit.competitor.excluded' : 'fit.industry.excluded'
     return {
       score: 0,
-      reasons: [r('fit', 'fit.industry.excluded', { industry: company.industry ?? '' })],
+      reasons: [
+        r('fit', reasonKey, {
+          industry: company.industry ?? '',
+          term: exclusion.term,
+        }),
+      ],
     }
   }
 

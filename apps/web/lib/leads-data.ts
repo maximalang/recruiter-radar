@@ -196,6 +196,11 @@ export function deriveNegativeSignals(input: {
     signals.push('Индустрия исключена из ICP агентства')
   }
 
+  // Competitor (recruitment/staffing agency) — never a valid client
+  if (keys.includes('fit.competitor.excluded')) {
+    signals.push('Компания-конкурент — кадровое/рекрутинговое агентство')
+  }
+
   // No safe contact path
   if (keys.includes('reachability.no-path')) {
     signals.push('Безопасный путь контакта пока не найден')

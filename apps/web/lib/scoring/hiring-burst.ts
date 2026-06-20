@@ -27,12 +27,16 @@ export interface BurstResult {
   score: number
   recentCount: number
   distinctRoles: number
+  freshCount: number
   reasons: string[]
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const WINDOW_DAYS = 14
 const BURST_THRESHOLD = 3
+// Postings inside this sub-window are "fresh" — a burst made of brand-new
+// roles is a stronger urgency cue than one trailing the 14-day window.
+const FRESH_DAYS = 3
 
 const clamp01 = (n: number): number => (n < 0 ? 0 : n > 1 ? 1 : n)
 
@@ -54,6 +58,7 @@ export function detectHiringBurst(input: BurstInput): BurstResult {
       score: 0,
       recentCount: 0,
       distinctRoles: 0,
+      freshCount: 0,
       reasons: ['no vacancies — no burst signal'],
     }
   }
@@ -65,6 +70,7 @@ export function detectHiringBurst(input: BurstInput): BurstResult {
       score: 0,
       recentCount: 0,
       distinctRoles: 0,
+      freshCount: 0,
       reasons: ['only internal-recruiter vacancies — does not count as hiring burst'],
     }
   }
@@ -78,11 +84,13 @@ export function detectHiringBurst(input: BurstInput): BurstResult {
       score: 0,
       recentCount: 0,
       distinctRoles: 0,
+      freshCount: 0,
       reasons: [`no postings inside the ${WINDOW_DAYS}-day window`],
     }
   }
 
   const distinctRoles = new Set(recent.map((v) => normalizeRole(v.role))).size
+  const freshCount = recent.filter((v) => ageDays(v.publishedAt, now) <= FRESH_DAYS).length
   const isBurst = recentCount >= BURST_THRESHOLD
 
   let score = 0
@@ -110,11 +118,20 @@ export function detectHiringBurst(input: BurstInput): BurstResult {
     reasons.push(`large-scale hiring — ${recentCount} postings amplifies urgency`)
   }
 
+  // Recency amplifier — only meaningful once a burst is established, so it
+  // cannot push a sub-threshold signal across the burst line (the [0, 0.4)
+  // vs [0.4, 1] contract for non-burst vs burst is preserved).
+  if (isBurst && freshCount >= 2) {
+    score += 0.1
+    reasons.push(`${freshCount} postings in the last ${FRESH_DAYS} days — very fresh activity`)
+  }
+
   return {
     isBurst,
     score: clamp01(score),
     recentCount,
     distinctRoles,
+    freshCount,
     reasons,
   }
 }

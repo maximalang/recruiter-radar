@@ -27,6 +27,7 @@ export interface ScoringReason {
 export const REASON_LABELS: Record<string, string> = {
   // Fit
   'fit.industry.excluded': 'Индустрия «{industry}» исключена из ICP',
+  'fit.competitor.excluded': 'Компания-конкурент (кадровое/рекрутинговое агентство) — не подходит как клиент',
   'fit.industry.match': 'Индустрия «{industry}» совпадает с ICP',
   'fit.industry.match.reweighted': 'Индустрия «{industry}» совпадает с ICP (понижен вес на {penaltyPercent}% из истории «мимо»)',
   'fit.industry.partial': 'Индустрия «{industry}» частично совпадает с ICP',

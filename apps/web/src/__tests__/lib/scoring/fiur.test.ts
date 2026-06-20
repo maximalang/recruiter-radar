@@ -112,6 +112,35 @@ describe('computeFiur', () => {
     expect(result.reasons.fit.some((r) => r.key === 'fit.industry.excluded')).toBe(true)
   })
 
+  it('drops fit to zero for a recruitment-agency competitor even without a profile exclusion', () => {
+    const result = computeFiur({
+      // Profile does NOT list agencies in exclusions — the global baseline must catch it.
+      company: { ...baseCompany, name: 'Рекрутинговое агентство «Кадры+»', industry: 'hr services' },
+      vacancies: [vacancy()],
+      clientProfile: baseProfile,
+      evidence: [{ tier: 'direct', source: 'career-page' }],
+    })
+
+    expect(result.fit).toBe(0)
+    expect(result.reasons.fit.some((r) => r.key === 'fit.competitor.excluded')).toBe(true)
+    // Must NOT be mislabelled as a profile industry exclusion.
+    expect(result.reasons.fit.some((r) => r.key === 'fit.industry.excluded')).toBe(false)
+  })
+
+  it('lets a profile exclusion take precedence over the competitor baseline', () => {
+    const result = computeFiur({
+      // Name trips the competitor baseline AND industry trips the profile list —
+      // profile-scoped reporting wins.
+      company: { ...baseCompany, name: 'Staffing Agency LLC', industry: 'gambling' },
+      vacancies: [vacancy()],
+      clientProfile: baseProfile,
+      evidence: [{ tier: 'direct', source: 'career-page' }],
+    })
+
+    expect(result.fit).toBe(0)
+    expect(result.reasons.fit.some((r) => r.key === 'fit.industry.excluded')).toBe(true)
+  })
+
   it('penalises a non-ICP region', () => {
     const result = computeFiur({
       company: { ...baseCompany, location: 'Vladivostok' },
