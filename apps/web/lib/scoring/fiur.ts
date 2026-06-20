@@ -189,14 +189,23 @@ function freshnessWeight(days: number): number {
  * and matched as substrings against company name + industry.
  */
 export const DEFAULT_COMPETITOR_EXCLUSIONS: readonly string[] = [
+  // English
   'recruitment agency',
+  'recruiting agency',
   'staffing agency',
   'staffing firm',
+  'headhunting',
+  'executive search',
+  // Russian
   'кадровое агентство',
-  'рекрутинговое агентство',
-  'агентство по подбору персонала',
-  'аутстаффинг',
   'кадровое агенство', // common misspelling seen in the wild
+  'рекрутинговое агентство',
+  'рекрутинговое агенство', // misspelling
+  'рекрутинг', // covers "рекрутинговая компания", "рекрутинг и подбор персонала"
+  'агентство по подбору персонала',
+  'подбор персонала',
+  'аутстаффинг',
+  'хедхантинг',
 ]
 
 type ExclusionHit =

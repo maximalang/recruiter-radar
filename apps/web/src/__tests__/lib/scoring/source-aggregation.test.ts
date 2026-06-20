@@ -107,6 +107,23 @@ describe('aggregateSourceSignals', () => {
       const careerPlusHh = aggregateSourceSignals([career, hh])
       expect(careerPlusHh.weight).toBeGreaterThan(careerOnly.weight)
     })
+
+    it('applies a graduated bonus: 3+ strong sources outrank exactly 2', () => {
+      // Two strong sources → +0.2 tier; three strong sources → +0.35 tier.
+      // Use low-base-weight corroboration sources so the aggregate stays well
+      // below the [0,1] clamp ceiling and the bonus delta is observable.
+      const rr: AggregationInput = { source: 'rabota_rossii', tier: 'corroboration', fetchedAt: '2026-05-20T00:00:00Z' }
+      const egrul: AggregationInput = { source: 'egrul', tier: 'corroboration', fetchedAt: '2026-05-20T00:00:00Z' }
+      const funding: AggregationInput = { source: 'funding', tier: 'corroboration', fetchedAt: '2026-05-20T00:00:00Z' }
+
+      const two = aggregateSourceSignals([rr, egrul])
+      const three = aggregateSourceSignals([rr, egrul, funding])
+      const fundingBase = aggregateSourceSignals([funding]).weight
+      // three = base(two) + base(funding) + 0.35 ; two = base(two) + 0.2
+      // ⇒ three - two = base(funding) + 0.15  > base(funding)
+      expect(three.weight).toBeLessThan(1) // not saturated — delta is real, not clamped
+      expect(three.weight - two.weight).toBeGreaterThan(fundingBase + 1e-9)
+    })
   })
 
   describe('breakdown', () => {

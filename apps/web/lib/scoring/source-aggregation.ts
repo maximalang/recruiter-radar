@@ -54,7 +54,24 @@ const TIER_RANK: Record<EvidenceTier, number> = {
   context: 0,
 }
 
-const MULTI_SOURCE_BONUS = 0.15
+/**
+ * Graduated multi-source confirmation bonus, keyed on the count of independent
+ * *strong* source families (direct/corroboration). More independent layers of
+ * evidence is a stronger "why now" signal, so the bonus is tiered rather than
+ * flat: 3+ strong sources outrank exactly 2. Weak (context-only) sources never
+ * trigger a bonus — they corroborate, they don't confirm.
+ */
+const MULTI_SOURCE_BONUS_TIERS: ReadonlyArray<{ minStrongSources: number; bonus: number }> = [
+  { minStrongSources: 3, bonus: 0.35 },
+  { minStrongSources: 2, bonus: 0.2 },
+]
+
+function multiSourceBonus(strongSources: number): number {
+  for (const tier of MULTI_SOURCE_BONUS_TIERS) {
+    if (strongSources >= tier.minStrongSources) return tier.bonus
+  }
+  return 0
+}
 
 function clamp01(n: number): number {
   if (n < 0) return 0
@@ -102,7 +119,7 @@ export function aggregateSourceSignals(items: AggregationInput[]): AggregationRe
   ).length
   const hasMultiSourceConfirmation = strongSources >= 2
 
-  const weight = clamp01(baseWeight + (hasMultiSourceConfirmation ? MULTI_SOURCE_BONUS : 0))
+  const weight = clamp01(baseWeight + multiSourceBonus(strongSources))
 
   return {
     weight,
