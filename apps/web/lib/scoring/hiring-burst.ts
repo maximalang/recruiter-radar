@@ -118,10 +118,12 @@ export function detectHiringBurst(input: BurstInput): BurstResult {
     reasons.push(`large-scale hiring — ${recentCount} postings amplifies urgency`)
   }
 
-  // Recency amplifier — only meaningful once a burst is established, so it
-  // cannot push a sub-threshold signal across the burst line (the [0, 0.4)
-  // vs [0.4, 1] contract for non-burst vs burst is preserved).
-  if (isBurst && freshCount >= 2) {
+  // Recency amplifier — applies to any multi-posting signal (burst or the
+  // two-posting case). The +0.1 bump is calibrated so it can never push a
+  // sub-threshold signal across the burst line: the two-posting ceiling is
+  // 0.2 + 0.1 = 0.3, still inside [0, 0.4); a burst already starts at 0.4.
+  // The [0, 0.4) vs [0.4, 1] non-burst/burst contract is preserved.
+  if ((isBurst || recentCount === 2) && freshCount >= 2) {
     score += 0.1
     reasons.push(`${freshCount} postings in the last ${FRESH_DAYS} days — very fresh activity`)
   }

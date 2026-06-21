@@ -137,9 +137,10 @@ describe('detectHiringBurst', () => {
     expect(fresh.score).toBeGreaterThan(trailing.score)
   })
 
-  it('does not let the recency boost push a sub-threshold signal into burst', () => {
+  it('applies the recency boost to two fresh postings without crossing the burst line', () => {
     // Two postings today: very fresh, but below BURST_THRESHOLD. The recency
-    // amplifier must stay gated behind isBurst so this remains non-burst.
+    // amplifier now rewards this multi-posting signal (+0.1) yet the ceiling
+    // (0.2 + 0.1 = 0.3) stays inside [0, 0.4), so it remains non-burst.
     const result = detectHiringBurst({
       vacancies: [
         vac({ id: 'v-1', publishedAt: new Date(NOW - 0 * DAY_MS).toISOString() }),
@@ -150,7 +151,25 @@ describe('detectHiringBurst', () => {
 
     expect(result.isBurst).toBe(false)
     expect(result.freshCount).toBe(2)
+    expect(result.score).toBeCloseTo(0.3, 10)
     expect(result.score).toBeLessThan(0.4)
+  })
+
+  it('does not award the recency boost to two trailing (non-fresh) postings', () => {
+    // Two postings inside the 14-day window but outside the 3-day fresh
+    // sub-window: the base two-posting score applies, but no recency bump.
+    const result = detectHiringBurst({
+      vacancies: [
+        vac({ id: 'v-1', publishedAt: new Date(NOW - 8 * DAY_MS).toISOString() }),
+        vac({ id: 'v-2', publishedAt: new Date(NOW - 10 * DAY_MS).toISOString() }),
+      ],
+      now: () => NOW,
+    })
+
+    expect(result.isBurst).toBe(false)
+    expect(result.recentCount).toBe(2)
+    expect(result.freshCount).toBe(0)
+    expect(result.score).toBeCloseTo(0.2, 10)
   })
 
   it('clamps the score to [0, 1] even with many fresh diverse vacancies', () => {

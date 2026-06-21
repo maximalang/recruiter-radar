@@ -51,6 +51,26 @@ function classifyTier(score: number): ContactQualityTier {
   return 'rich'
 }
 
+/**
+ * Named-contact bonus applied to a Reachability sub-score.
+ *
+ * Knowing a specific person to address ("Иван, руководитель подбора") makes
+ * the outreach warmer and safer than a generic mailbox, so a present
+ * `contactName` adds a small flat bonus. A null/blank name is a no-op — never
+ * a penalty. Result is clamped to the FIUR [0, 1] contract.
+ */
+const CONTACT_NAME_BONUS = 0.05
+
+export function applyContactNameBonus(
+  baseScore: number,
+  contactName: string | null | undefined
+): number {
+  const safeBase = Number.isFinite(baseScore) ? baseScore : 0
+  const hasName = typeof contactName === 'string' && contactName.trim().length > 0
+  const score = hasName ? safeBase + CONTACT_NAME_BONUS : safeBase
+  return clamp01(score)
+}
+
 export function computeContactQuality(paths: ContactPath[]): ContactQualityResult {
   if (paths.length === 0) {
     return {

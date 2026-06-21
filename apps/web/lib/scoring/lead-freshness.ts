@@ -52,6 +52,26 @@ function classify(ageHours: number): FreshnessStatus {
   return 'expired'
 }
 
+/**
+ * Freshness decay multiplier for a single lead, by age in whole days.
+ *
+ * Stepped tiers (product contract — newer signals score higher):
+ *   0–3 days  → 1.00
+ *   4–7 days  → 0.85
+ *   8–14 days → 0.65
+ *   >14 days  → 0.40
+ *
+ * Used as a multiplicative weight on the Urgency/Intent contribution so a
+ * stale vacancy never carries the same weight as a same-week one. Negative
+ * or NaN ages are treated as freshest (0 days) — a clock-skew guard.
+ */
+export function leadFreshnessDecay(ageDays: number): number {
+  if (!Number.isFinite(ageDays) || ageDays <= 3) return 1.0
+  if (ageDays <= 7) return 0.85
+  if (ageDays <= 14) return 0.65
+  return 0.4
+}
+
 export function computeLeadFreshness(
   items: FreshnessInput[],
   options: FreshnessOptions = {}

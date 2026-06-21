@@ -171,7 +171,7 @@ function extractConfidenceGate(payload: unknown): string | undefined {
   }
 
   const payloadObj = payload as Record<string, unknown>;
-  const confidenceGate = payloadObj.confidenceGate;
+  const confidenceGate = payloadObj.confidence_gate;
 
   if (typeof confidenceGate === "string" && confidenceGate.length > 0) {
     return confidenceGate;

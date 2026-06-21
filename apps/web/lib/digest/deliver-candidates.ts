@@ -45,7 +45,7 @@ export async function deliverCandidatesForRun(runId: string): Promise<DeliverRun
     SELECT id
     FROM digest_candidates
     WHERE digest_run_id = $1
-      AND (payload->>'confidenceGate' NOT IN ('C', 'D') OR payload->>'confidenceGate' IS NULL)
+      AND (payload->>'confidence_gate' NOT IN ('C', 'D') OR payload->>'confidence_gate' IS NULL)
     ORDER BY id ASC
   `, [runId])
 
