@@ -127,6 +127,45 @@ describe('computeFiur', () => {
     expect(result.reasons.fit.some((r) => r.key === 'fit.industry.excluded')).toBe(false)
   })
 
+  // Task #17: the competitor baseline must cover every flavour of the staffing /
+  // recruitment sector — by industry label or by company name, EN and RU, including
+  // the bare-root labels ("Staffing & Recruiting", "Recruitment") used on LinkedIn/HH.
+  it.each([
+    ['EN industry: Staffing & Recruiting', { industry: 'Staffing & Recruiting' }],
+    ['EN industry: Recruitment', { industry: 'Recruitment' }],
+    ['EN name: headhunting boutique', { name: 'Apex Headhunting LLC' }],
+    ['EN name: executive search', { name: 'Boyden Executive Search' }],
+    ['EN name: staffing firm', { name: 'Adecco Staffing' }],
+    ['RU industry: кадровое агентство', { industry: 'Кадровое агентство' }],
+    ['RU name: подбор персонала', { name: 'Агентство по подбору персонала «Юнити»' }],
+    ['RU name: рекрутинг', { name: 'Рекрутинговая компания «Контакт»' }],
+    ['RU industry: аутстаффинг', { industry: 'Аутстаффинг и аутсорсинг' }],
+    ['RU name: хедхантинг', { name: 'Хедхантинг Групп' }],
+  ])('excludes competitor sector — %s', (_label, patch) => {
+    const result = computeFiur({
+      company: { ...baseCompany, ...patch },
+      vacancies: [vacancy()],
+      clientProfile: baseProfile,
+      evidence: [{ tier: 'direct', source: 'career-page' }],
+    })
+
+    expect(result.fit).toBe(0)
+    expect(result.reasons.fit.some((r) => r.key === 'fit.competitor.excluded')).toBe(true)
+  })
+
+  it('does NOT exclude a normal company merely hiring an internal recruiter', () => {
+    // The competitor gate reads company name + industry only — never vacancy titles.
+    // A fintech hiring a recruiter is a real lead, not a competitor.
+    const result = computeFiur({
+      company: { ...baseCompany, name: 'Acme Fintech', industry: 'fintech' },
+      vacancies: [vacancy({ title: 'Internal Recruiter', role: 'recruiter' })],
+      clientProfile: baseProfile,
+      evidence: [{ tier: 'direct', source: 'career-page' }],
+    })
+
+    expect(result.reasons.fit.some((r) => r.key === 'fit.competitor.excluded')).toBe(false)
+  })
+
   it('lets a profile exclusion take precedence over the competitor baseline', () => {
     const result = computeFiur({
       // Name trips the competitor baseline AND industry trips the profile list —

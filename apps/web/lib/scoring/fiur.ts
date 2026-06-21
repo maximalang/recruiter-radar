@@ -189,23 +189,35 @@ function freshnessWeight(days: number): number {
  * and matched as substrings against company name + industry.
  */
 export const DEFAULT_COMPETITOR_EXCLUSIONS: readonly string[] = [
-  // English
-  'recruitment agency',
-  'recruiting agency',
-  'staffing agency',
-  'staffing firm',
+  // English.
+  // `staffing` / `recruit` / `recruitment` are matched as bare roots: findExclusion
+  // only inspects company.name + company.industry (never vacancy titles), so an
+  // industry of "Staffing & Recruiting" or "Recruitment" — the canonical LinkedIn/HH
+  // label for the competitor sector — must trip the gate even without the word
+  // "agency". This does NOT misfire on a normal company hiring an internal recruiter:
+  // that lives in the vacancy, which this gate never reads.
+  'recruitment',
+  'recruiting',
+  'staffing',
   'headhunting',
+  'head hunting',
   'executive search',
+  'talent acquisition agency',
   // Russian
   'кадровое агентство',
   'кадровое агенство', // common misspelling seen in the wild
+  'кадровый центр',
   'рекрутинговое агентство',
   'рекрутинговое агенство', // misspelling
   'рекрутинг', // covers "рекрутинговая компания", "рекрутинг и подбор персонала"
+  'рекрутмент',
   'агентство по подбору персонала',
   'подбор персонала',
+  'подбора персонала', // genitive: "агентство подбора персонала"
   'аутстаффинг',
+  'аутстаффинга',
   'хедхантинг',
+  'хантинг персонала',
 ]
 
 type ExclusionHit =
