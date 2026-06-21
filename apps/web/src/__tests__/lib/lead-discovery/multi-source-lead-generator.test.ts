@@ -6,20 +6,34 @@ jest.mock('@/lib/hhDigest', () => ({
   getHhDigestItems: mockGetHhDigestItems,
 }))
 
-// Mock the crawler to avoid real HTTP requests
-jest.mock('@/lib/sources/crawlers', () => ({
-  createDefaultRouter: () => ({
-    fetch: jest.fn().mockResolvedValue({
-      status: 404,
-      html: undefined,
-      url: '',
-      fetchedAt: new Date().toISOString(),
-      warnings: [],
-    }),
-  }),
+// Stub the crawler to avoid real HTTP requests. Shared fn so tests can assert
+// which URLs the career-page enricher attempted to crawl.
+//
+// NOTE: `jest.mock('@/lib/sources/crawlers')` is a no-op under next/jest's SWC
+// transform — the generator's static `@/`-aliased import of `createDefaultRouter`
+// resolves past the mock registry, so the real network-backed router loads
+// regardless of the factory. We therefore inject the stub through the
+// constructor seam (`new MultiSourceLeadGenerator({ crawler })`) instead.
+const mockCrawlerFetch = jest.fn<(input: { url: string }) => Promise<unknown>>()
+
+// Mock the DB pool so enrichWithCareerPages can resolve a corporate base URL.
+// Use the established pattern (jest.fn() in the factory + jest.mocked handle):
+// the global jest.setup.ts already mocks `lib/db`, so a literal-returning factory
+// here is shadowed and getPool() comes back null. Recover the handle post-import.
+const mockPoolQuery = jest.fn<(...args: unknown[]) => Promise<{ rows: unknown[] }>>()
+jest.mock('@/lib/db', () => ({
+  getPool: jest.fn(),
 }))
 
 import { MultiSourceLeadGenerator } from '@/lib/lead-discovery/multi-source-lead-generator'
+import type { CrawlerRouter } from '@/lib/sources/crawlers'
+import { getPool } from '@/lib/db'
+
+// Inject the stub through the constructor seam. `fetch` is the only method the
+// generator calls; cast covers the rest of the CrawlerRouter surface.
+const crawlerStub = { fetch: mockCrawlerFetch } as unknown as CrawlerRouter
+
+const mockGetPool = getPool as jest.MockedFunction<typeof getPool>
 
 const SAMPLE_DIGEST_ITEMS = [
   {
@@ -64,7 +78,17 @@ describe('MultiSourceLeadGenerator', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     mockGetHhDigestItems.mockResolvedValue(SAMPLE_DIGEST_ITEMS)
-    generator = new MultiSourceLeadGenerator()
+    // Default: crawler 404s (no career page found) and DB returns no orgs.
+    mockCrawlerFetch.mockResolvedValue({
+      status: 404,
+      html: undefined,
+      url: '',
+      fetchedAt: new Date().toISOString(),
+      warnings: [],
+    })
+    mockPoolQuery.mockResolvedValue({ rows: [] })
+    mockGetPool.mockReturnValue({ query: mockPoolQuery } as never)
+    generator = new MultiSourceLeadGenerator({ crawler: crawlerStub })
   })
 
   afterEach(() => {
@@ -192,6 +216,73 @@ describe('MultiSourceLeadGenerator', () => {
       const leads = await generator.generateLeads({ enableRealTime: true })
 
       expect(leads.length).toBeGreaterThan(0)
+    })
+  })
+
+  describe('enrichWithCareerPages domain fallback', () => {
+    // Regression: HH-sourced orgs have website_url but never domain; egrul/
+    // company-site/rf orgs have domain but not always website_url. Selecting on
+    // website_url alone silently skipped the career-page crawl for domain-only
+    // orgs, zeroing their FIUR reachability. The enricher must derive an https
+    // base from `domain` when `website_url` is null.
+    function resolveOrgBase(query: string): boolean {
+      return /SELECT id, website_url, domain FROM orgs/i.test(query)
+    }
+
+    it('crawls https://{domain}/careers when website_url is null', async () => {
+      mockPoolQuery.mockImplementation(async (sql: unknown) => {
+        if (typeof sql === 'string' && resolveOrgBase(sql)) {
+          return {
+            rows: [
+              { id: 'org-1', website_url: null, domain: 'techcorp.ru' },
+              { id: 'org-2', website_url: 'https://dataflow.io', domain: null },
+            ],
+          }
+        }
+        return { rows: [] }
+      })
+
+      await generator.generateLeads({ enableRealTime: true })
+
+      const crawledUrls = mockCrawlerFetch.mock.calls.map(([input]) => (input as { url: string }).url)
+      // Domain-only org: derived from `domain`.
+      expect(crawledUrls).toContain('https://techcorp.ru/careers')
+      // Website org: still uses website_url (regression guard).
+      expect(crawledUrls).toContain('https://dataflow.io/careers')
+    })
+
+    it('strips a scheme accidentally stored in domain before deriving the base', async () => {
+      mockPoolQuery.mockImplementation(async (sql: unknown) => {
+        if (typeof sql === 'string' && resolveOrgBase(sql)) {
+          return { rows: [{ id: 'org-1', website_url: null, domain: 'https://techcorp.ru/' }] }
+        }
+        return { rows: [] }
+      })
+
+      await generator.generateLeads({ enableRealTime: true })
+
+      const crawledUrls = mockCrawlerFetch.mock.calls.map(([input]) => (input as { url: string }).url)
+      expect(crawledUrls).toContain('https://techcorp.ru/careers')
+      // Must not double the scheme.
+      expect(crawledUrls.some(u => /https:\/\/https/.test(u))).toBe(false)
+    })
+
+    it('skips orgs with neither website_url nor domain', async () => {
+      mockPoolQuery.mockImplementation(async (sql: unknown) => {
+        // The query now filters these out at the SQL level, but assert the
+        // enricher attempts no crawl when the row set is empty.
+        if (typeof sql === 'string' && resolveOrgBase(sql)) {
+          return { rows: [] }
+        }
+        return { rows: [] }
+      })
+
+      await generator.generateLeads({ enableRealTime: true })
+
+      const careerCrawls = mockCrawlerFetch.mock.calls
+        .map(([input]) => (input as { url: string }).url)
+        .filter(u => u.includes('/careers'))
+      expect(careerCrawls).toHaveLength(0)
     })
   })
 })
