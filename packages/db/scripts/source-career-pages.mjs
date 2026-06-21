@@ -6,6 +6,7 @@ import pg from 'pg';
 import {
   buildRfJobQuality,
 } from './adapters/rf-source-normalizers.mjs';
+import { assertProviderNormalization } from './adapters/provider-contract.mjs';
 import {
   buildRussianLegalNameSourceKey,
   buildSourceKeyAliases,
@@ -152,6 +153,7 @@ export async function fetchCareerPagesInput({ persistSnapshot }) {
     fetchOutputPath: null,
     targetResults,
     discoverySummary: targetsConfig.discoverySummary ?? null,
+    rejectAllSkipped: true,
   });
 
   if (!persistSnapshot) {
@@ -814,7 +816,7 @@ async function fetchJson(url, targetId) {
   }
 }
 
-function buildNormalizedInput({ records, inputMode, inputFilePath, targetsFilePath, fetchOutputPath, targetResults, discoverySummary }) {
+export function buildNormalizedInput({ records, inputMode, inputFilePath, targetsFilePath, fetchOutputPath, targetResults, discoverySummary, rejectAllSkipped = false }) {
   const fetchedAt = new Date().toISOString();
   const sensitiveFieldsDropped = records.reduce((total, record) => total + countSensitiveFields(record), 0);
   const sanitizedRecords = records.map((record) => dropSensitiveFields(record));
@@ -833,6 +835,20 @@ function buildNormalizedInput({ records, inputMode, inputFilePath, targetsFilePa
   }
 
   const dedupeResult = dedupeNormalizedRecords(normalizedRecords);
+
+  // Live crawl must fail loudly when the fetcher returns records but the
+  // normalizer drops every one of them (markup drift, key mismatch). Without
+  // this the pipeline silently reports 0 leads — the exact habr-career
+  // "N records but 0 normalized" failure mode the provider contract guards.
+  // File mode stays permissive: an empty/all-skipped snapshot is legitimate.
+  if (rejectAllSkipped) {
+    assertProviderNormalization({
+      sourceId: SOURCE_ID,
+      recordsReceived: records.length,
+      normalizedRecords: dedupeResult.records,
+      skippedRecords,
+    });
+  }
 
   return {
     inputMode,
