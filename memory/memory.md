@@ -7,3 +7,4 @@
 - [Command Examples](command-examples.md) — Practical examples using slash commands in Russian
 - [Quick Reference](quick-reference.md) - Quick reference sheet for main slash commands
 - [Agent Skills Commands](agent-skills-commands.md) — Slash commands from agent-skills package by addyosmani
+- [Session 2026-06-21](session-2026-06-21.md) — source map (habr-career 94 + superjob 40 + hh 6 live in prod), superjob FIXED (corrupt key, not 403), HH confirmed geo-403 on search (needs RU proxy), open items: HH proxy, rabota-rossii promotion recheck, onboarding, TG channels
