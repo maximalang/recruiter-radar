@@ -14,6 +14,7 @@ import {
   stripBom,
 } from './adapters/source-records.mjs';
 import { toUrlOrNull } from './adapters/rf-source-runtime.mjs';
+import { extractDomain } from './lib/adapter-base.mjs';
 
 const { Client } = pg;
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -143,12 +144,18 @@ function normalizeVacancy(vacancy, fetchedAt) {
   // Do NOT fall back to employer.url / alternate_url as those are HH platform pages
   // (e.g. https://hh.ru/employer/12345), not actual company websites.
   const employerSiteUrl = toUrlOrNull(vacancy.employer?.site_url);
+  // Derive the bare domain from the same self-declared corporate website.
+  // orgs.domain is a first-class column (unique on LOWER(domain)); without
+  // this, HH ingest leaves it NULL and downstream readers fall back to
+  // re-deriving from website_url on every read.
+  const employerDomain = extractDomain(employerSiteUrl);
 
   return {
     hhVacancyId,
     hhEmployerId,
     employerName,
     employerSiteUrl,
+    employerDomain,
     orgName: employerName ?? buildFallbackEmployerName(hhEmployerId),
     orgDisplayName: employerName,
     orgSourceKey,
@@ -306,6 +313,9 @@ async function upsertOrgSourceRef(client, vacancy) {
   let orgId = existingRefResult.rows[0]?.org_id;
 
   if (!orgId) {
+    // Insert with NULL domain first; domain is set afterwards via the
+    // savepoint-protected setOrgDomain() so a unique-index conflict on
+    // LOWER(domain) can never abort this batch transaction.
     const insertedOrgResult = await client.query(
       `
         INSERT INTO orgs (name, website_url)
@@ -320,8 +330,43 @@ async function upsertOrgSourceRef(client, vacancy) {
 
   await upsertOrgSourceKeys(client, orgId, vacancy);
   await updateOrgSourceRef(client, orgId, vacancy);
+  await setOrgDomain(client, orgId, vacancy);
 
   return orgId;
+}
+
+// Best-effort domain enrichment. orgs has a UNIQUE index on LOWER(domain), so a
+// concurrent ingest (different connection) can claim the same domain between our
+// NOT EXISTS check and this UPDATE. Domain is non-critical — the read side falls
+// back to website_url — so we wrap the write in a SAVEPOINT and swallow a unique
+// violation (SQLSTATE 23505), leaving domain NULL rather than rolling back the
+// whole batch.
+async function setOrgDomain(client, orgId, vacancy) {
+  const domain = vacancy.employerDomain || null;
+  if (!domain) return;
+
+  await client.query('SAVEPOINT set_org_domain');
+  try {
+    await client.query(
+      `
+        UPDATE orgs
+        SET domain = $2
+        WHERE id = $1
+          AND (domain IS NULL OR BTRIM(domain) = '')
+          AND NOT EXISTS (
+            SELECT 1 FROM orgs other
+            WHERE other.id <> orgs.id AND LOWER(other.domain) = LOWER($2)
+          )
+      `,
+      [orgId, domain],
+    );
+    await client.query('RELEASE SAVEPOINT set_org_domain');
+  } catch (error) {
+    await client.query('ROLLBACK TO SAVEPOINT set_org_domain');
+    await client.query('RELEASE SAVEPOINT set_org_domain');
+    if (error?.code !== '23505') throw error;
+    // Unique-index race lost — another org already owns this domain. Leave NULL.
+  }
 }
 
 async function updateOrgSourceRef(client, orgId, vacancy) {
@@ -342,7 +387,12 @@ async function updateOrgSourceRef(client, orgId, vacancy) {
         END
       WHERE id = $1
     `,
-    [orgId, vacancy.orgDisplayName, buildFallbackEmployerName(vacancy.hhEmployerId), vacancy.employerSiteUrl || null],
+    [
+      orgId,
+      vacancy.orgDisplayName,
+      buildFallbackEmployerName(vacancy.hhEmployerId),
+      vacancy.employerSiteUrl || null,
+    ],
   );
 
   await client.query(

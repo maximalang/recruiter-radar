@@ -156,8 +156,17 @@ export class MultiSourceLeadGenerator {
   /** Per-source outcome of the most recent generateLeads() run. */
   private lastRunReport: SourceRunReport = {}
 
-  constructor() {
-    this.crawler = createDefaultRouter()
+  /**
+   * @param deps Optional dependency overrides. `crawler` lets tests inject a
+   *   stub router instead of the real network-backed one. Production callers
+   *   construct with no args and get the default router. This is the supported
+   *   seam for testing career-page enrichment: the `@/lib/sources/crawlers`
+   *   module cannot be reliably intercepted via `jest.mock` under next/jest's
+   *   SWC transform (static `@/`-aliased imports resolve past the mock
+   *   registry), so module-level mocking of `createDefaultRouter` is a no-op.
+   */
+  constructor(deps?: { crawler?: CrawlerRouter }) {
+    this.crawler = deps?.crawler ?? createDefaultRouter()
     this.sources = this.initializeSources()
     this.activeSources = this.getActiveSources()
   }
@@ -542,10 +551,11 @@ export class MultiSourceLeadGenerator {
 
   /**
    * Enrich leads with career page evidence.
-   * Uses real website URL from orgs table when available, falls back to slug-based URL.
+   * Resolves a corporate base URL from orgs.website_url, falling back to
+   * orgs.domain; orgs with neither are skipped (no career-page crawl).
    */
   private async enrichWithCareerPages(leads: MultiSourceLead[]): Promise<void> {
-    // Build org_id → website_url map from DB
+    // Build org_id → corporate base URL map from DB (website_url, else domain)
     const pool = getPool()
     const websiteMap = new Map<string, string>()
 
@@ -553,12 +563,31 @@ export class MultiSourceLeadGenerator {
       try {
         const orgIds = leads.map(l => l.companyId).filter(Boolean)
         if (orgIds.length > 0) {
+          // Fall back to `domain` when `website_url` is null, and vice versa:
+          // egrul/company-site/rf adapters populate domain (and not always
+          // website_url), while HH ingest populates website_url (and, since the
+          // 20260620 backfill + ingest fix, domain too — though older rows or
+          // ones whose domain collided on the unique index may still have it
+          // NULL). Selecting on website_url alone silently drops every org whose
+          // corporate surface is known only via domain — killing career-page
+          // enrichment and capping FIUR reachability to zero for those leads.
           const result = await withRetry(() => pool.query(
-            `SELECT id, website_url FROM orgs WHERE id = ANY($1) AND website_url IS NOT NULL`,
+            `SELECT id, website_url, domain FROM orgs
+             WHERE id = ANY($1) AND (website_url IS NOT NULL OR domain IS NOT NULL)`,
             [orgIds]
           ))
           for (const row of result.rows as Array<Record<string, unknown>>) {
-            websiteMap.set(String(row.id), String(row.website_url))
+            // Prefer the explicit website_url; otherwise derive an https base
+            // from the bare domain. Normalize to a scheme-qualified origin so the
+            // downstream `${base}/careers` concatenation and URL validation work.
+            let base: string | null = null
+            if (row.website_url != null && String(row.website_url).trim() !== '') {
+              base = String(row.website_url).trim()
+            } else if (row.domain != null && String(row.domain).trim() !== '') {
+              const bareDomain = String(row.domain).trim().replace(/^https?:\/\//i, '').replace(/\/+$/, '')
+              if (bareDomain) base = `https://${bareDomain}`
+            }
+            if (base) websiteMap.set(String(row.id), base)
           }
         }
       } catch (error) {

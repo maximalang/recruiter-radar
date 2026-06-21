@@ -101,6 +101,40 @@ export class BaseAdapter {
   }
 }
 
+/**
+ * Extract a bare, normalized domain from a full website URL.
+ *
+ * website_url ("https://www.Company.RU/careers") -> domain ("company.ru").
+ * This is the inverse of normalizeDomain(): normalizeDomain only cleans an
+ * already-extracted host, whereas extractDomain derives the host from a URL.
+ *
+ * Returns null for empty input or anything that doesn't parse as an
+ * http(s) URL with a hostname — callers must treat null as "no domain".
+ */
+export function extractDomain(url) {
+  if (!url || typeof url !== 'string' || !url.trim()) return null;
+  let candidate = url.trim();
+  // Detect any leading "scheme:" (with or without "//"). If one is present it
+  // must be http/https — otherwise reject (mailto:, tel:, ftp:, ...). Only when
+  // NO scheme is present do we prepend https://, so a bare "company.ru/jobs"
+  // isn't parsed with "company.ru" as the protocol.
+  const schemeMatch = /^([a-z][a-z0-9+.-]*):/i.exec(candidate);
+  if (schemeMatch) {
+    const scheme = schemeMatch[1].toLowerCase();
+    if (scheme !== 'http' && scheme !== 'https') return null;
+  } else {
+    candidate = `https://${candidate}`;
+  }
+  try {
+    const { protocol, hostname } = new URL(candidate);
+    if (protocol !== 'http:' && protocol !== 'https:') return null;
+    const host = hostname.toLowerCase().replace(/^www\./, '');
+    return host || null;
+  } catch {
+    return null;
+  }
+}
+
 // Common adapter contract
 export const AdapterContract = {
   // Required fields in normalized records
