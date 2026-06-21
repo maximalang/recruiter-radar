@@ -56,7 +56,7 @@ assert.equal(permissive.normalizedRecords.length, 0, 'file mode must not throw o
 assert.equal(permissive.recordsReceived, undroppableJunk.length);
 assert.equal(permissive.skippedRecords, undroppableJunk.length);
 
-// An empty fetch (0 records in) must NOT trip the guard even in live mode —
+// An empty crawl (0 records in) must NOT trip the guard even in live mode —
 // the guard only fires when records were received but none normalized.
 const emptyLive = buildNormalizedInput({
   records: [],

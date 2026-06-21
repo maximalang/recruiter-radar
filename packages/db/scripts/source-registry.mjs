@@ -67,6 +67,7 @@ const sourceReadinessPolicy = Object.freeze({
     maturity: 'official-live-public-gated',
     productionBlockers: [
       'RF query matrix, salary/region/freshness assertions, and HH dedupe checks must pass before digest promotion.',
+      'Freshness gate: 28% within active-30d vs 60% threshold as of 2026-06-21 — ingests to the signal pool but stays out of digest. Re-run `npm run verify:rabota-rossii:confidence` to re-check.',
     ],
     promotionStatus: 'blocked-from-digest-pending-confidence-tests',
   }),
