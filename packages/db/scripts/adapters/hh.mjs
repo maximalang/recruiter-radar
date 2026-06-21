@@ -1,4 +1,4 @@
-import { fetchJson } from './source-http.mjs';
+import { fetchJson, SourceHttpError } from './source-http.mjs';
 import { RateLimiter } from './rate-limiter.mjs';
 
 const HH_VACANCIES_URL = 'https://api.hh.ru/vacancies';
@@ -9,6 +9,40 @@ const DEFAULT_PER_PAGE = 20;
 const DEFAULT_PAGES = 1;
 const MAX_PER_PAGE = 100;
 const MAX_PAGES = 20;
+
+/**
+ * Thrown when HH's search API answers with HTTP 403 `forbidden`.
+ *
+ * WHY a dedicated error: the HH *search* endpoints (/vacancies, /employers)
+ * return 403 when the calling IP is outside HH's allowed range (datacenter /
+ * non-RU egress), while the public dictionary endpoints (/areas,
+ * /dictionaries) and hh.ru still answer 200. A bare "HTTP 403" is
+ * indistinguishable from a broken adapter or a stale user agent, so the HH
+ * source has historically read as a silent "HH broken" gate. This carries the
+ * operational cause + remediation so the failure is actionable, not a mystery.
+ */
+export class HhAccessForbiddenError extends Error {
+  constructor(safeUrl, cause) {
+    super(
+      'HH search API returned HTTP 403 forbidden. The dictionary endpoints '
+        + 'answer 200, so this is an IP/geo restriction on HH search — not an '
+        + 'adapter bug or a bad user agent. Run the HH ingest from an '
+        + 'RU-resident runner or proxy.',
+      { cause },
+    );
+    this.name = 'HhAccessForbiddenError';
+    this.url = safeUrl;
+    this.status = 403;
+  }
+}
+
+function isForbiddenError(error) {
+  return (
+    error instanceof SourceHttpError
+    && error.status === 403
+    && /forbidden/i.test(error.message)
+  );
+}
 
 const ENV_PARAM_MAP = [
   ['HH_AREA', 'area'],
@@ -94,14 +128,22 @@ export async function fetchHhVacancyPages({ userAgent, config = resolveHhVacancy
         await new Promise(resolve => setTimeout(resolve, waitMs));
       }
     }
-    const payload = await fetchJson(url, {
-      sourceName: 'hh',
-      headers: {
-        accept: 'application/json',
-        'hh-user-agent': normalizedUserAgent,
-        'user-agent': normalizedUserAgent,
-      },
-    });
+    let payload;
+    try {
+      payload = await fetchJson(url, {
+        sourceName: 'hh',
+        headers: {
+          accept: 'application/json',
+          'hh-user-agent': normalizedUserAgent,
+          'user-agent': normalizedUserAgent,
+        },
+      });
+    } catch (error) {
+      if (isForbiddenError(error)) {
+        throw new HhAccessForbiddenError(error.url, error);
+      }
+      throw error;
+    }
     const pageItems = Array.isArray(payload.items) ? payload.items : [];
     const payloadFound = Number(payload.found);
     const payloadPages = Number(payload.pages);

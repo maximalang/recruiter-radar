@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import {
   buildHhVacanciesUrl,
   fetchHhVacancyPages,
+  HhAccessForbiddenError,
   resolveHhVacancySearchConfig,
 } from './hh.mjs';
 import { parseGreenhouseJobs } from './greenhouse.mjs';
@@ -182,14 +183,43 @@ async function runHhAdapterSmoke() {
     assert.equal(result.pagesFetched, 2);
     assert.deepEqual(requestedPages, [0, 1]);
 
+    const forbiddenVerified = await verifyHhForbiddenMapping(config);
+
     return {
       configuredPages: config.pages,
       pagesFetched: result.pagesFetched,
       items: result.items.length,
+      forbiddenVerified,
     };
   } finally {
     globalThis.fetch = originalFetch;
   }
+}
+
+/**
+ * A 403 `forbidden` from HH search must surface as HhAccessForbiddenError with
+ * an actionable message — not a bare "HTTP 403" that reads as a broken adapter.
+ * Caller restores globalThis.fetch in its finally block.
+ */
+async function verifyHhForbiddenMapping(config) {
+  globalThis.fetch = async () =>
+    jsonResponse({ errors: [{ type: 'forbidden' }] }, { status: 403 });
+
+  await assert.rejects(
+    () => fetchHhVacancyPages({ userAgent: 'RecruiterRadarSmoke/1.0', config }),
+    (error) => {
+      assert.ok(
+        error instanceof HhAccessForbiddenError,
+        'HH 403 forbidden must map to HhAccessForbiddenError',
+      );
+      assert.equal(error.status, 403);
+      assert.match(error.message, /IP\/geo restriction/);
+      assert.match(error.message, /RU-resident/);
+      return true;
+    },
+  );
+
+  return true;
 }
 
 async function runSourceHttpSmoke() {
