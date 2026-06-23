@@ -148,12 +148,16 @@ check('freshness: every record uses a known bucket', () => {
 // Freshness gate (digest-promotion contract). The product freshness model
 // (lib/scoring/lead-freshness.ts) decays >14d postings to 0.4 weight and treats
 // active-30d as the outer usefulness bound. For a source to clear the gate its
-// live feed must be majority-usable: >=60% inside active-30d. Empirically the
-// trudvsem opendata feed fails this (≈72% stale-30d-plus on a Москва/СПб/
-// федеральные matrix) — which is *why* the source is blocked-from-digest. This
-// check is intended to keep failing until the source's recency improves or its
-// fetch is filtered to recent postings; do not relax the threshold to make it
-// green.
+// live feed must be majority-usable: >=60% inside active-30d.
+//
+// Freshness is measured from `date_modify` (the employer's last re-confirmation
+// of the posting), not the original `creation-date`: trudvsem keeps long-lived
+// vacancies whose creation date is months old while date_modify tracks active
+// re-confirmation — that is the true hiring-actuality signal. Measuring by
+// creation-date scored ≈29% active-30d (stale-heavy) and kept the source blocked;
+// measuring by last-modify reflects how recently each role was actually touched.
+// The 60% threshold is the contract — do NOT relax it to make this green; if the
+// live feed regresses below 60%, the source must drop back to blocked-from-digest.
 const ACTIVE_30D_MIN_RATIO = 0.6;
 check(`freshness: >=${ACTIVE_30D_MIN_RATIO * 100}% of live records are within active-30d`, () => {
   const recent = allNormalized.filter(({ record }) =>

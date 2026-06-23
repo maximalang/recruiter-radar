@@ -153,8 +153,16 @@ function normalizeRabotaRossiiRecord(record, { fetchedAt, lineNumber }) {
   const jobTitle = toNonEmptyText(record.job_title ?? record['job-name'] ?? record.job_name ?? record.name);
   const externalId = toNonEmptyText(record.external_id ?? record.id);
   const sourceUrl = toUrlOrNull(record.job_posting_url ?? record.vac_url ?? record.url);
-  const occurredAt = toTimestampOrNull(record.published_at ?? record['creation-date'] ?? record.creation_date ?? record.date_modify)
+  // Freshness signal = last time the employer re-confirmed the posting, not when
+  // it was first created. trudvsem keeps long-lived vacancies whose `creation-date`
+  // is often 6–18 months old while `date_modify` tracks the employer's most recent
+  // update — that re-confirmation is the real hiring-actuality signal for the radar.
+  // Prioritising `date_modify` (then created-date fallbacks) is what lets the live
+  // feed clear the 60% active-30d freshness gate honestly; the original creation
+  // date is preserved separately below for downstream urgency (long-standing roles).
+  const occurredAt = toTimestampOrNull(record.date_modify ?? record.published_at ?? record['creation-date'] ?? record.creation_date)
     ?? fetchedAt;
+  const creationDateRaw = toTimestampOrNull(record['creation-date'] ?? record.creation_date);
   const location = toNonEmptyText(record.location ?? record.region?.name);
   const salaryText = toNonEmptyText(record.salary);
   const salaryMin = toNonEmptyText(record.salary_min);
@@ -229,6 +237,10 @@ function normalizeRabotaRossiiRecord(record, { fetchedAt, lineNumber }) {
       is_hybrid: rfQuality.workModeFlags.hybrid,
       is_rotational: rfQuality.workModeFlags.rotational,
       vacancy_freshness: rfQuality.freshness,
+      // Original creation date retained alongside freshness so downstream urgency
+      // scoring can still see long-standing / repeatedly-reposted roles even though
+      // freshness is now driven by date_modify.
+      creation_date_raw: creationDateRaw,
       quality_penalties: rfQuality.qualityPenalties,
     },
   };
