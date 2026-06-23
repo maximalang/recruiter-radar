@@ -26,9 +26,12 @@ Railway cron (03:00 UTC / 06:00 MSK)
 
 ### 1. Create the service
 - Railway Dashboard → your project → **New** → **GitHub Repo** (same repo).
-- New service → **Settings → Build**:
-  - **Config-as-code path** = `cron/railway.toml`
-    (or set **Root Directory** = `cron/` — either makes Railway use this config).
+- New service → **Settings → Source**:
+  - **Root Directory** = `cron`
+    Railway then auto-discovers `cron/railway.toml`, and the Docker build
+    context is `cron/` (so `dockerfilePath = "Dockerfile"` and the script COPY
+    are both relative to `cron/`). Do **not** leave Root Directory at `/` — the
+    service would inherit the repo-root build and try to build the web app.
 
 ### 2. Set environment variables (Dashboard → Variables)
 Never commit these — they live only in Railway.

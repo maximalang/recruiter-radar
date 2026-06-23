@@ -1,12 +1,12 @@
 # Railway config for the daily-radar cron trigger (separate from web + n8n).
-# Point this service's "Config-as-code path" at cron/railway.toml in the
-# Railway Dashboard, or set the service Root Directory to cron/.
+# This service's Root Directory MUST be set to cron/ in the Railway Dashboard,
+# so Railway auto-discovers this railway.toml and resolves paths relative to it.
 #
-# NOTE: dockerfilePath is resolved from the repository root, matching the
-# web (apps/web/Dockerfile) and n8n (n8n/Dockerfile) service convention.
+# NOTE: with Root Directory = cron/, the build context and dockerfilePath are
+# relative to cron/ (NOT the repo root) — so dockerfilePath is just "Dockerfile".
 [build]
   builder = "DOCKERFILE"
-  dockerfilePath = "cron/Dockerfile"
+  dockerfilePath = "Dockerfile"
 
 [deploy]
   # cronSchedule turns this into a scheduled one-off: Railway starts the

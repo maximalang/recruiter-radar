@@ -15,6 +15,8 @@ WORKDIR /app
 USER node
 
 # Only the trigger script is needed — global fetch, zero dependencies.
-COPY --chown=node:node cron/trigger-daily-radar.mjs ./trigger-daily-radar.mjs
+# Build context is the cron/ dir (service Root Directory = cron), so the path
+# is relative to cron/, not the repo root.
+COPY --chown=node:node trigger-daily-radar.mjs ./trigger-daily-radar.mjs
 
 CMD ["node", "trigger-daily-radar.mjs"]
