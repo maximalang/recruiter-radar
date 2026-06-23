@@ -22,6 +22,34 @@ function throws(fn, label) {
   }
 }
 
+// resolveHhProxyDispatcher caches the first built dispatcher at module scope and
+// returns it for ANY later env (the cache is keyed on the process, not the arg).
+// That is correct for production — env is process-global — but it means a second
+// in-process call with a different HH_PROXY_URL gets a cache HIT and never
+// re-parses. To genuinely exercise a fresh parse path (IPv6, credentials) we run
+// it in a child process with a clean module cache, mirroring the scheme loop.
+function buildsInChild(proxyUrl) {
+  const result = spawnSync(
+    process.execPath,
+    [
+      '--input-type=module',
+      '-e',
+      `import { resolveHhProxyDispatcher } from './scripts/adapters/hh.mjs';`
+        + ` const d = resolveHhProxyDispatcher({ HH_PROXY_URL: process.env.__HH_PROXY_TEST_URL });`
+        + ` console.log(d && typeof d.dispatch === 'function' ? 'OK' : 'NULL');`,
+    ],
+    {
+      cwd: PKG_DB_DIR,
+      encoding: 'utf8',
+      timeout: 8000,
+      // Pass the URL via env, not string-interpolated into source, so credentials
+      // with quotes/backslashes can't break out of the inline script.
+      env: { ...process.env, __HH_PROXY_TEST_URL: proxyUrl },
+    },
+  );
+  return { ok: result.status === 0 && result.stdout.includes('OK'), result };
+}
+
 // --- a) returns null when HH_PROXY_URL is unset ---
 const noProxy = resolveHhProxyDispatcher({});
 assert.strictEqual(noProxy, null);
@@ -104,21 +132,13 @@ const schemeTests = [
   { scheme: 'socks4a:', expectedType: 4 },
 ];
 // Verification via sub-process spawn for each scheme. We assert on the
-// internal numeric SOCKS type, which fetch-socks does not expose on the
+// internal numeric SOCKS type, which the undici Agent does not expose on the
 // dispatcher — so the child re-imports the SOCKS_PROTOCOL_TYPES contract by
 // constructing a dispatcher and confirming it is non-null (parse + build
 // succeeded). The map itself is asserted directly below in-process.
 for (const { scheme, expectedType } of schemeTests) {
-  const result = spawnSync(
-    process.execPath,
-    [
-      '--input-type=module',
-      '-e',
-      `import { resolveHhProxyDispatcher } from './scripts/adapters/hh.mjs'; const d = resolveHhProxyDispatcher({HH_PROXY_URL:'${scheme}//host:1080'}); console.log(d && typeof d.dispatch === 'function' ? 'OK' : 'NULL');`,
-    ],
-    { cwd: PKG_DB_DIR, encoding: 'utf8', timeout: 8000 },
-  );
-  if (result.status !== 0 || !result.stdout.includes('OK')) {
+  const { ok, result } = buildsInChild(`${scheme}//host:1080`);
+  if (!ok) {
     fail(
       `${scheme} -> type ${expectedType}`,
       `status=${result.status} stdout=${result.stdout?.trim()} stderr=${result.stderr?.trim()}`,
@@ -129,31 +149,41 @@ for (const { scheme, expectedType } of schemeTests) {
 }
 
 // --- Credential encoding edge cases ---
-// Percent-encoded user:pass in URL -> decoded credentials
-const encodedEnv = { HH_PROXY_URL: 'socks5://user%40domain:p%40ss%3Aword@host:1080' };
-const d = resolveHhProxyDispatcher(encodedEnv);
-// fetch-socks stores raw config internally; we can't reach in, but we know
-// resolveHhProxyDispatcher returned a dispatcher (not null/throw), which
-// confirms URL parsed and socksDispatcher() was constructed.
-assert.ok(d !== null, 'dispatcher should be created for valid URL with credentials');
-pass('builds dispatcher with percent-encoded credentials (no throw)');
+// Percent-encoded user:pass in URL -> decoded credentials. Run in a child so the
+// parse path actually executes (an in-process call here would hit the module
+// cache from an earlier build and skip credential decoding entirely).
+{
+  const { ok, result } = buildsInChild('socks5://user%40domain:p%40ss%3Aword@host:1080');
+  if (ok) {
+    pass('builds dispatcher with percent-encoded credentials (no throw)');
+  } else {
+    fail('percent-encoded credentials', `stdout=${result.stdout?.trim()} stderr=${result.stderr?.trim()}`);
+  }
+}
 
 // --- IPv6 address with brackets ---
-const ipv6WithBrackets = { HH_PROXY_URL: 'socks5://[2001:db8::1]:1080' };
-const d6 = resolveHhProxyDispatcher(ipv6WithBrackets);
-assert.ok(d6 !== null, 'dispatcher should be created for IPv6 URL');
-pass('builds dispatcher for bracketed IPv6 address (no throw)');
+// Child process: a fresh module cache so bracket-stripping is genuinely exercised
+// instead of returning the cached non-IPv6 dispatcher built above.
+{
+  const { ok, result } = buildsInChild('socks5://[2001:db8::1]:1080');
+  if (ok) {
+    pass('builds dispatcher for bracketed IPv6 address (no throw)');
+  } else {
+    fail('bracketed IPv6', `stdout=${result.stdout?.trim()} stderr=${result.stderr?.trim()}`);
+  }
+}
 
 // --- IPv6 without brackets (raw host) ---
-const ipv6Raw = { HH_PROXY_URL: 'socks5://2001:db8::1:1080' };
-// URL constructor will parse this differently (last :1080 is the port, the
-// rest is IPv6 without brackets). Let's just confirm no throw.
-try {
-  resolveHhProxyDispatcher(ipv6Raw);
-  pass('handles IPv6 without brackets (URL parser resolves port)');
-} catch (e) {
-  // Acceptable: Node may reject it
-  pass(`IPv6 without brackets: ${e.message.slice(0, 50)}`);
+// URL parses the trailing :1080 as the port; the rest is a raw IPv6 host. Either
+// a successful build OR a clean rejection is acceptable — assert only that the
+// child does not crash unexpectedly (non-zero with no parseable outcome).
+{
+  const { result } = buildsInChild('socks5://2001:db8::1:1080');
+  if (result.status === 0 || result.stderr.includes('HH_PROXY_URL')) {
+    pass('handles IPv6 without brackets (builds or rejects cleanly)');
+  } else {
+    fail('IPv6 without brackets', `status=${result.status} stderr=${result.stderr?.trim()}`);
+  }
 }
 
 console.log('\nProxy dispatcher verification complete.');

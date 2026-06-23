@@ -78,11 +78,17 @@ export async function fetchWithSourcePolicy(url, options = {}) {
     retries = DEFAULT_RETRIES,
     retryDelayMs = DEFAULT_RETRY_DELAY_MS,
     retryStatuses = DEFAULT_RETRY_STATUSES,
-    // Optional undici dispatcher (e.g. a SOCKS5 dispatcher from fetch-socks).
-    // undici's global fetch ignores http.Agent passed via `agent`; routing
-    // through a proxy requires a dispatcher instead. Pulled out explicitly so
-    // it is forwarded to fetch() rather than swallowed into ...fetchOptions.
+    // Optional undici dispatcher (e.g. a SOCKS5 Agent). undici's global fetch
+    // ignores the http.Agent passed via `agent`; routing through a proxy
+    // requires a dispatcher instead. Pulled out explicitly so it is forwarded
+    // to fetch() rather than swallowed into ...fetchOptions.
     dispatcher,
+    // Optional fetch implementation. Defaults to Node's global fetch. Callers
+    // that pass a `dispatcher` MUST also pass the `fetchImpl` from the SAME
+    // undici copy that built the dispatcher — global fetch is a different undici
+    // version and rejects a foreign dispatcher with `invalid onRequestStart
+    // method`. See hh.mjs resolveHhProxyFetch.
+    fetchImpl = fetch,
     nodeHttpFallback: _nodeHttpFallback,
     preferNodeHttpFallback: _preferNodeHttpFallback,
     ...fetchOptions
@@ -103,7 +109,7 @@ export async function fetchWithSourcePolicy(url, options = {}) {
     const combinedSignal = combineSignals(signal, controller.signal);
 
     try {
-      const response = await fetch(url, {
+      const response = await fetchImpl(url, {
         ...fetchOptions,
         method,
         body,

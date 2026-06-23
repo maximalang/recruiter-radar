@@ -1,4 +1,5 @@
-import { socksDispatcher } from 'fetch-socks';
+import { SocksClient } from 'socks';
+import { Agent, buildConnector, fetch as undiciFetch } from 'undici';
 
 import { fetchJson, SourceHttpError } from './source-http.mjs';
 import { RateLimiter } from './rate-limiter.mjs';
@@ -47,19 +48,69 @@ function isForbiddenError(error) {
 }
 
 /**
- * Build an undici dispatcher that tunnels HH requests through the SOCKS5 proxy
+ * Build an undici `Agent` that tunnels HH requests through the SOCKS5 proxy
  * named by HH_PROXY_URL, or null when no proxy is configured.
  *
- * WHY a dispatcher and not `agent`: the HH adapter runs on Node's built-in
- * fetch (undici), which ignores the `http.Agent` that socks-proxy-agent
- * produces. undici routes through a proxy only via a `dispatcher`, so we build
- * one with fetch-socks and pass it per-request. This is what unblocks the
- * HH-search 403 — see HhAccessForbiddenError — when the runner egresses from a
- * non-RU IP and a SOCKS5 proxy provides an RU-resident exit.
+ * WHY a dispatcher and not `agent`: the HH adapter runs on undici's `fetch`,
+ * which ignores the `http.Agent` that socks-proxy-agent produces. undici routes
+ * through a proxy only via a `dispatcher`. This is what unblocks the HH-search
+ * 403 — see HhAccessForbiddenError — when the runner egresses from a non-RU IP
+ * and a SOCKS5 proxy provides an RU-resident exit.
+ *
+ * WHY we build the Agent from the explicit `undici` package (not fetch-socks):
+ * fetch-socks bundles its own undici@8 and builds the dispatcher against undici
+ * 8's handler contract. Node's global fetch is undici 6 (Node 22) / 7 (Node 24),
+ * so passing an undici-8 Agent into the global fetch throws
+ * `invalid onRequestStart method` (UND_ERR_INVALID_ARG). We instead build the
+ * SOCKS connector with `socks` + undici's own `buildConnector`, wrap it in
+ * undici's `Agent`, and pair it with undici's `fetch` (resolveHhProxyFetch) so
+ * dispatcher and fetch come from one undici copy — pinned to ^6 to match the
+ * Node 22 runtime. See memory: project_hh_proxy_undici_mismatch.
  *
  * Cached so we open a single connection pool, not one per page.
  */
 let cachedProxyDispatcher;
+
+/**
+ * undici connector that opens the TCP socket through one or more SOCKS proxies,
+ * then hands off to undici's own connector for the (optional) TLS upgrade.
+ *
+ * This is the minimal port of fetch-socks' `socksConnector`, kept in-tree so we
+ * never mix a second undici copy into the runtime fetch. Scoped to this adapter.
+ */
+function createSocksConnector(proxy, tlsOpts = {}) {
+  const { timeout = 10_000 } = tlsOpts;
+  const undiciConnect = buildConnector(tlsOpts);
+
+  return async (options, callback) => {
+    const { protocol, hostname, port, httpSocket } = options;
+    const destinationPort = port
+      ? Number.parseInt(port, 10)
+      : protocol === 'http:' ? 80 : 443;
+
+    let socket;
+    try {
+      const result = await SocksClient.createConnection({
+        command: 'connect',
+        proxy,
+        timeout,
+        destination: { host: hostname, port: destinationPort },
+        existing_socket: httpSocket,
+      });
+      socket = result.socket;
+    } catch (error) {
+      return callback(error, null);
+    }
+
+    // Plain HTTP: the raw SOCKS socket is the connection.
+    if (protocol !== 'https:') {
+      return callback(null, socket.setNoDelay());
+    }
+
+    // HTTPS: hand the established socket to undici for the TLS upgrade.
+    return undiciConnect({ ...options, httpSocket: socket }, callback);
+  };
+}
 
 // socks5h/socks4a are remote-DNS variants; fetch-socks resolves DNS proxy-side
 // for SOCKS5 (type 5) and SOCKS4 (type 4) regardless, so both map to the base
@@ -123,8 +174,19 @@ export function resolveHhProxyDispatcher(env = process.env) {
     proxyConfig.password = decodeURIComponent(parsed.password);
   }
 
-  cachedProxyDispatcher = socksDispatcher(proxyConfig);
+  cachedProxyDispatcher = new Agent({ connect: createSocksConnector(proxyConfig) });
   return cachedProxyDispatcher;
+}
+
+/**
+ * The `fetch` that MUST be used with the dispatcher from
+ * resolveHhProxyDispatcher: undici's own `fetch`, from the same undici copy
+ * that built the Agent. Pairing them avoids the "two undici" handler mismatch.
+ * Returns undici's fetch only when a proxy is active; null otherwise (callers
+ * then fall through to Node's global fetch for the direct, non-proxy path).
+ */
+export function resolveHhProxyFetch(env = process.env) {
+  return resolveHhProxyDispatcher(env) ? undiciFetch : null;
 }
 
 const ENV_PARAM_MAP = [
@@ -201,6 +263,9 @@ export async function fetchHhVacancyPages({ userAgent, config = resolveHhVacancy
   let found = 0;
   let pagesAvailable = null;
   const proxyDispatcher = resolveHhProxyDispatcher();
+  // Pair the dispatcher with undici's own fetchImpl (same undici copy) — see
+  // resolveHhProxyFetch. null when no proxy: the direct path stays on global fetch.
+  const proxyFetch = resolveHhProxyFetch();
 
   for (let page = 0; page < config.pages; page += 1) {
     // Rate limiting: wait if we've exceeded 30 req/min
@@ -221,7 +286,7 @@ export async function fetchHhVacancyPages({ userAgent, config = resolveHhVacancy
           'hh-user-agent': normalizedUserAgent,
           'user-agent': normalizedUserAgent,
         },
-        ...(proxyDispatcher ? { dispatcher: proxyDispatcher } : {}),
+        ...(proxyDispatcher ? { dispatcher: proxyDispatcher, fetchImpl: proxyFetch } : {}),
       });
     } catch (error) {
       if (isForbiddenError(error)) {
