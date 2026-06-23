@@ -5,6 +5,7 @@
     "validate": "node scripts/validate-syntax.mjs"
   },
   "dependencies": {
+    "fetch-socks": "^1.3.3",
     "pg": "^8.16.3"
   }
 }

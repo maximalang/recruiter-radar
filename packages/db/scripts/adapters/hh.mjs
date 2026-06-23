@@ -1,3 +1,5 @@
+import { socksDispatcher } from 'fetch-socks';
+
 import { fetchJson, SourceHttpError } from './source-http.mjs';
 import { RateLimiter } from './rate-limiter.mjs';
 
@@ -42,6 +44,87 @@ function isForbiddenError(error) {
     && error.status === 403
     && /forbidden/i.test(error.message)
   );
+}
+
+/**
+ * Build an undici dispatcher that tunnels HH requests through the SOCKS5 proxy
+ * named by HH_PROXY_URL, or null when no proxy is configured.
+ *
+ * WHY a dispatcher and not `agent`: the HH adapter runs on Node's built-in
+ * fetch (undici), which ignores the `http.Agent` that socks-proxy-agent
+ * produces. undici routes through a proxy only via a `dispatcher`, so we build
+ * one with fetch-socks and pass it per-request. This is what unblocks the
+ * HH-search 403 — see HhAccessForbiddenError — when the runner egresses from a
+ * non-RU IP and a SOCKS5 proxy provides an RU-resident exit.
+ *
+ * Cached so we open a single connection pool, not one per page.
+ */
+let cachedProxyDispatcher;
+
+// socks5h/socks4a are remote-DNS variants; fetch-socks resolves DNS proxy-side
+// for SOCKS5 (type 5) and SOCKS4 (type 4) regardless, so both map to the base
+// numeric type the `socks` library expects.
+const SOCKS_PROTOCOL_TYPES = {
+  'socks:': 5,
+  'socks5:': 5,
+  'socks5h:': 5,
+  'socks4:': 4,
+  'socks4a:': 4,
+};
+
+export function resolveHhProxyDispatcher(env = process.env) {
+  if (cachedProxyDispatcher !== undefined) {
+    return cachedProxyDispatcher;
+  }
+
+  const proxyUrl = toNonEmptyText(env.HH_PROXY_URL);
+
+  if (!proxyUrl) {
+    // No proxy configured — this is the common case and is not cached so
+    // tests can call resolveHhProxyDispatcher with different env objects.
+    return null;
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(proxyUrl);
+  } catch (_error) {
+    throw new Error(
+      'HH_PROXY_URL is not a valid URL. Check format: socks5://[user:pass@]host:port.',
+    );
+  }
+
+  const socksType = SOCKS_PROTOCOL_TYPES[parsed.protocol];
+  if (!socksType) {
+    throw new Error(
+      `HH_PROXY_URL must use a socks scheme (socks://, socks5://, socks5h://, socks4://, socks4a://). Got "${parsed.protocol}".`,
+    );
+  }
+
+  const port = Number.parseInt(parsed.port, 10);
+  if (!parsed.hostname || !Number.isInteger(port) || port <= 0) {
+    throw new Error('HH_PROXY_URL must include a host and port, e.g. socks5://host:1080.');
+  }
+
+  const proxyConfig = {
+    type: socksType,
+    // URL.hostname includes brackets for IPv6 (e.g. "[::1]"); the socks
+    // library expects a raw address — strip them.
+    host: parsed.hostname.replace(/^\[|\]$/g, ''),
+    port,
+  };
+
+  if (parsed.username) {
+    // URL.username is raw percent-encoded; decode to get the actual value.
+    proxyConfig.userId = decodeURIComponent(parsed.username);
+  }
+  if (parsed.password) {
+    // URL.password likewise — single decode, never double.
+    proxyConfig.password = decodeURIComponent(parsed.password);
+  }
+
+  cachedProxyDispatcher = socksDispatcher(proxyConfig);
+  return cachedProxyDispatcher;
 }
 
 const ENV_PARAM_MAP = [
@@ -117,6 +200,7 @@ export async function fetchHhVacancyPages({ userAgent, config = resolveHhVacancy
   const pageSummaries = [];
   let found = 0;
   let pagesAvailable = null;
+  const proxyDispatcher = resolveHhProxyDispatcher();
 
   for (let page = 0; page < config.pages; page += 1) {
     // Rate limiting: wait if we've exceeded 30 req/min
@@ -137,6 +221,7 @@ export async function fetchHhVacancyPages({ userAgent, config = resolveHhVacancy
           'hh-user-agent': normalizedUserAgent,
           'user-agent': normalizedUserAgent,
         },
+        ...(proxyDispatcher ? { dispatcher: proxyDispatcher } : {}),
       });
     } catch (error) {
       if (isForbiddenError(error)) {

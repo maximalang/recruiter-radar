@@ -78,6 +78,11 @@ export async function fetchWithSourcePolicy(url, options = {}) {
     retries = DEFAULT_RETRIES,
     retryDelayMs = DEFAULT_RETRY_DELAY_MS,
     retryStatuses = DEFAULT_RETRY_STATUSES,
+    // Optional undici dispatcher (e.g. a SOCKS5 dispatcher from fetch-socks).
+    // undici's global fetch ignores http.Agent passed via `agent`; routing
+    // through a proxy requires a dispatcher instead. Pulled out explicitly so
+    // it is forwarded to fetch() rather than swallowed into ...fetchOptions.
+    dispatcher,
     nodeHttpFallback: _nodeHttpFallback,
     preferNodeHttpFallback: _preferNodeHttpFallback,
     ...fetchOptions
@@ -104,6 +109,7 @@ export async function fetchWithSourcePolicy(url, options = {}) {
         body,
         headers,
         signal: combinedSignal,
+        ...(dispatcher ? { dispatcher } : {}),
       });
 
       if (!retryStatuses.has(response.status) || attempt === maxAttempts) {
@@ -120,7 +126,16 @@ export async function fetchWithSourcePolicy(url, options = {}) {
       }
 
       lastError = new SourceHttpError(
-        `${sourceName} request failed for ${safeUrl}: ${error?.message ?? String(error)}`,
+        [
+          `${sourceName} request failed for ${safeUrl}: ${error?.message ?? String(error)}.`,
+          // When a proxy dispatcher is in play, the undici "fetch failed"
+          // error gives no hint the proxy was involved — surface it so the
+          // operator can debug the SOCKS connection instead of thinking the
+          // upstream API is down.
+          ...(dispatcher
+            ? ['The request was routed through a proxy dispatcher — check that the proxy is reachable and not rejecting connections.']
+            : []),
+        ].join(' '),
         { url: safeUrl, attempt, cause: error },
       );
 
