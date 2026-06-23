@@ -66,10 +66,9 @@ const sourceReadinessPolicy = Object.freeze({
     leadEligibility: 'confidence-gated-evidence',
     maturity: 'official-live-public-gated',
     productionBlockers: [
-      'RF query matrix, salary/region/freshness assertions, and HH dedupe checks must pass before digest promotion.',
-      'Freshness gate: 28% within active-30d vs 60% threshold as of 2026-06-21 — ingests to the signal pool but stays out of digest. Re-run `npm run verify:rabota-rossii:confidence` to re-check.',
+      'Freshness gate cleared 2026-06-23: `npm run verify:rabota-rossii:confidence` (RABOTA_ROSSII_LIVE=1) passed with >=60% within active-30d by date_modify (75 live records, moscow/spb/federal matrix) plus region/salary/identity/privacy contracts. Re-run to re-verify if the live feed regresses.',
     ],
-    promotionStatus: 'blocked-from-digest-pending-confidence-tests',
+    promotionStatus: 'digest-allowed',
   }),
   'career-pages': sourcePolicy({
     priority: 'P1',
@@ -855,7 +854,10 @@ export function exportSourceCoverageDetails() {
       requiredTier: Object.entries(SOURCE_COVERAGE_TIERS).find(([_, config]) =>
         config.sources.includes(source.id)
       )?.[0] || 'none',
-      inDigest: ['hh', 'career-pages'].includes(source.id),
+      // Mirrors the TS registry isPrimary set (apps/web/lib/sources/source-registry.ts):
+      // sources both enrolled in ingestion AND cleared for digest origination.
+      // career-pages is digest-allowed but NOT yet isPrimary, so it is excluded here.
+      inDigest: ['hh', 'superjob', 'habr-career', 'rabota-rossii'].includes(source.id),
     })),
     coverage: coverageReport,
     requirements: SOURCE_COVERAGE_TIERS,

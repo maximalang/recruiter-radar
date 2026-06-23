@@ -190,7 +190,7 @@ describe('source-ingest', () => {
   })
 
   describe('ingestAllPrimarySources', () => {
-    it('runs all three primary sources in parallel', async () => {
+    it('runs all primary sources in parallel', async () => {
       mockExecFile.mockImplementation((_cmd, args: any, opts: any, callback: any) => {
         const script = args[0] as string
         if (script.includes('ingest-hh')) {
@@ -199,6 +199,8 @@ describe('source-ingest', () => {
           callback(null, JSON.stringify({ source: 'superjob', recordsReceived: 10, signalUpsertsCompleted: 8 }), '')
         } else if (script.includes('habr-career')) {
           callback(null, JSON.stringify({ source: 'habr-career', recordsReceived: 5, signalUpsertsCompleted: 4 }), '')
+        } else if (script.includes('rabota-rossii')) {
+          callback(null, JSON.stringify({ source: 'rabota-rossii', recordsReceived: 7, signalUpsertsCompleted: 6 }), '')
         } else {
           callback(null, '', '')
         }
@@ -207,11 +209,12 @@ describe('source-ingest', () => {
       const results = await ingestAllPrimarySources()
       if (isNoActiveProfiles(results)) throw new Error('unexpected no_active_profiles')
 
-      expect(results).toHaveLength(3)
+      expect(results).toHaveLength(4)
       const sources = results.map(r => r.source)
       expect(sources).toContain('hh')
       expect(sources).toContain('superjob')
       expect(sources).toContain('habr-career')
+      expect(sources).toContain('rabota-rossii')
       expect(results.every(r => r.success)).toBe(true)
       expect(results[0].fetchedCount).toBe(20)
       expect(results[0].upsertedCount).toBe(18)
@@ -256,10 +259,10 @@ describe('source-ingest', () => {
       const results = await ingestAllPrimarySources()
       if (isNoActiveProfiles(results)) throw new Error('unexpected no_active_profiles')
 
-      expect(results).toHaveLength(3)
+      expect(results).toHaveLength(4)
       const failed = results.find(r => r.source === 'hh')
       expect(failed?.success).toBe(false)
-      expect(results.filter(r => r.success).length).toBe(2)
+      expect(results.filter(r => r.success).length).toBe(3)
     })
   })
 })

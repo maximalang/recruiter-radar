@@ -109,18 +109,19 @@ const SOURCE_REGISTRY: SourceConfig[] = [
   {
     id: 'rabota-rossii',
     name: 'Rabota Rossii',
-    // Signal-pool source: ingests vacancy signals into the DB but is held out
-    // of the daily-radar digest until the freshness confidence gate passes.
-    // Governance: source-registry.mjs promotionStatus is
-    // 'blocked-from-digest-pending-confidence-tests' (freshness 28% vs 60%
-    // threshold as of 2026-06-21). Promotion path: when
-    // `npm run verify:rabota-rossii:confidence` passes, flip isPrimary: true.
-    description: 'Official Rabota Rossii open-data vacancies (trudvsem) — signal pool, non-digest',
+    // Promoted to primary on 2026-06-23: the live freshness confidence gate
+    // (`npm run verify:rabota-rossii:confidence`, RABOTA_ROSSII_LIVE=1) passed
+    // with freshness >=60% within active-30d measured by date_modify (75 live
+    // records across the moscow/spb/federal matrix), plus region/salary/
+    // identity/privacy contracts. Enrolling in ingestion does NOT bypass the
+    // digest confidence gate: per-org digest eligibility is still decided by
+    // isDigestEligibleGate (A/B) + matchesClientProfile downstream.
+    description: 'Official Rabota Rossii open-data vacancies (trudvsem) — primary signal source',
     script: 'source-rabota-rossii.mjs',
     requiredEnvVars: [],
     envPrefixes: ['RABOTA_ROSSII_'],
     searchEnvVars: [],
-    isPrimary: false,
+    isPrimary: true,
     category: 'job-board',
   },
 ]
