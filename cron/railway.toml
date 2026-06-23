@@ -1,0 +1,19 @@
+# Railway config for the daily-radar cron trigger (separate from web + n8n).
+# Point this service's "Config-as-code path" at cron/railway.toml in the
+# Railway Dashboard, or set the service Root Directory to cron/.
+#
+# NOTE: dockerfilePath is resolved from the repository root, matching the
+# web (apps/web/Dockerfile) and n8n (n8n/Dockerfile) service convention.
+[build]
+  builder = "DOCKERFILE"
+  dockerfilePath = "cron/Dockerfile"
+
+[deploy]
+  # cronSchedule turns this into a scheduled one-off: Railway starts the
+  # container on this cron, runs CMD to completion, then stops it. The schedule
+  # is in UTC. 03:00 UTC = 06:00 MSK (Europe/Moscow, UTC+3) — the daily window.
+  cronSchedule = "0 3 * * *"
+
+  # No long-running process to health-check; just retry a failed run.
+  restartPolicyType = "ON_FAILURE"
+  restartPolicyMaxRetries = 3
