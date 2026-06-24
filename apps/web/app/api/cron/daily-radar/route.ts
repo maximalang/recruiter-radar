@@ -1,8 +1,9 @@
 /**
  * Cron: Daily Radar Pipeline
  *
- * Triggered by n8n or external scheduler to run the complete daily cycle:
- *   1. Ingest source data (HH, SuperJob, Habr Career)
+ * Triggered by the Railway-native cron (cron/trigger-daily-radar.mjs) to run
+ * the complete daily cycle:
+ *   1. Ingest all primary sources (see getPrimarySourceIds in the source registry)
  *   2. Generate digest for each active client profile
  *   3. Deliver digest to Telegram
  *
