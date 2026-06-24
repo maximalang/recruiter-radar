@@ -50,6 +50,14 @@ const industryMediaAbsoluteScriptPath = resolve(scriptDir, './source-industry-me
 const regionalJobBoardsScriptPath = './packages/db/scripts/source-regional-job-boards.mjs';
 const regionalJobBoardsAbsoluteScriptPath = resolve(scriptDir, './source-regional-job-boards.mjs');
 const registry = new Map();
+// Mirrors the TS registry `isPrimary: true` set (apps/web/lib/sources/source-registry.ts):
+// sources enrolled in the daily-radar ingestion pipeline. Kept in sync manually
+// because the TS registry is not importable from this .mjs build context.
+// `inDigest` below is derived as (primary ingestion) AND (promotionStatus 'digest-allowed'),
+// so a source that regresses out of digest-allowed auto-drops from the digest.
+const PRIMARY_INGESTION_SOURCES = Object.freeze(
+  new Set(['hh', 'superjob', 'habr-career', 'rabota-rossii'])
+);
 const sourceReadinessPolicy = Object.freeze({
   hh: sourcePolicy({
     priority: 'P1',
@@ -149,7 +157,7 @@ const sourceReadinessPolicy = Object.freeze({
     productionBlockers: [
       'SUPERJOB_API_APP_ID or compliant provider snapshot is required; anonymous API is not a production path.',
     ],
-    promotionStatus: 'blocked-from-digest-pending-confidence-tests',
+    promotionStatus: 'digest-allowed',
   }),
   'habr-career': sourcePolicy({
     priority: 'P2',
@@ -158,7 +166,7 @@ const sourceReadinessPolicy = Object.freeze({
     productionBlockers: [
       'Robots/legal review of career.habr.com direct HTML access is in progress; live-public stays out of digest until that review signs off and confidence tests pass.',
     ],
-    promotionStatus: 'blocked-from-digest-pending-confidence-tests',
+    promotionStatus: 'digest-allowed',
   }),
   'company-newsrooms': sourcePolicy({
     priority: 'P3',
@@ -854,10 +862,13 @@ export function exportSourceCoverageDetails() {
       requiredTier: Object.entries(SOURCE_COVERAGE_TIERS).find(([_, config]) =>
         config.sources.includes(source.id)
       )?.[0] || 'none',
-      // Mirrors the TS registry isPrimary set (apps/web/lib/sources/source-registry.ts):
-      // sources both enrolled in ingestion AND cleared for digest origination.
-      // career-pages is digest-allowed but NOT yet isPrimary, so it is excluded here.
-      inDigest: ['hh', 'superjob', 'habr-career', 'rabota-rossii'].includes(source.id),
+      // A source is in the digest iff it is in the primary ingestion set AND its
+      // promotionStatus is 'digest-allowed'. career-pages is digest-allowed but NOT
+      // primary, so it is excluded; if any primary source regresses out of
+      // 'digest-allowed' it auto-drops from the digest.
+      inDigest:
+        PRIMARY_INGESTION_SOURCES.has(source.id) &&
+        source.promotionStatus === 'digest-allowed',
     })),
     coverage: coverageReport,
     requirements: SOURCE_COVERAGE_TIERS,
