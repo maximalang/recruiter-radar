@@ -107,28 +107,20 @@ normalized_signal_rows AS (
     signal.published_at,
     -- evidence_quality: classifies how close this signal is to a company-controlled hiring surface.
     --
-    -- direct_hiring_proof  — company-owned surface (career-pages) or a matched org-level external ID
-    --                        that indicates a verified employer entity, not a platform aggregator ID.
-    --                        source_entity_external_id / org_external_id are org-level identifiers.
-    --                        employer_id / hh_employer_id are NOT org-level: they are platform (HH)
-    --                        aggregator IDs and do NOT grant direct_hiring_proof status on their own.
-    --                        For rabota-rossii, INN-based org_external_id IS org-level → direct proof.
-    -- platform_aggregation  — signal from a platform (HH, superjob, etc.) with a company match in
-    --                        org_source_refs, but no company-owned surface.
+    -- direct_hiring_proof  — a COMPANY-OWNED hiring surface, i.e. career-pages. This is the only
+    --                        signal class that proves the company itself is publishing the role on
+    --                        its own surface. An external ID match (INN, company_id, employer_id,
+    --                        registry org id) only proves entity identity on a third-party platform
+    --                        or registry — it is NOT a company-owned surface and does NOT grant
+    --                        direct proof. rabota-rossii (trudvsem) is a federal registry: an
+    --                        INN-based org_external_id verifies the entity but carries no corporate
+    --                        surface, so it is platform_aggregation (gate C until corroborated),
+    --                        NOT direct_hiring_proof.
+    -- platform_aggregation  — signal from a platform or registry (HH, superjob, rabota-rossii, etc.)
+    --                        with a company match in org_source_refs, but no company-owned surface.
     -- enrichment_context    — no match found; signal provides background context only.
     CASE
       WHEN signal.source = 'career-pages'
-        THEN 'direct_hiring_proof'
-      WHEN signal.source = 'rabota-rossii'
-        AND signal.payload_external_id IS NOT NULL
-        THEN 'direct_hiring_proof'
-      WHEN signal.payload_external_id IS NOT NULL
-        AND signal.payload_external_id NOT IN (
-          -- employer_id and hh_employer_id are HH platform IDs, not org identifiers.
-          -- Their presence alone does not constitute a direct hiring proof.
-          COALESCE(signal.payload_employer_id, ''),
-          COALESCE(signal.payload_hh_employer_id, '')
-        )
         THEN 'direct_hiring_proof'
       WHEN source_ref.matched_by IS NOT NULL
         THEN 'platform_aggregation'

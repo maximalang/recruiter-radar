@@ -27,6 +27,11 @@ const CORPORATE_CATEGORIES = new Set([
   'contact-form',
 ])
 
+/** True if any path is a non-personal corporate surface (career page, HR/generic email, form). */
+export function hasCorporateSurface(paths: ContactPathLike[]): boolean {
+  return paths.some((p) => CORPORATE_CATEGORIES.has(p.category))
+}
+
 /** Categories blocked by no_personal (and corporate_only) */
 const PERSONAL_CATEGORIES = new Set([
   'personal-email',

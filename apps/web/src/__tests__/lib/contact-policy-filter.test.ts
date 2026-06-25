@@ -7,7 +7,7 @@
  * - unrestricted: all paths allowed
  */
 
-import { filterContactPathsByPolicy } from '@/lib/contact-policy-filter'
+import { filterContactPathsByPolicy, hasCorporateSurface } from '@/lib/contact-policy-filter'
 import type { ContactPathLike } from '@/lib/contact-policy-filter'
 
 describe('filterContactPathsByPolicy', () => {
@@ -48,5 +48,29 @@ describe('filterContactPathsByPolicy', () => {
 
   it('empty input returns empty', () => {
     expect(filterContactPathsByPolicy([], 'corporate_only')).toEqual([])
+  })
+})
+
+describe('hasCorporateSurface', () => {
+  it('true when any corporate/HR/form channel is present', () => {
+    expect(hasCorporateSurface([{ category: 'hr-email', value: 'hr@corp.com' }])).toBe(true)
+    expect(hasCorporateSurface([{ category: 'careers-email', value: 'careers@corp.com' }])).toBe(true)
+    expect(hasCorporateSurface([{ category: 'generic-email', value: 'info@corp.com' }])).toBe(true)
+    expect(hasCorporateSurface([{ category: 'contact-form', value: 'https://corp.com/contact' }])).toBe(true)
+  })
+
+  it('false for phone-only — a phone is not a safe corporate surface', () => {
+    expect(hasCorporateSurface([{ category: 'phone', value: '+7-900-123-4567' }])).toBe(false)
+  })
+
+  it('false for personal-only channels', () => {
+    expect(hasCorporateSurface([
+      { category: 'personal-email', value: 'john@corp.com' },
+      { category: 'telegram', value: '@john' },
+    ])).toBe(false)
+  })
+
+  it('false for empty input', () => {
+    expect(hasCorporateSurface([])).toBe(false)
   })
 })

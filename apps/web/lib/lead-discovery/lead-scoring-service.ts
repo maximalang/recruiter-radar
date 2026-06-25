@@ -26,6 +26,7 @@ import type {
   AgencyProfile
 } from '@/lib/scoring/scoring-pipeline'
 import type { ContactPath, ContactCategory } from '@/lib/scoring/contact-paths'
+import { hasCorporateSurface } from '@/lib/contact-policy-filter'
 
 export interface LeadScoringOptions {
   agencyProfile: AgencyProfile
@@ -311,6 +312,11 @@ export class LeadScoringService {
     options: LeadScoringOptions,
     clientOverrides?: FiurClientOverrides
   ): ScoringPipelineInput {
+    // Extract contact paths, then derive the corporate-surface flag from the
+    // actual paths rather than the raw enrichment.hasContactPath bool — a lead
+    // can have a contact path that is personal-only and not a safe corporate surface.
+    const contactPaths: ContactPath[] = this.extractContactPaths(lead)
+
     // Extract company info from lead
     const company: PipelineCompany = {
       id: lead.companyId,
@@ -322,7 +328,7 @@ export class LeadScoringService {
       size: this.mapCompanySize(lead.enrichment.companySize),
       employeeCount: lead.enrichment.employeeCount,
       hasCareerPage: lead.enrichment.hasCareerPage,
-      hasCorporateContactPath: lead.enrichment.hasContactPath,
+      hasCorporateContactPath: hasCorporateSurface(contactPaths),
     }
 
     // Convert signals to vacancies (T2.3: uses real publishedAt and location)
@@ -334,9 +340,6 @@ export class LeadScoringService {
       tier: this.mapEvidenceTierFromSource(source),
       fetchedAt: source.extractedAt.toISOString(),
     }))
-
-    // Extract contact paths
-    const contactPaths: ContactPath[] = this.extractContactPaths(lead)
 
     return {
       leadId: lead.id,
