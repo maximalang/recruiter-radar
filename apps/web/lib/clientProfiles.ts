@@ -328,6 +328,7 @@ export async function saveClientProfile(input: {
   const excludedIndustries = normalizeIndustryList(input.excludedIndustries);
   const excludedLocations = normalizeKeywordList(input.excludedLocations);
   const remoteFriendly = input.remoteFriendly ?? false;
+  const contactPolicy = normalizeContactPolicy(input.contactPolicy);
 
   const returningClause = `
     id::TEXT AS id,
@@ -386,7 +387,7 @@ export async function saveClientProfile(input: {
           companySizes.length > 0 ? JSON.stringify(companySizes) : null,
           dailyDigestLimit,
           isActive,
-          input.contactPolicy ?? 'corporate_only',
+          contactPolicy,
           roles,
           excludedIndustries,
           excludedLocations,
@@ -423,7 +424,7 @@ export async function saveClientProfile(input: {
           companySizes.length > 0 ? JSON.stringify(companySizes) : null,
           dailyDigestLimit,
           isActive,
-          input.contactPolicy ?? 'corporate_only',
+          contactPolicy,
           roles,
           excludedIndustries,
           excludedLocations,
@@ -883,6 +884,37 @@ const VALID_ROLES = new Set([
   'it-engineering', 'data', 'product', 'sales', 'marketing',
   'hr', 'finance', 'operations', 'legal', 'executive', 'other',
 ])
+
+/**
+ * Canonical contact-policy values — the single source of truth for:
+ *   - normalizeContactPolicy whitelist
+ *   - onboarding form <select> option values
+ *   - computeFit reachability gate
+ *
+ * 'corporate_only' is the default and the safest route (career page, HR email,
+ * feedback form only). Order is irrelevant; membership is what matters.
+ */
+export const VALID_CONTACT_POLICIES = new Set<ClientProfile['contactPolicy']>([
+  'corporate_only', 'no_personal', 'unrestricted',
+])
+
+export const DEFAULT_CONTACT_POLICY: ClientProfile['contactPolicy'] = 'corporate_only'
+
+/**
+ * Normalize a contact-policy value — only known values survive.
+ * Anything unknown (including null/non-string) falls back to the safest
+ * default, so a forged POST can never persist an arbitrary string into
+ * the contact_policy column.
+ */
+export function normalizeContactPolicy(value: unknown): ClientProfile['contactPolicy'] {
+  if (typeof value !== 'string') {
+    return DEFAULT_CONTACT_POLICY
+  }
+
+  const normalizedItem = value.trim().toLowerCase() as ClientProfile['contactPolicy']
+
+  return VALID_CONTACT_POLICIES.has(normalizedItem) ? normalizedItem : DEFAULT_CONTACT_POLICY
+}
 
 /**
  * Normalize role list — only known keys survive.
