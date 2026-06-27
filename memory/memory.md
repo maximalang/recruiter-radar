@@ -9,3 +9,4 @@
 - [Agent Skills Commands](agent-skills-commands.md) — Slash commands from agent-skills package by addyosmani
 - [Session 2026-06-21](session-2026-06-21.md) — source map (habr-career 94 + superjob 40 + hh 6 live in prod), superjob FIXED (corrupt key, not 403), HH confirmed geo-403 on search (needs RU proxy), open items: HH proxy, rabota-rossii promotion recheck, onboarding, TG channels
 - [Org match is per-source only](project_org_match_per_source.md) — INN dedup doesn't happen at ingest; cross-source domain backfill via shared INN needs a separate idempotent job, not the existing upsert path
+- [Railway DB access from local](setup_railway_db_access.md) — prod Postgres = Railway proj refreshing-solace svc Postgres; reach via DATABASE_PUBLIC_URL (proxy.rlwy.net), NOT internal host or localhost; Railway auto-applies migrations on deploy; delivery migration confirmed live 2026-06-27
