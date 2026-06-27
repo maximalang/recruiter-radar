@@ -10,6 +10,7 @@ import {
   VALID_ROLES,
   normalizeContactPolicy,
 } from "../../../lib/clientProfiles";
+import { saveDeliveryPreferencesByOwnerId } from "../../../lib/deliveryPreferences";
 import { readOwnerSession } from "../../../lib/session";
 
 function readRequiredText(formData: FormData, key: string): string {
@@ -95,6 +96,49 @@ export async function saveSettingsProfileAction(
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Не удалось сохранить профиль.";
+    return { ok: false, error: message };
+  }
+
+  revalidatePath("/settings/profile");
+  return { ok: true };
+}
+
+export type SaveDeliveryResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Persist delivery-channel preferences (web-push + email digest) from the
+ * /settings/profile page.
+ *
+ * Anti-IDOR boundary: writes are scoped to the authenticated session owner via
+ * saveDeliveryPreferencesByOwnerId — no profileId is read from the form. Channel
+ * invariants (email requires a valid address) are enforced in the repository and
+ * surfaced here as Russian copy.
+ */
+export async function saveDeliveryPreferencesAction(
+  _prev: SaveDeliveryResult | null,
+  formData: FormData
+): Promise<SaveDeliveryResult> {
+  const ownerId = await readOwnerSession();
+  if (!ownerId) {
+    return { ok: false, error: "Требуется вход в аккаунт." };
+  }
+
+  const result = await saveDeliveryPreferencesByOwnerId({
+    ownerId,
+    webPushEnabled: formData.get("webPushEnabled") === "on",
+    emailDigestEnabled: formData.get("emailDigestEnabled") === "on",
+    digestEmail: readOptionalText(formData, "digestEmail"),
+  });
+
+  if (!result.ok) {
+    const message =
+      result.reason === "invalid_email"
+        ? "Укажите корректный email."
+        : result.reason === "email_required"
+          ? "Чтобы включить email-дайджест, укажите адрес."
+          : result.reason === "not_found"
+            ? "Профиль не найден. Сначала активируйте пилот."
+            : "Не удалось сохранить настройки доставки.";
     return { ok: false, error: message };
   }
 

@@ -6,8 +6,10 @@ import {
   type NavItem,
 } from "../../ui/internal-page";
 import { getClientProfileByOwnerId } from "../../../lib/clientProfiles";
+import { getDeliveryPreferencesByOwnerId } from "../../../lib/deliveryPreferences";
 import { readOwnerSession } from "../../../lib/session";
 import { ProfileForm } from "./profile-form";
+import { DeliveryForm } from "./delivery-form";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +23,8 @@ const SETTINGS_NAV: NavItem[] = [
 export default async function SettingsProfilePage() {
   const ownerId = await readOwnerSession();
   const profile = ownerId ? await getClientProfileByOwnerId(ownerId) : null;
+  const deliveryPreferences =
+    ownerId && profile ? await getDeliveryPreferencesByOwnerId(ownerId) : null;
 
   return (
     <InternalPageFrame navItems={SETTINGS_NAV}>
@@ -39,6 +43,15 @@ export default async function SettingsProfilePage() {
           />
         )}
       </ContentCard>
+      {profile && deliveryPreferences ? (
+        <ContentCard>
+          <InternalPageHeader
+            title="Как доставлять радар"
+            subtitle="Telegram — основной канал. Дополнительно включите браузерные уведомления и ежедневный email-дайджест."
+          />
+          <DeliveryForm preferences={deliveryPreferences} />
+        </ContentCard>
+      ) : null}
     </InternalPageFrame>
   );
 }
