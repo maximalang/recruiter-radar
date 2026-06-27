@@ -115,10 +115,25 @@ ALTER TABLE client_profiles
   gate/confidence, corporate surface/contactability, ссылка в приложение →
   footer (саммари профиля + ссылка на настройки). `escapeHtml` на каждой строке.
   Переиспользует `deriveWhyNow`, `deriveLawfulContactPath` (как Telegram).
-- **Route/job** — `POST /api/email/digest` за `x-api-key`: для профиля с
-  `email_digest_enabled && digest_email`, собрать сегодняшних кандидатов, отрендерить,
-  отправить **одно письмо**, записать `lead_channel_deliveries` `dedupe_key = YYYY-MM-DD`
-  → один email/профиль/день.
+- **Триггер (как реализовано)** — НЕ отдельный `POST /api/email/digest`, а
+  best-effort вызов `sendDigestEmailForProfile({ clientProfileId, digestRunId })`
+  внутри `deliverCandidatesForRun(runId)`, рядом с web-push. Единый authenticated
+  вход — `POST /api/digest/delivery` (`x-api-key`), который запускает прогон и
+  доставляет по всем каналам одним run-scoped проходом. Для профиля с
+  `email_digest_enabled && digest_email`: взять кандидатов **этого run**
+  (`getLeadsForAllProfiles({ digestRunId })`), оставить gate A/B, отрендерить,
+  claim-before-send в `lead_channel_deliveries` `dedupe_key = day:<YYYY-MM-DD>`
+  (первый пишущий выигрывает) → одно письмо/профиль/день.
+- **Почему run-scoped, а НЕ «все сегодняшние кандидаты»** — email обязан брать
+  кандидатов конкретного run (`digest_run_id`), а не всю историю профиля: иначе
+  «дневной» дайджест накапливал бы устаревших кандидатов всех прошлых run и
+  расходился бы с Telegram/web-push. (Это поймал review как Critical; `digestRunId`
+  на `sendDigestEmailForProfile` сделан обязательным, чтобы регресс был
+  невозможен по типу.)
+- **Почему НЕ отдельный route** — standalone `/api/email/digest` пришлось бы
+  кормить кандидатами вне run-контекста, что воспроизвело бы ту же ошибку
+  накопления. Один общий `deliverCandidatesForRun` держит все каналы
+  консистентными.
 
 ### D. Настройки (UX) — в `/settings/profile` (owner-scoped, уже есть)
 
@@ -129,10 +144,22 @@ ALTER TABLE client_profiles
 
 ### E. Документация триггеров
 
-Дополнить `docs/specs/2026-06-27-delivery-paths-and-ai-roadmap.md`:
-- web-push trigger = новые сильные лиды (A/B) после прогона (event-driven).
-- email trigger = ежедневная сводка (cron-driven, идемпотентно по дате).
-- Почему такой выбор per-channel.
+- **Единый вход доставки** — `POST /api/digest/delivery` (`x-api-key`): прогон
+  (`runDigestForClientProfile`) + `deliverCandidatesForRun(runId)`, который
+  фан-аутит на Telegram (per-candidate, idempotency `digest:<run>:candidate:<id>`),
+  web-push и email. Cron бьёт по одному этому route.
+- **web-push trigger** = новые сильные лиды (A/B) после прогона (event-driven),
+  один агрегат на run, dedupe `run:<digest_run_id>`.
+- **email trigger** = run-scoped дайджест внутри того же прогона, idempotent по
+  `day:<YYYY-MM-DD>` (один/профиль/день). НЕ отдельный cron — см. секцию C
+  «Почему run-scoped / Почему НЕ отдельный route».
+- **Почему такой выбор per-channel** — Telegram дробится по кандидатам (нужны
+  inline-кнопки на каждый лид); web-push и email агрегируются (нудж «открой
+  радар», не спам), но оба скоупятся одним run, чтобы все три канала показывали
+  один и тот же свежий набор.
+- **SW hardening** — `sw.js` форсит same-origin на target URL в `push` и
+  `notificationclick` (`safeSameOriginUrl`, fallback `/leads`): даже форж payload
+  не уведёт на чужой origin.
 
 ---
 
