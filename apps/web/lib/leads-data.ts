@@ -431,6 +431,14 @@ export async function getLeadsForAllProfiles(input: {
   offset?: number;
   confidenceGate?: string | null;
   feedbackStatus?: string | null;
+  /**
+   * Restrict to candidates produced by a single digest run. Pass this for
+   * delivery channels (email/push) so the digest reflects THIS run's fresh
+   * batch — "companies worth contacting today" — instead of every candidate
+   * ever scored for the profile. Omit for the /leads UI, which shows the full
+   * history on purpose.
+   */
+  digestRunId?: string | number | null;
 }): Promise<LeadsListResult> {
   const pool = getPool();
   if (!pool || input.profileIds.length === 0) {
@@ -445,6 +453,12 @@ export async function getLeadsForAllProfiles(input: {
   ];
   const params: unknown[] = [input.profileIds];
   let paramIdx = 2;
+
+  if (input.digestRunId !== undefined && input.digestRunId !== null) {
+    conditions.push(`dc.digest_run_id = $${paramIdx}`);
+    params.push(input.digestRunId);
+    paramIdx++;
+  }
 
   if (input.confidenceGate) {
     conditions.push(`dc.confidence_gate = $${paramIdx}`);

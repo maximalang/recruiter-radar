@@ -9,6 +9,9 @@
  */
 
 import { getPool, sendLeadToTelegram } from '@/lib/db'
+import { notifyNewLeadsForRun } from '@/lib/webPush'
+import { sendDigestEmailForProfile } from '@/lib/email/sendDigestEmail'
+import { logError } from '@/lib/runtime'
 import { randomUUID } from 'node:crypto'
 
 const DELIVERY_STALE_SECONDS = 120
@@ -41,8 +44,8 @@ export async function deliverCandidatesForRun(runId: string): Promise<DeliverRun
   }
 
   // Get candidates for delivery (A/B gates only)
-  const candidates = await pool.query<{ id: number }>(`
-    SELECT id
+  const candidates = await pool.query<{ id: number; client_profile_id: string }>(`
+    SELECT id, client_profile_id::TEXT AS client_profile_id
     FROM digest_candidates
     WHERE digest_run_id = $1
       AND (payload->>'confidence_gate' NOT IN ('C', 'D') OR payload->>'confidence_gate' IS NULL)
@@ -107,6 +110,32 @@ export async function deliverCandidatesForRun(runId: string): Promise<DeliverRun
       )
       counters.failed += 1
       counters.failures.push({ digestCandidateId: row.id, error: message })
+    }
+  }
+
+  // Aggregate web-push for this run's strong (A/B) leads. Best-effort and
+  // additive: a push failure must never affect the Telegram delivery result.
+  // Dedupe/preference/subscription checks all live in notifyNewLeadsForRun.
+  if (candidates.rows.length > 0) {
+    const clientProfileId = candidates.rows[0].client_profile_id
+    try {
+      await notifyNewLeadsForRun({
+        clientProfileId,
+        digestRunId: runId,
+        count: candidates.rows.length,
+      })
+    } catch (error) {
+      logError('webpush.notify_run_failed', error, { runId })
+    }
+
+    // Daily email digest for this profile. Best-effort and additive, same as
+    // web-push: a failure must never affect the Telegram delivery result.
+    // Preference/destination/dedupe (one email per profile per day) all live in
+    // sendDigestEmailForProfile.
+    try {
+      await sendDigestEmailForProfile({ clientProfileId, digestRunId: runId })
+    } catch (error) {
+      logError('email.digest_send_exception', error, { runId })
     }
   }
 
