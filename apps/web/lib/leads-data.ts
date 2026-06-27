@@ -221,6 +221,8 @@ export type FeedbackStatus = Exclude<typeof VALID_FEEDBACK_STATUSES extends Set<
 export interface LeadItem {
   id: string;
   orgId: string;
+  /** Owning client profile — lets the list page match a lead to its agency profile. */
+  clientProfileId: string;
   orgName: string;
   sourceExternalId: string | null;
   score: number;
@@ -229,6 +231,13 @@ export interface LeadItem {
   distinctVacancyNamesCount: number;
   latestPublishedAt: string | null;
   reasons: string[];
+  /**
+   * Structured scoring reasons (component + stable key + params), parsed from the
+   * raw `reasons` column. Drives the deterministic fit explanation, which matches
+   * on stable keys rather than localized strings. Empty for legacy string-only
+   * rows — the fit builder degrades gracefully. Read-only to any AI layer.
+   */
+  structuredReasons: ScoringReason[];
   /** Why now — 1–2 short arguments for why this company is in focus today */
   whyNow: string;
   /** Best angle — the strongest angle for first contact */
@@ -252,7 +261,6 @@ export interface LeadsListResult {
 }
 
 export interface LeadDetail extends LeadItem {
-  clientProfileId: string;
   orgWebsite: string | null;
   /** ИНН from entity resolution */
   orgInn: string | null;
@@ -274,6 +282,7 @@ export interface LeadDetail extends LeadItem {
 interface LeadRow {
   id: string;
   org_id: string;
+  client_profile_id: string;
   org_name: string;
   source_external_id: string | null;
   score: number;
@@ -295,6 +304,7 @@ interface LeadRow {
 const LEAD_SELECT_COLUMNS = `
       dc.id::TEXT AS id,
       dc.org_id::TEXT AS org_id,
+      dc.client_profile_id::TEXT AS client_profile_id,
       dc.source_display_name AS org_name,
       dc.source_external_id,
       dc.total_score AS score,
@@ -318,11 +328,13 @@ function toStringArray(raw: unknown): string[] {
 /** Map a raw joined row into the derived LeadItem shape (why-now, best-angle, etc.). */
 function mapLeadRow(row: LeadRow): LeadItem {
   const reasonsRaw = row.reasons;
-  const reasons = parseReasons(reasonsRaw).map(formatReason);
+  const structuredReasons = parseReasons(reasonsRaw);
+  const reasons = structuredReasons.map(formatReason);
   const sourceFamilies = toStringArray(row.source_families);
   return {
     id: row.id,
     orgId: row.org_id,
+    clientProfileId: row.client_profile_id,
     orgName: row.org_name ?? "Неизвестная компания",
     sourceExternalId: row.source_external_id,
     score: row.score,
@@ -331,6 +343,7 @@ function mapLeadRow(row: LeadRow): LeadItem {
     distinctVacancyNamesCount: row.distinct_vacancy_names_count,
     latestPublishedAt: row.latest_published_at,
     reasons,
+    structuredReasons,
     whyNow: deriveWhyNow(reasonsRaw),
     bestAngle: deriveBestAngle(reasonsRaw, row.opener ?? "", sourceFamilies),
     lawfulContactPath: deriveLawfulContactPath(reasonsRaw, sourceFamilies),
@@ -599,7 +612,6 @@ export async function getLeadDetail(input: {
 
   return {
     ...mapLeadRow(row),
-    clientProfileId: row.client_profile_id,
     orgWebsite: row.org_website,
     orgInn: row.org_inn,
     orgOgrn: row.org_ogrn,

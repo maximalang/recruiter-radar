@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import Link from 'next/link';
 import { getLeadsForAllProfiles, getPendingReviewCount, type LeadItem, VALID_FEEDBACK_STATUSES } from '@/lib/leads-data';
 import { listClientProfiles, type ClientProfile } from '@/lib/clientProfiles';
+import { buildFitExplanation, FIT_DIMENSION_ICON } from '@/lib/leads/fit-explanation';
 import LeadsFilters from './leads-filters';
 import {
   InternalPageFrame,
@@ -26,7 +27,13 @@ const LEADS_NAV: NavItem[] = [
   { href: '/review', label: '🔍 Ревью' },
 ];
 
-function LeadCard({ lead }: { lead: LeadItem }) {
+function LeadCard({
+  lead,
+  fitPreview,
+}: {
+  lead: LeadItem;
+  fitPreview: { icon: string; text: string } | null;
+}) {
   const tone = getScoreTone(lead.score);
   const sources = lead.sourceFamilies.slice(0, 3);
   const risks = lead.negativeSignals.slice(0, 2);
@@ -63,6 +70,14 @@ function LeadCard({ lead }: { lead: LeadItem }) {
           </div>
         </div>
 
+        {fitPreview && (
+          <div className={ipStyles.leadFieldRow} data-kind="fit">
+            <span className={ipStyles.leadFieldLabel}>Почему подходит</span>
+            <span className={ipStyles.leadFieldValue}>
+              {fitPreview.icon} {fitPreview.text}
+            </span>
+          </div>
+        )}
         {lead.whyNow && (
           <div className={ipStyles.leadFieldRow} data-kind="why">
             <span className={ipStyles.leadFieldLabel}>Почему сейчас</span>
@@ -112,7 +127,13 @@ function LeadCard({ lead }: { lead: LeadItem }) {
   );
 }
 
-function LeadsList({ leads }: { leads: LeadItem[] }) {
+function LeadsList({
+  leads,
+  fitPreviewFor,
+}: {
+  leads: LeadItem[];
+  fitPreviewFor: (lead: LeadItem) => { icon: string; text: string } | null;
+}) {
   if (leads.length === 0) {
     return (
       <EmptyState
@@ -143,7 +164,7 @@ function LeadsList({ leads }: { leads: LeadItem[] }) {
       </div>
       <div className={ipStyles.leadsList}>
         {leads.map((lead) => (
-          <LeadCard key={lead.id} lead={lead} />
+          <LeadCard key={lead.id} lead={lead} fitPreview={fitPreviewFor(lead)} />
         ))}
       </div>
     </>
@@ -217,6 +238,44 @@ export default async function LeadsPage({
     pendingReview = 0;
   }
 
+  // Compact per-lead fit preview: the single strongest "почему подходит этому агентству"
+  // line, computed with the same deterministic builder the detail page uses. Keyed by the
+  // profile that produced the lead so multi-profile views stay correct.
+  const fitProfilesById = new Map(
+    activeProfiles.map((p) => [
+      p.id,
+      {
+        industries: p.industries,
+        roles: p.roles,
+        excludedIndustries: p.excludedIndustries,
+        excludedLocations: p.excludedLocations,
+        contactPolicy: p.contactPolicy,
+        remoteFriendly: p.remoteFriendly,
+        targetCity: p.targetCity,
+      },
+    ]),
+  );
+
+  const fitPreviewFor = (lead: LeadItem): { icon: string; text: string } | null => {
+    const profile = fitProfilesById.get(lead.clientProfileId);
+    if (!profile) return null;
+    const fit = buildFitExplanation(
+      {
+        // careerPageUrl / orgDomain live only on LeadDetail, not the list LeadItem.
+        // FitLeadInput marks them optional; the builder degrades gracefully — the
+        // reachability line just isn't surfaced in the compact list preview.
+        structuredReasons: lead.structuredReasons,
+        locationNames: lead.locationNames,
+        lawfulContactPath: lead.lawfulContactPath,
+        sourceFamilies: lead.sourceFamilies,
+      },
+      profile,
+    );
+    const first = fit.lines[0];
+    if (!first) return null;
+    return { icon: FIT_DIMENSION_ICON[first.dimension], text: first.text };
+  };
+
   const hasFilters = confidenceGate !== null || feedbackStatus !== null || selectedProfileId !== null;
 
   // Carry the active filters into the CSV export link so the export matches the view.
@@ -287,7 +346,7 @@ export default async function LeadsPage({
           />
         </Suspense>
         <Suspense fallback={<div className={ipStyles.loadingState}>Загрузка...</div>}>
-          <LeadsList leads={allLeads} />
+          <LeadsList leads={allLeads} fitPreviewFor={fitPreviewFor} />
         </Suspense>
       </TableCard>
     </InternalPageFrame>

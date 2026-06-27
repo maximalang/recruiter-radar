@@ -820,6 +820,14 @@
   font-weight: 500;
 }
 
+/* Fit line: the "почему подходит этому агентству" lead-in, accented positive. */
+.leadFieldRow[data-kind="fit"] .leadFieldLabel {
+  color: #10b981;
+}
+.leadFieldRow[data-kind="fit"] .leadFieldValue {
+  color: var(--c-text-primary);
+}
+
 /* ── Footer: safe contact + vacancies + sources + evidence ── */
 .leadCardFooter {
   display: flex;
@@ -1122,4 +1130,74 @@
   margin-top: 4px;
   font-style: italic;
   margin-bottom: 12px;
+}
+
+/* ── Fit explanation ("почему подходит") ── */
+.fitList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fitItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--c-text-primary);
+}
+
+.fitItem + .fitItem {
+  border-top: 1px solid #f3f4f6;
+}
+
+.fitItemIcon {
+  flex: none;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+/* Compact one-line fit preview on lead cards */
+.leadFitPreview {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 0.82rem;
+  color: var(--c-text-secondary);
+  line-height: 1.4;
+}
+
+.leadFitPreviewIcon {
+  flex: none;
+}
+
+/* ── Company / hiring summary ── */
+.summaryBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.summaryLine {
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--c-text-secondary);
+  margin: 0;
+}
+
+.summaryLineLead {
+  color: var(--c-text-primary);
+  font-weight: 500;
+}
+
+.summaryStrength {
+  font-size: 0.72rem;
+  color: var(--c-text-muted);
+  margin-top: 4px;
 }

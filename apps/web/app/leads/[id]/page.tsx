@@ -1,6 +1,9 @@
 import { Suspense } from 'react';
 import Link from 'next/link';
 import { getLeadDetail, formatLawfulContactPath } from '@/lib/leads-data';
+import { getClientProfileById } from '@/lib/clientProfiles';
+import { buildFitExplanation, FIT_DIMENSION_ICON } from '@/lib/leads/fit-explanation';
+import { buildCompanySummary } from '@/lib/leads/company-summary';
 import FeedbackButtons from './feedback-buttons';
 import OutreachPicker from './outreach-picker';
 import {
@@ -49,6 +52,46 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     ? FEEDBACK_LABELS[lead.feedbackStatus] ?? { label: lead.feedbackStatus, icon: '❓' }
     : null;
 
+  // Deterministic Stage 1 AI-assist: fit explanation needs the agency profile to
+  // match against. Degrade gracefully if the profile can't be loaded — the rest
+  // of the page (evidence-first) stands on its own.
+  const profile = await getClientProfileById(lead.clientProfileId).catch(() => null);
+  const fit = profile
+    ? buildFitExplanation(
+        {
+          structuredReasons: lead.structuredReasons,
+          locationNames: lead.locationNames,
+          lawfulContactPath: lead.lawfulContactPath,
+          sourceFamilies: lead.sourceFamilies,
+          careerPageUrl: lead.careerPageUrl,
+          orgDomain: lead.orgDomain,
+        },
+        {
+          industries: profile.industries,
+          roles: profile.roles,
+          excludedIndustries: profile.excludedIndustries,
+          excludedLocations: profile.excludedLocations,
+          contactPolicy: profile.contactPolicy,
+          remoteFriendly: profile.remoteFriendly,
+          targetCity: profile.targetCity,
+        },
+      )
+    : null;
+
+  const summary = buildCompanySummary({
+    orgName: lead.orgName,
+    confidenceGate: lead.confidenceGate,
+    vacanciesCount: lead.vacanciesCount,
+    distinctVacancyNamesCount: lead.distinctVacancyNamesCount,
+    evidenceTitles: lead.evidenceTitles,
+    sourceFamilies: lead.sourceFamilies,
+    locationNames: lead.locationNames,
+    latestPublishedAt: lead.latestPublishedAt,
+  });
+  const summaryLines = [summary.identity, summary.hiringMotion, summary.agencyRelevance].filter(
+    (l): l is string => l !== null,
+  );
+
   return (
     <InternalPageFrame navItems={LEAD_DETAIL_NAV}>
       <div className={ipStyles.leadDetailContainer}>
@@ -70,6 +113,45 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 <ContentCardTitle>🎯 Почему сейчас</ContentCardTitle>
                 <p className={ipStyles.bodyText}>{lead.whyNow}</p>
               </ContentCard>
+
+              {/* Why this lead fits the agency — deterministic, evidence-backed */}
+              {fit && !fit.isEmpty && (
+                <ContentCard>
+                  <ContentCardTitle>🤝 Почему этот лид вам подходит</ContentCardTitle>
+                  <ul className={ipStyles.fitList}>
+                    {fit.lines.map((line, i) => (
+                      <li key={i} className={ipStyles.fitItem}>
+                        <span className={ipStyles.fitItemIcon} aria-hidden="true">
+                          {FIT_DIMENSION_ICON[line.dimension]}
+                        </span>
+                        <span>{line.text}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </ContentCard>
+              )}
+
+              {/* Company / hiring summary — deterministic synthesis, no invented facts */}
+              {summaryLines.length > 0 && (
+                <ContentCard>
+                  <ContentCardTitle>🏢 Кратко о компании и найме</ContentCardTitle>
+                  <div className={ipStyles.summaryBlock}>
+                    {summaryLines.map((line, i) => (
+                      <p
+                        key={i}
+                        className={`${ipStyles.summaryLine} ${i === 0 ? ipStyles.summaryLineLead : ''}`.trim()}
+                      >
+                        {line}
+                      </p>
+                    ))}
+                  </div>
+                  {summary.isThin && (
+                    <p className={ipStyles.summaryStrength}>
+                      Доказательств немного — данные обновятся по мере поступления сигналов.
+                    </p>
+                  )}
+                </ContentCard>
+              )}
 
               {/* Best angle card */}
               <ContentCard>
