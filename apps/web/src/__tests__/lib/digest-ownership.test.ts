@@ -10,7 +10,12 @@ import { jest } from '@jest/globals'
 
 const originalDatabaseUrl = process.env.DATABASE_URL
 
+// digest.ts transitively imports lead-discovery/habr-keywords, whose module-level
+// guard reads VALID_ROLES at import time. Mock only getClientProfileById and keep
+// the real exports (VALID_ROLES, INDUSTRY_KEYWORDS) so the guard does not crash on
+// a partial mock — and so the role surface never drifts from a hand-copied list.
 jest.mock('@/lib/clientProfiles', () => ({
+  ...jest.requireActual('@/lib/clientProfiles'),
   getClientProfileById: jest.fn(),
 }))
 

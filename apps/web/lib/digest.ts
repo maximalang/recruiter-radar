@@ -2,6 +2,7 @@ import { Pool, type PoolClient } from "pg";
 import { getPool as getSharedPool } from "./db-pool";
 import { isDigestEligibleGate } from "./scoring/gate-pipeline";
 import { getClientProfileById, INDUSTRY_KEYWORDS, type ClientProfile } from "./clientProfiles";
+import { ROLE_HABR_KEYWORDS } from "./lead-discovery/habr-keywords";
 import { DIGEST_EVIDENCE_QUERY } from "./digest-evidence-query";
 import type {
   DigestItem,
@@ -46,7 +47,6 @@ export async function getDigestPreviewItems(limit = 10): Promise<DigestItemInput
 }
 
 export type { DigestItem };
-export type { DigestItemInput };
 export type DigestRunResult = {
   run: DigestRun;
   clientProfile: ClientProfile;
@@ -408,7 +408,7 @@ export async function runDigestForClientProfile(input: {
  * are only present after INSERT. Used as the return type of mapDigestEvidenceRow
  * and as the input type for internal helpers that don't need those fields.
  */
-type DigestItemInput = Omit<DigestItem, 'id' | 'digest_run_id' | 'created_at'>
+export type DigestItemInput = Omit<DigestItem, 'id' | 'digest_run_id' | 'created_at'>
 
 function mapDigestEvidenceRow(row: DigestEvidenceRow): DigestItemInput {
   const reasons: [string, string] = [
@@ -435,7 +435,7 @@ function mapDigestEvidenceRow(row: DigestEvidenceRow): DigestItemInput {
   };
 }
 
-function matchesClientProfile(item: DigestItemInput, clientProfile: ClientProfile): boolean {
+export function matchesClientProfile(item: DigestItemInput, clientProfile: ClientProfile): boolean {
   const haystack = buildDigestHaystack(item);
 
   // Industry filter: when the client selected specific industries, the
@@ -465,8 +465,84 @@ function matchesClientProfile(item: DigestItemInput, clientProfile: ClientProfil
     return false;
   }
 
+  // Excluded industries: symmetric to excludeKeywords — when the agency declared
+  // an industry it does NOT serve, any candidate matching that industry's
+  // keywords is dropped. FIUR computeFit already zeroes the Fit score via
+  // findExclusion at generation time, but the per-client digest filter must
+  // enforce it too, otherwise a strong Intent/Urgency lead in an excluded
+  // industry still surfaces.
+  if (clientProfile.excludedIndustries.length > 0) {
+    const matchesExcludedIndustry = clientProfile.excludedIndustries.some((industryKey) => {
+      const keywords = INDUSTRY_KEYWORDS.get(industryKey);
+      if (!keywords) return false;
+      return keywords.some((kw) => haystack.includes(kw));
+    });
+
+    if (matchesExcludedIndustry) {
+      return false;
+    }
+  }
+
+  // Excluded locations: an explicit negative from the agency. Drop when any of
+  // the candidate's location names matches an excluded location — UNLESS the
+  // agency is remote-friendly AND the candidate shows a remote-hiring signal,
+  // in which case geography should not gate the lead.
+  if (clientProfile.excludedLocations.length > 0 && !candidateIsRemoteFriendlyMatch(item, clientProfile)) {
+    const normalizedLocations = item.location_names.map((loc) => normalizeSearchText(loc));
+    const hitsExcludedLocation = clientProfile.excludedLocations.some((excluded) => {
+      const needle = normalizeSearchText(excluded);
+      if (!needle) return false;
+      return normalizedLocations.some((loc) => loc.includes(needle) || needle.includes(loc));
+    });
+
+    if (hitsExcludedLocation) {
+      return false;
+    }
+  }
+
+  // Contact policy (corporate_only): the agency only works leads with a safe,
+  // non-personal corporate surface. We drop ONLY when the absence of a corporate
+  // surface is EXPLICIT — i.e. no career-pages source AND the confidence gate is
+  // C/D (platform-only aggregation / context-only). Gate A/B already implies a
+  // direct company surface (see CLAUDE.md confidence gates), so those pass.
+  // A NULL/unknown domain is NOT treated as "no corporate surface" — this
+  // deliberately avoids the leads=0 trap when registry sources carry no domain.
+  if (clientProfile.contactPolicy === "corporate_only" && !candidateHasCorporateSurface(item)) {
+    return false;
+  }
+
   return true;
 }
+
+/**
+ * Whether the candidate has an evident safe corporate surface. True when a
+ * career-pages source is present (direct company surface) OR the confidence gate
+ * is A/B (auto-deliverable, which requires a direct company surface). Only an
+ * explicit platform-only + C/D candidate is considered surface-less.
+ */
+function candidateHasCorporateSurface(item: DigestItemInput): boolean {
+  const hasCareerSource = item.source_families.includes("career-pages");
+  const gate = item.confidence_gate;
+  const strongGate = gate === "A" || gate === "B";
+  return hasCareerSource || strongGate;
+}
+
+/**
+ * Whether a remote-friendly agency should ignore geography for this candidate.
+ * Only relevant when the agency is remoteFriendly AND the candidate shows a
+ * remote-hiring signal in its text (haystack). Conservative: with no remote
+ * signal, excludedLocations still gates.
+ */
+function candidateIsRemoteFriendlyMatch(item: DigestItemInput, clientProfile: ClientProfile): boolean {
+  if (!clientProfile.remoteFriendly) {
+    return false;
+  }
+
+  const haystack = buildDigestHaystack(item);
+  return REMOTE_HIRING_KEYWORDS.some((kw) => haystack.includes(kw));
+}
+
+const REMOTE_HIRING_KEYWORDS = ["удал", "remote", "удалённ", "удаленн", "дистанцион"] as const;
 
 function compareDigestItemsForClient(left: DigestItemInput, right: DigestItemInput, clientProfile: ClientProfile): number {
   const leftScopeScore = getClientScopeScore(left, clientProfile);
@@ -483,7 +559,7 @@ function compareDigestItemsForClient(left: DigestItemInput, right: DigestItemInp
   return left.rank - right.rank;
 }
 
-function getClientScopeScore(item: DigestItemInput, clientProfile: ClientProfile): number {
+export function getClientScopeScore(item: DigestItemInput, clientProfile: ClientProfile): number {
   let score = 0;
 
   score += getScopedFieldScore(clientProfile.targetCity, item.location_names, {
@@ -509,6 +585,24 @@ function getClientScopeScore(item: DigestItemInput, clientProfile: ClientProfile
     });
     // 3 points per matching industry, capped at 6 to avoid domination
     score += Math.min(matchingIndustries.length * 3, 6);
+  }
+
+  // Role relevance: boost (not filter) candidates whose evidence text matches
+  // the agency's target roles. Roles are a BOOST and never a hard drop here —
+  // ROLE_HABR_KEYWORDS is a narrow search seed (its own docstring warns it is
+  // not an exclusion filter), so dropping on a keyword miss would silently zero
+  // legitimate leads. FIUR computeFit already weights role share at generation;
+  // this nudges within-digest ordering toward the agency's specialisation.
+  if (clientProfile.roles.length > 0) {
+    const haystack = buildDigestHaystack(item);
+    const matchingRoles = clientProfile.roles.filter((roleKey) => {
+      const keywords = ROLE_HABR_KEYWORDS[roleKey];
+      if (!keywords || keywords.length === 0) return false;
+      return keywords.some((kw) => haystack.includes(kw.toLocaleLowerCase("ru-RU")));
+    });
+    // 2 points per matching role, capped at 4 — below industry weight so industry
+    // remains the dominant scoping signal.
+    score += Math.min(matchingRoles.length * 2, 4);
   }
 
   return score;

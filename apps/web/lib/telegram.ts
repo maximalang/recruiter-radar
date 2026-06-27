@@ -10,13 +10,23 @@ export type TelegramMessageConfig = {
   chatId: string;
 };
 
-type TelegramLeadMessage = {
+export type TelegramLeadMessage = {
   orgName: string;
   status: LeadStatus;
   score: number | null;
   lastSignalAt: string | null;
   userName: string;
   confidence_gate?: string;
+  /** Premium evidence-first fields. When present, the rich HTML card is sent. */
+  whyNow?: string | null;
+  evidenceTitles?: string[];
+  vacanciesCount?: number | null;
+  lawfulContactPath?: string | null;
+  sourceFamilies?: string[];
+  locationNames?: string[];
+  /** Domain / career page give a concrete corporate surface line. */
+  orgDomain?: string | null;
+  careerPageUrl?: string | null;
 };
 
 type TelegramSendResult = {
@@ -54,21 +64,134 @@ function formatDate(value: string | null): string {
   }).format(date);
 }
 
-function formatConfidenceGateLabel(gate: string | undefined): string {
-  if (!gate) return "";
-  const labels: Record<string, string> = { A: "Высокая", B: "Средняя", C: "Низкая", D: "Контекст" };
-  return `\nУверенность: ${labels[gate] ?? gate} (${gate})`;
+/**
+ * Escape the five characters Telegram's HTML parse mode treats as markup.
+ * Applied to every user/company-derived string before it enters the message,
+ * so a company name like "Romashka & Co <Group>" can never break the markup.
+ */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
 
-function formatTelegramLeadMessage(lead: TelegramLeadMessage): string {
-  const parts = [
-    `Компания: ${lead.orgName}`,
-    `Статус: ${lead.status}`,
-    `Score: ${lead.score ?? "-"}${formatConfidenceGateLabel(lead.confidence_gate)}`,
-    `Last signal at: ${formatDate(lead.lastSignalAt)}`,
-    `Пользователь: ${lead.userName}`
+type GatePresentation = {
+  /** Readiness headline — A/B are ready to reach out, C needs review. */
+  readiness: string;
+  /** Single restrained status icon. */
+  icon: string;
+};
+
+/**
+ * Map a confidence gate to its delivery presentation. The product contract
+ * (CLAUDE.md confidence gates) splits delivery into "ready to reach out" (A/B)
+ * vs "review manually" (C). D never reaches a lead, so it is treated as C.
+ */
+function getGatePresentation(gate: string | undefined): GatePresentation {
+  switch (gate) {
+    case "A":
+      return { readiness: "Готов к контакту", icon: "✅" };
+    case "B":
+      return { readiness: "Готов к контакту · с пометкой", icon: "✅" };
+    case "C":
+      return { readiness: "На проверку", icon: "🔍" };
+    default:
+      return { readiness: "На проверку", icon: "🔍" };
+  }
+}
+
+function formatScore(score: number | null): string {
+  if (score == null) return "—";
+  return Number.isInteger(score) ? `${score}.0` : score.toFixed(1);
+}
+
+/**
+ * Whether the lead carries enough evidence to render the premium card.
+ * Without it we fall back to the compact safe summary.
+ */
+function hasRichEvidence(lead: TelegramLeadMessage): boolean {
+  return Boolean(
+    (lead.whyNow && lead.whyNow.trim()) ||
+    (lead.evidenceTitles && lead.evidenceTitles.length > 0) ||
+    (lead.lawfulContactPath && lead.lawfulContactPath.trim())
+  );
+}
+
+/**
+ * Premium, mobile-first, evidence-first lead card for Telegram (HTML parse mode).
+ * Mirrors the /leads/[id] page hierarchy: company → readiness/score/gate →
+ * why now → role signal → safe contact path → sources. Restrained iconography
+ * (one glyph per line), tight whitespace, no wall of text. Feedback buttons are
+ * attached separately via reply_markup by the caller.
+ */
+export function formatTelegramLeadMessage(lead: TelegramLeadMessage): string {
+  if (!hasRichEvidence(lead)) {
+    return formatCompactLeadMessage(lead);
+  }
+
+  const gate = getGatePresentation(lead.confidence_gate);
+  const lines: string[] = [];
+
+  // Header: company + readiness badge line (score + gate letter)
+  lines.push(`🏢 <b>${escapeHtml(lead.orgName)}</b>`);
+  const gateLetter = lead.confidence_gate ? ` · ${escapeHtml(lead.confidence_gate)}` : "";
+  lines.push(`${gate.icon} ${gate.readiness} · ${formatScore(lead.score)}${gateLetter}`);
+
+  // Why now
+  if (lead.whyNow && lead.whyNow.trim()) {
+    lines.push("");
+    lines.push(`🎯 <b>Почему сейчас</b>`);
+    lines.push(escapeHtml(lead.whyNow.trim()));
+  }
+
+  // Role / hiring signal — top evidence titles, compact
+  if (lead.evidenceTitles && lead.evidenceTitles.length > 0) {
+    const top = lead.evidenceTitles.slice(0, 3).map((t) => escapeHtml(t)).join(", ");
+    const more = lead.evidenceTitles.length > 3 ? ` +${lead.evidenceTitles.length - 3}` : "";
+    const count = lead.vacanciesCount && lead.vacanciesCount > 0 ? ` (${lead.vacanciesCount} вак.)` : "";
+    lines.push("");
+    lines.push(`📋 ${top}${more}${count}`);
+  }
+
+  // Location (single line, first only — mobile-tight)
+  if (lead.locationNames && lead.locationNames.length > 0) {
+    lines.push(`📍 ${escapeHtml(lead.locationNames[0])}`);
+  }
+
+  // Safe contact path + concrete surface
+  if (lead.lawfulContactPath && lead.lawfulContactPath.trim()) {
+    lines.push(`📬 ${escapeHtml(lead.lawfulContactPath.trim())}`);
+  }
+  const surface = lead.careerPageUrl || (lead.orgDomain ? `https://${lead.orgDomain}` : null);
+  if (surface) {
+    lines.push(`🔗 ${escapeHtml(surface)}`);
+  }
+
+  // Sources (trust)
+  if (lead.sourceFamilies && lead.sourceFamilies.length > 0) {
+    lines.push("");
+    lines.push(`<i>Источники: ${lead.sourceFamilies.map((s) => escapeHtml(s)).join(", ")}</i>`);
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * Compact fallback when evidence fields are absent (e.g. minimal delivery rows).
+ * Still HTML-escaped and premium in tone — never the old raw key:value dump.
+ */
+function formatCompactLeadMessage(lead: TelegramLeadMessage): string {
+  const gate = getGatePresentation(lead.confidence_gate);
+  const gateLetter = lead.confidence_gate ? ` · ${escapeHtml(lead.confidence_gate)}` : "";
+  const lines = [
+    `🏢 <b>${escapeHtml(lead.orgName)}</b>`,
+    `${gate.icon} ${gate.readiness} · ${formatScore(lead.score)}${gateLetter}`,
   ];
-  return parts.join("\n");
+  if (lead.lastSignalAt) {
+    lines.push(`🕔 Сигнал: ${escapeHtml(formatDate(lead.lastSignalAt))}`);
+  }
+  return lines.join("\n");
 }
 
 function isTelegramApiSuccess(value: unknown): value is TelegramApiSuccess {
@@ -291,6 +414,7 @@ export async function sendTelegramLeadMessage(
   const result = await callTelegramApi<{ message_id: number }>("sendMessage", config, {
     chat_id: config.chatId,
     text: formatTelegramLeadMessage(lead),
+    parse_mode: "HTML",
     ...(options?.replyMarkup ? { reply_markup: options.replyMarkup } : {})
   });
 

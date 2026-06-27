@@ -4,6 +4,7 @@ import { getPool as getSharedPool } from "./db-pool";
 import { updateDigestOrgStateFeedback, type DigestFeedbackAction } from "./digestFeedback";
 import type { HhDigestItem } from "./hhDigest";
 import { getTelegramBotToken, sendTelegramLeadMessage } from "./telegram";
+import { deriveWhyNow, deriveLawfulContactPath, formatLawfulContactPath } from "./leads-data";
 import { buildTelegramDigestFeedbackReplyMarkup } from "./telegramDigestFeedback";
 import { logError, logEvent } from "./runtime";
 import type {
@@ -29,7 +30,22 @@ type LeadRow = {
   userName: string;
 };
 
-type LeadDeliveryRow = LeadRow & { clientProfileId: number; orgId: number; telegramChatId: string | null; payload: unknown };
+type LeadDeliveryRow = LeadRow & {
+  clientProfileId: number;
+  orgId: number;
+  telegramChatId: string | null;
+  payload: unknown;
+  reasons: unknown;
+  opener: string | null;
+  evidenceTitles: unknown;
+  locationNames: unknown;
+  sourceFamilies: unknown;
+  vacanciesCount: number | null;
+  distinctVacancyNamesCount: number | null;
+  confidenceGate: string | null;
+  orgDomain: string | null;
+  careerPageUrl: string | null;
+};
 export type TelegramDeliveryResult = { ok: true } | { ok: false; error: string };
 export type EntitlementResult = { allowed: boolean; reason: string | null };
 type LeadsResult = { rows: LeadRow[]; error: string | null };
@@ -97,6 +113,19 @@ export async function updateLeadStatus(candidateId: number, nextStatus: Actionab
   return true;
 }
 
+/**
+ * Coerces a Postgres array / JSON column (typed `unknown` off the row) into a
+ * clean `string[]` of non-empty trimmed entries. Tolerates null, a single
+ * string, or a mixed array.
+ */
+function toStringArray(value: unknown): string[] {
+  if (value == null) return [];
+  const raw = Array.isArray(value) ? value : [value];
+  return raw
+    .map((item) => (typeof item === "string" ? item.trim() : ""))
+    .filter((item) => item.length > 0);
+}
+
 async function getLeadDeliveryRow(candidateId: number): Promise<LeadDeliveryRow | null> {
   const pool = getPool();
   if (!pool) throw new Error("DATABASE_URL is not set.");
@@ -111,7 +140,17 @@ async function getLeadDeliveryRow(candidateId: number): Promise<LeadDeliveryRow 
       dc.created_at::text AS "lastSignalAt",
       cp.agency_name AS "userName",
       cp.telegram_chat_id::text AS "telegramChatId",
-      dc.payload
+      dc.payload,
+      dc.reasons,
+      dc.opener,
+      dc.evidence_titles AS "evidenceTitles",
+      dc.location_names AS "locationNames",
+      dc.source_families AS "sourceFamilies",
+      dc.vacancies_count AS "vacanciesCount",
+      dc.distinct_vacancy_names_count AS "distinctVacancyNamesCount",
+      dc.confidence_gate AS "confidenceGate",
+      o.domain AS "orgDomain",
+      o.career_page_url AS "careerPageUrl"
     FROM digest_candidates dc
     INNER JOIN orgs o ON o.id = dc.org_id
     INNER JOIN client_profiles cp ON cp.id = dc.client_profile_id
@@ -129,22 +168,34 @@ export async function sendLeadToTelegram(candidateId: number): Promise<TelegramD
   const { botToken, error } = getTelegramBotToken();
   if (!botToken) return { ok: false, error: error ?? "Telegram is not configured." };
   try {
-    const confidenceGate = extractConfidenceGate(lead.payload);
+    // Confidence gate: prefer the column, fall back to the JSON payload.
+    const confidenceGate = lead.confidenceGate ?? extractConfidenceGate(lead.payload);
+    const evidenceTitles = toStringArray(lead.evidenceTitles);
+    const locationNames = toStringArray(lead.locationNames);
+    const sourceFamilies = toStringArray(lead.sourceFamilies);
+
+    // Reuse the same evidence-first derivations the /leads/[id] page uses, so the
+    // Telegram card and the in-app card tell an identical story.
+    const whyNow = deriveWhyNow(lead.reasons);
+    const lawfulContactPath = formatLawfulContactPath(
+      deriveLawfulContactPath(lead.reasons, sourceFamilies)
+    );
+
     const feedbackItem: HhDigestItem = {
       rank: 1,
       org_id: String(lead.orgId),
       hh_employer_id: "",
       employer_name: lead.orgName,
-      vacancies_count: 0,
-      distinct_vacancy_names_count: 0,
+      vacancies_count: lead.vacanciesCount ?? 0,
+      distinct_vacancy_names_count: lead.distinctVacancyNamesCount ?? 0,
       latest_published_at: lead.lastSignalAt ?? "",
       total_score: lead.score ?? 0,
       reasons: ["", ""],
-      opener: "",
-      source_families: [],
-      evidence_titles: [],
+      opener: lead.opener ?? "",
+      source_families: sourceFamilies,
+      evidence_titles: evidenceTitles,
       candidate_source_keys: [],
-      location_names: []
+      location_names: locationNames
     };
 
     const replyMarkup = buildTelegramDigestFeedbackReplyMarkup({
@@ -152,7 +203,22 @@ export async function sendLeadToTelegram(candidateId: number): Promise<TelegramD
       items: [feedbackItem]
     });
     await sendTelegramLeadMessage(
-      { orgName: lead.orgName, status: lead.status, score: lead.score, lastSignalAt: lead.lastSignalAt, userName: lead.userName, confidence_gate: extractConfidenceGate(lead.payload) },
+      {
+        orgName: lead.orgName,
+        status: lead.status,
+        score: lead.score,
+        lastSignalAt: lead.lastSignalAt,
+        userName: lead.userName,
+        confidence_gate: confidenceGate,
+        whyNow,
+        evidenceTitles,
+        vacanciesCount: lead.vacanciesCount,
+        lawfulContactPath,
+        sourceFamilies,
+        locationNames,
+        orgDomain: lead.orgDomain,
+        careerPageUrl: lead.careerPageUrl
+      },
       { botToken, chatId: lead.telegramChatId },
       { replyMarkup }
     );

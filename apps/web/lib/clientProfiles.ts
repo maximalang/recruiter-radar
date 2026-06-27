@@ -150,6 +150,53 @@ export async function getClientProfileById(
   return result.rowCount === 1 ? mapClientProfileRow(result.rows[0]) : null;
 }
 
+/**
+ * Owner-scoped profile loader for the self-serve settings page.
+ *
+ * `client_profiles.owner_id` is unique (partial uidx) and NOT NULL, so an owner
+ * has at most one profile. Scoping the read to `owner_id` is the anti-IDOR
+ * boundary: the settings page never trusts a profileId from the client, it
+ * resolves the profile straight from the authenticated session owner.
+ */
+export async function getClientProfileByOwnerId(
+  ownerId: string | number,
+  db?: ClientProfilesDbClient
+): Promise<ClientProfile | null> {
+  const normalizedOwnerId = normalizeClientProfileId(ownerId);
+  const pool = db ?? getPool();
+
+  if (!pool) {
+    throw new Error("DATABASE_URL is not set.");
+  }
+
+  const result = await pool.query<ClientProfileRow>(`
+    SELECT
+      id::TEXT AS id,
+      agency_name AS "agencyName",
+      telegram_chat_id::TEXT AS "telegramChatId",
+      target_city AS "targetCity",
+      specialization,
+      include_keywords AS "includeKeywords",
+      exclude_keywords AS "excludeKeywords",
+      industries AS "industries",
+      company_sizes AS "companySizes",
+      daily_digest_limit AS "dailyDigestLimit",
+      is_active AS "isActive",
+      created_at::TEXT AS "createdAt",
+      updated_at::TEXT AS "updatedAt",
+      contact_policy AS "contactPolicy",
+      roles AS "roles",
+      excluded_industries AS "excludedIndustries",
+      excluded_locations AS "excludedLocations",
+      remote_friendly AS "remoteFriendly"
+    FROM client_profiles
+    WHERE owner_id = $1
+    LIMIT 1
+  `, [normalizedOwnerId]);
+
+  return result.rowCount === 1 ? mapClientProfileRow(result.rows[0]) : null;
+}
+
 export async function findMatchingClientProfileForCheckoutOrder(input: {
   checkoutOrderId?: string | number | null;
   agencyName: string;

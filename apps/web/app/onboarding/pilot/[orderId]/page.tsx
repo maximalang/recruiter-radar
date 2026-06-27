@@ -14,11 +14,13 @@ import {
 import ppStyles from "../../../ui/page-primitives.module.css";
 import {
   formatKeywordText,
-  getClientProfileById,
-  VALID_COMPANY_SIZES,
-  VALID_INDUSTRIES,
-  VALID_ROLES
+  getClientProfileById
 } from "../../../../lib/clientProfiles";
+import {
+  INDUSTRY_OPTIONS,
+  COMPANY_SIZE_OPTIONS,
+  ROLE_OPTIONS
+} from "../../../../lib/clientProfileOptions";
 import { getHhDigestItems } from "../../../../lib/hhDigest";
 import { getClientProfileWebPushStatuses } from "../../../../lib/webPushSubscriptions";
 import {
@@ -73,65 +75,6 @@ const stepItems: Array<{
 ] as const;
 
 const VISIBLE_PREVIEW_ITEMS = 2;
-
-/** Industry options for onboarding form — keys must match VALID_INDUSTRIES in clientProfiles.ts */
-const INDUSTRY_OPTIONS = [
-  { key: "it", label: "IT" },
-  { key: "finance", label: "Финансы" },
-  { key: "manufacturing", label: "Производство" },
-  { key: "retail", label: "Ритейл" },
-  { key: "healthcare", label: "Здравоохранение" },
-  { key: "construction", label: "Строительство" },
-  { key: "logistics", label: "Логистика" },
-  { key: "consulting", label: "Консалтинг" },
-  { key: "education", label: "Образование" },
-  { key: "media", label: "Медиа" },
-] as const;
-
-// Compile-time guard: every option key must be in the canonical VALID_INDUSTRIES set
-void (function _assertIndustryKeys(): void {
-  for (const opt of INDUSTRY_OPTIONS) {
-    if (!VALID_INDUSTRIES.has(opt.key)) throw new Error(`INDUSTRY_OPTIONS key "${opt.key}" not in VALID_INDUSTRIES`);
-  }
-})();
-
-/** Company size options for onboarding form — keys must match VALID_COMPANY_SIZES in clientProfiles.ts */
-const COMPANY_SIZE_OPTIONS = [
-  { key: "startup", label: "Стартап (1–10)" },
-  { key: "small", label: "Малая (10–50)" },
-  { key: "medium", label: "Средняя (50–250)" },
-  { key: "large", label: "Крупная (250–1000)" },
-  { key: "enterprise", label: "Корпорация (1000+)" },
-] as const;
-
-// Compile-time guard: every option key must be in the canonical VALID_COMPANY_SIZES set
-void (function _assertCompanySizeKeys(): void {
-  for (const opt of COMPANY_SIZE_OPTIONS) {
-    if (!VALID_COMPANY_SIZES.has(opt.key)) throw new Error(`COMPANY_SIZE_OPTIONS key "${opt.key}" not in VALID_COMPANY_SIZES`);
-  }
-})();
-
-/** Role options for onboarding form — keys must match VALID_ROLES in clientProfiles.ts */
-const ROLE_OPTIONS = [
-  { key: "it-engineering", label: "IT-инженерия" },
-  { key: "data", label: "Data / ML / AI" },
-  { key: "product", label: "Product / Project" },
-  { key: "sales", label: "Продажи" },
-  { key: "marketing", label: "Маркетинг" },
-  { key: "hr", label: "HR / Люди" },
-  { key: "finance", label: "Финансы / Бухгалтерия" },
-  { key: "operations", label: "Операции / Логистика" },
-  { key: "legal", label: "Юриспруденция" },
-  { key: "executive", label: "C-level / Руководство" },
-  { key: "other", label: "Другое" },
-] as const;
-
-// Compile-time guard: every role option key must be in VALID_ROLES
-void (function _assertRoleKeys(): void {
-  for (const opt of ROLE_OPTIONS) {
-    if (!VALID_ROLES.has(opt.key)) throw new Error(`ROLE_OPTIONS key "${opt.key}" not in VALID_ROLES`);
-  }
-})();
 
 type OnboardingPreviewItem = Awaited<ReturnType<typeof getHhDigestItems>>[number];
 
