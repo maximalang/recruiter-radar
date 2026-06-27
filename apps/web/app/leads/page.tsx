@@ -219,6 +219,14 @@ export default async function LeadsPage({
 
   const hasFilters = confidenceGate !== null || feedbackStatus !== null || selectedProfileId !== null;
 
+  // Carry the active filters into the CSV export link so the export matches the view.
+  const exportParams = new URLSearchParams();
+  if (confidenceGate) exportParams.set('gate', confidenceGate);
+  if (feedbackStatus) exportParams.set('feedback', feedbackStatus);
+  if (selectedProfileId) exportParams.set('profile', selectedProfileId);
+  const exportQuery = exportParams.toString();
+  const exportHref = exportQuery ? `/api/leads/export?${exportQuery}` : '/api/leads/export';
+
   return (
     <InternalPageFrame navItems={LEADS_NAV}>
       <InternalPageHeader
@@ -230,6 +238,18 @@ export default async function LeadsPage({
               : 'Компании, которым стоит написать сегодня'}
             {hasFilters && <span className={ipStyles.filterActive}>(фильтр активен)</span>}
           </>
+        }
+        nav={
+          allLeads.length > 0 ? (
+            <a
+              href={exportHref}
+              className={ipStyles.leadOpenBtn}
+              download
+              aria-label="Экспортировать лиды в CSV"
+            >
+              ⬇ Экспорт CSV
+            </a>
+          ) : null
         }
       />
 
