@@ -1162,21 +1162,6 @@
   line-height: 1.5;
 }
 
-/* Compact one-line fit preview on lead cards */
-.leadFitPreview {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 8px;
-  font-size: 0.82rem;
-  color: var(--c-text-secondary);
-  line-height: 1.4;
-}
-
-.leadFitPreviewIcon {
-  flex: none;
-}
-
 /* ── Company / hiring summary ── */
 .summaryBlock {
   display: flex;
