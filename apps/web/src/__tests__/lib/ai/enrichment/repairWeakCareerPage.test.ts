@@ -18,9 +18,16 @@ import {
   type WeakCareerPageCandidate,
 } from '@/lib/ai/enrichment/repairWeakCareerPage';
 import { AiBoundaryViolation } from '@/lib/ai/boundary';
+import { __resetEnrichmentQuotaForTests } from '@/lib/ai/enrichment/enrichmentRateLimit';
 import type { ScrapeProvider, ScrapeMarkdownResult } from '@/lib/ai/providers/scrapegraph';
 import type { EnrichedHiringSignals } from '@/lib/ai/enrichment/careerPages';
 import type { AssistResult } from '@/lib/ai/assist-types';
+
+// Reset the per-org cost quota before each test so cases don't leak the in-memory
+// window into one another (every weak attempt consumes quota by default).
+beforeEach(() => {
+  __resetEnrichmentQuotaForTests();
+});
 
 // ─── Fakes ───────────────────────────────────────────────────────────────────
 
@@ -206,6 +213,42 @@ describe('repairWeakCareerPage — graceful degradation', () => {
     const snapshot = JSON.stringify(candidate);
     await repairWeakCareerPage(candidate, provider);
     expect(JSON.stringify(candidate)).toBe(snapshot);
+  });
+});
+
+// ─── repairWeakCareerPage — per-org cost quota (spec §2) ────────────────────
+
+describe('repairWeakCareerPage — cost quota (1 call per org / 24h)', () => {
+  it('blocks the second enrichment for the same org within the window', async () => {
+    const { provider, calls } = makeRecordingProvider();
+
+    const first = await repairWeakCareerPage(weakCandidate({ orgId: 'org-quota' }), provider);
+    expect(first.available).toBe(true);
+    expect(calls.extract).toHaveLength(1);
+
+    // Second weak lead for the SAME org, same window → blocked, provider untouched.
+    const second = await repairWeakCareerPage(weakCandidate({ orgId: 'org-quota' }), provider);
+    expect(second.available).toBe(false);
+    expect(second.note).toMatch(/quota/i);
+    expect(calls.extract).toHaveLength(1); // no second provider call
+  });
+
+  it('does not consume quota when the lead is skipped (strong / no provider)', async () => {
+    const { provider, calls } = makeRecordingProvider();
+
+    // A strong lead is skipped before quota is touched...
+    await repairWeakCareerPage(strongCandidate({ orgId: 'org-spend' }), provider);
+    // ...so a later weak lead for the same org still gets its one allowed call.
+    const weak = await repairWeakCareerPage(weakCandidate({ orgId: 'org-spend' }), provider);
+    expect(weak.available).toBe(true);
+    expect(calls.extract).toHaveLength(1);
+  });
+
+  it('can be disabled for tests via enforceQuota:false', async () => {
+    const { provider, calls } = makeRecordingProvider();
+    await repairWeakCareerPage(weakCandidate({ orgId: 'o' }), provider, { enforceQuota: false });
+    await repairWeakCareerPage(weakCandidate({ orgId: 'o' }), provider, { enforceQuota: false });
+    expect(calls.extract).toHaveLength(2); // both passed — quota not enforced
   });
 });
 

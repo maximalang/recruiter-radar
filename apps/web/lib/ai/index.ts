@@ -64,10 +64,19 @@ export {
   assertEnrichmentDoesNotTouchEvidence,
   WEAK_CAREER_PAGE_QUALITY_THRESHOLD,
   type WeakCareerPageCandidate,
+  type RepairWeakCareerPageOptions,
 } from './enrichment/repairWeakCareerPage';
 
 export {
+  tryConsumeEnrichmentQuota,
+  logEnrichmentApiCall,
+  ENRICHMENT_QUOTA_WINDOW_MS,
+  type QuotaDecision,
+} from './enrichment/enrichmentRateLimit';
+
+export {
   createScrapeGraphProvider,
+  createStubScrapeGraphProvider,
   isScrapeGraphConfigured,
   CAREER_PAGE_EXTRACTION_INSTRUCTION,
   type ScrapeProvider,

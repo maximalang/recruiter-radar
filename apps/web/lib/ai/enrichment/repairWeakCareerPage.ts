@@ -42,6 +42,10 @@ import {
   CAREER_PAGE_EXTRACTION_INSTRUCTION,
   type ScrapeProvider,
 } from '../providers/scrapegraph';
+import {
+  tryConsumeEnrichmentQuota,
+  logEnrichmentApiCall,
+} from './enrichmentRateLimit';
 import { assertNoOverride, type ProtectedLeadField } from '../boundary';
 
 /**
@@ -95,6 +99,16 @@ function buildSnapshot(candidate: WeakCareerPageCandidate): SourceEvidenceSnapsh
   };
 }
 
+/** Options for the repair step. */
+export interface RepairWeakCareerPageOptions {
+  /**
+   * Enforce the per-org daily cost quota before any real provider call. Default
+   * true — every live call site MUST respect it. Tests that exercise the provider
+   * path directly can disable it to avoid coupling to the in-memory window.
+   */
+  enforceQuota?: boolean;
+}
+
 /**
  * The repair step. Returns a `CareerPageEnrichmentResult` that the caller stores
  * in a SEPARATE auxiliary field — it never feeds back into deterministic state.
@@ -102,14 +116,21 @@ function buildSnapshot(candidate: WeakCareerPageCandidate): SourceEvidenceSnapsh
  * Flow:
  *   1. Strong / no-URL lead  → skip (empty result, note explains why).
  *   2. Weak lead, no provider → empty result (graceful degrade — Stage-1 path).
- *   3. Weak lead + provider   → ask the provider; on any failure, empty result.
+ *   3. Weak lead, over quota  → skip (empty result; ≤1 provider call per org/24h).
+ *   4. Weak lead + provider   → ask the provider; on any failure, empty result.
+ *
+ * The quota (step 3) is a COST guard: the external provider charges per call, so
+ * a given org is enriched at most once per 24h. It is consumed only after the
+ * weakness + provider checks pass, so skipped leads never burn quota.
  *
  * @param candidate deterministic lead facts (weakness is judged from these).
  * @param provider  enrichment provider; omit to force the degrade path.
+ * @param options   see RepairWeakCareerPageOptions.
  */
 export async function repairWeakCareerPage(
   candidate: WeakCareerPageCandidate,
   provider?: ScrapeProvider,
+  options: RepairWeakCareerPageOptions = {},
 ): Promise<CareerPageEnrichmentResult> {
   if (!isWeakCareerPage(candidate)) {
     return emptyEnrichmentResult(
@@ -123,6 +144,19 @@ export async function repairWeakCareerPage(
 
   // careerPageUrl is non-null here: isWeakCareerPage returned true.
   const url = candidate.careerPageUrl as string;
+
+  // Cost guard: at most one real provider call per org per 24h. Consumed only
+  // now — after weakness + provider checks — so skips never spend quota.
+  const enforceQuota = options.enforceQuota ?? true;
+  if (enforceQuota) {
+    const quota = tryConsumeEnrichmentQuota(candidate.orgId);
+    if (!quota.allowed) {
+      return emptyEnrichmentResult('enrichment quota reached for this org (1/24h)');
+    }
+  }
+
+  logEnrichmentApiCall({ orgId: candidate.orgId, url });
+
   const enrichmentInput: CareerPageEnrichmentInput = {
     orgId: candidate.orgId,
     url,

@@ -27,6 +27,14 @@ import type {
 } from '@/lib/scoring/scoring-pipeline'
 import type { ContactPath, ContactCategory } from '@/lib/scoring/contact-paths'
 import { hasCorporateSurface } from '@/lib/contact-policy-filter'
+import {
+  repairWeakCareerPage,
+  createScrapeGraphProvider,
+  isScrapeGraphConfigured,
+  type ScrapeProvider,
+  type WeakCareerPageCandidate,
+  type CareerPageEnrichmentResult,
+} from '@/lib/ai'
 
 export interface LeadScoringOptions {
   agencyProfile: AgencyProfile
@@ -44,6 +52,14 @@ export interface LeadScoringOptions {
 export interface ScoredLead extends AggregatedLead {
   scoringBreakdown: ScoringPipelineResult['breakdown']
   finalScore: number
+  /**
+   * Optional AI-recovered hiring signals for weak career pages. This is a
+   * SEPARATE, attributed layer (provider + confidence + sourceUrl) that sits
+   * alongside — never inside — the deterministic `enrichment`/score/gate/evidence.
+   * Absent unless a provider is configured AND the page was weak. Scoring does
+   * NOT depend on it; downstream may read it as an optional hint.
+   */
+  aiEnrichment?: CareerPageEnrichmentResult
 }
 
 /**
@@ -51,9 +67,78 @@ export interface ScoredLead extends AggregatedLead {
  */
 export class LeadScoringService {
   private leadGenerator: MultiSourceLeadGenerator
+  /**
+   * Lazily-built enrichment provider. Created once per service when an API key
+   * is configured; null when enrichment is off (no key) so the scoring loop is
+   * entirely unaffected. The provider itself never throws to callers.
+   */
+  private enrichmentProvider: ScrapeProvider | null | undefined
 
   constructor() {
     this.leadGenerator = new MultiSourceLeadGenerator()
+  }
+
+  /**
+   * Resolve the AI enrichment provider, or null when enrichment is disabled.
+   * Memoized: built at most once. `undefined` means "not yet resolved", `null`
+   * means "resolved to off". Off whenever SCRAPEGRAPH_API_KEY is absent, so the
+   * common path does no work and runs no network call.
+   */
+  private getEnrichmentProvider(): ScrapeProvider | null {
+    if (this.enrichmentProvider === undefined) {
+      this.enrichmentProvider = isScrapeGraphConfigured()
+        ? createScrapeGraphProvider()
+        : null
+    }
+    return this.enrichmentProvider
+  }
+
+  /**
+   * Best-effort AI enrichment for a single scored lead. Runs ONLY when a
+   * provider is configured AND the lead's career page is weak (quality <= 0.4
+   * with a URL — judged inside repairWeakCareerPage). Returns a SEPARATE
+   * attributed result; it never touches score, gate, evidence, or the
+   * deterministic `enrichment`. Any failure degrades to undefined.
+   */
+  private async enrichWeakCareerPage(
+    lead: MultiSourceLead,
+  ): Promise<CareerPageEnrichmentResult | undefined> {
+    const provider = this.getEnrichmentProvider()
+    if (!provider) return undefined
+
+    const careerPageUrl = lead.enrichment.careerPageUrl ?? null
+    if (!careerPageUrl) return undefined
+
+    const candidate: WeakCareerPageCandidate = {
+      orgId: lead.companyId,
+      careerPageUrl,
+      qualityInput: {
+        url: careerPageUrl,
+        vacancyCount: lead.signals.length,
+        contactPaths: this.extractContactPaths(lead),
+        lastModifiedAt: lead.enrichment.lastHiringActivity ?? null,
+      },
+      knownRoleTitles: lead.signals
+        .map(s => this.extractRoleTitle(s))
+        .filter(t => t && t !== 'Hiring Position'),
+      confidenceGate: lead.confidence,
+    }
+
+    try {
+      return await repairWeakCareerPage(candidate, provider)
+    } catch (error) {
+      // repairWeakCareerPage already degrades internally; this is belt-and-braces
+      // so enrichment can never abort a scoring run.
+      console.error(
+        JSON.stringify({
+          level: 'error',
+          event: 'ai.enrichment.repair_failed',
+          orgId: lead.companyId,
+          message: error instanceof Error ? error.message : 'unknown_error',
+        }),
+      )
+      return undefined
+    }
   }
 
   /**
@@ -171,6 +256,11 @@ export class LeadScoringService {
 
     const finalScore = result.lead.score
 
+    // AI enrichment runs AFTER the deterministic score + gate are final, and its
+    // result is stored in a SEPARATE field. It cannot, by construction, change
+    // finalScore or bestConfidence computed above.
+    const aiEnrichment = await this.enrichWeakCareerPage(lead)
+
     return {
       id: lead.id,
       canonicalCompanyId: lead.companyId,
@@ -207,6 +297,7 @@ export class LeadScoringService {
       enrichment: lead.enrichment,
       scoringBreakdown: result.breakdown,
       finalScore,
+      ...(aiEnrichment ? { aiEnrichment } : {}),
     }
   }
 
