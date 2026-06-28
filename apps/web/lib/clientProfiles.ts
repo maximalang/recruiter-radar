@@ -78,7 +78,14 @@ function getPool(): Pool | null {
   return getSharedPool();
 }
 
-export async function listClientProfiles(): Promise<ClientProfile[]> {
+/**
+ * List client profiles owned by the given ownerId.
+ * Pilot mode: also returns profiles with owner_id IS NULL (anonymous/pilot profiles).
+ *
+ * @param ownerId - Session owner ID from getOwnerIdFromSession()
+ * @returns Array of client profiles accessible by this owner
+ */
+export async function listClientProfiles(ownerId: string | number): Promise<ClientProfile[]> {
   const pool = getPool();
 
   if (!pool) {
@@ -106,14 +113,29 @@ export async function listClientProfiles(): Promise<ClientProfile[]> {
       excluded_locations AS "excludedLocations",
       remote_friendly AS "remoteFriendly"
     FROM client_profiles
+    WHERE owner_id = $1 OR owner_id IS NULL
     ORDER BY is_active DESC, updated_at DESC, id DESC
-  `);
+  `, [ownerId]);
 
   return result.rows.map(mapClientProfileRow);
 }
 
+/**
+ * Get a client profile by ID, optionally scoped to a session owner.
+ *
+ * @param clientProfileId - Profile ID
+ * @param ownerId - Session owner ID from getOwnerIdFromSession() for user-facing
+ *   reads (anti-IDOR): the profile is returned only if owner_id matches OR the
+ *   profile is pilot/anonymous (owner_id IS NULL). Pass `null` ONLY from trusted
+ *   server contexts that have already authorized access (digest pipeline,
+ *   payments) — this skips the owner predicate. Never pass `null` from a path
+ *   that takes a profileId straight off an HTTP request.
+ * @param db - Optional DB client for transactions
+ * @returns Profile if found (and owned by this user, when ownerId given), else null
+ */
 export async function getClientProfileById(
   clientProfileId: string | number,
+  ownerId: string | number | null,
   db?: ClientProfilesDbClient
 ): Promise<ClientProfile | null> {
   const normalizedClientProfileId = normalizeClientProfileId(clientProfileId);
@@ -122,6 +144,14 @@ export async function getClientProfileById(
   if (!pool) {
     throw new Error("DATABASE_URL is not set.");
   }
+
+  // Owner predicate only when a session owner is supplied. Trusted server
+  // contexts pass ownerId=null to read by id alone (they authorize elsewhere).
+  const ownerScoped = ownerId !== null && ownerId !== undefined;
+  const ownerClause = ownerScoped ? "AND (owner_id = $2 OR owner_id IS NULL)" : "";
+  const params: (string | number)[] = ownerScoped
+    ? [normalizedClientProfileId, ownerId]
+    : [normalizedClientProfileId];
 
   const result = await pool.query<ClientProfileRow>(`
     SELECT
@@ -144,8 +174,8 @@ export async function getClientProfileById(
       excluded_locations AS "excludedLocations",
       remote_friendly AS "remoteFriendly"
     FROM client_profiles
-    WHERE id = $1
-  `, [normalizedClientProfileId]);
+    WHERE id = $1 ${ownerClause}
+  `, params);
 
   return result.rowCount === 1 ? mapClientProfileRow(result.rows[0]) : null;
 }

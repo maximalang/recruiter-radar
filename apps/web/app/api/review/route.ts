@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getPool } from "../../../lib/db";
 import { formatReason, type ScoringReason } from "../../../lib/scoring/scoring-reasons";
+import { getOwnerIdFromSession } from "../../../lib/session";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -51,6 +52,13 @@ export async function GET(request: Request) {
   const limit = Math.min(Number(searchParams.get("limit") ?? 50), 200);
   const offset = Math.max(Number(searchParams.get("offset") ?? 0), 0);
 
+  // Owner-scope: reject reads of another tenant's review queue. The JOIN +
+  // owner predicate below also defends against a forged clientProfileId.
+  const ownerId = await getOwnerIdFromSession();
+  if (!ownerId) {
+    return NextResponse.json({ error: "Access denied: no active session." }, { status: 401 });
+  }
+
   const pool = getPool();
   if (!pool) {
     return NextResponse.json({ error: "Database not available." }, { status: 503 });
@@ -59,9 +67,13 @@ export async function GET(request: Request) {
   try {
     const countResult = await pool.query<{ count: string }>(`
       SELECT COUNT(*) AS count
-      FROM digest_candidates
-      WHERE client_profile_id = $1 AND review_status = 'pending_review'
-    `, [clientProfileId]);
+      FROM digest_candidates dc
+      JOIN client_profiles cp
+        ON cp.id = dc.client_profile_id
+      WHERE dc.client_profile_id = $1
+        AND (cp.owner_id = $2 OR cp.owner_id IS NULL)
+        AND dc.review_status = 'pending_review'
+    `, [clientProfileId, ownerId]);
 
     const total = parseInt(countResult.rows[0]?.count ?? "0", 10);
 
@@ -95,10 +107,14 @@ export async function GET(request: Request) {
         dc.location_names,
         dc.created_at::TEXT AS created_at
       FROM digest_candidates dc
-      WHERE dc.client_profile_id = $1 AND dc.review_status = 'pending_review'
+      JOIN client_profiles cp
+        ON cp.id = dc.client_profile_id
+      WHERE dc.client_profile_id = $1
+        AND (cp.owner_id = $2 OR cp.owner_id IS NULL)
+        AND dc.review_status = 'pending_review'
       ORDER BY dc.total_score DESC, dc.created_at DESC
-      LIMIT $2 OFFSET $3
-    `, [clientProfileId, limit, offset]);
+      LIMIT $3 OFFSET $4
+    `, [clientProfileId, ownerId, limit, offset]);
 
     const items = itemsResult.rows.map((row) => ({
       id: row.id,
@@ -170,6 +186,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "clientProfileId is required." }, { status: 400 });
   }
 
+  // Owner-scope: only the profile's owner (or a pilot/anonymous profile) may
+  // approve/reject its candidates. The owner predicate is enforced inside the
+  // UPDATE so a forged clientProfileId simply matches no rows → 404.
+  const ownerId = await getOwnerIdFromSession();
+  if (!ownerId) {
+    return NextResponse.json({ error: "Access denied: no active session." }, { status: 401 });
+  }
+
   const pool = getPool();
   if (!pool) {
     return NextResponse.json({ error: "Database not available." }, { status: 503 });
@@ -183,11 +207,16 @@ export async function POST(request: Request) {
       org_id: string;
       review_status: string;
     }>(`
-      UPDATE digest_candidates
+      UPDATE digest_candidates dc
       SET review_status = $1
-      WHERE id = $2 AND client_profile_id = $3 AND review_status = 'pending_review'
-      RETURNING id::TEXT AS id, org_id::TEXT AS org_id, review_status
-    `, [reviewStatus, payload.candidateId, payload.clientProfileId]);
+      FROM client_profiles cp
+      WHERE dc.id = $2
+        AND dc.client_profile_id = $3
+        AND cp.id = dc.client_profile_id
+        AND (cp.owner_id = $4 OR cp.owner_id IS NULL)
+        AND dc.review_status = 'pending_review'
+      RETURNING dc.id::TEXT AS id, dc.org_id::TEXT AS org_id, dc.review_status
+    `, [reviewStatus, payload.candidateId, payload.clientProfileId, ownerId]);
 
     if (result.rows.length === 0) {
       return NextResponse.json(

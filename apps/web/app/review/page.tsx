@@ -1,5 +1,6 @@
 import { Suspense } from 'react';
 import { listClientProfiles, type ClientProfile } from '@/lib/clientProfiles';
+import { getOwnerIdFromSession } from '@/lib/session';
 import {
   InternalPageFrame,
   InternalPageHeader,
@@ -122,7 +123,10 @@ export default async function ReviewPage({
   }>;
 }) {
   const params = await searchParams;
-  const profiles = await listClientProfiles();
+  // Owner-scope the profile list: without a session, show no profiles (and thus
+  // no review queue) rather than another tenant's candidates.
+  const ownerId = await getOwnerIdFromSession();
+  const profiles = ownerId ? await listClientProfiles(ownerId) : [];
 
   const activeProfileId =
     params.clientProfileId ?? profiles[0]?.id?.toString() ?? '';

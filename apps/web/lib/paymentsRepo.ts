@@ -415,7 +415,7 @@ export async function ensureClientProfileForPaidOrder(
 ): Promise<ClientProfile> {
   const profileSeed = buildPaidOrderProfileSeed(order);
   const linkedProfile = order.payload.clientProfileId
-    ? await getClientProfileById(order.payload.clientProfileId, db).catch(() => null)
+    ? await getClientProfileById(order.payload.clientProfileId, null, db).catch(() => null)
     : null;
   const matchedProfile =
     linkedProfile ??
@@ -469,7 +469,12 @@ export async function getRequiredOrderClientProfile(
     throw new Error("Client profile is not linked to this order yet.");
   }
 
-  const profile = await getClientProfileById(clientProfileId, db);
+  // Trusted billing context: the order already authorizes access, so read by id
+  // alone (ownerId=null skips the owner predicate). Use the shared helper so the
+  // row is mapped snake_case → camelCase — a raw SELECT * would return snake_case
+  // columns typed as ClientProfile, silently nulling camelCase reads downstream
+  // (e.g. profile.telegramChatId at payments.ts:289).
+  const profile = await getClientProfileById(clientProfileId, null, db);
 
   if (!profile) {
     throw new Error("Client profile not found.");

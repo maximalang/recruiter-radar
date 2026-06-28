@@ -418,18 +418,24 @@ export interface TodayRadar {
  * Resolves active profiles internally (the dashboard has no profileIds to hand),
  * then reuses the same data layer as /leads so ranking and review-count semantics
  * stay identical between the two surfaces. Returns empty/zero on any failure.
+ *
+ * Owner-scoped: only returns leads for profiles owned by `ownerId` (or pilot/anonymous
+ * profiles with owner_id IS NULL).
  */
-export async function getDashboardTodayRadar(limit = 5): Promise<TodayRadar> {
+export async function getDashboardTodayRadar(
+  ownerId: string | number,
+  limit = 5
+): Promise<TodayRadar> {
   try {
-    const profiles = await listClientProfiles();
+    const profiles = await listClientProfiles(ownerId);
     const profileIds = profiles.filter((p) => p.isActive).map((p) => p.id);
     if (profileIds.length === 0) {
       return { topLeads: [], pendingReview: 0 };
     }
 
     const [leadsResult, pendingReview] = await Promise.all([
-      getLeadsForAllProfiles({ profileIds, limit }),
-      getPendingReviewCount({ profileIds }),
+      getLeadsForAllProfiles({ profileIds, ownerId, limit }),
+      getPendingReviewCount({ profileIds, ownerId }),
     ]);
 
     return { topLeads: leadsResult.leads, pendingReview };

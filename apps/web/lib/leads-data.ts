@@ -440,6 +440,7 @@ ${LEAD_SELECT_COLUMNS}
 
 export async function getLeadsForAllProfiles(input: {
   profileIds: (string | number)[];
+  ownerId: string | number;
   limit?: number;
   offset?: number;
   confidenceGate?: string | null;
@@ -463,9 +464,10 @@ export async function getLeadsForAllProfiles(input: {
 
   const conditions: string[] = [
     "dc.client_profile_id = ANY($1)",
+    "(cp.owner_id = $2 OR cp.owner_id IS NULL)",
   ];
-  const params: unknown[] = [input.profileIds];
-  let paramIdx = 2;
+  const params: unknown[] = [input.profileIds, input.ownerId];
+  let paramIdx = 3;
 
   if (input.digestRunId !== undefined && input.digestRunId !== null) {
     conditions.push(`dc.digest_run_id = $${paramIdx}`);
@@ -491,10 +493,13 @@ export async function getLeadsForAllProfiles(input: {
 
   const whereClause = conditions.join(" AND ");
 
-  // Count total
+  // Count total. JOIN client_profiles cp is required so the owner-scope
+  // predicate (cp.owner_id = $2 OR cp.owner_id IS NULL) can reference cp.
   const countResult = await pool.query<{ count: string }>(`
     SELECT COUNT(*) AS count
     FROM digest_candidates dc
+    JOIN client_profiles cp
+      ON cp.id = dc.client_profile_id
     LEFT JOIN client_digest_org_state cdos
       ON cdos.org_id = dc.org_id
       AND cdos.client_profile_id = dc.client_profile_id
@@ -508,6 +513,8 @@ export async function getLeadsForAllProfiles(input: {
     SELECT
 ${LEAD_SELECT_COLUMNS}
     FROM digest_candidates dc
+    JOIN client_profiles cp
+      ON cp.id = dc.client_profile_id
     LEFT JOIN client_digest_org_state cdos
       ON cdos.org_id = dc.org_id
       AND cdos.client_profile_id = dc.client_profile_id
@@ -527,9 +534,14 @@ ${LEAD_SELECT_COLUMNS}
  * Count digest candidates awaiting analyst review (review_status = 'pending_review')
  * across the given client profiles. Used to surface a "to review" metric on /leads
  * that links into the review queue. Returns 0 when no pool or no profiles.
+ *
+ * Owner-scoped: only counts candidates under profiles owned by `ownerId`
+ * (or pilot/anonymous profiles with owner_id IS NULL), so the metric cannot
+ * leak another tenant's review backlog.
  */
 export async function getPendingReviewCount(input: {
   profileIds: (string | number)[];
+  ownerId: string | number;
 }): Promise<number> {
   const pool = getPool();
   if (!pool || input.profileIds.length === 0) {
@@ -538,17 +550,28 @@ export async function getPendingReviewCount(input: {
 
   const result = await pool.query<{ count: string }>(`
     SELECT COUNT(*) AS count
-    FROM digest_candidates
-    WHERE client_profile_id = ANY($1) AND review_status = 'pending_review'
-  `, [input.profileIds]);
+    FROM digest_candidates dc
+    JOIN client_profiles cp
+      ON cp.id = dc.client_profile_id
+    WHERE dc.client_profile_id = ANY($1)
+      AND (cp.owner_id = $2 OR cp.owner_id IS NULL)
+      AND dc.review_status = 'pending_review'
+  `, [input.profileIds, input.ownerId]);
 
   return parseInt(result.rows[0]?.count ?? "0", 10);
 }
 
 // ─── Lead Detail ────────────────────────────────────────────────
 
+/**
+ * Fetch full detail for a single lead (digest candidate) by ID.
+ * Owner-scoped: only returns the lead if its client_profile is owned by `ownerId`
+ * (or is a pilot/anonymous profile with owner_id IS NULL).
+ * Returns null if not found or access denied.
+ */
 export async function getLeadDetail(input: {
   candidateId: string | number;
+  ownerId: string | number;
 }): Promise<LeadDetail | null> {
   const pool = getPool();
   if (!pool) {
@@ -596,13 +619,16 @@ export async function getLeadDetail(input: {
       dc.candidate_source_keys,
       dc.payload
     FROM digest_candidates dc
+    JOIN client_profiles cp
+      ON cp.id = dc.client_profile_id
     LEFT JOIN client_digest_org_state cdos
       ON cdos.org_id = dc.org_id
       AND cdos.client_profile_id = dc.client_profile_id
     LEFT JOIN orgs o
       ON o.id = dc.org_id
     WHERE dc.id = $1
-  `, [input.candidateId]);
+      AND (cp.owner_id = $2 OR cp.owner_id IS NULL)
+  `, [input.candidateId, input.ownerId]);
 
   if (result.rows.length === 0) {
     return null;

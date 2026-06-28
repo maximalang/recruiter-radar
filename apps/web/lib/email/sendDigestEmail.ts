@@ -44,6 +44,13 @@ type ProfileEmailPrefs = {
   emailDigestEnabled: boolean;
   digestEmail: string | null;
   agencyName: string;
+  /**
+   * Profile owner. Used to owner-scope the lead read below. May be null for
+   * legacy profiles created before owner attribution; getLeadsForAllProfiles
+   * treats a null owner as "match owner_id = $ OR owner_id IS NULL", so a null
+   * here would over-broaden the scope — we bail on null instead (see caller).
+   */
+  ownerId: string | null;
 };
 
 async function getProfileEmailPrefs(
@@ -56,9 +63,10 @@ async function getProfileEmailPrefs(
     email_digest_enabled: boolean;
     digest_email: string | null;
     agency_name: string;
+    owner_id: string | null;
   }>(
     `
-    SELECT email_digest_enabled, digest_email, agency_name
+    SELECT email_digest_enabled, digest_email, agency_name, owner_id::TEXT AS owner_id
     FROM client_profiles
     WHERE id = $1
     LIMIT 1
@@ -72,6 +80,7 @@ async function getProfileEmailPrefs(
     emailDigestEnabled: row.email_digest_enabled === true,
     digestEmail: row.digest_email,
     agencyName: row.agency_name,
+    ownerId: row.owner_id,
   };
 }
 
@@ -129,11 +138,20 @@ export async function sendDigestEmailForProfile(input: {
   if (!to) {
     return { delivered: false, reason: "no_email" };
   }
+  if (!prefs.ownerId) {
+    // Legacy profile created before owner attribution. Bail to avoid over-broad
+    // owner_id = $ OR owner_id IS NULL scope — fix the profile first.
+    logError("email.digest_no_owner", new Error("Profile has no owner."), {
+      clientProfileId: input.clientProfileId,
+    });
+    return { delivered: false, reason: "disabled" };
+  }
 
   // Reuse the pipeline's candidates for THIS run; keep only auto-deliverable
   // gates. Run-scoping mirrors web-push and matches the daily-digest contract.
   const { leads } = await getLeadsForAllProfiles({
     profileIds: [input.clientProfileId],
+    ownerId: prefs.ownerId,
     digestRunId: input.digestRunId,
   });
   const deliverable: LeadItem[] = leads.filter((lead) =>

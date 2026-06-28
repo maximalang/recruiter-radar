@@ -235,7 +235,7 @@ export async function getPilotActivationReadiness(
   }
 
   const profile = order.payload.clientProfileId
-    ? await getClientProfileById(order.payload.clientProfileId).catch(() => null)
+    ? await getClientProfileById(order.payload.clientProfileId, options.ownerId).catch(() => null)
     : null;
   const profileExists = profile !== null;
   const profileActive = profile?.isActive === true;

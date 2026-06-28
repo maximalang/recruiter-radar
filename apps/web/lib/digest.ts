@@ -65,7 +65,7 @@ export async function getDigestItemsForClientProfile(input: {
     return [];
   }
 
-  const clientProfile = await getClientProfileById(input.clientProfileId, pool);
+  const clientProfile = await getClientProfileById(input.clientProfileId, null, pool);
 
   if (!clientProfile) {
     throw new Error("Client profile not found.");
@@ -147,7 +147,7 @@ export async function runDigestForClientProfile(input: {
   try {
     await client.query("BEGIN");
 
-    const clientProfile = await getClientProfileById(input.clientProfileId, client);
+    const clientProfile = await getClientProfileById(input.clientProfileId, null, client);
 
     if (!clientProfile) {
       throw new Error("Client profile not found.");

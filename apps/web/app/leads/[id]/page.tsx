@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import Link from 'next/link';
 import { getLeadDetail, formatLawfulContactPath } from '@/lib/leads-data';
 import { getClientProfileById } from '@/lib/clientProfiles';
+import { getOwnerIdFromSession } from '@/lib/session';
 import { buildFitExplanation, FIT_DIMENSION_ICON } from '@/lib/leads/fit-explanation';
 import { buildCompanySummary } from '@/lib/leads/company-summary';
 import FeedbackButtons from './feedback-buttons';
@@ -33,7 +34,11 @@ const LEAD_DETAIL_NAV: NavItem[] = [
 
 export default async function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const lead = await getLeadDetail({ candidateId: id });
+
+  // Owner-scoped reads: without a session the lead lookup returns null,
+  // rendering NotFoundState (correct: no access).
+  const ownerId = await getOwnerIdFromSession();
+  const lead = ownerId ? await getLeadDetail({ candidateId: id, ownerId }) : null;
 
   if (!lead) {
     return (
@@ -55,7 +60,9 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   // Deterministic Stage 1 AI-assist: fit explanation needs the agency profile to
   // match against. Degrade gracefully if the profile can't be loaded — the rest
   // of the page (evidence-first) stands on its own.
-  const profile = await getClientProfileById(lead.clientProfileId).catch(() => null);
+  const profile = ownerId
+    ? await getClientProfileById(lead.clientProfileId, ownerId).catch(() => null)
+    : null;
   const fit = profile
     ? buildFitExplanation(
         {

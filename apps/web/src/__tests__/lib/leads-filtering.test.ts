@@ -126,14 +126,14 @@ describe('getLeadsForAllProfiles', () => {
 
   it('returns empty when pool is null', async () => {
     mockGetPool.mockReturnValue(null);
-    const result = await getLeadsForAllProfiles({ profileIds: ['1', '2'] });
+    const result = await getLeadsForAllProfiles({ profileIds: ['1', '2'], ownerId: 'owner-1' });
     expect(result.leads).toEqual([]);
     expect(result.total).toBe(0);
   });
 
   it('returns empty when profileIds is empty', async () => {
     makeMockPool();
-    const result = await getLeadsForAllProfiles({ profileIds: [] });
+    const result = await getLeadsForAllProfiles({ profileIds: [], ownerId: 'owner-1' });
     expect(result.leads).toEqual([]);
     expect(result.total).toBe(0);
   });
@@ -144,10 +144,15 @@ describe('getLeadsForAllProfiles', () => {
     mockQuery.mockResolvedValueOnce({ rows: [{ count: '15' }] });
     mockQuery.mockResolvedValueOnce({ rows: [] });
 
-    await getLeadsForAllProfiles({ profileIds: ['1', '2', '3'] });
+    await getLeadsForAllProfiles({ profileIds: ['1', '2', '3'], ownerId: 'owner-1' });
 
     const countSql = mockQuery.mock.calls[0][0] as string;
     expect(countSql).toContain("client_profile_id = ANY(");
+    // Owner-scope predicate + its JOIN must be present so the read cannot leak
+    // another tenant's leads (anti-IDOR; matches review/dashboard scoping).
+    expect(countSql).toContain("JOIN client_profiles cp");
+    expect(countSql).toContain("cp.owner_id = $2");
+    expect(mockQuery.mock.calls[0][1]).toEqual([['1', '2', '3'], 'owner-1']);
     // Only 1 query pair (count + data), not 3
     expect(mockQuery).toHaveBeenCalledTimes(2);
   });
@@ -158,7 +163,7 @@ describe('getLeadsForAllProfiles', () => {
     mockQuery.mockResolvedValueOnce({ rows: [{ count: '5' }] });
     mockQuery.mockResolvedValueOnce({ rows: [] });
 
-    await getLeadsForAllProfiles({ profileIds: ['1', '2'], confidenceGate: 'A' });
+    await getLeadsForAllProfiles({ profileIds: ['1', '2'], ownerId: 'owner-1', confidenceGate: 'A' });
 
     const countSql = mockQuery.mock.calls[0][0] as string;
     expect(countSql).toContain("confidence_gate");
@@ -170,7 +175,7 @@ describe('getLeadsForAllProfiles', () => {
     mockQuery.mockResolvedValueOnce({ rows: [{ count: '3' }] });
     mockQuery.mockResolvedValueOnce({ rows: [] });
 
-    await getLeadsForAllProfiles({ profileIds: ['1'], feedbackStatus: 'accepted' });
+    await getLeadsForAllProfiles({ profileIds: ['1'], ownerId: 'owner-1', feedbackStatus: 'accepted' });
 
     const countSql = mockQuery.mock.calls[0][0] as string;
     expect(countSql).toContain("feedback_status");

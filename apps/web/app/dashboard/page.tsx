@@ -22,11 +22,17 @@ import {
   getDashboardLeadMetrics,
   getDashboardSourcePerformance,
   getDashboardTodayRadar,
+  type TodayRadar,
 } from '@/lib/dashboard-data';
+import { getOwnerIdFromSession } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
+  // "Сегодняшний радар" is tenant data → owner-scope it. Without a session it
+  // stays empty; the rest of the dashboard is global source/quality telemetry.
+  const ownerId = await getOwnerIdFromSession();
+
   // Fetch all dashboard data in parallel on the server
   const [overview, quality, sources, feedbackFunnel, leadMetrics, sourcePerformance, todayRadar] = await Promise.all([
     getDashboardOverviewMetrics(),
@@ -35,7 +41,9 @@ export default async function DashboardPage() {
     getDashboardFeedbackFunnel(),
     getDashboardLeadMetrics(),
     getDashboardSourcePerformance(),
-    getDashboardTodayRadar(),
+    ownerId
+      ? getDashboardTodayRadar(ownerId)
+      : Promise.resolve<TodayRadar>({ topLeads: [], pendingReview: 0 }),
   ]);
 
   return (

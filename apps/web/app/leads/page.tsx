@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import Link from 'next/link';
 import { getLeadsForAllProfiles, getPendingReviewCount, type LeadItem, VALID_FEEDBACK_STATUSES } from '@/lib/leads-data';
 import { listClientProfiles, type ClientProfile } from '@/lib/clientProfiles';
+import { getOwnerIdFromSession } from '@/lib/session';
 import { buildFitExplanation, FIT_DIMENSION_ICON } from '@/lib/leads/fit-explanation';
 import LeadsFilters from './leads-filters';
 import {
@@ -194,9 +195,13 @@ export default async function LeadsPage({
     ? filters.feedback
     : null;
 
+  // Owner-scope every read: without a session there are no accessible profiles,
+  // so the page renders empty rather than leaking another tenant's leads.
+  const ownerId = await getOwnerIdFromSession();
+
   let profiles: ClientProfile[];
   try {
-    profiles = await listClientProfiles();
+    profiles = ownerId ? await listClientProfiles(ownerId) : [];
   } catch {
     profiles = [];
   }
@@ -221,13 +226,15 @@ export default async function LeadsPage({
   let pendingReview = 0;
 
   try {
+    if (!ownerId) throw new Error('no-session');
     const [result, reviewCount] = await Promise.all([
       getLeadsForAllProfiles({
         profileIds,
+        ownerId,
         confidenceGate,
         feedbackStatus,
       }),
-      getPendingReviewCount({ profileIds }),
+      getPendingReviewCount({ profileIds, ownerId }),
     ]);
     allLeads = result.leads;
     totalLeads = result.total;

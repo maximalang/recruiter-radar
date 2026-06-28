@@ -99,7 +99,7 @@ export default async function PilotOnboardingPage({
   }
 
   const profile = order.payload.clientProfileId
-    ? await getClientProfileById(order.payload.clientProfileId).catch(() => null)
+    ? await getClientProfileById(order.payload.clientProfileId, ownerId).catch(() => null)
     : null;
   const readiness = await getPilotActivationReadiness(order.id, { ownerId });
   const normalizedTelegramBotToken = getTelegramBotToken().botToken?.trim() ?? "";

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getLeadsForAllProfiles, VALID_FEEDBACK_STATUSES, type LeadItem } from '@/lib/leads-data';
 import { listClientProfiles, type ClientProfile } from '@/lib/clientProfiles';
 import { leadsToCsv } from '@/lib/leads-csv';
+import { getOwnerIdFromSession } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,9 +31,24 @@ export async function GET(request: Request) {
       ? feedbackParam
       : null;
 
+  // Owner-scope: without a session, return empty CSV rather than exposing
+  // another tenant's leads. Mirrors /leads page scoping.
+  const ownerId = await getOwnerIdFromSession();
+  if (!ownerId) {
+    const csv = leadsToCsv([]);
+    return new NextResponse(csv, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': 'attachment; filename="leads-empty.csv"',
+        'Cache-Control': 'no-store',
+      },
+    });
+  }
+
   let profiles: ClientProfile[];
   try {
-    profiles = await listClientProfiles();
+    profiles = await listClientProfiles(ownerId);
   } catch {
     profiles = [];
   }
@@ -52,6 +68,7 @@ export async function GET(request: Request) {
   try {
     const result = await getLeadsForAllProfiles({
       profileIds,
+      ownerId,
       confidenceGate,
       feedbackStatus,
       limit: 500,

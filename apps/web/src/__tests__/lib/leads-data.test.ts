@@ -29,14 +29,14 @@ describe('getLeadDetail', () => {
 
   it('returns null when pool is not available', async () => {
     mockGetPool.mockReturnValue(null);
-    const result = await getLeadDetail({ candidateId: '1' });
+    const result = await getLeadDetail({ candidateId: '1', ownerId: 'owner-1' });
     expect(result).toBeNull();
   });
 
   it('returns null when candidate not found', async () => {
     makeMockPool();
     mockQuery.mockResolvedValueOnce({ rows: [] });
-    const result = await getLeadDetail({ candidateId: '999' });
+    const result = await getLeadDetail({ candidateId: '999', ownerId: 'owner-1' });
     expect(result).toBeNull();
   });
 
@@ -74,7 +74,7 @@ describe('getLeadDetail', () => {
 
     mockQuery.mockResolvedValueOnce({ rows: [candidateRow] });
 
-    const result = await getLeadDetail({ candidateId: '42' });
+    const result = await getLeadDetail({ candidateId: '42', ownerId: 'owner-1' });
 
     expect(result).not.toBeNull();
     expect(result!.id).toBe('42');
@@ -127,7 +127,7 @@ describe('getLeadDetail', () => {
       }],
     });
 
-    const result = await getLeadDetail({ candidateId: '1' });
+    const result = await getLeadDetail({ candidateId: '1', ownerId: 'owner-1' });
     expect(result).not.toBeNull();
     expect(result!.orgWebsite).toBeNull();
   });

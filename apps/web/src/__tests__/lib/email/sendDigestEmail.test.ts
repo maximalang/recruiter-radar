@@ -56,6 +56,7 @@ const PREFS_ROW = {
   email_digest_enabled: true,
   digest_email: 'agency@example.com',
   agency_name: 'Агентство Альфа',
+  owner_id: 'owner-1',
 }
 
 describe('sendDigestEmailForProfile', () => {
@@ -164,8 +165,24 @@ describe('sendDigestEmailForProfile', () => {
     expect(mockGetLeads).toHaveBeenCalledTimes(1)
     expect(mockGetLeads).toHaveBeenCalledWith({
       profileIds: ['7'],
+      ownerId: 'owner-1',
       digestRunId: '42',
     })
+  })
+
+  it('bails (disabled) when the profile has no owner, never reading leads', async () => {
+    // Legacy profile without owner attribution: passing ownerId=null would
+    // over-broaden the lead scope, so we refuse rather than leak across tenants.
+    const { pool } = makeMockPool([
+      { rows: [{ ...PREFS_ROW, owner_id: null }], rowCount: 1 },
+    ])
+    mockGetPool.mockReturnValue(pool)
+
+    const res = await sendDigestEmailForProfile({ clientProfileId: '7', digestRunId: '42' })
+
+    expect(res).toEqual({ delivered: false, reason: 'disabled' })
+    expect(mockGetLeads).not.toHaveBeenCalled()
+    expect(mockSendEmail).not.toHaveBeenCalled()
   })
 
   it('returns already_sent and does NOT send when the dedupe row exists', async () => {
