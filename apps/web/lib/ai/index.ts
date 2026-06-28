@@ -43,3 +43,33 @@ export type {
   OpenerDraftInput,
   OpenerDraftOutput,
 } from './assist-types';
+
+// ─── Career-page enrichment (first concrete enrichment boundary) ─────────────
+
+export {
+  emptyEnrichmentResult,
+  hasEnrichment,
+  type CareerPageEnrichmentInput,
+  type CareerPageEnrichmentResult,
+  type SourceEvidenceSnapshot,
+  type EnrichedHiringSignals,
+  type EnrichedRole,
+  type EnrichedHiringUrgency,
+  type EnrichmentProvider,
+} from './enrichment/careerPages';
+
+export {
+  isWeakCareerPage,
+  repairWeakCareerPage,
+  assertEnrichmentDoesNotTouchEvidence,
+  WEAK_CAREER_PAGE_QUALITY_THRESHOLD,
+  type WeakCareerPageCandidate,
+} from './enrichment/repairWeakCareerPage';
+
+export {
+  createScrapeGraphProvider,
+  isScrapeGraphConfigured,
+  CAREER_PAGE_EXTRACTION_INSTRUCTION,
+  type ScrapeProvider,
+  type ScrapeMarkdownResult,
+} from './providers/scrapegraph';
