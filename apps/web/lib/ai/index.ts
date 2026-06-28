@@ -82,3 +82,10 @@ export {
   type ScrapeProvider,
   type ScrapeMarkdownResult,
 } from './providers/scrapegraph';
+
+export {
+  createCrawl4aiProvider,
+  createStubCrawl4aiProvider,
+  isCrawl4aiConfigured,
+  type MarkdownProvider,
+} from './providers/crawl4ai';

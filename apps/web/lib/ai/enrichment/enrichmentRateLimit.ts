@@ -50,20 +50,31 @@ export function tryConsumeEnrichmentQuota(orgId: string, now: number = Date.now(
 
 /**
  * Structured log for a real (quota-passing) provider call. Keeps a single audit
- * line per spend event: which org, which page, and tokens if the provider
- * reported them. Logging is the only side effect — no provider call here.
+ * line per spend event so spend is traceable: which provider, which org, which
+ * page, whether it produced a usable result, whether the Crawl4AI markdown
+ * fallback was used, and tokens if the provider reported them. Logging is the
+ * only side effect — no provider call here.
  */
 export function logEnrichmentApiCall(entry: {
   orgId: string;
   url: string;
+  /** Which provider the quota was spent on (scrapegraph today). */
+  provider?: string;
+  /** Whether the primary extract produced usable enrichment data. */
+  success?: boolean;
+  /** Whether the Crawl4AI markdown fallback prep path ran (primary empty). */
+  fallbackUsed?: boolean;
   tokensUsed?: number | null;
 }): void {
   console.info(
     JSON.stringify({
       level: 'info',
       event: 'ai.enrichment.api_call',
+      provider: entry.provider ?? null,
       orgId: entry.orgId,
       url: entry.url,
+      success: entry.success ?? null,
+      fallbackUsed: entry.fallbackUsed ?? false,
       tokensUsed: entry.tokensUsed ?? null,
     }),
   );

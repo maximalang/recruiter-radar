@@ -31,7 +31,10 @@ import {
   repairWeakCareerPage,
   createScrapeGraphProvider,
   isScrapeGraphConfigured,
+  createCrawl4aiProvider,
+  isCrawl4aiConfigured,
   type ScrapeProvider,
+  type MarkdownProvider,
   type WeakCareerPageCandidate,
   type CareerPageEnrichmentResult,
 } from '@/lib/ai'
@@ -73,6 +76,12 @@ export class LeadScoringService {
    * entirely unaffected. The provider itself never throws to callers.
    */
   private enrichmentProvider: ScrapeProvider | null | undefined
+  /**
+   * Lazily-built Crawl4AI markdown fallback. Used only to PREPARE clean markdown
+   * when the primary extract comes back empty (future re-extraction retry path);
+   * null when CRAWL4AI_API_URL is absent. Never affects the returned result.
+   */
+  private fallbackProvider: MarkdownProvider | null | undefined
 
   constructor() {
     this.leadGenerator = new MultiSourceLeadGenerator()
@@ -91,6 +100,20 @@ export class LeadScoringService {
         : null
     }
     return this.enrichmentProvider
+  }
+
+  /**
+   * Resolve the Crawl4AI markdown fallback, or null when it is not configured.
+   * Memoized like the primary provider. Off whenever CRAWL4AI_API_URL is absent,
+   * so the fallback prep path is simply skipped.
+   */
+  private getFallbackProvider(): MarkdownProvider | null {
+    if (this.fallbackProvider === undefined) {
+      this.fallbackProvider = isCrawl4aiConfigured()
+        ? createCrawl4aiProvider()
+        : null
+    }
+    return this.fallbackProvider
   }
 
   /**
@@ -125,7 +148,8 @@ export class LeadScoringService {
     }
 
     try {
-      return await repairWeakCareerPage(candidate, provider)
+      const fallbackProvider = this.getFallbackProvider() ?? undefined
+      return await repairWeakCareerPage(candidate, provider, { fallbackProvider })
     } catch (error) {
       // repairWeakCareerPage already degrades internally; this is belt-and-braces
       // so enrichment can never abort a scoring run.

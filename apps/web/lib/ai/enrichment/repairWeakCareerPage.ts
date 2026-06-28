@@ -42,6 +42,7 @@ import {
   CAREER_PAGE_EXTRACTION_INSTRUCTION,
   type ScrapeProvider,
 } from '../providers/scrapegraph';
+import type { MarkdownProvider } from '../providers/crawl4ai';
 import {
   tryConsumeEnrichmentQuota,
   logEnrichmentApiCall,
@@ -107,6 +108,14 @@ export interface RepairWeakCareerPageOptions {
    * path directly can disable it to avoid coupling to the in-memory window.
    */
   enforceQuota?: boolean;
+  /**
+   * Optional Crawl4AI-compatible markdown provider. When the PRIMARY extract
+   * returns no usable signal, this is used to PREPARE clean markdown for a future
+   * re-extraction retry path (spec §2.2/§2.3). It never re-extracts here and never
+   * changes the returned result — it only logs that the fallback prep ran. Omit to
+   * skip the fallback entirely.
+   */
+  fallbackProvider?: MarkdownProvider;
 }
 
 /**
@@ -118,10 +127,14 @@ export interface RepairWeakCareerPageOptions {
  *   2. Weak lead, no provider → empty result (graceful degrade — Stage-1 path).
  *   3. Weak lead, over quota  → skip (empty result; ≤1 provider call per org/24h).
  *   4. Weak lead + provider   → ask the provider; on any failure, empty result.
+ *   5. Primary extract empty + fallbackProvider → PREPARE clean markdown via
+ *      Crawl4AI for a future re-extraction retry; the returned result is still the
+ *      (empty) primary result — the fallback only logs that prep ran.
  *
  * The quota (step 3) is a COST guard: the external provider charges per call, so
  * a given org is enriched at most once per 24h. It is consumed only after the
- * weakness + provider checks pass, so skipped leads never burn quota.
+ * weakness + provider checks pass, so skipped leads never burn quota. The fallback
+ * (step 5) shares that single quota slot — it does not consume a second one.
  *
  * @param candidate deterministic lead facts (weakness is judged from these).
  * @param provider  enrichment provider; omit to force the degrade path.
@@ -155,8 +168,6 @@ export async function repairWeakCareerPage(
     }
   }
 
-  logEnrichmentApiCall({ orgId: candidate.orgId, url });
-
   const enrichmentInput: CareerPageEnrichmentInput = {
     orgId: candidate.orgId,
     url,
@@ -173,6 +184,12 @@ export async function repairWeakCareerPage(
       content = scraped.available && scraped.data ? scraped.data.markdown : null;
     }
     if (!content) {
+      logEnrichmentApiCall({
+        orgId: candidate.orgId,
+        url,
+        provider: provider.name,
+        success: false,
+      });
       return emptyEnrichmentResult('could not obtain page content for enrichment');
     }
 
@@ -181,9 +198,33 @@ export async function repairWeakCareerPage(
       content,
       instruction: CAREER_PAGE_EXTRACTION_INSTRUCTION,
     });
+
+    // Primary extract found nothing usable → optionally PREPARE markdown via the
+    // Crawl4AI fallback so a later retry path can re-extract. We do not re-extract
+    // here and the returned result is unchanged; this only readies the input and
+    // records that the fallback ran (spec §2.2/§2.3).
+    let fallbackUsed = false;
+    if (!result.available && options.fallbackProvider) {
+      const prepared = await options.fallbackProvider.fetchCleanMarkdown(url);
+      fallbackUsed = prepared.available && prepared.data !== null;
+    }
+
+    logEnrichmentApiCall({
+      orgId: candidate.orgId,
+      url,
+      provider: provider.name,
+      success: result.available,
+      fallbackUsed,
+    });
     return result;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'unknown_error';
+    logEnrichmentApiCall({
+      orgId: candidate.orgId,
+      url,
+      provider: provider.name,
+      success: false,
+    });
     return emptyEnrichmentResult(`enrichment provider error: ${message}`);
   }
 }

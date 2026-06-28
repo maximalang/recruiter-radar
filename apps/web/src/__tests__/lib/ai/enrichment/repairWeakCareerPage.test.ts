@@ -20,6 +20,7 @@ import {
 import { AiBoundaryViolation } from '@/lib/ai/boundary';
 import { __resetEnrichmentQuotaForTests } from '@/lib/ai/enrichment/enrichmentRateLimit';
 import type { ScrapeProvider, ScrapeMarkdownResult } from '@/lib/ai/providers/scrapegraph';
+import type { MarkdownProvider } from '@/lib/ai/providers/crawl4ai';
 import type { EnrichedHiringSignals } from '@/lib/ai/enrichment/careerPages';
 import type { AssistResult } from '@/lib/ai/assist-types';
 
@@ -74,6 +75,54 @@ function makeRecordingProvider(): {
   };
 
   return { provider, calls };
+}
+
+/** A provider whose extract returns NO usable signal (degraded), to drive the fallback. */
+function makeEmptyExtractProvider(): ScrapeProvider {
+  return {
+    name: 'scrapegraph',
+    async scrapeToMarkdown(url: string): Promise<AssistResult<ScrapeMarkdownResult>> {
+      return {
+        available: true,
+        capability: 'extract-weak-signal',
+        provider: 'scrapegraph',
+        confidence: 'medium',
+        data: { markdown: '# Careers', fetchedUrl: url },
+      };
+    },
+    async extractStructuredData(): Promise<AssistResult<EnrichedHiringSignals>> {
+      return {
+        available: false,
+        capability: 'extract-weak-signal',
+        provider: 'scrapegraph',
+        confidence: 'low',
+        data: null,
+        note: 'no usable signal',
+      };
+    },
+  };
+}
+
+/** A Crawl4AI-compatible markdown fallback that records its calls. */
+function makeRecordingFallback(available = true): {
+  fallback: MarkdownProvider;
+  calls: string[];
+} {
+  const calls: string[] = [];
+  const fallback: MarkdownProvider = {
+    name: 'crawl4ai',
+    async fetchCleanMarkdown(url: string): Promise<AssistResult<ScrapeMarkdownResult>> {
+      calls.push(url);
+      return {
+        available,
+        capability: 'extract-weak-signal',
+        provider: 'crawl4ai',
+        confidence: 'medium',
+        data: available ? { markdown: '# Clean markdown', fetchedUrl: url } : null,
+      };
+    },
+  };
+  return { fallback, calls };
 }
 
 // ─── Candidates ──────────────────────────────────────────────────────────────
@@ -249,6 +298,56 @@ describe('repairWeakCareerPage — cost quota (1 call per org / 24h)', () => {
     await repairWeakCareerPage(weakCandidate({ orgId: 'o' }), provider, { enforceQuota: false });
     await repairWeakCareerPage(weakCandidate({ orgId: 'o' }), provider, { enforceQuota: false });
     expect(calls.extract).toHaveLength(2); // both passed — quota not enforced
+  });
+});
+
+// ─── repairWeakCareerPage — Crawl4AI markdown fallback (spec §2.2/§2.3) ──────
+
+describe('repairWeakCareerPage — Crawl4AI fallback prep when primary extract is empty', () => {
+  it('runs the fallback markdown prep when the primary extract returns nothing', async () => {
+    const { fallback, calls } = makeRecordingFallback();
+    const result = await repairWeakCareerPage(weakCandidate(), makeEmptyExtractProvider(), {
+      fallbackProvider: fallback,
+    });
+
+    // Fallback prep ran for the same page...
+    expect(calls).toEqual(['https://weak.test/careers']);
+    // ...but the returned result is still the (empty) primary result — the
+    // fallback only PREPARES markdown for a future retry, it does not re-extract.
+    expect(result.available).toBe(false);
+    expect(result.data).toBeNull();
+  });
+
+  it('does NOT run the fallback when the primary extract succeeds', async () => {
+    const { provider } = makeRecordingProvider();
+    const { fallback, calls } = makeRecordingFallback();
+    const result = await repairWeakCareerPage(weakCandidate(), provider, {
+      fallbackProvider: fallback,
+    });
+
+    expect(result.available).toBe(true);
+    expect(calls).toHaveLength(0); // primary succeeded → no fallback prep
+  });
+
+  it('does not crash and still degrades when no fallback is supplied', async () => {
+    const result = await repairWeakCareerPage(weakCandidate(), makeEmptyExtractProvider());
+    expect(result.available).toBe(false);
+  });
+
+  it('shares the single org quota — fallback does not consume a second slot', async () => {
+    const { fallback } = makeRecordingFallback();
+    // First weak lead: primary empty + fallback prep, consumes the one org slot.
+    await repairWeakCareerPage(weakCandidate({ orgId: 'org-fb' }), makeEmptyExtractProvider(), {
+      fallbackProvider: fallback,
+    });
+    // Second weak lead same org/window → blocked regardless of the fallback.
+    const second = await repairWeakCareerPage(
+      weakCandidate({ orgId: 'org-fb' }),
+      makeEmptyExtractProvider(),
+      { fallbackProvider: fallback },
+    );
+    expect(second.available).toBe(false);
+    expect(second.note).toMatch(/quota/i);
   });
 });
 
