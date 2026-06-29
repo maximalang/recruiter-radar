@@ -128,6 +128,48 @@ export async function getDigestItemsForClientProfile(input: {
     .slice(0, requestedLimit);
 }
 
+/**
+ * Count how many CURRENT candidates a profile's filters would surface — the live
+ * "≈N компаний сейчас подходят" preview on the settings page. Runs the same
+ * evidence query + gate + matchesClientProfile path as the real digest (minus the
+ * per-client suppression/cooldown state, which is delivery bookkeeping, not a
+ * targeting signal), so the number reflects exactly what the filters do.
+ *
+ * Capped scan: counts within the same candidate window the digest considers, so a
+ * very broad profile returns a "+" hint rather than a full table scan. Degrades to
+ * 0 when there is no pool. Never throws to the caller (settings page must render).
+ */
+export async function countMatchingCandidatesForProfile(
+  clientProfile: ClientProfile,
+  options: { scanLimit?: number } = {},
+): Promise<{ count: number; capped: boolean }> {
+  const pool = getPool();
+  if (!pool) return { count: 0, capped: false };
+
+  const scanLimit = Math.min(Math.max(options.scanLimit ?? 500, 1), 2000);
+
+  try {
+    const result = await pool.query<DigestEvidenceRow>(
+      `${getDigestEvidenceQuery()}\nLIMIT ${scanLimit}`,
+    );
+    const matches = result.rows
+      .map(mapDigestEvidenceRow)
+      .filter(isDigestEligibleGate)
+      .filter((item) => matchesClientProfile(item, clientProfile));
+    return { count: matches.length, capped: result.rows.length >= scanLimit };
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        level: 'error',
+        event: 'digest.match_count_failed',
+        clientProfileId: clientProfile.id,
+        message: error instanceof Error ? error.message : 'unknown_error',
+      }),
+    );
+    return { count: 0, capped: false };
+  }
+}
+
 export async function runDigestForClientProfile(input: {
   clientProfileId: string | number;
   sourceKey?: string | null;

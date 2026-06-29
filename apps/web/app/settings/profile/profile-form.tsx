@@ -62,7 +62,7 @@ export function ProfileForm(props: { profile: ClientProfile }) {
   return (
     <form action={formAction} className={styles.form}>
       {state?.ok === true ? (
-        <NoticeBox tone="success" title="Профиль сохранён" description="Новые предпочтения учтутся в ближайшей подборке." />
+        <NoticeBox tone="success" title="Профиль сохранён" description="Новые фильтры применятся к следующей подборке. Превью совпадений выше обновится после перезагрузки страницы." />
       ) : null}
       {state?.ok === false ? (
         <NoticeBox tone="danger" title="Не удалось сохранить" description={state.error} />

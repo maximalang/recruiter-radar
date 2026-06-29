@@ -7,9 +7,12 @@ import {
 } from "../../ui/internal-page";
 import { getClientProfileByOwnerId } from "../../../lib/clientProfiles";
 import { getDeliveryPreferencesByOwnerId } from "../../../lib/deliveryPreferences";
+import { countMatchingCandidatesForProfile } from "../../../lib/digest";
+import { computeProfileCompletion } from "../../../lib/profileCompletion";
 import { readOwnerSession } from "../../../lib/session";
 import { ProfileForm } from "./profile-form";
 import { DeliveryForm } from "./delivery-form";
+import ProfileCompletionPanel from "./profile-completion-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -26,12 +29,24 @@ export default async function SettingsProfilePage() {
   const deliveryPreferences =
     ownerId && profile ? await getDeliveryPreferencesByOwnerId(ownerId) : null;
 
+  // Completion + live match-count: both best-effort. The match count is the same
+  // gate path the digest uses, so the number reflects exactly what the filters do.
+  const completion = profile ? computeProfileCompletion(profile) : null;
+  const matchCount = profile
+    ? await countMatchingCandidatesForProfile(profile).catch(() => null)
+    : null;
+
   return (
     <InternalPageFrame navItems={SETTINGS_NAV}>
       <InternalPageHeader
         title="Кто ваши идеальные клиенты?"
         subtitle="Чем точнее профиль, тем релевантнее радар. Эти настройки фильтруют и ранжируют ежедневную подборку — не только влияют на скоринг."
       />
+      {profile && completion ? (
+        <ContentCard>
+          <ProfileCompletionPanel completion={completion} matchCount={matchCount} />
+        </ContentCard>
+      ) : null}
       <ContentCard>
         {profile ? (
           <ProfileForm profile={profile} />

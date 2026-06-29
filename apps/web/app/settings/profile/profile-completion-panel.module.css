@@ -1,0 +1,96 @@
+/* Profile-completion panel — progress bar + checklist + live match-count. */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--c-text-primary);
+}
+
+.count {
+  font-size: 0.85rem;
+  color: var(--c-text-secondary);
+}
+
+.barTrack {
+  height: 8px;
+  border-radius: 999px;
+  background: #eef0f4;
+  overflow: hidden;
+}
+
+.barFill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--c-brand);
+  transition: width 0.3s ease;
+}
+
+.barFill[data-complete] {
+  background: #16a34a;
+}
+
+.checklist {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+}
+
+.checkItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--c-text-muted);
+}
+
+.checkItem[data-filled] {
+  color: var(--c-text-secondary);
+}
+
+.checkIcon {
+  font-size: 0.85rem;
+  color: #c0c4cc;
+}
+
+.checkItem[data-filled] .checkIcon {
+  color: #16a34a;
+}
+
+.preview {
+  padding-top: 10px;
+  border-top: 1px solid #f0f1f4;
+}
+
+.previewText {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--c-text-secondary);
+}
+
+.previewText strong {
+  color: var(--c-text-primary);
+}
+
+.previewEmpty {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--c-text-muted);
+}
