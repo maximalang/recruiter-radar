@@ -114,3 +114,37 @@ deliberately deferred (below) so this stage stays small and mergeable.
 - Persistence + prompt-version tracking for enrichment outputs (audit/replay).
 - Rate limiting / cost controls for the external provider.
 ```
+
+## Status — production-ready (2026-06-29)
+
+All "what remains" items above are now done (Block 1), except prompt-versioning
+which stays deferred by design.
+
+- **Real provider.** `createScrapeGraphProvider` makes a real `POST /v1/extract`
+  call (schema-shaped to `EnrichedHiringSignals`), 15s `AbortController` timeout,
+  `SCRAPEGRAPH_API_KEY` from env, degrade-to-typed-unavailable on any failure
+  (never throws into scoring). `isScrapeGraphConfigured()` reflects the key.
+- **Crawl4AI fallback.** `lib/ai/providers/crawl4ai.ts` (`MarkdownProvider` /
+  `fetchCleanMarkdown`). On an empty primary extract, `repairWeakCareerPage`
+  fetches clean markdown and **re-extracts** from it — recovering noisy pages —
+  reusing the SAME org quota slot. Self-hosted via `CRAWL4AI_API_URL` /
+  `CRAWL4AI_API_TOKEN`; absent ⇒ fallback skipped.
+- **Live call site.** `LeadScoringService.enrichWeakCareerPage` runs after the
+  deterministic score + gate are final and stores a SEPARATE `aiEnrichment`
+  field. Cannot change score/gate/evidence by construction.
+- **Persistence.** Migration `20260629120000_add_digest_candidate_ai_enrichment`
+  adds nullable JSONB `digest_candidates.ai_enrichment`. `enrichmentStore.ts`
+  serializes a successful enrichment (schema-versioned) and the scoring pass
+  persists it via a targeted `UPDATE` of ONLY that column, keyed by
+  (client_profile_id, org_id). `getLeadDetail` reads it back onto
+  `LeadDetail.aiEnrichment`.
+- **Cost guard.** `enrichmentRateLimit.ts` is now Redis-backed
+  (`SET enrichment:{orgId} <now> NX EX 86400`), correct across instances, with an
+  in-memory fallback when `REDIS_URL` is absent. 1 call/org/24h; skips and the
+  fallback re-extract never burn extra quota.
+- **UI.** `app/leads/[id]/ai-enrichment-block.tsx` renders a muted, explicitly
+  AI-labelled "AI-подсказка" panel below the evidence card, only when
+  `ai_enrichment` is non-null.
+
+Still deferred: prompt-version tracking; feeding the enrichment hint into scoring
+as a reviewed input candidate (today it is display-only).
