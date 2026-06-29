@@ -127,9 +127,9 @@ export interface RepairWeakCareerPageOptions {
  *   2. Weak lead, no provider → empty result (graceful degrade — Stage-1 path).
  *   3. Weak lead, over quota  → skip (empty result; ≤1 provider call per org/24h).
  *   4. Weak lead + provider   → ask the provider; on any failure, empty result.
- *   5. Primary extract empty + fallbackProvider → PREPARE clean markdown via
- *      Crawl4AI for a future re-extraction retry; the returned result is still the
- *      (empty) primary result — the fallback only logs that prep ran.
+ *   5. Primary extract empty + fallbackProvider → fetch CLEAN markdown via
+ *      Crawl4AI and RE-EXTRACT from it; if that yields signal, return it,
+ *      otherwise the empty primary result flows out. Shares the org quota slot.
  *
  * The quota (step 3) is a COST guard: the external provider charges per call, so
  * a given org is enriched at most once per 24h. It is consumed only after the
@@ -199,24 +199,34 @@ export async function repairWeakCareerPage(
       instruction: CAREER_PAGE_EXTRACTION_INSTRUCTION,
     });
 
-    // Primary extract found nothing usable → optionally PREPARE markdown via the
-    // Crawl4AI fallback so a later retry path can re-extract. We do not re-extract
-    // here and the returned result is unchanged; this only readies the input and
-    // records that the fallback ran (spec §2.2/§2.3).
+    // Primary extract found nothing usable → try the Crawl4AI fallback: fetch
+    // CLEAN markdown for the page and re-extract from it (noisy pages that defeat
+    // a one-shot extract often parse cleanly once reduced to markdown). This
+    // reuses the SAME org quota slot — no extra spend is charged for the retry.
+    // If the fallback also yields nothing, the empty primary result flows out.
     let fallbackUsed = false;
+    let finalResult = result;
     if (!result.available && options.fallbackProvider) {
       const prepared = await options.fallbackProvider.fetchCleanMarkdown(url);
-      fallbackUsed = prepared.available && prepared.data !== null;
+      if (prepared.available && prepared.data && prepared.data.markdown) {
+        const retried = await provider.extractStructuredData({
+          sourceUrl: url,
+          content: prepared.data.markdown,
+          instruction: CAREER_PAGE_EXTRACTION_INSTRUCTION,
+        });
+        fallbackUsed = true;
+        if (retried.available) finalResult = retried;
+      }
     }
 
     logEnrichmentApiCall({
       orgId: candidate.orgId,
       url,
       provider: provider.name,
-      success: result.available,
+      success: finalResult.available,
       fallbackUsed,
     });
-    return result;
+    return finalResult;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'unknown_error';
     logEnrichmentApiCall({
