@@ -162,7 +162,7 @@ export async function repairWeakCareerPage(
   // now — after weakness + provider checks — so skips never spend quota.
   const enforceQuota = options.enforceQuota ?? true;
   if (enforceQuota) {
-    const quota = tryConsumeEnrichmentQuota(candidate.orgId);
+    const quota = await tryConsumeEnrichmentQuota(candidate.orgId);
     if (!quota.allowed) {
       return emptyEnrichmentResult('enrichment quota reached for this org (1/24h)');
     }
