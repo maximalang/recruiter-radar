@@ -121,6 +121,58 @@ export function ProfileForm(props: { profile: ClientProfile }) {
         selected={profile.companySizes}
       />
 
+      {/* Targeting thresholds — data-backed hard filters (Block 2) */}
+      <fieldset className={styles.group}>
+        <div className={styles.groupHead}>
+          <span className={styles.groupTitle}>Пороги качества сигнала</span>
+          <span className={styles.groupHint}>
+            Жёсткие фильтры по силе и свежести найма. Пусто — порог не применяется.
+          </span>
+        </div>
+        <div className={styles.threeCol}>
+          <label className={ppStyles.field}>
+            <span className={ppStyles.fieldLabel}>Мин. сила сигнала</span>
+            <input
+              className={ppStyles.input}
+              name="hiringIntentMin"
+              type="number"
+              min={0}
+              max={4}
+              step={0.1}
+              defaultValue={profile.hiringIntentMin ?? ""}
+              placeholder="напр. 2.5"
+            />
+            <span className={ppStyles.helperText}>FIUR-оценка 0–4. Отсекает слабые лиды.</span>
+          </label>
+          <label className={ppStyles.field}>
+            <span className={ppStyles.fieldLabel}>Свежесть сигнала, дней</span>
+            <input
+              className={ppStyles.input}
+              name="signalFreshnessDays"
+              type="number"
+              min={1}
+              step={1}
+              defaultValue={profile.signalFreshnessDays ?? ""}
+              placeholder="напр. 14"
+            />
+            <span className={ppStyles.helperText}>Не старше N дней. Без даты — оставляем.</span>
+          </label>
+          <label className={ppStyles.field}>
+            <span className={ppStyles.fieldLabel}>Мин. открытых ролей</span>
+            <input
+              className={ppStyles.input}
+              name="minOpenRoles"
+              type="number"
+              min={0}
+              step={1}
+              defaultValue={profile.minOpenRoles ?? ""}
+              placeholder="напр. 2"
+            />
+            <span className={ppStyles.helperText}>Минимум распознанных вакансий.</span>
+          </label>
+        </div>
+      </fieldset>
+
       {/* Geography + remote */}
       <fieldset className={styles.group}>
         <div className={styles.groupHead}>

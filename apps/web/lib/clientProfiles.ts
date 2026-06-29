@@ -23,6 +23,9 @@ type ClientProfileRow = {
   excludedIndustries: unknown;
   excludedLocations: unknown;
   remoteFriendly: boolean;
+  hiringIntentMin: number | null;
+  signalFreshnessDays: number | null;
+  minOpenRoles: number | null;
 };
 
 export type ClientProfile = {
@@ -48,6 +51,12 @@ export type ClientProfile = {
   excludedLocations: string[];
   /** Whether the agency can serve remote-first companies regardless of location. */
   remoteFriendly: boolean;
+  /** Minimum FIUR total score (0..4) a candidate must reach. null = no threshold. */
+  hiringIntentMin: number | null;
+  /** Max age in days of the latest hiring signal. null = no threshold. */
+  signalFreshnessDays: number | null;
+  /** Minimum parsed open-role count (vacancies). null = no minimum. */
+  minOpenRoles: number | null;
 };
 
 type PilotApplicationRow = {
@@ -111,7 +120,10 @@ export async function listClientProfiles(ownerId: string | number): Promise<Clie
       roles AS "roles",
       excluded_industries AS "excludedIndustries",
       excluded_locations AS "excludedLocations",
-      remote_friendly AS "remoteFriendly"
+      remote_friendly AS "remoteFriendly",
+      hiring_intent_min AS "hiringIntentMin",
+      signal_freshness_days AS "signalFreshnessDays",
+      min_open_roles AS "minOpenRoles"
     FROM client_profiles
     WHERE owner_id = $1 OR owner_id IS NULL
     ORDER BY is_active DESC, updated_at DESC, id DESC
@@ -172,7 +184,10 @@ export async function getClientProfileById(
       roles AS "roles",
       excluded_industries AS "excludedIndustries",
       excluded_locations AS "excludedLocations",
-      remote_friendly AS "remoteFriendly"
+      remote_friendly AS "remoteFriendly",
+      hiring_intent_min AS "hiringIntentMin",
+      signal_freshness_days AS "signalFreshnessDays",
+      min_open_roles AS "minOpenRoles"
     FROM client_profiles
     WHERE id = $1 ${ownerClause}
   `, params);
@@ -218,7 +233,10 @@ export async function getClientProfileByOwnerId(
       roles AS "roles",
       excluded_industries AS "excludedIndustries",
       excluded_locations AS "excludedLocations",
-      remote_friendly AS "remoteFriendly"
+      remote_friendly AS "remoteFriendly",
+      hiring_intent_min AS "hiringIntentMin",
+      signal_freshness_days AS "signalFreshnessDays",
+      min_open_roles AS "minOpenRoles"
     FROM client_profiles
     WHERE owner_id = $1
     LIMIT 1
@@ -296,7 +314,10 @@ export async function findMatchingClientProfileForCheckoutOrder(input: {
         roles AS "roles",
         excluded_industries AS "excludedIndustries",
         excluded_locations AS "excludedLocations",
-        remote_friendly AS "remoteFriendly"
+        remote_friendly AS "remoteFriendly",
+        hiring_intent_min AS "hiringIntentMin",
+        signal_freshness_days AS "signalFreshnessDays",
+        min_open_roles AS "minOpenRoles"
       FROM client_profiles
       WHERE telegram_chat_id::TEXT = $1
       ${ownershipClause}
@@ -328,7 +349,10 @@ export async function findMatchingClientProfileForCheckoutOrder(input: {
       roles AS "roles",
       excluded_industries AS "excludedIndustries",
       excluded_locations AS "excludedLocations",
-      remote_friendly AS "remoteFriendly"
+      remote_friendly AS "remoteFriendly",
+      hiring_intent_min AS "hiringIntentMin",
+      signal_freshness_days AS "signalFreshnessDays",
+      min_open_roles AS "minOpenRoles"
     FROM client_profiles
     WHERE LOWER(BTRIM(agency_name)) = LOWER(BTRIM($1))
     ${ownershipClause}
@@ -383,6 +407,9 @@ export async function saveClientProfile(input: {
   excludedIndustries?: readonly string[] | null;
   excludedLocations?: readonly string[] | null;
   remoteFriendly?: boolean | null;
+  hiringIntentMin?: number | null;
+  signalFreshnessDays?: number | null;
+  minOpenRoles?: number | null;
 }, db?: ClientProfilesDbClient): Promise<ClientProfile> {
   const pool = db ?? getPool();
 
@@ -406,6 +433,9 @@ export async function saveClientProfile(input: {
   const excludedLocations = normalizeKeywordList(input.excludedLocations);
   const remoteFriendly = input.remoteFriendly ?? false;
   const contactPolicy = normalizeContactPolicy(input.contactPolicy);
+  const hiringIntentMin = normalizeHiringIntentMin(input.hiringIntentMin);
+  const signalFreshnessDays = normalizePositiveInt(input.signalFreshnessDays);
+  const minOpenRoles = normalizeNonNegativeInt(input.minOpenRoles);
 
   const returningClause = `
     id::TEXT AS id,
@@ -425,7 +455,10 @@ export async function saveClientProfile(input: {
     roles AS "roles",
     excluded_industries AS "excludedIndustries",
     excluded_locations AS "excludedLocations",
-    remote_friendly AS "remoteFriendly"
+    remote_friendly AS "remoteFriendly",
+    hiring_intent_min AS "hiringIntentMin",
+    signal_freshness_days AS "signalFreshnessDays",
+    min_open_roles AS "minOpenRoles"
   `;
 
   let result: Awaited<ReturnType<typeof pool.query<ClientProfileRow>>>;
@@ -449,7 +482,10 @@ export async function saveClientProfile(input: {
             roles = $13,
             excluded_industries = $14,
             excluded_locations = $15,
-            remote_friendly = $16
+            remote_friendly = $16,
+            hiring_intent_min = $17,
+            signal_freshness_days = $18,
+            min_open_roles = $19
           WHERE id = $1
           RETURNING ${returningClause}
         `, [
@@ -468,7 +504,10 @@ export async function saveClientProfile(input: {
           roles,
           excludedIndustries,
           excludedLocations,
-          remoteFriendly
+          remoteFriendly,
+          hiringIntentMin,
+          signalFreshnessDays,
+          minOpenRoles
         ])
       : await pool.query<ClientProfileRow>(`
           INSERT INTO client_profiles (
@@ -486,9 +525,12 @@ export async function saveClientProfile(input: {
             roles,
             excluded_industries,
             excluded_locations,
-            remote_friendly
+            remote_friendly,
+            hiring_intent_min,
+            signal_freshness_days,
+            min_open_roles
           )
-          VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8::jsonb, $9, $10, $11, $12, $13, $14, $15)
+          VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8::jsonb, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
           RETURNING ${returningClause}
         `, [
           agencyName,
@@ -505,7 +547,10 @@ export async function saveClientProfile(input: {
           roles,
           excludedIndustries,
           excludedLocations,
-          remoteFriendly
+          remoteFriendly,
+          hiringIntentMin,
+          signalFreshnessDays,
+          minOpenRoles
         ]);
   } catch (err) {
     if (isUniqueViolation(err, "client_profiles_telegram_chat_id_unique")) {
@@ -671,6 +716,9 @@ function mapClientProfileRow(row: ClientProfileRow): ClientProfile {
     excludedIndustries: normalizeIndustryList(row.excludedIndustries),
     excludedLocations: normalizeKeywordList(row.excludedLocations),
     remoteFriendly: row.remoteFriendly ?? false,
+    hiringIntentMin: normalizeHiringIntentMin(row.hiringIntentMin),
+    signalFreshnessDays: normalizePositiveInt(row.signalFreshnessDays),
+    minOpenRoles: normalizeNonNegativeInt(row.minOpenRoles),
   };
 }
 
@@ -831,6 +879,35 @@ function normalizeDailyDigestLimit(value: number | null | undefined): number {
 
   const normalizedValue = Math.trunc(value);
   return normalizedValue > 0 ? normalizedValue : 5;
+}
+
+/**
+ * Minimum FIUR total a candidate must reach. Clamped to the scorer's [0, 4]
+ * range. Anything outside a finite number, or ≤ 0, becomes null (no threshold) —
+ * a 0 floor would be a no-op anyway, so we store null to mean "unset".
+ */
+function normalizeHiringIntentMin(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    return null;
+  }
+  return Math.min(value, 4);
+}
+
+/** A strictly-positive integer threshold (e.g. freshness days), else null. */
+function normalizePositiveInt(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  const n = Math.trunc(value);
+  return n > 0 ? n : null;
+}
+
+/**
+ * A non-negative integer threshold (e.g. min open roles). 0 is a no-op floor, so
+ * it normalizes to null ("unset") to keep the "null = no filter" invariant.
+ */
+function normalizeNonNegativeInt(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  const n = Math.trunc(value);
+  return n > 0 ? n : null;
 }
 
 function normalizeKeywordList(value: unknown): string[] {

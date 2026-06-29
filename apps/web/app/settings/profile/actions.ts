@@ -93,6 +93,9 @@ export async function saveSettingsProfileAction(
       excludedIndustries: readCheckboxGroup(formData, "excludedIndustries", VALID_INDUSTRIES),
       excludedLocations: readOptionalStringList(formData, "excludedLocations"),
       remoteFriendly: formData.get("remoteFriendly") === "on",
+      hiringIntentMin: readOptionalNumber(formData, "hiringIntentMin"),
+      signalFreshnessDays: readOptionalNumber(formData, "signalFreshnessDays"),
+      minOpenRoles: readOptionalNumber(formData, "minOpenRoles"),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Не удалось сохранить профиль.";

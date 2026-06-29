@@ -511,6 +511,34 @@ export function matchesClientProfile(item: DigestItemInput, clientProfile: Clien
     return false;
   }
 
+  // Data-backed targeting thresholds (Block 2). Each applies ONLY when the agency
+  // set it; an unset (null) threshold is a no-op, so existing profiles keep
+  // surfacing every candidate (no leads=0 regression).
+
+  // Hiring-intent floor: drop candidates whose FIUR total is below the agency's
+  // minimum. total_score ∈ [0, 4]; threshold validated into the same range.
+  if (clientProfile.hiringIntentMin != null && item.total_score < clientProfile.hiringIntentMin) {
+    return false;
+  }
+
+  // Minimum open roles: drop candidates with fewer parsed vacancies than required.
+  if (clientProfile.minOpenRoles != null && item.vacancies_count < clientProfile.minOpenRoles) {
+    return false;
+  }
+
+  // Signal freshness: drop candidates whose latest hiring signal is older than the
+  // agency's window. A candidate with NO date is KEPT — absence of a date cannot
+  // prove staleness, and dropping it would silently lose registry-sourced leads.
+  if (clientProfile.signalFreshnessDays != null && item.latest_published_at) {
+    const publishedMs = Date.parse(item.latest_published_at);
+    if (Number.isFinite(publishedMs)) {
+      const ageDays = (Date.now() - publishedMs) / (24 * 60 * 60 * 1000);
+      if (ageDays > clientProfile.signalFreshnessDays) {
+        return false;
+      }
+    }
+  }
+
   return true;
 }
 

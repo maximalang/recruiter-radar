@@ -56,6 +56,9 @@ function mockProfile(overrides: Partial<ClientProfile> = {}): ClientProfile {
     excludedIndustries: [],
     excludedLocations: [],
     remoteFriendly: false,
+    hiringIntentMin: null,
+    signalFreshnessDays: null,
+    minOpenRoles: null,
     ...overrides,
   }
 }
@@ -151,3 +154,64 @@ describe('getClientScopeScore — roles boost', () => {
     expect(getClientScopeScore(item, profile)).toBe(0)
   })
 })
+
+describe('matchesClientProfile — hiringIntentMin gate', () => {
+  it('keeps a candidate at or above the FIUR threshold', () => {
+    const item = mockItem({ total_score: 3.2 })
+    expect(matchesClientProfile(item, mockProfile({ hiringIntentMin: 3.0 }))).toBe(true)
+  })
+
+  it('drops a candidate below the FIUR threshold', () => {
+    const item = mockItem({ total_score: 2.1 })
+    expect(matchesClientProfile(item, mockProfile({ hiringIntentMin: 3.0 }))).toBe(false)
+  })
+
+  it('is a no-op when unset (null)', () => {
+    const item = mockItem({ total_score: 0.5 })
+    expect(matchesClientProfile(item, mockProfile({ hiringIntentMin: null }))).toBe(true)
+  })
+})
+
+describe('matchesClientProfile — minOpenRoles gate', () => {
+  it('keeps a candidate with enough open roles', () => {
+    const item = mockItem({ vacancies_count: 4 })
+    expect(matchesClientProfile(item, mockProfile({ minOpenRoles: 3 }))).toBe(true)
+  })
+
+  it('drops a candidate with too few open roles', () => {
+    const item = mockItem({ vacancies_count: 1 })
+    expect(matchesClientProfile(item, mockProfile({ minOpenRoles: 3 }))).toBe(false)
+  })
+
+  it('is a no-op when unset (null)', () => {
+    const item = mockItem({ vacancies_count: 0 })
+    expect(matchesClientProfile(item, mockProfile({ minOpenRoles: null }))).toBe(true)
+  })
+})
+
+describe('matchesClientProfile — signalFreshnessDays gate', () => {
+  function daysAgo(days: number): string {
+    return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+  }
+
+  it('keeps a candidate whose signal is within the window', () => {
+    const item = mockItem({ latest_published_at: daysAgo(5) })
+    expect(matchesClientProfile(item, mockProfile({ signalFreshnessDays: 14 }))).toBe(true)
+  })
+
+  it('drops a candidate whose signal is older than the window', () => {
+    const item = mockItem({ latest_published_at: daysAgo(40) })
+    expect(matchesClientProfile(item, mockProfile({ signalFreshnessDays: 14 }))).toBe(false)
+  })
+
+  it('keeps a candidate with no signal date (cannot prove staleness)', () => {
+    const item = mockItem({ latest_published_at: null })
+    expect(matchesClientProfile(item, mockProfile({ signalFreshnessDays: 14 }))).toBe(true)
+  })
+
+  it('is a no-op when unset (null)', () => {
+    const item = mockItem({ latest_published_at: daysAgo(400) })
+    expect(matchesClientProfile(item, mockProfile({ signalFreshnessDays: null }))).toBe(true)
+  })
+})
+
