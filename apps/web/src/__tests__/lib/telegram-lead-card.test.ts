@@ -122,3 +122,43 @@ describe('formatTelegramLeadMessage — compact fallback', () => {
     expect(text).toContain('—');
   });
 });
+
+describe('formatTelegramLeadMessage — score band + why-match + AI hint', () => {
+  it('labels a score >= 3 as hot', () => {
+    const text = formatTelegramLeadMessage(baseRichLead({ score: 3.5 }));
+    expect(text).toContain('Горячий');
+  });
+
+  it('labels a score in [2,3) as warm', () => {
+    const text = formatTelegramLeadMessage(baseRichLead({ score: 2.4 }));
+    expect(text).toContain('Тёплый');
+  });
+
+  it('labels a score below 2 as cold', () => {
+    const text = formatTelegramLeadMessage(baseRichLead({ score: 1.2 }));
+    expect(text).toContain('Холодный');
+  });
+
+  it('renders why-this-match lines when provided', () => {
+    const text = formatTelegramLeadMessage(
+      baseRichLead({ whyMatch: ['Нанимают по вашему профилю: Продажи', 'Регион: Москва'] }),
+    );
+    expect(text).toContain('Почему вам');
+    expect(text).toContain('Нанимают по вашему профилю: Продажи');
+    expect(text).toContain('Регион: Москва');
+  });
+
+  it('renders the AI hint with an explicit AI label and escapes it', () => {
+    const text = formatTelegramLeadMessage(
+      baseRichLead({ aiHint: 'Активный найм в команду <Eng>' }),
+    );
+    expect(text).toContain('AI-подсказка');
+    expect(text).toContain('Активный найм в команду &lt;Eng&gt;');
+  });
+
+  it('omits why-match and AI sections when absent', () => {
+    const text = formatTelegramLeadMessage(baseRichLead());
+    expect(text).not.toContain('Почему вам');
+    expect(text).not.toContain('AI-подсказка');
+  });
+});

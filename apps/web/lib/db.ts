@@ -5,6 +5,8 @@ import { updateDigestOrgStateFeedback, type DigestFeedbackAction } from "./diges
 import type { HhDigestItem } from "./hhDigest";
 import { getTelegramBotToken, sendTelegramLeadMessage } from "./telegram";
 import { deriveWhyNow, deriveLawfulContactPath, formatLawfulContactPath } from "./leads-data";
+import { buildWhyMatch } from "./leads/why-match";
+import { parseStoredEnrichment } from "./ai/enrichment/enrichmentStore";
 import { buildTelegramDigestFeedbackReplyMarkup } from "./telegramDigestFeedback";
 import { logError, logEvent } from "./runtime";
 import type {
@@ -45,6 +47,12 @@ type LeadDeliveryRow = LeadRow & {
   confidenceGate: string | null;
   orgDomain: string | null;
   careerPageUrl: string | null;
+  aiEnrichment: unknown;
+  profileRoles: unknown;
+  profileIndustries: unknown;
+  profileTargetCity: string | null;
+  profileHiringIntentMin: number | null;
+  profileMinOpenRoles: number | null;
 };
 export type TelegramDeliveryResult = { ok: true } | { ok: false; error: string };
 export type EntitlementResult = { allowed: boolean; reason: string | null };
@@ -150,7 +158,13 @@ async function getLeadDeliveryRow(candidateId: number): Promise<LeadDeliveryRow 
       dc.distinct_vacancy_names_count AS "distinctVacancyNamesCount",
       dc.confidence_gate AS "confidenceGate",
       o.domain AS "orgDomain",
-      o.career_page_url AS "careerPageUrl"
+      o.career_page_url AS "careerPageUrl",
+      dc.ai_enrichment AS "aiEnrichment",
+      cp.roles AS "profileRoles",
+      cp.industries AS "profileIndustries",
+      cp.target_city AS "profileTargetCity",
+      cp.hiring_intent_min AS "profileHiringIntentMin",
+      cp.min_open_roles AS "profileMinOpenRoles"
     FROM digest_candidates dc
     INNER JOIN orgs o ON o.id = dc.org_id
     INNER JOIN client_profiles cp ON cp.id = dc.client_profile_id
@@ -180,6 +194,34 @@ export async function sendLeadToTelegram(candidateId: number): Promise<TelegramD
     const lawfulContactPath = formatLawfulContactPath(
       deriveLawfulContactPath(lead.reasons, sourceFamilies)
     );
+
+    // Why-this-match: concrete filter criteria this lead satisfies for the
+    // agency. Reads the profile filter columns joined onto the delivery row.
+    const whyMatch = buildWhyMatch(
+      {
+        orgName: lead.orgName,
+        evidenceTitles,
+        locationNames,
+        vacanciesCount: lead.vacanciesCount,
+        score: lead.score,
+        latestSignalAt: lead.lastSignalAt,
+      },
+      {
+        roles: toStringArray(lead.profileRoles),
+        industries: toStringArray(lead.profileIndustries),
+        targetCity: lead.profileTargetCity,
+        minOpenRoles: lead.profileMinOpenRoles,
+        hiringIntentMin: lead.profileHiringIntentMin,
+      }
+    );
+
+    // AI hint: the one-line enriched hiring summary, if a successful enrichment
+    // was persisted. Advisory only — rendered with an explicit AI label.
+    const storedEnrichment = parseStoredEnrichment(lead.aiEnrichment);
+    const aiHint =
+      storedEnrichment && storedEnrichment.hiringPatternSummary.trim().length > 0
+        ? storedEnrichment.hiringPatternSummary.trim()
+        : null;
 
     const feedbackItem: HhDigestItem = {
       rank: 1,
@@ -217,7 +259,9 @@ export async function sendLeadToTelegram(candidateId: number): Promise<TelegramD
         sourceFamilies,
         locationNames,
         orgDomain: lead.orgDomain,
-        careerPageUrl: lead.careerPageUrl
+        careerPageUrl: lead.careerPageUrl,
+        whyMatch,
+        aiHint
       },
       { botToken, chatId: lead.telegramChatId },
       { replyMarkup }

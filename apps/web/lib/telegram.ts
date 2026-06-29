@@ -27,6 +27,10 @@ export type TelegramLeadMessage = {
   /** Domain / career page give a concrete corporate surface line. */
   orgDomain?: string | null;
   careerPageUrl?: string | null;
+  /** 2–3 concrete filter criteria this lead satisfies for the agency profile. */
+  whyMatch?: string[];
+  /** One-line AI-recovered hiring summary, shown with an explicit AI label. */
+  aiHint?: string | null;
 };
 
 type TelegramSendResult = {
@@ -107,6 +111,18 @@ function formatScore(score: number | null): string {
 }
 
 /**
+ * FIUR score band for the card header — a one-glance temperature read. The FIUR
+ * total is ∈ [0, 4]: ≥3 is a hot lead, ≥2 warm, below that cold. Mirrors the
+ * "companies worth contacting today" framing without inventing precision.
+ */
+function getScoreBand(score: number | null): { label: string; icon: string } {
+  if (score == null) return { label: "Холодный", icon: "🔵" };
+  if (score >= 3) return { label: "Горячий", icon: "🔥" };
+  if (score >= 2) return { label: "Тёплый", icon: "🟠" };
+  return { label: "Холодный", icon: "🔵" };
+}
+
+/**
  * Whether the lead carries enough evidence to render the premium card.
  * Without it we fall back to the compact safe summary.
  */
@@ -131,18 +147,28 @@ export function formatTelegramLeadMessage(lead: TelegramLeadMessage): string {
   }
 
   const gate = getGatePresentation(lead.confidence_gate);
+  const band = getScoreBand(lead.score);
   const lines: string[] = [];
 
-  // Header: company + readiness badge line (score + gate letter)
+  // Header: company + readiness badge line (score band + score + gate letter)
   lines.push(`🏢 <b>${escapeHtml(lead.orgName)}</b>`);
   const gateLetter = lead.confidence_gate ? ` · ${escapeHtml(lead.confidence_gate)}` : "";
-  lines.push(`${gate.icon} ${gate.readiness} · ${formatScore(lead.score)}${gateLetter}`);
+  lines.push(`${band.icon} ${band.label} · ${gate.readiness} · ${formatScore(lead.score)}${gateLetter}`);
 
   // Why now
   if (lead.whyNow && lead.whyNow.trim()) {
     lines.push("");
     lines.push(`🎯 <b>Почему сейчас</b>`);
     lines.push(escapeHtml(lead.whyNow.trim()));
+  }
+
+  // Why this match — concrete filter criteria the lead satisfies for the agency.
+  if (lead.whyMatch && lead.whyMatch.length > 0) {
+    lines.push("");
+    lines.push(`🤝 <b>Почему вам</b>`);
+    for (const reason of lead.whyMatch.slice(0, 3)) {
+      lines.push(`• ${escapeHtml(reason)}`);
+    }
   }
 
   // Role / hiring signal — top evidence titles, compact
@@ -166,6 +192,12 @@ export function formatTelegramLeadMessage(lead: TelegramLeadMessage): string {
   const surface = lead.careerPageUrl || (lead.orgDomain ? `https://${lead.orgDomain}` : null);
   if (surface) {
     lines.push(`🔗 ${escapeHtml(surface)}`);
+  }
+
+  // AI hint — secondary, explicitly labelled. Advisory only; never evidence.
+  if (lead.aiHint && lead.aiHint.trim()) {
+    lines.push("");
+    lines.push(`✨ <i>AI-подсказка: ${escapeHtml(lead.aiHint.trim())}</i>`);
   }
 
   // Sources (trust)
