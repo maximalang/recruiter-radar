@@ -294,7 +294,6 @@ interface LeadRow {
   org_name: string;
   source_external_id: string | null;
   score: number;
-  confidence_gate: string;
   vacancies_count: number;
   distinct_vacancy_names_count: number;
   latest_published_at: string | null;
@@ -304,8 +303,14 @@ interface LeadRow {
   suppressed_until: string | null;
   created_at: string;
   source_families: unknown;
-  evidence_titles: unknown;
-  location_names: unknown;
+  /**
+   * Raw digest_candidates.payload JSON. The source of truth (evidence-first) for
+   * confidence gate, evidence titles, and location names — these are NOT real
+   * columns on digest_candidates (no migration ever created them), they live
+   * inside payload. `extractPayloadFields` reads them with snake_case/camelCase
+   * tolerance and safe empty-array degradation.
+   */
+  payload: unknown;
 }
 
 /** SELECT column list shared by every list query that maps into a LeadItem. */
@@ -316,7 +321,6 @@ const LEAD_SELECT_COLUMNS = `
       dc.source_display_name AS org_name,
       dc.source_external_id,
       dc.total_score AS score,
-      dc.confidence_gate,
       dc.vacancies_count,
       dc.distinct_vacancy_names_count,
       dc.latest_published_at,
@@ -326,11 +330,35 @@ const LEAD_SELECT_COLUMNS = `
       cdos.suppressed_until,
       dc.created_at::TEXT AS created_at,
       dc.source_families,
-      dc.evidence_titles,
-      dc.location_names`;
+      dc.payload`;
 
 function toStringArray(raw: unknown): string[] {
   return Array.isArray(raw) ? raw.filter((v: unknown): v is string => typeof v === "string") : [];
+}
+
+/**
+ * Pull confidence gate + evidence titles + location names out of the
+ * digest_candidates.payload JSON. These three are stored in payload, never as
+ * real columns. Tolerates both snake_case (how the digest writer persists them:
+ * `confidence_gate`, `evidence_titles`, `location_names`) and camelCase, and
+ * degrades to "" / [] when a key is absent — so a thin payload renders the lead
+ * without these fields rather than throwing.
+ */
+function extractPayloadFields(payload: unknown): {
+  confidenceGate: string;
+  evidenceTitles: string[];
+  locationNames: string[];
+} {
+  const p =
+    typeof payload === "object" && payload !== null && !Array.isArray(payload)
+      ? (payload as Record<string, unknown>)
+      : {};
+  const gateRaw = p.confidenceGate ?? p.confidence_gate;
+  return {
+    confidenceGate: typeof gateRaw === "string" ? gateRaw : "",
+    evidenceTitles: toStringArray(p.evidenceTitles ?? p.evidence_titles),
+    locationNames: toStringArray(p.locationNames ?? p.location_names),
+  };
 }
 
 /** Map a raw joined row into the derived LeadItem shape (why-now, best-angle, etc.). */
@@ -339,6 +367,7 @@ function mapLeadRow(row: LeadRow): LeadItem {
   const structuredReasons = parseReasons(reasonsRaw);
   const reasons = structuredReasons.map(formatReason);
   const sourceFamilies = toStringArray(row.source_families);
+  const { confidenceGate, evidenceTitles, locationNames } = extractPayloadFields(row.payload);
   return {
     id: row.id,
     orgId: row.org_id,
@@ -346,7 +375,7 @@ function mapLeadRow(row: LeadRow): LeadItem {
     orgName: row.org_name ?? "Неизвестная компания",
     sourceExternalId: row.source_external_id,
     score: row.score,
-    confidenceGate: row.confidence_gate ?? "",
+    confidenceGate,
     vacanciesCount: row.vacancies_count,
     distinctVacancyNamesCount: row.distinct_vacancy_names_count,
     latestPublishedAt: row.latest_published_at,
@@ -360,15 +389,15 @@ function mapLeadRow(row: LeadRow): LeadItem {
       vacanciesCount: row.vacancies_count,
       distinctVacancyNamesCount: row.distinct_vacancy_names_count,
       sourceFamilies,
-      confidenceGate: row.confidence_gate ?? "",
+      confidenceGate,
     }),
     opener: row.opener ?? "",
     feedbackStatus: row.feedback_status,
     suppressedUntil: row.suppressed_until,
     createdAt: row.created_at,
     sourceFamilies,
-    evidenceTitles: toStringArray(row.evidence_titles),
-    locationNames: toStringArray(row.location_names),
+    evidenceTitles,
+    locationNames,
   };
 }
 
@@ -396,7 +425,9 @@ export async function getLeadsForProfile(input: {
   let paramIdx = 2;
 
   if (input.confidenceGate) {
-    conditions.push(`dc.confidence_gate = $${paramIdx}`);
+    // confidence_gate lives in payload JSON, not a real column (snake_case from
+    // the digest writer; tolerate camelCase too).
+    conditions.push(`COALESCE(dc.payload->>'confidenceGate', dc.payload->>'confidence_gate') = $${paramIdx}`);
     params.push(input.confidenceGate);
     paramIdx++;
   }
@@ -484,7 +515,7 @@ export async function getLeadsForAllProfiles(input: {
   }
 
   if (input.confidenceGate) {
-    conditions.push(`dc.confidence_gate = $${paramIdx}`);
+    conditions.push(`COALESCE(dc.payload->>'confidenceGate', dc.payload->>'confidence_gate') = $${paramIdx}`);
     params.push(input.confidenceGate);
     paramIdx++;
   }
@@ -611,7 +642,6 @@ export async function getLeadDetail(input: {
       o.career_page_url,
       dc.source_external_id,
       dc.total_score AS score,
-      dc.confidence_gate,
       dc.vacancies_count,
       dc.distinct_vacancy_names_count,
       dc.latest_published_at,
@@ -623,8 +653,6 @@ export async function getLeadDetail(input: {
       cdos.cooldown_until,
       dc.created_at::TEXT AS created_at,
       dc.source_families,
-      dc.evidence_titles,
-      dc.location_names,
       dc.candidate_source_keys,
       dc.payload,
       dc.ai_enrichment

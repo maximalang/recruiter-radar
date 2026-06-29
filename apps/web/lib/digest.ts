@@ -311,6 +311,8 @@ export async function runDigestForClientProfile(input: {
             rank: item.rank,
             source_families: item.source_families,
             confidence_gate: item.confidence_gate,
+            evidence_titles: item.evidence_titles,
+            location_names: item.location_names,
           })
         )
         paramIdx += 13

@@ -51,7 +51,6 @@ describe('getLeadDetail', () => {
       org_website: 'https://yandex.ru',
       source_external_id: 'hh-12345',
       score: 45,
-      confidence_gate: 'A',
       vacancies_count: 5,
       distinct_vacancy_names_count: 3,
       latest_published_at: '2026-06-01T10:00:00Z',
@@ -66,10 +65,16 @@ describe('getLeadDetail', () => {
       cooldown_until: null,
       created_at: '2026-06-02T12:00:00Z',
       source_families: ['hh'],
-      evidence_titles: ['Backend Developer', 'Frontend Engineer', 'Data Analyst'],
-      location_names: ['Москва'],
       candidate_source_keys: ['yandex'],
-      payload: { rank: 1, source_families: ['hh'], confidence_gate: 'A' },
+      // confidence gate + evidence titles + location names live in payload JSON,
+      // NOT as real columns (no migration ever created them).
+      payload: {
+        rank: 1,
+        source_families: ['hh'],
+        confidence_gate: 'A',
+        evidence_titles: ['Backend Developer', 'Frontend Engineer', 'Data Analyst'],
+        location_names: ['Москва'],
+      },
     };
 
     mockQuery.mockResolvedValueOnce({ rows: [candidateRow] });
@@ -83,17 +88,91 @@ describe('getLeadDetail', () => {
     expect(result!.orgName).toBe('Яндекс');
     expect(result!.orgWebsite).toBe('https://yandex.ru');
     expect(result!.score).toBe(45);
+    // Read from payload.confidence_gate
     expect(result!.confidenceGate).toBe('A');
     expect(result!.vacanciesCount).toBe(5);
     expect(result!.reasons).toEqual(['Свежие сигналы найма (недели давности)', 'Несколько открытых ролей (3) — активный найм']);
     expect(result!.opener).toBe('Здравствуйте! По Яндекс видно...');
     expect(result!.feedbackStatus).toBe('accepted');
+    // Read from payload.evidence_titles / payload.location_names
     expect(result!.evidenceTitles).toEqual(['Backend Developer', 'Frontend Engineer', 'Data Analyst']);
     expect(result!.locationNames).toEqual(['Москва']);
     expect(result!.orgWebsite).toBe('https://yandex.ru');
     expect(result!.feedbackNote).toBeNull();
     expect(result!.candidateSourceKeys).toEqual(['yandex']);
-    expect(result!.payload).toEqual({ rank: 1, source_families: ['hh'], confidence_gate: 'A' });
+  });
+
+  it('reads confidence gate / evidence / locations from a camelCase payload too', async () => {
+    makeMockPool();
+    mockQuery.mockResolvedValueOnce({
+      rows: [{
+        id: '7',
+        client_profile_id: '3',
+        org_id: '9',
+        org_name: 'КамелКейс',
+        org_website: null,
+        source_external_id: null,
+        score: 30,
+        vacancies_count: 2,
+        distinct_vacancy_names_count: 2,
+        latest_published_at: null,
+        reasons: [],
+        opener: '',
+        feedback_status: 'none',
+        feedback_note: null,
+        suppressed_until: null,
+        cooldown_until: null,
+        created_at: '2026-06-01T00:00:00Z',
+        source_families: ['career-pages'],
+        candidate_source_keys: [],
+        payload: {
+          confidenceGate: 'B',
+          evidenceTitles: ['QA инженер'],
+          locationNames: ['Санкт-Петербург'],
+        },
+      }],
+    });
+
+    const result = await getLeadDetail({ candidateId: '7', ownerId: 'owner-1' });
+    expect(result!.confidenceGate).toBe('B');
+    expect(result!.evidenceTitles).toEqual(['QA инженер']);
+    expect(result!.locationNames).toEqual(['Санкт-Петербург']);
+  });
+
+  it('degrades gracefully when payload lacks gate/evidence/location keys (no 500)', async () => {
+    makeMockPool();
+    mockQuery.mockResolvedValueOnce({
+      rows: [{
+        id: '8',
+        client_profile_id: '3',
+        org_id: '9',
+        org_name: 'Тонкий пейлоад',
+        org_website: null,
+        source_external_id: null,
+        score: 12,
+        vacancies_count: 0,
+        distinct_vacancy_names_count: 0,
+        latest_published_at: null,
+        reasons: [],
+        opener: '',
+        feedback_status: 'none',
+        feedback_note: null,
+        suppressed_until: null,
+        cooldown_until: null,
+        created_at: '2026-06-01T00:00:00Z',
+        source_families: [],
+        candidate_source_keys: [],
+        // Mirrors real prod rows that only carry {rank, confidence_gate, source_families}
+        // — here even thinner, with none of the three fields.
+        payload: { rank: 5 },
+      }],
+    });
+
+    const result = await getLeadDetail({ candidateId: '8', ownerId: 'owner-1' });
+    expect(result).not.toBeNull();
+    expect(result!.confidenceGate).toBe('');
+    expect(result!.evidenceTitles).toEqual([]);
+    expect(result!.locationNames).toEqual([]);
   });
 
   it('handles null org_website gracefully', async () => {
@@ -108,7 +187,6 @@ describe('getLeadDetail', () => {
         org_website: null,
         source_external_id: null,
         score: 20,
-        confidence_gate: 'B',
         vacancies_count: 1,
         distinct_vacancy_names_count: 1,
         latest_published_at: null,
@@ -120,10 +198,8 @@ describe('getLeadDetail', () => {
         cooldown_until: null,
         created_at: '2026-06-01T00:00:00Z',
         source_families: ['hh'],
-        evidence_titles: ['Engineer'],
-        location_names: [],
         candidate_source_keys: [],
-        payload: {},
+        payload: { confidence_gate: 'B', evidence_titles: ['Engineer'], location_names: [] },
       }],
     });
 
