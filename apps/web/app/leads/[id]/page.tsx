@@ -7,6 +7,7 @@ import { buildFitExplanation, FIT_DIMENSION_ICON } from '@/lib/leads/fit-explana
 import { buildCompanySummary } from '@/lib/leads/company-summary';
 import FeedbackButtons from './feedback-buttons';
 import OutreachPicker from './outreach-picker';
+import AiEnrichmentBlock from './ai-enrichment-block';
 import {
   InternalPageFrame,
   InternalPageHeader,
@@ -194,6 +195,10 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                   )}
                 </div>
               </ContentCard>
+
+              {/* AI enrichment — secondary advisory layer, only when present.
+                  Sits below evidence; never affects score/gate/evidence. */}
+              <AiEnrichmentBlock enrichment={lead.aiEnrichment} />
 
               {/* Negative signals */}
               {lead.negativeSignals.length > 0 && (
