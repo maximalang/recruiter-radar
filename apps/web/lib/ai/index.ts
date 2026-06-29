@@ -75,6 +75,14 @@ export {
 } from './enrichment/enrichmentRateLimit';
 
 export {
+  persistEnrichmentForCandidate,
+  toStoredEnrichment,
+  parseStoredEnrichment,
+  AI_ENRICHMENT_SCHEMA_VERSION,
+  type StoredAiEnrichment,
+} from './enrichment/enrichmentStore';
+
+export {
   createScrapeGraphProvider,
   createStubScrapeGraphProvider,
   isScrapeGraphConfigured,

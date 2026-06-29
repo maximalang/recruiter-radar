@@ -33,6 +33,8 @@ import {
   isScrapeGraphConfigured,
   createCrawl4aiProvider,
   isCrawl4aiConfigured,
+  persistEnrichmentForCandidate,
+  hasEnrichment,
   type ScrapeProvider,
   type MarkdownProvider,
   type WeakCareerPageCandidate,
@@ -125,6 +127,7 @@ export class LeadScoringService {
    */
   private async enrichWeakCareerPage(
     lead: MultiSourceLead,
+    clientProfileId?: string,
   ): Promise<CareerPageEnrichmentResult | undefined> {
     const provider = this.getEnrichmentProvider()
     if (!provider) return undefined
@@ -149,7 +152,32 @@ export class LeadScoringService {
 
     try {
       const fallbackProvider = this.getFallbackProvider() ?? undefined
-      return await repairWeakCareerPage(candidate, provider, { fallbackProvider })
+      const result = await repairWeakCareerPage(candidate, provider, { fallbackProvider })
+
+      // Persist a SUCCESSFUL enrichment onto the candidate row (best-effort).
+      // Writes ONLY the ai_enrichment column — never the deterministic core —
+      // and only when we know which client profile owns the candidate. A DB
+      // failure here must not abort scoring, so it degrades to a logged warning.
+      if (clientProfileId && hasEnrichment(result)) {
+        try {
+          await persistEnrichmentForCandidate({
+            clientProfileId,
+            orgId: lead.companyId,
+            enrichment: result,
+          })
+        } catch (persistError) {
+          console.error(
+            JSON.stringify({
+              level: 'error',
+              event: 'ai.enrichment.persist_failed',
+              orgId: lead.companyId,
+              message: persistError instanceof Error ? persistError.message : 'unknown_error',
+            }),
+          )
+        }
+      }
+
+      return result
     } catch (error) {
       // repairWeakCareerPage already degrades internally; this is belt-and-braces
       // so enrichment can never abort a scoring run.
@@ -283,7 +311,7 @@ export class LeadScoringService {
     // AI enrichment runs AFTER the deterministic score + gate are final, and its
     // result is stored in a SEPARATE field. It cannot, by construction, change
     // finalScore or bestConfidence computed above.
-    const aiEnrichment = await this.enrichWeakCareerPage(lead)
+    const aiEnrichment = await this.enrichWeakCareerPage(lead, options.clientProfileId)
 
     return {
       id: lead.id,

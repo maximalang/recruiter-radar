@@ -7,6 +7,7 @@
 
 import { getPool } from "./db";
 import { formatReason, type ScoringReason } from "./scoring/scoring-reasons";
+import { parseStoredEnrichment, type StoredAiEnrichment } from "./ai/enrichment/enrichmentStore";
 
 // ─── Reason parsing ──────────────────────────────────────────────
 
@@ -274,6 +275,13 @@ export interface LeadDetail extends LeadItem {
   cooldownUntil: string | null;
   candidateSourceKeys: string[];
   payload: Record<string, unknown>;
+  /**
+   * Stage-2 AI enrichment for weak career pages — a SEPARATE, attributed advisory
+   * layer (provider + confidence + provenance). NULL unless a successful
+   * enrichment was persisted. Never feeds score/gate/evidence; UI renders it as an
+   * explicitly-labelled "AI-подсказка" block.
+   */
+  aiEnrichment: StoredAiEnrichment | null;
 }
 
 // ─── Row Mapping ─────────────────────────────────────────────────
@@ -589,6 +597,7 @@ export async function getLeadDetail(input: {
     cooldown_until: string | null;
     candidate_source_keys: unknown;
     payload: unknown;
+    ai_enrichment: unknown;
   }>(`
     SELECT
       dc.id::TEXT AS id,
@@ -617,7 +626,8 @@ export async function getLeadDetail(input: {
       dc.evidence_titles,
       dc.location_names,
       dc.candidate_source_keys,
-      dc.payload
+      dc.payload,
+      dc.ai_enrichment
     FROM digest_candidates dc
     JOIN client_profiles cp
       ON cp.id = dc.client_profile_id
@@ -647,6 +657,7 @@ export async function getLeadDetail(input: {
     cooldownUntil: row.cooldown_until,
     candidateSourceKeys: toStringArray(row.candidate_source_keys),
     payload: (typeof row.payload === 'object' && row.payload !== null && !Array.isArray(row.payload)) ? row.payload as Record<string, unknown> : {},
+    aiEnrichment: parseStoredEnrichment(row.ai_enrichment),
   };
 }
 
