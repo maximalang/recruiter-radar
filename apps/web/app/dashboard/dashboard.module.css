@@ -827,6 +827,32 @@
   margin-bottom: 16px;
 }
 
+/* Zone label — separates the agency-facing value zone from the secondary
+   operational/telemetry zone so the dashboard reads top-to-bottom as
+   "what to act on" then "system health", not one flat stack. */
+.zoneLabel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0 -8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--c-text-muted);
+}
+
+.zoneLabel::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background-color: var(--c-border);
+}
+
+.zoneLabelSystem {
+  margin-top: 16px;
+}
+
 .analyticsMetricsGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));

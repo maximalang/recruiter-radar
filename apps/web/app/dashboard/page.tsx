@@ -7,6 +7,7 @@ import DashboardAnalytics from './dashboard-analytics';
 import DashboardTodayRadar from './dashboard-today-radar';
 import LiveClock from './live-clock';
 import { InternalPageFrame, InternalPageHeader, type NavItem } from '../ui/internal-page';
+import dashStyles from './dashboard.module.css';
 
 const DASHBOARD_NAV: NavItem[] = [
   { href: '/dashboard', label: '📊 Дашборд', active: true },
@@ -55,6 +56,7 @@ export default async function DashboardPage() {
       />
       <Suspense fallback={<div>Загрузка...</div>}>
         <div style={{ marginTop: '32px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
+          {/* Agency value zone — what to act on today */}
           <DashboardTodayRadar topLeads={todayRadar.topLeads} pendingReview={todayRadar.pendingReview} />
           <DashboardQuality data={quality} />
           <DashboardAnalytics
@@ -62,6 +64,11 @@ export default async function DashboardPage() {
             leadMetrics={leadMetrics}
             sourcePerformance={sourcePerformance}
           />
+
+          {/* System zone — operational telemetry, secondary to the value above */}
+          <div className={`${dashStyles.zoneLabel} ${dashStyles.zoneLabelSystem}`}>
+            ⚙️ Система и источники
+          </div>
           <DashboardOverview
             totalSources={overview.totalSources}
             activeSources={overview.activeSources}
