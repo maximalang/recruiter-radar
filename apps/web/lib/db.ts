@@ -4,7 +4,7 @@ import { getPool as getSharedPool } from "./db-pool";
 import { updateDigestOrgStateFeedback, type DigestFeedbackAction } from "./digestFeedback";
 import type { HhDigestItem } from "./hhDigest";
 import { getTelegramBotToken, sendTelegramLeadMessage } from "./telegram";
-import { deriveWhyNow, deriveLawfulContactPath, formatLawfulContactPath } from "./leads-data";
+import { deriveWhyNow, deriveLawfulContactPath, formatLawfulContactPath, extractPayloadFields } from "./leads-data";
 import { buildWhyMatch } from "./leads/why-match";
 import { parseStoredEnrichment } from "./ai/enrichment/enrichmentStore";
 import { buildTelegramDigestFeedbackReplyMarkup } from "./telegramDigestFeedback";
@@ -39,12 +39,9 @@ type LeadDeliveryRow = LeadRow & {
   payload: unknown;
   reasons: unknown;
   opener: string | null;
-  evidenceTitles: unknown;
-  locationNames: unknown;
   sourceFamilies: unknown;
   vacanciesCount: number | null;
   distinctVacancyNamesCount: number | null;
-  confidenceGate: string | null;
   orgDomain: string | null;
   careerPageUrl: string | null;
   aiEnrichment: unknown;
@@ -151,12 +148,9 @@ async function getLeadDeliveryRow(candidateId: number): Promise<LeadDeliveryRow 
       dc.payload,
       dc.reasons,
       dc.opener,
-      dc.evidence_titles AS "evidenceTitles",
-      dc.location_names AS "locationNames",
       dc.source_families AS "sourceFamilies",
       dc.vacancies_count AS "vacanciesCount",
       dc.distinct_vacancy_names_count AS "distinctVacancyNamesCount",
-      dc.confidence_gate AS "confidenceGate",
       o.domain AS "orgDomain",
       o.career_page_url AS "careerPageUrl",
       dc.ai_enrichment AS "aiEnrichment",
@@ -182,10 +176,16 @@ export async function sendLeadToTelegram(candidateId: number): Promise<TelegramD
   const { botToken, error } = getTelegramBotToken();
   if (!botToken) return { ok: false, error: error ?? "Telegram is not configured." };
   try {
-    // Confidence gate: prefer the column, fall back to the JSON payload.
-    const confidenceGate = lead.confidenceGate ?? extractConfidenceGate(lead.payload);
-    const evidenceTitles = toStringArray(lead.evidenceTitles);
-    const locationNames = toStringArray(lead.locationNames);
+    // Evidence-first fields (confidence gate, evidence titles, location names)
+    // live in digest_candidates.payload — they are NOT real columns. Read them
+    // through the canonical extractor shared with the /leads page so the Telegram
+    // card and the in-app card tell an identical story and tolerate both
+    // snake_case (how the digest writer persists) and camelCase.
+    const {
+      confidenceGate,
+      evidenceTitles,
+      locationNames,
+    } = extractPayloadFields(lead.payload);
     const sourceFamilies = toStringArray(lead.sourceFamilies);
 
     // Reuse the same evidence-first derivations the /leads/[id] page uses, so the
@@ -273,21 +273,6 @@ export async function sendLeadToTelegram(candidateId: number): Promise<TelegramD
     logError("telegram.delivery.failed", error, { digestCandidateId: candidateId, clientProfileId: lead.clientProfileId, orgId: lead.orgId });
     return { ok: false, error: message };
   }
-}
-
-function extractConfidenceGate(payload: unknown): string | undefined {
-  if (!payload || typeof payload !== "object") {
-    return undefined;
-  }
-
-  const payloadObj = payload as Record<string, unknown>;
-  const confidenceGate = payloadObj.confidence_gate;
-
-  if (typeof confidenceGate === "string" && confidenceGate.length > 0) {
-    return confidenceGate;
-  }
-
-  return undefined;
 }
 
 

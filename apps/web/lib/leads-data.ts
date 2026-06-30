@@ -344,7 +344,7 @@ function toStringArray(raw: unknown): string[] {
  * degrades to "" / [] when a key is absent — so a thin payload renders the lead
  * without these fields rather than throwing.
  */
-function extractPayloadFields(payload: unknown): {
+export function extractPayloadFields(payload: unknown): {
   confidenceGate: string;
   evidenceTitles: string[];
   locationNames: string[];

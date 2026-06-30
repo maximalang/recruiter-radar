@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { ingestAllPrimarySources, isNoActiveProfiles, type IngestResult } from '@/lib/lead-discovery/source-ingest'
 import { runDigestForClientProfile } from '@/lib/digest'
 import { deliverCandidatesForRun, type DeliverRunResult } from '@/lib/digest/deliver-candidates'
+import { enrichRunCandidates } from '@/lib/ai/enrichment/enrichRunCandidates'
 import { getPool } from '@/lib/db'
 
 export const runtime = 'nodejs'
@@ -149,6 +150,18 @@ async function generateAndDeliverDigests(): Promise<DigestDeliveryResult[]> {
       // Run digest generation directly
       const { run } = await runDigestForClientProfile({ clientProfileId: profile.id })
       const runId = run.id
+
+      // AI enrichment (best-effort, provider-gated, quota-bounded). Runs AFTER
+      // the deterministic candidates are committed and BEFORE delivery so a
+      // recovered hiring hint can ride along in the Telegram/email card. It only
+      // ever writes the separate ai_enrichment column — never score/gate/evidence
+      // — and a failure here must never affect delivery, so it is fully isolated.
+      try {
+        await enrichRunCandidates(runId)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error'
+        console.error(`[daily-radar] enrichment failed for run ${runId}: ${message}`)
+      }
 
       // Deliver candidates using shared logic
       const delivery = await deliverCandidatesForRun(runId)

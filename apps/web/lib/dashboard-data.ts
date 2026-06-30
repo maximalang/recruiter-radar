@@ -63,11 +63,15 @@ export async function getDashboardQualityMetrics(): Promise<QualityMetrics> {
     const [gateResult, rate7dResult, rate30dResult] = await Promise.all([
       pool.query<{ gate: string; count: string }>(`
         SELECT
-          COALESCE(dc.confidence_gate, 'unknown') AS gate,
+          COALESCE(
+            dc.payload->>'confidence_gate',
+            dc.payload->>'confidenceGate',
+            'unknown'
+          ) AS gate,
           COUNT(*) AS count
         FROM digest_candidates dc
         WHERE dc.created_at >= NOW() - INTERVAL '30 days'
-        GROUP BY dc.confidence_gate
+        GROUP BY 1
         ORDER BY gate
       `),
       pool.query<{ delivered: string; accepted: string }>(`

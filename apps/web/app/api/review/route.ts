@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getPool } from "../../../lib/db";
 import { formatReason, type ScoringReason } from "../../../lib/scoring/scoring-reasons";
+import { extractPayloadFields } from "../../../lib/leads-data";
 import { getOwnerIdFromSession } from "../../../lib/session";
 
 export const dynamic = "force-dynamic";
@@ -82,14 +83,12 @@ export async function GET(request: Request) {
       org_id: string;
       org_name: string;
       score: number;
-      confidence_gate: string;
       vacancies_count: number;
       distinct_vacancy_names_count: number;
       latest_published_at: string | null;
       reasons: unknown;
       source_families: unknown;
-      evidence_titles: unknown;
-      location_names: unknown;
+      payload: unknown;
       created_at: string;
     }>(`
       SELECT
@@ -97,14 +96,12 @@ export async function GET(request: Request) {
         dc.org_id::TEXT AS org_id,
         dc.source_display_name AS org_name,
         dc.total_score AS score,
-        dc.confidence_gate,
         dc.vacancies_count,
         dc.distinct_vacancy_names_count,
         dc.latest_published_at,
         dc.reasons,
         dc.source_families,
-        dc.evidence_titles,
-        dc.location_names,
+        dc.payload,
         dc.created_at::TEXT AS created_at
       FROM digest_candidates dc
       JOIN client_profiles cp
@@ -116,27 +113,29 @@ export async function GET(request: Request) {
       LIMIT $3 OFFSET $4
     `, [clientProfileId, ownerId, limit, offset]);
 
-    const items = itemsResult.rows.map((row) => ({
-      id: row.id,
-      orgId: row.org_id,
-      orgName: row.org_name ?? "Неизвестная компания",
-      score: row.score,
-      confidenceGate: row.confidence_gate ?? "",
-      vacanciesCount: row.vacancies_count,
-      distinctVacancyNamesCount: row.distinct_vacancy_names_count,
-      latestPublishedAt: row.latest_published_at,
-      reasons: formatReasonsFromRaw(row.reasons),
-      sourceFamilies: Array.isArray(row.source_families)
-        ? row.source_families.filter((s: unknown): s is string => typeof s === "string")
-        : [],
-      evidenceTitles: Array.isArray(row.evidence_titles)
-        ? row.evidence_titles.filter((e: unknown): e is string => typeof e === "string")
-        : [],
-      locationNames: Array.isArray(row.location_names)
-        ? row.location_names.filter((l: unknown): l is string => typeof l === "string")
-        : [],
-      createdAt: row.created_at,
-    }));
+    const items = itemsResult.rows.map((row) => {
+      // Confidence gate, evidence titles, location names live in payload — they
+      // are not real columns on digest_candidates. Read them via the canonical
+      // extractor (snake_case/camelCase tolerant, safe empty-array degradation).
+      const { confidenceGate, evidenceTitles, locationNames } = extractPayloadFields(row.payload);
+      return {
+        id: row.id,
+        orgId: row.org_id,
+        orgName: row.org_name ?? "Неизвестная компания",
+        score: row.score,
+        confidenceGate,
+        vacanciesCount: row.vacancies_count,
+        distinctVacancyNamesCount: row.distinct_vacancy_names_count,
+        latestPublishedAt: row.latest_published_at,
+        reasons: formatReasonsFromRaw(row.reasons),
+        sourceFamilies: Array.isArray(row.source_families)
+          ? row.source_families.filter((s: unknown): s is string => typeof s === "string")
+          : [],
+        evidenceTitles,
+        locationNames,
+        createdAt: row.created_at,
+      };
+    });
 
     return NextResponse.json({ items, total, limit, offset });
   } catch (error) {
