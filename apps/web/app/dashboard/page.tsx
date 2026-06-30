@@ -13,6 +13,7 @@ const DASHBOARD_NAV: NavItem[] = [
   { href: '/dashboard', label: '📊 Дашборд', active: true },
   { href: '/leads', label: '🎯 Лиды' },
   { href: '/review', label: '🔍 Ревью' },
+  { href: '/settings/profile', label: '⚙️ Профиль' },
 ];
 
 import {

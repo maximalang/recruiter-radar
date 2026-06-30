@@ -316,12 +316,19 @@ export function EmptyState(props: {
   icon?: string;
   title: string;
   text?: string;
+  /** Optional next-step call to action — turns a dead end into a guided step. */
+  action?: { href: string; label: string };
 }) {
   return (
     <div className={s.emptyState}>
       {props.icon ? <div className={s.emptyStateIcon}>{props.icon}</div> : null}
       <p className={s.emptyStateTitle}>{repairVisibleNode(props.title)}</p>
       {props.text ? <p className={s.emptyStateText}>{repairVisibleNode(props.text)}</p> : null}
+      {props.action ? (
+        <Link href={props.action.href} className={s.emptyStateAction}>
+          {repairVisibleNode(props.action.label)}
+        </Link>
+      ) : null}
     </div>
   );
 }

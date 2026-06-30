@@ -26,6 +26,7 @@ const LEADS_NAV: NavItem[] = [
   { href: '/dashboard', label: '📊 Дашборд' },
   { href: '/leads', label: '🎯 Лиды', active: true },
   { href: '/review', label: '🔍 Ревью' },
+  { href: '/settings/profile', label: '⚙️ Профиль' },
 ];
 
 function LeadCard({
@@ -131,16 +132,28 @@ function LeadCard({
 function LeadsList({
   leads,
   fitPreviewFor,
+  hasActiveProfile,
 }: {
   leads: LeadItem[];
   fitPreviewFor: (lead: LeadItem) => { icon: string; text: string } | null;
+  hasActiveProfile: boolean;
 }) {
   if (leads.length === 0) {
-    return (
+    // Distinguish the two empty cases so the next step is obvious:
+    // no profile yet → set one up; profile set → leads are on their way.
+    return hasActiveProfile ? (
       <EmptyState
         icon="📭"
         title="Лидов пока нет"
-        text="Когда дайджест сгенерирует лиды, они появятся здесь."
+        text="Профиль настроен — первая подборка придёт со следующим запуском радара. Можно уточнить фильтры, чтобы повысить релевантность."
+        action={{ href: '/settings/profile', label: 'Уточнить профиль' }}
+      />
+    ) : (
+      <EmptyState
+        icon="🎯"
+        title="Настройте профиль идеального клиента"
+        text="Радар начнёт подбирать компании, как только вы опишете, кого ищете: роли, отрасли, регионы."
+        action={{ href: '/settings/profile', label: 'Настроить профиль' }}
       />
     );
   }
@@ -353,7 +366,7 @@ export default async function LeadsPage({
           />
         </Suspense>
         <Suspense fallback={<div className={ipStyles.loadingState}>Загрузка...</div>}>
-          <LeadsList leads={allLeads} fitPreviewFor={fitPreviewFor} />
+          <LeadsList leads={allLeads} fitPreviewFor={fitPreviewFor} hasActiveProfile={activeProfiles.length > 0} />
         </Suspense>
       </TableCard>
     </InternalPageFrame>

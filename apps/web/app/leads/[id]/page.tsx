@@ -31,6 +31,7 @@ export const dynamic = 'force-dynamic';
 const LEAD_DETAIL_NAV: NavItem[] = [
   { href: '/dashboard', label: '📊 Дашборд' },
   { href: '/leads', label: '🎯 Лиды' },
+  { href: '/settings/profile', label: '⚙️ Профиль' },
 ];
 
 export default async function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {

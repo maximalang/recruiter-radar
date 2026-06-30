@@ -22,6 +22,7 @@ const REVIEW_NAV: NavItem[] = [
   { href: '/dashboard', label: '📊 Дашборд' },
   { href: '/leads', label: '🎯 Лиды' },
   { href: '/review', label: '🔍 Ревью', active: true },
+  { href: '/settings/profile', label: '⚙️ Профиль' },
 ];
 
 interface ReviewCandidate {

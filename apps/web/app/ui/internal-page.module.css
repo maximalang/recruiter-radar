@@ -700,6 +700,28 @@
   font-size: 0.85rem;
 }
 
+.emptyStateAction {
+  display: inline-block;
+  margin-top: 16px;
+  padding: 9px 18px;
+  border-radius: 10px;
+  background-color: var(--c-brand);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: opacity 0.15s ease;
+}
+
+.emptyStateAction:hover {
+  opacity: 0.9;
+}
+
+.emptyStateAction:focus-visible {
+  outline: 2px solid var(--c-brand);
+  outline-offset: 2px;
+}
+
 .notFoundState {
   min-height: 100vh;
   display: flex;
