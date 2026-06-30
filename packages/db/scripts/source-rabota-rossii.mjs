@@ -31,6 +31,28 @@ const API_URL = 'https://opendata.trudvsem.ru/api/v1/vacancies';
 const DEFAULT_PAGES = 5;
 const MAX_PAGES = 50;
 
+// trudvsem caps the GLOBAL (region-less) result window at offset < 50, so the
+// federal feed alone surfaces at most ~50 records no matter how large meta.total
+// is. Each region code exposes its own independent window, so iterating the major
+// RF economic centres multiplies real coverage. This curated default activates
+// when RABOTA_ROSSII_REGION_CODES is unset; operators can override with their own
+// comma-separated list, or set it to "federal" to force the single region-less feed.
+// Codes are trudvsem's 13-digit OKTMO-style region_code values (live-probed 2026-06-30).
+const DEFAULT_REGION_CODES = Object.freeze([
+  '7700000000000', // Москва
+  '7800000000000', // Санкт-Петербург
+  '5000000000000', // Московская область
+  '6600000000000', // Свердловская область
+  '5400000000000', // Новосибирская область
+  '1600000000000', // Республика Татарстан
+  '2300000000000', // Краснодарский край
+  '0200000000000', // Республика Башкортостан
+  '7400000000000', // Челябинская область
+  '6300000000000', // Самарская область
+  '5200000000000', // Нижегородская область
+  '6100000000000', // Ростовская область
+]);
+
 
 const runtime = createStandardSourceRuntime({
   sourceId: SOURCE_ID,
@@ -68,14 +90,36 @@ export function resolveRabotaRossiiInput() {
     // trudvsem caps the GLOBAL (region-less) result window at offset < 50 — once
     // the offset reaches 50 the feed returns an empty page regardless of how
     // large meta.total is. Region-scoped queries each expose their own
-    // independent window, so iterating region codes (RABOTA_ROSSII_REGION_CODES)
-    // is the real coverage lever, far more than offset paging on the federal feed.
-    const regionCodes = parseCommaSeparated(process.env.RABOTA_ROSSII_REGION_CODES);
+    // independent window, so iterating region codes is the real coverage lever,
+    // far more than offset paging on the federal feed.
+    //
+    // Resolution precedence:
+    //   1. RABOTA_ROSSII_REGION_CODE (single, explicit) — kept for back-compat.
+    //   2. RABOTA_ROSSII_REGION_CODES = "federal" — opt back into the single
+    //      region-less feed (no region iteration).
+    //   3. RABOTA_ROSSII_REGION_CODES = "a,b,c" — operator-supplied region list.
+    //   4. unset — the curated DEFAULT_REGION_CODES (major RF economic centres),
+    //      so the coverage win is active in production without manual config.
+    const singleRegion = process.env.RABOTA_ROSSII_REGION_CODE?.trim() || null;
+    const rawRegionCodes = process.env.RABOTA_ROSSII_REGION_CODES?.trim();
+    const parsedRegionCodes = parseCommaSeparated(rawRegionCodes);
+
+    let regionCodes;
+    if (singleRegion) {
+      regionCodes = null; // single-region mode handled via regionCode below
+    } else if (rawRegionCodes && /^federal$/i.test(rawRegionCodes)) {
+      regionCodes = null; // explicit opt-out → region-less federal feed
+    } else if (parsedRegionCodes.length > 0) {
+      regionCodes = parsedRegionCodes;
+    } else {
+      regionCodes = [...DEFAULT_REGION_CODES];
+    }
+
     return {
       inputMode: 'public-pending',
       searchText,
-      regionCode: process.env.RABOTA_ROSSII_REGION_CODE?.trim() || null,
-      regionCodes: regionCodes.length > 0 ? regionCodes : null,
+      regionCode: singleRegion,
+      regionCodes,
       offset: clampInteger(process.env.RABOTA_ROSSII_OFFSET, 0, 0, 100000),
       limit: clampInteger(process.env.RABOTA_ROSSII_LIMIT, 50, 1, 100),
       pages: clampInteger(process.env.RABOTA_ROSSII_PAGES, DEFAULT_PAGES, 1, MAX_PAGES),

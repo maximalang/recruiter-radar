@@ -139,7 +139,11 @@ of 2026-06-30** (freshness gate cleared via `date_modify`-based freshness; see
   of `meta.total`, so a single federal query surfaced only ~25–50 of thousands of matches. The
   adapter now pages offset windows (`RABOTA_ROSSII_PAGES`) **and** iterates region codes
   (`RABOTA_ROSSII_REGION_CODES`) — each region exposes its own independent window, which is the
-  real coverage lever. Single-region signature preserved for the confidence verifier.
+  real coverage lever. A curated default of 12 major RF economic centres is active when no region
+  env is set (set `RABOTA_ROSSII_REGION_CODES=federal` to opt back into the single region-less
+  feed; a single `RABOTA_ROSSII_REGION_CODE` still wins for back-compat). Measured live
+  2026-06-30: default mode yields ~300 normalized records/run across 12 regions vs ~50 federal —
+  a ~6× per-run company-coverage gain. Single-region signature preserved for the confidence verifier.
 - Re-check freshness/contract with `npm run verify:rabota-rossii:confidence`
   (needs `RABOTA_ROSSII_LIVE=1`; optional `DATABASE_URL` adds HH-overlap dedupe). Live verifier
   **PASSES** as of 2026-06-30. Do **not** relax the 60% freshness threshold; filter the fetch to
