@@ -13,6 +13,8 @@ import {
   GateBadgeInline,
   FeedbackBadge,
   ScoreBar,
+  ScoreBandChip,
+  SignalFreshnessChip,
   getScoreTone,
   TableCard,
   EmptyState,
@@ -50,6 +52,7 @@ function LeadCard({
               <span className={ipStyles.leadCardOrg}>{lead.orgName}</span>
             </Link>
             <div className={ipStyles.leadCardTags}>
+              <ScoreBandChip score={lead.score} />
               <GateBadgeInline gate={lead.confidenceGate} />
               <FeedbackBadge status={lead.feedbackStatus} />
               {lead.locationNames.length > 0 && (
@@ -99,6 +102,7 @@ function LeadCard({
               🛡 {lead.lawfulContactPath}
             </span>
           )}
+          <SignalFreshnessChip latestPublishedAt={lead.latestPublishedAt} />
           {lead.vacanciesCount > 0 && (
             <span className={ipStyles.leadMetaChip}>💼 {lead.vacanciesCount} вакансий</span>
           )}

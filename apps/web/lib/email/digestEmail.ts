@@ -10,12 +10,20 @@
 
 import type { LeadItem } from "../leads-data";
 import { scoreBand, formatSignalStrength } from "../scoring/score-display";
+import { buildWhyMatch, type WhyMatchProfile } from "../leads/why-match";
 
 export type DigestEmailContext = {
   /** Display name of the client profile this digest is for. */
   profileName: string;
   /** App base URL for lead links, e.g. https://app.example.com (no trailing slash). */
   appBaseUrl: string;
+  /**
+   * Profile filter fields used to compute the per-lead "Почему вам" lines — the
+   * same concrete-match rationale the Telegram card shows, so the two channels
+   * speak with one voice. Omit to render the digest without the why-match block
+   * (e.g. when the profile filters are unavailable).
+   */
+  profileFilters?: WhyMatchProfile | null;
 };
 
 export type RenderedEmail = {
@@ -105,7 +113,19 @@ function leadSurfaceUrl(lead: LeadItem, appBaseUrl: string): string {
   return `${appBaseUrl}/leads/${encodeURIComponent(lead.id)}`;
 }
 
-function renderLeadHtml(lead: LeadItem, appBaseUrl: string): string {
+/** Narrow a LeadItem to the why-match input shape (same fields the Telegram path passes). */
+function toWhyMatchLead(lead: LeadItem) {
+  return {
+    orgName: lead.orgName,
+    evidenceTitles: lead.evidenceTitles,
+    locationNames: lead.locationNames,
+    vacanciesCount: lead.vacanciesCount,
+    score: lead.score,
+    latestSignalAt: lead.latestPublishedAt,
+  };
+}
+
+function renderLeadHtml(lead: LeadItem, appBaseUrl: string, profileFilters?: WhyMatchProfile | null): string {
   const gate = getGatePresentation(lead.confidenceGate);
   const band = scoreBand(lead.score);
   const gateLetter = lead.confidenceGate ? ` · ${escapeHtml(lead.confidenceGate)}` : "";
@@ -130,6 +150,24 @@ function renderLeadHtml(lead: LeadItem, appBaseUrl: string): string {
     blocks.push(
       `<tr><td style="padding:0 0 2px 0;color:${COLORS.ink};font-size:13px;font-weight:600;">🎯 Почему сейчас</td></tr>` +
         `<tr><td style="padding:0 0 10px 0;color:${COLORS.ink};font-size:14px;line-height:1.45;">${escapeHtml(lead.whyNow.trim())}</td></tr>`,
+    );
+  }
+
+  // Why this match — concrete filter criteria the lead satisfies for the agency.
+  // Same rationale the Telegram card shows; rendered only when profile filters
+  // are available and at least one concrete line is produced.
+  const whyMatch = profileFilters ? buildWhyMatch(toWhyMatchLead(lead), profileFilters) : [];
+  if (whyMatch.length > 0) {
+    const items = whyMatch
+      .map(
+        (reason) =>
+          `<tr><td style="padding:0 0 2px 0;color:${COLORS.ink};font-size:14px;line-height:1.45;">• ${escapeHtml(reason)}</td></tr>`,
+      )
+      .join("");
+    blocks.push(
+      `<tr><td style="padding:0 0 2px 0;color:${COLORS.ink};font-size:13px;font-weight:600;">🤝 Почему вам</td></tr>` +
+        items +
+        `<tr><td style="padding:0 0 8px 0;"></td></tr>`,
     );
   }
 
@@ -181,7 +219,7 @@ function renderLeadHtml(lead: LeadItem, appBaseUrl: string): string {
 }
 
 function renderHtml(leads: LeadItem[], ctx: DigestEmailContext): string {
-  const cards = leads.map((lead) => renderLeadHtml(lead, ctx.appBaseUrl)).join("");
+  const cards = leads.map((lead) => renderLeadHtml(lead, ctx.appBaseUrl, ctx.profileFilters)).join("");
   const heading = `Радар на сегодня — ${escapeHtml(ctx.profileName)}`;
   const subhead =
     leads.length === 1
@@ -208,7 +246,7 @@ function renderHtml(leads: LeadItem[], ctx: DigestEmailContext): string {
 
 // --- Plain-text fallback ----------------------------------------------------
 
-function renderLeadText(lead: LeadItem, appBaseUrl: string): string {
+function renderLeadText(lead: LeadItem, appBaseUrl: string, profileFilters?: WhyMatchProfile | null): string {
   const gate = getGatePresentation(lead.confidenceGate);
   const band = scoreBand(lead.score);
   const gateLetter = lead.confidenceGate ? ` · ${lead.confidenceGate}` : "";
@@ -219,6 +257,10 @@ function renderLeadText(lead: LeadItem, appBaseUrl: string): string {
 
   if (lead.whyNow && lead.whyNow.trim()) {
     lines.push(`Почему сейчас: ${lead.whyNow.trim()}`);
+  }
+  const whyMatch = profileFilters ? buildWhyMatch(toWhyMatchLead(lead), profileFilters) : [];
+  if (whyMatch.length > 0) {
+    lines.push(`Почему вам: ${whyMatch.join("; ")}`);
   }
   if (lead.evidenceTitles && lead.evidenceTitles.length > 0) {
     const top = lead.evidenceTitles.slice(0, 3).join(", ");
@@ -242,7 +284,7 @@ function renderLeadText(lead: LeadItem, appBaseUrl: string): string {
 
 function renderText(leads: LeadItem[], ctx: DigestEmailContext): string {
   const header = `Радар на сегодня — ${ctx.profileName}`;
-  const body = leads.map((lead) => renderLeadText(lead, ctx.appBaseUrl)).join("\n\n———\n\n");
+  const body = leads.map((lead) => renderLeadText(lead, ctx.appBaseUrl, ctx.profileFilters)).join("\n\n———\n\n");
   return `${header}\n\n${body}\n`;
 }
 

@@ -18,6 +18,7 @@
 import { getPool } from "../db-pool";
 import { getLeadsForAllProfiles, type LeadItem } from "../leads-data";
 import { logError, logEvent } from "../runtime";
+import type { WhyMatchProfile } from "../leads/why-match";
 
 import { renderDigestEmail } from "./digestEmail";
 import { isEmailConfigured, sendEmail } from "./transport";
@@ -51,6 +52,8 @@ type ProfileEmailPrefs = {
    * here would over-broaden the scope — we bail on null instead (see caller).
    */
   ownerId: string | null;
+  /** Filter fields for the per-lead "Почему вам" block (mirrors the Telegram card). */
+  profileFilters: WhyMatchProfile;
 };
 
 async function getProfileEmailPrefs(
@@ -64,9 +67,15 @@ async function getProfileEmailPrefs(
     digest_email: string | null;
     agency_name: string;
     owner_id: string | null;
+    roles: unknown;
+    industries: unknown;
+    target_city: string | null;
+    min_open_roles: number | null;
+    hiring_intent_min: number | null;
   }>(
     `
-    SELECT email_digest_enabled, digest_email, agency_name, owner_id::TEXT AS owner_id
+    SELECT email_digest_enabled, digest_email, agency_name, owner_id::TEXT AS owner_id,
+           roles, industries, target_city, min_open_roles, hiring_intent_min
     FROM client_profiles
     WHERE id = $1
     LIMIT 1
@@ -81,7 +90,19 @@ async function getProfileEmailPrefs(
     digestEmail: row.digest_email,
     agencyName: row.agency_name,
     ownerId: row.owner_id,
+    profileFilters: {
+      roles: toStringArray(row.roles),
+      industries: toStringArray(row.industries),
+      targetCity: row.target_city,
+      minOpenRoles: row.min_open_roles,
+      hiringIntentMin: row.hiring_intent_min,
+    },
   };
+}
+
+/** Coerce a JSON/array DB column to a string[] for the why-match filters. */
+function toStringArray(raw: unknown): string[] {
+  return Array.isArray(raw) ? raw.filter((v): v is string => typeof v === "string") : [];
 }
 
 /** Today's date in Moscow time as YYYY-MM-DD — the email dedupe day key. */
@@ -179,6 +200,7 @@ export async function sendDigestEmailForProfile(input: {
   const rendered = renderDigestEmail(deliverable, {
     profileName: prefs.agencyName,
     appBaseUrl: resolveAppBaseUrl(),
+    profileFilters: prefs.profileFilters,
   });
 
   const sendResult = await sendEmail({

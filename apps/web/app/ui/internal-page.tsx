@@ -8,6 +8,7 @@ import {
   scoreTone as scoreToneFromRaw,
   scoreLevelLabel,
   formatSignalStrength,
+  scoreBand,
   type ScoreTone as DisplayScoreTone,
 } from "../../lib/scoring/score-display";
 
@@ -295,6 +296,54 @@ export function ScoreBar(props: { score: number }) {
       </div>
       <span className={s.scoreBarValue}>{strength}</span>
     </div>
+  );
+}
+
+/* ── Score band chip (one-glance temperature: Горячий / Тёплый / Холодный) ── */
+
+/**
+ * Compact temperature read for a lead, mirroring the Telegram/email card band.
+ * Pairs with ScoreBar (which shows the numeric strength) so the list, detail,
+ * and delivery channels all speak the same "горячий/тёплый/холодный" language.
+ */
+export function ScoreBandChip(props: { score: number }) {
+  const band = scoreBand(props.score);
+  return (
+    <span className={s.scoreBandChip} data-tone={band.tone}>
+      <span aria-hidden="true">{band.icon}</span>
+      {band.label}
+    </span>
+  );
+}
+
+/* ── Signal freshness ── */
+
+/**
+ * Human "сигнал N дн. назад" cue from the latest hiring-signal date. Returns
+ * null when there is no usable date, so callers can drop it in unconditionally.
+ * `tone` lets the UI accent a fresh signal (≤7d) and mute a stale one (>30d).
+ */
+export function formatSignalFreshness(
+  latestPublishedAt: string | null,
+): { label: string; tone: "fresh" | "recent" | "stale" } | null {
+  if (!latestPublishedAt) return null;
+  const ts = new Date(latestPublishedAt).getTime();
+  if (Number.isNaN(ts)) return null;
+  const days = Math.floor((Date.now() - ts) / 86_400_000);
+  if (days < 0) return null;
+  const tone = days <= 7 ? "fresh" : days <= 30 ? "recent" : "stale";
+  if (days === 0) return { label: "сигнал сегодня", tone };
+  if (days === 1) return { label: "сигнал вчера", tone };
+  return { label: `сигнал ${days} дн. назад`, tone };
+}
+
+export function SignalFreshnessChip(props: { latestPublishedAt: string | null }) {
+  const fresh = formatSignalFreshness(props.latestPublishedAt);
+  if (!fresh) return null;
+  return (
+    <span className={s.freshnessChip} data-tone={fresh.tone}>
+      🕔 {fresh.label}
+    </span>
   );
 }
 

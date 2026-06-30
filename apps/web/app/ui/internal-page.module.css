@@ -432,6 +432,17 @@
   background-color: #ef4444;
 }
 
+/* Band + freshness row under the sidebar score gauge */
+.scoreSidebarMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--c-border);
+}
+
 /* ── Score bar (compact, for table rows) ── */
 .scoreBar {
   display: flex;
@@ -470,6 +481,73 @@
   font-weight: 600;
   color: var(--c-text-secondary);
   min-width: 2ch;
+}
+
+/* ── Score band chip (one-glance temperature) ── */
+.scoreBandChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.scoreBandChip[data-tone="success"] {
+  background-color: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
+.scoreBandChip[data-tone="warning"] {
+  background-color: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fed7aa;
+}
+
+.scoreBandChip[data-tone="danger"] {
+  background-color: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+/* ── Signal freshness chip ── */
+.freshnessChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.freshnessChip[data-tone="fresh"] {
+  color: #047857;
+}
+
+.freshnessChip[data-tone="recent"] {
+  color: var(--c-text-muted);
+}
+
+.freshnessChip[data-tone="stale"] {
+  color: #9ca3af;
+}
+
+/* ── AI-hint presence chip (lead has an attributed AI advisory layer) ── */
+.aiHintChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 0.72rem;
+  font-weight: 600;
+  background-color: #faf5ff;
+  color: #7c3aed;
+  border: 1px solid #e9d5ff;
+  white-space: nowrap;
 }
 
 /* ── Gate badge (inline, for leads pages) ── */

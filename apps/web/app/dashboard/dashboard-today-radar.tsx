@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { LeadItem } from '@/lib/leads-data';
-import { GateBadgeInline, ScoreBar } from '../ui/internal-page';
+import { GateBadgeInline, ScoreBar, ScoreBandChip, SignalFreshnessChip } from '../ui/internal-page';
 import styles from './dashboard.module.css';
 
 interface DashboardTodayRadarProps {
@@ -37,12 +37,19 @@ export default function DashboardTodayRadar({ topLeads, pendingReview }: Dashboa
             <Link key={lead.id} href={`/leads/${lead.id}`} className={styles.todayRadarCard}>
               <div className={styles.todayRadarCardTop}>
                 <span className={styles.todayRadarOrg}>{lead.orgName}</span>
+                <ScoreBandChip score={lead.score} />
                 <GateBadgeInline gate={lead.confidenceGate} />
               </div>
 
               <div className={styles.todayRadarScore}>
                 <ScoreBar score={lead.score} />
               </div>
+
+              {lead.latestPublishedAt && (
+                <div className={styles.todayRadarFreshness}>
+                  <SignalFreshnessChip latestPublishedAt={lead.latestPublishedAt} />
+                </div>
+              )}
 
               {lead.whyNow && (
                 <div className={styles.todayRadarLine}>

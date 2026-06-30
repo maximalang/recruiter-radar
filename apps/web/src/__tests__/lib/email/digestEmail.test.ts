@@ -113,4 +113,36 @@ describe('renderDigestEmail', () => {
     expect(out.html).toContain('Ромашка')
     expect(out.html).toContain('Открыть карточку')
   })
+
+  describe('"Почему вам" (whyMatch parity with the Telegram card)', () => {
+    const filters = {
+      roles: [] as string[],
+      industries: [] as string[],
+      targetCity: 'Москва',
+      minOpenRoles: 1,
+      hiringIntentMin: null,
+    }
+
+    it('renders the why-match block when profileFilters are provided and match', () => {
+      const out = renderDigestEmail([makeLead()], { ...ctx, profileFilters: filters })
+      // Region match (Москва) + open-role volume (2 >= 1) both fire.
+      expect(out.html).toContain('Почему вам')
+      expect(out.html).toContain('Регион: Москва')
+      expect(out.text).toContain('Почему вам')
+    })
+
+    it('omits the why-match block when no profileFilters are passed', () => {
+      const out = renderDigestEmail([makeLead()], ctx)
+      expect(out.html).not.toContain('Почему вам')
+      expect(out.text).not.toContain('Почему вам')
+    })
+
+    it('omits the why-match block when nothing concrete matches', () => {
+      const out = renderDigestEmail([makeLead({ locationNames: ['Казань'], vacanciesCount: 0 })], {
+        ...ctx,
+        profileFilters: filters,
+      })
+      expect(out.html).not.toContain('Почему вам')
+    })
+  })
 })

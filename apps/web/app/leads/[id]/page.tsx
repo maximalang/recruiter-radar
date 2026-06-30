@@ -17,6 +17,8 @@ import {
   DetailLayout,
   GateBadgeInline,
   ScoreGauge,
+  ScoreBandChip,
+  SignalFreshnessChip,
   EvidenceTag,
   SourceChip,
   NotFoundState,
@@ -117,11 +119,13 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         <DetailLayout
           main={
             <>
-              {/* Why now card */}
-              <ContentCard variant="hero">
-                <ContentCardTitle>🎯 Почему сейчас</ContentCardTitle>
-                <p className={ipStyles.bodyText}>{lead.whyNow}</p>
-              </ContentCard>
+              {/* Why now card — only when there is an actual argument to show */}
+              {lead.whyNow && lead.whyNow.trim() && (
+                <ContentCard variant="hero">
+                  <ContentCardTitle>🎯 Почему сейчас</ContentCardTitle>
+                  <p className={ipStyles.bodyText}>{lead.whyNow}</p>
+                </ContentCard>
+              )}
 
               {/* Why this lead fits the agency — deterministic, evidence-backed */}
               {fit && !fit.isEmpty && (
@@ -162,11 +166,13 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 </ContentCard>
               )}
 
-              {/* Best angle card */}
-              <ContentCard>
-                <ContentCardTitle>🔭 Лучший угол контакта</ContentCardTitle>
-                <p className={ipStyles.bodyText}>{lead.bestAngle}</p>
-              </ContentCard>
+              {/* Best angle card — only when an angle was derived */}
+              {lead.bestAngle && lead.bestAngle.trim() && (
+                <ContentCard>
+                  <ContentCardTitle>🔭 Лучший угол контакта</ContentCardTitle>
+                  <p className={ipStyles.bodyText}>{lead.bestAngle}</p>
+                </ContentCard>
+              )}
 
               {/* Lawful contact path */}
               {formatLawfulContactPath(lead.lawfulContactPath) && (
@@ -213,11 +219,13 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 </ContentCard>
               )}
 
-              {/* Opener card */}
-              <ContentCard>
-                <ContentCardTitle>💬 Текст первого сообщения</ContentCardTitle>
-                <p className={ipStyles.openerText}>{lead.opener}</p>
-              </ContentCard>
+              {/* Opener card — only when a draft opener exists */}
+              {lead.opener && lead.opener.trim() && (
+                <ContentCard>
+                  <ContentCardTitle>💬 Текст первого сообщения</ContentCardTitle>
+                  <p className={ipStyles.openerText}>{lead.opener}</p>
+                </ContentCard>
+              )}
 
               {/* Outreach templates */}
               <ContentCard>
@@ -242,6 +250,10 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               {/* Score */}
               <ContentCard>
                 <ScoreGauge score={lead.score} />
+                <div className={ipStyles.scoreSidebarMeta}>
+                  <ScoreBandChip score={lead.score} />
+                  <SignalFreshnessChip latestPublishedAt={lead.latestPublishedAt} />
+                </div>
               </ContentCard>
 
               {/* Confidence gate */}

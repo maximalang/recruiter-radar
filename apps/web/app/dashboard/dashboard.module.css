@@ -1029,7 +1029,8 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 12px;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .todayRadarOrg {
@@ -1037,10 +1038,16 @@
   font-weight: 600;
   color: var(--c-text-primary);
   line-height: 1.3;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .todayRadarScore {
   /* ScoreBar wrapper */
+}
+
+.todayRadarFreshness {
+  display: flex;
 }
 
 .todayRadarLine {
