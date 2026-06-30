@@ -147,12 +147,15 @@ export function MetricGrid(props: { children: ReactNode }) {
 export function ContentCard(props: {
   children: ReactNode;
   tone?: "neutral" | "danger";
+  /** Visual weight: "hero" lifts the decision-driver cards; "muted" recedes advisory blocks. */
+  variant?: "default" | "hero" | "muted";
   className?: string;
 }) {
   return (
     <section
       className={`${s.contentCard}${props.className ? ` ${props.className}` : ""}`}
       data-tone={props.tone && props.tone !== "neutral" ? props.tone : undefined}
+      data-variant={props.variant && props.variant !== "default" ? props.variant : undefined}
     >
       {props.children}
     </section>

@@ -40,7 +40,7 @@ export default function AiEnrichmentBlock({ enrichment }: { enrichment: StoredAi
   if (!roles.length && !hasSummary && !hasDepartments && !hasLocations) return null;
 
   return (
-    <ContentCard className={s.aiCard}>
+    <ContentCard variant="muted" className={s.aiCard}>
       <ContentCardTitle>
         <span className={s.aiBadge} aria-hidden="true">✨ AI</span>
         AI-подсказка по найму

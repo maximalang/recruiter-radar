@@ -117,14 +117,14 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           main={
             <>
               {/* Why now card */}
-              <ContentCard>
+              <ContentCard variant="hero">
                 <ContentCardTitle>🎯 Почему сейчас</ContentCardTitle>
                 <p className={ipStyles.bodyText}>{lead.whyNow}</p>
               </ContentCard>
 
               {/* Why this lead fits the agency — deterministic, evidence-backed */}
               {fit && !fit.isEmpty && (
-                <ContentCard>
+                <ContentCard variant="hero">
                   <ContentCardTitle>🤝 Почему этот лид вам подходит</ContentCardTitle>
                   <ul className={ipStyles.fitList}>
                     {fit.lines.map((line, i) => (
