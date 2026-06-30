@@ -56,7 +56,7 @@ const registry = new Map();
 // `inDigest` below is derived as (primary ingestion) AND (promotionStatus 'digest-allowed'),
 // so a source that regresses out of digest-allowed auto-drops from the digest.
 const PRIMARY_INGESTION_SOURCES = Object.freeze(
-  new Set(['hh', 'superjob', 'habr-career', 'rabota-rossii'])
+  new Set(['hh', 'superjob', 'habr-career', 'rabota-rossii', 'career-pages'])
 );
 const sourceReadinessPolicy = Object.freeze({
   hh: sourcePolicy({
@@ -863,9 +863,10 @@ export function exportSourceCoverageDetails() {
         config.sources.includes(source.id)
       )?.[0] || 'none',
       // A source is in the digest iff it is in the primary ingestion set AND its
-      // promotionStatus is 'digest-allowed'. career-pages is digest-allowed but NOT
-      // primary, so it is excluded; if any primary source regresses out of
-      // 'digest-allowed' it auto-drops from the digest.
+      // promotionStatus is 'digest-allowed'. As of 2026-06-30 career-pages is both
+      // (primary + digest-allowed), so the direct company-surface evidence now
+      // reaches the digest; if any primary source regresses out of 'digest-allowed'
+      // it auto-drops from the digest.
       inDigest:
         PRIMARY_INGESTION_SOURCES.has(source.id) &&
         source.promotionStatus === 'digest-allowed',

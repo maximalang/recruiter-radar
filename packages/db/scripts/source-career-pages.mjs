@@ -139,7 +139,22 @@ export async function fetchCareerPagesInput({ persistSnapshot }) {
   const targetResults = [];
   const records = [];
 
+  // Wall-clock fetch budget. career-pages crawls targets sequentially and only
+  // writes to the DB once the whole loop finishes, so when it runs inside the
+  // daily-radar pipeline (a 120s execFile timeout per source) a mid-crawl kill
+  // would discard every record fetched so far. Stopping early on a budget lets
+  // the partial batch reach ingestion; remaining targets are picked up on the
+  // next run. Default leaves headroom under the 120s pipeline timeout for the
+  // ingest write. Set CAREER_PAGES_FETCH_BUDGET_MS=0 to disable (manual runs).
+  const fetchBudgetMs = resolveCareerPagesFetchBudgetMs();
+  const fetchStartedAt = Date.now();
+  let budgetExhausted = false;
+
   for (const [index, target] of targetsConfig.targets.entries()) {
+    if (fetchBudgetMs > 0 && index > 0 && Date.now() - fetchStartedAt >= fetchBudgetMs) {
+      budgetExhausted = true;
+      break;
+    }
     const targetResult = await fetchCareerPageTarget(target, index + 1);
     targetResults.push(targetResult.summary);
     records.push(...targetResult.records);
@@ -153,6 +168,8 @@ export async function fetchCareerPagesInput({ persistSnapshot }) {
     fetchOutputPath: null,
     targetResults,
     discoverySummary: targetsConfig.discoverySummary ?? null,
+    targetsTotal: targetsConfig.targets.length,
+    budgetExhausted,
     rejectAllSkipped: true,
   });
 
@@ -637,6 +654,23 @@ function resolveCareerPagesDiscoveryLimit() {
   return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : 50;
 }
 
+/**
+ * Wall-clock fetch budget (ms) for the sequential crawl loop. Default 90s
+ * leaves ~30s headroom under the daily-radar 120s execFile timeout for the
+ * ingest write. 0 disables the budget (manual / off-pipeline runs that want to
+ * crawl every discovered target regardless of time).
+ */
+function resolveCareerPagesFetchBudgetMs() {
+  const rawValue = process.env.CAREER_PAGES_FETCH_BUDGET_MS?.trim();
+
+  if (rawValue === undefined || rawValue === '') {
+    return 90_000;
+  }
+
+  const parsedValue = Number.parseInt(rawValue, 10);
+  return Number.isFinite(parsedValue) && parsedValue >= 0 ? parsedValue : 90_000;
+}
+
 export function resolveCareerPagesDiscoveredTargetsOutputPath() {
   const configuredPath = process.env.CAREER_PAGES_DISCOVERED_TARGETS_FILE?.trim();
   return resolve(process.cwd(), configuredPath || defaultDiscoveredTargetsOutputPath);
@@ -816,7 +850,7 @@ async function fetchJson(url, targetId) {
   }
 }
 
-export function buildNormalizedInput({ records, inputMode, inputFilePath, targetsFilePath, fetchOutputPath, targetResults, discoverySummary, rejectAllSkipped = false }) {
+export function buildNormalizedInput({ records, inputMode, inputFilePath, targetsFilePath, fetchOutputPath, targetResults, discoverySummary, targetsTotal = null, budgetExhausted = false, rejectAllSkipped = false }) {
   const fetchedAt = new Date().toISOString();
   const sensitiveFieldsDropped = records.reduce((total, record) => total + countSensitiveFields(record), 0);
   const sanitizedRecords = records.map((record) => dropSensitiveFields(record));
@@ -856,6 +890,8 @@ export function buildNormalizedInput({ records, inputMode, inputFilePath, target
     targetsFilePath,
     fetchOutputPath,
     targetsProcessed: targetResults.length,
+    targetsTotal: targetsTotal ?? targetResults.length,
+    budgetExhausted,
     targetResults,
     discoverySummary: discoverySummary ?? null,
     recordsReceived: records.length,

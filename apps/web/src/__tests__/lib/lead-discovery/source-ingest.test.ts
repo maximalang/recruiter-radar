@@ -1,4 +1,5 @@
 import { ingestSource, ingestAllPrimarySources, isNoActiveProfiles } from '@/lib/lead-discovery/source-ingest'
+import { getPrimarySourceIds } from '@/lib/sources/source-registry'
 
 // Mock the execFile accessor (production resolves execFile via
 // process.getBuiltinModule, which bypasses jest's require-cache mock —
@@ -209,15 +210,18 @@ describe('source-ingest', () => {
       const results = await ingestAllPrimarySources()
       if (isNoActiveProfiles(results)) throw new Error('unexpected no_active_profiles')
 
-      expect(results).toHaveLength(4)
+      // Length derives from the registry so adding/removing a primary source
+      // updates here automatically rather than silently drifting.
+      expect(results).toHaveLength(getPrimarySourceIds().length)
       const sources = results.map(r => r.source)
       expect(sources).toContain('hh')
       expect(sources).toContain('superjob')
       expect(sources).toContain('habr-career')
       expect(sources).toContain('rabota-rossii')
       expect(results.every(r => r.success)).toBe(true)
-      expect(results[0].fetchedCount).toBe(20)
-      expect(results[0].upsertedCount).toBe(18)
+      const hhResult = results.find(r => r.source === 'hh')
+      expect(hhResult?.fetchedCount).toBe(20)
+      expect(hhResult?.upsertedCount).toBe(18)
     })
 
     it('returns no_active_profiles when DB has zero active profiles', async () => {
@@ -259,10 +263,12 @@ describe('source-ingest', () => {
       const results = await ingestAllPrimarySources()
       if (isNoActiveProfiles(results)) throw new Error('unexpected no_active_profiles')
 
-      expect(results).toHaveLength(4)
+      const primaryCount = getPrimarySourceIds().length
+      expect(results).toHaveLength(primaryCount)
       const failed = results.find(r => r.source === 'hh')
       expect(failed?.success).toBe(false)
-      expect(results.filter(r => r.success).length).toBe(3)
+      // Only hh is mocked to fail; every other primary source succeeds.
+      expect(results.filter(r => r.success).length).toBe(primaryCount - 1)
     })
   })
 })

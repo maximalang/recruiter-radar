@@ -90,9 +90,18 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     description: 'Company career page crawl and enrichment',
     script: 'source-career-pages.mjs',
     requiredEnvVars: [],
-    envPrefixes: ['CRAWLER_', 'FIRECRAWL_'],
+    envPrefixes: ['CRAWLER_', 'FIRECRAWL_', 'CAREER_PAGES_'],
     searchEnvVars: [],
-    isPrimary: false,
+    // Promoted to primary on 2026-06-30: career-pages is the only DIRECT
+    // company-surface, high-signal source (Gate A/B evidence). It was previously
+    // excluded from the daily-radar pipeline, so the highest-quality lead surface
+    // never ran automatically. The sequential crawl now self-limits via a
+    // wall-clock fetch budget (CAREER_PAGES_FETCH_BUDGET_MS, default 90s) so it
+    // stays within the 120s per-source ingest timeout and partial batches still
+    // reach ingestion. Auto-discovery seeds from existing orgs+signals (needs a
+    // domain), so it adds nothing until other sources have populated orgs — a
+    // no-op, not a failure, on an empty DB.
+    isPrimary: true,
     category: 'career-page',
   },
   {
