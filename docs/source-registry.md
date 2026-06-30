@@ -6,8 +6,36 @@
 > update this doc to match, never the reverse. Per-source legal/robots reviews live in
 > `docs/source-review/`; cross-cutting policy in `docs/source-priority-policy.md`.
 
-Last reconciled: **2026-06-23** against `source-registry.mjs`, `source-digest-evidence.sql`,
+Last reconciled: **2026-06-30** against `source-registry.mjs`, `source-digest-evidence.sql`,
 and `docs/source-review/`.
+
+---
+
+## Live status snapshot (2026-06-30, endpoint-probed)
+
+**Digest-delivering RF sources: 5** — `hh`, `career-pages`, `rabota-rossii`, `superjob`,
+`habr-career`. Of these, **4 verify healthy from this environment**; `hh` is policy-allowed but
+operationally geo-blocked in production.
+
+| source | live probe | status | note |
+|---|---|---|---|
+| rabota-rossii | HTTP 200 | ✅ live, digest | trudvsem open-data; now multi-region + paged |
+| career-pages | HTTP 200 | ✅ live, digest | direct surface; daily-radar primary since today |
+| habr-career | HTTP 200 | ✅ live, digest | public listings scrape, robots-compliant |
+| superjob | HTTP 301 | ✅ live w/ app-id, digest | needs `SUPERJOB_API_APP_ID`; healthy with key |
+| hh | HTTP 403 (search) | ⚠️ blocked (geo/IP), digest-allowed | dict endpoints 200; needs RU-resident runner |
+| egrul-fns / transparent-business / fedresurs | n/a | enrichment/context only | never originate leads |
+| tech-job-boards / linkedin / regional / company-site / funding / newsrooms / industry-media | n/a | blocked / context / enrichment | not in effective digest set |
+
+**Still blocked, documented in `docs/source-review/`:** avito (robots disallow `/api/`+catalog),
+rabota.ru (BI.ZONE WAF), zarplata.ru (= HH backend, same 403), Telegram channels (rejected by
+policy — social/personal scraping is out of product scope; see Rejected table + `telegram-channels-review.md`).
+
+**Coverage improvement this cycle:** rabota-rossii went from one ~25–50-record federal page to
+region-iterated paged fetch (each of ~85 RF region codes exposes an independent offset window),
+and career-pages — the only direct high-signal surface — now runs on every daily-radar cycle
+instead of never. Net: the highest-trust source is live daily, and the broadest official RF feed
+multiplies its per-run company coverage.
 
 ---
 
@@ -59,14 +87,18 @@ A source reaching the digest is gated in **two** independent places. Both must a
    it lets blocked sources accumulate evidence and dedupe-overlap data while the confidence
    gate decides whether they graduate.
 
-> **Known doc-vs-code nuance:** `exportSourceCoverageDetails()` in the registry hardcodes
-> `inDigest: ['hh', 'career-pages']`. That flag reflects *sources that are both whitelisted
-> and `digest-allowed` today* — it is the effective delivery set, not the SQL whitelist.
-> The other six whitelisted sources are present in SQL but `blocked-from-digest`. If you add a
-> source to `digest-allowed`, update that array too.
+> **Known doc-vs-code nuance:** `exportSourceCoverageDetails()` in the registry derives
+> `inDigest` as `(source in PRIMARY_INGESTION_SOURCES) AND (promotionStatus === 'digest-allowed')`.
+> As of 2026-06-30 that set is `hh`, `career-pages`, `rabota-rossii`, `superjob`, `habr-career`
+> — the effective delivery set. The other whitelisted sources (`tech-job-boards`,
+> `linkedin-company-pages`, `regional-job-boards`) are present in SQL but
+> `blocked-from-digest-pending-confidence-tests`. Promote a source to digest by adding it to
+> `PRIMARY_INGESTION_SOURCES` *and* setting `promotionStatus: 'digest-allowed'`.
 
-**Effective digest-delivering sources today: `hh`, `career-pages`.** Everything else is either
-blocked-from-digest, supporting-evidence-only, or never-lead-originating.
+**Effective digest-delivering sources today: `hh`, `career-pages`, `rabota-rossii`, `superjob`,
+`habr-career`.** Everything else is either blocked-from-digest, supporting-evidence-only, or
+never-lead-originating. ⚠️ `hh` is digest-allowed in policy but **operationally geo-403 blocked**
+in production (see P1 note) — it ingests/delivers only from an RU-resident runner.
 
 ---
 
@@ -75,8 +107,8 @@ blocked-from-digest, supporting-evidence-only, or never-lead-originating.
 | id | class / evidence tier | leadEligibility | promotionStatus | live? |
 |---|---|---|---|---|
 | **hh** | primary-platform / medium-signal (0.74) | digest-lead-originating | **digest-allowed** | live-public — see operational blocker ⚠️ |
-| **career-pages** | company-surface / high-signal (0.92) | digest-lead-originating | **digest-allowed** | live-public ✅ |
-| **rabota-rossii** | primary-platform / medium-signal (0.70) | confidence-gated-evidence | blocked-from-digest | live-public, signal-pool only |
+| **career-pages** | company-surface / high-signal (0.92) | digest-lead-originating | **digest-allowed** | live-public ✅ — **primary since 2026-06-30** |
+| **rabota-rossii** | primary-platform / medium-signal (0.70) | confidence-gated-evidence | **digest-allowed** | live-public ✅ |
 | **egrul-fns** | registry-reference / high-signal (0.90) | enrichment-only | never-lead-originating | live + provider |
 | **transparent-business-fns** | registry-reference / high-signal (0.86) | enrichment-only | never-lead-originating | provider/snapshot only |
 | **fedresurs** | market-signal / context-only (0.62) | context-only | never-lead-originating | provider/snapshot only |
@@ -93,18 +125,28 @@ blocked-from-digest, supporting-evidence-only, or never-lead-originating.
 
 **career-pages** — the highest-trust source (direct company hiring surface, default confidence
 0.92, the only source SQL classifies as `direct_hiring_proof` unconditionally). Guarded against
-the "N records but 0 normalized" silent-zero-leads bug (commit `d43b9a7`).
+the "N records but 0 normalized" silent-zero-leads bug (commit `d43b9a7`). **Promoted to primary
+(daily-radar) on 2026-06-30**: it now ingests on every daily run, self-limited by a wall-clock
+fetch budget (`CAREER_PAGES_FETCH_BUDGET_MS`, default 90s) so a long sequential crawl stays under
+the 120s per-source ingest timeout and partial batches still reach ingestion; remaining
+discovered targets are picked up next run. Auto-discovery seeds from existing orgs+signals that
+carry a domain, so on a cold DB it is a no-op until other sources populate orgs.
 
-**rabota-rossii** — official trudvsem open-data. Registered as a non-digest signal-pool source
-(commit `2d22d3b`). In the SQL whitelist, but held by `promotionStatus`.
-- Blocker: RF query matrix + salary/region/freshness assertions + HH dedupe must pass.
-- **Freshness gate currently fails:** ≈28% within active-30d vs the 60% threshold (as of
-  2026-06-21) — the live feed skews stale. Re-check with
-  `npm run verify:rabota-rossii:confidence` (needs `RABOTA_ROSSII_LIVE=1`; optional
-  `DATABASE_URL` adds HH-overlap dedupe). Do **not** relax the 60% threshold to make it green;
-  filter the fetch to recent postings instead.
-- For `rabota-rossii`, an INN-based `org_external_id` *is* org-level → SQL grants it
-  `direct_hiring_proof` if it ever clears the freshness gate.
+**rabota-rossii** — official trudvsem open-data. In the SQL whitelist and **`digest-allowed` as
+of 2026-06-30** (freshness gate cleared via `date_modify`-based freshness; see
+`source-review/trudvsem-review.md` and memory `project_rabota_rossii_live`).
+- Coverage: trudvsem caps the **global** (region-less) result window at `offset < 50` regardless
+  of `meta.total`, so a single federal query surfaced only ~25–50 of thousands of matches. The
+  adapter now pages offset windows (`RABOTA_ROSSII_PAGES`) **and** iterates region codes
+  (`RABOTA_ROSSII_REGION_CODES`) — each region exposes its own independent window, which is the
+  real coverage lever. Single-region signature preserved for the confidence verifier.
+- Re-check freshness/contract with `npm run verify:rabota-rossii:confidence`
+  (needs `RABOTA_ROSSII_LIVE=1`; optional `DATABASE_URL` adds HH-overlap dedupe). Live verifier
+  **PASSES** as of 2026-06-30. Do **not** relax the 60% freshness threshold; filter the fetch to
+  recent postings instead.
+- For `rabota-rossii`, an INN-based `org_external_id` *is* org-level → but INN-match is now
+  classified as `platform_aggregation` (gate C), not `direct_hiring_proof` — only career-pages is
+  a direct surface (see memory `project_trudvsem_platform_aggregation`).
 
 **egrul-fns / transparent-business-fns / fedresurs** — registry/context enrichment. Never
 originate leads. `egrul-fns`: 10-digit legal-entity INN only; skip 12-digit IP/person records.
@@ -117,25 +159,28 @@ originate leads. `egrul-fns`: 10-digit legal-entity INN only; skip 12-digit IP/p
 
 | id | class / evidence tier | leadEligibility | promotionStatus | live? |
 |---|---|---|---|---|
-| **superjob** | primary-platform / medium-signal (0.66) | confidence-gated-evidence | blocked-from-digest | provider-token |
-| **habr-career** | primary-platform / medium-signal (0.69) | confidence-gated-evidence | blocked-from-digest | live + provider, pending review |
+| **superjob** | primary-platform / medium-signal (0.66) | confidence-gated-evidence | **digest-allowed** | live API (needs app-id) / provider |
+| **habr-career** | primary-platform / medium-signal (0.69) | confidence-gated-evidence | **digest-allowed** | live-public ✅ + provider |
 | **tech-job-boards** | primary-platform / medium-signal (0.68) | confidence-gated-evidence | blocked-from-digest | live + provider |
 | **linkedin-company-pages** | primary-platform / medium-signal (0.72) | confidence-gated-evidence | blocked-from-digest | provider-token only |
 | **company-site** | company-surface / medium-signal (0.68) | enrichment-only | supporting-evidence-only | live-public |
 | **funding-business-signals** | market-signal / context-only (0.58) | context-only | never-lead-originating | live + provider |
 
-**superjob** — needs `SUPERJOB_API_APP_ID` or compliant provider snapshot; anonymous API is not
-a production path.
-- ⚠️ **Operational note:** the Railway `SUPERJOB_API_APP_ID` was corrupt — leading quote +
-  truncated secret, surfacing as a 403 that *looks* like geo/code blocking. Re-paste the full
-  key without quotes. See memory `project_superjob_key_corrupt`.
+**superjob** — needs `SUPERJOB_API_APP_ID` (live API) or compliant provider snapshot; anonymous
+API is not a production path. **`digest-allowed` + primary** (daily-radar). Pagination is built
+in (5 pages × 100 = 500-result cap, the API's own ceiling). Live probe returns 301→needs app-id;
+healthy with a valid key (see memory `project_superjob_key_corrupt`, resolved 2026-06-24).
 
-**habr-career** — live HTML path pending robots/legal review of `career.habr.com`; stays out of
-digest until that signs off *and* confidence tests pass. Keyword breadth was a contributor to
-the leads=0 pipeline gap (see memory `project_leads_pipeline_gaps`).
+**habr-career** — live HTML scraping path, **`digest-allowed` + primary** (daily-radar). robots
+review compliant (`source-review/habr-career-review.md`): only public `/vacancies` listings, no
+candidate/PII surfaces. Single-source platform aggregation → gated at C until corroborated.
+Keyword breadth is derived from active profiles' roles at ingest time
+(`deriveHabrKeywordsFromProfiles`); was a contributor to the leads=0 pipeline gap (see memory
+`project_leads_pipeline_gaps`). Live probe 200 as of 2026-06-30.
 
-**tech-job-boards** — API-mega-list providers must pass fixture shape, sensitive-field
-rejection, freshness, region, salary, and org-identity gates before digest use.
+**tech-job-boards** — API-mega-list providers + greenhouse/lever ATS adapters. Must pass fixture
+shape, sensitive-field rejection, freshness, region, salary, and org-identity gates before digest
+use. No RF greenhouse/lever tokens configured, so contributes nothing in production today.
 
 **linkedin-company-pages** — **compliant provider snapshots only.** Discard employee, profile,
 email, and phone fields. No direct scraping.
@@ -175,7 +220,7 @@ Reviewed and deliberately **not** integrated. Re-opening any of these requires a
 | **rabota.ru** | rejected | See `source-review/rabota-ru-review.md`. |
 | **trudvsem (direct)** | superseded | Covered via `rabota-rossii` open-data; direct review in `source-review/trudvsem-review.md`. |
 | **zarplata.ru** | rejected | See `source-review/zarplata-ru-review.md`. |
-| **Telegram / WhatsApp / social scrapers** | rejected by policy | `source-priority-policy.md` §"Rejected by default" — social/personal scraping is out of scope and conflicts with the product's evidence/privacy stance. Overrides any ad-hoc request to add Telegram-channel scraping. |
+| **Telegram / WhatsApp / social scrapers** | rejected by policy | See `source-review/telegram-channels-review.md` (re-evaluated 2026-06-30) + `source-priority-policy.md` §"Rejected by default" — social/personal scraping is out of scope, has no compliant evidence-grade path, and conflicts with the product's evidence/privacy stance. Overrides any ad-hoc request to add Telegram-channel scraping. |
 | **VC.ru / Tenchat** | rejected by policy | Social networks → fall under the same personal/social-scraping prohibition. |
 
 > All decisions above are commit-backed: `78b4160` (avito, rabota-ru, trudvsem, zarplata-ru
