@@ -3,6 +3,13 @@ import Link from "next/link";
 
 import s from "./internal-page.module.css";
 import { repairPossiblyMojibakeText } from "../../lib/copy/repair";
+import {
+  scorePercent,
+  scoreTone as scoreToneFromRaw,
+  scoreLevelLabel,
+  formatSignalStrength,
+  type ScoreTone as DisplayScoreTone,
+} from "../../lib/scoring/score-display";
 
 function repairVisibleNode(value: ReactNode): ReactNode {
   return typeof value === "string" ? repairPossiblyMojibakeText(value) : value;
@@ -231,36 +238,33 @@ export function FeedbackBadge(props: { status: string | null }) {
 
 /* ── Score tone helper ── */
 
-export type ScoreTone = "success" | "warning" | "danger";
+export type ScoreTone = DisplayScoreTone;
 
-export function getScoreTone(score: number, thresholds = { high: 30, mid: 15 }): ScoreTone {
-  if (score >= thresholds.high) return "success";
-  if (score >= thresholds.mid) return "warning";
-  return "danger";
+/**
+ * Tone for a raw `total_score`. Delegates to the shared score-display module so
+ * the [0,4] signal-strength scale is computed in exactly one place. Kept as a
+ * re-export under this name because several pages import `getScoreTone` directly.
+ */
+export function getScoreTone(score: number): ScoreTone {
+  return scoreToneFromRaw(score);
 }
 
 /* ── Score gauge (large, for detail page) ── */
 
-const SCORE_LEVEL_LABELS: Record<ScoreTone, string> = {
-  success: "Высокий",
-  warning: "Средний",
-  danger: "Низкий",
-};
-
-export function ScoreGauge(props: { score: number; max?: number }) {
-  const max = props.max ?? 50;
-  const pct = Math.min(Math.round((props.score / max) * 100), 100);
-  const tone = getScoreTone(props.score);
+export function ScoreGauge(props: { score: number }) {
+  const pct = scorePercent(props.score);
+  const tone = scoreToneFromRaw(props.score);
+  const strength = formatSignalStrength(props.score);
 
   return (
-    <div className={s.scoreGauge} role="meter" aria-valuenow={props.score} aria-valuemin={0} aria-valuemax={max} aria-label={`Скоринг: ${props.score} из ${max}`}>
+    <div className={s.scoreGauge} role="meter" aria-valuenow={Number(strength)} aria-valuemin={0} aria-valuemax={4} aria-label={`Сила сигнала: ${strength} из 4`}>
       <div className={s.scoreGaugeCircle} data-tone={tone}>
-        {props.score}
+        {strength}
       </div>
       <div className={s.scoreGaugeInfo}>
-        <div className={s.scoreGaugeLabel}>Скоринг</div>
-        <div className={s.scoreGaugeLevel} data-tone={tone} style={{ color: tone === "success" ? "#10b981" : tone === "warning" ? "#f59e0b" : "#ef4444" }}>
-          {SCORE_LEVEL_LABELS[tone]}
+        <div className={s.scoreGaugeLabel}>Сила сигнала</div>
+        <div className={s.scoreGaugeLevel} data-tone={tone}>
+          {scoreLevelLabel(props.score)}
         </div>
         <div className={s.scoreGaugeBar}>
           <div
@@ -276,17 +280,17 @@ export function ScoreGauge(props: { score: number; max?: number }) {
 
 /* ── Score bar (compact, for table rows) ── */
 
-export function ScoreBar(props: { score: number; max?: number }) {
-  const max = props.max ?? 50;
-  const pct = Math.min(Math.round((props.score / max) * 100), 100);
-  const tone = getScoreTone(props.score);
+export function ScoreBar(props: { score: number }) {
+  const pct = scorePercent(props.score);
+  const tone = scoreToneFromRaw(props.score);
+  const strength = formatSignalStrength(props.score);
 
   return (
-    <div className={s.scoreBar}>
+    <div className={s.scoreBar} title={`Сила сигнала: ${strength} из 4`}>
       <div className={s.scoreBarTrack}>
         <div className={s.scoreBarFill} data-tone={tone} style={{ width: `${pct}%` }} />
       </div>
-      <span className={s.scoreBarValue}>{props.score}</span>
+      <span className={s.scoreBarValue}>{strength}</span>
     </div>
   );
 }

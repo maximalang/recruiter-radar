@@ -4,6 +4,7 @@ import { isDigestEligibleGate } from "./scoring/gate-pipeline";
 import { getClientProfileById, INDUSTRY_KEYWORDS, type ClientProfile } from "./clientProfiles";
 import { ROLE_HABR_KEYWORDS } from "./lead-discovery/habr-keywords";
 import { DIGEST_EVIDENCE_QUERY } from "./digest-evidence-query";
+import { toSignalStrength } from "./scoring/score-display";
 import type {
   DigestItem,
   DigestRun,
@@ -559,9 +560,15 @@ export function matchesClientProfile(item: DigestItemInput, clientProfile: Clien
   // set it; an unset (null) threshold is a no-op, so existing profiles keep
   // surfacing every candidate (no leads=0 regression).
 
-  // Hiring-intent floor: drop candidates whose FIUR total is below the agency's
-  // minimum. total_score ∈ [0, 4]; threshold validated into the same range.
-  if (clientProfile.hiringIntentMin != null && item.total_score < clientProfile.hiringIntentMin) {
+  // Hiring-intent floor: drop candidates whose signal strength is below the
+  // agency's minimum. `hiringIntentMin` is on the [0,4] signal-strength scale
+  // (validated into that range), but `item.total_score` is the raw evidence
+  // score (~200–390). Convert before comparing — comparing the raw score
+  // against a [0,4] threshold made this filter silently never fire.
+  if (
+    clientProfile.hiringIntentMin != null &&
+    toSignalStrength(item.total_score) < clientProfile.hiringIntentMin
+  ) {
     return false;
   }
 

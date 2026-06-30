@@ -88,14 +88,14 @@ describe('leadsToCsv', () => {
     expect(csv).toContain('career-pages; habr');
   });
 
-  it('formats integer scores with one decimal place', () => {
-    const csv = leadsToCsv([makeLead({ score: 3 })]);
+  it('converts the raw score to one-decimal signal strength', () => {
+    const csv = leadsToCsv([makeLead({ score: 300 })]);
     const dataRow = csv.slice(BOM.length).split('\r\n')[1];
     expect(dataRow.split(',')[1]).toBe('3.0');
   });
 
-  it('formats fractional scores to one decimal place', () => {
-    const csv = leadsToCsv([makeLead({ score: 2.75 })]);
+  it('rounds the converted signal strength to one decimal place', () => {
+    const csv = leadsToCsv([makeLead({ score: 275 })]);
     const dataRow = csv.slice(BOM.length).split('\r\n')[1];
     expect(dataRow.split(',')[1]).toBe('2.8');
   });

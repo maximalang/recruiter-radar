@@ -28,7 +28,7 @@ function mockItem(overrides: Partial<DigestItemInput> = {}): DigestItemInput {
     vacancies_count: 2,
     distinct_vacancy_names_count: 1,
     latest_published_at: new Date().toISOString(),
-    total_score: 3.2,
+    total_score: 320,
     reasons: ['Есть активная вакансия', 'Опубликовано в пределах месяца'],
     opener: 'Здравствуйте! По Тестовая компания видно...',
     confidence_gate: 'A',
@@ -156,18 +156,21 @@ describe('getClientScopeScore — roles boost', () => {
 })
 
 describe('matchesClientProfile — hiringIntentMin gate', () => {
-  it('keeps a candidate at or above the FIUR threshold', () => {
-    const item = mockItem({ total_score: 3.2 })
+  // total_score is the raw evidence score (~200–390). hiringIntentMin is on the
+  // [0,4] signal-strength scale, so the gate divides total_score by 100 before
+  // comparing: raw 320 → strength 3.2, raw 210 → strength 2.1.
+  it('keeps a candidate at or above the signal-strength threshold', () => {
+    const item = mockItem({ total_score: 320 })
     expect(matchesClientProfile(item, mockProfile({ hiringIntentMin: 3.0 }))).toBe(true)
   })
 
-  it('drops a candidate below the FIUR threshold', () => {
-    const item = mockItem({ total_score: 2.1 })
+  it('drops a candidate below the signal-strength threshold', () => {
+    const item = mockItem({ total_score: 210 })
     expect(matchesClientProfile(item, mockProfile({ hiringIntentMin: 3.0 }))).toBe(false)
   })
 
   it('is a no-op when unset (null)', () => {
-    const item = mockItem({ total_score: 0.5 })
+    const item = mockItem({ total_score: 50 })
     expect(matchesClientProfile(item, mockProfile({ hiringIntentMin: null }))).toBe(true)
   })
 })

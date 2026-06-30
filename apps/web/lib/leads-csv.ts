@@ -12,6 +12,7 @@
  */
 
 import type { LeadItem } from "./leads-data";
+import { formatSignalStrength } from "./scoring/score-display";
 
 const BOM = "﻿";
 
@@ -22,7 +23,7 @@ type CsvColumn = {
 
 const COLUMNS: readonly CsvColumn[] = [
   { header: "Компания", value: (l) => l.orgName },
-  { header: "Скор", value: (l) => formatScore(l.score) },
+  { header: "Сила сигнала (0–4)", value: (l) => formatScore(l.score) },
   { header: "Уверенность", value: (l) => l.confidenceGate },
   { header: "Почему сейчас", value: (l) => l.whyNow },
   { header: "Лучший угол", value: (l) => l.bestAngle },
@@ -35,9 +36,13 @@ const COLUMNS: readonly CsvColumn[] = [
   { header: "Последний сигнал", value: (l) => l.latestPublishedAt ?? "" },
 ];
 
+/**
+ * Render the lead score for CSV. `score` is the raw persisted total_score
+ * (~200–390); the shared score-display module converts it to the [0,4]
+ * signal-strength scale so the export matches what the UI and cards show.
+ */
 function formatScore(score: number): string {
-  if (!Number.isFinite(score)) return "";
-  return Number.isInteger(score) ? `${score}.0` : score.toFixed(1);
+  return formatSignalStrength(score);
 }
 
 /** Quote a single CSV field per RFC 4180 when it contains a special character. */

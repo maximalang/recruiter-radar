@@ -1,4 +1,5 @@
 import type { LeadStatus } from "./db";
+import { scoreBand, formatSignalStrength } from "./scoring/score-display";
 
 export type TelegramConfig = {
   botToken: string;
@@ -105,21 +106,24 @@ function getGatePresentation(gate: string | undefined): GatePresentation {
   }
 }
 
+/**
+ * Render the score for a card line. `score` is the raw persisted total_score
+ * (~200–390); the shared score-display module converts it to the [0,4]
+ * signal-strength scale before formatting, so "247" reads as "2.5", never "247.0".
+ */
 function formatScore(score: number | null): string {
-  if (score == null) return "—";
-  return Number.isInteger(score) ? `${score}.0` : score.toFixed(1);
+  return formatSignalStrength(score);
 }
 
 /**
- * FIUR score band for the card header — a one-glance temperature read. The FIUR
- * total is ∈ [0, 4]: ≥3 is a hot lead, ≥2 warm, below that cold. Mirrors the
- * "companies worth contacting today" framing without inventing precision.
+ * Score band for the card header — a one-glance temperature read. Delegates to
+ * the shared score-display module, which converts the raw total_score (~200–390)
+ * to the [0,4] signal-strength scale: ≥3 hot, ≥2 warm, below cold. Keeping the
+ * mapping in one place is what stopped every card reading "🔥 Горячий · 247.0".
  */
 function getScoreBand(score: number | null): { label: string; icon: string } {
-  if (score == null) return { label: "Холодный", icon: "🔵" };
-  if (score >= 3) return { label: "Горячий", icon: "🔥" };
-  if (score >= 2) return { label: "Тёплый", icon: "🟠" };
-  return { label: "Холодный", icon: "🔵" };
+  const band = scoreBand(score);
+  return { label: band.label, icon: band.icon };
 }
 
 /**

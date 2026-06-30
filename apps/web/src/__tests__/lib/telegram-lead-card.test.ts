@@ -18,7 +18,9 @@ function baseRichLead(overrides: Partial<TelegramLeadMessage> = {}): TelegramLea
   return {
     orgName: 'Ромашка',
     status: 'new',
-    score: 3.2,
+    // Raw persisted total_score (~200–390). The card converts to the [0,4]
+    // signal-strength scale for display, so 320 renders as "3.2".
+    score: 320,
     lastSignalAt: '2026-06-20T10:00:00.000Z',
     userName: 'Агентство',
     confidence_gate: 'A',
@@ -93,14 +95,14 @@ describe('formatTelegramLeadMessage — compact fallback', () => {
     const text = formatTelegramLeadMessage({
       orgName: 'Пустышка',
       status: 'new',
-      score: 2,
+      score: 200,
       lastSignalAt: '2026-06-20T10:00:00.000Z',
       userName: 'Агентство',
       confidence_gate: 'B',
     });
 
     expect(text).toContain('<b>Пустышка</b>');
-    // Score 2 → "2.0"
+    // Raw 200 → signal strength "2.0"
     expect(text).toContain('2.0');
     // No rich sections
     expect(text).not.toContain('Почему сейчас');
@@ -125,17 +127,17 @@ describe('formatTelegramLeadMessage — compact fallback', () => {
 
 describe('formatTelegramLeadMessage — score band + why-match + AI hint', () => {
   it('labels a score >= 3 as hot', () => {
-    const text = formatTelegramLeadMessage(baseRichLead({ score: 3.5 }));
+    const text = formatTelegramLeadMessage(baseRichLead({ score: 350 }));
     expect(text).toContain('Горячий');
   });
 
   it('labels a score in [2,3) as warm', () => {
-    const text = formatTelegramLeadMessage(baseRichLead({ score: 2.4 }));
+    const text = formatTelegramLeadMessage(baseRichLead({ score: 240 }));
     expect(text).toContain('Тёплый');
   });
 
   it('labels a score below 2 as cold', () => {
-    const text = formatTelegramLeadMessage(baseRichLead({ score: 1.2 }));
+    const text = formatTelegramLeadMessage(baseRichLead({ score: 120 }));
     expect(text).toContain('Холодный');
   });
 

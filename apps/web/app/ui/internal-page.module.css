@@ -373,6 +373,18 @@
   font-size: 0.85rem;
 }
 
+.scoreGaugeLevel[data-tone="success"] {
+  color: #10b981;
+}
+
+.scoreGaugeLevel[data-tone="warning"] {
+  color: #f59e0b;
+}
+
+.scoreGaugeLevel[data-tone="danger"] {
+  color: #ef4444;
+}
+
 .scoreGaugeBar {
   margin-top: 4px;
   width: 120px;

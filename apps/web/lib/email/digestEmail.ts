@@ -9,6 +9,7 @@
  */
 
 import type { LeadItem } from "../leads-data";
+import { scoreBand, formatSignalStrength } from "../scoring/score-display";
 
 export type DigestEmailContext = {
   /** Display name of the client profile this digest is for. */
@@ -57,9 +58,14 @@ function escapeHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
+/**
+ * Render the lead score for an email line. `score` is the raw persisted
+ * total_score (~200–390); the shared score-display module converts it to the
+ * [0,4] signal-strength scale, so the email and Telegram cards show the same
+ * value and neither prints the raw "247.0".
+ */
 function formatScore(score: number | null): string {
-  if (score == null) return "—";
-  return Number.isInteger(score) ? `${score}.0` : score.toFixed(1);
+  return formatSignalStrength(score);
 }
 
 /** A/B sort before C; within a gate, higher score first. Stable on equal keys. */
@@ -101,6 +107,7 @@ function leadSurfaceUrl(lead: LeadItem, appBaseUrl: string): string {
 
 function renderLeadHtml(lead: LeadItem, appBaseUrl: string): string {
   const gate = getGatePresentation(lead.confidenceGate);
+  const band = scoreBand(lead.score);
   const gateLetter = lead.confidenceGate ? ` · ${escapeHtml(lead.confidenceGate)}` : "";
   const url = leadSurfaceUrl(lead, appBaseUrl);
 
@@ -114,7 +121,7 @@ function renderLeadHtml(lead: LeadItem, appBaseUrl: string): string {
   );
   blocks.push(
     `<tr><td style="padding:0 0 10px 0;color:${COLORS.muted};font-size:13px;">` +
-      `${gate.icon} ${escapeHtml(gate.readiness)} · ${escapeHtml(formatScore(lead.score))}${gateLetter}` +
+      `${band.icon} ${escapeHtml(band.label)} · ${gate.icon} ${escapeHtml(gate.readiness)} · ${escapeHtml(formatScore(lead.score))}${gateLetter}` +
       `</td></tr>`,
   );
 
@@ -203,11 +210,12 @@ function renderHtml(leads: LeadItem[], ctx: DigestEmailContext): string {
 
 function renderLeadText(lead: LeadItem, appBaseUrl: string): string {
   const gate = getGatePresentation(lead.confidenceGate);
+  const band = scoreBand(lead.score);
   const gateLetter = lead.confidenceGate ? ` · ${lead.confidenceGate}` : "";
   const lines: string[] = [];
 
   lines.push(`🏢 ${lead.orgName}`);
-  lines.push(`${gate.icon} ${gate.readiness} · ${formatScore(lead.score)}${gateLetter}`);
+  lines.push(`${band.icon} ${band.label} · ${gate.icon} ${gate.readiness} · ${formatScore(lead.score)}${gateLetter}`);
 
   if (lead.whyNow && lead.whyNow.trim()) {
     lines.push(`Почему сейчас: ${lead.whyNow.trim()}`);
