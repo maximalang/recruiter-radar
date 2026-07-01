@@ -10,7 +10,10 @@ import {
   VALID_ROLES,
   normalizeContactPolicy,
 } from "../../../lib/clientProfiles";
-import { saveDeliveryPreferencesByOwnerId } from "../../../lib/deliveryPreferences";
+import {
+  saveDeliveryPreferencesByOwnerId,
+  normalizeDeliveryFrequency,
+} from "../../../lib/deliveryPreferences";
 import { readOwnerSession } from "../../../lib/session";
 
 function readRequiredText(formData: FormData, key: string): string {
@@ -126,11 +129,20 @@ export async function saveDeliveryPreferencesAction(
     return { ok: false, error: "Требуется вход в аккаунт." };
   }
 
+  const deliveryFrequency = normalizeDeliveryFrequency(formData.get("deliveryFrequency"));
+  if (!deliveryFrequency) {
+    return { ok: false, error: "Выберите частоту доставки." };
+  }
+
   const result = await saveDeliveryPreferencesByOwnerId({
     ownerId,
     webPushEnabled: formData.get("webPushEnabled") === "on",
     emailDigestEnabled: formData.get("emailDigestEnabled") === "on",
     digestEmail: readOptionalText(formData, "digestEmail"),
+    deliveryEnabled: formData.get("deliveryEnabled") === "on",
+    deliveryTimeLocal: readOptionalText(formData, "deliveryTimeLocal"),
+    deliveryTimezone: formData.get("deliveryTimezone")?.toString().trim() || "Europe/Moscow",
+    deliveryFrequency,
   });
 
   if (!result.ok) {
@@ -139,9 +151,15 @@ export async function saveDeliveryPreferencesAction(
         ? "Укажите корректный email."
         : result.reason === "email_required"
           ? "Чтобы включить email-дайджест, укажите адрес."
-          : result.reason === "not_found"
-            ? "Профиль не найден. Сначала активируйте пилот."
-            : "Не удалось сохранить настройки доставки.";
+          : result.reason === "invalid_time"
+            ? "Время доставки должно быть в формате ЧЧ:ММ."
+            : result.reason === "invalid_timezone"
+              ? "Укажите корректный часовой пояс."
+              : result.reason === "invalid_frequency"
+                ? "Выберите частоту доставки."
+                : result.reason === "not_found"
+                  ? "Профиль не найден. Сначала активируйте пилот."
+                  : "Не удалось сохранить настройки доставки.";
     return { ok: false, error: message };
   }
 

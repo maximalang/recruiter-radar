@@ -31,7 +31,11 @@ export default async function SettingsProfilePage() {
 
   // Completion + live match-count: both best-effort. The match count is the same
   // gate path the digest uses, so the number reflects exactly what the filters do.
-  const completion = profile ? computeProfileCompletion(profile) : null;
+  // Delivery preferences are passed in so the "configured delivery" milestone is
+  // counted toward completion — but only when the prefs were actually loaded.
+  const completion = profile
+    ? computeProfileCompletion(profile, deliveryPreferences)
+    : null;
   const matchCount = profile
     ? await countMatchingCandidatesForProfile(profile).catch(() => null)
     : null;

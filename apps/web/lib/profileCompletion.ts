@@ -10,6 +10,7 @@
  */
 
 import type { ClientProfile } from "./clientProfiles";
+import type { DeliveryPreferences } from "./deliveryPreferences";
 
 export interface ProfileCompletionGroup {
   key: string;
@@ -32,8 +33,16 @@ export interface ProfileCompletion {
  * The key targeting groups that make a profile useful. Deliberately the
  * decision-driving filters (roles, industries, region, size, intent threshold) —
  * not every field — so the bar reflects targeting quality, not form tedium.
+ *
+ * When `deliveryPrefs` is supplied, a "configured delivery" milestone is
+ * appended: delivery is considered configured when the master toggle is on AND
+ * at least one channel is reachable (Telegram connected, or email digest
+ * enabled with an address, or web-push on).
  */
-export function computeProfileCompletion(profile: ClientProfile): ProfileCompletion {
+export function computeProfileCompletion(
+  profile: ClientProfile,
+  deliveryPrefs?: DeliveryPreferences | null,
+): ProfileCompletion {
   const groups: ProfileCompletionGroup[] = [
     { key: "roles", label: "Роли, которые вы закрываете", filled: profile.roles.length > 0 },
     { key: "industries", label: "Отрасли клиентов", filled: profile.industries.length > 0 },
@@ -49,6 +58,19 @@ export function computeProfileCompletion(profile: ClientProfile): ProfileComplet
       filled: profile.hiringIntentMin != null,
     },
   ];
+
+  if (deliveryPrefs) {
+    const channelReady =
+      deliveryPrefs.deliveryEnabled &&
+      (Boolean(profile.telegramChatId) ||
+        (deliveryPrefs.emailDigestEnabled && Boolean(deliveryPrefs.digestEmail)) ||
+        deliveryPrefs.webPushEnabled);
+    groups.push({
+      key: "delivery",
+      label: "Доставка радара настроена",
+      filled: channelReady,
+    });
+  }
 
   const filledCount = groups.filter((g) => g.filled).length;
   const totalCount = groups.length;

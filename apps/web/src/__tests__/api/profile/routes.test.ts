@@ -20,6 +20,13 @@ jest.mock('@/lib/digest', () => ({ countMatchingCandidatesForProfile: jest.fn() 
 jest.mock('@/lib/deliveryPreferences', () => ({
   getDeliveryPreferencesByOwnerId: jest.fn(),
   saveDeliveryPreferencesByOwnerId: jest.fn(),
+  // Real normalizeDeliveryFrequency so the route's 400-on-bad-frequency path
+  // runs against the actual validator, not a jest.fn() that returns undefined.
+  normalizeDeliveryFrequency: jest.fn((v: unknown) => {
+    if (typeof v !== 'string') return null;
+    const s = v.trim().toLowerCase();
+    return s === 'daily' || s === 'weekly' ? s : null;
+  }),
 }));
 
 const mockOwner = getOwnerIdFromSession as jest.MockedFunction<typeof getOwnerIdFromSession>;
@@ -138,10 +145,22 @@ describe('PATCH /api/profile/preferences', () => {
       webPushEnabled: false,
       emailDigestEnabled: true,
       digestEmail: 'a@b.co',
+      deliveryEnabled: true,
+      deliveryTimeLocal: '09:30',
+      deliveryTimezone: 'Europe/Moscow',
+      deliveryFrequency: 'daily',
     });
     mockSavePrefs.mockResolvedValue({
       ok: true,
-      preferences: { webPushEnabled: true, emailDigestEnabled: true, digestEmail: 'a@b.co' },
+      preferences: {
+        webPushEnabled: true,
+        emailDigestEnabled: true,
+        digestEmail: 'a@b.co',
+        deliveryEnabled: true,
+        deliveryTimeLocal: '09:30',
+        deliveryTimezone: 'Europe/Moscow',
+        deliveryFrequency: 'daily',
+      },
     });
 
     const res = await patchReq({ webPushEnabled: true });
@@ -152,7 +171,86 @@ describe('PATCH /api/profile/preferences', () => {
       webPushEnabled: true,
       emailDigestEnabled: true,
       digestEmail: 'a@b.co',
+      deliveryEnabled: true,
+      deliveryTimeLocal: '09:30',
+      deliveryTimezone: 'Europe/Moscow',
+      deliveryFrequency: 'daily',
     });
+  });
+
+  it('accepts Block 3 delivery-time fields and merges them', async () => {
+    mockOwner.mockResolvedValue('owner-1');
+    mockGetPrefs.mockResolvedValue({
+      webPushEnabled: false,
+      emailDigestEnabled: false,
+      digestEmail: null,
+      deliveryEnabled: true,
+      deliveryTimeLocal: null,
+      deliveryTimezone: 'Europe/Moscow',
+      deliveryFrequency: 'daily',
+    });
+    mockSavePrefs.mockResolvedValue({
+      ok: true,
+      preferences: {
+        webPushEnabled: false,
+        emailDigestEnabled: false,
+        digestEmail: null,
+        deliveryEnabled: false,
+        deliveryTimeLocal: '18:00',
+        deliveryTimezone: 'Asia/Novosibirsk',
+        deliveryFrequency: 'weekly',
+      },
+    });
+
+    const res = await patchReq({
+      deliveryEnabled: false,
+      deliveryTimeLocal: '18:00',
+      deliveryTimezone: 'Asia/Novosibirsk',
+      deliveryFrequency: 'weekly',
+    });
+    expect(res.status).toBe(200);
+    expect(mockSavePrefs).toHaveBeenCalledWith({
+      ownerId: 'owner-1',
+      webPushEnabled: false,
+      emailDigestEnabled: false,
+      digestEmail: null,
+      deliveryEnabled: false,
+      deliveryTimeLocal: '18:00',
+      deliveryTimezone: 'Asia/Novosibirsk',
+      deliveryFrequency: 'weekly',
+    });
+  });
+
+  it('400s on an invalid delivery frequency', async () => {
+    mockOwner.mockResolvedValue('owner-1');
+    mockGetPrefs.mockResolvedValue({
+      webPushEnabled: false,
+      emailDigestEnabled: false,
+      digestEmail: null,
+      deliveryEnabled: true,
+      deliveryTimeLocal: null,
+      deliveryTimezone: 'Europe/Moscow',
+      deliveryFrequency: 'daily',
+    });
+    const res = await patchReq({ deliveryFrequency: 'hourly' });
+    expect(res.status).toBe(400);
+    expect(mockSavePrefs).not.toHaveBeenCalled();
+  });
+
+  it('400s on a bad deliveryTimeLocal type', async () => {
+    mockOwner.mockResolvedValue('owner-1');
+    mockGetPrefs.mockResolvedValue({
+      webPushEnabled: false,
+      emailDigestEnabled: false,
+      digestEmail: null,
+      deliveryEnabled: true,
+      deliveryTimeLocal: null,
+      deliveryTimezone: 'Europe/Moscow',
+      deliveryFrequency: 'daily',
+    });
+    const res = await patchReq({ deliveryTimeLocal: 999 });
+    expect(res.status).toBe(400);
+    expect(mockSavePrefs).not.toHaveBeenCalled();
   });
 
   it('surfaces a save validation failure as 400', async () => {
@@ -161,6 +259,10 @@ describe('PATCH /api/profile/preferences', () => {
       webPushEnabled: false,
       emailDigestEnabled: false,
       digestEmail: null,
+      deliveryEnabled: true,
+      deliveryTimeLocal: null,
+      deliveryTimezone: 'Europe/Moscow',
+      deliveryFrequency: 'daily',
     });
     mockSavePrefs.mockResolvedValue({ ok: false, reason: 'email_required' });
 

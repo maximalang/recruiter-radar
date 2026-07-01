@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   getDeliveryPreferencesByOwnerId,
   saveDeliveryPreferencesByOwnerId,
+  normalizeDeliveryFrequency,
+  type DeliveryFrequency,
 } from '@/lib/deliveryPreferences';
 import { getOwnerIdFromSession } from '@/lib/session';
 
@@ -15,9 +17,11 @@ import { getOwnerIdFromSession } from '@/lib/session';
  *
  * PATCH semantics: every field is optional; omitted fields keep their stored
  * value (read-merge-write). Body is JSON:
- *   { webPushEnabled?, emailDigestEnabled?, digestEmail? | null }
- *
- * Block 3 extends this same route with delivery-time fields additively.
+ *   {
+ *     webPushEnabled?, emailDigestEnabled?, digestEmail? | null,
+ *     deliveryEnabled?, deliveryTimeLocal? | null,
+ *     deliveryTimezone?, deliveryFrequency?
+ *   }
  */
 
 export const dynamic = 'force-dynamic';
@@ -26,6 +30,10 @@ type PatchBody = {
   webPushEnabled?: unknown;
   emailDigestEnabled?: unknown;
   digestEmail?: unknown;
+  deliveryEnabled?: unknown;
+  deliveryTimeLocal?: unknown;
+  deliveryTimezone?: unknown;
+  deliveryFrequency?: unknown;
 };
 
 export async function PATCH(request: NextRequest) {
@@ -55,6 +63,30 @@ export async function PATCH(request: NextRequest) {
   ) {
     return NextResponse.json({ error: 'digestEmail must be a string or null' }, { status: 400 });
   }
+  if (body.deliveryEnabled !== undefined && typeof body.deliveryEnabled !== 'boolean') {
+    return NextResponse.json({ error: 'deliveryEnabled must be a boolean' }, { status: 400 });
+  }
+  if (
+    body.deliveryTimeLocal !== undefined &&
+    body.deliveryTimeLocal !== null &&
+    typeof body.deliveryTimeLocal !== 'string'
+  ) {
+    return NextResponse.json({ error: 'deliveryTimeLocal must be a string or null' }, { status: 400 });
+  }
+  if (body.deliveryTimezone !== undefined && typeof body.deliveryTimezone !== 'string') {
+    return NextResponse.json({ error: 'deliveryTimezone must be a string' }, { status: 400 });
+  }
+  let deliveryFrequency: DeliveryFrequency | undefined;
+  if (body.deliveryFrequency !== undefined) {
+    const normalized = normalizeDeliveryFrequency(body.deliveryFrequency);
+    if (!normalized) {
+      return NextResponse.json(
+        { error: 'deliveryFrequency must be one of: daily, weekly' },
+        { status: 400 },
+      );
+    }
+    deliveryFrequency = normalized;
+  }
 
   // Read-merge-write: omitted fields keep their current value.
   const current = await getDeliveryPreferencesByOwnerId(ownerId);
@@ -74,6 +106,15 @@ export async function PATCH(request: NextRequest) {
       body.digestEmail !== undefined
         ? (body.digestEmail as string | null)
         : current.digestEmail,
+    deliveryEnabled:
+      body.deliveryEnabled !== undefined ? body.deliveryEnabled : current.deliveryEnabled,
+    deliveryTimeLocal:
+      body.deliveryTimeLocal !== undefined
+        ? (body.deliveryTimeLocal as string | null)
+        : current.deliveryTimeLocal,
+    deliveryTimezone:
+      body.deliveryTimezone !== undefined ? body.deliveryTimezone : current.deliveryTimezone,
+    deliveryFrequency: deliveryFrequency ?? current.deliveryFrequency,
   };
 
   const result = await saveDeliveryPreferencesByOwnerId(next);

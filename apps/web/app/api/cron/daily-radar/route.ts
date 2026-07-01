@@ -16,6 +16,7 @@ import { ingestAllPrimarySources, isNoActiveProfiles, type IngestResult } from '
 import { runDigestForClientProfile } from '@/lib/digest'
 import { deliverCandidatesForRun, type DeliverRunResult } from '@/lib/digest/deliver-candidates'
 import { enrichRunCandidates } from '@/lib/ai/enrichment/enrichRunCandidates'
+import { shouldDeliverOnRun } from '@/lib/delivery/nextDeliveryHint'
 import { getPool } from '@/lib/db'
 
 export const runtime = 'nodejs'
@@ -130,12 +131,16 @@ async function generateAndDeliverDigests(): Promise<DigestDeliveryResult[]> {
     return [{ clientProfileId: 'none', ok: false, sent: 0, failed: 0, skipped: 0, error: 'DATABASE_URL not set' }]
   }
 
-  // Get all active client profiles with Telegram connected
-  const profiles = await pool.query<{ id: string }>(`
-    SELECT id::TEXT AS id
+  // Get all active client profiles with Telegram connected AND delivery enabled.
+  // delivery_enabled is the master toggle (Block 3): when false the profile gets
+  // no digest, regardless of channel config. weekly frequency is honored at run
+  // time below — the row still loads, but is skipped on non-target days.
+  const profiles = await pool.query<{ id: string; delivery_frequency: string }>(`
+    SELECT id::TEXT AS id, delivery_frequency
     FROM client_profiles
     WHERE is_active = true
       AND telegram_chat_id IS NOT NULL
+      AND delivery_enabled = true
     ORDER BY id
   `)
 
@@ -143,9 +148,28 @@ async function generateAndDeliverDigests(): Promise<DigestDeliveryResult[]> {
     return []
   }
 
+  // The cron boundary "now" — used for the weekly day-of-week gate. Captured
+  // once so all profiles in this run share the same decision instant.
+  const runUtc = new Date()
+
   const results: DigestDeliveryResult[] = []
 
   for (const profile of profiles.rows) {
+    // weekly frequency: skip on non-target days (Monday). daily: always run.
+    if (!shouldDeliverOnRun(
+      profile.delivery_frequency === "weekly" ? "weekly" : "daily",
+      runUtc,
+    )) {
+      results.push({
+        clientProfileId: profile.id,
+        ok: true,
+        sent: 0,
+        failed: 0,
+        skipped: 1,
+      })
+      continue
+    }
+
     try {
       // Run digest generation directly
       const { run } = await runDigestForClientProfile({ clientProfileId: profile.id })
