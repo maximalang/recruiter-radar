@@ -254,6 +254,13 @@ export interface LeadItem {
   sourceFamilies: string[];
   evidenceTitles: string[];
   locationNames: string[];
+  /**
+   * Whether an attributed AI enrichment was persisted for this candidate
+   * (`digest_candidates.ai_enrichment IS NOT NULL`). Presence only — the actual
+   * advisory payload lives on LeadDetail.aiEnrichment. Lets the list/API surface
+   * an "AI-подсказка есть" cue without loading the full enrichment per row.
+   */
+  hasAiHint: boolean;
 }
 
 export interface LeadsListResult {
@@ -311,6 +318,8 @@ interface LeadRow {
    * tolerance and safe empty-array degradation.
    */
   payload: unknown;
+  /** TRUE when digest_candidates.ai_enrichment IS NOT NULL — presence flag only. */
+  has_ai_hint?: boolean;
 }
 
 /** SELECT column list shared by every list query that maps into a LeadItem. */
@@ -330,7 +339,8 @@ const LEAD_SELECT_COLUMNS = `
       cdos.suppressed_until,
       dc.created_at::TEXT AS created_at,
       dc.source_families,
-      dc.payload`;
+      dc.payload,
+      (dc.ai_enrichment IS NOT NULL) AS has_ai_hint`;
 
 function toStringArray(raw: unknown): string[] {
   return Array.isArray(raw) ? raw.filter((v: unknown): v is string => typeof v === "string") : [];
@@ -398,6 +408,7 @@ function mapLeadRow(row: LeadRow): LeadItem {
     sourceFamilies,
     evidenceTitles,
     locationNames,
+    hasAiHint: row.has_ai_hint === true,
   };
 }
 
@@ -674,8 +685,13 @@ export async function getLeadDetail(input: {
 
   const row = result.rows[0];
 
+  const aiEnrichment = parseStoredEnrichment(row.ai_enrichment);
+
   return {
     ...mapLeadRow(row),
+    // mapLeadRow reads has_ai_hint, which the detail SELECT does not project;
+    // derive it from the parsed enrichment so the flag is correct on detail too.
+    hasAiHint: aiEnrichment !== null,
     orgWebsite: row.org_website,
     orgInn: row.org_inn,
     orgOgrn: row.org_ogrn,
@@ -685,7 +701,7 @@ export async function getLeadDetail(input: {
     cooldownUntil: row.cooldown_until,
     candidateSourceKeys: toStringArray(row.candidate_source_keys),
     payload: (typeof row.payload === 'object' && row.payload !== null && !Array.isArray(row.payload)) ? row.payload as Record<string, unknown> : {},
-    aiEnrichment: parseStoredEnrichment(row.ai_enrichment),
+    aiEnrichment,
   };
 }
 

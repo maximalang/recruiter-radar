@@ -15,6 +15,7 @@ import {
   ScoreBar,
   ScoreBandChip,
   SignalFreshnessChip,
+  AiHintChip,
   getScoreTone,
   TableCard,
   EmptyState,
@@ -54,6 +55,7 @@ function LeadCard({
             <div className={ipStyles.leadCardTags}>
               <ScoreBandChip score={lead.score} />
               <GateBadgeInline gate={lead.confidenceGate} />
+              <AiHintChip present={lead.hasAiHint} />
               <FeedbackBadge status={lead.feedbackStatus} />
               {lead.locationNames.length > 0 && (
                 <span className={ipStyles.leadMetaChip}>

@@ -347,6 +347,22 @@ export function SignalFreshnessChip(props: { latestPublishedAt: string | null })
   );
 }
 
+/* ── AI-hint presence chip ── */
+
+/**
+ * Compact "this lead carries an AI advisory layer" marker. Presence only — the
+ * actual attributed hint renders on the detail page (AiEnrichmentBlock). Lets a
+ * recruiter spot which list rows have extra AI context before drilling in.
+ */
+export function AiHintChip(props: { present: boolean }) {
+  if (!props.present) return null;
+  return (
+    <span className={s.aiHintChip} title="Для этого лида есть AI-подсказка по найму">
+      ✨ AI
+    </span>
+  );
+}
+
 /* ── Evidence tag ── */
 
 export function EvidenceTag(props: { children: ReactNode }) {
