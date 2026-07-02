@@ -19,7 +19,7 @@ import {
 } from '@/lib/ai/enrichment/repairWeakCareerPage';
 import { AiBoundaryViolation } from '@/lib/ai/boundary';
 import { __resetEnrichmentQuotaForTests } from '@/lib/ai/enrichment/enrichmentRateLimit';
-import type { ScrapeProvider, ScrapeMarkdownResult } from '@/lib/ai/providers/scrapegraph';
+import type { ScrapeProvider, ScrapeMarkdownResult } from '@/lib/ai/providers/firecrawl';
 import type { MarkdownProvider } from '@/lib/ai/providers/crawl4ai';
 import type { EnrichedHiringSignals } from '@/lib/ai/enrichment/careerPages';
 import type { AssistResult } from '@/lib/ai/assist-types';

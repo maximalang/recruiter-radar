@@ -1,7 +1,7 @@
 /**
  * Enrichment cost guard — a per-org daily quota for the external AI provider.
  *
- * The ScrapeGraphAI extract/scrape calls cost money per request, so enrichment
+ * The Firecrawl extract/scrape calls cost money per request, so enrichment
  * must be rate-limited independently of throughput throttling. The rule here is a
  * COST rule, not a latency rule: at most ONE real provider call per org per 24h.
  * A weak page does not change minute-to-minute, so a daily ceiling is plenty of
@@ -136,7 +136,7 @@ export async function tryConsumeEnrichmentQuota(
 export function logEnrichmentApiCall(entry: {
   orgId: string;
   url: string;
-  /** Which provider the quota was spent on (scrapegraph today). */
+  /** Which provider the quota was spent on (firecrawl today). */
   provider?: string;
   /** Whether the primary extract produced usable enrichment data. */
   success?: boolean;

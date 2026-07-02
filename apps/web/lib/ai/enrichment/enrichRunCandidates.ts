@@ -16,7 +16,7 @@
  * score, gate, evidence, or reasons.
  *
  * Safety contract (every one is load-bearing):
- *   - PROVIDER-GATED: with no SCRAPEGRAPH_API_KEY the provider is null and this
+ *   - PROVIDER-GATED: with no FIRECRAWL_API_KEY the provider is null and this
  *     returns immediately — zero DB work, zero network, zero cost.
  *   - QUOTA-BOUNDED: repairWeakCareerPage consumes the per-org 1/24h quota, so a
  *     given org is enriched at most once a day even across many runs.
@@ -32,8 +32,8 @@ import { logError, logEvent } from '../../runtime';
 import type { ContactPath } from '../../scoring/contact-paths';
 import {
   repairWeakCareerPage,
-  createScrapeGraphProvider,
-  isScrapeGraphConfigured,
+  createFirecrawlProvider,
+  isFirecrawlConfigured,
   createCrawl4aiProvider,
   isCrawl4aiConfigured,
   persistEnrichmentForCandidate,
@@ -82,7 +82,7 @@ export async function enrichRunCandidates(runId: string | number): Promise<Enric
   const off: EnrichRunResult = { ran: false, considered: 0, enriched: 0 };
 
   // Provider gate FIRST — no key means no work at all.
-  if (!isScrapeGraphConfigured()) {
+  if (!isFirecrawlConfigured()) {
     return off;
   }
 
@@ -92,7 +92,7 @@ export async function enrichRunCandidates(runId: string | number): Promise<Enric
   let provider: ScrapeProvider;
   let fallbackProvider: MarkdownProvider | undefined;
   try {
-    provider = createScrapeGraphProvider();
+    provider = createFirecrawlProvider();
     fallbackProvider = isCrawl4aiConfigured() ? createCrawl4aiProvider() : undefined;
   } catch (error) {
     logError('ai.enrichment.provider_init_failed', error, { runId: String(runId) });
@@ -185,13 +185,23 @@ export async function enrichRunCandidates(runId: string | number): Promise<Enric
 }
 
 /**
- * The career page itself is the one safe contact surface we can assert from a
- * URL alone. We pass it as a `careers-email`-class path so the quality scorer
- * counts a contact path — without inventing an email we do not have.
+ * Career-page contact paths for the weakness check.
+ *
+ * A career-page URL is a SURFACE (already counted by the quality scorer as
+ * `hasPage` = +0.1), NOT a contact path. Previously this returned a
+ * `careers-email` ContactPath with the URL as its value, which inflated quality
+ * by +0.37 (hasHrContact +0.3 + pathScore +0.07) and made EVERY career-page
+ * candidate score above the weak threshold (0.4) — so `isWeakCareerPage` was
+ * never true and enrichment never ran. That defeats the entire purpose of
+ * AI enrichment, which exists to recover signals from WEAK career pages.
+ *
+ * `careers-email` semantically means a real careers mailbox (see
+ * contact-paths.ts `CAREERS_LOCAL_PARTS`); a bare URL is not one. We return no
+ * derived contact path here — the deterministic pipeline's own contact
+ * extraction (real emails/phones) remains the only source of contact paths.
  */
-function deriveContactPaths(careerPageUrl: string | null): ContactPath[] {
-  if (!careerPageUrl) return [];
-  return [{ category: 'careers-email', value: careerPageUrl, confidence: 'medium' }];
+function deriveContactPaths(_careerPageUrl: string | null): ContactPath[] {
+  return [];
 }
 
 /** Read evidence titles out of payload (snake/camel tolerant). Read-only. */

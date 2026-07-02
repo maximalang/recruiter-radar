@@ -4,7 +4,7 @@
  * Purpose (per session 2026-06-28, AI roadmap §quality/quantity): recover hiring
  * signals from WEAK or unstructured career pages — pages that exist but yield
  * little structured evidence (no parseable vacancies, stale, thin contact paths).
- * A model (ScrapeGraphAI first, see ./providers/scrapegraph) reads the page and
+ * A model (Firecrawl first, see ./providers/firecrawl) reads the page and
  * proposes normalized hiring signals the deterministic pipeline could not extract.
  *
  * TRUST CONTRACT — this is the whole reason the types are split below:
@@ -34,10 +34,12 @@ import type { AssistConfidence, AssistResult } from '../assist-types';
 
 /**
  * Which enrichment provider produced a result. Kept as a named union (plus an
- * open `string & {}` escape hatch) so swapping ScrapeGraphAI for Crawl4AI /
- * PixelRAG later is a one-line provider change, not a type migration.
+ * open `string & {}` escape hatch) so swapping Firecrawl for Crawl4AI /
+ * PixelRAG later is a one-line provider change, not a type migration. Includes
+ * 'scrapegraph' for legacy stored enrichments written before the Firecrawl swap.
  */
 export type EnrichmentProvider =
+  | 'firecrawl'
   | 'scrapegraph'
   | 'crawl4ai'
   | 'pixelrag'

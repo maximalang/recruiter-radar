@@ -1,36 +1,36 @@
 /**
  * Crawl4AI provider boundary — the markdown-prep fallback for weak career pages.
  *
- * Why a SEPARATE provider (per session 2026-06-28, Stage-2 §2.2): ScrapeGraphAI's
- * `/extract` is the primary structured path, but some pages are too noisy for a
- * one-shot schema extraction (heavy JS, infinite-scroll lists, prose-only
+ * Why a SEPARATE provider (per session 2026-06-28, Stage-2 §2.2): Firecrawl's
+ * `/v1/extract` is the primary structured path, but some pages are too noisy for
+ * a one-shot schema extraction (heavy JS, infinite-scroll lists, prose-only
  * postings). Crawl4AI turns such a page into clean markdown — the normalized
  * intermediate a later retry can re-extract from. This file does NOT re-extract;
  * it only PREPARES markdown when the primary extract came back empty, so the
  * retry path can be wired later without a broad crawler rollout now.
  *
  * Contract: ONE method, `fetchCleanMarkdown(url)`. It mirrors
- * `ScrapeProvider.scrapeToMarkdown`, so ScrapeGraphAI and Crawl4AI are
+ * `ScrapeProvider.scrapeToMarkdown`, so Firecrawl and Crawl4AI are
  * structurally interchangeable behind the same markdown seam — a caller can hold
  * either as a `MarkdownProvider`.
  *
  * The real client NEVER throws to the caller: no config, timeout, HTTP error, or
  * malformed body all degrade to a typed `available: false` result and are logged.
- * Absent config ⇒ degrade-only stub, exactly like ScrapeGraphAI without a key.
+ * Absent config ⇒ degrade-only stub, exactly like Firecrawl without a key.
  *
- * See lib/ai/providers/scrapegraph.ts (primary) and
+ * See lib/ai/providers/firecrawl.ts (primary) and
  * docs/specs/2026-06-28-ai-enrichment-career-pages.md.
  */
 
 import type { AssistResult } from '../assist-types';
 import type { EnrichmentProvider } from '../enrichment/careerPages';
-import type { ScrapeMarkdownResult } from './scrapegraph';
+import type { ScrapeMarkdownResult } from './firecrawl';
 
 // ─── Provider interface (markdown-only, swappable) ───────────────────────────
 
 /**
  * A page→markdown provider. Deliberately a single method so any clean-markdown
- * engine (Crawl4AI, a self-hosted reader, even ScrapeGraphAI's /scrape) satisfies
+ * engine (Crawl4AI, a self-hosted reader, even Firecrawl's /v1/scrape) satisfies
  * it. Degrades to `available: false` on any failure — never throws.
  */
 export interface MarkdownProvider {

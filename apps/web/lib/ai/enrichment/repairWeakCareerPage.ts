@@ -22,7 +22,7 @@
  * the helper so the merge site cannot forget it.
  *
  * This is product-side plumbing only. The provider is a stub today (see
- * ../providers/scrapegraph), so in practice this returns the degraded result —
+ * ../providers/firecrawl), so in practice this returns the degraded result —
  * which is exactly the path the real provider will later light up.
  *
  * See docs/specs/2026-06-28-ai-enrichment-career-pages.md.
@@ -41,7 +41,7 @@ import {
 import {
   CAREER_PAGE_EXTRACTION_INSTRUCTION,
   type ScrapeProvider,
-} from '../providers/scrapegraph';
+} from '../providers/firecrawl';
 import type { MarkdownProvider } from '../providers/crawl4ai';
 import {
   tryConsumeEnrichmentQuota,

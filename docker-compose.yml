@@ -39,8 +39,12 @@ services:
       # WARNING: Default key is for local dev only. For non-local deployments,
       # set FIRECRAWL_API_KEY in .env — do NOT use the default on a network-accessible host.
       FIRECRAWL_API_KEY: ${FIRECRAWL_API_KEY:-change-me-local-firecrawl-key}
-      # LLM provider for structured extraction — requires OPENAI_API_KEY in .env
-      LLM_MODEL: ${FIRECRAWL_LLM_MODEL:-gpt-4o-mini}
+      # LLM provider for structured extraction — any OpenAI-compatible endpoint.
+      # Default is OpenAI (gpt-4o-mini). For CodeXoid, set in .env:
+      #   OPENAI_BASE_URL=https://codexoid.duckdns.org/v1
+      #   CODEXOID_MODEL=codexoid/kr/claude-opus-4.8
+      # CODEXOID_MODEL takes precedence over FIRECRAWL_LLM_MODEL when set.
+      LLM_MODEL: ${CODEXOID_MODEL:-${FIRECRAWL_LLM_MODEL:-gpt-4o-mini}}
       OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY is required for Firecrawl LLM extraction}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
       # Playwright browser for JS rendering

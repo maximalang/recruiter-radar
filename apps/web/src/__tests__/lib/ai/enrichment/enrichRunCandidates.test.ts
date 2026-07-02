@@ -12,9 +12,9 @@
 import { enrichRunCandidates } from '@/lib/ai/enrichment/enrichRunCandidates';
 import { getPool } from '@/lib/db';
 import {
-  isScrapeGraphConfigured,
+  isFirecrawlConfigured,
   isCrawl4aiConfigured,
-  createScrapeGraphProvider,
+  createFirecrawlProvider,
   repairWeakCareerPage,
   persistEnrichmentForCandidate,
   hasEnrichment,
@@ -22,9 +22,9 @@ import {
 
 jest.mock('@/lib/db', () => ({ getPool: jest.fn() }));
 jest.mock('@/lib/ai', () => ({
-  isScrapeGraphConfigured: jest.fn(),
+  isFirecrawlConfigured: jest.fn(),
   isCrawl4aiConfigured: jest.fn(),
-  createScrapeGraphProvider: jest.fn(),
+  createFirecrawlProvider: jest.fn(),
   createCrawl4aiProvider: jest.fn(),
   repairWeakCareerPage: jest.fn(),
   persistEnrichmentForCandidate: jest.fn(),
@@ -33,9 +33,9 @@ jest.mock('@/lib/ai', () => ({
 
 const mockQuery = jest.fn();
 const mockGetPool = jest.mocked(getPool);
-const mockIsScrapeGraphConfigured = jest.mocked(isScrapeGraphConfigured);
+const mockIsFirecrawlConfigured = jest.mocked(isFirecrawlConfigured);
 const mockIsCrawl4aiConfigured = jest.mocked(isCrawl4aiConfigured);
-const mockCreateProvider = jest.mocked(createScrapeGraphProvider);
+const mockCreateProvider = jest.mocked(createFirecrawlProvider);
 const mockRepair = jest.mocked(repairWeakCareerPage);
 const mockPersist = jest.mocked(persistEnrichmentForCandidate);
 const mockHasEnrichment = jest.mocked(hasEnrichment);
@@ -44,7 +44,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockGetPool.mockReturnValue({ query: mockQuery } as never);
   mockIsCrawl4aiConfigured.mockReturnValue(false);
-  mockCreateProvider.mockReturnValue({ name: 'scrapegraph' } as never);
+  mockCreateProvider.mockReturnValue({ name: 'firecrawl' } as never);
 });
 
 function candidateRow(overrides: Record<string, unknown> = {}) {
@@ -62,7 +62,7 @@ function candidateRow(overrides: Record<string, unknown> = {}) {
 
 describe('enrichRunCandidates — provider gate', () => {
   it('returns ran:false and does NO database work when no provider is configured', async () => {
-    mockIsScrapeGraphConfigured.mockReturnValue(false);
+    mockIsFirecrawlConfigured.mockReturnValue(false);
 
     const result = await enrichRunCandidates('run-1');
 
@@ -73,7 +73,7 @@ describe('enrichRunCandidates — provider gate', () => {
   });
 
   it('returns ran:false when configured but there is no pool', async () => {
-    mockIsScrapeGraphConfigured.mockReturnValue(true);
+    mockIsFirecrawlConfigured.mockReturnValue(true);
     mockGetPool.mockReturnValue(null);
 
     const result = await enrichRunCandidates('run-1');
@@ -84,7 +84,7 @@ describe('enrichRunCandidates — provider gate', () => {
 
 describe('enrichRunCandidates — happy path', () => {
   beforeEach(() => {
-    mockIsScrapeGraphConfigured.mockReturnValue(true);
+    mockIsFirecrawlConfigured.mockReturnValue(true);
   });
 
   it('persists enrichment for a candidate whose page yields signal', async () => {
@@ -126,7 +126,7 @@ describe('enrichRunCandidates — happy path', () => {
 
 describe('enrichRunCandidates — isolation', () => {
   beforeEach(() => {
-    mockIsScrapeGraphConfigured.mockReturnValue(true);
+    mockIsFirecrawlConfigured.mockReturnValue(true);
   });
 
   it('a failure on one candidate does not abort the others', async () => {

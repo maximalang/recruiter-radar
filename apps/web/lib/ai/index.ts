@@ -83,13 +83,13 @@ export {
 } from './enrichment/enrichmentStore';
 
 export {
-  createScrapeGraphProvider,
-  createStubScrapeGraphProvider,
-  isScrapeGraphConfigured,
+  createFirecrawlProvider,
+  createStubFirecrawlProvider,
+  isFirecrawlConfigured,
   CAREER_PAGE_EXTRACTION_INSTRUCTION,
   type ScrapeProvider,
   type ScrapeMarkdownResult,
-} from './providers/scrapegraph';
+} from './providers/firecrawl';
 
 export {
   createCrawl4aiProvider,
@@ -97,3 +97,13 @@ export {
   isCrawl4aiConfigured,
   type MarkdownProvider,
 } from './providers/crawl4ai';
+
+export {
+  resolveLlmApiKey,
+  resolveLlmBaseUrl,
+  resolveLlmModel,
+  resolveLlmProviderConfig,
+  isLlmConfigured,
+  isCodeXoidProvider,
+  type LlmProviderConfig,
+} from './providers/llm-config';

@@ -29,8 +29,8 @@ import type { ContactPath, ContactCategory } from '@/lib/scoring/contact-paths'
 import { hasCorporateSurface } from '@/lib/contact-policy-filter'
 import {
   repairWeakCareerPage,
-  createScrapeGraphProvider,
-  isScrapeGraphConfigured,
+  createFirecrawlProvider,
+  isFirecrawlConfigured,
   createCrawl4aiProvider,
   isCrawl4aiConfigured,
   persistEnrichmentForCandidate,
@@ -92,13 +92,13 @@ export class LeadScoringService {
   /**
    * Resolve the AI enrichment provider, or null when enrichment is disabled.
    * Memoized: built at most once. `undefined` means "not yet resolved", `null`
-   * means "resolved to off". Off whenever SCRAPEGRAPH_API_KEY is absent, so the
+   * means "resolved to off". Off whenever FIRECRAWL_API_KEY is absent, so the
    * common path does no work and runs no network call.
    */
   private getEnrichmentProvider(): ScrapeProvider | null {
     if (this.enrichmentProvider === undefined) {
-      this.enrichmentProvider = isScrapeGraphConfigured()
-        ? createScrapeGraphProvider()
+      this.enrichmentProvider = isFirecrawlConfigured()
+        ? createFirecrawlProvider()
         : null
     }
     return this.enrichmentProvider

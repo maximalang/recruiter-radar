@@ -1,15 +1,15 @@
 /**
- * ScrapeGraphAI provider boundary — the swappable seam for page→structure AI.
+ * Firecrawl provider boundary — the swappable seam for page→structure AI.
  *
- * Why ScrapeGraphAI (per session 2026-06-28): the first enrichment use case is
+ * Why Firecrawl (per session 2026-07-02): the first enrichment use case is
  * recovering hiring signals from WEAK career pages — pages that exist but whose
  * structure defeats the deterministic crawler (JS-rendered lists, prose-only
- * postings, non-standard markup). ScrapeGraphAI is graph-of-prompts scraping that
- * turns a messy page into structured data with one schema-shaped ask, which is
- * exactly the gap-filling this boundary needs — and it is far lighter to integrate
- * than standing up our own headless-render + extraction stack.
+ * postings, non-standard markup). Firecrawl is a self-hostable scraper with a
+ * schema-shaped /v1/extract endpoint that turns a messy page into structured
+ * data with one ask, which is exactly the gap-filling this boundary needs. It
+ * replaced ScrapeGraphAI, whose API key was rejected (403 Invalid API key).
  *
- * This file defines the CONTRACT (`ScrapeProvider`) and now a REAL client:
+ * This file owns the CONTRACT (`ScrapeProvider`) plus a REAL Firecrawl client:
  *   - `extract`  → POST /v1/extract  (structured JSON for our hiring schema)
  *   - `scrape`   → POST /v1/scrape   (markdown fallback when extract is empty)
  * The real client NEVER throws to the caller: any failure (no key, timeout, HTTP
@@ -17,6 +17,13 @@
  * logged. The stub is kept so Stage-1 callers and tests still exercise the
  * degrade path without a key, and so Crawl4AI / PixelRAG can implement the same
  * interface unchanged.
+ *
+ * Firecrawl /v1/extract is ASYNC: the first POST returns a job id, then the
+ * caller polls GET /v1/extract/{id} until status is "completed". /v1/scrape is
+ * synchronous. Each HTTP call has a hard REQUEST_TIMEOUT_MS (15s); the total
+ * extract wall-clock is bounded by REQUEST_TIMEOUT_MS (POST) + MAX_EXTRACT_POLLS
+ * × (EXTRACT_POLL_DELAY_MS + REQUEST_TIMEOUT_MS) ≈ 15 + 6×(2+15) ≈ 117s worst
+ * case, but the per-org 1/24h quota means at most one such hang per org/day.
  *
  * See lib/ai/enrichment/careerPages.ts for the data contract this provider feeds,
  * and docs/specs/2026-06-28-ai-enrichment-career-pages.md.
@@ -40,11 +47,10 @@ export interface ScrapeMarkdownResult {
 }
 
 /**
- * A page→structure scraping provider. Two stages, mirroring how ScrapeGraphAI and
- * its alternatives work: first reduce a page to clean markdown, then extract a
- * schema-shaped object from that markdown. Keeping them separate means a caller
- * can supply its own markdown (skipping the fetch) and means the extraction step
- * is engine-agnostic.
+ * A page→structure scraping provider. Two stages: first reduce a page to clean
+ * markdown, then extract a schema-shaped object from that markdown. Keeping them
+ * separate means a caller can supply its own markdown (skipping the fetch) and
+ * means the extraction step is engine-agnostic.
  *
  * Crawl4AI / PixelRAG implement this SAME interface to stay swappable.
  */
@@ -59,9 +65,9 @@ export interface ScrapeProvider {
 
   /**
    * Extract normalized hiring signals from page content (markdown preferred, raw
-   * HTML acceptable). The `instruction` is the natural-language extraction ask the
-   * graph-scraper is built around. Real impl: provider's structured-extract
-   * endpoint with our schema. Degrades to `available: false` on any failure.
+   * HTML acceptable). The `instruction` is the natural-language extraction ask.
+   * Real impl: provider's structured-extract endpoint with our schema. Degrades
+   * to `available: false` on any failure.
    */
   extractStructuredData(input: {
     sourceUrl: string;
@@ -72,18 +78,23 @@ export interface ScrapeProvider {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const PROVIDER_NAME: EnrichmentProvider = 'scrapegraph';
+const PROVIDER_NAME: EnrichmentProvider = 'firecrawl';
 
-/** ScrapeGraphAI API base. Overridable for tests / self-hosting via env. */
-const DEFAULT_API_BASE = 'https://api.scrapegraphai.com/v1';
+/** Firecrawl API base. Overridable for tests / self-hosting via env. */
+const DEFAULT_API_BASE = 'http://localhost:3002';
 
 /** Hard per-request timeout. Enrichment is best-effort and must never hang the run. */
 const REQUEST_TIMEOUT_MS = 15_000;
 
+/** Max polls for the async /v1/extract job before giving up. Bounds total wall-clock. */
+const MAX_EXTRACT_POLLS = 6;
+/** Delay between extract-status polls. */
+const EXTRACT_POLL_DELAY_MS = 2_000;
+
 /**
- * The extraction ask handed to the graph-scraper. Centralized here so prompt
- * versioning lives in product code (never in n8n) and so tests can assert it is
- * passed through.
+ * The extraction ask handed to the scraper. Centralized here so prompt versioning
+ * lives in product code (never in n8n) and so tests can assert it is passed
+ * through.
  */
 export const CAREER_PAGE_EXTRACTION_INSTRUCTION =
   'Extract hiring signals from this company career page: list open roles with ' +
@@ -92,7 +103,7 @@ export const CAREER_PAGE_EXTRACTION_INSTRUCTION =
   'states — do not invent roles, companies, or contacts.';
 
 /**
- * The JSON schema we ask ScrapeGraphAI's /extract to fill. Mirrors
+ * The JSON schema we ask Firecrawl's /v1/extract to fill. Mirrors
  * `EnrichedHiringSignals` (minus provenance, which we attach ourselves) so the
  * mapping is mechanical and the model can only return shapes we expect.
  */
@@ -123,26 +134,26 @@ const EXTRACTION_OUTPUT_SCHEMA = {
 // ─── Configuration ───────────────────────────────────────────────────────────
 
 /**
- * Resolve the ScrapeGraphAI API key. Read from process.env only — never
- * hardcoded. `.env.example` documents the variable name.
+ * Resolve the Firecrawl API key. Read from process.env only — never hardcoded.
+ * `.env.example` documents the variable name.
  */
 function resolveApiKey(explicit?: string | null): string | null {
   if (typeof explicit === 'string' && explicit.length > 0) return explicit;
-  const fromEnv = process.env.SCRAPEGRAPH_API_KEY;
+  const fromEnv = process.env.FIRECRAWL_API_KEY;
   return typeof fromEnv === 'string' && fromEnv.length > 0 ? fromEnv : null;
 }
 
 function resolveApiBase(): string {
-  const fromEnv = process.env.SCRAPEGRAPH_API_URL;
+  const fromEnv = process.env.FIRECRAWL_API_URL;
   return typeof fromEnv === 'string' && fromEnv.length > 0 ? fromEnv : DEFAULT_API_BASE;
 }
 
 /**
- * Whether a usable ScrapeGraphAI configuration is present (an API key). The
- * single place a caller checks before attempting enrichment — flip the env var
- * and the real client lights up with no code change.
+ * Whether a usable Firecrawl configuration is present (an API key). The single
+ * place a caller checks before attempting enrichment — flip the env var and the
+ * real client lights up with no code change.
  */
-export function isScrapeGraphConfigured(): boolean {
+export function isFirecrawlConfigured(): boolean {
   return resolveApiKey() !== null;
 }
 
@@ -173,12 +184,13 @@ function degradedExtract(note: string): AssistResult<EnrichedHiringSignals> {
 // ─── HTTP ────────────────────────────────────────────────────────────────────
 
 /**
- * POST JSON to a ScrapeGraphAI endpoint with a hard timeout. Returns the parsed
- * body, or throws — the caller wraps every call in try/catch and degrades, so a
- * throw here never reaches the enrichment caller.
+ * Make an HTTP request to a Firecrawl endpoint with a hard timeout. Returns the
+ * parsed body, or throws — the caller wraps every call in try/catch and
+ * degrades, so a throw here never reaches the enrichment caller.
  */
-async function postJson(
+async function requestJson(
   base: string,
+  method: string,
   path: string,
   apiKey: string,
   body: unknown,
@@ -187,22 +199,25 @@ async function postJson(
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
     const res = await fetch(`${base}${path}`, {
-      method: 'POST',
+      method,
       headers: {
         'Content-Type': 'application/json',
-        // ScrapeGraphAI authenticates via the SGAI-APIKEY header.
-        'SGAI-APIKEY': apiKey,
+        Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify(body),
+      body: body === undefined ? undefined : JSON.stringify(body),
       signal: controller.signal,
     });
     if (!res.ok) {
-      throw new Error(`scrapegraph ${path} returned HTTP ${res.status}`);
+      throw new Error(`firecrawl ${path} returned HTTP ${res.status}`);
     }
     return await res.json();
   } finally {
     clearTimeout(timer);
   }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 // ─── Response mapping (provider shape → our contract) ────────────────────────
@@ -247,21 +262,21 @@ function mapRoles(v: unknown): EnrichedRole[] {
 }
 
 /**
- * ScrapeGraphAI /extract wraps the schema result under a `result` (or `data`)
+ * Firecrawl /v1/extract wraps the schema result under a `data` (or `result`)
  * key. Unwrap defensively — providers differ and we never trust shape.
  */
 function unwrapResult(body: unknown): Record<string, unknown> | null {
   if (typeof body !== 'object' || body === null) return null;
   const obj = body as Record<string, unknown>;
-  const result = obj.result ?? obj.data ?? obj;
+  const result = obj.data ?? obj.result ?? obj;
   return typeof result === 'object' && result !== null
     ? (result as Record<string, unknown>)
     : null;
 }
 
 /**
- * Map a ScrapeGraphAI /extract body into `EnrichedHiringSignals`, attaching our
- * own provenance (sourceUrl + provider). Returns null when the body carries no
+ * Map a Firecrawl extract body into `EnrichedHiringSignals`, attaching our own
+ * provenance (sourceUrl + provider). Returns null when the body carries no
  * usable signal (no roles AND no summary) — the caller then degrades.
  */
 function mapExtractResponse(
@@ -273,6 +288,14 @@ function mapExtractResponse(
 
   const detectedRoles = mapRoles(result.detectedRoles);
   const hiringPatternSummary = asString(result.hiringPatternSummary) ?? '';
+  const departments = asStringList(result.departments);
+  // Firecrawl may surface a single departmentOrTeam string; fold it into
+  // departments for a uniform downstream shape.
+  const deptTeam = asString(result.departmentOrTeam);
+  if (deptTeam && !departments.includes(deptTeam)) departments.push(deptTeam);
+  const locations = asStringList(result.locations);
+  const geo = asString(result.geoOrLocation);
+  if (geo && !locations.includes(geo)) locations.push(geo);
 
   // No roles and no summary → the model found nothing structured. Treat as empty.
   if (detectedRoles.length === 0 && hiringPatternSummary.length === 0) {
@@ -282,8 +305,8 @@ function mapExtractResponse(
   return {
     detectedRoles,
     hiringUrgency: asUrgency(result.hiringUrgency),
-    departments: asStringList(result.departments),
-    locations: asStringList(result.locations),
+    departments,
+    locations,
     hiringPatternSummary,
     confidence: asConfidence(result.confidence, 'medium'),
     sourceUrl,
@@ -305,7 +328,57 @@ function mapScrapeResponse(
 
 // ─── Real client ─────────────────────────────────────────────────────────────
 
-function createRealScrapeGraphProvider(apiKey: string): ScrapeProvider {
+/**
+ * Firecrawl /v1/extract is async. POST returns a job id; we then poll
+ * GET /v1/extract/{id} until status === 'completed' (or a terminal failure).
+ * Returns the final body (with `data` populated) or throws on failure/timeout.
+ */
+async function runExtractJob(
+  base: string,
+  apiKey: string,
+  requestBody: Record<string, unknown>,
+): Promise<unknown> {
+  const startBody = await requestJson(base, 'POST', '/v1/extract', apiKey, requestBody);
+
+  // Firecrawl v1 returns { id, status } or { jobId }. Tolerate both.
+  const startObj =
+    typeof startBody === 'object' && startBody !== null
+      ? (startBody as Record<string, unknown>)
+      : {};
+  const jobId = asString(startObj.id) ?? asString(startObj.jobId);
+  if (!jobId) {
+    // Some self-hosted builds return the result synchronously — accept it.
+    return startBody;
+  }
+
+  // If already completed with data, skip polling.
+  const startStatus = asString(startObj.status);
+  if (startStatus === 'completed') return startBody;
+
+  for (let i = 0; i < MAX_EXTRACT_POLLS; i += 1) {
+    await sleep(EXTRACT_POLL_DELAY_MS);
+    const pollBody = await requestJson(
+      base,
+      'GET',
+      `/v1/extract/${jobId}`,
+      apiKey,
+      undefined,
+    );
+    const pollObj =
+      typeof pollBody === 'object' && pollBody !== null
+        ? (pollBody as Record<string, unknown>)
+        : {};
+    const status = asString(pollObj.status);
+    if (status === 'completed') return pollBody;
+    if (status === 'failed' || status === 'cancelled') {
+      throw new Error(`firecrawl extract job ${status}`);
+    }
+    // status === 'processing' (or unknown) → keep polling.
+  }
+  throw new Error('firecrawl extract job timed out (polling)');
+}
+
+function createRealFirecrawlProvider(apiKey: string): ScrapeProvider {
   const base = resolveApiBase();
 
   return {
@@ -313,12 +386,12 @@ function createRealScrapeGraphProvider(apiKey: string): ScrapeProvider {
 
     async scrapeToMarkdown(url: string): Promise<AssistResult<ScrapeMarkdownResult>> {
       try {
-        const body = await postJson(base, '/scrape', apiKey, {
-          website_url: url,
-          render_heavy_js: true,
+        const body = await requestJson(base, 'POST', '/v1/scrape', apiKey, {
+          url,
+          formats: ['markdown'],
         });
         const mapped = mapScrapeResponse(body, url);
-        if (!mapped) return degradedMarkdown('scrapegraph: scrape returned no markdown');
+        if (!mapped) return degradedMarkdown('firecrawl: scrape returned no markdown');
         return {
           available: true,
           capability: 'extract-weak-signal',
@@ -329,9 +402,9 @@ function createRealScrapeGraphProvider(apiKey: string): ScrapeProvider {
       } catch (error) {
         const message = error instanceof Error ? error.message : 'unknown_error';
         console.error(
-          JSON.stringify({ level: 'error', event: 'ai.scrapegraph.scrape_failed', url, message }),
+          JSON.stringify({ level: 'error', event: 'ai.firecrawl.scrape_failed', url, message }),
         );
-        return degradedMarkdown(`scrapegraph: scrape error: ${message}`);
+        return degradedMarkdown(`firecrawl: scrape error: ${message}`);
       }
     },
 
@@ -341,16 +414,19 @@ function createRealScrapeGraphProvider(apiKey: string): ScrapeProvider {
       instruction: string;
     }): Promise<AssistResult<EnrichedHiringSignals>> {
       try {
-        const body = await postJson(base, '/extract', apiKey, {
-          // Pass the already-fetched page content so /extract works on what we
-          // have; ScrapeGraphAI also accepts website_url, kept for redundancy.
-          website_url: input.sourceUrl,
-          website_markdown: input.content,
-          user_prompt: input.instruction,
-          output_schema: EXTRACTION_OUTPUT_SCHEMA,
+        const body = await runExtractJob(base, apiKey, {
+          // Firecrawl /v1/extract fetches the page itself from `urls` — unlike
+          // ScrapeGraphAI it does NOT accept a caller-supplied markdown/html
+          // body. `input.content` (pre-fetched by the caller) is therefore not
+          // forwarded here; it is still used by the Crawl4AI fallback path in
+          // repairWeakCareerPage, which re-extracts from clean markdown. The
+          // prompt + schema drive the structured output.
+          urls: [input.sourceUrl],
+          prompt: input.instruction,
+          schema: EXTRACTION_OUTPUT_SCHEMA,
         });
         const mapped = mapExtractResponse(body, input.sourceUrl);
-        if (!mapped) return degradedExtract('scrapegraph: extract returned no usable signal');
+        if (!mapped) return degradedExtract('firecrawl: extract returned no usable signal');
         return {
           available: true,
           capability: 'extract-weak-signal',
@@ -363,12 +439,12 @@ function createRealScrapeGraphProvider(apiKey: string): ScrapeProvider {
         console.error(
           JSON.stringify({
             level: 'error',
-            event: 'ai.scrapegraph.extract_failed',
+            event: 'ai.firecrawl.extract_failed',
             url: input.sourceUrl,
             message,
           }),
         );
-        return degradedExtract(`scrapegraph: extract error: ${message}`);
+        return degradedExtract(`firecrawl: extract error: ${message}`);
       }
     },
   };
@@ -381,10 +457,10 @@ function createRealScrapeGraphProvider(apiKey: string): ScrapeProvider {
  * with no network. Used when no API key is configured and exposed directly so
  * tests can exercise the degrade path deterministically.
  */
-export function createStubScrapeGraphProvider(
+export function createStubFirecrawlProvider(
   opts: { note?: string } = {},
 ): ScrapeProvider {
-  const note = opts.note ?? 'scrapegraph: no API key configured';
+  const note = opts.note ?? 'firecrawl: no API key configured';
   return {
     name: PROVIDER_NAME,
     async scrapeToMarkdown(url: string): Promise<AssistResult<ScrapeMarkdownResult>> {
@@ -401,17 +477,17 @@ export function createStubScrapeGraphProvider(
 // ─── Factory ─────────────────────────────────────────────────────────────────
 
 /**
- * Build the ScrapeGraphAI provider. Returns the REAL client when an API key is
- * available (explicit arg or `SCRAPEGRAPH_API_KEY`), otherwise the degrade-only
+ * Build the Firecrawl provider. Returns the REAL client when an API key is
+ * available (explicit arg or `FIRECRAWL_API_KEY`), otherwise the degrade-only
  * stub. Either way the result satisfies `ScrapeProvider` and never throws to the
  * caller — callers always degrade to the deterministic baseline.
  *
  * @param opts.apiKey override the env key (mainly for tests).
  */
-export function createScrapeGraphProvider(
+export function createFirecrawlProvider(
   opts: { apiKey?: string | null } = {},
 ): ScrapeProvider {
   const apiKey = resolveApiKey(opts.apiKey);
-  if (!apiKey) return createStubScrapeGraphProvider();
-  return createRealScrapeGraphProvider(apiKey);
+  if (!apiKey) return createStubFirecrawlProvider();
+  return createRealFirecrawlProvider(apiKey);
 }

@@ -11,6 +11,7 @@
 import { getPool, sendLeadToTelegram } from '@/lib/db'
 import { notifyNewLeadsForRun } from '@/lib/webPush'
 import { sendDigestEmailForProfile } from '@/lib/email/sendDigestEmail'
+import { enrichRunCandidates } from '@/lib/ai/enrichment/enrichRunCandidates'
 import { logError } from '@/lib/runtime'
 import { randomUUID } from 'node:crypto'
 
@@ -36,11 +37,25 @@ export interface DeliverRunResult {
  *
  * Claims each delivery attempt idempotently. Skips already-sent
  * candidates and claims owned by another worker. Records success/failure.
+ *
+ * AI enrichment runs FIRST, before any delivery: it populates
+ * `digest_candidates.ai_enrichment` for weak career pages so the
+ * advisory "AI-подсказка" block is present in the delivered card. It is
+ * strictly best-effort — provider-gated, quota-bounded, and any failure
+ * is swallowed so enrichment can never block or fail delivery.
  */
 export async function deliverCandidatesForRun(runId: string): Promise<DeliverRunResult> {
   const pool = getPool()
   if (!pool) {
     return { ok: false, sent: 0, failed: 0, skipped: 0, failures: [] }
+  }
+
+  // AI enrichment: provider-gated (no-op without FIRECRAWL_API_KEY),
+  // per-org 1/24h quota, bounded fan-out. Must never affect delivery.
+  try {
+    await enrichRunCandidates(runId)
+  } catch (error) {
+    logError('ai.enrichment.pre_delivery_failed', error, { runId })
   }
 
   // Get candidates for delivery (A/B gates only)
