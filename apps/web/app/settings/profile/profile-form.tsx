@@ -48,6 +48,9 @@ function CheckboxGroup(props: {
           </label>
         ))}
       </div>
+      {selectedSet.size === 0 && (
+        <span className={styles.groupEmptyHint}>Фильтр не настроен — учитываются все варианты.</span>
+      )}
     </fieldset>
   );
 }

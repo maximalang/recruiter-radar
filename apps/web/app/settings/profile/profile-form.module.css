@@ -37,6 +37,13 @@
   gap: 8px;
 }
 
+.groupEmptyHint {
+  font-size: 0.8rem;
+  color: var(--rr-text-muted, #6b7280);
+  font-style: italic;
+  margin-top: 6px;
+}
+
 .chip {
   display: inline-flex;
   align-items: center;
