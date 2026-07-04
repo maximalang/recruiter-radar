@@ -480,7 +480,14 @@ function mapDigestEvidenceRow(row: DigestEvidenceRow): DigestItemInput {
   const foreign = detectForeignEmployer({
     sourceDisplayName,
     sourceExternalId,
-    candidateSourceKeys,
+    // Fold the org career-page URL into the candidate keys the detector scans:
+    // a foreign ATS host (boards.greenhouse.io, jobs.lever.co) lives ONLY on
+    // career_page_url — the source keys carry a clean domain (domain:discord.com)
+    // that never matches FOREIGN_ATS_DOMAINS. Without this the geo penalty never
+    // fires and a Greenhouse/Lever board out-ranks a domestic lead.
+    candidateSourceKeys: row.career_page_url
+      ? [...candidateSourceKeys, row.career_page_url]
+      : candidateSourceKeys,
     evidenceTitles,
     locationNames,
   });

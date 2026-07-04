@@ -61,6 +61,38 @@ describe('detectForeignEmployer', () => {
     })
     expect(result.isForeign).toBe(false)
   })
+
+  // Regression (prod run 36): Discord/D&B ranked ABOVE domestic leads because the
+  // ATS host lived ONLY in orgs.career_page_url — the source keys carried a clean
+  // domain (domain:discord.com) that never matched FOREIGN_ATS_DOMAINS. The digest
+  // mapper now folds career_page_url into candidateSourceKeys as a raw URL, so the
+  // detector must match an ATS host from a full https:// URL, not just a
+  // domain:-prefixed key.
+  it('flags a foreign ATS host passed as a raw career-page URL (clean domain in keys)', () => {
+    const result = detectForeignEmployer({
+      sourceDisplayName: 'Discord',
+      sourceExternalId: '',
+      // The real prod shape: clean company domain in the keys, ATS host only in
+      // the appended career_page_url.
+      candidateSourceKeys: ['domain:discord.com', 'https://boards.greenhouse.io/discord'],
+      evidenceTitles: ['Senior Backend Engineer', 'Product Designer, Ads'],
+      locationNames: ['San Francisco Bay Area', 'Remote (U.S.)'],
+    })
+    expect(result.isForeign).toBe(true)
+    expect(result.matchedDomain).toBe('greenhouse.io')
+  })
+
+  it('flags a Lever raw career-page URL with foreign locations (D&B shape)', () => {
+    const result = detectForeignEmployer({
+      sourceDisplayName: 'Dun & Bradstreet',
+      sourceExternalId: '',
+      candidateSourceKeys: ['domain:dnb.com', 'https://jobs.lever.co/dnb'],
+      evidenceTitles: ['AI Architect', 'Account Executive II'],
+      locationNames: ['Austin - Texas - United States', 'Dublin - Ireland'],
+    })
+    expect(result.isForeign).toBe(true)
+    expect(result.matchedDomain).toBe('lever.co')
+  })
 })
 
 describe('applyForeignEmployerPenalty', () => {

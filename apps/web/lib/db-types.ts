@@ -182,6 +182,12 @@ export interface DigestItem {
   primary_reason_label?: string;
   secondary_reason_label?: string;
   /**
+   * Company career-page URL (from orgs), joined into the evidence query so the
+   * geo gate can detect a foreign ATS host (boards.greenhouse.io, jobs.lever.co)
+   * even when the source keys carry only a clean domain. Query-projection field.
+   */
+  career_page_url?: string | null;
+  /**
    * Geo gate (Block 1): true when the lead is a foreign employer — hosted on a
    * known foreign ATS with no Russian-market footprint. When set, total_score has
    * already had the soft foreign-employer penalty applied. Surfaced to the UI as

@@ -370,6 +370,7 @@ SELECT
   org_id,
   source_external_id,
   source_display_name,
+  ranked_org.career_page_url AS career_page_url,
   source_families,
   evidence_titles,
   candidate_source_keys,
@@ -414,4 +415,5 @@ SELECT
     )
   ) AS reason_details
 FROM ranked
+LEFT JOIN orgs AS ranked_org ON ranked_org.id = ranked.org_id
 ORDER BY rank ASC
