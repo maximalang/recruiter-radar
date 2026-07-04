@@ -16,7 +16,7 @@
 | Replay-safety | ✅ | Статус `processed`/`ignored` — ответ `{ ok: true, replaySafe: true }` |
 | Логирование | ✅ | `webhook_events` table; ошибки фиксируются в `error_message` |
 
-**Примечание:** встроенный `RateLimiter` в `secure-validation-schemas.ts` не применяется к webhook endpoint. Это приемлемо, т.к. claim-token pattern обеспечивает idempotency.
+**Примечание:** отдельный endpoint-level rate-limit к webhook не применяется. Это приемлемо, т.к. claim-token pattern обеспечивает idempotency и replay-safety.
 
 ### Billing webhook (`/api/billing/webhook`)
 
@@ -71,7 +71,6 @@ openssl rand -hex 32
 |----------|-------|--------|---------|
 | `/api/telegram/webhook` | 60 req | 1 min | Per bot token |
 | `/api/billing/webhook` | 30 req | 1 min | Per billing provider |
-| Internal rate-limiter | 100 req | 1 min | Per validation key |
 
 ## Secrets, которые НЕ должны быть в репозитории
 
