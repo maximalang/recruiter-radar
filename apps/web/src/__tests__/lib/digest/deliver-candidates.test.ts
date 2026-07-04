@@ -48,7 +48,7 @@ describe('deliverCandidatesForRun (batch)', () => {
 
     // Step 1: profiles query → one profile with 3 candidates
     pool.query.mockResolvedValueOnce({
-      rows: [{ client_profile_id: 'cp-1', candidate_count: 3 }],
+      rows: [{ client_profile_id: 'cp-1', candidate_count: 3, anchor_candidate_id: '101' }],
       rowCount: 1,
     } as never)
     // Step 2: claim INSERT → ownsClaim
@@ -74,7 +74,7 @@ describe('deliverCandidatesForRun (batch)', () => {
     mockGetPool.mockReturnValue(pool)
 
     pool.query.mockResolvedValueOnce({
-      rows: [{ client_profile_id: 'cp-1', candidate_count: 2 }],
+      rows: [{ client_profile_id: 'cp-1', candidate_count: 2, anchor_candidate_id: '201' }],
       rowCount: 1,
     } as never)
     pool.query.mockResolvedValueOnce({
@@ -94,7 +94,7 @@ describe('deliverCandidatesForRun (batch)', () => {
     mockGetPool.mockReturnValue(pool)
 
     pool.query.mockResolvedValueOnce({
-      rows: [{ client_profile_id: 'cp-1', candidate_count: 1 }],
+      rows: [{ client_profile_id: 'cp-1', candidate_count: 1, anchor_candidate_id: '301' }],
       rowCount: 1,
     } as never)
     pool.query.mockResolvedValueOnce({
@@ -130,7 +130,7 @@ describe('deliverCandidatesForRun (batch)', () => {
     mockGetPool.mockReturnValue(pool)
 
     pool.query.mockResolvedValueOnce({
-      rows: [{ client_profile_id: 'cp-9', candidate_count: 1 }],
+      rows: [{ client_profile_id: 'cp-9', candidate_count: 1, anchor_candidate_id: '601' }],
       rowCount: 1,
     } as never)
     pool.query.mockResolvedValueOnce({
@@ -145,6 +145,11 @@ describe('deliverCandidatesForRun (batch)', () => {
     const claimCall = pool.query.mock.calls[1]
     const params = claimCall[1] as unknown[]
     expect(params[0]).toBe('digest:run-abc:profile:cp-9:telegram-batch')
+    // Regression guard: the claim INSERT must anchor digest_candidate_id to a REAL
+    // candidate id (MIN(id) of the profile group), never 0. digest_candidate_id
+    // has a NOT NULL FK to digest_candidates(id); a 0/synthetic sentinel violates
+    // it and aborts every batch delivery.
+    expect(params[3]).toBe('601')
   })
 
   it('runs AI enrichment before delivery and survives its failure', async () => {
@@ -154,7 +159,7 @@ describe('deliverCandidatesForRun (batch)', () => {
     mockGetPool.mockReturnValue(pool)
 
     pool.query.mockResolvedValueOnce({
-      rows: [{ client_profile_id: 'cp-1', candidate_count: 1 }],
+      rows: [{ client_profile_id: 'cp-1', candidate_count: 1, anchor_candidate_id: '301' }],
       rowCount: 1,
     } as never)
     pool.query.mockResolvedValueOnce({

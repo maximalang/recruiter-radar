@@ -61,8 +61,17 @@ export async function deliverCandidatesForRun(runId: string): Promise<DeliverRun
   // Distinct client profiles that have A/B candidates in this run. Batch delivery
   // sends ONE digest per (run, profile) instead of one message per candidate, so
   // the delivery unit — and its idempotency claim — is the profile, not the lead.
-  const profiles = await pool.query<{ client_profile_id: string; candidate_count: number }>(`
-    SELECT client_profile_id::TEXT AS client_profile_id, COUNT(*)::INT AS candidate_count
+  //
+  // anchor_candidate_id is the smallest candidate id in this (run, profile) group.
+  // digest_delivery_attempts.digest_candidate_id has a NOT NULL FK to
+  // digest_candidates(id), so a batch claim must point at a REAL candidate row —
+  // a 0 / synthetic sentinel violates the FK and aborts every delivery. The row
+  // is only an FK anchor; per-profile uniqueness is carried by idempotency_key,
+  // and GROUP BY guarantees MIN(id) exists (a group only appears with ≥1 row).
+  const profiles = await pool.query<{ client_profile_id: string; candidate_count: number; anchor_candidate_id: string }>(`
+    SELECT client_profile_id::TEXT AS client_profile_id,
+           COUNT(*)::INT AS candidate_count,
+           MIN(id)::TEXT AS anchor_candidate_id
     FROM digest_candidates
     WHERE digest_run_id = $1
       AND (payload->>'confidence_gate' NOT IN ('C', 'D') OR payload->>'confidence_gate' IS NULL)
@@ -76,15 +85,17 @@ export async function deliverCandidatesForRun(runId: string): Promise<DeliverRun
     const clientProfileId = row.client_profile_id
     const claimToken = randomUUID()
     // Idempotency is now per (run, profile, telegram-batch) — one delivery unit
-    // per profile. digest_candidate_id is 0 (the whole batch, not a single lead);
-    // the idempotency_key carries the profile so the claim is unique per profile.
+    // per profile. digest_candidate_id anchors to MIN(id) of this profile's
+    // candidates (a real FK target); the idempotency_key carries the profile so
+    // the claim stays unique per profile regardless of which candidate anchors it.
     const idempotencyKey = `digest:${runId}:profile:${clientProfileId}:telegram-batch`
+    const anchorCandidateId = row.anchor_candidate_id
 
     const claim = await pool.query<{ id: number; status: string; ownsClaim: boolean }>(`
       INSERT INTO digest_delivery_attempts (
         digest_candidate_id, idempotency_key, channel, status, processing_claimed_at, processing_claim_token
       )
-      VALUES (0, $1, 'telegram', 'processing', NOW(), $2)
+      VALUES ($4, $1, 'telegram', 'processing', NOW(), $2)
       ON CONFLICT (digest_candidate_id, idempotency_key)
       DO UPDATE SET
         processing_claimed_at = CASE
@@ -100,7 +111,7 @@ export async function deliverCandidatesForRun(runId: string): Promise<DeliverRun
             OR (digest_delivery_attempts.status = 'processing' AND digest_delivery_attempts.processing_claimed_at < NOW() - ($3::int * INTERVAL '1 second'))
           THEN 'processing' ELSE digest_delivery_attempts.status END
       RETURNING id, status::TEXT AS status, processing_claim_token = $2 AS "ownsClaim"
-    `, [idempotencyKey, claimToken, DELIVERY_STALE_SECONDS])
+    `, [idempotencyKey, claimToken, DELIVERY_STALE_SECONDS, anchorCandidateId])
 
     const attempt = claim.rows[0]
     if (attempt.status === 'sent' || !attempt.ownsClaim) {
