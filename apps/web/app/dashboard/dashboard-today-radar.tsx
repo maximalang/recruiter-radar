@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { LeadItem } from '@/lib/leads-data';
-import { GateBadgeInline, ScoreBar, ScoreBandChip, SignalFreshnessChip } from '../ui/internal-page';
+import { ScoreBar, ScoreBandChip, SignalFreshnessChip, ForeignEmployerBadge } from '../ui/internal-page';
+import { deriveRoleNames, splitRolesForDisplay } from '@/lib/leads/lead-quality';
 import styles from './dashboard.module.css';
 
 interface DashboardTodayRadarProps {
@@ -29,16 +30,22 @@ export default function DashboardTodayRadar({ topLeads, pendingReview }: Dashboa
 
       {topLeads.length === 0 ? (
         <div className={styles.analyticsEmpty}>
-          Пока нет компаний для контакта. Как только дайджест соберёт лиды, они появятся здесь.
+          <p>Пока нет компаний для контакта. Радар подберёт их по вашему профилю: роли, отрасли, регионы.</p>
+          <Link href="/settings/profile" className={styles.todayRadarReviewPill}>
+            ⚙️ Проверить настройки профиля
+          </Link>
         </div>
       ) : (
         <div className={styles.todayRadarList}>
-          {topLeads.map((lead) => (
+          {topLeads.map((lead) => {
+            const roleNames = deriveRoleNames({ evidenceTitles: lead.evidenceTitles });
+            const { shown: shownRoles, more: moreRoles } = splitRolesForDisplay(roleNames, 2);
+            return (
             <Link key={lead.id} href={`/leads/${lead.id}`} className={styles.todayRadarCard}>
               <div className={styles.todayRadarCardTop}>
                 <span className={styles.todayRadarOrg}>{lead.orgName}</span>
                 <ScoreBandChip score={lead.score} />
-                <GateBadgeInline gate={lead.confidenceGate} />
+                <ForeignEmployerBadge isForeign={lead.isForeignEmployer} />
               </div>
 
               <div className={styles.todayRadarScore}>
@@ -58,14 +65,17 @@ export default function DashboardTodayRadar({ topLeads, pendingReview }: Dashboa
                 </div>
               )}
 
-              {lead.bestAngle && (
-                <div className={styles.todayRadarLine}>
-                  <span className={styles.todayRadarLineLabel}>Угол контакта</span>
-                  <span className={styles.todayRadarLineText}>{lead.bestAngle}</span>
-                </div>
-              )}
+              <div className={styles.todayRadarLine}>
+                <span className={styles.todayRadarLineLabel}>Роли</span>
+                <span className={styles.todayRadarLineText}>
+                  {shownRoles.length > 0
+                    ? `${shownRoles.join(' · ')}${moreRoles > 0 ? ` + ещё ${moreRoles}` : ''}`
+                    : 'роли не определены'}
+                </span>
+              </div>
             </Link>
-          ))}
+            );
+          })}
         </div>
       )}
     </section>

@@ -27,6 +27,7 @@ function profile(overrides: Partial<WhyMatchProfile> = {}): WhyMatchProfile {
     targetCity: null,
     minOpenRoles: null,
     hiringIntentMin: null,
+    remoteFriendly: false,
     ...overrides,
   };
 }
@@ -44,6 +45,30 @@ describe('buildWhyMatch', () => {
   it('reports a region match when the target city appears in locations', () => {
     const lines = buildWhyMatch(lead({ locationNames: ['Москва'] }), profile({ targetCity: 'Москва' }));
     expect(lines).toContain('Регион: Москва');
+  });
+
+  it('flags a region mismatch when the lead has a different location', () => {
+    const lines = buildWhyMatch(
+      lead({ locationNames: ['Новосибирск'] }),
+      profile({ targetCity: 'Москва' }),
+    );
+    expect(lines.some((l) => l.includes('Регион не ваш'))).toBe(true);
+  });
+
+  it('does not flag a region mismatch for a remote-friendly agency', () => {
+    const lines = buildWhyMatch(
+      lead({ locationNames: ['Новосибирск'] }),
+      profile({ targetCity: 'Москва', remoteFriendly: true }),
+    );
+    expect(lines.some((l) => l.includes('Регион не ваш'))).toBe(false);
+  });
+
+  it('does not assert a mismatch when the lead has no location data', () => {
+    const lines = buildWhyMatch(
+      lead({ locationNames: [] }),
+      profile({ targetCity: 'Москва' }),
+    );
+    expect(lines.some((l) => l.includes('Регион'))).toBe(false);
   });
 
   it('reports open-role volume only when the min threshold is set and met', () => {

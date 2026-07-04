@@ -5,6 +5,8 @@ import { getClientProfileById, INDUSTRY_KEYWORDS, type ClientProfile } from "./c
 import { ROLE_HABR_KEYWORDS } from "./lead-discovery/habr-keywords";
 import { DIGEST_EVIDENCE_QUERY } from "./digest-evidence-query";
 import { toSignalStrength } from "./scoring/score-display";
+import { detectForeignEmployer, applyForeignEmployerPenalty } from "./scoring/foreign-employer";
+import { deriveRoleNames, passesMinimumSignalGate } from "./leads/lead-quality";
 import type {
   DigestItem,
   DigestRun,
@@ -314,6 +316,8 @@ export async function runDigestForClientProfile(input: {
             confidence_gate: item.confidence_gate,
             evidence_titles: item.evidence_titles,
             location_names: item.location_names,
+            is_foreign_employer: item.is_foreign_employer ?? false,
+            foreign_matched_domain: item.foreign_matched_domain ?? null,
           })
         )
         paramIdx += 13
@@ -461,22 +465,45 @@ function mapDigestEvidenceRow(row: DigestEvidenceRow): DigestItemInput {
     row.secondary_reason_label || ''
   ];
 
+  const sourceExternalId = row.source_external_id ?? "";
+  const sourceDisplayName = row.source_display_name ?? "";
+  const evidenceTitles = normalizeTextArray(row.evidence_titles);
+  const candidateSourceKeys = normalizeTextArray(row.candidate_source_keys);
+  const locationNames = normalizeTextArray(row.location_names);
+
+  // Geo gate (Block 1): a foreign employer (foreign-ATS host, no RU footprint)
+  // must never out-rank a domestic lead. The SQL scorer grants any career-page
+  // direct_hiring_proof (300) — so a Greenhouse/Lever board beats an HH lead
+  // (200) purely for being a career page. Apply a SOFT penalty to the evidence
+  // total so the foreign lead sinks below any domestic lead at equal activity,
+  // while staying visible + flagged for the UI badge.
+  const foreign = detectForeignEmployer({
+    sourceDisplayName,
+    sourceExternalId,
+    candidateSourceKeys,
+    evidenceTitles,
+    locationNames,
+  });
+  const total_score = applyForeignEmployerPenalty(row.total_score, foreign.isForeign);
+
   return {
     rank: row.rank,
     org_id: String(row.org_id),
-    source_external_id: row.source_external_id ?? "",
-    source_display_name: row.source_display_name ?? "",
+    source_external_id: sourceExternalId,
+    source_display_name: sourceDisplayName,
     source_families: Array.isArray(row.source_families) ? row.source_families : [],
-    evidence_titles: normalizeTextArray(row.evidence_titles),
-    candidate_source_keys: normalizeTextArray(row.candidate_source_keys),
-    location_names: normalizeTextArray(row.location_names),
+    evidence_titles: evidenceTitles,
+    candidate_source_keys: candidateSourceKeys,
+    location_names: locationNames,
     vacancies_count: row.vacancies_count,
     distinct_vacancy_names_count: row.distinct_vacancy_names_count,
     latest_published_at: formatTimestamp(row.latest_published_at),
-    total_score: row.total_score,
+    total_score,
     reasons,
-    opener: buildOpener(row.source_display_name ?? "", reasons),
+    opener: buildOpener(sourceDisplayName, reasons),
     confidence_gate: row.confidence_gate ?? "",
+    is_foreign_employer: foreign.isForeign,
+    foreign_matched_domain: foreign.matchedDomain,
   };
 }
 
@@ -588,6 +615,25 @@ export function matchesClientProfile(item: DigestItemInput, clientProfile: Clien
         return false;
       }
     }
+  }
+
+  // Minimum signal-quality gate (Block 3): drop an empty-shell lead — no real
+  // roles, no direct corporate surface. (AI hint is not known at generation time,
+  // so it's treated as absent here; the gate only fires when roles AND surface
+  // are both missing, so a career-pages / A-B lead still passes.) This filters the
+  // vacuous leads that erode trust without regressing registry leads that carry
+  // actual role titles.
+  const roleNames = deriveRoleNames({ evidenceTitles: item.evidence_titles });
+  if (
+    !passesMinimumSignalGate({
+      vacanciesCount: item.vacancies_count,
+      roleNames,
+      hasAiHint: false,
+      sourceFamilies: item.source_families,
+      confidenceGate: item.confidence_gate,
+    })
+  ) {
+    return false;
   }
 
   return true;

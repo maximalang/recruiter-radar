@@ -37,6 +37,8 @@ export const REASON_LABELS: Record<string, string> = {
   'fit.role.no-match': 'Нет совпадений по ролям с вашим ICP',
   'fit.location.match': 'Регион совпадает с ICP',
   'fit.location.outside': 'Регион «{location}» вне ICP',
+  'fit.location.country-ru': 'Компания на рынке РФ',
+  'fit.country.foreign': 'Иностранная компания ({country}) — понижена релевантность для рынка РФ',
   'fit.size.match': 'Размер компании «{size}» совпадает с ICP',
   'fit.size.smb-sweet-spot': 'SMB sweet spot ({detail}, 50–500 сотрудников) — оптимальный бюджет для агентства',
   'fit.market.boom': 'Высокий рыночный спрос повышает релевантность',

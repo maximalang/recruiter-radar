@@ -118,6 +118,7 @@ export async function GET(request: Request) {
         targetCity: p.targetCity,
         minOpenRoles: p.minOpenRoles,
         hiringIntentMin: p.hiringIntentMin,
+        remoteFriendly: p.remoteFriendly,
       },
     ]),
   );

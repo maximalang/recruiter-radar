@@ -34,19 +34,53 @@ function parseReasons(raw: unknown): ScoringReason[] {
 
 // ─── Lead Card Derivation ────────────────────────────────────────
 
+// ─── Why-now priority ──────────────────────────────────────────────
+// Strongest "почему сейчас" signals first, so the lead card never leads with a
+// weak/ambient reason when a concrete hiring-urgency signal exists. Ordered by
+// evidential strength: direct corroborated hiring > burst > fresh > multiple
+// roles > generic freshness. Keys not listed inherit the lowest priority.
+const WHY_NOW_KEY_PRIORITY: Record<string, number> = {
+  'intent.direct-evidence.corroborated': 100,
+  'intent.multiple-corroborating': 95,
+  'intent.direct-evidence.present': 90,
+  'urgency.recent-signal-burst': 85,
+  'urgency.burst': 80,
+  'urgency.hard-to-fill': 75,
+  'urgency.fresh-postings': 70,
+  'intent.fresh-signals': 65,
+  'intent.partially-fresh': 55,
+  'intent.multiple-roles': 50,
+  'intent.source-diversity.high': 45,
+  'intent.source-diversity.medium': 40,
+  'intent.direct-surface': 35,
+  'intent.stale-signals': 10,
+  'urgency.stale-role-repeated': 5,
+  'urgency.stale-role-single': 4,
+}
+
+function whyNowPriority(reason: { component: string; key: string }): number {
+  return WHY_NOW_KEY_PRIORITY[reason.key] ?? 20
+}
+
 /**
  * Derive `why_now` from scoring reasons.
  * Picks the top urgency/intent reason keys, renders Russian labels.
+ *
+ * Priority-ordered: the strongest hiring-urgency/direct-evidence signal leads,
+ * so a low-quality lead (only stale/ambient reasons) cannot read as a hot one.
+ * Returns an empty string when there are no reasons at all — the caller hides
+ * the line, which is more honest than a vacuous "повод для контакта есть сейчас".
  */
 export function deriveWhyNow(rawReasons: unknown): string {
   const reasons = parseReasons(rawReasons)
-  if (reasons.length === 0) return 'Повод для контакта есть сейчас'
+  if (reasons.length === 0) return ''
 
-  // Prefer urgency/intent component reasons
+  // Prefer urgency/intent component reasons, ordered by evidential strength.
   const priorityReasons = reasons.filter(r =>
     r.component === 'urgency' || r.component === 'intent'
   )
-  const picked = priorityReasons.length > 0 ? priorityReasons.slice(0, 2) : reasons.slice(0, 2)
+  const pool = priorityReasons.length > 0 ? priorityReasons : reasons
+  const picked = [...pool].sort((a, b) => whyNowPriority(b) - whyNowPriority(a)).slice(0, 2)
   return picked.map(formatReason).join('; ')
 }
 
@@ -80,8 +114,8 @@ export function deriveBestAngle(rawReasons: unknown, opener: string, sourceFamil
   }
 
   // Hiring burst
-  if (keys.some(k => k.startsWith('urgency.burst'))) {
-    return 'Hiring burst — компания массово ищет специалистов'
+  if (keys.some(k => k.startsWith('urgency.burst')) || keys.includes('urgency.recent-signal-burst')) {
+    return 'Компания массово ищет специалистов — заходить с релевантной ролью сейчас'
   }
 
   // Opener takes precedence over source-family heuristics
@@ -103,8 +137,9 @@ export function deriveBestAngle(rawReasons: unknown, opener: string, sourceFamil
     }
   }
 
-  // Final fallback
-  return 'Короткий созвон, чтобы сверить задачи по найму'
+  // Final fallback — only when every concrete signal is absent. Honest about
+  // the lack of a specific angle rather than inventing one.
+  return 'Сверить задачи по найму коротким сообщением'
 }
 
 /**
@@ -175,8 +210,16 @@ export function deriveNegativeSignals(input: {
     signals.push('Низкая уверенность в сигнале — требуется проверка')
   }
 
-  // Single source
-  if (input.sourceFamilies.length <= 1) {
+  // Single source — only flag when no direct corporate surface is present.
+  // A single career-pages source IS a direct hiring surface (gate A/B), so
+  // "только один источник" would be misleading noise there; reserve the flag
+  // for platform-only aggregation where corroboration genuinely is missing.
+  const hasDirectSurface =
+    keys.includes('reachability.career-page') ||
+    keys.includes('reachability.corporate-contact') ||
+    keys.includes('reachability.direct-surface') ||
+    input.sourceFamilies.includes('career-pages')
+  if (input.sourceFamilies.length <= 1 && !hasDirectSurface) {
     signals.push('Только один источник — нет независимого подтверждения')
   }
 
@@ -261,6 +304,14 @@ export interface LeadItem {
    * an "AI-подсказка есть" cue without loading the full enrichment per row.
    */
   hasAiHint: boolean;
+  /**
+   * Geo gate (Block 1): true when the lead is a foreign employer (foreign-ATS
+   * host, no RU footprint). Drives the «Иностранный работодатель» badge. The
+   * score already reflects the soft foreign penalty.
+   */
+  isForeignEmployer: boolean;
+  /** The foreign ATS domain that triggered the flag, when isForeignEmployer. */
+  foreignMatchedDomain: string | null;
 }
 
 export interface LeadsListResult {
@@ -358,16 +409,22 @@ export function extractPayloadFields(payload: unknown): {
   confidenceGate: string;
   evidenceTitles: string[];
   locationNames: string[];
+  isForeignEmployer: boolean;
+  foreignMatchedDomain: string | null;
 } {
   const p =
     typeof payload === "object" && payload !== null && !Array.isArray(payload)
       ? (payload as Record<string, unknown>)
       : {};
   const gateRaw = p.confidenceGate ?? p.confidence_gate;
+  const foreignRaw = p.isForeignEmployer ?? p.is_foreign_employer;
+  const foreignDomainRaw = p.foreignMatchedDomain ?? p.foreign_matched_domain;
   return {
     confidenceGate: typeof gateRaw === "string" ? gateRaw : "",
     evidenceTitles: toStringArray(p.evidenceTitles ?? p.evidence_titles),
     locationNames: toStringArray(p.locationNames ?? p.location_names),
+    isForeignEmployer: foreignRaw === true,
+    foreignMatchedDomain: typeof foreignDomainRaw === "string" ? foreignDomainRaw : null,
   };
 }
 
@@ -377,7 +434,7 @@ function mapLeadRow(row: LeadRow): LeadItem {
   const structuredReasons = parseReasons(reasonsRaw);
   const reasons = structuredReasons.map(formatReason);
   const sourceFamilies = toStringArray(row.source_families);
-  const { confidenceGate, evidenceTitles, locationNames } = extractPayloadFields(row.payload);
+  const { confidenceGate, evidenceTitles, locationNames, isForeignEmployer, foreignMatchedDomain } = extractPayloadFields(row.payload);
   return {
     id: row.id,
     orgId: row.org_id,
@@ -409,6 +466,8 @@ function mapLeadRow(row: LeadRow): LeadItem {
     evidenceTitles,
     locationNames,
     hasAiHint: row.has_ai_hint === true,
+    isForeignEmployer,
+    foreignMatchedDomain,
   };
 }
 

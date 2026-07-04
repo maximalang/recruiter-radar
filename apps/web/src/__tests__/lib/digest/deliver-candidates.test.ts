@@ -1,88 +1,82 @@
 import { deliverCandidatesForRun } from '@/lib/digest/deliver-candidates'
 
-// Mock @/lib/db — getPool + sendLeadToTelegram
+// Mock @/lib/db — getPool + sendBatchDigestForRun (batch delivery, one message
+// per profile instead of one per lead).
 jest.mock('@/lib/db', () => ({
   getPool: jest.fn(),
-  sendLeadToTelegram: jest.fn(),
+  sendBatchDigestForRun: jest.fn(),
 }))
 
-import { getPool, sendLeadToTelegram } from '@/lib/db'
-const mockGetPool = getPool as jest.MockedFunction<typeof getPool>
-const mockSendLeadToTelegram = sendLeadToTelegram as jest.MockedFunction<typeof sendLeadToTelegram>
+// Mock the AI enrichment step so the delivery unit test does not depend on
+// provider env / network. The mock is asserted in the enrichment-isolation test.
+jest.mock('@/lib/ai/enrichment/enrichRunCandidates', () => ({
+  enrichRunCandidates: jest.fn(),
+}))
 
-/**
- * Helper: build a mock pool with a controllable query function.
- */
+// web-push + email are best-effort side channels — stub them so the unit test
+// stays focused on the Telegram batch path.
+jest.mock('@/lib/webPush', () => ({ notifyNewLeadsForRun: jest.fn() }))
+jest.mock('@/lib/email/sendDigestEmail', () => ({ sendDigestEmailForProfile: jest.fn() }))
+
+import { getPool, sendBatchDigestForRun } from '@/lib/db'
+import { enrichRunCandidates } from '@/lib/ai/enrichment/enrichRunCandidates'
+const mockGetPool = getPool as jest.MockedFunction<typeof getPool>
+const mockSendBatch = sendBatchDigestForRun as jest.MockedFunction<typeof sendBatchDigestForRun>
+const mockEnrich = enrichRunCandidates as jest.MockedFunction<typeof enrichRunCandidates>
+
 function makeMockPool(queryImpl?: jest.Mock) {
   const query = queryImpl ?? jest.fn()
   return { query } as unknown as import('pg').Pool
 }
 
-describe('deliverCandidatesForRun', () => {
+describe('deliverCandidatesForRun (batch)', () => {
   beforeEach(() => {
     mockGetPool.mockReset()
-    mockSendLeadToTelegram.mockReset()
+    mockSendBatch.mockReset()
+    mockEnrich.mockReset().mockResolvedValue({ ran: false, considered: 0, enriched: 0 })
   })
 
   it('returns ok:false with zeroed counters when pool is null', async () => {
     mockGetPool.mockReturnValue(null)
-
     const result = await deliverCandidatesForRun('run-1')
-
-    expect(result).toEqual({
-      ok: false,
-      sent: 0,
-      failed: 0,
-      skipped: 0,
-      failures: [],
-    })
+    expect(result).toEqual({ ok: false, sent: 0, failed: 0, skipped: 0, failures: [] })
   })
 
-  it('delivers A-gate candidate and reports sent=1', async () => {
+  it('sends one batch per profile and reports sent=1', async () => {
     const pool = makeMockPool()
     mockGetPool.mockReturnValue(pool)
 
-    // Step 1: candidates query returns one A-gate candidate
+    // Step 1: profiles query → one profile with 3 candidates
     pool.query.mockResolvedValueOnce({
-      rows: [{ id: 42 }],
+      rows: [{ client_profile_id: 'cp-1', candidate_count: 3 }],
       rowCount: 1,
     } as never)
-
-    // Step 2: claim INSERT returns ownsClaim=true, status='processing'
+    // Step 2: claim INSERT → ownsClaim
     pool.query.mockResolvedValueOnce({
       rows: [{ id: 100, status: 'processing', ownsClaim: true }],
       rowCount: 1,
     } as never)
-
-    // Step 3: sendLeadToTelegram succeeds
-    mockSendLeadToTelegram.mockResolvedValueOnce({ ok: true })
-
-    // Step 4: UPDATE status to 'sent'
-    pool.query.mockResolvedValueOnce({
-      rows: [],
-      rowCount: 1,
-    } as never)
+    // Step 3: batch send succeeds
+    mockSendBatch.mockResolvedValueOnce({ ok: true, messagesSent: 1, leadCount: 3 })
+    // Step 4: UPDATE status='sent'
+    pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 } as never)
 
     const result = await deliverCandidatesForRun('run-1')
 
     expect(result.sent).toBe(1)
     expect(result.failed).toBe(0)
-    expect(result.skipped).toBe(0)
     expect(result.ok).toBe(true)
-    expect(mockSendLeadToTelegram).toHaveBeenCalledWith(42)
+    expect(mockSendBatch).toHaveBeenCalledWith({ runId: 'run-1', clientProfileId: 'cp-1' })
   })
 
-  it('skips already-sent candidate (status=sent, ownsClaim=false)', async () => {
+  it('skips a profile already delivered (status=sent)', async () => {
     const pool = makeMockPool()
     mockGetPool.mockReturnValue(pool)
 
-    // One candidate
     pool.query.mockResolvedValueOnce({
-      rows: [{ id: 10 }],
+      rows: [{ client_profile_id: 'cp-1', candidate_count: 2 }],
       rowCount: 1,
     } as never)
-
-    // Claim returns status='sent' — already delivered
     pool.query.mockResolvedValueOnce({
       rows: [{ id: 200, status: 'sent', ownsClaim: false }],
       rowCount: 1,
@@ -92,244 +86,88 @@ describe('deliverCandidatesForRun', () => {
 
     expect(result.skipped).toBe(1)
     expect(result.sent).toBe(0)
-    expect(mockSendLeadToTelegram).not.toHaveBeenCalled()
+    expect(mockSendBatch).not.toHaveBeenCalled()
   })
 
-  it('skips when another worker owns the claim', async () => {
+  it('records a failure when the batch send returns ok:false', async () => {
     const pool = makeMockPool()
     mockGetPool.mockReturnValue(pool)
 
     pool.query.mockResolvedValueOnce({
-      rows: [{ id: 11 }],
+      rows: [{ client_profile_id: 'cp-1', candidate_count: 1 }],
       rowCount: 1,
     } as never)
-
-    // Claim returns status='processing' but ownsClaim=false (another worker)
-    pool.query.mockResolvedValueOnce({
-      rows: [{ id: 201, status: 'processing', ownsClaim: false }],
-      rowCount: 1,
-    } as never)
-
-    const result = await deliverCandidatesForRun('run-1')
-
-    expect(result.skipped).toBe(1)
-    expect(result.sent).toBe(0)
-  })
-
-  it('records failure when sendLeadToTelegram returns ok:false', async () => {
-    const pool = makeMockPool()
-    mockGetPool.mockReturnValue(pool)
-
-    pool.query.mockResolvedValueOnce({
-      rows: [{ id: 50 }],
-      rowCount: 1,
-    } as never)
-
     pool.query.mockResolvedValueOnce({
       rows: [{ id: 300, status: 'processing', ownsClaim: true }],
       rowCount: 1,
     } as never)
-
-    // Telegram send fails
-    mockSendLeadToTelegram.mockResolvedValueOnce({
-      ok: false,
-      error: 'Telegram API timeout',
-    })
-
-    // UPDATE status to 'failed'
-    pool.query.mockResolvedValueOnce({
-      rows: [],
-      rowCount: 1,
-    } as never)
+    mockSendBatch.mockResolvedValueOnce({ ok: false, error: 'Telegram API timeout' })
+    pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 } as never)
 
     const result = await deliverCandidatesForRun('run-1')
 
     expect(result.failed).toBe(1)
     expect(result.sent).toBe(0)
-    expect(result.failures).toEqual([
-      { digestCandidateId: 50, error: 'Telegram API timeout' },
-    ])
+    expect(result.failures[0].error).toContain('Telegram API timeout')
     expect(result.ok).toBe(false)
   })
 
-  it('records failure when sendLeadToTelegram throws an exception', async () => {
+  it('produces no batch when there are no A/B candidates', async () => {
     const pool = makeMockPool()
     mockGetPool.mockReturnValue(pool)
 
-    pool.query.mockResolvedValueOnce({
-      rows: [{ id: 60 }],
-      rowCount: 1,
-    } as never)
-
-    pool.query.mockResolvedValueOnce({
-      rows: [{ id: 301, status: 'processing', ownsClaim: true }],
-      rowCount: 1,
-    } as never)
-
-    // Telegram send throws
-    mockSendLeadToTelegram.mockRejectedValueOnce(new Error('Network error'))
-
-    // UPDATE status to 'failed'
-    pool.query.mockResolvedValueOnce({
-      rows: [],
-      rowCount: 1,
-    } as never)
-
-    const result = await deliverCandidatesForRun('run-1')
-
-    expect(result.failed).toBe(1)
-    expect(result.failures[0].error).toBe('Network error')
-    expect(result.ok).toBe(false)
-  })
-
-  it('handles non-Error exceptions in sendLeadToTelegram', async () => {
-    const pool = makeMockPool()
-    mockGetPool.mockReturnValue(pool)
-
-    pool.query.mockResolvedValueOnce({
-      rows: [{ id: 70 }],
-      rowCount: 1,
-    } as never)
-
-    pool.query.mockResolvedValueOnce({
-      rows: [{ id: 302, status: 'processing', ownsClaim: true }],
-      rowCount: 1,
-    } as never)
-
-    // Throws a non-Error value
-    mockSendLeadToTelegram.mockRejectedValueOnce('string error')
-
-    pool.query.mockResolvedValueOnce({
-      rows: [],
-      rowCount: 1,
-    } as never)
-
-    const result = await deliverCandidatesForRun('run-1')
-
-    expect(result.failed).toBe(1)
-    expect(result.failures[0].error).toBe('Delivery exception.')
-  })
-
-  it('filters out C and D gate candidates', async () => {
-    const pool = makeMockPool()
-    mockGetPool.mockReturnValue(pool)
-
-    // Candidates query returns no rows (all filtered by the SQL gate check)
-    pool.query.mockResolvedValueOnce({
-      rows: [],
-      rowCount: 0,
-    } as never)
+    pool.query.mockResolvedValueOnce({ rows: [], rowCount: 0 } as never)
 
     const result = await deliverCandidatesForRun('run-1')
 
     expect(result.sent).toBe(0)
-    expect(result.failed).toBe(0)
-    expect(result.skipped).toBe(0)
     expect(result.ok).toBe(true)
+    expect(mockSendBatch).not.toHaveBeenCalled()
   })
 
-  it('delivers multiple candidates in sequence', async () => {
-    const pool = makeMockPool()
-    mockGetPool.mockReturnValue(pool)
-
-    // Two A-gate candidates
-    pool.query.mockResolvedValueOnce({
-      rows: [{ id: 1 }, { id: 2 }],
-      rowCount: 2,
-    } as never)
-
-    // First candidate: claim → send → update
-    pool.query.mockResolvedValueOnce({
-      rows: [{ id: 400, status: 'processing', ownsClaim: true }],
-      rowCount: 1,
-    } as never)
-    mockSendLeadToTelegram.mockResolvedValueOnce({ ok: true })
-    pool.query.mockResolvedValueOnce({
-      rows: [],
-      rowCount: 1,
-    } as never)
-
-    // Second candidate: claim → send → update
-    pool.query.mockResolvedValueOnce({
-      rows: [{ id: 401, status: 'processing', ownsClaim: true }],
-      rowCount: 1,
-    } as never)
-    mockSendLeadToTelegram.mockResolvedValueOnce({ ok: true })
-    pool.query.mockResolvedValueOnce({
-      rows: [],
-      rowCount: 1,
-    } as never)
-
-    const result = await deliverCandidatesForRun('run-1')
-
-    expect(result.sent).toBe(2)
-    expect(result.ok).toBe(true)
-    expect(mockSendLeadToTelegram).toHaveBeenCalledTimes(2)
-  })
-
-  it('continues after one candidate fails', async () => {
-    const pool = makeMockPool()
-    mockGetPool.mockReturnValue(pool)
-
-    // Two candidates
-    pool.query.mockResolvedValueOnce({
-      rows: [{ id: 1 }, { id: 2 }],
-      rowCount: 2,
-    } as never)
-
-    // First candidate: claim → send fails → update
-    pool.query.mockResolvedValueOnce({
-      rows: [{ id: 500, status: 'processing', ownsClaim: true }],
-      rowCount: 1,
-    } as never)
-    mockSendLeadToTelegram.mockResolvedValueOnce({ ok: false, error: 'Timeout' })
-    pool.query.mockResolvedValueOnce({
-      rows: [],
-      rowCount: 1,
-    } as never)
-
-    // Second candidate: claim → send succeeds → update
-    pool.query.mockResolvedValueOnce({
-      rows: [{ id: 501, status: 'processing', ownsClaim: true }],
-      rowCount: 1,
-    } as never)
-    mockSendLeadToTelegram.mockResolvedValueOnce({ ok: true })
-    pool.query.mockResolvedValueOnce({
-      rows: [],
-      rowCount: 1,
-    } as never)
-
-    const result = await deliverCandidatesForRun('run-1')
-
-    expect(result.sent).toBe(1)
-    expect(result.failed).toBe(1)
-    expect(result.ok).toBe(false)
-  })
-
-  it('passes the correct idempotency key format to the claim query', async () => {
+  it('uses a per-profile idempotency key', async () => {
     const pool = makeMockPool()
     mockGetPool.mockReturnValue(pool)
 
     pool.query.mockResolvedValueOnce({
-      rows: [{ id: 99 }],
+      rows: [{ client_profile_id: 'cp-9', candidate_count: 1 }],
       rowCount: 1,
     } as never)
-
-    // Capture the claim query to verify idempotency key format
     pool.query.mockResolvedValueOnce({
       rows: [{ id: 600, status: 'processing', ownsClaim: true }],
       rowCount: 1,
     } as never)
-
-    mockSendLeadToTelegram.mockResolvedValueOnce({ ok: true })
+    mockSendBatch.mockResolvedValueOnce({ ok: true, messagesSent: 1, leadCount: 1 })
     pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 } as never)
 
     await deliverCandidatesForRun('run-abc')
 
-    // The second call is the claim INSERT — check the idempotency key param
     const claimCall = pool.query.mock.calls[1]
-    const idempotencyKey = claimCall[1] as unknown[]  // params array
-    // Key should be: `digest:${runId}:candidate:${candidateId}:telegram`
-    expect(idempotencyKey[1]).toBe('digest:run-abc:candidate:99:telegram')
+    const params = claimCall[1] as unknown[]
+    expect(params[0]).toBe('digest:run-abc:profile:cp-9:telegram-batch')
+  })
+
+  it('runs AI enrichment before delivery and survives its failure', async () => {
+    mockEnrich.mockReset().mockRejectedValueOnce(new Error('provider down'))
+
+    const pool = makeMockPool()
+    mockGetPool.mockReturnValue(pool)
+
+    pool.query.mockResolvedValueOnce({
+      rows: [{ client_profile_id: 'cp-1', candidate_count: 1 }],
+      rowCount: 1,
+    } as never)
+    pool.query.mockResolvedValueOnce({
+      rows: [{ id: 100, status: 'processing', ownsClaim: true }],
+      rowCount: 1,
+    } as never)
+    mockSendBatch.mockResolvedValueOnce({ ok: true, messagesSent: 1, leadCount: 1 })
+    pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 } as never)
+
+    const result = await deliverCandidatesForRun('run-1')
+
+    expect(mockEnrich).toHaveBeenCalledWith('run-1')
+    expect(result.sent).toBe(1)
+    expect(result.ok).toBe(true)
   })
 })

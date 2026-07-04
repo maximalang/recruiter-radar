@@ -414,6 +414,8 @@ export async function sendTelegramTextMessage(
   config: TelegramMessageConfig,
   options?: {
     replyMarkup?: unknown;
+    /** Telegram parse mode, e.g. "HTML". Omitted → plain text. */
+    parseMode?: "HTML" | "MarkdownV2";
   }
 ): Promise<TelegramTextMessageResult> {
   const safeText = text.length > TELEGRAM_MESSAGE_CHAR_LIMIT
@@ -422,6 +424,7 @@ export async function sendTelegramTextMessage(
   const result = await callTelegramApi<{ message_id: number }>("sendMessage", config, {
     chat_id: config.chatId,
     text: safeText,
+    ...(options?.parseMode ? { parse_mode: options.parseMode } : {}),
     ...(options?.replyMarkup ? { reply_markup: options.replyMarkup } : {})
   });
 

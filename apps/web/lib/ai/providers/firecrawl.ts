@@ -10,20 +10,21 @@
  * replaced ScrapeGraphAI, whose API key was rejected (403 Invalid API key).
  *
  * This file owns the CONTRACT (`ScrapeProvider`) plus a REAL Firecrawl client:
- *   - `extract`  → POST /v1/extract  (structured JSON for our hiring schema)
- *   - `scrape`   → POST /v1/scrape   (markdown fallback when extract is empty)
+ *   - `extract`  → POST /v2/scrape  formats:['json'] + jsonOptions.schema
+ *   - `scrape`   → POST /v2/scrape  formats:['markdown']  (fallback for RU pages)
  * The real client NEVER throws to the caller: any failure (no key, timeout, HTTP
  * error, malformed body) degrades to a typed `available: false` result and is
  * logged. The stub is kept so Stage-1 callers and tests still exercise the
  * degrade path without a key, and so Crawl4AI / PixelRAG can implement the same
  * interface unchanged.
  *
- * Firecrawl /v1/extract is ASYNC: the first POST returns a job id, then the
- * caller polls GET /v1/extract/{id} until status is "completed". /v1/scrape is
- * synchronous. Each HTTP call has a hard REQUEST_TIMEOUT_MS (15s); the total
- * extract wall-clock is bounded by REQUEST_TIMEOUT_MS (POST) + MAX_EXTRACT_POLLS
- * × (EXTRACT_POLL_DELAY_MS + REQUEST_TIMEOUT_MS) ≈ 15 + 6×(2+15) ≈ 117s worst
- * case, but the per-org 1/24h quota means at most one such hang per org/day.
+ * Migration (2026-07-03): Firecrawl /v1/extract is DEPRECATED. Structured
+ * extraction now rides on the SYNCHRONOUS /v2/scrape endpoint with the `json`
+ * format — one POST returns `{ data: { json, markdown } }`, no job id / polling.
+ * That both removes the async wall-clock (was ≈117s worst case) and lets a single
+ * scrape return markdown AND structured json together. Markdown scraping uses the
+ * same /v2/scrape with formats:['markdown'] (already works for RU SPA pages).
+ * Each HTTP call has a hard REQUEST_TIMEOUT_MS (15s).
  *
  * See lib/ai/enrichment/careerPages.ts for the data contract this provider feeds,
  * and docs/specs/2026-06-28-ai-enrichment-career-pages.md.
@@ -85,11 +86,6 @@ const DEFAULT_API_BASE = 'http://localhost:3002';
 
 /** Hard per-request timeout. Enrichment is best-effort and must never hang the run. */
 const REQUEST_TIMEOUT_MS = 15_000;
-
-/** Max polls for the async /v1/extract job before giving up. Bounds total wall-clock. */
-const MAX_EXTRACT_POLLS = 6;
-/** Delay between extract-status polls. */
-const EXTRACT_POLL_DELAY_MS = 2_000;
 
 /**
  * The extraction ask handed to the scraper. Centralized here so prompt versioning
@@ -216,10 +212,6 @@ async function requestJson(
   }
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 // ─── Response mapping (provider shape → our contract) ────────────────────────
 
 function asString(v: unknown): string | null {
@@ -262,8 +254,8 @@ function mapRoles(v: unknown): EnrichedRole[] {
 }
 
 /**
- * Firecrawl /v1/extract wraps the schema result under a `data` (or `result`)
- * key. Unwrap defensively — providers differ and we never trust shape.
+ * Firecrawl wraps its result under a `data` (or `result`) key. Unwrap
+ * defensively — providers differ and we never trust shape.
  */
 function unwrapResult(body: unknown): Record<string, unknown> | null {
   if (typeof body !== 'object' || body === null) return null;
@@ -275,6 +267,22 @@ function unwrapResult(body: unknown): Record<string, unknown> | null {
 }
 
 /**
+ * Unwrap the STRUCTURED object from a /v2/scrape response. v2 returns
+ * `{ success, data: { json: {...}, markdown } }` — the schema result lives at
+ * `data.json`. Falls back to `data` itself (self-hosted builds may inline the
+ * fields) then the whole body, so an older shape still maps.
+ */
+function unwrapJsonResult(body: unknown): Record<string, unknown> | null {
+  const data = unwrapResult(body);
+  if (!data) return null;
+  const json = data.json;
+  if (typeof json === 'object' && json !== null && !Array.isArray(json)) {
+    return json as Record<string, unknown>;
+  }
+  return data;
+}
+
+/**
  * Map a Firecrawl extract body into `EnrichedHiringSignals`, attaching our own
  * provenance (sourceUrl + provider). Returns null when the body carries no
  * usable signal (no roles AND no summary) — the caller then degrades.
@@ -283,7 +291,7 @@ function mapExtractResponse(
   body: unknown,
   sourceUrl: string,
 ): EnrichedHiringSignals | null {
-  const result = unwrapResult(body);
+  const result = unwrapJsonResult(body);
   if (!result) return null;
 
   const detectedRoles = mapRoles(result.detectedRoles);
@@ -328,56 +336,6 @@ function mapScrapeResponse(
 
 // ─── Real client ─────────────────────────────────────────────────────────────
 
-/**
- * Firecrawl /v1/extract is async. POST returns a job id; we then poll
- * GET /v1/extract/{id} until status === 'completed' (or a terminal failure).
- * Returns the final body (with `data` populated) or throws on failure/timeout.
- */
-async function runExtractJob(
-  base: string,
-  apiKey: string,
-  requestBody: Record<string, unknown>,
-): Promise<unknown> {
-  const startBody = await requestJson(base, 'POST', '/v1/extract', apiKey, requestBody);
-
-  // Firecrawl v1 returns { id, status } or { jobId }. Tolerate both.
-  const startObj =
-    typeof startBody === 'object' && startBody !== null
-      ? (startBody as Record<string, unknown>)
-      : {};
-  const jobId = asString(startObj.id) ?? asString(startObj.jobId);
-  if (!jobId) {
-    // Some self-hosted builds return the result synchronously — accept it.
-    return startBody;
-  }
-
-  // If already completed with data, skip polling.
-  const startStatus = asString(startObj.status);
-  if (startStatus === 'completed') return startBody;
-
-  for (let i = 0; i < MAX_EXTRACT_POLLS; i += 1) {
-    await sleep(EXTRACT_POLL_DELAY_MS);
-    const pollBody = await requestJson(
-      base,
-      'GET',
-      `/v1/extract/${jobId}`,
-      apiKey,
-      undefined,
-    );
-    const pollObj =
-      typeof pollBody === 'object' && pollBody !== null
-        ? (pollBody as Record<string, unknown>)
-        : {};
-    const status = asString(pollObj.status);
-    if (status === 'completed') return pollBody;
-    if (status === 'failed' || status === 'cancelled') {
-      throw new Error(`firecrawl extract job ${status}`);
-    }
-    // status === 'processing' (or unknown) → keep polling.
-  }
-  throw new Error('firecrawl extract job timed out (polling)');
-}
-
 function createRealFirecrawlProvider(apiKey: string): ScrapeProvider {
   const base = resolveApiBase();
 
@@ -386,7 +344,7 @@ function createRealFirecrawlProvider(apiKey: string): ScrapeProvider {
 
     async scrapeToMarkdown(url: string): Promise<AssistResult<ScrapeMarkdownResult>> {
       try {
-        const body = await requestJson(base, 'POST', '/v1/scrape', apiKey, {
+        const body = await requestJson(base, 'POST', '/v2/scrape', apiKey, {
           url,
           formats: ['markdown'],
         });
@@ -414,16 +372,21 @@ function createRealFirecrawlProvider(apiKey: string): ScrapeProvider {
       instruction: string;
     }): Promise<AssistResult<EnrichedHiringSignals>> {
       try {
-        const body = await runExtractJob(base, apiKey, {
-          // Firecrawl /v1/extract fetches the page itself from `urls` — unlike
-          // ScrapeGraphAI it does NOT accept a caller-supplied markdown/html
-          // body. `input.content` (pre-fetched by the caller) is therefore not
-          // forwarded here; it is still used by the Crawl4AI fallback path in
-          // repairWeakCareerPage, which re-extracts from clean markdown. The
-          // prompt + schema drive the structured output.
-          urls: [input.sourceUrl],
-          prompt: input.instruction,
-          schema: EXTRACTION_OUTPUT_SCHEMA,
+        // /v2/scrape with the `json` format is SYNCHRONOUS — one POST returns
+        // `{ data: { json, markdown } }`, no job id / polling. Firecrawl fetches
+        // the page itself from `url`; `input.content` (pre-fetched markdown) is
+        // therefore not forwarded here — it is used by the Crawl4AI fallback in
+        // repairWeakCareerPage, which re-extracts from clean markdown. The prompt
+        // + schema drive the structured output.
+        const body = await requestJson(base, 'POST', '/v2/scrape', apiKey, {
+          url: input.sourceUrl,
+          formats: [
+            {
+              type: 'json',
+              prompt: input.instruction,
+              schema: EXTRACTION_OUTPUT_SCHEMA,
+            },
+          ],
         });
         const mapped = mapExtractResponse(body, input.sourceUrl);
         if (!mapped) return degradedExtract('firecrawl: extract returned no usable signal');

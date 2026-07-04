@@ -8,7 +8,7 @@
  * stale processing claims are reclaimed after DELIVERY_STALE_SECONDS.
  */
 
-import { getPool, sendLeadToTelegram } from '@/lib/db'
+import { getPool, sendBatchDigestForRun } from '@/lib/db'
 import { notifyNewLeadsForRun } from '@/lib/webPush'
 import { sendDigestEmailForProfile } from '@/lib/email/sendDigestEmail'
 import { enrichRunCandidates } from '@/lib/ai/enrichment/enrichRunCandidates'
@@ -58,42 +58,49 @@ export async function deliverCandidatesForRun(runId: string): Promise<DeliverRun
     logError('ai.enrichment.pre_delivery_failed', error, { runId })
   }
 
-  // Get candidates for delivery (A/B gates only)
-  const candidates = await pool.query<{ id: number; client_profile_id: string }>(`
-    SELECT id, client_profile_id::TEXT AS client_profile_id
+  // Distinct client profiles that have A/B candidates in this run. Batch delivery
+  // sends ONE digest per (run, profile) instead of one message per candidate, so
+  // the delivery unit — and its idempotency claim — is the profile, not the lead.
+  const profiles = await pool.query<{ client_profile_id: string; candidate_count: number }>(`
+    SELECT client_profile_id::TEXT AS client_profile_id, COUNT(*)::INT AS candidate_count
     FROM digest_candidates
     WHERE digest_run_id = $1
       AND (payload->>'confidence_gate' NOT IN ('C', 'D') OR payload->>'confidence_gate' IS NULL)
-    ORDER BY id ASC
+    GROUP BY client_profile_id
+    ORDER BY client_profile_id ASC
   `, [runId])
 
   const counters: DeliveryCounters = { sent: 0, failed: 0, skipped: 0, failures: [] }
 
-  for (const row of candidates.rows) {
+  for (const row of profiles.rows) {
+    const clientProfileId = row.client_profile_id
     const claimToken = randomUUID()
-    const idempotencyKey = `digest:${runId}:candidate:${row.id}:telegram`
+    // Idempotency is now per (run, profile, telegram-batch) — one delivery unit
+    // per profile. digest_candidate_id is 0 (the whole batch, not a single lead);
+    // the idempotency_key carries the profile so the claim is unique per profile.
+    const idempotencyKey = `digest:${runId}:profile:${clientProfileId}:telegram-batch`
 
     const claim = await pool.query<{ id: number; status: string; ownsClaim: boolean }>(`
       INSERT INTO digest_delivery_attempts (
         digest_candidate_id, idempotency_key, channel, status, processing_claimed_at, processing_claim_token
       )
-      VALUES ($1, $2, 'telegram', 'processing', NOW(), $3)
+      VALUES (0, $1, 'telegram', 'processing', NOW(), $2)
       ON CONFLICT (digest_candidate_id, idempotency_key)
       DO UPDATE SET
         processing_claimed_at = CASE
           WHEN digest_delivery_attempts.status = 'failed'
-            OR (digest_delivery_attempts.status = 'processing' AND digest_delivery_attempts.processing_claimed_at < NOW() - ($4::int * INTERVAL '1 second'))
+            OR (digest_delivery_attempts.status = 'processing' AND digest_delivery_attempts.processing_claimed_at < NOW() - ($3::int * INTERVAL '1 second'))
           THEN NOW() ELSE digest_delivery_attempts.processing_claimed_at END,
         processing_claim_token = CASE
           WHEN digest_delivery_attempts.status = 'failed'
-            OR (digest_delivery_attempts.status = 'processing' AND digest_delivery_attempts.processing_claimed_at < NOW() - ($4::int * INTERVAL '1 second'))
+            OR (digest_delivery_attempts.status = 'processing' AND digest_delivery_attempts.processing_claimed_at < NOW() - ($3::int * INTERVAL '1 second'))
           THEN EXCLUDED.processing_claim_token ELSE digest_delivery_attempts.processing_claim_token END,
         status = CASE
           WHEN digest_delivery_attempts.status = 'failed'
-            OR (digest_delivery_attempts.status = 'processing' AND digest_delivery_attempts.processing_claimed_at < NOW() - ($4::int * INTERVAL '1 second'))
+            OR (digest_delivery_attempts.status = 'processing' AND digest_delivery_attempts.processing_claimed_at < NOW() - ($3::int * INTERVAL '1 second'))
           THEN 'processing' ELSE digest_delivery_attempts.status END
-      RETURNING id, status::TEXT AS status, processing_claim_token = $3 AS "ownsClaim"
-    `, [row.id, idempotencyKey, claimToken, DELIVERY_STALE_SECONDS])
+      RETURNING id, status::TEXT AS status, processing_claim_token = $2 AS "ownsClaim"
+    `, [idempotencyKey, claimToken, DELIVERY_STALE_SECONDS])
 
     const attempt = claim.rows[0]
     if (attempt.status === 'sent' || !attempt.ownsClaim) {
@@ -102,7 +109,7 @@ export async function deliverCandidatesForRun(runId: string): Promise<DeliverRun
     }
 
     try {
-      const result = await sendLeadToTelegram(row.id)
+      const result = await sendBatchDigestForRun({ runId, clientProfileId })
       if (result.ok) {
         await pool.query(
           `UPDATE digest_delivery_attempts SET status = 'sent', error_message = NULL WHERE id = $1 AND processing_claim_token = $2`,
@@ -115,7 +122,7 @@ export async function deliverCandidatesForRun(runId: string): Promise<DeliverRun
           [attempt.id, claimToken, result.error]
         )
         counters.failed += 1
-        counters.failures.push({ digestCandidateId: row.id, error: result.error })
+        counters.failures.push({ digestCandidateId: 0, error: `${clientProfileId}: ${result.error}` })
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Delivery exception.'
@@ -124,29 +131,21 @@ export async function deliverCandidatesForRun(runId: string): Promise<DeliverRun
         [attempt.id, claimToken, message]
       )
       counters.failed += 1
-      counters.failures.push({ digestCandidateId: row.id, error: message })
+      counters.failures.push({ digestCandidateId: 0, error: `${clientProfileId}: ${message}` })
     }
-  }
 
-  // Aggregate web-push for this run's strong (A/B) leads. Best-effort and
-  // additive: a push failure must never affect the Telegram delivery result.
-  // Dedupe/preference/subscription checks all live in notifyNewLeadsForRun.
-  if (candidates.rows.length > 0) {
-    const clientProfileId = candidates.rows[0].client_profile_id
+    // Aggregate web-push + email for this profile's strong (A/B) leads.
+    // Best-effort and additive: a failure must never affect the Telegram result.
+    // Dedupe/preference/subscription checks all live in the notify helpers.
     try {
       await notifyNewLeadsForRun({
         clientProfileId,
         digestRunId: runId,
-        count: candidates.rows.length,
+        count: row.candidate_count,
       })
     } catch (error) {
       logError('webpush.notify_run_failed', error, { runId })
     }
-
-    // Daily email digest for this profile. Best-effort and additive, same as
-    // web-push: a failure must never affect the Telegram delivery result.
-    // Preference/destination/dedupe (one email per profile per day) all live in
-    // sendDigestEmailForProfile.
     try {
       await sendDigestEmailForProfile({ clientProfileId, digestRunId: runId })
     } catch (error) {

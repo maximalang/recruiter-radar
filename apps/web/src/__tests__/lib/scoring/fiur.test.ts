@@ -469,4 +469,65 @@ describe('computeFiur', () => {
       ).toBe(false)
     })
   })
+
+  describe('country geo gate (Russia-first)', () => {
+    it('applies a Fit penalty to a confirmed foreign company', () => {
+      const domestic = computeFiur({
+        company: { ...baseCompany, country: 'RU' },
+        vacancies: [vacancy()],
+        clientProfile: baseProfile,
+        evidence: [{ tier: 'direct', source: 'career-page' }],
+      })
+      const foreign = computeFiur({
+        company: { ...baseCompany, country: 'US' },
+        vacancies: [vacancy()],
+        clientProfile: baseProfile,
+        evidence: [{ tier: 'direct', source: 'career-page' }],
+      })
+
+      expect(foreign.fit).toBeLessThan(domestic.fit)
+      expect(
+        foreign.reasons.fit.some((r) => r.key === 'fit.country.foreign')
+      ).toBe(true)
+    })
+
+    it('a RU company out-scores a foreign one at equal activity/evidence', () => {
+      const shared = {
+        vacancies: [vacancy(), vacancy({ id: 'v-2', role: 'ml engineer', title: 'ML Engineer' })],
+        clientProfile: baseProfile,
+        evidence: [
+          { tier: 'direct' as const, source: 'career-page' },
+          { tier: 'corroboration' as const, source: 'hh' },
+        ],
+      }
+      const ru = computeFiur({ company: { ...baseCompany, country: 'RU' }, ...shared })
+      const foreign = computeFiur({ company: { ...baseCompany, country: 'US' }, ...shared })
+
+      expect(ru.total).toBeGreaterThan(foreign.total)
+    })
+
+    it('does not penalise an unknown country (no leads=0 regression)', () => {
+      const unknown = computeFiur({
+        company: { ...baseCompany, country: undefined },
+        vacancies: [vacancy()],
+        clientProfile: baseProfile,
+        evidence: [{ tier: 'direct', source: 'career-page' }],
+      })
+      expect(
+        unknown.reasons.fit.some((r) => r.key === 'fit.country.foreign')
+      ).toBe(false)
+    })
+
+    it('awards a reduced location bonus for a RU company with no city match', () => {
+      const ruNoCity = computeFiur({
+        company: { ...baseCompany, country: 'RU', location: undefined },
+        vacancies: [vacancy({ location: undefined })],
+        clientProfile: baseProfile,
+        evidence: [{ tier: 'direct', source: 'career-page' }],
+      })
+      expect(
+        ruNoCity.reasons.fit.some((r) => r.key === 'fit.location.country-ru')
+      ).toBe(true)
+    })
+  })
 })

@@ -27,6 +27,8 @@ describe('extractPayloadFields (canonical payload reader)', () => {
       confidenceGate: 'A',
       evidenceTitles: ['Backend', 'Frontend'],
       locationNames: ['Москва'],
+      isForeignEmployer: false,
+      foreignMatchedDomain: null,
     });
   });
 
@@ -40,16 +42,25 @@ describe('extractPayloadFields (canonical payload reader)', () => {
       confidenceGate: 'B',
       evidenceTitles: ['QA'],
       locationNames: ['Санкт-Петербург'],
+      isForeignEmployer: false,
+      foreignMatchedDomain: null,
     });
   });
 
   it('degrades to "" / [] when keys are absent (thin payload, no throw)', () => {
     const out = extractPayloadFields({ rank: 5 });
-    expect(out).toEqual({ confidenceGate: '', evidenceTitles: [], locationNames: [] });
+    expect(out).toEqual({ confidenceGate: '', evidenceTitles: [], locationNames: [], isForeignEmployer: false, foreignMatchedDomain: null });
+  });
+
+  it('reads the foreign-employer flag + matched domain from payload', () => {
+    expect(extractPayloadFields({ is_foreign_employer: true, foreign_matched_domain: 'greenhouse.io' }))
+      .toMatchObject({ isForeignEmployer: true, foreignMatchedDomain: 'greenhouse.io' });
+    expect(extractPayloadFields({ isForeignEmployer: true, foreignMatchedDomain: 'lever.co' }))
+      .toMatchObject({ isForeignEmployer: true, foreignMatchedDomain: 'lever.co' });
   });
 
   it('degrades on a null / non-object / array payload', () => {
-    const empty = { confidenceGate: '', evidenceTitles: [], locationNames: [] };
+    const empty = { confidenceGate: '', evidenceTitles: [], locationNames: [], isForeignEmployer: false, foreignMatchedDomain: null };
     expect(extractPayloadFields(null)).toEqual(empty);
     expect(extractPayloadFields(undefined)).toEqual(empty);
     expect(extractPayloadFields('nope')).toEqual(empty);

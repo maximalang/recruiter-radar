@@ -3,11 +3,12 @@
 import { getPool as getSharedPool } from "./db-pool";
 import { updateDigestOrgStateFeedback, type DigestFeedbackAction } from "./digestFeedback";
 import type { HhDigestItem } from "./hhDigest";
-import { getTelegramBotToken, sendTelegramLeadMessage } from "./telegram";
+import { getTelegramBotToken, sendTelegramLeadMessage, sendTelegramTextMessage } from "./telegram";
 import { deriveWhyNow, deriveLawfulContactPath, formatLawfulContactPath, extractPayloadFields } from "./leads-data";
 import { buildWhyMatch } from "./leads/why-match";
 import { parseStoredEnrichment } from "./ai/enrichment/enrichmentStore";
 import { buildTelegramDigestFeedbackReplyMarkup } from "./telegramDigestFeedback";
+import { buildBatchDigestMessages, type BatchLead } from "./telegram/digest-batch";
 import { logError, logEvent } from "./runtime";
 import type {
   ClientProfile,
@@ -50,6 +51,7 @@ type LeadDeliveryRow = LeadRow & {
   profileTargetCity: string | null;
   profileHiringIntentMin: number | null;
   profileMinOpenRoles: number | null;
+  profileRemoteFriendly: boolean | null;
 };
 export type TelegramDeliveryResult = { ok: true } | { ok: false; error: string };
 export type EntitlementResult = { allowed: boolean; reason: string | null };
@@ -158,7 +160,8 @@ async function getLeadDeliveryRow(candidateId: number): Promise<LeadDeliveryRow 
       cp.industries AS "profileIndustries",
       cp.target_city AS "profileTargetCity",
       cp.hiring_intent_min AS "profileHiringIntentMin",
-      cp.min_open_roles AS "profileMinOpenRoles"
+      cp.min_open_roles AS "profileMinOpenRoles",
+      cp.remote_friendly AS "profileRemoteFriendly"
     FROM digest_candidates dc
     INNER JOIN orgs o ON o.id = dc.org_id
     INNER JOIN client_profiles cp ON cp.id = dc.client_profile_id
@@ -212,6 +215,7 @@ export async function sendLeadToTelegram(candidateId: number): Promise<TelegramD
         targetCity: lead.profileTargetCity,
         minOpenRoles: lead.profileMinOpenRoles,
         hiringIntentMin: lead.profileHiringIntentMin,
+        remoteFriendly: lead.profileRemoteFriendly ?? false,
       }
     );
 
@@ -271,6 +275,218 @@ export async function sendLeadToTelegram(candidateId: number): Promise<TelegramD
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown Telegram delivery error.";
     logError("telegram.delivery.failed", error, { digestCandidateId: candidateId, clientProfileId: lead.clientProfileId, orgId: lead.orgId });
+    return { ok: false, error: message };
+  }
+}
+
+/** App base URL for deep links in the batch digest. Trailing slash trimmed. */
+function resolveAppBaseUrlForTelegram(): string {
+  const raw = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (!raw) return "";
+  return raw.replace(/\/+$/, "");
+}
+
+/** Row shape for the per-run batch candidate query. */
+type BatchCandidateRow = {
+  id: number;
+  orgId: string;
+  orgName: string;
+  score: number | null;
+  vacanciesCount: number;
+  payload: unknown;
+  reasons: unknown;
+  sourceFamilies: unknown;
+  telegramChatId: string | null;
+  profileRoles: unknown;
+  profileIndustries: unknown;
+  profileTargetCity: string | null;
+  profileHiringIntentMin: number | null;
+  profileMinOpenRoles: number | null;
+  profileRemoteFriendly: boolean | null;
+  lastSignalAt: string | null;
+};
+
+export type BatchDeliveryResult =
+  | { ok: true; messagesSent: number; leadCount: number }
+  | { ok: false; error: string };
+
+/**
+ * Deliver ALL A/B candidates for one (run, client profile) as a SINGLE batched
+ * Telegram digest — one numbered message (split into ≤2 messages at the 4096
+ * char limit) instead of one message per lead. Feedback buttons for every
+ * included lead are attached to the LAST message (the one carrying the footer
+ * link and the one the recruiter lands on).
+ *
+ * Idempotency, claim/skip bookkeeping, and the C/D gate are owned by the caller
+ * (deliverCandidatesForRun); this function does the fetch + build + send only.
+ * Returns the number of Telegram messages sent and the lead count.
+ */
+export async function sendBatchDigestForRun(input: {
+  runId: string;
+  clientProfileId: string;
+}): Promise<BatchDeliveryResult> {
+  const pool = getPool();
+  if (!pool) return { ok: false, error: "DATABASE_URL is not set." };
+
+  const { botToken, error } = getTelegramBotToken();
+  if (!botToken) return { ok: false, error: error ?? "Telegram is not configured." };
+
+  const result = await pool.query<BatchCandidateRow>(`
+    SELECT
+      dc.id,
+      dc.org_id AS "orgId",
+      dc.source_display_name AS "orgName",
+      dc.total_score AS "score",
+      dc.vacancies_count AS "vacanciesCount",
+      dc.payload,
+      dc.reasons,
+      dc.source_families AS "sourceFamilies",
+      dc.latest_published_at::text AS "lastSignalAt",
+      cp.telegram_chat_id::text AS "telegramChatId",
+      cp.roles AS "profileRoles",
+      cp.industries AS "profileIndustries",
+      cp.target_city AS "profileTargetCity",
+      cp.hiring_intent_min AS "profileHiringIntentMin",
+      cp.min_open_roles AS "profileMinOpenRoles",
+      cp.remote_friendly AS "profileRemoteFriendly"
+    FROM digest_candidates dc
+    INNER JOIN client_profiles cp ON cp.id = dc.client_profile_id
+    WHERE dc.digest_run_id = $1
+      AND dc.client_profile_id = $2
+      AND (dc.payload->>'confidence_gate' NOT IN ('C', 'D') OR dc.payload->>'confidence_gate' IS NULL)
+    ORDER BY dc.total_score DESC, dc.id ASC
+  `, [input.runId, input.clientProfileId]);
+
+  if (result.rowCount === 0) {
+    return { ok: true, messagesSent: 0, leadCount: 0 };
+  }
+
+  const chatId = result.rows[0].telegramChatId;
+  if (!chatId) {
+    return { ok: false, error: "Client profile has no linked Telegram chat." };
+  }
+
+  // Build the per-lead batch cards + the feedback-button items in one pass so the
+  // buttons and the numbered blocks stay in lockstep (button rank = block index).
+  const batchLeads: BatchLead[] = [];
+  const feedbackItems: HhDigestItem[] = [];
+
+  result.rows.forEach((row, index) => {
+    const { evidenceTitles, locationNames, isForeignEmployer } = extractPayloadFields(row.payload);
+    const sourceFamilies = toStringArray(row.sourceFamilies);
+    const whyMatch = buildWhyMatch(
+      {
+        orgName: row.orgName,
+        evidenceTitles,
+        locationNames,
+        vacanciesCount: row.vacanciesCount,
+        score: row.score,
+        latestSignalAt: row.lastSignalAt,
+      },
+      {
+        roles: toStringArray(row.profileRoles),
+        industries: toStringArray(row.profileIndustries),
+        targetCity: row.profileTargetCity,
+        minOpenRoles: row.profileMinOpenRoles,
+        hiringIntentMin: row.profileHiringIntentMin,
+        remoteFriendly: row.profileRemoteFriendly ?? false,
+      },
+    );
+
+    batchLeads.push({
+      orgId: String(row.orgId),
+      orgName: row.orgName,
+      score: row.score,
+      vacanciesCount: row.vacanciesCount ?? 0,
+      evidenceTitles,
+      locationNames,
+      whyLine: whyMatch[0] ?? deriveWhyNow(row.reasons) ?? null,
+      isForeignEmployer,
+    });
+
+    feedbackItems.push({
+      rank: index + 1,
+      org_id: String(row.orgId),
+      hh_employer_id: "",
+      employer_name: row.orgName,
+      vacancies_count: row.vacanciesCount ?? 0,
+      distinct_vacancy_names_count: 0,
+      latest_published_at: row.lastSignalAt ?? "",
+      total_score: row.score ?? 0,
+      reasons: ["", ""],
+      opener: "",
+      source_families: sourceFamilies,
+      evidence_titles: evidenceTitles,
+      candidate_source_keys: [],
+      location_names: locationNames,
+    });
+  });
+
+  const baseUrl = resolveAppBaseUrlForTelegram();
+  const batch = buildBatchDigestMessages({
+    leads: batchLeads,
+    leadsUrl: baseUrl ? `${baseUrl}/leads` : "/leads",
+  });
+
+  if (batch.messages.length === 0) {
+    return { ok: true, messagesSent: 0, leadCount: 0 };
+  }
+
+  // Feedback buttons only cover the leads that made it into the text.
+  const replyMarkup = buildTelegramDigestFeedbackReplyMarkup({
+    clientProfileId: String(input.clientProfileId),
+    items: feedbackItems.slice(0, batch.includedLeads),
+  });
+
+  // Partial-send safety: the delivery claim covers the WHOLE batch, so if we
+  // fail the claim after the first message already went out, the caller's
+  // stale-reclaim would re-send message 1 (duplicate). To avoid that, a failure
+  // on message 1 fails the whole batch (nothing was delivered — safe to retry),
+  // but a failure on a LATER message is swallowed: the first message (which
+  // carries the leads + the "open all" link) is already in the recruiter's chat,
+  // so we treat the batch as delivered and log the shortfall rather than risk a
+  // duplicate on retry. The dropped leads remain reachable via the in-app link.
+  let messagesSent = 0;
+  try {
+    for (let i = 0; i < batch.messages.length; i += 1) {
+      const isLast = i === batch.messages.length - 1;
+      try {
+        await sendTelegramTextMessage(
+          batch.messages[i],
+          { botToken, chatId },
+          {
+            parseMode: "HTML",
+            ...(isLast && replyMarkup ? { replyMarkup } : {}),
+          },
+        );
+        messagesSent += 1;
+      } catch (perMessageError) {
+        if (i === 0) throw perMessageError; // nothing delivered yet — fail + retry
+        // A later message failed after message 1 landed. Don't fail the claim
+        // (that would re-deliver message 1); log and stop.
+        logError("telegram.batch_delivery.partial", perMessageError, {
+          runId: input.runId,
+          clientProfileId: input.clientProfileId,
+          failedMessageIndex: i,
+          messagesSent,
+        });
+        break;
+      }
+    }
+    logEvent("telegram.batch_delivery.sent", {
+      runId: input.runId,
+      clientProfileId: input.clientProfileId,
+      messages: messagesSent,
+      leads: batch.includedLeads,
+      dropped: batch.droppedLeads,
+    });
+    return { ok: true, messagesSent, leadCount: batch.includedLeads };
+  } catch (sendError) {
+    const message = sendError instanceof Error ? sendError.message : "Unknown Telegram batch error.";
+    logError("telegram.batch_delivery.failed", sendError, {
+      runId: input.runId,
+      clientProfileId: input.clientProfileId,
+    });
     return { ok: false, error: message };
   }
 }

@@ -4,6 +4,7 @@ import { getLeadsForAllProfiles, getPendingReviewCount, type LeadItem, VALID_FEE
 import { listClientProfiles, type ClientProfile } from '@/lib/clientProfiles';
 import { getOwnerIdFromSession } from '@/lib/session';
 import { buildFitExplanation, FIT_DIMENSION_ICON } from '@/lib/leads/fit-explanation';
+import { deriveRoleNames, splitRolesForDisplay, deriveUrgencyCue } from '@/lib/leads/lead-quality';
 import LeadsFilters from './leads-filters';
 import {
   InternalPageFrame,
@@ -16,6 +17,8 @@ import {
   ScoreBandChip,
   SignalFreshnessChip,
   AiHintChip,
+  ForeignEmployerBadge,
+  UrgencyCueChip,
   getScoreTone,
   TableCard,
   EmptyState,
@@ -40,8 +43,13 @@ function LeadCard({
   fitPreview: { icon: string; text: string } | null;
 }) {
   const tone = getScoreTone(lead.score);
-  const sources = lead.sourceFamilies.slice(0, 3);
   const risks = lead.negativeSignals.slice(0, 2);
+  const roleNames = deriveRoleNames({ evidenceTitles: lead.evidenceTitles });
+  const { shown: shownRoles, more: moreRoles } = splitRolesForDisplay(roleNames, 2);
+  const urgency = deriveUrgencyCue({
+    vacanciesCount: lead.vacanciesCount,
+    latestPublishedAt: lead.latestPublishedAt,
+  });
 
   return (
     <article className={ipStyles.leadCard}>
@@ -55,25 +63,23 @@ function LeadCard({
             <div className={ipStyles.leadCardTags}>
               <ScoreBandChip score={lead.score} />
               <GateBadgeInline gate={lead.confidenceGate} />
-              <AiHintChip present={lead.hasAiHint} />
-              <FeedbackBadge status={lead.feedbackStatus} />
+              <ForeignEmployerBadge isForeign={lead.isForeignEmployer} />
               {lead.locationNames.length > 0 && (
                 <span className={ipStyles.leadMetaChip}>
                   📍 {lead.locationNames.slice(0, 2).join(', ')}
                 </span>
               )}
+              {lead.vacanciesCount > 0 && (
+                <span className={ipStyles.leadMetaChip}>💼 {lead.vacanciesCount}</span>
+              )}
+              <FeedbackBadge status={lead.feedbackStatus} />
+              <AiHintChip present={lead.hasAiHint} />
             </div>
           </div>
           <div className={ipStyles.leadCardHeadAside}>
             <div className={ipStyles.leadCardScore}>
               <ScoreBar score={lead.score} />
             </div>
-            <span className={ipStyles.leadDate}>
-              {new Date(lead.createdAt).toLocaleDateString('ru-RU', {
-                day: 'numeric',
-                month: 'short',
-              })}
-            </span>
           </div>
         </div>
 
@@ -91,29 +97,22 @@ function LeadCard({
             <span className={ipStyles.leadFieldValue}>{lead.whyNow}</span>
           </div>
         )}
-        {lead.bestAngle && (
-          <div className={ipStyles.leadFieldRow} data-kind="angle">
-            <span className={ipStyles.leadFieldLabel}>Угол захода</span>
-            <span className={ipStyles.leadFieldValue}>{lead.bestAngle}</span>
-          </div>
-        )}
 
         <div className={ipStyles.leadCardFooter}>
+          <UrgencyCueChip level={urgency.level} label={urgency.label} />
+          <SignalFreshnessChip latestPublishedAt={lead.latestPublishedAt} />
           {lead.lawfulContactPath && (
             <span className={ipStyles.leadContactChip}>
               🛡 {lead.lawfulContactPath}
             </span>
           )}
-          <SignalFreshnessChip latestPublishedAt={lead.latestPublishedAt} />
-          {lead.vacanciesCount > 0 && (
-            <span className={ipStyles.leadMetaChip}>💼 {lead.vacanciesCount} вакансий</span>
-          )}
-          {sources.map((src) => (
-            <span key={src} className={ipStyles.leadMetaChip}>🔗 {src}</span>
-          ))}
-          {lead.evidenceTitles.length > 0 && (
+          {shownRoles.length > 0 ? (
             <span className={ipStyles.leadMetaChip}>
-              📄 {lead.evidenceTitles.slice(0, 2).join(' · ')}
+              📄 {shownRoles.join(' · ')}{moreRoles > 0 ? ` + ещё ${moreRoles}` : ''}
+            </span>
+          ) : (
+            <span className={ipStyles.leadMetaChip} data-muted="true">
+              📄 роли не определены
             </span>
           )}
         </div>

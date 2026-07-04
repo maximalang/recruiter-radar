@@ -181,6 +181,15 @@ export interface DigestItem {
   created_at: string;
   primary_reason_label?: string;
   secondary_reason_label?: string;
+  /**
+   * Geo gate (Block 1): true when the lead is a foreign employer — hosted on a
+   * known foreign ATS with no Russian-market footprint. When set, total_score has
+   * already had the soft foreign-employer penalty applied. Surfaced to the UI as
+   * an «Иностранный работодатель» badge.
+   */
+  is_foreign_employer?: boolean;
+  /** The foreign ATS domain that triggered the geo flag, when is_foreign_employer. */
+  foreign_matched_domain?: string | null;
 }
 
 export interface DigestDelivery {

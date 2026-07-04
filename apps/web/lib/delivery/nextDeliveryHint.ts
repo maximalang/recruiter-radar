@@ -62,53 +62,41 @@ function nextWeeklyCronUtcInstant(from: Date): Date {
  * Format a UTC instant in the target timezone using Intl. Falls back to UTC
  * when the tz is unrecognized, so a typo never crashes the UI.
  */
-function formatInTz(instant: Date, timezone: string): {
+function formatInTz(instant: Date, timezone: string, now: Date): {
   time: string;
   weekday: "today" | "tomorrow" | "other";
   dateLabel: string;
 } {
-  let fmt: Intl.DateTimeFormat;
+  // Resolve the effective tz once: invalid tz falls back to UTC so a typo
+  // never crashes the UI.
+  let resolvedTz: string;
   try {
-    fmt = new Intl.DateTimeFormat("ru-RU", {
-      timeZone: timezone,
-      hour: "2-digit",
-      minute: "2-digit",
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-    });
+    new Intl.DateTimeFormat("ru-RU", { timeZone: timezone });
+    resolvedTz = timezone;
   } catch {
-    fmt = new Intl.DateTimeFormat("ru-RU", {
-      hour: "2-digit",
-      minute: "2-digit",
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-      timeZone: "UTC",
-    });
+    resolvedTz = "UTC";
   }
-  // Parts order in ru-RU: weekday, day, month, hour, minute (roughly). Parse
-  // hour/minute by re-formatting with a time-only formatter for safety.
-  const timeFmt = new Intl.DateTimeFormat("ru-RU", {
-    timeZone: fmt.resolvedOptions().timeZone,
+
+  const time = new Intl.DateTimeFormat("ru-RU", {
+    timeZone: resolvedTz,
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
-  });
-  const time = timeFmt.format(instant);
+  }).format(instant);
 
-  // Today/tomorrow in the target tz, not UTC.
+  // Calendar-day keys in the target tz for the run instant, the reference
+  // "now", and "now + 1 day". Comparing keys in the SAME tz (rather than UTC
+  // or the system clock) is what makes today/tomorrow correct across DST
+  // transitions and tz-boundary days where the local calendar day differs
+  // from the UTC one. Using the injected `now` (not `new Date()`) is what
+  // makes the hint deterministic in tests.
   const dayFmt = new Intl.DateTimeFormat("en-CA", {
-    timeZone: fmt.resolvedOptions().timeZone,
+    timeZone: resolvedTz,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   });
   const runDayStr = dayFmt.format(instant);
-  const nowDayStr = dayFmt.format(new Date(instant.getTime())); // same instant for "now" compare
-  // We need "now" relative to the run; compute the run's calendar day and
-  // the current calendar day in the same tz.
-  const now = new Date();
   const nowStr = dayFmt.format(now);
   const tomorrowStr = dayFmt.format(addDays(now, 1));
 
@@ -117,15 +105,17 @@ function formatInTz(instant: Date, timezone: string): {
   else if (runDayStr === tomorrowStr) weekday = "tomorrow";
   else weekday = "other";
 
-  const dateLabel = fmt
+  const dateLabel = new Intl.DateTimeFormat("ru-RU", {
+    timeZone: resolvedTz,
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  })
     .formatToParts(instant)
     .filter((p) => p.type === "weekday" || p.type === "day" || p.type === "month")
     .map((p) => p.value)
     .join(" ");
 
-  // Silence unused-var lint without a runtime cost — nowDayStr is reserved for
-  // future same-day precision if we add hour-window checks.
-  void nowDayStr;
   return { time, weekday, dateLabel };
 }
 
@@ -144,7 +134,7 @@ export function computeNextDeliveryHint(
 ): NextDeliveryHint {
   const isWeekly = prefs.deliveryFrequency === "weekly";
   const runInstant = isWeekly ? nextWeeklyCronUtcInstant(now) : nextCronUtcInstant(now);
-  const { time, weekday, dateLabel } = formatInTz(runInstant, prefs.deliveryTimezone);
+  const { time, weekday, dateLabel } = formatInTz(runInstant, prefs.deliveryTimezone, now);
 
   const tzShort = tzLabel(prefs.deliveryTimezone);
   let label: string;

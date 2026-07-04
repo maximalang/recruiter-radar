@@ -17,13 +17,14 @@
 }
 
 .filterSelect {
-  padding: 4px 8px;
+  padding: 6px 10px;
   font-size: 0.8rem;
-  border-radius: 6px;
+  border-radius: 8px;
   border: 1px solid var(--c-border);
   background-color: var(--c-bg-card);
   color: var(--c-text-secondary);
   cursor: pointer;
+  min-height: 32px;
 }
 
 .filterSelect:focus-visible {
@@ -49,5 +50,18 @@
 @media (max-width: 640px) {
   .filterBar {
     gap: 8px;
+    padding: 10px 14px;
+  }
+  .filterLabel {
+    width: 100%;
+    margin-bottom: 2px;
+  }
+  .filterSelect {
+    flex: 1 1 calc(50% - 8px);
+    min-width: 0;
+  }
+  .filterReset {
+    flex: 1 1 100%;
+    padding: 8px 10px;
   }
 }

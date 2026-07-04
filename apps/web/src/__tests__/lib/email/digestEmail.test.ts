@@ -121,6 +121,7 @@ describe('renderDigestEmail', () => {
       targetCity: 'Москва',
       minOpenRoles: 1,
       hiringIntentMin: null,
+      remoteFriendly: false,
     }
 
     it('renders the why-match block when profileFilters are provided and match', () => {
@@ -138,11 +139,21 @@ describe('renderDigestEmail', () => {
     })
 
     it('omits the why-match block when nothing concrete matches', () => {
-      const out = renderDigestEmail([makeLead({ locationNames: ['Казань'], vacanciesCount: 0 })], {
+      // No location (absence can't assert a region mismatch) and no open-role
+      // volume → no concrete why-match line at all.
+      const out = renderDigestEmail([makeLead({ locationNames: [], vacanciesCount: 0 })], {
         ...ctx,
         profileFilters: filters,
       })
       expect(out.html).not.toContain('Почему вам')
+    })
+
+    it('surfaces a region mismatch when the lead is in another city', () => {
+      const out = renderDigestEmail([makeLead({ locationNames: ['Казань'], vacanciesCount: 0 })], {
+        ...ctx,
+        profileFilters: filters,
+      })
+      expect(out.html).toContain('Регион не ваш')
     })
   })
 })

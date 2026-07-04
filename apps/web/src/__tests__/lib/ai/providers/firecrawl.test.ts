@@ -4,10 +4,11 @@
  * What is under test (spec §1, §4):
  *   - Without an API key, the provider is the degrade-only stub: both methods
  *     return a typed "unavailable" result and make NO network call.
- *   - With an API key, the real client maps a Firecrawl /v1/extract response onto
- *     the EnrichedHiringSignals contract, attaching our own provenance.
- *   - /v1/extract is async (POST → job id → poll GET until completed).
- *   - /v1/scrape returns markdown synchronously.
+ *   - With an API key, the real client maps a Firecrawl /v2/scrape json response
+ *     onto the EnrichedHiringSignals contract, attaching our own provenance.
+ *   - Structured extraction rides on /v2/scrape formats:[json] — SYNCHRONOUS,
+ *     one POST returns { data: { json, markdown } }, no job id / polling.
+ *   - /v2/scrape formats:[markdown] returns markdown synchronously.
  *   - The real client NEVER throws: HTTP errors, timeouts, and malformed bodies
  *     all degrade to available:false.
  *   - The extraction instruction is centralized in product code (prompt
@@ -105,25 +106,25 @@ describe('createFirecrawlProvider — no key → degrade-only stub', () => {
 // ─── With key → real client maps the response ────────────────────────────────
 
 describe('createFirecrawlProvider — real client mapping', () => {
-  it('maps an async /v1/extract job (POST → poll → completed) onto EnrichedHiringSignals', async () => {
+  it('maps a synchronous /v2/scrape json response onto EnrichedHiringSignals', async () => {
     const fetchSpy = mockFetchSequence([
-      // POST /v1/extract → job id, processing
-      { body: { id: 'job-123', status: 'processing' } },
-      // GET /v1/extract/job-123 → completed with data
+      // POST /v2/scrape formats:[json] → synchronous { data: { json } }
       {
         body: {
-          status: 'completed',
+          success: true,
           data: {
-            detectedRoles: [
-              { title: 'Backend Engineer', department: 'Engineering', confidence: 'high' },
-              { title: 'QA', department: null, confidence: 'medium' },
-              { department: 'NoTitle' }, // dropped — no title
-            ],
-            hiringUrgency: 'high',
-            departments: ['Engineering', 'Engineering', 'QA'], // deduped on map
-            locations: ['Москва'],
-            hiringPatternSummary: 'Активный найм в инженерную команду.',
-            confidence: 'high',
+            json: {
+              detectedRoles: [
+                { title: 'Backend Engineer', department: 'Engineering', confidence: 'high' },
+                { title: 'QA', department: null, confidence: 'medium' },
+                { department: 'NoTitle' }, // dropped — no title
+              ],
+              hiringUrgency: 'high',
+              departments: ['Engineering', 'Engineering', 'QA'], // deduped on map
+              locations: ['Москва'],
+              hiringPatternSummary: 'Активный найм в инженерную команду.',
+              confidence: 'high',
+            },
           },
         },
       },
@@ -136,16 +137,17 @@ describe('createFirecrawlProvider — real client mapping', () => {
       instruction: CAREER_PAGE_EXTRACTION_INSTRUCTION,
     });
 
-    expect(fetchSpy).toHaveBeenCalledTimes(2);
-    // First call: POST /v1/extract with Bearer auth.
+    expect(fetchSpy).toHaveBeenCalledTimes(1); // synchronous — no polling
+    // POST /v2/scrape with Bearer auth and a json format entry.
     const [url1, init1] = fetchSpy.mock.calls[0];
-    expect(String(url1)).toMatch(/\/v1\/extract$/);
+    expect(String(url1)).toMatch(/\/v2\/scrape$/);
     expect((init1 as RequestInit).method).toBe('POST');
     expect((init1 as RequestInit).headers).toMatchObject({ Authorization: 'Bearer fc-test' });
-    // Second call: GET /v1/extract/<id>.
-    const [url2, init2] = fetchSpy.mock.calls[1];
-    expect(String(url2)).toMatch(/\/v1\/extract\/job-123$/);
-    expect((init2 as RequestInit).method).toBe('GET');
+    const sentBody = JSON.parse(String((init1 as RequestInit).body));
+    expect(sentBody.url).toBe('https://weak.test/careers');
+    expect(sentBody.formats[0].type).toBe('json');
+    expect(sentBody.formats[0].prompt).toBe(CAREER_PAGE_EXTRACTION_INSTRUCTION);
+    expect(sentBody.formats[0].schema).toBeDefined();
 
     expect(r.available).toBe(true);
     expect(r.provider).toBe('firecrawl');
@@ -157,7 +159,7 @@ describe('createFirecrawlProvider — real client mapping', () => {
     expect(r.data?.departments).toEqual(['Engineering', 'QA']); // deduped
   });
 
-  it('accepts a synchronous extract result (no job id) without polling', async () => {
+  it('accepts a json result inlined at data (no nested json key)', async () => {
     const fetchSpy = mockFetchOnceJson({
       data: {
         detectedRoles: [{ title: 'Recruiter' }],
@@ -175,8 +177,8 @@ describe('createFirecrawlProvider — real client mapping', () => {
     expect(r.data?.detectedRoles[0].title).toBe('Recruiter');
   });
 
-  it('degrades when /v1/extract returns no usable signal (no roles, no summary)', async () => {
-    mockFetchOnceJson({ data: { detectedRoles: [], hiringPatternSummary: '' } });
+  it('degrades when /v2/scrape json returns no usable signal (no roles, no summary)', async () => {
+    mockFetchOnceJson({ data: { json: { detectedRoles: [], hiringPatternSummary: '' } } });
     const r = await createFirecrawlProvider({ apiKey: 'fc-test' }).extractStructuredData({
       sourceUrl: 'https://weak.test/careers',
       content: '# Careers',
@@ -208,26 +210,15 @@ describe('createFirecrawlProvider — real client mapping', () => {
     expect(r.note).toMatch(/error/i);
   });
 
-  it('degrades when the extract job reports failed status', async () => {
-    mockFetchSequence([
-      { body: { id: 'job-fail', status: 'processing' } },
-      { body: { status: 'failed' } },
-    ]);
-    const r = await createFirecrawlProvider({ apiKey: 'fc-test' }).extractStructuredData({
-      sourceUrl: 'https://weak.test/careers',
-      content: '# Careers',
-      instruction: CAREER_PAGE_EXTRACTION_INSTRUCTION,
-    });
-    expect(r.available).toBe(false);
-    expect(r.note).toMatch(/error/i);
-  });
-
-  it('maps a /v1/scrape response onto markdown', async () => {
+  it('maps a /v2/scrape response onto markdown', async () => {
     const fetchSpy = mockFetchOnceJson({ data: { markdown: '# Careers\nWe hire.', url: 'https://weak.test/careers' } });
     const r = await createFirecrawlProvider({ apiKey: 'fc-test' }).scrapeToMarkdown(
       'https://weak.test/careers',
     );
-    expect(String(fetchSpy.mock.calls[0][0])).toMatch(/\/v1\/scrape$/);
+    const [url1, init1] = fetchSpy.mock.calls[0];
+    expect(String(url1)).toMatch(/\/v2\/scrape$/);
+    const sentBody = JSON.parse(String((init1 as RequestInit).body));
+    expect(sentBody.formats).toEqual(['markdown']);
     expect(r.available).toBe(true);
     expect(r.data?.markdown).toContain('We hire');
     expect(r.data?.fetchedUrl).toBe('https://weak.test/careers');

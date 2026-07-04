@@ -67,6 +67,8 @@ export interface PipelineCompany {
   website?: string
   industry?: string
   industries?: string[]
+  /** Country marker (e.g. 'RU', 'US') — drives the Russia-first Fit geo gate. */
+  country?: string
   locations?: string[]
   size?: 'startup' | 'small' | 'medium' | 'large' | 'enterprise'
   employeeCount?: number
@@ -264,6 +266,7 @@ export function runScoringPipeline(input: ScoringPipelineInput): ScoringPipeline
       id: input.company.id,
       name: input.company.name,
       industry: input.company.industry,
+      country: input.company.country,
       location: input.company.locations?.[0],
       size: input.company.size,
       employeeCount: input.company.employeeCount,

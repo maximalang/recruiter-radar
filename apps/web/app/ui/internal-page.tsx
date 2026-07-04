@@ -363,6 +363,49 @@ export function AiHintChip(props: { present: boolean }) {
   );
 }
 
+/* ── Foreign-employer badge ── */
+
+/**
+ * «Иностранный работодатель» marker — set when the geo gate flagged the lead as
+ * a foreign-ATS employer with no RU footprint. Presence only; the score already
+ * reflects the soft foreign penalty. Renders nothing when the lead is domestic.
+ */
+export function ForeignEmployerBadge(props: { isForeign: boolean }) {
+  if (!props.isForeign) return null;
+  return (
+    <span className={s.foreignBadge} title="Иностранный работодатель — сигнал только на зарубежном ATS, релевантность для рынка РФ понижена">
+      🌍 Иностранный работодатель
+    </span>
+  );
+}
+
+/* ── Urgency cue chip ── */
+
+/**
+ * Concrete urgency cue (burst / active / fresh / stale) for the lead card, so the
+ * recruiter reads the hiring tempo without opening the lead. `stale` carries a
+ * downgrade tone; everything else is neutral-to-positive.
+ */
+export function UrgencyCueChip(props: { level: string; label: string }) {
+  const tone =
+    props.level === 'burst' ? 'success'
+    : props.level === 'active' ? 'info'
+    : props.level === 'fresh' ? 'success'
+    : props.level === 'stale' ? 'danger'
+    : 'neutral';
+  const icon =
+    props.level === 'burst' ? '🔥'
+    : props.level === 'active' ? '📈'
+    : props.level === 'fresh' ? '🆕'
+    : props.level === 'stale' ? '🕓'
+    : '•';
+  return (
+    <span className={s.urgencyCueChip} data-tone={tone}>
+      {icon} {props.label}
+    </span>
+  );
+}
+
 /* ── Evidence tag ── */
 
 export function EvidenceTag(props: { children: ReactNode }) {

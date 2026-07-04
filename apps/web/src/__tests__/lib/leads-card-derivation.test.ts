@@ -23,8 +23,8 @@ function r(component: ScoringReason['component'], key: string, params?: Record<s
 }
 
 describe('deriveWhyNow', () => {
-  it('returns default when no reasons', () => {
-    expect(deriveWhyNow([])).toBe('Повод для контакта есть сейчас')
+  it('returns empty string when no reasons — caller hides the line', () => {
+    expect(deriveWhyNow([])).toBe('')
   })
 
   it('picks urgency/intent reasons over fit reasons', () => {
@@ -34,9 +34,20 @@ describe('deriveWhyNow', () => {
       r('intent', 'intent.fresh-signals'),
     ]
     const result = deriveWhyNow(reasons)
+    // Burst (priority 80) outranks fresh-signals (65); both lead, fit excluded
     expect(result).toContain('Hiring burst')
     expect(result).toContain('Свежие сигналы найма')
     expect(result).not.toContain('fintech')
+  })
+
+  it('orders by evidential strength: corroborated direct evidence leads', () => {
+    const reasons: ScoringReason[] = [
+      r('intent', 'intent.fresh-signals'),
+      r('intent', 'intent.direct-evidence.corroborated'),
+    ]
+    const result = deriveWhyNow(reasons)
+    expect(result.indexOf('Прямое подтверждение из независимого источника'))
+      .toBeLessThan(result.indexOf('Свежие сигналы найма'))
   })
 
   it('falls back to first 2 reasons when no urgency/intent', () => {
@@ -128,7 +139,7 @@ describe('deriveBestAngle', () => {
   })
 
   it('default fallback when no reasons, no opener, no source families', () => {
-    expect(deriveBestAngle([], '')).toBe('Короткий созвон, чтобы сверить задачи по найму')
+    expect(deriveBestAngle([], '')).toBe('Сверить задачи по найму коротким сообщением')
   })
 
   it('works with legacy string[] reasons and source families', () => {
@@ -194,6 +205,19 @@ describe('deriveNegativeSignals', () => {
     expect(result).toEqual(
       expect.arrayContaining([expect.stringContaining('один источник')]),
     )
+  })
+
+  it('does NOT flag single source when a direct corporate surface is present', () => {
+    // A single career-pages source is a direct hiring surface — calling it
+    // "только один источник, нет подтверждения" would be misleading noise.
+    const result = deriveNegativeSignals({
+      reasons: [r('reachability', 'reachability.career-page')],
+      vacanciesCount: 2,
+      distinctVacancyNamesCount: 2,
+      sourceFamilies: ['career-pages'],
+      confidenceGate: 'A',
+    })
+    expect(result).toEqual([])
   })
 
   it('flags repost pattern: high vacancies count but low distinct', () => {

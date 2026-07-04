@@ -72,10 +72,11 @@ async function getProfileEmailPrefs(
     target_city: string | null;
     min_open_roles: number | null;
     hiring_intent_min: number | null;
+    remote_friendly: boolean | null;
   }>(
     `
     SELECT email_digest_enabled, digest_email, agency_name, owner_id::TEXT AS owner_id,
-           roles, industries, target_city, min_open_roles, hiring_intent_min
+           roles, industries, target_city, min_open_roles, hiring_intent_min, remote_friendly
     FROM client_profiles
     WHERE id = $1
     LIMIT 1
@@ -96,6 +97,7 @@ async function getProfileEmailPrefs(
       targetCity: row.target_city,
       minOpenRoles: row.min_open_roles,
       hiringIntentMin: row.hiring_intent_min,
+      remoteFriendly: row.remote_friendly === true,
     },
   };
 }

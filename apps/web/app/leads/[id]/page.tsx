@@ -5,6 +5,7 @@ import { getClientProfileById } from '@/lib/clientProfiles';
 import { getOwnerIdFromSession } from '@/lib/session';
 import { buildFitExplanation, FIT_DIMENSION_ICON } from '@/lib/leads/fit-explanation';
 import { buildCompanySummary } from '@/lib/leads/company-summary';
+import { deriveRoleNames, splitRolesForDisplay, deriveUrgencyCue } from '@/lib/leads/lead-quality';
 import FeedbackButtons from './feedback-buttons';
 import OutreachPicker from './outreach-picker';
 import AiEnrichmentBlock from './ai-enrichment-block';
@@ -19,6 +20,8 @@ import {
   ScoreGauge,
   ScoreBandChip,
   SignalFreshnessChip,
+  ForeignEmployerBadge,
+  UrgencyCueChip,
   EvidenceTag,
   SourceChip,
   NotFoundState,
@@ -103,6 +106,20 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     (l): l is string => l !== null,
   );
 
+  // Roles: normalized/deduped, capped at 5 with a "+ ещё N" overflow. AI role
+  // titles fill in only when evidence carries none.
+  const roleNames = deriveRoleNames({
+    evidenceTitles: lead.evidenceTitles,
+    aiRoleTitles: lead.aiEnrichment?.detectedRoles?.map((r) => r.title) ?? null,
+  });
+  const { shown: shownRoles, more: moreRoles } = splitRolesForDisplay(roleNames, 5);
+
+  // Concrete urgency cue (burst / active / fresh / stale), shown on the verdict card.
+  const urgency = deriveUrgencyCue({
+    vacanciesCount: lead.vacanciesCount,
+    latestPublishedAt: lead.latestPublishedAt,
+  });
+
   return (
     <InternalPageFrame navItems={LEAD_DETAIL_NAV}>
       <div className={ipStyles.leadDetailContainer}>
@@ -111,7 +128,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           subtitle={
             lead.locationNames.length > 0
               ? `📍 ${lead.locationNames.join(', ')}`
-              : undefined
+              : '📍 Регион не указан'
           }
           nav={<InternalBackLink href="/leads">← Лиды</InternalBackLink>}
         />
@@ -119,9 +136,39 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         <DetailLayout
           main={
             <>
+              {/* One-glance primary answer: score band + freshness + gate + roles,
+                  so the recruiter sees the verdict before reading the prose below. */}
+              <ContentCard variant="hero" className={ipStyles.leadVerdict}>
+                <div className={ipStyles.leadVerdictTop}>
+                  <ScoreGauge score={lead.score} />
+                  <div className={ipStyles.leadVerdictChips}>
+                    <ScoreBandChip score={lead.score} />
+                    <GateBadgeInline gate={lead.confidenceGate} />
+                    <ForeignEmployerBadge isForeign={lead.isForeignEmployer} />
+                    <UrgencyCueChip level={urgency.level} label={urgency.label} />
+                    <SignalFreshnessChip latestPublishedAt={lead.latestPublishedAt} />
+                  </div>
+                </div>
+                <div className={ipStyles.leadVerdictRoles}>
+                  <span className={ipStyles.leadVerdictRolesLabel}>Открытые роли</span>
+                  {shownRoles.length > 0 ? (
+                    <div className={ipStyles.chipWrap} style={{ margin: 0 }}>
+                      {shownRoles.map((title, i) => (
+                        <EvidenceTag key={i}>{title}</EvidenceTag>
+                      ))}
+                      {moreRoles > 0 && (
+                        <span className={ipStyles.bodyTextMuted}>+ ещё {moreRoles}</span>
+                      )}
+                    </div>
+                  ) : (
+                    <span className={ipStyles.bodyTextMuted}>Роли не определены</span>
+                  )}
+                </div>
+              </ContentCard>
+
               {/* Why now card — only when there is an actual argument to show */}
               {lead.whyNow && lead.whyNow.trim() && (
-                <ContentCard variant="hero">
+                <ContentCard>
                   <ContentCardTitle>🎯 Почему сейчас</ContentCardTitle>
                   <p className={ipStyles.bodyText}>{lead.whyNow}</p>
                 </ContentCard>
@@ -247,16 +294,9 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           }
           sidebar={
             <>
-              {/* Score */}
-              <ContentCard>
-                <ScoreGauge score={lead.score} />
-                <div className={ipStyles.scoreSidebarMeta}>
-                  <ScoreBandChip score={lead.score} />
-                  <SignalFreshnessChip latestPublishedAt={lead.latestPublishedAt} />
-                </div>
-              </ContentCard>
-
-              {/* Confidence gate */}
+              {/* Confidence gate — the verdict score/gate live in the hero card
+                  at the top of the main column now, so the sidebar leads with
+                  the gate explanation instead of duplicating the gauge. */}
               <ContentCard>
                 <div className={ipStyles.sidebarLabel}>Уровень доверия</div>
                 <GateBadgeInline gate={lead.confidenceGate} />

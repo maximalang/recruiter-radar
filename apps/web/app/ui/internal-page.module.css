@@ -550,6 +550,57 @@
   white-space: nowrap;
 }
 
+/* ── Foreign-employer badge (geo gate) ── */
+.foreignBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 0.72rem;
+  font-weight: 600;
+  background-color: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+  white-space: nowrap;
+}
+
+/* ── Urgency cue chip (hiring tempo, visible without opening the lead) ── */
+.urgencyCueChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.urgencyCueChip[data-tone="success"] {
+  background-color: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
+.urgencyCueChip[data-tone="info"] {
+  background-color: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.urgencyCueChip[data-tone="danger"] {
+  background-color: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fed7aa;
+}
+
+.urgencyCueChip[data-tone="neutral"] {
+  background-color: var(--c-surface-muted, #f3f4f6);
+  color: var(--c-text-muted);
+  border: 1px solid var(--c-border, #e5e7eb);
+}
+
 /* ── Gate badge (inline, for leads pages) ── */
 .gateBadgeInline {
   display: inline-block;
@@ -1132,6 +1183,15 @@
     grid-template-columns: 1fr;
   }
 
+  /* Tap-target floor: interactive controls must be ≥44px tall for comfortable
+     touch use (WCAG 2.5.5 / Apple HIG). The full-width action button already
+     stretches horizontally; this guarantees vertical reach. */
+  .leadOpenBtn {
+    min-height: 44px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
   .dataTableWrap {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -1318,4 +1378,52 @@
   font-size: 0.72rem;
   color: var(--c-text-muted);
   margin-top: 4px;
+}
+
+/* ── Lead detail verdict hero ── */
+/* The one-glance primary answer at the top of the lead detail main column:
+   score gauge + chips (band/gate/freshness) + the top open roles. Lifts the
+   verdict above the prose so a recruiter decides before reading. */
+.leadVerdict {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.leadVerdictTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.leadVerdictChips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.leadVerdictRoles {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(29, 78, 216, 0.12);
+}
+
+.leadVerdictRolesLabel {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--c-text-muted);
+}
+
+@media (max-width: 640px) {
+  .leadVerdictTop {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }

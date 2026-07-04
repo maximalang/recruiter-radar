@@ -42,6 +42,14 @@ export interface FiurCompany {
   name: string
   industry?: string
   location?: string
+  /**
+   * ISO-ish country marker or free-text country (e.g. 'RU', 'Россия', 'US').
+   * Russia-first product: a RU country enables the location-match bonus even
+   * when city data is thin; a confirmed foreign country applies a Fit penalty so
+   * a domestic company out-ranks a foreign one at equal activity. Undefined =
+   * unknown → neither bonus nor penalty (no leads=0 regression on thin data).
+   */
+  country?: string
   size?: 'startup' | 'small' | 'medium' | 'large' | 'enterprise'
   employeeCount?: number
   hasCareerPage?: boolean
@@ -125,6 +133,25 @@ export interface FiurBreakdown {
 const clamp01 = (n: number, min = 0): number => Math.max(min, n < 0 ? 0 : n > 1 ? 1 : n)
 
 const normalize = (s: string): string => s.trim().toLowerCase()
+
+/** Fit penalty for a confirmed foreign (non-RU) company. Russia-first product. */
+const FOREIGN_COUNTRY_FIT_PENALTY = 0.3
+
+/** Tokens that mark a company as Russian-market. Matched against company.country. */
+const RU_COUNTRY_TOKENS: readonly string[] = ['ru', 'rus', 'russia', 'россия', 'рф', 'russian federation']
+
+type CountryMarket = 'ru' | 'foreign' | 'unknown'
+
+/**
+ * Classify a company's country marker. RU tokens → 'ru'; any other non-empty
+ * value → 'foreign'; empty/undefined → 'unknown' (neither bonus nor penalty).
+ */
+function classifyCountry(country: string | undefined): CountryMarket {
+  const c = country ? normalize(country) : ''
+  if (c === '') return 'unknown'
+  if (RU_COUNTRY_TOKENS.includes(c)) return 'ru'
+  return 'foreign'
+}
 
 /**
  * Split a comma-separated free-text ICP field into normalised terms.
@@ -360,6 +387,8 @@ function computeFit(
     }
   }
 
+  const market = classifyCountry(company.country)
+
   const profileLocations = profile.locations.map(normalize)
   if (profileLocations.length > 0) {
     const companyLoc = company.location ? normalize(company.location) : ''
@@ -370,9 +399,29 @@ function computeFit(
     if (companyMatches || anyVacancyMatches) {
       score += 0.2
       reasons.push(r('fit', 'fit.location.match'))
+    } else if (market === 'ru') {
+      // RU country confirmed but no explicit city/vacancy-location hit — the
+      // company is still in-market for a Russia-first agency. Award a reduced
+      // location bonus so a domestic company with thin city data is not treated
+      // the same as an out-of-market one.
+      score += 0.1
+      reasons.push(r('fit', 'fit.location.country-ru'))
     } else {
       reasons.push(r('fit', 'fit.location.outside', { location: company.location ?? '-' }))
     }
+  } else if (market === 'ru') {
+    // No profile locations set (agency works RU-wide): still reward a confirmed
+    // RU company so it out-ranks a foreign one on the country signal alone.
+    score += 0.1
+    reasons.push(r('fit', 'fit.location.country-ru'))
+  }
+
+  // Foreign-country penalty (Russia-first). A confirmed non-RU country reduces
+  // Fit so a domestic company out-ranks a foreign one at equal activity. Applied
+  // only when country is KNOWN and foreign — unknown country is never penalised.
+  if (market === 'foreign') {
+    score -= FOREIGN_COUNTRY_FIT_PENALTY
+    reasons.push(r('fit', 'fit.country.foreign', { country: company.country ?? '-' }))
   }
 
   if (profile.companySizes && profile.companySizes.length > 0 && company.size) {

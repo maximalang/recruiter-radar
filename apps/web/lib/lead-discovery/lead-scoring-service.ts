@@ -27,6 +27,7 @@ import type {
 } from '@/lib/scoring/scoring-pipeline'
 import type { ContactPath, ContactCategory } from '@/lib/scoring/contact-paths'
 import { hasCorporateSurface } from '@/lib/contact-policy-filter'
+import { detectForeignEmployer } from '@/lib/scoring/foreign-employer'
 import {
   repairWeakCareerPage,
   createFirecrawlProvider,
@@ -467,6 +468,7 @@ export class LeadScoringService {
       website: lead.enrichment.website,
       industry: lead.enrichment.industry?.[0],
       industries: lead.enrichment.industry,
+      country: this.deriveCountry(lead),
       locations: lead.enrichment.locations?.[0] ? [lead.enrichment.locations[0]] : [],
       size: this.mapCompanySize(lead.enrichment.companySize),
       employeeCount: lead.enrichment.employeeCount,
@@ -501,6 +503,26 @@ export class LeadScoringService {
   /**
    * Helper methods for conversion
    */
+  /**
+   * Derive a country marker for the Russia-first Fit geo gate. Reuses the shared
+   * foreign-employer detector over the lead's career-page URL / website /
+   * locations: a foreign-ATS host with no RU footprint → foreign country code;
+   * otherwise undefined (unknown), so a RU or ambiguous company is never
+   * penalised. The deterministic SQL path applies the same rule at the row level.
+   */
+  private deriveCountry(lead: MultiSourceLead): string | undefined {
+    const careerPageUrl = lead.enrichment.careerPageUrl ?? null
+    const website = lead.enrichment.website ?? null
+    const locations = lead.enrichment.locations ?? []
+    const foreign = detectForeignEmployer({
+      sourceDisplayName: lead.companyName,
+      sourceExternalId: careerPageUrl ?? website,
+      candidateSourceKeys: [careerPageUrl, website].filter((v): v is string => Boolean(v)),
+      locationNames: locations,
+    })
+    return foreign.isForeign ? (foreign.matchedDomain ?? 'foreign') : undefined
+  }
+
   private mapCompanySize(size?: string): PipelineCompany['size'] {
     if (!size) return undefined
 

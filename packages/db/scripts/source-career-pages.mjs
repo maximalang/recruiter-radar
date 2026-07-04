@@ -1036,13 +1036,17 @@ async function upsertOrgSourceRef(client, record) {
   let insertedOrg = false;
 
   if (!orgId) {
+    // Insert with NULL domain first; domain + career_page_url are set afterwards
+    // via the savepoint-protected UPDATE below so a unique-index conflict on
+    // LOWER(domain) (an org with the same domain already exists under a different
+    // source) can never abort this batch. Mirrors ingest-hh.mjs setOrgDomain.
     const insertedOrgResult = await client.query(
       `
-        INSERT INTO orgs (name, domain, website_url)
-        VALUES ($1, $2, $3)
+        INSERT INTO orgs (name, website_url)
+        VALUES ($1, $2)
         RETURNING id
       `,
-      [record.orgName, record.companyDomain, record.companyWebsiteUrl],
+      [record.orgName, record.companyWebsiteUrl],
     );
 
     orgId = insertedOrgResult.rows[0].id;
@@ -1082,6 +1086,9 @@ async function upsertOrgSourceRef(client, record) {
     );
   }
 
+  // Name / website_url / career_page_url are conflict-free (no unique index on
+  // them) — update them directly. career_page_url is the field AI enrichment
+  // reads, so it MUST land even when domain cannot.
   await client.query(
     `
       UPDATE orgs
@@ -1091,31 +1098,67 @@ async function upsertOrgSourceRef(client, record) {
           WHEN name IS NULL OR BTRIM(name) = '' OR name = $5::text THEN $2::text
           ELSE name
         END,
-        domain = CASE
-          WHEN $3::text IS NULL OR BTRIM($3::text) = '' THEN domain
-          WHEN domain IS NULL OR BTRIM(domain) = '' THEN $3::text
-          ELSE domain
-        END,
         website_url = CASE
-          WHEN $4::text IS NULL OR BTRIM($4::text) = '' THEN website_url
-          WHEN website_url IS NULL OR BTRIM(website_url) = '' THEN $4::text
+          WHEN $3::text IS NULL OR BTRIM($3::text) = '' THEN website_url
+          WHEN website_url IS NULL OR BTRIM(website_url) = '' THEN $3::text
           ELSE website_url
+        END,
+        career_page_url = CASE
+          WHEN $4::text IS NULL OR BTRIM($4::text) = '' THEN career_page_url
+          WHEN career_page_url IS NULL OR BTRIM(career_page_url) = '' THEN $4::text
+          ELSE career_page_url
         END
       WHERE id = $1::bigint
     `,
     [
       orgId,
       record.orgDisplayName,
-      record.companyDomain,
       record.companyWebsiteUrl,
+      record.careerPageUrl ?? null,
       buildFallbackOrgName(record),
     ],
   );
+
+  // Domain is set separately under a savepoint: orgs has a UNIQUE index on
+  // LOWER(domain), so a conflict (same domain under another source) must not
+  // abort the batch. Domain is non-critical — the read side falls back to
+  // website_url. Mirrors ingest-hh.mjs setOrgDomain.
+  await setOrgDomainSavepoint(client, orgId, record.companyDomain);
 
   return {
     orgId,
     insertedOrg,
   };
+}
+
+// Best-effort domain enrichment. orgs has a UNIQUE index on LOWER(domain), so a
+// conflict (the same domain already claimed by another source) must not abort
+// the batch. We only set domain when the org has none and no other org owns it,
+// wrapped in a SAVEPOINT that swallows SQLSTATE 23505. Domain is non-critical —
+// the read side falls back to website_url. Mirrors ingest-hh.mjs setOrgDomain.
+async function setOrgDomainSavepoint(client, orgId, domain) {
+  if (!domain) return;
+  await client.query('SAVEPOINT set_org_domain');
+  try {
+    await client.query(
+      `
+        UPDATE orgs
+        SET domain = $2
+        WHERE id = $1
+          AND (domain IS NULL OR BTRIM(domain) = '')
+          AND NOT EXISTS (
+            SELECT 1 FROM orgs other
+            WHERE other.id <> $1 AND LOWER(other.domain) = LOWER($2)
+          )
+      `,
+      [orgId, domain],
+    );
+    await client.query('RELEASE SAVEPOINT set_org_domain');
+  } catch (error) {
+    await client.query('ROLLBACK TO SAVEPOINT set_org_domain');
+    const sqlstate = error?.code ?? '';
+    if (sqlstate !== '23505') throw error;
+  }
 }
 
 async function lockOrgSourceKeys(client, sourceKeys) {

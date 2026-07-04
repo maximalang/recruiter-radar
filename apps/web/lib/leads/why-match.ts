@@ -32,7 +32,7 @@ export interface WhyMatchLead {
  */
 export type WhyMatchProfile = Pick<
   ClientProfile,
-  "roles" | "industries" | "targetCity" | "minOpenRoles" | "hiringIntentMin"
+  "roles" | "industries" | "targetCity" | "minOpenRoles" | "hiringIntentMin" | "remoteFriendly"
 >;
 
 const INDUSTRY_LABEL = new Map(INDUSTRY_OPTIONS.map((o) => [o.key, o.label]));
@@ -75,11 +75,19 @@ export function buildWhyMatch(
     lines.push(`Отрасль: ${INDUSTRY_LABEL.get(matchedIndustry) ?? matchedIndustry}`);
   }
 
-  // Region match — the agency's target city appears in the lead's locations.
+  // Region — confirm a match, or flag a mismatch so a narrow-region agency is
+  // not misled. A mismatch is only asserted when the lead HAS location data that
+  // fails to include the target city (absence of location can't prove mismatch),
+  // and never for a remote-friendly agency (geography is not a constraint there).
   if (profile.targetCity && profile.targetCity.trim()) {
     const needle = profile.targetCity.trim().toLocaleLowerCase("ru-RU");
-    if (lead.locationNames.some((loc) => loc.toLocaleLowerCase("ru-RU").includes(needle))) {
+    const matches = lead.locationNames.some((loc) =>
+      loc.toLocaleLowerCase("ru-RU").includes(needle),
+    );
+    if (matches) {
       lines.push(`Регион: ${profile.targetCity.trim()}`);
+    } else if (lead.locationNames.length > 0 && !profile.remoteFriendly) {
+      lines.push(`Регион не ваш: ${lead.locationNames.slice(0, 2).join(", ")}`);
     }
   }
 
