@@ -1,5 +1,6 @@
 import type { LeadStatus } from "./db";
 import { scoreBand, formatSignalStrength } from "./scoring/score-display";
+import { escapeTelegramHtml as escapeHtml } from "./telegram/html";
 
 export type TelegramConfig = {
   botToken: string;
@@ -67,18 +68,6 @@ function formatDate(value: string | null): string {
     dateStyle: "medium",
     timeStyle: "short"
   }).format(date);
-}
-
-/**
- * Escape the five characters Telegram's HTML parse mode treats as markup.
- * Applied to every user/company-derived string before it enters the message,
- * so a company name like "Romashka & Co <Group>" can never break the markup.
- */
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
 }
 
 type GatePresentation = {

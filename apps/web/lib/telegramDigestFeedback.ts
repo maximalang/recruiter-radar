@@ -177,12 +177,6 @@ export function verifyDigestFeedbackCallback(data: string | null): SignedDigestF
   return { ...unsigned, sig };
 }
 
-/** @deprecated All feedback paths must use verifyDigestFeedbackCallback. This function is removed. */
-export function parseDigestFeedbackCallbackData(_value: string | null | undefined): null {
-  // Unsigned parser is deprecated; all feedback paths must use verifyDigestFeedbackCallback.
-  return null;
-}
-
 function isPositiveIntegerString(value: string | null | undefined): value is string {
   return typeof value === "string" && /^\d+$/.test(value);
 }

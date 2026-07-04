@@ -16,6 +16,7 @@
 
 import { scoreBand } from '@/lib/scoring/score-display'
 import { deriveRoleNames, splitRolesForDisplay } from '@/lib/leads/lead-quality'
+import { escapeTelegramHtml as escapeHtml } from './html'
 
 /** Telegram hard limit per message. */
 export const TELEGRAM_MESSAGE_CHAR_LIMIT = 4096
@@ -44,10 +45,6 @@ export interface BatchDigestInput {
   date?: Date
   /** Absolute /leads deep link, e.g. https://app.example.com/leads. */
   leadsUrl: string
-}
-
-function escapeHtml(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
 function formatDateRu(date: Date): string {
