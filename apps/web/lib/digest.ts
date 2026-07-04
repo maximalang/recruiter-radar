@@ -85,11 +85,15 @@ export async function getDigestItemsForClientProfile(input: {
     WITH ranked_candidates AS (
       ${getDigestEvidenceQuery()}
     )
+    -- NOTE: this wrapper re-projects columns by name, so any column added to the
+    -- inner query (e.g. career_page_url, needed by the foreign-ATS geo gate in
+    -- mapDigestEvidenceRow) MUST also be listed here or it silently drops out.
     SELECT
       ranked_candidates.rank,
       ranked_candidates.org_id,
       ranked_candidates.source_external_id,
       ranked_candidates.source_display_name,
+      ranked_candidates.career_page_url,
       ranked_candidates.source_families,
       ranked_candidates.evidence_titles,
       ranked_candidates.candidate_source_keys,
@@ -244,11 +248,15 @@ export async function runDigestForClientProfile(input: {
       WITH ranked_candidates AS (
         ${getDigestEvidenceQuery()}
       )
+      -- NOTE: this wrapper re-projects columns by name, so any column added to the
+      -- inner query (e.g. career_page_url, needed by the foreign-ATS geo gate in
+      -- mapDigestEvidenceRow) MUST also be listed here or it silently drops out.
       SELECT
         ranked_candidates.rank,
         ranked_candidates.org_id,
         ranked_candidates.source_external_id,
         ranked_candidates.source_display_name,
+        ranked_candidates.career_page_url,
         ranked_candidates.source_families,
         ranked_candidates.evidence_titles,
         ranked_candidates.candidate_source_keys,
