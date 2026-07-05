@@ -25,6 +25,33 @@ const getBarColor = (overall: number) =>
   overall >= 60 ? styles.sourceItemScoreYellow :
   styles.sourceItemScoreRed;
 
+/**
+ * Render the last-sync moment as a human relative phrase. `lastRun` arrives as a
+ * raw ISO timestamp from the health query (or "" when a source produced no
+ * signal in the 24h window). Never surface the raw timestamp to the recruiter.
+ */
+function formatLastRun(lastRun: string): string {
+  if (!lastRun) return 'нет данных за 24ч';
+  const ts = new Date(lastRun).getTime();
+  if (Number.isNaN(ts)) return 'нет данных за 24ч';
+  const mins = Math.max(0, Math.round((Date.now() - ts) / 60000));
+  if (mins < 1) return 'только что';
+  if (mins < 60) return `${mins} мин назад`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours} ч назад`;
+  const days = Math.round(hours / 24);
+  return `${days} дн назад`;
+}
+
+/** Russian plural for "источник". */
+function pluralSources(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return 'источник';
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'источника';
+  return 'источников';
+}
+
 interface DashboardSourcesProps {
   sources?: SourceHealth[];
   loading?: boolean;
@@ -101,17 +128,8 @@ function SourcesSkeleton() {
   );
 }
 
-const DEFAULT_SOURCES: SourceHealth[] = [
-  { id: 'hh', name: 'HeadHunter', overall: 95, lastRun: '2 минуты назад', recordsProcessed: 1250, errors: 0, status: 'excellent' },
-  { id: 'career-pages', name: 'Career Pages', overall: 88, lastRun: '5 минут назад', recordsProcessed: 890, errors: 2, status: 'good' },
-  { id: 'rabota-rossii', name: 'Rabota Rossii', overall: 92, lastRun: '1 минута назад', recordsProcessed: 2100, errors: 1, status: 'excellent' },
-  { id: 'company-site', name: 'Company Site', overall: 76, lastRun: '15 минут назад', recordsProcessed: 450, errors: 5, status: 'warning' },
-  { id: 'tech-job-boards', name: 'Tech Job Boards', overall: 83, lastRun: '8 минут назад', recordsProcessed: 670, errors: 3, status: 'good' },
-  { id: 'linkedin-company-pages', name: 'LinkedIn', overall: 70, lastRun: '30 минут назад', recordsProcessed: 340, errors: 8, status: 'warning' },
-];
-
 const DashboardSources: React.FC<DashboardSourcesProps> = ({
-  sources = DEFAULT_SOURCES,
+  sources = [],
   loading = false,
   error,
   onRetry
@@ -137,7 +155,7 @@ const DashboardSources: React.FC<DashboardSourcesProps> = ({
           🎯 Статистика источников
         </h2>
         <span className={styles.sourcesCount}>
-          {sources.length} источников
+          {sources.length} {pluralSources(sources.length)}
         </span>
       </div>
       <ul
@@ -160,7 +178,7 @@ const DashboardSources: React.FC<DashboardSourcesProps> = ({
                   <div>
                     <div className={styles.sourceItemName}>{source.name}</div>
                     <div className={styles.sourceItemMeta}>
-                      {source.lastRun} • {source.recordsProcessed} записей
+                      {formatLastRun(source.lastRun)} • {source.recordsProcessed} записей
                     </div>
                   </div>
                 </div>

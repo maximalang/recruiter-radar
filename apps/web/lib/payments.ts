@@ -8,6 +8,9 @@ import {
 } from "./clientProfiles";
 import { runDigestForClientProfile, type DigestItemInput } from "./digest";
 import { buildHhDigestText, type HhDigestItem } from "./hhDigest";
+import { buildBatchDigestMessages, type BatchLead } from "./telegram/digest-batch";
+import { deriveWhyNow } from "./leads-data";
+import { detectForeignEmployer } from "./scoring/foreign-employer";
 import {
   buildCheckoutHref,
   getPublicPlanByCode
@@ -455,7 +458,37 @@ export async function sendPilotOrderTestDigest(
     throw new Error(telegramConfigMessage);
   }
 
-  const digestText = buildHhDigestText(items);
+  // First-impression parity: the pilot's onboarding test digest must read exactly
+  // like a real daily digest — the same premium batch card, not the legacy
+  // debug-style buildHhDigestText ("HH digest" / "score 332.0"). Map the digest
+  // items to the same BatchLead shape the daily delivery uses.
+  const batchLeads: BatchLead[] = items.map((item) => {
+    const foreign = detectForeignEmployer({
+      sourceDisplayName: item.employer_name,
+      sourceExternalId: item.hh_employer_id,
+      candidateSourceKeys: item.candidate_source_keys,
+      evidenceTitles: item.evidence_titles,
+      locationNames: item.location_names,
+    });
+    return {
+      orgId: item.org_id,
+      orgName: item.employer_name,
+      score: item.total_score,
+      confidenceGate: item.confidence_gate,
+      vacanciesCount: item.vacancies_count,
+      evidenceTitles: item.evidence_titles,
+      locationNames: item.location_names,
+      whyLine: deriveWhyNow(item.reasons) || null,
+      isForeignEmployer: foreign.isForeign,
+    };
+  });
+
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/+$/, "") ?? "";
+  const batch = buildBatchDigestMessages({
+    leads: batchLeads,
+    leadsUrl: baseUrl ? `${baseUrl}/leads` : "/leads",
+  });
+  const digestText = batch.messages[0] ?? buildHhDigestText(items);
   const replyMarkup = buildTelegramDigestFeedbackReplyMarkup({
     clientProfileId: profile.id,
     items
@@ -466,6 +499,7 @@ export async function sendPilotOrderTestDigest(
       botToken,
       chatId: profile.telegramChatId
     }, {
+      parseMode: "HTML",
       replyMarkup
     });
     const sentAt = new Date().toISOString();

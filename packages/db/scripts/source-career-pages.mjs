@@ -155,9 +155,25 @@ export async function fetchCareerPagesInput({ persistSnapshot }) {
       budgetExhausted = true;
       break;
     }
-    const targetResult = await fetchCareerPageTarget(target, index + 1);
-    targetResults.push(targetResult.summary);
-    records.push(...targetResult.records);
+    // Isolate per-target failures: one unreachable target (network reset,
+    // foreign host, malformed feed) must not discard every record fetched so
+    // far and fail the whole source. Record the failure in the summary and
+    // continue — the partial batch still reaches ingestion, and the bad target
+    // is retried on the next run.
+    try {
+      const targetResult = await fetchCareerPageTarget(target, index + 1);
+      targetResults.push(targetResult.summary);
+      records.push(...targetResult.records);
+    } catch (error) {
+      targetResults.push({
+        id: toNonEmptyText(target?.id) ?? `target-${index + 1}`,
+        adapter: toNonEmptyText(target?.adapter ?? target?.type) ?? null,
+        companyName: toNonEmptyText(target?.company_name ?? target?.companyName) ?? null,
+        sourceUrl: toUrlOrNull(target?.source_url ?? target?.sourceUrl ?? target?.url),
+        recordsFetched: 0,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   const normalizedInput = buildNormalizedInput({
