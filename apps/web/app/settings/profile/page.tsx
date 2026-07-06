@@ -17,10 +17,10 @@ import ProfileCompletionPanel from "./profile-completion-panel";
 export const dynamic = "force-dynamic";
 
 const SETTINGS_NAV: NavItem[] = [
-  { href: "/dashboard", label: "📊 Дашборд" },
-  { href: "/leads", label: "🎯 Лиды" },
-  { href: "/review", label: "🔍 Ревью" },
-  { href: "/settings/profile", label: "⚙️ Профиль", active: true },
+  { href: "/dashboard", label: "Дашборд" },
+  { href: "/leads", label: "Лиды" },
+  { href: "/review", label: "Ревью" },
+  { href: "/settings/profile", label: "Профиль", active: true },
 ];
 
 export default async function SettingsProfilePage() {
@@ -44,7 +44,7 @@ export default async function SettingsProfilePage() {
     <InternalPageFrame navItems={SETTINGS_NAV}>
       <InternalPageHeader
         title="Кто ваши идеальные клиенты?"
-        subtitle="Чем точнее профиль, тем релевантнее радар. Эти настройки фильтруют и ранжируют ежедневную подборку — не только влияют на скоринг."
+        subtitle="Чем точнее профиль, тем релевантнее ежедневная подборка."
       />
       {profile && completion ? (
         <ContentCard>
@@ -66,7 +66,7 @@ export default async function SettingsProfilePage() {
         <ContentCard>
           <InternalPageHeader
             title="Как доставлять радар"
-            subtitle="Telegram — основной канал. Дополнительно включите браузерные уведомления и ежедневный email-дайджест."
+            subtitle="Telegram — основной канал. Дополнительно: браузерные уведомления и ежедневный email."
           />
           <DeliveryForm preferences={deliveryPreferences} />
         </ContentCard>

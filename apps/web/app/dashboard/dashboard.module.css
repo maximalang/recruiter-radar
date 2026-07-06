@@ -830,6 +830,13 @@
 /* Zone label — separates the agency-facing value zone from the secondary
    operational/telemetry zone so the dashboard reads top-to-bottom as
    "what to act on" then "system health", not one flat stack. */
+.dashboardStack {
+  margin-top: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
 .zoneLabel {
   display: flex;
   align-items: center;

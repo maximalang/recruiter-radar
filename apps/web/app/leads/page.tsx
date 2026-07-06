@@ -29,10 +29,10 @@ import { internalPageClasses as ipStyles } from '../ui/internal-page';
 export const dynamic = 'force-dynamic';
 
 const LEADS_NAV: NavItem[] = [
-  { href: '/dashboard', label: '📊 Дашборд' },
-  { href: '/leads', label: '🎯 Лиды', active: true },
-  { href: '/review', label: '🔍 Ревью' },
-  { href: '/settings/profile', label: '⚙️ Профиль' },
+  { href: '/dashboard', label: 'Дашборд' },
+  { href: '/leads', label: 'Лиды', active: true },
+  { href: '/review', label: 'Ревью' },
+  { href: '/settings/profile', label: 'Профиль' },
 ];
 
 function LeadCard({
@@ -64,14 +64,6 @@ function LeadCard({
               <ScoreBandChip score={lead.score} />
               <GateBadgeInline gate={lead.confidenceGate} />
               <ForeignEmployerBadge isForeign={lead.isForeignEmployer} />
-              {lead.locationNames.length > 0 && (
-                <span className={ipStyles.leadMetaChip}>
-                  📍 {lead.locationNames.slice(0, 2).join(', ')}
-                </span>
-              )}
-              {lead.vacanciesCount > 0 && (
-                <span className={ipStyles.leadMetaChip}>💼 {lead.vacanciesCount}</span>
-              )}
               <FeedbackBadge status={lead.feedbackStatus} />
               <AiHintChip present={lead.hasAiHint} />
             </div>
@@ -105,6 +97,14 @@ function LeadCard({
             <span className={ipStyles.leadContactChip}>
               🛡 {lead.lawfulContactPath}
             </span>
+          )}
+          {lead.locationNames.length > 0 && (
+            <span className={ipStyles.leadMetaChip}>
+              📍 {lead.locationNames.slice(0, 2).join(', ')}
+            </span>
+          )}
+          {lead.vacanciesCount > 0 && (
+            <span className={ipStyles.leadMetaChip}>💼 {lead.vacanciesCount} вакансий</span>
           )}
           {shownRoles.length > 0 ? (
             <span className={ipStyles.leadMetaChip}>
@@ -314,7 +314,7 @@ export default async function LeadsPage({
   return (
     <InternalPageFrame navItems={LEADS_NAV}>
       <InternalPageHeader
-        title="🎯 Лиды"
+        title="Лиды"
         subtitle={
           <>
             {selectedProfile
@@ -331,7 +331,7 @@ export default async function LeadsPage({
               download
               aria-label="Экспортировать лиды в CSV"
             >
-              ⬇ Экспорт CSV
+              Экспорт CSV
             </a>
           ) : null
         }
@@ -340,14 +340,9 @@ export default async function LeadsPage({
       <MetricGrid>
         <MetricCard label="Всего лидов" value={totalLeads} />
         <MetricCard
-          label="Gate A/B"
+          label="Готовы к контакту (A/B)"
           value={allLeads.filter((l) => l.confidenceGate === 'A' || l.confidenceGate === 'B').length}
           tone="success"
-        />
-        <MetricCard
-          label="С обратной связью"
-          value={allLeads.filter((l) => l.feedbackStatus && l.feedbackStatus !== 'none').length}
-          tone="info"
         />
         <MetricCard
           label="Ожидают проверки"
@@ -357,10 +352,6 @@ export default async function LeadsPage({
             </Link>
           }
           tone={pendingReview > 0 ? 'info' : 'neutral'}
-        />
-        <MetricCard
-          label={selectedProfile ? 'Профиль' : 'Профилей'}
-          value={selectedProfile ? '1' : activeProfiles.length}
         />
       </MetricGrid>
 

@@ -140,6 +140,11 @@
   align-items: center;
 }
 
+.internalPageHeaderNav {
+  display: flex;
+  gap: 12px;
+}
+
 .internalPageTitle {
   font-size: 1.5rem;
   font-weight: 700;
@@ -1314,6 +1319,10 @@
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+}
+
+.chipWrapFlush {
+  margin-bottom: 0;
 }
 
 /* ── Feedback note (italic muted) ── */

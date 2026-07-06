@@ -10,10 +10,10 @@ import { InternalPageFrame, InternalPageHeader, type NavItem } from '../ui/inter
 import dashStyles from './dashboard.module.css';
 
 const DASHBOARD_NAV: NavItem[] = [
-  { href: '/dashboard', label: '📊 Дашборд', active: true },
-  { href: '/leads', label: '🎯 Лиды' },
-  { href: '/review', label: '🔍 Ревью' },
-  { href: '/settings/profile', label: '⚙️ Профиль' },
+  { href: '/dashboard', label: 'Дашборд', active: true },
+  { href: '/leads', label: 'Лиды' },
+  { href: '/review', label: 'Ревью' },
+  { href: '/settings/profile', label: 'Профиль' },
 ];
 
 import {
@@ -51,12 +51,12 @@ export default async function DashboardPage() {
   return (
     <InternalPageFrame navItems={DASHBOARD_NAV}>
       <InternalPageHeader
-        title="📊 Радар"
+        title="Радар"
         subtitle="Компании, которым стоит написать сегодня, и состояние источников в реальном времени"
         nav={<LiveClock />}
       />
       <Suspense fallback={<div>Загрузка...</div>}>
-        <div style={{ marginTop: '32px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
+        <div className={dashStyles.dashboardStack}>
           {/* Agency value zone — what to act on today */}
           <DashboardTodayRadar topLeads={todayRadar.topLeads} pendingReview={todayRadar.pendingReview} />
           <DashboardQuality data={quality} />
@@ -68,7 +68,7 @@ export default async function DashboardPage() {
 
           {/* System zone — operational telemetry, secondary to the value above */}
           <div className={`${dashStyles.zoneLabel} ${dashStyles.zoneLabelSystem}`}>
-            ⚙️ Система и источники
+            Система и источники
           </div>
           <DashboardOverview
             totalSources={overview.totalSources}

@@ -21,10 +21,10 @@ export default function DashboardTodayRadar({ topLeads, pendingReview }: Dashboa
     <section className={styles.todayRadarSection} aria-labelledby="today-radar-heading">
       <div className={styles.todayRadarHeader}>
         <h2 id="today-radar-heading" className={styles.analyticsHeading}>
-          🎯 Сегодняшний радар
+          Сегодняшний радар
         </h2>
         <Link href="/review" className={styles.todayRadarReviewPill} data-pending={pendingReview > 0}>
-          🔍 Ожидают проверки: {pendingReview}
+          Ожидают проверки: {pendingReview}
         </Link>
       </div>
 
@@ -32,7 +32,7 @@ export default function DashboardTodayRadar({ topLeads, pendingReview }: Dashboa
         <div className={styles.analyticsEmpty}>
           <p>Пока нет компаний для контакта. Радар подберёт их по вашему профилю: роли, отрасли, регионы.</p>
           <Link href="/settings/profile" className={styles.todayRadarReviewPill}>
-            ⚙️ Проверить настройки профиля
+            Проверить настройки профиля
           </Link>
         </div>
       ) : (

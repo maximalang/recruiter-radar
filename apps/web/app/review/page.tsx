@@ -19,10 +19,10 @@ import ReviewActions from './review-actions';
 export const dynamic = 'force-dynamic';
 
 const REVIEW_NAV: NavItem[] = [
-  { href: '/dashboard', label: '📊 Дашборд' },
-  { href: '/leads', label: '🎯 Лиды' },
-  { href: '/review', label: '🔍 Ревью', active: true },
-  { href: '/settings/profile', label: '⚙️ Профиль' },
+  { href: '/dashboard', label: 'Дашборд' },
+  { href: '/leads', label: 'Лиды' },
+  { href: '/review', label: 'Ревью', active: true },
+  { href: '/settings/profile', label: 'Профиль' },
 ];
 
 interface ReviewCandidate {

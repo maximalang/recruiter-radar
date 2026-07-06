@@ -575,7 +575,6 @@ function PreviewDigestCard(props: {
     totalScore: item.total_score
   });
   const whyNow = item.reasons[0] || "";
-  const bestAngle = item.bestAngle;
   const contactPath = formatLawfulContactPath(item.lawfulContactPath);
   const negativeSignals = item.negativeSignals;
   const secondaryReason = item.reasons[1] || null;
@@ -606,16 +605,6 @@ function PreviewDigestCard(props: {
       ) : null}
 
       {showRelevance ? <PreviewRelevanceBars signals={item.relevanceSignals} /> : null}
-
-      <div className={hpStyles.openerBox}>
-        <div className={hpStyles.openerLabel}>Лучший угол контакта</div>
-        <div>{bestAngle}</div>
-      </div>
-
-      <div className={hpStyles.openerBox}>
-        <div className={hpStyles.openerLabel}>Следующий шаг</div>
-        <div>{item.opener}</div>
-      </div>
 
       {contactPath ? (
         <div className={hpStyles.previewReasonList}>

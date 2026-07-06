@@ -85,7 +85,7 @@ export function InternalPageHeader(props: {
             <div className={s.internalPageSubtitle}>{props.subtitle}</div>
           ) : null}
         </div>
-        {props.nav ? <nav style={{ display: "flex", gap: "12px" }}>{props.nav}</nav> : null}
+        {props.nav ? <nav className={s.internalPageHeaderNav}>{props.nav}</nav> : null}
       </div>
     </header>
   );

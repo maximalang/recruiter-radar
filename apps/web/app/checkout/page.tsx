@@ -21,8 +21,8 @@ import {
 import ppStyles from "../ui/page-primitives.module.css";
 
 const CHECKOUT_NAV: NavItem[] = [
-  { href: '/dashboard', label: '📊 Дашборд' },
-  { href: '/leads', label: '🎯 Лиды' },
+  { href: '/dashboard', label: 'Дашборд' },
+  { href: '/leads', label: 'Лиды' },
 ];
 
 export const dynamic = "force-dynamic";
@@ -72,7 +72,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Rec
       <InternalPageHeader title={isRequest ? `Подключение: ${plan.name}` : "Оформление пилота"} />
       <div className={ipStyles.narrowLayout}>
         <ContentCard>
-          <ContentCardTitle>{isRequest ? `📈 ${plan.name}` : "🎯 Пилотный запуск"}</ContentCardTitle>
+          <ContentCardTitle>{isRequest ? plan.name : "Пилотный запуск"}</ContentCardTitle>
           <p className={ipStyles.bodyText}>
             {isRequest
               ? "Это тариф с ежемесячным сопровождением. Оставьте заявку — мы свяжемся, чтобы подключить радар и согласовать оплату."

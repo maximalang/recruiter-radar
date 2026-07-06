@@ -5,7 +5,7 @@ import { useCallback } from 'react';
 import s from './leads-filters.module.css';
 
 const GATE_OPTIONS = [
-  { value: '', label: 'Все' },
+  { value: '', label: 'Все уровни доверия' },
   { value: 'A', label: 'Авто (A)' },
   { value: 'B', label: 'Авто с меткой (B)' },
   { value: 'C', label: 'На проверке (C)' },
@@ -13,7 +13,7 @@ const GATE_OPTIONS = [
 ] as const;
 
 const FEEDBACK_OPTIONS = [
-  { value: '', label: 'Все' },
+  { value: '', label: 'Все статусы' },
   { value: 'none', label: 'Без обратной связи' },
   { value: 'accepted', label: 'Беру' },
   { value: 'dismissed', label: 'Мимо' },
@@ -53,7 +53,6 @@ export default function LeadsFilters({ profiles = [] }: { profiles?: ProfileOpti
 
   return (
     <div className={s.filterBar}>
-      <span className={s.filterLabel}>Фильтры:</span>
       {profiles.length > 1 && (
         <select
           value={currentProfile}
@@ -61,10 +60,10 @@ export default function LeadsFilters({ profiles = [] }: { profiles?: ProfileOpti
           className={s.filterSelect}
           aria-label="Фильтр по практике"
         >
-          <option value="">Практика: Все</option>
+          <option value="">Все практики</option>
           {profiles.map((p) => (
             <option key={p.id} value={p.id}>
-              Практика: {p.name}
+              {p.name}
             </option>
           ))}
         </select>
@@ -77,7 +76,7 @@ export default function LeadsFilters({ profiles = [] }: { profiles?: ProfileOpti
       >
         {GATE_OPTIONS.map((opt) => (
           <option key={opt.value} value={opt.value}>
-            Gate: {opt.label}
+            {opt.label}
           </option>
         ))}
       </select>
@@ -89,7 +88,7 @@ export default function LeadsFilters({ profiles = [] }: { profiles?: ProfileOpti
       >
         {FEEDBACK_OPTIONS.map((opt) => (
           <option key={opt.value} value={opt.value}>
-            Статус: {opt.label}
+            {opt.label}
           </option>
         ))}
       </select>
