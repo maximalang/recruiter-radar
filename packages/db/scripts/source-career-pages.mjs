@@ -567,7 +567,22 @@ export function detectCareerPageTargetFromHtml(html, seed) {
   }
 
   if (!greenhouseLink && !leverLink && sameDomainCareerPageUrl) {
+    // The company's OWN career page (same host as its website) is a direct,
+    // company-owned hiring surface — exactly the RU-native case foreign ATS
+    // detection (Greenhouse/Lever) misses. Emit a target that reads schema.org
+    // JobPosting JSON-LD from that page (the markup RU sites publish for
+    // Яндекс.Работа / Google Jobs), so it becomes a real career-pages signal
+    // instead of a dead `needs_review` note.
     notes.push(`same-domain-careers:${sameDomainCareerPageUrl}`);
+    targets.push(buildDiscoveredTarget({
+      adapter: 'same-domain-jsonld',
+      providerSlug: seed.domain ?? extractHostname(sameDomainCareerPageUrl) ?? 'careers',
+      companyName: seed.orgName,
+      companyDomain: seed.domain,
+      companyWebsiteUrl: seed.websiteUrl,
+      careerPageUrl: sameDomainCareerPageUrl,
+      sourceUrl: sameDomainCareerPageUrl,
+    }));
   }
 
   return {
@@ -575,6 +590,145 @@ export function detectCareerPageTargetFromHtml(html, seed) {
     sameDomainCareerPageUrl,
     notes,
   };
+}
+
+/**
+ * Extract schema.org JobPosting objects from a page's `application/ld+json`
+ * blocks. RU company career pages publish this markup for Яндекс.Работа /
+ * Google for Jobs, so it is a reliable, non-brittle structured surface — far
+ * more durable than scraping bespoke HTML. Walks arrays, `@graph`, and
+ * `ItemList`/`ListItem` wrappers to find every `@type: JobPosting`.
+ */
+export function extractJobPostingsFromHtml(html) {
+  const text = typeof html === 'string' ? html : '';
+  const postings = [];
+  const scriptPattern = /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  let match;
+
+  while ((match = scriptPattern.exec(text)) !== null) {
+    const raw = match[1]?.trim();
+
+    if (!raw) {
+      continue;
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      continue;
+    }
+
+    collectJobPostings(parsed, postings, 0);
+  }
+
+  return postings;
+}
+
+function collectJobPostings(node, acc, depth) {
+  if (!node || depth > 6 || acc.length >= 200) {
+    return;
+  }
+
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      collectJobPostings(item, acc, depth + 1);
+    }
+    return;
+  }
+
+  if (typeof node !== 'object') {
+    return;
+  }
+
+  const type = node['@type'];
+  const isJobPosting = Array.isArray(type)
+    ? type.some((entry) => String(entry).toLowerCase() === 'jobposting')
+    : String(type ?? '').toLowerCase() === 'jobposting';
+
+  if (isJobPosting) {
+    acc.push(node);
+  }
+
+  if (Array.isArray(node['@graph'])) {
+    collectJobPostings(node['@graph'], acc, depth + 1);
+  }
+
+  if (Array.isArray(node.itemListElement)) {
+    collectJobPostings(node.itemListElement, acc, depth + 1);
+  }
+
+  if (node.item && typeof node.item === 'object') {
+    collectJobPostings(node.item, acc, depth + 1);
+  }
+}
+
+/**
+ * Map extracted schema.org JobPosting objects to the career-pages record shape
+ * (same contract as mapGreenhouseBoardPayload). Only reads fields the standard
+ * actually carries — never fabricates a company, contact, or salary. Records
+ * without a job title are dropped downstream by normalizeCareerPageRecord.
+ */
+export function mapJsonLdJobPostings(postings, seed) {
+  const list = Array.isArray(postings) ? postings : [];
+  const seedInfo = seed && typeof seed === 'object' ? seed : {};
+
+  return list.map((posting, index) => {
+    const source = posting && typeof posting === 'object' ? posting : {};
+    const hiringOrg = asPlainObject(source.hiringOrganization);
+    const companyName = toNonEmptyText(hiringOrg.name) ?? seedInfo.companyName ?? null;
+    const companyWebsiteUrl = toUrlOrNull(hiringOrg.sameAs) ?? seedInfo.companyWebsiteUrl ?? null;
+    const jobPostingUrl = toUrlOrNull(source.url) ?? seedInfo.careerPageUrl ?? null;
+
+    return {
+      company_name: companyName,
+      company_domain: seedInfo.companyDomain ?? null,
+      company_website_url: companyWebsiteUrl,
+      career_page_url: seedInfo.careerPageUrl ?? null,
+      job_posting_url: jobPostingUrl,
+      job_title: toNonEmptyText(source.title ?? source.name),
+      external_id: extractJsonLdIdentifier(source) ?? stringifyExternalId(null, seedInfo.careerPageUrl ?? 'jsonld', index),
+      location: extractJsonLdLocation(source.jobLocation),
+      employment_type: normalizeJsonLdEmploymentType(source.employmentType),
+      occurred_at: toTimestampOrNull(source.datePosted ?? source.datePublished),
+      source_record_type: 'job_posting',
+      raw_target_adapter: 'same-domain-jsonld',
+      raw: source,
+    };
+  });
+}
+
+function asPlainObject(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
+function extractJsonLdIdentifier(posting) {
+  const identifier = posting.identifier;
+
+  if (identifier && typeof identifier === 'object' && !Array.isArray(identifier)) {
+    return toNonEmptyText(identifier.value ?? identifier['@id'] ?? identifier.name);
+  }
+
+  return toNonEmptyText(identifier);
+}
+
+function extractJsonLdLocation(jobLocation) {
+  const location = Array.isArray(jobLocation) ? jobLocation[0] : jobLocation;
+  const address = asPlainObject(asPlainObject(location).address);
+
+  return (
+    toNonEmptyText(address.addressLocality)
+    ?? toNonEmptyText(address.addressRegion)
+    ?? toNonEmptyText(asPlainObject(location).name)
+  );
+}
+
+function normalizeJsonLdEmploymentType(value) {
+  if (Array.isArray(value)) {
+    return value.map((entry) => toNonEmptyText(entry)).filter(Boolean).join(', ') || null;
+  }
+
+  return toNonEmptyText(value);
 }
 
 function buildDiscoveredTarget({ adapter, providerSlug, companyName, companyDomain, companyWebsiteUrl, careerPageUrl, sourceUrl }) {
@@ -705,6 +859,8 @@ async function fetchCareerPageTarget(target, index) {
     records = await fetchGreenhouseBoardRecords(normalizedTarget);
   } else if (normalizedTarget.adapter === 'lever-postings') {
     records = await fetchLeverPostingsRecords(normalizedTarget);
+  } else if (normalizedTarget.adapter === 'same-domain-jsonld') {
+    records = await fetchSameDomainJsonLdRecords(normalizedTarget);
   } else if (normalizedTarget.adapter === 'json-feed') {
     records = await fetchJsonFeedRecords(normalizedTarget);
   } else if (normalizedTarget.adapter === 'static-records') {
@@ -830,6 +986,23 @@ export function mapLeverPostingsPayload(payload, target) {
     raw_target_adapter: target.adapter,
     raw: job,
   }));
+}
+
+async function fetchSameDomainJsonLdRecords(target) {
+  const page = await fetchHtmlPage(target.sourceUrl);
+
+  if (!page) {
+    return [];
+  }
+
+  const postings = extractJobPostingsFromHtml(page.html);
+
+  return mapJsonLdJobPostings(postings, {
+    companyName: target.companyName,
+    companyDomain: target.companyDomain,
+    companyWebsiteUrl: target.companyWebsiteUrl,
+    careerPageUrl: target.careerPageUrl ?? target.sourceUrl,
+  });
 }
 
 async function fetchJsonFeedRecords(target) {

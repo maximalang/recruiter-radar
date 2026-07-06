@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {
   buildCareerPagesDiscoverySeedsQuery,
   detectCareerPageTargetFromHtml,
+  extractJobPostingsFromHtml,
+  mapJsonLdJobPostings,
   resolveCareerPagesDiscoveredTargetsOutputPath,
   resolveCareerPagesDiscoveryReviewOutputPath,
 } from './source-career-pages.mjs';
@@ -90,9 +92,67 @@ const sameDomainDetection = detectCareerPageTargetFromHtml(sameDomainHtml, {
   domain: 'same.example',
   websiteUrl: 'https://same.example/',
 });
-assert.equal(sameDomainDetection.targets.length, 0);
+// The company's own /careers page is now a real target (same-domain-jsonld),
+// not a dead needs_review note — this is the RU-native direct-surface path.
+assert.equal(sameDomainDetection.targets.length, 1);
+assert.deepEqual(sameDomainDetection.targets[0], {
+  id: 'same.example-same-domain-jsonld',
+  adapter: 'same-domain-jsonld',
+  company_name: 'Same',
+  company_domain: 'same.example',
+  company_website_url: 'https://same.example/',
+  career_page_url: 'https://same.example/careers',
+  source_url: 'https://same.example/careers',
+});
 assert.equal(sameDomainDetection.sameDomainCareerPageUrl, 'https://same.example/careers');
 assert.deepEqual(sameDomainDetection.notes, ['same-domain-careers:https://same.example/careers']);
+
+// JSON-LD JobPosting extraction: RU career pages emit schema.org markup for
+// Яндекс.Работа / Google Jobs. Verify we walk @graph + arrays and map only
+// fields the standard carries (no fabricated company/contact).
+const jsonLdHtml = `
+  <html><head>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "JobPosting",
+          "title": "Инженер-программист",
+          "datePosted": "2026-07-01",
+          "url": "https://same.example/careers/backend",
+          "identifier": { "@type": "PropertyValue", "value": "vac-42" },
+          "employmentType": "FULL_TIME",
+          "hiringOrganization": { "@type": "Organization", "name": "Смолл ООО", "sameAs": "https://same.example" },
+          "jobLocation": { "@type": "Place", "address": { "@type": "PostalAddress", "addressLocality": "Москва" } }
+        },
+        { "@type": "WebSite", "name": "not a job" }
+      ]
+    }
+    </script>
+  </head><body></body></html>
+`;
+const postings = extractJobPostingsFromHtml(jsonLdHtml);
+assert.equal(postings.length, 1, 'must extract exactly one JobPosting from @graph');
+
+const mapped = mapJsonLdJobPostings(postings, {
+  companyName: 'Same',
+  companyDomain: 'same.example',
+  companyWebsiteUrl: 'https://same.example/',
+  careerPageUrl: 'https://same.example/careers',
+});
+assert.equal(mapped.length, 1);
+assert.equal(mapped[0].job_title, 'Инженер-программист');
+assert.equal(mapped[0].company_name, 'Смолл ООО');
+assert.equal(mapped[0].external_id, 'vac-42');
+assert.equal(mapped[0].location, 'Москва');
+assert.equal(mapped[0].job_posting_url, 'https://same.example/careers/backend');
+assert.equal(mapped[0].career_page_url, 'https://same.example/careers');
+assert.equal(mapped[0].source_record_type, 'job_posting');
+
+// Empty / malformed LD+JSON must yield nothing, never throw.
+assert.deepEqual(extractJobPostingsFromHtml('<script type="application/ld+json">{ bad json </script>'), []);
+assert.deepEqual(extractJobPostingsFromHtml(''), []);
 
 console.log(JSON.stringify({
   ok: true,
