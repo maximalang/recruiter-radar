@@ -17,6 +17,17 @@ import { formatLawfulContactPath } from "./leads-data";
 
 const BOM = "﻿";
 
+/**
+ * Review-status labels for CSV export. Mirrors the in-app REVIEW_LABELS
+ * vocabulary so an exported row says "На проверке" / "Проверен" / "Отклонён"
+ * exactly as the UI does. auto_approved → empty (no review needed = no value).
+ */
+const REVIEW_CSV_LABELS: Record<string, string> = {
+  pending_review: "На проверке",
+  approved: "Проверен",
+  rejected: "Отклонён",
+};
+
 type CsvColumn = {
   header: string;
   value: (lead: LeadItem) => string;
@@ -39,6 +50,7 @@ const COLUMNS: readonly CsvColumn[] = [
   { header: "Локации", value: (l) => l.locationNames.join("; ") },
   { header: "Источники", value: (l) => l.sourceFamilies.join("; ") },
   { header: "Статус", value: (l) => l.feedbackStatus ?? "" },
+  { header: "Проверка", value: (l) => REVIEW_CSV_LABELS[l.reviewStatus ?? ""] ?? l.reviewStatus ?? "" },
   { header: "Последний сигнал", value: (l) => l.latestPublishedAt ?? "" },
 ];
 
@@ -110,6 +122,8 @@ export interface CrmBlockLead {
   orgWebsite?: string | null;
   careerPageUrl?: string | null;
   profileName?: string | null;
+  /** Analyst-review gate status (auto_approved/pending_review/approved/rejected). */
+  reviewStatus?: string | null;
 }
 
 /**
@@ -141,6 +155,10 @@ export function leadToCrmBlock(lead: CrmBlockLead): string {
   if (lead.sourceFamilies.length > 0) lines.push(`Источники: ${lead.sourceFamilies.join(", ")}`);
   if (lead.feedbackStatus && lead.feedbackStatus !== "none") {
     lines.push(`Статус: ${lead.feedbackStatus}`);
+  }
+  if (lead.reviewStatus && lead.reviewStatus !== "auto_approved") {
+    const reviewLabel = REVIEW_CSV_LABELS[lead.reviewStatus] ?? lead.reviewStatus;
+    lines.push(`Проверка: ${reviewLabel}`);
   }
   if (lead.latestPublishedAt) {
     lines.push(`Последний сигнал: ${lead.latestPublishedAt}`);

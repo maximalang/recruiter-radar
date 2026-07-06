@@ -1,6 +1,7 @@
 import { Pool, type PoolClient } from "pg";
 import { getPool as getSharedPool } from "./db-pool";
 import { isDigestEligibleGate } from "./scoring/gate-pipeline";
+import { deriveReviewStatus } from "./scoring/gates";
 import { getClientProfileById, INDUSTRY_KEYWORDS, type ClientProfile } from "./clientProfiles";
 import { ROLE_HABR_KEYWORDS } from "./lead-discovery/habr-keywords";
 import { DIGEST_EVIDENCE_QUERY } from "./digest-evidence-query";
@@ -304,7 +305,16 @@ export async function runDigestForClientProfile(input: {
       let paramIdx = 1
 
       for (const item of items) {
-        candidateValues.push(`($${paramIdx}, $${paramIdx+1}, $${paramIdx+2}, $${paramIdx+3}, $${paramIdx+4}, $${paramIdx+5}::jsonb, $${paramIdx+6}, $${paramIdx+7}, NULLIF($${paramIdx+8}, '')::timestamptz, $${paramIdx+9}, $${paramIdx+10}::jsonb, $${paramIdx+11}, $${paramIdx+12}::jsonb)`)
+        // Analyst-review gate: route gate-C / foreign-employer / single-source
+        // candidates to pending_review so they surface in /review and the
+        // "На проверке" metric. deriveReviewStatus is a pure rule (see
+        // lib/scoring/gates.ts); the result is cast to the review_status enum.
+        const reviewStatus = deriveReviewStatus({
+          confidenceGate: item.confidence_gate,
+          isForeignEmployer: item.is_foreign_employer ?? false,
+          sourceFamilies: item.source_families,
+        })
+        candidateValues.push(`($${paramIdx}, $${paramIdx+1}, $${paramIdx+2}, $${paramIdx+3}, $${paramIdx+4}, $${paramIdx+5}::jsonb, $${paramIdx+6}, $${paramIdx+7}, NULLIF($${paramIdx+8}, '')::timestamptz, $${paramIdx+9}, $${paramIdx+10}::jsonb, $${paramIdx+11}, $${paramIdx+12}::jsonb, $${paramIdx+13}::review_status)`)
         candidateParams.push(
           run.id,
           clientProfile.id,
@@ -326,9 +336,10 @@ export async function runDigestForClientProfile(input: {
             location_names: item.location_names,
             is_foreign_employer: item.is_foreign_employer ?? false,
             foreign_matched_domain: item.foreign_matched_domain ?? null,
-          })
+          }),
+          reviewStatus
         )
-        paramIdx += 13
+        paramIdx += 14
       }
 
       const insertedCandidates = await client.query<{
@@ -350,7 +361,8 @@ export async function runDigestForClientProfile(input: {
           total_score,
           reasons,
           opener,
-          payload
+          payload,
+          review_status
         )
         VALUES ${candidateValues.join(',\n')}
         ON CONFLICT (digest_run_id, org_id) DO NOTHING

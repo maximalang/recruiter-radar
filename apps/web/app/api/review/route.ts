@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getPool } from "../../../lib/db";
 import { formatReason, type ScoringReason } from "../../../lib/scoring/scoring-reasons";
 import { extractPayloadFields } from "../../../lib/leads-data";
+import { updateDigestOrgStateFeedback } from "../../../lib/digestFeedback";
 import { getOwnerIdFromSession } from "../../../lib/session";
 
 export const dynamic = "force-dynamic";
@@ -145,11 +146,21 @@ export async function GET(request: Request) {
 }
 
 /**
- * POST /api/review — approve or reject a candidate.
+ * POST /api/review — approve or reject a pending candidate.
  * Body:
  *   candidateId (required) — digest_candidates.id
  *   action (required) — "approve" | "reject"
  *   clientProfileId (required) — for verification
+ *
+ * Coherent with /leads triage:
+ *   approve → review_status = 'approved'. The candidate is cleared for delivery
+ *     as a lead. feedback_status is NOT touched: the agency's triage
+ *     (В работу / Ответили / …) is a separate stage that happens on /leads.
+ *   reject  → review_status = 'rejected' AND feedback_status = 'badfit' with a
+ *     30-day suppression (reuses the digest feedback badfit contract). This
+ *     means a rejected org will NOT reappear as a fresh lead in /leads for 30
+ *     days — the two state machines stay in sync instead of /review rejecting
+ *     a candidate that /leads then shows as brand new.
  */
 export async function POST(request: Request) {
   let body: unknown;
@@ -222,6 +233,31 @@ export async function POST(request: Request) {
         { error: "Candidate not found or not in pending_review status." },
         { status: 404 }
       );
+    }
+
+    // Reject also suppresses the org for 30d + marks feedback_status='badfit'
+    // so /review and /leads stay coherent (a rejected candidate does not
+    // re-surface as a fresh lead). Approve leaves feedback_status alone — the
+    // agency triages separately on /leads.
+    if (payload.action === "reject") {
+      try {
+        await updateDigestOrgStateFeedback({
+          clientProfileId: payload.clientProfileId,
+          orgId: result.rows[0].org_id,
+          digestCandidateId: payload.candidateId,
+          action: "badfit",
+        });
+      } catch (suppressError) {
+        // The review_status UPDATE already succeeded — log the suppression
+        // failure but don't fail the whole request. The candidate is rejected;
+        // suppression is a best-effort coherence bonus.
+        const message = suppressError instanceof Error ? suppressError.message : "suppression failed";
+        return NextResponse.json({
+          ok: true,
+          candidate: result.rows[0],
+          warning: `Rejected, but suppression failed: ${message}`,
+        });
+      }
     }
 
     return NextResponse.json({

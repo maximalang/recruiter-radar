@@ -6,6 +6,7 @@ import { getOwnerIdFromSession } from '@/lib/session';
 import { buildFitExplanation, FIT_DIMENSION_ICON } from '@/lib/leads/fit-explanation';
 import { deriveRoleNames, splitRolesForDisplay, deriveUrgencyCue } from '@/lib/leads/lead-quality';
 import LeadsFilters from './leads-filters';
+import { pluralizeLeads } from './page-helpers';
 import {
   InternalPageFrame,
   InternalPageHeader,
@@ -18,6 +19,7 @@ import {
   SignalFreshnessChip,
   AiHintChip,
   ForeignEmployerBadge,
+  ReviewStatusBadge,
   UrgencyCueChip,
   getScoreTone,
   TableCard,
@@ -74,6 +76,7 @@ function LeadCard({
               <ScoreBandChip score={lead.score} />
               <GateBadgeInline gate={lead.confidenceGate} />
               <ForeignEmployerBadge isForeign={lead.isForeignEmployer} />
+              <ReviewStatusBadge status={lead.reviewStatus} />
               <FeedbackBadge status={lead.feedbackStatus} />
               <AiHintChip present={lead.hasAiHint} />
             </div>
@@ -252,14 +255,6 @@ function LeadsList({
       </div>
     </>
   );
-}
-
-function pluralizeLeads(n: number): string {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod10 === 1 && mod100 !== 11) return 'лид';
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'лида';
-  return 'лидов';
 }
 
 export default async function LeadsPage({
@@ -460,7 +455,7 @@ export default async function LeadsPage({
           tone="success"
         />
         <MetricCard
-          label="Ожидают проверки"
+          label="На проверке"
           value={
             <Link href="/review" className={ipStyles.leadLink}>
               {pendingReview}

@@ -62,6 +62,7 @@ export async function GET(
     orgWebsite: lead.orgWebsite,
     careerPageUrl: lead.careerPageUrl,
     profileName: profile?.agencyName ?? null,
+    reviewStatus: lead.reviewStatus,
   });
 
   const filename = `lead-${sanitizeFilename(lead.orgName)}.csv`;

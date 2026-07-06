@@ -570,6 +570,39 @@
   white-space: nowrap;
 }
 
+/* ── Review-status badge (analyst gate: pending_review / approved / rejected) ──
+   auto_approved renders no badge. Tone mirrors the gate vocabulary: info for
+   "на проверке", success for "проверен", danger for "отклонён". */
+.reviewBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.reviewBadge[data-tone="info"] {
+  background-color: rgba(59, 130, 246, 0.1);
+  color: #1d4ed8;
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.reviewBadge[data-tone="success"] {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: #047857;
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.reviewBadge[data-tone="danger"] {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #b91c1c;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
 /* ── Urgency cue chip (hiring tempo, visible without opening the lead) ── */
 .urgencyCueChip {
   display: inline-flex;

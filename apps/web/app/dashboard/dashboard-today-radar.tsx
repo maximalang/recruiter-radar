@@ -24,7 +24,7 @@ export default function DashboardTodayRadar({ topLeads, pendingReview }: Dashboa
           Сегодняшний радар
         </h2>
         <Link href="/review" className={styles.todayRadarReviewPill} data-pending={pendingReview > 0}>
-          Ожидают проверки: {pendingReview}
+          На проверке: {pendingReview}
         </Link>
       </div>
 

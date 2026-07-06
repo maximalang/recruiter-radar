@@ -392,6 +392,47 @@ export function ForeignEmployerBadge(props: { isForeign: boolean }) {
   );
 }
 
+/* ── Review-status badge (analyst gate) ── */
+
+/**
+ * Display labels for `digest_candidates.review_status`.
+ *
+ * `auto_approved` is the default and is intentionally NOT surfaced (no badge =
+ * no review needed). `pending_review` shows "На проверке" — the SAME wording
+ * the gate-C label uses, so /leads, /review, and /dashboard speak one
+ * vocabulary. `approved`/`rejected` are analyst decisions written by /api/review.
+ */
+export const REVIEW_LABELS: Record<string, { label: string; icon: string; tone: 'info' | 'success' | 'danger' }> = {
+  pending_review: { label: 'На проверке', icon: '🔍', tone: 'info' },
+  approved: { label: 'Проверен', icon: '✓', tone: 'success' },
+  rejected: { label: 'Отклонён', icon: '✕', tone: 'danger' },
+};
+
+/**
+ * Inline review-status badge. Returns null for auto_approved / unknown so the
+ * default case renders no badge (the lead simply reads as a normal lead).
+ */
+export function ReviewStatusBadge(props: { status: string | null }) {
+  if (!props.status || props.status === 'auto_approved') return null;
+  const entry = REVIEW_LABELS[props.status];
+  if (!entry) return null;
+  return (
+    <span
+      className={s.reviewBadge}
+      data-tone={entry.tone}
+      title={
+        props.status === 'pending_review'
+          ? 'Требует проверки аналитиком перед доставкой как лид'
+          : props.status === 'approved'
+            ? 'Проверен аналитиком — доставлен как лид'
+            : 'Отклонён аналитиком — скрыт из радара'
+      }
+    >
+      {entry.icon} {entry.label}
+    </span>
+  );
+}
+
 /* ── Urgency cue chip ── */
 
 /**

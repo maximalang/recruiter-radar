@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import Link from 'next/link';
 import { listClientProfiles, type ClientProfile } from '@/lib/clientProfiles';
 import { getOwnerIdFromSession } from '@/lib/session';
 import {
@@ -8,6 +9,11 @@ import {
   MetricCard,
   GateBadgeInline,
   ScoreBar,
+  ScoreBandChip,
+  SignalFreshnessChip,
+  ForeignEmployerBadge,
+  EvidenceTag,
+  SourceChip,
   TableCard,
   EmptyState,
   ContentCard,
@@ -15,6 +21,7 @@ import {
 } from '../ui/internal-page';
 import { internalPageClasses as ipStyles } from '../ui/internal-page';
 import ReviewActions from './review-actions';
+import { pluralizeLeads } from '../leads/page-helpers';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,7 +71,14 @@ async function getReviewCandidates(
   }
 }
 
-function ReviewRow({
+/**
+ * One review candidate — rendered with the SAME vocabulary as a /leads card
+ * (gate badge, score band, evidence chips, freshness, foreign badge) so the
+ * analyst sees the same lead shape they triage on /leads. The whole card links
+ * to the lead detail so evidence can be reviewed before deciding; approve/
+ * reject live in a footer row so they never trigger on an accidental card click.
+ */
+function ReviewCard({
   candidate,
   clientProfileId,
 }: {
@@ -72,45 +86,71 @@ function ReviewRow({
   clientProfileId: string;
 }) {
   return (
-    <tr className={ipStyles.dataTableTr}>
-      <td className={ipStyles.dataTableTd}>
-        <div className={ipStyles.leadOrgName}>{candidate.orgName}</div>
-        {candidate.locationNames.length > 0 && (
-          <div className={ipStyles.leadLocation}>
-            📍 {candidate.locationNames.slice(0, 2).join(', ')}
+    <article className={ipStyles.leadCard}>
+      <div className={ipStyles.leadCardRail} aria-hidden="true" />
+      <div className={ipStyles.leadCardBody}>
+        <div className={ipStyles.leadCardHead}>
+          <div className={ipStyles.leadCardHeadMain}>
+            <Link href={`/leads/${candidate.id}`} className={ipStyles.leadLink}>
+              <span className={ipStyles.leadCardOrg}>{candidate.orgName}</span>
+            </Link>
+            <div className={ipStyles.leadCardTags}>
+              <ScoreBandChip score={candidate.score} />
+              <GateBadgeInline gate={candidate.confidenceGate} />
+              <ForeignEmployerBadge isForeign={false} />
+            </div>
+          </div>
+          <div className={ipStyles.leadCardHeadAside}>
+            <div className={ipStyles.leadCardScore}>
+              <ScoreBar score={candidate.score} />
+            </div>
+          </div>
+        </div>
+
+        {candidate.reasons.length > 0 && (
+          <div className={ipStyles.leadFieldRow} data-kind="why">
+            <span className={ipStyles.leadFieldLabel}>Почему кандидат</span>
+            <span className={ipStyles.leadFieldValue}>
+              {candidate.reasons.slice(0, 2).join('; ')}
+            </span>
           </div>
         )}
-      </td>
-      <td className={ipStyles.dataTableTd} style={{ minWidth: '140px' }}>
-        <ScoreBar score={candidate.score} />
-      </td>
-      <td className={ipStyles.dataTableTd}>
-        <GateBadgeInline gate={candidate.confidenceGate} />
-      </td>
-      <td className={ipStyles.dataTableTd}>
-        <div className={ipStyles.leadMeta}>
+
+        <div className={ipStyles.leadCardFooter}>
+          <SignalFreshnessChip latestPublishedAt={candidate.latestPublishedAt} />
+          {candidate.locationNames.length > 0 && (
+            <span className={ipStyles.leadMetaChip}>
+              📍 {candidate.locationNames.slice(0, 2).join(', ')}
+            </span>
+          )}
           {candidate.vacanciesCount > 0 && (
-            <span>💼 {candidate.vacanciesCount} вакансий</span>
+            <span className={ipStyles.leadMetaChip}>💼 {candidate.vacanciesCount} вакансий</span>
           )}
           {candidate.evidenceTitles.length > 0 && (
-            <span>📋 {candidate.evidenceTitles.length} доказательств</span>
+            <span className={ipStyles.leadMetaChip}>
+              📋 {candidate.evidenceTitles.slice(0, 2).join(' · ')}
+            </span>
           )}
         </div>
-      </td>
-      <td className={ipStyles.dataTableTd}>
-        <div className={ipStyles.leadMeta}>
-          {candidate.sourceFamilies.length > 0 && (
-            <span>📡 {candidate.sourceFamilies.join(', ')}</span>
-          )}
-        </div>
-      </td>
-      <td className={ipStyles.dataTableTd}>
+
+        {candidate.sourceFamilies.length > 0 && (
+          <div className={ipStyles.chipWrapSm}>
+            {candidate.sourceFamilies.map((src) => (
+              <SourceChip key={src}>{src}</SourceChip>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className={ipStyles.leadCardAction}>
+        <Link href={`/leads/${candidate.id}`} className={ipStyles.leadOpenBtn}>
+          Смотреть доказательства →
+        </Link>
         <ReviewActions
           candidateId={candidate.id}
           clientProfileId={clientProfileId}
         />
-      </td>
-    </tr>
+      </div>
+    </article>
   );
 }
 
@@ -142,15 +182,15 @@ export default async function ReviewPage({
   return (
     <InternalPageFrame navItems={REVIEW_NAV}>
       <InternalPageHeader
-        title="Очередь ревью"
-        subtitle="Лиды, требующие проверки аналитиком перед доставкой"
+        title="Очередь проверки"
+        subtitle="Кандидаты с уверенностью C, иностранные работодатели и одиночный источник — проверьте доказательства перед доставкой как лид"
       />
 
       {profiles.length === 0 ? (
         <EmptyState
           icon="🔍"
           title="Нет клиентских профилей"
-          text="Создайте профиль в онбординге, чтобы увидеть очередь ревью."
+          text="Создайте профиль в онбординге, чтобы увидеть очередь проверки."
         />
       ) : (
         <>
@@ -180,10 +220,7 @@ export default async function ReviewPage({
           )}
 
           <MetricGrid>
-            <MetricCard
-              label="На ревью"
-              value={reviewData.total}
-            />
+            <MetricCard label="На проверке" value={reviewData.total} tone="info" />
           </MetricGrid>
 
           <Suspense fallback={<ContentCard>Загрузка…</ContentCard>}>
@@ -191,31 +228,24 @@ export default async function ReviewPage({
               <EmptyState
                 icon="✅"
                 title="Очередь пуста"
-                text="Все лиды проверены. Новые кандидаты появятся автоматически."
+                text="Нет кандидатов, требующих проверки. Новые карьерные страницы и платформенные сигналы появляются ежедневно — кандидаты с уверенностью C или одиночным источником появятся здесь автоматически."
               />
             ) : (
               <TableCard>
-                <table className={ipStyles.dataTable}>
-                  <thead>
-                    <tr className={ipStyles.dataTableTr}>
-                      <th className={ipStyles.dataTableTh}>Компания</th>
-                      <th className={ipStyles.dataTableTh}>Оценка</th>
-                      <th className={ipStyles.dataTableTh}>Доверие</th>
-                      <th className={ipStyles.dataTableTh}>Доказательства</th>
-                      <th className={ipStyles.dataTableTh}>Источники</th>
-                      <th className={ipStyles.dataTableTh}>Действия</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {reviewData.items.map((candidate) => (
-                      <ReviewRow
-                        key={candidate.id}
-                        candidate={candidate}
-                        clientProfileId={activeProfileId}
-                      />
-                    ))}
-                  </tbody>
-                </table>
+                <div className={ipStyles.leadsListToolbar}>
+                  <div className={ipStyles.leadsListCount}>
+                    <strong>{reviewData.items.length}</strong> {pluralizeLeads(reviewData.items.length)} на проверке
+                  </div>
+                </div>
+                <div className={ipStyles.leadsList}>
+                  {reviewData.items.map((candidate) => (
+                    <ReviewCard
+                      key={candidate.id}
+                      candidate={candidate}
+                      clientProfileId={activeProfileId}
+                    />
+                  ))}
+                </div>
               </TableCard>
             )}
           </Suspense>

@@ -22,6 +22,7 @@ import {
   ScoreBandChip,
   SignalFreshnessChip,
   ForeignEmployerBadge,
+  ReviewStatusBadge,
   UrgencyCueChip,
   EvidenceTag,
   SourceChip,
@@ -158,6 +159,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     orgWebsite: lead.orgWebsite,
     careerPageUrl: lead.careerPageUrl,
     profileName: profile?.agencyName ?? null,
+    reviewStatus: lead.reviewStatus,
   });
   const singleExportHref = `/api/leads/${lead.id}/export`;
 
@@ -186,6 +188,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                     <ScoreBandChip score={lead.score} />
                     <GateBadgeInline gate={lead.confidenceGate} />
                     <ForeignEmployerBadge isForeign={lead.isForeignEmployer} />
+                    <ReviewStatusBadge status={lead.reviewStatus} />
                     <UrgencyCueChip level={urgency.level} label={urgency.label} />
                     <SignalFreshnessChip latestPublishedAt={lead.latestPublishedAt} />
                   </div>

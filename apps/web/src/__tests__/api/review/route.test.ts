@@ -5,11 +5,20 @@
  * regardless of storage format (legacy string[] or new ScoringReason[]).
  */
 
-import { GET } from '@/app/api/review/route';
+import { GET, POST } from '@/app/api/review/route';
 import { getPool } from '@/lib/db';
+import { updateDigestOrgStateFeedback } from '@/lib/digestFeedback';
 
 jest.mock('@/lib/db', () => ({
   getPool: jest.fn(),
+}));
+jest.mock('@/lib/digestFeedback', () => ({
+  updateDigestOrgStateFeedback: jest.fn(),
+  // statics referenced by the module path
+  DIGEST_FEEDBACK_ACTIONS: ['accepted', 'badfit', 'dismissed', 'snooze', 'contacted', 'replied', 'won'],
+  isDigestFeedbackAction: jest.fn((v: unknown) => typeof v === 'string' && ['accepted', 'badfit', 'dismissed', 'snooze', 'contacted', 'replied', 'won'].includes(v as string)),
+  DEFAULT_BADFIT_SUPPRESSION_DAYS: 30,
+  buildDigestFeedbackActionPlan: jest.fn(),
 }));
 
 // Owner-scope guard: the route now calls getOwnerIdFromSession() before touching
@@ -143,5 +152,112 @@ describe('GET /api/review', () => {
 
     const body = await res.json();
     expect(body.items[0].reasons).toEqual([]);
+  });
+});
+
+describe('POST /api/review', () => {
+  const mockSuppress = updateDigestOrgStateFeedback as jest.MockedFunction<typeof updateDigestOrgStateFeedback>;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  function makeMockPool() {
+    mockGetPool.mockReturnValue({ query: mockQuery } as never);
+  }
+
+  it('rejects an invalid action', async () => {
+    const res = await POST(
+      new Request('http://localhost/api/review', {
+        method: 'POST',
+        body: JSON.stringify({ candidateId: '1', action: 'bogus', clientProfileId: '1' }),
+      }),
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('approve sets review_status=approved and does NOT touch feedback/suppression', async () => {
+    makeMockPool();
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: '1', org_id: '10', review_status: 'approved' }],
+    });
+
+    const res = await POST(
+      new Request('http://localhost/api/review', {
+        method: 'POST',
+        body: JSON.stringify({ candidateId: '1', action: 'approve', clientProfileId: '1' }),
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(body.candidate.review_status).toBe('approved');
+    // The approve path must not call the suppression/feedback writer.
+    expect(mockSuppress).not.toHaveBeenCalled();
+    // The UPDATE wrote 'approved' into review_status.
+    expect(mockQuery.mock.calls[0][1]).toContain('approved');
+  });
+
+  it('reject sets review_status=rejected AND suppresses the org (badfit, 30d)', async () => {
+    makeMockPool();
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: '1', org_id: '10', review_status: 'rejected' }],
+    });
+    mockSuppress.mockResolvedValueOnce({
+      clientProfileId: '1', orgId: '10', feedbackStatus: 'badfit',
+      feedbackAt: '2026-07-06T00:00:00Z', feedbackNote: null,
+      cooldownUntil: null, suppressedUntil: '2026-08-05T00:00:00Z',
+      lastDigestCandidateId: '1', lastDigestRunId: null, updatedAt: '2026-07-06T00:00:00Z',
+    } as never);
+
+    const res = await POST(
+      new Request('http://localhost/api/review', {
+        method: 'POST',
+        body: JSON.stringify({ candidateId: '1', action: 'reject', clientProfileId: '1' }),
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.candidate.review_status).toBe('rejected');
+    // Reject MUST call the suppression writer with the badfit action so the
+    // org does not reappear as a fresh lead in /leads.
+    expect(mockSuppress).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'badfit', orgId: '10', digestCandidateId: '1' }),
+    );
+  });
+
+  it('reject still returns ok when suppression fails (review_status already persisted)', async () => {
+    makeMockPool();
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: '1', org_id: '10', review_status: 'rejected' }],
+    });
+    mockSuppress.mockRejectedValueOnce(new Error('boom'));
+
+    const res = await POST(
+      new Request('http://localhost/api/review', {
+        method: 'POST',
+        body: JSON.stringify({ candidateId: '1', action: 'reject', clientProfileId: '1' }),
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(body.warning).toMatch(/suppression failed/);
+  });
+
+  it('returns 404 when the candidate is not pending_review', async () => {
+    makeMockPool();
+    mockQuery.mockResolvedValueOnce({ rows: [] });
+
+    const res = await POST(
+      new Request('http://localhost/api/review', {
+        method: 'POST',
+        body: JSON.stringify({ candidateId: '999', action: 'approve', clientProfileId: '1' }),
+      }),
+    );
+    expect(res.status).toBe(404);
   });
 });

@@ -1,4 +1,4 @@
-import { selectConfidenceGate } from '@/lib/scoring/gates'
+import { selectConfidenceGate, deriveReviewStatus } from '@/lib/scoring/gates'
 import type { FiurEvidenceItem } from '@/lib/scoring/fiur'
 
 const direct = (source = 'career-page'): FiurEvidenceItem => ({ tier: 'direct', source })
@@ -79,5 +79,55 @@ describe('selectConfidenceGate', () => {
       entityMatch: 'clean',
     })
     expect(gate).toBe('B')
+  })
+})
+
+describe('deriveReviewStatus', () => {
+  /**
+   * deriveReviewStatus wires the /review queue. Contract (docs/инфо о проекте.md
+   * §"обязательный analyst review" + lib/scoring/gates.ts): gate C, foreign
+   * employer, or single source → pending_review; otherwise auto_approved.
+   * Pure function — the digest writer calls it per candidate.
+   */
+  it('routes gate C to pending_review even with multiple sources', () => {
+    expect(
+      deriveReviewStatus({ confidenceGate: 'C', isForeignEmployer: false, sourceFamilies: ['career-pages', 'habr'] }),
+    ).toBe('pending_review')
+  })
+
+  it('routes foreign employers to pending_review regardless of gate', () => {
+    expect(
+      deriveReviewStatus({ confidenceGate: 'A', isForeignEmployer: true, sourceFamilies: ['career-pages', 'habr'] }),
+    ).toBe('pending_review')
+  })
+
+  it('routes single-source candidates to pending_review (no corroboration)', () => {
+    expect(
+      deriveReviewStatus({ confidenceGate: 'B', isForeignEmployer: false, sourceFamilies: ['hh'] }),
+    ).toBe('pending_review')
+  })
+
+  it('routes empty source list to pending_review', () => {
+    expect(
+      deriveReviewStatus({ confidenceGate: 'B', isForeignEmployer: false, sourceFamilies: [] }),
+    ).toBe('pending_review')
+  })
+
+  it('auto-approves gate A/B with 2+ sources and no foreign flag', () => {
+    expect(
+      deriveReviewStatus({ confidenceGate: 'A', isForeignEmployer: false, sourceFamilies: ['career-pages', 'habr'] }),
+    ).toBe('auto_approved')
+    expect(
+      deriveReviewStatus({ confidenceGate: 'B', isForeignEmployer: false, sourceFamilies: ['career-pages', 'hh'] }),
+    ).toBe('auto_approved')
+  })
+
+  it('gate D falls through to auto_approved (gate D means no lead is created at all)', () => {
+    // Gate D candidates are filtered out of the digest before reaching the
+    // writer; if one ever reached deriveReviewStatus the review_status is moot.
+    // The rule only inspects gate C, so D falls through to auto_approved.
+    expect(
+      deriveReviewStatus({ confidenceGate: 'D', isForeignEmployer: false, sourceFamilies: ['career-pages', 'habr'] }),
+    ).toBe('auto_approved')
   })
 })

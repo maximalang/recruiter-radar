@@ -270,6 +270,15 @@ export interface LeadItem {
   /** The foreign ATS domain that triggered the flag, when isForeignEmployer. */
   foreignMatchedDomain: string | null;
   /**
+   * Analyst-review gate status from `digest_candidates.review_status`
+   * (auto_approved / pending_review / approved / rejected). Surfaces as a
+   * "На проверке аналитиком" badge on lead detail and drives the /review
+   * queue. `auto_approved` is the default and is NOT shown (no badge = no
+   * review needed). Null when the query didn't project the column (legacy
+   * paths) — callers treat null as auto_approved.
+   */
+  reviewStatus: string | null;
+  /**
    * Optional CRM-lookup identifiers populated only when the list query is asked
    * to JOIN orgs (includeOrgDetails: true, used by the CSV export so a row
    * carries INN/ОГРН/domain/career-page for pasting into a CRM). Null on the
@@ -328,6 +337,8 @@ interface LeadRow {
   score: number;
   vacancies_count: number;
   distinct_vacancy_names_count: number;
+  /** Analyst-review gate status (auto_approved/pending_review/approved/rejected). */
+  review_status?: string | null;
   latest_published_at: string | null;
   reasons: unknown;
   opener: string;
@@ -376,7 +387,8 @@ const LEAD_SELECT_COLUMNS = `
       dc.created_at::TEXT AS created_at,
       dc.source_families,
       dc.payload,
-      (dc.ai_enrichment IS NOT NULL) AS has_ai_hint`;
+      (dc.ai_enrichment IS NOT NULL) AS has_ai_hint,
+      dc.review_status::TEXT AS review_status`;
 
 function toStringArray(raw: unknown): string[] {
   return Array.isArray(raw) ? raw.filter((v: unknown): v is string => typeof v === "string") : [];
@@ -452,6 +464,7 @@ function mapLeadRow(row: LeadRow): LeadItem {
     hasAiHint: row.has_ai_hint === true,
     isForeignEmployer,
     foreignMatchedDomain,
+    reviewStatus: row.review_status ?? null,
     // Optional CRM identifiers — only populated by the export path's
     // includeOrgDetails join. Undefined (not null) on the default UI path, so
     // the list page never sees them and pays no join cost.
@@ -757,7 +770,8 @@ export async function getLeadDetail(input: {
       dc.source_families,
       dc.candidate_source_keys,
       dc.payload,
-      dc.ai_enrichment
+      dc.ai_enrichment,
+      dc.review_status::TEXT AS review_status
     FROM digest_candidates dc
     JOIN client_profiles cp
       ON cp.id = dc.client_profile_id
