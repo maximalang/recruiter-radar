@@ -230,4 +230,94 @@ describe('buildFitExplanation', () => {
     expect(fit.isEmpty).toBe(false);
     everyLineHasBasis(fit);
   });
+
+  // ── Narrow-agency specialization clarity (2026-07-06) ───────────────────────
+  // A narrow agency sets a free-text specialization (e.g. "IT-рекрутмент, дата").
+  // When the scorer fired fit.icp.match, the explanation must NAME the concrete
+  // term that appears in the lead's visible text — never invent one. This is the
+  // single most useful "почему подходит" line for a specialized agency.
+
+  it('names the matched specialization term when fit.icp.match fires and the term is in the lead haystack', () => {
+    const fit = buildFitExplanation(
+      lead({
+        structuredReasons: [reason('fit.icp.match')],
+        orgName: 'Дата-Системс',
+        evidenceTitles: ['Вакансия: дата-инженер'],
+      }),
+      profile({ specialization: 'IT-рекрутмент, дата' }),
+    );
+    const industry = fit.lines.find((l) => l.dimension === 'industry');
+    expect(industry).toBeDefined();
+    // "дата" is the term that appears in the haystack; "IT-рекрутмент" does not.
+    expect(industry!.text).toContain('дата');
+    expect(industry!.basis).toBe('fit.icp.match.named');
+    everyLineHasBasis(fit);
+  });
+
+  it('falls back to the generic ICP line when no specialization term re-derives from the visible haystack', () => {
+    const fit = buildFitExplanation(
+      lead({
+        structuredReasons: [reason('fit.icp.match')],
+        orgName: 'Ромашка',
+        evidenceTitles: ['Вакансия: бухгалтер'],
+      }),
+      profile({ specialization: 'IT-рекрутмент, дата' }),
+    );
+    const industry = fit.lines.find((l) => l.dimension === 'industry');
+    expect(industry).toBeDefined();
+    // No term hit the visible text → refuse to name a term; honest generic line.
+    expect(industry!.text).not.toContain('дата');
+    expect(industry!.basis).toBe('fit.icp.match');
+    everyLineHasBasis(fit);
+  });
+
+  it('names an include-keyword term when specialization did not match but a keyword did', () => {
+    const fit = buildFitExplanation(
+      lead({
+        structuredReasons: [reason('fit.icp.match')],
+        orgName: 'Авито',
+        evidenceTitles: ['Вакансия: продуктовый дизайнер'],
+      }),
+      profile({
+        specialization: 'промышленный дизайн',
+        includeKeywords: ['продуктовый', 'дизайн'],
+      }),
+    );
+    const industry = fit.lines.find((l) => l.dimension === 'industry');
+    expect(industry).toBeDefined();
+    // specialization "промышленный дизайн" is absent; "продуктовый" hits first.
+    expect(industry!.text).toContain('продуктовый');
+    expect(industry!.basis).toBe('fit.icp.match.named');
+    everyLineHasBasis(fit);
+  });
+
+  it('keeps the generic ICP line when the profile has no specialization and no include keywords', () => {
+    const fit = buildFitExplanation(
+      lead({
+        structuredReasons: [reason('fit.icp.match')],
+        orgName: 'Ромашка',
+        evidenceTitles: ['Вакансия: менеджер'],
+      }),
+      profile(),
+    );
+    const industry = fit.lines.find((l) => l.dimension === 'industry');
+    expect(industry).toBeDefined();
+    expect(industry!.basis).toBe('fit.icp.match');
+    everyLineHasBasis(fit);
+  });
+
+  it('uses an explicit icpHaystack when orgName/evidenceTitles are not supplied', () => {
+    const fit = buildFitExplanation(
+      lead({
+        structuredReasons: [reason('fit.icp.match')],
+        icpHaystack: 'открыли позицию дата-саентиста в Москве',
+      }),
+      profile({ specialization: 'дата, ML' }),
+    );
+    const industry = fit.lines.find((l) => l.dimension === 'industry');
+    expect(industry).toBeDefined();
+    expect(industry!.text).toContain('дата');
+    expect(industry!.basis).toBe('fit.icp.match.named');
+    everyLineHasBasis(fit);
+  });
 });

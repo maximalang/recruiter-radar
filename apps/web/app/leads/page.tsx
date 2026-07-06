@@ -138,27 +138,52 @@ function LeadsList({
   leads,
   fitPreviewFor,
   hasActiveProfile,
+  narrowProfile,
 }: {
   leads: LeadItem[];
   fitPreviewFor: (lead: LeadItem) => { icon: string; text: string } | null;
   hasActiveProfile: boolean;
+  /**
+   * True when an active profile has a narrow ICP (specialization or include
+   * keywords set). Used to give an honest, distinct empty state: a specialized
+   * agency with 0 leads is likely facing thin supply for their niche, not a
+   * pipeline failure — the next step is to broaden keywords or wait for the
+   * next run, not to reconfigure the whole profile.
+   */
+  narrowProfile: boolean;
 }) {
   if (leads.length === 0) {
-    // Distinguish the two empty cases so the next step is obvious:
-    // no profile yet → set one up; profile set → leads are on their way.
-    return hasActiveProfile ? (
+    // Distinguish three empty cases so the next step is obvious and the
+    // product never feels broken:
+    //  no profile yet        → set one up
+    //  narrow profile, 0     → honest "thin supply for your niche" — broaden or wait
+    //  broad profile, 0      → first batch comes with the next radar run
+    if (!hasActiveProfile) {
+      return (
+        <EmptyState
+          icon="🎯"
+          title="Настройте профиль идеального клиента"
+          text="Радар начнёт подбирать компании, как только вы опишете, кого ищете: роли, отрасли, регионы."
+          action={{ href: '/settings/profile', label: 'Настроить профиль' }}
+        />
+      );
+    }
+    if (narrowProfile) {
+      return (
+        <EmptyState
+          icon="🔭"
+          title="По вашей специализации пока мало сигналов"
+          text="По узкому ICP радар находит реже — это нормально. Расширьте ключевые фразы в профиле (например, смежные роли или отрасли) или дождитесь следующего запуска: новые карьерные страницы и платформенные сигналы появляются ежедневно."
+          action={{ href: '/settings/profile', label: 'Расширить ключевые фразы' }}
+        />
+      );
+    }
+    return (
       <EmptyState
         icon="📭"
         title="Лидов пока нет"
         text="Профиль настроен — первая подборка придёт со следующим запуском радара. Можно уточнить фильтры, чтобы повысить релевантность."
         action={{ href: '/settings/profile', label: 'Уточнить профиль' }}
-      />
-    ) : (
-      <EmptyState
-        icon="🎯"
-        title="Настройте профиль идеального клиента"
-        text="Радар начнёт подбирать компании, как только вы опишете, кого ищете: роли, отрасли, регионы."
-        action={{ href: '/settings/profile', label: 'Настроить профиль' }}
       />
     );
   }
@@ -277,6 +302,12 @@ export default async function LeadsPage({
         contactPolicy: p.contactPolicy,
         remoteFriendly: p.remoteFriendly,
         targetCity: p.targetCity,
+        // Fold the agency's free-text ICP fields into the profile so the fit
+        // explanation can name the concrete specialization / keyword that
+        // matched, instead of a generic «совпадает с ICP» label. This is the
+        // single most useful line for a narrow/specialized agency.
+        specialization: p.specialization,
+        includeKeywords: p.includeKeywords,
       },
     ]),
   );
@@ -293,6 +324,10 @@ export default async function LeadsPage({
         locationNames: lead.locationNames,
         lawfulContactPath: lead.lawfulContactPath,
         sourceFamilies: lead.sourceFamilies,
+        // Pass the visible free-text fields so the ICP re-derivation can name
+        // the matched specialization term from evidence the recruiter can see.
+        orgName: lead.orgName,
+        evidenceTitles: lead.evidenceTitles,
       },
       profile,
     );
@@ -302,6 +337,23 @@ export default async function LeadsPage({
   };
 
   const hasFilters = confidenceGate !== null || feedbackStatus !== null || selectedProfileId !== null;
+
+  // Narrow-ICP detection for the honest empty state: a specialized agency
+  // (specialization text or include keywords set) sees a different message
+  // when there are 0 leads — "thin supply for your niche" rather than the
+  // generic "radar hasn't run yet". When a single practice is selected, judge
+  // by that practice; in the all-practices view, judge by whether ANY active
+  // profile is narrow (a narrow shop with one broad practice still benefits).
+  const narrowProfile = selectedProfile
+    ? Boolean(
+        (selectedProfile.specialization && selectedProfile.specialization.trim() !== '') ||
+        selectedProfile.includeKeywords.length > 0,
+      )
+    : activeProfiles.some(
+        (p) =>
+          (p.specialization && p.specialization.trim() !== '') ||
+          p.includeKeywords.length > 0,
+      );
 
   // Carry the active filters into the CSV export link so the export matches the view.
   const exportParams = new URLSearchParams();
@@ -362,7 +414,12 @@ export default async function LeadsPage({
           />
         </Suspense>
         <Suspense fallback={<div className={ipStyles.loadingState}>Загрузка...</div>}>
-          <LeadsList leads={allLeads} fitPreviewFor={fitPreviewFor} hasActiveProfile={activeProfiles.length > 0} />
+          <LeadsList
+            leads={allLeads}
+            fitPreviewFor={fitPreviewFor}
+            hasActiveProfile={activeProfiles.length > 0}
+            narrowProfile={narrowProfile}
+          />
         </Suspense>
       </TableCard>
     </InternalPageFrame>

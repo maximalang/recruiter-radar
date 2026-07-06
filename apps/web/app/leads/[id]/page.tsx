@@ -78,6 +78,11 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           sourceFamilies: lead.sourceFamilies,
           careerPageUrl: lead.careerPageUrl,
           orgDomain: lead.orgDomain,
+          // Surface the matched specialization term by name on the detail page
+          // too — the full evidence stack is visible here, so the ICP
+          // re-derivation can name the niche that triggered fit.icp.match.
+          orgName: lead.orgName,
+          evidenceTitles: lead.evidenceTitles,
         },
         {
           industries: profile.industries,
@@ -87,6 +92,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           contactPolicy: profile.contactPolicy,
           remoteFriendly: profile.remoteFriendly,
           targetCity: profile.targetCity,
+          specialization: profile.specialization,
+          includeKeywords: profile.includeKeywords,
         },
       )
     : null;

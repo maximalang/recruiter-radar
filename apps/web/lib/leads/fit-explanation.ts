@@ -61,6 +61,18 @@ export interface FitLeadInput {
   sourceFamilies: string[];
   careerPageUrl?: string | null;
   orgDomain?: string | null;
+  /**
+   * Free-text haystack for ICP term re-derivation: org name + evidence titles
+   * (+ role names on the detail page). When the scorer emitted fit.icp.match,
+   * the builder re-derives WHICH specialization/include term actually hit this
+   * haystack so the explanation names the concrete niche, not a generic label.
+   * Optional — when absent the builder falls back to the generic line.
+   */
+  icpHaystack?: string | null;
+  /** Org name — folded into the ICP haystack when present. */
+  orgName?: string | null;
+  /** Evidence titles — folded into the ICP haystack when present. */
+  evidenceTitles?: string[];
 }
 
 /** The profile fields the builder reads. Subset of ClientProfile. */
@@ -72,6 +84,15 @@ export interface FitProfileInput {
   contactPolicy: 'corporate_only' | 'no_personal' | 'unrestricted';
   remoteFriendly: boolean;
   targetCity: string | null;
+  /**
+   * Free-text ICP specialization (e.g. "IT-рекрутмент, дата-инженеры").
+   * When the scorer emitted fit.icp.match and a term from this field appears
+   * in the lead haystack, the explanation names it — the single most useful
+   * line for a narrow/specialized agency. Optional for backward compat.
+   */
+  specialization?: string | null;
+  /** Extra ICP keywords (industries / niches) — same re-derivation path. */
+  includeKeywords?: string[];
 }
 
 // ─── Builder ─────────────────────────────────────────────────────────────────
@@ -111,10 +132,21 @@ export function buildFitExplanation(
       basis: 'fit.industry.partial',
     });
   } else if (keys.has('fit.icp.match')) {
+    // Narrow-agency clarity: re-derive WHICH specialization / include term
+    // actually matched the lead's own text and name it. The scorer already
+    // asserted the match (fit.icp.match) against company + vacancy text; here
+    // we re-check against the lead's org name + evidence titles (the fields
+    // available on the list/detail surface) so the term we surface is one the
+    // recruiter can literally see in the lead. If no term re-derives (the
+    // vacancy text that matched isn't exposed on this surface), fall back to
+    // the honest generic label — never invent a term.
+    const matchedTerm = findMatchedIcpTerm(lead, profile);
     lines.push({
       dimension: 'industry',
-      text: 'Совпадение с вашей специализацией и ключевыми словами ICP',
-      basis: 'fit.icp.match',
+      text: matchedTerm
+        ? `Специализация «${matchedTerm}» совпадает с вашим ICP`
+        : 'Совпадение с вашей специализацией и ключевыми словами ICP',
+      basis: matchedTerm ? 'fit.icp.match.named' : 'fit.icp.match',
     });
   }
 
@@ -208,6 +240,65 @@ function indexParams(
     if (!(r.key in out)) out[r.key] = r.params;
   }
   return out;
+}
+
+/**
+ * Split a comma-separated free-text ICP field into normalised lowercased terms.
+ * Mirrors lib/preview-relevance.ts and lib/scoring/fiur.ts splitTerms so the
+ * explanation re-derivation agrees with how the scorer tokenised the field.
+ */
+function splitIcpTerms(value: string | null | undefined): string[] {
+  if (!value) return [];
+  return value
+    .split(',')
+    .map((item) => item.trim().toLocaleLowerCase('ru-RU'))
+    .filter((item) => item !== '');
+}
+
+/**
+ * Build the lowercased haystack the ICP re-derivation scans. Combines the
+ * explicit icpHaystack (if the caller built one) with the org name and
+ * evidence titles — the free-text fields the recruiter can see on the lead
+ * surface. Location names are NOT folded in (they drive the region line).
+ */
+function buildIcpHaystack(lead: FitLeadInput): string {
+  if (lead.icpHaystack && lead.icpHaystack.trim() !== '') {
+    return lead.icpHaystack.toLocaleLowerCase('ru-RU');
+  }
+  const parts: string[] = [];
+  if (lead.orgName) parts.push(lead.orgName);
+  if (lead.evidenceTitles) parts.push(...lead.evidenceTitles);
+  return parts.join(' ').toLocaleLowerCase('ru-RU');
+}
+
+/**
+ * Re-derive the single specialization / include term that appears in the lead's
+ * visible text. Returns the FIRST hit (stable order: specialization terms in
+ * declared order, then include keywords) so the explanation is deterministic.
+ * Returns null when no term re-derives from the visible haystack — the scorer
+ * matched against vacancy text that isn't exposed on this surface, so we refuse
+ * to name a term we can't evidence here.
+ */
+function findMatchedIcpTerm(
+  lead: FitLeadInput,
+  profile: FitProfileInput,
+): string | null {
+  const haystack = buildIcpHaystack(lead);
+  if (!haystack) return null;
+
+  const specializationTerms = splitIcpTerms(profile.specialization);
+  for (const term of specializationTerms) {
+    if (haystack.includes(term)) return term;
+  }
+
+  const includeTerms = (profile.includeKeywords ?? [])
+    .map((v) => v.trim().toLocaleLowerCase('ru-RU'))
+    .filter((v) => v !== '');
+  for (const term of includeTerms) {
+    if (haystack.includes(term)) return term;
+  }
+
+  return null;
 }
 
 function contactPolicyLine(

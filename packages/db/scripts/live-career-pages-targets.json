@@ -17,6 +17,96 @@
       "company_website_url": "https://www.dnb.com/",
       "career_page_url": "https://jobs.lever.co/dnb",
       "source_url": "https://api.lever.co/v0/postings/dnb?mode=json"
+    },
+    {
+      "id": "yandex-careers-jsonld",
+      "adapter": "same-domain-jsonld",
+      "company_name": "Яндекс",
+      "company_domain": "yandex.ru",
+      "company_website_url": "https://yandex.ru/",
+      "career_page_url": "https://yandex.ru/jobs",
+      "source_url": "https://yandex.ru/jobs"
+    },
+    {
+      "id": "tinkoff-careers-jsonld",
+      "adapter": "same-domain-jsonld",
+      "company_name": "Тинькофф",
+      "company_domain": "tinkoff.ru",
+      "company_website_url": "https://www.tinkoff.ru/",
+      "career_page_url": "https://www.tinkoff.ru/career/",
+      "source_url": "https://www.tinkoff.ru/career/"
+    },
+    {
+      "id": "avito-careers-jsonld",
+      "adapter": "same-domain-jsonld",
+      "company_name": "Авито",
+      "company_domain": "avito.ru",
+      "company_website_url": "https://www.avito.ru/",
+      "career_page_url": "https://career.avito.ru/",
+      "source_url": "https://career.avito.ru/"
+    },
+    {
+      "id": "vk-careers-jsonld",
+      "adapter": "same-domain-jsonld",
+      "company_name": "VK",
+      "company_domain": "vk.com",
+      "company_website_url": "https://vk.com/",
+      "career_page_url": "https://team.vk.company/vacancies/",
+      "source_url": "https://team.vk.company/vacancies/"
+    },
+    {
+      "id": "ozon-careers-jsonld",
+      "adapter": "same-domain-jsonld",
+      "company_name": "Ozon",
+      "company_domain": "ozon.ru",
+      "company_website_url": "https://www.ozon.ru/",
+      "career_page_url": "https://cbt.ozon.ru/salary/",
+      "source_url": "https://cbt.ozon.ru/salary/"
+    },
+    {
+      "id": "hh-careers-jsonld",
+      "adapter": "same-domain-jsonld",
+      "company_name": "HeadHunter",
+      "company_domain": "hh.ru",
+      "company_website_url": "https://hh.ru/",
+      "career_page_url": "https://hh.ru/article/about-company",
+      "source_url": "https://hh.ru/article/about-company"
+    },
+    {
+      "id": "sber-careers-jsonld",
+      "adapter": "same-domain-jsonld",
+      "company_name": "Сбер",
+      "company_domain": "sber.ru",
+      "company_website_url": "https://www.sber.ru/",
+      "career_page_url": "https://sber.ru/about/career",
+      "source_url": "https://sber.ru/about/career"
+    },
+    {
+      "id": "kaspersky-careers-jsonld",
+      "adapter": "same-domain-jsonld",
+      "company_name": "Лаборатория Касперского",
+      "company_domain": "kaspersky.ru",
+      "company_website_url": "https://www.kaspersky.ru/",
+      "career_page_url": "https://www.kaspersky.ru/careers",
+      "source_url": "https://www.kaspersky.ru/careers"
+    },
+    {
+      "id": "wildberries-careers-jsonld",
+      "adapter": "same-domain-jsonld",
+      "company_name": "Wildberries",
+      "company_domain": "wildberries.ru",
+      "company_website_url": "https://www.wildberries.ru/",
+      "career_page_url": "https://careers.wildberries.ru/",
+      "source_url": "https://careers.wildberries.ru/"
+    },
+    {
+      "id": "mts-careers-jsonld",
+      "adapter": "same-domain-jsonld",
+      "company_name": "МТС",
+      "company_domain": "mts.ru",
+      "company_website_url": "https://www.mts.ru/",
+      "career_page_url": "https://career.mts.ru/",
+      "source_url": "https://career.mts.ru/"
     }
   ]
 }

@@ -481,12 +481,25 @@ function buildCareerPageProbeUrls(seed) {
     return [];
   }
 
+  // Russian company career pages live under a wider set of paths than the
+  // EN-default /careers and /jobs. /career (singular), /about/vacancies,
+  // /ru/jobs, /jobs/list, and /vacancies/all are common on RU corporate
+  // sites (Тинькофф, Авито, Яндекс-style paths, VK, Ozon). Probing them
+  // increases the same-domain JSON-LD hit rate — every added probe is a
+  // fetch of the company's OWN verified domain, so nothing is fabricated.
+  // Deduped via Set; 404s are swallowed by fetchHtmlPage (returns null).
   return [...new Set([
     baseUrl,
     new URL('/careers', baseUrl).toString(),
+    new URL('/career', baseUrl).toString(),
     new URL('/jobs', baseUrl).toString(),
     new URL('/vacancies', baseUrl).toString(),
+    new URL('/vacancies/all', baseUrl).toString(),
     new URL('/about/careers', baseUrl).toString(),
+    new URL('/about/vacancies', baseUrl).toString(),
+    new URL('/ru/jobs', baseUrl).toString(),
+    new URL('/ru/vacancies', baseUrl).toString(),
+    new URL('/jobs/list', baseUrl).toString(),
   ])];
 }
 
@@ -817,11 +830,21 @@ function resolveCareerPagesDiscoveryLimit() {
   const rawValue = process.env.CAREER_PAGES_DISCOVERY_LIMIT?.trim();
 
   if (!rawValue) {
-    return 50;
+    // Raised from 50 → 120 (2026-07-06): career-pages is the ONLY gate-A/B
+    // direct surface, and the 2026-07-05 prod audit showed the deliverable
+    // pool for corporate_only agencies is ~16 gate-B orgs — a burst-then-dry
+    // pilot risk. Each discovered same-domain career page is a potential new
+    // gate-B lead (or a 2nd source family that promotes an existing gate-C
+    // org to gate-B via cross-source corroboration in source-digest-evidence.sql).
+    // The 90s CAREER_PAGES_FETCH_BUDGET_MS still caps wall-clock runtime; the
+    // seed limit only widens the candidate set the budget draws from. No
+    // fabricated targets — every seed is a real org with an existing signal
+    // and a known domain, probed by fetching its own website.
+    return 120;
   }
 
   const parsedValue = Number.parseInt(rawValue, 10);
-  return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : 50;
+  return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : 120;
 }
 
 /**
