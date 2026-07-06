@@ -72,7 +72,6 @@ function makeLead(overrides: Partial<LeadItem> = {}): LeadItem {
     reasons: [],
     structuredReasons: [],
     whyNow: 'Открыли 3 вакансии',
-    bestAngle: 'IT-подбор',
     lawfulContactPath: 'Карьерная страница',
     negativeSignals: [],
     opener: 'СЕКРЕТНЫЙ черновик письма',

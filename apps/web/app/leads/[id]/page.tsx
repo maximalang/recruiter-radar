@@ -7,7 +7,6 @@ import { buildFitExplanation, FIT_DIMENSION_ICON } from '@/lib/leads/fit-explana
 import { buildCompanySummary } from '@/lib/leads/company-summary';
 import { deriveRoleNames, splitRolesForDisplay, deriveUrgencyCue } from '@/lib/leads/lead-quality';
 import FeedbackButtons from './feedback-buttons';
-import OutreachPicker from './outreach-picker';
 import AiEnrichmentBlock from './ai-enrichment-block';
 import {
   InternalPageFrame,
@@ -34,9 +33,9 @@ import {
 export const dynamic = 'force-dynamic';
 
 const LEAD_DETAIL_NAV: NavItem[] = [
-  { href: '/dashboard', label: '📊 Дашборд' },
-  { href: '/leads', label: '🎯 Лиды' },
-  { href: '/settings/profile', label: '⚙️ Профиль' },
+  { href: '/dashboard', label: 'Дашборд' },
+  { href: '/leads', label: 'Лиды' },
+  { href: '/settings/profile', label: 'Профиль' },
 ];
 
 export default async function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -127,8 +126,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           title={lead.orgName}
           subtitle={
             lead.locationNames.length > 0
-              ? `📍 ${lead.locationNames.join(', ')}`
-              : '📍 Регион не указан'
+              ? lead.locationNames.join(', ')
+              : 'Регион не указан'
           }
           nav={<InternalBackLink href="/leads">← Лиды</InternalBackLink>}
         />
@@ -152,7 +151,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 <div className={ipStyles.leadVerdictRoles}>
                   <span className={ipStyles.leadVerdictRolesLabel}>Открытые роли</span>
                   {shownRoles.length > 0 ? (
-                    <div className={ipStyles.chipWrap} style={{ margin: 0 }}>
+                    <div className={`${ipStyles.chipWrap} ${ipStyles.chipWrapFlush}`}>
                       {shownRoles.map((title, i) => (
                         <EvidenceTag key={i}>{title}</EvidenceTag>
                       ))}
@@ -169,7 +168,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               {/* Why now card — only when there is an actual argument to show */}
               {lead.whyNow && lead.whyNow.trim() && (
                 <ContentCard>
-                  <ContentCardTitle>🎯 Почему сейчас</ContentCardTitle>
+                  <ContentCardTitle>Почему сейчас</ContentCardTitle>
                   <p className={ipStyles.bodyText}>{lead.whyNow}</p>
                 </ContentCard>
               )}
@@ -177,7 +176,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               {/* Why this lead fits the agency — deterministic, evidence-backed */}
               {fit && !fit.isEmpty && (
                 <ContentCard variant="hero">
-                  <ContentCardTitle>🤝 Почему этот лид вам подходит</ContentCardTitle>
+                  <ContentCardTitle>Почему этот лид вам подходит</ContentCardTitle>
                   <ul className={ipStyles.fitList}>
                     {fit.lines.map((line, i) => (
                       <li key={i} className={ipStyles.fitItem}>
@@ -194,7 +193,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               {/* Company / hiring summary — deterministic synthesis, no invented facts */}
               {summaryLines.length > 0 && (
                 <ContentCard>
-                  <ContentCardTitle>🏢 Кратко о компании и найме</ContentCardTitle>
+                  <ContentCardTitle>Кратко о компании и найме</ContentCardTitle>
                   <div className={ipStyles.summaryBlock}>
                     {summaryLines.map((line, i) => (
                       <p
@@ -213,18 +212,10 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 </ContentCard>
               )}
 
-              {/* Best angle card — only when an angle was derived */}
-              {lead.bestAngle && lead.bestAngle.trim() && (
-                <ContentCard>
-                  <ContentCardTitle>🔭 Лучший угол контакта</ContentCardTitle>
-                  <p className={ipStyles.bodyText}>{lead.bestAngle}</p>
-                </ContentCard>
-              )}
-
               {/* Lawful contact path */}
               {formatLawfulContactPath(lead.lawfulContactPath) && (
                 <ContentCard>
-                  <ContentCardTitle>📬 Безопасный путь контакта</ContentCardTitle>
+                  <ContentCardTitle>Безопасный путь контакта</ContentCardTitle>
                   <p className={ipStyles.bodyText}>
                     {formatLawfulContactPath(lead.lawfulContactPath)}
                   </p>
@@ -233,7 +224,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
 
               {/* Evidence card */}
               <ContentCard>
-                <ContentCardTitle>📋 Доказательства</ContentCardTitle>
+                <ContentCardTitle>Доказательства</ContentCardTitle>
                 <div className={ipStyles.chipWrap}>
                   {lead.evidenceTitles.length > 0 ? lead.evidenceTitles.map((title, i) => (
                     <EvidenceTag key={i}>{title}</EvidenceTag>
@@ -257,7 +248,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               {/* Negative signals */}
               {lead.negativeSignals.length > 0 && (
                 <ContentCard tone="danger">
-                  <ContentCardTitle tone="danger">⚠️ Факторы риска</ContentCardTitle>
+                  <ContentCardTitle tone="danger">Факторы риска</ContentCardTitle>
                   <ul className={ipStyles.reasonList}>
                     {lead.negativeSignals.map((signal, i) => (
                       <li key={i} className={ipStyles.signalItem}>{signal}</li>
@@ -265,31 +256,6 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                   </ul>
                 </ContentCard>
               )}
-
-              {/* Opener card — only when a draft opener exists */}
-              {lead.opener && lead.opener.trim() && (
-                <ContentCard>
-                  <ContentCardTitle>💬 Текст первого сообщения</ContentCardTitle>
-                  <p className={ipStyles.openerText}>{lead.opener}</p>
-                </ContentCard>
-              )}
-
-              {/* Outreach templates */}
-              <ContentCard>
-                <ContentCardTitle>✉️ Шаблоны сообщения</ContentCardTitle>
-                <OutreachPicker
-                  clientProfileId={lead.clientProfileId}
-                  context={{
-                    orgName: lead.orgName,
-                    reasons: lead.reasons,
-                    vacancyCount: lead.vacanciesCount,
-                    roleNames: lead.evidenceTitles,
-                    sourceFamily: lead.sourceFamilies[0] ?? '',
-                    locationName: lead.locationNames[0] ?? '',
-                    confidenceGate: lead.confidenceGate,
-                  }}
-                />
-              </ContentCard>
             </>
           }
           sidebar={

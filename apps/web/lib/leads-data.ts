@@ -85,64 +85,6 @@ export function deriveWhyNow(rawReasons: unknown): string {
 }
 
 /**
- * Derive `best_angle` — the strongest angle for first contact.
- * Uses reason.key for structured matching, not substring search.
- * Falls back to source-family heuristics when no reason key matches.
- */
-export function deriveBestAngle(rawReasons: unknown, opener: string, sourceFamilies: string[] = []): string {
-  const reasons = parseReasons(rawReasons)
-  const keys = reasons.map(r => r.key)
-
-  // Geographic expansion
-  if (keys.includes('fit.location.outside') || keys.includes('fit.location.match')) {
-    return 'Поддержать выход в новый регион — компания ищет людей на месте'
-  }
-
-  // Hard-to-fill roles
-  if (keys.includes('urgency.hard-to-fill')) {
-    return 'Закрыть дефицитную роль, пока внутренний поиск не растянулся'
-  }
-
-  // Non-tech / multi-role mix
-  if (keys.includes('intent.non-tech-mix') || keys.includes('intent.multiple-roles')) {
-    return 'Несколько открытых ролей — компания активно строит команду'
-  }
-
-  // Career page available
-  if (keys.includes('reachability.career-page')) {
-    return 'Есть карьерная страница — прямой путь к HR'
-  }
-
-  // Hiring burst
-  if (keys.some(k => k.startsWith('urgency.burst')) || keys.includes('urgency.recent-signal-burst')) {
-    return 'Компания массово ищет специалистов — заходить с релевантной ролью сейчас'
-  }
-
-  // Opener takes precedence over source-family heuristics
-  if (opener) return opener
-
-  // Source-family fallback (for preview where reasons are plain strings)
-  if (sourceFamilies.length > 0) {
-    if (sourceFamilies.includes('career-pages')) {
-      return 'Карьерная страница — прямой путь к HR'
-    }
-    if (sourceFamilies.includes('egrul-fns') || sourceFamilies.includes('fedresurs')) {
-      return 'Данные реестра — можно найти контакт через официальный сайт'
-    }
-    if (sourceFamilies.length >= 2) {
-      return 'Несколько независимых источников подтверждают найм'
-    }
-    if (sourceFamilies.includes('hh')) {
-      return 'Активные вакансии на HeadHunter — можно заходить с релевантной ролью'
-    }
-  }
-
-  // Final fallback — only when every concrete signal is absent. Honest about
-  // the lack of a specific angle rather than inventing one.
-  return 'Сверить задачи по найму коротким сообщением'
-}
-
-/**
  * Derive `lawful_contact_path` from evidence and reasons.
  * Returns the safest non-personal contact path available.
  */
@@ -284,8 +226,6 @@ export interface LeadItem {
   structuredReasons: ScoringReason[];
   /** Why now — 1–2 short arguments for why this company is in focus today */
   whyNow: string;
-  /** Best angle — the strongest angle for first contact */
-  bestAngle: string;
   /** Lawful contact path — corporate form / generic HR / career page */
   lawfulContactPath: string | null;
   /** Negative signals — risk factors / why not */
@@ -449,7 +389,6 @@ function mapLeadRow(row: LeadRow): LeadItem {
     reasons,
     structuredReasons,
     whyNow: deriveWhyNow(reasonsRaw),
-    bestAngle: deriveBestAngle(reasonsRaw, row.opener ?? "", sourceFamilies),
     lawfulContactPath: deriveLawfulContactPath(reasonsRaw, sourceFamilies),
     negativeSignals: deriveNegativeSignals({
       reasons: reasonsRaw,

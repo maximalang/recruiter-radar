@@ -2,7 +2,6 @@
 
 import { updateLeadFeedback } from "@/lib/leads-data";
 import { getPool } from "@/lib/db";
-import { getTelegramBotToken, sendTelegramTextMessage } from "@/lib/telegram";
 import { getOwnerIdFromSession } from "@/lib/session";
 
 /**
@@ -62,66 +61,3 @@ export async function updateLeadFeedbackAction(
   return result.data;
 }
 
-/**
- * Send an outreach message to the client's Telegram chat.
- *
- * Verifies ownership, looks up the telegram_chat_id, and sends
- * the text message via the Telegram Bot API.
- * Combines ownership + chat_id lookup into a single query.
- */
-export async function sendOutreachToTelegramAction(
-  clientProfileId: string,
-  message: string,
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (!message || message.trim().length === 0) {
-    return { ok: false, error: "Message is empty." };
-  }
-
-  const ownerId = await getOwnerIdFromSession();
-  if (!ownerId) {
-    return { ok: false, error: "Access denied: no active session." };
-  }
-
-  const pool = getPool();
-  if (!pool) {
-    return { ok: false, error: "Database not configured." };
-  }
-
-  // Combine ownership check + chat_id lookup into one query
-  const profileResult = await pool.query<{
-    ok: boolean;
-    telegram_chat_id: string | null;
-  }>(
-    `SELECT 1 AS ok, telegram_chat_id
-     FROM client_profiles
-     WHERE id = $1
-       AND (owner_id = $2 OR owner_id IS NULL)
-       AND is_active = true
-     LIMIT 1`,
-    [clientProfileId, ownerId],
-  );
-
-  if (profileResult.rowCount !== 1) {
-    return { ok: false, error: "Access denied: ownership check failed." };
-  }
-
-  const chatId = profileResult.rows[0]?.telegram_chat_id;
-  if (!chatId) {
-    return { ok: false, error: "У профиля нет подключённого Telegram чата." };
-  }
-
-  const { botToken, error } = getTelegramBotToken();
-  if (!botToken) {
-    return { ok: false, error: `Telegram не настроен: ${error ?? "unknown"}` };
-  }
-
-  try {
-    await sendTelegramTextMessage(message, { botToken, chatId });
-    return { ok: true };
-  } catch (err) {
-    return {
-      ok: false,
-      error: err instanceof Error ? err.message : "Ошибка отправки в Telegram",
-    };
-  }
-}

@@ -156,10 +156,11 @@ export type WeakSignalExtractHook = (
 
 /**
  * Draft an editable opener. Deliberately LAST and minimal — copywriting is not
- * the priority of the AI roadmap. Today this is covered deterministically by
- * `lib/outreach-templates.ts`; this hook only exists so a model can later
- * propose an alternative the user edits and confirms. Must respect contactPolicy
- * and never auto-send.
+ * the priority of the AI roadmap. Openers are no longer surfaced to the user
+ * (outreach was removed; the digest is an executive brief, not a send tool);
+ * this hook only exists so a model could later propose an alternative the user
+ * edits and confirms if outreach is ever reintroduced. Must respect
+ * contactPolicy and never auto-send.
  */
 export interface OpenerDraftInput {
   orgName: string;

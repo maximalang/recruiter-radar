@@ -85,7 +85,6 @@ export async function GET(
 
     // Deterministic decision drivers
     whyNow: lead.whyNow && lead.whyNow.trim() ? lead.whyNow.trim() : null,
-    bestAngle: lead.bestAngle && lead.bestAngle.trim() ? lead.bestAngle.trim() : null,
     fit: fit && !fit.isEmpty ? fit.lines.map((l) => ({ dimension: l.dimension, text: l.text })) : [],
     companySummary: {
       identity: summary.identity,

@@ -3,10 +3,9 @@
 import { getPool as getSharedPool } from "./db-pool";
 import { updateDigestOrgStateFeedback, type DigestFeedbackAction } from "./digestFeedback";
 import type { HhDigestItem } from "./hhDigest";
-import { getTelegramBotToken, sendTelegramLeadMessage, sendTelegramTextMessage } from "./telegram";
+import { getTelegramBotToken, sendTelegramTextMessage } from "./telegram";
 import { deriveWhyNow, deriveLawfulContactPath, formatLawfulContactPath, extractPayloadFields } from "./leads-data";
 import { buildWhyMatch } from "./leads/why-match";
-import { parseStoredEnrichment } from "./ai/enrichment/enrichmentStore";
 import { buildTelegramDigestFeedbackReplyMarkup } from "./telegramDigestFeedback";
 import { buildBatchDigestMessages, type BatchLead } from "./telegram/digest-batch";
 import { logError, logEvent } from "./runtime";
@@ -33,27 +32,6 @@ type LeadRow = {
   userName: string;
 };
 
-type LeadDeliveryRow = LeadRow & {
-  clientProfileId: number;
-  orgId: number;
-  telegramChatId: string | null;
-  payload: unknown;
-  reasons: unknown;
-  opener: string | null;
-  sourceFamilies: unknown;
-  vacanciesCount: number | null;
-  distinctVacancyNamesCount: number | null;
-  orgDomain: string | null;
-  careerPageUrl: string | null;
-  aiEnrichment: unknown;
-  profileRoles: unknown;
-  profileIndustries: unknown;
-  profileTargetCity: string | null;
-  profileHiringIntentMin: number | null;
-  profileMinOpenRoles: number | null;
-  profileRemoteFriendly: boolean | null;
-};
-export type TelegramDeliveryResult = { ok: true } | { ok: false; error: string };
 export type EntitlementResult = { allowed: boolean; reason: string | null };
 type LeadsResult = { rows: LeadRow[]; error: string | null };
 
@@ -133,152 +111,6 @@ function toStringArray(value: unknown): string[] {
     .filter((item) => item.length > 0);
 }
 
-async function getLeadDeliveryRow(candidateId: number): Promise<LeadDeliveryRow | null> {
-  const pool = getPool();
-  if (!pool) throw new Error("DATABASE_URL is not set.");
-  const result = await pool.query<LeadDeliveryRow>(`
-    SELECT
-      dc.id,
-      dc.client_profile_id AS "clientProfileId",
-      dc.org_id AS "orgId",
-      o.name AS "orgName",
-      COALESCE(cdos.feedback_status::text, 'new') AS "status",
-      dc.total_score AS "score",
-      dc.created_at::text AS "lastSignalAt",
-      cp.agency_name AS "userName",
-      cp.telegram_chat_id::text AS "telegramChatId",
-      dc.payload,
-      dc.reasons,
-      dc.opener,
-      dc.source_families AS "sourceFamilies",
-      dc.vacancies_count AS "vacanciesCount",
-      dc.distinct_vacancy_names_count AS "distinctVacancyNamesCount",
-      o.domain AS "orgDomain",
-      o.career_page_url AS "careerPageUrl",
-      dc.ai_enrichment AS "aiEnrichment",
-      cp.roles AS "profileRoles",
-      cp.industries AS "profileIndustries",
-      cp.target_city AS "profileTargetCity",
-      cp.hiring_intent_min AS "profileHiringIntentMin",
-      cp.min_open_roles AS "profileMinOpenRoles",
-      cp.remote_friendly AS "profileRemoteFriendly"
-    FROM digest_candidates dc
-    INNER JOIN orgs o ON o.id = dc.org_id
-    INNER JOIN client_profiles cp ON cp.id = dc.client_profile_id
-    LEFT JOIN client_digest_org_state cdos ON cdos.client_profile_id = dc.client_profile_id AND cdos.org_id = dc.org_id
-    WHERE dc.id = $1
-    LIMIT 1
-  `, [candidateId]);
-  return result.rowCount === 1 ? result.rows[0] : null;
-}
-
-export async function sendLeadToTelegram(candidateId: number): Promise<TelegramDeliveryResult> {
-  const lead = await getLeadDeliveryRow(candidateId);
-  if (!lead) return { ok: false, error: "Digest candidate not found." };
-  if (!lead.telegramChatId) return { ok: false, error: "Client profile has no linked Telegram chat." };
-  const { botToken, error } = getTelegramBotToken();
-  if (!botToken) return { ok: false, error: error ?? "Telegram is not configured." };
-  try {
-    // Evidence-first fields (confidence gate, evidence titles, location names)
-    // live in digest_candidates.payload — they are NOT real columns. Read them
-    // through the canonical extractor shared with the /leads page so the Telegram
-    // card and the in-app card tell an identical story and tolerate both
-    // snake_case (how the digest writer persists) and camelCase.
-    const {
-      confidenceGate,
-      evidenceTitles,
-      locationNames,
-    } = extractPayloadFields(lead.payload);
-    const sourceFamilies = toStringArray(lead.sourceFamilies);
-
-    // Reuse the same evidence-first derivations the /leads/[id] page uses, so the
-    // Telegram card and the in-app card tell an identical story.
-    const whyNow = deriveWhyNow(lead.reasons);
-    const lawfulContactPath = formatLawfulContactPath(
-      deriveLawfulContactPath(lead.reasons, sourceFamilies)
-    );
-
-    // Why-this-match: concrete filter criteria this lead satisfies for the
-    // agency. Reads the profile filter columns joined onto the delivery row.
-    const whyMatch = buildWhyMatch(
-      {
-        orgName: lead.orgName,
-        evidenceTitles,
-        locationNames,
-        vacanciesCount: lead.vacanciesCount,
-        score: lead.score,
-        latestSignalAt: lead.lastSignalAt,
-      },
-      {
-        roles: toStringArray(lead.profileRoles),
-        industries: toStringArray(lead.profileIndustries),
-        targetCity: lead.profileTargetCity,
-        minOpenRoles: lead.profileMinOpenRoles,
-        hiringIntentMin: lead.profileHiringIntentMin,
-        remoteFriendly: lead.profileRemoteFriendly ?? false,
-      }
-    );
-
-    // AI hint: the one-line enriched hiring summary, if a successful enrichment
-    // was persisted. Advisory only — rendered with an explicit AI label.
-    const storedEnrichment = parseStoredEnrichment(lead.aiEnrichment);
-    const aiHint =
-      storedEnrichment && storedEnrichment.hiringPatternSummary.trim().length > 0
-        ? storedEnrichment.hiringPatternSummary.trim()
-        : null;
-
-    const feedbackItem: HhDigestItem = {
-      rank: 1,
-      org_id: String(lead.orgId),
-      hh_employer_id: "",
-      employer_name: lead.orgName,
-      vacancies_count: lead.vacanciesCount ?? 0,
-      distinct_vacancy_names_count: lead.distinctVacancyNamesCount ?? 0,
-      latest_published_at: lead.lastSignalAt ?? "",
-      total_score: lead.score ?? 0,
-      reasons: ["", ""],
-      opener: lead.opener ?? "",
-      source_families: sourceFamilies,
-      evidence_titles: evidenceTitles,
-      candidate_source_keys: [],
-      location_names: locationNames
-    };
-
-    const replyMarkup = buildTelegramDigestFeedbackReplyMarkup({
-      clientProfileId: String(lead.clientProfileId),
-      items: [feedbackItem]
-    });
-    await sendTelegramLeadMessage(
-      {
-        orgName: lead.orgName,
-        status: lead.status,
-        score: lead.score,
-        lastSignalAt: lead.lastSignalAt,
-        userName: lead.userName,
-        confidence_gate: confidenceGate,
-        whyNow,
-        evidenceTitles,
-        vacanciesCount: lead.vacanciesCount,
-        lawfulContactPath,
-        sourceFamilies,
-        locationNames,
-        orgDomain: lead.orgDomain,
-        careerPageUrl: lead.careerPageUrl,
-        whyMatch,
-        aiHint
-      },
-      { botToken, chatId: lead.telegramChatId },
-      { replyMarkup }
-    );
-    logEvent("telegram.delivery.sent", { digestCandidateId: candidateId, clientProfileId: lead.clientProfileId, orgId: lead.orgId });
-    return { ok: true };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown Telegram delivery error.";
-    logError("telegram.delivery.failed", error, { digestCandidateId: candidateId, clientProfileId: lead.clientProfileId, orgId: lead.orgId });
-    return { ok: false, error: message };
-  }
-}
-
 /** App base URL for deep links in the batch digest. Trailing slash trimmed. */
 function resolveAppBaseUrlForTelegram(): string {
   const raw = process.env.NEXT_PUBLIC_APP_URL?.trim();
@@ -296,6 +128,9 @@ type BatchCandidateRow = {
   payload: unknown;
   reasons: unknown;
   sourceFamilies: unknown;
+  orgDomain: string | null;
+  orgWebsite: string | null;
+  careerPageUrl: string | null;
   telegramChatId: string | null;
   profileRoles: unknown;
   profileIndustries: unknown;
@@ -342,6 +177,9 @@ export async function sendBatchDigestForRun(input: {
       dc.reasons,
       dc.source_families AS "sourceFamilies",
       dc.latest_published_at::text AS "lastSignalAt",
+      o.domain AS "orgDomain",
+      o.website_url AS "orgWebsite",
+      o.career_page_url AS "careerPageUrl",
       cp.telegram_chat_id::text AS "telegramChatId",
       cp.roles AS "profileRoles",
       cp.industries AS "profileIndustries",
@@ -351,6 +189,7 @@ export async function sendBatchDigestForRun(input: {
       cp.remote_friendly AS "profileRemoteFriendly"
     FROM digest_candidates dc
     INNER JOIN client_profiles cp ON cp.id = dc.client_profile_id
+    LEFT JOIN orgs o ON o.id = dc.org_id
     WHERE dc.digest_run_id = $1
       AND dc.client_profile_id = $2
       AND (dc.payload->>'confidence_gate' NOT IN ('C', 'D') OR dc.payload->>'confidence_gate' IS NULL)
@@ -372,7 +211,7 @@ export async function sendBatchDigestForRun(input: {
   const feedbackItems: HhDigestItem[] = [];
 
   result.rows.forEach((row, index) => {
-    const { evidenceTitles, locationNames, isForeignEmployer } = extractPayloadFields(row.payload);
+    const { evidenceTitles, locationNames, isForeignEmployer, confidenceGate } = extractPayloadFields(row.payload);
     const sourceFamilies = toStringArray(row.sourceFamilies);
     const whyMatch = buildWhyMatch(
       {
@@ -397,11 +236,19 @@ export async function sendBatchDigestForRun(input: {
       orgId: String(row.orgId),
       orgName: row.orgName,
       score: row.score,
+      confidenceGate: confidenceGate || undefined,
       vacanciesCount: row.vacanciesCount ?? 0,
       evidenceTitles,
       locationNames,
       whyLine: whyMatch[0] ?? deriveWhyNow(row.reasons) ?? null,
       isForeignEmployer,
+      careerPageUrl: row.careerPageUrl,
+      orgWebsite: row.orgWebsite,
+      orgDomain: row.orgDomain,
+      contactPathLabel: formatLawfulContactPath(
+        deriveLawfulContactPath(row.reasons, sourceFamilies),
+      ),
+      sourceFamilies,
     });
 
     feedbackItems.push({

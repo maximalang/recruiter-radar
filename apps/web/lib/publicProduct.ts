@@ -1,5 +1,5 @@
 import { getHhDigestItems, type HhDigestItem } from "./hhDigest"
-import { deriveBestAngle, deriveLawfulContactPath, deriveNegativeSignals } from "./leads-data"
+import { deriveLawfulContactPath, deriveNegativeSignals } from "./leads-data"
 import { rankPreviewItems, type PreviewRelevanceSignals } from "./preview-relevance"
 
 export type PublicPlanCode = "pilot" | "monthly" | "premium"
@@ -38,8 +38,6 @@ export type PublicPreviewItem = HhDigestItem & {
   sourceKeys: string[]
   structuredSignalCount: number
   curationLabels: string[]
-  /** Strongest angle for first contact (derived from source families). */
-  bestAngle: string
   /** Lawful contact-path key (career-page / registry-data / …) or null. */
   lawfulContactPath: string | null
   /** Risk factors / why-not — empty when none apply. */
@@ -249,7 +247,6 @@ function toPublicPreviewItem(
     // ScoringReason keys — so these derivations lean on source families, the
     // confidence gate, and vacancy counts (gate/count-driven, key-agnostic),
     // never on reason keys that don't exist in preview data.
-    bestAngle: deriveBestAngle(item.reasons, item.opener ?? "", sourceFamilies),
     lawfulContactPath: deriveLawfulContactPath(item.reasons, sourceFamilies),
     negativeSignals: deriveNegativeSignals({
       reasons: item.reasons,

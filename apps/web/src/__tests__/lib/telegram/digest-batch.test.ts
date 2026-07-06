@@ -11,11 +11,17 @@ function lead(overrides: Partial<BatchLead> = {}): BatchLead {
     orgId: '1',
     orgName: 'Ромашка',
     score: 320,
+    confidenceGate: 'A',
     vacanciesCount: 4,
     evidenceTitles: ['Backend разработчик', 'DevOps инженер'],
     locationNames: ['Москва'],
     whyLine: 'нанимают по вашему профилю',
     isForeignEmployer: false,
+    careerPageUrl: 'https://romashka.ru/career',
+    orgWebsite: 'https://romashka.ru',
+    orgDomain: 'romashka.ru',
+    contactPathLabel: 'Карьерная страница компании — прямой путь к HR',
+    sourceFamilies: ['career-pages', 'habr'],
     ...overrides,
   }
 }
@@ -23,14 +29,50 @@ function lead(overrides: Partial<BatchLead> = {}): BatchLead {
 const LEADS_URL = 'https://app.example.com/leads'
 
 describe('formatBatchLeadBlock', () => {
-  it('renders a numbered block with company, roles, and why line', () => {
+  it('renders a numbered block with company, readiness, why, roles', () => {
     const block = formatBatchLeadBlock(lead(), 1)
     expect(block).toContain('1.')
     expect(block).toContain('<b>Ромашка</b>')
     expect(block).toContain('Москва')
+    expect(block).toContain('Готов к контакту')
+    expect(block).toContain('· A')
+    expect(block).toContain('сигнал 3.2')
     expect(block).toContain('Роли:')
     expect(block).toContain('Backend разработчик')
     expect(block).toContain('нанимают по вашему профилю')
+  })
+
+  it('renders the reachable contact surface as links', () => {
+    const block = formatBatchLeadBlock(lead(), 1)
+    expect(block).toContain('Контакт:')
+    expect(block).toContain('<a href="https://romashka.ru/career">Карьерная страница</a>')
+    expect(block).toContain('romashka.ru')
+  })
+
+  it('falls back to the lawful-path label when no direct link is present', () => {
+    const block = formatBatchLeadBlock(
+      lead({ careerPageUrl: null, orgWebsite: null, orgDomain: null }),
+      1,
+    )
+    expect(block).toContain('Контакт: Карьерная страница компании — прямой путь к HR')
+  })
+
+  it('states plainly when there is no known contact surface — never invents one', () => {
+    const block = formatBatchLeadBlock(
+      lead({ careerPageUrl: null, orgWebsite: null, orgDomain: null, contactPathLabel: null }),
+      1,
+    )
+    expect(block).toContain('Контакт: прямой путь уточняется')
+  })
+
+  it('renders the sources trust line', () => {
+    expect(formatBatchLeadBlock(lead(), 1)).toContain('Источники: career-pages, habr')
+  })
+
+  it('reads readiness "на проверку" for gate C', () => {
+    const block = formatBatchLeadBlock(lead({ confidenceGate: 'C' }), 1)
+    expect(block).toContain('На проверку')
+    expect(block).not.toContain('Готов к контакту')
   })
 
   it('marks a foreign employer with 🌍', () => {
@@ -38,13 +80,21 @@ describe('formatBatchLeadBlock', () => {
     expect(formatBatchLeadBlock(lead({ isForeignEmployer: false }), 2)).not.toContain('🌍')
   })
 
-  it('shows "не определены" when there are no roles', () => {
-    expect(formatBatchLeadBlock(lead({ evidenceTitles: [] }), 1)).toContain('Роли: не определены')
+  it('omits the roles line when there are no roles', () => {
+    expect(formatBatchLeadBlock(lead({ evidenceTitles: [] }), 1)).not.toContain('Роли:')
   })
 
   it('escapes HTML in the company name', () => {
     const block = formatBatchLeadBlock(lead({ orgName: 'A & B <Co>' }), 1)
     expect(block).toContain('A &amp; B &lt;Co&gt;')
+  })
+
+  it('carries no outreach / first-contact draft content', () => {
+    const block = formatBatchLeadBlock(lead(), 1)
+    expect(block).not.toContain('Здравствуйте')
+    expect(block).not.toContain('созвон')
+    expect(block).not.toMatch(/перв\w+ сообщени/i)
+    expect(block).not.toContain('Что делать')
   })
 })
 
@@ -55,12 +105,16 @@ describe('buildBatchDigestMessages', () => {
     expect(r.includedLeads).toBe(0)
   })
 
-  it('builds a single message for 3 leads with header and footer link', () => {
-    const leads = [lead({ orgId: '1' }), lead({ orgId: '2', orgName: 'Лютик' }), lead({ orgId: '3', orgName: 'Одуванчик' })]
+  it('batches multiple leads into ONE digest message with header and footer', () => {
+    const leads = [
+      lead({ orgId: '1' }),
+      lead({ orgId: '2', orgName: 'Лютик' }),
+      lead({ orgId: '3', orgName: 'Одуванчик' }),
+    ]
     const r = buildBatchDigestMessages({ leads, leadsUrl: LEADS_URL })
     expect(r.messages).toHaveLength(1)
     expect(r.includedLeads).toBe(3)
-    expect(r.messages[0]).toContain('Радар на')
+    expect(r.messages[0]).toContain('Радар')
     expect(r.messages[0]).toContain('3 компании')
     expect(r.messages[0]).toContain('1.')
     expect(r.messages[0]).toContain('2.')
@@ -69,7 +123,7 @@ describe('buildBatchDigestMessages', () => {
     expect(r.messages[0]).toContain(LEADS_URL)
   })
 
-  it('handles 5 and 10 leads within a single message', () => {
+  it('keeps 5 and 10 leads within a single coherent digest', () => {
     for (const n of [5, 10]) {
       const leads = Array.from({ length: n }, (_, i) => lead({ orgId: String(i), orgName: `Co ${i}` }))
       const r = buildBatchDigestMessages({ leads, leadsUrl: LEADS_URL })
@@ -79,8 +133,7 @@ describe('buildBatchDigestMessages', () => {
     }
   })
 
-  it('splits into at most 2 messages and respects the 4096 char limit', () => {
-    // Long role lists inflate each block so the batch must split.
+  it('splits into at most MAX_BATCH_MESSAGES and respects the 4096 char limit', () => {
     const bulky = Array.from({ length: 60 }, (_, i) =>
       lead({
         orgId: String(i),
@@ -94,10 +147,10 @@ describe('buildBatchDigestMessages', () => {
     for (const msg of r.messages) {
       expect(msg.length).toBeLessThanOrEqual(TELEGRAM_MESSAGE_CHAR_LIMIT)
     }
-    // Some leads should be dropped from the text when they overflow 2 messages.
+    // Some leads should be dropped from the text when they overflow the cap.
     expect(r.droppedLeads).toBeGreaterThan(0)
     expect(r.includedLeads + r.droppedLeads).toBe(60)
-    // The footer link is on the last message only.
+    // The footer link is on the last message only — the recruiter can still open all.
     expect(r.messages[r.messages.length - 1]).toContain('Открыть все лиды')
   })
 })

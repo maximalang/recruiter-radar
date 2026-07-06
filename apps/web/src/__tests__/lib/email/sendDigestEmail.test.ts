@@ -28,7 +28,6 @@ function makeLead(overrides: Partial<LeadItem> = {}): LeadItem {
     latestPublishedAt: null,
     reasons: [],
     whyNow: 'Сигнал найма',
-    bestAngle: '',
     lawfulContactPath: null,
     negativeSignals: [],
     opener: '',

@@ -26,7 +26,6 @@ const COLUMNS: readonly CsvColumn[] = [
   { header: "Сила сигнала (0–4)", value: (l) => formatScore(l.score) },
   { header: "Уверенность", value: (l) => l.confidenceGate },
   { header: "Почему сейчас", value: (l) => l.whyNow },
-  { header: "Лучший угол", value: (l) => l.bestAngle },
   { header: "Безопасный контакт", value: (l) => l.lawfulContactPath ?? "" },
   { header: "Вакансий", value: (l) => String(l.vacanciesCount ?? 0) },
   { header: "Доказательства", value: (l) => l.evidenceTitles.join("; ") },

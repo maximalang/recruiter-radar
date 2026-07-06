@@ -9,7 +9,7 @@ import {
 import { runDigestForClientProfile, type DigestItemInput } from "./digest";
 import { buildHhDigestText, type HhDigestItem } from "./hhDigest";
 import { buildBatchDigestMessages, type BatchLead } from "./telegram/digest-batch";
-import { deriveWhyNow } from "./leads-data";
+import { deriveWhyNow, deriveLawfulContactPath, formatLawfulContactPath } from "./leads-data";
 import { detectForeignEmployer } from "./scoring/foreign-employer";
 import {
   buildCheckoutHref,
@@ -480,6 +480,10 @@ export async function sendPilotOrderTestDigest(
       locationNames: item.location_names,
       whyLine: deriveWhyNow(item.reasons) || null,
       isForeignEmployer: foreign.isForeign,
+      contactPathLabel: formatLawfulContactPath(
+        deriveLawfulContactPath(item.reasons, item.source_families),
+      ),
+      sourceFamilies: item.source_families,
     };
   });
 

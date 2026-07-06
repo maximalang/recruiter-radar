@@ -21,7 +21,6 @@ function makeLead(overrides: Partial<LeadItem> = {}): LeadItem {
     latestPublishedAt: '2026-06-25',
     reasons: [],
     whyNow: 'Всплеск найма',
-    bestAngle: 'Закрытие IT-ролей',
     lawfulContactPath: 'Карьерная страница',
     negativeSignals: [],
     opener: '',
@@ -73,7 +72,7 @@ describe('leadsToCsv', () => {
   });
 
   it('quotes fields containing newlines', () => {
-    const csv = leadsToCsv([makeLead({ bestAngle: 'Строка 1\nСтрока 2' })]);
+    const csv = leadsToCsv([makeLead({ whyNow: 'Строка 1\nСтрока 2' })]);
     expect(csv).toContain('"Строка 1\nСтрока 2"');
   });
 

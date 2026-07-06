@@ -15,7 +15,6 @@ function makeLead(overrides: Partial<LeadItem> = {}): LeadItem {
     latestPublishedAt: null,
     reasons: [],
     whyNow: 'Открыли 2 новые вакансии за неделю',
-    bestAngle: 'Подбор IT',
     lawfulContactPath: 'Карьерная страница',
     negativeSignals: [],
     opener: '',

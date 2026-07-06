@@ -40,7 +40,6 @@ function makeDetail(overrides: Partial<LeadDetail> = {}): LeadDetail {
     reasons: [],
     structuredReasons: [],
     whyNow: 'Активный найm',
-    bestAngle: 'IT',
     lawfulContactPath: 'Карьерная страница',
     negativeSignals: [],
     opener: 'СЕКРЕТ',
