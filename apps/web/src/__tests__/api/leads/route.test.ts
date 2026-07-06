@@ -24,7 +24,7 @@ jest.mock('@/lib/clientProfiles', () => ({
 }));
 jest.mock('@/lib/leads-data', () => ({
   getLeadsForAllProfiles: jest.fn(),
-  VALID_FEEDBACK_STATUSES: new Set(['accepted', 'dismissed', 'later', 'contacted', 'replied', 'call', 'client', 'badfit', 'none']),
+  VALID_FEEDBACK_STATUSES: new Set(['none', 'contacted', 'replied', 'won', 'badfit', 'snooze', 'dismissed']),
 }));
 
 const mockOwner = getOwnerIdFromSession as jest.MockedFunction<typeof getOwnerIdFromSession>;

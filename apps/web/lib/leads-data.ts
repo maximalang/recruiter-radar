@@ -197,9 +197,26 @@ export function deriveNegativeSignals(input: {
 
 // ─── Types ──────────────────────────────────────────────────────
 
-/** Valid feedback status values matching the DB enum digest_feedback_status */
+/**
+ * Valid feedback status values — MUST match the DB enum `digest_feedback_status`
+ * exactly (packages/db/schema/init.sql). The enum is:
+ *   none, contacted, replied, won, badfit, snooze, dismissed
+ *
+ * This set was previously drifted (listed accepted/later/call/client, which are
+ * NOT in the enum) — clicking in-app "Беру"/"Позже" threw `invalid input value
+ * for enum` at runtime because updateLeadFeedback casts the status to
+ * digest_feedback_status. The in-app writer now uses only DB-legal values.
+ * FEEDBACK_LABELS (internal-page.tsx) still carries the legacy labels for
+ * display-only tolerance of any old rows, but no writer emits them.
+ *
+ * `snooze` is a DB-legal triage state ("отложить на N дней") — the digest path
+ * pairs it with a suppressed_until window; the in-app path writes the status
+ * without the suppression window (the lead is marked "отложен", and a future
+ * run can re-surface it). This is intentional: the in-app button is a triage
+ * label, not a scheduling action.
+ */
 export const VALID_FEEDBACK_STATUSES = new Set([
-  'none', 'accepted', 'dismissed', 'later', 'contacted', 'replied', 'call', 'client', 'badfit',
+  'none', 'contacted', 'replied', 'won', 'badfit', 'snooze', 'dismissed',
 ] as const);
 
 export type FeedbackStatus = Exclude<typeof VALID_FEEDBACK_STATUSES extends Set<infer T> ? T : never, 'none'>;
@@ -252,6 +269,23 @@ export interface LeadItem {
   isForeignEmployer: boolean;
   /** The foreign ATS domain that triggered the flag, when isForeignEmployer. */
   foreignMatchedDomain: string | null;
+  /**
+   * Optional CRM-lookup identifiers populated only when the list query is asked
+   * to JOIN orgs (includeOrgDetails: true, used by the CSV export so a row
+   * carries INN/ОГРН/domain/career-page for pasting into a CRM). Null on the
+   * default /leads UI path, which does not need them and must not pay the join
+   * cost. See getLeadsForAllProfiles.
+   */
+  orgInn?: string | null;
+  orgOgrn?: string | null;
+  orgDomain?: string | null;
+  careerPageUrl?: string | null;
+  /**
+   * The owning client profile's display name, populated only when
+   * includeOrgDetails: true (CSV export) so an exported row names the practice
+   * the lead belongs to. Null on the default UI path.
+   */
+  profileName?: string | null;
 }
 
 export interface LeadsListResult {
@@ -311,6 +345,17 @@ interface LeadRow {
   payload: unknown;
   /** TRUE when digest_candidates.ai_enrichment IS NOT NULL — presence flag only. */
   has_ai_hint?: boolean;
+  /**
+   * Optional orgs columns. Only present when the query JOINs orgs
+   * (includeOrgDetails: true). mapLeadRow forwards them into LeadItem's
+   * optional CRM-identifier fields. Undefined on the default UI path.
+   */
+  org_inn?: string | null;
+  org_ogrn?: string | null;
+  org_domain?: string | null;
+  career_page_url?: string | null;
+  /** client_profiles.agency_name — only when joined for export. */
+  profile_name?: string | null;
 }
 
 /** SELECT column list shared by every list query that maps into a LeadItem. */
@@ -407,6 +452,14 @@ function mapLeadRow(row: LeadRow): LeadItem {
     hasAiHint: row.has_ai_hint === true,
     isForeignEmployer,
     foreignMatchedDomain,
+    // Optional CRM identifiers — only populated by the export path's
+    // includeOrgDetails join. Undefined (not null) on the default UI path, so
+    // the list page never sees them and pays no join cost.
+    orgInn: row.org_inn ?? undefined,
+    orgOgrn: row.org_ogrn ?? undefined,
+    orgDomain: row.org_domain ?? undefined,
+    careerPageUrl: row.career_page_url ?? undefined,
+    profileName: row.profile_name ?? undefined,
   };
 }
 
@@ -501,6 +554,23 @@ export async function getLeadsForAllProfiles(input: {
    * history on purpose.
    */
   digestRunId?: string | number | null;
+  /**
+   * When true, LEFT JOIN orgs + project client_profiles.agency_name so each
+   * LeadItem carries CRM-lookup identifiers (INN/ОГРН/domain/career-page) and
+   * the owning practice name. Used ONLY by the CSV export path — the /leads UI,
+   * dashboard today-radar, email, and API do not need these and must not pay
+   * the extra join. Default false keeps the original query plan.
+   */
+  includeOrgDetails?: boolean;
+  /**
+   * Narrow to the agency's active working set — leads currently in motion
+   * (feedback_status IN contacted/replied, i.e. "взял в работу" / "ответили").
+   * The "today in work" view on /leads uses this so a recruiter sees their
+   * open pipeline, not the full scored pool. Distinct from feedbackStatus
+   * (which narrows to ONE status); workingSet is the active-work band.
+   * Default false.
+   */
+  workingSet?: boolean;
 }): Promise<LeadsListResult> {
   const pool = getPool();
   if (!pool || input.profileIds.length === 0) {
@@ -539,7 +609,30 @@ export async function getLeadsForAllProfiles(input: {
     }
   }
 
+  // "Today in work" band: leads the recruiter has taken into active motion.
+  // Contacted = "взял в работу / написал", replied = "ответили". Won is excluded
+  // (closed-won is done, not in-work) and snooze/dismissed/badfit are excluded
+  // (parked/rejected). This is the open-pipeline view.
+  if (input.workingSet) {
+    conditions.push(`cdos.feedback_status IN ('contacted', 'replied')`);
+  }
+
   const whereClause = conditions.join(" AND ");
+
+  // Optional orgs join for the CSV export path. The default UI path skips it
+  // (no extra join, no extra columns) so the dashboard/email/API queries keep
+  // their original plan. cp is always joined (owner-scope predicate needs it).
+  const orgJoin = input.includeOrgDetails
+    ? `\n    LEFT JOIN orgs o ON o.id = dc.org_id`
+    : '';
+  const orgSelect = input.includeOrgDetails
+    ? `,
+      o.inn AS org_inn,
+      o.ogrn AS org_ogrn,
+      o.domain AS org_domain,
+      o.career_page_url,
+      cp.agency_name AS profile_name`
+    : '';
 
   // Count total. JOIN client_profiles cp is required so the owner-scope
   // predicate (cp.owner_id = $2 OR cp.owner_id IS NULL) can reference cp.
@@ -550,7 +643,7 @@ export async function getLeadsForAllProfiles(input: {
       ON cp.id = dc.client_profile_id
     LEFT JOIN client_digest_org_state cdos
       ON cdos.org_id = dc.org_id
-      AND cdos.client_profile_id = dc.client_profile_id
+      AND cdos.client_profile_id = dc.client_profile_id${orgJoin}
     WHERE ${whereClause}
   `, params);
 
@@ -559,13 +652,13 @@ export async function getLeadsForAllProfiles(input: {
   // Fetch leads
   const leadsResult = await pool.query<LeadRow>(`
     SELECT
-${LEAD_SELECT_COLUMNS}
+${LEAD_SELECT_COLUMNS}${orgSelect}
     FROM digest_candidates dc
     JOIN client_profiles cp
       ON cp.id = dc.client_profile_id
     LEFT JOIN client_digest_org_state cdos
       ON cdos.org_id = dc.org_id
-      AND cdos.client_profile_id = dc.client_profile_id
+      AND cdos.client_profile_id = dc.client_profile_id${orgJoin}
     WHERE ${whereClause}
     ORDER BY dc.total_score DESC, dc.created_at DESC
     LIMIT $${paramIdx} OFFSET $${paramIdx + 1}
@@ -735,11 +828,16 @@ export async function updateLeadFeedback(input: {
   // Validate feedback status
   const status = input.feedbackStatus;
   if (!VALID_FEEDBACK_STATUSES.has(status as never) || status === 'none') {
-    return { ok: false, error: `Invalid feedback status: "${status}". Must be one of: accepted, dismissed, later, contacted, replied, call, client, badfit.` };
+    return { ok: false, error: `Invalid feedback status: "${status}". Must be one of: contacted, replied, won, badfit, snooze, dismissed.` };
   }
 
-  // feedback_note is only allowed for 'badfit' status (matches DB constraint)
-  const feedbackNote = input.feedbackStatus === 'badfit' && input.feedbackNote
+  // feedback_note is allowed on the "not a fit" rejection states (badfit,
+  // dismissed) where a one-line "почему мимо" is useful triage context. The DB
+  // constraint (client_digest_org_state_feedback_note_check) permits a non-blank
+  // note for ANY non-'none' status; we restrict at the app layer to the states
+  // where the UI surfaces a note input, to keep notes intentional.
+  const NOTE_ALLOWED_STATUSES = new Set(['badfit', 'dismissed']);
+  const feedbackNote = NOTE_ALLOWED_STATUSES.has(input.feedbackStatus) && input.feedbackNote
     ? input.feedbackNote.trim() || null
     : null;
 

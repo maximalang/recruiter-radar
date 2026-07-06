@@ -13,6 +13,7 @@
 
 import type { LeadItem } from "./leads-data";
 import { formatSignalStrength } from "./scoring/score-display";
+import { formatLawfulContactPath } from "./leads-data";
 
 const BOM = "﻿";
 
@@ -22,11 +23,17 @@ type CsvColumn = {
 };
 
 const COLUMNS: readonly CsvColumn[] = [
+  { header: "ID лида", value: (l) => l.id },
+  { header: "Практика", value: (l) => l.profileName ?? "" },
   { header: "Компания", value: (l) => l.orgName },
+  { header: "ИНН", value: (l) => l.orgInn ?? "" },
+  { header: "ОГРН", value: (l) => l.orgOgrn ?? "" },
+  { header: "Домен", value: (l) => l.orgDomain ?? "" },
+  { header: "Карьерная страница", value: (l) => l.careerPageUrl ?? "" },
   { header: "Сила сигнала (0–4)", value: (l) => formatScore(l.score) },
   { header: "Уверенность", value: (l) => l.confidenceGate },
   { header: "Почему сейчас", value: (l) => l.whyNow },
-  { header: "Безопасный контакт", value: (l) => l.lawfulContactPath ?? "" },
+  { header: "Безопасный контакт", value: (l) => formatLawfulContactPath(l.lawfulContactPath) ?? l.lawfulContactPath ?? "" },
   { header: "Вакансий", value: (l) => String(l.vacanciesCount ?? 0) },
   { header: "Доказательства", value: (l) => l.evidenceTitles.join("; ") },
   { header: "Локации", value: (l) => l.locationNames.join("; ") },
@@ -72,3 +79,85 @@ export function leadsToCsv(leads: readonly LeadItem[]): string {
 
 /** Column count, exposed for tests asserting row/column integrity. */
 export const LEADS_CSV_COLUMN_COUNT = COLUMNS.length;
+
+// ─── CRM handoff block (single lead, plain text) ─────────────────
+
+/**
+ * Input shape for the CRM handoff block. A superset of the list LeadItem's
+ * CRM-identifier optional fields plus the detail-only org fields. Kept loose
+ * (all optional except the identity/score fields the block always shows) so it
+ * accepts both a list LeadItem (with includeOrgDetails fields) and a full
+ * LeadDetail without forcing the caller to adapt.
+ */
+export interface CrmBlockLead {
+  /** Lead id — included in the CSV row (ID лида column). Optional for the
+   * plain-text CRM block (which doesn't show it) but required for the CSV row. */
+  id?: string;
+  orgName: string;
+  score: number;
+  confidenceGate: string;
+  whyNow: string;
+  lawfulContactPath: string | null;
+  vacanciesCount: number;
+  evidenceTitles: string[];
+  locationNames: string[];
+  sourceFamilies: string[];
+  feedbackStatus: string | null;
+  latestPublishedAt: string | null;
+  orgInn?: string | null;
+  orgOgrn?: string | null;
+  orgDomain?: string | null;
+  orgWebsite?: string | null;
+  careerPageUrl?: string | null;
+  profileName?: string | null;
+}
+
+/**
+ * Build a structured, human-readable plain-text block for pasting a single
+ * lead into a CRM note, a team chat, or an email. Pure function — no I/O — so
+ * it is fully unit-testable. Only renders fields that are present; absent
+ * identifiers are omitted rather than emitted as empty "ИНН: " lines.
+ *
+ * The block mirrors the evidence-first lead card: who, score, confidence, why
+ * now, safe contact, identifiers, evidence, sources — so a pasted note keeps
+ * the story intact without inventing facts.
+ */
+export function leadToCrmBlock(lead: CrmBlockLead): string {
+  const lines: string[] = [];
+  lines.push(`Компания: ${lead.orgName}`);
+  if (lead.profileName) lines.push(`Практика: ${lead.profileName}`);
+  lines.push(`Сила сигнала: ${formatSignalStrength(lead.score)} / 4 (уверенность ${lead.confidenceGate})`);
+  if (lead.whyNow && lead.whyNow.trim()) lines.push(`Почему сейчас: ${lead.whyNow.trim()}`);
+  const contact = formatLawfulContactPath(lead.lawfulContactPath) ?? lead.lawfulContactPath;
+  if (contact) lines.push(`Безопасный контакт: ${contact}`);
+  if (lead.orgDomain) lines.push(`Домен: ${lead.orgDomain}`);
+  if (lead.orgWebsite) lines.push(`Сайт: ${lead.orgWebsite}`);
+  if (lead.careerPageUrl) lines.push(`Карьерная страница: ${lead.careerPageUrl}`);
+  if (lead.orgInn) lines.push(`ИНН: ${lead.orgInn}`);
+  if (lead.orgOgrn) lines.push(`ОГРН: ${lead.orgOgrn}`);
+  if (lead.locationNames.length > 0) lines.push(`Локации: ${lead.locationNames.join(", ")}`);
+  if (lead.vacanciesCount > 0) lines.push(`Вакансий: ${lead.vacanciesCount}`);
+  if (lead.evidenceTitles.length > 0) lines.push(`Доказательства: ${lead.evidenceTitles.join("; ")}`);
+  if (lead.sourceFamilies.length > 0) lines.push(`Источники: ${lead.sourceFamilies.join(", ")}`);
+  if (lead.feedbackStatus && lead.feedbackStatus !== "none") {
+    lines.push(`Статус: ${lead.feedbackStatus}`);
+  }
+  if (lead.latestPublishedAt) {
+    lines.push(`Последний сигнал: ${lead.latestPublishedAt}`);
+  }
+  return lines.join("\n");
+}
+
+/**
+ * Serialize a SINGLE lead to a one-row CSV document (with header + UTF-8 BOM).
+ * Used by the lead-detail "Экспорт этого лида" action for a quick handoff that
+ * doesn't pull the whole list. Same column layout as the list export so a CRM
+ * import mapping set up once works for both.
+ */
+export function singleLeadToCsv(lead: CrmBlockLead): string {
+  // Cast: singleLeadToCsv shares the list serializer's column contract; the
+  // CrmBlockLead shape is compatible with the Column value functions which read
+  // the optional CRM fields off the LeadItem superset.
+  return leadsToCsv([lead as unknown as LeadItem]);
+}
+

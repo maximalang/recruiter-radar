@@ -1,5 +1,22 @@
 /* Feedback buttons — references :root tokens via internal-page.module.css */
 
+.feedbackGroup {
+  margin-bottom: 8px;
+}
+
+.feedbackGroup:last-of-type {
+  margin-bottom: 0;
+}
+
+.feedbackGroupLabel {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--c-text-muted);
+  margin-bottom: 4px;
+}
+
 .feedbackBtnRow {
   display: flex;
   gap: 4px;
@@ -56,6 +73,71 @@
   border: 2px solid #ef4444;
   background-color: rgba(239, 68, 68, 0.1);
   color: #ef4444;
+}
+
+.noteRow {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.noteInput {
+  flex: 1 1 200px;
+  min-width: 0;
+  padding: 6px 10px;
+  font-size: 0.78rem;
+  border-radius: 6px;
+  border: 1px solid var(--c-border);
+  background-color: var(--c-bg-card);
+  color: var(--c-text);
+}
+
+.noteInput:focus-visible {
+  outline: 2px solid var(--c-brand);
+  outline-offset: 1px;
+}
+
+.noteSave {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid var(--c-brand);
+  background-color: var(--c-brand);
+  color: #fff;
+  cursor: pointer;
+}
+
+.noteSave:focus-visible {
+  outline: 2px solid var(--c-brand);
+  outline-offset: 2px;
+}
+
+.noteSave:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.noteSkip {
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  border: 1px solid var(--c-border);
+  background-color: var(--c-bg-card);
+  color: var(--c-text-muted);
+  cursor: pointer;
+}
+
+.noteSkip:focus-visible {
+  outline: 2px solid var(--c-brand);
+  outline-offset: 2px;
+}
+
+.noteSkip:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .errorText {

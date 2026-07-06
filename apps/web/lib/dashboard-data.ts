@@ -8,7 +8,7 @@
 import { getPool } from "./db";
 import { getSourceRegistry, type SourceId } from "./sources/source-registry";
 import { getLeadsForAllProfiles, getPendingReviewCount, type LeadItem } from "./leads-data";
-import { listClientProfiles } from "./clientProfiles";
+import { listClientProfiles, resolveHiringMode } from "./clientProfiles";
 
 // ─── Types ──────────────────────────────────────────────────────
 
@@ -90,7 +90,7 @@ export async function getDashboardQualityMetrics(): Promise<QualityMetrics> {
         )
         SELECT
           COUNT(*) FILTER (WHERE feedback_status IS NOT NULL) AS delivered,
-          COUNT(*) FILTER (WHERE feedback_status IN ('accepted', 'contacted', 'replied', 'won')) AS accepted
+          COUNT(*) FILTER (WHERE feedback_status IN ('contacted', 'replied', 'won')) AS accepted
         FROM recent
       `),
       pool.query<{ delivered: string; accepted: string }>(`
@@ -109,7 +109,7 @@ export async function getDashboardQualityMetrics(): Promise<QualityMetrics> {
         )
         SELECT
           COUNT(*) FILTER (WHERE feedback_status IS NOT NULL) AS delivered,
-          COUNT(*) FILTER (WHERE feedback_status IN ('accepted', 'contacted', 'replied', 'won')) AS accepted
+          COUNT(*) FILTER (WHERE feedback_status IN ('contacted', 'replied', 'won')) AS accepted
         FROM recent
       `),
     ]);
@@ -288,14 +288,18 @@ export interface FeedbackFunnelItem {
 }
 
 const FEEDBACK_LABELS: Record<string, string> = {
-  accepted: 'Беру',
-  dismissed: 'Мимо',
-  later: 'Позже',
-  contacted: 'Написал',
+  // DB-legal (digest_feedback_status enum) — current in-app vocabulary
+  contacted: 'В работе',
   replied: 'Ответили',
+  won: 'Клиент',
+  snooze: 'Отложено',
+  dismissed: 'Мимо',
+  badfit: 'Не наш профиль',
+  // Legacy / display-only — not emitted by the in-app writer (not in the enum)
+  accepted: 'Беру',
+  later: 'Позже',
   call: 'Созвон',
   client: 'Клиент',
-  badfit: 'Не подходит',
 };
 
 export async function getDashboardFeedbackFunnel(): Promise<FeedbackFunnelItem[]> {
@@ -413,6 +417,13 @@ export interface TodayRadar {
   topLeads: LeadItem[];
   /** Candidates awaiting analyst review (review_status = 'pending_review'). */
   pendingReview: number;
+  /**
+   * Resolved hiring mode per active client profile id — drives mode-aware
+   * urgency framing on the dashboard radar cards (executive vs volume vs
+   * specialist). 'auto' is resolved to a concrete mode via resolveHiringMode,
+   * so the card never has to handle it.
+   */
+  hiringModeByProfileId: Record<string, 'specialist' | 'executive' | 'volume'>;
 }
 
 /**
@@ -432,9 +443,10 @@ export async function getDashboardTodayRadar(
 ): Promise<TodayRadar> {
   try {
     const profiles = await listClientProfiles(ownerId);
-    const profileIds = profiles.filter((p) => p.isActive).map((p) => p.id);
+    const activeProfiles = profiles.filter((p) => p.isActive);
+    const profileIds = activeProfiles.map((p) => p.id);
     if (profileIds.length === 0) {
-      return { topLeads: [], pendingReview: 0 };
+      return { topLeads: [], pendingReview: 0, hiringModeByProfileId: {} };
     }
 
     const [leadsResult, pendingReview] = await Promise.all([
@@ -442,8 +454,13 @@ export async function getDashboardTodayRadar(
       getPendingReviewCount({ profileIds, ownerId }),
     ]);
 
-    return { topLeads: leadsResult.leads, pendingReview };
+    const hiringModeByProfileId: Record<string, 'specialist' | 'executive' | 'volume'> = {};
+    for (const p of activeProfiles) {
+      hiringModeByProfileId[p.id] = resolveHiringMode(p);
+    }
+
+    return { topLeads: leadsResult.leads, pendingReview, hiringModeByProfileId };
   } catch {
-    return { topLeads: [], pendingReview: 0 };
+    return { topLeads: [], pendingReview: 0, hiringModeByProfileId: {} };
   }
 }

@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import Link from 'next/link';
 import { getLeadsForAllProfiles, getPendingReviewCount, type LeadItem, VALID_FEEDBACK_STATUSES } from '@/lib/leads-data';
-import { listClientProfiles, type ClientProfile } from '@/lib/clientProfiles';
+import { listClientProfiles, resolveHiringMode, type ClientProfile } from '@/lib/clientProfiles';
 import { getOwnerIdFromSession } from '@/lib/session';
 import { buildFitExplanation, FIT_DIMENSION_ICON } from '@/lib/leads/fit-explanation';
 import { deriveRoleNames, splitRolesForDisplay, deriveUrgencyCue } from '@/lib/leads/lead-quality';
@@ -38,9 +38,18 @@ const LEADS_NAV: NavItem[] = [
 function LeadCard({
   lead,
   fitPreview,
+  hiringMode,
 }: {
   lead: LeadItem;
   fitPreview: { icon: string; text: string } | null;
+  /**
+   * Resolved hiring mode for the profile that produced this lead (never 'auto'
+   * — resolveHiringMode runs at the profile boundary). Drives mode-aware
+   * urgency framing so an executive agency does not see volume-shaped cues and
+   * a volume agency sees hiring-scale emphasis. Defaults to 'specialist' when
+   * the profile can't be matched (keeps the pre-mode behavior).
+   */
+  hiringMode: 'specialist' | 'executive' | 'volume';
 }) {
   const tone = getScoreTone(lead.score);
   const risks = lead.negativeSignals.slice(0, 2);
@@ -49,6 +58,7 @@ function LeadCard({
   const urgency = deriveUrgencyCue({
     vacanciesCount: lead.vacanciesCount,
     latestPublishedAt: lead.latestPublishedAt,
+    hiringMode,
   });
 
   return (
@@ -137,11 +147,18 @@ function LeadCard({
 function LeadsList({
   leads,
   fitPreviewFor,
+  hiringModeFor,
   hasActiveProfile,
   narrowProfile,
+  workingSet,
 }: {
   leads: LeadItem[];
   fitPreviewFor: (lead: LeadItem) => { icon: string; text: string } | null;
+  /**
+   * Resolved hiring mode for the profile that produced a given lead. Falls back
+   * to 'specialist' (the pre-mode default) when the profile can't be matched.
+   */
+  hiringModeFor: (lead: LeadItem) => 'specialist' | 'executive' | 'volume';
   hasActiveProfile: boolean;
   /**
    * True when an active profile has a narrow ICP (specialization or include
@@ -151,13 +168,30 @@ function LeadsList({
    * next run, not to reconfigure the whole profile.
    */
   narrowProfile: boolean;
+  /**
+   * True when the "Сегодня в работе" working-set filter is active. Changes the
+   * toolbar count noun ("в работе" vs "всего") and the empty-state copy so the
+   * page reads as an open-pipeline view, not the full scored pool.
+   */
+  workingSet: boolean;
 }) {
   if (leads.length === 0) {
     // Distinguish three empty cases so the next step is obvious and the
     // product never feels broken:
+    //  today view, 0         → honest "ничего в работе" — take a lead from the full pool
     //  no profile yet        → set one up
     //  narrow profile, 0     → honest "thin supply for your niche" — broaden or wait
     //  broad profile, 0      → first batch comes with the next radar run
+    if (workingSet) {
+      return (
+        <EmptyState
+          icon="🧭"
+          title="Ничего в работе"
+          text="Вы ещё не взяли лиды в работу на этом профиле. Откройте полный радар, оцените компании и отметьте первые — они появятся здесь."
+          action={{ href: '/leads', label: 'Открыть полный радар' }}
+        />
+      );
+    }
     if (!hasActiveProfile) {
       return (
         <EmptyState
@@ -192,7 +226,7 @@ function LeadsList({
     <>
       <div className={ipStyles.leadsListToolbar}>
         <div className={ipStyles.leadsListCount}>
-          <strong>{leads.length}</strong> {pluralizeLeads(leads.length)} в работе
+          <strong>{leads.length}</strong> {pluralizeLeads(leads.length)}{workingSet ? ' в работе' : ' всего'}
         </div>
         <div className={ipStyles.leadsListLegend} aria-hidden="true">
           <span className={ipStyles.leadsListLegendItem}>
@@ -208,7 +242,12 @@ function LeadsList({
       </div>
       <div className={ipStyles.leadsList}>
         {leads.map((lead) => (
-          <LeadCard key={lead.id} lead={lead} fitPreview={fitPreviewFor(lead)} />
+          <LeadCard
+            key={lead.id}
+            lead={lead}
+            fitPreview={fitPreviewFor(lead)}
+            hiringMode={hiringModeFor(lead)}
+          />
         ))}
       </div>
     </>
@@ -226,7 +265,7 @@ function pluralizeLeads(n: number): string {
 export default async function LeadsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ gate?: string; feedback?: string; page?: string; profile?: string }>;
+  searchParams: Promise<{ gate?: string; feedback?: string; page?: string; profile?: string; today?: string }>;
 }) {
   const filters = await searchParams;
 
@@ -237,6 +276,11 @@ export default async function LeadsPage({
   const feedbackStatus = filters.feedback && VALID_FEEDBACK_STATUSES.has(filters.feedback as never)
     ? filters.feedback
     : null;
+  // "Сегодня в работе" — the agency's open pipeline (contacted/replied).
+  // Supersedes feedbackStatus when both are set (the filter component clears
+  // feedback when today is toggled on, but defend against manual URL edits).
+  const workingSet = filters.today === '1';
+  const effectiveFeedbackStatus = workingSet ? null : feedbackStatus;
 
   // Owner-scope every read: without a session there are no accessible profiles,
   // so the page renders empty rather than leaking another tenant's leads.
@@ -275,7 +319,8 @@ export default async function LeadsPage({
         profileIds,
         ownerId,
         confidenceGate,
-        feedbackStatus,
+        feedbackStatus: effectiveFeedbackStatus,
+        workingSet,
       }),
       getPendingReviewCount({ profileIds, ownerId }),
     ]);
@@ -312,6 +357,13 @@ export default async function LeadsPage({
     ]),
   );
 
+  // Resolved hiring mode per profile — drives mode-aware urgency framing on
+  // each lead card. resolveHiringMode turns 'auto' into a concrete mode from
+  // the agency's declared roles, so the card never has to handle 'auto'.
+  const hiringModeByProfileId = new Map(
+    activeProfiles.map((p) => [p.id, resolveHiringMode(p)]),
+  );
+
   const fitPreviewFor = (lead: LeadItem): { icon: string; text: string } | null => {
     const profile = fitProfilesById.get(lead.clientProfileId);
     if (!profile) return null;
@@ -336,7 +388,8 @@ export default async function LeadsPage({
     return { icon: FIT_DIMENSION_ICON[first.dimension], text: first.text };
   };
 
-  const hasFilters = confidenceGate !== null || feedbackStatus !== null || selectedProfileId !== null;
+  const hasFilters =
+    confidenceGate !== null || effectiveFeedbackStatus !== null || selectedProfileId !== null || workingSet;
 
   // Narrow-ICP detection for the honest empty state: a specialized agency
   // (specialization text or include keywords set) sees a different message
@@ -358,8 +411,9 @@ export default async function LeadsPage({
   // Carry the active filters into the CSV export link so the export matches the view.
   const exportParams = new URLSearchParams();
   if (confidenceGate) exportParams.set('gate', confidenceGate);
-  if (feedbackStatus) exportParams.set('feedback', feedbackStatus);
+  if (effectiveFeedbackStatus) exportParams.set('feedback', effectiveFeedbackStatus);
   if (selectedProfileId) exportParams.set('profile', selectedProfileId);
+  if (workingSet) exportParams.set('today', '1');
   const exportQuery = exportParams.toString();
   const exportHref = exportQuery ? `/api/leads/export?${exportQuery}` : '/api/leads/export';
 
@@ -369,9 +423,11 @@ export default async function LeadsPage({
         title="Лиды"
         subtitle={
           <>
-            {selectedProfile
-              ? `Практика: ${selectedProfile.agencyName}`
-              : 'Компании, которым стоит написать сегодня'}
+            {workingSet
+              ? 'Сегодня в работе — ваши открытые лиды'
+              : selectedProfile
+                ? `Практика: ${selectedProfile.agencyName}`
+                : 'Компании, которым стоит написать сегодня'}
             {hasFilters && <span className={ipStyles.filterActive}>(фильтр активен)</span>}
           </>
         }
@@ -389,8 +445,15 @@ export default async function LeadsPage({
         }
       />
 
+      {/* Triage-relevant metrics. In the "Сегодня в работе" view the lead
+          metric is the open-pipeline count (contacted/replied) — the number a
+          recruiter actually acts on — instead of the total scored pool. */}
       <MetricGrid>
-        <MetricCard label="Всего лидов" value={totalLeads} />
+        {workingSet ? (
+          <MetricCard label="В работе" value={totalLeads} tone="info" />
+        ) : (
+          <MetricCard label="Всего лидов" value={totalLeads} />
+        )}
         <MetricCard
           label="Готовы к контакту (A/B)"
           value={allLeads.filter((l) => l.confidenceGate === 'A' || l.confidenceGate === 'B').length}
@@ -417,8 +480,10 @@ export default async function LeadsPage({
           <LeadsList
             leads={allLeads}
             fitPreviewFor={fitPreviewFor}
+            hiringModeFor={(lead) => hiringModeByProfileId.get(lead.clientProfileId) ?? 'specialist'}
             hasActiveProfile={activeProfiles.length > 0}
             narrowProfile={narrowProfile}
+            workingSet={workingSet}
           />
         </Suspense>
       </TableCard>

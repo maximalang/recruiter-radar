@@ -1,13 +1,15 @@
 import { Suspense } from 'react';
 import Link from 'next/link';
 import { getLeadDetail, formatLawfulContactPath } from '@/lib/leads-data';
-import { getClientProfileById } from '@/lib/clientProfiles';
+import { getClientProfileById, resolveHiringMode } from '@/lib/clientProfiles';
 import { getOwnerIdFromSession } from '@/lib/session';
 import { buildFitExplanation, FIT_DIMENSION_ICON } from '@/lib/leads/fit-explanation';
 import { buildCompanySummary } from '@/lib/leads/company-summary';
 import { deriveRoleNames, splitRolesForDisplay, deriveUrgencyCue } from '@/lib/leads/lead-quality';
+import { leadToCrmBlock } from '@/lib/leads-csv';
 import FeedbackButtons from './feedback-buttons';
 import AiEnrichmentBlock from './ai-enrichment-block';
+import NextStepsBlock from './next-steps-block';
 import {
   InternalPageFrame,
   InternalPageHeader,
@@ -121,10 +123,43 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   const { shown: shownRoles, more: moreRoles } = splitRolesForDisplay(roleNames, 5);
 
   // Concrete urgency cue (burst / active / fresh / stale), shown on the verdict card.
+  // Mode-aware: an executive agency sees seniority/freshness framing, a volume
+  // agency sees hiring-scale framing, a specialist agency keeps the default
+  // ladder. Resolved from the loaded profile so 'auto' never reaches the cue.
+  const resolvedHiringMode = profile ? resolveHiringMode(profile) : 'specialist';
   const urgency = deriveUrgencyCue({
     vacanciesCount: lead.vacanciesCount,
     latestPublishedAt: lead.latestPublishedAt,
+    hiringMode: resolvedHiringMode,
   });
+
+  // "Дальнейшие шаги" handoff block — built server-side so the CRM-ready text
+  // is stable and the client component only handles clipboard + open-links.
+  // Only surfaces links that actually exist; the empty-array case hides the
+  // links group inside the component.
+  const nextStepLinks: { href: string; label: string }[] = [];
+  if (lead.orgWebsite) nextStepLinks.push({ href: lead.orgWebsite, label: 'Сайт компании' });
+  if (lead.careerPageUrl) nextStepLinks.push({ href: lead.careerPageUrl, label: 'Карьерная страница' });
+  const crmBlock = leadToCrmBlock({
+    orgName: lead.orgName,
+    score: lead.score,
+    confidenceGate: lead.confidenceGate,
+    whyNow: lead.whyNow,
+    lawfulContactPath: lead.lawfulContactPath,
+    vacanciesCount: lead.vacanciesCount,
+    evidenceTitles: lead.evidenceTitles,
+    locationNames: lead.locationNames,
+    sourceFamilies: lead.sourceFamilies,
+    feedbackStatus: lead.feedbackStatus,
+    latestPublishedAt: lead.latestPublishedAt,
+    orgInn: lead.orgInn,
+    orgOgrn: lead.orgOgrn,
+    orgDomain: lead.orgDomain,
+    orgWebsite: lead.orgWebsite,
+    careerPageUrl: lead.careerPageUrl,
+    profileName: profile?.agencyName ?? null,
+  });
+  const singleExportHref = `/api/leads/${lead.id}/export`;
 
   return (
     <InternalPageFrame navItems={LEAD_DETAIL_NAV}>
@@ -267,6 +302,17 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           }
           sidebar={
             <>
+              {/* Дальнейшие шаги — the operational handoff area. Sits at the top
+                  of the sidebar so the recruiter's next action is visible the
+                  moment they finish reading the verdict + evidence. */}
+              <ContentCard>
+                <NextStepsBlock
+                  crmBlock={crmBlock}
+                  links={nextStepLinks}
+                  singleExportHref={singleExportHref}
+                />
+              </ContentCard>
+
               {/* Confidence gate — the verdict score/gate live in the hero card
                   at the top of the main column now, so the sidebar leads with
                   the gate explanation instead of duplicating the gauge. */}

@@ -59,7 +59,7 @@ describe('getLeadDetail', () => {
         { component: 'intent' as const, key: 'intent.multiple-roles', params: { count: 3 } },
       ],
       opener: 'Здравствуйте! По Яндекс видно...',
-      feedback_status: 'accepted',
+      feedback_status: 'contacted',
       feedback_note: null,
       suppressed_until: null,
       cooldown_until: null,
@@ -93,7 +93,7 @@ describe('getLeadDetail', () => {
     expect(result!.vacanciesCount).toBe(5);
     expect(result!.reasons).toEqual(['Свежие сигналы найма (недели давности)', 'Несколько открытых ролей (3) — активный найм']);
     expect(result!.opener).toBe('Здравствуйте! По Яндекс видно...');
-    expect(result!.feedbackStatus).toBe('accepted');
+    expect(result!.feedbackStatus).toBe('contacted');
     // Read from payload.evidence_titles / payload.location_names
     expect(result!.evidenceTitles).toEqual(['Backend Developer', 'Frontend Engineer', 'Data Analyst']);
     expect(result!.locationNames).toEqual(['Москва']);

@@ -30,6 +30,10 @@ export async function GET(request: Request) {
     feedbackParam && VALID_FEEDBACK_STATUSES.has(feedbackParam as never)
       ? feedbackParam
       : null;
+  // Mirror the /leads "Сегодня в работе" working-set filter so an export from
+  // that view matches what the recruiter sees on screen.
+  const workingSet = url.searchParams.get('today') === '1';
+  const effectiveFeedbackStatus = workingSet ? null : feedbackStatus;
 
   // Owner-scope: without a session, return empty CSV rather than exposing
   // another tenant's leads. Mirrors /leads page scoping.
@@ -70,8 +74,13 @@ export async function GET(request: Request) {
       profileIds,
       ownerId,
       confidenceGate,
-      feedbackStatus,
+      feedbackStatus: effectiveFeedbackStatus,
+      workingSet,
       limit: 500,
+      // CRM-identifier columns (INN/ОГРН/domain/career-page/profile name) are
+      // only useful in the export, not the UI — opt in here so the join cost is
+      // paid only by this path.
+      includeOrgDetails: true,
     });
     leads = result.leads;
   } catch {

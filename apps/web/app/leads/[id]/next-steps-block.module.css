@@ -1,0 +1,130 @@
+/* Дальнейшие шаги — handoff area on lead detail. Calm, actionable, secondary
+   to the evidence cards. References :root tokens via internal-page.module.css. */
+
+.nextSteps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.nextStepsLabel {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--c-text-muted);
+}
+
+.nextStepsLinks {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.nextStepsLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border-radius: 8px;
+  border: 1px solid var(--c-border);
+  background-color: var(--c-bg-card);
+  color: var(--c-text-secondary);
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.nextStepsLink:hover {
+  border-color: var(--c-brand);
+  color: var(--c-brand);
+}
+
+.nextStepsLink:focus-visible {
+  outline: 2px solid var(--c-brand);
+  outline-offset: 2px;
+}
+
+.nextStepsActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.nextStepsBtn {
+  padding: 8px 14px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid var(--c-border);
+  background-color: var(--c-bg-card);
+  color: var(--c-text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.nextStepsBtn[data-variant="primary"] {
+  border-color: var(--c-brand);
+  background-color: rgba(59, 130, 246, 0.08);
+  color: var(--c-brand);
+}
+
+.nextStepsBtn:hover {
+  border-color: var(--c-brand);
+  color: var(--c-brand);
+}
+
+.nextStepsBtn:focus-visible {
+  outline: 2px solid var(--c-brand);
+  outline-offset: 2px;
+}
+
+.nextStepsBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.nextStepsError {
+  font-size: 0.75rem;
+  color: #ef4444;
+  margin: 0;
+}
+
+.nextStepsPreview {
+  margin-top: 2px;
+}
+
+.nextStepsPreview > summary {
+  font-size: 0.72rem;
+  color: var(--c-text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.nextStepsPreview > summary:focus-visible {
+  outline: 2px solid var(--c-brand);
+  outline-offset: 2px;
+}
+
+.nextStepsPre {
+  margin: 6px 0 0;
+  padding: 10px 12px;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--c-text-secondary);
+  background-color: var(--c-bg-page);
+  border: 1px solid var(--c-border);
+  border-radius: 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nextStepsLink,
+  .nextStepsBtn {
+    transition: none;
+  }
+}

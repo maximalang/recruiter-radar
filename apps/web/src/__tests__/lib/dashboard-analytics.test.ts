@@ -40,16 +40,16 @@ describe('getDashboardFeedbackFunnel', () => {
     makeMockPool();
     mockQuery.mockResolvedValueOnce({
       rows: [
-        { feedback_status: 'accepted', count: '10' },
+        { feedback_status: 'contacted', count: '10' },
         { feedback_status: 'dismissed', count: '5' },
-        { feedback_status: 'later', count: '3' },
-        { feedback_status: 'contacted', count: '2' },
+        { feedback_status: 'snooze', count: '3' },
+        { feedback_status: 'replied', count: '2' },
       ],
     });
 
     const result = await getDashboardFeedbackFunnel();
     expect(result).toHaveLength(4);
-    expect(result[0]).toEqual({ status: 'accepted', count: 10, label: 'Беру' });
+    expect(result[0]).toEqual({ status: 'contacted', count: 10, label: 'В работе' });
     expect(result[1]).toEqual({ status: 'dismissed', count: 5, label: 'Мимо' });
   });
 
@@ -58,13 +58,13 @@ describe('getDashboardFeedbackFunnel', () => {
     // The SQL query filters `feedback_status != 'none'`, so mock only returns non-none rows
     mockQuery.mockResolvedValueOnce({
       rows: [
-        { feedback_status: 'accepted', count: '10' },
+        { feedback_status: 'contacted', count: '10' },
       ],
     });
 
     const result = await getDashboardFeedbackFunnel();
     expect(result).toHaveLength(1);
-    expect(result[0].status).toBe('accepted');
+    expect(result[0].status).toBe('contacted');
   });
 
   it('handles empty results', async () => {

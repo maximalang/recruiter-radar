@@ -15,17 +15,22 @@ const GATE_OPTIONS = [
 const FEEDBACK_OPTIONS = [
   { value: '', label: 'Все статусы' },
   { value: 'none', label: 'Без обратной связи' },
-  { value: 'accepted', label: 'Беру' },
-  { value: 'dismissed', label: 'Мимо' },
-  { value: 'later', label: 'Позже' },
-  { value: 'contacted', label: 'Написал' },
+  { value: 'contacted', label: 'В работе' },
   { value: 'replied', label: 'Ответили' },
-  { value: 'call', label: 'Созвон' },
-  { value: 'client', label: 'Клиент' },
-  { value: 'badfit', label: 'Не подходит' },
+  { value: 'won', label: 'Клиент' },
+  { value: 'snooze', label: 'Отложено' },
+  { value: 'dismissed', label: 'Мимо' },
+  { value: 'badfit', label: 'Не наш профиль' },
 ] as const;
 
 type ProfileOption = { id: string; name: string };
+
+/**
+ * Ephemeral review filters — everything EXCEPT the profile switcher. "Сбросить"
+ * wipes only these, so a durable practice choice survives a reset. Kept in its
+ * own key set so the reset button and the active-filter highlight stay honest.
+ */
+const EPHEMERAL_FILTER_KEYS = ['gate', 'feedback', 'today'] as const;
 
 export default function LeadsFilters({ profiles = [] }: { profiles?: ProfileOption[] }) {
   const router = useRouter();
@@ -34,6 +39,7 @@ export default function LeadsFilters({ profiles = [] }: { profiles?: ProfileOpti
   const currentGate = searchParams.get('gate') ?? '';
   const currentFeedback = searchParams.get('feedback') ?? '';
   const currentProfile = searchParams.get('profile') ?? '';
+  const currentToday = searchParams.get('today') === '1';
 
   const updateFilter = useCallback(
     (key: string, value: string) => {
@@ -51,53 +57,103 @@ export default function LeadsFilters({ profiles = [] }: { profiles?: ProfileOpti
     [router, searchParams],
   );
 
+  const toggleToday = useCallback(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (currentToday) {
+      params.delete('today');
+    } else {
+      params.set('today', '1');
+      // "Сегодня в работе" supersedes a single-status feedback filter — clear it
+      // so the two don't combine into a confusing narrow slice.
+      params.delete('feedback');
+    }
+    params.delete('page');
+    const qs = params.toString();
+    router.push(`/leads${qs ? `?${qs}` : ''}`, { scroll: false });
+  }, [router, searchParams, currentToday]);
+
+  const resetEphemeral = useCallback(() => {
+    // Keep the profile (durable), wipe only the review filters.
+    const params = new URLSearchParams(searchParams.toString());
+    for (const key of EPHEMERAL_FILTER_KEYS) {
+      params.delete(key);
+    }
+    params.delete('page');
+    const qs = params.toString();
+    router.push(`/leads${qs ? `?${qs}` : ''}`, { scroll: false });
+  }, [router, searchParams]);
+
+  const hasEphemeralFilters =
+    currentGate !== '' || currentFeedback !== '' || currentToday;
+
   return (
     <div className={s.filterBar}>
+      {/* Durable profile choice — survives "Сбросить". Visually separated from
+          the ephemeral review filters below so the agency sees profile setup as
+          a persistent context, not a today-filter. */}
       {profiles.length > 1 && (
+        <div className={s.filterGroup} data-kind="profile">
+          <span className={s.filterGroupLabel}>Профиль</span>
+          <select
+            value={currentProfile}
+            onChange={(e) => updateFilter('profile', e.target.value)}
+            className={s.filterSelect}
+            aria-label="Фильтр по практике (постоянный профиль)"
+          >
+            <option value="">Все практики</option>
+            {profiles.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {profiles.length > 1 && <div className={s.filterDivider} aria-hidden="true" />}
+
+      {/* Ephemeral review filters — the temporary working view. */}
+      <div className={s.filterGroup}>
+        <span className={s.filterGroupLabel}>Обзор</span>
         <select
-          value={currentProfile}
-          onChange={(e) => updateFilter('profile', e.target.value)}
+          value={currentGate}
+          onChange={(e) => updateFilter('gate', e.target.value)}
           className={s.filterSelect}
-          aria-label="Фильтр по практике"
+          aria-label="Фильтр по уровню доверия"
         >
-          <option value="">Все практики</option>
-          {profiles.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
+          {GATE_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
             </option>
           ))}
         </select>
-      )}
-      <select
-        value={currentGate}
-        onChange={(e) => updateFilter('gate', e.target.value)}
-        className={s.filterSelect}
-        aria-label="Фильтр по уровню доверия"
-      >
-        {GATE_OPTIONS.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
-      <select
-        value={currentFeedback}
-        onChange={(e) => updateFilter('feedback', e.target.value)}
-        className={s.filterSelect}
-        aria-label="Фильтр по обратной связи"
-      >
-        {FEEDBACK_OPTIONS.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
-      {(currentGate || currentFeedback || currentProfile) && (
-        <button
-          onClick={() => router.push('/leads', { scroll: false })}
-          className={s.filterReset}
+        <select
+          value={currentFeedback}
+          onChange={(e) => updateFilter('feedback', e.target.value)}
+          className={s.filterSelect}
+          aria-label="Фильтр по обратной связи"
         >
-          Сбросить
+          {FEEDBACK_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <button
+        onClick={toggleToday}
+        className={s.todayToggle}
+        data-active={currentToday ? 'true' : undefined}
+        aria-pressed={currentToday ? 'true' : 'false'}
+        title="Лиды, которые вы взяли в работу или по которым уже ответили"
+      >
+        Сегодня в работе
+      </button>
+
+      {hasEphemeralFilters && (
+        <button onClick={resetEphemeral} className={s.filterReset}>
+          Сбросить фильтры
         </button>
       )}
     </div>

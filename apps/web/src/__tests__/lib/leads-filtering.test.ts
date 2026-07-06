@@ -58,7 +58,7 @@ describe('getLeadsForProfile filtering', () => {
     mockQuery.mockResolvedValueOnce({ rows: [{ count: '3' }] });
     mockQuery.mockResolvedValueOnce({ rows: [] });
 
-    await getLeadsForProfile({ clientProfileId: '1', feedbackStatus: 'accepted' });
+    await getLeadsForProfile({ clientProfileId: '1', feedbackStatus: 'contacted' });
 
     const countSql = mockQuery.mock.calls[0][0] as string;
     expect(countSql).toContain("feedback_status");
@@ -175,7 +175,7 @@ describe('getLeadsForAllProfiles', () => {
     mockQuery.mockResolvedValueOnce({ rows: [{ count: '3' }] });
     mockQuery.mockResolvedValueOnce({ rows: [] });
 
-    await getLeadsForAllProfiles({ profileIds: ['1'], ownerId: 'owner-1', feedbackStatus: 'accepted' });
+    await getLeadsForAllProfiles({ profileIds: ['1'], ownerId: 'owner-1', feedbackStatus: 'contacted' });
 
     const countSql = mockQuery.mock.calls[0][0] as string;
     expect(countSql).toContain("feedback_status");

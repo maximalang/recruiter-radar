@@ -5,7 +5,7 @@
  * integrity, and the empty case.
  */
 
-import { leadsToCsv, LEADS_CSV_COLUMN_COUNT } from '@/lib/leads-csv';
+import { leadsToCsv, LEADS_CSV_COLUMN_COUNT, leadToCrmBlock, singleLeadToCsv } from '@/lib/leads-csv';
 import type { LeadItem } from '@/lib/leads-data';
 
 function makeLead(overrides: Partial<LeadItem> = {}): LeadItem {
@@ -30,6 +30,14 @@ function makeLead(overrides: Partial<LeadItem> = {}): LeadItem {
     sourceFamilies: ['career-pages'],
     evidenceTitles: ['Senior Java Developer'],
     locationNames: ['Москва'],
+    // CRM identifiers (optional on LeadItem; populated by the export path's
+    // includeOrgDetails join). Default to populated values so the identifier-
+    // column tests have something to assert against.
+    orgInn: '7701234567',
+    orgOgrn: '1027700123456',
+    orgDomain: 'example.com',
+    careerPageUrl: 'https://example.com/careers',
+    profileName: 'IT-подбор',
     ...overrides,
   };
 }
@@ -90,13 +98,15 @@ describe('leadsToCsv', () => {
   it('converts the raw score to one-decimal signal strength', () => {
     const csv = leadsToCsv([makeLead({ score: 300 })]);
     const dataRow = csv.slice(BOM.length).split('\r\n')[1];
-    expect(dataRow.split(',')[1]).toBe('3.0');
+    // "Сила сигнала (0–4)" is the 8th column (index 7) after the CRM
+    // identifier columns: ID, Практика, Компания, ИНН, ОГРН, Домен, Карьерная.
+    expect(dataRow.split(',')[7]).toBe('3.0');
   });
 
   it('rounds the converted signal strength to one decimal place', () => {
     const csv = leadsToCsv([makeLead({ score: 275 })]);
     const dataRow = csv.slice(BOM.length).split('\r\n')[1];
-    expect(dataRow.split(',')[1]).toBe('2.8');
+    expect(dataRow.split(',')[7]).toBe('2.8');
   });
 
   it('renders null contact path and feedback as empty fields', () => {
@@ -105,5 +115,109 @@ describe('leadsToCsv', () => {
     ]);
     // Should not contain the literal string "null"
     expect(csv).not.toContain('null');
+  });
+
+  it('emits the CRM identifier columns (ID, Практика, ИНН, ОГРН, Домен, Карьерная)', () => {
+    const csv = leadsToCsv([makeLead()]);
+    const header = csv.slice(BOM.length).split('\r\n')[0];
+    expect(header).toContain('ID лида');
+    expect(header).toContain('Практика');
+    expect(header).toContain('ИНН');
+    expect(header).toContain('ОГРН');
+    expect(header).toContain('Домен');
+    expect(header).toContain('Карьерная страница');
+    const dataRow = csv.slice(BOM.length).split('\r\n')[1];
+    expect(dataRow).toContain('lead-1');
+    expect(dataRow).toContain('7701234567');
+    expect(dataRow).toContain('example.com');
+    expect(dataRow).toContain('https://example.com/careers');
+  });
+
+  it('emits empty identifier cells when the optional fields are absent', () => {
+    const csv = leadsToCsv([
+      makeLead({ orgInn: undefined, orgOgrn: undefined, orgDomain: undefined, careerPageUrl: undefined, profileName: undefined }),
+    ]);
+    const dataRow = csv.slice(BOM.length).split('\r\n')[1];
+    // No "undefined" literal leaks into the CSV.
+    expect(dataRow).not.toContain('undefined');
+  });
+});
+
+describe('leadToCrmBlock', () => {
+  it('renders a structured plain-text block with only the present fields', () => {
+    const block = leadToCrmBlock({
+      orgName: 'Ромашка',
+      score: 320,
+      confidenceGate: 'A',
+      whyNow: 'Открыли 3 вакансии',
+      lawfulContactPath: 'career-page',
+      vacanciesCount: 3,
+      evidenceTitles: ['Backend', 'DevOps'],
+      locationNames: ['Москва'],
+      sourceFamilies: ['career-pages'],
+      feedbackStatus: 'contacted',
+      latestPublishedAt: '2026-06-28',
+      orgInn: '7701234567',
+      orgDomain: 'romashka.ru',
+      orgWebsite: 'https://romashka.ru',
+      careerPageUrl: 'https://romashka.ru/careers',
+      profileName: 'IT-подбор',
+    });
+    expect(block).toContain('Компания: Ромашка');
+    expect(block).toContain('Практика: IT-подбор');
+    expect(block).toContain('уверенность A');
+    expect(block).toContain('Почему сейчас: Открыли 3 вакансии');
+    expect(block).toContain('Безопасный контакт: Карьерная страница');
+    expect(block).toContain('Домен: romashka.ru');
+    expect(block).toContain('Сайт: https://romashka.ru');
+    expect(block).toContain('ИНН: 7701234567');
+    expect(block).toContain('Статус: contacted');
+  });
+
+  it('omits absent identifier lines instead of emitting empty "ИНН: "', () => {
+    const block = leadToCrmBlock({
+      orgName: 'Без ИНН',
+      score: 200,
+      confidenceGate: 'B',
+      whyNow: '',
+      lawfulContactPath: null,
+      vacanciesCount: 0,
+      evidenceTitles: [],
+      locationNames: [],
+      sourceFamilies: [],
+      feedbackStatus: null,
+      latestPublishedAt: null,
+    });
+    expect(block).not.toContain('ИНН:');
+    expect(block).not.toContain('Домен:');
+    expect(block).not.toContain('Почему сейчас:');
+    expect(block).toContain('Компания: Без ИНН');
+  });
+});
+
+describe('singleLeadToCsv', () => {
+  it('produces a one-row CSV with the same column layout as the list export', () => {
+    const csv = singleLeadToCsv({
+      id: 'lead-99',
+      orgName: 'Сингл',
+      score: 300,
+      confidenceGate: 'A',
+      whyNow: 'всплеск',
+      lawfulContactPath: 'career-page',
+      vacanciesCount: 2,
+      evidenceTitles: ['QA'],
+      locationNames: ['Москва'],
+      sourceFamilies: ['career-pages'],
+      feedbackStatus: 'contacted',
+      latestPublishedAt: '2026-06-28',
+      orgInn: '7700000001',
+      profileName: 'IT-подбор',
+    });
+    const rows = csv.slice(BOM.length).split('\r\n');
+    expect(rows).toHaveLength(2); // header + 1 row
+    expect(rows[0].split(',')).toHaveLength(LEADS_CSV_COLUMN_COUNT);
+    expect(rows[1]).toContain('lead-99');
+    expect(rows[1]).toContain('Сингл');
+    expect(rows[1]).toContain('7700000001');
   });
 });

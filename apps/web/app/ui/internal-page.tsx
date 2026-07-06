@@ -209,15 +209,28 @@ export const GATE_DESC: Record<string, string> = {
   D: "Контекст без прямого доказательства найма",
 };
 
+/**
+ * Display labels for `digest_feedback_status` values.
+ *
+ * The keys mirror the DB enum (none/contacted/replied/won/badfit/snooze/
+ * dismissed). Legacy rows with `accepted`/`later`/`call`/`client` (which the
+ * enum never contained and the in-app writer no longer emits) are still mapped
+ * so any historical row renders a readable label instead of a raw status
+ * string — display-only tolerance, no writer emits them.
+ */
 export const FEEDBACK_LABELS: Record<string, { label: string; icon: string }> = {
-  accepted: { label: "Беру", icon: "✅" },
-  dismissed: { label: "Мимо", icon: "👋" },
-  later: { label: "Позже", icon: "⏰" },
-  contacted: { label: "Уже написал", icon: "✉️" },
+  // DB-legal, current in-app vocabulary
+  contacted: { label: "В работе", icon: "✋" },
   replied: { label: "Ответили", icon: "💬" },
+  won: { label: "Клиент", icon: "🤝" },
+  snooze: { label: "Отложено", icon: "⏰" },
+  dismissed: { label: "Мимо", icon: "👋" },
+  badfit: { label: "Не наш профиль", icon: "❌" },
+  // Legacy / display-only — not emitted by the in-app writer (not in the enum)
+  accepted: { label: "Беру", icon: "✅" },
+  later: { label: "Позже", icon: "⏰" },
   call: { label: "Созвон", icon: "📞" },
   client: { label: "Клиент", icon: "🤝" },
-  badfit: { label: "Не подходит", icon: "❌" },
 };
 
 export function GateBadgeInline(props: { gate: string }) {

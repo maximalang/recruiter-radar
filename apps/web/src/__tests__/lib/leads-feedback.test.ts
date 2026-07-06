@@ -4,6 +4,11 @@
  * Verifies that updateLeadFeedbackAction validates input,
  * updates feedback_status in client_digest_org_state,
  * and returns the updated state.
+ *
+ * The valid set mirrors the DB enum `digest_feedback_status`:
+ *   none, contacted, replied, won, badfit, snooze, dismissed
+ * The in-app writer must only emit DB-legal values — emitting `accepted`/
+ * `later` would throw `invalid input value for enum` at runtime.
  */
 
 import { updateLeadFeedback } from '@/lib/leads-data';
@@ -22,7 +27,7 @@ function makeMockPool() {
   } as never);
 }
 
-const VALID_STATUSES = ['accepted', 'dismissed', 'later', 'contacted', 'replied', 'call', 'client', 'badfit'] as const;
+const VALID_STATUSES = ['contacted', 'replied', 'won', 'badfit', 'snooze', 'dismissed'] as const;
 
 describe('updateLeadFeedback', () => {
   beforeEach(() => {
@@ -34,7 +39,7 @@ describe('updateLeadFeedback', () => {
     const result = await updateLeadFeedback({
       orgId: '1',
       clientProfileId: '1',
-      feedbackStatus: 'accepted',
+      feedbackStatus: 'contacted',
     });
     expect(result.ok).toBe(false);
   });
@@ -52,7 +57,21 @@ describe('updateLeadFeedback', () => {
     }
   });
 
-  it('accepts all valid feedback statuses', async () => {
+  it('rejects the legacy drifted statuses that are not in the DB enum', async () => {
+    makeMockPool();
+    // accepted/later/call/client were never in digest_feedback_status; the
+    // reconciled writer must reject them so the enum cast cannot throw.
+    for (const legacy of ['accepted', 'later', 'call', 'client'] as const) {
+      const result = await updateLeadFeedback({
+        orgId: '10',
+        clientProfileId: '1',
+        feedbackStatus: legacy,
+      });
+      expect(result.ok).toBe(false);
+    }
+  });
+
+  it('accepts all DB-legal feedback statuses', async () => {
     makeMockPool();
 
     for (const status of VALID_STATUSES) {
@@ -76,7 +95,7 @@ describe('updateLeadFeedback', () => {
       rows: [{
         client_profile_id: '1',
         org_id: '10',
-        feedback_status: 'accepted',
+        feedback_status: 'contacted',
         feedback_note: null,
         feedback_at: '2026-06-04T12:00:00Z',
       }],
@@ -85,37 +104,37 @@ describe('updateLeadFeedback', () => {
     const result = await updateLeadFeedback({
       orgId: '10',
       clientProfileId: '1',
-      feedbackStatus: 'accepted',
+      feedbackStatus: 'contacted',
       feedbackNote: null,
     });
 
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.data.feedbackStatus).toBe('accepted');
+      expect(result.data.feedbackStatus).toBe('contacted');
     }
 
     // Verify the SQL was called correctly
     expect(mockQuery).toHaveBeenCalledWith(
       expect.stringContaining('client_digest_org_state'),
-      expect.arrayContaining(['accepted']),
+      expect.arrayContaining(['contacted']),
     );
   });
 
-  it('rejects feedbackNote when status is not badfit', async () => {
+  it('rejects feedbackNote when status does not allow notes', async () => {
     makeMockPool();
     mockQuery.mockResolvedValueOnce({
-      rows: [{ feedback_status: 'accepted', feedback_note: null }],
+      rows: [{ feedback_status: 'contacted', feedback_note: null }],
     });
 
     const result = await updateLeadFeedback({
       orgId: '10',
       clientProfileId: '1',
-      feedbackStatus: 'accepted',
+      feedbackStatus: 'contacted',
       feedbackNote: 'This should be rejected',
     });
 
     expect(result.ok).toBe(true);
-    // feedbackNote should be null when status != badfit
+    // feedbackNote should be null when status is not in the note-allowed set
     if (result.ok) {
       expect(result.data.feedbackNote).toBeNull();
     }
@@ -137,6 +156,25 @@ describe('updateLeadFeedback', () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.data.feedbackNote).toBe('IT but we do finance');
+    }
+  });
+
+  it('allows feedbackNote when status is dismissed (park-with-reason)', async () => {
+    makeMockPool();
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ feedback_status: 'dismissed', feedback_note: 'уже клиент конкурента' }],
+    });
+
+    const result = await updateLeadFeedback({
+      orgId: '10',
+      clientProfileId: '1',
+      feedbackStatus: 'dismissed',
+      feedbackNote: 'уже клиент конкурента',
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.feedbackNote).toBe('уже клиент конкурента');
     }
   });
 });

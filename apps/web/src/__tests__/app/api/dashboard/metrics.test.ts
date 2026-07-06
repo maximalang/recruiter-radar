@@ -127,15 +127,14 @@ describe('gate distribution percentages', () => {
 // --- Feedback status filtering for acceptance ---
 
 describe('accepted feedback statuses', () => {
-  const ACCEPTED_STATUSES = new Set(['accepted', 'contacted', 'replied', 'won'])
+  // Mirrors the production acceptance-rate funnel (dashboard-data.ts), which
+  // counts contacted/replied/won as "accepted". 'accepted' was never in the
+  // digest_feedback_status enum and is no longer referenced by production code.
+  const ACCEPTED_STATUSES = new Set(['contacted', 'replied', 'won'])
 
   const isAccepted = (status: string | null): boolean => {
     return status !== null && ACCEPTED_STATUSES.has(status)
   }
-
-  it('accepts "accepted" status', () => {
-    expect(isAccepted('accepted')).toBe(true)
-  })
 
   it('accepts "contacted" status', () => {
     expect(isAccepted('contacted')).toBe(true)
@@ -147,6 +146,10 @@ describe('accepted feedback statuses', () => {
 
   it('accepts "won" status', () => {
     expect(isAccepted('won')).toBe(true)
+  })
+
+  it('rejects the legacy "accepted" status (not in enum, not counted)', () => {
+    expect(isAccepted('accepted')).toBe(false)
   })
 
   it('rejects "badfit" status', () => {

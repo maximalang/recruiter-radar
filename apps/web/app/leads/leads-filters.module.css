@@ -10,6 +10,37 @@
   border-bottom: 1px solid var(--c-border);
 }
 
+.filterGroup {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* Durable profile group: subtle surface so it reads as persistent context,
+   not a today-filter. */
+.filterGroup[data-kind="profile"] {
+  padding: 4px 10px;
+  border-radius: 8px;
+  background-color: var(--c-bg-card);
+  border: 1px solid var(--c-border);
+}
+
+.filterGroupLabel {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--c-text-muted);
+}
+
+.filterDivider {
+  width: 1px;
+  align-self: stretch;
+  margin: 4px 0;
+  background-color: var(--c-border);
+}
+
 .filterLabel {
   font-size: 0.75rem;
   font-weight: 600;
@@ -28,6 +59,31 @@
 }
 
 .filterSelect:focus-visible {
+  outline: 2px solid var(--c-brand);
+  outline-offset: 2px;
+}
+
+/* "Сегодня в работе" — a quick toggle, not a select. Reads as the primary
+   working-set action so a recruiter reaches it in one click. */
+.todayToggle {
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 999px;
+  border: 1px solid var(--c-border);
+  background-color: var(--c-bg-card);
+  color: var(--c-text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.todayToggle[data-active="true"] {
+  border-color: var(--c-brand);
+  background-color: rgba(59, 130, 246, 0.12);
+  color: var(--c-brand);
+}
+
+.todayToggle:focus-visible {
   outline: 2px solid var(--c-brand);
   outline-offset: 2px;
 }
@@ -52,13 +108,20 @@
     gap: 8px;
     padding: 10px 14px;
   }
-  .filterLabel {
+  .filterGroupLabel {
     width: 100%;
     margin-bottom: 2px;
   }
   .filterSelect {
     flex: 1 1 calc(50% - 8px);
     min-width: 0;
+  }
+  .filterDivider {
+    display: none;
+  }
+  .todayToggle {
+    flex: 1 1 100%;
+    text-align: center;
   }
   .filterReset {
     flex: 1 1 100%;
