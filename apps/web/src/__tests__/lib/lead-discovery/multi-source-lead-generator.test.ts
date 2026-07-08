@@ -285,4 +285,189 @@ describe('MultiSourceLeadGenerator', () => {
       expect(careerCrawls).toHaveLength(0)
     })
   })
+
+  describe('enrichWithCareerPages multi-path probe (universality)', () => {
+    // Regression guard for the 2026-07-06 universality fix: non-IT companies
+    // publish vacancies under /vacancies, /jobs, /career, /about/vacancies,
+    // etc. — NOT only /careers. The probe must try the RU-native path set
+    // (mirroring the career-pages source script) and accept the first 200+HTML
+    // response, so a non-IT company still gets direct career-page evidence
+    // (the only route to gate A/B) instead of being silently stuck at gate C.
+    function resolveOrgBase(query: string): boolean {
+      return /SELECT id, website_url, domain FROM orgs/i.test(query)
+    }
+
+    it('resolves /vacancies when /careers 404s — non-IT URL convention', async () => {
+      mockPoolQuery.mockImplementation(async (sql: unknown) => {
+        if (typeof sql === 'string' && resolveOrgBase(sql)) {
+          return {
+            rows: [{ id: 'org-1', website_url: 'https://zavod-ural.ru', domain: null }],
+          }
+        }
+        return { rows: [] }
+      })
+
+      // Homepage + /careers 404; /vacancies returns 200+HTML.
+      mockCrawlerFetch.mockImplementation(async (input: { url: string }) => {
+        if (input.url === 'https://zavod-ural.ru/vacancies') {
+          return {
+            status: 200,
+            html: '<html><body>Вакансии завода</body></html>',
+            url: input.url,
+            fetchedAt: new Date().toISOString(),
+            warnings: [],
+          }
+        }
+        return {
+          status: 404,
+          html: undefined,
+          url: input.url,
+          fetchedAt: new Date().toISOString(),
+          warnings: [],
+        }
+      })
+
+      const leads = await generator.generateLeads({ enableRealTime: true })
+
+      const lead = leads.find(l => l.companyId === 'org-1')
+      expect(lead).toBeDefined()
+      // Direct career-page evidence attached with the resolved /vacancies URL.
+      expect(lead!.sources.some(s => s.sourceId === 'career-pages')).toBe(true)
+      expect(lead!.enrichment.hasCareerPage).toBe(true)
+      expect(lead!.enrichment.careerPageUrl).toBe('https://zavod-ural.ru/vacancies')
+    })
+
+    it('resolves /jobs when /careers and /vacancies both 404', async () => {
+      mockPoolQuery.mockImplementation(async (sql: unknown) => {
+        if (typeof sql === 'string' && resolveOrgBase(sql)) {
+          return {
+            rows: [{ id: 'org-1', website_url: 'https://logistic-pro.ru', domain: null }],
+          }
+        }
+        return { rows: [] }
+      })
+
+      mockCrawlerFetch.mockImplementation(async (input: { url: string }) => {
+        if (input.url === 'https://logistic-pro.ru/jobs') {
+          return {
+            status: 200,
+            html: '<html><body>Jobs</body></html>',
+            url: input.url,
+            fetchedAt: new Date().toISOString(),
+            warnings: [],
+          }
+        }
+        return {
+          status: 404,
+          html: undefined,
+          url: input.url,
+          fetchedAt: new Date().toISOString(),
+          warnings: [],
+        }
+      })
+
+      const leads = await generator.generateLeads({ enableRealTime: true })
+
+      const lead = leads.find(l => l.companyId === 'org-1')
+      expect(lead).toBeDefined()
+      expect(lead!.enrichment.hasCareerPage).toBe(true)
+      expect(lead!.enrichment.careerPageUrl).toBe('https://logistic-pro.ru/jobs')
+    })
+
+    it('falls back to a same-domain careers link mined from the homepage HTML', async () => {
+      mockPoolQuery.mockImplementation(async (sql: unknown) => {
+        if (typeof sql === 'string' && resolveOrgBase(sql)) {
+          return {
+            rows: [{ id: 'org-1', website_url: 'https://retail-south.ru', domain: null }],
+          }
+        }
+        return { rows: [] }
+      })
+
+      // Homepage returns HTML with a same-domain /company/vacancies link;
+      // every path variant 404s; the mined link itself returns 200+HTML.
+      mockCrawlerFetch.mockImplementation(async (input: { url: string }) => {
+        // The probe normalizes the base by stripping trailing slashes, so the
+        // homepage candidate is `https://retail-south.ru` (no slash). Accept
+        // both forms — the real crawler normalizes the same way.
+        if (input.url === 'https://retail-south.ru' || input.url === 'https://retail-south.ru/') {
+          return {
+            status: 200,
+            html: '<html><a href="/company/vacancies">Вакансии</a></html>',
+            url: input.url,
+            fetchedAt: new Date().toISOString(),
+            warnings: [],
+          }
+        }
+        if (input.url === 'https://retail-south.ru/company/vacancies') {
+          return {
+            status: 200,
+            html: '<html><body>Открытые вакансии</body></html>',
+            url: input.url,
+            fetchedAt: new Date().toISOString(),
+            warnings: [],
+          }
+        }
+        return {
+          status: 404,
+          html: undefined,
+          url: input.url,
+          fetchedAt: new Date().toISOString(),
+          warnings: [],
+        }
+      })
+
+      const leads = await generator.generateLeads({ enableRealTime: true })
+
+      const lead = leads.find(l => l.companyId === 'org-1')
+      expect(lead).toBeDefined()
+      expect(lead!.enrichment.hasCareerPage).toBe(true)
+      expect(lead!.enrichment.careerPageUrl).toBe('https://retail-south.ru/company/vacancies')
+    })
+
+    it('records hasCareerPage=false and no evidence when no path hits', async () => {
+      mockPoolQuery.mockImplementation(async (sql: unknown) => {
+        if (typeof sql === 'string' && resolveOrgBase(sql)) {
+          return {
+            rows: [{ id: 'org-1', website_url: 'https://no-careers.example', domain: null }],
+          }
+        }
+        return { rows: [] }
+      })
+
+      // Everything 404s — no career page, no inflation.
+      mockCrawlerFetch.mockResolvedValue({
+        status: 404,
+        html: undefined,
+        url: '',
+        fetchedAt: new Date().toISOString(),
+        warnings: [],
+      })
+
+      const leads = await generator.generateLeads({ enableRealTime: true })
+
+      const lead = leads.find(l => l.companyId === 'org-1')
+      expect(lead).toBeDefined()
+      expect(lead!.enrichment.hasCareerPage).toBe(false)
+      expect(lead!.sources.some(s => s.sourceId === 'career-pages')).toBe(false)
+    })
+
+    it('extractSameDomainCareerLinkFromHtml only matches same-host links', () => {
+      const { extractSameDomainCareerLinkFromHtml } = jest.requireActual<
+        typeof import('@/lib/lead-discovery/multi-source-lead-generator')
+      >('@/lib/lead-discovery/multi-source-lead-generator')
+
+      const html = `
+        <a href="https://boards.greenhouse.io/acme">External ATS</a>
+        <a href="https://example.ru/about">About</a>
+        <a href="https://example.ru/careers">Careers</a>
+      `
+      expect(extractSameDomainCareerLinkFromHtml(html, 'https://example.ru')).toBe(
+        'https://example.ru/careers',
+      )
+      // No same-domain career link → null (external ATS intentionally ignored).
+      const externalOnly = '<a href="https://boards.greenhouse.io/acme">ATS</a>'
+      expect(extractSameDomainCareerLinkFromHtml(externalOnly, 'https://example.ru')).toBeNull()
+    })
+  })
 })

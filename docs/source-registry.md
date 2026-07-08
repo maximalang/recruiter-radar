@@ -132,6 +132,22 @@ the 120s per-source ingest timeout and partial batches still reach ingestion; re
 discovered targets are picked up next run. Auto-discovery seeds from existing orgs+signals that
 carry a domain, so on a cold DB it is a no-op until other sources populate orgs.
 
+**Same-domain HTML-card fallback (2026-07-06):** the `same-domain-jsonld` adapter previously read
+schema.org JSON-LD exclusively — a Russian company career page that publishes vacancies as HTML
+cards with no JSON-LD (common on Bitrix/1C-Bitrix and custom-CMS RU corporate sites) silently
+yielded 0 records, losing the company's direct hiring proof after the page was already fetched.
+`fetchSameDomainJsonLdRecords` now runs `extractVacancyCardsFromSameDomainHtml` when JSON-LD is
+empty: it pulls vacancy titles from same-domain anchor links (title + same-host URL required, no
+fabricated company/contact/salary, navigation boilerplate rejected). Records are tagged
+`extraction_method: 'html-card-fallback'` in the signal payload. The fetch/ingest/pipeline
+summary now carries an `extractionBreakdown` (per-extractor target counts +
+`zeroRecordSameDomainTargets`: discovered same-domain pages that yielded NEITHER JSON-LD nor
+usable HTML cards — the previously-silent gap). The dashboard "Качество доказательств по
+источникам" section surfaces per-source gate A/B/C distribution + direct-hiring-proof share +
+average freshness, so the fallback's contribution is visible as more `direct_hiring_proof`
+leads under `career-pages`. Confidence gates are unchanged: HTML-card signals are still
+`direct_hiring_proof` (company-owned surface); only the extraction path broadened.
+
 **rabota-rossii** — official trudvsem open-data. In the SQL whitelist and **`digest-allowed` as
 of 2026-06-30** (freshness gate cleared via `date_modify`-based freshness; see
 `source-review/trudvsem-review.md` and memory `project_rabota_rossii_live`).

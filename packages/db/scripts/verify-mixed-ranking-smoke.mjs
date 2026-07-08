@@ -75,7 +75,10 @@ async function setupFixture(client) {
   await client.query(`
     CREATE TEMP TABLE orgs (
       id TEXT PRIMARY KEY,
-      name TEXT NOT NULL
+      name TEXT NOT NULL,
+      domain TEXT,
+      website_url TEXT,
+      career_page_url TEXT
     ) ON COMMIT DROP;
 
     CREATE TEMP TABLE org_source_refs (
@@ -99,20 +102,29 @@ async function setupFixture(client) {
   `);
 
   await client.query(`
-    INSERT INTO orgs (id, name)
+    INSERT INTO orgs (id, name, domain, website_url, career_page_url)
     VALUES
-      ('org-mixed-direct', 'Mixed Direct Co'),
-      ('org-hh-agg', 'HH Aggregated Co');
+      ('org-mixed-direct', 'Mixed Direct Co', 'mixed.example', 'https://mixed.example/', 'https://mixed.example/careers'),
+      ('org-hh-agg', 'HH Aggregated Co', 'agg.example', null, null);
 
     INSERT INTO org_source_refs (org_id, source, external_id, display_name, source_key, metadata)
-    VALUES (
-      'org-hh-agg',
-      'hh',
-      'hh-agg-1',
-      'HH Aggregated Co',
-      'domain:agg.example',
-      '{"source_alias_keys": ["domain:agg.example"]}'::jsonb
-    );
+    VALUES
+      (
+        'org-mixed-direct',
+        'career-pages',
+        'career-1',
+        'Mixed Direct Co',
+        'domain:mixed.example',
+        '{"source_alias_keys": ["domain:mixed.example"]}'::jsonb
+      ),
+      (
+        'org-hh-agg',
+        'hh',
+        'hh-agg-1',
+        'HH Aggregated Co',
+        'domain:agg.example',
+        '{"source_alias_keys": ["domain:agg.example"]}'::jsonb
+      );
 
     INSERT INTO signals (org_id, source, signal_type, headline, occurred_at, payload)
     VALUES

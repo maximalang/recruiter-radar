@@ -73,6 +73,16 @@ export interface EvidenceSource {
   relevanceScore: number
 }
 
+/**
+ * Result of a successful career-page probe — the URL that returned 200+HTML
+ * and the body to persist as direct evidence.
+ */
+interface CareerPageProbeResult {
+  url: string
+  html: string
+  fetchedAt: string
+}
+
 /** Per-source execution outcome for one generateLeads() run. */
 export interface SourceRunStatus {
   status: 'ok' | 'error'
@@ -144,6 +154,55 @@ const SOURCE_ID_TO_EVIDENCE_TYPE: Record<string, EvidenceSource['evidenceType']>
 
 function sourceIdToEvidenceType(sourceId: string): EvidenceSource['evidenceType'] {
   return SOURCE_ID_TO_EVIDENCE_TYPE[sourceId] ?? 'vacancy'
+}
+
+/**
+ * Extract a same-domain career/hiring link from raw HTML. Mirrors the logic
+ * proven in the career-pages source script (extractSameDomainCareerPageUrl):
+ * scan href attributes + raw URLs, keep only those on the same hostname as
+ * `baseUrl` whose path mentions career/jobs/vacancies (RU + EN). Returns the
+ * first match as an absolute URL, or null when none is found.
+ *
+ * Used by the runtime career-page probe as the fallback when none of the
+ * known path variants hit — the common Russian case where a company links to
+ * /company/vacancies or a careers subdomain from its homepage navigation.
+ * Pure + deterministic; only inspects the company's own domain links.
+ */
+export function extractSameDomainCareerLinkFromHtml(html: string, baseUrl: string): string | null {
+  if (!baseUrl) return null
+  let baseHostname: string
+  try {
+    baseHostname = new URL(baseUrl).hostname
+  } catch {
+    return null
+  }
+  if (!baseHostname) return null
+
+  const hrefPattern = /https?:\/\/[^"'\s<>]+|href=["']([^"']+)["']/gi
+  let match: RegExpExecArray | null
+  while ((match = hrefPattern.exec(html)) !== null) {
+    const raw = match[1] ?? match[0]
+    if (!raw) continue
+    let absolute: string
+    try {
+      absolute = new URL(raw, baseUrl).toString()
+    } catch {
+      continue
+    }
+    let hostname: string
+    try {
+      hostname = new URL(absolute).hostname
+    } catch {
+      continue
+    }
+    // Same-host only (rejects external ATS links — those are handled by the
+    // source-script greenhouse/lever detectors at ingest, not here).
+    if (hostname !== baseHostname) continue
+    if (/career|jobs|vacanc|rabota/i.test(absolute)) {
+      return absolute
+    }
+  }
+  return null
 }
 
 /**
@@ -550,6 +609,100 @@ export class MultiSourceLeadGenerator {
   }
 
   /**
+   * Career-page path variants probed for a company's own domain. Mirrors the
+   * set proven in the career-pages source script (buildCareerPageProbeUrls)
+   * so runtime enrichment and the ingest-time crawler agree on which URLs
+   * count as a direct company-owned hiring surface. RU-native paths
+   * (/vacancies, /about/vacancies, /ru/jobs, /jobs/list, /vacancies/all) are
+   * included because non-IT / regional companies rarely use the EN-default
+   * /careers — probing only that path was an IT-only assumption that silently
+   * dropped direct evidence for the majority of Russian employers.
+   */
+  private static readonly CAREER_PAGE_PATH_VARIANTS: readonly string[] = [
+    '/careers',
+    '/career',
+    '/jobs',
+    '/vacancies',
+    '/vacancies/all',
+    '/about/careers',
+    '/about/vacancies',
+    '/ru/jobs',
+    '/ru/vacancies',
+    '/jobs/list',
+  ]
+
+  /**
+   * Probe a company's own domain for a career/hiring page. Tries the homepage
+   * first (so we can mine it for a same-domain careers link), then the known
+   * path variants in order, short-circuiting on the first 200+HTML response.
+   * If no path variant hits but the homepage returned HTML, scan it for a
+   * same-domain link whose path mentions career/jobs/vacancies and fetch that.
+   *
+   * Every URL is derived from the company's verified `websiteUrl` — no
+   * fabrication. 404s / non-HTML responses are swallowed and the next
+   * candidate is tried. Returns null when no direct surface is found, so the
+   * caller records `hasCareerPage = false` and Reachability is gated as
+   * before (no inflation, no weakened evidence).
+   */
+  private async probeCareerPage(websiteUrl: string): Promise<CareerPageProbeResult | null> {
+    const base = websiteUrl.replace(/\/+$/, '')
+
+    const candidates: string[] = [base]
+    for (const path of MultiSourceLeadGenerator.CAREER_PAGE_PATH_VARIANTS) {
+      try {
+        candidates.push(new URL(path, base).toString())
+      } catch {
+        // base is malformed — abort probing entirely.
+        return null
+      }
+    }
+
+    let homepageHtml: string | null = null
+    for (const url of candidates) {
+      const validation = validateCrawlerUrl(url)
+      if (!validation.valid) continue
+
+      let result: CrawlerResult
+      try {
+        result = await this.crawler.fetch({ url, options: { timeoutMs: 10000 } })
+      } catch {
+        continue
+      }
+      if (result.status !== 200 || !result.html) continue
+
+      // First candidate is the homepage — remember its HTML for the
+      // same-domain link fallback, then keep probing path variants.
+      if (url === base) {
+        homepageHtml = result.html
+        continue
+      }
+      return { url: result.url, html: result.html, fetchedAt: result.fetchedAt }
+    }
+
+    // No path variant hit. Try to extract a same-domain careers link from the
+    // homepage HTML (the common RU case: a link like /company/vacancies or a
+    // subdomain careers.example.ru referenced from the homepage nav).
+    if (homepageHtml) {
+      const linkUrl = extractSameDomainCareerLinkFromHtml(homepageHtml, base)
+      if (linkUrl) {
+        const validation = validateCrawlerUrl(linkUrl)
+        if (validation.valid) {
+          try {
+            const result = await this.crawler.fetch({ url: linkUrl, options: { timeoutMs: 10000 } })
+            if (result.status === 200 && result.html) {
+              return { url: result.url, html: result.html, fetchedAt: result.fetchedAt }
+            }
+          } catch {
+            // fall through to null
+          }
+        }
+      }
+    }
+
+    return null
+  }
+
+  /**
    * Enrich leads with career page evidence.
    * Resolves a corporate base URL from orgs.website_url, falling back to
    * orgs.domain; orgs with neither are skipped (no career-page crawl).
@@ -578,8 +731,9 @@ export class MultiSourceLeadGenerator {
           ))
           for (const row of result.rows as Array<Record<string, unknown>>) {
             // Prefer the explicit website_url; otherwise derive an https base
-            // from the bare domain. Normalize to a scheme-qualified origin so the
-            // downstream `${base}/careers` concatenation and URL validation work.
+            // from the bare domain. Normalize to a scheme-qualified origin so
+            // the downstream career-page path probes (/careers, /vacancies,
+            // /jobs, …) and URL validation work.
             let base: string | null = null
             if (row.website_url != null && String(row.website_url).trim() !== '') {
               base = String(row.website_url).trim()
@@ -601,11 +755,7 @@ export class MultiSourceLeadGenerator {
       try {
         // Use real website URL from DB, or fall back to slug-based guess
         const websiteUrl = websiteMap.get(lead.companyId)
-        let careerUrl: string
-        if (websiteUrl) {
-          careerUrl = `${websiteUrl.replace(/\/$/, '')}/careers`
-          lead.enrichment.website = websiteUrl
-        } else {
+        if (!websiteUrl) {
           // Slug fallback: strip non-ASCII, transliterate to ASCII-safe form.
           // Cyrillic characters in DNS hostnames require punycode which is fragile.
           // If no real website in DB, skip career page crawl rather than guess a
@@ -614,59 +764,67 @@ export class MultiSourceLeadGenerator {
           lead.enrichment.hasCareerPage = false
           return
         }
+        lead.enrichment.website = websiteUrl
 
-        const crawlInput: CrawlerFetchInput = {
-          url: careerUrl,
-          options: {
-            timeoutMs: 10000
-          }
-        }
+        // Universality fix (2026-07-06): the previous runtime probe hardcoded
+        // `${base}/careers` — a tech-company URL convention. Non-IT companies
+        // (manufacturing, logistics, retail, regional) publish vacancies under
+        // /jobs, /vacancies, /career, /about/vacancies, /ru/jobs, /jobs/list,
+        // /vacancies/all, or link to a same-domain careers page from the
+        // homepage. Probing only /careers silently dropped direct career-page
+        // evidence for every such company — capping Reachability to zero and
+        // leaving them stuck at gate C (platform aggregation) even when they
+        // have a real, company-owned hiring surface.
+        //
+        // This mirrors the path set already proven in the career-pages source
+        // script (buildCareerPageProbeUrls) plus same-domain link extraction
+        // (extractSameDomainCareerPageUrl). Every probed URL is on the
+        // company's OWN verified domain — nothing is fabricated. We accept the
+        // first 200+HTML response and stop, keeping wall-clock cost bounded.
+        const resolved = await this.probeCareerPage(websiteUrl)
 
-        // C5: Validate URL before crawl — reject private IPs / bad schemes early.
-        // The crawler router also validates, but checking here avoids a network
-        // round-trip and provides a clearer warning in the lead's reasons.
-        const urlValidation = validateCrawlerUrl(careerUrl)
-        if (!urlValidation.valid) {
+        if (!resolved) {
           lead.enrichment.hasCareerPage = false
-          lead.reasons.push(`career page URL rejected: ${urlValidation.reason}`)
           return
         }
 
-        const result: CrawlerResult = await this.crawler.fetch(crawlInput)
+        const evidence: EvidenceSource = {
+          sourceId: 'career-pages',
+          sourceName: 'Career Pages',
+          evidenceType: 'career-page',
+          confidence: 0.92,
+          rawData: {
+            html: resolved.html,
+            url: resolved.url,
+            fetchedAt: resolved.fetchedAt
+          },
+          extractedAt: new Date(resolved.fetchedAt),
+          relevanceScore: 0.9
+        }
 
-        if (result.status === 200 && result.html) {
-          const evidence: EvidenceSource = {
-            sourceId: 'career-pages',
-            sourceName: 'Career Pages',
-            evidenceType: 'career-page',
-            confidence: 0.92,
-            rawData: {
-              html: result.html,
-              url: result.url,
-              fetchedAt: result.fetchedAt
-            },
-            extractedAt: new Date(result.fetchedAt),
-            relevanceScore: 0.9
-          }
+        // Record the resolved career-page URL so downstream scoring/UX can
+        // surface the concrete direct surface (FIUR reachability + the
+        // "есть карьерная страница" fit-explanation line).
+        lead.enrichment.hasCareerPage = true
+        lead.enrichment.careerPageUrl = resolved.url
 
-          // Add evidence if not already present
-          if (!lead.sources.find(s => s.sourceId === 'career-pages')) {
-            lead.sources.push(evidence)
+        // Add evidence if not already present
+        if (!lead.sources.find(s => s.sourceId === 'career-pages')) {
+          lead.sources.push(evidence)
 
-            // Recalculate confidence gate via selectConfidenceGate
-            // (career-page is 'direct' tier, which can promote B→A)
-            recalculateConfidence(lead)
+          // Recalculate confidence gate via selectConfidenceGate
+          // (career-page is 'direct' tier, which can promote B→A)
+          recalculateConfidence(lead)
 
-            // Add signal for direct career page
-            lead.signals.push({
-              companyId: lead.companyId,
-              companyName: lead.companyName,
-              signalType: 'fresh',
-              strength: 1.0,
-              evidence: ['Найдена прямая карьерная страница'],
-              detectedAt: new Date()
-            })
-          }
+          // Add signal for direct career page
+          lead.signals.push({
+            companyId: lead.companyId,
+            companyName: lead.companyName,
+            signalType: 'fresh',
+            strength: 1.0,
+            evidence: ['Найдена прямая карьерная страница'],
+            detectedAt: new Date()
+          })
         }
       } catch (error) {
         console.warn(`Failed to crawl career page for ${lead.companyName}:`, error)

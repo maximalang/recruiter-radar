@@ -2,6 +2,7 @@ import {
   getClientProfileById,
   parseKeywordText,
   saveClientProfile,
+  resolveHiringMode,
   VALID_COMPANY_SIZES,
   VALID_INDUSTRIES,
   VALID_ROLES
@@ -461,7 +462,10 @@ export async function sendPilotOrderTestDigest(
   // First-impression parity: the pilot's onboarding test digest must read exactly
   // like a real daily digest — the same premium batch card, not the legacy
   // debug-style buildHhDigestText ("HH digest" / "score 332.0"). Map the digest
-  // items to the same BatchLead shape the daily delivery uses.
+  // items to the same BatchLead shape the daily delivery uses. The resolved
+  // hiring mode is threaded through so the test digest is mode-aware too — the
+  // first impression an agency gets matches the daily radar's framing.
+  const resolvedHiringMode = resolveHiringMode(profile);
   const batchLeads: BatchLead[] = items.map((item) => {
     const foreign = detectForeignEmployer({
       sourceDisplayName: item.employer_name,
@@ -479,6 +483,8 @@ export async function sendPilotOrderTestDigest(
       evidenceTitles: item.evidence_titles,
       locationNames: item.location_names,
       whyLine: deriveWhyNow(item.reasons) || null,
+      latestPublishedAt: item.latest_published_at || null,
+      hiringMode: resolvedHiringMode,
       isForeignEmployer: foreign.isForeign,
       contactPathLabel: formatLawfulContactPath(
         deriveLawfulContactPath(item.reasons, item.source_families),

@@ -410,6 +410,112 @@ export async function getDashboardSourcePerformance(): Promise<SourcePerformance
   }
 }
 
+// ─── Analytics: Source Evidence Quality ──────────────────────────
+// Source performance (above) shows lead COUNT per source. Count alone is a
+// volume signal, not a quality signal — a source can produce many gate-C
+// platform-aggregation leads and still be weak evidence. This view exposes the
+// gate distribution (A/B/C) and evidence-quality distribution
+// (direct_hiring_proof vs platform_aggregation) per source, so an operator can
+// see whether a source is producing gate-A direct proof or gate-C noise. It
+// also surfaces the average recency (days since latest_published_at) so
+// staleness is visible per source. This is the analytics layer that makes the
+// RF evidence layer inspectable: the HTML-card fallback's contribution shows
+// up as more direct_hiring_proof leads under `career-pages`.
+
+export interface SourceEvidenceQualityItem {
+  source: string;
+  leads: number;
+  /** Gate A/B/C/D distribution counts. D is theoretically possible but the
+   * digest pipeline filters evidence_quality = enrichment_context, so in
+   * practice only A/B/C reach digest_candidates. */
+  gateA: number;
+  gateB: number;
+  gateC: number;
+  gateD: number;
+  /** Evidence-quality distribution counts. direct_hiring_proof = company-owned
+   * surface (career-pages); platform_aggregation = platform/registry match;
+   * enrichment_context = background only. */
+  directHiringProof: number;
+  platformAggregation: number;
+  enrichmentContext: number;
+  /** Average days from latest_published_at to now, rounded to 1 decimal.
+   * Lower = fresher source. null when no published rows. */
+  avgAgeDays: number | null;
+}
+
+export async function getDashboardSourceEvidenceQuality(): Promise<SourceEvidenceQualityItem[]> {
+  const pool = getPool();
+  if (!pool) {
+    return [];
+  }
+
+  try {
+    // confidence_gate lives in dc.payload JSON (snake_case from
+    // source-digest-evidence.sql, camelCase from mapDigestEvidenceRow) — COALESCE
+    // both spellings so this stays correct regardless of which writer produced
+    // the row. evidence_quality is NOT persisted to payload today, so derive it
+    // from source_families with the SAME classification source-digest-evidence.sql
+    // uses (career-pages present → direct_hiring_proof; else platform_aggregation;
+    // a lead that reached digest_candidates is never enrichment_context because
+    // the SQL scorer filters that out). This keeps the analytics view truthful
+    // without a payload-shape change. unnest source_families so a lead backed by
+    // 2 source families counts toward each — same projection the lead-count view
+    // above uses, so the two views reconcile.
+    const result = await pool.query<{
+      source: string;
+      leads: string;
+      gate_a: string;
+      gate_b: string;
+      gate_c: string;
+      gate_d: string;
+      direct: string;
+      platform: string;
+      context: string;
+      avg_age_days: number | null;
+    }>(`
+      SELECT
+        sf.element AS source,
+        COUNT(*)::TEXT AS leads,
+        COUNT(*) FILTER (WHERE COALESCE(dc.payload->>'confidence_gate', dc.payload->>'confidenceGate') = 'A')::TEXT AS gate_a,
+        COUNT(*) FILTER (WHERE COALESCE(dc.payload->>'confidence_gate', dc.payload->>'confidenceGate') = 'B')::TEXT AS gate_b,
+        COUNT(*) FILTER (WHERE COALESCE(dc.payload->>'confidence_gate', dc.payload->>'confidenceGate') = 'C')::TEXT AS gate_c,
+        COUNT(*) FILTER (WHERE COALESCE(dc.payload->>'confidence_gate', dc.payload->>'confidenceGate') = 'D')::TEXT AS gate_d,
+        COUNT(*) FILTER (WHERE 'career-pages' = ANY(dc.source_families))::TEXT AS direct,
+        COUNT(*) FILTER (WHERE 'career-pages' <> ALL(dc.source_families))::TEXT AS platform,
+        COUNT(*) FILTER (WHERE array_length(dc.source_families, 1) IS NULL)::TEXT AS context,
+        ROUND(AVG(EXTRACT(EPOCH FROM (NOW() - dc.latest_published_at)) / 86400.0), 1) AS avg_age_days
+      FROM digest_candidates dc
+      CROSS JOIN LATERAL unnest(dc.source_families) AS sf(element)
+      GROUP BY sf.element
+      ORDER BY COUNT(*) DESC
+    `);
+
+    return result.rows.map((row) => ({
+      source: row.source,
+      leads: parseInt(row.leads, 10),
+      gateA: parseInt(row.gate_a, 10),
+      gateB: parseInt(row.gate_b, 10),
+      gateC: parseInt(row.gate_c, 10),
+      gateD: parseInt(row.gate_d, 10),
+      directHiringProof: parseInt(row.direct, 10),
+      platformAggregation: parseInt(row.platform, 10),
+      enrichmentContext: parseInt(row.context, 10),
+      avgAgeDays: parseNullableFloat(row.avg_age_days),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+// pg returns `ROUND(numeric, 1)` as a string by default (the `numeric` type),
+// and `null` when no rows have a published date. Coerce to a number | null so
+// the UI layer gets a real number for formatting.
+function parseNullableFloat(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  const num = typeof value === 'number' ? value : Number.parseFloat(String(value));
+  return Number.isFinite(num) ? Math.round(num * 10) / 10 : null;
+}
+
 // ─── Today's Radar — companies worth contacting now ─────────────
 
 export interface TodayRadar {

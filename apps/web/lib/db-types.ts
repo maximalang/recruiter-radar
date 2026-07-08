@@ -196,6 +196,26 @@ export interface DigestItem {
   is_foreign_employer?: boolean;
   /** The foreign ATS domain that triggered the geo flag, when is_foreign_employer. */
   foreign_matched_domain?: string | null;
+  /**
+   * Cross-source corroboration identity (2026-07-06 pass 2). The canonical key
+   * under which fragmented orgs (same employer, different org_id per source)
+   * merge at digest-assembly time. Derived from the strongest shared strong
+   * key: 'inn:<inn>' | 'ogrn:<ogrn>' | 'domain:<domain>' | 'org:<org_id>'.
+   * Read-side only — does NOT touch the hot upsert WHERE source=$1 path.
+   * Query-projection field; null on legacy rows.
+   */
+  corroboration_key?: string | null;
+  /** Which strong-key type produced corroboration_key: 'inn' | 'ogrn' | 'domain' | 'org_id'. */
+  corroboration_key_type?: 'inn' | 'ogrn' | 'domain' | 'org_id' | null;
+  /**
+   * The full set of org_ids that merged under corroboration_key. When length
+   * >= 2 this lead is a cross-source merge of fragmented orgs — auditable,
+   * never silent. Drives the "подтверждено N источниками" surface and the
+   * fragmentation/overlap analytics. Query-projection field.
+   */
+  corroborated_org_ids?: number[];
+  /** True when corroborated_org_ids length >= 2 (cross-source merge happened). */
+  is_cross_source_corroborated?: boolean;
 }
 
 export interface DigestDelivery {

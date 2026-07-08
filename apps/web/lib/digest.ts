@@ -2,12 +2,13 @@ import { Pool, type PoolClient } from "pg";
 import { getPool as getSharedPool } from "./db-pool";
 import { isDigestEligibleGate } from "./scoring/gate-pipeline";
 import { deriveReviewStatus } from "./scoring/gates";
-import { getClientProfileById, INDUSTRY_KEYWORDS, type ClientProfile } from "./clientProfiles";
+import { getClientProfileById, INDUSTRY_KEYWORDS, resolveHiringMode, type ClientProfile } from "./clientProfiles";
 import { ROLE_HABR_KEYWORDS } from "./lead-discovery/habr-keywords";
 import { DIGEST_EVIDENCE_QUERY } from "./digest-evidence-query";
 import { toSignalStrength } from "./scoring/score-display";
 import { detectForeignEmployer, applyForeignEmployerPenalty } from "./scoring/foreign-employer";
 import { deriveRoleNames, passesMinimumSignalGate } from "./leads/lead-quality";
+import { hasSeniorRole } from "./scoring/role-category";
 import type {
   DigestItem,
   DigestRun,
@@ -336,6 +337,12 @@ export async function runDigestForClientProfile(input: {
             location_names: item.location_names,
             is_foreign_employer: item.is_foreign_employer ?? false,
             foreign_matched_domain: item.foreign_matched_domain ?? null,
+            // Cross-source corroboration metadata (2026-07-06 pass 2). Persisted
+            // so analytics + lead card can read it without re-running the SQL.
+            corroboration_key: item.corroboration_key ?? null,
+            corroboration_key_type: item.corroboration_key_type ?? null,
+            corroborated_org_ids: item.corroborated_org_ids ?? [],
+            is_cross_source_corroborated: item.is_cross_source_corroborated ?? false,
           }),
           reviewStatus
         )
@@ -531,6 +538,15 @@ function mapDigestEvidenceRow(row: DigestEvidenceRow): DigestItemInput {
     confidence_gate: row.confidence_gate ?? "",
     is_foreign_employer: foreign.isForeign,
     foreign_matched_domain: foreign.matchedDomain,
+    // Cross-source corroboration identity (2026-07-06 pass 2). Carried through
+    // so the digest candidate payload records the merge, the lead card can show
+    // "подтверждено N источниками" truthfully, and the analytics can count
+    // cross-source corroborated share. corroboration_key_type 'org_id' = no
+    // strong key, single-fragment (today's behavior).
+    corroboration_key: row.corroboration_key ?? null,
+    corroboration_key_type: row.corroboration_key_type ?? null,
+    corroborated_org_ids: Array.isArray(row.corroborated_org_ids) ? row.corroborated_org_ids : [],
+    is_cross_source_corroborated: Boolean(row.is_cross_source_corroborated),
   };
 }
 
@@ -755,6 +771,36 @@ export function getClientScopeScore(item: DigestItemInput, clientProfile: Client
     // 2 points per matching role, capped at 4 — below industry weight so industry
     // remains the dominant scoping signal.
     score += Math.min(matchingRoles.length * 2, 4);
+  }
+
+  // Mode-aware ranking (2026-07-06): the agency hiring practice mode changes
+  // which signal is the dominant ranking cue. The mode only REWEIGHTS within
+  // the digest — it never drops a candidate (matchesClientProfile already
+  // gated) and never weakens a confidence gate.
+  //
+  //   executive — seniority is the dominant cue. A candidate whose evidence
+  //               titles include a C-level / director / руководитель role
+  //               outranks a volume-of-junior-roles candidate even at equal
+  //               industry/region match. +6 (above industry cap of 6, but
+  //               seniority is the *defining* signal for this agency type).
+  //   volume    — open-role volume is the dominant cue. A candidate with many
+  //               open positions is a stronger lead for a mass-hiring agency
+  //               than one with a single role. Tiered: 10+ roles +5, 5–9 +3.
+  //   specialist — no extra weight; the existing industry/role/region/special-
+  //               ization scope above is the correct ranking for a niche
+  //               practice (current default behavior preserved).
+  const mode = resolveHiringMode(clientProfile);
+  if (mode === 'executive') {
+    const roles = deriveRoleNames({ evidenceTitles: item.evidence_titles });
+    if (roles.length > 0 && hasSeniorRole(roles)) {
+      score += 6;
+    }
+  } else if (mode === 'volume') {
+    if (item.vacancies_count >= 10) {
+      score += 5;
+    } else if (item.vacancies_count >= 5) {
+      score += 3;
+    }
   }
 
   return score;

@@ -9,6 +9,7 @@ import {
   getDashboardFeedbackFunnel,
   getDashboardLeadMetrics,
   getDashboardSourcePerformance,
+  getDashboardSourceEvidenceQuality,
 } from '@/lib/dashboard-data';
 import { getPool } from '@/lib/db';
 
@@ -154,5 +155,100 @@ describe('getDashboardSourcePerformance', () => {
     mockQuery.mockResolvedValueOnce({ rows: [] });
     const result = await getDashboardSourcePerformance();
     expect(result).toEqual([]);
+  });
+});
+
+describe('getDashboardSourceEvidenceQuality', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('returns empty array when pool is not available', async () => {
+    mockGetPool.mockReturnValue(null);
+    const result = await getDashboardSourceEvidenceQuality();
+    expect(result).toEqual([]);
+  });
+
+  it('returns per-source gate + evidence-quality distribution', async () => {
+    makeMockPool();
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          source: 'career-pages',
+          leads: '40',
+          gate_a: '12',
+          gate_b: '20',
+          gate_c: '8',
+          gate_d: '0',
+          direct: '32',
+          platform: '8',
+          context: '0',
+          avg_age_days: '4.5',
+        },
+        {
+          source: 'hh',
+          leads: '30',
+          gate_a: '0',
+          gate_b: '5',
+          gate_c: '25',
+          gate_d: '0',
+          direct: '0',
+          platform: '30',
+          context: '0',
+          avg_age_days: null,
+        },
+      ],
+    });
+
+    const result = await getDashboardSourceEvidenceQuality();
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({
+      source: 'career-pages',
+      leads: 40,
+      gateA: 12,
+      gateB: 20,
+      gateC: 8,
+      gateD: 0,
+      directHiringProof: 32,
+      platformAggregation: 8,
+      enrichmentContext: 0,
+      avgAgeDays: 4.5,
+    });
+    expect(result[1].gateC).toBe(25);
+    expect(result[1].platformAggregation).toBe(30);
+    expect(result[1].directHiringProof).toBe(0);
+    expect(result[1].avgAgeDays).toBeNull();
+  });
+
+  it('handles empty results', async () => {
+    makeMockPool();
+    mockQuery.mockResolvedValueOnce({ rows: [] });
+    const result = await getDashboardSourceEvidenceQuality();
+    expect(result).toEqual([]);
+  });
+
+  it('parses integer counts from string columns', async () => {
+    makeMockPool();
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          source: 'habr-career',
+          leads: '7',
+          gate_a: '0',
+          gate_b: '1',
+          gate_c: '6',
+          gate_d: '0',
+          direct: '0',
+          platform: '7',
+          context: '0',
+          avg_age_days: '12.3',
+        },
+      ],
+    });
+    const result = await getDashboardSourceEvidenceQuality();
+    expect(result[0].leads).toBe(7);
+    expect(result[0].gateB).toBe(1);
+    expect(result[0].gateC).toBe(6);
+    expect(result[0].avgAgeDays).toBe(12.3);
   });
 });

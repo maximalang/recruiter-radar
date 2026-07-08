@@ -94,9 +94,106 @@ export const DIGEST_EVIDENCE_QUERY = String.raw`WITH source_signal_rows AS (
   WHERE signal.signal_type = 'job_posting'
     AND signal.source IN ('hh', 'career-pages', 'rabota-rossii', 'superjob', 'habr-career', 'tech-job-boards', 'linkedin-company-pages', 'regional-job-boards')
 ),
+-- org_corroboration_keys: map each org_id to a canonical cross-source
+-- corroboration key derived from the STRONGEST shared strong key. This lets
+-- signals from fragmented orgs (same employer, different org_id per source
+-- because per-source resolution scopes WHERE source=$1) corroborate into one
+-- evidence package at digest-assembly time — WITHOUT touching the hot upsert
+-- path (the deferred canonical-org merge EPIC). Read-side only, reversible.
+--
+-- Key precedence (strongest first): inn: > ogrn: > domain:
+--   - inn:/ogrn: are legally unique → a perfect merge signal.
+--   - domain: is unique to one employer's corporate surface, but a PLATFORM
+--     host domain (hh.ru, trudvsem.ru, superjob.ru, career.habr.com,
+--     greenhouse.io, lever.co) must NEVER be used — 'domain:hh.ru' would
+--     falsely merge every HH employer. Platform domains are excluded below.
+--   - company-name:/employer-name:/employer: are EXCLUDED — RU company names
+--     drift (ООО/АО/ПАО suffixes, transliteration, short vs full) → false
+--     merges. Corroboration is earned by a strong key, not by name similarity.
+--
+-- An org with NO strong key (only company-name:) falls back to its own org_id
+-- as the corroboration_key → today's behavior, no forced merge, no regression.
+--
+-- PLATFORM_HOST_DOMAINS: domains that are job-board/ATS hosts, NOT employer
+-- corporate surfaces. A corroboration_key must never be 'domain:<these>' or
+-- the platform's many employers would falsely merge into one lead. Kept in
+-- sync with the foreign-employer + source-priority policy lists.
+org_corroboration_keys AS (
+  WITH platform_host_domains AS (
+    SELECT unnest(ARRAY[
+      'hh.ru', 'hhcdn.com', 'trudvsem.ru', 'superjob.ru', 'superjob.com',
+      'career.habr.com', 'habr.com', 'boards.greenhouse.io', 'greenhouse.io',
+      'jobs.lever.co', 'lever.co', 'api.lever.co', 'boards-api.greenhouse.io',
+      'linkedin.com', 'hh.kz', 'hh.ua', 'rabota.ru', 'zarplata.ru'
+    ]) AS host_domain
+  )
+  SELECT
+    org.id AS org_id,
+    COALESCE(
+      -- Strongest: INN (10-digit legal entity). Globally namespaced across sources.
+      (SELECT ('inn:' || ref.source_key)
+       FROM org_source_refs AS ref
+       WHERE ref.org_id = org.id
+         AND ref.source_key LIKE 'inn:%'
+       ORDER BY ref.source_key ASC
+       LIMIT 1),
+      -- OGRN (13-digit). Same namespace across sources.
+      (SELECT ('ogrn:' || ref.source_key)
+       FROM org_source_refs AS ref
+       WHERE ref.org_id = org.id
+         AND ref.source_key LIKE 'ogrn:%'
+       ORDER BY ref.source_key ASC
+       LIMIT 1),
+      -- domain: from org_source_refs (career-pages/rabota-rossii store it).
+      -- Excludes platform hosts — a domain key that would falsely merge
+      -- platform-aggregated employers is rejected.
+      (SELECT ('domain:' || LOWER(REPLACE(ref.source_key, 'domain:', '')))
+       FROM org_source_refs AS ref
+       WHERE ref.org_id = org.id
+         AND ref.source_key LIKE 'domain:%'
+         AND LOWER(REPLACE(ref.source_key, 'domain:', '')) NOT IN (SELECT host_domain FROM platform_host_domains)
+       ORDER BY ref.source_key ASC
+       LIMIT 1),
+      -- orgs.domain column (HH stores its corporate domain here, not as a
+      -- source_key). Same platform-host exclusion. This is the bridge that
+      -- lets an HH employer corroborate with a career-pages org on the same
+      -- corporate domain even though HH never wrote a domain: source_key.
+      CASE
+        WHEN NULLIF(BTRIM(org.domain), '') IS NOT NULL
+          AND LOWER(BTRIM(org.domain)) NOT IN (SELECT host_domain FROM platform_host_domains)
+        THEN 'domain:' || LOWER(BTRIM(org.domain))
+        ELSE NULL
+      END,
+      -- Fallback: no strong key → group by org_id (today's behavior).
+      ('org:' || org.id::TEXT)
+    ) AS corroboration_key,
+    CASE
+      WHEN EXISTS (
+        SELECT 1 FROM org_source_refs AS ref
+        WHERE ref.org_id = org.id AND ref.source_key LIKE 'inn:%'
+      ) THEN 'inn'
+      WHEN EXISTS (
+        SELECT 1 FROM org_source_refs AS ref
+        WHERE ref.org_id = org.id AND ref.source_key LIKE 'ogrn:%'
+      ) THEN 'ogrn'
+      WHEN EXISTS (
+        SELECT 1 FROM org_source_refs AS ref
+        WHERE ref.org_id = org.id
+          AND ref.source_key LIKE 'domain:%'
+          AND LOWER(REPLACE(ref.source_key, 'domain:', '')) NOT IN (SELECT host_domain FROM platform_host_domains)
+      ) THEN 'domain'
+      WHEN NULLIF(BTRIM(org.domain), '') IS NOT NULL
+        AND LOWER(BTRIM(org.domain)) NOT IN (SELECT host_domain FROM platform_host_domains) THEN 'domain'
+      ELSE 'org_id'
+    END AS corroboration_key_type
+  FROM orgs AS org
+  WHERE org.id IN (SELECT DISTINCT org_id FROM source_signal_rows)
+),
 normalized_signal_rows AS (
   SELECT
     signal.org_id,
+    corb.corroboration_key,
+    corb.corroboration_key_type,
     signal.source,
     signal.payload_source_keys,
     COALESCE(
@@ -135,6 +232,8 @@ normalized_signal_rows AS (
   FROM source_signal_rows AS signal
   JOIN orgs AS org
     ON org.id = signal.org_id
+  JOIN org_corroboration_keys AS corb
+    ON corb.org_id = signal.org_id
   LEFT JOIN LATERAL (
     SELECT
       external_id,
@@ -190,7 +289,27 @@ normalized_signal_rows AS (
 ),
 aggregated AS (
   SELECT
-    org_id,
+    -- Representative org_id: the fragment with the strongest evidence wins, so
+    -- downstream readers (career_page_url join, lead card) attach to the
+    -- canonical surface. corroboration_key is the grouping identity; org_id is
+    -- the representative surface, kept for the orgs join downstream.
+    (ARRAY_AGG(org_id ORDER BY
+      CASE evidence_quality
+        WHEN 'direct_hiring_proof' THEN 2
+        WHEN 'platform_aggregation' THEN 1
+        ELSE 0
+      END DESC,
+      (source = 'career-pages') DESC,
+      published_at DESC NULLS LAST,
+      org_id ASC
+    ))[1] AS org_id,
+    corroboration_key,
+    corroboration_key_type,
+    -- The full set of org_ids that merged under this corroboration_key. When
+    -- > 1, this lead is a cross-source merge of fragmented orgs — auditable,
+    -- never silent. Drives the "подтверждено N источниками" surface and the
+    -- fragmentation-overlap analytics.
+    ARRAY_AGG(DISTINCT org_id ORDER BY org_id) AS corroborated_org_ids,
     (
       ARRAY_AGG(source_external_id ORDER BY
         CASE evidence_quality
@@ -228,10 +347,13 @@ aggregated AS (
     END AS evidence_quality,
     ARRAY_AGG(DISTINCT source ORDER BY source) AS source_families,
     ARRAY_REMOVE(ARRAY_AGG(DISTINCT NULLIF(BTRIM(evidence_title), '')), NULL) AS evidence_titles,
+    -- candidate_source_keys now spans EVERY org_id in the corroboration group
+    -- (not just one fragment), so the lead card's source-key evidence reflects
+    -- the full merged entity, not a single fragment's keys.
     ARRAY(
       SELECT DISTINCT NULLIF(BTRIM(ref.source_key), '')
       FROM org_source_refs AS ref
-      WHERE ref.org_id = normalized_signal_rows.org_id
+      WHERE ref.org_id = ANY(ARRAY_AGG(DISTINCT normalized_signal_rows.org_id))
         AND ref.source = ANY(ARRAY_AGG(DISTINCT normalized_signal_rows.source))
         AND NULLIF(BTRIM(ref.source_key), '') IS NOT NULL
       ORDER BY NULLIF(BTRIM(ref.source_key), '')
@@ -241,11 +363,14 @@ aggregated AS (
     COUNT(DISTINCT evidence_title)::INT AS distinct_vacancy_names_count,
     MAX(published_at) AS latest_published_at
   FROM normalized_signal_rows
-  GROUP BY org_id
+  GROUP BY corroboration_key, corroboration_key_type
 ),
 scored AS (
   SELECT
     org_id,
+    corroboration_key,
+    corroboration_key_type,
+    corroborated_org_ids,
     source_external_id,
     source_display_name,
     evidence_quality,
@@ -323,6 +448,9 @@ ranked AS (
         latest_published_at DESC NULLS LAST
     )::INT AS rank,
     org_id,
+    corroboration_key,
+    corroboration_key_type,
+    corroborated_org_ids,
     source_external_id,
     source_display_name,
     evidence_quality,
@@ -374,6 +502,9 @@ ranked AS (
 SELECT
   rank,
   org_id,
+  corroboration_key,
+  corroboration_key_type,
+  corroborated_org_ids,
   source_external_id,
   source_display_name,
   ranked_org.career_page_url AS career_page_url,
@@ -395,6 +526,11 @@ SELECT
   is_recent,
   recency_code,
   confidence_gate,
+  -- is_cross_source_corroborated: true when this lead merges 2+ fragmented
+  -- org_ids under one corroboration_key. Exposed so the lead card / digest can
+  -- show "подтверждено N источниками" truthfully and the analytics can count
+  -- cross-source corroborated share. Single-fragment leads stay false.
+  (array_length(corroborated_org_ids, 1) >= 2) AS is_cross_source_corroborated,
   primary_reason_code,
   primary_reason_label,
   secondary_reason_code,

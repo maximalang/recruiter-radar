@@ -87,6 +87,7 @@ export async function runCareerPagesCli(argv = process.argv.slice(2)) {
           normalizedRecords: input.normalizedRecords.length,
           skippedRecords: input.skippedRecords,
           sensitiveFieldsDropped: input.sensitiveFieldsDropped ?? 0,
+          extractionBreakdown: summarizeExtractionBreakdown(input.targetResults),
           orgsCreated: stats.orgUpsertCount,
           signalUpsertsCompleted: stats.signalUpsertCount,
         },
@@ -711,6 +712,202 @@ export function mapJsonLdJobPostings(postings, seed) {
   });
 }
 
+/**
+ * HTML-card fallback extractor for same-domain RU career pages that publish
+ * vacancies as repeated HTML items WITHOUT schema.org JSON-LD markup.
+ *
+ * Many Russian corporate career sites (Bitrix/1C-Bitrix, custom CMS, older
+ * VK/Ozon-style pages) render vacancies as a list/table of cards where each
+ * card carries a vacancy title inside a link that points to a same-domain
+ * vacancy detail page. `extractJobPostingsFromHtml` (JSON-LD only) returns []
+ * for these pages, so without this fallback the company's direct hiring proof
+ * — the ONLY gate-A/B originator — is silently lost after the page was already
+ * discovered + fetched (a real cost).
+ *
+ * Evidence-first guardrails (non-negotiable):
+ *   - A record requires BOTH a non-empty title AND a same-domain vacancy URL.
+ *     No title + no same-domain link → dropped (never fabricated).
+ *   - The link host MUST match the career page host (same-domain only). An
+ *     external board link (greenhouse/lever/hh) is NOT a same-domain vacancy
+ *     — those have their own adapters and would double-count.
+ *   - No company name, contact, email, phone, or salary is invented. Company
+ *     identity is seeded from the target (the page we already trust to be the
+ *     company's own surface); per-card fields are read only when present.
+ *   - Cap at 200 cards/page to bound runaway markup (mirrors JSON-LD cap).
+ *
+ * Extraction strategy (tolerant, two markup generations):
+ *   1. Anchor-driven: scan every <a href> on the page; keep anchors whose
+ *      visible text looks like a vacancy title (>= 3 chars, not pure nav) AND
+ *      whose href resolves to the SAME host. This is the most reliable signal
+ *      because RU career pages almost always link the title to the vacancy
+ *      detail page on their own domain.
+ *   2. Heading-driven fallback: when a card has a heading (h1-h4) but no usable
+ *      anchor text, pair the heading with the first same-domain href inside the
+ *      card block.
+ *
+ * Returns the career-pages record shape (same contract as mapJsonLdJobPostings)
+ * tagged with `raw_target_adapter: 'same-domain-html-cards'` so the signal
+ * payload's extraction_method is auditable downstream.
+ */
+export function extractVacancyCardsFromSameDomainHtml(html, seed) {
+  const text = typeof html === 'string' ? html : '';
+  if (!text) return [];
+
+  const seedInfo = seed && typeof seed === 'object' ? seed : {};
+  const careerPageUrl = toUrlOrNull(seedInfo.careerPageUrl ?? seedInfo.sourceUrl);
+  const baseHost = careerPageUrl ? extractHostname(careerPageUrl) : null;
+  if (!baseHost) return [];
+
+  const records = [];
+  const seenUrls = new Set();
+
+  // Strategy 1 — anchor-driven. Find every <a href="..."> with visible text.
+  const anchorPattern = /<a\b[^>]*\bhref=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+  let match;
+  while ((match = anchorPattern.exec(text)) !== null) {
+    if (records.length >= 200) break;
+    const href = decodeHtmlUrl(match[1]);
+    const absoluteUrl = toAbsoluteUrlOrNull(href, careerPageUrl);
+    if (!absoluteUrl) continue;
+    if (extractHostname(absoluteUrl) !== baseHost) continue;
+    // Skip the career-page index itself and pure-fragment/same-page links —
+    // we want vacancy DETAIL pages, not the listing page we're already on.
+    if (normalizeUrlForDedupe(absoluteUrl) === normalizeUrlForDedupe(careerPageUrl)) continue;
+
+    const title = cleanCardText(match[2]);
+    if (!isPlausibleVacancyTitle(title)) continue;
+
+    // Dedupe by vacancy URL: a listing page often links the same vacancy twice
+    // (card title + "подробнее"). Keep the first occurrence.
+    const dedupeKey = normalizeUrlForDedupe(absoluteUrl);
+    if (seenUrls.has(dedupeKey)) continue;
+    seenUrls.add(dedupeKey);
+
+    // Capture a window of HTML around the anchor so per-card field extraction
+    // (location/salary/employment) can read sibling elements inside the same
+    // card block. ±600 chars is enough for a typical card without leaking into
+    // the neighbouring card. The anchor text alone never carries those fields.
+    const matchStart = match.index;
+    const matchEnd = matchStart + match[0].length;
+    const windowStart = Math.max(0, matchStart - 600);
+    const windowEnd = Math.min(text.length, matchEnd + 200);
+    const cardWindow = text.slice(windowStart, windowEnd);
+
+    records.push(buildSameDomainHtmlCardRecord({
+      title,
+      vacancyUrl: absoluteUrl,
+      cardHtml: cardWindow,
+      seedInfo,
+      careerPageUrl,
+    }));
+  }
+
+  return records;
+}
+
+function buildSameDomainHtmlCardRecord({ title, vacancyUrl, cardHtml, seedInfo, careerPageUrl }) {
+  // Read only fields that are actually present on the card. Never fabricate.
+  const location = toNonEmptyText(extractFirstMatch(cardHtml, LOCATION_CARD_PATTERNS));
+  const employmentType = toNonEmptyText(extractFirstMatch(cardHtml, EMPLOYMENT_CARD_PATTERNS));
+  const salary = toNonEmptyText(extractFirstMatch(cardHtml, SALARY_CARD_PATTERNS));
+
+  return {
+    company_name: seedInfo.companyName ?? null,
+    company_domain: seedInfo.companyDomain ?? null,
+    company_website_url: seedInfo.companyWebsiteUrl ?? null,
+    career_page_url: seedInfo.careerPageUrl ?? careerPageUrl ?? null,
+    job_posting_url: vacancyUrl,
+    job_title: title,
+    external_id: `html-card:${vacancyUrl}`,
+    location,
+    employment_type: employmentType,
+    salary,
+    occurred_at: null, // HTML cards rarely carry a reliable date; do NOT guess
+    source_record_type: 'job_posting',
+    raw_target_adapter: 'same-domain-html-cards',
+    extraction_method: 'html-card-fallback',
+    raw: { vacancyUrl, title, location, employmentType, salary },
+  };
+}
+
+// Card-level field patterns. Match a value inside a classed element near the
+// title. Tolerant of RU + EN class names and BEM `__` / `-` separators common
+// on Bitrix/1C-Bitrix RU corporate sites (`vacancy-card__location`,
+// `vacancy__city`, `job-item-salary`). Kept conservative: a false negative
+// (missed field) is cheap; a false positive (wrong value dressed as evidence)
+// is expensive.
+const LOCATION_CARD_PATTERNS = [
+  /class="[^"]*\b(?:vacancy|job|vac|position)[A-Za-z_-]*(?:location|city|region|geo|place)\b[^"]*"[^>]*>([\s\S]*?)<\//i,
+  /class="[^"]*\b(?:location|city|region|geo)[A-Za-z_-]*\b[^"]*"[^>]*>([\s\S]*?)<\//i,
+];
+const EMPLOYMENT_CARD_PATTERNS = [
+  /class="[^"]*\b(?:vacancy|job|vac|position)[A-Za-z_-]*(?:type|schedule|employment|work[-_]?type|mode|format)\b[^"]*"[^>]*>([\s\S]*?)<\//i,
+  /class="[^"]*\b(?:employment|schedule|work[-_]?type|work[-_]?mode|format)[A-Za-z_-]*\b[^"]*"[^>]*>([\s\S]*?)<\//i,
+];
+const SALARY_CARD_PATTERNS = [
+  /class="[^"]*\b(?:vacancy|job|vac|position)[A-Za-z_-]*(?:salary|compensation|pay|wage)\b[^"]*"[^>]*>([\s\S]*?)<\//i,
+  /class="[^"]*\b(?:salary|compensation)[A-Za-z_-]*\b[^"]*"[^>]*>([\s\S]*?)<\//i,
+];
+
+function extractFirstMatch(haystack, patterns) {
+  for (const pattern of patterns) {
+    const match = haystack.match(pattern);
+    const value = cleanCardText(match?.[1]);
+    if (value) return value;
+  }
+  return null;
+}
+
+// A plausible vacancy title: 3..120 chars after trim, not pure punctuation,
+// and not obvious navigation chrome ("подробнее", "откликнуться", "все
+// вакансии", "apply", "details"). Reject boilerplate so it never becomes a
+// fake vacancy headline. Plural/case endings tolerated for RU.
+const NAV_BOILERPLATE = /^(?:подробнее|откликнутьс[яьи]|все\s+ваканси(?:и|я|й)?|посмотреть\s+все|смотреть\s+(?:все\s+)?ваканси(?:и|я|й)?|apply|details|read\s+more|view\s+(?:all|jobs?)|learn\s+more|вакансии?|jobs?|careers?|back|назад|далее|подать\s+заявку|подробнее\s+о\s+ваканси)$/i;
+function isPlausibleVacancyTitle(value) {
+  const title = toNonEmptyText(value);
+  if (!title) return false;
+  if (title.length < 3 || title.length > 120) return false;
+  if (NAV_BOILERPLATE.test(title.trim())) return false;
+  // Must contain at least one letter (Cyrillic or Latin). A pure number/symbol
+  // string is not a vacancy title.
+  return /[\p{L}]/u.test(title);
+}
+
+function normalizeUrlForDedupe(url) {
+  try {
+    const u = new URL(url);
+    u.hash = '';
+    if (u.pathname.length > 1 && u.pathname.endsWith('/')) {
+      u.pathname = u.pathname.slice(0, -1);
+    }
+    // Drop marketing utm_* query params so the same vacancy linked from two
+    // campaign contexts dedupes to one record.
+    const keep = [];
+    for (const [key, value] of u.searchParams) {
+      if (!key.startsWith('utm_')) keep.push([key, value]);
+    }
+    u.search = keep.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
+    return u.toString();
+  } catch {
+    return String(url);
+  }
+}
+
+function cleanCardText(value) {
+  if (typeof value !== 'string') return null;
+  const stripped = value
+    .replace(/<[^>]+>/g, ' ') // drop nested tags
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+  return stripped === '' ? null : stripped;
+}
+
 function asPlainObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 }
@@ -906,8 +1103,32 @@ async function fetchCareerPageTarget(target, index) {
       companyName: normalizedTarget.companyName,
       sourceUrl: normalizedTarget.sourceUrl,
       recordsFetched: records.length,
+      // Per-target extraction diagnostics. For same-domain targets this names
+      // which extractor produced the records ('jsonld' vs 'html-card-fallback')
+      // so a discovered target that fetched a page but yielded 0 is inspectable
+      // in the fetch summary instead of silently lost. Other adapters report
+      // their native adapter id. A 0-record same-domain target is flagged
+      // `extractionMethod: 'none'` so the operator can see the gap.
+      extractionMethod: resolveExtractionMethodForSummary(records, normalizedTarget.adapter),
     },
   };
+}
+
+function resolveExtractionMethodForSummary(records, adapter) {
+  if (Array.isArray(records) && records.length > 0) {
+    const method = records[0]?.extraction_method;
+    if (typeof method === 'string' && method.trim() !== '') return method;
+    if (adapter === 'greenhouse-board') return 'greenhouse-api';
+    if (adapter === 'lever-postings') return 'lever-api';
+    if (adapter === 'json-feed') return 'json-feed';
+    if (adapter === 'static-records') return 'static-records';
+    return adapter ?? 'unknown';
+  }
+  // 0 records: distinguish "no extractor matched" from "adapter ran but found
+  // nothing". same-domain-jsonld is the path that now has the HTML fallback —
+  // a 0 here means the page had neither JSON-LD nor usable HTML cards.
+  if (adapter === 'same-domain-jsonld') return 'none';
+  return adapter ?? 'none';
 }
 
 function normalizeFetchTarget(target, index) {
@@ -1018,14 +1239,39 @@ async function fetchSameDomainJsonLdRecords(target) {
     return [];
   }
 
-  const postings = extractJobPostingsFromHtml(page.html);
-
-  return mapJsonLdJobPostings(postings, {
+  const seed = {
     companyName: target.companyName,
     companyDomain: target.companyDomain,
     companyWebsiteUrl: target.companyWebsiteUrl,
     careerPageUrl: target.careerPageUrl ?? target.sourceUrl,
-  });
+    sourceUrl: target.sourceUrl,
+  };
+
+  // JSON-LD first: schema.org JobPosting markup is the structurally-trusted
+  // surface (Яндекс.Работа / Google for Jobs). If present, it wins and the HTML
+  // fallback is skipped to avoid double-counting the same vacancy.
+  const postings = extractJobPostingsFromHtml(page.html);
+  const jsonLdRecords = mapJsonLdJobPostings(postings, seed);
+
+  if (jsonLdRecords.length > 0) {
+    tagRecordsWithExtractionMethod(jsonLdRecords, 'jsonld');
+    return jsonLdRecords;
+  }
+
+  // HTML-card fallback: many RU corporate career pages (Bitrix/1C-Bitrix,
+  // custom CMS) publish vacancies as HTML cards with NO JSON-LD. Without this
+  // fallback the company's direct hiring proof — the only gate-A/B originator
+  // — is silently lost after the page was already fetched. The fallback is
+  // guarded: title + same-domain URL required, no fabricated fields.
+  const htmlCardRecords = extractVacancyCardsFromSameDomainHtml(page.html, seed);
+  return htmlCardRecords;
+}
+
+function tagRecordsWithExtractionMethod(records, method) {
+  for (const record of records) {
+    record.extraction_method = method;
+  }
+  return records;
 }
 
 async function fetchJsonFeedRecords(target) {
@@ -1400,6 +1646,7 @@ function normalizeCareerPageRecord(record, fetchedAt, lineNumber) {
   const occurrenceInput = record.occurred_at ?? record.published_at ?? record.detected_at;
   const occurredAt = toTimestampOrNull(occurrenceInput) ?? fetchedAt;
   const sourceRecordType = toNonEmptyText(record.source_record_type) ?? 'job_posting';
+  const extractionMethod = toNonEmptyText(record.extraction_method) ?? 'unknown';
   const location = toNonEmptyText(record.location ?? record.city ?? record.area_name);
   const pageTitle = toNonEmptyText(record.page_title);
   const employmentType = toNonEmptyText(record.employment_type);
@@ -1459,6 +1706,7 @@ function normalizeCareerPageRecord(record, fetchedAt, lineNumber) {
     fetchedAt,
     occurredAt,
     sourceRecordType,
+    extractionMethod,
     orgExternalId,
     companyName,
     companyDomain: inferredDomain,
@@ -1504,7 +1752,32 @@ export function buildFetchSummary(input) {
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
     sensitiveFieldsDropped: input.sensitiveFieldsDropped ?? 0,
+    // Extraction-quality observability: how many targets yielded records by
+    // each extractor, and how many discovered same-domain career pages had
+    // NEITHER JSON-LD nor usable HTML cards (extractionMethod 'none'). The
+    // 'none' count is the previously-silent gap — a discovered+ fetched direct
+    // surface that produced 0 evidence. Surfaced here so source quality is
+    // inspectable from the fetch summary without a DB query.
+    extractionBreakdown: summarizeExtractionBreakdown(input.targetResults),
   };
+}
+
+function summarizeExtractionBreakdown(targetResults) {
+  const breakdown = { jsonld: 0, 'html-card-fallback': 0, 'greenhouse-api': 0, 'lever-api': 0, 'json-feed': 0, 'static-records': 0, none: 0, other: 0 };
+  let zeroRecordSameDomain = 0;
+  if (!Array.isArray(targetResults)) return { ...breakdown, zeroRecordSameDomainTargets: 0 };
+  for (const result of targetResults) {
+    const method = toNonEmptyText(result?.extractionMethod) ?? 'other';
+    if (Object.prototype.hasOwnProperty.call(breakdown, method)) {
+      breakdown[method] += 1;
+    } else {
+      breakdown.other += 1;
+    }
+    if (method === 'none' && (result?.adapter === 'same-domain-jsonld')) {
+      zeroRecordSameDomain += 1;
+    }
+  }
+  return { ...breakdown, zeroRecordSameDomainTargets: zeroRecordSameDomain };
 }
 
 function buildIngestSummary(input, stats) {
@@ -1523,6 +1796,7 @@ function buildIngestSummary(input, stats) {
     normalizedRecords: input.normalizedRecords.length,
     skippedRecords: input.skippedRecords,
     sensitiveFieldsDropped: input.sensitiveFieldsDropped ?? 0,
+    extractionBreakdown: summarizeExtractionBreakdown(input.targetResults),
     orgsCreated: stats.orgUpsertCount,
     signalUpsertsCompleted: stats.signalUpsertCount,
   };
@@ -1592,6 +1866,7 @@ function buildSignalPayload(record) {
     source_record_title: record.jobTitle,
     source_record_url: record.jobPostingUrl,
     source_record_published_at: record.occurredAt,
+    extraction_method: record.extractionMethod,
     org_source_key: record.primarySourceKey,
     company_name: record.companyName,
     company_domain: record.companyDomain,
