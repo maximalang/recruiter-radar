@@ -9,6 +9,7 @@ import { buildWhyMatch } from "./leads/why-match";
 import { buildTelegramDigestFeedbackReplyMarkup } from "./telegramDigestFeedback";
 import { buildBatchDigestMessages, type BatchLead } from "./telegram/digest-batch";
 import { logError, logEvent } from "./runtime";
+import { resolveHiringMode, normalizeHiringMode } from "./clientProfiles";
 import type {
   ClientProfile,
   Org,
@@ -138,6 +139,7 @@ type BatchCandidateRow = {
   profileHiringIntentMin: number | null;
   profileMinOpenRoles: number | null;
   profileRemoteFriendly: boolean | null;
+  profileHiringMode: string | null;
   lastSignalAt: string | null;
 };
 
@@ -186,7 +188,8 @@ export async function sendBatchDigestForRun(input: {
       cp.target_city AS "profileTargetCity",
       cp.hiring_intent_min AS "profileHiringIntentMin",
       cp.min_open_roles AS "profileMinOpenRoles",
-      cp.remote_friendly AS "profileRemoteFriendly"
+      cp.remote_friendly AS "profileRemoteFriendly",
+      cp.hiring_mode AS "profileHiringMode"
     FROM digest_candidates dc
     INNER JOIN client_profiles cp ON cp.id = dc.client_profile_id
     LEFT JOIN orgs o ON o.id = dc.org_id
@@ -213,6 +216,14 @@ export async function sendBatchDigestForRun(input: {
   result.rows.forEach((row, index) => {
     const { evidenceTitles, locationNames, isForeignEmployer, confidenceGate } = extractPayloadFields(row.payload);
     const sourceFamilies = toStringArray(row.sourceFamilies);
+    // Resolve the agency's hiring mode once per row: 'auto' is inferred from the
+    // profile's declared roles, so downstream (why-match + urgency cue) never
+    // handles 'auto'. Degrades to 'specialist' when the column is null/unknown
+    // (pre-migration profiles) — preserves the pre-mode digest behavior.
+    const resolvedMode = resolveHiringMode({
+      hiringMode: normalizeHiringMode(row.profileHiringMode),
+      roles: toStringArray(row.profileRoles),
+    });
     const whyMatch = buildWhyMatch(
       {
         orgName: row.orgName,
@@ -229,6 +240,7 @@ export async function sendBatchDigestForRun(input: {
         minOpenRoles: row.profileMinOpenRoles,
         hiringIntentMin: row.profileHiringIntentMin,
         remoteFriendly: row.profileRemoteFriendly ?? false,
+        hiringMode: resolvedMode,
       },
     );
 
@@ -241,6 +253,8 @@ export async function sendBatchDigestForRun(input: {
       evidenceTitles,
       locationNames,
       whyLine: whyMatch[0] ?? deriveWhyNow(row.reasons) ?? null,
+      latestPublishedAt: row.lastSignalAt,
+      hiringMode: resolvedMode,
       isForeignEmployer,
       careerPageUrl: row.careerPageUrl,
       orgWebsite: row.orgWebsite,

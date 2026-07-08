@@ -118,12 +118,20 @@ describe('VALID_COMPANY_SIZES', () => {
 })
 
 describe('VALID_INDUSTRIES', () => {
-  it('contains exactly 10 valid industries', () => {
-    expect(VALID_INDUSTRIES.size).toBe(10)
+  it('contains exactly 17 valid industries', () => {
+    // 10 original IT+generalist sectors + 7 non-IT sectors added 2026-07-06
+    // (agro, hospitality, energy, government, real-estate, telecom, auto) so
+    // the product framing + matching work for industrial / regional / mass /
+    // executive agencies, not only IT + finance.
+    expect(VALID_INDUSTRIES.size).toBe(17)
   })
 
   it('contains all canonical industry keys', () => {
-    const expected = ['it', 'finance', 'manufacturing', 'retail', 'healthcare', 'construction', 'logistics', 'consulting', 'education', 'media']
+    const expected = [
+      'it', 'finance', 'manufacturing', 'retail', 'healthcare', 'construction',
+      'logistics', 'consulting', 'education', 'media',
+      'agro', 'hospitality', 'energy', 'government', 'real-estate', 'telecom', 'auto',
+    ]
     for (const key of expected) {
       expect(VALID_INDUSTRIES.has(key)).toBe(true)
     }

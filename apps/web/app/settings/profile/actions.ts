@@ -9,6 +9,7 @@ import {
   VALID_COMPANY_SIZES,
   VALID_ROLES,
   normalizeContactPolicy,
+  normalizeHiringMode,
 } from "../../../lib/clientProfiles";
 import {
   saveDeliveryPreferencesByOwnerId,
@@ -99,6 +100,7 @@ export async function saveSettingsProfileAction(
       hiringIntentMin: readOptionalNumber(formData, "hiringIntentMin"),
       signalFreshnessDays: readOptionalNumber(formData, "signalFreshnessDays"),
       minOpenRoles: readOptionalNumber(formData, "minOpenRoles"),
+      hiringMode: normalizeHiringMode(formData.get("hiringMode")),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Не удалось сохранить профиль.";

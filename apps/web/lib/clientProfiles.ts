@@ -26,7 +26,33 @@ type ClientProfileRow = {
   hiringIntentMin: number | null;
   signalFreshnessDays: number | null;
   minOpenRoles: number | null;
+  hiringMode: string | null;
 };
+
+/**
+ * Agency hiring practice mode — the universal agency-model dimension.
+ *
+ * Controls how matching/ranking/urgency/explanation weight signals for this
+ * agency. The mode only REWEIGHTS within the existing gate pipeline; it never
+ * bypasses a confidence gate, never weakens an evidence-first bar, and never
+ * inflates lead counts.
+ *
+ *   'auto'       — infer from `roles` via resolveHiringMode(). Default for
+ *                  legacy/empty profiles → falls back to 'specialist'.
+ *   'specialist' — niche IT / digital / finance practice; current default
+ *                  behavior. Seniority matters but volume is not noise.
+ *   'executive'  — C-level / director search; seniority is the dominant fit
+ *                  signal, raw open-role volume is treated as noise.
+ *   'volume'     — mass / industrial / logistics / sales-floor hiring;
+ *                  open-role volume and burst are the dominant signals.
+ */
+export type HiringMode = 'auto' | 'specialist' | 'executive' | 'volume';
+
+export const VALID_HIRING_MODES: ReadonlySet<HiringMode> = new Set([
+  'auto', 'specialist', 'executive', 'volume',
+]);
+
+export const DEFAULT_HIRING_MODE: HiringMode = 'auto';
 
 export type ClientProfile = {
   id: string;
@@ -57,6 +83,8 @@ export type ClientProfile = {
   signalFreshnessDays: number | null;
   /** Minimum parsed open-role count (vacancies). null = no minimum. */
   minOpenRoles: number | null;
+  /** Agency hiring practice mode. See {@link HiringMode}. */
+  hiringMode: HiringMode;
 };
 
 type PilotApplicationRow = {
@@ -123,7 +151,8 @@ export async function listClientProfiles(ownerId: string | number): Promise<Clie
       remote_friendly AS "remoteFriendly",
       hiring_intent_min AS "hiringIntentMin",
       signal_freshness_days AS "signalFreshnessDays",
-      min_open_roles AS "minOpenRoles"
+      min_open_roles AS "minOpenRoles",
+      hiring_mode AS "hiringMode"
     FROM client_profiles
     WHERE owner_id = $1 OR owner_id IS NULL
     ORDER BY is_active DESC, updated_at DESC, id DESC
@@ -187,7 +216,8 @@ export async function getClientProfileById(
       remote_friendly AS "remoteFriendly",
       hiring_intent_min AS "hiringIntentMin",
       signal_freshness_days AS "signalFreshnessDays",
-      min_open_roles AS "minOpenRoles"
+      min_open_roles AS "minOpenRoles",
+      hiring_mode AS "hiringMode"
     FROM client_profiles
     WHERE id = $1 ${ownerClause}
   `, params);
@@ -236,7 +266,8 @@ export async function getClientProfileByOwnerId(
       remote_friendly AS "remoteFriendly",
       hiring_intent_min AS "hiringIntentMin",
       signal_freshness_days AS "signalFreshnessDays",
-      min_open_roles AS "minOpenRoles"
+      min_open_roles AS "minOpenRoles",
+      hiring_mode AS "hiringMode"
     FROM client_profiles
     WHERE owner_id = $1
     LIMIT 1
@@ -317,7 +348,8 @@ export async function findMatchingClientProfileForCheckoutOrder(input: {
         remote_friendly AS "remoteFriendly",
         hiring_intent_min AS "hiringIntentMin",
         signal_freshness_days AS "signalFreshnessDays",
-        min_open_roles AS "minOpenRoles"
+        min_open_roles AS "minOpenRoles",
+        hiring_mode AS "hiringMode"
       FROM client_profiles
       WHERE telegram_chat_id::TEXT = $1
       ${ownershipClause}
@@ -352,7 +384,8 @@ export async function findMatchingClientProfileForCheckoutOrder(input: {
       remote_friendly AS "remoteFriendly",
       hiring_intent_min AS "hiringIntentMin",
       signal_freshness_days AS "signalFreshnessDays",
-      min_open_roles AS "minOpenRoles"
+      min_open_roles AS "minOpenRoles",
+      hiring_mode AS "hiringMode"
     FROM client_profiles
     WHERE LOWER(BTRIM(agency_name)) = LOWER(BTRIM($1))
     ${ownershipClause}
@@ -410,6 +443,7 @@ export async function saveClientProfile(input: {
   hiringIntentMin?: number | null;
   signalFreshnessDays?: number | null;
   minOpenRoles?: number | null;
+  hiringMode?: HiringMode | null;
 }, db?: ClientProfilesDbClient): Promise<ClientProfile> {
   const pool = db ?? getPool();
 
@@ -436,6 +470,7 @@ export async function saveClientProfile(input: {
   const hiringIntentMin = normalizeHiringIntentMin(input.hiringIntentMin);
   const signalFreshnessDays = normalizePositiveInt(input.signalFreshnessDays);
   const minOpenRoles = normalizeNonNegativeInt(input.minOpenRoles);
+  const hiringMode = normalizeHiringMode(input.hiringMode);
 
   const returningClause = `
     id::TEXT AS id,
@@ -458,7 +493,8 @@ export async function saveClientProfile(input: {
     remote_friendly AS "remoteFriendly",
     hiring_intent_min AS "hiringIntentMin",
     signal_freshness_days AS "signalFreshnessDays",
-    min_open_roles AS "minOpenRoles"
+    min_open_roles AS "minOpenRoles",
+    hiring_mode AS "hiringMode"
   `;
 
   let result: Awaited<ReturnType<typeof pool.query<ClientProfileRow>>>;
@@ -485,7 +521,8 @@ export async function saveClientProfile(input: {
             remote_friendly = $16,
             hiring_intent_min = $17,
             signal_freshness_days = $18,
-            min_open_roles = $19
+            min_open_roles = $19,
+            hiring_mode = $20
           WHERE id = $1
           RETURNING ${returningClause}
         `, [
@@ -507,7 +544,8 @@ export async function saveClientProfile(input: {
           remoteFriendly,
           hiringIntentMin,
           signalFreshnessDays,
-          minOpenRoles
+          minOpenRoles,
+          hiringMode
         ])
       : await pool.query<ClientProfileRow>(`
           INSERT INTO client_profiles (
@@ -528,9 +566,10 @@ export async function saveClientProfile(input: {
             remote_friendly,
             hiring_intent_min,
             signal_freshness_days,
-            min_open_roles
+            min_open_roles,
+            hiring_mode
           )
-          VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8::jsonb, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+          VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8::jsonb, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
           RETURNING ${returningClause}
         `, [
           agencyName,
@@ -550,7 +589,8 @@ export async function saveClientProfile(input: {
           remoteFriendly,
           hiringIntentMin,
           signalFreshnessDays,
-          minOpenRoles
+          minOpenRoles,
+          hiringMode
         ]);
   } catch (err) {
     if (isUniqueViolation(err, "client_profiles_telegram_chat_id_unique")) {
@@ -719,6 +759,7 @@ function mapClientProfileRow(row: ClientProfileRow): ClientProfile {
     hiringIntentMin: normalizeHiringIntentMin(row.hiringIntentMin),
     signalFreshnessDays: normalizePositiveInt(row.signalFreshnessDays),
     minOpenRoles: normalizeNonNegativeInt(row.minOpenRoles),
+    hiringMode: normalizeHiringMode(row.hiringMode),
   };
 }
 
@@ -759,6 +800,9 @@ export function clientProfileToAgencyProfile(profile: ClientProfile): AgencyProf
     remoteFriendly: profile.remoteFriendly ?? false,
     specialization: profile.specialization ?? undefined,
     includeKeywords: profile.includeKeywords ?? [],
+    // Resolve 'auto' → concrete mode at the boundary so downstream scoring
+    // (FIUR, fit-explanation) never has to handle 'auto'.
+    hiringMode: resolveHiringMode(profile),
   }
 }
 
@@ -951,6 +995,8 @@ const VALID_COMPANY_SIZES = new Set(['startup', 'small', 'medium', 'large', 'ent
 const VALID_INDUSTRIES = new Set([
   'it', 'finance', 'manufacturing', 'retail', 'healthcare',
   'construction', 'logistics', 'consulting', 'education', 'media',
+  'agro', 'hospitality', 'energy', 'government', 'real-estate',
+  'telecom', 'auto',
 ])
 
 /**
@@ -970,6 +1016,13 @@ const INDUSTRY_KEYWORDS: ReadonlyMap<string, readonly string[]> = new Map([
   ['consulting',    ['консалтинг', 'consulting', 'консультаци']],
   ['education',     ['образован', 'учеб', 'школ', 'вуз', 'университет', 'education']],
   ['media',         ['медиа', 'телеканал', 'издани', 'media', 'журнал', 'новост']],
+  ['agro',          ['агропромышленн', 'агро', 'сельск', 'фермер', 'agro', 'agriculture', 'агрохолдинг', 'семен', 'урожай', 'птиц', 'молочн']],
+  ['hospitality',   ['ресторан', 'отель', 'гостиниц', 'туризм', 'hotel', 'hospitality', 'hoReCa', 'общепит', 'питан', 'кафе', 'ресторан']],
+  ['energy',        ['энерг', 'нефт', 'газ', 'нефтегаз', 'сырь', 'energy', 'oil', 'gas', 'уголь', 'электростанц', 'ресурс']],
+  ['government',    ['госу', 'гос.', 'министерств', 'ведомств', 'казён', 'бюджетн', 'нко', 'фонд', 'government', 'municipal', 'муниципал', 'администрац']],
+  ['real-estate',   ['недвижим', 'застройщик', 'девелопмент', 'real estate', 'property', 'жильё', 'помещен', 'риелтор']],
+  ['telecom',       ['телеком', 'связь', 'оператор связ', 'telecom', 'мобайл', 'билайн', 'мтс', 'мегафон', 'telecom']],
+  ['auto',          ['автомобил', 'авто ', 'автосервис', 'автосалон', 'автопарк', 'auto', 'automotive', 'транспортн', 'шиномонтаж', 'сто ']],
 ])
 
 /**
@@ -1068,6 +1121,60 @@ export function normalizeContactPolicy(value: unknown): ClientProfile['contactPo
   const normalizedItem = value.trim().toLowerCase() as ClientProfile['contactPolicy']
 
   return VALID_CONTACT_POLICIES.has(normalizedItem) ? normalizedItem : DEFAULT_CONTACT_POLICY
+}
+
+/**
+ * Normalize a hiring-mode value — only known values survive.
+ * Anything unknown (including null/non-string) falls back to the default
+ * ('auto'), so a forged POST can never persist an arbitrary string into the
+ * hiring_mode column.
+ */
+export function normalizeHiringMode(value: unknown): HiringMode {
+  if (typeof value !== 'string') {
+    return DEFAULT_HIRING_MODE
+  }
+
+  const normalizedItem = value.trim().toLowerCase() as HiringMode
+
+  return VALID_HIRING_MODES.has(normalizedItem) ? normalizedItem : DEFAULT_HIRING_MODE
+}
+
+/**
+ * Resolve the effective hiring mode for a profile.
+ *
+ * If the agency set an explicit mode other than 'auto', that wins — it is a
+ * deliberate product choice. 'auto' (the default) infers the mode from the
+ * agency's declared canonical `roles`:
+ *
+ *   - 'executive' role present (alone or with others) → 'executive'. An
+ *     agency that declares it closes C-level mandates is an executive agency
+ *     even if it also fills some line roles.
+ *   - otherwise, if industrial/logistics roles dominate (≥ 1 of them and no
+ *     executive/specialist-only signal) → 'volume'. Industrial & logistics
+ *     hiring is overwhelmingly volume hiring in Russia.
+ *   - otherwise → 'specialist' (the pre-existing default behavior).
+ *
+ * Inference is a heuristic; the agency can always override by picking an
+ * explicit mode in /settings/profile. Pure + deterministic.
+ */
+export function resolveHiringMode(profile: Pick<ClientProfile, 'hiringMode' | 'roles'>): Exclude<HiringMode, 'auto'> {
+  if (profile.hiringMode && profile.hiringMode !== 'auto') {
+    return profile.hiringMode
+  }
+
+  const roles = profile.roles ?? []
+  if (roles.includes('executive')) {
+    return 'executive'
+  }
+  // Industrial + logistics roles are the canonical volume-hiring markets.
+  // A single such role, in the absence of an executive declaration, is enough
+  // to infer volume mode — these agencies win mandates on throughput, not
+  // on per-role seniority.
+  const volumeRoles = roles.filter((r) => r === 'industrial' || r === 'logistics')
+  if (volumeRoles.length > 0) {
+    return 'volume'
+  }
+  return 'specialist'
 }
 
 /**

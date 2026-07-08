@@ -57,6 +57,15 @@ export function computeProfileCompletion(
       label: "Порог силы сигнала",
       filled: profile.hiringIntentMin != null,
     },
+    {
+      // The agency-model dimension. 'auto' counts as filled — it is a
+      // deliberate "infer from roles" choice, not a gap. The field is always
+      // present (DB default 'auto'), so this group is effectively always
+      // filled once the migration has run; kept in the list for visibility.
+      key: "hiringMode",
+      label: "Тип практики найма",
+      filled: Boolean(profile.hiringMode),
+    },
   ];
 
   if (deliveryPrefs) {

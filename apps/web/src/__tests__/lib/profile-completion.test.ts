@@ -31,15 +31,18 @@ function profile(overrides: Partial<ClientProfile> = {}): ClientProfile {
     hiringIntentMin: null,
     signalFreshnessDays: null,
     minOpenRoles: null,
+    hiringMode: 'auto',
     ...overrides,
   };
 }
 
 describe('computeProfileCompletion', () => {
-  it('reports an empty profile as 0% complete', () => {
+  it('reports an empty profile as only the hiringMode group filled', () => {
+    // hiringMode defaults to 'auto' (a deliberate infer-from-roles choice),
+    // so it counts as filled even on an otherwise-empty profile.
     const c = computeProfileCompletion(profile());
-    expect(c.filledCount).toBe(0);
-    expect(c.ratio).toBe(0);
+    expect(c.groups.find((g) => g.key === 'hiringMode')?.filled).toBe(true);
+    expect(c.groups.find((g) => g.key === 'roles')?.filled).toBe(false);
     expect(c.isComplete).toBe(false);
     expect(c.groups).toHaveLength(c.totalCount);
   });
@@ -48,7 +51,8 @@ describe('computeProfileCompletion', () => {
     const c = computeProfileCompletion(
       profile({ roles: ['it-engineering'], industries: ['it'], targetCity: 'Москва' }),
     );
-    expect(c.filledCount).toBe(3);
+    // 3 explicit groups + hiringMode (always filled by default 'auto') = 4.
+    expect(c.filledCount).toBe(4);
     expect(c.groups.find((g) => g.key === 'roles')?.filled).toBe(true);
     expect(c.groups.find((g) => g.key === 'companySizes')?.filled).toBe(false);
   });

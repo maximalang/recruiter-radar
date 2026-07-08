@@ -93,3 +93,60 @@ describe('buildWhyMatch', () => {
     expect(lines[0]).toContain('по вашему профилю');
   });
 });
+
+// ─── Mode-aware why-match (2026-07-06) ─────────────────────────────────────
+
+describe('buildWhyMatch mode-aware', () => {
+  it('executive mode leads with a seniority line when a senior title is present', () => {
+    const lines = buildWhyMatch(
+      lead({ evidenceTitles: ['Финансовый директор', 'CFO'] }),
+      profile({ roles: ['executive'], hiringMode: 'executive' }),
+    );
+    expect(lines[0]).toContain('руководителя');
+    expect(lines[0]).toContain('executive');
+  });
+
+  it('executive mode does NOT invent a seniority line when no senior title is present', () => {
+    const lines = buildWhyMatch(
+      lead({ evidenceTitles: ['Бариста', 'Кассир'] }),
+      profile({ roles: ['executive'], hiringMode: 'executive' }),
+    );
+    expect(lines.some((l) => l.includes('руководителя'))).toBe(false);
+    expect(lines.some((l) => l.includes('executive'))).toBe(false);
+  });
+
+  it('volume mode surfaces a hiring-scale line for 3+ open roles', () => {
+    const lines = buildWhyMatch(
+      lead({ vacanciesCount: 12 }),
+      profile({ hiringMode: 'volume' }),
+    );
+    expect(lines.some((l) => l.includes('Масштаб найма'))).toBe(true);
+    expect(lines.some((l) => l.includes('12'))).toBe(true);
+  });
+
+  it('volume mode does NOT surface a hiring-scale line for fewer than 3 roles', () => {
+    const lines = buildWhyMatch(
+      lead({ vacanciesCount: 1 }),
+      profile({ hiringMode: 'volume' }),
+    );
+    expect(lines.some((l) => l.includes('Масштаб найма'))).toBe(false);
+  });
+
+  it('specialist mode (default) keeps the pre-mode order — no seniority/scale line', () => {
+    const lines = buildWhyMatch(
+      lead({ evidenceTitles: ['Финансовый директор'], vacanciesCount: 12 }),
+      profile({ hiringMode: 'specialist' }),
+    );
+    expect(lines.some((l) => l.includes('руководителя'))).toBe(false);
+    expect(lines.some((l) => l.includes('Масштаб найма'))).toBe(false);
+  });
+
+  it('volume mode with an explicit minOpenRoles still surfaces the scale line (not the generic one)', () => {
+    const lines = buildWhyMatch(
+      lead({ vacanciesCount: 8 }),
+      profile({ hiringMode: 'volume', minOpenRoles: 3 }),
+    );
+    expect(lines.some((l) => l.includes('Масштаб найма'))).toBe(true);
+    expect(lines.some((l) => l === 'Открыто ролей: 8')).toBe(false);
+  });
+});

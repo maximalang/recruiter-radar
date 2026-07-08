@@ -119,17 +119,48 @@ const DAY_MS = 24 * 60 * 60 * 1000
  *
  * `recentSignalCount` is the count of signals in the last 7 days (may be
  * undefined when unknown). `now` is injectable for tests.
+ *
+ * `hiringMode` makes urgency agency-aware (2026-07-06):
+ *   - 'executive' — a single fresh senior posting is a strong signal, while a
+ *     high open-role count is NOT urgency (it often signals low-seniority churn,
+ *     the opposite of an executive mandate). Volume cues are downgraded; a fresh
+ *     single posting is upgraded to a senior-specific urgency line.
+ *   - 'volume' — open-role volume is the dominant urgency cue (kept as-is).
+ *   - 'specialist' — the default pre-mode behavior above (unchanged).
+ *
+ * The mode only changes the LABEL and the relative emphasis — it never weakens
+ * the underlying signal or invents activity that isn't there.
  */
 export function deriveUrgencyCue(input: {
   vacanciesCount: number
   latestPublishedAt?: string | null
   recentSignalCount?: number | null
   now?: number
+  hiringMode?: 'specialist' | 'executive' | 'volume'
 }): UrgencyCue {
   const now = input.now ?? Date.now()
   const recent = input.recentSignalCount ?? 0
   const ageDays = ageInDays(input.latestPublishedAt, now)
+  const mode = input.hiringMode ?? 'specialist'
 
+  // Executive mode: seniority-shaped urgency. A high open-role count is not a
+  // hot lead for an executive agency — downgrade volume cues and lead with the
+  // freshness/seniority signal instead. We do NOT invent a "senior" claim here
+  // (the caller knows the roles); we only reframe the recency cue so a single
+  // fresh posting reads as urgency rather than as "one role".
+  if (mode === 'executive') {
+    if (ageDays != null && ageDays <= 7) {
+      return { level: 'fresh', label: 'Свежая вакансия за неделю — стоит реагировать быстро' }
+    }
+    if (ageDays != null && ageDays > 30) {
+      const rounded = Math.round(ageDays)
+      return { level: 'stale', label: `Последняя вакансия ${rounded}+ дней назад` }
+    }
+    return { level: 'normal', label: 'Есть активная вакансия' }
+  }
+
+  // Volume + specialist share the volume-shaped ladder below; volume mode is
+  // the case where these cues matter most, specialist keeps them as the default.
   if (recent >= 5) {
     return { level: 'burst', label: `${recent}+ вакансий за последние 7 дней` }
   }

@@ -17,16 +17,23 @@ export type ProfileOption = { key: string; label: string };
 
 /** Industry options — keys must match VALID_INDUSTRIES. */
 export const INDUSTRY_OPTIONS: readonly ProfileOption[] = [
-  { key: "it", label: "IT" },
-  { key: "finance", label: "Финансы" },
+  { key: "it", label: "IT / Digital" },
+  { key: "finance", label: "Финансы / Банки" },
   { key: "manufacturing", label: "Производство" },
-  { key: "retail", label: "Ритейл" },
-  { key: "healthcare", label: "Здравоохранение" },
+  { key: "retail", label: "Ритейл / Торговля" },
+  { key: "healthcare", label: "Здравоохранение / Фарма" },
   { key: "construction", label: "Строительство" },
-  { key: "logistics", label: "Логистика" },
+  { key: "logistics", label: "Логистика / Транспорт" },
   { key: "consulting", label: "Консалтинг" },
   { key: "education", label: "Образование" },
   { key: "media", label: "Медиа" },
+  { key: "agro", label: "АПК / Сельское хозяйство" },
+  { key: "hospitality", label: "HoReCa / Туризм" },
+  { key: "energy", label: "Энергетика / Сырьё" },
+  { key: "government", label: "Госсектор / НКО" },
+  { key: "real-estate", label: "Недвижимость" },
+  { key: "telecom", label: "Телеком / Связь" },
+  { key: "auto", label: "Авто / Транспортные услуги" },
 ] as const;
 
 /** Company size options — keys must match VALID_COMPANY_SIZES. */
@@ -62,3 +69,53 @@ export const CONTACT_POLICY_OPTIONS: ReadonlyArray<{
   { key: "no_personal", label: "Без личных контактов сотрудников" },
   { key: "unrestricted", label: "Без ограничений" },
 ] as const;
+
+/**
+ * Hiring-mode options — keys must match ClientProfile['hiringMode'] /
+ * VALID_HIRING_MODES. Labels are calm, premium, and describe the practice
+ * type so an agency recognises itself rather than guessing what "executive"
+ * means. `auto` is the recommended default for a new agency, but it resolves
+ * to ONE concrete mode (see resolveHiringMode) — it does not blend practices.
+ */
+export const HIRING_MODE_OPTIONS: ReadonlyArray<{
+  key: ClientProfile["hiringMode"];
+  label: string;
+  /** Short helper shown under the option — what the mode changes in the radar. */
+  hint: string;
+}> = [
+  {
+    key: "auto",
+    label: "Авто (по ролям)",
+    hint: "Режим определяется по выбранным ролям: executive-роль → executive, промышленность/логистика → volume, иначе specialist. Подходит, когда у вас одна основная практика.",
+  },
+  {
+    key: "specialist",
+    label: "Спец-практика (нишевый найм)",
+    hint: "IT / digital / финансы. Мало ролей, важна релевантность и свежесть, объём не решает.",
+  },
+  {
+    key: "executive",
+    label: "Executive search (C-level)",
+    hint: "Руководители и топ-менеджмент. Главный сигнал — seniority, объём вакансий — шум.",
+  },
+  {
+    key: "volume",
+    label: "Массовый найм",
+    hint: "Промышленность, логистика, продажи, операционный линейный найм. Главный сигнал — объём и burst.",
+  },
+] as const;
+
+/**
+ * Short Russian label for a resolved (non-auto) hiring mode — used by the
+ * profile "currently active mode" badge and any surface that needs to name the
+ * effective mode without re-deriving it. Accepts only the three concrete modes;
+ * `auto` is resolved upstream via resolveHiringMode before reaching here.
+ */
+export const RESOLVED_HIRING_MODE_LABEL: Readonly<Record<
+  Exclude<ClientProfile["hiringMode"], "auto">,
+  string
+>> = {
+  specialist: "Спец-практика",
+  executive: "Executive search",
+  volume: "Массовый найм",
+};
