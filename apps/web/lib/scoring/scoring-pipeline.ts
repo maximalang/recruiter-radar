@@ -102,6 +102,14 @@ export interface AgencyProfile {
   specialization?: string
   /** Extra ICP keywords (industries / niches) — drive Fit term matching. */
   includeKeywords?: string[]
+  /**
+   * Agency hiring practice mode (specialist / executive / volume). Controls
+   * mode-aware weighting in FIUR intent/urgency + fit-explanation. Resolved
+   * from ClientProfile.hiringMode via resolveHiringMode before reaching here,
+   * so 'auto' is never passed downstream. Optional for backward compat with
+   * callers that build an AgencyProfile directly; defaults to 'specialist'.
+   */
+  hiringMode?: 'specialist' | 'executive' | 'volume'
 }
 
 export interface ScoringPipelineInput {
@@ -283,6 +291,7 @@ export function runScoringPipeline(input: ScoringPipelineInput): ScoringPipeline
       specialization: input.agencyProfile.specialization,
       includeKeywords: input.agencyProfile.includeKeywords,
       contactPolicy: input.agencyProfile.contactPolicy,
+      hiringMode: input.agencyProfile.hiringMode,
     },
     evidence: toFiurEvidence(input.evidence),
     now: () => nowMs,

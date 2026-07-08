@@ -11,7 +11,7 @@
 
 import type { EvidenceTier } from '@/lib/db/evidence'
 import { detectHiringBurst } from '@/lib/scoring/hiring-burst'
-import { summarizeRoleMix } from '@/lib/scoring/role-category'
+import { summarizeRoleMix, hasSeniorRole } from '@/lib/scoring/role-category'
 import { formatReason, type ScoringReason, type FiurComponent } from '@/lib/scoring/scoring-reasons'
 export type { EvidenceTier }
 export type { ScoringReason, FiurComponent }
@@ -77,6 +77,14 @@ export interface FiurClientProfile {
    * this agency, so Reachability is capped.
    */
   contactPolicy?: 'corporate_only' | 'no_personal' | 'unrestricted'
+  /**
+   * Agency hiring practice mode — controls mode-aware weighting in
+   * computeIntent / computeUrgency and the seniority fit reason. Resolved
+   * from ClientProfile.hiringMode via resolveHiringMode before reaching FIUR,
+   * so 'auto' is never passed here. Optional for backward compat with callers
+   * that build a FiurClientProfile directly; defaults to 'specialist'.
+   */
+  hiringMode?: 'specialist' | 'executive' | 'volume'
 }
 
 /**
@@ -365,6 +373,31 @@ function computeFit(
     }
   }
 
+  // Seniority fit — the defining signal for executive-search agencies. A
+  // company hiring a C-level / director / руководитель is a strong executive
+  // lead; a company hiring only line roles is a weaker (or negative) one.
+  // Mode-aware so the signal only fires for the agency type it describes:
+  //   executive → +0.25 when a senior role is present (the dominant fit cue),
+  //                and an honest "no senior roles" line when none — so the
+  //                explanation can say why a volume-only company ranks lower
+  //                for an executive agency without inventing a penalty.
+  //   volume / specialist → no seniority weight (seniority is not the cue).
+  // The senior detection is pure (detectSeniority over role titles); no new
+  // evidence is fabricated.
+  const mode = profile.hiringMode ?? 'specialist'
+  if (mode === 'executive' && vacancies.length > 0) {
+    // Seniority is read from the human vacancy TITLE (e.g. "CFO",
+    // "Генеральный директор"), not the canonical role key — the key carries
+    // no seniority information.
+    const seniorPresent = hasSeniorRole(vacancies.map((v) => v.title))
+    if (seniorPresent) {
+      score += 0.25
+      reasons.push(r('fit', 'fit.seniority.match'))
+    } else {
+      reasons.push(r('fit', 'fit.seniority.volume-mode'))
+    }
+  }
+
   // ICP free-text terms (specialization + includeKeywords) — the most
   // agency-specific signal. Matched against company + vacancy text, mirroring
   // the public preview engine (lib/preview-relevance.ts). Contributes up to
@@ -451,7 +484,8 @@ function computeFit(
 function computeIntent(
   vacancies: FiurVacancy[],
   evidence: FiurEvidenceItem[],
-  now: number
+  now: number,
+  hiringMode: 'specialist' | 'executive' | 'volume' = 'specialist'
 ): ComponentResult {
   const reasons: ScoringReason[] = []
   if (vacancies.length === 0) {
@@ -500,7 +534,12 @@ function computeIntent(
     reasons.push(r('intent', 'intent.multiple-corroborating'))
   }
 
-  if (realRoles.length >= 3) {
+  // Role-count bonus is mode-aware. For an executive agency, raw open-role
+  // count is NOT a stronger intent signal — a company hiring 10 junior roles
+  // is not a hotter executive lead than one hiring 1 CFO. Volume mode keeps
+  // the full bonus (volume IS intent for mass hiring); specialist keeps the
+  // default; executive skips it so volume doesn't dominate executive intent.
+  if (realRoles.length >= 3 && hiringMode !== 'executive') {
     score += 0.15
     reasons.push(r('intent', 'intent.multiple-roles', { count: realRoles.length }))
   }
@@ -655,7 +694,8 @@ function computeReachability(
 export function computeFiur(input: FiurInput): FiurBreakdown {
   const now = (input.now ?? Date.now)()
   const fit = computeFit(input.company, input.vacancies, input.clientProfile, input.clientOverrides, input.marketConditions)
-  const intent = computeIntent(input.vacancies, input.evidence, now)
+  const resolvedMode = input.clientProfile.hiringMode ?? 'specialist'
+  const intent = computeIntent(input.vacancies, input.evidence, now, resolvedMode)
   const urgency = computeUrgency(input.vacancies, now, input.recentSignalCount)
   const reachability = computeReachability(input.company, input.evidence, input.clientProfile.contactPolicy)
 

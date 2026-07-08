@@ -2,16 +2,29 @@
  * Role category classifier.
  *
  * Recruitment agencies most often win mandates for HR, Sales, Finance,
- * and operations roles. Tech roles are commonly filled in-house, via
- * employee referral, or by tech-specialist boutiques — so a company
- * hiring outside tech is a stronger lead signal for a generalist agency.
+ * operations, industrial, and logistics roles. Tech roles are commonly
+ * filled in-house, via employee referral, or by tech-specialist boutiques
+ * — so a company hiring outside tech is a stronger lead signal for a
+ * generalist agency. Industrial (factory / production / warehouse-floor)
+ * and logistics (driver / courier / supply-chain) are first-class
+ * categories because they are two of the largest non-IT agency markets in
+ * Russia and were previously folded into `operations` / `other`, hiding
+ * them from any role-aware reasoning.
  *
  * Classification is deterministic, case-insensitive keyword matching
  * over the role title in English and Russian. First matching category
  * wins; "other" is the fallback and is treated as non-tech.
  */
 
-export type RoleCategory = 'tech' | 'sales' | 'hr' | 'finance' | 'operations' | 'other'
+export type RoleCategory =
+  | 'tech'
+  | 'sales'
+  | 'hr'
+  | 'finance'
+  | 'operations'
+  | 'industrial'
+  | 'logistics'
+  | 'other'
 
 interface CategoryRule {
   category: RoleCategory
@@ -66,6 +79,58 @@ const RULES: CategoryRule[] = [
       'продаж',
       'клиент',
       'b2b',
+    ],
+  },
+  {
+    category: 'industrial',
+    keywords: [
+      'manufacturing',
+      'factory',
+      'production worker',
+      'machine operator',
+      'cnc',
+      'welder',
+      'fitter',
+      'turner',
+      'производств',
+      'завод',
+      'фабрик',
+      'рабочий',
+      'станочник',
+      'оператор линии',
+      'сварщик',
+      'токарь',
+      'слесарь',
+      'промышленн',
+    ],
+  },
+  {
+    category: 'logistics',
+    keywords: [
+      'logistics',
+      'supply chain',
+      'warehouse',
+      'warehouse worker',
+      'forklift',
+      'driver',
+      'courier',
+      'dispatcher',
+      'fleet',
+      'shipping',
+      'freight',
+      'логист',
+      'склад',
+      'кладовщик',
+      'кладовщ',
+      'водитель',
+      'курьер',
+      'доставк',
+      'перевозк',
+      'транспорт',
+      'экспедитор',
+      'диспетчер',
+      'грузчик',
+      'груз',
     ],
   },
   {
@@ -147,6 +212,8 @@ const ZERO_COUNTS: Record<RoleCategory, number> = {
   hr: 0,
   finance: 0,
   operations: 0,
+  industrial: 0,
+  logistics: 0,
   other: 0,
 }
 
@@ -159,4 +226,106 @@ export function summarizeRoleMix(roles: string[]): RoleMixSummary {
   const nonTechCount = total - counts.tech
   const nonTechShare = total > 0 ? nonTechCount / total : 0
   return { total, counts, nonTechCount, nonTechShare }
+}
+
+// ─── Seniority ───────────────────────────────────────────────────────────────
+
+/**
+ * Seniority level of a role title — the dominant fit signal for executive
+ * search agencies, and a useful disambiguator between a company hiring a
+ * C-level officer (strong lead) vs the same company hiring a junior in the
+ * same function (weaker lead for an executive agency).
+ *
+ *   - 'senior': C-level, director, head, VP, partner, principal, lead-of,
+ *               главный, руководитель, директор, начальник, завотделом,
+ *               коммерческий директор, финансовый директор, CTO/CFO/COO/CMO.
+ *   - 'entry':  explicit junior markers (junior, intern, стажер, младший,
+ *               assistant, помощник).
+ *   - 'mid':    everything else (the default for a plain "manager" / "инженер"
+ *               with no seniority marker).
+ *
+ * Pure + deterministic, case-insensitive. 'senior' wins over 'entry' when both
+ * markers appear (e.g. "junior head of" is pathological; a director is a
+ * director). First-match over the SENIOR list, then ENTRY, else 'mid'.
+ */
+export type Seniority = 'senior' | 'mid' | 'entry'
+
+const SENIOR_KEYWORDS: readonly string[] = [
+  // English C-suite / leadership
+  'c-level',
+  ' cto',
+  ' cfo',
+  ' coo',
+  ' cmo',
+  ' cio',
+  ' ceo',
+  'chief ',
+  'director',
+  'head of',
+  ' vp',
+  'vice president',
+  'partner',
+  'principal',
+  'managing director',
+  'general manager',
+  'country manager',
+  // Russian leadership
+  'генеральный директор',
+  'коммерческий директор',
+  'финансовый директор',
+  'исполнительный директор',
+  'директор',
+  'руководитель',
+  'начальник',
+  'заведующий',
+  'заведующая',
+  'главный',
+  'управляющий',
+  'партнёр',
+  'партнер',
+  'член правления',
+  'замдиректора',
+  'заместитель директора',
+]
+
+const ENTRY_KEYWORDS: readonly string[] = [
+  'junior',
+  'intern',
+  'internship',
+  'стажер',
+  'стажёр',
+  'младший',
+  'assistant',
+  'помощник',
+  'помощница',
+  'trainee',
+  'стажировка',
+]
+
+function normalizeSeniorityHaystack(title: string): string {
+  // Pad with spaces so ' cto' / ' vp' match as tokens, not as substrings of
+  // a longer word. Lowercased ru-RU for consistent Cyrillic folding.
+  return ` ${title.trim().toLowerCase()} `
+}
+
+export function detectSeniority(title: string): Seniority {
+  const haystack = normalizeSeniorityHaystack(title)
+  if (haystack.trim() === '') return 'mid'
+
+  // Senior wins over entry — a title with both markers is read as senior
+  // (e.g. a directorship implied by context). This is intentionally
+  // conservative for executive-search: better to surface a senior lead
+  // than to bury it on a false junior token.
+  if (SENIOR_KEYWORDS.some((k) => haystack.includes(k))) return 'senior'
+  if (ENTRY_KEYWORDS.some((k) => haystack.includes(k))) return 'entry'
+  return 'mid'
+}
+
+/**
+ * Whether a list of role titles contains at least one senior role. Used by
+ * mode-aware ranking/explanation to decide whether an executive-search agency
+ * gets a seniority reason line, without re-deriving the count at every call.
+ */
+export function hasSeniorRole(roles: readonly string[]): boolean {
+  return roles.some((r) => detectSeniority(r) === 'senior')
 }

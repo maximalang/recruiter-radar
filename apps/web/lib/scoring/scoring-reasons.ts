@@ -35,6 +35,8 @@ export const REASON_LABELS: Record<string, string> = {
   'fit.icp.match': 'Совпадение с вашей специализацией и ключевыми словами ICP',
   'fit.role.match': '{count} ролей совпадает с вашим профилем',
   'fit.role.no-match': 'Нет совпадений по ролям с вашим ICP',
+  'fit.seniority.match': 'Нанимают руководителя/C-level — совпадает с executive-практикой',
+  'fit.seniority.volume-mode': 'Массовый найм без явных руководящих ролей — ниже приоритет для executive-практики',
   'fit.location.match': 'Регион совпадает с ICP',
   'fit.location.outside': 'Регион «{location}» вне ICP',
   'fit.location.country-ru': 'Компания на рынке РФ',

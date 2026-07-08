@@ -12,7 +12,7 @@
  *   • the web score bar/gauge assumed a [0,50] scale → every real lead rendered
  *     at 100% width and "Высокий";
  *   • the Telegram card assumed a raw FIUR [0,4] value → every card read
- *     "🔥 Горячий · 247.0";
+ *     "Горячий · 247.0";
  *   • the hiring-intent filter compared a 200+ integer against a [0,4] threshold
  *     → the condition was never true, so the filter silently did nothing.
  *
@@ -64,18 +64,24 @@ export function scoreTone(rawScore: number | null | undefined): ScoreTone {
   return 'danger'
 }
 
-export type ScoreBand = { label: string; icon: string; tone: ScoreTone }
+export type ScoreBand = { label: string; tone: ScoreTone }
 
 /**
  * One-glance temperature read for a lead card (Telegram, email, web badge).
  * Mirrors the "companies worth contacting today" framing without inventing
  * precision the underlying number does not have.
+ *
+ * `tone` is the single source of truth for the temperature color across every
+ * surface — the web chip renders an inline-SVG by tone, and the email card
+ * colors the readiness line by tone. There is no `icon` field on purpose: the
+ * product no longer uses emoji as interface iconography, and tone is enough
+ * for every consumer to choose its own presentation.
  */
 export function scoreBand(rawScore: number | null | undefined): ScoreBand {
   const strength = toSignalStrength(rawScore)
-  if (strength >= 3) return { label: 'Горячий', icon: '🔥', tone: 'success' }
-  if (strength >= 2) return { label: 'Тёплый', icon: '🟠', tone: 'warning' }
-  return { label: 'Холодный', icon: '🔵', tone: 'danger' }
+  if (strength >= 3) return { label: 'Горячий', tone: 'success' }
+  if (strength >= 2) return { label: 'Тёплый', tone: 'warning' }
+  return { label: 'Холодный', tone: 'danger' }
 }
 
 const SCORE_LEVEL_LABELS: Record<ScoreTone, string> = {
