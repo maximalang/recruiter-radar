@@ -35,11 +35,38 @@ describe('formatBatchLeadBlock', () => {
     expect(block).toContain('<b>Ромашка</b>')
     expect(block).toContain('Москва')
     expect(block).toContain('Готов к контакту')
-    expect(block).toContain('· A')
+    expect(block).toContain('Горячий')
     expect(block).toContain('сигнал 3.2')
     expect(block).toContain('Роли:')
     expect(block).toContain('Backend разработчик')
     expect(block).toContain('нанимают по вашему профилю')
+  })
+
+  // ─── T6.1 readiness-line de-duplication (2026-07-08) ──────────────────────
+  // The readiness line must carry ≤2 confidence readouts — readinessLabel +
+  // band + numeric. The gate letter (A/B/C) is encoded in readinessLabel
+  // («Готов к контакту» vs «На проверку»), so it is dropped to avoid the
+  // triple-readout drift. One contract shared with the email renderer (T6.2).
+  it('drops the redundant gate letter from the readiness line', () => {
+    const block = formatBatchLeadBlock(lead(), 1)
+    expect(block).toContain('Готов к контакту · Горячий · сигнал 3.2')
+    expect(block).not.toMatch(/Готов к контакту · A/)
+    expect(block).not.toMatch(/· A ·/)
+  })
+
+  it('keeps ≤2 confidence readouts on the readiness line', () => {
+    const block = formatBatchLeadBlock(lead(), 1)
+    const readinessLine = block.split('\n')[1] ?? ''
+    // Confidence readouts = readinessLabel + band + signal. Gate letter must
+    // not be a fourth. Assert the exact expected contract form.
+    expect(readinessLine).toBe('Готов к контакту · Горячий · сигнал 3.2')
+  })
+
+  it('reads readiness «На проверку» without a gate letter for gate C', () => {
+    const block = formatBatchLeadBlock(lead({ confidenceGate: 'C' }), 1)
+    const readinessLine = block.split('\n')[1] ?? ''
+    expect(readinessLine).toBe('На проверку · Горячий · сигнал 3.2')
+    expect(block).not.toMatch(/· C\b/)
   })
 
   it('renders the reachable contact surface as links', () => {
@@ -75,9 +102,9 @@ describe('formatBatchLeadBlock', () => {
     expect(block).not.toContain('Готов к контакту')
   })
 
-  it('marks a foreign employer with 🌍', () => {
-    expect(formatBatchLeadBlock(lead({ isForeignEmployer: true }), 2)).toContain('🌍')
-    expect(formatBatchLeadBlock(lead({ isForeignEmployer: false }), 2)).not.toContain('🌍')
+  it('marks a foreign employer with a quiet textual tag (no emoji)', () => {
+    expect(formatBatchLeadBlock(lead({ isForeignEmployer: true }), 2)).toContain('зарубежный ATS')
+    expect(formatBatchLeadBlock(lead({ isForeignEmployer: false }), 2)).not.toContain('зарубежный ATS')
   })
 
   it('omits the roles line when there are no roles', () => {
@@ -95,6 +122,58 @@ describe('formatBatchLeadBlock', () => {
     expect(block).not.toContain('созвон')
     expect(block).not.toMatch(/перв\w+ сообщени/i)
     expect(block).not.toContain('Что делать')
+  })
+
+  // ─── Mode-aware urgency line (2026-07-06) ───────────────────────────────
+
+  it('executive mode renders freshness-shaped urgency, not volume count', () => {
+    const block = formatBatchLeadBlock(
+      lead({
+        vacanciesCount: 12,
+        latestPublishedAt: new Date().toISOString(),
+        hiringMode: 'executive',
+      }),
+      1,
+    )
+    // A fresh single posting reads as urgency for an executive agency.
+    expect(block).toContain('Свежая вакансия за неделю')
+    // The volume count is NOT the urgency framing for an executive agency.
+    expect(block).not.toMatch(/Активный найм.*12/)
+  })
+
+  it('volume mode renders hiring-scale urgency for many open roles', () => {
+    const block = formatBatchLeadBlock(
+      lead({
+        vacanciesCount: 12,
+        latestPublishedAt: new Date(Date.now() - 20 * 24 * 3600 * 1000).toISOString(),
+        hiringMode: 'volume',
+      }),
+      1,
+    )
+    expect(block).toContain('Активный найм')
+    expect(block).toContain('12')
+  })
+
+  it('specialist mode (default) keeps the pre-mode urgency ladder', () => {
+    const block = formatBatchLeadBlock(
+      lead({
+        vacanciesCount: 12,
+        latestPublishedAt: new Date(Date.now() - 20 * 24 * 3600 * 1000).toISOString(),
+        hiringMode: 'specialist',
+      }),
+      1,
+    )
+    expect(block).toContain('Активный найм')
+  })
+
+  it('never invents a mode-specific claim — urgency only restates counts + freshness', () => {
+    const block = formatBatchLeadBlock(
+      lead({ hiringMode: 'executive', vacanciesCount: 1, latestPublishedAt: null }),
+      1,
+    )
+    // No date and a single role → neutral cue, no fabricated seniority/timing.
+    expect(block).not.toContain('руководителя')
+    expect(block).not.toContain('C-level')
   })
 })
 

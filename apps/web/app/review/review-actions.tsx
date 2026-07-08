@@ -1,6 +1,8 @@
 'use client';
 
 import { useTransition, useState } from 'react';
+import { CheckIcon, XIcon } from '../ui/icons';
+import s from './review-actions.module.css';
 
 export default function ReviewActions({
   candidateId,
@@ -36,32 +38,21 @@ export default function ReviewActions({
     });
   };
 
-  const btnBase: React.CSSProperties = {
-    padding: '4px 10px',
-    borderRadius: '6px',
-    border: '1px solid var(--c-border)',
-    background: 'var(--c-surface)',
-    color: 'var(--c-text)',
-    cursor: 'pointer',
-    fontSize: '0.8rem',
-    fontWeight: 500,
-    transition: 'all 0.15s ease',
-  };
-
   if (status === 'approved' || status === 'rejected') {
     return (
-      <span style={{ fontSize: '0.8rem', color: 'var(--c-text-muted)', fontWeight: 500 }}>
-        {status === 'approved' ? '✅ Одобрено' : '❌ Отклонено'}
+      <span className={s.verdict} data-tone={status === 'approved' ? 'success' : 'danger'}>
+        {status === 'approved' ? <CheckIcon className={s.btnIcon} /> : <XIcon className={s.btnIcon} />}
+        {status === 'approved' ? 'Одобрено' : 'Отклонено'}
       </span>
     );
   }
 
   if (status === 'error') {
     return (
-      <span style={{ fontSize: '0.8rem', color: '#e53e3e' }}>
+      <span className={s.error}>
         Ошибка{' '}
         <button
-          style={btnBase}
+          className={s.btn}
           onClick={() => setStatus('idle')}
           disabled={isPending}
         >
@@ -72,22 +63,24 @@ export default function ReviewActions({
   }
 
   return (
-    <div style={{ display: 'flex', gap: '6px' }}>
+    <div className={s.row}>
       <button
-        style={btnBase}
+        className={s.btn}
+        data-tone="success"
         onClick={() => handleAction('approve')}
         disabled={isPending}
         title="Одобрить — лид будет доставлен клиенту"
       >
-        ✅ Одобрить
+        <CheckIcon className={s.btnIcon} /> Одобрить
       </button>
       <button
-        style={btnBase}
+        className={s.btn}
+        data-tone="danger"
         onClick={() => handleAction('reject')}
         disabled={isPending}
         title="Отклонить — лид не будет доставлен"
       >
-        ❌ Отклонить
+        <XIcon className={s.btnIcon} /> Отклонить
       </button>
     </div>
   );

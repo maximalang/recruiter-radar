@@ -35,24 +35,26 @@ export type RenderedEmail = {
 type GatePresentation = {
   /** Readiness headline — A/B are ready to reach out, C needs review. */
   readiness: string;
-  /** Single restrained status icon. */
-  icon: string;
+  /** Tone drives the inline color of the readiness line (no emoji). */
+  tone: "success" | "info";
 };
 
 /**
  * Map a confidence gate to its delivery presentation. Same contract as the
  * Telegram card: A/B = "ready to reach out", C/D = "review manually".
+ * Presentation is color-only (no emoji) — the readiness line is tinted green
+ * for A/B and blue for review, keeping the email calm and premium.
  */
 function getGatePresentation(gate: string | undefined): GatePresentation {
   switch (gate) {
     case "A":
-      return { readiness: "Готов к контакту", icon: "✅" };
+      return { readiness: "Готов к контакту", tone: "success" };
     case "B":
-      return { readiness: "Готов к контакту · с пометкой", icon: "✅" };
+      return { readiness: "Готов к контакту · с пометкой", tone: "success" };
     case "C":
-      return { readiness: "На проверку", icon: "🔍" };
+      return { readiness: "На проверку", tone: "info" };
     default:
-      return { readiness: "На проверку", icon: "🔍" };
+      return { readiness: "На проверку", tone: "info" };
   }
 }
 
@@ -107,7 +109,20 @@ const COLORS = {
   cardBg: "#ffffff",
   pageBg: "#f6f7f9",
   link: "#2563eb",
+  // Readiness / score-band tones — inline-colored labels (no emoji).
+  success: "#047857",
+  info: "#1d4ed8",
+  warning: "#c2410c",
+  // Section label color — a quiet uppercase eyebrow above each lead block.
+  sectionLabel: "#6b7280",
 } as const;
+
+/** Inline color for a score-band tone (matches the web chip). */
+function bandColor(tone: "success" | "warning" | "danger"): string {
+  if (tone === "success") return COLORS.success;
+  if (tone === "warning") return COLORS.warning;
+  return COLORS.info;
+}
 
 function leadSurfaceUrl(lead: LeadItem, appBaseUrl: string): string {
   return `${appBaseUrl}/leads/${encodeURIComponent(lead.id)}`;
@@ -128,27 +143,34 @@ function toWhyMatchLead(lead: LeadItem) {
 function renderLeadHtml(lead: LeadItem, appBaseUrl: string, profileFilters?: WhyMatchProfile | null): string {
   const gate = getGatePresentation(lead.confidenceGate);
   const band = scoreBand(lead.score);
-  const gateLetter = lead.confidenceGate ? ` · ${escapeHtml(lead.confidenceGate)}` : "";
   const url = leadSurfaceUrl(lead, appBaseUrl);
+  const readinessColor = gate.tone === "success" ? COLORS.success : COLORS.info;
 
   const blocks: string[] = [];
 
-  // Header: company + readiness/score/gate
+  // Header: company name as the anchor link (no emoji prefix).
   blocks.push(
     `<tr><td style="padding:0 0 4px 0;">` +
-      `<a href="${escapeHtml(url)}" style="color:${COLORS.ink};font-size:17px;font-weight:700;text-decoration:none;">🏢 ${escapeHtml(lead.orgName)}</a>` +
+      `<a href="${escapeHtml(url)}" style="color:${COLORS.ink};font-size:17px;font-weight:700;text-decoration:none;">${escapeHtml(lead.orgName)}</a>` +
       `</td></tr>`,
   );
+  // Readiness line — ≤2 confidence readouts: band + readiness + numeric. The
+  // gate letter is encoded in `gate.readiness` («Готов к контакту» /
+  // «Готов к контакту · с пометкой» / «На проверку»), so a bare «· A» would
+  // repeat the same fact. One contract shared with the Telegram card — see
+  // lib/telegram/digest-batch.ts (T6.1/T6.2 de-duplication).
   blocks.push(
     `<tr><td style="padding:0 0 10px 0;color:${COLORS.muted};font-size:13px;">` +
-      `${band.icon} ${escapeHtml(band.label)} · ${gate.icon} ${escapeHtml(gate.readiness)} · ${escapeHtml(formatScore(lead.score))}${gateLetter}` +
+      `<span style="color:${bandColor(band.tone)};font-weight:600;">${escapeHtml(band.label)}</span>` +
+      ` · <span style="color:${readinessColor};font-weight:600;">${escapeHtml(gate.readiness)}</span>` +
+      ` · ${escapeHtml(formatScore(lead.score))}` +
       `</td></tr>`,
   );
 
-  // Why now
+  // Why now — uppercase eyebrow label + body. No emoji.
   if (lead.whyNow && lead.whyNow.trim()) {
     blocks.push(
-      `<tr><td style="padding:0 0 2px 0;color:${COLORS.ink};font-size:13px;font-weight:600;">🎯 Почему сейчас</td></tr>` +
+      `<tr><td style="padding:0 0 2px 0;color:${COLORS.sectionLabel};font-size:11px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;">Почему сейчас</td></tr>` +
         `<tr><td style="padding:0 0 10px 0;color:${COLORS.ink};font-size:14px;line-height:1.45;">${escapeHtml(lead.whyNow.trim())}</td></tr>`,
     );
   }
@@ -165,33 +187,36 @@ function renderLeadHtml(lead: LeadItem, appBaseUrl: string, profileFilters?: Why
       )
       .join("");
     blocks.push(
-      `<tr><td style="padding:0 0 2px 0;color:${COLORS.ink};font-size:13px;font-weight:600;">🤝 Почему вам</td></tr>` +
+      `<tr><td style="padding:0 0 2px 0;color:${COLORS.sectionLabel};font-size:11px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;">Почему вам</td></tr>` +
         items +
         `<tr><td style="padding:0 0 8px 0;"></td></tr>`,
     );
   }
 
-  // Role / hiring signal — top evidence titles
+  // Role / hiring signal — top evidence titles with a quiet "Роли" eyebrow.
   if (lead.evidenceTitles && lead.evidenceTitles.length > 0) {
     const top = lead.evidenceTitles.slice(0, 3).map((t) => escapeHtml(t)).join(", ");
     const more = lead.evidenceTitles.length > 3 ? ` +${lead.evidenceTitles.length - 3}` : "";
     const count = lead.vacanciesCount > 0 ? ` (${lead.vacanciesCount} вак.)` : "";
     blocks.push(
-      `<tr><td style="padding:0 0 6px 0;color:${COLORS.ink};font-size:14px;">📋 ${top}${more}${count}</td></tr>`,
+      `<tr><td style="padding:0 0 2px 0;color:${COLORS.sectionLabel};font-size:11px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;">Роли</td></tr>`,
+    );
+    blocks.push(
+      `<tr><td style="padding:0 0 6px 0;color:${COLORS.ink};font-size:14px;">${top}${more}${count}</td></tr>`,
     );
   }
 
-  // Location (first only)
+  // Location (first only) — muted line, no emoji.
   if (lead.locationNames && lead.locationNames.length > 0) {
     blocks.push(
-      `<tr><td style="padding:0 0 6px 0;color:${COLORS.muted};font-size:13px;">📍 ${escapeHtml(lead.locationNames[0])}</td></tr>`,
+      `<tr><td style="padding:0 0 6px 0;color:${COLORS.muted};font-size:13px;">${escapeHtml(lead.locationNames[0])}</td></tr>`,
     );
   }
 
-  // Safe contact path
+  // Safe contact path — ink-colored line, no emoji.
   if (lead.lawfulContactPath && lead.lawfulContactPath.trim()) {
     blocks.push(
-      `<tr><td style="padding:0 0 6px 0;color:${COLORS.ink};font-size:13px;">📬 ${escapeHtml(lead.lawfulContactPath.trim())}</td></tr>`,
+      `<tr><td style="padding:0 0 6px 0;color:${COLORS.ink};font-size:13px;">${escapeHtml(lead.lawfulContactPath.trim())}</td></tr>`,
     );
   }
 
@@ -249,11 +274,12 @@ function renderHtml(leads: LeadItem[], ctx: DigestEmailContext): string {
 function renderLeadText(lead: LeadItem, appBaseUrl: string, profileFilters?: WhyMatchProfile | null): string {
   const gate = getGatePresentation(lead.confidenceGate);
   const band = scoreBand(lead.score);
-  const gateLetter = lead.confidenceGate ? ` · ${lead.confidenceGate}` : "";
   const lines: string[] = [];
 
-  lines.push(`🏢 ${lead.orgName}`);
-  lines.push(`${band.icon} ${band.label} · ${gate.icon} ${gate.readiness} · ${formatScore(lead.score)}${gateLetter}`);
+  // Readiness line — ≤2 confidence readouts, shared contract with the
+  // Telegram card (T6.1/T6.2): band + readiness + numeric, no bare gate letter.
+  lines.push(lead.orgName);
+  lines.push(`${band.label} · ${gate.readiness} · ${formatScore(lead.score)}`);
 
   if (lead.whyNow && lead.whyNow.trim()) {
     lines.push(`Почему сейчас: ${lead.whyNow.trim()}`);

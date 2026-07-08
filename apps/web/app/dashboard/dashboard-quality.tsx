@@ -36,7 +36,7 @@ function QualitySkeleton() {
   return (
     <section aria-labelledby="quality-heading" aria-busy="true" className={styles.qualitySection}>
       <h2 id="quality-heading" className={styles.qualityHeading}>
-        📈 Метрики качества
+        Метрики качества
       </h2>
       <div className={styles.qualityCards} role="list" aria-label="Загрузка метрик качества">
         {[1, 2].map((i) => (
@@ -94,7 +94,6 @@ function AcceptanceRateCard({ rate, period, delivered, accepted, srOnly }: Accep
     >
       <div className={styles.qualityCardHeader}>
         <span className={styles.qualityCardLabel}>Конверсия ({periodLabel})</span>
-        <span className={styles.qualityCardIcon} aria-hidden="true">📊</span>
       </div>
       <div className={styles.qualityRateValue} style={{ color }}>
         {rate}%
@@ -121,7 +120,6 @@ function GateDistributionCard({ distribution }: { distribution: GateDistribution
     >
       <div className={styles.qualityCardHeader}>
         <span className={styles.qualityCardLabel}>Распределение Gate</span>
-        <span className={styles.qualityCardIcon} aria-hidden="true">🎚️</span>
       </div>
       {distribution.length === 0 ? (
         <div className={styles.qualityRateSubtext}>Нет данных за 30 дней</div>
@@ -170,7 +168,7 @@ export default function DashboardQuality({ data, loading, error }: DashboardQual
     return (
       <section aria-labelledby="quality-heading" className={styles.qualitySection}>
         <h2 id="quality-heading" className={styles.qualityHeading}>
-          📈 Метрики качества
+          Метрики качества
         </h2>
         <div className={styles.qualityError} role="alert" aria-live="assertive">
           <div className={styles.qualityErrorText}>
@@ -188,7 +186,7 @@ export default function DashboardQuality({ data, loading, error }: DashboardQual
   return (
     <section aria-labelledby="quality-heading" className={styles.qualitySection}>
       <h2 id="quality-heading" className={styles.qualityHeading}>
-        📈 Метрики качества
+        Метрики качества
       </h2>
       <div className={styles.qualityCards} role="list" aria-label="Метрики качества">
         <AcceptanceRateCard {...data.acceptanceRate7d} srOnly />

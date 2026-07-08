@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { CheckIcon } from '../../ui/icons';
 import s from './next-steps-block.module.css';
 
 /**
@@ -94,7 +95,7 @@ export default function NextStepsBlock({ crmBlock, links, singleExportHref }: Ne
           data-variant="primary"
           disabled={isPending}
         >
-          {copied ? '✓ Скопировано' : 'Скопировать для CRM'}
+          {copied ? <><CheckIcon className={s.copiedIcon} aria-hidden="true" /> Скопировано</> : 'Скопировать для CRM'}
         </button>
         <button
           type="button"

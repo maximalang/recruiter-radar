@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import type { LeadItem } from '@/lib/leads-data';
-import { ScoreBar, ScoreBandChip, SignalFreshnessChip, ForeignEmployerBadge } from '../ui/internal-page';
-import { deriveRoleNames, splitRolesForDisplay } from '@/lib/leads/lead-quality';
+import { ScoreBar, ScoreBandChip, SignalFreshnessChip, ForeignEmployerBadge, UrgencyCueChip, EmptyState } from '../ui/internal-page';
+import { SearchIcon } from '../ui/icons';
+import { deriveRoleNames, splitRolesForDisplay, deriveUrgencyCue } from '@/lib/leads/lead-quality';
 import styles from './dashboard.module.css';
 
 interface DashboardTodayRadarProps {
@@ -9,6 +10,12 @@ interface DashboardTodayRadarProps {
   topLeads: LeadItem[];
   /** Count of candidates awaiting analyst review. */
   pendingReview: number;
+  /**
+   * Resolved hiring mode per active client profile id — drives mode-aware
+   * urgency framing on each radar card. A lead whose profile can't be matched
+   * falls back to 'specialist' (the pre-mode default behavior).
+   */
+  hiringModeByProfileId?: Record<string, 'specialist' | 'executive' | 'volume'>;
 }
 
 /**
@@ -16,7 +23,11 @@ interface DashboardTodayRadarProps {
  * "компании, которым стоит написать сегодня": top leads with why-now /
  * best-angle, plus a pending-review counter that links into the review queue.
  */
-export default function DashboardTodayRadar({ topLeads, pendingReview }: DashboardTodayRadarProps) {
+export default function DashboardTodayRadar({
+  topLeads,
+  pendingReview,
+  hiringModeByProfileId,
+}: DashboardTodayRadarProps) {
   return (
     <section className={styles.todayRadarSection} aria-labelledby="today-radar-heading">
       <div className={styles.todayRadarHeader}>
@@ -29,17 +40,26 @@ export default function DashboardTodayRadar({ topLeads, pendingReview }: Dashboa
       </div>
 
       {topLeads.length === 0 ? (
-        <div className={styles.analyticsEmpty}>
-          <p>Пока нет компаний для контакта. Радар подберёт их по вашему профилю: роли, отрасли, регионы.</p>
-          <Link href="/settings/profile" className={styles.todayRadarReviewPill}>
-            Проверить настройки профиля
-          </Link>
-        </div>
+        <EmptyState
+          icon={SearchIcon}
+          title="Пока нет компаний для контакта"
+          text="Радар подберёт их по вашему профилю: роли, отрасли, регионы."
+          action={{ href: '/settings/profile', label: 'Проверить настройки профиля' }}
+        />
       ) : (
         <div className={styles.todayRadarList}>
           {topLeads.map((lead) => {
             const roleNames = deriveRoleNames({ evidenceTitles: lead.evidenceTitles });
             const { shown: shownRoles, more: moreRoles } = splitRolesForDisplay(roleNames, 2);
+            // Mode-aware urgency: executive → freshness/seniority framing,
+            // volume → hiring-scale, specialist → default ladder. Falls back to
+            // 'specialist' when the profile can't be matched (keeps prior behavior).
+            const hiringMode = hiringModeByProfileId?.[lead.clientProfileId] ?? 'specialist';
+            const urgency = deriveUrgencyCue({
+              vacanciesCount: lead.vacanciesCount,
+              latestPublishedAt: lead.latestPublishedAt,
+              hiringMode,
+            });
             return (
             <Link key={lead.id} href={`/leads/${lead.id}`} className={styles.todayRadarCard}>
               <div className={styles.todayRadarCardTop}>
@@ -52,11 +72,12 @@ export default function DashboardTodayRadar({ topLeads, pendingReview }: Dashboa
                 <ScoreBar score={lead.score} />
               </div>
 
-              {lead.latestPublishedAt && (
-                <div className={styles.todayRadarFreshness}>
+              <div className={styles.todayRadarFreshness}>
+                <UrgencyCueChip level={urgency.level} label={urgency.label} />
+                {lead.latestPublishedAt && (
                   <SignalFreshnessChip latestPublishedAt={lead.latestPublishedAt} />
-                </div>
-              )}
+                )}
+              </div>
 
               {lead.whyNow && (
                 <div className={styles.todayRadarLine}>

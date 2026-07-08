@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import type { ReactElement, SVGProps } from 'react';
 import Link from 'next/link';
 import { listClientProfiles, type ClientProfile } from '@/lib/clientProfiles';
 import { getOwnerIdFromSession } from '@/lib/session';
@@ -20,7 +21,9 @@ import {
   type NavItem,
 } from '../ui/internal-page';
 import { internalPageClasses as ipStyles } from '../ui/internal-page';
+import { PinIcon, BriefcaseIcon, FileIcon, CheckIcon, TargetIcon } from '../ui/icons';
 import ReviewActions from './review-actions';
+import { deriveReviewReason } from './review-reason';
 import { pluralizeLeads } from '../leads/page-helpers';
 
 export const dynamic = 'force-dynamic';
@@ -38,6 +41,12 @@ interface ReviewCandidate {
   orgName: string;
   score: number;
   confidenceGate: string;
+  /**
+   * Derived from the candidate payload (extractPayloadFields) — no new SQL.
+   * T4.5: the review card shows the foreign reason chip + foreign badge from
+   * this flag, instead of the previous hardcoded `isForeign={false}`.
+   */
+  isForeignEmployer?: boolean;
   vacanciesCount: number;
   distinctVacancyNamesCount: number;
   latestPublishedAt: string | null;
@@ -71,6 +80,28 @@ async function getReviewCandidates(
   }
 }
 
+const REVIEW_REASON_LABEL: Record<string, string> = {
+  foreign: 'Зарубежный ATS',
+  'gate-c': 'Только платформа (C)',
+  'single-source': 'Один источник',
+};
+
+/**
+ * The single reason a candidate is in the review queue — one semantic chip so
+ * the analyst sees *why* it's here at a glance (foreign / gate-C / single-
+ * source), not just "на проверке". Rendered with the reason's SVG icon.
+ */
+function ReviewReasonChip(props: { reason: { key: string; icon: (p: SVGProps<SVGSVGElement>) => ReactElement } }) {
+  const { reason } = props;
+  const Icon = reason.icon;
+  const label = REVIEW_REASON_LABEL[reason.key] ?? reason.key;
+  return (
+    <span className={ipStyles.reviewReasonChip} data-reason={reason.key} title={`Причина проверки: ${label}`}>
+      <Icon className={ipStyles.chipIcon} aria-hidden="true" /> {label}
+    </span>
+  );
+}
+
 /**
  * One review candidate — rendered with the SAME vocabulary as a /leads card
  * (gate badge, score band, evidence chips, freshness, foreign badge) so the
@@ -85,9 +116,17 @@ function ReviewCard({
   candidate: ReviewCandidate;
   clientProfileId: string;
 }) {
+  // T4.5 — derive the single reason this candidate is in the queue, from
+  // already-available fields. Falls back to null when no reason applies.
+  const reason = deriveReviewReason({
+    confidenceGate: candidate.confidenceGate,
+    isForeignEmployer: candidate.isForeignEmployer ?? false,
+    sourceCount: candidate.sourceFamilies.length,
+  });
+
   return (
     <article className={ipStyles.leadCard}>
-      <div className={ipStyles.leadCardRail} aria-hidden="true" />
+      <div className={ipStyles.leadCardRail} data-tone="neutral" aria-hidden="true" />
       <div className={ipStyles.leadCardBody}>
         <div className={ipStyles.leadCardHead}>
           <div className={ipStyles.leadCardHeadMain}>
@@ -97,7 +136,8 @@ function ReviewCard({
             <div className={ipStyles.leadCardTags}>
               <ScoreBandChip score={candidate.score} />
               <GateBadgeInline gate={candidate.confidenceGate} />
-              <ForeignEmployerBadge isForeign={false} />
+              <ForeignEmployerBadge isForeign={candidate.isForeignEmployer ?? false} />
+              {reason ? <ReviewReasonChip reason={reason} /> : null}
             </div>
           </div>
           <div className={ipStyles.leadCardHeadAside}>
@@ -120,15 +160,15 @@ function ReviewCard({
           <SignalFreshnessChip latestPublishedAt={candidate.latestPublishedAt} />
           {candidate.locationNames.length > 0 && (
             <span className={ipStyles.leadMetaChip}>
-              📍 {candidate.locationNames.slice(0, 2).join(', ')}
+              <PinIcon className={ipStyles.chipIcon} /> {candidate.locationNames.slice(0, 2).join(', ')}
             </span>
           )}
           {candidate.vacanciesCount > 0 && (
-            <span className={ipStyles.leadMetaChip}>💼 {candidate.vacanciesCount} вакансий</span>
+            <span className={ipStyles.leadMetaChip}><BriefcaseIcon className={ipStyles.chipIcon} /> {candidate.vacanciesCount} вакансий</span>
           )}
           {candidate.evidenceTitles.length > 0 && (
             <span className={ipStyles.leadMetaChip}>
-              📋 {candidate.evidenceTitles.slice(0, 2).join(' · ')}
+              <FileIcon className={ipStyles.chipIcon} /> {candidate.evidenceTitles.slice(0, 2).join(' · ')}
             </span>
           )}
         </div>
@@ -188,7 +228,7 @@ export default async function ReviewPage({
 
       {profiles.length === 0 ? (
         <EmptyState
-          icon="🔍"
+          icon={TargetIcon}
           title="Нет клиентских профилей"
           text="Создайте профиль в онбординге, чтобы увидеть очередь проверки."
         />
@@ -226,7 +266,7 @@ export default async function ReviewPage({
           <Suspense fallback={<ContentCard>Загрузка…</ContentCard>}>
             {reviewData.items.length === 0 ? (
               <EmptyState
-                icon="✅"
+                icon={CheckIcon}
                 title="Очередь пуста"
                 text="Нет кандидатов, требующих проверки. Новые карьерные страницы и платформенные сигналы появляются ежедневно — кандидаты с уверенностью C или одиночным источником появятся здесь автоматически."
               />

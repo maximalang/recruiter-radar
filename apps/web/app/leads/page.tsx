@@ -24,9 +24,11 @@ import {
   getScoreTone,
   TableCard,
   EmptyState,
+  FitIcon,
   type NavItem,
 } from '../ui/internal-page';
 import { internalPageClasses as ipStyles } from '../ui/internal-page';
+import { ShieldIcon, PinIcon, BriefcaseIcon, FileIcon, AlertIcon, SearchIcon, TargetIcon, ClockIcon, CheckIcon } from '../ui/icons';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,7 +39,7 @@ const LEADS_NAV: NavItem[] = [
   { href: '/settings/profile', label: 'Профиль' },
 ];
 
-function LeadCard({
+export function LeadCard({
   lead,
   fitPreview,
   hiringMode,
@@ -73,11 +75,21 @@ function LeadCard({
               <span className={ipStyles.leadCardOrg}>{lead.orgName}</span>
             </Link>
             <div className={ipStyles.leadCardTags}>
-              <ScoreBandChip score={lead.score} />
-              <GateBadgeInline gate={lead.confidenceGate} />
+              {/* Decision cluster — the verdict (temperature + confidence gate)
+                  reads as one visual group, separate from the workflow state. */}
+              <span className={ipStyles.leadCardTagGroup} data-chip-group="decision">
+                <ScoreBandChip score={lead.score} />
+                <GateBadgeInline gate={lead.confidenceGate} />
+              </span>
+              {/* Status cluster — analyst-review + the agency's triage state. */}
+              {(lead.reviewStatus || lead.feedbackStatus) && lead.reviewStatus !== 'auto_approved' || (lead.feedbackStatus && lead.feedbackStatus !== 'none') ? (
+                <span className={ipStyles.leadCardTagGroup} data-chip-group="status">
+                  <ReviewStatusBadge status={lead.reviewStatus} />
+                  <FeedbackBadge status={lead.feedbackStatus} />
+                </span>
+              ) : null}
+              {/* Muted separate chips — geo + AI presence, not part of the verdict. */}
               <ForeignEmployerBadge isForeign={lead.isForeignEmployer} />
-              <ReviewStatusBadge status={lead.reviewStatus} />
-              <FeedbackBadge status={lead.feedbackStatus} />
               <AiHintChip present={lead.hasAiHint} />
             </div>
           </div>
@@ -92,7 +104,7 @@ function LeadCard({
           <div className={ipStyles.leadFieldRow} data-kind="fit">
             <span className={ipStyles.leadFieldLabel}>Почему подходит</span>
             <span className={ipStyles.leadFieldValue}>
-              {fitPreview.icon} {fitPreview.text}
+              <FitIcon name={fitPreview.icon} className={ipStyles.chipIcon} /> {fitPreview.text}
             </span>
           </div>
         )}
@@ -108,24 +120,24 @@ function LeadCard({
           <SignalFreshnessChip latestPublishedAt={lead.latestPublishedAt} />
           {lead.lawfulContactPath && (
             <span className={ipStyles.leadContactChip}>
-              🛡 {lead.lawfulContactPath}
+              <ShieldIcon className={ipStyles.chipIcon} /> {lead.lawfulContactPath}
             </span>
           )}
           {lead.locationNames.length > 0 && (
             <span className={ipStyles.leadMetaChip}>
-              📍 {lead.locationNames.slice(0, 2).join(', ')}
+              <PinIcon className={ipStyles.chipIcon} /> {lead.locationNames.slice(0, 2).join(', ')}
             </span>
           )}
           {lead.vacanciesCount > 0 && (
-            <span className={ipStyles.leadMetaChip}>💼 {lead.vacanciesCount} вакансий</span>
+            <span className={ipStyles.leadMetaChip}><BriefcaseIcon className={ipStyles.chipIcon} /> {lead.vacanciesCount} вакансий</span>
           )}
           {shownRoles.length > 0 ? (
             <span className={ipStyles.leadMetaChip}>
-              📄 {shownRoles.join(' · ')}{moreRoles > 0 ? ` + ещё ${moreRoles}` : ''}
+              <FileIcon className={ipStyles.chipIcon} /> {shownRoles.join(' · ')}{moreRoles > 0 ? ` + ещё ${moreRoles}` : ''}
             </span>
           ) : (
             <span className={ipStyles.leadMetaChip} data-muted="true">
-              📄 роли не определены
+              <FileIcon className={ipStyles.chipIcon} /> роли не определены
             </span>
           )}
         </div>
@@ -133,7 +145,7 @@ function LeadCard({
         {risks.length > 0 && (
           <div className={ipStyles.leadRiskRow}>
             {risks.map((risk) => (
-              <span key={risk} className={ipStyles.leadRiskChip}>⚠ {risk}</span>
+              <span key={risk} className={ipStyles.leadRiskChip}><AlertIcon className={ipStyles.chipIcon} /> {risk}</span>
             ))}
           </div>
         )}
@@ -144,6 +156,32 @@ function LeadCard({
         </Link>
       </div>
     </article>
+  );
+}
+
+/**
+ * Score-tone legend for the leads list. Previously rendered as a blind
+ * `aria-hidden` decoration — now it carries a `data-legend` root and visible
+ * labels tied to the rail tones, so the colour key is announced to AT and
+ * reads as part of the page, not as decoration. The dots stay visual; the
+ * labels do the a11y work.
+ */
+export function LeadsListLegend() {
+  return (
+    <div className={ipStyles.leadsListLegend} data-legend="true" aria-label="Условные обозначения силы сигнала">
+      <span className={ipStyles.leadsListLegendItem}>
+        <span className={ipStyles.leadsListLegendDot} data-tone="success" aria-hidden="true" />
+        высокий
+      </span>
+      <span className={ipStyles.leadsListLegendItem}>
+        <span className={ipStyles.leadsListLegendDot} data-tone="warning" aria-hidden="true" />
+        средний
+      </span>
+      <span className={ipStyles.leadsListLegendItem}>
+        <span className={ipStyles.leadsListLegendDot} data-tone="danger" aria-hidden="true" />
+        низкий
+      </span>
+    </div>
   );
 }
 
@@ -188,7 +226,7 @@ function LeadsList({
     if (workingSet) {
       return (
         <EmptyState
-          icon="🧭"
+          icon={ClockIcon}
           title="Ничего в работе"
           text="Вы ещё не взяли лиды в работу на этом профиле. Откройте полный радар, оцените компании и отметьте первые — они появятся здесь."
           action={{ href: '/leads', label: 'Открыть полный радар' }}
@@ -198,7 +236,7 @@ function LeadsList({
     if (!hasActiveProfile) {
       return (
         <EmptyState
-          icon="🎯"
+          icon={TargetIcon}
           title="Настройте профиль идеального клиента"
           text="Радар начнёт подбирать компании, как только вы опишете, кого ищете: роли, отрасли, регионы."
           action={{ href: '/settings/profile', label: 'Настроить профиль' }}
@@ -208,7 +246,7 @@ function LeadsList({
     if (narrowProfile) {
       return (
         <EmptyState
-          icon="🔭"
+          icon={SearchIcon}
           title="По вашей специализации пока мало сигналов"
           text="По узкому ICP радар находит реже — это нормально. Расширьте ключевые фразы в профиле (например, смежные роли или отрасли) или дождитесь следующего запуска: новые карьерные страницы и платформенные сигналы появляются ежедневно."
           action={{ href: '/settings/profile', label: 'Расширить ключевые фразы' }}
@@ -217,7 +255,7 @@ function LeadsList({
     }
     return (
       <EmptyState
-        icon="📭"
+        icon={BriefcaseIcon}
         title="Лидов пока нет"
         text="Профиль настроен — первая подборка придёт со следующим запуском радара. Можно уточнить фильтры, чтобы повысить релевантность."
         action={{ href: '/settings/profile', label: 'Уточнить профиль' }}
@@ -231,17 +269,7 @@ function LeadsList({
         <div className={ipStyles.leadsListCount}>
           <strong>{leads.length}</strong> {pluralizeLeads(leads.length)}{workingSet ? ' в работе' : ' всего'}
         </div>
-        <div className={ipStyles.leadsListLegend} aria-hidden="true">
-          <span className={ipStyles.leadsListLegendItem}>
-            <span className={ipStyles.leadsListLegendDot} data-tone="success" /> высокий
-          </span>
-          <span className={ipStyles.leadsListLegendItem}>
-            <span className={ipStyles.leadsListLegendDot} data-tone="warning" /> средний
-          </span>
-          <span className={ipStyles.leadsListLegendItem}>
-            <span className={ipStyles.leadsListLegendDot} data-tone="danger" /> низкий
-          </span>
-        </div>
+        <LeadsListLegend />
       </div>
       <div className={ipStyles.leadsList}>
         {leads.map((lead) => (

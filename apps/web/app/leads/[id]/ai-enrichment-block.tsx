@@ -1,5 +1,6 @@
 import type { StoredAiEnrichment } from '@/lib/ai/enrichment/enrichmentStore';
 import { ContentCard, ContentCardTitle, internalPageClasses as ipStyles } from '../../ui/internal-page';
+import { SparkIcon } from '../../ui/icons';
 import s from './ai-enrichment-block.module.css';
 
 /**
@@ -42,7 +43,7 @@ export default function AiEnrichmentBlock({ enrichment }: { enrichment: StoredAi
   return (
     <ContentCard variant="muted" className={s.aiCard}>
       <ContentCardTitle>
-        <span className={s.aiBadge} aria-hidden="true">✨ AI</span>
+        <span className={s.aiBadge} aria-hidden="true"><SparkIcon className={s.aiBadgeIcon} /> AI</span>
         AI-подсказка по найму
       </ContentCardTitle>
 

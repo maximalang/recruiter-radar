@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { CheckIcon } from "./icons";
 
 type PushState =
   | "loading"
@@ -177,7 +178,10 @@ function WebPushStatusBody(props: {
     case "subscribed":
       return (
         <div style={{ display: "grid", gap: "6px" }}>
-          <span>✅ Уведомления подключены в этом браузере.</span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+            <CheckIcon style={{ width: "1em", height: "1em", color: "#047857" }} aria-hidden="true" />
+            Уведомления подключены в этом браузере.
+          </span>
           <button type="button" onClick={props.onUnsubscribe} disabled={props.busy}>
             {props.busy ? "Отключаем…" : "Отключить"}
           </button>

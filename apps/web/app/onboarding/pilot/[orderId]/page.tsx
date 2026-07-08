@@ -1,5 +1,6 @@
 ﻿import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { ReactElement, SVGProps } from "react";
 
 import { FormSubmitButton } from "../../../ui/form-submit-button";
 import {
@@ -11,6 +12,12 @@ import {
   ThreeQuestionPanel,
   NoticeBox,
 } from "../../../ui/page-primitives";
+import {
+  IndustryIcon,
+  ChatIcon,
+  TargetIcon,
+  CheckIcon,
+} from "../../../ui/icons";
 import ppStyles from "../../../ui/page-primitives.module.css";
 import {
   formatKeywordText,
@@ -46,6 +53,7 @@ import {
   formatCompanyCount,
   formatDateTime,
   formatVacanciesCount,
+  formatPreviewScore,
   translateOrderStatus,
   getCurrentStep,
   getRequestedStep,
@@ -63,15 +71,18 @@ type PilotOnboardingPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
+type StepIcon = (p: SVGProps<SVGSVGElement>) => ReactElement;
+
 const stepItems: Array<{
   key: CheckoutOrderOnboardingStep;
   label: string;
   number: string;
+  icon: StepIcon;
 }> = [
-  { key: "confirm-profile", label: "Профиль", number: "01" },
-  { key: "telegram", label: "Telegram", number: "02" },
-  { key: "preview", label: "Радар", number: "03" },
-  { key: "complete", label: "Готово", number: "04" }
+  { key: "confirm-profile", label: "Профиль", number: "01", icon: IndustryIcon },
+  { key: "telegram", label: "Telegram", number: "02", icon: ChatIcon },
+  { key: "preview", label: "Радар", number: "03", icon: TargetIcon },
+  { key: "complete", label: "Готово", number: "04", icon: CheckIcon },
 ] as const;
 
 const VISIBLE_PREVIEW_ITEMS = 2;
@@ -251,17 +262,28 @@ export default async function PilotOnboardingPage({
         ) : (
           <>
             <div className={styles.stepRail}>
-              {stepItems.map((step) => (
-                <div
-                  key={step.key}
-                  className={styles.stepPill}
-                  data-current={step.key === currentStep}
-                  data-complete={isStepComplete(step.key, currentStep)}
-                >
-                  <span className={styles.stepNumber}>{step.number}</span>
-                  <span>{step.label}</span>
-                </div>
-              ))}
+              {stepItems.map((step) => {
+                const isCurrent = step.key === currentStep;
+                const isComplete = isStepComplete(step.key, currentStep);
+                // Completed steps carry the CheckIcon (the unified "done" glyph)
+                // instead of the step's own glyph, so progress reads at a glance.
+                // The current step keeps its semantic glyph; future steps show it
+                // muted via the data-future attribute.
+                const Glyph = isComplete ? CheckIcon : step.icon;
+                return (
+                  <div
+                    key={step.key}
+                    className={styles.stepPill}
+                    data-current={isCurrent}
+                    data-complete={isComplete}
+                    data-future={!isCurrent && !isComplete ? true : undefined}
+                  >
+                    <Glyph className={styles.stepIcon} aria-hidden="true" />
+                    <span className={styles.stepNumber}>{step.number}</span>
+                    <span>{step.label}</span>
+                  </div>
+                );
+              })}
             </div>
 
             {currentStep === "confirm-profile" ? (
@@ -317,7 +339,7 @@ export default async function PilotOnboardingPage({
                         <input
                           name="specialization"
                           defaultValue={profile?.specialization ?? order.payload.specialization ?? ""}
-                          placeholder="IT-рекрутмент / подбор в продажи"
+                          placeholder="Промышленный подбор / финансы C-level / массовый найм"
                           className={ppStyles.input}
                         />
                       </label>
@@ -498,18 +520,22 @@ export default async function PilotOnboardingPage({
                 ) : (
                   <>
                     <div className={styles.instructionGrid}>
-                      <InstructionCard>
-                        1. Откройте {telegramConnectState?.botUsername ? `@${telegramConnectState.botUsername}` : "бот Recruiter Radar"}.
+                      <InstructionCard step={1}>
+                        Откройте {telegramConnectState?.botUsername ? `@${telegramConnectState.botUsername}` : "бот Recruiter Radar"}.
                       </InstructionCard>
-                      <InstructionCard>2. Нажмите Start в чате.</InstructionCard>
-                      <InstructionCard>3. Вернитесь сюда. Подключение подтянется само.</InstructionCard>
+                      <InstructionCard step={2}>Нажмите Start в чате.</InstructionCard>
+                      <InstructionCard step={3}>Вернитесь сюда. Подключение подтянется само.</InstructionCard>
                     </div>
 
                     {telegramConnectState?.connectUrl ? (
                       <div style={{ display: "grid", gap: "10px" }}>
                         <div className={styles.actions}>
-                          <a href={telegramConnectState.connectUrl} className={ppStyles.primaryAction}>
-                            Открыть Telegram
+                          <a
+                            href={telegramConnectState.connectUrl}
+                            className={ppStyles.primaryAction}
+                            style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}
+                          >
+                            <ChatIcon aria-hidden="true" /> Открыть Telegram
                           </a>
                         </div>
                         <div className={ppStyles.helperText}>
@@ -612,7 +638,10 @@ export default async function PilotOnboardingPage({
               <section className={styles.wizardSection}>
                 <div style={{ display: "grid", gap: "10px" }}>
                   <StatusBadge tone="success">
-                    {hasTestDigestSent ? "Первый радар отправлен" : "Пилот включён"}
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                      <CheckIcon aria-hidden="true" />
+                      {hasTestDigestSent ? "Первый радар отправлен" : "Пилот включён"}
+                    </span>
                   </StatusBadge>
                   <SectionIntro
                     title={hasTestDigestSent ? "Пилот запущен" : "Всё готово"}
@@ -773,7 +802,20 @@ function OnboardingPreviewCard(props: {
           <strong style={{ fontSize: "1rem" }}>
             {item.rank}. {item.employer_name}
           </strong>
-          <span className={styles.scorePill}>score {item.total_score.toFixed(1)}</span>
+          {(() => {
+            // T1.3 — speak the same score vocabulary as /leads: band label +
+            // signal strength from the shared score-display module, instead of
+            // the divergent raw "score 247.0" pill. No second vocab onboarding.
+            const { bandLabel, strength } = formatPreviewScore(item.total_score);
+            return (
+              <span className={styles.scorePill} data-band={bandLabel}>
+                {bandLabel} · {strength}
+              </span>
+            );
+          })()}
+          {item.confidence_gate ? (
+            <span className={styles.previewChip}>Gate {item.confidence_gate}</span>
+          ) : null}
         </div>
         <span style={{ color: "#64748b", fontSize: "0.9rem" }}>{formatVacanciesCount(item.vacancies_count)}</span>
       </div>

@@ -5,19 +5,19 @@ import type { HhDigestItem } from "./hhDigest";
 const TELEGRAM_DIGEST_FEEDBACK_ACTIONS = [
   {
     key: "accepted",
-    label: "✅ Беру"
+    label: "Беру"
   },
   {
     key: "badfit",
-    label: "👎 Мимо"
+    label: "Мимо"
   },
   {
     key: "snooze",
-    label: "⏸ Позже"
+    label: "Позже"
   },
   {
     key: "dismissed",
-    label: "🚫 Скрыть"
+    label: "Скрыть"
   }
 ] as const;
 

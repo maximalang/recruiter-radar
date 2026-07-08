@@ -63,13 +63,36 @@
   color: var(--c-text-secondary);
 }
 
+/* Checklist icon — inline-SVG, sized to the item text, tone via currentColor.
+   Filled = brand-success CheckIcon; unfilled = muted CircleIcon. No literal
+   ✓ / ○ glyphs — the SVG system is the single visual vocabulary. */
 .checkIcon {
-  font-size: 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  width: 0.95em;
+  height: 0.95em;
   color: #c0c4cc;
+}
+
+.checkIcon svg {
+  width: 100%;
+  height: 100%;
 }
 
 .checkItem[data-filled] .checkIcon {
   color: #16a34a;
+}
+
+/* Match-count preview leading icon — semantic SearchIcon ("проверка радара"),
+   muted, sized to the preview text. */
+.previewIcon {
+  display: inline-block;
+  width: 0.95em;
+  height: 0.95em;
+  vertical-align: -0.1em;
+  color: var(--c-text-muted);
+  margin-right: 2px;
 }
 
 .preview {

@@ -24,15 +24,25 @@
 }
 
 .feedbackBtn {
-  padding: 4px 10px;
-  border-radius: 6px;
-  font-size: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 0.82rem;
   font-weight: 500;
   border: 1px solid var(--c-border);
   background-color: var(--c-bg-card);
   color: var(--c-text-secondary);
   cursor: pointer;
   transition: all 0.15s;
+}
+
+/* Inline-SVG triage icon — inherits the button tone via currentColor. */
+.btnIcon {
+  flex: 0 0 auto;
+  width: 1em;
+  height: 1em;
 }
 
 .feedbackBtn:focus-visible {
@@ -149,5 +159,14 @@
 @media (prefers-reduced-motion: reduce) {
   .feedbackBtn {
     transition: none;
+  }
+}
+
+@media (max-width: 640px) {
+  /* Tap-target floor: triage buttons must be ≥44px tall for comfortable touch
+     use (WCAG 2.5.5 / Apple HIG). */
+  .feedbackBtn {
+    min-height: 44px;
+    padding: 10px 14px;
   }
 }

@@ -1,0 +1,99 @@
+/* Review actions — approve / reject inline on a review card.
+   Uses the shared --c-* tokens; tone is encoded via data-tone so the active
+   state reads as a decision (green approve, red reject) without emoji. */
+
+.row {
+  display: flex;
+  gap: 8px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--c-border);
+  background-color: var(--c-bg-card);
+  color: var(--c-text-secondary);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--c-brand);
+  outline-offset: 2px;
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.btn[data-tone="success"] {
+  color: #047857;
+  border-color: #a7f3d0;
+  background-color: #ecfdf5;
+}
+
+.btn[data-tone="success"]:hover {
+  background-color: #d1fae5;
+}
+
+.btn[data-tone="danger"] {
+  color: #b91c1c;
+  border-color: #fecaca;
+  background-color: #fef2f2;
+}
+
+.btn[data-tone="danger"]:hover {
+  background-color: #fee2e2;
+}
+
+.btnIcon {
+  flex: 0 0 auto;
+  width: 1em;
+  height: 1em;
+}
+
+/* Committed verdict — a quiet inline label replacing the old button row once
+   the analyst has decided, so the card settles instead of staying actionable. */
+.verdict {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+
+.verdict[data-tone="success"] {
+  color: #047857;
+  background-color: #ecfdf5;
+  border: 1px solid #a7f3d0;
+}
+
+.verdict[data-tone="danger"] {
+  color: #b91c1c;
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
+.error {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: #b91c1c;
+}
+
+@media (max-width: 640px) {
+  /* Tap-target floor: review decision buttons must be ≥44px tall on touch. */
+  .btn {
+    min-height: 44px;
+    padding: 10px 14px;
+  }
+}

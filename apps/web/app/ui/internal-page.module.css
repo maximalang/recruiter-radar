@@ -69,6 +69,15 @@
   outline-offset: 2px;
 }
 
+/* Brand identity glyph — sized in em so it scales with the brand label and
+   inherits currentColor. Same sizing contract as `.backLinkIcon`. */
+.topNavBrandIcon {
+  flex: 0 0 auto;
+  width: 0.95em;
+  height: 0.95em;
+  color: var(--c-brand);
+}
+
 .topNavLinks {
   display: flex;
   gap: 4px;
@@ -163,7 +172,15 @@
   font-size: 0.875rem;
   color: var(--c-text-muted);
   text-decoration: none;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.backLinkIcon {
+  flex: 0 0 auto;
+  width: 0.9em;
+  height: 0.9em;
 }
 
 .internalPageBackLink:hover {
@@ -207,6 +224,10 @@
   border-radius: var(--radius-card-sm);
   padding: 16px;
   border: 1px solid var(--c-border);
+  /* Shared default elevation with dashboard.module.css .metricCard so the two
+     surfaces (overview metric cards + lead-detail MetricCard primitive) speak
+     one visual language — same radius/border/shadow/padding, no component merge. */
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
   transition: box-shadow 0.2s ease, transform 0.15s ease;
 }
 
@@ -500,6 +521,14 @@
   white-space: nowrap;
 }
 
+/* Inline-SVG chip icon — the single visual vocabulary that replaced emoji
+   markers. Scales with the chip font-size and inherits tone via currentColor. */
+.chipIcon {
+  flex: 0 0 auto;
+  width: 0.9em;
+  height: 0.9em;
+}
+
 .scoreBandChip[data-tone="success"] {
   background-color: #ecfdf5;
   color: #047857;
@@ -613,6 +642,24 @@
   font-size: 0.72rem;
   font-weight: 600;
   white-space: nowrap;
+}
+
+/* ── Review-reason chip (why a candidate is in the review queue) ──
+   One semantic chip: foreign / gate-C / single-source. Carries the reason's
+   SVG icon + a muted info tone so it reads as "context for the analyst", not
+   a verdict (the verdict is the gate badge next to it). */
+.reviewReasonChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  background-color: rgba(148, 163, 184, 0.12);
+  color: #475569;
+  border: 1px solid rgba(148, 163, 184, 0.28);
 }
 
 .urgencyCueChip[data-tone="success"] {
@@ -854,8 +901,17 @@
 }
 
 .emptyStateIcon {
-  font-size: 2rem;
-  margin-bottom: 8px;
+  /* SVG glyph well — sized by the icon's em scale, muted to the page text tone
+     so the glyph reads as a calm visual anchor, not a loud decoration. */
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+  color: var(--c-text-muted);
+}
+
+.emptyStateIcon svg {
+  width: 2rem;
+  height: 2rem;
 }
 
 .emptyStateTitle {
@@ -909,6 +965,61 @@
   color: var(--c-text-muted);
 }
 
+/* Skeleton loading — an aria-busy block with placeholder bars so a Suspense
+   gap reads as "loading this section" instead of a white flash. Calm, no
+   heavy animation: a single slow shimmer, gated by prefers-reduced-motion. */
+.loadingSkeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+}
+
+.loadingSkeletonLine {
+  height: 14px;
+  border-radius: 7px;
+  background-color: var(--c-border);
+  opacity: 0.55;
+  /* Shimmer — subtle horizontal sweep. Pinned to the line, not the whole block,
+     so it reads as content shaping, not a busy spinner. */
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.6) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: loadingShimmer 1.6s ease-in-out infinite;
+}
+
+@keyframes loadingShimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loadingSkeletonLine {
+    animation: none;
+    opacity: 0.5;
+  }
+}
+
+/* Screen-reader-only utility — used by the skeleton's visible-to-AT loading
+   label. Kept here (not in dashboard.module.css) so the LoadingState primitive
+   is self-contained. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* ── Table card container ── */
 .tableCard {
   background-color: var(--c-bg-card);
@@ -955,6 +1066,7 @@
 .leadCardRail[data-tone="success"] { background-color: #10b981; }
 .leadCardRail[data-tone="warning"] { background-color: #f59e0b; }
 .leadCardRail[data-tone="danger"] { background-color: #ef4444; }
+.leadCardRail[data-tone="neutral"] { background-color: #9ca3af; }
 
 .leadCardBody {
   flex: 1 1 auto;
@@ -997,6 +1109,34 @@
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
+}
+
+/* Chip sub-group — a visual cluster inside the head tag row. "decision" groups
+   the verdict (band + gate); "status" groups the workflow state (review +
+   feedback). A slightly larger gap + subtle separator after the decision group
+   separates the verdict from the workflow state at a glance, without a heavy
+   divider line (calm premium tone). */
+.leadCardTagGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.leadCardTagGroup[data-chip-group="decision"] {
+  margin-right: 4px;
+  padding-right: 10px;
+  border-right: 1px solid var(--c-border);
+}
+
+/* On narrow viewports the divider can crowd — drop it so the groups stack
+   cleanly while still reading as distinct clusters via the gap. */
+@media (max-width: 480px) {
+  .leadCardTagGroup[data-chip-group="decision"] {
+    border-right: none;
+    padding-right: 0;
+    margin-right: 0;
+  }
 }
 
 .leadCardHeadAside {
@@ -1445,6 +1585,57 @@
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+/* Verdict chip sub-group — "decision" (band + gate + urgency) vs "meta"
+   (foreign + review + freshness). A subtle divider after the decision group
+   separates the verdict from the metadata at a glance. Drops on narrow
+   viewports so the two clusters stack cleanly while still reading as distinct. */
+.leadVerdictChipGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.leadVerdictChipGroup[data-chip-group="decision"] {
+  margin-right: 4px;
+  padding-right: 12px;
+  border-right: 1px solid var(--c-border);
+}
+
+@media (max-width: 480px) {
+  .leadVerdictChipGroup[data-chip-group="decision"] {
+    border-right: none;
+    padding-right: 0;
+    margin-right: 0;
+  }
+}
+
+/* sr-only on mobile, visible on desktop. Used by ScoreGauge's level label so
+   the "Высокий/Средний/Низкий" read doesn't duplicate the band chip on a narrow
+   screen but stays visible + announced on desktop. Desktop ≥641px shows it. */
+.srOnlyMobile {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (min-width: 641px) {
+  .srOnlyMobile {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+  }
 }
 
 .leadVerdictRoles {

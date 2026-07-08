@@ -269,7 +269,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                   id="specialization"
                   name="specialization"
                   defaultValue={previewInput.specialization}
-                  placeholder="IT-рекрутмент / подбор в продажи"
+                  placeholder="Промышленный подбор / финансы C-level / массовый найм"
                   className={ppStyles.input}
                 />
               </label>

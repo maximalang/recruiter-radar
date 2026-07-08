@@ -20,14 +20,26 @@
 }
 
 .groupTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   font-size: 0.98rem;
   font-weight: 600;
   letter-spacing: -0.01em;
 }
 
+/* Semantic channel/group glyph — inline-SVG, scales with the title font-size,
+   inherits tone via currentColor. Marks the channel (push/email) at a glance. */
+.groupTitleIcon {
+  flex: 0 0 auto;
+  width: 1em;
+  height: 1em;
+  color: var(--c-text-muted, #667085);
+}
+
 .groupHint {
   font-size: 0.82rem;
-  color: var(--rr-text-muted, #6b7280);
+  color: var(--c-text-muted, #667085);
   line-height: 1.4;
 }
 
@@ -39,7 +51,7 @@
 
 .groupEmptyHint {
   font-size: 0.8rem;
-  color: var(--rr-text-muted, #6b7280);
+  color: var(--c-text-muted, #667085);
   font-style: italic;
   margin-top: 6px;
 }
@@ -50,21 +62,109 @@
   gap: 6px;
   font-size: 0.86rem;
   padding: 6px 10px;
-  border: 1px solid var(--rr-border, #e5e7eb);
+  border: 1px solid var(--c-border, rgba(15, 23, 42, 0.08));
   border-radius: 10px;
   cursor: pointer;
   user-select: none;
-  background: var(--rr-surface, #fff);
+  background: var(--c-bg-card, #fff);
   transition: border-color 0.12s ease, background 0.12s ease;
 }
 
 .chip:hover {
-  border-color: var(--rr-border-strong, #c7ccd4);
+  border-color: rgba(15, 23, 42, 0.12);
 }
 
 .chip:has(input:checked) {
-  border-color: var(--rr-accent, #2563eb);
-  background: var(--rr-accent-subtle, #eef2ff);
+  border-color: var(--c-brand, #1d4ed8);
+  background: rgba(29, 78, 216, 0.06);
+}
+
+.radioCards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.radioCard {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--c-border, rgba(15, 23, 42, 0.08));
+  border-radius: 12px;
+  cursor: pointer;
+  user-select: none;
+  background: var(--c-bg-card, #fff);
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.radioCard:hover {
+  border-color: rgba(15, 23, 42, 0.12);
+}
+
+.radioCard:has(input:checked) {
+  border-color: var(--c-brand, #1d4ed8);
+  background: rgba(29, 78, 216, 0.06);
+}
+
+.radioCard > input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.radioCardTitle {
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.radioCardHint {
+  font-size: 0.8rem;
+  color: var(--c-text-muted, #667085);
+  line-height: 1.4;
+}
+
+.modeBadgeRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.modeBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--c-border, rgba(15, 23, 42, 0.08));
+  background: var(--c-bg-card, #fff);
+  color: var(--c-text-primary, #0f172a);
+  letter-spacing: -0.01em;
+}
+
+/* Resolved-mode glyph — inline-SVG, scales with the badge font-size, inherits
+   tone via currentColor. Semantic only (marks the active practice). */
+.modeBadgeIcon {
+  flex: 0 0 auto;
+  width: 0.95em;
+  height: 0.95em;
+}
+
+.modeBadgeSource {
+  font-size: 0.78rem;
+  color: var(--c-text-muted, #667085);
+}
+
+.modeNote {
+  font-size: 0.8rem;
+  color: var(--c-text-muted, #667085);
+  line-height: 1.45;
+  margin: 4px 0 0;
 }
 
 .twoCol {
@@ -92,4 +192,14 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 14px;
+}
+
+@media (max-width: 640px) {
+  /* Tap-target floor: interactive chips must be ≥44px tall for comfortable touch use */
+  .chip,
+  .radioCard {
+    min-height: 44px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
 }

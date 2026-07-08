@@ -11,7 +11,9 @@
 }
 
 .aiBadge {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   margin-right: 8px;
   padding: 1px 8px;
   border-radius: 999px;
@@ -21,6 +23,12 @@
   font-weight: 600;
   letter-spacing: 0.02em;
   vertical-align: middle;
+}
+
+.aiBadgeIcon {
+  flex: 0 0 auto;
+  width: 0.95em;
+  height: 0.95em;
 }
 
 .aiDisclaimer {

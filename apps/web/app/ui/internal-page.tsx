@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode, ReactElement, SVGProps } from "react";
 import Link from "next/link";
 
 import s from "./internal-page.module.css";
@@ -11,9 +11,61 @@ import {
   scoreBand,
   type ScoreTone as DisplayScoreTone,
 } from "../../lib/scoring/score-display";
+import {
+  IndustryIcon,
+  RoleIcon,
+  TargetIcon,
+  PinIcon,
+  ShieldIcon,
+  MailIcon,
+  CheckIcon,
+  HandIcon,
+  ChatIcon,
+  HandshakeIcon,
+  ClockIcon,
+  WaveIcon,
+  XIcon,
+  SearchIcon,
+  FlameIcon,
+  TrendIcon,
+  SparkIcon,
+  DropIcon,
+  BriefcaseIcon,
+  FileIcon,
+  LayersIcon,
+  CalendarIcon,
+  GlobeIcon,
+  BackIcon,
+} from "./icons";
 
 function repairVisibleNode(value: ReactNode): ReactNode {
   return typeof value === "string" ? repairPossiblyMojibakeText(value) : value;
+}
+
+/**
+ * Fit-dimension → SVG icon component map. The lib layer (fit-explanation)
+ * keeps a stable string key per dimension; this map turns it into the rendered
+ * glyph so the lib never imports presentation. Used by the detail-page fit list.
+ */
+export const FIT_DIMENSION_ICON_COMPONENT: Record<string, (p: SVGProps<SVGSVGElement>) => ReactElement> = {
+  industry: IndustryIcon,
+  role: RoleIcon,
+  seniority: TargetIcon,
+  target: TargetIcon,
+  region: PinIcon,
+  pin: PinIcon,
+  'contact-policy': ShieldIcon,
+  shield: ShieldIcon,
+  reachability: MailIcon,
+  mail: MailIcon,
+  exclusions: CheckIcon,
+  check: CheckIcon,
+};
+
+/** Render a fit-dimension icon by its stable string key. Null for unknown keys. */
+export function FitIcon({ name, ...rest }: { name: string } & SVGProps<SVGSVGElement>) {
+  const C = FIT_DIMENSION_ICON_COMPONENT[name];
+  return C ? <C {...rest} /> : null;
 }
 
 /* ── Top navigation bar ── */
@@ -31,7 +83,12 @@ export function TopNav(props: {
     <nav className={s.topNav} aria-label="Основная навигация">
       <div className={s.topNavInner}>
         <Link href="/" className={s.topNavBrand}>
-          ← Recruiter Radar
+          {/* Brand identity glyph — `TargetIcon` (radar/concentric rings) reads
+            as the product's "radar" metaphor, not a back affordance. Replaces
+            the literal `←` interface glyph that violated AC1 of the UX-hardening
+            premium pass (§7.1: no literal arrow chars in navigation). The icon
+            is aria-hidden because the brand label is the accessible name. */}
+          <TargetIcon className={s.topNavBrandIcon} aria-hidden="true" /> Recruiter Radar
         </Link>
         <div className={s.topNavLinks}>
           {props.items.map((item) => (
@@ -106,13 +163,22 @@ export function InternalNavLink(props: {
 
 /* ── BackLink ── */
 
+/**
+ * Back affordance — carries a semantic BackIcon SVG by default (replaces the
+ * literal "←" character callers used to compose inline). The `icon` prop lets
+ * a caller pass a different glyph, but every back link speaks the SVG
+ * vocabulary now. The icon is `aria-hidden` because the label text is the
+ * accessible name.
+ */
 export function InternalBackLink(props: {
   href: string;
   children: ReactNode;
+  icon?: StateIcon;
 }) {
+  const Icon = props.icon ?? BackIcon;
   return (
     <Link href={props.href} className={s.internalPageBackLink}>
-      {props.children}
+      <Icon className={s.backLinkIcon} aria-hidden="true" /> {props.children}
     </Link>
   );
 }
@@ -217,20 +283,24 @@ export const GATE_DESC: Record<string, string> = {
  * enum never contained and the in-app writer no longer emits) are still mapped
  * so any historical row renders a readable label instead of a raw status
  * string — display-only tolerance, no writer emits them.
+ *
+ * `icon` is an inline-SVG component (from app/ui/icons) so the badge speaks the
+ * same visual vocabulary as the rest of the product, not emoji. Callers render
+ * it next to the label.
  */
-export const FEEDBACK_LABELS: Record<string, { label: string; icon: string }> = {
+export const FEEDBACK_LABELS: Record<string, { label: string; icon: (p: SVGProps<SVGSVGElement>) => ReactElement }> = {
   // DB-legal, current in-app vocabulary
-  contacted: { label: "В работе", icon: "✋" },
-  replied: { label: "Ответили", icon: "💬" },
-  won: { label: "Клиент", icon: "🤝" },
-  snooze: { label: "Отложено", icon: "⏰" },
-  dismissed: { label: "Мимо", icon: "👋" },
-  badfit: { label: "Не наш профиль", icon: "❌" },
+  contacted: { label: "В работе", icon: HandIcon },
+  replied: { label: "Ответили", icon: ChatIcon },
+  won: { label: "Клиент", icon: HandshakeIcon },
+  snooze: { label: "Отложено", icon: ClockIcon },
+  dismissed: { label: "Мимо", icon: WaveIcon },
+  badfit: { label: "Не наш профиль", icon: XIcon },
   // Legacy / display-only — not emitted by the in-app writer (not in the enum)
-  accepted: { label: "Беру", icon: "✅" },
-  later: { label: "Позже", icon: "⏰" },
-  call: { label: "Созвон", icon: "📞" },
-  client: { label: "Клиент", icon: "🤝" },
+  accepted: { label: "Беру", icon: CheckIcon },
+  later: { label: "Позже", icon: ClockIcon },
+  call: { label: "Созвон", icon: ChatIcon },
+  client: { label: "Клиент", icon: HandshakeIcon },
 };
 
 export function GateBadgeInline(props: { gate: string }) {
@@ -280,7 +350,10 @@ export function ScoreGauge(props: { score: number }) {
       </div>
       <div className={s.scoreGaugeInfo}>
         <div className={s.scoreGaugeLabel}>Сила сигнала</div>
-        <div className={s.scoreGaugeLevel} data-tone={tone}>
+        {/* The level label (Высокий/Средний/Низкий) is visible on desktop but
+            collapses to sr-only on mobile so it doesn't duplicate the band chip
+            (Горячий/Тёплый/Холодный) on a narrow screen. Always announced to AT. */}
+        <div className={`${s.scoreGaugeLevel} ${s.srOnlyMobile}`} data-score-level="true" data-tone={tone}>
           {scoreLevelLabel(props.score)}
         </div>
         <div className={s.scoreGaugeBar}>
@@ -321,9 +394,10 @@ export function ScoreBar(props: { score: number }) {
  */
 export function ScoreBandChip(props: { score: number }) {
   const band = scoreBand(props.score);
+  const Icon = band.tone === 'success' ? FlameIcon : band.tone === 'warning' ? DropIcon : DropIcon;
   return (
     <span className={s.scoreBandChip} data-tone={band.tone}>
-      <span aria-hidden="true">{band.icon}</span>
+      <Icon className={s.chipIcon} aria-hidden="true" />
       {band.label}
     </span>
   );
@@ -355,7 +429,7 @@ export function SignalFreshnessChip(props: { latestPublishedAt: string | null })
   if (!fresh) return null;
   return (
     <span className={s.freshnessChip} data-tone={fresh.tone}>
-      🕔 {fresh.label}
+      <ClockIcon className={s.chipIcon} /> {fresh.label}
     </span>
   );
 }
@@ -371,7 +445,7 @@ export function AiHintChip(props: { present: boolean }) {
   if (!props.present) return null;
   return (
     <span className={s.aiHintChip} title="Для этого лида есть AI-подсказка по найму">
-      ✨ AI
+      <SparkIcon className={s.chipIcon} /> AI
     </span>
   );
 }
@@ -387,7 +461,7 @@ export function ForeignEmployerBadge(props: { isForeign: boolean }) {
   if (!props.isForeign) return null;
   return (
     <span className={s.foreignBadge} title="Иностранный работодатель — сигнал только на зарубежном ATS, релевантность для рынка РФ понижена">
-      🌍 Иностранный работодатель
+      <GlobeIcon className={s.chipIcon} /> Иностранный работодатель
     </span>
   );
 }
@@ -402,10 +476,10 @@ export function ForeignEmployerBadge(props: { isForeign: boolean }) {
  * the gate-C label uses, so /leads, /review, and /dashboard speak one
  * vocabulary. `approved`/`rejected` are analyst decisions written by /api/review.
  */
-export const REVIEW_LABELS: Record<string, { label: string; icon: string; tone: 'info' | 'success' | 'danger' }> = {
-  pending_review: { label: 'На проверке', icon: '🔍', tone: 'info' },
-  approved: { label: 'Проверен', icon: '✓', tone: 'success' },
-  rejected: { label: 'Отклонён', icon: '✕', tone: 'danger' },
+export const REVIEW_LABELS: Record<string, { label: string; icon: (p: SVGProps<SVGSVGElement>) => ReactElement; tone: 'info' | 'success' | 'danger' }> = {
+  pending_review: { label: 'На проверке', icon: SearchIcon, tone: 'info' },
+  approved: { label: 'Проверен', icon: CheckIcon, tone: 'success' },
+  rejected: { label: 'Отклонён', icon: XIcon, tone: 'danger' },
 };
 
 /**
@@ -416,6 +490,7 @@ export function ReviewStatusBadge(props: { status: string | null }) {
   if (!props.status || props.status === 'auto_approved') return null;
   const entry = REVIEW_LABELS[props.status];
   if (!entry) return null;
+  const Icon = entry.icon;
   return (
     <span
       className={s.reviewBadge}
@@ -428,7 +503,7 @@ export function ReviewStatusBadge(props: { status: string | null }) {
             : 'Отклонён аналитиком — скрыт из радара'
       }
     >
-      {entry.icon} {entry.label}
+      <Icon className={s.chipIcon} /> {entry.label}
     </span>
   );
 }
@@ -447,16 +522,63 @@ export function UrgencyCueChip(props: { level: string; label: string }) {
     : props.level === 'fresh' ? 'success'
     : props.level === 'stale' ? 'danger'
     : 'neutral';
-  const icon =
-    props.level === 'burst' ? '🔥'
-    : props.level === 'active' ? '📈'
-    : props.level === 'fresh' ? '🆕'
-    : props.level === 'stale' ? '🕓'
-    : '•';
+  const Icon =
+    props.level === 'burst' ? FlameIcon
+    : props.level === 'active' ? TrendIcon
+    : props.level === 'fresh' ? SparkIcon
+    : props.level === 'stale' ? ClockIcon
+    : null;
   return (
     <span className={s.urgencyCueChip} data-tone={tone}>
-      {icon} {props.label}
+      {Icon ? <Icon className={s.chipIcon} /> : null} {props.label}
     </span>
+  );
+}
+
+/* ── Lead-detail verdict chips (decision / meta grouping) ── */
+
+/**
+ * The one-glance verdict chip row for the lead-detail hero. Splits the previous
+ * flat chip row into two visual clusters so the verdict reads separate from
+ * metadata:
+ *
+ *   decision — band (temperature) + gate (confidence) + urgency (tempo). The
+ *              three signals that answer "is this worth contacting now?"
+ *   meta     — foreign-employer marker + analyst-review status + signal
+ *              freshness. Contextual metadata, not the verdict.
+ *
+ * The meta group is rendered only when at least one meta chip would show, so a
+ * clean A/B domestic lead doesn't carry an empty wrapper. Reuses the existing
+ * chip primitives — the grouping is layout, not new components.
+ */
+export function LeadVerdictChips(props: {
+  score: number;
+  confidenceGate: string;
+  isForeignEmployer: boolean;
+  reviewStatus: string | null;
+  urgencyLevel: string;
+  urgencyLabel: string;
+  latestPublishedAt: string | null;
+}) {
+  const showMeta =
+    props.isForeignEmployer ||
+    (props.reviewStatus != null && props.reviewStatus !== 'auto_approved') ||
+    props.latestPublishedAt != null;
+  return (
+    <div className={s.leadVerdictChips}>
+      <span className={s.leadVerdictChipGroup} data-chip-group="decision">
+        <ScoreBandChip score={props.score} />
+        <GateBadgeInline gate={props.confidenceGate} />
+        <UrgencyCueChip level={props.urgencyLevel} label={props.urgencyLabel} />
+      </span>
+      {showMeta ? (
+        <span className={s.leadVerdictChipGroup} data-chip-group="meta">
+          <ForeignEmployerBadge isForeign={props.isForeignEmployer} />
+          <ReviewStatusBadge status={props.reviewStatus} />
+          <SignalFreshnessChip latestPublishedAt={props.latestPublishedAt} />
+        </span>
+      ) : null}
+    </div>
   );
 }
 
@@ -474,16 +596,34 @@ export function SourceChip(props: { children: ReactNode }) {
 
 /* ── Empty state ── */
 
+/**
+ * Inline-SVG icon component type for state primitives. Mirrors the established
+ * `(p: SVGProps<SVGSVGElement>) => ReactElement` shape used by FEEDBACK_LABELS,
+ * REVIEW_LABELS, and FIT_DIMENSION_ICON_COMPONENT so every glyph comes from
+ * the single app/ui/icons vocabulary.
+ */
+type StateIcon = (p: SVGProps<SVGSVGElement>) => ReactElement;
+
 export function EmptyState(props: {
-  icon?: string;
+  /**
+   * Semantic SVG glyph (from app/ui/icons). Replaces the previous dead
+   * `icon?: string` prop (which 0 callers passed). Rendered inside the icon
+   * well; tone comes from the `.emptyStateIcon` CSS (`currentColor`).
+   */
+  icon?: StateIcon;
   title: string;
   text?: string;
   /** Optional next-step call to action — turns a dead end into a guided step. */
   action?: { href: string; label: string };
 }) {
+  const Icon = props.icon;
   return (
     <div className={s.emptyState}>
-      {props.icon ? <div className={s.emptyStateIcon}>{props.icon}</div> : null}
+      {Icon ? (
+        <div className={s.emptyStateIcon}>
+          <Icon />
+        </div>
+      ) : null}
       <p className={s.emptyStateTitle}>{repairVisibleNode(props.title)}</p>
       {props.text ? <p className={s.emptyStateText}>{repairVisibleNode(props.text)}</p> : null}
       {props.action ? (
@@ -500,20 +640,56 @@ export function EmptyState(props: {
 /** Full-page "not found" state. Use *instead of* InternalPageFrame, not nested inside it —
  *  otherwise you'd get `<main>` inside `<main>`. */
 export function NotFoundState(props: {
-  icon?: string;
+  /** Semantic SVG glyph (from app/ui/icons). */
+  icon?: StateIcon;
   title: string;
   backHref: string;
   backLabel: string;
 }) {
+  const Icon = props.icon;
   return (
     <div className={s.notFoundState}>
       <div className={s.notFoundContent}>
-        {props.icon ? <div className={s.emptyStateIcon}>{props.icon}</div> : null}
+        {Icon ? (
+          <div className={s.emptyStateIcon}>
+            <Icon />
+          </div>
+        ) : null}
         <p className={s.emptyStateTitle}>{props.title}</p>
         <InternalBackLink href={props.backHref}>{props.backLabel}</InternalBackLink>
       </div>
     </div>
   );
+}
+
+/* ── Loading state ── */
+
+/**
+ * Unified Suspense / data-loading fallback. Replaces the flat
+ * `<div>Загрузка...</div>` strings scattered across pages so every loading
+ * moment speaks one calm vocabulary.
+ *
+ *   variant="inline"  — a quiet centered text line (reuses `.loadingState`).
+ *   variant="skeleton" — an `aria-busy` skeleton block with placeholder bars,
+ *                        so a Suspense gap doesn't flash white. Used for
+ *                        data-shaped sections (lists, metric grids).
+ *
+ * Defaults to "inline" so callers can drop it in without a variant for the
+ * simple case and opt into skeleton where the shape is known.
+ */
+export function LoadingState(props: { variant?: "skeleton" | "inline" }) {
+  const variant = props.variant ?? "inline";
+  if (variant === "skeleton") {
+    return (
+      <div className={s.loadingSkeleton} role="status" aria-busy="true" aria-live="polite">
+        <span className={s.srOnly}>Загрузка…</span>
+        <div className={s.loadingSkeletonLine} data-skeleton="true" />
+        <div className={s.loadingSkeletonLine} data-skeleton="true" />
+        <div className={s.loadingSkeletonLine} data-skeleton="true" style={{ width: "55%" }} />
+      </div>
+    );
+  }
+  return <div className={s.loadingState}>Загрузка…</div>;
 }
 
 /* ── Table card ── */

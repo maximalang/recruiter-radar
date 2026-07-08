@@ -92,6 +92,36 @@ describe('renderDigestEmail', () => {
     expect(out.text).toContain('На проверку')
   })
 
+  // ─── T6.2 readiness-line de-duplication (2026-07-08) ──────────────────────
+  // Email shares the Telegram readiness-line contract (T6.1): readinessLabel +
+  // band + numeric only — the gate letter is encoded in readinessLabel
+  // («Готов к контакту» / «Готов к контакту · с пометкой» / «На проверку») and
+  // must not be repeated as a bare « · A». Keeps the two channels from drifting.
+  it('drops the redundant gate letter from the email readiness line (html + text)', () => {
+    const out = renderDigestEmail([makeLead({ confidenceGate: 'A', score: 320 })], ctx)
+    // Band (Горячий) + readiness + numeric, no bare gate letter.
+    expect(out.text).toContain('Горячий · Готов к контакту · 3.2')
+    expect(out.text).not.toMatch(/· A\b/)
+    expect(out.html).not.toMatch(/>\s*A\s*</)
+    // HTML readiness line carries band + readiness + numeric with no gate letter.
+    expect(out.html).toContain('Горячий')
+    expect(out.html).toContain('Готов к контакту')
+    expect(out.html).toContain('3.2')
+  })
+
+  it('keeps the gate-B «с пометкой» readiness without a bare gate letter', () => {
+    const out = renderDigestEmail([makeLead({ confidenceGate: 'B', score: 320 })], ctx)
+    expect(out.text).toContain('Готов к контакту · с пометкой')
+    expect(out.text).not.toMatch(/· B\b/)
+    expect(out.html).toContain('с пометкой')
+  })
+
+  it('reads readiness «На проверку» for gate C without a bare gate letter', () => {
+    const out = renderDigestEmail([makeLead({ confidenceGate: 'C', score: 320 })], ctx)
+    expect(out.text).toContain('На проверку · 3.2')
+    expect(out.text).not.toMatch(/· C\b/)
+  })
+
   it('omits optional sections when their fields are empty', () => {
     const out = renderDigestEmail(
       [

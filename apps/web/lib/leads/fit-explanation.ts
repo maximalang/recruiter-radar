@@ -21,19 +21,29 @@ import type { ScoringReason } from '../scoring/scoring-reasons';
 export type FitDimension =
   | 'industry'
   | 'role'
+  | 'seniority'
   | 'region'
   | 'contact-policy'
   | 'reachability'
   | 'exclusions';
 
-/** Stable emoji per fit dimension for the UI. Presentation-only. */
+/**
+ * Stable icon key per fit dimension for the UI. Presentation-only.
+ *
+ * Each value is a stable string key the UI layer maps to an inline-SVG icon
+ * component (see app/ui/icons + the FIT_DIMENSION_ICON_COMPONENT map in
+ * internal-page.tsx). Keeping a string here preserves the lib→app boundary
+ * (lib never imports presentation) while the dimension→glyph mapping stays
+ * co-located with the dimension type. Consumers render the mapped component.
+ */
 export const FIT_DIMENSION_ICON: Record<FitDimension, string> = {
-  industry: '🏭',
-  role: '🧩',
-  region: '📍',
-  'contact-policy': '🛡',
-  reachability: '📬',
-  exclusions: '✅',
+  industry: 'industry',
+  role: 'role',
+  seniority: 'target',
+  region: 'pin',
+  'contact-policy': 'shield',
+  reachability: 'mail',
+  exclusions: 'check',
 };
 
 export interface FitLine {
@@ -168,6 +178,18 @@ export function buildFitExplanation(
         ? `Несколько открытых ролей (${count}) — активный найм`
         : 'Несколько открытых ролей — активный найм',
       basis: 'intent.multiple-roles',
+    });
+  }
+
+  // 2b. Seniority — the defining fit cue for executive-search agencies.
+  // Latches onto the FIUR fit.seniority.match reason (only emitted in
+  // executive mode when a senior role is detected). States only what the
+  // scorer asserted: a senior hire is present. Never invents seniority.
+  if (keys.has('fit.seniority.match')) {
+    lines.push({
+      dimension: 'seniority',
+      text: 'Нанимают руководителя / C-level — совпадает с executive-практикой',
+      basis: 'fit.seniority.match',
     });
   }
 

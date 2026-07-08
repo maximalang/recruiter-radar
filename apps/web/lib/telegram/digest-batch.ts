@@ -20,7 +20,7 @@
  */
 
 import { scoreBand, formatSignalStrength } from '@/lib/scoring/score-display'
-import { deriveRoleNames, splitRolesForDisplay } from '@/lib/leads/lead-quality'
+import { deriveRoleNames, splitRolesForDisplay, deriveUrgencyCue } from '@/lib/leads/lead-quality'
 import { escapeTelegramHtml as escapeHtml } from './html'
 
 /** Telegram hard limit per message. */
@@ -39,6 +39,19 @@ export interface BatchLead {
   locationNames: string[]
   /** Concrete why-now / why-match line, already derived. Optional. */
   whyLine?: string | null
+  /**
+   * ISO date of the latest hiring signal — feeds the mode-aware urgency cue
+   * (freshness recency). Optional; when absent the cue degrades to a count-only
+   * read. Mirrors `latest_published_at` on digest_candidates.
+   */
+  latestPublishedAt?: string | null
+  /**
+   * Resolved agency hiring mode (never 'auto' — resolve upstream). Drives a
+   * mode-aware urgency line so an executive agency does not see volume-shaped
+   * "12 вакансий" framing and a volume agency sees hiring-scale emphasis.
+   * Optional for backward compat; defaults to specialist (the pre-mode ladder).
+   */
+  hiringMode?: 'specialist' | 'executive' | 'volume'
   /** Geo gate: foreign employer → restrained marker. */
   isForeignEmployer?: boolean
   /** Reachable corporate surfaces — links are shown when present, never invented. */
@@ -137,7 +150,7 @@ function formatContactLine(lead: BatchLead): string | null {
  * Render one numbered lead block (no trailing newline), HTML parse mode.
  *
  *   1. <b>Ромашка</b> · Москва
- *   Готов к контакту · A · сигнал 3.2
+ *   Готов к контакту · Горячий · сигнал 3.2
  *   Открыли 4 вакансии за неделю
  *   Роли: Backend, DevOps + ещё 2
  *   Контакт: Карьерная страница · romashka.ru
@@ -145,7 +158,10 @@ function formatContactLine(lead: BatchLead): string | null {
  */
 export function formatBatchLeadBlock(lead: BatchLead, index: number): string {
   const band = scoreBand(lead.score)
-  const foreignMark = lead.isForeignEmployer ? ' 🌍' : ''
+  // Foreign-employer marker — a quiet textual tag instead of an emoji. Stated
+  // plainly so the recruiter knows the signal is on a foreign ATS and RU
+  // relevance is lowered, without emoji as the visual system.
+  const foreignMark = lead.isForeignEmployer ? ' · зарубежный ATS' : ''
   const location = lead.locationNames[0] ? ` · ${escapeHtml(lead.locationNames[0])}` : ''
 
   const lines: string[] = []
@@ -153,13 +169,32 @@ export function formatBatchLeadBlock(lead: BatchLead, index: number): string {
   // Title: company + region (+ foreign marker only when it aids scanning).
   lines.push(`${index}. <b>${escapeHtml(lead.orgName)}</b>${location}${foreignMark}`)
 
-  // Readiness line: one human-readable read of confidence + signal strength.
-  const gateLetter = lead.confidenceGate ? ` · ${escapeHtml(lead.confidenceGate.toUpperCase())}` : ''
-  lines.push(`${readinessLabel(lead.confidenceGate)}${gateLetter} · ${band.label} · сигнал ${formatSignalStrength(lead.score)}`)
+  // Readiness line — ≤2 confidence readouts: readinessLabel + band + numeric.
+  // The gate letter (A/B/C) is encoded in `readinessLabel` («Готов к контакту»
+  // for A/B, «На проверку» for C/D), so a bare gate letter would be a third
+  // readout of the same fact. One contract shared with the email renderer —
+  // see lib/email/digestEmail.ts (T6.1/T6.2 de-duplication).
+  lines.push(`${readinessLabel(lead.confidenceGate)} · ${band.label} · сигнал ${formatSignalStrength(lead.score)}`)
 
   // Why now — only when there is a concrete argument.
   if (lead.whyLine && lead.whyLine.trim()) {
     lines.push(escapeHtml(lead.whyLine.trim()))
+  }
+
+  // Mode-aware urgency cue — a one-line read of hiring tempo shaped by the
+  // agency's practice type. Executive: freshness/seniority framing (a single
+  // fresh posting reads as urgency, raw role count does NOT). Volume:
+  // hiring-scale framing. Specialist: the default recency ladder. The cue only
+  // restates what is true of the lead (counts + freshness) — it never invents
+  // activity, seniority, or a contact. Rendered only when it adds information
+  // beyond the whyLine above.
+  const urgency = deriveUrgencyCue({
+    vacanciesCount: lead.vacanciesCount,
+    latestPublishedAt: lead.latestPublishedAt ?? null,
+    hiringMode: lead.hiringMode ?? 'specialist',
+  })
+  if (urgency.label && urgency.label.trim()) {
+    lines.push(escapeHtml(urgency.label.trim()))
   }
 
   // Roles / hiring signal.

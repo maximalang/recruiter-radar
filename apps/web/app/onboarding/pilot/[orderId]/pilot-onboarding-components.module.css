@@ -20,6 +20,36 @@
   background-color: #fbfcfd;
 }
 
+/* Numbered instruction card — circle badge + body, aligned with step-rail */
+.instructionCard[data-step] {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.instructionNumber {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background-color: var(--c-brand, #1d4ed8);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.instructionBody {
+  min-width: 0;
+  flex: 1 1 auto;
+  padding-top: 2px;
+}
+
 /* Instruction grid */
 .instructionGrid {
   display: grid;
@@ -90,9 +120,17 @@
   font-weight: 700;
 }
 
+/* Step glyph — inline-SVG, scales with the pill font-size, currentColor tone */
+.stepIcon {
+  flex: 0 0 auto;
+  width: 1em;
+  height: 1em;
+}
+
 /* Step pill */
 .stepPill {
   display: inline-flex;
+  align-items: center;
   gap: 8px;
   padding: 10px 12px;
   border-radius: 999px;
@@ -109,6 +147,14 @@
 .stepPill[data-complete="true"] {
   background-color: #eefbf3;
   color: #111827;
+}
+
+/* Future (not-current, not-complete) steps recede — muted text + border so the
+   eye lands on the current step first. */
+.stepPill[data-future="true"] {
+  color: var(--c-text-muted, #667085);
+  border-color: rgba(15, 23, 42, 0.06);
+  background-color: rgba(255, 255, 255, 0.6);
 }
 
 /* Step rail */

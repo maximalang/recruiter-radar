@@ -1,4 +1,5 @@
 import type { ProfileCompletion } from "@/lib/profileCompletion";
+import { CheckIcon, CircleIcon, SearchIcon } from "../../ui/icons";
 import s from "./profile-completion-panel.module.css";
 
 /**
@@ -9,6 +10,11 @@ import s from "./profile-completion-panel.module.css";
  *   1. a completion progress bar + per-group checklist (which filters are filled);
  *   2. a live match-count preview — "≈N компаний сейчас подходят" — computed from
  *      the current candidate pool against the saved filters.
+ *
+ * The checklist uses the unified SVG icon system: a filled group shows the
+ * brand-tone CheckIcon, an unfilled group shows the muted CircleIcon — no
+ * literal "✓"/"○" character glyphs. The match-count preview leads with a
+ * semantic SearchIcon so it reads as "проверка радара", not a debug readout.
  *
  * Server-rendered display only (no client state). `matchCount` is null when it
  * could not be computed (no DB), in which case the preview line is omitted.
@@ -39,7 +45,9 @@ export default function ProfileCompletionPanel(props: {
       <ul className={s.checklist}>
         {completion.groups.map((g) => (
           <li key={g.key} className={s.checkItem} data-filled={g.filled || undefined}>
-            <span className={s.checkIcon} aria-hidden="true">{g.filled ? "✓" : "○"}</span>
+            <span className={s.checkIcon} aria-hidden="true">
+              {g.filled ? <CheckIcon /> : <CircleIcon />}
+            </span>
             {g.label}
           </li>
         ))}
@@ -49,7 +57,8 @@ export default function ProfileCompletionPanel(props: {
         <div className={s.preview}>
           {matchCount.count > 0 ? (
             <p className={s.previewText}>
-              С текущими настройками подходят{" "}
+              <SearchIcon className={s.previewIcon} aria-hidden="true" /> С текущими
+              настройками подходят{" "}
               <strong>
                 ≈{matchCount.count}
                 {matchCount.capped ? "+" : ""}
@@ -58,7 +67,8 @@ export default function ProfileCompletionPanel(props: {
             </p>
           ) : (
             <p className={s.previewEmpty}>
-              Пока ни одной подходящей компании — возможно, фильтры слишком узкие.
+              <SearchIcon className={s.previewIcon} aria-hidden="true" /> Пока ни
+              одной подходящей компании — возможно, фильтры слишком узкие.
               Ослабьте пороги или добавьте роли и отрасли.
             </p>
           )}

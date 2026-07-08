@@ -1,7 +1,16 @@
 'use client';
 
 import { useTransition, useState } from 'react';
+import type { ReactElement, SVGProps } from 'react';
 import { updateLeadFeedbackAction } from './actions';
+import {
+  HandIcon,
+  ChatIcon,
+  HandshakeIcon,
+  ClockIcon,
+  WaveIcon,
+  XIcon,
+} from '../../ui/icons';
 import s from './feedback-buttons.module.css';
 
 /**
@@ -28,13 +37,16 @@ type FeedbackTone = 'success' | 'warning' | 'danger' | 'info' | 'neutral';
  * can be attached to the "not a fit" decisions (badfit/dismissed) — the DB
  * allows a note for any non-none status, and a one-line "почему мимо" is the
  * single most useful piece of triage context for a future re-run.
+ *
+ * `icon` is an inline-SVG component (app/ui/icons) — the same visual vocabulary
+ * used by the feedback badge and the rest of the product, not emoji.
  */
 type TriageGroup = 'action' | 'progress' | 'park';
 
 interface TriageButton {
   status: 'contacted' | 'replied' | 'won' | 'snooze' | 'dismissed' | 'badfit';
   label: string;
-  emoji: string;
+  icon: (p: SVGProps<SVGSVGElement>) => ReactElement;
   tone: FeedbackTone;
   group: TriageGroup;
   /** Allow an optional one-line note for this status. */
@@ -42,12 +54,12 @@ interface TriageButton {
 }
 
 const BUTTONS: readonly TriageButton[] = [
-  { status: 'contacted', label: 'В работу', emoji: '✋', tone: 'info', group: 'action' },
-  { status: 'replied', label: 'Ответили', emoji: '💬', tone: 'success', group: 'progress' },
-  { status: 'won', label: 'Клиент', emoji: '🤝', tone: 'success', group: 'progress' },
-  { status: 'snooze', label: 'Отложить', emoji: '⏰', tone: 'warning', group: 'park' },
-  { status: 'dismissed', label: 'Мимо', emoji: '👋', tone: 'neutral', group: 'park' },
-  { status: 'badfit', label: 'Не наш профиль', emoji: '❌', tone: 'danger', group: 'park', noteAllowed: true },
+  { status: 'contacted', label: 'В работу', icon: HandIcon, tone: 'info', group: 'action' },
+  { status: 'replied', label: 'Ответили', icon: ChatIcon, tone: 'success', group: 'progress' },
+  { status: 'won', label: 'Клиент', icon: HandshakeIcon, tone: 'success', group: 'progress' },
+  { status: 'snooze', label: 'Отложить', icon: ClockIcon, tone: 'warning', group: 'park' },
+  { status: 'dismissed', label: 'Мимо', icon: WaveIcon, tone: 'neutral', group: 'park' },
+  { status: 'badfit', label: 'Не наш профиль', icon: XIcon, tone: 'danger', group: 'park', noteAllowed: true },
 ];
 
 const GROUP_LABEL: Record<TriageGroup, string> = {
@@ -126,7 +138,7 @@ export default function FeedbackButtons({ orgId, clientProfileId, currentStatus 
                     data-tone={isActive ? btn.tone : undefined}
                     aria-pressed={isActive ? 'true' : 'false'}
                   >
-                    {btn.emoji} {btn.label}
+                    <btn.icon className={s.btnIcon} /> {btn.label}
                   </button>
                 );
               })}

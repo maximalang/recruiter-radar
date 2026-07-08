@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import type { ReactElement, SVGProps } from 'react';
 import Link from 'next/link';
 import { getLeadDetail, formatLawfulContactPath } from '@/lib/leads-data';
 import { getClientProfileById, resolveHiringMode } from '@/lib/clientProfiles';
@@ -24,14 +25,17 @@ import {
   ForeignEmployerBadge,
   ReviewStatusBadge,
   UrgencyCueChip,
+  LeadVerdictChips,
   EvidenceTag,
   SourceChip,
   NotFoundState,
+  FitIcon,
   internalPageClasses as ipStyles,
   type NavItem,
   GATE_DESC,
   FEEDBACK_LABELS,
 } from '../../ui/internal-page';
+import { BriefcaseIcon, LayersIcon, CalendarIcon, HelpIcon, SearchIcon } from '../../ui/icons';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,6 +44,11 @@ const LEAD_DETAIL_NAV: NavItem[] = [
   { href: '/leads', label: 'Лиды' },
   { href: '/settings/profile', label: 'Профиль' },
 ];
+
+/** Renders the feedback-status icon component inline with its label. */
+function FeedbackStatusIcon({ icon: Icon }: { icon: (p: SVGProps<SVGSVGElement>) => ReactElement }) {
+  return <Icon className={ipStyles.chipIcon} />;
+}
 
 export default async function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -53,17 +62,17 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     return (
       <main>
         <NotFoundState
-          icon="🔍"
+          icon={SearchIcon}
           title="Лид не найден"
           backHref="/leads"
-          backLabel="← Назад к списку лидов"
+          backLabel="Назад к списку лидов"
         />
       </main>
     );
   }
 
   const feedback = lead.feedbackStatus && lead.feedbackStatus !== 'none'
-    ? FEEDBACK_LABELS[lead.feedbackStatus] ?? { label: lead.feedbackStatus, icon: '❓' }
+    ? FEEDBACK_LABELS[lead.feedbackStatus] ?? { label: lead.feedbackStatus, icon: HelpIcon }
     : null;
 
   // Deterministic Stage 1 AI-assist: fit explanation needs the agency profile to
@@ -173,7 +182,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               ? lead.locationNames.join(', ')
               : 'Регион не указан'
           }
-          nav={<InternalBackLink href="/leads">← Лиды</InternalBackLink>}
+          nav={<InternalBackLink href="/leads">Лиды</InternalBackLink>}
         />
 
         <DetailLayout
@@ -184,14 +193,15 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               <ContentCard variant="hero" className={ipStyles.leadVerdict}>
                 <div className={ipStyles.leadVerdictTop}>
                   <ScoreGauge score={lead.score} />
-                  <div className={ipStyles.leadVerdictChips}>
-                    <ScoreBandChip score={lead.score} />
-                    <GateBadgeInline gate={lead.confidenceGate} />
-                    <ForeignEmployerBadge isForeign={lead.isForeignEmployer} />
-                    <ReviewStatusBadge status={lead.reviewStatus} />
-                    <UrgencyCueChip level={urgency.level} label={urgency.label} />
-                    <SignalFreshnessChip latestPublishedAt={lead.latestPublishedAt} />
-                  </div>
+                  <LeadVerdictChips
+                    score={lead.score}
+                    confidenceGate={lead.confidenceGate}
+                    isForeignEmployer={lead.isForeignEmployer}
+                    reviewStatus={lead.reviewStatus}
+                    urgencyLevel={urgency.level}
+                    urgencyLabel={urgency.label}
+                    latestPublishedAt={lead.latestPublishedAt}
+                  />
                 </div>
                 <div className={ipStyles.leadVerdictRoles}>
                   <span className={ipStyles.leadVerdictRolesLabel}>Открытые роли</span>
@@ -226,7 +236,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                     {fit.lines.map((line, i) => (
                       <li key={i} className={ipStyles.fitItem}>
                         <span className={ipStyles.fitItemIcon} aria-hidden="true">
-                          {FIT_DIMENSION_ICON[line.dimension]}
+                          <FitIcon name={FIT_DIMENSION_ICON[line.dimension]} />
                         </span>
                         <span>{line.text}</span>
                       </li>
@@ -278,10 +288,10 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                   )}
                 </div>
                 <div className={ipStyles.evidenceStats}>
-                  <span>💼 {lead.vacanciesCount} вакансий</span>
-                  <span>🔀 {lead.distinctVacancyNamesCount} разных ролей</span>
+                  <span><BriefcaseIcon className={ipStyles.chipIcon} /> {lead.vacanciesCount} вакансий</span>
+                  <span><LayersIcon className={ipStyles.chipIcon} /> {lead.distinctVacancyNamesCount} разных ролей</span>
                   {lead.latestPublishedAt && (
-                    <span>📅 Последняя: {new Date(lead.latestPublishedAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</span>
+                    <span><CalendarIcon className={ipStyles.chipIcon} /> Последняя: {new Date(lead.latestPublishedAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</span>
                   )}
                 </div>
               </ContentCard>
@@ -329,7 +339,9 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               <ContentCard>
                 <div className={ipStyles.sidebarLabel}>Обратная связь</div>
                 {feedback ? (
-                  <div className={ipStyles.sidebarValue}>{feedback.icon} {feedback.label}</div>
+                  <div className={ipStyles.sidebarValue}>
+                    <FeedbackStatusIcon icon={feedback.icon} /> {feedback.label}
+                  </div>
                 ) : (
                   <div className={ipStyles.sidebarValueEmpty}>Ещё нет обратной связи</div>
                 )}
@@ -364,7 +376,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 <div className={ipStyles.sidebarLabel}>Компания</div>
 
                 {lead.orgDomain && (
-                  <div className={ipStyles.sidebarMeta}>🌐 {lead.orgDomain}</div>
+                  <div className={ipStyles.sidebarMeta}>{lead.orgDomain}</div>
                 )}
                 {lead.orgWebsite && (
                   <a
@@ -383,7 +395,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                     rel="noopener noreferrer"
                     className={ipStyles.sidebarLink}
                   >
-                    💼 Карьерная страница →
+                    Карьерная страница →
                   </a>
                 )}
 

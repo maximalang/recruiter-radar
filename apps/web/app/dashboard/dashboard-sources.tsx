@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useMemo } from 'react';
+import type { ReactElement, SVGProps } from 'react';
 import styles from './dashboard.module.css';
+import { CheckIcon, AlertIcon, XIcon } from '../ui/icons';
 
 interface SourceHealth {
   id: string;
@@ -13,17 +15,28 @@ interface SourceHealth {
   status: 'excellent' | 'good' | 'warning' | 'critical';
 }
 
-const STATUS_CONFIG: Record<SourceHealth['status'], { label: string; icon: string; colorClass: string }> = {
-  excellent: { label: 'отлично', icon: '✅', colorClass: styles.sourceItemScoreGreen },
-  good:      { label: 'хорошо',    icon: '⚠️', colorClass: styles.sourceItemScoreYellow },
-  warning:   { label: 'внимание',  icon: '⚠️', colorClass: styles.sourceItemScoreYellow },
-  critical:  { label: 'критично',  icon: '❌', colorClass: styles.sourceItemScoreRed },
+const STATUS_CONFIG: Record<SourceHealth['status'], { label: string; icon: (p: SVGProps<SVGSVGElement>) => ReactElement; colorClass: string }> = {
+  excellent: { label: 'отлично', icon: CheckIcon, colorClass: styles.sourceItemScoreGreen },
+  good:      { label: 'хорошо',   icon: AlertIcon, colorClass: styles.sourceItemScoreYellow },
+  warning:   { label: 'внимание', icon: AlertIcon, colorClass: styles.sourceItemScoreYellow },
+  critical:  { label: 'критично', icon: XIcon,     colorClass: styles.sourceItemScoreRed },
 };
 
 const getBarColor = (overall: number) =>
   overall >= 80 ? styles.sourceItemScoreGreen :
   overall >= 60 ? styles.sourceItemScoreYellow :
   styles.sourceItemScoreRed;
+
+/** Renders the source-status SVG icon, inheriting the status tone color. */
+function StatusIcon({
+  icon: Icon,
+  colorClass,
+}: {
+  icon: (p: SVGProps<SVGSVGElement>) => ReactElement;
+  colorClass: string;
+}) {
+  return <Icon className={`${styles.sourceItemIconSvg} ${colorClass}`} />;
+}
 
 /**
  * Render the last-sync moment as a human relative phrase. `lastRun` arrives as a
@@ -64,11 +77,10 @@ function SourcesErrorState({ error, onRetry }: { error: string; onRetry?: () => 
     <section aria-labelledby="sources-heading" className={styles.sourcesSection}>
       <div className={styles.sourcesHeader}>
         <h2 id="sources-heading" className={styles.sourcesTitle}>
-          🎯 Статистика источников
+          Статистика источников
         </h2>
       </div>
       <div className={styles.errorState} role="alert" aria-live="assertive">
-        <div className={styles.errorStateIcon}>⚠️</div>
         <div className={styles.errorStateTitle}>Ошибка загрузки</div>
         <div className={styles.errorStateDescription}>{error}</div>
         {onRetry && (
@@ -86,11 +98,10 @@ function SourcesEmptyState() {
     <section aria-labelledby="sources-heading" className={styles.sourcesSection}>
       <div className={styles.sourcesHeader}>
         <h2 id="sources-heading" className={styles.sourcesTitle}>
-          🎯 Статистика источников
+          Статистика источников
         </h2>
       </div>
       <div className={styles.sourcesEmpty}>
-        <div className={styles.sourcesEmptyIcon}>📭</div>
         <div className={styles.sourcesEmptyTitle}>Нет источников данных</div>
         <div className={styles.sourcesEmptyDescription}>
           Источники данных ещё не настроены. Добавьте первый источник для начала мониторинга.
@@ -152,7 +163,7 @@ const DashboardSources: React.FC<DashboardSourcesProps> = ({
     <section aria-labelledby="sources-heading" className={styles.sourcesSection}>
       <div className={styles.sourcesHeader}>
         <h2 id="sources-heading" className={styles.sourcesTitle}>
-          🎯 Статистика источников
+          Статистика источников
         </h2>
         <span className={styles.sourcesCount}>
           {sources.length} {pluralSources(sources.length)}
@@ -173,7 +184,7 @@ const DashboardSources: React.FC<DashboardSourcesProps> = ({
               >
                 <div className={styles.sourceItemInfo}>
                   <span className={styles.sourceItemIcon} aria-hidden="true">
-                    {config.icon}
+                    <StatusIcon icon={config.icon} colorClass={config.colorClass} />
                   </span>
                   <div>
                     <div className={styles.sourceItemName}>{source.name}</div>

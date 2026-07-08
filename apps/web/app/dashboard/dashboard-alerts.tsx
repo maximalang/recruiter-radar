@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import type { ReactElement, SVGProps } from 'react';
 import styles from './dashboard.module.css';
+import { AlertIcon, InfoIcon, CheckIcon } from '../ui/icons';
 
 interface Alert {
   id: string;
@@ -38,10 +40,10 @@ function AlertsSkeleton() {
   );
 }
 
-const ALERT_CONFIG: Record<Alert['type'], { icon: string; colorClass: string }> = {
-  critical: { icon: '🚨', colorClass: styles.alertCritical },
-  warning:  { icon: '⚠️',  colorClass: styles.alertWarning },
-  info:     { icon: 'ℹ️',  colorClass: styles.alertInfo },
+const ALERT_CONFIG: Record<Alert['type'], { icon: (p: SVGProps<SVGSVGElement>) => ReactElement; colorClass: string }> = {
+  critical: { icon: AlertIcon, colorClass: styles.alertCritical },
+  warning:  { icon: AlertIcon, colorClass: styles.alertWarning },
+  info:     { icon: InfoIcon,  colorClass: styles.alertInfo },
 };
 
 export default function DashboardAlerts({ loading = false }: DashboardAlertsProps) {
@@ -65,7 +67,7 @@ export default function DashboardAlerts({ loading = false }: DashboardAlertsProp
     <section aria-labelledby="alerts-heading" className={styles.alertsSection}>
       <div className={styles.alertsHeader}>
         <h2 id="alerts-heading" className={styles.alertsTitle}>
-          🚨 Активные алерты
+          Активные алерты
         </h2>
         <span
           className={styles.alertsCount}
@@ -78,7 +80,7 @@ export default function DashboardAlerts({ loading = false }: DashboardAlertsProp
 
       {activeAlerts.length === 0 ? (
         <div className={styles.alertsEmpty}>
-          ✅ Все системы в порядке
+          Все системы в порядке
         </div>
       ) : (
         <ul
@@ -88,6 +90,7 @@ export default function DashboardAlerts({ loading = false }: DashboardAlertsProp
         >
           {activeAlerts.map((alert: Alert) => {
             const config = ALERT_CONFIG[alert.type];
+            const AlertTypeIcon = config.icon;
             return (
               <li
                 key={alert.id}
@@ -95,7 +98,7 @@ export default function DashboardAlerts({ loading = false }: DashboardAlertsProp
               >
                 <div className={styles.alertItemContent}>
                   <span className={styles.alertItemIcon} aria-hidden="true">
-                    {config.icon}
+                    <AlertTypeIcon />
                   </span>
                   <div className={styles.alertItemBody}>
                     <div className={styles.alertItemSource}>{alert.source}</div>
@@ -103,7 +106,7 @@ export default function DashboardAlerts({ loading = false }: DashboardAlertsProp
                     <div className={styles.alertItemTime}>{alert.timestamp}</div>
                     {alert.recommendation && (
                       <div className={styles.alertItemRecommendation}>
-                        <div className={styles.alertItemRecommendationTitle}>💡 Рекомендация</div>
+                        <div className={styles.alertItemRecommendationTitle}>Рекомендация</div>
                         <div className={styles.alertItemRecommendationText}>{alert.recommendation}</div>
                       </div>
                     )}
@@ -113,8 +116,8 @@ export default function DashboardAlerts({ loading = false }: DashboardAlertsProp
                     onClick={() => resolveAlert(alert.id)}
                     aria-describedby={`alert-action-${alert.id}`}
                   >
-                    <span id={`alert-action-${alert.id}`} className="sr-only">Отметить алерт как решённый</span>
-                    ✅ Решить
+                    <span id={`alert-action-${alert.id}`} className={styles.srOnly}>Отметить алерт как решённый</span>
+                    <CheckIcon className={styles.alertActionIcon} /> Решить
                   </button>
                 </div>
               </li>
@@ -126,7 +129,7 @@ export default function DashboardAlerts({ loading = false }: DashboardAlertsProp
       {resolvedAlerts.length > 0 && (
         <div className={styles.alertsResolved}>
           <div className={styles.alertsResolvedTitle}>
-            📋 Решенные алерты
+            Решенные алерты
           </div>
           <ul
             className={styles.alertsResolvedList}
@@ -139,7 +142,7 @@ export default function DashboardAlerts({ loading = false }: DashboardAlertsProp
                 className={styles.resolvedItem}
               >
                 <div className={styles.resolvedItemContent}>
-                  <span className={styles.resolvedItemIcon} aria-hidden="true">✅</span>
+                  <CheckIcon className={styles.resolvedItemIcon} aria-hidden="true" />
                   <span className={styles.resolvedItemText}>
                     {alert.source} — {alert.message}
                   </span>

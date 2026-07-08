@@ -5,7 +5,7 @@ import {
   EmptyState,
   type NavItem,
 } from "../../ui/internal-page";
-import { getClientProfileByOwnerId } from "../../../lib/clientProfiles";
+import { getClientProfileByOwnerId, resolveHiringMode } from "../../../lib/clientProfiles";
 import { getDeliveryPreferencesByOwnerId } from "../../../lib/deliveryPreferences";
 import { countMatchingCandidatesForProfile } from "../../../lib/digest";
 import { computeProfileCompletion } from "../../../lib/profileCompletion";
@@ -39,6 +39,12 @@ export default async function SettingsProfilePage() {
   const matchCount = profile
     ? await countMatchingCandidatesForProfile(profile).catch(() => null)
     : null;
+  // Resolve the effective hiring mode server-side: 'auto' is inferred from the
+  // agency's declared roles, and the result is shown as a "currently active
+  // mode" badge on the form so the agency sees what the radar is actually doing
+  // — not just what radio card is checked. Degrades to 'specialist' when there
+  // is no profile.
+  const resolvedHiringMode = profile ? resolveHiringMode(profile) : 'specialist';
 
   return (
     <InternalPageFrame navItems={SETTINGS_NAV}>
@@ -53,10 +59,9 @@ export default async function SettingsProfilePage() {
       ) : null}
       <ContentCard>
         {profile ? (
-          <ProfileForm profile={profile} />
+          <ProfileForm profile={profile} resolvedHiringMode={resolvedHiringMode} />
         ) : (
           <EmptyState
-            icon="⚙️"
             title="Профиль ещё не активирован"
             text="Профиль появится после активации пилота. Завершите онбординг, чтобы настроить идеального клиента."
           />

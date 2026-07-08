@@ -6,6 +6,7 @@ import type { DeliveryPreferences } from "../../../lib/deliveryPreferences";
 import { computeNextDeliveryHint } from "../../../lib/delivery/nextDeliveryHint";
 import { FormSubmitButton } from "../../ui/form-submit-button";
 import { NoticeBox } from "../../ui/page-primitives";
+import { ChatIcon, BellIcon, MailIcon } from "../../ui/icons";
 import ppStyles from "../../ui/page-primitives.module.css";
 import { saveDeliveryPreferencesAction, type SaveDeliveryResult } from "./actions";
 import styles from "./profile-form.module.css";
@@ -135,7 +136,9 @@ export function DeliveryForm(props: { preferences: DeliveryPreferences }) {
 
       <fieldset className={styles.group}>
         <div className={styles.groupHead}>
-          <span className={styles.groupTitle}>Браузерные уведомления</span>
+          <span className={styles.groupTitle}>
+            <BellIcon className={styles.groupTitleIcon} aria-hidden="true" /> Браузерные уведомления
+          </span>
           <span className={styles.groupHint}>Короткий пуш, когда появляются сильные компании (A/B). Работает только при активной подписке браузера.</span>
         </div>
         <label className={styles.toggle}>
@@ -146,7 +149,9 @@ export function DeliveryForm(props: { preferences: DeliveryPreferences }) {
 
       <fieldset className={styles.group}>
         <div className={styles.groupHead}>
-          <span className={styles.groupTitle}>Email-дайджест</span>
+          <span className={styles.groupTitle}>
+            <MailIcon className={styles.groupTitleIcon} aria-hidden="true" /> Email-дайджест
+          </span>
           <span className={styles.groupHint}>Раз в день — компании, которым стоит написать сегодня, с доказательствами и «почему сейчас». Telegram остаётся основным каналом.</span>
         </div>
         <label className={styles.toggle}>

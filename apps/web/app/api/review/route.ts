@@ -115,16 +115,21 @@ export async function GET(request: Request) {
     `, [clientProfileId, ownerId, limit, offset]);
 
     const items = itemsResult.rows.map((row) => {
-      // Confidence gate, evidence titles, location names live in payload — they
-      // are not real columns on digest_candidates. Read them via the canonical
-      // extractor (snake_case/camelCase tolerant, safe empty-array degradation).
-      const { confidenceGate, evidenceTitles, locationNames } = extractPayloadFields(row.payload);
+      // Confidence gate, evidence titles, location names, and the foreign-
+      // employer flag live in payload — they are not real columns on
+      // digest_candidates. Read them via the canonical extractor
+      // (snake_case/camelCase tolerant, safe empty-array degradation).
+      // T4.5: isForeignEmployer is now surfaced so the review card can show the
+      // foreign reason chip instead of a hardcoded false. No new SQL — derived
+      // from the payload the route already reads.
+      const { confidenceGate, evidenceTitles, locationNames, isForeignEmployer } = extractPayloadFields(row.payload);
       return {
         id: row.id,
         orgId: row.org_id,
         orgName: row.org_name ?? "Неизвестная компания",
         score: row.score,
         confidenceGate,
+        isForeignEmployer,
         vacanciesCount: row.vacancies_count,
         distinctVacancyNamesCount: row.distinct_vacancy_names_count,
         latestPublishedAt: row.latest_published_at,

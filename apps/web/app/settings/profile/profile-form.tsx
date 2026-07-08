@@ -8,12 +8,15 @@ import {
   COMPANY_SIZE_OPTIONS,
   ROLE_OPTIONS,
   CONTACT_POLICY_OPTIONS,
+  HIRING_MODE_OPTIONS,
+  RESOLVED_HIRING_MODE_LABEL,
   type ProfileOption,
 } from "../../../lib/clientProfileOptions";
 import { FormSubmitButton } from "../../ui/form-submit-button";
 import { NoticeBox } from "../../ui/page-primitives";
 import ppStyles from "../../ui/page-primitives.module.css";
 import { saveSettingsProfileAction, type SaveProfileResult } from "./actions";
+import { modeIcon } from "./profile-form-helpers";
 import styles from "./profile-form.module.css";
 
 /** One entry per line — mirrors how the action parses these textareas back. */
@@ -55,12 +58,26 @@ function CheckboxGroup(props: {
   );
 }
 
-export function ProfileForm(props: { profile: ClientProfile }) {
-  const { profile } = props;
+export function ProfileForm(props: {
+  profile: ClientProfile;
+  /**
+   * Effective hiring mode after 'auto' is resolved from the agency's roles.
+   * Shown as a "currently active" badge so the agency sees what the radar is
+   * actually doing, not just which radio card is checked. Never 'auto'.
+   */
+  resolvedHiringMode: 'specialist' | 'executive' | 'volume';
+}) {
+  const { profile, resolvedHiringMode } = props;
   const [state, formAction] = useActionState<SaveProfileResult | null, FormData>(
     saveSettingsProfileAction,
     null
   );
+
+  // The effective mode is "auto-chosen" when the agency left hiringMode on
+  // 'auto' (the default) — the badge names the inferred mode so the inference is
+  // visible and trustable. Otherwise the agency picked the mode explicitly.
+  const modeIsAuto = (profile.hiringMode ?? 'auto') === 'auto';
+  const resolvedLabel = RESOLVED_HIRING_MODE_LABEL[resolvedHiringMode];
 
   return (
     <form action={formAction} className={styles.form}>
@@ -95,6 +112,58 @@ export function ProfileForm(props: { profile: ClientProfile }) {
             <span className={ppStyles.helperText}>От 1 до 10 компаний в одной подборке.</span>
           </label>
         </div>
+      </fieldset>
+
+      {/* Hiring practice mode — the universal agency-model dimension. Changes
+          how the radar weights signals: executive → seniority leads, volume →
+          open-role volume leads, specialist → balanced (default). */}
+      <fieldset className={styles.group}>
+        <div className={styles.groupHead}>
+          <span className={styles.groupTitle}>Тип практики</span>
+          <span className={styles.groupHint}>Как агентство зарабатывает найм — это меняет, какие сигналы важнее в радаре.</span>
+        </div>
+        {/* Effective-mode badge: surfaces what the radar is actually doing right
+            now. When the agency chose 'auto', the badge names the mode inferred
+            from their roles so the inference is visible — and overrideable. The
+            badge carries a semantic SVG glyph for the resolved mode so the
+            agency recognises the practice at a glance. */}
+        {(() => {
+          const ModeGlyph = modeIcon(resolvedHiringMode);
+          return (
+            <div className={styles.modeBadgeRow}>
+              <span className={styles.modeBadge} data-mode={resolvedHiringMode}>
+                {ModeGlyph ? <ModeGlyph className={styles.modeBadgeIcon} aria-hidden="true" /> : null}
+                Сейчас действует: {resolvedLabel}
+              </span>
+              <span className={styles.modeBadgeSource}>
+                {modeIsAuto
+                  ? 'определено автоматически по ролям'
+                  : 'выбрано вручную'}
+              </span>
+            </div>
+          );
+        })()}
+        <div className={styles.radioCards}>
+          {HIRING_MODE_OPTIONS.map((opt) => (
+            <label key={opt.key} className={styles.radioCard}>
+              <input
+                type="radio"
+                name="hiringMode"
+                value={opt.key}
+                defaultChecked={(profile.hiringMode ?? "auto") === opt.key}
+              />
+              <span className={styles.radioCardTitle}>{opt.label}</span>
+              <span className={styles.radioCardHint}>{opt.hint}</span>
+            </label>
+          ))}
+        </div>
+        {/* Mixed-practice honesty: 'auto' resolves to ONE mode, it does not
+            blend. An agency that combines executive + specialist or specialist
+            + volume work should pick the dominant practice explicitly, or the
+            radar will frame every lead through a single lens. */}
+        <p className={styles.modeNote}>
+          Если у вас несколько практик сразу (например, executive + спец-подбор или спец-подбор + массовый найм), режим «Авто» выберет одну — радар будет показывать лиды через неё. Чтобы видеть каждую практику честно, выберите доминирующую вручную или разделите на отдельные профили.
+        </p>
       </fieldset>
 
       {/* Roles — drives Fit scoring AND boosts within-digest ranking (not a hard filter) */}
@@ -189,7 +258,8 @@ export function ProfileForm(props: { profile: ClientProfile }) {
           </label>
           <label className={ppStyles.field}>
             <span className={ppStyles.fieldLabel}>Специализация</span>
-            <input className={ppStyles.input} name="specialization" defaultValue={profile.specialization ?? ""} placeholder="IT-рекрутмент" />
+            <input className={ppStyles.input} name="specialization" defaultValue={profile.specialization ?? ""} placeholder="Напр.: промышленный подбор, финансы C-level, массовый найм" />
+            <span className={ppStyles.helperText}>Через запятую. Помогает точнее находить компании под вашу практику — не только IT.</span>
           </label>
         </div>
         <label className={styles.toggle}>

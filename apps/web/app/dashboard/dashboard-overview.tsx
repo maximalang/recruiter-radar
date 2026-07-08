@@ -67,7 +67,6 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         >
           <div className={styles.cardHeader}>
             <span className={styles.cardLabel}>Всего источников</span>
-            <span className={styles.cardIcon} aria-hidden="true">🎯</span>
           </div>
           <div>
             <div className={styles.cardValue}>{totalSources}</div>
@@ -83,7 +82,6 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         >
           <div className={styles.cardHeader}>
             <span className={styles.cardLabel}>Общее здоровье</span>
-            <span className={styles.cardIcon} aria-hidden="true">💪</span>
           </div>
           <div>
             <div className={styles.cardValue}>{healthPercentage}%</div>
@@ -111,7 +109,6 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         >
           <div className={styles.cardHeader}>
             <span className={styles.cardLabel}>Активные источники</span>
-            <span className={styles.cardIcon} aria-hidden="true">⚡</span>
           </div>
           <div>
             <div className={styles.cardValue}>{activePercentage.toFixed(0)}%</div>
@@ -139,7 +136,6 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         >
           <div className={styles.cardHeader}>
             <span className={styles.cardLabel}>Активные алерты</span>
-            <span className={styles.cardIcon} aria-hidden="true">🚨</span>
           </div>
           <div>
             <div

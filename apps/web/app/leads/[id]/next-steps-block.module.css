@@ -54,6 +54,9 @@
 }
 
 .nextStepsBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 8px 14px;
   font-size: 0.8rem;
   font-weight: 600;
@@ -63,6 +66,14 @@
   color: var(--c-text-secondary);
   cursor: pointer;
   transition: all 0.15s ease;
+}
+
+/* CheckIcon shown next to "Скопировано" after a successful copy — the unified
+   "done" glyph, replacing the literal "✓" character. */
+.copiedIcon {
+  flex: 0 0 auto;
+  width: 0.95em;
+  height: 0.95em;
 }
 
 .nextStepsBtn[data-variant="primary"] {

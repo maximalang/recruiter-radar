@@ -3,10 +3,47 @@ import type { ReactNode } from "react";
 
 import type { CheckoutOrder, CheckoutOrderOnboardingStep } from "../../../../lib/payments";
 import { NoticeBox } from "../../../ui/page-primitives";
+import { scoreBand, formatSignalStrength } from "../../../../lib/scoring/score-display";
 import styles from "./pilot-onboarding-components.module.css";
 
-export function InstructionCard(props: { children: ReactNode }) {
-  return <div className={styles.instructionCard}>{props.children}</div>;
+/**
+ * Numbered instruction card for the wizard steps. When `step` is provided,
+ * renders a circle-number badge (1/2/3) so the page no longer composes inline
+ * "1. / 2. / 3." text prefixes — the affordance is visual and consistent with
+ * the step-rail numbering, not a typographic glyph. Without `step` it renders
+ * plain children (used by the unpaid-state path and any non-step caller).
+ */
+export function InstructionCard(props: { children: ReactNode; step?: number }) {
+  if (props.step == null) {
+    return <div className={styles.instructionCard}>{props.children}</div>;
+  }
+  return (
+    <div className={styles.instructionCard} data-step={String(props.step)}>
+      <span className={styles.instructionNumber} aria-hidden="true">{props.step}</span>
+      <span className={styles.instructionBody}>{props.children}</span>
+    </div>
+  );
+}
+
+/**
+ * Shared score read for the onboarding preview card (T1.3).
+ *
+ * The preview used to print a second score vocabulary — `score 247.0` — that
+ * drifted from /leads (which speaks "Горячий/Тёплый/Холодный" + a 0–4 signal
+ * strength). This helper funnels the preview through the same
+ * `lib/scoring/score-display` module every other surface uses, so the first
+ * radar a recruit sees in onboarding already speaks the language they'll meet
+ * daily. The raw `total_score` is the persisted evidence-ranking score; the
+ * shared module converts it once to the [0,4] scale.
+ */
+export function formatPreviewScore(rawScore: number | null | undefined): {
+  bandLabel: string;
+  strength: string;
+} {
+  return {
+    bandLabel: scoreBand(rawScore).label,
+    strength: formatSignalStrength(rawScore),
+  };
 }
 
 export function UnpaidState(props: { order: CheckoutOrder }) {

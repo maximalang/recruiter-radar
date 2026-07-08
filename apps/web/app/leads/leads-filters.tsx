@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback } from 'react';
+import { CheckIcon, XIcon } from '../ui/icons';
 import s from './leads-filters.module.css';
 
 const GATE_OPTIONS = [
@@ -119,6 +120,7 @@ export default function LeadsFilters({ profiles = [] }: { profiles?: ProfileOpti
           value={currentGate}
           onChange={(e) => updateFilter('gate', e.target.value)}
           className={s.filterSelect}
+          data-active={currentGate !== '' ? 'true' : undefined}
           aria-label="Фильтр по уровню доверия"
         >
           {GATE_OPTIONS.map((opt) => (
@@ -131,6 +133,7 @@ export default function LeadsFilters({ profiles = [] }: { profiles?: ProfileOpti
           value={currentFeedback}
           onChange={(e) => updateFilter('feedback', e.target.value)}
           className={s.filterSelect}
+          data-active={currentFeedback !== '' ? 'true' : undefined}
           aria-label="Фильтр по обратной связи"
         >
           {FEEDBACK_OPTIONS.map((opt) => (
@@ -148,11 +151,13 @@ export default function LeadsFilters({ profiles = [] }: { profiles?: ProfileOpti
         aria-pressed={currentToday ? 'true' : 'false'}
         title="Лиды, которые вы взяли в работу или по которым уже ответили"
       >
+        <CheckIcon className={s.todayToggleIcon} aria-hidden="true" />
         Сегодня в работе
       </button>
 
       {hasEphemeralFilters && (
         <button onClick={resetEphemeral} className={s.filterReset}>
+          <XIcon className={s.filterResetIcon} aria-hidden="true" />
           Сбросить фильтры
         </button>
       )}

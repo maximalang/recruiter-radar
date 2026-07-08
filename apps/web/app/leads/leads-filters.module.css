@@ -56,6 +56,16 @@
   color: var(--c-text-secondary);
   cursor: pointer;
   min-height: 32px;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+
+/* Active select — brand-tinted border + surface so the active filter is visible
+   at a glance on mobile without reading the selected option text. */
+.filterSelect[data-active="true"] {
+  border-color: var(--c-brand);
+  background-color: rgba(59, 130, 246, 0.08);
+  color: var(--c-brand);
+  font-weight: 600;
 }
 
 .filterSelect:focus-visible {
@@ -66,6 +76,9 @@
 /* "Сегодня в работе" — a quick toggle, not a select. Reads as the primary
    working-set action so a recruiter reaches it in one click. */
 .todayToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 6px 12px;
   font-size: 0.78rem;
   font-weight: 600;
@@ -75,6 +88,12 @@
   color: var(--c-text-secondary);
   cursor: pointer;
   transition: all 0.15s ease;
+}
+
+.todayToggleIcon {
+  flex: 0 0 auto;
+  width: 0.95em;
+  height: 0.95em;
 }
 
 .todayToggle[data-active="true"] {
@@ -89,6 +108,9 @@
 }
 
 .filterReset {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   padding: 4px 10px;
   font-size: 0.75rem;
   border-radius: 6px;
@@ -96,6 +118,12 @@
   background-color: var(--c-bg-card);
   color: var(--c-text-muted);
   cursor: pointer;
+}
+
+.filterResetIcon {
+  flex: 0 0 auto;
+  width: 0.9em;
+  height: 0.9em;
 }
 
 .filterReset:focus-visible {
