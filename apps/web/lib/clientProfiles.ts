@@ -1143,15 +1143,24 @@ export function normalizeHiringMode(value: unknown): HiringMode {
  * Resolve the effective hiring mode for a profile.
  *
  * If the agency set an explicit mode other than 'auto', that wins — it is a
- * deliberate product choice. 'auto' (the default) infers the mode from the
- * agency's declared canonical `roles`:
+ * deliberate product choice that always overrides auto-inference. Agencies
+ * with a genuinely mixed practice (e.g. mostly IT plus the occasional
+ * industrial mandate) SHOULD pick an explicit mode in /settings/profile, since
+ * any single-practice heuristic will misread a hybrid.
+ *
+ * 'auto' (the default) infers the mode from the agency's declared canonical
+ * `roles`:
  *
  *   - 'executive' role present (alone or with others) → 'executive'. An
  *     agency that declares it closes C-level mandates is an executive agency
  *     even if it also fills some line roles.
- *   - otherwise, if industrial/logistics roles dominate (≥ 1 of them and no
- *     executive/specialist-only signal) → 'volume'. Industrial & logistics
- *     hiring is overwhelmingly volume hiring in Russia.
+ *   - otherwise, if industrial/logistics roles are a CLEAR MAJORITY (≥ 50% of
+ *     the declared roles) → 'volume'. Industrial & logistics hiring is
+ *     overwhelmingly volume hiring in Russia, but a single such role amid a
+ *     mostly-specialist practice is NOT enough to reframe the whole agency —
+ *     the 50% threshold prevents a 1-industrial + 9-IT agency from being
+ *     mis-inferred as volume (R7 review follow-up). Tie (exactly half) goes
+ *     to volume so a half-volume practice still reads as volume.
  *   - otherwise → 'specialist' (the pre-existing default behavior).
  *
  * Inference is a heuristic; the agency can always override by picking an
@@ -1166,12 +1175,13 @@ export function resolveHiringMode(profile: Pick<ClientProfile, 'hiringMode' | 'r
   if (roles.includes('executive')) {
     return 'executive'
   }
-  // Industrial + logistics roles are the canonical volume-hiring markets.
-  // A single such role, in the absence of an executive declaration, is enough
-  // to infer volume mode — these agencies win mandates on throughput, not
-  // on per-role seniority.
+  // Industrial + logistics roles are the canonical volume-hiring markets, but
+  // a single such role amid a mostly-specialist practice must NOT reframe the
+  // whole agency as volume (R7). Require a clear majority — ≥ 50% of the
+  // declared roles — before auto-inference commits to volume; a tie (exactly
+  // half) still goes to volume so a half-volume practice reads as volume.
   const volumeRoles = roles.filter((r) => r === 'industrial' || r === 'logistics')
-  if (volumeRoles.length > 0) {
+  if (roles.length > 0 && volumeRoles.length * 2 >= roles.length) {
     return 'volume'
   }
   return 'specialist'

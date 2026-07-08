@@ -83,11 +83,42 @@ describe('resolveHiringMode', () => {
     ).toBe('executive')
   })
 
-  it('auto → volume when industrial/logistics roles are declared (no executive)', () => {
+  it('auto → volume when industrial/logistics roles DOMINATE (no executive)', () => {
+    // A pure volume practice — all declared roles are industrial/logistics.
     expect(resolveHiringMode(profile({ hiringMode: 'auto', roles: ['industrial'] }))).toBe('volume')
     expect(resolveHiringMode(profile({ hiringMode: 'auto', roles: ['logistics'] }))).toBe('volume')
     expect(
       resolveHiringMode(profile({ hiringMode: 'auto', roles: ['industrial', 'logistics'] })),
+    ).toBe('volume')
+    // A majority-volume practice (2 of 3) also infers volume.
+    expect(
+      resolveHiringMode(
+        profile({ hiringMode: 'auto', roles: ['industrial', 'logistics', 'it-engineering'] }),
+      ),
+    ).toBe('volume')
+  })
+
+  // R7 (review follow-up): a single industrial/logistics role amid a mostly-
+  // specialist practice must NOT flip the whole agency into volume mode. The
+  // pre-fix logic triggered volume on ANY volume-role presence, so an agency
+  // with 1 industrial + 9 IT roles was mis-inferred as volume — too aggressive.
+  // The fix requires volume roles to be ≥ 50% of the declared roles (a clear
+  // majority) before auto-inference commits to volume; otherwise specialist.
+  it('auto → specialist when a volume role is a minority of a mixed practice (R7)', () => {
+    // 1 industrial + 9 IT → 10% volume share → specialist, NOT volume.
+    expect(
+      resolveHiringMode(
+        profile({
+          hiringMode: 'auto',
+          roles: ['it-engineering', 'data', 'product', 'design', 'frontend', 'backend', 'mobile', 'devops', 'qa', 'industrial'],
+        }),
+      ),
+    ).toBe('specialist')
+    // 1 logistics + 1 IT → 50% is the boundary; ≥ 50% stays volume (tie goes
+    // to volume so a half-volume practice still reads as volume, matching the
+    // "dominant volume markets" framing). Confirm the boundary explicitly.
+    expect(
+      resolveHiringMode(profile({ hiringMode: 'auto', roles: ['logistics', 'it-engineering'] })),
     ).toBe('volume')
   })
 
