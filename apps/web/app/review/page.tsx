@@ -18,6 +18,7 @@ import {
   TableCard,
   EmptyState,
   ContentCard,
+  LoadingState,
   type NavItem,
 } from '../ui/internal-page';
 import { internalPageClasses as ipStyles } from '../ui/internal-page';
@@ -263,7 +264,7 @@ export default async function ReviewPage({
             <MetricCard label="На проверке" value={reviewData.total} tone="info" />
           </MetricGrid>
 
-          <Suspense fallback={<ContentCard>Загрузка…</ContentCard>}>
+          <Suspense fallback={<LoadingState variant="skeleton" />}>
             {reviewData.items.length === 0 ? (
               <EmptyState
                 icon={CheckIcon}
