@@ -24,6 +24,7 @@ import {
   getScoreTone,
   TableCard,
   EmptyState,
+  LoadingState,
   FitIcon,
   type NavItem,
 } from '../ui/internal-page';
@@ -494,12 +495,12 @@ export default async function LeadsPage({
       </MetricGrid>
 
       <TableCard>
-        <Suspense fallback={<div className={ipStyles.loadingState}>Загрузка...</div>}>
+        <Suspense fallback={<LoadingState variant="inline" />}>
           <LeadsFilters
             profiles={activeProfiles.map((p) => ({ id: p.id, name: p.agencyName }))}
           />
         </Suspense>
-        <Suspense fallback={<div className={ipStyles.loadingState}>Загрузка...</div>}>
+        <Suspense fallback={<LoadingState variant="skeleton" />}>
           <LeadsList
             leads={allLeads}
             fitPreviewFor={fitPreviewFor}
