@@ -147,7 +147,7 @@ export default function DashboardAnalytics({
             <div className={`${styles.cardValue} ${styles.metricValueInfo}`}>{leadMetrics.todayLeads}</div>
           </div>
           <div className={styles.metricCard}>
-            <div className={styles.cardLabel}>Средний скоринг</div>
+            <div className={styles.cardLabel}>Средний балл</div>
             <div className={`${styles.cardValue} ${styles.metricValueWarning}`}>{leadMetrics.avgScore.toFixed(1)}</div>
           </div>
         </div>
@@ -214,7 +214,7 @@ export default function DashboardAnalytics({
                 <tr className={styles.gateItemBar /* reuse border-bottom style */}>
                   <th className={styles.gateItemLabel} scope="col">Источник</th>
                   <th className={styles.gateItemLabel} scope="col">Лидов</th>
-                  <th className={styles.gateItemLabel} scope="col">Ср. скоринг</th>
+                  <th className={styles.gateItemLabel} scope="col">Ср. балл</th>
                 </tr>
               </thead>
               <tbody>
@@ -229,7 +229,7 @@ export default function DashboardAnalytics({
                     <td className={styles.sourcePerfTd} data-label="Лидов">
                       {src.leads}
                     </td>
-                    <td className={styles.sourcePerfTd} data-label="Ср. скоринг">
+                    <td className={styles.sourcePerfTd} data-label="Ср. балл">
                       {src.avgScore.toFixed(1)}
                     </td>
                   </tr>

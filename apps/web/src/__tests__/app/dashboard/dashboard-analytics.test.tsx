@@ -243,7 +243,7 @@ describe('DashboardAnalytics — T5.4 metric-card consistency', () => {
       />,
     );
     const metricCards = container.querySelectorAll('.metricCard');
-    // 3 metric cards: Всего лидов / Сегодня / Средний скоринг.
+    // 3 metric cards: Всего лидов / Сегодня / Средний балл.
     expect(metricCards.length).toBe(3);
   });
 });
