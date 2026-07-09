@@ -19,6 +19,7 @@ import {
   EmptyState,
   ContentCard,
   LoadingState,
+  ErrorState,
   type NavItem,
 } from '../ui/internal-page';
 import { internalPageClasses as ipStyles } from '../ui/internal-page';
@@ -62,7 +63,7 @@ async function getReviewCandidates(
   clientProfileId: string,
   limit: number,
   offset: number,
-): Promise<{ items: ReviewCandidate[]; total: number }> {
+): Promise<{ items: ReviewCandidate[]; total: number; error?: boolean }> {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
   const url = new URL('/api/review', baseUrl);
   url.searchParams.set('clientProfileId', clientProfileId);
@@ -74,10 +75,13 @@ async function getReviewCandidates(
       cache: 'no-store',
       headers: { 'Content-Type': 'application/json' },
     });
-    if (!res.ok) return { items: [], total: 0 };
-    return res.json();
+    if (!res.ok) return { items: [], total: 0, error: true };
+    const data = await res.json();
+    return { items: data.items ?? [], total: data.total ?? 0 };
   } catch {
-    return { items: [], total: 0 };
+    // Genuine fetch failure → flag it so the page shows an ErrorState instead
+    // of a silent empty queue that reads as "очередь пуста".
+    return { items: [], total: 0, error: true };
   }
 }
 
@@ -264,6 +268,12 @@ export default async function ReviewPage({
             <MetricCard label="На проверке" value={reviewData.total} tone="info" />
           </MetricGrid>
 
+          {reviewData.error ? (
+            <ErrorState
+              title="Очередь проверки не загрузилась"
+              description="Кандидаты с уверенностью C и одиночным источником собираются из доказательств. Повторите через минуту — если очередь не появится, напишите поддержку."
+            />
+          ) : (
           <Suspense fallback={<LoadingState variant="skeleton" />}>
             {reviewData.items.length === 0 ? (
               <EmptyState
@@ -290,6 +300,7 @@ export default async function ReviewPage({
               </TableCard>
             )}
           </Suspense>
+          )}
         </>
       )}
     </InternalPageFrame>

@@ -692,6 +692,43 @@ export function LoadingState(props: { variant?: "skeleton" | "inline" }) {
   return <div className={s.loadingState}>Загрузка…</div>;
 }
 
+/* ── Error state ── */
+
+/**
+ * Unified data-error fallback. When a data surface (analytics, leads, review,
+ * today-radar, quality) fails to load, it shows this instead of a raw error
+ * string or a silent empty list that reads as "no data". The contract:
+ *
+ *   - `title` — a short, human sentence: what went wrong (no internals).
+ *   - `description` — a concrete next step the user can take (повторите позже /
+ *     проверить профиль / написать поддержку), or an honest "собираем данные".
+ *   - `action` — optional link to the next step (e.g. /settings/profile).
+ *
+ * `role="alert"` + `aria-live="assertive"` so AT announces the failure. The
+ * raw internal error is NEVER rendered — only the human copy the caller passes.
+ * Mirrors `EmptyState`'s calm premium styling so an error reads as a quiet,
+ * recoverable moment, not a loud crash.
+ */
+export function ErrorState(props: {
+  title: string;
+  description?: ReactNode;
+  action?: { href: string; label: string };
+}) {
+  return (
+    <div className={s.errorState} role="alert" aria-live="assertive">
+      <div className={s.errorStateTitle}>{repairVisibleNode(props.title)}</div>
+      {props.description ? (
+        <div className={s.errorStateText}>{repairVisibleNode(props.description)}</div>
+      ) : null}
+      {props.action ? (
+        <a className={s.errorStateAction} href={props.action.href}>
+          {repairVisibleNode(props.action.label)}
+        </a>
+      ) : null}
+    </div>
+  );
+}
+
 /* ── Table card ── */
 
 export function TableCard(props: { children: ReactNode }) {
