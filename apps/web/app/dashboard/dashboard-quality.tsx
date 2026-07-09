@@ -2,7 +2,7 @@
 
 import React from 'react';
 import styles from './dashboard.module.css';
-import { GATE_LABELS } from '../ui/internal-page';
+import { GATE_LABELS, ErrorState } from '../ui/internal-page';
 
 interface AcceptanceRate {
   period: string;
@@ -170,11 +170,10 @@ export default function DashboardQuality({ data, loading, error }: DashboardQual
         <h2 id="quality-heading" className={styles.qualityHeading}>
           Метрики качества
         </h2>
-        <div className={styles.qualityError} role="alert" aria-live="assertive">
-          <div className={styles.qualityErrorText}>
-            Ошибка загрузки метрик: {error}
-          </div>
-        </div>
+        <ErrorState
+          title="Метрики качества не загрузились"
+          description="Собираем данные по принятым лидам и gate-распределению. Повторите через минуту — если не загрузится, напишите поддержку."
+        />
       </section>
     );
   }

@@ -25,6 +25,7 @@ import {
   TableCard,
   EmptyState,
   LoadingState,
+  ErrorState,
   FitIcon,
   type NavItem,
 } from '../ui/internal-page';
@@ -335,6 +336,10 @@ export default async function LeadsPage({
   let allLeads: LeadItem[] = [];
   let totalLeads = 0;
   let pendingReview = 0;
+  // leadsFetchError — surfaced as an ErrorState when the leads/review fetch
+  // genuinely fails. A missing session is NOT an error (it's the legitimate
+  // "no profiles → empty" path), so only a real fetch failure sets the flag.
+  let leadsFetchError = false;
 
   try {
     if (!ownerId) throw new Error('no-session');
@@ -351,10 +356,18 @@ export default async function LeadsPage({
     allLeads = result.leads;
     totalLeads = result.total;
     pendingReview = reviewCount;
-  } catch {
-    allLeads = [];
-    totalLeads = 0;
-    pendingReview = 0;
+  } catch (err) {
+    // 'no-session' is a control-flow signal for the empty (no-profiles) path,
+    // not a real failure — keep the calm empty state. Anything else is a genuine
+    // fetch error → surface an ErrorState instead of a silent empty list that
+    // would read as "radar found nothing".
+    if (err instanceof Error && err.message === 'no-session') {
+      allLeads = [];
+      totalLeads = 0;
+      pendingReview = 0;
+    } else {
+      leadsFetchError = true;
+    }
   }
 
   // Compact per-lead fit preview: the single strongest "почему подходит этому агентству"
@@ -500,16 +513,24 @@ export default async function LeadsPage({
             profiles={activeProfiles.map((p) => ({ id: p.id, name: p.agencyName }))}
           />
         </Suspense>
-        <Suspense fallback={<LoadingState variant="skeleton" />}>
-          <LeadsList
-            leads={allLeads}
-            fitPreviewFor={fitPreviewFor}
-            hiringModeFor={(lead) => hiringModeByProfileId.get(lead.clientProfileId) ?? 'specialist'}
-            hasActiveProfile={activeProfiles.length > 0}
-            narrowProfile={narrowProfile}
-            workingSet={workingSet}
+        {leadsFetchError ? (
+          <ErrorState
+            title="Не удалось загрузить лиды"
+            description="Радар подбирает компании по вашему профилю. Повторите через минуту — если лиды не появятся, проверьте настройки профиля или напишите поддержку."
+            action={{ href: '/settings/profile', label: 'Проверить профиль' }}
           />
-        </Suspense>
+        ) : (
+          <Suspense fallback={<LoadingState variant="skeleton" />}>
+            <LeadsList
+              leads={allLeads}
+              fitPreviewFor={fitPreviewFor}
+              hiringModeFor={(lead) => hiringModeByProfileId.get(lead.clientProfileId) ?? 'specialist'}
+              hasActiveProfile={activeProfiles.length > 0}
+              narrowProfile={narrowProfile}
+              workingSet={workingSet}
+            />
+          </Suspense>
+        )}
       </TableCard>
     </InternalPageFrame>
   );

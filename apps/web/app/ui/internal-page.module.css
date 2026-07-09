@@ -940,6 +940,47 @@
   opacity: 0.9;
 }
 
+/* ── Error state — a calm, recoverable data-failure moment ── */
+/* Mirrors .emptyState's centered premium styling so an error reads as a quiet
+   "something didn't load, here's what to do", not a loud crash. tone is a
+   muted danger (not a bright red alert) to keep the page calm. */
+.errorState {
+  text-align: center;
+  padding: 40px 24px;
+  color: var(--c-text-muted);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-card-sm);
+  background-color: var(--c-bg-card);
+}
+
+.errorStateTitle {
+  font-weight: 500;
+  color: var(--c-text-primary);
+  margin-bottom: 6px;
+}
+
+.errorStateText {
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.errorStateAction {
+  display: inline-block;
+  margin-top: 16px;
+  padding: 9px 18px;
+  border-radius: 10px;
+  background-color: var(--c-brand);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: opacity 0.15s ease;
+}
+
+.errorStateAction:hover {
+  opacity: 0.9;
+}
+
 .emptyStateAction:focus-visible {
   outline: 2px solid var(--c-brand);
   outline-offset: 2px;
