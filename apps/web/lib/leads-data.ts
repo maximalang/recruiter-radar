@@ -70,6 +70,14 @@ function whyNowPriority(reason: { component: string; key: string }): number {
  * so a low-quality lead (only stale/ambient reasons) cannot read as a hot one.
  * Returns an empty string when there are no reasons at all — the caller hides
  * the line, which is more honest than a vacuous "повод для контакта есть сейчас".
+ *
+ * TODO(Stage-1 AI-assist hook): this is the Stage-1 `explanation-enhance` hook
+ * point — a pure `(reasons) => rewordedText` adapter may wrap/replace the
+ * returned string WITHOUT touching `reasons`, score, gate, or evidence (see
+ * docs/specs/2026-06-27-stage1-ai-assist-deterministic.md + the delivery-paths
+ * roadmap §"UX-хук (готовить дёшево)"). The deterministic fallback must stay
+ * when the hook is absent/unavailable. deriveLawfulContactPath below is the
+ * same kind of pure derivation point.
  */
 export function deriveWhyNow(rawReasons: unknown): string {
   const reasons = parseReasons(rawReasons)

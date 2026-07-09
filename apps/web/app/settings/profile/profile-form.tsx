@@ -170,7 +170,7 @@ export function ProfileForm(props: {
       <CheckboxGroup
         name="roles"
         title="Роли, которые вы закрываете"
-        hint="Поднимает компании с релевантным наймом выше в подборке и усиливает их скоринг."
+        hint="Поднимает компании с релевантным наймом выше в подборке и усиливает их оценку."
         options={ROLE_OPTIONS}
         selected={profile.roles}
       />
