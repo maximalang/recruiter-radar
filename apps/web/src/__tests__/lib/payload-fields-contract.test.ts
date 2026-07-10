@@ -29,6 +29,7 @@ describe('extractPayloadFields (canonical payload reader)', () => {
       locationNames: ['Москва'],
       isForeignEmployer: false,
       foreignMatchedDomain: null,
+      contactPaths: [],
     });
   });
 
@@ -44,12 +45,13 @@ describe('extractPayloadFields (canonical payload reader)', () => {
       locationNames: ['Санкт-Петербург'],
       isForeignEmployer: false,
       foreignMatchedDomain: null,
+      contactPaths: [],
     });
   });
 
   it('degrades to "" / [] when keys are absent (thin payload, no throw)', () => {
     const out = extractPayloadFields({ rank: 5 });
-    expect(out).toEqual({ confidenceGate: '', evidenceTitles: [], locationNames: [], isForeignEmployer: false, foreignMatchedDomain: null });
+    expect(out).toEqual({ confidenceGate: '', evidenceTitles: [], locationNames: [], isForeignEmployer: false, foreignMatchedDomain: null, contactPaths: [] });
   });
 
   it('reads the foreign-employer flag + matched domain from payload', () => {
@@ -60,7 +62,7 @@ describe('extractPayloadFields (canonical payload reader)', () => {
   });
 
   it('degrades on a null / non-object / array payload', () => {
-    const empty = { confidenceGate: '', evidenceTitles: [], locationNames: [], isForeignEmployer: false, foreignMatchedDomain: null };
+    const empty = { confidenceGate: '', evidenceTitles: [], locationNames: [], isForeignEmployer: false, foreignMatchedDomain: null, contactPaths: [] };
     expect(extractPayloadFields(null)).toEqual(empty);
     expect(extractPayloadFields(undefined)).toEqual(empty);
     expect(extractPayloadFields('nope')).toEqual(empty);
