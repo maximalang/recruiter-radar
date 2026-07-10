@@ -21,6 +21,8 @@
  * call is made by the caller only after the quota allows.
  */
 
+import { logEvent } from '@/lib/runtime'
+
 /** Daily window. One real provider call per org per this period. */
 export const ENRICHMENT_QUOTA_WINDOW_MS = 24 * 60 * 60 * 1000;
 
@@ -144,18 +146,14 @@ export function logEnrichmentApiCall(entry: {
   fallbackUsed?: boolean;
   tokensUsed?: number | null;
 }): void {
-  console.info(
-    JSON.stringify({
-      level: 'info',
-      event: 'ai.enrichment.api_call',
-      provider: entry.provider ?? null,
-      orgId: entry.orgId,
-      url: entry.url,
-      success: entry.success ?? null,
-      fallbackUsed: entry.fallbackUsed ?? false,
-      tokensUsed: entry.tokensUsed ?? null,
-    }),
-  );
+  logEvent('ai.enrichment.api_call', {
+    provider: entry.provider ?? null,
+    orgId: entry.orgId,
+    url: entry.url,
+    success: entry.success ?? null,
+    fallbackUsed: entry.fallbackUsed ?? false,
+    tokensUsed: entry.tokensUsed ?? null,
+  });
 }
 
 /**

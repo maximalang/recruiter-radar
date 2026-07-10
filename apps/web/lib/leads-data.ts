@@ -278,6 +278,15 @@ export interface LeadItem {
   /** The foreign ATS domain that triggered the flag, when isForeignEmployer. */
   foreignMatchedDomain: string | null;
   /**
+   * Auto-discovered contact surface extracted from the career-page HTML by the
+   * ingest crawler — the concrete HR/careers email, phone, Telegram, or
+   * contact-form the system found so the agency does not have to open the page
+   * and hunt for it. Deduped, ranked HR-first. Read from digest_candidates
+   * payload (contact_paths). [] when the career page exposed no surface — the
+   * honest empty state, not "unknown".
+   */
+  contactPaths: Array<{ category: string; value: string }>;
+  /**
    * Analyst-review gate status from `digest_candidates.review_status`
    * (auto_approved / pending_review / approved / rejected). Surfaces as a
    * "На проверке аналитиком" badge on lead detail and drives the /review
@@ -416,6 +425,7 @@ export function extractPayloadFields(payload: unknown): {
   locationNames: string[];
   isForeignEmployer: boolean;
   foreignMatchedDomain: string | null;
+  contactPaths: Array<{ category: string; value: string }>;
 } {
   const p =
     typeof payload === "object" && payload !== null && !Array.isArray(payload)
@@ -430,7 +440,31 @@ export function extractPayloadFields(payload: unknown): {
     locationNames: toStringArray(p.locationNames ?? p.location_names),
     isForeignEmployer: foreignRaw === true,
     foreignMatchedDomain: typeof foreignDomainRaw === "string" ? foreignDomainRaw : null,
+    contactPaths: toContactPathArray(p.contactPaths ?? p.contact_paths),
   };
+}
+
+/**
+ * Normalize a raw contact_paths value (from payload JSON) into a stable
+ * {category,value}[] shape. Tolerates non-array / malformed elements; drops
+ * blanks and dedupes. Empty array is the honest "no surface found" outcome.
+ */
+function toContactPathArray(value: unknown): Array<{ category: string; value: string }> {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const out: Array<{ category: string; value: string }> = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+    const obj = item as Record<string, unknown>;
+    const category = typeof obj.category === "string" ? obj.category.trim() : "";
+    const val = typeof obj.value === "string" ? obj.value.trim() : "";
+    if (!category || !val) continue;
+    const key = `${category}:${val}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ category, value: val });
+  }
+  return out;
 }
 
 /** Map a raw joined row into the derived LeadItem shape (why-now, best-angle, etc.). */
@@ -439,7 +473,7 @@ function mapLeadRow(row: LeadRow): LeadItem {
   const structuredReasons = parseReasons(reasonsRaw);
   const reasons = structuredReasons.map(formatReason);
   const sourceFamilies = toStringArray(row.source_families);
-  const { confidenceGate, evidenceTitles, locationNames, isForeignEmployer, foreignMatchedDomain } = extractPayloadFields(row.payload);
+  const { confidenceGate, evidenceTitles, locationNames, isForeignEmployer, foreignMatchedDomain, contactPaths } = extractPayloadFields(row.payload);
   return {
     id: row.id,
     orgId: row.org_id,
@@ -472,6 +506,7 @@ function mapLeadRow(row: LeadRow): LeadItem {
     hasAiHint: row.has_ai_hint === true,
     isForeignEmployer,
     foreignMatchedDomain,
+    contactPaths,
     reviewStatus: row.review_status ?? null,
     // Optional CRM identifiers — only populated by the export path's
     // includeOrgDetails join. Undefined (not null) on the default UI path, so

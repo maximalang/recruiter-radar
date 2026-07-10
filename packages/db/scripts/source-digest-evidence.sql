@@ -83,7 +83,14 @@ WITH source_signal_rows AS (
       WHERE source_key IS NOT NULL
     ) AS payload_source_keys,
     NULLIF(signal.payload ->> 'employer_id', '') AS payload_employer_id,
-    NULLIF(signal.payload ->> 'hh_employer_id', '') AS payload_hh_employer_id
+    NULLIF(signal.payload ->> 'hh_employer_id', '') AS payload_hh_employer_id,
+    -- Auto-discovered contact surface (career-pages only): the HR/careers
+    -- email, phone, Telegram, contact-form the crawler extracted from the
+    -- company's OWN career-page HTML. Stored as a JSONB array in
+    -- signals.payload -> 'contact_paths'. Non-career-pages signals carry none,
+    -- so we coalesce to '[]' for a stable shape downstream. Read here so the
+    -- digest query can aggregate the corporate surface per lead without a join.
+    COALESCE(signal.payload -> 'contact_paths', '[]'::jsonb) AS payload_contact_paths
   FROM signals AS signal
   WHERE signal.signal_type = 'job_posting'
     AND signal.source IN ('hh', 'career-pages', 'rabota-rossii', 'superjob', 'habr-career', 'tech-job-boards', 'linkedin-company-pages', 'regional-job-boards')
@@ -202,6 +209,7 @@ normalized_signal_rows AS (
     signal.evidence_title,
     signal.location_name,
     signal.published_at,
+    signal.payload_contact_paths,
     -- evidence_quality: classifies how close this signal is to a company-controlled hiring surface.
     --
     -- direct_hiring_proof  — a COMPANY-OWNED hiring surface, i.e. career-pages. This is the only
@@ -353,11 +361,43 @@ aggregated AS (
       ORDER BY NULLIF(BTRIM(ref.source_key), '')
     ) AS candidate_source_keys,
     ARRAY_REMOVE(ARRAY_AGG(DISTINCT NULLIF(BTRIM(location_name), '')), NULL) AS location_names,
+    -- contact_paths: see contact_paths_by_group CTE (deduped per corroboration
+    -- group). Joined here so the aggregated row carries the merged surface.
+    cp.contact_paths,
     COUNT(*)::INT AS vacancies_count,
     COUNT(DISTINCT evidence_title)::INT AS distinct_vacancy_names_count,
     MAX(published_at) AS latest_published_at
   FROM normalized_signal_rows
-  GROUP BY corroboration_key, corroboration_key_type
+  LEFT JOIN LATERAL (
+    -- Deduped, ranked contact surface for this corroboration group. Flattens
+    -- every signal's payload_contact_paths array, dedupes by (category,value),
+    -- ranks HR/careers surfaces first so the agency sees the best path first.
+    -- '[]' when no signal in the group exposed a contact surface (honest empty
+    -- — downstream reachability is gated, not inflated).
+    SELECT COALESCE(jsonb_agg(obj ORDER BY rank), '[]'::jsonb) AS contact_paths
+    FROM (
+      SELECT
+        jsonb_build_object('category', elem->>'category', 'value', elem->>'value') AS obj,
+        CASE elem->>'category'
+          WHEN 'hr-email' THEN 0
+          WHEN 'careers-email' THEN 1
+          WHEN 'generic-email' THEN 2
+          WHEN 'telegram' THEN 3
+          WHEN 'whatsapp' THEN 4
+          WHEN 'phone' THEN 5
+          WHEN 'contact-form' THEN 6
+          WHEN 'personal-email' THEN 7
+          ELSE 99
+        END AS rank
+      FROM normalized_signal_rows AS nsr_inner,
+           jsonb_array_elements(nsr_inner.payload_contact_paths) AS elem
+      WHERE nsr_inner.corroboration_key = normalized_signal_rows.corroboration_key
+        AND elem->>'category' IS NOT NULL
+        AND elem->>'value' IS NOT NULL
+      GROUP BY elem->>'category', elem->>'value'
+    ) AS deduped
+  ) AS cp ON TRUE
+  GROUP BY corroboration_key, corroboration_key_type, cp.contact_paths
 ),
 scored AS (
   SELECT
@@ -372,6 +412,7 @@ scored AS (
     evidence_titles,
     candidate_source_keys,
     location_names,
+    contact_paths,
     vacancies_count,
     distinct_vacancy_names_count,
     latest_published_at,
@@ -452,6 +493,7 @@ ranked AS (
     evidence_titles,
     candidate_source_keys,
     location_names,
+    contact_paths,
     vacancies_count,
     distinct_vacancy_names_count,
     latest_published_at,
@@ -506,6 +548,7 @@ SELECT
   evidence_titles,
   candidate_source_keys,
   location_names,
+  contact_paths,
   vacancies_count,
   distinct_vacancy_names_count,
   latest_published_at,

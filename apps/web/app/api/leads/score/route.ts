@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { LeadScoringService } from '@/lib/lead-discovery/lead-scoring-service'
 import type { LeadScoringOptions, ScoredLead } from '@/lib/lead-discovery/lead-scoring-service'
+import { logEvent, logError } from '@/lib/runtime'
 
 // Module-level singleton — one instance per process
 let _scoringService: LeadScoringService | null = null
@@ -55,7 +56,6 @@ export async function POST(request: NextRequest) {
     const scoringService = getLeadScoringService()
 
     // Generate and score leads
-    console.log(`Generating and scoring leads for agency...`)
     const scoredLeads = await scoringService.generateAndScoreLeads({
       agencyProfile,
       sources,
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
       clientProfileId,
     })
 
-    console.log(`Generated ${scoredLeads.length} scored leads`)
+    logEvent('leads.score.completed', { count: scoredLeads.length })
 
     // Apply result limit
     const limitedLeads = scoredLeads.slice(0, maxResults)
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
       }
     })
   } catch (error) {
-    console.error('Lead scoring error:', error)
+    logError('leads.score.failed', error)
     return NextResponse.json(
       {
         success: false,

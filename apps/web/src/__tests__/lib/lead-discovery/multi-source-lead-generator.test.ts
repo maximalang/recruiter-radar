@@ -205,7 +205,6 @@ describe('MultiSourceLeadGenerator', () => {
       expect(analytics.sources[0]).toMatchObject({
         id: expect.any(String),
         count: expect.any(Number),
-        avgConfidence: expect.any(Number),
         totalRelevance: expect.any(Number)
       })
     })

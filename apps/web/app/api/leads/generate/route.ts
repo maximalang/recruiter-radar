@@ -3,6 +3,7 @@ import { MultiSourceLeadGenerator } from '@/lib/lead-discovery/multi-source-lead
 import { LeadScoringService } from '@/lib/lead-discovery/lead-scoring-service'
 import type { MultiSourceLead } from '@/lib/lead-discovery/multi-source-lead-generator'
 import type { ScoredLead } from '@/lib/lead-discovery/lead-scoring-service'
+import { logEvent, logError } from '@/lib/runtime'
 
 // Module-level singletons — one instance per process
 let _generator: MultiSourceLeadGenerator | null = null
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
     const generator = getLeadGenerator()
 
     // Generate leads from multiple sources
-    console.log(`Generating leads for ${companies.length || 'all'} companies...`)
+    logEvent('leads.generate.start', { companyCount: companies.length || 0 })
     const rawLeads = await generator.generateLeads({
       companies,
       industries,
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest) {
       clientProfileId
     })
 
-    console.log(`Generated ${rawLeads.length} raw leads`)
+    logEvent('leads.generate.completed', { rawCount: rawLeads.length })
 
     // Per-source outcome of this run — surfaced for observability without
     // altering the existing success/failure response shape.
@@ -75,11 +76,12 @@ export async function POST(request: NextRequest) {
     for (const [sourceId, outcome] of Object.entries(rawSourceReport)) {
       const effectiveStatus =
         outcome.status === 'ok' && outcome.leads_count === 0 ? 'empty' : outcome.status
-      console.log(
-        `[generate] source=${sourceId} status=${effectiveStatus} ` +
-        `leads_count=${outcome.leads_count}` +
-        (outcome.error ? ` error=${outcome.error}` : '')
-      )
+      logEvent('leads.generate.source', {
+        sourceId,
+        status: effectiveStatus,
+        leadsCount: outcome.leads_count,
+        ...(outcome.error ? { error: outcome.error } : {}),
+      })
     }
     // Flatten the keyed report into a stable array for the response body.
     const sourceReport = Object.entries(rawSourceReport).map(([sourceId, outcome]) => ({
@@ -134,7 +136,7 @@ export async function POST(request: NextRequest) {
       }
     })
   } catch (error) {
-    console.error('Lead generation error:', error)
+    logError('leads.generate.failed', error)
     return NextResponse.json(
       {
         success: false,

@@ -18,6 +18,7 @@ import { deliverCandidatesForRun, type DeliverRunResult } from '@/lib/digest/del
 import { enrichRunCandidates } from '@/lib/ai/enrichment/enrichRunCandidates'
 import { shouldDeliverOnRun } from '@/lib/delivery/nextDeliveryHint'
 import { getPool } from '@/lib/db'
+import { logEvent, logError } from '@/lib/runtime'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -81,13 +82,15 @@ export async function POST(request: NextRequest) {
     const allOk = ingestOk && digestOk
     const durationMs = Date.now() - startMs
 
-    console.log(
-      `[daily-radar] ${allOk ? 'OK' : 'PARTIAL'}: ` +
-      `ingest(${ingestSummary.succeeded}/${ingestSummary.total}) ` +
-      `digest(${digestSummary.succeeded}/${digestSummary.total}) ` +
-      `sent(${digestSummary.totalSent}) ` +
-      `duration(${durationMs}ms)`
-    )
+    logEvent('daily_radar.run', {
+      status: allOk ? 'ok' : 'partial',
+      ingestOk: ingestSummary.succeeded,
+      ingestTotal: ingestSummary.total,
+      digestOk: digestSummary.succeeded,
+      digestTotal: digestSummary.total,
+      sent: digestSummary.totalSent,
+      durationMs,
+    })
 
     return NextResponse.json({
       success: allOk,
@@ -100,7 +103,7 @@ export async function POST(request: NextRequest) {
       },
     }, { status: allOk ? 200 : 207 })
   } catch (error) {
-    console.error('[daily-radar] pipeline failed:', error)
+    logError('daily_radar.pipeline_failed', error)
     return NextResponse.json(
       { success: false, error: 'Daily radar pipeline failed' },
       { status: 500 }
@@ -183,8 +186,7 @@ async function generateAndDeliverDigests(): Promise<DigestDeliveryResult[]> {
       try {
         await enrichRunCandidates(runId)
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error'
-        console.error(`[daily-radar] enrichment failed for run ${runId}: ${message}`)
+        logError('daily_radar.enrichment_failed', error, { runId: String(runId) })
       }
 
       // Deliver candidates using shared logic

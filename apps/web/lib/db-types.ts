@@ -188,6 +188,16 @@ export interface DigestItem {
    */
   career_page_url?: string | null;
   /**
+   * Auto-discovered contact surface extracted from the career-page HTML by the
+   * ingest crawler (HR/careers email, phone, Telegram, contact-form). Deduped
+   * per corroboration group and ranked HR-first. A JSONB array of
+   * {category,value} objects from the digest evidence query; '[]' when the
+   * career page exposed no contact surface (honest empty — reachability is then
+   * gated, not inflated). Query-projection field. See
+   * packages/db/scripts/lib/career-page-contacts.mjs for the extractor.
+   */
+  contact_paths?: ReadonlyArray<{ category: string; value: string }> | null;
+  /**
    * Geo gate (Block 1): true when the lead is a foreign employer — hosted on a
    * known foreign ATS with no Russian-market footprint. When set, total_score has
    * already had the soft foreign-employer penalty applied. Surfaced to the UI as
