@@ -16,6 +16,7 @@ import type { ConfidenceGateInput, ConfidenceGate, EntityMatchQuality } from '@/
 import type { EvidenceTier } from '@/lib/db/evidence'
 import { evidenceTypeToTier } from '@/lib/db/evidence'
 import { getPool } from '@/lib/db'
+import { logError } from '@/lib/runtime'
 import { withRetry } from '@/lib/utils/retry'
 
 // Extend the interface to include confidence_gate (now in base type, kept for compatibility)
@@ -420,7 +421,7 @@ export class MultiSourceLeadGenerator {
       this.recordJobBoardSources(jobBoardLeads)
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
-      console.error('[generateLeads] source failed', { source: 'job-boards', error: message })
+      logError('leads.source_failed', err, { source: 'job-boards' })
       this.recordSource('job-boards', { status: 'error', leads_count: 0, error: message })
     }
 
@@ -433,7 +434,7 @@ export class MultiSourceLeadGenerator {
         this.recordSource('career-pages', { status: 'ok', leads_count: added })
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
-        console.error('[generateLeads] source failed', { source: 'career-pages', error: message })
+        logError('leads.source_failed', err, { source: 'career-pages' })
         this.recordSource('career-pages', { status: 'error', leads_count: 0, error: message })
       }
     }
@@ -447,7 +448,7 @@ export class MultiSourceLeadGenerator {
         this.recordSource('funding-business-signals', { status: 'ok', leads_count: added })
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
-        console.error('[generateLeads] source failed', { source: 'funding-business-signals', error: message })
+        logError('leads.source_failed', err, { source: 'funding-business-signals' })
         this.recordSource('funding-business-signals', { status: 'error', leads_count: 0, error: message })
       }
     }
@@ -461,7 +462,7 @@ export class MultiSourceLeadGenerator {
         this.recordSource('egrul-fns', { status: 'ok', leads_count: added })
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
-        console.error('[generateLeads] source failed', { source: 'egrul-fns', error: message })
+        logError('leads.source_failed', err, { source: 'egrul-fns' })
         this.recordSource('egrul-fns', { status: 'error', leads_count: 0, error: message })
       }
     }
@@ -475,7 +476,7 @@ export class MultiSourceLeadGenerator {
     try {
       aggregatedLeads = await this.deduplicateLeads(allLeads)
     } catch (err) {
-      console.error('[generateLeads] deduplication failed, using raw leads:', err)
+      logError('leads.dedup_failed', err)
       aggregatedLeads = allLeads
     }
 
@@ -603,7 +604,7 @@ export class MultiSourceLeadGenerator {
       }
     })
     } catch (err) {
-      console.error('[generateJobBoardLeads] failed:', err)
+      logError('leads.jobboard_failed', err)
       return []
     }
   }
@@ -745,7 +746,7 @@ export class MultiSourceLeadGenerator {
           }
         }
       } catch (error) {
-        console.warn('Failed to fetch website URLs from orgs:', error)
+        logError('leads.orgs_website_fetch_failed', error)
       }
     }
 
@@ -827,7 +828,7 @@ export class MultiSourceLeadGenerator {
           })
         }
       } catch (error) {
-        console.warn(`Failed to crawl career page for ${lead.companyName}:`, error)
+        logError('leads.career_page_crawl_failed', error, { company: lead.companyName })
       }
     })))
   }
@@ -903,7 +904,7 @@ export class MultiSourceLeadGenerator {
         }
       }
     } catch (error) {
-      console.warn('Failed to fetch business signals:', error)
+      logError('leads.business_signals_failed', error)
     }
 
     // Recalculate confidence after adding evidence
@@ -966,7 +967,7 @@ export class MultiSourceLeadGenerator {
         }
       }
     } catch (error) {
-      console.warn('Failed to fetch EGRUL registry data:', error)
+      logError('leads.egrul_fetch_failed', error)
     }
 
     // Recalculate confidence after adding evidence
@@ -1082,7 +1083,6 @@ export class MultiSourceLeadGenerator {
   getSourceAnalytics(leads: MultiSourceLead[]) {
     const sourceStats = new Map<string, {
       count: number
-      avgConfidence: number
       totalRelevance: number
     }>()
 
@@ -1091,7 +1091,6 @@ export class MultiSourceLeadGenerator {
         if (!sourceStats.has(source.sourceId)) {
           sourceStats.set(source.sourceId, {
             count: 0,
-            avgConfidence: 0,
             totalRelevance: 0
           })
         }
@@ -1102,12 +1101,7 @@ export class MultiSourceLeadGenerator {
       })
     })
 
-    // Calculate averages
-    sourceStats.forEach(stats => {
-      // This method was incorrectly implemented - it should track per-lead source data
-      // For now, just keep the count and relevance metrics
-    })
-
+    // Calculate averages (empty forEach was a stale no-op — removed in cleanup)
     return {
       totalLeads: leads.length,
       sources: Array.from(sourceStats.entries()).map(([id, stats]) => ({
@@ -1125,7 +1119,9 @@ export class MultiSourceLeadGenerator {
   private calculateCoverage(leads: MultiSourceLead[]) {
     const coverage = {
       totalCompanies: new Set(leads.map(l => l.companyId)).size,
-      avgSourcesPerLead: leads.reduce((sum, l) => sum + l.sources.length, 0) / leads.length,
+      avgSourcesPerLead: leads.length > 0
+        ? leads.reduce((sum, l) => sum + l.sources.length, 0) / leads.length
+        : 0,
       highConfidenceLeads: leads.filter(l => l.confidence === 'A').length,
       enrichedLeads: leads.filter(l => Object.keys(l.enrichment).length > 0).length
     }

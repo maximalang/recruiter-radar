@@ -25,6 +25,7 @@
 import type { AssistResult } from '../assist-types';
 import type { EnrichmentProvider } from '../enrichment/careerPages';
 import type { ScrapeMarkdownResult } from './firecrawl';
+import { logError } from '@/lib/runtime';
 
 // ─── Provider interface (markdown-only, swappable) ───────────────────────────
 
@@ -171,9 +172,7 @@ function createRealCrawl4aiProvider(base: string): MarkdownProvider {
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : 'unknown_error';
-        console.error(
-          JSON.stringify({ level: 'error', event: 'ai.crawl4ai.md_failed', url, message }),
-        );
+        logError('ai.crawl4ai.md_failed', error, { url });
         return degradedMarkdown(`crawl4ai: md error: ${message}`);
       }
     },

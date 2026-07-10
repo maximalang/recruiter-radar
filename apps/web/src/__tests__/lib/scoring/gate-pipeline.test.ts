@@ -47,7 +47,10 @@ describe('isDigestEligibleGate — backward compat for unexpected values', () =>
   it('passes unexpected gate values with a warning', () => {
     const spy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     expect(isDigestEligibleGate(item('1', 'X'))).toBe(true);
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining('unexpected confidence_gate'));
+    expect(spy).toHaveBeenCalledWith(
+      expect.stringContaining('"event":"digest.confidence_gate_unexpected"'),
+    );
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining('"gate":"X"'));
     spy.mockRestore();
   });
 

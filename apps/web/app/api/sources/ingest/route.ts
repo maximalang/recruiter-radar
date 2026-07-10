@@ -11,6 +11,7 @@ import {
   getAllSourceIds,
   getPrimarySourceIds,
 } from '@/lib/sources/source-registry'
+import { logError } from '@/lib/runtime'
 
 // Force Node.js runtime — ingestion requires child_process (no Edge/serverless)
 export const runtime = 'nodejs'
@@ -93,7 +94,7 @@ export async function POST(request: NextRequest) {
       data: { results, summary },
     }, { status: allSuccess ? 200 : 207 }) // 207 Multi-Status for partial failures
   } catch (error) {
-    console.error('Source ingestion error:', error)
+    logError('sources.ingest.failed', error)
     return NextResponse.json(
       { success: false, error: 'Failed to ingest sources' },
       { status: 500 }

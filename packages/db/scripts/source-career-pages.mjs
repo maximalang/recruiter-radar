@@ -17,6 +17,10 @@ import {
 } from './adapters/source-records.mjs';
 import { fetchJson as fetchJsonWithPolicy, fetchText } from './adapters/source-http.mjs';
 import { loadEnvFile, normalizeDomain, runScriptCli } from './lib/common-utils.mjs';
+import {
+  extractCareerPageContactPaths,
+  toPersistableContactPaths,
+} from './lib/career-page-contacts.mjs';
 
 const { Client } = pg;
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -707,6 +711,11 @@ export function mapJsonLdJobPostings(postings, seed) {
       occurred_at: toTimestampOrNull(source.datePosted ?? source.datePublished),
       source_record_type: 'job_posting',
       raw_target_adapter: 'same-domain-jsonld',
+      // Contact surface extracted from the career-page HTML (one pass per page,
+      // shared across every vacancy on it). Passed through to the signal payload
+      // so the agency-facing surfaces see the concrete contact, not just "there
+      // is a career page". Null when the page exposed no contact surface.
+      contact_paths: seedInfo.contactPaths ?? null,
       raw: source,
     };
   });
@@ -826,6 +835,8 @@ function buildSameDomainHtmlCardRecord({ title, vacancyUrl, cardHtml, seedInfo, 
     source_record_type: 'job_posting',
     raw_target_adapter: 'same-domain-html-cards',
     extraction_method: 'html-card-fallback',
+    // Contact surface extracted from the career-page HTML (one pass per page).
+    contact_paths: seedInfo.contactPaths ?? null,
     raw: { vacancyUrl, title, location, employmentType, salary },
   };
 }
@@ -1239,13 +1250,26 @@ async function fetchSameDomainJsonLdRecords(target) {
     return [];
   }
 
+  const careerPageUrl = target.careerPageUrl ?? target.sourceUrl;
   const seed = {
     companyName: target.companyName,
     companyDomain: target.companyDomain,
     companyWebsiteUrl: target.companyWebsiteUrl,
-    careerPageUrl: target.careerPageUrl ?? target.sourceUrl,
+    careerPageUrl,
     sourceUrl: target.sourceUrl,
   };
+
+  // Auto-discovery: the career-page HTML is already fetched, so extract the
+  // concrete contact surface (HR/careers email, phone, Telegram, contact-form)
+  // the company publishes on its OWN hiring page — exactly the data the agency
+  // would otherwise open the page to find by hand. One pass per page, deduped,
+  // capped, persisted on every record so the digest/lead-detail/FIUR paths all
+  // see it. No fabrication: values are pulled verbatim from the page. Empty
+  // when the page carries no contact surface — downstream reachability is then
+  // gated honestly instead of silently zero (the pre-slice gap).
+  seed.contactPaths = toPersistableContactPaths(
+    extractCareerPageContactPaths(page.html, careerPageUrl),
+  );
 
   // JSON-LD first: schema.org JobPosting markup is the structurally-trusted
   // surface (Яндекс.Работа / Google for Jobs). If present, it wins and the HTML
@@ -1652,6 +1676,14 @@ function normalizeCareerPageRecord(record, fetchedAt, lineNumber) {
   const employmentType = toNonEmptyText(record.employment_type);
   const salary = toNonEmptyText(record.salary ?? record.compensation);
   const orgExternalId = toNonEmptyText(record.org_external_id ?? record.company_id ?? record.employer_id);
+  // Contact surface extracted from the career-page HTML (see
+  // extractCareerPageContactPaths). Normalized to a compact array; null/empty
+  // → [] so the payload field is always a stable array downstream.
+  const contactPaths = Array.isArray(record.contact_paths)
+    ? record.contact_paths.filter(
+      (p) => p && typeof p === 'object' && typeof p.category === 'string' && typeof p.value === 'string',
+    ).map((p) => ({ category: p.category, value: p.value }))
+    : [];
   const rfQuality = buildRfJobQuality({
     companyName,
     jobTitle,
@@ -1732,6 +1764,7 @@ function normalizeCareerPageRecord(record, fetchedAt, lineNumber) {
     orgSourceKeys,
     orgSourceAliasKeys,
     signalExternalId,
+    contactPaths,
   };
 }
 
@@ -1888,6 +1921,12 @@ function buildSignalPayload(record) {
     vacancy_freshness: record.freshness,
     quality_penalties: record.qualityPenalties,
     fetched_at: record.fetchedAt,
+    // Auto-discovered contact surface from the career-page HTML (HR/careers
+    // email, phone, Telegram, contact-form). Stable array; [] when the page
+    // exposed no contact surface. Read by the digest SQL query, lead-detail,
+    // and FIUR reachability so the agency sees the concrete path the system
+    // found — not just "there is a career page".
+    contact_paths: record.contactPaths ?? [],
     raw: record.rawRecord,
   };
 }

@@ -8,6 +8,10 @@ export function logEvent(event: string, payload: Record<string, unknown>) {
   console.info(JSON.stringify({ level: "info", event, ...payload }));
 }
 
+export function logWarn(event: string, payload: Record<string, unknown> = {}) {
+  console.warn(JSON.stringify({ level: "warn", event, ...payload }));
+}
+
 export function logError(event: string, error: unknown, payload: Record<string, unknown> = {}) {
   const message = error instanceof Error ? error.message : "unknown_error";
   console.error(JSON.stringify({ level: "error", event, message, ...payload }));

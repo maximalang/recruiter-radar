@@ -9,6 +9,7 @@
 import { runScoringPipeline } from '@/lib/scoring/scoring-pipeline'
 import { computeClientOverrides } from '@/lib/scoring/client-overrides'
 import type { FiurClientOverrides } from '@/lib/scoring/fiur'
+import { logError } from '@/lib/runtime'
 import { MultiSourceLeadGenerator } from './multi-source-lead-generator'
 import pLimit from 'p-limit'
 import type {
@@ -167,14 +168,7 @@ export class LeadScoringService {
             enrichment: result,
           })
         } catch (persistError) {
-          console.error(
-            JSON.stringify({
-              level: 'error',
-              event: 'ai.enrichment.persist_failed',
-              orgId: lead.companyId,
-              message: persistError instanceof Error ? persistError.message : 'unknown_error',
-            }),
-          )
+          logError('ai.enrichment.persist_failed', persistError, { orgId: lead.companyId })
         }
       }
 
@@ -182,14 +176,7 @@ export class LeadScoringService {
     } catch (error) {
       // repairWeakCareerPage already degrades internally; this is belt-and-braces
       // so enrichment can never abort a scoring run.
-      console.error(
-        JSON.stringify({
-          level: 'error',
-          event: 'ai.enrichment.repair_failed',
-          orgId: lead.companyId,
-          message: error instanceof Error ? error.message : 'unknown_error',
-        }),
-      )
+      logError('ai.enrichment.repair_failed', error, { orgId: lead.companyId })
       return undefined
     }
   }
@@ -275,7 +262,7 @@ export class LeadScoringService {
       }
       return result.overrides
     } catch (error) {
-      console.error('Failed to compute client overrides; scoring without reweighting:', error)
+      logError('scoring.client_overrides_failed', error)
       return undefined
     }
   }

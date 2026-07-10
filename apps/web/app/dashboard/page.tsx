@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import DashboardOverview from './dashboard-overview';
+import DashboardDailySummary from './dashboard-daily-summary';
 import DashboardSources from './dashboard-sources';
 import DashboardAlerts from './dashboard-alerts';
 import DashboardQuality from './dashboard-quality';
@@ -17,7 +17,6 @@ const DASHBOARD_NAV: NavItem[] = [
 ];
 
 import {
-  getDashboardOverviewMetrics,
   getDashboardQualityMetrics,
   getDashboardSourceHealth,
   getDashboardFeedbackFunnel,
@@ -56,7 +55,6 @@ export default async function DashboardPage() {
   // safeDashboardFetch so a single rejection surfaces an ErrorState for that
   // block instead of crashing the entire page.
   const [
-    overview,
     quality,
     sources,
     feedbackFunnel,
@@ -65,7 +63,6 @@ export default async function DashboardPage() {
     sourceEvidenceQuality,
     todayRadar,
   ] = await Promise.all([
-    safeDashboardFetch(() => getDashboardOverviewMetrics()),
     safeDashboardFetch(() => getDashboardQualityMetrics()),
     safeDashboardFetch(() => getDashboardSourceHealth()),
     safeDashboardFetch(() => getDashboardFeedbackFunnel()),
@@ -87,6 +84,14 @@ export default async function DashboardPage() {
       <Suspense fallback={<AnalyticsSkeleton />}>
         <div className={dashStyles.dashboardStack}>
           {/* Agency value zone — what to act on today */}
+          <DashboardDailySummary
+            todayLeads={leadMetrics?.todayLeads}
+            totalLeads={leadMetrics?.totalLeads}
+            gateA={quality?.gateDistribution.find(g => g.gate === 'A')?.count}
+            gateB={quality?.gateDistribution.find(g => g.gate === 'B')?.count}
+            gateC={quality?.gateDistribution.find(g => g.gate === 'C')?.count}
+            pendingReview={todayRadar?.pendingReview}
+          />
           {todayRadar ? (
             <DashboardTodayRadar
               topLeads={todayRadar.topLeads}
@@ -117,21 +122,8 @@ export default async function DashboardPage() {
 
           {/* System zone — operational telemetry, secondary to the value above */}
           <div className={`${dashStyles.zoneLabel} ${dashStyles.zoneLabelSystem}`}>
-            Система и источники
+            Источники
           </div>
-          {overview ? (
-            <DashboardOverview
-              totalSources={overview.totalSources}
-              activeSources={overview.activeSources}
-              overallHealth={overview.overallHealth}
-              totalAlerts={overview.totalAlerts}
-            />
-          ) : (
-            <ErrorState
-              title="Обзор источников не загрузился"
-              description="Состояние источников обновляется непрерывно. Повторите позже."
-            />
-          )}
           {sources ? <DashboardSources sources={sources} /> : (
             <ErrorState
               title="Источники не загрузились"

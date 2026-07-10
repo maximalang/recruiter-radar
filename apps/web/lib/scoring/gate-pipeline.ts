@@ -8,6 +8,8 @@
  * surface (digest.ts, hhDigest.ts, payments.ts, lead-discovery) shares it.
  */
 
+import { logWarn } from '@/lib/runtime'
+
 /**
  * Confidence-gate filter for digest eligibility.
  *
@@ -30,7 +32,7 @@ export function isDigestEligibleGate<T extends { confidence_gate?: string | null
   // This preserves backward compat with the old inline filter that would
   // have passed any non-C/non-D value.
   if (gate !== 'A' && gate !== 'B') {
-    console.warn(`isDigestEligibleGate: unexpected confidence_gate "${gate}" — passing (backward compat)`)
+    logWarn('digest.confidence_gate_unexpected', { gate })
   }
   return true
 }

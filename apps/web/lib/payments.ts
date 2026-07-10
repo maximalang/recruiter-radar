@@ -24,6 +24,7 @@ import { getTelegramBotToken, sendTelegramTextMessage } from "./telegram";
 import { buildTelegramDigestFeedbackReplyMarkup } from "./telegramDigestFeedback";
 import { recordClientProfileDigestShownOutcomes } from "./clientProfileSignalOutcomes";
 import { isDigestEligibleGate } from "./scoring/gate-pipeline";
+import { logError } from "./runtime";
 import {
   type CheckoutOrder,
   type PaymentsDbClient,
@@ -524,7 +525,7 @@ export async function sendPilotOrderTestDigest(
         feedbackSource: "telegram"
       });
     } catch (error) {
-      console.error("Failed to record shown onboarding digest items.", error);
+      logError("payments.onboarding_digest_shown_record_failed", error);
     }
 
     order = await updateCheckoutOrder(order.id, {

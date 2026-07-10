@@ -37,6 +37,7 @@ import type {
   EnrichedHiringUrgency,
   EnrichmentProvider,
 } from '../enrichment/careerPages';
+import { logError } from '@/lib/runtime';
 
 // ─── Provider interface (swappable) ──────────────────────────────────────────
 
@@ -359,9 +360,7 @@ function createRealFirecrawlProvider(apiKey: string): ScrapeProvider {
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : 'unknown_error';
-        console.error(
-          JSON.stringify({ level: 'error', event: 'ai.firecrawl.scrape_failed', url, message }),
-        );
+        logError('ai.firecrawl.scrape_failed', error, { url });
         return degradedMarkdown(`firecrawl: scrape error: ${message}`);
       }
     },
@@ -399,14 +398,7 @@ function createRealFirecrawlProvider(apiKey: string): ScrapeProvider {
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : 'unknown_error';
-        console.error(
-          JSON.stringify({
-            level: 'error',
-            event: 'ai.firecrawl.extract_failed',
-            url: input.sourceUrl,
-            message,
-          }),
-        );
+        logError('ai.firecrawl.extract_failed', error, { url: input.sourceUrl });
         return degradedExtract(`firecrawl: extract error: ${message}`);
       }
     },

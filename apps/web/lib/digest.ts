@@ -1,5 +1,6 @@
 import { Pool, type PoolClient } from "pg";
 import { getPool as getSharedPool } from "./db-pool";
+import { logError, logWarn } from "./runtime";
 import { isDigestEligibleGate } from "./scoring/gate-pipeline";
 import { deriveReviewStatus } from "./scoring/gates";
 import { getClientProfileById, INDUSTRY_KEYWORDS, resolveHiringMode, type ClientProfile } from "./clientProfiles";
@@ -41,7 +42,7 @@ export async function getDigestPreviewItems(limit = 10): Promise<DigestItemInput
   const pool = getPool();
 
   if (!pool) {
-    console.warn('getDigestPreviewItems: DATABASE_URL not set, returning empty digest');
+    logWarn('digest.preview_no_db', { fn: 'getDigestPreviewItems' });
     return [];
   }
 
@@ -66,7 +67,7 @@ export async function getDigestItemsForClientProfile(input: {
   const pool = getPool();
 
   if (!pool) {
-    console.warn('getDigestItemsForClientProfile: DATABASE_URL not set, returning empty digest');
+    logWarn('digest.items_no_db', { fn: 'getDigestItemsForClientProfile' });
     return [];
   }
 
@@ -100,6 +101,7 @@ export async function getDigestItemsForClientProfile(input: {
       ranked_candidates.evidence_titles,
       ranked_candidates.candidate_source_keys,
       ranked_candidates.location_names,
+      ranked_candidates.contact_paths,
       ranked_candidates.vacancies_count,
       ranked_candidates.distinct_vacancy_names_count,
       ranked_candidates.latest_published_at,
@@ -167,14 +169,7 @@ export async function countMatchingCandidatesForProfile(
       .filter((item) => matchesClientProfile(item, clientProfile));
     return { count: matches.length, capped: result.rows.length >= scanLimit };
   } catch (error) {
-    console.error(
-      JSON.stringify({
-        level: 'error',
-        event: 'digest.match_count_failed',
-        clientProfileId: clientProfile.id,
-        message: error instanceof Error ? error.message : 'unknown_error',
-      }),
-    );
+    logError('digest.match_count_failed', error, { clientProfileId: clientProfile.id });
     return { count: 0, capped: false };
   }
 }
@@ -263,6 +258,7 @@ export async function runDigestForClientProfile(input: {
         ranked_candidates.evidence_titles,
         ranked_candidates.candidate_source_keys,
         ranked_candidates.location_names,
+        ranked_candidates.contact_paths,
         ranked_candidates.vacancies_count,
         ranked_candidates.distinct_vacancy_names_count,
         ranked_candidates.latest_published_at,
@@ -335,6 +331,10 @@ export async function runDigestForClientProfile(input: {
             confidence_gate: item.confidence_gate,
             evidence_titles: item.evidence_titles,
             location_names: item.location_names,
+            // Auto-discovered contact surface (career-page HTML extraction).
+            // Persisted so /leads + lead detail can render the concrete contact
+            // without re-running the evidence query. [] = no surface found.
+            contact_paths: item.contact_paths ?? [],
             is_foreign_employer: item.is_foreign_employer ?? false,
             foreign_matched_domain: item.foreign_matched_domain ?? null,
             // Cross-source corroboration metadata (2026-07-06 pass 2). Persisted
@@ -538,6 +538,10 @@ function mapDigestEvidenceRow(row: DigestEvidenceRow): DigestItemInput {
     confidence_gate: row.confidence_gate ?? "",
     is_foreign_employer: foreign.isForeign,
     foreign_matched_domain: foreign.matchedDomain,
+    // Auto-discovered contact surface (career-page HTML extraction). Normalized
+    // to a stable {category,value}[] shape; [] when the page exposed no contact
+    // surface. See lib/scoring/contact-paths.ts for the category taxonomy.
+    contact_paths: normalizeContactPaths(row.contact_paths),
     // Cross-source corroboration identity (2026-07-06 pass 2). Carried through
     // so the digest candidate payload records the merge, the lead card can show
     // "подтверждено N источниками" truthfully, and the analytics can count
@@ -927,6 +931,34 @@ function normalizeTextArray(value: string[] | null | undefined): string[] {
   }
 
   return Array.from(uniqueValues.values());
+}
+
+/**
+ * Normalize the auto-discovered contact surface from the digest evidence query
+ * into a stable {category,value}[] shape. The query already dedupes + ranks
+ * HR-first; this guards the boundary: tolerate non-array / malformed elements
+ * (pg may return objects as Record<string,unknown>), drop blanks, dedupe again
+ * defensively. Empty array is the honest "no contact surface found" outcome —
+ * callers gate reachability on it rather than treat missing as "unreachable
+ * unknown".
+ */
+function normalizeContactPaths(
+  value: DigestEvidenceRow["contact_paths"],
+): Array<{ category: string; value: string }> {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const out: Array<{ category: string; value: string }> = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+    const category = typeof item.category === "string" ? item.category.trim() : "";
+    const val = typeof item.value === "string" ? item.value.trim() : "";
+    if (!category || !val) continue;
+    const key = `${category}:${val}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ category, value: val });
+  }
+  return out;
 }
 
 function normalizeSearchText(value: string): string {

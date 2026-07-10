@@ -7,6 +7,8 @@ import { getOwnerIdFromSession } from '@/lib/session';
 import { buildFitExplanation, FIT_DIMENSION_ICON } from '@/lib/leads/fit-explanation';
 import { buildCompanySummary } from '@/lib/leads/company-summary';
 import { deriveRoleNames, splitRolesForDisplay, deriveUrgencyCue } from '@/lib/leads/lead-quality';
+import { toContactPathViews, hasCorporateContact } from '@/lib/leads/contact-display';
+import { filterContactPathsByPolicy } from '@/lib/contact-policy-filter';
 import { leadToCrmBlock } from '@/lib/leads-csv';
 import FeedbackButtons from './feedback-buttons';
 import AiEnrichmentBlock from './ai-enrichment-block';
@@ -143,6 +145,16 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     hiringMode: resolvedHiringMode,
   });
 
+  // Auto-discovered contact surface: the system extracted concrete contact
+  // channels from the company's career-page HTML so the agency sees the actual
+  // HR mailbox / phone / Telegram — not just "there is a career page". Filtered
+  // by the client's contact policy (corporate_only by default) so a personal
+  // route is never surfaced as a safe path. Empty when the career page exposed
+  // no contact surface — the honest empty state, rendered explicitly below.
+  const contactPolicy = profile?.contactPolicy ?? 'corporate_only';
+  const policyFilteredContactPaths = filterContactPathsByPolicy(lead.contactPaths, contactPolicy);
+  const contactViews = toContactPathViews(policyFilteredContactPaths);
+
   // "Дальнейшие шаги" handoff block — built server-side so the CRM-ready text
   // is stable and the client component only handles clipboard + open-links.
   // Only surfaces links that actually exist; the empty-array case hides the
@@ -276,6 +288,45 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                   </p>
                 </ContentCard>
               )}
+
+              {/* Auto-discovered contacts — the concrete channels the system
+                  found on the company's career page, so the agency can act
+                  without opening the page to hunt for an HR mailbox. */}
+              <ContentCard>
+                <ContentCardTitle>Найденные контакты</ContentCardTitle>
+                {contactViews.length > 0 ? (
+                  <ul className={ipStyles.contactList}>
+                    {contactViews.map((c, i) => (
+                      <li key={i} className={ipStyles.contactItem}>
+                        <span className={ipStyles.contactLabel}>
+                          {c.label}
+                          {c.isHiringSurface && (
+                            <span className={ipStyles.contactHiringTag}>HR</span>
+                          )}
+                        </span>
+                        {c.href ? (
+                          <a
+                            href={c.href}
+                            target={c.href.startsWith('http') ? '_blank' : undefined}
+                            rel={c.href.startsWith('http') ? 'noopener noreferrer' : undefined}
+                            className={ipStyles.contactValue}
+                          >
+                            {c.value}
+                          </a>
+                        ) : (
+                          <span className={ipStyles.contactValue}>{c.value}</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className={ipStyles.bodyTextMuted}>
+                    Контакты на карьерной странице не найдены — система определила
+                    карьерную страницу, но конкретный HR-ящик или форма не видны.
+                    Откройте страницу, чтобы найти путь контакта вручную.
+                  </p>
+                )}
+              </ContentCard>
 
               {/* Evidence card */}
               <ContentCard>
