@@ -28,14 +28,14 @@ export default function PrivacyPage() {
           description="Политика обработки и защиты персональных данных пользователей сервиса Recruiter Radar. Согласием с условиями ниже считается факт использования сервиса или его оплаты."
         />
 
-        <SurfaceCard>
-          <div style={{ display: "grid", gap: "10px" }}>
-            <SummaryRow label="Оператор" value={OPERATOR.fullName} />
-            <SummaryRow label="ИНН" value={OPERATOR.inn} />
-            <SummaryRow label="Статус" value={OPERATOR.status} />
-            <SummaryRow label="Сервис" value={OPERATOR.service} />
-            <SummaryRow label="Контакт" value={<a href={`mailto:${OPERATOR.email}`} style={{ color: "inherit" }}>{OPERATOR.email}</a>} />
-            <SummaryRow label="Действует с" value="11 июля 2026" />
+        <SurfaceCard padding="18px">
+          <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap", color: "var(--c-text-secondary, #475569)", fontSize: "0.92rem" }}>
+            <strong style={{ color: "var(--c-text-primary, #0f172a)" }}>Оператор:</strong>
+            <span>{OPERATOR.fullName}</span>
+            <span style={{ color: "var(--c-text-muted, #94a3b8)" }}>·</span>
+            <span>самозанятый, ИНН {OPERATOR.inn}</span>
+            <span style={{ color: "var(--c-text-muted, #94a3b8)" }}>·</span>
+            <span>действует с 11 июля 2026</span>
           </div>
         </SurfaceCard>
 
@@ -156,15 +156,6 @@ export default function PrivacyPage() {
         </SurfaceCard>
       </section>
     </PageFrame>
-  );
-}
-
-function SummaryRow({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div style={{ display: "flex", justifyContent: "space-between", gap: "16px", padding: "8px 0", borderBottom: "1px solid var(--c-border, #e2e8f0)", flexWrap: "wrap" }}>
-      <span style={{ color: "var(--c-text-secondary, #475569)", fontSize: "0.92rem" }}>{label}</span>
-      <strong style={{ textAlign: "right" }}>{value}</strong>
-    </div>
   );
 }
 

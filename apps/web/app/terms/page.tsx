@@ -28,13 +28,14 @@ export default function TermsPage() {
           description="Использование сервиса Recruiter Radar означает согласие с условиями ниже. Договор-оферта вступает в силу с момента оплаты выбранного тарифа."
         />
 
-        <SurfaceCard>
-          <div style={{ display: "grid", gap: "10px" }}>
-            <SummaryRow label="Оператор" value={OPERATOR.fullName} />
-            <SummaryRow label="ИНН" value={OPERATOR.inn} />
-            <SummaryRow label="Статус" value={OPERATOR.status} />
-            <SummaryRow label="Сервис" value={OPERATOR.service} />
-            <SummaryRow label="Контакт" value={<a href={`mailto:${OPERATOR.email}`} style={{ color: "inherit" }}>{OPERATOR.email}</a>} />
+        <SurfaceCard padding="18px">
+          <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap", color: "var(--c-text-secondary, #475569)", fontSize: "0.92rem" }}>
+            <strong style={{ color: "var(--c-text-primary, #0f172a)" }}>Оператор:</strong>
+            <span>{OPERATOR.fullName}</span>
+            <span style={{ color: "var(--c-text-muted, #94a3b8)" }}>·</span>
+            <span>самозанятый, ИНН {OPERATOR.inn}</span>
+            <span style={{ color: "var(--c-text-muted, #94a3b8)" }}>·</span>
+            <Link href="/legal" style={{ color: "inherit", textDecoration: "underline" }}>полные реквизиты</Link>
           </div>
         </SurfaceCard>
 
@@ -42,7 +43,7 @@ export default function TermsPage() {
           <TermsSection n="1" title="Предмет договора">
             Оператор предоставляет Заказчику доступ к сервису Recruiter Radar — ежедневной подборке
             компаний с признаками активного найма, с доказательствами сигнала, оценкой уверенности
-            (confidence) и подсказкой законного пути первого контакта. Доступ предоставляется через
+            и подсказкой законного пути первого контакта. Доступ предоставляется через
             веб-интерфейс и/или доставку дайджеста в Telegram. Сервис оказывает информационно-аналитические
             услуги и не осуществляет подбор кандидатов, рассылку сообщений от имени Заказчика и не выступает
             кадровым агентством.
@@ -84,8 +85,8 @@ export default function TermsPage() {
         <SurfaceCard>
           <TermsSection n="5" title="Что сервис НЕ гарантирует">
             Recruiter Radar предоставляет информационно-аналитические данные о сигналах найма и не гарантирует
-            заключения сделок Заказчиком, отклика компаний или конкретных результатов найма. Confidence-оценки и
-            gating (A/B/C/D) отражают доказательность сигнала, а не вероятность успеха контакта. Заказчик
+            заключения сделок Заказчиком, отклика компаний или конкретных результатов найма. Оценки уверенности
+            по каждой компании отражают надёжность сигнала, а не вероятность успеха контакта. Заказчик
             принимает решения о выходе на компании самостоятельно и несёт ответственность за соблюдение
             применимого права при контактах.
           </TermsSection>
@@ -118,15 +119,6 @@ export default function TermsPage() {
         </SurfaceCard>
       </section>
     </PageFrame>
-  );
-}
-
-function SummaryRow({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div style={{ display: "flex", justifyContent: "space-between", gap: "16px", padding: "8px 0", borderBottom: "1px solid var(--c-border, #e2e8f0)", flexWrap: "wrap" }}>
-      <span style={{ color: "var(--c-text-secondary, #475569)", fontSize: "0.92rem" }}>{label}</span>
-      <strong style={{ textAlign: "right" }}>{value}</strong>
-    </div>
   );
 }
 

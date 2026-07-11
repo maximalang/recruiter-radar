@@ -5,7 +5,6 @@ import {
   NoticeBox,
   PageFrame,
   SectionIntro,
-  StatusBadge,
   SummaryRow,
   SurfaceCard,
 } from "../ui/page-primitives";
@@ -18,12 +17,13 @@ export const metadata: Metadata = {
 };
 
 // Реквизиты оператора сервиса. ИНН указан явно — требуется для приёма оплат
-// через ЮKassa (самозанятый, плательщик НПД).
+// через ЮKassa (самозанятый, плательщик НПД). Эта страница — единый источник
+// реквизитов; оферта и политика ссылаются сюда и не дублируют блок целиком.
 const SELF_EMPLOYED = {
   fullName: "Головий Наталья Ярославна",
   inn: "622809740837",
   status: "Самозанятый, плательщик НПД (налог на профессиональный доход)",
-  service: "Recruiter Radar — ежедневный радар по компаниям с активным наймом",
+  service: "Recruiter Radar — ежедневный радар по компаниям с активным наймом",
   email: "6uunn9@gmail.com",
 };
 
@@ -34,7 +34,7 @@ export default function LegalPage() {
         <SectionIntro
           eyebrow="Реквизиты"
           title="Реквизиты оператора сервиса"
-          description="Оператор сервиса Recruiter Radar — самозанятый, плательщик налога на профессиональный доход (НПД). Реквизиты указаны для приёма оплат через ЮKassa."
+          description="Оператор Recruiter Radar — самозанятый, плательщик налога на профессиональный доход (НПД). Реквизиты применяются при формировании чеков через ЮKassa."
         />
 
         <SurfaceCard>
@@ -64,18 +64,16 @@ export default function LegalPage() {
         <NoticeBox
           tone="info"
           title="ИНН для оплаты"
-          description="ИНН самозанятого указан на этой странице и применяется при формировании чеков через ЮKassa в соответствии с ФЗ-54."
+          description="Этот ИНН применяется при формировании чеков через ЮKassa в соответствии с ФЗ-54. Полные условия оказания услуг — в оферте."
         />
 
         <SurfaceCard padding="18px">
-          <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
-            <StatusBadge tone="neutral">Самозанятый · НПД</StatusBadge>
-            <StatusBadge tone="info">ИНН {SELF_EMPLOYED.inn}</StatusBadge>
-          </div>
-          <div style={{ marginTop: "14px", fontSize: "0.9em", color: "var(--c-text-secondary, #475569)" }}>
-            <Link href="/" style={{ color: "inherit", textDecoration: "underline" }}>
-              ← На главную Recruiter Radar
-            </Link>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap", fontSize: "0.92rem", color: "var(--c-text-secondary, #475569)" }}>
+            <Link href="/" style={{ color: "inherit", textDecoration: "underline" }}>← На главную</Link>
+            <span style={{ color: "var(--c-text-muted, #94a3b8)" }}>·</span>
+            <Link href="/terms" style={{ color: "inherit", textDecoration: "underline" }}>Оферта</Link>
+            <span style={{ color: "var(--c-text-muted, #94a3b8)" }}>·</span>
+            <Link href="/privacy" style={{ color: "inherit", textDecoration: "underline" }}>Конфиденциальность</Link>
           </div>
         </SurfaceCard>
       </section>

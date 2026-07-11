@@ -305,9 +305,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               key={item.step}
               className={hpStyles.featureSurfaceCardAlt}
             >
-              <StatusBadge tone="neutral" style={{ justifySelf: "start" }}>
-                {item.step}
-              </StatusBadge>
+              <span className={hpStyles.stepBadge}>{item.step}</span>
               <h3 className={hpStyles.stepTitle}>{item.title}</h3>
               <p className={hpStyles.stepText}>{item.text}</p>
             </SurfaceCard>
@@ -325,15 +323,18 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         <div className={hpStyles.pricingGrid}>
           {PUBLIC_PLANS.map((plan) => {
             const isYearly = plan.code === "yearly";
-            const highlight = plan.isPrimary || isYearly;
+            const isFeatured = plan.isPrimary;
             return (
               <SurfaceCard
                 key={plan.code}
-                className={highlight ? hpStyles.primaryPlanCard : hpStyles.secondaryPlanCard}
+                className={isFeatured ? hpStyles.primaryPlanCard : hpStyles.secondaryPlanCard}
               >
+                {isFeatured ? (
+                  <span className={hpStyles.planFlag}>Рекомендуем начать</span>
+                ) : null}
                 <div className={ppStyles.planPriceContainer}>
                   <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
-                    <StatusBadge tone={plan.isPrimary ? "info" : isYearly ? "info" : "neutral"} className={ppStyles.planBadge}>
+                    <StatusBadge tone={isFeatured ? "info" : "neutral"} className={ppStyles.planBadge}>
                       {plan.name}
                     </StatusBadge>
                     {isYearly ? (
@@ -351,7 +352,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
                 <Link
                   href={buildCheckoutHref({ ...previewInput, planCode: plan.code })}
-                  className={plan.isPrimary ? ppStyles.primaryAction : ppStyles.secondaryAction}
+                  className={isFeatured ? ppStyles.primaryAction : ppStyles.secondaryAction}
                 >
                   {plan.ctaLabel}
                 </Link>
@@ -389,21 +390,39 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       </ScrollReveal>
 
       <footer className={hpStyles.siteFooter}>
-        <div className={hpStyles.footerBrand}>
-          <div className={hpStyles.footerBrandName}>Recruiter Radar</div>
-          <div className={hpStyles.footerBrandSub}>Ежедневный радар по компаниям с активным наймом</div>
+        <div className={hpStyles.footerTop}>
+          <div className={hpStyles.footerBrand}>
+            <div className={hpStyles.footerBrandName}>Recruiter Radar</div>
+            <div className={hpStyles.footerBrandSub}>
+              Ежедневный радар по компаниям с активным наймом. Доставка в Telegram.
+            </div>
+          </div>
+
+          <div className={hpStyles.footerOperator}>
+            <div className={hpStyles.footerOperatorLabel}>Оператор сервиса</div>
+            <div className={hpStyles.footerOperatorRow}>
+              <strong>Головий Наталья Ярославна</strong>
+            </div>
+            <div className={hpStyles.footerOperatorRow}>
+              <span>Самозанятый, плательщик НПД</span>
+              <span className={hpStyles.footerOperatorSep}>·</span>
+              <span>ИНН <span className={hpStyles.footerOperatorInn}>622809740837</span></span>
+            </div>
+            <div className={hpStyles.footerOperatorRow}>
+              <span>Оплата через ЮKassa, чек по ФЗ-54</span>
+              <span className={hpStyles.footerOperatorSep}>·</span>
+              <a href="mailto:6uunn9@gmail.com" style={{ color: "inherit", textDecoration: "underline" }}>6uunn9@gmail.com</a>
+            </div>
+          </div>
         </div>
+
         <nav className={hpStyles.footerLinks}>
           <Link href="/legal" className={hpStyles.footerLink}>Реквизиты</Link>
           <Link href="/terms" className={hpStyles.footerLink}>Оферта</Link>
           <Link href="/privacy" className={hpStyles.footerLink}>Конфиденциальность</Link>
-          <Link href="/admin" className={hpStyles.footerLink}>Оператор</Link>
-          <a href="mailto:6uunn9@gmail.com" className={hpStyles.footerLink}>6uunn9@gmail.com</a>
+          <Link href="/admin" className={hpStyles.footerLink}>Панель оператора</Link>
         </nav>
-        <div className={hpStyles.footerLegal}>
-          Оператор — Головий Наталья Ярославна, самозанятый (НПД). ИНН 622809740837.
-          Оплата через ЮKassa, чек по ФЗ-54.
-        </div>
+
         <div className={hpStyles.footerCopy}>
           © {new Date().getFullYear()} Recruiter Radar
         </div>
