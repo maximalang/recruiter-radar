@@ -19,7 +19,7 @@ Russia-first, evidence-first, premium client-intelligence radar for recruitment 
 
 **Core loop:** Landing → live preview → pilot activation → client profile → Telegram → daily digest → feedback buttons → suppression/reweighting → better digests.
 
-**Tech:** Next.js + Postgres for product core. n8n for orchestration only (schedules, retries, webhook fan-out, alerts). Core business logic (scoring, entity resolution, confidence gates, billing, suppression, digest/feedback state, prompt versioning) **never** lives in n8n.
+**Tech:** Next.js + Postgres for product core. Orchestration via cron-trigger + `/api/cron/daily-radar` (VPS crontab in prod, replacing Railway cron-trigger); n8n is decommissioned and NOT deployed. Core business logic (scoring, entity resolution, confidence gates, billing, suppression, digest/feedback state, prompt versioning) **never** lives in external orchestration — always in app code.
 
 ## Quality Principles
 
@@ -68,7 +68,7 @@ After code changes:
 - Run `npm run web:build` only if routes/middleware/`next.config.*` changed, OR `web:check` passed and patch is commit-ready
 - Do NOT loop check/build. If check fails: one focused fix pass, then stop.
 
-If migrations changed: inspect schema consistency, mention how to apply. If n8n workflow changed: confirm no secrets in JSON. If Telegram webhook changed: describe auth, idempotency, replay-safety, callback ack.
+If migrations changed: inspect schema consistency, mention how to apply (applied automatically via `docker-entrypoint.sh` on container start, or manually via `psql`). If Telegram webhook changed: describe auth, idempotency, replay-safety, callback ack.
 
 ## Code Standards
 
@@ -118,4 +118,4 @@ If any step fails or is skipped, the patch is NOT ready to merge — report hone
 
 ## Memory
 
-Auto-memory files live in `memory/`. Index is `MEMORY.md`. See user-level instructions for memory protocol.
+Auto-memory is **user-scoped** per-project: `~/.claude/projects/<project-slug>/memory/`, index is `MEMORY.md`. The repo-local `memory/` dir is a stale legacy duplicate (git-tracked, last touched 2026-06) — do NOT write new auto-memory there; it is not loaded into session context. See user-level instructions for memory protocol.

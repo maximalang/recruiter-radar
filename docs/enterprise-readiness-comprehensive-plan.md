@@ -1,11 +1,8 @@
----
-name: enterprise-readiness-comprehensive-plan
-description: Comprehensive enterprise readiness implementation plan with detailed phases
-metadata:
-  type: project
----
-
 # Enterprise-Readiness Comprehensive Implementation Plan
+
+> Мигрировано из устаревшего `memory/enterprise-readiness-comprehensive-plan.md` (2026-06-01).
+> Дополняет `docs/enterprise-readiness-evaluation.md` и `docs/enterprise-readiness-progress-report.md`.
+> Часть пунктов Phase 1 уже COMPLETED — проверь актуальность по user-scoped auto-memory перед работой.
 
 ## Текущая оценка: 65% enterprise-ready
 
@@ -29,6 +26,10 @@ metadata:
 - [ ] Усилить client-level изоляцию
 
 #### 1.2 RBAC System - Приоритет 1 ✅ COMPLETED
+
+> Примечание 2026-07: middleware/RBAC-остров был удалён как unreachable
+> (см. auto-memory `project_cleanup_dead_island`). Проверь, какие из этих
+> пунктов реально живут в коде сейчас, прежде чем считать completed.
 
 **Increment 1.2.1: Database schema** ✅ COMPLETED
 - [x] Создать таблицу roles с user_type enum
