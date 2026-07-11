@@ -75,7 +75,12 @@ jobs:
 
       - name: Verify public HTTPS endpoint
         run: |
-          sleep 5
-          code=$(curl -s -o /dev/null -w '%{http_code}' https://recruiter-radar.ru/api/health --max-time 30)
-          echo "Public /api/health -> HTTP $code"
-          if [ "$code" != "200" ]; then echo "WARNING: public health check returned $code"; fi
+          # Retry loop: Caddy may briefly 502 while the recreated web container
+          # finishes booting (Next.js ready ~2-4s after container health passes).
+          for i in $(seq 1 10); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' https://recruiter-radar.ru/api/health --max-time 30)
+            echo "Public /api/health attempt $i -> HTTP $code"
+            if [ "$code" = "200" ]; then echo "Public endpoint healthy"; exit 0; fi
+            sleep 3
+          done
+          echo "WARNING: public health check did not reach 200 after 10 attempts (last: $code)"
