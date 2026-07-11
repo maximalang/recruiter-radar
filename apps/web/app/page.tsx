@@ -45,56 +45,25 @@ type HomePageProps = {
 type HomePreviewItem = Awaited<ReturnType<typeof getPublicSampleDigestState>>["items"][number];
 
 const heroTrust = [
-  { value: "Только подтверждённый найм", label: "не список «на всякий случай», а живые доказательства" },
-  { value: "Доставка в Telegram", label: "короткий дайджест каждое утро, без рутины" },
+  { value: "Только подтверждённый найм", label: "живые доказательства, не список «на всякий случай»" },
   { value: "2 990 ₽ за пилот", label: "чек самозанятого, оплата через ЮKassa" },
-] as const;
-
-const valueItems = [
-  {
-    title: "Короткий список тех, кто нанимает прямо сейчас",
-    text: "Каждое утро — несколько компаний с подтверждённым наймом, понятным поводом для контакта и готовой фразой для первого сообщения."
-  },
-  {
-    title: "Доказательства, а не догадки",
-    text: "По каждой компании видно, откуда мы знаем про найм, насколько сильный сигнал и какие есть риски. Решение опирается на факты, а не на интуицию."
-  },
-  {
-    title: "С чего начинать разговор",
-    text: "Радар подсказывает рабочий и корректный путь контакта — карьерная страница, HR-канал или корпоративная форма, без холодных рассылок."
-  }
-] as const;
-
-const workflowItems = [
-  {
-    title: "Для соло-рекрутера",
-    text: "Каждое утро открыть радар и сразу забрать в работу 3–5 компаний — без ручного поиска и холодных списков."
-  },
-  {
-    title: "Для агентства",
-    text: "Отдельный профиль под каждую практику: промышленный подбор, финансы, IT — каждый видит свой спрос."
-  },
-  {
-    title: "Для команды BD",
-    text: "Выходить на компании не наугад, а там, где есть понятный повод для разговора прямо сейчас."
-  }
 ] as const;
 
 const howItWorksItems = [
   {
     step: "01",
     title: "Задайте профиль",
-    text: "Город, специализация и пара ключевых слов. Этого хватает, чтобы радар начал собираться под вас."
+    text: "Город, специализация, пара ключевых слов."
   },
   {
     step: "02",
     title: "Посмотрите пример",
-    text: "Сразу видно, какие компании попадают в фокус, почему мы считаем, что они нанимают, и с чего лучше начинать разговор."
+    text: "Видно, кто нанимает, почему и с чего начинать разговор."
   },
   {
     step: "03",
     title: "Подключите Telegram",
-    text: "После пилота радар приходит каждый день в Telegram. Отмечаете «беру» или «мимо» — и радар учится под вашу обратную связь."
+    text: "Радар приходит каждый день. Отметки «беру» / «мимо» его доучивают."
   }
 ] as const;
 
@@ -135,8 +104,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           <span className={hpStyles.heroEyebrow}>Для рекрутинговых агентств и BD-команд</span>
           <h1 className={hpStyles.heroTitle}>Радар компаний, которые нанимают прямо сейчас.</h1>
           <p className={hpStyles.heroSubtitle}>
-            Каждый день — короткий список работодателей с подтверждённым наймом, готовым поводом
-            для контакта и рабочим путём первого сообщения. Доставка в Telegram, без CRM и холодных рассылок.
+            Короткий список нанимающих компаний — с готовым поводом для контакта. Каждый день в Telegram.
           </p>
           <div className={hpStyles.heroActions}>
             <a href="#preview" className={ppStyles.primaryAction}>
@@ -157,31 +125,11 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         </div>
       </section>
 
-      <ScrollReveal as="section" className={hpStyles.scrollSection}>
-        <SectionIntro
-          eyebrow="Что вы получаете каждое утро"
-          title="Один дайджест. Несколько компаний. По каждой — три вещи."
-          description="Не база на тысячи строк и не поток вакансий. Короткий список работодателей, по которому понятно, кому писать сегодня и с чего начинать."
-        />
-
-        <div className={hpStyles.stepsGrid}>
-          {valueItems.map((item) => (
-            <SurfaceCard
-              key={item.title}
-              className={hpStyles.featureSurfaceCard}
-            >
-              <h3 className={hpStyles.stepTitle}>{item.title}</h3>
-              <p className={hpStyles.stepText}>{item.text}</p>
-            </SurfaceCard>
-          ))}
-        </div>
-      </ScrollReveal>
-
       <ScrollReveal as="section" id="preview" className={hpStyles.scrollSection}>
         <SectionIntro
           eyebrow="Живой пример"
           title="Так выглядит утренний радар"
-          description="Задайте город и специализацию — и сразу увидите, какие компании стоит брать в работу сегодня. Это те же данные, что приходят в Telegram каждый день."
+          description="Каждое утро — несколько компаний. По каждой: почему мы знаем про найм, с чего начать разговор и какой есть риск. Задайте город и специализацию — это те же данные, что приходят в Telegram."
         />
 
         <div className={hpStyles.previewGrid}>
@@ -346,24 +294,6 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
       <ScrollReveal as="section" className={hpStyles.scrollSection}>
         <SectionIntro
-          eyebrow="Для кого"
-          title="Подходит под реальный процесс команды"
-          description="Не требует долгого внедрения и не заставляет менять привычный ход работы."
-        />
-
-        <div className={hpStyles.audienceStrip}>
-          {workflowItems.map((item, i) => (
-            <div key={item.title} className={hpStyles.audienceCard}>
-              <div className={hpStyles.audienceLabel}>0{i + 1}</div>
-              <h3 className={hpStyles.audienceTitle}>{item.title}</h3>
-              <p className={hpStyles.audienceText}>{item.text}</p>
-            </div>
-          ))}
-        </div>
-      </ScrollReveal>
-
-      <ScrollReveal as="section" className={hpStyles.scrollSection}>
-        <SectionIntro
           eyebrow="Как это работает"
           title="Три шага до первого радара"
           description="От примера до ежедневной работы без лишней настройки."
@@ -389,7 +319,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         <SectionIntro
           eyebrow="Тарифы"
           title="Один продукт — три срока"
-          description="Во всех тарифах одинаковые возможности: радар, профиль, доставка в Telegram и обратная связь. Отличается только срок."
+          description="Возможности везде одинаковые. Отличается только срок."
         />
 
         <div className={hpStyles.pricingGrid}>
@@ -417,16 +347,6 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                     ) : null}
                   </div>
                   <div className={ppStyles.planPriceCadence}>{plan.cadence}</div>
-                  <p className={ppStyles.planDescription}>{plan.description}</p>
-                </div>
-
-                <div className={ppStyles.planFeatures}>
-                  {plan.bullets.map((bullet) => (
-                    <div key={bullet} className={hpStyles.featureRow}>
-                      <span className={hpStyles.featureDot} />
-                      <span>{bullet}</span>
-                    </div>
-                  ))}
                 </div>
 
                 <Link
@@ -440,10 +360,18 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           })}
         </div>
 
-        <p className={ppStyles.helperText} style={{ textAlign: "center", marginTop: "4px" }}>
-          Оплата через ЮKassa, чек по ФЗ-54 с ИНН самозанятого. Условия — в{" "}
-          <Link href="/terms" style={{ color: "var(--c-brand)", textDecoration: "underline" }}>оферте</Link>.
-        </p>
+        <div className={hpStyles.includedOnce}>
+          <div className={hpStyles.includedOnceLabel}>В любой тариф входит</div>
+          <ul className={hpStyles.includedOnceList}>
+            {PUBLIC_PLANS[0].bullets.map((bullet) => (
+              <li key={bullet}>{bullet}</li>
+            ))}
+          </ul>
+          <p className={ppStyles.helperText} style={{ marginTop: "4px" }}>
+            Оплата через ЮKassa, чек по ФЗ-54. Условия — в{" "}
+            <Link href="/terms" style={{ color: "var(--c-brand)", textDecoration: "underline" }}>оферте</Link>.
+          </p>
+        </div>
       </ScrollReveal>
 
       <ScrollReveal as="section" className={hpStyles.scrollSection}>
