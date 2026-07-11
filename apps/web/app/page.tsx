@@ -44,44 +44,10 @@ type HomePageProps = {
 
 type HomePreviewItem = Awaited<ReturnType<typeof getPublicSampleDigestState>>["items"][number];
 
-const heroProofItems = [
-  "3 минуты — и видно, кому писать сегодня",
-  "Живой hiring-proof по каждой компании",
-  "Понятно, почему сейчас и готовый угол контакта"
-] as const;
-
-const heroStats = [
-  {
-    value: "3 минуты",
-    label: "от входа до первого радара"
-  },
-  {
-    value: "Без регистрации",
-    label: "просто укажите нишу и регион"
-  },
-  {
-    value: "0 настроек",
-    label: "никакой CRM и длинного внедрения"
-  }
-] as const;
-
-const heroSignalRows = [
-  {
-    label: "Сигнал",
-    value: "живой найм по нескольким ролям, подтверждённый с разных источников"
-  },
-  {
-    label: "Gate",
-    value: "A — 2+ независимых источника, чистое совпадение"
-  },
-  {
-    label: "Почему сейчас",
-    value: "hiring burst, новый регион, дефицитная функция — понятный повод для контакта"
-  },
-  {
-    label: "Угол контакта",
-    value: "корпоративная карьерная страница + готовый оупенер"
-  }
+const heroTrust = [
+  { value: "Gate A–B", label: "только компании с подтверждённым наймом" },
+  { value: "Telegram", label: "дайджест каждый день, без рутины" },
+  { value: "ФЗ-54", label: "чек самозанятого, оплата через ЮKassa" },
 ] as const;
 
 const valueItems = [
@@ -162,80 +128,33 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
       <section id="main-content" className={hpStyles.heroSection} aria-label="Recruiter Radar">
         <RadarCanvas />
-        <div className={`${hpStyles.heroGrid} ${hpStyles.heroContent}`}>
-          <SurfaceCard className={hpStyles.surfaceCardGradient}>
-            <StatusBadge tone="success">Сначала пример. Потом решение.</StatusBadge>
-
-            <div>
-              <h1 className={hpStyles.heroTitle} style={{ lineHeight: "0.95" }}>Компании, которым стоит написать сегодня.</h1>
-              <p className={hpStyles.heroText}>
-                Recruiter Radar каждый день находит работодателей с живым наймом, показывает
-                причину сигнала и подсказывает лучший угол первого контакта.
-              </p>
-            </div>
-
-            <div className={hpStyles.proofGrid}>
-              {heroProofItems.map((item) => (
-                <div key={item} className={hpStyles.proofItem}>
-                  <span className={hpStyles.featureDot} />
-                  <span>{item}</span>
-                </div>
-              ))}
-            </div>
-
-            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-              <a href="#preview" className={ppStyles.primaryAction}>
-                Открыть пример радара
-              </a>
-              <Link href={checkoutHref} className={ppStyles.secondaryAction}>
-                Запустить пилот — 2 990 ₽
-              </Link>
-            </div>
-
-            <div className={hpStyles.heroStatGrid}>
-              {heroStats.map((item) => (
-                <div key={item.label} className={hpStyles.mutedPanel}>
-                  <div className={hpStyles.heroStatValue}>{item.value}</div>
-                  <div className={hpStyles.heroStatLabel}>{item.label}</div>
-                </div>
-              ))}
-            </div>
-
-            <div className={hpStyles.heroFootnote}>
-              Не CRM и не база “на всякий случай”. Это рабочий радар, который каждый день поднимает
-              только те компании, где уже есть повод выйти в контакт.
-            </div>
-          </SurfaceCard>
-
-          <SurfaceCard className={hpStyles.surfaceCardDark}>
-            <div className={hpStyles.signalRow}>
-              <div className={hpStyles.signalEyebrow}>Пример сигнала</div>
-              <div className={hpStyles.signalTitle}>Northline Recruiting Ops</div>
-              <div className={hpStyles.signalText}>
-                Свежий найм по 3 ролям, подтверждённый из 2 источников. Gate A — можно работать сразу.
+        <div className={hpStyles.heroContent}>
+          <span className={hpStyles.heroEyebrow}>Сначала пример. Потом решение.</span>
+          <h1 className={hpStyles.heroTitle}>Компании, которым стоит написать сегодня.</h1>
+          <p className={hpStyles.heroSubtitle}>
+            Recruiter Radar каждый день находит работодателей с живым наймом, показывает причину
+            сигнала и подсказывает безопасный угол первого контакта — без CRM, без базы «на всякий случай».
+          </p>
+          <div className={hpStyles.heroActions}>
+            <a href="#preview" className={ppStyles.primaryAction}>
+              Открыть пример радара
+            </a>
+            <Link href={checkoutHref} className={ppStyles.secondaryAction}>
+              Запустить пилот — 2 990 ₽
+            </Link>
+          </div>
+          <div className={hpStyles.heroTrust}>
+            {heroTrust.map((item) => (
+              <div key={item.label} className={hpStyles.heroTrustItem}>
+                <div className={hpStyles.heroTrustValue}>{item.value}</div>
+                <div className={hpStyles.heroTrustLabel}>{item.label}</div>
               </div>
-            </div>
-
-            <div style={{ display: "grid", gap: "10px" }}>
-              {heroSignalRows.map((item) => (
-                <div key={item.label} className={hpStyles.signalRow}>
-                  <div className={hpStyles.signalLabel}>{item.label}</div>
-                  <div className={hpStyles.signalValue}>{item.value}</div>
-                </div>
-              ))}
-            </div>
-
-            <div className={hpStyles.whatUserGetsBox}>
-              <div className={hpStyles.userGetsLabel}>Что получает пользователь</div>
-              <div className={hpStyles.userGetsText}>
-                Компании, которым стоит написать сегодня — с confidence, доказательствами, почему сейчас и готовым углом контакта.
-              </div>
-            </div>
-          </SurfaceCard>
+            ))}
+          </div>
         </div>
       </section>
 
-      <ScrollReveal as="section" style={{ display: "grid", gap: "16px" }}>
+      <ScrollReveal as="section" className={hpStyles.scrollSection}>
         <SectionIntro
           eyebrow="Что получает команда"
           title="Продукт, который помогает продавать подбор быстрее"
@@ -255,7 +174,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         </div>
       </ScrollReveal>
 
-      <ScrollReveal as="section" id="preview" style={{ display: "grid", gap: "16px" }}>
+      <ScrollReveal as="section" id="preview" className={hpStyles.scrollSection}>
         <SectionIntro
           eyebrow="Живой пример"
           title="Посмотрите радар под свой профиль"
@@ -422,27 +341,25 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         </div>
       </ScrollReveal>
 
-      <ScrollReveal as="section" style={{ display: "grid", gap: "16px" }}>
+      <ScrollReveal as="section" className={hpStyles.scrollSection}>
         <SectionIntro
           eyebrow="Как это встраивается в работу"
           title="Подходит под реальный процесс команды"
           description="Не требует долгого внедрения и не заставляет менять привычный workflow."
         />
 
-        <div className={hpStyles.stepsGrid}>
-          {workflowItems.map((item) => (
-            <SurfaceCard
-              key={item.title}
-              className={hpStyles.featureSurfaceCardAlt}
-            >
-              <h3 className={hpStyles.stepTitle}>{item.title}</h3>
-              <p className={hpStyles.stepText}>{item.text}</p>
-            </SurfaceCard>
+        <div className={hpStyles.audienceStrip}>
+          {workflowItems.map((item, i) => (
+            <div key={item.title} className={hpStyles.audienceCard}>
+              <div className={hpStyles.audienceLabel}>0{i + 1}</div>
+              <h3 className={hpStyles.audienceTitle}>{item.title}</h3>
+              <p className={hpStyles.audienceText}>{item.text}</p>
+            </div>
           ))}
         </div>
       </ScrollReveal>
 
-      <ScrollReveal as="section" style={{ display: "grid", gap: "16px" }}>
+      <ScrollReveal as="section" className={hpStyles.scrollSection}>
         <SectionIntro
           eyebrow="Как это работает"
           title="Три шага до первого радара"
@@ -465,7 +382,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         </div>
       </ScrollReveal>
 
-      <ScrollReveal as="section" style={{ display: "grid", gap: "16px" }}>
+      <ScrollReveal as="section" className={hpStyles.scrollSection}>
         <SectionIntro
           eyebrow="Тарифы"
           title="Один продукт — три срока"
@@ -526,7 +443,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         </p>
       </ScrollReveal>
 
-      <ScrollReveal as="section" style={{ display: "grid", gap: "10px" }}>
+      <ScrollReveal as="section" className={hpStyles.scrollSection}>
         <SectionIntro
           eyebrow="FAQ"
           title="Коротко перед запуском"
@@ -540,7 +457,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         ))}
       </ScrollReveal>
 
-      <ScrollReveal as="section" style={{ display: "grid", gap: "16px" }}>
+      <ScrollReveal as="section" className={hpStyles.scrollSection}>
         <SectionIntro
           eyebrow="Как вы получите доступ"
           title="Доступ — цифровой, без физической доставки"

@@ -5,27 +5,35 @@
   gap: var(--space-section);
   align-items: center;
   flex-wrap: wrap;
+  padding: 4px 2px;
 }
 
-/* Hero grid */
-.heroGrid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
-  gap: var(--space-section);
-  align-items: stretch;
-}
-
-/* Hero wrapper with animated radar background */
+/* Hero wrapper with animated radar background — full-bleed, single column.
+   The radar canvas is the backdrop; content floats above it. No competing
+   right-hand card: that card duplicated the live preview further down. */
 .heroSection {
   position: relative;
   overflow: hidden;
   border-radius: var(--radius-card);
-  margin-bottom: var(--space-section);
+  margin-bottom: var(--space-section-lg);
+  min-height: clamp(420px, 56vh, 620px);
+  display: grid;
+  align-content: center;
+  background:
+    radial-gradient(120% 120% at 78% 18%, rgba(37, 99, 235, 0.16) 0%, transparent 46%),
+    radial-gradient(90% 90% at 12% 88%, rgba(30, 64, 175, 0.12) 0%, transparent 50%),
+    linear-gradient(180deg, #0b1220 0%, #111c34 100%);
+  color: #f8fafc;
+  box-shadow: 0 30px 80px rgba(15, 23, 42, 0.28);
 }
 
 .heroContent {
   position: relative;
   z-index: 1;
+  display: grid;
+  gap: 22px;
+  padding: clamp(40px, 7vw, 88px) clamp(22px, 5vw, 72px);
+  max-width: 920px;
 }
 
 /* Yearly plan savings badge */
@@ -56,93 +64,131 @@
   color: var(--c-text-secondary);
 }
 
-/* Hero title */
+/* Hero eyebrow pill above the title */
+.heroEyebrow {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(147, 197, 253, 0.32);
+  background: rgba(59, 130, 246, 0.14);
+  color: #cfe0ff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  backdrop-filter: blur(6px);
+}
+
+/* Hero title — wide, large, premium. Was max-width:11ch which chopped the line. */
 .heroTitle {
   margin: 0;
-  font-size: var(--fs-3xl);
-  line-height: 0.95;
-  letter-spacing: -0.06em;
-  max-width: 11ch;
-}
-
-/* Hero text */
-.heroText {
-  margin: 0;
-  max-width: 720px;
-  color: var(--c-text-secondary);
-  font-size: var(--fs-base);
-  line-height: 1.7;
-}
-
-/* Hero footnote */
-.heroFootnote {
-  color: var(--c-text-muted);
-  font-size: var(--fs-base);
-  line-height: 1.62;
-  max-width: 72ch;
-}
-
-/* Hero stat grid */
-.heroStatGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 12px;
-}
-
-/* Hero stat value */
-.heroStatValue {
-  font-size: var(--fs-lg);
+  font-size: clamp(2.3rem, 5.4vw, 4.1rem);
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+  max-width: 18ch;
   font-weight: 800;
-  color: var(--c-text-primary);
+  color: #ffffff;
+  text-wrap: balance;
 }
 
-/* Hero stat label */
-.heroStatLabel {
-  color: var(--c-text-muted);
-  font-size: var(--fs-sm);
-  line-height: 1.45;
+/* Hero subtitle — one calm sentence, generous size */
+.heroSubtitle {
+  margin: 0;
+  max-width: 56ch;
+  color: rgba(241, 245, 249, 0.82);
+  font-size: clamp(1.02rem, 1.5vw, 1.2rem);
+  line-height: 1.6;
+  font-weight: 400;
 }
 
-/* Muted panel */
-.mutedPanel {
-  padding: 14px 16px;
-  border-radius: var(--radius-card-sm);
-  border: 1px solid rgba(148, 163, 184, 0.14);
-  background-color: rgba(255, 255, 255, 0.72);
-  display: grid;
-  gap: 4px;
-  backdrop-filter: blur(8px);
-}
-
-/* Proof grid */
-.proofGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 10px;
-}
-
-/* Proof item */
-.proofItem {
+/* Hero action row */
+.heroActions {
   display: flex;
-  gap: 10px;
+  gap: 14px;
+  flex-wrap: wrap;
   align-items: center;
-  padding: 12px 14px;
-  border-radius: var(--radius-card-sm);
-  border: 1px solid var(--c-border);
-  background-color: var(--c-bg-card);
-  color: var(--c-text-primary);
-  font-weight: 600;
-  backdrop-filter: blur(8px);
 }
 
-/* Metric row */
-.metricRow {
+/* Hero trust strip — replaces the old dense stat grid + footnote */
+.heroTrust {
   display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  color: #344054;
-  padding-bottom: 10px;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  gap: 26px;
+  flex-wrap: wrap;
+  align-items: center;
+  padding-top: 8px;
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+  margin-top: 6px;
+}
+
+.heroTrustItem {
+  display: grid;
+  gap: 2px;
+}
+
+.heroTrustValue {
+  font-size: 1.02rem;
+  font-weight: 800;
+  color: #f8fafc;
+  line-height: 1.1;
+}
+
+.heroTrustLabel {
+  color: rgba(203, 213, 225, 0.78);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+/* Vertical air between landing sections — the old 16-18px gaps made the page
+   feel cramped for a premium product. Applied via .scrollSection wrappers. */
+.scrollSection {
+  display: grid;
+  gap: 20px;
+  padding: clamp(28px, 4vw, 52px) 0;
+}
+
+.scrollSection:first-of-type {
+  padding-top: 0;
+}
+
+/* Audience strip — compact "для кого" row, breaks the monotony of three
+   identical 3-card grids in a row (value / workflow / howItWorks). */
+.audienceStrip {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.audienceCard {
+  display: grid;
+  gap: 6px;
+  padding: 22px 24px;
+  border-radius: var(--radius-card-sm);
+  border: 1px solid var(--c-border, rgba(15, 23, 42, 0.08));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(244, 248, 255, 0.7) 100%);
+}
+
+.audienceLabel {
+  color: var(--c-brand, #1d4ed8);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.audienceTitle {
+  margin: 0;
+  font-size: 1.06rem;
+  font-weight: 700;
+  color: var(--c-text-primary, #0f172a);
+}
+
+.audienceText {
+  margin: 0;
+  color: var(--c-text-muted, #667085);
+  line-height: 1.6;
+  font-size: 0.92rem;
 }
 
 /* Preview grid */
@@ -200,27 +246,6 @@
   line-height: 1.58;
 }
 
-/* Opener box */
-.openerBox {
-  padding: 13px 14px;
-  border-radius: 16px;
-  border: 1px solid rgba(15, 23, 42, 0.07);
-  background-color: #fbfcfd;
-  color: #344054;
-  line-height: 1.6;
-  display: grid;
-  gap: 6px;
-}
-
-/* Opener label */
-.openerLabel {
-  color: #667487;
-  font-size: 0.76rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
 /* Steps grid */
 .stepsGrid {
   display: grid;
@@ -263,13 +288,6 @@
   gap: 16px;
   border: 1px solid rgba(15, 23, 42, 0.06);
   background-color: rgba(255,255,255,0.8);
-}
-
-/* Plan description */
-.planDescription {
-  margin: 0;
-  color: #445164;
-  line-height: 1.65;
 }
 
 /* Feature row */
@@ -329,40 +347,6 @@
 }
 
 /* Gradient surface cards (home page) */
-.surfaceCardGradient {
-  display: grid;
-  gap: var(--space-card-padding-lg);
-  padding: var(--space-card-padding-lg);
-  background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(239,246,255,0.94) 100%);
-}
-
-.surfaceCardDark {
-  display: grid;
-  gap: var(--space-section);
-  padding: var(--space-card-padding);
-  background: linear-gradient(180deg, #0f172a 0%, #172554 100%);
-  color: #f8fafc;
-  border: 1px solid rgba(59, 130, 246, 0.18);
-}
-
-.signalRow {
-  display: grid;
-  gap: 4px;
-  padding: 14px 16px;
-  border-radius: var(--radius-card-sm);
-  background-color: rgba(255,255,255,0.06);
-  border: 1px solid rgba(148, 163, 184, 0.16);
-}
-
-.whatUserGetsBox {
-  display: grid;
-  gap: 8px;
-  padding: 16px;
-  border-radius: var(--radius-card-sm);
-  background: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.04) 100%);
-  border: 1px solid rgba(191, 219, 254, 0.18);
-}
-
 .previewCardContainer {
   display: grid;
   gap: 14px;
@@ -383,46 +367,6 @@
   gap: 10px;
   padding: var(--space-card-padding);
   background: rgba(255,255,255,0.86);
-}
-
-.signalEyebrow {
-  color: rgba(191, 219, 254, 0.9);
-  font-size: 0.78rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.signalTitle {
-  font-size: 1.28rem;
-  font-weight: 800;
-}
-
-.signalText {
-  color: #e2e8f0;
-  line-height: 1.6;
-}
-
-.signalLabel {
-  color: #93c5fd;
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-
-.signalValue {
-  color: #f8fafc;
-  line-height: 1.55;
-}
-
-.userGetsLabel {
-  color: #93c5fd;
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-
-.userGetsText {
-  color: #e2e8f0;
-  line-height: 1.6;
 }
 
 .heroBrandName {
@@ -505,16 +449,23 @@
 
 /* ===================== Mobile responsiveness ===================== */
 
-@media (max-width: 960px) {
-  .heroGrid {
-    grid-template-columns: 1fr;
-  }
-}
-
 @media (max-width: 720px) {
+  .heroSection {
+    min-height: auto;
+    align-content: start;
+  }
+
+  .heroContent {
+    padding: 36px 20px 32px;
+    gap: 18px;
+  }
+
   .heroTitle {
-    font-size: 1.7rem;
-    max-width: none;
+    font-size: clamp(1.9rem, 8vw, 2.4rem);
+  }
+
+  .heroTrust {
+    gap: 18px 22px;
   }
 
   .topBar {
@@ -539,11 +490,6 @@
 }
 
 @media (max-width: 560px) {
-  .heroTitle {
-    font-size: 1.5rem;
-    line-height: 1.05;
-  }
-
   .stepsGrid {
     grid-template-columns: 1fr !important;
   }
@@ -558,14 +504,6 @@
 
   .footerLinks {
     gap: 12px;
-  }
-
-  .heroText {
-    font-size: 0.95rem;
-  }
-
-  .heroFootnote {
-    font-size: 0.9rem;
   }
 }
 
