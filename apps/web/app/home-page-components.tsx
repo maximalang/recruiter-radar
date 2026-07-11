@@ -1,25 +1,6 @@
-import styles from "./home-page-components.module.css";
+import { formatVacanciesCount } from "../lib/format/plural";
 
-export function MetricRow(props: { label: string; value: string }) {
-  return (
-    <div className={styles.metricRow}>
-      <strong>{props.label}</strong>
-      <span>{props.value}</span>
-    </div>
-  );
-}
-
-export function formatVacanciesCount(value: number): string {
-  if (value === 1) {
-    return "1 вакансия";
-  }
-
-  if (value >= 2 && value <= 4) {
-    return `${value} вакансии`;
-  }
-
-  return `${value} вакансий`;
-}
+export { formatVacanciesCount };
 
 export function buildFaqItems(paymentConfigured: boolean) {
   return [
@@ -45,5 +26,3 @@ export function buildFaqItems(paymentConfigured: boolean) {
     }
   ] as const;
 }
-
-export { styles as homePageStyles };

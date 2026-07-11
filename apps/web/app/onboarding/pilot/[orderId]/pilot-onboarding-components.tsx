@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import type { CheckoutOrder, CheckoutOrderOnboardingStep } from "../../../../lib/payments";
 import { NoticeBox } from "../../../ui/page-primitives";
 import { scoreBand, formatSignalStrength } from "../../../../lib/scoring/score-display";
+import { formatVacanciesCount } from "../../../../lib/format/plural";
 import styles from "./pilot-onboarding-components.module.css";
 
 /**
@@ -62,10 +63,6 @@ export function UnpaidState(props: { order: CheckoutOrder }) {
 
 export function formatCompanyCount(value: number): string {
   return `${value} ${value === 1 ? "компания" : value < 5 ? "компании" : "компаний"}`;
-}
-
-export function formatVacanciesCount(value: number): string {
-  return `${value} вакансий`;
 }
 
 export function formatDateTime(value: string | null): string {

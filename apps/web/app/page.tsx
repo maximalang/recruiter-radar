@@ -17,7 +17,7 @@ import {
   StatusBadge,
   SurfaceCard,
 } from "./ui/page-primitives";
-import ppStyles from "./page-primitives.module.css";
+import ppStyles from "./ui/page-primitives.module.css";
 import {
   buildFaqItems,
   formatVacanciesCount,

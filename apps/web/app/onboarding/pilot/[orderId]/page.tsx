@@ -47,12 +47,12 @@ import {
 } from "./actions";
 import { BrowserPushCard } from "./browser-push-card";
 import { TelegramStepAutoRefresh } from "./telegram-step-auto-refresh";
+import { formatVacanciesCount } from "../../../../lib/format/plural";
 import {
   InstructionCard,
   UnpaidState,
   formatCompanyCount,
   formatDateTime,
-  formatVacanciesCount,
   formatPreviewScore,
   translateOrderStatus,
   getCurrentStep,

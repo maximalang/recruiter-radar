@@ -21,6 +21,7 @@
 
 import { scoreBand, formatSignalStrength } from '@/lib/scoring/score-display'
 import { deriveRoleNames, splitRolesForDisplay, deriveUrgencyCue } from '@/lib/leads/lead-quality'
+import { pluralCompanies } from '@/lib/format/plural'
 import { escapeTelegramHtml as escapeHtml } from './html'
 
 /** Telegram hard limit per message. */
@@ -75,15 +76,6 @@ export interface BatchDigestInput {
 
 function formatDateRu(date: Date): string {
   return new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long' }).format(date)
-}
-
-/** Russian plural for "компания". */
-function pluralCompanies(n: number): string {
-  const mod10 = n % 10
-  const mod100 = n % 100
-  if (mod10 === 1 && mod100 !== 11) return 'компания'
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'компании'
-  return 'компаний'
 }
 
 /**

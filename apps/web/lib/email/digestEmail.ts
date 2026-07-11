@@ -11,6 +11,7 @@
 import type { LeadItem } from "../leads-data";
 import { scoreBand, formatSignalStrength } from "../scoring/score-display";
 import { buildWhyMatch, type WhyMatchProfile } from "../leads/why-match";
+import { pluralCompanies } from "../format/plural";
 
 export type DigestEmailContext = {
   /** Display name of the client profile this digest is for. */
@@ -314,15 +315,7 @@ function renderText(leads: LeadItem[], ctx: DigestEmailContext): string {
   return `${header}\n\n${body}\n`;
 }
 
-// --- Russian pluralization --------------------------------------------------
-
-function pluralCompanies(n: number): string {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod10 === 1 && mod100 !== 11) return "компания";
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return "компании";
-  return "компаний";
-}
+// --- Russian pluralization: see lib/format/plural.ts ------------------------
 
 // --- Public entry -----------------------------------------------------------
 
