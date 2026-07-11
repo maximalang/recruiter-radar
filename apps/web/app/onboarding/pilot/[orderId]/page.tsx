@@ -48,6 +48,7 @@ import {
 import { BrowserPushCard } from "./browser-push-card";
 import { TelegramStepAutoRefresh } from "./telegram-step-auto-refresh";
 import { formatVacanciesCount } from "../../../../lib/format/plural";
+import { getGatePresentation } from "../../../../lib/scoring/gate-labels";
 import {
   InstructionCard,
   UnpaidState,
@@ -813,9 +814,12 @@ function OnboardingPreviewCard(props: {
               </span>
             );
           })()}
-          {item.confidence_gate ? (
-            <span className={styles.previewChip}>Gate {item.confidence_gate}</span>
-          ) : null}
+          {(() => {
+            const gate = getGatePresentation(item.confidence_gate);
+            return gate ? (
+              <span className={styles.previewChip}>{gate.label}</span>
+            ) : null;
+          })()}
         </div>
         <span style={{ color: "#64748b", fontSize: "0.9rem" }}>{formatVacanciesCount(item.vacancies_count)}</span>
       </div>

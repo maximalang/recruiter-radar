@@ -10,6 +10,7 @@ import {
 } from "../lib/publicProduct";
 import { buildHhRadarProbabilitySummary } from "../lib/hhProbabilities";
 import { formatLawfulContactPath } from "../lib/leads-data";
+import { getGatePresentation } from "../lib/scoring/gate-labels";
 import {
   NoticeBox,
   PageFrame,
@@ -26,13 +27,6 @@ import hpStyles from "./home-page-components.module.css";
 import RadarCanvas from "./radar-canvas";
 import ScrollReveal from "./scroll-reveal";
 import ScrollProgress from "./scroll-progress";
-
-const GATE_CONFIG: Record<string, { color: string; bg: string; label: string }> = {
-  A: { color: '#065f46', bg: '#d1fae5', label: 'A — авто' },
-  B: { color: '#1e40af', bg: '#dbeafe', label: 'B — авто' },
-  C: { color: '#92400e', bg: '#fef3c7', label: 'C — проверка' },
-  D: { color: '#4b5563', bg: '#f3f4f6', label: 'D — контекст' },
-};
 
 export const dynamic = "force-dynamic";
 
@@ -253,7 +247,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                   <NoticeBox
                     tone="neutral"
                     title="Точных совпадений по нише пока нет"
-                    description="Показываем ближайшие компании по релевантности вашему ICP. На реальном радаре совпадений будет больше — sample-набор ограничен."
+                    description="Показываем ближайшие по релевантности компании. На реальном радаре совпадений будет больше — в примере выборка ограничена."
                   />
                 ) : null}
                 {visiblePreviewItems.map((item) => (
@@ -273,10 +267,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                       <div style={{ display: "grid", gap: "12px" }}>
                         {hiddenPreviewItems.map((item) => (
                           <PreviewDigestCard
-                    key={`${item.org_id}-${item.rank}`}
-                    item={item}
-                    showRelevance={previewState.isPersonalized}
-                  />
+                            key={`${item.org_id}-${item.rank}`}
+                            item={item}
+                            showRelevance={previewState.isPersonalized}
+                          />
                         ))}
                       </div>
                     </div>
@@ -446,7 +440,7 @@ function PreviewRelevanceBars(props: { signals: HomePreviewItem["relevanceSignal
   return (
     <div className={hpStyles.previewReasonList}>
       <div style={{ color: "#667085", fontSize: "0.78rem", fontWeight: 700 }}>
-        Оценка релевантности вашему ICP
+        Оценка релевантности вашему профилю
       </div>
       <div style={{ display: "grid", gap: "6px" }}>
         {RELEVANCE_AXES.map((axis) => {
@@ -488,6 +482,7 @@ function PreviewDigestCard(props: {
   const probability = buildHhRadarProbabilitySummary({
     totalScore: item.total_score
   });
+  const gatePresentation = getGatePresentation(item.confidence_gate);
   const whyNow = item.reasons[0] || "";
   const contactPath = formatLawfulContactPath(item.lawfulContactPath);
   const negativeSignals = item.negativeSignals;
@@ -502,11 +497,11 @@ function PreviewDigestCard(props: {
             {item.rank}. {item.employer_name}
           </strong>
           <span className={hpStyles.scorePill}>{probability.workNowText}</span>
-          {item.confidence_gate && item.confidence_gate in GATE_CONFIG && (
+          {gatePresentation ? (
             <span className={ppStyles.gateBadge} data-gate={item.confidence_gate}>
-              {GATE_CONFIG[item.confidence_gate].label}
+              {gatePresentation.label}
             </span>
-          )}
+          ) : null}
         </div>
         <span className={hpStyles.vacanciesCount}>{formatVacanciesCount(item.vacancies_count)}</span>
       </div>

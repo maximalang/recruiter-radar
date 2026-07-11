@@ -491,51 +491,6 @@
   font-weight: 500;
 }
 
-/* Plan description */
-.planDescription {
-  color: #445164;
-  line-height: 1.65;
-  margin: 0;
-}
-
-/* Feature row */
-.featureRow {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-}
-
-/* Feature dot */
-.featureDot {
-  width: 6px;
-  height: 6px;
-  margin-top: 10px;
-  border-radius: var(--radius-pill);
-  background-color: #101828;
-  flex-shrink: 0;
-}
-
-/* Plan card hover effects */
-.primaryPlanCard {
-  position: relative;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.primaryPlanCard:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 24px 56px rgba(37, 99, 235, 0.18);
-}
-
-.secondaryPlanCard {
-  position: relative;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.secondaryPlanCard:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.1);
-}
-
 /* CTA button enhanced styling */
 .primaryAction {
   position: relative;
@@ -579,19 +534,6 @@
   width: 100%;
 }
 
-/* Gradient overlay for primary plan */
-.primaryPlanCard::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.03) 0%, rgba(147, 197, 253, 0.05) 50%, rgba(219, 234, 254, 0.03) 100%);
-  pointer-events: none;
-  border-radius: inherit;
-}
-
 /* Plan container */
 .planPriceContainer {
   display: grid;
@@ -601,12 +543,6 @@
 /* Plan badge */
 .planBadge {
   justify-self: start;
-}
-
-/* Plan features grid */
-.planFeatures {
-  display: grid;
-  gap: 10px;
 }
 
 /* Gate badge */

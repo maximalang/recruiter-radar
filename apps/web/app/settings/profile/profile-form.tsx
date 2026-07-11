@@ -214,7 +214,7 @@ export function ProfileForm(props: {
               defaultValue={profile.hiringIntentMin ?? ""}
               placeholder="напр. 2.5"
             />
-            <span className={ppStyles.helperText}>FIUR-оценка 0–4. Отсекает слабые лиды.</span>
+            <span className={ppStyles.helperText}>Оценка силы от 0 до 4. Отсекает слабые лиды.</span>
           </label>
           <label className={ppStyles.field}>
             <span className={ppStyles.fieldLabel}>Свежесть сигнала, дней</span>
