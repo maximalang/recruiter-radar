@@ -182,7 +182,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               Открыть пример радара
             </a>
             <Link href={checkoutHref} className={ppStyles.secondaryAction}>
-              Запустить пилот на 7 дней
+              Запустить пилот — 3 000 ₽
             </Link>
           </div>
 
@@ -513,9 +513,63 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           </details>
         ))}
       </section>
+
+      <section style={{ display: "grid", gap: "16px" }}>
+        <SectionIntro
+          eyebrow="Как вы получите доступ"
+          title="Доступ — цифровой, без физической доставки"
+          description="Recruiter Radar — онлайн-сервис. После оплаты доступ открывается онлайн."
+        />
+        <div className={hpStyles.stepsGrid}>
+          {deliverySteps.map((item) => (
+            <SurfaceCard key={item.step} className={hpStyles.featureSurfaceCard}>
+              <div className={hpStyles.stepNumber}>{item.step}</div>
+              <h3 className={hpStyles.stepTitle}>{item.title}</h3>
+              <p className={hpStyles.stepText}>{item.text}</p>
+            </SurfaceCard>
+          ))}
+        </div>
+      </section>
+
+      <footer className={hpStyles.siteFooter}>
+        <div className={hpStyles.footerBrand}>
+          <div className={hpStyles.footerBrandName}>Recruiter Radar</div>
+          <div className={hpStyles.footerBrandSub}>Ежедневный радар по компаниям с активным наймом</div>
+        </div>
+        <nav className={hpStyles.footerLinks}>
+          <Link href="/legal" className={hpStyles.footerLink}>Реквизиты</Link>
+          <Link href="/terms" className={hpStyles.footerLink}>Оферта</Link>
+          <a href="mailto:6uunn9@gmail.com" className={hpStyles.footerLink}>6uunn9@gmail.com</a>
+        </nav>
+        <div className={hpStyles.footerLegal}>
+          Оператор — Головий Наталья Ярославна, самозанятый (НПД). ИНН 622809740837.
+          Оплата через ЮKassa, чек по ФЗ-54.
+        </div>
+        <div className={hpStyles.footerCopy}>
+          © {new Date().getFullYear()} Recruiter Radar
+        </div>
+      </footer>
     </PageFrame>
   );
 }
+
+const deliverySteps = [
+  {
+    step: "01",
+    title: "Оплата тарифа",
+    text: "Оплачиваете выбранный тариф через ЮKassa. Чек с ИНН самозанятого приходит автоматически."
+  },
+  {
+    step: "02",
+    title: "Активация профиля",
+    text: "Получаете ссылку на активацию: указываете город, специализацию и ключевые слова поиска."
+  },
+  {
+    step: "03",
+    title: "Доставка в Telegram",
+    text: "Подключаете Telegram за 2 минуты — и каждый день получаете радар с компаниями."
+  },
+] as const;
 
 const RELEVANCE_AXES: Array<{ key: keyof HomePreviewItem["relevanceSignals"]; label: string }> = [
   { key: "fit", label: "Соответствие" },

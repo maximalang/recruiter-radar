@@ -400,3 +400,131 @@
   font-size: var(--fs-sm);
 }
 
+/* Step number (delivery steps) */
+.stepNumber {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--c-accent, #1e40af);
+  letter-spacing: 0.06em;
+}
+
+/* Site footer */
+.siteFooter {
+  margin-top: 24px;
+  padding-top: 22px;
+  border-top: 1px solid var(--c-border, #e2e8f0);
+  display: grid;
+  gap: 14px;
+}
+
+.footerBrand {
+  display: grid;
+  gap: 2px;
+}
+
+.footerBrandName {
+  font-size: 1.02rem;
+  font-weight: 800;
+  color: var(--c-text-primary, #0f172a);
+}
+
+.footerBrandSub {
+  color: var(--c-text-muted, #94a3b8);
+  font-size: var(--fs-sm);
+}
+
+.footerLinks {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.footerLink {
+  color: var(--c-text-secondary, #475569);
+  font-size: var(--fs-sm);
+  text-decoration: none;
+}
+
+.footerLink:hover {
+  color: var(--c-accent, #1e40af);
+  text-decoration: underline;
+}
+
+.footerLegal {
+  color: var(--c-text-muted, #94a3b8);
+  font-size: 0.82rem;
+  line-height: 1.55;
+  max-width: 64ch;
+}
+
+.footerCopy {
+  color: var(--c-text-muted, #94a3b8);
+  font-size: 0.8rem;
+}
+
+/* ===================== Mobile responsiveness ===================== */
+
+@media (max-width: 960px) {
+  .heroGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .heroTitle {
+    font-size: 1.7rem;
+    max-width: none;
+  }
+
+  .topBar {
+    gap: 12px;
+  }
+
+  .heroBrandName {
+    font-size: 1rem;
+  }
+
+  .heroBrandSubtitle {
+    font-size: 0.86rem;
+  }
+
+  .heroStatGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .proofGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .heroTitle {
+    font-size: 1.5rem;
+    line-height: 1.05;
+  }
+
+  .stepsGrid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .pricingGrid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .previewGrid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .footerLinks {
+    gap: 12px;
+  }
+
+  .heroText {
+    font-size: 0.95rem;
+  }
+
+  .heroFootnote {
+    font-size: 0.9rem;
+  }
+}
+
