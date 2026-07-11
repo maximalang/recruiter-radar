@@ -5,7 +5,7 @@ import {
   VALID_ROLES,
   type ClientProfile
 } from "./clientProfiles";
-import { getPublicPlanByCode, isPublicPlanCode, type PublicPlan } from "./publicProduct";
+import { getPublicPlanByCode, isPublicPlanCode, normalizeLegacyPlanCode, type PublicPlan } from "./publicProduct";
 import { CUSTOMER_CHECKOUT_COPY } from "./copy/customer";
 import {
   CHECKOUT_ORDER_ONBOARDING_STATUSES,
@@ -240,7 +240,9 @@ function normalizeProductCode(value: string): PublicPlanCode {
     return normalizedValue;
   }
 
-  throw new Error(`Unknown product code: ${value}`);
+  // Legacy "premium" orders fold onto the yearly plan (pricing model changed).
+  // normalizeLegacyPlanCode throws only for genuinely unknown codes.
+  return normalizeLegacyPlanCode(normalizedValue);
 }
 
 export function normalizeSiteUrl(value: string): string {

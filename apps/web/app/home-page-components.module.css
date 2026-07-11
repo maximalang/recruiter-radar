@@ -15,6 +15,47 @@
   align-items: stretch;
 }
 
+/* Hero wrapper with animated radar background */
+.heroSection {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  margin-bottom: var(--space-section);
+}
+
+.heroContent {
+  position: relative;
+  z-index: 1;
+}
+
+/* Yearly plan savings badge */
+.savingsBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
+  color: #fff;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  box-shadow: 0 8px 20px rgba(30, 64, 175, 0.28);
+}
+
+.planPriceRow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.planPriceSmall {
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  color: var(--c-text-secondary);
+}
+
 /* Hero title */
 .heroTitle {
   margin: 0;

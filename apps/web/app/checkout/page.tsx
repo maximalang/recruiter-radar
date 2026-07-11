@@ -33,7 +33,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Rec
   const plan = getPublicPlanByCode(planCode);
   const restartHref = buildCheckoutHref({ ...input, planCode });
 
-  // Recurring plans (monthly, premium) have no self-serve subscription flow while
+  // Recurring plans (monthly, yearly) have no self-serve subscription flow while
   // billing is stubbed — the checkout captures a sales request instead of a payment.
   const isRequest = plan.isRecurring;
 

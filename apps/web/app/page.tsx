@@ -23,6 +23,8 @@ import {
   formatVacanciesCount,
 } from "./home-page-components";
 import hpStyles from "./home-page-components.module.css";
+import RadarCanvas from "./radar-canvas";
+import ScrollReveal from "./scroll-reveal";
 
 const GATE_CONFIG: Record<string, { color: string; bg: string; label: string }> = {
   A: { color: '#065f46', bg: '#d1fae5', label: 'A — авто' },
@@ -156,79 +158,82 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         </a>
       </header>
 
-      <section id="main-content" className={hpStyles.heroGrid}>
-        <SurfaceCard className={hpStyles.surfaceCardGradient}>
-          <StatusBadge tone="success">Сначала пример. Потом решение.</StatusBadge>
+      <section id="main-content" className={hpStyles.heroSection} aria-label="Recruiter Radar">
+        <RadarCanvas />
+        <div className={`${hpStyles.heroGrid} ${hpStyles.heroContent}`}>
+          <SurfaceCard className={hpStyles.surfaceCardGradient}>
+            <StatusBadge tone="success">Сначала пример. Потом решение.</StatusBadge>
 
-          <div>
-            <h1 className={hpStyles.heroTitle} style={{ lineHeight: "0.95" }}>Компании, которым стоит написать сегодня.</h1>
-            <p className={hpStyles.heroText}>
-              Recruiter Radar каждый день находит работодателей с живым наймом, показывает
-              причину сигнала и подсказывает лучший угол первого контакта.
-            </p>
-          </div>
-
-          <div className={hpStyles.proofGrid}>
-            {heroProofItems.map((item) => (
-              <div key={item} className={hpStyles.proofItem}>
-                <span className={hpStyles.featureDot} />
-                <span>{item}</span>
-              </div>
-            ))}
-          </div>
-
-          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-            <a href="#preview" className={ppStyles.primaryAction}>
-              Открыть пример радара
-            </a>
-            <Link href={checkoutHref} className={ppStyles.secondaryAction}>
-              Запустить пилот — 3 000 ₽
-            </Link>
-          </div>
-
-          <div className={hpStyles.heroStatGrid}>
-            {heroStats.map((item) => (
-              <div key={item.label} className={hpStyles.mutedPanel}>
-                <div className={hpStyles.heroStatValue}>{item.value}</div>
-                <div className={hpStyles.heroStatLabel}>{item.label}</div>
-              </div>
-            ))}
-          </div>
-
-          <div className={hpStyles.heroFootnote}>
-            Не CRM и не база “на всякий случай”. Это рабочий радар, который каждый день поднимает
-            только те компании, где уже есть повод выйти в контакт.
-          </div>
-        </SurfaceCard>
-
-        <SurfaceCard className={hpStyles.surfaceCardDark}>
-          <div className={hpStyles.signalRow}>
-            <div className={hpStyles.signalEyebrow}>Пример сигнала</div>
-            <div className={hpStyles.signalTitle}>Northline Recruiting Ops</div>
-            <div className={hpStyles.signalText}>
-              Свежий найм по 3 ролям, подтверждённый из 2 источников. Gate A — можно работать сразу.
+            <div>
+              <h1 className={hpStyles.heroTitle} style={{ lineHeight: "0.95" }}>Компании, которым стоит написать сегодня.</h1>
+              <p className={hpStyles.heroText}>
+                Recruiter Radar каждый день находит работодателей с живым наймом, показывает
+                причину сигнала и подсказывает лучший угол первого контакта.
+              </p>
             </div>
-          </div>
 
-          <div style={{ display: "grid", gap: "10px" }}>
-            {heroSignalRows.map((item) => (
-              <div key={item.label} className={hpStyles.signalRow}>
-                <div className={hpStyles.signalLabel}>{item.label}</div>
-                <div className={hpStyles.signalValue}>{item.value}</div>
-              </div>
-            ))}
-          </div>
-
-          <div className={hpStyles.whatUserGetsBox}>
-            <div className={hpStyles.userGetsLabel}>Что получает пользователь</div>
-            <div className={hpStyles.userGetsText}>
-              Компании, которым стоит написать сегодня — с confidence, доказательствами, почему сейчас и готовым углом контакта.
+            <div className={hpStyles.proofGrid}>
+              {heroProofItems.map((item) => (
+                <div key={item} className={hpStyles.proofItem}>
+                  <span className={hpStyles.featureDot} />
+                  <span>{item}</span>
+                </div>
+              ))}
             </div>
-          </div>
-        </SurfaceCard>
+
+            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+              <a href="#preview" className={ppStyles.primaryAction}>
+                Открыть пример радара
+              </a>
+              <Link href={checkoutHref} className={ppStyles.secondaryAction}>
+                Запустить пилот — 3 000 ₽
+              </Link>
+            </div>
+
+            <div className={hpStyles.heroStatGrid}>
+              {heroStats.map((item) => (
+                <div key={item.label} className={hpStyles.mutedPanel}>
+                  <div className={hpStyles.heroStatValue}>{item.value}</div>
+                  <div className={hpStyles.heroStatLabel}>{item.label}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className={hpStyles.heroFootnote}>
+              Не CRM и не база “на всякий случай”. Это рабочий радар, который каждый день поднимает
+              только те компании, где уже есть повод выйти в контакт.
+            </div>
+          </SurfaceCard>
+
+          <SurfaceCard className={hpStyles.surfaceCardDark}>
+            <div className={hpStyles.signalRow}>
+              <div className={hpStyles.signalEyebrow}>Пример сигнала</div>
+              <div className={hpStyles.signalTitle}>Northline Recruiting Ops</div>
+              <div className={hpStyles.signalText}>
+                Свежий найм по 3 ролям, подтверждённый из 2 источников. Gate A — можно работать сразу.
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gap: "10px" }}>
+              {heroSignalRows.map((item) => (
+                <div key={item.label} className={hpStyles.signalRow}>
+                  <div className={hpStyles.signalLabel}>{item.label}</div>
+                  <div className={hpStyles.signalValue}>{item.value}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className={hpStyles.whatUserGetsBox}>
+              <div className={hpStyles.userGetsLabel}>Что получает пользователь</div>
+              <div className={hpStyles.userGetsText}>
+                Компании, которым стоит написать сегодня — с confidence, доказательствами, почему сейчас и готовым углом контакта.
+              </div>
+            </div>
+          </SurfaceCard>
+        </div>
       </section>
 
-      <section style={{ display: "grid", gap: "16px" }}>
+      <ScrollReveal as="section" style={{ display: "grid", gap: "16px" }}>
         <SectionIntro
           eyebrow="Что получает команда"
           title="Продукт, который помогает продавать подбор быстрее"
@@ -246,9 +251,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             </SurfaceCard>
           ))}
         </div>
-      </section>
+      </ScrollReveal>
 
-      <section id="preview" style={{ display: "grid", gap: "16px" }}>
+      <ScrollReveal as="section" id="preview" style={{ display: "grid", gap: "16px" }}>
         <SectionIntro
           eyebrow="Живой пример"
           title="Посмотрите радар под свой профиль"
@@ -413,9 +418,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             </Link>
           </SurfaceCard>
         </div>
-      </section>
+      </ScrollReveal>
 
-      <section style={{ display: "grid", gap: "16px" }}>
+      <ScrollReveal as="section" style={{ display: "grid", gap: "16px" }}>
         <SectionIntro
           eyebrow="Как это встраивается в работу"
           title="Подходит под реальный процесс команды"
@@ -433,9 +438,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             </SurfaceCard>
           ))}
         </div>
-      </section>
+      </ScrollReveal>
 
-      <section style={{ display: "grid", gap: "16px" }}>
+      <ScrollReveal as="section" style={{ display: "grid", gap: "16px" }}>
         <SectionIntro
           eyebrow="Как это работает"
           title="Три шага до первого радара"
@@ -456,51 +461,70 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             </SurfaceCard>
           ))}
         </div>
-      </section>
+      </ScrollReveal>
 
-      <section style={{ display: "grid", gap: "16px" }}>
+      <ScrollReveal as="section" style={{ display: "grid", gap: "16px" }}>
         <SectionIntro
-          eyebrow="Пилот"
-          title="Быстрый запуск без большого риска"
-          description="Сначала пример, потом короткий пилот. Если ценность есть, переводите радар в постоянный канал."
+          eyebrow="Тарифы"
+          title="Один продукт — три срока"
+          description="Во всех тарифах одинаковые возможности: радар, профиль, доставка в Telegram и обратная связь. Отличается только срок."
         />
 
         <div className={hpStyles.pricingGrid}>
-          {PUBLIC_PLANS.map((plan) => (
-            <SurfaceCard
-              key={plan.code}
-              className={plan.isPrimary ? hpStyles.primaryPlanCard : hpStyles.secondaryPlanCard}
-            >
-              <div className={ppStyles.planPriceContainer}>
-                <StatusBadge tone={plan.isPrimary ? "info" : "neutral"} className={ppStyles.planBadge}>
-                  {plan.name}
-                </StatusBadge>
-                <div className={ppStyles.planPrice}>{plan.price}</div>
-                <div className={ppStyles.planPriceCadence}>{plan.cadence}</div>
-                <p className={ppStyles.planDescription}>{plan.description}</p>
-              </div>
-
-              <div className={ppStyles.planFeatures}>
-                {plan.bullets.map((bullet) => (
-                  <div key={bullet} className={hpStyles.featureRow}>
-                    <span className={hpStyles.featureDot} />
-                    <span>{bullet}</span>
-                  </div>
-                ))}
-              </div>
-
-              <Link
-                href={buildCheckoutHref({ ...previewInput, planCode: plan.code })}
-                className={plan.isPrimary ? ppStyles.primaryAction : ppStyles.secondaryAction}
+          {PUBLIC_PLANS.map((plan) => {
+            const isYearly = plan.code === "yearly";
+            const highlight = plan.isPrimary || isYearly;
+            return (
+              <SurfaceCard
+                key={plan.code}
+                className={highlight ? hpStyles.primaryPlanCard : hpStyles.secondaryPlanCard}
               >
-                {plan.ctaLabel}
-              </Link>
-            </SurfaceCard>
-          ))}
-        </div>
-      </section>
+                <div className={ppStyles.planPriceContainer}>
+                  <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+                    <StatusBadge tone={plan.isPrimary ? "info" : isYearly ? "info" : "neutral"} className={ppStyles.planBadge}>
+                      {plan.name}
+                    </StatusBadge>
+                    {isYearly ? (
+                      <span className={hpStyles.savingsBadge}>выгода 30 000 ₽</span>
+                    ) : null}
+                  </div>
+                  <div className={hpStyles.planPriceRow}>
+                    <span className={ppStyles.planPrice}>{plan.price}</span>
+                    {isYearly ? (
+                      <span className={hpStyles.planPriceSmall}>~12 500 ₽/мес</span>
+                    ) : null}
+                  </div>
+                  <div className={ppStyles.planPriceCadence}>{plan.cadence}</div>
+                  <p className={ppStyles.planDescription}>{plan.description}</p>
+                </div>
 
-      <section style={{ display: "grid", gap: "10px" }}>
+                <div className={ppStyles.planFeatures}>
+                  {plan.bullets.map((bullet) => (
+                    <div key={bullet} className={hpStyles.featureRow}>
+                      <span className={hpStyles.featureDot} />
+                      <span>{bullet}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <Link
+                  href={buildCheckoutHref({ ...previewInput, planCode: plan.code })}
+                  className={plan.isPrimary ? ppStyles.primaryAction : ppStyles.secondaryAction}
+                >
+                  {plan.ctaLabel}
+                </Link>
+              </SurfaceCard>
+            );
+          })}
+        </div>
+
+        <p className={ppStyles.helperText} style={{ textAlign: "center", marginTop: "4px" }}>
+          Оплата через ЮKassa, чек по ФЗ-54 с ИНН самозанятого. Условия — в{" "}
+          <Link href="/terms" style={{ color: "var(--c-brand)", textDecoration: "underline" }}>оферте</Link>.
+        </p>
+      </ScrollReveal>
+
+      <ScrollReveal as="section" style={{ display: "grid", gap: "10px" }}>
         <SectionIntro
           eyebrow="FAQ"
           title="Коротко перед запуском"
@@ -512,9 +536,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             <div className={hpStyles.faqAnswer}>{item.answer}</div>
           </details>
         ))}
-      </section>
+      </ScrollReveal>
 
-      <section style={{ display: "grid", gap: "16px" }}>
+      <ScrollReveal as="section" style={{ display: "grid", gap: "16px" }}>
         <SectionIntro
           eyebrow="Как вы получите доступ"
           title="Доступ — цифровой, без физической доставки"
@@ -529,7 +553,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             </SurfaceCard>
           ))}
         </div>
-      </section>
+      </ScrollReveal>
 
       <footer className={hpStyles.siteFooter}>
         <div className={hpStyles.footerBrand}>
@@ -539,6 +563,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         <nav className={hpStyles.footerLinks}>
           <Link href="/legal" className={hpStyles.footerLink}>Реквизиты</Link>
           <Link href="/terms" className={hpStyles.footerLink}>Оферта</Link>
+          <Link href="/admin" className={hpStyles.footerLink}>Оператор</Link>
           <a href="mailto:6uunn9@gmail.com" className={hpStyles.footerLink}>6uunn9@gmail.com</a>
         </nav>
         <div className={hpStyles.footerLegal}>

@@ -2,7 +2,7 @@ import { getHhDigestItems, type HhDigestItem } from "./hhDigest"
 import { deriveLawfulContactPath, deriveNegativeSignals } from "./leads-data"
 import { rankPreviewItems, type PreviewRelevanceSignals } from "./preview-relevance"
 
-export type PublicPlanCode = "pilot" | "monthly" | "premium"
+export type PublicPlanCode = "pilot" | "monthly" | "yearly"
 
 export type PublicPlan = {
   code: PublicPlanCode
@@ -16,13 +16,28 @@ export type PublicPlan = {
   ctaLabel: string
   isPrimary: boolean
   /**
-   * Recurring plans (monthly, premium) are billed per month. With the billing
+   * Recurring plans (monthly, yearly) are billed per period. With the billing
    * provider stubbed there is no real subscription flow, so a checkout for these
    * is captured as a sales request — NOT a self-serve pilot. Drives whether the
    * pilot application + pilot onboarding funnel is triggered. See payments.ts.
    */
   isRecurring: boolean
 }
+
+/**
+ * Identical capability set for every plan — the tariff differs only by term
+ * (pilot = short trial, monthly = per-month, yearly = per-year with a saving).
+ * Do NOT diverge capabilities between plans: the product contract is that every
+ * paying customer gets the same radar.
+ */
+const SHARED_PLAN_BULLETS: string[] = [
+  "ежедневный радар с hiring-proof по каждой компании",
+  "профиль поиска под вашу нишу и географию",
+  "подключение Telegram за 2 минуты",
+  "объяснимый scoring: почему сейчас и почему вам",
+  "доказательства сигнала и безопасный путь контакта",
+  "обратная связь по лидам и подавление нерелевантных",
+]
 
 export type PublicPreviewInput = {
   specialization: string
@@ -59,49 +74,34 @@ export const PUBLIC_PLANS: PublicPlan[] = [
     currency: "RUB",
     price: "3 000 ₽",
     description: "Короткий запуск: увидите компании, которым стоит написать, с доказательствами и готовым углом контакта.",
-    bullets: [
-      "профиль поиска под вашу нишу",
-      "ежедневный радар с hiring-proof",
-      "подключение Telegram за 2 минуты",
-      "объяснимый scoring: почему сейчас и почему вам",
-    ],
+    bullets: SHARED_PLAN_BULLETS,
     ctaLabel: "Запустить пилот",
     isPrimary: true,
     isRecurring: false
   },
   {
     code: "monthly",
-    name: "Ассистированный радар",
-    cadence: "ежемесячно",
+    name: "Месяц",
+    cadence: "30 дней",
     amountMinor: 1500000,
     currency: "RUB",
     price: "15 000 ₽/мес",
-    description: "Постоянный радар с weekly-калибровкой, reviewed hot leads и приоритетной доставкой.",
-    bullets: [
-      "ежедневный радар с релевантными компаниями",
-      "weekly calibration по вашей обратной связи",
-      "hot lead review — аналитик проверяет верхний слой",
-      "приоритетная доставка и custom exclusions",
-    ],
-    ctaLabel: "Обсудить ассистированный",
+    description: "Полный доступ к радару на месяц. Те же возможности, что и на год — просто короче срок.",
+    bullets: SHARED_PLAN_BULLETS,
+    ctaLabel: "Подключить на месяц",
     isPrimary: false,
     isRecurring: true
   },
   {
-    code: "premium",
-    name: "Premium Desk",
-    cadence: "ежемесячно",
-    amountMinor: 3000000,
+    code: "yearly",
+    name: "Год",
+    cadence: "365 дней, экономия 30 000 ₽",
+    amountMinor: 15000000,
     currency: "RUB",
-    price: "30 000 ₽/мес",
-    description: "Выделенный аналитик и приоритетный канал: радар собирается и проверяется под вашу воронку вручную.",
-    bullets: [
-      "выделенный аналитик ведёт ваш радар",
-      "ручная проверка hot leads и evidence bundles",
-      "приоритетный SLA на доставку и калибровку",
-      "индивидуальные источники и corporate contact paths",
-    ],
-    ctaLabel: "Обсудить Premium Desk",
+    price: "150 000 ₽/год",
+    description: "Годовой доступ со скидкой — два месяца бесплатно (~12 500 ₽/мес). Для команды, которая делает радар постоянным каналом.",
+    bullets: SHARED_PLAN_BULLETS,
+    ctaLabel: "Подключить на год",
     isPrimary: false,
     isRecurring: true
   }
@@ -116,9 +116,28 @@ export function isPublicPlanCode(code: unknown): code is PublicPlanCode {
   return typeof code === "string" && Object.prototype.hasOwnProperty.call(PUBLIC_PLAN_BY_CODE, code)
 }
 
+/**
+ * Map a legacy plan code onto the current one. The pricing model changed from
+ * pilot/monthly/premium (different capabilities) to pilot/monthly/yearly
+ * (identical capabilities). Existing DB orders and old checkout links may still
+ * carry "premium" — fold them onto the yearly plan so historical data does not
+ * throw. The pilot and monthly codes are unchanged.
+ */
+export function normalizeLegacyPlanCode(code: string): PublicPlanCode {
+  const normalized = code.trim().toLocaleLowerCase("en-US")
+  if (normalized === "premium") return "yearly"
+  if (isPublicPlanCode(normalized)) return normalized
+  throw new Error(`Unknown product code: ${code}`)
+}
+
 export function getPublicPlanByCode(code: PublicPlanCode | string): PublicPlan {
-  if (isPublicPlanCode(code)) {
-    return PUBLIC_PLAN_BY_CODE[code]
+  const normalized = code.trim().toLocaleLowerCase("en-US")
+  if (isPublicPlanCode(normalized)) {
+    return PUBLIC_PLAN_BY_CODE[normalized]
+  }
+  // Legacy "premium" → yearly, so historical orders/links don't throw.
+  if (normalized === "premium") {
+    return PUBLIC_PLAN_BY_CODE.yearly
   }
 
   throw new Error(`Unknown product code: ${code}`)
