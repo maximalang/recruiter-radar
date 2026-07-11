@@ -1,0 +1,81 @@
+name: Deploy
+
+# Autodeploy to Timeweb VDS (replaces Railway deploy).
+# Runs after a push to main (the Tests workflow runs separately on the same push).
+# Builds the standalone Next.js image on a fast CI runner, ships it as a tar to
+# the VDS over SSH, loads it, and recreates the web container with a health check.
+# No registry / PAT needed — image travels via scp. Secrets: RR_SSH_*.
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          docker build -f apps/web/Dockerfile -t recruiter-radar:latest .
+
+      - name: Save image as tarball
+        run: |
+          docker save recruiter-radar:latest | gzip > /tmp/recruiter-radar-image.tar.gz
+          ls -lh /tmp/recruiter-radar-image.tar.gz
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.RR_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p ${{ secrets.RR_SSH_PORT }} -t ed25519 ${{ secrets.RR_SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Upload image to server
+        run: |
+          scp -P ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
+            /tmp/recruiter-radar-image.tar.gz \
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}:/opt/recruiter-radar/image-new.tar.gz
+
+      - name: Load image and recreate web container
+        run: |
+          ssh -p ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }} << 'SSH_EOF'
+          set -e
+          echo "=== Loading new image ==="
+          docker load < /opt/recruiter-radar/image-new.tar.gz | tail -1
+          echo "=== Recreating web container ==="
+          cd /opt/recruiter-radar
+          docker compose up -d --force-recreate web
+          # Clean up the tarball to save disk
+          rm -f /opt/recruiter-radar/image-new.tar.gz
+          echo "=== Waiting for health (up to 60s) ==="
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:3000/api/health > /dev/null 2>&1; then
+              echo "Health check passed after ${i}x2s"
+              curl -s http://localhost:3000/api/health
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Health check FAILED — showing logs:"
+          docker logs --tail 30 recruiter-radar-web-1
+          exit 1
+          SSH_EOF
+
+      - name: Verify public HTTPS endpoint
+        run: |
+          sleep 5
+          code=$(curl -s -o /dev/null -w '%{http_code}' https://recruiter-radar.ru/api/health --max-time 30)
+          echo "Public /api/health -> HTTP $code"
+          if [ "$code" != "200" ]; then echo "WARNING: public health check returned $code"; fi
