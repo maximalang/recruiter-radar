@@ -25,6 +25,7 @@ import {
 import hpStyles from "./home-page-components.module.css";
 import RadarCanvas from "./radar-canvas";
 import ScrollReveal from "./scroll-reveal";
+import ScrollProgress from "./scroll-progress";
 
 const GATE_CONFIG: Record<string, { color: string; bg: string; label: string }> = {
   A: { color: '#065f46', bg: '#d1fae5', label: 'A — авто' },
@@ -144,6 +145,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
   return (
     <PageFrame maxWidth="1160px">
+      <ScrollProgress />
       <a href="#main-content" className={ppStyles.skipLink}>Перейти к содержанию</a>
       <header className={hpStyles.topBar}>
         <div className={hpStyles.heroBrandName}>
@@ -186,7 +188,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                 Открыть пример радара
               </a>
               <Link href={checkoutHref} className={ppStyles.secondaryAction}>
-                Запустить пилот — 3 000 ₽
+                Запустить пилот — 2 990 ₽
               </Link>
             </div>
 
@@ -485,13 +487,13 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                       {plan.name}
                     </StatusBadge>
                     {isYearly ? (
-                      <span className={hpStyles.savingsBadge}>выгода 30 000 ₽</span>
+                      <span className={hpStyles.savingsBadge}>выгода 89 890 ₽</span>
                     ) : null}
                   </div>
                   <div className={hpStyles.planPriceRow}>
                     <span className={ppStyles.planPrice}>{plan.price}</span>
                     {isYearly ? (
-                      <span className={hpStyles.planPriceSmall}>~12 500 ₽/мес</span>
+                      <span className={hpStyles.planPriceSmall}>~7 499 ₽/мес</span>
                     ) : null}
                   </div>
                   <div className={ppStyles.planPriceCadence}>{plan.cadence}</div>
@@ -563,6 +565,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         <nav className={hpStyles.footerLinks}>
           <Link href="/legal" className={hpStyles.footerLink}>Реквизиты</Link>
           <Link href="/terms" className={hpStyles.footerLink}>Оферта</Link>
+          <Link href="/privacy" className={hpStyles.footerLink}>Конфиденциальность</Link>
           <Link href="/admin" className={hpStyles.footerLink}>Оператор</Link>
           <a href="mailto:6uunn9@gmail.com" className={hpStyles.footerLink}>6uunn9@gmail.com</a>
         </nav>

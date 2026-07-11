@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { getSourceRegistry, getPrimarySourceIds } from "@/lib/sources/source-registry";
 import { getDashboardSourceHealth, getDashboardQualityMetrics, getDashboardOverviewMetrics } from "@/lib/dashboard-data";
-import { checkOperatorAccess, operatorLockedReason } from "@/lib/operator-auth";
+import { checkOperatorAccess, isOperatorPanelConfigured, operatorLockedReason } from "@/lib/operator-auth";
 import {
   InternalPageFrame,
   InternalPageHeader,
@@ -12,6 +12,8 @@ import {
 } from "../ui/internal-page";
 import ppStyles from "../ui/page-primitives.module.css";
 import AdminIngestForm from "./admin-ingest-form";
+import AdminLoginForm from "./admin-login-form";
+import AdminLogoutButton from "./admin-logout-button";
 
 export const dynamic = "force-dynamic";
 
@@ -38,8 +40,10 @@ function statusTone(status: string | undefined): { color: string; bg: string; la
 
 export default async function AdminPage() {
   const access = await checkOperatorAccess();
+  const configured = isOperatorPanelConfigured();
 
-  if (!access.ok) {
+  // State 1: panel not configured (no ADMIN_OPERATOR_PASSWORD on server)
+  if (!configured) {
     return (
       <InternalPageFrame navItems={ADMIN_NAV}>
         <InternalPageHeader title="Панель оператора" />
@@ -47,7 +51,7 @@ export default async function AdminPage() {
           <ContentCard>
             <ContentCardTitle>Доступ ограничен</ContentCardTitle>
             <p className={ppStyles.bodyText}>
-              {operatorLockedReason(access.reason)}
+              {operatorLockedReason("missing-config")}
             </p>
             <p className={ppStyles.bodyTextMutedBlock}>
               Панель оператора предназначена для администратора сервиса (запуск инжеста,
@@ -60,7 +64,26 @@ export default async function AdminPage() {
     );
   }
 
-  // Authenticated operator view
+  // State 2: configured but not logged in (no session cookie)
+  if (!access.ok) {
+    return (
+      <InternalPageFrame navItems={ADMIN_NAV}>
+        <InternalPageHeader title="Панель оператора" />
+        <div className={ppStyles.narrowLayout}>
+          <ContentCard>
+            <ContentCardTitle>Вход оператора</ContentCardTitle>
+            <p className={ppStyles.bodyText}>
+              Панель оператора: запуск инжеста, мониторинг источников и метрики качества.
+              Введите пароль, чтобы открыть консоль.
+            </p>
+            <AdminLoginForm />
+          </ContentCard>
+        </div>
+      </InternalPageFrame>
+    );
+  }
+
+  // State 3: authenticated operator console
   const registry = getSourceRegistry();
   const primaryIds = new Set(getPrimarySourceIds());
   let health: Awaited<ReturnType<typeof getDashboardSourceHealth>> = [];
@@ -101,7 +124,10 @@ export default async function AdminPage() {
 
   return (
     <InternalPageFrame navItems={ADMIN_NAV}>
-      <InternalPageHeader title="Панель оператора" />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+        <InternalPageHeader title="Панель оператора" />
+        <AdminLogoutButton />
+      </div>
       <div style={{ display: "grid", gap: "16px" }}>
         {/* Overview metrics */}
         <ContentCard>
