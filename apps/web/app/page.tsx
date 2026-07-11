@@ -45,38 +45,38 @@ type HomePageProps = {
 type HomePreviewItem = Awaited<ReturnType<typeof getPublicSampleDigestState>>["items"][number];
 
 const heroTrust = [
-  { value: "Gate A–B", label: "только компании с подтверждённым наймом" },
-  { value: "Telegram", label: "дайджест каждый день, без рутины" },
-  { value: "ФЗ-54", label: "чек самозанятого, оплата через ЮKassa" },
+  { value: "Только подтверждённый найм", label: "не список «на всякий случай», а живые доказательства" },
+  { value: "Доставка в Telegram", label: "короткий дайджест каждое утро, без рутины" },
+  { value: "2 990 ₽ за пилот", label: "чек самозанятого, оплата через ЮKassa" },
 ] as const;
 
 const valueItems = [
   {
-    title: "Компании, которым стоит написать сегодня",
-    text: "Каждое утро — короткий список компаний с живым hiring-proof, объяснением «почему сейчас» и готовым углом контакта."
+    title: "Короткий список тех, кто нанимает прямо сейчас",
+    text: "Каждое утро — несколько компаний с подтверждённым наймом, понятным поводом для контакта и готовой фразой для первого сообщения."
   },
   {
-    title: "Доказательства, не догадки",
-    text: "По каждой компании видно, какие источники подтверждают найм, какой confidence у сигнала и какие есть риски."
+    title: "Доказательства, а не догадки",
+    text: "По каждой компании видно, откуда мы знаем про найм, насколько сильный сигнал и какие есть риски. Решение опирается на факты, а не на интуицию."
   },
   {
-    title: "Безопасный первый контакт",
-    text: "Радар подсказывает законный и рабочий путь контакта — корпоративная форма, HR-канал, карьерная страница."
+    title: "С чего начинать разговор",
+    text: "Радар подсказывает рабочий и корректный путь контакта — карьерная страница, HR-канал или корпоративная форма, без холодных рассылок."
   }
 ] as const;
 
 const workflowItems = [
   {
     title: "Для соло-рекрутера",
-    text: "Каждое утро открыть радар и сразу забрать в работу 3–5 самых сильных компаний."
+    text: "Каждое утро открыть радар и сразу забрать в работу 3–5 компаний — без ручного поиска и холодных списков."
   },
   {
     title: "Для агентства",
-    text: "Держать отдельный профиль под каждую практику и быстрее находить новый спрос."
+    text: "Отдельный профиль под каждую практику: промышленный подбор, финансы, IT — каждый видит свой спрос."
   },
   {
     title: "Для команды BD",
-    text: "Работать не по холодному списку, а по компаниям с понятным поводом для выхода."
+    text: "Выходить на компании не наугад, а там, где есть понятный повод для разговора прямо сейчас."
   }
 ] as const;
 
@@ -84,17 +84,17 @@ const howItWorksItems = [
   {
     step: "01",
     title: "Задайте профиль",
-    text: "Город, специализация и пара ключевых слов. Этого хватает для первого результата."
+    text: "Город, специализация и пара ключевых слов. Этого хватает, чтобы радар начал собираться под вас."
   },
   {
     step: "02",
-    title: "Посмотрите радар",
-    text: "Сразу видно, какие компании в фокусе, почему сигнал сильный и с чего лучше заходить."
+    title: "Посмотрите пример",
+    text: "Сразу видно, какие компании попадают в фокус, почему мы считаем, что они нанимают, и с чего лучше начинать разговор."
   },
   {
     step: "03",
-    title: "Запустите пилот",
-    text: "Профиль переносится в пилот. Дальше остаётся подключить Telegram и получать радар каждый день."
+    title: "Подключите Telegram",
+    text: "После пилота радар приходит каждый день в Telegram. Отмечаете «беру» или «мимо» — и радар учится под вашу обратную связь."
   }
 ] as const;
 
@@ -114,10 +114,13 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       <ScrollProgress />
       <a href="#main-content" className={ppStyles.skipLink}>Перейти к содержанию</a>
       <header className={hpStyles.topBar}>
-        <div className={hpStyles.heroBrandName}>
-          <div>Recruiter Radar</div>
-          <div className={hpStyles.heroBrandSubtitle}>
-            Ежедневный радар по компаниям с активным наймом
+        <div className={hpStyles.brandMark}>
+          <span className={hpStyles.brandLiveDot} aria-hidden="true" />
+          <div className={hpStyles.heroBrandName}>
+            <div>Recruiter Radar</div>
+            <div className={hpStyles.heroBrandSubtitle}>
+              Ежедневный радар по компаниям с активным наймом
+            </div>
           </div>
         </div>
 
@@ -129,11 +132,11 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       <section id="main-content" className={hpStyles.heroSection} aria-label="Recruiter Radar">
         <RadarCanvas />
         <div className={hpStyles.heroContent}>
-          <span className={hpStyles.heroEyebrow}>Сначала пример. Потом решение.</span>
-          <h1 className={hpStyles.heroTitle}>Компании, которым стоит написать сегодня.</h1>
+          <span className={hpStyles.heroEyebrow}>Для рекрутинговых агентств и BD-команд</span>
+          <h1 className={hpStyles.heroTitle}>Радар компаний, которые нанимают прямо сейчас.</h1>
           <p className={hpStyles.heroSubtitle}>
-            Recruiter Radar каждый день находит работодателей с живым наймом, показывает причину
-            сигнала и подсказывает безопасный угол первого контакта — без CRM, без базы «на всякий случай».
+            Каждый день — короткий список работодателей с подтверждённым наймом, готовым поводом
+            для контакта и рабочим путём первого сообщения. Доставка в Telegram, без CRM и холодных рассылок.
           </p>
           <div className={hpStyles.heroActions}>
             <a href="#preview" className={ppStyles.primaryAction}>
@@ -156,9 +159,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
       <ScrollReveal as="section" className={hpStyles.scrollSection}>
         <SectionIntro
-          eyebrow="Что получает команда"
-          title="Продукт, который помогает продавать подбор быстрее"
-          description="Коротко, прозрачно и без тяжёлого внедрения."
+          eyebrow="Что вы получаете каждое утро"
+          title="Один дайджест. Несколько компаний. По каждой — три вещи."
+          description="Не база на тысячи строк и не поток вакансий. Короткий список работодателей, по которому понятно, кому писать сегодня и с чего начинать."
         />
 
         <div className={hpStyles.stepsGrid}>
@@ -177,8 +180,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       <ScrollReveal as="section" id="preview" className={hpStyles.scrollSection}>
         <SectionIntro
           eyebrow="Живой пример"
-          title="Посмотрите радар под свой профиль"
-          description="Задайте профиль и сразу проверьте, какие компании стоит брать в работу сегодня."
+          title="Так выглядит утренний радар"
+          description="Задайте город и специализацию — и сразу увидите, какие компании стоит брать в работу сегодня. Это те же данные, что приходят в Telegram каждый день."
         />
 
         <div className={hpStyles.previewGrid}>
@@ -343,9 +346,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
       <ScrollReveal as="section" className={hpStyles.scrollSection}>
         <SectionIntro
-          eyebrow="Как это встраивается в работу"
+          eyebrow="Для кого"
           title="Подходит под реальный процесс команды"
-          description="Не требует долгого внедрения и не заставляет менять привычный workflow."
+          description="Не требует долгого внедрения и не заставляет менять привычный ход работы."
         />
 
         <div className={hpStyles.audienceStrip}>
@@ -457,23 +460,6 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         ))}
       </ScrollReveal>
 
-      <ScrollReveal as="section" className={hpStyles.scrollSection}>
-        <SectionIntro
-          eyebrow="Как вы получите доступ"
-          title="Доступ — цифровой, без физической доставки"
-          description="Recruiter Radar — онлайн-сервис. После оплаты доступ открывается онлайн."
-        />
-        <div className={hpStyles.stepsGrid}>
-          {deliverySteps.map((item) => (
-            <SurfaceCard key={item.step} className={hpStyles.featureSurfaceCard}>
-              <div className={hpStyles.stepNumber}>{item.step}</div>
-              <h3 className={hpStyles.stepTitle}>{item.title}</h3>
-              <p className={hpStyles.stepText}>{item.text}</p>
-            </SurfaceCard>
-          ))}
-        </div>
-      </ScrollReveal>
-
       <footer className={hpStyles.siteFooter}>
         <div className={hpStyles.footerBrand}>
           <div className={hpStyles.footerBrandName}>Recruiter Radar</div>
@@ -497,24 +483,6 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     </PageFrame>
   );
 }
-
-const deliverySteps = [
-  {
-    step: "01",
-    title: "Оплата тарифа",
-    text: "Оплачиваете выбранный тариф через ЮKassa. Чек с ИНН самозанятого приходит автоматически."
-  },
-  {
-    step: "02",
-    title: "Активация профиля",
-    text: "Получаете ссылку на активацию: указываете город, специализацию и ключевые слова поиска."
-  },
-  {
-    step: "03",
-    title: "Доставка в Telegram",
-    text: "Подключаете Telegram за 2 минуты — и каждый день получаете радар с компаниями."
-  },
-] as const;
 
 const RELEVANCE_AXES: Array<{ key: keyof HomePreviewItem["relevanceSignals"]; label: string }> = [
   { key: "fit", label: "Соответствие" },

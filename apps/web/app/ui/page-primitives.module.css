@@ -296,9 +296,10 @@
 /* Section title */
 .sectionTitle {
   margin: 0;
-  font-size: clamp(1.7rem, 2.5vw, 2.3rem);
-  line-height: 1.04;
-  letter-spacing: -0.03em;
+  font-size: clamp(1.8rem, 2.8vw, 2.5rem);
+  line-height: 1.06;
+  letter-spacing: -0.035em;
+  font-weight: 800;
 }
 
 /* Section description */

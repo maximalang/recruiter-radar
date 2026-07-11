@@ -8,6 +8,32 @@
   padding: 4px 2px;
 }
 
+/* Brand mark — a quiet "live" dot + wordmark. Premium restraint detail. */
+.brandMark {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brandLiveDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #22c55e;
+  box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5);
+  animation: brandPulse 2.4s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes brandPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.45); }
+  50% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brandLiveDot { animation: none; }
+}
+
 /* Hero wrapper with animated radar background — full-bleed, single column.
    The radar canvas is the backdrop; content floats above it. No competing
    right-hand card: that card duplicated the live preview further down. */
@@ -84,10 +110,10 @@
 /* Hero title — wide, large, premium. Was max-width:11ch which chopped the line. */
 .heroTitle {
   margin: 0;
-  font-size: clamp(2.3rem, 5.4vw, 4.1rem);
+  font-size: clamp(2.3rem, 5.6vw, 4.6rem);
   line-height: 1.02;
   letter-spacing: -0.035em;
-  max-width: 18ch;
+  max-width: 16ch;
   font-weight: 800;
   color: #ffffff;
   text-wrap: balance;
@@ -96,10 +122,10 @@
 /* Hero subtitle — one calm sentence, generous size */
 .heroSubtitle {
   margin: 0;
-  max-width: 56ch;
-  color: rgba(241, 245, 249, 0.82);
-  font-size: clamp(1.02rem, 1.5vw, 1.2rem);
-  line-height: 1.6;
+  max-width: 58ch;
+  color: rgba(241, 245, 249, 0.84);
+  font-size: clamp(1.05rem, 1.6vw, 1.28rem);
+  line-height: 1.7;
   font-weight: 400;
 }
 
@@ -383,14 +409,6 @@
 .vacanciesCount {
   color: var(--c-text-muted);
   font-size: var(--fs-sm);
-}
-
-/* Step number (delivery steps) */
-.stepNumber {
-  font-size: 0.82rem;
-  font-weight: 800;
-  color: var(--c-accent, #1e40af);
-  letter-spacing: 0.06em;
 }
 
 /* Site footer */
