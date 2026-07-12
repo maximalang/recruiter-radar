@@ -8,6 +8,7 @@ import DashboardAnalytics, { AnalyticsSkeleton } from './dashboard-analytics';
 import DashboardTodayRadar from './dashboard-today-radar';
 import LiveClock from './live-clock';
 import { InternalPageFrame, InternalPageHeader, ErrorState, type NavItem } from '../ui/internal-page';
+import { SiteFooter } from '../ui/site-footer';
 import dashStyles from './dashboard.module.css';
 
 export const metadata: Metadata = {
@@ -81,7 +82,7 @@ export default async function DashboardPage() {
   ]);
 
   return (
-    <InternalPageFrame navItems={DASHBOARD_NAV}>
+    <InternalPageFrame navItems={DASHBOARD_NAV} footer={<SiteFooter />}>
       <InternalPageHeader
         title="Радар"
         subtitle="Компании, которым стоит написать сегодня, и состояние источников в реальном времени"

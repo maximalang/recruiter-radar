@@ -117,6 +117,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       <section id="main-content" className={hpStyles.heroSection} aria-label="Recruiter Radar">
         <RadarCanvas />
         <div className={hpStyles.heroContent}>
+          <span className={hpStyles.heroKicker}>
+            <span className={hpStyles.heroKickerDot} aria-hidden="true" />
+            Ежедневный радар по компаниям с активным наймом
+          </span>
           <h1 className={hpStyles.heroTitle}>
             Компании, которым стоит написать{" "}
             <span className={hpStyles.heroTitleAccent}>сегодня</span>.
@@ -128,6 +132,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           <div className={hpStyles.heroActions}>
             <a href="#preview" className={hpStyles.heroCta}>
               Открыть пример радара
+              <svg className={hpStyles.heroCtaArrow} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="13 6 19 12 13 18" />
+              </svg>
             </a>
           </div>
           <div className={hpStyles.heroTrust}>

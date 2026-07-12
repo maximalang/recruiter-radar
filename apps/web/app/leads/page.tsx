@@ -31,6 +31,7 @@ import {
   type NavItem,
 } from '../ui/internal-page';
 import { internalPageClasses as ipStyles } from '../ui/internal-page';
+import { SiteFooter } from '../ui/site-footer';
 import { ShieldIcon, PinIcon, BriefcaseIcon, FileIcon, AlertIcon, SearchIcon, TargetIcon, ClockIcon, CheckIcon } from '../ui/icons';
 
 export const dynamic = 'force-dynamic';
@@ -461,7 +462,7 @@ export default async function LeadsPage({
   const exportHref = exportQuery ? `/api/leads/export?${exportQuery}` : '/api/leads/export';
 
   return (
-    <InternalPageFrame navItems={LEADS_NAV}>
+    <InternalPageFrame navItems={LEADS_NAV} footer={<SiteFooter />}>
       <InternalPageHeader
         title="Лиды"
         subtitle={

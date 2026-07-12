@@ -24,6 +24,7 @@ import {
   type NavItem,
 } from '../ui/internal-page';
 import { internalPageClasses as ipStyles } from '../ui/internal-page';
+import { SiteFooter } from '../ui/site-footer';
 import { PinIcon, BriefcaseIcon, FileIcon, CheckIcon, TargetIcon } from '../ui/icons';
 import ReviewActions from './review-actions';
 import { deriveReviewReason } from './review-reason';
@@ -231,7 +232,7 @@ export default async function ReviewPage({
     : { items: [], total: 0 };
 
   return (
-    <InternalPageFrame navItems={REVIEW_NAV}>
+    <InternalPageFrame navItems={REVIEW_NAV} footer={<SiteFooter />}>
       <InternalPageHeader
         title="Очередь проверки"
         subtitle="Кандидаты с уверенностью C, иностранные работодатели и одиночный источник — проверьте доказательства перед доставкой как лид"

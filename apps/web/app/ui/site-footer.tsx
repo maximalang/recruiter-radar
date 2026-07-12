@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { readOperatorSession } from "../../lib/operator-auth";
 import s from "./site-footer.module.css";
 
 /**
@@ -13,12 +14,21 @@ import s from "./site-footer.module.css";
  * restraint rather than a form. Replaces the per-page inline footers and the
  * `← На главную` link rows that used the forbidden literal glyph.
  *
+ * The /admin link is operator-gated: it renders ONLY for a browser that
+ * carries the signed `rr_op` operator session (see lib/operator-auth.ts).
+ * The /admin page itself is auth-gated too, but the link must not advertise
+ * the operator panel to ordinary users on the public landing/legal pages —
+ * admin surfaces are not a public site function. The check is server-side
+ * (this is a server component), so the link is absent from the HTML, not
+ * merely hidden.
+ *
  * `tone` lets a dark hero/landing surface request the light-on-dark variant;
  * internal + legal pages use the default light tone.
  */
-export function SiteFooter(props: { tone?: "light" | "dark" }) {
+export async function SiteFooter(props: { tone?: "light" | "dark" }) {
   const tone = props.tone ?? "light";
   const year = new Date().getFullYear();
+  const isOperator = await readOperatorSession().catch(() => false);
   return (
     <footer className={s.siteFooter} data-tone={tone}>
       <div className={s.footerInner}>
@@ -30,7 +40,9 @@ export function SiteFooter(props: { tone?: "light" | "dark" }) {
             <Link href="/legal" className={s.footerLink}>Реквизиты</Link>
             <Link href="/terms" className={s.footerLink}>Оферта</Link>
             <Link href="/privacy" className={s.footerLink}>Конфиденциальность</Link>
-            <Link href="/admin" className={s.footerLink}>Панель оператора</Link>
+            {isOperator ? (
+              <Link href="/admin" className={s.footerLink}>Панель оператора</Link>
+            ) : null}
           </nav>
         </div>
 

@@ -19,6 +19,7 @@ import {
   type NavItem,
   internalPageClasses as ipStyles,
 } from "../ui/internal-page";
+import { SiteFooter } from "../ui/site-footer";
 import ppStyles from "../ui/page-primitives.module.css";
 
 const CHECKOUT_NAV: NavItem[] = [
@@ -74,7 +75,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Rec
   }
 
   return (
-    <InternalPageFrame navItems={CHECKOUT_NAV}>
+    <InternalPageFrame navItems={CHECKOUT_NAV} footer={<SiteFooter />}>
       <InternalPageHeader title={isRequest ? `Подключение: ${plan.name}` : "Оформление: пробная неделя"} />
       <div className={ipStyles.narrowLayout}>
         <ContentCard>
