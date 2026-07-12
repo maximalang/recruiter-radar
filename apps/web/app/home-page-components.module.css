@@ -1,14 +1,28 @@
-/* Top bar */
+/* ============================================================
+   Landing — premium, professional, Russia-first radar.
+   Visual language: deep focused blue, generous whitespace, calm
+   type, restrained gradients, hairline borders. Premium = rest.
+   ============================================================ */
+
+/* ── Sticky top nav ── */
 .topBar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
   display: flex;
   justify-content: space-between;
   gap: var(--space-section);
   align-items: center;
   flex-wrap: wrap;
-  padding: 4px 2px;
+  padding: 12px 18px;
+  margin: 0 0 var(--space-section);
+  border-radius: var(--radius-card-sm);
+  border: 1px solid var(--c-border);
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: saturate(180%) blur(14px);
+  box-shadow: 0 6px 24px rgba(15, 23, 42, 0.06);
 }
 
-/* Brand mark — a quiet "live" dot + wordmark. Premium restraint detail. */
 .brandMark {
   display: flex;
   align-items: center;
@@ -34,35 +48,435 @@
   .brandLiveDot { animation: none; }
 }
 
-/* Hero wrapper with animated radar background — full-bleed, single column.
-   The radar canvas is the backdrop; content floats above it. No competing
-   right-hand card: that card duplicated the live preview further down. */
+.heroBrandName {
+  font-size: 1.06rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--c-text-primary);
+}
+
+.heroBrandSubtitle {
+  color: var(--c-text-muted);
+  font-size: var(--fs-sm);
+  line-height: 1.3;
+}
+
+.topNavLinks {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.topNavLink {
+  padding: 7px 12px;
+  border-radius: 10px;
+  color: var(--c-text-secondary);
+  font-size: 0.86rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.topNavLink:hover {
+  background: rgba(29, 78, 216, 0.06);
+  color: var(--c-brand);
+}
+
+.topNavCta {
+  padding: 8px 16px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+  color: #fff;
+  font-size: 0.86rem;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 6px 18px rgba(30, 64, 175, 0.22);
+  transition: box-shadow 0.18s ease, transform 0.15s ease;
+}
+
+.topNavCta:hover {
+  box-shadow: 0 10px 26px rgba(30, 64, 175, 0.3);
+  transform: translateY(-1px);
+}
+
+/* ── Hero — deep, focused, single proof ── */
 .heroSection {
   position: relative;
   overflow: hidden;
   border-radius: var(--radius-card);
   margin-bottom: var(--space-section-lg);
-  min-height: clamp(420px, 56vh, 620px);
+  min-height: clamp(440px, 60vh, 660px);
   display: grid;
-  align-content: center;
+  grid-template-columns: 1.15fr 0.85fr;
   background:
-    radial-gradient(120% 120% at 78% 18%, rgba(37, 99, 235, 0.16) 0%, transparent 46%),
-    radial-gradient(90% 90% at 12% 88%, rgba(30, 64, 175, 0.12) 0%, transparent 50%),
-    linear-gradient(180deg, #0b1220 0%, #111c34 100%);
+    radial-gradient(120% 130% at 82% 14%, rgba(59, 130, 246, 0.22) 0%, transparent 48%),
+    radial-gradient(90% 90% at 10% 92%, rgba(30, 64, 175, 0.16) 0%, transparent 52%),
+    linear-gradient(160deg, #0a1120 0%, #0f1a33 48%, #0b1426 100%);
   color: #f8fafc;
-  box-shadow: 0 30px 80px rgba(15, 23, 42, 0.28);
+  box-shadow: 0 32px 90px rgba(11, 18, 38, 0.34);
 }
 
 .heroContent {
   position: relative;
   z-index: 1;
   display: grid;
+  align-content: center;
   gap: 22px;
-  padding: clamp(40px, 7vw, 88px) clamp(22px, 5vw, 72px);
-  max-width: 920px;
+  padding: clamp(44px, 7vw, 96px) clamp(28px, 5vw, 76px);
 }
 
-/* Yearly plan savings badge */
+.heroEyebrow {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(147, 197, 253, 0.32);
+  background: rgba(59, 130, 246, 0.14);
+  color: #cfe0ff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  backdrop-filter: blur(6px);
+}
+
+.heroTitle {
+  margin: 0;
+  font-size: clamp(2.2rem, 4.6vw, 4rem);
+  line-height: 1.04;
+  letter-spacing: -0.038em;
+  max-width: 15ch;
+  font-weight: 800;
+  color: #ffffff;
+  text-wrap: balance;
+}
+
+.heroTitleAccent {
+  background: linear-gradient(135deg, #93c5fd 0%, #60a5fa 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.heroSubtitle {
+  margin: 0;
+  max-width: 52ch;
+  color: rgba(226, 232, 240, 0.82);
+  font-size: clamp(1.02rem, 1.4vw, 1.2rem);
+  line-height: 1.68;
+  font-weight: 400;
+}
+
+.heroActions {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.heroTrust {
+  display: flex;
+  gap: 28px;
+  flex-wrap: wrap;
+  padding-top: 18px;
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+  margin-top: 8px;
+}
+
+.heroTrustItem {
+  display: grid;
+  gap: 3px;
+}
+
+.heroTrustValue {
+  font-size: 1.04rem;
+  font-weight: 800;
+  color: #f8fafc;
+  line-height: 1.1;
+}
+
+.heroTrustLabel {
+  color: rgba(203, 213, 225, 0.74);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+/* Hero product mockup — a quiet, floating radar card on the right.
+   SSR-safe: always visible, no JS dependency. */
+.heroMock {
+  position: relative;
+  z-index: 1;
+  display: none;
+  align-items: center;
+  padding: clamp(28px, 4vw, 52px) clamp(20px, 3vw, 40px) clamp(28px, 4vw, 52px) 0;
+}
+
+.heroMockCard {
+  position: relative;
+  width: 100%;
+  max-width: 360px;
+  justify-self: center;
+  border-radius: 20px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.55) 0%, rgba(11, 18, 38, 0.7) 100%);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.38);
+  padding: 20px 22px;
+  display: grid;
+  gap: 16px;
+}
+
+.heroMockHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.heroMockDate {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(148, 163, 184, 0.85);
+}
+
+.heroMockLive {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #86efac;
+}
+
+.heroMockLive::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18);
+}
+
+.heroMockRow {
+  display: grid;
+  gap: 8px;
+  padding: 14px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.heroMockRowTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.heroMockCo {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+
+.heroMockScore {
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: rgba(59, 130, 246, 0.22);
+  color: #bfdbfe;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.heroMockWhy {
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: rgba(203, 213, 225, 0.78);
+}
+
+.heroMockGate {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #6ee7b7;
+}
+
+@media (min-width: 900px) {
+  .heroMock {
+    display: flex;
+  }
+}
+
+/* ── Section spacing ── */
+.scrollSection {
+  display: grid;
+  gap: 24px;
+  padding: clamp(32px, 5vw, 60px) 0;
+}
+
+.scrollSection:first-of-type {
+  padding-top: 8px;
+}
+
+/* ── Principles / value row ── */
+.principles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.principle {
+  display: grid;
+  gap: 10px;
+  padding: 22px 22px;
+  border-radius: var(--radius-card-sm);
+  border: 1px solid var(--c-border);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.9) 100%);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+}
+
+.principleIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(29, 78, 216, 0.08);
+  color: var(--c-brand);
+}
+
+.principleIcon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.principleTitle {
+  margin: 0;
+  font-size: 1.04rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--c-text-primary);
+}
+
+.principleText {
+  margin: 0;
+  color: var(--c-text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+/* ── Preview grid ── */
+.previewGrid {
+  display: grid;
+  grid-template-columns: 0.85fr 1.15fr;
+  gap: var(--space-section);
+  align-items: start;
+}
+
+.previewCardContainer {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+  padding: var(--space-card-padding-lg);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.92) 100%);
+}
+
+.previewHeaderRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* Preview card — reads like a real digest entry */
+.previewCard {
+  padding: 18px 20px;
+  border-radius: var(--radius-card-sm);
+  border: 1px solid var(--c-border);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.96) 100%);
+  display: grid;
+  gap: 14px;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+}
+
+.previewCardHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.scorePill {
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(29, 78, 216, 0.16);
+  background-color: #eef4ff;
+  color: var(--c-brand);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+
+.previewReasonList {
+  display: grid;
+  gap: 5px;
+  color: #334155;
+  line-height: 1.56;
+}
+
+.vacanciesCount {
+  color: var(--c-text-muted);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+/* ── Pricing — hierarchy, not 3-equal ── */
+.pricingGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  align-items: stretch;
+}
+
+/* Primary plan card — the single recommended plan, prominent. */
+.primaryPlanCard {
+  position: relative;
+  display: grid;
+  gap: 18px;
+  border: 1.5px solid rgba(37, 99, 235, 0.3);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(239, 246, 255, 0.96) 100%);
+  box-shadow: 0 18px 48px rgba(37, 99, 235, 0.16);
+  padding: 26px 28px;
+}
+
+.primaryPlanCardHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.planFlag {
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  box-shadow: 0 6px 16px rgba(30, 64, 175, 0.26);
+}
+
 .savingsBadge {
   display: inline-flex;
   align-items: center;
@@ -73,8 +487,7 @@
   color: #fff;
   font-size: 0.74rem;
   font-weight: 700;
-  letter-spacing: 0.02em;
-  box-shadow: 0 8px 20px rgba(30, 64, 175, 0.28);
+  box-shadow: 0 8px 20px rgba(30, 64, 175, 0.22);
 }
 
 .planPriceRow {
@@ -90,110 +503,36 @@
   color: var(--c-text-secondary);
 }
 
-/* Hero eyebrow pill above the title */
-.heroEyebrow {
-  justify-self: start;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 14px;
-  border-radius: var(--radius-pill);
-  border: 1px solid rgba(147, 197, 253, 0.32);
-  background: rgba(59, 130, 246, 0.14);
-  color: #cfe0ff;
-  font-size: 0.82rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  backdrop-filter: blur(6px);
+/* Secondary plans — two side by side, lighter */
+.secondaryPlansRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
 }
 
-/* Hero title — wide, large, premium. Was max-width:11ch which chopped the line. */
-.heroTitle {
-  margin: 0;
-  font-size: clamp(2.3rem, 5.6vw, 4.6rem);
-  line-height: 1.02;
-  letter-spacing: -0.035em;
-  max-width: 16ch;
-  font-weight: 800;
-  color: #ffffff;
-  text-wrap: balance;
-}
-
-/* Hero subtitle — one calm sentence, generous size */
-.heroSubtitle {
-  margin: 0;
-  max-width: 58ch;
-  color: rgba(241, 245, 249, 0.84);
-  font-size: clamp(1.05rem, 1.6vw, 1.28rem);
-  line-height: 1.7;
-  font-weight: 400;
-}
-
-/* Hero action row */
-.heroActions {
-  display: flex;
+.secondaryPlanCard {
+  display: grid;
   gap: 14px;
-  flex-wrap: wrap;
-  align-items: center;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background-color: rgba(255, 255, 255, 0.86);
+  padding: 22px 24px;
 }
 
-/* Hero trust strip — replaces the old dense stat grid + footnote */
-.heroTrust {
-  display: flex;
-  gap: 26px;
-  flex-wrap: wrap;
-  align-items: center;
-  padding-top: 8px;
-  border-top: 1px solid rgba(148, 163, 184, 0.18);
-  margin-top: 6px;
-}
-
-.heroTrustItem {
-  display: grid;
-  gap: 2px;
-}
-
-.heroTrustValue {
-  font-size: 1.02rem;
-  font-weight: 800;
-  color: #f8fafc;
-  line-height: 1.1;
-}
-
-.heroTrustLabel {
-  color: rgba(203, 213, 225, 0.78);
-  font-size: 0.82rem;
-  line-height: 1.4;
-}
-
-/* Vertical air between landing sections — the old 16-18px gaps made the page
-   feel cramped for a premium product. Applied via .scrollSection wrappers. */
-.scrollSection {
-  display: grid;
-  gap: 20px;
-  padding: clamp(28px, 4vw, 52px) 0;
-}
-
-.scrollSection:first-of-type {
-  padding-top: 0;
-}
-
-/* Single shared "what's included" block under pricing — the 6 bullets used to
-   repeat in every plan card (18 lines of duplicate text). Shown once now. */
+/* Single shared "what's included" block under pricing */
 .includedOnce {
   display: grid;
-  gap: 10px;
-  padding: 22px 26px;
+  gap: 12px;
+  padding: 24px 28px;
   border-radius: var(--radius-card-sm);
-  border: 1px solid var(--c-border, rgba(15, 23, 42, 0.08));
+  border: 1px solid var(--c-border);
   background: rgba(248, 250, 252, 0.6);
 }
 
 .includedOnceLabel {
   color: var(--c-brand, #1d4ed8);
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 800;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -202,13 +541,13 @@
   padding: 0;
   list-style: none;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 8px 24px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 9px 26px;
 }
 
 .includedOnceList li {
   position: relative;
-  padding-left: 18px;
+  padding-left: 22px;
   color: var(--c-text-secondary, #475569);
   font-size: 0.92rem;
   line-height: 1.5;
@@ -218,158 +557,114 @@
   content: "";
   position: absolute;
   left: 0;
-  top: 0.62em;
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: var(--c-brand, #1d4ed8);
+  top: 0.5em;
+  width: 14px;
+  height: 8px;
+  border-left: 2px solid var(--c-brand, #1d4ed8);
+  border-bottom: 2px solid var(--c-brand, #1d4ed8);
+  transform: rotate(-45deg);
 }
 
-/* Preview grid */
-.previewGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: var(--space-section);
-}
-
-/* Preview header row */
-.previewHeaderRow {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-/* Preview card */
-.previewCard {
-  padding: var(--space-card-padding);
-  border-radius: var(--radius-card);
-  border: 1px solid var(--c-border);
-  background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(248,250,252,0.96) 100%);
-  display: grid;
-  gap: 14px;
-  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
-}
-
-/* Preview card header */
-.previewCardHeader {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-/* Score pill */
-.scorePill {
-  padding: 4px 9px;
-  border-radius: var(--radius-pill);
-  border: 1px solid rgba(29, 78, 216, 0.12);
-  background-color: #f4f8ff;
-  color: var(--c-brand);
-  font-size: var(--fs-xs);
-  font-weight: 700;
-}
-
-/* Preview reason list */
-.previewReasonList {
-  display: grid;
-  gap: 6px;
-  color: #334155;
-  line-height: 1.58;
-}
-
-/* Pricing grid */
-.pricingGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 14px;
-  align-items: stretch;
-}
-
-/* Primary plan card — the single recommended plan. */
-.primaryPlanCard {
-  position: relative;
-  display: grid;
-  gap: 16px;
-  border: 1.5px solid rgba(37, 99, 235, 0.28);
-  background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(239,246,255,0.96) 100%);
-  box-shadow: 0 16px 42px rgba(37, 99, 235, 0.14);
-}
-
-/* Recommended flag pinned to the top of the featured plan. */
-.planFlag {
-  justify-self: start;
-  padding: 5px 12px;
-  border-radius: var(--radius-pill);
-  background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
-  color: #ffffff;
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  box-shadow: 0 6px 16px rgba(30, 64, 175, 0.26);
-}
-
-/* Secondary plan card */
-.secondaryPlanCard {
-  display: grid;
-  gap: 16px;
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  background-color: rgba(255,255,255,0.8);
-}
-
-/* FAQ card */
+/* ── FAQ ── */
 .faqCard {
-  padding: 16px 18px;
+  padding: 4px 22px;
   border-radius: var(--radius-card-sm);
   border: 1px solid var(--c-border);
-  background-color: rgba(255, 255, 255, 0.88);
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+  background-color: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.04);
+  overflow: hidden;
 }
 
-/* FAQ summary */
 .faqSummary {
   cursor: pointer;
-  display: block;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 0;
   font-weight: 700;
+  font-size: 1rem;
+  color: var(--c-text-primary);
   list-style: none;
 }
 
-/* FAQ answer */
+.faqSummary::-webkit-details-marker {
+  display: none;
+}
+
+.faqChevron {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  color: var(--c-text-muted);
+  transition: transform 0.2s ease;
+}
+
+.faqCard[open] .faqChevron {
+  transform: rotate(180deg);
+}
+
 .faqAnswer {
-  margin-top: 12px;
-  color: #667487;
+  margin: 0 0 18px;
+  color: var(--c-text-secondary);
+  font-size: 0.94rem;
   line-height: 1.65;
+  max-width: 70ch;
 }
 
-/* Gradient surface cards (home page) */
-.previewCardContainer {
+/* ── Final CTA band ── */
+.closingBand {
   display: grid;
-  gap: 14px;
-  align-content: start;
-  padding: var(--space-card-padding);
-  background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(248,250,252,0.92) 100%);
+  gap: 18px;
+  justify-items: center;
+  text-align: center;
+  padding: clamp(40px, 6vw, 64px) clamp(24px, 4vw, 48px);
+  margin-top: var(--space-section-lg);
+  border-radius: var(--radius-card);
+  background:
+    radial-gradient(120% 140% at 50% 0%, rgba(59, 130, 246, 0.28) 0%, transparent 56%),
+    linear-gradient(160deg, #0a1120 0%, #0f1a33 100%);
+  color: #f8fafc;
+  box-shadow: 0 28px 80px rgba(11, 18, 38, 0.28);
 }
 
-.heroBrandName {
-  font-size: 1.08rem;
+.closingTitle {
+  margin: 0;
+  font-size: clamp(1.6rem, 3vw, 2.3rem);
   font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  max-width: 22ch;
+  text-wrap: balance;
 }
 
-.heroBrandSubtitle {
-  color: var(--c-text-muted);
-  font-size: var(--fs-base);
+.closingText {
+  margin: 0;
+  max-width: 46ch;
+  color: rgba(226, 232, 240, 0.8);
+  font-size: 1.02rem;
+  line-height: 1.6;
 }
 
-/* Vacancies count */
-.vacanciesCount {
-  color: var(--c-text-muted);
-  font-size: var(--fs-sm);
+.closingActions {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 4px;
 }
 
 /* ===================== Mobile responsiveness ===================== */
+
+@media (max-width: 900px) {
+  .heroSection {
+    grid-template-columns: 1fr;
+  }
+
+  .previewGrid {
+    grid-template-columns: 1fr;
+  }
+}
 
 @media (max-width: 720px) {
   .heroSection {
@@ -378,12 +673,12 @@
   }
 
   .heroContent {
-    padding: 36px 20px 32px;
+    padding: 36px 22px 40px;
     gap: 18px;
   }
 
   .heroTitle {
-    font-size: clamp(1.9rem, 8vw, 2.4rem);
+    font-size: clamp(1.9rem, 7vw, 2.5rem);
   }
 
   .heroTrust {
@@ -391,7 +686,12 @@
   }
 
   .topBar {
-    gap: 12px;
+    gap: 10px;
+    padding: 10px 14px;
+  }
+
+  .topNavLinks {
+    display: none;
   }
 
   .heroBrandName {
@@ -399,17 +699,25 @@
   }
 
   .heroBrandSubtitle {
-    font-size: 0.86rem;
+    font-size: 0.82rem;
+  }
+
+  .secondaryPlansRow {
+    grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 560px) {
-  .pricingGrid {
-    grid-template-columns: 1fr !important;
+  .principles {
+    grid-template-columns: 1fr;
   }
 
-  .previewGrid {
-    grid-template-columns: 1fr !important;
+  .primaryPlanCard,
+  .secondaryPlanCard {
+    padding: 22px 20px;
+  }
+
+  .includedOnce {
+    padding: 20px 20px;
   }
 }
-
