@@ -52,8 +52,7 @@ type HomePageProps = {
 type HomePreviewItem = Awaited<ReturnType<typeof getPublicSampleDigestState>>["items"][number];
 
 const heroTrust = [
-  { value: "Только подтверждённый найм", label: "живые доказательства, не список «на всякий случай»" },
-  { value: "2 990 ₽ за неделю", label: "чек самозанятого, оплата через ЮKassa" },
+  { value: "Только подтверждённый найм", label: "доказательства, а не «возможно, нанимают»" },
   { value: "5 минут на старт", label: "профиль, Telegram — и утренний радар готов" },
 ] as const;
 
@@ -61,17 +60,17 @@ const principles = [
   {
     icon: CheckIcon,
     title: "Только подтверждённый найм",
-    text: "Каждая компания в радаре — с доказательством: карьерная страница, свежие вакансии, независимый источник. Не агрегат «возможно, нанимают».",
+    text: "Карьерная страница, свежие вакансии, независимый источник. Не агрегат «возможно, нанимают».",
   },
   {
     icon: ShieldIcon,
-    title: "Оценка уверенности и рисков",
-    text: "По каждой компании — уровень доверия (A–D) и честный «почему сейчас». Видно, что за сигналом стоит, до первого касания.",
+    title: "Оценка уверенности",
+    text: "Уровень доверия A–D и честный «почему сейчас» — до первого касания.",
   },
   {
     icon: MailIcon,
     title: "Безопасный путь контакта",
-    text: "Подсказываем законный первый контакт: корпоративный сайт, карьерная страница, HR-почта. Никаких личных адресов вслепую.",
+    text: "Корпоративный сайт, карьерная страница, HR-почта. Без личных адресов вслепую.",
   },
 ] as const;
 
@@ -118,22 +117,18 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       <section id="main-content" className={hpStyles.heroSection} aria-label="Recruiter Radar">
         <RadarCanvas />
         <div className={hpStyles.heroContent}>
-          <span className={hpStyles.heroEyebrow}>Для рекрутинговых агентств и BD-команд</span>
           <h1 className={hpStyles.heroTitle}>
             Компании, которым стоит написать{" "}
             <span className={hpStyles.heroTitleAccent}>сегодня</span>.
           </h1>
           <p className={hpStyles.heroSubtitle}>
-            Каждый день — короткий список нанимающих компаний с готовым поводом для контакта.
-            Доказательства найма, оценка уверенности и безопасный путь — в одном радаре в Telegram.
+            Каждый день — короткий список нанимающих компаний с поводом для контакта.
+            Доказательства найма, оценка уверенности и безопасный путь — в Telegram.
           </p>
           <div className={hpStyles.heroActions}>
             <a href="#preview" className={ppStyles.primaryAction}>
               Открыть пример радара
             </a>
-            <Link href={checkoutHref} className={ppStyles.secondaryAction}>
-              Попробовать неделю — 2 990 ₽
-            </Link>
           </div>
           <div className={hpStyles.heroTrust}>
             {heroTrust.map((item) => (
@@ -179,9 +174,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       {/* Principles / value row */}
       <ScrollReveal as="section" className={hpStyles.scrollSection}>
         <SectionIntro
-          eyebrow="Почему этому можно доверять"
-          title="Радар, а не список «на всякий случай»"
-          description="Три принципа, без которых сигнал о найме бесполезен для агентства."
+          title="Почему этому можно доверять"
         />
         <div className={hpStyles.principles}>
           {principles.map((p) => {
@@ -202,17 +195,13 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       {/* Live preview */}
       <ScrollReveal as="section" id="preview" className={hpStyles.scrollSection}>
         <SectionIntro
-          eyebrow="Живой пример"
           title="Так выглядит утренний радар"
-          description="Каждое утро — несколько компаний. По каждой: почему мы знаем про найм, с чего начать разговор и какой есть риск. Задайте город и специализацию — это те же данные, что приходят в Telegram."
+          description="Задайте город и специализацию — это те же данные, что приходят в Telegram."
         />
 
         <div className={hpStyles.previewGrid}>
           <SurfaceCard className={hpStyles.previewCardContainer}>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: "var(--fs-lg)" }}>Параметры профиля</div>
-              <div className={ppStyles.helperText}>Только то, что реально влияет на подборку.</div>
-            </div>
+            <div style={{ fontWeight: 700, fontSize: "var(--fs-lg)" }}>Параметры профиля</div>
 
             <form method="GET" action="/" style={{ display: "grid", gap: "14px" }}>
               <label htmlFor="specialization" className={ppStyles.field}>
@@ -221,7 +210,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                   id="specialization"
                   name="specialization"
                   defaultValue={previewInput.specialization}
-                  placeholder="Промышленный подбор / финансы C-level / массовый найм"
+                  placeholder="Промышленный подбор / финансы C-level"
                   className={ppStyles.input}
                 />
               </label>
@@ -232,21 +221,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                   id="targetCity"
                   name="targetCity"
                   defaultValue={previewInput.targetCity}
-                  placeholder="Москва / Берлин / удалённо"
+                  placeholder="Москва / удалённо"
                   className={ppStyles.input}
                 />
-              </label>
-
-              <label htmlFor="includeKeywords" className={ppStyles.field}>
-                <span className={ppStyles.fieldLabel}>Ключевые слова</span>
-                <input
-                  id="includeKeywords"
-                  name="includeKeywords"
-                  defaultValue={previewInput.includeKeywords}
-                  placeholder="рекрутер, сорсинг, агентство"
-                  className={ppStyles.input}
-                />
-                <span className={ppStyles.helperText}>Через запятую — поднимает компании с этими словами.</span>
               </label>
 
               <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "center" }}>
@@ -256,7 +233,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
                 {hasPreview ? (
                   <Link href="/" className={ppStyles.secondaryAction}>
-                    Сбросить фильтры
+                    Сбросить
                   </Link>
                 ) : null}
               </div>
@@ -279,19 +256,13 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                       : "демо"}
                 </StatusBadge>
               </div>
-
-              <div className={ppStyles.helperText}>
-                {hasPreview
-                  ? "Так выглядит верх радара на сегодня."
-                  : "Ниже пример того, что получает пользователь в рабочем радаре."}
-              </div>
             </div>
 
             {previewState.items.length === 0 ? (
               <NoticeBox
                 tone="neutral"
                 title="Пока нет сильных совпадений"
-                description="Попробуйте расширить географию, убрать часть исключений или ослабить фильтр."
+                description="Расширьте географию или ослабьте фильтр."
               />
             ) : (
               <div style={{ display: "grid", gap: "12px" }}>
@@ -299,7 +270,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                   <NoticeBox
                     tone="neutral"
                     title="Точных совпадений по нише пока нет"
-                    description="Показываем ближайшие по релевантности компании. На реальном радаре совпадений будет больше — в примере выборка ограничена."
+                    description="Показываем ближайшие по релевантности. На реальном радаре совпадений больше."
                   />
                 ) : null}
                 {visiblePreviewItems.map((item) => (
@@ -341,7 +312,6 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         <SectionIntro
           eyebrow="Тарифы"
           title="Один продукт — три срока"
-          description="Возможности везде одинаковые. Отличается только срок."
         />
 
         <div className={hpStyles.pricingGrid}>
@@ -418,19 +388,17 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               <li key={bullet}>{bullet}</li>
             ))}
           </ul>
-          <p className={ppStyles.helperText} style={{ marginTop: "4px" }}>
-            Оплата через ЮKassa, чек по ФЗ-54. Условия — в{" "}
-            <Link href="/terms" style={{ color: "var(--c-brand)", textDecoration: "underline" }}>оферте</Link>.
-          </p>
+          <div className={ppStyles.helperText} style={{ marginTop: "4px" }}>
+            Оплата через ЮKassa, чек по ФЗ-54.{" "}
+            <Link href="/terms" style={{ color: "var(--c-brand)", textDecoration: "underline" }}>Оферта</Link>.
+          </div>
         </div>
       </ScrollReveal>
 
       {/* FAQ */}
       <ScrollReveal as="section" id="faq" className={hpStyles.scrollSection}>
         <SectionIntro
-          eyebrow="FAQ"
           title="Коротко перед запуском"
-          description="Только то, что важно для решения."
         />
         {faqItems.map((item) => (
           <details key={item.question} className={hpStyles.faqCard}>
@@ -449,15 +417,12 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       <section className={hpStyles.closingBand}>
         <h2 className={hpStyles.closingTitle}>Начните неделю с радаром в Telegram</h2>
         <p className={hpStyles.closingText}>
-          За 2 990 ₽ — семь дней ежедневного радара, профиль под вашу нишу и обратная связь, которая доучивает подбор.
+          Семь дней ежедневного радара и профиль под вашу нишу.
         </p>
         <div className={hpStyles.closingActions}>
           <Link href={checkoutHref} className={ppStyles.primaryAction}>
             Активировать неделю — 2 990 ₽
           </Link>
-          <a href="#preview" className={ppStyles.secondaryAction}>
-            Сначала посмотреть пример
-          </a>
         </div>
       </section>
 
