@@ -1,55 +1,48 @@
 /* ============================================================
-   Landing — premium, professional, Russia-first radar.
-   Visual language: deep focused blue, generous whitespace, calm
-   type, restrained gradients, hairline borders. Premium = rest.
+   Landing — premium, evidence-first, calm.
+   Visual language: deep focused blue on clean light surfaces,
+   one dark hero/closing frame, generous whitespace, restrained
+   type, hairline borders. Premium = rest + honesty. No fabricated
+   data — the radar canvas is a metaphor, the live preview is the
+   real product.
    ============================================================ */
 
-/* ── Sticky top nav ── */
+/* ── Sticky top nav — frosted glass, minimal ── */
 .topBar {
   position: sticky;
   top: 0;
   z-index: 50;
   display: flex;
   justify-content: space-between;
-  gap: var(--space-section);
   align-items: center;
-  flex-wrap: wrap;
-  padding: 12px 18px;
+  gap: 16px;
+  padding: 14px 22px;
   margin: 0 0 var(--space-section);
   border-radius: var(--radius-card-sm);
   border: 1px solid var(--c-border);
-  background: rgba(255, 255, 255, 0.82);
-  backdrop-filter: saturate(180%) blur(14px);
-  box-shadow: 0 6px 24px rgba(15, 23, 42, 0.06);
+  background: rgba(255, 255, 255, 0.78);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  backdrop-filter: saturate(180%) blur(16px);
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.05);
 }
 
 .brandMark {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 11px;
+  text-decoration: none;
 }
 
-.brandLiveDot {
-  width: 9px;
-  height: 9px;
+.brandDot {
+  width: 8px;
+  height: 8px;
   border-radius: 999px;
-  background: #22c55e;
-  box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5);
-  animation: brandPulse 2.4s ease-in-out infinite;
+  background: var(--c-brand);
   flex-shrink: 0;
 }
 
-@keyframes brandPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.45); }
-  50% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .brandLiveDot { animation: none; }
-}
-
 .heroBrandName {
-  font-size: 1.06rem;
+  font-size: 1.02rem;
   font-weight: 800;
   letter-spacing: -0.01em;
   color: var(--c-text-primary);
@@ -63,12 +56,12 @@
 
 .topNavLinks {
   display: flex;
-  gap: 4px;
+  gap: 2px;
   align-items: center;
 }
 
 .topNavLink {
-  padding: 7px 12px;
+  padding: 7px 13px;
   border-radius: 10px;
   color: var(--c-text-secondary);
   font-size: 0.86rem;
@@ -78,75 +71,60 @@
 }
 
 .topNavLink:hover {
-  background: rgba(29, 78, 216, 0.06);
+  background: rgba(29, 78, 216, 0.07);
   color: var(--c-brand);
 }
 
 .topNavCta {
   padding: 8px 16px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
-  color: #fff;
+  border-radius: 11px;
+  background: var(--c-text-primary);
+  color: #ffffff;
   font-size: 0.86rem;
   font-weight: 700;
   text-decoration: none;
-  box-shadow: 0 6px 18px rgba(30, 64, 175, 0.22);
-  transition: box-shadow 0.18s ease, transform 0.15s ease;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.16);
+  transition: transform 0.15s ease, box-shadow 0.18s ease;
 }
 
 .topNavCta:hover {
-  box-shadow: 0 10px 26px rgba(30, 64, 175, 0.3);
   transform: translateY(-1px);
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.22);
 }
 
-/* ── Hero — deep, focused, single proof ── */
+/* ── Hero — centered, dark, calm. RadarCanvas = honest metaphor. ── */
 .heroSection {
   position: relative;
   overflow: hidden;
   border-radius: var(--radius-card);
   margin-bottom: var(--space-section-lg);
-  min-height: clamp(440px, 60vh, 660px);
+  min-height: clamp(460px, 62vh, 680px);
   display: grid;
-  grid-template-columns: 1.15fr 0.85fr;
+  align-content: center;
+  justify-items: center;
+  text-align: center;
+  padding: clamp(56px, 9vw, 110px) clamp(24px, 5vw, 48px);
   background:
-    radial-gradient(120% 130% at 82% 14%, rgba(59, 130, 246, 0.22) 0%, transparent 48%),
-    radial-gradient(90% 90% at 10% 92%, rgba(30, 64, 175, 0.16) 0%, transparent 52%),
-    linear-gradient(160deg, #0a1120 0%, #0f1a33 48%, #0b1426 100%);
+    radial-gradient(120% 130% at 50% 6%, rgba(59, 130, 246, 0.18) 0%, transparent 50%),
+    linear-gradient(165deg, #0f172a 0%, #1e293b 100%);
   color: #f8fafc;
-  box-shadow: 0 32px 90px rgba(11, 18, 38, 0.34);
+  box-shadow: 0 32px 80px rgba(15, 23, 42, 0.3);
 }
 
 .heroContent {
   position: relative;
   z-index: 1;
   display: grid;
-  align-content: center;
-  gap: 22px;
-  padding: clamp(44px, 7vw, 96px) clamp(28px, 5vw, 76px);
-}
-
-.heroEyebrow {
-  justify-self: start;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 14px;
-  border-radius: var(--radius-pill);
-  border: 1px solid rgba(147, 197, 253, 0.32);
-  background: rgba(59, 130, 246, 0.14);
-  color: #cfe0ff;
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  backdrop-filter: blur(6px);
+  gap: 24px;
+  justify-items: center;
+  max-width: 720px;
 }
 
 .heroTitle {
   margin: 0;
-  font-size: clamp(2.2rem, 4.6vw, 4rem);
-  line-height: 1.04;
-  letter-spacing: -0.038em;
-  max-width: 15ch;
+  font-size: clamp(2.3rem, 5.2vw, 4.2rem);
+  line-height: 1.03;
+  letter-spacing: -0.04em;
   font-weight: 800;
   color: #ffffff;
   text-wrap: balance;
@@ -162,10 +140,10 @@
 
 .heroSubtitle {
   margin: 0;
-  max-width: 52ch;
-  color: rgba(226, 232, 240, 0.82);
-  font-size: clamp(1.02rem, 1.4vw, 1.2rem);
-  line-height: 1.68;
+  max-width: 56ch;
+  color: rgba(203, 213, 225, 0.82);
+  font-size: clamp(1.04rem, 1.4vw, 1.22rem);
+  line-height: 1.6;
   font-weight: 400;
 }
 
@@ -174,15 +152,55 @@
   gap: 14px;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
+}
+
+/* Primary CTA rendered on the dark hero — light surface, dark text,
+   so it reads against the slate gradient instead of disappearing into it. */
+.heroCta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 13px 24px;
+  border-radius: 13px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: #ffffff;
+  color: #0f172a;
+  text-decoration: none;
+  font-size: 0.96rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 14px 34px rgba(2, 6, 23, 0.4);
+  transition: transform 0.15s ease, box-shadow 0.18s ease;
+  will-change: transform;
+}
+
+.heroCta:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 42px rgba(2, 6, 23, 0.48);
+}
+
+.heroCta:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .heroCta {
+    transition: none;
+  }
 }
 
 .heroTrust {
   display: flex;
-  gap: 28px;
+  gap: 48px;
   flex-wrap: wrap;
-  padding-top: 18px;
+  justify-content: center;
+  padding-top: 22px;
   border-top: 1px solid rgba(148, 163, 184, 0.18);
-  margin-top: 8px;
+  margin-top: 10px;
+  width: 100%;
+  max-width: 540px;
 }
 
 .heroTrustItem {
@@ -191,133 +209,23 @@
 }
 
 .heroTrustValue {
-  font-size: 1.04rem;
+  font-size: 1.02rem;
   font-weight: 800;
   color: #f8fafc;
   line-height: 1.1;
 }
 
 .heroTrustLabel {
-  color: rgba(203, 213, 225, 0.74);
+  color: rgba(148, 163, 184, 0.78);
   font-size: 0.8rem;
   line-height: 1.4;
-}
-
-/* Hero product mockup — a quiet, floating radar card on the right.
-   SSR-safe: always visible, no JS dependency. */
-.heroMock {
-  position: relative;
-  z-index: 1;
-  display: none;
-  align-items: center;
-  padding: clamp(28px, 4vw, 52px) clamp(20px, 3vw, 40px) clamp(28px, 4vw, 52px) 0;
-}
-
-.heroMockCard {
-  position: relative;
-  width: 100%;
-  max-width: 360px;
-  justify-self: center;
-  border-radius: 20px;
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0.55) 0%, rgba(11, 18, 38, 0.7) 100%);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.38);
-  padding: 20px 22px;
-  display: grid;
-  gap: 16px;
-}
-
-.heroMockHead {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-}
-
-.heroMockDate {
-  font-size: 0.74rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgba(148, 163, 184, 0.85);
-}
-
-.heroMockLive {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: #86efac;
-}
-
-.heroMockLive::before {
-  content: "";
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: #22c55e;
-  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18);
-}
-
-.heroMockRow {
-  display: grid;
-  gap: 8px;
-  padding: 14px 14px;
-  border-radius: 14px;
-  border: 1px solid rgba(148, 163, 184, 0.14);
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.heroMockRowTop {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-}
-
-.heroMockCo {
-  font-size: 0.92rem;
-  font-weight: 700;
-  color: #f1f5f9;
-}
-
-.heroMockScore {
-  padding: 2px 8px;
-  border-radius: var(--radius-pill);
-  background: rgba(59, 130, 246, 0.22);
-  color: #bfdbfe;
-  font-size: 0.72rem;
-  font-weight: 700;
-}
-
-.heroMockWhy {
-  font-size: 0.8rem;
-  line-height: 1.5;
-  color: rgba(203, 213, 225, 0.78);
-}
-
-.heroMockGate {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: #6ee7b7;
-}
-
-@media (min-width: 900px) {
-  .heroMock {
-    display: flex;
-  }
 }
 
 /* ── Section spacing ── */
 .scrollSection {
   display: grid;
   gap: 24px;
-  padding: clamp(32px, 5vw, 60px) 0;
+  padding: clamp(36px, 5vw, 64px) 0;
 }
 
 .scrollSection:first-of-type {
@@ -333,33 +241,33 @@
 
 .principle {
   display: grid;
-  gap: 10px;
-  padding: 22px 22px;
+  gap: 11px;
+  padding: 24px 22px;
   border-radius: var(--radius-card-sm);
   border: 1px solid var(--c-border);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.9) 100%);
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
 }
 
 .principleIcon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
   background: rgba(29, 78, 216, 0.08);
   color: var(--c-brand);
 }
 
 .principleIcon svg {
-  width: 22px;
-  height: 22px;
+  width: 21px;
+  height: 21px;
 }
 
 .principleTitle {
   margin: 0;
-  font-size: 1.04rem;
+  font-size: 1.02rem;
   font-weight: 800;
   letter-spacing: -0.01em;
   color: var(--c-text-primary);
@@ -404,7 +312,7 @@
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.96) 100%);
   display: grid;
   gap: 14px;
-  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
 }
 
 .previewCardHeader {
@@ -438,7 +346,7 @@
   font-weight: 600;
 }
 
-/* ── Pricing — hierarchy, not 3-equal ── */
+/* ── Pricing — hierarchy: primary week plan, then secondary plans ── */
 .pricingGrid {
   display: grid;
   grid-template-columns: 1fr;
@@ -451,10 +359,10 @@
   position: relative;
   display: grid;
   gap: 18px;
-  border: 1.5px solid rgba(37, 99, 235, 0.3);
+  border: 1.5px solid rgba(29, 78, 216, 0.28);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(239, 246, 255, 0.96) 100%);
-  box-shadow: 0 18px 48px rgba(37, 99, 235, 0.16);
-  padding: 26px 28px;
+  box-shadow: 0 16px 42px rgba(29, 78, 216, 0.14);
+  padding: 28px 30px;
 }
 
 .primaryPlanCardHead {
@@ -468,13 +376,12 @@
 .planFlag {
   padding: 5px 12px;
   border-radius: var(--radius-pill);
-  background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
+  background: var(--c-text-primary);
   color: #ffffff;
   font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  box-shadow: 0 6px 16px rgba(30, 64, 175, 0.26);
 }
 
 .savingsBadge {
@@ -483,11 +390,10 @@
   gap: 6px;
   padding: 4px 10px;
   border-radius: var(--radius-pill);
-  background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
+  background: var(--c-brand);
   color: #fff;
   font-size: 0.74rem;
   font-weight: 700;
-  box-shadow: 0 8px 20px rgba(30, 64, 175, 0.22);
 }
 
 .planPriceRow {
@@ -513,9 +419,9 @@
 .secondaryPlanCard {
   display: grid;
   gap: 14px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  background-color: rgba(255, 255, 255, 0.86);
-  padding: 22px 24px;
+  border: 1px solid var(--c-border);
+  background-color: rgba(255, 255, 255, 0.92);
+  padding: 24px 26px;
 }
 
 /* Single shared "what's included" block under pricing */
@@ -571,7 +477,7 @@
   border-radius: var(--radius-card-sm);
   border: 1px solid var(--c-border);
   background-color: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
   overflow: hidden;
 }
 
@@ -618,19 +524,19 @@
   gap: 18px;
   justify-items: center;
   text-align: center;
-  padding: clamp(40px, 6vw, 64px) clamp(24px, 4vw, 48px);
+  padding: clamp(48px, 7vw, 76px) clamp(24px, 4vw, 48px);
   margin-top: var(--space-section-lg);
   border-radius: var(--radius-card);
   background:
-    radial-gradient(120% 140% at 50% 0%, rgba(59, 130, 246, 0.28) 0%, transparent 56%),
-    linear-gradient(160deg, #0a1120 0%, #0f1a33 100%);
+    radial-gradient(120% 140% at 50% 0%, rgba(59, 130, 246, 0.22) 0%, transparent 56%),
+    linear-gradient(165deg, #0f172a 0%, #1e293b 100%);
   color: #f8fafc;
-  box-shadow: 0 28px 80px rgba(11, 18, 38, 0.28);
+  box-shadow: 0 28px 70px rgba(15, 23, 42, 0.26);
 }
 
 .closingTitle {
   margin: 0;
-  font-size: clamp(1.6rem, 3vw, 2.3rem);
+  font-size: clamp(1.7rem, 3.2vw, 2.4rem);
   font-weight: 800;
   letter-spacing: -0.03em;
   line-height: 1.1;
@@ -641,7 +547,7 @@
 .closingText {
   margin: 0;
   max-width: 46ch;
-  color: rgba(226, 232, 240, 0.8);
+  color: rgba(203, 213, 225, 0.8);
   font-size: 1.02rem;
   line-height: 1.6;
 }
@@ -657,37 +563,15 @@
 /* ===================== Mobile responsiveness ===================== */
 
 @media (max-width: 900px) {
-  .heroSection {
-    grid-template-columns: 1fr;
-  }
-
   .previewGrid {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 720px) {
-  .heroSection {
-    min-height: auto;
-    align-content: start;
-  }
-
-  .heroContent {
-    padding: 36px 22px 40px;
-    gap: 18px;
-  }
-
-  .heroTitle {
-    font-size: clamp(1.9rem, 7vw, 2.5rem);
-  }
-
-  .heroTrust {
-    gap: 18px 22px;
-  }
-
   .topBar {
     gap: 10px;
-    padding: 10px 14px;
+    padding: 12px 16px;
   }
 
   .topNavLinks {
@@ -700,6 +584,10 @@
 
   .heroBrandSubtitle {
     font-size: 0.82rem;
+  }
+
+  .heroTrust {
+    gap: 24px;
   }
 
   .secondaryPlansRow {

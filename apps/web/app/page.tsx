@@ -95,7 +95,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       {/* Sticky top nav */}
       <header className={hpStyles.topBar}>
         <a href="/" className={hpStyles.brandMark} style={{ textDecoration: "none" }}>
-          <span className={hpStyles.brandLiveDot} aria-hidden="true" />
+          <span className={hpStyles.brandDot} aria-hidden="true" />
           <div>
             <div className={hpStyles.heroBrandName}>Recruiter Radar</div>
             <div className={hpStyles.heroBrandSubtitle}>
@@ -123,10 +123,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           </h1>
           <p className={hpStyles.heroSubtitle}>
             Каждый день — короткий список нанимающих компаний с поводом для контакта.
-            Доказательства найма, оценка уверенности и безопасный путь — в Telegram.
+            Доказательства найма, оценка уверенности и безопасный путь контакта — в Telegram.
           </p>
           <div className={hpStyles.heroActions}>
-            <a href="#preview" className={ppStyles.primaryAction}>
+            <a href="#preview" className={hpStyles.heroCta}>
               Открыть пример радара
             </a>
           </div>
@@ -139,42 +139,12 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             ))}
           </div>
         </div>
-
-        {/* Floating product mockup — SSR-safe, desktop-only */}
-        <div className={hpStyles.heroMock} aria-hidden="true">
-          <div className={hpStyles.heroMockCard}>
-            <div className={hpStyles.heroMockHead}>
-              <span className={hpStyles.heroMockDate}>Радар · сегодня</span>
-              <span className={hpStyles.heroMockLive}>в работе</span>
-            </div>
-            <div className={hpStyles.heroMockRow}>
-              <div className={hpStyles.heroMockRowTop}>
-                <span className={hpStyles.heroMockCo}>ООО «Технополис»</span>
-                <span className={hpStyles.heroMockScore}>3.6 / 4</span>
-              </div>
-              <div className={hpStyles.heroMockWhy}>
-                Burst найма: 4 вакансии за 5 дней, карьерная страница обновлена.
-              </div>
-              <span className={hpStyles.heroMockGate}>Gate A · 2 источника</span>
-            </div>
-            <div className={hpStyles.heroMockRow}>
-              <div className={hpStyles.heroMockRowTop}>
-                <span className={hpStyles.heroMockCo}>«Финанс-Групп»</span>
-                <span className={hpStyles.heroMockScore}>3.1 / 4</span>
-              </div>
-              <div className={hpStyles.heroMockWhy}>
-                Новый регион, поиск C-level: подтверждён карьерным сайтом.
-              </div>
-              <span className={hpStyles.heroMockGate}>Gate B · авто с меткой</span>
-            </div>
-          </div>
-        </div>
       </section>
 
       {/* Principles / value row */}
       <ScrollReveal as="section" className={hpStyles.scrollSection}>
         <SectionIntro
-          title="Почему этому можно доверять"
+          title="Доверие вместо шума"
         />
         <div className={hpStyles.principles}>
           {principles.map((p) => {
@@ -420,7 +390,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           Семь дней ежедневного радара и профиль под вашу нишу.
         </p>
         <div className={hpStyles.closingActions}>
-          <Link href={checkoutHref} className={ppStyles.primaryAction}>
+          <Link href={checkoutHref} className={hpStyles.heroCta}>
             Активировать неделю — 2 990 ₽
           </Link>
         </div>
