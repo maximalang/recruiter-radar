@@ -50,7 +50,13 @@ const RENDER_FILES = [
   'profile/delivery-form.tsx',
   'onboarding/pilot/[orderId]/page.tsx',
   'onboarding/pilot/[orderId]/pilot-onboarding-components.tsx',
+  'legal/page.tsx',
+  'terms/page.tsx',
+  'privacy/page.tsx',
+  'admin/page.tsx',
+  'checkout/page.tsx',
   'ui/internal-page.tsx',
+  'ui/site-footer.tsx',
   'ui/web-push-opt-in.tsx',
 ];
 

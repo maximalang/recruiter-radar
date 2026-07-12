@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 
 import { getSourceRegistry, getPrimarySourceIds } from "@/lib/sources/source-registry";
 import { getDashboardSourceHealth, getDashboardQualityMetrics, getDashboardOverviewMetrics } from "@/lib/dashboard-data";
@@ -16,6 +17,12 @@ import AdminLoginForm from "./admin-login-form";
 import AdminLogoutButton from "./admin-logout-button";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Панель оператора — Recruiter Radar",
+  description: "Запуск инжеста, мониторинг источников и метрики качества.",
+  robots: { index: false, follow: false },
+};
 
 const ADMIN_NAV: NavItem[] = [
   { href: "/dashboard", label: "Дашборд" },

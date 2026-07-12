@@ -28,6 +28,7 @@ import hpStyles from "./home-page-components.module.css";
 import RadarCanvas from "./radar-canvas";
 import ScrollReveal from "./scroll-reveal";
 import ScrollProgress from "./scroll-progress";
+import { SiteFooter } from "./ui/site-footer";
 
 export const dynamic = "force-dynamic";
 
@@ -320,44 +321,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         ))}
       </ScrollReveal>
 
-      <footer className={hpStyles.siteFooter}>
-        <div className={hpStyles.footerTop}>
-          <div className={hpStyles.footerBrand}>
-            <div className={hpStyles.footerBrandName}>Recruiter Radar</div>
-            <div className={hpStyles.footerBrandSub}>
-              Ежедневный радар по компаниям с активным наймом. Доставка в Telegram.
-            </div>
-          </div>
-
-          <div className={hpStyles.footerOperator}>
-            <div className={hpStyles.footerOperatorLabel}>Оператор сервиса</div>
-            <div className={hpStyles.footerOperatorRow}>
-              <strong>Головий Наталья Ярославна</strong>
-            </div>
-            <div className={hpStyles.footerOperatorRow}>
-              <span>Самозанятый, плательщик НПД</span>
-              <span className={hpStyles.footerOperatorSep}>·</span>
-              <span>ИНН <span className={hpStyles.footerOperatorInn}>622809740837</span></span>
-            </div>
-            <div className={hpStyles.footerOperatorRow}>
-              <span>Оплата через ЮKassa, чек по ФЗ-54</span>
-              <span className={hpStyles.footerOperatorSep}>·</span>
-              <a href="mailto:6uunn9@gmail.com" style={{ color: "inherit", textDecoration: "underline" }}>6uunn9@gmail.com</a>
-            </div>
-          </div>
-        </div>
-
-        <nav className={hpStyles.footerLinks}>
-          <Link href="/legal" className={hpStyles.footerLink}>Реквизиты</Link>
-          <Link href="/terms" className={hpStyles.footerLink}>Оферта</Link>
-          <Link href="/privacy" className={hpStyles.footerLink}>Конфиденциальность</Link>
-          <Link href="/admin" className={hpStyles.footerLink}>Панель оператора</Link>
-        </nav>
-
-        <div className={hpStyles.footerCopy}>
-          © {new Date().getFullYear()} Recruiter Radar
-        </div>
-      </footer>
+      <SiteFooter />
     </PageFrame>
   );
 }

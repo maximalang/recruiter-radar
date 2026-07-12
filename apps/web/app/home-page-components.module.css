@@ -369,114 +369,6 @@
   font-size: var(--fs-sm);
 }
 
-/* Site footer — a quiet two-column panel. Brand + operator requisites side by
-   side, then a thin link row, then copyright. No heavy borders, just air. */
-.siteFooter {
-  margin-top: 28px;
-  padding-top: 28px;
-  border-top: 1px solid var(--c-border, #e2e8f0);
-  display: grid;
-  gap: 22px;
-}
-
-.footerTop {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 28px;
-  align-items: start;
-}
-
-@media (max-width: 640px) {
-  .footerTop {
-    grid-template-columns: 1fr;
-    gap: 22px;
-  }
-}
-
-.footerBrand {
-  display: grid;
-  gap: 4px;
-}
-
-.footerBrandName {
-  font-size: 1.08rem;
-  font-weight: 800;
-  color: var(--c-text-primary, #0f172a);
-}
-
-.footerBrandSub {
-  color: var(--c-text-muted, #94a3b8);
-  font-size: var(--fs-sm);
-  line-height: 1.55;
-  max-width: 38ch;
-}
-
-/* Operator requisites — a compact labeled block, the "who's behind this" panel. */
-.footerOperator {
-  display: grid;
-  gap: 8px;
-  padding: 16px 18px;
-  border-radius: var(--radius-card-sm);
-  border: 1px solid var(--c-border, rgba(15, 23, 42, 0.08));
-  background: rgba(255, 255, 255, 0.6);
-}
-
-.footerOperatorLabel {
-  color: var(--c-brand, #1d4ed8);
-  font-size: 0.7rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.footerOperatorRow {
-  display: flex;
-  gap: 8px;
-  align-items: baseline;
-  flex-wrap: wrap;
-  color: var(--c-text-secondary, #475569);
-  font-size: 0.86rem;
-  line-height: 1.5;
-}
-
-.footerOperatorRow strong {
-  color: var(--c-text-primary, #0f172a);
-  font-weight: 700;
-}
-
-.footerOperatorInn {
-  font-family: ui-monospace, SFMono-Regular, monospace;
-  font-size: 0.92em;
-}
-
-.footerOperatorSep {
-  color: var(--c-text-muted, #94a3b8);
-}
-
-.footerLinks {
-  display: flex;
-  gap: 18px;
-  flex-wrap: wrap;
-  padding-top: 16px;
-  border-top: 1px solid var(--c-border, #e2e8f0);
-}
-
-.footerLink {
-  color: var(--c-text-secondary, #475569);
-  font-size: var(--fs-sm);
-  text-decoration: none;
-}
-
-.footerLink:hover {
-  color: var(--c-accent, #1e40af);
-  text-decoration: underline;
-}
-
-.footerCopy {
-  color: var(--c-text-muted, #94a3b8);
-  font-size: 0.8rem;
-}
-
 /* ===================== Mobile responsiveness ===================== */
 
 @media (max-width: 720px) {
@@ -518,10 +410,6 @@
 
   .previewGrid {
     grid-template-columns: 1fr !important;
-  }
-
-  .footerLinks {
-    gap: 12px;
   }
 }
 

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
 import { PageFrame, SectionIntro, SurfaceCard } from "../ui/page-primitives";
+import { SiteFooter } from "../ui/site-footer";
 
 export const metadata: Metadata = {
   title: "Политика конфиденциальности — Recruiter Radar",
@@ -144,17 +144,8 @@ export default function PrivacyPage() {
             Оператор рассматривает обращения в срок до 30 дней.
           </TermsSection>
         </SurfaceCard>
-
-        <SurfaceCard padding="18px">
-          <div style={{ fontSize: "0.9em", color: "var(--c-text-secondary, #475569)" }}>
-            <Link href="/" style={{ color: "inherit", textDecoration: "underline" }}>← На главную Recruiter Radar</Link>
-            <span style={{ margin: "0 8px" }}>·</span>
-            <Link href="/terms" style={{ color: "inherit", textDecoration: "underline" }}>Оферта</Link>
-            <span style={{ margin: "0 8px" }}>·</span>
-            <Link href="/legal" style={{ color: "inherit", textDecoration: "underline" }}>Реквизиты</Link>
-          </div>
-        </SurfaceCard>
       </section>
+      <SiteFooter />
     </PageFrame>
   );
 }

@@ -1,0 +1,175 @@
+/* Site-wide footer — premium, minimal. A thin rule, brand + links, then a
+   single compact operator line and the copyright. No cards, no heavy borders:
+   air and quiet type carry the weight. Tokens come from page-primitives :root. */
+
+.siteFooter {
+  margin-top: 48px;
+  padding-top: 24px;
+  border-top: 1px solid var(--c-border, rgba(15, 23, 42, 0.08));
+}
+
+/* Light tone (internal + legal pages) — quiet on the page background. */
+.siteFooter[data-tone="light"] {
+  color: var(--c-text-secondary, #475569);
+}
+
+/* Dark tone (landing hero backdrop) — light type on the dark hero gradient. */
+.siteFooter[data-tone="dark"] {
+  color: rgba(203, 213, 225, 0.78);
+  border-top-color: rgba(148, 163, 184, 0.18);
+}
+
+.footerInner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 16px;
+  display: grid;
+  gap: 16px;
+}
+
+/* Top row — brand on the left, nav links on the right. */
+.footerTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.footerBrand {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--c-text-primary, #0f172a);
+  text-decoration: none;
+  letter-spacing: -0.01em;
+}
+
+.siteFooter[data-tone="dark"] .footerBrand {
+  color: #f8fafc;
+}
+
+.footerBrand:hover {
+  color: var(--c-brand, #1d4ed8);
+}
+
+.siteFooter[data-tone="dark"] .footerBrand:hover {
+  color: #cfe0ff;
+}
+
+.footerLinks {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.footerLink {
+  font-size: var(--fs-sm, 0.875rem);
+  color: var(--c-text-secondary, #475569);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.siteFooter[data-tone="dark"] .footerLink {
+  color: rgba(203, 213, 225, 0.78);
+}
+
+.footerLink:hover {
+  color: var(--c-accent, #1e40af);
+  text-decoration: underline;
+}
+
+.siteFooter[data-tone="dark"] .footerLink:hover {
+  color: #cfe0ff;
+}
+
+.footerLink:focus-visible {
+  outline: 2px solid var(--c-brand, #1d4ed8);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* Operator line — one quiet row with the legally-required requisites. */
+.footerOperator {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--c-text-muted, #667085);
+}
+
+.siteFooter[data-tone="dark"] .footerOperator {
+  color: rgba(148, 163, 184, 0.7);
+}
+
+.footerOperatorName {
+  color: var(--c-text-secondary, #475569);
+  font-weight: 600;
+}
+
+.siteFooter[data-tone="dark"] .footerOperatorName {
+  color: rgba(226, 232, 240, 0.9);
+}
+
+.footerOperatorSep {
+  color: var(--c-text-muted, #94a3b8);
+  opacity: 0.7;
+}
+
+.footerOperatorInn {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.92em;
+}
+
+.footerOperatorEmail {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.footerOperatorEmail:hover {
+  color: var(--c-accent, #1e40af);
+}
+
+.siteFooter[data-tone="dark"] .footerOperatorEmail:hover {
+  color: #cfe0ff;
+}
+
+/* Copyright — the smallest, most muted line. */
+.footerCopy {
+  font-size: 0.76rem;
+  color: var(--c-text-muted, #94a3b8);
+  line-height: 1.5;
+}
+
+.siteFooter[data-tone="dark"] .footerCopy {
+  color: rgba(148, 163, 184, 0.55);
+}
+
+/* ── Mobile ── */
+@media (max-width: 640px) {
+  .siteFooter {
+    margin-top: 36px;
+    padding-top: 20px;
+  }
+
+  .footerInner {
+    padding: 0 12px;
+    gap: 14px;
+  }
+
+  .footerTop {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .footerLinks {
+    gap: 16px;
+  }
+
+  .footerOperator {
+    font-size: 0.76rem;
+  }
+}

@@ -2,6 +2,7 @@ import type { ReactNode, ReactElement, SVGProps } from "react";
 import Link from "next/link";
 
 import s from "./internal-page.module.css";
+import { SiteFooter } from "./site-footer";
 import { repairPossiblyMojibakeText } from "../../lib/copy/repair";
 import {
   scorePercent,
@@ -122,6 +123,7 @@ export function InternalPageFrame(props: {
       <a href="#main-content" className={s.skipLink}>Перейти к содержанию</a>
       {props.navItems ? <TopNav items={props.navItems} /> : null}
       <div className={s.internalPageFrameInner} id="main-content">{props.children}</div>
+      <SiteFooter />
     </main>
   );
 }

@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
 import {
   NoticeBox,
@@ -8,6 +7,7 @@ import {
   SummaryRow,
   SurfaceCard,
 } from "../ui/page-primitives";
+import { SiteFooter } from "../ui/site-footer";
 
 export const metadata: Metadata = {
   title: "Реквизиты — Recruiter Radar",
@@ -66,17 +66,8 @@ export default function LegalPage() {
           title="ИНН для оплаты"
           description="Этот ИНН применяется при формировании чеков через ЮKassa в соответствии с ФЗ-54. Полные условия оказания услуг — в оферте."
         />
-
-        <SurfaceCard padding="18px">
-          <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap", fontSize: "0.92rem", color: "var(--c-text-secondary, #475569)" }}>
-            <Link href="/" style={{ color: "inherit", textDecoration: "underline" }}>← На главную</Link>
-            <span style={{ color: "var(--c-text-muted, #94a3b8)" }}>·</span>
-            <Link href="/terms" style={{ color: "inherit", textDecoration: "underline" }}>Оферта</Link>
-            <span style={{ color: "var(--c-text-muted, #94a3b8)" }}>·</span>
-            <Link href="/privacy" style={{ color: "inherit", textDecoration: "underline" }}>Конфиденциальность</Link>
-          </div>
-        </SurfaceCard>
       </section>
+      <SiteFooter />
     </PageFrame>
   );
 }
