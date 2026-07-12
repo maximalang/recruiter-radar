@@ -33,7 +33,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Rec
   const plan = getPublicPlanByCode(planCode);
   const restartHref = buildCheckoutHref({ ...input, planCode });
 
-  // Recurring plans (monthly, yearly) have no self-serve subscription flow while
+  // Recurring plans (monthly, quarterly) have no self-serve subscription flow while
   // billing is stubbed — the checkout captures a sales request instead of a payment.
   const isRequest = plan.isRecurring;
 
@@ -69,13 +69,13 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Rec
 
   return (
     <InternalPageFrame navItems={CHECKOUT_NAV}>
-      <InternalPageHeader title={isRequest ? `Подключение: ${plan.name}` : "Оформление пилота"} />
+      <InternalPageHeader title={isRequest ? `Подключение: ${plan.name}` : "Оформление: пробная неделя"} />
       <div className={ipStyles.narrowLayout}>
         <ContentCard>
-          <ContentCardTitle>{isRequest ? plan.name : "Пилотный запуск"}</ContentCardTitle>
+          <ContentCardTitle>{isRequest ? plan.name : "Пробная неделя"}</ContentCardTitle>
           <p className={ipStyles.bodyText}>
             {isRequest
-              ? "Это тариф с ежемесячным сопровождением. Оставьте заявку — мы свяжемся, чтобы подключить радар и согласовать оплату."
+              ? "Это тариф на больший срок. Оставьте заявку — мы свяжемся, чтобы подключить радар и согласовать оплату."
               : "Оплата запускается только после явного подтверждения. После оплаты мы начнём генерировать ежедневный радар компаний для вашей ниши."}
           </p>
           <div className={ipStyles.fieldRow}>
@@ -98,7 +98,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Rec
             <p className={ipStyles.bodyTextMutedBlock}>
               {isRequest
                 ? "Нажмите кнопку ниже, чтобы оставить заявку."
-                : "Нажмите кнопку ниже, чтобы запустить пилот."}
+                : "Нажмите кнопку ниже, чтобы оплатить неделю."}
             </p>
           ) : null}
           <form action={startCheckoutAction}>
@@ -109,7 +109,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Rec
         </ContentCard>
 
         <InternalBackLink href={restartHref}>
-          {isRequest ? "Изменить параметры" : "Обновить параметры пилота"}
+          {isRequest ? "Изменить параметры" : "Обновить параметры недели"}
         </InternalBackLink>
       </div>
     </InternalPageFrame>

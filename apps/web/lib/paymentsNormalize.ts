@@ -240,8 +240,9 @@ function normalizeProductCode(value: string): PublicPlanCode {
     return normalizedValue;
   }
 
-  // Legacy "premium" orders fold onto the yearly plan (pricing model changed).
-  // normalizeLegacyPlanCode throws only for genuinely unknown codes.
+  // Legacy "premium"/"yearly" orders fold onto the quarterly plan (pricing
+  // model changed: v1 premium → v2 yearly → v3 quarterly). normalizeLegacyPlanCode
+  // throws only for genuinely unknown codes.
   return normalizeLegacyPlanCode(normalizedValue);
 }
 

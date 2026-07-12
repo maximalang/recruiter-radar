@@ -30,6 +30,8 @@ function CheckboxGroup(props: {
   hint: string;
   options: readonly ProfileOption[];
   selected: readonly string[];
+  /** Shown when nothing is selected. Defaults to a soft-boost phrasing. */
+  emptyHint?: string;
 }) {
   const selectedSet = new Set(props.selected);
   return (
@@ -52,7 +54,9 @@ function CheckboxGroup(props: {
         ))}
       </div>
       {selectedSet.size === 0 && (
-        <span className={styles.groupEmptyHint}>Фильтр не настроен — учитываются все варианты.</span>
+        <span className={styles.groupEmptyHint}>
+          {props.emptyHint ?? "Ничего не выбрано — все варианты учитываются без усиления."}
+        </span>
       )}
     </fieldset>
   );
@@ -88,35 +92,23 @@ export function ProfileForm(props: {
         <NoticeBox tone="danger" title="Не удалось сохранить" description={state.error} />
       ) : null}
 
-      {/* Agency identity + cadence */}
+      {/* Group 1 — Agency identity. Just who you are; volume lives in its own
+          group at the bottom so it isn't conflated with the name. */}
       <fieldset className={styles.group}>
         <div className={styles.groupHead}>
           <span className={styles.groupTitle}>Агентство</span>
-          <span className={styles.groupHint}>Как вас называть и сколько компаний показывать в одной подборке.</span>
+          <span className={styles.groupHint}>Как вас называть в радаре.</span>
         </div>
-        <div className={styles.twoCol}>
-          <label className={ppStyles.field}>
-            <span className={ppStyles.fieldLabel}>Название агентства</span>
-            <input className={ppStyles.input} name="agencyName" defaultValue={profile.agencyName} required />
-          </label>
-          <label className={ppStyles.field}>
-            <span className={ppStyles.fieldLabel}>Компаний в подборке</span>
-            <input
-              className={ppStyles.input}
-              name="dailyDigestLimit"
-              type="number"
-              min={1}
-              max={10}
-              defaultValue={profile.dailyDigestLimit}
-            />
-            <span className={ppStyles.helperText}>От 1 до 10 компаний в одной подборке.</span>
-          </label>
-        </div>
+        <label className={ppStyles.field}>
+          <span className={ppStyles.fieldLabel}>Название агентства</span>
+          <input className={ppStyles.input} name="agencyName" defaultValue={profile.agencyName} required />
+        </label>
       </fieldset>
 
-      {/* Hiring practice mode — the universal agency-model dimension. Changes
-          how the radar weights signals: executive → seniority leads, volume →
-          open-role volume leads, specialist → balanced (default). */}
+      {/* Group 2 — Practice + roles. These belong together: the mode decides HOW
+          roles are weighted (executive → seniority, volume → raw count,
+          specialist → relevance), so reading them as one block makes the
+          radar's lens legible. */}
       <fieldset className={styles.group}>
         <div className={styles.groupHead}>
           <span className={styles.groupTitle}>Тип практики</span>
@@ -166,7 +158,9 @@ export function ProfileForm(props: {
         </p>
       </fieldset>
 
-      {/* Roles — drives Fit scoring AND boosts within-digest ranking (not a hard filter) */}
+      {/* Roles — drives Fit scoring AND boosts within-digest ranking (not a hard
+          filter). Sits right after the mode because the mode is what gives these
+          roles their meaning. */}
       <CheckboxGroup
         name="roles"
         title="Роли, которые вы закрываете"
@@ -175,16 +169,63 @@ export function ProfileForm(props: {
         selected={profile.roles}
       />
 
-      {/* Industries served */}
+      {/* Group 3 — Where & whom. Geography, sector, size read as one
+          "physical + market footprint" block. Served-industries and
+          excluded-industries are adjacent now: the two halves of one decision
+          (what you take / what you don't) instead of four sections apart. */}
+      <fieldset className={styles.group}>
+        <div className={styles.groupHead}>
+          <span className={styles.groupTitle}>География и охват</span>
+          <span className={styles.groupHint}>Где работаете, какие отрасли и размеры компаний берёте — и какие точно нет.</span>
+        </div>
+        <div className={styles.twoCol}>
+          <label className={ppStyles.field}>
+            <span className={ppStyles.fieldLabel}>Основной регион</span>
+            <input className={ppStyles.input} name="targetCity" defaultValue={profile.targetCity ?? ""} placeholder="Москва" />
+          </label>
+          <label className={ppStyles.field}>
+            <span className={ppStyles.fieldLabel}>Специализация</span>
+            <input className={ppStyles.input} name="specialization" defaultValue={profile.specialization ?? ""} placeholder="Напр.: промышленный подбор, финансы C-level, массовый найм" />
+            <span className={ppStyles.helperText}>Через запятую. Помогает точнее находить компании под вашу практику — не только IT.</span>
+          </label>
+        </div>
+        <label className={styles.toggle}>
+          <input type="checkbox" name="remoteFriendly" defaultChecked={profile.remoteFriendly} />
+          Готовы работать с удалёнными компаниями вне основного региона
+        </label>
+        <label className={ppStyles.field}>
+          <span className={ppStyles.fieldLabel}>Исключённые регионы</span>
+          <textarea
+            className={ppStyles.textarea}
+            name="excludedLocations"
+            rows={3}
+            defaultValue={toLines(profile.excludedLocations)}
+          />
+          <span className={ppStyles.helperText}>По одному региону на строку. Компании из этих регионов не появятся в радаре.</span>
+        </label>
+      </fieldset>
+
+      {/* Served industries — boosts (soft), not a hard filter. */}
       <CheckboxGroup
         name="industries"
-        title="Отрасли клиентов"
+        title="Отрасли, с которыми работаете"
         hint="Усиливает компании из этих отраслей в подборке. Пусто — без отраслевого предпочтения."
         options={INDUSTRY_OPTIONS}
         selected={profile.industries}
       />
 
-      {/* Company sizes */}
+      {/* Excluded industries — hard exclude. Adjacent to the served list above so
+          the take/don't-take decision reads as one. */}
+      <CheckboxGroup
+        name="excludedIndustries"
+        title="Отрасли, с которыми не работаете"
+        hint="Жёсткое исключение: такие компании не попадут в радар, даже при сильном сигнале найма."
+        options={INDUSTRY_OPTIONS}
+        selected={profile.excludedIndustries}
+        emptyHint="Ничего не исключено — все отрасли попадают в радар."
+      />
+
+      {/* Company sizes — soft boost, kept with the rest of the footprint. */}
       <CheckboxGroup
         name="companySizes"
         title="Размер компаний"
@@ -193,13 +234,31 @@ export function ProfileForm(props: {
         selected={profile.companySizes}
       />
 
-      {/* Targeting thresholds — data-backed hard filters (Block 2) */}
+      {/* Group 4 — Contact policy. Reads as "how we reach them", a distinct
+          safety concern from "whom we target", so it gets its own labeled block
+          before the advanced tuning. */}
       <fieldset className={styles.group}>
         <div className={styles.groupHead}>
-          <span className={styles.groupTitle}>Пороги качества сигнала</span>
-          <span className={styles.groupHint}>
-            Жёсткие фильтры по силе и свежести найма. Пусто — порог не применяется.
-          </span>
+          <span className={styles.groupTitle}>Путь контакта</span>
+          <span className={styles.groupHint}>Какой путь контакта считать безопасным. «Только корпоративные» отсекает компании без корпоративной поверхности.</span>
+        </div>
+        <label className={ppStyles.field}>
+          <select className={ppStyles.input} name="contactPolicy" defaultValue={profile.contactPolicy}>
+            {CONTACT_POLICY_OPTIONS.map((opt) => (
+              <option key={opt.key} value={opt.key}>{opt.label}</option>
+            ))}
+          </select>
+        </label>
+      </fieldset>
+
+      {/* Group 5 — Fine-tuning. The advanced controls that can zero out the
+          radar if set too aggressively. Deliberately last and clearly framed:
+          thresholds + keyword tuning + digest volume. Everything here is
+          optional — empty means "no constraint". */}
+      <fieldset className={styles.group}>
+        <div className={styles.groupHead}>
+          <span className={styles.groupTitle}>Точная настройка</span>
+          <span className={styles.groupHint}>Необязательно. Жёсткие фильтры по силе и свежести найма — пусто значит «без ограничения». Слишком строгие пороги могут оставить радар пустым.</span>
         </div>
         <div className={styles.threeCol}>
           <label className={ppStyles.field}>
@@ -243,75 +302,19 @@ export function ProfileForm(props: {
             <span className={ppStyles.helperText}>Минимум распознанных вакансий.</span>
           </label>
         </div>
-      </fieldset>
-
-      {/* Geography + remote */}
-      <fieldset className={styles.group}>
-        <div className={styles.groupHead}>
-          <span className={styles.groupTitle}>Регионы</span>
-          <span className={styles.groupHint}>Где вы работаете и как относитесь к удалённым компаниям.</span>
-        </div>
         <div className={styles.twoCol}>
           <label className={ppStyles.field}>
-            <span className={ppStyles.fieldLabel}>Основной регион</span>
-            <input className={ppStyles.input} name="targetCity" defaultValue={profile.targetCity ?? ""} placeholder="Москва" />
-          </label>
-          <label className={ppStyles.field}>
-            <span className={ppStyles.fieldLabel}>Специализация</span>
-            <input className={ppStyles.input} name="specialization" defaultValue={profile.specialization ?? ""} placeholder="Напр.: промышленный подбор, финансы C-level, массовый найм" />
-            <span className={ppStyles.helperText}>Через запятую. Помогает точнее находить компании под вашу практику — не только IT.</span>
-          </label>
-        </div>
-        <label className={styles.toggle}>
-          <input type="checkbox" name="remoteFriendly" defaultChecked={profile.remoteFriendly} />
-          Готовы работать с удалёнными компаниями вне основного региона
-        </label>
-        <label className={ppStyles.field}>
-          <span className={ppStyles.fieldLabel}>Исключённые регионы</span>
-          <textarea
-            className={ppStyles.textarea}
-            name="excludedLocations"
-            rows={3}
-            defaultValue={toLines(profile.excludedLocations)}
-          />
-          <span className={ppStyles.helperText}>По одному региону на строку. Компании из этих регионов не появятся в радаре.</span>
-        </label>
-      </fieldset>
-
-      {/* Contact policy — gates reachability/delivery */}
-      <fieldset className={styles.group}>
-        <div className={styles.groupHead}>
-          <span className={styles.groupTitle}>Политика контакта</span>
-          <span className={styles.groupHint}>Определяет, какой путь контакта мы считаем безопасным. «Только корпоративные» отсекает лиды без корпоративной поверхности.</span>
-        </div>
-        <label className={ppStyles.field}>
-          <select className={ppStyles.input} name="contactPolicy" defaultValue={profile.contactPolicy}>
-            {CONTACT_POLICY_OPTIONS.map((opt) => (
-              <option key={opt.key} value={opt.key}>{opt.label}</option>
-            ))}
-          </select>
-        </label>
-      </fieldset>
-
-      {/* Keyword include / exclude */}
-      <fieldset className={styles.group}>
-        <div className={styles.groupHead}>
-          <span className={styles.groupTitle}>Ключевые фразы</span>
-          <span className={styles.groupHint}>Точная настройка: какие сигналы усиливать, а какие исключать из радара.</span>
-        </div>
-        <div className={styles.twoCol}>
-          <label className={ppStyles.field}>
-            <span className={ppStyles.fieldLabel}>Усиливать</span>
+            <span className={ppStyles.fieldLabel}>Усиливать фразы</span>
             <textarea
               className={ppStyles.textarea}
               name="includeKeywords"
               rows={4}
               defaultValue={toLines(profile.includeKeywords)}
             />
-            <span className={ppStyles.helperText}>По одной фразе на строку.</span>
+            <span className={ppStyles.helperText}>По одной фразе на строку. Поднимает компании с этими словами.</span>
           </label>
           <label className={ppStyles.field}>
-            <span className={ppStyles.fieldLabel}>Исключать</span>
+            <span className={ppStyles.fieldLabel}>Исключать фразы</span>
             <textarea
               className={ppStyles.textarea}
               name="excludeKeywords"
@@ -323,14 +326,27 @@ export function ProfileForm(props: {
         </div>
       </fieldset>
 
-      {/* Excluded industries */}
-      <CheckboxGroup
-        name="excludedIndustries"
-        title="Отрасли, с которыми не работаете"
-        hint="Жёсткое исключение: такие компании не попадут в радар, даже при сильном сигнале найма."
-        options={INDUSTRY_OPTIONS}
-        selected={profile.excludedIndustries}
-      />
+      {/* Group 6 — Volume. How many companies per digest. Lives at the end so
+          it reads as a delivery-shape control, not an identity field. Still
+          saved by this same action (column is on client_profiles). */}
+      <fieldset className={styles.group}>
+        <div className={styles.groupHead}>
+          <span className={styles.groupTitle}>Объём подборки</span>
+          <span className={styles.groupHint}>Сколько компаний показывать в одном радаре.</span>
+        </div>
+        <label className={ppStyles.field}>
+          <span className={ppStyles.fieldLabel}>Компаний в одной подборке</span>
+          <input
+            className={ppStyles.input}
+            name="dailyDigestLimit"
+            type="number"
+            min={1}
+            max={10}
+            defaultValue={profile.dailyDigestLimit}
+          />
+          <span className={ppStyles.helperText}>От 1 до 10. Больше — шире охват, меньше — фокус на сильнейших.</span>
+        </label>
+      </fieldset>
 
       <div className={styles.submitRow}>
         <FormSubmitButton idleLabel="Сохранить профиль" pendingLabel="Сохраняем..." className={ppStyles.primaryAction} />

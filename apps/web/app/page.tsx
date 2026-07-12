@@ -40,7 +40,7 @@ type HomePreviewItem = Awaited<ReturnType<typeof getPublicSampleDigestState>>["i
 
 const heroTrust = [
   { value: "Только подтверждённый найм", label: "живые доказательства, не список «на всякий случай»" },
-  { value: "2 990 ₽ за пилот", label: "чек самозанятого, оплата через ЮKassa" },
+  { value: "2 990 ₽ за неделю", label: "чек самозанятого, оплата через ЮKassa" },
 ] as const;
 
 const howItWorksItems = [
@@ -105,7 +105,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               Открыть пример радара
             </a>
             <Link href={checkoutHref} className={ppStyles.secondaryAction}>
-              Запустить пилот — 2 990 ₽
+              Попробовать неделю — 2 990 ₽
             </Link>
           </div>
           <div className={hpStyles.heroTrust}>
@@ -280,7 +280,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             )}
 
             <Link href={checkoutHref} className={ppStyles.primaryAction}>
-              {previewState.items.length > 0 ? "Получать такой радар каждый день" : "Запустить пилот"}
+              {previewState.items.length > 0 ? "Получать такой радар каждый день" : "Попробовать неделю"}
             </Link>
           </SurfaceCard>
         </div>
@@ -316,7 +316,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
         <div className={hpStyles.pricingGrid}>
           {PUBLIC_PLANS.map((plan) => {
-            const isYearly = plan.code === "yearly";
+            const isQuarterly = plan.code === "quarterly";
             const isFeatured = plan.isPrimary;
             return (
               <SurfaceCard
@@ -331,14 +331,14 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                     <StatusBadge tone={isFeatured ? "info" : "neutral"} className={ppStyles.planBadge}>
                       {plan.name}
                     </StatusBadge>
-                    {isYearly ? (
-                      <span className={hpStyles.savingsBadge}>выгода 89 890 ₽</span>
+                    {isQuarterly ? (
+                      <span className={hpStyles.savingsBadge}>выгода 14 980 ₽</span>
                     ) : null}
                   </div>
                   <div className={hpStyles.planPriceRow}>
                     <span className={ppStyles.planPrice}>{plan.price}</span>
-                    {isYearly ? (
-                      <span className={hpStyles.planPriceSmall}>~7 499 ₽/мес</span>
+                    {isQuarterly ? (
+                      <span className={hpStyles.planPriceSmall}>~9 997 ₽/мес</span>
                     ) : null}
                   </div>
                   <div className={ppStyles.planPriceCadence}>{plan.cadence}</div>

@@ -122,7 +122,7 @@ export async function startCheckoutOrder(input: StartCheckoutOrderInput): Promis
   const provider = getConfiguredPaymentProvider();
   const successUrl = `${normalizeSiteUrl(input.siteUrl)}/checkout/order/${order.id}/success`;
   const cancelUrl = `${normalizeSiteUrl(input.siteUrl)}/checkout/order/${order.id}/cancel`;
-  // Recurring plans (monthly, yearly) have no self-serve subscription flow — we
+  // Recurring plans (monthly, quarterly) have no self-serve subscription flow — we
   // capture them as a sales request, never as a pilot and never as a payment.
   const isRecurringPlan = plan.isRecurring;
   const unavailableReason = isRecurringPlan ? "request-received" : "payment-unavailable";

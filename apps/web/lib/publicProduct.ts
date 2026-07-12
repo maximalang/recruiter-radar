@@ -2,7 +2,7 @@ import { getHhDigestItems, type HhDigestItem } from "./hhDigest"
 import { deriveLawfulContactPath, deriveNegativeSignals } from "./leads-data"
 import { rankPreviewItems, type PreviewRelevanceSignals } from "./preview-relevance"
 
-export type PublicPlanCode = "pilot" | "monthly" | "yearly"
+export type PublicPlanCode = "pilot" | "monthly" | "quarterly"
 
 export type PublicPlan = {
   code: PublicPlanCode
@@ -16,7 +16,7 @@ export type PublicPlan = {
   ctaLabel: string
   isPrimary: boolean
   /**
-   * Recurring plans (monthly, yearly) are billed per period. With the billing
+   * Recurring plans (monthly, quarterly) are billed per period. With the billing
    * provider stubbed there is no real subscription flow, so a checkout for these
    * is captured as a sales request — NOT a self-serve pilot. Drives whether the
    * pilot application + pilot onboarding funnel is triggered. See payments.ts.
@@ -26,7 +26,7 @@ export type PublicPlan = {
 
 /**
  * Identical capability set for every plan — the tariff differs only by term
- * (pilot = short trial, monthly = per-month, yearly = per-year with a saving).
+ * (pilot = 1 week, monthly = 1 month, quarterly = 3 months with a saving).
  * Do NOT diverge capabilities between plans: the product contract is that every
  * paying customer gets the same radar.
  */
@@ -68,8 +68,8 @@ export type PublicPreviewItem = HhDigestItem & {
 export const PUBLIC_PLANS: PublicPlan[] = [
   {
     code: "pilot",
-    name: "Пилот",
-    cadence: "7–14 дней",
+    name: "Неделя",
+    cadence: "7 дней",
     amountMinor: 299000,
     currency: "RUB",
     price: "2 990 ₽",
@@ -86,22 +86,22 @@ export const PUBLIC_PLANS: PublicPlan[] = [
     amountMinor: 1499000,
     currency: "RUB",
     price: "14 990 ₽/мес",
-    description: "Полный доступ к радару на месяц. Те же возможности, что и на год — просто короче срок.",
+    description: "Полный доступ к радару на месяц. Те же возможности, что и на больший срок — просто короче период.",
     bullets: SHARED_PLAN_BULLETS,
     ctaLabel: "Подключить на месяц",
     isPrimary: false,
     isRecurring: true
   },
   {
-    code: "yearly",
-    name: "Год",
-    cadence: "365 дней, экономия 89 890 ₽",
-    amountMinor: 8999000,
+    code: "quarterly",
+    name: "Три месяца",
+    cadence: "90 дней, экономия 14 980 ₽",
+    amountMinor: 2999000,
     currency: "RUB",
-    price: "89 990 ₽/год",
-    description: "Годовой доступ со скидкой — почти 6 месяцев бесплатно (~7 500 ₽/мес). Для команды, которая делает радар постоянным каналом.",
+    price: "29 990 ₽/3 мес",
+    description: "Доступ на три месяца со скидкой — выгоднее помесячной оплаты (~9 997 ₽/мес). Для команды, которая делает радар рабочим каналом на квартал.",
     bullets: SHARED_PLAN_BULLETS,
-    ctaLabel: "Подключить на год",
+    ctaLabel: "Подключить на 3 месяца",
     isPrimary: false,
     isRecurring: true
   }
@@ -117,15 +117,18 @@ export function isPublicPlanCode(code: unknown): code is PublicPlanCode {
 }
 
 /**
- * Map a legacy plan code onto the current one. The pricing model changed from
- * pilot/monthly/premium (different capabilities) to pilot/monthly/yearly
- * (identical capabilities). Existing DB orders and old checkout links may still
- * carry "premium" — fold them onto the yearly plan so historical data does not
+ * Map a legacy plan code onto the current one. The pricing model changed twice:
+ *   v1  pilot/monthly/premium (different capabilities)
+ *   v2  pilot/monthly/yearly  (identical capabilities, yearly term)
+ *   v3  pilot/monthly/quarterly (current — week / month / 3 months)
+ * Existing DB orders and old checkout links may still carry "premium" or
+ * "yearly" — fold both onto the quarterly plan so historical data does not
  * throw. The pilot and monthly codes are unchanged.
  */
 export function normalizeLegacyPlanCode(code: string): PublicPlanCode {
   const normalized = code.trim().toLocaleLowerCase("en-US")
-  if (normalized === "premium") return "yearly"
+  if (normalized === "premium") return "quarterly"
+  if (normalized === "yearly") return "quarterly"
   if (isPublicPlanCode(normalized)) return normalized
   throw new Error(`Unknown product code: ${code}`)
 }
@@ -135,9 +138,9 @@ export function getPublicPlanByCode(code: PublicPlanCode | string): PublicPlan {
   if (isPublicPlanCode(normalized)) {
     return PUBLIC_PLAN_BY_CODE[normalized]
   }
-  // Legacy "premium" → yearly, so historical orders/links don't throw.
-  if (normalized === "premium") {
-    return PUBLIC_PLAN_BY_CODE.yearly
+  // Legacy "premium"/"yearly" → quarterly, so historical orders/links don't throw.
+  if (normalized === "premium" || normalized === "yearly") {
+    return PUBLIC_PLAN_BY_CODE.quarterly
   }
 
   throw new Error(`Unknown product code: ${code}`)

@@ -50,7 +50,7 @@ export default async function SettingsProfilePage() {
     <InternalPageFrame navItems={SETTINGS_NAV}>
       <InternalPageHeader
         title="Кто ваши идеальные клиенты?"
-        subtitle="Чем точнее профиль, тем релевантнее ежедневная подборка."
+        subtitle="Чем точнее профиль, тем релевантнее ежедневная подборка. Заполните сверху вниз — основные блоки идут раньше, точная настройка в конце."
       />
       {profile && completion ? (
         <ContentCard>
