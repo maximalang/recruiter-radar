@@ -49,12 +49,12 @@ describe('EmptyState (T0.2 — SVG icon API)', () => {
     render(
       <EmptyState
         title="Пусто"
-        action={{ href: '/settings/profile', label: 'Настроить профиль' }}
+        action={{ href: '/profile', label: 'Настроить профиль' }}
       />,
     );
     const link = screen.getByText('Настроить профиль').closest('a');
     expect(link).not.toBeNull();
-    expect(link?.getAttribute('href')).toBe('/settings/profile');
+    expect(link?.getAttribute('href')).toBe('/profile');
   });
 
   it('no longer accepts a string icon (type contract is SVG-component)', () => {

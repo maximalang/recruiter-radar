@@ -16,7 +16,7 @@
  */
 import { render } from '@testing-library/react';
 import type { ReactElement, SVGProps } from 'react';
-import { modeIcon } from '@/app/settings/profile/profile-form-helpers';
+import { modeIcon } from '@/app/profile/profile-form-helpers';
 import { TargetIcon, TrendIcon, BriefcaseIcon } from '@/app/ui/icons';
 
 type IconCmp = (p: SVGProps<SVGSVGElement>) => ReactElement;

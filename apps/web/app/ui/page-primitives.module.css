@@ -342,38 +342,6 @@
   font-size: 0.88rem;
 }
 
-/* Three question grid */
-.threeQuestionGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 10px;
-}
-
-/* Three question card */
-.threeQuestionCard {
-  display: grid;
-  gap: 6px;
-  padding: 12px 14px;
-  border-radius: 16px;
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  background-color: #fbfcfd;
-}
-
-/* Three question label */
-.threeQuestionLabel {
-  color: #667085;
-  font-size: 0.8rem;
-  font-weight: 700;
-}
-
-/* Three question value */
-.threeQuestionValue {
-  color: #0f172a;
-  font-size: 0.92rem;
-  font-weight: 600;
-  line-height: 1.55;
-}
-
 /* Chip */
 .chip {
   display: inline-flex;

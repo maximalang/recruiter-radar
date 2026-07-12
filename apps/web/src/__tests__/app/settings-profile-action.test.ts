@@ -1,5 +1,5 @@
 /**
- * Owner-scoped save action for /settings/profile.
+ * Owner-scoped save action for /profile.
  *
  * Security invariant (anti-IDOR): the action must resolve the target profile
  * ONLY from the authenticated session owner — never from a form-supplied id —
@@ -15,6 +15,7 @@ import { jest } from '@jest/globals'
 const getClientProfileByOwnerId = jest.fn()
 const saveClientProfile = jest.fn()
 const readOwnerSession = jest.fn()
+const countMatchingCandidatesForProfile = jest.fn()
 
 jest.mock('@/lib/clientProfiles', () => ({
   ...jest.requireActual('@/lib/clientProfiles'),
@@ -28,6 +29,13 @@ jest.mock('@/lib/session', () => ({
 
 jest.mock('next/cache', () => ({
   revalidatePath: jest.fn(),
+}))
+
+// The action now returns a live match count (best-effort) alongside ok. Mock the
+// counter so the result shape is deterministic — this test is about the IDOR
+// boundary, not the match-count logic.
+jest.mock('@/lib/digest', () => ({
+  countMatchingCandidatesForProfile,
 }))
 
 const OWNER_PROFILE = {
@@ -61,7 +69,7 @@ function form(entries: Record<string, string | string[]>): FormData {
 }
 
 async function loadAction() {
-  const mod = await import('../../../app/settings/profile/actions')
+  const mod = await import('../../../app/profile/actions')
   return mod.saveSettingsProfileAction
 }
 
@@ -95,6 +103,7 @@ describe('saveSettingsProfileAction', () => {
     readOwnerSession.mockResolvedValue('77')
     getClientProfileByOwnerId.mockResolvedValue(OWNER_PROFILE)
     saveClientProfile.mockResolvedValue(OWNER_PROFILE)
+    countMatchingCandidatesForProfile.mockResolvedValue({ count: 3, capped: false })
     const save = await loadAction()
 
     const result = await save(
@@ -109,7 +118,7 @@ describe('saveSettingsProfileAction', () => {
       }),
     )
 
-    expect(result).toEqual({ ok: true })
+    expect(result).toEqual({ ok: true, matchCount: { count: 3, capped: false } })
     expect(getClientProfileByOwnerId).toHaveBeenCalledWith('77')
     expect(saveClientProfile).toHaveBeenCalledTimes(1)
 

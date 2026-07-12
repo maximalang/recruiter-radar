@@ -108,42 +108,6 @@ export function SectionIntro(props: {
   );
 }
 
-export function ThreeQuestionPanel(props: {
-  whatLabel?: string;
-  whatValue: ReactNode;
-  whyLabel?: string;
-  whyValue: ReactNode;
-  nextLabel?: string;
-  nextValue: ReactNode;
-  style?: React.CSSProperties;
-}) {
-  const items = [
-    {
-      label: props.whatLabel ?? "Что важно сегодня",
-      value: props.whatValue
-    },
-    {
-      label: props.whyLabel ?? "Почему это важно",
-      value: props.whyValue
-    },
-    {
-      label: props.nextLabel ?? "Что делать дальше",
-      value: props.nextValue
-    }
-  ];
-
-  return (
-    <div className={styles.threeQuestionGrid} style={props.style}>
-      {items.map((item) => (
-        <div key={item.label} className={styles.threeQuestionCard}>
-          <div className={styles.threeQuestionLabel}>{repairVisibleNode(item.label)}</div>
-          <div className={styles.threeQuestionValue}>{repairVisibleNode(item.value)}</div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function repairVisibleNode(value: ReactNode): ReactNode {
   return typeof value === "string" ? repairPossiblyMojibakeText(value) : value;
 }

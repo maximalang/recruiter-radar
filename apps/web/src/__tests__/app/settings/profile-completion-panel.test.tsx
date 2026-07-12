@@ -11,7 +11,7 @@
  *   - The progress bar + count + match-count preview are unchanged.
  */
 import { render, screen } from '@testing-library/react';
-import ProfileCompletionPanel from '@/app/settings/profile/profile-completion-panel';
+import ProfileCompletionPanel from '@/app/profile/profile-completion-panel';
 import type { ProfileCompletion } from '@/lib/profileCompletion';
 
 function completion(overrides: Partial<ProfileCompletion> = {}): ProfileCompletion {

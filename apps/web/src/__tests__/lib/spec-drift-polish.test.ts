@@ -37,7 +37,7 @@ describe('F-A — Stage-1 AI-assist hook marker at derive functions', () => {
 
 describe('F-B — profile-form hint canonicalized (no anglicism "скоринг")', () => {
   it('profile-form.tsx hint uses "оценку", not the anglicism "скоринг"', () => {
-    const src = readApp('settings/profile/profile-form.tsx')
+    const src = readApp('profile/profile-form.tsx')
     // The hiringIntentMin hint previously read "...усиливает их скоринг."
     expect(src).not.toMatch(/усиливает их скоринг/)
     // Canonicalized to "оценку".

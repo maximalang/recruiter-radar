@@ -11,6 +11,9 @@
   border: none;
   padding: 0;
   margin: 0;
+  /* Anchor links (#fine-tuning etc.) land with the group title visible below
+     the sticky top nav, not hidden under it. */
+  scroll-margin-top: 80px;
 }
 
 .groupHead {

@@ -38,7 +38,7 @@ const LEADS_NAV: NavItem[] = [
   { href: '/dashboard', label: 'Дашборд' },
   { href: '/leads', label: 'Лиды', active: true },
   { href: '/review', label: 'Ревью' },
-  { href: '/settings/profile', label: 'Профиль' },
+  { href: '/profile', label: 'Профиль' },
 ];
 
 export function LeadCard({
@@ -241,7 +241,7 @@ function LeadsList({
           icon={TargetIcon}
           title="Настройте профиль идеального клиента"
           text="Радар начнёт подбирать компании, как только вы опишете, кого ищете: роли, отрасли, регионы."
-          action={{ href: '/settings/profile', label: 'Настроить профиль' }}
+          action={{ href: '/profile', label: 'Настроить профиль' }}
         />
       );
     }
@@ -251,7 +251,7 @@ function LeadsList({
           icon={SearchIcon}
           title="По вашей специализации пока мало сигналов"
           text="С узкой специализацией радар находит реже — это нормально. Расширьте ключевые фразы в профиле (например, смежные роли или отрасли) или дождитесь следующего запуска: новые карьерные страницы и платформенные сигналы появляются ежедневно."
-          action={{ href: '/settings/profile', label: 'Расширить ключевые фразы' }}
+          action={{ href: '/profile#fine-tuning', label: 'Расширить ключевые фразы' }}
         />
       );
     }
@@ -260,7 +260,7 @@ function LeadsList({
         icon={BriefcaseIcon}
         title="Лидов пока нет"
         text="Профиль настроен — первая подборка придёт со следующим запуском радара. Можно уточнить фильтры, чтобы повысить релевантность."
-        action={{ href: '/settings/profile', label: 'Уточнить профиль' }}
+        action={{ href: '/profile#fine-tuning', label: 'Уточнить профиль' }}
       />
     );
   }
@@ -517,7 +517,7 @@ export default async function LeadsPage({
           <ErrorState
             title="Не удалось загрузить лиды"
             description="Радар подбирает компании по вашему профилю. Повторите через минуту — если лиды не появятся, проверьте настройки профиля или напишите поддержку."
-            action={{ href: '/settings/profile', label: 'Проверить профиль' }}
+            action={{ href: '/profile', label: 'Проверить профиль' }}
           />
         ) : (
           <Suspense fallback={<LoadingState variant="skeleton" />}>

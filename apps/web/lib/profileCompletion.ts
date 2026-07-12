@@ -1,5 +1,5 @@
 /**
- * Profile-completion model for the /settings/profile page.
+ * Profile-completion model for the /profile page.
  *
  * A "complete" profile is the UX goal — the more filter groups an agency fills,
  * the sharper its radar. This computes a simple, honest completion signal: which

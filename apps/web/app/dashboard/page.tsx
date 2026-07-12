@@ -13,7 +13,7 @@ const DASHBOARD_NAV: NavItem[] = [
   { href: '/dashboard', label: 'Дашборд', active: true },
   { href: '/leads', label: 'Лиды' },
   { href: '/review', label: 'Ревью' },
-  { href: '/settings/profile', label: 'Профиль' },
+  { href: '/profile', label: 'Профиль' },
 ];
 
 import {
@@ -102,7 +102,7 @@ export default async function DashboardPage() {
             <ErrorState
               title="Сегодняшний радар не загрузился"
               description="Подбираем компании по вашему профилю. Повторите через минуту — если радар не появится, проверьте настройки профиля."
-              action={{ href: '/settings/profile', label: 'Проверить профиль' }}
+              action={{ href: '/profile', label: 'Проверить профиль' }}
             />
           )}
           <DashboardQuality data={quality ?? undefined} error={quality === null ? 'Метрики качества не загрузились' : undefined} />

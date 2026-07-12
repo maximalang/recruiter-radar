@@ -1,5 +1,5 @@
 /**
- * Pure helpers for the profile/settings form — kept in a standalone module
+ * Pure helpers for the profile form — kept in a standalone module
  * (not profile-form.tsx) so they are unit-testable without pulling the client
  * component's `useActionState` + server-action import chain, which couples to
  * next/server and breaks a jsdom test environment at module load.
@@ -11,8 +11,8 @@
  */
 import type { ReactElement, SVGProps } from "react";
 
-import { TargetIcon, TrendIcon, BriefcaseIcon } from "../../ui/icons";
-import type { ClientProfile } from "../../../lib/clientProfiles";
+import { TargetIcon, TrendIcon, BriefcaseIcon } from "../ui/icons";
+import type { ClientProfile } from "../../lib/clientProfiles";
 
 /** Resolved hiring mode (never 'auto' — resolve upstream). */
 export type ResolvedHiringMode = "specialist" | "executive" | "volume";

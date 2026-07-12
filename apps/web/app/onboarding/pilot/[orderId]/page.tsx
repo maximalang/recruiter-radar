@@ -9,7 +9,6 @@ import {
   StatusBadge,
   SurfaceCard,
   SummaryRow,
-  ThreeQuestionPanel,
   NoticeBox,
 } from "../../../ui/page-primitives";
 import {
@@ -53,7 +52,6 @@ import {
   InstructionCard,
   UnpaidState,
   formatCompanyCount,
-  formatDateTime,
   formatPreviewScore,
   translateOrderStatus,
   getCurrentStep,
@@ -162,25 +160,7 @@ export default async function PilotOnboardingPage({
   const completePilotOnboardingBoundAction = completePilotOnboardingAction.bind(null, order.id);
   const visiblePreviewItems = previewItems.slice(0, VISIBLE_PREVIEW_ITEMS);
   const hiddenPreviewItems = previewItems.slice(VISIBLE_PREVIEW_ITEMS);
-  const telegramDeliveryLabel = telegramConnectState?.botUsername
-    ? `подключён через @${telegramConnectState.botUsername}`
-    : profile?.telegramChatId
-      ? "подключён"
-      : "не подключён";
-  const browserDeliveryLabel =
-    webPushStatus?.configured === true
-      ? webPushStatus.activeSubscriptionCount > 0
-        ? "подключён"
-        : "не подключён"
-      : "готовим";
   const previewUnavailableMessage = "Не удалось обновить текущий радар. Попробуйте позже.";
-  const stepFocus = buildOnboardingStepFocus({
-    currentStep,
-    previewCount: previewItems.length,
-    hasTestDigestSent,
-    telegramConnected: Boolean(profile?.telegramChatId),
-    hasPushRadarView: showPushRadarView
-  });
 
   return (
     <PageFrame maxWidth="860px">
@@ -195,13 +175,6 @@ export default async function PilotOnboardingPage({
           <SectionIntro
             title="Закончите настройку"
             description="Сначала профиль, потом Telegram, потом первый радар. Без лишних шагов."
-          />
-
-          <ThreeQuestionPanel
-            whatLabel="Что важно сейчас"
-            whatValue={stepFocus.what}
-            whyValue={stepFocus.why}
-            nextValue={stepFocus.next}
           />
 
           <div style={{ display: "grid", gap: "8px" }}>
@@ -360,7 +333,7 @@ export default async function PilotOnboardingPage({
                             </label>
                           ))}
                         </div>
-                        <span className={ppStyles.helperText}>Выберите роли, которые ваше агентство закрывает лучше всего. Это влияет на Fit-скоринг.</span>
+                        <span className={ppStyles.helperText}>Роли, которые ваше агентство закрывает лучше всего.</span>
                       </fieldset>
 
                       <fieldset className={ppStyles.field} style={{ border: "none", padding: 0 }}>
@@ -378,7 +351,7 @@ export default async function PilotOnboardingPage({
                             </label>
                           ))}
                         </div>
-                        <span className={ppStyles.helperText}>Выберите отрасли, в которых вы ищете клиентов.</span>
+                        <span className={ppStyles.helperText}>Отрасли, в которых вы ищете клиентов.</span>
                       </fieldset>
 
                       <fieldset className={ppStyles.field} style={{ border: "none", padding: 0 }}>
@@ -414,7 +387,7 @@ export default async function PilotOnboardingPage({
                             </label>
                           ))}
                         </div>
-                        <span className={ppStyles.helperText}>Выберите размеры компаний, с которыми хотите работать.</span>
+                        <span className={ppStyles.helperText}>Размеры компаний, с которыми хотите работать.</span>
                       </fieldset>
 
                       <label className={ppStyles.field} style={{ gridColumn: "1 / -1" }}>
@@ -476,7 +449,7 @@ export default async function PilotOnboardingPage({
                       <option value="unrestricted">Все каналы</option>
                     </select>
                     <span className={ppStyles.helperText}>
-                      Какие контактные данные включать в радар. По умолчанию — только безопасные корпоративные каналы: карьерная страница, HR-email, форма обратной связи.
+                      Какие контактные данные включать в радар. По умолчанию — только безопасные корпоративные каналы.
                     </span>
                   </label>
 
@@ -655,29 +628,19 @@ export default async function PilotOnboardingPage({
                 </div>
 
                 <NoticeBox
-                  tone="neutral"
-                  title="Как это будет работать дальше"
-                  description={
-                    hasTestDigestSent
-                      ? telegramConnectState?.botUsername
-                        ? `Следующие радары будут приходить в тот же чат через @${telegramConnectState.botUsername}.`
-                        : "Следующие радары будут приходить в тот же подключённый чат."
-                      : "Пилот уже активен. Как только появятся подходящие компании, они будут приходить автоматически."
-                  }
-                />
-
-                <NoticeBox
                   tone="info"
                   title="Что делать дальше"
                   description={
                     hasTestDigestSent
-                      ? "Откройте отправленный радар в Telegram, отмечайте релевантность карточек и используйте обратную связь."
+                      ? telegramConnectState?.botUsername
+                        ? `Первый радар уже в чате через @${telegramConnectState.botUsername}. Откройте его, отмечайте релевантность карточек — радар доучивается. Дальше новые компании приходят автоматически в тот же чат.`
+                        : "Первый радар уже в подключённом чате. Откройте его, отмечайте релевантность карточек — радар доучивается. Дальше новые компании приходят автоматически."
                       : previewError
                         ? "Не удалось обновить текущий радар. Попробуйте позже."
                         : !deliveryPrerequisitesReady
                           ? "Вернитесь к шагу подключения Telegram, чтобы включить доставку радара."
                           : firstDigestHasCandidates
-                            ? "Откройте первую подборку в Telegram, отметьте релевантность карточек и используйте обратную связь."
+                            ? "Откройте первую подборку в Telegram, отмечайте релевантность карточек — радар доучивается. Дальше новые компании приходят автоматически."
                             : "Пилот уже активен. Как только появятся компании с сильным сигналом, подборка придёт автоматически."
                   }
                 />
@@ -748,31 +711,6 @@ export default async function PilotOnboardingPage({
                     </div>
                   </details>
                 ) : null}
-
-                <details className={ppStyles.disclosure}>
-                  <summary className={ppStyles.disclosureSummary}>Детали пилота</summary>
-                  <div className={ppStyles.disclosureBody}>
-                    <div className={ppStyles.summaryBox}>
-                      <SummaryRow label="Агентство" value={profile?.agencyName ?? order.customerName ?? "не указано"} />
-                      <SummaryRow label="Telegram" value={telegramDeliveryLabel} />
-                      <SummaryRow label="Браузер" value={browserDeliveryLabel} />
-                      <SummaryRow label="Доставка" value="ежедневно" />
-                      <SummaryRow label="Город" value={profile?.targetCity ?? "-"} />
-                      <SummaryRow
-                        label="Компаний в день"
-                        value={String(profile?.dailyDigestLimit ?? order.payload.dailyDigestLimit)}
-                      />
-                      <SummaryRow
-                        label="Первая подборка"
-                        value={
-                          hasTestDigestSent
-                            ? `отправлена ${formatDateTime(order.payload.onboardingTestDigestSentAt)}`
-                            : "ещё не отправляли"
-                        }
-                      />
-                    </div>
-                  </div>
-                </details>
 
                 <div className={styles.actions}>
                   <Link href="/" className={ppStyles.secondaryAction}>
@@ -853,67 +791,5 @@ function OnboardingPreviewCard(props: {
       ) : null}
     </article>
   );
-}
-
-function buildOnboardingStepFocus(input: {
-  currentStep: CheckoutOrderOnboardingStep;
-  previewCount: number;
-  hasTestDigestSent: boolean;
-  telegramConnected: boolean;
-  hasPushRadarView: boolean;
-}) {
-  if (input.currentStep === "confirm-profile") {
-    return {
-      what: "профиль поиска на сегодня",
-      why: "он определяет, какие компании попадут в радар и как будет выглядеть первый день",
-      next: "сохранить профиль и перейти к Telegram"
-    };
-  }
-
-  if (input.currentStep === "telegram") {
-    return {
-      what: "подключить Telegram",
-      why: "без чата первый радар не уйдёт и ежедневный цикл не запустится",
-      next: "открыть бота, нажать Start и вернуться сюда"
-    };
-  }
-
-  if (input.currentStep === "preview") {
-    if (input.previewCount === 0) {
-      return {
-        what: "сильных компаний пока нет",
-        why: "по текущему профилю радар ещё не собрал достаточно сильный сигнал",
-        next: "уточнить профиль или закончить настройку и вернуться позже"
-      };
-    }
-
-    return {
-      what: `${formatCompanyCount(input.previewCount)} уже в фокусе`,
-      why: "по этим компаниям уже есть повод выходить в контакт",
-      next: "отправить первый радар в Telegram"
-    };
-  }
-
-  if (input.hasPushRadarView && input.previewCount > 0) {
-    return {
-      what: `${formatCompanyCount(input.previewCount)} сейчас в радаре`,
-      why: "сильные компании уже собраны сверху и не требуют лишнего поиска",
-      next: "начать с первых карточек и открыть нужную компанию"
-    };
-  }
-
-  if (input.hasTestDigestSent) {
-    return {
-      what: "пилот уже запущен",
-      why: "первый радар ушёл в чат и дальше цикл работает автоматически",
-      next: "ждать следующий сигнал или вернуться позже"
-    };
-  }
-
-  return {
-    what: input.telegramConnected ? "профиль уже готов" : "настройка почти закончена",
-    why: "ежедневный радар уже сможет приходить без ручного запуска",
-    next: "вернуться позже или включить быстрый возврат в браузере"
-  };
 }
 

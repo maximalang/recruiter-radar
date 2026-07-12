@@ -10,12 +10,13 @@ import {
   VALID_ROLES,
   normalizeContactPolicy,
   normalizeHiringMode,
-} from "../../../lib/clientProfiles";
+} from "../../lib/clientProfiles";
 import {
   saveDeliveryPreferencesByOwnerId,
   normalizeDeliveryFrequency,
-} from "../../../lib/deliveryPreferences";
-import { readOwnerSession } from "../../../lib/session";
+} from "../../lib/deliveryPreferences";
+import { countMatchingCandidatesForProfile } from "../../lib/digest";
+import { readOwnerSession } from "../../lib/session";
 
 function readRequiredText(formData: FormData, key: string): string {
   const value = formData.get(key);
@@ -54,15 +55,22 @@ function readOptionalNumber(formData: FormData, key: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-export type SaveProfileResult = { ok: true } | { ok: false; error: string };
+export type SaveProfileResult =
+  | { ok: true; matchCount: { count: number; capped: boolean } | null }
+  | { ok: false; error: string };
 
 /**
- * Persist edits from the /settings/profile page.
+ * Persist edits from the /profile page.
  *
  * Anti-IDOR boundary: the target profile is resolved ONLY from the authenticated
  * session owner via getClientProfileByOwnerId. No profileId is ever read from the
  * form, so a forged id cannot redirect the write to someone else's profile. The
  * saved id is the one we just loaded under owner scope.
+ *
+ * Returns a live match count so the form can tell the agency, in the save
+ * confirmation, whether their filters still surface companies — the same gate
+ * path the digest uses. null means the count could not be computed (best-effort:
+ * never blocks the save itself).
  */
 export async function saveSettingsProfileAction(
   _prev: SaveProfileResult | null,
@@ -78,8 +86,9 @@ export async function saveSettingsProfileAction(
     return { ok: false, error: "Профиль не найден. Сначала активируйте пилот." };
   }
 
+  let savedProfile: Awaited<ReturnType<typeof saveClientProfile>>;
   try {
-    await saveClientProfile({
+    savedProfile = await saveClientProfile({
       id: existing.id,
       agencyName: readRequiredText(formData, "agencyName"),
       // Preserve the linked Telegram chat — it is managed elsewhere, not on this page.
@@ -107,15 +116,24 @@ export async function saveSettingsProfileAction(
     return { ok: false, error: message };
   }
 
-  revalidatePath("/settings/profile");
-  return { ok: true };
+  revalidatePath("/profile");
+
+  // Best-effort match count against the just-saved profile — same gate path as
+  // the digest. Never throws (countMatchingCandidatesForProfile swallows errors),
+  // so a DB hiccup degrades to null rather than failing the save confirmation.
+  const matchCount = await countMatchingCandidatesForProfile(savedProfile).then(
+    (r) => ({ count: r.count, capped: r.capped }),
+    () => null,
+  );
+
+  return { ok: true, matchCount };
 }
 
 export type SaveDeliveryResult = { ok: true } | { ok: false; error: string };
 
 /**
  * Persist delivery-channel preferences (web-push + email digest) from the
- * /settings/profile page.
+ * /profile page.
  *
  * Anti-IDOR boundary: writes are scoped to the authenticated session owner via
  * saveDeliveryPreferencesByOwnerId — no profileId is read from the form. Channel
@@ -165,6 +183,6 @@ export async function saveDeliveryPreferencesAction(
     return { ok: false, error: message };
   }
 
-  revalidatePath("/settings/profile");
+  revalidatePath("/profile");
   return { ok: true };
 }

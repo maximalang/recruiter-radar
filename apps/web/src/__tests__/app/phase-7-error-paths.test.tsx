@@ -46,11 +46,11 @@ describe('T7.2 — ErrorState primitive', () => {
       <ErrorState
         title="Профиль не загрузился"
         description="Проверьте настройки — без профиля радар не подбирает компании."
-        action={{ href: '/settings/profile', label: 'Открыть профиль' }}
+        action={{ href: '/profile', label: 'Открыть профиль' }}
       />,
     )
     const link = screen.getByText('Открыть профиль')
-    expect(link.getAttribute('href')).toBe('/settings/profile')
+    expect(link.getAttribute('href')).toBe('/profile')
   })
 
   it('never exposes a raw error message to the DOM', () => {

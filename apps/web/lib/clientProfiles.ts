@@ -1145,7 +1145,7 @@ export function normalizeHiringMode(value: unknown): HiringMode {
  * If the agency set an explicit mode other than 'auto', that wins — it is a
  * deliberate product choice that always overrides auto-inference. Agencies
  * with a genuinely mixed practice (e.g. mostly IT plus the occasional
- * industrial mandate) SHOULD pick an explicit mode in /settings/profile, since
+ * industrial mandate) SHOULD pick an explicit mode in /profile, since
  * any single-practice heuristic will misread a hybrid.
  *
  * 'auto' (the default) infers the mode from the agency's declared canonical
@@ -1164,7 +1164,7 @@ export function normalizeHiringMode(value: unknown): HiringMode {
  *   - otherwise → 'specialist' (the pre-existing default behavior).
  *
  * Inference is a heuristic; the agency can always override by picking an
- * explicit mode in /settings/profile. Pure + deterministic.
+ * explicit mode in /profile. Pure + deterministic.
  */
 export function resolveHiringMode(profile: Pick<ClientProfile, 'hiringMode' | 'roles'>): Exclude<HiringMode, 'auto'> {
   if (profile.hiringMode && profile.hiringMode !== 'auto') {

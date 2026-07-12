@@ -1,13 +1,14 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
-import type { DeliveryPreferences } from "../../../lib/deliveryPreferences";
-import { computeNextDeliveryHint } from "../../../lib/delivery/nextDeliveryHint";
-import { FormSubmitButton } from "../../ui/form-submit-button";
-import { NoticeBox } from "../../ui/page-primitives";
-import { ChatIcon, BellIcon, MailIcon } from "../../ui/icons";
-import ppStyles from "../../ui/page-primitives.module.css";
+import type { DeliveryPreferences } from "../../lib/deliveryPreferences";
+import { computeNextDeliveryHint } from "../../lib/delivery/nextDeliveryHint";
+import { FormSubmitButton } from "../ui/form-submit-button";
+import { NoticeBox } from "../ui/page-primitives";
+import { ChatIcon, BellIcon, MailIcon } from "../ui/icons";
+import ppStyles from "../ui/page-primitives.module.css";
 import { saveDeliveryPreferencesAction, type SaveDeliveryResult } from "./actions";
 import styles from "./profile-form.module.css";
 
@@ -41,6 +42,16 @@ export function DeliveryForm(props: { preferences: DeliveryPreferences }) {
     saveDeliveryPreferencesAction,
     null
   );
+  const router = useRouter();
+
+  // After a successful save, re-fetch the server-rendered completion panel above
+  // (delivery counts toward profile completion), so the progress bar reflects the
+  // new state without a manual reload. The form keeps its client-side mirrors.
+  useEffect(() => {
+    if (state?.ok === true) {
+      router.refresh();
+    }
+  }, [state, router]);
 
   // Local mirror so the email field can react to the toggle without a round-trip.
   const [emailEnabled, setEmailEnabled] = useState(preferences.emailDigestEnabled);

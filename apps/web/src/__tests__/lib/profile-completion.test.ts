@@ -2,7 +2,7 @@
  * Unit tests for computeProfileCompletion (lib/profileCompletion.ts).
  *
  * Pure function: maps a ClientProfile to the filled/total breakdown that drives
- * the completion progress bar + checklist on /settings/profile.
+ * the completion progress bar + checklist on /profile.
  */
 
 import { computeProfileCompletion } from '@/lib/profileCompletion';

@@ -1,6 +1,6 @@
 /**
  * Shared ICP option dictionaries (key → Russian label) for every client-profile
- * form: pilot onboarding and the /settings/profile editor. Single source of the
+ * form: pilot onboarding and the /profile editor. Single source of the
  * human-facing labels so onboarding and settings never drift.
  *
  * This module is imported by CLIENT components, so it must stay free of any

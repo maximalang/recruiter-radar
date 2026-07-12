@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
-import type { ClientProfile } from "../../../lib/clientProfiles";
+import type { ClientProfile } from "../../lib/clientProfiles";
 import {
   INDUSTRY_OPTIONS,
   COMPANY_SIZE_OPTIONS,
@@ -10,13 +11,13 @@ import {
   CONTACT_POLICY_OPTIONS,
   HIRING_MODE_OPTIONS,
   RESOLVED_HIRING_MODE_LABEL,
-  type ProfileOption,
-} from "../../../lib/clientProfileOptions";
-import { FormSubmitButton } from "../../ui/form-submit-button";
-import { NoticeBox } from "../../ui/page-primitives";
-import ppStyles from "../../ui/page-primitives.module.css";
+} from "../../lib/clientProfileOptions";
+import { FormSubmitButton } from "../ui/form-submit-button";
+import { NoticeBox } from "../ui/page-primitives";
+import ppStyles from "../ui/page-primitives.module.css";
 import { saveSettingsProfileAction, type SaveProfileResult } from "./actions";
 import { modeIcon } from "./profile-form-helpers";
+import { CheckboxGroup } from "./checkbox-group";
 import styles from "./profile-form.module.css";
 
 /** One entry per line — mirrors how the action parses these textareas back. */
@@ -24,42 +25,34 @@ function toLines(values: readonly string[]): string {
   return values.join("\n");
 }
 
-function CheckboxGroup(props: {
-  name: string;
-  title: string;
-  hint: string;
-  options: readonly ProfileOption[];
-  selected: readonly string[];
-  /** Shown when nothing is selected. Defaults to a soft-boost phrasing. */
-  emptyHint?: string;
-}) {
-  const selectedSet = new Set(props.selected);
-  return (
-    <fieldset className={styles.group}>
-      <div className={styles.groupHead}>
-        <span className={styles.groupTitle}>{props.title}</span>
-        <span className={styles.groupHint}>{props.hint}</span>
-      </div>
-      <div className={styles.chips}>
-        {props.options.map((opt) => (
-          <label key={opt.key} className={styles.chip}>
-            <input
-              type="checkbox"
-              name={props.name}
-              value={opt.key}
-              defaultChecked={selectedSet.has(opt.key)}
-            />
-            {opt.label}
-          </label>
-        ))}
-      </div>
-      {selectedSet.size === 0 && (
-        <span className={styles.groupEmptyHint}>
-          {props.emptyHint ?? "Ничего не выбрано — все варианты учитываются без усиления."}
-        </span>
-      )}
-    </fieldset>
-  );
+/** Russian plural for "компания" (1 / 2–4 / 5+), nominative count phrasing. */
+function pluralizeCompanies(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return "компания";
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "компании";
+  return "компаний";
+}
+
+/**
+ * Save-confirmation copy, honest about the radar's current state:
+ *  - matchCount === 0 → filters are too strict and the radar is empty (warn);
+ *  - matchCount > 0   → name the approximate pool so the agency trusts the save;
+ *  - matchCount null  → the count could not be computed; fall back to the generic
+ *    "applies to the next digest" message without claiming a number.
+ * The match count uses the same gate path as the digest, so the number reflects
+ * exactly what the saved filters do — not a loose estimate.
+ */
+function describeSaveOutcome(
+  matchCount: { count: number; capped: boolean } | null,
+): string {
+  if (matchCount === null) {
+    return "Новые фильтры применятся к следующей подборке.";
+  }
+  if (matchCount.count === 0) {
+    return "Пороги слишком строгие — по текущему профилю радар пуст. Ослабьте пороги в блоке «Точная настройка» или добавьте роли и отрасли.";
+  }
+  return `Новые фильтры применятся к следующей подборке. Сейчас подходят ≈${matchCount.count}${matchCount.capped ? "+" : ""} ${pluralizeCompanies(matchCount.count)}.`;
 }
 
 export function ProfileForm(props: {
@@ -76,6 +69,17 @@ export function ProfileForm(props: {
     saveSettingsProfileAction,
     null
   );
+  const router = useRouter();
+
+  // After a successful save, re-fetch the server-rendered parts of the page
+  // (completion panel + live match-count preview above the form) so the agency
+  // sees the effect of their edits without a manual reload. The form itself keeps
+  // its client-side state; only the surrounding server components refresh.
+  useEffect(() => {
+    if (state?.ok === true) {
+      router.refresh();
+    }
+  }, [state, router]);
 
   // The effective mode is "auto-chosen" when the agency left hiringMode on
   // 'auto' (the default) — the badge names the inferred mode so the inference is
@@ -86,7 +90,11 @@ export function ProfileForm(props: {
   return (
     <form action={formAction} className={styles.form}>
       {state?.ok === true ? (
-        <NoticeBox tone="success" title="Профиль сохранён" description="Новые фильтры применятся к следующей подборке. Превью совпадений выше обновится после перезагрузки страницы." />
+        <NoticeBox
+          tone="success"
+          title="Профиль сохранён"
+          description={describeSaveOutcome(state.matchCount)}
+        />
       ) : null}
       {state?.ok === false ? (
         <NoticeBox tone="danger" title="Не удалось сохранить" description={state.error} />
@@ -94,7 +102,7 @@ export function ProfileForm(props: {
 
       {/* Group 1 — Agency identity. Just who you are; volume lives in its own
           group at the bottom so it isn't conflated with the name. */}
-      <fieldset className={styles.group}>
+      <fieldset className={styles.group} id="agency">
         <div className={styles.groupHead}>
           <span className={styles.groupTitle}>Агентство</span>
           <span className={styles.groupHint}>Как вас называть в радаре.</span>
@@ -109,7 +117,7 @@ export function ProfileForm(props: {
           roles are weighted (executive → seniority, volume → raw count,
           specialist → relevance), so reading them as one block makes the
           radar's lens legible. */}
-      <fieldset className={styles.group}>
+      <fieldset className={styles.group} id="practice">
         <div className={styles.groupHead}>
           <span className={styles.groupTitle}>Тип практики</span>
           <span className={styles.groupHint}>Как агентство зарабатывает найм — это меняет, какие сигналы важнее в радаре.</span>
@@ -173,7 +181,7 @@ export function ProfileForm(props: {
           "physical + market footprint" block. Served-industries and
           excluded-industries are adjacent now: the two halves of one decision
           (what you take / what you don't) instead of four sections apart. */}
-      <fieldset className={styles.group}>
+      <fieldset className={styles.group} id="geography">
         <div className={styles.groupHead}>
           <span className={styles.groupTitle}>География и охват</span>
           <span className={styles.groupHint}>Где работаете, какие отрасли и размеры компаний берёте — и какие точно нет.</span>
@@ -237,7 +245,7 @@ export function ProfileForm(props: {
       {/* Group 4 — Contact policy. Reads as "how we reach them", a distinct
           safety concern from "whom we target", so it gets its own labeled block
           before the advanced tuning. */}
-      <fieldset className={styles.group}>
+      <fieldset className={styles.group} id="contact-path">
         <div className={styles.groupHead}>
           <span className={styles.groupTitle}>Путь контакта</span>
           <span className={styles.groupHint}>Какой путь контакта считать безопасным. «Только корпоративные» отсекает компании без корпоративной поверхности.</span>
@@ -253,9 +261,10 @@ export function ProfileForm(props: {
 
       {/* Group 5 — Fine-tuning. The advanced controls that can zero out the
           radar if set too aggressively. Deliberately last and clearly framed:
-          thresholds + keyword tuning + digest volume. Everything here is
-          optional — empty means "no constraint". */}
-      <fieldset className={styles.group}>
+          thresholds + keyword tuning. Everything here is optional — empty
+          means "no constraint". Anchored #fine-tuning so deep links from
+          empty-state nudges land here directly. */}
+      <fieldset className={styles.group} id="fine-tuning">
         <div className={styles.groupHead}>
           <span className={styles.groupTitle}>Точная настройка</span>
           <span className={styles.groupHint}>Необязательно. Жёсткие фильтры по силе и свежести найма — пусто значит «без ограничения». Слишком строгие пороги могут оставить радар пустым.</span>
@@ -329,7 +338,7 @@ export function ProfileForm(props: {
       {/* Group 6 — Volume. How many companies per digest. Lives at the end so
           it reads as a delivery-shape control, not an identity field. Still
           saved by this same action (column is on client_profiles). */}
-      <fieldset className={styles.group}>
+      <fieldset className={styles.group} id="volume">
         <div className={styles.groupHead}>
           <span className={styles.groupTitle}>Объём подборки</span>
           <span className={styles.groupHint}>Сколько компаний показывать в одном радаре.</span>

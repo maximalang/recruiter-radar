@@ -702,7 +702,7 @@ export function LoadingState(props: { variant?: "skeleton" | "inline" }) {
  *   - `title` — a short, human sentence: what went wrong (no internals).
  *   - `description` — a concrete next step the user can take (повторите позже /
  *     проверить профиль / написать поддержку), or an honest "собираем данные".
- *   - `action` — optional link to the next step (e.g. /settings/profile).
+ *   - `action` — optional link to the next step (e.g. /profile).
  *
  * `role="alert"` + `aria-live="assertive"` so AT announces the failure. The
  * raw internal error is NEVER rendered — only the human copy the caller passes.

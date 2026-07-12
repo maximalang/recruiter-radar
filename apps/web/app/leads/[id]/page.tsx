@@ -44,7 +44,7 @@ export const dynamic = 'force-dynamic';
 const LEAD_DETAIL_NAV: NavItem[] = [
   { href: '/dashboard', label: 'Дашборд' },
   { href: '/leads', label: 'Лиды' },
-  { href: '/settings/profile', label: 'Профиль' },
+  { href: '/profile', label: 'Профиль' },
 ];
 
 /** Renders the feedback-status icon component inline with its label. */

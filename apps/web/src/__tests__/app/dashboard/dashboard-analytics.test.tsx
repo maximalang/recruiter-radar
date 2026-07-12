@@ -226,7 +226,7 @@ describe('DashboardTodayRadar — T5.3 empty-state icon', () => {
     render(<DashboardTodayRadar topLeads={[]} pendingReview={0} />);
     const link = screen.getByText(/проверить настройки профиля/i).closest('a');
     expect(link).not.toBeNull();
-    expect(link?.getAttribute('href')).toBe('/settings/profile');
+    expect(link?.getAttribute('href')).toBe('/profile');
   });
 });
 

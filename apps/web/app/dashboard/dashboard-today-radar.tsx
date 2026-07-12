@@ -44,7 +44,7 @@ export default function DashboardTodayRadar({
           icon={SearchIcon}
           title="Пока нет компаний для контакта"
           text="Радар подберёт их по вашему профилю: роли, отрасли, регионы."
-          action={{ href: '/settings/profile', label: 'Проверить настройки профиля' }}
+          action={{ href: '/profile', label: 'Проверить настройки профиля' }}
         />
       ) : (
         <div className={styles.todayRadarList}>

@@ -1,9 +1,9 @@
 import type { ProfileCompletion } from "@/lib/profileCompletion";
-import { CheckIcon, CircleIcon, SearchIcon } from "../../ui/icons";
+import { CheckIcon, CircleIcon, SearchIcon } from "../ui/icons";
 import s from "./profile-completion-panel.module.css";
 
 /**
- * Profile-completion panel for /settings/profile.
+ * Profile-completion panel for /profile.
  *
  * Shows two honest signals so a user knows whether their radar is well-targeted
  * BEFORE waiting a full digest cycle:
