@@ -73,9 +73,9 @@ export const PUBLIC_PLANS: PublicPlan[] = [
     amountMinor: 299000,
     currency: "RUB",
     price: "2 990 ₽",
-    description: "Короткий запуск: увидите компании, которым стоит написать, с доказательствами и готовым углом контакта.",
+    description: "Короткий запуск: за неделю увидите компании, которым стоит написать, с доказательствами и готовым углом контакта.",
     bullets: SHARED_PLAN_BULLETS,
-    ctaLabel: "Запустить пилот",
+    ctaLabel: "Попробовать неделю",
     isPrimary: true,
     isRecurring: false
   },
