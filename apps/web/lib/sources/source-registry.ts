@@ -30,6 +30,17 @@ export interface SourceConfig {
   isPrimary: boolean
   /** Source category for routing and filtering. */
   category: 'job-board' | 'career-page' | 'registry'
+  /**
+   * Per-source execFile timeout in ms for ingestSource(). When omitted, the
+   * default 120s applies. Set this only for sources that legitimately need more
+   * than 120s end-to-end (fetch + DB write). career-pages crawls many company
+   * sites sequentially and its DB upsert runs after the whole crawl, so a 120s
+   * cap kills the process mid-write and discards every fetched record — see
+   * the career-pages entry below. Keep the source's own fetch budget
+   * (CAREER_PAGES_FETCH_BUDGET_MS, default 90s) well under this so the write
+   * has headroom.
+   */
+  timeoutMs?: number
 }
 
 /**
@@ -95,14 +106,20 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     // Promoted to primary on 2026-06-30: career-pages is the only DIRECT
     // company-surface, high-signal source (Gate A/B evidence). It was previously
     // excluded from the daily-radar pipeline, so the highest-quality lead surface
-    // never ran automatically. The sequential crawl now self-limits via a
-    // wall-clock fetch budget (CAREER_PAGES_FETCH_BUDGET_MS, default 90s) so it
-    // stays within the 120s per-source ingest timeout and partial batches still
-    // reach ingestion. Auto-discovery seeds from existing orgs+signals (needs a
-    // domain), so it adds nothing until other sources have populated orgs — a
-    // no-op, not a failure, on an empty DB.
+    // never ran automatically. The sequential crawl self-limits via a wall-clock
+    // fetch budget (CAREER_PAGES_FETCH_BUDGET_MS, default 90s) so partial batches
+    // still reach ingestion. Auto-discovery seeds from existing orgs+signals
+    // (needs a domain), so it adds nothing until other sources have populated
+    // orgs — a no-op, not a failure, on an empty DB.
+    //
+    // Per-source timeout 240s (raised from the 120s default on 2026-07-12): the
+    // crawl (≤90s budget) + the DB upsert (runs once after the whole loop) can
+    // exceed 120s on a large candidate set, and a 120s execFile kill discarded
+    // EVERY fetched record because the write never reached the DB. 240s gives the
+    // 90s crawl + ~150s write headroom; the daily cron tolerates a 4-minute source.
     isPrimary: true,
     category: 'career-page',
+    timeoutMs: 240_000,
   },
   {
     id: 'egrul-fns',

@@ -249,7 +249,11 @@ export async function ingestSource(
       [scriptPath],
       {
         env: mergedEnv,
-        timeout: 120_000, // 2 min timeout — API + DB round-trips
+        // Per-source timeout (SourceConfig.timeoutMs) falling back to 120s.
+        // Sources that legitimately exceed 120s end-to-end (career-pages: crawl
+        // + post-loop DB write) declare a higher timeoutMs so the execFile kill
+        // doesn't discard their fetched records.
+        timeout: config.timeoutMs ?? 120_000,
         maxBuffer: 1024 * 1024, // 1 MB output buffer
         windowsHide: true,
       },
