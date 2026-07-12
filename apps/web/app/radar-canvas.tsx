@@ -54,13 +54,19 @@ export default function RadarCanvas() {
     }
 
     function seedBlips() {
+      // Origin sits a little above the vertical center so the sweep emanates
+      // from behind the headline, not from the middle of the trust strip.
       const cx = width / 2;
-      const cy = height / 2;
-      const maxR = Math.min(width, height) * 0.46;
-      const count = Math.max(6, Math.round((width * height) / 26000));
+      const cy = height * 0.4;
+      const maxR = Math.min(width, height) * 0.5;
+      // Fewer blips than before — a focused radar shows a handful of
+      // contacts, not a scatter of noise. Keep them in the mid/outer band so
+      // the headline area reads clean and the contacts ring the text.
+      const inner = maxR * 0.34;
+      const count = Math.max(5, Math.round((width * height) / 68000));
       blips = Array.from({ length: count }, (_, i) => {
         const angle = Math.random() * Math.PI * 2;
-        const radius = 30 + Math.random() * (maxR - 30);
+        const radius = inner + Math.random() * (maxR - inner);
         return {
           angle,
           radius,
@@ -79,13 +85,14 @@ export default function RadarCanvas() {
     function drawStatic() {
       if (!ctx) return;
       ctx.clearRect(0, 0, width, height);
-      // base radial wash
-      const g = ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, Math.max(width, height) / 1.4);
-      g.addColorStop(0, "rgba(30, 64, 175, 0.10)");
+      // base radial wash — a soft glow centered on the radar origin so the
+      // sweep reads as coming from a real focal point, not flat darkness.
+      const g = ctx.createRadialGradient(width / 2, height * 0.4, 0, width / 2, height * 0.4, Math.max(width, height) / 1.3);
+      g.addColorStop(0, "rgba(37, 99, 235, 0.14)");
       g.addColorStop(1, "rgba(15, 23, 42, 0)");
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, width, height);
-      drawRings(0.35);
+      drawRings(0.55);
       drawBlips(1);
     }
 
@@ -94,13 +101,29 @@ export default function RadarCanvas() {
       const cx = cxRef.current;
       const cy = cyRef.current;
       const maxR = Math.min(width, height) * 0.46;
-      ctx.strokeStyle = `rgba(59, 130, 246, ${alpha * 0.5})`;
+      // Concentric range rings — the radar's defining shape. Brighter than
+      // before so the metaphor actually reads against the dark hero.
       ctx.lineWidth = 1;
-      for (let r = maxR * 0.3; r <= maxR; r += maxR * 0.23) {
+      for (let i = 1; i <= 4; i++) {
+        const r = (maxR * i) / 4;
+        ctx.strokeStyle = `rgba(96, 165, 250, ${alpha * (0.22 + i * 0.04)})`;
         ctx.beginPath();
         ctx.arc(cx, cy, r, 0, Math.PI * 2);
         ctx.stroke();
       }
+      // Crosshair axes through the origin — completes the radar silhouette.
+      ctx.strokeStyle = `rgba(96, 165, 250, ${alpha * 0.16})`;
+      ctx.beginPath();
+      ctx.moveTo(cx - maxR, cy);
+      ctx.lineTo(cx + maxR, cy);
+      ctx.moveTo(cx, cy - maxR);
+      ctx.lineTo(cx, cy + maxR);
+      ctx.stroke();
+      // Center origin node
+      ctx.fillStyle = `rgba(147, 197, 253, ${alpha * 0.5})`;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+      ctx.fill();
     }
 
     function drawBlips(litFloor: number) {
@@ -113,21 +136,21 @@ export default function RadarCanvas() {
         const intensity = Math.max(litFloor, b.lit);
         // halo
         if (intensity > 0.05) {
-          const halo = ctx.createRadialGradient(x, y, 0, x, y, 14);
-          halo.addColorStop(0, `rgba(96, 165, 250, ${intensity * 0.7})`);
+          const halo = ctx.createRadialGradient(x, y, 0, x, y, 16);
+          halo.addColorStop(0, `rgba(96, 165, 250, ${intensity * 0.85})`);
           halo.addColorStop(1, "rgba(96, 165, 250, 0)");
           ctx.fillStyle = halo;
           ctx.beginPath();
-          ctx.arc(x, y, 14, 0, Math.PI * 2);
+          ctx.arc(x, y, 16, 0, Math.PI * 2);
           ctx.fill();
         }
-        // core dot
-        ctx.fillStyle = `rgba(191, 219, 254, ${0.3 + intensity * 0.7})`;
+        // core dot — brighter idle state so the radar looks populated, not empty
+        ctx.fillStyle = `rgba(191, 219, 254, ${0.45 + intensity * 0.55})`;
         ctx.beginPath();
-        ctx.arc(x, y, 2.4, 0, Math.PI * 2);
+        ctx.arc(x, y, 2.6, 0, Math.PI * 2);
         ctx.fill();
         // label when freshly lit
-        if (b.lit > 0.55) {
+        if (b.lit > 0.5) {
           ctx.fillStyle = `rgba(219, 234, 254, ${b.lit})`;
           ctx.font = "600 11px Inter, system-ui, sans-serif";
           ctx.fillText(b.label, x + 8, y + 4);
@@ -140,7 +163,9 @@ export default function RadarCanvas() {
       const cx = cxRef.current;
       const cy = cyRef.current;
       const maxR = Math.min(width, height) * 0.46;
-      const start = sweep - 0.5;
+      // Wider, brighter trailing sweep — the "scan" should be the most
+      // visible moving element, a clear radial gradient from origin.
+      const start = sweep - 0.62;
       const end = sweep;
       const grad = ctx.createLinearGradient(
         cx + Math.cos(start) * maxR,
@@ -148,8 +173,8 @@ export default function RadarCanvas() {
         cx + Math.cos(end) * maxR,
         cy + Math.sin(end) * maxR,
       );
-      grad.addColorStop(0, "rgba(59, 130, 246, 0)");
-      grad.addColorStop(1, "rgba(59, 130, 246, 0.22)");
+      grad.addColorStop(0, "rgba(96, 165, 250, 0)");
+      grad.addColorStop(1, "rgba(96, 165, 250, 0.34)");
       ctx.fillStyle = grad;
       ctx.beginPath();
       ctx.moveTo(cx, cy);
@@ -161,14 +186,14 @@ export default function RadarCanvas() {
     function frame() {
       if (!ctx) return;
       ctx.clearRect(0, 0, width, height);
-      // background wash
-      const g = ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, Math.max(width, height) / 1.4);
-      g.addColorStop(0, "rgba(30, 64, 175, 0.10)");
+      // background wash — glow centered on the radar origin (above center)
+      const g = ctx.createRadialGradient(width / 2, height * 0.4, 0, width / 2, height * 0.4, Math.max(width, height) / 1.3);
+      g.addColorStop(0, "rgba(37, 99, 235, 0.14)");
       g.addColorStop(1, "rgba(15, 23, 42, 0)");
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, width, height);
 
-      drawRings(0.35);
+      drawRings(0.55);
       drawSweep();
 
       // advance sweep + light up blips in its path
