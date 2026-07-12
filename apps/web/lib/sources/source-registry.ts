@@ -115,8 +115,14 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     // Per-source timeout 240s (raised from the 120s default on 2026-07-12): the
     // crawl (≤90s budget) + the DB upsert (runs once after the whole loop) can
     // exceed 120s on a large candidate set, and a 120s execFile kill discarded
-    // EVERY fetched record because the write never reached the DB. 240s gives the
-    // 90s crawl + ~150s write headroom; the daily cron tolerates a 4-minute source.
+    // EVERY fetched record because the write never reached the DB. 240s gives
+    // more headroom. NOTE: the post-loop write is row-by-row (per-record
+    // pg_advisory_xact_lock + SELECT + per-source-key INSERTs), so a large batch
+    // can still exceed 240s and be killed mid-write — the write is inside one
+    // transaction so a kill loses the whole batch. The durable fix is a batched
+    // write in the script (deferred); until then, lowering
+    // CAREER_PAGES_FETCH_BUDGET_MS via env shrinks the batch so crawl+write fits
+    // the timeout, at the cost of per-run coverage.
     isPrimary: true,
     category: 'career-page',
     timeoutMs: 240_000,
