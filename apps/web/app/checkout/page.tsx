@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { startCheckoutOrder } from "../../lib/payments";
@@ -26,6 +27,11 @@ const CHECKOUT_NAV: NavItem[] = [
 ];
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Оформление — Recruiter Radar",
+  description: "Оплата пробной недели или заявка на подключение радара.",
+};
 
 export default async function CheckoutPage({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
   const input = readPublicPreviewInput(searchParams);

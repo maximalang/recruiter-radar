@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import type { Metadata } from 'next';
 import DashboardDailySummary from './dashboard-daily-summary';
 import DashboardSources from './dashboard-sources';
 import DashboardAlerts from './dashboard-alerts';
@@ -8,6 +9,11 @@ import DashboardTodayRadar from './dashboard-today-radar';
 import LiveClock from './live-clock';
 import { InternalPageFrame, InternalPageHeader, ErrorState, type NavItem } from '../ui/internal-page';
 import dashStyles from './dashboard.module.css';
+
+export const metadata: Metadata = {
+  title: 'Дашборд — Recruiter Radar',
+  description: 'Сегодняшний радар, источники и качество доказательств.',
+};
 
 const DASHBOARD_NAV: NavItem[] = [
   { href: '/dashboard', label: 'Дашборд', active: true },

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 
 import { getPaymentProviderSetupState } from "../lib/payments";
 import {
@@ -30,6 +31,12 @@ import ScrollProgress from "./scroll-progress";
 
 export const dynamic = "force-dynamic";
 
+export const metadata: Metadata = {
+  title: "Recruiter Radar — ежедневный радар по нанимающим компаниям",
+  description:
+    "Короткий список компаний с активным наймом и готовым поводом для контакта. Каждый день в Telegram. Для рекрутинговых агентств и BD-команд.",
+};
+
 const VISIBLE_PREVIEW_ITEMS = 2;
 
 type HomePageProps = {
@@ -41,24 +48,6 @@ type HomePreviewItem = Awaited<ReturnType<typeof getPublicSampleDigestState>>["i
 const heroTrust = [
   { value: "Только подтверждённый найм", label: "живые доказательства, не список «на всякий случай»" },
   { value: "2 990 ₽ за неделю", label: "чек самозанятого, оплата через ЮKassa" },
-] as const;
-
-const howItWorksItems = [
-  {
-    step: "01",
-    title: "Задайте профиль",
-    text: "Город, специализация, пара ключевых слов."
-  },
-  {
-    step: "02",
-    title: "Посмотрите пример",
-    text: "Видно, кто нанимает, почему и с чего начинать разговор."
-  },
-  {
-    step: "03",
-    title: "Подключите Telegram",
-    text: "Радар приходит каждый день. Отметки «беру» / «мимо» его доучивают."
-  }
 ] as const;
 
 export default async function HomePage({ searchParams }: HomePageProps) {
@@ -156,46 +145,17 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                 />
               </label>
 
-              <details className={ppStyles.disclosure}>
-                <summary className={ppStyles.disclosureSummary}>Уточнить профиль</summary>
-                <div className={ppStyles.disclosureBody}>
-                  <label htmlFor="dailyDigestLimit" className={ppStyles.field}>
-                    <span className={ppStyles.fieldLabel}>Компаний в день</span>
-                    <input
-                      id="dailyDigestLimit"
-                      name="dailyDigestLimit"
-                      type="number"
-                      min={1}
-                      max={10}
-                      defaultValue={previewInput.dailyDigestLimit}
-                      className={ppStyles.input}
-                    />
-                    <span className={ppStyles.helperText}>От 1 до 10 компаний в одном радаре.</span>
-                  </label>
-
-                  <label htmlFor="includeKeywords" className={ppStyles.field}>
-                    <span className={ppStyles.fieldLabel}>Усилить фокус</span>
-                    <input
-                      id="includeKeywords"
-                      name="includeKeywords"
-                      defaultValue={previewInput.includeKeywords}
-                      placeholder="рекрутер, сорсинг, агентство"
-                      className={ppStyles.input}
-                    />
-                  </label>
-
-                  <label htmlFor="excludeKeywords" className={ppStyles.field}>
-                    <span className={ppStyles.fieldLabel}>Исключить</span>
-                    <input
-                      id="excludeKeywords"
-                      name="excludeKeywords"
-                      defaultValue={previewInput.excludeKeywords}
-                      placeholder="вахта, завод, стажировка"
-                      className={ppStyles.input}
-                    />
-                  </label>
-                </div>
-              </details>
+              <label htmlFor="includeKeywords" className={ppStyles.field}>
+                <span className={ppStyles.fieldLabel}>Ключевые слова</span>
+                <input
+                  id="includeKeywords"
+                  name="includeKeywords"
+                  defaultValue={previewInput.includeKeywords}
+                  placeholder="рекрутер, сорсинг, агентство"
+                  className={ppStyles.input}
+                />
+                <span className={ppStyles.helperText}>Через запятую — поднимает компании с этими словами.</span>
+              </label>
 
               <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "center" }}>
                 <button type="submit" className={ppStyles.primaryAction}>
@@ -254,7 +214,6 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                   <PreviewDigestCard
                     key={`${item.org_id}-${item.rank}`}
                     item={item}
-                    showRelevance={previewState.isPersonalized}
                   />
                 ))}
 
@@ -269,7 +228,6 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                           <PreviewDigestCard
                             key={`${item.org_id}-${item.rank}`}
                             item={item}
-                            showRelevance={previewState.isPersonalized}
                           />
                         ))}
                       </div>
@@ -283,27 +241,6 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               {previewState.items.length > 0 ? "Получать такой радар каждый день" : "Попробовать неделю"}
             </Link>
           </SurfaceCard>
-        </div>
-      </ScrollReveal>
-
-      <ScrollReveal as="section" className={hpStyles.scrollSection}>
-        <SectionIntro
-          eyebrow="Как это работает"
-          title="Три шага до первого радара"
-          description="От примера до ежедневной работы без лишней настройки."
-        />
-
-        <div className={hpStyles.stepsGrid}>
-          {howItWorksItems.map((item) => (
-            <SurfaceCard
-              key={item.step}
-              className={hpStyles.featureSurfaceCardAlt}
-            >
-              <span className={hpStyles.stepBadge}>{item.step}</span>
-              <h3 className={hpStyles.stepTitle}>{item.title}</h3>
-              <p className={hpStyles.stepText}>{item.text}</p>
-            </SurfaceCard>
-          ))}
         </div>
       </ScrollReveal>
 
@@ -425,69 +362,16 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   );
 }
 
-const RELEVANCE_AXES: Array<{ key: keyof HomePreviewItem["relevanceSignals"]; label: string }> = [
-  { key: "fit", label: "Соответствие" },
-  { key: "intent", label: "Намерение" },
-  { key: "urgency", label: "Срочность" },
-  { key: "reachability", label: "Доступность" },
-];
-
-function PreviewRelevanceBars(props: { signals: HomePreviewItem["relevanceSignals"] }) {
-  const { signals } = props;
-  const hasAny = RELEVANCE_AXES.some((axis) => signals[axis.key] > 0);
-  if (!hasAny) return null;
-
-  return (
-    <div className={hpStyles.previewReasonList}>
-      <div style={{ color: "#667085", fontSize: "0.78rem", fontWeight: 700 }}>
-        Оценка релевантности вашему профилю
-      </div>
-      <div style={{ display: "grid", gap: "6px" }}>
-        {RELEVANCE_AXES.map((axis) => {
-          const value = Math.round(signals[axis.key] * 100);
-          return (
-            <div
-              key={axis.key}
-              style={{ display: "grid", gridTemplateColumns: "92px 1fr 34px", gap: "8px", alignItems: "center" }}
-            >
-              <span style={{ fontSize: "0.74rem", color: "#475467" }}>{axis.label}</span>
-              <span
-                aria-hidden
-                style={{ height: "6px", borderRadius: "999px", background: "#eaecf0", overflow: "hidden" }}
-              >
-                <span
-                  style={{
-                    display: "block",
-                    height: "100%",
-                    width: `${value}%`,
-                    borderRadius: "999px",
-                    background: "var(--accent, #2563eb)",
-                  }}
-                />
-              </span>
-              <span style={{ fontSize: "0.72rem", color: "#667085", textAlign: "right" }}>{value}%</span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 function PreviewDigestCard(props: {
   item: HomePreviewItem;
-  showRelevance?: boolean;
 }) {
-  const { item, showRelevance } = props;
+  const { item } = props;
   const probability = buildHhRadarProbabilitySummary({
     totalScore: item.total_score
   });
   const gatePresentation = getGatePresentation(item.confidence_gate);
   const whyNow = item.reasons[0] || "";
   const contactPath = formatLawfulContactPath(item.lawfulContactPath);
-  const negativeSignals = item.negativeSignals;
-  const secondaryReason = item.reasons[1] || null;
-  const hasExtraContext = Boolean(secondaryReason) || item.curationLabels.length > 0;
 
   return (
     <article className={hpStyles.previewCard}>
@@ -513,42 +397,11 @@ function PreviewDigestCard(props: {
         </div>
       ) : null}
 
-      {showRelevance ? <PreviewRelevanceBars signals={item.relevanceSignals} /> : null}
-
       {contactPath ? (
         <div className={hpStyles.previewReasonList}>
           <div style={{ color: "#667085", fontSize: "0.78rem", fontWeight: 700 }}>Безопасный путь контакта</div>
           <div>{contactPath}</div>
         </div>
-      ) : null}
-
-      {negativeSignals.length > 0 ? (
-        <div className={hpStyles.previewReasonList}>
-          <div style={{ color: "#b42318", fontSize: "0.78rem", fontWeight: 700 }}>Факторы риска</div>
-          <ul style={{ margin: 0, paddingLeft: "18px", display: "grid", gap: "4px" }}>
-            {negativeSignals.slice(0, 2).map((signal) => (
-              <li key={signal}>{signal}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      {hasExtraContext ? (
-        <details className={ppStyles.disclosure}>
-          <summary className={ppStyles.disclosureSummary}>Показать дополнительный контекст</summary>
-          <div className={ppStyles.disclosureBody}>
-            {secondaryReason ? <div className={ppStyles.helperText}>{secondaryReason}</div> : null}
-            {item.curationLabels.length > 0 ? (
-              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                {item.curationLabels.slice(0, 2).map((label) => (
-                  <span key={`${item.org_id}-${label}`} className={hpStyles.chipTone}>
-                    {label}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        </details>
       ) : null}
     </article>
   );

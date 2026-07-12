@@ -1,5 +1,6 @@
 ﻿import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import type { ReactElement, SVGProps } from "react";
 
 import { FormSubmitButton } from "../../../ui/form-submit-button";
@@ -62,6 +63,11 @@ import {
 import styles from "./pilot-onboarding-components.module.css";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Запуск пилота — Recruiter Radar",
+  description: "Настройка профиля, подключение Telegram и первый радар.",
+};
 
 type PilotOnboardingPageProps = {
   params: Promise<{

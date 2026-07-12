@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import type { Metadata } from 'next';
 import type { ReactElement, SVGProps } from 'react';
 import Link from 'next/link';
 import { listClientProfiles, type ClientProfile } from '@/lib/clientProfiles';
@@ -29,6 +30,11 @@ import { deriveReviewReason } from './review-reason';
 import { pluralizeLeads } from '../leads/page-helpers';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+  title: 'Ревью — Recruiter Radar',
+  description: 'Кандидаты, требующие проверки перед отправкой в подборку.',
+};
 
 const REVIEW_NAV: NavItem[] = [
   { href: '/dashboard', label: 'Дашборд' },

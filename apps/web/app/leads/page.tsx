@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getLeadsForAllProfiles, getPendingReviewCount, type LeadItem, VALID_FEEDBACK_STATUSES } from '@/lib/leads-data';
 import { listClientProfiles, resolveHiringMode, type ClientProfile } from '@/lib/clientProfiles';
@@ -33,6 +34,11 @@ import { internalPageClasses as ipStyles } from '../ui/internal-page';
 import { ShieldIcon, PinIcon, BriefcaseIcon, FileIcon, AlertIcon, SearchIcon, TargetIcon, ClockIcon, CheckIcon } from '../ui/icons';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+  title: 'Лиды — Recruiter Radar',
+  description: 'Компании с активным наймом: оценка, доказательства и безопасный путь контакта.',
+};
 
 const LEADS_NAV: NavItem[] = [
   { href: '/dashboard', label: 'Дашборд' },

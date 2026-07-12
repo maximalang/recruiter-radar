@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import {
   InternalPageFrame,
   InternalPageHeader,
@@ -15,6 +16,11 @@ import { DeliveryForm } from "./delivery-form";
 import ProfileCompletionPanel from "./profile-completion-panel";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Профиль — Recruiter Radar",
+  description: "Кого вы ищете: роли, отрасли, география и точная настройка радара.",
+};
 
 const PROFILE_NAV: NavItem[] = [
   { href: "/dashboard", label: "Дашборд" },
@@ -64,6 +70,7 @@ export default async function ProfilePage() {
           <EmptyState
             title="Профиль ещё не активирован"
             text="Профиль появится после активации пилота. Завершите онбординг, чтобы настроить идеального клиента."
+            action={{ href: "/checkout", label: "Активировать пилот" }}
           />
         )}
       </ContentCard>
