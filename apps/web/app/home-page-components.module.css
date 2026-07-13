@@ -339,7 +339,7 @@
   display: grid;
   grid-template-columns: 0.85fr 1.15fr;
   gap: var(--space-section);
-  align-items: start;
+  align-items: stretch;
 }
 
 .previewCardContainer {
@@ -348,6 +348,15 @@
   align-content: start;
   padding: var(--space-card-padding-lg);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.92) 100%);
+}
+
+/* Shared heading style inside preview cards — matches .fieldLabel weight, sits
+   above the form / the digest list. */
+.previewCardHeading {
+  font-weight: 700;
+  font-size: var(--fs-lg);
+  color: var(--c-text-primary);
+  letter-spacing: -0.01em;
 }
 
 .previewHeaderRow {
@@ -400,24 +409,32 @@
   font-weight: 600;
 }
 
-/* ── Pricing — hierarchy: primary week plan, then secondary plans ── */
+/* ── Pricing — three equal-weight cards, pilot gently featured ── */
 .pricingGrid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 16px;
   align-items: stretch;
 }
 
-/* Primary plan card — the single recommended plan, prominent. */
-.primaryPlanCard {
+/* All three plan cards share the same base weight so the row reads balanced;
+   the pilot is gently lifted by a top accent line + soft blue tint + a flag. */
+.primaryPlanCard,
+.secondaryPlanCard {
   position: relative;
   display: grid;
-  gap: 18px;
-  border: 1.5px solid rgba(29, 78, 216, 0.3);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(239, 246, 255, 0.96) 100%);
-  box-shadow: 0 18px 46px rgba(29, 78, 216, 0.15);
-  padding: 30px 32px;
+  gap: 16px;
+  border: 1px solid var(--c-border);
+  background-color: rgba(255, 255, 255, 0.92);
+  padding: 26px 26px;
   overflow: hidden;
+}
+
+.primaryPlanCard {
+  gap: 18px;
+  border-color: rgba(29, 78, 216, 0.28);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(239, 246, 255, 0.96) 100%);
+  box-shadow: 0 16px 40px rgba(29, 78, 216, 0.14);
 }
 
 /* A quiet accent line along the top edge of the featured plan. */
@@ -475,19 +492,24 @@
   color: var(--c-text-secondary);
 }
 
-/* Secondary plans — two side by side, lighter */
+/* Secondary plans now render directly in the same row — no nested grid. */
 .secondaryPlansRow {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  display: contents;
 }
 
-.secondaryPlanCard {
-  display: grid;
-  gap: 14px;
-  border: 1px solid var(--c-border);
-  background-color: rgba(255, 255, 255, 0.92);
-  padding: 24px 26px;
+/* Short plan description shown on every card so the row has equal density. */
+.planDescription {
+  margin: 0;
+  color: var(--c-text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+/* Push the CTA to the bottom of every plan card so the row stays aligned even
+   when descriptions differ in length. Works because each card is a grid with
+   stretched height (align-items: stretch on .pricingGrid). */
+.planCta {
+  margin-top: auto;
 }
 
 /* Single shared "what's included" block under pricing */
@@ -637,6 +659,13 @@
 
 /* ===================== Mobile responsiveness ===================== */
 
+@media (max-width: 1000px) {
+  /* Three pricing cards get cramped below ~1000px — collapse to a single column. */
+  .pricingGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 900px) {
   .previewGrid {
     grid-template-columns: 1fr;
@@ -663,10 +692,6 @@
 
   .heroTrust {
     gap: 28px;
-  }
-
-  .secondaryPlansRow {
-    grid-template-columns: 1fr;
   }
 }
 

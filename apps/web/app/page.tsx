@@ -52,25 +52,25 @@ type HomePageProps = {
 type HomePreviewItem = Awaited<ReturnType<typeof getPublicSampleDigestState>>["items"][number];
 
 const heroTrust = [
-  { value: "Только подтверждённый найм", label: "доказательства, а не «возможно, нанимают»" },
-  { value: "5 минут на старт", label: "профиль, Telegram — и утренний радар готов" },
+  { value: "Только подтверждённый найм", label: "карьерная страница и свежие вакансии — не агрегатор" },
+  { value: "Готово за 5 минут", label: "профиль и Telegram — утром приходит радар" },
 ] as const;
 
 const principles = [
   {
     icon: CheckIcon,
     title: "Только подтверждённый найм",
-    text: "Карьерная страница, свежие вакансии, независимый источник. Не агрегат «возможно, нанимают».",
+    text: "Карьерная страница, свежие вакансии, независимый источник. Видно, кого и зачем ищут.",
   },
   {
     icon: ShieldIcon,
     title: "Оценка уверенности",
-    text: "Уровень доверия A–D и честный «почему сейчас» — до первого касания.",
+    text: "Уровень доверия A–D и понятный «почему сейчас» — до первого касания.",
   },
   {
     icon: MailIcon,
     title: "Безопасный путь контакта",
-    text: "Корпоративный сайт, карьерная страница, HR-почта. Без личных адресов вслепую.",
+    text: "Корпоративный сайт, карьерная страница, HR-почта. Без личных адресов наугад.",
   },
 ] as const;
 
@@ -119,15 +119,16 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         <div className={hpStyles.heroContent}>
           <span className={hpStyles.heroKicker}>
             <span className={hpStyles.heroKickerDot} aria-hidden="true" />
-            Ежедневный радар по компаниям с активным наймом
+            Радар по компаниям с активным наймом
           </span>
           <h1 className={hpStyles.heroTitle}>
             Компании, которым стоит написать{" "}
             <span className={hpStyles.heroTitleAccent}>сегодня</span>.
           </h1>
           <p className={hpStyles.heroSubtitle}>
-            Каждый день — короткий список нанимающих компаний с поводом для контакта.
-            Доказательства найма, оценка уверенности и безопасный путь контакта — в Telegram.
+            Каждое утро — короткий список нанимающих компаний: что меняется, почему
+            сейчас и как выйти на них корректно. Всё в Telegram, с доказательствами
+            и оценкой уверенности.
           </p>
           <div className={hpStyles.heroActions}>
             <a href="#preview" className={hpStyles.heroCta}>
@@ -152,7 +153,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       {/* Principles / value row */}
       <ScrollReveal as="section" className={hpStyles.scrollSection}>
         <SectionIntro
+          eyebrow="Что внутри"
           title="Доверие вместо шума"
+          description="Каждая компания в радаре доказана и оценена. Три правила, по которым мы её отбираем."
         />
         <div className={hpStyles.principles}>
           {principles.map((p) => {
@@ -173,13 +176,14 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       {/* Live preview */}
       <ScrollReveal as="section" id="preview" className={hpStyles.scrollSection}>
         <SectionIntro
+          eyebrow="Живой пример"
           title="Так выглядит утренний радар"
-          description="Задайте город и специализацию — это те же данные, что приходят в Telegram."
+          description="Задайте город и специализацию — справа появится тот самый список, что утром приходит в Telegram."
         />
 
         <div className={hpStyles.previewGrid}>
           <SurfaceCard className={hpStyles.previewCardContainer}>
-            <div style={{ fontWeight: 700, fontSize: "var(--fs-lg)" }}>Параметры профиля</div>
+            <div className={hpStyles.previewCardHeading}>Параметры профиля</div>
 
             <form method="GET" action="/" style={{ display: "grid", gap: "14px" }}>
               <label htmlFor="specialization" className={ppStyles.field}>
@@ -221,8 +225,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           <SurfaceCard className={hpStyles.previewCardContainer}>
             <div>
               <div className={hpStyles.previewHeaderRow}>
-                <div style={{ fontWeight: 700, fontSize: "var(--fs-lg)" }}>
-                  {hasPreview ? "Радар для выбранного профиля" : "Как выглядит ежедневный радар"}
+                <div className={hpStyles.previewCardHeading}>
+                  {hasPreview ? "Радар для вашего профиля" : "Как выглядит радар"}
                 </div>
                 <StatusBadge tone={previewState.isPersonalized ? "info" : "neutral"} style={{ justifySelf: "start" }}>
                   {previewState.isPersonalized
@@ -279,7 +283,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             )}
 
             <Link href={checkoutHref} className={ppStyles.primaryAction}>
-              {previewState.items.length > 0 ? "Получать такой радар каждый день" : "Попробовать неделю"}
+              {previewState.items.length > 0 ? "Получать такой радар каждое утро" : "Попробовать неделю"}
             </Link>
           </SurfaceCard>
         </div>
@@ -289,7 +293,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       <ScrollReveal as="section" id="pricing" className={hpStyles.scrollSection}>
         <SectionIntro
           eyebrow="Тарифы"
-          title="Один продукт — три срока"
+          title="Один радар — на неделю, месяц или квартал"
         />
 
         <div className={hpStyles.pricingGrid}>
@@ -311,12 +315,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               </div>
               <span className={hpStyles.planFlag}>Рекомендуем начать</span>
             </div>
-            <p style={{ margin: 0, color: "var(--c-text-secondary)", fontSize: "0.94rem", lineHeight: 1.6 }}>
-              {pilotPlan.description}
-            </p>
+            <p className={hpStyles.planDescription}>{pilotPlan.description}</p>
             <Link
               href={buildCheckoutHref({ ...previewInput, planCode: pilotPlan.code })}
-              className={ppStyles.primaryAction}
+              className={`${ppStyles.primaryAction} ${hpStyles.planCta}`}
             >
               {pilotPlan.ctaLabel}
             </Link>
@@ -347,9 +349,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                     </div>
                     <div className={ppStyles.planPriceCadence}>{plan.cadence}</div>
                   </div>
+                  <p className={hpStyles.planDescription}>{plan.description}</p>
                   <Link
                     href={buildCheckoutHref({ ...previewInput, planCode: plan.code })}
-                    className={ppStyles.secondaryAction}
+                    className={`${ppStyles.secondaryAction} ${hpStyles.planCta}`}
                   >
                     {plan.ctaLabel}
                   </Link>
@@ -376,7 +379,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       {/* FAQ */}
       <ScrollReveal as="section" id="faq" className={hpStyles.scrollSection}>
         <SectionIntro
-          title="Коротко перед запуском"
+          eyebrow="Перед запуском"
+          title="Коротко о порядке"
         />
         {faqItems.map((item) => (
           <details key={item.question} className={hpStyles.faqCard}>
@@ -393,9 +397,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
       {/* Closing CTA band */}
       <section className={hpStyles.closingBand}>
-        <h2 className={hpStyles.closingTitle}>Начните неделю с радаром в Telegram</h2>
+        <h2 className={hpStyles.closingTitle}>Завтра утром — первый радар</h2>
         <p className={hpStyles.closingText}>
-          Семь дней ежедневного радара и профиль под вашу нишу.
+          Неделя ежедневных сигналов найма по вашей нише. Профиль настраивается за пять минут.
         </p>
         <div className={hpStyles.closingActions}>
           <Link href={checkoutHref} className={hpStyles.heroCta}>
