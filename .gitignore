@@ -33,9 +33,14 @@ apps/web/.cache/
 packages/db/scripts/test-sources-results.json
 # Throwaway Playwright screenshot/fixture tooling (local visual QA only)
 apps/web/scripts/shot-*.mjs
+apps/web/scripts/*-probe.mjs
 apps/web/scripts/hero-fixture.html
+apps/web/scripts/*-fixture.html
+apps/web/scripts/*-probe.html
 apps/web/scripts/*-shot*.png
 apps/web/scripts/prod-*.png
+apps/web/scripts/amb-*.png
+apps/web/scripts/spin-*.png
 apps/web/scripts/*-report.json
 apps/web/scripts/*-console.txt
 apps/web/scripts/fix-*.png
