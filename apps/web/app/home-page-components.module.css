@@ -7,6 +7,76 @@
    No fabricated data anywhere.
    ============================================================ */
 
+/* ── Ambient page background — calm, slow, behind everything ──
+   A fixed full-viewport layer of two soft blue radial glows that drift
+   across the page over ~30s. Low opacity, cool tones, blurred edges —
+   premium and restful, never busy. Sits behind all content (negative
+   z-index relative to the page frame) and is pointer-events:none so it
+   never intercepts clicks. Honors prefers-reduced-motion (static). */
+.ambientBg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+}
+.ambientBlob {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(60px);
+  will-change: transform;
+  opacity: 0.5;
+}
+.ambientBlobA {
+  width: 42vw;
+  height: 42vw;
+  max-width: 620px;
+  max-height: 620px;
+  top: -8vw;
+  left: -6vw;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.22) 0%, rgba(59, 130, 246, 0) 70%);
+  animation: ambientDriftA 32s ease-in-out infinite alternate;
+}
+.ambientBlobB {
+  width: 46vw;
+  height: 46vw;
+  max-width: 680px;
+  max-height: 680px;
+  bottom: -12vw;
+  right: -8vw;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.16) 0%, rgba(99, 102, 241, 0) 70%);
+  animation: ambientDriftB 38s ease-in-out infinite alternate;
+}
+.ambientBlobC {
+  width: 30vw;
+  height: 30vw;
+  max-width: 440px;
+  max-height: 440px;
+  top: 38%;
+  left: 58%;
+  background: radial-gradient(circle, rgba(14, 165, 233, 0.1) 0%, rgba(14, 165, 233, 0) 70%);
+  animation: ambientDriftC 44s ease-in-out infinite alternate;
+}
+@keyframes ambientDriftA {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(6vw, 4vh) scale(1.12); }
+}
+@keyframes ambientDriftB {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(-5vw, -3vh) scale(1.1); }
+}
+@keyframes ambientDriftC {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(-4vw, 5vh) scale(1.15); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ambientBlobA,
+  .ambientBlobB,
+  .ambientBlobC {
+    animation: none;
+  }
+}
+
 /* ── Sticky top nav — frosted glass, minimal ── */
 .topBar {
   position: sticky;
@@ -35,13 +105,35 @@
 
 /* Brand logo — the RadarLogo glyph (concentric rings + sweep). Sized in em so
    it scales with the brand name, inherits the brand blue from currentColor. A
-   soft halo behind it echoes the radar's focal glow without a hard ring. */
+   soft halo behind it echoes the radar's focal glow without a hard ring. On the
+   landing the sweep is animated (see `rr-sweep-spin` below) so the logo scans. */
 .brandLogo {
   flex: 0 0 auto;
   width: 1.5rem;
   height: 1.5rem;
   color: var(--c-brand);
   filter: drop-shadow(0 0 6px rgba(29, 78, 216, 0.18));
+}
+
+/* Slow sweep rotation for the logo's scan sector. The class is global (not
+   hashed) because RadarLogo applies it inside an inline SVG; the keyframe is
+   declared global to match. A full turn takes ~9s — calm, never distracting,
+   and roughly synced to the hero radar's pace. transform-origin lands on the
+   glyph center via the inline style set in icons.tsx (12px 12px in the 24-unit
+   viewBox). Honors prefers-reduced-motion (the animation is dropped, leaving a
+   static sweep — the glyph still reads as a radar). */
+:global(.rr-sweep-spin) {
+  animation: rrSweepSpin 9s linear infinite;
+  transform-origin: 12px 12px;
+}
+@keyframes rrSweepSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  :global(.rr-sweep-spin) {
+    animation: none;
+  }
 }
 
 .heroBrandName {

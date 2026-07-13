@@ -85,8 +85,18 @@ export function TargetIcon(p: IconProps) {
  * "scan") and a filled center node, because a brand mark needs a little more
  * visual weight than an interface glyph to read at small sizes / in a tab.
  * Still `currentColor` so it inherits the brand blue from CSS.
+ *
+ * `animate` (optional) rotates the sweep sector so the logo literally
+ * scans, mirroring the hero RadarCanvas. The rotation uses a stable
+ * global class `rr-sweep-spin` (defined in the landing CSS module via
+ * `:global` so it isn't hashed) and a `transform-origin` at the glyph's
+ * center (12px 12px in the 24-unit viewBox). The animation is skipped
+ * when the user prefers reduced motion — see the keyframe guard. When
+ * `animate` is false/omitted the glyph renders exactly as before, so the
+ * shared TopNav and favicon stay static.
  */
-export function RadarLogo(p: IconProps) {
+export function RadarLogo(p: IconProps & { animate?: boolean }) {
+  const { animate, ...svgProps } = p;
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -99,20 +109,23 @@ export function RadarLogo(p: IconProps) {
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
-      {...p}
+      {...svgProps}
     >
       {/* Outer + mid + inner range rings — circles within circles. */}
       <circle cx="12" cy="12" r="9.2" opacity="0.45" />
       <circle cx="12" cy="12" r="6" opacity="0.7" />
       <circle cx="12" cy="12" r="2.9" />
       {/* The sweep — a filled sector from center to the outer ring, the
-          "scan" that makes it a radar and not a target. */}
-      <path
-        d="M12 12 L21.2 12 A9.2 9.2 0 0 0 14.4 3.1 Z"
-        fill="currentColor"
-        stroke="none"
-        opacity="0.28"
-      />
+          "scan" that makes it a radar and not a target. When `animate`
+          is set the whole sector slowly rotates around the origin. */}
+      <g className={animate ? 'rr-sweep-spin' : undefined}>
+        <path
+          d="M12 12 L21.2 12 A9.2 9.2 0 0 0 14.4 3.1 Z"
+          fill="currentColor"
+          stroke="none"
+          opacity={0.28}
+        />
+      </g>
       {/* Center origin node — solid dot, the radar's focal point. */}
       <circle cx="12" cy="12" r="1.1" fill="currentColor" stroke="none" />
     </svg>

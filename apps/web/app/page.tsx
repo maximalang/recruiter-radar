@@ -92,12 +92,21 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   return (
     <PageFrame maxWidth="1160px">
       <ScrollProgress />
+      {/* Calm animated ambient background — soft drifting blue glows behind
+          every section. Decorative only; pointer-events:none and a negative
+          z-index keep it behind content and unclickable. Honors
+          prefers-reduced-motion (static) via the CSS keyframe guard. */}
+      <div className={hpStyles.ambientBg} aria-hidden="true">
+        <span className={hpStyles.ambientBlobA} />
+        <span className={hpStyles.ambientBlobB} />
+        <span className={hpStyles.ambientBlobC} />
+      </div>
       <a href="#main-content" className={ppStyles.skipLink}>Перейти к содержанию</a>
 
       {/* Sticky top nav */}
       <header className={hpStyles.topBar}>
         <a href="/" className={hpStyles.brandMark} style={{ textDecoration: "none" }}>
-          <RadarLogo className={hpStyles.brandLogo} aria-hidden="true" />
+          <RadarLogo className={hpStyles.brandLogo} animate aria-hidden="true" />
           <div>
             <div className={hpStyles.heroBrandName}>Recruiter Radar</div>
           </div>
