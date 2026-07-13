@@ -443,58 +443,61 @@ function PreviewDigestCard(props: {
 
   return (
     <article className={hpStyles.previewCard} data-tone={tone}>
+      {/* Header — rank + company name, with the confidence gate label as a quiet
+          right-aligned caption. One line, no chips yet: the score bar carries
+          the temperature below, so the name gets the full visual weight here. */}
       <div className={hpStyles.previewCardHeader}>
         <div className={hpStyles.previewCardName}>
-          <span className={hpStyles.previewCardRank}>{item.rank}.</span>
+          <span className={hpStyles.previewCardRank}>{item.rank}</span>
           {item.employer_name}
         </div>
-        <span className={hpStyles.vacanciesCount}>{formatVacanciesCount(item.vacancies_count)}</span>
+        <span className={hpStyles.previewCardMeta}>
+          {formatVacanciesCount(item.vacancies_count)}
+          {gatePresentation ? (
+            <>
+              <span className={hpStyles.previewCardMetaDot} aria-hidden="true">·</span>
+              <span className={hpStyles.previewCardGate} data-gate={item.confidence_gate}>
+                {gatePresentation.label}
+              </span>
+            </>
+          ) : null}
+        </span>
       </div>
 
-      {/* Verdict — the one-glance temperature word + the confidence gate label,
-          grouped so "is this worth contacting now?" reads in one line. */}
-      <div className={hpStyles.previewVerdict}>
+      {/* Score line — the one-glance temperature word + a clean strength readout.
+          The number is the same [0,4] value the profile threshold and /leads bar
+          use (from lib/scoring/score-display); the bar is a single calm fill, no
+          segmented ticks — strictly the value, nothing decorative. */}
+      <div className={hpStyles.previewScoreLine}>
         <ScoreBandChip score={item.total_score} />
-        {gatePresentation ? (
-          <span className={ppStyles.gateBadge} data-gate={item.confidence_gate}>
-            {gatePresentation.label}
-          </span>
-        ) : null}
-      </div>
-
-      {/* Signal-strength meter — a premium strength readout for the landing
-          preview. Big numeric strength ("3.2") + a segmented gradient bar whose
-          four ticks make the [0,4] domain read as a real scale. Same numbers as
-          the compact ScoreBar on /leads — a landing-only presentation, not a
-          second scale. The meter role + aria-valuenow keep it accessible. */}
-      <div
-        className={hpStyles.previewScale}
-        role="meter"
-        aria-valuenow={Number(strength)}
-        aria-valuemin={0}
-        aria-valuemax={4}
-        aria-label={`Сила сигнала: ${strength} из 4`}
-      >
-        <div className={hpStyles.previewScaleReadout}>
+        <div
+          className={hpStyles.previewScale}
+          role="meter"
+          aria-valuenow={Number(strength)}
+          aria-valuemin={0}
+          aria-valuemax={4}
+          aria-label={`Сила сигнала: ${strength} из 4`}
+        >
           <span className={hpStyles.previewScaleNumber} data-tone={tone}>{strength}</span>
-          <span className={hpStyles.previewScaleOf}>/4</span>
-        </div>
-        <div className={hpStyles.previewScaleTrack} title={`Сила сигнала: ${strength} из 4`}>
-          <div className={hpStyles.previewScaleFill} data-tone={tone} style={{ width: `${pct}%` }} />
+          <div className={hpStyles.previewScaleTrack} title={`Сила сигнала: ${strength} из 4`}>
+            <div className={hpStyles.previewScaleFill} data-tone={tone} style={{ width: `${pct}%` }} />
+          </div>
         </div>
       </div>
 
+      {/* Evidence — a tight two-row list with quiet inline labels (no dot
+          bullets, no uppercase shouting). Reads as a brief, not a form. */}
       {whyNow ? (
-        <div className={hpStyles.previewReasonList}>
-          <div className={hpStyles.previewReasonLabel}>Почему сейчас</div>
-          <div className={hpStyles.previewReasonValue}>{whyNow}</div>
+        <div className={hpStyles.previewReason}>
+          <span className={hpStyles.previewReasonKey}>Почему сейчас</span>
+          <span className={hpStyles.previewReasonVal}>{whyNow}</span>
         </div>
       ) : null}
 
       {contactPath ? (
-        <div className={hpStyles.previewReasonList}>
-          <div className={hpStyles.previewReasonLabel}>Безопасный путь контакта</div>
-          <div className={hpStyles.previewReasonValue}>{contactPath}</div>
+        <div className={hpStyles.previewReason}>
+          <span className={hpStyles.previewReasonKey}>Контакт</span>
+          <span className={hpStyles.previewReasonVal}>{contactPath}</span>
         </div>
       ) : null}
     </article>

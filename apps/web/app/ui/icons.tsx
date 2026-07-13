@@ -112,22 +112,44 @@ export function RadarLogo(p: IconProps & { animate?: boolean }) {
       {...svgProps}
     >
       {/* Outer + mid + inner range rings — circles within circles. */}
-      <circle cx="12" cy="12" r="9.2" opacity="0.45" />
-      <circle cx="12" cy="12" r="6" opacity="0.7" />
-      <circle cx="12" cy="12" r="2.9" />
-      {/* The sweep — a filled sector from center to the outer ring, the
-          "scan" that makes it a radar and not a target. When `animate`
-          is set the whole sector slowly rotates around the origin. */}
+      <circle cx="12" cy="12" r="9.2" opacity="0.4" />
+      <circle cx="12" cy="12" r="6" opacity="0.6" />
+      <circle cx="12" cy="12" r="2.9" opacity="0.85" />
+      {/* The sweep — a filled sector + a bright leading edge that rotates so
+          the "scan" reads as a real radar sweep, not a static wedge. The
+          group spins around the origin (12,12); the leading line + sector
+          + a faint trailing fade all ride the same rotation. */}
       <g className={animate ? 'rr-sweep-spin' : undefined}>
         <path
           d="M12 12 L21.2 12 A9.2 9.2 0 0 0 14.4 3.1 Z"
           fill="currentColor"
           stroke="none"
-          opacity={0.28}
+          opacity={0.22}
         />
+        {/* Bright leading edge — the beam currently scanning. */}
+        <line
+          x1="12"
+          y1="12"
+          x2="21.2"
+          y2="12"
+          stroke="currentColor"
+          strokeWidth={1.4}
+          strokeLinecap="round"
+          opacity={0.9}
+        />
+        {/* A faint "blip" ahead of the beam — a detected contact. */}
+        <circle cx="17.4" cy="9.2" r="0.9" fill="currentColor" stroke="none" opacity={0.9} />
       </g>
-      {/* Center origin node — solid dot, the radar's focal point. */}
-      <circle cx="12" cy="12" r="1.1" fill="currentColor" stroke="none" />
+      {/* Center origin node — the radar's focal point. When `animate` is set
+          it gently pulses so the glyph feels alive without the sweep alone. */}
+      <circle
+        cx="12"
+        cy="12"
+        r="1.25"
+        fill="currentColor"
+        stroke="none"
+        className={animate ? 'rr-core-pulse' : undefined}
+      />
     </svg>
   );
 }

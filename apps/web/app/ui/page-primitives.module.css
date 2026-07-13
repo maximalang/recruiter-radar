@@ -513,35 +513,6 @@
   justify-self: start;
 }
 
-/* Gate badge */
-.gateBadge {
-  padding: 2px 8px;
-  border-radius: var(--radius-pill);
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-/* Gate badge variants */
-.gateBadge[data-gate="A"] {
-  background: var(--gate-a-bg, #d1fae5);
-  color: var(--gate-a-color, #065f46);
-}
-
-.gateBadge[data-gate="B"] {
-  background: var(--gate-b-bg, #dbeafe);
-  color: var(--gate-b-color, #1e40af);
-}
-
-.gateBadge[data-gate="C"] {
-  background: var(--gate-c-bg, #fef3c7);
-  color: var(--gate-c-color, #92400e);
-}
-
-.gateBadge[data-gate="D"] {
-  background: var(--gate-d-bg, #f3f4f6);
-  color: var(--gate-d-color, #4b5563);
-}
-
 /* Reduce motion for users who prefer it */
 @media (prefers-reduced-motion: reduce) {
   .surfaceCard,
