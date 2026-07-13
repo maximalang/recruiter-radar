@@ -4,26 +4,23 @@ import { readOperatorSession } from "../../lib/operator-auth";
 import s from "./site-footer.module.css";
 
 /**
- * Site-wide footer — a premium, minimal closer for every page surface.
+ * Site-wide footer — a quiet, minimal closer for every page surface.
  *
- * One vocabulary across the landing page, internal app pages, and legal
- * pages: a thin top rule, a brand mark + a row of quiet navigation links,
- * then a single compact operator line (ФИО · статус · ИНН · email) and the
- * copyright. The operator requisites are the legally-required minimum
- * (ФЗ-54 / НПД) — kept on one line, mono INN, no heavy card so it reads as
- * restraint rather than a form. Replaces the per-page inline footers and the
- * `← На главную` link rows that used the forbidden literal glyph.
+ * Three lines, no more: brand + nav links; one operator-requisites line (the
+ * legally-required minimum — ФИО, ИНН, email); the copyright. The full
+ * requisites (status, service description) live on /legal, so the footer
+ * carries only what the law requires on every page and points to /legal for
+ * the rest. Replaces the heavier footer that repeated the status and a
+ * tagline-style copyright line.
  *
  * The /admin link is operator-gated: it renders ONLY for a browser that
  * carries the signed `rr_op` operator session (see lib/operator-auth.ts).
  * The /admin page itself is auth-gated too, but the link must not advertise
- * the operator panel to ordinary users on the public landing/legal pages —
- * admin surfaces are not a public site function. The check is server-side
- * (this is a server component), so the link is absent from the HTML, not
- * merely hidden.
+ * the operator panel to ordinary users on the public landing/legal pages.
+ * Server-side check (server component), so the link is absent from the HTML.
  *
- * `tone` lets a dark hero/landing surface request the light-on-dark variant;
- * internal + legal pages use the default light tone.
+ * `tone` lets a dark surface request the light-on-dark variant; internal +
+ * legal pages use the default light tone.
  */
 export async function SiteFooter(props: { tone?: "light" | "dark" }) {
   const tone = props.tone ?? "light";
@@ -46,10 +43,10 @@ export async function SiteFooter(props: { tone?: "light" | "dark" }) {
           </nav>
         </div>
 
+        {/* Operator requisites — the legally-required minimum on every page:
+            ФИО + ИНН + контактный email. Full status/service on /legal. */}
         <div className={s.footerOperator}>
           <span className={s.footerOperatorName}>Головий Наталья Ярославна</span>
-          <span className={s.footerOperatorSep} aria-hidden="true">·</span>
-          <span>самозанятый, плательщик НПД</span>
           <span className={s.footerOperatorSep} aria-hidden="true">·</span>
           <span>ИНН <span className={s.footerOperatorInn}>622809740837</span></span>
           <span className={s.footerOperatorSep} aria-hidden="true">·</span>
@@ -57,7 +54,7 @@ export async function SiteFooter(props: { tone?: "light" | "dark" }) {
         </div>
 
         <div className={s.footerCopy}>
-          © {year} Recruiter Radar. Ежедневный радар по компаниям с активным наймом.
+          © {year} Recruiter Radar
         </div>
       </div>
     </footer>

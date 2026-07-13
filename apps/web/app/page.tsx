@@ -10,7 +10,7 @@ import {
   readPublicPreviewInput
 } from "../lib/publicProduct";
 import { formatSignalStrength, scorePercent, scoreTone } from "../lib/scoring/score-display";
-import { formatLawfulContactPath } from "../lib/leads-data";
+import { formatLawfulContactPath, deriveWhyNow } from "../lib/leads-data";
 import { getGatePresentation } from "../lib/scoring/gate-labels";
 import {
   NoticeBox,
@@ -23,7 +23,9 @@ import ppStyles from "./ui/page-primitives.module.css";
 import { ScoreBandChip } from "./ui/internal-page";
 import {
   buildFaqItems,
-  formatVacanciesCount,
+  formatVacancyFreshness,
+  formatLocationCaption,
+  pickEvidenceTitles,
 } from "./home-page-components";
 import hpStyles from "./home-page-components.module.css";
 import {
@@ -128,10 +130,6 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       <section id="main-content" className={hpStyles.heroSection} aria-label="Recruiter Radar">
         <RadarCanvas />
         <div className={hpStyles.heroContent}>
-          <span className={hpStyles.heroKicker}>
-            <span className={hpStyles.heroKickerDot} aria-hidden="true" />
-            Радар по компаниям с активным наймом
-          </span>
           <h1 className={hpStyles.heroTitle}>
             Компании, которым стоит написать{" "}
             <span className={hpStyles.heroTitleAccent}>сегодня</span>.
@@ -430,63 +428,98 @@ function PreviewDigestCard(props: {
 }) {
   const { item } = props;
   const gatePresentation = getGatePresentation(item.confidence_gate);
-  const whyNow = item.reasons[0] || "";
+  // `whyNow` joins both structured reasons (deriveWhyNow picks the urgency/
+  // intent components and orders by evidential strength) — the old card used
+  // only reasons[0] and threw away the second reason. This is the "what
+  // changed / why now" answer in one line.
+  const whyNow = deriveWhyNow(item.reasons) || item.reasons[0] || "";
   const contactPath = formatLawfulContactPath(item.lawfulContactPath);
-  // Conversion comes from the single shared score-display module so the
-  // landing's premium strength meter can never drift from the [0,4] scale the
-  // FIUR contract, the profile `hiringIntentMin` threshold, and the shared
-  // /leads + /review score bars all speak. `strength` feeds the big readout,
-  // `tone` colors the rail + number + bar gradient, `pct` fills the bar.
+  const freshness = formatVacancyFreshness(item.latest_published_at);
+  const location = formatLocationCaption(item.location_names);
+  const evidenceTitles = pickEvidenceTitles(item.evidence_titles, 3);
+  // Score scale stays [0,4] — shared lib/scoring/score-display primitives,
+  // same numbers as the profile threshold and /leads bar. `strength` is the
+  // numeric readout, `tone` colors the chip + bar, `pct` fills the bar.
   const strength = formatSignalStrength(item.total_score);
   const tone = scoreTone(item.total_score);
   const pct = scorePercent(item.total_score);
+  // ICP-relevance breakdown — only shown when the preview was personalised
+  // (the user typed a specialization/city). When there's no ICP input the
+  // signals are all 0 (defaultRelevanceSignals), so the block would show empty
+  // bars — hide it in that case rather than fabricate a "match". Each axis ∈
+  // [0,1]; the four dots are the FIUR axes (Fit / Intent / Urgency /
+  // Reachability), the honest "is this company a fit for YOUR agency" signal.
+  const rs = item.relevanceSignals;
+  const hasRelevance = rs.fit > 0 || rs.intent > 0 || rs.urgency > 0 || rs.reachability > 0;
+  const relevanceAxes: ReadonlyArray<{ key: string; label: string; value: number }> = [
+    { key: "fit", label: "Fit", value: rs.fit },
+    { key: "intent", label: "Intent", value: rs.intent },
+    { key: "urgency", label: "Urgency", value: rs.urgency },
+    { key: "reachability", label: "Reach", value: rs.reachability },
+  ];
 
   return (
     <article className={hpStyles.previewCard} data-tone={tone}>
-      {/* Header — rank + company name, with the confidence gate label as a quiet
-          right-aligned caption. One line, no chips yet: the score bar carries
-          the temperature below, so the name gets the full visual weight here. */}
+      {/* Header — rank + company name (the "who"), with location as a quiet
+          right-aligned caption (the "where"). The score + gate live below, so
+          the name gets the full visual weight here. */}
       <div className={hpStyles.previewCardHeader}>
         <div className={hpStyles.previewCardName}>
-          <span className={hpStyles.previewCardRank}>{item.rank}</span>
+          <span className={hpStyles.previewCardRank} aria-hidden="true">{item.rank}</span>
           {item.employer_name}
         </div>
-        <span className={hpStyles.previewCardMeta}>
-          {formatVacanciesCount(item.vacancies_count)}
-          {gatePresentation ? (
-            <>
-              <span className={hpStyles.previewCardMetaDot} aria-hidden="true">·</span>
-              <span className={hpStyles.previewCardGate} data-gate={item.confidence_gate}>
-                {gatePresentation.label}
-              </span>
-            </>
-          ) : null}
-        </span>
+        {location ? (
+          <span className={hpStyles.previewCardLoc} aria-label={`География: ${location}`}>
+            {location}
+          </span>
+        ) : null}
       </div>
 
-      {/* Score line — the one-glance temperature word + a clean strength readout.
-          The number is the same [0,4] value the profile threshold and /leads bar
-          use (from lib/scoring/score-display); the bar is a single calm fill, no
-          segmented ticks — strictly the value, nothing decorative. */}
+      {/* Score + gate — the one-glance temperature. The chip carries the word
+          ("Горячий"/"Тёплый"/"Холодный"); the gate label is the confidence
+          stamp ("Подтверждено"/"Скорее подтверждено"/"Нужна проверка"). A
+          single 4px strength bar under them makes the [0,4] value measurable
+          without a big number competing with the name. */}
       <div className={hpStyles.previewScoreLine}>
         <ScoreBandChip score={item.total_score} />
+        {gatePresentation ? (
+          <span className={hpStyles.previewCardGate} data-gate={item.confidence_gate}>
+            {gatePresentation.label}
+          </span>
+        ) : null}
         <div
-          className={hpStyles.previewScale}
+          className={hpStyles.previewStrengthMeter}
           role="meter"
           aria-valuenow={Number(strength)}
           aria-valuemin={0}
           aria-valuemax={4}
           aria-label={`Сила сигнала: ${strength} из 4`}
+          title={`Сила сигнала: ${strength} из 4`}
         >
-          <span className={hpStyles.previewScaleNumber} data-tone={tone}>{strength}</span>
-          <div className={hpStyles.previewScaleTrack} title={`Сила сигнала: ${strength} из 4`}>
-            <div className={hpStyles.previewScaleFill} data-tone={tone} style={{ width: `${pct}%` }} />
-          </div>
+          <span className={hpStyles.previewStrengthNumber} data-tone={tone}>{strength}</span>
+          <span className={hpStyles.previewStrengthTrack}>
+            <span className={hpStyles.previewStrengthFill} data-tone={tone} style={{ width: `${pct}%` }} />
+          </span>
         </div>
       </div>
 
-      {/* Evidence — a tight two-row list with quiet inline labels (no dot
-          bullets, no uppercase shouting). Reads as a brief, not a form. */}
+      {/* Evidence — real vacancy titles (the proof behind "this company is
+          hiring"), capped at 3, de-duplicated. This is the substantive "what
+          they're hiring for" that the old card buried under a bare count. */}
+      {evidenceTitles.length > 0 ? (
+        <div className={hpStyles.previewEvidence}>
+          {evidenceTitles.map((title, idx) => (
+            <span key={`${title}-${idx}`} className={hpStyles.previewEvidenceChip}>
+              {title}
+            </span>
+          ))}
+        </div>
+      ) : null}
+
+      {/* Why now + freshness — the "what changed" answer. `whyNow` is the
+          structured reason; freshness is the latest publish date distance,
+          the strongest time signal. Paired so "why now" reads with a time
+          anchor. */}
       {whyNow ? (
         <div className={hpStyles.previewReason}>
           <span className={hpStyles.previewReasonKey}>Почему сейчас</span>
@@ -494,6 +527,41 @@ function PreviewDigestCard(props: {
         </div>
       ) : null}
 
+      {freshness ? (
+        <div className={hpStyles.previewReason}>
+          <span className={hpStyles.previewReasonKey}>Свежесть</span>
+          <span className={hpStyles.previewReasonVal}>{freshness}</span>
+        </div>
+      ) : null}
+
+      {/* ICP-relevance — the "is this a fit for YOUR agency" signal, broken
+          onto the four FIUR axes. Only for personalised previews (see
+          hasRelevance). This is the conceptual core the old card lacked: it
+          answers "why fit this agency", not just "is this company hiring". */}
+      {hasRelevance ? (
+        <div className={hpStyles.previewRelevance} aria-label="Релевантность вашему ICP по осям">
+          <span className={hpStyles.previewReasonKey}>Релевантность ICP</span>
+          <div className={hpStyles.previewRelevanceAxes}>
+            {relevanceAxes.map((axis) => (
+              <span key={axis.key} className={hpStyles.previewRelevanceAxis} aria-label={`${axis.label}: ${Math.round(axis.value * 100)}%`}>
+                <span className={hpStyles.previewRelevanceAxisLabel}>{axis.label}</span>
+                <span className={hpStyles.previewRelevanceDots}>
+                  {[0.25, 0.5, 0.75, 1].map((threshold) => (
+                    <span
+                      key={threshold}
+                      className={hpStyles.previewRelevanceDot}
+                      data-on={axis.value >= threshold ? "true" : "false"}
+                      aria-hidden="true"
+                    />
+                  ))}
+                </span>
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Contact — the safest non-personal path, one line. */}
       {contactPath ? (
         <div className={hpStyles.previewReason}>
           <span className={hpStyles.previewReasonKey}>Контакт</span>

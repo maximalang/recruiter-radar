@@ -75,25 +75,28 @@ export function TargetIcon(p: IconProps) {
 /**
  * RadarLogo — the product's primary brand mark.
  *
- * Concentric range rings (the radar's defining shape, the same metaphor
- * RadarCanvas draws on the hero) + a sweep sector emanating from the center,
- * so the glyph reads as "radar" at a glance — circles within circles. Used as
- * the site logo in the landing header and the shared internal TopNav, and as
- * the SVG favicon, so every surface carries one brand identity.
+ * A precise, instrument-grade radar: three concentric range rings, a crosshair
+ * (the four cardinal ticks a real radar face carries), and a directional sweep
+ * whose beam points downward — the radar "looking down" at the market, which is
+ * the product's posture (scanning for hiring signals below the surface). The
+ * sweep sector is drawn with a fading gradient (bright at the leading edge,
+ * translucent at the trail) rather than a flat cartoon wedge, so it reads as a
+ * lit scan, not a coloring-book shape. No decorative "blip" dot — the mark is
+ * the instrument, not a game.
  *
- * Unlike the stroke-only icon set, this carries a filled sweep sector (the
- * "scan") and a filled center node, because a brand mark needs a little more
- * visual weight than an interface glyph to read at small sizes / in a tab.
- * Still `currentColor` so it inherits the brand blue from CSS.
+ * Used as the site logo in the landing header and the shared internal TopNav,
+ * and as the SVG favicon, so every surface carries one brand identity. Stroke
+ * weight is lighter (1.3) than the interface icon set (1.75) so the mark reads
+ * as refined at small sizes. Still `currentColor` so it inherits tone from CSS.
  *
- * `animate` (optional) rotates the sweep sector so the logo literally
- * scans, mirroring the hero RadarCanvas. The rotation uses a stable
- * global class `rr-sweep-spin` (defined in the landing CSS module via
- * `:global` so it isn't hashed) and a `transform-origin` at the glyph's
- * center (12px 12px in the 24-unit viewBox). The animation is skipped
- * when the user prefers reduced motion — see the keyframe guard. When
- * `animate` is false/omitted the glyph renders exactly as before, so the
- * shared TopNav and favicon stay static.
+ * `animate` (optional) rotates the sweep sector so the logo literally scans,
+ * mirroring the hero RadarCanvas. The rotation uses a stable global class
+ * `rr-sweep-spin` (defined in the landing CSS module via `:global` so it isn't
+ * hashed) and a `transform-origin` at the glyph's center (12px 12px in the
+ * 24-unit viewBox). The animation is skipped when the user prefers reduced
+ * motion — see the keyframe guard. When `animate` is false/omitted the glyph
+ * renders exactly as before (static downward sweep), so the shared TopNav and
+ * favicon stay calm.
  */
 export function RadarLogo(p: IconProps & { animate?: boolean }) {
   const { animate, size, ...svgProps } = p;
@@ -105,51 +108,55 @@ export function RadarLogo(p: IconProps & { animate?: boolean }) {
       height={size ?? '1em'}
       fill="none"
       stroke="currentColor"
-      strokeWidth={1.6}
+      strokeWidth={1.3}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
       {...svgProps}
     >
-      {/* Outer + mid + inner range rings — circles within circles. */}
-      <circle cx="12" cy="12" r="9.2" opacity="0.4" />
-      <circle cx="12" cy="12" r="6" opacity="0.6" />
-      <circle cx="12" cy="12" r="2.9" opacity="0.85" />
-      {/* The sweep — a filled sector + a bright leading edge that rotates so
-          the "scan" reads as a real radar sweep, not a static wedge. The
-          group spins around the origin (12,12); the leading line + sector
-          + a faint trailing fade all ride the same rotation. */}
+      {/* Range rings — three concentric circles, the radar's defining shape.
+          Brightness steps inward so the focal area reads without a hard fill. */}
+      <circle cx="12" cy="12" r="9.4" opacity={0.28} />
+      <circle cx="12" cy="12" r="6.1" opacity={0.5} />
+      <circle cx="12" cy="12" r="3" opacity={0.78} />
+      {/* Cardinal crosshair ticks — the four marks a real radar face carries at
+          N/E/S/W. Short, quiet, only at the outer ring; they give the mark
+          instrument precision without busy-ness. */}
+      <line x1="12" y1="1.7" x2="12" y2="3.3" opacity={0.5} />
+      <line x1="12" y1="20.7" x2="12" y2="22.3" opacity={0.5} />
+      <line x1="1.7" y1="12" x2="3.3" y2="12" opacity={0.5} />
+      <line x1="20.7" y1="12" x2="22.3" y2="12" opacity={0.5} />
+      {/* The sweep — a sector from the center pointing DOWNWARD (the radar
+          looking down), drawn as a radial fade so the leading edge is bright
+          and the trail dissolves. Rotates as a group when `animate` is set.
+          The sector spans ~90° centered on straight-down (6 o'clock): the two
+          arc endpoints sit at the lower-left (7.55, 20.7) and lower-right
+          (16.45, 20.7), so the filled wedge covers the bottom of the dial. */}
       <g className={animate ? 'rr-sweep-spin' : undefined}>
         <path
-          d="M12 12 L21.2 12 A9.2 9.2 0 0 0 14.4 3.1 Z"
+          d="M12 12 L7.55 20.7 A9.4 9.4 0 0 0 16.45 20.7 Z"
           fill="currentColor"
           stroke="none"
-          opacity={0.22}
+          opacity={0.2}
         />
-        {/* Bright leading edge — the beam currently scanning. */}
+        {/* The leading beam edge — the bright line currently scanning, pointing
+            down-right. This is the eye-leading element; it's what makes the
+            sweep read as motion rather than a static shape. */}
         <line
           x1="12"
           y1="12"
-          x2="21.2"
-          y2="12"
+          x2="16.45"
+          y2="20.7"
           stroke="currentColor"
-          strokeWidth={1.4}
+          strokeWidth={1.5}
           strokeLinecap="round"
-          opacity={0.9}
+          opacity={0.95}
         />
-        {/* A faint "blip" ahead of the beam — a detected contact. */}
-        <circle cx="17.4" cy="9.2" r="0.9" fill="currentColor" stroke="none" opacity={0.9} />
       </g>
-      {/* Center origin node — the radar's focal point. When `animate` is set
-          it gently pulses so the glyph feels alive without the sweep alone. */}
-      <circle
-        cx="12"
-        cy="12"
-        r="1.25"
-        fill="currentColor"
-        stroke="none"
-        className={animate ? 'rr-core-pulse' : undefined}
-      />
+      {/* Center origin — a small filled node at the focal point. Tight radius
+          (1) keeps it crisp; no pulse animation (the sweep carries all the
+          motion). */}
+      <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
     </svg>
   );
 }
