@@ -9,7 +9,7 @@ import {
   hasPublicPreviewInput,
   readPublicPreviewInput
 } from "../lib/publicProduct";
-import { scoreBand } from "../lib/scoring/score-display";
+import { formatSignalStrength } from "../lib/scoring/score-display";
 import { formatLawfulContactPath } from "../lib/leads-data";
 import { getGatePresentation } from "../lib/scoring/gate-labels";
 import {
@@ -20,6 +20,7 @@ import {
   SurfaceCard,
 } from "./ui/page-primitives";
 import ppStyles from "./ui/page-primitives.module.css";
+import { ScoreBar, ScoreBandChip } from "./ui/internal-page";
 import {
   buildFaqItems,
   formatVacanciesCount,
@@ -418,10 +419,10 @@ function PreviewDigestCard(props: {
   item: HomePreviewItem;
 }) {
   const { item } = props;
-  const band = scoreBand(item.total_score);
   const gatePresentation = getGatePresentation(item.confidence_gate);
   const whyNow = item.reasons[0] || "";
   const contactPath = formatLawfulContactPath(item.lawfulContactPath);
+  const strength = formatSignalStrength(item.total_score);
 
   return (
     <article className={hpStyles.previewCard}>
@@ -430,7 +431,7 @@ function PreviewDigestCard(props: {
           <strong style={{ fontSize: "var(--fs-base)" }}>
             {item.rank}. {item.employer_name}
           </strong>
-          <span className={hpStyles.scorePill} data-tone={band.tone}>{band.label}</span>
+          <ScoreBandChip score={item.total_score} />
           {gatePresentation ? (
             <span className={ppStyles.gateBadge} data-gate={item.confidence_gate}>
               {gatePresentation.label}
@@ -438,6 +439,21 @@ function PreviewDigestCard(props: {
           ) : null}
         </div>
         <span className={hpStyles.vacanciesCount}>{formatVacanciesCount(item.vacancies_count)}</span>
+      </div>
+
+      {/* Signal-strength scale — the same visual language /leads + /review +
+          dashboard use: a filled bar + the numeric strength, tone-coloured by
+          temperature. The word band chip above gives the one-glance read
+          ("Горячий"); this row adds a measurable scale — "Сила сигнала … из 4",
+          with the numeric strength printed by ScoreBar inside the bar. */}
+      <div className={hpStyles.previewReasonList}>
+        <div className={hpStyles.previewScaleLabel}>
+          <span>Сила сигнала</span>
+          <span className={hpStyles.previewScaleValue}>из 4</span>
+        </div>
+        <div className={hpStyles.previewScoreBar} title={`Сила сигнала: ${strength} из 4`}>
+          <ScoreBar score={item.total_score} />
+        </div>
       </div>
 
       {gatePresentation ? (

@@ -386,36 +386,29 @@
   align-items: center;
 }
 
-.scorePill {
-  padding: 3px 9px;
-  border-radius: var(--radius-pill);
-  border: 1px solid rgba(29, 78, 216, 0.16);
-  background-color: #eef4ff;
-  color: var(--c-brand);
-  font-size: var(--fs-xs);
+/* Signal-strength scale label row — "Сила сигнала" left, "N из 4" right.
+   Sits directly above the shared ScoreBar so the scale is self-labelled. */
+.previewScaleLabel {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  color: #667085;
+  font-size: 0.78rem;
   font-weight: 700;
 }
 
-/* Temperature tone for the signal-strength band (Горячий / Тёплый / Холодный).
-   Same palette the rest of the product uses — success/warning/danger — so the
-   landing preview and /leads read the same colour for the same band. The bare
-   .scorePill (no data-tone) keeps the calm blue default above. */
-.scorePill[data-tone="success"] {
-  border-color: rgba(6, 95, 70, 0.22);
-  background-color: #d1fae5;
-  color: #065f46;
+.previewScaleValue {
+  color: var(--c-text-secondary);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
-.scorePill[data-tone="warning"] {
-  border-color: rgba(146, 64, 14, 0.22);
-  background-color: #fef3c7;
-  color: #92400e;
-}
-
-.scorePill[data-tone="danger"] {
-  border-color: rgba(75, 85, 99, 0.22);
-  background-color: #f3f4f6;
-  color: #4b5563;
+/* Wrapper that gives the shared ScoreBar full card width — the bar's track is
+   flex:1, so it needs a block parent to stretch against (mirrors how /leads
+   wraps ScoreBar in .leadCardScore). */
+.previewScoreBar {
+  width: 100%;
 }
 
 .previewReasonList {
