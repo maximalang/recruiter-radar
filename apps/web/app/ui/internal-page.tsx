@@ -36,6 +36,7 @@ import {
   CalendarIcon,
   GlobeIcon,
   BackIcon,
+  RadarLogo,
 } from "./icons";
 
 function repairVisibleNode(value: ReactNode): ReactNode {
@@ -83,12 +84,11 @@ export function TopNav(props: {
     <nav className={s.topNav} aria-label="Основная навигация">
       <div className={s.topNavInner}>
         <Link href="/" className={s.topNavBrand}>
-          {/* Brand identity glyph — `TargetIcon` (radar/concentric rings) reads
-            as the product's "radar" metaphor, not a back affordance. Replaces
-            the literal `←` interface glyph that violated AC1 of the UX-hardening
-            premium pass (§7.1: no literal arrow chars in navigation). The icon
-            is aria-hidden because the brand label is the accessible name. */}
-          <TargetIcon className={s.topNavBrandIcon} aria-hidden="true" /> Recruiter Radar
+          {/* Brand identity glyph — `RadarLogo` (concentric rings + sweep) is
+            the product's primary brand mark, the same "radar" metaphor the hero
+            canvas draws. The icon is aria-hidden because the brand label is the
+            accessible name. */}
+          <RadarLogo className={s.topNavBrandIcon} aria-hidden="true" /> Recruiter Radar
         </Link>
         <div className={s.topNavLinks}>
           {props.items.map((item) => (

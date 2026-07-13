@@ -72,6 +72,53 @@ export function TargetIcon(p: IconProps) {
   );
 }
 
+/**
+ * RadarLogo — the product's primary brand mark.
+ *
+ * Concentric range rings (the radar's defining shape, the same metaphor
+ * RadarCanvas draws on the hero) + a sweep sector emanating from the center,
+ * so the glyph reads as "radar" at a glance — circles within circles. Used as
+ * the site logo in the landing header and the shared internal TopNav, and as
+ * the SVG favicon, so every surface carries one brand identity.
+ *
+ * Unlike the stroke-only icon set, this carries a filled sweep sector (the
+ * "scan") and a filled center node, because a brand mark needs a little more
+ * visual weight than an interface glyph to read at small sizes / in a tab.
+ * Still `currentColor` so it inherits the brand blue from CSS.
+ */
+export function RadarLogo(p: IconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      width={p.size ?? '1em'}
+      height={p.size ?? '1em'}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      {...p}
+    >
+      {/* Outer + mid + inner range rings — circles within circles. */}
+      <circle cx="12" cy="12" r="9.2" opacity="0.45" />
+      <circle cx="12" cy="12" r="6" opacity="0.7" />
+      <circle cx="12" cy="12" r="2.9" />
+      {/* The sweep — a filled sector from center to the outer ring, the
+          "scan" that makes it a radar and not a target. */}
+      <path
+        d="M12 12 L21.2 12 A9.2 9.2 0 0 0 14.4 3.1 Z"
+        fill="currentColor"
+        stroke="none"
+        opacity="0.28"
+      />
+      {/* Center origin node — solid dot, the radar's focal point. */}
+      <circle cx="12" cy="12" r="1.1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 export function PinIcon(p: IconProps) {
   return (
     <Svg {...p}>

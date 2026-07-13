@@ -33,13 +33,15 @@
   text-decoration: none;
 }
 
-.brandDot {
-  width: 9px;
-  height: 9px;
-  border-radius: 999px;
-  background: var(--c-brand);
-  flex-shrink: 0;
-  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.12);
+/* Brand logo — the RadarLogo glyph (concentric rings + sweep). Sized in em so
+   it scales with the brand name, inherits the brand blue from currentColor. A
+   soft halo behind it echoes the radar's focal glow without a hard ring. */
+.brandLogo {
+  flex: 0 0 auto;
+  width: 1.5rem;
+  height: 1.5rem;
+  color: var(--c-brand);
+  filter: drop-shadow(0 0 6px rgba(29, 78, 216, 0.18));
 }
 
 .heroBrandName {
@@ -56,6 +58,14 @@
 }
 
 .topNavLinks {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+}
+
+/* The section anchors are grouped so they can collapse on mobile while the
+   activation CTA stays visible (a persistent conversion path). */
+.topNavAnchors {
   display: flex;
   gap: 2px;
   align-items: center;
@@ -91,6 +101,15 @@
 .topNavCta:hover {
   transform: translateY(-1px);
   box-shadow: 0 10px 26px rgba(15, 23, 42, 0.22);
+}
+
+/* Two CTA labels swap by breakpoint: the full "Активировать неделю" on desktop,
+   a shorter "Активировать" on narrow phones so the button fits beside the
+   brand without overflowing the sticky header. The short label is aria-hidden
+   because the full label carries the accessible name on desktop; on mobile the
+   button's visible text IS the short label, which still reads as an action. */
+.topNavCtaShort {
+  display: none;
 }
 
 /* ── Hero — centered, dark slate, refined. RadarCanvas = honest metaphor. ── */
@@ -367,15 +386,44 @@
   align-items: center;
 }
 
-/* Preview card — reads like a real digest entry */
+/* Preview card — a premium digest entry. A tone-keyed left accent rail
+   (green/amber/blue) gives the card a temperature cue before the reader
+   parses the chips, and the signal-strength meter below makes the score
+   measurable at a glance. */
 .previewCard {
-  padding: 18px 20px;
+  position: relative;
+  padding: 20px 22px 18px 26px;
   border-radius: var(--radius-card-sm);
   border: 1px solid var(--c-border);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.96) 100%);
   display: grid;
   gap: 14px;
   box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
+  overflow: hidden;
+}
+
+/* Tone-keyed accent rail down the left edge — the same temperature vocabulary
+   the chip + meter use, applied as a quiet brand cue on the card itself. */
+.previewCard::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+}
+
+.previewCard[data-tone="success"]::before {
+  background: linear-gradient(180deg, #10b981 0%, #34d399 100%);
+}
+
+.previewCard[data-tone="warning"]::before {
+  background: linear-gradient(180deg, #f59e0b 0%, #fbbf24 100%);
+}
+
+.previewCard[data-tone="danger"]::before {
+  background: linear-gradient(180deg, #3b82f6 0%, #60a5fa 100%);
 }
 
 .previewCardHeader {
@@ -383,32 +431,146 @@
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
+  align-items: baseline;
+}
+
+.previewCardName {
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--c-text-primary);
+  line-height: 1.25;
+}
+
+.previewCardRank {
+  color: #94a3b8;
+  font-weight: 700;
+  margin-right: 4px;
+}
+
+/* Verdict row — the temperature word chip + the confidence gate badge grouped
+   so "worth contacting now?" reads in one line. */
+.previewVerdict {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
   align-items: center;
 }
 
-/* Signal-strength scale label row — "Сила сигнала" left, "N из 4" right.
-   Sits directly above the shared ScoreBar so the scale is self-labelled. */
-.previewScaleLabel {
+/* Signal-strength meter — premium strength readout for the landing preview.
+   Big numeric strength left, segmented gradient bar right. The four segment
+   ticks mark the [0,4] domain so the scale reads as real, not arbitrary. The
+   numbers come straight from lib/scoring/score-display — same scale as /leads,
+   a landing-only presentation. */
+.previewScale {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.previewScaleReadout {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.previewScaleNumber {
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  color: var(--c-text-primary);
+}
+
+.previewScaleNumber[data-tone="success"] {
+  color: #047857;
+}
+
+.previewScaleNumber[data-tone="warning"] {
+  color: #b45309;
+}
+
+.previewScaleNumber[data-tone="danger"] {
+  color: #1d4ed8;
+}
+
+.previewScaleOf {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+.previewScaleTrack {
+  position: relative;
+  flex: 1;
+  height: 10px;
+  border-radius: 6px;
+  background-color: rgba(15, 23, 42, 0.06);
+  overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+
+/* Three interior dividers marking the four bands (1|2|3|4) — drawn as a faint
+   white line overlay so the [0,4] domain reads as a segmented strength scale. */
+.previewScaleTrack::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(
+    90deg,
+    transparent calc(25% - 1px),
+    rgba(255, 255, 255, 0.7) 25%,
+    transparent calc(25% + 1px),
+    transparent calc(50% - 1px),
+    rgba(255, 255, 255, 0.7) 50%,
+    transparent calc(50% + 1px),
+    transparent calc(75% - 1px),
+    rgba(255, 255, 255, 0.7) 75%,
+    transparent calc(75% + 1px)
+  );
+  pointer-events: none;
+  z-index: 2;
+}
+
+.previewScaleFill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.25s ease;
+}
+
+.previewScaleFill[data-tone="success"] {
+  background: linear-gradient(90deg, #34d399 0%, #10b981 100%);
+}
+
+.previewScaleFill[data-tone="warning"] {
+  background: linear-gradient(90deg, #fbbf24 0%, #f59e0b 100%);
+}
+
+.previewScaleFill[data-tone="danger"] {
+  background: linear-gradient(90deg, #60a5fa 0%, #3b82f6 100%);
+}
+
+.previewScaleMeta {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
+  margin-top: -4px;
+}
+
+.previewScaleLabelWord {
   color: #667085;
-  font-size: 0.78rem;
   font-weight: 700;
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
 }
 
-.previewScaleValue {
-  color: var(--c-text-secondary);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-/* Wrapper that gives the shared ScoreBar full card width — the bar's track is
-   flex:1, so it needs a block parent to stretch against (mirrors how /leads
-   wraps ScoreBar in .leadCardScore). */
-.previewScoreBar {
-  width: 100%;
+.previewScaleHint {
+  color: #94a3b8;
+  font-weight: 500;
+  font-size: 0.72rem;
 }
 
 .previewReasonList {
@@ -418,10 +580,38 @@
   line-height: 1.56;
 }
 
+.previewReasonLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #667085;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+/* A small bullet dot prefixes each reason label so the rows read as a tidy
+   evidence list rather than a flat paragraph. */
+.previewReasonLabel::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: #cbd5e1;
+  flex-shrink: 0;
+}
+
+.previewReasonValue {
+  color: #334155;
+  font-size: 0.9rem;
+}
+
 .vacanciesCount {
   color: var(--c-text-muted);
   font-size: var(--fs-sm);
   font-weight: 600;
+  white-space: nowrap;
 }
 
 /* ── Pricing — three equal-weight cards, pilot gently featured ── */
@@ -690,19 +880,40 @@
 @media (max-width: 720px) {
   .topBar {
     gap: 10px;
-    padding: 12px 16px;
+    padding: 11px 14px;
   }
 
-  .topNavLinks {
+  /* Hide the section anchors on phones, but KEEP the activation CTA visible —
+     a persistent conversion path is more valuable than nav jumps on a one-page
+     landing (the hero CTA + closing CTA still cover scrolling). The anchors
+     group collapses as a unit; the CTA stays. */
+  .topNavAnchors {
     display: none;
+  }
+
+  /* Swap to the short CTA label so the button fits beside the brand without
+     forcing the sticky header to wrap or overflow. */
+  .topNavCtaFull {
+    display: none;
+  }
+
+  .topNavCtaShort {
+    display: inline;
+  }
+
+  .topNavCta {
+    padding: 8px 14px;
+    font-size: 0.82rem;
   }
 
   .heroBrandName {
     font-size: 1rem;
   }
 
+  /* Drop the brand subtitle on phones so the sticky header stays a single,
+     low row — the subtitle duplicated the kicker anyway. */
   .heroBrandSubtitle {
-    font-size: 0.82rem;
+    display: none;
   }
 
   .heroTrust {
@@ -722,5 +933,42 @@
 
   .includedOnce {
     padding: 20px 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Premium lead card on a narrow phone: trim the accent-rail padding so the
+     name has more room, and let the signal-strength meter breathe — the big
+     numeric readout shrinks a touch so the gradient bar keeps real width. */
+  .previewCard {
+    padding: 18px 18px 16px 22px;
+  }
+
+  .previewScale {
+    gap: 11px;
+  }
+
+  .previewScaleNumber {
+    font-size: 1.35rem;
+  }
+
+  /* The scale hint duplicates the "/4" readout; on the narrowest phones it can
+     wrap awkwardly, so keep only the label and let the bar speak for the scale. */
+  .previewScaleHint {
+    display: none;
+  }
+
+  .previewScaleMeta {
+    justify-content: flex-start;
+  }
+
+  .heroTrust {
+    /* Stack the two trust items so they don't crowd on a 360px screen. */
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .heroTrustItem {
+    text-align: center;
   }
 }

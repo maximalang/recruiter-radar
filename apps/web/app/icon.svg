@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
+  <!-- Recruiter Radar brand mark — concentric range rings + a sweep sector.
+       Mirrors the RadarLogo React component (app/ui/icons.tsx) and the hero
+       radar canvas so the tab/favicon carries one brand identity. -->
+  <rect width="24" height="24" rx="6" fill="#0f172a"/>
+  <g stroke="#60a5fa" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="9.2" opacity="0.45"/>
+    <circle cx="12" cy="12" r="6" opacity="0.7"/>
+    <circle cx="12" cy="12" r="2.9"/>
+  </g>
+  <path d="M12 12 L21.2 12 A9.2 9.2 0 0 0 14.4 3.1 Z" fill="#60a5fa" opacity="0.28"/>
+  <circle cx="12" cy="12" r="1.1" fill="#93c5fd"/>
+</svg>

@@ -9,7 +9,7 @@ import {
   hasPublicPreviewInput,
   readPublicPreviewInput
 } from "../lib/publicProduct";
-import { formatSignalStrength } from "../lib/scoring/score-display";
+import { formatSignalStrength, scorePercent, scoreTone } from "../lib/scoring/score-display";
 import { formatLawfulContactPath } from "../lib/leads-data";
 import { getGatePresentation } from "../lib/scoring/gate-labels";
 import {
@@ -20,7 +20,7 @@ import {
   SurfaceCard,
 } from "./ui/page-primitives";
 import ppStyles from "./ui/page-primitives.module.css";
-import { ScoreBar, ScoreBandChip } from "./ui/internal-page";
+import { ScoreBandChip } from "./ui/internal-page";
 import {
   buildFaqItems,
   formatVacanciesCount,
@@ -30,6 +30,7 @@ import {
   CheckIcon,
   ShieldIcon,
   MailIcon,
+  RadarLogo,
 } from "./ui/icons";
 import RadarCanvas from "./radar-canvas";
 import ScrollReveal from "./scroll-reveal";
@@ -96,7 +97,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       {/* Sticky top nav */}
       <header className={hpStyles.topBar}>
         <a href="/" className={hpStyles.brandMark} style={{ textDecoration: "none" }}>
-          <span className={hpStyles.brandDot} aria-hidden="true" />
+          <RadarLogo className={hpStyles.brandLogo} aria-hidden="true" />
           <div>
             <div className={hpStyles.heroBrandName}>Recruiter Radar</div>
             <div className={hpStyles.heroBrandSubtitle}>
@@ -105,11 +106,14 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           </div>
         </a>
         <nav className={hpStyles.topNavLinks} aria-label="Разделы лендинга">
-          <a href="#preview" className={hpStyles.topNavLink}>Пример</a>
-          <a href="#pricing" className={hpStyles.topNavLink}>Тарифы</a>
-          <a href="#faq" className={hpStyles.topNavLink}>FAQ</a>
+          <span className={hpStyles.topNavAnchors}>
+            <a href="#preview" className={hpStyles.topNavLink}>Пример</a>
+            <a href="#pricing" className={hpStyles.topNavLink}>Тарифы</a>
+            <a href="#faq" className={hpStyles.topNavLink}>FAQ</a>
+          </span>
           <Link href={checkoutHref} className={hpStyles.topNavCta}>
-            Активировать неделю
+            <span className={hpStyles.topNavCtaFull}>Активировать неделю</span>
+            <span className={hpStyles.topNavCtaShort} aria-hidden="true">Активировать</span>
           </Link>
         </nav>
       </header>
@@ -422,58 +426,80 @@ function PreviewDigestCard(props: {
   const gatePresentation = getGatePresentation(item.confidence_gate);
   const whyNow = item.reasons[0] || "";
   const contactPath = formatLawfulContactPath(item.lawfulContactPath);
+  // Conversion comes from the single shared score-display module so the
+  // landing's premium strength meter can never drift from the [0,4] scale the
+  // FIUR contract, the profile `hiringIntentMin` threshold, and the shared
+  // /leads + /review score bars all speak. `strength` feeds the big readout,
+  // `tone` colors the rail + number + bar gradient, `pct` fills the bar.
   const strength = formatSignalStrength(item.total_score);
+  const tone = scoreTone(item.total_score);
+  const pct = scorePercent(item.total_score);
 
   return (
-    <article className={hpStyles.previewCard}>
+    <article className={hpStyles.previewCard} data-tone={tone}>
       <div className={hpStyles.previewCardHeader}>
-        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
-          <strong style={{ fontSize: "var(--fs-base)" }}>
-            {item.rank}. {item.employer_name}
-          </strong>
-          <ScoreBandChip score={item.total_score} />
-          {gatePresentation ? (
-            <span className={ppStyles.gateBadge} data-gate={item.confidence_gate}>
-              {gatePresentation.label}
-            </span>
-          ) : null}
+        <div className={hpStyles.previewCardName}>
+          <span className={hpStyles.previewCardRank}>{item.rank}.</span>
+          {item.employer_name}
         </div>
         <span className={hpStyles.vacanciesCount}>{formatVacanciesCount(item.vacancies_count)}</span>
       </div>
 
-      {/* Signal-strength scale — the same visual language /leads + /review +
-          dashboard use: a filled bar + the numeric strength, tone-coloured by
-          temperature. The word band chip above gives the one-glance read
-          ("Горячий"); this row adds a measurable scale — "Сила сигнала … из 4",
-          with the numeric strength printed by ScoreBar inside the bar. */}
-      <div className={hpStyles.previewReasonList}>
-        <div className={hpStyles.previewScaleLabel}>
-          <span>Сила сигнала</span>
-          <span className={hpStyles.previewScaleValue}>из 4</span>
+      {/* Verdict — the one-glance temperature word + the confidence gate label,
+          grouped so "is this worth contacting now?" reads in one line. */}
+      <div className={hpStyles.previewVerdict}>
+        <ScoreBandChip score={item.total_score} />
+        {gatePresentation ? (
+          <span className={ppStyles.gateBadge} data-gate={item.confidence_gate}>
+            {gatePresentation.label}
+          </span>
+        ) : null}
+      </div>
+
+      {/* Signal-strength meter — a premium strength readout for the landing
+          preview. Big numeric strength ("3.2") + a segmented gradient bar whose
+          four ticks make the [0,4] domain read as a real scale. Same numbers as
+          the compact ScoreBar on /leads — a landing-only presentation, not a
+          second scale. The meter role + aria-valuenow keep it accessible. */}
+      <div
+        className={hpStyles.previewScale}
+        role="meter"
+        aria-valuenow={Number(strength)}
+        aria-valuemin={0}
+        aria-valuemax={4}
+        aria-label={`Сила сигнала: ${strength} из 4`}
+      >
+        <div className={hpStyles.previewScaleReadout}>
+          <span className={hpStyles.previewScaleNumber} data-tone={tone}>{strength}</span>
+          <span className={hpStyles.previewScaleOf}>/4</span>
         </div>
-        <div className={hpStyles.previewScoreBar} title={`Сила сигнала: ${strength} из 4`}>
-          <ScoreBar score={item.total_score} />
+        <div className={hpStyles.previewScaleTrack} title={`Сила сигнала: ${strength} из 4`}>
+          <div className={hpStyles.previewScaleFill} data-tone={tone} style={{ width: `${pct}%` }} />
         </div>
+      </div>
+      <div className={hpStyles.previewScaleMeta}>
+        <span className={hpStyles.previewScaleLabelWord}>Сила сигнала</span>
+        <span className={hpStyles.previewScaleHint}>из 4 — чем больше, тем горячее</span>
       </div>
 
       {gatePresentation ? (
         <div className={hpStyles.previewReasonList}>
-          <div style={{ color: "#667085", fontSize: "0.78rem", fontWeight: 700 }}>Уверенность</div>
-          <div>{gatePresentation.hint}</div>
+          <div className={hpStyles.previewReasonLabel}>Уверенность</div>
+          <div className={hpStyles.previewReasonValue}>{gatePresentation.hint}</div>
         </div>
       ) : null}
 
       {whyNow ? (
         <div className={hpStyles.previewReasonList}>
-          <div style={{ color: "#667085", fontSize: "0.78rem", fontWeight: 700 }}>Почему сейчас</div>
-          <div>{whyNow}</div>
+          <div className={hpStyles.previewReasonLabel}>Почему сейчас</div>
+          <div className={hpStyles.previewReasonValue}>{whyNow}</div>
         </div>
       ) : null}
 
       {contactPath ? (
         <div className={hpStyles.previewReasonList}>
-          <div style={{ color: "#667085", fontSize: "0.78rem", fontWeight: 700 }}>Безопасный путь контакта</div>
-          <div>{contactPath}</div>
+          <div className={hpStyles.previewReasonLabel}>Безопасный путь контакта</div>
+          <div className={hpStyles.previewReasonValue}>{contactPath}</div>
         </div>
       ) : null}
     </article>
