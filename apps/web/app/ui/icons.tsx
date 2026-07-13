@@ -96,13 +96,13 @@ export function TargetIcon(p: IconProps) {
  * shared TopNav and favicon stay static.
  */
 export function RadarLogo(p: IconProps & { animate?: boolean }) {
-  const { animate, ...svgProps } = p;
+  const { animate, size, ...svgProps } = p;
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 24 24"
-      width={p.size ?? '1em'}
-      height={p.size ?? '1em'}
+      width={size ?? '1em'}
+      height={size ?? '1em'}
       fill="none"
       stroke="currentColor"
       strokeWidth={1.6}
