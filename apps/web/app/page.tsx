@@ -100,9 +100,6 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           <RadarLogo className={hpStyles.brandLogo} aria-hidden="true" />
           <div>
             <div className={hpStyles.heroBrandName}>Recruiter Radar</div>
-            <div className={hpStyles.heroBrandSubtitle}>
-              радар по компаниям с активным наймом
-            </div>
           </div>
         </a>
         <nav className={hpStyles.topNavLinks} aria-label="Разделы лендинга">
@@ -477,17 +474,6 @@ function PreviewDigestCard(props: {
           <div className={hpStyles.previewScaleFill} data-tone={tone} style={{ width: `${pct}%` }} />
         </div>
       </div>
-      <div className={hpStyles.previewScaleMeta}>
-        <span className={hpStyles.previewScaleLabelWord}>Сила сигнала</span>
-        <span className={hpStyles.previewScaleHint}>из 4 — чем больше, тем горячее</span>
-      </div>
-
-      {gatePresentation ? (
-        <div className={hpStyles.previewReasonList}>
-          <div className={hpStyles.previewReasonLabel}>Уверенность</div>
-          <div className={hpStyles.previewReasonValue}>{gatePresentation.hint}</div>
-        </div>
-      ) : null}
 
       {whyNow ? (
         <div className={hpStyles.previewReasonList}>
