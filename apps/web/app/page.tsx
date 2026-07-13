@@ -9,7 +9,7 @@ import {
   hasPublicPreviewInput,
   readPublicPreviewInput
 } from "../lib/publicProduct";
-import { buildHhRadarProbabilitySummary } from "../lib/hhProbabilities";
+import { scoreBand } from "../lib/scoring/score-display";
 import { formatLawfulContactPath } from "../lib/leads-data";
 import { getGatePresentation } from "../lib/scoring/gate-labels";
 import {
@@ -40,7 +40,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Recruiter Radar — ежедневный радар по нанимающим компаниям",
   description:
-    "Короткий список компаний с активным наймом и готовым поводом для контакта. Каждый день в Telegram. Для рекрутинговых агентств и BD-команд.",
+    "Каждое утро — короткий список компаний с подтверждённым наймом: что меняется, почему сейчас и как выйти на них корректно. Доставка в Telegram. Для рекрутинговых агентств и BD-команд.",
 };
 
 const VISIBLE_PREVIEW_ITEMS = 2;
@@ -52,20 +52,20 @@ type HomePageProps = {
 type HomePreviewItem = Awaited<ReturnType<typeof getPublicSampleDigestState>>["items"][number];
 
 const heroTrust = [
-  { value: "Только подтверждённый найм", label: "карьерная страница и свежие вакансии — не агрегатор" },
-  { value: "Готово за 5 минут", label: "профиль и Telegram — утром приходит радар" },
+  { value: "Только подтверждённый найм", label: "карьерная страница и свежие вакансии — не агрегатор «возможно, нанимают»" },
+  { value: "Готово за 5 минут", label: "профиль и Telegram — утром приходит первый радар" },
 ] as const;
 
 const principles = [
   {
     icon: CheckIcon,
     title: "Только подтверждённый найм",
-    text: "Карьерная страница, свежие вакансии, независимый источник. Видно, кого и зачем ищут.",
+    text: "Карьерная страница, свежие вакансии, независимый источник. Видно, кого и зачем ищут — не догадки агрегатора.",
   },
   {
     icon: ShieldIcon,
-    title: "Оценка уверенности",
-    text: "Уровень доверия A–D и понятный «почему сейчас» — до первого касания.",
+    title: "Понятная оценка уверенности",
+    text: "«Подтверждено», «скорее подтверждено» или «нужна проверка» — и понятный «почему сейчас» до первого касания.",
   },
   {
     icon: MailIcon,
@@ -126,9 +126,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             <span className={hpStyles.heroTitleAccent}>сегодня</span>.
           </h1>
           <p className={hpStyles.heroSubtitle}>
-            Каждое утро — короткий список нанимающих компаний: что меняется, почему
-            сейчас и как выйти на них корректно. Всё в Telegram, с доказательствами
-            и оценкой уверенности.
+            Каждое утро — короткий список компаний с подтверждённым наймом: что
+            изменилось, почему сейчас и как выйти на них корректно. Доказательства,
+            оценка уверенности и безопасный путь контакта — в Telegram.
           </p>
           <div className={hpStyles.heroActions}>
             <a href="#preview" className={hpStyles.heroCta}>
@@ -155,7 +155,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         <SectionIntro
           eyebrow="Что внутри"
           title="Доверие вместо шума"
-          description="Каждая компания в радаре доказана и оценена. Три правила, по которым мы её отбираем."
+          description="Каждая компания в радаре доказана и оценена. Три правила, по которым мы её отбираем, — до того, как она попадёт к вам."
         />
         <div className={hpStyles.principles}>
           {principles.map((p) => {
@@ -210,7 +210,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
               <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "center" }}>
                 <button type="submit" className={ppStyles.primaryAction}>
-                  Показать компании
+                  Посмотреть компании
                 </button>
 
                 {hasPreview ? (
@@ -243,8 +243,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             {previewState.items.length === 0 ? (
               <NoticeBox
                 tone="neutral"
-                title="Пока нет сильных совпадений"
-                description="Расширьте географию или ослабьте фильтр."
+                title="Пока нет совпадений"
+                description="Расширьте географию или смягчите специализацию — и список обновится."
               />
             ) : (
               <div style={{ display: "grid", gap: "12px" }}>
@@ -399,7 +399,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       <section className={hpStyles.closingBand}>
         <h2 className={hpStyles.closingTitle}>Завтра утром — первый радар</h2>
         <p className={hpStyles.closingText}>
-          Неделя ежедневных сигналов найма по вашей нише. Профиль настраивается за пять минут.
+          Неделя ежедневного радара по вашей нише: компании с подтверждённым наймом,
+          оценка уверенности и безопасный путь контакта. Профиль настраивается за пять минут.
         </p>
         <div className={hpStyles.closingActions}>
           <Link href={checkoutHref} className={hpStyles.heroCta}>
@@ -417,9 +418,7 @@ function PreviewDigestCard(props: {
   item: HomePreviewItem;
 }) {
   const { item } = props;
-  const probability = buildHhRadarProbabilitySummary({
-    totalScore: item.total_score
-  });
+  const band = scoreBand(item.total_score);
   const gatePresentation = getGatePresentation(item.confidence_gate);
   const whyNow = item.reasons[0] || "";
   const contactPath = formatLawfulContactPath(item.lawfulContactPath);
@@ -431,7 +430,7 @@ function PreviewDigestCard(props: {
           <strong style={{ fontSize: "var(--fs-base)" }}>
             {item.rank}. {item.employer_name}
           </strong>
-          <span className={hpStyles.scorePill}>{probability.workNowText}</span>
+          <span className={hpStyles.scorePill} data-tone={band.tone}>{band.label}</span>
           {gatePresentation ? (
             <span className={ppStyles.gateBadge} data-gate={item.confidence_gate}>
               {gatePresentation.label}
@@ -440,6 +439,13 @@ function PreviewDigestCard(props: {
         </div>
         <span className={hpStyles.vacanciesCount}>{formatVacanciesCount(item.vacancies_count)}</span>
       </div>
+
+      {gatePresentation ? (
+        <div className={hpStyles.previewReasonList}>
+          <div style={{ color: "#667085", fontSize: "0.78rem", fontWeight: 700 }}>Уверенность</div>
+          <div>{gatePresentation.hint}</div>
+        </div>
+      ) : null}
 
       {whyNow ? (
         <div className={hpStyles.previewReasonList}>
