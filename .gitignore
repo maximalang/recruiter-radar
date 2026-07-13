@@ -47,6 +47,14 @@ apps/web/scripts/fix-*.png
 apps/web/scripts/now-*.png
 apps/web/scripts/now-*.json
 apps/web/scripts/fix-*.json
+apps/web/scripts/card-*.png
+apps/web/scripts/fav-*.png
+apps/web/scripts/fav-*.html
+apps/web/scripts/fav.png
+apps/web/scripts/logo-fav*.png
+apps/web/scripts/logo-fav*.html
+apps/web/scripts/m-*.png
+apps/web/scripts/mob-*.mjs
 
 # Auto-memory is user-scoped (~/.claude/projects/<slug>/memory/); repo memory/ is a stale legacy duplicate
 memory/
