@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 import type { CheckoutOrder, CheckoutOrderOnboardingStep } from "../../../../lib/payments";
 import { NoticeBox } from "../../../ui/page-primitives";
-import { scoreBand, formatSignalStrength } from "../../../../lib/scoring/score-display";
+import { scoreBand, formatScorePoints } from "../../../../lib/scoring/score-display";
 import { formatVacanciesCount } from "../../../../lib/format/plural";
 import styles from "./pilot-onboarding-components.module.css";
 
@@ -30,20 +30,22 @@ export function InstructionCard(props: { children: ReactNode; step?: number }) {
  * Shared score read for the onboarding preview card (T1.3).
  *
  * The preview used to print a second score vocabulary — `score 247.0` — that
- * drifted from /leads (which speaks "Горячий/Тёплый/Холодный" + a 0–4 signal
- * strength). This helper funnels the preview through the same
+ * drifted from /leads (which speaks "Горячий/Тёплый/Холодный" + a 0–100 score
+ * points number). This helper funnels the preview through the same
  * `lib/scoring/score-display` module every other surface uses, so the first
  * radar a recruit sees in onboarding already speaks the language they'll meet
  * daily. The raw `total_score` is the persisted evidence-ranking score; the
- * shared module converts it once to the [0,4] scale.
+ * shared module converts it once to the 0–100 points scale (raw / 4). The
+ * internal [0,4] signal strength still drives the band + gate behind the
+ * scenes — unchanged.
  */
 export function formatPreviewScore(rawScore: number | null | undefined): {
   bandLabel: string;
-  strength: string;
+  points: string;
 } {
   return {
     bandLabel: scoreBand(rawScore).label,
-    strength: formatSignalStrength(rawScore),
+    points: formatScorePoints(rawScore),
   };
 }
 

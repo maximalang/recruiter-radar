@@ -277,12 +277,14 @@ export function ProfileForm(props: {
               name="hiringIntentMin"
               type="number"
               min={0}
-              max={4}
-              step={0.1}
-              defaultValue={profile.hiringIntentMin ?? ""}
-              placeholder="напр. 2.5"
+              max={100}
+              step={1}
+              // Stored on the internal [0,4] scale; show it as the 0–100 points
+              // the lead card uses, so the floor and the card number agree.
+              defaultValue={profile.hiringIntentMin != null ? Math.round(profile.hiringIntentMin * 25) : ""}
+              placeholder="напр. 75"
             />
-            <span className={ppStyles.helperText}>Оценка силы от 0 до 4. Отсекает слабые лиды.</span>
+            <span className={ppStyles.helperText}>Оценка силы от 0 до 100 (как в карточке лида). Отсекает слабые лиды.</span>
           </label>
           <label className={ppStyles.field}>
             <span className={ppStyles.fieldLabel}>Свежесть сигнала, дней</span>

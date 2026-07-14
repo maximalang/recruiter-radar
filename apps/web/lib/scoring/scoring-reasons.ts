@@ -80,9 +80,21 @@ export const REASON_LABELS: Record<string, string> = {
 
 /**
  * Format a ScoringReason into a user-facing Russian string.
- * Falls back to `[key]` if no label template exists.
+ *
+ * Legacy free-form reasons (older digest rows stored as plain Russian strings)
+ * are wrapped by `parseReasons` with `key: 'legacy'` and the full original text
+ * in `params.text`. Render that text VERBATIM — it is already human Russian copy
+ * ("86 вакансий, включая «Аккредитация специалистов»"), so the bracketed
+ * `[legacy.<text>]` debug stub must never reach a card. For genuinely unknown
+ * structured keys (a real key missing a label), keep the `[key]` fallback so a
+ * gap is visible in dev rather than silently dropping the reason.
  */
 export function formatReason(reason: ScoringReason): string {
+  if (reason.key === 'legacy') {
+    const text = reason.params?.text
+    return typeof text === 'string' && text.length > 0 ? text : ''
+  }
+
   const template = REASON_LABELS[reason.key]
   if (!template) return `[${reason.key}]`
 

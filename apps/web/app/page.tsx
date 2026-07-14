@@ -9,7 +9,7 @@ import {
   hasPublicPreviewInput,
   readPublicPreviewInput
 } from "../lib/publicProduct";
-import { formatSignalStrength, scorePercent, scoreTone } from "../lib/scoring/score-display";
+import { formatScorePoints, scorePercent, scoreTone } from "../lib/scoring/score-display";
 import { formatLawfulContactPath, deriveWhyNow } from "../lib/leads-data";
 import { formatVacanciesCount } from "../lib/format/plural";
 import {
@@ -437,21 +437,30 @@ function PreviewDigestCard(props: {
 }) {
   const { item } = props;
   // `whyNow` joins the top structured reasons (deriveWhyNow picks urgency/
-  // intent components ordered by evidential strength). The reason labels already
-  // carry the time anchor ("Несколько свежих вакансий за 14 дней"), so a
+  // intent components ordered by evidential strength). On prod the reasons are
+  // legacy free-form Russian strings ("86 вакансий, включая «…»"); parseReasons
+  // now wraps those as a `legacy` reason whose full text renders verbatim, so
+  // the card shows the human copy instead of the `[legacy.…]` debug stub. The
+  // reason text already carries the time anchor ("Опубликовано 12.07"), so a
   // separate "Свежесть" row would duplicate it — one "Почему сейчас" line is
-  // enough and reads cleaner.
-  const whyNow = deriveWhyNow(item.reasons) || item.reasons[0] || "";
+  // enough.
+  const whyNow = deriveWhyNow(item.reasons) || "";
   const contactPath = formatLawfulContactPath(item.lawfulContactPath);
   const location = formatLocationCaption(item.location_names);
   const evidenceTitles = pickEvidenceTitles(item.evidence_titles, 3);
   const vacanciesCaption = formatVacanciesCount(item.vacancies_count);
-  // Score scale stays [0,4] — shared lib/scoring/score-display primitives,
-  // same numbers as the profile threshold and /leads bar. `strength` is the
-  // numeric readout, `tone` colors the chip + bar, `pct` fills the bar.
-  const strength = formatSignalStrength(item.total_score);
+  // Score = 0–100 points (raw total_score / 4). The internal [0,4] signal
+  // strength still drives the tone + the confidence gate + the hiringIntentMin
+  // threshold (unchanged) — points are a higher-resolution read of the SAME
+  // value, so a 75-point lead is exactly the "горячий" 3.0-of-4 cut. `points`
+  // is the headline number, `tone` colors it + the bar, `pct` fills the bar.
+  const points = formatScorePoints(item.total_score);
   const tone = scoreTone(item.total_score);
   const pct = scorePercent(item.total_score);
+  // Clean employer name — strip the legal-form wrapper quotes/brackets that read
+  // as noise ("АО "ГОСТИНИЦА "СОВЕТСКАЯ"" → "ГОСТИНИЦА «СОВЕТСКАЯ»"). Best-effort:
+  // if the name is all-caps legal boilerplate we keep it, just trim.
+  const employerName = cleanEmployerName(item.employer_name);
   // ICP-relevance breakdown — only shown when the preview was personalised
   // (the user typed a specialization/city). When there's no ICP input the
   // signals are all 0 (defaultRelevanceSignals), so the block would show empty
@@ -474,7 +483,7 @@ function PreviewDigestCard(props: {
       <div className={hpStyles.previewCardHeader}>
         <div className={hpStyles.previewCardName}>
           <span className={hpStyles.previewCardRank} aria-hidden="true">{item.rank}</span>
-          {item.employer_name}
+          {employerName}
         </div>
         {location ? (
           <span className={hpStyles.previewCardLoc} aria-label={`География: ${location}`}>
@@ -483,30 +492,24 @@ function PreviewDigestCard(props: {
         ) : null}
       </div>
 
-      {/* Score line — the measurable [0,4] strength meter alone. The temperature
-          WORD chip ("Горячий"/"Тёплый"/"Холодный") was removed first — it derived
-          from the same total_score as the numeric meter and was a synonym for
-          the number. The evidence-gate label ("Подтверждено" / "Скорее
-          подтверждено" / "Нужна проверка") was removed next per the same note:
-          on the public preview the gate reads as a second verdict next to the
-          score, and "Скорее подтверждено" restates a confidence the number +
-          evidence row already convey, so it is noise on this surface. The gate
-          is still stored on the row and still surfaces on the internal surfaces
-          (/leads, /review, /dashboard, onboarding) where it carries operational
-          meaning; the public landing card shows the score value + the evidence
-          row (vacancy count + real role titles) — the proof, not a word about
-          the proof. */}
+      {/* Score line — a measurable 0–100 points meter. The temperature word chip
+          and the evidence-gate label were removed from this surface as noise
+          (both restated a confidence the number + evidence row already convey);
+          the gate still drives delivery on the internal surfaces. What carries
+          signal here: the points number + tone bar (the score itself, shown as a
+          value, not a word), and the evidence row below (vacancy count + real
+          role titles — the proof). */}
       <div className={hpStyles.previewScoreLine}>
         <div
           className={hpStyles.previewStrengthMeter}
           role="meter"
-          aria-valuenow={Number(strength)}
+          aria-valuenow={Number(points)}
           aria-valuemin={0}
-          aria-valuemax={4}
-          aria-label={`Сила сигнала: ${strength} из 4`}
-          title={`Сила сигнала: ${strength} из 4`}
+          aria-valuemax={100}
+          aria-label={`Сила сигнала: ${points} из 100`}
+          title={`Сила сигнала: ${points} из 100`}
         >
-          <span className={hpStyles.previewStrengthNumber} data-tone={tone}>{strength}</span>
+          <span className={hpStyles.previewStrengthNumber} data-tone={tone}>{points}</span>
           <span className={hpStyles.previewStrengthTrack}>
             <span className={hpStyles.previewStrengthFill} data-tone={tone} style={{ width: `${pct}%` }} />
           </span>
@@ -573,4 +576,44 @@ function PreviewDigestCard(props: {
       ) : null}
     </article>
   );
+}
+
+/**
+ * Tidy an employer display name for the lead-card header. Registry/career-page
+ * names often arrive as legal-form boilerplate with mismatched/nested straight
+ * quotes ("АО "ГОСТИНИЦА "СОВЕТСКАЯ""), which reads as crooked noise in a card
+ * title. This is a presentation-only cleanup: it normalises straight `"` to
+ * typographic «», decides each quote's role by context (not blind alternation),
+ * drops empty «» pairs, collapses stray whitespace, and trims. It never drops
+ * the legal form or reorders tokens, so the name stays identifiable and matches
+ * what the operator sees in /leads. Returns the trimmed original when already
+ * clean.
+ */
+function cleanEmployerName(raw: string): string {
+  const trimmed = (raw ?? "").trim();
+  if (trimmed === "") return trimmed;
+  // Collapse runs of whitespace inside the name (registry names carry stray
+  // double-spaces from OCR/concat).
+  const name = trimmed.replace(/\s+/g, " ");
+  // Normalise straight double quotes to typographic guillemets. A quote is an
+  // OPENING « when it follows whitespace, start-of-string, or another opening
+  // « (so nested legal-form names pair correctly: АО "ГОСТИНИЦА "СОВЕТСКАЯ""
+  // → АО «ГОСТИНИЦА «СОВЕТСКАЯ»»); otherwise it is a closing ». Context-based
+  // pairing beats blind alternation, which mis-pairs nested/odd quotes and
+  // inserts a stray » mid-name (the original "криво" the operator flagged).
+  let out = "";
+  for (let i = 0; i < name.length; i++) {
+    const ch = name[i];
+    if (ch === '"') {
+      const prev = i > 0 ? name[i - 1] : " ";
+      const isOpen = /[\s«]/.test(prev);
+      out += isOpen ? "«" : "»";
+    } else {
+      out += ch;
+    }
+  }
+  // Drop an empty guillemet pair («») a doubled quote may have produced, then
+  // collapse any whitespace left behind by the removal.
+  out = out.replace(/«\s*»/g, "").replace(/\s+/g, " ").trim();
+  return out || name;
 }

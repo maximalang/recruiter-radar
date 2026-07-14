@@ -7,7 +7,7 @@ import {
   scorePercent,
   scoreTone as scoreToneFromRaw,
   scoreLevelLabel,
-  formatSignalStrength,
+  formatScorePoints,
   scoreBand,
   type ScoreTone as DisplayScoreTone,
 } from "../../lib/scoring/score-display";
@@ -349,12 +349,12 @@ export function getScoreTone(score: number): ScoreTone {
 export function ScoreGauge(props: { score: number }) {
   const pct = scorePercent(props.score);
   const tone = scoreToneFromRaw(props.score);
-  const strength = formatSignalStrength(props.score);
+  const points = formatScorePoints(props.score);
 
   return (
-    <div className={s.scoreGauge} role="meter" aria-valuenow={Number(strength)} aria-valuemin={0} aria-valuemax={4} aria-label={`Сила сигнала: ${strength} из 4`}>
+    <div className={s.scoreGauge} role="meter" aria-valuenow={Number(points)} aria-valuemin={0} aria-valuemax={100} aria-label={`Сила сигнала: ${points} из 100`}>
       <div className={s.scoreGaugeCircle} data-tone={tone}>
-        {strength}
+        {points}
       </div>
       <div className={s.scoreGaugeInfo}>
         <div className={s.scoreGaugeLabel}>Сила сигнала</div>
@@ -381,14 +381,14 @@ export function ScoreGauge(props: { score: number }) {
 export function ScoreBar(props: { score: number }) {
   const pct = scorePercent(props.score);
   const tone = scoreToneFromRaw(props.score);
-  const strength = formatSignalStrength(props.score);
+  const points = formatScorePoints(props.score);
 
   return (
-    <div className={s.scoreBar} title={`Сила сигнала: ${strength} из 4`}>
+    <div className={s.scoreBar} title={`Сила сигнала: ${points} из 100`}>
       <div className={s.scoreBarTrack}>
         <div className={s.scoreBarFill} data-tone={tone} style={{ width: `${pct}%` }} />
       </div>
-      <span className={s.scoreBarValue}>{strength}</span>
+      <span className={s.scoreBarValue}>{points}</span>
     </div>
   );
 }

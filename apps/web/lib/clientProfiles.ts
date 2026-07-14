@@ -467,7 +467,7 @@ export async function saveClientProfile(input: {
   const excludedLocations = normalizeKeywordList(input.excludedLocations);
   const remoteFriendly = input.remoteFriendly ?? false;
   const contactPolicy = normalizeContactPolicy(input.contactPolicy);
-  const hiringIntentMin = normalizeHiringIntentMin(input.hiringIntentMin);
+  const hiringIntentMin = formPointsToHiringIntentMin(input.hiringIntentMin);
   const signalFreshnessDays = normalizePositiveInt(input.signalFreshnessDays);
   const minOpenRoles = normalizeNonNegativeInt(input.minOpenRoles);
   const hiringMode = normalizeHiringMode(input.hiringMode);
@@ -926,15 +926,43 @@ function normalizeDailyDigestLimit(value: number | null | undefined): number {
 }
 
 /**
- * Minimum FIUR total a candidate must reach. Clamped to the scorer's [0, 4]
- * range. Anything outside a finite number, or ≤ 0, becomes null (no threshold) —
- * a 0 floor would be a no-op anyway, so we store null to mean "unset".
+ * Normalize a STORED `hiring_intent_min` row value back to the ClientProfile.
+ *
+ * The stored value lives on the internal FIUR [0,4] signal-strength scale
+ * (the contract `digest.ts` filters on: `toSignalStrength(total_score) <
+ * hiringIntentMin`). This is the READ path, so it must be IDEMPOTENT on [0,4]
+ * — it clamps to the scorer's range and turns non-finite / non-positive into
+ * null (no floor). It must NOT divide by 25 (that conversion is the write
+ * path's job, below) — re-dividing a stored strength here would shrink the
+ * threshold 25× on every read and silently disable the floor.
  */
-function normalizeHiringIntentMin(value: unknown): number | null {
+export function normalizeHiringIntentMin(value: unknown): number | null {
   if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
     return null;
   }
   return Math.min(value, 4);
+}
+
+/**
+ * Convert a PROFILE FORM threshold to the stored [0,4] strength scale.
+ *
+ * The form submits on the user-facing 0–100 points scale (the same number the
+ * lead card shows), so a recruiter's floor and a card's score speak one
+ * language. The STORED value + the digest filter + the confidence gate stay
+ * on the internal FIUR [0,4] scale (unchanged contract). This is the ONE write
+ * conversion point: form points (0–100) → stored strength (0–4) via ÷25,
+ * clamped to the FIUR ceiling. A non-positive or non-finite input → null.
+ * Used only by `saveClientProfile` (the write path); the read path
+ * (`mapClientProfileRow`) calls `normalizeHiringIntentMin` directly on the
+ * already-[0,4] row, so the threshold is divided exactly once.
+ */
+export function formPointsToHiringIntentMin(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    return null;
+  }
+  const strength = value / 25;
+  if (strength <= 0) return null;
+  return Math.min(strength, 4);
 }
 
 /** A strictly-positive integer threshold (e.g. freshness days), else null. */

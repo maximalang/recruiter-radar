@@ -100,13 +100,13 @@ describe('renderDigestEmail', () => {
   it('drops the redundant gate letter from the email readiness line (html + text)', () => {
     const out = renderDigestEmail([makeLead({ confidenceGate: 'A', score: 320 })], ctx)
     // Band (Горячий) + readiness + numeric, no bare gate letter.
-    expect(out.text).toContain('Горячий · Готов к контакту · 3.2')
+    expect(out.text).toContain('Горячий · Готов к контакту · 80')
     expect(out.text).not.toMatch(/· A\b/)
     expect(out.html).not.toMatch(/>\s*A\s*</)
     // HTML readiness line carries band + readiness + numeric with no gate letter.
     expect(out.html).toContain('Горячий')
     expect(out.html).toContain('Готов к контакту')
-    expect(out.html).toContain('3.2')
+    expect(out.html).toContain('80')
   })
 
   it('keeps the gate-B «с пометкой» readiness without a bare gate letter', () => {
@@ -118,7 +118,7 @@ describe('renderDigestEmail', () => {
 
   it('reads readiness «На проверку» for gate C without a bare gate letter', () => {
     const out = renderDigestEmail([makeLead({ confidenceGate: 'C', score: 320 })], ctx)
-    expect(out.text).toContain('На проверку · 3.2')
+    expect(out.text).toContain('На проверку · 80')
     expect(out.text).not.toMatch(/· C\b/)
   })
 

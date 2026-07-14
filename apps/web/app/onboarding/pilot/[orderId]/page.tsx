@@ -749,12 +749,12 @@ function OnboardingPreviewCard(props: {
           </strong>
           {(() => {
             // T1.3 — speak the same score vocabulary as /leads: band label +
-            // signal strength from the shared score-display module, instead of
-            // the divergent raw "score 247.0" pill. No second vocab onboarding.
-            const { bandLabel, strength } = formatPreviewScore(item.total_score);
+            // 0–100 score points from the shared score-display module, instead
+            // of the divergent raw "score 247.0" pill. No second vocab onboarding.
+            const { bandLabel, points } = formatPreviewScore(item.total_score);
             return (
               <span className={styles.scorePill} data-band={bandLabel}>
-                {bandLabel} · {strength}
+                {bandLabel} · {points}
               </span>
             );
           })()}

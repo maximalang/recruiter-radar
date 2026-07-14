@@ -32,6 +32,17 @@ export const RAW_SCORE_MAX = 400
 /** The FIUR-aligned signal-strength scale shown to users. */
 export const SIGNAL_STRENGTH_MAX = 4
 
+/**
+ * The user-facing points scale (0–100). The persisted `total_score` lives on
+ * [0,400]; the displayed score is `raw / 4` → 0–100 points, so a 75-point lead
+ * is the same 75% of the ceiling as strength 3.0 of 4 (raw 300). This is the
+ * scale the lead-card meter, the detail gauge, the CSV export, and the delivery
+ * cards show as the headline number. The internal [0,4] signal strength stays
+ * the gate/tone/threshold contract (see toSignalStrength) — points are a
+ * higher-resolution read of the SAME underlying value, not a separate score.
+ */
+export const SCORE_POINTS_MAX = 100
+
 export type ScoreTone = 'success' | 'warning' | 'danger'
 
 /**
@@ -45,6 +56,20 @@ export function toSignalStrength(rawScore: number | null | undefined): number {
   if (value < 0) return 0
   if (value > SIGNAL_STRENGTH_MAX) return SIGNAL_STRENGTH_MAX
   return value
+}
+
+/**
+ * Convert the raw persisted `total_score` to the user-facing 0–100 points scale.
+ * `raw / 4` (the raw ceiling 400 → 100). Same fraction as toSignalStrength, so
+ * the points number and the gate/tone/threshold never disagree: 75 pts ↔ 3.0 of
+ * 4 ↔ raw 300 ↔ the "горячий" cut. Clamped to [0, SCORE_POINTS_MAX].
+ */
+export function scorePoints(rawScore: number | null | undefined): number {
+  if (rawScore == null || !Number.isFinite(rawScore)) return 0
+  const points = Math.round(rawScore / 4)
+  if (points < 0) return 0
+  if (points > SCORE_POINTS_MAX) return SCORE_POINTS_MAX
+  return points
 }
 
 /** Percent fill (0–100) for a progress bar, derived from the raw score. */
@@ -99,4 +124,10 @@ export function scoreLevelLabel(rawScore: number | null | undefined): string {
 export function formatSignalStrength(rawScore: number | null | undefined): string {
   if (rawScore == null || !Number.isFinite(rawScore)) return '—'
   return toSignalStrength(rawScore).toFixed(1)
+}
+
+/** "75" — whole-number score points on the 0–100 scale; "—" when absent. */
+export function formatScorePoints(rawScore: number | null | undefined): string {
+  if (rawScore == null || !Number.isFinite(rawScore)) return '—'
+  return String(scorePoints(rawScore))
 }

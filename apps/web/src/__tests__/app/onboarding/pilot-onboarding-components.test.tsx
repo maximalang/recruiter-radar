@@ -51,30 +51,30 @@ describe('InstructionCard (T1.2 — step number badge)', () => {
 });
 
 describe('formatPreviewScore (T1.3 — shared score vocabulary)', () => {
-  it('returns the shared band label + signal strength, not the raw score', () => {
-    // raw total_score ~247 → /100 = 2.47 → "Тёплый" (≥2, <3), strength "2.5"
+  it('returns the shared band label + 0–100 score points, not the raw score', () => {
+    // raw total_score 247 → /4 = 61.75 → 62 points; band "Тёплый" (≥2, <3 strength)
     const out = formatPreviewScore(247);
     expect(out.bandLabel).toMatch(/Тёплый|Горячий|Холодный/);
-    expect(out.strength).toMatch(/^\d\.\d$/);
-    // The raw "247.0" must NOT be the surfaced value.
-    expect(`${out.bandLabel} ${out.strength}`).not.toContain('247');
+    expect(out.points).toMatch(/^\d+$/);
+    // The raw "247" must NOT be the surfaced value.
+    expect(`${out.bandLabel} ${out.points}`).not.toContain('247');
   });
 
   it('a direct-hiring raw score (~320) reads as hot', () => {
     const out = formatPreviewScore(320);
     expect(out.bandLabel).toBe('Горячий');
-    expect(out.strength).toBe('3.2');
+    expect(out.points).toBe('80');
   });
 
   it('a weak raw score (~150) reads as cold', () => {
     const out = formatPreviewScore(150);
     expect(out.bandLabel).toBe('Холодный');
-    expect(out.strength).toBe('1.5');
+    expect(out.points).toBe('38'); // 150/4 = 37.5 → 38
   });
 
   it('handles null/undefined raw score without throwing', () => {
     const out = formatPreviewScore(null);
     expect(out.bandLabel).toBe('Холодный');
-    expect(out.strength).toBe('—');
+    expect(out.points).toBe('—');
   });
 });

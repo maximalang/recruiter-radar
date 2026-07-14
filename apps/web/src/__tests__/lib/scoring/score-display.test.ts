@@ -8,13 +8,16 @@
 
 import {
   toSignalStrength,
+  scorePoints,
   scorePercent,
   scoreTone,
   scoreBand,
   scoreLevelLabel,
   formatSignalStrength,
+  formatScorePoints,
   RAW_SCORE_MAX,
   SIGNAL_STRENGTH_MAX,
+  SCORE_POINTS_MAX,
 } from '@/lib/scoring/score-display'
 
 describe('toSignalStrength', () => {
@@ -33,6 +36,44 @@ describe('toSignalStrength', () => {
     expect(toSignalStrength(null)).toBe(0)
     expect(toSignalStrength(undefined)).toBe(0)
     expect(toSignalStrength(Number.NaN)).toBe(0)
+  })
+})
+
+describe('scorePoints', () => {
+  it('maps the raw [0,400] score onto 0–100 (raw / 4)', () => {
+    // 320 → 80, 200 → 50, 290 → 73 (72.5 rounds to 73)
+    expect(scorePoints(320)).toBe(80)
+    expect(scorePoints(200)).toBe(50)
+    expect(scorePoints(290)).toBe(73)
+  })
+
+  it('agrees with the [0,4] strength at the same fractions (no drift)', () => {
+    // 75 pts = the "горячий" 3.0-of-4 cut = raw 300; the points number and the
+    // gate/tone/threshold must never disagree.
+    expect(scorePoints(300)).toBe(75)
+    expect(toSignalStrength(300)).toBeCloseTo(3.0)
+    expect(scoreTone(300)).toBe('success')
+    expect(scorePoints(200)).toBe(50)
+    expect(toSignalStrength(200)).toBeCloseTo(2.0)
+  })
+
+  it('clamps to [0, SCORE_POINTS_MAX]', () => {
+    expect(scorePoints(999)).toBe(SCORE_POINTS_MAX)
+    expect(scorePoints(-10)).toBe(0)
+  })
+
+  it('treats null / undefined / NaN as 0', () => {
+    expect(scorePoints(null)).toBe(0)
+    expect(scorePoints(undefined)).toBe(0)
+    expect(scorePoints(Number.NaN)).toBe(0)
+  })
+})
+
+describe('formatScorePoints', () => {
+  it('whole-number points string; em dash for missing', () => {
+    expect(formatScorePoints(320)).toBe('80')
+    expect(formatScorePoints(247)).toBe('62') // 247/4 = 61.75 → 62
+    expect(formatScorePoints(null)).toBe('—')
   })
 })
 

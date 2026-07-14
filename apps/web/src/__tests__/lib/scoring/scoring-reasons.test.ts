@@ -76,6 +76,24 @@ describe('T2: ScoringReason module', () => {
     expect(formatted).toBe('[fit.unknown.test]')
   })
 
+  it('formatReason renders a legacy free-form reason text verbatim, not [legacy.…]', () => {
+    // Legacy digest rows store plain Russian strings; parseReasons wraps them as
+    // { key: 'legacy', params: { text } }. The card must show the human text, not
+    // the debug-style bracketed stub that used to leak.
+    const reason: ScoringReason = {
+      component: 'fit',
+      key: 'legacy',
+      params: { text: '86 вакансий, включая «Аккредитация специалистов»' },
+    }
+    expect(formatReason(reason)).toBe('86 вакансий, включая «Аккредитация специалистов»')
+    expect(formatReason(reason)).not.toMatch(/^\[/)
+  })
+
+  it('formatReason renders empty string for a legacy reason with no text', () => {
+    const reason: ScoringReason = { component: 'fit', key: 'legacy' }
+    expect(formatReason(reason)).toBe('')
+  })
+
   it('formatReason handles reason without params', () => {
     const reason: ScoringReason = { component: 'intent', key: 'intent.fresh-signals' }
     const formatted = formatReason(reason)

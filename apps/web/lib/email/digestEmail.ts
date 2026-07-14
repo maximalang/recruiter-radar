@@ -9,7 +9,7 @@
  */
 
 import type { LeadItem } from "../leads-data";
-import { scoreBand, formatSignalStrength } from "../scoring/score-display";
+import { scoreBand, formatScorePoints } from "../scoring/score-display";
 import { buildWhyMatch, type WhyMatchProfile } from "../leads/why-match";
 import { pluralCompanies } from "../format/plural";
 
@@ -71,12 +71,12 @@ function escapeHtml(value: string): string {
 
 /**
  * Render the lead score for an email line. `score` is the raw persisted
- * total_score (~200–390); the shared score-display module converts it to the
- * [0,4] signal-strength scale, so the email and Telegram cards show the same
- * value and neither prints the raw "247.0".
+ * total_score (~200–400); the shared score-display module converts it to the
+ * 0–100 points scale, so the email and Telegram cards show the same value and
+ * neither prints the raw "247.0".
  */
 function formatScore(score: number | null): string {
-  return formatSignalStrength(score);
+  return formatScorePoints(score);
 }
 
 /** A/B sort before C; within a gate, higher score first. Stable on equal keys. */

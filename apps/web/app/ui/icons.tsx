@@ -76,20 +76,23 @@ export function TargetIcon(p: IconProps) {
  * RadarLogo — the product's primary brand mark.
  *
  * An instrument-grade radar scope: three concentric range rings, four short
- * cardinal crosshair ticks (N/E/S/W), and a directional sweep whose beam points
- * down-right with a TRUE radial-gradient trail (bright at the leading edge,
- * dissolving toward the trail) — the radar "looking down" at the market, the
- * product's posture (scanning for hiring signals below the surface). Three
- * "blip" contacts sit on the dial at different bearings/ranges and FLASH ON the
- * moment the rotating sweep passes over them, then fade — the literal behaviour
- * of a real radar (contacts light up under the scan, not statically). Three
- * contacts (not two) read as a populated airspace — "the market has activity",
- * not "two stray dots".
+ * cardinal crosshair ticks (N/E/S/W), and a directional sweep — a thin bright
+ * BEAM (the leading edge) with a NARROW ~45° fading TRAIL behind it built from
+ * three stacked sectors of decreasing opacity (brightest at the beam,
+ * dissolving counterclockwise into the afterglow) — the way a real radar
+ * scope's sweep actually reads, not a wide solid pie wedge. The beam points
+ * down-right, the radar "looking down" at the market (scanning for hiring
+ * signals below the surface). Three "blip" contacts sit on the dial at
+ * different bearings/ranges and FLASH ON the moment the rotating sweep passes
+ * over them, then fade — the literal behaviour of a real radar (contacts light
+ * up under the scan, not statically). Three contacts (not two) read as a
+ * populated airspace — "the market has activity", not "two stray dots".
  *
  * Built to read at 16px (favicon / sticky header) and stay crisp at 48px. The
- * rings step brightness inward; the beam trail is a radial gradient so motion
- * reads as a lit scan, not a flat cartoon wedge. Still `currentColor` so tone
- * comes from CSS — the brand blue on light surfaces.
+ * rings step brightness inward; the beam trail is three stacked fading sectors
+ * (a true angular afterglow), so motion reads as a lit scan, not a flat cartoon
+ * wedge. Still `currentColor` so tone comes from CSS — the brand blue on light
+ * surfaces.
  *
  * Used as the site logo (landing header, animated) and the shared internal
  * TopNav (static), and the `app/icon.svg` favicon mirrors it, so every surface
@@ -150,18 +153,6 @@ export function RadarLogo(p: IconProps & { animate?: boolean }) {
       aria-hidden="true"
       {...svgProps}
     >
-      <defs>
-        {/* The sweep trail — a radial gradient centred at the glyph origin so
-            the sector fills bright near the centre (the leading edge) and
-            fades to transparent at the outer ring (the trail). This is what
-            makes the sweep read as a real lit scan instead of a flat wedge —
-            the eye follows the bright core out along the beam. */}
-        <radialGradient id="rr-sweep-trail" cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0%" stopColor="currentColor" stopOpacity="0.42" />
-          <stop offset="55%" stopColor="currentColor" stopOpacity="0.18" />
-          <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
-        </radialGradient>
-      </defs>
       {/* Range rings — three concentric circles, the radar's defining shape.
           Brightness steps inward so the focal area reads without a hard fill. */}
       <circle cx="12" cy="12" r="9.4" opacity={0.26} />
@@ -208,26 +199,35 @@ export function RadarLogo(p: IconProps & { animate?: boolean }) {
         className={animate ? blipC.animClass : undefined}
         opacity={animate ? undefined : 0.45}
       />
-      {/* The sweep — a sector from the center pointing DOWN-RIGHT, filled with
-          the radial-gradient trail (bright core → transparent edge). Rotates as
-          a group when `animate` is set. The sector spans ~90° centered on the
-          down-right diagonal: the two arc endpoints sit at the lower-left
-          (7.55, 20.7) and lower-right (16.45, 20.7), so the wedge covers the
-          bottom of the dial. */}
+      {/* The sweep — a real radar scan: a thin bright BEAM (the leading edge)
+          with a NARROW fading TRAIL behind it (the region just swept), not a
+          wide solid pie wedge. The beam points to bearing ~153° (down-right);
+          the sweep rotates clockwise 360°/9s (group `rr-sweep-spin`, bearing
+          increasing), so the AFTERGLOW is the ~45° fan BEHIND the beam —
+          bearings 153→108 (decreasing, counterclockwise from the beam, the
+          region just swept). The trail is three stacked 15° sectors of
+          DECREASING opacity (0.30 → 0.16 → 0.07), brightest right at the beam
+          edge (153°) and dissolving toward 108° — exactly how a real radar
+          scope's afterglow reads. The arc sweep flag is 0 (counterclockwise =
+          decreasing bearing = behind a clockwise beam); a flag of 1 would draw
+          the fan AHEAD of the beam, which is wrong. The blips' flash timings
+          (A 13% / C 45% / B 74% of the loop) are computed from the same 153°
+          start bearing and stay correct with this geometry. */}
       <g className={animate ? 'rr-sweep-spin' : undefined}>
-        <path
-          d="M12 12 L7.55 20.7 A9.4 9.4 0 0 0 16.45 20.7 Z"
-          fill="url(#rr-sweep-trail)"
-          stroke="none"
-        />
-        {/* The leading beam edge — the bright line currently scanning, pointing
-            down-right. This is the eye-leading element; it's what makes the
-            sweep read as motion rather than a static shape. */}
+        {/* Trail — three stacked 15° sectors, brightest at the beam edge (153°)
+            and dissolving counterclockwise toward 108°. Each arc sweep flag is
+            0 so the sector opens BEHIND the beam (decreasing bearing). */}
+        <path d="M12 12 L16.27 20.38 A9.4 9.4 0 0 0 18.29 18.99 Z" fill="currentColor" stroke="none" opacity={0.3} />
+        <path d="M12 12 L18.29 18.99 A9.4 9.4 0 0 0 19.88 17.12 Z" fill="currentColor" stroke="none" opacity={0.16} />
+        <path d="M12 12 L19.88 17.12 A9.4 9.4 0 0 0 20.94 14.90 Z" fill="currentColor" stroke="none" opacity={0.07} />
+        {/* The leading beam edge — the bright radial line currently scanning,
+            pointing down-right. The eye-leading element that makes the sweep
+            read as a rotating scan, not a static shape. */}
         <line
           x1="12"
           y1="12"
-          x2="16.45"
-          y2="20.7"
+          x2="16.27"
+          y2="20.38"
           stroke="currentColor"
           strokeWidth={1.5}
           strokeLinecap="round"

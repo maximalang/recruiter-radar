@@ -36,7 +36,7 @@ describe('formatBatchLeadBlock', () => {
     expect(block).toContain('Москва')
     expect(block).toContain('Готов к контакту')
     expect(block).toContain('Горячий')
-    expect(block).toContain('сигнал 3.2')
+    expect(block).toContain('сигнал 80')
     expect(block).toContain('Роли:')
     expect(block).toContain('Backend разработчик')
     expect(block).toContain('нанимают по вашему профилю')
@@ -49,7 +49,7 @@ describe('formatBatchLeadBlock', () => {
   // triple-readout drift. One contract shared with the email renderer (T6.2).
   it('drops the redundant gate letter from the readiness line', () => {
     const block = formatBatchLeadBlock(lead(), 1)
-    expect(block).toContain('Готов к контакту · Горячий · сигнал 3.2')
+    expect(block).toContain('Готов к контакту · Горячий · сигнал 80')
     expect(block).not.toMatch(/Готов к контакту · A/)
     expect(block).not.toMatch(/· A ·/)
   })
@@ -59,13 +59,13 @@ describe('formatBatchLeadBlock', () => {
     const readinessLine = block.split('\n')[1] ?? ''
     // Confidence readouts = readinessLabel + band + signal. Gate letter must
     // not be a fourth. Assert the exact expected contract form.
-    expect(readinessLine).toBe('Готов к контакту · Горячий · сигнал 3.2')
+    expect(readinessLine).toBe('Готов к контакту · Горячий · сигнал 80')
   })
 
   it('reads readiness «На проверку» without a gate letter for gate C', () => {
     const block = formatBatchLeadBlock(lead({ confidenceGate: 'C' }), 1)
     const readinessLine = block.split('\n')[1] ?? ''
-    expect(readinessLine).toBe('На проверку · Горячий · сигнал 3.2')
+    expect(readinessLine).toBe('На проверку · Горячий · сигнал 80')
     expect(block).not.toMatch(/· C\b/)
   })
 

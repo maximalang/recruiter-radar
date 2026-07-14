@@ -627,6 +627,11 @@
   letter-spacing: -0.02em;
   color: var(--c-text-primary);
   flex-shrink: 0;
+  /* The 0–100 points number can be 1–3 digits ("8" / "80" / "100"); a fixed
+     min-width + tabular-nums keeps the bar起点 aligned across cards so the
+     meters line up in a column. */
+  min-width: 1.7em;
+  text-align: right;
 }
 
 .previewStrengthNumber[data-tone="success"] { color: #047857; }

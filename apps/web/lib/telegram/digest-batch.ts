@@ -19,7 +19,7 @@
  * Pure + deterministic: no network here. The caller sends the returned strings.
  */
 
-import { scoreBand, formatSignalStrength } from '@/lib/scoring/score-display'
+import { scoreBand, formatScorePoints } from '@/lib/scoring/score-display'
 import { deriveRoleNames, splitRolesForDisplay, deriveUrgencyCue } from '@/lib/leads/lead-quality'
 import { pluralCompanies } from '@/lib/format/plural'
 import { escapeTelegramHtml as escapeHtml } from './html'
@@ -142,7 +142,7 @@ function formatContactLine(lead: BatchLead): string | null {
  * Render one numbered lead block (no trailing newline), HTML parse mode.
  *
  *   1. <b>Ромашка</b> · Москва
- *   Готов к контакту · Горячий · сигнал 3.2
+ *   Готов к контакту · Горячий · сигнал 80
  *   Открыли 4 вакансии за неделю
  *   Роли: Backend, DevOps + ещё 2
  *   Контакт: Карьерная страница · romashka.ru
@@ -166,7 +166,7 @@ export function formatBatchLeadBlock(lead: BatchLead, index: number): string {
   // for A/B, «На проверку» for C/D), so a bare gate letter would be a third
   // readout of the same fact. One contract shared with the email renderer —
   // see lib/email/digestEmail.ts (T6.1/T6.2 de-duplication).
-  lines.push(`${readinessLabel(lead.confidenceGate)} · ${band.label} · сигнал ${formatSignalStrength(lead.score)}`)
+  lines.push(`${readinessLabel(lead.confidenceGate)} · ${band.label} · сигнал ${formatScorePoints(lead.score)}`)
 
   // Why now — only when there is a concrete argument.
   if (lead.whyLine && lead.whyLine.trim()) {

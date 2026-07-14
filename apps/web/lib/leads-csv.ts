@@ -12,7 +12,7 @@
  */
 
 import type { LeadItem } from "./leads-data";
-import { formatSignalStrength } from "./scoring/score-display";
+import { formatScorePoints } from "./scoring/score-display";
 import { formatLawfulContactPath } from "./leads-data";
 
 const BOM = "﻿";
@@ -41,7 +41,7 @@ const COLUMNS: readonly CsvColumn[] = [
   { header: "ОГРН", value: (l) => l.orgOgrn ?? "" },
   { header: "Домен", value: (l) => l.orgDomain ?? "" },
   { header: "Карьерная страница", value: (l) => l.careerPageUrl ?? "" },
-  { header: "Сила сигнала (0–4)", value: (l) => formatScore(l.score) },
+  { header: "Сила сигнала (0–100)", value: (l) => formatScore(l.score) },
   { header: "Уверенность", value: (l) => l.confidenceGate },
   { header: "Почему сейчас", value: (l) => l.whyNow },
   { header: "Безопасный контакт", value: (l) => formatLawfulContactPath(l.lawfulContactPath) ?? l.lawfulContactPath ?? "" },
@@ -56,11 +56,11 @@ const COLUMNS: readonly CsvColumn[] = [
 
 /**
  * Render the lead score for CSV. `score` is the raw persisted total_score
- * (~200–390); the shared score-display module converts it to the [0,4]
- * signal-strength scale so the export matches what the UI and cards show.
+ * (~200–400); the shared score-display module converts it to the 0–100
+ * points scale so the export matches what the UI and cards show.
  */
 function formatScore(score: number): string {
-  return formatSignalStrength(score);
+  return formatScorePoints(score);
 }
 
 /** Quote a single CSV field per RFC 4180 when it contains a special character. */
@@ -140,7 +140,7 @@ export function leadToCrmBlock(lead: CrmBlockLead): string {
   const lines: string[] = [];
   lines.push(`Компания: ${lead.orgName}`);
   if (lead.profileName) lines.push(`Практика: ${lead.profileName}`);
-  lines.push(`Сила сигнала: ${formatSignalStrength(lead.score)} / 4 (уверенность ${lead.confidenceGate})`);
+  lines.push(`Сила сигнала: ${formatScorePoints(lead.score)} / 100 (уверенность ${lead.confidenceGate})`);
   if (lead.whyNow && lead.whyNow.trim()) lines.push(`Почему сейчас: ${lead.whyNow.trim()}`);
   const contact = formatLawfulContactPath(lead.lawfulContactPath) ?? lead.lawfulContactPath;
   if (contact) lines.push(`Безопасный контакт: ${contact}`);

@@ -57,6 +57,20 @@ describe('deriveWhyNow', () => {
     const result = deriveWhyNow(reasons)
     expect(result).toBe('Индустрия «it» совпадает с ICP; SMB sweet spot (100 сотрудников, 50–500 сотрудников) — оптимальный бюджет для агентства')
   })
+
+  it('renders legacy free-form Russian reasons verbatim, never the [legacy.…] stub', () => {
+    // Prod digest rows store reasons as plain Russian strings, not structured
+    // ScoringReason objects. deriveWhyNow must surface the human text, not the
+    // debug-style bracketed key that used to leak into the lead card.
+    const rawReasons = [
+      '86 вакансий, включая «Аккредитация специалистов»',
+      'Опубликовано 12.07',
+    ]
+    const result = deriveWhyNow(rawReasons)
+    expect(result).toContain('86 вакансий, включая «Аккредитация специалистов»')
+    expect(result).not.toMatch(/\[legacy/)
+    expect(result).not.toMatch(/^\[/)
+  })
 })
 
 describe('deriveLawfulContactPath', () => {

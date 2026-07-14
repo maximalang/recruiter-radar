@@ -25,8 +25,15 @@ function parseReasons(raw: unknown): ScoringReason[] {
       // New ScoringReason format
       result.push(item as ScoringReason)
     } else if (typeof item === 'string' && item.length > 0) {
-      // Legacy string — wrap as a synthetic reason for backward compat
-      result.push({ component: 'fit', key: `legacy.${item.slice(0, 40)}` })
+      // Legacy free-form Russian string (the older digest format, still present
+      // on prod rows that predate the structured-reason migration). Wrap it as a
+      // synthetic reason whose KEY is the stable signal 'legacy' and whose FULL
+      // original text rides in params.text — so formatReason can render the
+      // human string verbatim instead of the debug-style `[legacy.<text>]` stub
+      // it used to leak into the lead card. Do NOT truncate (the old code sliced
+      // to 40 chars and baked the slice into the key, which both lost text and
+      // produced the bracketed stub users saw).
+      result.push({ component: 'fit', key: 'legacy', params: { text: item } })
     }
   }
   return result

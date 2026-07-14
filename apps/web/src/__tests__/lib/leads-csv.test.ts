@@ -95,18 +95,20 @@ describe('leadsToCsv', () => {
     expect(csv).toContain('career-pages; habr');
   });
 
-  it('converts the raw score to one-decimal signal strength', () => {
+  it('converts the raw score to a 0–100 score-points integer', () => {
     const csv = leadsToCsv([makeLead({ score: 300 })]);
     const dataRow = csv.slice(BOM.length).split('\r\n')[1];
-    // "Сила сигнала (0–4)" is the 8th column (index 7) after the CRM
+    // "Сила сигнала (0–100)" is the 8th column (index 7) after the CRM
     // identifier columns: ID, Практика, Компания, ИНН, ОГРН, Домен, Карьерная.
-    expect(dataRow.split(',')[7]).toBe('3.0');
+    // raw 300 → scorePoints 75 (raw/4, rounded).
+    expect(dataRow.split(',')[7]).toBe('75');
   });
 
-  it('rounds the converted signal strength to one decimal place', () => {
+  it('rounds the 0–100 score points to a whole number', () => {
     const csv = leadsToCsv([makeLead({ score: 275 })]);
     const dataRow = csv.slice(BOM.length).split('\r\n')[1];
-    expect(dataRow.split(',')[7]).toBe('2.8');
+    // raw 275 → 275/4 = 68.75 → rounded to 69.
+    expect(dataRow.split(',')[7]).toBe('69');
   });
 
   it('renders null contact path and feedback as empty fields', () => {

@@ -19,10 +19,11 @@ describe('ScoreGauge (T4.3 — level sr-only on mobile)', () => {
     expect(levelNode?.classList.toString()).toMatch(/srOnlyMobile|sr-only-mobile/);
   });
 
-  it('keeps the band/strength visible (the one-glance read)', () => {
+  it('keeps the band/points visible (the one-glance read)', () => {
     const { container } = render(<ScoreGauge score={320} />);
-    // The gauge circle shows the numeric strength; the band chip is elsewhere
-    // on the page. The gauge itself must still render the strength number.
-    expect(container.textContent).toMatch(/3\.\d/);
+    // The gauge circle shows the numeric 0–100 score points; the band chip is
+    // elsewhere on the page. The gauge itself must still render the points
+    // number (320 → 80).
+    expect(container.textContent).toMatch(/80/);
   });
 });
