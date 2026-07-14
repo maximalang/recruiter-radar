@@ -5,9 +5,9 @@
  * WHY this module exists: `total_score` is NOT the FIUR [0,4] total. It is the
  * digest evidence-ranking score produced by digest-evidence-query.ts:
  *
- *   total_score = quality_weight (200 platform | 300 direct) + activity_score (0..90)
+ *   total_score = quality_weight (140 platform | 220 direct) + activity_score (0..180)
  *
- * so any *surfaced* lead scores ~200–390 (enrichment_context/0 is filtered out
+ * so any *surfaced* lead scores ~180–400 (enrichment_context/0 is filtered out
  * before persistence). Three surfaces each independently mis-read this value:
  *   • the web score bar/gauge assumed a [0,50] scale → every real lead rendered
  *     at 100% width and "Высокий";
@@ -26,7 +26,7 @@
  * gated, or persisted. The raw `total_score` remains the ordering key.
  */
 
-/** Raw evidence-ranking ceiling: quality_weight 300 + activity_score 90, rounded to 400. */
+/** Raw evidence-ranking ceiling: quality_weight 220 + activity_score 180 = 400. */
 export const RAW_SCORE_MAX = 400
 
 /** The FIUR-aligned signal-strength scale shown to users. */

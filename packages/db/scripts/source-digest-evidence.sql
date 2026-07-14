@@ -416,20 +416,44 @@ scored AS (
     vacancies_count,
     distinct_vacancy_names_count,
     latest_published_at,
-    LEAST(vacancies_count * 10, 50)::INT AS vacancies_score,
-    LEAST(distinct_vacancy_names_count * 5, 25)::INT AS role_diversity_score,
-    -- Sliding recency_score: 20 at 0 days → 10 at 7 days → 0 at 45 days.
+    -- vacancies_score: LOG-SCALE so hiring volume keeps differentiating leads past
+    -- the first few roles. The old linear LEAST(vacancies*10, 50) saturated at 5
+    -- vacancies → every delivered lead (5+ roles) hit the activity_score cap of 90
+    -- → all direct leads scored 300+90=390 → 3.9/4 with zero spread (the radar
+    -- couldn't tell "86 roles today" from "10 roles"). 90*(1-exp(-vac/25)) is
+    -- sub-linear and asymptotic: 5≈16, 10≈30, 25≈57, 50≈82, 86≈95 — it never
+    -- reaches a hard ceiling, so larger employers score higher without clamping.
+    LEAST(90, (90 * (1 - EXP(-vacancies_count / 25.0)))::INT) AS vacancies_score,
+    -- role_diversity: distinct role breadth. Capped at 50 (a very broad hiring
+    -- sweep) so one employer posting 40 near-duplicate roles doesn't outscore
+    -- one posting 25 genuinely different roles.
+    LEAST(distinct_vacancy_names_count * 1.5, 50)::INT AS role_diversity_score,
+    -- Sliding recency_score: 40 at 0 days → 20 at 7 days → 0 at 45 days.
     -- Linear gradient avoids the binary cliff at day 3/7 boundaries.
-    GREATEST(0, LEAST(20, (20 * (1.0 - EXTRACT(EPOCH FROM (NOW() - latest_published_at)) / (45.0 * 86400)))::INT))::INT AS recency_score,
+    GREATEST(0, LEAST(40, (40 * (1.0 - EXTRACT(EPOCH FROM (NOW() - latest_published_at)) / (45.0 * 86400)))::INT))::INT AS recency_score,
+    -- activity_score: the spread-bearing component. With quality_weight lowered
+    -- (220/140 below), activity has room to differentiate leads on the [0,4]
+    -- scale. Cap 180 so a direct lead tops out at 220+180=400 (= 4.0 on the
+    -- /100 signal-strength scale, the contract ceiling), reached only by a
+    -- very large, fresh, multi-role direct employer — not by every delivered
+    -- lead the way the old cap-90 formula did.
     LEAST(
-      vacancies_count * 10
-      + distinct_vacancy_names_count * 5
-      + GREATEST(0, LEAST(20, (20 * (1.0 - EXTRACT(EPOCH FROM (NOW() - latest_published_at)) / (45.0 * 86400)))::INT)),
-      90
+      LEAST(90, (90 * (1 - EXP(-vacancies_count / 25.0)))::INT)
+      + LEAST(distinct_vacancy_names_count * 1.5, 50)::INT
+      + GREATEST(0, LEAST(40, (40 * (1.0 - EXTRACT(EPOCH FROM (NOW() - latest_published_at)) / (45.0 * 86400)))::INT)),
+      180
     )::INT AS activity_score,
+    -- quality_weight: lowered from 300/200 → 220/140 so it no longer consumes
+    -- 75% of the 400 ceiling. Every delivered lead is direct (gate A/B filters
+    -- the rest), so the old 300 weight gave ALL delivered leads the same 75%
+    -- floor and left only 90 activity points — most of which the cap-90 ate.
+    -- At 220, a direct lead ranges 220+(40..180) = 260..400 → 2.6..4.0, and a
+    -- platform lead ranges 140+(40..180) = 180..320 → 1.8..3.2. The quality
+    -- tier still separates direct from platform; activity now separates leads
+    -- within a tier. total_score stays on the same [0,400]/100 → [0,4] contract.
     CASE evidence_quality
-      WHEN 'direct_hiring_proof' THEN 300
-      WHEN 'platform_aggregation' THEN 200
+      WHEN 'direct_hiring_proof' THEN 220
+      WHEN 'platform_aggregation' THEN 140
       ELSE 0
     END::INT AS quality_weight,
     CASE evidence_quality
