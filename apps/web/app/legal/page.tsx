@@ -8,6 +8,7 @@ import {
   SurfaceCard,
 } from "../ui/page-primitives";
 import { SiteFooter } from "../ui/site-footer";
+import { OPERATOR_REQUISITES } from "../../lib/operatorRequisites";
 
 export const metadata: Metadata = {
   title: "Реквизиты — Recruiter Radar",
@@ -16,16 +17,11 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-// Реквизиты оператора сервиса. ИНН указан явно — требуется для приёма оплат
-// через ЮKassa (самозанятый, плательщик НПД). Эта страница — единый источник
-// реквизитов; оферта и политика ссылаются сюда и не дублируют блок целиком.
-const SELF_EMPLOYED = {
-  fullName: "Головий Наталья Ярославна",
-  inn: "622809740837",
-  status: "Самозанятый, плательщик НПД (налог на профессиональный доход)",
-  service: "Recruiter Radar — ежедневный радар по компаниям с активным наймом",
-  email: "6uunn9@gmail.com",
-};
+// The requisites live in lib/operatorRequisites (the single source the footer
+// and this page share). This page renders the full block (status + service
+// description); the footer carries only the legally-required minimum + a link
+// here. ИНН is the operational key for ЮKassa receipts (ФЗ-54).
+const SELF_EMPLOYED = OPERATOR_REQUISITES;
 
 export default function LegalPage() {
   return (

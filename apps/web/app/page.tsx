@@ -11,7 +11,6 @@ import {
 } from "../lib/publicProduct";
 import { formatSignalStrength, scorePercent, scoreTone } from "../lib/scoring/score-display";
 import { formatLawfulContactPath, deriveWhyNow } from "../lib/leads-data";
-import { getGatePresentation } from "../lib/scoring/gate-labels";
 import { formatVacanciesCount } from "../lib/format/plural";
 import {
   NoticeBox,
@@ -437,7 +436,6 @@ function PreviewDigestCard(props: {
   item: HomePreviewItem;
 }) {
   const { item } = props;
-  const gatePresentation = getGatePresentation(item.confidence_gate);
   // `whyNow` joins the top structured reasons (deriveWhyNow picks urgency/
   // intent components ordered by evidential strength). The reason labels already
   // carry the time anchor ("Несколько свежих вакансий за 14 дней"), so a
@@ -485,16 +483,19 @@ function PreviewDigestCard(props: {
         ) : null}
       </div>
 
-      {/* Score + evidence gate. The temperature WORD chip ("Горячий"/"Тёплый"/
-          "Холодный") was removed — it derived from the same total_score as the
-          numeric meter and added only a synonym for the number already shown,
-          so it was noise (the operator's note). What carries signal instead:
-            • the measurable [0,4] strength meter (number + bar, tone-colored) —
-              the score itself, shown not as a word but as a value;
-            • the evidence-gate label ("Подтверждено" / "Скорее подтверждено" /
-              "Нужна проверка") — the one thing the score does NOT encode: how
-              many independent sources back the hiring proof. That is real,
-              non-redundant information, so it stays. */}
+      {/* Score line — the measurable [0,4] strength meter alone. The temperature
+          WORD chip ("Горячий"/"Тёплый"/"Холодный") was removed first — it derived
+          from the same total_score as the numeric meter and was a synonym for
+          the number. The evidence-gate label ("Подтверждено" / "Скорее
+          подтверждено" / "Нужна проверка") was removed next per the same note:
+          on the public preview the gate reads as a second verdict next to the
+          score, and "Скорее подтверждено" restates a confidence the number +
+          evidence row already convey, so it is noise on this surface. The gate
+          is still stored on the row and still surfaces on the internal surfaces
+          (/leads, /review, /dashboard, onboarding) where it carries operational
+          meaning; the public landing card shows the score value + the evidence
+          row (vacancy count + real role titles) — the proof, not a word about
+          the proof. */}
       <div className={hpStyles.previewScoreLine}>
         <div
           className={hpStyles.previewStrengthMeter}
@@ -510,11 +511,6 @@ function PreviewDigestCard(props: {
             <span className={hpStyles.previewStrengthFill} data-tone={tone} style={{ width: `${pct}%` }} />
           </span>
         </div>
-        {gatePresentation ? (
-          <span className={hpStyles.previewCardGate} data-gate={item.confidence_gate}>
-            {gatePresentation.label}
-          </span>
-        ) : null}
       </div>
 
       {/* Evidence — the vacancy count (the scale of hiring) + real vacancy

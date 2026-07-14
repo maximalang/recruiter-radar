@@ -263,6 +263,26 @@
   cursor: pointer;
   transition: box-shadow 0.2s ease, transform 0.15s ease;
   will-change: transform;
+  /* position/overflow anchor the ::before shimmer sweep (merged here from the
+     duplicate second declaration that used to re-define this whole class). */
+  position: relative;
+  overflow: hidden;
+}
+
+/* Shimmer sweep on hover — a soft light band travels across the button. */
+.primaryAction::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: width 0.5s ease;
+}
+
+.primaryAction:hover::before {
+  width: 100%;
 }
 
 .primaryAction:hover {
@@ -296,6 +316,25 @@
   backdrop-filter: blur(8px);
   transition: box-shadow 0.2s ease, transform 0.15s ease;
   will-change: transform;
+  /* position/overflow anchor the ::before shimmer (merged from the duplicate). */
+  position: relative;
+  overflow: hidden;
+}
+
+/* Shimmer sweep on hover — a softer band for the light secondary surface. */
+.secondaryAction::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  transition: width 0.5s ease;
+}
+
+.secondaryAction:hover::before {
+  width: 100%;
 }
 
 .secondaryAction:hover {
@@ -507,49 +546,6 @@
   color: #64748b;
   font-size: 0.875rem;
   font-weight: 500;
-}
-
-/* CTA button enhanced styling */
-.primaryAction {
-  position: relative;
-  overflow: hidden;
-  transition: all 0.2s ease;
-}
-
-.primaryAction::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 0;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-  transition: width 0.5s ease;
-}
-
-.primaryAction:hover::before {
-  width: 100%;
-}
-
-.secondaryAction {
-  position: relative;
-  overflow: hidden;
-  transition: all 0.2s ease;
-}
-
-.secondaryAction::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 0;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
-  transition: width 0.5s ease;
-}
-
-.secondaryAction:hover::before {
-  width: 100%;
 }
 
 /* Plan container */

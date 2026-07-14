@@ -40,7 +40,7 @@
   max-height: 720px;
   top: -10vw;
   left: -8vw;
-  background: radial-gradient(circle, rgba(59, 130, 246, 0.32) 0%, rgba(59, 130, 246, 0) 68%);
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.38) 0%, rgba(59, 130, 246, 0) 68%);
   animation: ambientDriftA 34s ease-in-out infinite alternate;
 }
 .ambientBlobB {
@@ -50,7 +50,7 @@
   max-height: 780px;
   bottom: -14vw;
   right: -10vw;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.26) 0%, rgba(99, 102, 241, 0) 68%);
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.32) 0%, rgba(99, 102, 241, 0) 68%);
   animation: ambientDriftB 40s ease-in-out infinite alternate;
 }
 .ambientBlobC {
@@ -60,7 +60,7 @@
   max-height: 520px;
   top: 34%;
   left: 56%;
-  background: radial-gradient(circle, rgba(14, 165, 233, 0.2) 0%, rgba(14, 165, 233, 0) 68%);
+  background: radial-gradient(circle, rgba(14, 165, 233, 0.26) 0%, rgba(14, 165, 233, 0) 68%);
   animation: ambientDriftC 46s ease-in-out infinite alternate;
 }
 /* A faint moving grid echo — barely-there vertical light lines drifting
@@ -201,12 +201,28 @@
   89%  { opacity: 0.35; transform: scale(1); }
   100% { opacity: 0.35; transform: scale(1); }
 }
+/* Third detected contact — bearing 315° (up-left). The beam reaches it at
+   t≈4.05s, mid-loop, so the spike sits at ~45%: between blip A (13%) and blip B
+   (74%). Three evenly-spread flashes per scan read as a populated airspace. */
+:global(.rr-blip-c) {
+  animation: rrBlipC 9s linear infinite;
+  opacity: 0.3;
+}
+@keyframes rrBlipC {
+  0%   { opacity: 0.3;  transform: scale(1); }
+  43%  { opacity: 0.3;  transform: scale(1); }
+  45%  { opacity: 1;    transform: scale(1.4); }
+  48%  { opacity: 0.8;  transform: scale(1.2); }
+  60%  { opacity: 0.3;  transform: scale(1); }
+  100% { opacity: 0.3;  transform: scale(1); }
+}
 @media (prefers-reduced-motion: reduce) {
   :global(.rr-sweep-spin) {
     animation: none;
   }
   :global(.rr-blip-a),
-  :global(.rr-blip-b) {
+  :global(.rr-blip-b),
+  :global(.rr-blip-c) {
     animation: none;
   }
 }
@@ -583,22 +599,11 @@
   text-overflow: ellipsis;
 }
 
-/* Confidence-gate label — the evidence-quality stamp, shown once on the score
-   line. Tone-keyed text (no background chip) so it reads as a label, not a
-   banner. */
-.previewCardGate {
-  font-weight: 700;
-  font-size: var(--fs-small);
-  letter-spacing: 0.005em;
-}
-.previewCardGate[data-gate="A"] { color: #047857; }
-.previewCardGate[data-gate="B"] { color: #1d4ed8; }
-.previewCardGate[data-gate="C"] { color: #b45309; }
-.previewCardGate[data-gate="D"] { color: #64748b; }
-
-/* Score line — temperature chip + gate label + a compact strength meter. The
-   meter is a small number + a 4px bar (not the old 10px segmented bar) so the
-   score is measurable without dominating the name. Same [0,4] scale as /leads. */
+/* Score line — the strength meter alone (number + 4px bar, tone-colored).
+   The meter is a small number + a 4px bar (not the old 10px segmented bar) so
+   the score is measurable without dominating the name. Same [0,4] scale as
+   /leads. The gate label that used to sit next to it was removed (noise next to
+   the score + evidence row); the gate-gate CSS was dropped with it. */
 .previewScoreLine {
   display: flex;
   align-items: center;

@@ -75,20 +75,21 @@ export function TargetIcon(p: IconProps) {
 /**
  * RadarLogo — the product's primary brand mark.
  *
- * An instrument-grade radar scope: three concentric range rings, four cardinal
- * crosshair ticks (N/E/S/W), and a directional sweep whose beam points down-
- * right with a fading gradient trail (bright at the leading edge, translucent
- * at the trail) — the radar "looking down" at the market, the product's
- * posture (scanning for hiring signals below the surface). Two "blip" contacts
- * sit on the dial and FLASH ON the moment the rotating sweep passes over them,
- * then fade — the literal behaviour of a real radar (contacts light up under
- * the scan, not statically). This is the mark the operator asked to bring back,
- * with the live-detection dots added on top.
+ * An instrument-grade radar scope: three concentric range rings, four short
+ * cardinal crosshair ticks (N/E/S/W), and a directional sweep whose beam points
+ * down-right with a TRUE radial-gradient trail (bright at the leading edge,
+ * dissolving toward the trail) — the radar "looking down" at the market, the
+ * product's posture (scanning for hiring signals below the surface). Three
+ * "blip" contacts sit on the dial at different bearings/ranges and FLASH ON the
+ * moment the rotating sweep passes over them, then fade — the literal behaviour
+ * of a real radar (contacts light up under the scan, not statically). Three
+ * contacts (not two) read as a populated airspace — "the market has activity",
+ * not "two stray dots".
  *
  * Built to read at 16px (favicon / sticky header) and stay crisp at 48px. The
- * rings step brightness inward; the beam trail fades so motion reads as a lit
- * scan, not a flat cartoon wedge. Still `currentColor` so tone comes from CSS —
- * the brand blue on light surfaces.
+ * rings step brightness inward; the beam trail is a radial gradient so motion
+ * reads as a lit scan, not a flat cartoon wedge. Still `currentColor` so tone
+ * comes from CSS — the brand blue on light surfaces.
  *
  * Used as the site logo (landing header, animated) and the shared internal
  * TopNav (static), and the `app/icon.svg` favicon mirrors it, so every surface
@@ -99,13 +100,15 @@ export function TargetIcon(p: IconProps) {
  * via `:global` (so they aren't hashed) with `transform-origin` at the glyph
  * center (12px 12px in the 24-unit viewBox):
  *   1. rotates the sweep group (`rr-sweep-spin`) — a full clockwise turn;
- *   2. fires each blip's flash (`rr-blip-a` / `rr-blip-b`) once per loop, timed
- *      so the flash peaks exactly when the rotating beam is over that blip's
- *      bearing. The beam starts at ~153° (down-right) and sweeps clockwise
- *      360°/9s, so it reaches blip A (bearing 200°) at t≈1.18s and blip B
- *      (bearing 60°) at t≈6.68s — the CSS keyframe opacity spikes are placed at
- *      ~13% and ~74% of the loop to match (verified with a Playwright opacity
- *      sampler). Honors prefers-reduced-motion (static mark).
+ *   2. fires each blip's flash (`rr-blip-a` / `rr-blip-b` / `rr-blip-c`) once
+ *      per loop, timed so the flash peaks exactly when the rotating beam is over
+ *      that blip's bearing. The beam starts at ~153° (down-right) and sweeps
+ *      clockwise 360°/9s, so it reaches:
+ *        blip A — bearing 200°, r5.6 → t≈1.18s → spike at ~13% of loop;
+ *        blip C — bearing 315°, r7.0 → t≈4.05s → spike at ~45% of loop;
+ *        blip B — bearing  60°, r7.4 → t≈6.68s → spike at ~74% of loop.
+ *      The CSS keyframe opacity spikes are placed at those fractions to match.
+ *      Honors prefers-reduced-motion (static mark).
  *
  * When `animate` is false/omitted the glyph renders as a calm static mark
  * (sweep pointing down-right, blips at a low idle opacity) — for the shared
@@ -116,6 +119,23 @@ export function TargetIcon(p: IconProps) {
  */
 export function RadarLogo(p: IconProps & { animate?: boolean }) {
   const { animate, size, ...svgProps } = p;
+  // Blip geometry — bearing (clockwise from 12 o'clock) + range radius.
+  // Computed once so the static + animated branches share identical positions.
+  const blipA = {
+    cx: (12 + Math.sin((200 * Math.PI) / 180) * 5.6).toFixed(2),
+    cy: (12 - Math.cos((200 * Math.PI) / 180) * 5.6).toFixed(2),
+    animClass: 'rr-blip-a',
+  };
+  const blipB = {
+    cx: (12 + Math.sin((60 * Math.PI) / 180) * 7.4).toFixed(2),
+    cy: (12 - Math.cos((60 * Math.PI) / 180) * 7.4).toFixed(2),
+    animClass: 'rr-blip-b',
+  };
+  const blipC = {
+    cx: (12 + Math.sin((315 * Math.PI) / 180) * 7.0).toFixed(2),
+    cy: (12 - Math.cos((315 * Math.PI) / 180) * 7.0).toFixed(2),
+    animClass: 'rr-blip-c',
+  };
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -130,76 +150,75 @@ export function RadarLogo(p: IconProps & { animate?: boolean }) {
       aria-hidden="true"
       {...svgProps}
     >
+      <defs>
+        {/* The sweep trail — a radial gradient centred at the glyph origin so
+            the sector fills bright near the centre (the leading edge) and
+            fades to transparent at the outer ring (the trail). This is what
+            makes the sweep read as a real lit scan instead of a flat wedge —
+            the eye follows the bright core out along the beam. */}
+        <radialGradient id="rr-sweep-trail" cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0%" stopColor="currentColor" stopOpacity="0.42" />
+          <stop offset="55%" stopColor="currentColor" stopOpacity="0.18" />
+          <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
+        </radialGradient>
+      </defs>
       {/* Range rings — three concentric circles, the radar's defining shape.
           Brightness steps inward so the focal area reads without a hard fill. */}
-      <circle cx="12" cy="12" r="9.4" opacity={0.28} />
-      <circle cx="12" cy="12" r="6.1" opacity={0.5} />
+      <circle cx="12" cy="12" r="9.4" opacity={0.26} />
+      <circle cx="12" cy="12" r="6.1" opacity={0.46} />
       <circle cx="12" cy="12" r="3" opacity={0.78} />
       {/* Cardinal crosshair ticks — the four marks a real radar face carries at
-          N/E/S/W. Short, quiet, only at the outer ring; they give the mark
-          instrument precision without busy-ness. */}
-      <line x1="12" y1="1.7" x2="12" y2="3.3" opacity={0.5} />
-      <line x1="12" y1="20.7" x2="12" y2="22.3" opacity={0.5} />
-      <line x1="1.7" y1="12" x2="3.3" y2="12" opacity={0.5} />
-      <line x1="20.7" y1="12" x2="22.3" y2="12" opacity={0.5} />
-      {/* Detected contacts — blips on the dial. In the static mark they sit at a
-          low idle opacity (faint contacts the radar has seen before); when
-          `animate` is set each fires a bright flash timed to the rotating
-          sweep passing its bearing, then fades — the literal "contact lights up
-          under the scan" of a real radar. Drawn BEFORE the sweep so the bright
-          beam paints over them at its leading edge but the flash halo (a soft
-          ring) reads behind. Bearing is measured clockwise from 12 o'clock;
-          the positions match the sweep-beam geometry below (r=9.4). */}
-      {animate ? (
-        <circle
-          cx={(12 + Math.sin((200 * Math.PI) / 180) * 5.6).toFixed(2)}
-          cy={(12 - Math.cos((200 * Math.PI) / 180) * 5.6).toFixed(2)}
-          r="1.6"
-          fill="currentColor"
-          stroke="none"
-          className="rr-blip-a"
-        />
-      ) : (
-        <circle
-          cx={(12 + Math.sin((200 * Math.PI) / 180) * 5.6).toFixed(2)}
-          cy={(12 - Math.cos((200 * Math.PI) / 180) * 5.6).toFixed(2)}
-          r="1.2"
-          fill="currentColor"
-          stroke="none"
-          opacity={0.5}
-        />
-      )}
-      {animate ? (
-        <circle
-          cx={(12 + Math.sin((60 * Math.PI) / 180) * 7.4).toFixed(2)}
-          cy={(12 - Math.cos((60 * Math.PI) / 180) * 7.4).toFixed(2)}
-          r="1.6"
-          fill="currentColor"
-          stroke="none"
-          className="rr-blip-b"
-        />
-      ) : (
-        <circle
-          cx={(12 + Math.sin((60 * Math.PI) / 180) * 7.4).toFixed(2)}
-          cy={(12 - Math.cos((60 * Math.PI) / 180) * 7.4).toFixed(2)}
-          r="1.2"
-          fill="currentColor"
-          stroke="none"
-          opacity={0.5}
-        />
-      )}
-      {/* The sweep — a sector from the center pointing DOWN-RIGHT, drawn as a
-          radial fade so the leading edge is bright and the trail dissolves.
-          Rotates as a group when `animate` is set. The sector spans ~90°
-          centered on the down-right diagonal: the two arc endpoints sit at the
-          lower-left (7.55, 20.7) and lower-right (16.45, 20.7), so the filled
-          wedge covers the bottom of the dial. */}
+          N/E/S/W. Short (only across the outermost ring) and quiet so they give
+          the mark instrument precision without competing with the rings. */}
+      <line x1="12" y1="0.9" x2="12" y2="2.4" opacity={0.42} />
+      <line x1="12" y1="21.6" x2="12" y2="23.1" opacity={0.42} />
+      <line x1="0.9" y1="12" x2="2.4" y2="12" opacity={0.42} />
+      <line x1="21.6" y1="12" x2="23.1" y2="12" opacity={0.42} />
+      {/* Detected contacts — three blips on the dial at different bearings and
+          ranges. In the static mark they sit at a low idle opacity (faint
+          contacts the radar has seen before); when `animate` is set each fires a
+          bright flash timed to the rotating sweep passing its bearing, then
+          fades — the literal "contact lights up under the scan" of a real
+          radar. Drawn BEFORE the sweep so the bright beam paints over them at
+          its leading edge; the flash reads behind the sweep. */}
+      <circle
+        cx={blipA.cx}
+        cy={blipA.cy}
+        r={animate ? 1.6 : 1.2}
+        fill="currentColor"
+        stroke="none"
+        className={animate ? blipA.animClass : undefined}
+        opacity={animate ? undefined : 0.5}
+      />
+      <circle
+        cx={blipB.cx}
+        cy={blipB.cy}
+        r={animate ? 1.6 : 1.2}
+        fill="currentColor"
+        stroke="none"
+        className={animate ? blipB.animClass : undefined}
+        opacity={animate ? undefined : 0.5}
+      />
+      <circle
+        cx={blipC.cx}
+        cy={blipC.cy}
+        r={animate ? 1.5 : 1.1}
+        fill="currentColor"
+        stroke="none"
+        className={animate ? blipC.animClass : undefined}
+        opacity={animate ? undefined : 0.45}
+      />
+      {/* The sweep — a sector from the center pointing DOWN-RIGHT, filled with
+          the radial-gradient trail (bright core → transparent edge). Rotates as
+          a group when `animate` is set. The sector spans ~90° centered on the
+          down-right diagonal: the two arc endpoints sit at the lower-left
+          (7.55, 20.7) and lower-right (16.45, 20.7), so the wedge covers the
+          bottom of the dial. */}
       <g className={animate ? 'rr-sweep-spin' : undefined}>
         <path
           d="M12 12 L7.55 20.7 A9.4 9.4 0 0 0 16.45 20.7 Z"
-          fill="currentColor"
+          fill="url(#rr-sweep-trail)"
           stroke="none"
-          opacity={0.2}
         />
         {/* The leading beam edge — the bright line currently scanning, pointing
             down-right. This is the eye-leading element; it's what makes the

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { readOperatorSession } from "../../lib/operator-auth";
+import { OPERATOR_REQUISITES } from "../../lib/operatorRequisites";
 import s from "./site-footer.module.css";
 
 /**
@@ -44,13 +45,17 @@ export async function SiteFooter(props: { tone?: "light" | "dark" }) {
         </div>
 
         {/* Operator requisites — the legally-required minimum on every page:
-            ФИО + ИНН + контактный email. Full status/service on /legal. */}
+            ФИО + ИНН + контактный email. Full status/service on /legal. The
+            operator's identifying details live in one place (lib/operatorRequisites)
+            so the footer and /legal never drift apart. These stay on every page
+            by law (152-ФЗ / 54-ФЗ for a self-employed seller accepting payments
+            online) — removing them would be a compliance regression. */}
         <div className={s.footerOperator}>
-          <span className={s.footerOperatorName}>Головий Наталья Ярославна</span>
+          <span className={s.footerOperatorName}>{OPERATOR_REQUISITES.fullName}</span>
           <span className={s.footerOperatorSep} aria-hidden="true">·</span>
-          <span>ИНН <span className={s.footerOperatorInn}>622809740837</span></span>
+          <span>ИНН <span className={s.footerOperatorInn}>{OPERATOR_REQUISITES.inn}</span></span>
           <span className={s.footerOperatorSep} aria-hidden="true">·</span>
-          <a href="mailto:6uunn9@gmail.com" className={s.footerOperatorEmail}>6uunn9@gmail.com</a>
+          <a href={`mailto:${OPERATOR_REQUISITES.email}`} className={s.footerOperatorEmail}>{OPERATOR_REQUISITES.email}</a>
         </div>
 
         <div className={s.footerCopy}>
