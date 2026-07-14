@@ -130,10 +130,13 @@
   text-decoration: none;
 }
 
-/* Brand logo — the RadarLogo glyph (concentric rings + animated sweep + pulsing
-   core). Sized a touch larger than the brand name so the radar reads as the
-   mark, not a dot. Inherits the brand blue from currentColor; a soft halo echoes
-   the radar's focal glow. On the landing the sweep rotates + the core pulses. */
+/* Brand logo — the RadarLogo glyph (three range rings + four cardinal ticks +
+   a down-right sweep + two detected-contact blips). Sized a touch larger than
+   the brand name so the radar reads as the mark, not a dot. Inherits the brand
+   blue from currentColor; a soft halo echoes the radar's focal glow. On the
+   landing the sweep rotates (9s loop) and the two blips flash on once per loop,
+   timed so each lights up exactly as the rotating beam passes its bearing — the
+   literal "contacts pop up under the scan" of a real radar. */
 .brandLogo {
   flex: 0 0 auto;
   width: 1.75rem;
@@ -159,8 +162,51 @@
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+/* Detected-contact blip flashes. Each class is global (applied inside the inline
+   SVG logo, so unhashed); the keyframes are local to co-hash with the refs
+   (same Turbopack rule as the sweep). One 9s loop matched to the sweep so a blip
+   fires once per full scan. The opacity spike is placed at the EXACT cycle
+   fraction when the rotating beam (which starts at ~153° bearing, down-right,
+   and turns clockwise 360°/9s) is over that blip's bearing:
+     blip A — bearing 200° → beam reaches it at t≈1.18s → spike at ~13% of loop;
+     blip B — bearing  60° → beam reaches it at t≈6.68s → spike at ~74% of loop.
+   Between flashes a blip sits at a low idle opacity (a faint contact the radar
+   has seen before) so the dial never looks empty; the brief 0.35→1→0.35 pop is
+   the "point lights up under the scan" the operator asked for. transform-box:
+   fill-box + a 1.4× scale bloom at peak reinforces the pop without moving the
+   contact off its bearing. Honors prefers-reduced-motion (idle opacity, no
+   flash — the blips read as static faint contacts). */
+:global(.rr-blip-a) {
+  animation: rrBlipA 9s linear infinite;
+  opacity: 0.35;
+}
+@keyframes rrBlipA {
+  0%   { opacity: 0.35; transform: scale(1); }
+  11%  { opacity: 0.35; transform: scale(1); }
+  13%  { opacity: 1;    transform: scale(1.4); }
+  16%  { opacity: 0.8;  transform: scale(1.2); }
+  28%  { opacity: 0.35; transform: scale(1); }
+  100% { opacity: 0.35; transform: scale(1); }
+}
+:global(.rr-blip-b) {
+  animation: rrBlipB 9s linear infinite;
+  opacity: 0.35;
+}
+@keyframes rrBlipB {
+  0%   { opacity: 0.35; transform: scale(1); }
+  72%  { opacity: 0.35; transform: scale(1); }
+  74%  { opacity: 1;    transform: scale(1.4); }
+  77%  { opacity: 0.8;  transform: scale(1.2); }
+  89%  { opacity: 0.35; transform: scale(1); }
+  100% { opacity: 0.35; transform: scale(1); }
+}
 @media (prefers-reduced-motion: reduce) {
   :global(.rr-sweep-spin) {
+    animation: none;
+  }
+  :global(.rr-blip-a),
+  :global(.rr-blip-b) {
     animation: none;
   }
 }
@@ -580,7 +626,7 @@
 
 .previewStrengthNumber[data-tone="success"] { color: #047857; }
 .previewStrengthNumber[data-tone="warning"] { color: #b45309; }
-.previewStrengthNumber[data-tone="danger"]  { color: #1d4ed8; }
+.previewStrengthNumber[data-tone="danger"]  { color: #64748b; }
 
 .previewStrengthTrack {
   position: relative;
@@ -603,8 +649,11 @@
 .previewStrengthFill[data-tone="warning"] {
   background: linear-gradient(90deg, #fbbf24 0%, #f59e0b 100%);
 }
+/* Cold leads (<2.0) read muted slate, NOT brand blue — a cold lead must look
+   quiet, not "active". The old blue fill made a cold lead visually resemble a
+   hot/brand element, undercutting the tone encoding. */
 .previewStrengthFill[data-tone="danger"] {
-  background: linear-gradient(90deg, #60a5fa 0%, #3b82f6 100%);
+  background: linear-gradient(90deg, #94a3b8 0%, #64748b 100%);
 }
 
 /* Evidence — the hiring scale (vacancy count) + real vacancy titles as quiet

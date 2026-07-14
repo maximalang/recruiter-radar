@@ -21,7 +21,6 @@ import {
   SurfaceCard,
 } from "./ui/page-primitives";
 import ppStyles from "./ui/page-primitives.module.css";
-import { ScoreBandChip } from "./ui/internal-page";
 import {
   buildFaqItems,
   formatLocationCaption,
@@ -122,9 +121,17 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             <a href="#pricing" className={hpStyles.topNavLink}>Тарифы</a>
             <a href="#faq" className={hpStyles.topNavLink}>FAQ</a>
           </span>
-          <Link href={checkoutHref} className={hpStyles.topNavCta}>
-            <span className={hpStyles.topNavCtaFull}>Активировать неделю</span>
-            <span className={hpStyles.topNavCtaShort} aria-hidden="true">Активировать</span>
+          {/* Header account button — the entry into the signed-in area. The
+              product has no separate login page: auth is an anonymous rr_sid
+              session minted at checkout. /dashboard is the account surface (it
+              reads the session and shows the tenant's radar; without a session
+              it shows the empty radar + the profile CTA routes to checkout).
+              So "Войти" lands you in your account when signed in, and on the
+              activation path when not — the honest "log into your account"
+              affordance over the existing auth model. */}
+          <Link href="/dashboard" className={hpStyles.topNavCta}>
+            <span className={hpStyles.topNavCtaFull}>Войти в аккаунт</span>
+            <span className={hpStyles.topNavCtaShort} aria-hidden="true">Войти</span>
           </Link>
         </nav>
       </header>
@@ -478,16 +485,17 @@ function PreviewDigestCard(props: {
         ) : null}
       </div>
 
-      {/* Score + gate — one-glance temperature. Chip = word
-          ("Горячий"/"Тёплый"/"Холодный"); gate = confidence stamp; meter =
-          measurable [0,4] bar so the value isn't just a word. */}
+      {/* Score + evidence gate. The temperature WORD chip ("Горячий"/"Тёплый"/
+          "Холодный") was removed — it derived from the same total_score as the
+          numeric meter and added only a synonym for the number already shown,
+          so it was noise (the operator's note). What carries signal instead:
+            • the measurable [0,4] strength meter (number + bar, tone-colored) —
+              the score itself, shown not as a word but as a value;
+            • the evidence-gate label ("Подтверждено" / "Скорее подтверждено" /
+              "Нужна проверка") — the one thing the score does NOT encode: how
+              many independent sources back the hiring proof. That is real,
+              non-redundant information, so it stays. */}
       <div className={hpStyles.previewScoreLine}>
-        <ScoreBandChip score={item.total_score} />
-        {gatePresentation ? (
-          <span className={hpStyles.previewCardGate} data-gate={item.confidence_gate}>
-            {gatePresentation.label}
-          </span>
-        ) : null}
         <div
           className={hpStyles.previewStrengthMeter}
           role="meter"
@@ -502,6 +510,11 @@ function PreviewDigestCard(props: {
             <span className={hpStyles.previewStrengthFill} data-tone={tone} style={{ width: `${pct}%` }} />
           </span>
         </div>
+        {gatePresentation ? (
+          <span className={hpStyles.previewCardGate} data-gate={item.confidence_gate}>
+            {gatePresentation.label}
+          </span>
+        ) : null}
       </div>
 
       {/* Evidence — the vacancy count (the scale of hiring) + real vacancy

@@ -1,11 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
-  <!-- Recruiter Radar brand mark — a polished radar scope. A deep slate→blue
-       gradient dial, faint focal glow, outer ring, two inner range rings, 12
-       scale ticks (every 30°, longer at the cardinals), and a bright beam
-       pointing straight down with a fading gradient trail behind it. Static
-       (the favicon carries the mark; the animated sweep lives on the site).
-       Mirrors the RadarLogo React component (app/ui/icons.tsx) so the tab and
-       the site share one identity. Reads at 16px. -->
+  <!-- Recruiter Radar brand mark — an instrument-grade radar scope. A deep
+       slate→blue gradient disc, three concentric range rings, four cardinal
+       crosshair ticks (N/E/S/W), and a directional sweep whose beam points
+       down-right with a fading gradient trail. Static (the favicon carries the
+       mark; the animated sweep + contact blips live on the site). Mirrors the
+       RadarLogo React component (app/ui/icons.tsx) so the tab and the site
+       share one identity. Reads at 16px. -->
   <defs>
     <linearGradient id="rr-disc" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#1e293b"/>
@@ -13,33 +13,22 @@
     </linearGradient>
   </defs>
   <circle cx="12" cy="12" r="12" fill="url(#rr-disc)"/>
-  <!-- Focal glow -->
-  <circle cx="12" cy="12" r="10.2" fill="#bfdbfe" opacity="0.08"/>
-  <!-- Outer dial ring + inner range rings -->
+  <!-- Range rings — outer + mid + inner, brightness steps inward -->
   <g stroke="#bfdbfe" stroke-linecap="round" stroke-linejoin="round" fill="none">
-    <circle cx="12" cy="12" r="9.6" stroke-width="1.1" opacity="0.9"/>
-    <circle cx="12" cy="12" r="6.4" stroke-width="1.3" opacity="0.45"/>
-    <circle cx="12" cy="12" r="3.2" stroke-width="1.3" opacity="0.65"/>
-    <!-- 12 scale ticks (longer + brighter at every 3rd = cardinals) -->
-    <line x1="12" y1="2.4" x2="12" y2="3.8" stroke-width="1" opacity="0.6"/>
-    <line x1="16.8" y1="3.7" x2="16.1" y2="4.9" stroke-width="0.7" opacity="0.32"/>
-    <line x1="20.3" y1="7.2" x2="19.1" y2="7.9" stroke-width="1" opacity="0.6"/>
-    <line x1="21.6" y1="12" x2="20.2" y2="12" stroke-width="0.7" opacity="0.32"/>
-    <line x1="20.3" y1="16.8" x2="19.1" y2="16.1" stroke-width="1" opacity="0.6"/>
-    <line x1="16.8" y1="20.3" x2="16.1" y2="19.1" stroke-width="0.7" opacity="0.32"/>
-    <line x1="12" y1="21.6" x2="12" y2="20.2" stroke-width="1" opacity="0.6"/>
-    <line x1="7.2" y1="20.3" x2="7.9" y2="19.1" stroke-width="0.7" opacity="0.32"/>
-    <line x1="3.7" y1="16.8" x2="4.9" y2="16.1" stroke-width="1" opacity="0.6"/>
-    <line x1="2.4" y1="12" x2="3.8" y2="12" stroke-width="0.7" opacity="0.32"/>
-    <line x1="3.7" y1="7.2" x2="4.9" y2="7.9" stroke-width="1" opacity="0.6"/>
-    <line x1="7.2" y1="3.7" x2="7.9" y2="4.9" stroke-width="0.7" opacity="0.32"/>
+    <circle cx="12" cy="12" r="9.4" stroke-width="1.2" opacity="0.4"/>
+    <circle cx="12" cy="12" r="6.1" stroke-width="1.3" opacity="0.6"/>
+    <circle cx="12" cy="12" r="3"   stroke-width="1.3" opacity="0.85"/>
+    <!-- Cardinal crosshair ticks at N/E/S/W -->
+    <line x1="12" y1="1.7" x2="12" y2="3.3" stroke-width="1.2" opacity="0.6"/>
+    <line x1="12" y1="20.7" x2="12" y2="22.3" stroke-width="1.2" opacity="0.6"/>
+    <line x1="1.7" y1="12" x2="3.3" y2="12" stroke-width="1.2" opacity="0.6"/>
+    <line x1="20.7" y1="12" x2="22.3" y2="12" stroke-width="1.2" opacity="0.6"/>
   </g>
-  <!-- Downward beam with fading trail (comet tail), static -->
-  <path d="M12 12 L4.0 19.2 A9.6 9.6 0 0 0 8.0 21.0 Z" fill="#bfdbfe" opacity="0.1"/>
-  <path d="M12 12 L8.0 21.0 A9.6 9.6 0 0 0 11.0 21.58 Z" fill="#bfdbfe" opacity="0.18"/>
-  <path d="M12 12 L11.0 21.58 A9.6 9.6 0 0 0 12 21.6 Z" fill="#bfdbfe" opacity="0.32"/>
-  <!-- Bright leading beam pointing straight down -->
-  <line x1="12" y1="12" x2="12" y2="21.6" stroke="#dbeafe" stroke-width="1.8" stroke-linecap="round" opacity="1"/>
-  <!-- Origin node -->
-  <circle cx="12" cy="12" r="1.3" fill="#eff6ff"/>
+  <!-- Sweep sector — a radial fade (bright leading edge, translucent trail),
+       pointing down-right, static -->
+  <path d="M12 12 L7.55 20.7 A9.4 9.4 0 0 0 16.45 20.7 Z" fill="#bfdbfe" opacity="0.28"/>
+  <!-- Bright leading beam edge pointing down-right -->
+  <line x1="12" y1="12" x2="16.45" y2="20.7" stroke="#dbeafe" stroke-width="1.5" stroke-linecap="round" opacity="1"/>
+  <!-- Center origin node -->
+  <circle cx="12" cy="12" r="1" fill="#eff6ff"/>
 </svg>
