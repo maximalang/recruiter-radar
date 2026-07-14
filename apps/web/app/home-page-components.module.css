@@ -7,72 +7,99 @@
    No fabricated data anywhere.
    ============================================================ */
 
-/* ── Ambient page background — calm, slow, behind everything ──
-   A fixed full-viewport layer of two soft blue radial glows that drift
-   across the page over ~30s. Low opacity, cool tones, blurred edges —
-   premium and restful, never busy. Sits behind all content (negative
-   z-index relative to the page frame) and is pointer-events:none so it
-   never intercepts clicks. Honors prefers-reduced-motion (static). */
+/* ── Ambient page background — a living, drifting field of blue light ──
+   A fixed full-viewport layer of soft radial glows that slowly drift across
+   the page. This is the "animated background" the product should feel like —
+   not a flat white page, but a calm radar airspace with light moving through
+   it. The layer sits ABOVE the body's base tint (which shows through the
+   page frame, now transparent) and BELOW all content, so the glows read as
+   atmosphere behind cards/text, never in front. pointer-events:none so it
+   never intercepts clicks. Honors prefers-reduced-motion (static glows).
+
+   z-index: 0 on the fixed layer + position:relative/z-index:1 on every
+   content wrapper keeps the stack correct without negative z-index (which
+   used to bury the layer behind the opaque body background — the reason the
+   animation was never visible). */
 .ambientBg {
   position: fixed;
   inset: 0;
-  z-index: -1;
+  z-index: 0;
   pointer-events: none;
   overflow: hidden;
 }
 .ambientBlob {
   position: absolute;
   border-radius: 999px;
-  filter: blur(60px);
+  filter: blur(70px);
   will-change: transform;
-  opacity: 0.5;
 }
 .ambientBlobA {
-  width: 42vw;
-  height: 42vw;
-  max-width: 620px;
-  max-height: 620px;
-  top: -8vw;
-  left: -6vw;
-  background: radial-gradient(circle, rgba(59, 130, 246, 0.22) 0%, rgba(59, 130, 246, 0) 70%);
-  animation: ambientDriftA 32s ease-in-out infinite alternate;
+  width: 48vw;
+  height: 48vw;
+  max-width: 720px;
+  max-height: 720px;
+  top: -10vw;
+  left: -8vw;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.32) 0%, rgba(59, 130, 246, 0) 68%);
+  animation: ambientDriftA 34s ease-in-out infinite alternate;
 }
 .ambientBlobB {
-  width: 46vw;
-  height: 46vw;
-  max-width: 680px;
-  max-height: 680px;
-  bottom: -12vw;
-  right: -8vw;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.16) 0%, rgba(99, 102, 241, 0) 70%);
-  animation: ambientDriftB 38s ease-in-out infinite alternate;
+  width: 52vw;
+  height: 52vw;
+  max-width: 780px;
+  max-height: 780px;
+  bottom: -14vw;
+  right: -10vw;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.26) 0%, rgba(99, 102, 241, 0) 68%);
+  animation: ambientDriftB 40s ease-in-out infinite alternate;
 }
 .ambientBlobC {
-  width: 30vw;
-  height: 30vw;
-  max-width: 440px;
-  max-height: 440px;
-  top: 38%;
-  left: 58%;
-  background: radial-gradient(circle, rgba(14, 165, 233, 0.1) 0%, rgba(14, 165, 233, 0) 70%);
-  animation: ambientDriftC 44s ease-in-out infinite alternate;
+  width: 34vw;
+  height: 34vw;
+  max-width: 520px;
+  max-height: 520px;
+  top: 34%;
+  left: 56%;
+  background: radial-gradient(circle, rgba(14, 165, 233, 0.2) 0%, rgba(14, 165, 233, 0) 68%);
+  animation: ambientDriftC 46s ease-in-out infinite alternate;
+}
+/* A faint moving grid echo — barely-there vertical light lines drifting
+   horizontally, giving the airspace a subtle "scanning" rhythm without ever
+   reading as a hard pattern. Sits with the blobs on the same fixed layer. */
+.ambientGrid {
+  position: absolute;
+  inset: -20% -20%;
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent 0,
+    transparent 120px,
+    rgba(37, 99, 235, 0.05) 120px,
+    rgba(37, 99, 235, 0.05) 121px
+  );
+  animation: ambientGridShift 60s linear infinite;
+  opacity: 0.7;
 }
 @keyframes ambientDriftA {
   from { transform: translate(0, 0) scale(1); }
-  to   { transform: translate(6vw, 4vh) scale(1.12); }
+  to   { transform: translate(7vw, 5vh) scale(1.14); }
 }
 @keyframes ambientDriftB {
   from { transform: translate(0, 0) scale(1); }
-  to   { transform: translate(-5vw, -3vh) scale(1.1); }
+  to   { transform: translate(-6vw, -4vh) scale(1.12); }
 }
 @keyframes ambientDriftC {
   from { transform: translate(0, 0) scale(1); }
-  to   { transform: translate(-4vw, 5vh) scale(1.15); }
+  to   { transform: translate(-5vw, 6vh) scale(1.18); }
+}
+@keyframes ambientGridShift {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-120px); }
 }
 @media (prefers-reduced-motion: reduce) {
   .ambientBlobA,
   .ambientBlobB,
-  .ambientBlobC {
+  .ambientBlobC,
+  .ambientGrid {
     animation: none;
   }
 }
@@ -580,13 +607,25 @@
   background: linear-gradient(90deg, #60a5fa 0%, #3b82f6 100%);
 }
 
-/* Evidence — real vacancy titles as quiet chips. The substantive "what they're
-   hiring for" that the old card buried under a bare count. Wrap to 2 lines max
-   so a company with many distinct roles doesn't bloat the card. */
+/* Evidence — the hiring scale (vacancy count) + real vacancy titles as quiet
+   chips. The count leads as a small bold caption (the "how much"), the titles
+   follow as proof (the "what"). Wrap to 2 lines max so a company with many
+   distinct roles doesn't bloat the card. */
 .previewEvidence {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  align-items: center;
+}
+
+/* Vacancy count — a quiet bold caption, the scale of hiring. Sits first so the
+   eye reads "86 вакансий" then the role titles. */
+.previewEvidenceCount {
+  color: var(--c-brand);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
 }
 
 .previewEvidenceChip {
@@ -653,7 +692,7 @@
   color: #94a3b8;
   font-size: 0.74rem;
   font-weight: 600;
-  min-width: 56px;
+  min-width: 78px;
 }
 
 .previewRelevanceDots {

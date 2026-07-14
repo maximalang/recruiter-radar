@@ -12,6 +12,7 @@ import {
 import { formatSignalStrength, scorePercent, scoreTone } from "../lib/scoring/score-display";
 import { formatLawfulContactPath, deriveWhyNow } from "../lib/leads-data";
 import { getGatePresentation } from "../lib/scoring/gate-labels";
+import { formatVacanciesCount } from "../lib/format/plural";
 import {
   NoticeBox,
   PageFrame,
@@ -23,7 +24,6 @@ import ppStyles from "./ui/page-primitives.module.css";
 import { ScoreBandChip } from "./ui/internal-page";
 import {
   buildFaqItems,
-  formatVacancyFreshness,
   formatLocationCaption,
   pickEvidenceTitles,
 } from "./home-page-components";
@@ -94,11 +94,14 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   return (
     <PageFrame maxWidth="1160px">
       <ScrollProgress />
-      {/* Calm animated ambient background — soft drifting blue glows behind
-          every section. Decorative only; pointer-events:none and a negative
-          z-index keep it behind content and unclickable. Honors
-          prefers-reduced-motion (static) via the CSS keyframe guard. */}
+      {/* Animated ambient background — a living field of drifting blue glows +
+          a faint scanning grid behind every section. Decorative only;
+          pointer-events:none + z-index:0 keep it behind content (pageFrameInner
+          is z-index:1). Honors prefers-reduced-motion (static) via the keyframe
+          guard. The pageFrame is transparent, so this layer is finally visible
+          (the old opaque pageFrame gradient hid it). */}
       <div className={hpStyles.ambientBg} aria-hidden="true">
+        <span className={hpStyles.ambientGrid} />
         <span className={hpStyles.ambientBlobA} />
         <span className={hpStyles.ambientBlobB} />
         <span className={hpStyles.ambientBlobC} />
@@ -428,15 +431,16 @@ function PreviewDigestCard(props: {
 }) {
   const { item } = props;
   const gatePresentation = getGatePresentation(item.confidence_gate);
-  // `whyNow` joins both structured reasons (deriveWhyNow picks the urgency/
-  // intent components and orders by evidential strength) — the old card used
-  // only reasons[0] and threw away the second reason. This is the "what
-  // changed / why now" answer in one line.
+  // `whyNow` joins the top structured reasons (deriveWhyNow picks urgency/
+  // intent components ordered by evidential strength). The reason labels already
+  // carry the time anchor ("Несколько свежих вакансий за 14 дней"), so a
+  // separate "Свежесть" row would duplicate it — one "Почему сейчас" line is
+  // enough and reads cleaner.
   const whyNow = deriveWhyNow(item.reasons) || item.reasons[0] || "";
   const contactPath = formatLawfulContactPath(item.lawfulContactPath);
-  const freshness = formatVacancyFreshness(item.latest_published_at);
   const location = formatLocationCaption(item.location_names);
   const evidenceTitles = pickEvidenceTitles(item.evidence_titles, 3);
+  const vacanciesCaption = formatVacanciesCount(item.vacancies_count);
   // Score scale stays [0,4] — shared lib/scoring/score-display primitives,
   // same numbers as the profile threshold and /leads bar. `strength` is the
   // numeric readout, `tone` colors the chip + bar, `pct` fills the bar.
@@ -446,23 +450,22 @@ function PreviewDigestCard(props: {
   // ICP-relevance breakdown — only shown when the preview was personalised
   // (the user typed a specialization/city). When there's no ICP input the
   // signals are all 0 (defaultRelevanceSignals), so the block would show empty
-  // bars — hide it in that case rather than fabricate a "match". Each axis ∈
-  // [0,1]; the four dots are the FIUR axes (Fit / Intent / Urgency /
-  // Reachability), the honest "is this company a fit for YOUR agency" signal.
+  // dots — hide it rather than fabricate a "match". Each axis ∈ [0,1]; the four
+  // dots are the FIUR axes, the honest "is this company a fit for YOUR agency"
+  // signal. Russian labels — this is a Russia-first product.
   const rs = item.relevanceSignals;
   const hasRelevance = rs.fit > 0 || rs.intent > 0 || rs.urgency > 0 || rs.reachability > 0;
   const relevanceAxes: ReadonlyArray<{ key: string; label: string; value: number }> = [
-    { key: "fit", label: "Fit", value: rs.fit },
-    { key: "intent", label: "Intent", value: rs.intent },
-    { key: "urgency", label: "Urgency", value: rs.urgency },
-    { key: "reachability", label: "Reach", value: rs.reachability },
+    { key: "fit", label: "Соответствие", value: rs.fit },
+    { key: "intent", label: "Намерение", value: rs.intent },
+    { key: "urgency", label: "Срочность", value: rs.urgency },
+    { key: "reachability", label: "Доступность", value: rs.reachability },
   ];
 
   return (
     <article className={hpStyles.previewCard} data-tone={tone}>
-      {/* Header — rank + company name (the "who"), with location as a quiet
-          right-aligned caption (the "where"). The score + gate live below, so
-          the name gets the full visual weight here. */}
+      {/* Header — rank + company name (the "who"), location right-aligned (the
+          "where"). Name gets the full visual weight. */}
       <div className={hpStyles.previewCardHeader}>
         <div className={hpStyles.previewCardName}>
           <span className={hpStyles.previewCardRank} aria-hidden="true">{item.rank}</span>
@@ -475,11 +478,9 @@ function PreviewDigestCard(props: {
         ) : null}
       </div>
 
-      {/* Score + gate — the one-glance temperature. The chip carries the word
-          ("Горячий"/"Тёплый"/"Холодный"); the gate label is the confidence
-          stamp ("Подтверждено"/"Скорее подтверждено"/"Нужна проверка"). A
-          single 4px strength bar under them makes the [0,4] value measurable
-          without a big number competing with the name. */}
+      {/* Score + gate — one-glance temperature. Chip = word
+          ("Горячий"/"Тёплый"/"Холодный"); gate = confidence stamp; meter =
+          measurable [0,4] bar so the value isn't just a word. */}
       <div className={hpStyles.previewScoreLine}>
         <ScoreBandChip score={item.total_score} />
         {gatePresentation ? (
@@ -503,23 +504,23 @@ function PreviewDigestCard(props: {
         </div>
       </div>
 
-      {/* Evidence — real vacancy titles (the proof behind "this company is
-          hiring"), capped at 3, de-duplicated. This is the substantive "what
-          they're hiring for" that the old card buried under a bare count. */}
-      {evidenceTitles.length > 0 ? (
-        <div className={hpStyles.previewEvidence}>
-          {evidenceTitles.map((title, idx) => (
-            <span key={`${title}-${idx}`} className={hpStyles.previewEvidenceChip}>
-              {title}
-            </span>
-          ))}
-        </div>
-      ) : null}
+      {/* Evidence — the vacancy count (the scale of hiring) + real vacancy
+          titles (the proof behind "this company is hiring"), capped at 3,
+          de-duplicated. The count + titles together answer "what and how
+          much" — more substantive than either alone. */}
+      <div className={hpStyles.previewEvidence}>
+        {vacanciesCaption ? (
+          <span className={hpStyles.previewEvidenceCount}>{vacanciesCaption}</span>
+        ) : null}
+        {evidenceTitles.map((title, idx) => (
+          <span key={`${title}-${idx}`} className={hpStyles.previewEvidenceChip}>
+            {title}
+          </span>
+        ))}
+      </div>
 
-      {/* Why now + freshness — the "what changed" answer. `whyNow` is the
-          structured reason; freshness is the latest publish date distance,
-          the strongest time signal. Paired so "why now" reads with a time
-          anchor. */}
+      {/* Why now — the single "what changed" line (freshness is encoded in the
+          reason label, no separate row to avoid duplication). */}
       {whyNow ? (
         <div className={hpStyles.previewReason}>
           <span className={hpStyles.previewReasonKey}>Почему сейчас</span>
@@ -527,17 +528,10 @@ function PreviewDigestCard(props: {
         </div>
       ) : null}
 
-      {freshness ? (
-        <div className={hpStyles.previewReason}>
-          <span className={hpStyles.previewReasonKey}>Свежесть</span>
-          <span className={hpStyles.previewReasonVal}>{freshness}</span>
-        </div>
-      ) : null}
-
-      {/* ICP-relevance — the "is this a fit for YOUR agency" signal, broken
-          onto the four FIUR axes. Only for personalised previews (see
-          hasRelevance). This is the conceptual core the old card lacked: it
-          answers "why fit this agency", not just "is this company hiring". */}
+      {/* ICP-relevance — the "is this a fit for YOUR agency" signal on the four
+          FIUR axes. Only for personalised previews (hasRelevance). Russian
+          labels. The conceptual core: "why fit THIS agency", not just "is
+          hiring". */}
       {hasRelevance ? (
         <div className={hpStyles.previewRelevance} aria-label="Релевантность вашему ICP по осям">
           <span className={hpStyles.previewReasonKey}>Релевантность ICP</span>

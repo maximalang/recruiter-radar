@@ -59,6 +59,12 @@ apps/web/scripts/logo-v2*.html
 apps/web/scripts/m-*.png
 apps/web/scripts/mob-*.mjs
 apps/web/scripts/rev-*.png
+apps/web/scripts/rev3-*
+apps/web/scripts/revcard*
+apps/web/scripts/revlogo*
+apps/web/scripts/diag-*.png
+apps/web/scripts/card-v3-*
+apps/web/scripts/*-probe.cjs
 
 # Auto-memory is user-scoped (~/.claude/projects/<slug>/memory/); repo memory/ is a stale legacy duplicate
 memory/

@@ -33,7 +33,11 @@ export default function RootLayout({ children }: RootLayoutProps) {
         className={`${inter.variable} font-sans`}
         style={{
           margin: 0,
-          backgroundColor: "var(--c-bg-page, #f8fbff)",
+          /* Base page tint — a calm near-white with a faint cool cast. The
+             animated ambient layer (drifting blue glows) renders above this on
+             the landing, so this is the floor the glows blend over, not a flat
+             white that hides them. */
+          backgroundColor: "var(--c-bg-page, #f7faff)",
           color: "var(--c-text-primary, #0f172a)",
         }}
       >
