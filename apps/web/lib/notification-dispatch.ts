@@ -13,6 +13,9 @@ import type { NotificationProvider } from "./notifications";
 
 const MAX_DIGEST_ITEMS = 10;
 const STALE_JOB_SECONDS = 120;
+const MAX_ATTEMPTS = 5;
+
+export type NotificationErrorClassification = ReturnType<typeof classifyNotificationProviderError>;
 
 type RouteRow = {
   accountId: string;
@@ -42,6 +45,11 @@ type DigestLeadRow = {
 type ClaimedJob = {
   id: string;
   attemptCount: number;
+};
+
+type RetryBatchRow = {
+  runId: string;
+  clientProfileId: string;
 };
 
 type TelegramCredentials = { botToken: string };
@@ -152,6 +160,20 @@ function buildIdempotencyKey(runId: string, route: RouteRow): string {
     .digest("hex");
 }
 
+export function notificationRetryDelaySeconds(
+  attemptNo: number,
+  classified: Pick<NotificationErrorClassification, "kind" | "retryAfterSeconds">,
+): number | null {
+  if (classified.kind === "permanent" || classified.kind === "auth" || attemptNo >= MAX_ATTEMPTS) {
+    return null;
+  }
+  if (classified.kind === "rate_limited") {
+    return Math.min(Math.max(classified.retryAfterSeconds ?? 60, 15), 10_800);
+  }
+  const schedule = [30, 300, 1_800, 10_800];
+  return schedule[Math.min(Math.max(attemptNo - 1, 0), schedule.length - 1)];
+}
+
 async function claimDeliveryJob(
   pool: Pool,
   input: {
@@ -168,11 +190,13 @@ async function claimDeliveryJob(
       ) VALUES ($1, $2, $3, $4, $5, 'daily_digest', $6, 'sending')
       ON CONFLICT (idempotency_key)
       DO UPDATE SET status = 'sending', updated_at = NOW()
-      WHERE notification_delivery_jobs.status IN ('failed', 'queued')
-         OR (
-           notification_delivery_jobs.status = 'sending'
-           AND notification_delivery_jobs.updated_at < NOW() - ($7::int * INTERVAL '1 second')
-         )
+      WHERE (
+          notification_delivery_jobs.status IN ('failed', 'queued')
+          AND notification_delivery_jobs.not_before <= NOW()
+        ) OR (
+          notification_delivery_jobs.status = 'sending'
+          AND notification_delivery_jobs.updated_at < NOW() - ($7::int * INTERVAL '1 second')
+        )
       RETURNING id::text AS id, attempt_count AS "attemptCount"
     `,
     [
@@ -206,7 +230,8 @@ async function recordDeliverySuccess(
       `
         UPDATE notification_delivery_jobs
         SET status = 'sent', attempt_count = $2, sent_at = NOW(), failed_at = NULL,
-            last_error_code = NULL, last_error_message = NULL, updated_at = NOW()
+            not_before = NOW(), last_error_code = NULL, last_error_message = NULL,
+            updated_at = NOW()
         WHERE id = $1 AND status = 'sending'
       `,
       [input.job.id, attemptNo],
@@ -250,7 +275,7 @@ async function recordDeliveryFailure(
     job: ClaimedJob;
     endpointId: string;
     startedAt: Date;
-    classified: ReturnType<typeof classifyNotificationProviderError>;
+    classified: NotificationErrorClassification;
     safeMessage: string;
   },
 ): Promise<void> {
@@ -264,10 +289,8 @@ async function recordDeliveryFailure(
         : input.classified.kind === "permanent"
           ? "permanent_error"
           : "retryable_error";
-  const jobStatus =
-    attemptNo >= 5 || input.classified.kind === "permanent" || input.classified.kind === "auth"
-      ? "dead_letter"
-      : "failed";
+  const retryDelaySeconds = notificationRetryDelaySeconds(attemptNo, input.classified);
+  const jobStatus = retryDelaySeconds == null ? "dead_letter" : "failed";
 
   try {
     await client.query("BEGIN");
@@ -275,6 +298,10 @@ async function recordDeliveryFailure(
       `
         UPDATE notification_delivery_jobs
         SET status = $2, attempt_count = $3, failed_at = NOW(),
+            not_before = CASE
+              WHEN $6::int IS NULL THEN not_before
+              ELSE NOW() + ($6::int * INTERVAL '1 second')
+            END,
             last_error_code = $4, last_error_message = $5, updated_at = NOW()
         WHERE id = $1 AND status = 'sending'
       `,
@@ -284,6 +311,7 @@ async function recordDeliveryFailure(
         attemptNo,
         input.classified.code ?? input.classified.kind,
         input.safeMessage,
+        retryDelaySeconds,
       ],
     );
     await client.query(
@@ -531,5 +559,70 @@ export async function dispatchDigestNotifications(input: {
     }
   }
 
+  return result;
+}
+
+export type NotificationRetryResult = NotificationDispatchResult & {
+  batches: number;
+};
+
+export async function retryDueNotificationDeliveries(input?: {
+  limit?: number;
+}): Promise<NotificationRetryResult> {
+  const pool = getPool();
+  if (!pool) {
+    return {
+      batches: 0,
+      sent: 0,
+      failed: 0,
+      skipped: 0,
+      errors: ["DATABASE_URL is not set."],
+    };
+  }
+  const limit = Math.min(Math.max(input?.limit ?? 50, 1), 200);
+  const due = await pool.query<RetryBatchRow>(
+    `
+      SELECT
+        digest_run_id::text AS "runId",
+        client_profile_id::text AS "clientProfileId"
+      FROM notification_delivery_jobs
+      WHERE digest_run_id IS NOT NULL
+        AND (
+          (status = 'failed' AND not_before <= NOW())
+          OR (status = 'sending' AND updated_at < NOW() - ($2::int * INTERVAL '1 second'))
+        )
+      GROUP BY digest_run_id, client_profile_id
+      ORDER BY MIN(not_before) ASC
+      LIMIT $1
+    `,
+    [limit, STALE_JOB_SECONDS],
+  );
+
+  const result: NotificationRetryResult = {
+    batches: due.rowCount,
+    sent: 0,
+    failed: 0,
+    skipped: 0,
+    errors: [],
+  };
+  for (const batch of due.rows) {
+    try {
+      const dispatched = await dispatchDigestNotifications({
+        runId: batch.runId,
+        clientProfileId: batch.clientProfileId,
+      });
+      result.sent += dispatched.sent;
+      result.failed += dispatched.failed;
+      result.skipped += dispatched.skipped;
+      result.errors.push(...dispatched.errors);
+    } catch (error) {
+      result.failed += 1;
+      result.errors.push(
+        redactProviderSecret(
+          error instanceof Error ? error.message : "Notification retry batch failed.",
+        ).slice(0, 1000),
+      );
+    }
+  }
   return result;
 }
