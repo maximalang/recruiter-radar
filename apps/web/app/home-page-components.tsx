@@ -62,6 +62,91 @@ export function pickEvidenceTitles(titles: readonly string[], limit = 3): string
   return out;
 }
 
+const PREVIEW_SOURCE_LABELS: Readonly<Record<string, string>> = {
+  'career-pages': 'карьерная страница',
+  'egrul-fns': 'ЕГРЮЛ',
+  'habr-career': 'Хабр Карьера',
+  hh: 'hh.ru',
+  'rabota-rossii': 'Работа России',
+  superjob: 'SuperJob',
+};
+
+function comparableCardText(value: string): string {
+  return value
+    .toLocaleLowerCase('ru-RU')
+    .replace(/[«»„“”"']/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Build up to three factual evidence lines without repeating copy already used
+ * in the prominent "Почему сейчас" block. Source provenance leads the row;
+ * vacancy count and titles are included only when they add new information.
+ */
+export function buildPreviewEvidenceItems(input: {
+  whyNow: string;
+  vacanciesCaption: string;
+  evidenceTitles: readonly string[];
+  sourceFamilies: readonly string[];
+  limit?: number;
+}): string[] {
+  const limit = input.limit ?? 3;
+  const whyNow = comparableCardText(input.whyNow);
+  const sourceLabels = Array.from(new Set(
+    input.sourceFamilies
+      .map((source) => source.trim())
+      .filter(Boolean)
+      .map((source) => PREVIEW_SOURCE_LABELS[source] ?? source),
+  ));
+  const sourceSummary = sourceLabels.length > 0
+    ? `${sourceLabels.length > 1 ? 'Источники' : 'Источник'}: ${sourceLabels.slice(0, 2).join(' · ')}`
+    : '';
+  const candidates = [sourceSummary, input.vacanciesCaption, ...input.evidenceTitles];
+  const seen = new Set<string>();
+  const evidence: string[] = [];
+
+  for (const candidate of candidates) {
+    const normalized = comparableCardText(candidate);
+    if (!normalized || seen.has(normalized) || (whyNow && whyNow.includes(normalized))) continue;
+    seen.add(normalized);
+    evidence.push(candidate.trim());
+    if (evidence.length >= limit) break;
+  }
+
+  return evidence;
+}
+
+/** Balance malformed registry quotes while preserving the legal display name. */
+export function cleanEmployerName(raw: string): string {
+  const name = (raw ?? '').trim().replace(/\s+/g, ' ');
+  if (!name) return name;
+
+  let normalized = '';
+  for (let index = 0; index < name.length; index += 1) {
+    const character = name[index];
+    if (character !== '"') {
+      normalized += character;
+      continue;
+    }
+    const previous = index > 0 ? name[index - 1] : ' ';
+    normalized += /[\s«]/.test(previous) ? '«' : '»';
+  }
+
+  let balanced = '';
+  let openQuotes = 0;
+  for (const character of normalized.replace(/«\s*»/g, '')) {
+    if (character === '«') openQuotes += 1;
+    if (character === '»') {
+      if (openQuotes === 0) continue;
+      openQuotes -= 1;
+    }
+    balanced += character;
+  }
+
+  return `${balanced}${'»'.repeat(openQuotes)}`.replace(/\s+/g, ' ').trim() || name;
+}
+
 export function buildFaqItems(paymentConfigured: boolean) {
   return [
     {
