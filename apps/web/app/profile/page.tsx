@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
+import { getAccountById } from "../../lib/account-auth";
 import {
   InternalPageFrame,
   InternalPageHeader,
   ContentCard,
   EmptyState,
-  type NavItem,
 } from "../ui/internal-page";
+import { buildAccountNavigation } from "../ui/account-navigation";
 import { SiteFooter } from "../ui/site-footer";
 import { getClientProfileByOwnerId, resolveHiringMode } from "../../lib/clientProfiles";
 import { getDeliveryPreferencesByOwnerId } from "../../lib/deliveryPreferences";
@@ -23,15 +24,11 @@ export const metadata: Metadata = {
   description: "Кого вы ищете: роли, отрасли, география и точная настройка радара.",
 };
 
-const PROFILE_NAV: NavItem[] = [
-  { href: "/dashboard", label: "Дашборд" },
-  { href: "/leads", label: "Лиды" },
-  { href: "/review", label: "Ревью" },
-  { href: "/profile", label: "Профиль", active: true },
-];
+const PROFILE_NAV = buildAccountNavigation("profile");
 
 export default async function ProfilePage() {
-  const ownerId = await readOwnerSession();
+  const account = await getAccountById(await readOwnerSession()).catch(() => null);
+  const ownerId = account?.id ?? null;
   const profile = ownerId ? await getClientProfileByOwnerId(ownerId) : null;
   const deliveryPreferences =
     ownerId && profile ? await getDeliveryPreferencesByOwnerId(ownerId) : null;
@@ -69,20 +66,26 @@ export default async function ProfilePage() {
           <ProfileForm profile={profile} resolvedHiringMode={resolvedHiringMode} />
         ) : (
           <EmptyState
-            title="Профиль ещё не активирован"
-            text="Профиль появится после активации пилота. Завершите онбординг, чтобы настроить идеального клиента."
-            action={{ href: "/checkout", label: "Активировать пилот" }}
+            title={ownerId ? "Профиль ещё не активирован" : "Нужен вход в аккаунт"}
+            text={ownerId
+              ? "Профиль появится после активации радара. Завершите онбординг, чтобы настроить идеального клиента."
+              : "Сессия этого браузера не связана с аккаунтом. Восстановите доступ, чтобы изменить профиль."}
+            action={ownerId
+              ? { href: "/checkout", label: "Активировать радар" }
+              : { href: "/login", label: "Войти в аккаунт" }}
           />
         )}
       </ContentCard>
       {profile && deliveryPreferences ? (
-        <ContentCard>
-          <InternalPageHeader
-            title="Как доставлять радар"
-            subtitle="Telegram — основной канал. Дополнительно: браузерные уведомления и ежедневный email."
-          />
-          <DeliveryForm preferences={deliveryPreferences} />
-        </ContentCard>
+        <div id="delivery">
+          <ContentCard>
+            <InternalPageHeader
+              title="Как доставлять радар"
+              subtitle="Telegram — основной канал. Дополнительно: браузерные уведомления и ежедневный email."
+            />
+            <DeliveryForm preferences={deliveryPreferences} />
+          </ContentCard>
+        </div>
       ) : null}
     </InternalPageFrame>
   );

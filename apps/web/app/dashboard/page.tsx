@@ -1,145 +1,111 @@
-import { Suspense } from 'react';
-import type { Metadata } from 'next';
-import DashboardDailySummary from './dashboard-daily-summary';
-import DashboardSources from './dashboard-sources';
-import DashboardAlerts from './dashboard-alerts';
-import DashboardQuality from './dashboard-quality';
-import DashboardAnalytics, { AnalyticsSkeleton } from './dashboard-analytics';
-import DashboardTodayRadar from './dashboard-today-radar';
-import LiveClock from './live-clock';
-import { InternalPageFrame, InternalPageHeader, ErrorState, type NavItem } from '../ui/internal-page';
-import { SiteFooter } from '../ui/site-footer';
-import dashStyles from './dashboard.module.css';
+import type { Metadata } from "next";
+
+import { getAccountById } from "@/lib/account-auth";
+import { getClientProfileByOwnerId } from "@/lib/clientProfiles";
+import { getDashboardTodayRadar } from "@/lib/dashboard-data";
+import { getDeliveryPreferencesByOwnerId } from "@/lib/deliveryPreferences";
+import { computeProfileCompletion } from "@/lib/profileCompletion";
+import { readOwnerSession } from "@/lib/session";
+import DashboardAccountOverview from "./dashboard-account-overview";
+import DashboardTodayRadar from "./dashboard-today-radar";
+import { buildAccountNavigation } from "../ui/account-navigation";
+import {
+  ContentCard,
+  EmptyState,
+  ErrorState,
+  InternalPageFrame,
+  InternalPageHeader,
+} from "../ui/internal-page";
+import { SiteFooter } from "../ui/site-footer";
+import dashStyles from "./dashboard.module.css";
 
 export const metadata: Metadata = {
-  title: 'Дашборд — Recruiter Radar',
-  description: 'Сегодняшний радар, источники и качество доказательств.',
+  title: "Рабочий стол — Recruiter Radar",
+  description: "Компании на сегодня, очередь проверки и готовность личного радара.",
 };
 
-const DASHBOARD_NAV: NavItem[] = [
-  { href: '/dashboard', label: 'Дашборд', active: true },
-  { href: '/leads', label: 'Лиды' },
-  { href: '/review', label: 'Ревью' },
-  { href: '/profile', label: 'Профиль' },
-];
+export const dynamic = "force-dynamic";
 
-import {
-  getDashboardQualityMetrics,
-  getDashboardSourceHealth,
-  getDashboardFeedbackFunnel,
-  getDashboardLeadMetrics,
-  getDashboardSourcePerformance,
-  getDashboardSourceEvidenceQuality,
-  getDashboardTodayRadar,
-  type TodayRadar,
-} from '@/lib/dashboard-data';
-import { getOwnerIdFromSession } from '@/lib/session';
-
-export const dynamic = 'force-dynamic';
-
-/**
- * Run a dashboard fetcher with per-block recovery. A single fetcher rejection
- * no longer crashes the whole dashboard (Promise.all is all-or-nothing); the
- * failed block returns null and renders an ErrorState inline, while the rest
- * of the page stays healthy. The raw error is logged server-side and NEVER
- * reaches the DOM — the caller shows only the human ErrorState copy.
- */
-async function safeDashboardFetch<T>(fn: () => Promise<T>): Promise<T | null> {
-  try {
-    return await fn();
-  } catch (err) {
-    console.error('[dashboard] fetcher failed', err instanceof Error ? err.message : String(err));
-    return null;
-  }
-}
+const DASHBOARD_NAV = buildAccountNavigation("dashboard");
 
 export default async function DashboardPage() {
-  // "Сегодняшний радар" is tenant data → owner-scope it. Without a session it
-  // stays empty; the rest of the dashboard is global source/quality telemetry.
-  const ownerId = await getOwnerIdFromSession();
+  const account = await getAccountById(await readOwnerSession()).catch(() => null);
 
-  // Fetch all dashboard data in parallel on the server, each wrapped in
-  // safeDashboardFetch so a single rejection surfaces an ErrorState for that
-  // block instead of crashing the entire page.
-  const [
-    quality,
-    sources,
-    feedbackFunnel,
-    leadMetrics,
-    sourcePerformance,
-    sourceEvidenceQuality,
-    todayRadar,
-  ] = await Promise.all([
-    safeDashboardFetch(() => getDashboardQualityMetrics()),
-    safeDashboardFetch(() => getDashboardSourceHealth()),
-    safeDashboardFetch(() => getDashboardFeedbackFunnel()),
-    safeDashboardFetch(() => getDashboardLeadMetrics()),
-    safeDashboardFetch(() => getDashboardSourcePerformance()),
-    safeDashboardFetch(() => getDashboardSourceEvidenceQuality()),
-    ownerId
-      ? safeDashboardFetch(() => getDashboardTodayRadar(ownerId))
-      : Promise.resolve<TodayRadar | null>({ topLeads: [], pendingReview: 0, hiringModeByProfileId: {} }),
+  if (!account) {
+    return (
+      <InternalPageFrame navItems={DASHBOARD_NAV} footer={<SiteFooter />}>
+        <InternalPageHeader
+          title="Личный кабинет"
+          subtitle="Войдите, чтобы видеть только свой профиль, лиды и историю работы."
+        />
+        <ContentCard variant="hero">
+          <EmptyState
+            title="Нужен вход в аккаунт"
+            text="Сессия этого браузера не связана с аккаунтом. Восстановите доступ по данным заказа или активируйте новый радар."
+            action={{ href: "/login", label: "Войти в аккаунт" }}
+          />
+        </ContentCard>
+      </InternalPageFrame>
+    );
+  }
+
+  const [profile, todayRadar, deliveryPreferences] = await Promise.all([
+    getClientProfileByOwnerId(account.id).catch(() => null),
+    getDashboardTodayRadar(account.id).catch(() => null),
+    getDeliveryPreferencesByOwnerId(account.id).catch(() => null),
   ]);
+
+  if (!profile) {
+    return (
+      <InternalPageFrame navItems={DASHBOARD_NAV} footer={<SiteFooter />}>
+        <InternalPageHeader
+          title="Завершите активацию"
+          subtitle="Аккаунт найден, но рабочий профиль ещё не создан."
+        />
+        <ContentCard variant="hero">
+          <EmptyState
+            title="Радар ещё не настроен"
+            text="Активируйте тариф и укажите специализацию агентства — после этого здесь появятся компании и очередь работы."
+            action={{ href: "/checkout", label: "Активировать радар" }}
+          />
+        </ContentCard>
+      </InternalPageFrame>
+    );
+  }
+
+  const completion = computeProfileCompletion(profile, deliveryPreferences);
+  const deliveryReady = completion.groups.find((group) => group.key === "delivery")?.filled ?? false;
+  const completionPercent = Math.round(completion.ratio * 100);
 
   return (
     <InternalPageFrame navItems={DASHBOARD_NAV} footer={<SiteFooter />}>
       <InternalPageHeader
-        title="Радар"
-        subtitle="Компании, которым стоит написать сегодня, и состояние источников в реальном времени"
-        nav={<LiveClock />}
+        title="Ваш радар"
+        subtitle="Один экран для приоритетных компаний, очереди проверки и готовности аккаунта."
       />
-      <Suspense fallback={<AnalyticsSkeleton />}>
-        <div className={dashStyles.dashboardStack}>
-          {/* Agency value zone — what to act on today */}
-          <DashboardDailySummary
-            todayLeads={leadMetrics?.todayLeads}
-            totalLeads={leadMetrics?.totalLeads}
-            gateA={quality?.gateDistribution.find(g => g.gate === 'A')?.count}
-            gateB={quality?.gateDistribution.find(g => g.gate === 'B')?.count}
-            gateC={quality?.gateDistribution.find(g => g.gate === 'C')?.count}
-            pendingReview={todayRadar?.pendingReview}
-          />
-          {todayRadar ? (
-            <DashboardTodayRadar
-              topLeads={todayRadar.topLeads}
-              pendingReview={todayRadar.pendingReview}
-              hiringModeByProfileId={todayRadar.hiringModeByProfileId}
-            />
-          ) : (
-            <ErrorState
-              title="Сегодняшний радар не загрузился"
-              description="Подбираем компании по вашему профилю. Повторите через минуту — если радар не появится, проверьте настройки профиля."
-              action={{ href: '/profile', label: 'Проверить профиль' }}
-            />
-          )}
-          <DashboardQuality data={quality ?? undefined} error={quality === null ? 'Метрики качества не загрузились' : undefined} />
-          {feedbackFunnel && leadMetrics && sourcePerformance && sourceEvidenceQuality ? (
-            <DashboardAnalytics
-              feedbackFunnel={feedbackFunnel}
-              leadMetrics={leadMetrics}
-              sourcePerformance={sourcePerformance}
-              sourceEvidenceQuality={sourceEvidenceQuality}
-            />
-          ) : (
-            <ErrorState
-              title="Аналитика не загрузилась"
-              description="Собираем данные по источникам и gate-распределению. Повторите через минуту — если не загрузится, напишите поддержку."
-            />
-          )}
+      <div className={dashStyles.dashboardStack}>
+        <DashboardAccountOverview
+          agencyName={profile.agencyName}
+          todayLeads={todayRadar?.topLeads.length ?? 0}
+          pendingReview={todayRadar?.pendingReview ?? 0}
+          completionPercent={completionPercent}
+          deliveryReady={deliveryReady}
+        />
 
-          {/* System zone — operational telemetry, secondary to the value above */}
-          <div className={`${dashStyles.zoneLabel} ${dashStyles.zoneLabelSystem}`}>
-            Источники
-          </div>
-          {sources ? <DashboardSources sources={sources} /> : (
-            <ErrorState
-              title="Источники не загрузились"
-              description="Состояние источников обновляется непрерывно. Повторите позже."
-            />
-          )}
-          <DashboardAlerts />
-        </div>
-      </Suspense>
+        {todayRadar ? (
+          <DashboardTodayRadar
+            topLeads={todayRadar.topLeads}
+            pendingReview={todayRadar.pendingReview}
+            hiringModeByProfileId={todayRadar.hiringModeByProfileId}
+          />
+        ) : (
+          <ErrorState
+            title="Радар временно не загрузился"
+            description="Профиль и настройки доступны. Обновите страницу через минуту — данные других аккаунтов здесь не показываются."
+            action={{ href: "/profile", label: "Проверить профиль" }}
+          />
+        )}
+      </div>
     </InternalPageFrame>
   );
 }

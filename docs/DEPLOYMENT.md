@@ -52,6 +52,8 @@ Migrations are **idempotent** — safe to run on every deploy. Only one path run
 | `DATABASE_URL` | Postgres connection string | Railway-provided Postgres service or external |
 | `SESSION_SECRET` | ≥32 chars, signs rr_sid cookies | Generate: `openssl rand -hex 32` |
 | `NEXT_PUBLIC_APP_URL` | Public URL of the app | e.g. `https://recruiter-radar.up.railway.app` |
+| `AUTH_SITE_URL` | Canonical HTTPS origin for one-time login links | Usually the same value as `NEXT_PUBLIC_APP_URL` |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | SMTP transport for passwordless account login | Without it login requests stay generic but no email is delivered |
 
 ### Telegram (mandatory for digest delivery)
 

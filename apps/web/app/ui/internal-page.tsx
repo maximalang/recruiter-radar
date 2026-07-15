@@ -1,5 +1,6 @@
 import type { ReactNode, ReactElement, SVGProps } from "react";
 import Link from "next/link";
+import { BrandLogo } from "./brand-logo";
 
 import s from "./internal-page.module.css";
 import { repairPossiblyMojibakeText } from "../../lib/copy/repair";
@@ -83,7 +84,7 @@ export function TopNav(props: {
     <nav className={s.topNav} aria-label="Основная навигация">
       <div className={s.topNavInner}>
         <Link href="/" className={s.topNavBrand}>
-          Recruiter <span className={s.topNavBrandAccent}>Radar</span>
+          <BrandLogo size="small" />
         </Link>
         <div className={s.topNavLinks}>
           {props.items.map((item) => (

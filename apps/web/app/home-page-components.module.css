@@ -162,6 +162,10 @@
   text-align: left;
 }
 
+.heroLogo {
+  margin-bottom: 4px;
+}
+
 .heroEyebrow {
   display: inline-flex;
   align-items: center;
@@ -1058,7 +1062,11 @@
      demanding a full screen-height. */
   .heroSection {
     min-height: 0;
-    padding: 44px 22px;
+    padding: 34px 20px 28px;
+  }
+
+  .heroContent {
+    gap: 28px;
   }
 
 }
@@ -1098,8 +1106,12 @@
   }
 
   .heroProduct {
-    gap: 18px;
-    padding: 20px;
+    gap: 15px;
+    padding: 18px;
+  }
+
+  .heroLogo {
+    margin-bottom: 0;
   }
 
   .heroEvidenceRow {

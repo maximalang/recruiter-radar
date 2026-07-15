@@ -33,20 +33,16 @@ import {
   NotFoundState,
   FitIcon,
   internalPageClasses as ipStyles,
-  type NavItem,
   GATE_DESC,
   FEEDBACK_LABELS,
 } from '../../ui/internal-page';
+import { buildAccountNavigation } from '../../ui/account-navigation';
 import { SiteFooter } from '../../ui/site-footer';
 import { BriefcaseIcon, LayersIcon, CalendarIcon, HelpIcon, SearchIcon } from '../../ui/icons';
 
 export const dynamic = 'force-dynamic';
 
-const LEAD_DETAIL_NAV: NavItem[] = [
-  { href: '/dashboard', label: 'Дашборд' },
-  { href: '/leads', label: 'Лиды' },
-  { href: '/profile', label: 'Профиль' },
-];
+const LEAD_DETAIL_NAV = buildAccountNavigation('leads');
 
 /** Renders the feedback-status icon component inline with its label. */
 function FeedbackStatusIcon({ icon: Icon }: { icon: (p: SVGProps<SVGSVGElement>) => ReactElement }) {

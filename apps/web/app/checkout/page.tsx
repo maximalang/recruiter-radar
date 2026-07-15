@@ -2,122 +2,108 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
-import { startCheckoutOrder } from "../../lib/payments";
+import { getAccountById } from "@/lib/account-auth";
+import { startCheckoutOrder } from "@/lib/payments";
 import {
   buildCheckoutHref,
   getPublicPlanByCode,
   readCheckoutPlanCode,
   readPublicPreviewInput,
-} from "../../lib/publicProduct";
-import { generateOwnerId, readOwnerSession, writeOwnerSession } from "../../lib/session";
+} from "@/lib/publicProduct";
+import { readOwnerSession } from "@/lib/session";
+import { buildAccountNavigation } from "../ui/account-navigation";
 import {
   InternalPageFrame,
   InternalPageHeader,
   InternalBackLink,
   ContentCard,
   ContentCardTitle,
-  type NavItem,
   internalPageClasses as ipStyles,
 } from "../ui/internal-page";
 import { SiteFooter } from "../ui/site-footer";
 import ppStyles from "../ui/page-primitives.module.css";
 
-const CHECKOUT_NAV: NavItem[] = [
-  { href: '/dashboard', label: 'Дашборд' },
-  { href: '/leads', label: 'Лиды' },
-];
-
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Оформление — Recruiter Radar",
-  description: "Оплата пробной недели или заявка на подключение радара.",
+  description: "Безопасное оформление пробной недели или заявки на подключение Recruiter Radar.",
 };
 
-export default async function CheckoutPage({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
+export default async function CheckoutPage(props: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const searchParams = await props.searchParams;
   const input = readPublicPreviewInput(searchParams);
   const planCode = readCheckoutPlanCode(searchParams);
   const plan = getPublicPlanByCode(planCode);
   const restartHref = buildCheckoutHref({ ...input, planCode });
-
-  // Recurring plans (monthly, quarterly) have no self-serve subscription flow while
-  // billing is stubbed — the checkout captures a sales request instead of a payment.
+  const loginHref = `/login?returnTo=${encodeURIComponent(restartHref)}`;
   const isRequest = plan.isRecurring;
+  const account = await getAccountById(await readOwnerSession()).catch(() => null);
 
-  // Read existing session — do NOT fall back to CHECKOUT_DEFAULT_OWNER_ID for public customers.
-  const existingOwnerId = await readOwnerSession();
-
-  async function startCheckoutAction() {
+  async function startCheckoutAction(formData: FormData) {
     "use server";
-
-    // Resolve or mint a per-visitor owner ID inside the action (write path only).
-    let ownerId = await readOwnerSession();
-
-    if (!ownerId) {
-      ownerId = generateOwnerId();
-    }
+    const currentAccount = await getAccountById(await readOwnerSession());
+    if (!currentAccount) redirect(`/login?returnTo=${encodeURIComponent(restartHref)}`);
+    const agencyNameValue = formData.get("agencyName");
+    const agencyName = typeof agencyNameValue === "string" ? agencyNameValue.trim() : "";
+    if (!agencyName || agencyName.length > 160) redirect(`${restartHref}${restartHref.includes("?") ? "&" : "?"}error=agency`);
 
     const result = await startCheckoutOrder({
-      userId: ownerId,
+      userId: currentAccount.id,
       productCode: planCode,
-      customerName: isRequest ? `Sales request: ${plan.name}` : "Self-serve pilot checkout",
-      customerContact: "checkout@recruiter-radar.local",
+      customerName: agencyName,
+      customerContact: currentAccount.email,
       specialization: input.specialization || null,
       city: input.targetCity || null,
       includeKeywords: input.includeKeywords || null,
       excludeKeywords: input.excludeKeywords || null,
       dailyDigestLimit: input.dailyDigestLimit,
-      siteUrl: process.env.PAYMENTS_SITE_URL ?? "http://localhost:3000"
+      siteUrl: process.env.PAYMENTS_SITE_URL ?? "http://localhost:3000",
     });
-
-    await writeOwnerSession(ownerId);
     redirect(result.redirectUrl);
   }
 
   return (
-    <InternalPageFrame navItems={CHECKOUT_NAV} footer={<SiteFooter />}>
-      <InternalPageHeader title={isRequest ? `Подключение: ${plan.name}` : "Оформление: пробная неделя"} />
+    <InternalPageFrame navItems={buildAccountNavigation("dashboard")} footer={<SiteFooter />}>
+      <InternalPageHeader
+        title={isRequest ? `Подключение: ${plan.name}` : "Оформление пробной недели"}
+        subtitle="Заказ привязан к подтверждённому аккаунту — статусы и настройки не потеряются после оплаты."
+      />
       <div className={ipStyles.narrowLayout}>
         <ContentCard>
-          <ContentCardTitle>{isRequest ? plan.name : "Пробная неделя"}</ContentCardTitle>
+          <ContentCardTitle>{plan.name}</ContentCardTitle>
           <p className={ipStyles.bodyText}>
             {isRequest
-              ? "Это тариф на больший срок. Оставьте заявку — мы свяжемся, чтобы подключить радар и согласовать оплату."
-              : "Оплата запускается только после явного подтверждения. После оплаты мы начнём генерировать ежедневный радар компаний для вашей ниши."}
+              ? "Оставьте заявку на долгосрочный тариф. Мы свяжемся по рабочему email и согласуем подключение без автоматического списания."
+              : "Оплата запускается только после явного подтверждения. Затем вы настроите профиль поиска и получите первый тестовый радар."}
           </p>
-          <div className={ipStyles.fieldRow}>
-            Тариф: <strong className={ipStyles.fieldRowStrong}>{plan.name}</strong>
-          </div>
-          <div className={ipStyles.fieldRow}>
-            Стоимость: <strong className={ipStyles.fieldRowStrong}>{plan.price}</strong>
-          </div>
-          {input.specialization && (
-            <div className={ipStyles.fieldRow}>
-              Специализация: <strong className={ipStyles.fieldRowStrong}>{input.specialization}</strong>
+          <div className={ipStyles.fieldRow}>Тариф: <strong className={ipStyles.fieldRowStrong}>{plan.name}</strong></div>
+          <div className={ipStyles.fieldRow}>Стоимость: <strong className={ipStyles.fieldRowStrong}>{plan.price}</strong></div>
+          {input.specialization ? <div className={ipStyles.fieldRow}>Специализация: <strong className={ipStyles.fieldRowStrong}>{input.specialization}</strong></div> : null}
+          {input.targetCity ? <div className={ipStyles.fieldRow}>Город: <strong className={ipStyles.fieldRowStrong}>{input.targetCity}</strong></div> : null}
+
+          {account ? (
+            <form action={startCheckoutAction} style={{ display: "grid", gap: 14, marginTop: 18 }}>
+              <label className={ppStyles.field}>
+                <span className={ppStyles.fieldLabel}>Название агентства или команды</span>
+                <input className={ppStyles.input} name="agencyName" required maxLength={160} autoComplete="organization" placeholder="Например, Northstar Recruiting" />
+              </label>
+              <p className={ipStyles.bodyTextMutedBlock}>Аккаунт: {account.email}. На этот адрес придут документы и ссылка для возврата к настройке.</p>
+              <button type="submit" className={ppStyles.primaryAction}>
+                {isRequest ? "Оставить заявку" : "Перейти к оплате"}
+              </button>
+            </form>
+          ) : (
+            <div style={{ display: "grid", gap: 12, marginTop: 18 }}>
+              <p className={ipStyles.bodyTextMutedBlock}>Сначала подтвердите рабочий email. Вход без пароля занимает один шаг и создаёт защищённый личный кабинет.</p>
+              <Link href={loginHref} className={ppStyles.primaryAction}>Войти или создать аккаунт</Link>
             </div>
           )}
-          {input.targetCity && (
-            <div className={ipStyles.fieldRow}>
-              Город: <strong className={ipStyles.fieldRowStrong}>{input.targetCity}</strong>
-            </div>
-          )}
-          {!existingOwnerId ? (
-            <p className={ipStyles.bodyTextMutedBlock}>
-              {isRequest
-                ? "Нажмите кнопку ниже, чтобы оставить заявку."
-                : "Нажмите кнопку ниже, чтобы оплатить неделю."}
-            </p>
-          ) : null}
-          <form action={startCheckoutAction}>
-            <button type="submit" className={ppStyles.primaryAction}>
-              {isRequest ? "Оставить заявку" : "Перейти к оплате"}
-            </button>
-          </form>
         </ContentCard>
 
-        <InternalBackLink href={restartHref}>
-          {isRequest ? "Изменить параметры" : "Обновить параметры недели"}
-        </InternalBackLink>
+        <InternalBackLink href={restartHref}>Изменить параметры радара</InternalBackLink>
       </div>
     </InternalPageFrame>
   );

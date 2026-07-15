@@ -21,8 +21,8 @@ import {
   ContentCard,
   LoadingState,
   ErrorState,
-  type NavItem,
 } from '../ui/internal-page';
+import { buildAccountNavigation } from '../ui/account-navigation';
 import { internalPageClasses as ipStyles } from '../ui/internal-page';
 import { SiteFooter } from '../ui/site-footer';
 import { PinIcon, BriefcaseIcon, FileIcon, CheckIcon, TargetIcon } from '../ui/icons';
@@ -37,12 +37,7 @@ export const metadata: Metadata = {
   description: 'Кандидаты, требующие проверки перед отправкой в подборку.',
 };
 
-const REVIEW_NAV: NavItem[] = [
-  { href: '/dashboard', label: 'Дашборд' },
-  { href: '/leads', label: 'Лиды' },
-  { href: '/review', label: 'Ревью', active: true },
-  { href: '/profile', label: 'Профиль' },
-];
+const REVIEW_NAV = buildAccountNavigation('review');
 
 interface ReviewCandidate {
   id: string;

@@ -38,6 +38,7 @@ import RadarCanvas from "./radar-canvas";
 import ScrollReveal from "./scroll-reveal";
 import ScrollProgress from "./scroll-progress";
 import { SiteFooter } from "./ui/site-footer";
+import { BrandLogo } from "./ui/brand-logo";
 
 export const dynamic = "force-dynamic";
 
@@ -99,6 +100,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         <RadarCanvas />
         <div className={hpStyles.heroContent}>
           <div className={hpStyles.heroCopy}>
+            <BrandLogo className={hpStyles.heroLogo} tone="dark" />
             <div className={hpStyles.heroEyebrow}>
               <span className={hpStyles.heroEyebrowDot} aria-hidden="true" />
               Радар клиентских возможностей

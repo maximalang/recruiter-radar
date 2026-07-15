@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Inter } from "next/font/google";
 
 import { PushReadinessBoot } from "./push-readiness-boot";
+import "./globals.css";
 
 const inter = Inter({
   subsets: ["latin"],

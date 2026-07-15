@@ -30,7 +30,7 @@ function decode(token: string): string | null {
     const ownerId = token.slice(0, dot);
     const mac = token.slice(dot + 1);
 
-    if (!/^[0-9a-f]+$/.test(ownerId)) return null;
+    if (!/^[1-9]\d*$/.test(ownerId)) return null;
 
     const secret = getSecret();
     const expected = sign(`session:${ownerId}`, secret);
@@ -52,8 +52,12 @@ export async function getOwnerIdFromSession(): Promise<string | null> {
 }
 
 export function generateOwnerId(): string {
-  // 8 random bytes → 16-char hex, used as anonymous visitor ID
-  return randomBytes(8).toString("hex");
+  // Compatible with JavaScript's safe-integer range and BIGINT payment IDs.
+  let value = 0;
+  while (value === 0) {
+    value = randomBytes(6).readUIntBE(0, 6);
+  }
+  return String(value);
 }
 
 /**
@@ -72,6 +76,9 @@ export async function readOwnerSession(): Promise<string | null> {
  * Must be called from a Server Action or Route Handler (not a Server Component render).
  */
 export async function writeOwnerSession(ownerId: string): Promise<void> {
+  if (!/^[1-9]\d*$/.test(ownerId)) {
+    throw new Error("Owner ID must be a positive integer.");
+  }
   const token = encode(ownerId);
   const jar = await cookies();
   // Default secure=true; set SESSION_SECURE_COOKIE=false only for local HTTP dev
@@ -83,4 +90,13 @@ export async function writeOwnerSession(ownerId: string): Promise<void> {
     maxAge: COOKIE_MAX_AGE,
     secure,
   });
+}
+
+export function assertOwnerSessionConfigured(): void {
+  getSecret();
+}
+
+export async function clearOwnerSession(): Promise<void> {
+  const jar = await cookies();
+  jar.delete(COOKIE_NAME);
 }

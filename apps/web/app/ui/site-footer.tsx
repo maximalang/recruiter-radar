@@ -3,6 +3,7 @@ import Link from "next/link";
 import { readOperatorSession } from "../../lib/operator-auth";
 import { OPERATOR_REQUISITES } from "../../lib/operatorRequisites";
 import s from "./site-footer.module.css";
+import { BrandLogo } from "./brand-logo";
 
 /**
  * Site-wide footer — a quiet, minimal closer for every page surface.
@@ -32,7 +33,7 @@ export async function SiteFooter(props: { tone?: "light" | "dark" }) {
       <div className={s.footerInner}>
         <div className={s.footerTop}>
           <Link href="/" className={s.footerBrand}>
-            Recruiter Radar
+            <BrandLogo size="small" tone={tone} />
           </Link>
           <nav className={s.footerLinks} aria-label="Подвал">
             <Link href="/legal" className={s.footerLink}>Реквизиты</Link>

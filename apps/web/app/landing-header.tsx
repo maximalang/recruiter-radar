@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import hpStyles from "./home-page-components.module.css";
+import { BrandLogo } from "./ui/brand-logo";
 
 export default function LandingHeader() {
   return (
@@ -10,9 +11,7 @@ export default function LandingHeader() {
         className={hpStyles.brandMark}
         aria-label="Recruiter Radar — на главную"
       >
-        <span className={hpStyles.heroBrandName}>
-          Recruiter <span className={hpStyles.brandNameAccent}>Radar</span>
-        </span>
+        <BrandLogo />
       </Link>
       <nav className={hpStyles.topNavLinks} aria-label="Разделы лендинга">
         <span className={hpStyles.topNavAnchors}>
