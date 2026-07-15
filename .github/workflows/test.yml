@@ -55,6 +55,15 @@ jobs:
         fi
         cat /tmp/jest-output.log
 
+    - name: Upload Jest failure log
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: jest-failure-log
+        path: /tmp/jest-output.log
+        if-no-files-found: error
+        retention-days: 3
+
   build:
     needs: test
     runs-on: ubuntu-latest
