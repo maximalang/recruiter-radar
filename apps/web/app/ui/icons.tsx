@@ -122,23 +122,6 @@ export function TargetIcon(p: IconProps) {
  */
 export function RadarLogo(p: IconProps & { animate?: boolean }) {
   const { animate, size, ...svgProps } = p;
-  // Blip geometry — bearing (clockwise from 12 o'clock) + range radius.
-  // Computed once so the static + animated branches share identical positions.
-  const blipA = {
-    cx: (12 + Math.sin((200 * Math.PI) / 180) * 5.6).toFixed(2),
-    cy: (12 - Math.cos((200 * Math.PI) / 180) * 5.6).toFixed(2),
-    animClass: 'rr-blip-a',
-  };
-  const blipB = {
-    cx: (12 + Math.sin((60 * Math.PI) / 180) * 7.4).toFixed(2),
-    cy: (12 - Math.cos((60 * Math.PI) / 180) * 7.4).toFixed(2),
-    animClass: 'rr-blip-b',
-  };
-  const blipC = {
-    cx: (12 + Math.sin((315 * Math.PI) / 180) * 7.0).toFixed(2),
-    cy: (12 - Math.cos((315 * Math.PI) / 180) * 7.0).toFixed(2),
-    animClass: 'rr-blip-c',
-  };
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -147,97 +130,33 @@ export function RadarLogo(p: IconProps & { animate?: boolean }) {
       height={size ?? '1em'}
       fill="none"
       stroke="currentColor"
-      strokeWidth={1.3}
+      strokeWidth={1.65}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
       {...svgProps}
     >
-      {/* Range rings — three concentric circles, the radar's defining shape.
-          Brightness steps inward so the focal area reads without a hard fill. */}
-      <circle cx="12" cy="12" r="9.4" opacity={0.26} />
-      <circle cx="12" cy="12" r="6.1" opacity={0.46} />
-      <circle cx="12" cy="12" r="3" opacity={0.78} />
-      {/* Cardinal crosshair ticks — the four marks a real radar face carries at
-          N/E/S/W. Short (only across the outermost ring) and quiet so they give
-          the mark instrument precision without competing with the rings. */}
-      <line x1="12" y1="0.9" x2="12" y2="2.4" opacity={0.42} />
-      <line x1="12" y1="21.6" x2="12" y2="23.1" opacity={0.42} />
-      <line x1="0.9" y1="12" x2="2.4" y2="12" opacity={0.42} />
-      <line x1="21.6" y1="12" x2="23.1" y2="12" opacity={0.42} />
-      {/* Detected contacts — three blips on the dial at different bearings and
-          ranges. In the static mark they sit at a low idle opacity (faint
-          contacts the radar has seen before); when `animate` is set each fires a
-          bright flash timed to the rotating sweep passing its bearing, then
-          fades — the literal "contact lights up under the scan" of a real
-          radar. Drawn BEFORE the sweep so the bright beam paints over them at
-          its leading edge; the flash reads behind the sweep. */}
-      <circle
-        cx={blipA.cx}
-        cy={blipA.cy}
-        r={animate ? 1.6 : 1.2}
-        fill="currentColor"
-        stroke="none"
-        className={animate ? blipA.animClass : undefined}
-        opacity={animate ? undefined : 0.5}
-      />
-      <circle
-        cx={blipB.cx}
-        cy={blipB.cy}
-        r={animate ? 1.6 : 1.2}
-        fill="currentColor"
-        stroke="none"
-        className={animate ? blipB.animClass : undefined}
-        opacity={animate ? undefined : 0.5}
-      />
-      <circle
-        cx={blipC.cx}
-        cy={blipC.cy}
-        r={animate ? 1.5 : 1.1}
-        fill="currentColor"
-        stroke="none"
-        className={animate ? blipC.animClass : undefined}
-        opacity={animate ? undefined : 0.45}
-      />
-      {/* The sweep — a real radar scan: a thin bright BEAM (the leading edge)
-          with a NARROW fading TRAIL behind it (the region just swept), not a
-          wide solid pie wedge. The beam points to bearing ~153° (down-right);
-          the sweep rotates clockwise 360°/9s (group `rr-sweep-spin`, bearing
-          increasing), so the AFTERGLOW is the ~45° fan BEHIND the beam —
-          bearings 153→108 (decreasing, counterclockwise from the beam, the
-          region just swept). The trail is three stacked 15° sectors of
-          DECREASING opacity (0.30 → 0.16 → 0.07), brightest right at the beam
-          edge (153°) and dissolving toward 108° — exactly how a real radar
-          scope's afterglow reads. The arc sweep flag is 0 (counterclockwise =
-          decreasing bearing = behind a clockwise beam); a flag of 1 would draw
-          the fan AHEAD of the beam, which is wrong. The blips' flash timings
-          (A 13% / C 45% / B 74% of the loop) are computed from the same 153°
-          start bearing and stay correct with this geometry. */}
+      {/* Broken rings create a compact, ownable R-shaped radar silhouette. */}
+      <circle cx="12" cy="12" r="9.2" opacity={0.32} />
+      <path d="M12 5.1a6.9 6.9 0 1 1-6.25 9.82" opacity={0.62} />
+      <path d="M12 8.35a3.65 3.65 0 1 1-3.34 5.12" opacity={0.92} />
+      {/* One contact keeps the mark legible at favicon size. */}
+      <circle cx="17.7" cy="15.7" r="1.35" fill="currentColor" stroke="none" className={animate ? "rr-blip-a" : undefined} />
+      {/* The sweep animates only when explicitly requested. */}
       <g className={animate ? 'rr-sweep-spin' : undefined}>
-        {/* Trail — three stacked 15° sectors, brightest at the beam edge (153°)
-            and dissolving counterclockwise toward 108°. Each arc sweep flag is
-            0 so the sector opens BEHIND the beam (decreasing bearing). */}
-        <path d="M12 12 L16.27 20.38 A9.4 9.4 0 0 0 18.29 18.99 Z" fill="currentColor" stroke="none" opacity={0.3} />
-        <path d="M12 12 L18.29 18.99 A9.4 9.4 0 0 0 19.88 17.12 Z" fill="currentColor" stroke="none" opacity={0.16} />
-        <path d="M12 12 L19.88 17.12 A9.4 9.4 0 0 0 20.94 14.90 Z" fill="currentColor" stroke="none" opacity={0.07} />
-        {/* The leading beam edge — the bright radial line currently scanning,
-            pointing down-right. The eye-leading element that makes the sweep
-            read as a rotating scan, not a static shape. */}
+        <path d="M12 12 19.7 7.55A9.15 9.15 0 0 1 21.1 12Z" fill="currentColor" stroke="none" opacity={0.14} />
         <line
           x1="12"
           y1="12"
-          x2="16.27"
-          y2="20.38"
+          x2="19.7"
+          y2="7.55"
           stroke="currentColor"
-          strokeWidth={1.5}
+          strokeWidth={2}
           strokeLinecap="round"
           opacity={0.95}
         />
       </g>
-      {/* Center origin — a small filled node at the focal point. Tight radius
-          (1) keeps it crisp; no pulse animation (the sweep + blips carry all
-          the motion). */}
-      <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.55" fill="currentColor" stroke="none" />
     </svg>
   );
 }
