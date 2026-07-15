@@ -40,28 +40,12 @@
   max-height: 720px;
   top: -10vw;
   left: -8vw;
-  background: radial-gradient(circle, rgba(59, 130, 246, 0.38) 0%, rgba(59, 130, 246, 0) 68%);
+  background: radial-gradient(circle, rgba(37, 99, 235, 0.16) 0%, rgba(37, 99, 235, 0) 70%);
   animation: ambientDriftA 34s ease-in-out infinite alternate;
 }
-.ambientBlobB {
-  width: 52vw;
-  height: 52vw;
-  max-width: 780px;
-  max-height: 780px;
-  bottom: -14vw;
-  right: -10vw;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.32) 0%, rgba(99, 102, 241, 0) 68%);
-  animation: ambientDriftB 40s ease-in-out infinite alternate;
-}
+.ambientBlobB,
 .ambientBlobC {
-  width: 34vw;
-  height: 34vw;
-  max-width: 520px;
-  max-height: 520px;
-  top: 34%;
-  left: 56%;
-  background: radial-gradient(circle, rgba(14, 165, 233, 0.26) 0%, rgba(14, 165, 233, 0) 68%);
-  animation: ambientDriftC 46s ease-in-out infinite alternate;
+  display: none;
 }
 /* A faint moving grid echo — barely-there vertical light lines drifting
    horizontally, giving the airspace a subtle "scanning" rhythm without ever
@@ -77,19 +61,11 @@
     rgba(37, 99, 235, 0.05) 121px
   );
   animation: ambientGridShift 60s linear infinite;
-  opacity: 0.7;
+  opacity: 0.32;
 }
 @keyframes ambientDriftA {
   from { transform: translate(0, 0) scale(1); }
   to   { transform: translate(7vw, 5vh) scale(1.14); }
-}
-@keyframes ambientDriftB {
-  from { transform: translate(0, 0) scale(1); }
-  to   { transform: translate(-6vw, -4vh) scale(1.12); }
-}
-@keyframes ambientDriftC {
-  from { transform: translate(0, 0) scale(1); }
-  to   { transform: translate(-5vw, 6vh) scale(1.18); }
 }
 @keyframes ambientGridShift {
   from { transform: translateX(0); }
@@ -113,21 +89,35 @@
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  padding: 13px 22px;
+  padding: 10px 12px 10px 14px;
   margin: 0 0 var(--space-section);
-  border-radius: var(--radius-card-sm);
+  border-radius: 16px;
   border: 1px solid var(--c-border);
-  background: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.9);
   -webkit-backdrop-filter: saturate(180%) blur(16px);
   backdrop-filter: saturate(180%) blur(16px);
-  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 12px 36px rgba(15, 23, 42, 0.07);
 }
 
 .brandMark {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 10px;
   text-decoration: none;
+}
+
+.brandLockup {
+  display: grid;
+  gap: 1px;
+}
+
+.brandDescriptor {
+  color: var(--c-text-muted);
+  font-size: 0.62rem;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  text-transform: uppercase;
 }
 
 /* Brand logo — the RadarLogo glyph (three range rings + four cardinal ticks +
@@ -139,10 +129,13 @@
    literal "contacts pop up under the scan" of a real radar. */
 .brandLogo {
   flex: 0 0 auto;
-  width: 1.75rem;
-  height: 1.75rem;
-  color: var(--c-brand);
-  filter: drop-shadow(0 0 7px rgba(29, 78, 216, 0.22));
+  width: 1.55rem;
+  height: 1.55rem;
+  padding: 7px;
+  border-radius: 11px;
+  color: #ffffff;
+  background: #173a8f;
+  box-shadow: 0 8px 20px rgba(23, 58, 143, 0.24), inset 0 0 0 1px rgba(255, 255, 255, 0.14);
 }
 
 /* Slow sweep rotation for the logo's scan sector. The class is global (not
@@ -228,9 +221,9 @@
 }
 
 .heroBrandName {
-  font-size: 1.04rem;
-  font-weight: 700;
-  letter-spacing: -0.014em;
+  font-size: 1rem;
+  font-weight: 760;
+  letter-spacing: -0.025em;
   color: var(--c-text-primary);
 }
 
@@ -295,18 +288,15 @@
   overflow: hidden;
   border-radius: var(--radius-card);
   margin-bottom: var(--space-section-lg);
-  min-height: clamp(460px, 76vh, 660px);
-  display: grid;
-  align-content: center;
-  justify-items: center;
-  text-align: center;
-  padding: clamp(44px, 6vw, 80px) clamp(24px, 5vw, 48px);
+  min-height: 620px;
+  display: flex;
+  align-items: center;
+  padding: clamp(52px, 7vw, 88px) clamp(28px, 6vw, 72px);
   background:
-    radial-gradient(90% 120% at 50% 0%, rgba(59, 130, 246, 0.24) 0%, transparent 52%),
-    radial-gradient(140% 100% at 50% 100%, rgba(2, 6, 23, 0.6) 0%, transparent 60%),
-    linear-gradient(170deg, #0b1426 0%, #131f38 48%, #0f172a 100%);
+    radial-gradient(70% 90% at 50% 0%, rgba(59, 130, 246, 0.2) 0%, transparent 58%),
+    #0b1324;
   color: #f8fafc;
-  box-shadow: 0 40px 90px rgba(2, 6, 23, 0.34);
+  box-shadow: 0 32px 72px rgba(2, 6, 23, 0.24);
   border: 1px solid rgba(148, 163, 184, 0.1);
 }
 
@@ -314,9 +304,36 @@
   position: relative;
   z-index: 1;
   display: grid;
+  grid-template-columns: minmax(0, 1.04fr) minmax(340px, 0.96fr);
+  gap: clamp(36px, 6vw, 76px);
+  align-items: center;
+  width: 100%;
+}
+
+.heroCopy {
+  display: grid;
+  justify-items: start;
   gap: 22px;
-  justify-items: center;
-  max-width: 820px;
+  text-align: left;
+}
+
+.heroEyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: rgba(219, 234, 254, 0.76);
+  font-size: 0.74rem;
+  font-weight: 720;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.heroEyebrowDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #60a5fa;
+  box-shadow: 0 0 0 5px rgba(96, 165, 250, 0.12);
 }
 
 /* The hero headline — the single most-read line on the page. Uses the display
@@ -330,23 +347,20 @@
   letter-spacing: var(--ls-display);
   font-weight: var(--fw-display);
   color: #ffffff;
+  max-width: 12ch;
   text-wrap: balance;
 }
 
 .heroTitleAccent {
-  background: linear-gradient(135deg, #dbeafe 0%, #60a5fa 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
+  color: #8ab9ff;
 }
 
 .heroSubtitle {
   margin: 0;
-  max-width: 56ch;
-  color: rgba(203, 213, 225, 0.82);
-  font-size: clamp(1.08rem, 1.5vw, 1.3rem);
-  line-height: var(--lh-body);
+  max-width: 53ch;
+  color: rgba(203, 213, 225, 0.76);
+  font-size: clamp(1rem, 1.35vw, 1.16rem);
+  line-height: 1.62;
   font-weight: 400;
   letter-spacing: var(--ls-body);
 }
@@ -356,7 +370,7 @@
   gap: 14px;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   margin-top: 4px;
 }
 
@@ -379,6 +393,171 @@
   box-shadow: 0 16px 38px rgba(2, 6, 23, 0.42);
   transition: transform 0.15s ease, box-shadow 0.18s ease;
   will-change: transform;
+}
+
+.heroSecondaryCta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 20px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  color: rgba(241, 245, 249, 0.86);
+  font-size: 0.94rem;
+  font-weight: 680;
+  text-decoration: none;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.heroSecondaryCta:hover {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.heroFootnote {
+  margin: -8px 0 0;
+  color: rgba(148, 163, 184, 0.72);
+  font-size: 0.78rem;
+}
+
+.heroProduct {
+  display: grid;
+  gap: 22px;
+  padding: 26px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 18px;
+  background: rgba(15, 27, 49, 0.88);
+  box-shadow: 0 28px 70px rgba(2, 6, 23, 0.34);
+  backdrop-filter: blur(12px);
+  text-align: left;
+}
+
+.heroProductTopbar,
+.heroCompanyRow,
+.heroProductFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.heroProductLabel,
+.heroProductFooter span {
+  color: rgba(148, 163, 184, 0.78);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.heroProductLive {
+  padding: 5px 9px;
+  border: 1px solid rgba(52, 211, 153, 0.22);
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.08);
+  color: #86efac;
+  font-size: 0.7rem;
+  font-weight: 720;
+}
+
+.heroCompanyName {
+  color: #f8fafc;
+  font-size: 1.18rem;
+  font-weight: 760;
+  letter-spacing: -0.02em;
+}
+
+.heroCompanyMeta {
+  margin-top: 4px;
+  color: rgba(148, 163, 184, 0.72);
+  font-size: 0.76rem;
+}
+
+.heroScore {
+  display: flex;
+  align-items: baseline;
+  color: #f8fafc;
+}
+
+.heroScore strong {
+  font-size: 1.8rem;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.heroScore span {
+  color: rgba(148, 163, 184, 0.62);
+  font-size: 0.72rem;
+}
+
+.heroScoreTrack {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.14);
+}
+
+.heroScoreTrack span {
+  display: block;
+  width: 87%;
+  height: 100%;
+  border-radius: inherit;
+  background: #60a5fa;
+}
+
+.heroSignalBlock {
+  display: grid;
+  gap: 7px;
+  padding: 16px 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.heroSignalBlock span {
+  color: #7fb0fa;
+  font-size: 0.68rem;
+  font-weight: 760;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.heroSignalBlock strong {
+  color: rgba(241, 245, 249, 0.9);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.heroEvidenceRow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.heroEvidenceRow div {
+  min-width: 0;
+}
+
+.heroEvidenceRow span {
+  color: #60a5fa;
+  font-size: 0.68rem;
+  font-weight: 780;
+}
+
+.heroEvidenceRow p {
+  margin: 4px 0 0;
+  color: rgba(203, 213, 225, 0.72);
+  font-size: 0.7rem;
+  line-height: 1.35;
+}
+
+.heroProductFooter {
+  padding-top: 4px;
+}
+
+.heroProductFooter strong {
+  color: #f8fafc;
+  font-size: 0.78rem;
 }
 
 .heroCta:hover {
@@ -409,42 +588,11 @@
   transform: translateX(2px);
 }
 
-.heroTrust {
-  display: flex;
-  gap: 56px;
-  flex-wrap: wrap;
-  justify-content: center;
-  padding-top: 26px;
-  border-top: 1px solid rgba(148, 163, 184, 0.16);
-  margin-top: 12px;
-  width: 100%;
-  max-width: 580px;
-}
-
-.heroTrustItem {
-  display: grid;
-  gap: 4px;
-}
-
-.heroTrustValue {
-  font-size: 1.04rem;
-  font-weight: 800;
-  color: #f8fafc;
-  line-height: 1.1;
-  letter-spacing: -0.01em;
-}
-
-.heroTrustLabel {
-  color: rgba(148, 163, 184, 0.78);
-  font-size: 0.8rem;
-  line-height: 1.4;
-}
-
 /* ── Section spacing ── */
 .scrollSection {
   display: grid;
-  gap: 26px;
-  padding: clamp(40px, 5vw, 68px) 0;
+  gap: 32px;
+  padding: clamp(52px, 7vw, 88px) 0;
 }
 
 .scrollSection:first-of-type {
@@ -454,24 +602,21 @@
 /* ── Principles / value row ── */
 .principles {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  border-top: 1px solid var(--c-border);
+  border-bottom: 1px solid var(--c-border);
 }
 
 .principle {
   display: grid;
-  gap: 12px;
-  padding: 26px 24px;
-  border-radius: var(--radius-card-sm);
-  border: 1px solid var(--c-border);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.9) 100%);
-  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.05);
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  align-content: start;
+  gap: 14px;
+  padding: 32px clamp(22px, 3vw, 36px);
 }
 
-.principle:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 16px 38px rgba(15, 23, 42, 0.08);
+.principle + .principle {
+  border-left: 1px solid var(--c-border);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -984,12 +1129,9 @@
   padding: clamp(52px, 7vw, 84px) clamp(24px, 4vw, 48px);
   margin-top: var(--space-section-lg);
   border-radius: var(--radius-card);
-  background:
-    radial-gradient(90% 130% at 50% 0%, rgba(59, 130, 246, 0.24) 0%, transparent 54%),
-    radial-gradient(140% 100% at 50% 100%, rgba(2, 6, 23, 0.55) 0%, transparent 60%),
-    linear-gradient(170deg, #0b1426 0%, #131f38 48%, #0f172a 100%);
+  background: #0b1324;
   color: #f8fafc;
-  box-shadow: 0 34px 80px rgba(2, 6, 23, 0.3);
+  box-shadow: 0 28px 64px rgba(2, 6, 23, 0.2);
   border: 1px solid rgba(148, 163, 184, 0.1);
 }
 
@@ -1032,6 +1174,32 @@
   .previewGrid {
     grid-template-columns: 1fr;
   }
+
+  .heroSection {
+    min-height: auto;
+  }
+
+  .heroContent {
+    grid-template-columns: 1fr;
+  }
+
+  .heroTitle {
+    max-width: 14ch;
+  }
+
+  .heroProduct {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .principles {
+    grid-template-columns: 1fr;
+  }
+
+  .principle + .principle {
+    border-top: 1px solid var(--c-border);
+    border-left: 0;
+  }
 }
 
 @media (max-width: 720px) {
@@ -1043,8 +1211,13 @@
   /* Logo a touch smaller so the brand mark + name + CTA balance on one row
      without the CTA feeling crammed against the right edge. */
   .brandLogo {
-    width: 1.5rem;
-    height: 1.5rem;
+    width: 1.35rem;
+    height: 1.35rem;
+    padding: 6px;
+  }
+
+  .brandDescriptor {
+    display: none;
   }
 
   /* Hide the section anchors on phones, but KEEP the activation CTA visible —
@@ -1078,13 +1251,10 @@
      phone and pushes the preview below the fold. Let it breathe without
      demanding a full screen-height. */
   .heroSection {
-    min-height: clamp(420px, 64vh, 560px);
-    padding: clamp(36px, 9vw, 56px) clamp(20px, 5vw, 28px);
+    min-height: 0;
+    padding: 44px 22px;
   }
 
-  .heroTrust {
-    gap: 28px;
-  }
 }
 
 @media (max-width: 560px) {
@@ -1103,6 +1273,43 @@
 }
 
 @media (max-width: 480px) {
+  .heroCopy {
+    gap: 18px;
+  }
+
+  .heroTitle {
+    font-size: clamp(2.25rem, 11vw, 3rem);
+  }
+
+  .heroActions {
+    width: 100%;
+  }
+
+  .heroCta,
+  .heroSecondaryCta {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .heroProduct {
+    gap: 18px;
+    padding: 20px;
+  }
+
+  .heroEvidenceRow {
+    grid-template-columns: 1fr;
+  }
+
+  .heroEvidenceRow div {
+    display: grid;
+    grid-template-columns: 24px 1fr;
+    align-items: baseline;
+  }
+
+  .heroEvidenceRow p {
+    margin: 0;
+  }
+
   /* Lead card on a narrow phone: stack the reason key/value rows (label over
      value) so long contact paths and reasons don't overflow, and let the
      relevance axes drop to a single column so the dot-meters aren't cramped.
@@ -1142,13 +1349,4 @@
     gap: 5px;
   }
 
-  .heroTrust {
-    /* Stack the two trust items so they don't crowd on a 360px screen. */
-    flex-direction: column;
-    gap: 14px;
-  }
-
-  .heroTrustItem {
-    text-align: center;
-  }
 }
