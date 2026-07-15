@@ -43,7 +43,17 @@ jobs:
       run: npm run web:check
 
     - name: Run tests
-      run: npm run --workspace @recruiter-radar/web test
+      shell: bash
+      run: |
+        set +e
+        npm run --workspace @recruiter-radar/web test > /tmp/jest-output.log 2>&1
+        status=$?
+        if [ "$status" -ne 0 ]; then
+          echo "Jest failed. Showing the final 200 log lines:"
+          tail -n 200 /tmp/jest-output.log
+          exit "$status"
+        fi
+        cat /tmp/jest-output.log
 
   build:
     needs: test
