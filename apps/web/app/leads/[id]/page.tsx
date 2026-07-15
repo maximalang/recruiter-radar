@@ -229,10 +229,10 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 </div>
               </ContentCard>
 
-              {/* Why now card — only when there is an actual argument to show */}
+              {/* Primary hiring signal — only when there is an actual argument to show */}
               {lead.whyNow && lead.whyNow.trim() && (
                 <ContentCard>
-                  <ContentCardTitle>Почему сейчас</ContentCardTitle>
+                  <ContentCardTitle>Сигналы найма</ContentCardTitle>
                   <p className={ipStyles.bodyText}>{lead.whyNow}</p>
                 </ContentCard>
               )}

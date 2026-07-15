@@ -7,11 +7,27 @@
 }
 
 .mark {
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   flex: 0 0 auto;
-  filter: drop-shadow(0 7px 13px rgba(29, 78, 216, 0.2));
+  overflow: visible;
 }
+
+.orbit,
+.orbitSoft,
+.monogram {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.orbit { stroke-width: 1.65; opacity: 0.82; }
+.orbitSoft { stroke-width: 1.45; opacity: 0.34; }
+.monogram { stroke-width: 1.8; opacity: 0.82; }
+.needle { fill: #315fc8; opacity: 0.9; }
+.origin { fill: currentColor; }
+.target { fill: #315fc8; }
 
 .wordmark {
   display: inline-flex;
@@ -19,8 +35,8 @@
   gap: 0.28em;
   white-space: nowrap;
   font-size: 0.98rem;
-  font-weight: 780;
-  letter-spacing: -0.035em;
+  font-weight: 710;
+  letter-spacing: -0.025em;
   line-height: 1;
 }
 
@@ -35,6 +51,11 @@
 
 .logo[data-tone="dark"] .wordmark strong {
   color: #8ab9ff;
+}
+
+.logo[data-tone="dark"] .needle,
+.logo[data-tone="dark"] .target {
+  fill: #8ab9ff;
 }
 
 .logo[data-size="small"] {
