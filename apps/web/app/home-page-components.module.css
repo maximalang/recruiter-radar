@@ -338,6 +338,40 @@
   gap: 10px;
 }
 
+.ambientBg::before,
+.ambientBg::after {
+  content: "";
+  position: absolute;
+  width: min(72vw, 980px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  filter: blur(18px);
+  opacity: 0.52;
+  will-change: transform;
+}
+
+.ambientBg::before {
+  top: -34%;
+  left: -18%;
+  background: radial-gradient(circle, rgba(62, 111, 235, 0.24), transparent 68%);
+  animation: ambientDriftOne 22s ease-in-out infinite alternate;
+}
+
+.ambientBg::after {
+  right: -28%;
+  top: 28%;
+  background: radial-gradient(circle, rgba(74, 151, 214, 0.18), transparent 70%);
+  animation: ambientDriftTwo 28s ease-in-out infinite alternate;
+}
+
+@keyframes ambientDriftOne {
+  to { transform: translate3d(24vw, 18vh, 0) scale(1.12); }
+}
+
+@keyframes ambientDriftTwo {
+  to { transform: translate3d(-22vw, 22vh, 0) scale(0.88); }
+}
+
 .heroEvidenceRow div {
   min-width: 0;
   padding: 14px;
@@ -1106,4 +1140,52 @@
     gap: 5px;
   }
 
+}
+
+/* Final surface layer: intentionally after responsive rules so later card
+   declarations cannot restore borders or opaque fills. */
+.topBar,
+.heroSection,
+.heroProduct,
+.heroEvidenceRow div,
+.principles,
+.previewCard,
+.previewEvidence > div,
+.primaryPlanCard,
+.secondaryPlanCard,
+.includedOnce,
+.faqCard,
+.closingBand {
+  border: 0;
+}
+
+.topBar,
+.principles,
+.previewCard,
+.primaryPlanCard,
+.secondaryPlanCard,
+.includedOnce,
+.faqCard {
+  -webkit-backdrop-filter: saturate(145%) blur(18px);
+  backdrop-filter: saturate(145%) blur(18px);
+}
+
+.topBar { background: rgba(255, 255, 255, 0.7); }
+.heroProduct { background: rgba(15, 27, 49, 0.68); }
+.heroEvidenceRow div { background: rgba(255, 255, 255, 0.055); }
+.principles { background: rgba(255, 255, 255, 0.5); }
+.principle + .principle { border-left: 0; }
+.previewCard { background: rgba(255, 255, 255, 0.62); }
+.previewEvidence > div { background: rgba(255, 255, 255, 0.5); }
+.primaryPlanCard { background: rgba(239, 246, 255, 0.68); }
+.secondaryPlanCard { background: rgba(255, 255, 255, 0.58); }
+.includedOnce { background: rgba(255, 255, 255, 0.44); }
+.faqCard { background: rgba(255, 255, 255, 0.56); }
+.closingBand { background: rgba(11, 19, 36, 0.9); }
+
+@media (prefers-reduced-motion: reduce) {
+  .ambientBg::before,
+  .ambientBg::after {
+    animation: none;
+  }
 }
