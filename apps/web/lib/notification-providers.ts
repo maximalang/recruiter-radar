@@ -2,8 +2,6 @@ import { createHmac } from "node:crypto";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 
-import { sendTelegramTextMessage } from "./telegram";
-
 export type TelegramBotIdentity = {
   id: string;
   username: string;
@@ -46,6 +44,7 @@ async function callTelegramApi<T>(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
     cache: "no-store",
+    signal: AbortSignal.timeout(15_000),
   });
 
   let body: unknown = null;
@@ -111,18 +110,32 @@ export async function configureTelegramWebhook(input: {
   });
 }
 
+export async function deleteTelegramWebhook(input: {
+  botToken: string;
+  dropPendingUpdates?: boolean;
+}): Promise<void> {
+  await callTelegramApi(input.botToken, "deleteWebhook", {
+    drop_pending_updates: input.dropPendingUpdates ?? false,
+  });
+}
+
 export async function sendTelegramNotification(input: {
   botToken: string;
   chatId: string;
   text: string;
   parseMode?: "HTML" | "MarkdownV2";
 }): Promise<{ providerMessageId: string }> {
-  const result = await sendTelegramTextMessage(
-    input.text,
-    { botToken: input.botToken, chatId: input.chatId },
-    input.parseMode ? { parseMode: input.parseMode } : undefined,
+  const result = await callTelegramApi<{ message_id: number | string }>(
+    input.botToken,
+    "sendMessage",
+    {
+      chat_id: input.chatId,
+      text: input.text,
+      ...(input.parseMode ? { parse_mode: input.parseMode } : {}),
+      disable_web_page_preview: true,
+    },
   );
-  return { providerMessageId: String(result.messageId) };
+  return { providerMessageId: String(result.message_id) };
 }
 
 const VK_API_BASE = "https://api.vk.com/method";
@@ -145,6 +158,7 @@ async function callVkApi<T>(
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: form,
     cache: "no-store",
+    signal: AbortSignal.timeout(15_000),
   });
 
   let body: unknown = null;
@@ -234,6 +248,17 @@ export async function configureVkCallback(input: {
   return { serverId: String(created.server_id) };
 }
 
+export async function deleteVkCallbackServer(input: {
+  groupId: string;
+  token: string;
+  serverId: string;
+}): Promise<void> {
+  await callVkApi("groups.deleteCallbackServer", input.token, {
+    group_id: input.groupId,
+    server_id: input.serverId,
+  });
+}
+
 export async function sendVkNotification(input: {
   token: string;
   peerId: string;
@@ -270,7 +295,7 @@ function isPrivateIpv4(address: string): boolean {
 
 function isPrivateIpv6(address: string): boolean {
   const normalized = address.toLowerCase().split("%")[0];
-  return (
+  if (
     normalized === "::" ||
     normalized === "::1" ||
     normalized.startsWith("fc") ||
@@ -278,12 +303,15 @@ function isPrivateIpv6(address: string): boolean {
     normalized.startsWith("fe8") ||
     normalized.startsWith("fe9") ||
     normalized.startsWith("fea") ||
-    normalized.startsWith("feb") ||
-    normalized.startsWith("::ffff:127.") ||
-    normalized.startsWith("::ffff:10.") ||
-    normalized.startsWith("::ffff:192.168.") ||
-    normalized.startsWith("::ffff:169.254.")
-  );
+    normalized.startsWith("feb")
+  ) {
+    return true;
+  }
+  if (normalized.startsWith("::ffff:")) {
+    const mapped = normalized.slice("::ffff:".length);
+    return isIP(mapped) !== 4 || isPrivateIpv4(mapped);
+  }
+  return false;
 }
 
 function isPrivateAddress(address: string): boolean {
@@ -339,6 +367,29 @@ async function assertPublicWebhookTarget(target: URL): Promise<void> {
   }
 }
 
+async function readResponseTextWithLimit(response: Response, maxBytes: number): Promise<string> {
+  if (!response.body) return "";
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let bytesRead = 0;
+  let text = "";
+  try {
+    while (bytesRead < maxBytes) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      const remaining = maxBytes - bytesRead;
+      const value = chunk.value.byteLength > remaining ? chunk.value.slice(0, remaining) : chunk.value;
+      bytesRead += value.byteLength;
+      text += decoder.decode(value, { stream: bytesRead < maxBytes });
+      if (chunk.value.byteLength > remaining) break;
+    }
+    text += decoder.decode();
+    return text;
+  } finally {
+    await reader.cancel().catch(() => {});
+  }
+}
+
 export async function sendSignedWebhook(input: {
   url: string;
   secret: string;
@@ -370,14 +421,16 @@ export async function sendSignedWebhook(input: {
     body: rawBody,
     cache: "no-store",
     redirect: "manual",
+    signal: AbortSignal.timeout(15_000),
   });
   if (response.status >= 300 && response.status < 400) {
+    await response.body?.cancel().catch(() => {});
     throw providerError("Webhook redirects are not allowed.", {
       status: response.status,
       code: "webhook_redirect_blocked",
     });
   }
-  const responseText = (await response.text()).slice(0, 2_000);
+  const responseText = await readResponseTextWithLimit(response, 2_000);
   if (!response.ok) {
     throw providerError(`Webhook returned HTTP ${response.status}.`, {
       status: response.status,
@@ -392,14 +445,25 @@ export function classifyNotificationProviderError(error: unknown): {
   kind: "retryable" | "rate_limited" | "auth" | "permanent";
   status?: number;
   code?: string;
+  retryAfterSeconds?: number;
   message: string;
 } {
   const provider = error as ProviderRequestError;
   const status = typeof provider?.status === "number" ? provider.status : undefined;
+  const retryAfterSeconds =
+    typeof provider?.retryAfterSeconds === "number" && provider.retryAfterSeconds > 0
+      ? provider.retryAfterSeconds
+      : undefined;
   const message = error instanceof Error ? error.message : "Unknown provider error.";
 
-  if (status === 429) return { kind: "rate_limited", status, code: provider.code, message };
-  if (status === 401 || status === 403) return { kind: "auth", status, code: provider.code, message };
-  if (!status || status >= 500) return { kind: "retryable", status, code: provider.code, message };
-  return { kind: "permanent", status, code: provider.code, message };
+  if (status === 429) {
+    return { kind: "rate_limited", status, code: provider.code, retryAfterSeconds, message };
+  }
+  if (status === 401 || status === 403) {
+    return { kind: "auth", status, code: provider.code, retryAfterSeconds, message };
+  }
+  if (!status || status >= 500) {
+    return { kind: "retryable", status, code: provider.code, retryAfterSeconds, message };
+  }
+  return { kind: "permanent", status, code: provider.code, retryAfterSeconds, message };
 }
