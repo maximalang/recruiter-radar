@@ -27,8 +27,8 @@ import {
   LoadingState,
   ErrorState,
   FitIcon,
-  type NavItem,
 } from '../ui/internal-page';
+import { buildAccountNavigation } from '../ui/account-navigation';
 import { internalPageClasses as ipStyles } from '../ui/internal-page';
 import { SiteFooter } from '../ui/site-footer';
 import { ShieldIcon, PinIcon, BriefcaseIcon, AlertIcon, SearchIcon, TargetIcon, ClockIcon, CheckIcon } from '../ui/icons';
@@ -40,12 +40,7 @@ export const metadata: Metadata = {
   description: 'Компании с активным наймом: оценка, доказательства и безопасный путь контакта.',
 };
 
-const LEADS_NAV: NavItem[] = [
-  { href: '/dashboard', label: 'Дашборд' },
-  { href: '/leads', label: 'Лиды', active: true },
-  { href: '/review', label: 'Ревью' },
-  { href: '/profile', label: 'Профиль' },
-];
+const LEADS_NAV = buildAccountNavigation('leads');
 
 export function LeadCard({
   lead,

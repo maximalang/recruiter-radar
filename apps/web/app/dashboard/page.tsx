@@ -7,13 +7,13 @@ import { computeProfileCompletion } from "@/lib/profileCompletion";
 import { readOwnerSession } from "@/lib/session";
 import DashboardAccountOverview from "./dashboard-account-overview";
 import DashboardTodayRadar from "./dashboard-today-radar";
+import { buildAccountNavigation } from "../ui/account-navigation";
 import {
   ContentCard,
   EmptyState,
   ErrorState,
   InternalPageFrame,
   InternalPageHeader,
-  type NavItem,
 } from "../ui/internal-page";
 import { SiteFooter } from "../ui/site-footer";
 import dashStyles from "./dashboard.module.css";
@@ -25,12 +25,7 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-const DASHBOARD_NAV: NavItem[] = [
-  { href: "/dashboard", label: "Дашборд", active: true },
-  { href: "/leads", label: "Лиды" },
-  { href: "/review", label: "Ревью" },
-  { href: "/profile", label: "Профиль" },
-];
+const DASHBOARD_NAV = buildAccountNavigation("dashboard");
 
 export default async function DashboardPage() {
   const ownerId = await readOwnerSession();
