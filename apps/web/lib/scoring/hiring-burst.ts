@@ -59,7 +59,7 @@ export function detectHiringBurst(input: BurstInput): BurstResult {
       recentCount: 0,
       distinctRoles: 0,
       freshCount: 0,
-      reasons: ['no vacancies — no burst signal'],
+      reasons: ['нет вакансий — нет всплеска найма'],
     }
   }
 
@@ -71,7 +71,7 @@ export function detectHiringBurst(input: BurstInput): BurstResult {
       recentCount: 0,
       distinctRoles: 0,
       freshCount: 0,
-      reasons: ['only internal-recruiter vacancies — does not count as hiring burst'],
+      reasons: ['только вакансии внутреннего рекрутера — не считается всплеском найма'],
     }
   }
 
@@ -85,7 +85,7 @@ export function detectHiringBurst(input: BurstInput): BurstResult {
       recentCount: 0,
       distinctRoles: 0,
       freshCount: 0,
-      reasons: [`no postings inside the ${WINDOW_DAYS}-day window`],
+      reasons: [`нет публикаций за последние ${WINDOW_DAYS} дней`],
     }
   }
 
@@ -97,25 +97,25 @@ export function detectHiringBurst(input: BurstInput): BurstResult {
 
   if (isBurst) {
     score += 0.4
-    reasons.push(`hiring burst — ${recentCount} concurrent postings in the last ${WINDOW_DAYS} days`)
+    reasons.push(`всплеск найма — ${recentCount} одновременных публикаций за последние ${WINDOW_DAYS} дней`)
   } else if (recentCount === 2) {
     score += 0.2
-    reasons.push(`two concurrent postings in the last ${WINDOW_DAYS} days`)
+    reasons.push(`две одновременные публикации за последние ${WINDOW_DAYS} дней`)
   } else {
-    reasons.push(`single recent posting in the last ${WINDOW_DAYS} days`)
+    reasons.push(`одна свежая публикация за последние ${WINDOW_DAYS} дней`)
   }
 
   if (isBurst && distinctRoles >= 3) {
     score += 0.3
-    reasons.push(`role diversity — ${distinctRoles} distinct roles suggest cross-department expansion`)
+    reasons.push(`разные роли — ${distinctRoles} уникальных ролей указывают на расширение нескольких направлений`)
   } else if (isBurst && distinctRoles === 2) {
     score += 0.15
-    reasons.push(`two distinct roles being hired`)
+    reasons.push(`нанимают на две разные роли`)
   }
 
   if (isBurst && recentCount >= 6) {
     score += 0.2
-    reasons.push(`large-scale hiring — ${recentCount} postings amplifies urgency`)
+    reasons.push(`масштабный найм — ${recentCount} публикаций усиливают срочность`)
   }
 
   // Recency amplifier — applies to any multi-posting signal (burst or the
@@ -125,7 +125,7 @@ export function detectHiringBurst(input: BurstInput): BurstResult {
   // The [0, 0.4) vs [0.4, 1] non-burst/burst contract is preserved.
   if ((isBurst || recentCount === 2) && freshCount >= 2) {
     score += 0.1
-    reasons.push(`${freshCount} postings in the last ${FRESH_DAYS} days — very fresh activity`)
+    reasons.push(`${freshCount} публикаций за последние ${FRESH_DAYS} дня — очень свежая активность`)
   }
 
   return {

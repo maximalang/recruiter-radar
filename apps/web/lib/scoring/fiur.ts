@@ -465,8 +465,8 @@ function computeFit(
   } else if (isSmbSweetSpot(company)) {
     score += 0.1
     const detail = typeof company.employeeCount === 'number'
-      ? `${company.employeeCount} employees`
-      : `size "${company.size}"`
+      ? `${company.employeeCount} сотрудников`
+      : `размер «${company.size}»`
     reasons.push(r('fit', 'fit.size.smb-sweet-spot', { detail }))
   }
 
