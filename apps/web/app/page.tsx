@@ -30,8 +30,8 @@ import {
   CheckIcon,
   ShieldIcon,
   MailIcon,
-  RadarLogo,
 } from "./ui/icons";
+import LandingHeader from "./landing-header";
 import RadarCanvas from "./radar-canvas";
 import ScrollReveal from "./scroll-reveal";
 import ScrollProgress from "./scroll-progress";
@@ -417,28 +417,6 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   );
 }
 
-function LandingHeader() {
-  return (
-    <header className={hpStyles.topBar}>
-      <a href="/" className={hpStyles.brandMark} aria-label="Recruiter Radar — на главную">
-        <RadarLogo className={hpStyles.brandLogo} aria-hidden="true" />
-        <span className={hpStyles.heroBrandName}>Recruiter Radar</span>
-      </a>
-      <nav className={hpStyles.topNavLinks} aria-label="Разделы лендинга">
-        <span className={hpStyles.topNavAnchors}>
-          <a href="#preview" className={hpStyles.topNavLink}>Пример</a>
-          <a href="#pricing" className={hpStyles.topNavLink}>Тарифы</a>
-          <a href="#faq" className={hpStyles.topNavLink}>FAQ</a>
-        </span>
-        <Link href="/dashboard" className={hpStyles.topNavCta}>
-          <span className={hpStyles.topNavCtaFull}>Войти в аккаунт</span>
-          <span className={hpStyles.topNavCtaShort} aria-hidden="true">Войти</span>
-        </Link>
-      </nav>
-    </header>
-  );
-}
-
 function PreviewDigestCard(props: {
   item: HomePreviewItem;
 }) {
@@ -456,6 +434,11 @@ function PreviewDigestCard(props: {
   const location = formatLocationCaption(item.location_names);
   const evidenceTitles = pickEvidenceTitles(item.evidence_titles, 3);
   const vacanciesCaption = formatVacanciesCount(item.vacancies_count);
+  const evidenceItems = Array.from(new Set([
+    vacanciesCaption,
+    ...evidenceTitles,
+    contactPath,
+  ].filter((value): value is string => Boolean(value)))).slice(0, 3);
   // Score = 0–100 points (raw total_score / 4). The internal [0,4] signal
   // strength still drives the tone + the confidence gate + the hiringIntentMin
   // threshold (unchanged) — points are a higher-resolution read of the SAME
@@ -485,72 +468,47 @@ function PreviewDigestCard(props: {
 
   return (
     <article className={hpStyles.previewCard} data-tone={tone}>
-      {/* Header — rank + company name (the "who"), location right-aligned (the
-          "where"). Name gets the full visual weight. */}
-      <div className={hpStyles.previewCardHeader}>
-        <div className={hpStyles.previewCardName}>
-          <span className={hpStyles.previewCardRank} aria-hidden="true">{item.rank}</span>
-          {employerName}
-        </div>
+      <div className={hpStyles.previewCardTopbar}>
+        <span>Сигнал радара · {String(item.rank).padStart(2, "0")}</span>
         {location ? (
-          <span className={hpStyles.previewCardLoc} aria-label={`География: ${location}`}>
-            {location}
-          </span>
+          <span className={hpStyles.previewCardLoc} aria-label={`География: ${location}`}>{location}</span>
         ) : null}
       </div>
 
-      {/* Score line — a measurable 0–100 points meter. The temperature word chip
-          and the evidence-gate label were removed from this surface as noise
-          (both restated a confidence the number + evidence row already convey);
-          the gate still drives delivery on the internal surfaces. What carries
-          signal here: the points number + tone bar (the score itself, shown as a
-          value, not a word), and the evidence row below (vacancy count + real
-          role titles — the proof). */}
-      <div className={hpStyles.previewScoreLine}>
-        <div
-          className={hpStyles.previewStrengthMeter}
-          role="meter"
-          aria-valuenow={Number(points)}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-label={`Сила сигнала: ${points} из 100`}
-          title={`Сила сигнала: ${points} из 100`}
-        >
-          <span className={hpStyles.previewStrengthNumber} data-tone={tone}>{points}</span>
-          <span className={hpStyles.previewStrengthTrack}>
-            <span className={hpStyles.previewStrengthFill} data-tone={tone} style={{ width: `${pct}%` }} />
-          </span>
+      <div className={hpStyles.previewCompanyRow}>
+        <div className={hpStyles.previewCardName}>{employerName}</div>
+        <div className={hpStyles.previewScore}>
+          <strong>{points}</strong><span>/100</span>
         </div>
       </div>
 
-      {/* Evidence — the vacancy count (the scale of hiring) + real vacancy
-          titles (the proof behind "this company is hiring"), capped at 3,
-          de-duplicated. The count + titles together answer "what and how
-          much" — more substantive than either alone. */}
-      <div className={hpStyles.previewEvidence}>
-        {vacanciesCaption ? (
-          <span className={hpStyles.previewEvidenceCount}>{vacanciesCaption}</span>
-        ) : null}
-        {evidenceTitles.map((title, idx) => (
-          <span key={`${title}-${idx}`} className={hpStyles.previewEvidenceChip}>
-            {title}
-          </span>
-        ))}
+      <div
+        className={hpStyles.previewStrengthTrack}
+        role="meter"
+        aria-valuenow={Number(points)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={`Сила сигнала: ${points} из 100`}
+      >
+        <span className={hpStyles.previewStrengthFill} data-tone={tone} style={{ width: `${pct}%` }} />
       </div>
 
-      {/* Why now — the single "what changed" line (freshness is encoded in the
-          reason label, no separate row to avoid duplication). */}
       {whyNow ? (
-        <div className={hpStyles.previewReason}>
-          <span className={hpStyles.previewReasonKey}>Почему сейчас</span>
-          <span className={hpStyles.previewReasonVal}>{whyNow}</span>
+        <div className={hpStyles.previewWhy}>
+          <span>Почему сейчас</span>
+          <strong>{whyNow}</strong>
         </div>
       ) : null}
 
-      {/* ICP-relevance — the "is this a fit for YOUR agency" signal on the four
-          FIUR axes. Only for personalised previews (hasRelevance). Russian
-          labels. The conceptual core: "why fit THIS agency", not just "is
-          hiring". */}
+      <div className={hpStyles.previewEvidence} aria-label="Доказательства сигнала">
+        {evidenceItems.map((itemText, index) => (
+          <div key={`${itemText}-${index}`}>
+            <span>{String(index + 1).padStart(2, "0")}</span>
+            <p>{itemText}</p>
+          </div>
+        ))}
+      </div>
+
       {hasRelevance ? (
         <div className={hpStyles.previewRelevance} aria-label="Релевантность вашему ICP по осям">
           <span className={hpStyles.previewReasonKey}>Релевантность ICP</span>
@@ -574,11 +532,10 @@ function PreviewDigestCard(props: {
         </div>
       ) : null}
 
-      {/* Contact — the safest non-personal path, one line. */}
       {contactPath ? (
-        <div className={hpStyles.previewReason}>
-          <span className={hpStyles.previewReasonKey}>Контакт</span>
-          <span className={hpStyles.previewReasonVal}>{contactPath}</span>
+        <div className={hpStyles.previewFooter}>
+          <span>Корпоративный контакт</span>
+          <strong>{contactPath}</strong>
         </div>
       ) : null}
     </article>

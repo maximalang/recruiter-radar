@@ -43,10 +43,11 @@ describe('LeadCard signal-card template', () => {
     );
     const card = container.querySelector('[data-signal-card="true"]');
     expect(card).not.toBeNull();
-    expect(screen.getByText('Сила сигнала')).toBeTruthy();
+    expect(screen.getByText('Сигнал радара')).toBeTruthy();
+    expect(screen.getByRole('meter', { name: 'Сила сигнала: 80 из 100' })).toBeTruthy();
     expect(screen.getByText('Почему сейчас')).toBeTruthy();
-    expect(screen.getByText('Доказательства')).toBeTruthy();
-    expect(screen.getByText('Контакт')).toBeTruthy();
+    expect(screen.getByLabelText('Доказательства сигнала')).toBeTruthy();
+    expect(screen.getByText('Корпоративный контакт')).toBeTruthy();
     expect(card?.textContent).not.toContain('Горячий');
     expect(card?.textContent).toContain('A');
   });
