@@ -115,6 +115,8 @@
   .topNavLinks {
     width: 100%;
     overflow-x: auto;
+    justify-content: space-between;
+    gap: 2px;
     padding-bottom: 2px;
     scrollbar-width: none;
   }
@@ -126,8 +128,8 @@
     min-height: 36px;
     display: inline-flex;
     align-items: center;
-    font-size: 0.78rem;
-    padding: 6px 11px;
+    font-size: 0.74rem;
+    padding: 6px 7px;
   }
 }
 
