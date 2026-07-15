@@ -1,4 +1,5 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
+import type { Pool } from "pg";
 
 import { getPool } from "./db-pool";
 import {
@@ -11,6 +12,7 @@ import { decryptNotificationSecret, redactProviderSecret } from "./notification-
 import type { NotificationProvider } from "./notifications";
 
 const MAX_DIGEST_ITEMS = 10;
+const STALE_JOB_SECONDS = 120;
 
 type RouteRow = {
   accountId: string;
@@ -35,6 +37,11 @@ type DigestLeadRow = {
   confidenceGate: string | null;
   latestPublishedAt: string | null;
   payload: Record<string, unknown> | null;
+};
+
+type ClaimedJob = {
+  id: string;
+  attemptCount: number;
 };
 
 type TelegramCredentials = { botToken: string };
@@ -70,7 +77,9 @@ function leadWhyNow(lead: DigestLeadRow): string | null {
   }
   const titles = payload.evidence_titles;
   if (Array.isArray(titles)) {
-    const first = titles.find((value): value is string => typeof value === "string" && value.trim() !== "");
+    const first = titles.find(
+      (value): value is string => typeof value === "string" && value.trim() !== "",
+    );
     if (first) return first.trim();
   }
   return null;
@@ -87,21 +96,22 @@ function filterLeadsForRoute(route: RouteRow, leads: DigestLeadRow[]): DigestLea
 
 function renderTelegramDigest(leads: DigestLeadRow[]): string {
   const baseUrl = resolveAppBaseUrl();
-  const lines = [
-    "<b>Recruiter Radar — компании для контакта сегодня</b>",
-    "",
-  ];
+  const lines = ["<b>Recruiter Radar — компании для контакта сегодня</b>", ""];
   leads.slice(0, MAX_DIGEST_ITEMS).forEach((lead, index) => {
     const score = lead.score == null ? "—" : lead.score.toFixed(1);
     lines.push(`<b>${index + 1}. ${escapeHtml(lead.orgName)}</b>`);
-    lines.push(`Сигнал: ${escapeHtml(lead.confidenceGate ?? "B")} · score ${score} · вакансий ${lead.vacanciesCount}`);
+    lines.push(
+      `Сигнал: ${escapeHtml(lead.confidenceGate ?? "B")} · score ${score} · вакансий ${lead.vacanciesCount}`,
+    );
     const why = leadWhyNow(lead);
     if (why) lines.push(escapeHtml(why).slice(0, 420));
     if (baseUrl) lines.push(`<a href="${baseUrl}/leads/${lead.id}">Открыть карточку</a>`);
     lines.push("");
   });
   if (leads.length > MAX_DIGEST_ITEMS && baseUrl) {
-    lines.push(`Ещё ${leads.length - MAX_DIGEST_ITEMS}: <a href="${baseUrl}/leads">открыть весь список</a>`);
+    lines.push(
+      `Ещё ${leads.length - MAX_DIGEST_ITEMS}: <a href="${baseUrl}/leads">открыть весь список</a>`,
+    );
   }
   return lines.join("\n").slice(0, 4090);
 }
@@ -112,7 +122,9 @@ function renderPlainDigest(leads: DigestLeadRow[]): string {
   leads.slice(0, MAX_DIGEST_ITEMS).forEach((lead, index) => {
     const score = lead.score == null ? "—" : lead.score.toFixed(1);
     lines.push(`${index + 1}. ${lead.orgName}`);
-    lines.push(`Сигнал ${lead.confidenceGate ?? "B"} · score ${score} · вакансий ${lead.vacanciesCount}`);
+    lines.push(
+      `Сигнал ${lead.confidenceGate ?? "B"} · score ${score} · вакансий ${lead.vacanciesCount}`,
+    );
     const why = leadWhyNow(lead);
     if (why) lines.push(why.slice(0, 420));
     if (baseUrl) lines.push(`${baseUrl}/leads/${lead.id}`);
@@ -125,23 +137,192 @@ function renderPlainDigest(leads: DigestLeadRow[]): string {
 }
 
 function deterministicVkRandomId(jobId: string): number {
-  const value = Number.parseInt(createHash("sha256").update(jobId).digest("hex").slice(0, 8), 16);
+  const value = Number.parseInt(
+    createHash("sha256").update(jobId).digest("hex").slice(0, 8),
+    16,
+  );
   return value % 2_147_483_647;
 }
 
-function idempotencyKey(input: {
-  runId: string;
-  route: RouteRow;
-}): string {
+function buildIdempotencyKey(runId: string, route: RouteRow): string {
   return createHash("sha256")
-    .update([
-      "digest",
-      input.runId,
+    .update(
+      ["digest", runId, route.routeId, route.endpointId, String(route.routeVersion)].join(":"),
+    )
+    .digest("hex");
+}
+
+async function claimDeliveryJob(
+  pool: Pool,
+  input: {
+    runId: string;
+    clientProfileId: string | number;
+    route: RouteRow;
+  },
+): Promise<ClaimedJob | null> {
+  const result = await pool.query<ClaimedJob>(
+    `
+      INSERT INTO notification_delivery_jobs (
+        client_profile_id, route_id, endpoint_id, provider_account_id,
+        digest_run_id, event_kind, idempotency_key, status
+      ) VALUES ($1, $2, $3, $4, $5, 'daily_digest', $6, 'sending')
+      ON CONFLICT (idempotency_key)
+      DO UPDATE SET status = 'sending', updated_at = NOW()
+      WHERE notification_delivery_jobs.status IN ('failed', 'queued')
+         OR (
+           notification_delivery_jobs.status = 'sending'
+           AND notification_delivery_jobs.updated_at < NOW() - ($7::int * INTERVAL '1 second')
+         )
+      RETURNING id::text AS id, attempt_count AS "attemptCount"
+    `,
+    [
+      input.clientProfileId,
       input.route.routeId,
       input.route.endpointId,
-      String(input.route.routeVersion),
-    ].join(":"))
-    .digest("hex");
+      input.route.accountId,
+      input.runId,
+      buildIdempotencyKey(input.runId, input.route),
+      STALE_JOB_SECONDS,
+    ],
+  );
+  return result.rowCount === 1 ? result.rows[0] : null;
+}
+
+async function recordDeliverySuccess(
+  pool: Pool,
+  input: {
+    job: ClaimedJob;
+    endpointId: string;
+    providerMessageId?: string;
+    responseSnapshot: Record<string, unknown>;
+    startedAt: Date;
+  },
+): Promise<void> {
+  const client = await pool.connect();
+  const attemptNo = input.job.attemptCount + 1;
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      `
+        UPDATE notification_delivery_jobs
+        SET status = 'sent', attempt_count = $2, sent_at = NOW(), failed_at = NULL,
+            last_error_code = NULL, last_error_message = NULL, updated_at = NOW()
+        WHERE id = $1 AND status = 'sending'
+      `,
+      [input.job.id, attemptNo],
+    );
+    await client.query(
+      `
+        INSERT INTO notification_delivery_attempts (
+          job_id, attempt_no, status, provider_message_id, response_snapshot,
+          started_at, finished_at
+        ) VALUES ($1, $2, 'sent', $3, $4::jsonb, $5, NOW())
+      `,
+      [
+        input.job.id,
+        attemptNo,
+        input.providerMessageId ?? null,
+        JSON.stringify(input.responseSnapshot),
+        input.startedAt.toISOString(),
+      ],
+    );
+    await client.query(
+      `
+        UPDATE notification_endpoints
+        SET last_delivery_at = NOW(), last_error_at = NULL, last_error_code = NULL,
+            status = 'active', updated_at = NOW()
+        WHERE id = $1
+      `,
+      [input.endpointId],
+    );
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function recordDeliveryFailure(
+  pool: Pool,
+  input: {
+    job: ClaimedJob;
+    endpointId: string;
+    startedAt: Date;
+    classified: ReturnType<typeof classifyNotificationProviderError>;
+    safeMessage: string;
+  },
+): Promise<void> {
+  const client = await pool.connect();
+  const attemptNo = input.job.attemptCount + 1;
+  const attemptStatus =
+    input.classified.kind === "rate_limited"
+      ? "rate_limited"
+      : input.classified.kind === "auth"
+        ? "auth_error"
+        : input.classified.kind === "permanent"
+          ? "permanent_error"
+          : "retryable_error";
+  const jobStatus =
+    attemptNo >= 5 || input.classified.kind === "permanent" || input.classified.kind === "auth"
+      ? "dead_letter"
+      : "failed";
+
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      `
+        UPDATE notification_delivery_jobs
+        SET status = $2, attempt_count = $3, failed_at = NOW(),
+            last_error_code = $4, last_error_message = $5, updated_at = NOW()
+        WHERE id = $1 AND status = 'sending'
+      `,
+      [
+        input.job.id,
+        jobStatus,
+        attemptNo,
+        input.classified.code ?? input.classified.kind,
+        input.safeMessage,
+      ],
+    );
+    await client.query(
+      `
+        INSERT INTO notification_delivery_attempts (
+          job_id, attempt_no, status, http_status, provider_error_code,
+          provider_error_message, started_at, finished_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+      `,
+      [
+        input.job.id,
+        attemptNo,
+        attemptStatus,
+        input.classified.status ?? null,
+        input.classified.code ?? input.classified.kind,
+        input.safeMessage,
+        input.startedAt.toISOString(),
+      ],
+    );
+    await client.query(
+      `
+        UPDATE notification_endpoints
+        SET last_error_at = NOW(), last_error_code = $2, updated_at = NOW(),
+            status = CASE WHEN $3 IN ('auth', 'permanent') THEN 'error' ELSE status END
+        WHERE id = $1
+      `,
+      [
+        input.endpointId,
+        input.classified.code ?? input.classified.kind,
+        input.classified.kind,
+      ],
+    );
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function hasActiveNotificationEndpoint(input: {
@@ -183,9 +364,13 @@ export async function dispatchDigestNotifications(input: {
   providers?: NotificationProvider[];
 }): Promise<NotificationDispatchResult> {
   const pool = getPool();
-  if (!pool) return { sent: 0, failed: 0, skipped: 0, errors: ["DATABASE_URL is not set."] };
+  if (!pool) {
+    return { sent: 0, failed: 0, skipped: 0, errors: ["DATABASE_URL is not set."] };
+  }
 
-  const providers = input.providers?.length ? input.providers : ["telegram", "vk", "webhook"];
+  const providers = input.providers?.length
+    ? input.providers
+    : (["telegram", "vk", "webhook"] as NotificationProvider[]);
   const routes = await pool.query<RouteRow>(
     `
       SELECT
@@ -244,42 +429,16 @@ export async function dispatchDigestNotifications(input: {
       continue;
     }
 
-    const dedupeKey = idempotencyKey({ runId: input.runId, route });
-    const jobResult = await pool.query<{
-      id: string;
-      status: string;
-      attemptCount: number;
-    }>(
-      `
-        INSERT INTO notification_delivery_jobs (
-          client_profile_id, route_id, endpoint_id, provider_account_id,
-          digest_run_id, event_kind, idempotency_key, status
-        ) VALUES ($1, $2, $3, $4, $5, 'daily_digest', $6, 'sending')
-        ON CONFLICT (idempotency_key)
-        DO UPDATE SET
-          status = CASE
-            WHEN notification_delivery_jobs.status IN ('failed', 'queued') THEN 'sending'
-            ELSE notification_delivery_jobs.status
-          END,
-          updated_at = NOW()
-        RETURNING id::text AS id, status, attempt_count AS "attemptCount"
-      `,
-      [
-        input.clientProfileId,
-        route.routeId,
-        route.endpointId,
-        route.accountId,
-        input.runId,
-        dedupeKey,
-      ],
-    );
-    const job = jobResult.rows[0];
-    if (job.status === "sent" || job.status === "dead_letter" || job.status === "cancelled") {
+    const job = await claimDeliveryJob(pool, {
+      runId: input.runId,
+      clientProfileId: input.clientProfileId,
+      route,
+    });
+    if (!job) {
       result.skipped += 1;
       continue;
     }
 
-    const attemptNo = job.attemptCount + 1;
     const startedAt = new Date();
     try {
       let providerMessageId: string | undefined;
@@ -315,6 +474,7 @@ export async function dispatchDigestNotifications(input: {
           route.secretCiphertext,
           accountAad(route.accountId, route.ownerId),
         );
+        const baseUrl = resolveAppBaseUrl();
         const webhook = await sendSignedWebhook({
           url: credentials.url,
           secret: credentials.signingSecret,
@@ -332,114 +492,44 @@ export async function dispatchDigestNotifications(input: {
               vacancies_count: lead.vacanciesCount,
               why_now: leadWhyNow(lead),
               latest_published_at: lead.latestPublishedAt,
-              url: resolveAppBaseUrl() ? `${resolveAppBaseUrl()}/leads/${lead.id}` : null,
+              url: baseUrl ? `${baseUrl}/leads/${lead.id}` : null,
             })),
           },
         });
         responseSnapshot = { status: webhook.status, response: webhook.responseText };
       }
 
-      await pool.query("BEGIN");
-      try {
-        await pool.query(
-          `
-            UPDATE notification_delivery_jobs
-            SET status = 'sent', attempt_count = $2, sent_at = NOW(), failed_at = NULL,
-                last_error_code = NULL, last_error_message = NULL, updated_at = NOW()
-            WHERE id = $1
-          `,
-          [job.id, attemptNo],
-        );
-        await pool.query(
-          `
-            INSERT INTO notification_delivery_attempts (
-              job_id, attempt_no, status, provider_message_id, response_snapshot,
-              started_at, finished_at
-            ) VALUES ($1, $2, 'sent', $3, $4::jsonb, $5, NOW())
-          `,
-          [job.id, attemptNo, providerMessageId ?? null, JSON.stringify(responseSnapshot), startedAt.toISOString()],
-        );
-        await pool.query(
-          `
-            UPDATE notification_endpoints
-            SET last_delivery_at = NOW(), last_error_at = NULL, last_error_code = NULL, updated_at = NOW()
-            WHERE id = $1
-          `,
-          [route.endpointId],
-        );
-        await pool.query("COMMIT");
-      } catch (error) {
-        await pool.query("ROLLBACK");
-        throw error;
-      }
+      await recordDeliverySuccess(pool, {
+        job,
+        endpointId: route.endpointId,
+        providerMessageId,
+        responseSnapshot,
+        startedAt,
+      });
       result.sent += 1;
     } catch (error) {
       const classified = classifyNotificationProviderError(error);
-      const attemptStatus =
-        classified.kind === "rate_limited"
-          ? "rate_limited"
-          : classified.kind === "auth"
-            ? "auth_error"
-            : classified.kind === "permanent"
-              ? "permanent_error"
-              : "retryable_error";
-      const nextStatus = attemptNo >= 5 || classified.kind === "permanent" || classified.kind === "auth"
-        ? "dead_letter"
-        : "failed";
       const safeMessage = redactProviderSecret(classified.message).slice(0, 1000);
-
-      await pool.query("BEGIN");
       try {
-        await pool.query(
-          `
-            UPDATE notification_delivery_jobs
-            SET status = $2, attempt_count = $3, failed_at = NOW(),
-                last_error_code = $4, last_error_message = $5, updated_at = NOW()
-            WHERE id = $1
-          `,
-          [job.id, nextStatus, attemptNo, classified.code ?? classified.kind, safeMessage],
+        await recordDeliveryFailure(pool, {
+          job,
+          endpointId: route.endpointId,
+          startedAt,
+          classified,
+          safeMessage,
+        });
+      } catch (recordError) {
+        result.errors.push(
+          `${route.provider}:${route.destinationLabel ?? route.destinationId}: failed to persist delivery error`,
         );
-        await pool.query(
-          `
-            INSERT INTO notification_delivery_attempts (
-              job_id, attempt_no, status, http_status, provider_error_code,
-              provider_error_message, started_at, finished_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-          `,
-          [
-            job.id,
-            attemptNo,
-            attemptStatus,
-            classified.status ?? null,
-            classified.code ?? classified.kind,
-            safeMessage,
-            startedAt.toISOString(),
-          ],
-        );
-        await pool.query(
-          `
-            UPDATE notification_endpoints
-            SET last_error_at = NOW(), last_error_code = $2, updated_at = NOW(),
-                status = CASE WHEN $3 IN ('auth', 'permanent') THEN 'error' ELSE status END
-            WHERE id = $1
-          `,
-          [route.endpointId, classified.code ?? classified.kind, classified.kind],
-        );
-        await pool.query("COMMIT");
-      } catch {
-        await pool.query("ROLLBACK");
+        console.error("Failed to persist notification delivery failure", recordError);
       }
       result.failed += 1;
-      result.errors.push(`${route.provider}:${route.destinationLabel ?? route.destinationId}: ${safeMessage}`);
+      result.errors.push(
+        `${route.provider}:${route.destinationLabel ?? route.destinationId}: ${safeMessage}`,
+      );
     }
   }
 
   return result;
-}
-
-export async function dispatchTestNotificationJob(input: {
-  clientProfileId: string | number;
-  connectionId: string;
-}): Promise<string> {
-  return `test_${input.clientProfileId}_${input.connectionId}_${randomUUID()}`;
 }
