@@ -72,31 +72,6 @@ export function TargetIcon(p: IconProps) {
   );
 }
 
-/** Geometric R monogram with an open radar orbit and one detected signal. */
-export function RadarLogo(p: IconProps) {
-  const { size, ...svgProps } = p;
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 36 36"
-      width={size ?? '1em'}
-      height={size ?? '1em'}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={3.2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      {...svgProps}
-    >
-      <path d="M7.5 29V7.5h9.2c6.4 0 10.2 3.2 10.2 8.3 0 4.2-2.6 7-6.9 7.8L29 31" />
-      <path d="M13 13h3.7c2.6 0 4.1 1 4.1 2.9 0 1.8-1.5 2.9-4.1 2.9H13" opacity={0.72} />
-      <path d="M25.4 7.8a10.7 10.7 0 0 1 3.1 3.5" stroke="var(--rr-logo-accent, #4f7df3)" strokeWidth={2.5} />
-      <circle cx="29.5" cy="6" r="2.4" fill="var(--rr-logo-accent, #4f7df3)" stroke="none" />
-    </svg>
-  );
-}
-
 export function PinIcon(p: IconProps) {
   return (
     <Svg {...p}>

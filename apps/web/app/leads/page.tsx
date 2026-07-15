@@ -6,6 +6,8 @@ import { listClientProfiles, resolveHiringMode, type ClientProfile } from '@/lib
 import { getOwnerIdFromSession } from '@/lib/session';
 import { buildFitExplanation, FIT_DIMENSION_ICON } from '@/lib/leads/fit-explanation';
 import { deriveRoleNames, splitRolesForDisplay, deriveUrgencyCue } from '@/lib/leads/lead-quality';
+import { formatVacanciesCount } from '@/lib/format/plural';
+import { formatScorePoints, scorePercent } from '@/lib/scoring/score-display';
 import LeadsFilters from './leads-filters';
 import { pluralizeLeads } from './page-helpers';
 import {
@@ -15,12 +17,10 @@ import {
   MetricCard,
   GateBadgeInline,
   FeedbackBadge,
-  ScoreBar,
-  SignalFreshnessChip,
+  formatSignalFreshness,
   AiHintChip,
   ForeignEmployerBadge,
   ReviewStatusBadge,
-  UrgencyCueChip,
   getScoreTone,
   TableCard,
   EmptyState,
@@ -31,7 +31,7 @@ import {
 } from '../ui/internal-page';
 import { internalPageClasses as ipStyles } from '../ui/internal-page';
 import { SiteFooter } from '../ui/site-footer';
-import { ShieldIcon, PinIcon, BriefcaseIcon, FileIcon, AlertIcon, SearchIcon, TargetIcon, ClockIcon, CheckIcon } from '../ui/icons';
+import { ShieldIcon, PinIcon, BriefcaseIcon, AlertIcon, SearchIcon, TargetIcon, ClockIcon, CheckIcon } from '../ui/icons';
 
 export const dynamic = 'force-dynamic';
 
@@ -75,95 +75,103 @@ export function LeadCard({
   const showWorkflowStatus =
     (Boolean(lead.reviewStatus) && lead.reviewStatus !== 'auto_approved') ||
     (Boolean(lead.feedbackStatus) && lead.feedbackStatus !== 'none');
+  const points = formatScorePoints(lead.score);
+  const scoreWidth = scorePercent(lead.score);
+  const freshness = formatSignalFreshness(lead.latestPublishedAt)?.label;
+  const vacancies = formatVacanciesCount(lead.vacanciesCount);
+  const roles = shownRoles.length > 0
+    ? `${shownRoles.join(' · ')}${moreRoles > 0 ? ` + ещё ${moreRoles}` : ''}`
+    : 'Роли уточняются';
+  const evidenceItems = [
+    urgency.label,
+    [vacancies, freshness].filter(Boolean).join(' · ') || 'Свежесть проверяется',
+    roles,
+  ];
 
   return (
-    <article className={ipStyles.leadCard} data-signal-card="true" data-tone={tone}>
-      <div className={ipStyles.leadCardBody}>
-        <div className={ipStyles.leadCardHead}>
-          <div className={ipStyles.leadCardHeadMain}>
-            <Link href={`/leads/${lead.id}`} className={ipStyles.leadLink}>
-              <span className={ipStyles.leadCardOrg}>{lead.orgName}</span>
-            </Link>
-            {lead.locationNames.length > 0 && (
-              <span className={ipStyles.leadCompanyMeta}>
-                <PinIcon className={ipStyles.chipIcon} /> {lead.locationNames.slice(0, 2).join(', ')}
-              </span>
-            )}
-            <div className={ipStyles.leadCardTags}>
-              {showWorkflowStatus ? (
-                <span className={ipStyles.leadCardTagGroup} data-chip-group="status">
-                  <ReviewStatusBadge status={lead.reviewStatus} />
-                  <FeedbackBadge status={lead.feedbackStatus} />
-                </span>
-              ) : null}
-              <ForeignEmployerBadge isForeign={lead.isForeignEmployer} />
-              <AiHintChip present={lead.hasAiHint} />
-            </div>
-          </div>
-          <div className={ipStyles.leadCardHeadAside}>
-            <span className={ipStyles.leadScoreLabel}>Сила сигнала</span>
-            <div className={ipStyles.leadCardScore}>
-              <ScoreBar score={lead.score} />
-            </div>
-            <GateBadgeInline gate={lead.confidenceGate} />
-          </div>
-        </div>
-
-        {lead.whyNow && (
-          <div className={ipStyles.leadFieldRow} data-kind="why">
-            <span className={ipStyles.leadFieldLabel}>Почему сейчас</span>
-            <span className={ipStyles.leadFieldValue}>{lead.whyNow}</span>
-          </div>
-        )}
-        {fitPreview && (
-          <div className={ipStyles.leadFieldRow} data-kind="fit">
-            <span className={ipStyles.leadFieldLabel}>Почему подходит</span>
-            <span className={ipStyles.leadFieldValue}>
-              <FitIcon name={fitPreview.icon} className={ipStyles.chipIcon} /> {fitPreview.text}
+    <article className={`${ipStyles.leadCard} ${ipStyles.signalLeadCard}`} data-signal-card="true" data-tone={tone}>
+      <div className={ipStyles.signalLeadTopbar}>
+        <span className={ipStyles.signalLeadLabel}>Сигнал радара</span>
+        <div className={ipStyles.leadCardTags}>
+          <GateBadgeInline gate={lead.confidenceGate} />
+          {showWorkflowStatus ? (
+            <span className={ipStyles.leadCardTagGroup} data-chip-group="status">
+              <ReviewStatusBadge status={lead.reviewStatus} />
+              <FeedbackBadge status={lead.feedbackStatus} />
             </span>
-          </div>
-        )}
-
-        <div className={ipStyles.leadEvidenceBlock}>
-          <span className={ipStyles.leadFieldLabel}>Доказательства</span>
-          <div className={ipStyles.leadCardFooter}>
-            <UrgencyCueChip level={urgency.level} label={urgency.label} />
-            <SignalFreshnessChip latestPublishedAt={lead.latestPublishedAt} />
-            {lead.vacanciesCount > 0 && (
-              <span className={ipStyles.leadMetaChip}><BriefcaseIcon className={ipStyles.chipIcon} /> {lead.vacanciesCount} вакансий</span>
-            )}
-            {shownRoles.length > 0 ? (
-              <span className={ipStyles.leadMetaChip}>
-                <FileIcon className={ipStyles.chipIcon} /> {shownRoles.join(' · ')}{moreRoles > 0 ? ` + ещё ${moreRoles}` : ''}
-              </span>
-            ) : (
-              <span className={ipStyles.leadMetaChip} data-muted="true">
-                <FileIcon className={ipStyles.chipIcon} /> роли не определены
-              </span>
-            )}
-          </div>
+          ) : null}
+          <ForeignEmployerBadge isForeign={lead.isForeignEmployer} />
+          <AiHintChip present={lead.hasAiHint} />
         </div>
-
-        {risks.length > 0 && (
-          <div className={ipStyles.leadRiskRow}>
-            {risks.map((risk) => (
-              <span key={risk} className={ipStyles.leadRiskChip}><AlertIcon className={ipStyles.chipIcon} /> {risk}</span>
-            ))}
-          </div>
-        )}
-
-        {lead.lawfulContactPath && (
-          <div className={ipStyles.leadContactRow}>
-            <span className={ipStyles.leadFieldLabel}>Контакт</span>
-            <span className={ipStyles.leadContactChip}>
-              <ShieldIcon className={ipStyles.chipIcon} /> {lead.lawfulContactPath}
-            </span>
-          </div>
-        )}
       </div>
-      <div className={ipStyles.leadCardAction}>
+
+      <div className={ipStyles.signalLeadCompanyRow}>
+        <div>
+          <Link href={`/leads/${lead.id}`} className={ipStyles.signalLeadName}>
+            {lead.orgName}
+          </Link>
+          {lead.locationNames.length > 0 && (
+            <div className={ipStyles.signalLeadMeta}>
+              <PinIcon className={ipStyles.chipIcon} /> {lead.locationNames.slice(0, 2).join(', ')}
+            </div>
+          )}
+        </div>
+        <div className={ipStyles.signalLeadScore}>
+          <strong>{points}</strong><span>/100</span>
+        </div>
+      </div>
+
+      <div
+        className={ipStyles.signalLeadScoreTrack}
+        role="meter"
+        aria-valuenow={Number(points)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={`Сила сигнала: ${points} из 100`}
+      >
+        <span data-tone={tone} style={{ width: `${scoreWidth}%` }} />
+      </div>
+
+      {lead.whyNow && (
+        <div className={ipStyles.signalLeadWhy}>
+          <span>Почему сейчас</span>
+          <strong>{lead.whyNow}</strong>
+        </div>
+      )}
+
+      {fitPreview && (
+        <div className={ipStyles.signalLeadFit}>
+          <span>Почему подходит</span>
+          <p><FitIcon name={fitPreview.icon} className={ipStyles.chipIcon} /> {fitPreview.text}</p>
+        </div>
+      )}
+
+      <div className={ipStyles.signalLeadEvidence} aria-label="Доказательства сигнала">
+        {evidenceItems.map((item, index) => (
+          <div key={`${item}-${index}`}>
+            <span>{String(index + 1).padStart(2, '0')}</span>
+            <p>{item}</p>
+          </div>
+        ))}
+      </div>
+
+      {risks.length > 0 && (
+        <div className={ipStyles.leadRiskRow}>
+          {risks.map((risk) => (
+            <span key={risk} className={ipStyles.leadRiskChip}><AlertIcon className={ipStyles.chipIcon} /> {risk}</span>
+          ))}
+        </div>
+      )}
+
+      <div className={ipStyles.signalLeadFooter}>
+        <div>
+          <span className={ipStyles.signalLeadFooterLabel}>Корпоративный контакт</span>
+          <strong>
+            <ShieldIcon className={ipStyles.chipIcon} /> {lead.lawfulContactPath || 'Уточняется'}
+          </strong>
+        </div>
         <Link href={`/leads/${lead.id}`} className={ipStyles.leadOpenBtn}>
-          Открыть →
+          Открыть карточку →
         </Link>
       </div>
     </article>

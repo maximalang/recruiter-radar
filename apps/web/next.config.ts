@@ -1,5 +1,17 @@
 import type { NextConfig } from "next";
 
+export function buildContentSecurityPolicy(environment: string | undefined): string {
+  const isDevelopment = environment !== 'production';
+  const scriptPolicy = isDevelopment
+    ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+    : "script-src 'self' 'unsafe-inline'";
+  const connectPolicy = isDevelopment
+    ? "connect-src 'self' ws: https://telegram.org"
+    : "connect-src 'self' https://telegram.org";
+
+  return `default-src 'self'; ${scriptPolicy}; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; ${connectPolicy}; frame-ancestors 'none'`;
+}
+
 const nextConfig: NextConfig = {
   // Enable standalone output for Docker
   output: 'standalone',
@@ -21,7 +33,7 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self' https://telegram.org; frame-ancestors 'none'",
+            value: buildContentSecurityPolicy(process.env.NODE_ENV),
           },
           {
             key: 'X-DNS-Prefetch-Control',
