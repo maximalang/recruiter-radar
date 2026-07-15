@@ -27,6 +27,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Validate deployment scripts
+      run: bash -n scripts/deploy/configure-notification-encryption.sh
+
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
