@@ -11,6 +11,7 @@ describe('landing card copy helpers', () => {
       evidenceTitles: [
         'A-HOTEL Fontanka 3*',
         'A-HOTEL Liner Airport 3*',
+        'A-ОТЕЛЬ Лайнер Аэропорт 3*',
         'A-HOTEL Hotel Park Krestovskiy',
       ],
       sourceFamilies: ['hh', 'hh'],
