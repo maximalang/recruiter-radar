@@ -18,6 +18,11 @@ import {
   isLlmConfigured,
   isCodeXoidProvider,
 } from '@/lib/ai/providers/llm-config';
+// The operator-DB override cache (lib/operatorSettings) is a second precedence
+// layer above env as of 2026-07-15. These env-only tests must start from a clean
+// cache so the resolvers fall through to env exactly as before — otherwise a
+// stale override cached by an earlier test would change the result.
+import { __resetLlmOverridesCacheForTests } from '@/lib/operatorSettings';
 
 const ORIG = {
   OPENAI_API_KEY: process.env.OPENAI_API_KEY,
@@ -26,7 +31,12 @@ const ORIG = {
   FIRECRAWL_LLM_MODEL: process.env.FIRECRAWL_LLM_MODEL,
 };
 
+beforeEach(() => {
+  __resetLlmOverridesCacheForTests();
+});
+
 afterEach(() => {
+  __resetLlmOverridesCacheForTests();
   for (const k of Object.keys(ORIG) as Array<keyof typeof ORIG>) {
     if (ORIG[k] === undefined) delete process.env[k];
     else process.env[k] = ORIG[k];
