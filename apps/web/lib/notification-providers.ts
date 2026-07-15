@@ -1,4 +1,6 @@
 import { createHmac } from "node:crypto";
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
 
 import { sendTelegramTextMessage } from "./telegram";
 
@@ -246,6 +248,55 @@ export async function sendVkNotification(input: {
   return { providerMessageId: response == null ? undefined : String(response) };
 }
 
+function isPrivateIpv4(address: string): boolean {
+  const parts = address.split(".").map(Number);
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
+    return true;
+  }
+  const [a, b] = parts;
+  return (
+    a === 0 ||
+    a === 10 ||
+    a === 127 ||
+    (a === 100 && b >= 64 && b <= 127) ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 0) ||
+    (a === 192 && b === 168) ||
+    (a === 198 && (b === 18 || b === 19)) ||
+    a >= 224
+  );
+}
+
+function isPrivateIpv6(address: string): boolean {
+  const normalized = address.toLowerCase().split("%")[0];
+  return (
+    normalized === "::" ||
+    normalized === "::1" ||
+    normalized.startsWith("fc") ||
+    normalized.startsWith("fd") ||
+    normalized.startsWith("fe8") ||
+    normalized.startsWith("fe9") ||
+    normalized.startsWith("fea") ||
+    normalized.startsWith("feb") ||
+    normalized.startsWith("::ffff:127.") ||
+    normalized.startsWith("::ffff:10.") ||
+    normalized.startsWith("::ffff:192.168.") ||
+    normalized.startsWith("::ffff:169.254.")
+  );
+}
+
+function isPrivateAddress(address: string): boolean {
+  const family = isIP(address);
+  if (family === 4) return isPrivateIpv4(address);
+  if (family === 6) return isPrivateIpv6(address);
+  return true;
+}
+
+function localWebhookAllowed(): boolean {
+  return process.env.NODE_ENV !== "production";
+}
+
 export function validateWebhookUrl(raw: string): URL {
   let url: URL;
   try {
@@ -254,14 +305,38 @@ export function validateWebhookUrl(raw: string): URL {
     throw new Error("Webhook URL is invalid.");
   }
 
-  const isLocal = url.hostname === "localhost" || url.hostname === "127.0.0.1";
-  if (url.protocol !== "https:" && !(isLocal && url.protocol === "http:")) {
+  const hostname = url.hostname.toLowerCase().replace(/\.$/, "");
+  const localHostname =
+    hostname === "localhost" ||
+    hostname.endsWith(".localhost") ||
+    hostname.endsWith(".local") ||
+    hostname.endsWith(".internal");
+  if (url.protocol !== "https:" && !(localWebhookAllowed() && localHostname && url.protocol === "http:")) {
     throw new Error("Webhook URL must use HTTPS.");
   }
   if (url.username || url.password) {
     throw new Error("Webhook URL must not contain embedded credentials.");
   }
+  if (localHostname && !localWebhookAllowed()) {
+    throw new Error("Webhook URL must not point to a local host.");
+  }
+  if (isIP(hostname) && isPrivateAddress(hostname) && !localWebhookAllowed()) {
+    throw new Error("Webhook URL must not point to a private network address.");
+  }
   return url;
+}
+
+async function assertPublicWebhookTarget(target: URL): Promise<void> {
+  if (localWebhookAllowed()) return;
+  const hostname = target.hostname.toLowerCase().replace(/\.$/, "");
+  const addresses = isIP(hostname)
+    ? [{ address: hostname }]
+    : await lookup(hostname, { all: true, verbatim: true });
+  if (addresses.length === 0 || addresses.some(({ address }) => isPrivateAddress(address))) {
+    throw providerError("Webhook host resolves to a private or reserved network address.", {
+      code: "webhook_private_address",
+    });
+  }
 }
 
 export async function sendSignedWebhook(input: {
@@ -272,6 +347,7 @@ export async function sendSignedWebhook(input: {
   payload: Record<string, unknown>;
 }): Promise<{ status: number; responseText: string }> {
   const target = validateWebhookUrl(input.url);
+  await assertPublicWebhookTarget(target);
   const timestamp = new Date().toISOString();
   const rawBody = JSON.stringify({
     event: input.event,
@@ -293,7 +369,14 @@ export async function sendSignedWebhook(input: {
     },
     body: rawBody,
     cache: "no-store",
+    redirect: "manual",
   });
+  if (response.status >= 300 && response.status < 400) {
+    throw providerError("Webhook redirects are not allowed.", {
+      status: response.status,
+      code: "webhook_redirect_blocked",
+    });
+  }
   const responseText = (await response.text()).slice(0, 2_000);
   if (!response.ok) {
     throw providerError(`Webhook returned HTTP ${response.status}.`, {
