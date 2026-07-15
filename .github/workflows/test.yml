@@ -42,6 +42,9 @@ jobs:
     - name: Type check
       run: npm run web:check
 
+    - name: Validate database migrations
+      run: DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/test node packages/db/scripts/migrate.mjs
+
     - name: Run tests
       shell: bash
       run: |
