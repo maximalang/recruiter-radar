@@ -51,9 +51,13 @@ jobs:
         run: |
           ssh -p ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
             ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }} << 'SSH_EOF'
-          set -e
+          set -euo pipefail
+          echo "=== Freeing space from unused Docker artifacts ==="
+          docker container prune -f
+          docker image prune -af
+          df -h /
           echo "=== Loading new image ==="
-          docker load < /opt/recruiter-radar/image-new.tar.gz | tail -1
+          docker load < /opt/recruiter-radar/image-new.tar.gz
           echo "=== Recreating web container ==="
           cd /opt/recruiter-radar
           docker compose up -d --force-recreate web
@@ -80,7 +84,14 @@ jobs:
           for i in $(seq 1 10); do
             code=$(curl -s -o /dev/null -w '%{http_code}' https://recruiter-radar.ru/api/health --max-time 30)
             echo "Public /api/health attempt $i -> HTTP $code"
-            if [ "$code" = "200" ]; then echo "Public endpoint healthy"; exit 0; fi
+            if [ "$code" = "200" ]; then
+              if curl -fsS https://recruiter-radar.ru/ --max-time 30 | grep -q "Компания и контакты"; then
+                echo "Public endpoint serves the new landing"
+                exit 0
+              fi
+              echo "Health is green, but the landing is still stale"
+            fi
             sleep 3
           done
-          echo "WARNING: public health check did not reach 200 after 10 attempts (last: $code)"
+          echo "Public deployment verification failed (last health status: $code)"
+          exit 1
