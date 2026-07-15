@@ -21,7 +21,9 @@ import {
 } from "./ui/page-primitives";
 import ppStyles from "./ui/page-primitives.module.css";
 import {
+  buildPreviewEvidenceItems,
   buildFaqItems,
+  cleanEmployerName,
   formatLocationCaption,
   pickEvidenceTitles,
 } from "./home-page-components";
@@ -434,11 +436,12 @@ function PreviewDigestCard(props: {
   const location = formatLocationCaption(item.location_names);
   const evidenceTitles = pickEvidenceTitles(item.evidence_titles, 3);
   const vacanciesCaption = formatVacanciesCount(item.vacancies_count);
-  const evidenceItems = Array.from(new Set([
+  const evidenceItems = buildPreviewEvidenceItems({
+    whyNow,
     vacanciesCaption,
-    ...evidenceTitles,
-    contactPath,
-  ].filter((value): value is string => Boolean(value)))).slice(0, 3);
+    evidenceTitles,
+    sourceFamilies: item.source_families,
+  });
   // Score = 0–100 points (raw total_score / 4). The internal [0,4] signal
   // strength still drives the tone + the confidence gate + the hiringIntentMin
   // threshold (unchanged) — points are a higher-resolution read of the SAME
@@ -540,44 +543,4 @@ function PreviewDigestCard(props: {
       ) : null}
     </article>
   );
-}
-
-/**
- * Tidy an employer display name for the lead-card header. Registry/career-page
- * names often arrive as legal-form boilerplate with mismatched/nested straight
- * quotes ("АО "ГОСТИНИЦА "СОВЕТСКАЯ""), which reads as crooked noise in a card
- * title. This is a presentation-only cleanup: it normalises straight `"` to
- * typographic «», decides each quote's role by context (not blind alternation),
- * drops empty «» pairs, collapses stray whitespace, and trims. It never drops
- * the legal form or reorders tokens, so the name stays identifiable and matches
- * what the operator sees in /leads. Returns the trimmed original when already
- * clean.
- */
-function cleanEmployerName(raw: string): string {
-  const trimmed = (raw ?? "").trim();
-  if (trimmed === "") return trimmed;
-  // Collapse runs of whitespace inside the name (registry names carry stray
-  // double-spaces from OCR/concat).
-  const name = trimmed.replace(/\s+/g, " ");
-  // Normalise straight double quotes to typographic guillemets. A quote is an
-  // OPENING « when it follows whitespace, start-of-string, or another opening
-  // « (so nested legal-form names pair correctly: АО "ГОСТИНИЦА "СОВЕТСКАЯ""
-  // → АО «ГОСТИНИЦА «СОВЕТСКАЯ»»); otherwise it is a closing ». Context-based
-  // pairing beats blind alternation, which mis-pairs nested/odd quotes and
-  // inserts a stray » mid-name (the original "криво" the operator flagged).
-  let out = "";
-  for (let i = 0; i < name.length; i++) {
-    const ch = name[i];
-    if (ch === '"') {
-      const prev = i > 0 ? name[i - 1] : " ";
-      const isOpen = /[\s«]/.test(prev);
-      out += isOpen ? "«" : "»";
-    } else {
-      out += ch;
-    }
-  }
-  // Drop an empty guillemet pair («») a doubled quote may have produced, then
-  // collapse any whitespace left behind by the removal.
-  out = out.replace(/«\s*»/g, "").replace(/\s+/g, " ").trim();
-  return out || name;
 }

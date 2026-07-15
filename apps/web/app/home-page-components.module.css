@@ -643,7 +643,7 @@
 
 .previewEvidence {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   border-top: 1px solid #e5eaf2;
   border-bottom: 1px solid #e5eaf2;
 }
