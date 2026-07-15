@@ -67,7 +67,7 @@ export function encryptNotificationSecret(
   ].join(".");
 }
 
-export function decryptNotificationSecret<T extends Record<string, unknown>>(
+export function decryptNotificationSecret<T extends object>(
   envelope: string,
   aad: string,
 ): T {
