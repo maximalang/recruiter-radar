@@ -42,8 +42,30 @@ jobs:
     - name: Type check
       run: npm run web:check
 
+    - name: Validate database migrations
+      run: DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/test node packages/db/scripts/migrate.mjs
+
     - name: Run tests
-      run: npm run --workspace @recruiter-radar/web test
+      shell: bash
+      run: |
+        set +e
+        npm run --workspace @recruiter-radar/web test > /tmp/jest-output.log 2>&1
+        status=$?
+        if [ "$status" -ne 0 ]; then
+          echo "Jest failed. Showing the final 200 log lines:"
+          tail -n 200 /tmp/jest-output.log
+          exit "$status"
+        fi
+        cat /tmp/jest-output.log
+
+    - name: Upload Jest failure log
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: jest-failure-log
+        path: /tmp/jest-output.log
+        if-no-files-found: error
+        retention-days: 3
 
   build:
     needs: test

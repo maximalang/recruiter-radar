@@ -3,14 +3,14 @@ import { render } from '@testing-library/react';
 import { TopNav } from '@/app/ui/internal-page';
 
 describe('TopNav brand wordmark', () => {
-  it('renders the shared radar mark and wordmark', () => {
+  it('renders the shared Recruiter Radar artwork', () => {
     const { container } = render(<TopNav items={[]} />);
     const brand = container.querySelector('a.topNavBrand');
-    const mark = brand?.querySelector('svg');
+    const artwork = brand?.querySelector('img');
 
-    expect(mark).not.toBeNull();
-    expect(mark).toHaveAttribute('aria-hidden', 'true');
-    expect(brand?.textContent ?? '').toContain('Recruiter Radar');
+    expect(artwork).not.toBeNull();
+    expect(artwork).toHaveAttribute('src', expect.stringContaining('/brand/recruiter-radar-logo.svg'));
+    expect(artwork).toHaveAttribute('alt', 'Recruiter Radar');
   });
 
   it('does not render a literal back arrow in the brand', () => {
@@ -24,7 +24,8 @@ describe('TopNav brand wordmark', () => {
   it('keeps the "Recruiter Radar" brand label as the accessible name', () => {
     const { container } = render(<TopNav items={[]} />);
     const brand = container.querySelector('a.topNavBrand');
+    const artwork = brand?.querySelector('img');
 
-    expect(brand?.textContent ?? '').toContain('Recruiter Radar');
+    expect(artwork).toHaveAttribute('alt', 'Recruiter Radar');
   });
 });
