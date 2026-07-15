@@ -434,7 +434,7 @@ function PreviewDigestCard(props: {
   const whyNow = deriveWhyNow(item.reasons) || "";
   const contactPath = formatLawfulContactPath(item.lawfulContactPath);
   const location = formatLocationCaption(item.location_names);
-  const evidenceTitles = pickEvidenceTitles(item.evidence_titles, 3);
+  const evidenceTitles = pickEvidenceTitles(item.evidence_titles, 6);
   const vacanciesCaption = formatVacanciesCount(item.vacancies_count);
   const evidenceItems = buildPreviewEvidenceItems({
     whyNow,

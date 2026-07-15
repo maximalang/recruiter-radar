@@ -71,12 +71,43 @@ const PREVIEW_SOURCE_LABELS: Readonly<Record<string, string>> = {
   superjob: 'SuperJob',
 };
 
+const CARD_TRANSLITERATION: Readonly<Record<string, string>> = {
+  а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z',
+  и: 'i', й: 'i', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r',
+  с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'c', ч: 'ch', ш: 'sh',
+  щ: 'sh', ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya',
+};
+
+const NEAR_DUPLICATE_SIMILARITY = 0.78;
+
 function comparableCardText(value: string): string {
-  return value
-    .toLocaleLowerCase('ru-RU')
-    .replace(/[«»„“”"']/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return Array.from(value.toLocaleLowerCase('ru-RU'))
+    .map((character) => CARD_TRANSLITERATION[character] ?? character)
+    .join('')
+    .replace(/[^a-z0-9]+/g, '');
+}
+
+function editDistance(left: string, right: string): number {
+  let previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let leftIndex = 1; leftIndex <= left.length; leftIndex += 1) {
+    const current = [leftIndex];
+    for (let rightIndex = 1; rightIndex <= right.length; rightIndex += 1) {
+      current[rightIndex] = Math.min(
+        current[rightIndex - 1] + 1,
+        previous[rightIndex] + 1,
+        previous[rightIndex - 1] + (left[leftIndex - 1] === right[rightIndex - 1] ? 0 : 1),
+      );
+    }
+    previous = current;
+  }
+  return previous[right.length];
+}
+
+function isNearDuplicate(left: string, right: string): boolean {
+  if (left === right) return true;
+  const maxLength = Math.max(left.length, right.length);
+  if (Math.min(left.length, right.length) < 8 || maxLength === 0) return false;
+  return 1 - editDistance(left, right) / maxLength >= NEAR_DUPLICATE_SIMILARITY;
 }
 
 /**
@@ -103,13 +134,15 @@ export function buildPreviewEvidenceItems(input: {
     ? `${sourceLabels.length > 1 ? 'Источники' : 'Источник'}: ${sourceLabels.slice(0, 2).join(' · ')}`
     : '';
   const candidates = [sourceSummary, input.vacanciesCaption, ...input.evidenceTitles];
-  const seen = new Set<string>();
+  const seen: string[] = [];
   const evidence: string[] = [];
 
   for (const candidate of candidates) {
     const normalized = comparableCardText(candidate);
-    if (!normalized || seen.has(normalized) || (whyNow && whyNow.includes(normalized))) continue;
-    seen.add(normalized);
+    const repeatsEvidence = seen.some((existing) => isNearDuplicate(existing, normalized));
+    const repeatsWhyNow = Boolean(whyNow && whyNow.includes(normalized));
+    if (!normalized || repeatsEvidence || repeatsWhyNow) continue;
+    seen.push(normalized);
     evidence.push(candidate.trim());
     if (evidence.length >= limit) break;
   }
