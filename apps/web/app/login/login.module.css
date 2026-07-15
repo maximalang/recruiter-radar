@@ -1,0 +1,39 @@
+.shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 28px 16px;
+}
+
+.card {
+  width: min(100%, 520px);
+  padding: clamp(24px, 5vw, 42px);
+  border: 1px solid rgba(18, 42, 83, 0.1);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 28px 90px rgba(18, 42, 83, 0.13);
+  backdrop-filter: blur(18px);
+}
+
+.brand { display: inline-flex; margin-bottom: 30px; color: inherit; text-decoration: none; }
+.eyebrow { margin: 0 0 10px; color: #476181; font-size: 0.76rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
+.title { margin: 0; color: #0f1f3d; font-size: clamp(2rem, 7vw, 3rem); line-height: 1; letter-spacing: -0.045em; }
+.lead { margin: 16px 0 26px; color: #5b687a; line-height: 1.65; }
+.form { display: grid; gap: 14px; }
+.field { display: grid; gap: 7px; color: #263a58; font-size: 0.86rem; font-weight: 700; }
+.input { width: 100%; box-sizing: border-box; padding: 14px 15px; border: 1px solid rgba(18, 42, 83, 0.14); border-radius: 14px; background: #fff; color: #0f1f3d; font: inherit; font-size: 1rem; outline: none; }
+.input:focus { border-color: #3566bd; box-shadow: 0 0 0 4px rgba(53, 102, 189, 0.11); }
+.submit { min-height: 50px; border: 0; border-radius: 14px; background: linear-gradient(135deg, #10244d, #2250a1); color: #fff; font: inherit; font-weight: 800; cursor: pointer; box-shadow: 0 15px 34px rgba(24, 66, 139, 0.23); }
+.submit:disabled { opacity: 0.62; cursor: wait; }
+.helper { margin: 0; color: #718096; font-size: 0.8rem; line-height: 1.5; }
+.success, .error, .notice { padding: 12px 14px; border-radius: 13px; font-size: 0.86rem; line-height: 1.5; }
+.success { background: #eefaf4; color: #16623d; }
+.error { background: #fff1f1; color: #9d2525; }
+.notice { margin: 0 0 18px; background: #eef4ff; color: #254f92; }
+.back { display: inline-flex; margin-top: 24px; color: #345b99; font-size: 0.86rem; font-weight: 700; text-decoration: none; }
+
+@media (max-width: 520px) {
+  .shell { align-items: start; padding: 12px; }
+  .card { border-radius: 22px; padding: 24px 19px; }
+  .brand { margin-bottom: 24px; }
+}

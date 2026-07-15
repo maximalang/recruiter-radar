@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
 
+import { getAccountById } from "@/lib/account-auth";
 import { getClientProfileByOwnerId } from "@/lib/clientProfiles";
 import { getDeliveryPreferencesByOwnerId } from "@/lib/deliveryPreferences";
 import { computeProfileCompletion } from "@/lib/profileCompletion";
 import { readOwnerSession } from "@/lib/session";
 import { buildAccountNavigation } from "../ui/account-navigation";
-import { ContentCard, EmptyState, InternalPageFrame, InternalPageHeader } from "../ui/internal-page";
+import { logoutAction } from "../login/actions";
+import { ContentCard, ContentCardTitle, EmptyState, InternalPageFrame, InternalPageHeader } from "../ui/internal-page";
 import { SiteFooter } from "../ui/site-footer";
+import ppStyles from "../ui/page-primitives.module.css";
 import SettingsOverview from "./settings-overview";
 
 export const metadata: Metadata = {
@@ -18,8 +21,9 @@ export const dynamic = "force-dynamic";
 
 export default async function SettingsIndexPage() {
   const ownerId = await readOwnerSession();
+  const account = await getAccountById(ownerId).catch(() => null);
 
-  if (!ownerId) {
+  if (!account) {
     return (
       <InternalPageFrame navItems={buildAccountNavigation("settings")} footer={<SiteFooter />}>
         <InternalPageHeader title="Настройки аккаунта" subtitle="Для доступа к настройкам нужен вход." />
@@ -35,8 +39,8 @@ export default async function SettingsIndexPage() {
   }
 
   const [profile, preferences] = await Promise.all([
-    getClientProfileByOwnerId(ownerId).catch(() => null),
-    getDeliveryPreferencesByOwnerId(ownerId).catch(() => null),
+    getClientProfileByOwnerId(account.id).catch(() => null),
+    getDeliveryPreferencesByOwnerId(account.id).catch(() => null),
   ]);
 
   if (!profile) {
@@ -49,6 +53,11 @@ export default async function SettingsIndexPage() {
             text="Сначала активируйте радар, затем настройте поиск и доставку."
             action={{ href: "/checkout", label: "Активировать радар" }}
           />
+        </ContentCard>
+        <ContentCard>
+          <ContentCardTitle>Аккаунт</ContentCardTitle>
+          <p>Вы вошли как {account.email}.</p>
+          <form action={logoutAction}><button className={ppStyles.secondaryAction} type="submit">Выйти из аккаунта</button></form>
         </ContentCard>
       </InternalPageFrame>
     );
@@ -76,6 +85,11 @@ export default async function SettingsIndexPage() {
         emailEnabled={preferences?.emailDigestEnabled ?? false}
         webPushEnabled={preferences?.webPushEnabled ?? false}
       />
+      <ContentCard>
+        <ContentCardTitle>Доступ к аккаунту</ContentCardTitle>
+        <p>Рабочий email: {account.email}. Вход выполняется одноразовой ссылкой, без хранения пароля.</p>
+        <form action={logoutAction}><button className={ppStyles.secondaryAction} type="submit">Выйти из аккаунта</button></form>
+      </ContentCard>
     </InternalPageFrame>
   );
 }

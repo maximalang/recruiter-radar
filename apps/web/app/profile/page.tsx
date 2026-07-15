@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getAccountById } from "../../lib/account-auth";
 import {
   InternalPageFrame,
   InternalPageHeader,
@@ -26,7 +27,8 @@ export const metadata: Metadata = {
 const PROFILE_NAV = buildAccountNavigation("profile");
 
 export default async function ProfilePage() {
-  const ownerId = await readOwnerSession();
+  const account = await getAccountById(await readOwnerSession()).catch(() => null);
+  const ownerId = account?.id ?? null;
   const profile = ownerId ? await getClientProfileByOwnerId(ownerId) : null;
   const deliveryPreferences =
     ownerId && profile ? await getDeliveryPreferencesByOwnerId(ownerId) : null;
