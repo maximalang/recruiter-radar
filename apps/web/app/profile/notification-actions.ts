@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { getClientProfileByOwnerId } from "../../lib/clientProfiles";
 import { redactProviderSecret } from "../../lib/notification-secrets";
+import { reconcileVkNotificationConnection } from "../../lib/notification-vk-reconcile";
 import {
   createNotificationBindingInstructions,
   createTelegramNotificationConnection,
@@ -92,14 +93,28 @@ export async function addVkNotificationAction(
       token,
       displayName: text(formData, "displayName"),
     });
+
+    let callbackConfigured = created.callbackConfigured;
+    if (!callbackConfigured) {
+      try {
+        await reconcileVkNotificationConnection({
+          ownerId,
+          connectionId: created.connectionId,
+        });
+        callbackConfigured = true;
+      } catch {
+        callbackConfigured = false;
+      }
+    }
+
     refreshNotificationPages();
     return {
       ok: true,
-      message: created.callbackConfigured
+      message: callbackConfigured
         ? "VK Callback API настроен. Отправьте команду сообществу для привязки диалога."
-        : "Сообщество проверено, но VK не разрешил автонастройку Callback API. Проверьте права ключа и повторите подключение.",
+        : "Сообщество сохранено, но Callback API пока не настроен. Проверьте права ключа и нажмите «Повторить настройку VK».",
       connectCommand: created.connectCommand,
-      callbackConfigured: created.callbackConfigured,
+      callbackConfigured,
     };
   } catch (error) {
     return safeError(error, "Не удалось подключить VK-сообщество.");
@@ -149,6 +164,22 @@ export async function createNotificationBindingAction(
     };
   } catch (error) {
     return safeError(error, "Не удалось создать ссылку подключения.");
+  }
+}
+
+export async function reconcileVkNotificationAction(
+  _previous: NotificationActionResult | null,
+  formData: FormData,
+): Promise<NotificationActionResult> {
+  try {
+    const { ownerId } = await ownerContext();
+    const connectionId = text(formData, "connectionId");
+    if (!connectionId) return { ok: false, message: "VK-канал не выбран." };
+    await reconcileVkNotificationConnection({ ownerId, connectionId });
+    refreshNotificationPages();
+    return { ok: true, message: "VK Callback API настроен." };
+  } catch (error) {
+    return safeError(error, "Не удалось настроить VK Callback API.");
   }
 }
 
