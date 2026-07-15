@@ -66,6 +66,13 @@ apps/web/scripts/diag-*.png
 apps/web/scripts/card-v3-*
 apps/web/scripts/*-probe.cjs
 apps/web/scripts/logo-blip.png
+apps/web/scripts/logo-refine.png
+apps/web/scripts/prod3-*.png
+
+# Root-level visual QA captures and generated pet workspaces are local-only.
+card-v2-*.png
+rev-*.png
+tmp-pet-*/
 
 # Auto-memory is user-scoped (~/.claude/projects/<slug>/memory/); repo memory/ is a stale legacy duplicate
 memory/

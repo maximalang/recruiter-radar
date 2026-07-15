@@ -53,11 +53,6 @@ type HomePageProps = {
 
 type HomePreviewItem = Awaited<ReturnType<typeof getPublicSampleDigestState>>["items"][number];
 
-const heroTrust = [
-  { value: "Только подтверждённый найм", label: "карьерная страница и свежие вакансии — не агрегатор «возможно, нанимают»" },
-  { value: "Готово за 5 минут", label: "профиль и Telegram — утром приходит первый радар" },
-] as const;
-
 const principles = [
   {
     icon: CheckIcon,
@@ -108,10 +103,11 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
       {/* Sticky top nav */}
       <header className={hpStyles.topBar}>
-        <a href="/" className={hpStyles.brandMark} style={{ textDecoration: "none" }}>
+        <a href="/" className={hpStyles.brandMark}>
           <RadarLogo className={hpStyles.brandLogo} animate aria-hidden="true" />
-          <div>
+          <div className={hpStyles.brandLockup}>
             <div className={hpStyles.heroBrandName}>Recruiter Radar</div>
+            <div className={hpStyles.brandDescriptor}>client intelligence</div>
           </div>
         </a>
         <nav className={hpStyles.topNavLinks} aria-label="Разделы лендинга">
@@ -139,32 +135,60 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       <section id="main-content" className={hpStyles.heroSection} aria-label="Recruiter Radar">
         <RadarCanvas />
         <div className={hpStyles.heroContent}>
-          <h1 className={hpStyles.heroTitle}>
-            Компании, которым стоит написать{" "}
-            <span className={hpStyles.heroTitleAccent}>сегодня</span>.
-          </h1>
-          <p className={hpStyles.heroSubtitle}>
-            Каждое утро — короткий список компаний с подтверждённым наймом: что
-            изменилось, почему сейчас и как выйти на них корректно. Доказательства,
-            оценка уверенности и безопасный путь контакта — в Telegram.
-          </p>
-          <div className={hpStyles.heroActions}>
-            <a href="#preview" className={hpStyles.heroCta}>
-              Открыть пример радара
-              <svg className={hpStyles.heroCtaArrow} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <line x1="5" y1="12" x2="19" y2="12" />
-                <polyline points="13 6 19 12 13 18" />
-              </svg>
-            </a>
+          <div className={hpStyles.heroCopy}>
+            <div className={hpStyles.heroEyebrow}>
+              <span className={hpStyles.heroEyebrowDot} aria-hidden="true" />
+              Радар клиентских возможностей
+            </div>
+            <h1 className={hpStyles.heroTitle}>
+              Узнайте, кому нужен подбор — <span className={hpStyles.heroTitleAccent}>раньше конкурентов</span>
+            </h1>
+            <p className={hpStyles.heroSubtitle}>
+              Recruiter Radar находит компании с подтверждённым наймом, объясняет
+              «почему сейчас» и показывает корректный путь контакта. Каждое утро —
+              короткий список возможностей под специализацию вашего агентства.
+            </p>
+            <div className={hpStyles.heroActions}>
+              <a href="#preview" className={hpStyles.heroCta}>
+                Посмотреть живой радар
+                <svg className={hpStyles.heroCtaArrow} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                  <polyline points="13 6 19 12 13 18" />
+                </svg>
+              </a>
+              <a href="#pricing" className={hpStyles.heroSecondaryCta}>Тарифы</a>
+            </div>
+            <p className={hpStyles.heroFootnote}>Настройка профиля за 5 минут · доставка в Telegram</p>
           </div>
-          <div className={hpStyles.heroTrust}>
-            {heroTrust.map((item) => (
-              <div key={item.label} className={hpStyles.heroTrustItem}>
-                <div className={hpStyles.heroTrustValue}>{item.value}</div>
-                <div className={hpStyles.heroTrustLabel}>{item.label}</div>
+
+          <div className={hpStyles.heroProduct} aria-label="Как Recruiter Radar оценивает компанию">
+            <div className={hpStyles.heroProductTopbar}>
+              <span className={hpStyles.heroProductLabel}>Пример структуры сигнала</span>
+              <span className={hpStyles.heroProductLive}>демо</span>
+            </div>
+            <div className={hpStyles.heroCompanyRow}>
+              <div>
+                <div className={hpStyles.heroCompanyName}>Компания в вашем ICP</div>
+                <div className={hpStyles.heroCompanyMeta}>Москва · производство</div>
               </div>
-            ))}
+              <div className={hpStyles.heroScore}><strong>87</strong><span>/100</span></div>
+            </div>
+            <div className={hpStyles.heroScoreTrack}><span /></div>
+            <div className={hpStyles.heroSignalBlock}>
+              <span>Почему сейчас</span>
+              <strong>Открыты новые вакансии по вашей специализации</strong>
+            </div>
+            <div className={hpStyles.heroEvidenceRow}>
+              <div><span>01</span><p>Карьерная страница</p></div>
+              <div><span>02</span><p>Свежие вакансии</p></div>
+              <div><span>03</span><p>Корпоративный контакт</p></div>
+            </div>
+            <div className={hpStyles.heroProductFooter}>
+              <span>Доказательства собраны</span>
+              <strong>Можно действовать</strong>
+            </div>
           </div>
+
         </div>
       </section>
 

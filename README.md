@@ -60,7 +60,11 @@ Planned expansion остаётся phased:
    `npm run dev`
 
 По умолчанию Next.js будет доступен на `http://localhost:3000`.
-Локальный n8n будет доступен на `http://localhost:5678`.
+В production расписание запускает VPS cron через `/api/cron/daily-radar`. n8n выведен из production-контура и не является частью обязательного локального запуска.
+
+## Рабочий процесс разработки
+
+Перед новой продуктовой задачей прочитайте [SPEC.md](SPEC.md) и [docs/development-workflow.md](docs/development-workflow.md). Проект использует короткие ветки `codex/<task>`, обязательный preflight, атомарные коммиты и review/check gate перед merge.
 
 ## Career pages source
 

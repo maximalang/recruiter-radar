@@ -1,0 +1,14 @@
+[shell_environment_policy]
+inherit = "core"
+
+[shell_environment_policy.set]
+CLAUDE_CODE_DISABLE_GIT_INSTRUCTIONS = "0"
+
+[mcp_servers.magic]
+command = "npx"
+args = ["-y", "@21st-dev/magic@latest"]
+env_vars = ["API_KEY"]
+
+[mcp_servers.timeweb]
+url = "https://timeweb.cloud/api/v1/mcp"
+bearer_token_env_var = "TIMEWEB_MCP_TOKEN"
