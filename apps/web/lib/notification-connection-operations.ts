@@ -45,6 +45,11 @@ function accountAad(accountId: string, ownerId: string | number): string {
   return `notification-account:${accountId}:owner:${ownerId}`;
 }
 
+function isPostgresError(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  return typeof code === "string" && /^[0-9A-Z]{5}$/.test(code);
+}
+
 async function findExistingAccount(input: {
   ownerId: string | number;
   provider: "telegram" | "vk";
@@ -145,7 +150,7 @@ export async function createTelegramNotificationConnectionSafely(input: {
     if (after) {
       const recovered = await recoverTelegramConnection(after).catch(() => null);
       if (recovered) return recovered;
-    } else {
+    } else if (isPostgresError(error)) {
       await deleteTelegramWebhook({ botToken }).catch(() => {});
     }
     throw error;
