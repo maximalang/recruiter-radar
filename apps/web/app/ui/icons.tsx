@@ -72,91 +72,27 @@ export function TargetIcon(p: IconProps) {
   );
 }
 
-/**
- * RadarLogo — the product's primary brand mark.
- *
- * An instrument-grade radar scope: three concentric range rings, four short
- * cardinal crosshair ticks (N/E/S/W), and a directional sweep — a thin bright
- * BEAM (the leading edge) with a NARROW ~45° fading TRAIL behind it built from
- * three stacked sectors of decreasing opacity (brightest at the beam,
- * dissolving counterclockwise into the afterglow) — the way a real radar
- * scope's sweep actually reads, not a wide solid pie wedge. The beam points
- * down-right, the radar "looking down" at the market (scanning for hiring
- * signals below the surface). Three "blip" contacts sit on the dial at
- * different bearings/ranges and FLASH ON the moment the rotating sweep passes
- * over them, then fade — the literal behaviour of a real radar (contacts light
- * up under the scan, not statically). Three contacts (not two) read as a
- * populated airspace — "the market has activity", not "two stray dots".
- *
- * Built to read at 16px (favicon / sticky header) and stay crisp at 48px. The
- * rings step brightness inward; the beam trail is three stacked fading sectors
- * (a true angular afterglow), so motion reads as a lit scan, not a flat cartoon
- * wedge. Still `currentColor` so tone comes from CSS — the brand blue on light
- * surfaces.
- *
- * Used as the site logo (landing header, animated) and the shared internal
- * TopNav (static), and the `app/icon.svg` favicon mirrors it, so every surface
- * carries one brand identity.
- *
- * `animate` does two things on a 9s loop (matched to the hero RadarCanvas
- * pace), both driven by stable global classes defined in the landing CSS module
- * via `:global` (so they aren't hashed) with `transform-origin` at the glyph
- * center (12px 12px in the 24-unit viewBox):
- *   1. rotates the sweep group (`rr-sweep-spin`) — a full clockwise turn;
- *   2. fires each blip's flash (`rr-blip-a` / `rr-blip-b` / `rr-blip-c`) once
- *      per loop, timed so the flash peaks exactly when the rotating beam is over
- *      that blip's bearing. The beam starts at ~153° (down-right) and sweeps
- *      clockwise 360°/9s, so it reaches:
- *        blip A — bearing 200°, r5.6 → t≈1.18s → spike at ~13% of loop;
- *        blip C — bearing 315°, r7.0 → t≈4.05s → spike at ~45% of loop;
- *        blip B — bearing  60°, r7.4 → t≈6.68s → spike at ~74% of loop.
- *      The CSS keyframe opacity spikes are placed at those fractions to match.
- *      Honors prefers-reduced-motion (static mark).
- *
- * When `animate` is false/omitted the glyph renders as a calm static mark
- * (sweep pointing down-right, blips at a low idle opacity) — for the shared
- * TopNav and the favicon.
- *
- * Signature: `(p: IconProps & { animate?: boolean })` — additive optional
- * prop; the static TopNav call is unchanged.
- */
-export function RadarLogo(p: IconProps & { animate?: boolean }) {
-  const { animate, size, ...svgProps } = p;
+/** Geometric R monogram with an open radar orbit and one detected signal. */
+export function RadarLogo(p: IconProps) {
+  const { size, ...svgProps } = p;
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
+      viewBox="0 0 36 36"
       width={size ?? '1em'}
       height={size ?? '1em'}
       fill="none"
       stroke="currentColor"
-      strokeWidth={1.65}
+      strokeWidth={3.2}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
       {...svgProps}
     >
-      {/* Broken rings create a compact, ownable R-shaped radar silhouette. */}
-      <circle cx="12" cy="12" r="9.2" opacity={0.32} />
-      <path d="M12 5.1a6.9 6.9 0 1 1-6.25 9.82" opacity={0.62} />
-      <path d="M12 8.35a3.65 3.65 0 1 1-3.34 5.12" opacity={0.92} />
-      {/* One contact keeps the mark legible at favicon size. */}
-      <circle cx="17.7" cy="15.7" r="1.35" fill="currentColor" stroke="none" className={animate ? "rr-blip-a" : undefined} />
-      {/* The sweep animates only when explicitly requested. */}
-      <g className={animate ? 'rr-sweep-spin' : undefined}>
-        <path d="M12 12 19.7 7.55A9.15 9.15 0 0 1 21.1 12Z" fill="currentColor" stroke="none" opacity={0.14} />
-        <line
-          x1="12"
-          y1="12"
-          x2="19.7"
-          y2="7.55"
-          stroke="currentColor"
-          strokeWidth={2}
-          strokeLinecap="round"
-          opacity={0.95}
-        />
-      </g>
-      <circle cx="12" cy="12" r="1.55" fill="currentColor" stroke="none" />
+      <path d="M7.5 29V7.5h9.2c6.4 0 10.2 3.2 10.2 8.3 0 4.2-2.6 7-6.9 7.8L29 31" />
+      <path d="M13 13h3.7c2.6 0 4.1 1 4.1 2.9 0 1.8-1.5 2.9-4.1 2.9H13" opacity={0.72} />
+      <path d="M25.4 7.8a10.7 10.7 0 0 1 3.1 3.5" stroke="var(--rr-logo-accent, #4f7df3)" strokeWidth={2.5} />
+      <circle cx="29.5" cy="6" r="2.4" fill="var(--rr-logo-accent, #4f7df3)" stroke="none" />
     </svg>
   );
 }
