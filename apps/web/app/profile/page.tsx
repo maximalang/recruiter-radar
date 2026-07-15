@@ -11,10 +11,12 @@ import { SiteFooter } from "../ui/site-footer";
 import { getClientProfileByOwnerId, resolveHiringMode } from "../../lib/clientProfiles";
 import { getDeliveryPreferencesByOwnerId } from "../../lib/deliveryPreferences";
 import { countMatchingCandidatesForProfile } from "../../lib/digest";
+import { listNotificationConnectionsByOwnerId } from "../../lib/notifications";
 import { computeProfileCompletion } from "../../lib/profileCompletion";
 import { readOwnerSession } from "../../lib/session";
 import { ProfileForm } from "./profile-form";
 import { DeliveryForm } from "./delivery-form";
+import { NotificationChannels } from "./notification-channels";
 import ProfileCompletionPanel from "./profile-completion-panel";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +34,10 @@ export default async function ProfilePage() {
   const profile = ownerId ? await getClientProfileByOwnerId(ownerId) : null;
   const deliveryPreferences =
     ownerId && profile ? await getDeliveryPreferencesByOwnerId(ownerId) : null;
+  const notificationConnections =
+    ownerId && profile
+      ? await listNotificationConnectionsByOwnerId(ownerId).catch(() => [])
+      : [];
 
   // Completion + live match-count: both best-effort. The match count is the same
   // gate path the digest uses, so the number reflects exactly what the filters do.
@@ -48,7 +54,7 @@ export default async function ProfilePage() {
   // mode" badge on the form so the agency sees what the radar is actually doing
   // — not just what radio card is checked. Degrades to 'specialist' when there
   // is no profile.
-  const resolvedHiringMode = profile ? resolveHiringMode(profile) : 'specialist';
+  const resolvedHiringMode = profile ? resolveHiringMode(profile) : "specialist";
 
   return (
     <InternalPageFrame navItems={PROFILE_NAV} footer={<SiteFooter />}>
@@ -76,12 +82,19 @@ export default async function ProfilePage() {
           />
         )}
       </ContentCard>
+      {profile ? (
+        <div id="notification-channels">
+          <ContentCard>
+            <NotificationChannels connections={notificationConnections} />
+          </ContentCard>
+        </div>
+      ) : null}
       {profile && deliveryPreferences ? (
         <div id="delivery">
           <ContentCard>
             <InternalPageHeader
-              title="Как доставлять радар"
-              subtitle="Telegram — основной канал. Дополнительно: браузерные уведомления и ежедневный email."
+              title="Расписание и резервные каналы"
+              subtitle="Задайте частоту и время. Email и браузерные push работают параллельно с подключёнными Telegram, VK и webhook."
             />
             <DeliveryForm preferences={deliveryPreferences} />
           </ContentCard>
