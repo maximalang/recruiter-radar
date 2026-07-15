@@ -203,7 +203,8 @@ function ConnectionCard({ connection }: { connection: NotificationConnection }) 
           <FormSubmitButton idleLabel="Отключить" pendingLabel="Отключаем..." className={styles.dangerButton} />
         </form>
       </div>
-      <ActionFeedback state={bindState ?? testState ?? disconnectState} />
+      <ActionFeedback state={needsBinding ? bindState : testState} />
+      <ActionFeedback state={disconnectState} />
     </article>
   );
 }
