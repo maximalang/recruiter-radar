@@ -9,9 +9,6 @@ export function BrandLogo(props: {
   const tone = props.tone ?? "light";
   const size = props.size ?? "default";
   const showsWordmark = props.showWordmark !== false;
-  const src = showsWordmark
-    ? "/brand/recruiter-radar-logo.svg?v=exact-2"
-    : "/brand/recruiter-radar-mark.svg?v=exact-2";
 
   return (
     <span
@@ -22,9 +19,9 @@ export function BrandLogo(props: {
     >
       <img
         className={s.artwork}
-        src={src}
-        width={showsWordmark ? 546 : 195}
-        height={189}
+        src="/brand/recruiter-radar-logo.svg?v=vector-3"
+        width={728}
+        height={252}
         alt="Recruiter Radar"
         draggable={false}
       />
