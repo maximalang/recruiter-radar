@@ -5,12 +5,26 @@ import { render, screen } from '@testing-library/react';
 import { BrandLogo } from '../../../../app/ui/brand-logo';
 
 describe('BrandLogo', () => {
-  it('renders a transparent minimal mark without a background shape or gradient', () => {
+  it('renders the self-contained transparent vector wordmark asset', () => {
     const { container } = render(<BrandLogo />);
 
-    expect(screen.getByText(/Recruiter/)).toBeTruthy();
-    expect(container.querySelector('rect')).toBeNull();
-    expect(container.querySelector('linearGradient')).toBeNull();
-    expect(container.querySelectorAll('path').length).toBeGreaterThanOrEqual(4);
+    const logo = screen.getByRole('img', { name: 'Recruiter Radar' });
+    expect(logo.getAttribute('src')).toBe('/brand/recruiter-radar-logo.svg?v=vector-3');
+    expect(logo.getAttribute('width')).toBe('728');
+    expect(logo.getAttribute('height')).toBe('252');
+    expect(container.querySelector('svg')).toBeNull();
+    expect(container.querySelector('[data-wordmark="true"]')).toBeTruthy();
+  });
+
+  it('crops the same working vector asset for compact placements', () => {
+    const { container } = render(
+      <BrandLogo tone="dark" size="small" showWordmark={false} />
+    );
+
+    const logo = screen.getByRole('img', { name: 'Recruiter Radar' });
+    expect(logo.getAttribute('src')).toBe('/brand/recruiter-radar-logo.svg?v=vector-3');
+    expect(container.querySelector('[data-tone="dark"]')).toBeTruthy();
+    expect(container.querySelector('[data-size="small"]')).toBeTruthy();
+    expect(container.querySelector('[data-wordmark="false"]')).toBeTruthy();
   });
 });

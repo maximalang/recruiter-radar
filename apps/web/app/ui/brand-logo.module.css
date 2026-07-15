@@ -1,83 +1,64 @@
 .logo {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
   min-width: 0;
-  color: var(--c-text-primary, #0f172a);
+  line-height: 0;
 }
 
-.mark {
-  width: 32px;
-  height: 32px;
+.artwork {
+  display: block;
+  width: auto;
+  height: 44px;
+  max-width: min(100%, 220px);
   flex: 0 0 auto;
-  overflow: visible;
+  object-fit: contain;
+  object-position: left center;
+  user-select: none;
 }
 
-.orbit,
-.orbitSoft,
-.monogram {
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+.logo[data-tone="dark"] .artwork {
+  filter: brightness(0) invert(1);
 }
 
-.orbit { stroke-width: 1.65; opacity: 0.82; }
-.orbitSoft { stroke-width: 1.45; opacity: 0.34; }
-.monogram { stroke-width: 1.8; opacity: 0.82; }
-.needle { fill: #315fc8; opacity: 0.9; }
-.origin { fill: currentColor; }
-.target { fill: #315fc8; }
-
-.wordmark {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 0.28em;
-  white-space: nowrap;
-  font-size: 0.98rem;
-  font-weight: 710;
-  letter-spacing: -0.025em;
-  line-height: 1;
+.logo[data-size="small"] .artwork {
+  height: 36px;
+  max-width: 180px;
 }
 
-.wordmark strong {
-  color: #315fc8;
-  font: inherit;
+.logo[data-wordmark="false"] {
+  width: 36px;
+  overflow: hidden;
 }
 
-.logo[data-tone="dark"] {
-  color: #f8fafc;
+.logo[data-wordmark="false"] .artwork {
+  height: 35px;
+  max-width: none;
 }
 
-.logo[data-tone="dark"] .wordmark strong {
-  color: #8ab9ff;
+.logo[data-size="small"][data-wordmark="false"] {
+  width: 32px;
 }
 
-.logo[data-tone="dark"] .needle,
-.logo[data-tone="dark"] .target {
-  fill: #8ab9ff;
+.logo[data-size="small"][data-wordmark="false"] .artwork {
+  height: 31px;
+  max-width: none;
 }
 
-.logo[data-size="small"] {
-  gap: 8px;
-}
+@media (max-width: 480px) {
+  .logo[data-wordmark="true"] .artwork {
+    height: 40px;
+    max-width: 160px;
+  }
 
-.logo[data-size="small"] .mark {
-  width: 28px;
-  height: 28px;
-}
-
-.logo[data-size="small"] .wordmark {
-  font-size: 0.9rem;
+  .logo[data-size="small"][data-wordmark="true"] .artwork {
+    height: 34px;
+    max-width: 145px;
+  }
 }
 
 @media (max-width: 360px) {
-  .wordmark {
-    font-size: 0.86rem;
-  }
-
-  .mark {
-    width: 30px;
-    height: 30px;
+  .logo[data-wordmark="true"] .artwork {
+    height: 36px;
+    max-width: 145px;
   }
 }

@@ -25,11 +25,11 @@ WORKDIR /app
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
 
-# Copy only the build output and necessary files
-# Standalone output includes node_modules/pg and all transitive deps
-# Note: public/ directory is only copied if it exists (no static assets yet)
+# Copy the standalone server, Next static files, and public assets.
+# Next.js standalone output does not include public/ automatically.
 COPY --from=builder /app/apps/web/.next/standalone ./
 COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=builder /app/apps/web/public ./apps/web/public
 
 # Copy migration tooling for startup migrations
 COPY --from=builder /app/packages/db/scripts/migrate.mjs ./packages/db/scripts/migrate.mjs

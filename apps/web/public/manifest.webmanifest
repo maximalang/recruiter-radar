@@ -1,0 +1,17 @@
+{
+  "name": "Recruiter Radar",
+  "short_name": "Radar",
+  "description": "Ежедневный радар по компаниям с активным наймом для рекрутеров и агентств.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7faff",
+  "theme_color": "#071b3f",
+  "icons": [
+    {
+      "src": "/icon.svg?v=brand-7",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
