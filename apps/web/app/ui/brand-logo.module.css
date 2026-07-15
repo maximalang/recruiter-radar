@@ -16,19 +16,32 @@
   user-select: none;
 }
 
+.logo[data-tone="dark"] .artwork {
+  filter: brightness(0) invert(1);
+}
+
 .logo[data-size="small"] .artwork {
   height: 36px;
   max-width: 180px;
 }
 
+.logo[data-wordmark="false"] {
+  width: 36px;
+  overflow: hidden;
+}
+
 .logo[data-wordmark="false"] .artwork {
-  height: 34px;
-  max-width: 36px;
+  height: 35px;
+  max-width: none;
+}
+
+.logo[data-size="small"][data-wordmark="false"] {
+  width: 32px;
 }
 
 .logo[data-size="small"][data-wordmark="false"] .artwork {
-  height: 30px;
-  max-width: 32px;
+  height: 31px;
+  max-width: none;
 }
 
 @media (max-width: 480px) {
