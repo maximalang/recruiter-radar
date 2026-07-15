@@ -1,0 +1,322 @@
+import { createHmac } from "node:crypto";
+
+import { sendTelegramTextMessage } from "./telegram";
+
+export type TelegramBotIdentity = {
+  id: string;
+  username: string;
+  displayName: string;
+};
+
+export type VkCommunityIdentity = {
+  id: string;
+  name: string;
+};
+
+type ProviderRequestError = Error & {
+  status?: number;
+  code?: string;
+  retryAfterSeconds?: number;
+};
+
+function providerError(
+  message: string,
+  input?: { status?: number; code?: string; retryAfterSeconds?: number },
+): ProviderRequestError {
+  const error = new Error(message) as ProviderRequestError;
+  error.status = input?.status;
+  error.code = input?.code;
+  error.retryAfterSeconds = input?.retryAfterSeconds;
+  return error;
+}
+
+function telegramApiBase(): string {
+  return (process.env.TELEGRAM_API_BASE_URL?.trim() || "https://api.telegram.org").replace(/\/+$/, "");
+}
+
+async function callTelegramApi<T>(
+  botToken: string,
+  method: string,
+  payload: Record<string, unknown> = {},
+): Promise<T> {
+  const response = await fetch(`${telegramApiBase()}/bot${botToken}/${method}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    cache: "no-store",
+  });
+
+  let body: unknown = null;
+  try {
+    body = await response.json();
+  } catch {
+    body = null;
+  }
+
+  if (
+    response.ok &&
+    body &&
+    typeof body === "object" &&
+    (body as { ok?: unknown }).ok === true
+  ) {
+    return (body as { result: T }).result;
+  }
+
+  const description =
+    body && typeof body === "object" && typeof (body as { description?: unknown }).description === "string"
+      ? (body as { description: string }).description
+      : `Telegram API request failed with status ${response.status}.`;
+  const retryAfter =
+    body && typeof body === "object"
+      ? Number((body as { parameters?: { retry_after?: unknown } }).parameters?.retry_after)
+      : Number.NaN;
+
+  throw providerError(description, {
+    status: response.status,
+    code: String((body as { error_code?: unknown } | null)?.error_code ?? response.status),
+    retryAfterSeconds: Number.isFinite(retryAfter) ? retryAfter : undefined,
+  });
+}
+
+export async function verifyTelegramBotToken(botToken: string): Promise<TelegramBotIdentity> {
+  const result = await callTelegramApi<{
+    id: number | string;
+    username?: string;
+    first_name?: string;
+  }>(botToken, "getMe");
+
+  if (!result.username) {
+    throw new Error("Telegram bot does not have a username.");
+  }
+
+  return {
+    id: String(result.id),
+    username: result.username,
+    displayName: result.first_name?.trim() || `@${result.username}`,
+  };
+}
+
+export async function configureTelegramWebhook(input: {
+  botToken: string;
+  webhookUrl: string;
+  webhookSecret: string;
+}): Promise<void> {
+  await callTelegramApi(input.botToken, "setWebhook", {
+    url: input.webhookUrl,
+    secret_token: input.webhookSecret,
+    allowed_updates: ["message", "callback_query", "my_chat_member", "channel_post"],
+    drop_pending_updates: false,
+  });
+}
+
+export async function sendTelegramNotification(input: {
+  botToken: string;
+  chatId: string;
+  text: string;
+  parseMode?: "HTML" | "MarkdownV2";
+}): Promise<{ providerMessageId: string }> {
+  const result = await sendTelegramTextMessage(
+    input.text,
+    { botToken: input.botToken, chatId: input.chatId },
+    input.parseMode ? { parseMode: input.parseMode } : undefined,
+  );
+  return { providerMessageId: String(result.messageId) };
+}
+
+const VK_API_BASE = "https://api.vk.com/method";
+const VK_API_VERSION = "5.199";
+
+async function callVkApi<T>(
+  method: string,
+  token: string,
+  params: Record<string, string | number | boolean | undefined>,
+): Promise<T> {
+  const form = new URLSearchParams();
+  form.set("access_token", token);
+  form.set("v", VK_API_VERSION);
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined) form.set(key, String(value));
+  }
+
+  const response = await fetch(`${VK_API_BASE}/${method}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: form,
+    cache: "no-store",
+  });
+
+  let body: unknown = null;
+  try {
+    body = await response.json();
+  } catch {
+    body = null;
+  }
+
+  const apiError =
+    body && typeof body === "object"
+      ? (body as { error?: { error_code?: number; error_msg?: string } }).error
+      : undefined;
+  if (!response.ok || apiError) {
+    throw providerError(
+      apiError?.error_msg || `VK API request failed with status ${response.status}.`,
+      {
+        status: response.status,
+        code: apiError?.error_code ? String(apiError.error_code) : String(response.status),
+      },
+    );
+  }
+
+  return (body as { response: T }).response;
+}
+
+export async function verifyVkCommunity(input: {
+  groupId: string;
+  token: string;
+}): Promise<VkCommunityIdentity> {
+  const response = await callVkApi<unknown>("groups.getById", input.token, {
+    group_id: input.groupId,
+  });
+
+  const groups = Array.isArray(response)
+    ? response
+    : response && typeof response === "object" && Array.isArray((response as { groups?: unknown }).groups)
+      ? (response as { groups: unknown[] }).groups
+      : [];
+  const group = groups[0] as { id?: number | string; name?: string } | undefined;
+  if (!group?.id) throw new Error("VK community was not returned by the API.");
+
+  return {
+    id: String(group.id),
+    name: group.name?.trim() || `VK ${group.id}`,
+  };
+}
+
+export async function getVkCallbackConfirmationCode(input: {
+  groupId: string;
+  token: string;
+}): Promise<string> {
+  const response = await callVkApi<{ code?: string }>(
+    "groups.getCallbackConfirmationCode",
+    input.token,
+    { group_id: input.groupId },
+  );
+  if (!response.code) throw new Error("VK did not return a callback confirmation code.");
+  return response.code;
+}
+
+export async function configureVkCallback(input: {
+  groupId: string;
+  token: string;
+  callbackUrl: string;
+  callbackSecret: string;
+}): Promise<{ serverId: string }> {
+  const created = await callVkApi<{ server_id?: number | string }>(
+    "groups.addCallbackServer",
+    input.token,
+    {
+      group_id: input.groupId,
+      url: input.callbackUrl,
+      title: "Recruiter Radar",
+      secret_key: input.callbackSecret,
+    },
+  );
+  if (!created.server_id) throw new Error("VK callback server was not created.");
+
+  await callVkApi("groups.setCallbackSettings", input.token, {
+    group_id: input.groupId,
+    server_id: created.server_id,
+    api_version: VK_API_VERSION,
+    message_new: true,
+  });
+
+  return { serverId: String(created.server_id) };
+}
+
+export async function sendVkNotification(input: {
+  token: string;
+  peerId: string;
+  text: string;
+  randomId: number;
+}): Promise<{ providerMessageId?: string }> {
+  const response = await callVkApi<number | string>("messages.send", input.token, {
+    peer_id: input.peerId,
+    random_id: input.randomId,
+    message: input.text,
+  });
+  return { providerMessageId: response == null ? undefined : String(response) };
+}
+
+export function validateWebhookUrl(raw: string): URL {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new Error("Webhook URL is invalid.");
+  }
+
+  const isLocal = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+  if (url.protocol !== "https:" && !(isLocal && url.protocol === "http:")) {
+    throw new Error("Webhook URL must use HTTPS.");
+  }
+  if (url.username || url.password) {
+    throw new Error("Webhook URL must not contain embedded credentials.");
+  }
+  return url;
+}
+
+export async function sendSignedWebhook(input: {
+  url: string;
+  secret: string;
+  event: string;
+  eventId: string;
+  payload: Record<string, unknown>;
+}): Promise<{ status: number; responseText: string }> {
+  const target = validateWebhookUrl(input.url);
+  const timestamp = new Date().toISOString();
+  const rawBody = JSON.stringify({
+    event: input.event,
+    event_id: input.eventId,
+    occurred_at: timestamp,
+    data: input.payload,
+  });
+  const signature = createHmac("sha256", input.secret).update(rawBody).digest("hex");
+
+  const response = await fetch(target, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Radar-Event": input.event,
+      "X-Radar-Event-Id": input.eventId,
+      "X-Radar-Timestamp": timestamp,
+      "X-Radar-Signature": `sha256=${signature}`,
+      "Idempotency-Key": input.eventId,
+    },
+    body: rawBody,
+    cache: "no-store",
+  });
+  const responseText = (await response.text()).slice(0, 2_000);
+  if (!response.ok) {
+    throw providerError(`Webhook returned HTTP ${response.status}.`, {
+      status: response.status,
+      code: `http_${response.status}`,
+    });
+  }
+
+  return { status: response.status, responseText };
+}
+
+export function classifyNotificationProviderError(error: unknown): {
+  kind: "retryable" | "rate_limited" | "auth" | "permanent";
+  status?: number;
+  code?: string;
+  message: string;
+} {
+  const provider = error as ProviderRequestError;
+  const status = typeof provider?.status === "number" ? provider.status : undefined;
+  const message = error instanceof Error ? error.message : "Unknown provider error.";
+
+  if (status === 429) return { kind: "rate_limited", status, code: provider.code, message };
+  if (status === 401 || status === 403) return { kind: "auth", status, code: provider.code, message };
+  if (!status || status >= 500) return { kind: "retryable", status, code: provider.code, message };
+  return { kind: "permanent", status, code: provider.code, message };
+}
