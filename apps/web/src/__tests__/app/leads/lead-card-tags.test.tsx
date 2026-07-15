@@ -1,19 +1,7 @@
-/**
- * @jest-environment jsdom
- *
- * Phase 3 (T3.2 + T3.3) — the lead-card head chips are grouped into two
- * visual clusters — "decision" (band + gate) and "status" (review + feedback)
- * — instead of one flat row, so a recruiter's eye separates the verdict from
- * the workflow state. Foreign + AI-hint chips stay as muted separate chips.
- *
- * Also covers T3.3's legend a11y contract: the leads-list legend must not be
- * a blind aria-hidden decoration — it carries an a11y label tying the dots to
- * the rail tones.
- */
+/** @jest-environment jsdom */
 import { render, screen } from '@testing-library/react';
 import { LeadCard, LeadsListLegend } from '@/app/leads/page';
 import type { LeadItem } from '@/lib/leads-data';
-import type { ClientProfile } from '@/lib/clientProfiles';
 
 const baseLead = {
   id: 'lead-1',
@@ -44,8 +32,8 @@ const baseLead = {
   reviewStatus: 'auto_approved',
 } as unknown as LeadItem;
 
-describe('LeadCard (T3.2 — chip grouping)', () => {
-  it('renders a decision chip group (band + gate)', () => {
+describe('LeadCard signal-card template', () => {
+  it('uses the landing signal-card hierarchy without a duplicate score band', () => {
     const { container } = render(
       <LeadCard
         lead={baseLead}
@@ -53,14 +41,17 @@ describe('LeadCard (T3.2 — chip grouping)', () => {
         hiringMode="specialist"
       />,
     );
-    const decision = container.querySelector('[data-chip-group="decision"]');
-    expect(decision).not.toBeNull();
-    // The decision group contains the score band + gate badge.
-    expect(decision?.textContent).toContain('Горячий'); // scoreBand label
-    expect(decision?.textContent).toContain('A'); // gate
+    const card = container.querySelector('[data-signal-card="true"]');
+    expect(card).not.toBeNull();
+    expect(screen.getByText('Сила сигнала')).toBeTruthy();
+    expect(screen.getByText('Почему сейчас')).toBeTruthy();
+    expect(screen.getByText('Доказательства')).toBeTruthy();
+    expect(screen.getByText('Контакт')).toBeTruthy();
+    expect(card?.textContent).not.toContain('Горячий');
+    expect(card?.textContent).toContain('A');
   });
 
-  it('renders a status chip group (review + feedback) separate from decision', () => {
+  it('keeps workflow status separate from the score block', () => {
     const { container } = render(
       <LeadCard
         lead={baseLead}
@@ -68,26 +59,19 @@ describe('LeadCard (T3.2 — chip grouping)', () => {
         hiringMode="specialist"
       />,
     );
-    const decision = container.querySelector('[data-chip-group="decision"]');
     const status = container.querySelector('[data-chip-group="status"]');
     expect(status).not.toBeNull();
-    expect(decision).not.toBeNull();
-    // The two groups are distinct elements.
-    expect(decision).not.toBe(status);
+    expect(status?.textContent).toMatch(/В работе/i);
   });
 
-  it('keeps foreign + AI-hint chips outside the decision/status groups (muted)', () => {
+  it('keeps foreign and AI hints outside the workflow status group', () => {
     const foreignLead = { ...baseLead, isForeignEmployer: true } as unknown as LeadItem;
     const { container } = render(
       <LeadCard lead={foreignLead} fitPreview={null} hiringMode="specialist" />,
     );
-    const decision = container.querySelector('[data-chip-group="decision"]');
     const status = container.querySelector('[data-chip-group="status"]');
-    // Foreign badge text is NOT inside the decision or status groups.
     const foreignText = 'Иностранный работодатель';
-    expect(decision?.textContent ?? '').not.toContain(foreignText);
     expect(status?.textContent ?? '').not.toContain(foreignText);
-    // But it is present somewhere in the card.
     expect(container.textContent).toContain(foreignText);
   });
 });

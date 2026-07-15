@@ -56,18 +56,18 @@ type HomePreviewItem = Awaited<ReturnType<typeof getPublicSampleDigestState>>["i
 const principles = [
   {
     icon: CheckIcon,
-    title: "Только подтверждённый найм",
-    text: "Карьерная страница, свежие вакансии, независимый источник. Видно, кого и зачем ищут — не догадки агрегатора.",
+    title: "Сигнал, а не список вакансий",
+    text: "Радар выделяет изменение: новый найм, рост команды или редкую для компании роль — и показывает, когда это произошло.",
   },
   {
     icon: ShieldIcon,
-    title: "Понятная оценка уверенности",
-    text: "«Подтверждено», «скорее подтверждено» или «нужна проверка» — и понятный «почему сейчас» до первого касания.",
+    title: "Доказательства можно проверить",
+    text: "У каждого вывода есть источники, дата и уровень уверенности. Вы видите основание рекомендации до первого касания.",
   },
   {
     icon: MailIcon,
-    title: "Безопасный путь контакта",
-    text: "Корпоративный сайт, карьерная страница, HR-почта. Без личных адресов наугад.",
+    title: "Следующий шаг уже понятен",
+    text: "В карточке есть деловой повод и корректный корпоративный путь контакта — без личных адресов и массовой рассылки.",
   },
 ] as const;
 
@@ -87,49 +87,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   return (
     <PageFrame maxWidth="1160px">
       <ScrollProgress />
-      {/* Animated ambient background — a living field of drifting blue glows +
-          a faint scanning grid behind every section. Decorative only;
-          pointer-events:none + z-index:0 keep it behind content (pageFrameInner
-          is z-index:1). Honors prefers-reduced-motion (static) via the keyframe
-          guard. The pageFrame is transparent, so this layer is finally visible
-          (the old opaque pageFrame gradient hid it). */}
       <div className={hpStyles.ambientBg} aria-hidden="true">
         <span className={hpStyles.ambientGrid} />
-        <span className={hpStyles.ambientBlobA} />
-        <span className={hpStyles.ambientBlobB} />
-        <span className={hpStyles.ambientBlobC} />
       </div>
       <a href="#main-content" className={ppStyles.skipLink}>Перейти к содержанию</a>
-
-      {/* Sticky top nav */}
-      <header className={hpStyles.topBar}>
-        <a href="/" className={hpStyles.brandMark}>
-          <RadarLogo className={hpStyles.brandLogo} animate aria-hidden="true" />
-          <div className={hpStyles.brandLockup}>
-            <div className={hpStyles.heroBrandName}>Recruiter Radar</div>
-            <div className={hpStyles.brandDescriptor}>client intelligence</div>
-          </div>
-        </a>
-        <nav className={hpStyles.topNavLinks} aria-label="Разделы лендинга">
-          <span className={hpStyles.topNavAnchors}>
-            <a href="#preview" className={hpStyles.topNavLink}>Пример</a>
-            <a href="#pricing" className={hpStyles.topNavLink}>Тарифы</a>
-            <a href="#faq" className={hpStyles.topNavLink}>FAQ</a>
-          </span>
-          {/* Header account button — the entry into the signed-in area. The
-              product has no separate login page: auth is an anonymous rr_sid
-              session minted at checkout. /dashboard is the account surface (it
-              reads the session and shows the tenant's radar; without a session
-              it shows the empty radar + the profile CTA routes to checkout).
-              So "Войти" lands you in your account when signed in, and on the
-              activation path when not — the honest "log into your account"
-              affordance over the existing auth model. */}
-          <Link href="/dashboard" className={hpStyles.topNavCta}>
-            <span className={hpStyles.topNavCtaFull}>Войти в аккаунт</span>
-            <span className={hpStyles.topNavCtaShort} aria-hidden="true">Войти</span>
-          </Link>
-        </nav>
-      </header>
 
       {/* Hero */}
       <section id="main-content" className={hpStyles.heroSection} aria-label="Recruiter Radar">
@@ -141,16 +102,15 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               Радар клиентских возможностей
             </div>
             <h1 className={hpStyles.heroTitle}>
-              Узнайте, кому нужен подбор — <span className={hpStyles.heroTitleAccent}>раньше конкурентов</span>
+              Компании, которым нужен подбор — <span className={hpStyles.heroTitleAccent}>в момент, когда стоит написать</span>
             </h1>
             <p className={hpStyles.heroSubtitle}>
-              Recruiter Radar находит компании с подтверждённым наймом, объясняет
-              «почему сейчас» и показывает корректный путь контакта. Каждое утро —
-              короткий список возможностей под специализацию вашего агентства.
+              Каждое утро — несколько компаний под специализацию вашего агентства.
+              Вы сразу видите повод для обращения, силу сигнала и следующий шаг.
             </p>
             <div className={hpStyles.heroActions}>
               <a href="#preview" className={hpStyles.heroCta}>
-                Посмотреть живой радар
+                Посмотреть пример радара
                 <svg className={hpStyles.heroCtaArrow} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <line x1="5" y1="12" x2="19" y2="12" />
                   <polyline points="13 6 19 12 13 18" />
@@ -192,12 +152,14 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         </div>
       </section>
 
+      <LandingHeader />
+
       {/* Principles / value row */}
       <ScrollReveal as="section" className={hpStyles.scrollSection}>
         <SectionIntro
           eyebrow="Что внутри"
-          title="Доверие вместо шума"
-          description="Каждая компания в радаре доказана и оценена. Три правила, по которым мы её отбираем, — до того, как она попадёт к вам."
+          title="От сигнала к следующему действию"
+          description="Карточка отвечает на три вопроса: что изменилось, почему этому можно доверять и как корректно выйти на компанию."
         />
         <div className={hpStyles.principles}>
           {principles.map((p) => {
@@ -218,7 +180,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       {/* Live preview */}
       <ScrollReveal as="section" id="preview" className={hpStyles.scrollSection}>
         <SectionIntro
-          eyebrow="Живой пример"
+          eyebrow="Пример результата"
           title="Так выглядит утренний радар"
           description="Задайте город и специализацию — справа появится тот самый список, что утром приходит в Telegram."
         />
@@ -275,8 +237,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                     ? previewState.items.length > 0
                       ? "по вашему профилю"
                       : "пока без совпадений"
-                    : previewState.isLive
-                      ? "живой пример"
+                    : previewState.isLive && previewState.items.length > 0
+                      ? "актуальные данные"
                       : "демо"}
                 </StatusBadge>
               </div>
@@ -294,7 +256,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                   <NoticeBox
                     tone="neutral"
                     title="Точных совпадений по нише пока нет"
-                    description="Показываем ближайшие по релевантности. На реальном радаре совпадений больше."
+                    description="Показываем ближайшие по релевантности. Уточните профиль или расширьте специализацию."
                   />
                 ) : null}
                 {visiblePreviewItems.map((item) => (
@@ -439,10 +401,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
       {/* Closing CTA band */}
       <section className={hpStyles.closingBand}>
-        <h2 className={hpStyles.closingTitle}>Завтра утром — первый радар</h2>
+        <h2 className={hpStyles.closingTitle}>Настройте первый радар</h2>
         <p className={hpStyles.closingText}>
-          Неделя ежедневного радара по вашей нише: компании с подтверждённым наймом,
-          оценка уверенности и безопасный путь контакта. Профиль настраивается за пять минут.
+          Укажите специализацию и географию. После запуска первый список придёт в Telegram.
         </p>
         <div className={hpStyles.closingActions}>
           <Link href={checkoutHref} className={hpStyles.heroCta}>
@@ -453,6 +414,28 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
       <SiteFooter />
     </PageFrame>
+  );
+}
+
+function LandingHeader() {
+  return (
+    <header className={hpStyles.topBar}>
+      <a href="/" className={hpStyles.brandMark} aria-label="Recruiter Radar — на главную">
+        <RadarLogo className={hpStyles.brandLogo} aria-hidden="true" />
+        <span className={hpStyles.heroBrandName}>Recruiter Radar</span>
+      </a>
+      <nav className={hpStyles.topNavLinks} aria-label="Разделы лендинга">
+        <span className={hpStyles.topNavAnchors}>
+          <a href="#preview" className={hpStyles.topNavLink}>Пример</a>
+          <a href="#pricing" className={hpStyles.topNavLink}>Тарифы</a>
+          <a href="#faq" className={hpStyles.topNavLink}>FAQ</a>
+        </span>
+        <Link href="/dashboard" className={hpStyles.topNavCta}>
+          <span className={hpStyles.topNavCtaFull}>Войти в аккаунт</span>
+          <span className={hpStyles.topNavCtaShort} aria-hidden="true">Войти</span>
+        </Link>
+      </nav>
+    </header>
   );
 }
 

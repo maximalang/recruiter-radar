@@ -7,77 +7,30 @@
    No fabricated data anywhere.
    ============================================================ */
 
-/* ── Ambient page background — a living, drifting field of blue light ──
-   A fixed full-viewport layer of soft radial glows that slowly drift across
-   the page. This is the "animated background" the product should feel like —
-   not a flat white page, but a calm radar airspace with light moving through
-   it. The layer sits ABOVE the body's base tint (which shows through the
-   page frame, now transparent) and BELOW all content, so the glows read as
-   atmosphere behind cards/text, never in front. pointer-events:none so it
-   never intercepts clicks. Honors prefers-reduced-motion (static glows).
-
-   z-index: 0 on the fixed layer + position:relative/z-index:1 on every
-   content wrapper keeps the stack correct without negative z-index (which
-   used to bury the layer behind the opaque body background — the reason the
-   animation was never visible). */
+/* Calm, persistent radar-field background for the complete landing. */
 .ambientBg {
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
   overflow: hidden;
+  background:
+    radial-gradient(circle at 8% 3%, rgba(68, 116, 236, 0.18), transparent 30%),
+    radial-gradient(circle at 92% 46%, rgba(115, 149, 230, 0.15), transparent 30%),
+    radial-gradient(circle at 16% 88%, rgba(87, 128, 221, 0.1), transparent 26%),
+    linear-gradient(180deg, #eaf0f7 0%, #f0f4f9 42%, #e7edf5 100%);
 }
-.ambientBlob {
-  position: absolute;
-  border-radius: 999px;
-  filter: blur(70px);
-  will-change: transform;
-}
-.ambientBlobA {
-  width: 48vw;
-  height: 48vw;
-  max-width: 720px;
-  max-height: 720px;
-  top: -10vw;
-  left: -8vw;
-  background: radial-gradient(circle, rgba(37, 99, 235, 0.16) 0%, rgba(37, 99, 235, 0) 70%);
-  animation: ambientDriftA 34s ease-in-out infinite alternate;
-}
-.ambientBlobB,
-.ambientBlobC {
-  display: none;
-}
-/* A faint moving grid echo — barely-there vertical light lines drifting
-   horizontally, giving the airspace a subtle "scanning" rhythm without ever
-   reading as a hard pattern. Sits with the blobs on the same fixed layer. */
+
 .ambientGrid {
   position: absolute;
-  inset: -20% -20%;
-  background-image: repeating-linear-gradient(
-    90deg,
-    transparent 0,
-    transparent 120px,
-    rgba(37, 99, 235, 0.05) 120px,
-    rgba(37, 99, 235, 0.05) 121px
-  );
-  animation: ambientGridShift 60s linear infinite;
-  opacity: 0.32;
-}
-@keyframes ambientDriftA {
-  from { transform: translate(0, 0) scale(1); }
-  to   { transform: translate(7vw, 5vh) scale(1.14); }
-}
-@keyframes ambientGridShift {
-  from { transform: translateX(0); }
-  to   { transform: translateX(-120px); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .ambientBlobA,
-  .ambientBlobB,
-  .ambientBlobC,
-  .ambientGrid {
-    animation: none;
-  }
+  inset: 0;
+  opacity: 0.55;
+  background-image:
+    linear-gradient(rgba(38, 73, 132, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(38, 73, 132, 0.035) 1px, transparent 1px);
+  background-size: 72px 72px;
+  -webkit-mask-image: linear-gradient(to bottom, black 0%, rgba(0, 0, 0, 0.55) 58%, transparent 100%);
+  mask-image: linear-gradient(to bottom, black 0%, rgba(0, 0, 0, 0.55) 58%, transparent 100%);
 }
 
 /* ── Sticky top nav — frosted glass, minimal ── */
@@ -90,7 +43,7 @@
   align-items: center;
   gap: 16px;
   padding: 10px 12px 10px 14px;
-  margin: 0 0 var(--space-section);
+  margin: 0 0 var(--space-section-lg);
   border-radius: 16px;
   border: 1px solid var(--c-border);
   background: rgba(255, 255, 255, 0.9);
@@ -106,118 +59,12 @@
   text-decoration: none;
 }
 
-.brandLockup {
-  display: grid;
-  gap: 1px;
-}
-
-.brandDescriptor {
-  color: var(--c-text-muted);
-  font-size: 0.62rem;
-  font-weight: 650;
-  letter-spacing: 0.12em;
-  line-height: 1;
-  text-transform: uppercase;
-}
-
-/* Brand logo — the RadarLogo glyph (three range rings + four cardinal ticks +
-   a down-right sweep + two detected-contact blips). Sized a touch larger than
-   the brand name so the radar reads as the mark, not a dot. Inherits the brand
-   blue from currentColor; a soft halo echoes the radar's focal glow. On the
-   landing the sweep rotates (9s loop) and the two blips flash on once per loop,
-   timed so each lights up exactly as the rotating beam passes its bearing — the
-   literal "contacts pop up under the scan" of a real radar. */
 .brandLogo {
   flex: 0 0 auto;
-  width: 1.55rem;
-  height: 1.55rem;
-  padding: 7px;
-  border-radius: 11px;
-  color: #ffffff;
-  background: #173a8f;
-  box-shadow: 0 8px 20px rgba(23, 58, 143, 0.24), inset 0 0 0 1px rgba(255, 255, 255, 0.14);
-}
-
-/* Slow sweep rotation for the logo's scan sector. The class is global (not
-   hashed) because RadarLogo applies it inside an inline SVG; the keyframe is
-   declared local to match (Turbopack co-hashes the keyframe name + the
-   animation reference to the same suffix). A full turn takes ~9s — calm, never
-   distracting, roughly synced to the hero radar's pace. transform-origin lands
-   on the glyph center (12px 12px in the 24-unit viewBox; default
-   transform-box: view-box rotates around that point). Honors
-   prefers-reduced-motion (the animation is dropped, leaving a static downward
-   sweep — the glyph still reads as a radar). */
-:global(.rr-sweep-spin) {
-  animation: rrSweepSpin 9s linear infinite;
-  transform-origin: 12px 12px;
-}
-@keyframes rrSweepSpin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-/* Detected-contact blip flashes. Each class is global (applied inside the inline
-   SVG logo, so unhashed); the keyframes are local to co-hash with the refs
-   (same Turbopack rule as the sweep). One 9s loop matched to the sweep so a blip
-   fires once per full scan. The opacity spike is placed at the EXACT cycle
-   fraction when the rotating beam (which starts at ~153° bearing, down-right,
-   and turns clockwise 360°/9s) is over that blip's bearing:
-     blip A — bearing 200° → beam reaches it at t≈1.18s → spike at ~13% of loop;
-     blip B — bearing  60° → beam reaches it at t≈6.68s → spike at ~74% of loop.
-   Between flashes a blip sits at a low idle opacity (a faint contact the radar
-   has seen before) so the dial never looks empty; the brief 0.35→1→0.35 pop is
-   the "point lights up under the scan" the operator asked for. transform-box:
-   fill-box + a 1.4× scale bloom at peak reinforces the pop without moving the
-   contact off its bearing. Honors prefers-reduced-motion (idle opacity, no
-   flash — the blips read as static faint contacts). */
-:global(.rr-blip-a) {
-  animation: rrBlipA 9s linear infinite;
-  opacity: 0.35;
-}
-@keyframes rrBlipA {
-  0%   { opacity: 0.35; transform: scale(1); }
-  11%  { opacity: 0.35; transform: scale(1); }
-  13%  { opacity: 1;    transform: scale(1.4); }
-  16%  { opacity: 0.8;  transform: scale(1.2); }
-  28%  { opacity: 0.35; transform: scale(1); }
-  100% { opacity: 0.35; transform: scale(1); }
-}
-:global(.rr-blip-b) {
-  animation: rrBlipB 9s linear infinite;
-  opacity: 0.35;
-}
-@keyframes rrBlipB {
-  0%   { opacity: 0.35; transform: scale(1); }
-  72%  { opacity: 0.35; transform: scale(1); }
-  74%  { opacity: 1;    transform: scale(1.4); }
-  77%  { opacity: 0.8;  transform: scale(1.2); }
-  89%  { opacity: 0.35; transform: scale(1); }
-  100% { opacity: 0.35; transform: scale(1); }
-}
-/* Third detected contact — bearing 315° (up-left). The beam reaches it at
-   t≈4.05s, mid-loop, so the spike sits at ~45%: between blip A (13%) and blip B
-   (74%). Three evenly-spread flashes per scan read as a populated airspace. */
-:global(.rr-blip-c) {
-  animation: rrBlipC 9s linear infinite;
-  opacity: 0.3;
-}
-@keyframes rrBlipC {
-  0%   { opacity: 0.3;  transform: scale(1); }
-  43%  { opacity: 0.3;  transform: scale(1); }
-  45%  { opacity: 1;    transform: scale(1.4); }
-  48%  { opacity: 0.8;  transform: scale(1.2); }
-  60%  { opacity: 0.3;  transform: scale(1); }
-  100% { opacity: 0.3;  transform: scale(1); }
-}
-@media (prefers-reduced-motion: reduce) {
-  :global(.rr-sweep-spin) {
-    animation: none;
-  }
-  :global(.rr-blip-a),
-  :global(.rr-blip-b),
-  :global(.rr-blip-c) {
-    animation: none;
-  }
+  width: 2.2rem;
+  height: 2.2rem;
+  color: #102344;
+  --rr-logo-accent: #4f7df3;
 }
 
 .heroBrandName {
@@ -287,7 +134,7 @@
   position: relative;
   overflow: hidden;
   border-radius: var(--radius-card);
-  margin-bottom: var(--space-section-lg);
+  margin-bottom: 18px;
   min-height: 620px;
   display: flex;
   align-items: center;
@@ -1208,16 +1055,9 @@
     padding: 11px 14px;
   }
 
-  /* Logo a touch smaller so the brand mark + name + CTA balance on one row
-     without the CTA feeling crammed against the right edge. */
   .brandLogo {
-    width: 1.35rem;
-    height: 1.35rem;
-    padding: 6px;
-  }
-
-  .brandDescriptor {
-    display: none;
+    width: 1.9rem;
+    height: 1.9rem;
   }
 
   /* Hide the section anchors on phones, but KEEP the activation CTA visible —

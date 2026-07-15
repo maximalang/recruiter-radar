@@ -69,11 +69,7 @@
 
 /* Page frame */
 .pageFrame {
-  /* Transparent so the animated ambient layer (z-index:-1 fixed, behind the
-     frame) shows through. The base page tint + the drifting blue glows live on
-     <body> / the ambient layer, not here — an opaque gradient here would paint
-     over them (the old bug: the ambient animation existed but was never visible
-     because this was an opaque #f8fbff→#eef2f7 gradient). */
+  /* Keep the frame transparent so each page can provide its own backdrop. */
   min-height: 100vh;
   padding: 32px 20px 72px;
   background: transparent;
@@ -107,8 +103,7 @@
   flex-direction: column;
   min-width: 0;
   gap: 18px;
-  /* Lift content above the fixed ambient background layer (z-index:0) so the
-     drifting glows read as atmosphere behind cards/text, never on top. */
+  /* Lift content above page-level decorative backgrounds. */
   position: relative;
   z-index: 1;
 }

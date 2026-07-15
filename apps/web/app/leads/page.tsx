@@ -16,7 +16,6 @@ import {
   GateBadgeInline,
   FeedbackBadge,
   ScoreBar,
-  ScoreBandChip,
   SignalFreshnessChip,
   AiHintChip,
   ForeignEmployerBadge,
@@ -73,42 +72,49 @@ export function LeadCard({
     latestPublishedAt: lead.latestPublishedAt,
     hiringMode,
   });
+  const showWorkflowStatus =
+    (Boolean(lead.reviewStatus) && lead.reviewStatus !== 'auto_approved') ||
+    (Boolean(lead.feedbackStatus) && lead.feedbackStatus !== 'none');
 
   return (
-    <article className={ipStyles.leadCard}>
-      <div className={ipStyles.leadCardRail} data-tone={tone} aria-hidden="true" />
+    <article className={ipStyles.leadCard} data-signal-card="true" data-tone={tone}>
       <div className={ipStyles.leadCardBody}>
         <div className={ipStyles.leadCardHead}>
           <div className={ipStyles.leadCardHeadMain}>
             <Link href={`/leads/${lead.id}`} className={ipStyles.leadLink}>
               <span className={ipStyles.leadCardOrg}>{lead.orgName}</span>
             </Link>
-            <div className={ipStyles.leadCardTags}>
-              {/* Decision cluster — the verdict (temperature + confidence gate)
-                  reads as one visual group, separate from the workflow state. */}
-              <span className={ipStyles.leadCardTagGroup} data-chip-group="decision">
-                <ScoreBandChip score={lead.score} />
-                <GateBadgeInline gate={lead.confidenceGate} />
+            {lead.locationNames.length > 0 && (
+              <span className={ipStyles.leadCompanyMeta}>
+                <PinIcon className={ipStyles.chipIcon} /> {lead.locationNames.slice(0, 2).join(', ')}
               </span>
-              {/* Status cluster — analyst-review + the agency's triage state. */}
-              {(lead.reviewStatus || lead.feedbackStatus) && lead.reviewStatus !== 'auto_approved' || (lead.feedbackStatus && lead.feedbackStatus !== 'none') ? (
+            )}
+            <div className={ipStyles.leadCardTags}>
+              {showWorkflowStatus ? (
                 <span className={ipStyles.leadCardTagGroup} data-chip-group="status">
                   <ReviewStatusBadge status={lead.reviewStatus} />
                   <FeedbackBadge status={lead.feedbackStatus} />
                 </span>
               ) : null}
-              {/* Muted separate chips — geo + AI presence, not part of the verdict. */}
               <ForeignEmployerBadge isForeign={lead.isForeignEmployer} />
               <AiHintChip present={lead.hasAiHint} />
             </div>
           </div>
           <div className={ipStyles.leadCardHeadAside}>
+            <span className={ipStyles.leadScoreLabel}>Сила сигнала</span>
             <div className={ipStyles.leadCardScore}>
               <ScoreBar score={lead.score} />
             </div>
+            <GateBadgeInline gate={lead.confidenceGate} />
           </div>
         </div>
 
+        {lead.whyNow && (
+          <div className={ipStyles.leadFieldRow} data-kind="why">
+            <span className={ipStyles.leadFieldLabel}>Почему сейчас</span>
+            <span className={ipStyles.leadFieldValue}>{lead.whyNow}</span>
+          </div>
+        )}
         {fitPreview && (
           <div className={ipStyles.leadFieldRow} data-kind="fit">
             <span className={ipStyles.leadFieldLabel}>Почему подходит</span>
@@ -117,38 +123,25 @@ export function LeadCard({
             </span>
           </div>
         )}
-        {lead.whyNow && (
-          <div className={ipStyles.leadFieldRow} data-kind="why">
-            <span className={ipStyles.leadFieldLabel}>Почему сейчас</span>
-            <span className={ipStyles.leadFieldValue}>{lead.whyNow}</span>
-          </div>
-        )}
 
-        <div className={ipStyles.leadCardFooter}>
-          <UrgencyCueChip level={urgency.level} label={urgency.label} />
-          <SignalFreshnessChip latestPublishedAt={lead.latestPublishedAt} />
-          {lead.lawfulContactPath && (
-            <span className={ipStyles.leadContactChip}>
-              <ShieldIcon className={ipStyles.chipIcon} /> {lead.lawfulContactPath}
-            </span>
-          )}
-          {lead.locationNames.length > 0 && (
-            <span className={ipStyles.leadMetaChip}>
-              <PinIcon className={ipStyles.chipIcon} /> {lead.locationNames.slice(0, 2).join(', ')}
-            </span>
-          )}
-          {lead.vacanciesCount > 0 && (
-            <span className={ipStyles.leadMetaChip}><BriefcaseIcon className={ipStyles.chipIcon} /> {lead.vacanciesCount} вакансий</span>
-          )}
-          {shownRoles.length > 0 ? (
-            <span className={ipStyles.leadMetaChip}>
-              <FileIcon className={ipStyles.chipIcon} /> {shownRoles.join(' · ')}{moreRoles > 0 ? ` + ещё ${moreRoles}` : ''}
-            </span>
-          ) : (
-            <span className={ipStyles.leadMetaChip} data-muted="true">
-              <FileIcon className={ipStyles.chipIcon} /> роли не определены
-            </span>
-          )}
+        <div className={ipStyles.leadEvidenceBlock}>
+          <span className={ipStyles.leadFieldLabel}>Доказательства</span>
+          <div className={ipStyles.leadCardFooter}>
+            <UrgencyCueChip level={urgency.level} label={urgency.label} />
+            <SignalFreshnessChip latestPublishedAt={lead.latestPublishedAt} />
+            {lead.vacanciesCount > 0 && (
+              <span className={ipStyles.leadMetaChip}><BriefcaseIcon className={ipStyles.chipIcon} /> {lead.vacanciesCount} вакансий</span>
+            )}
+            {shownRoles.length > 0 ? (
+              <span className={ipStyles.leadMetaChip}>
+                <FileIcon className={ipStyles.chipIcon} /> {shownRoles.join(' · ')}{moreRoles > 0 ? ` + ещё ${moreRoles}` : ''}
+              </span>
+            ) : (
+              <span className={ipStyles.leadMetaChip} data-muted="true">
+                <FileIcon className={ipStyles.chipIcon} /> роли не определены
+              </span>
+            )}
+          </div>
         </div>
 
         {risks.length > 0 && (
@@ -156,6 +149,15 @@ export function LeadCard({
             {risks.map((risk) => (
               <span key={risk} className={ipStyles.leadRiskChip}><AlertIcon className={ipStyles.chipIcon} /> {risk}</span>
             ))}
+          </div>
+        )}
+
+        {lead.lawfulContactPath && (
+          <div className={ipStyles.leadContactRow}>
+            <span className={ipStyles.leadFieldLabel}>Контакт</span>
+            <span className={ipStyles.leadContactChip}>
+              <ShieldIcon className={ipStyles.chipIcon} /> {lead.lawfulContactPath}
+            </span>
           </div>
         )}
       </div>
@@ -280,7 +282,7 @@ function LeadsList({
         </div>
         <LeadsListLegend />
       </div>
-      <div className={ipStyles.leadsList}>
+      <div className={`${ipStyles.leadsList} ${ipStyles.signalCardList}`}>
         {leads.map((lead) => (
           <LeadCard
             key={lead.id}
