@@ -9,7 +9,19 @@
  * Adding a new source = one entry in this file + the ingestion script.
  */
 
-export type SourceId = 'hh' | 'superjob' | 'habr-career' | 'career-pages' | 'egrul-fns' | 'rabota-rossii'
+export type SourceId =
+  | 'hh'
+  | 'superjob'
+  | 'habr-career'
+  | 'career-pages'
+  | 'egrul-fns'
+  | 'rabota-rossii'
+  | 'company-site'
+  | 'tech-job-boards'
+  | 'regional-job-boards'
+  | 'funding-business-signals'
+  | 'fedresurs'
+  | 'transparent-business-fns'
 
 export interface SourceConfig {
   /** Unique identifier used in API calls, DB, and n8n workflows. */
@@ -94,6 +106,19 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     ],
     isPrimary: true,
     category: 'job-board',
+    // Per-source timeout 240s (raised from the 120s default on 2026-07-15):
+    // career.habr.com is scraped (no partner API), with a respectful 2s
+    // SCRAPE_DELAY_MS between pages. With the multi-keyword derivation feeding
+    // ~9 role keywords × 3 pages, a run issues ~27 fetches (~54s in delay alone)
+    // plus per-card HTML extraction plus 150+ signal upserts — it reliably
+    // exceeds the 120s default. A 120s execFile kill was discarding EVERY fetched
+    // record each day (the run that reached the DB wrote 0; the rows that appeared
+    // in logs were lost), so habr-career silently produced no signals from the
+    // cron despite a successful fetch. 240s matches the career-pages precedent.
+    // NOTE (2026-07-15 merge): this entry is carried from upstream commit
+    // 0e5d778 — preserved verbatim during the 12-source registry expansion so
+    // the data-loss fix is not silently dropped when this superset merges.
+    timeoutMs: 240_000,
   },
   {
     id: 'career-pages',
@@ -135,6 +160,127 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     requiredEnvVars: [],
     envPrefixes: ['SOURCE_'],
     searchEnvVars: [],
+    isPrimary: false,
+    category: 'registry',
+  },
+  {
+    id: 'company-site',
+    name: 'Company sites',
+    description: 'Direct company websites — corroborating evidence and contact surfaces',
+    script: 'source-company-site.mjs',
+    requiredEnvVars: [],
+    envPrefixes: ['COMPANY_SITE_', 'CRAWLER_'],
+    searchEnvVars: [],
+    // NOT primary on purpose (2026-07-15): company-site is supporting-evidence-only
+    // (registry policy 'supporting-evidence-only') — it corroborates existing leads
+    // and surfaces direct company/contact pages, but must never originate a lead on
+    // its own. Kept out of the daily-radar auto-run so it doesn't add ambient noise
+    // or volume without direct hiring proof; the operator runs it on demand from the
+    // admin panel to enrich the org/contact surface for an existing candidate set.
+    isPrimary: false,
+    category: 'career-page',
+  },
+  {
+    id: 'tech-job-boards',
+    name: 'Tech job boards (Greenhouse/Lever)',
+    description:
+      'Public ATS manifests (boards.greenhouse.io, jobs.lever.co) — international tech companies with Russia-presence vacancies',
+    script: 'source-tech-job-boards.mjs',
+    // No paid provider key required: the live-public mode reads the public JSON
+    // manifests that every Greenhouse/Lever board publishes. The operator only
+    // needs to list the board tokens/slugs (TECH_JOB_BOARDS_GREENHOUSE_TOKENS /
+    // TECH_JOB_BOARDS_LEVER_SLUGS) — these are board identifiers, not secrets.
+    // File mode (TECH_JOB_BOARDS_INPUT_FILE) and provider mode
+    // (TECH_JOB_BOARDS_PROVIDER_API_URL + _TOKEN) are also supported.
+    requiredEnvVars: [],
+    envPrefixes: ['TECH_JOB_BOARDS_'],
+    searchEnvVars: [],
+    // NOT primary (2026-07-15): this is a curated ATS surface, not a
+    // search-crawl. The operator lists which boards to poll, so it must not run
+    // blindly every day. It is digest-eligible (signal_type 'job_posting' and
+    // accepted by source-digest-evidence.sql) so any records it ingests DO
+    // surface as leads — running it from the admin panel enriches the pool with
+    // international tech-company vacancies that have a Russian location.
+    isPrimary: false,
+    category: 'job-board',
+  },
+  {
+    id: 'regional-job-boards',
+    name: 'Regional Russian job boards',
+    description: 'Regional Russian job-board vacancies — file or provider feed',
+    script: 'source-regional-job-boards.mjs',
+    // File mode (REGIONAL_JOB_BOARDS_INPUT_FILE) or provider mode
+    // (REGIONAL_JOB_BOARDS_PROVIDER_API_URL + _TOKEN). There is no free live
+    // crawl — the operator supplies a feed after a legal/robots review, which
+    // is why requiredEnvVars is empty (no key is technically required, but the
+    // feed must be configured or the script exits with a clear "no input"
+    // error). Digest-eligible: signal_type 'job_posting', accepted by the
+    // digest SQL.
+    requiredEnvVars: [],
+    envPrefixes: ['REGIONAL_JOB_BOARDS_'],
+    searchEnvVars: [],
+    // NOT primary: needs an operator-supplied feed and a per-board legal review.
+    // Run on demand from the admin panel once a feed is configured.
+    isPrimary: false,
+    category: 'job-board',
+  },
+  {
+    id: 'funding-business-signals',
+    name: 'Funding & business signals (GDELT)',
+    description: 'Funding rounds / venture signals — corroborating context (not a lead trigger)',
+    script: 'source-funding-business-signals.mjs',
+    // Free live-public mode: set FUNDING_SIGNALS_GDELT_QUERIES to query the
+    // public GDELT global news/event database (no paid key). File mode
+    // (FUNDING_BUSINESS_SIGNALS_INPUT_FILE) and provider mode
+    // (FUNDING_SIGNALS_PROVIDER_API_URL + _TOKEN) are also supported.
+    requiredEnvVars: [],
+    envPrefixes: ['FUNDING_BUSINESS_SIGNALS_', 'FUNDING_SIGNALS_'],
+    searchEnvVars: [],
+    // CONTEXT-only source (2026-07-15): signal_type 'funding' / 'funding_round'
+    // does NOT originate a lead — per Gate D, context without direct hiring
+    // proof is supporting context only, never a lead. The digest SQL filters
+    // to signal_type='job_posting' for lead candidacy, so these records
+    // corroborate org identity (INN/OGRN/domain) but never surface as leads on
+    // their own. Run on demand from the admin panel to enrich the context pool;
+    // a future enhancement can read them as Urgency corroboration on an EXISTING
+    // job_posting lead (that would be a digest-SQL change — deferred).
+    isPrimary: false,
+    category: 'registry',
+  },
+  {
+    id: 'fedresurs',
+    name: 'Fedresurs (corporate events)',
+    description: 'Russian Fedresurs corporate-event records — corroborating context (not a lead trigger)',
+    script: 'source-fedresurs.mjs',
+    // File mode (FEDRESURS_INPUT_FILE) or provider mode
+    // (FEDRESURS_PROVIDER_API_URL + _TOKEN). Public-site scraping is NOT
+    // supported (the script refuses it) — the operator supplies a feed after a
+    // legal review. signal_type 'other', evidence_role 'context'.
+    requiredEnvVars: [],
+    envPrefixes: ['FEDRESURS_'],
+    searchEnvVars: [],
+    // CONTEXT-only: corporate events (bankruptcy, reorganization, large
+    // transactions) corroborate org identity + Urgency but never originate a
+    // lead (Gate D). Digest-lead candidacy stays job_posting-only.
+    isPrimary: false,
+    category: 'registry',
+  },
+  {
+    id: 'transparent-business-fns',
+    name: 'Transparent business (FNS)',
+    description: 'Russian FNS transparent-business registry references — org enrichment (not a lead trigger)',
+    script: 'source-transparent-business-fns.mjs',
+    // File mode (TRANSPARENT_BUSINESS_FNS_INPUT_FILE) or provider mode
+    // (TRANSPARENT_BUSINESS_FNS_PROVIDER_API_URL + _TOKEN). Direct pb.nalog.ru
+    // scraping is NOT supported. signal_type 'other', evidence_role
+    // 'enrichment' — registry references that resolve/enrich org identity
+    // (INN/OGRN/name) rather than signal a hiring event.
+    requiredEnvVars: [],
+    envPrefixes: ['TRANSPARENT_BUSINESS_FNS_'],
+    searchEnvVars: [],
+    // ENRICHMENT-only: strengthens org identity resolution (legal name, INN,
+    // OGRN) which feeds cross-source corroboration, but never originates a
+    // lead. Run on demand from the admin panel to enrich the org registry.
     isPrimary: false,
     category: 'registry',
   },
