@@ -110,6 +110,21 @@ function isNearDuplicate(left: string, right: string): boolean {
   return 1 - editDistance(left, right) / maxLength >= NEAR_DUPLICATE_SIMILARITY;
 }
 
+function containsNearDuplicate(haystack: string, needle: string): boolean {
+  if (!needle) return false;
+  if (haystack.includes(needle)) return true;
+  const minWindow = Math.max(8, needle.length - 2);
+  const maxWindow = Math.min(haystack.length, needle.length + 2);
+
+  for (let windowSize = minWindow; windowSize <= maxWindow; windowSize += 1) {
+    for (let start = 0; start + windowSize <= haystack.length; start += 1) {
+      if (isNearDuplicate(haystack.slice(start, start + windowSize), needle)) return true;
+    }
+  }
+
+  return false;
+}
+
 /**
  * Build up to three factual evidence lines without repeating copy already used
  * in the prominent "Почему сейчас" block. Source provenance leads the row;
@@ -140,7 +155,7 @@ export function buildPreviewEvidenceItems(input: {
   for (const candidate of candidates) {
     const normalized = comparableCardText(candidate);
     const repeatsEvidence = seen.some((existing) => isNearDuplicate(existing, normalized));
-    const repeatsWhyNow = Boolean(whyNow && whyNow.includes(normalized));
+    const repeatsWhyNow = containsNearDuplicate(whyNow, normalized);
     if (!normalized || repeatsEvidence || repeatsWhyNow) continue;
     seen.push(normalized);
     evidence.push(candidate.trim());
