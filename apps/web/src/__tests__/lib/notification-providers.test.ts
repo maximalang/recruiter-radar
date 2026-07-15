@@ -1,4 +1,9 @@
-import { validateWebhookUrl } from '../../../lib/notification-providers';
+import {
+  classifyNotificationProviderError,
+  sendSignedWebhook,
+  sendTelegramNotification,
+  validateWebhookUrl,
+} from '../../../lib/notification-providers';
 
 describe('notification webhook validation', () => {
   const previousNodeEnv = process.env.NODE_ENV;
@@ -10,6 +15,7 @@ describe('notification webhook validation', () => {
       enumerable: true,
       writable: true,
     });
+    jest.restoreAllMocks();
   });
 
   function setNodeEnv(value: string) {
@@ -46,5 +52,75 @@ describe('notification webhook validation', () => {
   it('allows localhost HTTP only outside production', () => {
     setNodeEnv('test');
     expect(validateWebhookUrl('http://localhost:5678/webhook').hostname).toBe('localhost');
+  });
+
+  it('reads at most 2KB from a provider response', async () => {
+    setNodeEnv('test');
+    jest.spyOn(global, 'fetch').mockResolvedValue(
+      new Response('x'.repeat(10_000), { status: 200 }),
+    );
+
+    const result = await sendSignedWebhook({
+      url: 'https://example.com/hook',
+      secret: 'secret',
+      event: 'digest.ready',
+      eventId: 'evt_1',
+      payload: { ok: true },
+    });
+
+    expect(result.responseText).toHaveLength(2_000);
+  });
+});
+
+describe('Telegram provider error classification', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('preserves HTTP 429 and retry_after for the dispatcher', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ok: false,
+          error_code: 429,
+          description: 'Too Many Requests',
+          parameters: { retry_after: 17 },
+        }),
+        { status: 429, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+
+    let caught: unknown;
+    try {
+      await sendTelegramNotification({
+        botToken: '123456:token',
+        chatId: '42',
+        text: 'test',
+      });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(classifyNotificationProviderError(caught)).toEqual(
+      expect.objectContaining({
+        kind: 'rate_limited',
+        status: 429,
+        code: '429',
+        retryAfterSeconds: 17,
+      }),
+    );
+  });
+
+  it('returns the provider message id on success', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ ok: true, result: { message_id: 987 } }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    await expect(
+      sendTelegramNotification({ botToken: '123456:token', chatId: '42', text: 'test' }),
+    ).resolves.toEqual({ providerMessageId: '987' });
   });
 });
