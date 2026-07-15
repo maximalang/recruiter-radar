@@ -516,6 +516,83 @@ function parseNullableFloat(value: unknown): number | null {
   return Number.isFinite(num) ? Math.round(num * 10) / 10 : null;
 }
 
+// ─── Analytics: Ingest Volume Trend (7 days) ──────────────────────
+// Per-source daily signal counts over the last 7 days. This is the view that
+// makes a silently-failing source visible: the 24h health card only shows the
+// latest window, so a source that fetches fine but times out mid-write every
+// day (habr-career's historical 120s-kill bug) reads as "0 records / 24h" once
+// and "healthy" the next, never surfacing the daily loss. A 7-day trend row of
+// all-zero days (or zero-after-nonzero) for one source is the actionable signal
+// an operator scans for. Read-only; no new tables or migrations.
+
+export interface IngestTrendDay {
+  /** ISO date (YYYY-MM-DD) in the DB's timezone — grouped by occurred_at::date. */
+  day: string;
+  /** Per-source signal counts for that day. Sources with zero are omitted. */
+  bySource: Record<string, number>;
+  /** Total signals that day across all sources (sum of bySource values). */
+  total: number;
+}
+
+export interface IngestTrend {
+  /** Last 7 days, oldest-first. Days with no signals still appear (total 0). */
+  days: IngestTrendDay[];
+  /** Union of sources seen across the window, for stable chart columns. */
+  sources: string[];
+}
+
+export async function getDashboardIngestTrend(): Promise<IngestTrend> {
+  const pool = getPool();
+  if (!pool) {
+    return { days: [], sources: [] };
+  }
+
+  try {
+    // Group by occurred_at::date so a signal counts on the day the hiring event
+    // happened (what the freshness gate uses), not when we ingested it. This keeps
+    // the trend truthful: a backlog ingested today still lands on its real day.
+    const result = await pool.query<{ day: string; source: string; count: string }>(`
+      SELECT
+        occurred_at::DATE::TEXT AS day,
+        source,
+        COUNT(*)::TEXT AS count
+      FROM signals
+      WHERE occurred_at >= NOW() - INTERVAL '7 days'
+      GROUP BY 1, 2
+      ORDER BY 1, 2
+    `);
+
+    // Build a dense 7-day window (oldest-first) so empty days render as zeros
+    // instead of disappearing — a missing day is itself a signal of "source ran
+    // and wrote nothing", which is exactly what we want visible.
+    const today = new Date();
+    const dayBuckets = new Map<string, IngestTrendDay>();
+    for (let offset = 6; offset >= 0; offset -= 1) {
+      const d = new Date(today.getTime() - offset * 24 * 60 * 60 * 1000);
+      const key = d.toISOString().slice(0, 10);
+      dayBuckets.set(key, { day: key, bySource: {}, total: 0 });
+    }
+
+    const sourceSet = new Set<string>();
+    for (const row of result.rows) {
+      const bucket = dayBuckets.get(row.day);
+      // A signal older than 7 days (timezone edge) outside our window — skip.
+      if (!bucket) continue;
+      const count = parseInt(row.count, 10);
+      bucket.bySource[row.source] = count;
+      bucket.total += count;
+      sourceSet.add(row.source);
+    }
+
+    return {
+      days: [...dayBuckets.values()],
+      sources: [...sourceSet].sort(),
+    };
+  } catch {
+    return { days: [], sources: [] };
+  }
+}
+
 // ─── Today's Radar — companies worth contacting now ─────────────
 
 export interface TodayRadar {
@@ -568,5 +645,135 @@ export async function getDashboardTodayRadar(
     return { topLeads: leadsResult.leads, pendingReview, hiringModeByProfileId };
   } catch {
     return { topLeads: [], pendingReview: 0, hiringModeByProfileId: {} };
+  }
+}
+
+// ─── Operator: user management overview ──────────────────────────
+// One row per registered user with their client profile, pilot entitlement, and
+// payment status joined in — the surface an operator scans to track who signed
+// up, who has an active pilot, who paid, and who has Telegram delivery wired.
+// Read-only. owner_id links users→client_profiles (1:1 by the unique partial
+// index; a NULL owner_id is the pre-multi-tenancy pilot-mode profile and still
+// surfaces so the operator can see it).
+
+export interface OperatorUserRow {
+  id: string;
+  email: string;
+  fullName: string | null;
+  telegramUsername: string | null;
+  telegramChatId: string | null;
+  createdAt: string;
+  /** Client profile (null when the user has no profile yet). */
+  profile: {
+    id: string;
+    agencyName: string;
+    isActive: boolean;
+    specialization: string | null;
+    targetCity: string | null;
+    deliveryEnabled: boolean | null;
+    telegramChatId: string | null;
+  } | null;
+  /** Most recent / active pilot enrollment, if any. */
+  pilot: {
+    status: string;
+    startsAt: string;
+    endsAt: string | null;
+  } | null;
+  /** Whether the user has at least one PAID checkout order. */
+  hasPaidOrder: boolean;
+  /** Count of paid orders (for the "paid N×" signal). */
+  paidOrderCount: number;
+}
+
+export async function getOperatorUsers(): Promise<OperatorUserRow[]> {
+  const pool = getPool();
+  if (!pool) return [];
+
+  try {
+    // LATERAL joins keep the per-user aggregates clean without GROUP BY fan-out:
+    //   * profile  — the single client_profiles row owned by the user (NULL ok)
+    //   * pilot    — the latest enrollment row (NULL when none)
+    //   * paid     — count of paid orders; hasPaidOrder = count > 0
+    // Ordered newest-first so a new signup is the top row.
+    const result = await pool.query<{
+      id: string;
+      email: string;
+      full_name: string | null;
+      telegram_username: string | null;
+      telegram_chat_id: string | null;
+      created_at: string;
+      profile_id: string | null;
+      agency_name: string | null;
+      is_active: boolean | null;
+      specialization: string | null;
+      target_city: string | null;
+      delivery_enabled: boolean | null;
+      profile_telegram_chat_id: string | null;
+      pilot_status: string | null;
+      pilot_starts_at: string | null;
+      pilot_ends_at: string | null;
+      paid_order_count: string;
+    }>(`
+      SELECT
+        u.id::TEXT            AS id,
+        u.email               AS email,
+        u.full_name           AS full_name,
+        u.telegram_username   AS telegram_username,
+        u.telegram_chat_id::TEXT AS telegram_chat_id,
+        u.created_at::TEXT    AS created_at,
+        p.id::TEXT            AS profile_id,
+        p.agency_name         AS agency_name,
+        p.is_active           AS is_active,
+        p.specialization      AS specialization,
+        p.target_city         AS target_city,
+        p.delivery_enabled    AS delivery_enabled,
+        p.telegram_chat_id::TEXT AS profile_telegram_chat_id,
+        pe.status::TEXT       AS pilot_status,
+        pe.starts_at::TEXT    AS pilot_starts_at,
+        pe.ends_at::TEXT      AS pilot_ends_at,
+        COALESCE(po.paid_count, 0)::TEXT AS paid_order_count
+      FROM users u
+      LEFT JOIN LATERAL (
+        SELECT * FROM client_profiles cp WHERE cp.owner_id = u.id LIMIT 1
+      ) p ON true
+      LEFT JOIN LATERAL (
+        SELECT * FROM pilot_enrollments pe2
+        WHERE pe2.user_id = u.id
+        ORDER BY created_at DESC LIMIT 1
+      ) pe ON true
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*)::INT AS paid_count
+        FROM checkout_orders co
+        WHERE co.user_id = u.id AND co.status = 'paid'
+      ) po ON true
+      ORDER BY u.created_at DESC
+    `);
+
+    return result.rows.map((r) => ({
+      id: r.id,
+      email: r.email,
+      fullName: r.full_name,
+      telegramUsername: r.telegram_username,
+      telegramChatId: r.telegram_chat_id,
+      createdAt: r.created_at,
+      profile: r.profile_id
+        ? {
+            id: r.profile_id,
+            agencyName: r.agency_name ?? "",
+            isActive: Boolean(r.is_active),
+            specialization: r.specialization,
+            targetCity: r.target_city,
+            deliveryEnabled: r.delivery_enabled === null ? null : Boolean(r.delivery_enabled),
+            telegramChatId: r.profile_telegram_chat_id,
+          }
+        : null,
+      pilot: r.pilot_status
+        ? { status: r.pilot_status, startsAt: r.pilot_starts_at ?? "", endsAt: r.pilot_ends_at }
+        : null,
+      hasPaidOrder: parseInt(r.paid_order_count, 10) > 0,
+      paidOrderCount: parseInt(r.paid_order_count, 10),
+    }));
+  } catch {
+    return [];
   }
 }
