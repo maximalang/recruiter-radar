@@ -1,0 +1,104 @@
+name: Notification delivery validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/notification-delivery-validation.yml'
+      - 'apps/web/app/api/cron/notification-delivery-retry/**'
+      - 'apps/web/app/profile/notification-actions.ts'
+      - 'apps/web/lib/notification-connection-operations.ts'
+      - 'apps/web/lib/notification-dispatch.ts'
+      - 'apps/web/lib/notification-providers.ts'
+      - 'apps/web/src/__tests__/lib/notification-dispatch.test.ts'
+      - 'apps/web/src/__tests__/lib/notification-providers.test.ts'
+      - 'docs/notification-delivery.md'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: notification_delivery_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    env:
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/notification_delivery_test
+      SESSION_SECRET: test-session-secret-at-least-32-characters
+      NEXT_PUBLIC_APP_URL: https://recruiter-radar.test
+      NOTIFICATION_ENCRYPTION_KEY: BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run web:check 2>&1 | tee /tmp/notification-typecheck.log
+
+      - name: Upload typecheck failure log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: notification-typecheck-${{ github.run_id }}-${{ github.run_attempt }}
+          path: /tmp/notification-typecheck.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Run targeted tests
+        run: >-
+          npm run --workspace @recruiter-radar/web test --
+          --runInBand
+          src/__tests__/lib/notification-providers.test.ts
+          src/__tests__/lib/notification-dispatch.test.ts
+
+      - name: Apply all migrations
+        run: node packages/db/scripts/migrate.mjs
+
+      - name: Build Docker image
+        run: docker build -f apps/web/Dockerfile -t recruiter-radar-notification-delivery:pr .
+
+      - name: Run health smoke
+        run: |
+          docker run -d --name notification-delivery-smoke --network host \
+            -e DATABASE_URL="$DATABASE_URL" \
+            -e SESSION_SECRET="$SESSION_SECRET" \
+            -e NEXT_PUBLIC_APP_URL="$NEXT_PUBLIC_APP_URL" \
+            -e NOTIFICATION_ENCRYPTION_KEY="$NOTIFICATION_ENCRYPTION_KEY" \
+            -e MIGRATE_ON_START=false \
+            recruiter-radar-notification-delivery:pr
+
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3000/api/health >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+
+          docker logs notification-delivery-smoke
+          exit 1
+
+      - name: Cleanup smoke container
+        if: always()
+        run: docker rm -f notification-delivery-smoke || true
