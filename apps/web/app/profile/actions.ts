@@ -117,6 +117,7 @@ export async function saveSettingsProfileAction(
   }
 
   revalidatePath("/profile");
+  revalidatePath("/settings");
 
   // Best-effort match count against the just-saved profile — same gate path as
   // the digest. Never throws (countMatchingCandidatesForProfile swallows errors),
@@ -184,5 +185,6 @@ export async function saveDeliveryPreferencesAction(
   }
 
   revalidatePath("/profile");
+  revalidatePath("/settings");
   return { ok: true };
 }

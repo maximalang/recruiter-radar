@@ -21,7 +21,6 @@ import {
 } from "./ui/page-primitives";
 import ppStyles from "./ui/page-primitives.module.css";
 import {
-  buildPreviewEvidenceItems,
   buildFaqItems,
   cleanEmployerName,
   formatLocationCaption,
@@ -99,10 +98,6 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         <RadarCanvas />
         <div className={hpStyles.heroContent}>
           <div className={hpStyles.heroCopy}>
-            <div className={hpStyles.heroEyebrow}>
-              <span className={hpStyles.heroEyebrowDot} aria-hidden="true" />
-              Радар клиентских возможностей
-            </div>
             <h1 className={hpStyles.heroTitle}>
               Компании, которым нужен подбор — <span className={hpStyles.heroTitleAccent}>в момент, когда стоит написать</span>
             </h1>
@@ -136,14 +131,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               <div className={hpStyles.heroScore}><strong>87</strong><span>/100</span></div>
             </div>
             <div className={hpStyles.heroScoreTrack}><span /></div>
-            <div className={hpStyles.heroSignalBlock}>
-              <span>Почему сейчас</span>
-              <strong>Открыты новые вакансии по вашей специализации</strong>
-            </div>
             <div className={hpStyles.heroEvidenceRow}>
-              <div><span>01</span><p>Карьерная страница</p></div>
-              <div><span>02</span><p>Свежие вакансии</p></div>
-              <div><span>03</span><p>Корпоративный контакт</p></div>
+              <div><span>Компания и контакты</span><p>Карьерная страница и корпоративный канал связи</p></div>
+              <div><span>Релевантные вакансии</span><p>Новые роли по вашей специализации</p></div>
+              <div><span>Сигналы</span><p>Найм усилился — сейчас уместно выйти на контакт</p></div>
             </div>
             <div className={hpStyles.heroProductFooter}>
               <span>Доказательства собраны</span>
@@ -436,12 +427,20 @@ function PreviewDigestCard(props: {
   const location = formatLocationCaption(item.location_names);
   const evidenceTitles = pickEvidenceTitles(item.evidence_titles, 6);
   const vacanciesCaption = formatVacanciesCount(item.vacancies_count);
-  const evidenceItems = buildPreviewEvidenceItems({
-    whyNow,
-    vacanciesCaption,
-    evidenceTitles,
-    sourceFamilies: item.source_families,
-  });
+  const previewSections = [
+    {
+      label: "Компания и контакты",
+      value: contactPath || "Корпоративный контакт уточняется",
+    },
+    {
+      label: "Релевантные вакансии",
+      value: [vacanciesCaption, evidenceTitles.slice(0, 2).join(" · ")].filter(Boolean).join(" · "),
+    },
+    {
+      label: "Сигналы",
+      value: whyNow || "Активность найма подтверждена источниками",
+    },
+  ];
   // Score = 0–100 points (raw total_score / 4). The internal [0,4] signal
   // strength still drives the tone + the confidence gate + the hiringIntentMin
   // threshold (unchanged) — points are a higher-resolution read of the SAME
@@ -471,12 +470,11 @@ function PreviewDigestCard(props: {
 
   return (
     <article className={hpStyles.previewCard} data-tone={tone}>
-      <div className={hpStyles.previewCardTopbar}>
-        <span>Сигнал радара · {String(item.rank).padStart(2, "0")}</span>
-        {location ? (
+      {location ? (
+        <div className={hpStyles.previewCardTopbar}>
           <span className={hpStyles.previewCardLoc} aria-label={`География: ${location}`}>{location}</span>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
       <div className={hpStyles.previewCompanyRow}>
         <div className={hpStyles.previewCardName}>{employerName}</div>
@@ -496,18 +494,11 @@ function PreviewDigestCard(props: {
         <span className={hpStyles.previewStrengthFill} data-tone={tone} style={{ width: `${pct}%` }} />
       </div>
 
-      {whyNow ? (
-        <div className={hpStyles.previewWhy}>
-          <span>Почему сейчас</span>
-          <strong>{whyNow}</strong>
-        </div>
-      ) : null}
-
-      <div className={hpStyles.previewEvidence} aria-label="Доказательства сигнала">
-        {evidenceItems.map((itemText, index) => (
-          <div key={`${itemText}-${index}`}>
-            <span>{String(index + 1).padStart(2, "0")}</span>
-            <p>{itemText}</p>
+      <div className={hpStyles.previewEvidence} aria-label="Краткая информация о компании">
+        {previewSections.map((section) => (
+          <div key={section.label}>
+            <span>{section.label}</span>
+            <p>{section.value}</p>
           </div>
         ))}
       </div>

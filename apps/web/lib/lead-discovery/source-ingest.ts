@@ -238,6 +238,9 @@ export async function ingestSource(
     const filteredEnv = env ? filterEnvVars(env, searchEnvVars) : {}
     // Merge: process.env → DB search prefs → derived (role-based) → caller filtered env
     const mergedEnv = { ...process.env, ...dbSearchEnv, ...derivedSearchEnv, ...filteredEnv }
+    // Windows exposes the inherited path case-insensitively (often as `Path`),
+    // while Node child processes and our allowlist contract use `PATH`.
+    if (process.env.PATH) mergedEnv.PATH = process.env.PATH
 
     // Resolve execFile via the bundler-opaque accessor so Turbopack does not
     // statically analyze this spawn as a `<dynamic>` module import (the script

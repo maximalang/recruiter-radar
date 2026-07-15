@@ -1,0 +1,83 @@
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  color: var(--c-text-primary, #0f172a);
+}
+
+.mark {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+.orbit,
+.orbitSoft,
+.monogram {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.orbit { stroke-width: 1.65; opacity: 0.82; }
+.orbitSoft { stroke-width: 1.45; opacity: 0.34; }
+.monogram { stroke-width: 1.8; opacity: 0.82; }
+.needle { fill: #315fc8; opacity: 0.9; }
+.origin { fill: currentColor; }
+.target { fill: #315fc8; }
+
+.wordmark {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.28em;
+  white-space: nowrap;
+  font-size: 0.98rem;
+  font-weight: 710;
+  letter-spacing: -0.025em;
+  line-height: 1;
+}
+
+.wordmark strong {
+  color: #315fc8;
+  font: inherit;
+}
+
+.logo[data-tone="dark"] {
+  color: #f8fafc;
+}
+
+.logo[data-tone="dark"] .wordmark strong {
+  color: #8ab9ff;
+}
+
+.logo[data-tone="dark"] .needle,
+.logo[data-tone="dark"] .target {
+  fill: #8ab9ff;
+}
+
+.logo[data-size="small"] {
+  gap: 8px;
+}
+
+.logo[data-size="small"] .mark {
+  width: 28px;
+  height: 28px;
+}
+
+.logo[data-size="small"] .wordmark {
+  font-size: 0.9rem;
+}
+
+@media (max-width: 360px) {
+  .wordmark {
+    font-size: 0.86rem;
+  }
+
+  .mark {
+    width: 30px;
+    height: 30px;
+  }
+}

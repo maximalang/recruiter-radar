@@ -112,12 +112,9 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     // ~9 role keywords × 3 pages, a run issues ~27 fetches (~54s in delay alone)
     // plus per-card HTML extraction plus 150+ signal upserts — it reliably
     // exceeds the 120s default. A 120s execFile kill was discarding EVERY fetched
-    // record each day (the run that reached the DB wrote 0; the rows that appeared
+    // record each day (the run that reached the DB wrote 0; the 165 that appeared
     // in logs were lost), so habr-career silently produced no signals from the
     // cron despite a successful fetch. 240s matches the career-pages precedent.
-    // NOTE (2026-07-15 merge): this entry is carried from upstream commit
-    // 0e5d778 — preserved verbatim during the 12-source registry expansion so
-    // the data-loss fix is not silently dropped when this superset merges.
     timeoutMs: 240_000,
   },
   {

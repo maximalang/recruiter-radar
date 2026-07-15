@@ -27,8 +27,8 @@ import {
   LoadingState,
   ErrorState,
   FitIcon,
-  type NavItem,
 } from '../ui/internal-page';
+import { buildAccountNavigation } from '../ui/account-navigation';
 import { internalPageClasses as ipStyles } from '../ui/internal-page';
 import { SiteFooter } from '../ui/site-footer';
 import { ShieldIcon, PinIcon, BriefcaseIcon, AlertIcon, SearchIcon, TargetIcon, ClockIcon, CheckIcon } from '../ui/icons';
@@ -40,12 +40,7 @@ export const metadata: Metadata = {
   description: 'Компании с активным наймом: оценка, доказательства и безопасный путь контакта.',
 };
 
-const LEADS_NAV: NavItem[] = [
-  { href: '/dashboard', label: 'Дашборд' },
-  { href: '/leads', label: 'Лиды', active: true },
-  { href: '/review', label: 'Ревью' },
-  { href: '/profile', label: 'Профиль' },
-];
+const LEADS_NAV = buildAccountNavigation('leads');
 
 export function LeadCard({
   lead,
@@ -82,16 +77,17 @@ export function LeadCard({
   const roles = shownRoles.length > 0
     ? `${shownRoles.join(' · ')}${moreRoles > 0 ? ` + ещё ${moreRoles}` : ''}`
     : 'Роли уточняются';
-  const evidenceItems = [
-    urgency.label,
-    [vacancies, freshness].filter(Boolean).join(' · ') || 'Свежесть проверяется',
-    roles,
-  ];
+  const vacanciesSummary = [vacancies, freshness].filter(Boolean).join(' · ') || 'Свежесть проверяется';
+  const signalSummary = lead.whyNow || urgency.label;
 
   return (
+    <Link
+      href={`/leads/${lead.id}`}
+      className={ipStyles.signalLeadCardLink}
+      aria-label={`Открыть полную карточку компании ${lead.orgName}`}
+    >
     <article className={`${ipStyles.leadCard} ${ipStyles.signalLeadCard}`} data-signal-card="true" data-tone={tone}>
       <div className={ipStyles.signalLeadTopbar}>
-        <span className={ipStyles.signalLeadLabel}>Сигнал радара</span>
         <div className={ipStyles.leadCardTags}>
           <GateBadgeInline gate={lead.confidenceGate} />
           {showWorkflowStatus ? (
@@ -107,9 +103,7 @@ export function LeadCard({
 
       <div className={ipStyles.signalLeadCompanyRow}>
         <div>
-          <Link href={`/leads/${lead.id}`} className={ipStyles.signalLeadName}>
-            {lead.orgName}
-          </Link>
+          <span className={ipStyles.signalLeadName}>{lead.orgName}</span>
           {lead.locationNames.length > 0 && (
             <div className={ipStyles.signalLeadMeta}>
               <PinIcon className={ipStyles.chipIcon} /> {lead.locationNames.slice(0, 2).join(', ')}
@@ -132,27 +126,22 @@ export function LeadCard({
         <span data-tone={tone} style={{ width: `${scoreWidth}%` }} />
       </div>
 
-      {lead.whyNow && (
-        <div className={ipStyles.signalLeadWhy}>
-          <span>Почему сейчас</span>
-          <strong>{lead.whyNow}</strong>
-        </div>
-      )}
-
-      {fitPreview && (
-        <div className={ipStyles.signalLeadFit}>
-          <span>Почему подходит</span>
-          <p><FitIcon name={fitPreview.icon} className={ipStyles.chipIcon} /> {fitPreview.text}</p>
-        </div>
-      )}
-
-      <div className={ipStyles.signalLeadEvidence} aria-label="Доказательства сигнала">
-        {evidenceItems.map((item, index) => (
-          <div key={`${item}-${index}`}>
-            <span>{String(index + 1).padStart(2, '0')}</span>
-            <p>{item}</p>
-          </div>
-        ))}
+      <div className={ipStyles.signalLeadSections}>
+        <section className={ipStyles.signalLeadSection}>
+          <span>Компания и контакты</span>
+          <strong><ShieldIcon className={ipStyles.chipIcon} /> {lead.lawfulContactPath || 'Корпоративный контакт уточняется'}</strong>
+          {lead.locationNames.length > 0 ? <p>{lead.locationNames.slice(0, 2).join(', ')}</p> : null}
+        </section>
+        <section className={ipStyles.signalLeadSection}>
+          <span>Релевантные вакансии</span>
+          <strong>{roles}</strong>
+          <p>{vacanciesSummary}</p>
+        </section>
+        <section className={`${ipStyles.signalLeadSection} ${ipStyles.signalLeadSectionPrimary}`}>
+          <span>Сигналы</span>
+          <strong>{signalSummary}</strong>
+          {fitPreview ? <p><FitIcon name={fitPreview.icon} className={ipStyles.chipIcon} /> {fitPreview.text}</p> : null}
+        </section>
       </div>
 
       {risks.length > 0 && (
@@ -163,18 +152,12 @@ export function LeadCard({
         </div>
       )}
 
-      <div className={ipStyles.signalLeadFooter}>
-        <div>
-          <span className={ipStyles.signalLeadFooterLabel}>Корпоративный контакт</span>
-          <strong>
-            <ShieldIcon className={ipStyles.chipIcon} /> {lead.lawfulContactPath || 'Уточняется'}
-          </strong>
-        </div>
-        <Link href={`/leads/${lead.id}`} className={ipStyles.leadOpenBtn}>
-          Открыть карточку →
-        </Link>
+      <div className={ipStyles.signalLeadFooter} aria-hidden="true">
+        <span>Полная информация о компании</span>
+        <strong>Открыть →</strong>
       </div>
     </article>
+    </Link>
   );
 }
 

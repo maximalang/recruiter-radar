@@ -162,25 +162,6 @@
   text-align: left;
 }
 
-.heroEyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  color: rgba(219, 234, 254, 0.76);
-  font-size: 0.74rem;
-  font-weight: 720;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.heroEyebrowDot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #60a5fa;
-  box-shadow: 0 0 0 5px rgba(96, 165, 250, 0.12);
-}
-
 /* The hero headline — the single most-read line on the page. Uses the display
    token: large, tight tracking, weight 700 (not 800 — 700 reads as confident
    and editorial; 800 reads as a banner). The accent word gets a calm blue
@@ -351,49 +332,67 @@
   background: #60a5fa;
 }
 
-.heroSignalBlock {
-  display: grid;
-  gap: 7px;
-  padding: 16px 0;
-  border-top: 1px solid rgba(148, 163, 184, 0.12);
-  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
-}
-
-.heroSignalBlock span {
-  color: #7fb0fa;
-  font-size: 0.68rem;
-  font-weight: 760;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
-
-.heroSignalBlock strong {
-  color: rgba(241, 245, 249, 0.9);
-  font-size: 0.9rem;
-  line-height: 1.45;
-}
-
 .heroEvidenceRow {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
 }
 
+.ambientBg::before,
+.ambientBg::after {
+  content: "";
+  position: absolute;
+  width: min(72vw, 980px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  filter: blur(18px);
+  opacity: 0.52;
+  will-change: transform;
+}
+
+.ambientBg::before {
+  top: -34%;
+  left: -18%;
+  background: radial-gradient(circle, rgba(62, 111, 235, 0.24), transparent 68%);
+  animation: ambientDriftOne 22s ease-in-out infinite alternate;
+}
+
+.ambientBg::after {
+  right: -28%;
+  top: 28%;
+  background: radial-gradient(circle, rgba(74, 151, 214, 0.18), transparent 70%);
+  animation: ambientDriftTwo 28s ease-in-out infinite alternate;
+}
+
+@keyframes ambientDriftOne {
+  to { transform: translate3d(24vw, 18vh, 0) scale(1.12); }
+}
+
+@keyframes ambientDriftTwo {
+  to { transform: translate3d(-22vw, 22vh, 0) scale(0.88); }
+}
+
 .heroEvidenceRow div {
   min-width: 0;
+  padding: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.025);
 }
 
 .heroEvidenceRow span {
-  color: #60a5fa;
-  font-size: 0.68rem;
+  color: #8ab9ff;
+  font-size: 0.66rem;
   font-weight: 780;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .heroEvidenceRow p {
   margin: 4px 0 0;
   color: rgba(203, 213, 225, 0.72);
-  font-size: 0.7rem;
-  line-height: 1.35;
+  font-size: 0.72rem;
+  line-height: 1.4;
 }
 
 .heroProductFooter {
@@ -557,9 +556,7 @@
   gap: 12px;
 }
 
-.previewCardTopbar > span:first-child,
-.previewFooter > span,
-.previewWhy > span {
+.previewFooter > span {
   color: #738198;
   font-size: 0.66rem;
   font-weight: 780;
@@ -626,41 +623,26 @@
 .previewStrengthFill[data-tone="warning"] { background: #f59e0b; }
 .previewStrengthFill[data-tone="danger"] { background: #64748b; }
 
-.previewWhy {
-  display: grid;
-  gap: 6px;
-  padding: 11px 13px;
-  border: 1px solid #e2e8f1;
-  border-radius: 11px;
-  background: #f6f8fc;
-}
-
-.previewWhy strong {
-  color: var(--c-text-primary);
-  font-size: 0.82rem;
-  line-height: 1.42;
-}
-
 .previewEvidence {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  border-top: 1px solid #e5eaf2;
-  border-bottom: 1px solid #e5eaf2;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .previewEvidence > div {
   min-width: 0;
-  padding: 10px 11px;
-}
-
-.previewEvidence > div + div {
-  border-left: 1px solid #e5eaf2;
+  padding: 11px;
+  border: 1px solid #e2e8f1;
+  border-radius: 10px;
+  background: #f8fafc;
 }
 
 .previewEvidence span {
-  color: var(--c-brand);
+  color: #60708a;
   font-size: 0.64rem;
   font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .previewEvidence p {
@@ -1058,7 +1040,11 @@
      demanding a full screen-height. */
   .heroSection {
     min-height: 0;
-    padding: 44px 22px;
+    padding: 34px 20px 28px;
+  }
+
+  .heroContent {
+    gap: 28px;
   }
 
 }
@@ -1098,8 +1084,8 @@
   }
 
   .heroProduct {
-    gap: 18px;
-    padding: 20px;
+    gap: 15px;
+    padding: 18px;
   }
 
   .heroEvidenceRow {
@@ -1144,11 +1130,6 @@
     grid-template-columns: 1fr;
   }
 
-  .previewEvidence > div + div {
-    border-top: 1px solid #e5eaf2;
-    border-left: 0;
-  }
-
   .previewRelevance {
     grid-template-columns: 1fr;
     gap: 6px;
@@ -1159,4 +1140,52 @@
     gap: 5px;
   }
 
+}
+
+/* Final surface layer: intentionally after responsive rules so later card
+   declarations cannot restore borders or opaque fills. */
+.topBar,
+.heroSection,
+.heroProduct,
+.heroEvidenceRow div,
+.principles,
+.previewCard,
+.previewEvidence > div,
+.primaryPlanCard,
+.secondaryPlanCard,
+.includedOnce,
+.faqCard,
+.closingBand {
+  border: 0;
+}
+
+.topBar,
+.principles,
+.previewCard,
+.primaryPlanCard,
+.secondaryPlanCard,
+.includedOnce,
+.faqCard {
+  -webkit-backdrop-filter: saturate(145%) blur(18px);
+  backdrop-filter: saturate(145%) blur(18px);
+}
+
+.topBar { background: rgba(255, 255, 255, 0.7); }
+.heroProduct { background: rgba(15, 27, 49, 0.68); }
+.heroEvidenceRow div { background: rgba(255, 255, 255, 0.055); }
+.principles { background: rgba(255, 255, 255, 0.5); }
+.principle + .principle { border-left: 0; }
+.previewCard { background: rgba(255, 255, 255, 0.62); }
+.previewEvidence > div { background: rgba(255, 255, 255, 0.5); }
+.primaryPlanCard { background: rgba(239, 246, 255, 0.68); }
+.secondaryPlanCard { background: rgba(255, 255, 255, 0.58); }
+.includedOnce { background: rgba(255, 255, 255, 0.44); }
+.faqCard { background: rgba(255, 255, 255, 0.56); }
+.closingBand { background: rgba(11, 19, 36, 0.9); }
+
+@media (prefers-reduced-motion: reduce) {
+  .ambientBg::before,
+  .ambientBg::after {
+    animation: none;
+  }
 }
