@@ -22,7 +22,7 @@ export type DisconnectNotificationResult = {
 type ExistingAccountRow = {
   id: string;
   ownerId: string;
-  provider: "telegram" | "vk";
+  provider: "telegram" | "vk" | "webhook";
   status: string;
   secretCiphertext: string;
   providerMetadata: Record<string, unknown> | null;
@@ -238,15 +238,17 @@ export async function disconnectNotificationConnectionSafely(input: {
       error instanceof Error ? error.message : "Provider hook cleanup failed.",
     ).slice(0, 500);
     const pool = getPool();
-    await pool?.query(
-      `
-        INSERT INTO notification_audit_log (
-          owner_id, actor_type, action, object_type, object_id, metadata
-        ) VALUES ($1, 'system', 'notification.provider_cleanup_failed',
-                  'provider_account', $2, $3::jsonb)
-      `,
-      [input.ownerId, input.connectionId, JSON.stringify({ warning: cleanupWarning })],
-    ).catch(() => {});
+    if (pool) {
+      await pool.query(
+        `
+          INSERT INTO notification_audit_log (
+            owner_id, actor_type, action, object_type, object_id, metadata
+          ) VALUES ($1, 'system', 'notification.provider_cleanup_failed',
+                    'provider_account', $2, $3::jsonb)
+        `,
+        [input.ownerId, input.connectionId, JSON.stringify({ warning: cleanupWarning })],
+      ).catch(() => {});
+    }
   }
   return cleanupWarning ? { cleanupWarning } : {};
 }
