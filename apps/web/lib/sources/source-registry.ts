@@ -94,6 +94,16 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     ],
     isPrimary: true,
     category: 'job-board',
+    // Per-source timeout 240s (raised from the 120s default on 2026-07-15):
+    // career.habr.com is scraped (no partner API), with a respectful 2s
+    // SCRAPE_DELAY_MS between pages. With the multi-keyword derivation feeding
+    // ~9 role keywords × 3 pages, a run issues ~27 fetches (~54s in delay alone)
+    // plus per-card HTML extraction plus 150+ signal upserts — it reliably
+    // exceeds the 120s default. A 120s execFile kill was discarding EVERY fetched
+    // record each day (the run that reached the DB wrote 0; the 165 that appeared
+    // in logs were lost), so habr-career silently produced no signals from the
+    // cron despite a successful fetch. 240s matches the career-pages precedent.
+    timeoutMs: 240_000,
   },
   {
     id: 'career-pages',
