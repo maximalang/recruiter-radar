@@ -1,0 +1,55 @@
+name: Notification typecheck report v2
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/notification-typecheck-report-v2.yml'
+      - 'apps/web/app/api/cron/notification-delivery-retry/**'
+      - 'apps/web/app/profile/notification-actions.ts'
+      - 'apps/web/lib/notification-connection-operations.ts'
+      - 'apps/web/lib/notification-dispatch.ts'
+      - 'apps/web/lib/notification-providers.ts'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - id: typecheck
+        name: Run typecheck
+        shell: bash
+        run: |
+          set +e
+          npm run web:check > /tmp/typecheck.log 2>&1
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Comment failure tail
+        if: steps.typecheck.outputs.exit_code != '0'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const text = fs.readFileSync('/tmp/typecheck.log', 'utf8');
+            const tail = text.split('\n').slice(-120).join('\n').slice(-60000);
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `<!-- notification-typecheck-report-v2 -->\n### Notification typecheck failure\n\n\`\`\`text\n${tail}\n\`\`\``,
+            });
+            core.setFailed('Typecheck failed');
+      - name: Pass
+        if: steps.typecheck.outputs.exit_code == '0'
+        run: echo "Typecheck passed"
