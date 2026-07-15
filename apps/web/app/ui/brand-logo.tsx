@@ -21,7 +21,7 @@ export function BrandLogo(props: {
         className={s.artwork}
         viewBox={showsWordmark ? "0 0 640 220" : "0 0 212 212"}
         width={showsWordmark ? 640 : 212}
-        height={220}
+        height={showsWordmark ? 220 : 212}
         preserveAspectRatio="xMinYMid meet"
         role="img"
         aria-label="Recruiter Radar"
