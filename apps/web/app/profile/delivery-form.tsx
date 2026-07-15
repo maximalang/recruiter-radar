@@ -7,7 +7,7 @@ import type { DeliveryPreferences } from "../../lib/deliveryPreferences";
 import { computeNextDeliveryHint } from "../../lib/delivery/nextDeliveryHint";
 import { FormSubmitButton } from "../ui/form-submit-button";
 import { NoticeBox } from "../ui/page-primitives";
-import { ChatIcon, BellIcon, MailIcon } from "../ui/icons";
+import { BellIcon, MailIcon } from "../ui/icons";
 import ppStyles from "../ui/page-primitives.module.css";
 import { saveDeliveryPreferencesAction, type SaveDeliveryResult } from "./actions";
 import styles from "./profile-form.module.css";
@@ -31,10 +31,8 @@ const FREQUENCIES: ReadonlyArray<{ value: "daily" | "weekly"; label: string }> =
 ];
 
 /**
- * Delivery-channel preferences — a separate concern (and separate submit) from
- * the ICP/scoring profile. Telegram stays the primary channel and is managed via
- * the connect flow, not here; this section opts into the additive channels
- * (browser push, email digest) AND the delivery-time preferences (when to send).
+ * Schedule and additive browser/email preferences. Provider accounts and concrete
+ * Telegram, VK and webhook destinations are managed by NotificationChannels.
  */
 export function DeliveryForm(props: { preferences: DeliveryPreferences }) {
   const { preferences } = props;
@@ -44,24 +42,18 @@ export function DeliveryForm(props: { preferences: DeliveryPreferences }) {
   );
   const router = useRouter();
 
-  // After a successful save, re-fetch the server-rendered completion panel above
-  // (delivery counts toward profile completion), so the progress bar reflects the
-  // new state without a manual reload. The form keeps its client-side mirrors.
   useEffect(() => {
     if (state?.ok === true) {
       router.refresh();
     }
   }, [state, router]);
 
-  // Local mirror so the email field can react to the toggle without a round-trip.
   const [emailEnabled, setEmailEnabled] = useState(preferences.emailDigestEnabled);
-  // Local mirror so the time/frequency hint can update without a round-trip.
   const [deliveryEnabled, setDeliveryEnabled] = useState(preferences.deliveryEnabled);
   const [timeLocal, setTimeLocal] = useState(preferences.deliveryTimeLocal ?? "");
   const [timezone, setTimezone] = useState(preferences.deliveryTimezone);
   const [frequency, setFrequency] = useState(preferences.deliveryFrequency);
 
-  // Hint is computed from the live mirror so it reflects edits before save.
   const hint = deliveryEnabled
     ? computeNextDeliveryHint({
         deliveryTimezone: timezone || "Europe/Moscow",
@@ -163,7 +155,7 @@ export function DeliveryForm(props: { preferences: DeliveryPreferences }) {
           <span className={styles.groupTitle}>
             <MailIcon className={styles.groupTitleIcon} aria-hidden="true" /> Email-дайджест
           </span>
-          <span className={styles.groupHint}>Раз в день — компании, которым стоит написать сегодня, с доказательствами и «почему сейчас». Telegram остаётся основным каналом.</span>
+          <span className={styles.groupHint}>Раз в день — компании, которым стоит написать сегодня, с доказательствами и «почему сейчас». Работает параллельно с подключёнными каналами.</span>
         </div>
         <label className={styles.toggle}>
           <input
@@ -190,7 +182,7 @@ export function DeliveryForm(props: { preferences: DeliveryPreferences }) {
 
       <div className={styles.submitRow}>
         <FormSubmitButton idleLabel="Сохранить доставку" pendingLabel="Сохраняем..." className={ppStyles.primaryAction} />
-        <span className={ppStyles.helperText}>Одно письмо в день на профиль.</span>
+        <span className={ppStyles.helperText}>Настройки применяются ко всем активным каналам профиля.</span>
       </div>
     </form>
   );
