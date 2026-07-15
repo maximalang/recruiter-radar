@@ -1,5 +1,5 @@
 import { ingestSource, ingestAllPrimarySources, isNoActiveProfiles } from '@/lib/lead-discovery/source-ingest'
-import { getPrimarySourceIds } from '@/lib/sources/source-registry'
+import { getPrimarySourceIds, getSourceConfig } from '@/lib/sources/source-registry'
 
 // Mock the execFile accessor (production resolves execFile via
 // process.getBuiltinModule, which bypasses jest's require-cache mock —
@@ -25,6 +25,10 @@ describe('source-ingest', () => {
   })
 
   describe('ingestSource', () => {
+    it('allows the Habr Career scraper to finish its multi-keyword run', () => {
+      expect(getSourceConfig('habr-career').timeoutMs).toBe(240_000)
+    })
+
     it('returns success for HH ingestion with valid output', async () => {
       const jsonMetrics = JSON.stringify({
         source: 'hh',
