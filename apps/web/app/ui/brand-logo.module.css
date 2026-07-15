@@ -1,89 +1,51 @@
 .logo {
-  --logo-primary: #071b3f;
-  --logo-accent: #0869eb;
-  --logo-signal: #ffa30b;
-
   display: inline-flex;
   align-items: center;
   min-width: 0;
   line-height: 0;
 }
 
-.logo[data-tone="dark"] {
-  --logo-primary: #f8fafc;
-  --logo-accent: #8ab9ff;
-}
-
 .artwork {
   display: block;
   width: auto;
   height: 44px;
-  max-width: 100%;
+  max-width: min(100%, 220px);
   flex: 0 0 auto;
-  overflow: visible;
-}
-
-.primaryFill {
-  fill: var(--logo-primary);
-}
-
-.accentFill {
-  fill: var(--logo-accent);
-}
-
-.signalFill {
-  fill: var(--logo-signal);
-}
-
-.primaryStroke,
-.accentStroke {
-  fill: none;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.primaryStroke {
-  stroke: var(--logo-primary);
-}
-
-.accentStroke {
-  stroke: var(--logo-accent);
-}
-
-.monogram,
-.wordmark {
-  font-family: var(
-    --font-sans,
-    Inter,
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif
-  );
-  font-weight: 800;
-  letter-spacing: -3px;
+  object-fit: contain;
+  object-position: left center;
+  user-select: none;
 }
 
 .logo[data-size="small"] .artwork {
   height: 36px;
+  max-width: 180px;
 }
 
 .logo[data-wordmark="false"] .artwork {
-  height: 32px;
+  height: 34px;
+  max-width: 36px;
 }
 
 .logo[data-size="small"][data-wordmark="false"] .artwork {
-  height: 28px;
+  height: 30px;
+  max-width: 32px;
 }
 
-@media (max-width: 360px) {
+@media (max-width: 480px) {
   .logo[data-wordmark="true"] .artwork {
     height: 40px;
+    max-width: 160px;
   }
 
   .logo[data-size="small"][data-wordmark="true"] .artwork {
     height: 34px;
+    max-width: 145px;
+  }
+}
+
+@media (max-width: 360px) {
+  .logo[data-wordmark="true"] .artwork {
+    height: 36px;
+    max-width: 145px;
   }
 }

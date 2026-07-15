@@ -5,26 +5,27 @@ import { render, screen } from '@testing-library/react';
 import { BrandLogo } from '../../../../app/ui/brand-logo';
 
 describe('BrandLogo', () => {
-  it('renders the supplied two-line radar wordmark without a background shape', () => {
+  it('renders the exact supplied transparent wordmark asset', () => {
     const { container } = render(<BrandLogo />);
 
     const logo = screen.getByRole('img', { name: 'Recruiter Radar' });
-    expect(logo.getAttribute('viewBox')).toBe('0 0 640 220');
-    expect(screen.getByText('Recruiter')).toBeTruthy();
-    expect(screen.getByText('Radar')).toBeTruthy();
-    expect(container.querySelector('rect')).toBeNull();
-    expect(container.querySelector('linearGradient')).toBeNull();
+    expect(logo.getAttribute('src')).toBe('/brand/recruiter-radar-logo.svg?v=exact-2');
+    expect(logo.getAttribute('width')).toBe('546');
+    expect(logo.getAttribute('height')).toBe('189');
+    expect(container.querySelector('svg')).toBeNull();
+    expect(container.querySelector('[data-wordmark="true"]')).toBeTruthy();
   });
 
-  it('keeps a compact mark-only variant for narrow brand placements', () => {
+  it('uses the cropped supplied mark for compact placements', () => {
     const { container } = render(
       <BrandLogo tone="dark" size="small" showWordmark={false} />
     );
 
     const logo = screen.getByRole('img', { name: 'Recruiter Radar' });
-    expect(logo.getAttribute('viewBox')).toBe('0 0 212 212');
+    expect(logo.getAttribute('src')).toBe('/brand/recruiter-radar-mark.svg?v=exact-2');
+    expect(logo.getAttribute('width')).toBe('195');
     expect(container.querySelector('[data-tone="dark"]')).toBeTruthy();
-    expect(screen.queryByText('Recruiter')).toBeNull();
-    expect(screen.queryByText('Radar')).toBeNull();
+    expect(container.querySelector('[data-size="small"]')).toBeTruthy();
+    expect(container.querySelector('[data-wordmark="false"]')).toBeTruthy();
   });
 });
