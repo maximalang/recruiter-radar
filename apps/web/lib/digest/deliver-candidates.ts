@@ -40,7 +40,9 @@ export interface DeliverRunResult {
  * Deliver all A/B-gated candidates for a digest run.
  *
  * Telegram uses the customer's connected BYOB bot when an active endpoint exists.
- * Until then, the legacy shared Telegram bot remains a rollback-safe fallback.
+ * The legacy shared bot is used when there is no active customer endpoint, or when
+ * a custom dispatch fails before sending anything. A partial custom delivery never
+ * falls back because that would duplicate messages for already-successful endpoints.
  * VK and signed webhook delivery are additive and best-effort, like email and push.
  *
  * AI enrichment runs FIRST, before any delivery: it populates
@@ -122,8 +124,23 @@ export async function deliverCandidatesForRun(runId: string): Promise<DeliverRun
           clientProfileId,
           providers: ['telegram'],
         })
-        telegramOk = customResult.failed === 0 && customResult.sent > 0
-        telegramError = customResult.errors.join('; ') || (customResult.sent === 0 ? 'No active custom Telegram route accepted the digest.' : null)
+
+        // `skipped` means the deterministic custom job was already sent or the
+        // route intentionally filtered this digest. Neither case is an error and
+        // neither should trigger a duplicate legacy message.
+        telegramOk = customResult.failed === 0 && (customResult.sent > 0 || customResult.skipped > 0)
+        telegramError = customResult.errors.join('; ') || null
+
+        // Fall back only when no custom endpoint received anything. A partial
+        // success must remain a partial failure, otherwise legacy delivery would
+        // duplicate the digest for endpoints that already succeeded.
+        if (!telegramOk && customResult.sent === 0) {
+          const legacyResult = await sendBatchDigestForRun({ runId, clientProfileId })
+          telegramOk = legacyResult.ok
+          telegramError = legacyResult.ok
+            ? null
+            : [telegramError, legacyResult.error].filter(Boolean).join('; ')
+        }
       } else {
         const legacyResult = await sendBatchDigestForRun({ runId, clientProfileId })
         telegramOk = legacyResult.ok
