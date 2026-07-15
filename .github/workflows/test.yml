@@ -70,6 +70,93 @@ jobs:
         if-no-files-found: error
         retention-days: 3
 
+  grant-monthly-access:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.head_ref == 'ops/grant-monthly-access-6uunn9' &&
+      github.actor == 'maximalang'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+    - name: Setup SSH
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.RR_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+        chmod 600 ~/.ssh/id_ed25519
+        ssh-keyscan -p ${{ secrets.RR_SSH_PORT }} -t ed25519 ${{ secrets.RR_SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+    - name: Grant 30-day monthly access
+      run: |
+        ssh -p ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
+          ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }} << 'SSH_EOF'
+        set -euo pipefail
+        cd /opt/recruiter-radar
+        docker compose exec -T db sh -lc 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' <<'SQL'
+        DO $grant$
+        DECLARE
+          target_user_id BIGINT;
+          granted_until TIMESTAMPTZ;
+        BEGIN
+          SELECT id
+          INTO target_user_id
+          FROM users
+          WHERE md5(lower(btrim(email))) = '0b2af1a77193ab2cd8f9d54dcff566d0'
+          LIMIT 1;
+
+          IF target_user_id IS NULL THEN
+            RAISE EXCEPTION 'Target account is not registered';
+          END IF;
+
+          UPDATE subscriptions
+          SET status = 'expired',
+              updated_at = NOW()
+          WHERE user_id = target_user_id
+            AND status IN ('trial', 'active', 'past_due');
+
+          granted_until := NOW() + INTERVAL '30 days';
+
+          INSERT INTO subscriptions (
+            user_id,
+            plan_code,
+            status,
+            started_at,
+            current_period_end,
+            cancel_at_period_end,
+            billing_provider
+          )
+          VALUES (
+            target_user_id,
+            'monthly',
+            'active',
+            NOW(),
+            granted_until,
+            TRUE,
+            'manual_owner_grant'
+          );
+
+          RAISE NOTICE 'Monthly access granted: user_id=%, current_period_end=%',
+            target_user_id,
+            granted_until;
+        END
+        $grant$;
+
+        SELECT
+          u.id AS user_id,
+          s.plan_code,
+          s.status,
+          s.started_at,
+          s.current_period_end,
+          s.cancel_at_period_end
+        FROM users u
+        JOIN subscriptions s ON s.user_id = u.id
+        WHERE md5(lower(btrim(u.email))) = '0b2af1a77193ab2cd8f9d54dcff566d0'
+          AND s.status = 'active'
+        ORDER BY s.created_at DESC
+        LIMIT 1;
+        SQL
+        SSH_EOF
+
   build:
     needs: test
     runs-on: ubuntu-latest
