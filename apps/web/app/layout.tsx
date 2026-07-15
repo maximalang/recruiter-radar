@@ -14,16 +14,17 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Recruiter Radar",
   description: "Ежедневный радар по компаниям с активным наймом для рекрутеров и агентств.",
-  manifest: "/manifest.webmanifest?v=vector-3",
+  manifest: "/manifest.webmanifest?v=brand-4",
   applicationName: "Recruiter Radar",
   icons: {
     icon: [
       {
-        url: "/brand/recruiter-radar-logo.svg?v=vector-3",
+        url: "/icon.svg?v=brand-4",
         type: "image/svg+xml",
+        sizes: "any",
       },
     ],
-    shortcut: "/brand/recruiter-radar-logo.svg?v=vector-3",
+    shortcut: "/icon.svg?v=brand-4",
   },
   appleWebApp: {
     capable: true,

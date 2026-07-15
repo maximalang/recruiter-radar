@@ -1,17 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" width="36" height="36">
-  <defs>
-    <linearGradient id="b" x1="5" y1="3" x2="31" y2="33" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#0B1324"/><stop offset=".58" stop-color="#163B78"/><stop offset="1" stop-color="#3977EE"/>
-    </linearGradient>
-    <linearGradient id="s" x1="17" y1="18" x2="28" y2="7" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#fff" stop-opacity=".35"/><stop offset="1" stop-color="#BBD5FF"/>
-    </linearGradient>
-  </defs>
-  <rect x="1" y="1" width="34" height="34" rx="10" fill="url(#b)"/>
-  <path d="M8.7 22.8A10.5 10.5 0 0 1 23.2 8.5" fill="none" stroke="#fff" stroke-opacity=".24" stroke-width="1.35" stroke-linecap="round"/>
-  <path d="M12.2 21A6.6 6.6 0 0 1 21.1 12" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="1.55" stroke-linecap="round"/>
-  <circle cx="17.2" cy="18.3" r="2.15" fill="#fff"/>
-  <path d="M17.2 18.3 27.2 7.7 22.1 21.4Z" fill="url(#s)" fill-opacity=".88"/>
-  <circle cx="27.2" cy="7.7" r="1.55" fill="#9CC2FF"/>
-  <path d="M17.2 18.3v9.1M17.2 27.4h7.1" fill="none" stroke="#fff" stroke-opacity=".78" stroke-width="1.65" stroke-linecap="round"/>
-</svg>
+<svg width="512" height="512" viewBox="-8 -8 224 224" role="img" aria-label="Recruiter Radar" xmlns="http://www.w3.org/2000/svg"><defs/><style>.navy{fill:#071b3f}.blue{fill:#0869eb}.line{fill:none;stroke:#071b3f;stroke-linecap:round;stroke-linejoin:round}.lineBlue{fill:none;stroke:#0869eb;stroke-linecap:round;stroke-linejoin:round}</style><circle cx="104" cy="104" r="86" class="line" stroke-width="5.5" stroke-dasharray="118 20 85 17 92 20 120 34" transform="rotate(-72 104 104)"/><path d="M104 6v27M104 175v27M6 104h31M171 104h31" class="line" stroke-width="3.5"/><circle cx="104" cy="104" r="57" class="line" stroke-width="2.5" stroke-dasharray="188 35 95 40" transform="rotate(-100 104 104)"/><circle cx="104" cy="104" r="31" class="lineBlue" stroke-width="3" stroke-dasharray="105 90" transform="rotate(28 104 104)"/><circle cx="104" cy="104" r="9" class="navy"/><circle cx="151" cy="61" r="10" fill="#ffa30b"/><circle cx="126" cy="159" r="7.5" class="blue"/><circle cx="50" cy="137" r="6.2" class="navy"/><path d="M60.084961 105 47.630859 84.624023H34.453125V105H23.217773V51.336914h26.8125q9.597657 0 14.81543 4.151367 5.217774 4.113281 5.217774 11.844727 0 5.636719-3.199219 9.75-3.199219 4.075195-8.645508 5.370117L72.729492 105Zm-1.333008-37.209961q0-7.731445-9.902344-7.731445H34.453125v15.84375h14.701172q4.722656 0 7.160156-2.132813 2.4375-2.132812 2.4375-5.979492Z" fill="#071b3f"/><path d="M163.24316 187 150.15039 165.5791h-13.85352V187h-11.81152v-56.41504h28.1875q10.08985 0 15.5752 4.36426 5.48535 4.32422 5.48535 12.45215 0 5.92578-3.36328 10.25-3.36328 4.28418-9.08887 5.6455L176.53613 187Zm-1.40136-39.11816q0-8.12793-10.41016-8.12793h-15.13477v16.65625h15.45508q4.96485 0 7.52735-2.24219 2.5625-2.24219 2.5625-6.28613Z" fill="#0869eb"/></svg>
