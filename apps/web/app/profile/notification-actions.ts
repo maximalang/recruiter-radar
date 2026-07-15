@@ -3,14 +3,16 @@
 import { revalidatePath } from "next/cache";
 
 import { getClientProfileByOwnerId } from "../../lib/clientProfiles";
+import {
+  createTelegramNotificationConnectionSafely,
+  createVkNotificationConnectionSafely,
+  disconnectNotificationConnectionSafely,
+} from "../../lib/notification-connection-operations";
 import { redactProviderSecret } from "../../lib/notification-secrets";
 import { reconcileVkNotificationConnection } from "../../lib/notification-vk-reconcile";
 import {
   createNotificationBindingInstructions,
-  createTelegramNotificationConnection,
-  createVkNotificationConnection,
   createWebhookNotificationConnection,
-  disconnectNotificationConnection,
   testNotificationConnection,
 } from "../../lib/notifications";
 import { readOwnerSession } from "../../lib/session";
@@ -57,7 +59,7 @@ export async function addTelegramNotificationAction(
     const { ownerId, profile } = await ownerContext();
     const botToken = text(formData, "botToken");
     if (!botToken) return { ok: false, message: "Вставьте токен бота из BotFather." };
-    const created = await createTelegramNotificationConnection({
+    const created = await createTelegramNotificationConnectionSafely({
       ownerId,
       clientProfileId: profile.id,
       botToken,
@@ -86,7 +88,7 @@ export async function addVkNotificationAction(
     if (!groupId || !token) {
       return { ok: false, message: "Укажите ID сообщества и ключ доступа сообщества." };
     }
-    const created = await createVkNotificationConnection({
+    const created = await createVkNotificationConnectionSafely({
       ownerId,
       clientProfileId: profile.id,
       groupId,
@@ -205,9 +207,14 @@ export async function disconnectNotificationConnectionAction(
   try {
     const { ownerId } = await ownerContext();
     const connectionId = text(formData, "connectionId");
-    await disconnectNotificationConnection({ ownerId, connectionId });
+    const disconnected = await disconnectNotificationConnectionSafely({ ownerId, connectionId });
     refreshNotificationPages();
-    return { ok: true, message: "Канал отключён." };
+    return {
+      ok: true,
+      message: disconnected.cleanupWarning
+        ? `Канал отключён в Recruiter Radar. Provider hook не удалось снять автоматически: ${disconnected.cleanupWarning}`
+        : "Канал отключён, provider-side webhook удалён.",
+    };
   } catch (error) {
     return safeError(error, "Не удалось отключить канал.");
   }
