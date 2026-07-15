@@ -16,6 +16,15 @@ export const metadata: Metadata = {
   description: "Ежедневный радар по компаниям с активным наймом для рекрутеров и агентств.",
   manifest: "/manifest.webmanifest",
   applicationName: "Recruiter Radar",
+  icons: {
+    icon: [
+      {
+        url: "/brand/recruiter-radar-mark.svg?v=exact-2",
+        type: "image/svg+xml",
+      },
+    ],
+    shortcut: "/brand/recruiter-radar-mark.svg?v=exact-2",
+  },
   appleWebApp: {
     capable: true,
     title: "Recruiter Radar",
