@@ -3,12 +3,14 @@ import { render } from '@testing-library/react';
 import { TopNav } from '@/app/ui/internal-page';
 
 describe('TopNav brand wordmark', () => {
-  it('renders the restrained text wordmark without an extra app-style icon', () => {
+  it('renders the shared radar mark and wordmark', () => {
     const { container } = render(<TopNav items={[]} />);
     const brand = container.querySelector('a.topNavBrand');
+    const mark = brand?.querySelector('svg');
 
-    expect(brand?.querySelector('svg')).toBeNull();
-    expect(brand?.querySelector('.topNavBrandAccent')?.textContent).toBe('Radar');
+    expect(mark).not.toBeNull();
+    expect(mark).toHaveAttribute('aria-hidden', 'true');
+    expect(brand?.textContent ?? '').toContain('Recruiter Radar');
   });
 
   it('does not render a literal back arrow in the brand', () => {
