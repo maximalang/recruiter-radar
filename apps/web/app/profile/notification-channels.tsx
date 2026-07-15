@@ -11,6 +11,7 @@ import {
   addWebhookNotificationAction,
   createNotificationBindingAction,
   disconnectNotificationConnectionAction,
+  reconcileVkNotificationAction,
   testNotificationConnectionAction,
   type NotificationActionResult,
 } from "./notification-actions";
@@ -152,10 +153,12 @@ function AddWebhookForm() {
 
 function ConnectionCard({ connection }: { connection: NotificationConnection }) {
   const [bindState, bindAction] = useActionState(createNotificationBindingAction, null);
+  const [reconcileState, reconcileAction] = useActionState(reconcileVkNotificationAction, null);
   const [testState, testAction] = useActionState(testNotificationConnectionAction, null);
   const [disconnectState, disconnectAction] = useActionState(disconnectNotificationConnectionAction, null);
   const activeEndpoints = connection.endpoints.filter((endpoint) => endpoint.status === "active");
   const needsBinding = connection.provider !== "webhook" && activeEndpoints.length === 0;
+  const needsVkRecovery = connection.provider === "vk" && connection.status === "degraded";
 
   return (
     <article className={styles.connectionCard}>
@@ -183,6 +186,12 @@ function ConnectionCard({ connection }: { connection: NotificationConnection }) 
       {connection.lastErrorMessage ? <p className={styles.errorText}>{connection.lastErrorMessage}</p> : null}
 
       <div className={styles.actions}>
+        {needsVkRecovery ? (
+          <form action={reconcileAction}>
+            <input type="hidden" name="connectionId" value={connection.id} />
+            <FormSubmitButton idleLabel="Повторить настройку VK" pendingLabel="Настраиваем..." className={styles.secondaryButton} />
+          </form>
+        ) : null}
         {needsBinding ? (
           <form action={bindAction}>
             <input type="hidden" name="connectionId" value={connection.id} />
@@ -203,6 +212,7 @@ function ConnectionCard({ connection }: { connection: NotificationConnection }) 
           <FormSubmitButton idleLabel="Отключить" pendingLabel="Отключаем..." className={styles.dangerButton} />
         </form>
       </div>
+      <ActionFeedback state={reconcileState} />
       <ActionFeedback state={needsBinding ? bindState : testState} />
       <ActionFeedback state={disconnectState} />
     </article>
