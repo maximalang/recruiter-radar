@@ -106,11 +106,28 @@
 
 @media (max-width: 640px) {
   .topNavInner {
-    gap: 12px;
+    height: auto;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 0 8px;
+  }
+  .topNavLinks {
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+  .topNavLinks::-webkit-scrollbar {
+    display: none;
   }
   .topNavLink {
-    font-size: 0.75rem;
-    padding: 6px 8px;
+    flex: 0 0 auto;
+    min-height: 36px;
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.78rem;
+    padding: 6px 11px;
   }
 }
 
