@@ -1,0 +1,183 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+
+import { getClientProfileByOwnerId } from "../../lib/clientProfiles";
+import { redactProviderSecret } from "../../lib/notification-secrets";
+import {
+  createNotificationBindingInstructions,
+  createTelegramNotificationConnection,
+  createVkNotificationConnection,
+  createWebhookNotificationConnection,
+  disconnectNotificationConnection,
+  testNotificationConnection,
+} from "../../lib/notifications";
+import { readOwnerSession } from "../../lib/session";
+
+export type NotificationActionResult = {
+  ok: boolean;
+  message: string;
+  privateLink?: string;
+  groupLink?: string;
+  connectCommand?: string;
+  signingSecret?: string;
+  callbackConfigured?: boolean;
+};
+
+function text(formData: FormData, key: string): string {
+  const value = formData.get(key);
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function safeError(error: unknown, fallback: string): NotificationActionResult {
+  const message = error instanceof Error ? error.message : fallback;
+  return { ok: false, message: redactProviderSecret(message) };
+}
+
+async function ownerContext() {
+  const ownerId = await readOwnerSession();
+  if (!ownerId) throw new Error("Требуется вход в аккаунт.");
+  const profile = await getClientProfileByOwnerId(ownerId);
+  if (!profile) throw new Error("Профиль не найден. Сначала активируйте радар.");
+  return { ownerId, profile };
+}
+
+function refreshNotificationPages() {
+  revalidatePath("/profile");
+  revalidatePath("/settings");
+  revalidatePath("/dashboard");
+}
+
+export async function addTelegramNotificationAction(
+  _previous: NotificationActionResult | null,
+  formData: FormData,
+): Promise<NotificationActionResult> {
+  try {
+    const { ownerId, profile } = await ownerContext();
+    const botToken = text(formData, "botToken");
+    if (!botToken) return { ok: false, message: "Вставьте токен бота из BotFather." };
+    const created = await createTelegramNotificationConnection({
+      ownerId,
+      clientProfileId: profile.id,
+      botToken,
+      displayName: text(formData, "displayName"),
+    });
+    refreshNotificationPages();
+    return {
+      ok: true,
+      message: "Telegram-бот проверен, webhook настроен. Осталось выбрать чат.",
+      privateLink: created.privateLink,
+      groupLink: created.groupLink,
+    };
+  } catch (error) {
+    return safeError(error, "Не удалось подключить Telegram-бота.");
+  }
+}
+
+export async function addVkNotificationAction(
+  _previous: NotificationActionResult | null,
+  formData: FormData,
+): Promise<NotificationActionResult> {
+  try {
+    const { ownerId, profile } = await ownerContext();
+    const groupId = text(formData, "groupId");
+    const token = text(formData, "token");
+    if (!groupId || !token) {
+      return { ok: false, message: "Укажите ID сообщества и ключ доступа сообщества." };
+    }
+    const created = await createVkNotificationConnection({
+      ownerId,
+      clientProfileId: profile.id,
+      groupId,
+      token,
+      displayName: text(formData, "displayName"),
+    });
+    refreshNotificationPages();
+    return {
+      ok: true,
+      message: created.callbackConfigured
+        ? "VK Callback API настроен. Отправьте команду сообществу для привязки диалога."
+        : "Сообщество проверено, но VK не разрешил автонастройку Callback API. Проверьте права ключа и повторите подключение.",
+      connectCommand: created.connectCommand,
+      callbackConfigured: created.callbackConfigured,
+    };
+  } catch (error) {
+    return safeError(error, "Не удалось подключить VK-сообщество.");
+  }
+}
+
+export async function addWebhookNotificationAction(
+  _previous: NotificationActionResult | null,
+  formData: FormData,
+): Promise<NotificationActionResult> {
+  try {
+    const { ownerId, profile } = await ownerContext();
+    const url = text(formData, "url");
+    if (!url) return { ok: false, message: "Укажите URL webhook." };
+    const created = await createWebhookNotificationConnection({
+      ownerId,
+      clientProfileId: profile.id,
+      url,
+      displayName: text(formData, "displayName"),
+    });
+    refreshNotificationPages();
+    return {
+      ok: true,
+      message: "Webhook подключён. Сохраните секрет: повторно он не показывается.",
+      signingSecret: created.signingSecret,
+    };
+  } catch (error) {
+    return safeError(error, "Не удалось подключить webhook.");
+  }
+}
+
+export async function createNotificationBindingAction(
+  _previous: NotificationActionResult | null,
+  formData: FormData,
+): Promise<NotificationActionResult> {
+  try {
+    const { ownerId } = await ownerContext();
+    const connectionId = text(formData, "connectionId");
+    if (!connectionId) return { ok: false, message: "Канал не выбран." };
+    const instructions = await createNotificationBindingInstructions({ ownerId, connectionId });
+    return {
+      ok: true,
+      message: "Одноразовая ссылка действует 30 минут.",
+      privateLink: instructions.privateLink,
+      groupLink: instructions.groupLink,
+      connectCommand: instructions.connectCommand,
+    };
+  } catch (error) {
+    return safeError(error, "Не удалось создать ссылку подключения.");
+  }
+}
+
+export async function testNotificationConnectionAction(
+  _previous: NotificationActionResult | null,
+  formData: FormData,
+): Promise<NotificationActionResult> {
+  try {
+    const { ownerId } = await ownerContext();
+    const connectionId = text(formData, "connectionId");
+    await testNotificationConnection({ ownerId, connectionId });
+    refreshNotificationPages();
+    return { ok: true, message: "Тестовое уведомление отправлено." };
+  } catch (error) {
+    return safeError(error, "Тестовая отправка не удалась.");
+  }
+}
+
+export async function disconnectNotificationConnectionAction(
+  _previous: NotificationActionResult | null,
+  formData: FormData,
+): Promise<NotificationActionResult> {
+  try {
+    const { ownerId } = await ownerContext();
+    const connectionId = text(formData, "connectionId");
+    await disconnectNotificationConnection({ ownerId, connectionId });
+    refreshNotificationPages();
+    return { ok: true, message: "Канал отключён." };
+  } catch (error) {
+    return safeError(error, "Не удалось отключить канал.");
+  }
+}
