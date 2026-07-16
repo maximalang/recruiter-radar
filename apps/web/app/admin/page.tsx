@@ -11,7 +11,12 @@ import {
   getDashboardLeadMetrics,
   getDashboardSourcePerformance,
   getDashboardSourceEvidenceQuality,
+  getDashboardIngestTrend,
+  getOperatorUsers,
+  type IngestTrend,
+  type OperatorUserRow,
 } from "@/lib/dashboard-data";
+import { getOperatorSettingsForDisplay } from "@/lib/operatorSettings";
 import { checkOperatorAccess, isOperatorPanelConfigured, operatorLockedReason } from "@/lib/operator-auth";
 import {
   InternalPageFrame,
@@ -24,6 +29,7 @@ import {
 } from "../ui/internal-page";
 import { SiteFooter } from "../ui/site-footer";
 import AdminIngestForm from "./admin-ingest-form";
+import AdminLlmConfigForm from "./admin-llm-config-form";
 import AdminLoginForm from "./admin-login-form";
 import AdminLogoutButton from "./admin-logout-button";
 
@@ -121,7 +127,7 @@ export default async function AdminPage() {
   const registry = getSourceRegistry();
   const primaryIds = new Set(getPrimarySourceIds());
 
-  const [health, overview, quality, feedbackFunnel, leadMetrics, sourcePerformance, sourceEvidenceQuality] =
+  const [health, overview, quality, feedbackFunnel, leadMetrics, sourcePerformance, sourceEvidenceQuality, ingestTrend, llmSettings, users] =
     await Promise.all([
       safe(() => getDashboardSourceHealth(), []),
       safe(() => getDashboardOverviewMetrics(), null),
@@ -130,6 +136,9 @@ export default async function AdminPage() {
       safe(() => getDashboardLeadMetrics(), null),
       safe(() => getDashboardSourcePerformance(), null),
       safe(() => getDashboardSourceEvidenceQuality(), null),
+      safe(() => getDashboardIngestTrend(), null),
+      safe(() => getOperatorSettingsForDisplay(), []),
+      safe(() => getOperatorUsers(), [] as OperatorUserRow[]),
     ]);
 
   const healthById = new Map(health.map((h) => [h.id, h]));
@@ -164,6 +173,21 @@ export default async function AdminPage() {
             <Metric label="Primary" value={String(sources.filter((s) => s.isPrimary).length)} />
             <Metric label="Здоровье" value={overview ? `${overview.overallHealth}%` : "—"} />
           </div>
+        </ContentCard>
+
+        {/* Ingest volume trend (7 days) — surfaces a silently-failing source.
+            A source that fetches but writes 0 every day (timeout mid-write) shows
+            as an all-zero column here even when the 24h health card flips between
+            0 and healthy. Read-only daily signal counts grouped by occurred_at. */}
+        <ContentCard>
+          <ContentCardTitle>Объём инжеста за 7 дней</ContentCardTitle>
+          {ingestTrend && ingestTrend.days.length > 0 ? (
+            <IngestTrendChart trend={ingestTrend} />
+          ) : (
+            <p className={internalPageClasses.bodyTextMutedBlock}>
+              Нет данных за 7 дней.
+            </p>
+          )}
         </ContentCard>
 
         {/* Lead + funnel — what the pipeline is producing */}
@@ -279,7 +303,22 @@ export default async function AdminPage() {
             Принудительный забор данных из источников. В норме запускается по расписанию (cron 06:00 МСК).
             Используйте для ручного прогона после правок конфигурации источника.
           </p>
-          <AdminIngestForm />
+          <AdminIngestForm sources={sources} />
+        </ContentCard>
+
+        {/* LLM provider config — switch providers at runtime (no redeploy).
+            The seam for the future in-app LLM: today only Firecrawl structured
+            extraction consumes these, but the resolver (llm-config) + this panel
+            are the stable URL/config surface any future LLM call will route
+            through. Secrets are masked in display and never logged. */}
+        <ContentCard>
+          <ContentCardTitle>LLM-провайдер</ContentCardTitle>
+          <p className={internalPageClasses.bodyText}>
+            Смена API-ключа, Base URL и модели — без редеплоя и правки env.
+            Приоритет: значение из панели → env (OPENAI_API_KEY / OPENAI_BASE_URL /
+            CODEXOID_MODEL).
+          </p>
+          <AdminLlmConfigForm settings={llmSettings} />
         </ContentCard>
 
         {/* Source health table */}
@@ -330,6 +369,65 @@ export default async function AdminPage() {
               );
             })}
           </div>
+        </ContentCard>
+
+        {/* User management — who signed up, profile, pilot, payment, Telegram.
+            Read-only overview (the operator tracks users; write-actions like
+            activating a pilot or toggling a profile are existing surfaces). */}
+        <ContentCard>
+          <ContentCardTitle>Пользователи ({users.length})</ContentCardTitle>
+          {users.length === 0 ? (
+            <p className={internalPageClasses.bodyTextMutedBlock}>
+              Зарегистрированных пользователей пока нет.
+            </p>
+          ) : (
+            <div style={{ display: "grid", gap: "8px" }}>
+              {users.map((u) => (
+                <div
+                  key={u.id}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr auto",
+                    gap: "12px",
+                    alignItems: "start",
+                    padding: "10px 12px",
+                    border: "1px solid var(--c-border, #e2e8f0)",
+                    borderRadius: "12px",
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: "0.88rem" }}>
+                      {u.fullName ?? u.email}
+                      {u.fullName ? <span style={{ fontWeight: 400, color: "var(--c-text-muted, #667085)" }}> · {u.email}</span> : null}
+                    </div>
+                    <div style={{ fontSize: "0.76rem", color: "var(--c-text-muted, #667085)", display: "grid", gap: "2px", marginTop: "4px" }}>
+                      <span>
+                        Профиль: {u.profile ? `${u.profile.agencyName}${u.profile.isActive ? "" : " (неактивен)"}` : "нет"}
+                        {u.profile?.specialization ? ` · ${u.profile.specialization}` : ""}
+                      </span>
+                      <span>
+                        Доставка: {u.profile?.telegramChatId ? `Telegram подключён${u.profile.deliveryEnabled === false ? " (выключена)" : ""}` : "Telegram не подключён"}
+                      </span>
+                      <span>
+                        Пилот: {u.pilot ? `${u.pilot.status}${u.pilot.endsAt ? ` до ${new Date(u.pilot.endsAt).toLocaleDateString("ru-RU")}` : ""}` : "нет"}
+                      </span>
+                      <span>
+                        Оплата: {u.hasPaidOrder ? `${u.paidOrderCount} оплаченных заказов` : "нет оплаченных"}
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", justifyContent: "flex-end", alignItems: "center" }}>
+                    {u.hasPaidOrder ? <Tag color="#047857" bg="#d1fae5">оплачен</Tag> : null}
+                    {u.pilot?.status === "active" ? <Tag color="#1d4ed8" bg="#dbeafe">пилот</Tag> : null}
+                    {u.profile?.isActive && u.profile?.telegramChatId ? <Tag color="#7c3aed" bg="#ede9fe">доставка</Tag> : null}
+                    <span style={{ fontSize: "0.72rem", color: "var(--c-text-muted, #667085)", whiteSpace: "nowrap" }}>
+                      {new Date(u.createdAt).toLocaleDateString("ru-RU", { day: "numeric", month: "short", year: "numeric" })}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </ContentCard>
       </div>
     </InternalPageFrame>
@@ -384,4 +482,44 @@ const sourceRowStyle: CSSProperties = {
   border: "1px solid var(--c-border, #e2e8f0)",
   borderRadius: "12px",
 };
+
+/**
+ * Compact 7-day ingest-volume bar chart. Each day is a column whose height is
+ * proportional to that day's total signal count (capped at the window max). The
+ * total is labelled under each column so the operator can see a day that wrote
+ * 0 — the actionable "source ran and lost everything" signal. A per-source
+ * legend is omitted on purpose to keep the card scannable; the source-evidence
+ * card above carries the per-source detail.
+ */
+function IngestTrendChart({ trend }: { trend: IngestTrend }) {
+  const max = Math.max(...trend.days.map((d) => d.total), 1);
+  return (
+    <div style={{ display: "flex", alignItems: "flex-end", gap: "8px", height: "120px", paddingTop: "12px" }}>
+      {trend.days.map((d) => {
+        const heightPct = d.total > 0 ? Math.max((d.total / max) * 100, 6) : 0;
+        const dayLabel = d.day.slice(8);
+        return (
+          <div key={d.day} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", flex: 1 }}>
+            <div
+              title={`${d.day}: ${d.total} сигналов`}
+              style={{
+                width: "100%",
+                maxWidth: "36px",
+                height: `${heightPct}%`,
+                minHeight: d.total > 0 ? "6px" : "2px",
+                borderRadius: "6px 6px 0 0",
+                background: d.total > 0 ? "var(--c-brand, #1d4ed8)" : "rgba(15,23,42,0.08)",
+                transition: "height 0.2s ease",
+              }}
+            />
+            <div style={{ fontSize: "0.72rem", fontWeight: 700, color: d.total > 0 ? "var(--c-text-primary, #0f172a)" : "var(--c-text-muted, #667085)" }}>
+              {d.total}
+            </div>
+            <div style={{ fontSize: "0.7rem", color: "var(--c-text-muted, #667085)" }}>{dayLabel}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 

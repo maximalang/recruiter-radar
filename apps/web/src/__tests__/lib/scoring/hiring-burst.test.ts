@@ -20,7 +20,7 @@ describe('detectHiringBurst', () => {
     expect(result.isBurst).toBe(false)
     expect(result.score).toBe(0)
     expect(result.recentCount).toBe(0)
-    expect(result.reasons[0]).toMatch(/no vacancies/i)
+    expect(result.reasons[0]).toMatch(/нет вакансий/i)
   })
 
   it('ignores internal-recruiter vacancies — they do not count toward burst', () => {
@@ -64,7 +64,7 @@ describe('detectHiringBurst', () => {
     expect(result.isBurst).toBe(true)
     expect(result.recentCount).toBe(3)
     expect(result.score).toBeGreaterThanOrEqual(0.4)
-    expect(result.reasons.some((r) => /burst|spike|concurrent/i.test(r))).toBe(true)
+    expect(result.reasons.some((r) => /всплеск/i.test(r))).toBe(true)
   })
 
   it('excludes vacancies older than the 14-day window from the burst count', () => {

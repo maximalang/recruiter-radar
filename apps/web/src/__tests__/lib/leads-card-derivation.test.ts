@@ -32,8 +32,10 @@ describe('deriveWhyNow', () => {
       r('intent', 'intent.fresh-signals'),
     ]
     const result = deriveWhyNow(reasons)
-    // Burst (priority 80) outranks fresh-signals (65); both lead, fit excluded
-    expect(result).toContain('Hiring burst')
+    // Burst (priority 80) outranks fresh-signals (65); both lead, fit excluded.
+    // urgency.burst renders as Russian "Всплеск найма" — the English "Hiring
+    // burst" label was a crooked prod card leak fixed 2026-07-15.
+    expect(result).toContain('Всплеск найма')
     expect(result).toContain('Свежие сигналы найма')
     expect(result).not.toContain('fintech')
   })
@@ -55,7 +57,7 @@ describe('deriveWhyNow', () => {
       r('fit', 'fit.location.match'),
     ]
     const result = deriveWhyNow(reasons)
-    expect(result).toBe('Индустрия «it» совпадает с ICP; SMB sweet spot (100 сотрудников, 50–500 сотрудников) — оптимальный бюджет для агентства')
+    expect(result).toBe('Индустрия «it» совпадает с ICP; Средний бизнес в «золотой зоне» (100 сотрудников, 50–500 сотрудников) — оптимальный бюджет для агентства')
   })
 
   it('renders legacy free-form Russian reasons verbatim, never the [legacy.…] stub', () => {

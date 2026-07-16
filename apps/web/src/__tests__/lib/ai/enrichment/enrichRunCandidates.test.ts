@@ -30,6 +30,14 @@ jest.mock('@/lib/ai', () => ({
   persistEnrichmentForCandidate: jest.fn(),
   hasEnrichment: jest.fn(),
 }));
+// The operator-DB LLM override prime (ensureLlmOverridesLoaded) runs before the
+// provider is built. Mock it to a no-op so it does NOT call getPool().query and
+// steal the test's mockResolvedValueOnce candidate row (the prime would consume
+// the first query otherwise, breaking the happy-path expectations). The override
+// layer is unit-tested in llm-config.test.ts + operatorSettings.
+jest.mock('@/lib/operatorSettings', () => ({
+  ensureLlmOverridesLoaded: jest.fn().mockResolvedValue({ apiKey: null, baseUrl: null, model: null }),
+}));
 
 const mockQuery = jest.fn();
 const mockGetPool = jest.mocked(getPool);

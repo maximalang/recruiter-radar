@@ -3,15 +3,28 @@
 import { useActionState, useState } from "react";
 import { runIngest } from "./admin-actions";
 
+/** Source row the admin page passes in (already health-decorated). */
+export interface AdminSourceOption {
+  id: string;
+  name: string;
+  category: string;
+  isPrimary: boolean;
+}
+
 /**
  * Operator ingest trigger. Uses the runIngest server action via useActionState.
  * No API key is entered here — the action auths via the signed operator session
  * cookie set at login. The action can take >60s (career-pages crawl under a
  * 90s budget), so the button shows a busy state.
+ *
+ * The single-source picker lists EVERY registered source (primary + non-primary
+ * RF enrichment sources like EGRUL and company-site) so the operator can run an
+ * enrichment/corroboration source on demand — not just the daily-radar primary
+ * set. Non-primary sources corroborate evidence rather than originating leads.
  */
-export default function AdminIngestForm() {
+export default function AdminIngestForm({ sources }: { sources: AdminSourceOption[] }) {
   const [mode, setMode] = useState<"all" | "single">("all");
-  const [source, setSource] = useState("");
+  const [source, setSource] = useState(sources[0]?.id ?? "");
   const [state, formAction, pending] = useActionState(runIngest, {
     ok: false,
     message: "",
@@ -32,19 +45,31 @@ export default function AdminIngestForm() {
           Один источник
         </label>
         {mode === "single" ? (
-          <input
+          <select
             value={source}
             onChange={(e) => setSource(e.target.value)}
-            placeholder="career-pages / habr / rabota-rossii"
             style={{
               fontSize: "var(--fs-base)",
               padding: "8px 12px",
               border: "1px solid var(--c-border, #e2e8f0)",
               borderRadius: "10px",
             }}
-          />
+          >
+            {sources.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name} ({s.id}){s.isPrimary ? " · primary" : ""}
+              </option>
+            ))}
+          </select>
         ) : null}
       </div>
+
+      {mode === "single" && sources.find((s) => s.id === source && !s.isPrimary) ? (
+        <p style={{ fontSize: "0.78rem", color: "var(--c-text-muted, #667085)", margin: 0 }}>
+          Не-primary источники обогащают и подтверждают уже собранные лиды — они не
+          создают лиды сами и не входят в ежедневный автоинжест.
+        </p>
+      ) : null}
 
       <button
         type="submit"
