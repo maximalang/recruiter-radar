@@ -90,10 +90,40 @@ WITH source_signal_rows AS (
     -- signals.payload -> 'contact_paths'. Non-career-pages signals carry none,
     -- so we coalesce to '[]' for a stable shape downstream. Read here so the
     -- digest query can aggregate the corporate surface per lead without a join.
-    COALESCE(signal.payload -> 'contact_paths', '[]'::jsonb) AS payload_contact_paths
+    COALESCE(signal.payload -> 'contact_paths', '[]'::jsonb) AS payload_contact_paths,
+    -- is_context_evidence: true for РФ context/corroboration sources. These
+    -- sources corroborate an EXISTING job_posting lead's identity (via the
+    -- corroboration_key INN/OGRN/domain merge) and contribute to source
+    -- diversity, but NEVER originate a lead (Gate D: context without direct
+    -- hiring proof is supporting context only). Originator sources are the
+    -- job_posting boards above. Context sources emit signal_type 'other' or
+    -- 'funding' (funding-business-signals) — never 'job_posting' — so this
+    -- flag is also the clean seam that keeps context rows out of the
+    -- hiring-metric aggregates (vacancies_count, evidence_titles,
+    -- latest_published_at) while still letting them count toward source_families.
+    (signal.source IN ('funding-business-signals', 'fedresurs', 'transparent-business-fns', 'egrul-fns', 'company-site')) AS is_context_evidence
   FROM signals AS signal
-  WHERE signal.signal_type = 'job_posting'
-    AND signal.source IN ('hh', 'career-pages', 'rabota-rossii', 'superjob', 'habr-career', 'tech-job-boards', 'linkedin-company-pages', 'regional-job-boards')
+  WHERE
+    (
+      -- Lead originators: company-owned or platform hiring surfaces. Only these
+      -- originate a lead candidate (Gate A/B/C). signal_type='job_posting'.
+      signal.signal_type = 'job_posting'
+        AND signal.source IN ('hh', 'career-pages', 'rabota-rossii', 'superjob', 'habr-career', 'tech-job-boards', 'linkedin-company-pages', 'regional-job-boards')
+    )
+    OR
+    (
+      -- РФ context/corroboration sources: funding (GDELT), fedresurs corporate
+      -- events, FNS transparent-business, EGRUL registry, and company-site
+      -- corporate-surface pages. These corroborate an existing lead's org
+      -- identity (INN/OGRN/domain via corroboration_key) and add evidence + a
+      -- contact surface, but their evidence_quality is forced to
+      -- 'enrichment_context' (see normalized_signal_rows) so they can never
+      -- originate a lead on their own (Gate D preserved). Admitted on their own
+      -- signal_type ('other' or 'funding') so job_posting-only filters above
+      -- stay the originator gate.
+      signal.signal_type IN ('other', 'funding')
+        AND signal.source IN ('funding-business-signals', 'fedresurs', 'transparent-business-fns', 'egrul-fns', 'company-site')
+    )
 ),
 -- org_corroboration_keys: map each org_id to a canonical cross-source
 -- corroboration key derived from the STRONGEST shared strong key. This lets
@@ -210,6 +240,11 @@ normalized_signal_rows AS (
     signal.location_name,
     signal.published_at,
     signal.payload_contact_paths,
+    -- is_context_evidence is propagated so the aggregated CTE can keep РФ
+    -- context rows OUT of hiring-metric aggregates (vacancies_count, evidence
+    -- titles, latest_published_at) while still letting them count toward
+    -- source_families diversity. See source_signal_rows for the source list.
+    signal.is_context_evidence,
     -- evidence_quality: classifies how close this signal is to a company-controlled hiring surface.
     --
     -- direct_hiring_proof  — a COMPANY-OWNED hiring surface, i.e. career-pages. This is the only
@@ -224,7 +259,20 @@ normalized_signal_rows AS (
     -- platform_aggregation  — signal from a platform or registry (HH, superjob, rabota-rossii, etc.)
     --                        with a company match in org_source_refs, but no company-owned surface.
     -- enrichment_context    — no match found; signal provides background context only.
+    --
+    -- Gate D guard (is_context_evidence FIRST): a РФ context/corroboration source
+    -- (funding/fedresurs/transparent-business-fns/egrul-fns/company-site) writes
+    -- its OWN org_source_refs during ingest, so the source_ref LATERAL below
+    -- would find a matched_by and classify it as 'platform_aggregation' — which
+    -- would let context-only rows originate a Gate-C lead and violate Gate D.
+    -- Forcing enrichment_context for context sources BEFORE the matched_by check
+    -- keeps them as identity-corroboration + contact-surface contributors that
+    -- can never raise a group's evidence_quality on their own (their MAX
+    -- contribution is 0, so a context-only group stays enrichment_context and is
+    -- dropped by the scored CTE — exactly Gate D).
     CASE
+      WHEN signal.is_context_evidence
+        THEN 'enrichment_context'
       WHEN signal.source = 'career-pages'
         THEN 'direct_hiring_proof'
       WHEN source_ref.matched_by IS NOT NULL
@@ -348,7 +396,16 @@ aggregated AS (
       ELSE 'enrichment_context'
     END AS evidence_quality,
     ARRAY_AGG(DISTINCT source ORDER BY source) AS source_families,
-    ARRAY_REMOVE(ARRAY_AGG(DISTINCT NULLIF(BTRIM(evidence_title), '')), NULL) AS evidence_titles,
+    -- evidence_titles holds the OPEN ROLE titles the agency acts on, so it must
+    -- contain ONLY job_posting originator titles — a funding round headline or a
+    -- fedresurs event label must never appear as a "vacancy". Context rows are
+    -- excluded via the is_context_evidence FILTER. (Context evidence still
+    -- surfaces elsewhere: in source_families diversity, in the contact_paths
+    -- merge, and in the corroboration identity — not here.)
+    ARRAY_REMOVE(
+      ARRAY_AGG(DISTINCT NULLIF(BTRIM(evidence_title), '') FILTER (WHERE NOT is_context_evidence)),
+      NULL
+    ) AS evidence_titles,
     -- candidate_source_keys now spans EVERY org_id in the corroboration group
     -- (not just one fragment), so the lead card's source-key evidence reflects
     -- the full merged entity, not a single fragment's keys.
@@ -364,9 +421,16 @@ aggregated AS (
     -- contact_paths: see contact_paths_by_group CTE (deduped per corroboration
     -- group). Joined here so the aggregated row carries the merged surface.
     cp.contact_paths,
-    COUNT(*)::INT AS vacancies_count,
-    COUNT(DISTINCT evidence_title)::INT AS distinct_vacancy_names_count,
-    MAX(published_at) AS latest_published_at
+    -- vacancies_count / distinct_vacancy_names_count / latest_published_at count
+    -- ONLY originator (job_posting) rows. A funding signal, a fedresurs event,
+    -- or a company-site context page is NOT a vacancy and its occurred_at is NOT
+    -- the hiring freshness clock — including them would inflate vacancies_score
+    -- and shift the recency/45-day freshness gate off the actual hiring date.
+    -- Context rows still contribute to source_families (diversity → gate lift)
+    -- and to contact_paths, just not to these hiring metrics.
+    COUNT(*) FILTER (WHERE NOT is_context_evidence)::INT AS vacancies_count,
+    COUNT(DISTINCT evidence_title) FILTER (WHERE NOT is_context_evidence)::INT AS distinct_vacancy_names_count,
+    MAX(published_at) FILTER (WHERE NOT is_context_evidence) AS latest_published_at
   FROM normalized_signal_rows
   LEFT JOIN LATERAL (
     -- Deduped, ranked contact surface for this corroboration group. Flattens
