@@ -403,7 +403,7 @@ aggregated AS (
     -- surfaces elsewhere: in source_families diversity, in the contact_paths
     -- merge, and in the corroboration identity — not here.)
     ARRAY_REMOVE(
-      ARRAY_AGG(DISTINCT NULLIF(BTRIM(evidence_title), '') FILTER (WHERE NOT is_context_evidence)),
+      ARRAY_AGG(DISTINCT NULLIF(BTRIM(evidence_title), '')) FILTER (WHERE NOT is_context_evidence),
       NULL
     ) AS evidence_titles,
     -- candidate_source_keys now spans EVERY org_id in the corroboration group
