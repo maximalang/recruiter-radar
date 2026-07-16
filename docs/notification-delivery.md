@@ -55,6 +55,12 @@ x-api-key: <CRON_API_KEY>
 
 The retry endpoint is idempotent. Multiple schedulers may invoke it, but a job can be claimed only when it is due or when a previous `sending` lease is stale.
 
+## Provider identity uniqueness
+
+An active Telegram bot or VK community is globally unique across all owners. A second owner who pastes a token that is already active for a different account is rejected before any provider webhook or VK Callback API server is reconfigured, with a neutral error that never reveals the other owner. Revoking a connection frees the identity, so the same owner can reconnect it, and a different owner can claim an identity a previous owner released.
+
+This is enforced by a partial unique index on `(provider, external_account_id) WHERE status <> 'revoked'` (`20260716180000`). The legacy owner-scoped index was dropped (`20260716180500`) so a released identity is not pinned to its first owner. The hardening migration refuses to apply if duplicate active identities already exist — resolve them first.
+
 ## Telegram BYOB flow
 
 1. The customer creates a bot in BotFather.

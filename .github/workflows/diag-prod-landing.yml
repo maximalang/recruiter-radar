@@ -1,0 +1,25 @@
+name: Diagnose prod landing (throwaway)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch prod landing + health and print bodies
+        run: |
+          set +e
+          echo "=== /api/health ==="
+          curl -sS -i --max-time 30 https://recruiter-radar.ru/api/health || true
+          echo ""
+          echo "=== / (status + first 4000 bytes of body) ==="
+          curl -sS -i --max-time 30 https://recruiter-radar.ru/ -o /tmp/landing.html -w "HTTP %{http_code} bytes %{size_download}\n" || true
+          echo "--- body head ---"
+          head -c 4000 /tmp/landing.html 2>/dev/null || true
+          echo ""
+          echo "=== grep checks ==="
+          grep -c "Компания и контакты" /tmp/landing.html 2>/dev/null || echo "string not found"
