@@ -30,6 +30,7 @@ const dbBackedScripts = [
   './verify-mixed-ranking-smoke.mjs',
   './verify-digest-selection-smoke.mjs',
   './verify-digest-feedback-smoke.mjs',
+  './verify-rf-context-corroboration-smoke.mjs',
   './verify-career-pages-ingest.mjs',
 ];
 

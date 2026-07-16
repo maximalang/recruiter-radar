@@ -14,9 +14,18 @@
  *     container level; this module exposes them to Next.js code for any future
  *     in-app LLM call and to make the configuration testable.
  *
+ * Precedence (2026-07-15): an operator DB override (set from the admin panel,
+ * see lib/operatorSettings.ts) now wins over env, so the operator can switch
+ * providers WITHOUT a redeploy. Env remains the fallback and the historical
+ * default, so a DB with no override rows behaves exactly as before. The DB
+ * overrides live in an in-memory cache (kept synchronous here — see
+ * operatorSettings.getCachedLlmOverrides) primed lazily / on write.
+ *
  * Read from process.env only — secrets are never hardcoded. `.env.example`
  * documents every variable.
  */
+
+import { getCachedLlmOverrides } from '../../operatorSettings';
 
 /** Default OpenAI base URL, used when OPENAI_BASE_URL is unset. */
 const DEFAULT_OPENAI_BASE_URL = 'https://api.openai.com/v1';
@@ -25,34 +34,42 @@ const DEFAULT_OPENAI_BASE_URL = 'https://api.openai.com/v1';
 const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini';
 
 /**
- * Resolve the LLM API key. Read from OPENAI_API_KEY only — never hardcoded.
- * Returns null when unset, so callers can gate (no key ⇒ no LLM call).
+ * Resolve the LLM API key. Precedence: explicit arg → operator DB override →
+ * OPENAI_API_KEY env. Never hardcoded. Returns null when unset, so callers can
+ * gate (no key ⇒ no LLM call).
  */
 export function resolveLlmApiKey(explicit?: string | null): string | null {
   if (typeof explicit === 'string' && explicit.length > 0) return explicit;
+  const override = getCachedLlmOverrides().apiKey;
+  if (override) return override;
   const fromEnv = process.env.OPENAI_API_KEY;
   return typeof fromEnv === 'string' && fromEnv.length > 0 ? fromEnv : null;
 }
 
 /**
- * Resolve the OpenAI-compatible base URL. Defaults to OpenAI; pointing
- * OPENAI_BASE_URL at https://codexoid.duckdns.org/v1 switches to CodeXoid with
- * no code change. Never throws.
+ * Resolve the OpenAI-compatible base URL. Precedence: explicit arg → operator
+ * DB override → OPENAI_BASE_URL env → OpenAI default. Pointing the override/env
+ * at https://codexoid.duckdns.org/v1 switches to CodeXoid with no code change.
+ * Never throws.
  */
 export function resolveLlmBaseUrl(explicit?: string | null): string {
   if (typeof explicit === 'string' && explicit.length > 0) return explicit;
+  const override = getCachedLlmOverrides().baseUrl;
+  if (override) return override;
   const fromEnv = process.env.OPENAI_BASE_URL;
   return typeof fromEnv === 'string' && fromEnv.length > 0 ? fromEnv : DEFAULT_OPENAI_BASE_URL;
 }
 
 /**
- * Resolve the model name. Precedence: explicit arg → CODEXOID_MODEL (when set,
- * signals CodeXoid is the intended provider) → FIRECRAWL_LLM_MODEL → OpenAI
- * default. Returns the model a caller should pass to the LLM explicitly, so
- * no consumer has to hardcode a model name.
+ * Resolve the model name. Precedence: explicit arg → operator DB override →
+ * CODEXOID_MODEL env → FIRECRAWL_LLM_MODEL env → OpenAI default. Returns the
+ * model a caller should pass to the LLM explicitly, so no consumer has to
+ * hardcode a model name.
  */
 export function resolveLlmModel(explicit?: string | null): string {
   if (typeof explicit === 'string' && explicit.length > 0) return explicit;
+  const override = getCachedLlmOverrides().model;
+  if (override) return override;
   const codexoid = process.env.CODEXOID_MODEL;
   if (typeof codexoid === 'string' && codexoid.length > 0) return codexoid;
   const firecrawl = process.env.FIRECRAWL_LLM_MODEL;

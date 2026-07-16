@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { ingestAllPrimarySources, ingestSource, isNoActiveProfiles, type IngestResult } from "@/lib/lead-discovery/source-ingest";
 import { writeOperatorSession, clearOperatorSession, readOperatorSession } from "@/lib/operator-auth";
+import { setOperatorSetting, clearOperatorSetting, LLM_SETTING_KEYS, type LlmSettingKey } from "@/lib/operatorSettings";
 
 /**
  * Server actions for the /admin panel.
@@ -107,6 +108,79 @@ export async function runIngest(_prev: IngestState, formData: FormData): Promise
       ok: false,
       message: err instanceof Error ? err.message : "Ошибка инжеста.",
     };
+  }
+}
+
+// ─── LLM provider config (operator-managed, runtime) ────────────────────────
+
+type LlmConfigState = {
+  ok: boolean;
+  message: string;
+};
+
+/**
+ * Save one LLM provider setting (key + value) from the admin panel.
+ *
+ * Auth: requires an active operator session (same boundary as runIngest).
+ * The API key is stored in the operator_settings table with is_secret=true and
+ * is masked in every read surface; it is never logged. Writing reloads the
+ * in-memory override cache (see operatorSettings.refreshLlmSettingsOverrides)
+ * so the new provider takes effect on the next resolver call without a restart.
+ *
+ * SECURITY: the key is validated against the closed set LLM_SETTING_KEYS
+ * (enforced in setOperatorSetting AND the DB CHECK constraint), so an arbitrary
+ * row cannot be injected to influence the app. Values are trimmed; an empty
+ * value is rejected (use clearLlmConfig to revert to env).
+ */
+export async function saveLlmConfig(_prev: LlmConfigState, formData: FormData): Promise<LlmConfigState> {
+  const hasSession = await readOperatorSession();
+  if (!hasSession) {
+    return { ok: false, message: "Сессия оператора истекла. Перезайдите в панель." };
+  }
+
+  const rawKey = String(formData.get("key") ?? "").trim();
+  const value = String(formData.get("value") ?? "");
+  if (!LLM_SETTING_KEYS.includes(rawKey as LlmSettingKey)) {
+    return { ok: false, message: "Неизвестный параметр. Допустимы только llm_api_key, llm_base_url, llm_model." };
+  }
+
+  // The API-key field ships a masked placeholder when the operator did not edit
+  // it (the form pre-fills "••••xxxx"). Reject a masked/unchanged submission so
+  // we never overwrite the real key with mask dots.
+  if (rawKey === "llm_api_key" && value.startsWith("••••")) {
+    return { ok: false, message: "API-ключ не изменён — введите новое значение или используйте сброс." };
+  }
+
+  try {
+    await setOperatorSetting(rawKey, value);
+    revalidatePath("/admin");
+    return { ok: true, message: `Параметр «${rawKey}» сохранён. Провайдер обновлён без редеплоя.` };
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : "Не удалось сохранить параметр." };
+  }
+}
+
+/**
+ * Clear one LLM setting's override so the env default applies again.
+ * Auth: operator session required (same boundary).
+ */
+export async function clearLlmConfig(_prev: LlmConfigState, formData: FormData): Promise<LlmConfigState> {
+  const hasSession = await readOperatorSession();
+  if (!hasSession) {
+    return { ok: false, message: "Сессия оператора истекла. Перезайдите в панель." };
+  }
+
+  const rawKey = String(formData.get("key") ?? "").trim();
+  if (!LLM_SETTING_KEYS.includes(rawKey as LlmSettingKey)) {
+    return { ok: false, message: "Неизвестный параметр." };
+  }
+
+  try {
+    await clearOperatorSetting(rawKey);
+    revalidatePath("/admin");
+    return { ok: true, message: `Параметр «${rawKey}» сброшен. Возвращает значение из env.` };
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : "Не удалось сбросить параметр." };
   }
 }
 

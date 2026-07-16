@@ -42,7 +42,7 @@ export const REASON_LABELS: Record<string, string> = {
   'fit.location.country-ru': 'Компания на рынке РФ',
   'fit.country.foreign': 'Иностранная компания ({country}) — понижена релевантность для рынка РФ',
   'fit.size.match': 'Размер компании «{size}» совпадает с ICP',
-  'fit.size.smb-sweet-spot': 'SMB sweet spot ({detail}, 50–500 сотрудников) — оптимальный бюджет для агентства',
+  'fit.size.smb-sweet-spot': 'Средний бизнес в «золотой зоне» ({detail}, 50–500 сотрудников) — оптимальный бюджет для агентства',
   'fit.market.boom': 'Высокий рыночный спрос повышает релевантность',
   'fit.market.bust': 'Низкий рыночный спрос снижает релевантность',
 
@@ -57,13 +57,13 @@ export const REASON_LABELS: Record<string, string> = {
   'intent.direct-evidence.present': 'Прямое подтверждение есть',
   'intent.multiple-corroborating': 'Независимые источники подтверждают друг друга',
   'intent.multiple-roles': 'Несколько открытых ролей ({count}) — активный найм',
-  'intent.non-tech-mix': 'Non-tech роли ({nonTech}/{total}) — аутсорсинг-вероятные позиции усиливают лид',
+  'intent.non-tech-mix': 'Непрофильные роли ({nonTech}/{total}) — позиции, вероятные для аутсорсинга, усиливают лид',
   'intent.source-diversity.high': '{count} независимых источников повышают уверенность',
   'intent.source-diversity.medium': '2 независимых источника усиливают сигнал',
 
   // Urgency
   'urgency.no-vacancies': 'Нет вакансий — нет срочности',
-  'urgency.burst': 'Hiring burst: {details}',
+  'urgency.burst': 'Всплеск найма: {details}',
   'urgency.hard-to-fill': '{count} дефицитных ролей повышают срочность',
   'urgency.fresh-postings': 'Несколько свежих вакансий за 14 дней',
   'urgency.stale-role-repeated': '{count} повторяющихся ролей без обновления >30 дн. — понижение срочности',

@@ -1487,7 +1487,20 @@ async function ingestCareerPages({ connectionString, input }) {
 }
 
 async function upsertOrgSourceRef(client, record) {
-  await lockOrgSourceKeys(client, record.orgSourceKeys);
+  // Lock this record's source keys in ONE round-trip instead of one-per-key.
+  // Previously `lockOrgSourceKeys` issued a separate `pg_advisory_xact_lock`
+  // statement per key (3-5 round-trips/record × 619 records ≈ 2000+ round-trips
+  // — the dominant cost behind the >150s write that exceeded the ingest timeout
+  // and lost the whole batch). `lockRecordOrgSourceKeys` batches all of a
+  // record's keys into a single unnest-driven statement, cutting the lock
+  // round-trips ~3-5× while preserving the per-record lock ordering. Deadlock
+  // characteristics are UNCHANGED from the old per-key loop: we still lock each
+  // record's keys in sorted order, one record at a time — the same discipline
+  // rf-source-runtime.mjs and ingest-hh.mjs use — so concurrent parallel ingests
+  // (ingestAllPrimarySources runs all 5 sources via Promise.all) see no new
+  // circular-wait risk. A whole-batch pre-acquire would lock more for longer and
+  // mix badly with the other sources' per-record locking; deliberately avoided.
+  await lockRecordOrgSourceKeys(client, record.orgSourceKeys);
 
   const existingRefResult = await client.query(
     `
@@ -1643,13 +1656,24 @@ async function setOrgDomainSavepoint(client, orgId, domain) {
   }
 }
 
-async function lockOrgSourceKeys(client, sourceKeys) {
-  for (const sourceKey of [...sourceKeys].sort()) {
-    await client.query('SELECT pg_advisory_xact_lock(hashtext($1::text), hashtext($2::text))', [
-      SOURCE_ID,
-      sourceKey,
-    ]);
-  }
+/**
+ * Lock one record's org source keys in a single round-trip.
+ *
+ * Drop-in replacement for the old per-key `lockOrgSourceKeys` loop: sorts the
+ * keys the same way (deterministic per-record order) and locks them all with one
+ * `unnest`-driven statement instead of one statement per key. This cuts the
+ * lock round-trips ~3-5× (a 619-record batch went from ~2000+ lock statements to
+ * ~619) without changing the per-record lock ordering, so deadlock behaviour
+ * vs the other parallel ingests is unchanged. `pg_advisory_xact_lock` is held
+ * until COMMIT either way.
+ */
+async function lockRecordOrgSourceKeys(client, sourceKeys) {
+  const sortedKeys = [...(sourceKeys ?? [])].sort();
+  if (sortedKeys.length === 0) return;
+  await client.query(
+    `SELECT pg_advisory_xact_lock(hashtext($1::text), hashtext(key)) FROM unnest($2::text[]) AS t(key)`,
+    [SOURCE_ID, sortedKeys],
+  );
 }
 
 function normalizeCareerPageRecord(record, fetchedAt, lineNumber) {

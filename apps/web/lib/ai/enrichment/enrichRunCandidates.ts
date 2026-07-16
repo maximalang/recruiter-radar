@@ -29,6 +29,7 @@
 import pLimit from 'p-limit';
 import { getPool } from '../../db';
 import { logError, logEvent } from '../../runtime';
+import { ensureLlmOverridesLoaded } from '../../operatorSettings';
 import type { ContactPath } from '../../scoring/contact-paths';
 import {
   repairWeakCareerPage,
@@ -88,6 +89,12 @@ export async function enrichRunCandidates(runId: string | number): Promise<Enric
 
   const pool = getPool();
   if (!pool) return off;
+
+  // Prime the operator-DB LLM override cache before the provider is built, so
+  // an admin-set provider (api key / base url / model) is live on this run even
+  // right after a container restart — not just after the first lazy resolver
+  // call. No-op once cached. See lib/operatorSettings.ts.
+  await ensureLlmOverridesLoaded();
 
   let provider: ScrapeProvider;
   let fallbackProvider: MarkdownProvider | undefined;
