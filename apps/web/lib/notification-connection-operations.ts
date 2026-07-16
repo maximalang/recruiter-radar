@@ -51,7 +51,6 @@ function isPostgresError(error: unknown): boolean {
 }
 
 async function findExistingAccount(input: {
-  ownerId: string | number;
   provider: "telegram" | "vk";
   externalAccountId: string;
 }): Promise<ExistingAccountRow | null> {
@@ -62,16 +61,24 @@ async function findExistingAccount(input: {
       SELECT id::text AS id, owner_id::text AS "ownerId", provider, status,
              secret_ciphertext AS "secretCiphertext", provider_metadata AS "providerMetadata"
       FROM notification_provider_accounts
-      WHERE owner_id = $1
-        AND provider = $2
-        AND external_account_id = $3
+      WHERE provider = $1
+        AND external_account_id = $2
         AND status <> 'revoked'
       ORDER BY created_at DESC
       LIMIT 1
     `,
-    [input.ownerId, input.provider, input.externalAccountId],
+    [input.provider, input.externalAccountId],
   );
   return result.rowCount === 1 ? result.rows[0] : null;
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  return code === "23505";
+}
+
+function sameOwner(left: string | number, right: string): boolean {
+  return String(left) === String(right);
 }
 
 async function getOwnedAccount(input: {
@@ -133,25 +140,40 @@ export async function createTelegramNotificationConnectionSafely(input: {
   }
   const identity = await verifyTelegramBotToken(botToken);
   const before = await findExistingAccount({
-    ownerId: input.ownerId,
     provider: "telegram",
     externalAccountId: identity.id,
   });
-  if (before) throw new Error("Этот Telegram-бот уже подключён к аккаунту.");
+  if (before) {
+    if (sameOwner(input.ownerId, before.ownerId)) {
+      throw new Error("Этот Telegram-бот уже подключён к вашему аккаунту.");
+    }
+    // The bot is active for a different owner. Do not reconfigure the webhook,
+    // do not reveal the other owner, and surface a neutral error.
+    throw new Error("Этот Telegram-бот уже используется другим аккаунтом.");
+  }
 
   try {
     return await createTelegramNotificationConnection({ ...input, botToken });
   } catch (error) {
     const after = await findExistingAccount({
-      ownerId: input.ownerId,
       provider: "telegram",
       externalAccountId: identity.id,
     });
-    if (after) {
+    if (after && sameOwner(input.ownerId, after.ownerId)) {
+      // Our own partially-committed connection — recover it.
       const recovered = await recoverTelegramConnection(after).catch(() => null);
       if (recovered) return recovered;
-    } else if (isPostgresError(error)) {
+      throw error;
+    }
+    // Either no row exists, or the row belongs to another owner (e.g. a global
+    // unique-index violation raced against our pre-check). In the cross-owner
+    // case we must NOT delete the other owner's webhook. Only clean up an
+    // orphan webhook we created when there is no active account at all.
+    if (!after && isPostgresError(error) && !isUniqueViolation(error)) {
       await deleteTelegramWebhook({ botToken }).catch(() => {});
+    }
+    if (after && !sameOwner(input.ownerId, after.ownerId)) {
+      throw new Error("Этот Telegram-бот уже используется другим аккаунтом.");
     }
     throw error;
   }
@@ -171,39 +193,50 @@ export async function createVkNotificationConnectionSafely(input: {
   }
   const identity = await verifyVkCommunity({ groupId, token });
   const before = await findExistingAccount({
-    ownerId: input.ownerId,
     provider: "vk",
     externalAccountId: identity.id,
   });
-  if (before) throw new Error("Это VK-сообщество уже подключено к аккаунту.");
+  if (before) {
+    if (sameOwner(input.ownerId, before.ownerId)) {
+      throw new Error("Это VK-сообщество уже подключено к вашему аккаунту.");
+    }
+    // The community is active for a different owner. Do not reconfigure the
+    // VK Callback API server and surface a neutral error.
+    throw new Error("Это VK-сообщество уже используется другим аккаунтом.");
+  }
 
   try {
     return await createVkNotificationConnection({ ...input, groupId, token });
   } catch (error) {
     const after = await findExistingAccount({
-      ownerId: input.ownerId,
       provider: "vk",
       externalAccountId: identity.id,
     });
-    if (!after) throw error;
-    let callbackConfigured = true;
-    try {
-      await reconcileVkNotificationConnection({
+    if (after && sameOwner(input.ownerId, after.ownerId)) {
+      // Our own partially-committed connection — reconcile and bind it.
+      let callbackConfigured = true;
+      try {
+        await reconcileVkNotificationConnection({
+          ownerId: input.ownerId,
+          connectionId: after.id,
+        });
+      } catch {
+        callbackConfigured = false;
+      }
+      const instructions = await createNotificationBindingInstructions({
         ownerId: input.ownerId,
         connectionId: after.id,
       });
-    } catch {
-      callbackConfigured = false;
+      return {
+        connectionId: after.id,
+        connectCommand: instructions.connectCommand ?? "/connect",
+        callbackConfigured,
+      };
     }
-    const instructions = await createNotificationBindingInstructions({
-      ownerId: input.ownerId,
-      connectionId: after.id,
-    });
-    return {
-      connectionId: after.id,
-      connectCommand: instructions.connectCommand ?? "/connect",
-      callbackConfigured,
-    };
+    if (after && !sameOwner(input.ownerId, after.ownerId)) {
+      throw new Error("Это VK-сообщество уже используется другим аккаунтом.");
+    }
+    throw error;
   }
 }
 

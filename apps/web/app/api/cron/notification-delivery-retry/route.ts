@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { retryDueNotificationDeliveries } from "@/lib/notification-dispatch";
+import { redactProviderSecret } from "@/lib/notification-secrets";
 import { logError, logEvent } from "@/lib/runtime";
 
 export const runtime = "nodejs";
@@ -45,13 +46,15 @@ export async function POST(request: NextRequest) {
       ...result,
     });
   } catch (error) {
-    logError("notification.retry_queue.failed", error, {
+    const rawMessage = error instanceof Error ? error.message : "Notification retry queue failed.";
+    const safeMessage = redactProviderSecret(rawMessage).slice(0, 1000);
+    logError("notification.retry_queue.failed", new Error(safeMessage), {
       durationMs: Date.now() - startedAt,
     });
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "Notification retry queue failed.",
+        error: safeMessage,
       },
       { status: 500 },
     );

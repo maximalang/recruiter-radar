@@ -599,7 +599,7 @@ export async function retryDueNotificationDeliveries(input?: {
   );
 
   const result: NotificationRetryResult = {
-    batches: due.rowCount,
+    batches: due.rows.length,
     sent: 0,
     failed: 0,
     skipped: 0,

@@ -6,13 +6,19 @@ on:
     paths:
       - '.github/workflows/notification-delivery-validation.yml'
       - 'apps/web/app/api/cron/notification-delivery-retry/**'
+      - 'apps/web/app/api/notifications/**'
       - 'apps/web/app/profile/notification-actions.ts'
       - 'apps/web/lib/notification-connection-operations.ts'
       - 'apps/web/lib/notification-dispatch.ts'
       - 'apps/web/lib/notification-providers.ts'
+      - 'apps/web/lib/notification-secrets.ts'
+      - 'apps/web/lib/notification-vk-reconcile.ts'
+      - 'apps/web/lib/notifications.ts'
+      - 'apps/web/src/__tests__/lib/notification-connection-operations.test.ts'
       - 'apps/web/src/__tests__/lib/notification-dispatch.test.ts'
       - 'apps/web/src/__tests__/lib/notification-providers.test.ts'
       - 'docs/notification-delivery.md'
+      - 'packages/db/migrations/**'
   workflow_dispatch:
 
 jobs:
@@ -72,6 +78,7 @@ jobs:
           --runInBand
           src/__tests__/lib/notification-providers.test.ts
           src/__tests__/lib/notification-dispatch.test.ts
+          src/__tests__/lib/notification-connection-operations.test.ts
 
       - name: Apply all migrations
         run: node packages/db/scripts/migrate.mjs
