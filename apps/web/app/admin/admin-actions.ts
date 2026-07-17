@@ -5,6 +5,12 @@ import { revalidatePath } from "next/cache";
 import { ingestAllPrimarySources, ingestSource, isNoActiveProfiles, type IngestResult } from "@/lib/lead-discovery/source-ingest";
 import { writeOperatorSession, clearOperatorSession, readOperatorSession } from "@/lib/operator-auth";
 import { setOperatorSetting, clearOperatorSetting, LLM_SETTING_KEYS, type LlmSettingKey } from "@/lib/operatorSettings";
+import {
+  activatePilotForUser,
+  pausePilotForUser,
+  setProfileActive,
+  clearProfileTelegram,
+} from "@/lib/admin/adminUsers";
 
 /**
  * Server actions for the /admin panel.
@@ -182,5 +188,55 @@ export async function clearLlmConfig(_prev: LlmConfigState, formData: FormData):
   } catch (err) {
     return { ok: false, message: err instanceof Error ? err.message : "Не удалось сбросить параметр." };
   }
+}
+
+// ─── User management (operator write-actions) ───────────────────────────────
+
+type UserActionState = { ok: boolean; message: string };
+
+/**
+ * Shared guard for the user-management actions: require an active operator
+ * session and a valid user id, then delegate to the adminUsers DB layer.
+ * Returns the state to render next to the action button.
+ */
+async function withOperatorSession<T extends UserActionState>(
+  formData: FormData,
+  run: (userId: string) => Promise<T>,
+): Promise<T> {
+  const hasSession = await readOperatorSession();
+  if (!hasSession) {
+    return { ok: false, message: "Сессия оператора истекла. Перезайдите в панель." } as T;
+  }
+  const userId = String(formData.get("userId") ?? "").trim();
+  if (!/^\d+$/.test(userId) || Number(userId) <= 0) {
+    return { ok: false, message: "Некорректный id пользователя." } as T;
+  }
+  try {
+    const result = await run(userId);
+    revalidatePath("/admin");
+    return result;
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : "Действие не выполнено." } as T;
+  }
+}
+
+export async function adminActivatePilot(_prev: UserActionState, formData: FormData): Promise<UserActionState> {
+  return withOperatorSession(formData, (userId) => activatePilotForUser(userId));
+}
+
+export async function adminPausePilot(_prev: UserActionState, formData: FormData): Promise<UserActionState> {
+  return withOperatorSession(formData, (userId) => pausePilotForUser(userId));
+}
+
+export async function adminPauseProfile(_prev: UserActionState, formData: FormData): Promise<UserActionState> {
+  return withOperatorSession(formData, (userId) => setProfileActive(userId, false));
+}
+
+export async function adminResumeProfile(_prev: UserActionState, formData: FormData): Promise<UserActionState> {
+  return withOperatorSession(formData, (userId) => setProfileActive(userId, true));
+}
+
+export async function adminClearTelegram(_prev: UserActionState, formData: FormData): Promise<UserActionState> {
+  return withOperatorSession(formData, (userId) => clearProfileTelegram(userId));
 }
 

@@ -32,6 +32,7 @@ import AdminIngestForm from "./admin-ingest-form";
 import AdminLlmConfigForm from "./admin-llm-config-form";
 import AdminLoginForm from "./admin-login-form";
 import AdminLogoutButton from "./admin-logout-button";
+import AdminUserCard from "./admin-user-card";
 
 export const dynamic = "force-dynamic";
 
@@ -371,9 +372,11 @@ export default async function AdminPage() {
           </div>
         </ContentCard>
 
-        {/* User management — who signed up, profile, pilot, payment, Telegram.
-            Read-only overview (the operator tracks users; write-actions like
-            activating a pilot or toggling a profile are existing surfaces). */}
+        {/* User management — who signed up + functional write-actions.
+            The operator can ACT on a user from here, not just view: activate /
+            extend a 7-day pilot, pause a pilot, toggle profile is_active (digest
+            on/off), and unlink Telegram delivery. All actions run behind the
+            operator-session gate (re-checked server-side). */}
         <ContentCard>
           <ContentCardTitle>Пользователи ({users.length})</ContentCardTitle>
           {users.length === 0 ? (
@@ -383,48 +386,29 @@ export default async function AdminPage() {
           ) : (
             <div style={{ display: "grid", gap: "8px" }}>
               {users.map((u) => (
-                <div
+                <AdminUserCard
                   key={u.id}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr auto",
-                    gap: "12px",
-                    alignItems: "start",
-                    padding: "10px 12px",
-                    border: "1px solid var(--c-border, #e2e8f0)",
-                    borderRadius: "12px",
+                  user={{
+                    id: u.id,
+                    email: u.email,
+                    fullName: u.fullName,
+                    createdAt: u.createdAt,
+                    profile: u.profile
+                      ? {
+                          id: u.profile.id,
+                          agencyName: u.profile.agencyName,
+                          isActive: u.profile.isActive,
+                          specialization: u.profile.specialization,
+                          telegramChatId: u.profile.telegramChatId,
+                        }
+                      : null,
+                    pilot: u.pilot
+                      ? { status: u.pilot.status, endsAt: u.pilot.endsAt }
+                      : null,
+                    hasPaidOrder: u.hasPaidOrder,
+                    paidOrderCount: u.paidOrderCount,
                   }}
-                >
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: "0.88rem" }}>
-                      {u.fullName ?? u.email}
-                      {u.fullName ? <span style={{ fontWeight: 400, color: "var(--c-text-muted, #667085)" }}> · {u.email}</span> : null}
-                    </div>
-                    <div style={{ fontSize: "0.76rem", color: "var(--c-text-muted, #667085)", display: "grid", gap: "2px", marginTop: "4px" }}>
-                      <span>
-                        Профиль: {u.profile ? `${u.profile.agencyName}${u.profile.isActive ? "" : " (неактивен)"}` : "нет"}
-                        {u.profile?.specialization ? ` · ${u.profile.specialization}` : ""}
-                      </span>
-                      <span>
-                        Доставка: {u.profile?.telegramChatId ? `Telegram подключён${u.profile.deliveryEnabled === false ? " (выключена)" : ""}` : "Telegram не подключён"}
-                      </span>
-                      <span>
-                        Пилот: {u.pilot ? `${u.pilot.status}${u.pilot.endsAt ? ` до ${new Date(u.pilot.endsAt).toLocaleDateString("ru-RU")}` : ""}` : "нет"}
-                      </span>
-                      <span>
-                        Оплата: {u.hasPaidOrder ? `${u.paidOrderCount} оплаченных заказов` : "нет оплаченных"}
-                      </span>
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", justifyContent: "flex-end", alignItems: "center" }}>
-                    {u.hasPaidOrder ? <Tag color="#047857" bg="#d1fae5">оплачен</Tag> : null}
-                    {u.pilot?.status === "active" ? <Tag color="#1d4ed8" bg="#dbeafe">пилот</Tag> : null}
-                    {u.profile?.isActive && u.profile?.telegramChatId ? <Tag color="#7c3aed" bg="#ede9fe">доставка</Tag> : null}
-                    <span style={{ fontSize: "0.72rem", color: "var(--c-text-muted, #667085)", whiteSpace: "nowrap" }}>
-                      {new Date(u.createdAt).toLocaleDateString("ru-RU", { day: "numeric", month: "short", year: "numeric" })}
-                    </span>
-                  </div>
-                </div>
+                />
               ))}
             </div>
           )}

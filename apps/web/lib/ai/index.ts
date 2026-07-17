@@ -75,6 +75,13 @@ export {
 } from './enrichment/enrichmentRateLimit';
 
 export {
+  discoverCareerPageUrls,
+  assertDiscoveryDoesNotTouchEvidence,
+  type CareerPageDiscoveryCandidate,
+  type CareerPageDiscoveryResult,
+} from './enrichment/careerPageDiscovery';
+
+export {
   persistEnrichmentForCandidate,
   toStoredEnrichment,
   parseStoredEnrichment,
