@@ -39,6 +39,7 @@ import {
   isCrawl4aiConfigured,
   persistEnrichmentForCandidate,
   hasEnrichment,
+  discoverCareerPageUrls,
   type ScrapeProvider,
   type MarkdownProvider,
   type WeakCareerPageCandidate,
@@ -61,6 +62,10 @@ export interface EnrichRunResult {
   considered: number;
   /** Candidates that received a persisted enrichment. */
   enriched: number;
+  /** Orgs inspected for career-page URL discovery (had a website, no career page). */
+  discoveryConsidered: number;
+  /** Orgs for which a career-page URL was discovered and persisted. */
+  discoveryDiscovered: number;
 }
 
 interface RunCandidateRow {
@@ -80,7 +85,7 @@ interface RunCandidateRow {
  * @returns a summary; `ran: false` means enrichment is off (no provider).
  */
 export async function enrichRunCandidates(runId: string | number): Promise<EnrichRunResult> {
-  const off: EnrichRunResult = { ran: false, considered: 0, enriched: 0 };
+  const off: EnrichRunResult = { ran: false, considered: 0, enriched: 0, discoveryConsidered: 0, discoveryDiscovered: 0 };
 
   // Provider gate FIRST — no key means no work at all.
   if (!isFirecrawlConfigured()) {
@@ -104,6 +109,32 @@ export async function enrichRunCandidates(runId: string | number): Promise<Enric
   } catch (error) {
     logError('ai.enrichment.provider_init_failed', error, { runId: String(runId) });
     return off;
+  }
+
+  // ACTIVE DATA COLLECTION (per operator direction: "LLM должен сам собирать
+  // инфу"). Before repairing weak career pages, visit the company sites that
+  // have a website but NO recorded career page and discover their careers/vacancies
+  // URL. The discovered URL is persisted onto orgs.career_page_url (ONLY that
+  // column — never score/gate/evidence) so:
+  //   - the next enrichment run can repair it, and
+  //   - the next daily-radar career-pages crawl can pick it up.
+  // Best-effort + quota-bounded (shares the per-org 1/24h slot); a failure never
+  // affects the repair step below.
+  let discovery: { considered: number; discovered: number } = { considered: 0, discovered: 0 };
+  try {
+    const disc = await discoverCareerPageUrls(runId, provider);
+    if (disc.ran) {
+      discovery = { considered: disc.considered, discovered: disc.discovered };
+      if (disc.considered > 0) {
+        logEvent('ai.enrichment.discovery_summary', {
+          runId: String(runId),
+          considered: disc.considered,
+          discovered: disc.discovered,
+        });
+      }
+    }
+  } catch (error) {
+    logError('ai.enrichment.discovery_step_failed', error, { runId: String(runId) });
   }
 
   // Only candidates whose org carries a career-page URL are enrichable — there is
@@ -134,11 +165,11 @@ export async function enrichRunCandidates(runId: string | number): Promise<Enric
     rows = result.rows;
   } catch (error) {
     logError('ai.enrichment.run_query_failed', error, { runId: String(runId) });
-    return { ran: true, considered: 0, enriched: 0 };
+    return { ran: true, considered: 0, enriched: 0, discoveryConsidered: discovery.considered, discoveryDiscovered: discovery.discovered };
   }
 
   if (rows.length === 0) {
-    return { ran: true, considered: 0, enriched: 0 };
+    return { ran: true, considered: 0, enriched: 0, discoveryConsidered: discovery.considered, discoveryDiscovered: discovery.discovered };
   }
 
   const limit = pLimit(ENRICH_CONCURRENCY);
@@ -188,7 +219,7 @@ export async function enrichRunCandidates(runId: string | number): Promise<Enric
     enriched,
   });
 
-  return { ran: true, considered: rows.length, enriched };
+  return { ran: true, considered: rows.length, enriched, discoveryConsidered: discovery.considered, discoveryDiscovered: discovery.discovered };
 }
 
 /**

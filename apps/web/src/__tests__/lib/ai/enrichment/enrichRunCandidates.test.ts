@@ -18,6 +18,7 @@ import {
   repairWeakCareerPage,
   persistEnrichmentForCandidate,
   hasEnrichment,
+  discoverCareerPageUrls,
 } from '@/lib/ai';
 
 jest.mock('@/lib/db', () => ({ getPool: jest.fn() }));
@@ -29,6 +30,7 @@ jest.mock('@/lib/ai', () => ({
   repairWeakCareerPage: jest.fn(),
   persistEnrichmentForCandidate: jest.fn(),
   hasEnrichment: jest.fn(),
+  discoverCareerPageUrls: jest.fn(),
 }));
 // The operator-DB LLM override prime (ensureLlmOverridesLoaded) runs before the
 // provider is built. Mock it to a no-op so it does NOT call getPool().query and
@@ -47,12 +49,18 @@ const mockCreateProvider = jest.mocked(createFirecrawlProvider);
 const mockRepair = jest.mocked(repairWeakCareerPage);
 const mockPersist = jest.mocked(persistEnrichmentForCandidate);
 const mockHasEnrichment = jest.mocked(hasEnrichment);
+const mockDiscover = jest.mocked(discoverCareerPageUrls);
 
 beforeEach(() => {
   jest.clearAllMocks();
   mockGetPool.mockReturnValue({ query: mockQuery } as never);
   mockIsCrawl4aiConfigured.mockReturnValue(false);
   mockCreateProvider.mockReturnValue({ name: 'firecrawl' } as never);
+  // Discovery is a best-effort ACTIVE-collection step that runs before repair.
+  // Default to "ran but found nothing / considered nothing" so it does not steal
+  // the repair query's mockResolvedValueOnce rows. Tests that need discovery to
+  // behave differently override this.
+  mockDiscover.mockResolvedValue({ ran: true, considered: 0, discovered: 0 });
 });
 
 function candidateRow(overrides: Record<string, unknown> = {}) {
@@ -74,10 +82,11 @@ describe('enrichRunCandidates — provider gate', () => {
 
     const result = await enrichRunCandidates('run-1');
 
-    expect(result).toEqual({ ran: false, considered: 0, enriched: 0 });
+    expect(result).toEqual({ ran: false, considered: 0, enriched: 0, discoveryConsidered: 0, discoveryDiscovered: 0 });
     expect(mockGetPool).not.toHaveBeenCalled();
     expect(mockQuery).not.toHaveBeenCalled();
     expect(mockRepair).not.toHaveBeenCalled();
+    expect(mockDiscover).not.toHaveBeenCalled();
   });
 
   it('returns ran:false when configured but there is no pool', async () => {
@@ -87,6 +96,7 @@ describe('enrichRunCandidates — provider gate', () => {
     const result = await enrichRunCandidates('run-1');
     expect(result.ran).toBe(false);
     expect(mockQuery).not.toHaveBeenCalled();
+    expect(mockDiscover).not.toHaveBeenCalled();
   });
 });
 
@@ -103,7 +113,7 @@ describe('enrichRunCandidates — happy path', () => {
 
     const result = await enrichRunCandidates('run-1');
 
-    expect(result).toEqual({ ran: true, considered: 1, enriched: 1 });
+    expect(result).toEqual({ ran: true, considered: 1, enriched: 1, discoveryConsidered: 0, discoveryDiscovered: 0 });
     expect(mockRepair).toHaveBeenCalledTimes(1);
     // Persisted against the natural (clientProfileId, orgId) key — never an
     // arbitrary candidate id — so the UPDATE matches the right row.
@@ -119,7 +129,7 @@ describe('enrichRunCandidates — happy path', () => {
 
     const result = await enrichRunCandidates('run-1');
 
-    expect(result).toEqual({ ran: true, considered: 1, enriched: 0 });
+    expect(result).toEqual({ ran: true, considered: 1, enriched: 0, discoveryConsidered: 0, discoveryDiscovered: 0 });
     expect(mockPersist).not.toHaveBeenCalled();
   });
 
@@ -127,7 +137,7 @@ describe('enrichRunCandidates — happy path', () => {
     mockQuery.mockResolvedValueOnce({ rows: [] });
 
     const result = await enrichRunCandidates('run-1');
-    expect(result).toEqual({ ran: true, considered: 0, enriched: 0 });
+    expect(result).toEqual({ ran: true, considered: 0, enriched: 0, discoveryConsidered: 0, discoveryDiscovered: 0 });
     expect(mockRepair).not.toHaveBeenCalled();
   });
 });
@@ -162,6 +172,6 @@ describe('enrichRunCandidates — isolation', () => {
     mockQuery.mockRejectedValueOnce(new Error('db down'));
 
     const result = await enrichRunCandidates('run-1');
-    expect(result).toEqual({ ran: true, considered: 0, enriched: 0 });
+    expect(result).toEqual({ ran: true, considered: 0, enriched: 0, discoveryConsidered: 0, discoveryDiscovered: 0 });
   });
 });
