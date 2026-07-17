@@ -21,9 +21,9 @@ export function BrandLogo(props: {
     >
       <img
         className={s.mark}
-        src="/brand/recruiter-radar-mark.svg?v=brand-11"
-        width={512}
-        height={512}
+        src="/brand/recruiter-radar-mark-brand12.svg"
+        width={128}
+        height={128}
         alt=""
         aria-hidden="true"
         draggable={false}

@@ -3,7 +3,7 @@ import { render } from '@testing-library/react';
 import { TopNav } from '@/app/ui/internal-page';
 
 describe('TopNav brand wordmark', () => {
-  it('renders the Recruiter Radar mark and wordmark', () => {
+  it('renders the exact uploaded Recruiter Radar mark and wordmark', () => {
     const { container } = render(<TopNav items={[]} />);
     const brand = container.querySelector('a.topNavBrand');
     const logo = brand?.querySelector('[role="img"][aria-label="Recruiter Radar"]');
@@ -13,7 +13,7 @@ describe('TopNav brand wordmark', () => {
     expect(artwork).not.toBeNull();
     expect(artwork).toHaveAttribute(
       'src',
-      expect.stringContaining('/brand/recruiter-radar-mark.svg')
+      '/brand/recruiter-radar-mark-brand12.svg'
     );
     expect(artwork).toHaveAttribute('alt', '');
     expect(logo?.textContent ?? '').toContain('Recruiter');
