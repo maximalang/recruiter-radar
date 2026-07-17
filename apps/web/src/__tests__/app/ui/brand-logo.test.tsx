@@ -11,7 +11,7 @@ describe('BrandLogo', () => {
     const logo = screen.getByRole('img', { name: 'Recruiter Radar' });
     const artwork = logo.querySelector('img');
 
-    expect(artwork?.getAttribute('src')).toBe('/brand/recruiter-radar-mark.svg?v=brand-10');
+    expect(artwork?.getAttribute('src')).toBe('/brand/recruiter-radar-mark.svg?v=brand-11');
     expect(artwork?.getAttribute('width')).toBe('512');
     expect(artwork?.getAttribute('height')).toBe('512');
     expect(artwork?.getAttribute('alt')).toBe('');
@@ -29,7 +29,7 @@ describe('BrandLogo', () => {
     const logo = screen.getByRole('img', { name: 'Recruiter Radar' });
     const artwork = logo.querySelector('img');
 
-    expect(artwork?.getAttribute('src')).toBe('/brand/recruiter-radar-mark.svg?v=brand-10');
+    expect(artwork?.getAttribute('src')).toBe('/brand/recruiter-radar-mark.svg?v=brand-11');
     expect(container.querySelector('[data-tone="dark"]')).toBeTruthy();
     expect(container.querySelector('[data-size="small"]')).toBeTruthy();
     expect(container.querySelector('[data-wordmark="false"]')).toBeTruthy();
