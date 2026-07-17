@@ -13,7 +13,6 @@
   height: 44px;
   flex: 0 0 auto;
   object-fit: contain;
-  filter: drop-shadow(0 5px 10px rgba(37, 99, 235, 0.16));
   user-select: none;
 }
 
@@ -34,12 +33,9 @@
 }
 
 .logo[data-tone="dark"] .mark {
-  box-sizing: border-box;
-  padding: 2px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.16);
-  filter: drop-shadow(0 7px 14px rgba(23, 116, 245, 0.22));
+  background: transparent;
+  box-shadow: none;
+  filter: none;
 }
 
 .logo[data-tone="dark"] .wordmark {
