@@ -134,20 +134,23 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     // (needs a domain), so it adds nothing until other sources have populated
     // orgs — a no-op, not a failure, on an empty DB.
     //
-    // Per-source timeout 240s (raised from the 120s default on 2026-07-12): the
-    // crawl (≤90s budget) + the DB upsert (runs once after the whole loop) can
-    // exceed 120s on a large candidate set, and a 120s execFile kill discarded
-    // EVERY fetched record because the write never reached the DB. 240s gives
-    // more headroom. NOTE: the post-loop write is row-by-row (per-record
-    // pg_advisory_xact_lock + SELECT + per-source-key INSERTs), so a large batch
-    // can still exceed 240s and be killed mid-write — the write is inside one
-    // transaction so a kill loses the whole batch. The durable fix is a batched
-    // write in the script (deferred); until then, lowering
-    // CAREER_PAGES_FETCH_BUDGET_MS via env shrinks the batch so crawl+write fits
-    // the timeout, at the cost of per-run coverage.
+    // Per-source timeout 420s (raised 120→240 on 2026-07-12, then 240→420 on
+    // 2026-07-17): the crawl (≤90s budget) + the DB upsert (runs once after the
+    // whole loop) empirically takes ~300s end-to-end for a ~700-record batch
+    // (verified by a manual prod run 2026-07-17: 30 targets, 716 records,
+    // EXIT_CODE=0 in ~5min). A 240s execFile kill was discarding EVERY fetched
+    // record because the write never reached the DB (career-pages reported
+    // success:false "Command failed" in every daily-radar while still writing 0
+    // signals). 420s = ~300s observed + headroom for the parallel-source CPU/DB
+    // contention from ingestAllPrimarySources' Promise.all over 5 sources.
+    // NOTE: the post-loop write is still row-by-row (per-record
+    // pg_advisory_xact_lock + SELECT + per-source-key INSERTs), so a much larger
+    // batch could still exceed 420s. The durable fix is a batched write in the
+    // script (deferred — see memory); until then this timeout + the 90s fetch
+    // budget bound the batch so crawl+write fits.
     isPrimary: true,
     category: 'career-page',
-    timeoutMs: 240_000,
+    timeoutMs: 420_000,
   },
   {
     id: 'egrul-fns',

@@ -29,6 +29,14 @@ describe('source-ingest', () => {
       expect(getSourceConfig('habr-career').timeoutMs).toBe(240_000)
     })
 
+    it('allows career-pages crawl + post-loop write to finish (empirically ~300s)', () => {
+      // A manual prod run (2026-07-17: 30 targets, 716 records, EXIT_CODE=0)
+      // took ~5min end-to-end; a 240s execFile kill was discarding every fetched
+      // record because the row-by-row write never reached COMMIT in time. 420s
+      // = observed ~300s + headroom for parallel-source contention.
+      expect(getSourceConfig('career-pages').timeoutMs).toBe(420_000)
+    })
+
     it('returns success for HH ingestion with valid output', async () => {
       const jsonMetrics = JSON.stringify({
         source: 'hh',
