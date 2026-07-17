@@ -16,15 +16,24 @@ export function BrandLogo(props: {
       data-tone={tone}
       data-size={size}
       data-wordmark={showsWordmark ? "true" : "false"}
+      role="img"
+      aria-label="Recruiter Radar"
     >
       <img
-        className={s.artwork}
-        src="/brand/recruiter-radar-logo.svg?v=vector-3"
-        width={728}
-        height={252}
-        alt="Recruiter Radar"
+        className={s.mark}
+        src="/brand/recruiter-radar-mark.svg?v=brand-8"
+        width={64}
+        height={64}
+        alt=""
+        aria-hidden="true"
         draggable={false}
       />
+      {showsWordmark ? (
+        <span className={s.wordmark} aria-hidden="true">
+          <span>Recruiter</span>
+          <span className={s.wordmarkAccent}>Radar</span>
+        </span>
+      ) : null}
     </span>
   );
 }
