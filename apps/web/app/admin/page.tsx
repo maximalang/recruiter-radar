@@ -151,6 +151,7 @@ export default async function AdminPage() {
       name: s.name,
       category: s.category,
       isPrimary: primaryIds.has(s.id),
+      timeoutMs: s.timeoutMs ?? 120_000,
       status: h?.status,
       overall: h?.overall,
       recordsLast24h: h?.recordsProcessed,
@@ -468,41 +469,93 @@ const sourceRowStyle: CSSProperties = {
 };
 
 /**
- * Compact 7-day ingest-volume bar chart. Each day is a column whose height is
- * proportional to that day's total signal count (capped at the window max). The
- * total is labelled under each column so the operator can see a day that wrote
- * 0 — the actionable "source ran and lost everything" signal. A per-source
- * legend is omitted on purpose to keep the card scannable; the source-evidence
- * card above carries the per-source detail.
+ * Stable color per source so a given source reads the same across days. The
+ * palette is deliberately distinct (not a gradient) so two adjacent stack
+ * segments are easy to separate visually.
+ */
+const SOURCE_COLORS: Record<string, string> = {
+  "career-pages": "#1d4ed8",
+  "habr-career": "#7c3aed",
+  "rabota-rossii": "#047857",
+  superjob: "#b45309",
+  hh: "#64748b",
+};
+const SOURCE_COLOR_FALLBACK = "#9333ea";
+
+function sourceColor(source: string): string {
+  return SOURCE_COLORS[source] ?? SOURCE_COLOR_FALLBACK;
+}
+
+/**
+ * Compact 7-day ingest-volume chart with a PER-SOURCE stacked breakdown.
+ *
+ * Each day is a column of stacked segments (one per source that wrote that
+ * day), so a source that fetched but wrote 0 — or was absent from the run —
+ * shows as a missing segment / shorter column rather than being hidden inside
+ * a single blue total. The total is labelled under each column. A compact
+ * legend lists the sources that appeared in the window. This makes a silently
+ * failing source (e.g. career-pages losing every record to a timeout mid-write)
+ * visible at a glance, which the old single-color total chart could not.
  */
 function IngestTrendChart({ trend }: { trend: IngestTrend }) {
   const max = Math.max(...trend.days.map((d) => d.total), 1);
+  const orderedSources = trend.sources;
   return (
-    <div style={{ display: "flex", alignItems: "flex-end", gap: "8px", height: "120px", paddingTop: "12px" }}>
-      {trend.days.map((d) => {
-        const heightPct = d.total > 0 ? Math.max((d.total / max) * 100, 6) : 0;
-        const dayLabel = d.day.slice(8);
-        return (
-          <div key={d.day} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", flex: 1 }}>
-            <div
-              title={`${d.day}: ${d.total} сигналов`}
-              style={{
-                width: "100%",
-                maxWidth: "36px",
-                height: `${heightPct}%`,
-                minHeight: d.total > 0 ? "6px" : "2px",
-                borderRadius: "6px 6px 0 0",
-                background: d.total > 0 ? "var(--c-brand, #1d4ed8)" : "rgba(15,23,42,0.08)",
-                transition: "height 0.2s ease",
-              }}
-            />
-            <div style={{ fontSize: "0.72rem", fontWeight: 700, color: d.total > 0 ? "var(--c-text-primary, #0f172a)" : "var(--c-text-muted, #667085)" }}>
-              {d.total}
+    <div>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: "8px", height: "120px", paddingTop: "12px" }}>
+        {trend.days.map((d) => {
+          const heightPct = d.total > 0 ? Math.max((d.total / max) * 100, 6) : 0;
+          const dayLabel = d.day.slice(8);
+          const presentSources = orderedSources.filter((s) => (d.bySource[s] ?? 0) > 0);
+          return (
+            <div key={d.day} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", flex: 1 }}>
+              <div
+                style={{
+                  width: "100%",
+                  maxWidth: "36px",
+                  height: `${heightPct}%`,
+                  minHeight: d.total > 0 ? "6px" : "2px",
+                  display: "flex",
+                  flexDirection: "column-reverse",
+                  borderRadius: "6px 6px 0 0",
+                  overflow: "hidden",
+                  background: d.total > 0 ? "transparent" : "rgba(15,23,42,0.08)",
+                  transition: "height 0.2s ease",
+                }}
+                title={`${d.day}: ${d.total} сигналов\n${presentSources
+                  .map((s) => `${s}: ${d.bySource[s]}`)
+                  .join("\n")}`}
+              >
+                {d.total > 0
+                  ? presentSources.map((s) => {
+                      const segPct = (d.bySource[s] / d.total) * 100;
+                      return (
+                        <div
+                          key={s}
+                          style={{ height: `${segPct}%`, background: sourceColor(s), width: "100%" }}
+                        />
+                      );
+                    })
+                  : null}
+              </div>
+              <div style={{ fontSize: "0.72rem", fontWeight: 700, color: d.total > 0 ? "var(--c-text-primary, #0f172a)" : "var(--c-text-muted, #667085)" }}>
+                {d.total}
+              </div>
+              <div style={{ fontSize: "0.7rem", color: "var(--c-text-muted, #667085)" }}>{dayLabel}</div>
             </div>
-            <div style={{ fontSize: "0.7rem", color: "var(--c-text-muted, #667085)" }}>{dayLabel}</div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
+      {orderedSources.length > 0 ? (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 14px", marginTop: "10px" }}>
+          {orderedSources.map((s) => (
+            <span key={s} style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "0.72rem", color: "var(--c-text-secondary, #475569)" }}>
+              <span style={{ width: "9px", height: "9px", borderRadius: "2px", background: sourceColor(s), display: "inline-block" }} />
+              {s}
+            </span>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

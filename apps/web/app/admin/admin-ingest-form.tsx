@@ -9,13 +9,25 @@ export interface AdminSourceOption {
   name: string;
   category: string;
   isPrimary: boolean;
+  /** Per-source execFile timeout in ms (from SourceConfig.timeoutMs, default 120s). */
+  timeoutMs: number;
+}
+
+/** Human-readable upper bound for a timeoutMs, for the busy-state label. */
+function timeoutLabel(ms: number): string {
+  if (ms >= 60_000) {
+    const mins = Math.round(ms / 60_000);
+    return `до ${mins} мин`;
+  }
+  return `до ${Math.round(ms / 1000)}с`;
 }
 
 /**
  * Operator ingest trigger. Uses the runIngest server action via useActionState.
  * No API key is entered here — the action auths via the signed operator session
- * cookie set at login. The action can take >60s (career-pages crawl under a
- * 90s budget), so the button shows a busy state.
+ * cookie set at login. A run can take several minutes (career-pages crawl + the
+ * post-loop DB write is bounded by a 420s execFile timeout), so the button shows
+ * a busy state with the real per-source upper bound.
  *
  * The single-source picker lists EVERY registered source (primary + non-primary
  * RF enrichment sources like EGRUL and company-site) so the operator can run an
@@ -29,6 +41,16 @@ export default function AdminIngestForm({ sources }: { sources: AdminSourceOptio
     ok: false,
     message: "",
   });
+
+  // Real upper bound for the busy-state label so the operator knows how long a
+  // manual run can take. career-pages is 420s (the post-loop DB write runs after
+  // the 90s crawl budget), not the historical "до 90с" the button used to show.
+  // "all" mode is bounded by the max across primary sources; "single" by the
+  // selected source's own timeout.
+  const boundTimeout =
+    mode === "single"
+      ? sources.find((s) => s.id === source)?.timeoutMs ?? 120_000
+      : Math.max(...sources.filter((s) => s.isPrimary).map((s) => s.timeoutMs), 120_000);
 
   return (
     <form action={formAction} style={{ display: "grid", gap: "12px" }}>
@@ -57,7 +79,7 @@ export default function AdminIngestForm({ sources }: { sources: AdminSourceOptio
           >
             {sources.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.name} ({s.id}){s.isPrimary ? " · primary" : ""}
+                {s.name} ({s.id}){s.isPrimary ? " · primary" : ""} · {timeoutLabel(s.timeoutMs)}
               </option>
             ))}
           </select>
@@ -87,7 +109,7 @@ export default function AdminIngestForm({ sources }: { sources: AdminSourceOptio
           justifySelf: "start",
         }}
       >
-        {pending ? "Запуск… (до 90с)" : "Запустить инжест"}
+        {pending ? `Запуск… (${timeoutLabel(boundTimeout)})` : "Запустить инжест"}
       </button>
 
       {state.message ? (
