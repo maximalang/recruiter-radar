@@ -1,52 +1,40 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Recruiter Radar tab icon">
   <defs>
-    <linearGradient id="rr-bg" x1="36" y1="24" x2="480" y2="494" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#07122E"/>
-      <stop offset="0.55" stop-color="#171744"/>
+    <linearGradient id="bg" x1="42" y1="28" x2="472" y2="486" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0A1230"/>
+      <stop offset=".55" stop-color="#171743"/>
       <stop offset="1" stop-color="#071B3F"/>
     </linearGradient>
-    <radialGradient id="rr-glow-blue" cx="0" cy="0" r="1" gradientTransform="translate(420 78) rotate(132) scale(300)" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#166BFF" stop-opacity="0.62"/>
-      <stop offset="1" stop-color="#166BFF" stop-opacity="0"/>
+    <radialGradient id="blueGlow" cx="0" cy="0" r="1" gradientTransform="translate(420 84) rotate(132) scale(300)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#00C8F8" stop-opacity=".44"/>
+      <stop offset="1" stop-color="#00C8F8" stop-opacity="0"/>
     </radialGradient>
-    <radialGradient id="rr-glow-purple" cx="0" cy="0" r="1" gradientTransform="translate(74 440) rotate(-45) scale(260)" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#6F17E8" stop-opacity="0.58"/>
-      <stop offset="1" stop-color="#6F17E8" stop-opacity="0"/>
+    <radialGradient id="purpleGlow" cx="0" cy="0" r="1" gradientTransform="translate(82 430) rotate(-44) scale(280)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7A08A8" stop-opacity=".50"/>
+      <stop offset="1" stop-color="#7A08A8" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="rr-gradient" x1="54" y1="54" x2="458" y2="458" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#7A08A8"/>
-      <stop offset="0.36" stop-color="#4A24E8"/>
-      <stop offset="0.68" stop-color="#147CFF"/>
-      <stop offset="1" stop-color="#00C8F8"/>
+    <linearGradient id="mark" x1="62" y1="66" x2="456" y2="450" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D35BFF"/>
+      <stop offset=".34" stop-color="#7A5CFF"/>
+      <stop offset=".68" stop-color="#37A0FF"/>
+      <stop offset="1" stop-color="#20E4FF"/>
     </linearGradient>
-    <filter id="rr-shadow" x="-30%" y="-30%" width="160%" height="160%">
-      <feDropShadow dx="0" dy="9" stdDeviation="10" flood-color="#020617" flood-opacity="0.72"/>
-    </filter>
-    <clipPath id="rr-card">
-      <rect x="10" y="10" width="492" height="492" rx="116"/>
-    </clipPath>
+    <clipPath id="tile"><rect x="10" y="10" width="492" height="492" rx="118"/></clipPath>
   </defs>
-
-  <g clip-path="url(#rr-card)">
-    <rect x="10" y="10" width="492" height="492" rx="116" fill="url(#rr-bg)"/>
-    <rect x="10" y="10" width="492" height="492" rx="116" fill="url(#rr-glow-blue)"/>
-    <rect x="10" y="10" width="492" height="492" rx="116" fill="url(#rr-glow-purple)"/>
-    <ellipse cx="256" cy="96" rx="220" ry="120" fill="#FFFFFF" opacity="0.045"/>
+  <g clip-path="url(#tile)">
+    <rect x="10" y="10" width="492" height="492" rx="118" fill="url(#bg)"/>
+    <rect x="10" y="10" width="492" height="492" rx="118" fill="url(#blueGlow)"/>
+    <rect x="10" y="10" width="492" height="492" rx="118" fill="url(#purpleGlow)"/>
+    <ellipse cx="256" cy="70" rx="214" ry="100" fill="#FFFFFF" opacity=".055"/>
   </g>
-  <rect x="11.5" y="11.5" width="489" height="489" rx="114.5" fill="none" stroke="#8BB8FF" stroke-opacity="0.48" stroke-width="3"/>
-  <rect x="19" y="19" width="474" height="474" rx="107" fill="none" stroke="#FFFFFF" stroke-opacity="0.1" stroke-width="2"/>
-
-  <g transform="translate(41 41) scale(.84)" filter="url(#rr-shadow)">
-    <g fill="none" stroke="#190536" stroke-linecap="butt" opacity="0.9">
-      <path d="M142 80A210 210 0 1 1 58 190" stroke-width="21.5"/>
-      <path d="M174 180A112 112 0 1 1 154 209" stroke-width="18.5"/>
-    </g>
-    <g fill="none" stroke="url(#rr-gradient)" stroke-linecap="butt">
-      <path d="M142 80A210 210 0 1 1 58 190" stroke-width="19"/>
-      <path d="M174 180A112 112 0 1 1 154 209" stroke-width="16"/>
-    </g>
-    <path d="M64 78h50c31 0 49 17 49 42 0 21-13 35-35 40l132 92-10 15L91 142h22c17 0 27-8 27-21 0-13-10-21-27-21H84v82H64V78Z"
-          fill="url(#rr-gradient)" stroke="#190536" stroke-width="1.8" paint-order="stroke fill"/>
-    <circle cx="256" cy="256" r="14" fill="url(#rr-gradient)" stroke="#190536" stroke-width="1.8"/>
+  <rect x="15" y="15" width="482" height="482" rx="113" fill="none" stroke="#A4C8FF" stroke-opacity=".62" stroke-width="7"/>
+  <g transform="translate(18 18) scale(.93)">
+    <path d="M142 80A210 210 0 1 1 58 190" fill="none" stroke="#FFFFFF" stroke-opacity=".94" stroke-width="32" stroke-linecap="butt"/>
+    <path d="M142 80A210 210 0 1 1 58 190" fill="none" stroke="url(#mark)" stroke-width="23" stroke-linecap="butt"/>
+    <path d="M70 188V78H132C168 78 188 96 188 123C188 151 167 169 132 169H91M132 169L258 256"
+      fill="none" stroke="#FFFFFF" stroke-width="30" stroke-linecap="butt" stroke-linejoin="miter"/>
+    <path d="M70 188V78H132C168 78 188 96 188 123C188 151 167 169 132 169H91M132 169L258 256"
+      fill="none" stroke="url(#mark)" stroke-width="20" stroke-linecap="butt" stroke-linejoin="miter"/>
+    <circle cx="258" cy="256" r="19" fill="url(#mark)" stroke="#FFFFFF" stroke-width="9"/>
   </g>
 </svg>
