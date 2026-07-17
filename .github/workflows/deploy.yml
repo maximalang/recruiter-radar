@@ -99,17 +99,17 @@ jobs:
                 landing_ok=true
               fi
 
-              if curl -fsS 'https://recruiter-radar.ru/brand/recruiter-radar-logo.svg?v=vector-3' --max-time 30 | grep -q '<svg'; then
+              if curl -fsS 'https://recruiter-radar.ru/brand/recruiter-radar-mark.svg?v=brand-10' --max-time 30 | grep -q 'aria-label="Recruiter Radar header mark"'; then
                 logo_ok=true
               fi
 
-              if curl -fsS 'https://recruiter-radar.ru/icon.svg?v=brand-9' --max-time 30 | grep -q 'aria-label="Recruiter Radar"'; then
+              if curl -fsS 'https://recruiter-radar.ru/icon.svg?v=brand-10' --max-time 30 | grep -q 'aria-label="Recruiter Radar tab icon"'; then
                 icon_ok=true
               fi
 
               echo "landing_ok=$landing_ok logo_ok=$logo_ok icon_ok=$icon_ok"
               if [ "$landing_ok" = "true" ] && [ "$logo_ok" = "true" ] && [ "$icon_ok" = "true" ]; then
-                echo "Public endpoint, header logo, and approved brand icon are live"
+                echo "Public endpoint, new header logo, and tab icon are live"
                 exit 0
               fi
             fi
