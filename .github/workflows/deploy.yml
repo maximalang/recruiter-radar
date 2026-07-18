@@ -83,7 +83,7 @@ jobs:
           exit 1
           SSH_EOF
 
-      - name: Verify public HTTPS endpoint and brand assets
+      - name: Verify public HTTPS endpoint and inline brand
         run: |
           # Retry loop: Caddy may briefly 502 while the recreated web container
           # finishes booting (Next.js ready ~2-4s after container health passes).
@@ -92,33 +92,25 @@ jobs:
             echo "Public /api/health attempt $i -> HTTP $code"
             if [ "$code" = "200" ]; then
               landing_ok=false
-              text_only_header_ok=false
-              footer_logo_ok=false
-              logo_asset_ok=false
-              icon_ok=false
+              inline_logo_ok=false
+              favicon_ok=false
 
               landing_html=$(curl -fsS https://recruiter-radar.ru/ --max-time 30 || true)
               if printf '%s' "$landing_html" | grep -q "Компания и контакты"; then
                 landing_ok=true
               fi
-              if printf '%s' "$landing_html" | grep -q 'data-mark="false"'; then
-                text_only_header_ok=true
+              if printf '%s' "$landing_html" | grep -q 'data-mark="true"' \
+                && printf '%s' "$landing_html" | grep -q 'data-logo-mark="inline"'; then
+                inline_logo_ok=true
               fi
-              if printf '%s' "$landing_html" | grep -q 'recruiter-radar-mark-brand15.svg'; then
-                footer_logo_ok=true
-              fi
-
-              if curl -fsS 'https://recruiter-radar.ru/brand/recruiter-radar-mark-brand15.svg' --max-time 30 | grep -q 'aria-label="Recruiter Radar brand 15 logo"'; then
-                logo_asset_ok=true
+              if printf '%s' "$landing_html" | grep -q 'favicon-brand19' \
+                && curl -fsS 'https://recruiter-radar.ru/favicon-brand19.png?v=brand-21' --max-time 30 -o /dev/null; then
+                favicon_ok=true
               fi
 
-              if curl -fsS 'https://recruiter-radar.ru/icon.svg?v=brand-15' --max-time 30 | grep -q 'aria-label="Recruiter Radar tab icon brand 15"'; then
-                icon_ok=true
-              fi
-
-              echo "landing_ok=$landing_ok text_only_header_ok=$text_only_header_ok footer_logo_ok=$footer_logo_ok logo_asset_ok=$logo_asset_ok icon_ok=$icon_ok"
-              if [ "$landing_ok" = "true" ] && [ "$text_only_header_ok" = "true" ] && [ "$footer_logo_ok" = "true" ] && [ "$logo_asset_ok" = "true" ] && [ "$icon_ok" = "true" ]; then
-                echo "Public endpoint, text-only header, brand 15 footer logo, and matching favicon are live"
+              echo "landing_ok=$landing_ok inline_logo_ok=$inline_logo_ok favicon_ok=$favicon_ok"
+              if [ "$landing_ok" = "true" ] && [ "$inline_logo_ok" = "true" ] && [ "$favicon_ok" = "true" ]; then
+                echo "Public endpoint, inline logo, and current favicon are live"
                 exit 0
               fi
             fi
