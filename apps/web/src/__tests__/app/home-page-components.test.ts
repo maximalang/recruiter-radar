@@ -1,4 +1,5 @@
 import {
+  buildFaqItems,
   buildPreviewEvidenceItems,
   cleanEmployerName,
 } from '@/app/home-page-components';
@@ -28,5 +29,12 @@ describe('landing card copy helpers', () => {
       .toBe('АО «ГОСТИНИЦА «СОВЕТСКАЯ»»');
     expect(cleanEmployerName('ООО "Ромашка"'))
       .toBe('ООО «Ромашка»');
+  });
+
+  it('describes the public example honestly when live data can fall back to demo', () => {
+    const [exampleQuestion] = buildFaqItems(true);
+
+    expect(exampleQuestion.answer).toContain('явно показываем демо');
+    expect(exampleQuestion.answer).not.toContain('показывает те же данные');
   });
 });

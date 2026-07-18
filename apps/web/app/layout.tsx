@@ -6,7 +6,7 @@ import { PushReadinessBoot } from "./push-readiness-boot";
 import "./globals.css";
 
 const inter = Inter({
-  subsets: ["latin"],
+  subsets: ["cyrillic", "latin"],
   variable: "--font-inter",
   display: "swap",
 });

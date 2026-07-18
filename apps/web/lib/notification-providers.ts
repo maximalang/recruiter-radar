@@ -341,21 +341,24 @@ export function validateWebhookUrl(raw: string): URL {
   }
 
   const hostname = normalizeWebhookHostname(url.hostname);
-  const localHostname =
+  const developmentHostname =
     hostname === "localhost" ||
-    hostname.endsWith(".localhost") ||
+    hostname.endsWith(".localhost");
+  const reservedHostname =
+    developmentHostname ||
     hostname.endsWith(".local") ||
     hostname.endsWith(".internal");
-  if (url.protocol !== "https:" && !(localWebhookAllowed() && localHostname && url.protocol === "http:")) {
+  const localHttpAllowed = localWebhookAllowed() && developmentHostname && url.protocol === "http:";
+  if (url.protocol !== "https:" && !localHttpAllowed) {
     throw new Error("Webhook URL must use HTTPS.");
   }
   if (url.username || url.password) {
     throw new Error("Webhook URL must not contain embedded credentials.");
   }
-  if (localHostname && !localWebhookAllowed()) {
+  if (reservedHostname && !localHttpAllowed) {
     throw new Error("Webhook URL must not point to a local host.");
   }
-  if (isIP(hostname) && isPrivateAddress(hostname) && !localWebhookAllowed()) {
+  if (isIP(hostname) && isPrivateAddress(hostname)) {
     throw new Error("Webhook URL must not point to a private network address.");
   }
   return url;

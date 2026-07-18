@@ -21,7 +21,7 @@ export default function LandingHeader() {
         </span>
         <Link href="/dashboard" className={hpStyles.topNavCta}>
           <span className={hpStyles.topNavCtaFull}>Войти в аккаунт</span>
-          <span className={hpStyles.topNavCtaShort} aria-hidden="true">Войти</span>
+          <span className={hpStyles.topNavCtaShort}>Войти</span>
         </Link>
       </nav>
     </header>
