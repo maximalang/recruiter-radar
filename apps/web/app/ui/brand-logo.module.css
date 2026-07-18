@@ -1,16 +1,16 @@
 .logo {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 11px;
   min-width: 0;
-  color: #071b3f;
+  color: #0b1730;
   line-height: 1;
 }
 
 .mark {
   display: block;
-  width: 44px;
-  height: 44px;
+  width: 46px;
+  height: 46px;
   flex: 0 0 auto;
   object-fit: contain;
   user-select: none;
@@ -19,17 +19,21 @@
 .wordmark {
   display: inline-flex;
   align-items: baseline;
-  gap: 0.28em;
+  gap: 0.3em;
   white-space: nowrap;
-  color: #071b3f;
-  font-size: 1.03rem;
-  font-weight: 800;
-  letter-spacing: -0.04em;
+  color: #0b1730;
+  font-size: 1.04rem;
+  font-weight: 790;
+  letter-spacing: -0.038em;
   line-height: 1;
 }
 
 .wordmarkAccent {
-  color: #1474f5;
+  color: #2563eb;
+  background: linear-gradient(96deg, #5b21b6 0%, #2563eb 58%, #0ea5e9 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .logo[data-tone="dark"] .mark {
@@ -43,20 +47,24 @@
 }
 
 .logo[data-tone="dark"] .wordmarkAccent {
-  color: #8ab9ff;
+  color: #8dc8ff;
+  background: linear-gradient(96deg, #c4b5fd 0%, #8dbbff 55%, #67e8f9 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .logo[data-size="small"] {
-  gap: 8px;
+  gap: 9px;
 }
 
 .logo[data-size="small"] .mark {
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
 }
 
 .logo[data-size="small"] .wordmark {
-  font-size: 0.92rem;
+  font-size: 0.94rem;
 }
 
 .logo[data-wordmark="false"] {
@@ -65,35 +73,35 @@
 
 @media (max-width: 480px) {
   .mark {
-    width: 38px;
-    height: 38px;
+    width: 42px;
+    height: 42px;
   }
 
   .wordmark {
-    font-size: 0.92rem;
+    font-size: 0.96rem;
   }
 
   .logo[data-size="small"] .mark {
-    width: 34px;
-    height: 34px;
+    width: 36px;
+    height: 36px;
   }
 
   .logo[data-size="small"] .wordmark {
-    font-size: 0.86rem;
+    font-size: 0.88rem;
   }
 }
 
 @media (max-width: 360px) {
   .logo {
-    gap: 7px;
+    gap: 8px;
   }
 
   .mark {
-    width: 34px;
-    height: 34px;
+    width: 38px;
+    height: 38px;
   }
 
   .wordmark {
-    font-size: 0.84rem;
+    font-size: 0.88rem;
   }
 }

@@ -92,24 +92,29 @@ jobs:
             echo "Public /api/health attempt $i -> HTTP $code"
             if [ "$code" = "200" ]; then
               landing_ok=false
-              logo_ok=false
+              header_ref_ok=false
+              logo_asset_ok=false
               icon_ok=false
 
-              if curl -fsS https://recruiter-radar.ru/ --max-time 30 | grep -q "Компания и контакты"; then
+              landing_html=$(curl -fsS https://recruiter-radar.ru/ --max-time 30 || true)
+              if printf '%s' "$landing_html" | grep -q "Компания и контакты"; then
                 landing_ok=true
               fi
-
-              if curl -fsS 'https://recruiter-radar.ru/brand/recruiter-radar-mark-brand12.svg' --max-time 30 | grep -q 'aria-label="Recruiter Radar exact uploaded mark"'; then
-                logo_ok=true
+              if printf '%s' "$landing_html" | grep -q "recruiter-radar-mark-brand13.svg"; then
+                header_ref_ok=true
               fi
 
-              if curl -fsS 'https://recruiter-radar.ru/icon.svg?v=brand-12' --max-time 30 | grep -q 'aria-label="Recruiter Radar exact uploaded tab icon"'; then
+              if curl -fsS 'https://recruiter-radar.ru/brand/recruiter-radar-mark-brand13.svg' --max-time 30 | grep -q 'aria-label="Recruiter Radar brand mark"'; then
+                logo_asset_ok=true
+              fi
+
+              if curl -fsS 'https://recruiter-radar.ru/icon.svg?v=brand-13' --max-time 30 | grep -q 'aria-label="Recruiter Radar tab icon"'; then
                 icon_ok=true
               fi
 
-              echo "landing_ok=$landing_ok logo_ok=$logo_ok icon_ok=$icon_ok"
-              if [ "$landing_ok" = "true" ] && [ "$logo_ok" = "true" ] && [ "$icon_ok" = "true" ]; then
-                echo "Public endpoint and exact transparent uploaded logo are live in header and tab"
+              echo "landing_ok=$landing_ok header_ref_ok=$header_ref_ok logo_asset_ok=$logo_asset_ok icon_ok=$icon_ok"
+              if [ "$landing_ok" = "true" ] && [ "$header_ref_ok" = "true" ] && [ "$logo_asset_ok" = "true" ] && [ "$icon_ok" = "true" ]; then
+                echo "Public endpoint, polished header logo, and premium tab icon are live"
                 exit 0
               fi
             fi
