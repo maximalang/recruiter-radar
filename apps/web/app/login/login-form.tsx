@@ -30,7 +30,7 @@ export default function LoginForm(props: { returnTo: string; initialEmail?: stri
           Если адрес указан верно, письмо уже в пути. Ссылка действует 15 минут. Проверьте также папку «Спам».
         </div>
       ) : null}
-      {state && !state.ok ? <div className={styles.error}>{state.error}</div> : null}
+      {state && !state.ok ? <div className={styles.error} role="alert">{state.error}</div> : null}
       <button className={styles.submit} type="submit" disabled={pending}>
         {pending ? "Отправляем…" : "Получить ссылку для входа"}
       </button>

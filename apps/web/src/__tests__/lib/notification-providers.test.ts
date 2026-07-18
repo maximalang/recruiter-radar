@@ -9,7 +9,6 @@ describe('notification webhook validation', () => {
   afterEach(() => {
     jest.restoreAllMocks();
   });
-
   it('accepts a public HTTPS endpoint', () => {
     expect(validateWebhookUrl('https://hooks.example.com/radar').hostname).toBe('hooks.example.com');
   });
@@ -26,6 +25,9 @@ describe('notification webhook validation', () => {
     'https://169.254.169.254/latest/meta-data',
     'https://localhost/hook',
     'http://service.internal/hook',
+    'https://[::1]/hook',
+    'https://[fd00::1]/hook',
+    'https://[::ffff:169.254.169.254]/latest/meta-data',
     'https://service.internal/hook',
   ])('rejects unsafe local or private endpoint %s', (url) => {
     expect(() => validateWebhookUrl(url)).toThrow();

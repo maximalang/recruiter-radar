@@ -325,6 +325,13 @@ function localWebhookAllowed(): boolean {
   return process.env.NODE_ENV !== "production";
 }
 
+function normalizeWebhookHostname(hostname: string): string {
+  const normalized = hostname.toLowerCase().replace(/\.$/, "");
+  return normalized.startsWith("[") && normalized.endsWith("]")
+    ? normalized.slice(1, -1)
+    : normalized;
+}
+
 export function validateWebhookUrl(raw: string): URL {
   let url: URL;
   try {
@@ -333,7 +340,7 @@ export function validateWebhookUrl(raw: string): URL {
     throw new Error("Webhook URL is invalid.");
   }
 
-  const hostname = url.hostname.toLowerCase().replace(/\.$/, "");
+  const hostname = normalizeWebhookHostname(url.hostname);
   const developmentHostname =
     hostname === "localhost" ||
     hostname.endsWith(".localhost");
@@ -359,7 +366,7 @@ export function validateWebhookUrl(raw: string): URL {
 
 async function assertPublicWebhookTarget(target: URL): Promise<void> {
   if (localWebhookAllowed()) return;
-  const hostname = target.hostname.toLowerCase().replace(/\.$/, "");
+  const hostname = normalizeWebhookHostname(target.hostname);
   const addresses = isIP(hostname)
     ? [{ address: hostname }]
     : await lookup(hostname, { all: true, verbatim: true });

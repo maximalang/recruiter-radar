@@ -31,7 +31,7 @@ try {
   };
 
   // Print results
-  console.log('=== SOURCE READINESS VERIFICATION ===');
+  console.log('=== SOURCE STRUCTURAL READINESS VERIFICATION ===');
   console.log(`Generated: ${new Date().toISOString()}\n`);
 
   // Registry integrity
@@ -114,12 +114,13 @@ try {
 
   console.log('=== OVERALL RESULT ===');
   if (allPassed) {
-    console.log('✅ Source readiness verification PASSED');
-    console.log('   All checks passed. Sources are ready for production use.');
+    console.log('✅ Source structural readiness verification PASSED');
+    console.log('   Registry, contracts, digest boundaries, HTTP usage, and actions are consistent.');
+    console.log('   Run verify-source-readiness.mjs with live-config gates before claiming production readiness.');
     process.exit(0);
   } else {
-    console.log('❌ Source readiness verification FAILED');
-    console.log('   Issues found that must be resolved before production.');
+    console.log('❌ Source structural readiness verification FAILED');
+    console.log('   Registry or contract issues must be resolved before live validation.');
     process.exit(1);
   }
 } catch (error) {
@@ -222,7 +223,11 @@ function checkDigestBoundaries(sources) {
   });
 
   // Verify no non-digest sources are in active digest
-  const expectedDigestSources = ['hh', 'career-pages'];
+  // Keep this allowlist deliberately explicit: promotion is a production
+  // decision, not something inferred from a source being runnable. Rabota
+  // Rossii cleared its recorded live confidence gate on 2026-06-23, while
+  // SuperJob and Habr Career still have provider/legal confidence blockers.
+  const expectedDigestSources = ['hh', 'rabota-rossii', 'career-pages'];
   activeDigest.forEach(id => {
     if (!expectedDigestSources.includes(id)) {
       issues.push(`${id} should not be in digest with current promotionStatus`);

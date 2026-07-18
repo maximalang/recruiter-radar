@@ -101,7 +101,7 @@ WITH source_signal_rows AS (
     -- flag is also the clean seam that keeps context rows out of the
     -- hiring-metric aggregates (vacancies_count, evidence_titles,
     -- latest_published_at) while still letting them count toward source_families.
-    (signal.source IN ('funding-business-signals', 'fedresurs', 'transparent-business-fns', 'egrul-fns', 'company-site')) AS is_context_evidence
+    (signal.source IN ('funding-business-signals', 'fedresurs', 'transparent-business-fns', 'egrul-fns', 'company-site', 'company-newsrooms', 'industry-media')) AS is_context_evidence
   FROM signals AS signal
   WHERE
     (
@@ -113,7 +113,8 @@ WITH source_signal_rows AS (
     OR
     (
       -- РФ context/corroboration sources: funding (GDELT), fedresurs corporate
-      -- events, FNS transparent-business, EGRUL registry, and company-site
+      -- events, FNS transparent-business, EGRUL registry, company-site,
+      -- curated company newsrooms, and reviewed industry-media records
       -- corporate-surface pages. These corroborate an existing lead's org
       -- identity (INN/OGRN/domain via corroboration_key) and add evidence + a
       -- contact surface, but their evidence_quality is forced to
@@ -122,7 +123,7 @@ WITH source_signal_rows AS (
       -- signal_type ('other' or 'funding') so job_posting-only filters above
       -- stay the originator gate.
       signal.signal_type IN ('other', 'funding')
-        AND signal.source IN ('funding-business-signals', 'fedresurs', 'transparent-business-fns', 'egrul-fns', 'company-site')
+        AND signal.source IN ('funding-business-signals', 'fedresurs', 'transparent-business-fns', 'egrul-fns', 'company-site', 'company-newsrooms', 'industry-media')
     )
 ),
 -- org_corroboration_keys: map each org_id to a canonical cross-source
@@ -261,7 +262,7 @@ normalized_signal_rows AS (
     -- enrichment_context    — no match found; signal provides background context only.
     --
     -- Gate D guard (is_context_evidence FIRST): a РФ context/corroboration source
-    -- (funding/fedresurs/transparent-business-fns/egrul-fns/company-site) writes
+    -- (funding/fedresurs/FNS/EGRUL/company-site/newsrooms/industry-media) writes
     -- its OWN org_source_refs during ingest, so the source_ref LATERAL below
     -- would find a matched_by and classify it as 'platform_aggregation' — which
     -- would let context-only rows originate a Gate-C lead and violate Gate D.

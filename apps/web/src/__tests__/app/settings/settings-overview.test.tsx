@@ -24,4 +24,19 @@ describe("SettingsOverview", () => {
     expect(screen.getByRole("link", { name: /Изменить профиль/ })).toHaveAttribute("href", "/profile#agency");
     expect(screen.getByRole("link", { name: /Настроить каналы/ })).toHaveAttribute("href", "/profile#delivery");
   });
+  it("does not claim delivery is ready when no channel is connected", () => {
+    render(
+      <SettingsOverview
+        agencyName="Команда"
+        completionPercent={50}
+        deliveryEnabled
+        deliverySchedule="Каждый день, 09:00"
+        telegramConnected={false}
+        emailEnabled={false}
+        webPushEnabled={false}
+      />,
+    );
+
+    expect(screen.getByText("Доставка ожидает канал")).toBeInTheDocument();
+  });
 });

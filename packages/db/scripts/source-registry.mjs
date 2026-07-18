@@ -157,7 +157,7 @@ const sourceReadinessPolicy = Object.freeze({
     productionBlockers: [
       'SUPERJOB_API_APP_ID or compliant provider snapshot is required; anonymous API is not a production path.',
     ],
-    promotionStatus: 'digest-allowed',
+    promotionStatus: 'blocked-from-digest-pending-confidence-tests',
   }),
   'habr-career': sourcePolicy({
     priority: 'P2',
@@ -166,7 +166,7 @@ const sourceReadinessPolicy = Object.freeze({
     productionBlockers: [
       'Robots/legal review of career.habr.com direct HTML access is in progress; live-public stays out of digest until that review signs off and confidence tests pass.',
     ],
-    promotionStatus: 'digest-allowed',
+    promotionStatus: 'blocked-from-digest-pending-confidence-tests',
   }),
   'company-newsrooms': sourcePolicy({
     priority: 'P3',
@@ -538,6 +538,10 @@ registerRunnableScriptSource({
 
 export function listSources() {
   return [...registry.values()];
+}
+
+export function listPrimaryIngestionSourceIds() {
+  return [...PRIMARY_INGESTION_SOURCES];
 }
 
 export function getSource(sourceId) {

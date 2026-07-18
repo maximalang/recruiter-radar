@@ -1,13 +1,12 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function LiveClock() {
   const [currentTime, setCurrentTime] = useState(new Date());
-  const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
-    let intervalId: ReturnType<typeof setInterval> | null = null;
+    let timerId: ReturnType<typeof setTimeout> | null = null;
 
     const tick = () => {
       if (!document.hidden) {
@@ -15,52 +14,38 @@ export default function LiveClock() {
       }
     };
 
-    const scheduleNext = () => {
-      if (document.hidden) {
-        intervalId = setInterval(() => {
-          if (!document.hidden) {
-            tick();
-            startActiveLoop();
-          }
-        }, 1000);
+    const clearScheduledTick = () => {
+      if (timerId !== null) {
+        clearTimeout(timerId);
+        timerId = null;
       }
     };
 
-    const startActiveLoop = () => {
-      tick();
-      rafRef.current = requestAnimationFrame(() => {
-        const now = Date.now();
-        const delay = 1000 - (now % 1000);
-        intervalId = setTimeout(() => {
-          tick();
-          if (!document.hidden) {
-            startActiveLoop();
-          } else {
-            scheduleNext();
-          }
-        }, delay);
-      });
+    const scheduleNextTick = () => {
+      if (document.hidden) return;
+
+      const delay = 1000 - (Date.now() % 1000);
+      timerId = setTimeout(() => {
+        tick();
+        scheduleNextTick();
+      }, delay);
     };
 
     const onVisibilityChange = () => {
-      if (!document.hidden) {
-        tick();
-        startActiveLoop();
-      }
+      clearScheduledTick();
+      if (document.hidden) return;
+
+      tick();
+      scheduleNextTick();
     };
 
     document.addEventListener('visibilitychange', onVisibilityChange);
-    startActiveLoop();
+    tick();
+    scheduleNextTick();
 
     return () => {
       document.removeEventListener('visibilitychange', onVisibilityChange);
-      if (rafRef.current !== null) {
-        cancelAnimationFrame(rafRef.current);
-      }
-      if (intervalId !== null) {
-        clearTimeout(intervalId);
-        clearInterval(intervalId);
-      }
+      clearScheduledTick();
     };
   }, []);
 

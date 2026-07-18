@@ -13,6 +13,7 @@ export type SourceId =
   | 'hh'
   | 'superjob'
   | 'habr-career'
+  | 'linkedin-company-pages'
   | 'career-pages'
   | 'egrul-fns'
   | 'rabota-rossii'
@@ -22,6 +23,8 @@ export type SourceId =
   | 'funding-business-signals'
   | 'fedresurs'
   | 'transparent-business-fns'
+  | 'company-newsrooms'
+  | 'industry-media'
 
 export interface SourceConfig {
   /** Unique identifier used in API calls, DB, and n8n workflows. */
@@ -41,7 +44,7 @@ export interface SourceConfig {
   /** Whether this source is a primary source (included in daily-radar pipeline). */
   isPrimary: boolean
   /** Source category for routing and filtering. */
-  category: 'job-board' | 'career-page' | 'registry'
+  category: 'job-board' | 'career-page' | 'registry' | 'professional-network' | 'business-signal'
   /**
    * Per-source execFile timeout in ms for ingestSource(). When omitted, the
    * default 120s applies. Set this only for sources that legitimately need more
@@ -80,7 +83,9 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     name: 'SuperJob',
     description: 'Secondary Russian job board',
     script: 'source-superjob.mjs',
-    requiredEnvVars: ['SUPERJOB_API_KEY'],
+    // No single variable is universally required: file mode needs only
+    // SUPERJOB_INPUT_FILE, while provider/live modes use SUPERJOB_API_APP_ID.
+    requiredEnvVars: [],
     envPrefixes: ['SUPERJOB_'],
     searchEnvVars: [
       'SUPERJOB_KEYWORD', 'SUPERJOB_PER_PAGE', 'SUPERJOB_PAGES',
@@ -116,6 +121,20 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     // in logs were lost), so habr-career silently produced no signals from the
     // cron despite a successful fetch. 240s matches the career-pages precedent.
     timeoutMs: 240_000,
+  },
+  {
+    id: 'linkedin-company-pages',
+    name: 'LinkedIn company pages',
+    description: 'Compliant company-page snapshots used as confidence-gated employer evidence',
+    script: 'source-linkedin-company-pages.mjs',
+    requiredEnvVars: [],
+    envPrefixes: ['LINKEDIN_'],
+    searchEnvVars: [],
+    // Provider/file snapshots only. Personal profile, employee, email, and
+    // phone fields are rejected by the adapter, and the source remains outside
+    // the automatic daily pipeline until its confidence gates are promoted.
+    isPrimary: false,
+    category: 'professional-network',
   },
   {
     id: 'career-pages',
@@ -158,7 +177,7 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     description: 'Russian company registry data',
     script: 'source-egrul-fns.mjs',
     requiredEnvVars: [],
-    envPrefixes: ['SOURCE_'],
+    envPrefixes: ['EGRUL_FNS_'],
     searchEnvVars: [],
     isPrimary: false,
     category: 'registry',
@@ -177,6 +196,17 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     // its own. Kept out of the daily-radar auto-run so it doesn't add ambient noise
     // or volume without direct hiring proof; the operator runs it on demand from the
     // admin panel to enrich the org/contact surface for an existing candidate set.
+    isPrimary: false,
+    category: 'career-page',
+  },
+  {
+    id: 'company-newsrooms',
+    name: 'Company newsrooms',
+    description: 'Curated company newsroom context that can corroborate, but never originate, a lead',
+    script: 'source-company-newsrooms.mjs',
+    requiredEnvVars: [],
+    envPrefixes: ['COMPANY_NEWSROOMS_'],
+    searchEnvVars: [],
     isPrimary: false,
     category: 'career-page',
   },
@@ -246,6 +276,17 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     // job_posting lead (that would be a digest-SQL change — deferred).
     isPrimary: false,
     category: 'registry',
+  },
+  {
+    id: 'industry-media',
+    name: 'Industry media',
+    description: 'Curated industry-media events used as supporting context only',
+    script: 'source-industry-media.mjs',
+    requiredEnvVars: [],
+    envPrefixes: ['INDUSTRY_MEDIA_'],
+    searchEnvVars: [],
+    isPrimary: false,
+    category: 'business-signal',
   },
   {
     id: 'fedresurs',
