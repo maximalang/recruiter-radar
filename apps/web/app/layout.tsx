@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Inter } from "next/font/google";
 
+import favicon from "../public/favicon-brand19.png";
 import { PushReadinessBoot } from "./push-readiness-boot";
 import "./globals.css";
 
@@ -14,18 +15,18 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Recruiter Radar",
   description: "Ежедневный радар по компаниям с активным наймом для рекрутеров и агентств.",
-  manifest: "/manifest.webmanifest?v=brand-19",
+  manifest: "/manifest.webmanifest?v=brand-21",
   applicationName: "Recruiter Radar",
   icons: {
     icon: [
       {
-        url: "/favicon-brand19.png?v=brand-19",
+        url: favicon.src,
         type: "image/png",
         sizes: "64x64",
       },
     ],
-    shortcut: "/favicon-brand19.png?v=brand-19",
-    apple: "/favicon-brand19.png?v=brand-19",
+    shortcut: favicon.src,
+    apple: favicon.src,
   },
   appleWebApp: {
     capable: true,

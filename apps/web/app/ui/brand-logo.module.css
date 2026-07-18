@@ -1,9 +1,18 @@
 .logo {
   display: inline-flex;
   align-items: center;
+  gap: 0.62rem;
   min-width: 0;
   color: #0b1730;
   line-height: 1;
+}
+
+.mark {
+  display: block;
+  flex: 0 0 auto;
+  width: 2.25rem;
+  height: 2.25rem;
+  object-fit: contain;
 }
 
 .wordmark {
@@ -38,11 +47,25 @@
   -webkit-text-fill-color: transparent;
 }
 
+.logo[data-size="small"] {
+  gap: 0.5rem;
+}
+
+.logo[data-size="small"] .mark {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
 .logo[data-size="small"] .wordmark {
   font-size: 0.95rem;
 }
 
 @media (max-width: 480px) {
+  .mark {
+    width: 2rem;
+    height: 2rem;
+  }
+
   .wordmark {
     font-size: 0.98rem;
   }
@@ -53,6 +76,15 @@
 }
 
 @media (max-width: 360px) {
+  .logo {
+    gap: 0.48rem;
+  }
+
+  .mark {
+    width: 1.8rem;
+    height: 1.8rem;
+  }
+
   .wordmark {
     font-size: 0.9rem;
   }
