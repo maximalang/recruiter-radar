@@ -54,10 +54,17 @@ describe('GET /api/sources/status', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(Array.isArray(body.sources)).toBe(true);
-    expect(body.summary.total).toBeGreaterThan(0);
+    expect(body.summary.total).toBe(15);
     const cp = body.sources.find((s: { id: string }) => s.id === 'career-pages');
     expect(cp.health.recordsLast24h).toBe(5);
     expect(cp.isPrimary).toBe(true);
+    for (const contextSourceId of ['company-newsrooms', 'industry-media', 'linkedin-company-pages']) {
+      const source = body.sources.find((item: { id: string }) => item.id === contextSourceId);
+      expect(source).toBeDefined();
+      expect(source.isPrimary).toBe(false);
+    }
+    const superjob = body.sources.find((item: { id: string }) => item.id === 'superjob');
+    expect(superjob.requiredEnvVars).toEqual([]);
   });
 
   it('still returns registry when health computation fails', async () => {

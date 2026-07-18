@@ -2,13 +2,15 @@ import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 
 import { SOURCE_ACTIONS } from './source-contract.mjs';
-import { listSources } from './source-registry.mjs';
+import { listPrimaryIngestionSourceIds, listSources } from './source-registry.mjs';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, '../../..');
 const sourceScriptsDir = resolve(repoRoot, 'packages/db/scripts');
+const webSourceRegistryPath = resolve(repoRoot, 'apps/web/lib/sources/source-registry.ts');
 const expectedSources = [
   'hh',
   'rabota-rossii',
@@ -41,6 +43,15 @@ const digestLeadSources = [
   'tech-job-boards',
   'linkedin-company-pages',
   'regional-job-boards',
+];
+const digestContextSources = [
+  'funding-business-signals',
+  'fedresurs',
+  'transparent-business-fns',
+  'egrul-fns',
+  'company-site',
+  'company-newsrooms',
+  'industry-media',
 ];
 const providerTokenSources = [
   'linkedin-company-pages',
@@ -125,8 +136,20 @@ const liveConfigRules = {
 
 const sources = listSources();
 const sourceIds = sources.map((source) => source.id).sort();
+const webSources = readWebSourceRegistry(webSourceRegistryPath);
+const webSourceIds = webSources.map((source) => source.id).sort();
 
 assert.deepEqual(sourceIds, [...expectedSources].sort(), 'source registry must contain exactly the supported source families');
+assert.deepEqual(
+  webSourceIds,
+  sourceIds,
+  'web and DB source registries must contain the same source families',
+);
+assert.deepEqual(
+  webSources.filter((source) => source.isPrimary).map((source) => source.id).sort(),
+  listPrimaryIngestionSourceIds().sort(),
+  'web and DB source registries must select the same primary ingestion sources',
+);
 
 for (const source of sources) {
   assert.equal(source.status, 'active', `${source.id} must be active`);
@@ -167,8 +190,13 @@ for (const sourceId of providerTokenSources) {
 }
 
 const digestSql = readFileSync(resolve(sourceScriptsDir, 'source-digest-evidence.sql'), 'utf8');
-const digestSourceMatch = digestSql.match(/signal\.source\s+IN\s*\(([^)]*)\)/i);
-assert.ok(digestSourceMatch, 'source-digest-evidence.sql must have an explicit source allow-list');
+const digestSourceMatch = digestSql.match(
+  /signal\.signal_type\s*=\s*'job_posting'[\s\S]{0,240}?signal\.source\s+IN\s*\(([^)]*)\)/i,
+);
+assert.ok(
+  digestSourceMatch,
+  'source-digest-evidence.sql must have an explicit job_posting source allow-list',
+);
 
 const digestSources = [...digestSourceMatch[1].matchAll(/'([^']+)'/g)]
   .map((match) => match[1])
@@ -177,6 +205,22 @@ assert.deepEqual(
   digestSources,
   [...digestLeadSources].sort(),
   'digest lead selection must stay limited to lead-originating sources',
+);
+
+const digestContextMatch = digestSql.match(
+  /signal\.signal_type\s+IN\s*\(\s*'other'\s*,\s*'funding'\s*\)[\s\S]{0,240}?signal\.source\s+IN\s*\(([^)]*)\)/i,
+);
+assert.ok(
+  digestContextMatch,
+  'source-digest-evidence.sql must have an explicit context source allow-list',
+);
+const digestContextSourceIds = [...digestContextMatch[1].matchAll(/'([^']+)'/g)]
+  .map((match) => match[1])
+  .sort();
+assert.deepEqual(
+  digestContextSourceIds,
+  [...digestContextSources].sort(),
+  'digest context selection must contain every approved context-only source',
 );
 
 const directFetchCallers = findMjsFiles(sourceScriptsDir)
@@ -229,6 +273,7 @@ console.log(JSON.stringify({
   sources: expectedSources.length,
   liveCapableSources: sources.filter((source) => source.liveCapable).length,
   digestLeadSources,
+  digestContextSources,
   providerTokenSources,
   liveConfigRequired: requireLiveConfig,
   providerConfigRequired: includeProviderRequired,
@@ -286,4 +331,52 @@ function findMjsFiles(dirPath) {
 
 function hasEnvValue(envName) {
   return typeof process.env[envName] === 'string' && process.env[envName].trim() !== '';
+}
+
+function readWebSourceRegistry(filePath) {
+  const sourceFile = ts.createSourceFile(
+    filePath,
+    readFileSync(filePath, 'utf8'),
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS,
+  );
+  const registryDeclaration = sourceFile.statements
+    .filter(ts.isVariableStatement)
+    .flatMap((statement) => statement.declarationList.declarations)
+    .find((declaration) => ts.isIdentifier(declaration.name) && declaration.name.text === 'SOURCE_REGISTRY');
+
+  assert.ok(
+    registryDeclaration?.initializer && ts.isArrayLiteralExpression(registryDeclaration.initializer),
+    'web SOURCE_REGISTRY must be an array literal',
+  );
+
+  return registryDeclaration.initializer.elements.map((element) => {
+    assert.ok(ts.isObjectLiteralExpression(element), 'web SOURCE_REGISTRY entries must be object literals');
+    const idProperty = element.properties.find((property) => (
+      ts.isPropertyAssignment(property)
+      && ts.isIdentifier(property.name)
+      && property.name.text === 'id'
+    ));
+    assert.ok(
+      idProperty && ts.isPropertyAssignment(idProperty) && ts.isStringLiteral(idProperty.initializer),
+      'every web SOURCE_REGISTRY entry must have a string id',
+    );
+    const primaryProperty = element.properties.find((property) => (
+      ts.isPropertyAssignment(property)
+      && ts.isIdentifier(property.name)
+      && property.name.text === 'isPrimary'
+    ));
+    assert.ok(
+      primaryProperty
+        && ts.isPropertyAssignment(primaryProperty)
+        && (primaryProperty.initializer.kind === ts.SyntaxKind.TrueKeyword
+          || primaryProperty.initializer.kind === ts.SyntaxKind.FalseKeyword),
+      `web SOURCE_REGISTRY entry ${idProperty.initializer.text} must have a boolean isPrimary`,
+    );
+    return {
+      id: idProperty.initializer.text,
+      isPrimary: primaryProperty.initializer.kind === ts.SyntaxKind.TrueKeyword,
+    };
+  });
 }

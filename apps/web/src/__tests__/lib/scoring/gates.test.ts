@@ -20,12 +20,28 @@ describe('selectConfidenceGate', () => {
     expect(gate).toBe('A')
   })
 
+  it('does not promote duplicate direct evidence from one source family to A', () => {
+    const gate = selectConfidenceGate({
+      evidence: [direct('career-page'), direct('career-page')],
+      entityMatch: 'clean',
+    })
+    expect(gate).toBe('B')
+  })
+
   it('returns A when one direct and one corroboration with clean match', () => {
     const gate = selectConfidenceGate({
       evidence: [direct('career-page'), corroboration('hh')],
       entityMatch: 'clean',
     })
     expect(gate).toBe('A')
+  })
+
+  it('does not treat direct and corroboration records from one source family as independent', () => {
+    const gate = selectConfidenceGate({
+      evidence: [direct('career-page'), corroboration('career-page')],
+      entityMatch: 'clean',
+    })
+    expect(gate).toBe('B')
   })
 
   it('returns B with single direct evidence and enrichment, clean match', () => {

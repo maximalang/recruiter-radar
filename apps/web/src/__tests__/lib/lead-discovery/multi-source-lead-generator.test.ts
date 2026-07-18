@@ -25,7 +25,11 @@ jest.mock('@/lib/db', () => ({
   getPool: jest.fn(),
 }))
 
-import { MultiSourceLeadGenerator } from '@/lib/lead-discovery/multi-source-lead-generator'
+import {
+  MultiSourceLeadGenerator,
+  sourceIdToEvidenceType,
+} from '@/lib/lead-discovery/multi-source-lead-generator'
+import type { MultiSourceLead } from '@/lib/lead-discovery/multi-source-lead-generator'
 import type { CrawlerRouter } from '@/lib/sources/crawlers'
 import { getPool } from '@/lib/db'
 
@@ -118,6 +122,52 @@ describe('MultiSourceLeadGenerator', () => {
     })
   })
 
+  describe('source evidence policy', () => {
+    it('keeps supporting and unknown sources out of corroboration-based promotion', () => {
+      expect(sourceIdToEvidenceType('company-site')).toBe('news')
+      expect(sourceIdToEvidenceType('unregistered-source')).toBe('news')
+      expect(sourceIdToEvidenceType('fedresurs')).toBe('registry')
+    })
+  })
+
+  describe('deduplication', () => {
+    it('merges different org fragments when they carry the same valid INN', async () => {
+      const fromHh = {
+        id: 'lead-hh',
+        companyId: 'org-hh-fragment',
+        companyName: 'ООО ТехКорп',
+        inn: '7701234567',
+        score: 2.3,
+        confidence: 'B',
+        sources: [{
+          sourceId: 'hh', sourceName: 'HeadHunter', evidenceType: 'vacancy',
+          confidence: 0.74, extractedAt: new Date(), relevanceScore: 0.8,
+        }],
+        signals: [], nextAction: 'Review hiring', reasons: [], detectedAt: new Date(), enrichment: {},
+      } as MultiSourceLead
+      const fromRegistry = {
+        id: 'lead-registry',
+        companyId: 'org-registry-fragment',
+        companyName: 'ТехКорп',
+        inn: '7701234567',
+        score: 2.1,
+        confidence: 'C',
+        sources: [{
+          sourceId: 'egrul-fns', sourceName: 'EGRUL/FNS', evidenceType: 'registry',
+          confidence: 0.9, extractedAt: new Date(), relevanceScore: 0.8,
+        }],
+        signals: [], nextAction: 'Review entity', reasons: [], detectedAt: new Date(), enrichment: {},
+      } as MultiSourceLead
+
+      const leads = await generator['deduplicateLeads']([fromHh, fromRegistry])
+
+      expect(leads).toHaveLength(1)
+      expect(leads[0].sources.map((source) => source.sourceId)).toEqual(
+        expect.arrayContaining(['hh', 'egrul-fns']),
+      )
+    })
+  })
+
   describe('getActiveSources', () => {
     it('should filter out non-eligible sources', () => {
       const activeSources = generator['activeSources']
@@ -125,7 +175,8 @@ describe('MultiSourceLeadGenerator', () => {
       expect(activeSources).toContain('hh')
       expect(activeSources).toContain('career-pages')
       expect(activeSources).toContain('linkedin-company-pages') // P2 secondary source
-      expect(activeSources).not.toContain('egrul-fns') // P3 enrichment-only is excluded
+      expect(activeSources).toContain('egrul-fns') // enrichment runs by default for lead quality
+      expect(activeSources).not.toContain('company-site') // no generator step owns generic company-site crawling
     })
   })
 
@@ -160,6 +211,12 @@ describe('MultiSourceLeadGenerator', () => {
       })
     })
 
+    it('filters out leads outside the requested Russian regions', async () => {
+      const leads = await generator.generateLeads({ regions: ['Екатеринбург'] })
+
+      expect(leads).toEqual([])
+    })
+
     it('should limit sources when specified', async () => {
       const leads = await generator.generateLeads({
         sources: ['hh', 'career-pages']
@@ -169,6 +226,29 @@ describe('MultiSourceLeadGenerator', () => {
         const sourceIds = lead.sources.map(s => s.sourceId)
         expect(sourceIds).toEqual(expect.arrayContaining(['hh']))
       })
+    })
+
+    it('does not return job-board candidates when no job-board source was selected', async () => {
+      const leads = await generator.generateLeads({
+        sources: ['career-pages'],
+      })
+
+      expect(leads).toEqual([])
+    })
+
+    it('keeps supporting evidence when a selected job-board source originated the candidate', async () => {
+      mockGetHhDigestItems.mockResolvedValue([{
+        ...SAMPLE_DIGEST_ITEMS[0],
+        source_families: ['hh', 'fedresurs'],
+      }])
+
+      const leads = await generator.generateLeads({ sources: ['hh'] })
+
+      expect(leads).toHaveLength(1)
+      expect(leads[0].sources).toEqual(expect.arrayContaining([
+        expect.objectContaining({ sourceId: 'hh' }),
+        expect.objectContaining({ sourceId: 'fedresurs', confidence: 0.62 }),
+      ]))
     })
 
     it('should return empty array when no digest items found', async () => {

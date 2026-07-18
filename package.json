@@ -97,6 +97,8 @@
     "verify:mixed-ranking": "node packages/db/scripts/verify-mixed-ranking-smoke.mjs",
     "verify:rf-context:corroboration": "node packages/db/scripts/verify-rf-context-corroboration-smoke.mjs",
     "verify:sources:readiness": "node packages/db/scripts/verify-sources-readiness.mjs",
+    "verify:source:readiness": "node packages/db/scripts/verify-source-readiness.mjs",
+    "verify:source:readiness:live": "node packages/db/scripts/verify-source-readiness.mjs --require-live-config --include-provider-required",
     "verify:sources:live-config": "node packages/db/scripts/verify-sources-live-config.mjs",
     "verify:sources:coverage": "node packages/db/scripts/verify-sources-coverage.mjs",
     "verify:smoke": "node packages/db/scripts/verify-smoke.mjs",

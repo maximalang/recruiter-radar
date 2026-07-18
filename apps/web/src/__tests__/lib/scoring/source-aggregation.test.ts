@@ -56,6 +56,17 @@ describe('aggregateSourceSignals', () => {
       expect(careerOnly.weight).toBeGreaterThan(hhOnly.weight)
     })
 
+    it('uses the canonical career-pages source id rather than the unknown-source fallback', () => {
+      const careerPages = aggregateSourceSignals([
+        { source: 'career-pages', tier: 'direct', fetchedAt: '2026-05-25T00:00:00Z' },
+      ])
+      const unknown = aggregateSourceSignals([
+        { source: 'unregistered-source', tier: 'direct', fetchedAt: '2026-05-25T00:00:00Z' },
+      ])
+
+      expect(careerPages.weight).toBeGreaterThan(unknown.weight)
+    })
+
     it('hh direct outweighs rabota_rossii corroboration', () => {
       const hhOnly = aggregateSourceSignals([hh])
       const rrOnly = aggregateSourceSignals([rabotaRossii])

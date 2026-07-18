@@ -25,8 +25,17 @@ export interface ConfidenceGateInput {
 }
 
 export function selectConfidenceGate(input: ConfidenceGateInput): ConfidenceGate {
-  const direct = input.evidence.filter((e) => e.tier === 'direct').length
-  const corroboration = input.evidence.filter((e) => e.tier === 'corroboration').length
+  const directSources = new Set(
+    input.evidence.filter((e) => e.tier === 'direct').map((e) => e.source),
+  )
+  const corroborationSources = new Set(
+    input.evidence.filter((e) => e.tier === 'corroboration').map((e) => e.source),
+  )
+  const direct = directSources.size
+  const corroboration = corroborationSources.size
+  const hasIndependentCorroboration = [...corroborationSources].some(
+    (source) => !directSources.has(source),
+  )
 
   if (direct === 0 && corroboration === 0) return 'D'
 
@@ -34,7 +43,7 @@ export function selectConfidenceGate(input: ConfidenceGateInput): ConfidenceGate
 
   if (direct === 0) return 'C'
 
-  if (direct >= 2 || (direct >= 1 && corroboration >= 1)) return 'A'
+  if (direct >= 2 || (direct >= 1 && hasIndependentCorroboration)) return 'A'
 
   return 'B'
 }
