@@ -83,7 +83,7 @@ jobs:
           exit 1
           SSH_EOF
 
-      - name: Verify public HTTPS endpoint and native favicon
+      - name: Verify public HTTPS endpoint and embedded favicon
         run: |
           # Retry loop: Caddy may briefly 502 while the recreated web container
           # finishes booting (Next.js ready ~2-4s after container health passes).
@@ -103,22 +103,14 @@ jobs:
                 && printf '%s' "$landing_html" | grep -q 'data-logo-mark="inline"'; then
                 inline_logo_ok=true
               fi
-
-              favicon_href=$(printf '%s' "$landing_html" \
-                | grep -oE 'href="/icon[^\"]*"' \
-                | head -n 1 \
-                | cut -d'"' -f2 \
-                | sed 's/&amp;/\&/g' || true)
-              echo "favicon_href=$favicon_href"
-              if [ -n "$favicon_href" ] \
-                && curl -fsSL "https://recruiter-radar.ru${favicon_href}" --max-time 30 -o /tmp/recruiter-radar-favicon \
-                && file /tmp/recruiter-radar-favicon | grep -q 'PNG image data'; then
+              if printf '%s' "$landing_html" \
+                | grep -q 'rel="icon"[^>]*href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAM'; then
                 favicon_ok=true
               fi
 
               echo "landing_ok=$landing_ok inline_logo_ok=$inline_logo_ok favicon_ok=$favicon_ok"
               if [ "$landing_ok" = "true" ] && [ "$inline_logo_ok" = "true" ] && [ "$favicon_ok" = "true" ]; then
-                echo "Public endpoint, inline logo, and native Next favicon are live"
+                echo "Public endpoint, inline logo, and embedded favicon are live"
                 exit 0
               fi
             fi
