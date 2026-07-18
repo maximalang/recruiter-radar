@@ -377,6 +377,26 @@
   text-transform: uppercase;
 }
 
+/* Accent eyebrow variant — a brand-tinted label with a leading dot. Used on the
+   landing only (SectionIntro accent prop). Legal/privacy/terms/checkout keep
+   the plain .sectionEyebrow above, so this never changes those pages. */
+.sectionEyebrowAccent {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  color: var(--c-brand);
+}
+
+.sectionEyebrowAccent::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--c-brand);
+  box-shadow: 0 0 0 4px rgba(29, 78, 216, 0.1);
+}
+
 /* Section title */
 .sectionTitle {
   margin: 0;

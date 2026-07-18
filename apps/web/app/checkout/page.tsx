@@ -6,6 +6,7 @@ import { getAccountById } from "@/lib/account-auth";
 import { startCheckoutOrder } from "@/lib/payments";
 import {
   buildCheckoutHref,
+  buildPublicPreviewHref,
   getPublicPlanByCode,
   readCheckoutPlanCode,
   readPublicPreviewInput,
@@ -37,18 +38,19 @@ export default async function CheckoutPage(props: {
   const input = readPublicPreviewInput(searchParams);
   const planCode = readCheckoutPlanCode(searchParams);
   const plan = getPublicPlanByCode(planCode);
-  const restartHref = buildCheckoutHref({ ...input, planCode });
-  const loginHref = `/login?returnTo=${encodeURIComponent(restartHref)}`;
+  const checkoutHref = buildCheckoutHref({ ...input, planCode });
+  const previewHref = buildPublicPreviewHref(input);
+  const loginHref = `/login?returnTo=${encodeURIComponent(checkoutHref)}`;
   const isRequest = plan.isRecurring;
   const account = await getAccountById(await readOwnerSession()).catch(() => null);
 
   async function startCheckoutAction(formData: FormData) {
     "use server";
     const currentAccount = await getAccountById(await readOwnerSession());
-    if (!currentAccount) redirect(`/login?returnTo=${encodeURIComponent(restartHref)}`);
+    if (!currentAccount) redirect(`/login?returnTo=${encodeURIComponent(checkoutHref)}`);
     const agencyNameValue = formData.get("agencyName");
     const agencyName = typeof agencyNameValue === "string" ? agencyNameValue.trim() : "";
-    if (!agencyName || agencyName.length > 160) redirect(`${restartHref}${restartHref.includes("?") ? "&" : "?"}error=agency`);
+    if (!agencyName || agencyName.length > 160) redirect(`${checkoutHref}${checkoutHref.includes("?") ? "&" : "?"}error=agency`);
 
     const result = await startCheckoutOrder({
       userId: currentAccount.id,
@@ -103,7 +105,7 @@ export default async function CheckoutPage(props: {
           )}
         </ContentCard>
 
-        <InternalBackLink href={restartHref}>Изменить параметры радара</InternalBackLink>
+        <InternalBackLink href={previewHref}>Изменить параметры радара</InternalBackLink>
       </div>
     </InternalPageFrame>
   );

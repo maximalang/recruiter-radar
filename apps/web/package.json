@@ -4,7 +4,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "node .next/standalone/server.js",
+    "prestart": "node scripts/prepare-standalone.mjs",
+    "start": "node .next/standalone/apps/web/server.js",
     "check": "tsc --noEmit",
     "test": "jest",
     "test:types": "tsc -p tsconfig.test.json --noEmit",

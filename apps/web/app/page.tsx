@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { getPaymentProviderSetupState } from "../lib/payments";
 import {
   PUBLIC_PLANS,
+  PUBLIC_PREVIEW_FIELD_LIMITS,
   buildCheckoutHref,
   getPublicSampleDigestState,
   hasPublicPreviewInput,
@@ -183,6 +184,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       {/* Principles / value row */}
       <ScrollReveal as="section" className={hpStyles.scrollSection}>
         <SectionIntro
+          accent
           eyebrow="Что внутри"
           title="От сигнала к следующему действию"
           description="Карточка отвечает на три вопроса: что изменилось, почему этому можно доверять и как корректно выйти на компанию."
@@ -206,6 +208,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       {/* Problem — why this radar exists */}
       <ScrollReveal as="section" className={hpStyles.scrollSection}>
         <SectionIntro
+          accent
           eyebrow="Проблема"
           title="Вакансии есть. Приоритета нет."
           description="Радар показывает не вакансии, а компании, которым стоит написать первыми — с доказательствами и поводом для контакта."
@@ -232,26 +235,38 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       {/* Live preview */}
       <ScrollReveal as="section" id="preview" className={hpStyles.scrollSection}>
         <SectionIntro
+          accent
           eyebrow="Пример результата"
           title="Так выглядит утренний радар"
-          description="Задайте город и специализацию — справа появится тот самый список, что утром приходит в Telegram."
+          description={previewState.isLive
+            ? "Задайте город и специализацию — справа появится тот самый список, что утром приходит в Telegram."
+            : "Задайте город и специализацию. Сейчас можно оценить структуру карточек; актуальная выдача появится здесь после восстановления источника."}
         />
 
         <div className={hpStyles.previewGrid}>
           <SurfaceCard className={hpStyles.previewCardContainer}>
             <div className={hpStyles.previewCardHeading}>Параметры профиля</div>
 
-            <form method="GET" action="/" style={{ display: "grid", gap: "14px" }}>
+            <form method="GET" action="/#preview" style={{ display: "grid", gap: "14px" }}>
               <label htmlFor="specialization" className={ppStyles.field}>
                 <span className={ppStyles.fieldLabel}>Специализация</span>
                 <input
                   id="specialization"
                   name="specialization"
                   defaultValue={previewInput.specialization}
+                  maxLength={PUBLIC_PREVIEW_FIELD_LIMITS.specialization}
                   placeholder="Промышленный подбор / финансы C-level"
                   className={ppStyles.input}
                 />
               </label>
+
+              {previewInput.includeKeywords ? (
+                <input type="hidden" name="includeKeywords" value={previewInput.includeKeywords} />
+              ) : null}
+              {previewInput.excludeKeywords ? (
+                <input type="hidden" name="excludeKeywords" value={previewInput.excludeKeywords} />
+              ) : null}
+              <input type="hidden" name="dailyDigestLimit" value={previewInput.dailyDigestLimit} />
 
               <label htmlFor="targetCity" className={ppStyles.field}>
                 <span className={ppStyles.fieldLabel}>География</span>
@@ -259,6 +274,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                   id="targetCity"
                   name="targetCity"
                   defaultValue={previewInput.targetCity}
+                  maxLength={PUBLIC_PREVIEW_FIELD_LIMITS.targetCity}
                   placeholder="Москва / удалённо"
                   className={ppStyles.input}
                 />
@@ -270,7 +286,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                 </button>
 
                 {hasPreview ? (
-                  <Link href="/" className={ppStyles.secondaryAction}>
+                  <Link href="/#preview" className={ppStyles.secondaryAction}>
                     Сбросить
                   </Link>
                 ) : null}
@@ -282,7 +298,11 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             <div>
               <div className={hpStyles.previewHeaderRow}>
                 <div className={hpStyles.previewCardHeading}>
-                  {hasPreview ? "Радар для вашего профиля" : "Как выглядит радар"}
+                  {previewState.isLive
+                    ? previewState.isPersonalized
+                      ? "Радар для вашего профиля"
+                      : "Как выглядит радар"
+                    : "Демо радара"}
                 </div>
                 <StatusBadge tone={previewState.isPersonalized ? "info" : "neutral"} style={{ justifySelf: "start" }}>
                   {previewState.isPersonalized
@@ -295,6 +315,14 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                 </StatusBadge>
               </div>
             </div>
+
+            {!previewState.isLive ? (
+              <NoticeBox
+                tone="neutral"
+                title="Показываем демо-карточки"
+                description="Актуальная выдача временно недоступна. Структура карточек, оценки и состав полей соответствуют реальному радару."
+              />
+            ) : null}
 
             {previewState.items.length === 0 ? (
               <NoticeBox
@@ -339,7 +367,11 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             )}
 
             <Link href={checkoutHref} className={ppStyles.primaryAction}>
-              {previewState.items.length > 0 ? "Получать такой радар каждое утро" : "Попробовать неделю"}
+              {!previewState.isLive
+                ? "Запустить актуальный радар"
+                : previewState.items.length > 0
+                  ? "Получать такой радар каждое утро"
+                  : "Попробовать неделю"}
             </Link>
           </SurfaceCard>
         </div>
@@ -348,6 +380,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       {/* How it works — the three-step flow */}
       <ScrollReveal as="section" className={hpStyles.scrollSection}>
         <SectionIntro
+          accent
           eyebrow="Как работает"
           title="Готовый список — каждое утро"
           description="Настраиваете профиль один раз. Дальше радар сам собирает и проверяет сигналы найма."
@@ -375,12 +408,15 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       {/* Signal anatomy — what a single lead card contains */}
       <ScrollReveal as="section" className={hpStyles.scrollSection}>
         <SectionIntro
+          accent
           eyebrow="Карточка лида"
           title="Почему компании стоит написать"
           description="Каждая рекомендация содержит факты, источники и конкретный следующий шаг — без выдуманных данных."
         />
         <p className={hpStyles.demoNote}>
-          Ниже — пример структуры карточки. Реальные компании, даты и источники приходят в радаре выше и в Telegram.
+          {previewState.isLive
+            ? "Ниже — пример структуры карточки. Реальные компании, даты и источники приходят в радаре выше и в Telegram."
+            : "Ниже — пример структуры карточки. В рабочем радаре компании, даты и источники берутся из актуальных открытых данных."}
         </p>
         <div className={hpStyles.signalLayout}>
           <div className={hpStyles.signalSide}>
@@ -422,6 +458,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       {/* Pricing — hierarchy: primary week plan, then secondary plans */}
       <ScrollReveal as="section" id="pricing" className={hpStyles.scrollSection}>
         <SectionIntro
+          accent
           eyebrow="Тарифы"
           title="Один радар — на неделю, месяц или квартал"
         />
@@ -486,8 +523,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                   </div>
                   <p className={hpStyles.planDescription}>{plan.description}</p>
                   <div className={hpStyles.planFeatureLine}>
-                    <b>Тот же функционал</b>
-                    <span>{isQuarterly ? "Самая низкая цена месяца" : "Более длительный период"}</span>
+                    <b>Подключение по заявке</b>
+                    <span>Без автоматического списания</span>
                   </div>
                   <Link
                     href={buildCheckoutHref({ ...previewInput, planCode: plan.code })}
@@ -518,6 +555,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       {/* FAQ */}
       <ScrollReveal as="section" id="faq" className={hpStyles.scrollSection}>
         <SectionIntro
+          accent
           eyebrow="Перед запуском"
           title="Коротко о порядке"
         />

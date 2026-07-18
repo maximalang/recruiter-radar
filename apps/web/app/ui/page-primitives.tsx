@@ -98,10 +98,21 @@ export function SectionIntro(props: {
   title: string;
   description?: ReactNode;
   style?: React.CSSProperties;
+  /** Brand-accent eyebrow variant: a brand-tinted label with a leading dot.
+   *  Used on the landing to give section heads a structured, premium read.
+   *  Default (false) keeps the minimal plain eyebrow used on legal/privacy/
+   *  terms/checkout — so existing pages are unchanged. */
+  accent?: boolean;
 }) {
   return (
     <div className={styles.sectionIntro} style={props.style}>
-      {props.eyebrow ? <div className={styles.sectionEyebrow}>{repairVisibleNode(props.eyebrow)}</div> : null}
+      {props.eyebrow ? (
+        <div
+          className={`${styles.sectionEyebrow}${props.accent ? ` ${styles.sectionEyebrowAccent}` : ""}`}
+        >
+          {repairVisibleNode(props.eyebrow)}
+        </div>
+      ) : null}
       <h2 className={styles.sectionTitle}>{repairVisibleNode(props.title)}</h2>
       {props.description ? <p className={styles.sectionDescription}>{repairVisibleNode(props.description)}</p> : null}
     </div>

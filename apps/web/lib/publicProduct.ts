@@ -47,6 +47,12 @@ export type PublicPreviewInput = {
   dailyDigestLimit: number
 }
 
+export const PUBLIC_PREVIEW_FIELD_LIMITS = {
+  specialization: 160,
+  targetCity: 120,
+  keywords: 300,
+} as const
+
 export type PublicPreviewItem = HhDigestItem & {
   confidenceLabel: string
   sourceCount: number
@@ -63,6 +69,53 @@ export type PublicPreviewItem = HhDigestItem & {
    * explainable "relevance to your ICP" signal. See preview-relevance.ts.
    */
   relevanceSignals: PreviewRelevanceSignals
+}
+
+function buildPublicDemoDigestItems(referenceDate = new Date()): HhDigestItem[] {
+  const previousDay = new Date(referenceDate.getTime() - 24 * 60 * 60 * 1000)
+
+  return [
+    {
+      rank: 1,
+      org_id: "demo-industrial",
+      hh_employer_id: "demo-industrial",
+      employer_name: "Производственная компания",
+      vacancies_count: 14,
+      distinct_vacancy_names_count: 6,
+      latest_published_at: referenceDate.toISOString(),
+      total_score: 3.48,
+      reasons: [
+        "14 новых вакансий за 6 дней",
+        "Появилась редкая инженерная роль",
+      ],
+      opener: "Предложить точечный подбор по инженерным ролям",
+      source_families: ["hh", "career-pages", "egrul-fns"],
+      evidence_titles: ["Инженер-конструктор", "Руководитель производства"],
+      candidate_source_keys: ["demo:hh:industrial", "demo:career:industrial", "demo:egrul:industrial"],
+      location_names: ["Москва и область"],
+      confidence_gate: "A",
+    },
+    {
+      rank: 2,
+      org_id: "demo-b2b-service",
+      hh_employer_id: "demo-b2b-service",
+      employer_name: "Сервисная B2B-компания",
+      vacancies_count: 9,
+      distinct_vacancy_names_count: 5,
+      latest_published_at: previousDay.toISOString(),
+      total_score: 3.12,
+      reasons: [
+        "Команда найма расширяет коммерческий блок",
+        "Повторно открыты две сложные роли",
+      ],
+      opener: "Уточнить приоритетные роли и предложить короткий пилот",
+      source_families: ["career-pages", "egrul-fns"],
+      evidence_titles: ["Руководитель отдела продаж", "Менеджер по развитию"],
+      candidate_source_keys: ["demo:career:b2b", "demo:egrul:b2b"],
+      location_names: ["Санкт-Петербург"],
+      confidence_gate: "B",
+    },
+  ]
 }
 
 export const PUBLIC_PLANS: PublicPlan[] = [
@@ -88,20 +141,20 @@ export const PUBLIC_PLANS: PublicPlan[] = [
     price: "14 990 ₽/мес",
     description: "Полный доступ к радару на месяц — всё то же, что в пилоте, на срок, удобный для проверки канала.",
     bullets: SHARED_PLAN_BULLETS,
-    ctaLabel: "Подключить на месяц",
+    ctaLabel: "Оставить заявку на месяц",
     isPrimary: false,
     isRecurring: true
   },
   {
     code: "quarterly",
     name: "Три месяца",
-    cadence: "90 дней, экономия 14 980 ₽",
+    cadence: "90 дней",
     amountMinor: 2999000,
     currency: "RUB",
     price: "29 990 ₽/3 мес",
     description: "Доступ на квартал со скидкой — выгоднее помесячной оплаты (~9 997 ₽/мес). Для команды, которая делает радар рабочим каналом на три месяца, а не на пробу.",
     bullets: SHARED_PLAN_BULLETS,
-    ctaLabel: "Подключить на 3 месяца",
+    ctaLabel: "Оставить заявку на 3 месяца",
     isPrimary: false,
     isRecurring: true
   }
@@ -146,13 +199,39 @@ export function getPublicPlanByCode(code: PublicPlanCode | string): PublicPlan {
   throw new Error(`Unknown product code: ${code}`)
 }
 
+type PublicPreviewHrefInput = {
+  specialization?: string | null
+  targetCity?: string | null
+  includeKeywords?: string | null
+  excludeKeywords?: string | null
+  dailyDigestLimit?: number | null
+}
+
+function appendPublicPreviewParams(params: URLSearchParams, input: PublicPreviewHrefInput): void {
+  if (input.specialization) params.set("specialization", input.specialization)
+  if (input.targetCity) params.set("targetCity", input.targetCity)
+  if (input.includeKeywords) params.set("includeKeywords", input.includeKeywords)
+  if (input.excludeKeywords) params.set("excludeKeywords", input.excludeKeywords)
+  if (typeof input.dailyDigestLimit === "number") {
+    params.set("dailyDigestLimit", String(input.dailyDigestLimit))
+  }
+}
+
+export function buildPublicPreviewHref(input: PublicPreviewHrefInput): string {
+  const params = new URLSearchParams()
+  appendPublicPreviewParams(params, input)
+  const query = params.toString()
+
+  return query === "" ? "/#preview" : `/?${query}#preview`
+}
+
 export function readPublicPreviewInput(searchParams: Record<string, string | string[] | undefined>): PublicPreviewInput {
   return {
-    specialization: readSearchParam(searchParams.specialization),
-    targetCity: readSearchParam(searchParams.targetCity),
-    includeKeywords: readSearchParam(searchParams.includeKeywords),
-    excludeKeywords: readSearchParam(searchParams.excludeKeywords),
-    dailyDigestLimit: normalizeDailyDigestLimit(readSearchParam(searchParams.dailyDigestLimit))
+    specialization: readSearchParam(searchParams.specialization, PUBLIC_PREVIEW_FIELD_LIMITS.specialization),
+    targetCity: readSearchParam(searchParams.targetCity, PUBLIC_PREVIEW_FIELD_LIMITS.targetCity),
+    includeKeywords: readSearchParam(searchParams.includeKeywords, PUBLIC_PREVIEW_FIELD_LIMITS.keywords),
+    excludeKeywords: readSearchParam(searchParams.excludeKeywords, PUBLIC_PREVIEW_FIELD_LIMITS.keywords),
+    dailyDigestLimit: normalizeDailyDigestLimit(readSearchParam(searchParams.dailyDigestLimit, 2))
   }
 }
 
@@ -161,15 +240,40 @@ export function hasPublicPreviewInput(input: PublicPreviewInput): boolean {
     .some((value) => value !== "")
 }
 
-export async function getPublicSampleDigestState(input: PublicPreviewInput): Promise<{
+type PublicSampleDigestState = {
   isLive: boolean
   isPersonalized: boolean
   /** False when the niche query had no exact ICP match and we fell back to closest companies. */
   hasExactMatches: boolean
   items: PublicPreviewItem[]
-}> {
-  const items = await getHhDigestItems()
+}
+
+function buildPublicDemoDigestState(): PublicSampleDigestState {
+  return {
+    isLive: false,
+    isPersonalized: false,
+    hasExactMatches: true,
+    items: buildPublicDemoDigestItems().map((item) => (
+      toPublicPreviewItem(item, defaultRelevanceSignals())
+    )),
+  }
+}
+
+export async function getPublicSampleDigestState(input: PublicPreviewInput): Promise<PublicSampleDigestState> {
   const isPersonalized = hasPublicPreviewInput(input)
+  let items: HhDigestItem[]
+
+  try {
+    items = await getHhDigestItems()
+  } catch {
+    console.info("Public preview data unavailable; serving static demo fallback")
+    return buildPublicDemoDigestState()
+  }
+
+  if (items.length === 0) {
+    console.info("Public preview has no eligible items; serving static demo fallback")
+    return buildPublicDemoDigestState()
+  }
 
   if (!isPersonalized) {
     return {
@@ -202,14 +306,7 @@ export function buildCheckoutHref(input: {
   planCode?: PublicPlanCode | null
 }): string {
   const params = new URLSearchParams()
-
-  if (input.specialization) params.set("specialization", input.specialization)
-  if (input.targetCity) params.set("targetCity", input.targetCity)
-  if (input.includeKeywords) params.set("includeKeywords", input.includeKeywords)
-  if (input.excludeKeywords) params.set("excludeKeywords", input.excludeKeywords)
-  if (typeof input.dailyDigestLimit === "number") {
-    params.set("dailyDigestLimit", String(input.dailyDigestLimit))
-  }
+  appendPublicPreviewParams(params, input)
   if (input.ownerId != null && String(input.ownerId).trim() !== "") {
     params.set("ownerId", String(input.ownerId).trim())
   }
@@ -227,7 +324,7 @@ export function buildCheckoutHref(input: {
 export function readCheckoutPlanCode(
   searchParams: Record<string, string | string[] | undefined>
 ): PublicPlanCode {
-  const raw = readSearchParam(searchParams.plan).toLowerCase()
+  const raw = readSearchParam(searchParams.plan, 20).toLowerCase()
   return isPublicPlanCode(raw) ? raw : "pilot"
 }
 
@@ -296,12 +393,16 @@ function deriveConfidenceLabel(totalScore: number): string {
   return "low"
 }
 
-function readSearchParam(value: string | string[] | undefined): string {
+function readSearchParam(value: string | string[] | undefined, maxLength: number): string {
+  let normalized = ""
+
   if (Array.isArray(value)) {
-    return typeof value[0] === "string" ? value[0].trim() : ""
+    normalized = typeof value[0] === "string" ? value[0].trim() : ""
+  } else if (typeof value === "string") {
+    normalized = value.trim()
   }
 
-  return typeof value === "string" ? value.trim() : ""
+  return normalized.slice(0, maxLength)
 }
 
 function normalizeDailyDigestLimit(value: string): number {
