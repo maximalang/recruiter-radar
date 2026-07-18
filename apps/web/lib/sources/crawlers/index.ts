@@ -5,7 +5,7 @@
  * constructing engines directly. The default router registers the static
  * engine plus any engines whose deps are available at startup:
  *
- *   - SPA (Crawlee + Playwright) — registered when `crawlee` is importable
+ *   - SPA (Playwright) — registered when `playwright` is importable
  *   - LLM-markdown (Firecrawl) — registered when `FIRECRAWL_API_KEY` is set
  *
  * To force-register or override engines, pass `extraEngines` to
@@ -39,7 +39,7 @@ export type {
 
 export interface DefaultRouterOptions {
   staticEngine?: CreateStaticEngineOptions
-  /** Crawlee engine options (SPA + enhanced static). */
+  /** Browser engine options (legacy property name retained for compatibility). */
   crawlee?: CrawleeEngineOptions
   /** Firecrawl engine options (LLM-markdown). */
   firecrawl?: FirecrawlEngineOptions
@@ -51,17 +51,17 @@ export interface DefaultRouterOptions {
   /**
    * Force-register all engines even if deps are missing.
    * Engines will throw a clear error at `fetch()` time instead.
-   * Useful for testing without installing Crawlee/Playwright.
+   * Useful for testing without installing Playwright.
    */
   forceRegisterAll?: boolean
 }
 
 /**
- * Detect whether Crawlee is importable (optional dep).
+ * Detect whether Playwright is importable.
  */
-async function isCrawleeAvailable(): Promise<boolean> {
+async function isPlaywrightAvailable(): Promise<boolean> {
   try {
-    await import('crawlee')
+    await import('playwright')
     return true
   } catch {
     return false
@@ -76,13 +76,12 @@ async function detectOptionalEngines(
 ): Promise<EngineRegistry> {
   const engines: EngineRegistry = {}
 
-  // Crawlee SPA engine — requires `crawlee` + `playwright` packages
-  const crawleeAvailable = options.forceRegisterAll || await isCrawleeAvailable()
-  if (crawleeAvailable) {
+  const playwrightAvailable = options.forceRegisterAll || await isPlaywrightAvailable()
+  if (playwrightAvailable) {
     try {
       engines.spa = createCrawleeSpaEngine(options.crawlee)
     } catch {
-      // Crawlee import succeeded but Playwright init failed — skip
+      // Playwright import succeeded but engine initialization failed — skip
     }
   }
 
@@ -101,20 +100,20 @@ export function createDefaultRouter(
     ...options.extraEngines,
   }
 
-  // NOTE: Optional engines (Crawlee, Firecrawl) are registered
-  // synchronously here. Crawlee may fail at `fetch()` time if
+  // NOTE: Optional engines (Playwright, Firecrawl) are registered
+  // synchronously here. Playwright may fail at `fetch()` time if
   // its deps are missing, and Firecrawl gracefully falls back
   // to the static engine. For full async detection, use
   // `createDefaultRouterAsync()` below.
   //
   // We register Firecrawl eagerly (it has built-in fallback),
-  // but skip Crawlee SPA unless explicitly requested via extraEngines
+  // but skip Playwright SPA unless explicitly requested via extraEngines
   // or forceRegisterAll, because its import is expensive.
 
   if (options.forceRegisterAll) {
     try {
       registry.spa = createCrawleeSpaEngine(options.crawlee)
-    } catch { /* Crawlee not installed */ }
+    } catch { /* Playwright not installed */ }
   }
 
   // Firecrawl is always safe to register — it degrades gracefully

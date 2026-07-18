@@ -112,6 +112,29 @@ describe('deliverCandidatesForRun (batch)', () => {
     expect(result.ok).toBe(false)
   })
 
+  it('does not fail additive delivery when the profile has no Telegram chat', async () => {
+    const pool = makeMockPool()
+    mockGetPool.mockReturnValue(pool)
+
+    pool.query.mockResolvedValueOnce({
+      rows: [{ client_profile_id: 'cp-email', candidate_count: 1, anchor_candidate_id: '401' }],
+      rowCount: 1,
+    } as never)
+    pool.query.mockResolvedValueOnce({
+      rows: [{ id: 400, status: 'processing', ownsClaim: true }],
+      rowCount: 1,
+    } as never)
+    mockSendBatch.mockResolvedValueOnce({
+      ok: false,
+      error: 'Client profile has no linked Telegram chat.',
+    })
+    pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 } as never)
+
+    const result = await deliverCandidatesForRun('run-email')
+
+    expect(result).toMatchObject({ ok: true, sent: 0, failed: 0, skipped: 1 })
+  })
+
   it('produces no batch when there are no A/B candidates', async () => {
     const pool = makeMockPool()
     mockGetPool.mockReturnValue(pool)

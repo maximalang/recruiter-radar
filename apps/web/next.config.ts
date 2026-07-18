@@ -16,11 +16,10 @@ const nextConfig: NextConfig = {
   // Enable standalone output for Docker
   output: 'standalone',
 
-  // Crawlee and its browser backends are server-only and pull optional peers
-  // (puppeteer/playwright) that aren't installed. Leave them as runtime
-  // requires instead of bundling; the routes that reach them force
-  // runtime='nodejs' and gate on isCrawleeAvailable() before use.
-  serverExternalPackages: ['crawlee', '@crawlee/puppeteer', '@crawlee/playwright', 'puppeteer', 'playwright'],
+  // Keep the browser runtime outside the server bundle. Routes that need SPA
+  // rendering run on Node.js and register the engine only when Playwright is
+  // importable.
+  serverExternalPackages: ['playwright'],
 
   // Allow localhost development
   allowedDevOrigins: ["127.0.0.1"],
