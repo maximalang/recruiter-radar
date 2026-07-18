@@ -9,22 +9,12 @@ describe('notification webhook validation', () => {
   const previousNodeEnv = process.env.NODE_ENV;
 
   afterEach(() => {
-    Object.defineProperty(process.env, 'NODE_ENV', {
-      value: previousNodeEnv,
-      configurable: true,
-      enumerable: true,
-      writable: true,
-    });
+    process.env.NODE_ENV = previousNodeEnv;
     jest.restoreAllMocks();
   });
 
   function setNodeEnv(value: string) {
-    Object.defineProperty(process.env, 'NODE_ENV', {
-      value,
-      configurable: true,
-      enumerable: true,
-      writable: true,
-    });
+    process.env.NODE_ENV = value;
   }
 
   it('accepts a public HTTPS endpoint', () => {
@@ -43,6 +33,9 @@ describe('notification webhook validation', () => {
     'http://127.0.0.1:5678/webhook',
     'https://10.0.0.5/hook',
     'https://169.254.169.254/latest/meta-data',
+    'https://[::1]/hook',
+    'https://[fd00::1]/hook',
+    'https://[::ffff:169.254.169.254]/latest/meta-data',
     'https://service.internal/hook',
   ])('rejects production-local endpoint %s', (url) => {
     setNodeEnv('production');
