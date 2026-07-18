@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Inter } from "next/font/google";
 
-import favicon from "../public/favicon-brand19.png";
 import { PushReadinessBoot } from "./push-readiness-boot";
 import "./globals.css";
 
@@ -12,21 +11,23 @@ const inter = Inter({
   display: "swap",
 });
 
+const faviconUrl = "/favicon-brand23?v=brand-23";
+
 export const metadata: Metadata = {
   title: "Recruiter Radar",
   description: "Ежедневный радар по компаниям с активным наймом для рекрутеров и агентств.",
-  manifest: "/manifest.webmanifest?v=brand-21",
+  manifest: "/manifest.webmanifest?v=brand-23",
   applicationName: "Recruiter Radar",
   icons: {
     icon: [
       {
-        url: favicon.src,
+        url: faviconUrl,
         type: "image/png",
         sizes: "64x64",
       },
     ],
-    shortcut: favicon.src,
-    apple: favicon.src,
+    shortcut: faviconUrl,
+    apple: faviconUrl,
   },
   appleWebApp: {
     capable: true,
@@ -42,6 +43,11 @@ type RootLayoutProps = {
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="ru">
+      <head>
+        <link rel="icon" type="image/png" sizes="64x64" href={faviconUrl} />
+        <link rel="shortcut icon" type="image/png" href={faviconUrl} />
+        <link rel="apple-touch-icon" href={faviconUrl} />
+      </head>
       <body
         className={`${inter.variable} font-sans`}
         style={{
