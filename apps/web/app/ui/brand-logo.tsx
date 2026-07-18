@@ -21,12 +21,13 @@ export function BrandLogo(props: {
     >
       <img
         className={s.mark}
-        src="/brand/recruiter-radar-mark-brand12.svg"
-        width={128}
-        height={128}
+        src="/brand/recruiter-radar-mark-brand13.svg"
+        width={512}
+        height={512}
         alt=""
         aria-hidden="true"
         draggable={false}
+        decoding="async"
       />
       {showsWordmark ? (
         <span className={s.wordmark} aria-hidden="true">
