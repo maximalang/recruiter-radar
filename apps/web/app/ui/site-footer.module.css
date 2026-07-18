@@ -39,7 +39,7 @@
 .footerBrand {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 7px;
   min-width: 0;
   font-size: 1rem;
   font-weight: 800;
@@ -50,9 +50,9 @@
 
 .footerMark {
   display: block;
-  width: 48px;
-  height: 48px;
-  flex: 0 0 48px;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
   object-fit: contain;
   user-select: none;
 }
@@ -179,9 +179,9 @@
   }
 
   .footerMark {
-    width: 42px;
-    height: 42px;
-    flex-basis: 42px;
+    width: 26px;
+    height: 26px;
+    flex-basis: 26px;
   }
 
   .footerLinks {
