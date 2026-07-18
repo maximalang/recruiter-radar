@@ -123,25 +123,58 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               <span className={hpStyles.heroProductLabel}>Пример структуры сигнала</span>
               <span className={hpStyles.heroProductLive}>демо</span>
             </div>
+            <div className={hpStyles.heroEvidenceBadge}>
+              <span>Сигнал подтверждён</span>
+              <b>2 источника · контакт найден</b>
+            </div>
             <div className={hpStyles.heroCompanyRow}>
               <div>
-                <div className={hpStyles.heroCompanyName}>Компания в вашем ICP</div>
-                <div className={hpStyles.heroCompanyMeta}>Москва · производство</div>
+                <div className={hpStyles.heroCompanyName}>Производственная компания</div>
+                <div className={hpStyles.heroCompanyMeta}>Москва и область · промышленность</div>
               </div>
               <div className={hpStyles.heroScore}><strong>87</strong><span>/100</span></div>
             </div>
             <div className={hpStyles.heroScoreTrack}><span /></div>
             <div className={hpStyles.heroEvidenceRow}>
-              <div><span>Компания и контакты</span><p>Карьерная страница и корпоративный канал связи</p></div>
-              <div><span>Релевантные вакансии</span><p>Новые роли по вашей специализации</p></div>
-              <div><span>Сигналы</span><p>Найм усилился — сейчас уместно выйти на контакт</p></div>
+              <div><span>Что изменилось</span><p>14 новых вакансий за 6 дней</p></div>
+              <div><span>Момент</span><p>Появилась редкая инженерная роль</p></div>
+              <div><span>Как связаться</span><p>Сайт компании и HR-форма</p></div>
+            </div>
+            <div className={hpStyles.heroSignalMeters}>
+              <div className={hpStyles.heroSignalMeter}>
+                <div className={hpStyles.heroSignalMeterHead}>
+                  <span>Соответствие профилю</span>
+                  <strong>Высокое</strong>
+                </div>
+                <div className={hpStyles.heroSignalMeterTrack} data-tone="green"><span style={{ width: "88%" }} /></div>
+              </div>
+              <div className={hpStyles.heroSignalMeter}>
+                <div className={hpStyles.heroSignalMeterHead}>
+                  <span>Сила сигнала</span>
+                  <strong>Сильная</strong>
+                </div>
+                <div className={hpStyles.heroSignalMeterTrack}><span style={{ width: "84%" }} /></div>
+              </div>
+              <div className={hpStyles.heroSignalMeter}>
+                <div className={hpStyles.heroSignalMeterHead}>
+                  <span>Актуальность</span>
+                  <strong>Сегодня</strong>
+                </div>
+                <div className={hpStyles.heroSignalMeterTrack} data-tone="amber"><span style={{ width: "94%" }} /></div>
+              </div>
             </div>
             <div className={hpStyles.heroProductFooter}>
-              <span>Доказательства собраны</span>
-              <strong>Можно действовать</strong>
+              <span>Рекомендуемое действие</span>
+              <strong>Проверить контакт сегодня</strong>
             </div>
           </div>
 
+        </div>
+
+        <div className={hpStyles.heroMetrics}>
+          <div className={hpStyles.heroMetric}><strong>3–7</strong><span>компаний с наивысшим приоритетом</span></div>
+          <div className={hpStyles.heroMetric}><strong>1 карточка</strong><span>сигнал, доказательства, контакт и следующий шаг</span></div>
+          <div className={hpStyles.heroMetric}><strong>0 автоспама</strong><span>решение об обращении всегда за вами</span></div>
         </div>
       </section>
 
@@ -158,7 +191,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           {principles.map((p) => {
             const Icon = p.icon;
             return (
-              <div key={p.title} className={hpStyles.principle}>
+              <div key={p.title} className={`${hpStyles.principle} ${hpStyles.revealCard}`}>
                 <span className={hpStyles.principleIcon}>
                   <Icon />
                 </span>
@@ -167,6 +200,32 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               </div>
             );
           })}
+        </div>
+      </ScrollReveal>
+
+      {/* Problem — why this radar exists */}
+      <ScrollReveal as="section" className={hpStyles.scrollSection}>
+        <SectionIntro
+          eyebrow="Проблема"
+          title="Вакансии есть. Приоритета нет."
+          description="Радар показывает не вакансии, а компании, которым стоит написать первыми — с доказательствами и поводом для контакта."
+        />
+        <div className={hpStyles.problemGrid}>
+          <article className={`${hpStyles.problemCard} ${hpStyles.revealCard}`}>
+            <span className={hpStyles.problemIndex}>01</span>
+            <h3>Все видят одно и то же</h3>
+            <p>Открытые вакансии одновременно замечают десятки агентств — реакция на них не дает преимущества.</p>
+          </article>
+          <article className={`${hpStyles.problemCard} ${hpStyles.revealCard}`}>
+            <span className={hpStyles.problemIndex}>02</span>
+            <h3>Вакансия — ещё не лид</h3>
+            <p>Активный найм не всегда означает готовность работать с агентством. Нужен контекст, а не список ролей.</p>
+          </article>
+          <article className={`${hpStyles.problemCard} ${hpStyles.revealCard}`}>
+            <span className={hpStyles.problemIndex}>03</span>
+            <h3>Контекст требует времени</h3>
+            <p>Даты, динамику, источники и корректный контакт приходится собирать вручную — на это уходит час за компанией.</p>
+          </article>
         </div>
       </ScrollReveal>
 
@@ -286,6 +345,80 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         </div>
       </ScrollReveal>
 
+      {/* How it works — the three-step flow */}
+      <ScrollReveal as="section" className={hpStyles.scrollSection}>
+        <SectionIntro
+          eyebrow="Как работает"
+          title="Готовый список — каждое утро"
+          description="Настраиваете профиль один раз. Дальше радар сам собирает и проверяет сигналы найма."
+        />
+        <div className={hpStyles.steps}>
+          <article className={`${hpStyles.step} ${hpStyles.revealCard}`}>
+            <span className={hpStyles.stepIndex}>01 · Профиль</span>
+            <h3>Задаёте нишу</h3>
+            <p>Специализация, роли, отрасли, география и исключения — под ваше агентство.</p>
+          </article>
+          <article className={`${hpStyles.step} ${hpStyles.revealCard}`}>
+            <span className={hpStyles.stepIndex}>02 · Проверка</span>
+            <h3>Радар ищет сигналы</h3>
+            <p>Карьерные страницы, вакансии и динамика найма — с подтверждением и оценкой уверенности.</p>
+          </article>
+          <article className={`${hpStyles.step} ${hpStyles.revealCard}`}>
+            <span className={hpStyles.stepIndex}>03 · Результат</span>
+            <h3>Получаете приоритеты</h3>
+            <p>3–7 компаний с причиной, доказательствами, контактом и следующим шагом — в Telegram.</p>
+          </article>
+        </div>
+        <div className={hpStyles.stepsTrack} aria-hidden="true" />
+      </ScrollReveal>
+
+      {/* Signal anatomy — what a single lead card contains */}
+      <ScrollReveal as="section" className={hpStyles.scrollSection}>
+        <SectionIntro
+          eyebrow="Карточка лида"
+          title="Почему компании стоит написать"
+          description="Каждая рекомендация содержит факты, источники и конкретный следующий шаг — без выдуманных данных."
+        />
+        <p className={hpStyles.demoNote}>
+          Ниже — пример структуры карточки. Реальные компании, даты и источники приходят в радаре выше и в Telegram.
+        </p>
+        <div className={hpStyles.signalLayout}>
+          <div className={hpStyles.signalSide}>
+            <span className={hpStyles.priorityChip}>Высокий приоритет</span>
+            <h3 className={hpStyles.signalSideTitle}>Производственная компания</h3>
+            <p className={hpStyles.signalSideSub}>Промышленность · Москва и область</p>
+            <div className={hpStyles.bigScore}>87<small>/100</small></div>
+            <div className={hpStyles.signalSideMeta}>
+              <div className={hpStyles.signalSideMetaRow}><span>Уверенность</span><b>Подтверждено</b></div>
+              <div className={hpStyles.signalSideMetaRow}><span>Источники</span><b>2 независимых</b></div>
+              <div className={hpStyles.signalSideMetaRow}><span>Контакт</span><b>Найден</b></div>
+            </div>
+          </div>
+          <div className={hpStyles.signalMain}>
+            <div className={hpStyles.detailGrid}>
+              <div className={hpStyles.detail}>
+                <h3>Что изменилось</h3>
+                <p>14 новых вакансий за 6 дней, включая редкую инженерную роль.</p>
+              </div>
+              <div className={hpStyles.detail}>
+                <h3>Почему сейчас</h3>
+                <p>Найм ускорился, а сложные роли повышают нагрузку на внутреннюю команду.</p>
+              </div>
+              <div className={`${hpStyles.detail} ${hpStyles.detailFull}`}>
+                <h3>Следующий шаг</h3>
+                <p>Проверить HR-форму на сайте компании и предложить помощь по инженерным ролям.</p>
+              </div>
+            </div>
+            <p className={hpStyles.timelineTitle}>Хронология сигнала</p>
+            <div className={hpStyles.timeline}>
+              <div className={hpStyles.timelineItem}><time>15 июля</time><span>На карьерной странице появились 4 новые инженерные позиции</span></div>
+              <div className={hpStyles.timelineItem}><time>12 июля</time><span>Количество открытых вакансий выросло с 7 до 16</span></div>
+            </div>
+            <div className={hpStyles.trustLine}>Компания, даты и факты подтверждаются открытыми источниками</div>
+          </div>
+        </div>
+      </ScrollReveal>
+
       {/* Pricing — hierarchy: primary week plan, then secondary plans */}
       <ScrollReveal as="section" id="pricing" className={hpStyles.scrollSection}>
         <SectionIntro
@@ -296,8 +429,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         <div className={hpStyles.pricingGrid}>
           <SurfaceCard
             key={pilotPlan.code}
-            className={hpStyles.primaryPlanCard}
+            className={`${hpStyles.primaryPlanCard} ${hpStyles.revealCard}`}
           >
+            <span className={hpStyles.primaryPlanBadge}>Рекомендуем начать</span>
             <div className={hpStyles.primaryPlanCardHead}>
               <div className={ppStyles.planPriceContainer}>
                 <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
@@ -310,15 +444,19 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                 </div>
                 <div className={ppStyles.planPriceCadence}>{pilotPlan.cadence}</div>
               </div>
-              <span className={hpStyles.planFlag}>Рекомендуем начать</span>
             </div>
             <p className={hpStyles.planDescription}>{pilotPlan.description}</p>
+            <div className={hpStyles.planFeatureLine}>
+              <b>Разовая оплата</b>
+              <span>Без автопродления</span>
+            </div>
             <Link
               href={buildCheckoutHref({ ...previewInput, planCode: pilotPlan.code })}
               className={`${ppStyles.primaryAction} ${hpStyles.planCta}`}
             >
               {pilotPlan.ctaLabel}
             </Link>
+            <p className={hpStyles.billingNote}>После оплаты вы настраиваете профиль и подключаете Telegram.</p>
           </SurfaceCard>
 
           <div className={hpStyles.secondaryPlansRow}>
@@ -327,7 +465,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               return (
                 <SurfaceCard
                   key={plan.code}
-                  className={hpStyles.secondaryPlanCard}
+                  className={`${hpStyles.secondaryPlanCard} ${hpStyles.revealCard}`}
                 >
                   <div className={ppStyles.planPriceContainer}>
                     <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
@@ -347,6 +485,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                     <div className={ppStyles.planPriceCadence}>{plan.cadence}</div>
                   </div>
                   <p className={hpStyles.planDescription}>{plan.description}</p>
+                  <div className={hpStyles.planFeatureLine}>
+                    <b>Тот же функционал</b>
+                    <span>{isQuarterly ? "Самая низкая цена месяца" : "Более длительный период"}</span>
+                  </div>
                   <Link
                     href={buildCheckoutHref({ ...previewInput, planCode: plan.code })}
                     className={`${ppStyles.secondaryAction} ${hpStyles.planCta}`}
@@ -380,7 +522,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           title="Коротко о порядке"
         />
         {faqItems.map((item) => (
-          <details key={item.question} className={hpStyles.faqCard}>
+          <details key={item.question} className={`${hpStyles.faqCard} ${hpStyles.revealCard}`}>
             <summary className={hpStyles.faqSummary}>
               <span>{item.question}</span>
               <svg className={hpStyles.faqChevron} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -394,14 +536,15 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
       {/* Closing CTA band */}
       <section className={hpStyles.closingBand}>
-        <h2 className={hpStyles.closingTitle}>Настройте первый радар</h2>
+        <h2 className={hpStyles.closingTitle}>Узнайте, кому стоит написать</h2>
         <p className={hpStyles.closingText}>
-          Укажите специализацию и географию. После запуска первый список придёт в Telegram.
+          Настройте профиль агентства, получите первый список компаний и проверьте качество нового канала клиентского спроса за 7 дней.
         </p>
         <div className={hpStyles.closingActions}>
           <Link href={checkoutHref} className={hpStyles.heroCta}>
             Активировать неделю — 2 990 ₽
           </Link>
+          <a href="#preview" className={hpStyles.heroSecondaryCta}>Посмотреть пример</a>
         </div>
       </section>
 

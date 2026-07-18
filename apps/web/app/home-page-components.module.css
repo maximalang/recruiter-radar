@@ -127,6 +127,36 @@
   display: none;
 }
 
+/* Progressive-enhancement scroll reveal: in browsers that support scroll-driven
+   animations AND the user has not asked for reduced motion, cards lift + fade
+   in as they enter the viewport. The base state is fully visible, so browsers
+   without support (Firefox) and reduced-motion users see everything immediately —
+   the reveal is decorative, never gatekeeping. Per modern-web-guidance: animate
+   only transform/opacity, feature-detect with @supports, gate on
+   prefers-reduced-motion: no-preference, declare animation-timeline AFTER the
+   animation shorthand. */
+.revealCard {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @supports ((animation-timeline: view()) and (animation-range: entry)) {
+    .revealCard {
+      animation: revealUp 0.7s ease backwards;
+      animation-range: entry 0% entry 55%;
+      animation-timeline: view();
+    }
+  }
+}
+
+@keyframes revealUp {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+}
+
 /* ── Hero — centered, dark slate, refined. RadarCanvas = honest metaphor. ── */
 .heroSection {
   position: relative;
@@ -395,6 +425,148 @@
   line-height: 1.4;
 }
 
+/* Evidence badge — the "сигнал подтверждён" strip that leads the hero product
+   card. Carries the confidence story (sources count + contact found) in one
+   calm green-tinted row, before the company name. */
+.heroEvidenceBadge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 11px 13px;
+  border: 1px solid rgba(52, 211, 153, 0.16);
+  border-radius: 13px;
+  background: rgba(16, 185, 129, 0.07);
+}
+
+.heroEvidenceBadge span {
+  color: #8fe0bd;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.heroEvidenceBadge b {
+  color: #d1fae5;
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+/* Signal meters — three sub-card meters inside the hero product card:
+   соответствие профилю / сила сигнала / актуальность. Each is a label + level
+   word + a thin gradient bar whose fill animates in on first paint. The amber
+   variant marks the freshness meter so "today" reads warmer than fit/strength. */
+.heroSignalMeters {
+  display: grid;
+  gap: 8px;
+}
+
+.heroSignalMeter {
+  display: grid;
+  gap: 8px;
+  padding: 11px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.heroSignalMeterHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.heroSignalMeterHead span {
+  color: rgba(176, 190, 211, 0.7);
+  font-size: 0.7rem;
+  font-weight: 650;
+}
+
+.heroSignalMeterHead strong {
+  color: #eff5ff;
+  font-size: 0.7rem;
+  font-weight: 750;
+}
+
+.heroSignalMeterTrack {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.heroSignalMeterTrack span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #5576b8, #83a4e5);
+  transform-origin: left;
+}
+
+.heroSignalMeterTrack[data-tone="amber"] span {
+  background: linear-gradient(90deg, #9f7431, #d5a35a);
+}
+
+.heroSignalMeterTrack[data-tone="green"] span {
+  background: linear-gradient(90deg, #358f70, #68c59f);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .heroSignalMeterTrack span {
+    animation: meterReveal 1.1s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+
+@keyframes meterReveal {
+  from {
+    transform: scaleX(0);
+    opacity: 0.3;
+  }
+  to {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+/* Hero metrics — the 3-up strip under the hero product card that quantifies the
+   promise: 3–7 companies, one card per lead, zero auto-spam. Reads as the
+   product contract in three tiles. */
+.heroMetrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.heroMetric {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: center;
+  min-height: 72px;
+  padding: 14px 16px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.heroMetric strong {
+  color: #ffffff;
+  font-size: 1.2rem;
+  letter-spacing: -0.04em;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.heroMetric span {
+  color: rgba(203, 213, 225, 0.72);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
 .heroProductFooter {
   padding-top: 4px;
 }
@@ -501,6 +673,409 @@
   color: var(--c-text-secondary);
   font-size: 0.9rem;
   line-height: 1.58;
+}
+
+/* ── Problem section — the "why this exists" narrative ──
+   Three numbered cards (01/02/03) that reframe the buyer's current state:
+   everyone sees the same vacancies, a vacancy is not a lead, and assembling
+   context by hand is slow. Sets up the radar as the resolution. */
+.problemGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.problemCard {
+  position: relative;
+  display: grid;
+  gap: 12px;
+  padding: 26px 24px;
+  border-radius: 18px;
+  border: 1px solid var(--c-border);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(249, 251, 255, 0.92) 100%);
+  box-shadow: 0 10px 30px rgba(15, 35, 68, 0.05);
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.problemCard::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 22px;
+  right: 22px;
+  height: 2px;
+  border-radius: 0 0 999px 999px;
+  background: linear-gradient(90deg, transparent, rgba(47, 98, 232, 0.34), transparent);
+  opacity: 0.55;
+  transition: opacity 0.2s ease, left 0.2s ease, right 0.2s ease;
+}
+
+.problemCard:hover {
+  transform: translateY(-3px);
+  border-color: rgba(47, 98, 232, 0.16);
+  box-shadow: 0 22px 48px rgba(31, 51, 89, 0.1);
+}
+
+.problemCard:hover::before {
+  left: 10px;
+  right: 10px;
+  opacity: 0.95;
+}
+
+.problemIndex {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  background: linear-gradient(145deg, rgba(233, 240, 255, 0.96) 0%, rgba(244, 248, 255, 0.86) 100%);
+  box-shadow: inset 0 0 0 1px rgba(47, 98, 232, 0.08), 0 8px 18px rgba(47, 98, 232, 0.08);
+  color: var(--c-brand);
+  font-size: 0.9rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+}
+
+.problemCard h3 {
+  margin: 0;
+  font-size: 1.08rem;
+  font-weight: 800;
+  letter-spacing: -0.012em;
+  color: var(--c-text-primary);
+}
+
+.problemCard p {
+  margin: 0;
+  color: var(--c-text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.58;
+}
+
+/* ── How-it-works steps ──
+   Three flow cards joined by a travelling light line. The line animates left→
+   right to suggest a moving pipeline (profile → verify → result). Cards carry a
+   step index, a heading and one line of copy. */
+.steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.step {
+  position: relative;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  padding: 24px;
+  border-radius: 18px;
+  border: 1px solid var(--c-border);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(249, 251, 255, 0.92) 100%);
+  box-shadow: 0 10px 30px rgba(15, 35, 68, 0.05);
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.step:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 22px 48px rgba(31, 51, 89, 0.1);
+}
+
+/* Arrow joining steps on desktop — absent on the last card and on stacked rows. */
+.step:not(:last-child)::after {
+  content: "→";
+  position: absolute;
+  top: 50%;
+  right: -11px;
+  transform: translateY(-50%);
+  color: var(--c-brand);
+  font-weight: 900;
+  font-size: 1.1rem;
+  z-index: 2;
+  background: var(--c-bg-page, #f7faff);
+  padding: 0 2px;
+}
+
+.stepIndex {
+  color: var(--c-brand);
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.step h3 {
+  margin: 0;
+  font-size: 1.06rem;
+  font-weight: 800;
+  letter-spacing: -0.012em;
+  color: var(--c-text-primary);
+}
+
+.step p {
+  margin: 0;
+  color: var(--c-text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.58;
+}
+
+/* Travelling accent line along the bottom of the steps row — a soft light band
+   that sweeps left→right, reinforcing the "flow" metaphor. Decorative, gated on
+   no-preference motion. */
+.stepsTrack {
+  position: relative;
+  height: 2px;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: rgba(47, 98, 232, 0.1);
+  overflow: hidden;
+}
+
+.stepsTrack::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--c-brand), transparent);
+  transform: translateX(-100%);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .stepsTrack::after {
+    animation: flowSweep 4.5s linear infinite;
+  }
+}
+
+@keyframes flowSweep {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* ── Signal anatomy — the "why this company, why now" showcase ──
+   A two-column layout: a dark "signal-side" panel with the company, big score
+   and confidence metadata, and a light "signal-main" with three detail tiles
+   (what changed / why now / next step) and a signal timeline. Uses the same
+   honest copy structure as a real lead card, but as a teaching exhibit. */
+.signalLayout {
+  display: grid;
+  grid-template-columns: 0.74fr 1.26fr;
+  gap: 24px;
+  padding: 26px;
+  border-radius: 24px;
+  border: 1px solid var(--c-border);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 18px 46px rgba(31, 51, 89, 0.08);
+}
+
+/* Demo note — the small caption that marks the signal-anatomy exhibit as a
+   structural example, not a real lead. Keeps the evidence-first contract honest:
+   the live preview above shows real data, this panel teaches the card shape. */
+.demoNote {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(47, 98, 232, 0.11);
+  border-radius: 13px;
+  background: rgba(238, 244, 255, 0.74);
+  color: #475569;
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.signalSide {
+  position: relative;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  padding: 24px;
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 88% 10%, rgba(91, 134, 255, 0.22), transparent 24%),
+    linear-gradient(145deg, #0f1d37 0%, #162a52 100%);
+  color: #ffffff;
+  overflow: hidden;
+}
+
+.signalSide::after {
+  content: "";
+  position: absolute;
+  inset: auto -24px -24px auto;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 0 30px rgba(255, 255, 255, 0.025), 0 0 0 60px rgba(255, 255, 255, 0.018);
+  opacity: 0.8;
+}
+
+.priorityChip {
+  display: inline-flex;
+  align-items: center;
+  align-self: start;
+  padding: 7px 11px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.signalSideTitle {
+  margin: 8px 0 0;
+  font-size: 1.5rem;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-weight: 800;
+}
+
+.signalSideSub {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.86rem;
+}
+
+.bigScore {
+  margin: 14px 0 6px;
+  font-size: 3.4rem;
+  line-height: 1;
+  letter-spacing: -0.05em;
+  font-weight: 900;
+}
+
+.bigScore small {
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.55);
+  font-weight: 700;
+}
+
+.signalSideMeta {
+  display: grid;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.signalSideMetaRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.signalSideMetaRow:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.signalSideMetaRow span {
+  color: rgba(176, 190, 211, 0.7);
+  font-size: 0.76rem;
+}
+
+.signalSideMetaRow b {
+  color: #eff5ff;
+  font-size: 0.82rem;
+  font-weight: 750;
+  text-align: right;
+}
+
+.signalMain {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.detailGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.detail {
+  padding: 18px;
+  border-radius: 16px;
+  border: 1px solid var(--c-border);
+  background: rgba(248, 250, 252, 0.92);
+  transition: transform 0.18s ease, border-color 0.18s ease;
+}
+
+.detail:hover {
+  transform: translateY(-2px);
+  border-color: rgba(47, 98, 232, 0.16);
+}
+
+.detail h3 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: -0.012em;
+  color: var(--c-text-primary);
+}
+
+.detail p {
+  margin: 0;
+  color: var(--c-text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.58;
+}
+
+/* The third detail tile spans full width — the "next step" reads as a conclusion. */
+.detailFull {
+  grid-column: 1 / -1;
+}
+
+.timelineTitle {
+  margin: 0;
+  color: var(--c-text-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.timeline {
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--c-border);
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.timelineItem {
+  display: grid;
+  grid-template-columns: 86px 1fr;
+  gap: 16px;
+  padding: 15px 16px;
+  border-top: 1px solid var(--c-border);
+  align-items: start;
+}
+
+.timelineItem:first-child {
+  border-top: 0;
+}
+
+.timelineItem time {
+  color: var(--c-brand);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.timelineItem span {
+  color: var(--c-text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.trustLine {
+  margin-top: 6px;
+  padding: 14px 18px;
+  border-radius: 14px;
+  background: rgba(21, 163, 107, 0.08);
+  border: 1px solid rgba(21, 163, 107, 0.14);
+  color: #17633f;
+  text-align: center;
+  font-size: 0.86rem;
+  font-weight: 700;
 }
 
 /* ── Preview grid ── */
@@ -733,8 +1308,16 @@
   gap: 16px;
   border: 1px solid var(--c-border);
   background-color: rgba(255, 255, 255, 0.92);
-  padding: 26px 26px;
+  padding: 28px 26px;
   overflow: hidden;
+  box-shadow: 0 10px 30px rgba(15, 35, 68, 0.05);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.primaryPlanCard:hover,
+.secondaryPlanCard:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 22px 48px rgba(31, 51, 89, 0.1);
 }
 
 .primaryPlanCard {
@@ -755,23 +1338,60 @@
   background: linear-gradient(90deg, var(--c-brand) 0%, #60a5fa 100%);
 }
 
+/* Featured badge — floats above the featured card's top border. */
+.primaryPlanBadge {
+  position: absolute;
+  top: -12px;
+  left: 22px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--c-brand);
+  color: #ffffff;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  box-shadow: 0 10px 22px rgba(29, 78, 216, 0.22);
+}
+
+/* A divider row with a bold label on the left and a muted note on the right —
+   the "what you get / how it bills" line on each plan card. */
+.planFeatureLine {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 0;
+  border-top: 1px solid var(--c-border);
+  border-bottom: 1px solid var(--c-border);
+}
+
+.planFeatureLine b {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--c-text-primary);
+}
+
+.planFeatureLine span {
+  color: var(--c-text-muted);
+  font-size: 0.72rem;
+  text-align: right;
+}
+
+.billingNote {
+  margin: 0;
+  color: var(--c-text-muted);
+  font-size: 0.74rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
 .primaryPlanCardHead {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 12px;
   flex-wrap: wrap;
-}
-
-.planFlag {
-  padding: 5px 12px;
-  border-radius: var(--radius-pill);
-  background: var(--c-text-primary);
-  color: #ffffff;
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 
 .savingsBadge {
@@ -968,6 +1588,17 @@
   .pricingGrid {
     grid-template-columns: 1fr;
   }
+
+  /* The signal-anatomy two-column exhibit stacks below ~1000px — the dark side
+     panel reads above the detail grid. */
+  .signalLayout {
+    grid-template-columns: 1fr;
+  }
+
+  /* Hero metrics collapse to a single column on narrow viewports. */
+  .heroMetrics {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 900px) {
@@ -999,6 +1630,24 @@
   .principle + .principle {
     border-top: 1px solid var(--c-border);
     border-left: 0;
+  }
+
+  /* Problem + steps go two-up, then one-up further down. */
+  .problemGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .steps {
+    grid-template-columns: 1fr;
+  }
+
+  /* No joining arrows when steps are stacked. */
+  .step:not(:last-child)::after {
+    display: none;
+  }
+
+  .detailGrid {
+    grid-template-columns: 1fr;
   }
 }
 
