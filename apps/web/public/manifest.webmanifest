@@ -8,7 +8,7 @@
   "theme_color": "#f3eee6",
   "icons": [
     {
-      "src": "/favicon-brand19.png?v=brand-19",
+      "src": "/api/favicon-brand20",
       "sizes": "64x64",
       "type": "image/png",
       "purpose": "any"
