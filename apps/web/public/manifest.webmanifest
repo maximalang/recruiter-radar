@@ -4,11 +4,11 @@
   "description": "Ежедневный радар по компаниям с активным наймом для рекрутеров и агентств.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f7faff",
-  "theme_color": "#f7faff",
+  "background_color": "#f3eee6",
+  "theme_color": "#f3eee6",
   "icons": [
     {
-      "src": "/icon.svg?v=brand-15",
+      "src": "/icon.svg?v=brand-16",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
