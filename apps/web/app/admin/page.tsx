@@ -33,6 +33,7 @@ import AdminLlmConfigForm from "./admin-llm-config-form";
 import AdminLoginForm from "./admin-login-form";
 import AdminLogoutButton from "./admin-logout-button";
 import AdminUserCard from "./admin-user-card";
+import { sourceColor } from "./admin-source-colors";
 
 export const dynamic = "force-dynamic";
 
@@ -473,19 +474,6 @@ const sourceRowStyle: CSSProperties = {
  * palette is deliberately distinct (not a gradient) so two adjacent stack
  * segments are easy to separate visually.
  */
-const SOURCE_COLORS: Record<string, string> = {
-  "career-pages": "#1d4ed8",
-  "habr-career": "#7c3aed",
-  "rabota-rossii": "#047857",
-  superjob: "#b45309",
-  hh: "#64748b",
-};
-const SOURCE_COLOR_FALLBACK = "#9333ea";
-
-function sourceColor(source: string): string {
-  return SOURCE_COLORS[source] ?? SOURCE_COLOR_FALLBACK;
-}
-
 /**
  * Compact 7-day ingest-volume chart with a PER-SOURCE stacked breakdown.
  *

@@ -31,12 +31,27 @@ export interface AggregationResult {
 }
 
 const SOURCE_BASE_WEIGHTS: Record<string, number> = {
+  // Canonical source IDs from the ingestion registry.
+  'career-pages': 0.45,
   career_page: 0.45,
   hh: 0.35,
+  'tech-job-boards': 0.25,
+  'regional-job-boards': 0.2,
+  superjob: 0.2,
+  'habr-career': 0.25,
+  'linkedin-company-pages': 0.2,
+  'rabota-rossii': 0.2,
   rabota_rossii: 0.2,
+  'company-site': 0.15,
+  'company-newsrooms': 0.1,
+  'industry-media': 0.1,
   news: 0.1,
   social: 0.08,
+  'egrul-fns': 0.15,
   egrul: 0.15,
+  'transparent-business-fns': 0.15,
+  fedresurs: 0.15,
+  'funding-business-signals': 0.18,
   funding: 0.18,
 }
 

@@ -191,7 +191,10 @@ export class LeadScoringService {
       industries: options.agencyProfile.industries,
       regions: options.agencyProfile.locations,
       minScore: options.minScore || 1.0,
-      sources: options.sources || [],
+      // Preserve an omitted source filter so the generator can use its
+      // configured defaults. An empty array is an explicit request to run no
+      // originating sources, not a synonym for "all sources".
+      sources: options.sources,
       enableRealTime: options.enableRealTime || false,
       clientProfileId: options.clientProfileId,
     })

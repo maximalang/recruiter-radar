@@ -113,7 +113,7 @@ console.log(JSON.stringify({
   fileModeResults,
   providerMode,
   newsroomsLiveMode,
-  evidenceBoundary: 'new RF sources are runnable but not promoted to digest selection',
+  evidenceBoundary: 'job sources are confidence-gated; newsroom/media sources are context-only corroboration and never lead-originating',
   sideEffects: { databaseUrlUsed: false },
 }, null, 2));
 

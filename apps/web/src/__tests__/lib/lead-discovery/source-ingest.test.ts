@@ -126,6 +126,21 @@ describe('source-ingest', () => {
       expect(result.upsertedCount).toBe(3)
     })
 
+    it('passes EGRUL/FNS source configuration through the env whitelist', async () => {
+      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
+        expect(opts.env.EGRUL_FNS_INNS).toBe('7707083893')
+        expect(opts.env.EGRUL_FNS_PUBLIC_BASE_URL).toBe('https://egrul.example/api')
+        callback(null, JSON.stringify({ source: 'egrul-fns', recordsReceived: 1, signalUpsertsCompleted: 1 }), '')
+      })
+
+      const result = await ingestSource('egrul-fns', {
+        EGRUL_FNS_INNS: '7707083893',
+        EGRUL_FNS_PUBLIC_BASE_URL: 'https://egrul.example/api',
+      })
+
+      expect(result.success).toBe(true)
+    })
+
     it('parses metrics from JSON output', async () => {
       mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
         callback(null, `some text\n${JSON.stringify({ source: 'hh', recordsReceived: 3, signalUpsertsCompleted: 15 })}`, '')

@@ -139,8 +139,10 @@ function recalculateConfidence(lead: MultiSourceLead): void {
  */
 const SOURCE_ID_TO_EVIDENCE_TYPE: Record<string, EvidenceSource['evidenceType']> = {
   'career-pages': 'career-page',
-  'company-site': 'company-profile',
-  'linkedin-company-pages': 'company-profile',
+  // Supporting company surfaces may enrich an existing lead but must not
+  // independently promote its confidence gate.
+  'company-site': 'news',
+  'linkedin-company-pages': 'news',
   'hh': 'vacancy',
   'rabota-rossii': 'vacancy',
   'superjob': 'vacancy',
@@ -148,13 +150,17 @@ const SOURCE_ID_TO_EVIDENCE_TYPE: Record<string, EvidenceSource['evidenceType']>
   'tech-job-boards': 'vacancy',
   'regional-job-boards': 'vacancy',
   'egrul-fns': 'registry',
+  'transparent-business-fns': 'registry',
+  'fedresurs': 'registry',
   'funding-business-signals': 'news',
   'company-newsrooms': 'news',
   'industry-media': 'news',
 }
 
-function sourceIdToEvidenceType(sourceId: string): EvidenceSource['evidenceType'] {
-  return SOURCE_ID_TO_EVIDENCE_TYPE[sourceId] ?? 'vacancy'
+export function sourceIdToEvidenceType(sourceId: string): EvidenceSource['evidenceType'] {
+  // Unregistered sources are context until an explicit source contract is
+  // added; they cannot create corroboration or promote a confidence gate.
+  return SOURCE_ID_TO_EVIDENCE_TYPE[sourceId] ?? 'news'
 }
 
 /**
@@ -345,6 +351,24 @@ export class MultiSourceLeadGenerator {
         description: 'Company registry data'
       },
       {
+        id: 'transparent-business-fns',
+        name: 'Transparent Business/FNS',
+        kind: 'company-registry',
+        confidence: 0.86,
+        priority: 'P3',
+        leadEligibility: 'enrichment-only',
+        description: 'FNS legal-entity enrichment data'
+      },
+      {
+        id: 'fedresurs',
+        name: 'Fedresurs',
+        kind: 'business-signal',
+        confidence: 0.62,
+        priority: 'P3',
+        leadEligibility: 'context-only',
+        description: 'Corporate-event context'
+      },
+      {
         id: 'funding-business-signals',
         name: 'Funding Signals',
         kind: 'business-signal',
@@ -379,9 +403,7 @@ export class MultiSourceLeadGenerator {
    */
   private getActiveSources(): string[] {
     return this.sources
-      .filter(source =>
-        (source.priority !== 'P3' || source.leadEligibility === 'context-only')
-      )
+      .filter(source => source.leadEligibility !== 'enrichment-only' || source.id === 'egrul-fns')
       .map(source => source.id)
   }
 
@@ -416,9 +438,9 @@ export class MultiSourceLeadGenerator {
     // A failure here must not abort the rest of the pipeline.
     let jobBoardLeads: MultiSourceLead[] = []
     try {
-      jobBoardLeads = await this.generateJobBoardLeads(clientProfileId)
+      jobBoardLeads = await this.generateJobBoardLeads(clientProfileId, new Set(sources))
       allLeads.push(...jobBoardLeads)
-      this.recordJobBoardSources(jobBoardLeads)
+      this.recordJobBoardSources(jobBoardLeads, new Set(sources))
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       logError('leads.source_failed', err, { source: 'job-boards' })
@@ -502,9 +524,12 @@ export class MultiSourceLeadGenerator {
    * so the run report exposes per-board lead counts. A source family that
    * contributed no leads is still recorded as ok with leads_count: 0.
    */
-  private recordJobBoardSources(leads: MultiSourceLead[]): void {
+  private recordJobBoardSources(
+    leads: MultiSourceLead[],
+    selectedSourceIds: ReadonlySet<string>,
+  ): void {
     const jobBoardIds = this.sources
-      .filter(s => s.kind === 'job-board')
+      .filter(s => s.kind === 'job-board' && selectedSourceIds.has(s.id))
       .map(s => s.id)
     const counts = new Map<string, number>(jobBoardIds.map(id => [id, 0]))
     for (const lead of leads) {
@@ -526,7 +551,10 @@ export class MultiSourceLeadGenerator {
    * Reads from signals → source-digest-evidence.sql → digest items.
    * Now covers HH, Rabota Rossii, SuperJob, Habr Career, etc.
    */
-  private async generateJobBoardLeads(clientProfileId?: string): Promise<MultiSourceLead[]> {
+  private async generateJobBoardLeads(
+    clientProfileId?: string,
+    selectedSourceIds?: ReadonlySet<string>,
+  ): Promise<MultiSourceLead[]> {
     try {
       const { getHhDigestItems } = await import('@/lib/hhDigest')
 
@@ -562,11 +590,22 @@ export class MultiSourceLeadGenerator {
     }
 
     // Convert to MultiSourceLead format — one evidence source per source family
-    return candidates.map(candidate => {
+    return candidates.flatMap<MultiSourceLead>(candidate => {
       const matchingItem = digestItems.find(item => item.org_id === candidate.companyId)
       const sourceFamilies = matchingItem?.source_families || ['hh']
+      const permittedSourceFamilies = selectedSourceIds
+        ? sourceFamilies.filter(sourceId => selectedSourceIds.has(sourceId))
+        : sourceFamilies
 
-      // Build evidence sources from all contributing source families
+      // A digest candidate must retain at least one explicitly selected
+      // originating source. Enrichment-only selections cannot leak job-board
+      // candidates into the result set.
+      if (permittedSourceFamilies.length === 0) return []
+
+      // Once an explicitly selected lead-originating source admits a candidate,
+      // preserve all linked evidence families. Registry and context sources do
+      // not originate the lead, but they make its identity and rationale
+      // auditable instead of silently disappearing from the card.
       const evidenceSources: EvidenceSource[] = sourceFamilies.map(sourceId => ({
         sourceId,
         sourceName: sourceNameMap[sourceId] || sourceId,
@@ -582,12 +621,11 @@ export class MultiSourceLeadGenerator {
         'superjob', 'habr-career', 'linkedin-company-pages',
         'tech-job-boards', 'regional-job-boards'
       ])
-      const hasBlockedSource = sourceFamilies.some(s => blockedSources.has(s))
       // If ALL sources are blocked, cap confidence at C (review required)
       // If at least one P1 digest-allowed source is present, use the gate from SQL
-      const allBlocked = sourceFamilies.every(s => blockedSources.has(s))
+      const allBlocked = permittedSourceFamilies.every(s => blockedSources.has(s))
 
-      return {
+      return [{
         id: `multi-${candidate.id}`,
         companyId: candidate.companyId,
         companyName: candidate.companyName,
@@ -600,8 +638,10 @@ export class MultiSourceLeadGenerator {
         nextAction: candidate.nextAction,
         reasons: candidate.reasons,
         detectedAt: candidate.detectedAt,
-        enrichment: {}
-      }
+        enrichment: {
+          locations: matchingItem?.location_names ?? [],
+        }
+      }]
     })
     } catch (err) {
       logError('leads.jobboard_failed', err)
@@ -978,8 +1018,8 @@ export class MultiSourceLeadGenerator {
 
   /**
    * Deduplicate leads using EntityResolver from LeadAggregator.
-   * Two-level grouping: first by companyId (org_id from DB), then by
-   * canonicalCompanyId (name hash) for leads without matching org_id.
+   * Three-level grouping: first by legal-entity INN, then by companyId
+   * (org_id from DB), then by canonical name for records without either key.
    * Merges sources and keeps the highest-scored lead per group.
    */
   private async deduplicateLeads(leads: MultiSourceLead[]): Promise<MultiSourceLead[]> {
@@ -992,11 +1032,19 @@ export class MultiSourceLeadGenerator {
     const resolved = await resolver.resolveAll(leads)
 
     // Level 1: Group by companyId (org_id) — definitive match from DB
+    // Different source adapters can create distinct org fragments for the
+    // same Russian legal entity, so INN takes precedence over org_id.
+    const innGroups = new Map<string, (typeof resolved)[number][]>()
     const orgGroups = new Map<string, (typeof resolved)[number][]>()
     const unresolved: (typeof resolved)[number][] = []
 
     for (const lead of resolved) {
-      if (lead.companyId) {
+      if (lead.canonicalCompanyId.startsWith('inn-')) {
+        if (!innGroups.has(lead.canonicalCompanyId)) {
+          innGroups.set(lead.canonicalCompanyId, [])
+        }
+        innGroups.get(lead.canonicalCompanyId)!.push(lead)
+      } else if (lead.companyId) {
         if (!orgGroups.has(lead.companyId)) {
           orgGroups.set(lead.companyId, [])
         }
@@ -1049,6 +1097,9 @@ export class MultiSourceLeadGenerator {
 
     // Merge all groups
     const deduplicated: MultiSourceLead[] = []
+    for (const [, group] of innGroups) {
+      deduplicated.push(mergeGroup(group))
+    }
     for (const [, group] of orgGroups) {
       deduplicated.push(mergeGroup(group))
     }
@@ -1068,9 +1119,40 @@ export class MultiSourceLeadGenerator {
   ): MultiSourceLead[] {
     let filtered = leads
 
+    const normalizeRegion = (value: string): string => {
+      const normalized = value.trim().toLocaleLowerCase('ru-RU').replace(/ё/g, 'е')
+      const aliases: Record<string, string> = {
+        moscow: 'москва',
+        'saint petersburg': 'санкт-петербург',
+        'st petersburg': 'санкт-петербург',
+      }
+      return aliases[normalized] ?? normalized
+    }
+
     // Apply score filter — score comes from DB/FIUR, do NOT recalculate here
     if (options.minScore) {
       filtered = filtered.filter(lead => lead.score >= (options.minScore || 0))
+    }
+
+    if (options.regions && options.regions.length > 0) {
+      const requestedRegions = options.regions
+        .map(normalizeRegion)
+        .filter(Boolean)
+      if (requestedRegions.length > 0) {
+        filtered = filtered.filter((lead) => {
+          const locations = lead.enrichment.locations ?? []
+          // Missing geography is not evidence of a mismatch. Keep the lead
+          // for enrichment/review instead of collapsing a regional profile to
+          // an empty digest.
+          if (locations.length === 0) return true
+          return locations.some((location) => {
+            const normalizedLocation = normalizeRegion(location)
+            return requestedRegions.some(
+              (region) => normalizedLocation.includes(region) || region.includes(normalizedLocation),
+            )
+          })
+        })
+      }
     }
 
     // Sort by score descending

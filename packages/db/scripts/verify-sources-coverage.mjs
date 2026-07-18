@@ -17,7 +17,7 @@ try {
   console.log(`Generated: ${report.timestamp}\n`);
 
   // P1 Coverage
-  console.log('P1 - Core production-ready sources:');
+  console.log('P1 - Core required source families:');
   console.log(`  Required: ${report.requiredTiers.P1.sources.length} sources`);
   console.log(`  Present: ${report.coverageReport.P1.present.length}/${report.requiredTiers.P1.sources.length}`);
   console.log(`  Compliant: ${report.coverageReport.P1.compliant.length}/${report.coverageReport.P1.present.length}`);
@@ -69,12 +69,11 @@ try {
 
   // Digest sources check
   console.log('=== DIGEST SOURCES STATUS ===');
-  ['hh', 'career-pages'].forEach(sourceId => {
-    const source = report.allSources.find(s => s.id === sourceId);
-    if (source) {
-      console.log(`${sourceId}: ${source.promotionStatus} (${source.leadEligibility})`);
-    }
-  });
+  report.allSources
+    .filter(source => source.status === 'active' && source.promotionStatus === 'digest-allowed')
+    .forEach(source => {
+      console.log(`${source.id}: ${source.promotionStatus} (${source.leadEligibility})`);
+    });
   console.log();
 
   // Errors and warnings

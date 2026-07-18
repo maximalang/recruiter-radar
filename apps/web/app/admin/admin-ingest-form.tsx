@@ -68,6 +68,7 @@ export default function AdminIngestForm({ sources }: { sources: AdminSourceOptio
         </label>
         {mode === "single" ? (
           <select
+            aria-label="Источник для инжеста"
             value={source}
             onChange={(e) => setSource(e.target.value)}
             style={{
@@ -114,6 +115,8 @@ export default function AdminIngestForm({ sources }: { sources: AdminSourceOptio
 
       {state.message ? (
         <div
+          role="status"
+          aria-live="polite"
           style={{
             padding: "10px 12px",
             borderRadius: "10px",
