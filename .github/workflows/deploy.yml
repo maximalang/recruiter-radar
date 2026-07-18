@@ -83,7 +83,7 @@ jobs:
           exit 1
           SSH_EOF
 
-      - name: Verify public HTTPS endpoint and embedded favicon
+      - name: Verify public HTTPS endpoint, brand layout, and embedded favicon
         run: |
           # Retry loop: Caddy may briefly 502 while the recreated web container
           # finishes booting (Next.js ready ~2-4s after container health passes).
@@ -92,25 +92,31 @@ jobs:
             echo "Public /api/health attempt $i -> HTTP $code"
             if [ "$code" = "200" ]; then
               landing_ok=false
-              inline_logo_ok=false
+              brand_layout_ok=false
               favicon_ok=false
 
               landing_html=$(curl -fsS https://recruiter-radar.ru/ --max-time 30 || true)
               if printf '%s' "$landing_html" | grep -q "Компания и контакты"; then
                 landing_ok=true
               fi
-              if printf '%s' "$landing_html" | grep -q 'data-mark="true"' \
-                && printf '%s' "$landing_html" | grep -q 'data-logo-mark="inline"'; then
-                inline_logo_ok=true
+
+              footer_mark_count=$(printf '%s' "$landing_html" \
+                | grep -o 'recruiter-radar-mark-brand15.svg' \
+                | wc -l || true)
+              if printf '%s' "$landing_html" | grep -q 'data-mark="false"' \
+                && ! printf '%s' "$landing_html" | grep -q 'data-logo-mark="inline"' \
+                && [ "$footer_mark_count" = "1" ]; then
+                brand_layout_ok=true
               fi
+
               if printf '%s' "$landing_html" \
                 | grep -q 'rel="icon"[^>]*href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAM'; then
                 favicon_ok=true
               fi
 
-              echo "landing_ok=$landing_ok inline_logo_ok=$inline_logo_ok favicon_ok=$favicon_ok"
-              if [ "$landing_ok" = "true" ] && [ "$inline_logo_ok" = "true" ] && [ "$favicon_ok" = "true" ]; then
-                echo "Public endpoint, inline logo, and embedded favicon are live"
+              echo "landing_ok=$landing_ok brand_layout_ok=$brand_layout_ok favicon_ok=$favicon_ok"
+              if [ "$landing_ok" = "true" ] && [ "$brand_layout_ok" = "true" ] && [ "$favicon_ok" = "true" ]; then
+                echo "Public endpoint, text-only header wordmark, single footer mark, and embedded favicon are live"
                 exit 0
               fi
             fi
