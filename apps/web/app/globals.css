@@ -28,6 +28,14 @@
   --lh-small: 1.5;
   --ls-small: 0;
   --fw-small: 500;
+  /* Mid-size heading token — the step between section title and body. Used by
+     the landing preview-card heading and the secondary-plan per-month price.
+     Was referenced before it existed, so those headings silently fell back to
+     the 16px body size; defining it restores the intended hierarchy. */
+  --fs-lg: 1.18rem;
+  --lh-lg: 1.3;
+  --ls-lg: -0.012em;
+  --fw-lg: 720;
   --space-section: 18px;
   --space-section-lg: 40px;
   --space-card-padding: 24px;
