@@ -5,15 +5,15 @@ import { render, screen } from '@testing-library/react';
 import { BrandLogo } from '../../../../app/ui/brand-logo';
 
 describe('BrandLogo', () => {
-  it('renders the exact uploaded Recruiter Radar mark with a separate wordmark', () => {
+  it('renders the polished Recruiter Radar mark with a separate wordmark', () => {
     const { container } = render(<BrandLogo />);
 
     const logo = screen.getByRole('img', { name: 'Recruiter Radar' });
     const artwork = logo.querySelector('img');
 
-    expect(artwork?.getAttribute('src')).toBe('/brand/recruiter-radar-mark-brand12.svg');
-    expect(artwork?.getAttribute('width')).toBe('128');
-    expect(artwork?.getAttribute('height')).toBe('128');
+    expect(artwork?.getAttribute('src')).toBe('/brand/recruiter-radar-mark-brand13.svg');
+    expect(artwork?.getAttribute('width')).toBe('512');
+    expect(artwork?.getAttribute('height')).toBe('512');
     expect(artwork?.getAttribute('alt')).toBe('');
     expect(container.querySelector('svg')).toBeNull();
     expect(container.querySelector('[data-wordmark="true"]')).toBeTruthy();
@@ -29,7 +29,7 @@ describe('BrandLogo', () => {
     const logo = screen.getByRole('img', { name: 'Recruiter Radar' });
     const artwork = logo.querySelector('img');
 
-    expect(artwork?.getAttribute('src')).toBe('/brand/recruiter-radar-mark-brand12.svg');
+    expect(artwork?.getAttribute('src')).toBe('/brand/recruiter-radar-mark-brand13.svg');
     expect(container.querySelector('[data-tone="dark"]')).toBeTruthy();
     expect(container.querySelector('[data-size="small"]')).toBeTruthy();
     expect(container.querySelector('[data-wordmark="false"]')).toBeTruthy();
