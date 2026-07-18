@@ -15,7 +15,6 @@
   },
   "dependencies": {
     "@mendable/firecrawl-js": "^4.25.1",
-    "crawlee": "^3.16.0",
     "ioredis": "^5.11.1",
     "next": "^16.0.0",
     "nodemailer": "^9.0.1",
