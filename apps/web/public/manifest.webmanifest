@@ -5,10 +5,10 @@
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f7faff",
-  "theme_color": "#07101f",
+  "theme_color": "#f5f8ff",
   "icons": [
     {
-      "src": "/icon.svg?v=brand-13",
+      "src": "/icon.svg?v=brand-14",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
