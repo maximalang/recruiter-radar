@@ -12,6 +12,10 @@ export default function SettingsOverview(props: {
   emailEnabled: boolean;
   webPushEnabled: boolean;
 }) {
+  const deliveryReady = props.deliveryEnabled && (
+    props.telegramConnected || props.emailEnabled || props.webPushEnabled
+  );
+
   return (
     <div className={styles.overview}>
       <section className={styles.intro}>
@@ -37,9 +41,15 @@ export default function SettingsOverview(props: {
         <article className={styles.card}>
           <BellIcon className={styles.cardIcon} aria-hidden="true" />
           <span className={styles.cardLabel}>Расписание</span>
-          <strong>{props.deliveryEnabled ? "Доставка включена" : "Доставка выключена"}</strong>
+          <strong>
+            {deliveryReady
+              ? "Доставка включена"
+              : props.deliveryEnabled
+                ? "Доставка ожидает канал"
+                : "Доставка выключена"}
+          </strong>
           <div className={styles.cardMeta}>
-            <span>{props.deliverySchedule}</span>
+            <span>{deliveryReady ? props.deliverySchedule : "Подключите хотя бы один канал доставки."}</span>
           </div>
           <Link href="/profile#delivery">Настроить расписание</Link>
         </article>
