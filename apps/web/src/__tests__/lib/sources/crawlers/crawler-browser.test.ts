@@ -14,6 +14,7 @@ import { createCrawleeSpaEngine } from '@/lib/sources/crawlers/crawler-crawlee'
 describe('Playwright SPA crawler', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    delete process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
   })
 
   it('renders a page in an isolated context and closes the browser', async () => {
@@ -58,5 +59,17 @@ describe('Playwright SPA crawler', () => {
       'navigation failed',
     )
     expect(close).toHaveBeenCalledTimes(1)
+  })
+
+  it('uses the production system Chromium when configured', async () => {
+    process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH = '/usr/bin/chromium-browser'
+    const engine = createCrawleeSpaEngine()
+
+    await engine.fetch({ url: 'https://careers.example' })
+
+    expect(launch).toHaveBeenCalledWith({
+      headless: true,
+      executablePath: '/usr/bin/chromium-browser',
+    })
   })
 })
