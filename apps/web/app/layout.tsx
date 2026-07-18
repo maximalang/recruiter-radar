@@ -11,19 +11,19 @@ const inter = Inter({
   display: "swap",
 });
 
-const faviconUrl = "/favicon-brand23?v=brand-23";
+const faviconUrl = "/icon.svg?v=brand-24";
 
 export const metadata: Metadata = {
   title: "Recruiter Radar",
   description: "Ежедневный радар по компаниям с активным наймом для рекрутеров и агентств.",
-  manifest: "/manifest.webmanifest?v=brand-23",
+  manifest: "/manifest.webmanifest?v=brand-24",
   applicationName: "Recruiter Radar",
   icons: {
     icon: [
       {
         url: faviconUrl,
-        type: "image/png",
-        sizes: "64x64",
+        type: "image/svg+xml",
+        sizes: "any",
       },
     ],
     shortcut: faviconUrl,
@@ -44,8 +44,8 @@ export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="ru">
       <head>
-        <link rel="icon" type="image/png" sizes="64x64" href={faviconUrl} />
-        <link rel="shortcut icon" type="image/png" href={faviconUrl} />
+        <link rel="icon" type="image/svg+xml" sizes="any" href={faviconUrl} />
+        <link rel="shortcut icon" type="image/svg+xml" href={faviconUrl} />
         <link rel="apple-touch-icon" href={faviconUrl} />
       </head>
       <body
