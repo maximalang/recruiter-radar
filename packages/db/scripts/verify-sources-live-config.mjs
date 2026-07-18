@@ -6,6 +6,13 @@
  */
 
 import { listSources } from './source-registry.mjs';
+import { existsSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const scriptDir = dirname(fileURLToPath(import.meta.url));
+const defaultCareerPageTargets = resolve(scriptDir, 'career-pages-targets.json');
+const REQUIRED_LAUNCH_SOURCES = ['hh', 'career-pages'];
 
 console.log('Verifying source live configuration...\n');
 
@@ -122,7 +129,9 @@ try {
   console.log(`With blockers: ${results.blockers.length}`);
 
   // Check for launch readiness
-  const launchReady = results.productionReady.length >= 2; // At least HH and career-pages
+  const readySourceIds = new Set(results.productionReady.map(source => source.id));
+  const launchReady = REQUIRED_LAUNCH_SOURCES.every(sourceId => readySourceIds.has(sourceId))
+    && results.blockers.length === 0;
   console.log(`\nLaunch ready: ${launchReady ? 'YES' : 'NO'}`);
 
   if (launchReady) {
@@ -169,18 +178,23 @@ function checkSourceEnvironment(source) {
       break;
 
     case 'rabota-rossii':
-      if (process.env.RABOTA_ROSSII_SEARCH_TEXT || !process.env.DATABASE_URL) {
-        result.productionReady = true;
-        result.modes = ['live-public'];
-      }
+      result.productionReady = true;
+      result.modes = ['live-public'];
       break;
 
     case 'career-pages':
       if (process.env.CAREER_PAGES_TARGETS_FILE ||
           process.env.CAREER_PAGES_INPUT_FILE ||
-          process.env.DATABASE_URL) {
+          process.env.DATABASE_URL ||
+          existsSync(defaultCareerPageTargets)) {
         result.productionReady = true;
         result.modes = ['live-public', 'file'];
+      } else {
+        result.requiredEnv = [
+          'CAREER_PAGES_TARGETS_FILE',
+          'CAREER_PAGES_INPUT_FILE',
+          'or DATABASE_URL',
+        ];
       }
       break;
 
