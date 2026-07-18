@@ -31,17 +31,30 @@
 .footerTop {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
   gap: 20px;
   flex-wrap: wrap;
 }
 
 .footerBrand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
   font-size: 1rem;
   font-weight: 800;
   color: var(--c-text-primary, #0f172a);
   text-decoration: none;
   letter-spacing: -0.01em;
+}
+
+.footerMark {
+  display: block;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  object-fit: contain;
+  user-select: none;
 }
 
 .siteFooter[data-tone="dark"] .footerBrand {
@@ -163,6 +176,12 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
+  }
+
+  .footerMark {
+    width: 42px;
+    height: 42px;
+    flex-basis: 42px;
   }
 
   .footerLinks {

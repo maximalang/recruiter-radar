@@ -33,6 +33,15 @@ export async function SiteFooter(props: { tone?: "light" | "dark" }) {
       <div className={s.footerInner}>
         <div className={s.footerTop}>
           <Link href="/" className={s.footerBrand}>
+            <img
+              className={s.footerMark}
+              src="/brand/recruiter-radar-mark-brand15.svg"
+              width={48}
+              height={48}
+              alt=""
+              aria-hidden="true"
+              draggable={false}
+            />
             <BrandLogo size="small" tone={tone} />
           </Link>
           <nav className={s.footerLinks} aria-label="Подвал">
