@@ -1,11 +1,11 @@
 /**
  * Cron: Daily Radar Pipeline
  *
- * Triggered by the Railway-native cron (cron/trigger-daily-radar.mjs) to run
+ * Triggered by the production cron (cron/trigger-daily-radar.mjs) to run
  * the complete daily cycle:
  *   1. Ingest all primary sources (see getPrimarySourceIds in the source registry)
  *   2. Generate digest for each active client profile
- *   3. Deliver digest to Telegram
+ *   3. Deliver the digest to every enabled channel
  *
  * Auth: CRON_API_KEY (separate from ingestion/digest keys)
  * Runtime: nodejs (requires child_process for ingestion scripts)
@@ -134,7 +134,7 @@ async function generateAndDeliverDigests(): Promise<DigestDeliveryResult[]> {
     return [{ clientProfileId: 'none', ok: false, sent: 0, failed: 0, skipped: 0, error: 'DATABASE_URL not set' }]
   }
 
-  // Get all active client profiles with Telegram connected AND delivery enabled.
+  // Load active profiles that have at least one usable delivery channel.
   // delivery_enabled is the master toggle (Block 3): when false the profile gets
   // no digest, regardless of channel config. weekly frequency is honored at run
   // time below — the row still loads, but is skipped on non-target days.
@@ -142,8 +142,32 @@ async function generateAndDeliverDigests(): Promise<DigestDeliveryResult[]> {
     SELECT id::TEXT AS id, delivery_frequency
     FROM client_profiles
     WHERE is_active = true
-      AND telegram_chat_id IS NOT NULL
       AND delivery_enabled = true
+      AND (
+        telegram_chat_id IS NOT NULL
+        OR (email_digest_enabled = true AND digest_email IS NOT NULL)
+        OR (
+          web_push_enabled = true
+          AND EXISTS (
+            SELECT 1
+            FROM web_push_subscriptions wps
+            WHERE wps.client_profile_id = client_profiles.id
+              AND wps.is_active = true
+          )
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM notification_routes nr
+          INNER JOIN notification_endpoints ne ON ne.id = nr.endpoint_id
+          INNER JOIN notification_provider_accounts npa ON npa.id = ne.provider_account_id
+          WHERE nr.client_profile_id = client_profiles.id
+            AND nr.event_kind = 'daily_digest'
+            AND nr.status = 'active'
+            AND ne.status = 'active'
+            AND ne.destination_id IS NOT NULL
+            AND npa.status IN ('active', 'degraded')
+        )
+      )
     ORDER BY id
   `)
 

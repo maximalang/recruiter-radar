@@ -117,6 +117,7 @@ export async function deliverCandidatesForRun(runId: string): Promise<DeliverRun
       })
 
       let telegramOk = false
+      let telegramSkipped = false
       let telegramError: string | null = null
       if (customTelegram) {
         const customResult = await dispatchDigestNotifications({
@@ -143,8 +144,13 @@ export async function deliverCandidatesForRun(runId: string): Promise<DeliverRun
         }
       } else {
         const legacyResult = await sendBatchDigestForRun({ runId, clientProfileId })
-        telegramOk = legacyResult.ok
-        telegramError = legacyResult.ok ? null : legacyResult.error
+        if (legacyResult.ok) {
+          telegramOk = true
+        } else {
+          telegramSkipped = legacyResult.error === 'Client profile has no linked Telegram chat.'
+          telegramOk = telegramSkipped
+          telegramError = telegramSkipped ? null : legacyResult.error
+        }
       }
 
       if (telegramOk) {
@@ -152,7 +158,8 @@ export async function deliverCandidatesForRun(runId: string): Promise<DeliverRun
           `UPDATE digest_delivery_attempts SET status = 'sent', error_message = NULL WHERE id = $1 AND processing_claim_token = $2`,
           [attempt.id, claimToken]
         )
-        counters.sent += 1
+        if (telegramSkipped) counters.skipped += 1
+        else counters.sent += 1
       } else {
         const error = telegramError ?? 'Telegram delivery failed.'
         await pool.query(
