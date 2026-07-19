@@ -146,13 +146,17 @@
   position: relative;
   overflow: hidden;
   border-radius: var(--radius-card);
-  margin-bottom: 18px;
-  min-height: max(620px, calc(100svh - 64px));
+  margin-bottom: 14px;
+  /* Was max(620px, 100svh - 64px) — a full-screen hero that pushed everything
+     else below the fold and left ~132px of bare backdrop between the hero and
+     the nav bar, reading as "пусто". Cap the hero at a fixed premium height so
+     the nav + first section are visible without a full screen of dark. */
+  min-height: 560px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  padding: clamp(52px, 7vw, 88px) clamp(28px, 6vw, 72px);
+  padding: clamp(40px, 5vw, 64px) clamp(28px, 6vw, 72px);
   background:
     radial-gradient(70% 90% at 50% 0%, rgba(59, 130, 246, 0.2) 0%, transparent 58%),
     #0b1324;
