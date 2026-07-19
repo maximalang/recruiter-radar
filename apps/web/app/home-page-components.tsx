@@ -166,21 +166,48 @@ export function buildPreviewEvidenceItems(input: {
 }
 
 /** Balance malformed registry quotes while preserving the legal display name. */
+/**
+ * Russian legal-form prefixes that precede the trading name in registry data
+ * (АО, ООО, ПАО, ГУП, МУП, ГБУ/ГБУЗ/ГКУ, ФГБОУ ВО / ФГБОУ / ФГБНУ, ГАУ, ИП …).
+ * They read as boilerplate noise on a public lead card — the hero example
+ * shows "Производственная компания", not "ООО «Производственная компания»", so
+ * a real lead should match that register. Stripping the prefix is display-only:
+ * the full legal name still lives on the org record and in the digest; this is
+ * the public-facing card label. The list is anchored on the org-form tokens that
+ * actually appear in prod lead names (sampled from the live preview).
+ */
+const LEGAL_FORM_PREFIX = /^(?:ФГБОУ ВО|ФГБОУ|ФГБНУ|ФГАНУ|ФГБУ|ФГУП|ФГУ|ГБПОУ ВО|ГБПОУ|ГБУЗ|ГБУ|ГБОУ|ГКУК|ГКУ|ГАУК|ГАУ|ГПО|ГУП|МУП|ФКУ|ПАО|НАО|ОАО|ЗАО|ООО|ОДО|АНО|НОП|НКО|ТОО|КФХ|БФ|ИП|АО|НО|НП|УК|РГП|Фонд)\s+/i;
+
 export function cleanEmployerName(raw: string): string {
   const name = (raw ?? '').trim().replace(/\s+/g, ' ');
   if (!name) return name;
 
+  // 1) Strip the leading legal-form prefix FIRST so the quote logic below works
+  //    on the trading name, not "АО «…»". Registry writes the prefix outside the
+  //    quotes ("АО "ГОСТИНИЦА "СОВЕТСКАЯ""), so removing it leaves
+  //    `"ГОСТИНИЦА "СОВЕТСКАЯ""` — the descriptive lead + a nested brand.
+  //    Apply repeatedly in case a name carries two prefixes (rare).
+  let dePrefixed = name;
+  for (let guard = 0; guard < 3; guard += 1) {
+    const next = dePrefixed.replace(LEGAL_FORM_PREFIX, '');
+    if (next === dePrefixed) break;
+    dePrefixed = next;
+  }
+
+  // 2) Convert straight quotes to guillemets (opening after whitespace/«,
+  //    closing otherwise).
   let normalized = '';
-  for (let index = 0; index < name.length; index += 1) {
-    const character = name[index];
+  for (let index = 0; index < dePrefixed.length; index += 1) {
+    const character = dePrefixed[index];
     if (character !== '"') {
       normalized += character;
       continue;
     }
-    const previous = index > 0 ? name[index - 1] : ' ';
+    const previous = index > 0 ? dePrefixed[index - 1] : ' ';
     normalized += /[\s«]/.test(previous) ? '«' : '»';
   }
 
+  // 3) Drop empty quote pairs, then balance any dangling open quotes.
   let balanced = '';
   let openQuotes = 0;
   for (const character of normalized.replace(/«\s*»/g, '')) {
@@ -191,8 +218,21 @@ export function cleanEmployerName(raw: string): string {
     }
     balanced += character;
   }
+  balanced = `${balanced}${'»'.repeat(openQuotes)}`.replace(/\s+/g, ' ').trim() || name;
 
-  return `${balanced}${'»'.repeat(openQuotes)}`.replace(/\s+/g, ' ').trim() || name;
+  // 4) Collapse a double-nested quote: `«ГОСТИНИЦА «СОВЕТСКАЯ»»` (the registry
+  //    writes the trading name once as a wrapper, once as the brand inside) →
+  //    `ГОСТИНИЦА «СОВЕТСКАЯ»`. Keep the descriptive lead + the innermost quoted
+  //    brand at a single clean level. If there's only one quote level, unchanged.
+  const doubleNested = balanced.match(/^«([^«»]*)«([^«»]+)»»$/);
+  if (doubleNested) {
+    const lead = doubleNested[1].trim();
+    const brand = doubleNested[2].trim();
+    balanced = lead ? `${lead} «${brand}»` : `«${brand}»`;
+    balanced = balanced.replace(/\s+/g, ' ').trim();
+  }
+
+  return balanced || name;
 }
 
 export function buildFaqItems(paymentConfigured: boolean) {
