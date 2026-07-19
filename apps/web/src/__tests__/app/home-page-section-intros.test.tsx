@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import Link from "next/link";
 
 import HomePage, { PreviewSection } from "@/app/page";
-import { NoticeBox, SectionIntro } from "@/app/ui/page-primitives";
+import { NoticeBox, SectionIntro, SurfaceCard } from "@/app/ui/page-primitives";
 import {
   buildCheckoutHref,
   getPublicSampleDigestState,
@@ -95,6 +95,8 @@ describe("landing section hierarchy", () => {
   it("keeps the hero concise and makes the pilot the obvious first decision", async () => {
     const page = await HomePage({ searchParams: Promise.resolve({}) });
     const pageText = readVisibleText(page);
+    const alignedPlanCards = collectElements(page, SurfaceCard)
+      .filter((card) => card.props.padding === "var(--plan-card-padding)");
     const pricingIntro = collectElements(page, SectionIntro)
       .find((section) => section.props.eyebrow === "Тарифы");
 
@@ -102,6 +104,7 @@ describe("landing section hierarchy", () => {
     expect(pricingIntro?.props.title).toBe("Начните с недели. Продолжайте, только если радар полезен.");
     expect(pricingIntro?.props.description).toContain("Пилот — разовая оплата без продления.");
     expect(pageText).toContain("Проверьте новый канал за 7 дней");
+    expect(alignedPlanCards).toHaveLength(3);
     expect(pageText).not.toContain("0 автоспама");
     expect(pageText).not.toContain("Один радар — на неделю, месяц или квартал");
   });

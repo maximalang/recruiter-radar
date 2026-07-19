@@ -699,6 +699,7 @@
 
 .qualityMethodCard,
 .deliveryCard {
+  padding: clamp(24px, 3vw, 32px);
   border: 1px solid rgba(20, 40, 72, 0.12);
   border-radius: 22px;
   overflow: hidden;
@@ -709,7 +710,6 @@
   display: grid;
   align-content: start;
   gap: 22px;
-  padding: clamp(24px, 3.5vw, 38px);
   color: #f8fbff;
   background:
     radial-gradient(circle at 90% 10%, rgba(65, 118, 255, 0.18), transparent 32%),
@@ -836,9 +836,9 @@
 
 .deliveryCard {
   display: grid;
+  grid-template-rows: auto auto 1fr;
   align-content: start;
   gap: 18px;
-  padding: clamp(22px, 3vw, 30px);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(244, 248, 254, 0.96));
 }
 
@@ -925,6 +925,7 @@
 }
 
 .deliveryNote {
+  align-self: end;
   color: var(--c-text-tertiary);
   font-size: 0.78rem;
   line-height: 1.55;
@@ -1482,6 +1483,7 @@
 
 /* ── Pricing — three equal-weight cards, pilot gently featured ── */
 .pricingGrid {
+  --plan-card-padding: 28px 26px;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 16px;
@@ -1497,7 +1499,6 @@
   gap: 16px;
   border: 1px solid var(--c-border);
   background-color: rgba(255, 255, 255, 0.92);
-  padding: 28px 26px;
   overflow: hidden;
   box-shadow: 0 10px 30px rgba(15, 35, 68, 0.05);
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
@@ -1527,11 +1528,12 @@
   background: linear-gradient(90deg, var(--c-brand) 0%, #60a5fa 100%);
 }
 
-/* Featured badge — floats above the featured card's top border. */
+/* Featured badge stays inside the card header so it cannot be clipped by the
+   SurfaceCard paint containment and remains aligned with the plan label. */
 .primaryPlanBadge {
-  position: absolute;
-  top: -12px;
-  left: 22px;
+  position: static;
+  flex: 0 0 auto;
+  align-self: start;
   padding: 6px 12px;
   border-radius: 999px;
   background: var(--c-brand);
@@ -1572,7 +1574,7 @@
   color: var(--c-text-muted);
   font-size: 0.74rem;
   line-height: 1.5;
-  text-align: center;
+  text-align: left;
 }
 
 .primaryPlanCardHead {
@@ -1628,6 +1630,11 @@
    stretched height (align-items: stretch on .pricingGrid). */
 .planCta {
   margin-top: auto;
+  min-height: 45px;
+  box-sizing: border-box;
+  padding-inline: 14px;
+  font-size: 0.86rem;
+  text-align: center;
 }
 
 /* Single shared "what's included" block under pricing */
@@ -1937,9 +1944,8 @@
     justify-self: start;
   }
 
-  .primaryPlanCard,
-  .secondaryPlanCard {
-    padding: 22px 20px;
+  .pricingGrid {
+    --plan-card-padding: 22px 20px;
   }
 
   .includedOnce {

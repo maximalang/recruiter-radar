@@ -279,8 +279,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           <SurfaceCard
             key={pilotPlan.code}
             className={`${hpStyles.primaryPlanCard} ${hpStyles.revealCard}`}
+            padding="var(--plan-card-padding)"
           >
-            <span className={hpStyles.primaryPlanBadge}>Рекомендуем начать</span>
             <div className={hpStyles.primaryPlanCardHead}>
               <div className={ppStyles.planPriceContainer}>
                 <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
@@ -293,19 +293,20 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                 </div>
                 <div className={ppStyles.planPriceCadence}>{pilotPlan.cadence}</div>
               </div>
+              <span className={hpStyles.primaryPlanBadge}>Рекомендуем начать</span>
             </div>
             <p className={hpStyles.planDescription}>{pilotPlan.description}</p>
             <div className={hpStyles.planFeatureLine}>
               <b>Разовая оплата</b>
               <span>Без автопродления</span>
             </div>
+            <p className={hpStyles.billingNote}>После оплаты вы настраиваете профиль и подключаете Telegram.</p>
             <Link
               href={buildCheckoutHref({ ...previewInput, planCode: pilotPlan.code })}
               className={`${ppStyles.primaryAction} ${hpStyles.planCta}`}
             >
               {pilotPlan.ctaLabel}
             </Link>
-            <p className={hpStyles.billingNote}>После оплаты вы настраиваете профиль и подключаете Telegram.</p>
           </SurfaceCard>
 
           <div className={hpStyles.secondaryPlansRow}>
@@ -315,6 +316,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                 <SurfaceCard
                   key={plan.code}
                   className={`${hpStyles.secondaryPlanCard} ${hpStyles.revealCard}`}
+                  padding="var(--plan-card-padding)"
                 >
                   <div className={ppStyles.planPriceContainer}>
                     <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
