@@ -42,7 +42,7 @@ export async function SiteFooter(props: { tone?: "light" | "dark" }) {
               aria-hidden="true"
               draggable={false}
             />
-            <BrandLogo size="small" tone={tone} />
+            <BrandLogo size="small" tone={tone} joined={false} />
           </Link>
           <nav className={s.footerLinks} aria-label="Подвал">
             <Link href="/legal" className={s.footerLink}>Реквизиты</Link>
