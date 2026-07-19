@@ -100,8 +100,12 @@ jobs:
                 landing_ok=true
               fi
 
+              # Count only the real footer <img> mark — not the Next.js
+              # <link rel="preload"> hint or the RSC flight-data serializations,
+              # which also embed the asset path and would inflate a bare-string
+              # grep to 4 hits on a page with exactly one visible mark.
               footer_mark_count=$(printf '%s' "$landing_html" \
-                | grep -o 'recruiter-radar-mark-brand15.svg' \
+                | grep -oE '<img[^>]*recruiter-radar-mark-brand15\.svg[^>]*>' \
                 | wc -l || true)
               if printf '%s' "$landing_html" | grep -q 'data-mark="false"' \
                 && ! printf '%s' "$landing_html" | grep -q 'data-logo-mark="inline"' \
