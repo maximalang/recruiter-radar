@@ -1,9 +1,14 @@
 import { Children, isValidElement, type ReactNode } from "react";
 import Link from "next/link";
 
-import HomePage from "@/app/page";
+import HomePage, { PreviewSection } from "@/app/page";
 import { NoticeBox, SectionIntro } from "@/app/ui/page-primitives";
-import { getPublicSampleDigestState } from "@/lib/publicProduct";
+import {
+  buildCheckoutHref,
+  getPublicSampleDigestState,
+  hasPublicPreviewInput,
+  readPublicPreviewInput,
+} from "@/lib/publicProduct";
 
 jest.mock("@/lib/payments", () => ({
   getPaymentProviderSetupState: () => ({ configured: false }),
@@ -56,14 +61,25 @@ describe("landing section hierarchy", () => {
   });
 
   it("uses the brand-accent eyebrow on every public landing section", async () => {
+    // The live preview is now an async <PreviewSection> behind a <Suspense>
+    // boundary (the home page is `force-dynamic` and the digest query blocked
+    // the whole render — see page.tsx). HomePage's static tree no longer
+    // contains the preview's children, so we render both halves and combine:
+    // HomePage renders Что внутри / Проблема / Как работает / Тарифы /
+    // Перед запуском (5 SectionIntros), PreviewSection renders Пример результата
+    // (1) — six total, matching the original count. The "Карточка лида" anatomy
+    // exhibit was removed earlier as a duplicate of the hero card.
     const page = await HomePage({ searchParams: Promise.resolve({}) });
-    const sectionIntros = collectElements(page, SectionIntro);
+    const preview = await PreviewSection({
+      previewInput: readPublicPreviewInput({}),
+      hasPreview: false,
+      checkoutHref: buildCheckoutHref(readPublicPreviewInput({})),
+    });
+    const sectionIntros = [
+      ...collectElements(page, SectionIntro),
+      ...collectElements(preview, SectionIntro),
+    ];
 
-    // Six sections: Что внутри / Проблема / Пример результата / Как работает /
-    // Тарифы / Перед запуском. The "Карточка лида" anatomy exhibit was removed
-    // as a duplicate of the hero "Пример структуры сигнала" card — both showed
-    // the same demo "Производственная компания 87/100", so the exhibit added a
-    // second copy of the same content instead of teaching anything new.
     expect(sectionIntros).toHaveLength(6);
     expect(sectionIntros.every((section) => section.props.accent === true)).toBe(true);
   });
@@ -76,29 +92,35 @@ describe("landing section hierarchy", () => {
       items: [],
     });
 
-    const page = await HomePage({
-      searchParams: Promise.resolve({ specialization: "инженерный подбор" }),
+    const input = readPublicPreviewInput({ specialization: "инженерный подбор" });
+    const preview = await PreviewSection({
+      previewInput: input,
+      hasPreview: hasPublicPreviewInput(input),
+      checkoutHref: buildCheckoutHref(input),
     });
-    const pageText = readVisibleText(page);
-    const notices = collectElements(page, NoticeBox);
-    const previewIntro = collectElements(page, SectionIntro)
+    const previewText = readVisibleText(preview);
+    const notices = collectElements(preview, NoticeBox);
+    const previewIntro = collectElements(preview, SectionIntro)
       .find((section) => section.props.eyebrow === "Пример результата");
 
-    expect(pageText).toContain("Демо радара");
-    expect(pageText).not.toContain("Радар для вашего профиля");
+    expect(previewText).toContain("Демо радара");
+    expect(previewText).not.toContain("Радар для вашего профиля");
     expect(notices.some((notice) => notice.props.title === "Показываем демо-карточки")).toBe(true);
-    expect(pageText).toContain("Запустить актуальный радар");
+    expect(previewText).toContain("Запустить актуальный радар");
     expect(previewIntro?.props.description).toBe(
       "Задайте город и специализацию. Сейчас можно оценить структуру карточек; актуальная выдача появится здесь после восстановления источника.",
     );
   });
 
   it("keeps filter submit and reset actions anchored to the preview", async () => {
-    const page = await HomePage({
-      searchParams: Promise.resolve({ specialization: "инженерный подбор" }),
+    const input = readPublicPreviewInput({ specialization: "инженерный подбор" });
+    const preview = await PreviewSection({
+      previewInput: input,
+      hasPreview: hasPublicPreviewInput(input),
+      checkoutHref: buildCheckoutHref(input),
     });
-    const forms = collectElements(page, "form");
-    const links = collectElements(page, Link);
+    const forms = collectElements(preview, "form");
+    const links = collectElements(preview, Link);
     const resetLink = links.find((link) => readVisibleText(link) === "Сбросить");
 
     expect(forms).toHaveLength(1);
@@ -107,8 +129,13 @@ describe("landing section hierarchy", () => {
   });
 
   it("constrains the public profile fields before submission", async () => {
-    const page = await HomePage({ searchParams: Promise.resolve({}) });
-    const inputs = collectElements(page, "input");
+    const input = readPublicPreviewInput({});
+    const preview = await PreviewSection({
+      previewInput: input,
+      hasPreview: hasPublicPreviewInput(input),
+      checkoutHref: buildCheckoutHref(input),
+    });
+    const inputs = collectElements(preview, "input");
     const specialization = inputs.find((input) => input.props.name === "specialization");
     const targetCity = inputs.find((input) => input.props.name === "targetCity");
 

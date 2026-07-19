@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 import { getPaymentProviderSetupState } from "../lib/payments";
 import {
@@ -8,7 +9,8 @@ import {
   buildCheckoutHref,
   getPublicSampleDigestState,
   hasPublicPreviewInput,
-  readPublicPreviewInput
+  readPublicPreviewInput,
+  type PublicPreviewInput,
 } from "../lib/publicProduct";
 import { formatScorePoints, scorePercent, scoreTone } from "../lib/scoring/score-display";
 import { formatLawfulContactPath, deriveWhyNow } from "../lib/leads-data";
@@ -76,14 +78,19 @@ const principles = [
 
 export default async function HomePage({ searchParams }: HomePageProps) {
   const resolvedSearchParams = (await searchParams) ?? {};
+  // Pure search-param parse only — no DB. This keeps `previewInput` available
+  // for the pricing cards + closing CTA (which read it synchronously) while the
+  // actual digest DB query lives behind a <Suspense> boundary in <PreviewSection>
+  // below. The home page is `force-dynamic`, so without the boundary the whole
+  // server render blocked on getPublicSampleDigestState (a Postgres query) and
+  // first-contentful-paint sat at ~2.5s — the "half the landing doesn't load"
+  // symptom. Now hero + principles + problem + how-it-works + pricing + FAQ
+  // paint immediately and the live preview streams in.
   const previewInput = readPublicPreviewInput(resolvedSearchParams);
-  const previewState = await getPublicSampleDigestState(previewInput);
   const hasPreview = hasPublicPreviewInput(previewInput);
   const checkoutHref = buildCheckoutHref(previewInput);
   const paymentSetup = getPaymentProviderSetupState();
   const faqItems = buildFaqItems(paymentSetup.configured);
-  const visiblePreviewItems = previewState.items.slice(0, VISIBLE_PREVIEW_ITEMS);
-  const hiddenPreviewItems = previewState.items.slice(VISIBLE_PREVIEW_ITEMS);
   const pilotPlan = PUBLIC_PLANS.find((p) => p.code === "pilot") ?? PUBLIC_PLANS[0];
   const secondaryPlans = PUBLIC_PLANS.filter((p) => p.code !== "pilot");
 
@@ -225,150 +232,13 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         </div>
       </ScrollReveal>
 
-      {/* Live preview */}
-      <ScrollReveal as="section" id="preview" className={hpStyles.scrollSection}>
-        <SectionIntro
-          accent
-          eyebrow="Пример результата"
-          title="Так выглядит утренний радар"
-          description={previewState.isLive
-            ? "Задайте город и специализацию — справа появится тот самый список, что утром приходит в Telegram."
-            : "Задайте город и специализацию. Сейчас можно оценить структуру карточек; актуальная выдача появится здесь после восстановления источника."}
-        />
-
-        <div className={hpStyles.previewGrid}>
-          <SurfaceCard className={hpStyles.previewCardContainer}>
-            <div className={hpStyles.previewCardHeading}>Параметры профиля</div>
-
-            <form method="GET" action="/#preview" style={{ display: "grid", gap: "14px" }}>
-              <label htmlFor="specialization" className={ppStyles.field}>
-                <span className={ppStyles.fieldLabel}>Специализация</span>
-                <input
-                  id="specialization"
-                  name="specialization"
-                  defaultValue={previewInput.specialization}
-                  maxLength={PUBLIC_PREVIEW_FIELD_LIMITS.specialization}
-                  placeholder="Промышленный подбор / финансы C-level"
-                  className={ppStyles.input}
-                />
-              </label>
-
-              {previewInput.includeKeywords ? (
-                <input type="hidden" name="includeKeywords" value={previewInput.includeKeywords} />
-              ) : null}
-              {previewInput.excludeKeywords ? (
-                <input type="hidden" name="excludeKeywords" value={previewInput.excludeKeywords} />
-              ) : null}
-              <input type="hidden" name="dailyDigestLimit" value={previewInput.dailyDigestLimit} />
-
-              <label htmlFor="targetCity" className={ppStyles.field}>
-                <span className={ppStyles.fieldLabel}>География</span>
-                <input
-                  id="targetCity"
-                  name="targetCity"
-                  defaultValue={previewInput.targetCity}
-                  maxLength={PUBLIC_PREVIEW_FIELD_LIMITS.targetCity}
-                  placeholder="Москва / удалённо"
-                  className={ppStyles.input}
-                />
-              </label>
-
-              <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "center" }}>
-                <button type="submit" className={ppStyles.primaryAction}>
-                  Посмотреть компании
-                </button>
-
-                {hasPreview ? (
-                  <Link href="/#preview" className={ppStyles.secondaryAction}>
-                    Сбросить
-                  </Link>
-                ) : null}
-              </div>
-            </form>
-          </SurfaceCard>
-
-          <SurfaceCard className={hpStyles.previewCardContainer}>
-            <div>
-              <div className={hpStyles.previewHeaderRow}>
-                <div className={hpStyles.previewCardHeading}>
-                  {previewState.isLive
-                    ? previewState.isPersonalized
-                      ? "Радар для вашего профиля"
-                      : "Как выглядит радар"
-                    : "Демо радара"}
-                </div>
-                <StatusBadge tone={previewState.isPersonalized ? "info" : "neutral"} style={{ justifySelf: "start" }}>
-                  {previewState.isPersonalized
-                    ? previewState.items.length > 0
-                      ? "по вашему профилю"
-                      : "пока без совпадений"
-                    : previewState.isLive && previewState.items.length > 0
-                      ? "актуальные данные"
-                      : "демо"}
-                </StatusBadge>
-              </div>
-            </div>
-
-            {!previewState.isLive ? (
-              <NoticeBox
-                tone="neutral"
-                title="Показываем демо-карточки"
-                description="Актуальная выдача временно недоступна. Структура карточек, оценки и состав полей соответствуют реальному радару."
-              />
-            ) : null}
-
-            {previewState.items.length === 0 ? (
-              <NoticeBox
-                tone="neutral"
-                title="Пока нет совпадений"
-                description="Расширьте географию или смягчите специализацию — и список обновится."
-              />
-            ) : (
-              <div style={{ display: "grid", gap: "12px" }}>
-                {previewState.isPersonalized && !previewState.hasExactMatches ? (
-                  <NoticeBox
-                    tone="neutral"
-                    title="Точных совпадений по нише пока нет"
-                    description="Показываем ближайшие по релевантности. Уточните профиль или расширьте специализацию."
-                  />
-                ) : null}
-                {visiblePreviewItems.map((item) => (
-                  <PreviewDigestCard
-                    key={`${item.org_id}-${item.rank}`}
-                    item={item}
-                  />
-                ))}
-
-                {hiddenPreviewItems.length > 0 ? (
-                  <details className={ppStyles.disclosure}>
-                    <summary className={ppStyles.disclosureSummary}>
-                      Показать ещё {hiddenPreviewItems.length} компаний
-                    </summary>
-                    <div className={ppStyles.disclosureBody}>
-                      <div style={{ display: "grid", gap: "12px" }}>
-                        {hiddenPreviewItems.map((item) => (
-                          <PreviewDigestCard
-                            key={`${item.org_id}-${item.rank}`}
-                            item={item}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  </details>
-                ) : null}
-              </div>
-            )}
-
-            <Link href={checkoutHref} className={ppStyles.primaryAction}>
-              {!previewState.isLive
-                ? "Запустить актуальный радар"
-                : previewState.items.length > 0
-                  ? "Получать такой радар каждое утро"
-                  : "Попробовать неделю"}
-            </Link>
-          </SurfaceCard>
-        </div>
-      </ScrollReveal>
+      {/* Live preview — DB-backed, so it streams in via Suspense. The rest of
+          the page (hero/principles/problem/how-it-works/pricing/FAQ) paints
+          immediately without waiting for the digest query. See the note at the
+          top of HomePage on why this boundary fixes the slow first paint. */}
+      <Suspense fallback={<PreviewSkeleton />}>
+        <PreviewSection previewInput={previewInput} hasPreview={hasPreview} checkoutHref={checkoutHref} />
+      </Suspense>
 
       {/* How it works — the three-step flow */}
       <ScrollReveal as="section" className={hpStyles.scrollSection}>
@@ -531,6 +401,214 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
       <SiteFooter />
     </PageFrame>
+  );
+}
+
+/**
+ * Live preview section — the only DB-backed part of the home page. Wrapped in
+ * <Suspense> by HomePage so hero + every other section paint immediately while
+ * getPublicSampleDigestState (a Postgres query) resolves. Owns the profile form
+ * (left) and the digest cards (right) together so the description copy can read
+ * `isLive` and the form defaults read `previewInput` — both pure of the DB
+ * except this one awaited call. `previewInput`/`hasPreview`/`checkoutHref` are
+ * pre-computed synchronously in HomePage and passed in (the pricing cards and
+ * closing CTA also read `previewInput`, so we don't recompute it here).
+ */
+export async function PreviewSection(props: {
+  previewInput: PublicPreviewInput;
+  hasPreview: boolean;
+  checkoutHref: string;
+}) {
+  const { previewInput, hasPreview, checkoutHref } = props;
+  const previewState = await getPublicSampleDigestState(previewInput);
+  const visiblePreviewItems = previewState.items.slice(0, VISIBLE_PREVIEW_ITEMS);
+  const hiddenPreviewItems = previewState.items.slice(VISIBLE_PREVIEW_ITEMS);
+
+  return (
+    <ScrollReveal as="section" id="preview" className={hpStyles.scrollSection}>
+      <SectionIntro
+        accent
+        eyebrow="Пример результата"
+        title="Так выглядит утренний радар"
+        description={previewState.isLive
+          ? "Задайте город и специализацию — справа появится тот самый список, что утром приходит в Telegram."
+          : "Задайте город и специализацию. Сейчас можно оценить структуру карточек; актуальная выдача появится здесь после восстановления источника."}
+      />
+
+      <div className={hpStyles.previewGrid}>
+        <SurfaceCard className={hpStyles.previewCardContainer}>
+          <div className={hpStyles.previewCardHeading}>Параметры профиля</div>
+
+          <form method="GET" action="/#preview" style={{ display: "grid", gap: "14px" }}>
+            <label htmlFor="specialization" className={ppStyles.field}>
+              <span className={ppStyles.fieldLabel}>Специализация</span>
+              <input
+                id="specialization"
+                name="specialization"
+                defaultValue={previewInput.specialization}
+                maxLength={PUBLIC_PREVIEW_FIELD_LIMITS.specialization}
+                placeholder="Промышленный подбор / финансы C-level"
+                className={ppStyles.input}
+              />
+            </label>
+
+            {previewInput.includeKeywords ? (
+              <input type="hidden" name="includeKeywords" value={previewInput.includeKeywords} />
+            ) : null}
+            {previewInput.excludeKeywords ? (
+              <input type="hidden" name="excludeKeywords" value={previewInput.excludeKeywords} />
+            ) : null}
+            <input type="hidden" name="dailyDigestLimit" value={previewInput.dailyDigestLimit} />
+
+            <label htmlFor="targetCity" className={ppStyles.field}>
+              <span className={ppStyles.fieldLabel}>География</span>
+              <input
+                id="targetCity"
+                name="targetCity"
+                defaultValue={previewInput.targetCity}
+                maxLength={PUBLIC_PREVIEW_FIELD_LIMITS.targetCity}
+                placeholder="Москва / удалённо"
+                className={ppStyles.input}
+              />
+            </label>
+
+            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "center" }}>
+              <button type="submit" className={ppStyles.primaryAction}>
+                Посмотреть компании
+              </button>
+
+              {hasPreview ? (
+                <Link href="/#preview" className={ppStyles.secondaryAction}>
+                  Сбросить
+                </Link>
+              ) : null}
+            </div>
+          </form>
+        </SurfaceCard>
+
+        <SurfaceCard className={hpStyles.previewCardContainer}>
+          <div>
+            <div className={hpStyles.previewHeaderRow}>
+              <div className={hpStyles.previewCardHeading}>
+                {previewState.isLive
+                  ? previewState.isPersonalized
+                    ? "Радар для вашего профиля"
+                    : "Как выглядит радар"
+                  : "Демо радара"}
+              </div>
+              <StatusBadge tone={previewState.isPersonalized ? "info" : "neutral"} style={{ justifySelf: "start" }}>
+                {previewState.isPersonalized
+                  ? previewState.items.length > 0
+                    ? "по вашему профилю"
+                    : "пока без совпадений"
+                  : previewState.isLive && previewState.items.length > 0
+                    ? "актуальные данные"
+                    : "демо"}
+              </StatusBadge>
+            </div>
+          </div>
+
+          {!previewState.isLive ? (
+            <NoticeBox
+              tone="neutral"
+              title="Показываем демо-карточки"
+              description="Актуальная выдача временно недоступна. Структура карточек, оценки и состав полей соответствуют реальному радару."
+            />
+          ) : null}
+
+          {previewState.items.length === 0 ? (
+            <NoticeBox
+              tone="neutral"
+              title="Пока нет совпадений"
+              description="Расширьте географию или смягчите специализацию — и список обновится."
+            />
+          ) : (
+            <div style={{ display: "grid", gap: "12px" }}>
+              {previewState.isPersonalized && !previewState.hasExactMatches ? (
+                <NoticeBox
+                  tone="neutral"
+                  title="Точных совпадений по нише пока нет"
+                  description="Показываем ближайшие по релевантности. Уточните профиль или расширьте специализацию."
+                />
+              ) : null}
+              {visiblePreviewItems.map((item) => (
+                <PreviewDigestCard
+                  key={`${item.org_id}-${item.rank}`}
+                  item={item}
+                />
+              ))}
+
+              {hiddenPreviewItems.length > 0 ? (
+                <details className={ppStyles.disclosure}>
+                  <summary className={ppStyles.disclosureSummary}>
+                    Показать ещё {hiddenPreviewItems.length} компаний
+                  </summary>
+                  <div className={ppStyles.disclosureBody}>
+                    <div style={{ display: "grid", gap: "12px" }}>
+                      {hiddenPreviewItems.map((item) => (
+                        <PreviewDigestCard
+                          key={`${item.org_id}-${item.rank}`}
+                          item={item}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </details>
+              ) : null}
+            </div>
+          )}
+
+          <Link href={checkoutHref} className={ppStyles.primaryAction}>
+            {!previewState.isLive
+              ? "Запустить актуальный радар"
+              : previewState.items.length > 0
+                ? "Получать такой радар каждое утро"
+                : "Попробовать неделю"}
+          </Link>
+        </SurfaceCard>
+      </div>
+    </ScrollReveal>
+  );
+}
+
+/**
+ * Suspense fallback for <PreviewSection>. Reserves the same two-column
+ * `previewGrid` footprint + shows the eyebrow/title so the block is visibly
+ * "there" (not missing) while the digest query streams in — the section heading
+ * is what the user's "half the landing doesn't load" complaint was about. The
+ * shimmer bars stay subtle (premium, not a spinner) and the form is intentionally
+ * omitted from the skeleton so the interactive inputs don't render twice.
+ */
+export function PreviewSkeleton() {
+  return (
+    <ScrollReveal as="section" id="preview" className={hpStyles.scrollSection}>
+      <SectionIntro
+        accent
+        eyebrow="Пример результата"
+        title="Так выглядит утренний радар"
+        description="Задайте город и специализацию — справа появится тот самый список, что утром приходит в Telegram."
+      />
+      <div className={hpStyles.previewGrid}>
+        <SurfaceCard className={hpStyles.previewCardContainer}>
+          <div className={hpStyles.previewCardHeading}>Параметры профиля</div>
+          <div className={hpStyles.previewSkeletonBody}>
+            <span className={hpStyles.previewSkeletonLine} />
+            <span className={hpStyles.previewSkeletonLine} />
+            <span className={hpStyles.previewSkeletonBar} />
+          </div>
+        </SurfaceCard>
+        <SurfaceCard className={hpStyles.previewCardContainer}>
+          <div className={hpStyles.previewHeaderRow}>
+            <div className={hpStyles.previewCardHeading}>Как выглядит радар</div>
+            <StatusBadge tone="neutral" style={{ justifySelf: "start" }}>демо</StatusBadge>
+          </div>
+          <div className={hpStyles.previewSkeletonBody}>
+            <span className={hpStyles.previewSkeletonCard} />
+            <span className={hpStyles.previewSkeletonCard} />
+          </div>
+        </SurfaceCard>
+      </div>
+    </ScrollReveal>
   );
 }
 
