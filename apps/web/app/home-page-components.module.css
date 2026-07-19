@@ -561,8 +561,12 @@
 /* ── Section spacing ── */
 .scrollSection {
   display: grid;
-  gap: 28px;
-  padding: clamp(40px, 5vw, 64px) 0;
+  gap: 20px;
+  /* Tightened from clamp(40px,5vw,64px): the previous 64px top/bottom on every
+     transparent section stacked into ~768px of bare backdrop between cards,
+     which read as "empty / not loaded" rather than premium whitespace. The
+     cards still breathe (44px at desktop) but the page now feels connected. */
+  padding: clamp(28px, 4vw, 44px) 0;
   scroll-margin-top: 96px;
 }
 
@@ -1077,6 +1081,16 @@
   font-size: 0.76rem;
   line-height: 1.4;
   overflow-wrap: anywhere;
+  /* Two-line cap: real lead reasons/openers can be a long paragraph (legacy
+     free-form copy like "246 вакансий, включая «…»; Опубликовано 17.07"), but
+     the hero demo tile shows a one-line "14 новых вакансий за 6 дней". Clamping
+     keeps the collapsed card compact + readable and matches the demo's neat
+     tile shape — the full text still lives in the expanded <details> body. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
 }
 
 .previewSignalMeters {
