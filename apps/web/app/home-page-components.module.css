@@ -499,8 +499,8 @@
   gap: 10px;
   width: 100%;
   box-sizing: border-box;
-  margin-top: 22px;
-  padding-top: 22px;
+  margin-top: 14px;
+  padding-top: 14px;
   border-top: 1px solid rgba(148, 163, 184, 0.16);
 }
 
@@ -561,17 +561,18 @@
 /* ── Section spacing ── */
 .scrollSection {
   display: grid;
-  gap: 20px;
-  /* Tightened from clamp(40px,5vw,64px): the previous 64px top/bottom on every
-     transparent section stacked into ~768px of bare backdrop between cards,
-     which read as "empty / not loaded" rather than premium whitespace. The
-     cards still breathe (44px at desktop) but the page now feels connected. */
-  padding: clamp(28px, 4vw, 44px) 0;
+  gap: 16px;
+  /* Tight padding: the transparent sections sit on the ambient backdrop, so
+     every px of vertical padding reads as empty space between cards. Was 64px,
+     then 44px — both still left ~106px of bare backdrop at each section join
+     (padding-bottom A + margin + padding-top B), which read as "пусто / не
+     грузится". 26px keeps content breathing but closes the dead bands. */
+  padding: clamp(18px, 2.5vw, 26px) 0;
   scroll-margin-top: 96px;
 }
 
 .scrollSection:first-of-type {
-  padding-top: 12px;
+  padding-top: 8px;
 }
 
 /* ── Principles / value row ── */
@@ -1601,8 +1602,8 @@
   gap: 18px;
   justify-items: center;
   text-align: center;
-  padding: clamp(52px, 7vw, 84px) clamp(24px, 4vw, 48px);
-  margin-top: var(--space-section-lg);
+  padding: clamp(32px, 5vw, 48px) clamp(24px, 4vw, 48px);
+  margin-top: clamp(18px, 2.5vw, 26px);
   border-radius: var(--radius-card);
   background: #0b1324;
   color: #f8fafc;
