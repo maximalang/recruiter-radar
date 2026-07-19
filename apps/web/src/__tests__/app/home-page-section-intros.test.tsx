@@ -88,7 +88,7 @@ describe("landing section hierarchy", () => {
       "Проверка сигнала",
       "Тарифы",
       "FAQ",
-      "Пример результата",
+      "Интерактивный пример",
     ]);
   });
 
@@ -107,16 +107,17 @@ describe("landing section hierarchy", () => {
       checkoutHref: buildCheckoutHref(input),
     });
     const previewText = readVisibleText(preview);
-    const notices = collectElements(preview, NoticeBox);
     const previewIntro = collectElements(preview, SectionIntro)
-      .find((section) => section.props.eyebrow === "Пример результата");
+      .find((section) => section.props.eyebrow === "Интерактивный пример");
 
-    expect(previewText).toContain("Демо радара");
+    expect(previewIntro?.props.title).toBe("Проверьте радар на своём профиле");
+    expect(previewText).toContain("Демонстрационный радар");
     expect(previewText).not.toContain("Радар для вашего профиля");
-    expect(notices.some((notice) => notice.props.title === "Показываем демо-карточки")).toBe(true);
-    expect(previewText).toContain("Запустить актуальный радар");
+    expect(previewText).not.toContain("временно недоступна");
+    expect(previewText).not.toContain("восстановления источника");
+    expect(previewText).toContain("Получить актуальный радар");
     expect(previewIntro?.props.description).toBe(
-      "Задайте город и специализацию. Сейчас можно оценить структуру карточек; актуальная выдача появится здесь после восстановления источника.",
+      "Укажите специализацию и географию, чтобы увидеть логику отбора. Ниже — демонстрационные карточки в формате реального утреннего радара.",
     );
   });
 

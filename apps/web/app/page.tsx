@@ -414,7 +414,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
  * Live preview section — the only DB-backed part of the home page. Wrapped in
  * <Suspense> by HomePage so hero + every other section paint immediately while
  * getPublicSampleDigestState (a Postgres query) resolves. Owns the profile form
- * (left) and the digest cards (right) together so the description copy can read
+ * and digest cards in one workspace so the description copy can read
  * `isLive` and the form defaults read `previewInput` — both pure of the DB
  * except this one awaited call. `previewInput`/`hasPreview`/`checkoutHref` are
  * pre-computed synchronously in HomePage and passed in (the pricing cards and
@@ -434,18 +434,21 @@ export async function PreviewSection(props: {
     <ScrollReveal as="section" id="preview" className={hpStyles.scrollSection}>
       <SectionIntro
         accent
-        eyebrow="Пример результата"
-        title="Так выглядит утренний радар"
+        eyebrow="Интерактивный пример"
+        title="Проверьте радар на своём профиле"
         description={previewState.isLive
-          ? "Задайте город и специализацию — справа появится тот самый список, что утром приходит в Telegram."
-          : "Задайте город и специализацию. Сейчас можно оценить структуру карточек; актуальная выдача появится здесь после восстановления источника."}
+          ? "Укажите специализацию и географию. Радар пересчитает приоритеты и покажет компании, которые подходят именно вашему агентству."
+          : "Укажите специализацию и географию, чтобы увидеть логику отбора. Ниже — демонстрационные карточки в формате реального утреннего радара."}
       />
 
-      <div className={hpStyles.previewGrid}>
-        <SurfaceCard className={`${hpStyles.previewCardContainer} ${hpStyles.previewProfileCard}`}>
-          <div className={hpStyles.previewCardHeading}>Параметры профиля</div>
+      <div className={hpStyles.previewWorkspace}>
+        <SurfaceCard className={hpStyles.previewConfigurator}>
+          <div className={hpStyles.previewConfiguratorLead}>
+            <h3 className={hpStyles.previewCardHeading}>Настройте пример</h3>
+            <p>Двух полей достаточно, чтобы пересчитать соответствие компаний вашему профилю.</p>
+          </div>
 
-          <form method="GET" action="/#preview" style={{ display: "grid", gap: "14px" }}>
+          <form method="GET" action="/#preview" className={hpStyles.previewForm}>
             <label htmlFor="specialization" className={ppStyles.field}>
               <span className={ppStyles.fieldLabel}>Специализация</span>
               <input
@@ -478,7 +481,7 @@ export async function PreviewSection(props: {
               />
             </label>
 
-            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "center" }}>
+            <div className={hpStyles.previewFormActions}>
               <button type="submit" className={ppStyles.primaryAction}>
                 Посмотреть компании
               </button>
@@ -492,34 +495,31 @@ export async function PreviewSection(props: {
           </form>
         </SurfaceCard>
 
-        <SurfaceCard className={hpStyles.previewCardContainer}>
-          <div>
-            <div className={hpStyles.previewHeaderRow}>
-              <div className={hpStyles.previewCardHeading}>
-                {previewState.isLive
-                  ? previewState.isPersonalized
-                    ? "Радар для вашего профиля"
-                    : "Как выглядит радар"
-                  : "Демо радара"}
-              </div>
-              <StatusBadge tone={previewState.isPersonalized ? "info" : "neutral"} style={{ justifySelf: "start" }}>
-                {previewState.isPersonalized
-                  ? previewState.items.length > 0
-                    ? "по вашему профилю"
-                    : "пока без совпадений"
-                  : previewState.isLive && previewState.items.length > 0
-                    ? "актуальные данные"
-                    : "демо"}
-              </StatusBadge>
-            </div>
+        <SurfaceCard className={`${hpStyles.previewCardContainer} ${hpStyles.previewResults}`}>
+          <div className={hpStyles.previewHeaderRow}>
+            <h3 className={hpStyles.previewCardHeading}>
+              {previewState.isLive
+                ? previewState.isPersonalized
+                  ? "Радар для вашего профиля"
+                  : "Пример утренней выдачи"
+                : "Пример выдачи"}
+            </h3>
+            <StatusBadge tone={previewState.isPersonalized ? "info" : "neutral"} style={{ justifySelf: "start" }}>
+              {previewState.isPersonalized
+                ? previewState.items.length > 0
+                  ? "по вашему профилю"
+                  : "пока без совпадений"
+                : previewState.isLive && previewState.items.length > 0
+                  ? "актуальные данные"
+                  : "демо"}
+            </StatusBadge>
           </div>
 
           {!previewState.isLive ? (
-            <NoticeBox
-              tone="neutral"
-              title="Показываем демо-карточки"
-              description="Актуальная выдача временно недоступна. Структура карточек, оценки и состав полей соответствуют реальному радару."
-            />
+            <div className={hpStyles.previewDemoNote}>
+              <strong>Демонстрационный радар</strong>
+              <span>Компании обезличены. Состав полей, шкала оценки и логика проверки соответствуют продукту.</span>
+            </div>
           ) : null}
 
           {previewState.items.length === 0 ? (
@@ -529,7 +529,7 @@ export async function PreviewSection(props: {
               description="Расширьте географию или смягчите специализацию — и список обновится."
             />
           ) : (
-            <div style={{ display: "grid", gap: "12px" }}>
+            <div className={hpStyles.previewResultsBody}>
               {previewState.isPersonalized && !previewState.hasExactMatches ? (
                 <NoticeBox
                   tone="neutral"
@@ -537,12 +537,14 @@ export async function PreviewSection(props: {
                   description="Показываем ближайшие по релевантности. Уточните профиль или расширьте специализацию."
                 />
               ) : null}
-              {visiblePreviewItems.map((item) => (
-                <PreviewDigestCard
-                  key={`${item.org_id}-${item.rank}`}
-                  item={item}
-                />
-              ))}
+              <div className={hpStyles.previewItemsGrid}>
+                {visiblePreviewItems.map((item) => (
+                  <PreviewDigestCard
+                    key={`${item.org_id}-${item.rank}`}
+                    item={item}
+                  />
+                ))}
+              </div>
 
               {hiddenPreviewItems.length > 0 ? (
                 <details className={ppStyles.disclosure}>
@@ -550,7 +552,7 @@ export async function PreviewSection(props: {
                     Показать ещё {hiddenPreviewItems.length} компаний
                   </summary>
                   <div className={ppStyles.disclosureBody}>
-                    <div style={{ display: "grid", gap: "12px" }}>
+                    <div className={hpStyles.previewItemsGrid}>
                       {hiddenPreviewItems.map((item) => (
                         <PreviewDigestCard
                           key={`${item.org_id}-${item.rank}`}
@@ -566,7 +568,7 @@ export async function PreviewSection(props: {
 
           <Link href={checkoutHref} className={ppStyles.primaryAction}>
             {!previewState.isLive
-              ? "Запустить актуальный радар"
+              ? "Получить актуальный радар"
               : previewState.items.length > 0
                 ? "Получать такой радар каждое утро"
                 : "Попробовать неделю"}
@@ -578,8 +580,8 @@ export async function PreviewSection(props: {
 }
 
 /**
- * Suspense fallback for <PreviewSection>. Reserves the same two-column
- * `previewGrid` footprint + shows the eyebrow/title so the block is visibly
+ * Suspense fallback for <PreviewSection>. Reserves the same workspace footprint
+ * and shows the eyebrow/title so the block is visibly
  * "there" (not missing) while the digest query streams in — the section heading
  * is what the user's "half the landing doesn't load" complaint was about. The
  * shimmer bars stay subtle (premium, not a spinner) and the form is intentionally
@@ -590,25 +592,27 @@ export function PreviewSkeleton() {
     <ScrollReveal as="section" id="preview" className={hpStyles.scrollSection}>
       <SectionIntro
         accent
-        eyebrow="Пример результата"
-        title="Так выглядит утренний радар"
-        description="Задайте город и специализацию — справа появится тот самый список, что утром приходит в Telegram."
+        eyebrow="Интерактивный пример"
+        title="Проверьте радар на своём профиле"
+        description="Укажите специализацию и географию — радар покажет компании, которые подходят именно вашему агентству."
       />
-      <div className={hpStyles.previewGrid}>
-        <SurfaceCard className={`${hpStyles.previewCardContainer} ${hpStyles.previewProfileCard}`}>
-          <div className={hpStyles.previewCardHeading}>Параметры профиля</div>
+      <div className={hpStyles.previewWorkspace}>
+        <SurfaceCard className={hpStyles.previewConfigurator}>
+          <div className={hpStyles.previewConfiguratorLead}>
+            <h3 className={hpStyles.previewCardHeading}>Настройте пример</h3>
+          </div>
           <div className={hpStyles.previewSkeletonBody}>
             <span className={hpStyles.previewSkeletonLine} />
             <span className={hpStyles.previewSkeletonLine} />
             <span className={hpStyles.previewSkeletonBar} />
           </div>
         </SurfaceCard>
-        <SurfaceCard className={hpStyles.previewCardContainer}>
+        <SurfaceCard className={`${hpStyles.previewCardContainer} ${hpStyles.previewResults}`}>
           <div className={hpStyles.previewHeaderRow}>
-            <div className={hpStyles.previewCardHeading}>Как выглядит радар</div>
+            <h3 className={hpStyles.previewCardHeading}>Пример утренней выдачи</h3>
             <StatusBadge tone="neutral" style={{ justifySelf: "start" }}>демо</StatusBadge>
           </div>
-          <div className={hpStyles.previewSkeletonBody}>
+          <div className={`${hpStyles.previewSkeletonBody} ${hpStyles.previewItemsGrid}`}>
             <span className={hpStyles.previewSkeletonCard} />
             <span className={hpStyles.previewSkeletonCard} />
           </div>

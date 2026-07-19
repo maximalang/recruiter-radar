@@ -1026,17 +1026,94 @@
   line-height: 1.55;
 }
 
-/* ── Preview grid ── */
-.previewGrid {
+/* ── Interactive preview workspace ── */
+.previewWorkspace {
   display: grid;
-  grid-template-columns: 0.85fr 1.15fr;
-  gap: var(--space-section);
-  align-items: start;
+  gap: 16px;
 }
 
-.previewProfileCard {
-  position: sticky;
-  top: 96px;
+.previewConfigurator {
+  display: grid;
+  grid-template-columns: minmax(190px, 0.55fr) minmax(0, 1.45fr);
+  gap: clamp(20px, 4vw, 48px);
+  align-items: end;
+  padding: 24px 28px;
+  border: 1px solid rgba(29, 78, 216, 0.14);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 18px 50px rgba(20, 39, 74, 0.07);
+}
+
+.previewConfiguratorLead {
+  display: grid;
+  gap: 7px;
+  align-self: center;
+}
+
+.previewConfiguratorLead p {
+  margin: 0;
+  color: var(--c-text-secondary);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.previewForm {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr) auto;
+  gap: 14px;
+  align-items: end;
+}
+
+.previewFormActions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.previewResults {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+  min-width: 0;
+}
+
+.previewResultsBody {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  min-width: 0;
+}
+
+.previewItemsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.previewItemsGrid > * {
+  min-width: 0;
+}
+
+.previewDemoNote {
+  display: grid;
+  grid-template-columns: minmax(170px, 0.45fr) minmax(0, 1.55fr);
+  gap: 18px;
+  align-items: baseline;
+  padding: 12px 0;
+  border-top: 1px solid var(--c-border);
+  border-bottom: 1px solid var(--c-border);
+}
+
+.previewDemoNote strong {
+  color: var(--c-text-primary);
+  font-size: 0.78rem;
+}
+
+.previewDemoNote span {
+  color: var(--c-text-secondary);
+  font-size: 0.78rem;
+  line-height: 1.5;
 }
 
 .previewCardContainer {
@@ -1049,9 +1126,7 @@
 
 /* Suspense fallback for the live preview (<PreviewSkeleton>) — reserves the
    section footprint while the digest DB query streams in, so the block reads as
-   "loading" instead of "missing". Subtle slate shimmer, no spinner (premium,
-   calm). Same two-column grid as .previewGrid so there is no layout shift when
-   the real content resolves. */
+   "loading" instead of "missing". Subtle slate shimmer, no spinner. */
 .previewSkeletonBody {
   display: grid;
   gap: 14px;
@@ -1118,6 +1193,7 @@
 /* Shared heading style inside preview cards — matches .fieldLabel weight, sits
    above the form / the digest list. */
 .previewCardHeading {
+  margin: 0;
   font-size: var(--fs-lg);
   line-height: var(--lh-lg);
   letter-spacing: var(--ls-lg);
@@ -1858,15 +1934,20 @@
     grid-template-columns: 1fr;
   }
 
-}
-
-@media (max-width: 900px) {
-  .previewGrid {
+  .previewItemsGrid {
     grid-template-columns: 1fr;
   }
 
-  .previewProfileCard {
-    position: static;
+}
+
+@media (max-width: 900px) {
+  .previewConfigurator {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .previewForm {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.75fr) auto;
   }
 
   /* The three promises repeat information already visible in the hero product
@@ -1956,6 +2037,21 @@
 
   .problemRow {
     gap: 14px;
+  }
+
+  .previewConfigurator,
+  .previewResults.previewCardContainer {
+    padding: 20px 18px;
+  }
+
+  .previewForm,
+  .previewDemoNote {
+    grid-template-columns: 1fr;
+  }
+
+  .previewFormActions,
+  .previewFormActions > * {
+    width: 100%;
   }
 
   .qualityChecks li {
