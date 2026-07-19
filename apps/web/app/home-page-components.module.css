@@ -156,7 +156,9 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  padding: clamp(40px, 5vw, 64px) clamp(28px, 6vw, 72px);
+  /* Asymmetric: less bottom padding so the nav bar sits closer to the hero
+     metrics instead of floating in ~97px of bare backdrop. */
+  padding: clamp(40px, 5vw, 64px) clamp(28px, 6vw, 72px) clamp(20px, 3vw, 32px);
   background:
     radial-gradient(70% 90% at 50% 0%, rgba(59, 130, 246, 0.2) 0%, transparent 58%),
     #0b1324;
