@@ -17,5 +17,10 @@ describe("landing header accessibility", () => {
       "href",
       "/dashboard",
     );
+
+    expect(screen.getByRole("link", { name: "Проверка" })).toHaveAttribute(
+      "href",
+      "#quality",
+    );
   });
 });

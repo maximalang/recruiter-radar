@@ -17,6 +17,7 @@ export default function LandingHeader({ activationHref }: { activationHref: stri
         <span className={hpStyles.topNavAnchors}>
           <a href="#preview" className={hpStyles.topNavLink}>Пример</a>
           <a href="#how-it-works" className={hpStyles.topNavLink}>Как работает</a>
+          <a href="#quality" className={hpStyles.topNavLink}>Проверка</a>
           <a href="#pricing" className={hpStyles.topNavLink}>Тарифы</a>
           <a href="#faq" className={hpStyles.topNavLink}>FAQ</a>
         </span>

@@ -31,11 +31,6 @@ import {
   pickEvidenceTitles,
 } from "./home-page-components";
 import hpStyles from "./home-page-components.module.css";
-import {
-  CheckIcon,
-  ShieldIcon,
-  MailIcon,
-} from "./ui/icons";
 import LandingHeader from "./landing-header";
 import RadarCanvas from "./radar-canvas";
 import ScrollReveal from "./scroll-reveal";
@@ -58,24 +53,6 @@ type HomePageProps = {
 
 type HomePreviewItem = Awaited<ReturnType<typeof getPublicSampleDigestState>>["items"][number];
 
-const principles = [
-  {
-    icon: CheckIcon,
-    title: "Сигнал, а не список вакансий",
-    text: "Радар выделяет изменение: новый найм, рост команды или редкую для компании роль — и показывает, когда это произошло.",
-  },
-  {
-    icon: ShieldIcon,
-    title: "Доказательства можно проверить",
-    text: "У каждого вывода есть источники, дата и уровень уверенности. Вы видите основание рекомендации до первого касания.",
-  },
-  {
-    icon: MailIcon,
-    title: "Следующий шаг уже понятен",
-    text: "В карточке есть деловой повод и корректный корпоративный путь контакта — без личных адресов и массовой рассылки.",
-  },
-] as const;
-
 export default async function HomePage({ searchParams }: HomePageProps) {
   const resolvedSearchParams = (await searchParams) ?? {};
   // Pure search-param parse only — no DB. This keeps `previewInput` available
@@ -84,7 +61,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   // below. The home page is `force-dynamic`, so without the boundary the whole
   // server render blocked on getPublicSampleDigestState (a Postgres query) and
   // first-contentful-paint sat at ~2.5s — the "half the landing doesn't load"
-  // symptom. Now hero + principles + problem + how-it-works + pricing + FAQ
+  // symptom. Now hero + problem + how-it-works + quality + pricing + FAQ
   // paint immediately and the live preview streams in.
   const previewInput = readPublicPreviewInput(resolvedSearchParams);
   const hasPreview = hasPublicPreviewInput(previewInput);
@@ -187,59 +164,34 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
       <LandingHeader activationHref={checkoutHref} />
 
-      {/* Principles / value row */}
-      <ScrollReveal as="section" className={hpStyles.scrollSection}>
-        <SectionIntro
-          accent
-          eyebrow="Что внутри"
-          title="От сигнала к следующему действию"
-          description="Карточка отвечает на три вопроса: что изменилось, почему этому можно доверять и как корректно выйти на компанию."
-        />
-        <div className={hpStyles.principles}>
-          {principles.map((p) => {
-            const Icon = p.icon;
-            return (
-              <div key={p.title} className={`${hpStyles.principle} ${hpStyles.revealCard}`}>
-                <span className={hpStyles.principleIcon}>
-                  <Icon />
-                </span>
-                <h3 className={hpStyles.principleTitle}>{p.title}</h3>
-                <p className={hpStyles.principleText}>{p.text}</p>
-              </div>
-            );
-          })}
-        </div>
-      </ScrollReveal>
-
       {/* Problem — why this radar exists */}
-      <ScrollReveal as="section" className={hpStyles.scrollSection}>
-        <SectionIntro
-          accent
-          eyebrow="Проблема"
-          title="Вакансии есть. Приоритета нет."
-          description="Радар показывает не вакансии, а компании, которым стоит написать первыми — с доказательствами и поводом для контакта."
-        />
-        <div className={hpStyles.problemGrid}>
-          <article className={`${hpStyles.problemCard} ${hpStyles.revealCard}`}>
-            <span className={hpStyles.problemIndex}>01</span>
-            <h3>Все видят одно и то же</h3>
-            <p>Открытые вакансии одновременно замечают десятки агентств — реакция на них не дает преимущества.</p>
-          </article>
-          <article className={`${hpStyles.problemCard} ${hpStyles.revealCard}`}>
-            <span className={hpStyles.problemIndex}>02</span>
-            <h3>Вакансия — ещё не лид</h3>
-            <p>Активный найм не всегда означает готовность работать с агентством. Нужен контекст, а не список ролей.</p>
-          </article>
-          <article className={`${hpStyles.problemCard} ${hpStyles.revealCard}`}>
-            <span className={hpStyles.problemIndex}>03</span>
-            <h3>Контекст требует времени</h3>
-            <p>Даты, динамику, источники и корректный контакт приходится собирать вручную — на это уходит час за компанией.</p>
-          </article>
+      <ScrollReveal as="section" className={`${hpStyles.scrollSection} ${hpStyles.problemSection}`}>
+        <div className={hpStyles.problemLayout}>
+          <SectionIntro
+            accent
+            eyebrow="Проблема"
+            title="Вакансий много. Приоритета нет."
+            description="Радар сокращает исследование до короткого списка компаний, где найм подтверждён, момент объясним, а следующий шаг понятен."
+          />
+          <ol className={hpStyles.problemList}>
+            <li className={hpStyles.problemRow}>
+              <span className={hpStyles.problemIndex}>01</span>
+              <div><h3>Все видят одни вакансии</h3><p>Обычная реакция на публикацию не даёт преимущества: её одновременно замечают десятки агентств.</p></div>
+            </li>
+            <li className={hpStyles.problemRow}>
+              <span className={hpStyles.problemIndex}>02</span>
+              <div><h3>Вакансия ещё не означает спрос</h3><p>Нужны динамика найма, профиль компании и несколько независимых фактов — не один заголовок.</p></div>
+            </li>
+            <li className={hpStyles.problemRow}>
+              <span className={hpStyles.problemIndex}>03</span>
+              <div><h3>Контекст собирается слишком долго</h3><p>Источники, даты и корпоративный контакт приходится проверять вручную, когда момент уже уходит.</p></div>
+            </li>
+          </ol>
         </div>
       </ScrollReveal>
 
       {/* Live preview — DB-backed, so it streams in via Suspense. The rest of
-          the page (hero/principles/problem/how-it-works/pricing/FAQ) paints
+          the page (hero/problem/how-it-works/quality/pricing/FAQ) paints
           immediately without waiting for the digest query. See the note at the
           top of HomePage on why this boundary fixes the slow first paint. */}
       <Suspense fallback={<PreviewSkeleton />}>
@@ -272,6 +224,65 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           </article>
         </div>
         <div className={hpStyles.stepsTrack} aria-hidden="true" />
+      </ScrollReveal>
+
+      {/* Evidence contract + Telegram delivery */}
+      <ScrollReveal as="section" id="quality" className={hpStyles.scrollSection}>
+        <SectionIntro
+          accent
+          eyebrow="Проверка сигнала"
+          title="Почему компании стоит написать"
+          description="Рекомендация появляется только вместе с проверяемыми фактами, уровнем уверенности и безопасным корпоративным контактом."
+        />
+        <div className={hpStyles.qualityGrid}>
+          <article className={hpStyles.qualityCard}>
+            <div className={hpStyles.qualityCardTopbar}>
+              <span>Анатомия рекомендации</span>
+              <span className={hpStyles.qualityDemoBadge}>пример</span>
+            </div>
+            <div className={hpStyles.qualityCompanyRow}>
+              <div>
+                <h3>Производственная компания</h3>
+                <p>Москва и область · промышленность</p>
+              </div>
+              <div className={hpStyles.qualityScore}><strong>87</strong><span>/100</span></div>
+            </div>
+            <dl className={hpStyles.qualityEvidence}>
+              <div><dt>Что изменилось</dt><dd>14 новых вакансий за 6 дней</dd></div>
+              <div><dt>Почему сейчас</dt><dd>Появилась редкая инженерная роль</dd></div>
+              <div><dt>Следующий шаг</dt><dd>Проверить HR-форму на сайте компании</dd></div>
+            </dl>
+            <div className={hpStyles.qualityCardFooter}>
+              <span className={hpStyles.qualityConfidence}><i aria-hidden="true" /> Подтверждено</span>
+              <span>3 источника</span>
+              <span>обновлено сегодня</span>
+            </div>
+          </article>
+
+          <article className={hpStyles.deliveryCard}>
+            <div className={hpStyles.deliveryTopbar}>
+              <span className={hpStyles.telegramMark} aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M20 4 3.8 10.3c-1.1.4-1.1 1.1-.2 1.4l4.1 1.3 1.6 4.8c.2.6.1.8.8.8.5 0 .8-.2 1-.4l2-1.9 4.2 3.1c.8.4 1.3.2 1.5-.7L21.5 5c.3-1-.4-1.4-1.5-1Z" fill="currentColor" /></svg>
+              </span>
+              <div><strong>Recruiter Radar</strong><span>Telegram · 09:00</span></div>
+            </div>
+            <div className={hpStyles.deliveryMessage}>
+              <span className={hpStyles.deliveryKicker}>Утренний радар · 5 компаний</span>
+              <h3>Начните с этого сигнала</h3>
+              <p><strong>Производственная компания</strong> усилила инженерный найм. Уверенность высокая, доступен корпоративный путь контакта.</p>
+              <div className={hpStyles.feedbackChoices} aria-label="Пример обратной связи в Telegram">
+                <span>Беру в работу</span><span>Позже</span><span>Не подходит</span>
+              </div>
+            </div>
+            <p className={hpStyles.deliveryNote}>Вы решаете, кому писать. Радар учитывает обратную связь, но ничего не отправляет компаниям автоматически.</p>
+          </article>
+        </div>
+        <ul className={hpStyles.qualityRules} aria-label="Принципы качества Recruiter Radar">
+          <li>Источник и дата у каждого факта</li>
+          <li>Вывод отделён от доказательств</li>
+          <li>Только корпоративные пути контакта</li>
+          <li>Без автоматической рассылки</li>
+        </ul>
       </ScrollReveal>
 
       {/* Pricing — hierarchy: primary week plan, then secondary plans */}

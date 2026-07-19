@@ -65,10 +65,9 @@ describe("landing section hierarchy", () => {
     // boundary (the home page is `force-dynamic` and the digest query blocked
     // the whole render — see page.tsx). HomePage's static tree no longer
     // contains the preview's children, so we render both halves and combine:
-    // HomePage renders Что внутри / Проблема / Как работает / Тарифы /
+    // HomePage renders Проблема / Как работает / Проверка сигнала / Тарифы /
     // Перед запуском (5 SectionIntros), PreviewSection renders Пример результата
-    // (1) — six total, matching the original count. The "Карточка лида" anatomy
-    // exhibit was removed earlier as a duplicate of the hero card.
+    // (1) — six total. The duplicate "Что внутри" block must not return.
     const page = await HomePage({ searchParams: Promise.resolve({}) });
     const preview = await PreviewSection({
       previewInput: readPublicPreviewInput({}),
@@ -82,6 +81,14 @@ describe("landing section hierarchy", () => {
 
     expect(sectionIntros).toHaveLength(6);
     expect(sectionIntros.every((section) => section.props.accent === true)).toBe(true);
+    expect(sectionIntros.map((section) => section.props.eyebrow)).toEqual([
+      "Проблема",
+      "Как работает",
+      "Проверка сигнала",
+      "Тарифы",
+      "Перед запуском",
+      "Пример результата",
+    ]);
   });
 
   it("labels the resilient fallback as demo instead of personalized live data", async () => {

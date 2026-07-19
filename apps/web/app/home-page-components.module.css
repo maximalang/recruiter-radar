@@ -11,7 +11,10 @@
 .ambientBg {
   position: fixed;
   inset: 0;
-  z-index: 0;
+  /* Keep the fixed field inside PageFrame's stacking context but behind every
+     in-flow section. z-index: 0 could paint above non-positioned content after
+     a real scroll (the DOM stayed present while the viewport looked empty). */
+  z-index: -1;
   pointer-events: none;
   overflow: hidden;
   background:
@@ -621,141 +624,64 @@
   padding-top: 8px;
 }
 
-/* ── Principles / value row ── */
-.principles {
+/* ── Problem section ──
+   An editorial split instead of another three-card grid. The product already
+   has several dense surfaces; this quieter list gives the narrative room and
+   keeps the page from reading like a template gallery. */
+.problemSection {
+  padding-block: clamp(38px, 6vw, 72px);
+}
+
+.problemLayout {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0;
-  overflow: hidden;
-  border: 1px solid var(--c-border);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.72);
-  box-shadow: 0 10px 30px rgba(15, 35, 68, 0.04);
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: clamp(36px, 7vw, 88px);
+  align-items: start;
+  padding: clamp(30px, 5vw, 64px);
+  border: 1px solid rgba(20, 40, 72, 0.1);
+  border-radius: 28px;
+  background: linear-gradient(135deg, rgba(247, 250, 255, 0.98), rgba(237, 244, 255, 0.86));
+  box-shadow: 0 28px 80px rgba(31, 51, 89, 0.08);
 }
 
-.principle {
+.problemList {
   display: grid;
-  align-content: start;
-  gap: 14px;
-  padding: 32px clamp(22px, 3vw, 36px);
-}
-
-.principle + .principle {
-  border-left: 1px solid var(--c-border);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .principle {
-    transition: none;
-  }
-}
-
-.principleIcon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, rgba(29, 78, 216, 0.1) 0%, rgba(37, 99, 235, 0.14) 100%);
-  color: var(--c-brand);
-}
-
-.principleIcon svg {
-  width: 22px;
-  height: 22px;
-}
-
-.principleTitle {
   margin: 0;
-  font-size: 1.04rem;
-  font-weight: 800;
-  letter-spacing: -0.01em;
-  color: var(--c-text-primary);
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid rgba(20, 40, 72, 0.12);
 }
 
-.principleText {
-  margin: 0;
-  color: var(--c-text-secondary);
-  font-size: 0.9rem;
-  line-height: 1.58;
-}
-
-/* ── Problem section — the "why this exists" narrative ──
-   Three numbered cards (01/02/03) that reframe the buyer's current state:
-   everyone sees the same vacancies, a vacancy is not a lead, and assembling
-   context by hand is slow. Sets up the radar as the resolution. */
-.problemGrid {
+.problemRow {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-}
-
-.problemCard {
-  position: relative;
-  display: grid;
-  gap: 12px;
-  padding: 26px 24px;
-  border-radius: 18px;
-  border: 1px solid var(--c-border);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(249, 251, 255, 0.92) 100%);
-  box-shadow: 0 10px 30px rgba(15, 35, 68, 0.05);
-  overflow: hidden;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-}
-
-.problemCard::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 22px;
-  right: 22px;
-  height: 2px;
-  border-radius: 0 0 999px 999px;
-  background: linear-gradient(90deg, transparent, rgba(47, 98, 232, 0.34), transparent);
-  opacity: 0.55;
-  transition: opacity 0.2s ease, left 0.2s ease, right 0.2s ease;
-}
-
-.problemCard:hover {
-  transform: translateY(-3px);
-  border-color: rgba(47, 98, 232, 0.16);
-  box-shadow: 0 22px 48px rgba(31, 51, 89, 0.1);
-}
-
-.problemCard:hover::before {
-  left: 10px;
-  right: 10px;
-  opacity: 0.95;
+  grid-template-columns: auto 1fr;
+  gap: 20px;
+  align-items: start;
+  padding: 22px 0;
+  border-bottom: 1px solid rgba(20, 40, 72, 0.12);
 }
 
 .problemIndex {
-  display: inline-grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 13px;
-  background: linear-gradient(145deg, rgba(233, 240, 255, 0.96) 0%, rgba(244, 248, 255, 0.86) 100%);
-  box-shadow: inset 0 0 0 1px rgba(47, 98, 232, 0.08), 0 8px 18px rgba(47, 98, 232, 0.08);
+  padding-top: 3px;
   color: var(--c-brand);
-  font-size: 0.9rem;
+  font-size: 0.76rem;
   font-weight: 900;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.08em;
 }
 
-.problemCard h3 {
+.problemRow h3 {
   margin: 0;
-  font-size: 1.08rem;
+  font-size: clamp(1rem, 1.5vw, 1.18rem);
   font-weight: 800;
-  letter-spacing: -0.012em;
+  letter-spacing: -0.018em;
   color: var(--c-text-primary);
 }
 
-.problemCard p {
-  margin: 0;
+.problemRow p {
+  margin: 7px 0 0;
   color: var(--c-text-secondary);
-  font-size: 0.9rem;
-  line-height: 1.58;
+  font-size: 0.92rem;
+  line-height: 1.62;
 }
 
 /* ── How-it-works steps ──
@@ -855,6 +781,277 @@
   to {
     transform: translateX(100%);
   }
+}
+
+/* ── Evidence contract + Telegram delivery ── */
+.qualityGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+  gap: 18px;
+  align-items: stretch;
+}
+
+.qualityCard,
+.deliveryCard {
+  border: 1px solid rgba(20, 40, 72, 0.12);
+  border-radius: 22px;
+  overflow: hidden;
+  box-shadow: 0 24px 70px rgba(20, 39, 74, 0.09);
+}
+
+.qualityCard {
+  display: grid;
+  align-content: start;
+  gap: 20px;
+  padding: clamp(24px, 3.5vw, 38px);
+  color: #f8fbff;
+  background:
+    radial-gradient(circle at 90% 10%, rgba(65, 118, 255, 0.18), transparent 32%),
+    linear-gradient(150deg, #101b2f 0%, #0a1221 100%);
+}
+
+.qualityCardTopbar,
+.qualityCompanyRow,
+.qualityCardFooter,
+.deliveryTopbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.qualityCardTopbar {
+  color: rgba(226, 235, 248, 0.7);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.qualityDemoBadge {
+  padding: 5px 9px;
+  border: 1px solid rgba(139, 172, 255, 0.24);
+  border-radius: 999px;
+  color: #b9ceff;
+  background: rgba(72, 117, 232, 0.12);
+}
+
+.qualityCompanyRow h3,
+.qualityCompanyRow p,
+.deliveryMessage h3,
+.deliveryMessage p,
+.deliveryNote {
+  margin: 0;
+}
+
+.qualityCompanyRow h3 {
+  font-size: clamp(1.3rem, 2.2vw, 1.8rem);
+  letter-spacing: -0.035em;
+}
+
+.qualityCompanyRow p {
+  margin-top: 5px;
+  color: rgba(226, 235, 248, 0.63);
+  font-size: 0.84rem;
+}
+
+.qualityScore {
+  display: flex;
+  align-items: baseline;
+  color: rgba(226, 235, 248, 0.56);
+}
+
+.qualityScore strong {
+  color: #fff;
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1;
+  letter-spacing: -0.06em;
+}
+
+.qualityScore span {
+  font-size: 0.78rem;
+}
+
+.qualityEvidence {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid rgba(181, 203, 237, 0.12);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.qualityEvidence div {
+  min-width: 0;
+  padding: 17px;
+}
+
+.qualityEvidence div + div {
+  border-left: 1px solid rgba(181, 203, 237, 0.12);
+}
+
+.qualityEvidence dt {
+  color: rgba(191, 208, 235, 0.62);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.qualityEvidence dd {
+  margin: 8px 0 0;
+  color: #f4f7fb;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.qualityCardFooter {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  color: rgba(226, 235, 248, 0.65);
+  font-size: 0.76rem;
+}
+
+.qualityConfidence {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #bcebd2;
+  font-weight: 800;
+}
+
+.qualityConfidence i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #39ca7a;
+  box-shadow: 0 0 0 4px rgba(57, 202, 122, 0.12);
+}
+
+.deliveryCard {
+  display: grid;
+  align-content: start;
+  gap: 18px;
+  padding: clamp(22px, 3vw, 30px);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(244, 248, 254, 0.96));
+}
+
+.deliveryTopbar {
+  justify-content: flex-start;
+}
+
+.telegramMark {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  border-radius: 14px;
+  color: #fff;
+  background: linear-gradient(145deg, #32a9e8, #1b86cb);
+  box-shadow: 0 10px 24px rgba(31, 149, 214, 0.25);
+}
+
+.telegramMark svg {
+  width: 23px;
+  height: 23px;
+}
+
+.deliveryTopbar div {
+  display: grid;
+  gap: 2px;
+}
+
+.deliveryTopbar strong {
+  color: var(--c-text-primary);
+  font-size: 0.9rem;
+}
+
+.deliveryTopbar span {
+  color: var(--c-text-tertiary);
+  font-size: 0.74rem;
+}
+
+.deliveryMessage {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  border-radius: 16px 16px 16px 5px;
+  background: #fff;
+  box-shadow: 0 12px 34px rgba(20, 39, 74, 0.08);
+}
+
+.deliveryKicker {
+  color: var(--c-brand);
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.deliveryMessage h3 {
+  color: var(--c-text-primary);
+  font-size: 1.08rem;
+  letter-spacing: -0.02em;
+}
+
+.deliveryMessage p {
+  color: var(--c-text-secondary);
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+.feedbackChoices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding-top: 3px;
+}
+
+.feedbackChoices span {
+  padding: 7px 10px;
+  border: 1px solid rgba(47, 98, 232, 0.13);
+  border-radius: 9px;
+  color: #2457c5;
+  background: rgba(47, 98, 232, 0.055);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.deliveryNote {
+  color: var(--c-text-tertiary);
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
+.qualityRules {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  margin: 0;
+  padding: 18px 0 0;
+  list-style: none;
+  color: var(--c-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.qualityRules li {
+  position: relative;
+  padding: 0 20px 0 22px;
+}
+
+.qualityRules li::before {
+  content: "";
+  position: absolute;
+  top: 0.43em;
+  left: 4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--c-brand);
+  box-shadow: 0 0 0 4px rgba(47, 98, 232, 0.08);
 }
 
 /* ── Preview grid ── */
@@ -1719,17 +1916,8 @@
     box-sizing: border-box;
   }
 
-  .principles {
-    grid-template-columns: 1fr;
-  }
-
-  .principle + .principle {
-    border-top: 1px solid var(--c-border);
-    border-left: 0;
-  }
-
-  /* Problem + steps go two-up, then one-up further down. */
-  .problemGrid {
+  .problemLayout,
+  .qualityGrid {
     grid-template-columns: 1fr;
   }
 
@@ -1783,8 +1971,28 @@
     display: none;
   }
 
-  .principles {
+  .problemLayout {
+    gap: 20px;
+    padding: 24px 20px;
+    border-radius: 22px;
+  }
+
+  .problemRow {
+    gap: 14px;
+  }
+
+  .qualityEvidence {
     grid-template-columns: 1fr;
+  }
+
+  .qualityEvidence div + div {
+    border-top: 1px solid rgba(181, 203, 237, 0.12);
+    border-left: 0;
+  }
+
+  .qualityRules {
+    grid-template-columns: 1fr 1fr;
+    gap: 16px 0;
   }
 
   .primaryPlanCard,
@@ -1898,7 +2106,8 @@
 .heroSection,
 .heroProduct,
 .heroEvidenceRow div,
-.principles,
+.qualityCard,
+.deliveryCard,
 .previewCard,
 .primaryPlanCard,
 .secondaryPlanCard,
@@ -1909,7 +2118,6 @@
 }
 
 .topBar,
-.principles,
 .previewCard,
 .primaryPlanCard,
 .secondaryPlanCard,
@@ -1922,8 +2130,6 @@
 .topBar { background: rgba(255, 255, 255, 0.86); }
 .heroProduct { background: rgba(15, 27, 49, 0.78); }
 .heroEvidenceRow div { background: rgba(255, 255, 255, 0.055); }
-.principles { background: rgba(255, 255, 255, 0.9); }
-.principle + .principle { border-left: 1px solid var(--c-border); }
 .previewCard { background: rgba(255, 255, 255, 0.92); }
 .primaryPlanCard { background: rgba(239, 246, 255, 0.9); }
 .secondaryPlanCard { background: rgba(255, 255, 255, 0.9); }
