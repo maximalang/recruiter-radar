@@ -107,24 +107,30 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         <RadarCanvas />
         <div className={hpStyles.heroContent}>
           <div className={hpStyles.heroCopy}>
+            <div className={hpStyles.heroEyebrow}>
+              <span aria-hidden="true" />
+              Клиентский радар для рекрутинговых агентств
+            </div>
             <h1 className={hpStyles.heroTitle}>
-              Компании, которым нужен подбор — <span className={hpStyles.heroTitleAccent}>в момент, когда стоит написать</span>
+              Компании, которым стоит написать сегодня — <span className={hpStyles.heroTitleAccent}>с поводом и доказательствами</span>
             </h1>
             <p className={hpStyles.heroSubtitle}>
-              Каждое утро — несколько компаний под специализацию вашего агентства.
-              Вы сразу видите повод для обращения, силу сигнала и следующий шаг.
+              Каждое утро Recruiter Radar отбирает 3–7 компаний под специализацию агентства.
+              В каждой карточке — сигнал найма, уровень уверенности и безопасный путь контакта.
             </p>
             <div className={hpStyles.heroActions}>
-              <a href="#preview" className={hpStyles.heroCta}>
-                Посмотреть пример радара
+              <Link href={checkoutHref} className={hpStyles.heroCta}>
+                Попробовать неделю
                 <svg className={hpStyles.heroCtaArrow} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <line x1="5" y1="12" x2="19" y2="12" />
                   <polyline points="13 6 19 12 13 18" />
                 </svg>
-              </a>
-              <a href="#pricing" className={hpStyles.heroSecondaryCta}>Тарифы</a>
+              </Link>
+              <a href="#preview" className={hpStyles.heroSecondaryCta}>Посмотреть демо</a>
             </div>
-            <p className={hpStyles.heroFootnote}>Настройка профиля за 5 минут · доставка в Telegram</p>
+            <p className={hpStyles.heroFootnote}>
+              {pilotPlan.price} за {pilotPlan.cadence} · без автопродления · доставка в Telegram
+            </p>
           </div>
 
           <div className={hpStyles.heroProduct} aria-label="Как Recruiter Radar оценивает компанию">
@@ -179,7 +185,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         </div>
       </section>
 
-      <LandingHeader />
+      <LandingHeader activationHref={checkoutHref} />
 
       {/* Principles / value row */}
       <ScrollReveal as="section" className={hpStyles.scrollSection}>
@@ -241,7 +247,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       </Suspense>
 
       {/* How it works — the three-step flow */}
-      <ScrollReveal as="section" className={hpStyles.scrollSection}>
+      <ScrollReveal as="section" id="how-it-works" className={hpStyles.scrollSection}>
         <SectionIntro
           accent
           eyebrow="Как работает"
