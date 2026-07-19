@@ -25,6 +25,7 @@ import {
   buildFaqItems,
   cleanEmployerName,
   formatLocationCaption,
+  formatVacancyFreshness,
   pickEvidenceTitles,
 } from "./home-page-components";
 import hpStyles from "./home-page-components.module.css";
@@ -590,25 +591,54 @@ function PreviewDigestCard(props: {
   const sourceCountRow = item.sourceCount > 0 ? `${item.sourceCount} ${pluralSources(item.sourceCount)}` : null;
   const contactRow = contactPath || null;
 
-  // The three detail tiles use real item fields — "what changed" = the whyNow
-  // signal (urgency/intent reasons), "next step" = the opener (a ready-made
-  // outreach angle the digest already produced), and "evidence" = the actual
-  // vacancy titles. This makes the expanded card honest: no fabricated copy,
-  // every line traces to a digest field.
+  // The collapsed card mirrors the hero "Пример структуры сигнала" anatomy:
+  // three evidence tiles + three signal meters, all from real item fields.
+  //   - "Что изменилось"  = whyNow (urgency/intent reasons) — the hiring change
+  //   - "Доказательства" = top vacancy titles — the proof behind the signal
+  //   - "Следующий шаг"  = opener (a ready-made outreach angle the digest built)
+  // The three meters read the SAME single total_score from three angles:
+  //   - "Соответствие профилю" = the ICP fit axis (rs.fit) — empty on a generic
+  //     (non-personalised) preview, so we fall back to a "по умолчанию" caption
+  //     and a neutral fill rather than fabricate a high fit.
+  //   - "Сила сигнала"        = total_score → points, the headline strength
+  //   - "Актуальность"        = freshness of latest_published_at ("сегодня" /
+  //     "за N дней" / "более месяца"), the amber warmth meter. Falls back to
+  //     neutral when no publish date is present.
   const detailWhat = whyNow || vacanciesCaption || "Активность найма подтверждена источниками";
+  const detailEvidence = evidenceTitles.length > 0 ? evidenceTitles.join(" · ") : (vacanciesCaption || "Открытые позиции подтверждают активный найм");
   const detailNext = item.opener?.trim() || (contactPath ? "Проверить корпоративный путь контакта" : "Уточнить контакт и предложить помощь по открытому найму");
-  const detailEvidence = evidenceTitles.length > 0 ? evidenceTitles.join(" · ") : "Открытые позиции подтверждают активный найм";
+
+  const freshness = formatVacancyFreshness(item.latest_published_at);
+  // Map the [0,1] relevance axes onto a 0–100 fill for the meter bars. When the
+  // preview is not personalised the axes are 0 — use a neutral mid fill so the
+  // meter reads as "без ICP-профиля" instead of a fabricated low score.
+  const fitPct = hasRelevance ? Math.round(rs.fit * 100) : 50;
+  const fitLabel = hasRelevance
+    ? (rs.fit >= 0.75 ? "Высокое" : rs.fit >= 0.5 ? "Среднее" : rs.fit > 0 ? "Низкое" : "Нет данных")
+    : "по умолчанию";
+  const strengthLabel = pct >= 75 ? "Сильная" : pct >= 50 ? "Умеренная" : "Слабая";
+  const freshnessLabel = freshness ? (freshness.includes("сегодня") || freshness.includes("1 день") || freshness.includes("за 2") || freshness.includes("за 3") ? "Сегодня" : freshness.includes("недел") ? "Эта неделя" : "Ранее") : "Нет даты";
 
   return (
     <article className={hpStyles.previewCard} data-tone={tone}>
-      {location ? (
-        <div className={hpStyles.previewCardTopbar}>
+      <div className={hpStyles.previewCardTopbar}>
+        {location ? (
           <span className={hpStyles.previewCardLoc} aria-label={`География: ${location}`}>{location}</span>
-        </div>
-      ) : null}
+        ) : (
+          <span className={hpStyles.previewCardLoc} aria-hidden="true" />
+        )}
+        {confidenceRow ? (
+          <span className={hpStyles.previewGateChip} data-gate={item.confidence_gate}>{confidenceRow}</span>
+        ) : null}
+      </div>
 
       <div className={hpStyles.previewCompanyRow}>
-        <div className={hpStyles.previewCardName}>{employerName}</div>
+        <div>
+          <div className={hpStyles.previewCardName}>{employerName}</div>
+          {vacanciesCaption ? (
+            <div className={hpStyles.previewCardMeta}>{vacanciesCaption}</div>
+          ) : null}
+        </div>
         <div className={hpStyles.previewScore}>
           <strong>{points}</strong><span>/100</span>
         </div>
@@ -623,6 +653,40 @@ function PreviewDigestCard(props: {
         aria-label={`Сила сигнала: ${points} из 100`}
       >
         <span className={hpStyles.previewStrengthFill} data-tone={tone} style={{ width: `${pct}%` }} />
+      </div>
+
+      {/* Three evidence tiles — the collapsed "what's in this signal" read,
+          identical shape to the hero example card. */}
+      <div className={hpStyles.previewEvidenceRow}>
+        <div><span>Что изменилось</span><p>{detailWhat}</p></div>
+        <div><span>Доказательства</span><p>{detailEvidence}</p></div>
+        <div><span>Следующий шаг</span><p>{detailNext}</p></div>
+      </div>
+
+      {/* Three signal meters — same three axes the hero card shows. Fit falls
+          back to a neutral read when the preview is not personalised. */}
+      <div className={hpStyles.previewSignalMeters}>
+        <div className={hpStyles.previewSignalMeter}>
+          <div className={hpStyles.previewSignalMeterHead}>
+            <span>Соответствие профилю</span>
+            <strong>{fitLabel}</strong>
+          </div>
+          <div className={hpStyles.previewSignalMeterTrack} data-tone="green"><span style={{ width: `${fitPct}%` }} /></div>
+        </div>
+        <div className={hpStyles.previewSignalMeter}>
+          <div className={hpStyles.previewSignalMeterHead}>
+            <span>Сила сигнала</span>
+            <strong>{strengthLabel}</strong>
+          </div>
+          <div className={hpStyles.previewSignalMeterTrack}><span style={{ width: `${pct}%` }} /></div>
+        </div>
+        <div className={hpStyles.previewSignalMeter}>
+          <div className={hpStyles.previewSignalMeterHead}>
+            <span>Актуальность</span>
+            <strong>{freshnessLabel}</strong>
+          </div>
+          <div className={hpStyles.previewSignalMeterTrack} data-tone="amber"><span style={{ width: `${freshness ? 88 : 30}%` }} /></div>
+        </div>
       </div>
 
       <details className={hpStyles.previewDetails}>
