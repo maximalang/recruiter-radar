@@ -9,6 +9,7 @@ export function BrandLogo(props: {
 }) {
   const tone = props.tone ?? "light";
   const size = props.size ?? "default";
+  const joined = props.joined ?? true;
 
   return (
     <span
@@ -22,7 +23,7 @@ export function BrandLogo(props: {
       <span
         className={s.wordmark}
         aria-hidden="true"
-        style={props.joined ? { gap: 0 } : undefined}
+        style={joined ? { gap: 0 } : undefined}
       >
         <span>Recruiter</span>
         <span className={s.wordmarkAccent}>Radar</span>
