@@ -11,7 +11,7 @@ export default function LandingHeader() {
         className={hpStyles.brandMark}
         aria-label="Recruiter Radar — на главную"
       >
-        <BrandLogo />
+        <BrandLogo joined />
       </Link>
       <nav className={hpStyles.topNavLinks} aria-label="Разделы лендинга">
         <span className={hpStyles.topNavAnchors}>
