@@ -67,7 +67,7 @@ describe("landing section hierarchy", () => {
     // the whole render — see page.tsx). HomePage's static tree no longer
     // contains the preview's children, so we render both halves and combine:
     // HomePage renders Проблема / Как работает / Проверка сигнала / Тарифы /
-    // Перед запуском (5 SectionIntros), PreviewSection renders Пример результата
+    // FAQ (5 SectionIntros), PreviewSection renders Интерактивный пример
     // (1) — six total. The duplicate "Что внутри" block must not return.
     const page = await HomePage({ searchParams: Promise.resolve({}) });
     const preview = await PreviewSection({
@@ -90,6 +90,20 @@ describe("landing section hierarchy", () => {
       "FAQ",
       "Интерактивный пример",
     ]);
+  });
+
+  it("keeps the hero concise and makes the pilot the obvious first decision", async () => {
+    const page = await HomePage({ searchParams: Promise.resolve({}) });
+    const pageText = readVisibleText(page);
+    const pricingIntro = collectElements(page, SectionIntro)
+      .find((section) => section.props.eyebrow === "Тарифы");
+
+    expect(pageText).toContain("Компании, которым стоит написать сегодня. С доказательствами.");
+    expect(pricingIntro?.props.title).toBe("Начните с недели. Продолжайте, только если радар полезен.");
+    expect(pricingIntro?.props.description).toContain("Пилот — разовая оплата без продления.");
+    expect(pageText).toContain("Проверьте новый канал за 7 дней");
+    expect(pageText).not.toContain("0 автоспама");
+    expect(pageText).not.toContain("Один радар — на неделю, месяц или квартал");
   });
 
   it("labels the resilient fallback as demo instead of personalized live data", async () => {

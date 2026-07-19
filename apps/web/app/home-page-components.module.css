@@ -541,46 +541,6 @@
   }
 }
 
-/* Hero metrics — the 3-up strip under the hero product card that quantifies the
-   promise: 3–7 companies, one card per lead, zero auto-spam. Reads as the
-   product contract in three tiles. */
-.heroMetrics {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  width: 100%;
-  box-sizing: border-box;
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid rgba(148, 163, 184, 0.16);
-}
-
-.heroMetric {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 12px;
-  align-items: center;
-  min-height: 72px;
-  padding: 14px 16px;
-  border: 1px solid rgba(148, 163, 184, 0.12);
-  border-radius: 15px;
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.heroMetric strong {
-  color: #ffffff;
-  font-size: 1.2rem;
-  letter-spacing: -0.04em;
-  font-weight: 800;
-  white-space: nowrap;
-}
-
-.heroMetric span {
-  color: rgba(203, 213, 225, 0.72);
-  font-size: 0.76rem;
-  line-height: 1.4;
-}
-
 .heroCta:hover {
   transform: translateY(-1px);
   box-shadow: 0 20px 46px rgba(2, 6, 23, 0.5);
@@ -639,11 +599,9 @@
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
   gap: clamp(36px, 7vw, 88px);
   align-items: start;
-  padding: clamp(30px, 5vw, 64px);
-  border: 1px solid rgba(20, 40, 72, 0.1);
-  border-radius: 28px;
-  background: linear-gradient(135deg, rgba(247, 250, 255, 0.98), rgba(237, 244, 255, 0.86));
-  box-shadow: 0 28px 80px rgba(31, 51, 89, 0.08);
+  padding: clamp(30px, 5vw, 58px) 0;
+  border-top: 1px solid rgba(20, 40, 72, 0.12);
+  border-bottom: 1px solid rgba(20, 40, 72, 0.12);
 }
 
 .problemList {
@@ -686,14 +644,13 @@
   line-height: 1.62;
 }
 
-/* ── How-it-works steps ──
-   Three flow cards joined by a travelling light line. The line animates left→
-   right to suggest a moving pipeline (profile → verify → result). Cards carry a
-   step index, a heading and one line of copy. */
+/* ── How-it-works steps ── */
 .steps {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  gap: 0;
+  border-top: 1px solid var(--c-border);
+  border-bottom: 1px solid var(--c-border);
 }
 
 .step {
@@ -701,33 +658,12 @@
   display: grid;
   gap: 10px;
   align-content: start;
-  padding: 24px;
-  border-radius: 18px;
-  border: 1px solid var(--c-border);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(249, 251, 255, 0.92) 100%);
-  box-shadow: 0 10px 30px rgba(15, 35, 68, 0.05);
-  overflow: hidden;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  padding: 26px clamp(20px, 3vw, 34px);
+  border-right: 1px solid var(--c-border);
 }
 
-.step:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 22px 48px rgba(31, 51, 89, 0.1);
-}
-
-/* Arrow joining steps on desktop — absent on the last card and on stacked rows. */
-.step:not(:last-child)::after {
-  content: "→";
-  position: absolute;
-  top: 50%;
-  right: -11px;
-  transform: translateY(-50%);
-  color: var(--c-brand);
-  font-weight: 900;
-  font-size: 1.1rem;
-  z-index: 2;
-  background: var(--c-bg-page, #f7faff);
-  padding: 0 2px;
+.step:last-child {
+  border-right: 0;
 }
 
 .stepIndex {
@@ -751,38 +687,6 @@
   color: var(--c-text-secondary);
   font-size: 0.9rem;
   line-height: 1.58;
-}
-
-/* Travelling accent line along the bottom of the steps row — a soft light band
-   that sweeps left→right, reinforcing the "flow" metaphor. Decorative, gated on
-   no-preference motion. */
-.stepsTrack {
-  position: relative;
-  height: 2px;
-  margin-top: 4px;
-  border-radius: 999px;
-  background: rgba(47, 98, 232, 0.1);
-  overflow: hidden;
-}
-
-.stepsTrack::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, transparent, var(--c-brand), transparent);
-  transform: translateX(-100%);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .stepsTrack::after {
-    animation: flowSweep 4.5s linear infinite;
-  }
-}
-
-@keyframes flowSweep {
-  to {
-    transform: translateX(100%);
-  }
 }
 
 /* ── Evidence contract + Telegram delivery ── */
@@ -1950,13 +1854,6 @@
     grid-template-columns: minmax(0, 1fr) minmax(0, 0.75fr) auto;
   }
 
-  /* The three promises repeat information already visible in the hero product
-     card. Keeping them below the one-column hero makes the first block feel
-     longer than the product story itself on tablets and phones. */
-  .heroMetrics {
-    display: none;
-  }
-
   .heroSection {
     min-height: auto;
   }
@@ -1983,10 +1880,15 @@
     grid-template-columns: 1fr;
   }
 
-  /* No joining arrows when steps are stacked. */
-  .step:not(:last-child)::after {
-    display: none;
+  .step {
+    border-right: 0;
+    border-bottom: 1px solid var(--c-border);
   }
+
+  .step:last-child {
+    border-bottom: 0;
+  }
+
 }
 
 @media (max-width: 820px) {
@@ -2031,8 +1933,7 @@
 
   .problemLayout {
     gap: 20px;
-    padding: 24px 20px;
-    border-radius: 22px;
+    padding: 28px 0;
   }
 
   .problemRow {

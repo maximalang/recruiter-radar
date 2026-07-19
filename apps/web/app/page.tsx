@@ -89,11 +89,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               Клиентский радар для рекрутинговых агентств
             </div>
             <h1 className={hpStyles.heroTitle}>
-              Компании, которым стоит написать сегодня — <span className={hpStyles.heroTitleAccent}>с поводом и доказательствами</span>
+              Компании, которым стоит написать сегодня. <span className={hpStyles.heroTitleAccent}>С доказательствами.</span>
             </h1>
             <p className={hpStyles.heroSubtitle}>
-              Каждое утро Recruiter Radar отбирает 3–7 компаний под специализацию агентства.
-              В каждой карточке — сигнал найма, уровень уверенности и безопасный путь контакта.
+              Каждое утро Recruiter Radar отбирает 3–7 компаний под специализацию агентства и показывает сигнал найма, уровень уверенности и безопасный путь контакта.
             </p>
             <div className={hpStyles.heroActions}>
               <Link href={checkoutHref} className={hpStyles.heroCta}>
@@ -153,12 +152,6 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             </div>
           </div>
 
-        </div>
-
-        <div className={hpStyles.heroMetrics}>
-          <div className={hpStyles.heroMetric}><strong>3–7</strong><span>компаний с наивысшим приоритетом</span></div>
-          <div className={hpStyles.heroMetric}><strong>1 карточка</strong><span>сигнал, доказательства, контакт и следующий шаг</span></div>
-          <div className={hpStyles.heroMetric}><strong>0 автоспама</strong><span>решение об обращении всегда за вами</span></div>
         </div>
       </section>
 
@@ -223,7 +216,6 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             <p>3–7 компаний с причиной, доказательствами, контактом и следующим шагом — в Telegram.</p>
           </article>
         </div>
-        <div className={hpStyles.stepsTrack} aria-hidden="true" />
       </ScrollReveal>
 
       {/* Evidence contract + Telegram delivery */}
@@ -278,7 +270,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         <SectionIntro
           accent
           eyebrow="Тарифы"
-          title="Один радар — на неделю, месяц или квартал"
+          title="Начните с недели. Продолжайте, только если радар полезен."
+          description="Пилот — разовая оплата без продления. Месяц и квартал подключаются по заявке после проверки качества."
         />
 
         <div className={hpStyles.pricingGrid}>
@@ -328,7 +321,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                         {plan.name}
                       </StatusBadge>
                       {isQuarterly ? (
-                        <span className={hpStyles.savingsBadge}>выгода 14 980 ₽</span>
+                        <span className={hpStyles.savingsBadge}>экономия 14 980 ₽</span>
                       ) : null}
                     </div>
                     <div className={hpStyles.planPriceRow}>
@@ -393,9 +386,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
       {/* Closing CTA band */}
       <section className={hpStyles.closingBand}>
-        <h2 className={hpStyles.closingTitle}>Узнайте, кому стоит написать</h2>
+        <h2 className={hpStyles.closingTitle}>Проверьте новый канал за 7 дней</h2>
         <p className={hpStyles.closingText}>
-          Настройте профиль агентства, получите первый список компаний и проверьте качество нового канала клиентского спроса за 7 дней.
+          Настройте профиль, получите первый радар и решите на фактах, стоит ли продолжать.
         </p>
         <div className={hpStyles.closingActions}>
           <Link href={checkoutHref} className={hpStyles.heroCta}>

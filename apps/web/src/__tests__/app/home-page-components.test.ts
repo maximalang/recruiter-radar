@@ -47,7 +47,8 @@ describe('landing card copy helpers', () => {
   it('describes the public example honestly when live data can fall back to demo', () => {
     const [exampleQuestion] = buildFaqItems(true);
 
-    expect(exampleQuestion.answer).toContain('явно показываем демо');
+    expect(exampleQuestion.answer).toContain('Демонстрационные карточки');
+    expect(exampleQuestion.answer).not.toContain('временно недоступна');
     expect(exampleQuestion.answer).not.toContain('показывает те же данные');
   });
 
