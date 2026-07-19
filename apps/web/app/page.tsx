@@ -397,56 +397,6 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         <div className={hpStyles.stepsTrack} aria-hidden="true" />
       </ScrollReveal>
 
-      {/* Signal anatomy — what a single lead card contains */}
-      <ScrollReveal as="section" className={hpStyles.scrollSection}>
-        <SectionIntro
-          accent
-          eyebrow="Карточка лида"
-          title="Почему компании стоит написать"
-          description="Каждая рекомендация содержит факты, источники и конкретный следующий шаг — без выдуманных данных."
-        />
-        <p className={hpStyles.demoNote}>
-          {previewState.isLive
-            ? "Ниже — пример структуры карточки. Реальные компании, даты и источники приходят в радаре выше и в Telegram."
-            : "Ниже — пример структуры карточки. В рабочем радаре компании, даты и источники берутся из актуальных открытых данных."}
-        </p>
-        <div className={hpStyles.signalLayout}>
-          <div className={hpStyles.signalSide}>
-            <span className={hpStyles.priorityChip}>Высокий приоритет</span>
-            <h3 className={hpStyles.signalSideTitle}>Производственная компания</h3>
-            <p className={hpStyles.signalSideSub}>Промышленность · Москва и область</p>
-            <div className={hpStyles.bigScore}>87<small>/100</small></div>
-            <div className={hpStyles.signalSideMeta}>
-              <div className={hpStyles.signalSideMetaRow}><span>Уверенность</span><b>Подтверждено</b></div>
-              <div className={hpStyles.signalSideMetaRow}><span>Источники</span><b>2 независимых</b></div>
-              <div className={hpStyles.signalSideMetaRow}><span>Контакт</span><b>Найден</b></div>
-            </div>
-          </div>
-          <div className={hpStyles.signalMain}>
-            <div className={hpStyles.detailGrid}>
-              <div className={hpStyles.detail}>
-                <h3>Что изменилось</h3>
-                <p>14 новых вакансий за 6 дней, включая редкую инженерную роль.</p>
-              </div>
-              <div className={hpStyles.detail}>
-                <h3>Почему сейчас</h3>
-                <p>Найм ускорился, а сложные роли повышают нагрузку на внутреннюю команду.</p>
-              </div>
-              <div className={`${hpStyles.detail} ${hpStyles.detailFull}`}>
-                <h3>Следующий шаг</h3>
-                <p>Проверить HR-форму на сайте компании и предложить помощь по инженерным ролям.</p>
-              </div>
-            </div>
-            <p className={hpStyles.timelineTitle}>Хронология сигнала</p>
-            <div className={hpStyles.timeline}>
-              <div className={hpStyles.timelineItem}><time>15 июля</time><span>На карьерной странице появились 4 новые инженерные позиции</span></div>
-              <div className={hpStyles.timelineItem}><time>12 июля</time><span>Количество открытых вакансий выросло с 7 до 16</span></div>
-            </div>
-            <div className={hpStyles.trustLine}>Компания, даты и факты подтверждаются открытыми источниками</div>
-          </div>
-        </div>
-      </ScrollReveal>
-
       {/* Pricing — hierarchy: primary week plan, then secondary plans */}
       <ScrollReveal as="section" id="pricing" className={hpStyles.scrollSection}>
         <SectionIntro
@@ -754,7 +704,7 @@ function pluralSources(count: number): string {
  * lib/scoring/gates) to a short Russian label for the public lead card. Returns
  * null for an absent/unknown gate so the caller hides the row instead of
  * showing a raw letter or an English bucket. Mirrors the "Уверенность" copy in
- * the "Карточка лида" exhibit so a real card and the teaching panel agree.
+ * the hero "Пример структуры сигнала" card so a real lead and the demo agree.
  */
 function gateLabel(gate: string | null | undefined): string | null {
   switch (gate) {
