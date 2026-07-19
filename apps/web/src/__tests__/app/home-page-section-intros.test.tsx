@@ -1,4 +1,5 @@
 import { Children, isValidElement, type ReactNode } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import Link from "next/link";
 
 import HomePage, { PreviewSection } from "@/app/page";
@@ -86,7 +87,7 @@ describe("landing section hierarchy", () => {
       "Как работает",
       "Проверка сигнала",
       "Тарифы",
-      "Перед запуском",
+      "FAQ",
       "Пример результата",
     ]);
   });
@@ -148,5 +149,58 @@ describe("landing section hierarchy", () => {
 
     expect(specialization?.props.maxLength).toBe(160);
     expect(targetCity?.props.maxLength).toBe(120);
+  });
+
+  it("does not repeat the visible recommendation summary inside its disclosure", async () => {
+    mockGetPublicSampleDigestState.mockResolvedValueOnce({
+      isLive: false,
+      isPersonalized: false,
+      hasExactMatches: true,
+      items: [{
+        rank: 1,
+        org_id: "demo-industrial",
+        employer_name: "Производственная компания",
+        vacancies_count: 14,
+        distinct_vacancy_names_count: 6,
+        latest_published_at: "2026-07-19T09:00:00.000Z",
+        total_score: 348,
+        reasons: ["14 новых вакансий за 6 дней"],
+        opener: "Предложить точечный подбор по инженерным ролям",
+        source_families: ["hh", "career-pages"],
+        evidence_titles: ["Инженер-конструктор", "Руководитель производства"],
+        candidate_source_keys: ["demo:hh", "demo:career"],
+        location_names: ["Москва и область"],
+        confidence_gate: "A",
+        confidenceLabel: "high",
+        sourceCount: 2,
+        sourceKeys: ["demo:hh", "demo:career"],
+        structuredSignalCount: 2,
+        curationLabels: [],
+        lawfulContactPath: "career-page",
+        negativeSignals: [],
+        relevanceSignals: { fit: 0, intent: 0, urgency: 0, reachability: 0 },
+      }],
+    });
+
+    const input = readPublicPreviewInput({});
+    const preview = await PreviewSection({
+      previewInput: input,
+      hasPreview: false,
+      checkoutHref: buildCheckoutHref(input),
+    });
+    const previewMarkup = renderToStaticMarkup(preview);
+
+    expect(previewMarkup).toContain("Проверка и источники");
+    expect(previewMarkup.match(/Что изменилось/g)).toHaveLength(1);
+    expect(previewMarkup.match(/Доказательства/g)).toHaveLength(1);
+    expect(previewMarkup.match(/Следующий шаг/g)).toHaveLength(1);
+  });
+
+  it("explains the four quality checks without duplicating the hero company card", async () => {
+    const page = await HomePage({ searchParams: Promise.resolve({}) });
+    const pageText = readVisibleText(page);
+
+    expect(pageText).toContain("Сигнал проходит четыре проверки");
+    expect(pageText.match(/Производственная компания/g)).toHaveLength(1);
   });
 });

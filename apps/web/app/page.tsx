@@ -235,28 +235,22 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           description="Рекомендация появляется только вместе с проверяемыми фактами, уровнем уверенности и безопасным корпоративным контактом."
         />
         <div className={hpStyles.qualityGrid}>
-          <article className={hpStyles.qualityCard}>
+          <article className={hpStyles.qualityMethodCard}>
             <div className={hpStyles.qualityCardTopbar}>
-              <span>Анатомия рекомендации</span>
-              <span className={hpStyles.qualityDemoBadge}>пример</span>
+              <span>Контур проверки</span>
+              <span className={hpStyles.qualityDemoBadge}>4 шага</span>
             </div>
-            <div className={hpStyles.qualityCompanyRow}>
-              <div>
-                <h3>Производственная компания</h3>
-                <p>Москва и область · промышленность</p>
-              </div>
-              <div className={hpStyles.qualityScore}><strong>87</strong><span>/100</span></div>
+            <div className={hpStyles.qualityMethodIntro}>
+              <h3>Сигнал проходит четыре проверки</h3>
+              <p>Высокий балл сам по себе ничего не доказывает. Радар показывает, из чего сложилась рекомендация.</p>
             </div>
-            <dl className={hpStyles.qualityEvidence}>
-              <div><dt>Что изменилось</dt><dd>14 новых вакансий за 6 дней</dd></div>
-              <div><dt>Почему сейчас</dt><dd>Появилась редкая инженерная роль</dd></div>
-              <div><dt>Следующий шаг</dt><dd>Проверить HR-форму на сайте компании</dd></div>
-            </dl>
-            <div className={hpStyles.qualityCardFooter}>
-              <span className={hpStyles.qualityConfidence}><i aria-hidden="true" /> Подтверждено</span>
-              <span>3 источника</span>
-              <span>обновлено сегодня</span>
-            </div>
+            <ol className={hpStyles.qualityChecks}>
+              <li><span>01</span><div><strong>Соответствие</strong><p>Ниша, роли и география совпадают с профилем агентства.</p></div><em>профиль</em></li>
+              <li><span>02</span><div><strong>Намерение</strong><p>Найм подтверждён несколькими фактами, а не одной вакансией.</p></div><em>2+ факта</em></li>
+              <li><span>03</span><div><strong>Срочность</strong><p>Изменение свежее: момент для обращения ещё не потерян.</p></div><em>сегодня</em></li>
+              <li><span>04</span><div><strong>Доступность</strong><p>Есть законный корпоративный путь контакта.</p></div><em>корп. канал</em></li>
+            </ol>
+            <div className={hpStyles.qualityOutcome}><i aria-hidden="true" /><span><strong>Допущено в радар</strong> — факты и ограничения остаются в карточке.</span></div>
           </article>
 
           <article className={hpStyles.deliveryCard}>
@@ -269,7 +263,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             <div className={hpStyles.deliveryMessage}>
               <span className={hpStyles.deliveryKicker}>Утренний радар · 5 компаний</span>
               <h3>Начните с этого сигнала</h3>
-              <p><strong>Производственная компания</strong> усилила инженерный найм. Уверенность высокая, доступен корпоративный путь контакта.</p>
+              <p><strong>Компания из вашего списка</strong> усилила инженерный найм. Уверенность высокая, доступен корпоративный путь контакта.</p>
               <div className={hpStyles.feedbackChoices} aria-label="Пример обратной связи в Telegram">
                 <span>Беру в работу</span><span>Позже</span><span>Не подходит</span>
               </div>
@@ -277,12 +271,6 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             <p className={hpStyles.deliveryNote}>Вы решаете, кому писать. Радар учитывает обратную связь, но ничего не отправляет компаниям автоматически.</p>
           </article>
         </div>
-        <ul className={hpStyles.qualityRules} aria-label="Принципы качества Recruiter Radar">
-          <li>Источник и дата у каждого факта</li>
-          <li>Вывод отделён от доказательств</li>
-          <li>Только корпоративные пути контакта</li>
-          <li>Без автоматической рассылки</li>
-        </ul>
       </ScrollReveal>
 
       {/* Pricing — hierarchy: primary week plan, then secondary plans */}
@@ -386,8 +374,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       <ScrollReveal as="section" id="faq" className={hpStyles.scrollSection}>
         <SectionIntro
           accent
-          eyebrow="Перед запуском"
-          title="Коротко о порядке"
+          eyebrow="FAQ"
+          title="Главные вопросы перед запуском"
+          description="Что именно приходит, откуда берутся данные и что остаётся под вашим контролем."
         />
         {faqItems.map((item) => (
           <details key={item.question} className={`${hpStyles.faqCard} ${hpStyles.revealCard}`}>
@@ -453,7 +442,7 @@ export async function PreviewSection(props: {
       />
 
       <div className={hpStyles.previewGrid}>
-        <SurfaceCard className={hpStyles.previewCardContainer}>
+        <SurfaceCard className={`${hpStyles.previewCardContainer} ${hpStyles.previewProfileCard}`}>
           <div className={hpStyles.previewCardHeading}>Параметры профиля</div>
 
           <form method="GET" action="/#preview" style={{ display: "grid", gap: "14px" }}>
@@ -606,7 +595,7 @@ export function PreviewSkeleton() {
         description="Задайте город и специализацию — справа появится тот самый список, что утром приходит в Telegram."
       />
       <div className={hpStyles.previewGrid}>
-        <SurfaceCard className={hpStyles.previewCardContainer}>
+        <SurfaceCard className={`${hpStyles.previewCardContainer} ${hpStyles.previewProfileCard}`}>
           <div className={hpStyles.previewCardHeading}>Параметры профиля</div>
           <div className={hpStyles.previewSkeletonBody}>
             <span className={hpStyles.previewSkeletonLine} />
@@ -692,25 +681,21 @@ function PreviewDigestCard(props: {
   //   - "Доказательства" = top vacancy titles — the proof behind the signal
   //   - "Следующий шаг"  = opener (a ready-made outreach angle the digest built)
   // The three meters read the SAME single total_score from three angles:
-  //   - "Соответствие профилю" = the ICP fit axis (rs.fit) — empty on a generic
-  //     (non-personalised) preview, so we fall back to a "по умолчанию" caption
-  //     and a neutral fill rather than fabricate a high fit.
+  //   - "Соответствие профилю" = the ICP fit axis (rs.fit). On a generic
+  //     preview we show an explicit setup hint instead of fabricating a fill.
   //   - "Сила сигнала"        = total_score → points, the headline strength
   //   - "Актуальность"        = freshness of latest_published_at ("сегодня" /
   //     "за N дней" / "более месяца"), the amber warmth meter. Falls back to
   //     neutral when no publish date is present.
   const detailWhat = whyNow || vacanciesCaption || "Активность найма подтверждена источниками";
-  const detailEvidence = evidenceTitles.length > 0 ? evidenceTitles.join(" · ") : (vacanciesCaption || "Открытые позиции подтверждают активный найм");
+  const detailEvidence = evidenceTitles.length > 0 ? evidenceTitles.slice(0, 2).join(" · ") : (vacanciesCaption || "Открытые позиции подтверждают активный найм");
   const detailNext = item.opener?.trim() || (contactPath ? "Проверить корпоративный путь контакта" : "Уточнить контакт и предложить помощь по открытому найму");
 
   const freshness = formatVacancyFreshness(item.latest_published_at);
-  // Map the [0,1] relevance axes onto a 0–100 fill for the meter bars. When the
-  // preview is not personalised the axes are 0 — use a neutral mid fill so the
-  // meter reads as "без ICP-профиля" instead of a fabricated low score.
-  const fitPct = hasRelevance ? Math.round(rs.fit * 100) : 50;
-  const fitLabel = hasRelevance
-    ? (rs.fit >= 0.75 ? "Высокое" : rs.fit >= 0.5 ? "Среднее" : rs.fit > 0 ? "Низкое" : "Нет данных")
-    : "по умолчанию";
+  // Map the [0,1] relevance axis onto a 0–100 fill only when the preview is
+  // actually personalized. Generic/demo cards show no invented fit score.
+  const fitPct = Math.round(rs.fit * 100);
+  const fitLabel = rs.fit >= 0.75 ? "Высокое" : rs.fit >= 0.5 ? "Среднее" : rs.fit > 0 ? "Низкое" : "Нет данных";
   const strengthLabel = pct >= 75 ? "Сильная" : pct >= 50 ? "Умеренная" : "Слабая";
   const freshnessLabel = freshness ? (freshness.includes("сегодня") || freshness.includes("1 день") || freshness.includes("за 2") || freshness.includes("за 3") ? "Сегодня" : freshness.includes("недел") ? "Эта неделя" : "Ранее") : "Нет даты";
 
@@ -758,16 +743,22 @@ function PreviewDigestCard(props: {
         <div><span>Следующий шаг</span><p>{detailNext}</p></div>
       </div>
 
-      {/* Three signal meters — same three axes the hero card shows. Fit falls
-          back to a neutral read when the preview is not personalised. */}
+      {/* Signal meters — fit is only scored for a personalized preview. */}
       <div className={hpStyles.previewSignalMeters}>
-        <div className={hpStyles.previewSignalMeter}>
-          <div className={hpStyles.previewSignalMeterHead}>
-            <span>Соответствие профилю</span>
-            <strong>{fitLabel}</strong>
+        {hasRelevance ? (
+          <div className={hpStyles.previewSignalMeter}>
+            <div className={hpStyles.previewSignalMeterHead}>
+              <span>Соответствие профилю</span>
+              <strong>{fitLabel}</strong>
+            </div>
+            <div className={hpStyles.previewSignalMeterTrack} data-tone="green"><span style={{ width: `${fitPct}%` }} /></div>
           </div>
-          <div className={hpStyles.previewSignalMeterTrack} data-tone="green"><span style={{ width: `${fitPct}%` }} /></div>
-        </div>
+        ) : (
+          <div className={hpStyles.previewProfileHint}>
+            <span>Соответствие профилю</span>
+            <strong>появится после настройки</strong>
+          </div>
+        )}
         <div className={hpStyles.previewSignalMeter}>
           <div className={hpStyles.previewSignalMeterHead}>
             <span>Сила сигнала</span>
@@ -786,27 +777,12 @@ function PreviewDigestCard(props: {
 
       <details className={hpStyles.previewDetails}>
         <summary className={hpStyles.previewSummary}>
-          <span>Подробнее о сигнале</span>
+          <span>Проверка и источники</span>
           <svg className={hpStyles.previewChevron} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <polyline points="6 9 12 15 18 9" />
           </svg>
         </summary>
         <div className={hpStyles.previewDetailsBody}>
-          <div className={hpStyles.previewDetailGrid}>
-            <div className={hpStyles.previewDetail}>
-              <h3>Что изменилось</h3>
-              <p>{detailWhat}</p>
-            </div>
-            <div className={hpStyles.previewDetail}>
-              <h3>Доказательства</h3>
-              <p>{detailEvidence}</p>
-            </div>
-            <div className={`${hpStyles.previewDetail} ${hpStyles.previewDetailFull}`}>
-              <h3>Следующий шаг</h3>
-              <p>{detailNext}</p>
-            </div>
-          </div>
-
           {(confidenceRow || sourceCountRow || contactRow) ? (
             <dl className={hpStyles.previewMeta}>
               {confidenceRow ? (
@@ -841,6 +817,12 @@ function PreviewDigestCard(props: {
                   </span>
                 ))}
               </div>
+            </div>
+          ) : null}
+          {item.negativeSignals.length > 0 ? (
+            <div className={hpStyles.previewCaveats}>
+              <h3>Что проверить перед контактом</h3>
+              <ul>{item.negativeSignals.slice(0, 3).map((signal) => <li key={signal}>{signal}</li>)}</ul>
             </div>
           ) : null}
         </div>

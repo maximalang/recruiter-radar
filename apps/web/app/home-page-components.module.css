@@ -203,7 +203,9 @@
 
 .heroCopy {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   min-width: 0;
+  width: 100%;
   justify-items: start;
   gap: 22px;
   text-align: left;
@@ -791,7 +793,7 @@
   align-items: stretch;
 }
 
-.qualityCard,
+.qualityMethodCard,
 .deliveryCard {
   border: 1px solid rgba(20, 40, 72, 0.12);
   border-radius: 22px;
@@ -799,10 +801,10 @@
   box-shadow: 0 24px 70px rgba(20, 39, 74, 0.09);
 }
 
-.qualityCard {
+.qualityMethodCard {
   display: grid;
   align-content: start;
-  gap: 20px;
+  gap: 22px;
   padding: clamp(24px, 3.5vw, 38px);
   color: #f8fbff;
   background:
@@ -811,8 +813,6 @@
 }
 
 .qualityCardTopbar,
-.qualityCompanyRow,
-.qualityCardFooter,
 .deliveryTopbar {
   display: flex;
   align-items: center;
@@ -836,92 +836,93 @@
   background: rgba(72, 117, 232, 0.12);
 }
 
-.qualityCompanyRow h3,
-.qualityCompanyRow p,
+.qualityMethodIntro h3,
+.qualityMethodIntro p,
 .deliveryMessage h3,
 .deliveryMessage p,
 .deliveryNote {
   margin: 0;
 }
 
-.qualityCompanyRow h3 {
+.qualityMethodIntro h3 {
   font-size: clamp(1.3rem, 2.2vw, 1.8rem);
+  line-height: 1.12;
   letter-spacing: -0.035em;
 }
 
-.qualityCompanyRow p {
-  margin-top: 5px;
+.qualityMethodIntro p {
+  margin-top: 10px;
   color: rgba(226, 235, 248, 0.63);
   font-size: 0.84rem;
+  line-height: 1.55;
 }
 
-.qualityScore {
-  display: flex;
-  align-items: baseline;
-  color: rgba(226, 235, 248, 0.56);
-}
-
-.qualityScore strong {
-  color: #fff;
-  font-size: clamp(2rem, 4vw, 3rem);
-  line-height: 1;
-  letter-spacing: -0.06em;
-}
-
-.qualityScore span {
-  font-size: 0.78rem;
-}
-
-.qualityEvidence {
+.qualityChecks {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
   margin: 0;
-  overflow: hidden;
-  border: 1px solid rgba(181, 203, 237, 0.12);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.04);
+  padding: 0;
+  border-top: 1px solid rgba(181, 203, 237, 0.14);
+  list-style: none;
 }
 
-.qualityEvidence div {
-  min-width: 0;
-  padding: 17px;
+.qualityChecks li {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(181, 203, 237, 0.14);
 }
 
-.qualityEvidence div + div {
-  border-left: 1px solid rgba(181, 203, 237, 0.12);
-}
-
-.qualityEvidence dt {
-  color: rgba(191, 208, 235, 0.62);
-  font-size: 0.68rem;
+.qualityChecks li > span {
+  color: #8ab9ff;
+  font-size: 0.7rem;
   font-weight: 800;
   letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 
-.qualityEvidence dd {
-  margin: 8px 0 0;
-  color: #f4f7fb;
+.qualityChecks strong,
+.qualityChecks p {
+  margin: 0;
+}
+
+.qualityChecks strong {
+  display: block;
+  color: #f8fbff;
   font-size: 0.86rem;
+  letter-spacing: -0.01em;
+}
+
+.qualityChecks p {
+  margin-top: 4px;
+  color: rgba(226, 235, 248, 0.65);
+  font-size: 0.76rem;
+  line-height: 1.42;
+}
+
+.qualityChecks em {
+  padding: 5px 8px;
+  border: 1px solid rgba(139, 172, 255, 0.18);
+  border-radius: 999px;
+  color: #b9ceff;
+  background: rgba(72, 117, 232, 0.09);
+  font-size: 0.68rem;
+  font-style: normal;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.qualityOutcome {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: rgba(226, 235, 248, 0.72);
+  font-size: 0.76rem;
   line-height: 1.45;
 }
 
-.qualityCardFooter {
-  justify-content: flex-start;
-  flex-wrap: wrap;
-  color: rgba(226, 235, 248, 0.65);
-  font-size: 0.76rem;
-}
-
-.qualityConfidence {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  color: #bcebd2;
-  font-weight: 800;
-}
-
-.qualityConfidence i {
+.qualityOutcome i {
+  flex: 0 0 auto;
   width: 7px;
   height: 7px;
   border-radius: 50%;
@@ -1025,41 +1026,17 @@
   line-height: 1.55;
 }
 
-.qualityRules {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0;
-  margin: 0;
-  padding: 18px 0 0;
-  list-style: none;
-  color: var(--c-text-secondary);
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-
-.qualityRules li {
-  position: relative;
-  padding: 0 20px 0 22px;
-}
-
-.qualityRules li::before {
-  content: "";
-  position: absolute;
-  top: 0.43em;
-  left: 4px;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--c-brand);
-  box-shadow: 0 0 0 4px rgba(47, 98, 232, 0.08);
-}
-
 /* ── Preview grid ── */
 .previewGrid {
   display: grid;
   grid-template-columns: 0.85fr 1.15fr;
   gap: var(--space-section);
-  align-items: stretch;
+  align-items: start;
+}
+
+.previewProfileCard {
+  position: sticky;
+  top: 96px;
 }
 
 .previewCardContainer {
@@ -1325,16 +1302,6 @@
   font-size: 0.76rem;
   line-height: 1.4;
   overflow-wrap: anywhere;
-  /* Two-line cap: real lead reasons/openers can be a long paragraph (legacy
-     free-form copy like "246 вакансий, включая «…»; Опубликовано 17.07"), but
-     the hero demo tile shows a one-line "14 новых вакансий за 6 дней". Clamping
-     keeps the collapsed card compact + readable and matches the demo's neat
-     tile shape — the full text still lives in the expanded <details> body. */
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  overflow: hidden;
 }
 
 .previewSignalMeters {
@@ -1393,6 +1360,33 @@
   background: linear-gradient(90deg, #358f70, #68c59f);
 }
 
+.previewProfileHint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 12px;
+  border: 1px dashed rgba(47, 98, 232, 0.22);
+  border-radius: 12px;
+  background: rgba(238, 244, 255, 0.55);
+}
+
+.previewProfileHint span,
+.previewProfileHint strong {
+  font-size: 0.74rem;
+}
+
+.previewProfileHint span {
+  color: var(--c-text-secondary);
+  font-weight: 650;
+}
+
+.previewProfileHint strong {
+  color: var(--c-brand);
+  font-weight: 750;
+  text-align: right;
+}
+
 .previewReasonKey {
   color: #738198;
   font-size: 0.72rem;
@@ -1447,11 +1441,10 @@
 }
 
 /* ── Expandable lead card ──
-   The collapsed summary carries the company, score and meter (the at-a-glance
-   read). Expanding reveals the same anatomy the "Карточка лида" exhibit
-   teaches: what changed / evidence / next step, plus confidence + provenance +
-   ICP-relevance. Native <details> keeps it server-rendered, keyboard-operable
-   and JS-free; the chevron rotates on open. */
+   The collapsed card already explains what changed, the evidence and the next
+   step. Expanding exposes verification metadata, the contact path and caveats
+   without repeating that same product narrative. Native <details> keeps it
+   server-rendered, keyboard-operable and JS-free. */
 .previewDetails {
   margin-top: 2px;
 }
@@ -1503,46 +1496,6 @@
   padding-top: 4px;
 }
 
-.previewDetailGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.previewDetail {
-  padding: 14px;
-  border-radius: 14px;
-  border: 1px solid var(--c-border);
-  background: rgba(248, 250, 252, 0.9);
-  transition: border-color 0.18s ease;
-}
-
-.previewDetail:hover {
-  border-color: rgba(29, 78, 216, 0.18);
-}
-
-.previewDetail h3 {
-  margin: 0 0 5px;
-  font-size: 0.78rem;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: var(--c-text-muted);
-}
-
-.previewDetail p {
-  margin: 0;
-  color: var(--c-text-primary);
-  font-size: 0.88rem;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-}
-
-/* The "next step" tile spans full width — it reads as the conclusion. */
-.previewDetailFull {
-  grid-column: 1 / -1;
-}
-
 .previewMeta {
   display: grid;
   gap: 0;
@@ -1581,11 +1534,28 @@
   overflow-wrap: anywhere;
 }
 
-/* Stacked detail tiles on narrow cards. */
-@media (max-width: 480px) {
-  .previewDetailGrid {
-    grid-template-columns: 1fr;
-  }
+.previewCaveats {
+  padding: 12px 14px;
+  border: 1px solid rgba(180, 122, 37, 0.18);
+  border-radius: 14px;
+  background: rgba(255, 248, 235, 0.72);
+}
+
+.previewCaveats h3 {
+  margin: 0;
+  color: #855c22;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.previewCaveats ul {
+  display: grid;
+  gap: 5px;
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: var(--c-text-secondary);
+  font-size: 0.76rem;
+  line-height: 1.45;
 }
 
 /* ── Pricing — three equal-weight cards, pilot gently featured ── */
@@ -1888,15 +1858,22 @@
     grid-template-columns: 1fr;
   }
 
-  /* Hero metrics collapse to a single column on narrow viewports. */
-  .heroMetrics {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 900px) {
   .previewGrid {
     grid-template-columns: 1fr;
+  }
+
+  .previewProfileCard {
+    position: static;
+  }
+
+  /* The three promises repeat information already visible in the hero product
+     card. Keeping them below the one-column hero makes the first block feel
+     longer than the product story itself on tablets and phones. */
+  .heroMetrics {
+    display: none;
   }
 
   .heroSection {
@@ -1981,18 +1958,14 @@
     gap: 14px;
   }
 
-  .qualityEvidence {
-    grid-template-columns: 1fr;
+  .qualityChecks li {
+    grid-template-columns: 28px minmax(0, 1fr);
+    gap: 10px;
   }
 
-  .qualityEvidence div + div {
-    border-top: 1px solid rgba(181, 203, 237, 0.12);
-    border-left: 0;
-  }
-
-  .qualityRules {
-    grid-template-columns: 1fr 1fr;
-    gap: 16px 0;
+  .qualityChecks em {
+    grid-column: 2;
+    justify-self: start;
   }
 
   .primaryPlanCard,
@@ -2021,7 +1994,9 @@
   }
 
   .heroTitle {
-    font-size: clamp(2.25rem, 11vw, 3rem);
+    width: 100%;
+    max-width: none;
+    font-size: clamp(1.7rem, 8.5vw, 2.45rem);
   }
 
   .heroActions {
@@ -2036,7 +2011,7 @@
 
   .heroProduct {
     gap: 15px;
-    padding: 18px;
+    padding: 16px;
   }
 
   .heroEvidenceRow {
@@ -2045,8 +2020,9 @@
 
   .heroEvidenceRow div {
     display: grid;
-    grid-template-columns: 24px 1fr;
-    align-items: baseline;
+    grid-template-columns: 1fr;
+    gap: 6px;
+    align-items: start;
   }
 
   .heroEvidenceRow p {
@@ -2106,7 +2082,7 @@
 .heroSection,
 .heroProduct,
 .heroEvidenceRow div,
-.qualityCard,
+.qualityMethodCard,
 .deliveryCard,
 .previewCard,
 .primaryPlanCard,
