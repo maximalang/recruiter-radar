@@ -83,7 +83,7 @@ function buildPublicDemoDigestItems(referenceDate = new Date()): HhDigestItem[] 
       vacancies_count: 14,
       distinct_vacancy_names_count: 6,
       latest_published_at: referenceDate.toISOString(),
-      total_score: 3.48,
+      total_score: 348,
       reasons: [
         "14 новых вакансий за 6 дней",
         "Появилась редкая инженерная роль",
@@ -103,7 +103,7 @@ function buildPublicDemoDigestItems(referenceDate = new Date()): HhDigestItem[] 
       vacancies_count: 9,
       distinct_vacancy_names_count: 5,
       latest_published_at: previousDay.toISOString(),
-      total_score: 3.12,
+      total_score: 312,
       reasons: [
         "Команда найма расширяет коммерческий блок",
         "Повторно открыты две сложные роли",

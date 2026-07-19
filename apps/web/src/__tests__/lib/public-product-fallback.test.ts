@@ -5,6 +5,7 @@ import {
   PUBLIC_PLANS,
   readPublicPreviewInput,
 } from "@/lib/publicProduct";
+import { formatScorePoints } from "@/lib/scoring/score-display";
 
 jest.mock("@/lib/hhDigest", () => ({
   getHhDigestItems: jest.fn(),
@@ -70,6 +71,7 @@ describe("public preview resilience", () => {
     expect(state.items[0].source_families).toEqual(
       expect.arrayContaining(["hh", "career-pages"]),
     );
+    expect(state.items.map((item) => formatScorePoints(item.total_score))).toEqual(["87", "78"]);
     expect(reportFallback).toHaveBeenCalledWith(
       "Public preview data unavailable; serving static demo fallback",
     );
