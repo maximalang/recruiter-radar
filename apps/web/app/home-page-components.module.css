@@ -128,38 +128,17 @@
   display: none;
 }
 
-/* Progressive-enhancement scroll reveal: in browsers that support scroll-driven
-   animations AND the user has not asked for reduced motion, cards lift + fade
-   in as they enter the viewport. The base state is fully visible, so browsers
-   without support (Firefox) and reduced-motion users see everything immediately —
-   the reveal is decorative, never gatekeeping. Per modern-web-guidance: animate
-   only transform/opacity, feature-detect with @supports, gate on
-   prefers-reduced-motion: no-preference, declare animation-timeline AFTER the
-   animation shorthand.
-   Tuned for "calm premium, not loading": a short 12px lift over 0.5s with an
-   ease-out spline that completes by 30% of the entry range, so a card reads as
-   fully present the moment it crosses the viewport edge — never as a half-faded
-   "still loading" tile. `both` fill keeps it visible after it has revealed. */
+/* Reveal cards: NO scroll-driven animation. The previous scroll-timeline reveal
+   (animation-timeline: view()) made every below-fold card start at opacity:0 and
+   animate in on scroll; on real browsers where the scroll timeline hiccups on
+   load (layout shift, partial paint, observer timing), those cards stayed
+   invisible — users saw "half the landing not loading". A marketing page must
+   render fully on first paint with zero JS and zero scroll dependency. Cards are
+   always visible. The `.revealCard` class is kept as a stable no-op hook so the
+   JSX does not need to change, but it carries no animation. */
 .revealCard {
   opacity: 1;
   transform: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  @supports ((animation-timeline: view()) and (animation-range: entry)) {
-    .revealCard {
-      animation: revealUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
-      animation-range: entry 0% entry 30%;
-      animation-timeline: view();
-    }
-  }
-}
-
-@keyframes revealUp {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
 }
 
 /* ── Hero — centered, dark slate, refined. RadarCanvas = honest metaphor. ── */
@@ -880,6 +859,11 @@
   gap: 12px;
 }
 
+.previewCardTopbar {
+  align-items: center;
+  min-height: 22px;
+}
+
 .previewCompanyRow {
   align-items: flex-start;
 }
@@ -893,14 +877,65 @@
   line-height: 1.25;
 }
 
+/* Second-line meta under the company name — the vacancies caption ("14
+   вакансий"), a calm muted line that mirrors the hero card's company subline
+   ("Москва и область · промышленность"). Hidden by the caller when empty. */
+.previewCardMeta {
+  margin-top: 3px;
+  color: var(--c-text-muted);
+  font-size: 0.76rem;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
 .previewCardLoc {
   color: var(--c-text-muted);
   font-size: 0.74rem;
   font-weight: 600;
   white-space: nowrap;
-  max-width: 44%;
+  max-width: 60%;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Confidence-gate chip on the topbar right — a small pill that carries the
+   evidence-quality read ("Подтверждено" / "Скорее подтверждено" / "Нужна
+   проверка"). Tinted by gate: A = green, B = blue, C = amber, D = grey.
+   Mirrors the gate tokens used elsewhere so the card speaks the same contract. */
+.previewGateChip {
+  flex: 0 0 auto;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: #f1f5f9;
+  color: var(--c-text-muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.previewGateChip[data-gate="A"] {
+  border-color: rgba(4, 120, 87, 0.22);
+  background: var(--gate-a-bg);
+  color: var(--gate-a-color);
+}
+
+.previewGateChip[data-gate="B"] {
+  border-color: rgba(29, 78, 216, 0.22);
+  background: var(--gate-b-bg);
+  color: var(--gate-b-color);
+}
+
+.previewGateChip[data-gate="C"] {
+  border-color: rgba(194, 65, 12, 0.22);
+  background: var(--gate-c-bg);
+  color: var(--gate-c-color);
+}
+
+.previewGateChip[data-gate="D"] {
+  border-color: rgba(15, 23, 42, 0.1);
+  background: var(--gate-d-bg);
+  color: var(--gate-d-color);
 }
 
 .previewScore {
@@ -938,6 +973,99 @@
 .previewStrengthFill[data-tone="success"] { background: #10b981; }
 .previewStrengthFill[data-tone="warning"] { background: #f59e0b; }
 .previewStrengthFill[data-tone="danger"] { background: #64748b; }
+
+/* ── Evidence tiles + signal meters (collapsed card) ──
+   The three-tile evidence row + three-meter signal block mirror the hero
+   "Пример структуры сигнала" card so a real lead reads with the same shape the
+   demo teaches. Every tile/meter is driven by a real digest field — no
+   fabricated copy. */
+
+.previewEvidenceRow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.previewEvidenceRow > div {
+  min-width: 0;
+  padding: 11px;
+  border: 1px solid #e2e8f1;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.previewEvidenceRow span {
+  display: block;
+  color: #60708a;
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.previewEvidenceRow p {
+  margin: 4px 0 0;
+  color: var(--c-text-secondary);
+  font-size: 0.76rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.previewSignalMeters {
+  display: grid;
+  gap: 8px;
+}
+
+.previewSignalMeter {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--c-border);
+  border-radius: 12px;
+  background: rgba(248, 250, 252, 0.7);
+}
+
+.previewSignalMeterHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.previewSignalMeterHead span {
+  color: var(--c-text-secondary);
+  font-size: 0.74rem;
+  font-weight: 650;
+}
+
+.previewSignalMeterHead strong {
+  color: var(--c-text-primary);
+  font-size: 0.74rem;
+  font-weight: 750;
+}
+
+.previewSignalMeterTrack {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.06);
+}
+
+.previewSignalMeterTrack span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #5576b8, #83a4e5);
+  transform-origin: left;
+}
+
+.previewSignalMeterTrack[data-tone="amber"] span {
+  background: linear-gradient(90deg, #9f7431, #d5a35a);
+}
+
+.previewSignalMeterTrack[data-tone="green"] span {
+  background: linear-gradient(90deg, #358f70, #68c59f);
+}
 
 .previewReasonKey {
   color: #738198;
@@ -1604,6 +1732,12 @@
     /* Let the location wrap under the name on very narrow screens rather than
        truncate aggressively. */
     max-width: 45%;
+  }
+
+  /* Three evidence tiles stack to one column on a narrow phone — the labels
+     stay readable and long vacancy titles don't overflow. */
+  .previewEvidenceRow {
+    grid-template-columns: 1fr;
   }
 
   .previewReasonKey {
