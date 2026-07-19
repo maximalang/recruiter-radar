@@ -59,7 +59,12 @@ describe("landing section hierarchy", () => {
     const page = await HomePage({ searchParams: Promise.resolve({}) });
     const sectionIntros = collectElements(page, SectionIntro);
 
-    expect(sectionIntros).toHaveLength(7);
+    // Six sections: Что внутри / Проблема / Пример результата / Как работает /
+    // Тарифы / Перед запуском. The "Карточка лида" anatomy exhibit was removed
+    // as a duplicate of the hero "Пример структуры сигнала" card — both showed
+    // the same demo "Производственная компания 87/100", so the exhibit added a
+    // second copy of the same content instead of teaching anything new.
+    expect(sectionIntros).toHaveLength(6);
     expect(sectionIntros.every((section) => section.props.accent === true)).toBe(true);
   });
 
@@ -83,8 +88,6 @@ describe("landing section hierarchy", () => {
     expect(pageText).not.toContain("Радар для вашего профиля");
     expect(notices.some((notice) => notice.props.title === "Показываем демо-карточки")).toBe(true);
     expect(pageText).toContain("Запустить актуальный радар");
-    expect(pageText).toContain("В рабочем радаре компании, даты и источники берутся из актуальных открытых данных.");
-    expect(pageText).not.toContain("Реальные компании, даты и источники приходят в радаре выше");
     expect(previewIntro?.props.description).toBe(
       "Задайте город и специализацию. Сейчас можно оценить структуру карточек; актуальная выдача появится здесь после восстановления источника.",
     );
