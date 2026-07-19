@@ -975,6 +975,7 @@
 }
 
 .previewResults {
+  --preview-results-padding: var(--space-card-padding-lg);
   grid-template-columns: minmax(0, 1fr);
   gap: 18px;
   min-width: 0;
@@ -989,7 +990,7 @@
 
 .previewItemsGrid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   align-items: stretch;
   min-width: 0;
@@ -1113,427 +1114,352 @@
   align-items: center;
 }
 
-.previewCard {
-  position: relative;
-  display: grid;
-  gap: 14px;
-  padding: 18px 20px;
-  border: 1px solid #dce4ef;
+
+/* Lead list — one featured recommendation stays open while the remaining
+   companies remain compact and scannable. The dark product surface mirrors
+   the actual Telegram digest and the strongest interaction from demo v27. */
+.previewLeadCard {
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.24);
   border-radius: 16px;
-  background: linear-gradient(145deg, #ffffff 0%, #f9fbfe 100%);
-  box-shadow: 0 10px 28px rgba(15, 35, 68, 0.06);
+  background: #172236;
+  color: #f8fafc;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.14);
 }
 
-.previewCardTopbar,
-.previewCompanyRow {
-  display: flex;
+.previewLeadSummary {
+  display: grid;
+  grid-template-columns: minmax(190px, 0.85fr) minmax(240px, 1.2fr) auto 18px;
+  gap: 18px;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  min-height: 84px;
+  padding: 16px 18px;
+  cursor: pointer;
+  list-style: none;
+  background: linear-gradient(135deg, #26334a 0%, #1c293f 100%);
+  transition: background 0.18s ease;
 }
 
-.previewCardTopbar {
-  align-items: center;
-  min-height: 22px;
+.previewLeadSummary::-webkit-details-marker {
+  display: none;
 }
 
-.previewCompanyRow {
-  align-items: flex-start;
+.previewLeadSummary:hover {
+  background: linear-gradient(135deg, #2b3952 0%, #202e45 100%);
 }
 
-.previewCardName {
+.previewLeadSummary:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: -3px;
+}
+
+.previewLeadCard[open] > .previewLeadSummary {
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.previewLeadSummaryCompany,
+.previewLeadSummarySignal {
   min-width: 0;
-  color: var(--c-text-primary);
-  font-size: 1rem;
-  font-weight: 780;
-  letter-spacing: -0.02em;
-  line-height: 1.25;
 }
 
-/* Second-line meta under the company name — the vacancies caption ("14
-   вакансий"), a calm muted line that mirrors the hero card's company subline
-   ("Москва и область · промышленность"). Hidden by the caller when empty. */
-.previewCardMeta {
-  margin-top: 3px;
-  color: var(--c-text-muted);
-  font-size: 0.76rem;
-  font-weight: 500;
+.previewLeadSummaryCompany {
+  display: grid;
+  gap: 4px;
+}
+
+.previewLeadSummaryCompany strong {
+  color: #f8fafc;
+  font-size: 0.9rem;
   line-height: 1.3;
 }
 
-.previewCardLoc {
-  color: var(--c-text-muted);
-  font-size: 0.74rem;
-  font-weight: 600;
-  white-space: nowrap;
-  max-width: 60%;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.previewLeadSummaryCompany span {
+  color: #9cabc0;
+  font-size: 0.72rem;
+  line-height: 1.35;
 }
 
-/* Confidence-gate chip on the topbar right — a small pill that carries the
-   evidence-quality read ("Подтверждено" / "Скорее подтверждено" / "Нужна
-   проверка"). Tinted by gate: A = green, B = blue, C = amber, D = grey.
-   Mirrors the gate tokens used elsewhere so the card speaks the same contract. */
-.previewGateChip {
-  flex: 0 0 auto;
-  padding: 3px 9px;
+.previewLeadSummarySignal {
+  color: #d8e1ed;
+  font-size: 0.82rem;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.previewLeadSummaryScore,
+.previewLeadScore {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.previewLeadSummaryScore {
+  min-width: 68px;
+  padding: 8px 10px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.previewLeadSummaryScore strong {
+  color: #f8fafc;
+  font-size: 1rem;
+}
+
+.previewLeadSummaryScore span,
+.previewLeadScore span {
+  color: #9cabc0;
+  font-size: 0.65rem;
+}
+
+.previewLeadChevron {
+  width: 18px;
+  height: 18px;
+  color: #a9b8cc;
+  transition: transform 0.2s ease;
+}
+
+.previewLeadCard[open] .previewLeadChevron {
+  transform: rotate(180deg);
+}
+
+.previewLeadBody {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  background:
+    radial-gradient(circle at 88% 12%, rgba(76, 124, 205, 0.14), transparent 32%),
+    linear-gradient(155deg, #172236 0%, #111b2d 100%);
+}
+
+.previewLeadRecommendationRow,
+.previewLeadHeadline,
+.previewLeadNextStep {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.previewLeadRecommendationRow > span,
+.previewLeadEvidence span,
+.previewLeadFacts > span,
+.previewLeadNextStep > div > span {
+  color: #91a2bb;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.previewLeadChips {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.previewLeadChips span,
+.previewLeadSafety {
+  padding: 4px 8px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
   border-radius: 999px;
-  border: 1px solid rgba(15, 23, 42, 0.1);
-  background: #f1f5f9;
-  color: var(--c-text-muted);
-  font-size: 0.68rem;
+  background: rgba(255, 255, 255, 0.055);
+  color: #c4cfdd;
+  font-size: 0.65rem;
   font-weight: 700;
   white-space: nowrap;
 }
 
-.previewGateChip[data-gate="A"] {
-  border-color: rgba(4, 120, 87, 0.22);
-  background: var(--gate-a-bg);
-  color: var(--gate-a-color);
+.previewLeadChips span[data-gate="A"] {
+  border-color: rgba(52, 211, 153, 0.3);
+  color: #86efac;
 }
 
-.previewGateChip[data-gate="B"] {
-  border-color: rgba(29, 78, 216, 0.22);
-  background: var(--gate-b-bg);
-  color: var(--gate-b-color);
+.previewLeadChips span[data-gate="B"] {
+  border-color: rgba(96, 165, 250, 0.32);
+  color: #bfdbfe;
 }
 
-.previewGateChip[data-gate="C"] {
-  border-color: rgba(194, 65, 12, 0.22);
-  background: var(--gate-c-bg);
-  color: var(--gate-c-color);
+.previewLeadChips span[data-gate="C"] {
+  border-color: rgba(251, 191, 36, 0.32);
+  color: #fde68a;
 }
 
-.previewGateChip[data-gate="D"] {
-  border-color: rgba(15, 23, 42, 0.1);
-  background: var(--gate-d-bg);
-  color: var(--gate-d-color);
+.previewLeadHeadline {
+  align-items: end;
 }
 
-.previewScore {
-  display: flex;
-  align-items: baseline;
-  flex: 0 0 auto;
-  font-variant-numeric: tabular-nums;
+.previewLeadHeadline h4 {
+  margin: 0;
+  color: #ffffff;
+  font-size: clamp(1.08rem, 2vw, 1.35rem);
+  line-height: 1.2;
+  letter-spacing: -0.025em;
 }
 
-.previewScore strong {
-  color: var(--c-text-primary);
-  font-size: 1.55rem;
+.previewLeadHeadline p {
+  margin: 5px 0 0;
+  color: #9cabc0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.previewLeadScore strong {
+  color: #ffffff;
+  font-size: 1.85rem;
   line-height: 1;
   letter-spacing: -0.05em;
 }
 
-.previewScore span {
-  color: var(--c-text-muted);
-  font-size: 0.68rem;
+.previewLeadBody .previewStrengthTrack {
+  background: rgba(148, 163, 184, 0.14);
 }
 
-.previewStrengthTrack {
-  height: 4px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: #e8edf4;
-}
-
-.previewStrengthFill {
-  display: block;
-  height: 100%;
-  border-radius: 999px;
-}
-
-.previewStrengthFill[data-tone="success"] { background: #10b981; }
-.previewStrengthFill[data-tone="warning"] { background: #f59e0b; }
-.previewStrengthFill[data-tone="danger"] { background: #64748b; }
-
-/* ── Evidence tiles + signal meters (collapsed card) ──
-   The three-tile evidence row + three-meter signal block mirror the hero
-   "Пример структуры сигнала" card so a real lead reads with the same shape the
-   demo teaches. Every tile/meter is driven by a real digest field — no
-   fabricated copy. */
-
-.previewEvidenceRow {
+.previewLeadEvidence {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  gap: 10px;
 }
 
-.previewEvidenceRow > div {
+.previewLeadEvidence > div {
   min-width: 0;
-  padding: 11px;
-  border: 1px solid #e2e8f1;
-  border-radius: 10px;
-  background: #f8fafc;
+  padding: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 12px;
+  background: rgba(8, 15, 28, 0.34);
 }
 
-.previewEvidenceRow span {
-  display: block;
-  color: #60708a;
-  font-size: 0.64rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.previewEvidenceRow p {
-  margin: 4px 0 0;
-  color: var(--c-text-secondary);
-  font-size: 0.76rem;
-  line-height: 1.4;
+.previewLeadEvidence p {
+  margin: 7px 0 0;
+  color: #e1e8f0;
+  font-size: 0.78rem;
+  line-height: 1.5;
   overflow-wrap: anywhere;
 }
 
-.previewSignalMeters {
+.previewLeadMeters {
   display: grid;
   gap: 8px;
 }
 
-.previewSignalMeter {
+.previewLeadMeter {
   display: grid;
-  gap: 6px;
-  padding: 10px 12px;
-  border: 1px solid var(--c-border);
-  border-radius: 12px;
-  background: rgba(248, 250, 252, 0.7);
-}
-
-.previewSignalMeterHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  grid-template-columns: minmax(140px, 0.52fr) minmax(110px, 1fr) minmax(92px, auto);
   gap: 14px;
+  align-items: center;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 10px;
+  background: rgba(8, 15, 28, 0.28);
 }
 
-.previewSignalMeterHead span {
-  color: var(--c-text-secondary);
-  font-size: 0.74rem;
+.previewLeadMeter > span:first-child {
+  color: #aebbc9;
+  font-size: 0.72rem;
   font-weight: 650;
 }
 
-.previewSignalMeterHead strong {
-  color: var(--c-text-primary);
-  font-size: 0.74rem;
-  font-weight: 750;
+.previewLeadMeter strong {
+  color: #eef4fa;
+  font-size: 0.7rem;
+  text-align: right;
 }
 
-.previewSignalMeterTrack {
+.previewLeadMeterTrack {
   height: 5px;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(15, 23, 42, 0.06);
+  background: rgba(148, 163, 184, 0.16);
 }
 
-.previewSignalMeterTrack span {
+.previewLeadMeterTrack span {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #5576b8, #83a4e5);
-  transform-origin: left;
+  background: linear-gradient(90deg, #657fc5, #8fc1e8);
 }
 
-.previewSignalMeterTrack[data-tone="amber"] span {
-  background: linear-gradient(90deg, #9f7431, #d5a35a);
-}
-
-.previewSignalMeterTrack[data-tone="green"] span {
-  background: linear-gradient(90deg, #358f70, #68c59f);
-}
-
-.previewProfileHint {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 10px 12px;
-  border: 1px dashed rgba(47, 98, 232, 0.22);
-  border-radius: 12px;
-  background: rgba(238, 244, 255, 0.55);
-}
-
-.previewProfileHint span,
-.previewProfileHint strong {
-  font-size: 0.74rem;
-}
-
-.previewProfileHint span {
-  color: var(--c-text-secondary);
-  font-weight: 650;
-}
-
-.previewProfileHint strong {
-  color: var(--c-brand);
-  font-weight: 750;
-  text-align: right;
-}
-
-.previewReasonKey {
-  color: #738198;
-  font-size: 0.72rem;
-  font-weight: 700;
-}
-
-/* ICP-relevance — the "is this a fit for YOUR agency" signal on the four FIUR
-   axes. A label row, then four mini dot-meters (4 dots each, one per 0.25 step
-   of the [0,1] axis). Lit dots = the axis strength. This is the conceptual
-   core the old card lacked; it only shows on personalised previews. */
-.previewRelevance {
+.previewLeadFacts {
   display: grid;
-  grid-template-columns: 124px 1fr;
-  gap: 10px;
-  align-items: start;
+  grid-template-columns: minmax(140px, 0.35fr) minmax(0, 1fr);
+  gap: 20px;
+  padding: 14px 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.14);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
 }
 
-.previewRelevanceAxes {
+.previewLeadFacts ul {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 5px 16px;
-}
-
-.previewRelevanceAxis {
-  display: inline-flex;
-  align-items: center;
   gap: 7px;
-}
-
-.previewRelevanceAxisLabel {
-  color: #94a3b8;
-  font-size: 0.74rem;
-  font-weight: 600;
-  min-width: 78px;
-}
-
-.previewRelevanceDots {
-  display: inline-flex;
-  gap: 3px;
-}
-
-.previewRelevanceDot {
-  width: 5px;
-  height: 5px;
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.12);
-  transition: background 0.2s ease;
-}
-
-.previewRelevanceDot[data-on="true"] {
-  background: var(--c-brand);
-}
-
-/* ── Expandable lead card ──
-   The collapsed card already explains what changed, the evidence and the next
-   step. Expanding exposes verification metadata, the contact path and caveats
-   without repeating that same product narrative. Native <details> keeps it
-   server-rendered, keyboard-operable and JS-free. */
-.previewDetails {
-  margin-top: 2px;
-}
-
-.previewSummary {
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid var(--c-border);
-  background: rgba(238, 244, 255, 0.55);
-  color: var(--c-brand);
-  font-size: 0.8rem;
-  font-weight: 700;
+  margin: 0;
+  padding: 0;
   list-style: none;
-  transition: background 0.18s ease, border-color 0.18s ease;
 }
 
-.previewSummary::-webkit-details-marker {
-  display: none;
-}
-
-.previewSummary:hover {
-  background: rgba(224, 234, 255, 0.85);
-  border-color: rgba(29, 78, 216, 0.22);
-}
-
-.previewChevron {
-  flex-shrink: 0;
-  width: 16px;
-  height: 16px;
-  color: var(--c-brand);
-  transition: transform 0.2s ease;
-}
-
-.previewDetails[open] .previewChevron {
-  transform: rotate(180deg);
-}
-
-/* The expanded body — a calm, surfaced panel under the summary. The grid-gap
-   lets the detail tiles + meta + relevance breathe without crowding. */
-.previewDetailsBody {
-  display: grid;
-  gap: 12px;
-  margin-top: 10px;
-  padding-top: 4px;
-}
-
-.previewMeta {
-  display: grid;
-  gap: 0;
-  margin: 0;
-  padding: 12px 14px;
-  border-radius: 14px;
-  border: 1px solid var(--c-border);
-  background: rgba(255, 255, 255, 0.7);
-}
-
-.previewMetaRow {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 12px;
-  padding: 7px 0;
-  border-bottom: 1px solid var(--c-border);
-}
-
-.previewMetaRow:last-child {
-  border-bottom: 0;
-}
-
-.previewMetaRow dt {
-  color: var(--c-text-muted);
+.previewLeadFacts li {
+  position: relative;
+  padding-left: 14px;
+  color: #c7d2df;
   font-size: 0.76rem;
-  font-weight: 700;
+  line-height: 1.45;
 }
 
-.previewMetaRow dd {
-  margin: 0;
-  color: var(--c-text-primary);
-  font-size: 0.84rem;
-  font-weight: 700;
-  text-align: right;
-  overflow-wrap: anywhere;
+.previewLeadFacts li::before {
+  content: "";
+  position: absolute;
+  top: 0.62em;
+  left: 0;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: #7da6df;
 }
 
-.previewCaveats {
+.previewLeadNextStep {
+  align-items: end;
+}
+
+.previewLeadNextStep > div {
+  display: grid;
+  gap: 6px;
+  max-width: 70ch;
+}
+
+.previewLeadNextStep strong {
+  color: #ffffff;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.previewLeadSafety {
+  flex: 0 0 auto;
+}
+
+.previewLeadBody .previewCaveats {
   padding: 12px 14px;
-  border: 1px solid rgba(180, 122, 37, 0.18);
-  border-radius: 14px;
-  background: rgba(255, 248, 235, 0.72);
+  border-color: rgba(251, 191, 36, 0.22);
+  border-style: solid;
+  border-width: 1px;
+  border-radius: 12px;
+  background: rgba(120, 76, 16, 0.16);
 }
 
-.previewCaveats h3 {
+.previewLeadBody .previewCaveats h4 {
   margin: 0;
-  color: #855c22;
+  color: #fde68a;
   font-size: 0.76rem;
-  font-weight: 800;
 }
 
-.previewCaveats ul {
+.previewLeadBody .previewCaveats ul {
   display: grid;
   gap: 5px;
   margin: 8px 0 0;
   padding-left: 18px;
-  color: var(--c-text-secondary);
+  color: #d6dee8;
   font-size: 0.76rem;
   line-height: 1.45;
 }
@@ -2026,46 +1952,6 @@
     margin: 0;
   }
 
-  /* Lead card on a narrow phone: stack the reason key/value rows (label over
-     value) so long contact paths and reasons don't overflow, and let the
-     relevance axes drop to a single column so the dot-meters aren't cramped.
-     The score line already wraps naturally (chip + gate on one row, meter on
-     the next). Evidence chips wrap to 2 lines as set on the base class. */
-  .previewCard {
-    padding: 16px 16px 14px;
-    gap: 11px;
-  }
-
-  .previewCardName {
-    font-size: 1.05rem;
-  }
-
-  .previewCardLoc {
-    /* Let the location wrap under the name on very narrow screens rather than
-       truncate aggressively. */
-    max-width: 45%;
-  }
-
-  /* Three evidence tiles stack to one column on a narrow phone — the labels
-     stay readable and long vacancy titles don't overflow. */
-  .previewEvidenceRow {
-    grid-template-columns: 1fr;
-  }
-
-  .previewReasonKey {
-    font-size: 0.74rem;
-  }
-
-  .previewRelevance {
-    grid-template-columns: 1fr;
-    gap: 6px;
-  }
-
-  .previewRelevanceAxes {
-    grid-template-columns: 1fr;
-    gap: 5px;
-  }
-
 }
 
 /* Final surface layer: intentionally after responsive rules so later card
@@ -2081,7 +1967,6 @@
 .heroEvidenceRow div,
 .qualityMethodCard,
 .deliveryCard,
-.previewCard,
 .primaryPlanCard,
 .secondaryPlanCard,
 .includedOnce,
@@ -2091,7 +1976,6 @@
 }
 
 .topBar,
-.previewCard,
 .primaryPlanCard,
 .secondaryPlanCard,
 .includedOnce,
@@ -2103,12 +1987,78 @@
 .topBar { background: rgba(255, 255, 255, 0.86); }
 .heroProduct { background: rgba(15, 27, 49, 0.78); }
 .heroEvidenceRow div { background: rgba(255, 255, 255, 0.055); }
-.previewCard { background: rgba(255, 255, 255, 0.92); }
 .primaryPlanCard { background: rgba(239, 246, 255, 0.9); }
 .secondaryPlanCard { background: rgba(255, 255, 255, 0.9); }
 .includedOnce { background: rgba(248, 250, 252, 0.88); }
 .faqCard { background: rgba(255, 255, 255, 0.92); }
 .closingBand { background: rgba(11, 19, 36, 0.94); }
+
+@media (max-width: 900px) {
+  .previewLeadSummary {
+    grid-template-columns: minmax(0, 1fr) auto 18px;
+    gap: 10px 14px;
+  }
+
+  .previewLeadSummarySignal {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 560px) {
+  .previewResults.previewCardContainer {
+    --preview-results-padding: 18px 14px;
+  }
+
+  .previewLeadSummary {
+    min-height: 0;
+    padding: 14px;
+  }
+
+  .previewLeadSummaryScore {
+    min-width: 58px;
+    padding: 7px 8px;
+  }
+
+  .previewLeadBody {
+    gap: 14px;
+    padding: 16px 14px;
+  }
+
+  .previewLeadRecommendationRow,
+  .previewLeadHeadline,
+  .previewLeadNextStep {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .previewLeadChips {
+    justify-content: flex-start;
+  }
+
+  .previewLeadScore {
+    align-self: flex-start;
+  }
+
+  .previewLeadEvidence,
+  .previewLeadFacts {
+    grid-template-columns: 1fr;
+  }
+
+  .previewLeadMeter {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 7px 12px;
+  }
+
+  .previewLeadMeterTrack {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .previewLeadSafety {
+    white-space: normal;
+  }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .ambientBg::before,

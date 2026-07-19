@@ -166,7 +166,7 @@ describe("landing section hierarchy", () => {
     expect(targetCity?.props.maxLength).toBe(120);
   });
 
-  it("does not repeat the visible recommendation summary inside its disclosure", async () => {
+  it("renders lead cards as a scannable list with one recommendation expanded", async () => {
     mockGetPublicSampleDigestState.mockResolvedValueOnce({
       isLive: false,
       isPersonalized: false,
@@ -194,6 +194,29 @@ describe("landing section hierarchy", () => {
         lawfulContactPath: "career-page",
         negativeSignals: [],
         relevanceSignals: { fit: 0, intent: 0, urgency: 0, reachability: 0 },
+      }, {
+        rank: 2,
+        org_id: "demo-service",
+        employer_name: "Сервисная B2B-компания",
+        vacancies_count: 9,
+        distinct_vacancy_names_count: 5,
+        latest_published_at: "2026-07-18T09:00:00.000Z",
+        total_score: 312,
+        reasons: ["Команда найма расширяет коммерческий блок"],
+        opener: "Уточнить приоритетные роли и предложить короткий пилот",
+        source_families: ["career-pages", "egrul-fns"],
+        evidence_titles: ["Руководитель отдела продаж", "Менеджер по развитию"],
+        candidate_source_keys: ["demo:career", "demo:egrul"],
+        location_names: ["Санкт-Петербург"],
+        confidence_gate: "B",
+        confidenceLabel: "medium",
+        sourceCount: 2,
+        sourceKeys: ["demo:career", "demo:egrul"],
+        structuredSignalCount: 2,
+        curationLabels: [],
+        lawfulContactPath: "career-page",
+        negativeSignals: [],
+        relevanceSignals: { fit: 0, intent: 0, urgency: 0, reachability: 0 },
       }],
     });
 
@@ -205,10 +228,14 @@ describe("landing section hierarchy", () => {
     });
     const previewMarkup = renderToStaticMarkup(preview);
 
-    expect(previewMarkup).toContain("Проверка и источники");
-    expect(previewMarkup.match(/Что изменилось/g)).toHaveLength(1);
-    expect(previewMarkup.match(/Доказательства/g)).toHaveLength(1);
-    expect(previewMarkup.match(/Следующий шаг/g)).toHaveLength(1);
+    expect(previewMarkup.match(/data-lead-card="true"/g)).toHaveLength(2);
+    expect(previewMarkup.match(/name="preview-leads"/g)).toHaveLength(2);
+    expect(previewMarkup.match(/<details(?=[^>]*data-lead-card="true")(?=[^>]*open="")[^>]*>/g)).toHaveLength(1);
+    expect(previewMarkup).toContain("Рекомендация на сегодня");
+    expect(previewMarkup).toContain("Почему сейчас");
+    expect(previewMarkup).toContain("Факты и источники");
+    expect(previewMarkup).toContain("Следующий шаг");
+    expect(previewMarkup).not.toContain("Проверка и источники");
   });
 
   it("explains the four quality checks without duplicating the hero company card", async () => {

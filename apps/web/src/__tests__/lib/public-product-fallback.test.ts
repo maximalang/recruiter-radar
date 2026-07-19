@@ -71,6 +71,7 @@ describe("public preview resilience", () => {
     expect(state.items[0].source_families).toEqual(
       expect.arrayContaining(["hh", "career-pages"]),
     );
+    expect(state.items[0].lawfulContactPath).toBe("career-page");
     expect(state.items.map((item) => formatScorePoints(item.total_score))).toEqual(["87", "78"]);
     expect(reportFallback).toHaveBeenCalledWith(
       "Public preview data unavailable; serving static demo fallback",

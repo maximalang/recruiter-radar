@@ -24,6 +24,7 @@ import {
 } from "./ui/page-primitives";
 import ppStyles from "./ui/page-primitives.module.css";
 import {
+  buildPreviewEvidenceItems,
   buildFaqItems,
   cleanEmployerName,
   formatLocationCaption,
@@ -488,7 +489,10 @@ export async function PreviewSection(props: {
           </form>
         </SurfaceCard>
 
-        <SurfaceCard className={`${hpStyles.previewCardContainer} ${hpStyles.previewResults}`}>
+        <SurfaceCard
+          className={`${hpStyles.previewCardContainer} ${hpStyles.previewResults}`}
+          padding="var(--preview-results-padding)"
+        >
           <div className={hpStyles.previewHeaderRow}>
             <h3 className={hpStyles.previewCardHeading}>
               {previewState.isLive
@@ -531,10 +535,11 @@ export async function PreviewSection(props: {
                 />
               ) : null}
               <div className={hpStyles.previewItemsGrid}>
-                {visiblePreviewItems.map((item) => (
+                {visiblePreviewItems.map((item, index) => (
                   <PreviewDigestCard
                     key={`${item.org_id}-${item.rank}`}
                     item={item}
+                    defaultOpen={index === 0}
                   />
                 ))}
               </div>
@@ -550,6 +555,7 @@ export async function PreviewSection(props: {
                         <PreviewDigestCard
                           key={`${item.org_id}-${item.rank}`}
                           item={item}
+                          defaultOpen={false}
                         />
                       ))}
                     </div>
@@ -600,7 +606,10 @@ export function PreviewSkeleton() {
             <span className={hpStyles.previewSkeletonBar} />
           </div>
         </SurfaceCard>
-        <SurfaceCard className={`${hpStyles.previewCardContainer} ${hpStyles.previewResults}`}>
+        <SurfaceCard
+          className={`${hpStyles.previewCardContainer} ${hpStyles.previewResults}`}
+          padding="var(--preview-results-padding)"
+        >
           <div className={hpStyles.previewHeaderRow}>
             <h3 className={hpStyles.previewCardHeading}>Пример утренней выдачи</h3>
             <StatusBadge tone="neutral" style={{ justifySelf: "start" }}>демо</StatusBadge>
@@ -617,214 +626,140 @@ export function PreviewSkeleton() {
 
 function PreviewDigestCard(props: {
   item: HomePreviewItem;
+  defaultOpen: boolean;
 }) {
-  const { item } = props;
-  // `whyNow` joins the top structured reasons (deriveWhyNow picks urgency/
-  // intent components ordered by evidential strength). On prod the reasons are
-  // legacy free-form Russian strings ("86 вакансий, включая «…»"); parseReasons
-  // now wraps those as a `legacy` reason whose full text renders verbatim, so
-  // the card shows the human copy instead of the `[legacy.…]` debug stub. The
-  // reason text already carries the time anchor ("Опубликовано 12.07"), so a
-  // separate "Свежесть" row would duplicate it — one "Почему сейчас" line is
-  // enough.
+  const { item, defaultOpen } = props;
   const whyNow = deriveWhyNow(item.reasons) || "";
   const contactPath = formatLawfulContactPath(item.lawfulContactPath);
   const location = formatLocationCaption(item.location_names);
   const evidenceTitles = pickEvidenceTitles(item.evidence_titles, 6);
   const vacanciesCaption = formatVacanciesCount(item.vacancies_count);
-  // Score = 0–100 points (raw total_score / 4). The internal [0,4] signal
-  // strength still drives the tone + the confidence gate + the hiringIntentMin
-  // threshold (unchanged) — points are a higher-resolution read of the SAME
-  // value, so a 75-point lead is exactly the "горячий" 3.0-of-4 cut. `points`
-  // is the headline number, `tone` colors it + the bar, `pct` fills the bar.
   const points = formatScorePoints(item.total_score);
   const tone = scoreTone(item.total_score);
   const pct = scorePercent(item.total_score);
-  // Clean employer name — strip the legal-form wrapper quotes/brackets that read
-  // as noise ("АО "ГОСТИНИЦА "СОВЕТСКАЯ"" → "ГОСТИНИЦА «СОВЕТСКАЯ»"). Best-effort:
-  // if the name is all-caps legal boilerplate we keep it, just trim.
   const employerName = cleanEmployerName(item.employer_name);
-  // ICP-relevance breakdown — only shown when the preview was personalised
-  // (the user typed a specialization/city). When there's no ICP input the
-  // signals are all 0 (defaultRelevanceSignals), so the block would show empty
-  // dots — hide it rather than fabricate a "match". Each axis ∈ [0,1]; the four
-  // dots are the FIUR axes, the honest "is this company a fit for YOUR agency"
-  // signal. Russian labels — this is a Russia-first product.
   const rs = item.relevanceSignals;
   const hasRelevance = rs.fit > 0 || rs.intent > 0 || rs.urgency > 0 || rs.reachability > 0;
-  const relevanceAxes: ReadonlyArray<{ key: string; label: string; value: number }> = [
-    { key: "fit", label: "Соответствие", value: rs.fit },
-    { key: "intent", label: "Намерение", value: rs.intent },
-    { key: "urgency", label: "Срочность", value: rs.urgency },
-    { key: "reachability", label: "Доступность", value: rs.reachability },
-  ];
-
-  // Confidence + provenance rows for the expanded body — mirror the
-  // signal-anatomy exhibit's side metadata so a real lead card reads with the
-  // same shape: confidence, source count, contact path. Hidden when the field
-  // is empty so we never show an empty row.
-  // NOTE: `confidenceLabel` is an internal English bucket (high/medium/low) —
-  // never user-facing. The honest, Russia-first read is the confidence GATE
-  // (A = подтверждено, B = скорее подтверждено, C = нужна проверка, D = контекст
-  // без прямого найма). Fall back to the gate's Russian label; if no gate is
-  // present on the item we drop the row rather than show a raw English key.
   const confidenceRow = gateLabel(item.confidence_gate) || null;
   const sourceCountRow = item.sourceCount > 0 ? `${item.sourceCount} ${pluralSources(item.sourceCount)}` : null;
   const contactRow = contactPath || null;
-
-  // The collapsed card mirrors the hero "Пример структуры сигнала" anatomy:
-  // three evidence tiles + three signal meters, all from real item fields.
-  //   - "Что изменилось"  = whyNow (urgency/intent reasons) — the hiring change
-  //   - "Доказательства" = top vacancy titles — the proof behind the signal
-  //   - "Следующий шаг"  = opener (a ready-made outreach angle the digest built)
-  // The three meters read the SAME single total_score from three angles:
-  //   - "Соответствие профилю" = the ICP fit axis (rs.fit). On a generic
-  //     preview we show an explicit setup hint instead of fabricating a fill.
-  //   - "Сила сигнала"        = total_score → points, the headline strength
-  //   - "Актуальность"        = freshness of latest_published_at ("сегодня" /
-  //     "за N дней" / "более месяца"), the amber warmth meter. Falls back to
-  //     neutral when no publish date is present.
   const detailWhat = whyNow || vacanciesCaption || "Активность найма подтверждена источниками";
-  const detailEvidence = evidenceTitles.length > 0 ? evidenceTitles.slice(0, 2).join(" · ") : (vacanciesCaption || "Открытые позиции подтверждают активный найм");
   const detailNext = item.opener?.trim() || (contactPath ? "Проверить корпоративный путь контакта" : "Уточнить контакт и предложить помощь по открытому найму");
-
   const freshness = formatVacancyFreshness(item.latest_published_at);
-  // Map the [0,1] relevance axis onto a 0–100 fill only when the preview is
-  // actually personalized. Generic/demo cards show no invented fit score.
   const fitPct = Math.round(rs.fit * 100);
   const fitLabel = rs.fit >= 0.75 ? "Высокое" : rs.fit >= 0.5 ? "Среднее" : rs.fit > 0 ? "Низкое" : "Нет данных";
   const strengthLabel = pct >= 75 ? "Сильная" : pct >= 50 ? "Умеренная" : "Слабая";
   const freshnessLabel = freshness ? (freshness.includes("сегодня") || freshness.includes("1 день") || freshness.includes("за 2") || freshness.includes("за 3") ? "Сегодня" : freshness.includes("недел") ? "Эта неделя" : "Ранее") : "Нет даты";
+  const reachabilityPct = hasRelevance ? Math.round(rs.reachability * 100) : contactPath ? 82 : 28;
+  const reachabilityLabel = reachabilityPct >= 75 ? "Высокая" : reachabilityPct >= 50 ? "Средняя" : "Нужно уточнить";
+  const detailMoment = [
+    sourceCountRow ? `Подтверждение: ${sourceCountRow}.` : null,
+    freshness ? `Последнее изменение — ${freshness}.` : null,
+  ].filter(Boolean).join(" ") || "Сигнал требует дополнительной проверки актуальности.";
+  const detailContact = contactPath
+    ? `${contactPath}. Решение об обращении остаётся за вами.`
+    : "Корпоративный путь контакта нужно уточнить до обращения.";
+  const evidenceItems = buildPreviewEvidenceItems({
+    whyNow,
+    vacanciesCaption,
+    evidenceTitles,
+    sourceFamilies: item.source_families,
+    limit: 3,
+  });
+  const summaryMeta = [location, vacanciesCaption].filter(Boolean).join(" · ");
 
   return (
-    <article className={hpStyles.previewCard} data-tone={tone}>
-      <div className={hpStyles.previewCardTopbar}>
-        {location ? (
-          <span className={hpStyles.previewCardLoc} aria-label={`География: ${location}`}>{location}</span>
-        ) : (
-          <span className={hpStyles.previewCardLoc} aria-hidden="true" />
-        )}
-        {confidenceRow ? (
-          <span className={hpStyles.previewGateChip} data-gate={item.confidence_gate}>{confidenceRow}</span>
+    <details
+      className={hpStyles.previewLeadCard}
+      data-lead-card="true"
+      data-tone={tone}
+      name="preview-leads"
+      open={defaultOpen}
+    >
+      <summary className={hpStyles.previewLeadSummary}>
+        <span className={hpStyles.previewLeadSummaryCompany}>
+          <strong>{employerName}</strong>
+          {summaryMeta ? <span>{summaryMeta}</span> : null}
+        </span>
+        <span className={hpStyles.previewLeadSummarySignal}>{detailWhat}</span>
+        <span className={hpStyles.previewLeadSummaryScore}><strong>{points}</strong><span>/100</span></span>
+        <svg className={hpStyles.previewLeadChevron} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </summary>
+
+      <div className={hpStyles.previewLeadBody}>
+        <div className={hpStyles.previewLeadRecommendationRow}>
+          <span>Рекомендация на сегодня</span>
+          <div className={hpStyles.previewLeadChips}>
+            {confidenceRow ? <span data-gate={item.confidence_gate}>{confidenceRow}</span> : null}
+            {sourceCountRow ? <span>{sourceCountRow}</span> : null}
+            {contactRow ? <span>контакт найден</span> : null}
+          </div>
+        </div>
+
+        <div className={hpStyles.previewLeadHeadline}>
+          <div>
+            <h4>{employerName}</h4>
+            {summaryMeta ? <p>{summaryMeta}</p> : null}
+          </div>
+          <span className={hpStyles.previewLeadScore}><strong>{points}</strong><span>/100</span></span>
+        </div>
+
+        <div
+          className={hpStyles.previewStrengthTrack}
+          role="meter"
+          aria-valuenow={Number(points)}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={`Сила сигнала: ${points} из 100`}
+        >
+          <span className={hpStyles.previewStrengthFill} data-tone={tone} style={{ width: `${pct}%` }} />
+        </div>
+
+        <div className={hpStyles.previewLeadEvidence}>
+          <div><span>Что изменилось</span><p>{detailWhat}</p></div>
+          <div><span>Почему сейчас</span><p>{detailMoment}</p></div>
+          <div><span>Контакт</span><p>{detailContact}</p></div>
+        </div>
+
+        <div className={hpStyles.previewLeadMeters} aria-label="Оценка рекомендации">
+          <LeadMeter label="Соответствие профилю" value={hasRelevance ? fitPct : 0} valueLabel={hasRelevance ? fitLabel : "После настройки"} />
+          <LeadMeter label="Сила сигнала" value={pct} valueLabel={strengthLabel} />
+          <LeadMeter label="Актуальность" value={freshness ? 88 : 30} valueLabel={freshnessLabel} />
+          <LeadMeter label="Доступность контакта" value={reachabilityPct} valueLabel={reachabilityLabel} />
+        </div>
+
+        {evidenceItems.length > 0 ? (
+          <div className={hpStyles.previewLeadFacts}>
+            <span>Факты и источники</span>
+            <ul>{evidenceItems.map((evidence) => <li key={evidence}>{evidence}</li>)}</ul>
+          </div>
+        ) : null}
+
+        <div className={hpStyles.previewLeadNextStep}>
+          <div><span>Следующий шаг</span><strong>{detailNext}</strong></div>
+          <span className={hpStyles.previewLeadSafety}>Без автоматической отправки</span>
+        </div>
+
+        {item.negativeSignals.length > 0 ? (
+          <div className={hpStyles.previewCaveats}>
+            <h4>Что проверить перед контактом</h4>
+            <ul>{item.negativeSignals.slice(0, 3).map((signal) => <li key={signal}>{signal}</li>)}</ul>
+          </div>
         ) : null}
       </div>
+    </details>
+  );
+}
 
-      <div className={hpStyles.previewCompanyRow}>
-        <div>
-          <div className={hpStyles.previewCardName}>{employerName}</div>
-          {vacanciesCaption ? (
-            <div className={hpStyles.previewCardMeta}>{vacanciesCaption}</div>
-          ) : null}
-        </div>
-        <div className={hpStyles.previewScore}>
-          <strong>{points}</strong><span>/100</span>
-        </div>
-      </div>
-
-      <div
-        className={hpStyles.previewStrengthTrack}
-        role="meter"
-        aria-valuenow={Number(points)}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-label={`Сила сигнала: ${points} из 100`}
-      >
-        <span className={hpStyles.previewStrengthFill} data-tone={tone} style={{ width: `${pct}%` }} />
-      </div>
-
-      {/* Three evidence tiles — the collapsed "what's in this signal" read,
-          identical shape to the hero example card. */}
-      <div className={hpStyles.previewEvidenceRow}>
-        <div><span>Что изменилось</span><p>{detailWhat}</p></div>
-        <div><span>Доказательства</span><p>{detailEvidence}</p></div>
-        <div><span>Следующий шаг</span><p>{detailNext}</p></div>
-      </div>
-
-      {/* Signal meters — fit is only scored for a personalized preview. */}
-      <div className={hpStyles.previewSignalMeters}>
-        {hasRelevance ? (
-          <div className={hpStyles.previewSignalMeter}>
-            <div className={hpStyles.previewSignalMeterHead}>
-              <span>Соответствие профилю</span>
-              <strong>{fitLabel}</strong>
-            </div>
-            <div className={hpStyles.previewSignalMeterTrack} data-tone="green"><span style={{ width: `${fitPct}%` }} /></div>
-          </div>
-        ) : (
-          <div className={hpStyles.previewProfileHint}>
-            <span>Соответствие профилю</span>
-            <strong>появится после настройки</strong>
-          </div>
-        )}
-        <div className={hpStyles.previewSignalMeter}>
-          <div className={hpStyles.previewSignalMeterHead}>
-            <span>Сила сигнала</span>
-            <strong>{strengthLabel}</strong>
-          </div>
-          <div className={hpStyles.previewSignalMeterTrack}><span style={{ width: `${pct}%` }} /></div>
-        </div>
-        <div className={hpStyles.previewSignalMeter}>
-          <div className={hpStyles.previewSignalMeterHead}>
-            <span>Актуальность</span>
-            <strong>{freshnessLabel}</strong>
-          </div>
-          <div className={hpStyles.previewSignalMeterTrack} data-tone="amber"><span style={{ width: `${freshness ? 88 : 30}%` }} /></div>
-        </div>
-      </div>
-
-      <details className={hpStyles.previewDetails}>
-        <summary className={hpStyles.previewSummary}>
-          <span>Проверка и источники</span>
-          <svg className={hpStyles.previewChevron} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        </summary>
-        <div className={hpStyles.previewDetailsBody}>
-          {(confidenceRow || sourceCountRow || contactRow) ? (
-            <dl className={hpStyles.previewMeta}>
-              {confidenceRow ? (
-                <div className={hpStyles.previewMetaRow}><dt>Уверенность</dt><dd>{confidenceRow}</dd></div>
-              ) : null}
-              {sourceCountRow ? (
-                <div className={hpStyles.previewMetaRow}><dt>Источники</dt><dd>{sourceCountRow}</dd></div>
-              ) : null}
-              {contactRow ? (
-                <div className={hpStyles.previewMetaRow}><dt>Контакт</dt><dd>{contactRow}</dd></div>
-              ) : null}
-            </dl>
-          ) : null}
-
-          {hasRelevance ? (
-            <div className={hpStyles.previewRelevance} aria-label="Релевантность вашему ICP по осям">
-              <span className={hpStyles.previewReasonKey}>Релевантность ICP</span>
-              <div className={hpStyles.previewRelevanceAxes}>
-                {relevanceAxes.map((axis) => (
-                  <span key={axis.key} className={hpStyles.previewRelevanceAxis} aria-label={`${axis.label}: ${Math.round(axis.value * 100)}%`}>
-                    <span className={hpStyles.previewRelevanceAxisLabel}>{axis.label}</span>
-                    <span className={hpStyles.previewRelevanceDots}>
-                      {[0.25, 0.5, 0.75, 1].map((threshold) => (
-                        <span
-                          key={threshold}
-                          className={hpStyles.previewRelevanceDot}
-                          data-on={axis.value >= threshold ? "true" : "false"}
-                          aria-hidden="true"
-                        />
-                      ))}
-                    </span>
-                  </span>
-                ))}
-              </div>
-            </div>
-          ) : null}
-          {item.negativeSignals.length > 0 ? (
-            <div className={hpStyles.previewCaveats}>
-              <h3>Что проверить перед контактом</h3>
-              <ul>{item.negativeSignals.slice(0, 3).map((signal) => <li key={signal}>{signal}</li>)}</ul>
-            </div>
-          ) : null}
-        </div>
-      </details>
-    </article>
+function LeadMeter(props: { label: string; value: number; valueLabel: string }) {
+  return (
+    <div className={hpStyles.previewLeadMeter}>
+      <span>{props.label}</span>
+      <span className={hpStyles.previewLeadMeterTrack} aria-hidden="true"><span style={{ width: `${props.value}%` }} /></span>
+      <strong>{props.valueLabel}</strong>
+    </div>
   );
 }
 

@@ -355,6 +355,9 @@ function toPublicPreviewItem(
   relevanceSignals: PreviewRelevanceSignals
 ): PublicPreviewItem {
   const sourceFamilies = item.source_families
+  const lawfulContactPath = sourceFamilies.includes("career-pages")
+    ? "career-page"
+    : deriveLawfulContactPath(item.reasons, sourceFamilies)
   return {
     ...item,
     confidenceLabel: deriveConfidenceLabel(item.total_score),
@@ -366,7 +369,9 @@ function toPublicPreviewItem(
     // ScoringReason keys — so these derivations lean on source families, the
     // confidence gate, and vacancy counts (gate/count-driven, key-agnostic),
     // never on reason keys that don't exist in preview data.
-    lawfulContactPath: deriveLawfulContactPath(item.reasons, sourceFamilies),
+    // A direct career surface is a more actionable corporate path than registry
+    // context. Prefer it in the public card when both source families exist.
+    lawfulContactPath,
     negativeSignals: deriveNegativeSignals({
       reasons: item.reasons,
       vacanciesCount: item.vacancies_count,
