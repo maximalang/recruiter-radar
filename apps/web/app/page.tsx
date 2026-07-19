@@ -436,7 +436,10 @@ export async function PreviewSection(props: {
       />
 
       <div className={hpStyles.previewWorkspace}>
-        <SurfaceCard className={hpStyles.previewConfigurator}>
+        <SurfaceCard
+          className={hpStyles.previewConfigurator}
+          padding="var(--preview-surface-padding)"
+        >
           <div className={hpStyles.previewConfiguratorLead}>
             <h3 className={hpStyles.previewCardHeading}>Настройте пример</h3>
             <p>Двух полей достаточно, чтобы пересчитать соответствие компаний вашему профилю.</p>
@@ -491,7 +494,7 @@ export async function PreviewSection(props: {
 
         <SurfaceCard
           className={`${hpStyles.previewCardContainer} ${hpStyles.previewResults}`}
-          padding="var(--preview-results-padding)"
+          padding="var(--preview-surface-padding)"
         >
           <div className={hpStyles.previewHeaderRow}>
             <h3 className={hpStyles.previewCardHeading}>
@@ -606,7 +609,10 @@ export function PreviewSkeleton() {
         description="Укажите специализацию и географию — радар покажет компании, которые подходят именно вашему агентству."
       />
       <div className={hpStyles.previewWorkspace}>
-        <SurfaceCard className={hpStyles.previewConfigurator}>
+        <SurfaceCard
+          className={hpStyles.previewConfigurator}
+          padding="var(--preview-surface-padding)"
+        >
           <div className={hpStyles.previewConfiguratorLead}>
             <h3 className={hpStyles.previewCardHeading}>Настройте пример</h3>
           </div>
@@ -618,7 +624,7 @@ export function PreviewSkeleton() {
         </SurfaceCard>
         <SurfaceCard
           className={`${hpStyles.previewCardContainer} ${hpStyles.previewResults}`}
-          padding="var(--preview-results-padding)"
+          padding="var(--preview-surface-padding)"
         >
           <div className={hpStyles.previewHeaderRow}>
             <h3 className={hpStyles.previewCardHeading}>Пример утренней выдачи</h3>

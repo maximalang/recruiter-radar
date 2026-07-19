@@ -572,7 +572,7 @@
 /* ── Section spacing ── */
 .scrollSection {
   display: grid;
-  gap: 16px;
+  gap: 20px;
   /* Tight padding: the transparent sections sit on the ambient backdrop, so
      every px of vertical padding reads as empty space between cards. Was 64px,
      then 44px — both still left ~106px of bare backdrop at each section join
@@ -591,7 +591,7 @@
    has several dense surfaces; this quieter list gives the narrative room and
    keeps the page from reading like a template gallery. */
 .problemSection {
-  padding-block: clamp(38px, 6vw, 72px);
+  padding-block: clamp(22px, 2.5vw, 30px);
 }
 
 .problemLayout {
@@ -599,7 +599,7 @@
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
   gap: clamp(36px, 7vw, 88px);
   align-items: start;
-  padding: clamp(30px, 5vw, 58px) 0;
+  padding: clamp(28px, 3vw, 36px) 0;
   border-top: 1px solid rgba(20, 40, 72, 0.12);
   border-bottom: 1px solid rgba(20, 40, 72, 0.12);
 }
@@ -932,8 +932,9 @@
 
 /* ── Interactive preview workspace ── */
 .previewWorkspace {
+  --preview-surface-padding: 28px;
   display: grid;
-  gap: 16px;
+  gap: 18px;
 }
 
 .previewConfigurator {
@@ -941,7 +942,6 @@
   grid-template-columns: minmax(190px, 0.55fr) minmax(0, 1.45fr);
   gap: clamp(20px, 4vw, 48px);
   align-items: end;
-  padding: 24px 28px;
   border: 1px solid rgba(29, 78, 216, 0.14);
   background: rgba(255, 255, 255, 0.9);
   box-shadow: 0 18px 50px rgba(20, 39, 74, 0.07);
@@ -975,7 +975,6 @@
 }
 
 .previewResults {
-  --preview-results-padding: var(--space-card-padding-lg);
   grid-template-columns: minmax(0, 1fr);
   gap: 18px;
   min-width: 0;
@@ -1787,7 +1786,38 @@
 
 }
 
+@media (max-width: 1100px) and (min-width: 901px) {
+  .heroSection {
+    padding-inline: 44px;
+  }
+
+  .heroContent {
+    gap: 32px;
+  }
+
+  .heroCopy {
+    gap: 18px;
+  }
+
+  .heroActions {
+    gap: 10px;
+    flex-wrap: nowrap;
+  }
+
+  .heroCta {
+    padding-inline: 20px;
+  }
+
+  .heroSecondaryCta {
+    padding-inline: 16px;
+  }
+}
+
 @media (max-width: 900px) {
+  .previewWorkspace {
+    --preview-surface-padding: 24px;
+  }
+
   .previewConfigurator {
     grid-template-columns: 1fr;
     gap: 18px;
@@ -1883,9 +1913,8 @@
     gap: 14px;
   }
 
-  .previewConfigurator,
-  .previewResults.previewCardContainer {
-    padding: 20px 18px;
+  .previewWorkspace {
+    --preview-surface-padding: 20px 18px;
   }
 
   .previewForm,
@@ -2026,10 +2055,6 @@
 }
 
 @media (max-width: 560px) {
-  .previewResults.previewCardContainer {
-    --preview-results-padding: 18px 14px;
-  }
-
   .previewLeadSummary {
     min-height: 0;
     padding: 14px;

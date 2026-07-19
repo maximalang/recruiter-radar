@@ -230,6 +230,7 @@ describe("landing section hierarchy", () => {
 
     expect(previewMarkup.match(/data-lead-card="true"/g)).toHaveLength(2);
     expect(previewMarkup.match(/name="preview-leads"/g)).toHaveLength(2);
+    expect(previewMarkup.match(/padding:var\(--preview-surface-padding\)/g)).toHaveLength(2);
     expect(previewMarkup).toContain('data-lead-columns="true"');
     expect(previewMarkup.match(/<details(?=[^>]*data-lead-card="true")(?=[^>]*open="")[^>]*>/g)).toHaveLength(1);
     expect(previewMarkup).toContain("Рекомендация на сегодня");
