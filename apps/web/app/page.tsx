@@ -124,10 +124,6 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               <span className={hpStyles.heroProductLabel}>Пример структуры сигнала</span>
               <span className={hpStyles.heroProductLive}>демо</span>
             </div>
-            <div className={hpStyles.heroEvidenceBadge}>
-              <span>Сигнал подтверждён</span>
-              <b>2 источника · контакт найден</b>
-            </div>
             <div className={hpStyles.heroCompanyRow}>
               <div>
                 <div className={hpStyles.heroCompanyName}>Производственная компания</div>
@@ -163,10 +159,6 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                 </div>
                 <div className={hpStyles.heroSignalMeterTrack} data-tone="amber"><span style={{ width: "94%" }} /></div>
               </div>
-            </div>
-            <div className={hpStyles.heroProductFooter}>
-              <span>Рекомендуемое действие</span>
-              <strong>Проверить контакт сегодня</strong>
             </div>
           </div>
 
@@ -608,20 +600,6 @@ function PreviewDigestCard(props: {
   const location = formatLocationCaption(item.location_names);
   const evidenceTitles = pickEvidenceTitles(item.evidence_titles, 6);
   const vacanciesCaption = formatVacanciesCount(item.vacancies_count);
-  const previewSections = [
-    {
-      label: "Компания и контакты",
-      value: contactPath || "Корпоративный контакт уточняется",
-    },
-    {
-      label: "Релевантные вакансии",
-      value: [vacanciesCaption, evidenceTitles.slice(0, 2).join(" · ")].filter(Boolean).join(" · "),
-    },
-    {
-      label: "Сигналы",
-      value: whyNow || "Активность найма подтверждена источниками",
-    },
-  ];
   // Score = 0–100 points (raw total_score / 4). The internal [0,4] signal
   // strength still drives the tone + the confidence gate + the hiringIntentMin
   // threshold (unchanged) — points are a higher-resolution read of the SAME
@@ -649,6 +627,28 @@ function PreviewDigestCard(props: {
     { key: "reachability", label: "Доступность", value: rs.reachability },
   ];
 
+  // Confidence + provenance rows for the expanded body — mirror the
+  // signal-anatomy exhibit's side metadata so a real lead card reads with the
+  // same shape: confidence, source count, contact path. Hidden when the field
+  // is empty so we never show an empty row.
+  // NOTE: `confidenceLabel` is an internal English bucket (high/medium/low) —
+  // never user-facing. The honest, Russia-first read is the confidence GATE
+  // (A = подтверждено, B = скорее подтверждено, C = нужна проверка, D = контекст
+  // без прямого найма). Fall back to the gate's Russian label; if no gate is
+  // present on the item we drop the row rather than show a raw English key.
+  const confidenceRow = gateLabel(item.confidence_gate) || null;
+  const sourceCountRow = item.sourceCount > 0 ? `${item.sourceCount} ${pluralSources(item.sourceCount)}` : null;
+  const contactRow = contactPath || null;
+
+  // The three detail tiles use real item fields — "what changed" = the whyNow
+  // signal (urgency/intent reasons), "next step" = the opener (a ready-made
+  // outreach angle the digest already produced), and "evidence" = the actual
+  // vacancy titles. This makes the expanded card honest: no fabricated copy,
+  // every line traces to a digest field.
+  const detailWhat = whyNow || vacanciesCaption || "Активность найма подтверждена источниками";
+  const detailNext = item.opener?.trim() || (contactPath ? "Проверить корпоративный путь контакта" : "Уточнить контакт и предложить помощь по открытому найму");
+  const detailEvidence = evidenceTitles.length > 0 ? evidenceTitles.join(" · ") : "Открытые позиции подтверждают активный найм";
+
   return (
     <article className={hpStyles.previewCard} data-tone={tone}>
       {location ? (
@@ -675,44 +675,98 @@ function PreviewDigestCard(props: {
         <span className={hpStyles.previewStrengthFill} data-tone={tone} style={{ width: `${pct}%` }} />
       </div>
 
-      <div className={hpStyles.previewEvidence} aria-label="Краткая информация о компании">
-        {previewSections.map((section) => (
-          <div key={section.label}>
-            <span>{section.label}</span>
-            <p>{section.value}</p>
+      <details className={hpStyles.previewDetails}>
+        <summary className={hpStyles.previewSummary}>
+          <span>Подробнее о сигнале</span>
+          <svg className={hpStyles.previewChevron} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </summary>
+        <div className={hpStyles.previewDetailsBody}>
+          <div className={hpStyles.previewDetailGrid}>
+            <div className={hpStyles.previewDetail}>
+              <h3>Что изменилось</h3>
+              <p>{detailWhat}</p>
+            </div>
+            <div className={hpStyles.previewDetail}>
+              <h3>Доказательства</h3>
+              <p>{detailEvidence}</p>
+            </div>
+            <div className={`${hpStyles.previewDetail} ${hpStyles.previewDetailFull}`}>
+              <h3>Следующий шаг</h3>
+              <p>{detailNext}</p>
+            </div>
           </div>
-        ))}
-      </div>
 
-      {hasRelevance ? (
-        <div className={hpStyles.previewRelevance} aria-label="Релевантность вашему ICP по осям">
-          <span className={hpStyles.previewReasonKey}>Релевантность ICP</span>
-          <div className={hpStyles.previewRelevanceAxes}>
-            {relevanceAxes.map((axis) => (
-              <span key={axis.key} className={hpStyles.previewRelevanceAxis} aria-label={`${axis.label}: ${Math.round(axis.value * 100)}%`}>
-                <span className={hpStyles.previewRelevanceAxisLabel}>{axis.label}</span>
-                <span className={hpStyles.previewRelevanceDots}>
-                  {[0.25, 0.5, 0.75, 1].map((threshold) => (
-                    <span
-                      key={threshold}
-                      className={hpStyles.previewRelevanceDot}
-                      data-on={axis.value >= threshold ? "true" : "false"}
-                      aria-hidden="true"
-                    />
-                  ))}
-                </span>
-              </span>
-            ))}
-          </div>
-        </div>
-      ) : null}
+          {(confidenceRow || sourceCountRow || contactRow) ? (
+            <dl className={hpStyles.previewMeta}>
+              {confidenceRow ? (
+                <div className={hpStyles.previewMetaRow}><dt>Уверенность</dt><dd>{confidenceRow}</dd></div>
+              ) : null}
+              {sourceCountRow ? (
+                <div className={hpStyles.previewMetaRow}><dt>Источники</dt><dd>{sourceCountRow}</dd></div>
+              ) : null}
+              {contactRow ? (
+                <div className={hpStyles.previewMetaRow}><dt>Контакт</dt><dd>{contactRow}</dd></div>
+              ) : null}
+            </dl>
+          ) : null}
 
-      {contactPath ? (
-        <div className={hpStyles.previewFooter}>
-          <span>Корпоративный контакт</span>
-          <strong>{contactPath}</strong>
+          {hasRelevance ? (
+            <div className={hpStyles.previewRelevance} aria-label="Релевантность вашему ICP по осям">
+              <span className={hpStyles.previewReasonKey}>Релевантность ICP</span>
+              <div className={hpStyles.previewRelevanceAxes}>
+                {relevanceAxes.map((axis) => (
+                  <span key={axis.key} className={hpStyles.previewRelevanceAxis} aria-label={`${axis.label}: ${Math.round(axis.value * 100)}%`}>
+                    <span className={hpStyles.previewRelevanceAxisLabel}>{axis.label}</span>
+                    <span className={hpStyles.previewRelevanceDots}>
+                      {[0.25, 0.5, 0.75, 1].map((threshold) => (
+                        <span
+                          key={threshold}
+                          className={hpStyles.previewRelevanceDot}
+                          data-on={axis.value >= threshold ? "true" : "false"}
+                          aria-hidden="true"
+                        />
+                      ))}
+                    </span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
-      ) : null}
+      </details>
     </article>
   );
+}
+
+/** Russian plural for "источник" by count — 1 / 2–4 / 5+. */
+function pluralSources(count: number): string {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return "источник";
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return "источника";
+  return "источников";
+}
+
+/**
+ * Map a confidence gate (A/B/C/D — the evidence-quality contract from
+ * lib/scoring/gates) to a short Russian label for the public lead card. Returns
+ * null for an absent/unknown gate so the caller hides the row instead of
+ * showing a raw letter or an English bucket. Mirrors the "Уверенность" copy in
+ * the "Карточка лида" exhibit so a real card and the teaching panel agree.
+ */
+function gateLabel(gate: string | null | undefined): string | null {
+  switch (gate) {
+    case "A":
+      return "Подтверждено";
+    case "B":
+      return "Скорее подтверждено";
+    case "C":
+      return "Нужна проверка";
+    case "D":
+      return "Контекст без прямого найма";
+    default:
+      return null;
+  }
 }

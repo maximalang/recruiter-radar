@@ -566,7 +566,9 @@
 
 /* Plan price cadence */
 .planPriceCadence {
-  color: #64748b;
+  /* Darkened from #64748b → #586076 to clear WCAG AA 4.5:1 for small text on the
+     #f2f7ff plan-card surface (was 4.42:1). */
+  color: #586076;
   font-size: 0.875rem;
   font-weight: 500;
 }

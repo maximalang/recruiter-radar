@@ -135,7 +135,11 @@
    the reveal is decorative, never gatekeeping. Per modern-web-guidance: animate
    only transform/opacity, feature-detect with @supports, gate on
    prefers-reduced-motion: no-preference, declare animation-timeline AFTER the
-   animation shorthand. */
+   animation shorthand.
+   Tuned for "calm premium, not loading": a short 12px lift over 0.5s with an
+   ease-out spline that completes by 30% of the entry range, so a card reads as
+   fully present the moment it crosses the viewport edge — never as a half-faded
+   "still loading" tile. `both` fill keeps it visible after it has revealed. */
 .revealCard {
   opacity: 1;
   transform: none;
@@ -144,8 +148,8 @@
 @media (prefers-reduced-motion: no-preference) {
   @supports ((animation-timeline: view()) and (animation-range: entry)) {
     .revealCard {
-      animation: revealUp 0.7s ease backwards;
-      animation-range: entry 0% entry 55%;
+      animation: revealUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+      animation-range: entry 0% entry 30%;
       animation-timeline: view();
     }
   }
@@ -154,7 +158,7 @@
 @keyframes revealUp {
   from {
     opacity: 0;
-    transform: translateY(22px);
+    transform: translateY(12px);
   }
 }
 
@@ -277,7 +281,9 @@
 
 .heroFootnote {
   margin: -8px 0 0;
-  color: rgba(148, 163, 184, 0.72);
+  /* Alpha lifted from 0.72 → 0.85 so the composited color on the #0b1324 hero
+     clears WCAG AA 4.5:1 for small text (was 4.32:1). */
+  color: rgba(180, 195, 215, 0.85);
   font-size: 0.78rem;
 }
 
@@ -1302,6 +1308,148 @@
   background: var(--c-brand);
 }
 
+/* ── Expandable lead card ──
+   The collapsed summary carries the company, score and meter (the at-a-glance
+   read). Expanding reveals the same anatomy the "Карточка лида" exhibit
+   teaches: what changed / evidence / next step, plus confidence + provenance +
+   ICP-relevance. Native <details> keeps it server-rendered, keyboard-operable
+   and JS-free; the chevron rotates on open. */
+.previewDetails {
+  margin-top: 2px;
+}
+
+.previewSummary {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--c-border);
+  background: rgba(238, 244, 255, 0.55);
+  color: var(--c-brand);
+  font-size: 0.8rem;
+  font-weight: 700;
+  list-style: none;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.previewSummary::-webkit-details-marker {
+  display: none;
+}
+
+.previewSummary:hover {
+  background: rgba(224, 234, 255, 0.85);
+  border-color: rgba(29, 78, 216, 0.22);
+}
+
+.previewChevron {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  color: var(--c-brand);
+  transition: transform 0.2s ease;
+}
+
+.previewDetails[open] .previewChevron {
+  transform: rotate(180deg);
+}
+
+/* The expanded body — a calm, surfaced panel under the summary. The grid-gap
+   lets the detail tiles + meta + relevance breathe without crowding. */
+.previewDetailsBody {
+  display: grid;
+  gap: 12px;
+  margin-top: 10px;
+  padding-top: 4px;
+}
+
+.previewDetailGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.previewDetail {
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--c-border);
+  background: rgba(248, 250, 252, 0.9);
+  transition: border-color 0.18s ease;
+}
+
+.previewDetail:hover {
+  border-color: rgba(29, 78, 216, 0.18);
+}
+
+.previewDetail h3 {
+  margin: 0 0 5px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--c-text-muted);
+}
+
+.previewDetail p {
+  margin: 0;
+  color: var(--c-text-primary);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* The "next step" tile spans full width — it reads as the conclusion. */
+.previewDetailFull {
+  grid-column: 1 / -1;
+}
+
+.previewMeta {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--c-border);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.previewMetaRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--c-border);
+}
+
+.previewMetaRow:last-child {
+  border-bottom: 0;
+}
+
+.previewMetaRow dt {
+  color: var(--c-text-muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.previewMetaRow dd {
+  margin: 0;
+  color: var(--c-text-primary);
+  font-size: 0.84rem;
+  font-weight: 700;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+/* Stacked detail tiles on narrow cards — matches the .detailGrid collapse. */
+@media (max-width: 480px) {
+  .previewDetailGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ── Pricing — three equal-weight cards, pilot gently featured ── */
 .pricingGrid {
   display: grid;
@@ -1805,7 +1953,12 @@
 }
 
 /* Final surface layer: intentionally after responsive rules so later card
-   declarations cannot restore borders or opaque fills. */
+   declarations cannot restore borders or opaque fills.
+   Cards read as crisp, premium surfaces over the soft ambient field: a hairline
+   border + a mostly-opaque fill. Earlier the border was zeroed and fills were
+   0.4–0.7 alpha, so the ambient grid bled through every card and the layout
+   read as unfinished — borders are restored (hairline, brand-tinted) and fills
+   lifted so the cards separate cleanly from the backdrop. */
 .topBar,
 .heroSection,
 .heroProduct,
@@ -1818,7 +1971,7 @@
 .includedOnce,
 .faqCard,
 .closingBand {
-  border: 0;
+  border: 1px solid var(--c-border);
 }
 
 .topBar,
@@ -1828,22 +1981,22 @@
 .secondaryPlanCard,
 .includedOnce,
 .faqCard {
-  -webkit-backdrop-filter: saturate(145%) blur(18px);
-  backdrop-filter: saturate(145%) blur(18px);
+  -webkit-backdrop-filter: saturate(150%) blur(16px);
+  backdrop-filter: saturate(150%) blur(16px);
 }
 
-.topBar { background: rgba(255, 255, 255, 0.7); }
-.heroProduct { background: rgba(15, 27, 49, 0.68); }
+.topBar { background: rgba(255, 255, 255, 0.86); }
+.heroProduct { background: rgba(15, 27, 49, 0.78); }
 .heroEvidenceRow div { background: rgba(255, 255, 255, 0.055); }
-.principles { background: rgba(255, 255, 255, 0.5); }
-.principle + .principle { border-left: 0; }
-.previewCard { background: rgba(255, 255, 255, 0.62); }
-.previewEvidence > div { background: rgba(255, 255, 255, 0.5); }
-.primaryPlanCard { background: rgba(239, 246, 255, 0.68); }
-.secondaryPlanCard { background: rgba(255, 255, 255, 0.58); }
-.includedOnce { background: rgba(255, 255, 255, 0.44); }
-.faqCard { background: rgba(255, 255, 255, 0.56); }
-.closingBand { background: rgba(11, 19, 36, 0.9); }
+.principles { background: rgba(255, 255, 255, 0.9); }
+.principle + .principle { border-left: 1px solid var(--c-border); }
+.previewCard { background: rgba(255, 255, 255, 0.92); }
+.previewEvidence > div { background: rgba(255, 255, 255, 0.78); }
+.primaryPlanCard { background: rgba(239, 246, 255, 0.9); }
+.secondaryPlanCard { background: rgba(255, 255, 255, 0.9); }
+.includedOnce { background: rgba(248, 250, 252, 0.88); }
+.faqCard { background: rgba(255, 255, 255, 0.92); }
+.closingBand { background: rgba(11, 19, 36, 0.94); }
 
 @media (prefers-reduced-motion: reduce) {
   .ambientBg::before,
