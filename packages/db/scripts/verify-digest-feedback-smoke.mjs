@@ -82,7 +82,15 @@ try {
 
   assert.deepEqual(digestVisibility.rows, [], 'accepted/snoozed orgs should stay out of the next digest window');
 
-  console.log('digest feedback smoke passed');
+  console.log(JSON.stringify({
+    ok: true,
+    smoke: 'digest-feedback',
+    verified: {
+      tenantOwnerInvariant: true,
+      acceptedMapsToContacted: true,
+      snoozeSuppression: true,
+    },
+  }, null, 2));
 } catch (error) {
   try {
     await client.query('ROLLBACK');
@@ -96,22 +104,29 @@ try {
 }
 
 async function setupFixture(client) {
-  const clientProfileResult = await client.query(`
-    INSERT INTO client_profiles (agency_name, daily_digest_limit)
-    VALUES ($1, 5)
+  const fixtureId = `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+  const ownerResult = await client.query(`
+    INSERT INTO users (email, email_verified_at, full_name)
+    VALUES ($1, NOW(), $2)
     RETURNING id
-  `, [`Digest feedback smoke ${Date.now()}`]);
+  `, [`digest-feedback-${fixtureId}@example.invalid`, `Digest feedback smoke ${fixtureId}`]);
+
+  const clientProfileResult = await client.query(`
+    INSERT INTO client_profiles (owner_id, agency_name, daily_digest_limit)
+    VALUES ($1, $2, 5)
+    RETURNING id
+  `, [ownerResult.rows[0].id, `Digest feedback smoke ${fixtureId}`]);
 
   const acceptedOrgResult = await client.query(`
     INSERT INTO orgs (name)
-    VALUES ('Accepted Fixture Org')
+    VALUES ($1)
     RETURNING id
-  `);
+  `, [`Accepted Fixture Org ${fixtureId}`]);
   const snoozedOrgResult = await client.query(`
     INSERT INTO orgs (name)
-    VALUES ('Snoozed Fixture Org')
+    VALUES ($1)
     RETURNING id
-  `);
+  `, [`Snoozed Fixture Org ${fixtureId}`]);
 
   const acceptedRunResult = await client.query(`
     INSERT INTO digest_runs (client_profile_id, source_key, status, requested_limit, selected_count, cooldown_days, completed_at)
@@ -140,7 +155,7 @@ async function setupFixture(client) {
       $2,
       $3,
       'accept-1',
-      'Accepted Fixture Org',
+      $4,
       '["hh"]'::jsonb,
       2,
       2,
@@ -151,9 +166,15 @@ async function setupFixture(client) {
       '{}'::jsonb
     )
     RETURNING id
-  `, [acceptedRunResult.rows[0].id, clientProfileResult.rows[0].id, acceptedOrgResult.rows[0].id]);
+  `, [
+    acceptedRunResult.rows[0].id,
+    clientProfileResult.rows[0].id,
+    acceptedOrgResult.rows[0].id,
+    `Accepted Fixture Org ${fixtureId}`,
+  ]);
 
   return {
+    ownerId: ownerResult.rows[0].id,
     clientProfileId: clientProfileResult.rows[0].id,
     acceptedOrgId: acceptedOrgResult.rows[0].id,
     snoozedOrgId: snoozedOrgResult.rows[0].id,
