@@ -48,14 +48,14 @@
 }
 
 .filterSelect {
-  padding: 6px 10px;
+  padding: 8px 10px;
   font-size: 0.8rem;
   border-radius: 8px;
   border: 1px solid var(--c-border);
   background-color: var(--c-bg-card);
   color: var(--c-text-secondary);
   cursor: pointer;
-  min-height: 32px;
+  min-height: 44px;
   transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
 }
 
@@ -78,8 +78,10 @@
 .todayToggle {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 6px 12px;
+  min-height: 44px;
+  padding: 8px 12px;
   font-size: 0.78rem;
   font-weight: 600;
   border-radius: 999px;
@@ -110,8 +112,10 @@
 .filterReset {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
-  padding: 4px 10px;
+  min-height: 44px;
+  padding: 8px 10px;
   font-size: 0.75rem;
   border-radius: 6px;
   border: 1px solid var(--c-border);
@@ -153,6 +157,5 @@
   }
   .filterReset {
     flex: 1 1 100%;
-    padding: 8px 10px;
   }
 }
