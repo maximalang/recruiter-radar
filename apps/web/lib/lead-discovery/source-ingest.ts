@@ -31,6 +31,16 @@ import {
 } from '@/lib/sources/source-registry'
 import { getPool } from '@/lib/db-pool'
 import { deriveHabrKeywordsFromProfiles } from './habr-keywords'
+import {
+  buildProfileSearchEnv,
+  type ProfileSearchInput,
+} from './search-query-builder'
+import {
+  classifyFeedbackSentiment,
+  computeClientQueryAdjustments,
+  industryDemoteTerms,
+  type FeedbackPatternEvent,
+} from './query-feedback-tuning'
 
 export type { SourceId } from '@/lib/sources/source-registry'
 
@@ -176,6 +186,167 @@ async function loadActiveProfileRoles(): Promise<string[][]> {
 }
 
 /**
+ * Load the ICP search fields of every active client profile.
+ *
+ * Ingestion is global: `ingestAllPrimarySources()` fills ONE shared signal
+ * pool before per-profile digest runs, so a source search must reflect the
+ * UNION of all active profiles' ICP, not one profile's. This loads the fields
+ * `buildProfileSearchEnv` consumes (roles, industries, exclusions, operator
+ * keywords, target city) for every active profile so the per-source query is
+ * derived from the combined ICP. Returns [] when no pool (test/dev) — caller
+ * falls back to ENV / source defaults.
+ */
+async function loadActiveProfileSearchInputs(): Promise<ProfileSearchInput[]> {
+  const pool = getPool()
+  if (!pool) return []
+  const { rows } = await pool.query<{
+    roles: string[] | null
+    industries: string[] | null
+    excluded_industries: string[] | null
+    include_keywords: string[] | null
+    exclude_keywords: string[] | null
+    target_city: string | null
+  }>(`
+    SELECT
+      roles,
+      industries,
+      excluded_industries,
+      include_keywords,
+      exclude_keywords,
+      target_city
+    FROM client_profiles
+    WHERE is_active = TRUE
+  `)
+  return rows.map(r => ({
+    roles: r.roles ?? [],
+    industries: r.industries ?? [],
+    excludedIndustries: r.excluded_industries ?? [],
+    includeKeywords: r.include_keywords ?? [],
+    excludeKeywords: r.exclude_keywords ?? [],
+    targetCity: r.target_city ?? null,
+  }))
+}
+
+/**
+ * Merge a list of per-profile search inputs into ONE union input for global
+ * ingestion. Operator includeKeywords and excludeKeywords are unioned across
+ * profiles; role/industry/exclusion arrays are unioned and deduped. This keeps
+ * ingestion global (one fetch per source) while the query reflects every
+ * active profile's ICP — the same pattern `loadActiveProfileRoles` uses for
+ * habr-career, generalised to all supported search sources.
+ */
+function unionProfileSearchInputs(inputs: readonly ProfileSearchInput[]): ProfileSearchInput {
+  const union = (arrs: ReadonlyArray<readonly string[]>): string[] => {
+    const seen = new Set<string>()
+    const out: string[] = []
+    for (const arr of arrs) {
+      for (const v of arr ?? []) {
+        if (typeof v !== 'string') continue
+        const key = v.toLowerCase()
+        if (seen.has(key)) continue
+        seen.add(key)
+        out.push(v)
+      }
+    }
+    return out
+  }
+  return {
+    roles: union(inputs.map(i => i.roles)),
+    industries: union(inputs.map(i => i.industries)),
+    excludedIndustries: union(inputs.map(i => i.excludedIndustries)),
+    includeKeywords: union(inputs.map(i => i.includeKeywords)),
+    excludeKeywords: union(inputs.map(i => i.excludeKeywords)),
+    targetCity: inputs.find(i => i.targetCity)?.targetCity ?? null,
+  }
+}
+
+/**
+ * Load the feedback history of every active client profile, projected onto the
+ * (industry, role, sentiment) axes the query tuner reads.
+ *
+ * Ingestion is global (one shared signal pool), so feedback tuning is also
+ * global: we union every active profile's feedback so a source query learns
+ * from the combined client experience. The join is client_digest_org_state
+ * (feedback_status) × orgs (industry) — the same join `computeClientOverrides`
+ * uses for score reweighting, read here for query tuning. Returns [] when no
+ * pool (test/dev) — caller skips tuning and builds the query from the profile
+ * alone (Foundation 1 behaviour).
+ *
+ * The role axis is left null for now (role extraction from vacancy headlines is
+ * a future increment); only industry is populated today, which is the axis
+ * already reliably persisted on orgs.
+ */
+async function loadActiveFeedbackPatterns(): Promise<FeedbackPatternEvent[]> {
+  const pool = getPool()
+  if (!pool) return []
+  const { rows } = await pool.query<{
+    feedback_status: string
+    industry: string | null
+  }>(`
+    SELECT
+      state.feedback_status,
+      LOWER(TRIM(orgs.industry)) AS industry
+    FROM client_digest_org_state AS state
+    JOIN orgs ON orgs.id = state.org_id
+    WHERE state.feedback_status IN ('badfit', 'dismissed', 'contacted', 'replied', 'won')
+  `)
+  const events: FeedbackPatternEvent[] = []
+  for (const r of rows) {
+    const sentiment = classifyFeedbackSentiment(r.feedback_status)
+    if (!sentiment) continue
+    events.push({ industry: r.industry ?? null, role: null, sentiment })
+  }
+  return events
+}
+
+/**
+ * Resolve the profile-derived search env for a source from the UNION of all
+ * active client profiles, with feedback-driven demote terms applied.
+ *
+ * Precedence (matches the habr-career contract): an explicit operator override
+ * already present in `dbSearchEnv` (from `user_search_preferences`) or in the
+ * caller's filtered env ALWAYS wins — operators can pin a query. Only keys the
+ * operator has NOT set are derived from profiles. When the profile union yields
+ * no keywords for a key, that key is left unset and the source adapter falls
+ * back to its own built-in default (unchanged from today).
+ *
+ * Feedback tuning: the union of all active profiles' feedback history is
+ * turned into industry demote terms via `computeClientQueryAdjustments` +
+ * `industryDemoteTerms`. These terms are NOT removed from the query — the
+ * builder re-orders them to the back (bounded effect), so the query stays
+ * inside the operator's ICP while poor-fit industries are de-emphasised.
+ * Operator-pinned includeKeywords are exempt from demotion (human pin > loop).
+ *
+ * Sources with no supported search params (career-pages, tech-job-boards) get
+ * an empty env — their ingestion is not keyword-driven.
+ */
+async function resolveProfileSearchEnv(
+  source: SourceId,
+  dbSearchEnv: Record<string, string>
+): Promise<Record<string, string>> {
+  const inputs = await loadActiveProfileSearchInputs()
+  if (inputs.length === 0) return {}
+  const unionInput = unionProfileSearchInputs(inputs)
+
+  // Feedback self-tuning: demote terms from the combined feedback history.
+  // Computed once per ingestion; empty when there is insufficient feedback
+  // (MIN_SAMPLES_PER_AXIS gate inside computeClientQueryAdjustments).
+  const feedbackEvents = await loadActiveFeedbackPatterns()
+  const adjustments = computeClientQueryAdjustments(feedbackEvents)
+  const demoteTerms = industryDemoteTerms(adjustments)
+
+  const derived = buildProfileSearchEnv(source, unionInput, demoteTerms)
+
+  // Strip any key the operator already pinned (manual override wins).
+  const result: Record<string, string> = {}
+  for (const [key, value] of Object.entries(derived)) {
+    if (key in dbSearchEnv) continue
+    result[key] = value
+  }
+  return result
+}
+
+/**
  * Resolve the habr-career keyword search env from active profiles' roles.
  *
  * Precedence: an explicit DB/ENV keyword pref (HABR_CAREER_KEYWORD or the
@@ -228,15 +399,27 @@ export async function ingestSource(
 
   // habr-career: derive search keywords from the union of active profiles'
   // roles (ingestion is global), unless an explicit keyword pref is set.
-  const derivedSearchEnv =
+  const habrDerivedEnv =
     source === 'habr-career' ? await resolveHabrKeywordEnv(dbSearchEnv) : {}
+  // Generalised profile-derived search env for the other search-capable
+  // sources (hh, superjob, rabota-rossii). For habr-career the specialised
+  // resolver above already emits HABR_CAREER_KEYWORDS, so the generalised
+  // resolver is skipped to avoid double-deriving the same key. Operator
+  // overrides in dbSearchEnv always win (resolver strips already-pinned keys).
+  const profileDerivedEnv =
+    source === 'habr-career' ? {} : await resolveProfileSearchEnv(source, dbSearchEnv)
+  const derivedSearchEnv = { ...profileDerivedEnv, ...habrDerivedEnv }
 
   return new Promise<IngestResult>((resolvePromise) => {
     // Filter env vars through whitelist — prevent injection of
     // DATABASE_URL, NODE_OPTIONS, PATH, etc.
     // Exclude searchEnvVars from caller-provided env (they come from DB).
     const filteredEnv = env ? filterEnvVars(env, searchEnvVars) : {}
-    // Merge: process.env → DB search prefs → derived (role-based) → caller filtered env
+    // Merge precedence (last wins):
+    //   process.env → DB operator search prefs → profile-derived defaults → caller filtered env
+    // Operator DB prefs and caller env override the profile-derived defaults; the
+    // derived defaults only fill keys nobody pinned. This keeps a human able to
+    // pin a query while letting the profile shape the default search.
     const mergedEnv = { ...process.env, ...dbSearchEnv, ...derivedSearchEnv, ...filteredEnv }
     // Windows exposes the inherited path case-insensitively (often as `Path`),
     // while Node child processes and our allowlist contract use `PATH`.

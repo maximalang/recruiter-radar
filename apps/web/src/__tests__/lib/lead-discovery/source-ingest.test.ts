@@ -154,13 +154,42 @@ describe('source-ingest', () => {
   })
 
   describe('habr-career keyword derivation', () => {
-    // Route queries by shape: search-prefs SELECT vs active-profile roles SELECT.
-    function mockPoolWith({ roles, searchParams }: { roles?: string[][]; searchParams?: Record<string, string> }) {
+    // Route queries by shape: count SELECT vs search-prefs SELECT vs
+    // active-profile ICP SELECT. `profiles` carries the full column set the
+    // generalised profile-search loader reads (roles, industries, exclusions,
+    // operator keywords, target city); `roles` is the legacy roles-only shape
+    // used by the habr resolver path.
+    function mockPoolWith({
+      roles,
+      searchParams,
+      profiles,
+      count,
+    }: {
+      roles?: string[][]
+      searchParams?: Record<string, string>
+      profiles?: Array<{
+        roles?: string[] | null
+        industries?: string[] | null
+        excluded_industries?: string[] | null
+        include_keywords?: string[] | null
+        exclude_keywords?: string[] | null
+        target_city?: string | null
+      }>
+      count?: string;
+    }) {
       const query = jest.fn((sql: string) => {
+        if (sql.includes('COUNT(*)')) {
+          return Promise.resolve({ rows: [{ count: count ?? '0' }] })
+        }
         if (sql.includes('user_search_preferences')) {
           return Promise.resolve({ rows: searchParams ? [{ params: searchParams }] : [] })
         }
+        if (sql.includes('excluded_industries') || sql.includes('include_keywords')) {
+          // Generalised profile-search loader (selects multiple ICP columns).
+          return Promise.resolve({ rows: profiles ?? [] })
+        }
         if (sql.includes('client_profiles')) {
+          // Legacy roles-only SELECT (habr resolver path).
           return Promise.resolve({ rows: (roles ?? []).map(r => ({ roles: r })) })
         }
         return Promise.resolve({ rows: [] })
@@ -202,8 +231,10 @@ describe('source-ingest', () => {
       expect(capturedEnv?.HABR_CAREER_KEYWORDS).toBeUndefined()
     })
 
-    it('does not derive keywords for non-habr sources', async () => {
-      mockGetPool.mockReturnValue(mockPoolWith({ roles: [['hr']] }))
+    it('does not derive HABR_CAREER_KEYWORDS for non-habr sources', async () => {
+      mockGetPool.mockReturnValue(
+        mockPoolWith({ profiles: [{ roles: ['hr'] }] }),
+      )
 
       let capturedEnv: Record<string, string> | undefined
       mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
@@ -213,7 +244,247 @@ describe('source-ingest', () => {
 
       await ingestSource('hh')
 
+      // hh derives its OWN search text from the profile, but must NOT emit the
+      // habr-only HABR_CAREER_KEYWORDS param.
       expect(capturedEnv?.HABR_CAREER_KEYWORDS).toBeUndefined()
+    })
+  })
+
+  describe('profile-derived search queries (hh/superjob/rabota-rossii)', () => {
+    function mockPoolWithProfiles(
+      profiles: Array<Record<string, unknown>>,
+      feedbackRows?: Array<{ feedback_status: string; industry: string | null }>,
+    ) {
+      const query = jest.fn((sql: string) => {
+        if (sql.includes('user_search_preferences')) {
+          return Promise.resolve({ rows: [] })
+        }
+        if (sql.includes('client_digest_org_state')) {
+          return Promise.resolve({ rows: feedbackRows ?? [] })
+        }
+        if (sql.includes('excluded_industries') || sql.includes('include_keywords')) {
+          return Promise.resolve({ rows: profiles })
+        }
+        return Promise.resolve({ rows: [] })
+      })
+      return { query }
+    }
+
+    it('derives HH_SEARCH_TEXT from the union of active profiles ICP', async () => {
+      mockGetPool.mockReturnValue(
+        mockPoolWithProfiles([
+          { roles: ['hr'], industries: ['it'], excluded_industries: null, include_keywords: null, exclude_keywords: null, target_city: null },
+          { roles: ['sales'], industries: null, excluded_industries: null, include_keywords: null, exclude_keywords: null, target_city: null },
+        ]),
+      )
+
+      let capturedEnv: Record<string, string> | undefined
+      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
+        capturedEnv = opts.env
+        callback(null, JSON.stringify({ source: 'hh', recordsReceived: 1, signalUpsertsCompleted: 1 }), '')
+      })
+
+      await ingestSource('hh')
+
+      expect(capturedEnv?.HH_SEARCH_TEXT).toBeDefined()
+      // role terms from both profiles + industry terms from 'it'
+      expect(capturedEnv!.HH_SEARCH_TEXT).toContain('рекрутер')
+      expect(capturedEnv!.HH_SEARCH_TEXT).toContain('менеджер по продажам')
+      expect(capturedEnv!.HH_SEARCH_TEXT).toContain('айти')
+    })
+
+    it('derives SUPERJOB_KEYWORD for superjob', async () => {
+      mockGetPool.mockReturnValue(
+        mockPoolWithProfiles([{ roles: ['data'] }]),
+      )
+
+      let capturedEnv: Record<string, string> | undefined
+      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
+        capturedEnv = opts.env
+        callback(null, JSON.stringify({ source: 'superjob', recordsReceived: 1, signalUpsertsCompleted: 1 }), '')
+      })
+
+      await ingestSource('superjob')
+
+      expect(capturedEnv?.SUPERJOB_KEYWORD).toBeDefined()
+      expect(capturedEnv!.SUPERJOB_KEYWORD).toContain('data scientist')
+    })
+
+    it('derives RABOTA_ROSSII_SEARCH_TEXT for rabota-rossii', async () => {
+      mockGetPool.mockReturnValue(
+        mockPoolWithProfiles([{ roles: ['hr'] }]),
+      )
+
+      let capturedEnv: Record<string, string> | undefined
+      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
+        capturedEnv = opts.env
+        callback(null, JSON.stringify({ source: 'rabota-rossii', recordsReceived: 1, signalUpsertsCompleted: 1 }), '')
+      })
+
+      await ingestSource('rabota-rossii')
+
+      expect(capturedEnv?.RABOTA_ROSSII_SEARCH_TEXT).toBeDefined()
+      expect(capturedEnv!.RABOTA_ROSSII_SEARCH_TEXT).toContain('рекрутер')
+    })
+
+    it('lets an explicit operator DB search pref override the profile-derived query', async () => {
+      const mockPool = {
+        query: jest.fn((sql: string) => {
+          if (sql.includes('user_search_preferences')) {
+            return Promise.resolve({ rows: [{ params: { HH_SEARCH_TEXT: 'operator-pinned' } }] })
+          }
+          if (sql.includes('excluded_industries') || sql.includes('include_keywords')) {
+            return Promise.resolve({ rows: [{ roles: ['hr'], industries: null, excluded_industries: null, include_keywords: null, exclude_keywords: null, target_city: null }] })
+          }
+          return Promise.resolve({ rows: [] })
+        }),
+      }
+      mockGetPool.mockReturnValue(mockPool)
+
+      let capturedEnv: Record<string, string> | undefined
+      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
+        capturedEnv = opts.env
+        callback(null, JSON.stringify({ source: 'hh', recordsReceived: 1, signalUpsertsCompleted: 1 }), '')
+      })
+
+      await ingestSource('hh')
+
+      // Operator pin wins; profile-derived 'рекрутер' must NOT appear.
+      expect(capturedEnv?.HH_SEARCH_TEXT).toBe('operator-pinned')
+    })
+
+    it('omits search env when no active profiles exist (caller falls back to source default)', async () => {
+      const mockPool = {
+        query: jest.fn((sql: string) => {
+          if (sql.includes('user_search_preferences')) return Promise.resolve({ rows: [] })
+          if (sql.includes('excluded_industries') || sql.includes('include_keywords')) return Promise.resolve({ rows: [] })
+          return Promise.resolve({ rows: [] })
+        }),
+      }
+      mockGetPool.mockReturnValue(mockPool)
+
+      let capturedEnv: Record<string, string> | undefined
+      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
+        capturedEnv = opts.env
+        callback(null, JSON.stringify({ source: 'hh', recordsReceived: 1, signalUpsertsCompleted: 1 }), '')
+      })
+
+      await ingestSource('hh')
+
+      expect(capturedEnv?.HH_SEARCH_TEXT).toBeUndefined()
+    })
+
+    it('emits no search env for sources without supported search params (career-pages)', async () => {
+      mockGetPool.mockReturnValue(
+        mockPoolWithProfiles([{ roles: ['hr'] }]),
+      )
+
+      let capturedEnv: Record<string, string> | undefined
+      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
+        capturedEnv = opts.env
+        callback(null, JSON.stringify({ source: 'career-pages', recordsReceived: 1, signalUpsertsCompleted: 1 }), '')
+      })
+
+      await ingestSource('career-pages')
+
+      expect(capturedEnv?.HH_SEARCH_TEXT).toBeUndefined()
+      expect(capturedEnv?.SUPERJOB_KEYWORD).toBeUndefined()
+      expect(capturedEnv?.HABR_CAREER_KEYWORDS).toBeUndefined()
+    })
+  })
+
+  describe('feedback self-tuning loop (badfit history → query demote)', () => {
+    function mockPool(profiles: Array<Record<string, unknown>>, feedbackRows: Array<{ feedback_status: string; industry: string | null }>) {
+      const query = jest.fn((sql: string) => {
+        if (sql.includes('user_search_preferences')) return Promise.resolve({ rows: [] })
+        if (sql.includes('client_digest_org_state')) return Promise.resolve({ rows: feedbackRows })
+        if (sql.includes('excluded_industries') || sql.includes('include_keywords')) return Promise.resolve({ rows: profiles })
+        return Promise.resolve({ rows: [] })
+      })
+      return { query }
+    }
+
+    it('demotes finance terms to the BACK of the HH query after 3+ finance badfits', async () => {
+      // Profile serves both it and finance; finance has 3 badfits → demoted.
+      mockGetPool.mockReturnValue(
+        mockPool(
+          [{ roles: ['hr'], industries: ['it', 'finance'], excluded_industries: null, include_keywords: null, exclude_keywords: null, target_city: null }],
+          [
+            { feedback_status: 'badfit', industry: 'finance' },
+            { feedback_status: 'badfit', industry: 'finance' },
+            { feedback_status: 'badfit', industry: 'finance' },
+          ],
+        ),
+      )
+
+      let capturedEnv: Record<string, string> | undefined
+      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
+        capturedEnv = opts.env
+        callback(null, JSON.stringify({ source: 'hh', recordsReceived: 1, signalUpsertsCompleted: 1 }), '')
+      })
+
+      await ingestSource('hh')
+
+      const query = capturedEnv?.HH_SEARCH_TEXT ?? ''
+      // finance terms still present (bounded effect = re-order, not removal)
+      expect(query).toContain('финанс')
+      // ...but an it term ('айти') must appear before 'финанс'
+      const itIdx = query.toLowerCase().indexOf('айти')
+      const financeIdx = query.toLowerCase().indexOf('финанс')
+      expect(itIdx).toBeGreaterThanOrEqual(0)
+      expect(financeIdx).toBeGreaterThanOrEqual(0)
+      expect(itIdx).toBeLessThan(financeIdx)
+    })
+
+    it('does NOT demote when feedback is below the minimum sample (1 badfit)', async () => {
+      mockGetPool.mockReturnValue(
+        mockPool(
+          [{ roles: ['hr'], industries: ['it', 'finance'], excluded_industries: null, include_keywords: null, exclude_keywords: null, target_city: null }],
+          [{ feedback_status: 'badfit', industry: 'finance' }],
+        ),
+      )
+
+      let capturedEnv: Record<string, string> | undefined
+      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
+        capturedEnv = opts.env
+        callback(null, JSON.stringify({ source: 'hh', recordsReceived: 1, signalUpsertsCompleted: 1 }), '')
+      })
+
+      await ingestSource('hh')
+
+      // With only 1 badfit the minimum-sample gate fires: no demotion, so the
+      // natural composition order (it before finance) is unchanged — but more
+      // importantly finance is NOT artificially pushed back beyond it.
+      const query = (capturedEnv?.HH_SEARCH_TEXT ?? '').toLowerCase()
+      const itIdx = query.indexOf('айти')
+      const financeIdx = query.indexOf('финанс')
+      expect(itIdx).toBeLessThan(financeIdx) // same as no-feedback baseline
+    })
+
+    it('keeps feedback-tuned query inside the ICP (demoted terms still present)', async () => {
+      mockGetPool.mockReturnValue(
+        mockPool(
+          [{ roles: ['hr'], industries: ['finance'], excluded_industries: null, include_keywords: null, exclude_keywords: null, target_city: null }],
+          [
+            { feedback_status: 'badfit', industry: 'finance' },
+            { feedback_status: 'badfit', industry: 'finance' },
+            { feedback_status: 'badfit', industry: 'finance' },
+          ],
+        ),
+      )
+
+      let capturedEnv: Record<string, string> | undefined
+      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
+        capturedEnv = opts.env
+        callback(null, JSON.stringify({ source: 'hh', recordsReceived: 1, signalUpsertsCompleted: 1 }), '')
+      })
+
+      await ingestSource('hh')
+
+      // finance is the ONLY industry AND it is demoted — but bounded effect
+      // means the term is re-ordered, never removed, so the query is non-empty
+      // and still contains the finance term. The loop never starves the pool.
+      expect(capturedEnv?.HH_SEARCH_TEXT).toContain('финанс')
     })
   })
 
