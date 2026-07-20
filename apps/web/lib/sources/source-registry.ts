@@ -263,9 +263,14 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     // public GDELT global news/event database (no paid key). File mode
     // (FUNDING_BUSINESS_SIGNALS_INPUT_FILE) and provider mode
     // (FUNDING_SIGNALS_PROVIDER_API_URL + _TOKEN) are also supported.
+    // FUNDING_SIGNALS_GDELT_QUERIES is listed as a searchEnvVar so it is
+    // EXCLUDED from the caller env whitelist and instead derived per-profile
+    // from the active profiles' ICP (gdelt-query-builder) — same contract as
+    // the job-board search params. An operator can still pin it via
+    // user_search_preferences; the derived default only fills when unset.
     requiredEnvVars: [],
     envPrefixes: ['FUNDING_BUSINESS_SIGNALS_', 'FUNDING_SIGNALS_'],
-    searchEnvVars: [],
+    searchEnvVars: ['FUNDING_SIGNALS_GDELT_QUERIES'],
     // CONTEXT-only source (2026-07-15): signal_type 'funding' / 'funding_round'
     // does NOT originate a lead — per Gate D, context without direct hiring
     // proof is supporting context only, never a lead. The digest SQL filters

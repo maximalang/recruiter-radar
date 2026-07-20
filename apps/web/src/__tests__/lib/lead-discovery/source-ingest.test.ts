@@ -488,6 +488,98 @@ describe('source-ingest', () => {
     })
   })
 
+  describe('funding-business-signals GDELT (free live-public from profile ICP)', () => {
+    function mockPool(profiles: Array<Record<string, unknown>>) {
+      const query = jest.fn((sql: string) => {
+        if (sql.includes('user_search_preferences')) return Promise.resolve({ rows: [] })
+        if (sql.includes('excluded_industries') || sql.includes('include_keywords')) {
+          return Promise.resolve({ rows: profiles })
+        }
+        return Promise.resolve({ rows: [] })
+      })
+      return { query }
+    }
+
+    it('derives FUNDING_SIGNALS_GDELT_QUERIES from the union of active profiles industries', async () => {
+      mockGetPool.mockReturnValue(
+        mockPool([
+          { roles: ['hr'], industries: ['it', 'finance'], excluded_industries: null, include_keywords: null, exclude_keywords: null, target_city: null },
+        ]),
+      )
+
+      let capturedEnv: Record<string, string> | undefined
+      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
+        capturedEnv = opts.env
+        callback(null, JSON.stringify({ source: 'funding-business-signals', recordsReceived: 1, signalUpsertsCompleted: 1 }), '')
+      })
+
+      await ingestSource('funding-business-signals')
+
+      expect(capturedEnv?.FUNDING_SIGNALS_GDELT_QUERIES).toBeDefined()
+      const queries = (capturedEnv?.FUNDING_SIGNALS_GDELT_QUERIES ?? '').split('\n')
+      // at least one query combining an industry term with a context verb
+      expect(queries.length).toBeGreaterThan(0)
+      expect(queries.some(q => q.includes('финансирование') || q.includes('инвестиции'))).toBe(true)
+    })
+
+    it('lets an explicit operator DB pref override the profile-derived GDELT queries', async () => {
+      const mockPoolWithOverride = {
+        query: jest.fn((sql: string) => {
+          if (sql.includes('user_search_preferences')) {
+            return Promise.resolve({ rows: [{ params: { FUNDING_SIGNALS_GDELT_QUERIES: 'operator-pinned-query' } }] })
+          }
+          if (sql.includes('excluded_industries') || sql.includes('include_keywords')) {
+            return Promise.resolve({ rows: [{ roles: ['hr'], industries: ['it'], excluded_industries: null, include_keywords: null, exclude_keywords: null, target_city: null }] })
+          }
+          return Promise.resolve({ rows: [] })
+        }),
+      }
+      mockGetPool.mockReturnValue(mockPoolWithOverride)
+
+      let capturedEnv: Record<string, string> | undefined
+      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
+        capturedEnv = opts.env
+        callback(null, JSON.stringify({ source: 'funding-business-signals', recordsReceived: 1, signalUpsertsCompleted: 1 }), '')
+      })
+
+      await ingestSource('funding-business-signals')
+
+      expect(capturedEnv?.FUNDING_SIGNALS_GDELT_QUERIES).toBe('operator-pinned-query')
+    })
+
+    it('omits GDELT queries when no active profiles declare an industry', async () => {
+      mockGetPool.mockReturnValue(
+        mockPool([
+          { roles: ['hr'], industries: [], excluded_industries: null, include_keywords: null, exclude_keywords: null, target_city: null },
+        ]),
+      )
+
+      let capturedEnv: Record<string, string> | undefined
+      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
+        capturedEnv = opts.env
+        callback(null, JSON.stringify({ source: 'funding-business-signals', recordsReceived: 0, signalUpsertsCompleted: 0 }), '')
+      })
+
+      await ingestSource('funding-business-signals')
+
+      expect(capturedEnv?.FUNDING_SIGNALS_GDELT_QUERIES).toBeUndefined()
+    })
+
+    it('does NOT emit GDELT queries when no active profiles exist', async () => {
+      mockGetPool.mockReturnValue(mockPool([]))
+
+      let capturedEnv: Record<string, string> | undefined
+      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
+        capturedEnv = opts.env
+        callback(null, JSON.stringify({ source: 'funding-business-signals', recordsReceived: 0, signalUpsertsCompleted: 0 }), '')
+      })
+
+      await ingestSource('funding-business-signals')
+
+      expect(capturedEnv?.FUNDING_SIGNALS_GDELT_QUERIES).toBeUndefined()
+    })
+  })
+
   describe('ingestAllPrimarySources', () => {
     it('runs all primary sources in parallel', async () => {
       mockExecFile.mockImplementation((_cmd, args: any, opts: any, callback: any) => {

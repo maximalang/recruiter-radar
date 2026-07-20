@@ -41,6 +41,7 @@ import {
   industryDemoteTerms,
   type FeedbackPatternEvent,
 } from './query-feedback-tuning'
+import { buildProfileGdeltQueries } from './gdelt-query-builder'
 
 export type { SourceId } from '@/lib/sources/source-registry'
 
@@ -369,6 +370,41 @@ async function resolveHabrKeywordEnv(
 }
 
 /**
+ * Resolve the funding-business-signals GDELT query env from the union of all
+ * active client profiles' ICP.
+ *
+ * Precedence (matches the habr/job-board contract): an explicit operator
+ * override already present in `dbSearchEnv` (FUNDING_SIGNALS_GDELT_QUERIES
+ * pinned via user_search_preferences) or in process.env ALWAYS wins. Only when
+ * nobody pinned it do we derive GDELT queries from the profiles' industries and
+ * inject them as FUNDING_SIGNALS_GDELT_QUERIES (newline-joined, the shape
+ * parseGdeltQueries consumes). When the profile union yields no industries, we
+ * inject nothing and the source falls back to file/provider/no-input.
+ *
+ * This unlocks funding-business-signals' FREE live-public GDELT mode with zero
+ * manual ENV curation: the source runs live-public whenever at least one
+ * active profile declares an industry, no paid key needed. The source stays
+ * isPrimary:false (admin-triggered, not daily-cron) and context-only (Gate D).
+ */
+async function resolveFundingGdeltEnv(
+  dbSearchEnv: Record<string, string>
+): Promise<Record<string, string>> {
+  if (dbSearchEnv.FUNDING_SIGNALS_GDELT_QUERIES) return {}
+  if (process.env.FUNDING_SIGNALS_GDELT_QUERIES) return {}
+  if (process.env.FUNDING_SIGNALS_GDELT_QUERIES_JSON) return {}
+  if (process.env.FUNDING_BUSINESS_SIGNALS_INPUT_FILE) return {}
+  if (process.env.FUNDING_SIGNALS_PROVIDER_API_URL) return {}
+
+  const inputs = await loadActiveProfileSearchInputs()
+  if (inputs.length === 0) return {}
+  const unionInput = unionProfileSearchInputs(inputs)
+  const queries = buildProfileGdeltQueries(unionInput)
+  if (queries.length === 0) return {}
+
+  return { FUNDING_SIGNALS_GDELT_QUERIES: queries }
+}
+
+/**
  * Run a source ingestion script.
  *
  * Returns a promise that resolves when the script finishes.
@@ -401,14 +437,21 @@ export async function ingestSource(
   // roles (ingestion is global), unless an explicit keyword pref is set.
   const habrDerivedEnv =
     source === 'habr-career' ? await resolveHabrKeywordEnv(dbSearchEnv) : {}
+  // funding-business-signals: derive free live-public GDELT queries from the
+  // union of active profiles' industries, unless an operator pinned them.
+  const fundingDerivedEnv =
+    source === 'funding-business-signals' ? await resolveFundingGdeltEnv(dbSearchEnv) : {}
   // Generalised profile-derived search env for the other search-capable
-  // sources (hh, superjob, rabota-rossii). For habr-career the specialised
-  // resolver above already emits HABR_CAREER_KEYWORDS, so the generalised
-  // resolver is skipped to avoid double-deriving the same key. Operator
-  // overrides in dbSearchEnv always win (resolver strips already-pinned keys).
+  // sources (hh, superjob, rabota-rossii). For habr-career and
+  // funding-business-signals the specialised resolvers above already emit
+  // their keys, so the generalised resolver is skipped for them to avoid
+  // double-deriving. Operator overrides in dbSearchEnv always win (resolver
+  // strips already-pinned keys).
   const profileDerivedEnv =
-    source === 'habr-career' ? {} : await resolveProfileSearchEnv(source, dbSearchEnv)
-  const derivedSearchEnv = { ...profileDerivedEnv, ...habrDerivedEnv }
+    (source === 'habr-career' || source === 'funding-business-signals')
+      ? {}
+      : await resolveProfileSearchEnv(source, dbSearchEnv)
+  const derivedSearchEnv = { ...profileDerivedEnv, ...habrDerivedEnv, ...fundingDerivedEnv }
 
   return new Promise<IngestResult>((resolvePromise) => {
     // Filter env vars through whitelist — prevent injection of
