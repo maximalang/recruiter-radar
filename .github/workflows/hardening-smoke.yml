@@ -1,0 +1,41 @@
+name: Hardening smoke
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Apply migrations
+        env:
+          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+        run: node packages/db/scripts/migrate.mjs
+      - name: Run strongest available smoke chain
+        env:
+          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+        run: npm run verify:smoke
