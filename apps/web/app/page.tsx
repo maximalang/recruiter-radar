@@ -7,6 +7,7 @@ import {
   PUBLIC_PLANS,
   PUBLIC_PREVIEW_FIELD_LIMITS,
   buildCheckoutHref,
+  buildPublicPreviewHref,
   getPublicSampleDigestState,
   hasPublicPreviewInput,
   readPublicPreviewInput,
@@ -43,10 +44,15 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Recruiter Radar — ежедневный радар по нанимающим компаниям",
   description:
-    "Каждое утро — короткий список компаний с подтверждённым наймом: что меняется, почему сейчас и как выйти на них корректно. Доставка в Telegram. Для рекрутинговых агентств и BD-команд.",
+    "Каждое утро — короткий список компаний с подтверждённым наймом: что меняется, почему сейчас и как выйти на них корректно. Telegram-first доставка с дополнительными каналами. Для рекрутинговых агентств и BD-команд.",
 };
 
 const VISIBLE_PREVIEW_ITEMS = 2;
+const PREVIEW_PRESETS = [
+  { label: "Инженерный подбор · Москва", specialization: "инженерный подбор", targetCity: "Москва" },
+  { label: "IT-подбор · удалённо", specialization: "IT-подбор", targetCity: "удалённо" },
+  { label: "Коммерческие роли · Петербург", specialization: "коммерческие роли", targetCity: "Санкт-Петербург" },
+] as const;
 
 type HomePageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -103,17 +109,17 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                   <polyline points="13 6 19 12 13 18" />
                 </svg>
               </Link>
-              <a href="#preview" className={hpStyles.heroSecondaryCta}>Посмотреть демо</a>
+              <a href="#preview" className={hpStyles.heroSecondaryCta}>Настроить радар</a>
             </div>
             <p className={hpStyles.heroFootnote}>
-              {pilotPlan.price} за {pilotPlan.cadence} · без автопродления · доставка в Telegram
+              {pilotPlan.price} за {pilotPlan.cadence} · без автопродления · Telegram-first
             </p>
           </div>
 
           <div className={hpStyles.heroProduct} aria-label="Как Recruiter Radar оценивает компанию">
             <div className={hpStyles.heroProductTopbar}>
-              <span className={hpStyles.heroProductLabel}>Пример структуры сигнала</span>
-              <span className={hpStyles.heroProductLive}>демо</span>
+              <span className={hpStyles.heroProductLabel}>Так выглядит лид в радаре</span>
+              <span className={hpStyles.heroProductLive}>gate A</span>
             </div>
             <div className={hpStyles.heroCompanyRow}>
               <div>
@@ -214,12 +220,56 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           <article className={`${hpStyles.step} ${hpStyles.revealCard}`}>
             <span className={hpStyles.stepIndex}>03 · Результат</span>
             <h3>Получаете приоритеты</h3>
-            <p>3–7 компаний с причиной, доказательствами, контактом и следующим шагом — в Telegram.</p>
+            <p>3–7 компаний с причиной, доказательствами, контактом и следующим шагом — в подключённых каналах.</p>
           </article>
         </div>
+        <aside className={hpStyles.sourceArchitecture} aria-labelledby="source-architecture-title">
+          <div className={hpStyles.sourceArchitectureHeader}>
+            <div>
+              <span className={hpStyles.sourceArchitectureEyebrow}>Контур данных</span>
+              <h3 id="source-architecture-title">Каждый источник отвечает за свою часть доказательства</h3>
+            </div>
+            <p>Лид появляется не из списка площадок. Сначала радар находит сигнал найма, затем подтверждает компанию и только после добавляет контекст.</p>
+          </div>
+
+          <ol className={hpStyles.sourceLayers}>
+            <li className={hpStyles.sourceLayer} data-source-role="origin">
+              <div className={hpStyles.sourceLayerMeta}>
+                <span>01 · Создаёт сигнал</span>
+                <em>допущены</em>
+              </div>
+              <h4>Источники клиентской выдачи</h4>
+              <p><strong>hh.ru, Работа России и прямые карьерные страницы.</strong> Только они могут стать основанием для лида — после проверки уверенности.</p>
+            </li>
+            <li className={hpStyles.sourceLayer} data-source-role="verification">
+              <div className={hpStyles.sourceLayerMeta}>
+                <span>02 · Подтверждает</span>
+                <em>не создаёт лид</em>
+              </div>
+              <h4>Компания и путь контакта</h4>
+              <p><strong>Сайт компании и ЕГРЮЛ/ФНС</strong> уточняют юрлицо, домен и безопасный корпоративный канал. Отдельно лид не создают.</p>
+            </li>
+            <li className={hpStyles.sourceLayer} data-source-role="context">
+              <div className={hpStyles.sourceLayerMeta}>
+                <span>03 · Усиливает</span>
+                <em>только контекст</em>
+              </div>
+              <h4>Почему сейчас</h4>
+              <p><strong>Корпоративные события, официальные публикации и отраслевой контекст</strong> объясняют момент обращения, но не заменяют доказательство найма.</p>
+            </li>
+          </ol>
+
+          <details className={hpStyles.sourceGateDisclosure}>
+            <summary>
+              <span>Что пока не попадает в клиентскую выдачу</span>
+              <em>5 групп источников</em>
+            </summary>
+            <p>SuperJob, Хабр Карьера, страницы компаний LinkedIn, технологические и региональные доски вакансий остаются за контуром выдачи, пока не пройдут проверки уверенности, качества данных и правомерности доступа.</p>
+          </details>
+        </aside>
       </ScrollReveal>
 
-      {/* Evidence contract + Telegram delivery */}
+      {/* Evidence contract + enabled delivery channels */}
       <ScrollReveal as="section" id="quality" className={hpStyles.scrollSection}>
         <SectionIntro
           accent
@@ -251,7 +301,14 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               <span className={hpStyles.telegramMark} aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none"><path d="M20 4 3.8 10.3c-1.1.4-1.1 1.1-.2 1.4l4.1 1.3 1.6 4.8c.2.6.1.8.8.8.5 0 .8-.2 1-.4l2-1.9 4.2 3.1c.8.4 1.3.2 1.5-.7L21.5 5c.3-1-.4-1.4-1.5-1Z" fill="currentColor" /></svg>
               </span>
-              <div><strong>Recruiter Radar</strong><span>Telegram · 09:00</span></div>
+              <div><strong>Каналы доставки</strong><span>по расписанию профиля</span></div>
+            </div>
+            <div className={hpStyles.deliveryChannels} aria-label="Доступные каналы доставки">
+              <span data-primary="true">Telegram · основной</span>
+              <span>Email</span>
+              <span>Web push</span>
+              <span>VK</span>
+              <span>Webhook</span>
             </div>
             <div className={hpStyles.deliveryMessage}>
               <span className={hpStyles.deliveryKicker}>Утренний радар · 5 компаний</span>
@@ -261,7 +318,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                 <span>Беру в работу</span><span>Позже</span><span>Не подходит</span>
               </div>
             </div>
-            <p className={hpStyles.deliveryNote}>Вы решаете, кому писать. Радар учитывает обратную связь, но ничего не отправляет компаниям автоматически.</p>
+            <p className={hpStyles.deliveryNote}>Радар приходит только в подключённые каналы. Вы решаете, кому писать: продукт не отправляет сообщения компаниям автоматически.</p>
           </article>
         </div>
       </ScrollReveal>
@@ -425,16 +482,15 @@ export async function PreviewSection(props: {
   const previewState = await getPublicSampleDigestState(previewInput);
   const visiblePreviewItems = previewState.items.slice(0, VISIBLE_PREVIEW_ITEMS);
   const hiddenPreviewItems = previewState.items.slice(VISIBLE_PREVIEW_ITEMS);
+  const appliedProfile = [previewInput.specialization, previewInput.targetCity].filter(Boolean);
 
   return (
     <ScrollReveal as="section" id="preview" className={hpStyles.scrollSection}>
       <SectionIntro
         accent
-        eyebrow="Интерактивный пример"
+        eyebrow="Рабочий радар"
         title="Проверьте радар на своём профиле"
-        description={previewState.isLive
-          ? "Укажите специализацию и географию. Радар пересчитает приоритеты и покажет компании, которые подходят именно вашему агентству."
-          : "Укажите специализацию и географию, чтобы увидеть логику отбора. Ниже — демонстрационные карточки в формате реального утреннего радара."}
+        description="Укажите специализацию и географию. Радар пересчитает приоритеты и покажет, почему каждая компания поднялась в выдаче."
       />
 
       <div className={hpStyles.previewWorkspace}>
@@ -443,8 +499,18 @@ export async function PreviewSection(props: {
           padding="var(--preview-surface-padding)"
         >
           <div className={hpStyles.previewConfiguratorLead}>
-            <h3 className={hpStyles.previewCardHeading}>Настройте пример</h3>
-            <p>Двух полей достаточно, чтобы пересчитать соответствие компаний вашему профилю.</p>
+            <h3 className={hpStyles.previewCardHeading}>Соберите свою выдачу</h3>
+            <p>Двух полей достаточно для первого пересчёта. Можно начать с готового профиля.</p>
+            <div className={hpStyles.previewPresets} aria-label="Готовые профили радара">
+              {PREVIEW_PRESETS.map((preset) => (
+                <Link
+                  key={preset.label}
+                  href={buildPublicPreviewHref({ ...preset, dailyDigestLimit: previewInput.dailyDigestLimit })}
+                >
+                  {preset.label}
+                </Link>
+              ))}
+            </div>
           </div>
 
           <form method="GET" action="/#preview" className={hpStyles.previewForm}>
@@ -499,28 +565,30 @@ export async function PreviewSection(props: {
           padding="var(--preview-surface-padding)"
         >
           <div className={hpStyles.previewHeaderRow}>
-            <h3 className={hpStyles.previewCardHeading}>
-              {previewState.isLive
-                ? previewState.isPersonalized
-                  ? "Радар для вашего профиля"
-                  : "Пример утренней выдачи"
-                : "Пример выдачи"}
-            </h3>
+            <div>
+              <h3 className={hpStyles.previewCardHeading}>
+                {previewState.isPersonalized ? "Радар для вашего профиля" : "Утренняя выдача"}
+              </h3>
+              <span className={hpStyles.previewResultCount}>{formatCompaniesCount(previewState.items.length)} в текущей выдаче</span>
+            </div>
             <StatusBadge tone={previewState.isPersonalized ? "info" : "neutral"} style={{ justifySelf: "start" }}>
-              {previewState.isPersonalized
-                ? previewState.items.length > 0
-                  ? "по вашему профилю"
-                  : "пока без совпадений"
-                : previewState.isLive && previewState.items.length > 0
-                  ? "актуальные данные"
-                  : "демо"}
+              {previewState.isLive ? "актуальные данные" : "примерные данные"}
             </StatusBadge>
           </div>
 
           {!previewState.isLive ? (
             <div className={hpStyles.previewDemoNote}>
-              <strong>Демонстрационный радар</strong>
-              <span>Компании обезличены. Состав полей, шкала оценки и логика проверки соответствуют продукту.</span>
+              <strong>Обезличенный набор</strong>
+              <span>{previewState.isPersonalized
+                ? "Приоритеты и оценка соответствия реально пересчитаны по введённому профилю; названия компаний и факты — примерные данные."
+                : "Выберите профиль или заполните поля: порядок компаний и оценка соответствия изменятся по тем же правилам, что в live-выдаче."}</span>
+            </div>
+          ) : null}
+
+          {appliedProfile.length > 0 ? (
+            <div className={hpStyles.previewAppliedProfile} aria-label="Применённый профиль">
+              <span>Профиль</span>
+              {appliedProfile.map((value) => <strong key={value}>{value}</strong>)}
             </div>
           ) : null}
 
@@ -581,11 +649,9 @@ export async function PreviewSection(props: {
           )}
 
           <Link href={checkoutHref} className={ppStyles.primaryAction}>
-            {!previewState.isLive
-              ? "Получить актуальный радар"
-              : previewState.items.length > 0
-                ? "Получать такой радар каждое утро"
-                : "Попробовать неделю"}
+            {previewState.items.length > 0
+              ? "Получать такой радар каждое утро"
+              : "Попробовать неделю"}
           </Link>
         </SurfaceCard>
       </div>
@@ -606,7 +672,7 @@ export function PreviewSkeleton() {
     <ScrollReveal as="section" id="preview" className={hpStyles.scrollSection}>
       <SectionIntro
         accent
-        eyebrow="Интерактивный пример"
+        eyebrow="Рабочий радар"
         title="Проверьте радар на своём профиле"
         description="Укажите специализацию и географию — радар покажет компании, которые подходят именно вашему агентству."
       />
@@ -630,7 +696,7 @@ export function PreviewSkeleton() {
         >
           <div className={hpStyles.previewHeaderRow}>
             <h3 className={hpStyles.previewCardHeading}>Пример утренней выдачи</h3>
-            <StatusBadge tone="neutral" style={{ justifySelf: "start" }}>демо</StatusBadge>
+            <StatusBadge tone="neutral" style={{ justifySelf: "start" }}>загрузка данных</StatusBadge>
           </div>
           <div className={`${hpStyles.previewSkeletonBody} ${hpStyles.previewItemsGrid}`}>
             <span className={hpStyles.previewSkeletonCard} />
@@ -716,14 +782,6 @@ function PreviewDigestCard(props: {
           </div>
         </div>
 
-        <div className={hpStyles.previewLeadHeadline}>
-          <div>
-            <h4>{employerName}</h4>
-            {summaryMeta ? <p>{summaryMeta}</p> : null}
-          </div>
-          <span className={hpStyles.previewLeadScore}><strong>{points}</strong><span>/100</span></span>
-        </div>
-
         <div
           className={hpStyles.previewStrengthTrack}
           role="meter"
@@ -781,6 +839,18 @@ function LeadMeter(props: { label: string; value: number; valueLabel: string }) 
   );
 }
 
+function formatCompaniesCount(count: number): string {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  const noun = mod10 === 1 && mod100 !== 11
+    ? "компания"
+    : mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)
+      ? "компании"
+      : "компаний";
+
+  return `${count} ${noun}`;
+}
+
 /** Russian plural for "источник" by count — 1 / 2–4 / 5+. */
 function pluralSources(count: number): string {
   const mod10 = count % 10;
@@ -795,7 +865,7 @@ function pluralSources(count: number): string {
  * lib/scoring/gates) to a short Russian label for the public lead card. Returns
  * null for an absent/unknown gate so the caller hides the row instead of
  * showing a raw letter or an English bucket. Mirrors the "Уверенность" copy in
- * the hero "Пример структуры сигнала" card so a real lead and the demo agree.
+ * the hero lead-format card so the public preview and product explanation agree.
  */
 function gateLabel(gate: string | null | undefined): string | null {
   switch (gate) {

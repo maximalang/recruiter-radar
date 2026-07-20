@@ -197,7 +197,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1.04fr) minmax(340px, 0.96fr);
   gap: clamp(36px, 6vw, 76px);
-  align-items: center;
+  align-items: stretch;
   width: 100%;
 }
 
@@ -207,6 +207,7 @@
   min-width: 0;
   width: 100%;
   justify-items: start;
+  align-content: center;
   gap: 22px;
   text-align: left;
 }
@@ -319,6 +320,7 @@
 
 .heroProduct {
   display: grid;
+  align-content: center;
   min-width: 0;
   gap: 22px;
   padding: 26px;
@@ -689,7 +691,215 @@
   line-height: 1.58;
 }
 
-/* ── Evidence contract + Telegram delivery ── */
+.sourceArchitecture {
+  margin-top: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(20, 40, 72, 0.13);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 94% 6%, rgba(55, 105, 220, 0.08), transparent 31%),
+    rgba(255, 255, 255, 0.9);
+  box-shadow: 0 20px 52px rgba(20, 39, 74, 0.07);
+}
+
+.sourceArchitectureHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(300px, 0.92fr);
+  gap: clamp(24px, 4vw, 64px);
+  align-items: end;
+  padding: clamp(26px, 3.2vw, 38px);
+}
+
+.sourceArchitectureHeader > div {
+  display: grid;
+  gap: 10px;
+}
+
+.sourceArchitectureEyebrow {
+  color: var(--c-brand);
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.sourceArchitectureHeader h3 {
+  max-width: 22ch;
+  margin: 0;
+  color: var(--c-text-primary);
+  font-size: clamp(1.35rem, 2.25vw, 2rem);
+  line-height: 1.12;
+  letter-spacing: -0.035em;
+}
+
+.sourceArchitectureHeader > p {
+  max-width: 54ch;
+  margin: 0;
+  color: var(--c-text-secondary);
+  font-size: 0.92rem;
+  line-height: 1.65;
+}
+
+.sourceLayers {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--c-border);
+  border-bottom: 1px solid var(--c-border);
+  list-style: none;
+}
+
+.sourceLayer {
+  position: relative;
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  min-width: 0;
+  padding: 26px clamp(22px, 2.4vw, 30px) 28px;
+}
+
+.sourceLayer::before {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: var(--c-brand);
+  content: "";
+  opacity: 0.72;
+}
+
+.sourceLayer[data-source-role="verification"]::before {
+  background: #70809a;
+  opacity: 0.5;
+}
+
+.sourceLayer[data-source-role="context"]::before {
+  background: #b07a38;
+  opacity: 0.48;
+}
+
+.sourceLayer + .sourceLayer {
+  border-left: 1px solid var(--c-border);
+}
+
+.sourceLayerMeta {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sourceLayerMeta span {
+  color: var(--c-text-muted);
+  font-size: 0.67rem;
+  font-weight: 900;
+  letter-spacing: 0.075em;
+  text-transform: uppercase;
+}
+
+.sourceLayerMeta em {
+  color: var(--c-text-secondary);
+  font-size: 0.65rem;
+  font-style: normal;
+  font-weight: 750;
+  letter-spacing: 0.035em;
+  white-space: nowrap;
+}
+
+.sourceLayer h4 {
+  margin: 2px 0 0;
+  color: var(--c-text-primary);
+  font-size: 1rem;
+  line-height: 1.3;
+  letter-spacing: -0.012em;
+}
+
+.sourceLayer p {
+  margin: 0;
+  color: var(--c-text-secondary);
+  font-size: 0.84rem;
+  line-height: 1.62;
+}
+
+.sourceLayer p strong {
+  color: var(--c-text-primary);
+  font-weight: 750;
+}
+
+.sourceGateDisclosure {
+  color: var(--c-text-secondary);
+}
+
+.sourceGateDisclosure summary {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 58px;
+  padding: 0 clamp(22px, 3.2vw, 38px);
+  cursor: pointer;
+  list-style: none;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.sourceGateDisclosure summary::-webkit-details-marker {
+  display: none;
+}
+
+.sourceGateDisclosure summary:hover {
+  color: var(--c-text-primary);
+  background: rgba(235, 241, 250, 0.62);
+}
+
+.sourceGateDisclosure summary:focus-visible {
+  outline: 2px solid var(--c-brand);
+  outline-offset: -3px;
+}
+
+.sourceGateDisclosure summary span {
+  position: relative;
+  padding-right: 22px;
+  color: inherit;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.sourceGateDisclosure summary span::after {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  content: "";
+  transform: translateY(-70%) rotate(45deg);
+  transition: transform 160ms ease;
+}
+
+.sourceGateDisclosure[open] summary span::after {
+  transform: translateY(-30%) rotate(225deg);
+}
+
+.sourceGateDisclosure summary em {
+  color: var(--c-text-muted);
+  font-size: 0.7rem;
+  font-style: normal;
+  font-weight: 750;
+  letter-spacing: 0.045em;
+  white-space: nowrap;
+}
+
+.sourceGateDisclosure > p {
+  max-width: 92ch;
+  margin: 0;
+  padding: 0 clamp(22px, 3.2vw, 38px) 24px;
+  color: var(--c-text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.62;
+}
+
+/* ── Evidence contract + enabled delivery channels ── */
 .qualityGrid {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
@@ -836,7 +1046,7 @@
 
 .deliveryCard {
   display: grid;
-  grid-template-rows: auto auto 1fr;
+  grid-template-rows: auto auto auto 1fr;
   align-content: start;
   gap: 18px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(244, 248, 254, 0.96));
@@ -876,6 +1086,28 @@
 .deliveryTopbar span {
   color: var(--c-text-tertiary);
   font-size: 0.74rem;
+}
+
+.deliveryChannels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.deliveryChannels span {
+  padding: 6px 9px;
+  border: 1px solid rgba(71, 85, 105, 0.14);
+  border-radius: 999px;
+  color: var(--c-text-secondary);
+  background: rgba(255, 255, 255, 0.78);
+  font-size: 0.68rem;
+  font-weight: 760;
+}
+
+.deliveryChannels span[data-primary="true"] {
+  border-color: rgba(37, 99, 235, 0.2);
+  color: #2457c5;
+  background: rgba(37, 99, 235, 0.07);
 }
 
 .deliveryMessage {
@@ -959,6 +1191,32 @@
   color: var(--c-text-secondary);
   font-size: 0.8rem;
   line-height: 1.5;
+}
+
+.previewPresets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 4px;
+}
+
+.previewPresets a {
+  padding: 6px 9px;
+  border: 1px solid rgba(37, 99, 235, 0.14);
+  border-radius: 999px;
+  color: #2857b8;
+  background: rgba(37, 99, 235, 0.045);
+  font-size: 0.68rem;
+  font-weight: 720;
+  line-height: 1.25;
+  text-decoration: none;
+  transition: border-color 0.16s ease, background 0.16s ease;
+}
+
+.previewPresets a:hover,
+.previewPresets a:focus-visible {
+  border-color: rgba(37, 99, 235, 0.3);
+  background: rgba(37, 99, 235, 0.09);
 }
 
 .previewForm {
@@ -1131,6 +1389,43 @@
   align-items: center;
 }
 
+.previewHeaderRow > div {
+  display: grid;
+  gap: 4px;
+}
+
+.previewResultCount {
+  color: var(--c-text-muted);
+  font-size: 0.72rem;
+}
+
+.previewAppliedProfile {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 10px 12px;
+  border: 1px solid rgba(37, 99, 235, 0.12);
+  border-radius: 12px;
+  background: rgba(239, 246, 255, 0.72);
+}
+
+.previewAppliedProfile > span {
+  color: var(--c-text-muted);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.previewAppliedProfile strong {
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: #244fa6;
+  background: rgba(37, 99, 235, 0.08);
+  font-size: 0.68rem;
+}
+
 
 /* Lead list — one featured recommendation stays open while the remaining
    companies remain compact and scannable. The dark product surface mirrors
@@ -1203,8 +1498,7 @@
   line-height: 1.45;
 }
 
-.previewLeadSummaryScore,
-.previewLeadScore {
+.previewLeadSummaryScore {
   display: inline-flex;
   align-items: baseline;
   justify-content: flex-end;
@@ -1225,8 +1519,7 @@
   font-size: 1rem;
 }
 
-.previewLeadSummaryScore span,
-.previewLeadScore span {
+.previewLeadSummaryScore span {
   color: #9cabc0;
   font-size: 0.65rem;
 }
@@ -1252,7 +1545,6 @@
 }
 
 .previewLeadRecommendationRow,
-.previewLeadHeadline,
 .previewLeadNextStep {
   display: flex;
   align-items: flex-start;
@@ -1303,32 +1595,6 @@
 .previewLeadChips span[data-gate="C"] {
   border-color: rgba(251, 191, 36, 0.32);
   color: #fde68a;
-}
-
-.previewLeadHeadline {
-  align-items: end;
-}
-
-.previewLeadHeadline h4 {
-  margin: 0;
-  color: #ffffff;
-  font-size: clamp(1.08rem, 2vw, 1.35rem);
-  line-height: 1.2;
-  letter-spacing: -0.025em;
-}
-
-.previewLeadHeadline p {
-  margin: 5px 0 0;
-  color: #9cabc0;
-  font-size: 0.78rem;
-  line-height: 1.4;
-}
-
-.previewLeadScore strong {
-  color: #ffffff;
-  font-size: 1.85rem;
-  line-height: 1;
-  letter-spacing: -0.05em;
 }
 
 .previewLeadBody .previewStrengthTrack {
@@ -1869,6 +2135,20 @@
     border-bottom: 0;
   }
 
+  .sourceArchitectureHeader {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .sourceLayers {
+    grid-template-columns: 1fr;
+  }
+
+  .sourceLayer + .sourceLayer {
+    border-top: 1px solid var(--c-border);
+    border-left: 0;
+  }
+
 }
 
 @media (max-width: 820px) {
@@ -1918,6 +2198,32 @@
 
   .problemRow {
     gap: 14px;
+  }
+
+  .sourceArchitecture {
+    border-radius: 16px;
+  }
+
+  .sourceArchitectureHeader,
+  .sourceLayer {
+    padding: 22px 18px;
+  }
+
+  .sourceLayerMeta {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .sourceGateDisclosure summary {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+    padding: 15px 18px;
+  }
+
+  .sourceGateDisclosure > p {
+    padding: 0 18px 20px;
   }
 
   .previewWorkspace {
@@ -2077,7 +2383,6 @@
   }
 
   .previewLeadRecommendationRow,
-  .previewLeadHeadline,
   .previewLeadNextStep {
     align-items: flex-start;
     flex-direction: column;
@@ -2086,10 +2391,6 @@
 
   .previewLeadChips {
     justify-content: flex-start;
-  }
-
-  .previewLeadScore {
-    align-self: flex-start;
   }
 
   .previewLeadEvidence,

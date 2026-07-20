@@ -33,7 +33,7 @@ export type PublicPlan = {
 const SHARED_PLAN_BULLETS: string[] = [
   "ежедневный радар с подтверждённым наймом по каждой компании",
   "профиль поиска под вашу нишу и географию",
-  "подключение Telegram за пару минут",
+  "Telegram-first доставка; при необходимости — email, web push, VK или webhook",
   "оценка уверенности и понятное «почему сейчас» по каждому лиду",
   "доказательства найма и безопасный путь контакта",
   "обратная связь по компаниям — и всё меньше нерелевантных в радаре",
@@ -73,6 +73,9 @@ export type PublicPreviewItem = HhDigestItem & {
 
 function buildPublicDemoDigestItems(referenceDate = new Date()): HhDigestItem[] {
   const previousDay = new Date(referenceDate.getTime() - 24 * 60 * 60 * 1000)
+  const twoDaysAgo = new Date(referenceDate.getTime() - 2 * 24 * 60 * 60 * 1000)
+  const threeDaysAgo = new Date(referenceDate.getTime() - 3 * 24 * 60 * 60 * 1000)
+  const fourDaysAgo = new Date(referenceDate.getTime() - 4 * 24 * 60 * 60 * 1000)
 
   return [
     {
@@ -85,7 +88,7 @@ function buildPublicDemoDigestItems(referenceDate = new Date()): HhDigestItem[] 
       latest_published_at: referenceDate.toISOString(),
       total_score: 348,
       reasons: [
-        "14 новых вакансий за 6 дней",
+        "Инженерный подбор: 14 новых вакансий за 6 дней",
         "Появилась редкая инженерная роль",
       ],
       opener: "Предложить точечный подбор по инженерным ролям",
@@ -113,6 +116,66 @@ function buildPublicDemoDigestItems(referenceDate = new Date()): HhDigestItem[] 
       evidence_titles: ["Руководитель отдела продаж", "Менеджер по развитию"],
       candidate_source_keys: ["demo:career:b2b", "demo:egrul:b2b"],
       location_names: ["Санкт-Петербург"],
+      confidence_gate: "B",
+    },
+    {
+      rank: 3,
+      org_id: "demo-tech-product",
+      hh_employer_id: "demo-tech-product",
+      employer_name: "Продуктовая IT-компания",
+      vacancies_count: 11,
+      distinct_vacancy_names_count: 7,
+      latest_published_at: twoDaysAgo.toISOString(),
+      total_score: 328,
+      reasons: [
+        "IT-подбор: за неделю открыты роли в backend и инфраструктуре",
+        "Команда выходит на удалённый найм по России",
+      ],
+      opener: "Предложить точечный поиск backend- и DevOps-специалистов",
+      source_families: ["career-pages", "hh", "company-site"],
+      evidence_titles: ["Backend-разработчик", "DevOps-инженер", "Product analyst"],
+      candidate_source_keys: ["demo:career:tech", "demo:hh:tech", "demo:site:tech"],
+      location_names: ["Удалённо · Россия"],
+      confidence_gate: "A",
+    },
+    {
+      rank: 4,
+      org_id: "demo-retail-regional",
+      hh_employer_id: "demo-retail-regional",
+      employer_name: "Региональная розничная сеть",
+      vacancies_count: 18,
+      distinct_vacancy_names_count: 8,
+      latest_published_at: threeDaysAgo.toISOString(),
+      total_score: 296,
+      reasons: [
+        "Массовый подбор: сеть открывает новые точки",
+        "Повторно опубликованы операционные роли",
+      ],
+      opener: "Уточнить график открытий и предложить региональную проектную команду",
+      source_families: ["rabota-rossii", "career-pages", "egrul-fns"],
+      evidence_titles: ["Директор магазина", "Специалист по подбору персонала"],
+      candidate_source_keys: ["demo:rr:retail", "demo:career:retail", "demo:egrul:retail"],
+      location_names: ["Казань и Татарстан"],
+      confidence_gate: "B",
+    },
+    {
+      rank: 5,
+      org_id: "demo-pharma",
+      hh_employer_id: "demo-pharma",
+      employer_name: "Фармацевтическая компания",
+      vacancies_count: 7,
+      distinct_vacancy_names_count: 5,
+      latest_published_at: fourDaysAgo.toISOString(),
+      total_score: 284,
+      reasons: [
+        "Фармацевтический подбор: усиливается контроль качества",
+        "Открыта редкая регуляторная роль",
+      ],
+      opener: "Предложить карту кандидатов по качеству и регуляторным функциям",
+      source_families: ["hh", "career-pages", "egrul-fns"],
+      evidence_titles: ["Менеджер по качеству", "Специалист по регистрации"],
+      candidate_source_keys: ["demo:hh:pharma", "demo:career:pharma", "demo:egrul:pharma"],
+      location_names: ["Новосибирск"],
       confidence_gate: "B",
     },
   ]
@@ -248,14 +311,28 @@ type PublicSampleDigestState = {
   items: PublicPreviewItem[]
 }
 
-function buildPublicDemoDigestState(): PublicSampleDigestState {
+function buildPublicDemoDigestState(input: PublicPreviewInput): PublicSampleDigestState {
+  const items = buildPublicDemoDigestItems()
+  const isPersonalized = hasPublicPreviewInput(input)
+
+  if (!isPersonalized) {
+    return {
+      isLive: false,
+      isPersonalized: false,
+      hasExactMatches: true,
+      items: items.map((item) => toPublicPreviewItem(item, defaultRelevanceSignals())),
+    }
+  }
+
+  const { ranked, hasExactMatches } = rankPreviewItems(items, input, {
+    limit: input.dailyDigestLimit,
+  })
+
   return {
     isLive: false,
-    isPersonalized: false,
-    hasExactMatches: true,
-    items: buildPublicDemoDigestItems().map((item) => (
-      toPublicPreviewItem(item, defaultRelevanceSignals())
-    )),
+    isPersonalized: true,
+    hasExactMatches,
+    items: ranked.map((entry) => toPublicPreviewItem(entry.item, entry.relevance.signals)),
   }
 }
 
@@ -266,13 +343,13 @@ export async function getPublicSampleDigestState(input: PublicPreviewInput): Pro
   try {
     items = await getHhDigestItems()
   } catch {
-    console.info("Public preview data unavailable; serving static demo fallback")
-    return buildPublicDemoDigestState()
+    console.info("Public preview data unavailable; serving interactive sample fallback")
+    return buildPublicDemoDigestState(input)
   }
 
   if (items.length === 0) {
-    console.info("Public preview has no eligible items; serving static demo fallback")
-    return buildPublicDemoDigestState()
+    console.info("Public preview has no eligible items; serving interactive sample fallback")
+    return buildPublicDemoDigestState(input)
   }
 
   if (!isPersonalized) {

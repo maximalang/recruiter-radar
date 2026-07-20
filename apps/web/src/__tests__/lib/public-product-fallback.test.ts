@@ -72,9 +72,9 @@ describe("public preview resilience", () => {
       expect.arrayContaining(["hh", "career-pages"]),
     );
     expect(state.items[0].lawfulContactPath).toBe("career-page");
-    expect(state.items.map((item) => formatScorePoints(item.total_score))).toEqual(["87", "78"]);
+    expect(state.items.map((item) => formatScorePoints(item.total_score)).slice(0, 2)).toEqual(["87", "78"]);
     expect(reportFallback).toHaveBeenCalledWith(
-      "Public preview data unavailable; serving static demo fallback",
+      "Public preview data unavailable; serving interactive sample fallback",
     );
 
     reportFallback.mockRestore();
@@ -91,7 +91,7 @@ describe("public preview resilience", () => {
     expect(state.items.length).toBeGreaterThan(0);
     expect(state.items.every((item) => item.org_id.startsWith("demo-"))).toBe(true);
     expect(reportFallback).toHaveBeenCalledWith(
-      "Public preview has no eligible items; serving static demo fallback",
+      "Public preview has no eligible items; serving interactive sample fallback",
     );
 
     reportFallback.mockRestore();
@@ -111,7 +111,7 @@ describe("public preview resilience", () => {
     jest.useRealTimers();
   });
 
-  it("does not claim demo results were personalized to submitted filters", async () => {
+  it("re-ranks the resilient sample by submitted profile instead of serving static cards", async () => {
     const reportFallback = jest.spyOn(console, "info").mockImplementation(() => undefined);
     mockGetHhDigestItems.mockRejectedValueOnce(new Error("database unavailable"));
 
@@ -121,7 +121,10 @@ describe("public preview resilience", () => {
     }));
 
     expect(state.isLive).toBe(false);
-    expect(state.isPersonalized).toBe(false);
+    expect(state.isPersonalized).toBe(true);
+    expect(state.hasExactMatches).toBe(true);
+    expect(state.items[0].org_id).toBe("demo-industrial");
+    expect(state.items[0].relevanceSignals.fit).toBeGreaterThan(0);
 
     reportFallback.mockRestore();
   });

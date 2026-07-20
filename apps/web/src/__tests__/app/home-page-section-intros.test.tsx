@@ -67,7 +67,7 @@ describe("landing section hierarchy", () => {
     // the whole render — see page.tsx). HomePage's static tree no longer
     // contains the preview's children, so we render both halves and combine:
     // HomePage renders Проблема / Как работает / Проверка сигнала / Тарифы /
-    // FAQ (5 SectionIntros), PreviewSection renders Интерактивный пример
+    // FAQ (5 SectionIntros), PreviewSection renders Рабочий радар
     // (1) — six total. The duplicate "Что внутри" block must not return.
     const page = await HomePage({ searchParams: Promise.resolve({}) });
     const preview = await PreviewSection({
@@ -88,7 +88,7 @@ describe("landing section hierarchy", () => {
       "Проверка сигнала",
       "Тарифы",
       "FAQ",
-      "Интерактивный пример",
+      "Рабочий радар",
     ]);
   });
 
@@ -109,10 +109,10 @@ describe("landing section hierarchy", () => {
     expect(pageText).not.toContain("Один радар — на неделю, месяц или квартал");
   });
 
-  it("labels the resilient fallback as demo instead of personalized live data", async () => {
+  it("labels the resilient fallback as a personalized sample instead of live data", async () => {
     mockGetPublicSampleDigestState.mockResolvedValueOnce({
       isLive: false,
-      isPersonalized: false,
+      isPersonalized: true,
       hasExactMatches: true,
       items: [],
     });
@@ -125,17 +125,39 @@ describe("landing section hierarchy", () => {
     });
     const previewText = readVisibleText(preview);
     const previewIntro = collectElements(preview, SectionIntro)
-      .find((section) => section.props.eyebrow === "Интерактивный пример");
+      .find((section) => section.props.eyebrow === "Рабочий радар");
 
     expect(previewIntro?.props.title).toBe("Проверьте радар на своём профиле");
-    expect(previewText).toContain("Демонстрационный радар");
-    expect(previewText).not.toContain("Радар для вашего профиля");
+    expect(previewText).toContain("Обезличенный набор");
+    expect(previewText).toContain("Радар для вашего профиля");
+    expect(previewText).toContain("примерные данные");
     expect(previewText).not.toContain("временно недоступна");
     expect(previewText).not.toContain("восстановления источника");
-    expect(previewText).toContain("Получить актуальный радар");
+    expect(previewText).toContain("Попробовать неделю");
     expect(previewIntro?.props.description).toBe(
-      "Укажите специализацию и географию, чтобы увидеть логику отбора. Ниже — демонстрационные карточки в формате реального утреннего радара.",
+      "Укажите специализацию и географию. Радар пересчитает приоритеты и покажет, почему каждая компания поднялась в выдаче.",
     );
+  });
+
+  it("explains the role and delivery status of every source group", async () => {
+    const page = await HomePage({ searchParams: Promise.resolve({}) });
+    const pageText = readVisibleText(page);
+
+    expect(pageText).toContain("Каждый источник отвечает за свою часть доказательства");
+    expect(pageText).toContain("Источники клиентской выдачи");
+    expect(pageText).toContain("hh.ru, Работа России и прямые карьерные страницы");
+    expect(pageText).toContain("Компания и путь контакта");
+    expect(pageText).toContain("Сайт компании и ЕГРЮЛ/ФНС");
+    expect(pageText).toContain("Почему сейчас");
+    expect(pageText).toContain("Корпоративные события, официальные публикации и отраслевой контекст");
+    expect(pageText).toContain("Что пока не попадает в клиентскую выдачу");
+    expect(pageText).toContain("SuperJob, Хабр Карьера, страницы компаний LinkedIn");
+    expect(pageText).toContain("проверки уверенности, качества данных и правомерности доступа");
+    expect(pageText).toContain("Telegram · основной");
+    expect(pageText).toContain("Email");
+    expect(pageText).toContain("Web push");
+    expect(pageText).toContain("VK");
+    expect(pageText).toContain("Webhook");
   });
 
   it("keeps filter submit and reset actions anchored to the preview", async () => {
