@@ -132,20 +132,49 @@ jobs:
           fi
           SSH_EOF
 
-      - name: Verify public HTTPS endpoint and embedded favicon
+      - name: Verify public HTTPS endpoint, brand layout, and embedded favicon
         run: |
           code=000
           for i in $(seq 1 10); do
             code=$(curl -s -o /dev/null -w '%{http_code}' https://recruiter-radar.ru/api/health --max-time 30)
             echo "Public /api/health attempt $i -> HTTP $code"
             if [ "$code" = "200" ]; then
+              landing_ok=false
+              brand_layout_ok=false
+              favicon_ok=false
+
               landing_html=$(curl -fsS https://recruiter-radar.ru/ --max-time 30 || true)
-              if printf '%s' "$landing_html" | grep -q "Компания и контакты" \
-                && printf '%s' "$landing_html" | grep -q 'data-mark="true"' \
-                && printf '%s' "$landing_html" | grep -q 'data-logo-mark="inline"' \
-                && printf '%s' "$landing_html" \
-                  | grep -q 'rel="icon"[^>]*href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAM'; then
-                echo "Public endpoint, inline logo, and embedded favicon are live"
+              # Anchor the "landing rendered" check on the hero subtitle copy
+              # ("Каждое утро Recruiter Radar отбирает …"), NOT on an internal lead-card
+              # label. The previous anchor ("Компания и контакты") was a card label
+              # that drifted out when lead cards became expandable <details>; a
+              # user-visible hero line is stable across card restructuring and
+              # proves the page actually rendered its primary content.
+              if printf '%s' "$landing_html" | grep -q "Каждое утро Recruiter Radar отбирает 3–7 компаний"; then
+                landing_ok=true
+              fi
+
+              # Count only the real footer <img> mark — not the Next.js
+              # <link rel="preload"> hint or the RSC flight-data serializations,
+              # which also embed the asset path and would inflate a bare-string
+              # grep to 4 hits on a page with exactly one visible mark.
+              footer_mark_count=$(printf '%s' "$landing_html" \
+                | grep -oE '<img[^>]*recruiter-radar-mark-brand15\.svg[^>]*>' \
+                | wc -l || true)
+              if printf '%s' "$landing_html" | grep -q 'data-mark="false"' \
+                && ! printf '%s' "$landing_html" | grep -q 'data-logo-mark="inline"' \
+                && [ "$footer_mark_count" = "1" ]; then
+                brand_layout_ok=true
+              fi
+
+              if printf '%s' "$landing_html" \
+                | grep -q 'rel="icon"[^>]*href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAM'; then
+                favicon_ok=true
+              fi
+
+              echo "landing_ok=$landing_ok brand_layout_ok=$brand_layout_ok favicon_ok=$favicon_ok"
+              if [ "$landing_ok" = "true" ] && [ "$brand_layout_ok" = "true" ] && [ "$favicon_ok" = "true" ]; then
+                echo "Public endpoint, text-only header wordmark, single footer mark, and embedded favicon are live"
                 exit 0
               fi
             fi

@@ -3,15 +3,15 @@ import { render } from '@testing-library/react';
 import { TopNav } from '@/app/ui/internal-page';
 
 describe('TopNav brand wordmark', () => {
-  it('renders the Recruiter Radar wordmark with an inline graphic logo', () => {
+  it('renders the Recruiter Radar wordmark without a graphic logo', () => {
     const { container } = render(<TopNav items={[]} />);
     const brand = container.querySelector('a.topNavBrand');
     const logo = brand?.querySelector('[role="img"][aria-label="Recruiter Radar"]');
 
     expect(logo).not.toBeNull();
     expect(logo?.querySelector('img')).toBeNull();
-    expect(logo?.querySelector('svg[data-logo-mark="inline"]')).not.toBeNull();
-    expect(logo).toHaveAttribute('data-mark', 'true');
+    expect(logo?.querySelector('svg')).toBeNull();
+    expect(logo).toHaveAttribute('data-mark', 'false');
     expect(logo?.textContent ?? '').toContain('Recruiter');
     expect(logo?.textContent ?? '').toContain('Radar');
   });

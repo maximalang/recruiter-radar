@@ -1,14 +1,17 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 import { getPaymentProviderSetupState } from "../lib/payments";
 import {
   PUBLIC_PLANS,
   PUBLIC_PREVIEW_FIELD_LIMITS,
   buildCheckoutHref,
+  buildPublicPreviewHref,
   getPublicSampleDigestState,
   hasPublicPreviewInput,
-  readPublicPreviewInput
+  readPublicPreviewInput,
+  type PublicPreviewInput,
 } from "../lib/publicProduct";
 import { formatScorePoints, scorePercent, scoreTone } from "../lib/scoring/score-display";
 import { formatLawfulContactPath, deriveWhyNow } from "../lib/leads-data";
@@ -22,17 +25,14 @@ import {
 } from "./ui/page-primitives";
 import ppStyles from "./ui/page-primitives.module.css";
 import {
+  buildPreviewEvidenceItems,
   buildFaqItems,
   cleanEmployerName,
   formatLocationCaption,
+  formatVacancyFreshness,
   pickEvidenceTitles,
 } from "./home-page-components";
 import hpStyles from "./home-page-components.module.css";
-import {
-  CheckIcon,
-  ShieldIcon,
-  MailIcon,
-} from "./ui/icons";
 import LandingHeader from "./landing-header";
 import RadarCanvas from "./radar-canvas";
 import ScrollReveal from "./scroll-reveal";
@@ -44,10 +44,15 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Recruiter Radar — ежедневный радар по нанимающим компаниям",
   description:
-    "Каждое утро — короткий список компаний с подтверждённым наймом: что меняется, почему сейчас и как выйти на них корректно. Доставка в Telegram. Для рекрутинговых агентств и BD-команд.",
+    "Каждое утро — короткий список компаний с подтверждённым наймом: что меняется, почему сейчас и как выйти на них корректно. Telegram-first доставка с дополнительными каналами. Для рекрутинговых агентств и BD-команд.",
 };
 
 const VISIBLE_PREVIEW_ITEMS = 2;
+const PREVIEW_PRESETS = [
+  { label: "Инженерный подбор · Москва", specialization: "инженерный подбор", targetCity: "Москва" },
+  { label: "IT-подбор · удалённо", specialization: "IT-подбор", targetCity: "удалённо" },
+  { label: "Коммерческие роли · Петербург", specialization: "коммерческие роли", targetCity: "Санкт-Петербург" },
+] as const;
 
 type HomePageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -55,34 +60,21 @@ type HomePageProps = {
 
 type HomePreviewItem = Awaited<ReturnType<typeof getPublicSampleDigestState>>["items"][number];
 
-const principles = [
-  {
-    icon: CheckIcon,
-    title: "Сигнал, а не список вакансий",
-    text: "Радар выделяет изменение: новый найм, рост команды или редкую для компании роль — и показывает, когда это произошло.",
-  },
-  {
-    icon: ShieldIcon,
-    title: "Доказательства можно проверить",
-    text: "У каждого вывода есть источники, дата и уровень уверенности. Вы видите основание рекомендации до первого касания.",
-  },
-  {
-    icon: MailIcon,
-    title: "Следующий шаг уже понятен",
-    text: "В карточке есть деловой повод и корректный корпоративный путь контакта — без личных адресов и массовой рассылки.",
-  },
-] as const;
-
 export default async function HomePage({ searchParams }: HomePageProps) {
   const resolvedSearchParams = (await searchParams) ?? {};
+  // Pure search-param parse only — no DB. This keeps `previewInput` available
+  // for the pricing cards + closing CTA (which read it synchronously) while the
+  // actual digest DB query lives behind a <Suspense> boundary in <PreviewSection>
+  // below. The home page is `force-dynamic`, so without the boundary the whole
+  // server render blocked on getPublicSampleDigestState (a Postgres query) and
+  // first-contentful-paint sat at ~2.5s — the "half the landing doesn't load"
+  // symptom. Now hero + problem + how-it-works + quality + pricing + FAQ
+  // paint immediately and the live preview streams in.
   const previewInput = readPublicPreviewInput(resolvedSearchParams);
-  const previewState = await getPublicSampleDigestState(previewInput);
   const hasPreview = hasPublicPreviewInput(previewInput);
   const checkoutHref = buildCheckoutHref(previewInput);
   const paymentSetup = getPaymentProviderSetupState();
   const faqItems = buildFaqItems(paymentSetup.configured);
-  const visiblePreviewItems = previewState.items.slice(0, VISIBLE_PREVIEW_ITEMS);
-  const hiddenPreviewItems = previewState.items.slice(VISIBLE_PREVIEW_ITEMS);
   const pilotPlan = PUBLIC_PLANS.find((p) => p.code === "pilot") ?? PUBLIC_PLANS[0];
   const secondaryPlans = PUBLIC_PLANS.filter((p) => p.code !== "pilot");
 
@@ -99,34 +91,35 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         <RadarCanvas />
         <div className={hpStyles.heroContent}>
           <div className={hpStyles.heroCopy}>
+            <div className={hpStyles.heroEyebrow}>
+              <span aria-hidden="true" />
+              Клиентский радар для рекрутинговых агентств
+            </div>
             <h1 className={hpStyles.heroTitle}>
-              Компании, которым нужен подбор — <span className={hpStyles.heroTitleAccent}>в момент, когда стоит написать</span>
+              Компании, которым стоит написать сегодня. <span className={hpStyles.heroTitleAccent}>С доказательствами.</span>
             </h1>
             <p className={hpStyles.heroSubtitle}>
-              Каждое утро — несколько компаний под специализацию вашего агентства.
-              Вы сразу видите повод для обращения, силу сигнала и следующий шаг.
+              Каждое утро Recruiter Radar отбирает 3–7 компаний под специализацию агентства и показывает сигнал найма, уровень уверенности и безопасный путь контакта.
             </p>
             <div className={hpStyles.heroActions}>
-              <a href="#preview" className={hpStyles.heroCta}>
-                Посмотреть пример радара
+              <Link href={checkoutHref} className={hpStyles.heroCta}>
+                Попробовать неделю
                 <svg className={hpStyles.heroCtaArrow} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <line x1="5" y1="12" x2="19" y2="12" />
                   <polyline points="13 6 19 12 13 18" />
                 </svg>
-              </a>
-              <a href="#pricing" className={hpStyles.heroSecondaryCta}>Тарифы</a>
+              </Link>
+              <a href="#preview" className={hpStyles.heroSecondaryCta}>Настроить радар</a>
             </div>
-            <p className={hpStyles.heroFootnote}>Настройка профиля за 5 минут · доставка в Telegram</p>
+            <p className={hpStyles.heroFootnote}>
+              {pilotPlan.price} за {pilotPlan.cadence} · без автопродления · Telegram-first
+            </p>
           </div>
 
           <div className={hpStyles.heroProduct} aria-label="Как Recruiter Radar оценивает компанию">
             <div className={hpStyles.heroProductTopbar}>
-              <span className={hpStyles.heroProductLabel}>Пример структуры сигнала</span>
-              <span className={hpStyles.heroProductLive}>демо</span>
-            </div>
-            <div className={hpStyles.heroEvidenceBadge}>
-              <span>Сигнал подтверждён</span>
-              <b>2 источника · контакт найден</b>
+              <span className={hpStyles.heroProductLabel}>Так выглядит лид в радаре</span>
+              <span className={hpStyles.heroProductLive}>gate A</span>
             </div>
             <div className={hpStyles.heroCompanyRow}>
               <div>
@@ -164,221 +157,49 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                 <div className={hpStyles.heroSignalMeterTrack} data-tone="amber"><span style={{ width: "94%" }} /></div>
               </div>
             </div>
-            <div className={hpStyles.heroProductFooter}>
-              <span>Рекомендуемое действие</span>
-              <strong>Проверить контакт сегодня</strong>
-            </div>
           </div>
 
         </div>
-
-        <div className={hpStyles.heroMetrics}>
-          <div className={hpStyles.heroMetric}><strong>3–7</strong><span>компаний с наивысшим приоритетом</span></div>
-          <div className={hpStyles.heroMetric}><strong>1 карточка</strong><span>сигнал, доказательства, контакт и следующий шаг</span></div>
-          <div className={hpStyles.heroMetric}><strong>0 автоспама</strong><span>решение об обращении всегда за вами</span></div>
-        </div>
       </section>
 
-      <LandingHeader />
-
-      {/* Principles / value row */}
-      <ScrollReveal as="section" className={hpStyles.scrollSection}>
-        <SectionIntro
-          accent
-          eyebrow="Что внутри"
-          title="От сигнала к следующему действию"
-          description="Карточка отвечает на три вопроса: что изменилось, почему этому можно доверять и как корректно выйти на компанию."
-        />
-        <div className={hpStyles.principles}>
-          {principles.map((p) => {
-            const Icon = p.icon;
-            return (
-              <div key={p.title} className={`${hpStyles.principle} ${hpStyles.revealCard}`}>
-                <span className={hpStyles.principleIcon}>
-                  <Icon />
-                </span>
-                <h3 className={hpStyles.principleTitle}>{p.title}</h3>
-                <p className={hpStyles.principleText}>{p.text}</p>
-              </div>
-            );
-          })}
-        </div>
-      </ScrollReveal>
+      <LandingHeader activationHref={checkoutHref} />
 
       {/* Problem — why this radar exists */}
-      <ScrollReveal as="section" className={hpStyles.scrollSection}>
-        <SectionIntro
-          accent
-          eyebrow="Проблема"
-          title="Вакансии есть. Приоритета нет."
-          description="Радар показывает не вакансии, а компании, которым стоит написать первыми — с доказательствами и поводом для контакта."
-        />
-        <div className={hpStyles.problemGrid}>
-          <article className={`${hpStyles.problemCard} ${hpStyles.revealCard}`}>
-            <span className={hpStyles.problemIndex}>01</span>
-            <h3>Все видят одно и то же</h3>
-            <p>Открытые вакансии одновременно замечают десятки агентств — реакция на них не дает преимущества.</p>
-          </article>
-          <article className={`${hpStyles.problemCard} ${hpStyles.revealCard}`}>
-            <span className={hpStyles.problemIndex}>02</span>
-            <h3>Вакансия — ещё не лид</h3>
-            <p>Активный найм не всегда означает готовность работать с агентством. Нужен контекст, а не список ролей.</p>
-          </article>
-          <article className={`${hpStyles.problemCard} ${hpStyles.revealCard}`}>
-            <span className={hpStyles.problemIndex}>03</span>
-            <h3>Контекст требует времени</h3>
-            <p>Даты, динамику, источники и корректный контакт приходится собирать вручную — на это уходит час за компанией.</p>
-          </article>
+      <ScrollReveal as="section" className={`${hpStyles.scrollSection} ${hpStyles.problemSection}`}>
+        <div className={hpStyles.problemLayout}>
+          <SectionIntro
+            accent
+            eyebrow="Проблема"
+            title="Вакансий много. Приоритета нет."
+            description="Радар сокращает исследование до короткого списка компаний, где найм подтверждён, момент объясним, а следующий шаг понятен."
+          />
+          <ol className={hpStyles.problemList}>
+            <li className={hpStyles.problemRow}>
+              <span className={hpStyles.problemIndex}>01</span>
+              <div><h3>Все видят одни вакансии</h3><p>Обычная реакция на публикацию не даёт преимущества: её одновременно замечают десятки агентств.</p></div>
+            </li>
+            <li className={hpStyles.problemRow}>
+              <span className={hpStyles.problemIndex}>02</span>
+              <div><h3>Вакансия ещё не означает спрос</h3><p>Нужны динамика найма, профиль компании и несколько независимых фактов — не один заголовок.</p></div>
+            </li>
+            <li className={hpStyles.problemRow}>
+              <span className={hpStyles.problemIndex}>03</span>
+              <div><h3>Контекст собирается слишком долго</h3><p>Источники, даты и корпоративный контакт приходится проверять вручную, когда момент уже уходит.</p></div>
+            </li>
+          </ol>
         </div>
       </ScrollReveal>
 
-      {/* Live preview */}
-      <ScrollReveal as="section" id="preview" className={hpStyles.scrollSection}>
-        <SectionIntro
-          accent
-          eyebrow="Пример результата"
-          title="Так выглядит утренний радар"
-          description={previewState.isLive
-            ? "Задайте город и специализацию — справа появится тот самый список, что утром приходит в Telegram."
-            : "Задайте город и специализацию. Сейчас можно оценить структуру карточек; актуальная выдача появится здесь после восстановления источника."}
-        />
-
-        <div className={hpStyles.previewGrid}>
-          <SurfaceCard className={hpStyles.previewCardContainer}>
-            <div className={hpStyles.previewCardHeading}>Параметры профиля</div>
-
-            <form method="GET" action="/#preview" style={{ display: "grid", gap: "14px" }}>
-              <label htmlFor="specialization" className={ppStyles.field}>
-                <span className={ppStyles.fieldLabel}>Специализация</span>
-                <input
-                  id="specialization"
-                  name="specialization"
-                  defaultValue={previewInput.specialization}
-                  maxLength={PUBLIC_PREVIEW_FIELD_LIMITS.specialization}
-                  placeholder="Промышленный подбор / финансы C-level"
-                  className={ppStyles.input}
-                />
-              </label>
-
-              {previewInput.includeKeywords ? (
-                <input type="hidden" name="includeKeywords" value={previewInput.includeKeywords} />
-              ) : null}
-              {previewInput.excludeKeywords ? (
-                <input type="hidden" name="excludeKeywords" value={previewInput.excludeKeywords} />
-              ) : null}
-              <input type="hidden" name="dailyDigestLimit" value={previewInput.dailyDigestLimit} />
-
-              <label htmlFor="targetCity" className={ppStyles.field}>
-                <span className={ppStyles.fieldLabel}>География</span>
-                <input
-                  id="targetCity"
-                  name="targetCity"
-                  defaultValue={previewInput.targetCity}
-                  maxLength={PUBLIC_PREVIEW_FIELD_LIMITS.targetCity}
-                  placeholder="Москва / удалённо"
-                  className={ppStyles.input}
-                />
-              </label>
-
-              <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "center" }}>
-                <button type="submit" className={ppStyles.primaryAction}>
-                  Посмотреть компании
-                </button>
-
-                {hasPreview ? (
-                  <Link href="/#preview" className={ppStyles.secondaryAction}>
-                    Сбросить
-                  </Link>
-                ) : null}
-              </div>
-            </form>
-          </SurfaceCard>
-
-          <SurfaceCard className={hpStyles.previewCardContainer}>
-            <div>
-              <div className={hpStyles.previewHeaderRow}>
-                <div className={hpStyles.previewCardHeading}>
-                  {previewState.isLive
-                    ? previewState.isPersonalized
-                      ? "Радар для вашего профиля"
-                      : "Как выглядит радар"
-                    : "Демо радара"}
-                </div>
-                <StatusBadge tone={previewState.isPersonalized ? "info" : "neutral"} style={{ justifySelf: "start" }}>
-                  {previewState.isPersonalized
-                    ? previewState.items.length > 0
-                      ? "по вашему профилю"
-                      : "пока без совпадений"
-                    : previewState.isLive && previewState.items.length > 0
-                      ? "актуальные данные"
-                      : "демо"}
-                </StatusBadge>
-              </div>
-            </div>
-
-            {!previewState.isLive ? (
-              <NoticeBox
-                tone="neutral"
-                title="Показываем демо-карточки"
-                description="Актуальная выдача временно недоступна. Структура карточек, оценки и состав полей соответствуют реальному радару."
-              />
-            ) : null}
-
-            {previewState.items.length === 0 ? (
-              <NoticeBox
-                tone="neutral"
-                title="Пока нет совпадений"
-                description="Расширьте географию или смягчите специализацию — и список обновится."
-              />
-            ) : (
-              <div style={{ display: "grid", gap: "12px" }}>
-                {previewState.isPersonalized && !previewState.hasExactMatches ? (
-                  <NoticeBox
-                    tone="neutral"
-                    title="Точных совпадений по нише пока нет"
-                    description="Показываем ближайшие по релевантности. Уточните профиль или расширьте специализацию."
-                  />
-                ) : null}
-                {visiblePreviewItems.map((item) => (
-                  <PreviewDigestCard
-                    key={`${item.org_id}-${item.rank}`}
-                    item={item}
-                  />
-                ))}
-
-                {hiddenPreviewItems.length > 0 ? (
-                  <details className={ppStyles.disclosure}>
-                    <summary className={ppStyles.disclosureSummary}>
-                      Показать ещё {hiddenPreviewItems.length} компаний
-                    </summary>
-                    <div className={ppStyles.disclosureBody}>
-                      <div style={{ display: "grid", gap: "12px" }}>
-                        {hiddenPreviewItems.map((item) => (
-                          <PreviewDigestCard
-                            key={`${item.org_id}-${item.rank}`}
-                            item={item}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  </details>
-                ) : null}
-              </div>
-            )}
-
-            <Link href={checkoutHref} className={ppStyles.primaryAction}>
-              {!previewState.isLive
-                ? "Запустить актуальный радар"
-                : previewState.items.length > 0
-                  ? "Получать такой радар каждое утро"
-                  : "Попробовать неделю"}
-            </Link>
-          </SurfaceCard>
-        </div>
-      </ScrollReveal>
+      {/* Live preview — DB-backed, so it streams in via Suspense. The rest of
+          the page (hero/problem/how-it-works/quality/pricing/FAQ) paints
+          immediately without waiting for the digest query. See the note at the
+          top of HomePage on why this boundary fixes the slow first paint. */}
+      <Suspense fallback={<PreviewSkeleton />}>
+        <PreviewSection previewInput={previewInput} hasPreview={hasPreview} checkoutHref={checkoutHref} />
+      </Suspense>
 
       {/* How it works — the three-step flow */}
-      <ScrollReveal as="section" className={hpStyles.scrollSection}>
+      <ScrollReveal as="section" id="how-it-works" className={hpStyles.scrollSection}>
         <SectionIntro
           accent
           eyebrow="Как работает"
@@ -399,59 +220,106 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           <article className={`${hpStyles.step} ${hpStyles.revealCard}`}>
             <span className={hpStyles.stepIndex}>03 · Результат</span>
             <h3>Получаете приоритеты</h3>
-            <p>3–7 компаний с причиной, доказательствами, контактом и следующим шагом — в Telegram.</p>
+            <p>3–7 компаний с причиной, доказательствами, контактом и следующим шагом — в подключённых каналах.</p>
           </article>
         </div>
-        <div className={hpStyles.stepsTrack} aria-hidden="true" />
+        <aside className={hpStyles.sourceArchitecture} aria-labelledby="source-architecture-title">
+          <div className={hpStyles.sourceArchitectureHeader}>
+            <div>
+              <span className={hpStyles.sourceArchitectureEyebrow}>Контур данных</span>
+              <h3 id="source-architecture-title">Каждый источник отвечает за свою часть доказательства</h3>
+            </div>
+            <p>Лид появляется не из списка площадок. Сначала радар находит сигнал найма, затем подтверждает компанию и только после добавляет контекст.</p>
+          </div>
+
+          <ol className={hpStyles.sourceLayers}>
+            <li className={hpStyles.sourceLayer} data-source-role="origin">
+              <div className={hpStyles.sourceLayerMeta}>
+                <span>01 · Создаёт сигнал</span>
+                <em>допущены</em>
+              </div>
+              <h4>Источники клиентской выдачи</h4>
+              <p><strong>hh.ru, Работа России и прямые карьерные страницы.</strong> Только они могут стать основанием для лида — после проверки уверенности.</p>
+            </li>
+            <li className={hpStyles.sourceLayer} data-source-role="verification">
+              <div className={hpStyles.sourceLayerMeta}>
+                <span>02 · Подтверждает</span>
+                <em>не создаёт лид</em>
+              </div>
+              <h4>Компания и путь контакта</h4>
+              <p><strong>Сайт компании и ЕГРЮЛ/ФНС</strong> уточняют юрлицо, домен и безопасный корпоративный канал. Отдельно лид не создают.</p>
+            </li>
+            <li className={hpStyles.sourceLayer} data-source-role="context">
+              <div className={hpStyles.sourceLayerMeta}>
+                <span>03 · Усиливает</span>
+                <em>только контекст</em>
+              </div>
+              <h4>Почему сейчас</h4>
+              <p><strong>Корпоративные события, официальные публикации и отраслевой контекст</strong> объясняют момент обращения, но не заменяют доказательство найма.</p>
+            </li>
+          </ol>
+
+          <details className={hpStyles.sourceGateDisclosure}>
+            <summary>
+              <span>Что пока не попадает в клиентскую выдачу</span>
+              <em>5 групп источников</em>
+            </summary>
+            <p>SuperJob, Хабр Карьера, страницы компаний LinkedIn, технологические и региональные доски вакансий остаются за контуром выдачи, пока не пройдут проверки уверенности, качества данных и правомерности доступа.</p>
+          </details>
+        </aside>
       </ScrollReveal>
 
-      {/* Signal anatomy — what a single lead card contains */}
-      <ScrollReveal as="section" className={hpStyles.scrollSection}>
+      {/* Evidence contract + enabled delivery channels */}
+      <ScrollReveal as="section" id="quality" className={hpStyles.scrollSection}>
         <SectionIntro
           accent
-          eyebrow="Карточка лида"
+          eyebrow="Проверка сигнала"
           title="Почему компании стоит написать"
-          description="Каждая рекомендация содержит факты, источники и конкретный следующий шаг — без выдуманных данных."
+          description="Рекомендация появляется только вместе с проверяемыми фактами, уровнем уверенности и безопасным корпоративным контактом."
         />
-        <p className={hpStyles.demoNote}>
-          {previewState.isLive
-            ? "Ниже — пример структуры карточки. Реальные компании, даты и источники приходят в радаре выше и в Telegram."
-            : "Ниже — пример структуры карточки. В рабочем радаре компании, даты и источники берутся из актуальных открытых данных."}
-        </p>
-        <div className={hpStyles.signalLayout}>
-          <div className={hpStyles.signalSide}>
-            <span className={hpStyles.priorityChip}>Высокий приоритет</span>
-            <h3 className={hpStyles.signalSideTitle}>Производственная компания</h3>
-            <p className={hpStyles.signalSideSub}>Промышленность · Москва и область</p>
-            <div className={hpStyles.bigScore}>87<small>/100</small></div>
-            <div className={hpStyles.signalSideMeta}>
-              <div className={hpStyles.signalSideMetaRow}><span>Уверенность</span><b>Подтверждено</b></div>
-              <div className={hpStyles.signalSideMetaRow}><span>Источники</span><b>2 независимых</b></div>
-              <div className={hpStyles.signalSideMetaRow}><span>Контакт</span><b>Найден</b></div>
+        <div className={hpStyles.qualityGrid}>
+          <article className={hpStyles.qualityMethodCard}>
+            <div className={hpStyles.qualityCardTopbar}>
+              <span>Контур проверки</span>
+              <span className={hpStyles.qualityDemoBadge}>4 шага</span>
             </div>
-          </div>
-          <div className={hpStyles.signalMain}>
-            <div className={hpStyles.detailGrid}>
-              <div className={hpStyles.detail}>
-                <h3>Что изменилось</h3>
-                <p>14 новых вакансий за 6 дней, включая редкую инженерную роль.</p>
-              </div>
-              <div className={hpStyles.detail}>
-                <h3>Почему сейчас</h3>
-                <p>Найм ускорился, а сложные роли повышают нагрузку на внутреннюю команду.</p>
-              </div>
-              <div className={`${hpStyles.detail} ${hpStyles.detailFull}`}>
-                <h3>Следующий шаг</h3>
-                <p>Проверить HR-форму на сайте компании и предложить помощь по инженерным ролям.</p>
+            <div className={hpStyles.qualityMethodIntro}>
+              <h3>Сигнал проходит четыре проверки</h3>
+              <p>Высокий балл сам по себе ничего не доказывает. Радар показывает, из чего сложилась рекомендация.</p>
+            </div>
+            <ol className={hpStyles.qualityChecks}>
+              <li><span>01</span><div><strong>Соответствие</strong><p>Ниша, роли и география совпадают с профилем агентства.</p></div><em>профиль</em></li>
+              <li><span>02</span><div><strong>Намерение</strong><p>Найм подтверждён несколькими фактами, а не одной вакансией.</p></div><em>2+ факта</em></li>
+              <li><span>03</span><div><strong>Срочность</strong><p>Изменение свежее: момент для обращения ещё не потерян.</p></div><em>сегодня</em></li>
+              <li><span>04</span><div><strong>Доступность</strong><p>Есть законный корпоративный путь контакта.</p></div><em>корп. канал</em></li>
+            </ol>
+            <div className={hpStyles.qualityOutcome}><i aria-hidden="true" /><span><strong>Допущено в радар</strong> — факты и ограничения остаются в карточке.</span></div>
+          </article>
+
+          <article className={hpStyles.deliveryCard}>
+            <div className={hpStyles.deliveryTopbar}>
+              <span className={hpStyles.telegramMark} aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M20 4 3.8 10.3c-1.1.4-1.1 1.1-.2 1.4l4.1 1.3 1.6 4.8c.2.6.1.8.8.8.5 0 .8-.2 1-.4l2-1.9 4.2 3.1c.8.4 1.3.2 1.5-.7L21.5 5c.3-1-.4-1.4-1.5-1Z" fill="currentColor" /></svg>
+              </span>
+              <div><strong>Каналы доставки</strong><span>по расписанию профиля</span></div>
+            </div>
+            <div className={hpStyles.deliveryChannels} aria-label="Доступные каналы доставки">
+              <span data-primary="true">Telegram · основной</span>
+              <span>Email</span>
+              <span>Web push</span>
+              <span>VK</span>
+              <span>Webhook</span>
+            </div>
+            <div className={hpStyles.deliveryMessage}>
+              <span className={hpStyles.deliveryKicker}>Утренний радар · 5 компаний</span>
+              <h3>Начните с этого сигнала</h3>
+              <p><strong>Компания из вашего списка</strong> усилила инженерный найм. Уверенность высокая, доступен корпоративный путь контакта.</p>
+              <div className={hpStyles.feedbackChoices} aria-label="Пример обратной связи в Telegram">
+                <span>Беру в работу</span><span>Позже</span><span>Не подходит</span>
               </div>
             </div>
-            <p className={hpStyles.timelineTitle}>Хронология сигнала</p>
-            <div className={hpStyles.timeline}>
-              <div className={hpStyles.timelineItem}><time>15 июля</time><span>На карьерной странице появились 4 новые инженерные позиции</span></div>
-              <div className={hpStyles.timelineItem}><time>12 июля</time><span>Количество открытых вакансий выросло с 7 до 16</span></div>
-            </div>
-            <div className={hpStyles.trustLine}>Компания, даты и факты подтверждаются открытыми источниками</div>
-          </div>
+            <p className={hpStyles.deliveryNote}>Радар приходит только в подключённые каналы. Вы решаете, кому писать: продукт не отправляет сообщения компаниям автоматически.</p>
+          </article>
         </div>
       </ScrollReveal>
 
@@ -460,15 +328,16 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         <SectionIntro
           accent
           eyebrow="Тарифы"
-          title="Один радар — на неделю, месяц или квартал"
+          title="Начните с недели. Продолжайте, только если радар полезен."
+          description="Пилот — разовая оплата без продления. Месяц и квартал подключаются по заявке после проверки качества."
         />
 
         <div className={hpStyles.pricingGrid}>
           <SurfaceCard
             key={pilotPlan.code}
             className={`${hpStyles.primaryPlanCard} ${hpStyles.revealCard}`}
+            padding="var(--plan-card-padding)"
           >
-            <span className={hpStyles.primaryPlanBadge}>Рекомендуем начать</span>
             <div className={hpStyles.primaryPlanCardHead}>
               <div className={ppStyles.planPriceContainer}>
                 <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
@@ -481,19 +350,20 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                 </div>
                 <div className={ppStyles.planPriceCadence}>{pilotPlan.cadence}</div>
               </div>
+              <span className={hpStyles.primaryPlanBadge}>Рекомендуем начать</span>
             </div>
             <p className={hpStyles.planDescription}>{pilotPlan.description}</p>
             <div className={hpStyles.planFeatureLine}>
               <b>Разовая оплата</b>
               <span>Без автопродления</span>
             </div>
+            <p className={hpStyles.billingNote}>После оплаты вы настраиваете профиль и подключаете Telegram.</p>
             <Link
               href={buildCheckoutHref({ ...previewInput, planCode: pilotPlan.code })}
               className={`${ppStyles.primaryAction} ${hpStyles.planCta}`}
             >
               {pilotPlan.ctaLabel}
             </Link>
-            <p className={hpStyles.billingNote}>После оплаты вы настраиваете профиль и подключаете Telegram.</p>
           </SurfaceCard>
 
           <div className={hpStyles.secondaryPlansRow}>
@@ -503,6 +373,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                 <SurfaceCard
                   key={plan.code}
                   className={`${hpStyles.secondaryPlanCard} ${hpStyles.revealCard}`}
+                  padding="var(--plan-card-padding)"
                 >
                   <div className={ppStyles.planPriceContainer}>
                     <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
@@ -510,7 +381,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                         {plan.name}
                       </StatusBadge>
                       {isQuarterly ? (
-                        <span className={hpStyles.savingsBadge}>выгода 14 980 ₽</span>
+                        <span className={hpStyles.savingsBadge}>экономия 14 980 ₽</span>
                       ) : null}
                     </div>
                     <div className={hpStyles.planPriceRow}>
@@ -556,8 +427,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       <ScrollReveal as="section" id="faq" className={hpStyles.scrollSection}>
         <SectionIntro
           accent
-          eyebrow="Перед запуском"
-          title="Коротко о порядке"
+          eyebrow="FAQ"
+          title="Главные вопросы перед запуском"
+          description="Что именно приходит, откуда берутся данные и что остаётся под вашим контролем."
         />
         {faqItems.map((item) => (
           <details key={item.question} className={`${hpStyles.faqCard} ${hpStyles.revealCard}`}>
@@ -574,9 +446,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
       {/* Closing CTA band */}
       <section className={hpStyles.closingBand}>
-        <h2 className={hpStyles.closingTitle}>Узнайте, кому стоит написать</h2>
+        <h2 className={hpStyles.closingTitle}>Проверьте новый канал за 7 дней</h2>
         <p className={hpStyles.closingText}>
-          Настройте профиль агентства, получите первый список компаний и проверьте качество нового канала клиентского спроса за 7 дней.
+          Настройте профиль, получите первый радар и решите на фактах, стоит ли продолжать.
         </p>
         <div className={hpStyles.closingActions}>
           <Link href={checkoutHref} className={hpStyles.heroCta}>
@@ -591,128 +463,421 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   );
 }
 
+/**
+ * Live preview section — the only DB-backed part of the home page. Wrapped in
+ * <Suspense> by HomePage so hero + every other section paint immediately while
+ * getPublicSampleDigestState (a Postgres query) resolves. Owns the profile form
+ * and digest cards in one workspace so the description copy can read
+ * `isLive` and the form defaults read `previewInput` — both pure of the DB
+ * except this one awaited call. `previewInput`/`hasPreview`/`checkoutHref` are
+ * pre-computed synchronously in HomePage and passed in (the pricing cards and
+ * closing CTA also read `previewInput`, so we don't recompute it here).
+ */
+export async function PreviewSection(props: {
+  previewInput: PublicPreviewInput;
+  hasPreview: boolean;
+  checkoutHref: string;
+}) {
+  const { previewInput, hasPreview, checkoutHref } = props;
+  const previewState = await getPublicSampleDigestState(previewInput);
+  const visiblePreviewItems = previewState.items.slice(0, VISIBLE_PREVIEW_ITEMS);
+  const hiddenPreviewItems = previewState.items.slice(VISIBLE_PREVIEW_ITEMS);
+  const appliedProfile = [previewInput.specialization, previewInput.targetCity].filter(Boolean);
+
+  return (
+    <ScrollReveal as="section" id="preview" className={hpStyles.scrollSection}>
+      <SectionIntro
+        accent
+        eyebrow="Рабочий радар"
+        title="Проверьте радар на своём профиле"
+        description="Укажите специализацию и географию. Радар пересчитает приоритеты и покажет, почему каждая компания поднялась в выдаче."
+      />
+
+      <div className={hpStyles.previewWorkspace}>
+        <SurfaceCard
+          className={hpStyles.previewConfigurator}
+          padding="var(--preview-surface-padding)"
+        >
+          <div className={hpStyles.previewConfiguratorLead}>
+            <h3 className={hpStyles.previewCardHeading}>Соберите свою выдачу</h3>
+            <p>Двух полей достаточно для первого пересчёта. Можно начать с готового профиля.</p>
+            <div className={hpStyles.previewPresets} aria-label="Готовые профили радара">
+              {PREVIEW_PRESETS.map((preset) => (
+                <Link
+                  key={preset.label}
+                  href={buildPublicPreviewHref({ ...preset, dailyDigestLimit: previewInput.dailyDigestLimit })}
+                >
+                  {preset.label}
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          <form method="GET" action="/#preview" className={hpStyles.previewForm}>
+            <label htmlFor="specialization" className={ppStyles.field}>
+              <span className={ppStyles.fieldLabel}>Специализация</span>
+              <input
+                id="specialization"
+                name="specialization"
+                defaultValue={previewInput.specialization}
+                maxLength={PUBLIC_PREVIEW_FIELD_LIMITS.specialization}
+                placeholder="Промышленный подбор / финансы C-level"
+                className={ppStyles.input}
+              />
+            </label>
+
+            {previewInput.includeKeywords ? (
+              <input type="hidden" name="includeKeywords" value={previewInput.includeKeywords} />
+            ) : null}
+            {previewInput.excludeKeywords ? (
+              <input type="hidden" name="excludeKeywords" value={previewInput.excludeKeywords} />
+            ) : null}
+            <input type="hidden" name="dailyDigestLimit" value={previewInput.dailyDigestLimit} />
+
+            <label htmlFor="targetCity" className={ppStyles.field}>
+              <span className={ppStyles.fieldLabel}>География</span>
+              <input
+                id="targetCity"
+                name="targetCity"
+                defaultValue={previewInput.targetCity}
+                maxLength={PUBLIC_PREVIEW_FIELD_LIMITS.targetCity}
+                placeholder="Москва / удалённо"
+                className={ppStyles.input}
+              />
+            </label>
+
+            <div className={hpStyles.previewFormActions}>
+              <button type="submit" className={ppStyles.primaryAction}>
+                Посмотреть компании
+              </button>
+
+              {hasPreview ? (
+                <Link href="/#preview" className={ppStyles.secondaryAction}>
+                  Сбросить
+                </Link>
+              ) : null}
+            </div>
+          </form>
+        </SurfaceCard>
+
+        <SurfaceCard
+          className={`${hpStyles.previewCardContainer} ${hpStyles.previewResults}`}
+          padding="var(--preview-surface-padding)"
+        >
+          <div className={hpStyles.previewHeaderRow}>
+            <div>
+              <h3 className={hpStyles.previewCardHeading}>
+                {previewState.isPersonalized ? "Радар для вашего профиля" : "Утренняя выдача"}
+              </h3>
+              <span className={hpStyles.previewResultCount}>{formatCompaniesCount(previewState.items.length)} в текущей выдаче</span>
+            </div>
+            <StatusBadge tone={previewState.isPersonalized ? "info" : "neutral"} style={{ justifySelf: "start" }}>
+              {previewState.isLive ? "актуальные данные" : "примерные данные"}
+            </StatusBadge>
+          </div>
+
+          {!previewState.isLive ? (
+            <div className={hpStyles.previewDemoNote}>
+              <strong>Обезличенный набор</strong>
+              <span>{previewState.isPersonalized
+                ? "Приоритеты и оценка соответствия реально пересчитаны по введённому профилю; названия компаний и факты — примерные данные."
+                : "Выберите профиль или заполните поля: порядок компаний и оценка соответствия изменятся по тем же правилам, что в live-выдаче."}</span>
+            </div>
+          ) : null}
+
+          {appliedProfile.length > 0 ? (
+            <div className={hpStyles.previewAppliedProfile} aria-label="Применённый профиль">
+              <span>Профиль</span>
+              {appliedProfile.map((value) => <strong key={value}>{value}</strong>)}
+            </div>
+          ) : null}
+
+          {previewState.items.length === 0 ? (
+            <NoticeBox
+              tone="neutral"
+              title="Пока нет совпадений"
+              description="Расширьте географию или смягчите специализацию — и список обновится."
+            />
+          ) : (
+            <div className={hpStyles.previewResultsBody}>
+              {previewState.isPersonalized && !previewState.hasExactMatches ? (
+                <NoticeBox
+                  tone="neutral"
+                  title="Точных совпадений по нише пока нет"
+                  description="Показываем ближайшие по релевантности. Уточните профиль или расширьте специализацию."
+                />
+              ) : null}
+              <div
+                className={hpStyles.previewLeadColumns}
+                data-lead-columns="true"
+                aria-hidden="true"
+              >
+                <span>Компания</span>
+                <span>Сигнал</span>
+                <span>Приоритет</span>
+                <span />
+              </div>
+              <div className={hpStyles.previewItemsGrid}>
+                {visiblePreviewItems.map((item, index) => (
+                  <PreviewDigestCard
+                    key={`${item.org_id}-${item.rank}`}
+                    item={item}
+                    defaultOpen={index === 0}
+                  />
+                ))}
+              </div>
+
+              {hiddenPreviewItems.length > 0 ? (
+                <details className={ppStyles.disclosure}>
+                  <summary className={ppStyles.disclosureSummary}>
+                    Показать ещё {hiddenPreviewItems.length} компаний
+                  </summary>
+                  <div className={ppStyles.disclosureBody}>
+                    <div className={hpStyles.previewItemsGrid}>
+                      {hiddenPreviewItems.map((item) => (
+                        <PreviewDigestCard
+                          key={`${item.org_id}-${item.rank}`}
+                          item={item}
+                          defaultOpen={false}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </details>
+              ) : null}
+            </div>
+          )}
+
+          <Link href={checkoutHref} className={ppStyles.primaryAction}>
+            {previewState.items.length > 0
+              ? "Получать такой радар каждое утро"
+              : "Попробовать неделю"}
+          </Link>
+        </SurfaceCard>
+      </div>
+    </ScrollReveal>
+  );
+}
+
+/**
+ * Suspense fallback for <PreviewSection>. Reserves the same workspace footprint
+ * and shows the eyebrow/title so the block is visibly
+ * "there" (not missing) while the digest query streams in — the section heading
+ * is what the user's "half the landing doesn't load" complaint was about. The
+ * shimmer bars stay subtle (premium, not a spinner) and the form is intentionally
+ * omitted from the skeleton so the interactive inputs don't render twice.
+ */
+export function PreviewSkeleton() {
+  return (
+    <ScrollReveal as="section" id="preview" className={hpStyles.scrollSection}>
+      <SectionIntro
+        accent
+        eyebrow="Рабочий радар"
+        title="Проверьте радар на своём профиле"
+        description="Укажите специализацию и географию — радар покажет компании, которые подходят именно вашему агентству."
+      />
+      <div className={hpStyles.previewWorkspace}>
+        <SurfaceCard
+          className={hpStyles.previewConfigurator}
+          padding="var(--preview-surface-padding)"
+        >
+          <div className={hpStyles.previewConfiguratorLead}>
+            <h3 className={hpStyles.previewCardHeading}>Настройте пример</h3>
+          </div>
+          <div className={hpStyles.previewSkeletonBody}>
+            <span className={hpStyles.previewSkeletonLine} />
+            <span className={hpStyles.previewSkeletonLine} />
+            <span className={hpStyles.previewSkeletonBar} />
+          </div>
+        </SurfaceCard>
+        <SurfaceCard
+          className={`${hpStyles.previewCardContainer} ${hpStyles.previewResults}`}
+          padding="var(--preview-surface-padding)"
+        >
+          <div className={hpStyles.previewHeaderRow}>
+            <h3 className={hpStyles.previewCardHeading}>Пример утренней выдачи</h3>
+            <StatusBadge tone="neutral" style={{ justifySelf: "start" }}>загрузка данных</StatusBadge>
+          </div>
+          <div className={`${hpStyles.previewSkeletonBody} ${hpStyles.previewItemsGrid}`}>
+            <span className={hpStyles.previewSkeletonCard} />
+            <span className={hpStyles.previewSkeletonCard} />
+          </div>
+        </SurfaceCard>
+      </div>
+    </ScrollReveal>
+  );
+}
+
 function PreviewDigestCard(props: {
   item: HomePreviewItem;
+  defaultOpen: boolean;
 }) {
-  const { item } = props;
-  // `whyNow` joins the top structured reasons (deriveWhyNow picks urgency/
-  // intent components ordered by evidential strength). On prod the reasons are
-  // legacy free-form Russian strings ("86 вакансий, включая «…»"); parseReasons
-  // now wraps those as a `legacy` reason whose full text renders verbatim, so
-  // the card shows the human copy instead of the `[legacy.…]` debug stub. The
-  // reason text already carries the time anchor ("Опубликовано 12.07"), so a
-  // separate "Свежесть" row would duplicate it — one "Почему сейчас" line is
-  // enough.
+  const { item, defaultOpen } = props;
   const whyNow = deriveWhyNow(item.reasons) || "";
   const contactPath = formatLawfulContactPath(item.lawfulContactPath);
   const location = formatLocationCaption(item.location_names);
   const evidenceTitles = pickEvidenceTitles(item.evidence_titles, 6);
   const vacanciesCaption = formatVacanciesCount(item.vacancies_count);
-  const previewSections = [
-    {
-      label: "Компания и контакты",
-      value: contactPath || "Корпоративный контакт уточняется",
-    },
-    {
-      label: "Релевантные вакансии",
-      value: [vacanciesCaption, evidenceTitles.slice(0, 2).join(" · ")].filter(Boolean).join(" · "),
-    },
-    {
-      label: "Сигналы",
-      value: whyNow || "Активность найма подтверждена источниками",
-    },
-  ];
-  // Score = 0–100 points (raw total_score / 4). The internal [0,4] signal
-  // strength still drives the tone + the confidence gate + the hiringIntentMin
-  // threshold (unchanged) — points are a higher-resolution read of the SAME
-  // value, so a 75-point lead is exactly the "горячий" 3.0-of-4 cut. `points`
-  // is the headline number, `tone` colors it + the bar, `pct` fills the bar.
   const points = formatScorePoints(item.total_score);
   const tone = scoreTone(item.total_score);
   const pct = scorePercent(item.total_score);
-  // Clean employer name — strip the legal-form wrapper quotes/brackets that read
-  // as noise ("АО "ГОСТИНИЦА "СОВЕТСКАЯ"" → "ГОСТИНИЦА «СОВЕТСКАЯ»"). Best-effort:
-  // if the name is all-caps legal boilerplate we keep it, just trim.
   const employerName = cleanEmployerName(item.employer_name);
-  // ICP-relevance breakdown — only shown when the preview was personalised
-  // (the user typed a specialization/city). When there's no ICP input the
-  // signals are all 0 (defaultRelevanceSignals), so the block would show empty
-  // dots — hide it rather than fabricate a "match". Each axis ∈ [0,1]; the four
-  // dots are the FIUR axes, the honest "is this company a fit for YOUR agency"
-  // signal. Russian labels — this is a Russia-first product.
   const rs = item.relevanceSignals;
   const hasRelevance = rs.fit > 0 || rs.intent > 0 || rs.urgency > 0 || rs.reachability > 0;
-  const relevanceAxes: ReadonlyArray<{ key: string; label: string; value: number }> = [
-    { key: "fit", label: "Соответствие", value: rs.fit },
-    { key: "intent", label: "Намерение", value: rs.intent },
-    { key: "urgency", label: "Срочность", value: rs.urgency },
-    { key: "reachability", label: "Доступность", value: rs.reachability },
-  ];
+  const confidenceRow = gateLabel(item.confidence_gate) || null;
+  const sourceCountRow = item.sourceCount > 0 ? `${item.sourceCount} ${pluralSources(item.sourceCount)}` : null;
+  const contactRow = contactPath || null;
+  const detailWhat = whyNow || vacanciesCaption || "Активность найма подтверждена источниками";
+  const detailNext = item.opener?.trim() || (contactPath ? "Проверить корпоративный путь контакта" : "Уточнить контакт и предложить помощь по открытому найму");
+  const freshness = formatVacancyFreshness(item.latest_published_at);
+  const fitPct = Math.round(rs.fit * 100);
+  const fitLabel = rs.fit >= 0.75 ? "Высокое" : rs.fit >= 0.5 ? "Среднее" : rs.fit > 0 ? "Низкое" : "Нет данных";
+  const strengthLabel = pct >= 75 ? "Сильная" : pct >= 50 ? "Умеренная" : "Слабая";
+  const freshnessLabel = freshness ? (freshness.includes("сегодня") || freshness.includes("1 день") || freshness.includes("за 2") || freshness.includes("за 3") ? "Сегодня" : freshness.includes("недел") ? "Эта неделя" : "Ранее") : "Нет даты";
+  const reachabilityPct = hasRelevance ? Math.round(rs.reachability * 100) : contactPath ? 82 : 28;
+  const reachabilityLabel = reachabilityPct >= 75 ? "Высокая" : reachabilityPct >= 50 ? "Средняя" : "Нужно уточнить";
+  const detailMoment = [
+    sourceCountRow ? `Подтверждение: ${sourceCountRow}.` : null,
+    freshness ? `Последнее изменение — ${freshness}.` : null,
+  ].filter(Boolean).join(" ") || "Сигнал требует дополнительной проверки актуальности.";
+  const detailContact = contactPath
+    ? `${contactPath}. Решение об обращении остаётся за вами.`
+    : "Корпоративный путь контакта нужно уточнить до обращения.";
+  const evidenceItems = buildPreviewEvidenceItems({
+    whyNow,
+    vacanciesCaption,
+    evidenceTitles,
+    sourceFamilies: item.source_families,
+    limit: 3,
+  });
+  const summaryMeta = [location, vacanciesCaption].filter(Boolean).join(" · ");
 
   return (
-    <article className={hpStyles.previewCard} data-tone={tone}>
-      {location ? (
-        <div className={hpStyles.previewCardTopbar}>
-          <span className={hpStyles.previewCardLoc} aria-label={`География: ${location}`}>{location}</span>
-        </div>
-      ) : null}
+    <details
+      className={hpStyles.previewLeadCard}
+      data-lead-card="true"
+      data-tone={tone}
+      name="preview-leads"
+      open={defaultOpen}
+    >
+      <summary className={hpStyles.previewLeadSummary}>
+        <span className={hpStyles.previewLeadSummaryCompany}>
+          <strong>{employerName}</strong>
+          {summaryMeta ? <span>{summaryMeta}</span> : null}
+        </span>
+        <span className={hpStyles.previewLeadSummarySignal}>{detailWhat}</span>
+        <span className={hpStyles.previewLeadSummaryScore}><strong>{points}</strong><span>/100</span></span>
+        <svg className={hpStyles.previewLeadChevron} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </summary>
 
-      <div className={hpStyles.previewCompanyRow}>
-        <div className={hpStyles.previewCardName}>{employerName}</div>
-        <div className={hpStyles.previewScore}>
-          <strong>{points}</strong><span>/100</span>
-        </div>
-      </div>
-
-      <div
-        className={hpStyles.previewStrengthTrack}
-        role="meter"
-        aria-valuenow={Number(points)}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-label={`Сила сигнала: ${points} из 100`}
-      >
-        <span className={hpStyles.previewStrengthFill} data-tone={tone} style={{ width: `${pct}%` }} />
-      </div>
-
-      <div className={hpStyles.previewEvidence} aria-label="Краткая информация о компании">
-        {previewSections.map((section) => (
-          <div key={section.label}>
-            <span>{section.label}</span>
-            <p>{section.value}</p>
-          </div>
-        ))}
-      </div>
-
-      {hasRelevance ? (
-        <div className={hpStyles.previewRelevance} aria-label="Релевантность вашему ICP по осям">
-          <span className={hpStyles.previewReasonKey}>Релевантность ICP</span>
-          <div className={hpStyles.previewRelevanceAxes}>
-            {relevanceAxes.map((axis) => (
-              <span key={axis.key} className={hpStyles.previewRelevanceAxis} aria-label={`${axis.label}: ${Math.round(axis.value * 100)}%`}>
-                <span className={hpStyles.previewRelevanceAxisLabel}>{axis.label}</span>
-                <span className={hpStyles.previewRelevanceDots}>
-                  {[0.25, 0.5, 0.75, 1].map((threshold) => (
-                    <span
-                      key={threshold}
-                      className={hpStyles.previewRelevanceDot}
-                      data-on={axis.value >= threshold ? "true" : "false"}
-                      aria-hidden="true"
-                    />
-                  ))}
-                </span>
-              </span>
-            ))}
+      <div className={hpStyles.previewLeadBody}>
+        <div className={hpStyles.previewLeadRecommendationRow}>
+          <span>Рекомендация на сегодня</span>
+          <div className={hpStyles.previewLeadChips}>
+            {confidenceRow ? <span data-gate={item.confidence_gate}>{confidenceRow}</span> : null}
+            {sourceCountRow ? <span>{sourceCountRow}</span> : null}
+            {contactRow ? <span>контакт найден</span> : null}
           </div>
         </div>
-      ) : null}
 
-      {contactPath ? (
-        <div className={hpStyles.previewFooter}>
-          <span>Корпоративный контакт</span>
-          <strong>{contactPath}</strong>
+        <div
+          className={hpStyles.previewStrengthTrack}
+          role="meter"
+          aria-valuenow={Number(points)}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={`Сила сигнала: ${points} из 100`}
+        >
+          <span className={hpStyles.previewStrengthFill} data-tone={tone} style={{ width: `${pct}%` }} />
         </div>
-      ) : null}
-    </article>
+
+        <div className={hpStyles.previewLeadEvidence}>
+          <div><span>Что изменилось</span><p>{detailWhat}</p></div>
+          <div><span>Почему сейчас</span><p>{detailMoment}</p></div>
+          <div><span>Контакт</span><p>{detailContact}</p></div>
+        </div>
+
+        <div className={hpStyles.previewLeadMeters} aria-label="Оценка рекомендации">
+          <LeadMeter label="Соответствие профилю" value={hasRelevance ? fitPct : 0} valueLabel={hasRelevance ? fitLabel : "После настройки"} />
+          <LeadMeter label="Сила сигнала" value={pct} valueLabel={strengthLabel} />
+          <LeadMeter label="Актуальность" value={freshness ? 88 : 30} valueLabel={freshnessLabel} />
+          <LeadMeter label="Доступность контакта" value={reachabilityPct} valueLabel={reachabilityLabel} />
+        </div>
+
+        {evidenceItems.length > 0 ? (
+          <div className={hpStyles.previewLeadFacts}>
+            <span>Факты и источники</span>
+            <ul>{evidenceItems.map((evidence) => <li key={evidence}>{evidence}</li>)}</ul>
+          </div>
+        ) : null}
+
+        <div className={hpStyles.previewLeadNextStep}>
+          <div><span>Следующий шаг</span><strong>{detailNext}</strong></div>
+          <span className={hpStyles.previewLeadSafety}>Без автоматической отправки</span>
+        </div>
+
+        {item.negativeSignals.length > 0 ? (
+          <div className={hpStyles.previewCaveats}>
+            <h4>Что проверить перед контактом</h4>
+            <ul>{item.negativeSignals.slice(0, 3).map((signal) => <li key={signal}>{signal}</li>)}</ul>
+          </div>
+        ) : null}
+      </div>
+    </details>
   );
+}
+
+function LeadMeter(props: { label: string; value: number; valueLabel: string }) {
+  return (
+    <div className={hpStyles.previewLeadMeter}>
+      <span>{props.label}</span>
+      <span className={hpStyles.previewLeadMeterTrack} aria-hidden="true"><span style={{ width: `${props.value}%` }} /></span>
+      <strong>{props.valueLabel}</strong>
+    </div>
+  );
+}
+
+function formatCompaniesCount(count: number): string {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  const noun = mod10 === 1 && mod100 !== 11
+    ? "компания"
+    : mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)
+      ? "компании"
+      : "компаний";
+
+  return `${count} ${noun}`;
+}
+
+/** Russian plural for "источник" by count — 1 / 2–4 / 5+. */
+function pluralSources(count: number): string {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return "источник";
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return "источника";
+  return "источников";
+}
+
+/**
+ * Map a confidence gate (A/B/C/D — the evidence-quality contract from
+ * lib/scoring/gates) to a short Russian label for the public lead card. Returns
+ * null for an absent/unknown gate so the caller hides the row instead of
+ * showing a raw letter or an English bucket. Mirrors the "Уверенность" copy in
+ * the hero lead-format card so the public preview and product explanation agree.
+ */
+function gateLabel(gate: string | null | undefined): string | null {
+  switch (gate) {
+    case "A":
+      return "Подтверждено";
+    case "B":
+      return "Скорее подтверждено";
+    case "C":
+      return "Нужна проверка";
+    case "D":
+      return "Контекст без прямого найма";
+    default:
+      return null;
+  }
 }

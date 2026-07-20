@@ -5,11 +5,22 @@ import { render, screen } from "@testing-library/react";
 import LandingHeader from "@/app/landing-header";
 
 describe("landing header accessibility", () => {
-  it("keeps the compact mobile login label available to assistive technology", () => {
-    render(<LandingHeader />);
+  it("offers a clear activation path without hiding account access", () => {
+    render(<LandingHeader activationHref="/checkout?plan=pilot" />);
 
-    const compactLabel = screen.getByText("Войти", { selector: "span" });
+    expect(screen.getByRole("link", { name: "Попробовать неделю" })).toHaveAttribute(
+      "href",
+      "/checkout?plan=pilot",
+    );
 
-    expect(compactLabel).not.toHaveAttribute("aria-hidden");
+    expect(screen.getByRole("link", { name: "Войти" })).toHaveAttribute(
+      "href",
+      "/dashboard",
+    );
+
+    expect(screen.getByRole("link", { name: "Проверка" })).toHaveAttribute(
+      "href",
+      "#quality",
+    );
   });
 });
