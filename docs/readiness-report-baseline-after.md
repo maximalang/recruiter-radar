@@ -29,9 +29,9 @@ branch is green end to end.
 
 ## Repository state (after)
 
-- Branch tip: `3b48329 docs(issue-74): add before/after readiness report —
-  baseline-before` (this session's doc on top of the executor's work).
-- **ahead 11, behind 0** vs `origin/main`. Fully rebased; the `deploy.yml`
+- Branch tip: `c383097 docs(issue-74): add readiness report — baseline-after`
+  (this session's readiness reports on top of the executor's hardening work).
+- **ahead 14, behind 0** vs `origin/main`. Fully rebased; the `deploy.yml`
   brand-gate keeps the PR #78 hardening semantics (Tests-gated deploy,
   verified SHA, rollback, hero-copy anchor, single footer `<img>` mark,
   embedded favicon).
