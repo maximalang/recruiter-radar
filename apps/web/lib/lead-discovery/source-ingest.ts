@@ -370,6 +370,52 @@ async function resolveHabrKeywordEnv(
 }
 
 /**
+ * Maximum 10-digit legal-entity INNs to enrich per egrul-fns run. Each INN is
+ * one request to the public JSON mirror, so bounding the count bounds load on
+ * the public endpoint. The most-recently-seen orgs are prioritised so the
+ * enrichment tracks the freshest signal pool.
+ */
+const MAX_EGRUL_INNS_PER_RUN = 50
+
+/**
+ * Resolve the egrul-fns INN list from the DB: 10-digit legal-entity INNs on
+ * orgs that still need registry verification (ogrn IS NULL), most-recent first,
+ * capped to MAX_EGRUL_INNS_PER_RUN.
+ *
+ * Precedence (matches the other resolvers): an explicit operator override in
+ * `dbSearchEnv` (EGRUL_FNS_INNS pinned via user_search_preferences), in
+ * process.env, file mode, or provider mode ALWAYS wins — derivation only fills
+ * when nobody pinned the input. Returns {} when there are no candidate orgs or
+ * no pool — the source then falls back to its own no-input error (unchanged).
+ *
+ * Only 10-digit INNs (юрлицо) are selected; 12-digit ИП/person INNs are
+ * excluded per the source readiness policy (enrichment-only, never
+ * lead-originating). This is enforced at the SQL level (inn ~ '^\d{10}$').
+ */
+async function resolveEgrulInnsEnv(
+  dbSearchEnv: Record<string, string>
+): Promise<Record<string, string>> {
+  if (dbSearchEnv.EGRUL_FNS_INNS) return {}
+  if (process.env.EGRUL_FNS_INNS) return {}
+  if (process.env.EGRUL_FNS_INPUT_FILE) return {}
+  if (process.env.EGRUL_FNS_PROVIDER_API_URL) return {}
+
+  const pool = getPool()
+  if (!pool) return {}
+  const { rows } = await pool.query<{ inn: string }>(`
+    SELECT inn
+    FROM orgs
+    WHERE inn ~ '^\\d{10}$'
+      AND ogrn IS NULL
+    ORDER BY updated_at DESC
+    LIMIT $1
+  `, [MAX_EGRUL_INNS_PER_RUN])
+
+  if (rows.length === 0) return {}
+  return { EGRUL_FNS_INNS: rows.map(r => r.inn).join(',') }
+}
+
+/**
  * Resolve the funding-business-signals GDELT query env from the union of all
  * active client profiles' ICP.
  *
@@ -441,17 +487,22 @@ export async function ingestSource(
   // union of active profiles' industries, unless an operator pinned them.
   const fundingDerivedEnv =
     source === 'funding-business-signals' ? await resolveFundingGdeltEnv(dbSearchEnv) : {}
+  // egrul-fns: derive the INN list from orgs that still need registry
+  // verification (10-digit legal-entity INNs, ogrn IS NULL), unless an
+  // operator pinned the input.
+  const egrulDerivedEnv =
+    source === 'egrul-fns' ? await resolveEgrulInnsEnv(dbSearchEnv) : {}
   // Generalised profile-derived search env for the other search-capable
-  // sources (hh, superjob, rabota-rossii). For habr-career and
-  // funding-business-signals the specialised resolvers above already emit
-  // their keys, so the generalised resolver is skipped for them to avoid
-  // double-deriving. Operator overrides in dbSearchEnv always win (resolver
-  // strips already-pinned keys).
+  // sources (hh, superjob, rabota-rossii). For habr-career,
+  // funding-business-signals, and egrul-fns the specialised resolvers above
+  // already emit their keys, so the generalised resolver is skipped for them
+  // to avoid double-deriving. Operator overrides in dbSearchEnv always win
+  // (resolver strips already-pinned keys).
   const profileDerivedEnv =
-    (source === 'habr-career' || source === 'funding-business-signals')
+    (source === 'habr-career' || source === 'funding-business-signals' || source === 'egrul-fns')
       ? {}
       : await resolveProfileSearchEnv(source, dbSearchEnv)
-  const derivedSearchEnv = { ...profileDerivedEnv, ...habrDerivedEnv, ...fundingDerivedEnv }
+  const derivedSearchEnv = { ...profileDerivedEnv, ...habrDerivedEnv, ...fundingDerivedEnv, ...egrulDerivedEnv }
 
   return new Promise<IngestResult>((resolvePromise) => {
     // Filter env vars through whitelist — prevent injection of

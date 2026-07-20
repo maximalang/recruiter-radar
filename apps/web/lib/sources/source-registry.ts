@@ -178,7 +178,14 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     script: 'source-egrul-fns.mjs',
     requiredEnvVars: [],
     envPrefixes: ['EGRUL_FNS_'],
-    searchEnvVars: [],
+    // EGRUL_FNS_INNS is a searchEnvVar so it is EXCLUDED from the caller env
+    // whitelist and instead derived from the DB: source-ingest queries orgs
+    // for 10-digit legal-entity INNs that still need registry verification and
+    // injects them here. An operator can still pin EGRUL_FNS_INNS via
+    // user_search_preferences or ENV; the derived default only fills when
+    // unset. Only 10-digit INNs (юрлицо) — 12-digit ИП/person records are
+    // skipped per the source readiness policy (enrichment-only).
+    searchEnvVars: ['EGRUL_FNS_INNS'],
     isPrimary: false,
     category: 'registry',
   },
