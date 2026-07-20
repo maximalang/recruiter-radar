@@ -1,28 +1,40 @@
 import { deliverCandidatesForRun } from '@/lib/digest/deliver-candidates'
 
-// Mock @/lib/db — getPool + sendBatchDigestForRun (batch delivery, one message
-// per profile instead of one per lead).
 jest.mock('@/lib/db', () => ({
   getPool: jest.fn(),
   sendBatchDigestForRun: jest.fn(),
 }))
 
-// Mock the AI enrichment step so the delivery unit test does not depend on
-// provider env / network. The mock is asserted in the enrichment-isolation test.
 jest.mock('@/lib/ai/enrichment/enrichRunCandidates', () => ({
   enrichRunCandidates: jest.fn(),
 }))
 
-// web-push + email are best-effort side channels — stub them so the unit test
-// stays focused on the Telegram batch path.
 jest.mock('@/lib/webPush', () => ({ notifyNewLeadsForRun: jest.fn() }))
 jest.mock('@/lib/email/sendDigestEmail', () => ({ sendDigestEmailForProfile: jest.fn() }))
+jest.mock('@/lib/notification-dispatch', () => ({
+  hasActiveNotificationEndpoint: jest.fn(),
+  dispatchDigestNotifications: jest.fn(),
+}))
+jest.mock('@/lib/telemetry', () => ({ tryRecordProductEvent: jest.fn() }))
 
 import { getPool, sendBatchDigestForRun } from '@/lib/db'
 import { enrichRunCandidates } from '@/lib/ai/enrichment/enrichRunCandidates'
+import { notifyNewLeadsForRun } from '@/lib/webPush'
+import { sendDigestEmailForProfile } from '@/lib/email/sendDigestEmail'
+import {
+  dispatchDigestNotifications,
+  hasActiveNotificationEndpoint,
+} from '@/lib/notification-dispatch'
+import { tryRecordProductEvent } from '@/lib/telemetry'
+
 const mockGetPool = getPool as jest.MockedFunction<typeof getPool>
 const mockSendBatch = sendBatchDigestForRun as jest.MockedFunction<typeof sendBatchDigestForRun>
 const mockEnrich = enrichRunCandidates as jest.MockedFunction<typeof enrichRunCandidates>
+const mockPush = notifyNewLeadsForRun as jest.MockedFunction<typeof notifyNewLeadsForRun>
+const mockEmail = sendDigestEmailForProfile as jest.MockedFunction<typeof sendDigestEmailForProfile>
+const mockHasEndpoint = hasActiveNotificationEndpoint as jest.MockedFunction<typeof hasActiveNotificationEndpoint>
+const mockDispatch = dispatchDigestNotifications as jest.MockedFunction<typeof dispatchDigestNotifications>
+const mockTelemetry = tryRecordProductEvent as jest.MockedFunction<typeof tryRecordProductEvent>
 
 function makeMockPool(queryImpl?: jest.Mock) {
   const query = queryImpl ?? jest.fn()
@@ -34,6 +46,11 @@ describe('deliverCandidatesForRun (batch)', () => {
     mockGetPool.mockReset()
     mockSendBatch.mockReset()
     mockEnrich.mockReset().mockResolvedValue({ ran: false, considered: 0, enriched: 0 })
+    mockPush.mockReset().mockResolvedValue({ delivered: false, reason: 'not_configured' })
+    mockEmail.mockReset().mockResolvedValue({ delivered: false, reason: 'not_configured' })
+    mockHasEndpoint.mockReset().mockResolvedValue(false)
+    mockDispatch.mockReset().mockResolvedValue({ sent: 0, failed: 0, skipped: 0, errors: [] })
+    mockTelemetry.mockReset().mockResolvedValue(true)
   })
 
   it('returns ok:false with zeroed counters when pool is null', async () => {
@@ -45,20 +62,15 @@ describe('deliverCandidatesForRun (batch)', () => {
   it('sends one batch per profile and reports sent=1', async () => {
     const pool = makeMockPool()
     mockGetPool.mockReturnValue(pool)
-
-    // Step 1: profiles query → one profile with 3 candidates
     pool.query.mockResolvedValueOnce({
       rows: [{ client_profile_id: 'cp-1', candidate_count: 3, anchor_candidate_id: '101' }],
       rowCount: 1,
     } as never)
-    // Step 2: claim INSERT → ownsClaim
     pool.query.mockResolvedValueOnce({
       rows: [{ id: 100, status: 'processing', ownsClaim: true }],
       rowCount: 1,
     } as never)
-    // Step 3: batch send succeeds
     mockSendBatch.mockResolvedValueOnce({ ok: true, messagesSent: 1, leadCount: 3 })
-    // Step 4: UPDATE status='sent'
     pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 } as never)
 
     const result = await deliverCandidatesForRun('run-1')
@@ -72,7 +84,6 @@ describe('deliverCandidatesForRun (batch)', () => {
   it('skips a profile already delivered (status=sent)', async () => {
     const pool = makeMockPool()
     mockGetPool.mockReturnValue(pool)
-
     pool.query.mockResolvedValueOnce({
       rows: [{ client_profile_id: 'cp-1', candidate_count: 2, anchor_candidate_id: '201' }],
       rowCount: 1,
@@ -92,7 +103,6 @@ describe('deliverCandidatesForRun (batch)', () => {
   it('records a failure when the batch send returns ok:false', async () => {
     const pool = makeMockPool()
     mockGetPool.mockReturnValue(pool)
-
     pool.query.mockResolvedValueOnce({
       rows: [{ client_profile_id: 'cp-1', candidate_count: 1, anchor_candidate_id: '301' }],
       rowCount: 1,
@@ -115,7 +125,6 @@ describe('deliverCandidatesForRun (batch)', () => {
   it('does not fail additive delivery when the profile has no Telegram chat', async () => {
     const pool = makeMockPool()
     mockGetPool.mockReturnValue(pool)
-
     pool.query.mockResolvedValueOnce({
       rows: [{ client_profile_id: 'cp-email', candidate_count: 1, anchor_candidate_id: '401' }],
       rowCount: 1,
@@ -135,10 +144,74 @@ describe('deliverCandidatesForRun (batch)', () => {
     expect(result).toMatchObject({ ok: true, sent: 0, failed: 0, skipped: 1 })
   })
 
+  it('records email and web-push telemetry only after an actual provider success', async () => {
+    const pool = makeMockPool()
+    mockGetPool.mockReturnValue(pool)
+    pool.query.mockResolvedValueOnce({
+      rows: [{ client_profile_id: 'cp-multi', candidate_count: 2, anchor_candidate_id: '501' }],
+      rowCount: 1,
+    } as never)
+    pool.query.mockResolvedValueOnce({
+      rows: [{ id: 500, status: 'processing', ownsClaim: true }],
+      rowCount: 1,
+    } as never)
+    mockSendBatch.mockResolvedValueOnce({
+      ok: false,
+      error: 'Client profile has no linked Telegram chat.',
+    })
+    pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 } as never)
+    mockPush.mockResolvedValueOnce({
+      delivered: true,
+      result: { sent: 2, failed: 0, pruned: 0 },
+    })
+    mockEmail.mockResolvedValueOnce({ delivered: true, leadCount: 2 })
+
+    await deliverCandidatesForRun('run-multi')
+
+    expect(mockTelemetry).toHaveBeenCalledWith(expect.objectContaining({
+      eventName: 'digest_delivered',
+      provider: 'web_push',
+      clientProfileId: 'cp-multi',
+    }))
+    expect(mockTelemetry).toHaveBeenCalledWith(expect.objectContaining({
+      eventName: 'digest_delivered',
+      provider: 'email',
+      clientProfileId: 'cp-multi',
+    }))
+    expect(mockTelemetry).toHaveBeenCalledTimes(4)
+  })
+
+  it('records a failed additive provider without exposing its raw error', async () => {
+    const pool = makeMockPool()
+    mockGetPool.mockReturnValue(pool)
+    pool.query.mockResolvedValueOnce({
+      rows: [{ client_profile_id: 'cp-email', candidate_count: 1, anchor_candidate_id: '551' }],
+      rowCount: 1,
+    } as never)
+    pool.query.mockResolvedValueOnce({
+      rows: [{ id: 550, status: 'processing', ownsClaim: true }],
+      rowCount: 1,
+    } as never)
+    mockSendBatch.mockResolvedValueOnce({
+      ok: false,
+      error: 'Client profile has no linked Telegram chat.',
+    })
+    pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 } as never)
+    mockEmail.mockResolvedValueOnce({ delivered: false, reason: 'send_failed' })
+
+    await deliverCandidatesForRun('run-email-fail')
+
+    expect(mockTelemetry).toHaveBeenCalledWith(expect.objectContaining({
+      eventName: 'delivery_failed',
+      provider: 'email',
+      outcome: 'send_failed',
+    }))
+    expect(JSON.stringify(mockTelemetry.mock.calls)).not.toContain('SMTP')
+  })
+
   it('produces no batch when there are no A/B candidates', async () => {
     const pool = makeMockPool()
     mockGetPool.mockReturnValue(pool)
-
     pool.query.mockResolvedValueOnce({ rows: [], rowCount: 0 } as never)
 
     const result = await deliverCandidatesForRun('run-1')
@@ -151,7 +224,6 @@ describe('deliverCandidatesForRun (batch)', () => {
   it('uses a per-profile idempotency key', async () => {
     const pool = makeMockPool()
     mockGetPool.mockReturnValue(pool)
-
     pool.query.mockResolvedValueOnce({
       rows: [{ client_profile_id: 'cp-9', candidate_count: 1, anchor_candidate_id: '601' }],
       rowCount: 1,
@@ -168,19 +240,13 @@ describe('deliverCandidatesForRun (batch)', () => {
     const claimCall = pool.query.mock.calls[1]
     const params = claimCall[1] as unknown[]
     expect(params[0]).toBe('digest:run-abc:profile:cp-9:telegram-batch')
-    // Regression guard: the claim INSERT must anchor digest_candidate_id to a REAL
-    // candidate id (MIN(id) of the profile group), never 0. digest_candidate_id
-    // has a NOT NULL FK to digest_candidates(id); a 0/synthetic sentinel violates
-    // it and aborts every batch delivery.
     expect(params[3]).toBe('601')
   })
 
   it('runs AI enrichment before delivery and survives its failure', async () => {
     mockEnrich.mockReset().mockRejectedValueOnce(new Error('provider down'))
-
     const pool = makeMockPool()
     mockGetPool.mockReturnValue(pool)
-
     pool.query.mockResolvedValueOnce({
       rows: [{ client_profile_id: 'cp-1', candidate_count: 1, anchor_candidate_id: '301' }],
       rowCount: 1,
