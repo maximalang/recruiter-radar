@@ -70,7 +70,12 @@ function assertTelemetryValueSafe(value: TelemetryMetadataValue, depth: number):
     throw new Error('Telemetry metadata is nested too deeply.')
   }
 
-  if (value === null || ['string', 'number', 'boolean'].includes(typeof value)) {
+  if (
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'boolean' ||
+    typeof value === 'number'
+  ) {
     if (typeof value === 'number' && !Number.isFinite(value)) {
       throw new Error('Telemetry metadata numbers must be finite.')
     }
