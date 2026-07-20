@@ -43,7 +43,13 @@ jobs:
       run: npm run guard:router
 
     - name: Type check
-      run: npm run web:check
+      shell: bash
+      run: |
+        set +e
+        npm run web:check > /tmp/tsc-output.log 2>&1
+        status=$?
+        cat /tmp/tsc-output.log
+        exit "$status"
 
     - name: Validate database migrations
       run: DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/test node packages/db/scripts/migrate.mjs
@@ -86,6 +92,7 @@ jobs:
       with:
         name: contract-reports
         path: |
+          /tmp/tsc-output.log
           /tmp/jest-output.log
           /tmp/fiur-evaluation.json
         if-no-files-found: warn
