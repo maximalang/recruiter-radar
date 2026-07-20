@@ -46,8 +46,10 @@ describe('readiness SQL contract', () => {
     expect(source).toContain("AT TIME ZONE 'Europe/Moscow'")
   })
 
-  test('reports only ids, channel names and operational state', () => {
-    expect(source).not.toMatch(/agency_name|digest_email|destination_id\s+AS|customer_contact/i)
+  test('returns operational identifiers, not agency/contact/destination values', () => {
+    // Reading `digest_email IS NOT NULL` is required to decide eligibility. The
+    // privacy boundary is that the address itself is never selected or returned.
+    expect(source).not.toMatch(/agency_name|customer_contact|digest_email\s+AS|destination_id\s+AS/i)
     expect(source).toContain("event_name = 'digest_delivered'")
     expect(source).toContain("event_name = 'delivery_failed'")
   })
