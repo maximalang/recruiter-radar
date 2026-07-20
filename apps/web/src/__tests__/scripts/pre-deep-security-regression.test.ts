@@ -93,12 +93,18 @@ describe('webhook replay and secret handling', () => {
 
 describe('parameterized database writes', () => {
   test.each([
-    'lib/digestFeedback.ts',
+    'lib/digestFeedbackCore.mjs',
     'lib/paymentsRepo.ts',
     'lib/telemetry.ts',
   ])('%s uses placeholders for mutation input', (file) => {
     const source = read(file)
     expect(source).toMatch(/\$1/)
     expect(source).toContain('.query')
+  })
+
+  test('typed feedback API delegates to the shared mutation core', () => {
+    const source = read('lib/digestFeedback.ts')
+    expect(source).toContain('updateDigestOrgStateFeedbackCore')
+    expect(source).toContain('getSharedPool')
   })
 })
