@@ -1,15 +1,40 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import pg from 'pg';
 
 const { Client } = pg;
-const scriptDir = dirname(fileURLToPath(import.meta.url));
+const scriptPath = fileURLToPath(import.meta.url);
+const scriptDir = dirname(scriptPath);
 const rootEnvPath = resolve(scriptDir, '../../../.env');
 const rootDir = resolve(scriptDir, '../../..');
 
 loadEnvFile(rootEnvPath);
+
+// Node 22 can strip TypeScript syntax, but plain ESM does not resolve the
+// extensionless imports used by the Next.js application. Re-execute this smoke
+// once with the repository's ts-node ESM loader so the verifier exercises the
+// real digestFeedback.ts mutation path instead of duplicating its SQL.
+if (process.env.RR_DIGEST_FEEDBACK_TS_LOADER !== '1') {
+  const result = spawnSync(
+    process.execPath,
+    ['--loader', 'ts-node/esm', '--experimental-specifier-resolution=node', scriptPath],
+    {
+      cwd: rootDir,
+      env: {
+        ...process.env,
+        RR_DIGEST_FEEDBACK_TS_LOADER: '1',
+        TS_NODE_PROJECT: resolve(rootDir, 'apps/web/tsconfig.json'),
+        TS_NODE_TRANSPILE_ONLY: 'true',
+        TS_NODE_EXPERIMENTAL_SPECIFIER_RESOLUTION: 'node',
+      },
+      stdio: 'inherit',
+    },
+  );
+  process.exit(result.status ?? 1);
+}
 
 const databaseUrl = process.env.DATABASE_URL?.trim();
 
@@ -87,6 +112,7 @@ try {
     smoke: 'digest-feedback',
     verified: {
       tenantOwnerInvariant: true,
+      realApplicationMutationPath: true,
       acceptedMapsToContacted: true,
       snoozeSuppression: true,
     },
