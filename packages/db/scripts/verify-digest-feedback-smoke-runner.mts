@@ -4,8 +4,9 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import pg from 'pg'
 
-import { updateDigestOrgStateFeedback } from '../../../apps/web/lib/digestFeedback.ts'
+import digestFeedbackModule from '../../../apps/web/lib/digestFeedback.ts'
 
+const { updateDigestOrgStateFeedback } = digestFeedbackModule as typeof import('../../../apps/web/lib/digestFeedback.ts')
 const { Client } = pg
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const rootEnvPath = resolve(scriptDir, '../../../.env')
