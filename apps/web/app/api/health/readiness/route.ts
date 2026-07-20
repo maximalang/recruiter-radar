@@ -3,6 +3,7 @@ import { timingSafeEqual } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 
 import { getOperationalReadinessReport } from '@/lib/operational-readiness'
+import { getSourceFreshnessReport } from '@/lib/source-freshness'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -34,10 +35,13 @@ export async function GET(request: NextRequest) {
   const parsedWindow = rawWindow === null ? null : Number(rawWindow)
 
   try {
-    const report = await getOperationalReadinessReport(parsedWindow)
+    const [report, sourceFreshness] = await Promise.all([
+      getOperationalReadinessReport(parsedWindow),
+      getSourceFreshnessReport(),
+    ])
     const status = report.profiles.missed === 0 ? 'ready' : 'degraded'
     return NextResponse.json(
-      { ok: true, status, report },
+      { ok: true, status, report: { ...report, sourceFreshness } },
       { status: 200, headers: { 'Cache-Control': 'no-store' } },
     )
   } catch {
