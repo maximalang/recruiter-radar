@@ -48,6 +48,11 @@ jobs:
     - name: Validate database migrations
       run: DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/test node packages/db/scripts/migrate.mjs
 
+    - name: Validate database contract
+      env:
+        DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+      run: npm run db:validate
+
     - name: Run tests
       shell: bash
       run: |
@@ -61,19 +66,35 @@ jobs:
         fi
         cat /tmp/jest-output.log
 
-    - name: Upload Jest failure log
-      if: failure()
+    - name: Evaluate FIUR quality fixture
+      run: npm run --workspace @recruiter-radar/web quality:evaluate > /tmp/fiur-evaluation.json
+
+    - name: Verify source readiness contracts
+      env:
+        DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+      run: |
+        npm run verify:sources:readiness
+        npm run verify:sources:coverage
+        npm run verify:source:confidence
+
+    - name: Audit production dependencies
+      run: npm audit --omit=dev --audit-level=high
+
+    - name: Upload verification reports
+      if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: jest-failure-log
-        path: /tmp/jest-output.log
-        if-no-files-found: error
-        retention-days: 3
+        name: contract-reports
+        path: |
+          /tmp/jest-output.log
+          /tmp/fiur-evaluation.json
+        if-no-files-found: warn
+        retention-days: 7
 
   build:
     needs: test
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')))
 
     services:
       postgres:
@@ -106,29 +127,46 @@ jobs:
 
     - name: Run smoke tests
       run: |
-        # Run migrations against CI Postgres first (outside Docker)
         DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/test node packages/db/scripts/migrate.mjs
 
-        # Start app with host network so container can reach CI Postgres
-        # MIGRATE_ON_START=false because migrations already ran above
         docker run -d --name smoke-test --network host \
           -e DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/test \
           -e SESSION_SECRET=test-session-secret-at-least-32-chars-long \
+          -e CRON_API_KEY=test-cron-api-key-at-least-32-chars \
           -e NEXT_PUBLIC_APP_URL=http://localhost:3000 \
           -e MIGRATE_ON_START=false \
           ${{ github.repository }}:latest
 
-        # Wait for health check
         for i in {1..30}; do
           if curl -f http://localhost:3000/api/health > /dev/null 2>&1; then
             echo "Health check passed"
-            exit 0
+            break
+          fi
+          if [ "$i" = "30" ]; then
+            echo "Health check timed out"
+            docker logs smoke-test
+            exit 1
           fi
           sleep 2
         done
-        echo "Health check timed out"
-        docker logs smoke-test
-        exit 1
+
+    - name: Install Playwright Chromium
+      run: npx playwright install --with-deps chromium
+
+    - name: Responsive and accessibility smoke
+      env:
+        RESPONSIVE_BASE_URL: http://localhost:3000
+        RESPONSIVE_ARTIFACT_DIR: /tmp/recruiter-radar-responsive
+      run: node scripts/verify-responsive-surfaces.mjs
+
+    - name: Upload responsive screenshots
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: responsive-surface-audit
+        path: /tmp/recruiter-radar-responsive
+        if-no-files-found: error
+        retention-days: 7
 
     - name: Cleanup smoke test
       if: always()

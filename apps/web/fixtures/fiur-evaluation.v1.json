@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "datasetVersion": "fixture-2026-07-20-v1",
+  "scoringVersion": "fiur-additive-v1",
+  "description": "Synthetic anonymized contract fixture. It validates the evaluation pipeline, not production precision.",
+  "items": [
+    {
+      "id": "industrial-a",
+      "prediction": { "rank": 1, "score": 3.62, "gate": "A", "shouldContact": true },
+      "sourceFamilies": ["career-pages", "hh", "egrul-fns"],
+      "labels": {
+        "entityMatch": true,
+        "actualHiring": true,
+        "fresh": true,
+        "icpFit": true,
+        "evidenceIndependent": true,
+        "lawfulContactPath": true,
+        "shouldContact": true
+      },
+      "outcome": "replied"
+    },
+    {
+      "id": "b2b-b",
+      "prediction": { "rank": 2, "score": 3.31, "gate": "A", "shouldContact": true },
+      "sourceFamilies": ["career-pages", "rabota-rossii"],
+      "labels": {
+        "entityMatch": true,
+        "actualHiring": true,
+        "fresh": true,
+        "icpFit": true,
+        "evidenceIndependent": true,
+        "lawfulContactPath": true,
+        "shouldContact": true
+      },
+      "outcome": "contacted"
+    },
+    {
+      "id": "tech-c",
+      "prediction": { "rank": 3, "score": 3.08, "gate": "B", "shouldContact": true },
+      "sourceFamilies": ["hh", "company-site"],
+      "labels": {
+        "entityMatch": true,
+        "actualHiring": true,
+        "fresh": true,
+        "icpFit": false,
+        "evidenceIndependent": false,
+        "lawfulContactPath": true,
+        "shouldContact": false
+      },
+      "outcome": "badfit"
+    },
+    {
+      "id": "finance-d",
+      "prediction": { "rank": 4, "score": 2.92, "gate": "B", "shouldContact": true },
+      "sourceFamilies": ["hh", "egrul-fns"],
+      "labels": {
+        "entityMatch": true,
+        "actualHiring": true,
+        "fresh": true,
+        "icpFit": true,
+        "evidenceIndependent": false,
+        "lawfulContactPath": true,
+        "shouldContact": true
+      },
+      "outcome": null
+    },
+    {
+      "id": "regional-e",
+      "prediction": { "rank": 5, "score": 2.71, "gate": "B", "shouldContact": true },
+      "sourceFamilies": ["rabota-rossii", "company-site"],
+      "labels": {
+        "entityMatch": true,
+        "actualHiring": true,
+        "fresh": false,
+        "icpFit": true,
+        "evidenceIndependent": true,
+        "lawfulContactPath": true,
+        "shouldContact": false
+      },
+      "outcome": "snooze"
+    },
+    {
+      "id": "duplicate-f",
+      "prediction": { "rank": 6, "score": 2.55, "gate": "C", "shouldContact": false },
+      "sourceFamilies": ["hh"],
+      "labels": {
+        "entityMatch": false,
+        "actualHiring": true,
+        "fresh": true,
+        "icpFit": true,
+        "evidenceIndependent": false,
+        "lawfulContactPath": false,
+        "shouldContact": false
+      },
+      "outcome": null
+    },
+    {
+      "id": "context-g",
+      "prediction": { "rank": 7, "score": 2.22, "gate": "D", "shouldContact": false },
+      "sourceFamilies": ["industry-media", "funding-business-signals"],
+      "labels": {
+        "entityMatch": true,
+        "actualHiring": false,
+        "fresh": true,
+        "icpFit": true,
+        "evidenceIndependent": true,
+        "lawfulContactPath": true,
+        "shouldContact": false
+      },
+      "outcome": null
+    },
+    {
+      "id": "executive-h",
+      "prediction": { "rank": 8, "score": 2.06, "gate": "C", "shouldContact": false },
+      "sourceFamilies": ["career-pages"],
+      "labels": {
+        "entityMatch": true,
+        "actualHiring": true,
+        "fresh": true,
+        "icpFit": true,
+        "evidenceIndependent": false,
+        "lawfulContactPath": true,
+        "shouldContact": true
+      },
+      "outcome": null
+    }
+  ]
+}
