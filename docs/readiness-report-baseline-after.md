@@ -18,21 +18,25 @@ green.
 ## How this state was reached
 
 The branch is a shared workstream. A parallel executor delivered Phases 0–7
-and rebuilt the hardening on latest `main`; it also fixed the two
-regressions that the rebuild surfaced — the `lib/telemetry.ts`
-`TelemetryMetadata` narrowing error (`3cd51bd fix(telemetry): make metadata
-narrowing explicit`) and the outbound-webhook bounded-response contract
-(`259dbe0 test(security): match the stricter response snapshot limit`). This
-session's independent contribution is the required baseline readiness report
-artifacts (before + after) and the verification that the final integrated
-branch is green end to end.
+and rebuilt the hardening on latest `main`; it also fixed the regressions
+that the rebuild surfaced — the `lib/telemetry.ts` `TelemetryMetadata`
+narrowing error (`3cd51bd fix(telemetry): make metadata narrowing
+explicit`), the outbound-webhook bounded-response contract (`259dbe0
+test(security): match the stricter response snapshot limit`), and the CI
+hardening-smoke `ts-node`/ESM interop failure (resolved by extracting the
+shared digest-feedback mutation logic into a native-ESM
+`apps/web/lib/digestFeedbackCore.mjs` and dropping the `ts-node` runner —
+`b7a0dfb`→`2fd1d95`→`dbe91bd`, then canonicalized the smoke fixture's
+career-page ref in `f738903`). This session's independent contribution is
+the required baseline readiness report artifacts (before + after) and the
+verification that the final integrated branch is green end to end.
 
 ## Repository state (after)
 
-- Branch tip: `872d98b fix(ux): make lead filters touch-safe` (the executor's
-  smoke + UX hardening on top of this session's readiness reports and the
-  executor's Phase 0–7 work).
-- **ahead 25, behind 0** vs `origin/main`. Fully rebased; the `deploy.yml`
+- Branch tip: `f738903 fix(smoke): verify canonical career-page ref and
+  weak-name alias` (the executor's smoke resolution + UX hardening on top
+  of this session's readiness reports and the executor's Phase 0–7 work).
+- **ahead 36, behind 0** vs `origin/main`. Fully rebased; the `deploy.yml`
   brand-gate keeps the PR #78 hardening semantics (Tests-gated deploy,
   verified SHA, rollback, hero-copy anchor, single footer `<img>` mark,
   embedded favicon).
@@ -44,7 +48,7 @@ branch is green end to end.
 | `npm run guard:router` | ✅ PASS | No `src/app` shadowing `app/`. |
 | `npm run web:check` | ✅ PASS | tsc --noEmit clean (telemetry narrowing fixed). |
 | `npm run web:build` | ✅ PASS | All routes build, including `/api/health/readiness` and `/api/health/payment-readiness`. |
-| `npm test --workspace @recruiter-radar/web` | ✅ PASS | **158 suites, 1554 tests.** |
+| `npm test --workspace @recruiter-radar/web` | ✅ PASS | **158 suites, 1555 tests.** |
 | `npm run db:validate` | ✅ PASS | 89 `.mjs` files. |
 | `npm run verify:smoke` | ✅ PASS (read-only) | `mode: read-only-smoke`, `ok: true`. |
 | `npm run verify:sources:readiness` | ✅ PASS | 15 sources, structural boundaries consistent. |
@@ -53,7 +57,7 @@ branch is green end to end.
 | `npm audit --omit=dev --audit-level=high` | ✅ PASS | **0 vulnerabilities.** |
 | `npm run quality:evaluate` (Phase 5) | ✅ PASS | Deterministic on fixture; reports `scoringVersion: fiur-additive-v1`, `datasetVersion: fixture-2026-07-20-v1`, precision@3/5, false-positive rate, entity-resolution error, gate calibration, source coverage, outcomes by gate. |
 | `npm run verify:sources:live-config` | ❌ NOT LAUNCH READY (honest) | 2 production-ready, 8 provider-required, 2 missing-env, 1 with-blockers. `Launch ready: NO`. Configuration fact, not a code gap. |
-| CI `Hardening smoke` workflow | ❌ FAIL (active blocker, not stubbed) | The new `hardening-smoke.yml` CI workflow fails on `verify-digest-feedback-smoke-runner.mts` importing `apps/web/lib/digestFeedback.ts` through the `ts-node/esm` loader: `ERR_REQUIRE_CYCLE_MODULE — Cannot require() ES Module digestFeedback.ts in a cycle`. This is a ts-node ESM/CJS interop defect in the smoke runner, not a product defect — `digestFeedback.ts` exports are correct and consumed normally by the app. The executor iterated on the import shape (`f21c384` → `0f0cfef` consume via CommonJS namespace) but the require(esm) cycle remains on CI (Node 22). The runner needs a non-ts-node import path (compiled JS, or a pure-SQL port like `verify-mixed-ranking-smoke.mjs`). Recorded as a blocker, not green. |
+| CI `Hardening smoke` workflow | ✅ PASS (resolved) | Was failing on `verify-digest-feedback-smoke-runner.mts` importing `digestFeedback.ts` via the `ts-node/esm` loader (`ERR_REQUIRE_CYCLE_MODULE`). Resolved by extracting the shared mutation logic into `apps/web/lib/digestFeedbackCore.mjs` (native ESM, no ts-node) and importing it directly in the smoke runner — the same non-ts-node import path noted as the fix in the prior blocker entry. `digestFeedback.ts` delegates to the core, so the app path is unchanged. CI `build`/`test`/`validate`/`smoke` all green on `f738903`. |
 
 ### CI / production checks not runnable from this environment
 
