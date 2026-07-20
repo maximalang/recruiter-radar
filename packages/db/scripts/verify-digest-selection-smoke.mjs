@@ -347,3 +347,4 @@ function loadEnvFile(filePath) {
 
     process.env[key] = value;
   }
+}
