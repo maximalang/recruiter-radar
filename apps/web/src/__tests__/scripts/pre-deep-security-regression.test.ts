@@ -43,7 +43,7 @@ describe('outbound webhook SSRF boundary', () => {
     expect(providers).toContain('redirect: "manual"')
     expect(providers).toContain('AbortSignal.timeout(15_000)')
     expect(providers).toContain('readResponseTextWithLimit')
-    expect(providers).toContain('2_048')
+    expect(providers).toContain('2_000')
   })
 })
 
