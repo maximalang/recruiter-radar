@@ -196,7 +196,14 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     script: 'source-company-site.mjs',
     requiredEnvVars: [],
     envPrefixes: ['COMPANY_SITE_', 'CRAWLER_'],
-    searchEnvVars: [],
+    // COMPANY_SITE_TARGETS_FILE is a searchEnvVar so it is EXCLUDED from the
+    // caller env whitelist and instead derived from the DB: source-ingest
+    // selects orgs the radar is already tracking (domain/website_url + a hiring
+    // signal), writes them to a temp .cache/ file as the JSON array the script
+    // `existsSync`s, and injects the path here. An operator can still pin
+    // COMPANY_SITE_TARGETS_FILE / COMPANY_SITE_INPUT_FILE via ENV or
+    // user_search_preferences; the derived default only fills when unset.
+    searchEnvVars: ['COMPANY_SITE_TARGETS_FILE'],
     // NOT primary on purpose (2026-07-15): company-site is supporting-evidence-only
     // (registry policy 'supporting-evidence-only') — it corroborates existing leads
     // and surfaces direct company/contact pages, but must never originate a lead on

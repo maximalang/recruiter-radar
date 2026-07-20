@@ -42,6 +42,12 @@ import {
   type FeedbackPatternEvent,
 } from './query-feedback-tuning'
 import { buildProfileGdeltQueries } from './gdelt-query-builder'
+import {
+  buildCompanySiteTargets,
+  MAX_COMPANY_SITE_TARGETS_PER_RUN,
+  type CompanySiteTargetRow,
+} from './company-site-targets'
+import { writeFileSync, mkdirSync } from 'node:fs'
 
 export type { SourceId } from '@/lib/sources/source-registry'
 
@@ -416,6 +422,89 @@ async function resolveEgrulInnsEnv(
 }
 
 /**
+ * Resolve the company-site targets FILE from the DB: orgs the radar is already
+ * tracking (a domain/website_url AND at least one hiring signal from a
+ * job-board), prioritised by freshest signal, capped to
+ * MAX_COMPANY_SITE_TARGETS_PER_RUN.
+ *
+ * Unlike the other resolvers, company-site's live-public mode takes a FILE the
+ * script `existsSync`s (not an inline env value), so this resolver writes the
+ * derived target list to a temp `.cache/company-site-derived-targets.json` file
+ * and injects the path as COMPANY_SITE_TARGETS_FILE. The temp file lives under
+ * packages/db/scripts/.cache/ (same dir career-pages uses for its discovered
+ * targets snapshot) and is overwritten each run — no accumulation, no secret
+ * content (just public company URLs already in the DB).
+ *
+ * Precedence (matches the other resolvers): an explicit operator override in
+ * `dbSearchEnv` (COMPANY_SITE_TARGETS_FILE pinned via user_search_preferences),
+ * process.env, or COMPANY_SITE_INPUT_FILE (file mode) ALWAYS wins — derivation
+ * only fills when nobody pinned the input. Returns {} when there are no
+ * candidate orgs or no pool — the source then falls back to its own no-input
+ * error (unchanged). On any FS write error, derivation is skipped (returns {})
+ * so the source falls back rather than crashing the whole ingestion batch.
+ *
+ * company-site is supporting-evidence-only (isPrimary:false) — we only target
+ * orgs the radar is ALREADY tracking (HAVING a hiring signal), never cold
+ * domains, so the crawl corroborates existing leads instead of originating new
+ * ones. Excludes orgs that already have a company-site signal so a re-run
+ * doesn't re-crawl the same corporate pages.
+ */
+async function resolveCompanySiteTargetsEnv(
+  dbSearchEnv: Record<string, string>
+): Promise<Record<string, string>> {
+  if (dbSearchEnv.COMPANY_SITE_TARGETS_FILE) return {}
+  if (dbSearchEnv.COMPANY_SITE_INPUT_FILE) return {}
+  if (process.env.COMPANY_SITE_TARGETS_FILE) return {}
+  if (process.env.COMPANY_SITE_INPUT_FILE) return {}
+
+  const pool = getPool()
+  if (!pool) return {}
+  const { rows } = await pool.query<CompanySiteTargetRow>(`
+    SELECT
+      orgs.id::text AS id,
+      orgs.name,
+      orgs.domain,
+      orgs.website_url
+    FROM orgs
+    WHERE COALESCE(NULLIF(BTRIM(orgs.domain), ''), NULLIF(BTRIM(orgs.website_url), '')) IS NOT NULL
+      AND EXISTS (
+        SELECT 1
+        FROM signals
+        WHERE signals.org_id = orgs.id
+          AND signals.source IN ('hh', 'superjob', 'habr-career', 'rabota-rossii', 'career-pages')
+      )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM signals
+        WHERE signals.org_id = orgs.id
+          AND signals.source = 'company-site'
+      )
+    ORDER BY (
+      SELECT MAX(signals.occurred_at)
+      FROM signals
+      WHERE signals.org_id = orgs.id
+    ) DESC NULLS LAST, orgs.id DESC
+    LIMIT $1
+  `, [MAX_COMPANY_SITE_TARGETS_PER_RUN])
+
+  const targets = buildCompanySiteTargets(rows)
+  if (targets.length === 0) return {}
+
+  const cacheDir = resolve(getScriptDir(), '.cache')
+  const targetsFilePath = resolve(cacheDir, 'company-site-derived-targets.json')
+  try {
+    mkdirSync(cacheDir, { recursive: true })
+    writeFileSync(targetsFilePath, `${JSON.stringify(targets, null, 2)}\n`, 'utf8')
+  } catch {
+    // FS write failed (read-only FS, permissions, …) — skip derivation so the
+    // source falls back to its own no-input error instead of crashing the
+    // ingestion batch. The operator can still pin COMPANY_SITE_TARGETS_FILE.
+    return {}
+  }
+  return { COMPANY_SITE_TARGETS_FILE: targetsFilePath }
+}
+
+/**
  * Resolve the funding-business-signals GDELT query env from the union of all
  * active client profiles' ICP.
  *
@@ -492,17 +581,25 @@ export async function ingestSource(
   // operator pinned the input.
   const egrulDerivedEnv =
     source === 'egrul-fns' ? await resolveEgrulInnsEnv(dbSearchEnv) : {}
+  // company-site: derive the targets FILE from orgs the radar is already
+  // tracking (domain/website_url + a hiring signal), written to a temp
+  // .cache/ file, unless an operator pinned the targets/input file. The
+  // source has no keyword search params, so the generalised profile resolver
+  // is skipped for it.
+  const companySiteDerivedEnv =
+    source === 'company-site' ? await resolveCompanySiteTargetsEnv(dbSearchEnv) : {}
   // Generalised profile-derived search env for the other search-capable
   // sources (hh, superjob, rabota-rossii). For habr-career,
-  // funding-business-signals, and egrul-fns the specialised resolvers above
-  // already emit their keys, so the generalised resolver is skipped for them
-  // to avoid double-deriving. Operator overrides in dbSearchEnv always win
-  // (resolver strips already-pinned keys).
+  // funding-business-signals, egrul-fns, and company-site the specialised
+  // resolvers above already emit their keys (or nothing — company-site has no
+  // keyword params), so the generalised resolver is skipped for them to avoid
+  // double-deriving / unnecessary profile loads. Operator overrides in
+  // dbSearchEnv always win (resolver strips already-pinned keys).
   const profileDerivedEnv =
-    (source === 'habr-career' || source === 'funding-business-signals' || source === 'egrul-fns')
+    (source === 'habr-career' || source === 'funding-business-signals' || source === 'egrul-fns' || source === 'company-site')
       ? {}
       : await resolveProfileSearchEnv(source, dbSearchEnv)
-  const derivedSearchEnv = { ...profileDerivedEnv, ...habrDerivedEnv, ...fundingDerivedEnv, ...egrulDerivedEnv }
+  const derivedSearchEnv = { ...profileDerivedEnv, ...habrDerivedEnv, ...fundingDerivedEnv, ...egrulDerivedEnv, ...companySiteDerivedEnv }
 
   return new Promise<IngestResult>((resolvePromise) => {
     // Filter env vars through whitelist — prevent injection of
