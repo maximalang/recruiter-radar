@@ -29,10 +29,10 @@ branch is green end to end.
 
 ## Repository state (after)
 
-- Branch tip: `f21c384 fix(smoke): load real TypeScript feedback path with
-  ts-node` (the executor's smoke-hardening on top of this session's
-  readiness reports and the executor's Phase 0–7 work).
-- **ahead 23, behind 0** vs `origin/main`. Fully rebased; the `deploy.yml`
+- Branch tip: `872d98b fix(ux): make lead filters touch-safe` (the executor's
+  smoke + UX hardening on top of this session's readiness reports and the
+  executor's Phase 0–7 work).
+- **ahead 25, behind 0** vs `origin/main`. Fully rebased; the `deploy.yml`
   brand-gate keeps the PR #78 hardening semantics (Tests-gated deploy,
   verified SHA, rollback, hero-copy anchor, single footer `<img>` mark,
   embedded favicon).
@@ -53,6 +53,7 @@ branch is green end to end.
 | `npm audit --omit=dev --audit-level=high` | ✅ PASS | **0 vulnerabilities.** |
 | `npm run quality:evaluate` (Phase 5) | ✅ PASS | Deterministic on fixture; reports `scoringVersion: fiur-additive-v1`, `datasetVersion: fixture-2026-07-20-v1`, precision@3/5, false-positive rate, entity-resolution error, gate calibration, source coverage, outcomes by gate. |
 | `npm run verify:sources:live-config` | ❌ NOT LAUNCH READY (honest) | 2 production-ready, 8 provider-required, 2 missing-env, 1 with-blockers. `Launch ready: NO`. Configuration fact, not a code gap. |
+| CI `Hardening smoke` workflow | ❌ FAIL (active blocker, not stubbed) | The new `hardening-smoke.yml` CI workflow fails on `verify-digest-feedback-smoke-runner.mts` importing `apps/web/lib/digestFeedback.ts` through the `ts-node/esm` loader: `ERR_REQUIRE_CYCLE_MODULE — Cannot require() ES Module digestFeedback.ts in a cycle`. This is a ts-node ESM/CJS interop defect in the smoke runner, not a product defect — `digestFeedback.ts` exports are correct and consumed normally by the app. The executor iterated on the import shape (`f21c384` → `0f0cfef` consume via CommonJS namespace) but the require(esm) cycle remains on CI (Node 22). The runner needs a non-ts-node import path (compiled JS, or a pure-SQL port like `verify-mixed-ranking-smoke.mjs`). Recorded as a blocker, not green. |
 
 ### CI / production checks not runnable from this environment
 
