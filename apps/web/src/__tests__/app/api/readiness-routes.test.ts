@@ -5,16 +5,21 @@ import { NextRequest } from 'next/server'
 jest.mock('@/lib/operational-readiness', () => ({
   getOperationalReadinessReport: jest.fn(),
 }))
+jest.mock('@/lib/source-freshness', () => ({
+  getSourceFreshnessReport: jest.fn(),
+}))
 jest.mock('@/lib/payment-readiness', () => ({
   buildPaymentReadinessReport: jest.fn(),
 }))
 
 import { getOperationalReadinessReport } from '@/lib/operational-readiness'
+import { getSourceFreshnessReport } from '@/lib/source-freshness'
 import { buildPaymentReadinessReport } from '@/lib/payment-readiness'
 import { GET as getOperationalReadiness } from '@/app/api/health/readiness/route'
 import { GET as getPaymentReadiness } from '@/app/api/health/payment-readiness/route'
 
 const mockedOperational = jest.mocked(getOperationalReadinessReport)
+const mockedFreshness = jest.mocked(getSourceFreshnessReport)
 const mockedPayment = jest.mocked(buildPaymentReadinessReport)
 
 function request(path: string, apiKey?: string): NextRequest {
@@ -37,6 +42,7 @@ describe('protected readiness endpoints', () => {
     expect((await getOperationalReadiness(request('/api/health/readiness'))).status).toBe(503)
     expect((await getPaymentReadiness(request('/api/health/payment-readiness'))).status).toBe(503)
     expect(mockedOperational).not.toHaveBeenCalled()
+    expect(mockedFreshness).not.toHaveBeenCalled()
     expect(mockedPayment).not.toHaveBeenCalled()
   })
 
@@ -45,10 +51,11 @@ describe('protected readiness endpoints', () => {
     expect((await getOperationalReadiness(request('/api/health/readiness'))).status).toBe(401)
     expect((await getPaymentReadiness(request('/api/health/payment-readiness', 'wrong-key'))).status).toBe(401)
     expect(mockedOperational).not.toHaveBeenCalled()
+    expect(mockedFreshness).not.toHaveBeenCalled()
     expect(mockedPayment).not.toHaveBeenCalled()
   })
 
-  test('returns aggregate operational state to an authorized operator', async () => {
+  test('returns aggregate operational and source freshness state to an authorized operator', async () => {
     process.env.CRON_API_KEY = 'correct-key-with-enough-entropy'
     mockedOperational.mockResolvedValue({
       windowHours: 24,
@@ -65,13 +72,23 @@ describe('protected readiness endpoints', () => {
       performance: { digestRunP95Ms: 100, deliveryP95Ms: 50 },
       externalBlockers: [],
     })
+    mockedFreshness.mockResolvedValue([
+      { source: 'hh', latestOccurredAt: '2026-07-20T09:00:00.000Z', lagHours: 1, signalCount: 42 },
+    ])
 
     const response = await getOperationalReadiness(
       request('/api/health/readiness?windowHours=48', 'correct-key-with-enough-entropy'),
     )
     expect(response.status).toBe(200)
-    expect(await response.json()).toMatchObject({ ok: true, status: 'degraded' })
+    expect(await response.json()).toMatchObject({
+      ok: true,
+      status: 'degraded',
+      report: {
+        sourceFreshness: [{ source: 'hh', lagHours: 1, signalCount: 42 }],
+      },
+    })
     expect(mockedOperational).toHaveBeenCalledWith(48)
+    expect(mockedFreshness).toHaveBeenCalledTimes(1)
   })
 
   test('returns honest payment readiness without credentials or customer data', async () => {
