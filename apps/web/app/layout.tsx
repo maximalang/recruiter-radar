@@ -11,17 +11,23 @@ const inter = Inter({
   display: "swap",
 });
 
-const appIcon = "/recruiter-radar-logo.svg?v=brand-28";
+const brandVersion = "brand-29";
+const tabIcon = `/recruiter-radar-logo.svg?v=${brandVersion}`;
+const installIcon = `/app-icon-192?v=${brandVersion}`;
+const appleIcon = `/apple-icon-180?v=${brandVersion}`;
 
 export const metadata: Metadata = {
   title: "Recruiter Radar",
   description: "Ежедневный радар по компаниям с активным наймом для рекрутеров и агентств.",
-  manifest: "/manifest.webmanifest?v=brand-28",
+  manifest: `/manifest.webmanifest?v=${brandVersion}`,
   applicationName: "Recruiter Radar",
   icons: {
-    icon: [{ url: appIcon, type: "image/svg+xml", sizes: "any" }],
-    shortcut: [{ url: appIcon, type: "image/svg+xml", sizes: "any" }],
-    apple: [{ url: appIcon, type: "image/svg+xml", sizes: "any" }],
+    icon: [
+      { url: tabIcon, type: "image/svg+xml", sizes: "any" },
+      { url: installIcon, type: "image/png", sizes: "192x192" },
+    ],
+    shortcut: [{ url: tabIcon, type: "image/svg+xml", sizes: "any" }],
+    apple: [{ url: appleIcon, type: "image/png", sizes: "180x180" }],
   },
   appleWebApp: {
     capable: true,
@@ -38,9 +44,10 @@ export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="ru">
       <head>
-        <link rel="icon" type="image/svg+xml" sizes="any" href={appIcon} />
-        <link rel="shortcut icon" type="image/svg+xml" href={appIcon} />
-        <link rel="apple-touch-icon" href={appIcon} />
+        <link rel="icon" type="image/svg+xml" sizes="any" href={tabIcon} />
+        <link rel="icon" type="image/png" sizes="192x192" href={installIcon} />
+        <link rel="shortcut icon" type="image/svg+xml" href={tabIcon} />
+        <link rel="apple-touch-icon" sizes="180x180" href={appleIcon} />
       </head>
       <body
         className={`${inter.variable} font-sans`}
