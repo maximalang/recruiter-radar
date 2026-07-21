@@ -11,10 +11,10 @@ const inter = Inter({
   display: "swap",
 });
 
-const brandVersion = "brand-32";
-const tabIcon = `/recruiter-radar-logo.svg?v=${brandVersion}`;
-const tabPng192 = `/app-icon-192?v=${brandVersion}`;
-const tabPng512 = `/app-icon-512?v=${brandVersion}`;
+const brandVersion = "brand-34";
+const tabIcon16 = "/tab-favicon-brand34-16";
+const tabIcon32 = "/tab-favicon-brand34-32";
+const tabIcon48 = "/tab-favicon-brand34-48";
 const appleIcon = `/apple-icon-180?v=${brandVersion}`;
 
 export const metadata: Metadata = {
@@ -24,10 +24,11 @@ export const metadata: Metadata = {
   applicationName: "Recruiter Radar",
   icons: {
     icon: [
-      { url: tabIcon, type: "image/svg+xml", sizes: "any" },
-      { url: tabPng192, type: "image/png", sizes: "192x192" },
-      { url: tabPng512, type: "image/png", sizes: "512x512" },
+      { url: tabIcon16, type: "image/png", sizes: "16x16" },
+      { url: tabIcon32, type: "image/png", sizes: "32x32" },
+      { url: tabIcon48, type: "image/png", sizes: "48x48" },
     ],
+    shortcut: [{ url: tabIcon32, type: "image/png", sizes: "32x32" }],
     apple: [{ url: appleIcon, type: "image/png", sizes: "180x180" }],
   },
   other: {
