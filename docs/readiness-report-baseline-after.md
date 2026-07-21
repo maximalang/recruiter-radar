@@ -41,6 +41,30 @@ verification that the final integrated branch is green end to end.
   verified SHA, rollback, hero-copy anchor, single footer `<img>` mark,
   embedded favicon).
 
+### Addendum — source-automation follow-on commits (same branch, after this snapshot)
+
+This report was captured at `f738903`. The branch then received five more
+atomic commits that are additive to the phase 0–7 work above and do not
+change any phase status:
+
+- `9f285a9` funding-business-signals — free GDELT live-public from profile ICP.
+- `b09c342` egrul-fns — live-public INNs from DB orgs needing verification.
+- `703989d` company-site — live-public crawl targets from DB orgs the radar tracks.
+- `d5e1edf` company-newsrooms — same FILE-input contract, reuses `buildCompanySiteTargets`.
+- `4bbcbbe` docs(current-state) — resynced the Phase-0 source table to the post-automatism state.
+- `b49eae3` refactor(source-ingest) — deduped the two company-page resolvers into one parameterised resolver (-24 net lines).
+
+Final branch tip at merge: `b49eae3`, **ahead 44, behind 0**, CI `build`/`test`/
+`validate`/`smoke` all green on `b49eae3`, `mergeable: true`. None of these
+commits change FIUR scoring, the confidence contract, or source promotion
+policy (the source-automation work changes *which records get fetched* via
+DB-derived inputs, upstream of scoring, with operator override always winning).
+Genuinely operator-credentials-only sources (superjob, linkedin-company-pages,
+industry-media, fedresurs, transparent-business-fns, regional-job-boards,
+tech-job-boards) plus `hh` USER_AGENT and payment-live remain external blockers —
+reported honestly, not stubbed. See `docs/current-state.md` for the live
+post-automatism registry table.
+
 ## Final verification results (after)
 
 | Command | Result | Notes |
