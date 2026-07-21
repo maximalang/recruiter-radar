@@ -9,13 +9,13 @@ const require = createRequire(path.join(appDirectory, "package.json"));
 const sharp = require("sharp");
 
 const appSourcePath = path.join(appDirectory, "public", "recruiter-radar-app-source.svg");
-const tabSourcePath = path.join(appDirectory, "public", "recruiter-radar-logo.svg");
+const tabSourcePath = path.join(appDirectory, "public", "recruiter-radar-tab-brand34.svg");
 const appOutputDirectory = path.join(appDirectory, "public", "app-icons");
 const tabOutputDirectory = path.join(appDirectory, "public", "tab-icons");
 
 const standardSizes = [48, 64, 72, 96, 128, 144, 152, 180, 192, 256, 384, 512, 1024];
 const maskableSizes = [192, 512, 1024];
-const tabFallbackSizes = [192, 512];
+const tabFallbackSizes = [16, 32, 48, 192, 512];
 const masterSize = 4096;
 
 async function renderMaster(sourcePath) {
@@ -42,7 +42,7 @@ async function writePng(master, outputPath, size) {
       fit: "fill",
       kernel: sharp.kernel.lanczos3,
     })
-    .sharpen({ sigma: 0.35 })
+    .sharpen({ sigma: size <= 48 ? 0.55 : 0.35 })
     .png({
       compressionLevel: 9,
       progressive: false,
@@ -76,14 +76,13 @@ for (const size of maskableSizes) {
   );
 }
 
-// Browser engines may prefer a PNG rel=icon candidate over the SVG. Generate
-// those fallback candidates from the rounded favicon artwork, not the unrounded
-// installed-app source, so every possible tab icon has identical rounded edges.
+// Render native tab sizes from the dedicated rounded source. The transparent
+// perimeter and large radius remain visible even at the browser's 16px size.
 const tabMaster = await renderMaster(tabSourcePath);
 for (const size of tabFallbackSizes) {
   await writePng(tabMaster, path.join(tabOutputDirectory, `tab-icon-${size}.png`), size);
 }
 
 console.log(
-  `Generated ${standardSizes.length + maskableSizes.length} PWA icons and ${tabFallbackSizes.length} rounded tab fallbacks.`,
+  `Generated ${standardSizes.length + maskableSizes.length} PWA icons and ${tabFallbackSizes.length} rounded tab icons.`,
 );
