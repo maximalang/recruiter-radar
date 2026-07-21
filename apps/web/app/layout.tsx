@@ -11,7 +11,7 @@ const inter = Inter({
   display: "swap",
 });
 
-const brandVersion = "brand-30";
+const brandVersion = "brand-31";
 const tabIcon = `/recruiter-radar-logo.svg?v=${brandVersion}`;
 const installIcon192 = `/app-icon-192?v=${brandVersion}`;
 const installIcon512 = `/app-icon-512?v=${brandVersion}`;

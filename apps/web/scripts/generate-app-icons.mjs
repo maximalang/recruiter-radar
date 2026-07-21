@@ -7,7 +7,7 @@ const scriptsDirectory = path.dirname(fileURLToPath(import.meta.url));
 const appDirectory = path.resolve(scriptsDirectory, "..");
 const require = createRequire(path.join(appDirectory, "package.json"));
 const sharp = require("sharp");
-const sourcePath = path.join(appDirectory, "public", "recruiter-radar-logo.svg");
+const sourcePath = path.join(appDirectory, "public", "recruiter-radar-app-source.svg");
 const outputDirectory = path.join(appDirectory, "public", "app-icons");
 
 const standardSizes = [48, 64, 72, 96, 128, 144, 152, 180, 192, 256, 384, 512, 1024];
