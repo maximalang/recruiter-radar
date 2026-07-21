@@ -422,121 +422,66 @@ async function resolveEgrulInnsEnv(
 }
 
 /**
- * Resolve the company-site targets FILE from the DB: orgs the radar is already
- * tracking (a domain/website_url AND at least one hiring signal from a
- * job-board), prioritised by freshest signal, capped to
- * MAX_COMPANY_SITE_TARGETS_PER_RUN.
- *
- * Unlike the other resolvers, company-site's live-public mode takes a FILE the
- * script `existsSync`s (not an inline env value), so this resolver writes the
- * derived target list to a temp `.cache/company-site-derived-targets.json` file
- * and injects the path as COMPANY_SITE_TARGETS_FILE. The temp file lives under
- * packages/db/scripts/.cache/ (same dir career-pages uses for its discovered
- * targets snapshot) and is overwritten each run — no accumulation, no secret
- * content (just public company URLs already in the DB).
- *
- * Precedence (matches the other resolvers): an explicit operator override in
- * `dbSearchEnv` (COMPANY_SITE_TARGETS_FILE pinned via user_search_preferences),
- * process.env, or COMPANY_SITE_INPUT_FILE (file mode) ALWAYS wins — derivation
- * only fills when nobody pinned the input. Returns {} when there are no
- * candidate orgs or no pool — the source then falls back to its own no-input
- * error (unchanged). On any FS write error, derivation is skipped (returns {})
- * so the source falls back rather than crashing the whole ingestion batch.
- *
- * company-site is supporting-evidence-only (isPrimary:false) — we only target
- * orgs the radar is ALREADY tracking (HAVING a hiring signal), never cold
- * domains, so the crawl corroborates existing leads instead of originating new
- * ones. Excludes orgs that already have a company-site signal so a re-run
- * doesn't re-crawl the same corporate pages.
+ * Config for `resolveCompanyPageTargetsEnv` — the two sources that share the
+ * `fetchCompanyPages` live-public contract (company-site and company-newsrooms)
+ * differ ONLY in the env-var names they pin, the `source` literal used in the
+ * "already crawled" NOT EXISTS guard, and the temp-file name. Everything else
+ * (the org-selection SQL, the `buildCompanySiteTargets` shaping, the temp-file
+ * write + FS-error fallback) is identical, so the resolver is parameterised
+ * once and each source declares a small config below.
  */
-async function resolveCompanySiteTargetsEnv(
-  dbSearchEnv: Record<string, string>
-): Promise<Record<string, string>> {
-  if (dbSearchEnv.COMPANY_SITE_TARGETS_FILE) return {}
-  if (dbSearchEnv.COMPANY_SITE_INPUT_FILE) return {}
-  if (process.env.COMPANY_SITE_TARGETS_FILE) return {}
-  if (process.env.COMPANY_SITE_INPUT_FILE) return {}
-
-  const pool = getPool()
-  if (!pool) return {}
-  const { rows } = await pool.query<CompanySiteTargetRow>(`
-    SELECT
-      orgs.id::text AS id,
-      orgs.name,
-      orgs.domain,
-      orgs.website_url
-    FROM orgs
-    WHERE COALESCE(NULLIF(BTRIM(orgs.domain), ''), NULLIF(BTRIM(orgs.website_url), '')) IS NOT NULL
-      AND EXISTS (
-        SELECT 1
-        FROM signals
-        WHERE signals.org_id = orgs.id
-          AND signals.source IN ('hh', 'superjob', 'habr-career', 'rabota-rossii', 'career-pages')
-      )
-      AND NOT EXISTS (
-        SELECT 1
-        FROM signals
-        WHERE signals.org_id = orgs.id
-          AND signals.source = 'company-site'
-      )
-    ORDER BY (
-      SELECT MAX(signals.occurred_at)
-      FROM signals
-      WHERE signals.org_id = orgs.id
-    ) DESC NULLS LAST, orgs.id DESC
-    LIMIT $1
-  `, [MAX_COMPANY_SITE_TARGETS_PER_RUN])
-
-  const targets = buildCompanySiteTargets(rows)
-  if (targets.length === 0) return {}
-
-  const cacheDir = resolve(getScriptDir(), '.cache')
-  const targetsFilePath = resolve(cacheDir, 'company-site-derived-targets.json')
-  try {
-    mkdirSync(cacheDir, { recursive: true })
-    writeFileSync(targetsFilePath, `${JSON.stringify(targets, null, 2)}\n`, 'utf8')
-  } catch {
-    // FS write failed (read-only FS, permissions, …) — skip derivation so the
-    // source falls back to its own no-input error instead of crashing the
-    // ingestion batch. The operator can still pin COMPANY_SITE_TARGETS_FILE.
-    return {}
-  }
-  return { COMPANY_SITE_TARGETS_FILE: targetsFilePath }
+interface CompanyPageTargetsConfig {
+  /** Source id, used as the `source` literal in the NOT EXISTS guard. */
+  source: 'company-site' | 'company-newsrooms'
+  /** Env var that points at the targets FILE (injected as the derived path). */
+  targetsFileEnv: 'COMPANY_SITE_TARGETS_FILE' | 'COMPANY_NEWSROOMS_TARGETS_FILE'
+  /** Env var for operator file mode (operator override). */
+  inputFileEnv: 'COMPANY_SITE_INPUT_FILE' | 'COMPANY_NEWSROOMS_INPUT_FILE'
+  /** Optional provider env var (company-newsrooms has one; company-site does not). */
+  providerApiEnv?: 'COMPANY_NEWSROOMS_PROVIDER_API_URL'
+  /** Temp-file basename written under packages/db/scripts/.cache/. */
+  tempFileName: 'company-site-derived-targets.json' | 'company-newsrooms-derived-targets.json'
 }
 
 /**
- * Resolve the company-newsrooms targets FILE from the DB. Identical contract to
- * `resolveCompanySiteTargetsEnv`: company-newsrooms' live-public mode takes the
- * SAME FILE shape (`COMPANY_NEWSROOMS_TARGETS_FILE`, a JSON array the script
- * `existsSync`s and feeds to the same `fetchCompanyPages` adapter), so this
- * reuses `buildCompanySiteTargets` to shape the rows and writes the derived
- * list to a temp `.cache/company-newsrooms-derived-targets.json` file.
+ * Resolve a company-page targets FILE from the DB for either company-site or
+ * company-newsrooms: orgs the radar is already tracking (a domain/website_url
+ * AND at least one hiring signal from a job-board source), prioritised by
+ * freshest signal, capped to MAX_COMPANY_SITE_TARGETS_PER_RUN.
  *
- * Selection mirrors company-site: orgs the radar is already tracking
- * (domain/website_url + a hiring signal from a job-board source), prioritised by
- * freshest signal, capped to MAX_COMPANY_SITE_TARGETS_PER_RUN. We EXCLUDE orgs
- * that already have a company-newsrooms signal so a re-run doesn't re-crawl the
- * same newsroom pages. company-newsrooms is context-only (signal_type 'other',
- * evidence_role 'context') — it corroborates org identity / Urgency (funding,
- * expansion, leadership changes) but never originates a lead (Gate D), so we
- * only target tracked orgs, never cold domains.
+ * Both sources' live-public mode takes a FILE the script `existsSync`s (not an
+ * inline env value), so this resolver writes the derived target list to a temp
+ * `.cache/<tempFileName>` file and injects the path as `<targetsFileEnv>`. The
+ * temp file lives under packages/db/scripts/.cache/ (same dir career-pages uses
+ * for its discovered-targets snapshot) and is overwritten each run — no
+ * accumulation, no secret content (just public company URLs already in the DB).
  *
  * Precedence (matches the other resolvers): an explicit operator override in
- * `dbSearchEnv` (COMPANY_NEWSROOMS_TARGETS_FILE pinned via
- * user_search_preferences), process.env, COMPANY_NEWSROOMS_INPUT_FILE (file
- * mode), or the provider env ALWAYS wins — derivation only fills when nobody
- * pinned the input. Returns {} when there are no candidate orgs or no pool; on
- * any FS write error, derivation is skipped (returns {}) so the source falls
- * back rather than crashing the ingestion batch.
+ * `dbSearchEnv` (the targets/input/provider env pinned via
+ * user_search_preferences), process.env, or the source's file-mode env ALWAYS
+ * wins — derivation only fills when nobody pinned the input. Returns {} when
+ * there are no candidate orgs or no pool — the source then falls back to its
+ * own no-input error (unchanged). On any FS write error, derivation is skipped
+ * (returns {}) so the source falls back rather than crashing the whole
+ * ingestion batch.
+ *
+ * Both sources are non-primary and never lead-originating (company-site is
+ * supporting-evidence-only; company-newsrooms is context-only, Gate D) — we
+ * only target orgs the radar is ALREADY tracking (HAVING a hiring signal),
+ * never cold domains, so the crawl corroborates existing leads instead of
+ * originating new ones. Excludes orgs that already have a `<source>` signal so
+ * a re-run doesn't re-crawl the same pages.
  */
-async function resolveCompanyNewsroomsTargetsEnv(
-  dbSearchEnv: Record<string, string>
+async function resolveCompanyPageTargetsEnv(
+  dbSearchEnv: Record<string, string>,
+  cfg: CompanyPageTargetsConfig,
 ): Promise<Record<string, string>> {
-  if (dbSearchEnv.COMPANY_NEWSROOMS_TARGETS_FILE) return {}
-  if (dbSearchEnv.COMPANY_NEWSROOMS_INPUT_FILE) return {}
-  if (process.env.COMPANY_NEWSROOMS_TARGETS_FILE) return {}
-  if (process.env.COMPANY_NEWSROOMS_INPUT_FILE) return {}
-  if (process.env.COMPANY_NEWSROOMS_PROVIDER_API_URL) return {}
+  const { source, targetsFileEnv, inputFileEnv, providerApiEnv, tempFileName } = cfg
+  if (dbSearchEnv[targetsFileEnv]) return {}
+  if (dbSearchEnv[inputFileEnv]) return {}
+  if (process.env[targetsFileEnv]) return {}
+  if (process.env[inputFileEnv]) return {}
+  if (providerApiEnv && process.env[providerApiEnv]) return {}
 
   const pool = getPool()
   if (!pool) return {}
@@ -558,7 +503,7 @@ async function resolveCompanyNewsroomsTargetsEnv(
         SELECT 1
         FROM signals
         WHERE signals.org_id = orgs.id
-          AND signals.source = 'company-newsrooms'
+          AND signals.source = $2
       )
     ORDER BY (
       SELECT MAX(signals.occurred_at)
@@ -566,23 +511,54 @@ async function resolveCompanyNewsroomsTargetsEnv(
       WHERE signals.org_id = orgs.id
     ) DESC NULLS LAST, orgs.id DESC
     LIMIT $1
-  `, [MAX_COMPANY_SITE_TARGETS_PER_RUN])
+  `, [MAX_COMPANY_SITE_TARGETS_PER_RUN, source])
 
   const targets = buildCompanySiteTargets(rows)
   if (targets.length === 0) return {}
 
   const cacheDir = resolve(getScriptDir(), '.cache')
-  const targetsFilePath = resolve(cacheDir, 'company-newsrooms-derived-targets.json')
+  const targetsFilePath = resolve(cacheDir, tempFileName)
   try {
     mkdirSync(cacheDir, { recursive: true })
     writeFileSync(targetsFilePath, `${JSON.stringify(targets, null, 2)}\n`, 'utf8')
   } catch {
     // FS write failed (read-only FS, permissions, …) — skip derivation so the
     // source falls back to its own no-input error instead of crashing the
-    // ingestion batch. The operator can still pin COMPANY_NEWSROOMS_TARGETS_FILE.
+    // ingestion batch. The operator can still pin the targets-file env.
     return {}
   }
-  return { COMPANY_NEWSROOMS_TARGETS_FILE: targetsFilePath }
+  return { [targetsFileEnv]: targetsFilePath }
+}
+
+/** company-site config for the shared company-page targets resolver. */
+const COMPANY_SITE_TARGETS_CONFIG: CompanyPageTargetsConfig = {
+  source: 'company-site',
+  targetsFileEnv: 'COMPANY_SITE_TARGETS_FILE',
+  inputFileEnv: 'COMPANY_SITE_INPUT_FILE',
+  tempFileName: 'company-site-derived-targets.json',
+}
+
+/** company-newsrooms config for the shared company-page targets resolver. */
+const COMPANY_NEWSROOMS_TARGETS_CONFIG: CompanyPageTargetsConfig = {
+  source: 'company-newsrooms',
+  targetsFileEnv: 'COMPANY_NEWSROOMS_TARGETS_FILE',
+  inputFileEnv: 'COMPANY_NEWSROOMS_INPUT_FILE',
+  providerApiEnv: 'COMPANY_NEWSROOMS_PROVIDER_API_URL',
+  tempFileName: 'company-newsrooms-derived-targets.json',
+}
+
+/** Resolve the company-site targets FILE (thin wrapper over the shared resolver). */
+function resolveCompanySiteTargetsEnv(
+  dbSearchEnv: Record<string, string>
+): Promise<Record<string, string>> {
+  return resolveCompanyPageTargetsEnv(dbSearchEnv, COMPANY_SITE_TARGETS_CONFIG)
+}
+
+/** Resolve the company-newsrooms targets FILE (thin wrapper over the shared resolver). */
+function resolveCompanyNewsroomsTargetsEnv(
+  dbSearchEnv: Record<string, string>
+): Promise<Record<string, string>> {
+  return resolveCompanyPageTargetsEnv(dbSearchEnv, COMPANY_NEWSROOMS_TARGETS_CONFIG)
 }
 
 /**
