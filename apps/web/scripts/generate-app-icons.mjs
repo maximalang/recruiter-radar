@@ -7,36 +7,35 @@ const scriptsDirectory = path.dirname(fileURLToPath(import.meta.url));
 const appDirectory = path.resolve(scriptsDirectory, "..");
 const require = createRequire(path.join(appDirectory, "package.json"));
 const sharp = require("sharp");
-const sourcePath = path.join(appDirectory, "public", "recruiter-radar-app-source.svg");
-const outputDirectory = path.join(appDirectory, "public", "app-icons");
+
+const appSourcePath = path.join(appDirectory, "public", "recruiter-radar-app-source.svg");
+const tabSourcePath = path.join(appDirectory, "public", "recruiter-radar-logo.svg");
+const appOutputDirectory = path.join(appDirectory, "public", "app-icons");
+const tabOutputDirectory = path.join(appDirectory, "public", "tab-icons");
 
 const standardSizes = [48, 64, 72, 96, 128, 144, 152, 180, 192, 256, 384, 512, 1024];
 const maskableSizes = [192, 512, 1024];
+const tabFallbackSizes = [192, 512];
 const masterSize = 4096;
 
-await rm(outputDirectory, { recursive: true, force: true });
-await mkdir(outputDirectory, { recursive: true });
+async function renderMaster(sourcePath) {
+  const sourceSvg = await readFile(sourcePath);
+  return sharp(sourceSvg, { density: 320, limitInputPixels: false })
+    .resize(masterSize, masterSize, {
+      fit: "fill",
+      kernel: sharp.kernel.lanczos3,
+    })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+}
 
-const sourceSvg = await readFile(sourcePath);
-const { data: masterPixels, info: masterInfo } = await sharp(sourceSvg, {
-  density: 320,
-  limitInputPixels: false,
-})
-  .resize(masterSize, masterSize, {
-    fit: "fill",
-    kernel: sharp.kernel.lanczos3,
-  })
-  .ensureAlpha()
-  .raw()
-  .toBuffer({ resolveWithObject: true });
-
-for (const size of standardSizes) {
-  const outputPath = path.join(outputDirectory, `app-icon-${size}.png`);
-  const info = await sharp(masterPixels, {
+async function writePng(master, outputPath, size) {
+  const info = await sharp(master.data, {
     raw: {
-      width: masterInfo.width,
-      height: masterInfo.height,
-      channels: masterInfo.channels,
+      width: master.info.width,
+      height: master.info.height,
+      channels: master.info.channels,
     },
   })
     .resize(size, size, {
@@ -56,16 +55,35 @@ for (const size of standardSizes) {
   }
 }
 
-// The artwork already has a full-bleed background and the mark sits inside the
-// adaptive-icon safe zone. Separate files prevent launchers from reusing a
-// previously cached non-maskable resource for the maskable purpose.
+await Promise.all([
+  rm(appOutputDirectory, { recursive: true, force: true }),
+  rm(tabOutputDirectory, { recursive: true, force: true }),
+]);
+await Promise.all([
+  mkdir(appOutputDirectory, { recursive: true }),
+  mkdir(tabOutputDirectory, { recursive: true }),
+]);
+
+const appMaster = await renderMaster(appSourcePath);
+for (const size of standardSizes) {
+  await writePng(appMaster, path.join(appOutputDirectory, `app-icon-${size}.png`), size);
+}
+
 for (const size of maskableSizes) {
   await copyFile(
-    path.join(outputDirectory, `app-icon-${size}.png`),
-    path.join(outputDirectory, `maskable-${size}.png`),
+    path.join(appOutputDirectory, `app-icon-${size}.png`),
+    path.join(appOutputDirectory, `maskable-${size}.png`),
   );
 }
 
+// Browser engines may prefer a PNG rel=icon candidate over the SVG. Generate
+// those fallback candidates from the rounded favicon artwork, not the unrounded
+// installed-app source, so every possible tab icon has identical rounded edges.
+const tabMaster = await renderMaster(tabSourcePath);
+for (const size of tabFallbackSizes) {
+  await writePng(tabMaster, path.join(tabOutputDirectory, `tab-icon-${size}.png`), size);
+}
+
 console.log(
-  `Generated ${standardSizes.length + maskableSizes.length} native PNG app icons from ${path.basename(sourcePath)}.`,
+  `Generated ${standardSizes.length + maskableSizes.length} PWA icons and ${tabFallbackSizes.length} rounded tab fallbacks.`,
 );

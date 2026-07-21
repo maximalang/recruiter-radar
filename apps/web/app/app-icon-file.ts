@@ -1,10 +1,10 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-export async function serveGeneratedAppIcon(filename: string) {
+async function serveGeneratedIcon(directory: string, filename: string) {
   const candidates = [
-    path.join(process.cwd(), "public", "app-icons", filename),
-    path.join(process.cwd(), "apps", "web", "public", "app-icons", filename),
+    path.join(process.cwd(), "public", directory, filename),
+    path.join(process.cwd(), "apps", "web", "public", directory, filename),
   ];
 
   let lastError: unknown;
@@ -25,4 +25,12 @@ export async function serveGeneratedAppIcon(filename: string) {
   }
 
   throw lastError;
+}
+
+export function serveGeneratedAppIcon(filename: string) {
+  return serveGeneratedIcon("app-icons", filename);
+}
+
+export function serveGeneratedTabIcon(filename: string) {
+  return serveGeneratedIcon("tab-icons", filename);
 }

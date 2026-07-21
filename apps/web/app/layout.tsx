@@ -11,10 +11,10 @@ const inter = Inter({
   display: "swap",
 });
 
-const brandVersion = "brand-31";
+const brandVersion = "brand-32";
 const tabIcon = `/recruiter-radar-logo.svg?v=${brandVersion}`;
-const installIcon192 = `/app-icon-192?v=${brandVersion}`;
-const installIcon512 = `/app-icon-512?v=${brandVersion}`;
+const tabPng192 = `/app-icon-192?v=${brandVersion}`;
+const tabPng512 = `/app-icon-512?v=${brandVersion}`;
 const appleIcon = `/apple-icon-180?v=${brandVersion}`;
 
 export const metadata: Metadata = {
@@ -25,11 +25,13 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: tabIcon, type: "image/svg+xml", sizes: "any" },
-      { url: installIcon192, type: "image/png", sizes: "192x192" },
-      { url: installIcon512, type: "image/png", sizes: "512x512" },
+      { url: tabPng192, type: "image/png", sizes: "192x192" },
+      { url: tabPng512, type: "image/png", sizes: "512x512" },
     ],
-    shortcut: [{ url: tabIcon, type: "image/svg+xml", sizes: "any" }],
     apple: [{ url: appleIcon, type: "image/png", sizes: "180x180" }],
+  },
+  other: {
+    "msapplication-TileImage": `/app-icons/app-icon-144.png?v=${brandVersion}`,
   },
   appleWebApp: {
     capable: true,
@@ -45,17 +47,6 @@ type RootLayoutProps = {
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="ru">
-      <head>
-        <link rel="icon" type="image/svg+xml" sizes="any" href={tabIcon} />
-        <link rel="icon" type="image/png" sizes="192x192" href={installIcon192} />
-        <link rel="icon" type="image/png" sizes="512x512" href={installIcon512} />
-        <link rel="shortcut icon" type="image/svg+xml" href={tabIcon} />
-        <link rel="apple-touch-icon" sizes="180x180" href={appleIcon} />
-        <meta
-          name="msapplication-TileImage"
-          content={`/app-icons/app-icon-144.png?v=${brandVersion}`}
-        />
-      </head>
       <body
         className={`${inter.variable} font-sans`}
         style={{
