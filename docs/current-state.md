@@ -1,6 +1,6 @@
 # Recruiter Radar — текущее состояние runtime
 
-**Обновлено:** 2026-07-20  
+**Обновлено:** 2026-07-21  
 **Назначение:** компактная runtime-grounded точка входа перед изменениями и аудитами.
 
 При конфликте документации применяются `AGENTS.md` / `CLAUDE.md`, затем `SPEC.md`, затем фактический runtime-код. Датированные specs, task-файлы и launch notes являются историческими, если прямо не указано обратное.
@@ -46,23 +46,25 @@ Notification platform поддерживает:
 
 | Source | Роль | Promotion state |
 |---|---|---|
-| `hh` | primary hiring evidence | `digest-allowed`, controlled live checks required |
+| `hh` | primary hiring evidence | `digest-allowed`, controlled live checks required (real `HH_USER_AGENT` is an external blocker) |
 | `rabota-rossii` | official primary evidence | `digest-allowed`, freshness/confidence gated |
 | `career-pages` | direct company hiring surface | `digest-allowed`, controlled discovery coverage required |
-| `egrul-fns` | legal entity enrichment | `never-lead-originating` |
+| `habr-career` | secondary hiring evidence | `digest-allowed`-gated candidate; full-automatism (scraped, no partner API, keywords derived from profile ICP). Live-public when DB has active profiles; pending confidence tests for promotion |
+| `egrul-fns` | legal entity enrichment | `never-lead-originating`; full-automatism — INNs derived from DB orgs needing registry verification (10-digit юрлицо, `ogrn IS NULL`) |
 | `transparent-business-fns` | registry enrichment | `never-lead-originating`, approved provider/snapshot required |
 | `fedresurs` | business context | `never-lead-originating`, compliant provider required |
-| `company-site` | company enrichment/corroboration | `supporting-evidence-only` |
-| `funding-business-signals` | business context | `never-lead-originating` |
+| `company-site` | company enrichment/corroboration | `supporting-evidence-only`; full-automatism — crawl targets derived from DB orgs the radar already tracks (domain + hiring signal, `NOT EXISTS` a company-site signal) |
+| `funding-business-signals` | business context | `never-lead-originating`; full-automatism — GDELT queries derived from active profiles' ICP industries (free, no key) |
 | `linkedin-company-pages` | secondary platform evidence | blocked pending compliant provider and confidence tests |
-| `tech-job-boards` | secondary hiring evidence | blocked pending provider and confidence tests |
+| `tech-job-boards` | secondary hiring evidence | live-public via public ATS manifests (Greenhouse/Lever); operator lists board tokens/slugs — board identifiers, not secrets, but not DB-derivable, so still operator-curated. Pending confidence tests for promotion |
 | `superjob` | secondary hiring evidence | blocked pending API/provider and confidence tests |
-| `habr-career` | secondary hiring evidence | blocked pending legal/robots review and confidence tests |
-| `company-newsrooms` | curated context | `never-lead-originating` |
-| `industry-media` | curated context | `never-lead-originating` |
+| `company-newsrooms` | curated context | `never-lead-originating`; full-automatism — newsroom crawl targets derived from DB orgs (same contract as company-site, `NOT EXISTS` a company-newsrooms signal) |
+| `industry-media` | curated context | `never-lead-originating`; operator INPUT_FILE or provider feed only (no free live crawl) — pending compliant provider/manual review |
 | `regional-job-boards` | regional hiring evidence | blocked pending per-board legal/provider review |
 
 Точный список и policy берутся из `packages/db/scripts/source-registry.mjs`; фиксированное число источников в narrative docs не является контрактом.
+
+`full-automatism` в таблице означает, что источник выводит свой live-public input из DB/профилей без ручной кураторской ENV и без платного ключа — операторский override всегда выигрывает. Это **не** production-live-ready само по себе: такие источники производят записи только когда DB достаточно населена (orgs/профили/сигналы), а первичные источники всё ещё требуют реальных credentials (например `HH_USER_AGENT`). Честный live-config статус проверяется `verify:sources:live-config`, а не статусом в таблице.
 
 ## Payment state
 
