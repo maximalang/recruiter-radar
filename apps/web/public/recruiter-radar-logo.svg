@@ -3,10 +3,14 @@
      width="1254" height="1254" viewBox="0 0 1254 1254"
      version="1.1" role="img" aria-labelledby="title desc"
      shape-rendering="geometricPrecision">
-  <title id="title">Recruiter Radar logo — clean vector</title>
-  <desc id="desc">Clean SVG reconstruction with smooth geometry, refined gradients and no raster noise.</desc>
+  <title id="title">Recruiter Radar rounded browser tab logo</title>
+  <desc id="desc">Rounded-corner browser tab favicon using the clean Recruiter Radar vector artwork.</desc>
 
   <defs>
+    <clipPath id="roundedFrame" clipPathUnits="userSpaceOnUse">
+      <rect width="1254" height="1254" rx="240" ry="240"/>
+    </clipPath>
+
     <radialGradient id="backgroundGradient" cx="47%" cy="40%" r="82%" fx="44%" fy="36%">
       <stop offset="0" stop-color="#f4efea"/>
       <stop offset="0.34" stop-color="#eee7e1"/>
@@ -52,50 +56,48 @@
     </linearGradient>
   </defs>
 
-  <rect width="1254" height="1254" fill="url(#backgroundGradient)"/>
-  <rect width="1254" height="1254" fill="url(#backgroundLight)"/>
+  <g clip-path="url(#roundedFrame)">
+    <rect width="1254" height="1254" fill="url(#backgroundGradient)"/>
+    <rect width="1254" height="1254" fill="url(#backgroundLight)"/>
 
-  <!-- Outer radar ring: true smooth elliptical arc -->
-  <path d="M 516.3 257.4
-           A 387 410 0 1 1 241.9 609.3"
-        fill="none" stroke="url(#outerBrown)" stroke-width="78"
-        stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M 516.3 257.4
+             A 387 410 0 1 1 241.9 609.3"
+          fill="none" stroke="url(#outerBrown)" stroke-width="78"
+          stroke-linecap="round" stroke-linejoin="round"/>
 
-  <!-- Inner radar ring: true smooth elliptical arc -->
-  <path d="M 537.1 475.5
-           A 192 204 0 1 1 439.8 604.7"
-        fill="none" stroke="url(#innerBrown)" stroke-width="74"
-        stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M 537.1 475.5
+             A 192 204 0 1 1 439.8 604.7"
+          fill="none" stroke="url(#innerBrown)" stroke-width="74"
+          stroke-linecap="round" stroke-linejoin="round"/>
 
-  <!-- Letter and radar beam: clean vector geometry -->
-  <path fill="url(#letterGradient)" fill-rule="evenodd" clip-rule="evenodd"
-        d="M 266 272
-           H 407
-           C 456 272 495 314 495 365
-           C 495 402 477 436 447 458
-           L 602 612
-           L 627 654
-           L 579 639
-           L 334 464
-           H 318
-           C 316 464 315 465 315 467
-           V 518
-           C 315 534 302 547 286 547
-           H 269
-           C 252 547 239 533 239 516
-           V 301
-           C 239 285 251 272 266 272
-           Z
+    <path fill="url(#letterGradient)" fill-rule="evenodd" clip-rule="evenodd"
+          d="M 266 272
+             H 407
+             C 456 272 495 314 495 365
+             C 495 402 477 436 447 458
+             L 602 612
+             L 627 654
+             L 579 639
+             L 334 464
+             H 318
+             C 316 464 315 465 315 467
+             V 518
+             C 315 534 302 547 286 547
+             H 269
+             C 252 547 239 533 239 516
+             V 301
+             C 239 285 251 272 266 272
+             Z
 
-           M 315 345
-           C 315 343 317 341 320 341
-           H 397
-           C 414 341 427 355 427 373
-           C 427 391 414 405 397 405
-           H 318
-           C 316 405 315 403 315 401
-           Z"/>
+             M 315 345
+             C 315 343 317 341 320 341
+             H 397
+             C 414 341 427 355 427 373
+             C 427 391 414 405 397 405
+             H 318
+             C 316 405 315 403 315 401
+             Z"/>
 
-  <!-- Perfectly round central radar point -->
-  <circle cx="627" cy="654" r="50" fill="url(#letterGradient)"/>
+    <circle cx="627" cy="654" r="50" fill="url(#letterGradient)"/>
+  </g>
 </svg>
