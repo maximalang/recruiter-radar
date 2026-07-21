@@ -36,7 +36,7 @@ self.addEventListener("push", (event) => {
   const title = payload.title || "Recruiter Radar";
   const options = {
     body: payload.body || "Появились новые лиды в радаре.",
-    icon: "/favicon-brand27",
+    icon: "/recruiter-radar-logo.svg?v=brand-28",
     badge: "/favicon-brand27",
     // Coalesce repeated pushes into one notification instead of stacking.
     tag: "recruiter-radar-leads",

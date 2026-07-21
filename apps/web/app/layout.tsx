@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Inter } from "next/font/google";
 
-import { FAVICON_DATA_URL } from "./favicon-data";
 import { PushReadinessBoot } from "./push-readiness-boot";
 import "./globals.css";
 
@@ -12,11 +11,18 @@ const inter = Inter({
   display: "swap",
 });
 
+const appIcon = "/recruiter-radar-logo.svg?v=brand-28";
+
 export const metadata: Metadata = {
   title: "Recruiter Radar",
   description: "Ежедневный радар по компаниям с активным наймом для рекрутеров и агентств.",
-  manifest: "/manifest.webmanifest?v=brand-27",
+  manifest: "/manifest.webmanifest?v=brand-28",
   applicationName: "Recruiter Radar",
+  icons: {
+    icon: [{ url: appIcon, type: "image/svg+xml", sizes: "any" }],
+    shortcut: [{ url: appIcon, type: "image/svg+xml", sizes: "any" }],
+    apple: [{ url: appIcon, type: "image/svg+xml", sizes: "any" }],
+  },
   appleWebApp: {
     capable: true,
     title: "Recruiter Radar",
@@ -32,9 +38,9 @@ export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="ru">
       <head>
-        <link rel="icon" type="image/png" sizes="64x64" href={FAVICON_DATA_URL} />
-        <link rel="shortcut icon" type="image/png" href={FAVICON_DATA_URL} />
-        <link rel="apple-touch-icon" href="/apple-icon.png?v=brand-27" />
+        <link rel="icon" type="image/svg+xml" sizes="any" href={appIcon} />
+        <link rel="shortcut icon" type="image/svg+xml" href={appIcon} />
+        <link rel="apple-touch-icon" href={appIcon} />
       </head>
       <body
         className={`${inter.variable} font-sans`}
