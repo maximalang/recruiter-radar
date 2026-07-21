@@ -505,6 +505,87 @@ async function resolveCompanySiteTargetsEnv(
 }
 
 /**
+ * Resolve the company-newsrooms targets FILE from the DB. Identical contract to
+ * `resolveCompanySiteTargetsEnv`: company-newsrooms' live-public mode takes the
+ * SAME FILE shape (`COMPANY_NEWSROOMS_TARGETS_FILE`, a JSON array the script
+ * `existsSync`s and feeds to the same `fetchCompanyPages` adapter), so this
+ * reuses `buildCompanySiteTargets` to shape the rows and writes the derived
+ * list to a temp `.cache/company-newsrooms-derived-targets.json` file.
+ *
+ * Selection mirrors company-site: orgs the radar is already tracking
+ * (domain/website_url + a hiring signal from a job-board source), prioritised by
+ * freshest signal, capped to MAX_COMPANY_SITE_TARGETS_PER_RUN. We EXCLUDE orgs
+ * that already have a company-newsrooms signal so a re-run doesn't re-crawl the
+ * same newsroom pages. company-newsrooms is context-only (signal_type 'other',
+ * evidence_role 'context') — it corroborates org identity / Urgency (funding,
+ * expansion, leadership changes) but never originates a lead (Gate D), so we
+ * only target tracked orgs, never cold domains.
+ *
+ * Precedence (matches the other resolvers): an explicit operator override in
+ * `dbSearchEnv` (COMPANY_NEWSROOMS_TARGETS_FILE pinned via
+ * user_search_preferences), process.env, COMPANY_NEWSROOMS_INPUT_FILE (file
+ * mode), or the provider env ALWAYS wins — derivation only fills when nobody
+ * pinned the input. Returns {} when there are no candidate orgs or no pool; on
+ * any FS write error, derivation is skipped (returns {}) so the source falls
+ * back rather than crashing the ingestion batch.
+ */
+async function resolveCompanyNewsroomsTargetsEnv(
+  dbSearchEnv: Record<string, string>
+): Promise<Record<string, string>> {
+  if (dbSearchEnv.COMPANY_NEWSROOMS_TARGETS_FILE) return {}
+  if (dbSearchEnv.COMPANY_NEWSROOMS_INPUT_FILE) return {}
+  if (process.env.COMPANY_NEWSROOMS_TARGETS_FILE) return {}
+  if (process.env.COMPANY_NEWSROOMS_INPUT_FILE) return {}
+  if (process.env.COMPANY_NEWSROOMS_PROVIDER_API_URL) return {}
+
+  const pool = getPool()
+  if (!pool) return {}
+  const { rows } = await pool.query<CompanySiteTargetRow>(`
+    SELECT
+      orgs.id::text AS id,
+      orgs.name,
+      orgs.domain,
+      orgs.website_url
+    FROM orgs
+    WHERE COALESCE(NULLIF(BTRIM(orgs.domain), ''), NULLIF(BTRIM(orgs.website_url), '')) IS NOT NULL
+      AND EXISTS (
+        SELECT 1
+        FROM signals
+        WHERE signals.org_id = orgs.id
+          AND signals.source IN ('hh', 'superjob', 'habr-career', 'rabota-rossii', 'career-pages')
+      )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM signals
+        WHERE signals.org_id = orgs.id
+          AND signals.source = 'company-newsrooms'
+      )
+    ORDER BY (
+      SELECT MAX(signals.occurred_at)
+      FROM signals
+      WHERE signals.org_id = orgs.id
+    ) DESC NULLS LAST, orgs.id DESC
+    LIMIT $1
+  `, [MAX_COMPANY_SITE_TARGETS_PER_RUN])
+
+  const targets = buildCompanySiteTargets(rows)
+  if (targets.length === 0) return {}
+
+  const cacheDir = resolve(getScriptDir(), '.cache')
+  const targetsFilePath = resolve(cacheDir, 'company-newsrooms-derived-targets.json')
+  try {
+    mkdirSync(cacheDir, { recursive: true })
+    writeFileSync(targetsFilePath, `${JSON.stringify(targets, null, 2)}\n`, 'utf8')
+  } catch {
+    // FS write failed (read-only FS, permissions, …) — skip derivation so the
+    // source falls back to its own no-input error instead of crashing the
+    // ingestion batch. The operator can still pin COMPANY_NEWSROOMS_TARGETS_FILE.
+    return {}
+  }
+  return { COMPANY_NEWSROOMS_TARGETS_FILE: targetsFilePath }
+}
+
+/**
  * Resolve the funding-business-signals GDELT query env from the union of all
  * active client profiles' ICP.
  *
@@ -588,18 +669,24 @@ export async function ingestSource(
   // is skipped for it.
   const companySiteDerivedEnv =
     source === 'company-site' ? await resolveCompanySiteTargetsEnv(dbSearchEnv) : {}
+  // company-newsrooms: same FILE contract as company-site (reuses
+  // buildCompanySiteTargets + fetchCompanyPages), written to its own temp
+  // .cache/ file, unless an operator pinned the targets/input/provider.
+  const companyNewsroomsDerivedEnv =
+    source === 'company-newsrooms' ? await resolveCompanyNewsroomsTargetsEnv(dbSearchEnv) : {}
   // Generalised profile-derived search env for the other search-capable
   // sources (hh, superjob, rabota-rossii). For habr-career,
-  // funding-business-signals, egrul-fns, and company-site the specialised
-  // resolvers above already emit their keys (or nothing — company-site has no
-  // keyword params), so the generalised resolver is skipped for them to avoid
-  // double-deriving / unnecessary profile loads. Operator overrides in
-  // dbSearchEnv always win (resolver strips already-pinned keys).
+  // funding-business-signals, egrul-fns, company-site, and company-newsrooms
+  // the specialised resolvers above already emit their keys (or nothing —
+  // neither company-* source has keyword params), so the generalised resolver
+  // is skipped for them to avoid double-deriving / unnecessary profile loads.
+  // Operator overrides in dbSearchEnv always win (resolver strips already-pinned
+  // keys).
   const profileDerivedEnv =
-    (source === 'habr-career' || source === 'funding-business-signals' || source === 'egrul-fns' || source === 'company-site')
+    (source === 'habr-career' || source === 'funding-business-signals' || source === 'egrul-fns' || source === 'company-site' || source === 'company-newsrooms')
       ? {}
       : await resolveProfileSearchEnv(source, dbSearchEnv)
-  const derivedSearchEnv = { ...profileDerivedEnv, ...habrDerivedEnv, ...fundingDerivedEnv, ...egrulDerivedEnv, ...companySiteDerivedEnv }
+  const derivedSearchEnv = { ...profileDerivedEnv, ...habrDerivedEnv, ...fundingDerivedEnv, ...egrulDerivedEnv, ...companySiteDerivedEnv, ...companyNewsroomsDerivedEnv }
 
   return new Promise<IngestResult>((resolvePromise) => {
     // Filter env vars through whitelist — prevent injection of

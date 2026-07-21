@@ -1,13 +1,15 @@
 /**
- * Company-site targets builder — pure function.
+ * Company-site / company-newsrooms targets builder — pure function.
  *
- * company-site is the last no-secrets source that was snapshot-only in
- * practice: unlike egrul-fns / funding-business-signals, its live-public mode
- * takes a FILE (`COMPANY_SITE_TARGETS_FILE`, a JSON array the script
- * `existsSync`s), not an inline env value. So derivation here produces the
- * target *list* (pure); `source-ingest.ts` writes it to a temp cache file and
- * injects the path — the same `.cache/` pattern career-pages already uses for
- * its discovered-targets snapshot.
+ * SHARED by two no-secrets sources whose live-public mode takes a FILE (a JSON
+ * array the script `existsSync`s), not an inline env value: company-site
+ * (`COMPANY_SITE_TARGETS_FILE`) and company-newsrooms
+ * (`COMPANY_NEWSROOMS_TARGETS_FILE`). Both consume the same `fetchCompanyPages`
+ * adapter with the identical target shape, so one builder shapes the rows for
+ * both; `source-ingest.ts` owns the per-source query + temp-file write
+ * (`resolveCompanySiteTargetsEnv` / `resolveCompanyNewsroomsTargetsEnv`) and
+ * injects the path. The temp `.cache/` pattern mirrors career-pages' discovered-
+ * targets snapshot.
  *
  * Target shape (matches `fetchCompanyPages` in
  * packages/db/scripts/adapters/company-site-crawl.mjs):
@@ -18,10 +20,10 @@
  *
  * Selection mirrors career-pages auto-discovery: orgs that already have a
  * corporate surface (domain / website_url) AND at least one hiring signal from
- * a job-board source, prioritised by freshest signal. company-site is
- * supporting-evidence-only (isPrimary:false) — it corroborates existing leads
- * and surfaces direct company/contact pages, so we only target orgs the radar
- * is ALREADY tracking, never cold domains.
+ * a job-board source, prioritised by freshest signal. Both sources are
+ * supporting-evidence-only / context-only (isPrimary:false) — they corroborate
+ * existing leads and surface direct company/contact/newsroom pages, so we only
+ * target orgs the radar is ALREADY tracking, never cold domains.
  */
 
 export type CompanySiteTarget = {

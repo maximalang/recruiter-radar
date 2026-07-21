@@ -220,7 +220,24 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     script: 'source-company-newsrooms.mjs',
     requiredEnvVars: [],
     envPrefixes: ['COMPANY_NEWSROOMS_'],
-    searchEnvVars: [],
+    // COMPANY_NEWSROOMS_TARGETS_FILE is a searchEnvVar so it is EXCLUDED from
+    // the caller env whitelist and instead derived from the DB (same contract
+    // as company-site): source-ingest selects orgs the radar is already
+    // tracking (domain/website_url + a hiring signal), writes them to a temp
+    // .cache/ file as the JSON array the script `existsSync`s, and injects the
+    // path here. The target shape {url, company_name?, company_domain?} is
+    // identical to company-site's and consumed by the same fetchCompanyPages
+    // adapter, so the derivation reuses buildCompanySiteTargets. An operator
+    // can still pin COMPANY_NEWSROOMS_TARGETS_FILE /
+    // COMPANY_NEWSROOMS_INPUT_FILE via ENV or user_search_preferences; the
+    // derived default only fills when unset.
+    searchEnvVars: ['COMPANY_NEWSROOMS_TARGETS_FILE'],
+    // NOT primary (2026-07-15): context-only (signal_type 'other',
+    // evidence_role 'context', contextOnly:true). Newsroom pages corroborate
+    // org identity / Urgency (funding, expansion, leadership changes) but
+    // never originate a lead (Gate D). Digest lead candidacy stays
+    // job_posting-only. Run on demand from the admin panel to enrich the
+    // context surface for an existing candidate set.
     isPrimary: false,
     category: 'career-page',
   },

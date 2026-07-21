@@ -790,6 +790,131 @@ describe('source-ingest', () => {
     })
   })
 
+  describe('company-newsrooms targets FILE (live-public from DB orgs the radar tracks)', () => {
+    // Same contract as company-site: the resolver writes a real temp file to
+    // packages/db/scripts/.cache/ — clean it up after each test so the working
+    // tree stays pristine. The path is gitignored
+    // (.gitignore: packages/db/scripts/.cache/company-newsrooms-derived-targets.json).
+    const path = require('node:path')
+    const fs = require('node:fs')
+    const cacheDir = path.resolve(process.cwd(), '../../packages/db/scripts/.cache')
+    const targetsFilePath = path.join(cacheDir, 'company-newsrooms-derived-targets.json')
+    afterEach(() => {
+      try { fs.unlinkSync(targetsFilePath) } catch { /* already absent */ }
+    })
+
+    function mockPoolWithOrgs(orgRows: Array<{ id: string | number; name: string | null; domain: string | null; website_url: string | null }>) {
+      const query = jest.fn((sql: string) => {
+        if (sql.includes('user_search_preferences')) return Promise.resolve({ rows: [] })
+        if (sql.includes('FROM orgs')) {
+          return Promise.resolve({ rows: orgRows })
+        }
+        return Promise.resolve({ rows: [] })
+      })
+      return { query }
+    }
+
+    it('derives COMPANY_NEWSROOMS_TARGETS_FILE from orgs with a domain + a hiring signal, writes the file', async () => {
+      mockGetPool.mockReturnValue(
+        mockPoolWithOrgs([
+          { id: 1, name: 'АО Ромашка', domain: 'romashka.ru', website_url: null },
+          { id: 2, name: 'ООО Вектор', domain: null, website_url: 'https://vector.ru' },
+        ]),
+      )
+
+      let capturedEnv: Record<string, string> | undefined
+      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
+        capturedEnv = opts.env
+        callback(null, JSON.stringify({ source: 'company-newsrooms', recordsReceived: 2, signalUpsertsCompleted: 2 }), '')
+      })
+
+      await ingestSource('company-newsrooms')
+
+      expect(capturedEnv?.COMPANY_NEWSROOMS_TARGETS_FILE).toBeDefined()
+      const written = JSON.parse(fs.readFileSync(capturedEnv!.COMPANY_NEWSROOMS_TARGETS_FILE, 'utf8'))
+      expect(Array.isArray(written)).toBe(true)
+      expect(written).toHaveLength(2)
+      // Reuses buildCompanySiteTargets — same object shape as company-site.
+      expect(written[0]).toEqual({ url: 'https://romashka.ru', company_name: 'АО Ромашка', company_domain: 'romashka.ru' })
+      expect(written[1].url).toBe('https://vector.ru')
+    })
+
+    it('lets an explicit operator DB pref override the derived targets file', async () => {
+      const mockPoolWithOverride = {
+        query: jest.fn((sql: string) => {
+          if (sql.includes('user_search_preferences')) {
+            return Promise.resolve({ rows: [{ params: { COMPANY_NEWSROOMS_TARGETS_FILE: '/operator/pinned-newsrooms.json' } }] })
+          }
+          return Promise.resolve({ rows: [] })
+        }),
+      }
+      mockGetPool.mockReturnValue(mockPoolWithOverride)
+
+      let capturedEnv: Record<string, string> | undefined
+      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
+        capturedEnv = opts.env
+        callback(null, JSON.stringify({ source: 'company-newsrooms', recordsReceived: 1, signalUpsertsCompleted: 1 }), '')
+      })
+
+      await ingestSource('company-newsrooms')
+
+      // Operator pin wins; no derived file is written.
+      expect(capturedEnv?.COMPANY_NEWSROOMS_TARGETS_FILE).toBe('/operator/pinned-newsrooms.json')
+      expect(fs.existsSync(targetsFilePath)).toBe(false)
+    })
+
+    it('omits COMPANY_NEWSROOMS_TARGETS_FILE when no candidate orgs exist', async () => {
+      mockGetPool.mockReturnValue(mockPoolWithOrgs([]))
+
+      let capturedEnv: Record<string, string> | undefined
+      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
+        capturedEnv = opts.env
+        callback(null, JSON.stringify({ source: 'company-newsrooms', recordsReceived: 0, signalUpsertsCompleted: 0 }), '')
+      })
+
+      await ingestSource('company-newsrooms')
+
+      expect(capturedEnv?.COMPANY_NEWSROOMS_TARGETS_FILE).toBeUndefined()
+      expect(fs.existsSync(targetsFilePath)).toBe(false)
+    })
+
+    it('omits COMPANY_NEWSROOMS_TARGETS_FILE when no pool is configured (test/dev)', async () => {
+      mockGetPool.mockReturnValue(null)
+
+      let capturedEnv: Record<string, string> | undefined
+      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
+        capturedEnv = opts.env
+        callback(null, JSON.stringify({ source: 'company-newsrooms', recordsReceived: 0, signalUpsertsCompleted: 0 }), '')
+      })
+
+      await ingestSource('company-newsrooms')
+
+      expect(capturedEnv?.COMPANY_NEWSROOMS_TARGETS_FILE).toBeUndefined()
+    })
+
+    it('excludes COMPANY_NEWSROOMS_TARGETS_FILE from the caller env whitelist (derived, not passed)', async () => {
+      mockGetPool.mockReturnValue(mockPoolWithOrgs([]))
+
+      let capturedEnv: Record<string, string> | undefined
+      mockExecFile.mockImplementation((_cmd, _args, opts: any, callback: any) => {
+        capturedEnv = opts.env
+        callback(null, JSON.stringify({ source: 'company-newsrooms', recordsReceived: 0, signalUpsertsCompleted: 0 }), '')
+      })
+
+      // Caller tries to inject a targets file + a dangerous key — search var is
+      // excluded, dangerous key is filtered.
+      await ingestSource('company-newsrooms', {
+        COMPANY_NEWSROOMS_TARGETS_FILE: '/attacker/newsrooms.json',
+        NODE_OPTIONS: '--require=/evil.js',
+      })
+
+      // Caller-provided COMPANY_NEWSROOMS_TARGETS_FILE is excluded (search var);
+      // with no candidate orgs nothing is derived either, so it is undefined.
+      expect(capturedEnv?.COMPANY_NEWSROOMS_TARGETS_FILE).toBeUndefined()
+      expect(capturedEnv?.NODE_OPTIONS).toBeUndefined()
+    })
+  })
+
   describe('ingestAllPrimarySources', () => {
     it('runs all primary sources in parallel', async () => {
       mockExecFile.mockImplementation((_cmd, args: any, opts: any, callback: any) => {
