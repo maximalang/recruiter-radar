@@ -13,9 +13,9 @@ const inter = Inter({
 
 const brandVersion = "brand-30";
 const tabIcon = `/recruiter-radar-logo.svg?v=${brandVersion}`;
-const installIcon192 = `/app-icons/app-icon-192.png?v=${brandVersion}`;
-const installIcon512 = `/app-icons/app-icon-512.png?v=${brandVersion}`;
-const appleIcon = `/app-icons/app-icon-180.png?v=${brandVersion}`;
+const installIcon192 = `/app-icon-192?v=${brandVersion}`;
+const installIcon512 = `/app-icon-512?v=${brandVersion}`;
+const appleIcon = `/apple-icon-180?v=${brandVersion}`;
 
 export const metadata: Metadata = {
   title: "Recruiter Radar",
