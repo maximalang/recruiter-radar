@@ -30,8 +30,9 @@ docker-data/
 .codegraph/
 agent-skills/
 apps/web/.cache/
-# Generated from the canonical SVG by scripts/generate-app-icons.mjs before dev/build.
+# Generated from the canonical SVGs by scripts/generate-app-icons.mjs before dev/build.
 apps/web/public/app-icons/
+apps/web/public/tab-icons/
 packages/db/scripts/test-sources-results.json
 # Derived company-site targets (DB-derived temp file written by source-ingest each run)
 packages/db/scripts/.cache/company-site-derived-targets.json
