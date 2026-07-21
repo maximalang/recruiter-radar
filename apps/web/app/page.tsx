@@ -607,16 +607,6 @@ export async function PreviewSection(props: {
                   description="Показываем ближайшие по релевантности. Уточните профиль или расширьте специализацию."
                 />
               ) : null}
-              <div
-                className={hpStyles.previewLeadColumns}
-                data-lead-columns="true"
-                aria-hidden="true"
-              >
-                <span>Компания</span>
-                <span>Сигнал</span>
-                <span>Приоритет</span>
-                <span />
-              </div>
               <div className={hpStyles.previewItemsGrid}>
                 {visiblePreviewItems.map((item, index) => (
                   <PreviewDigestCard
