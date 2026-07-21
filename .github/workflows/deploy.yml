@@ -132,8 +132,26 @@ jobs:
           fi
           SSH_EOF
 
-      - name: Verify public HTTPS endpoint, brand layout, and embedded favicon
+      - name: Read brand version (single source of truth for the favicon gate)
+        id: brand
         run: |
+          # The operator bumps `brandVersion` in layout.tsx to cache-bust icon
+          # assets. The favicon gate below greps for links that embed this exact
+          # version string, so the gate stays in lockstep with the deployed
+          # icon strategy without a hardcoded base64 prefix that drifts whenever
+          # the tab icon changes format.
+          BRAND_VERSION=$(grep -oE 'brandVersion = "brand-[0-9]+"' apps/web/app/layout.tsx \
+            | grep -oE 'brand-[0-9]+' | head -1)
+          if [ -z "$BRAND_VERSION" ]; then
+            echo "Could not read brandVersion from apps/web/app/layout.tsx" >&2
+            exit 1
+          fi
+          echo "Brand version: $BRAND_VERSION"
+          echo "version=$BRAND_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Verify public HTTPS endpoint, brand layout, and app icons
+        run: |
+          BRAND_VERSION="${{ steps.brand.outputs.version }}"
           code=000
           for i in $(seq 1 10); do
             code=$(curl -s -o /dev/null -w '%{http_code}' https://recruiter-radar.ru/api/health --max-time 30)
@@ -161,14 +179,57 @@ jobs:
                 brand_layout_ok=true
               fi
 
+              # Favicon gate follows the operator's file-based icon strategy
+              # (PR #83, brand-29): the browser tab uses a cached SVG
+              # (/recruiter-radar-logo.svg?v=brand-N), the install/home-screen
+              # icon is a real PNG served from a Next route (/app-icon-192), and
+              # Apple touch is a 180x180 PNG (/apple-icon-180). We verify all
+              # three link tags are present AND the underlying PNG/SVG assets
+              # resolve (so a missing route or a dropped icon file fails the
+              # deploy rather than shipping a broken tab icon). The version
+              # string is read from layout.tsx in the preceding step so the
+              # gate never hardcodes a value that drifts on the next bump.
+              #
+              # Next.js renders each icon <link> in two attribute orders (href
+              # first in the metadata-generated tag, href last in the JSX <head>
+              # tag), so we match tag+href in one grep and the required
+              # type/sizes attribute in a second grep — order-independent and
+              # robust to Next changing its attribute emission.
+              tab_icon_ok=false
+              install_icon_ok=false
+              apple_icon_ok=false
               if printf '%s' "$landing_html" \
-                | grep -q 'rel="icon"[^>]*href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAM'; then
+                | grep -qE '<link[^>]*rel="icon"[^>]*href="/recruiter-radar-logo\.svg\?v='"${BRAND_VERSION}"'"[^>]*>' \
+                && printf '%s' "$landing_html" | grep -q 'type="image/svg+xml"'; then
+                tab_icon_ok=true
+              fi
+              if printf '%s' "$landing_html" \
+                | grep -qE '<link[^>]*rel="icon"[^>]*href="/app-icon-192\?v='"${BRAND_VERSION}"'"[^>]*>' \
+                && printf '%s' "$landing_html" | grep -q 'sizes="192x192"'; then
+                install_icon_ok=true
+              fi
+              if printf '%s' "$landing_html" \
+                | grep -qE '<link[^>]*rel="apple-touch-icon"[^>]*href="/apple-icon-180\?v='"${BRAND_VERSION}"'"[^>]*>' \
+                && printf '%s' "$landing_html" | grep -q 'sizes="180x180"'; then
+                apple_icon_ok=true
+              fi
+
+              # Confirm the icon assets themselves resolve (not just the link
+              # tags) — a 404 here means the route is missing or the build did
+              # not emit the static PNG.
+              tab_asset_code=$(curl -s -o /dev/null -w '%{http_code}' "https://recruiter-radar.ru/recruiter-radar-logo.svg?v=${BRAND_VERSION}" --max-time 30)
+              install_asset_code=$(curl -s -o /dev/null -w '%{http_code}' "https://recruiter-radar.ru/app-icon-192?v=${BRAND_VERSION}" --max-time 30)
+              apple_asset_code=$(curl -s -o /dev/null -w '%{http_code}' "https://recruiter-radar.ru/apple-icon-180?v=${BRAND_VERSION}" --max-time 30)
+              echo "icon assets: tab=$tab_asset_code install=$install_asset_code apple=$apple_asset_code"
+
+              if [ "$tab_icon_ok" = "true" ] && [ "$install_icon_ok" = "true" ] && [ "$apple_icon_ok" = "true" ] \
+                && [ "$tab_asset_code" = "200" ] && [ "$install_asset_code" = "200" ] && [ "$apple_asset_code" = "200" ]; then
                 favicon_ok=true
               fi
 
-              echo "landing_ok=$landing_ok brand_layout_ok=$brand_layout_ok favicon_ok=$favicon_ok"
+              echo "landing_ok=$landing_ok brand_layout_ok=$brand_layout_ok favicon_ok=$favicon_ok (brand=$BRAND_VERSION)"
               if [ "$landing_ok" = "true" ] && [ "$brand_layout_ok" = "true" ] && [ "$favicon_ok" = "true" ]; then
-                echo "Public endpoint, text-only header wordmark, single footer mark, and embedded favicon are live"
+                echo "Public endpoint, text-only header wordmark, single footer mark, and app icons are live"
                 exit 0
               fi
             fi
