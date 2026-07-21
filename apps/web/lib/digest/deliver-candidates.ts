@@ -16,6 +16,7 @@ import {
   dispatchDigestNotifications,
   hasActiveNotificationEndpoint,
 } from '@/lib/notification-dispatch'
+import { tryRecordProductEvent } from '@/lib/telemetry'
 import { logError } from '@/lib/runtime'
 import { randomUUID } from 'node:crypto'
 
@@ -34,6 +35,48 @@ export interface DeliverRunResult {
   failed: number
   skipped: number
   failures: Array<{ digestCandidateId: number; error: string }>
+}
+
+async function recordChannelSuccess(input: {
+  runId: string
+  clientProfileId: string
+  provider: 'email' | 'web_push'
+  metadata: Record<string, number>
+}): Promise<void> {
+  const key = `${input.provider}:run:${input.runId}:profile:${input.clientProfileId}`
+  await tryRecordProductEvent({
+    eventName: 'delivery_succeeded',
+    eventKey: `delivery_succeeded:${key}`,
+    clientProfileId: input.clientProfileId,
+    provider: input.provider,
+    outcome: 'sent',
+    metadata: input.metadata,
+  })
+  await tryRecordProductEvent({
+    eventName: 'digest_delivered',
+    eventKey: `digest_delivered:${key}`,
+    clientProfileId: input.clientProfileId,
+    provider: input.provider,
+    outcome: 'sent',
+    metadata: input.metadata,
+  })
+}
+
+async function recordChannelFailure(input: {
+  runId: string
+  clientProfileId: string
+  provider: 'email' | 'web_push'
+  reason: string
+  metadata?: Record<string, number>
+}): Promise<void> {
+  await tryRecordProductEvent({
+    eventName: 'delivery_failed',
+    eventKey: `delivery_failed:${input.provider}:run:${input.runId}:profile:${input.clientProfileId}`,
+    clientProfileId: input.clientProfileId,
+    provider: input.provider,
+    outcome: input.reason,
+    metadata: input.metadata ?? {},
+  })
 }
 
 /**
@@ -117,6 +160,7 @@ export async function deliverCandidatesForRun(runId: string): Promise<DeliverRun
       })
 
       let telegramOk = false
+      let telegramSkipped = false
       let telegramError: string | null = null
       if (customTelegram) {
         const customResult = await dispatchDigestNotifications({
@@ -125,15 +169,9 @@ export async function deliverCandidatesForRun(runId: string): Promise<DeliverRun
           providers: ['telegram'],
         })
 
-        // `skipped` means the deterministic custom job was already sent or the
-        // route intentionally filtered this digest. Neither case is an error and
-        // neither should trigger a duplicate legacy message.
         telegramOk = customResult.failed === 0 && (customResult.sent > 0 || customResult.skipped > 0)
         telegramError = customResult.errors.join('; ') || null
 
-        // Fall back only when no custom endpoint received anything. A partial
-        // success must remain a partial failure, otherwise legacy delivery would
-        // duplicate the digest for endpoints that already succeeded.
         if (!telegramOk && customResult.sent === 0) {
           const legacyResult = await sendBatchDigestForRun({ runId, clientProfileId })
           telegramOk = legacyResult.ok
@@ -143,8 +181,13 @@ export async function deliverCandidatesForRun(runId: string): Promise<DeliverRun
         }
       } else {
         const legacyResult = await sendBatchDigestForRun({ runId, clientProfileId })
-        telegramOk = legacyResult.ok
-        telegramError = legacyResult.ok ? null : legacyResult.error
+        if (legacyResult.ok) {
+          telegramOk = true
+        } else {
+          telegramSkipped = legacyResult.error === 'Client profile has no linked Telegram chat.'
+          telegramOk = telegramSkipped
+          telegramError = telegramSkipped ? null : legacyResult.error
+        }
       }
 
       if (telegramOk) {
@@ -152,7 +195,8 @@ export async function deliverCandidatesForRun(runId: string): Promise<DeliverRun
           `UPDATE digest_delivery_attempts SET status = 'sent', error_message = NULL WHERE id = $1 AND processing_claim_token = $2`,
           [attempt.id, claimToken]
         )
-        counters.sent += 1
+        if (telegramSkipped) counters.skipped += 1
+        else counters.sent += 1
       } else {
         const error = telegramError ?? 'Telegram delivery failed.'
         await pool.query(
@@ -172,22 +216,58 @@ export async function deliverCandidatesForRun(runId: string): Promise<DeliverRun
       counters.failures.push({ digestCandidateId: 0, error: `${clientProfileId}: ${message}` })
     }
 
-    // Additive channels never change the Telegram success result. Each helper owns
-    // its own preference, endpoint and idempotency checks.
     try {
-      await notifyNewLeadsForRun({
+      const pushResult = await notifyNewLeadsForRun({
         clientProfileId,
         digestRunId: runId,
         count: row.candidate_count,
       })
+      if (pushResult.delivered && pushResult.result.sent > 0) {
+        await recordChannelSuccess({
+          runId,
+          clientProfileId,
+          provider: 'web_push',
+          metadata: {
+            sent: pushResult.result.sent,
+            failed: pushResult.result.failed,
+            pruned: pushResult.result.pruned,
+          },
+        })
+      } else if (pushResult.delivered && pushResult.result.failed > 0) {
+        await recordChannelFailure({
+          runId,
+          clientProfileId,
+          provider: 'web_push',
+          reason: 'send_failed',
+          metadata: {
+            sent: pushResult.result.sent,
+            failed: pushResult.result.failed,
+            pruned: pushResult.result.pruned,
+          },
+        })
+      }
     } catch (error) {
       logError('webpush.notify_run_failed', error, { runId, clientProfileId })
+      await recordChannelFailure({ runId, clientProfileId, provider: 'web_push', reason: 'exception' })
     }
+
     try {
-      await sendDigestEmailForProfile({ clientProfileId, digestRunId: runId })
+      const emailResult = await sendDigestEmailForProfile({ clientProfileId, digestRunId: runId })
+      if (emailResult.delivered) {
+        await recordChannelSuccess({
+          runId,
+          clientProfileId,
+          provider: 'email',
+          metadata: { leadCount: emailResult.leadCount },
+        })
+      } else if (emailResult.reason === 'send_failed') {
+        await recordChannelFailure({ runId, clientProfileId, provider: 'email', reason: emailResult.reason })
+      }
     } catch (error) {
       logError('email.digest_send_exception', error, { runId, clientProfileId })
+      await recordChannelFailure({ runId, clientProfileId, provider: 'email', reason: 'exception' })
     }
+
     try {
       const additional = await dispatchDigestNotifications({
         runId,

@@ -47,6 +47,7 @@ try {
     ok: true,
     smoke: 'digest-selection',
     verified: {
+      tenantOwnerInvariant: true,
       scopedBoostWinner: defaultItems[0].source_display_name,
       careerPagesSelection: careerPageRows.map((row) => row.source_display_name),
       domainSelection: domainRows.map((row) => row.source_display_name),
@@ -67,6 +68,7 @@ function createFixture() {
   const runId = `digest-selection-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
 
   return {
+    ownerEmail: `${runId}@example.invalid`,
     agencyName: `Digest Selection ${runId}`,
     cityMatchName: `Scoped Match ${runId}`,
     cityMissName: `Unscoped Match ${runId}`,
@@ -163,13 +165,23 @@ async function setupFixture(client, fixture) {
   await client.query('BEGIN');
 
   try {
-    const clientProfileResult = await client.query(
+    const ownerResult = await client.query(
       `
-        INSERT INTO client_profiles (agency_name, target_city, specialization, daily_digest_limit)
-        VALUES ($1, 'Москва', 'recruiter', 5)
+        INSERT INTO users (email, email_verified_at, full_name)
+        VALUES ($1, NOW(), $2)
         RETURNING id
       `,
-      [fixture.agencyName],
+      [fixture.ownerEmail, fixture.agencyName],
+    );
+    const ownerId = ownerResult.rows[0].id;
+
+    const clientProfileResult = await client.query(
+      `
+        INSERT INTO client_profiles (owner_id, agency_name, target_city, specialization, daily_digest_limit)
+        VALUES ($1, $2, 'Москва', 'recruiter', 5)
+        RETURNING id
+      `,
+      [ownerId, fixture.agencyName],
     );
 
     const orgResult = await client.query(
@@ -259,6 +271,7 @@ async function setupFixture(client, fixture) {
     await client.query('COMMIT');
 
     return {
+      ownerId,
       clientProfileId: clientProfileResult.rows[0].id,
       orgIds: [matchOrgId, missOrgId],
     };
@@ -271,10 +284,12 @@ async function setupFixture(client, fixture) {
 async function cleanupFixture(client, ids) {
   await client.query('BEGIN');
   try {
+    await client.query(`DELETE FROM product_telemetry_events WHERE client_profile_id = $1 OR owner_id = $2`, [ids.clientProfileId, ids.ownerId]);
     await client.query(`DELETE FROM signals WHERE org_id = ANY($1::bigint[])`, [ids.orgIds]);
     await client.query(`DELETE FROM org_source_refs WHERE org_id = ANY($1::bigint[])`, [ids.orgIds]);
     await client.query(`DELETE FROM orgs WHERE id = ANY($1::bigint[])`, [ids.orgIds]);
     await client.query(`DELETE FROM client_profiles WHERE id = $1`, [ids.clientProfileId]);
+    await client.query(`DELETE FROM users WHERE id = $1`, [ids.ownerId]);
     await client.query('COMMIT');
   } catch (error) {
     await client.query('ROLLBACK');
@@ -290,10 +305,11 @@ async function assertRequiredTablesExist(client) {
       WHERE table_schema = 'public'
         AND table_name = ANY($1)
     `,
-    [['client_profiles', 'orgs', 'org_source_refs', 'signals']],
+    [['users', 'client_profiles', 'orgs', 'org_source_refs', 'signals', 'product_telemetry_events']],
   );
   const existingTables = new Set(result.rows.map((row) => row.table_name));
-  const missingTables = ['client_profiles', 'orgs', 'org_source_refs', 'signals'].filter((tableName) => !existingTables.has(tableName));
+  const missingTables = ['users', 'client_profiles', 'orgs', 'org_source_refs', 'signals', 'product_telemetry_events']
+    .filter((tableName) => !existingTables.has(tableName));
   assert.equal(missingTables.length, 0, `Missing required public tables for digest selection verify: ${missingTables.join(', ')}`);
 }
 

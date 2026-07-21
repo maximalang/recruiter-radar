@@ -1,64 +1,75 @@
 # Self-serve MVP launch note
 
-## Flow
-Landing → preview → pilot activation → Telegram connection → daily digest → callback feedback → suppression/reweighting.
+> **Статус:** historical rollout note. Актуальные runtime-контракты находятся в `SPEC.md`, `docs/current-state.md`, `docs/architecture.md` и `docs/notification-delivery.md`.
 
-## Activation readiness (pilot → Telegram → first digest)
-- Readiness is evaluated server-side from paid pilot order + linked client profile state.
-- Required checkpoints:
-  - client profile exists;
-  - client profile active;
-  - Telegram connected;
-  - pilot entitlement active (paid order);
-  - first test digest can be requested.
-- UI only reflects readiness and next steps; delivery logic remains server-side.
-- First test digest should be triggered through existing delivery path (conceptually `/api/digest/delivery` / server delivery functions), without duplicating business logic in onboarding UI.
+## Historical flow
 
-## Implemented
-- `apps/web/lib/db.ts` migrated from legacy `leads/lead_status/deliveries` reads to digest model (`digest_candidates`, `client_profiles`, `client_digest_org_state`) for list/status/send actions.
-- Telegram webhook `/api/telegram/webhook` now enforces `TELEGRAM_WEBHOOK_SECRET`, writes to `webhook_events`, is replay-safe via deterministic idempotency key, persists processed/failed statuses, and answers callback queries.
-- Billing webhook `/api/billing/webhook`: secret validation + idempotent billing event ledger.
-- Self-serve foundations migration aligned to digest model: `digest_delivery_attempts` references `digest_candidates` (not legacy `deliveries`).
+Первоначальный flow был: Landing → preview → pilot activation → shared Telegram connection → daily digest → callback feedback → suppression/reweighting.
+
+Текущий продукт поддерживает несколько delivery channels и customer-managed provider accounts; Telegram больше не является обязательным единственным каналом.
+
+## Activation readiness
+
+Readiness всегда оценивается server-side. Для активации нужны:
+
+- существующий и активный client profile;
+- действующий pilot/subscription entitlement либо явно разрешённый sales-assisted state;
+- хотя бы один пригодный notification channel;
+- возможность создать и доставить test notification/digest через общий delivery path.
+
+UI только отражает readiness и следующий шаг. Он не дублирует entitlement или delivery business logic.
+
+## Implemented foundations
+
+- Web reads переведены на digest model (`digest_candidates`, `client_profiles`, `client_digest_org_state`).
+- Telegram и billing webhooks используют secret validation и idempotent event ledger.
+- Notification platform добавляет provider accounts, endpoints, routes, durable jobs/attempts, replay-safe inbound events и audit log.
+- Premium delivery проверяет entitlement server-side.
+- Legacy lead tables задепрекейчены и не используются production queries.
 
 ## Confidence-gated delivery
-Digest candidates are assigned confidence gates (A/B/C/D) based on evidence quality and entity resolution confidence. Delivery behavior:
 
-- **A/B gates**: auto-delivered to Telegram (2+ independent sources or 1 strong source + enrichment)
-- **C/D gates**: held from Telegram delivery (single-source aggregation or context-only enrichment)
-- **Missing/null gate**: treated as allowed (backward compatibility)
+Digest candidates получают gates A/B/C/D:
 
-Held candidates are filtered at query level in `/api/digest/delivery` before delivery loop, preventing retry noise.
+- A/B могут быть доставлены автоматически согласно текущей confidence policy;
+- C требуют review/hold policy;
+- D не является lead;
+- высокий score не обходит gate.
 
-**Operator inspection**: `npm run digest:held` lists up to 100 most recent C/D candidates with id, digest_run_id, client_profile_id, org_id, confidence_gate, total_score, source_families, created_at.
+Held candidates остаются доступными оператору и не должны создавать ложный successful delivery state.
 
-**Known limitation**: no approval UI yet. Held candidates remain in `digest_candidates` but never create `digest_delivery_attempts` records.
+## Runtime prerequisites
 
-**Next step**: review queue v1 with operator approval workflow (requires schema for review state tracking).
+Минимально требуются:
 
-## Required env vars
-`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_WEBHOOK_SECRET`, `DIGEST_API_KEY`, `RR_APP_BASE_URL`, `BILLING_WEBHOOK_SECRET`.
+- `DATABASE_URL`;
+- `SESSION_SECRET`;
+- `CRON_API_KEY`;
+- `NEXT_PUBLIC_APP_URL`;
+- notification encryption key и provider-specific credentials для реально включённых каналов;
+- payment provider configuration только если используется self-serve checkout;
+- source-specific compliant credentials/configuration для live источников.
 
-Additional onboarding/runtime prerequisites:
-- `DATABASE_URL` for checkout orders, profiles, and Telegram connect tokens.
-- Payment provider env for active pilot entitlement (`PAYMENTS_PROVIDER`, provider-specific keys).
-- Configured Telegram bot username/token so connect links can be generated and test digest can be delivered.
+Точный список определяется runtime validators и provider setup state. Fixture или отсутствующий token не считается production readiness.
 
-## Migration
-- Apply `packages/db/migrations/0004_self_serve_mvp_foundations.sql`.
-- This migration now expects digest pipeline tables from `20260504090000_add_client_digest_pipeline.sql` (`digest_candidates`, etc.).
+## Production scheduling
 
-## Telegram webhook setup
-- Configure Telegram webhook with secret header support (`X-Telegram-Bot-Api-Secret-Token`) equal to `TELEGRAM_WEBHOOK_SECRET`.
-- Endpoint: `${RR_APP_BASE_URL}/api/telegram/webhook`.
-- Replays are safe: duplicated updates are deduplicated by `webhook_events(provider,idempotency_key)`.
+Production не использует n8n как обязательный orchestration layer.
 
-## n8n setup
-- Use `n8n/workflows/daily-signals.json` template only with env-backed config (`RR_APP_BASE_URL`, `DIGEST_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, optional `TELEGRAM_API_BASE_URL`).
-- Do not move scoring/billing/feedback business logic into n8n; keep it in app APIs.
+- VPS cron вызывает `/api/cron/daily-radar`.
+- Retry scheduler вызывает `/api/cron/notification-delivery-retry`.
+- Клиентский n8n может принимать signed webhook как один из notification endpoints.
+- Scoring, billing, feedback, suppression, digest state и entitlement остаются в приложении/PostgreSQL.
 
-## Launch blockers
-- Entitlement gate must be mandatory for all premium digest deliveries server-side (no optional path). ✅ **RESOLVED** — gate is enforced in `apps/web/lib/payments.ts` (`hasPremiumEntitlement`) and in digest API routes (returns 403 if not allowed).
-- Legacy naming (`leadId` in actions/UI) still exists in web layer and should be renamed to `digestCandidateId` for full consistency. ✅ **RESOLVED** (T9) — `updateLeadStatus` / `getLeadDeliveryRow` / `sendLeadToTelegram` params are now `candidateId`; logging uses `digestCandidateId`; `actions.ts` callers use `candidateId` locals. The only remaining `leadId` is the HTML form wire-field key (`formData.get("leadId")`), kept intentionally as an external form contract.
-- Existing historical schema/docs still include legacy lead tables; needs explicit deprecation plan. ✅ **RESOLVED** (T10) — `leads`, `lead_status`, `deliveries` marked deprecated via `COMMENT ON TABLE` (migration `20260615120000_deprecate_legacy_lead_tables.sql`); deprecation + future-drop plan in `docs/legacy-tables-deprecation.md`. Verified no production queries. Tables retained (not dropped).
+Исторический `n8n/workflows/daily-signals.json` не является production source of truth.
 
-> См. также root-level `AGENTS.md` для обязательных правил работы Codex (ветки, PR, проверки, продуктовые и архитектурные границы).
+## Known external blockers
+
+- Реальные provider credentials и webhook registration нельзя подтвердить unit fixture.
+- Stripe является единственным реализованным payment adapter; RF provider требует отдельного выбора, credentials, sandbox/live validation и legal/accounting review.
+- Monthly/quarterly request flow не равен автоматической recurring subscription.
+- Production observability и distributed rate limiting требуют внешней инфраструктуры.
+
+## Verification
+
+См. обязательную матрицу в `docs/current-state.md` и root-level `AGENTS.md` / `CLAUDE.md`.

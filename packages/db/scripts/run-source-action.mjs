@@ -2,6 +2,7 @@ import { pathToFileURL } from 'node:url';
 
 import { SOURCE_ACTIONS } from './source-contract.mjs';
 import { executeSourceAction, listSourceSummaries } from './source-registry.mjs';
+import { recordSourceActionTelemetry } from './lib/product-telemetry.mjs';
 
 export function formatSourceActionResult(command, source, result) {
   if (source.id === 'hh' && command === 'pipeline') {
@@ -49,6 +50,7 @@ export async function runSourceActionCli(argv = process.argv.slice(2)) {
     return;
   }
 
+  const startedAt = Date.now();
   try {
     const { source, result } = await executeSourceAction(requestedSourceId, requestedCommand);
     sourceIdForError = source.id;
@@ -56,9 +58,22 @@ export async function runSourceActionCli(argv = process.argv.slice(2)) {
     for (const line of formatSourceActionResult(requestedCommand, source, result)) {
       console.log(line);
     }
+
+    await recordSourceActionTelemetry({
+      sourceId: source.id,
+      action: requestedCommand,
+      ok: true,
+      durationMs: Date.now() - startedAt,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`${sourceIdForError.toUpperCase()} ${requestedCommand} failed: ${message}`);
+    await recordSourceActionTelemetry({
+      sourceId: sourceIdForError,
+      action: requestedCommand,
+      ok: false,
+      durationMs: Date.now() - startedAt,
+    });
     process.exitCode = 1;
   }
 }

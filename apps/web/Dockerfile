@@ -22,6 +22,11 @@ FROM node:22-alpine AS runner
 
 WORKDIR /app
 
+# Playwright uses the distribution Chromium in production. Browser downloads
+# are intentionally not persisted from the builder's node_modules cache.
+RUN apk add --no-cache chromium
+ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser
+
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
 

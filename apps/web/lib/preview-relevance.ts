@@ -21,6 +21,7 @@
 
 import type { HhDigestItem } from "./hhDigest"
 import type { PublicPreviewInput } from "./publicProduct"
+import { tryRecordProductEvent } from "./telemetry"
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -246,6 +247,25 @@ export function rankPreviewItems(
     .slice()
     .sort((a, b) => b.relevance.total - a.relevance.total)
     .slice(0, options.limit)
+
+  // Best-effort server-side event. Only field-presence booleans and aggregate
+  // counts are stored; user-entered specialization, city and keywords are never
+  // passed to telemetry. The VDS process is long-lived, and telemetry itself is
+  // fail-open, so this side effect cannot block preview rendering.
+  void tryRecordProductEvent({
+    eventName: "preview_submitted",
+    outcome: "ranked",
+    metadata: {
+      hasSpecialization: input.specialization.trim() !== "",
+      hasTargetCity: input.targetCity.trim() !== "",
+      hasIncludeTerms: input.includeKeywords.trim() !== "",
+      hasExcludeTerms: input.excludeKeywords.trim() !== "",
+      requestedLimit: options.limit,
+      candidateCount: items.length,
+      resultCount: ranked.length,
+      hasExactMatches: exact.length > 0,
+    },
+  })
 
   return { ranked, hasExactMatches: exact.length > 0 }
 }

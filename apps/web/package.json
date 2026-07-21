@@ -11,11 +11,11 @@
     "test:types": "tsc -p tsconfig.test.json --noEmit",
     "sync:digest-evidence": "node scripts/sync-digest-evidence-query.mjs",
     "sync:digest-evidence:check": "node scripts/sync-digest-evidence-query.mjs --check",
+    "quality:evaluate": "node scripts/evaluate-fiur.mjs",
     "validate": "npm run check && npm run build"
   },
   "dependencies": {
     "@mendable/firecrawl-js": "^4.25.1",
-    "crawlee": "^3.16.0",
     "ioredis": "^5.11.1",
     "next": "^16.0.0",
     "nodemailer": "^9.0.1",

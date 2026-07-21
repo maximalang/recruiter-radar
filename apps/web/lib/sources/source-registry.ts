@@ -178,7 +178,14 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     script: 'source-egrul-fns.mjs',
     requiredEnvVars: [],
     envPrefixes: ['EGRUL_FNS_'],
-    searchEnvVars: [],
+    // EGRUL_FNS_INNS is a searchEnvVar so it is EXCLUDED from the caller env
+    // whitelist and instead derived from the DB: source-ingest queries orgs
+    // for 10-digit legal-entity INNs that still need registry verification and
+    // injects them here. An operator can still pin EGRUL_FNS_INNS via
+    // user_search_preferences or ENV; the derived default only fills when
+    // unset. Only 10-digit INNs (юрлицо) — 12-digit ИП/person records are
+    // skipped per the source readiness policy (enrichment-only).
+    searchEnvVars: ['EGRUL_FNS_INNS'],
     isPrimary: false,
     category: 'registry',
   },
@@ -189,7 +196,14 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     script: 'source-company-site.mjs',
     requiredEnvVars: [],
     envPrefixes: ['COMPANY_SITE_', 'CRAWLER_'],
-    searchEnvVars: [],
+    // COMPANY_SITE_TARGETS_FILE is a searchEnvVar so it is EXCLUDED from the
+    // caller env whitelist and instead derived from the DB: source-ingest
+    // selects orgs the radar is already tracking (domain/website_url + a hiring
+    // signal), writes them to a temp .cache/ file as the JSON array the script
+    // `existsSync`s, and injects the path here. An operator can still pin
+    // COMPANY_SITE_TARGETS_FILE / COMPANY_SITE_INPUT_FILE via ENV or
+    // user_search_preferences; the derived default only fills when unset.
+    searchEnvVars: ['COMPANY_SITE_TARGETS_FILE'],
     // NOT primary on purpose (2026-07-15): company-site is supporting-evidence-only
     // (registry policy 'supporting-evidence-only') — it corroborates existing leads
     // and surfaces direct company/contact pages, but must never originate a lead on
@@ -206,7 +220,24 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     script: 'source-company-newsrooms.mjs',
     requiredEnvVars: [],
     envPrefixes: ['COMPANY_NEWSROOMS_'],
-    searchEnvVars: [],
+    // COMPANY_NEWSROOMS_TARGETS_FILE is a searchEnvVar so it is EXCLUDED from
+    // the caller env whitelist and instead derived from the DB (same contract
+    // as company-site): source-ingest selects orgs the radar is already
+    // tracking (domain/website_url + a hiring signal), writes them to a temp
+    // .cache/ file as the JSON array the script `existsSync`s, and injects the
+    // path here. The target shape {url, company_name?, company_domain?} is
+    // identical to company-site's and consumed by the same fetchCompanyPages
+    // adapter, so the derivation reuses buildCompanySiteTargets. An operator
+    // can still pin COMPANY_NEWSROOMS_TARGETS_FILE /
+    // COMPANY_NEWSROOMS_INPUT_FILE via ENV or user_search_preferences; the
+    // derived default only fills when unset.
+    searchEnvVars: ['COMPANY_NEWSROOMS_TARGETS_FILE'],
+    // NOT primary (2026-07-15): context-only (signal_type 'other',
+    // evidence_role 'context', contextOnly:true). Newsroom pages corroborate
+    // org identity / Urgency (funding, expansion, leadership changes) but
+    // never originate a lead (Gate D). Digest lead candidacy stays
+    // job_posting-only. Run on demand from the admin panel to enrich the
+    // context surface for an existing candidate set.
     isPrimary: false,
     category: 'career-page',
   },
@@ -263,9 +294,14 @@ const SOURCE_REGISTRY: SourceConfig[] = [
     // public GDELT global news/event database (no paid key). File mode
     // (FUNDING_BUSINESS_SIGNALS_INPUT_FILE) and provider mode
     // (FUNDING_SIGNALS_PROVIDER_API_URL + _TOKEN) are also supported.
+    // FUNDING_SIGNALS_GDELT_QUERIES is listed as a searchEnvVar so it is
+    // EXCLUDED from the caller env whitelist and instead derived per-profile
+    // from the active profiles' ICP (gdelt-query-builder) — same contract as
+    // the job-board search params. An operator can still pin it via
+    // user_search_preferences; the derived default only fills when unset.
     requiredEnvVars: [],
     envPrefixes: ['FUNDING_BUSINESS_SIGNALS_', 'FUNDING_SIGNALS_'],
-    searchEnvVars: [],
+    searchEnvVars: ['FUNDING_SIGNALS_GDELT_QUERIES'],
     // CONTEXT-only source (2026-07-15): signal_type 'funding' / 'funding_round'
     // does NOT originate a lead — per Gate D, context without direct hiring
     // proof is supporting context only, never a lead. The digest SQL filters

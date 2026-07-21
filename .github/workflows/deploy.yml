@@ -1,40 +1,46 @@
 name: Deploy
 
-# Autodeploy to Timeweb VDS (replaces Railway deploy).
-# Runs after a push to main (the Tests workflow runs separately on the same push).
-# Builds the standalone Next.js image on a fast CI runner, ships it as a tar to
-# the VDS over SSH, loads it, and recreates the web container with a health check.
-# No registry / PAT needed — image travels via scp. Secrets: RR_SSH_*.
+# Production deploy to Timeweb VDS. The workflow runs only for a successful
+# Tests workflow triggered by a push to main and deploys that exact tested SHA.
+# The image is transferred over SSH, so no container registry credentials are
+# required. Secrets: RR_SSH_HOST, RR_SSH_PORT, RR_SSH_USER, RR_SSH_PRIVATE_KEY.
 
 on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
+  workflow_run:
+    workflows: [Tests]
+    types: [completed]
 
 permissions:
   contents: read
 
 concurrency:
   group: deploy-prod
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
+    env:
+      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Validate deployment scripts
         run: bash -n scripts/deploy/configure-notification-encryption.sh
 
-      - name: Build Docker image
-        run: |
-          docker build -f apps/web/Dockerfile -t recruiter-radar:latest .
+      - name: Build immutable Docker image
+        run: docker build -f apps/web/Dockerfile -t "recruiter-radar:${DEPLOY_SHA}" .
 
       - name: Save image as tarball
         run: |
-          docker save recruiter-radar:latest | gzip > /tmp/recruiter-radar-image.tar.gz
+          docker save "recruiter-radar:${DEPLOY_SHA}" | gzip > /tmp/recruiter-radar-image.tar.gz
           ls -lh /tmp/recruiter-radar-image.tar.gz
 
       - name: Setup SSH
@@ -53,40 +59,82 @@ jobs:
             scripts/deploy/configure-notification-encryption.sh \
             ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}:/opt/recruiter-radar/configure-notification-encryption.sh
 
-      - name: Load image and recreate web container
+      - name: Deploy image with local rollback
+        id: deploy
         run: |
           ssh -p ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
-            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }} << 'SSH_EOF'
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }} \
+            "DEPLOY_SHA='${DEPLOY_SHA}' bash -s" << 'SSH_EOF'
           set -euo pipefail
-          echo "=== Freeing space from unused Docker artifacts ==="
+          cd /opt/recruiter-radar
+
+          cleanup_tarball() {
+            rm -f /opt/recruiter-radar/image-new.tar.gz
+          }
+          trap cleanup_tarball EXIT
+
+          wait_for_health() {
+            for i in $(seq 1 30); do
+              if curl -fsS http://localhost:3000/api/health > /dev/null 2>&1; then
+                echo "Health check passed after ${i}x2s"
+                curl -fsS http://localhost:3000/api/health
+                return 0
+              fi
+              sleep 2
+            done
+            return 1
+          }
+
+          rollback() {
+            echo "=== Rolling back to previous production image ==="
+            if ! docker image inspect recruiter-radar:rollback > /dev/null 2>&1; then
+              echo "Rollback image is unavailable" >&2
+              return 1
+            fi
+            docker tag recruiter-radar:rollback recruiter-radar:latest
+            /opt/recruiter-radar/configure-notification-encryption.sh
+            wait_for_health
+          }
+
+          previous_image_id="$(docker inspect --format '{{.Image}}' recruiter-radar-web-1 2>/dev/null || true)"
+          if [ -n "$previous_image_id" ]; then
+            docker tag "$previous_image_id" recruiter-radar:rollback
+            echo "Preserved rollback image $previous_image_id"
+          fi
+
+          echo "=== Reclaiming only safe Docker artifacts ==="
           docker container prune -f
-          docker image prune -af
-          df -h /
-          echo "=== Loading new image ==="
+          docker image prune -f
+
+          archive_bytes="$(stat -c '%s' /opt/recruiter-radar/image-new.tar.gz)"
+          available_bytes="$(df -PB1 /opt/recruiter-radar | awk 'NR == 2 { print $4 }')"
+          required_bytes="$((archive_bytes * 3 + 536870912))"
+          if [ "$available_bytes" -lt "$required_bytes" ]; then
+            echo "Insufficient disk space: ${available_bytes} bytes available, ${required_bytes} required" >&2
+            exit 1
+          fi
+
+          echo "=== Loading immutable image ${DEPLOY_SHA} ==="
           docker load < /opt/recruiter-radar/image-new.tar.gz
-          echo "=== Ensuring notification encryption and recreating web container ==="
+          docker image inspect "recruiter-radar:${DEPLOY_SHA}" > /dev/null
+          docker tag "recruiter-radar:${DEPLOY_SHA}" recruiter-radar:latest
+
+          echo "=== Recreating web container ==="
           chmod 700 /opt/recruiter-radar/configure-notification-encryption.sh
           /opt/recruiter-radar/configure-notification-encryption.sh
-          # Clean up the tarball to save disk
-          rm -f /opt/recruiter-radar/image-new.tar.gz
-          echo "=== Waiting for health (up to 60s) ==="
-          for i in $(seq 1 30); do
-            if curl -fsS http://localhost:3000/api/health > /dev/null 2>&1; then
-              echo "Health check passed after ${i}x2s"
-              curl -s http://localhost:3000/api/health
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "Health check FAILED — showing logs:"
-          docker logs --tail 30 recruiter-radar-web-1
-          exit 1
+
+          echo "=== Waiting for local health (up to 60s) ==="
+          if ! wait_for_health; then
+            echo "New deployment failed local health check" >&2
+            docker logs --tail 50 recruiter-radar-web-1 || true
+            rollback
+            exit 1
+          fi
           SSH_EOF
 
       - name: Verify public HTTPS endpoint, brand layout, and embedded favicon
         run: |
-          # Retry loop: Caddy may briefly 502 while the recreated web container
-          # finishes booting (Next.js ready ~2-4s after container health passes).
+          code=000
           for i in $(seq 1 10); do
             code=$(curl -s -o /dev/null -w '%{http_code}' https://recruiter-radar.ru/api/health --max-time 30)
             echo "Public /api/health attempt $i -> HTTP $code"
@@ -94,22 +142,12 @@ jobs:
               landing_ok=false
               brand_layout_ok=false
               favicon_ok=false
-
               landing_html=$(curl -fsS https://recruiter-radar.ru/ --max-time 30 || true)
-              # Anchor the "landing rendered" check on the hero subtitle copy
-              # ("Каждое утро — несколько компаний …"), NOT on an internal lead-card
-              # label. The previous anchor ("Компания и контакты") was a card label
-              # that drifted out when lead cards became expandable <details>; a
-              # user-visible hero line is stable across card restructuring and
-              # proves the page actually rendered its primary content.
+
               if printf '%s' "$landing_html" | grep -q "Каждое утро — несколько компаний"; then
                 landing_ok=true
               fi
 
-              # Count only the real footer <img> mark — not the Next.js
-              # <link rel="preload"> hint or the RSC flight-data serializations,
-              # which also embed the asset path and would inflate a bare-string
-              # grep to 4 hits on a page with exactly one visible mark.
               footer_mark_count=$(printf '%s' "$landing_html" \
                 | grep -oE '<img[^>]*recruiter-radar-mark-brand15\.svg[^>]*>' \
                 | wc -l || true)
@@ -134,3 +172,26 @@ jobs:
           done
           echo "Public deployment verification failed (last health status: $code)"
           exit 1
+
+      - name: Rollback production deployment
+        if: failure() && steps.deploy.outcome == 'success'
+        run: |
+          ssh -p ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }} << 'SSH_EOF'
+          set -euo pipefail
+          cd /opt/recruiter-radar
+          docker image inspect recruiter-radar:rollback > /dev/null
+          docker tag recruiter-radar:rollback recruiter-radar:latest
+          chmod 700 /opt/recruiter-radar/configure-notification-encryption.sh
+          /opt/recruiter-radar/configure-notification-encryption.sh
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:3000/api/health > /dev/null 2>&1; then
+              echo "Rollback health check passed after ${i}x2s"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Rollback health check failed" >&2
+          docker logs --tail 50 recruiter-radar-web-1 || true
+          exit 1
+          SSH_EOF

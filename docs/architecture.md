@@ -1,190 +1,195 @@
-# Архитектура MVP
+# Архитектура Recruiter Radar
 
 ## Цель
 
-Recruiter Radar каждый день находит компании с доказуемыми hiring signals, собирает per-client evidence-first digest и отправляет actionable лиды в Telegram.
+Recruiter Radar каждый день находит компании с доказуемыми hiring signals, собирает per-client evidence-first digest и доставляет actionable лиды через подключённые клиентом каналы.
 
-Система должна оставаться client-intelligence radar для рекрутинговых агентств, а не ATS, CRM, generic parser, mass outreach tool или candidate sourcing product.
+Система остаётся client-intelligence radar для рекрутинговых агентств, а не ATS, CRM, generic parser, mass outreach tool или candidate sourcing product.
+
+Актуальный operational snapshot находится в [`docs/current-state.md`](current-state.md). Фиксированные числа источников и исторические rollout-планы не являются runtime-контрактом.
 
 ## Architecture principles
 
-- **Next.js + Postgres** — product core.
-- **n8n** — orchestration only.
+- **Next.js + PostgreSQL** — product core и единственный владелец бизнес-решений.
+- **VPS cron + product APIs** — production orchestration.
+- **n8n** — не обязательная часть production. Клиент может подключить собственный n8n через signed webhook.
 - **AI** — узкий слой поверх evidence/scoring, не источник истины.
-- **Telegram** — delivery и feedback loop, а не отдельный источник бизнес-логики.
+- **Notification providers** — delivery и feedback transport, не отдельный источник бизнес-логики.
 - **Quality-first** — evidence, confidence, dedupe, suppression и feedback важнее объёма лидов.
 
 ## Источники данных
 
-### Контур 1, primary hiring-signal sources
-Источники, которые напрямую дают сигнал, что компания сейчас нанимает:
-1. `hh` — primary platform source, runnable, lead-originating, участвует в digest selection
-2. `career-pages` — company-surface high-signal source, runnable, lead-originating, участвует в digest selection
-3. `linkedin-company-pages` — secondary platform evidence, runnable, not a sole lead-originating source, НЕ в digest selection
-4. `tech-job-boards` — tech job board coverage, runnable, not в digest selection до подтверждения confidence-gate
+Source registry разделяет несколько независимых состояний:
 
-### Контур 2, enrichment sources
-Источники, которые не создают лид сами по себе, но повышают качество score, confidence и контекста:
-1. `company-site` — company-surface enrichment/corroboration, runnable, не lead-originating по умолчанию
-2. `egrul-fns` — ФНС / ЕГРЮЛ для юридических данных компании и entity validation
-3. `funding-business-signals` — funding, hiring, growth и другие business signals, context-only
+- `status` — source зарегистрирован и имеет runnable contract;
+- `maturity` — стадия технической и operational готовности;
+- `leadEligibility` — допустимая роль evidence;
+- `promotionStatus` — участие в digest;
+- `productionBlockers` — legal, provider, confidence и configuration ограничения.
 
-Enrichment/context sources не должны создавать лид без direct hiring evidence.
+`status: active` сам по себе не означает live-configured или digest-allowed.
 
-**Текущее состояние**: 7 источников в registry (`source-registry.mjs`), все со `status: active`. В digest lead selection (`source-digest-evidence.sql`) участвуют только `hh` и `career-pages`. Остальные пять — на этапе роста покрытия и валидации перед включением в selection.
+### Lead-originating hiring evidence
+
+Кандидатами на lead-originating evidence являются primary/platform и direct company hiring surfaces. Включение определяется `promotionStatus` и confidence policy, а не названием адаптера.
+
+Ключевые направления:
+
+- `hh`;
+- `rabota-rossii`;
+- `career-pages`;
+- provider-gated secondary sources: `superjob`, `habr-career`, `linkedin-company-pages`, `tech-job-boards`, `regional-job-boards`.
+
+### Enrichment и context
+
+Эти источники повышают качество entity match, confidence, context и reachability, но не должны создавать лид без direct hiring proof:
+
+- `company-site`;
+- `egrul-fns`;
+- `transparent-business-fns`;
+- `fedresurs`;
+- `funding-business-signals`;
+- `company-newsrooms`;
+- `industry-media`.
+
+Точное текущее состояние берётся из `packages/db/scripts/source-registry.mjs` и проверяется командами:
+
+```text
+npm run source:list
+npm run verify:sources:readiness
+npm run verify:sources:coverage
+npm run verify:sources:live-config
+```
 
 ## Основные части системы
 
 ### 1. Data layer
 
-- Postgres
-- Основные сущности:
-  - `orgs`
-  - `signals`
-  - `org_source_refs`
-  - `client_profiles`
-  - `digest_runs`
-  - `digest_candidates`
-  - `client_digest_org_state`
-  - billing / checkout / entitlement tables where enabled
+PostgreSQL хранит product state:
 
-Postgres хранит product state: normalized evidence, client profiles, digest state, feedback/suppression, billing/entitlements, scoring outputs и audit data.
+- `orgs`, `signals`, `org_source_refs`;
+- `client_profiles`;
+- `digest_runs`, `digest_candidates`, `client_digest_org_state`;
+- billing, checkout и entitlement state;
+- notification provider accounts, endpoints, routes, jobs, attempts и inbound events;
+- audit data.
+
+Normalized evidence, feedback, suppression, billing и delivery history должны быть tenant-scoped и повторяемо обрабатываться.
 
 ### 2. Product backend
 
-- Next.js / Node.js API
-- Отвечает за:
-  - onboarding / checkout / pilot state
-  - digest APIs
-  - feedback APIs
-  - Telegram webhook APIs
-  - billing/webhook APIs
-  - entitlement gates
-  - score/confidence/evidence assembly boundaries
+Next.js / Node.js API отвечает за:
 
-Backend не должен доверять client-side state для billing, delivery entitlement или privileged actions.
+- authentication, tenant boundary и privileged actions;
+- onboarding, checkout и pilot state;
+- digest generation и selection;
+- feedback/suppression;
+- notification callbacks и delivery;
+- billing/webhook APIs;
+- entitlement gates;
+- score, confidence и evidence assembly.
 
-### 3. Orchestration
+Backend не доверяет client-side state для billing, delivery entitlement или access decisions.
 
-n8n is orchestration only.
+### 3. Production orchestration
 
-n8n может:
-- запускать scheduled jobs
-- вызывать product APIs
-- делать retry/fallback
-- слать operational alerts
-- fan-out/fan-in source jobs
-- триггерить delivery workflow
+Production scheduler вызывает product-owned endpoints:
 
-n8n не должен владеть:
-- scoring
-- confidence gates
-- entity resolution
-- billing/entitlements
-- suppression
-- feedback state
-- digest state
-- evidence assembly
-- prompt versioning
-- product access decisions
+- daily radar: `/api/cron/daily-radar`;
+- notification retry drain: `/api/cron/notification-delivery-retry`.
 
-Эти решения должны жить в code/Postgres, чтобы их можно было тестировать, ревьюить, версионировать и безопасно менять.
+Scheduler может инициировать job, но scoring, entity resolution, confidence, billing, suppression, digest selection и prompt versioning остаются в приложении/PostgreSQL.
 
-### 4. Telegram bot
+Исторические n8n templates не являются production source of truth.
 
-Telegram получает дайджест и принимает feedback.
+### 4. Notification platform
 
-Карточка лида должна быть короткой и actionable:
-- company name
-- score / confidence
-- why now
-- evidence summary
-- best angle
-- safe next action
+Поддерживаются:
 
-Feedback buttons:
-- accepted / Беру
-- badfit / Мимо
-- snooze / Позже
-- contacted / Уже написал
-- replied / Ответили
-- won / Клиент
-- dismissed / Скрыть
+- customer-managed Telegram bots;
+- legacy shared Telegram fallback;
+- VK communities;
+- email;
+- browser push;
+- signed HTTPS webhook.
 
-Callback handling must be authenticated, idempotent, logged, replay-safe and connected to future suppression/reweighting.
+Delivery contract включает:
 
-## Логика MVP
+- deterministic idempotency key;
+- durable job/attempt state;
+- retry и dead-letter semantics;
+- credential redaction;
+- replay-safe inbound events;
+- server-side entitlement;
+- feedback, связанный с будущим suppression/reweighting.
 
-### Поток данных
-1. Primary hiring source отдаёт вакансии или hiring events.
-2. Сервис нормализует вакансии, компании и source references.
-3. Company-owned surfaces и enrichment sources добавляют подтверждение, legal identity и context.
-4. Evidence bundle собирается по компании.
-5. FIUR scoring считает Fit, Intent, Urgency, Reachability.
-6. Confidence gate решает: auto-deliver, deliver with label, review, или do not create lead.
-7. Per-client digest отбирает top candidates с учётом ICP, cooldown, suppression и feedback state.
-8. Telegram delivery отправляет digest.
-9. Feedback меняет future suppression/reweighting.
+Карточка лида должна содержать:
+
+- company name;
+- score/confidence;
+- why now;
+- evidence summary;
+- best angle;
+- safe next action.
+
+Feedback statuses должны оставаться совместимыми с DB enum и маппингами transport layer.
+
+## Поток данных
+
+1. Hiring source отдаёт vacancy/hiring events.
+2. Адаптер нормализует компанию, vacancy и source references.
+3. Entity resolution объединяет evidence на уровне организации.
+4. Company-owned surfaces и enrichment добавляют подтверждение, legal identity и context.
+5. Evidence bundle проходит quality/confidence checks.
+6. FIUR считает Fit, Intent, Urgency и Reachability.
+7. Confidence gate определяет delivery/review/hold.
+8. Per-client digest применяет ICP, cooldown, suppression и feedback state.
+9. Daily scheduler создаёт delivery jobs для всех пригодных каналов.
+10. Provider result/callback записывается идемпотентно.
+11. Feedback влияет на следующие digest runs.
 
 ## FIUR и confidence
-
-FIUR — explainable score:
 
 ```text
 Total Score = Fit + Intent + Urgency + Reachability
 ```
 
+Каждый компонент ограничен `[0,1]`, total — `[0,4]`.
+
 - **Fit** — совпадение с ICP клиента.
 - **Intent** — сила и свежесть hiring evidence.
 - **Urgency** — наличие правильного окна сейчас.
-- **Reachability** — безопасный lawful contact path.
+- **Reachability** — безопасный lawful corporate contact path.
 
-Confidence gate важен не меньше score: высокий score без сильного evidence не должен автоматически становиться hot lead.
+Высокий score не обходит confidence gate. Unit tests формулы не доказывают market precision; объективная оценка требует versioned gold set и offline evaluation.
 
-## Что делает LLM
-
-LLM используется только как narrow layer поверх evidence bundle и deterministic scoring.
+## LLM boundary
 
 Разрешено:
-- сжать evidence в короткое `why_now`
-- предложить `best_angle`
-- классифицировать noisy text / vacancy titles
-- подготовить draft opener
+
+- сжать evidence в `why_now`;
+- предложить `best_angle`;
+- классифицировать noisy text/vacancy titles;
+- подготовить draft opener.
 
 Запрещено:
-- выдумывать факты
-- заменять evidence
-- создавать lead без direct hiring proof
-- отправлять outreach автоматически по умолчанию
-- менять scoring/confidence без audit trail
 
-Для LLM-слоя желательно хранить prompt/model/version/input hash/output audit fields, когда user-facing AI text становится частью продукта.
+- выдумывать факты;
+- заменять evidence;
+- создавать lead без direct hiring proof;
+- автоматически отправлять mass outreach;
+- менять scoring/confidence без versioning и audit trail.
 
-## Что не делаем сейчас
+## Не входит в product core
 
-- ATS
-- CRM
-- candidate sourcing workflow
-- массовый outreach / auto-send
-- одновременное подключение многих primary hiring-signal sources в первом релизе
-- сложную BI-аналитику до подтверждения precision
-- перенос бизнес-логики в n8n
-- генерацию user-facing текста для всех лидов без quality gate
+- ATS;
+- CRM;
+- candidate sourcing workflow;
+- массовый auto-send;
+- enrichment-only источник как самостоятельный lead;
+- перенос бизнес-логики в n8n;
+- optimistic readiness без credentials/legal/confidence checks.
 
-## Первый релиз
+## Runtime verification
 
-MVP должен уметь:
-1. Получать hiring signals из one primary source.
-2. Сохранять org/signal/evidence state в Postgres.
-3. Считать explainable score и confidence.
-4. Собирать per-client digest без дублей и повторов.
-5. Отправлять лиды в Telegram.
-6. Менять feedback state по кнопке.
-7. Использовать feedback для suppression/reweighting будущих дайджестов.
-
-## Очередность расширения после первого релиза
-
-1. Добавить career pages компаний как следующий high-signal company-surface source.
-2. Добавить LinkedIn jobs/company pages или аналогичный внешний jobs/company source, если он допустим для выбранного контура.
-3. Подключить ЕГРЮЛ / ФНС как стандартный entity verification/enrichment source.
-4. После этого тестировать tech job boards и funding/business signals.
+Перед readiness-заявлением обязательны tests, build, migrations, source verifiers, Docker smoke и dependency audit. Полный список приведён в `docs/current-state.md`.

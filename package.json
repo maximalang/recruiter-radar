@@ -154,7 +154,7 @@
     "babel-preset-jest": "^29.6.3",
     "balanced-match": "^1.0.2",
     "baseline-browser-mapping": "^2.10.32",
-    "brace-expansion": "^1.1.14",
+    "brace-expansion": "^1.1.16",
     "braces": "^3.0.3",
     "browserslist": "^4.28.2",
     "bs-logger": "^0.2.6",

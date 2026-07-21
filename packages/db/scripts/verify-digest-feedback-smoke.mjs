@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import pg from 'pg';
+
+import { updateDigestOrgStateFeedbackCore } from '../../../apps/web/lib/digestFeedbackCore.mjs';
 
 const { Client } = pg;
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const rootEnvPath = resolve(scriptDir, '../../../.env');
-const rootDir = resolve(scriptDir, '../../..');
 
 loadEnvFile(rootEnvPath);
 
@@ -18,10 +19,6 @@ if (!databaseUrl) {
   process.exit(1);
 }
 
-const { updateDigestOrgStateFeedback } = await import(
-  pathToFileURL(resolve(rootDir, 'apps/web/lib/digestFeedback.ts')).href
-);
-
 const client = new Client({ connectionString: databaseUrl });
 
 try {
@@ -30,11 +27,11 @@ try {
 
   const fixture = await setupFixture(client);
 
-  const acceptedState = await updateDigestOrgStateFeedback({
+  const acceptedState = await updateDigestOrgStateFeedbackCore({
     clientProfileId: fixture.clientProfileId,
     digestCandidateId: fixture.acceptedCandidateId,
     action: 'accepted',
-    note: 'Strong fit, keep out of future digests'
+    note: 'Strong fit, keep out of future digests',
   }, client);
 
   assert.equal(acceptedState.feedbackStatus, 'contacted');
@@ -43,12 +40,12 @@ try {
   assert.equal(acceptedState.feedbackNote, 'Strong fit, keep out of future digests');
   assert.equal(acceptedState.suppressedUntil, 'infinity');
 
-  const snoozedState = await updateDigestOrgStateFeedback({
+  const snoozedState = await updateDigestOrgStateFeedbackCore({
     clientProfileId: fixture.clientProfileId,
     orgId: fixture.snoozedOrgId,
     action: 'snooze',
     note: 'Retry later',
-    snoozeDays: 14
+    snoozeDays: 14,
   }, client);
 
   assert.equal(snoozedState.feedbackStatus, 'snooze');
@@ -82,7 +79,16 @@ try {
 
   assert.deepEqual(digestVisibility.rows, [], 'accepted/snoozed orgs should stay out of the next digest window');
 
-  console.log('digest feedback smoke passed');
+  console.log(JSON.stringify({
+    ok: true,
+    smoke: 'digest-feedback',
+    verified: {
+      tenantOwnerInvariant: true,
+      sharedRuntimeCore: true,
+      acceptedMapsToContacted: true,
+      snoozeSuppression: true,
+    },
+  }, null, 2));
 } catch (error) {
   try {
     await client.query('ROLLBACK');
@@ -96,22 +102,29 @@ try {
 }
 
 async function setupFixture(client) {
-  const clientProfileResult = await client.query(`
-    INSERT INTO client_profiles (agency_name, daily_digest_limit)
-    VALUES ($1, 5)
+  const fixtureId = `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+  const ownerResult = await client.query(`
+    INSERT INTO users (email, email_verified_at, full_name)
+    VALUES ($1, NOW(), $2)
     RETURNING id
-  `, [`Digest feedback smoke ${Date.now()}`]);
+  `, [`digest-feedback-${fixtureId}@example.invalid`, `Digest feedback smoke ${fixtureId}`]);
+
+  const clientProfileResult = await client.query(`
+    INSERT INTO client_profiles (owner_id, agency_name, daily_digest_limit)
+    VALUES ($1, $2, 5)
+    RETURNING id
+  `, [ownerResult.rows[0].id, `Digest feedback smoke ${fixtureId}`]);
 
   const acceptedOrgResult = await client.query(`
     INSERT INTO orgs (name)
-    VALUES ('Accepted Fixture Org')
+    VALUES ($1)
     RETURNING id
-  `);
+  `, [`Accepted Fixture Org ${fixtureId}`]);
   const snoozedOrgResult = await client.query(`
     INSERT INTO orgs (name)
-    VALUES ('Snoozed Fixture Org')
+    VALUES ($1)
     RETURNING id
-  `);
+  `, [`Snoozed Fixture Org ${fixtureId}`]);
 
   const acceptedRunResult = await client.query(`
     INSERT INTO digest_runs (client_profile_id, source_key, status, requested_limit, selected_count, cooldown_days, completed_at)
@@ -140,7 +153,7 @@ async function setupFixture(client) {
       $2,
       $3,
       'accept-1',
-      'Accepted Fixture Org',
+      $4,
       '["hh"]'::jsonb,
       2,
       2,
@@ -151,48 +164,40 @@ async function setupFixture(client) {
       '{}'::jsonb
     )
     RETURNING id
-  `, [acceptedRunResult.rows[0].id, clientProfileResult.rows[0].id, acceptedOrgResult.rows[0].id]);
+  `, [
+    acceptedRunResult.rows[0].id,
+    clientProfileResult.rows[0].id,
+    acceptedOrgResult.rows[0].id,
+    `Accepted Fixture Org ${fixtureId}`,
+  ]);
 
   return {
     clientProfileId: clientProfileResult.rows[0].id,
     acceptedOrgId: acceptedOrgResult.rows[0].id,
     snoozedOrgId: snoozedOrgResult.rows[0].id,
-    acceptedCandidateId: acceptedCandidateResult.rows[0].id
+    acceptedCandidateId: acceptedCandidateResult.rows[0].id,
   };
 }
 
 function loadEnvFile(filePath) {
-  if (!existsSync(filePath)) {
-    return;
-  }
+  if (!existsSync(filePath)) return;
 
   const envFile = readFileSync(filePath, 'utf8').replace(/^\uFEFF/, '');
 
   for (const rawLine of envFile.split(/\r?\n/)) {
     const trimmedLine = rawLine.trim();
-
-    if (!trimmedLine || trimmedLine.startsWith('#')) {
-      continue;
-    }
+    if (!trimmedLine || trimmedLine.startsWith('#')) continue;
 
     const separatorIndex = rawLine.indexOf('=');
-
-    if (separatorIndex === -1) {
-      continue;
-    }
+    if (separatorIndex === -1) continue;
 
     const key = rawLine.slice(0, separatorIndex).trim();
-
-    if (!key || process.env[key] !== undefined) {
-      continue;
-    }
+    if (!key || process.env[key] !== undefined) continue;
 
     let value = rawLine.slice(separatorIndex + 1).trim();
-
     if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
       value = value.slice(1, -1);
     }
-
     process.env[key] = value;
   }
 }

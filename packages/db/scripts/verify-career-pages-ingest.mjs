@@ -29,10 +29,9 @@ const companyWebsiteUrl = `https://${companyDomain}/`;
 const careerPageUrl = `https://${companyDomain}/careers`;
 const externalId = `career-pages-${runId}`;
 const jobPostingUrl = `${careerPageUrl}/roles/platform-engineer`;
-const orgSourceKeys = [
-  `domain:${companyDomain}`,
-  `company-name:${companyName.toLowerCase()}`,
-];
+const canonicalSourceKeys = [`domain:${companyDomain}`];
+const companyNameAliasKey = `company-name:${companyName.toLowerCase()}`;
+const cleanupSourceKeys = [...canonicalSourceKeys, companyNameAliasKey];
 
 const fixtureRecords = [
   {
@@ -103,7 +102,7 @@ async function cleanup() {
     );
     await cleanupClient.query(
       `DELETE FROM org_source_refs WHERE source = $1 AND source_key = ANY($2)`,
-      ['career-pages', orgSourceKeys],
+      ['career-pages', cleanupSourceKeys],
     );
     await cleanupClient.query(
       `DELETE FROM orgs WHERE domain = $1`,
@@ -130,12 +129,12 @@ async function queryVerificationState() {
       [companyDomain],
     );
     const signalResult = await client.query(
-      `SELECT org_id, source, external_id, headline, source_url FROM signals WHERE source = $1 AND external_id = $2`,
+      `SELECT org_id, source, external_id, headline, source_url, payload FROM signals WHERE source = $1 AND external_id = $2`,
       ['career-pages', externalId],
     );
     const refResult = await client.query(
-      `SELECT org_id, source_key, external_id, display_name FROM org_source_refs WHERE source = $1 AND source_key = ANY($2) ORDER BY source_key ASC`,
-      ['career-pages', orgSourceKeys],
+      `SELECT org_id, source_key, external_id, display_name, metadata FROM org_source_refs WHERE source = $1 AND source_key = ANY($2) ORDER BY source_key ASC`,
+      ['career-pages', cleanupSourceKeys],
     );
 
     return {
@@ -170,6 +169,24 @@ function runIngest() {
   return summary;
 }
 
+function assertIdentityState(state) {
+  assert.equal(state.refRows.length, canonicalSourceKeys.length);
+  assert.deepEqual(state.refRows.map((row) => row.source_key), canonicalSourceKeys);
+  assert.ok(
+    state.refRows[0].metadata?.source_alias_keys?.includes(companyNameAliasKey),
+    'weak company-name identity must remain an alias on the canonical domain ref',
+  );
+  assert.equal(
+    state.refRows.some((row) => row.source_key === companyNameAliasKey),
+    false,
+    'weak company-name identity must not become a standalone canonical source ref when a domain exists',
+  );
+  assert.ok(
+    state.signalRows[0].payload?.source_entity_alias_keys?.includes(companyNameAliasKey),
+    'signal payload must retain the company-name alias for entity resolution',
+  );
+}
+
 let verifyError = null;
 
 try {
@@ -180,20 +197,19 @@ try {
 
   assert.equal(firstState.orgRows.length, 1);
   assert.equal(firstState.signalRows.length, 1);
-  assert.equal(firstState.refRows.length, orgSourceKeys.length);
   assert.equal(firstState.orgRows[0].name, companyName);
   assert.equal(firstState.orgRows[0].domain, companyDomain);
   assert.equal(firstState.orgRows[0].website_url, companyWebsiteUrl);
   assert.equal(firstState.signalRows[0].headline, 'Platform Engineer');
   assert.equal(firstState.signalRows[0].source_url, jobPostingUrl);
-  assert.deepEqual(firstState.refRows.map((row) => row.source_key), [...orgSourceKeys].sort());
+  assertIdentityState(firstState);
 
   const secondSummary = runIngest();
   const secondState = await queryVerificationState();
 
   assert.equal(secondState.orgRows.length, 1);
   assert.equal(secondState.signalRows.length, 1);
-  assert.equal(secondState.refRows.length, orgSourceKeys.length);
+  assertIdentityState(secondState);
   assert.equal(secondSummary.signalUpsertsCompleted, fixtureRecords.length);
 
   console.log(JSON.stringify({
@@ -214,7 +230,9 @@ try {
     verified: {
       orgRows: secondState.orgRows.length,
       signalRows: secondState.signalRows.length,
-      sourceRefRows: secondState.refRows.length,
+      canonicalSourceRefRows: secondState.refRows.length,
+      weakCompanyNameAliasPreserved: true,
+      idempotent: true,
     },
     cleanup: 'performed',
   }, null, 2));
