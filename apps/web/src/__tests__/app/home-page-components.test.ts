@@ -47,7 +47,18 @@ describe('landing card copy helpers', () => {
   it('describes the public example honestly when live data can fall back to demo', () => {
     const [exampleQuestion] = buildFaqItems(true);
 
-    expect(exampleQuestion.answer).toContain('явно показываем демо');
+    expect(exampleQuestion.answer).toContain('Демонстрационные карточки');
+    expect(exampleQuestion.answer).not.toContain('временно недоступна');
     expect(exampleQuestion.answer).not.toContain('показывает те же данные');
+  });
+
+  it('answers trust, outreach and Telegram questions before checkout', () => {
+    const faqItems = buildFaqItems(true);
+    const faqCopy = faqItems.map((item) => `${item.question} ${item.answer}`).join(' ');
+
+    expect(faqItems).toHaveLength(6);
+    expect(faqCopy).toContain('Почему оценке можно доверять');
+    expect(faqCopy).toContain('не отправляет сообщения автоматически');
+    expect(faqCopy).toContain('Telegram');
   });
 });

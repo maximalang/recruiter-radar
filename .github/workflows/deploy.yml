@@ -144,7 +144,11 @@ jobs:
               favicon_ok=false
               landing_html=$(curl -fsS https://recruiter-radar.ru/ --max-time 30 || true)
 
-              if printf '%s' "$landing_html" | grep -q "Каждое утро — несколько компаний"; then
+              # Anchor the "landing rendered" check on the hero subtitle copy
+              # ("Каждый день Recruiter Radar находит лучшие компании"), NOT on an
+              # internal lead-card label. A user-visible hero line is stable across
+              # card restructuring and proves the page rendered its primary content.
+              if printf '%s' "$landing_html" | grep -q "Каждый день Recruiter Radar находит лучшие компании"; then
                 landing_ok=true
               fi
 
