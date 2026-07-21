@@ -54,10 +54,10 @@ export default function RadarCanvas() {
     }
 
     function seedBlips() {
-      // Origin sits a little above the vertical center so the sweep emanates
-      // from behind the headline, not from the middle of the trust strip.
+      // Keep the origin geometrically centered. The canvas fills the hero, so
+      // any vertical offset makes the outer range ring visibly clip unevenly.
       const cx = width / 2;
-      const cy = height * 0.4;
+      const cy = height / 2;
       const maxR = Math.min(width, height) * 0.5;
       // Fewer blips than before — a focused radar shows a handful of
       // contacts, not a scatter of noise. Keep them in the mid/outer band so
@@ -87,7 +87,7 @@ export default function RadarCanvas() {
       ctx.clearRect(0, 0, width, height);
       // base radial wash — a soft glow centered on the radar origin so the
       // sweep reads as coming from a real focal point, not flat darkness.
-      const g = ctx.createRadialGradient(width / 2, height * 0.4, 0, width / 2, height * 0.4, Math.max(width, height) / 1.3);
+      const g = ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, Math.max(width, height) / 1.3);
       g.addColorStop(0, "rgba(37, 99, 235, 0.14)");
       g.addColorStop(1, "rgba(15, 23, 42, 0)");
       ctx.fillStyle = g;
@@ -186,8 +186,9 @@ export default function RadarCanvas() {
     function frame() {
       if (!ctx) return;
       ctx.clearRect(0, 0, width, height);
-      // background wash — glow centered on the radar origin (above center)
-      const g = ctx.createRadialGradient(width / 2, height * 0.4, 0, width / 2, height * 0.4, Math.max(width, height) / 1.3);
+      // Background wash shares the exact ring origin, preventing a second,
+      // optically shifted center from appearing during the sweep.
+      const g = ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, Math.max(width, height) / 1.3);
       g.addColorStop(0, "rgba(37, 99, 235, 0.14)");
       g.addColorStop(1, "rgba(15, 23, 42, 0)");
       ctx.fillStyle = g;
