@@ -6,6 +6,9 @@ import HomePage, { metadata } from "@/app/page";
 import { LandingPreviewSection as PreviewSection } from "@/app/landing-preview";
 import LandingAnalytics from "@/app/landing-analytics";
 import LandingHeader from "@/app/landing-header";
+import LandingHeroDemo from "@/app/landing-hero-demo";
+import { ProductScrollytelling, SourceLayerExplorer } from "@/app/landing-product-story";
+import { MethodPipeline, TelegramDeliveryDemo } from "@/app/landing-quality-demo";
 import { NoticeBox, SectionIntro, SurfaceCard } from "@/app/ui/page-primitives";
 import {
   buildCheckoutHref,
@@ -52,6 +55,15 @@ function readVisibleText(node: ReactNode): string {
     else if (typeof child === "string" || typeof child === "number") parts.push(String(child));
   });
   return parts.join(" ").replace(/\s+/g, " ").trim();
+}
+
+function readRenderedText(node: ReactNode): string {
+  return renderToStaticMarkup(<>{node}</>)
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&#x27;/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 describe("landing section hierarchy", () => {
@@ -154,11 +166,13 @@ describe("landing section hierarchy", () => {
       .filter((element) => element.props["data-landing-faq"]);
 
     expect(collectElements(page, LandingAnalytics)).toHaveLength(1);
-    expect(heroCta?.props.href).toBe("#preview");
+    expect(heroCta?.props.href).toBe("#preview-configurator");
     expect(heroCta?.props["data-landing-events"]).toBe("preview_started");
+    expect(previewLink?.props.href).toBe("#preview-results");
     expect(previewLink?.props["data-landing-events"]).toBe("preview_started");
-    expect(pilotCta?.props["data-landing-events"]).toBe("preview_checkout_clicked");
-    expect(previewForm.props["data-landing-events"]).toBeUndefined();
+    expect(pilotCta?.props["data-landing-events"]).toBe("pilot_cta_clicked");
+    expect(previewForm.props["data-landing-events"]).toBe("preview_started");
+    expect(previewForm.props["data-landing-event-context"]).toBe("form");
     expect(pricingMarker).toBeDefined();
     expect(faqMarkers).toHaveLength(7);
   });
@@ -195,7 +209,7 @@ describe("landing section hierarchy", () => {
 
   it("explains the role and delivery status of every source group", async () => {
     const page = await HomePage({ searchParams: Promise.resolve({}) });
-    const pageText = readVisibleText(page);
+    const pageText = `${readVisibleText(page)} ${readRenderedText(<SourceLayerExplorer />)}`;
 
     expect(pageText).toContain("Каждый источник отвечает за свою часть доказательства");
     expect(pageText).toContain("Источники клиентской выдачи");
@@ -226,7 +240,7 @@ describe("landing section hierarchy", () => {
     const resetLink = links.find((link) => readVisibleText(link) === "Сбросить");
 
     expect(forms).toHaveLength(1);
-    expect(forms[0].props.action).toBe("/#preview");
+    expect(forms[0].props.action).toBe("/#preview-results");
     expect(resetLink?.props.href).toBe("/#preview");
   });
 
@@ -323,14 +337,23 @@ describe("landing section hierarchy", () => {
 
   it("explains the compact quality pipeline without duplicating the hero company card", async () => {
     const page = await HomePage({ searchParams: Promise.resolve({}) });
-    const pageText = readVisibleText(page);
+    const pageText = [
+      readVisibleText(page),
+      readRenderedText(<LandingHeroDemo />),
+      readRenderedText(<ProductScrollytelling />),
+      readRenderedText(<MethodPipeline />),
+      readRenderedText(<TelegramDeliveryDemo />),
+    ].join(" ");
 
     expect(pageText).toContain("Обычный мониторинг показывает, кто нанимает");
     expect(pageText).toContain("Recruiter Radar показывает, кому стоит написать вашему агентству именно сейчас");
-    expect(pageText).toContain("Сигнал найма Проверка компании Контекст момента Confidence gate Клиентская выдача");
+    for (const stage of ["Сигнал найма", "Проверка компании", "Контекст момента", "Порог доверия", "Клиентская выдача"]) {
+      expect(pageText).toContain(stage);
+    }
+    expect(pageText).not.toContain("Confidence gate");
     expect(pageText).toContain("Сигнал проходит единый контур проверки");
     expect(pageText).toContain("Как рассчитывается приоритет");
-    expect(pageText).toContain("Feedback loop");
+    expect(pageText).toContain("Ваш выбор профиль радара следующая выдача");
     expect(pageText).toContain("Будущая выдача учитывает ваши отметки");
     expect(pageText.match(/Производственная компания/g)).toHaveLength(1);
   });

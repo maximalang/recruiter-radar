@@ -1,32 +1,40 @@
 /** @jest-environment jsdom */
 
-import { render, screen } from "@testing-library/react";
+import { act, render } from "@testing-library/react";
 
-import ScrollReveal from "../../../app/scroll-reveal";
+import ScrollReveal from "@/app/scroll-reveal";
 
-describe("ScrollReveal", () => {
-  beforeEach(() => {
-    jest.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
-      x: 0,
-      y: 2_000,
-      top: 2_000,
-      right: 100,
-      bottom: 2_100,
-      left: 0,
-      width: 100,
-      height: 100,
-      toJSON: () => ({}),
+describe("safe landing reveal", () => {
+  it("never hides server content and disconnects after the first reveal", () => {
+    let callback: IntersectionObserverCallback = () => undefined;
+    const disconnect = jest.fn();
+    window.matchMedia = jest.fn().mockReturnValue({ matches: false });
+    Object.defineProperty(window, "IntersectionObserver", {
+      configurable: true,
+      value: jest.fn((nextCallback: IntersectionObserverCallback) => {
+        callback = nextCallback;
+        return { observe: jest.fn(), disconnect, unobserve: jest.fn() };
+      }),
     });
+
+    const { container } = render(<ScrollReveal as="section">Полностью видимый контент</ScrollReveal>);
+    const section = container.querySelector("section");
+
+    expect(section).toBeVisible();
+    expect(section).not.toHaveStyle({ opacity: "0" });
+    act(() => callback([{ isIntersecting: true, target: section } as IntersectionObserverEntry], {} as IntersectionObserver));
+    expect(section).toHaveAttribute("data-revealed", "true");
+    expect(disconnect).toHaveBeenCalled();
   });
 
-  afterEach(() => jest.restoreAllMocks());
+  it("does not create reveal observers when reduced motion is requested", () => {
+    const observer = jest.fn();
+    window.matchMedia = jest.fn().mockReturnValue({ matches: true });
+    Object.defineProperty(window, "IntersectionObserver", { configurable: true, value: observer });
 
-  it("keeps content visible when the intersection callback has not fired", () => {
-    render(<ScrollReveal><p>Важный контент</p></ScrollReveal>);
+    const { container } = render(<ScrollReveal>Статичный контент</ScrollReveal>);
 
-    expect(screen.getByText("Важный контент").parentElement).toHaveStyle({
-      opacity: "1",
-      transform: "none",
-    });
+    expect(container.firstElementChild).toHaveAttribute("data-revealed", "true");
+    expect(observer).not.toHaveBeenCalled();
   });
 });

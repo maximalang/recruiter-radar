@@ -51,6 +51,11 @@
   --gate-c-bg: #fef3c7;
   --gate-d-color: #4b5563;
   --gate-d-bg: #f3f4f6;
+  --motion-fast: 160ms;
+  --motion-base: 280ms;
+  --motion-slow: 620ms;
+  --ease-premium: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
 }
 
 *,

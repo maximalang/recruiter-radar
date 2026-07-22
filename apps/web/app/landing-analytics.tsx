@@ -9,8 +9,11 @@ const LANDING_EVENT_NAMES = [
   "preview_started",
   "preview_generated",
   "preview_checkout_clicked",
+  "pilot_cta_clicked",
+  "closing_cta_clicked",
   "checkout_viewed",
   "payment_started",
+  "continuation_requested",
   "payment_succeeded",
 ] as const;
 
@@ -30,9 +33,23 @@ declare global {
 }
 
 const LANDING_EVENT_NAME_SET = new Set<string>(LANDING_EVENT_NAMES);
+
+function getSameOriginAnalyticsEndpoint() {
+  const fallback = "/api/analytics/landing";
+  const configured = process.env.NEXT_PUBLIC_LANDING_ANALYTICS_ENDPOINT?.trim() || fallback;
+
+  try {
+    const url = new URL(configured, window.location.origin);
+    if (url.origin !== window.location.origin) return fallback;
+    return `${url.pathname}${url.search}`;
+  } catch {
+    return fallback;
+  }
+}
+
 function deliverLandingEvent(detail: LandingAnalyticsDetail) {
   const params = detail.context ? { context: detail.context } : undefined;
-  const analyticsEndpoint = process.env.NEXT_PUBLIC_LANDING_ANALYTICS_ENDPOINT?.trim();
+  const analyticsEndpoint = getSameOriginAnalyticsEndpoint();
   const metrikaCounterId = Number(process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID);
 
   if (Number.isFinite(metrikaCounterId) && metrikaCounterId > 0 && typeof window.ym === "function") {
@@ -43,7 +60,7 @@ function deliverLandingEvent(detail: LandingAnalyticsDetail) {
     }
   }
 
-  if (analyticsEndpoint && typeof navigator.sendBeacon === "function") {
+  if (typeof navigator.sendBeacon === "function") {
     try {
       navigator.sendBeacon(
         analyticsEndpoint,
@@ -61,10 +78,19 @@ export function emitLandingAnalyticsEvent(detail: LandingAnalyticsDetail) {
   deliverLandingEvent(detail);
 }
 
-export function LandingStageEvent(props: { name: LandingAnalyticsEventName; context?: string }) {
+export function LandingStageEvent(props: { name: LandingAnalyticsEventName; context?: string; dedupeKey?: string }) {
   useEffect(() => {
+    if (props.dedupeKey) {
+      const storageKey = `rr:landing-event:${props.name}:${props.dedupeKey}`;
+      try {
+        if (window.sessionStorage.getItem(storageKey)) return;
+        window.sessionStorage.setItem(storageKey, "1");
+      } catch {
+        // Storage may be unavailable in privacy mode; delivery remains best-effort.
+      }
+    }
     emitLandingAnalyticsEvent({ name: props.name, context: props.context });
-  }, [props.context, props.name]);
+  }, [props.context, props.dedupeKey, props.name]);
 
   return null;
 }

@@ -89,7 +89,12 @@ export default async function CheckoutPage(props: {
           {input.targetCity ? <div className={ipStyles.fieldRow}>Город: <strong className={ipStyles.fieldRowStrong}>{input.targetCity}</strong></div> : null}
 
           {account ? (
-            <form action={startCheckoutAction} style={{ display: "grid", gap: 14, marginTop: 18 }} data-landing-events="payment_started" data-landing-event-context="checkout">
+            <form
+              action={startCheckoutAction}
+              style={{ display: "grid", gap: 14, marginTop: 18 }}
+              data-landing-events={isRequest ? "continuation_requested" : "payment_started"}
+              data-landing-event-context="checkout"
+            >
               <label className={ppStyles.field}>
                 <span className={ppStyles.fieldLabel}>Название агентства или команды</span>
                 <input className={ppStyles.input} name="agencyName" required maxLength={160} autoComplete="organization" placeholder="Например, Northstar Recruiting" />

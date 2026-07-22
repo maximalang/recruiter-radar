@@ -9,6 +9,10 @@ import LandingAnalytics, {
 } from "@/app/landing-analytics";
 
 describe("landing analytics event layer", () => {
+  beforeEach(() => {
+    window.sessionStorage.clear();
+  });
+
   it("keeps the preview-first funnel provider-neutral and free of profile data", () => {
     const received: LandingAnalyticsDetail[] = [];
     const listener = (event: Event) => received.push((event as CustomEvent<LandingAnalyticsDetail>).detail);
@@ -67,6 +71,23 @@ describe("landing analytics event layer", () => {
     delete (navigator as Partial<Navigator>).sendBeacon;
   });
 
+  it("never sends the beacon to a cross-origin endpoint", () => {
+    const sendBeacon = jest.fn(() => true);
+    Object.defineProperty(navigator, "sendBeacon", { configurable: true, value: sendBeacon });
+    process.env.NEXT_PUBLIC_LANDING_ANALYTICS_ENDPOINT = "https://analytics.example/collect";
+    const { emitLandingAnalyticsEvent } = jest.requireActual("@/app/landing-analytics") as typeof import("@/app/landing-analytics");
+
+    emitLandingAnalyticsEvent({ name: "landing_viewed", context: "landing" });
+
+    expect(sendBeacon).toHaveBeenCalledWith(
+      "/api/analytics/landing",
+      expect.objectContaining({ type: "application/json" }),
+    );
+
+    delete process.env.NEXT_PUBLIC_LANDING_ANALYTICS_ENDPOINT;
+    delete (navigator as Partial<Navigator>).sendBeacon;
+  });
+
   it("emits generated preview only after the result stage is mounted", () => {
     const received: LandingAnalyticsDetail[] = [];
     const listener = (event: Event) => received.push((event as CustomEvent<LandingAnalyticsDetail>).detail);
@@ -75,6 +96,47 @@ describe("landing analytics event layer", () => {
     render(<LandingStageEvent name="preview_generated" context="preview" />);
 
     expect(received).toEqual([{ name: "preview_generated", context: "preview" }]);
+    window.removeEventListener(LANDING_ANALYTICS_EVENT, listener);
+  });
+
+  it("keeps pricing, closing and continuation intent distinct from checkout/payment", () => {
+    const received: LandingAnalyticsDetail[] = [];
+    const listener = (event: Event) => received.push((event as CustomEvent<LandingAnalyticsDetail>).detail);
+    window.addEventListener(LANDING_ANALYTICS_EVENT, listener);
+
+    const { getByRole } = render(
+      <>
+        <LandingAnalytics />
+        <a href="/checkout?plan=pilot" data-landing-events="pilot_cta_clicked" data-landing-event-context="pilot">Пилот</a>
+        <a href="/checkout?plan=pilot" data-landing-events="closing_cta_clicked" data-landing-event-context="closing">Финальный CTA</a>
+        <form data-landing-events="continuation_requested" data-landing-event-context="checkout"><button type="submit">Заявка</button></form>
+      </>,
+    );
+
+    fireEvent.click(getByRole("link", { name: "Пилот" }));
+    fireEvent.click(getByRole("link", { name: "Финальный CTA" }));
+    fireEvent.submit(getByRole("button", { name: "Заявка" }).closest("form")!);
+
+    expect(received).toEqual(expect.arrayContaining([
+      { name: "pilot_cta_clicked", context: "pilot" },
+      { name: "closing_cta_clicked", context: "closing" },
+      { name: "continuation_requested", context: "checkout" },
+    ]));
+    expect(received).not.toContainEqual({ name: "payment_started", context: "checkout" });
+    window.removeEventListener(LANDING_ANALYTICS_EVENT, listener);
+  });
+
+  it("deduplicates a successful payment across remounts without putting the order id in the payload", () => {
+    const received: LandingAnalyticsDetail[] = [];
+    const listener = (event: Event) => received.push((event as CustomEvent<LandingAnalyticsDetail>).detail);
+    window.addEventListener(LANDING_ANALYTICS_EVENT, listener);
+
+    const first = render(<LandingStageEvent name="payment_succeeded" context="pilot-onboarding" dedupeKey="order-123" />);
+    first.unmount();
+    render(<LandingStageEvent name="payment_succeeded" context="pilot-onboarding" dedupeKey="order-123" />);
+
+    expect(received).toEqual([{ name: "payment_succeeded", context: "pilot-onboarding" }]);
+    expect(JSON.stringify(received)).not.toContain("order-123");
     window.removeEventListener(LANDING_ANALYTICS_EVENT, listener);
   });
 });

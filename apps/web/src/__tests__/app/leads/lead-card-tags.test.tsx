@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 import { render, screen } from '@testing-library/react';
-import { LeadCard, LeadsListLegend } from '@/app/leads/page';
+import { LeadCard, LeadsListLegend } from '@/app/leads/leads-list-components';
 import type { LeadItem } from '@/lib/leads-data';
 
 const baseLead = {
