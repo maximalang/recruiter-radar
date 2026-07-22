@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import Link from "next/link";
 
 import HomePage, { PreviewSection, metadata } from "@/app/page";
+import LandingAnalytics from "@/app/landing-analytics";
 import LandingHeader from "@/app/landing-header";
 import { NoticeBox, SectionIntro, SurfaceCard } from "@/app/ui/page-primitives";
 import {
@@ -110,8 +111,11 @@ describe("landing section hierarchy", () => {
 
     expect(headerIndex).toBeGreaterThanOrEqual(0);
     expect(headerIndex).toBeLessThan(heroIndex);
-    expect(pageText).toContain("Находите компании с подтверждённым спросом на подбор");
-    expect(pageText).toContain("пока окно для обращения ещё открыто");
+    expect(pageText).toContain("Находите компании с подтверждённым спросом");
+    expect(pageText).toContain("пока окно обращения открыто");
+    expect(pageText).not.toContain("окно для обращения ещё открыто");
+    expect(pageText).toContain("Радар ежедневно отбирает компании под профиль агентства");
+    expect(pageText).not.toContain("под специализацию агентства и показывает");
     expect(pageText).toContain("Собрать мой радар");
     expect(pageText).toContain("Посмотреть живой пример");
     expect(pageText).toContain("Не база вакансий");
@@ -124,6 +128,35 @@ describe("landing section hierarchy", () => {
     expect(alignedPlanCards).toHaveLength(3);
     expect(pageText).not.toContain("0 автоспама");
     expect(pageText).not.toContain("Один радар — на неделю, месяц или квартал");
+  });
+
+  it("wires the provider-neutral conversion events into the real landing controls", async () => {
+    const page = await HomePage({ searchParams: Promise.resolve({}) });
+    const preview = await PreviewSection({
+      previewInput: readPublicPreviewInput({}),
+      hasPreview: false,
+      checkoutHref: buildCheckoutHref(readPublicPreviewInput({})),
+    });
+    const links = [
+      ...collectElements(page, Link),
+      ...collectElements(page, "a"),
+    ];
+    const heroCta = links.find((link) => readVisibleText(link) === "Собрать мой радар");
+    const previewLink = links.find((link) => readVisibleText(link) === "Посмотреть живой пример");
+    const pilotCta = links.find((link) => readVisibleText(link) === "Попробовать неделю");
+    const previewForm = collectElements(preview, "form")[0];
+    const pricingMarker = collectElements(page, "div")
+      .find((element) => element.props["data-landing-pricing"] === true);
+    const faqMarkers = collectElements(page, "details")
+      .filter((element) => element.props["data-landing-faq"]);
+
+    expect(collectElements(page, LandingAnalytics)).toHaveLength(1);
+    expect(heroCta?.props["data-landing-events"]).toBe("hero_cta_clicked checkout_started");
+    expect(previewLink?.props["data-landing-events"]).toBe("live_preview_opened");
+    expect(pilotCta?.props["data-landing-events"]).toBe("plan_selected checkout_started");
+    expect(previewForm.props["data-landing-events"]).toBe("profile_setup_started");
+    expect(pricingMarker).toBeDefined();
+    expect(faqMarkers).toHaveLength(7);
   });
 
   it("labels the resilient fallback as a personalized sample instead of live data", async () => {
