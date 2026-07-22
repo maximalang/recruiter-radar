@@ -61,6 +61,7 @@ import {
   isStepComplete
 } from "./pilot-onboarding-components";
 import styles from "./pilot-onboarding-components.module.css";
+import { LandingStageEvent } from "../../../landing-analytics";
 
 export const dynamic = "force-dynamic";
 
@@ -170,6 +171,7 @@ export default async function PilotOnboardingPage({
 
   return (
     <PageFrame maxWidth="860px">
+      {order.status === "paid" ? <LandingStageEvent name="payment_succeeded" context="pilot-onboarding" /> : null}
       <Link href="/" className={ppStyles.backLink}>
         На главную
       </Link>

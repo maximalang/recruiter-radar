@@ -2,7 +2,8 @@ import { Children, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import Link from "next/link";
 
-import HomePage, { PreviewSection, metadata } from "@/app/page";
+import HomePage, { metadata } from "@/app/page";
+import { LandingPreviewSection as PreviewSection } from "@/app/landing-preview";
 import LandingAnalytics from "@/app/landing-analytics";
 import LandingHeader from "@/app/landing-header";
 import { NoticeBox, SectionIntro, SurfaceCard } from "@/app/ui/page-primitives";
@@ -88,7 +89,7 @@ describe("landing section hierarchy", () => {
       "Проблема",
       "Как работает",
       "Проверка сигнала",
-      "Тарифы",
+      "Пилот",
       "FAQ",
       "Рабочий радар",
     ]);
@@ -107,7 +108,7 @@ describe("landing section hierarchy", () => {
     const alignedPlanCards = collectElements(page, SurfaceCard)
       .filter((card) => card.props.padding === "var(--plan-card-padding)");
     const pricingIntro = collectElements(page, SectionIntro)
-      .find((section) => section.props.eyebrow === "Тарифы");
+      .find((section) => section.props.eyebrow === "Пилот");
 
     expect(headerIndex).toBeGreaterThanOrEqual(0);
     expect(headerIndex).toBeLessThan(heroIndex);
@@ -120,12 +121,14 @@ describe("landing section hierarchy", () => {
     expect(pageText).toContain("Посмотреть живой пример");
     expect(pageText).toContain("Не база вакансий");
     expect(pageText).toContain("Без автоматической рассылки");
-    expect(pageText).toContain("Evidence у каждой компании");
-    expect(pageText).toContain("Вы решаете, кому писать");
-    expect(pricingIntro?.props.title).toBe("Начните с недели. Продолжайте, только если радар полезен.");
+    expect(pageText).toContain("Каждая рекомендация с доказательствами");
+    expect(pageText).toContain("Решение об обращении к компании остаётся за агентством");
+    expect(pricingIntro?.props.title).toBe("Пилот на 7 дней — один понятный способ проверить канал.");
     expect(pricingIntro?.props.description).toContain("Пилот — разовая оплата без продления.");
     expect(pageText).toContain("Проверьте новый канал за 7 дней");
-    expect(alignedPlanCards).toHaveLength(3);
+    expect(alignedPlanCards).toHaveLength(1);
+    expect(pageText).toContain("Месяц 14 990 ₽/мес");
+    expect(pageText).toContain("Три месяца 29 990 ₽/3 мес");
     expect(pageText).not.toContain("0 автоспама");
     expect(pageText).not.toContain("Один радар — на неделю, месяц или квартал");
   });
@@ -143,7 +146,7 @@ describe("landing section hierarchy", () => {
     ];
     const heroCta = links.find((link) => readVisibleText(link) === "Собрать мой радар");
     const previewLink = links.find((link) => readVisibleText(link) === "Посмотреть живой пример");
-    const pilotCta = links.find((link) => readVisibleText(link) === "Попробовать неделю");
+    const pilotCta = links.find((link) => readVisibleText(link) === "Запустить пилот");
     const previewForm = collectElements(preview, "form")[0];
     const pricingMarker = collectElements(page, "div")
       .find((element) => element.props["data-landing-pricing"] === true);
@@ -151,10 +154,11 @@ describe("landing section hierarchy", () => {
       .filter((element) => element.props["data-landing-faq"]);
 
     expect(collectElements(page, LandingAnalytics)).toHaveLength(1);
-    expect(heroCta?.props["data-landing-events"]).toBe("hero_cta_clicked checkout_started");
-    expect(previewLink?.props["data-landing-events"]).toBe("live_preview_opened");
-    expect(pilotCta?.props["data-landing-events"]).toBe("plan_selected checkout_started");
-    expect(previewForm.props["data-landing-events"]).toBe("profile_setup_started");
+    expect(heroCta?.props.href).toBe("#preview");
+    expect(heroCta?.props["data-landing-events"]).toBe("preview_started");
+    expect(previewLink?.props["data-landing-events"]).toBe("preview_started");
+    expect(pilotCta?.props["data-landing-events"]).toBe("preview_checkout_clicked");
+    expect(previewForm.props["data-landing-events"]).toBeUndefined();
     expect(pricingMarker).toBeDefined();
     expect(faqMarkers).toHaveLength(7);
   });
@@ -317,14 +321,15 @@ describe("landing section hierarchy", () => {
     expect(previewMarkup).not.toContain("Проверка и источники");
   });
 
-  it("explains the four quality checks without duplicating the hero company card", async () => {
+  it("explains the compact quality pipeline without duplicating the hero company card", async () => {
     const page = await HomePage({ searchParams: Promise.resolve({}) });
     const pageText = readVisibleText(page);
 
     expect(pageText).toContain("Обычный мониторинг показывает, кто нанимает");
     expect(pageText).toContain("Recruiter Radar показывает, кому стоит написать вашему агентству именно сейчас");
     expect(pageText).toContain("Сигнал найма Проверка компании Контекст момента Confidence gate Клиентская выдача");
-    expect(pageText).toContain("Сигнал проходит четыре проверки");
+    expect(pageText).toContain("Сигнал проходит единый контур проверки");
+    expect(pageText).toContain("Как рассчитывается приоритет");
     expect(pageText).toContain("Feedback loop");
     expect(pageText).toContain("Будущая выдача учитывает ваши отметки");
     expect(pageText.match(/Производственная компания/g)).toHaveLength(1);
@@ -338,6 +343,16 @@ describe("landing section hierarchy", () => {
       siteName: "Recruiter Radar",
       locale: "ru_RU",
       type: "website",
+      images: [{
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: "Recruiter Radar — компании, которым стоит написать сегодня",
+      }],
+    }));
+    expect(metadata.twitter).toEqual(expect.objectContaining({
+      card: "summary_large_image",
+      images: ["/opengraph-image"],
     }));
   });
 });

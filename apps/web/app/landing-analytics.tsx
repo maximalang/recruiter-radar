@@ -5,13 +5,13 @@ import { useEffect } from "react";
 export const LANDING_ANALYTICS_EVENT = "recruiter-radar:landing-event";
 
 const LANDING_EVENT_NAMES = [
-  "hero_cta_clicked",
-  "live_preview_opened",
-  "profile_setup_started",
-  "checkout_started",
-  "plan_selected",
-  "pricing_viewed",
-  "faq_opened",
+  "landing_viewed",
+  "preview_started",
+  "preview_generated",
+  "preview_checkout_clicked",
+  "checkout_viewed",
+  "payment_started",
+  "payment_succeeded",
 ] as const;
 
 export type LandingAnalyticsEventName = (typeof LANDING_EVENT_NAMES)[number];
@@ -21,10 +21,52 @@ export type LandingAnalyticsDetail = {
   context?: string;
 };
 
-const LANDING_EVENT_NAME_SET = new Set<string>(LANDING_EVENT_NAMES);
+type YandexMetrika = (counterId: number, method: "reachGoal", target: string, params?: Record<string, string>) => void;
 
-function emitLandingAnalyticsEvent(detail: LandingAnalyticsDetail) {
+declare global {
+  interface Window {
+    ym?: YandexMetrika;
+  }
+}
+
+const LANDING_EVENT_NAME_SET = new Set<string>(LANDING_EVENT_NAMES);
+function deliverLandingEvent(detail: LandingAnalyticsDetail) {
+  const params = detail.context ? { context: detail.context } : undefined;
+  const analyticsEndpoint = process.env.NEXT_PUBLIC_LANDING_ANALYTICS_ENDPOINT?.trim();
+  const metrikaCounterId = Number(process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID);
+
+  if (Number.isFinite(metrikaCounterId) && metrikaCounterId > 0 && typeof window.ym === "function") {
+    try {
+      window.ym(metrikaCounterId, "reachGoal", detail.name, params);
+    } catch {
+      // One optional provider must not block another or affect conversion.
+    }
+  }
+
+  if (analyticsEndpoint && typeof navigator.sendBeacon === "function") {
+    try {
+      navigator.sendBeacon(
+        analyticsEndpoint,
+        new Blob([JSON.stringify({ name: detail.name, ...(params ?? {}) })], { type: "application/json" }),
+      );
+    } catch {
+      // Analytics delivery is best-effort and never blocks the UI.
+    }
+  }
+}
+
+export function emitLandingAnalyticsEvent(detail: LandingAnalyticsDetail) {
+  if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent<LandingAnalyticsDetail>(LANDING_ANALYTICS_EVENT, { detail }));
+  deliverLandingEvent(detail);
+}
+
+export function LandingStageEvent(props: { name: LandingAnalyticsEventName; context?: string }) {
+  useEffect(() => {
+    emitLandingAnalyticsEvent({ name: props.name, context: props.context });
+  }, [props.context, props.name]);
+
+  return null;
 }
 
 function emitElementEvents(element: HTMLElement) {
@@ -38,12 +80,17 @@ function emitElementEvents(element: HTMLElement) {
 }
 
 /**
- * Provider-neutral conversion instrumentation for the public landing. It emits
- * a stable browser event contract and deliberately reads only static data-*
- * attributes, so profile fields and other personal data never enter analytics.
+ * Provider-neutral landing instrumentation. Event payloads are intentionally
+ * limited to static stage names and UI context: profile fields never leave the
+ * browser through this layer.
  */
-export default function LandingAnalytics() {
+export default function LandingAnalytics(props: { initialEvent?: LandingAnalyticsEventName; context?: string }) {
   useEffect(() => {
+    emitLandingAnalyticsEvent({
+      name: props.initialEvent ?? "landing_viewed",
+      context: props.context ?? (props.initialEvent ? undefined : "landing"),
+    });
+
     const handleClick = (event: MouseEvent) => {
       if (!(event.target instanceof Element)) return;
       const target = event.target.closest<HTMLElement>("[data-landing-events]");
@@ -52,43 +99,18 @@ export default function LandingAnalytics() {
     };
 
     const handleSubmit = (event: SubmitEvent) => {
-      if (!(event.target instanceof HTMLFormElement)) return;
-      if (!event.target.matches("[data-landing-events]")) return;
+      if (!(event.target instanceof HTMLFormElement) || !event.target.matches("[data-landing-events]")) return;
       emitElementEvents(event.target);
-    };
-
-    const faqItems = Array.from(document.querySelectorAll<HTMLDetailsElement>("details[data-landing-faq]"));
-    const handleFaqToggle = (event: Event) => {
-      const target = event.currentTarget;
-      if (!(target instanceof HTMLDetailsElement) || !target.open) return;
-      emitLandingAnalyticsEvent({
-        name: "faq_opened",
-        context: target.dataset.landingFaq?.trim() || undefined,
-      });
     };
 
     document.addEventListener("click", handleClick);
     document.addEventListener("submit", handleSubmit, true);
-    faqItems.forEach((item) => item.addEventListener("toggle", handleFaqToggle));
-
-    const pricing = document.querySelector<HTMLElement>("[data-landing-pricing]");
-    let pricingObserver: IntersectionObserver | undefined;
-    if (pricing && "IntersectionObserver" in window) {
-      pricingObserver = new IntersectionObserver((entries) => {
-        if (!entries.some((entry) => entry.isIntersecting)) return;
-        emitLandingAnalyticsEvent({ name: "pricing_viewed", context: "pricing" });
-        pricingObserver?.disconnect();
-      }, { threshold: 0.35 });
-      pricingObserver.observe(pricing);
-    }
 
     return () => {
       document.removeEventListener("click", handleClick);
       document.removeEventListener("submit", handleSubmit, true);
-      faqItems.forEach((item) => item.removeEventListener("toggle", handleFaqToggle));
-      pricingObserver?.disconnect();
     };
-  }, []);
+  }, [props.context, props.initialEvent]);
 
   return null;
 }
