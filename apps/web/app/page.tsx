@@ -41,10 +41,23 @@ import { SiteFooter } from "./ui/site-footer";
 
 export const dynamic = "force-dynamic";
 
+const LANDING_TITLE = "Recruiter Radar — компании, которым стоит написать сегодня";
+const LANDING_DESCRIPTION = "Ежедневный evidence-first радар клиентских возможностей для рекрутинговых агентств: сигнал найма, почему сейчас, источники, confidence и безопасный следующий шаг.";
+
 export const metadata: Metadata = {
-  title: "Recruiter Radar — ежедневный радар по нанимающим компаниям",
-  description:
-    "Каждый день Recruiter Radar находит лучшие компании под специализацию агентства: что меняется, почему сейчас и как выйти на них корректно. Telegram-first доставка с дополнительными каналами. Для рекрутинговых агентств и BD-команд.",
+  title: LANDING_TITLE,
+  description: LANDING_DESCRIPTION,
+  alternates: {
+    canonical: "https://recruiter-radar.ru/",
+  },
+  openGraph: {
+    title: LANDING_TITLE,
+    description: LANDING_DESCRIPTION,
+    url: "https://recruiter-radar.ru/",
+    siteName: "Recruiter Radar",
+    locale: "ru_RU",
+    type: "website",
+  },
 };
 
 const VISIBLE_PREVIEW_ITEMS = 2;
@@ -182,12 +195,17 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       {/* Problem — why this radar exists */}
       <ScrollReveal as="section" className={`${hpStyles.scrollSection} ${hpStyles.problemSection}`}>
         <div className={hpStyles.problemLayout}>
-          <SectionIntro
-            accent
-            eyebrow="Проблема"
-            title="Вакансий много. Приоритета нет."
-            description="Радар сокращает исследование до короткого списка компаний, где найм подтверждён, момент объясним, а следующий шаг понятен."
-          />
+          <div className={hpStyles.problemIntro}>
+            <SectionIntro
+              accent
+              eyebrow="Проблема"
+              title="Вакансий много. Приоритета нет."
+              description="Радар сокращает исследование до короткого списка компаний, где найм подтверждён, момент объясним, а следующий шаг понятен."
+            />
+            <p className={hpStyles.problemComparison}>
+              Обычный мониторинг показывает, кто нанимает. <strong>Recruiter Radar показывает, кому стоит написать вашему агентству именно сейчас.</strong>
+            </p>
+          </div>
           <ol className={hpStyles.problemList}>
             <li className={hpStyles.problemRow}>
               <span className={hpStyles.problemIndex}>01</span>
@@ -302,6 +320,13 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               <h3>Сигнал проходит четыре проверки</h3>
               <p>Высокий балл сам по себе ничего не доказывает. Радар показывает, из чего сложилась рекомендация.</p>
             </div>
+            <ol className={hpStyles.methodPipeline} aria-label="Путь сигнала до клиентской выдачи">
+              <li>Сигнал найма</li>
+              <li>Проверка компании</li>
+              <li>Контекст момента</li>
+              <li>Confidence gate</li>
+              <li>Клиентская выдача</li>
+            </ol>
             <ol className={hpStyles.qualityChecks}>
               <li><span>01</span><div><strong>Соответствие</strong><p>Ниша, роли и география совпадают с профилем агентства.</p></div><em>профиль</em></li>
               <li><span>02</span><div><strong>Намерение</strong><p>Найм подтверждён несколькими фактами, а не одной вакансией.</p></div><em>2+ факта</em></li>
@@ -333,6 +358,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                 <span>Беру в работу</span><span>Позже</span><span>Не подходит</span>
               </div>
             </div>
+            <p className={hpStyles.feedbackLoopNote}><strong>Feedback loop.</strong> Будущая выдача учитывает ваши отметки «Беру», «Позже» и «Не подходит» — без автоматических решений за вас.</p>
             <p className={hpStyles.deliveryNote}>Радар приходит только в подключённые каналы. Вы решаете, кому писать: продукт не отправляет сообщения компаниям автоматически.</p>
           </article>
         </div>
