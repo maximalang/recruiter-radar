@@ -3,6 +3,13 @@ import Link from "next/link";
 import hpStyles from "./home-page-components.module.css";
 import { BrandLogo } from "./ui/brand-logo";
 
+const LANDING_NAV_ITEMS = [
+  { href: "#preview", label: "Пример радара" },
+  { href: "#how-it-works", label: "Как работает" },
+  { href: "#quality", label: "Методология" },
+  { href: "#pricing", label: "Стоимость" },
+] as const;
+
 export default function LandingHeader({ activationHref }: { activationHref: string }) {
   return (
     <header className={hpStyles.topBar}>
@@ -15,19 +22,41 @@ export default function LandingHeader({ activationHref }: { activationHref: stri
       </Link>
       <nav className={hpStyles.topNavLinks} aria-label="Разделы лендинга">
         <span className={hpStyles.topNavAnchors}>
-          <a href="#preview" className={hpStyles.topNavLink}>Пример</a>
-          <a href="#how-it-works" className={hpStyles.topNavLink}>Как работает</a>
-          <a href="#quality" className={hpStyles.topNavLink}>Проверка</a>
-          <a href="#pricing" className={hpStyles.topNavLink}>Тарифы</a>
-          <a href="#faq" className={hpStyles.topNavLink}>FAQ</a>
+          {LANDING_NAV_ITEMS.map((item) => (
+            <a key={item.href} href={item.href} className={hpStyles.topNavLink}>{item.label}</a>
+          ))}
         </span>
         <span className={hpStyles.topNavActions}>
           <Link href="/dashboard" className={hpStyles.topNavLogin}>Войти</Link>
           <Link href={activationHref} className={hpStyles.topNavCta}>
-            Попробовать неделю
+            Собрать мой радар
           </Link>
         </span>
       </nav>
+      <div className={hpStyles.mobileHeaderActions}>
+        <Link
+          href={activationHref}
+          className={hpStyles.topNavCta}
+          aria-label="Собрать мой радар"
+        >
+          Собрать радар
+        </Link>
+        <details className={hpStyles.mobileNav}>
+          <summary>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              <path d="M5 7h14M5 12h14M5 17h14" />
+            </svg>
+            Меню
+          </summary>
+          <nav aria-label="Мобильная навигация" className={hpStyles.mobileNavPanel}>
+            {LANDING_NAV_ITEMS.map((item) => (
+              <a key={item.href} href={item.href}>{item.label}</a>
+            ))}
+            <a href="#faq">FAQ</a>
+            <Link href="/dashboard">Войти</Link>
+          </nav>
+        </details>
+      </div>
     </header>
   );
 }

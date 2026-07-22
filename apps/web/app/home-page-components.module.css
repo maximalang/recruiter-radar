@@ -36,7 +36,8 @@
   mask-image: linear-gradient(to bottom, black 0%, rgba(0, 0, 0, 0.55) 58%, transparent 100%);
 }
 
-/* In-flow after the full-height hero; once reached it remains sticky. */
+/* The primary navigation is visible from the first screen and remains close
+   while the user evaluates the product. */
 .topBar {
   position: sticky;
   top: 14px;
@@ -48,7 +49,7 @@
   align-items: center;
   gap: 16px;
   padding: 10px 12px 10px 14px;
-  margin: 0;
+  margin: 0 0 12px;
   border-radius: 16px;
   border: 1px solid var(--c-border);
   background: rgba(255, 255, 255, 0.9);
@@ -151,6 +152,20 @@
   box-shadow: 0 10px 26px rgba(15, 23, 42, 0.22);
 }
 
+.mobileHeaderActions,
+.mobileNav {
+  display: none;
+}
+
+.topNavLink:focus-visible,
+.topNavLogin:focus-visible,
+.topNavCta:focus-visible,
+.mobileNav summary:focus-visible,
+.mobileNavPanel a:focus-visible {
+  outline: 2px solid var(--c-brand);
+  outline-offset: 3px;
+}
+
 /* Reveal cards: NO scroll-driven animation. The previous scroll-timeline reveal
    (animation-timeline: view()) made every below-fold card start at opacity:0 and
    animate in on scroll; on real browsers where the scroll timeline hiccups on
@@ -171,11 +186,9 @@
   overflow: hidden;
   border-radius: var(--radius-card);
   margin-bottom: 14px;
-  /* Keep the initial viewport focused on the product story only. The sticky
-     header lives after this block in the document and enters on the next
-     scroll; subtracting the page frame leaves enough room for the hero while
-     guaranteeing the header does not peek into the first screen at 1024px. */
-  min-height: calc(100svh - 48px);
+  /* Header + product proof fit in the first desktop viewport without turning
+     the hero into an oversized empty screen. */
+  min-height: min(720px, calc(100svh - 116px));
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -586,6 +599,49 @@
 
 .scrollSection:first-of-type {
   padding-top: 8px;
+}
+
+.trustStrip {
+  margin: 2px 0 4px;
+  border-top: 1px solid rgba(20, 40, 72, 0.12);
+  border-bottom: 1px solid rgba(20, 40, 72, 0.12);
+}
+
+.trustStrip ul {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  padding: 16px 0;
+  list-style: none;
+}
+
+.trustStrip li {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 0 18px;
+  border-right: 1px solid rgba(20, 40, 72, 0.1);
+}
+
+.trustStrip li:first-child {
+  padding-left: 0;
+}
+
+.trustStrip li:last-child {
+  padding-right: 0;
+  border-right: 0;
+}
+
+.trustStrip strong {
+  color: var(--c-text-primary);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.trustStrip span {
+  color: var(--c-text-secondary);
+  font-size: 0.72rem;
+  line-height: 1.45;
 }
 
 /* ── Problem section ──
@@ -2137,8 +2193,94 @@
 }
 
 @media (max-width: 820px) {
-  .topNavAnchors {
+  .topNavLinks {
     display: none;
+  }
+
+  .mobileHeaderActions,
+  .mobileNav {
+    display: flex;
+  }
+
+  .mobileHeaderActions {
+    align-items: center;
+    gap: 8px;
+  }
+
+  .mobileNav {
+    position: relative;
+  }
+
+  .mobileNav summary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 44px;
+    box-sizing: border-box;
+    padding: 0 11px;
+    border: 1px solid var(--c-border);
+    border-radius: 10px;
+    color: var(--c-text-primary);
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .mobileNav summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .mobileNav summary svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  .mobileNavPanel {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    display: grid;
+    width: min(78vw, 280px);
+    padding: 8px;
+    border: 1px solid var(--c-border);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.98);
+    box-shadow: 0 18px 48px rgba(15, 23, 42, 0.2);
+  }
+
+  .mobileNavPanel a {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    border-radius: 9px;
+    color: var(--c-text-primary);
+    font-size: 0.88rem;
+    font-weight: 650;
+    text-decoration: none;
+  }
+
+  .mobileNavPanel a:hover {
+    background: rgba(29, 78, 216, 0.07);
+    color: var(--c-brand);
+  }
+
+  .trustStrip ul {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .trustStrip li {
+    padding-block: 12px;
+  }
+
+  .trustStrip li:nth-child(2) {
+    border-right: 0;
+  }
+
+  .trustStrip li:nth-child(n + 3) {
+    border-top: 1px solid rgba(20, 40, 72, 0.1);
   }
 }
 
@@ -2172,10 +2314,6 @@
 }
 
 @media (max-width: 560px) {
-  .topNavLogin {
-    display: none;
-  }
-
   .problemLayout {
     gap: 20px;
     padding: 28px 0;
@@ -2253,6 +2391,21 @@
     min-height: 40px;
     padding-inline: 12px;
     font-size: 0.76rem;
+  }
+
+  .trustStrip ul {
+    grid-template-columns: 1fr;
+  }
+
+  .trustStrip li,
+  .trustStrip li:first-child,
+  .trustStrip li:last-child {
+    padding: 12px 4px;
+    border-right: 0;
+  }
+
+  .trustStrip li + li {
+    border-top: 1px solid rgba(20, 40, 72, 0.1);
   }
 
   .heroCopy {

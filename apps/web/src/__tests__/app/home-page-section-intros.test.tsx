@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import Link from "next/link";
 
 import HomePage, { PreviewSection } from "@/app/page";
+import LandingHeader from "@/app/landing-header";
 import { NoticeBox, SectionIntro, SurfaceCard } from "@/app/ui/page-primitives";
 import {
   buildCheckoutHref,
@@ -95,12 +96,28 @@ describe("landing section hierarchy", () => {
   it("keeps the hero concise and makes the pilot the obvious first decision", async () => {
     const page = await HomePage({ searchParams: Promise.resolve({}) });
     const pageText = readVisibleText(page);
+    const rootChildren = Children.toArray(page.props.children);
+    const headerIndex = rootChildren.findIndex(
+      (child) => isValidElement(child) && child.type === LandingHeader,
+    );
+    const heroIndex = rootChildren.findIndex(
+      (child) => isValidElement(child) && child.type === "section" && child.props.id === "main-content",
+    );
     const alignedPlanCards = collectElements(page, SurfaceCard)
       .filter((card) => card.props.padding === "var(--plan-card-padding)");
     const pricingIntro = collectElements(page, SectionIntro)
       .find((section) => section.props.eyebrow === "Тарифы");
 
-    expect(pageText).toContain("Компании, которым стоит написать сегодня. С доказательствами.");
+    expect(headerIndex).toBeGreaterThanOrEqual(0);
+    expect(headerIndex).toBeLessThan(heroIndex);
+    expect(pageText).toContain("Находите компании с подтверждённым спросом на подбор");
+    expect(pageText).toContain("пока окно для обращения ещё открыто");
+    expect(pageText).toContain("Собрать мой радар");
+    expect(pageText).toContain("Посмотреть живой пример");
+    expect(pageText).toContain("Не база вакансий");
+    expect(pageText).toContain("Без автоматической рассылки");
+    expect(pageText).toContain("Evidence у каждой компании");
+    expect(pageText).toContain("Вы решаете, кому писать");
     expect(pricingIntro?.props.title).toBe("Начните с недели. Продолжайте, только если радар полезен.");
     expect(pricingIntro?.props.description).toContain("Пилот — разовая оплата без продления.");
     expect(pageText).toContain("Проверьте новый канал за 7 дней");
