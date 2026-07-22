@@ -106,6 +106,25 @@ jobs:
           docker container prune -f
           docker image prune -f
 
+          # Each deploy tags a new recruiter-radar:<sha> image and never removes
+          # the old ones, so they accumulate and exhaust the VDS disk (the d5d320f
+          # deploy failed with "Insufficient disk space" this way). Drop every
+          # <sha>-tagged image except the ones backing the live (:latest) and
+          # rollback (:rollback) tags, then prune build cache. This keeps the
+          # disk bounded across deploys without losing the rollback safety net.
+          keep_ids="$(
+            docker inspect --format '{{.Image}}' recruiter-radar:latest 2>/dev/null || true
+            docker inspect --format '{{.Image}}' recruiter-radar:rollback 2>/dev/null || true
+          )"
+          for img in $(docker images --filter 'reference=recruiter-radar:*' --format '{{.Repository}}:{{.Tag}} {{.ID}}' \
+                       | awk '$1 !~ /:latest$/ && $1 !~ /:rollback$/ { print $2 }'); do
+            case "$keep_ids" in
+              *"$img"*) : ;;           # image backs latest or rollback — keep it
+              *) docker rmi -f "$img" 2>/dev/null || true ;;
+            esac
+          done
+          docker builder prune -f 2>/dev/null || true
+
           archive_bytes="$(stat -c '%s' /opt/recruiter-radar/image-new.tar.gz)"
           available_bytes="$(df -PB1 /opt/recruiter-radar | awk 'NR == 2 { print $4 }')"
           required_bytes="$((archive_bytes * 3 + 536870912))"
