@@ -125,7 +125,8 @@
     "ts-node": "^10.9.2"
   },
   "overrides": {
-    "postcss": "^8.5.15"
+    "postcss": "^8.5.15",
+    "sharp": "^0.35.3"
   },
   "version": "1.0.0",
   "description": "Recruiter Radar — premium Russia-first client-intelligence radar для рекрутинговых агентств.",
@@ -371,7 +372,7 @@
     "saxes": "^6.0.0",
     "scheduler": "^0.27.0",
     "semver": "^7.8.1",
-    "sharp": "^0.34.5",
+    "sharp": "^0.35.3",
     "shebang-command": "^2.0.0",
     "shebang-regex": "^3.0.0",
     "signal-exit": "^3.0.7",
