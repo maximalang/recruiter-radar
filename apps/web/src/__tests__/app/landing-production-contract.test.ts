@@ -11,12 +11,12 @@ describe("landing production contract", () => {
     const header = readRepoFile("apps/web/app/landing-header.tsx");
     const deploy = readRepoFile(".github/workflows/deploy.yml");
 
-    expect(page).toContain('data-deploy-anchor="landing-private-intelligence-v2"');
-    expect(header).toContain('data-brand-header="landing-private-intelligence-v2"');
-    expect(header).toContain('data-brand-radar-mark="true"');
-    expect(deploy).toContain('data-deploy-anchor="landing-private-intelligence-v2"');
-    expect(deploy).toContain('data-brand-header="landing-private-intelligence-v2"');
-    expect(deploy).toContain('data-brand-radar-mark="true"');
+    expect(page).toContain('data-deploy-anchor="recruiter-radar-landing-v2"');
+    expect(header).toContain('data-brand-layout="landing-header-v2"');
+    expect(header).toContain('data-mark="true"');
+    expect(deploy).toContain('data-deploy-anchor="recruiter-radar-landing-v2"');
+    expect(deploy).toContain('data-brand-layout="landing-header-v2"');
+    expect(deploy).toContain('data-mark="true"');
     expect(deploy).not.toContain("Каждый день Recruiter Radar находит лучшие компании");
     expect(deploy).not.toContain('data-mark="false"');
   });
@@ -32,5 +32,12 @@ describe("landing production contract", () => {
     expect(dockerfile).toContain("ARG NEXT_PUBLIC_LANDING_ANALYTICS_ENDPOINT");
     expect(deploy).toContain("--build-arg NEXT_PUBLIC_YANDEX_METRIKA_ID");
     expect(deploy).toContain("--build-arg NEXT_PUBLIC_LANDING_ANALYTICS_ENDPOINT");
+  });
+
+  it("keeps preview state shareable and exposes the exact scanning state", () => {
+    const preview = readRepoFile("apps/web/app/landing-preview.tsx");
+
+    expect(preview).toContain('aria-current={isActive ? "true" : undefined}');
+    expect(preview).toContain('data-loading-label="Радар анализирует сигналы"');
   });
 });

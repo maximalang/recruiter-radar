@@ -183,14 +183,14 @@ jobs:
               landing_html=$(curl -fsS https://recruiter-radar.ru/ --max-time 30 || true)
 
               if printf '%s' "$landing_html" \
-                | grep -q 'data-deploy-anchor="landing-private-intelligence-v2"'; then
+                | grep -q 'data-deploy-anchor="recruiter-radar-landing-v2"'; then
                 landing_ok=true
               fi
 
               if printf '%s' "$landing_html" \
-                | grep -q 'data-brand-header="landing-private-intelligence-v2"' \
+                | grep -q 'data-brand-layout="landing-header-v2"' \
                 && printf '%s' "$landing_html" \
-                | grep -q 'data-brand-radar-mark="true"'; then
+                | grep -q 'data-mark="true"'; then
                 brand_layout_ok=true
               fi
 
