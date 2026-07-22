@@ -662,6 +662,26 @@
   border-bottom: 1px solid rgba(20, 40, 72, 0.12);
 }
 
+.problemIntro {
+  display: grid;
+  gap: 20px;
+}
+
+.problemComparison {
+  margin: 0;
+  max-width: 48ch;
+  padding-left: 15px;
+  border-left: 2px solid rgba(49, 95, 200, 0.55);
+  color: var(--c-text-secondary);
+  font-size: 0.88rem;
+  line-height: 1.65;
+}
+
+.problemComparison strong {
+  color: var(--c-text-primary);
+  font-weight: 700;
+}
+
 .problemList {
   display: grid;
   margin: 0;
@@ -1027,6 +1047,40 @@
   line-height: 1.55;
 }
 
+.methodPipeline {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid rgba(181, 203, 237, 0.14);
+  border-bottom: 1px solid rgba(181, 203, 237, 0.14);
+  list-style: none;
+  counter-reset: method-step;
+}
+
+.methodPipeline li {
+  min-width: 0;
+  padding: 12px 9px;
+  border-right: 1px solid rgba(181, 203, 237, 0.12);
+  color: rgba(226, 235, 248, 0.78);
+  font-size: 0.68rem;
+  font-weight: 720;
+  line-height: 1.35;
+  counter-increment: method-step;
+}
+
+.methodPipeline li::before {
+  display: block;
+  margin-bottom: 5px;
+  color: #8ab9ff;
+  font-size: 0.62rem;
+  content: "0" counter(method-step);
+}
+
+.methodPipeline li:last-child {
+  border-right: 0;
+}
+
 .qualityChecks {
   display: grid;
   margin: 0;
@@ -1102,7 +1156,6 @@
 
 .deliveryCard {
   display: grid;
-  grid-template-rows: auto auto auto 1fr;
   align-content: start;
   gap: 18px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(244, 248, 254, 0.96));
@@ -1210,6 +1263,20 @@
   background: rgba(47, 98, 232, 0.055);
   font-size: 0.72rem;
   font-weight: 800;
+}
+
+.feedbackLoopNote {
+  margin: 0;
+  padding: 12px 14px;
+  border-left: 2px solid rgba(49, 95, 200, 0.5);
+  color: var(--c-text-secondary);
+  background: rgba(49, 95, 200, 0.045);
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
+.feedbackLoopNote strong {
+  color: var(--c-text-primary);
 }
 
 .deliveryNote {
@@ -2371,6 +2438,27 @@
   .qualityChecks em {
     grid-column: 2;
     justify-self: start;
+  }
+
+  .methodPipeline {
+    grid-template-columns: 1fr;
+  }
+
+  .methodPipeline li {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr);
+    gap: 8px;
+    padding: 9px 0;
+    border-right: 0;
+    border-bottom: 1px solid rgba(181, 203, 237, 0.12);
+  }
+
+  .methodPipeline li::before {
+    margin: 0;
+  }
+
+  .methodPipeline li:last-child {
+    border-bottom: 0;
   }
 
   .pricingGrid {

@@ -2,7 +2,7 @@ import { Children, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import Link from "next/link";
 
-import HomePage, { PreviewSection } from "@/app/page";
+import HomePage, { PreviewSection, metadata } from "@/app/page";
 import LandingHeader from "@/app/landing-header";
 import { NoticeBox, SectionIntro, SurfaceCard } from "@/app/ui/page-primitives";
 import {
@@ -288,7 +288,23 @@ describe("landing section hierarchy", () => {
     const page = await HomePage({ searchParams: Promise.resolve({}) });
     const pageText = readVisibleText(page);
 
+    expect(pageText).toContain("Обычный мониторинг показывает, кто нанимает");
+    expect(pageText).toContain("Recruiter Radar показывает, кому стоит написать вашему агентству именно сейчас");
+    expect(pageText).toContain("Сигнал найма Проверка компании Контекст момента Confidence gate Клиентская выдача");
     expect(pageText).toContain("Сигнал проходит четыре проверки");
+    expect(pageText).toContain("Feedback loop");
+    expect(pageText).toContain("Будущая выдача учитывает ваши отметки");
     expect(pageText.match(/Производственная компания/g)).toHaveLength(1);
+  });
+
+  it("publishes canonical and Open Graph metadata for the public landing", () => {
+    expect(metadata.alternates).toEqual({ canonical: "https://recruiter-radar.ru/" });
+    expect(metadata.openGraph).toEqual(expect.objectContaining({
+      title: "Recruiter Radar — компании, которым стоит написать сегодня",
+      url: "https://recruiter-radar.ru/",
+      siteName: "Recruiter Radar",
+      locale: "ru_RU",
+      type: "website",
+    }));
   });
 });

@@ -56,9 +56,11 @@ describe('landing card copy helpers', () => {
     const faqItems = buildFaqItems(true);
     const faqCopy = faqItems.map((item) => `${item.question} ${item.answer}`).join(' ');
 
-    expect(faqItems).toHaveLength(6);
-    expect(faqCopy).toContain('Почему оценке можно доверять');
+    expect(faqItems).toHaveLength(7);
+    expect(faqCopy).toContain('Чем Recruiter Radar отличается от базы вакансий');
+    expect(faqCopy).toContain('роли, отрасли и регионы');
     expect(faqCopy).toContain('не отправляет сообщения автоматически');
-    expect(faqCopy).toContain('Telegram');
+    expect(faqCopy).toContain('После окончания пилота');
+    expect(faqCopy).toContain('персональные контакты');
   });
 });
