@@ -85,6 +85,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         <span className={hpStyles.ambientGrid} />
       </div>
       <a href="#main-content" className={ppStyles.skipLink}>Перейти к содержанию</a>
+      <LandingHeader activationHref={checkoutHref} />
 
       {/* Hero */}
       <section id="main-content" className={hpStyles.heroSection} aria-label="Recruiter Radar">
@@ -96,20 +97,20 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               Клиентский радар для рекрутинговых агентств
             </div>
             <h1 className={hpStyles.heroTitle}>
-              Компании, которым стоит написать сегодня. <span className={hpStyles.heroTitleAccent}>С доказательствами.</span>
+              Находите компании с подтверждённым спросом на подбор — <span className={hpStyles.heroTitleAccent}>пока окно для обращения ещё открыто.</span>
             </h1>
             <p className={hpStyles.heroSubtitle}>
-              Каждый день Recruiter Radar находит лучшие компании под специализацию агентства и показывает сигнал найма, уровень уверенности и безопасный путь контакта.
+              Recruiter Radar ежедневно отбирает компании под специализацию агентства и показывает, что изменилось, почему писать сейчас, какими источниками это подтверждено и какой следующий шаг сделать.
             </p>
             <div className={hpStyles.heroActions}>
               <Link href={checkoutHref} className={hpStyles.heroCta}>
-                Попробовать неделю
+                Собрать мой радар
                 <svg className={hpStyles.heroCtaArrow} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <line x1="5" y1="12" x2="19" y2="12" />
                   <polyline points="13 6 19 12 13 18" />
                 </svg>
               </Link>
-              <a href="#preview" className={hpStyles.heroSecondaryCta}>Настроить радар</a>
+              <a href="#preview" className={hpStyles.heroSecondaryCta}>Посмотреть живой пример</a>
             </div>
             <p className={hpStyles.heroFootnote}>
               {pilotPlan.price} за {pilotPlan.cadence} · без автопродления · Telegram-first
@@ -118,8 +119,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
           <div className={hpStyles.heroProduct} aria-label="Как Recruiter Radar оценивает компанию">
             <div className={hpStyles.heroProductTopbar}>
-              <span className={hpStyles.heroProductLabel}>Так выглядит лид в радаре</span>
-              <span className={hpStyles.heroProductLive}>gate A</span>
+              <span className={hpStyles.heroProductLabel}>Обезличенный пример лида</span>
+              <span className={hpStyles.heroProductLive}>Демо · gate A</span>
             </div>
             <div className={hpStyles.heroCompanyRow}>
               <div>
@@ -130,31 +131,38 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             </div>
             <div className={hpStyles.heroScoreTrack}><span /></div>
             <div className={hpStyles.heroEvidenceRow}>
-              <div><span>Что изменилось</span><p>14 новых вакансий за 6 дней</p></div>
-              <div><span>Момент</span><p>Появилась редкая инженерная роль</p></div>
-              <div><span>Как связаться</span><p>Сайт компании и HR-форма</p></div>
+              <div><span>Hiring signal</span><p>14 новых вакансий за 6 дней</p></div>
+              <div><span>Evidence</span><p>Карьерная страница + hh.ru</p></div>
+              <div><span>Следующий шаг</span><p>Проверить HR-форму сегодня</p></div>
             </div>
             <div className={hpStyles.heroSignalMeters}>
               <div className={hpStyles.heroSignalMeter}>
                 <div className={hpStyles.heroSignalMeterHead}>
-                  <span>Соответствие профилю</span>
-                  <strong>Высокое</strong>
+                  <span>Fit · соответствие профилю</span>
+                  <strong>Высокий</strong>
                 </div>
                 <div className={hpStyles.heroSignalMeterTrack} data-tone="green"><span style={{ width: "88%" }} /></div>
               </div>
               <div className={hpStyles.heroSignalMeter}>
                 <div className={hpStyles.heroSignalMeterHead}>
-                  <span>Сила сигнала</span>
-                  <strong>Сильная</strong>
+                  <span>Intent · намерение нанимать</span>
+                  <strong>Подтверждён</strong>
                 </div>
                 <div className={hpStyles.heroSignalMeterTrack}><span style={{ width: "84%" }} /></div>
               </div>
               <div className={hpStyles.heroSignalMeter}>
                 <div className={hpStyles.heroSignalMeterHead}>
-                  <span>Актуальность</span>
-                  <strong>Сегодня</strong>
+                  <span>Urgency · актуальность</span>
+                  <strong>Окно открыто</strong>
                 </div>
                 <div className={hpStyles.heroSignalMeterTrack} data-tone="amber"><span style={{ width: "94%" }} /></div>
+              </div>
+              <div className={hpStyles.heroSignalMeter}>
+                <div className={hpStyles.heroSignalMeterHead}>
+                  <span>Reachability · путь контакта</span>
+                  <strong>Найден</strong>
+                </div>
+                <div className={hpStyles.heroSignalMeterTrack} data-tone="green"><span style={{ width: "82%" }} /></div>
               </div>
             </div>
           </div>
@@ -162,7 +170,14 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         </div>
       </section>
 
-      <LandingHeader activationHref={checkoutHref} />
+      <aside className={hpStyles.trustStrip} aria-label="Принципы Recruiter Radar">
+        <ul>
+          <li><strong>Не база вакансий</strong><span>Приоритет для конкретного агентства</span></li>
+          <li><strong>Без автоматической рассылки</strong><span>Контакт всегда решаете вы</span></li>
+          <li><strong>Evidence у каждой компании</strong><span>Факты, даты и источники рядом</span></li>
+          <li><strong>Вы решаете, кому писать</strong><span>Радар помогает принять решение</span></li>
+        </ul>
+      </aside>
 
       {/* Problem — why this radar exists */}
       <ScrollReveal as="section" className={`${hpStyles.scrollSection} ${hpStyles.problemSection}`}>
