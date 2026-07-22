@@ -208,8 +208,8 @@
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: minmax(0, 1.04fr) minmax(340px, 0.96fr);
-  gap: clamp(36px, 6vw, 76px);
+  grid-template-columns: minmax(0, 1.18fr) minmax(340px, 0.82fr);
+  gap: clamp(32px, 4vw, 52px);
   align-items: stretch;
   width: 100%;
 }
@@ -255,7 +255,7 @@
   letter-spacing: var(--ls-display);
   font-weight: var(--fw-display);
   color: #ffffff;
-  max-width: 12ch;
+  max-width: none;
   text-wrap: balance;
 }
 
@@ -2167,6 +2167,16 @@
 
 }
 
+@media (max-width: 1300px) and (min-width: 901px) {
+  .heroTitle {
+    font-size: clamp(2.75rem, 4vw, 3.25rem);
+  }
+
+  .heroCopy {
+    gap: 18px;
+  }
+}
+
 @media (max-width: 1100px) and (min-width: 901px) {
   .heroSection {
     padding-inline: 44px;
@@ -2174,10 +2184,6 @@
 
   .heroContent {
     gap: 32px;
-  }
-
-  .heroCopy {
-    gap: 18px;
   }
 
   .heroActions {

@@ -33,6 +33,7 @@ import {
   pickEvidenceTitles,
 } from "./home-page-components";
 import hpStyles from "./home-page-components.module.css";
+import LandingAnalytics from "./landing-analytics";
 import LandingHeader from "./landing-header";
 import RadarCanvas from "./radar-canvas";
 import ScrollReveal from "./scroll-reveal";
@@ -93,6 +94,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
   return (
     <PageFrame maxWidth="1160px">
+      <LandingAnalytics />
       <ScrollProgress />
       <div className={hpStyles.ambientBg} aria-hidden="true">
         <span className={hpStyles.ambientGrid} />
@@ -110,20 +112,32 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               Клиентский радар для рекрутинговых агентств
             </div>
             <h1 className={hpStyles.heroTitle}>
-              Находите компании с подтверждённым спросом на подбор — <span className={hpStyles.heroTitleAccent}>пока окно для обращения ещё открыто.</span>
+              Находите компании с подтверждённым спросом — <span className={hpStyles.heroTitleAccent}>пока окно обращения открыто.</span>
             </h1>
             <p className={hpStyles.heroSubtitle}>
-              Recruiter Radar ежедневно отбирает компании под специализацию агентства и показывает, что изменилось, почему писать сейчас, какими источниками это подтверждено и какой следующий шаг сделать.
+              Радар ежедневно отбирает компании под профиль агентства и показывает: что изменилось, почему писать сейчас, чем это подтверждено и какой следующий шаг сделать.
             </p>
             <div className={hpStyles.heroActions}>
-              <Link href={checkoutHref} className={hpStyles.heroCta}>
+              <Link
+                href={checkoutHref}
+                className={hpStyles.heroCta}
+                data-landing-events="hero_cta_clicked checkout_started"
+                data-landing-event-context="hero"
+              >
                 Собрать мой радар
                 <svg className={hpStyles.heroCtaArrow} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <line x1="5" y1="12" x2="19" y2="12" />
                   <polyline points="13 6 19 12 13 18" />
                 </svg>
               </Link>
-              <a href="#preview" className={hpStyles.heroSecondaryCta}>Посмотреть живой пример</a>
+              <a
+                href="#preview"
+                className={hpStyles.heroSecondaryCta}
+                data-landing-events="live_preview_opened"
+                data-landing-event-context="hero"
+              >
+                Посмотреть живой пример
+              </a>
             </div>
             <p className={hpStyles.heroFootnote}>
               {pilotPlan.price} за {pilotPlan.cadence} · без автопродления · Telegram-first
@@ -373,7 +387,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           description="Пилот — разовая оплата без продления. Месяц и квартал подключаются по заявке после проверки качества."
         />
 
-        <div className={hpStyles.pricingGrid}>
+        <div className={hpStyles.pricingGrid} data-landing-pricing>
           <SurfaceCard
             key={pilotPlan.code}
             className={`${hpStyles.primaryPlanCard} ${hpStyles.revealCard}`}
@@ -402,6 +416,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             <Link
               href={buildCheckoutHref({ ...previewInput, planCode: pilotPlan.code })}
               className={`${ppStyles.primaryAction} ${hpStyles.planCta}`}
+              data-landing-events="plan_selected checkout_started"
+              data-landing-event-context="pilot"
             >
               {pilotPlan.ctaLabel}
             </Link>
@@ -441,6 +457,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                   <Link
                     href={buildCheckoutHref({ ...previewInput, planCode: plan.code })}
                     className={`${ppStyles.secondaryAction} ${hpStyles.planCta}`}
+                    data-landing-events="plan_selected checkout_started"
+                    data-landing-event-context={plan.code}
                   >
                     {plan.ctaLabel}
                   </Link>
@@ -472,8 +490,12 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           title="Главные вопросы перед запуском"
           description="Что именно приходит, откуда берутся данные и что остаётся под вашим контролем."
         />
-        {faqItems.map((item) => (
-          <details key={item.question} className={`${hpStyles.faqCard} ${hpStyles.revealCard}`}>
+        {faqItems.map((item, index) => (
+          <details
+            key={item.question}
+            className={`${hpStyles.faqCard} ${hpStyles.revealCard}`}
+            data-landing-faq={`faq-${index + 1}`}
+          >
             <summary className={hpStyles.faqSummary}>
               <span>{item.question}</span>
               <svg className={hpStyles.faqChevron} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -492,10 +514,22 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           Настройте профиль, получите первый радар и решите на фактах, стоит ли продолжать.
         </p>
         <div className={hpStyles.closingActions}>
-          <Link href={checkoutHref} className={hpStyles.heroCta}>
+          <Link
+            href={checkoutHref}
+            className={hpStyles.heroCta}
+            data-landing-events="checkout_started"
+            data-landing-event-context="closing"
+          >
             Активировать неделю — 2 990 ₽
           </Link>
-          <a href="#preview" className={hpStyles.heroSecondaryCta}>Посмотреть пример</a>
+          <a
+            href="#preview"
+            className={hpStyles.heroSecondaryCta}
+            data-landing-events="live_preview_opened"
+            data-landing-event-context="closing"
+          >
+            Посмотреть пример
+          </a>
         </div>
       </section>
 
@@ -554,7 +588,13 @@ export async function PreviewSection(props: {
             </div>
           </div>
 
-          <form method="GET" action="/#preview" className={hpStyles.previewForm}>
+          <form
+            method="GET"
+            action="/#preview"
+            className={hpStyles.previewForm}
+            data-landing-events="profile_setup_started"
+            data-landing-event-context="preview"
+          >
             <label htmlFor="specialization" className={ppStyles.field}>
               <span className={ppStyles.fieldLabel}>Специализация</span>
               <input
@@ -679,7 +719,12 @@ export async function PreviewSection(props: {
             </div>
           )}
 
-          <Link href={checkoutHref} className={ppStyles.primaryAction}>
+          <Link
+            href={checkoutHref}
+            className={ppStyles.primaryAction}
+            data-landing-events="checkout_started"
+            data-landing-event-context="preview"
+          >
             {previewState.items.length > 0
               ? "Получать такой радар каждое утро"
               : "Попробовать неделю"}
