@@ -30,4 +30,15 @@ describe('BrandLogo', () => {
     expect(logo.textContent).toContain('Recruiter');
     expect(logo.textContent).toContain('Radar');
   });
+
+  it('renders the established radar mark when the header opts in', () => {
+    const { container } = render(<BrandLogo showMark priority />);
+
+    const logo = screen.getByRole('img', { name: 'Recruiter Radar' });
+    const mark = logo.querySelector('img');
+
+    expect(mark).toHaveAttribute('src', '/recruiter-radar-app-source.svg');
+    expect(mark).toHaveAttribute('alt', '');
+    expect(container.querySelector('[data-mark="true"]')).toBeTruthy();
+  });
 });

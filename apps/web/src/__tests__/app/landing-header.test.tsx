@@ -1,16 +1,16 @@
 /** @jest-environment jsdom */
 
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 
 import LandingHeader from "@/app/landing-header";
 
 describe("landing header accessibility", () => {
   it("offers the required navigation and a clear activation path", () => {
-    render(<LandingHeader activationHref="/checkout?plan=pilot" />);
+    render(<LandingHeader />);
 
     expect(screen.getAllByRole("link", { name: "Собрать мой радар" })[0]).toHaveAttribute(
       "href",
-      "/checkout?plan=pilot",
+      "#preview",
     );
 
     expect(screen.getAllByRole("link", { name: "Войти" })[0]).toHaveAttribute(
@@ -35,12 +35,25 @@ describe("landing header accessibility", () => {
   });
 
   it("keeps the full navigation available in a native mobile disclosure", () => {
-    render(<LandingHeader activationHref="/checkout?plan=pilot" />);
+    render(<LandingHeader />);
 
     const menuSummary = screen.getByText("Меню").closest("summary");
 
     expect(menuSummary).not.toBeNull();
     expect(screen.getAllByRole("link", { name: "Войти" })).toHaveLength(2);
     expect(screen.getAllByRole("link", { name: "Как работает" })).toHaveLength(2);
+  });
+
+  it("closes the mobile disclosure after choosing a destination", () => {
+    render(<LandingHeader />);
+
+    const mobileNav = screen.getByRole("navigation", { name: "Мобильная навигация" });
+    const disclosure = mobileNav.closest("details");
+    if (!disclosure) throw new Error("Mobile navigation disclosure is missing");
+    disclosure.open = true;
+
+    fireEvent.click(within(mobileNav).getByRole("link", { name: "Стоимость" }));
+
+    expect(disclosure).not.toHaveAttribute("open");
   });
 });
