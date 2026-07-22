@@ -51,7 +51,7 @@ export default function LandingHeader() {
     <header
       className={hpStyles.topBar}
       data-scrolled={scrolled ? "true" : "false"}
-      data-brand-header="landing-private-intelligence-v2"
+      data-brand-layout="landing-header-v2"
     >
       <Link href="/" className={hpStyles.brandMark} aria-label="Recruiter Radar — на главную">
         <img
@@ -59,6 +59,7 @@ export default function LandingHeader() {
           width="36"
           height="36"
           className={hpStyles.brandRadarMark}
+          data-mark="true"
           data-brand-radar-mark="true"
           alt=""
           aria-hidden="true"

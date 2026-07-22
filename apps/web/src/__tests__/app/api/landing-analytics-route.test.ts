@@ -29,4 +29,17 @@ describe("POST /api/analytics/landing", () => {
     expect(withProfile.status).toBe(400);
     expect(unknown.status).toBe(400);
   });
+
+  it("accepts an FAQ open without sending question copy", async () => {
+    const info = jest.spyOn(console, "info").mockImplementation(() => undefined);
+    const response = await POST(new Request("http://localhost/api/analytics/landing", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "faq_opened", context: "faq-3" }),
+    }));
+
+    expect(response.status).toBe(204);
+    expect(info).toHaveBeenCalledWith(expect.stringContaining('"name":"faq_opened"'));
+    info.mockRestore();
+  });
 });

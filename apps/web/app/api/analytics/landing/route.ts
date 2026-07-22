@@ -11,6 +11,7 @@ const EVENT_NAMES = new Set([
   "payment_started",
   "continuation_requested",
   "payment_succeeded",
+  "faq_opened",
 ]);
 
 const CONTEXT_PATTERN = /^[a-z0-9:_-]{1,64}$/i;

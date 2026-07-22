@@ -60,6 +60,25 @@ describe("landing header accessibility", () => {
     expect(disclosure).not.toHaveAttribute("open");
   });
 
+  it("closes the mobile disclosure on Escape and outside pointer input", () => {
+    render(<LandingHeader />);
+
+    const mobileNav = screen.getByRole("navigation", { name: "Мобильная навигация" });
+    const disclosure = mobileNav.closest("details");
+    if (!disclosure) throw new Error("Mobile navigation disclosure is missing");
+
+    disclosure.open = true;
+    fireEvent(disclosure, new Event("toggle"));
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(disclosure).not.toHaveAttribute("open");
+    expect(screen.getByText("Меню").closest("summary")).toHaveFocus();
+
+    disclosure.open = true;
+    fireEvent(disclosure, new Event("toggle"));
+    fireEvent.pointerDown(document.body);
+    expect(disclosure).not.toHaveAttribute("open");
+  });
+
   it("marks the section currently intersecting the reading band", () => {
     let callback: IntersectionObserverCallback = () => undefined;
     Object.defineProperty(window, "IntersectionObserver", {

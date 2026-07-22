@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 
 import hpStyles from "./home-page-components.module.css";
+import { LANDING_MOTION_EVENT, type LandingMotionDetail } from "./landing-motion-control";
 import { RADAR_BLIP_EVENT, type RadarBlipDetail } from "./radar-canvas";
 
 const HERO_TARGETS = ["signal", "evidence", "next-step", "fiur"] as const;
@@ -26,7 +27,7 @@ export default function LandingHeroDemo() {
     const card = cardRef.current;
     if (!card) return;
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reducedMotion) return;
+    if (reducedMotion || document.documentElement.dataset.landingMotion === "paused") return;
 
     let played = false;
     const play = () => {
@@ -69,6 +70,7 @@ export default function LandingHeroDemo() {
 
   useEffect(() => {
     const onBlip = (event: Event) => {
+      if (document.documentElement.dataset.landingMotion === "paused") return;
       const detail = (event as CustomEvent<RadarBlipDetail>).detail;
       const target = HERO_TARGETS[Math.abs(detail.index) % HERO_TARGETS.length];
       setActiveTarget(target);
@@ -82,16 +84,32 @@ export default function LandingHeroDemo() {
     };
   }, []);
 
+  useEffect(() => {
+    const onMotionPreference = (event: Event) => {
+      const { paused } = (event as CustomEvent<LandingMotionDetail>).detail;
+      if (!paused) return;
+      cancelAnimationFrame(scoreRafRef.current);
+      if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+      setScore(87);
+      setScoreRunning(false);
+      setActiveTarget(null);
+      if (cardRef.current) cardRef.current.style.transform = "none";
+    };
+    window.addEventListener(LANDING_MOTION_EVENT, onMotionPreference);
+    return () => window.removeEventListener(LANDING_MOTION_EVENT, onMotionPreference);
+  }, []);
+
   const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
     const card = cardRef.current;
     if (!card || event.pointerType === "touch") return;
+    if (document.documentElement.dataset.landingMotion === "paused") return;
     if (!window.matchMedia("(pointer: fine)").matches || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const rect = card.getBoundingClientRect();
     const x = (event.clientX - rect.left) / rect.width - 0.5;
     const y = (event.clientY - rect.top) / rect.height - 0.5;
     cancelAnimationFrame(tiltRafRef.current);
     tiltRafRef.current = requestAnimationFrame(() => {
-      card.style.transform = `perspective(1000px) rotateX(${-y * 3.2}deg) rotateY(${x * 3.2}deg) translate3d(${x * 3}px, ${y * 3}px, 0)`;
+      card.style.transform = `perspective(1000px) rotateX(${-y * 2.8}deg) rotateY(${x * 2.8}deg) translate3d(${x * 3}px, ${y * 3}px, 0)`;
     });
   };
 
@@ -107,6 +125,7 @@ export default function LandingHeroDemo() {
       ref={cardRef}
       className={hpStyles.heroProduct}
       aria-label="Как Recruiter Radar оценивает компанию"
+      data-hero-entrance
       data-score-running={scoreRunning ? "true" : "false"}
       onPointerMove={onPointerMove}
       onPointerLeave={resetTilt}

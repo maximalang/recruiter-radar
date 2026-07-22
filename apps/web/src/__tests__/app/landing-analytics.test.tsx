@@ -7,6 +7,7 @@ import LandingAnalytics, {
   LandingStageEvent,
   type LandingAnalyticsDetail,
 } from "@/app/landing-analytics";
+import LandingMotion from "@/app/landing-motion";
 
 describe("landing analytics event layer", () => {
   beforeEach(() => {
@@ -137,6 +138,29 @@ describe("landing analytics event layer", () => {
 
     expect(received).toEqual([{ name: "payment_succeeded", context: "pilot-onboarding" }]);
     expect(JSON.stringify(received)).not.toContain("order-123");
+    window.removeEventListener(LANDING_ANALYTICS_EVENT, listener);
+  });
+
+  it("emits faq_opened only when a FAQ actually opens", () => {
+    const received: LandingAnalyticsDetail[] = [];
+    const listener = (event: Event) => received.push((event as CustomEvent<LandingAnalyticsDetail>).detail);
+    window.addEventListener(LANDING_ANALYTICS_EVENT, listener);
+
+    render(
+      <>
+        <LandingMotion />
+        <details data-landing-faq="faq-1"><summary>Вопрос</summary><p>Ответ</p></details>
+      </>,
+    );
+    const faq = document.querySelector<HTMLDetailsElement>("[data-landing-faq='faq-1']")!;
+
+    faq.open = true;
+    fireEvent(faq, new Event("toggle"));
+    faq.open = false;
+    fireEvent(faq, new Event("toggle"));
+    fireEvent(faq, new Event("toggle"));
+
+    expect(received).toEqual([{ name: "faq_opened", context: "faq-1" }]);
     window.removeEventListener(LANDING_ANALYTICS_EVENT, listener);
   });
 });

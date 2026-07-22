@@ -2,6 +2,8 @@
 
 import { useEffect, useRef } from "react";
 
+import { LANDING_MOTION_EVENT, type LandingMotionDetail } from "./landing-motion-control";
+
 export const RADAR_BLIP_EVENT = "recruiter-radar:radar-blip";
 export type RadarBlipDetail = { index: number };
 
@@ -39,15 +41,16 @@ export default function RadarCanvas() {
     let originY = 0;
     let targetOriginX = 0;
     let targetOriginY = 0;
+    let motionPaused = document.documentElement.dataset.landingMotion === "paused";
     const hero = canvas.closest<HTMLElement>("[data-deploy-anchor]");
 
     const labels = [
       "HR-отдел",
       "карьерный сайт",
-      "burst найма",
+      "рост найма",
       "новый регион",
       "3 роли",
-      "gate A",
+      "уровень A",
       "2 источника",
     ];
 
@@ -75,8 +78,8 @@ export default function RadarCanvas() {
       const inner = maxR * 0.34;
       const count = Math.max(5, Math.round((width * height) / 68000));
       blips = Array.from({ length: count }, (_, i) => {
-        const angle = Math.random() * Math.PI * 2;
-        const radius = inner + Math.random() * (maxR - inner);
+        const angle = (0.45 + i * 2.3999632297) % (Math.PI * 2);
+        const radius = inner + (((i * 37) % 101) / 100) * (maxR - inner);
         return {
           angle,
           radius,
@@ -228,7 +231,7 @@ export default function RadarCanvas() {
       }
       drawBlips(0);
 
-      if (running && heroVisible && tabVisible) rafId = requestAnimationFrame(frame);
+      if (running && heroVisible && tabVisible && !motionPaused) rafId = requestAnimationFrame(frame);
     }
 
     function stopLoop() {
@@ -237,7 +240,7 @@ export default function RadarCanvas() {
     }
 
     function startLoop() {
-      if (reduceMotion || running || !heroVisible || !tabVisible) return;
+      if (reduceMotion || motionPaused || running || !heroVisible || !tabVisible) return;
       running = true;
       rafId = requestAnimationFrame(frame);
     }
@@ -248,13 +251,23 @@ export default function RadarCanvas() {
       else stopLoop();
     }
 
+    function onMotionPreference(event: Event) {
+      motionPaused = (event as CustomEvent<LandingMotionDetail>).detail.paused;
+      if (motionPaused) {
+        stopLoop();
+        drawStatic();
+      } else {
+        startLoop();
+      }
+    }
+
     function onPointerMove(event: PointerEvent) {
       if (!hero || !window.matchMedia("(pointer: fine)").matches) return;
       const rect = hero.getBoundingClientRect();
       const normalizedX = Math.max(-1, Math.min(1, ((event.clientX - rect.left) / rect.width - 0.5) * 2));
       const normalizedY = Math.max(-1, Math.min(1, ((event.clientY - rect.top) / rect.height - 0.5) * 2));
-      targetOriginX = normalizedX * 10;
-      targetOriginY = normalizedY * 8;
+      targetOriginX = normalizedX * 6;
+      targetOriginY = normalizedY * 5;
     }
 
     function onPointerLeave() {
@@ -270,6 +283,7 @@ export default function RadarCanvas() {
     }
     window.addEventListener("resize", resize);
     document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener(LANDING_MOTION_EVENT, onMotionPreference);
     hero?.addEventListener("pointermove", onPointerMove, { passive: true });
     hero?.addEventListener("pointerleave", onPointerLeave);
 
@@ -287,6 +301,7 @@ export default function RadarCanvas() {
       heroObserver?.disconnect();
       window.removeEventListener("resize", resize);
       document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener(LANDING_MOTION_EVENT, onMotionPreference);
       hero?.removeEventListener("pointermove", onPointerMove);
       hero?.removeEventListener("pointerleave", onPointerLeave);
     };

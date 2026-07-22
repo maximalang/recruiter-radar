@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState, type MouseEvent, type SyntheticEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent, type SyntheticEvent } from "react";
 
 import hpStyles from "./home-page-components.module.css";
 
@@ -13,6 +13,7 @@ type LandingNavItem = {
 
 export default function LandingMobileNav(props: { items: readonly LandingNavItem[]; activeSection?: string | null }) {
   const detailsRef = useRef<HTMLDetailsElement | null>(null);
+  const summaryRef = useRef<HTMLElement | null>(null);
   const tapLockRef = useRef(false);
   const [open, setOpen] = useState(false);
 
@@ -31,9 +32,33 @@ export default function LandingMobileNav(props: { items: readonly LandingNavItem
     setOpen(event.currentTarget.open);
   };
 
+  useEffect(() => {
+    if (!open) return;
+    const close = (restoreFocus = false) => {
+      detailsRef.current?.removeAttribute("open");
+      setOpen(false);
+      if (restoreFocus) summaryRef.current?.focus();
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      close(true);
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      if (!(event.target instanceof Node) || detailsRef.current?.contains(event.target)) return;
+      close();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("pointerdown", onPointerDown);
+    };
+  }, [open]);
+
   return (
     <details ref={detailsRef} className={hpStyles.mobileNav} onToggle={onToggle}>
-      <summary aria-expanded={open}>
+      <summary ref={summaryRef} aria-expanded={open}>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
           <path d="M5 7h14M5 12h14M5 17h14" />
         </svg>

@@ -15,6 +15,7 @@ const LANDING_EVENT_NAMES = [
   "payment_started",
   "continuation_requested",
   "payment_succeeded",
+  "faq_opened",
 ] as const;
 
 export type LandingAnalyticsEventName = (typeof LANDING_EVENT_NAMES)[number];

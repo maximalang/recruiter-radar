@@ -209,7 +209,7 @@ describe("landing section hierarchy", () => {
 
   it("explains the role and delivery status of every source group", async () => {
     const page = await HomePage({ searchParams: Promise.resolve({}) });
-    const pageText = `${readVisibleText(page)} ${readRenderedText(<SourceLayerExplorer />)}`;
+    const pageText = `${readVisibleText(page)} ${readRenderedText(<SourceLayerExplorer />)} ${readRenderedText(<TelegramDeliveryDemo />)}`;
 
     expect(pageText).toContain("Каждый источник отвечает за свою часть доказательства");
     expect(pageText).toContain("Источники клиентской выдачи");
@@ -221,7 +221,7 @@ describe("landing section hierarchy", () => {
     expect(pageText).toContain("Что пока не попадает в клиентскую выдачу");
     expect(pageText).toContain("SuperJob, Хабр Карьера, страницы компаний LinkedIn");
     expect(pageText).toContain("проверки уверенности, качества данных и правомерности доступа");
-    expect(pageText).toContain("Telegram · основной");
+    expect(pageText).toContain("Telegram");
     expect(pageText).toContain("Email");
     expect(pageText).toContain("Web push");
     expect(pageText).toContain("VK");
@@ -354,7 +354,7 @@ describe("landing section hierarchy", () => {
     expect(pageText).toContain("Сигнал проходит единый контур проверки");
     expect(pageText).toContain("Как рассчитывается приоритет");
     expect(pageText).toContain("Ваш выбор профиль радара следующая выдача");
-    expect(pageText).toContain("Будущая выдача учитывает ваши отметки");
+    expect(pageText).toContain("Это локальная демонстрация: выбор не сохраняется");
     expect(pageText.match(/Производственная компания/g)).toHaveLength(1);
   });
 

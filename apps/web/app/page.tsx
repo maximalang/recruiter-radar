@@ -25,9 +25,10 @@ import LandingAnalytics from "./landing-analytics";
 import LandingHeader from "./landing-header";
 import LandingHeroDemo from "./landing-hero-demo";
 import LandingMotion from "./landing-motion";
+import LandingMotionControl from "./landing-motion-control";
 import { LandingPreviewSection, LandingPreviewSkeleton } from "./landing-preview";
 import { ProductScrollytelling, SourceLayerExplorer } from "./landing-product-story";
-import { MethodPipeline, TelegramDeliveryDemo } from "./landing-quality-demo";
+import { FiurGlossary, MethodPipeline, TelegramDeliveryDemo } from "./landing-quality-demo";
 import RadarCanvas from "./radar-canvas";
 import ScrollReveal from "./scroll-reveal";
 import ScrollProgress from "./scroll-progress";
@@ -36,7 +37,7 @@ import { SiteFooter } from "./ui/site-footer";
 export const dynamic = "force-dynamic";
 
 const LANDING_TITLE = "Recruiter Radar — компании, которым стоит написать сегодня";
-const LANDING_DESCRIPTION = "Ежедневный evidence-first радар клиентских возможностей для рекрутинговых агентств: сигнал найма, почему сейчас, источники, confidence и безопасный следующий шаг.";
+const LANDING_DESCRIPTION = "Ежедневный радар клиентских возможностей для рекрутинговых агентств: сигнал найма, доказательства, уровень доверия и безопасный следующий шаг.";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://recruiter-radar.ru"),
@@ -100,22 +101,22 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         id="main-content"
         className={hpStyles.heroSection}
         aria-label="Recruiter Radar"
-        data-deploy-anchor="landing-private-intelligence-v2"
+        data-deploy-anchor="recruiter-radar-landing-v2"
       >
         <RadarCanvas />
         <div className={hpStyles.heroContent}>
           <div className={hpStyles.heroCopy}>
-            <div className={hpStyles.heroEyebrow}>
+            <div className={hpStyles.heroEyebrow} data-hero-entrance>
               <span aria-hidden="true" />
               Клиентский радар для рекрутинговых агентств
             </div>
-            <h1 className={hpStyles.heroTitle}>
+            <h1 className={hpStyles.heroTitle} data-hero-entrance>
               Находите компании с подтверждённым спросом — <span className={hpStyles.heroTitleAccent}>пока окно обращения открыто.</span>
             </h1>
-            <p className={hpStyles.heroSubtitle}>
+            <p className={hpStyles.heroSubtitle} data-hero-entrance>
               Радар ежедневно отбирает компании под профиль агентства и показывает: что изменилось, почему писать сейчас, чем это подтверждено и какой следующий шаг сделать.
             </p>
-            <div className={hpStyles.heroActions}>
+            <div className={hpStyles.heroActions} data-hero-entrance>
               <Link
                 href="#preview-configurator"
                 className={hpStyles.heroCta}
@@ -137,9 +138,12 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                 Посмотреть живой пример
               </a>
             </div>
-            <p className={hpStyles.heroFootnote}>
-              {pilotPlan.price} за {pilotPlan.cadence} · без автопродления · Telegram-first
-            </p>
+            <div className={hpStyles.heroMetaRow} data-hero-entrance>
+              <p className={hpStyles.heroFootnote}>
+                {pilotPlan.price} за {pilotPlan.cadence} · без автопродления · сначала Telegram
+              </p>
+              <LandingMotionControl />
+            </div>
           </div>
 
           <LandingHeroDemo />
@@ -214,7 +218,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
           <SourceLayerExplorer />
 
-          <details className={hpStyles.sourceGateDisclosure}>
+          <details className={hpStyles.sourceGateDisclosure} data-animated-details>
             <summary>
               <span>Что пока не попадает в клиентскую выдачу</span>
               <em>5 групп источников</em>
@@ -243,10 +247,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               <p>Высокий балл сам по себе ничего не доказывает. Радар показывает, из чего сложилась рекомендация.</p>
             </div>
             <MethodPipeline />
-            <div className={hpStyles.methodFiurLine} aria-label="Состав приоритета FIUR">
-              <span>Соответствие · Fit</span><span>Намерение · Intent</span><span>Актуальность · Urgency</span><span>Доступность · Reachability</span>
-            </div>
-            <details className={hpStyles.methodDetails}>
+            <FiurGlossary />
+            <details className={hpStyles.methodDetails} data-animated-details>
               <summary>Как рассчитывается приоритет</summary>
               <div>
                 <p><strong>Соответствие</strong> — ниша, роли и география совпадают с профилем агентства.</p>
@@ -265,15 +267,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               </span>
               <div><strong>Каналы доставки</strong><span>по расписанию профиля</span></div>
             </div>
-            <div className={hpStyles.deliveryChannels} aria-label="Доступные каналы доставки">
-              <span data-primary="true">Telegram · основной</span>
-              <span>Email</span>
-              <span>Web push</span>
-              <span>VK</span>
-              <span>Webhook</span>
-            </div>
             <TelegramDeliveryDemo />
-            <p className={hpStyles.feedbackLoopNote}><strong>Контур обратной связи.</strong> Будущая выдача учитывает ваши отметки «Беру», «Позже» и «Не подходит» — без автоматических решений за вас.</p>
             <p className={hpStyles.deliveryNote}>Радар приходит только в подключённые каналы. Вы решаете, кому писать: продукт не отправляет сообщения компаниям автоматически.</p>
           </article>
         </div>
@@ -359,6 +353,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             key={item.question}
             className={`${hpStyles.faqCard} ${hpStyles.revealCard}`}
             data-landing-faq={`faq-${index + 1}`}
+            data-animated-details
           >
             <summary className={hpStyles.faqSummary}>
               <span>{item.question}</span>

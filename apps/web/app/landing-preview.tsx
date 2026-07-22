@@ -71,18 +71,22 @@ export async function LandingPreviewSection(props: {
             <h3 className={hpStyles.previewCardHeading}>Соберите свою выдачу</h3>
             <p>Двух полей достаточно для первого пересчёта. Можно начать с готового профиля.</p>
             <div className={hpStyles.previewPresets} aria-label="Готовые профили радара">
-              {PREVIEW_PRESETS.map((preset) => (
-                <Link
-                  key={preset.label}
-                  href={buildPublicPreviewHref({ ...preset, dailyDigestLimit: previewInput.dailyDigestLimit })}
-                  data-preview-preset="true"
-                  data-active={previewInput.specialization === preset.specialization && previewInput.targetCity === preset.targetCity ? "true" : undefined}
-                  data-landing-events="preview_started"
-                  data-landing-event-context="preset"
-                >
-                  {preset.label}
-                </Link>
-              ))}
+              {PREVIEW_PRESETS.map((preset) => {
+                const isActive = previewInput.specialization === preset.specialization && previewInput.targetCity === preset.targetCity;
+                return (
+                  <Link
+                    key={preset.label}
+                    href={buildPublicPreviewHref({ ...preset, dailyDigestLimit: previewInput.dailyDigestLimit })}
+                    aria-current={isActive ? "true" : undefined}
+                    data-preview-preset="true"
+                    data-active={isActive ? "true" : undefined}
+                    data-landing-events="preview_started"
+                    data-landing-event-context="preset"
+                  >
+                    {preset.label}
+                  </Link>
+                );
+              })}
             </div>
           </div>
 
@@ -127,7 +131,7 @@ export async function LandingPreviewSection(props: {
             </label>
 
             <div className={hpStyles.previewFormActions}>
-              <button type="submit" className={ppStyles.primaryAction} data-loading-label="Собираем радар…">
+              <button type="submit" className={ppStyles.primaryAction} data-loading-label="Радар анализирует сигналы">
                 Посмотреть компании
               </button>
 
@@ -199,7 +203,7 @@ export async function LandingPreviewSection(props: {
               </div>
 
               {hiddenPreviewItems.length > 0 ? (
-                <details className={ppStyles.disclosure}>
+                <details className={ppStyles.disclosure} data-animated-details>
                   <summary className={ppStyles.disclosureSummary}>
                     Показать ещё {hiddenPreviewItems.length} компаний
                   </summary>
@@ -333,7 +337,8 @@ function PreviewDigestCard(props: {
   return (
     <details
       className={hpStyles.previewLeadCard}
-      data-lead-card="true"
+          data-lead-card="true"
+          data-animated-details
       data-tone={tone}
       data-result-index={revealIndex}
       name="preview-leads"

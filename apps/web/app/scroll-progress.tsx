@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef } from "react";
+
+import hpStyles from "./home-page-components.module.css";
 
 /**
  * Thin progress bar at the very top of the viewport showing scroll position,
@@ -8,66 +10,55 @@ import { useEffect, useState } from "react";
  * prefers-reduced-motion (no transitions). No deps.
  */
 export default function ScrollProgress() {
-  const [progress, setProgress] = useState(0);
-  const [showTop, setShowTop] = useState(false);
+  const progressRef = useRef<HTMLDivElement | null>(null);
+  const topRef = useRef<HTMLButtonElement | null>(null);
+  const reducedMotionRef = useRef(false);
 
   useEffect(() => {
-    const onScroll = () => {
+    reducedMotionRef.current = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let raf = 0;
+    const update = () => {
       const doc = document.documentElement;
       const scrollTop = doc.scrollTop || document.body.scrollTop;
       const height = doc.scrollHeight - doc.clientHeight;
       const pct = height > 0 ? Math.min(100, (scrollTop / height) * 100) : 0;
-      setProgress(pct);
-      setShowTop(scrollTop > 600);
+      progressRef.current?.style.setProperty("--scroll-progress", `${pct}%`);
+      topRef.current?.style.setProperty("--scroll-progress", `${pct}%`);
+      if (topRef.current) topRef.current.dataset.visible = scrollTop > 600 ? "true" : "false";
     };
-    onScroll();
+    const onScroll = () => {
+      if (raf) return;
+      raf = window.requestAnimationFrame(() => {
+        update();
+        raf = 0;
+      });
+    };
+    update();
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.cancelAnimationFrame(raf);
+    };
   }, []);
 
   return (
     <>
       <div
+        ref={progressRef}
+        data-testid="landing-scroll-progress"
         aria-hidden="true"
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          height: "3px",
-          width: `${progress}%`,
-          background: "linear-gradient(90deg, #1d4ed8, #3b82f6)",
-          zIndex: 100,
-          transition: "width 0.1s linear",
-        }}
+        className={hpStyles.scrollProgress}
       />
-      {showTop ? (
-        <button
-          type="button"
-          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-          aria-label="Наверх"
-          style={{
-            position: "fixed",
-            bottom: "24px",
-            right: "24px",
-            width: "44px",
-            height: "44px",
-            borderRadius: "50%",
-            border: "1px solid var(--c-border, #e2e8f0)",
-            background: "#fff",
-            color: "var(--c-brand, #1d4ed8)",
-            boxShadow: "0 8px 24px rgba(15, 23, 42, 0.14)",
-            cursor: "pointer",
-            fontSize: "1.2rem",
-            fontWeight: 700,
-            zIndex: 100,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          ↑
-        </button>
-      ) : null}
+      <button
+        ref={topRef}
+        type="button"
+        data-visible="false"
+        onClick={() => window.scrollTo({ top: 0, behavior: reducedMotionRef.current ? "auto" : "smooth" })}
+        aria-label="Наверх"
+        className={hpStyles.scrollTopButton}
+      >
+        <span aria-hidden="true">↑</span>
+      </button>
     </>
   );
 }
