@@ -1,25 +1,69 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
 import hpStyles from "./home-page-components.module.css";
 import LandingMobileNav from "./landing-mobile-nav";
-import { BrandLogo } from "./ui/brand-logo";
 
 const LANDING_NAV_ITEMS = [
-  { href: "#preview", label: "Пример радара" },
-  { href: "#how-it-works", label: "Как работает" },
-  { href: "#quality", label: "Методология" },
-  { href: "#pricing", label: "Стоимость" },
+  { href: "#preview-configurator", sectionId: "preview", label: "Пример радара" },
+  { href: "#how-it-works", sectionId: "how-it-works", label: "Как работает" },
+  { href: "#quality", sectionId: "quality", label: "Методология" },
+  { href: "#pricing", sectionId: "pricing", label: "Стоимость" },
 ] as const;
 
 export default function LandingHeader() {
+  const [scrolled, setScrolled] = useState(false);
+  const [activeSection, setActiveSection] = useState<string | null>(null);
+
+  useEffect(() => {
+    let raf = 0;
+    const updateScrollState = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        setScrolled(window.scrollY > 28);
+        raf = 0;
+      });
+    };
+    updateScrollState();
+    window.addEventListener("scroll", updateScrollState, { passive: true });
+
+    const sections = LANDING_NAV_ITEMS
+      .map((item) => document.getElementById(item.sectionId))
+      .filter((section): section is HTMLElement => Boolean(section));
+    const observer = typeof IntersectionObserver === "undefined" ? null : new IntersectionObserver((entries) => {
+      const visible = entries
+        .filter((entry) => entry.isIntersecting)
+        .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+      if (visible) setActiveSection(visible.target.id);
+    }, { rootMargin: "-22% 0px -64%", threshold: [0.05, 0.25, 0.6] });
+    sections.forEach((section) => observer?.observe(section));
+
+    return () => {
+      window.removeEventListener("scroll", updateScrollState);
+      cancelAnimationFrame(raf);
+      observer?.disconnect();
+    };
+  }, []);
+
   return (
-    <header className={hpStyles.topBar}>
-      <Link
-        href="/"
-        className={hpStyles.brandMark}
-        aria-label="Recruiter Radar — на главную"
-      >
-        <BrandLogo joined showMark priority />
+    <header
+      className={hpStyles.topBar}
+      data-scrolled={scrolled ? "true" : "false"}
+      data-brand-header="landing-private-intelligence-v2"
+    >
+      <Link href="/" className={hpStyles.brandMark} aria-label="Recruiter Radar — на главную">
+        <img
+          src="/recruiter-radar-mark.svg"
+          width="36"
+          height="36"
+          className={hpStyles.brandRadarMark}
+          data-brand-radar-mark="true"
+          alt=""
+          aria-hidden="true"
+        />
+        <span className={hpStyles.brandWordmark} aria-hidden="true"><span>Recruiter</span><strong>Radar</strong></span>
       </Link>
       <nav className={hpStyles.topNavLinks} aria-label="Разделы лендинга">
         <span className={hpStyles.topNavAnchors}>
@@ -28,8 +72,10 @@ export default function LandingHeader() {
               key={item.href}
               href={item.href}
               className={hpStyles.topNavLink}
-              data-landing-events={item.href === "#preview" ? "preview_started" : undefined}
-              data-landing-event-context={item.href === "#preview" ? "header" : undefined}
+              data-active={activeSection === item.sectionId ? "true" : "false"}
+              aria-current={activeSection === item.sectionId ? "location" : undefined}
+              data-landing-events={item.sectionId === "preview" ? "preview_started" : undefined}
+              data-landing-event-context={item.sectionId === "preview" ? "header" : undefined}
             >
               {item.label}
             </a>
@@ -38,7 +84,7 @@ export default function LandingHeader() {
         <span className={hpStyles.topNavActions}>
           <Link href="/dashboard" className={hpStyles.topNavLogin}>Войти</Link>
           <Link
-            href="#preview"
+            href="#preview-configurator"
             className={hpStyles.topNavCta}
             data-landing-events="preview_started"
             data-landing-event-context="header"
@@ -49,15 +95,16 @@ export default function LandingHeader() {
       </nav>
       <div className={hpStyles.mobileHeaderActions}>
         <Link
-          href="#preview"
+          href="#preview-configurator"
           className={hpStyles.topNavCta}
           aria-label="Собрать мой радар"
           data-landing-events="preview_started"
           data-landing-event-context="mobile-header"
         >
-          Собрать радар
+          <span className={hpStyles.mobileCtaLong}>Собрать радар</span>
+          <span className={hpStyles.mobileCtaShort}>Собрать</span>
         </Link>
-        <LandingMobileNav items={LANDING_NAV_ITEMS} />
+        <LandingMobileNav items={LANDING_NAV_ITEMS} activeSection={activeSection} />
       </div>
     </header>
   );

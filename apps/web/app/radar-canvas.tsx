@@ -2,6 +2,9 @@
 
 import { useEffect, useRef } from "react";
 
+export const RADAR_BLIP_EVENT = "recruiter-radar:radar-blip";
+export type RadarBlipDetail = { index: number };
+
 /**
  * Background radar animation for the landing hero.
  *
@@ -29,7 +32,14 @@ export default function RadarCanvas() {
     let blips: Blip[] = [];
     let sweep = 0;
     let rafId = 0;
-    let running = true;
+    let running = false;
+    let heroVisible = true;
+    let tabVisible = !document.hidden;
+    let originX = 0;
+    let originY = 0;
+    let targetOriginX = 0;
+    let targetOriginY = 0;
+    const hero = canvas.closest<HTMLElement>("[data-deploy-anchor]");
 
     const labels = [
       "HR-отдел",
@@ -75,8 +85,8 @@ export default function RadarCanvas() {
         };
       });
       // place origin relative to center for the sweep math
-      cxRef.current = cx;
-      cyRef.current = cy;
+      cxRef.current = cx + originX;
+      cyRef.current = cy + originY;
     }
 
     const cxRef = { current: 0 };
@@ -185,6 +195,10 @@ export default function RadarCanvas() {
 
     function frame() {
       if (!ctx) return;
+      originX += (targetOriginX - originX) * 0.075;
+      originY += (targetOriginY - originY) * 0.075;
+      cxRef.current = width / 2 + originX;
+      cyRef.current = height / 2 + originY;
       ctx.clearRect(0, 0, width, height);
       // Background wash shares the exact ring origin, preventing a second,
       // optically shifted center from appearing during the sweep.
@@ -200,44 +214,81 @@ export default function RadarCanvas() {
       // advance sweep + light up blips in its path
       sweep += 0.018;
       if (sweep > Math.PI * 2) sweep -= Math.PI * 2;
-      for (const b of blips) {
+      for (const [index, b] of blips.entries()) {
         let a = b.angle - sweep;
         a = ((a % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
         // blip is lit when the sweep just passed it (a small window)
         if (a < 0.08) {
+          if (b.lit < 0.2) {
+            window.dispatchEvent(new CustomEvent<RadarBlipDetail>(RADAR_BLIP_EVENT, { detail: { index } }));
+          }
           b.lit = 1;
         }
         b.lit *= 0.985;
       }
       drawBlips(0);
 
-      if (running) rafId = requestAnimationFrame(frame);
+      if (running && heroVisible && tabVisible) rafId = requestAnimationFrame(frame);
+    }
+
+    function stopLoop() {
+      running = false;
+      cancelAnimationFrame(rafId);
+    }
+
+    function startLoop() {
+      if (reduceMotion || running || !heroVisible || !tabVisible) return;
+      running = true;
+      rafId = requestAnimationFrame(frame);
     }
 
     function onVisibility() {
-      if (document.hidden) {
-        running = false;
-        cancelAnimationFrame(rafId);
-      } else if (!reduceMotion) {
-        running = true;
-        rafId = requestAnimationFrame(frame);
-      }
+      tabVisible = !document.hidden;
+      if (tabVisible) startLoop();
+      else stopLoop();
+    }
+
+    function onPointerMove(event: PointerEvent) {
+      if (!hero || !window.matchMedia("(pointer: fine)").matches) return;
+      const rect = hero.getBoundingClientRect();
+      const normalizedX = Math.max(-1, Math.min(1, ((event.clientX - rect.left) / rect.width - 0.5) * 2));
+      const normalizedY = Math.max(-1, Math.min(1, ((event.clientY - rect.top) / rect.height - 0.5) * 2));
+      targetOriginX = normalizedX * 10;
+      targetOriginY = normalizedY * 8;
+    }
+
+    function onPointerLeave() {
+      targetOriginX = 0;
+      targetOriginY = 0;
     }
 
     resize();
     if (reduceMotion) {
       drawStatic();
     } else {
-      rafId = requestAnimationFrame(frame);
+      startLoop();
     }
     window.addEventListener("resize", resize);
     document.addEventListener("visibilitychange", onVisibility);
+    hero?.addEventListener("pointermove", onPointerMove, { passive: true });
+    hero?.addEventListener("pointerleave", onPointerLeave);
+
+    const heroObserver = !reduceMotion && hero && typeof IntersectionObserver !== "undefined"
+      ? new IntersectionObserver((entries) => {
+          heroVisible = entries.some((entry) => entry.isIntersecting);
+          if (heroVisible) startLoop();
+          else stopLoop();
+        }, { rootMargin: "120px", threshold: 0.01 })
+      : null;
+    if (hero && heroObserver) heroObserver.observe(hero);
 
     return () => {
-      running = false;
-      cancelAnimationFrame(rafId);
+      stopLoop();
+      heroObserver?.disconnect();
       window.removeEventListener("resize", resize);
       document.removeEventListener("visibilitychange", onVisibility);
+      hero?.removeEventListener("pointermove", onPointerMove);
+      hero?.removeEventListener("pointerleave", onPointerLeave);
     };
   }, []);
 

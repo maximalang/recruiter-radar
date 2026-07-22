@@ -28,6 +28,11 @@ function collectElements(node: ReactNode, type: unknown): React.ReactElement[] {
 }
 
 describe("checkout navigation", () => {
+  beforeEach(() => {
+    const { getAccountById } = jest.requireMock("@/lib/account-auth") as { getAccountById: jest.Mock };
+    getAccountById.mockResolvedValue(null);
+  });
+
   it("returns to the landing preview when the user edits radar parameters", async () => {
     const page = await CheckoutPage({
       searchParams: Promise.resolve({
@@ -44,5 +49,18 @@ describe("checkout navigation", () => {
     expect(url.searchParams.get("specialization")).toBe("инженерный подбор");
     expect(url.searchParams.get("targetCity")).toBe("Москва");
     expect(url.searchParams.has("plan")).toBe(false);
+  });
+
+  it("tracks a recurring-plan request separately from a pilot payment start", async () => {
+    const { getAccountById } = jest.requireMock("@/lib/account-auth") as { getAccountById: jest.Mock };
+    getAccountById.mockResolvedValue({ id: "account-1", email: "team@example.test" });
+
+    const requestPage = await CheckoutPage({ searchParams: Promise.resolve({ plan: "monthly" }) });
+    const pilotPage = await CheckoutPage({ searchParams: Promise.resolve({ plan: "pilot" }) });
+    const requestForm = collectElements(requestPage, "form")[0];
+    const pilotForm = collectElements(pilotPage, "form")[0];
+
+    expect(requestForm.props["data-landing-events"]).toBe("continuation_requested");
+    expect(pilotForm.props["data-landing-events"]).toBe("payment_started");
   });
 });

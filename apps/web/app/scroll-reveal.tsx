@@ -1,13 +1,15 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
+
+import hpStyles from "./home-page-components.module.css";
 
 /**
- * Semantic section wrapper that never hides product content.
+ * Progressive enhancement for calm, one-shot section reveals.
  *
- * The old client-side intersection animation switched every below-fold section
- * to `opacity: 0` after hydration. Slow devices, full-page captures and missed
- * observer callbacks could then leave the landing visually empty. A marketing
- * page must remain readable independently of JavaScript and scroll timing, so
- * the wrapper is deliberately server-safe and permanently visible.
+ * The server markup is always fully visible. JavaScript may lower the initial
+ * opacity only to the readable 0.78 baseline and add a small translate before
+ * the first intersection; it never owns whether the content can be read.
  */
 export default function ScrollReveal({
   children,
@@ -16,24 +18,50 @@ export default function ScrollReveal({
   className,
   style,
   id,
+  stagger = false,
 }: {
   children: ReactNode;
   delay?: number;
   as?: "div" | "section";
   className?: string;
-  style?: React.CSSProperties;
+  style?: CSSProperties;
   id?: string;
+  stagger?: boolean;
 }) {
+  const elementRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const element = elementRef.current;
+    if (!element) return;
+
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reducedMotion || typeof IntersectionObserver === "undefined") {
+      element.dataset.revealed = "true";
+      return;
+    }
+
+    element.dataset.revealReady = "true";
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return;
+      element.dataset.revealed = "true";
+      observer.disconnect();
+    }, { rootMargin: "0px 0px -8%", threshold: 0.08 });
+
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <Tag
+      ref={(node) => { elementRef.current = node; }}
       id={id}
-      className={className}
+      className={`${hpStyles.motionReveal}${className ? ` ${className}` : ""}`}
+      data-landing-reveal="true"
+      data-reveal-stagger={stagger ? "true" : undefined}
       style={{
         ...style,
-        opacity: 1,
-        transform: "none",
-        transitionDelay: `${delay}ms`,
-      }}
+        "--reveal-delay": `${delay}ms`,
+      } as CSSProperties}
     >
       {children}
     </Tag>

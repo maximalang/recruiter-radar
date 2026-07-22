@@ -1,23 +1,39 @@
 "use client";
 
 import Link from "next/link";
-import type { MouseEvent } from "react";
+import { useRef, useState, type MouseEvent, type SyntheticEvent } from "react";
 
 import hpStyles from "./home-page-components.module.css";
 
 type LandingNavItem = {
   href: string;
+  sectionId: string;
   label: string;
 };
 
-function closeMobileNav(event: MouseEvent<HTMLAnchorElement>) {
-  event.currentTarget.closest("details")?.removeAttribute("open");
-}
+export default function LandingMobileNav(props: { items: readonly LandingNavItem[]; activeSection?: string | null }) {
+  const detailsRef = useRef<HTMLDetailsElement | null>(null);
+  const tapLockRef = useRef(false);
+  const [open, setOpen] = useState(false);
 
-export default function LandingMobileNav(props: { items: readonly LandingNavItem[] }) {
+  const closeMobileNav = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (tapLockRef.current) {
+      event.preventDefault();
+      return;
+    }
+    tapLockRef.current = true;
+    detailsRef.current?.removeAttribute("open");
+    setOpen(false);
+    window.setTimeout(() => { tapLockRef.current = false; }, 320);
+  };
+
+  const onToggle = (event: SyntheticEvent<HTMLDetailsElement>) => {
+    setOpen(event.currentTarget.open);
+  };
+
   return (
-    <details className={hpStyles.mobileNav}>
-      <summary>
+    <details ref={detailsRef} className={hpStyles.mobileNav} onToggle={onToggle}>
+      <summary aria-expanded={open}>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
           <path d="M5 7h14M5 12h14M5 17h14" />
         </svg>
@@ -28,8 +44,9 @@ export default function LandingMobileNav(props: { items: readonly LandingNavItem
           <a
             key={item.href}
             href={item.href}
-            data-landing-events={item.href === "#preview" ? "preview_started" : undefined}
-            data-landing-event-context={item.href === "#preview" ? "mobile-menu" : undefined}
+            aria-current={props.activeSection === item.sectionId ? "location" : undefined}
+            data-landing-events={item.sectionId === "preview" ? "preview_started" : undefined}
+            data-landing-event-context={item.sectionId === "preview" ? "mobile-menu" : undefined}
             onClick={closeMobileNav}
           >
             {item.label}

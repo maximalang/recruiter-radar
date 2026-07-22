@@ -171,7 +171,7 @@ export default async function PilotOnboardingPage({
 
   return (
     <PageFrame maxWidth="860px">
-      {order.status === "paid" ? <LandingStageEvent name="payment_succeeded" context="pilot-onboarding" /> : null}
+      {order.status === "paid" ? <LandingStageEvent name="payment_succeeded" context="pilot-onboarding" dedupeKey={order.id} /> : null}
       <Link href="/" className={ppStyles.backLink}>
         На главную
       </Link>

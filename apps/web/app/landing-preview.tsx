@@ -67,7 +67,7 @@ export async function LandingPreviewSection(props: {
           className={hpStyles.previewConfigurator}
           padding="var(--preview-surface-padding)"
         >
-          <div className={hpStyles.previewConfiguratorLead}>
+          <div id="preview-configurator" className={hpStyles.previewConfiguratorLead}>
             <h3 className={hpStyles.previewCardHeading}>Соберите свою выдачу</h3>
             <p>Двух полей достаточно для первого пересчёта. Можно начать с готового профиля.</p>
             <div className={hpStyles.previewPresets} aria-label="Готовые профили радара">
@@ -75,6 +75,10 @@ export async function LandingPreviewSection(props: {
                 <Link
                   key={preset.label}
                   href={buildPublicPreviewHref({ ...preset, dailyDigestLimit: previewInput.dailyDigestLimit })}
+                  data-preview-preset="true"
+                  data-active={previewInput.specialization === preset.specialization && previewInput.targetCity === preset.targetCity ? "true" : undefined}
+                  data-landing-events="preview_started"
+                  data-landing-event-context="preset"
                 >
                   {preset.label}
                 </Link>
@@ -84,8 +88,11 @@ export async function LandingPreviewSection(props: {
 
           <form
             method="GET"
-            action="/#preview"
+            action="/#preview-results"
             className={hpStyles.previewForm}
+            data-preview-form="true"
+            data-landing-events="preview_started"
+            data-landing-event-context="form"
           >
             <label htmlFor="specialization" className={ppStyles.field}>
               <span className={ppStyles.fieldLabel}>Специализация</span>
@@ -120,7 +127,7 @@ export async function LandingPreviewSection(props: {
             </label>
 
             <div className={hpStyles.previewFormActions}>
-              <button type="submit" className={ppStyles.primaryAction}>
+              <button type="submit" className={ppStyles.primaryAction} data-loading-label="Собираем радар…">
                 Посмотреть компании
               </button>
 
@@ -137,7 +144,7 @@ export async function LandingPreviewSection(props: {
           className={`${hpStyles.previewCardContainer} ${hpStyles.previewResults}`}
           padding="var(--preview-surface-padding)"
         >
-          <div className={hpStyles.previewHeaderRow}>
+          <div id="preview-results" className={hpStyles.previewHeaderRow} data-preview-results="true">
             <div>
               <h3 className={hpStyles.previewCardHeading}>
                 {previewState.isPersonalized ? "Радар для вашего профиля" : "Утренняя выдача"}
@@ -160,7 +167,7 @@ export async function LandingPreviewSection(props: {
 
           {appliedProfile.length > 0 ? (
             <div className={hpStyles.previewAppliedProfile} aria-label="Применённый профиль">
-              <span>Профиль</span>
+              <span role="status" aria-live="polite">Профиль применён</span>
               {appliedProfile.map((value) => <strong key={value}>{value}</strong>)}
             </div>
           ) : null}
@@ -186,6 +193,7 @@ export async function LandingPreviewSection(props: {
                     key={`${item.org_id}-${item.rank}`}
                     item={item}
                     defaultOpen={index === 0}
+                    revealIndex={index}
                   />
                 ))}
               </div>
@@ -197,11 +205,12 @@ export async function LandingPreviewSection(props: {
                   </summary>
                   <div className={ppStyles.disclosureBody}>
                     <div className={hpStyles.previewItemsGrid}>
-                      {hiddenPreviewItems.map((item) => (
+                      {hiddenPreviewItems.map((item, index) => (
                         <PreviewDigestCard
                           key={`${item.org_id}-${item.rank}`}
                           item={item}
                           defaultOpen={false}
+                          revealIndex={index + VISIBLE_PREVIEW_ITEMS}
                         />
                       ))}
                     </div>
@@ -279,8 +288,9 @@ export function LandingPreviewSkeleton() {
 function PreviewDigestCard(props: {
   item: HomePreviewItem;
   defaultOpen: boolean;
+  revealIndex: number;
 }) {
-  const { item, defaultOpen } = props;
+  const { item, defaultOpen, revealIndex } = props;
   const whyNow = deriveWhyNow(item.reasons) || "";
   const contactPath = formatLawfulContactPath(item.lawfulContactPath);
   const location = formatLocationCaption(item.location_names);
@@ -325,8 +335,10 @@ function PreviewDigestCard(props: {
       className={hpStyles.previewLeadCard}
       data-lead-card="true"
       data-tone={tone}
+      data-result-index={revealIndex}
       name="preview-leads"
       open={defaultOpen}
+      style={{ "--result-delay": `${Math.min(revealIndex, 5) * 70}ms` } as React.CSSProperties}
     >
       <summary className={hpStyles.previewLeadSummary}>
         <span className={hpStyles.previewLeadSummaryCompany}>
@@ -358,7 +370,7 @@ function PreviewDigestCard(props: {
           aria-valuemax={100}
           aria-label={`Сила сигнала: ${points} из 100`}
         >
-          <span className={hpStyles.previewStrengthFill} data-tone={tone} style={{ width: `${pct}%` }} />
+          <span className={hpStyles.previewStrengthFill} data-tone={tone} style={{ "--meter-value": `${pct}%` } as React.CSSProperties} />
         </div>
 
         <div className={hpStyles.previewLeadEvidence}>
@@ -401,7 +413,7 @@ function LeadMeter(props: { label: string; value: number; valueLabel: string }) 
   return (
     <div className={hpStyles.previewLeadMeter}>
       <span>{props.label}</span>
-      <span className={hpStyles.previewLeadMeterTrack} aria-hidden="true"><span style={{ width: `${props.value}%` }} /></span>
+      <span className={hpStyles.previewLeadMeterTrack} aria-hidden="true"><span style={{ "--meter-value": `${props.value}%` } as React.CSSProperties} /></span>
       <strong>{props.valueLabel}</strong>
     </div>
   );

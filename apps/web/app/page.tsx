@@ -23,7 +23,11 @@ import {
 import hpStyles from "./home-page-components.module.css";
 import LandingAnalytics from "./landing-analytics";
 import LandingHeader from "./landing-header";
+import LandingHeroDemo from "./landing-hero-demo";
+import LandingMotion from "./landing-motion";
 import { LandingPreviewSection, LandingPreviewSkeleton } from "./landing-preview";
+import { ProductScrollytelling, SourceLayerExplorer } from "./landing-product-story";
+import { MethodPipeline, TelegramDeliveryDemo } from "./landing-quality-demo";
 import RadarCanvas from "./radar-canvas";
 import ScrollReveal from "./scroll-reveal";
 import ScrollProgress from "./scroll-progress";
@@ -83,15 +87,21 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   return (
     <PageFrame maxWidth="1160px">
       <LandingAnalytics />
+      <LandingMotion />
       <ScrollProgress />
       <div className={hpStyles.ambientBg} aria-hidden="true">
-        <span className={hpStyles.ambientGrid} />
+        <span className={hpStyles.ambientGrid} data-ambient-grid />
       </div>
       <a href="#main-content" className={ppStyles.skipLink}>Перейти к содержанию</a>
       <LandingHeader />
 
       {/* Hero */}
-      <section id="main-content" className={hpStyles.heroSection} aria-label="Recruiter Radar">
+      <section
+        id="main-content"
+        className={hpStyles.heroSection}
+        aria-label="Recruiter Radar"
+        data-deploy-anchor="landing-private-intelligence-v2"
+      >
         <RadarCanvas />
         <div className={hpStyles.heroContent}>
           <div className={hpStyles.heroCopy}>
@@ -107,7 +117,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             </p>
             <div className={hpStyles.heroActions}>
               <Link
-                href="#preview"
+                href="#preview-configurator"
                 className={hpStyles.heroCta}
                 data-landing-events="preview_started"
                 data-landing-event-context="hero"
@@ -119,7 +129,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                 </svg>
               </Link>
               <a
-                href="#preview"
+                href="#preview-results"
                 className={hpStyles.heroSecondaryCta}
                 data-landing-events="preview_started"
                 data-landing-event-context="hero"
@@ -132,31 +142,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             </p>
           </div>
 
-          <div className={hpStyles.heroProduct} aria-label="Как Recruiter Radar оценивает компанию">
-            <div className={hpStyles.heroProductTopbar}>
-              <span className={hpStyles.heroProductLabel}>Обезличенный пример лида</span>
-              <span className={hpStyles.heroProductLive}>Обновлено сегодня · уровень доверия A</span>
-            </div>
-            <div className={hpStyles.heroCompanyRow}>
-              <div>
-                <div className={hpStyles.heroCompanyName}>Производственная компания</div>
-                <div className={hpStyles.heroCompanyMeta}>Москва и область · промышленность</div>
-              </div>
-              <div className={hpStyles.heroScore}><strong>87</strong><span>/100</span></div>
-            </div>
-            <div className={hpStyles.heroScoreTrack}><span /></div>
-            <div className={hpStyles.heroEvidenceRow}>
-              <div><span>Сигнал найма</span><p>14 новых вакансий за 6 дней</p></div>
-              <div><span>Доказательства</span><p>Карьерная страница + hh.ru</p></div>
-              <div><span>Следующий шаг</span><p>Проверить HR-форму сегодня</p></div>
-            </div>
-            <div className={hpStyles.heroFiurLine} aria-label="FIUR: соответствие 88, намерение 84, актуальность 94, доступность 82">
-              <span><small>Соответствие · Fit</small><strong>88</strong></span>
-              <span><small>Намерение · Intent</small><strong>84</strong></span>
-              <span><small>Актуальность · Urgency</small><strong>94</strong></span>
-              <span><small>Доступность · Reachability</small><strong>82</strong></span>
-            </div>
-          </div>
+          <LandingHeroDemo />
 
         </div>
       </section>
@@ -170,7 +156,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       </aside>
 
       {/* Problem — why this radar exists */}
-      <ScrollReveal as="section" className={`${hpStyles.scrollSection} ${hpStyles.problemSection}`}>
+      <ScrollReveal as="section" className={`${hpStyles.scrollSection} ${hpStyles.problemSection}`} stagger>
         <div className={hpStyles.problemLayout}>
           <div className={hpStyles.problemIntro}>
             <SectionIntro
@@ -216,23 +202,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           title="Готовый список — каждое утро"
           description="Настраиваете профиль один раз. Дальше радар сам собирает и проверяет сигналы найма."
         />
-        <div className={hpStyles.steps}>
-          <article className={`${hpStyles.step} ${hpStyles.revealCard}`}>
-            <span className={hpStyles.stepIndex}>01 · Профиль</span>
-            <h3>Задаёте нишу</h3>
-            <p>Специализация, роли, отрасли, география и исключения — под ваше агентство.</p>
-          </article>
-          <article className={`${hpStyles.step} ${hpStyles.revealCard}`}>
-            <span className={hpStyles.stepIndex}>02 · Проверка</span>
-            <h3>Радар ищет сигналы</h3>
-            <p>Карьерные страницы, вакансии и динамика найма — с подтверждением и оценкой уверенности.</p>
-          </article>
-          <article className={`${hpStyles.step} ${hpStyles.revealCard}`}>
-            <span className={hpStyles.stepIndex}>03 · Результат</span>
-            <h3>Получаете приоритеты</h3>
-            <p>3–7 компаний с причиной, доказательствами, контактом и следующим шагом — в подключённых каналах.</p>
-          </article>
-        </div>
+        <ProductScrollytelling />
         <aside className={hpStyles.sourceArchitecture} aria-labelledby="source-architecture-title">
           <div className={hpStyles.sourceArchitectureHeader}>
             <div>
@@ -242,32 +212,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             <p>Лид появляется не из списка площадок. Сначала радар находит сигнал найма, затем подтверждает компанию и только после добавляет контекст.</p>
           </div>
 
-          <ol className={hpStyles.sourceLayers}>
-            <li className={hpStyles.sourceLayer} data-source-role="origin">
-              <div className={hpStyles.sourceLayerMeta}>
-                <span>01 · Создаёт сигнал</span>
-                <em>допущены</em>
-              </div>
-              <h4>Источники клиентской выдачи</h4>
-              <p><strong>hh.ru, Работа России и прямые карьерные страницы.</strong> Только они могут стать основанием для лида — после проверки уверенности.</p>
-            </li>
-            <li className={hpStyles.sourceLayer} data-source-role="verification">
-              <div className={hpStyles.sourceLayerMeta}>
-                <span>02 · Подтверждает</span>
-                <em>не создаёт лид</em>
-              </div>
-              <h4>Компания и путь контакта</h4>
-              <p><strong>Сайт компании и ЕГРЮЛ/ФНС</strong> уточняют юрлицо, домен и безопасный корпоративный канал. Отдельно лид не создают.</p>
-            </li>
-            <li className={hpStyles.sourceLayer} data-source-role="context">
-              <div className={hpStyles.sourceLayerMeta}>
-                <span>03 · Усиливает</span>
-                <em>только контекст</em>
-              </div>
-              <h4>Почему сейчас</h4>
-              <p><strong>Корпоративные события, официальные публикации и отраслевой контекст</strong> объясняют момент обращения, но не заменяют доказательство найма.</p>
-            </li>
-          </ol>
+          <SourceLayerExplorer />
 
           <details className={hpStyles.sourceGateDisclosure}>
             <summary>
@@ -291,19 +236,13 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           <article className={hpStyles.qualityMethodCard}>
             <div className={hpStyles.qualityCardTopbar}>
               <span>Контур проверки</span>
-              <span className={hpStyles.qualityDemoBadge}>evidence-first</span>
+              <span className={hpStyles.qualityDemoBadge}>Проверка доказательств</span>
             </div>
             <div className={hpStyles.qualityMethodIntro}>
               <h3>Сигнал проходит единый контур проверки</h3>
               <p>Высокий балл сам по себе ничего не доказывает. Радар показывает, из чего сложилась рекомендация.</p>
             </div>
-            <ol className={hpStyles.methodPipeline} aria-label="Путь сигнала до клиентской выдачи">
-              <li>Сигнал найма</li>
-              <li>Проверка компании</li>
-              <li>Контекст момента</li>
-              <li>Confidence gate</li>
-              <li>Клиентская выдача</li>
-            </ol>
+            <MethodPipeline />
             <div className={hpStyles.methodFiurLine} aria-label="Состав приоритета FIUR">
               <span>Соответствие · Fit</span><span>Намерение · Intent</span><span>Актуальность · Urgency</span><span>Доступность · Reachability</span>
             </div>
@@ -333,15 +272,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               <span>VK</span>
               <span>Webhook</span>
             </div>
-            <div className={hpStyles.deliveryMessage}>
-              <span className={hpStyles.deliveryKicker}>Утренний радар · 5 компаний</span>
-              <h3>Начните с этого сигнала</h3>
-              <p><strong>Компания из вашего списка</strong> усилила инженерный найм. Уверенность высокая, доступен корпоративный путь контакта.</p>
-              <div className={hpStyles.feedbackChoices} aria-label="Пример обратной связи в Telegram">
-                <span>Беру в работу</span><span>Позже</span><span>Не подходит</span>
-              </div>
-            </div>
-            <p className={hpStyles.feedbackLoopNote}><strong>Feedback loop.</strong> Будущая выдача учитывает ваши отметки «Беру», «Позже» и «Не подходит» — без автоматических решений за вас.</p>
+            <TelegramDeliveryDemo />
+            <p className={hpStyles.feedbackLoopNote}><strong>Контур обратной связи.</strong> Будущая выдача учитывает ваши отметки «Беру», «Позже» и «Не подходит» — без автоматических решений за вас.</p>
             <p className={hpStyles.deliveryNote}>Радар приходит только в подключённые каналы. Вы решаете, кому писать: продукт не отправляет сообщения компаниям автоматически.</p>
           </article>
         </div>
@@ -385,7 +317,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             <Link
               href={buildCheckoutHref({ ...previewInput, planCode: pilotPlan.code })}
               className={`${ppStyles.primaryAction} ${hpStyles.planCta}`}
-              data-landing-events="preview_checkout_clicked"
+              data-landing-events="pilot_cta_clicked"
               data-landing-event-context="pilot"
             >
               Запустить пилот
@@ -449,13 +381,13 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           <Link
             href={checkoutHref}
             className={hpStyles.heroCta}
-            data-landing-events="preview_checkout_clicked"
+            data-landing-events="closing_cta_clicked"
             data-landing-event-context="closing"
           >
             Активировать неделю — 2 990 ₽
           </Link>
           <a
-            href="#preview"
+            href="#preview-results"
             className={hpStyles.heroSecondaryCta}
             data-landing-events="preview_started"
             data-landing-event-context="closing"

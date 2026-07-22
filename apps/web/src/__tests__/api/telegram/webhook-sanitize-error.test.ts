@@ -1,20 +1,29 @@
 /**
  * Tests for sanitizeError — redacts Telegram bot tokens before they reach
- * persisted error_message columns or HTTP error responses.
+ * persisted error_message columns.
  *
  * Token shape: numeric bot id (>= 8 digits) ":" 35+ char auth string.
  * Both URL-embedded ("bot<id>:<auth>") and bare ("<id>:<auth>") forms must be redacted.
  */
 
-import { __test } from '@/app/api/telegram/webhook/route';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 
-const { sanitizeError } = __test;
+import { sanitizeTelegramError as sanitizeError } from '@/lib/telegram/sanitize-error';
 
 // Realistic-looking token: 10-digit id + ":" + 35-char auth (mix of letters, digits, _ and -).
 const AUTH_35 = 'AAH1bCdEfGhIjKlMnOpQrStUvWxYz012-_3';
 const TOKEN = `1234567890:${AUTH_35}`;
 
 describe('sanitizeError', () => {
+  it('stays wired into the webhook persistence path', () => {
+    const routePath = path.join(process.cwd(), 'app', 'api', 'telegram', 'webhook', 'route.ts');
+    const routeSource = readFileSync(routePath, 'utf8');
+
+    expect(routeSource).toMatch(/import \{ sanitizeTelegramError \} from ["'][^"']*telegram\/sanitize-error["']/);
+    expect(routeSource).toContain('sanitizeTelegramError(message)');
+  });
+
   it('redacts a bare Telegram token', () => {
     expect(sanitizeError(`request failed for token ${TOKEN}`)).toBe(
       'request failed for token [redacted-token]',

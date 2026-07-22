@@ -14,6 +14,13 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+# Public analytics configuration is compiled into the Next.js client bundle.
+# The same-origin endpoint remains the safe default when no provider id exists.
+ARG NEXT_PUBLIC_YANDEX_METRIKA_ID=""
+ARG NEXT_PUBLIC_LANDING_ANALYTICS_ENDPOINT="/api/analytics/landing"
+ENV NEXT_PUBLIC_YANDEX_METRIKA_ID=${NEXT_PUBLIC_YANDEX_METRIKA_ID}
+ENV NEXT_PUBLIC_LANDING_ANALYTICS_ENDPOINT=${NEXT_PUBLIC_LANDING_ANALYTICS_ENDPOINT}
+
 # Build the application
 RUN npm run build --workspace @recruiter-radar/web
 
