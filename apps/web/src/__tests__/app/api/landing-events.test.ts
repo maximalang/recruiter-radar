@@ -118,4 +118,22 @@ describe("POST /api/landing-events", () => {
 
     expect(response.status).toBe(204);
   });
+
+  it("accepts the external same origin when standalone rewrites the internal URL", async () => {
+    const response = await POST(new Request(
+      "http://127.0.0.1:3000/api/landing-events",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          host: "recruiter-radar.ru",
+          origin: "https://recruiter-radar.ru",
+          "x-forwarded-proto": "https",
+        },
+        body: JSON.stringify({ name: "landing_viewed" }),
+      },
+    ));
+
+    expect(response.status).toBe(204);
+  });
 });

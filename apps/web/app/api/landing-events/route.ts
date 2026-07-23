@@ -32,12 +32,27 @@ function jsonError(status: number, error: string): Response {
 }
 
 function isSameOriginRequest(request: Request): boolean {
-  const expectedUrl = new URL(request.url);
-  const host = request.headers.get("host")?.trim().toLowerCase();
-  if (host && host !== expectedUrl.host.toLowerCase()) return false;
-
+  const internalUrl = new URL(request.url);
+  const host =
+    request.headers.get("host")?.trim().toLowerCase() ||
+    internalUrl.host.toLowerCase();
   const origin = request.headers.get("origin");
-  if (origin) return origin === expectedUrl.origin;
+  if (origin) {
+    const forwardedProtocol = request.headers
+      .get("x-forwarded-proto")
+      ?.split(",", 1)[0]
+      ?.trim()
+      .toLowerCase();
+    const protocol =
+      forwardedProtocol === "http" || forwardedProtocol === "https"
+        ? forwardedProtocol
+        : internalUrl.protocol.slice(0, -1);
+    try {
+      return new URL(origin).origin.toLowerCase() === `${protocol}://${host}`;
+    } catch {
+      return false;
+    }
+  }
 
   const fetchSite = request.headers.get("sec-fetch-site");
   return fetchSite === "same-origin" || fetchSite === "none";
