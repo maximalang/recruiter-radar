@@ -42,8 +42,8 @@ export default function LandingHeader({ activationHref }: { activationHref: stri
         }
       }
       const next = [...visible.entries()].sort((left, right) => {
-        const ratioDifference = right[1].ratio - left[1].ratio;
-        return ratioDifference || Math.abs(left[1].top - 80) - Math.abs(right[1].top - 80);
+        const offsetDifference = Math.abs(left[1].top - 80) - Math.abs(right[1].top - 80);
+        return offsetDifference || right[1].ratio - left[1].ratio;
       })[0]?.[0];
       if (next) setActiveSection(next);
     }, {

@@ -109,4 +109,36 @@ describe("landing header accessibility", () => {
       "location",
     );
   });
+
+  it("prefers the section nearest the sticky header over a smaller section with a higher ratio", () => {
+    renderHeader(
+      <>
+        <section id="preview" />
+        <section id="how-it-works" />
+        <section id="quality" />
+        <section id="pricing" />
+        <section id="faq" />
+      </>,
+    );
+
+    act(() => intersectionCallback([
+      {
+        target: document.getElementById("how-it-works"),
+        isIntersecting: true,
+        intersectionRatio: 0.75,
+        boundingClientRect: { top: -420 },
+      },
+      {
+        target: document.getElementById("quality"),
+        isIntersecting: true,
+        intersectionRatio: 0.35,
+        boundingClientRect: { top: 96 },
+      },
+    ] as IntersectionObserverEntry[], {} as IntersectionObserver));
+
+    expect(screen.getAllByRole("link", { name: "Проверка" })[0]).toHaveAttribute(
+      "aria-current",
+      "location",
+    );
+  });
 });
