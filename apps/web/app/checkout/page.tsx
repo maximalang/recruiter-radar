@@ -24,6 +24,7 @@ import {
 import { SiteFooter } from "../ui/site-footer";
 import ppStyles from "../ui/page-primitives.module.css";
 import LandingCheckoutAnalytics from "../landing-checkout-analytics";
+import { LANDING_ANALYTICS_EVENT } from "../../lib/landing-analytics-contract";
 
 export const dynamic = "force-dynamic";
 
@@ -70,7 +71,13 @@ export default async function CheckoutPage(props: {
 
   return (
     <InternalPageFrame navItems={buildAccountNavigation("dashboard")} footer={<SiteFooter />}>
-      <LandingCheckoutAnalytics trackPaymentStart={!isRequest} />
+      <LandingCheckoutAnalytics
+        submitEvent={
+          isRequest
+            ? LANDING_ANALYTICS_EVENT.continuationRequested
+            : LANDING_ANALYTICS_EVENT.paymentStarted
+        }
+      />
       <InternalPageHeader
         title={isRequest ? `Подключение: ${plan.name}` : "Оформление пробной недели"}
         subtitle="Заказ привязан к подтверждённому аккаунту — статусы и настройки не потеряются после оплаты."

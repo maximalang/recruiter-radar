@@ -14,28 +14,24 @@ const STAGES = [
     secondary: "Fit",
     description: "Ниша, роли и география совпадают с профилем агентства.",
     badge: "профиль",
-    context: "fit",
   },
   {
     name: "Намерение",
     secondary: "Intent",
     description: "Найм подтверждён несколькими фактами, а не одной вакансией.",
     badge: "2+ факта",
-    context: "intent",
   },
   {
     name: "Актуальность",
     secondary: "Urgency",
     description: "Изменение свежее: момент для обращения ещё не потерян.",
     badge: "сегодня",
-    context: "urgency",
   },
   {
     name: "Доступность",
     secondary: "Reachability",
     description: "Есть законный корпоративный путь контакта.",
     badge: "корп. канал",
-    context: "reachability",
   },
 ] as const;
 
@@ -84,14 +80,6 @@ export default function LandingMethodology() {
   const selectStage = (index: number) => {
     stopAutomaticRotation();
     setActiveIndex(index);
-    window.dispatchEvent(
-      new CustomEvent("landing:analytics", {
-        detail: {
-          name: "methodology_stage_selected",
-          context: STAGES[index].context,
-        },
-      }),
-    );
   };
 
   return (

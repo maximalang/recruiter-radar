@@ -2,6 +2,11 @@
 
 import { useEffect, useState } from "react";
 
+import {
+  LANDING_ANALYTICS_CONTEXT,
+  LANDING_ANALYTICS_DOM_EVENT,
+  LANDING_ANALYTICS_EVENT,
+} from "../../lib/landing-analytics-contract";
 import hpStyles from "../home-page-components.module.css";
 
 export const LANDING_MOTION_EVENT = "landing:motionchange";
@@ -55,10 +60,12 @@ export default function LandingMotionPreference() {
     setPaused(nextPaused);
     publishMotionPreference({ paused: nextPaused, reduced: false });
     window.dispatchEvent(
-      new CustomEvent("landing:analytics", {
+      new CustomEvent(LANDING_ANALYTICS_DOM_EVENT, {
         detail: {
-          name: nextPaused ? "motion_paused" : "motion_resumed",
-          context: "motion_control",
+          name: nextPaused
+            ? LANDING_ANALYTICS_EVENT.motionPaused
+            : LANDING_ANALYTICS_EVENT.motionResumed,
+          context: LANDING_ANALYTICS_CONTEXT.motionControl,
         },
       }),
     );

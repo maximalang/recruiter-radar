@@ -2,14 +2,20 @@
 
 import { useId, useRef, useState } from "react";
 
+import {
+  LANDING_ANALYTICS_CONTEXT,
+  LANDING_ANALYTICS_DOM_EVENT,
+  LANDING_ANALYTICS_EVENT,
+  type LandingAnalyticsEventName,
+} from "../lib/landing-analytics-contract";
 import hpStyles from "./home-page-components.module.css";
 
 const CHANNELS = [
-  { id: "telegram", label: "Telegram", context: "telegram" },
-  { id: "email", label: "Email", context: "email" },
-  { id: "web-push", label: "Web push", context: "web_push" },
-  { id: "vk", label: "VK", context: "vk" },
-  { id: "webhook", label: "Webhook", context: "webhook" },
+  { id: "telegram", label: "Telegram" },
+  { id: "email", label: "Email" },
+  { id: "web-push", label: "Web push" },
+  { id: "vk", label: "VK" },
+  { id: "webhook", label: "Webhook" },
 ] as const;
 
 const FEEDBACK = [
@@ -33,9 +39,9 @@ const FEEDBACK = [
 type ChannelId = (typeof CHANNELS)[number]["id"];
 type FeedbackId = (typeof FEEDBACK)[number]["id"];
 
-function emitAnalytics(name: string, context: string) {
-  window.dispatchEvent(new CustomEvent("landing:analytics", {
-    detail: { name, context },
+function emitAnalytics(name: LandingAnalyticsEventName) {
+  window.dispatchEvent(new CustomEvent(LANDING_ANALYTICS_DOM_EVENT, {
+    detail: { name, context: LANDING_ANALYTICS_CONTEXT.deliveryDemo },
   }));
 }
 
@@ -48,7 +54,7 @@ export default function LandingDeliveryDemo() {
   const selectChannel = (index: number, focus = false) => {
     const next = CHANNELS[index];
     setChannel(next.id);
-    emitAnalytics("delivery_channel_selected", next.context);
+    emitAnalytics(LANDING_ANALYTICS_EVENT.deliveryChannelSelected);
     if (focus) tabRefs.current[index]?.focus();
   };
 
@@ -122,7 +128,7 @@ export default function LandingDeliveryDemo() {
               aria-pressed={feedback === item.id}
               onClick={() => {
                 setFeedback(item.id);
-                emitAnalytics("delivery_feedback_selected", item.id);
+                emitAnalytics(LANDING_ANALYTICS_EVENT.deliveryFeedbackSelected);
               }}
             >
               {item.label}

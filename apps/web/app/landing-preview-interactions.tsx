@@ -2,11 +2,16 @@
 
 import { useEffect } from "react";
 
-const PREVIEW_ANALYTICS_EVENT = "landing:analytics";
+import {
+  LANDING_ANALYTICS_CONTEXT,
+  LANDING_ANALYTICS_DOM_EVENT,
+  LANDING_ANALYTICS_EVENT,
+  type LandingAnalyticsContext,
+} from "../lib/landing-analytics-contract";
 
-function emitPreviewStarted(context: "form" | "preset") {
-  window.dispatchEvent(new CustomEvent(PREVIEW_ANALYTICS_EVENT, {
-    detail: { name: "preview_started", context },
+function emitPreviewStarted(context: LandingAnalyticsContext) {
+  window.dispatchEvent(new CustomEvent(LANDING_ANALYTICS_DOM_EVENT, {
+    detail: { name: LANDING_ANALYTICS_EVENT.previewStarted, context },
   }));
 }
 
@@ -52,7 +57,7 @@ export default function LandingPreviewInteractions() {
       controls.submit.disabled = true;
       controls.idleLabel.hidden = true;
       controls.busyLabel.hidden = false;
-      emitPreviewStarted("form");
+      emitPreviewStarted(LANDING_ANALYTICS_CONTEXT.previewForm);
     };
 
     const handlePresetClick = (event: Event) => {
@@ -61,7 +66,7 @@ export default function LandingPreviewInteractions() {
         ? target.closest("[data-preview-preset]")
         : null;
       if (!preset?.closest("[data-preview-section-content]")) return;
-      emitPreviewStarted("preset");
+      emitPreviewStarted(LANDING_ANALYTICS_CONTEXT.preset);
     };
 
     const handlePageShow = () => {
@@ -72,10 +77,6 @@ export default function LandingPreviewInteractions() {
     document.addEventListener("submit", handleSubmit, true);
     document.addEventListener("click", handlePresetClick);
     window.addEventListener("pageshow", handlePageShow);
-    window.dispatchEvent(new CustomEvent(PREVIEW_ANALYTICS_EVENT, {
-      detail: { name: "preview_generated" },
-    }));
-
     return () => {
       document.removeEventListener("submit", handleSubmit, true);
       document.removeEventListener("click", handlePresetClick);

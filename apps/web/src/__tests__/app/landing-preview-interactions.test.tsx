@@ -9,6 +9,19 @@ describe("LandingPreviewInteractions", () => {
     window.history.replaceState({}, "", "/");
   });
 
+  it("does not claim a personalized generation merely by mounting", () => {
+    const listener = jest.fn();
+    window.addEventListener("landing:analytics", listener);
+
+    const { unmount } = render(<LandingPreviewInteractions />);
+
+    expect(listener).not.toHaveBeenCalledWith(expect.objectContaining({
+      detail: expect.objectContaining({ name: "preview_generated" }),
+    }));
+    unmount();
+    window.removeEventListener("landing:analytics", listener);
+  });
+
   it("mounts with the real preview and blocks duplicate form submissions", () => {
     render(
       <div data-preview-section-content>

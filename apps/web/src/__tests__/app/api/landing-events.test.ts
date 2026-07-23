@@ -32,15 +32,24 @@ describe("POST /api/landing-events", () => {
   it("persists an allowlisted, privacy-bounded event and returns 204", async () => {
     const response = await POST(request(JSON.stringify({
       name: "preview_started",
-      context: "form",
+      context: "preview-form",
       timestamp: Date.now(),
     })));
 
     expect(response.status).toBe(204);
     expect(mockTryRecordProductEvent).toHaveBeenCalledWith(expect.objectContaining({
       eventName: "preview_started",
-      metadata: { context: "form" },
+      metadata: { context: "preview-form" },
     }));
+  });
+
+  it("accepts the canonical motion-control context", async () => {
+    const response = await POST(request(JSON.stringify({
+      name: "motion_paused",
+      context: "motion-control",
+    })));
+
+    expect(response.status).toBe(204);
   });
 
   it("rejects unknown events and contexts", async () => {

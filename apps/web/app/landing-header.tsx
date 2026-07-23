@@ -3,6 +3,10 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
+import {
+  LANDING_ANALYTICS_CONTEXT,
+  LANDING_ANALYTICS_EVENT,
+} from "../lib/landing-analytics-contract";
 import hpStyles from "./home-page-components.module.css";
 import LandingMotionPreference from "./landing-motion/motion-preference";
 import { BrandLogo } from "./ui/brand-logo";
@@ -62,7 +66,12 @@ export default function LandingHeader({ activationHref }: { activationHref: stri
         <span className={hpStyles.topNavActions}>
           <LandingMotionPreference />
           <Link href="/dashboard" className={hpStyles.topNavLogin}>Войти</Link>
-          <Link href={activationHref} className={hpStyles.topNavCta}>
+          <Link
+            href={activationHref}
+            className={hpStyles.topNavCta}
+            data-analytics-event={LANDING_ANALYTICS_EVENT.pilotCtaClicked}
+            data-analytics-context={LANDING_ANALYTICS_CONTEXT.header}
+          >
             Попробовать неделю
           </Link>
           <button
@@ -95,6 +104,8 @@ export default function LandingHeader({ activationHref }: { activationHref: stri
         <Link
           href={activationHref}
           className={hpStyles.mobileMenuActivation}
+          data-analytics-event={LANDING_ANALYTICS_EVENT.pilotCtaClicked}
+          data-analytics-context={LANDING_ANALYTICS_CONTEXT.header}
           onClick={closeMenu}
         >
           Попробовать неделю

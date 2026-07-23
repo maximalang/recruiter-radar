@@ -2,12 +2,20 @@
 
 import { useEffect } from "react";
 
-export type LandingAnalyticsDetail = {
-  name: string;
-  context?: string;
-};
+import {
+  LANDING_ANALYTICS_CONTEXT,
+  LANDING_ANALYTICS_DOM_EVENT,
+  LANDING_ANALYTICS_EVENT,
+  isLandingAnalyticsContext,
+  isLandingAnalyticsEventName,
+  type LandingAnalyticsContext,
+  type LandingAnalyticsEventName,
+} from "../lib/landing-analytics-contract";
 
-const ANALYTICS_EVENT = "landing:analytics";
+export type LandingAnalyticsDetail = {
+  name: LandingAnalyticsEventName;
+  context?: LandingAnalyticsContext;
+};
 
 export function sendLandingEvent(detail: LandingAnalyticsDetail) {
   const timestamp = Date.now();
@@ -35,11 +43,12 @@ export function sendLandingEvent(detail: LandingAnalyticsDetail) {
 
 export default function LandingAnalytics() {
   useEffect(() => {
-    sendLandingEvent({ name: "landing_viewed" });
+    sendLandingEvent({ name: LANDING_ANALYTICS_EVENT.landingViewed });
 
     const handleCustomEvent = (event: Event) => {
       const detail = (event as CustomEvent<LandingAnalyticsDetail>).detail;
-      if (!detail || typeof detail.name !== "string") return;
+      if (!detail || !isLandingAnalyticsEventName(detail.name)) return;
+      if (detail.context !== undefined && !isLandingAnalyticsContext(detail.context)) return;
       sendLandingEvent(detail);
     };
     const handleClick = (event: MouseEvent) => {
@@ -48,25 +57,30 @@ export default function LandingAnalytics() {
       const analyticsTarget = target.closest<HTMLElement>("[data-analytics-event]");
       const name = analyticsTarget?.dataset.analyticsEvent;
       if (!analyticsTarget || !name) return;
+      if (analyticsTarget instanceof HTMLDetailsElement) return;
+      if (!isLandingAnalyticsEventName(name)) return;
+      const context = analyticsTarget.dataset.analyticsContext;
+      if (context !== undefined && !isLandingAnalyticsContext(context)) return;
       sendLandingEvent({
         name,
-        ...(analyticsTarget.dataset.analyticsContext
-          ? { context: analyticsTarget.dataset.analyticsContext }
-          : {}),
+        ...(context ? { context } : {}),
       });
     };
     const handleToggle = (event: Event) => {
       const details = event.target;
       if (!(details instanceof HTMLDetailsElement) || !details.open) return;
-      if (details.dataset.analyticsEvent !== "faq_opened") return;
-      sendLandingEvent({ name: "faq_opened", context: "faq" });
+      if (details.dataset.analyticsEvent !== LANDING_ANALYTICS_EVENT.faqOpened) return;
+      sendLandingEvent({
+        name: LANDING_ANALYTICS_EVENT.faqOpened,
+        context: LANDING_ANALYTICS_CONTEXT.faq,
+      });
     };
 
-    window.addEventListener(ANALYTICS_EVENT, handleCustomEvent);
+    window.addEventListener(LANDING_ANALYTICS_DOM_EVENT, handleCustomEvent);
     document.addEventListener("click", handleClick);
     document.addEventListener("toggle", handleToggle, true);
     return () => {
-      window.removeEventListener(ANALYTICS_EVENT, handleCustomEvent);
+      window.removeEventListener(LANDING_ANALYTICS_DOM_EVENT, handleCustomEvent);
       document.removeEventListener("click", handleClick);
       document.removeEventListener("toggle", handleToggle, true);
     };

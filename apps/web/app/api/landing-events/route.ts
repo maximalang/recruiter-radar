@@ -1,9 +1,11 @@
 import { SlidingWindowRateLimiter } from "@/lib/rate-limiter";
 import {
-  isProductEventName,
-  tryRecordProductEvent,
-  type ProductEventName,
-} from "@/lib/telemetry";
+  isLandingAnalyticsContext,
+  isLandingAnalyticsEventName,
+  type LandingAnalyticsContext,
+  type LandingAnalyticsEventName,
+} from "@/lib/landing-analytics-contract";
+import { tryRecordProductEvent } from "@/lib/telemetry";
 
 const MAX_BODY_BYTES = 1_024;
 const EVENT_RATE_LIMIT = new SlidingWindowRateLimiter({
@@ -11,47 +13,9 @@ const EVENT_RATE_LIMIT = new SlidingWindowRateLimiter({
   windowMs: 60_000,
 });
 
-const LANDING_EVENT_NAMES = new Set<ProductEventName>([
-  "landing_viewed",
-  "preview_started",
-  "preview_generated",
-  "preview_checkout_clicked",
-  "checkout_viewed",
-  "payment_started",
-  "payment_succeeded",
-  "delivery_channel_selected",
-  "delivery_feedback_selected",
-  "faq_opened",
-  "methodology_stage_selected",
-  "motion_paused",
-  "motion_resumed",
-]);
-
-const LANDING_EVENT_CONTEXTS = new Set([
-  "form",
-  "preset",
-  "pricing",
-  "closing",
-  "preview",
-  "telegram",
-  "email",
-  "web_push",
-  "vk",
-  "webhook",
-  "take",
-  "later",
-  "reject",
-  "faq",
-  "fit",
-  "intent",
-  "urgency",
-  "reachability",
-  "manual",
-]);
-
 type LandingEventPayload = {
-  name: ProductEventName;
-  context?: string;
+  name: LandingAnalyticsEventName;
+  context?: LandingAnalyticsContext;
   timestamp?: number;
 };
 
@@ -73,12 +37,12 @@ function parseLandingEvent(value: unknown): LandingEventPayload | null {
   const record = value as Record<string, unknown>;
   const keys = Object.keys(record);
   if (keys.some((key) => !["name", "context", "timestamp"].includes(key))) return null;
-  if (!isProductEventName(record.name) || !LANDING_EVENT_NAMES.has(record.name)) {
+  if (!isLandingAnalyticsEventName(record.name)) {
     return null;
   }
   if (
     record.context !== undefined &&
-    (typeof record.context !== "string" || !LANDING_EVENT_CONTEXTS.has(record.context))
+    !isLandingAnalyticsContext(record.context)
   ) {
     return null;
   }

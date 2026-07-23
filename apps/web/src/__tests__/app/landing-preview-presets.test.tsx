@@ -5,6 +5,21 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import LandingPreviewPresets from "@/app/landing-preview-presets";
 
 describe("LandingPreviewPresets", () => {
+  it("keeps every preset unselected when the query has no preset", () => {
+    render(
+      <LandingPreviewPresets
+        options={[
+          { label: "Москва", href: "/?specialization=engineering", selected: false },
+          { label: "Удалённо", href: "/?specialization=it", selected: false },
+        ]}
+      />,
+    );
+
+    expect(screen.queryByRole("radio", { checked: true })).not.toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Москва" })).toHaveAttribute("tabindex", "0");
+    expect(screen.getByRole("radio", { name: "Удалённо" })).toHaveAttribute("tabindex", "-1");
+  });
+
   it("exposes the selected profile as an accessible radio option", () => {
     render(
       <LandingPreviewPresets
@@ -48,5 +63,22 @@ describe("LandingPreviewPresets", () => {
       "/?specialization=it#preview-results",
     );
     click.mockRestore();
+  });
+
+  it("does not emit analytics directly from the preset component", () => {
+    const listener = jest.fn();
+    window.addEventListener("landing:analytics", listener);
+    render(
+      <LandingPreviewPresets
+        options={[
+          { label: "Москва", href: "/?specialization=engineering", selected: false },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("radio", { name: "Москва" }));
+
+    expect(listener).not.toHaveBeenCalled();
+    window.removeEventListener("landing:analytics", listener);
   });
 });

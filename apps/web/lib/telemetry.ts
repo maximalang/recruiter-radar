@@ -1,21 +1,11 @@
 import type { Pool, PoolClient } from 'pg'
 
 import { getPool } from './db-pool'
+import { LANDING_ANALYTICS_EVENT_NAMES } from './landing-analytics-contract'
 
 export const PRODUCT_EVENT_NAMES = [
-  'landing_viewed',
-  'preview_started',
-  'preview_generated',
-  'preview_checkout_clicked',
-  'checkout_viewed',
-  'payment_started',
-  'payment_succeeded',
-  'delivery_channel_selected',
-  'delivery_feedback_selected',
-  'faq_opened',
+  ...LANDING_ANALYTICS_EVENT_NAMES,
   'methodology_stage_selected',
-  'motion_paused',
-  'motion_resumed',
   'preview_submitted',
   'checkout_started',
   'order_paid',

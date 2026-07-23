@@ -1,4 +1,20 @@
+import { Children, isValidElement, type ReactNode } from "react";
+
+import RootLayout from "@/app/layout";
 import YandexMetrika from "@/app/yandex-metrika";
+
+function containsElementType(node: ReactNode, type: unknown): boolean {
+  let found = false;
+  Children.forEach(node, (child) => {
+    if (!isValidElement(child) || found) return;
+    if (child.type === type) {
+      found = true;
+      return;
+    }
+    found = containsElementType(child.props.children, type);
+  });
+  return found;
+}
 
 describe("YandexMetrika", () => {
   const originalId = process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID;
@@ -23,5 +39,11 @@ describe("YandexMetrika", () => {
 
     expect(initialization).toContain("https://mc.yandex.ru/metrika/tag.js");
     expect(initialization).toContain("12345678");
+  });
+
+  it("mounts Metrika in the root layout shared by checkout and onboarding", () => {
+    const layout = RootLayout({ children: <main data-route-content /> });
+
+    expect(containsElementType(layout, YandexMetrika)).toBe(true);
   });
 });

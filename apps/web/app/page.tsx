@@ -4,6 +4,10 @@ import { Suspense } from "react";
 
 import { getPaymentProviderSetupState } from "../lib/payments";
 import {
+  LANDING_ANALYTICS_CONTEXT,
+  LANDING_ANALYTICS_EVENT,
+} from "../lib/landing-analytics-contract";
+import {
   PUBLIC_PLANS,
   PUBLIC_PREVIEW_FIELD_LIMITS,
   buildCheckoutHref,
@@ -42,11 +46,11 @@ import LandingHeroInteractions from "./landing-hero-interactions";
 import LandingMethodology from "./landing-methodology";
 import LandingPreviewInteractions from "./landing-preview-interactions";
 import LandingPreviewPresets from "./landing-preview-presets";
+import PreviewGeneratedEvent from "./preview-generated-event";
 import RadarCanvas from "./radar-canvas";
 import ScrollReveal from "./scroll-reveal";
 import ScrollProgress from "./scroll-progress";
 import { SiteFooter } from "./ui/site-footer";
-import YandexMetrika from "./yandex-metrika";
 
 export const dynamic = "force-dynamic";
 
@@ -89,7 +93,6 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
   return (
     <PageFrame maxWidth="1160px" dataDeployAnchor="recruiter-radar-landing-v3">
-      <YandexMetrika />
       <LandingAnalytics />
       <LandingDetailsInteractions />
       <ScrollProgress />
@@ -120,14 +123,26 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               Каждый день Recruiter Radar находит лучшие компании под специализацию агентства и показывает сигнал найма, уровень уверенности и безопасный путь контакта.
             </p>
             <div className={hpStyles.heroActions} data-hero-step>
-              <a href="#preview-configurator" className={hpStyles.heroCta}>
+              <a
+                href="#preview-configurator"
+                className={hpStyles.heroCta}
+                data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
+                data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroPrimary}
+              >
                 Настроить мой радар
                 <svg className={hpStyles.heroCtaArrow} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <line x1="5" y1="12" x2="19" y2="12" />
                   <polyline points="13 6 19 12 13 18" />
                 </svg>
               </a>
-              <a href="#preview-results" className={hpStyles.heroSecondaryCta}>Посмотреть результат</a>
+              <a
+                href="#preview-results"
+                className={hpStyles.heroSecondaryCta}
+                data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
+                data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroResults}
+              >
+                Посмотреть результат
+              </a>
             </div>
             <p className={hpStyles.heroFootnote}>
               {pilotPlan.price} за {pilotPlan.cadence} · без автопродления · Telegram — основной канал
@@ -353,8 +368,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             <Link
               href={buildCheckoutHref({ ...previewInput, planCode: pilotPlan.code })}
               className={`${ppStyles.primaryAction} ${hpStyles.planCta}`}
-              data-analytics-event="payment_started"
-              data-analytics-context="pricing"
+              data-analytics-event={LANDING_ANALYTICS_EVENT.pilotCtaClicked}
+              data-analytics-context={LANDING_ANALYTICS_CONTEXT.pricing}
             >
               {pilotPlan.ctaLabel}
             </Link>
@@ -394,8 +409,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                   <Link
                     href={buildCheckoutHref({ ...previewInput, planCode: plan.code })}
                     className={`${ppStyles.secondaryAction} ${hpStyles.planCta}`}
-                    data-analytics-event="preview_checkout_clicked"
-                    data-analytics-context="pricing"
+                    data-analytics-event={LANDING_ANALYTICS_EVENT.continuationRequested}
+                    data-analytics-context={LANDING_ANALYTICS_CONTEXT.pricing}
                   >
                     {plan.ctaLabel}
                   </Link>
@@ -431,7 +446,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           <details
             key={item.question}
             className={`${hpStyles.faqCard} ${hpStyles.revealCard}`}
-            data-analytics-event="faq_opened"
+            data-analytics-event={LANDING_ANALYTICS_EVENT.faqOpened}
             data-animated-details
           >
             <summary className={hpStyles.faqSummary}>
@@ -455,8 +470,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           <Link
             href={checkoutHref}
             className={hpStyles.heroCta}
-            data-analytics-event="payment_started"
-            data-analytics-context="closing"
+            data-analytics-event={LANDING_ANALYTICS_EVENT.closingCtaClicked}
+            data-analytics-context={LANDING_ANALYTICS_CONTEXT.closing}
           >
             Активировать неделю — 2 990 ₽
           </Link>
@@ -492,6 +507,10 @@ export async function PreviewSection(props: {
 
   return (
     <div className={hpStyles.previewSectionContent} data-preview-section-content>
+      <PreviewGeneratedEvent
+        generated={previewState.isLive && previewState.isPersonalized}
+        context={LANDING_ANALYTICS_CONTEXT.preview}
+      />
       <div className={hpStyles.previewWorkspace}>
         <div id="preview-configurator" className={hpStyles.previewSurfaceAnchor}>
           <SurfaceCard
@@ -656,8 +675,8 @@ export async function PreviewSection(props: {
           <Link
             href={checkoutHref}
             className={ppStyles.primaryAction}
-            data-analytics-event="preview_checkout_clicked"
-            data-analytics-context="preview"
+            data-analytics-event={LANDING_ANALYTICS_EVENT.previewCheckoutClicked}
+            data-analytics-context={LANDING_ANALYTICS_CONTEXT.preview}
           >
             {previewState.items.length > 0
               ? "Получать такой радар каждое утро"

@@ -16,25 +16,21 @@ export default function LandingPreviewPresets({
 }: {
   options: LandingPreviewPresetOption[];
 }) {
-  const initialIndex = Math.max(0, options.findIndex((option) => option.selected));
-  const [selectedIndex, setSelectedIndex] = useState(initialIndex);
+  const initialIndex = options.findIndex((option) => option.selected);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(
+    initialIndex >= 0 ? initialIndex : null,
+  );
   const optionRefs = useRef<Array<HTMLAnchorElement | null>>([]);
 
   useEffect(() => {
-    setSelectedIndex(Math.max(0, options.findIndex((option) => option.selected)));
+    const nextIndex = options.findIndex((option) => option.selected);
+    setSelectedIndex(nextIndex >= 0 ? nextIndex : null);
   }, [options]);
 
-  const select = (index: number, emitAnalytics = true) => {
+  const select = (index: number) => {
     const option = options[index];
     if (!option) return;
     setSelectedIndex(index);
-    if (emitAnalytics) {
-      window.dispatchEvent(
-        new CustomEvent("landing:analytics", {
-          detail: { name: "preview_started", context: "preset" },
-        }),
-      );
-    }
   };
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLAnchorElement>, index: number) => {
@@ -49,10 +45,11 @@ export default function LandingPreviewPresets({
     } else if (event.key === "End") {
       nextIndex = lastIndex;
     }
+    if (event.key === "Enter" || event.key === " ") nextIndex = index;
     if (nextIndex === null) return;
 
     event.preventDefault();
-    select(nextIndex, false);
+    select(nextIndex);
     optionRefs.current[nextIndex]?.focus();
     optionRefs.current[nextIndex]?.click();
   };
@@ -72,7 +69,7 @@ export default function LandingPreviewPresets({
           href={option.href}
           role="radio"
           aria-checked={selectedIndex === index}
-          tabIndex={selectedIndex === index ? 0 : -1}
+          tabIndex={selectedIndex === index || (selectedIndex === null && index === 0) ? 0 : -1}
           data-preview-preset
           data-selected={selectedIndex === index}
           onClick={() => select(index)}

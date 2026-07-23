@@ -7,6 +7,10 @@ import LandingDeliveryDemo from "@/app/landing-delivery-demo";
 import LandingMethodology from "@/app/landing-methodology";
 import { NoticeBox, SectionIntro, SurfaceCard } from "@/app/ui/page-primitives";
 import {
+  LANDING_ANALYTICS_CONTEXT,
+  LANDING_ANALYTICS_EVENT,
+} from "@/lib/landing-analytics-contract";
+import {
   buildCheckoutHref,
   getPublicSampleDigestState,
   hasPublicPreviewInput,
@@ -136,6 +140,31 @@ describe("landing section hierarchy", () => {
     expect(previewText).not.toContain("временно недоступна");
     expect(previewText).not.toContain("восстановления источника");
     expect(previewText).toContain("Попробовать неделю");
+  });
+
+  it("keeps CTA analytics aligned with the real funnel transition", async () => {
+    const page = await HomePage({ searchParams: Promise.resolve({}) });
+    const anchors = collectElements(page, "a");
+    const links = collectElements(page, Link);
+    const heroPrimary = anchors.find((anchor) => anchor.props.href === "#preview-configurator");
+    const heroResults = anchors.find((anchor) => anchor.props.href === "#preview-results");
+    const trackedLinks = links.filter((link) => link.props["data-analytics-event"]);
+
+    expect(heroPrimary?.props["data-analytics-event"])
+      .toBe(LANDING_ANALYTICS_EVENT.previewStarted);
+    expect(heroPrimary?.props["data-analytics-context"])
+      .toBe(LANDING_ANALYTICS_CONTEXT.heroPrimary);
+    expect(heroResults?.props["data-analytics-context"])
+      .toBe(LANDING_ANALYTICS_CONTEXT.heroResults);
+    expect(trackedLinks.some((link) =>
+      link.props["data-analytics-event"] === LANDING_ANALYTICS_EVENT.pilotCtaClicked
+    )).toBe(true);
+    expect(trackedLinks.some((link) =>
+      link.props["data-analytics-event"] === LANDING_ANALYTICS_EVENT.continuationRequested
+    )).toBe(true);
+    expect(trackedLinks.some((link) =>
+      link.props["data-analytics-event"] === LANDING_ANALYTICS_EVENT.paymentStarted
+    )).toBe(false);
   });
 
   it("explains the role and delivery status of every source group", async () => {
