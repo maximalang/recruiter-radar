@@ -6,8 +6,15 @@ import {
   LANDING_MOTION_EVENT,
   type LandingMotionDetail,
 } from "./landing-motion/motion-preference";
+import { useLandingMotion } from "./landing-motion/landing-motion-provider";
+import {
+  LANDING_RADAR_SIGNAL_EVENT,
+  type LandingRadarSignalDetail,
+} from "./landing-radar-signal";
 
 export default function LandingHeroInteractions() {
+  const initialMotion = useLandingMotion();
+  const initialMotionRef = useRef(initialMotion);
   const markerRef = useRef<HTMLSpanElement | null>(null);
 
   useEffect(() => {
@@ -16,9 +23,10 @@ export default function LandingHeroInteractions() {
     if (!hero || !tiltTarget) return;
 
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-    let paused = document.documentElement.dataset.landingMotion === "paused";
-    let reduced = media.matches;
+    let paused = initialMotionRef.current.paused;
+    let reduced = initialMotionRef.current.reduced;
     let rafId = 0;
+    let pulseTimer = 0;
 
     if (!reduced && !paused) {
       hero.querySelectorAll<HTMLElement>("[data-hero-step]").forEach((element, index) => {
@@ -45,6 +53,14 @@ export default function LandingHeroInteractions() {
       tiltTarget.style.removeProperty("--hero-shift-y");
       tiltTarget.style.willChange = "auto";
     };
+    const resetSignal = () => {
+      window.clearTimeout(pulseTimer);
+      hero.querySelectorAll<HTMLElement>("[data-signal-active]").forEach((element) => {
+        element.removeAttribute("data-signal-active");
+      });
+      hero.querySelector<HTMLElement>("[data-confirmation-pulse]")
+        ?.removeAttribute("data-confirmation-pulse");
+    };
     const onPointerEnter = () => {
       if (!reduced && !paused) tiltTarget.style.willChange = "transform";
     };
@@ -65,19 +81,42 @@ export default function LandingHeroInteractions() {
       const detail = (event as CustomEvent<LandingMotionDetail>).detail;
       paused = detail?.paused ?? false;
       reduced = detail?.reduced ?? media.matches;
-      if (paused || reduced) resetTilt();
+      if (paused || reduced) {
+        resetTilt();
+        resetSignal();
+      }
+    };
+    const onRadarSignal = (event: Event) => {
+      if (paused || reduced || document.hidden) return;
+      const detail = (event as CustomEvent<LandingRadarSignalDetail>).detail;
+      const index = Number.isInteger(detail?.index) ? detail.index : 0;
+      const normalizedIndex = Math.abs(index);
+      const evidenceItems = hero.querySelectorAll<HTMLElement>("[data-hero-evidence-index]");
+      const fiurItems = hero.querySelectorAll<HTMLElement>("[data-hero-fiur-index]");
+      const evidence = evidenceItems[normalizedIndex % Math.max(1, evidenceItems.length)];
+      const fiur = fiurItems[normalizedIndex % Math.max(1, fiurItems.length)];
+      const scoreTrack = hero.querySelector<HTMLElement>("[data-hero-score-track]");
+
+      resetSignal();
+      evidence?.setAttribute("data-signal-active", "true");
+      fiur?.setAttribute("data-signal-active", "true");
+      scoreTrack?.setAttribute("data-confirmation-pulse", "true");
+      pulseTimer = window.setTimeout(resetSignal, 780);
     };
 
     tiltTarget.addEventListener("pointerenter", onPointerEnter);
     tiltTarget.addEventListener("pointermove", onPointerMove);
     tiltTarget.addEventListener("pointerleave", resetTilt);
     window.addEventListener(LANDING_MOTION_EVENT, onMotionChange);
+    window.addEventListener(LANDING_RADAR_SIGNAL_EVENT, onRadarSignal);
     return () => {
       resetTilt();
+      resetSignal();
       tiltTarget.removeEventListener("pointerenter", onPointerEnter);
       tiltTarget.removeEventListener("pointermove", onPointerMove);
       tiltTarget.removeEventListener("pointerleave", resetTilt);
       window.removeEventListener(LANDING_MOTION_EVENT, onMotionChange);
+      window.removeEventListener(LANDING_RADAR_SIGNAL_EVENT, onRadarSignal);
     };
   }, []);
 

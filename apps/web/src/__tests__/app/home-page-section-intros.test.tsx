@@ -5,6 +5,7 @@ import Link from "next/link";
 import HomePage, { PreviewSection, PreviewSkeleton } from "@/app/page";
 import LandingDeliveryDemo from "@/app/landing-delivery-demo";
 import LandingMethodology from "@/app/landing-methodology";
+import LandingSourceArchitecture from "@/app/landing-source-architecture";
 import { NoticeBox, SectionIntro, SurfaceCard } from "@/app/ui/page-primitives";
 import {
   LANDING_ANALYTICS_CONTEXT,
@@ -169,19 +170,20 @@ describe("landing section hierarchy", () => {
 
   it("explains the role and delivery status of every source group", async () => {
     const page = await HomePage({ searchParams: Promise.resolve({}) });
-    const pageText = readVisibleText(page);
     const deliveryMarkup = renderToStaticMarkup(<LandingDeliveryDemo />);
+    const sourceMarkup = renderToStaticMarkup(<LandingSourceArchitecture />);
 
-    expect(pageText).toContain("Каждый источник отвечает за свою часть доказательства");
-    expect(pageText).toContain("Источники клиентской выдачи");
-    expect(pageText).toContain("hh.ru, Работа России и прямые карьерные страницы");
-    expect(pageText).toContain("Компания и путь контакта");
-    expect(pageText).toContain("Сайт компании и ЕГРЮЛ/ФНС");
-    expect(pageText).toContain("Почему сейчас");
-    expect(pageText).toContain("Корпоративные события, официальные публикации и отраслевой контекст");
-    expect(pageText).toContain("Что пока не попадает в клиентскую выдачу");
-    expect(pageText).toContain("SuperJob, Хабр Карьера, страницы компаний LinkedIn");
-    expect(pageText).toContain("проверки уверенности, качества данных и правомерности доступа");
+    expect(collectElements(page, LandingSourceArchitecture)).toHaveLength(1);
+    expect(sourceMarkup).toContain("Каждый источник отвечает за свою часть доказательства");
+    expect(sourceMarkup).toContain("Источники клиентской выдачи");
+    expect(sourceMarkup).toContain("hh.ru, Работа России и прямые карьерные страницы");
+    expect(sourceMarkup).toContain("Компания и путь контакта");
+    expect(sourceMarkup).toContain("Сайт компании и ЕГРЮЛ/ФНС");
+    expect(sourceMarkup).toContain("Почему сейчас");
+    expect(sourceMarkup).toContain("Корпоративные события, официальные публикации и отраслевой контекст");
+    expect(sourceMarkup).toContain("Что пока не попадает в клиентскую выдачу");
+    expect(sourceMarkup).toContain("SuperJob, Хабр Карьера, страницы компаний LinkedIn");
+    expect(sourceMarkup).toContain("проверки уверенности, качества данных и правомерности доступа");
     expect(deliveryMarkup).toContain("Telegram");
     expect(deliveryMarkup).toContain("Email");
     expect(deliveryMarkup).toContain("Web push");

@@ -6,6 +6,8 @@ import {
   LANDING_MOTION_EVENT,
   type LandingMotionDetail,
 } from "./landing-motion/motion-preference";
+import { useLandingMotion } from "./landing-motion/landing-motion-provider";
+import { dispatchLandingRadarSignal } from "./landing-radar-signal";
 
 /**
  * Background radar animation for the landing hero.
@@ -16,6 +18,8 @@ import {
  * pauses when the tab is hidden.
  */
 export default function RadarCanvas() {
+  const initialMotion = useLandingMotion();
+  const initialMotionRef = useRef(initialMotion);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -25,10 +29,8 @@ export default function RadarCanvas() {
     if (!ctx) return;
 
     const motionMedia = window.matchMedia("(prefers-reduced-motion: reduce)");
-    let reduceMotion = motionMedia.matches;
-    let userPaused =
-      document.documentElement.dataset.landingMotion === "paused" ||
-      document.documentElement.dataset.landingMotion === "reduced";
+    let reduceMotion = initialMotionRef.current.reduced;
+    let userPaused = initialMotionRef.current.paused;
     let inViewport = true;
 
     let width = 0;
@@ -38,6 +40,8 @@ export default function RadarCanvas() {
     type Blip = { angle: number; radius: number; lit: number; label: string };
     let blips: Blip[] = [];
     let sweep = 0;
+    let lastSignalAt = 0;
+    let signalIndex = 0;
     let rafId = 0;
     let running = true;
 
@@ -216,6 +220,12 @@ export default function RadarCanvas() {
         // blip is lit when the sweep just passed it (a small window)
         if (a < 0.08) {
           b.lit = 1;
+          const now = performance.now();
+          if (now - lastSignalAt >= 2_400) {
+            dispatchLandingRadarSignal(signalIndex);
+            signalIndex = (signalIndex + 1) % 3;
+            lastSignalAt = now;
+          }
         }
         b.lit *= 0.985;
       }

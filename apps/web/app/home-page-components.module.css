@@ -186,6 +186,12 @@
   outline: none;
 }
 
+.mobileMenu a[data-active="true"] {
+  color: var(--c-brand);
+  background: rgba(49, 95, 200, 0.09);
+  box-shadow: inset 3px 0 0 var(--c-brand);
+}
+
 .mobileMenu .mobileMenuActivation {
   justify-content: center;
   margin-top: 4px;
@@ -208,6 +214,7 @@
 }
 
 .topNavLink {
+  position: relative;
   padding: 7px 13px;
   border-radius: 10px;
   color: var(--c-text-secondary);
@@ -217,9 +224,29 @@
   transition: background 0.15s ease, color 0.15s ease;
 }
 
-.topNavLink:hover {
+.topNavLink:hover,
+.topNavLink[data-active="true"] {
   background: rgba(29, 78, 216, 0.07);
   color: var(--c-brand);
+}
+
+.topNavLink::after {
+  position: absolute;
+  right: 13px;
+  bottom: 3px;
+  left: 13px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  content: "";
+  opacity: 0;
+  transform: scaleX(0.35);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.topNavLink[data-active="true"]::after {
+  opacity: 1;
+  transform: scaleX(1);
 }
 
 .topNavLogin {
@@ -671,6 +698,56 @@
   animation-play-state: paused;
 }
 
+:global(html[data-landing-motion="paused"]) [data-landing-motion-root] *,
+:global(html[data-landing-motion="paused"]) [data-landing-motion-root] *::before,
+:global(html[data-landing-motion="paused"]) [data-landing-motion-root] *::after,
+:global(html[data-landing-motion="reduced"]) [data-landing-motion-root] *,
+:global(html[data-landing-motion="reduced"]) [data-landing-motion-root] *::before,
+:global(html[data-landing-motion="reduced"]) [data-landing-motion-root] *::after {
+  transition-duration: 0.01ms !important;
+}
+
+:global(html[data-landing-motion="paused"]) [data-landing-motion-root] *,
+:global(html[data-landing-motion="paused"]) [data-landing-motion-root] *::before,
+:global(html[data-landing-motion="paused"]) [data-landing-motion-root] *::after {
+  animation-play-state: paused !important;
+}
+
+:global(html[data-landing-motion="reduced"]) [data-landing-motion-root] *,
+:global(html[data-landing-motion="reduced"]) [data-landing-motion-root] *::before,
+:global(html[data-landing-motion="reduced"]) [data-landing-motion-root] *::after {
+  animation: none !important;
+}
+
+[data-hero-evidence-index],
+[data-hero-fiur-index] {
+  transition: border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
+}
+
+[data-hero-evidence-index][data-signal-active="true"] {
+  border-color: rgba(96, 165, 250, 0.58);
+  background: rgba(59, 130, 246, 0.13);
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.08);
+}
+
+[data-hero-fiur-index][data-signal-active="true"] {
+  color: #ffffff;
+}
+
+[data-hero-fiur-index][data-signal-active="true"] .heroSignalMeterTrack {
+  box-shadow: 0 0 0 1px rgba(147, 197, 253, 0.48), 0 0 16px rgba(96, 165, 250, 0.22);
+}
+
+.heroScoreTrack[data-confirmation-pulse="true"] {
+  animation: hero-score-confirmation 780ms ease-out;
+}
+
+@keyframes hero-score-confirmation {
+  0% { box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.5); }
+  55% { box-shadow: 0 0 0 6px rgba(96, 165, 250, 0.12); }
+  100% { box-shadow: 0 0 0 10px rgba(96, 165, 250, 0); }
+}
+
 .heroEvidenceRow div {
   min-width: 0;
   padding: 14px;
@@ -887,11 +964,28 @@
 
 /* ── How-it-works steps ── */
 .steps {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0;
   border-top: 1px solid var(--c-border);
   border-bottom: 1px solid var(--c-border);
+}
+
+.stepsInteractive::after {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  z-index: 1;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    var(--c-brand) 0 var(--flow-progress),
+    transparent var(--flow-progress) 100%
+  );
+  content: "";
+  pointer-events: none;
 }
 
 .step {
@@ -901,10 +995,37 @@
   align-content: start;
   padding: 26px clamp(20px, 3vw, 34px);
   border-right: 1px solid var(--c-border);
+  transition: background-color 180ms ease, box-shadow 180ms ease;
 }
 
 .step:last-child {
   border-right: 0;
+}
+
+.step[data-active="true"] {
+  z-index: 1;
+  background: rgba(239, 246, 255, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(49, 95, 200, 0.26);
+}
+
+.stepButton,
+.sourceLayerButton {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.stepButton:focus-visible,
+.sourceLayerButton:focus-visible {
+  outline: 2px solid var(--c-brand);
+  outline-offset: 5px;
 }
 
 .stepIndex {
@@ -915,7 +1036,8 @@
   text-transform: uppercase;
 }
 
-.step h3 {
+.step h3,
+.stepTitle {
   margin: 0;
   font-size: 1.06rem;
   font-weight: 800;
@@ -923,11 +1045,27 @@
   color: var(--c-text-primary);
 }
 
-.step p {
+.step p,
+.stepDescription {
   margin: 0;
   color: var(--c-text-secondary);
   font-size: 0.9rem;
   line-height: 1.58;
+}
+
+.stepResult,
+.sourceLayerResult {
+  display: block;
+  margin-top: 4px;
+  color: var(--c-brand);
+  font-size: 0.78rem;
+  font-weight: 750;
+  line-height: 1.5;
+}
+
+.stepResult[hidden],
+.sourceLayerResult[hidden] {
+  display: none;
 }
 
 .sourceArchitecture {
@@ -980,6 +1118,7 @@
 }
 
 .sourceLayers {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   margin: 0;
@@ -989,6 +1128,22 @@
   list-style: none;
 }
 
+.sourceLayersInteractive::after {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  z-index: 1;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    var(--c-brand) 0 var(--source-flow-progress),
+    rgba(112, 128, 154, 0.18) var(--source-flow-progress) 100%
+  );
+  content: "";
+  pointer-events: none;
+}
+
 .sourceLayer {
   position: relative;
   display: grid;
@@ -996,6 +1151,7 @@
   align-content: start;
   min-width: 0;
   padding: 26px clamp(22px, 2.4vw, 30px) 28px;
+  transition: background-color 180ms ease, box-shadow 180ms ease;
 }
 
 .sourceLayer::before {
@@ -1019,6 +1175,12 @@
 
 .sourceLayer + .sourceLayer {
   border-left: 1px solid var(--c-border);
+}
+
+.sourceLayer[data-active="true"] {
+  z-index: 1;
+  background: rgba(239, 246, 255, 0.64);
+  box-shadow: inset 0 0 0 1px rgba(49, 95, 200, 0.24);
 }
 
 .sourceLayerMeta {
@@ -1045,7 +1207,9 @@
   white-space: nowrap;
 }
 
-.sourceLayer h4 {
+.sourceLayer h4,
+.sourceLayerTitle {
+  display: block;
   margin: 2px 0 0;
   color: var(--c-text-primary);
   font-size: 1rem;
@@ -1053,7 +1217,9 @@
   letter-spacing: -0.012em;
 }
 
-.sourceLayer p {
+.sourceLayer p,
+.sourceLayerDescription {
+  display: block;
   margin: 0;
   color: var(--c-text-secondary);
   font-size: 0.84rem;
@@ -1063,6 +1229,10 @@
 .sourceLayer p strong {
   color: var(--c-text-primary);
   font-weight: 750;
+}
+
+.sourceLayerResult {
+  color: var(--c-text-primary);
 }
 
 .sourceGateDisclosure {

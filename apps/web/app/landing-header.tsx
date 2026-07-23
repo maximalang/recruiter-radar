@@ -11,14 +11,55 @@ import hpStyles from "./home-page-components.module.css";
 import LandingMotionPreference from "./landing-motion/motion-preference";
 import { BrandLogo } from "./ui/brand-logo";
 
+const NAV_ITEMS = [
+  { id: "preview", label: "Пример" },
+  { id: "how-it-works", label: "Как работает" },
+  { id: "quality", label: "Проверка" },
+  { id: "pricing", label: "Тарифы" },
+  { id: "faq", label: "FAQ" },
+] as const;
+
 export default function LandingHeader({ activationHref }: { activationHref: string }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState<string | null>(null);
   const headerRef = useRef<HTMLElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
-    if (!menuOpen) return;
+    if (typeof IntersectionObserver === "undefined") return;
+    const visible = new Map<string, { ratio: number; top: number }>();
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        const id = (entry.target as HTMLElement).id;
+        if (!id) continue;
+        if (entry.isIntersecting && entry.intersectionRatio > 0) {
+          visible.set(id, {
+            ratio: entry.intersectionRatio,
+            top: entry.boundingClientRect.top,
+          });
+        } else {
+          visible.delete(id);
+        }
+      }
+      const next = [...visible.entries()].sort((left, right) => {
+        const ratioDifference = right[1].ratio - left[1].ratio;
+        return ratioDifference || Math.abs(left[1].top - 80) - Math.abs(right[1].top - 80);
+      })[0]?.[0];
+      if (next) setActiveSection(next);
+    }, {
+      rootMargin: "-80px 0px -55% 0px",
+      threshold: [0, 0.15, 0.4, 0.75],
+    });
 
+    for (const item of NAV_ITEMS) {
+      const section = document.getElementById(item.id);
+      if (section) observer.observe(section);
+    }
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!menuOpen) return;
     const closeAndRestoreFocus = () => {
       setMenuOpen(false);
       triggerRef.current?.focus();
@@ -31,7 +72,6 @@ export default function LandingHeader({ activationHref }: { activationHref: stri
         setMenuOpen(false);
       }
     };
-
     document.addEventListener("keydown", onKeyDown);
     document.addEventListener("pointerdown", onPointerDown);
     return () => {
@@ -40,7 +80,10 @@ export default function LandingHeader({ activationHref }: { activationHref: stri
     };
   }, [menuOpen]);
 
-  const closeMenu = () => setMenuOpen(false);
+  const activateSection = (id: string, closeMenu = false) => {
+    setActiveSection(id);
+    if (closeMenu) setMenuOpen(false);
+  };
 
   return (
     <header
@@ -48,20 +91,23 @@ export default function LandingHeader({ activationHref }: { activationHref: stri
       className={hpStyles.topBar}
       data-brand-header="recruiter-radar-v3"
     >
-      <Link
-        href="/"
-        className={hpStyles.brandMark}
-        aria-label="Recruiter Radar — на главную"
-      >
+      <Link href="/" className={hpStyles.brandMark} aria-label="Recruiter Radar — на главную">
         <BrandLogo joined />
       </Link>
       <nav className={hpStyles.topNavLinks} aria-label="Разделы лендинга">
         <span className={hpStyles.topNavAnchors}>
-          <a href="#preview" className={hpStyles.topNavLink}>Пример</a>
-          <a href="#how-it-works" className={hpStyles.topNavLink}>Как работает</a>
-          <a href="#quality" className={hpStyles.topNavLink}>Проверка</a>
-          <a href="#pricing" className={hpStyles.topNavLink}>Тарифы</a>
-          <a href="#faq" className={hpStyles.topNavLink}>FAQ</a>
+          {NAV_ITEMS.map((item) => (
+            <a
+              key={item.id}
+              href={`#${item.id}`}
+              className={hpStyles.topNavLink}
+              data-active={activeSection === item.id ? "true" : undefined}
+              aria-current={activeSection === item.id ? "location" : undefined}
+              onClick={() => activateSection(item.id)}
+            >
+              {item.label}
+            </a>
+          ))}
         </span>
         <span className={hpStyles.topNavActions}>
           <LandingMotionPreference />
@@ -95,18 +141,24 @@ export default function LandingHeader({ activationHref }: { activationHref: stri
         aria-label="Мобильные разделы лендинга"
         hidden={!menuOpen}
       >
-        <a href="#preview" onClick={closeMenu}>Пример</a>
-        <a href="#how-it-works" onClick={closeMenu}>Как работает</a>
-        <a href="#quality" onClick={closeMenu}>Проверка</a>
-        <a href="#pricing" onClick={closeMenu}>Тарифы</a>
-        <a href="#faq" onClick={closeMenu}>FAQ</a>
-        <Link href="/dashboard" onClick={closeMenu}>Войти</Link>
+        {NAV_ITEMS.map((item) => (
+          <a
+            key={item.id}
+            href={`#${item.id}`}
+            data-active={activeSection === item.id ? "true" : undefined}
+            aria-current={activeSection === item.id ? "location" : undefined}
+            onClick={() => activateSection(item.id, true)}
+          >
+            {item.label}
+          </a>
+        ))}
+        <Link href="/dashboard" onClick={() => setMenuOpen(false)}>Войти</Link>
         <Link
           href={activationHref}
           className={hpStyles.mobileMenuActivation}
           data-analytics-event={LANDING_ANALYTICS_EVENT.pilotCtaClicked}
           data-analytics-context={LANDING_ANALYTICS_CONTEXT.header}
-          onClick={closeMenu}
+          onClick={() => setMenuOpen(false)}
         >
           Попробовать неделю
         </Link>

@@ -43,13 +43,16 @@ import LandingDetailsInteractions from "./landing-details-interactions";
 import LandingDeliveryDemo from "./landing-delivery-demo";
 import LandingHeader from "./landing-header";
 import LandingHeroInteractions from "./landing-hero-interactions";
+import LandingHowItWorks from "./landing-how-it-works";
 import LandingMethodology from "./landing-methodology";
+import { LandingMotionProvider } from "./landing-motion/landing-motion-provider";
 import LandingPreviewInteractions from "./landing-preview-interactions";
 import LandingPreviewPresets from "./landing-preview-presets";
 import PreviewGeneratedEvent from "./preview-generated-event";
 import RadarCanvas from "./radar-canvas";
 import ScrollReveal from "./scroll-reveal";
 import ScrollProgress from "./scroll-progress";
+import LandingSourceArchitecture from "./landing-source-architecture";
 import { SiteFooter } from "./ui/site-footer";
 
 export const dynamic = "force-dynamic";
@@ -93,6 +96,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
   return (
     <PageFrame maxWidth="1160px" dataDeployAnchor="recruiter-radar-landing-v3">
+      <LandingMotionProvider>
       <LandingAnalytics />
       <LandingDetailsInteractions />
       <ScrollProgress />
@@ -166,28 +170,28 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               </div>
               <div className={hpStyles.heroScore}><strong>87</strong><span>/100</span></div>
             </div>
-            <div className={hpStyles.heroScoreTrack}><span /></div>
+            <div className={hpStyles.heroScoreTrack} data-hero-score-track><span /></div>
             <div className={hpStyles.heroEvidenceRow}>
-              <div><span>Что изменилось</span><p>14 новых вакансий за 6 дней</p></div>
-              <div><span>Момент</span><p>Появилась редкая инженерная роль</p></div>
-              <div><span>Как связаться</span><p>Сайт компании и HR-форма</p></div>
+              <div data-hero-evidence-index="0"><span>Что изменилось</span><p>14 новых вакансий за 6 дней</p></div>
+              <div data-hero-evidence-index="1"><span>Момент</span><p>Появилась редкая инженерная роль</p></div>
+              <div data-hero-evidence-index="2"><span>Как связаться</span><p>Сайт компании и HR-форма</p></div>
             </div>
             <div className={hpStyles.heroSignalMeters}>
-              <div className={hpStyles.heroSignalMeter}>
+              <div className={hpStyles.heroSignalMeter} data-hero-fiur-index="0">
                 <div className={hpStyles.heroSignalMeterHead}>
                   <span>Соответствие профилю</span>
                   <strong>Высокое</strong>
                 </div>
                 <div className={hpStyles.heroSignalMeterTrack} data-tone="green"><span style={{ width: "88%" }} /></div>
               </div>
-              <div className={hpStyles.heroSignalMeter}>
+              <div className={hpStyles.heroSignalMeter} data-hero-fiur-index="1">
                 <div className={hpStyles.heroSignalMeterHead}>
                   <span>Сила сигнала</span>
                   <strong>Сильная</strong>
                 </div>
                 <div className={hpStyles.heroSignalMeterTrack}><span style={{ width: "84%" }} /></div>
               </div>
-              <div className={hpStyles.heroSignalMeter}>
+              <div className={hpStyles.heroSignalMeter} data-hero-fiur-index="2">
                 <div className={hpStyles.heroSignalMeterHead}>
                   <span>Актуальность</span>
                   <strong>Сегодня</strong>
@@ -252,67 +256,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           title="Готовый список — каждое утро"
           description="Настраиваете профиль один раз. Дальше радар сам собирает и проверяет сигналы найма."
         />
-        <div className={hpStyles.steps}>
-          <article className={`${hpStyles.step} ${hpStyles.revealCard}`}>
-            <span className={hpStyles.stepIndex}>01 · Профиль</span>
-            <h3>Задаёте нишу</h3>
-            <p>Специализация, роли, отрасли, география и исключения — под ваше агентство.</p>
-          </article>
-          <article className={`${hpStyles.step} ${hpStyles.revealCard}`}>
-            <span className={hpStyles.stepIndex}>02 · Проверка</span>
-            <h3>Радар ищет сигналы</h3>
-            <p>Карьерные страницы, вакансии и динамика найма — с подтверждением и оценкой уверенности.</p>
-          </article>
-          <article className={`${hpStyles.step} ${hpStyles.revealCard}`}>
-            <span className={hpStyles.stepIndex}>03 · Результат</span>
-            <h3>Получаете приоритеты</h3>
-            <p>3–7 компаний с причиной, доказательствами, контактом и следующим шагом — в подключённых каналах.</p>
-          </article>
-        </div>
-        <aside className={hpStyles.sourceArchitecture} aria-labelledby="source-architecture-title">
-          <div className={hpStyles.sourceArchitectureHeader}>
-            <div>
-              <span className={hpStyles.sourceArchitectureEyebrow}>Контур данных</span>
-              <h3 id="source-architecture-title">Каждый источник отвечает за свою часть доказательства</h3>
-            </div>
-            <p>Лид появляется не из списка площадок. Сначала радар находит сигнал найма, затем подтверждает компанию и только после добавляет контекст.</p>
-          </div>
-
-          <ol className={hpStyles.sourceLayers}>
-            <li className={hpStyles.sourceLayer} data-source-role="origin">
-              <div className={hpStyles.sourceLayerMeta}>
-                <span>01 · Создаёт сигнал</span>
-                <em>допущены</em>
-              </div>
-              <h4>Источники клиентской выдачи</h4>
-              <p><strong>hh.ru, Работа России и прямые карьерные страницы.</strong> Только они могут стать основанием для лида — после проверки уверенности.</p>
-            </li>
-            <li className={hpStyles.sourceLayer} data-source-role="verification">
-              <div className={hpStyles.sourceLayerMeta}>
-                <span>02 · Подтверждает</span>
-                <em>не создаёт лид</em>
-              </div>
-              <h4>Компания и путь контакта</h4>
-              <p><strong>Сайт компании и ЕГРЮЛ/ФНС</strong> уточняют юрлицо, домен и безопасный корпоративный канал. Отдельно лид не создают.</p>
-            </li>
-            <li className={hpStyles.sourceLayer} data-source-role="context">
-              <div className={hpStyles.sourceLayerMeta}>
-                <span>03 · Усиливает</span>
-                <em>только контекст</em>
-              </div>
-              <h4>Почему сейчас</h4>
-              <p><strong>Корпоративные события, официальные публикации и отраслевой контекст</strong> объясняют момент обращения, но не заменяют доказательство найма.</p>
-            </li>
-          </ol>
-
-          <details className={hpStyles.sourceGateDisclosure} data-animated-details>
-            <summary>
-              <span>Что пока не попадает в клиентскую выдачу</span>
-              <em>5 групп источников</em>
-            </summary>
-            <p>SuperJob, Хабр Карьера, страницы компаний LinkedIn, технологические и региональные доски вакансий остаются за контуром выдачи, пока не пройдут проверки уверенности, качества данных и правомерности доступа.</p>
-          </details>
-        </aside>
+        <LandingHowItWorks />
+        <LandingSourceArchitecture />
       </ScrollReveal>
 
       {/* Evidence contract + enabled delivery channels */}
@@ -480,6 +425,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       </section>
 
       <SiteFooter />
+      </LandingMotionProvider>
     </PageFrame>
   );
 }
