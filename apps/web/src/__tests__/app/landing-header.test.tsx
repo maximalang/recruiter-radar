@@ -134,7 +134,7 @@ describe("landing header accessibility", () => {
         intersectionRatio: 0.35,
         boundingClientRect: { top: 96 },
       },
-    ] as IntersectionObserverEntry[], {} as IntersectionObserver));
+    ] as unknown as IntersectionObserverEntry[], {} as IntersectionObserver));
 
     expect(screen.getAllByRole("link", { name: "Проверка" })[0]).toHaveAttribute(
       "aria-current",
