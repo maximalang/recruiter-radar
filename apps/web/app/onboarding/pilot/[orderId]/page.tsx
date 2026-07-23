@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import type { ReactElement, SVGProps } from "react";
 
 import { FormSubmitButton } from "../../../ui/form-submit-button";
+import PaymentSuccessAnalytics from "../../../payment-success-analytics";
 import {
   PageFrame,
   SectionIntro,
@@ -170,6 +171,7 @@ export default async function PilotOnboardingPage({
 
   return (
     <PageFrame maxWidth="860px">
+      {order.status === "paid" ? <PaymentSuccessAnalytics dedupeKey={String(order.id)} /> : null}
       <Link href="/" className={ppStyles.backLink}>
         На главную
       </Link>

@@ -33,12 +33,14 @@ import {
   pickEvidenceTitles,
 } from "./home-page-components";
 import hpStyles from "./home-page-components.module.css";
+import LandingAnalytics from "./landing-analytics";
 import LandingHeader from "./landing-header";
 import LandingPreviewInteractions from "./landing-preview-interactions";
 import RadarCanvas from "./radar-canvas";
 import ScrollReveal from "./scroll-reveal";
 import ScrollProgress from "./scroll-progress";
 import { SiteFooter } from "./ui/site-footer";
+import YandexMetrika from "./yandex-metrika";
 
 export const dynamic = "force-dynamic";
 
@@ -81,6 +83,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
   return (
     <PageFrame maxWidth="1160px">
+      <YandexMetrika />
+      <LandingAnalytics />
       <ScrollProgress />
       <div className={hpStyles.ambientBg} aria-hidden="true">
         <span className={hpStyles.ambientGrid} />
@@ -369,6 +373,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             <Link
               href={buildCheckoutHref({ ...previewInput, planCode: pilotPlan.code })}
               className={`${ppStyles.primaryAction} ${hpStyles.planCta}`}
+              data-analytics-event="payment_started"
+              data-analytics-context="pricing"
             >
               {pilotPlan.ctaLabel}
             </Link>
@@ -408,6 +414,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                   <Link
                     href={buildCheckoutHref({ ...previewInput, planCode: plan.code })}
                     className={`${ppStyles.secondaryAction} ${hpStyles.planCta}`}
+                    data-analytics-event="preview_checkout_clicked"
+                    data-analytics-context="pricing"
                   >
                     {plan.ctaLabel}
                   </Link>
@@ -440,7 +448,11 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           description="Что именно приходит, откуда берутся данные и что остаётся под вашим контролем."
         />
         {faqItems.map((item) => (
-          <details key={item.question} className={`${hpStyles.faqCard} ${hpStyles.revealCard}`}>
+          <details
+            key={item.question}
+            className={`${hpStyles.faqCard} ${hpStyles.revealCard}`}
+            data-analytics-event="faq_opened"
+          >
             <summary className={hpStyles.faqSummary}>
               <span>{item.question}</span>
               <svg className={hpStyles.faqChevron} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -459,7 +471,12 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           Настройте профиль, получите первый радар и решите на фактах, стоит ли продолжать.
         </p>
         <div className={hpStyles.closingActions}>
-          <Link href={checkoutHref} className={hpStyles.heroCta}>
+          <Link
+            href={checkoutHref}
+            className={hpStyles.heroCta}
+            data-analytics-event="payment_started"
+            data-analytics-context="closing"
+          >
             Активировать неделю — 2 990 ₽
           </Link>
           <a href="#preview" className={hpStyles.heroSecondaryCta}>Посмотреть пример</a>
@@ -654,7 +671,12 @@ export async function PreviewSection(props: {
             </div>
           )}
 
-          <Link href={checkoutHref} className={ppStyles.primaryAction}>
+          <Link
+            href={checkoutHref}
+            className={ppStyles.primaryAction}
+            data-analytics-event="preview_checkout_clicked"
+            data-analytics-context="preview"
+          >
             {previewState.items.length > 0
               ? "Получать такой радар каждое утро"
               : "Попробовать неделю"}

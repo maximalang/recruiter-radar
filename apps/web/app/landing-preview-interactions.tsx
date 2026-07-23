@@ -54,6 +54,9 @@ export default function LandingPreviewInteractions() {
     form.addEventListener("submit", handleSubmit);
     root.addEventListener("click", handlePresetClick);
     window.addEventListener("pageshow", handlePageShow);
+    window.dispatchEvent(new CustomEvent(PREVIEW_ANALYTICS_EVENT, {
+      detail: { name: "preview_generated" },
+    }));
 
     return () => {
       form.removeEventListener("submit", handleSubmit);
