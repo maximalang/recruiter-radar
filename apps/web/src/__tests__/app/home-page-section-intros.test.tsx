@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import Link from "next/link";
 
 import HomePage, { metadata } from "@/app/page";
-import { LandingPreviewSection as PreviewSection } from "@/app/landing-preview";
+import { LandingPreviewSection as PreviewSection, LandingPreviewSkeleton } from "@/app/landing-preview";
 import LandingAnalytics from "@/app/landing-analytics";
 import LandingHeader from "@/app/landing-header";
 import LandingHeroDemo from "@/app/landing-hero-demo";
@@ -205,6 +205,14 @@ describe("landing section hierarchy", () => {
     expect(previewIntro?.props.description).toBe(
       "Укажите специализацию и географию. Радар пересчитает приоритеты и покажет, почему каждая компания поднялась в выдаче.",
     );
+  });
+
+  it("keeps a meaningful preview example available without JavaScript", () => {
+    const markup = renderToStaticMarkup(<LandingPreviewSkeleton />);
+
+    expect(markup).toContain("<noscript>");
+    expect(markup).toContain("Пример лида доступен без анимации");
+    expect(markup).toContain("Сигнал найма подтверждён двумя источниками");
   });
 
   it("explains the role and delivery status of every source group", async () => {

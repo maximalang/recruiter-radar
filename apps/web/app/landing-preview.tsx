@@ -283,6 +283,23 @@ export function LandingPreviewSkeleton() {
             <span className={hpStyles.previewSkeletonCard} />
             <span className={hpStyles.previewSkeletonCard} />
           </div>
+          <noscript>
+            <div className={hpStyles.previewNoScript}>
+              <span className={hpStyles.previewNoScriptEyebrow}>Обезличенный пример</span>
+              <strong>Пример лида доступен без анимации</strong>
+              <p>Сигнал найма подтверждён двумя источниками</p>
+              <dl>
+                <div>
+                  <dt>Почему сейчас</dt>
+                  <dd>Компания расширяет команду и недавно обновила вакансии.</dd>
+                </div>
+                <div>
+                  <dt>Безопасный следующий шаг</dt>
+                  <dd>Проверить корпоративную форму контакта — без автоматической отправки.</dd>
+                </div>
+              </dl>
+            </div>
+          </noscript>
         </SurfaceCard>
       </div>
     </ScrollReveal>
