@@ -58,7 +58,7 @@ export default function FiurPopover(props: {
         aria-expanded={open}
         aria-describedby={open ? tooltipId : undefined}
         onFocus={() => setOpen(true)}
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => setOpen(true)}
       >
         i
       </button>

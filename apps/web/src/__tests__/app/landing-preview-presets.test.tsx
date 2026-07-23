@@ -25,7 +25,7 @@ describe("LandingPreviewPresets", () => {
   it("selects the next preset with ArrowRight and keeps the URL shareable", () => {
     const click = jest
       .spyOn(HTMLAnchorElement.prototype, "click")
-      .mockImplementation(function clickWithoutNavigation() {
+      .mockImplementation(function clickWithoutNavigation(this: HTMLAnchorElement) {
         this.focus();
       });
     render(

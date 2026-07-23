@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 
 const PREVIEW_ANALYTICS_EVENT = "landing:analytics";
 
@@ -10,60 +10,78 @@ function emitPreviewStarted(context: "form" | "preset") {
   }));
 }
 
+function getFormControls(form: HTMLFormElement) {
+  const submit = form.querySelector<HTMLButtonElement>("[data-preview-submit]");
+  const idleLabel = submit?.querySelector<HTMLElement>("[data-preview-submit-label]");
+  const busyLabel = submit?.querySelector<HTMLElement>("[data-preview-submit-status]");
+  if (!submit || !idleLabel || !busyLabel) return null;
+  return { submit, idleLabel, busyLabel };
+}
+
+function resetSubmittingState(form: HTMLFormElement) {
+  const controls = getFormControls(form);
+  if (!controls) return;
+
+  form.setAttribute("aria-busy", "false");
+  form.removeAttribute("data-submitting");
+  controls.submit.disabled = false;
+  controls.idleLabel.hidden = false;
+  controls.busyLabel.hidden = true;
+}
+
 export default function LandingPreviewInteractions() {
-  const markerRef = useRef<HTMLSpanElement>(null);
-
   useEffect(() => {
-    const root = markerRef.current?.closest<HTMLElement>("[data-preview-section-content]");
-    const form = root?.querySelector<HTMLFormElement>("[data-preview-form]");
-    const submit = form?.querySelector<HTMLButtonElement>("[data-preview-submit]");
-    const idleLabel = submit?.querySelector<HTMLElement>("[data-preview-submit-label]");
-    const busyLabel = submit?.querySelector<HTMLElement>("[data-preview-submit-status]");
-    if (!root || !form || !submit || !idleLabel || !busyLabel) return;
+    const handleSubmit = (event: Event) => {
+      const form = event.target;
+      if (
+        !(form instanceof HTMLFormElement)
+        || !form.matches("[data-preview-form]")
+        || !form.closest("[data-preview-section-content]")
+      ) return;
 
-    const resetSubmittingState = () => {
-      form.setAttribute("aria-busy", "false");
-      form.removeAttribute("data-submitting");
-      submit.disabled = false;
-      idleLabel.hidden = false;
-      busyLabel.hidden = true;
-    };
-
-    const handleSubmit = (event: SubmitEvent) => {
       if (form.getAttribute("aria-busy") === "true") {
         event.preventDefault();
         return;
       }
 
+      const controls = getFormControls(form);
+      if (!controls) return;
+
       form.setAttribute("aria-busy", "true");
       form.setAttribute("data-submitting", "true");
-      submit.disabled = true;
-      idleLabel.hidden = true;
-      busyLabel.hidden = false;
+      controls.submit.disabled = true;
+      controls.idleLabel.hidden = true;
+      controls.busyLabel.hidden = false;
       emitPreviewStarted("form");
     };
 
     const handlePresetClick = (event: Event) => {
       const target = event.target;
-      if (!(target instanceof Element) || !target.closest("[data-preview-preset]")) return;
+      const preset = target instanceof Element
+        ? target.closest("[data-preview-preset]")
+        : null;
+      if (!preset?.closest("[data-preview-section-content]")) return;
       emitPreviewStarted("preset");
     };
 
-    const handlePageShow = () => resetSubmittingState();
+    const handlePageShow = () => {
+      document.querySelectorAll<HTMLFormElement>("[data-preview-form]")
+        .forEach(resetSubmittingState);
+    };
 
-    form.addEventListener("submit", handleSubmit);
-    root.addEventListener("click", handlePresetClick);
+    document.addEventListener("submit", handleSubmit, true);
+    document.addEventListener("click", handlePresetClick);
     window.addEventListener("pageshow", handlePageShow);
     window.dispatchEvent(new CustomEvent(PREVIEW_ANALYTICS_EVENT, {
       detail: { name: "preview_generated" },
     }));
 
     return () => {
-      form.removeEventListener("submit", handleSubmit);
-      root.removeEventListener("click", handlePresetClick);
+      document.removeEventListener("submit", handleSubmit, true);
+      document.removeEventListener("click", handlePresetClick);
       window.removeEventListener("pageshow", handlePageShow);
     };
   }, []);
 
-  return <span ref={markerRef} hidden data-preview-interactions />;
+  return <span hidden data-preview-interactions />;
 }

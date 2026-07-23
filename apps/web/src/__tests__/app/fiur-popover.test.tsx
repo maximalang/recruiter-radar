@@ -36,4 +36,14 @@ describe("FiurPopover", () => {
 
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
+
+  it("stays open when a pointer click follows hover", () => {
+    render(<FiurPopover label="Fit" secondaryLabel="Fit" description="Profile match." />);
+
+    const trigger = screen.getByRole("button");
+    fireEvent.mouseEnter(trigger.parentElement!);
+    fireEvent.click(trigger);
+
+    expect(screen.getByRole("tooltip")).toBeVisible();
+  });
 });

@@ -57,4 +57,35 @@ describe("LandingPreviewInteractions", () => {
     expect(screen.getByRole("button", { name: "Посмотреть компании" }).closest("form"))
       .toHaveAttribute("aria-busy", "false");
   });
+
+  it("handles a preview form replaced by a server-component navigation", () => {
+    const { container } = render(
+      <div data-preview-section-content>
+        <form data-preview-form aria-busy="false">
+          <button type="submit" data-preview-submit>
+            <span data-preview-submit-label>Submit preview</span>
+            <span data-preview-submit-status hidden>Loading preview</span>
+          </button>
+        </form>
+        <LandingPreviewInteractions />
+      </div>,
+    );
+
+    const initialForm = container.querySelector<HTMLFormElement>("[data-preview-form]");
+    const replacementForm = document.createElement("form");
+    replacementForm.setAttribute("data-preview-form", "");
+    replacementForm.setAttribute("aria-busy", "false");
+    replacementForm.innerHTML = `
+      <button type="submit" data-preview-submit>
+        <span data-preview-submit-label>Submit replacement</span>
+        <span data-preview-submit-status hidden>Loading replacement</span>
+      </button>
+    `;
+    initialForm?.replaceWith(replacementForm);
+
+    fireEvent.submit(replacementForm);
+
+    expect(replacementForm).toHaveAttribute("aria-busy", "true");
+    expect(replacementForm.querySelector("[data-preview-submit]")).toBeDisabled();
+  });
 });

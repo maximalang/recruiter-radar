@@ -226,6 +226,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         <Suspense fallback={<PreviewSkeleton />}>
           <PreviewSection previewInput={previewInput} hasPreview={hasPreview} checkoutHref={checkoutHref} />
         </Suspense>
+        <LandingPreviewInteractions />
       </section>
 
       {/* How it works — the three-step flow */}
@@ -665,7 +666,6 @@ export async function PreviewSection(props: {
           </SurfaceCard>
         </div>
       </div>
-      <LandingPreviewInteractions />
     </div>
   );
 }

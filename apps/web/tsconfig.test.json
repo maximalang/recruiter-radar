@@ -18,6 +18,7 @@
     "**/*.spec.{ts,tsx}",
     "jest.config.ts",
     "jest.setup.ts",
+    "types/**/*.d.ts",
     "**/__tests__/**/*"
   ],
   "exclude": [
