@@ -154,7 +154,8 @@ jobs:
           node apps/web/.next/standalone/apps/web/server.js > /tmp/landing-server.log 2>&1 &
           echo "$!" > /tmp/landing-server.pid
           for i in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:3000/api/health > /dev/null; then
+            if curl -fsS http://127.0.0.1:3000/ \
+              | grep -q 'data-deploy-anchor="recruiter-radar-landing-v3"'; then
               exit 0
             fi
             sleep 2

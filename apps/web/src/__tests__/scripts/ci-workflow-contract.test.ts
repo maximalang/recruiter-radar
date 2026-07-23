@@ -30,6 +30,7 @@ describe('pull request CI workflow contract', () => {
     expect(workflow).toContain('npm run test:types --workspace @recruiter-radar/web')
     expect(workflow).toContain('npm run test:landing:e2e')
     expect(workflow).toContain('npm run test:responsive-surfaces')
+    expect(workflow).toContain('data-deploy-anchor="recruiter-radar-landing-v3"')
     expect(workflow).toContain('if: always()')
     expect(workflow).toContain('playwright-report')
     expect(workflow).toContain('test-results')
