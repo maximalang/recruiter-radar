@@ -61,7 +61,7 @@ BEGIN
     occurred_at
   ) VALUES (
     'payment_succeeded',
-    'payment_succeeded:' || NEW.id,
+    'payment-succeeded:' || NEW.id,
     NEW.user_id,
     NEW.id,
     NEW.provider,
