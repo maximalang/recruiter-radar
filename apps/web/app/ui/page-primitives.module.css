@@ -328,6 +328,13 @@
   box-shadow: 0 0 0 4px rgba(29, 78, 216, 0.1);
 }
 
+.sectionEyebrowAccent + .sectionTitle {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
+}
+
 /* Section title */
 .sectionTitle {
   margin: 0;

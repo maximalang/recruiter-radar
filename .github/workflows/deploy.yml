@@ -190,7 +190,7 @@ jobs:
               if printf '%s' "$landing_html" \
                 | grep -q 'data-brand-layout="landing-header-v2"' \
                 && printf '%s' "$landing_html" \
-                | grep -q 'data-mark="true"'; then
+                | grep -q 'data-brand-wordmark="true"'; then
                 brand_layout_ok=true
               fi
 

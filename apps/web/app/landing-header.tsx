@@ -53,18 +53,14 @@ export default function LandingHeader() {
       data-scrolled={scrolled ? "true" : "false"}
       data-brand-layout="landing-header-v2"
     >
-      <Link href="/" className={hpStyles.brandMark} aria-label="Recruiter Radar — на главную">
-        <img
-          src="/recruiter-radar-mark.svg"
-          width="36"
-          height="36"
-          className={hpStyles.brandRadarMark}
-          data-mark="true"
-          data-brand-radar-mark="true"
-          alt=""
-          aria-hidden="true"
-        />
-        <span className={hpStyles.brandWordmark} aria-hidden="true"><span>Recruiter</span><strong>Radar</strong></span>
+      <Link
+        href="/"
+        className={hpStyles.brandMark}
+        aria-label="Recruiter Radar — на главную"
+        data-brand-wordmark="true"
+        data-landing-entrance
+      >
+        <span className={hpStyles.brandWordmark}><span>Recruiter</span> <strong>Radar</strong></span>
       </Link>
       <nav className={hpStyles.topNavLinks} aria-label="Разделы лендинга">
         <span className={hpStyles.topNavAnchors}>

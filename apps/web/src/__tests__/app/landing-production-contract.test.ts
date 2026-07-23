@@ -13,12 +13,12 @@ describe("landing production contract", () => {
 
     expect(page).toContain('data-deploy-anchor="recruiter-radar-landing-v2"');
     expect(header).toContain('data-brand-layout="landing-header-v2"');
-    expect(header).toContain('data-mark="true"');
+    expect(header).toContain('data-brand-wordmark="true"');
     expect(deploy).toContain('data-deploy-anchor="recruiter-radar-landing-v2"');
     expect(deploy).toContain('data-brand-layout="landing-header-v2"');
-    expect(deploy).toContain('data-mark="true"');
+    expect(deploy).toContain('data-brand-wordmark="true"');
     expect(deploy).not.toContain("Каждый день Recruiter Radar находит лучшие компании");
-    expect(deploy).not.toContain('data-mark="false"');
+    expect(deploy).not.toContain('data-brand-wordmark="false"');
   });
 
   it("keeps one scroll margin declaration and passes public analytics build args", () => {

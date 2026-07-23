@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { Inter } from "next/font/google";
+import { Inter, Manrope } from "next/font/google";
 
 import { PushReadinessBoot } from "./push-readiness-boot";
 import "./globals.css";
@@ -8,6 +8,12 @@ import "./globals.css";
 const inter = Inter({
   subsets: ["cyrillic", "latin"],
   variable: "--font-inter",
+  display: "swap",
+});
+
+const manrope = Manrope({
+  subsets: ["cyrillic", "latin"],
+  variable: "--font-manrope",
   display: "swap",
 });
 
@@ -49,7 +55,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="ru">
       <body
-        className={`${inter.variable} font-sans`}
+        className={`${inter.variable} ${manrope.variable} font-sans`}
         style={{
           margin: 0,
           /* Shared calm background; the landing adds its own radar field. */

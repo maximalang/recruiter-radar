@@ -5,6 +5,16 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import LandingHeader from "@/app/landing-header";
 
 describe("landing header accessibility", () => {
+  it("uses a typographic wordmark without a decorative logo image", () => {
+    const { container } = render(<LandingHeader />);
+    const homeLink = screen.getByRole("link", { name: /Recruiter Radar/ });
+
+    expect(homeLink).toHaveTextContent("Recruiter Radar");
+    expect(homeLink).toHaveAttribute("data-brand-wordmark", "true");
+    expect(container.querySelector(".brandRadarMark")).toBeNull();
+    expect(container.querySelector("header img")).toBeNull();
+  });
+
   it("offers the required navigation and a clear activation path", () => {
     render(<LandingHeader />);
 

@@ -61,9 +61,9 @@
 }
 
 .brandMark {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 10px;
   min-height: 44px;
   text-decoration: none;
 }
@@ -252,6 +252,7 @@
    gradient so "сегодня" is the eye-leading element without a color shock. */
 .heroTitle {
   margin: 0;
+  font-family: var(--font-display);
   font-size: var(--fs-display);
   line-height: var(--lh-display);
   letter-spacing: var(--ls-display);
@@ -2583,6 +2584,14 @@
   animation-delay: 70ms;
 }
 
+.motionReveal[data-reveal-stagger="true"][data-revealed="true"] .revealCard:nth-child(3) {
+  animation-delay: 140ms;
+}
+
+.motionReveal[data-reveal-stagger="true"][data-revealed="true"] .revealCard:nth-child(4) {
+  animation-delay: 210ms;
+}
+
 @keyframes landing-card-in {
   from { opacity: 0.78; transform: translate3d(0, 12px, 0); }
   to { opacity: 1; transform: translate3d(0, 0, 0); }
@@ -2603,32 +2612,47 @@
   box-shadow: 0 12px 34px rgba(15, 23, 42, 0.12);
 }
 
-.brandRadarMark {
-  width: 34px;
-  height: 38px;
-  object-fit: contain;
-  flex: 0 0 auto;
-  transition: width var(--motion-base) var(--ease-premium), height var(--motion-base) var(--ease-premium);
-}
-
-.topBar[data-scrolled="true"] .brandRadarMark {
-  width: 30px;
-  height: 34px;
-}
-
 .brandWordmark {
   display: inline-flex;
   align-items: baseline;
+  gap: 0.25em;
   color: var(--c-text-primary);
-  font-size: 0.97rem;
-  font-weight: 760;
-  letter-spacing: -0.035em;
+  font-family: var(--font-display);
+  font-size: clamp(1.02rem, 1.5vw, 1.16rem);
+  font-weight: 720;
+  letter-spacing: -0.045em;
+  line-height: 1;
   white-space: nowrap;
+  transition: letter-spacing var(--motion-base) var(--ease-premium);
 }
 
 .brandWordmark strong {
   color: #315fc8;
   font-weight: inherit;
+}
+
+.brandMark::after {
+  position: absolute;
+  right: 0;
+  bottom: 7px;
+  left: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(49, 95, 200, 0.7), transparent);
+  content: "";
+  opacity: 0;
+  transform: scaleX(0.45);
+  transition:
+    opacity var(--motion-fast) var(--ease-standard),
+    transform var(--motion-base) var(--ease-premium);
+}
+
+.brandMark:hover .brandWordmark {
+  letter-spacing: -0.035em;
+}
+
+.brandMark:hover::after {
+  opacity: 1;
+  transform: scaleX(1);
 }
 
 .topNavLink {
@@ -3069,16 +3093,12 @@
 
 @media (max-width: 360px) {
   .topBar { gap: 6px; padding-inline: 8px; }
-  .brandRadarMark { width: 30px; height: 34px; }
+  .brandWordmark { font-size: 0.98rem; }
   .mobileHeaderActions { gap: 5px; }
   .mobileCtaLong { display: none; }
   .mobileCtaShort { display: inline; }
   .topNavCta { padding-inline: 10px; }
   .mobileNav summary { padding-inline: 9px; }
-}
-
-@media (max-width: 330px) {
-  .brandWordmark { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -3108,5 +3128,10 @@
   .ambientBg::before,
   .ambientBg::after {
     animation: none;
+  }
+
+  .brandWordmark,
+  .brandMark::after {
+    transition: none;
   }
 }

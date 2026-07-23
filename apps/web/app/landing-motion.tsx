@@ -12,14 +12,16 @@ export default function LandingMotion() {
     const finePointer = window.matchMedia("(pointer: fine)").matches;
     const cleanups: Array<() => void> = [];
 
-    const heroEntrance = Array.from(document.querySelectorAll<HTMLElement>("[data-hero-entrance]"));
+    const heroEntrance = Array.from(
+      document.querySelectorAll<HTMLElement>("[data-landing-entrance], [data-hero-entrance]"),
+    );
     if (!reducedMotion && document.documentElement.dataset.landingMotion !== "paused" && typeof Element.prototype.animate === "function") {
       const animations = heroEntrance.map((element, index) => element.animate(
         [
-          { opacity: 0.88, transform: "translate3d(0, 12px, 0)" },
+          { opacity: 0.84, transform: "translate3d(0, 14px, 0)" },
           { opacity: 1, transform: "translate3d(0, 0, 0)" },
         ],
-        { duration: 520, delay: index * 70, easing: "cubic-bezier(.2,.75,.2,1)" },
+        { duration: 560, delay: index * 65, easing: "cubic-bezier(.22,1,.36,1)", fill: "backwards" },
       ));
       const onMotionPreference = (event: Event) => {
         if (!(event as CustomEvent<LandingMotionDetail>).detail.paused) return;

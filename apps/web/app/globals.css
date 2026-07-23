@@ -8,9 +8,10 @@
   --c-brand: #1d4ed8;
   --c-accent: #1e40af;
   --font-sans: var(--font-inter, "Inter"), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --fs-display: clamp(2.1rem, 4.6vw, 3.5rem);
-  --lh-display: 1.06;
-  --ls-display: -0.035em;
+  --font-display: var(--font-manrope, "Manrope"), var(--font-sans);
+  --fs-display: clamp(2.2rem, 4.8vw, 3.7rem);
+  --lh-display: 1.02;
+  --ls-display: -0.045em;
   --fw-display: 700;
   --fs-title: clamp(1.5rem, 2.6vw, 2rem);
   --lh-title: 1.15;
