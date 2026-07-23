@@ -21,6 +21,8 @@ describe("payment success telemetry contract", () => {
     expect(migration).toContain("'payment-succeeded:' || NEW.id");
     expect(migration).toContain("checkout_order_id");
     expect(migration).toContain("ON CONFLICT (event_key) DO NOTHING");
+    expect(migration).toContain("EXCEPTION WHEN OTHERS THEN");
+    expect(migration).toContain("payment_succeeded telemetry insert failed");
     for (const eventName of PRODUCT_EVENT_NAMES) {
       expect(migration).toContain(`'${eventName}'`);
     }
