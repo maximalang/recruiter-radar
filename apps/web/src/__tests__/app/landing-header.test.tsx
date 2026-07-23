@@ -141,4 +141,51 @@ describe("landing header accessibility", () => {
       "location",
     );
   });
+
+  it("synchronizes the active section once after a burst of scroll events", () => {
+    jest.useFakeTimers();
+    try {
+      renderHeader(
+        <>
+          <section id="preview" />
+          <section id="how-it-works" />
+          <section id="quality" />
+          <section id="pricing" />
+          <section id="faq" />
+        </>,
+      );
+      Object.defineProperty(window, "innerHeight", {
+        configurable: true,
+        value: 900,
+      });
+      const rect = (top: number, bottom: number) => ({
+        top,
+        bottom,
+        left: 0,
+        right: 100,
+        width: 100,
+        height: bottom - top,
+        x: 0,
+        y: top,
+        toJSON: () => ({}),
+      }) as DOMRect;
+      jest
+        .spyOn(document.getElementById("how-it-works")!, "getBoundingClientRect")
+        .mockReturnValue(rect(-420, 140));
+      jest
+        .spyOn(document.getElementById("quality")!, "getBoundingClientRect")
+        .mockReturnValue(rect(96, 760));
+
+      fireEvent.scroll(window);
+      fireEvent.scroll(window);
+      act(() => jest.advanceTimersByTime(120));
+
+      expect(screen.getAllByRole("link", { name: "Проверка" })[0]).toHaveAttribute(
+        "aria-current",
+        "location",
+      );
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });

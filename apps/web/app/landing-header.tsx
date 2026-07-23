@@ -27,7 +27,23 @@ export default function LandingHeader({ activationHref }: { activationHref: stri
 
   useEffect(() => {
     if (typeof IntersectionObserver === "undefined") return;
+    const sections = NAV_ITEMS
+      .map((item) => document.getElementById(item.id))
+      .filter((section): section is HTMLElement => section !== null);
     const visible = new Map<string, { ratio: number; top: number }>();
+    const syncActiveSection = () => {
+      const next = sections
+        .map((section) => ({
+          id: section.id,
+          rect: section.getBoundingClientRect(),
+        }))
+        .filter(({ rect }) => rect.bottom > 80 && rect.top < window.innerHeight * 0.45)
+        .sort(
+          (left, right) =>
+            Math.abs(left.rect.top - 80) - Math.abs(right.rect.top - 80),
+        )[0]?.id;
+      if (next) setActiveSection(next);
+    };
     const observer = new IntersectionObserver((entries) => {
       for (const entry of entries) {
         const id = (entry.target as HTMLElement).id;
@@ -51,11 +67,21 @@ export default function LandingHeader({ activationHref }: { activationHref: stri
       threshold: [0, 0.15, 0.4, 0.75],
     });
 
-    for (const item of NAV_ITEMS) {
-      const section = document.getElementById(item.id);
-      if (section) observer.observe(section);
+    for (const section of sections) {
+      observer.observe(section);
     }
-    return () => observer.disconnect();
+    let scrollTimer: ReturnType<typeof setTimeout> | null = null;
+    const onScroll = () => {
+      if (scrollTimer) clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(syncActiveSection, 120);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    syncActiveSection();
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("scroll", onScroll);
+      if (scrollTimer) clearTimeout(scrollTimer);
+    };
   }, []);
 
   useEffect(() => {
