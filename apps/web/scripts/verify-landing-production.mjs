@@ -69,7 +69,11 @@ const jsTransfer = await page.evaluate(() => {
 await screenshot(page.locator("#main-content"), "hero-desktop-1440x900");
 await screenshot(page.locator("#preview"), "preview-desktop-1440x900");
 
-await page.locator("#quality").scrollIntoViewIfNeeded();
+await page.locator("#quality").evaluate((section) => {
+  window.scrollTo({
+    top: section.getBoundingClientRect().top + window.scrollY - 96,
+  });
+});
 await page.waitForFunction(
   () => document.querySelector('header a[href="#quality"]')?.getAttribute("aria-current") === "location",
 );
