@@ -662,6 +662,15 @@
   opacity: 1;
 }
 
+:global(html[data-landing-motion="paused"]) .previewSkeletonLine,
+:global(html[data-landing-motion="paused"]) .previewSkeletonBar,
+:global(html[data-landing-motion="paused"]) .previewSkeletonCard,
+:global(html[data-landing-motion="reduced"]) .previewSkeletonLine,
+:global(html[data-landing-motion="reduced"]) .previewSkeletonBar,
+:global(html[data-landing-motion="reduced"]) .previewSkeletonCard {
+  animation-play-state: paused;
+}
+
 .heroEvidenceRow div {
   min-width: 0;
   padding: 14px;
@@ -790,6 +799,15 @@
 
 .heroCta:hover .heroCtaArrow {
   transform: translateX(2px);
+}
+
+.heroCta:focus-visible .heroCtaArrow {
+  transform: translateX(2px);
+}
+
+.heroCta:active,
+.heroSecondaryCta:active {
+  transform: translateY(1px);
 }
 
 /* ── Section spacing ── */
@@ -1201,15 +1219,35 @@
 }
 
 .qualityChecks li {
+  border-bottom: 1px solid rgba(181, 203, 237, 0.14);
+}
+
+.qualityChecks li[data-active="true"] {
+  background: linear-gradient(90deg, rgba(72, 117, 232, 0.14), transparent);
+}
+
+.qualityChecks button {
   display: grid;
   grid-template-columns: 32px minmax(0, 1fr) auto;
   gap: 14px;
   align-items: center;
-  padding: 14px 0;
-  border-bottom: 1px solid rgba(181, 203, 237, 0.14);
+  width: 100%;
+  min-height: 64px;
+  padding: 12px 8px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
-.qualityChecks li > span {
+.qualityChecks button:focus-visible {
+  outline: 2px solid #8ab9ff;
+  outline-offset: -2px;
+}
+
+.qualityChecks button > span:first-child {
   color: #8ab9ff;
   font-size: 0.7rem;
   font-weight: 800;
@@ -1217,7 +1255,7 @@
 }
 
 .qualityChecks strong,
-.qualityChecks p {
+.qualityChecks button > span:nth-child(2) > span {
   margin: 0;
 }
 
@@ -1228,7 +1266,15 @@
   letter-spacing: -0.01em;
 }
 
-.qualityChecks p {
+.qualityChecks strong small {
+  margin-left: 5px;
+  color: rgba(185, 206, 255, 0.7);
+  font-size: 0.68rem;
+  font-weight: 650;
+}
+
+.qualityChecks button > span:nth-child(2) > span {
+  display: block;
   margin-top: 4px;
   color: rgba(226, 235, 248, 0.65);
   font-size: 0.76rem;
@@ -1245,6 +1291,18 @@
   font-style: normal;
   font-weight: 800;
   white-space: nowrap;
+}
+
+.methodologyStatus {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .qualityOutcome {
@@ -1604,6 +1662,10 @@
 }
 
 .previewPresets a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  box-sizing: border-box;
   padding: 6px 9px;
   border: 1px solid rgba(37, 99, 235, 0.14);
   border-radius: 999px;
@@ -1620,6 +1682,12 @@
 .previewPresets a:focus-visible {
   border-color: rgba(37, 99, 235, 0.3);
   background: rgba(37, 99, 235, 0.09);
+}
+
+.previewPresets a[data-selected="true"] {
+  border-color: rgba(37, 99, 235, 0.44);
+  background: rgba(37, 99, 235, 0.13);
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.08);
 }
 
 .previewForm {
@@ -1825,6 +1893,12 @@
   box-shadow: 0 14px 34px rgba(15, 23, 42, 0.14);
 }
 
+.previewLeadCard[open] {
+  position: relative;
+  z-index: 1;
+  overflow: visible;
+}
+
 .previewLeadSummary {
   display: grid;
   grid-template-columns: minmax(190px, 1fr) minmax(0, 1.35fr) auto 18px;
@@ -2026,16 +2100,77 @@
   background: rgba(8, 15, 28, 0.28);
 }
 
-.previewLeadMeter > span:first-child {
-  color: #aebbc9;
-  font-size: 0.72rem;
-  font-weight: 650;
-}
-
 .previewLeadMeter strong {
   color: #eef4fa;
   font-size: 0.7rem;
   text-align: right;
+}
+
+.fiurPopover {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 6px;
+  color: #aebbc9;
+}
+
+.fiurPopoverLabel {
+  min-width: 0;
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+
+.fiurPopoverLabel small {
+  margin-left: 4px;
+  color: #8392a5;
+  font-size: 0.62rem;
+  font-weight: 600;
+}
+
+.fiurPopoverTrigger {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 1px solid rgba(174, 187, 201, 0.28);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #b8c7d8;
+  font: 700 0.68rem/1 system-ui, sans-serif;
+  cursor: help;
+}
+
+.fiurPopoverTrigger:hover,
+.fiurPopoverTrigger:focus-visible,
+.fiurPopoverTrigger[aria-expanded="true"] {
+  border-color: rgba(143, 193, 232, 0.6);
+  color: #dbeafe;
+  outline: none;
+}
+
+.fiurPopoverTrigger:focus-visible {
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.34);
+}
+
+.fiurPopoverBody {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 9px);
+  z-index: 8;
+  width: min(260px, calc(100vw - 48px));
+  padding: 10px 12px;
+  border: 1px solid rgba(148, 184, 226, 0.24);
+  border-radius: 10px;
+  background: #111d31;
+  color: #e2e8f0;
+  box-shadow: 0 14px 34px rgba(2, 6, 23, 0.34);
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1.45;
+  text-align: left;
 }
 
 .previewLeadMeterTrack {
@@ -2652,7 +2787,7 @@
     width: 100%;
   }
 
-  .qualityChecks li {
+  .qualityChecks button {
     grid-template-columns: 28px minmax(0, 1fr);
     gap: 10px;
   }

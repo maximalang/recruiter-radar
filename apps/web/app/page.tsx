@@ -33,11 +33,15 @@ import {
   pickEvidenceTitles,
 } from "./home-page-components";
 import hpStyles from "./home-page-components.module.css";
+import FiurPopover from "./fiur-popover";
 import LandingAnalytics from "./landing-analytics";
+import LandingDetailsInteractions from "./landing-details-interactions";
 import LandingDeliveryDemo from "./landing-delivery-demo";
 import LandingHeader from "./landing-header";
 import LandingHeroInteractions from "./landing-hero-interactions";
+import LandingMethodology from "./landing-methodology";
 import LandingPreviewInteractions from "./landing-preview-interactions";
+import LandingPreviewPresets from "./landing-preview-presets";
 import RadarCanvas from "./radar-canvas";
 import ScrollReveal from "./scroll-reveal";
 import ScrollProgress from "./scroll-progress";
@@ -87,6 +91,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     <PageFrame maxWidth="1160px">
       <YandexMetrika />
       <LandingAnalytics />
+      <LandingDetailsInteractions />
       <ScrollProgress />
       <div className={hpStyles.ambientBg} aria-hidden="true">
         <span className={hpStyles.ambientGrid} />
@@ -103,18 +108,18 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         <RadarCanvas />
         <LandingHeroInteractions />
         <div className={hpStyles.heroContent}>
-          <div className={hpStyles.heroCopy} data-hero-step>
-            <div className={hpStyles.heroEyebrow}>
+          <div className={hpStyles.heroCopy}>
+            <div className={hpStyles.heroEyebrow} data-hero-step>
               <span aria-hidden="true" />
               Клиентский радар для рекрутинговых агентств
             </div>
-            <h1 className={hpStyles.heroTitle}>
+            <h1 className={hpStyles.heroTitle} data-hero-step>
               Компании, которым стоит написать сегодня. <span className={hpStyles.heroTitleAccent}>С доказательствами.</span>
             </h1>
-            <p className={hpStyles.heroSubtitle}>
+            <p className={hpStyles.heroSubtitle} data-hero-step>
               Каждый день Recruiter Radar находит лучшие компании под специализацию агентства и показывает сигнал найма, уровень уверенности и безопасный путь контакта.
             </p>
-            <div className={hpStyles.heroActions}>
+            <div className={hpStyles.heroActions} data-hero-step>
               <a href="#preview-configurator" className={hpStyles.heroCta}>
                 Настроить мой радар
                 <svg className={hpStyles.heroCtaArrow} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -284,7 +289,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             </li>
           </ol>
 
-          <details className={hpStyles.sourceGateDisclosure}>
+          <details className={hpStyles.sourceGateDisclosure} data-animated-details>
             <summary>
               <span>Что пока не попадает в клиентскую выдачу</span>
               <em>5 групп источников</em>
@@ -303,23 +308,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           description="Рекомендация появляется только вместе с проверяемыми фактами, уровнем уверенности и безопасным корпоративным контактом."
         />
         <div className={hpStyles.qualityGrid}>
-          <article className={hpStyles.qualityMethodCard}>
-            <div className={hpStyles.qualityCardTopbar}>
-              <span>Контур проверки</span>
-              <span className={hpStyles.qualityDemoBadge}>4 шага</span>
-            </div>
-            <div className={hpStyles.qualityMethodIntro}>
-              <h3>Сигнал проходит четыре проверки</h3>
-              <p>Высокий балл сам по себе ничего не доказывает. Радар показывает, из чего сложилась рекомендация.</p>
-            </div>
-            <ol className={hpStyles.qualityChecks}>
-              <li><span>01</span><div><strong>Соответствие</strong><p>Ниша, роли и география совпадают с профилем агентства.</p></div><em>профиль</em></li>
-              <li><span>02</span><div><strong>Намерение</strong><p>Найм подтверждён несколькими фактами, а не одной вакансией.</p></div><em>2+ факта</em></li>
-              <li><span>03</span><div><strong>Срочность</strong><p>Изменение свежее: момент для обращения ещё не потерян.</p></div><em>сегодня</em></li>
-              <li><span>04</span><div><strong>Доступность</strong><p>Есть законный корпоративный путь контакта.</p></div><em>корп. канал</em></li>
-            </ol>
-            <div className={hpStyles.qualityOutcome}><i aria-hidden="true" /><span><strong>Допущено в радар</strong> — факты и ограничения остаются в карточке.</span></div>
-          </article>
+          <LandingMethodology />
 
           <LandingDeliveryDemo />
         </div>
@@ -442,6 +431,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             key={item.question}
             className={`${hpStyles.faqCard} ${hpStyles.revealCard}`}
             data-analytics-event="faq_opened"
+            data-animated-details
           >
             <summary className={hpStyles.faqSummary}>
               <span>{item.question}</span>
@@ -510,17 +500,18 @@ export async function PreviewSection(props: {
           <div className={hpStyles.previewConfiguratorLead}>
             <h3 className={hpStyles.previewCardHeading}>Соберите свою выдачу</h3>
             <p>Двух полей достаточно для первого пересчёта. Можно начать с готового профиля.</p>
-            <div className={hpStyles.previewPresets} aria-label="Готовые профили радара">
-              {PREVIEW_PRESETS.map((preset) => (
-                <Link
-                  key={preset.label}
-                  href={buildPublicPreviewHref({ ...preset, dailyDigestLimit: previewInput.dailyDigestLimit })}
-                  data-preview-preset
-                >
-                  {preset.label}
-                </Link>
-              ))}
-            </div>
+            <LandingPreviewPresets
+              options={PREVIEW_PRESETS.map((preset) => ({
+                label: preset.label,
+                href: buildPublicPreviewHref({
+                  ...preset,
+                  dailyDigestLimit: previewInput.dailyDigestLimit,
+                }),
+                selected:
+                  previewInput.specialization === preset.specialization &&
+                  previewInput.targetCity === preset.targetCity,
+              }))}
+            />
           </div>
 
           <form
@@ -641,7 +632,7 @@ export async function PreviewSection(props: {
               </div>
 
               {hiddenPreviewItems.length > 0 ? (
-                <details className={ppStyles.disclosure}>
+                <details className={ppStyles.disclosure} data-animated-details>
                   <summary className={ppStyles.disclosureSummary}>
                     Показать ещё {hiddenPreviewItems.length} компаний
                   </summary>
@@ -752,6 +743,15 @@ function PreviewDigestCard(props: {
   const fitLabel = rs.fit >= 0.75 ? "Высокое" : rs.fit >= 0.5 ? "Среднее" : rs.fit > 0 ? "Низкое" : "Нет данных";
   const strengthLabel = pct >= 75 ? "Сильная" : pct >= 50 ? "Умеренная" : "Слабая";
   const freshnessLabel = freshness ? (freshness.includes("сегодня") || freshness.includes("1 день") || freshness.includes("за 2") || freshness.includes("за 3") ? "Сегодня" : freshness.includes("недел") ? "Эта неделя" : "Ранее") : "Нет даты";
+  const intentPct = hasRelevance ? Math.round(rs.intent * 100) : pct;
+  const intentLabel = hasRelevance
+    ? intentPct >= 75
+      ? "Высокое"
+      : intentPct >= 50
+        ? "Среднее"
+        : "Нужно подтвердить"
+    : strengthLabel;
+  const urgencyPct = hasRelevance ? Math.round(rs.urgency * 100) : freshness ? 88 : 30;
   const reachabilityPct = hasRelevance ? Math.round(rs.reachability * 100) : contactPath ? 82 : 28;
   const reachabilityLabel = reachabilityPct >= 75 ? "Высокая" : reachabilityPct >= 50 ? "Средняя" : "Нужно уточнить";
   const detailMoment = [
@@ -777,6 +777,7 @@ function PreviewDigestCard(props: {
       data-tone={tone}
       name="preview-leads"
       open={defaultOpen}
+      data-animated-details
     >
       <summary className={hpStyles.previewLeadSummary}>
         <span className={hpStyles.previewLeadSummaryCompany}>
@@ -818,10 +819,10 @@ function PreviewDigestCard(props: {
         </div>
 
         <div className={hpStyles.previewLeadMeters} aria-label="Оценка рекомендации">
-          <LeadMeter label="Соответствие профилю" value={hasRelevance ? fitPct : 0} valueLabel={hasRelevance ? fitLabel : "После настройки"} />
-          <LeadMeter label="Сила сигнала" value={pct} valueLabel={strengthLabel} />
-          <LeadMeter label="Актуальность" value={freshness ? 88 : 30} valueLabel={freshnessLabel} />
-          <LeadMeter label="Доступность контакта" value={reachabilityPct} valueLabel={reachabilityLabel} />
+          <LeadMeter label="Соответствие" secondaryLabel="Fit" description="Насколько компания совпадает с нишей, ролями и географией профиля." value={hasRelevance ? fitPct : 0} valueLabel={hasRelevance ? fitLabel : "После настройки"} />
+          <LeadMeter label="Намерение" secondaryLabel="Intent" description="Насколько факты подтверждают активное намерение компании нанимать." value={intentPct} valueLabel={intentLabel} />
+          <LeadMeter label="Актуальность" secondaryLabel="Urgency" description="Насколько свеж сигнал и сохраняется ли подходящий момент для обращения." value={urgencyPct} valueLabel={freshnessLabel} />
+          <LeadMeter label="Доступность" secondaryLabel="Reachability" description="Есть ли законный корпоративный путь контакта без персональных данных." value={reachabilityPct} valueLabel={reachabilityLabel} />
         </div>
 
         {evidenceItems.length > 0 ? (
@@ -847,10 +848,20 @@ function PreviewDigestCard(props: {
   );
 }
 
-function LeadMeter(props: { label: string; value: number; valueLabel: string }) {
+function LeadMeter(props: {
+  label: string;
+  secondaryLabel: string;
+  description: string;
+  value: number;
+  valueLabel: string;
+}) {
   return (
     <div className={hpStyles.previewLeadMeter}>
-      <span>{props.label}</span>
+      <FiurPopover
+        label={props.label}
+        secondaryLabel={props.secondaryLabel}
+        description={props.description}
+      />
       <span className={hpStyles.previewLeadMeterTrack} aria-hidden="true"><span style={{ width: `${props.value}%` }} /></span>
       <strong>{props.valueLabel}</strong>
     </div>

@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import HomePage, { PreviewSection, PreviewSkeleton } from "@/app/page";
 import LandingDeliveryDemo from "@/app/landing-delivery-demo";
+import LandingMethodology from "@/app/landing-methodology";
 import { NoticeBox, SectionIntro, SurfaceCard } from "@/app/ui/page-primitives";
 import {
   buildCheckoutHref,
@@ -269,8 +270,11 @@ describe("landing section hierarchy", () => {
   it("explains the four quality checks without duplicating the hero company card", async () => {
     const page = await HomePage({ searchParams: Promise.resolve({}) });
     const pageText = readVisibleText(page);
+    const methodologies = collectElements(page, LandingMethodology);
+    const methodologyMarkup = renderToStaticMarkup(<LandingMethodology />);
 
-    expect(pageText).toContain("Сигнал проходит четыре проверки");
+    expect(methodologies).toHaveLength(1);
+    expect(methodologyMarkup).toContain("Сигнал проходит четыре проверки");
     expect(pageText.match(/Производственная компания/g)).toHaveLength(1);
   });
 });

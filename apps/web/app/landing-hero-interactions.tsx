@@ -24,7 +24,7 @@ export default function LandingHeroInteractions() {
       hero.querySelectorAll<HTMLElement>("[data-hero-step]").forEach((element, index) => {
         element.animate(
           [
-            { opacity: 0.72, transform: "translateY(8px)" },
+            { opacity: 0.88, transform: "translateY(8px)" },
             { opacity: 1, transform: "translateY(0)" },
           ],
           {
