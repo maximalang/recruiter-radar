@@ -12,31 +12,36 @@ const ENV_PARAM_MAP = [
   ['HH_SEARCH_FIELD', 'search_field'],
 ]
 
-function parseMultiValue(value) {
+function parseMultiValue(value: unknown): string[] {
   if (!value) return []
-  return value
+  return String(value)
     .split(',')
-    .map((item) => item.trim())
+    .map((item: string) => item.trim())
     .filter(Boolean)
 }
 
-function clampInteger(value, defaultValue, minValue, maxValue) {
-  const parsed = Number.parseInt(value, 10)
+function clampInteger(
+  value: unknown,
+  defaultValue: number,
+  minValue: number,
+  maxValue: number,
+): number {
+  const parsed = Number.parseInt(String(value), 10)
   if (!Number.isFinite(parsed)) return defaultValue
   return Math.min(maxValue, Math.max(minValue, parsed))
 }
 
-function toNonEmptyText(value) {
+function toNonEmptyText(value: unknown): string | null {
   if (typeof value !== 'string') return null
   const normalizedValue = value.trim()
   return normalizedValue === '' ? null : normalizedValue
 }
 
-export function resolveHhVacancySearchConfig(env = process.env) {
+export function resolveHhVacancySearchConfig(env: Partial<NodeJS.ProcessEnv> = process.env) {
   const searchText = toNonEmptyText(env.HH_SEARCH_TEXT) ?? 'рекрутер'
   const perPage = clampInteger(env.HH_PER_PAGE, 20, 1, 100)
   const pages = clampInteger(env.HH_PAGES, 1, 1, 20)
-  const extraParams = {}
+  const extraParams: Record<string, string[]> = {}
 
   for (const [envName, paramName] of ENV_PARAM_MAP) {
     const values = parseMultiValue(env[envName])
@@ -45,7 +50,9 @@ export function resolveHhVacancySearchConfig(env = process.env) {
     }
   }
 
-  const jsonParams = env.HH_SEARCH_PARAMS_JSON ? JSON.parse(env.HH_SEARCH_PARAMS_JSON) : {}
+  const jsonParams: Record<string, unknown> = env.HH_SEARCH_PARAMS_JSON
+    ? JSON.parse(env.HH_SEARCH_PARAMS_JSON)
+    : {}
 
   for (const [key, value] of Object.entries(jsonParams)) {
     const values = Array.isArray(value)
@@ -64,7 +71,13 @@ export function resolveHhVacancySearchConfig(env = process.env) {
   }
 }
 
-export async function fetchHhVacancyPages({ userAgent, config = resolveHhVacancySearchConfig() }) {
+export async function fetchHhVacancyPages({
+  userAgent,
+  config = resolveHhVacancySearchConfig(),
+}: {
+  userAgent: string
+  config?: ReturnType<typeof resolveHhVacancySearchConfig>
+}) {
   const normalizedUserAgent = toNonEmptyText(userAgent)
   if (!normalizedUserAgent) {
     throw new Error('HH user agent is required.')

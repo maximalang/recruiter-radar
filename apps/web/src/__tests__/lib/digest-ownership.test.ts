@@ -6,7 +6,7 @@
  * System callers (n8n, scripts) omit userId and bypass the check.
  */
 
-import { jest } from '@jest/globals'
+export {}
 
 const originalDatabaseUrl = process.env.DATABASE_URL
 
@@ -15,7 +15,7 @@ const originalDatabaseUrl = process.env.DATABASE_URL
 // the real exports (VALID_ROLES, INDUSTRY_KEYWORDS) so the guard does not crash on
 // a partial mock — and so the role surface never drifts from a hand-copied list.
 jest.mock('@/lib/clientProfiles', () => ({
-  ...jest.requireActual('@/lib/clientProfiles'),
+  ...(jest.requireActual('@/lib/clientProfiles') as object),
   getClientProfileById: jest.fn(),
 }))
 

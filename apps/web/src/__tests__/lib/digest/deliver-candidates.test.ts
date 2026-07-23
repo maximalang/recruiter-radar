@@ -27,7 +27,7 @@ import {
 } from '@/lib/notification-dispatch'
 import { tryRecordProductEvent } from '@/lib/telemetry'
 
-const mockGetPool = getPool as jest.MockedFunction<typeof getPool>
+const mockGetPool = getPool as jest.Mock
 const mockSendBatch = sendBatchDigestForRun as jest.MockedFunction<typeof sendBatchDigestForRun>
 const mockEnrich = enrichRunCandidates as jest.MockedFunction<typeof enrichRunCandidates>
 const mockPush = notifyNewLeadsForRun as jest.MockedFunction<typeof notifyNewLeadsForRun>
@@ -38,14 +38,20 @@ const mockTelemetry = tryRecordProductEvent as jest.MockedFunction<typeof tryRec
 
 function makeMockPool(queryImpl?: jest.Mock) {
   const query = queryImpl ?? jest.fn()
-  return { query } as unknown as import('pg').Pool
+  return { query }
 }
 
 describe('deliverCandidatesForRun (batch)', () => {
   beforeEach(() => {
     mockGetPool.mockReset()
     mockSendBatch.mockReset()
-    mockEnrich.mockReset().mockResolvedValue({ ran: false, considered: 0, enriched: 0 })
+    mockEnrich.mockReset().mockResolvedValue({
+      ran: false,
+      considered: 0,
+      enriched: 0,
+      discoveryConsidered: 0,
+      discoveryDiscovered: 0,
+    })
     mockPush.mockReset().mockResolvedValue({ delivered: false, reason: 'not_configured' })
     mockEmail.mockReset().mockResolvedValue({ delivered: false, reason: 'not_configured' })
     mockHasEndpoint.mockReset().mockResolvedValue(false)

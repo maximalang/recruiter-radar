@@ -74,12 +74,12 @@ describe("ScrollReveal", () => {
 
     await act(async () => {
       intersectionCallback([
-        { target: wrapper, isIntersecting: true, intersectionRatio: 0.5 } as IntersectionObserverEntry,
+        { target: wrapper, isIntersecting: true, intersectionRatio: 0.5 } as unknown as IntersectionObserverEntry,
       ], {} as IntersectionObserver);
       await Promise.resolve();
     });
     act(() => intersectionCallback([
-      { target: wrapper, isIntersecting: true, intersectionRatio: 0.8 } as IntersectionObserverEntry,
+      { target: wrapper, isIntersecting: true, intersectionRatio: 0.8 } as unknown as IntersectionObserverEntry,
     ], {} as IntersectionObserver));
 
     expect(animate).toHaveBeenCalledTimes(1);

@@ -6,6 +6,7 @@ function makeLead(overrides: Partial<LeadItem> = {}): LeadItem {
   return {
     id: 'lead-1',
     orgId: 'org-1',
+    clientProfileId: 'profile-1',
     orgName: 'Ромашка',
     sourceExternalId: null,
     score: 3.2,
@@ -14,6 +15,7 @@ function makeLead(overrides: Partial<LeadItem> = {}): LeadItem {
     distinctVacancyNamesCount: 2,
     latestPublishedAt: null,
     reasons: [],
+    structuredReasons: [],
     whyNow: 'Открыли 2 новые вакансии за неделю',
     lawfulContactPath: 'Карьерная страница',
     negativeSignals: [],
@@ -24,6 +26,11 @@ function makeLead(overrides: Partial<LeadItem> = {}): LeadItem {
     sourceFamilies: ['career-pages'],
     evidenceTitles: ['Backend-разработчик', 'DevOps'],
     locationNames: ['Москва'],
+    hasAiHint: false,
+    isForeignEmployer: false,
+    foreignMatchedDomain: null,
+    contactPaths: [],
+    reviewStatus: 'auto_approved',
     ...overrides,
   }
 }

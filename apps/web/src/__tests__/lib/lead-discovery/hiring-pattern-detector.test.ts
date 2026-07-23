@@ -1,5 +1,6 @@
 import { describe, it, expect } from '@jest/globals'
 import { HiringPatternDetector, type HiringPattern, type LeadCandidate } from '@/lib/lead-discovery/hiring-pattern-detector'
+import type { HhDigestItem } from '@/lib/hhDigest'
 
 describe('HiringPatternDetector', () => {
   const sampleVacancies = [
@@ -129,7 +130,7 @@ describe('HiringPatternDetector', () => {
   })
 
   describe('digestToLeadCandidates', () => {
-    const sampleDigestItems = [
+    const sampleDigestItems: HhDigestItem[] = [
       {
         rank: 1,
         org_id: 'company1',
@@ -140,7 +141,7 @@ describe('HiringPatternDetector', () => {
         latest_published_at: '2024-05-28T10:00:00Z',
         total_score: 350,
         confidence_gate: 'A', // Add confidence gate
-        reasons: ['high hiring activity', 'diverse roles'],
+        reasons: ['high hiring activity', 'diverse roles'] as [string, string],
         opener: 'Компания активно нанимает',
         source_families: ['hh'],
         evidence_titles: ['Frontend Developer', 'Backend Developer', 'Product Manager'],
@@ -162,7 +163,7 @@ describe('HiringPatternDetector', () => {
     })
 
     it('filters out low-confidence items', () => {
-      const lowConfidenceItem = {
+      const lowConfidenceItem: HhDigestItem = {
         ...sampleDigestItems[0],
         confidence_gate: 'D'
       }

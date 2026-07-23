@@ -58,6 +58,7 @@ function makeProfile() {
     hiringIntentMin: 2,
     signalFreshnessDays: null,
     minOpenRoles: null,
+    hiringMode: 'auto' as const,
   };
 }
 

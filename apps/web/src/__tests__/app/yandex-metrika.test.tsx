@@ -6,7 +6,7 @@ import YandexMetrika from "@/app/yandex-metrika";
 function containsElementType(node: ReactNode, type: unknown): boolean {
   let found = false;
   Children.forEach(node, (child) => {
-    if (!isValidElement(child) || found) return;
+    if (!isValidElement<{ children?: ReactNode }>(child) || found) return;
     if (child.type === type) {
       found = true;
       return;

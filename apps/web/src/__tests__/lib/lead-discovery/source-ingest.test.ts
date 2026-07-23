@@ -16,7 +16,7 @@ jest.mock('@/lib/db-pool', () => ({
 
 import { getPool } from '@/lib/db-pool'
 const mockExecFile = mockExecFileFn
-const mockGetPool = getPool as jest.MockedFunction<typeof getPool>
+const mockGetPool = getPool as jest.Mock
 
 describe('source-ingest', () => {
   beforeEach(() => {

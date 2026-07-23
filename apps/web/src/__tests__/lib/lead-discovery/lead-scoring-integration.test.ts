@@ -1,5 +1,3 @@
-import { describe, it, expect, beforeEach, jest } from '@jest/globals'
-
 // Mock getHhDigestItems before importing the service
 const mockGetHhDigestItems = jest.fn()
 jest.mock('@/lib/hhDigest', () => ({
@@ -20,6 +18,7 @@ jest.mock('@/lib/sources/crawlers', () => ({
 }))
 
 import { LeadScoringService } from '@/lib/lead-discovery/lead-scoring-service'
+import type { MultiSourceLead } from '@/lib/lead-discovery/multi-source-lead-generator'
 
 const SAMPLE_DIGEST_ITEMS = [
   {
@@ -137,7 +136,11 @@ describe('Lead Scoring Service Integration', () => {
       }
     ]
 
-    const insights = scoringService.getScoringInsights(mockLeads)
+    // Aggregation reads only finalScore/confidence; keep this fixture minimal
+    // while making that deliberate test boundary explicit to TypeScript.
+    const insights = scoringService.getScoringInsights(
+      mockLeads as unknown as Parameters<LeadScoringService['getScoringInsights']>[0],
+    )
 
     expect(insights).toBeTruthy()
     expect(insights?.total).toBe(3)
@@ -169,12 +172,11 @@ describe('scoreExistingLeads — score pre-generated leads without re-generating
   })
 
   it('scores pre-generated leads without calling generateLeads', async () => {
-    const rawLeads = [
+    const rawLeads: MultiSourceLead[] = [
       {
         id: 'lead-1',
         companyId: 'org-1',
         companyName: 'TestCorp',
-        canonicalCompanyId: 'org-1',
         score: 2.5,
         confidence: 'B' as const,
         sources: [

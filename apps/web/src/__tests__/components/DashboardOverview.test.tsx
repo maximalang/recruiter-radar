@@ -1,5 +1,5 @@
-import { render, screen, fireEvent } from '@/__tests__/utils/test-utils'
-import { DashboardOverview } from '@/components/DashboardOverview'
+import { render, screen } from '@/src/test-utils/render'
+import DashboardOverview from '@/app/dashboard/dashboard-overview'
 
 describe('DashboardOverview', () => {
   const mockProps = {
@@ -7,7 +7,6 @@ describe('DashboardOverview', () => {
     activeSources: 120,
     overallHealth: 85,
     totalAlerts: 5,
-    lastUpdated: '2023-05-23T12:00:00Z',
   }
 
   it('renders dashboard overview with correct stats', () => {

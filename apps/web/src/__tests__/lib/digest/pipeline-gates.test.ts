@@ -21,14 +21,13 @@ function mockDigestItem(overrides: Partial<{
   confidence_gate: 'A' | 'B' | 'C' | 'D'
   total_score: number
   source_families: string[]
-}> = {}): Record<string, unknown> {
+}> & Record<string, unknown> = {}): Record<string, unknown> {
   return {
     rank: 1,
     org_id: '1',
     source_external_id: 'hh-123',
     source_display_name: 'Test Company',
     source_families: ['hh'],
-    evidence_titles: ['Backend Engineer'],
     candidate_source_keys: [],
     location_names: ['Moscow'],
     vacancies_count: 2,
@@ -62,7 +61,7 @@ function filterDigestItems(
         String(item.source_display_name ?? ''),
         ...(item.evidence_titles as string[] ?? []),
         ...(item.location_names as string[] ?? []),
-      ].join(' ').toLowerCase('ru-RU')
+      ].join(' ').toLocaleLowerCase('ru-RU')
 
       return industries.some((industryKey) => {
         const keywords = INDUSTRY_KEYWORDS.get(industryKey)
@@ -75,7 +74,7 @@ function filterDigestItems(
       const haystack = [
         String(item.source_display_name ?? ''),
         ...(item.evidence_titles as string[] ?? []),
-      ].join(' ').toLowerCase('ru-RU')
+      ].join(' ').toLocaleLowerCase('ru-RU')
 
       if (clientProfile.includeKeywords.length > 0) {
         if (!clientProfile.includeKeywords.some((kw) => haystack.includes(kw.toLowerCase()))) {

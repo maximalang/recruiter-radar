@@ -45,9 +45,9 @@ describe('createStaticEngine', () => {
 
   describe('headers and options', () => {
     it('passes a default User-Agent identifying the radar', async () => {
-      let observedHeaders: Map<string, string> | null = null
+      let observedHeaders = new Map<string, string>()
 
-      mockFetchText.mockImplementationOnce((url, options) => {
+      mockFetchText.mockImplementationOnce((url: string, options: { headers?: Record<string, string> }) => {
         observedHeaders = new Map(Object.entries(options.headers || {}))
         return Promise.resolve({
           response: {
@@ -67,9 +67,9 @@ describe('createStaticEngine', () => {
     })
 
     it('lets caller override headers', async () => {
-      let observedHeaders: Map<string, string> | null = null
+      let observedHeaders = new Map<string, string>()
 
-      mockFetchText.mockImplementationOnce((url, options) => {
+      mockFetchText.mockImplementationOnce((url: string, options: { headers?: Record<string, string> }) => {
         observedHeaders = new Map(Object.entries(options.headers || {}))
         return Promise.resolve({
           response: {

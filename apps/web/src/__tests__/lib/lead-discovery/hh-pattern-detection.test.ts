@@ -1,4 +1,3 @@
-import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals'
 import { resolveHhVacancySearchConfig, fetchHhVacancyPages } from './hh-mock'
 
 // Test data to avoid making real API calls
@@ -30,12 +29,14 @@ const mockHhResponse = {
 }
 
 describe('Hiring Pattern Detection', () => {
-  let mockFetch: jest.Mock | undefined
-  let mockConsoleLog: typeof console.log | undefined
+  let originalFetch: typeof fetch
+  let fetchMock: jest.Mock
+  let mockConsoleLog: typeof console.log
 
   beforeEach(() => {
-    mockFetch = global.fetch as jest.Mock
-    global.fetch = jest.fn()
+    originalFetch = global.fetch
+    fetchMock = jest.fn()
+    global.fetch = fetchMock as unknown as typeof fetch
     mockConsoleLog = console.log
     console.log = jest.fn()
     for (const key of Object.keys(process.env)) {
@@ -44,8 +45,8 @@ describe('Hiring Pattern Detection', () => {
   })
 
   afterEach(() => {
-    global.fetch = mockFetch as typeof fetch
-    console.log = mockConsoleLog as typeof console.log
+    global.fetch = originalFetch
+    console.log = mockConsoleLog
   })
 
   describe('resolveHhVacancySearchConfig', () => {
@@ -94,11 +95,11 @@ describe('Hiring Pattern Detection', () => {
 
   describe('fetchHhVacancyPages', () => {
     it('fetches vacancy pages successfully', async () => {
-      global.fetch.mockResolvedValueOnce({
+      fetchMock.mockResolvedValueOnce({
         ok: true,
         headers: new Map([['content-type', 'application/json']]),
         json: () => Promise.resolve(mockHhResponse)
-      } as Response)
+      } as unknown as Response)
 
       const config = resolveHhVacancySearchConfig({
         HH_PAGES: '1'
@@ -115,7 +116,7 @@ describe('Hiring Pattern Detection', () => {
     })
 
     it('handles pagination correctly', async () => {
-      global.fetch.mockResolvedValueOnce({
+      fetchMock.mockResolvedValueOnce({
         ok: true,
         headers: new Map([['content-type', 'application/json']]),
         json: () => Promise.resolve({
@@ -123,9 +124,9 @@ describe('Hiring Pattern Detection', () => {
           pages: 2,
           items: [mockHhResponse.items[0]] // Only first item on first page
         })
-      } as Response)
+      } as unknown as Response)
 
-      global.fetch.mockResolvedValueOnce({
+      fetchMock.mockResolvedValueOnce({
         ok: true,
         headers: new Map([['content-type', 'application/json']]),
         json: () => Promise.resolve({
@@ -133,7 +134,7 @@ describe('Hiring Pattern Detection', () => {
           pages: 2,
           items: [mockHhResponse.items[1]] // Second item on second page
         })
-      } as Response)
+      } as unknown as Response)
 
       const config = resolveHhVacancySearchConfig({
         HH_PAGES: '2'

@@ -1,4 +1,4 @@
-import { Children, isValidElement, type ReactNode } from "react";
+import { Children, isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import Link from "next/link";
 
@@ -35,11 +35,11 @@ const mockGetPublicSampleDigestState = getPublicSampleDigestState as jest.Mocked
   typeof getPublicSampleDigestState
 >;
 
-function collectElements(node: ReactNode, type: unknown): React.ReactElement[] {
-  const matches: React.ReactElement[] = [];
+function collectElements(node: ReactNode, type: unknown): ReactElement<Record<string, any>>[] {
+  const matches: ReactElement<Record<string, any>>[] = [];
 
   Children.forEach(node, (child) => {
-    if (!isValidElement(child)) return;
+    if (!isValidElement<Record<string, any>>(child)) return;
     if (child.type === type) matches.push(child);
     matches.push(...collectElements(child.props.children, type));
   });
@@ -52,7 +52,9 @@ function readVisibleText(node: ReactNode): string {
 
   const parts: string[] = [];
   Children.forEach(node, (child) => {
-    if (isValidElement(child)) parts.push(readVisibleText(child.props.children));
+    if (isValidElement<{ children?: ReactNode }>(child)) {
+      parts.push(readVisibleText(child.props.children));
+    }
     else if (typeof child === "string" || typeof child === "number") parts.push(String(child));
   });
   return parts.join(" ").replace(/\s+/g, " ").trim();
@@ -230,12 +232,16 @@ describe("landing section hierarchy", () => {
       items: [{
         rank: 1,
         org_id: "demo-industrial",
+        hh_employer_id: "demo-industrial",
         employer_name: "Производственная компания",
         vacancies_count: 14,
         distinct_vacancy_names_count: 6,
         latest_published_at: "2026-07-19T09:00:00.000Z",
         total_score: 348,
-        reasons: ["14 новых вакансий за 6 дней"],
+        reasons: [
+          "14 новых вакансий за 6 дней",
+          "Сигнал подтверждён двумя источниками",
+        ],
         opener: "Предложить точечный подбор по инженерным ролям",
         source_families: ["hh", "career-pages"],
         evidence_titles: ["Инженер-конструктор", "Руководитель производства"],
@@ -253,12 +259,16 @@ describe("landing section hierarchy", () => {
       }, {
         rank: 2,
         org_id: "demo-service",
+        hh_employer_id: "demo-service",
         employer_name: "Сервисная B2B-компания",
         vacancies_count: 9,
         distinct_vacancy_names_count: 5,
         latest_published_at: "2026-07-18T09:00:00.000Z",
         total_score: 312,
-        reasons: ["Команда найма расширяет коммерческий блок"],
+        reasons: [
+          "Команда найма расширяет коммерческий блок",
+          "Сигнал подтверждён карьерной страницей",
+        ],
         opener: "Уточнить приоритетные роли и предложить короткий пилот",
         source_families: ["career-pages", "egrul-fns"],
         evidence_titles: ["Руководитель отдела продаж", "Менеджер по развитию"],

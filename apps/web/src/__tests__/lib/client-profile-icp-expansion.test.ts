@@ -34,6 +34,10 @@ function makeClientProfile(overrides: Partial<ClientProfile> = {}): ClientProfil
     excludedIndustries: ['healthcare'],
     excludedLocations: ['Владивосток'],
     remoteFriendly: true,
+    hiringIntentMin: null,
+    signalFreshnessDays: null,
+    minOpenRoles: null,
+    hiringMode: 'auto',
     ...overrides,
   }
 }

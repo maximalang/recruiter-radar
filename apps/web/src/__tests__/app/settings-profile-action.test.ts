@@ -10,15 +10,13 @@
  *                             ignores any forged `id` field in the form
  */
 
-import { jest } from '@jest/globals'
-
 const getClientProfileByOwnerId = jest.fn()
 const saveClientProfile = jest.fn()
 const readOwnerSession = jest.fn()
 const countMatchingCandidatesForProfile = jest.fn()
 
 jest.mock('@/lib/clientProfiles', () => ({
-  ...jest.requireActual('@/lib/clientProfiles'),
+  ...(jest.requireActual('@/lib/clientProfiles') as object),
   getClientProfileByOwnerId,
   saveClientProfile,
 }))
