@@ -139,6 +139,8 @@ jobs:
         with:
           name: web-build-output
           path: apps/web
+      - name: Prepare standalone static assets
+        run: node apps/web/scripts/prepare-standalone.mjs
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
       - name: Start production server

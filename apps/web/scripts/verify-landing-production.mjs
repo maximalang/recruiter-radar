@@ -136,13 +136,23 @@ const howItWorks = page.getByTestId("how-it-works-flow");
 const howItWorksFirstStep = howItWorks.getByRole("button").first();
 await howItWorksFirstStep.focus();
 await howItWorksFirstStep.press("End");
-assert.equal(await howItWorks.getAttribute("data-active-step"), "3");
+await page.waitForFunction(
+  () =>
+    document
+      .querySelector('[data-testid="how-it-works-flow"]')
+      ?.getAttribute("data-active-step") === "3",
+);
 
 const sourceFlow = page.getByTestId("source-flow");
 const sourceFirstLayer = sourceFlow.getByRole("button").first();
 await sourceFirstLayer.focus();
 await sourceFirstLayer.press("ArrowRight");
-assert.equal(await sourceFlow.getAttribute("data-active-layer"), "2");
+await page.waitForFunction(
+  () =>
+    document
+      .querySelector('[data-testid="source-flow"]')
+      ?.getAttribute("data-active-layer") === "2",
+);
 
 const delivery = page
   .getByRole("tablist", { name: "Канал доставки примера" })
