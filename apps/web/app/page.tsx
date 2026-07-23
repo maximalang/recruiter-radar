@@ -36,6 +36,7 @@ import hpStyles from "./home-page-components.module.css";
 import LandingAnalytics from "./landing-analytics";
 import LandingDeliveryDemo from "./landing-delivery-demo";
 import LandingHeader from "./landing-header";
+import LandingHeroInteractions from "./landing-hero-interactions";
 import LandingPreviewInteractions from "./landing-preview-interactions";
 import RadarCanvas from "./radar-canvas";
 import ScrollReveal from "./scroll-reveal";
@@ -48,7 +49,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Recruiter Radar — ежедневный радар по нанимающим компаниям",
   description:
-    "Каждый день Recruiter Radar находит лучшие компании под специализацию агентства: что меняется, почему сейчас и как выйти на них корректно. Telegram-first доставка с дополнительными каналами. Для рекрутинговых агентств и BD-команд.",
+    "Каждый день Recruiter Radar находит лучшие компании под специализацию агентства: что меняется, почему сейчас и как выйти на них корректно. Telegram — основной канал доставки, доступны и дополнительные каналы. Для рекрутинговых агентств и BD-команд.",
 };
 
 const VISIBLE_PREVIEW_ITEMS = 2;
@@ -93,10 +94,16 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       <a href="#main-content" className={ppStyles.skipLink}>Перейти к содержанию</a>
 
       {/* Hero */}
-      <section id="main-content" className={hpStyles.heroSection} aria-label="Recruiter Radar">
+      <section
+        id="main-content"
+        className={hpStyles.heroSection}
+        aria-label="Recruiter Radar"
+        data-landing-hero
+      >
         <RadarCanvas />
+        <LandingHeroInteractions />
         <div className={hpStyles.heroContent}>
-          <div className={hpStyles.heroCopy}>
+          <div className={hpStyles.heroCopy} data-hero-step>
             <div className={hpStyles.heroEyebrow}>
               <span aria-hidden="true" />
               Клиентский радар для рекрутинговых агентств
@@ -118,14 +125,19 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               <a href="#preview-results" className={hpStyles.heroSecondaryCta}>Посмотреть результат</a>
             </div>
             <p className={hpStyles.heroFootnote}>
-              {pilotPlan.price} за {pilotPlan.cadence} · без автопродления · Telegram-first
+              {pilotPlan.price} за {pilotPlan.cadence} · без автопродления · Telegram — основной канал
             </p>
           </div>
 
-          <div className={hpStyles.heroProduct} aria-label="Как Recruiter Radar оценивает компанию">
+          <div
+            className={hpStyles.heroProduct}
+            aria-label="Как Recruiter Radar оценивает компанию"
+            data-hero-step
+            data-hero-tilt
+          >
             <div className={hpStyles.heroProductTopbar}>
               <span className={hpStyles.heroProductLabel}>Так выглядит лид в радаре</span>
-              <span className={hpStyles.heroProductLive}>gate A</span>
+              <span className={hpStyles.heroProductLive}>уровень доверия A</span>
             </div>
             <div className={hpStyles.heroCompanyRow}>
               <div>

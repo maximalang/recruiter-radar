@@ -2,6 +2,11 @@
 
 import { useEffect, useRef } from "react";
 
+import {
+  LANDING_MOTION_EVENT,
+  type LandingMotionDetail,
+} from "./landing-motion/motion-preference";
+
 /**
  * Background radar animation for the landing hero.
  *
@@ -19,7 +24,12 @@ export default function RadarCanvas() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const motionMedia = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let reduceMotion = motionMedia.matches;
+    let userPaused =
+      document.documentElement.dataset.landingMotion === "paused" ||
+      document.documentElement.dataset.landingMotion === "reduced";
+    let inViewport = true;
 
     let width = 0;
     let height = 0;
@@ -34,10 +44,10 @@ export default function RadarCanvas() {
     const labels = [
       "HR-отдел",
       "карьерный сайт",
-      "burst найма",
+      "всплеск найма",
       "новый регион",
       "3 роли",
-      "gate A",
+      "уровень доверия A",
       "2 источника",
     ];
 
@@ -214,29 +224,59 @@ export default function RadarCanvas() {
       if (running) rafId = requestAnimationFrame(frame);
     }
 
-    function onVisibility() {
-      if (document.hidden) {
-        running = false;
-        cancelAnimationFrame(rafId);
-      } else if (!reduceMotion) {
+    function syncAnimation() {
+      running = false;
+      cancelAnimationFrame(rafId);
+      const shouldAnimate =
+        !reduceMotion && !userPaused && inViewport && !document.hidden;
+      if (shouldAnimate) {
         running = true;
         rafId = requestAnimationFrame(frame);
+      } else {
+        drawStatic();
       }
     }
 
-    resize();
-    if (reduceMotion) {
-      drawStatic();
-    } else {
-      rafId = requestAnimationFrame(frame);
+    function onVisibility() {
+      syncAnimation();
     }
-    window.addEventListener("resize", resize);
+
+    function onMotionPreference(event: Event) {
+      const detail = (event as CustomEvent<LandingMotionDetail>).detail;
+      userPaused = detail?.paused ?? false;
+      reduceMotion = detail?.reduced ?? motionMedia.matches;
+      syncAnimation();
+    }
+
+    function onReducedMotionChange() {
+      reduceMotion = motionMedia.matches;
+      syncAnimation();
+    }
+
+    resize();
+    syncAnimation();
+    const onResize = () => {
+      resize();
+      if (!running) drawStatic();
+    };
+    const intersectionObserver = new IntersectionObserver(([entry]) => {
+      inViewport = entry?.isIntersecting ?? true;
+      syncAnimation();
+    }, { rootMargin: "120px" });
+    intersectionObserver.observe(canvas);
+
+    window.addEventListener("resize", onResize);
+    window.addEventListener(LANDING_MOTION_EVENT, onMotionPreference);
+    motionMedia.addEventListener("change", onReducedMotionChange);
     document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
       running = false;
       cancelAnimationFrame(rafId);
-      window.removeEventListener("resize", resize);
+      intersectionObserver.disconnect();
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener(LANDING_MOTION_EVENT, onMotionPreference);
+      motionMedia.removeEventListener("change", onReducedMotionChange);
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, []);
