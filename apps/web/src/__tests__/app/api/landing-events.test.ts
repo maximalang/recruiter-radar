@@ -80,4 +80,42 @@ describe("POST /api/landing-events", () => {
     expect(crossOrigin.status).toBe(403);
     await expect(malformed.text()).resolves.not.toContain("SyntaxError");
   });
+
+  it("requires JSON and rejects a forged Host even with a matching Origin", async () => {
+    const wrongType = await POST(request(
+      JSON.stringify({ name: "landing_viewed" }),
+      { "content-type": "text/plain" },
+    ));
+    const forgedHost = await POST(request(
+      JSON.stringify({ name: "landing_viewed" }),
+      { host: "attacker.example" },
+    ));
+
+    expect(wrongType.status).toBe(415);
+    expect(forgedHost.status).toBe(403);
+    expect(mockTryRecordProductEvent).not.toHaveBeenCalled();
+  });
+
+  it("limits each ephemeral client independently without persisting the raw IP", async () => {
+    const body = JSON.stringify({ name: "landing_viewed" });
+    const limitedIp = "203.0.113.71";
+
+    for (let index = 0; index < 30; index += 1) {
+      const response = await POST(request(body, { "x-forwarded-for": limitedIp }));
+      expect(response.status).toBe(204);
+    }
+
+    const rejected = await POST(request(body, { "x-forwarded-for": limitedIp }));
+    const otherClient = await POST(request(body, { "x-forwarded-for": "203.0.113.72" }));
+
+    expect(rejected.status).toBe(429);
+    expect(otherClient.status).toBe(204);
+    expect(JSON.stringify(mockTryRecordProductEvent.mock.calls)).not.toContain(limitedIp);
+  });
+
+  it("still accepts a same-origin request when proxy IP headers are absent", async () => {
+    const response = await POST(request(JSON.stringify({ name: "landing_viewed" })));
+
+    expect(response.status).toBe(204);
+  });
 });
