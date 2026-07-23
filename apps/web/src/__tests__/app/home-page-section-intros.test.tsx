@@ -2,7 +2,7 @@ import { Children, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import Link from "next/link";
 
-import HomePage, { PreviewSection } from "@/app/page";
+import HomePage, { PreviewSection, PreviewSkeleton } from "@/app/page";
 import { NoticeBox, SectionIntro, SurfaceCard } from "@/app/ui/page-primitives";
 import {
   buildCheckoutHref,
@@ -62,34 +62,37 @@ describe("landing section hierarchy", () => {
   });
 
   it("uses the brand-accent eyebrow on every public landing section", async () => {
-    // The live preview is now an async <PreviewSection> behind a <Suspense>
-    // boundary (the home page is `force-dynamic` and the digest query blocked
-    // the whole render — see page.tsx). HomePage's static tree no longer
-    // contains the preview's children, so we render both halves and combine:
-    // HomePage renders Проблема / Как работает / Проверка сигнала / Тарифы /
-    // FAQ (5 SectionIntros), PreviewSection renders Рабочий радар
-    // (1) — six total. The duplicate "Что внутри" block must not return.
+    // The stable preview wrapper and heading live outside Suspense. This keeps
+    // the anchor and section hierarchy available while Postgres is still
+    // resolving the real form/results workspace.
     const page = await HomePage({ searchParams: Promise.resolve({}) });
-    const preview = await PreviewSection({
-      previewInput: readPublicPreviewInput({}),
-      hasPreview: false,
-      checkoutHref: buildCheckoutHref(readPublicPreviewInput({})),
-    });
-    const sectionIntros = [
-      ...collectElements(page, SectionIntro),
-      ...collectElements(preview, SectionIntro),
-    ];
+    const sectionIntros = collectElements(page, SectionIntro);
 
     expect(sectionIntros).toHaveLength(6);
     expect(sectionIntros.every((section) => section.props.accent === true)).toBe(true);
     expect(sectionIntros.map((section) => section.props.eyebrow)).toEqual([
       "Проблема",
+      "Рабочий радар",
       "Как работает",
       "Проверка сигнала",
       "Тарифы",
       "FAQ",
-      "Рабочий радар",
     ]);
+  });
+
+  it("keeps the preview wrapper stable and exposes both CTA anchors during Suspense", async () => {
+    const page = await HomePage({ searchParams: Promise.resolve({}) });
+    const previewWrapper = collectElements(page, "section")
+      .find((section) => section.props.id === "preview");
+    const anchorHrefs = collectElements(page, "a").map((anchor) => anchor.props.href);
+    const skeletonMarkup = renderToStaticMarkup(<PreviewSkeleton />);
+
+    expect(previewWrapper).toBeDefined();
+    expect(previewWrapper?.props["data-section"]).toBe("preview");
+    expect(skeletonMarkup).toContain('id="preview-configurator"');
+    expect(skeletonMarkup).toContain('id="preview-results"');
+    expect(anchorHrefs).toContain("#preview-configurator");
+    expect(anchorHrefs).toContain("#preview-results");
   });
 
   it("keeps the hero concise and makes the pilot the obvious first decision", async () => {
@@ -124,19 +127,13 @@ describe("landing section hierarchy", () => {
       checkoutHref: buildCheckoutHref(input),
     });
     const previewText = readVisibleText(preview);
-    const previewIntro = collectElements(preview, SectionIntro)
-      .find((section) => section.props.eyebrow === "Рабочий радар");
 
-    expect(previewIntro?.props.title).toBe("Проверьте радар на своём профиле");
     expect(previewText).toContain("Обезличенный набор");
     expect(previewText).toContain("Радар для вашего профиля");
     expect(previewText).toContain("примерные данные");
     expect(previewText).not.toContain("временно недоступна");
     expect(previewText).not.toContain("восстановления источника");
     expect(previewText).toContain("Попробовать неделю");
-    expect(previewIntro?.props.description).toBe(
-      "Укажите специализацию и географию. Радар пересчитает приоритеты и покажет, почему каждая компания поднялась в выдаче.",
-    );
   });
 
   it("explains the role and delivery status of every source group", async () => {
@@ -172,7 +169,7 @@ describe("landing section hierarchy", () => {
     const resetLink = links.find((link) => readVisibleText(link) === "Сбросить");
 
     expect(forms).toHaveLength(1);
-    expect(forms[0].props.action).toBe("/#preview");
+    expect(forms[0].props.action).toBe("/#preview-results");
     expect(resetLink?.props.href).toBe("/#preview");
   });
 

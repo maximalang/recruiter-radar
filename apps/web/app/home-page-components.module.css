@@ -1170,6 +1170,15 @@
   gap: 18px;
 }
 
+.previewSectionContent,
+.previewSurfaceAnchor {
+  min-width: 0;
+}
+
+.previewSurfaceAnchor > section {
+  height: 100%;
+}
+
 .previewConfigurator {
   display: grid;
   grid-template-columns: minmax(190px, 0.55fr) minmax(0, 1.45fr);

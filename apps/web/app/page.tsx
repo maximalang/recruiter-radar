@@ -34,6 +34,7 @@ import {
 } from "./home-page-components";
 import hpStyles from "./home-page-components.module.css";
 import LandingHeader from "./landing-header";
+import LandingPreviewInteractions from "./landing-preview-interactions";
 import RadarCanvas from "./radar-canvas";
 import ScrollReveal from "./scroll-reveal";
 import ScrollProgress from "./scroll-progress";
@@ -102,14 +103,14 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               Каждый день Recruiter Radar находит лучшие компании под специализацию агентства и показывает сигнал найма, уровень уверенности и безопасный путь контакта.
             </p>
             <div className={hpStyles.heroActions}>
-              <Link href={checkoutHref} className={hpStyles.heroCta}>
-                Попробовать неделю
+              <a href="#preview-configurator" className={hpStyles.heroCta}>
+                Настроить мой радар
                 <svg className={hpStyles.heroCtaArrow} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <line x1="5" y1="12" x2="19" y2="12" />
                   <polyline points="13 6 19 12 13 18" />
                 </svg>
-              </Link>
-              <a href="#preview" className={hpStyles.heroSecondaryCta}>Настроить радар</a>
+              </a>
+              <a href="#preview-results" className={hpStyles.heroSecondaryCta}>Посмотреть результат</a>
             </div>
             <p className={hpStyles.heroFootnote}>
               {pilotPlan.price} за {pilotPlan.cadence} · без автопродления · Telegram-first
@@ -190,13 +191,20 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         </div>
       </ScrollReveal>
 
-      {/* Live preview — DB-backed, so it streams in via Suspense. The rest of
-          the page (hero/problem/how-it-works/quality/pricing/FAQ) paints
-          immediately without waiting for the digest query. See the note at the
-          top of HomePage on why this boundary fixes the slow first paint. */}
-      <Suspense fallback={<PreviewSkeleton />}>
-        <PreviewSection previewInput={previewInput} hasPreview={hasPreview} checkoutHref={checkoutHref} />
-      </Suspense>
+      {/* The section shell and heading remain mounted while only the DB-backed
+          workspace streams. This keeps sticky navigation and CTA anchors stable
+          across the Suspense replacement. */}
+      <section id="preview" data-section="preview" className={hpStyles.scrollSection}>
+        <SectionIntro
+          accent
+          eyebrow="Рабочий радар"
+          title="Проверьте радар на своём профиле"
+          description="Укажите специализацию и географию. Радар пересчитает приоритеты и покажет, почему каждая компания поднялась в выдаче."
+        />
+        <Suspense fallback={<PreviewSkeleton />}>
+          <PreviewSection previewInput={previewInput} hasPreview={hasPreview} checkoutHref={checkoutHref} />
+        </Suspense>
+      </section>
 
       {/* How it works — the three-step flow */}
       <ScrollReveal as="section" id="how-it-works" className={hpStyles.scrollSection}>
@@ -485,19 +493,13 @@ export async function PreviewSection(props: {
   const appliedProfile = [previewInput.specialization, previewInput.targetCity].filter(Boolean);
 
   return (
-    <ScrollReveal as="section" id="preview" className={hpStyles.scrollSection}>
-      <SectionIntro
-        accent
-        eyebrow="Рабочий радар"
-        title="Проверьте радар на своём профиле"
-        description="Укажите специализацию и географию. Радар пересчитает приоритеты и покажет, почему каждая компания поднялась в выдаче."
-      />
-
+    <div className={hpStyles.previewSectionContent} data-preview-section-content>
       <div className={hpStyles.previewWorkspace}>
-        <SurfaceCard
-          className={hpStyles.previewConfigurator}
-          padding="var(--preview-surface-padding)"
-        >
+        <div id="preview-configurator" className={hpStyles.previewSurfaceAnchor}>
+          <SurfaceCard
+            className={hpStyles.previewConfigurator}
+            padding="var(--preview-surface-padding)"
+          >
           <div className={hpStyles.previewConfiguratorLead}>
             <h3 className={hpStyles.previewCardHeading}>Соберите свою выдачу</h3>
             <p>Двух полей достаточно для первого пересчёта. Можно начать с готового профиля.</p>
@@ -506,6 +508,7 @@ export async function PreviewSection(props: {
                 <Link
                   key={preset.label}
                   href={buildPublicPreviewHref({ ...preset, dailyDigestLimit: previewInput.dailyDigestLimit })}
+                  data-preview-preset
                 >
                   {preset.label}
                 </Link>
@@ -513,7 +516,13 @@ export async function PreviewSection(props: {
             </div>
           </div>
 
-          <form method="GET" action="/#preview" className={hpStyles.previewForm}>
+          <form
+            method="GET"
+            action="/#preview-results"
+            className={hpStyles.previewForm}
+            data-preview-form
+            aria-busy="false"
+          >
             <label htmlFor="specialization" className={ppStyles.field}>
               <span className={ppStyles.fieldLabel}>Специализация</span>
               <input
@@ -547,8 +556,9 @@ export async function PreviewSection(props: {
             </label>
 
             <div className={hpStyles.previewFormActions}>
-              <button type="submit" className={ppStyles.primaryAction}>
-                Посмотреть компании
+              <button type="submit" className={ppStyles.primaryAction} data-preview-submit>
+                <span data-preview-submit-label>Посмотреть компании</span>
+                <span data-preview-submit-status hidden>Радар анализирует сигналы…</span>
               </button>
 
               {hasPreview ? (
@@ -558,12 +568,18 @@ export async function PreviewSection(props: {
               ) : null}
             </div>
           </form>
-        </SurfaceCard>
+          </SurfaceCard>
+        </div>
 
-        <SurfaceCard
-          className={`${hpStyles.previewCardContainer} ${hpStyles.previewResults}`}
-          padding="var(--preview-surface-padding)"
+        <div
+          id="preview-results"
+          className={hpStyles.previewSurfaceAnchor}
+          data-preview-results
         >
+          <SurfaceCard
+            className={`${hpStyles.previewCardContainer} ${hpStyles.previewResults}`}
+            padding="var(--preview-surface-padding)"
+          >
           <div className={hpStyles.previewHeaderRow}>
             <div>
               <h3 className={hpStyles.previewCardHeading}>
@@ -643,9 +659,11 @@ export async function PreviewSection(props: {
               ? "Получать такой радар каждое утро"
               : "Попробовать неделю"}
           </Link>
-        </SurfaceCard>
+          </SurfaceCard>
+        </div>
       </div>
-    </ScrollReveal>
+      <LandingPreviewInteractions />
+    </div>
   );
 }
 
@@ -659,18 +677,13 @@ export async function PreviewSection(props: {
  */
 export function PreviewSkeleton() {
   return (
-    <ScrollReveal as="section" id="preview" className={hpStyles.scrollSection}>
-      <SectionIntro
-        accent
-        eyebrow="Рабочий радар"
-        title="Проверьте радар на своём профиле"
-        description="Укажите специализацию и географию — радар покажет компании, которые подходят именно вашему агентству."
-      />
+    <div className={hpStyles.previewSectionContent} aria-busy="true" aria-label="Загрузка примера радара">
       <div className={hpStyles.previewWorkspace}>
-        <SurfaceCard
-          className={hpStyles.previewConfigurator}
-          padding="var(--preview-surface-padding)"
-        >
+        <div id="preview-configurator" className={hpStyles.previewSurfaceAnchor}>
+          <SurfaceCard
+            className={hpStyles.previewConfigurator}
+            padding="var(--preview-surface-padding)"
+          >
           <div className={hpStyles.previewConfiguratorLead}>
             <h3 className={hpStyles.previewCardHeading}>Настройте пример</h3>
           </div>
@@ -679,11 +692,13 @@ export function PreviewSkeleton() {
             <span className={hpStyles.previewSkeletonLine} />
             <span className={hpStyles.previewSkeletonBar} />
           </div>
-        </SurfaceCard>
-        <SurfaceCard
-          className={`${hpStyles.previewCardContainer} ${hpStyles.previewResults}`}
-          padding="var(--preview-surface-padding)"
-        >
+          </SurfaceCard>
+        </div>
+        <div id="preview-results" className={hpStyles.previewSurfaceAnchor}>
+          <SurfaceCard
+            className={`${hpStyles.previewCardContainer} ${hpStyles.previewResults}`}
+            padding="var(--preview-surface-padding)"
+          >
           <div className={hpStyles.previewHeaderRow}>
             <h3 className={hpStyles.previewCardHeading}>Пример утренней выдачи</h3>
             <StatusBadge tone="neutral" style={{ justifySelf: "start" }}>загрузка данных</StatusBadge>
@@ -692,9 +707,10 @@ export function PreviewSkeleton() {
             <span className={hpStyles.previewSkeletonCard} />
             <span className={hpStyles.previewSkeletonCard} />
           </div>
-        </SurfaceCard>
+          </SurfaceCard>
+        </div>
       </div>
-    </ScrollReveal>
+    </div>
   );
 }
 
