@@ -719,22 +719,22 @@
   animation: none !important;
 }
 
-[data-hero-evidence-index],
-[data-hero-fiur-index] {
+.heroEvidenceRow [data-hero-evidence-index],
+.heroSignalMeter[data-hero-fiur-index] {
   transition: border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
 }
 
-[data-hero-evidence-index][data-signal-active="true"] {
+.heroEvidenceRow [data-hero-evidence-index][data-signal-active="true"] {
   border-color: rgba(96, 165, 250, 0.58);
   background: rgba(59, 130, 246, 0.13);
   box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.08);
 }
 
-[data-hero-fiur-index][data-signal-active="true"] {
+.heroSignalMeter[data-hero-fiur-index][data-signal-active="true"] {
   color: #ffffff;
 }
 
-[data-hero-fiur-index][data-signal-active="true"] .heroSignalMeterTrack {
+.heroSignalMeter[data-hero-fiur-index][data-signal-active="true"] .heroSignalMeterTrack {
   box-shadow: 0 0 0 1px rgba(147, 197, 253, 0.48), 0 0 16px rgba(96, 165, 250, 0.22);
 }
 
@@ -1641,6 +1641,7 @@
 .deliveryTabs button,
 .feedbackChoices button,
 .feedbackReset {
+  min-width: 44px;
   min-height: 44px;
   border: 1px solid rgba(71, 85, 105, 0.16);
   border-radius: 10px;

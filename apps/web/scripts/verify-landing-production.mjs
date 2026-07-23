@@ -13,8 +13,8 @@ const screenshotDirectory =
 const viewportMatrix = [
   { width: 320, height: 700 },
   { width: 360, height: 800 },
+  { width: 375, height: 812 },
   { width: 390, height: 844 },
-  { width: 430, height: 932 },
   { width: 768, height: 1024 },
   { width: 1024, height: 768 },
   { width: 1280, height: 800 },
@@ -69,11 +69,18 @@ const jsTransfer = await page.evaluate(() => {
 await screenshot(page.locator("#main-content"), "hero-desktop-1440x900");
 await screenshot(page.locator("#preview"), "preview-desktop-1440x900");
 
-const selectedPreset = page.getByRole("radio", { checked: true }).first();
-await selectedPreset.waitFor();
+await page.locator("#quality").scrollIntoViewIfNeeded();
+await page.waitForFunction(
+  () => document.querySelector('header a[href="#quality"]')?.getAttribute("aria-current") === "location",
+);
+
+const firstPreset = page.getByRole("radio").first();
+await firstPreset.waitFor();
+assert.equal(await page.getByRole("radio", { checked: true }).count(), 0);
+await firstPreset.focus();
 await Promise.all([
   page.waitForURL(/specialization=/),
-  selectedPreset.press("ArrowRight"),
+  firstPreset.press("ArrowRight"),
 ]);
 assert.equal(await page.getByRole("radio", { checked: true }).count(), 1);
 
@@ -121,6 +128,18 @@ assert.equal(
 );
 await screenshot(methodology, "methodology-1440x900");
 
+const howItWorks = page.getByTestId("how-it-works-flow");
+const howItWorksFirstStep = howItWorks.getByRole("button").first();
+await howItWorksFirstStep.focus();
+await howItWorksFirstStep.press("End");
+assert.equal(await howItWorks.getAttribute("data-active-step"), "3");
+
+const sourceFlow = page.getByTestId("source-flow");
+const sourceFirstLayer = sourceFlow.getByRole("button").first();
+await sourceFirstLayer.focus();
+await sourceFirstLayer.press("ArrowRight");
+assert.equal(await sourceFlow.getAttribute("data-active-layer"), "2");
+
 const delivery = page
   .getByRole("tablist", { name: "Канал доставки примера" })
   .locator("..");
@@ -151,6 +170,10 @@ await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeig
 const backToTop = page.getByRole("button", { name: "Вернуться наверх" });
 await backToTop.waitFor();
 assert.equal(await backToTop.getAttribute("data-visible"), "true");
+const scrollProgress = await page.locator("[data-scroll-progress]").evaluate((element) =>
+  Number.parseFloat(getComputedStyle(element).getPropertyValue("--scroll-progress")),
+);
+assert.ok(scrollProgress > 0.95, `scroll progress should be near completion, received ${scrollProgress}`);
 await backToTop.click();
 await page.waitForFunction(() => window.scrollY < 4);
 
@@ -178,6 +201,9 @@ assert.equal(await mobileMenuTrigger.getAttribute("aria-expanded"), "true");
 await mobilePage.keyboard.press("Escape");
 assert.equal(await mobileMenuTrigger.getAttribute("aria-expanded"), "false");
 assert.equal(await mobileMenuTrigger.evaluate((element) => element === document.activeElement), true);
+await mobileMenuTrigger.click();
+await mobilePage.locator("main").click({ position: { x: 1, y: 1 } });
+assert.equal(await mobileMenuTrigger.getAttribute("aria-expanded"), "false");
 
 const reducedContext = await browser.newContext({
   viewport: { width: 1024, height: 768 },
@@ -231,6 +257,13 @@ for (const viewport of viewportMatrix) {
   await matrixPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await matrixPage.getByRole("heading", { level: 1 }).waitFor();
   await assertNoHorizontalOverflow(matrixPage, `${viewport.width}x${viewport.height}`);
+  await matrixPage.screenshot({
+    path: path.join(
+      screenshotDirectory,
+      `landing-full-${viewport.width}x${viewport.height}.png`,
+    ),
+    fullPage: true,
+  });
   await context.close();
 }
 
@@ -250,7 +283,7 @@ console.log(
       ok: true,
       baseUrl,
       screenshotDirectory,
-      screenshots: 10,
+      screenshots: 18,
       viewportMatrix: viewportMatrix.map(({ width, height }) => `${width}x${height}`),
       slowPreviewSkeletonObserved: skeletonObserved,
       jsTransfer,
