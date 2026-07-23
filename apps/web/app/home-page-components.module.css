@@ -1163,6 +1163,179 @@
   line-height: 1.55;
 }
 
+.deliveryDemo {
+  grid-template-rows: auto auto minmax(220px, auto) auto auto;
+}
+
+.deliveryMark {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  border-radius: 13px;
+  color: #ffffff !important;
+  background: #174a9f;
+  font-size: 0.72rem !important;
+  font-weight: 850;
+  letter-spacing: -0.02em;
+}
+
+.deliveryTabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 2px;
+  scrollbar-width: thin;
+}
+
+.deliveryTabs button,
+.feedbackChoices button,
+.feedbackReset {
+  min-height: 44px;
+  border: 1px solid rgba(71, 85, 105, 0.16);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--c-text-secondary);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 760;
+  cursor: pointer;
+}
+
+.deliveryTabs button {
+  flex: 0 0 auto;
+  padding: 0 11px;
+}
+
+.deliveryTabs button[aria-selected="true"] {
+  border-color: rgba(37, 99, 235, 0.28);
+  color: #174a9f;
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.deliveryPanel {
+  min-height: 220px;
+  outline: none;
+}
+
+.deliveryPanel:focus-visible,
+.deliveryTabs button:focus-visible,
+.feedbackChoices button:focus-visible,
+.feedbackReset:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.32);
+  outline-offset: 2px;
+}
+
+.botPreview,
+.emailPreview,
+.pushPreview,
+.webhookPreview {
+  box-sizing: border-box;
+  min-height: 220px;
+  margin: 0;
+  padding: 18px;
+  border: 1px solid rgba(20, 40, 72, 0.1);
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 12px 34px rgba(20, 39, 74, 0.07);
+}
+
+.botPreview,
+.emailPreview,
+.pushPreview {
+  display: grid;
+  align-content: center;
+  gap: 10px;
+}
+
+.botPreview span,
+.emailPreview span,
+.pushPreview span {
+  color: var(--c-brand);
+  font-size: 0.7rem;
+  font-weight: 820;
+}
+
+.botPreview h3,
+.emailPreview h3,
+.pushPreview h3,
+.botPreview p,
+.emailPreview p,
+.pushPreview p {
+  margin: 0;
+}
+
+.botPreview h3,
+.emailPreview h3,
+.pushPreview h3 {
+  color: var(--c-text-primary);
+  font-size: 1.05rem;
+}
+
+.botPreview p,
+.emailPreview p,
+.pushPreview p {
+  color: var(--c-text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.emailPreview > strong {
+  justify-self: start;
+  color: #174a9f;
+  font-size: 0.76rem;
+}
+
+.pushPreview {
+  min-height: 150px;
+  margin-block: 35px;
+}
+
+.webhookPreview {
+  overflow: auto;
+  color: #dbeafe;
+  background: #101b2f;
+  font: 0.74rem/1.65 ui-monospace, SFMono-Regular, Consolas, monospace;
+  white-space: pre-wrap;
+}
+
+.feedbackDemo {
+  display: grid;
+  gap: 9px;
+}
+
+.feedbackLabel {
+  color: var(--c-text-primary);
+  font-size: 0.75rem;
+  font-weight: 780;
+}
+
+.feedbackChoices button {
+  padding: 0 11px;
+  color: #2457c5;
+}
+
+.feedbackChoices button[aria-pressed="true"] {
+  border-color: rgba(37, 99, 235, 0.34);
+  color: #123b84;
+  background: rgba(37, 99, 235, 0.12);
+}
+
+.feedbackStatus {
+  min-height: 2.7em;
+  margin: 0;
+  color: var(--c-text-secondary);
+  font-size: 0.74rem;
+  line-height: 1.4;
+}
+
+.feedbackReset {
+  justify-self: start;
+  padding: 0 12px;
+  background: transparent;
+}
+
 /* ── Interactive preview workspace ── */
 .previewWorkspace {
   --preview-surface-padding: 28px;

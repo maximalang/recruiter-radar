@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import Link from "next/link";
 
 import HomePage, { PreviewSection, PreviewSkeleton } from "@/app/page";
+import LandingDeliveryDemo from "@/app/landing-delivery-demo";
 import { NoticeBox, SectionIntro, SurfaceCard } from "@/app/ui/page-primitives";
 import {
   buildCheckoutHref,
@@ -139,6 +140,7 @@ describe("landing section hierarchy", () => {
   it("explains the role and delivery status of every source group", async () => {
     const page = await HomePage({ searchParams: Promise.resolve({}) });
     const pageText = readVisibleText(page);
+    const deliveryMarkup = renderToStaticMarkup(<LandingDeliveryDemo />);
 
     expect(pageText).toContain("Каждый источник отвечает за свою часть доказательства");
     expect(pageText).toContain("Источники клиентской выдачи");
@@ -150,11 +152,11 @@ describe("landing section hierarchy", () => {
     expect(pageText).toContain("Что пока не попадает в клиентскую выдачу");
     expect(pageText).toContain("SuperJob, Хабр Карьера, страницы компаний LinkedIn");
     expect(pageText).toContain("проверки уверенности, качества данных и правомерности доступа");
-    expect(pageText).toContain("Telegram · основной");
-    expect(pageText).toContain("Email");
-    expect(pageText).toContain("Web push");
-    expect(pageText).toContain("VK");
-    expect(pageText).toContain("Webhook");
+    expect(deliveryMarkup).toContain("Telegram");
+    expect(deliveryMarkup).toContain("Email");
+    expect(deliveryMarkup).toContain("Web push");
+    expect(deliveryMarkup).toContain("VK");
+    expect(deliveryMarkup).toContain("Webhook");
   });
 
   it("keeps filter submit and reset actions anchored to the preview", async () => {

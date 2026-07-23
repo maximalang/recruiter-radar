@@ -34,6 +34,7 @@ import {
 } from "./home-page-components";
 import hpStyles from "./home-page-components.module.css";
 import LandingAnalytics from "./landing-analytics";
+import LandingDeliveryDemo from "./landing-delivery-demo";
 import LandingHeader from "./landing-header";
 import LandingPreviewInteractions from "./landing-preview-interactions";
 import RadarCanvas from "./radar-canvas";
@@ -308,30 +309,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             <div className={hpStyles.qualityOutcome}><i aria-hidden="true" /><span><strong>Допущено в радар</strong> — факты и ограничения остаются в карточке.</span></div>
           </article>
 
-          <article className={hpStyles.deliveryCard}>
-            <div className={hpStyles.deliveryTopbar}>
-              <span className={hpStyles.telegramMark} aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none"><path d="M20 4 3.8 10.3c-1.1.4-1.1 1.1-.2 1.4l4.1 1.3 1.6 4.8c.2.6.1.8.8.8.5 0 .8-.2 1-.4l2-1.9 4.2 3.1c.8.4 1.3.2 1.5-.7L21.5 5c.3-1-.4-1.4-1.5-1Z" fill="currentColor" /></svg>
-              </span>
-              <div><strong>Каналы доставки</strong><span>по расписанию профиля</span></div>
-            </div>
-            <div className={hpStyles.deliveryChannels} aria-label="Доступные каналы доставки">
-              <span data-primary="true">Telegram · основной</span>
-              <span>Email</span>
-              <span>Web push</span>
-              <span>VK</span>
-              <span>Webhook</span>
-            </div>
-            <div className={hpStyles.deliveryMessage}>
-              <span className={hpStyles.deliveryKicker}>Утренний радар · 5 компаний</span>
-              <h3>Начните с этого сигнала</h3>
-              <p><strong>Компания из вашего списка</strong> усилила инженерный найм. Уверенность высокая, доступен корпоративный путь контакта.</p>
-              <div className={hpStyles.feedbackChoices} aria-label="Пример обратной связи в Telegram">
-                <span>Беру в работу</span><span>Позже</span><span>Не подходит</span>
-              </div>
-            </div>
-            <p className={hpStyles.deliveryNote}>Радар приходит только в подключённые каналы. Вы решаете, кому писать: продукт не отправляет сообщения компаниям автоматически.</p>
-          </article>
+          <LandingDeliveryDemo />
         </div>
       </ScrollReveal>
 
