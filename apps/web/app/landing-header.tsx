@@ -39,7 +39,11 @@ export default function LandingHeader({ activationHref }: { activationHref: stri
   const closeMenu = () => setMenuOpen(false);
 
   return (
-    <header ref={headerRef} className={hpStyles.topBar}>
+    <header
+      ref={headerRef}
+      className={hpStyles.topBar}
+      data-brand-header="recruiter-radar-v3"
+    >
       <Link
         href="/"
         className={hpStyles.brandMark}

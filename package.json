@@ -118,6 +118,8 @@
     "digest:run": "node packages/db/scripts/report-digest.mjs",
     "lead:generate": "npm run test --workspace @recruiter-radar/web -- --testPathPattern=src/__tests__/scripts/lead-generate.smoke.test.ts",
     "smoke:e2e": "node scripts/smoke-e2e.mjs",
+    "test:landing:e2e": "npm run test:landing:e2e --workspace @recruiter-radar/web",
+    "test:responsive-surfaces": "node scripts/verify-responsive-surfaces.mjs",
     "prepare": "husky"
   },
   "devDependencies": {

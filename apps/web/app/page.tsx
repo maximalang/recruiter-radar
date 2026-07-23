@@ -88,7 +88,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const secondaryPlans = PUBLIC_PLANS.filter((p) => p.code !== "pilot");
 
   return (
-    <PageFrame maxWidth="1160px">
+    <PageFrame maxWidth="1160px" dataDeployAnchor="recruiter-radar-landing-v3">
       <YandexMetrika />
       <LandingAnalytics />
       <LandingDetailsInteractions />

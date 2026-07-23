@@ -2,14 +2,34 @@ name: Tests
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, 'codex/**' ]
   pull_request:
     branches: [ main ]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test:
+  lint-and-types:
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Guard router layout
+        run: npm run guard:router
+      - name: Type check application
+        run: npm run web:check
+      - name: Type check tests
+        run: npm run test:types --workspace @recruiter-radar/web
 
+  unit-tests:
+    runs-on: ubuntu-latest
     services:
       postgres:
         image: postgres:16-alpine
@@ -23,86 +43,159 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
-
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Validate deployment scripts
+        run: bash -n scripts/deploy/configure-notification-encryption.sh
+      - name: Validate database migrations
+        run: DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/test node packages/db/scripts/migrate.mjs
+      - name: Validate database contract
+        env:
+          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+        run: npm run db:validate
+      - name: Run Jest
+        shell: bash
+        run: |
+          set +e
+          npm test --workspace @recruiter-radar/web -- --runInBand > /tmp/jest-output.log 2>&1
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            echo "Jest failed. Showing the final 200 log lines:"
+            tail -n 200 /tmp/jest-output.log
+            exit "$status"
+          fi
+          cat /tmp/jest-output.log
+      - name: Evaluate FIUR quality fixture
+        run: npm run --workspace @recruiter-radar/web quality:evaluate > /tmp/fiur-evaluation.json
+      - name: Verify source readiness contracts
+        env:
+          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+        run: |
+          npm run verify:sources:readiness
+          npm run verify:sources:coverage
+          npm run verify:source:confidence
+      - name: Upload contract reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: contract-reports
+          path: |
+            /tmp/jest-output.log
+            /tmp/fiur-evaluation.json
+          if-no-files-found: warn
+          retention-days: 7
 
-    - name: Validate deployment scripts
-      run: bash -n scripts/deploy/configure-notification-encryption.sh
-
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '22'
-        cache: 'npm'
-
-    - name: Install dependencies
-      run: npm ci
-
-    - name: Guard router layout
-      run: npm run guard:router
-
-    - name: Type check
-      shell: bash
-      run: |
-        set +e
-        npm run web:check > /tmp/tsc-output.log 2>&1
-        status=$?
-        cat /tmp/tsc-output.log
-        exit "$status"
-
-    - name: Validate database migrations
-      run: DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/test node packages/db/scripts/migrate.mjs
-
-    - name: Validate database contract
-      env:
-        DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
-      run: npm run db:validate
-
-    - name: Run tests
-      shell: bash
-      run: |
-        set +e
-        npm run --workspace @recruiter-radar/web test > /tmp/jest-output.log 2>&1
-        status=$?
-        if [ "$status" -ne 0 ]; then
-          echo "Jest failed. Showing the final 200 log lines:"
-          tail -n 200 /tmp/jest-output.log
-          exit "$status"
-        fi
-        cat /tmp/jest-output.log
-
-    - name: Evaluate FIUR quality fixture
-      run: npm run --workspace @recruiter-radar/web quality:evaluate > /tmp/fiur-evaluation.json
-
-    - name: Verify source readiness contracts
-      env:
-        DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
-      run: |
-        npm run verify:sources:readiness
-        npm run verify:sources:coverage
-        npm run verify:source:confidence
-
-    - name: Audit production dependencies
-      run: npm audit --omit=dev --audit-level=high
-
-    - name: Upload verification reports
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: contract-reports
-        path: |
-          /tmp/tsc-output.log
-          /tmp/jest-output.log
-          /tmp/fiur-evaluation.json
-        if-no-files-found: warn
-        retention-days: 7
-
-  build:
-    needs: test
+  web-build:
+    needs: lint-and-types
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' || (github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')))
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build Next.js application
+        run: npm run web:build
+      - name: Upload standalone build
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build-output
+          path: |
+            apps/web/.next/standalone
+            apps/web/.next/static
+            apps/web/public
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
 
+  landing-playwright:
+    needs: web-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      LANDING_BASE_URL: http://127.0.0.1:3000
+      LANDING_SCREENSHOT_DIR: /tmp/recruiter-radar-landing/screenshots
+      LANDING_TRACE_DIR: /tmp/recruiter-radar-landing/traces
+      RESPONSIVE_BASE_URL: http://127.0.0.1:3000
+      RESPONSIVE_ARTIFACT_DIR: /tmp/recruiter-radar-responsive
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Download standalone build
+        uses: actions/download-artifact@v4
+        with:
+          name: web-build-output
+          path: apps/web
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Start production server
+        shell: bash
+        env:
+          PORT: '3000'
+          HOSTNAME: 127.0.0.1
+          MIGRATE_ON_START: 'false'
+          SESSION_SECRET: test-session-secret-at-least-32-chars-long
+          CRON_API_KEY: test-cron-api-key-at-least-32-chars
+          NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
+        run: |
+          node apps/web/.next/standalone/apps/web/server.js > /tmp/landing-server.log 2>&1 &
+          echo "$!" > /tmp/landing-server.pid
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3000/api/health > /dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/landing-server.log
+          exit 1
+      - name: Landing production audit
+        run: npm run test:landing:e2e
+      - name: Responsive surface audit
+        run: npm run test:responsive-surfaces
+      - name: Upload Playwright screenshots and traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: landing-playwright-artifacts
+          path: |
+            /tmp/recruiter-radar-landing
+            /tmp/recruiter-radar-responsive
+            playwright-report
+            test-results
+            /tmp/landing-server.log
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Stop production server
+        if: always()
+        shell: bash
+        run: |
+          if [ -f /tmp/landing-server.pid ]; then
+            kill "$(cat /tmp/landing-server.pid)" 2>/dev/null || true
+          fi
+
+  security-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+  docker-build:
+    needs: [unit-tests, web-build]
+    runs-on: ubuntu-latest
     services:
       postgres:
         image: postgres:16-alpine
@@ -116,67 +209,33 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
-
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: docker build -f apps/web/Dockerfile -t ${{ github.repository }}:${{ github.sha }} .
+      - name: Run container smoke test
+        shell: bash
+        run: |
+          docker run -d --name smoke-test --network host \
+            -e DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/test \
+            -e SESSION_SECRET=test-session-secret-at-least-32-chars-long \
+            -e CRON_API_KEY=test-cron-api-key-at-least-32-chars \
+            -e NEXT_PUBLIC_APP_URL=http://localhost:3000 \
+            -e MIGRATE_ON_START=true \
+            ${{ github.repository }}:${{ github.sha }}
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '22'
-        cache: 'npm'
-
-    - name: Install dependencies
-      run: npm ci
-
-    - name: Build Docker image
-      run: docker build -f apps/web/Dockerfile -t ${{ github.repository }}:latest .
-
-    - name: Run smoke tests
-      run: |
-        DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/test node packages/db/scripts/migrate.mjs
-
-        docker run -d --name smoke-test --network host \
-          -e DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/test \
-          -e SESSION_SECRET=test-session-secret-at-least-32-chars-long \
-          -e CRON_API_KEY=test-cron-api-key-at-least-32-chars \
-          -e NEXT_PUBLIC_APP_URL=http://localhost:3000 \
-          -e MIGRATE_ON_START=false \
-          ${{ github.repository }}:latest
-
-        for i in {1..30}; do
-          if curl -f http://localhost:3000/api/health > /dev/null 2>&1; then
-            echo "Health check passed"
-            break
-          fi
-          if [ "$i" = "30" ]; then
-            echo "Health check timed out"
-            docker logs smoke-test
-            exit 1
-          fi
-          sleep 2
-        done
-
-    - name: Install Playwright Chromium
-      run: npx playwright install --with-deps chromium
-
-    - name: Responsive and accessibility smoke
-      env:
-        RESPONSIVE_BASE_URL: http://localhost:3000
-        RESPONSIVE_ARTIFACT_DIR: /tmp/recruiter-radar-responsive
-      run: node scripts/verify-responsive-surfaces.mjs
-
-    - name: Upload responsive screenshots
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: responsive-surface-audit
-        path: /tmp/recruiter-radar-responsive
-        if-no-files-found: error
-        retention-days: 7
-
-    - name: Cleanup smoke test
-      if: always()
-      run: |
-        docker stop smoke-test || true
-        docker rm smoke-test || true
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:3000/api/health > /dev/null; then
+              exit 0
+            fi
+            if [ "$i" = "30" ]; then
+              docker logs smoke-test
+              exit 1
+            fi
+            sleep 2
+          done
+      - name: Cleanup smoke test
+        if: always()
+        run: |
+          docker stop smoke-test 2>/dev/null || true
+          docker rm smoke-test 2>/dev/null || true
