@@ -16,14 +16,14 @@ export default function LandingCheckoutAnalytics(props: {
   useEffect(() => {
     sendLandingEvent({
       name: LANDING_ANALYTICS_EVENT.checkoutViewed,
-      context: LANDING_ANALYTICS_CONTEXT.checkoutForm,
+      context: LANDING_ANALYTICS_CONTEXT.checkout,
     });
 
     const form = document.querySelector<HTMLFormElement>("[data-checkout-form]");
     if (!form) return;
     const handleSubmit = () => sendLandingEvent({
       name: props.submitEvent,
-      context: LANDING_ANALYTICS_CONTEXT.checkoutForm,
+      context: LANDING_ANALYTICS_CONTEXT.checkout,
     });
     form.addEventListener("submit", handleSubmit);
     return () => form.removeEventListener("submit", handleSubmit);

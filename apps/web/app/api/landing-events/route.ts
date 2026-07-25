@@ -1,4 +1,5 @@
 import { createHmac, randomBytes } from "node:crypto";
+import { isIP } from "node:net";
 
 import { SlidingWindowRateLimiter } from "@/lib/rate-limiter";
 import {
@@ -18,8 +19,13 @@ const GLOBAL_EVENT_RATE_LIMIT = new SlidingWindowRateLimiter({
   maxRequests: 1_000,
   windowMs: 60_000,
 });
+const RATE_LIMIT_RETRY_AFTER_SECONDS = 60;
 const RATE_LIMIT_SECRET =
   process.env.LANDING_ANALYTICS_RATE_LIMIT_SALT?.trim() || randomBytes(32);
+const LOCAL_DEVELOPMENT_ORIGINS = new Set([
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+]);
 
 type LandingEventPayload = {
   name: LandingAnalyticsEventName;
@@ -27,51 +33,84 @@ type LandingEventPayload = {
   timestamp?: number;
 };
 
-function jsonError(status: number, error: string): Response {
-  return Response.json({ error }, { status });
+function jsonError(
+  status: number,
+  error: string,
+  headers?: HeadersInit,
+): Response {
+  return Response.json({ error }, { status, headers });
 }
 
-function isSameOriginRequest(request: Request): boolean {
-  const internalUrl = new URL(request.url);
-  const host =
-    request.headers.get("host")?.trim().toLowerCase() ||
-    internalUrl.host.toLowerCase();
-  const origin = request.headers.get("origin");
-  if (origin) {
-    const forwardedProtocol = request.headers
-      .get("x-forwarded-proto")
-      ?.split(",", 1)[0]
-      ?.trim()
-      .toLowerCase();
-    const protocol =
-      forwardedProtocol === "http" || forwardedProtocol === "https"
-        ? forwardedProtocol
-        : internalUrl.protocol.slice(0, -1);
-    try {
-      return new URL(origin).origin.toLowerCase() === `${protocol}://${host}`;
-    } catch {
-      return false;
+function normalizeOrigin(
+  rawOrigin: string | null | undefined,
+  nodeEnvironment: string | undefined,
+): string | null {
+  if (!rawOrigin) return null;
+
+  try {
+    const url = new URL(rawOrigin.trim());
+    if (
+      !["http:", "https:"].includes(url.protocol) ||
+      url.username ||
+      url.password ||
+      url.pathname !== "/" ||
+      url.search ||
+      url.hash
+    ) {
+      return null;
     }
+    if (nodeEnvironment === "production" && url.protocol !== "https:") {
+      return null;
+    }
+    return url.origin.toLowerCase();
+  } catch {
+    return null;
   }
-
-  const fetchSite = request.headers.get("sec-fetch-site");
-  return fetchSite === "same-origin" || fetchSite === "none";
 }
 
-function normalizeClientIp(request: Request): string {
-  const forwarded = request.headers.get("x-forwarded-for")?.split(",", 1)[0]?.trim();
-  const direct = request.headers.get("x-real-ip")?.trim();
-  const candidate = (forwarded || direct || "unknown").toLowerCase();
+export function isAllowedLandingOrigin(
+  requestOrigin: string | null,
+  options: {
+    configuredOrigin?: string;
+    nodeEnvironment?: string;
+  } = {},
+): boolean {
+  const nodeEnvironment = options.nodeEnvironment ?? process.env.NODE_ENV;
+  const origin = normalizeOrigin(requestOrigin, nodeEnvironment);
+  if (!origin) return false;
+
+  const configuredOrigin = normalizeOrigin(
+    options.configuredOrigin ?? process.env.PUBLIC_APP_ORIGIN,
+    nodeEnvironment,
+  );
+  if (configuredOrigin && origin === configuredOrigin) return true;
+
+  return (
+    nodeEnvironment !== "production" &&
+    LOCAL_DEVELOPMENT_ORIGINS.has(origin)
+  );
+}
+
+export async function resetLandingEventRateLimitsForTests(): Promise<void> {
+  if (process.env.NODE_ENV !== "test") return;
+  await Promise.all([
+    CLIENT_EVENT_RATE_LIMIT.reset(),
+    GLOBAL_EVENT_RATE_LIMIT.reset(),
+  ]);
+}
+
+function normalizeClientIp(request: Request): string | null {
+  const candidate = request.headers.get("x-real-ip")?.trim().toLowerCase() ?? "";
   const normalized = candidate
     .replace(/^\[([0-9a-f:]+)\](?::\d+)?$/i, "$1")
     .replace(/^::ffff:/, "");
-  return normalized.slice(0, 128) || "unknown";
+  return isIP(normalized) ? normalized : null;
 }
 
-function getEphemeralClientKey(request: Request): string {
+function getEphemeralClientKey(normalizedIp: string): string {
   const dayBucket = new Date().toISOString().slice(0, 10);
   return createHmac("sha256", RATE_LIMIT_SECRET)
-    .update(`${dayBucket}\0${normalizeClientIp(request)}`)
+    .update(`${dayBucket}\0${normalizedIp}`)
     .digest("hex");
 }
 
@@ -111,7 +150,9 @@ function parseLandingEvent(value: unknown): LandingEventPayload | null {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  if (!isSameOriginRequest(request)) return jsonError(403, "Forbidden");
+  if (!isAllowedLandingOrigin(request.headers.get("origin"))) {
+    return jsonError(403, "Forbidden");
+  }
 
   const contentType = request.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
   if (contentType !== "application/json") {
@@ -123,12 +164,18 @@ export async function POST(request: Request): Promise<Response> {
     return jsonError(413, "Payload too large");
   }
 
-  const clientKey = getEphemeralClientKey(request);
+  const normalizedIp = normalizeClientIp(request);
+  if (!normalizedIp) return jsonError(403, "Forbidden");
+  const clientKey = getEphemeralClientKey(normalizedIp);
   if (!(await CLIENT_EVENT_RATE_LIMIT.isAllowed(`landing-events:client:${clientKey}`))) {
-    return jsonError(429, "Too many requests");
+    return jsonError(429, "Too many requests", {
+      "retry-after": String(RATE_LIMIT_RETRY_AFTER_SECONDS),
+    });
   }
   if (!(await GLOBAL_EVENT_RATE_LIMIT.isAllowed("landing-events:global"))) {
-    return jsonError(429, "Too many requests");
+    return jsonError(429, "Too many requests", {
+      "retry-after": String(RATE_LIMIT_RETRY_AFTER_SECONDS),
+    });
   }
 
   const body = await request.text();

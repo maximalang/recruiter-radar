@@ -33,13 +33,14 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Validate deployment scripts
-        run: bash -n scripts/deploy/configure-notification-encryption.sh
+        run: |
+          bash -n scripts/deploy/configure-notification-encryption.sh
+          bash -n scripts/deploy/configure-caddy-real-ip.sh
 
       - name: Build immutable Docker image
         run: |
           docker build \
             --build-arg NEXT_PUBLIC_YANDEX_METRIKA_ID="${{ vars.NEXT_PUBLIC_YANDEX_METRIKA_ID }}" \
-            --build-arg NEXT_PUBLIC_LANDING_ANALYTICS_ENDPOINT="${{ vars.NEXT_PUBLIC_LANDING_ANALYTICS_ENDPOINT }}" \
             -f apps/web/Dockerfile \
             -t "recruiter-radar:${DEPLOY_SHA}" .
 
@@ -63,6 +64,9 @@ jobs:
           scp -P ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
             scripts/deploy/configure-notification-encryption.sh \
             ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}:/opt/recruiter-radar/configure-notification-encryption.sh
+          scp -P ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
+            scripts/deploy/configure-caddy-real-ip.sh \
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}:/opt/recruiter-radar/configure-caddy-real-ip.sh
 
       - name: Deploy image with local rollback
         id: deploy
@@ -72,6 +76,8 @@ jobs:
             "DEPLOY_SHA='${DEPLOY_SHA}' bash -s" << 'SSH_EOF'
           set -euo pipefail
           cd /opt/recruiter-radar
+          chmod 700 /opt/recruiter-radar/configure-caddy-real-ip.sh
+          /opt/recruiter-radar/configure-caddy-real-ip.sh
 
           cleanup_tarball() {
             rm -f /opt/recruiter-radar/image-new.tar.gz

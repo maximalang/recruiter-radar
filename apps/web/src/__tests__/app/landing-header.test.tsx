@@ -32,7 +32,7 @@ describe("landing header accessibility", () => {
   function renderHeader(children?: React.ReactNode) {
     return render(
       <LandingMotionProvider>
-        <LandingHeader activationHref="/checkout?plan=pilot" />
+        <LandingHeader previewHref="#preview-configurator" />
         {children}
       </LandingMotionProvider>,
     );
@@ -43,8 +43,12 @@ describe("landing header accessibility", () => {
 
     expect(screen.getByRole("link", { name: "Попробовать неделю" })).toHaveAttribute(
       "href",
-      "/checkout?plan=pilot",
+      "#preview-configurator",
     );
+    expect(screen.getByRole("link", { name: "Попробовать неделю" }))
+      .toHaveAttribute("data-analytics-event", "preview_started");
+    expect(screen.getByRole("link", { name: "Попробовать неделю" }))
+      .toHaveAttribute("data-analytics-context", "header");
     expect(screen.getByRole("link", { name: "Войти" })).toHaveAttribute(
       "href",
       "/dashboard",

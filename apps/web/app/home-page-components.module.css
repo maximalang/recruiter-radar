@@ -2279,10 +2279,12 @@
 
 .fiurPopover {
   position: relative;
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px;
   align-items: center;
+  width: 100%;
   min-width: 0;
-  gap: 6px;
+  gap: 8px;
   color: #aebbc9;
 }
 
@@ -2306,24 +2308,39 @@
   height: 44px;
   flex: 0 0 auto;
   padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #b8c7d8;
+  cursor: help;
+}
+
+.fiurPopoverTriggerVisual {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
   border: 1px solid rgba(174, 187, 201, 0.28);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.04);
-  color: #b8c7d8;
   font: 700 0.68rem/1 system-ui, sans-serif;
-  cursor: help;
 }
 
 .fiurPopoverTrigger:hover,
 .fiurPopoverTrigger:focus-visible,
 .fiurPopoverTrigger[aria-expanded="true"] {
-  border-color: rgba(143, 193, 232, 0.6);
   color: #dbeafe;
   outline: none;
 }
 
+.fiurPopoverTrigger:hover .fiurPopoverTriggerVisual,
+.fiurPopoverTrigger:focus-visible .fiurPopoverTriggerVisual,
+.fiurPopoverTrigger[aria-expanded="true"] .fiurPopoverTriggerVisual {
+  border-color: rgba(143, 193, 232, 0.6);
+}
+
 .fiurPopoverTrigger:focus-visible {
-  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.34);
+  box-shadow: inset 0 0 0 2px rgba(96, 165, 250, 0.42);
 }
 
 .fiurPopoverBody {

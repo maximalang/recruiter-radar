@@ -9,9 +9,21 @@ describe("landing analytics contract", () => {
   it("shares strict event and context allowlists with runtime guards", () => {
     expect(isLandingAnalyticsEventName(LANDING_ANALYTICS_EVENT.previewGenerated)).toBe(true);
     expect(isLandingAnalyticsEventName(LANDING_ANALYTICS_EVENT.paymentSucceeded)).toBe(true);
+    expect(LANDING_ANALYTICS_EVENT.previewResultsClicked).toBe("preview_results_clicked");
+    expect(LANDING_ANALYTICS_EVENT.checkoutStarted).toBe("checkout_started");
+    expect(LANDING_ANALYTICS_EVENT.continuationCtaClicked).toBe("continuation_cta_clicked");
+    expect(isLandingAnalyticsEventName("pilot_cta_clicked")).toBe(false);
+    expect(isLandingAnalyticsEventName("closing_cta_clicked")).toBe(false);
+    expect(isLandingAnalyticsEventName("preview_checkout_clicked")).toBe(false);
     expect(isLandingAnalyticsEventName("email_captured")).toBe(false);
 
     expect(isLandingAnalyticsContext(LANDING_ANALYTICS_CONTEXT.motionControl)).toBe(true);
-    expect(isLandingAnalyticsContext("motion_control")).toBe(false);
+    expect(LANDING_ANALYTICS_CONTEXT.heroPrimary).toBe("hero_primary");
+    expect(LANDING_ANALYTICS_CONTEXT.heroSecondary).toBe("hero_secondary");
+    expect(LANDING_ANALYTICS_CONTEXT.pricingPilot).toBe("pricing_pilot");
+    expect(LANDING_ANALYTICS_CONTEXT.form).toBe("form");
+    expect(LANDING_ANALYTICS_CONTEXT.monthly).toBe("monthly");
+    expect(LANDING_ANALYTICS_CONTEXT.quarterly).toBe("quarterly");
+    expect(isLandingAnalyticsContext("raw_form_value")).toBe(false);
   });
 });

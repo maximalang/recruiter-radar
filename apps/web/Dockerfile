@@ -4,9 +4,7 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 
 ARG NEXT_PUBLIC_YANDEX_METRIKA_ID=""
-ARG NEXT_PUBLIC_LANDING_ANALYTICS_ENDPOINT=""
 ENV NEXT_PUBLIC_YANDEX_METRIKA_ID=$NEXT_PUBLIC_YANDEX_METRIKA_ID
-ENV NEXT_PUBLIC_LANDING_ANALYTICS_ENDPOINT=$NEXT_PUBLIC_LANDING_ANALYTICS_ENDPOINT
 
 # Copy package files for better layer caching
 COPY package*.json ./
@@ -66,5 +64,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 # Start the application (via entrypoint that runs migrations first)
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
+ENV PUBLIC_APP_ORIGIN="https://recruiter-radar.ru"
 
 CMD ["./docker-entrypoint.sh"]

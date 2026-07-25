@@ -1,6 +1,10 @@
 /** @jest-environment node */
 
-import { POST } from "@/app/api/landing-events/route";
+import {
+  POST,
+  isAllowedLandingOrigin,
+  resetLandingEventRateLimitsForTests,
+} from "@/app/api/landing-events/route";
 import { tryRecordProductEvent } from "@/lib/telemetry";
 
 jest.mock("@/lib/telemetry", () => ({
@@ -18,6 +22,7 @@ function request(body: string, headers: Record<string, string> = {}) {
     headers: {
       "content-type": "application/json",
       origin: "https://recruiter-radar.ru",
+      "x-real-ip": "203.0.113.10",
       ...headers,
     },
     body,
@@ -25,28 +30,53 @@ function request(body: string, headers: Record<string, string> = {}) {
 }
 
 describe("POST /api/landing-events", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    process.env.PUBLIC_APP_ORIGIN = "https://recruiter-radar.ru/";
     mockTryRecordProductEvent.mockClear();
+    await resetLandingEventRateLimitsForTests();
+  });
+
+  it("allows only canonical HTTPS in production and explicit localhost in test", () => {
+    expect(isAllowedLandingOrigin("https://recruiter-radar.ru", {
+      configuredOrigin: "https://recruiter-radar.ru/",
+      nodeEnvironment: "production",
+    })).toBe(true);
+    expect(isAllowedLandingOrigin("http://recruiter-radar.ru", {
+      configuredOrigin: "http://recruiter-radar.ru",
+      nodeEnvironment: "production",
+    })).toBe(false);
+    expect(isAllowedLandingOrigin("http://localhost:3000", {
+      configuredOrigin: "https://recruiter-radar.ru",
+      nodeEnvironment: "production",
+    })).toBe(false);
+    expect(isAllowedLandingOrigin("http://localhost:3000", {
+      configuredOrigin: "https://recruiter-radar.ru",
+      nodeEnvironment: "test",
+    })).toBe(true);
+    expect(isAllowedLandingOrigin("https://recruiter-radar.ru/path", {
+      configuredOrigin: "https://recruiter-radar.ru",
+      nodeEnvironment: "production",
+    })).toBe(false);
   });
 
   it("persists an allowlisted, privacy-bounded event and returns 204", async () => {
     const response = await POST(request(JSON.stringify({
       name: "preview_started",
-      context: "preview-form",
+      context: "form",
       timestamp: Date.now(),
     })));
 
     expect(response.status).toBe(204);
     expect(mockTryRecordProductEvent).toHaveBeenCalledWith(expect.objectContaining({
       eventName: "preview_started",
-      metadata: { context: "preview-form" },
+      metadata: { context: "form" },
     }));
   });
 
   it("accepts the canonical motion-control context", async () => {
     const response = await POST(request(JSON.stringify({
       name: "motion_paused",
-      context: "motion-control",
+      context: "motion_control",
     })));
 
     expect(response.status).toBe(204);
@@ -81,45 +111,98 @@ describe("POST /api/landing-events", () => {
     await expect(malformed.text()).resolves.not.toContain("SyntaxError");
   });
 
-  it("requires JSON and rejects a forged Host even with a matching Origin", async () => {
+  it("uses configured canonical origin instead of trusting Host", async () => {
     const wrongType = await POST(request(
       JSON.stringify({ name: "landing_viewed" }),
       { "content-type": "text/plain" },
     ));
-    const forgedHost = await POST(request(
+    const canonicalOriginWithForgedHost = await POST(request(
       JSON.stringify({ name: "landing_viewed" }),
       { host: "attacker.example" },
     ));
+    const forgedHostAndOrigin = await POST(request(
+      JSON.stringify({ name: "landing_viewed" }),
+      {
+        host: "attacker.example",
+        origin: "https://attacker.example",
+      },
+    ));
 
     expect(wrongType.status).toBe(415);
-    expect(forgedHost.status).toBe(403);
-    expect(mockTryRecordProductEvent).not.toHaveBeenCalled();
+    expect(canonicalOriginWithForgedHost.status).toBe(204);
+    expect(forgedHostAndOrigin.status).toBe(403);
   });
 
-  it("limits each ephemeral client independently without persisting the raw IP", async () => {
+  it("rejects malformed and missing Origin headers", async () => {
+    const malformedOrigin = await POST(request(
+      JSON.stringify({ name: "landing_viewed" }),
+      { origin: "not a url" },
+    ));
+    const missingOriginHeaders = new Headers({
+      "content-type": "application/json",
+      "x-real-ip": "203.0.113.11",
+    });
+    const missingOrigin = await POST(new Request(
+      "https://recruiter-radar.ru/api/landing-events",
+      {
+        method: "POST",
+        headers: missingOriginHeaders,
+        body: JSON.stringify({ name: "landing_viewed" }),
+      },
+    ));
+
+    expect(malformedOrigin.status).toBe(403);
+    expect(missingOrigin.status).toBe(403);
+  });
+
+  it("uses trusted X-Real-IP for independent buckets and ignores forged X-Forwarded-For", async () => {
     const body = JSON.stringify({ name: "landing_viewed" });
     const limitedIp = "203.0.113.71";
 
     for (let index = 0; index < 30; index += 1) {
-      const response = await POST(request(body, { "x-forwarded-for": limitedIp }));
+      const response = await POST(request(body, {
+        "x-real-ip": limitedIp,
+        "x-forwarded-for": `198.51.100.${index + 1}`,
+      }));
       expect(response.status).toBe(204);
     }
 
-    const rejected = await POST(request(body, { "x-forwarded-for": limitedIp }));
-    const otherClient = await POST(request(body, { "x-forwarded-for": "203.0.113.72" }));
+    const rejected = await POST(request(body, {
+      "x-real-ip": limitedIp,
+      "x-forwarded-for": "192.0.2.250",
+    }));
+    const otherClient = await POST(request(body, {
+      "x-real-ip": "203.0.113.72",
+      "x-forwarded-for": "192.0.2.250",
+    }));
 
     expect(rejected.status).toBe(429);
+    expect(rejected.headers.get("retry-after")).toBe("60");
     expect(otherClient.status).toBe(204);
     expect(JSON.stringify(mockTryRecordProductEvent.mock.calls)).not.toContain(limitedIp);
   });
 
-  it("still accepts a same-origin request when proxy IP headers are absent", async () => {
-    const response = await POST(request(JSON.stringify({ name: "landing_viewed" })));
+  it("rejects missing or malformed trusted proxy IP headers", async () => {
+    const body = JSON.stringify({ name: "landing_viewed" });
+    const missingIp = await POST(new Request(
+      "https://recruiter-radar.ru/api/landing-events",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: "https://recruiter-radar.ru",
+        },
+        body,
+      },
+    ));
+    const malformedIp = await POST(request(body, { "x-real-ip": "not-an-ip" }));
 
-    expect(response.status).toBe(204);
+    expect(missingIp.status).toBe(403);
+    expect(malformedIp.status).toBe(403);
+    expect(mockTryRecordProductEvent).not.toHaveBeenCalled();
   });
 
-  it("accepts the external same origin when standalone rewrites the internal URL", async () => {
+  it("accepts the configured external origin when standalone uses an internal URL", async () => {
     const response = await POST(new Request(
       "http://127.0.0.1:3000/api/landing-events",
       {
@@ -129,11 +212,30 @@ describe("POST /api/landing-events", () => {
           host: "recruiter-radar.ru",
           origin: "https://recruiter-radar.ru",
           "x-forwarded-proto": "https",
+          "x-real-ip": "203.0.113.80",
         },
         body: JSON.stringify({ name: "landing_viewed" }),
       },
     ));
 
     expect(response.status).toBe(204);
+  });
+
+  it("enforces the global emergency limit separately from per-client limits", async () => {
+    const body = JSON.stringify({ name: "landing_viewed" });
+    for (let index = 0; index < 1_000; index += 1) {
+      const thirdOctet = Math.floor(index / 250);
+      const fourthOctet = (index % 250) + 1;
+      const response = await POST(request(body, {
+        "x-real-ip": `198.18.${thirdOctet}.${fourthOctet}`,
+      }));
+      expect(response.status).toBe(204);
+    }
+
+    const rejected = await POST(request(body, {
+      "x-real-ip": "198.19.0.1",
+    }));
+    expect(rejected.status).toBe(429);
+    expect(rejected.headers.get("retry-after")).toBe("60");
   });
 });

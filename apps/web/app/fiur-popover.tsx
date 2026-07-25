@@ -60,7 +60,9 @@ export default function FiurPopover(props: {
         onFocus={() => setOpen(true)}
         onClick={() => setOpen(true)}
       >
-        i
+        <span className={hpStyles.fiurPopoverTriggerVisual} aria-hidden="true">
+          i
+        </span>
       </button>
       {open ? (
         <span id={tooltipId} className={hpStyles.fiurPopoverBody} role="tooltip">

@@ -1,7 +1,9 @@
 interface Window {
-  ym?: (
+  ym?: ((
     counterId: number,
     method: "init" | "reachGoal" | string,
     ...args: unknown[]
-  ) => void;
+  ) => void) & {
+    a?: unknown[][];
+  };
 }

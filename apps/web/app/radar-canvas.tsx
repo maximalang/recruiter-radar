@@ -144,6 +144,7 @@ export default function RadarCanvas() {
       if (!ctx) return;
       const cx = cxRef.current;
       const cy = cyRef.current;
+      const showLabels = width >= 720;
       for (const b of blips) {
         const x = cx + Math.cos(b.angle) * b.radius;
         const y = cy + Math.sin(b.angle) * b.radius;
@@ -164,7 +165,7 @@ export default function RadarCanvas() {
         ctx.arc(x, y, 2.6, 0, Math.PI * 2);
         ctx.fill();
         // label when freshly lit
-        if (b.lit > 0.5) {
+        if (showLabels && b.lit > 0.5) {
           ctx.fillStyle = `rgba(219, 234, 254, ${b.lit})`;
           ctx.font = "600 11px Inter, system-ui, sans-serif";
           ctx.fillText(b.label, x + 8, y + 4);

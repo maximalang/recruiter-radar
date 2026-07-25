@@ -52,9 +52,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Validate deployment scripts
-        run: bash -n scripts/deploy/configure-notification-encryption.sh
+        run: |
+          bash -n scripts/deploy/configure-notification-encryption.sh
+          bash -n scripts/deploy/configure-caddy-real-ip.sh
       - name: Validate database migrations
         run: DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/test node packages/db/scripts/migrate.mjs
+      - name: Verify payment success telemetry transitions
+        env:
+          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+        run: npm run test:payment-telemetry:db
       - name: Validate database contract
         env:
           DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
@@ -103,6 +109,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Build Next.js application
+        env:
+          NEXT_PUBLIC_YANDEX_METRIKA_ID: '12345678'
         run: npm run web:build
       - name: Upload standalone build
         uses: actions/upload-artifact@v4
@@ -121,11 +129,27 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
       LANDING_BASE_URL: http://127.0.0.1:3000
+      LANDING_E2E_ALLOW_DB_FIXTURES: 'true'
       LANDING_SCREENSHOT_DIR: /tmp/recruiter-radar-landing/screenshots
       LANDING_TRACE_DIR: /tmp/recruiter-radar-landing/traces
       RESPONSIVE_BASE_URL: http://127.0.0.1:3000
       RESPONSIVE_ARTIFACT_DIR: /tmp/recruiter-radar-responsive
+      SESSION_SECRET: test-session-secret-at-least-32-chars-long
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -134,6 +158,8 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Apply database migrations
+        run: node packages/db/scripts/migrate.mjs
       - name: Download standalone build
         uses: actions/download-artifact@v4
         with:
@@ -149,7 +175,6 @@ jobs:
           PORT: '3000'
           HOSTNAME: 127.0.0.1
           MIGRATE_ON_START: 'false'
-          SESSION_SECRET: test-session-secret-at-least-32-chars-long
           CRON_API_KEY: test-cron-api-key-at-least-32-chars
           NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
         run: |

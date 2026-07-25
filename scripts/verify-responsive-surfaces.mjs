@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 
-const baseUrl = (process.env.RESPONSIVE_BASE_URL ?? 'http://localhost:3000').replace(/\/+$/, '');
+const baseUrl = (process.env.RESPONSIVE_BASE_URL ?? 'http://127.0.0.1:3000').replace(/\/+$/, '');
 const outputDir = path.resolve(process.env.RESPONSIVE_ARTIFACT_DIR ?? '/tmp/recruiter-radar-responsive');
 const routes = [
   '/',
@@ -34,6 +34,12 @@ let failed = false;
 try {
   for (const viewport of viewports) {
     const context = await browser.newContext({ viewport });
+    await context.route('https://mc.yandex.ru/**', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/javascript', body: '' }),
+    );
+    await context.route('**/api/landing-events', (route) =>
+      route.fulfill({ status: 204, body: '' }),
+    );
     for (const route of routes) {
       const page = await context.newPage();
       const consoleErrors = [];

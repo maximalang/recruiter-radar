@@ -53,6 +53,7 @@ import RadarCanvas from "./radar-canvas";
 import ScrollReveal from "./scroll-reveal";
 import ScrollProgress from "./scroll-progress";
 import LandingSourceArchitecture from "./landing-source-architecture";
+import YandexMetrika from "./yandex-metrika";
 import { SiteFooter } from "./ui/site-footer";
 
 export const dynamic = "force-dynamic";
@@ -97,6 +98,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   return (
     <PageFrame maxWidth="1160px" dataDeployAnchor="recruiter-radar-landing-v3">
       <LandingMotionProvider>
+      <YandexMetrika pathname="/" />
       <LandingAnalytics />
       <LandingDetailsInteractions />
       <ScrollProgress />
@@ -142,8 +144,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               <a
                 href="#preview-results"
                 className={hpStyles.heroSecondaryCta}
-                data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
-                data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroResults}
+                data-analytics-event={LANDING_ANALYTICS_EVENT.previewResultsClicked}
+                data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroSecondary}
               >
                 Посмотреть результат
               </a>
@@ -204,7 +206,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         </div>
       </section>
 
-      <LandingHeader activationHref={checkoutHref} />
+      <LandingHeader previewHref="#preview-configurator" />
 
       {/* Problem — why this radar exists */}
       <ScrollReveal as="section" className={`${hpStyles.scrollSection} ${hpStyles.problemSection}`}>
@@ -313,8 +315,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             <Link
               href={buildCheckoutHref({ ...previewInput, planCode: pilotPlan.code })}
               className={`${ppStyles.primaryAction} ${hpStyles.planCta}`}
-              data-analytics-event={LANDING_ANALYTICS_EVENT.pilotCtaClicked}
-              data-analytics-context={LANDING_ANALYTICS_CONTEXT.pricing}
+              data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
+              data-analytics-context={LANDING_ANALYTICS_CONTEXT.pricingPilot}
             >
               {pilotPlan.ctaLabel}
             </Link>
@@ -354,8 +356,12 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                   <Link
                     href={buildCheckoutHref({ ...previewInput, planCode: plan.code })}
                     className={`${ppStyles.secondaryAction} ${hpStyles.planCta}`}
-                    data-analytics-event={LANDING_ANALYTICS_EVENT.continuationRequested}
-                    data-analytics-context={LANDING_ANALYTICS_CONTEXT.pricing}
+                    data-analytics-event={LANDING_ANALYTICS_EVENT.continuationCtaClicked}
+                    data-analytics-context={
+                      isQuarterly
+                        ? LANDING_ANALYTICS_CONTEXT.quarterly
+                        : LANDING_ANALYTICS_CONTEXT.monthly
+                    }
                   >
                     {plan.ctaLabel}
                   </Link>
@@ -415,7 +421,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           <Link
             href={checkoutHref}
             className={hpStyles.heroCta}
-            data-analytics-event={LANDING_ANALYTICS_EVENT.closingCtaClicked}
+            data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.closing}
           >
             Активировать неделю — 2 990 ₽
@@ -621,7 +627,7 @@ export async function PreviewSection(props: {
           <Link
             href={checkoutHref}
             className={ppStyles.primaryAction}
-            data-analytics-event={LANDING_ANALYTICS_EVENT.previewCheckoutClicked}
+            data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.preview}
           >
             {previewState.items.length > 0

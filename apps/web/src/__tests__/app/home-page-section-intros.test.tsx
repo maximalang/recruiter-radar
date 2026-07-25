@@ -158,13 +158,18 @@ describe("landing section hierarchy", () => {
     expect(heroPrimary?.props["data-analytics-context"])
       .toBe(LANDING_ANALYTICS_CONTEXT.heroPrimary);
     expect(heroResults?.props["data-analytics-context"])
-      .toBe(LANDING_ANALYTICS_CONTEXT.heroResults);
+      .toBe(LANDING_ANALYTICS_CONTEXT.heroSecondary);
+    expect(heroResults?.props["data-analytics-event"])
+      .toBe(LANDING_ANALYTICS_EVENT.previewResultsClicked);
     expect(trackedLinks.some((link) =>
-      link.props["data-analytics-event"] === LANDING_ANALYTICS_EVENT.pilotCtaClicked
+      link.props["data-analytics-event"] === LANDING_ANALYTICS_EVENT.checkoutStarted
+    )).toBe(true);
+    expect(trackedLinks.some((link) =>
+      link.props["data-analytics-event"] === LANDING_ANALYTICS_EVENT.continuationCtaClicked
     )).toBe(true);
     expect(trackedLinks.some((link) =>
       link.props["data-analytics-event"] === LANDING_ANALYTICS_EVENT.continuationRequested
-    )).toBe(true);
+    )).toBe(false);
     expect(trackedLinks.some((link) =>
       link.props["data-analytics-event"] === LANDING_ANALYTICS_EVENT.paymentStarted
     )).toBe(false);

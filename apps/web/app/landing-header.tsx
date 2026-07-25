@@ -19,7 +19,7 @@ const NAV_ITEMS = [
   { id: "faq", label: "FAQ" },
 ] as const;
 
-export default function LandingHeader({ activationHref }: { activationHref: string }) {
+export default function LandingHeader({ previewHref }: { previewHref: string }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const headerRef = useRef<HTMLElement | null>(null);
@@ -113,9 +113,9 @@ export default function LandingHeader({ activationHref }: { activationHref: stri
           <LandingMotionPreference />
           <Link href="/dashboard" className={hpStyles.topNavLogin}>Войти</Link>
           <Link
-            href={activationHref}
+            href={previewHref}
             className={hpStyles.topNavCta}
-            data-analytics-event={LANDING_ANALYTICS_EVENT.pilotCtaClicked}
+            data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.header}
           >
             Попробовать неделю
@@ -154,9 +154,9 @@ export default function LandingHeader({ activationHref }: { activationHref: stri
         ))}
         <Link href="/dashboard" onClick={() => setMenuOpen(false)}>Войти</Link>
         <Link
-          href={activationHref}
+          href={previewHref}
           className={hpStyles.mobileMenuActivation}
-          data-analytics-event={LANDING_ANALYTICS_EVENT.pilotCtaClicked}
+          data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
           data-analytics-context={LANDING_ANALYTICS_CONTEXT.header}
           onClick={() => setMenuOpen(false)}
         >

@@ -57,7 +57,7 @@ export default function LandingPreviewInteractions() {
       controls.submit.disabled = true;
       controls.idleLabel.hidden = true;
       controls.busyLabel.hidden = false;
-      emitPreviewStarted(LANDING_ANALYTICS_CONTEXT.previewForm);
+      emitPreviewStarted(LANDING_ANALYTICS_CONTEXT.form);
     };
 
     const handlePresetClick = (event: Event) => {
