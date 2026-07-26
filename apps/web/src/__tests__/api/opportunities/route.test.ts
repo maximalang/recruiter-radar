@@ -74,6 +74,7 @@ describe('opportunities API', () => {
     expect(response.status).toBe(200)
     expect(mockedList).toHaveBeenCalledWith(expect.objectContaining({
       ownerId: '7',
+      morningBriefOnly: true,
       clientProfileId: '8',
       statuses: ['new'],
       confidenceGate: 'A',

@@ -65,6 +65,7 @@ describe('opportunity engine migration contract', () => {
     expect(migration).toContain('hiring_episodes_active_last_seen_idx')
     expect(migration).toContain('opportunities_owner_status_score_idx')
     expect(migration).toContain('opportunities_episode_idx')
+    expect(migration).toContain('digest_candidates_client_profile_org_created_idx')
     expect(migration).not.toMatch(/INSERT\s+INTO\s+(hiring_episodes|opportunities)/i)
     expect(migration).not.toMatch(/ALTER\s+TYPE\s+signal_kind/i)
   })

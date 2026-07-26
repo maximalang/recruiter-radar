@@ -73,6 +73,7 @@ export interface OpportunityEvidenceItem {
 export interface OpportunityListInput {
   ownerId: string | number
   clientProfileId?: string | null
+  morningBriefOnly?: boolean
   statuses?: OpportunityStatus[]
   minimumScore?: number | null
   confidenceGate?: ConfidenceGate | null
@@ -100,6 +101,9 @@ export async function listOpportunities(
   const params: unknown[] = [String(input.ownerId)]
   const clauses = ['o.owner_id = $1']
 
+  if (input.morningBriefOnly) {
+    clauses.push(`o.metadata->>'morningBriefEligible' = 'true'`)
+  }
   if (input.clientProfileId) {
     params.push(input.clientProfileId)
     clauses.push(`o.client_profile_id = $${params.length}`)

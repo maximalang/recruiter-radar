@@ -243,6 +243,14 @@ CREATE INDEX opportunities_valid_until_idx
 CREATE INDEX opportunity_actions_owner_created_idx
   ON opportunity_actions (owner_id, created_at DESC, id DESC);
 
+CREATE INDEX digest_candidates_client_profile_org_created_idx
+  ON digest_candidates (
+    client_profile_id,
+    org_id,
+    created_at DESC,
+    id DESC
+  );
+
 CREATE TRIGGER hiring_episodes_set_updated_at
 BEFORE UPDATE ON hiring_episodes
 FOR EACH ROW

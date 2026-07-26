@@ -43,6 +43,7 @@ describe('opportunity repository tenant scope', () => {
     const result = await listOpportunities(
       {
         ownerId: '7',
+        morningBriefOnly: true,
         statuses: ['new'],
         confidenceGate: 'A',
         minimumScore: 0.5,
@@ -55,6 +56,12 @@ describe('opportunity repository tenant scope', () => {
     expect(calls[0].sql).toContain('o.owner_id = $1')
     expect(calls[1].sql).toContain('o.owner_id = $1')
     expect(calls[2].sql).toContain('o.owner_id = $1')
+    expect(calls[0].sql).toContain(
+      `o.metadata->>'morningBriefEligible' = 'true'`,
+    )
+    expect(calls[1].sql).toContain(
+      `o.metadata->>'morningBriefEligible' = 'true'`,
+    )
     expect(calls[0].params?.[0]).toBe('7')
     expect(calls[2].params?.[0]).toBe('7')
   })

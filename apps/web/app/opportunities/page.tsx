@@ -59,6 +59,7 @@ export default async function OpportunitiesPage(props: {
   try {
     result = await listOpportunities({
       ownerId,
+      morningBriefOnly: true,
       statuses,
       confidenceGate: params.gate === 'A' || params.gate === 'B' ||
         params.gate === 'C' || params.gate === 'D'

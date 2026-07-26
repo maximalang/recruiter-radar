@@ -46,6 +46,7 @@ export async function GET(request: NextRequest) {
   try {
     const result = await listOpportunities({
       ownerId,
+      morningBriefOnly: true,
       clientProfileId: positiveId(params.get('profile')),
       organizationId: positiveId(params.get('organization')),
       statuses: parseStatuses(params.get('status')),

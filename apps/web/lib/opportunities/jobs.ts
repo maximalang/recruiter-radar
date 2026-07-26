@@ -639,10 +639,7 @@ function computeFiurForOpportunity(
     clientProfile: {
       industries: toStringArray(row.industries),
       roles: toStringArray(row.roles),
-      locations: [
-        row.targetCity,
-        ...toStringArray(row.excludedLocations).map(() => ''),
-      ].filter((value): value is string => Boolean(value)),
+      locations: row.targetCity ? [row.targetCity] : [],
       companySizes: toCompanySizes(row.companySizes),
       exclusions: [
         ...toStringArray(row.excludeKeywords),

@@ -1,5 +1,7 @@
 BEGIN;
 
+DROP INDEX IF EXISTS digest_candidates_client_profile_org_created_idx;
+
 DROP TABLE IF EXISTS opportunity_actions;
 DROP TABLE IF EXISTS opportunities;
 DROP TABLE IF EXISTS hiring_episode_evidence;
