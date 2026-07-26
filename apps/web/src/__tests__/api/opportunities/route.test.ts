@@ -9,6 +9,7 @@ jest.mock('@/lib/opportunities/repository', () => ({
   listOpportunities: jest.fn(),
   getOpportunityById: jest.fn(),
   applyOpportunityAction: jest.fn(),
+  OpportunityActionConflictError: class OpportunityActionConflictError extends Error {},
   isOpportunityAction: (value: unknown) =>
     ['accepted', 'dismissed', 'snoozed', 'contacted'].includes(String(value)),
 }))
@@ -18,6 +19,7 @@ import {
   applyOpportunityAction,
   getOpportunityById,
   listOpportunities,
+  OpportunityActionConflictError,
 } from '@/lib/opportunities/repository'
 import { GET as list } from '@/app/api/opportunities/route'
 import { GET as detail } from '@/app/api/opportunities/[id]/route'
@@ -66,6 +68,7 @@ describe('opportunities API', () => {
       total: 0,
       page: 2,
       pageSize: 25,
+      nextOffset: null,
     })
     const response = await list(request(
       '/api/opportunities?status=new,invalid&gate=A&minimumScore=0.6&page=2&pageSize=25&profile=8',
@@ -82,6 +85,49 @@ describe('opportunities API', () => {
       page: 2,
       pageSize: 25,
     }))
+  })
+
+  it('supports the documented limit/cursor and filter parameter names', async () => {
+    mockedOwner.mockResolvedValue('7')
+    mockedList.mockResolvedValue({
+      opportunities: [],
+      total: 40,
+      page: 3,
+      pageSize: 10,
+      nextOffset: 30,
+    })
+    const cursor = Buffer.from(
+      JSON.stringify({ version: 1, offset: 20 }),
+      'utf8',
+    ).toString('base64url')
+    const response = await list(request(
+      `/api/opportunities?limit=10&cursor=${cursor}&confidenceGate=B&organizationId=9`,
+    ))
+
+    expect(response.status).toBe(200)
+    expect(mockedList).toHaveBeenCalledWith(expect.objectContaining({
+      ownerId: '7',
+      morningBriefOnly: true,
+      pageSize: 10,
+      offset: 20,
+      confidenceGate: 'B',
+      organizationId: '9',
+    }))
+    const payload = await response.json() as { nextCursor: string | null }
+    expect(payload.nextCursor).toBe(
+      Buffer.from(
+        JSON.stringify({ version: 1, offset: 30 }),
+        'utf8',
+      ).toString('base64url'),
+    )
+  })
+
+  it('rejects malformed cursors instead of silently resetting pagination', async () => {
+    mockedOwner.mockResolvedValue('7')
+    const response = await list(request('/api/opportunities?cursor=not-a-cursor'))
+
+    expect(response.status).toBe(400)
+    expect(mockedList).not.toHaveBeenCalled()
   })
 
   it('returns 404 for a foreign detail without leaking its existence', async () => {
@@ -125,5 +171,21 @@ describe('opportunities API', () => {
       action: 'accepted',
       actionKey: 'request-1',
     }))
+  })
+
+  it('returns a conflict when an idempotency key is reused with another payload', async () => {
+    mockedOwner.mockResolvedValue('7')
+    mockedAction.mockRejectedValue(new OpportunityActionConflictError())
+
+    const response = await action(
+      request('/api/opportunities/10/action', {
+        method: 'POST',
+        headers: { 'idempotency-key': 'reused-key' },
+        body: JSON.stringify({ action: 'dismissed' }),
+      }),
+      { params: Promise.resolve({ id: '10' }) },
+    )
+
+    expect(response.status).toBe(409)
   })
 })

@@ -39,8 +39,8 @@ export default async function OpportunitiesPage(props: {
     return (
       <InternalPageFrame navItems={NAVIGATION} footer={<SiteFooter />}>
         <InternalPageHeader
-          title="Morning Brief"
-          subtitle="Приоритетные возможности из подтверждённых эпизодов найма."
+          title="Коммерческие возможности на сегодня"
+          subtitle="Morning Brief из подтверждённых эпизодов найма."
         />
         <ContentCard variant="hero">
           <EmptyState
@@ -74,7 +74,7 @@ export default async function OpportunitiesPage(props: {
   if (!result) {
     return (
       <InternalPageFrame navItems={NAVIGATION} footer={<SiteFooter />}>
-        <InternalPageHeader title="Morning Brief" />
+        <InternalPageHeader title="Коммерческие возможности на сегодня" />
         <ErrorState
           title="Brief временно не загрузился"
           description="Данные других аккаунтов не показываются. Обновите страницу через минуту."
@@ -84,18 +84,24 @@ export default async function OpportunitiesPage(props: {
     )
   }
 
-  const topScore = result.opportunities[0]?.opportunityScore ?? 0
-  const directEvidence = result.opportunities.reduce(
-    (sum, opportunity) =>
-      sum + opportunity.evidenceTimeline.filter((item) => item.tier === 'direct').length,
-    0,
-  )
+  const newCount = result.opportunities.filter(
+    (opportunity) => opportunity.status === 'new',
+  ).length
+  const attentionCount = result.opportunities.filter(
+    (opportunity) => opportunity.status === 'review',
+  ).length
+  const highConfidenceCount = result.opportunities.filter(
+    (opportunity) => opportunity.confidenceGate === 'A',
+  ).length
+  const expiringSoonCount = result.opportunities.filter(
+    (opportunity) => isExpiringSoon(opportunity.validUntil),
+  ).length
 
   return (
     <InternalPageFrame navItems={NAVIGATION} footer={<SiteFooter />}>
       <InternalPageHeader
-        title="Morning Brief"
-        subtitle="Короткий список компаний, где свежий эпизод найма совпал с профилем агентства и прошёл текущие evidence gates."
+        title="Коммерческие возможности на сегодня"
+        subtitle="Morning Brief: свежий эпизод найма совпал с профилем агентства и прошёл текущие evidence gates."
         nav={(
           <Link href="/leads" className={styles.headerLink}>
             Все лиды
@@ -105,15 +111,24 @@ export default async function OpportunitiesPage(props: {
 
       <div className={styles.pageStack}>
         <MetricGrid>
-          <MetricCard label="Возможностей" value={result.total} tone="info" />
           <MetricCard
-            label="Максимальный приоритет"
-            value={`${Math.round(topScore * 100)} / 100`}
+            label="Новые opportunities"
+            value={newCount}
+            tone="info"
+          />
+          <MetricCard
+            label="Требуют внимания"
+            value={attentionCount}
+            tone="neutral"
+          />
+          <MetricCard
+            label="Высокая достоверность"
+            value={highConfidenceCount}
             tone="success"
           />
           <MetricCard
-            label="Прямых подтверждений"
-            value={directEvidence}
+            label="Истекают скоро"
+            value={expiringSoonCount}
             tone="neutral"
           />
         </MetricGrid>
@@ -145,8 +160,8 @@ export default async function OpportunitiesPage(props: {
         ) : (
           <ContentCard variant="hero">
             <EmptyState
-              title="На сегодня новых возможностей нет"
-              text="Радар продолжает наблюдать за сигналами. Низкоуверенные и исключённые компании не попадают в Morning Brief."
+              title="Радар пока не обнаружил достаточно подтверждённых коммерческих возможностей под ваш профиль."
+              text="Мы не показываем компании только потому, что у них есть одна вакансия."
               action={{ href: '/leads', label: 'Открыть все лиды' }}
             />
           </ContentCard>
@@ -154,6 +169,14 @@ export default async function OpportunitiesPage(props: {
       </div>
     </InternalPageFrame>
   )
+}
+
+function isExpiringSoon(value: string | null): boolean {
+  if (!value) return false
+  const timestamp = Date.parse(value)
+  if (!Number.isFinite(timestamp)) return false
+  const remaining = timestamp - Date.now()
+  return remaining >= 0 && remaining <= 3 * 24 * 60 * 60 * 1000
 }
 
 function FilterLink(props: {
@@ -176,5 +199,5 @@ function FilterLink(props: {
 function parseStatusFilter(value: string | undefined): OpportunityStatus[] {
   if (value === 'accepted,contacted') return ['accepted', 'contacted']
   if (value === 'snoozed') return ['snoozed']
-  return ['new', 'review', 'accepted', 'snoozed']
+  return ['new', 'review', 'accepted']
 }

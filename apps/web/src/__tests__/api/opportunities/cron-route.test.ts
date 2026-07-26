@@ -10,13 +10,19 @@ jest.mock('@/lib/opportunities/jobs', () => ({
 }))
 
 import { backfillOpportunitiesJob } from '@/lib/opportunities/jobs'
-import { POST } from '@/app/api/cron/opportunities/[job]/route'
+import { GET, POST } from '@/app/api/cron/opportunities/[job]/route'
 
 const mockedBackfill = jest.mocked(backfillOpportunitiesJob)
 
 function request(path: string, key?: string) {
   return new NextRequest(`https://recruiter-radar.ru${path}`, {
     method: 'POST',
+    headers: key ? { 'x-api-key': key } : undefined,
+  })
+}
+
+function getRequest(path: string, key?: string) {
+  return new NextRequest(`https://recruiter-radar.ru${path}`, {
     headers: key ? { 'x-api-key': key } : undefined,
   })
 }
@@ -49,8 +55,21 @@ describe('opportunity cron API', () => {
     expect((await POST(
       request('/api/cron/opportunities/backfill-opportunities', testKey),
       { params: Promise.resolve({ job: 'backfill-opportunities' }) },
-    )).status).toBe(409)
+    )).status).toBe(404)
     expect(mockedBackfill).not.toHaveBeenCalled()
+  })
+
+  it('protects the read-only job status endpoint with flag and cron key', async () => {
+    expect((await GET(
+      getRequest('/api/cron/opportunities/build-opportunities'),
+      { params: Promise.resolve({ job: 'build-opportunities' }) },
+    )).status).toBe(401)
+
+    process.env.OPPORTUNITY_ENGINE_V1_ENABLED = 'false'
+    expect((await GET(
+      getRequest('/api/cron/opportunities/build-opportunities', testKey),
+      { params: Promise.resolve({ job: 'build-opportunities' }) },
+    )).status).toBe(404)
   })
 
   it('keeps backfill read-only by default and requires apply=true for writes', async () => {
@@ -81,5 +100,18 @@ describe('opportunity cron API', () => {
     expect(mockedBackfill).toHaveBeenLastCalledWith(expect.objectContaining({
       dryRun: false,
     }))
+  })
+
+  it('rejects invalid canary parameters instead of widening the job scope', async () => {
+    const response = await POST(
+      request(
+        '/api/cron/opportunities/backfill-opportunities?apply=true&organization=all',
+        testKey,
+      ),
+      { params: Promise.resolve({ job: 'backfill-opportunities' }) },
+    )
+
+    expect(response.status).toBe(400)
+    expect(mockedBackfill).not.toHaveBeenCalled()
   })
 })

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-import { isOpportunityEngineV1Enabled } from '@/lib/opportunities/config'
+import {
+  OPPORTUNITY_ENGINE_LIMITS,
+  isOpportunityEngineV1Enabled,
+} from '@/lib/opportunities/config'
 import {
   backfillOpportunitiesJob,
   buildOpportunitiesJob,
@@ -21,9 +24,15 @@ const JOBS = new Set([
 ])
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ job: string }> },
 ) {
+  if (!isOpportunityEngineV1Enabled()) {
+    return NextResponse.json({ error: 'not_found' }, { status: 404 })
+  }
+  const authError = authorizeCron(request)
+  if (authError) return authError
+
   const { job } = await context.params
   if (!JOBS.has(job)) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 })
@@ -40,38 +49,41 @@ export async function POST(
   request: NextRequest,
   context: { params: Promise<{ job: string }> },
 ) {
-  const expectedKey = process.env.CRON_API_KEY?.trim()
-  if (!expectedKey) {
-    return NextResponse.json(
-      { success: false, error: 'CRON_API_KEY is not configured.' },
-      { status: 503 },
-    )
-  }
-  if (request.headers.get('x-api-key') !== expectedKey) {
-    return NextResponse.json(
-      { success: false, error: 'Invalid or missing x-api-key header.' },
-      { status: 401 },
-    )
-  }
   if (!isOpportunityEngineV1Enabled()) {
-    return NextResponse.json(
-      { success: false, error: 'Opportunity Engine v1 is disabled.' },
-      { status: 409 },
-    )
+    return NextResponse.json({ error: 'not_found' }, { status: 404 })
   }
+  const authError = authorizeCron(request)
+  if (authError) return authError
 
   const { job } = await context.params
   if (!JOBS.has(job)) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 })
   }
   const params = request.nextUrl.searchParams
+  const organizationValue = params.get('organization')
+  const batchSizeValue = params.get('batchSize')
+  const dryRunValue = params.get('dryRun')
+  const applyValue = params.get('apply')
+  const organizationId = positiveId(organizationValue)
+  const batchSize = positiveInteger(batchSizeValue)
+  if (
+    (organizationValue !== null && organizationId === null) ||
+    (batchSizeValue !== null && (
+      batchSize === null ||
+      batchSize > OPPORTUNITY_ENGINE_LIMITS.maximumJobBatchSize
+    )) ||
+    (dryRunValue !== null && dryRunValue !== 'true' && dryRunValue !== 'false') ||
+    (applyValue !== null && applyValue !== 'true' && applyValue !== 'false')
+  ) {
+    return NextResponse.json({ error: 'invalid_parameters' }, { status: 400 })
+  }
   const options: OpportunityJobOptions = {
     enabled: true,
-    organizationId: positiveId(params.get('organization')),
-    batchSize: positiveInteger(params.get('batchSize')) ?? undefined,
+    organizationId,
+    batchSize: batchSize ?? undefined,
     dryRun: job === 'backfill-opportunities'
-      ? params.get('apply') !== 'true'
-      : params.get('dryRun') === 'true',
+      ? applyValue !== 'true'
+      : dryRunValue === 'true',
   }
 
   try {
@@ -90,6 +102,23 @@ export async function POST(
       { status: 500 },
     )
   }
+}
+
+function authorizeCron(request: NextRequest): NextResponse | null {
+  const expectedKey = process.env.CRON_API_KEY?.trim()
+  if (!expectedKey) {
+    return NextResponse.json(
+      { success: false, error: 'CRON_API_KEY is not configured.' },
+      { status: 503 },
+    )
+  }
+  if (request.headers.get('x-api-key') !== expectedKey) {
+    return NextResponse.json(
+      { success: false, error: 'Invalid or missing x-api-key header.' },
+      { status: 401 },
+    )
+  }
+  return null
 }
 
 function positiveId(value: string | null): string | null {

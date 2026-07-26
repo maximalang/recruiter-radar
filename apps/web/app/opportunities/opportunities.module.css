@@ -267,7 +267,10 @@
 }
 
 .actionButton {
+  display: inline-flex;
   min-height: 40px;
+  align-items: center;
+  justify-content: center;
   padding: 0 14px;
   border: 1px solid #cbd5e1;
   border-radius: 11px;
@@ -277,6 +280,7 @@
   font: inherit;
   font-size: 0.78rem;
   font-weight: 700;
+  text-decoration: none;
 }
 
 .actionButton[data-tone="primary"] {

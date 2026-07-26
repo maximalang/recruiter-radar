@@ -192,22 +192,24 @@ try {
        owner_id,
        opportunity_id,
        action_type,
-       action_key
+       action_key,
+       action_fingerprint
      )
-     VALUES ($1, $2, 'accepted', 'accepted:test')
+     VALUES ($1, $2, 'accepted', 'accepted:test', $3)
      ON CONFLICT (opportunity_id, action_key) DO NOTHING`,
-    [ownerId, opportunityId],
+    [ownerId, opportunityId, 'd'.repeat(64)],
   )
   const repeatedAction = await client.query(
     `INSERT INTO opportunity_actions (
        owner_id,
        opportunity_id,
        action_type,
-       action_key
+       action_key,
+       action_fingerprint
      )
-     VALUES ($1, $2, 'accepted', 'accepted:test')
+     VALUES ($1, $2, 'accepted', 'accepted:test', $3)
      ON CONFLICT (opportunity_id, action_key) DO NOTHING`,
-    [ownerId, opportunityId],
+    [ownerId, opportunityId, 'd'.repeat(64)],
   )
   assert.equal(firstAction.rowCount, 1, 'the first action must be persisted')
   assert.equal(repeatedAction.rowCount, 0, 'a repeated action key must be idempotent')
@@ -220,10 +222,11 @@ try {
          owner_id,
          opportunity_id,
          action_type,
-         action_key
+         action_key,
+         action_fingerprint
        )
-       VALUES ($1, $2, 'dismissed', 'dismissed:other-tenant')`,
-      [otherOwnerId, opportunityId],
+       VALUES ($1, $2, 'dismissed', 'dismissed:other-tenant', $3)`,
+      [otherOwnerId, opportunityId, 'e'.repeat(64)],
     )
   } catch {
     crossTenantRejected = true

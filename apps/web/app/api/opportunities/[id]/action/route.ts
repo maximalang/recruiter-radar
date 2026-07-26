@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 
 import { isOpportunityEngineV1Enabled } from '@/lib/opportunities/config'
@@ -5,6 +6,7 @@ import { toPublicOpportunity } from '@/lib/opportunities/api-projection'
 import {
   applyOpportunityAction,
   isOpportunityAction,
+  OpportunityActionConflictError,
 } from '@/lib/opportunities/repository'
 import { logError } from '@/lib/runtime'
 import { getOwnerIdFromSession } from '@/lib/session'
@@ -42,7 +44,11 @@ export async function POST(
   const bodyKey = typeof body.idempotencyKey === 'string'
     ? body.idempotencyKey.trim()
     : ''
-  const actionKey = (headerKey || bodyKey || `${body.action}:default`).slice(0, 160)
+  const requestedActionKey = headerKey || bodyKey
+  if (requestedActionKey.length > 160) {
+    return NextResponse.json({ error: 'invalid_idempotency_key' }, { status: 400 })
+  }
+  const actionKey = requestedActionKey || randomUUID()
   const snoozeDays = typeof body.snoozeDays === 'number'
     ? body.snoozeDays
     : undefined
@@ -65,6 +71,12 @@ export async function POST(
       idempotent: result.idempotent,
     })
   } catch (error) {
+    if (error instanceof OpportunityActionConflictError) {
+      return NextResponse.json(
+        { error: 'idempotency_key_conflict' },
+        { status: 409 },
+      )
+    }
     logError('opportunity.api.action_failed', error, {
       ownerId,
       opportunityId: id,

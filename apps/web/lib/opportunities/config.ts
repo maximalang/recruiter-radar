@@ -13,7 +13,7 @@ export const OPPORTUNITY_ENGINE_LIMITS = {
 export function isOpportunityEngineV1Enabled(
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): boolean {
-  return env[OPPORTUNITY_ENGINE_FEATURE_FLAG]?.trim().toLowerCase() === 'true'
+  return env[OPPORTUNITY_ENGINE_FEATURE_FLAG] === 'true'
 }
 
 export function clampOpportunityPageSize(value: number): number {

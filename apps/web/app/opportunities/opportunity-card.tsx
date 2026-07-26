@@ -61,8 +61,15 @@ export function OpportunityCard(props: { opportunity: OpportunityItem }) {
       </div>
 
       <div className={styles.briefGrid}>
-        <BriefField label="Почему сейчас" value={opportunity.whyNow} />
-        <BriefField label="Гипотеза задачи" value={opportunity.problemHypothesis} />
+        <BriefField label="Что изменилось" value={opportunity.whyNow} />
+        <BriefField
+          label="Почему это может быть важно"
+          value={opportunity.problemHypothesis}
+        />
+        <BriefField
+          label="Почему подходит агентству"
+          value={agencyFitExplanation(opportunity)}
+        />
         <BriefField label="Рекомендуемый заход" value={opportunity.recommendedAngle} />
         <BriefField label="Кому адресовать" value={opportunity.recommendedPersona} />
       </div>
@@ -114,6 +121,7 @@ export function OpportunityCard(props: { opportunity: OpportunityItem }) {
       <OpportunityActions
         opportunityId={opportunity.id}
         currentStatus={opportunity.status}
+        detailHref={`#evidence-${opportunity.id}`}
       />
     </article>
   )
@@ -126,6 +134,24 @@ function BriefField(props: { label: string; value: string }) {
       <p>{props.value}</p>
     </div>
   )
+}
+
+function agencyFitExplanation(opportunity: OpportunityItem): string {
+  const components = asRecord(opportunity.metadata.components)
+  const agencyFit = asRecord(components.agencyFit)
+  const reasons = Array.isArray(agencyFit.reasons) ? agencyFit.reasons : []
+  const message = reasons
+    .map((reason) => asRecord(reason).message)
+    .find((value): value is string =>
+      typeof value === 'string' && value.trim().length > 0)
+  return message?.trim() ??
+    'Соответствие подтверждено текущим профилем агентства и моделью FIUR Fit.'
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
 }
 
 function formatDate(value: string | null): string {

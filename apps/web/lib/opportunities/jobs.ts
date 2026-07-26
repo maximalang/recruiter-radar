@@ -1,12 +1,13 @@
 import type { Pool, PoolClient } from 'pg'
 
 import { resolveHiringMode } from '@/lib/clientProfiles'
-import { getPool } from '@/lib/db-pool'
+import { getClient, getPool } from '@/lib/db-pool'
 import { extractPayloadFields } from '@/lib/leads-data'
 import { logError, logEvent, logWarn } from '@/lib/runtime'
 import { computeFiur, type EvidenceTier } from '@/lib/scoring/fiur'
 import {
   DEFAULT_HIRING_EPISODE_CONFIG,
+  HIRING_EPISODE_ENGINE_VERSION,
   HiringEpisodeDetectionService,
   classifyOpportunityRoleFamily,
   type HiringEpisodeCandidate,
@@ -123,13 +124,34 @@ export async function detectHiringEpisodesJob(
     batchSize,
   })
 
-  const organizations = await db.query<{ organizationId: string }>(
-    `SELECT DISTINCT org_id::TEXT AS "organizationId"
-     FROM signals
-     WHERE signal_type = 'job_posting'
-       AND occurred_at >= $1::timestamptz
-       AND ($2::bigint IS NULL OR org_id = $2)
-     ORDER BY org_id::TEXT
+  const organizations = await db.query<{
+    organizationId: string
+    lastSignalId: string
+    lastSignalUpdatedAt: string
+  }>(
+    `SELECT
+       s.org_id::TEXT AS "organizationId",
+       MAX(s.id)::TEXT AS "lastSignalId",
+       MAX(s.updated_at)::TEXT AS "lastSignalUpdatedAt"
+     FROM signals s
+     LEFT JOIN hiring_episode_detection_state state
+       ON state.organization_id = s.org_id
+      AND state.engine_version = $4
+     WHERE s.signal_type = 'job_posting'
+       AND s.occurred_at >= $1::timestamptz
+       AND ($2::bigint IS NULL OR s.org_id = $2)
+     GROUP BY s.org_id
+     HAVING
+       $2::bigint IS NOT NULL
+       OR MAX(s.id) > COALESCE(MAX(state.last_signal_id), 0)
+       OR MAX(s.updated_at) > COALESCE(
+         MAX(state.last_signal_updated_at),
+         '-infinity'::timestamptz
+       )
+       OR MAX(state.next_retry_at) <= NOW()
+     ORDER BY
+       COALESCE(MAX(state.next_retry_at), '-infinity'::timestamptz) ASC,
+       s.org_id::TEXT
      LIMIT $3`,
     [
       new Date(
@@ -138,10 +160,12 @@ export async function detectHiringEpisodesJob(
       ).toISOString(),
       options.organizationId == null ? null : String(options.organizationId),
       batchSize,
+      HIRING_EPISODE_ENGINE_VERSION,
     ],
   )
 
   const detector = new HiringEpisodeDetectionService()
+  const persistPreview = shouldPersistPreview(options)
   for (const organization of organizations.rows) {
     stats.scanned += 1
     try {
@@ -197,19 +221,42 @@ export async function detectHiringEpisodesJob(
 
       if (candidates.length === 0) {
         stats.skipped += 1
+        if (!stats.dryRun || persistPreview) {
+          await markDetectionState(organization, db)
+        }
         continue
       }
       for (const candidate of candidates) {
-        if (stats.dryRun) {
+        if (stats.dryRun && !persistPreview) {
           stats.created += 1
           continue
         }
         const stored = await upsertEpisode(candidate, db)
         if (stored.inserted) stats.created += 1
         else stats.updated += 1
+        logEvent(
+          stored.inserted ? 'hiring_episode.created' : 'hiring_episode.updated',
+          {
+            hiringEpisodeId: stored.id,
+            organizationId: candidate.organizationId,
+            episodeType: candidate.episodeType,
+            preview: persistPreview,
+          },
+        )
+      }
+      if (!stats.dryRun || persistPreview) {
+        await markDetectionState(organization, db)
       }
     } catch (error) {
       stats.failed += 1
+      if (!stats.dryRun || persistPreview) {
+        await markDetectionFailure(organization, db).catch((checkpointError) => {
+          logError('opportunity.job.failure_checkpoint_failed', checkpointError, {
+            job: 'detect-hiring-episodes',
+            organizationId: organization.organizationId,
+          })
+        })
+      }
       logError('opportunity.job.entity_failed', error, {
         job: 'detect-hiring-episodes',
         organizationId: organization.organizationId,
@@ -245,7 +292,32 @@ export async function buildOpportunitiesJob(
        AND cp.is_active = TRUE
        AND cp.owner_id IS NOT NULL
        AND ($1::bigint IS NULL OR he.organization_id = $1)
-     ORDER BY he.last_seen_at DESC, he.id DESC, cp.id DESC
+       AND (
+         build_failure.next_retry_at IS NULL
+         OR build_failure.next_retry_at <= NOW()
+       )
+       AND NOT EXISTS (
+         SELECT 1
+         FROM hiring_episode_evidence episode_source
+         JOIN signals source_signal ON source_signal.id = episode_source.signal_id
+         WHERE episode_source.hiring_episode_id = he.id
+           AND NOT (dc.source_families ? source_signal.source)
+       )
+       AND NOT EXISTS (
+         SELECT 1
+         FROM opportunities existing
+         WHERE existing.client_profile_id = cp.id
+           AND existing.hiring_episode_id = he.id
+           AND existing.scoring_version = 'opportunity-v1'
+           AND existing.evidence_hash = he.evidence_hash
+           AND existing.metadata->>'digestCandidateId' = dc.id::TEXT
+       )
+     ORDER BY
+       (build_failure.next_retry_at IS NOT NULL) ASC,
+       build_failure.next_retry_at ASC NULLS FIRST,
+       he.last_seen_at DESC,
+       he.id DESC,
+       cp.id DESC
      LIMIT $2`,
     [
       options.organizationId == null ? null : String(options.organizationId),
@@ -255,6 +327,7 @@ export async function buildOpportunitiesJob(
 
   const scorer = new OpportunityScoringService()
   const briefBuilder = new OpportunityBriefBuilder()
+  const persistPreview = shouldPersistPreview(options)
   for (const row of result.rows) {
     stats.scanned += 1
     try {
@@ -284,7 +357,7 @@ export async function buildOpportunitiesJob(
         score,
       })
 
-      if (stats.dryRun) {
+      if (stats.dryRun && !persistPreview) {
         stats.created += 1
         continue
       }
@@ -297,7 +370,7 @@ export async function buildOpportunitiesJob(
             60 *
             1000,
       ).toISOString()
-      const upsert = await db.query<{ inserted: boolean }>(
+      const upsert = await db.query<{ id: string; inserted: boolean }>(
         `INSERT INTO opportunities (
            owner_id,
            client_profile_id,
@@ -356,7 +429,7 @@ export async function buildOpportunitiesJob(
            updated_at = NOW()
          WHERE opportunities.evidence_hash IS DISTINCT FROM EXCLUDED.evidence_hash
             OR opportunities.metadata IS DISTINCT FROM EXCLUDED.metadata
-         RETURNING (xmax = 0) AS inserted`,
+         RETURNING id::TEXT AS id, (xmax = 0) AS inserted`,
         [
           row.ownerId,
           row.clientProfileId,
@@ -386,7 +459,6 @@ export async function buildOpportunitiesJob(
             digestCandidateId: row.digestCandidateId,
             digestReasons: row.digestReasons,
             sourceFamilies: toStringArray(row.sourceFamilies),
-            contactPaths: payload.contactPaths,
             fiur: {
               fit: fiur.fit,
               intent: fiur.intent,
@@ -397,11 +469,38 @@ export async function buildOpportunitiesJob(
           }),
         ],
       )
-      if (upsert.rowCount === 0) stats.skipped += 1
-      else if (upsert.rows[0]?.inserted) stats.created += 1
-      else stats.updated += 1
+      if (upsert.rowCount === 0) {
+        stats.skipped += 1
+      } else {
+        const stored = upsert.rows[0]
+        if (!stored) {
+          throw new Error('Opportunity upsert returned no row.')
+        }
+        if (stored.inserted) stats.created += 1
+        else stats.updated += 1
+        logEvent(
+          stored.inserted ? 'opportunity.created' : 'opportunity.updated',
+          {
+            opportunityId: stored.id,
+            hiringEpisodeId: row.hiringEpisodeId,
+            clientProfileId: row.clientProfileId,
+            organizationId: row.organizationId,
+            preview: persistPreview,
+          },
+        )
+      }
+      await clearBuildFailure(row, db)
     } catch (error) {
       stats.failed += 1
+      if (!stats.dryRun || persistPreview) {
+        await markBuildFailure(row, db).catch((checkpointError) => {
+          logError('opportunity.job.failure_checkpoint_failed', checkpointError, {
+            job: 'build-opportunities',
+            hiringEpisodeId: row.hiringEpisodeId,
+            clientProfileId: row.clientProfileId,
+          })
+        })
+      }
       logError('opportunity.job.entity_failed', error, {
         job: 'build-opportunities',
         hiringEpisodeId: row.hiringEpisodeId,
@@ -434,48 +533,135 @@ export async function expireOpportunitiesJob(
     return stats
   }
 
-  const closed = await db.query(
+  const closed = await db.query<{ id: string; organizationId: string }>(
     `UPDATE hiring_episodes
      SET status = 'closed', closed_at = $1::timestamptz, updated_at = NOW()
      WHERE status = 'active'
        AND last_seen_at < $1::timestamptz - ($2 * INTERVAL '1 day')
-       AND ($3::bigint IS NULL OR organization_id = $3)`,
+       AND ($3::bigint IS NULL OR organization_id = $3)
+     RETURNING id::TEXT AS id, organization_id::TEXT AS "organizationId"`,
     [
       now.toISOString(),
       DEFAULT_HIRING_EPISODE_CONFIG.inactivityCloseDays,
       options.organizationId ?? null,
     ],
   )
-  const expired = await db.query(
+  const awakened = await db.query<{
+    id: string
+    organizationId: string
+    clientProfileId: string
+  }>(
+    `UPDATE opportunities o
+     SET status = 'new', snoozed_until = NULL, updated_at = NOW()
+     FROM hiring_episodes he
+     WHERE he.id = o.hiring_episode_id
+       AND he.status = 'active'
+       AND o.status = 'snoozed'
+       AND o.snoozed_until <= $1::timestamptz
+       AND (o.valid_until IS NULL OR o.valid_until >= $1::timestamptz)
+       AND ($2::bigint IS NULL OR o.organization_id = $2)
+     RETURNING
+       o.id::TEXT AS id,
+       o.organization_id::TEXT AS "organizationId",
+       o.client_profile_id::TEXT AS "clientProfileId"`,
+    [now.toISOString(), options.organizationId ?? null],
+  )
+  const expired = await db.query<{
+    id: string
+    organizationId: string
+    clientProfileId: string
+  }>(
     `UPDATE opportunities o
      SET status = 'expired', updated_at = NOW()
      FROM hiring_episodes he
      WHERE he.id = o.hiring_episode_id
        AND o.status IN ('new', 'review', 'snoozed')
        AND (he.status = 'closed' OR o.valid_until < $1::timestamptz)
-       AND ($2::bigint IS NULL OR o.organization_id = $2)`,
+       AND ($2::bigint IS NULL OR o.organization_id = $2)
+     RETURNING
+       o.id::TEXT AS id,
+       o.organization_id::TEXT AS "organizationId",
+       o.client_profile_id::TEXT AS "clientProfileId"`,
     [now.toISOString(), options.organizationId ?? null],
   )
-  stats.scanned = (closed.rowCount ?? 0) + (expired.rowCount ?? 0)
+  stats.scanned =
+    (closed.rowCount ?? 0) +
+    (awakened.rowCount ?? 0) +
+    (expired.rowCount ?? 0)
   stats.expired = expired.rowCount ?? 0
-  stats.updated = closed.rowCount ?? 0
+  stats.updated = (closed.rowCount ?? 0) + (awakened.rowCount ?? 0)
+  for (const episode of closed.rows) {
+    logEvent('hiring_episode.closed', {
+      hiringEpisodeId: episode.id,
+      organizationId: episode.organizationId,
+    })
+  }
+  for (const opportunity of awakened.rows) {
+    logEvent('opportunity.updated', {
+      opportunityId: opportunity.id,
+      clientProfileId: opportunity.clientProfileId,
+      organizationId: opportunity.organizationId,
+      reason: 'snooze_elapsed',
+    })
+  }
+  for (const opportunity of expired.rows) {
+    logEvent('opportunity.expired', {
+      opportunityId: opportunity.id,
+      clientProfileId: opportunity.clientProfileId,
+      organizationId: opportunity.organizationId,
+    })
+  }
   logJobCompleted('expire-opportunities', stats)
   return stats
 }
 
 export async function backfillOpportunitiesJob(
   options: OpportunityJobOptions = {},
-  db: OpportunityJobDb | null = getPool(),
+  db: OpportunityJobDb | null = null,
 ): Promise<{
   detection: OpportunityJobStats
   opportunities: OpportunityJobStats
 }> {
-  if (!db && (options.enabled ?? isOpportunityEngineV1Enabled())) {
-    throw new Error('DATABASE_URL is not set.')
+  const enabled = isOpportunityEngineV1Enabled() && options.enabled !== false
+  if (!enabled) {
+    const disabledOptions = { ...options, dryRun: options.dryRun !== false }
+    return {
+      detection: await detectHiringEpisodesJob(disabledOptions, db),
+      opportunities: await buildOpportunitiesJob(disabledOptions, db),
+    }
   }
-  const detection = await detectHiringEpisodesJob(options, db)
-  const opportunities = await buildOpportunitiesJob(options, db)
-  return { detection, opportunities }
+
+  const dryRun = options.dryRun !== false
+  if (!dryRun) {
+    const database = db ?? getPool()
+    if (!database) throw new Error('DATABASE_URL is not set.')
+    return {
+      detection: await detectHiringEpisodesJob({ ...options, dryRun: false }, database),
+      opportunities: await buildOpportunitiesJob({ ...options, dryRun: false }, database),
+    }
+  }
+
+  const ownedClient = db ? null : await getClient()
+  const previewDb = db ?? ownedClient
+  if (!previewDb) throw new Error('DATABASE_URL is not set.')
+  const previewOptions = {
+    ...options,
+    dryRun: true,
+    transactionalPreview: true,
+  }
+
+  await previewDb.query('BEGIN')
+  try {
+    const detection = await detectHiringEpisodesJob(previewOptions, previewDb)
+    const opportunities = await buildOpportunitiesJob(previewOptions, previewDb)
+    await previewDb.query('ROLLBACK')
+    return { detection, opportunities }
+  } catch (error) {
+    await previewDb.query('ROLLBACK').catch(() => undefined)
+    throw error
+  } finally {
+    ownedClient?.release()
+  }
 }
 
 async function upsertEpisode(
@@ -569,6 +755,132 @@ async function upsertEpisode(
     )
   }
   return episode
+}
+
+async function markDetectionState(
+  organization: {
+    organizationId: string
+    lastSignalId: string
+    lastSignalUpdatedAt: string
+  },
+  db: OpportunityJobDb,
+): Promise<void> {
+  await db.query(
+    `INSERT INTO hiring_episode_detection_state (
+       organization_id,
+       engine_version,
+       last_signal_id,
+       last_signal_updated_at,
+       failure_count,
+       next_retry_at,
+       last_scanned_at
+     )
+     VALUES ($1, $2, $3::bigint, $4::timestamptz, 0, NULL, NOW())
+     ON CONFLICT (organization_id, engine_version)
+     DO UPDATE SET
+       last_signal_id = GREATEST(
+         hiring_episode_detection_state.last_signal_id,
+         EXCLUDED.last_signal_id
+       ),
+       last_signal_updated_at = GREATEST(
+         hiring_episode_detection_state.last_signal_updated_at,
+         EXCLUDED.last_signal_updated_at
+       ),
+       failure_count = 0,
+       next_retry_at = NULL,
+       last_scanned_at = NOW()`,
+    [
+      organization.organizationId,
+      HIRING_EPISODE_ENGINE_VERSION,
+      organization.lastSignalId,
+      organization.lastSignalUpdatedAt,
+    ],
+  )
+}
+
+async function markDetectionFailure(
+  organization: {
+    organizationId: string
+    lastSignalId: string
+    lastSignalUpdatedAt: string
+  },
+  db: OpportunityJobDb,
+): Promise<void> {
+  await db.query(
+    `INSERT INTO hiring_episode_detection_state (
+       organization_id,
+       engine_version,
+       last_signal_id,
+       last_signal_updated_at,
+       failure_count,
+       next_retry_at,
+       last_scanned_at
+     )
+     VALUES (
+       $1,
+       $2,
+       $3::bigint,
+       $4::timestamptz,
+       1,
+       NOW() + INTERVAL '5 minutes',
+       NOW()
+     )
+     ON CONFLICT (organization_id, engine_version)
+     DO UPDATE SET
+       last_signal_id = GREATEST(
+         hiring_episode_detection_state.last_signal_id,
+         EXCLUDED.last_signal_id
+       ),
+       last_signal_updated_at = GREATEST(
+         hiring_episode_detection_state.last_signal_updated_at,
+         EXCLUDED.last_signal_updated_at
+       ),
+       failure_count = hiring_episode_detection_state.failure_count + 1,
+       next_retry_at = NOW() + INTERVAL '5 minutes',
+       last_scanned_at = NOW()`,
+    [
+      organization.organizationId,
+      HIRING_EPISODE_ENGINE_VERSION,
+      organization.lastSignalId,
+      organization.lastSignalUpdatedAt,
+    ],
+  )
+}
+
+async function clearBuildFailure(
+  row: Pick<OpportunityBuildRow, 'clientProfileId' | 'hiringEpisodeId'>,
+  db: OpportunityJobDb,
+): Promise<void> {
+  await db.query(
+    `DELETE FROM opportunity_build_failures
+     WHERE client_profile_id = $1
+       AND hiring_episode_id = $2
+       AND scoring_version = 'opportunity-v1'`,
+    [row.clientProfileId, row.hiringEpisodeId],
+  )
+}
+
+async function markBuildFailure(
+  row: Pick<OpportunityBuildRow, 'clientProfileId' | 'hiringEpisodeId'>,
+  db: OpportunityJobDb,
+): Promise<void> {
+  await db.query(
+    `INSERT INTO opportunity_build_failures (
+       client_profile_id,
+       hiring_episode_id,
+       scoring_version,
+       failure_count,
+       next_retry_at,
+       last_failed_at
+     )
+     VALUES ($1, $2, 'opportunity-v1', 1, NOW() + INTERVAL '5 minutes', NOW())
+     ON CONFLICT (client_profile_id, hiring_episode_id, scoring_version)
+     DO UPDATE SET
+       failure_count = opportunity_build_failures.failure_count + 1,
+       next_retry_at = NOW() + INTERVAL '5 minutes',
+       last_failed_at = NOW()`,
+    [row.clientProfileId, row.hiringEpisodeId],
+  )
 }
 
 function mapHiringSignal(row: SignalRow): HiringSignalInput {
@@ -667,22 +979,45 @@ function computeFiurForOpportunity(
 }
 
 function hasExplicitProfileExclusion(row: OpportunityBuildRow): boolean {
+  const signals = toRecordArray(row.signals)
   const haystack = [
     row.organizationName,
     row.organizationIndustry ?? '',
     row.organizationCity ?? '',
+    row.episodeTitle,
+    row.episodeSummary,
+    ...signals.flatMap((signal) => [
+      stringValue(signal.title),
+      stringValue(signal.region),
+    ]),
   ].join(' ').toLocaleLowerCase('ru-RU')
-  const exclusions = [
+  const keywordExclusions = [
     ...toStringArray(row.excludeKeywords),
     ...toStringArray(row.excludedIndustries),
-    ...toStringArray(row.excludedLocations),
   ].map((value) => value.toLocaleLowerCase('ru-RU'))
-  return exclusions.some((value) => value && haystack.includes(value))
+  if (keywordExclusions.some((value) => value && haystack.includes(value))) {
+    return true
+  }
+
+  const locations = [
+    row.organizationCity ?? '',
+    ...signals.map((signal) => stringValue(signal.region)),
+  ].map((value) => value.toLocaleLowerCase('ru-RU')).filter(Boolean)
+  const hasRemoteSignal = row.remoteFriendly &&
+    ['удал', 'remote', 'дистанцион'].some((term) => haystack.includes(term))
+  if (hasRemoteSignal) return false
+
+  return toStringArray(row.excludedLocations)
+    .map((value) => value.toLocaleLowerCase('ru-RU'))
+    .some((excluded) =>
+      excluded &&
+      locations.some((location) =>
+        location.includes(excluded) || excluded.includes(location)))
 }
 
 function createStats(options: OpportunityJobOptions): OpportunityJobStats {
   return {
-    enabled: options.enabled ?? isOpportunityEngineV1Enabled(),
+    enabled: isOpportunityEngineV1Enabled() && options.enabled !== false,
     dryRun: options.dryRun === true,
     scanned: 0,
     created: 0,
@@ -691,6 +1026,12 @@ function createStats(options: OpportunityJobOptions): OpportunityJobStats {
     failed: 0,
     expired: 0,
   }
+}
+
+function shouldPersistPreview(options: OpportunityJobOptions): boolean {
+  return (options as OpportunityJobOptions & {
+    transactionalPreview?: boolean
+  }).transactionalPreview === true
 }
 
 function disabledJob(job: string, stats: OpportunityJobStats): OpportunityJobStats {
@@ -804,11 +1145,20 @@ const OPPORTUNITY_BUILD_QUERY = `
   FROM hiring_episodes he
   JOIN orgs org ON org.id = he.organization_id
   CROSS JOIN client_profiles cp
+  LEFT JOIN opportunity_build_failures build_failure
+    ON build_failure.client_profile_id = cp.id
+   AND build_failure.hiring_episode_id = he.id
+   AND build_failure.scoring_version = 'opportunity-v1'
   JOIN LATERAL (
     SELECT candidate.*
     FROM digest_candidates candidate
+    JOIN digest_runs run ON run.id = candidate.digest_run_id
     WHERE candidate.client_profile_id = cp.id
       AND candidate.org_id = he.organization_id
+      AND run.status = 'completed'
+      AND candidate.created_at >= he.started_at
+      AND candidate.created_at >= he.last_seen_at
+      AND candidate.created_at >= cp.updated_at
     ORDER BY candidate.created_at DESC, candidate.id DESC
     LIMIT 1
   ) dc ON TRUE

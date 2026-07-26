@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
 import styles from './opportunities.module.css'
 
@@ -21,20 +21,24 @@ const ACTIONS: ReadonlyArray<{
 export function OpportunityActions(props: {
   opportunityId: string
   currentStatus: string
+  detailHref?: string
 }) {
   const router = useRouter()
   const [pending, setPending] = useState<Action | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const retryKeys = useRef<Partial<Record<Action, string>>>({})
 
   async function submit(action: Action) {
     setPending(action)
     setError(null)
+    const actionKey = retryKeys.current[action] ?? createActionKey()
+    retryKeys.current[action] = actionKey
     try {
       const response = await fetch(`/api/opportunities/${props.opportunityId}/action`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Idempotency-Key': `${action}:${props.opportunityId}`,
+          'Idempotency-Key': actionKey,
         },
         body: JSON.stringify({
           action,
@@ -44,6 +48,7 @@ export function OpportunityActions(props: {
       if (!response.ok) {
         throw new Error('action_failed')
       }
+      delete retryKeys.current[action]
       router.refresh()
     } catch {
       setError('Действие не сохранилось. Повторите через минуту.')
@@ -68,10 +73,25 @@ export function OpportunityActions(props: {
             {pending === item.action ? 'Сохраняем…' : item.label}
           </button>
         ))}
+        {props.detailHref ? (
+          <a className={styles.actionButton} href={props.detailHref}>
+            Открыть
+          </a>
+        ) : null}
       </div>
       <p className={styles.actionError} role="status" aria-live="polite">
         {error}
       </p>
     </div>
   )
+}
+
+function createActionKey(): string {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  const entropy = new Uint32Array(4)
+  crypto.getRandomValues(entropy)
+  return Array.from(
+    entropy,
+    (value) => value.toString(16).padStart(8, '0'),
+  ).join('')
 }

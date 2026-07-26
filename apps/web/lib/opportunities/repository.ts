@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 
 import { getClient, getPool } from '@/lib/db-pool'
@@ -9,6 +10,7 @@ import {
   clampOpportunitySnoozeDays,
 } from './config'
 import {
+  DEFAULT_OPPORTUNITY_SCORING_CONFIG,
   OPPORTUNITY_STATUSES,
   type ConfidenceGate,
   type OpportunityStatus,
@@ -22,6 +24,13 @@ export const OPPORTUNITY_ACTIONS = [
 ] as const
 
 export type OpportunityAction = (typeof OPPORTUNITY_ACTIONS)[number]
+
+export class OpportunityActionConflictError extends Error {
+  constructor() {
+    super('Opportunity action idempotency key was reused with another payload.')
+    this.name = 'OpportunityActionConflictError'
+  }
+}
 
 type OpportunityDb = Pick<Pool, 'query'> | Pick<PoolClient, 'query'>
 
@@ -48,6 +57,7 @@ interface OpportunityRow {
   confidenceGate: ConfidenceGate
   scores: Record<string, number>
   evidenceHash: string
+  validFrom: string
   validUntil: string | null
   snoozedUntil: string | null
   metadata: Record<string, unknown>
@@ -81,6 +91,7 @@ export interface OpportunityListInput {
   organizationId?: string | null
   page?: number
   pageSize?: number
+  offset?: number
 }
 
 export interface OpportunityListResult {
@@ -88,6 +99,7 @@ export interface OpportunityListResult {
   total: number
   page: number
   pageSize: number
+  nextOffset: number | null
 }
 
 export async function listOpportunities(
@@ -96,13 +108,27 @@ export async function listOpportunities(
 ): Promise<OpportunityListResult> {
   if (!db) throw new Error('DATABASE_URL is not set.')
 
-  const page = Math.max(Math.trunc(input.page ?? 1), 1)
   const pageSize = clampOpportunityPageSize(input.pageSize ?? Number.NaN)
+  const requestedPage = Math.max(Math.trunc(input.page ?? 1), 1)
+  const offset = typeof input.offset === 'number' && Number.isFinite(input.offset)
+    ? Math.max(Math.trunc(input.offset), 0)
+    : (requestedPage - 1) * pageSize
+  const page = Math.floor(offset / pageSize) + 1
   const params: unknown[] = [String(input.ownerId)]
   const clauses = ['o.owner_id = $1']
 
   if (input.morningBriefOnly) {
     clauses.push(`o.metadata->>'morningBriefEligible' = 'true'`)
+    clauses.push(`o.status <> 'dismissed'`)
+    clauses.push(`he.status = 'active'`)
+    clauses.push(`(o.valid_until IS NULL OR o.valid_until >= NOW())`)
+    clauses.push(`o.confidence_gate <> 'D'`)
+    params.push(DEFAULT_OPPORTUNITY_SCORING_CONFIG.minimumAgencyFit)
+    clauses.push(`o.agency_fit_score >= $${params.length}`)
+    params.push(
+      DEFAULT_OPPORTUNITY_SCORING_CONFIG.minimumExternalAgencyPropensity,
+    )
+    clauses.push(`o.agency_propensity_score >= $${params.length}`)
   }
   if (input.clientProfileId) {
     params.push(input.clientProfileId)
@@ -139,7 +165,7 @@ export async function listOpportunities(
     params,
   )
 
-  params.push(pageSize, (page - 1) * pageSize)
+  params.push(pageSize, offset)
   const rows = await db.query<OpportunityRow>(
     `${OPPORTUNITY_SELECT}
      WHERE ${where}
@@ -159,14 +185,17 @@ export async function listOpportunities(
     db,
   )
 
+  const total = Number(countResult.rows[0]?.count ?? 0)
+  const consumed = offset + rows.rows.length
   return {
     opportunities: rows.rows.map((row) => ({
       ...row,
       evidenceTimeline: evidenceByOpportunity.get(row.id) ?? [],
     })),
-    total: Number(countResult.rows[0]?.count ?? 0),
+    total,
     page,
     pageSize,
+    nextOffset: consumed < total ? consumed : null,
   }
 }
 
@@ -215,6 +244,13 @@ export async function applyOpportunityAction(input: {
 
   const client = await getClient()
   if (!client) throw new Error('DATABASE_URL is not set.')
+  const note = normalizeNote(input.note)
+  const snoozeDays = clampOpportunitySnoozeDays(input.snoozeDays)
+  const actionFingerprint = createActionFingerprint({
+    action: input.action,
+    note,
+    snoozeDays: input.action === 'snoozed' ? snoozeDays : null,
+  })
 
   try {
     await client.query('BEGIN')
@@ -245,29 +281,43 @@ export async function applyOpportunityAction(input: {
          opportunity_id,
          action_type,
          action_key,
+         action_fingerprint,
          note,
          metadata
        )
-       VALUES ($1, $2, $3, $4, $5, $6::jsonb)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
        ON CONFLICT (opportunity_id, action_key) DO NOTHING`,
       [
         String(input.ownerId),
         input.opportunityId,
         input.action,
         actionKey,
-        normalizeNote(input.note),
+        actionFingerprint,
+        note,
         JSON.stringify({
           source: 'opportunity-api',
           ...(input.action === 'snoozed'
-            ? { snoozeDays: clampOpportunitySnoozeDays(input.snoozeDays) }
+            ? { snoozeDays }
             : {}),
         }),
       ],
     )
     const idempotent = actionInsert.rowCount === 0
 
-    if (!idempotent) {
-      const snoozeDays = clampOpportunitySnoozeDays(input.snoozeDays)
+    if (idempotent) {
+      const existing = await client.query<{ actionFingerprint: string }>(
+        `SELECT action_fingerprint AS "actionFingerprint"
+         FROM opportunity_actions
+         WHERE opportunity_id = $1
+           AND owner_id = $2
+           AND action_key = $3
+         LIMIT 1`,
+        [input.opportunityId, String(input.ownerId), actionKey],
+      )
+      if (existing.rows[0]?.actionFingerprint !== actionFingerprint) {
+        throw new OpportunityActionConflictError()
+      }
+    } else {
       await client.query(
         `UPDATE opportunities
          SET
@@ -287,7 +337,7 @@ export async function applyOpportunityAction(input: {
           clientProfileId: row.clientProfileId,
           orgId: row.organizationId,
           action: input.action === 'snoozed' ? 'snooze' : input.action,
-          note: normalizeNote(input.note),
+          note,
           snoozeDays,
         },
         client,
@@ -301,7 +351,7 @@ export async function applyOpportunityAction(input: {
     )
     if (!opportunity) return null
 
-    logEvent('opportunity.action.completed', {
+    logEvent('opportunity.action', {
       ownerId: String(input.ownerId),
       opportunityId: String(input.opportunityId),
       action: input.action,
@@ -352,6 +402,7 @@ const OPPORTUNITY_SELECT = `
       'confidence', o.confidence_score
     ) AS scores,
     o.evidence_hash AS "evidenceHash",
+    o.valid_from::TEXT AS "validFrom",
     o.valid_until::TEXT AS "validUntil",
     o.snoozed_until::TEXT AS "snoozedUntil",
     o.metadata,
@@ -425,4 +476,14 @@ function normalizeNote(value: string | null | undefined): string | null {
   if (typeof value !== 'string') return null
   const normalized = value.trim()
   return normalized ? normalized.slice(0, 1000) : null
+}
+
+function createActionFingerprint(input: {
+  action: OpportunityAction
+  note: string | null
+  snoozeDays: number | null
+}): string {
+  return createHash('sha256')
+    .update(JSON.stringify(input))
+    .digest('hex')
 }

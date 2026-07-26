@@ -43,18 +43,31 @@ export async function GET(request: NextRequest) {
   }
 
   const params = request.nextUrl.searchParams
+  const cursorValue = params.get('cursor')
+  const cursorOffset = decodeCursor(cursorValue)
+  if (cursorValue && cursorOffset === null) {
+    return NextResponse.json({ error: 'invalid_cursor' }, { status: 400 })
+  }
   try {
+    const pageSize = positiveInteger(params.get('limit')) ??
+      positiveInteger(params.get('pageSize')) ??
+      undefined
     const result = await listOpportunities({
       ownerId,
       morningBriefOnly: true,
       clientProfileId: positiveId(params.get('profile')),
-      organizationId: positiveId(params.get('organization')),
+      organizationId: positiveId(
+        params.get('organizationId') ?? params.get('organization'),
+      ),
       statuses: parseStatuses(params.get('status')),
-      confidenceGate: parseConfidenceGate(params.get('gate')),
+      confidenceGate: parseConfidenceGate(
+        params.get('confidenceGate') ?? params.get('gate'),
+      ),
       episodeType: parseEpisodeType(params.get('episodeType')),
       minimumScore: boundedNumber(params.get('minimumScore'), 0, 1),
       page: positiveInteger(params.get('page')) ?? 1,
-      pageSize: positiveInteger(params.get('pageSize')) ?? undefined,
+      pageSize,
+      offset: cursorOffset ?? undefined,
     })
 
     return NextResponse.json({
@@ -62,6 +75,9 @@ export async function GET(request: NextRequest) {
       total: result.total,
       page: result.page,
       pageSize: result.pageSize,
+      nextCursor: result.nextOffset === null
+        ? null
+        : encodeCursor(result.nextOffset),
     })
   } catch (error) {
     logError('opportunity.api.list_failed', error, { ownerId })
@@ -72,12 +88,37 @@ export async function GET(request: NextRequest) {
   }
 }
 
+function encodeCursor(offset: number): string {
+  return Buffer.from(
+    JSON.stringify({ version: 1, offset }),
+    'utf8',
+  ).toString('base64url')
+}
+
+function decodeCursor(value: string | null): number | null {
+  if (!value) return null
+  if (value.length > 256 || !/^[A-Za-z0-9_-]+$/.test(value)) return null
+  try {
+    const parsed = JSON.parse(
+      Buffer.from(value, 'base64url').toString('utf8'),
+    ) as { version?: unknown; offset?: unknown }
+    return parsed.version === 1 &&
+      typeof parsed.offset === 'number' &&
+      Number.isSafeInteger(parsed.offset) &&
+      parsed.offset >= 0
+      ? parsed.offset
+      : null
+  } catch {
+    return null
+  }
+}
+
 function parseStatuses(value: string | null): OpportunityStatus[] | undefined {
-  if (!value) return ['new', 'review', 'accepted', 'snoozed']
+  if (!value) return ['new', 'review', 'accepted']
   const statuses = value.split(',').filter(
     (item): item is OpportunityStatus => STATUSES.has(item as OpportunityStatus),
   )
-  return statuses.length > 0 ? statuses : undefined
+  return statuses.length > 0 ? statuses : ['new', 'review', 'accepted']
 }
 
 function parseConfidenceGate(value: string | null): ConfidenceGate | null {

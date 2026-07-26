@@ -1,7 +1,10 @@
+import { createHash } from 'node:crypto'
+
 import {
   applyOpportunityAction,
   getOpportunityById,
   listOpportunities,
+  OpportunityActionConflictError,
 } from '@/lib/opportunities/repository'
 import { getClient } from '@/lib/db-pool'
 
@@ -52,6 +55,7 @@ describe('opportunity repository tenant scope', () => {
     )
 
     expect(result.total).toBe(1)
+    expect(result.nextOffset).toBeNull()
     expect(calls).toHaveLength(3)
     expect(calls[0].sql).toContain('o.owner_id = $1')
     expect(calls[1].sql).toContain('o.owner_id = $1')
@@ -59,11 +63,33 @@ describe('opportunity repository tenant scope', () => {
     expect(calls[0].sql).toContain(
       `o.metadata->>'morningBriefEligible' = 'true'`,
     )
+    expect(calls[0].sql).toContain(`he.status = 'active'`)
+    expect(calls[0].sql).toContain(`o.valid_until >= NOW()`)
     expect(calls[1].sql).toContain(
       `o.metadata->>'morningBriefEligible' = 'true'`,
     )
     expect(calls[0].params?.[0]).toBe('7')
     expect(calls[2].params?.[0]).toBe('7')
+  })
+
+  it('uses an explicit cursor offset and returns the next offset', async () => {
+    const { db, calls } = createDb([
+      [{ count: '5' }],
+      [
+        { id: '3', ownerId: '7' },
+        { id: '4', ownerId: '7' },
+      ],
+      [],
+    ])
+
+    const result = await listOpportunities(
+      { ownerId: '7', pageSize: 2, offset: 2 },
+      db,
+    )
+
+    expect(result.page).toBe(2)
+    expect(result.nextOffset).toBe(4)
+    expect(calls[1].params?.slice(-2)).toEqual([2, 2])
   })
 
   it('does not run an evidence lookup for a foreign or missing detail', async () => {
@@ -129,6 +155,7 @@ describe('opportunity repository tenant scope', () => {
       confidenceGate: 'A',
       scores: {},
       evidenceHash: 'a'.repeat(64),
+      validFrom: '2026-07-26T00:00:00.000Z',
       validUntil: null,
       snoozedUntil: null,
       metadata: {},
@@ -173,6 +200,101 @@ describe('opportunity repository tenant scope', () => {
     expect(query.mock.calls.some(([sql]) =>
       String(sql).includes('INSERT INTO client_digest_org_state'),
     )).toBe(true)
+    expect(query.mock.calls.some(([sql]) => String(sql) === 'COMMIT')).toBe(true)
+    expect(release).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects reuse of an idempotency key with another action payload', async () => {
+    const query = jest.fn(async (sql: string) => {
+      if (sql.includes('FROM opportunities') && sql.includes('FOR UPDATE')) {
+        return {
+          rowCount: 1,
+          rows: [{ id: '10', clientProfileId: '8', organizationId: '9' }],
+        }
+      }
+      if (sql.includes('INSERT INTO opportunity_actions')) {
+        return { rowCount: 0, rows: [] }
+      }
+      if (sql.includes('SELECT action_fingerprint')) {
+        return {
+          rowCount: 1,
+          rows: [{ actionFingerprint: '0'.repeat(64) }],
+        }
+      }
+      return { rowCount: 0, rows: [] }
+    })
+    const release = jest.fn()
+    jest.mocked(getClient).mockResolvedValue({ query, release })
+
+    await expect(applyOpportunityAction({
+      ownerId: '7',
+      opportunityId: '10',
+      action: 'accepted',
+      actionKey: 'request-reused',
+    })).rejects.toBeInstanceOf(OpportunityActionConflictError)
+
+    expect(query.mock.calls.some(([sql]) =>
+      String(sql).startsWith('UPDATE opportunities'),
+    )).toBe(false)
+    expect(query.mock.calls.some(([sql]) => String(sql) === 'ROLLBACK')).toBe(true)
+    expect(release).toHaveBeenCalledTimes(1)
+  })
+
+  it('replays an action with the same idempotency key and payload without mutating state', async () => {
+    const actionFingerprint = createHash('sha256')
+      .update(JSON.stringify({
+        action: 'accepted',
+        note: null,
+        snoozeDays: null,
+      }))
+      .digest('hex')
+    const query = jest.fn(async (sql: string) => {
+      if (sql.includes('FROM opportunities') && sql.includes('FOR UPDATE')) {
+        return {
+          rowCount: 1,
+          rows: [{ id: '10', clientProfileId: '8', organizationId: '9' }],
+        }
+      }
+      if (sql.includes('INSERT INTO opportunity_actions')) {
+        return { rowCount: 0, rows: [] }
+      }
+      if (sql.includes('SELECT action_fingerprint')) {
+        return {
+          rowCount: 1,
+          rows: [{ actionFingerprint }],
+        }
+      }
+      if (sql.includes('WHERE o.id = $1')) {
+        return {
+          rowCount: 1,
+          rows: [{
+            id: '10',
+            ownerId: '7',
+            status: 'accepted',
+            evidenceCount: 0,
+          }],
+        }
+      }
+      return { rowCount: 0, rows: [] }
+    })
+    const release = jest.fn()
+    jest.mocked(getClient).mockResolvedValue({ query, release })
+
+    const result = await applyOpportunityAction({
+      ownerId: '7',
+      opportunityId: '10',
+      action: 'accepted',
+      actionKey: 'accepted:request-1',
+    })
+
+    expect(result?.idempotent).toBe(true)
+    expect(result?.opportunity.status).toBe('accepted')
+    expect(query.mock.calls.some(([sql]) =>
+      String(sql).startsWith('UPDATE opportunities'),
+    )).toBe(false)
+    expect(query.mock.calls.some(([sql]) =>
+      String(sql).includes('INSERT INTO client_digest_org_state'),
+    )).toBe(false)
     expect(query.mock.calls.some(([sql]) => String(sql) === 'COMMIT')).toBe(true)
     expect(release).toHaveBeenCalledTimes(1)
   })

@@ -99,6 +99,21 @@ CREATE TABLE hiring_episode_evidence (
     UNIQUE (hiring_episode_id, evidence_id)
 );
 
+CREATE TABLE hiring_episode_detection_state (
+  organization_id BIGINT NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+  engine_version TEXT NOT NULL,
+  last_signal_id BIGINT NOT NULL,
+  last_signal_updated_at TIMESTAMPTZ NOT NULL,
+  failure_count INTEGER NOT NULL DEFAULT 0,
+  next_retry_at TIMESTAMPTZ,
+  last_scanned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (organization_id, engine_version),
+  CONSTRAINT hiring_episode_detection_state_engine_not_blank
+    CHECK (BTRIM(engine_version) <> ''),
+  CONSTRAINT hiring_episode_detection_state_failure_count_check
+    CHECK (failure_count >= 0)
+);
+
 CREATE TABLE opportunities (
   id BIGSERIAL PRIMARY KEY,
   owner_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -122,6 +137,7 @@ CREATE TABLE opportunities (
   confidence_gate TEXT NOT NULL,
   scoring_version TEXT NOT NULL,
   evidence_hash TEXT NOT NULL,
+  valid_from TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   valid_until TIMESTAMPTZ,
   snoozed_until TIMESTAMPTZ,
   metadata JSONB NOT NULL DEFAULT '{}'::JSONB,
@@ -180,6 +196,8 @@ CREATE TABLE opportunities (
     CHECK (confidence_score BETWEEN 0 AND 1),
   CONSTRAINT opportunities_opportunity_score_check
     CHECK (opportunity_score BETWEEN 0 AND 1),
+  CONSTRAINT opportunities_validity_window_check
+    CHECK (valid_until IS NULL OR valid_until >= valid_from),
   CONSTRAINT opportunities_snoozed_until_check
     CHECK (snoozed_until IS NULL OR snoozed_until > created_at)
 );
@@ -190,6 +208,7 @@ CREATE TABLE opportunity_actions (
   opportunity_id BIGINT NOT NULL,
   action_type TEXT NOT NULL,
   action_key TEXT NOT NULL,
+  action_fingerprint TEXT NOT NULL,
   note TEXT,
   metadata JSONB NOT NULL DEFAULT '{}'::JSONB,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -200,10 +219,26 @@ CREATE TABLE opportunity_actions (
   CONSTRAINT opportunity_actions_type_check
     CHECK (action_type IN ('accepted', 'dismissed', 'snoozed', 'contacted')),
   CONSTRAINT opportunity_actions_key_not_blank CHECK (BTRIM(action_key) <> ''),
+  CONSTRAINT opportunity_actions_fingerprint_format
+    CHECK (action_fingerprint ~ '^[a-f0-9]{64}$'),
   CONSTRAINT opportunity_actions_note_not_blank
     CHECK (note IS NULL OR BTRIM(note) <> ''),
   CONSTRAINT opportunity_actions_dedupe_unique
     UNIQUE (opportunity_id, action_key)
+);
+
+CREATE TABLE opportunity_build_failures (
+  client_profile_id BIGINT NOT NULL REFERENCES client_profiles(id) ON DELETE CASCADE,
+  hiring_episode_id BIGINT NOT NULL REFERENCES hiring_episodes(id) ON DELETE CASCADE,
+  scoring_version TEXT NOT NULL,
+  failure_count INTEGER NOT NULL DEFAULT 1,
+  next_retry_at TIMESTAMPTZ NOT NULL,
+  last_failed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (client_profile_id, hiring_episode_id, scoring_version),
+  CONSTRAINT opportunity_build_failures_version_not_blank
+    CHECK (BTRIM(scoring_version) <> ''),
+  CONSTRAINT opportunity_build_failures_count_check
+    CHECK (failure_count > 0)
 );
 
 CREATE INDEX hiring_episodes_active_last_seen_idx
@@ -213,8 +248,28 @@ CREATE INDEX hiring_episodes_active_last_seen_idx
 CREATE INDEX hiring_episodes_organization_status_idx
   ON hiring_episodes (organization_id, status, last_seen_at DESC);
 
+CREATE INDEX hiring_episodes_status_idx
+  ON hiring_episodes (status, id DESC);
+
+CREATE INDEX hiring_episodes_started_at_idx
+  ON hiring_episodes (started_at DESC, id DESC);
+
+CREATE INDEX hiring_episodes_last_seen_at_idx
+  ON hiring_episodes (last_seen_at DESC, id DESC);
+
+CREATE INDEX hiring_episodes_episode_type_idx
+  ON hiring_episodes (episode_type, last_seen_at DESC, id DESC);
+
 CREATE INDEX hiring_episode_evidence_episode_created_idx
   ON hiring_episode_evidence (hiring_episode_id, created_at ASC);
+
+CREATE INDEX hiring_episode_evidence_signal_lookup_idx
+  ON hiring_episode_evidence (signal_id, organization_id)
+  WHERE signal_id IS NOT NULL;
+
+CREATE INDEX hiring_episode_evidence_item_lookup_idx
+  ON hiring_episode_evidence (evidence_id, organization_id)
+  WHERE evidence_id IS NOT NULL;
 
 CREATE INDEX opportunities_owner_status_score_idx
   ON opportunities (
@@ -236,12 +291,21 @@ CREATE INDEX opportunities_profile_status_score_idx
 CREATE INDEX opportunities_episode_idx
   ON opportunities (hiring_episode_id, id);
 
+CREATE INDEX opportunities_organization_status_idx
+  ON opportunities (organization_id, status, valid_until, id);
+
 CREATE INDEX opportunities_valid_until_idx
   ON opportunities (valid_until ASC)
   WHERE status IN ('new', 'review', 'snoozed');
 
 CREATE INDEX opportunity_actions_owner_created_idx
   ON opportunity_actions (owner_id, created_at DESC, id DESC);
+
+CREATE INDEX opportunity_build_failures_retry_idx
+  ON opportunity_build_failures (next_retry_at, hiring_episode_id, client_profile_id);
+
+CREATE INDEX opportunity_build_failures_episode_idx
+  ON opportunity_build_failures (hiring_episode_id, client_profile_id);
 
 CREATE INDEX digest_candidates_client_profile_org_created_idx
   ON digest_candidates (

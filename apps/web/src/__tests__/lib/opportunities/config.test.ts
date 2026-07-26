@@ -9,7 +9,8 @@ describe('opportunity engine config', () => {
   it('is dark by default and only accepts an explicit true value', () => {
     expect(isOpportunityEngineV1Enabled({})).toBe(false)
     expect(isOpportunityEngineV1Enabled({ OPPORTUNITY_ENGINE_V1_ENABLED: '1' })).toBe(false)
-    expect(isOpportunityEngineV1Enabled({ OPPORTUNITY_ENGINE_V1_ENABLED: ' TRUE ' })).toBe(true)
+    expect(isOpportunityEngineV1Enabled({ OPPORTUNITY_ENGINE_V1_ENABLED: 'true' })).toBe(true)
+    expect(isOpportunityEngineV1Enabled({ OPPORTUNITY_ENGINE_V1_ENABLED: ' TRUE ' })).toBe(false)
   })
 
   it('clamps user and job controlled limits', () => {

@@ -14,7 +14,8 @@ Opportunity Engine превращает уже собранные сигналы
 OPPORTUNITY_ENGINE_V1_ENABLED=false
 ```
 
-Значение по умолчанию — `false`. Только точная строка `true` включает:
+Значение по умолчанию — `false`. Только точная строка `true` без пробелов и
+изменения регистра включает:
 
 - `/opportunities`;
 - `/api/opportunities`;
@@ -33,8 +34,13 @@ OPPORTUNITY_ENGINE_V1_ENABLED=false
 
 - `hiring_episodes` — глобальные company-level факты с versioned dedupe key;
 - `hiring_episode_evidence` — traceability до `signals` и `evidence_items`;
+- `hiring_episode_detection_state` — checkpoint последнего успешно
+  обработанного signal id/update по organization и engine version, включая
+  поздно пришедшие сигналы с более старым `occurred_at`;
 - `opportunities` — owner/profile-scoped score и детерминированный brief;
-- `opportunity_actions` — idempotent audit trail пользовательских действий.
+- `opportunity_actions` — idempotent audit trail пользовательских действий;
+- `opportunity_build_failures` — retry-backoff для неуспешных
+  episode/profile pairs без блокировки следующих batch-строк.
 
 Composite foreign keys не позволяют связать opportunity с чужим профилем или записать действие от другого owner. Score columns ограничены диапазоном `0..1`, lifecycle и confidence gates — allowlist constraints.
 
@@ -62,6 +68,9 @@ Engine version: `hiring-episode-v1`.
 - создаёт стабильный `episode_key` и SHA-256 `evidence_hash`;
 - связывает эпизод с исходными signal/evidence IDs;
 - повторный запуск обновляет существующий versioned episode.
+- успешный apply-run сохраняет checkpoint даже при отсутствии episode, поэтому
+  следующий batch не застревает на первых организациях; dry-run checkpoint не
+  меняет.
 
 ## Opportunity scoring
 
@@ -103,7 +112,9 @@ Backfill безопасен по умолчанию:
 POST /api/cron/opportunities/backfill-opportunities
 ```
 
-выполняет dry-run. Запись разрешается только явным:
+выполняет полный detect → build внутри одной транзакции и завершает её
+`ROLLBACK`, поэтому preview совпадает с apply-путём даже на первой загрузке.
+Запись разрешается только явным:
 
 ```text
 POST /api/cron/opportunities/backfill-opportunities?apply=true
@@ -121,8 +132,25 @@ Jobs изолируют ошибку одной organization/profile pair, ве�
 - `opportunity.job.entity_failed`;
 - `opportunity.job.completed`;
 - `opportunity.job.disabled`;
-- `opportunity.action.completed`;
 - `opportunity.cron.failed`.
+
+Entity-level события:
+
+- `hiring_episode.created`;
+- `hiring_episode.updated`;
+- `hiring_episode.closed`;
+- `opportunity.created`;
+- `opportunity.updated`;
+- `opportunity.expired`;
+- `opportunity.action`.
+
+Build использует только candidate из завершённого digest run, созданный не
+раньше последнего сигнала episode и последнего изменения client profile.
+Source families candidate должны покрывать источники signal-ов episode. Уже
+актуальные opportunities отсекаются до `LIMIT`, поэтому повторные batch-run не
+застревают на первых строках. Ошибка конкретной organization/profile pair
+ставит её на пятиминутный retry-backoff, освобождая bounded batch для следующих
+строк.
 
 ## API
 
@@ -137,13 +165,16 @@ POST /api/opportunities/:id/action
 List filters:
 
 - `profile`;
-- `organization`;
+- `organizationId`;
 - `status` (comma-separated allowlist);
-- `gate=A|B|C|D`;
+- `confidenceGate=A|B|C|D`;
 - `episodeType`;
 - `minimumScore=0..1`;
-- `page`;
-- `pageSize=1..100`.
+- `limit=1..100`;
+- `cursor`.
+
+Для совместимости также принимаются прежние aliases `organization`, `gate`,
+`page` и `pageSize`.
 
 List endpoint и `/opportunities` всегда применяют
 `morningBriefEligible = true`; поэтому gate D и profile-excluded записи не
@@ -158,7 +189,16 @@ Actions:
 
 Action request принимает `Idempotency-Key` header или `idempotencyKey` в JSON. `snoozed` также принимает `snoozeDays` и ограничивает его диапазоном `1..90`. Feedback синхронизируется через существующий `client_digest_org_state` core в той же транзакции.
 
-API projection не возвращает `owner_id`, raw metadata, evidence hash, внутренний digest candidate ID или contact paths.
+Idempotency key хранится вместе с SHA-256 fingerprint нормализованного payload.
+Повтор того же request безопасен, а повторное использование ключа с другим
+action/note/snooze payload возвращает `409`. UI сохраняет один request key для
+сетевого retry, но создаёт новый key для нового пользовательского намерения.
+Snoozed-записи не входят в default Brief; после истечения срока expire job
+возвращает ещё актуальную запись в `new`.
+
+Opportunity storage и API projection не дублируют contact paths. API также не
+возвращает `owner_id`, raw metadata, evidence hash или внутренний digest
+candidate ID.
 
 ## Проверки
 
@@ -203,3 +243,15 @@ Verifier работает внутри транзакции с `ROLLBACK` и п�
 - Morning Brief не отправляет outreach и не генерирует массовые сообщения.
 - Связь evidence item с signal возможна только при существующей нормализованной ссылке; signal trace остаётся обязательным.
 - Scheduler configuration остаётся инфраструктурной задачей deployment environment; приложение предоставляет защищённые idempotent endpoints.
+
+## Следующая версия
+
+После canary v1 рекомендуется:
+
+1. измерить precision по `accepted`, `dismissed` и причинам;
+2. откалибровать thresholds только на размеченных outcomes;
+3. добавить новые company-level episode types лишь после появления надёжных
+   источников и evidence contracts;
+4. расширить outcome model без превращения Morning Brief в CRM;
+5. при необходимости заменить opaque offset cursor на keyset cursor для
+   очень больших tenant-выборок.

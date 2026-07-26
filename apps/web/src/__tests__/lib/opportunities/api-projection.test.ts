@@ -26,13 +26,19 @@ describe('opportunity API projection', () => {
       confidenceGate: 'A',
       scores: {},
       evidenceHash: 'a'.repeat(64),
+      validFrom: '2026-07-26T00:00:00.000Z',
       validUntil: null,
       snoozedUntil: null,
       metadata: {
         morningBriefEligible: true,
         sourceFamilies: ['career-pages'],
-        components: { agencyFit: { score: 0.8 } },
-        fiur: { total: 3.2 },
+        components: {
+          agencyFit: {
+            score: 0.8,
+            contactPaths: [{ value: 'nested-private@example.test' }],
+          },
+        },
+        fiur: { total: 3.2, digestCandidateId: 'nested-private-id' },
         digestCandidateId: 'private-internal-id',
         contactPaths: [{ category: 'email', value: 'personal@example.test' }],
       },
@@ -47,6 +53,8 @@ describe('opportunity API projection', () => {
     expect(serialized).not.toContain('"evidenceHash"')
     expect(serialized).not.toContain('private-internal-id')
     expect(serialized).not.toContain('personal@example.test')
+    expect(serialized).not.toContain('nested-private@example.test')
+    expect(serialized).not.toContain('nested-private-id')
     expect(publicItem.morningBriefEligible).toBe(true)
     expect(publicItem.sourceFamilies).toEqual(['career-pages'])
   })

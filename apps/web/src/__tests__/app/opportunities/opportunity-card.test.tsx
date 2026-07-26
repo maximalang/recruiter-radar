@@ -34,6 +34,7 @@ const OPPORTUNITY: OpportunityItem = {
   confidenceGate: 'A',
   scores: {},
   evidenceHash: 'a'.repeat(64),
+  validFrom: '2026-07-26T00:00:00.000Z',
   validUntil: '2026-08-15T00:00:00.000Z',
   snoozedUntil: null,
   metadata: {},
@@ -57,12 +58,17 @@ describe('OpportunityCard', () => {
 
     expect(screen.getByRole('heading', { name: 'Пример ускорила найм' })).toBeInTheDocument()
     expect(screen.getByText('За 14 дней открыто 8 вакансий.')).toBeInTheDocument()
+    expect(screen.getByText('Почему подходит агентству')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Лента доказательств' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Backend developer' })).toHaveAttribute(
       'href',
       'https://example.test/jobs/1',
     )
     expect(screen.getByRole('button', { name: 'В работу' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Открыть' })).toHaveAttribute(
+      'href',
+      '#evidence-10',
+    )
     expect(screen.getByLabelText('Оценка возможности: 82 из 100')).toBeInTheDocument()
   })
 
