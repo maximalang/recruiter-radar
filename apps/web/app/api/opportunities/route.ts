@@ -1,0 +1,114 @@
+import { NextRequest, NextResponse } from 'next/server'
+
+import { isOpportunityEngineV1Enabled } from '@/lib/opportunities/config'
+import { toPublicOpportunity } from '@/lib/opportunities/api-projection'
+import { listOpportunities } from '@/lib/opportunities/repository'
+import type { HiringEpisodeType } from '@/lib/opportunities/hiring-episode-detection'
+import type {
+  ConfidenceGate,
+  OpportunityStatus,
+} from '@/lib/opportunities/opportunity-scoring'
+import { logError } from '@/lib/runtime'
+import { getOwnerIdFromSession } from '@/lib/session'
+
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
+const STATUSES = new Set<OpportunityStatus>([
+  'new',
+  'review',
+  'accepted',
+  'dismissed',
+  'snoozed',
+  'contacted',
+  'expired',
+])
+const EPISODE_TYPES = new Set<HiringEpisodeType>([
+  'vacancy_spike',
+  'repeated_vacancies',
+  'new_role_cluster',
+  'new_region',
+  'hiring_restart',
+  'sustained_hiring',
+])
+
+export async function GET(request: NextRequest) {
+  if (!isOpportunityEngineV1Enabled()) {
+    return NextResponse.json({ error: 'not_found' }, { status: 404 })
+  }
+
+  const ownerId = await getOwnerIdFromSession()
+  if (!ownerId) {
+    return NextResponse.json({ error: 'authentication_required' }, { status: 401 })
+  }
+
+  const params = request.nextUrl.searchParams
+  try {
+    const result = await listOpportunities({
+      ownerId,
+      clientProfileId: positiveId(params.get('profile')),
+      organizationId: positiveId(params.get('organization')),
+      statuses: parseStatuses(params.get('status')),
+      confidenceGate: parseConfidenceGate(params.get('gate')),
+      episodeType: parseEpisodeType(params.get('episodeType')),
+      minimumScore: boundedNumber(params.get('minimumScore'), 0, 1),
+      page: positiveInteger(params.get('page')) ?? 1,
+      pageSize: positiveInteger(params.get('pageSize')) ?? undefined,
+    })
+
+    return NextResponse.json({
+      opportunities: result.opportunities.map(toPublicOpportunity),
+      total: result.total,
+      page: result.page,
+      pageSize: result.pageSize,
+    })
+  } catch (error) {
+    logError('opportunity.api.list_failed', error, { ownerId })
+    return NextResponse.json(
+      { error: 'opportunities_unavailable' },
+      { status: 500 },
+    )
+  }
+}
+
+function parseStatuses(value: string | null): OpportunityStatus[] | undefined {
+  if (!value) return ['new', 'review', 'accepted', 'snoozed']
+  const statuses = value.split(',').filter(
+    (item): item is OpportunityStatus => STATUSES.has(item as OpportunityStatus),
+  )
+  return statuses.length > 0 ? statuses : undefined
+}
+
+function parseConfidenceGate(value: string | null): ConfidenceGate | null {
+  return value === 'A' || value === 'B' || value === 'C' || value === 'D'
+    ? value
+    : null
+}
+
+function parseEpisodeType(value: string | null): HiringEpisodeType | null {
+  return value && EPISODE_TYPES.has(value as HiringEpisodeType)
+    ? value as HiringEpisodeType
+    : null
+}
+
+function positiveId(value: string | null): string | null {
+  return value && /^[1-9]\d*$/.test(value) ? value : null
+}
+
+function positiveInteger(value: string | null): number | null {
+  if (!value) return null
+  const parsed = Number(value)
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null
+}
+
+function boundedNumber(
+  value: string | null,
+  minimum: number,
+  maximum: number,
+): number | null {
+  if (!value) return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) && parsed >= minimum && parsed <= maximum
+    ? parsed
+    : null
+}
