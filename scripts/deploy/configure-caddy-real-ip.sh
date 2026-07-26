@@ -25,7 +25,7 @@ if [ "$site_block_count" -ne 1 ]; then
   exit 1
 fi
 
-managed_block_count="$(
+canonical_block_count="$(
   awk -v target_site_line="$target_site_line" -v expected_proxy_line="$expected_proxy_line" '
     $0 == target_site_line {
       in_target_site = 1
@@ -36,21 +36,22 @@ managed_block_count="$(
       next
     }
     in_target_site && $0 == expected_proxy_line " {" {
-      if ((getline header) > 0 && header == "        header_up X-Real-IP {remote_host}") {
-        if ((getline closing) > 0 && closing == "    }") {
-          count += 1
-        }
+      if ((getline real_ip) > 0 && real_ip == "        header_up X-Real-IP {remote_host}" &&
+          (getline forwarded_proto) > 0 && forwarded_proto == "        header_up X-Forwarded-Proto https" &&
+          (getline host) > 0 && host == "        header_up Host recruiter-radar.ru" &&
+          (getline closing) > 0 && closing == "    }") {
+        count += 1
       }
     }
     END { print count + 0 }
   ' "$config_path"
 )"
-if [ "$managed_block_count" -gt 1 ]; then
+if [ "$canonical_block_count" -gt 1 ]; then
   echo "Multiple managed Recruiter Radar proxy blocks found; refusing to guess." >&2
   exit 1
 fi
 
-proxy_line_count="$(
+bare_proxy_line_count="$(
   awk -v target_site_line="$target_site_line" -v expected_proxy_line="$expected_proxy_line" '
     $0 == target_site_line {
       in_target_site = 1
@@ -61,6 +62,22 @@ proxy_line_count="$(
       next
     }
     in_target_site && $0 == expected_proxy_line {
+      count += 1
+    }
+    END { print count + 0 }
+  ' "$config_path"
+)"
+braced_proxy_line_count="$(
+  awk -v target_site_line="$target_site_line" -v expected_proxy_line="$expected_proxy_line" '
+    $0 == target_site_line {
+      in_target_site = 1
+      next
+    }
+    in_target_site && $0 == "}" {
+      in_target_site = 0
+      next
+    }
+    in_target_site && $0 == expected_proxy_line " {" {
       count += 1
     }
     END { print count + 0 }
@@ -86,16 +103,16 @@ if [ "$trust_boundary_comment_count" -gt 1 ]; then
   echo "Multiple Recruiter Radar trust-boundary comments found; refusing to guess." >&2
   exit 1
 fi
-if [ "$managed_block_count" -eq 1 ] && [ "$trust_boundary_comment_count" -eq 1 ]; then
-  if [ "$proxy_line_count" -ne 0 ]; then
+if [ "$canonical_block_count" -eq 1 ] && [ "$trust_boundary_comment_count" -eq 1 ]; then
+  if [ "$bare_proxy_line_count" -ne 0 ] || [ "$braced_proxy_line_count" -ne 1 ]; then
     echo "Multiple recruiter-radar.ru proxy blocks found; refusing to guess." >&2
     exit 1
   fi
   caddy validate --config "$config_path" --adapter caddyfile
-  echo "Caddy already overwrites X-Real-IP for Recruiter Radar."
+  echo "Caddy already enforces the Recruiter Radar upstream trust boundary."
   exit 0
 fi
-if [ "$managed_block_count" -ne 1 ] && [ "$proxy_line_count" -ne 1 ]; then
+if [ "$((bare_proxy_line_count + braced_proxy_line_count))" -ne 1 ]; then
   echo "Unexpected recruiter-radar.ru reverse_proxy layout; refusing an unsafe rewrite." >&2
   exit 1
 fi
@@ -119,16 +136,32 @@ awk -v target_site_line="$target_site_line" \
     print
     next
   }
+  in_target_site && skip_proxy {
+    if ($0 == "    }") {
+      skip_proxy = 0
+    }
+    next
+  }
+  in_target_site && $0 == trust_boundary_comment {
+    next
+  }
   in_target_site && $0 == expected_proxy_line {
     print trust_boundary_comment
     print "    reverse_proxy localhost:3000 {"
     print "        header_up X-Real-IP {remote_host}"
+    print "        header_up X-Forwarded-Proto https"
+    print "        header_up Host recruiter-radar.ru"
     print "    }"
     next
   }
   in_target_site && $0 == expected_proxy_line " {" {
     print trust_boundary_comment
-    print
+    print "    reverse_proxy localhost:3000 {"
+    print "        header_up X-Real-IP {remote_host}"
+    print "        header_up X-Forwarded-Proto https"
+    print "        header_up Host recruiter-radar.ru"
+    print "    }"
+    skip_proxy = 1
     next
   }
   { print }
@@ -147,4 +180,4 @@ if ! systemctl reload caddy; then
   exit 1
 fi
 
-echo "Caddy now overwrites X-Real-IP from the direct client address."
+echo "Caddy now enforces canonical Host, HTTPS forwarding, and trusted X-Real-IP."

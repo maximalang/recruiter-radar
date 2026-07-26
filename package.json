@@ -13,6 +13,7 @@
     "db:validate": "npm run validate --workspace @recruiter-radar/db",
     "reconcile:payment-telemetry": "node packages/db/scripts/reconcile-payment-success-telemetry.mjs",
     "test:payment-telemetry:db": "node packages/db/scripts/verify-payment-success-telemetry.mjs",
+    "test:db-migrations": "node packages/db/scripts/migrate.mjs && node packages/db/scripts/verify-payment-success-telemetry.mjs",
     "web:build": "npm run build --workspace @recruiter-radar/web",
     "web:check": "npm run check --workspace @recruiter-radar/web",
     "web:validate": "npm run validate --workspace @recruiter-radar/web",
@@ -123,6 +124,7 @@
     "test:landing:e2e": "npm run test:landing:e2e --workspace @recruiter-radar/web",
     "test:responsive": "npm run test:responsive-surfaces",
     "test:responsive-surfaces": "node scripts/verify-responsive-surfaces.mjs",
+    "verify:responsive-surfaces": "node scripts/verify-responsive-surfaces.mjs",
     "prepare": "husky"
   },
   "devDependencies": {

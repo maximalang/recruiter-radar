@@ -25,6 +25,21 @@ const caddySmoke = readFileSync(
   resolve(process.cwd(), '..', '..', 'scripts', 'test', 'landing-events-caddy-smoke.sh'),
   'utf8',
 )
+const paymentReconciliationWorkflow = readFileSync(
+  resolve(
+    process.cwd(),
+    '..',
+    '..',
+    '.github',
+    'workflows',
+    'payment-telemetry-reconciliation.yml',
+  ),
+  'utf8',
+)
+const dockerEntrypoint = readFileSync(
+  resolve(process.cwd(), 'docker-entrypoint.sh'),
+  'utf8',
+)
 
 describe('production deploy workflow contract', () => {
   it('deploys main only after the Tests workflow succeeds', () => {
@@ -46,6 +61,19 @@ describe('production deploy workflow contract', () => {
     expect(dockerfile).toContain('ENV PUBLIC_APP_ORIGIN="https://recruiter-radar.ru"')
   })
 
+  it('validates production configuration before building the image', () => {
+    const configurationPreflightIndex = workflow.indexOf(
+      'Preflight production server configuration',
+    )
+    const dockerBuildIndex = workflow.indexOf('Build immutable Docker image')
+
+    expect(configurationPreflightIndex).toBeGreaterThan(-1)
+    expect(dockerBuildIndex).toBeGreaterThan(configurationPreflightIndex)
+    expect(workflow).toContain(
+      '/opt/recruiter-radar/configure-notification-encryption.sh --preflight',
+    )
+  })
+
   it('keeps a rollback image and never deletes all unused images', () => {
     expect(workflow).toContain('recruiter-radar:rollback')
     expect(workflow).toContain('Rollback production deployment')
@@ -58,6 +86,8 @@ describe('production deploy workflow contract', () => {
     expect(caddyConfigurator).toContain('$0 == target_site_line')
     expect(caddyConfigurator).toContain('in_target_site && $0 == expected_proxy_line')
     expect(caddyConfigurator).toContain('header_up X-Real-IP {remote_host}')
+    expect(caddyConfigurator).toContain('header_up X-Forwarded-Proto https')
+    expect(caddyConfigurator).toContain('header_up Host recruiter-radar.ru')
     expect(caddyConfigurator).toContain('Trust boundary')
     expect(caddyConfigurator.match(/caddy validate/g)).toHaveLength(2)
     expect(caddyConfigurator).toContain('systemctl reload caddy')
@@ -78,8 +108,38 @@ describe('production deploy workflow contract', () => {
     expect(testWorkflow).toContain('scripts/test/landing-events-caddy-smoke.sh')
     expect(caddySmoke).toContain('caddy:2-alpine')
     expect(caddySmoke).toContain('header_up X-Real-IP {remote_host}')
+    expect(caddySmoke).toContain('header_up X-Forwarded-Proto https')
+    expect(caddySmoke).toContain('header_up Host recruiter-radar.ru')
     expect(caddySmoke).toContain('landing-events-smoke')
     expect(workflow).toContain('"dryRun":true')
+  })
+
+  it('reconciles payment telemetry after migrations without blocking startup', () => {
+    const migrationIndex = dockerEntrypoint.indexOf(
+      'node packages/db/scripts/migrate.mjs',
+    )
+    const reconciliationIndex = dockerEntrypoint.indexOf(
+      'node packages/db/scripts/reconcile-payment-success-telemetry.mjs',
+    )
+    const applicationIndex = dockerEntrypoint.indexOf(
+      'exec node apps/web/server.js',
+    )
+
+    expect(migrationIndex).toBeGreaterThan(-1)
+    expect(reconciliationIndex).toBeGreaterThan(migrationIndex)
+    expect(applicationIndex).toBeGreaterThan(reconciliationIndex)
+    expect(dockerEntrypoint).toContain(
+      'Payment telemetry reconciliation failed; application startup continues.',
+    )
+  })
+
+  it('runs the idempotent payment reconciliation daily under a process lock', () => {
+    expect(paymentReconciliationWorkflow).toContain('schedule:')
+    expect(paymentReconciliationWorkflow).toContain("cron: '")
+    expect(paymentReconciliationWorkflow).toContain('flock -n')
+    expect(paymentReconciliationWorkflow).toContain(
+      'packages/db/scripts/reconcile-payment-success-telemetry.mjs',
+    )
   })
 
   it('uses stable server-rendered deploy markers rather than mutable landing copy', () => {

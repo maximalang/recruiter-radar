@@ -36,6 +36,26 @@ jobs:
         run: |
           bash -n scripts/deploy/configure-notification-encryption.sh
           bash -n scripts/deploy/configure-caddy-real-ip.sh
+          bash -n scripts/deploy/rollback-guard.sh
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.RR_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p ${{ secrets.RR_SSH_PORT }} -t ed25519 ${{ secrets.RR_SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Upload runtime configurator for preflight
+        run: |
+          scp -P ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
+            scripts/deploy/configure-notification-encryption.sh \
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}:/opt/recruiter-radar/configure-notification-encryption.sh
+
+      - name: Preflight production server configuration
+        run: |
+          ssh -p ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }} \
+            'chmod 700 /opt/recruiter-radar/configure-notification-encryption.sh && /opt/recruiter-radar/configure-notification-encryption.sh --preflight'
 
       - name: Build immutable Docker image
         run: |
@@ -54,21 +74,14 @@ jobs:
           docker save "recruiter-radar:${DEPLOY_SHA}" | gzip > /tmp/recruiter-radar-image.tar.gz
           ls -lh /tmp/recruiter-radar-image.tar.gz
 
-      - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.RR_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -p ${{ secrets.RR_SSH_PORT }} -t ed25519 ${{ secrets.RR_SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
-
       - name: Upload image and deployment helper to server
         run: |
           scp -P ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
             /tmp/recruiter-radar-image.tar.gz \
             ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}:/opt/recruiter-radar/image-new.tar.gz
           scp -P ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
-            scripts/deploy/configure-notification-encryption.sh \
-            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}:/opt/recruiter-radar/configure-notification-encryption.sh
+            scripts/deploy/rollback-guard.sh \
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}:/opt/recruiter-radar/rollback-guard.sh
           scp -P ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
             scripts/deploy/configure-caddy-real-ip.sh \
             ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}:/opt/recruiter-radar/configure-caddy-real-ip.sh
@@ -79,10 +92,13 @@ jobs:
           ssh -p ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
             ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }} \
             "DEPLOY_SHA='${DEPLOY_SHA}' bash -s" << 'SSH_EOF'
-          set -euo pipefail
+          set -Eeuo pipefail
           cd /opt/recruiter-radar
           chmod 700 /opt/recruiter-radar/configure-caddy-real-ip.sh
           /opt/recruiter-radar/configure-caddy-real-ip.sh
+          chmod 700 /opt/recruiter-radar/configure-notification-encryption.sh
+          chmod 700 /opt/recruiter-radar/rollback-guard.sh
+          source /opt/recruiter-radar/rollback-guard.sh
 
           cleanup_tarball() {
             rm -f /opt/recruiter-radar/image-new.tar.gz
@@ -149,22 +165,21 @@ jobs:
             exit 1
           fi
 
+          echo "=== Validating production runtime configuration ==="
+          /opt/recruiter-radar/configure-notification-encryption.sh --preflight
+
           echo "=== Loading immutable image ${DEPLOY_SHA} ==="
           docker load < /opt/recruiter-radar/image-new.tar.gz
           docker image inspect "recruiter-radar:${DEPLOY_SHA}" > /dev/null
           docker tag "recruiter-radar:${DEPLOY_SHA}" recruiter-radar:latest
+          rollback_guard_arm
 
           echo "=== Recreating web container ==="
-          chmod 700 /opt/recruiter-radar/configure-notification-encryption.sh
           /opt/recruiter-radar/configure-notification-encryption.sh
 
           echo "=== Waiting for local health (up to 60s) ==="
-          if ! wait_for_health; then
-            echo "New deployment failed local health check" >&2
-            docker logs --tail 50 recruiter-radar-web-1 || true
-            rollback
-            exit 1
-          fi
+          wait_for_health
+          rollback_guard_disarm
           SSH_EOF
 
       - name: Read brand version (single source of truth for the favicon gate)

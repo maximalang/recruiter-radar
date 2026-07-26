@@ -20,5 +20,14 @@ else
   fi
 fi
 
+if [ -n "$DATABASE_URL" ]; then
+  echo "Reconciling payment telemetry..."
+  if ! node packages/db/scripts/reconcile-payment-success-telemetry.mjs; then
+    echo "Payment telemetry reconciliation failed; application startup continues." >&2
+  fi
+else
+  echo "DATABASE_URL not set — skipping payment telemetry reconciliation."
+fi
+
 echo "Starting application..."
 exec node apps/web/server.js

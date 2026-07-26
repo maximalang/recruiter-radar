@@ -38,7 +38,14 @@ export function resolveLandingAnalyticsRateLimitSecret(
   const configuredSalt = (
     options.configuredSalt ?? process.env.LANDING_ANALYTICS_RATE_LIMIT_SALT
   )?.trim();
-  if (configuredSalt) return configuredSalt;
+  if (configuredSalt) {
+    if (nodeEnvironment === "production" && configuredSalt.length < 32) {
+      throw new Error(
+        "LANDING_ANALYTICS_RATE_LIMIT_SALT must contain at least 32 characters",
+      );
+    }
+    return configuredSalt;
+  }
   if (
     nodeEnvironment === "production" &&
     nextPhase === "phase-production-build"

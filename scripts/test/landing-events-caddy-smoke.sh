@@ -21,6 +21,8 @@ http://:8080 {
     reverse_proxy landing-events-smoke-web:3000 {
         # Trust boundary: overwrite any client-supplied X-Real-IP.
         header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-Proto https
+        header_up Host recruiter-radar.ru
     }
 }
 CADDY_EOF
@@ -100,7 +102,52 @@ event_count="$(
 )"
 test "$event_count" = "1"
 
-for index in $(seq 1 29); do
+dry_run_status="$(
+  curl --silent --output /dev/null --write-out '%{http_code}' \
+    --request POST \
+    --header "Host: recruiter-radar.ru" \
+    --header "Origin: https://recruiter-radar.ru" \
+    --header "Content-Type: application/json" \
+    --data "$dry_run_payload" \
+    http://127.0.0.1:8080/api/landing-events
+)"
+test "$dry_run_status" = "204"
+
+unknown_event_status="$(
+  curl --silent --output /dev/null --write-out '%{http_code}' \
+    --request POST \
+    --header "Host: recruiter-radar.ru" \
+    --header "Origin: https://recruiter-radar.ru" \
+    --header "Content-Type: application/json" \
+    --data '{"name":"unknown_event","context":"landing"}' \
+    http://127.0.0.1:8080/api/landing-events
+)"
+test "$unknown_event_status" = "400"
+
+forbidden_field_status="$(
+  curl --silent --output /dev/null --write-out '%{http_code}' \
+    --request POST \
+    --header "Host: recruiter-radar.ru" \
+    --header "Origin: https://recruiter-radar.ru" \
+    --header "Content-Type: application/json" \
+    --data '{"name":"landing_viewed","context":"landing","email":"private@example.test"}' \
+    http://127.0.0.1:8080/api/landing-events
+)"
+test "$forbidden_field_status" = "400"
+
+event_count_after_rejected_and_dry_run="$(
+  docker exec "$db_container" psql -U postgres -d smoke -tAc \
+    "SELECT COUNT(*) FROM product_telemetry_events WHERE event_name = 'landing_viewed'"
+)"
+test "$event_count_after_rejected_and_dry_run" = "1"
+
+unsafe_metadata_count="$(
+  docker exec "$db_container" psql -U postgres -d smoke -tAc \
+    "SELECT COUNT(*) FROM product_telemetry_events WHERE metadata ?| ARRAY['email', 'profile', 'order', 'ip', 'x-real-ip', 'x-forwarded-for']"
+)"
+test "$unsafe_metadata_count" = "0"
+
+for index in $(seq 1 26); do
   status="$(
     curl --silent --output /dev/null --write-out '%{http_code}' \
       --request POST \
@@ -108,6 +155,7 @@ for index in $(seq 1 29); do
       --header "Origin: https://recruiter-radar.ru" \
       --header "Content-Type: application/json" \
       --header "X-Real-IP: 198.51.100.${index}" \
+      --header "X-Forwarded-For: 203.0.113.${index}" \
       --data "$dry_run_payload" \
       http://127.0.0.1:8080/api/landing-events
   )"
@@ -145,4 +193,4 @@ if curl --fail --silent \
 fi
 
 printf '%s\n' \
-  '{"ok":true,"proxyStatus":204,"forgedStatus":403,"rateLimitedStatus":429,"eventCount":1,"nodePortPublished":false}'
+  '{"ok":true,"proxyStatus":204,"dryRunStatus":204,"unknownEventStatus":400,"forbiddenFieldStatus":400,"forgedStatus":403,"rateLimitedStatus":429,"eventCount":1,"unsafeMetadataCount":0,"nodePortPublished":false}'

@@ -55,6 +55,15 @@ jobs:
         run: |
           bash -n scripts/deploy/configure-notification-encryption.sh
           bash -n scripts/deploy/configure-caddy-real-ip.sh
+          bash -n scripts/deploy/rollback-guard.sh
+          bash -n scripts/test/deploy-rollback-guard.sh
+          bash -n scripts/test/configure-notification-encryption.sh
+          bash -n scripts/test/docker-entrypoint-reconciliation.sh
+      - name: Verify deployment rollback and runtime preflights
+        run: |
+          bash scripts/test/deploy-rollback-guard.sh
+          bash scripts/test/configure-notification-encryption.sh
+          bash scripts/test/docker-entrypoint-reconciliation.sh
       - name: Validate database migrations
         run: DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/test node packages/db/scripts/migrate.mjs
       - name: Verify payment success telemetry transitions

@@ -2293,8 +2293,9 @@
   font-size: 0.72rem;
   font-weight: 650;
   line-height: 1.25;
-  hyphens: auto;
-  overflow-wrap: break-word;
+  hyphens: none;
+  word-break: normal;
+  overflow-wrap: normal;
 }
 
 .fiurPopoverLabel small {

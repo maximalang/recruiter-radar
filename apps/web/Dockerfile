@@ -41,6 +41,7 @@ COPY --from=builder /app/apps/web/public ./apps/web/public
 
 # Copy migration tooling for startup migrations
 COPY --from=builder /app/packages/db/scripts/migrate.mjs ./packages/db/scripts/migrate.mjs
+COPY --from=builder /app/packages/db/scripts/reconcile-payment-success-telemetry.mjs ./packages/db/scripts/reconcile-payment-success-telemetry.mjs
 COPY --from=builder /app/packages/db/schema ./packages/db/schema
 COPY --from=builder /app/packages/db/migrations ./packages/db/migrations
 

@@ -242,6 +242,16 @@ describe("POST /api/landing-events", () => {
       configuredSalt: "",
       nextPhase: "",
     })).toThrow("LANDING_ANALYTICS_RATE_LIMIT_SALT is required");
+    expect(() => resolveLandingAnalyticsRateLimitSecret({
+      nodeEnvironment: "production",
+      configuredSalt: "too-short",
+      nextPhase: "",
+    })).toThrow("LANDING_ANALYTICS_RATE_LIMIT_SALT must contain at least 32 characters");
+    expect(resolveLandingAnalyticsRateLimitSecret({
+      nodeEnvironment: "production",
+      configuredSalt: "0123456789abcdef0123456789abcdef",
+      nextPhase: "",
+    })).toBe("0123456789abcdef0123456789abcdef");
     expect(resolveLandingAnalyticsRateLimitSecret({
       nodeEnvironment: "production",
       configuredSalt: "",

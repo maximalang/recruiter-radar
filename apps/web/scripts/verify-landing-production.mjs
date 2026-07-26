@@ -108,6 +108,10 @@ async function assertMobileFiurGeometry(page, viewport) {
       `${viewport.width}px: FIUR label overlaps its trigger`,
     );
     assert.ok(
+      labelBox.height <= 34,
+      `${viewport.width}px: FIUR label exceeds the expected two-line height`,
+    );
+    assert.ok(
       triggerBox.width >= 44 && triggerBox.height >= 44,
       `${viewport.width}px: FIUR touch target is smaller than 44px`,
     );
@@ -572,6 +576,11 @@ for (const viewport of viewportMatrix) {
   await assertNoHorizontalOverflow(matrixPage, `${viewport.width}x${viewport.height}`);
   if (viewport.width <= 390) {
     await assertMobileFiurGeometry(matrixPage, viewport);
+    const matrixLead = matrixPage.locator("details[data-lead-card]").first();
+    await screenshot(
+      matrixLead.locator('[aria-label="Оценка рекомендации"]'),
+      `fiur-meters-matrix-${viewport.width}x${viewport.height}`,
+    );
   }
   await matrixPage.screenshot({
     path: path.join(
@@ -602,7 +611,7 @@ console.log(
       ok: true,
       baseUrl,
       screenshotDirectory,
-      screenshots: 20,
+      screenshots: 24,
       viewportMatrix: viewportMatrix.map(({ width, height }) => `${width}x${height}`),
       slowPreviewSkeletonObserved: skeletonObserved,
       jsTransfer,
