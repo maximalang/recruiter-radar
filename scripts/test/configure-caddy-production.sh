@@ -17,22 +17,47 @@ cat > "$mock_bin/caddy" <<'CADDY_EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 
-printf 'validate %s\n' "$*" >> "$MOCK_COMMAND_LOG"
-count="$(grep -c '^validate ' "$MOCK_COMMAND_LOG")"
-if [ "${MOCK_CADDY_VALIDATE_FAIL_ON_CALL:-0}" = "$count" ]; then
-  exit 21
-fi
+case "${1:-}" in
+  validate)
+    printf 'validate %s\n' "$*" >> "$MOCK_COMMAND_LOG"
+    count="$(grep -c '^validate ' "$MOCK_COMMAND_LOG")"
+    if [ "${MOCK_CADDY_VALIDATE_FAIL_ON_CALL:-0}" = "$count" ]; then
+      exit 21
+    fi
+    ;;
+  reload)
+    printf 'caddy-reload %s\n' "$*" >> "$MOCK_COMMAND_LOG"
+    count="$(grep -c '^caddy-reload ' "$MOCK_COMMAND_LOG")"
+    if [ "${MOCK_CADDY_RELOAD_FAIL_ON_CALL:-0}" = "$count" ]; then
+      exit 34
+    fi
+    ;;
+  *)
+    exit 35
+    ;;
+esac
 CADDY_EOF
 
 cat > "$mock_bin/systemctl" <<'SYSTEMCTL_EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 
-printf 'reload %s\n' "$*" >> "$MOCK_COMMAND_LOG"
-count="$(grep -c '^reload ' "$MOCK_COMMAND_LOG")"
-if [ "${MOCK_SYSTEMCTL_FAIL_ON_CALL:-0}" = "$count" ]; then
-  exit 33
-fi
+case "${1:-}" in
+  show)
+    printf 'show %s\n' "$*" >> "$MOCK_COMMAND_LOG"
+    printf '%s\n' "${MOCK_SYSTEMCTL_CAN_RELOAD:-yes}"
+    ;;
+  reload)
+    printf 'reload %s\n' "$*" >> "$MOCK_COMMAND_LOG"
+    count="$(grep -c '^reload ' "$MOCK_COMMAND_LOG")"
+    if [ "${MOCK_SYSTEMCTL_FAIL_ON_CALL:-0}" = "$count" ]; then
+      exit 33
+    fi
+    ;;
+  *)
+    exit 36
+    ;;
+esac
 SYSTEMCTL_EOF
 
 chmod +x "$mock_bin/caddy" "$mock_bin/systemctl"
@@ -122,6 +147,19 @@ run_configurator "$legacy_dir" env
 assert_canonical "$legacy_dir/Caddyfile"
 cmp "$legacy_dir/original" "$legacy_dir/Caddyfile.backup"
 test "$(grep -c '^reload ' "$legacy_dir/commands.log")" = "1"
+
+no_systemd_reload_dir="$(new_scenario no-systemd-reload)"
+write_site \
+  "$no_systemd_reload_dir/Caddyfile" \
+  '    reverse_proxy localhost:3000'
+run_configurator "$no_systemd_reload_dir" \
+  env MOCK_SYSTEMCTL_CAN_RELOAD=no
+assert_canonical "$no_systemd_reload_dir/Caddyfile"
+test "$(grep -c '^show ' "$no_systemd_reload_dir/commands.log")" = "1"
+test "$(grep -c '^reload ' "$no_systemd_reload_dir/commands.log" || true)" = "0"
+test \
+  "$(grep -c '^caddy-reload ' "$no_systemd_reload_dir/commands.log")" \
+  = "1"
 
 unknown_dir="$(new_scenario unknown)"
 write_site "$unknown_dir/Caddyfile" '    reverse_proxy localhost:3000 {
@@ -244,5 +282,28 @@ cmp "$reload_dir/original" "$reload_dir/Caddyfile.backup"
 test "$(grep -c '^validate ' "$reload_dir/commands.log")" = "2"
 test "$(grep -c '^reload ' "$reload_dir/commands.log")" = "2"
 
+direct_reload_failure_dir="$(new_scenario direct-reload-failure)"
+write_site \
+  "$direct_reload_failure_dir/Caddyfile" \
+  '    reverse_proxy localhost:3000'
+cp \
+  "$direct_reload_failure_dir/Caddyfile" \
+  "$direct_reload_failure_dir/original"
+set +e
+run_configurator "$direct_reload_failure_dir" \
+  env MOCK_SYSTEMCTL_CAN_RELOAD=no MOCK_CADDY_RELOAD_FAIL_ON_CALL=1
+direct_reload_failure_status=$?
+set -e
+test "$direct_reload_failure_status" = "34"
+cmp \
+  "$direct_reload_failure_dir/original" \
+  "$direct_reload_failure_dir/Caddyfile"
+test \
+  "$(grep -c '^caddy-reload ' "$direct_reload_failure_dir/commands.log")" \
+  = "2"
+test \
+  "$(grep -c '^reload ' "$direct_reload_failure_dir/commands.log" || true)" \
+  = "0"
+
 printf '%s\n' \
-  '{"ok":true,"scenarios":["bare","canonical","legacy","unknown","multiple","validation-failure","reload-failure"]}'
+  '{"ok":true,"scenarios":["bare","canonical","legacy","no-systemd-reload","unknown","multiple","validation-failure","reload-failure","direct-reload-failure"]}'

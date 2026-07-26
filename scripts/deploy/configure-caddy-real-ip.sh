@@ -10,6 +10,19 @@ real_ip_header="        header_up X-Real-IP {remote_host}"
 forwarded_proto_header="        header_up X-Forwarded-Proto https"
 host_header="        header_up Host recruiter-radar.ru"
 
+reload_caddy() {
+  can_systemd_reload="$(
+    systemctl show caddy.service --property=CanReload --value 2>/dev/null ||
+      true
+  )"
+  if [ "$can_systemd_reload" = "yes" ]; then
+    systemctl reload caddy.service
+    return
+  fi
+
+  caddy reload --config "$config_path" --adapter caddyfile
+}
+
 if [ ! -f "$config_path" ]; then
   echo "Caddyfile is missing at $config_path" >&2
   exit 1
@@ -217,7 +230,7 @@ mv "$temporary_path" "$config_path"
 temporary_path=""
 
 set +e
-systemctl reload caddy
+reload_caddy
 reload_status=$?
 set -e
 if [ "$reload_status" -ne 0 ]; then
@@ -255,7 +268,7 @@ if [ "$reload_status" -ne 0 ]; then
     fi
   fi
   if [ "$restore_installed" = "true" ]; then
-    systemctl reload caddy
+    reload_caddy
     restored_reload_status=$?
   fi
   set -e

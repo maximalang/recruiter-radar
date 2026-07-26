@@ -211,7 +211,11 @@ describe('production deploy workflow contract', () => {
     expect(caddyConfigurator).toContain(
       'mv "$restore_temporary_path" "$config_path"',
     )
-    expect(caddyConfigurator).toContain('systemctl reload caddy')
+    expect(caddyConfigurator).toContain('CanReload')
+    expect(caddyConfigurator).toContain(
+      'caddy reload --config "$config_path" --adapter caddyfile',
+    )
+    expect(caddyConfigurator).toContain('reload_caddy')
     expect(caddyConfigurator).toContain('previous configuration was restored')
     expect(caddyConfigurator).toContain('exit "$reload_status"')
     expect(testWorkflow).toContain('scripts/test/configure-caddy-production.sh')
