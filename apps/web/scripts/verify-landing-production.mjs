@@ -19,6 +19,7 @@ const viewportMatrix = [
   { width: 360, height: 800 },
   { width: 375, height: 812 },
   { width: 390, height: 844 },
+  { width: 430, height: 932 },
   { width: 768, height: 1024 },
   { width: 1024, height: 768 },
   { width: 1280, height: 800 },
@@ -78,6 +79,47 @@ async function assertNoHorizontalOverflow(page, label) {
 async function screenshot(locator, name) {
   await locator.scrollIntoViewIfNeeded();
   await locator.screenshot({ path: path.join(screenshotDirectory, `${name}.png`) });
+  screenshotCount += 1;
+}
+
+let screenshotCount = 0;
+
+const landingAnchorIds = [
+  "preview",
+  "preview-configurator",
+  "preview-results",
+  "how-it-works",
+  "quality",
+  "pricing",
+  "faq",
+];
+
+async function assertAnchorBelowStickyHeader(page, id, label) {
+  const target = page.locator(`#${id}`);
+  await target.waitFor();
+  await page.waitForFunction((expectedHash) => window.location.hash === expectedHash, `#${id}`);
+  await page.waitForTimeout(80);
+  const geometry = await page.evaluate((anchorId) => {
+    const header = document.querySelector("header");
+    const anchor = document.getElementById(anchorId);
+    if (!(header instanceof HTMLElement) || !(anchor instanceof HTMLElement)) return null;
+    const headerRect = header.getBoundingClientRect();
+    const anchorRect = anchor.getBoundingClientRect();
+    return {
+      headerBottom: headerRect.bottom,
+      anchorTop: anchorRect.top,
+      scrollMarginTop: Number.parseFloat(getComputedStyle(anchor).scrollMarginTop),
+    };
+  }, id);
+  assert.ok(geometry, `${label}: missing sticky-header or #${id} geometry`);
+  assert.ok(
+    geometry.anchorTop >= geometry.headerBottom + 8,
+    `${label}: #${id} starts at ${geometry.anchorTop}px, header ends at ${geometry.headerBottom}px`,
+  );
+  assert.ok(
+    geometry.scrollMarginTop >= 80,
+    `${label}: #${id} has no systemic scroll margin`,
+  );
 }
 
 async function assertMobileFiurGeometry(page, viewport) {
@@ -198,17 +240,37 @@ assertSingleEvent(analyticsEvents, "landing_viewed");
 analyticsEvents.length = 0;
 await page.getByRole("link", { name: "Настроить мой радар" }).click();
 await page.waitForFunction(() => window.location.hash === "#preview-configurator");
+await assertAnchorBelowStickyHeader(page, "preview-configurator", "hero CTA");
 assertSingleEvent(analyticsEvents, "preview_started", "hero_primary");
 
 analyticsEvents.length = 0;
 await page.getByRole("link", { name: "Посмотреть результат" }).first().click();
 await page.waitForFunction(() => window.location.hash === "#preview-results");
+await assertAnchorBelowStickyHeader(page, "preview-results", "hero secondary CTA");
 assertSingleEvent(analyticsEvents, "preview_results_clicked", "hero_secondary");
 
 analyticsEvents.length = 0;
 await page.locator('header [data-analytics-context="header"]').first().click();
 await page.waitForFunction(() => window.location.hash === "#preview-configurator");
+await assertAnchorBelowStickyHeader(page, "preview-configurator", "desktop header CTA");
 assertSingleEvent(analyticsEvents, "preview_started", "header");
+
+analyticsEvents.length = 0;
+for (const id of ["preview", "how-it-works", "quality", "pricing", "faq"]) {
+  await page.locator(`header a[href="#${id}"]`).first().click();
+  await assertAnchorBelowStickyHeader(page, id, `desktop navigation #${id}`);
+}
+assertSingleEvent(analyticsEvents, "pricing_viewed", "pricing");
+
+await page.locator('header a[href="#quality"]').first().click();
+await assertAnchorBelowStickyHeader(page, "quality", "history setup #quality");
+await page.locator('header a[href="#pricing"]').first().click();
+await assertAnchorBelowStickyHeader(page, "pricing", "history setup #pricing");
+await page.goBack();
+await assertAnchorBelowStickyHeader(page, "quality", "browser back");
+await page.goForward();
+await assertAnchorBelowStickyHeader(page, "pricing", "browser forward");
+assert.equal(eventsMatching(analyticsEvents, "pricing_viewed", "pricing").length, 1);
 
 const jsTransfer = await page.evaluate(() => {
   const resources = performance
@@ -333,7 +395,14 @@ assert.equal(
 );
 await screenshot(delivery, "delivery-tabs-1440x900");
 
+const productProof = page.locator("[data-product-proof]");
+const productProofVisible = await productProof.count() === 1;
+if (productProofVisible) {
+  await screenshot(productProof, "product-proof-desktop-1440x900");
+}
+await screenshot(page.locator("#fit"), "product-fit-desktop-1440x900");
 await screenshot(page.locator("#pricing"), "pricing-1440x900");
+await screenshot(page.locator('[aria-labelledby="after-payment-title"]'), "after-payment-desktop-1440x900");
 const faq = page.locator("#faq");
 analyticsEvents.length = 0;
 const faqOpenedResponse = page.waitForResponse((response) => {
@@ -471,6 +540,11 @@ await mobilePage.keyboard.press("Escape");
 const mobileMenuTrigger = mobilePage.locator('button[aria-controls="landing-mobile-menu"]');
 await mobileMenuTrigger.click();
 assert.equal(await mobileMenuTrigger.getAttribute("aria-expanded"), "true");
+await mobilePage.locator('#landing-mobile-menu a[href="#pricing"]').click();
+assert.equal(await mobileMenuTrigger.getAttribute("aria-expanded"), "false");
+assert.equal(await mobilePage.locator("#landing-mobile-menu").isHidden(), true);
+await assertAnchorBelowStickyHeader(mobilePage, "pricing", "mobile navigation");
+await mobileMenuTrigger.click();
 await mobilePage.keyboard.press("Escape");
 assert.equal(await mobileMenuTrigger.getAttribute("aria-expanded"), "false");
 assert.equal(await mobileMenuTrigger.evaluate((element) => element === document.activeElement), true);
@@ -550,6 +624,19 @@ await internalContext.route("https://mc.yandex.ru/**", (route) =>
 const internalPage = await internalContext.newPage();
 await internalPage.goto(`${baseUrl}/dashboard`, { waitUntil: "domcontentloaded" });
 assert.equal(await internalPage.locator('[id^="yandex-metrika-"]').count(), 0);
+
+const directHashPage = await desktopContext.newPage();
+await directHashPage.route("**/api/landing-events", (route) =>
+  route.fulfill({ status: 204, body: "" })
+);
+for (const id of landingAnchorIds) {
+  const anchorUrl = new URL(baseUrl);
+  anchorUrl.hash = id;
+  await directHashPage.goto(anchorUrl.href, { waitUntil: "domcontentloaded" });
+  await assertAnchorBelowStickyHeader(directHashPage, id, `direct URL #${id}`);
+}
+await directHashPage.close();
+
 await slowPage.goto(baseUrl, { waitUntil: "commit" });
 const heroPreviewCta = slowPage.getByRole("link", { name: "Настроить мой радар" });
 await heroPreviewCta.waitFor();
@@ -574,7 +661,7 @@ for (const viewport of viewportMatrix) {
   await matrixPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await matrixPage.getByRole("heading", { level: 1 }).waitFor();
   await assertNoHorizontalOverflow(matrixPage, `${viewport.width}x${viewport.height}`);
-  if (viewport.width <= 390) {
+  if (viewport.width <= 430) {
     await assertMobileFiurGeometry(matrixPage, viewport);
     const matrixLead = matrixPage.locator("details[data-lead-card]").first();
     await screenshot(
@@ -589,6 +676,7 @@ for (const viewport of viewportMatrix) {
     ),
     fullPage: true,
   });
+  screenshotCount += 1;
   await context.close();
 }
 
@@ -611,9 +699,10 @@ console.log(
       ok: true,
       baseUrl,
       screenshotDirectory,
-      screenshots: 24,
+      screenshots: screenshotCount,
       viewportMatrix: viewportMatrix.map(({ width, height }) => `${width}x${height}`),
       slowPreviewSkeletonObserved: skeletonObserved,
+      productProofVisible,
       jsTransfer,
     },
     null,
