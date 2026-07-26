@@ -364,6 +364,22 @@ jobs:
             "$EXPECTED_DEPLOY_SHA"
           SSH_EOF
 
+      - name: Cleanup staged preflight configurator
+        if: always()
+        run: |
+          ssh -p ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }} \
+            "DEPLOY_SHA='${DEPLOY_SHA}' bash -s" << 'SSH_EOF'
+          set -euo pipefail
+          staged_configurator="/opt/recruiter-radar/configure-notification-encryption.${DEPLOY_SHA}.sh"
+          deployment_marker="/opt/recruiter-radar/.deployment-switched"
+          if [ ! -e "$deployment_marker" ] && [ ! -L "$deployment_marker" ]; then
+            rm -f -- "$staged_configurator"
+          else
+            echo "Deployment recovery is pending; preserving the staged preflight configurator."
+          fi
+          SSH_EOF
+
   rollback:
     name: Rollback production deployment
     needs: deploy

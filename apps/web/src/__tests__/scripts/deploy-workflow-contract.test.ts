@@ -114,6 +114,31 @@ describe('production deploy workflow contract', () => {
     )
   })
 
+  it('always cleans only the current SHA preflight helper when recovery is not pending', () => {
+    const cleanupStart = workflow.indexOf(
+      'name: Cleanup staged preflight configurator',
+    )
+    const rollbackJobStart = workflow.indexOf('\n  rollback:', cleanupStart)
+    const cleanupStep = workflow.slice(cleanupStart, rollbackJobStart)
+
+    expect(cleanupStart).toBeGreaterThan(-1)
+    expect(rollbackJobStart).toBeGreaterThan(cleanupStart)
+    expect(cleanupStep).toContain('if: always()')
+    expect(cleanupStep).toContain(
+      'staged_configurator="/opt/recruiter-radar/configure-notification-encryption.${DEPLOY_SHA}.sh"',
+    )
+    expect(cleanupStep).toContain(
+      'deployment_marker="/opt/recruiter-radar/.deployment-switched"',
+    )
+    expect(cleanupStep).toContain(
+      'if [ ! -e "$deployment_marker" ] && [ ! -L "$deployment_marker" ]; then',
+    )
+    expect(cleanupStep).toContain('rm -f -- "$staged_configurator"')
+    expect(cleanupStep).not.toContain(
+      'rm -f -- /opt/recruiter-radar/configure-notification-encryption.*.sh',
+    )
+  })
+
   it('keeps a rollback image and never deletes all unused images', () => {
     expect(workflow).toContain('recruiter-radar:rollback')
     expect(workflow).toContain('Rollback production deployment')
