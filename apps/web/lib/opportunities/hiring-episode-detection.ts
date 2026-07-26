@@ -451,7 +451,10 @@ function buildEpisodeCandidate(
     engineVersion: HIRING_EPISODE_ENGINE_VERSION,
     signalIds,
     evidenceIds,
-    metadata: facts.metadata,
+    metadata: {
+      ...facts.metadata,
+      episodeDimension: facts.dimension,
+    },
   }
 }
 

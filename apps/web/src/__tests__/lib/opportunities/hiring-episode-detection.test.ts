@@ -106,6 +106,7 @@ describe('HiringEpisodeDetectionService', () => {
 
     const cluster = episodes.find((episode) => episode.episodeType === 'new_role_cluster')
     expect(cluster?.metadata.roleFamily).toBe('backend')
+    expect(cluster?.metadata.episodeDimension).toBe('backend')
     expect(cluster?.vacancyCount).toBe(3)
   })
 
