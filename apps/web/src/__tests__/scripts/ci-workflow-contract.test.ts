@@ -30,10 +30,25 @@ describe('pull request CI workflow contract', () => {
     expect(workflow).toContain('npm run test:types --workspace @recruiter-radar/web')
     expect(workflow).toContain('npm run test:landing:e2e')
     expect(workflow).toContain('npm run test:responsive-surfaces')
+    expect(workflow).toContain(
+      'LANDING_ANALYTICS_RATE_LIMIT_SALT: test-landing-rate-limit-salt-at-least-32-characters',
+    )
+    expect(workflow).toContain(
+      'PUBLIC_APP_ORIGIN: https://recruiter-radar.ru',
+    )
     expect(workflow).toContain('node apps/web/scripts/prepare-standalone.mjs')
     expect(workflow).toContain('-o /tmp/landing-ready.html')
     expect(workflow).toContain('grep -q')
     expect(workflow).toContain('data-deploy-anchor="recruiter-radar-landing-v3"')
+    expect(workflow).toContain(
+      'node scripts/verify-production-server-log.mjs /tmp/landing-server.log',
+    )
+    expect(workflow.indexOf('- name: Stop production server')).toBeLessThan(
+      workflow.indexOf('- name: Verify production server log'),
+    )
+    expect(workflow.indexOf('- name: Verify production server log')).toBeLessThan(
+      workflow.indexOf('- name: Upload Playwright screenshots and traces'),
+    )
     expect(workflow).toContain('if: always()')
     expect(workflow).toContain('playwright-report')
     expect(workflow).toContain('test-results')

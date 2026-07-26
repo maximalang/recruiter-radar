@@ -38,8 +38,13 @@ jobs:
 
           set +e
           flock -n -E 75 /tmp/recruiter-radar-payment-telemetry.lock \
-            docker compose exec -T web \
-              node packages/db/scripts/reconcile-payment-success-telemetry.mjs
+            docker compose exec -T web sh -eu -c '
+              test -n "${DATABASE_URL:-}" || {
+                echo "DATABASE_URL is unavailable inside the web container." >&2
+                exit 1
+              }
+              exec node packages/db/scripts/reconcile-payment-success-telemetry.mjs
+            '
           status=$?
           set -e
 

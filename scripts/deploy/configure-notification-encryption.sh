@@ -99,26 +99,14 @@ if [ "${#landing_rate_limit_salt}" -lt 32 ]; then
 fi
 unset landing_rate_limit_salt
 
-public_app_origin="${public_app_origin%/}"
 if [ "$public_app_origin" != "https://recruiter-radar.ru" ]; then
   echo "PUBLIC_APP_ORIGIN must use the canonical HTTPS origin; refusing to deploy" >&2
   exit 1
 fi
 
 if [ -z "$notification_key" ]; then
-  # Preserve credentials encrypted while the app used the SESSION_SECRET fallback.
-  # This computes exactly the same 32-byte key as notification-secrets.ts.
-  notification_key="$(
-    docker compose "${compose_args[@]}" run --rm --no-deps -T web \
-      node -e '
-        const { createHash } = require("node:crypto");
-        const value = process.env.SESSION_SECRET?.trim();
-        if (!value || value.length < 32) process.exit(2);
-        process.stdout.write(
-          createHash("sha256").update(value, "utf8").digest("hex"),
-        );
-      '
-  )"
+  echo "NOTIFICATION_ENCRYPTION_KEY is missing or invalid; refusing to deploy" >&2
+  exit 1
 fi
 
 valid_key=false

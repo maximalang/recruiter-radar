@@ -56,6 +56,9 @@ jobs:
           bash -n scripts/deploy/configure-notification-encryption.sh
           bash -n scripts/deploy/configure-caddy-real-ip.sh
           bash -n scripts/deploy/rollback-guard.sh
+          bash -n scripts/deploy/recover-deployment.sh
+          sh -n scripts/deploy/validate-metrika-id.sh
+          bash -n scripts/test/configure-caddy-production.sh
           bash -n scripts/test/deploy-rollback-guard.sh
           bash -n scripts/test/configure-notification-encryption.sh
           bash -n scripts/test/docker-entrypoint-reconciliation.sh
@@ -63,7 +66,9 @@ jobs:
         run: |
           bash scripts/test/deploy-rollback-guard.sh
           bash scripts/test/configure-notification-encryption.sh
+          bash scripts/test/configure-caddy-production.sh
           bash scripts/test/docker-entrypoint-reconciliation.sh
+          bash scripts/test/validate-metrika-id.sh
       - name: Validate database migrations
         run: DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/test node packages/db/scripts/migrate.mjs
       - name: Verify payment success telemetry transitions
@@ -146,6 +151,8 @@ jobs:
       RESPONSIVE_BASE_URL: http://127.0.0.1:3000
       RESPONSIVE_ARTIFACT_DIR: /tmp/recruiter-radar-responsive
       SESSION_SECRET: test-session-secret-at-least-32-chars-long
+      LANDING_ANALYTICS_RATE_LIMIT_SALT: test-landing-rate-limit-salt-at-least-32-characters
+      PUBLIC_APP_ORIGIN: https://recruiter-radar.ru
     services:
       postgres:
         image: postgres:16-alpine
@@ -202,6 +209,24 @@ jobs:
         run: npm run test:landing:e2e
       - name: Responsive surface audit
         run: npm run test:responsive-surfaces
+      - name: Stop production server
+        if: always()
+        shell: bash
+        run: |
+          if [ -f /tmp/landing-server.pid ]; then
+            server_pid="$(cat /tmp/landing-server.pid)"
+            kill "$server_pid" 2>/dev/null || true
+            for _ in $(seq 1 20); do
+              if ! kill -0 "$server_pid" 2>/dev/null; then
+                exit 0
+              fi
+              sleep 0.25
+            done
+            kill -KILL "$server_pid" 2>/dev/null || true
+          fi
+      - name: Verify production server log
+        if: always()
+        run: node scripts/verify-production-server-log.mjs /tmp/landing-server.log
       - name: Upload Playwright screenshots and traces
         if: always()
         uses: actions/upload-artifact@v4
@@ -215,13 +240,6 @@ jobs:
             /tmp/landing-server.log
           if-no-files-found: warn
           retention-days: 7
-      - name: Stop production server
-        if: always()
-        shell: bash
-        run: |
-          if [ -f /tmp/landing-server.pid ]; then
-            kill "$(cat /tmp/landing-server.pid)" 2>/dev/null || true
-          fi
 
   security-audit:
     runs-on: ubuntu-latest

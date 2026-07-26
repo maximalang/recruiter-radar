@@ -37,8 +37,12 @@ chmod +x "$mock_bin/docker"
 write_env() {
   local salt="$1"
   local origin="$2"
+  local notification_key="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  if [ "$#" -ge 3 ]; then
+    notification_key="$3"
+  fi
   cat > "$app_dir/.env" <<ENV_EOF
-NOTIFICATION_ENCRYPTION_KEY=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+NOTIFICATION_ENCRYPTION_KEY=$notification_key
 LANDING_ANALYTICS_RATE_LIMIT_SALT=$salt
 PUBLIC_APP_ORIGIN=$origin
 ENV_EOF
@@ -51,12 +55,12 @@ run_configurator() {
     bash "$configurator" "$@"
 }
 
-write_env "0123456789abcdef0123456789abcdef" "https://recruiter-radar.ru/"
+write_env "0123456789abcdef0123456789abcdef" "https://recruiter-radar.ru"
 : > "$docker_log"
 run_configurator --preflight
 grep -q ' config$' "$docker_log"
 ! grep -q ' up ' "$docker_log"
-grep -q '^PUBLIC_APP_ORIGIN=https://recruiter-radar.ru/$' "$app_dir/.env"
+grep -q '^PUBLIC_APP_ORIGIN=https://recruiter-radar.ru$' "$app_dir/.env"
 
 : > "$docker_log"
 run_configurator
@@ -68,7 +72,7 @@ test "$config_line" -lt "$up_line"
 test "$up_line" -lt "$port_line"
 
 : > "$docker_log"
-write_env "0123456789abcdef0123456789abcdef" "https://recruiter-radar.ru/"
+write_env "0123456789abcdef0123456789abcdef" "https://recruiter-radar.ru"
 printf 'sentinel override\n' > "$app_dir/.rr-notification-key.compose.yml"
 set +e
 MOCK_COMPOSE_CONFIG_FAIL=true run_configurator --preflight
@@ -76,13 +80,21 @@ preflight_status=$?
 set -e
 test "$preflight_status" = "31"
 ! grep -q ' up ' "$docker_log"
-grep -q '^PUBLIC_APP_ORIGIN=https://recruiter-radar.ru/$' "$app_dir/.env"
+grep -q '^PUBLIC_APP_ORIGIN=https://recruiter-radar.ru$' "$app_dir/.env"
 grep -q '^sentinel override$' "$app_dir/.rr-notification-key.compose.yml"
 
 write_env "too-short" "https://recruiter-radar.ru"
 : > "$docker_log"
 if run_configurator --preflight; then
   echo "Short analytics salt unexpectedly passed" >&2
+  exit 1
+fi
+test ! -s "$docker_log"
+
+write_env "" "https://recruiter-radar.ru"
+: > "$docker_log"
+if run_configurator --preflight; then
+  echo "Missing analytics salt unexpectedly passed" >&2
   exit 1
 fi
 test ! -s "$docker_log"
@@ -103,5 +115,43 @@ if run_configurator --preflight; then
 fi
 test ! -s "$docker_log"
 
+write_env "0123456789abcdef0123456789abcdef" ""
+: > "$docker_log"
+if run_configurator --preflight; then
+  echo "Missing public origin unexpectedly passed" >&2
+  exit 1
+fi
+test ! -s "$docker_log"
+
+write_env "0123456789abcdef0123456789abcdef" "https://recruiter-radar.ru/"
+: > "$docker_log"
+if run_configurator --preflight; then
+  echo "Trailing-slash public origin unexpectedly passed" >&2
+  exit 1
+fi
+test ! -s "$docker_log"
+
+write_env \
+  "0123456789abcdef0123456789abcdef" \
+  "https://recruiter-radar.ru" \
+  "invalid-key"
+: > "$docker_log"
+if run_configurator --preflight; then
+  echo "Invalid notification encryption key unexpectedly passed" >&2
+  exit 1
+fi
+test ! -s "$docker_log"
+
+write_env \
+  "0123456789abcdef0123456789abcdef" \
+  "https://recruiter-radar.ru" \
+  ""
+: > "$docker_log"
+if run_configurator --preflight; then
+  echo "Missing notification encryption key unexpectedly passed" >&2
+  exit 1
+fi
+test ! -s "$docker_log"
+
 printf '%s\n' \
-  '{"ok":true,"composeOrder":["config","up","runtime-validation"],"preflightFailureMutatedContainer":false}'
+  '{"ok":true,"composeOrder":["config","up","runtime-validation"],"preflightFailureMutatedContainer":false,"prerequisites":["LANDING_ANALYTICS_RATE_LIMIT_SALT","PUBLIC_APP_ORIGIN","NOTIFICATION_ENCRYPTION_KEY"]}'

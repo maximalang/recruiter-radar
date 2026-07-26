@@ -22,7 +22,8 @@ fi
 
 if [ -n "$DATABASE_URL" ]; then
   echo "Reconciling payment telemetry..."
-  if ! node packages/db/scripts/reconcile-payment-success-telemetry.mjs; then
+  if ! timeout -s TERM 45 \
+    node packages/db/scripts/reconcile-payment-success-telemetry.mjs; then
     echo "Payment telemetry reconciliation failed; application startup continues." >&2
   fi
 else

@@ -40,6 +40,37 @@ const dockerEntrypoint = readFileSync(
   resolve(process.cwd(), 'docker-entrypoint.sh'),
   'utf8',
 )
+const rollbackGuard = readFileSync(
+  resolve(process.cwd(), '..', '..', 'scripts', 'deploy', 'rollback-guard.sh'),
+  'utf8',
+)
+const deploymentRecovery = readFileSync(
+  resolve(process.cwd(), '..', '..', 'scripts', 'deploy', 'recover-deployment.sh'),
+  'utf8',
+)
+const paymentReconciliationScript = readFileSync(
+  resolve(
+    process.cwd(),
+    '..',
+    '..',
+    'packages',
+    'db',
+    'scripts',
+    'reconcile-payment-success-telemetry.mjs',
+  ),
+  'utf8',
+)
+const metrikaValidator = readFileSync(
+  resolve(
+    process.cwd(),
+    '..',
+    '..',
+    'scripts',
+    'deploy',
+    'validate-metrika-id.sh',
+  ),
+  'utf8',
+)
 
 describe('production deploy workflow contract', () => {
   it('deploys main only after the Tests workflow succeeds', () => {
@@ -55,7 +86,16 @@ describe('production deploy workflow contract', () => {
     expect(workflow).toContain('recruiter-radar:${DEPLOY_SHA}')
     expect(workflow).not.toContain('docker build -f apps/web/Dockerfile -t recruiter-radar:latest')
     expect(workflow).toContain('--build-arg NEXT_PUBLIC_YANDEX_METRIKA_ID=')
-    expect(workflow).toContain('NEXT_PUBLIC_YANDEX_METRIKA_ID is missing or invalid')
+    expect(workflow).toContain('scripts/deploy/validate-metrika-id.sh')
+    expect(workflow).toContain(
+      'METRIKA_ID: ${{ vars.NEXT_PUBLIC_YANDEX_METRIKA_ID }}',
+    )
+    expect(workflow).not.toContain(
+      'metrika_id="${{ vars.NEXT_PUBLIC_YANDEX_METRIKA_ID }}"',
+    )
+    expect(metrikaValidator).toContain(
+      'NEXT_PUBLIC_YANDEX_METRIKA_ID is missing or invalid',
+    )
     expect(workflow).not.toContain('NEXT_PUBLIC_LANDING_ANALYTICS_ENDPOINT')
     expect(dockerfile).not.toContain('NEXT_PUBLIC_LANDING_ANALYTICS_ENDPOINT')
     expect(dockerfile).toContain('ENV PUBLIC_APP_ORIGIN="https://recruiter-radar.ru"')
@@ -80,18 +120,76 @@ describe('production deploy workflow contract', () => {
     expect(workflow).not.toContain('docker image prune -af')
   })
 
+  it('persists the switched deployment and recovers on errors or signals', () => {
+    expect(workflow).toContain('/opt/recruiter-radar/.deployment-switched')
+    expect(workflow).toContain('rollback_guard_write_marker')
+    expect(workflow).toContain('rollback_guard_finalize')
+    expect(workflow).toContain('scripts/deploy/recover-deployment.sh')
+    expect(workflow).toContain("needs.deploy.result == 'failure'")
+    expect(workflow).toContain("needs.deploy.result == 'cancelled'")
+    expect(workflow).not.toContain("steps.deploy.outcome == 'success'")
+    expect(
+      workflow.indexOf('Refuse unresolved production recovery state'),
+    ).toBeLessThan(
+      workflow.indexOf('Upload runtime configurator for preflight'),
+    )
+    expect(workflow).toContain(
+      'Current production container is not running and healthy',
+    )
+    expect(workflow).toContain(
+      'configure-notification-encryption.${DEPLOY_SHA}.sh',
+    )
+    expect(workflow).toContain(
+      'mv "$staged_notification" /opt/recruiter-radar/configure-notification-encryption.sh',
+    )
+    expect(workflow).toContain('flock -w 180 9')
+    expect(workflow).toContain('RR_DEPLOYMENT_LOCK_HELD=true')
+    expect(workflow).toContain(
+      'recover-deployment.external.${DEPLOY_SHA}.sh',
+    )
+    expect(
+      workflow.indexOf('Upload isolated recovery helper'),
+    ).toBeLessThan(
+      workflow.indexOf('Recover marked deployment'),
+    )
+    expect(workflow).toContain(
+      "docker image inspect --format '{{.Id}}' recruiter-radar:latest",
+    )
+    expect(workflow).not.toContain(
+      "docker inspect --format '{{.Image}}' recruiter-radar:latest",
+    )
+    expect(rollbackGuard).toContain('trap rollback_on_int INT')
+    expect(rollbackGuard).toContain('trap rollback_on_term TERM')
+    expect(deploymentRecovery).toContain('previous_image_id')
+    expect(deploymentRecovery).toContain('flock -w 180')
+    expect(deploymentRecovery).toContain(
+      'Previous production image is already running',
+    )
+    expect(deploymentRecovery).toContain('docker image inspect "$previous_image_id"')
+    expect(deploymentRecovery).toContain('rm -f "$marker_path"')
+  })
+
   it('configures a validated trusted client IP header before deployment', () => {
     expect(workflow).toContain('configure-caddy-real-ip.sh')
     expect(caddyConfigurator).toContain('target_site_line="recruiter-radar.ru {"')
     expect(caddyConfigurator).toContain('$0 == target_site_line')
-    expect(caddyConfigurator).toContain('in_target_site && $0 == expected_proxy_line')
+    expect(caddyConfigurator).toContain('proxy_layout')
     expect(caddyConfigurator).toContain('header_up X-Real-IP {remote_host}')
     expect(caddyConfigurator).toContain('header_up X-Forwarded-Proto https')
     expect(caddyConfigurator).toContain('header_up Host recruiter-radar.ru')
     expect(caddyConfigurator).toContain('Trust boundary')
-    expect(caddyConfigurator.match(/caddy validate/g)).toHaveLength(2)
+    expect(caddyConfigurator).toContain(
+      'Unknown reverse_proxy directives found; refusing an unsafe Caddyfile rewrite.',
+    )
+    expect(caddyConfigurator).toContain('restored_validation_status')
+    expect(caddyConfigurator).toContain('Caddyfile.restore.')
+    expect(caddyConfigurator).toContain(
+      'mv "$restore_temporary_path" "$config_path"',
+    )
     expect(caddyConfigurator).toContain('systemctl reload caddy')
     expect(caddyConfigurator).toContain('previous configuration was restored')
+    expect(caddyConfigurator).toContain('exit "$reload_status"')
+    expect(testWorkflow).toContain('scripts/test/configure-caddy-production.sh')
   })
 
   it('binds Node to loopback and requires the production analytics salt', () => {
@@ -128,6 +226,7 @@ describe('production deploy workflow contract', () => {
     expect(migrationIndex).toBeGreaterThan(-1)
     expect(reconciliationIndex).toBeGreaterThan(migrationIndex)
     expect(applicationIndex).toBeGreaterThan(reconciliationIndex)
+    expect(dockerEntrypoint).toContain('timeout -s TERM 45')
     expect(dockerEntrypoint).toContain(
       'Payment telemetry reconciliation failed; application startup continues.',
     )
@@ -138,8 +237,25 @@ describe('production deploy workflow contract', () => {
     expect(paymentReconciliationWorkflow).toContain("cron: '")
     expect(paymentReconciliationWorkflow).toContain('flock -n')
     expect(paymentReconciliationWorkflow).toContain(
+      'test -n "${DATABASE_URL:-}"',
+    )
+    expect(paymentReconciliationWorkflow).toContain(
       'packages/db/scripts/reconcile-payment-success-telemetry.mjs',
     )
+    expect(paymentReconciliationScript).toContain(
+      'WITH paid_orders AS MATERIALIZED',
+    )
+    expect(paymentReconciliationScript).toContain(
+      'statement_timeout: 30_000',
+    )
+    for (const summaryField of [
+      'scanned',
+      'inserted',
+      'already_present',
+      'failed',
+    ]) {
+      expect(paymentReconciliationScript).toContain(summaryField)
+    }
   })
 
   it('uses stable server-rendered deploy markers rather than mutable landing copy', () => {

@@ -4,6 +4,7 @@ import pg from "pg";
 
 import {
   reconcilePaymentSuccessTelemetry,
+  summarizePaymentSuccessTelemetry,
 } from "./reconcile-payment-success-telemetry.mjs";
 
 const { Client } = pg;
@@ -24,6 +25,18 @@ const initialStatuses = ["pending", "canceled", "failed", "processing"];
 try {
   await client.connect();
   await client.query("BEGIN");
+
+  const emptySummary = await summarizePaymentSuccessTelemetry(client);
+  assert.deepEqual(
+    emptySummary,
+    {
+      scanned: 0,
+      inserted: 0,
+      already_present: 0,
+      failed: 0,
+    },
+    "reconciliation must succeed when there are no paid orders",
+  );
 
   const userResult = await client.query(
     `INSERT INTO users (email, full_name)
@@ -219,6 +232,17 @@ try {
     0,
     "reconciliation must be idempotent",
   );
+  const finalSummary = await summarizePaymentSuccessTelemetry(client);
+  assert.deepEqual(
+    finalSummary,
+    {
+      scanned: initialStatuses.length + 1,
+      inserted: 0,
+      already_present: initialStatuses.length + 1,
+      failed: 0,
+    },
+    "reconciliation summary must be count-only and idempotent",
+  );
 
   console.log(
     JSON.stringify({
@@ -227,8 +251,10 @@ try {
       duplicateProtection: ["paid->paid", "webhook-replay"],
       telemetryFailureDoesNotBlockPayment: true,
       reconciliation: {
+        emptySummary,
         firstRunInserted: firstReconciliationCount,
         secondRunInserted: secondReconciliationCount,
+        finalSummary,
       },
       privacyValuesCopied: false,
     }),

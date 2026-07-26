@@ -37,6 +37,8 @@ jobs:
           bash -n scripts/deploy/configure-notification-encryption.sh
           bash -n scripts/deploy/configure-caddy-real-ip.sh
           bash -n scripts/deploy/rollback-guard.sh
+          bash -n scripts/deploy/recover-deployment.sh
+          sh -n scripts/deploy/validate-metrika-id.sh
 
       - name: Setup SSH
         run: |
@@ -45,27 +47,42 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -p ${{ secrets.RR_SSH_PORT }} -t ed25519 ${{ secrets.RR_SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
+      - name: Refuse unresolved production recovery state
+        run: |
+          ssh -p ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }} << 'SSH_EOF'
+          set -euo pipefail
+          marker_path="/opt/recruiter-radar/.deployment-switched"
+          if [ -e "$marker_path" ] || [ -L "$marker_path" ]; then
+            echo "An unresolved deployment marker exists; recover it before another deploy." >&2
+            exit 1
+          fi
+          SSH_EOF
+
       - name: Upload runtime configurator for preflight
         run: |
           scp -P ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
             scripts/deploy/configure-notification-encryption.sh \
-            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}:/opt/recruiter-radar/configure-notification-encryption.sh
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}:/opt/recruiter-radar/configure-notification-encryption.${DEPLOY_SHA}.sh
 
       - name: Preflight production server configuration
         run: |
           ssh -p ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
             ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }} \
-            'chmod 700 /opt/recruiter-radar/configure-notification-encryption.sh && /opt/recruiter-radar/configure-notification-encryption.sh --preflight'
+            "DEPLOY_SHA='${DEPLOY_SHA}' bash -s" << 'SSH_EOF'
+          set -euo pipefail
+          staged_configurator="/opt/recruiter-radar/configure-notification-encryption.${DEPLOY_SHA}.sh"
+          chmod 700 "$staged_configurator"
+          "$staged_configurator" --preflight
+          SSH_EOF
 
       - name: Build immutable Docker image
+        env:
+          METRIKA_ID: ${{ vars.NEXT_PUBLIC_YANDEX_METRIKA_ID }}
         run: |
-          metrika_id="${{ vars.NEXT_PUBLIC_YANDEX_METRIKA_ID }}"
-          [[ "$metrika_id" =~ ^[0-9]{5,12}$ ]] || {
-            echo "NEXT_PUBLIC_YANDEX_METRIKA_ID is missing or invalid" >&2
-            exit 1
-          }
+          sh scripts/deploy/validate-metrika-id.sh "$METRIKA_ID"
           docker build \
-            --build-arg NEXT_PUBLIC_YANDEX_METRIKA_ID="$metrika_id" \
+            --build-arg NEXT_PUBLIC_YANDEX_METRIKA_ID="$METRIKA_ID" \
             -f apps/web/Dockerfile \
             -t "recruiter-radar:${DEPLOY_SHA}" .
 
@@ -78,13 +95,16 @@ jobs:
         run: |
           scp -P ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
             /tmp/recruiter-radar-image.tar.gz \
-            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}:/opt/recruiter-radar/image-new.tar.gz
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}:/opt/recruiter-radar/image-${DEPLOY_SHA}.tar.gz
           scp -P ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
             scripts/deploy/rollback-guard.sh \
-            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}:/opt/recruiter-radar/rollback-guard.sh
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}:/opt/recruiter-radar/rollback-guard.${DEPLOY_SHA}.sh
+          scp -P ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
+            scripts/deploy/recover-deployment.sh \
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}:/opt/recruiter-radar/recover-deployment.${DEPLOY_SHA}.sh
           scp -P ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
             scripts/deploy/configure-caddy-real-ip.sh \
-            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}:/opt/recruiter-radar/configure-caddy-real-ip.sh
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}:/opt/recruiter-radar/configure-caddy-real-ip.${DEPLOY_SHA}.sh
 
       - name: Deploy image with local rollback
         id: deploy
@@ -94,16 +114,43 @@ jobs:
             "DEPLOY_SHA='${DEPLOY_SHA}' bash -s" << 'SSH_EOF'
           set -Eeuo pipefail
           cd /opt/recruiter-radar
+          deployment_marker="/opt/recruiter-radar/.deployment-switched"
+          deployment_lock="/tmp/recruiter-radar-deployment.lock"
+          staged_image="/opt/recruiter-radar/image-${DEPLOY_SHA}.tar.gz"
+          staged_notification="/opt/recruiter-radar/configure-notification-encryption.${DEPLOY_SHA}.sh"
+          staged_rollback_guard="/opt/recruiter-radar/rollback-guard.${DEPLOY_SHA}.sh"
+          staged_recovery="/opt/recruiter-radar/recover-deployment.${DEPLOY_SHA}.sh"
+          staged_caddy="/opt/recruiter-radar/configure-caddy-real-ip.${DEPLOY_SHA}.sh"
+
+          cleanup_staged() {
+            rm -f \
+              "$staged_image" \
+              "$staged_notification" \
+              "$staged_rollback_guard" \
+              "$staged_recovery" \
+              "$staged_caddy"
+          }
+          trap cleanup_staged EXIT
+
+          exec 9> "$deployment_lock"
+          if ! flock -w 180 9; then
+            echo "Timed out waiting for the production deployment lock." >&2
+            exit 1
+          fi
+          if [ -e "$deployment_marker" ] || [ -L "$deployment_marker" ]; then
+            echo "An unresolved deployment marker exists; refusing server mutation." >&2
+            exit 1
+          fi
+          mv "$staged_notification" /opt/recruiter-radar/configure-notification-encryption.sh
+          mv "$staged_rollback_guard" /opt/recruiter-radar/rollback-guard.sh
+          mv "$staged_recovery" /opt/recruiter-radar/recover-deployment.sh
+          mv "$staged_caddy" /opt/recruiter-radar/configure-caddy-real-ip.sh
           chmod 700 /opt/recruiter-radar/configure-caddy-real-ip.sh
           /opt/recruiter-radar/configure-caddy-real-ip.sh
           chmod 700 /opt/recruiter-radar/configure-notification-encryption.sh
           chmod 700 /opt/recruiter-radar/rollback-guard.sh
+          chmod 700 /opt/recruiter-radar/recover-deployment.sh
           source /opt/recruiter-radar/rollback-guard.sh
-
-          cleanup_tarball() {
-            rm -f /opt/recruiter-radar/image-new.tar.gz
-          }
-          trap cleanup_tarball EXIT
 
           wait_for_health() {
             for i in $(seq 1 30); do
@@ -118,21 +165,35 @@ jobs:
           }
 
           rollback() {
-            echo "=== Rolling back to previous production image ==="
-            if ! docker image inspect recruiter-radar:rollback > /dev/null 2>&1; then
-              echo "Rollback image is unavailable" >&2
-              return 1
-            fi
-            docker tag recruiter-radar:rollback recruiter-radar:latest
-            /opt/recruiter-radar/configure-notification-encryption.sh
-            wait_for_health
+            EXPECTED_DEPLOY_SHA="$DEPLOY_SHA" \
+              RR_DEPLOYMENT_MARKER="$deployment_marker" \
+              RR_RECOVERY_LOCK="$deployment_lock" \
+              RR_DEPLOYMENT_LOCK_HELD=true \
+              /opt/recruiter-radar/recover-deployment.sh
           }
 
-          previous_image_id="$(docker inspect --format '{{.Image}}' recruiter-radar-web-1 2>/dev/null || true)"
-          if [ -n "$previous_image_id" ]; then
-            docker tag "$previous_image_id" recruiter-radar:rollback
-            echo "Preserved rollback image $previous_image_id"
+          current_container_state="$(
+            docker inspect \
+              --format '{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}' \
+              recruiter-radar-web-1 2>/dev/null || true
+          )"
+          if [ "$current_container_state" != "running healthy" ]; then
+            echo "Current production container is not running and healthy; refusing to record it for rollback." >&2
+            exit 1
           fi
+          if ! curl -fsS http://localhost:3000/api/health > /dev/null; then
+            echo "Current production health endpoint failed; refusing to record its image for rollback." >&2
+            exit 1
+          fi
+
+          previous_image_id="$(docker inspect --format '{{.Image}}' recruiter-radar-web-1 2>/dev/null || true)"
+          if [ -z "$previous_image_id" ]; then
+            echo "Previous production image is unavailable; refusing a non-recoverable switch" >&2
+            exit 1
+          fi
+          docker image inspect "$previous_image_id" > /dev/null
+          docker tag "$previous_image_id" recruiter-radar:rollback
+          echo "Preserved rollback image $previous_image_id"
 
           echo "=== Reclaiming only safe Docker artifacts ==="
           docker container prune -f
@@ -144,20 +205,29 @@ jobs:
           # <sha>-tagged image except the ones backing the live (:latest) and
           # rollback (:rollback) tags, then prune build cache. This keeps the
           # disk bounded across deploys without losing the rollback safety net.
-          keep_ids="$(
-            docker inspect --format '{{.Image}}' recruiter-radar:latest 2>/dev/null || true
-            docker inspect --format '{{.Image}}' recruiter-radar:rollback 2>/dev/null || true
+          latest_image_id="$(
+            docker image inspect --format '{{.Id}}' recruiter-radar:latest
           )"
-          for img in $(docker images --filter 'reference=recruiter-radar:*' --format '{{.Repository}}:{{.Tag}} {{.ID}}' \
-                       | awk '$1 !~ /:latest$/ && $1 !~ /:rollback$/ { print $2 }'); do
-            case "$keep_ids" in
-              *"$img"*) : ;;           # image backs latest or rollback — keep it
-              *) docker rmi -f "$img" 2>/dev/null || true ;;
+          rollback_image_id="$(
+            docker image inspect --format '{{.Id}}' recruiter-radar:rollback
+          )"
+          for image_ref in $(
+            docker images \
+              --filter 'reference=recruiter-radar:*' \
+              --format '{{.Repository}}:{{.Tag}}' |
+              awk '$0 !~ /:latest$/ && $0 !~ /:rollback$/'
+          ); do
+            candidate_image_id="$(
+              docker image inspect --format '{{.Id}}' "$image_ref"
+            )"
+            case "$candidate_image_id" in
+              "$latest_image_id" | "$rollback_image_id") : ;;
+              *) docker rmi "$image_ref" 2>/dev/null || true ;;
             esac
           done
           docker builder prune -f 2>/dev/null || true
 
-          archive_bytes="$(stat -c '%s' /opt/recruiter-radar/image-new.tar.gz)"
+          archive_bytes="$(stat -c '%s' "$staged_image")"
           available_bytes="$(df -PB1 /opt/recruiter-radar | awk 'NR == 2 { print $4 }')"
           required_bytes="$((archive_bytes * 3 + 536870912))"
           if [ "$available_bytes" -lt "$required_bytes" ]; then
@@ -169,10 +239,14 @@ jobs:
           /opt/recruiter-radar/configure-notification-encryption.sh --preflight
 
           echo "=== Loading immutable image ${DEPLOY_SHA} ==="
-          docker load < /opt/recruiter-radar/image-new.tar.gz
+          docker load < "$staged_image"
           docker image inspect "recruiter-radar:${DEPLOY_SHA}" > /dev/null
-          docker tag "recruiter-radar:${DEPLOY_SHA}" recruiter-radar:latest
+          rollback_guard_write_marker \
+            "$deployment_marker" \
+            "$DEPLOY_SHA" \
+            "$previous_image_id"
           rollback_guard_arm
+          docker tag "recruiter-radar:${DEPLOY_SHA}" recruiter-radar:latest
 
           echo "=== Recreating web container ==="
           /opt/recruiter-radar/configure-notification-encryption.sh
@@ -278,25 +352,64 @@ jobs:
             --data '{"name":"landing_viewed","context":"landing","dryRun":true}' \
             https://recruiter-radar.ru/api/landing-events
 
-      - name: Rollback production deployment
-        if: failure() && steps.deploy.outcome == 'success'
+      - name: Finalize successful production deployment
         run: |
           ssh -p ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
-            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }} << 'SSH_EOF'
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }} \
+            "EXPECTED_DEPLOY_SHA='${DEPLOY_SHA}' bash -s" << 'SSH_EOF'
           set -euo pipefail
-          cd /opt/recruiter-radar
-          docker image inspect recruiter-radar:rollback > /dev/null
-          docker tag recruiter-radar:rollback recruiter-radar:latest
+          source /opt/recruiter-radar/rollback-guard.sh
+          rollback_guard_finalize \
+            /opt/recruiter-radar/.deployment-switched \
+            "$EXPECTED_DEPLOY_SHA"
+          SSH_EOF
+
+  rollback:
+    name: Rollback production deployment
+    needs: deploy
+    if: >-
+      ${{
+        always() &&
+        (
+          needs.deploy.result == 'failure' ||
+          needs.deploy.result == 'cancelled'
+        )
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.RR_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p ${{ secrets.RR_SSH_PORT }} -t ed25519 ${{ secrets.RR_SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Upload isolated recovery helper
+        run: |
+          scp -P ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
+            scripts/deploy/recover-deployment.sh \
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}:/opt/recruiter-radar/recover-deployment.external.${DEPLOY_SHA}.sh
+
+      - name: Recover marked deployment
+        run: |
+          ssh -p ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }} \
+            "EXPECTED_DEPLOY_SHA='${DEPLOY_SHA}' bash -s" << 'SSH_EOF'
+          set -euo pipefail
+          marker_path="/opt/recruiter-radar/.deployment-switched"
+          external_recovery="/opt/recruiter-radar/recover-deployment.external.${EXPECTED_DEPLOY_SHA}.sh"
+          trap 'rm -f "$external_recovery"' EXIT
           chmod 700 /opt/recruiter-radar/configure-notification-encryption.sh
-          /opt/recruiter-radar/configure-notification-encryption.sh
-          for i in $(seq 1 30); do
-            if curl -fsS http://localhost:3000/api/health > /dev/null 2>&1; then
-              echo "Rollback health check passed after ${i}x2s"
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "Rollback health check failed" >&2
-          docker logs --tail 50 recruiter-radar-web-1 || true
-          exit 1
+          chmod 700 "$external_recovery"
+          EXPECTED_DEPLOY_SHA="$EXPECTED_DEPLOY_SHA" \
+            RR_DEPLOYMENT_MARKER="$marker_path" \
+            RR_RECOVERY_LOCK="/tmp/recruiter-radar-deployment.lock" \
+            "$external_recovery"
           SSH_EOF
