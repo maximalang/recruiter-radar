@@ -19,20 +19,6 @@ export type LandingAnalyticsDetail = {
 
 export function sendLandingEvent(detail: LandingAnalyticsDetail) {
   const timestamp = Date.now();
-  try {
-    const counterId = Number(process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID);
-    if (Number.isInteger(counterId) && counterId > 0 && typeof window.ym === "function") {
-      window.ym(
-        counterId,
-        "reachGoal",
-        detail.name,
-        detail.context ? { context: detail.context } : undefined,
-      );
-    }
-  } catch {
-    // Analytics must never interrupt navigation or checkout.
-  }
-
   void fetch("/api/landing-events", {
     method: "POST",
     headers: { "content-type": "application/json" },

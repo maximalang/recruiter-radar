@@ -5,6 +5,7 @@ config_path="/etc/caddy/Caddyfile"
 backup_path="/etc/caddy/Caddyfile.pre-recruiter-radar-real-ip"
 target_site_line="recruiter-radar.ru {"
 expected_proxy_line="    reverse_proxy localhost:3000"
+trust_boundary_comment="    # Trust boundary: overwrite client X-Real-IP at the only public ingress."
 
 if [ ! -f "$config_path" ]; then
   echo "Caddyfile is missing at $config_path" >&2
@@ -65,7 +66,27 @@ proxy_line_count="$(
     END { print count + 0 }
   ' "$config_path"
 )"
-if [ "$managed_block_count" -eq 1 ]; then
+trust_boundary_comment_count="$(
+  awk -v target_site_line="$target_site_line" -v trust_boundary_comment="$trust_boundary_comment" '
+    $0 == target_site_line {
+      in_target_site = 1
+      next
+    }
+    in_target_site && $0 == "}" {
+      in_target_site = 0
+      next
+    }
+    in_target_site && $0 == trust_boundary_comment {
+      count += 1
+    }
+    END { print count + 0 }
+  ' "$config_path"
+)"
+if [ "$trust_boundary_comment_count" -gt 1 ]; then
+  echo "Multiple Recruiter Radar trust-boundary comments found; refusing to guess." >&2
+  exit 1
+fi
+if [ "$managed_block_count" -eq 1 ] && [ "$trust_boundary_comment_count" -eq 1 ]; then
   if [ "$proxy_line_count" -ne 0 ]; then
     echo "Multiple recruiter-radar.ru proxy blocks found; refusing to guess." >&2
     exit 1
@@ -74,7 +95,7 @@ if [ "$managed_block_count" -eq 1 ]; then
   echo "Caddy already overwrites X-Real-IP for Recruiter Radar."
   exit 0
 fi
-if [ "$proxy_line_count" -ne 1 ]; then
+if [ "$managed_block_count" -ne 1 ] && [ "$proxy_line_count" -ne 1 ]; then
   echo "Unexpected recruiter-radar.ru reverse_proxy layout; refusing an unsafe rewrite." >&2
   exit 1
 fi
@@ -85,7 +106,9 @@ cleanup() {
 }
 trap cleanup EXIT
 
-awk -v target_site_line="$target_site_line" -v expected_proxy_line="$expected_proxy_line" '
+awk -v target_site_line="$target_site_line" \
+    -v expected_proxy_line="$expected_proxy_line" \
+    -v trust_boundary_comment="$trust_boundary_comment" '
   $0 == target_site_line {
     in_target_site = 1
     print
@@ -97,9 +120,15 @@ awk -v target_site_line="$target_site_line" -v expected_proxy_line="$expected_pr
     next
   }
   in_target_site && $0 == expected_proxy_line {
+    print trust_boundary_comment
     print "    reverse_proxy localhost:3000 {"
     print "        header_up X-Real-IP {remote_host}"
     print "    }"
+    next
+  }
+  in_target_site && $0 == expected_proxy_line " {" {
+    print trust_boundary_comment
+    print
     next
   }
   { print }

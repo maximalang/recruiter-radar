@@ -118,7 +118,7 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
             data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.header}
           >
-            Попробовать неделю
+            Настроить радар
           </Link>
           <button
             ref={triggerRef}
@@ -160,7 +160,7 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
           data-analytics-context={LANDING_ANALYTICS_CONTEXT.header}
           onClick={() => setMenuOpen(false)}
         >
-          Попробовать неделю
+          Настроить радар
         </Link>
       </nav>
     </header>

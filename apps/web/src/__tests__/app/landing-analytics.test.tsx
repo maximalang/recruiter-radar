@@ -2,7 +2,7 @@
 
 import { fireEvent, render } from "@testing-library/react";
 
-import LandingAnalytics from "@/app/landing-analytics";
+import LandingAnalytics, { sendLandingEvent } from "@/app/landing-analytics";
 import LandingCheckoutAnalytics from "@/app/landing-checkout-analytics";
 
 describe("landing funnel analytics", () => {
@@ -12,6 +12,29 @@ describe("landing funnel analytics", () => {
     fetchMock.mockClear();
     global.fetch = fetchMock as typeof fetch;
     sessionStorage.clear();
+    delete window.ym;
+  });
+
+  it("keeps conversion events in first-party telemetry", () => {
+    const previousCounterId = process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID;
+    process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID = "12345678";
+    window.ym = jest.fn();
+
+    sendLandingEvent({
+      name: "checkout_started",
+      context: "pricing_pilot",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][1]?.body).toContain(
+      '"name":"checkout_started"',
+    );
+    expect(window.ym).not.toHaveBeenCalled();
+    if (previousCounterId === undefined) {
+      delete process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID;
+    } else {
+      process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID = previousCounterId;
+    }
   });
 
   it("tracks checkout view and uses submit semantics for payment and continuation", () => {

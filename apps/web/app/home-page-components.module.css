@@ -2281,7 +2281,7 @@
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 44px;
-  align-items: center;
+  align-items: start;
   width: 100%;
   min-width: 0;
   gap: 8px;
@@ -2292,10 +2292,14 @@
   min-width: 0;
   font-size: 0.72rem;
   font-weight: 650;
+  line-height: 1.25;
+  hyphens: auto;
+  overflow-wrap: break-word;
 }
 
 .fiurPopoverLabel small {
-  margin-left: 4px;
+  display: block;
+  margin-top: 2px;
   color: #8392a5;
   font-size: 0.62rem;
   font-weight: 600;
@@ -2348,7 +2352,8 @@
   left: 0;
   bottom: calc(100% + 9px);
   z-index: 8;
-  width: min(260px, calc(100vw - 48px));
+  box-sizing: border-box;
+  width: min(260px, calc(100vw - 80px));
   padding: 10px 12px;
   border: 1px solid rgba(148, 184, 226, 0.24);
   border-radius: 10px;
@@ -3134,6 +3139,12 @@
   .previewLeadMeter {
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 7px 12px;
+  }
+
+  .previewLeadMeter strong {
+    max-width: 82px;
+    line-height: 1.25;
+    white-space: normal;
   }
 
   .previewLeadMeterTrack {

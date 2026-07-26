@@ -39,8 +39,13 @@ jobs:
 
       - name: Build immutable Docker image
         run: |
+          metrika_id="${{ vars.NEXT_PUBLIC_YANDEX_METRIKA_ID }}"
+          [[ "$metrika_id" =~ ^[0-9]{5,12}$ ]] || {
+            echo "NEXT_PUBLIC_YANDEX_METRIKA_ID is missing or invalid" >&2
+            exit 1
+          }
           docker build \
-            --build-arg NEXT_PUBLIC_YANDEX_METRIKA_ID="${{ vars.NEXT_PUBLIC_YANDEX_METRIKA_ID }}" \
+            --build-arg NEXT_PUBLIC_YANDEX_METRIKA_ID="$metrika_id" \
             -f apps/web/Dockerfile \
             -t "recruiter-radar:${DEPLOY_SHA}" .
 
@@ -247,6 +252,16 @@ jobs:
           done
           echo "Public deployment verification failed (last health status: $code)"
           exit 1
+
+      - name: Verify public landing events route
+        run: |
+          curl \
+            --fail-with-body \
+            --request POST \
+            --header "Content-Type: application/json" \
+            --header "Origin: https://recruiter-radar.ru" \
+            --data '{"name":"landing_viewed","context":"landing","dryRun":true}' \
+            https://recruiter-radar.ru/api/landing-events
 
       - name: Rollback production deployment
         if: failure() && steps.deploy.outcome == 'success'

@@ -19,6 +19,7 @@ export const LANDING_ANALYTICS_EVENT = {
 export const LANDING_ANALYTICS_CONTEXT = {
   heroPrimary: "hero_primary",
   heroSecondary: "hero_secondary",
+  landing: "landing",
   header: "header",
   preset: "preset",
   form: "form",

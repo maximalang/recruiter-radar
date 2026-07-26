@@ -8,11 +8,7 @@ function readCounterId(): string | null {
   return /^\d{5,12}$/.test(value) ? value : null;
 }
 
-export default function YandexMetrika({
-  pathname,
-}: {
-  pathname: "/" | "/checkout" | "/onboarding";
-}) {
+export default function YandexMetrika() {
   const counterId = readCounterId();
   const [ready, setReady] = useState(false);
 
@@ -34,8 +30,8 @@ export default function YandexMetrika({
   `;
   useEffect(() => {
     if (!counterId || !ready || typeof window.ym !== "function") return;
-    window.ym(Number(counterId), "hit", pathname, { title: document.title });
-  }, [counterId, pathname, ready]);
+    window.ym(Number(counterId), "hit", "/", { title: document.title });
+  }, [counterId, ready]);
 
   if (!counterId) return null;
 

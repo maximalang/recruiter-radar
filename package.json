@@ -11,6 +11,7 @@
     "guard:router": "node scripts/guard-no-src-app.mjs",
     "db:migrate": "node packages/db/scripts/migrate.mjs",
     "db:validate": "npm run validate --workspace @recruiter-radar/db",
+    "reconcile:payment-telemetry": "node packages/db/scripts/reconcile-payment-success-telemetry.mjs",
     "test:payment-telemetry:db": "node packages/db/scripts/verify-payment-success-telemetry.mjs",
     "web:build": "npm run build --workspace @recruiter-radar/web",
     "web:check": "npm run check --workspace @recruiter-radar/web",

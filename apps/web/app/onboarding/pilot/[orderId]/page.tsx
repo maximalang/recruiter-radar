@@ -61,7 +61,6 @@ import {
   isStepComplete
 } from "./pilot-onboarding-components";
 import styles from "./pilot-onboarding-components.module.css";
-import YandexMetrika from "../../../yandex-metrika";
 
 export const dynamic = "force-dynamic";
 
@@ -171,7 +170,6 @@ export default async function PilotOnboardingPage({
 
   return (
     <PageFrame maxWidth="860px">
-      <YandexMetrika pathname="/onboarding" />
       <Link href="/" className={ppStyles.backLink}>
         На главную
       </Link>

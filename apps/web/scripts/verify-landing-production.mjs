@@ -80,6 +80,56 @@ async function screenshot(locator, name) {
   await locator.screenshot({ path: path.join(screenshotDirectory, `${name}.png`) });
 }
 
+async function assertMobileFiurGeometry(page, viewport) {
+  const lead = page.locator("details[data-lead-card]").first();
+  await lead.waitFor();
+  if (!(await lead.evaluate((element) => element.hasAttribute("open")))) {
+    await lead.locator("summary").click();
+  }
+
+  const meters = lead.locator('[aria-label="Оценка рекомендации"]');
+  const triggers = meters.getByRole("button", { name: /Что означает/ });
+  const triggerCount = await triggers.count();
+  assert.ok(triggerCount > 0, `${viewport.width}px: FIUR triggers are missing`);
+
+  for (let index = 0; index < triggerCount; index += 1) {
+    const trigger = triggers.nth(index);
+    const header = trigger.locator("..");
+    const label = header.locator('[class*="fiurPopoverLabel"]');
+    const visual = trigger.locator('[class*="fiurPopoverTriggerVisual"]');
+    const [labelBox, triggerBox, visualBox] = await Promise.all([
+      label.boundingBox(),
+      trigger.boundingBox(),
+      visual.boundingBox(),
+    ]);
+    assert.ok(labelBox && triggerBox && visualBox);
+    assert.ok(
+      labelBox.x + labelBox.width + 4 <= triggerBox.x,
+      `${viewport.width}px: FIUR label overlaps its trigger`,
+    );
+    assert.ok(
+      triggerBox.width >= 44 && triggerBox.height >= 44,
+      `${viewport.width}px: FIUR touch target is smaller than 44px`,
+    );
+    assert.ok(
+      visualBox.width >= 22 && visualBox.width <= 26,
+      `${viewport.width}px: FIUR visible trigger must be 22-26px`,
+    );
+  }
+
+  await triggers.first().click();
+  const tooltip = lead.getByRole("tooltip");
+  await tooltip.waitFor();
+  const tooltipBox = await tooltip.boundingBox();
+  assert.ok(tooltipBox, `${viewport.width}px: FIUR tooltip has no layout box`);
+  assert.ok(
+    tooltipBox.x >= 0 &&
+      tooltipBox.x + tooltipBox.width <= viewport.width,
+    `${viewport.width}px: FIUR tooltip escapes the viewport (${JSON.stringify(tooltipBox)})`,
+  );
+  await page.keyboard.press("Escape");
+}
+
 function eventsMatching(events, name, context) {
   return events.filter((event) =>
     event.name === name && (context === undefined || event.context === context)
@@ -303,16 +353,30 @@ await Promise.all([
   page.waitForURL(/\/checkout/),
   page.locator('#pricing [data-analytics-context="pricing_pilot"]').click(),
 ]);
-assert.equal(await page.locator("#yandex-metrika-loader").count(), 1);
-await page.waitForFunction(() =>
-  Array.isArray(window.ym?.a) &&
-  window.ym.a.some((args) => args[1] === "hit" && args[2] === "/checkout")
+const checkoutMetrikaCalls = await page.evaluate(() => window.ym?.a ?? []);
+assert.equal(
+  checkoutMetrikaCalls.some(
+    (args) => args[1] === "hit" && args[2] === "/checkout",
+  ),
+  false,
 );
-const metrikaCalls = await page.evaluate(() => window.ym?.a ?? []);
-assert.equal(JSON.stringify(metrikaCalls).includes("specialization="), false);
 assertSingleEvent(analyticsEvents, "checkout_started", "pricing_pilot");
 assert.equal(eventsMatching(analyticsEvents, "payment_started").length, 0);
 await screenshot(page.locator("main"), "checkout-desktop-1440x900");
+const directCheckoutContext = await browser.newContext({
+  viewport: { width: 1440, height: 900 },
+  locale: "ru-RU",
+});
+await directCheckoutContext.route("https://mc.yandex.ru/**", (route) =>
+  route.fulfill({ status: 200, contentType: "application/javascript", body: "" })
+);
+const directCheckoutPage = await directCheckoutContext.newPage();
+await directCheckoutPage.goto(page.url(), { waitUntil: "domcontentloaded" });
+assert.equal(
+  await directCheckoutPage.locator("#yandex-metrika-loader").count(),
+  0,
+);
+await directCheckoutContext.close();
 if (checkoutFixture) {
   analyticsEvents.length = 0;
   const paymentEventRequest = page.waitForRequest((request) => {
@@ -390,6 +454,7 @@ if (!(await mobileLead.evaluate((element) => element.hasAttribute("open")))) {
 }
 const mobileMeters = mobileLead.locator('[aria-label="Оценка рекомендации"]');
 await screenshot(mobileMeters, "fiur-meters-mobile-360x800");
+await assertMobileFiurGeometry(mobilePage, { width: 360, height: 800 });
 const mobileFiurTrigger = mobileLead.getByRole("button", { name: /Что означает/ }).first();
 await mobileFiurTrigger.click();
 const mobileTooltip = mobileLead.getByRole("tooltip");
@@ -505,6 +570,9 @@ for (const viewport of viewportMatrix) {
   await matrixPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await matrixPage.getByRole("heading", { level: 1 }).waitFor();
   await assertNoHorizontalOverflow(matrixPage, `${viewport.width}x${viewport.height}`);
+  if (viewport.width <= 390) {
+    await assertMobileFiurGeometry(matrixPage, viewport);
+  }
   await matrixPage.screenshot({
     path: path.join(
       screenshotDirectory,

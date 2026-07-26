@@ -70,6 +70,17 @@ notification_key="$(
     tail -n 1
 )"
 notification_key="$(strip_quotes "$notification_key")"
+landing_rate_limit_salt="$(
+  sed -n 's/^LANDING_ANALYTICS_RATE_LIMIT_SALT=//p' "$ENV_FILE" |
+    tail -n 1
+)"
+landing_rate_limit_salt="$(strip_quotes "$landing_rate_limit_salt")"
+
+if [ -z "$landing_rate_limit_salt" ]; then
+  echo "LANDING_ANALYTICS_RATE_LIMIT_SALT is required; refusing to deploy" >&2
+  exit 1
+fi
+unset landing_rate_limit_salt
 
 if [ -z "$notification_key" ]; then
   # Preserve credentials encrypted while the app used the SESSION_SECRET fallback.
@@ -130,14 +141,27 @@ unset notification_key
 cat > "$NOTIFICATION_OVERRIDE" <<'COMPOSE_EOF'
 services:
   web:
+    # Caddy is the only public ingress and the only trusted X-Real-IP writer.
+    ports: !override
+      - "127.0.0.1:3000:3000"
     environment:
       NOTIFICATION_ENCRYPTION_KEY: ${NOTIFICATION_ENCRYPTION_KEY:?NOTIFICATION_ENCRYPTION_KEY is required}
+      LANDING_ANALYTICS_RATE_LIMIT_SALT: ${LANDING_ANALYTICS_RATE_LIMIT_SALT:?LANDING_ANALYTICS_RATE_LIMIT_SALT is required}
+      PUBLIC_APP_ORIGIN: ${PUBLIC_APP_ORIGIN:-https://recruiter-radar.ru}
 COMPOSE_EOF
 chmod 600 "$NOTIFICATION_OVERRIDE"
 
 compose_args+=(-f "$NOTIFICATION_OVERRIDE")
 
 docker compose "${compose_args[@]}" up -d --force-recreate web
+
+published_web_port="$(
+  docker compose "${compose_args[@]}" port web 3000
+)"
+if [ "$published_web_port" != "127.0.0.1:3000" ]; then
+  echo "Web port trust boundary is invalid: expected 127.0.0.1:3000" >&2
+  exit 1
+fi
 
 docker compose "${compose_args[@]}" exec -T web \
   node -e '

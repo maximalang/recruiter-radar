@@ -41,13 +41,13 @@ describe("landing header accessibility", () => {
   it("offers a clear activation path without hiding account access", () => {
     renderHeader();
 
-    expect(screen.getByRole("link", { name: "Попробовать неделю" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Настроить радар" })).toHaveAttribute(
       "href",
       "#preview-configurator",
     );
-    expect(screen.getByRole("link", { name: "Попробовать неделю" }))
+    expect(screen.getByRole("link", { name: "Настроить радар" }))
       .toHaveAttribute("data-analytics-event", "preview_started");
-    expect(screen.getByRole("link", { name: "Попробовать неделю" }))
+    expect(screen.getByRole("link", { name: "Настроить радар" }))
       .toHaveAttribute("data-analytics-context", "header");
     expect(screen.getByRole("link", { name: "Войти" })).toHaveAttribute(
       "href",

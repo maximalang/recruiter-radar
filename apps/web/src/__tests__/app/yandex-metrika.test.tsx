@@ -46,11 +46,11 @@ describe("YandexMetrika", () => {
 
   it("renders nothing when the public counter id is missing or invalid", () => {
     delete process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID;
-    const { container, rerender } = render(<YandexMetrika pathname="/" />);
+    const { container, rerender } = render(<YandexMetrika />);
     expect(container.querySelector("#yandex-metrika-loader")).toBeNull();
 
     process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID = "not-a-counter";
-    rerender(<YandexMetrika pathname="/" />);
+    rerender(<YandexMetrika />);
     expect(container.querySelector("#yandex-metrika-loader")).toBeNull();
   });
 
@@ -58,7 +58,7 @@ describe("YandexMetrika", () => {
     process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID = "12345678";
     const ym = jest.fn();
     window.ym = ym;
-    const { container, rerender } = render(<YandexMetrika pathname="/" />);
+    const { container, rerender } = render(<YandexMetrika />);
     const loader = container.querySelector("#yandex-metrika-loader");
     const initialization = loader?.textContent ?? "";
 
@@ -77,18 +77,17 @@ describe("YandexMetrika", () => {
       "/",
       expect.objectContaining({ title: expect.any(String) }),
     ));
-    rerender(<YandexMetrika pathname="/checkout" />);
-    rerender(<YandexMetrika pathname="/" />);
+    rerender(<YandexMetrika />);
 
     await waitFor(() => {
       const pageviews = ym.mock.calls
         .filter((call) => call[1] === "hit")
         .map((call) => call[2]);
-      expect(pageviews).toEqual(["/", "/checkout", "/"]);
+      expect(pageviews).toEqual(["/"]);
     });
   });
 
-  it("does not mount Metrika globally and scopes it to public funnel routes", () => {
+  it("does not mount Metrika globally or on routes with customer data", () => {
     const layout = RootLayout({ children: <main data-route-content /> });
 
     expect(containsElementType(layout, YandexMetrika)).toBe(false);
@@ -99,8 +98,8 @@ describe("YandexMetrika", () => {
       resolve(process.cwd(), "app/onboarding/pilot/[orderId]/page.tsx"),
       "utf8",
     );
-    expect(landing).toContain('<YandexMetrika pathname="/"');
-    expect(checkout).toContain('<YandexMetrika pathname="/checkout"');
-    expect(onboarding).toContain('<YandexMetrika pathname="/onboarding"');
+    expect(landing).toContain("<YandexMetrika");
+    expect(checkout).not.toContain("YandexMetrika");
+    expect(onboarding).not.toContain("YandexMetrika");
   });
 });

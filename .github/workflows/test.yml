@@ -224,46 +224,12 @@ jobs:
   docker-build:
     needs: [unit-tests, web-build]
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: test
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
     steps:
       - uses: actions/checkout@v4
       - name: Build Docker image
         run: docker build -f apps/web/Dockerfile -t ${{ github.repository }}:${{ github.sha }} .
-      - name: Run container smoke test
+      - name: Caddy landing events smoke
         shell: bash
-        run: |
-          docker run -d --name smoke-test --network host \
-            -e DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/test \
-            -e SESSION_SECRET=test-session-secret-at-least-32-chars-long \
-            -e CRON_API_KEY=test-cron-api-key-at-least-32-chars \
-            -e NEXT_PUBLIC_APP_URL=http://localhost:3000 \
-            -e MIGRATE_ON_START=true \
-            ${{ github.repository }}:${{ github.sha }}
-
-          for i in $(seq 1 30); do
-            if curl -fsS http://localhost:3000/api/health > /dev/null; then
-              exit 0
-            fi
-            if [ "$i" = "30" ]; then
-              docker logs smoke-test
-              exit 1
-            fi
-            sleep 2
-          done
-      - name: Cleanup smoke test
-        if: always()
-        run: |
-          docker stop smoke-test 2>/dev/null || true
-          docker rm smoke-test 2>/dev/null || true
+        env:
+          SMOKE_IMAGE: ${{ github.repository }}:${{ github.sha }}
+        run: bash scripts/test/landing-events-caddy-smoke.sh

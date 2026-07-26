@@ -4,6 +4,7 @@ import {
   POST,
   isAllowedLandingOrigin,
   resetLandingEventRateLimitsForTests,
+  resolveLandingAnalyticsRateLimitSecret,
 } from "@/app/api/landing-events/route";
 import { tryRecordProductEvent } from "@/lib/telemetry";
 
@@ -71,6 +72,23 @@ describe("POST /api/landing-events", () => {
       eventName: "preview_started",
       metadata: { context: "form" },
     }));
+  });
+
+  it("supports a non-persisting deployment smoke payload", async () => {
+    const response = await POST(request(JSON.stringify({
+      name: "landing_viewed",
+      context: "landing",
+      dryRun: true,
+    })));
+    const invalidDryRun = await POST(request(JSON.stringify({
+      name: "checkout_started",
+      context: "pricing_pilot",
+      dryRun: true,
+    })));
+
+    expect(response.status).toBe(204);
+    expect(invalidDryRun.status).toBe(400);
+    expect(mockTryRecordProductEvent).not.toHaveBeenCalled();
   });
 
   it("accepts the canonical motion-control context", async () => {
@@ -200,6 +218,42 @@ describe("POST /api/landing-events", () => {
     expect(missingIp.status).toBe(403);
     expect(malformedIp.status).toBe(403);
     expect(mockTryRecordProductEvent).not.toHaveBeenCalled();
+  });
+
+  it("allows direct loopback development requests without a proxy header", async () => {
+    const response = await POST(new Request(
+      "http://127.0.0.1:3000/api/landing-events",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: "http://127.0.0.1:3000",
+        },
+        body: JSON.stringify({ name: "landing_viewed" }),
+      },
+    ));
+
+    expect(response.status).toBe(204);
+  });
+
+  it("requires a stable rate-limit salt in production", () => {
+    expect(() => resolveLandingAnalyticsRateLimitSecret({
+      nodeEnvironment: "production",
+      configuredSalt: "",
+      nextPhase: "",
+    })).toThrow("LANDING_ANALYTICS_RATE_LIMIT_SALT is required");
+    expect(resolveLandingAnalyticsRateLimitSecret({
+      nodeEnvironment: "production",
+      configuredSalt: "",
+      nextPhase: "phase-production-build",
+    })).toContain("build-only");
+    expect(resolveLandingAnalyticsRateLimitSecret({
+      nodeEnvironment: "development",
+      configuredSalt: "",
+    })).toBe(resolveLandingAnalyticsRateLimitSecret({
+      nodeEnvironment: "development",
+      configuredSalt: "",
+    }));
   });
 
   it("accepts the configured external origin when standalone uses an internal URL", async () => {

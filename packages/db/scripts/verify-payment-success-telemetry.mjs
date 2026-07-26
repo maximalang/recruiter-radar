@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 
 import pg from "pg";
 
+import {
+  reconcilePaymentSuccessTelemetry,
+} from "./reconcile-payment-success-telemetry.mjs";
+
 const { Client } = pg;
 const databaseUrl = process.env.DATABASE_URL?.trim();
 
@@ -129,11 +133,103 @@ try {
     );
   }
 
+  const failureOrderResult = await client.query(
+    `INSERT INTO checkout_orders (
+       user_id,
+       plan_code,
+       amount_rub,
+       currency,
+       status,
+       customer_name,
+       customer_contact,
+       payload,
+       provider
+     )
+     VALUES ($1, 'pilot', 1000, 'RUB', 'pending', $2, $3, '{}'::jsonb, 'test-provider')
+     RETURNING id`,
+    [
+      userId,
+      "Telemetry Failure Test",
+      "telemetry-failure@example.invalid",
+    ],
+  );
+  const failureOrderId = failureOrderResult.rows[0].id;
+
+  await client.query(`
+    CREATE OR REPLACE FUNCTION pg_temp.reject_payment_success_telemetry()
+    RETURNS TRIGGER
+    LANGUAGE plpgsql
+    AS $$
+    BEGIN
+      IF NEW.checkout_order_id = '${failureOrderId}'::bigint THEN
+        RAISE EXCEPTION 'controlled payment telemetry insert failure';
+      END IF;
+      RETURN NEW;
+    END;
+    $$
+  `);
+  await client.query(`
+    CREATE TRIGGER test_reject_payment_success_telemetry
+    BEFORE INSERT ON product_telemetry_events
+    FOR EACH ROW
+    WHEN (NEW.event_name = 'payment_succeeded')
+    EXECUTE FUNCTION pg_temp.reject_payment_success_telemetry()
+  `);
+
+  await client.query(
+    `UPDATE checkout_orders
+     SET status = 'paid', paid_at = NOW()
+     WHERE id = $1`,
+    [failureOrderId],
+  );
+  const paidDespiteTelemetryFailure = await client.query(
+    `SELECT status
+     FROM checkout_orders
+     WHERE id = $1`,
+    [failureOrderId],
+  );
+  assert.equal(
+    paidDespiteTelemetryFailure.rows[0].status,
+    "paid",
+    "a telemetry insert failure must not roll back the paid transition",
+  );
+
+  await client.query(
+    "DROP TRIGGER test_reject_payment_success_telemetry ON product_telemetry_events",
+  );
+  const missingBeforeReconciliation = await client.query(
+    `SELECT COUNT(*)::int AS count
+     FROM product_telemetry_events
+     WHERE event_key = $1`,
+    [`payment-succeeded:${failureOrderId}`],
+  );
+  assert.equal(missingBeforeReconciliation.rows[0].count, 0);
+
+  const firstReconciliationCount =
+    await reconcilePaymentSuccessTelemetry(client);
+  const secondReconciliationCount =
+    await reconcilePaymentSuccessTelemetry(client);
+  assert.equal(
+    firstReconciliationCount,
+    1,
+    "reconciliation must restore the missing payment telemetry event",
+  );
+  assert.equal(
+    secondReconciliationCount,
+    0,
+    "reconciliation must be idempotent",
+  );
+
   console.log(
     JSON.stringify({
       ok: true,
       transitions: initialStatuses.map((status) => `${status}->paid`),
       duplicateProtection: ["paid->paid", "webhook-replay"],
+      telemetryFailureDoesNotBlockPayment: true,
+      reconciliation: {
+        firstRunInserted: firstReconciliationCount,
+        secondRunInserted: secondReconciliationCount,
+      },
       privacyValuesCopied: false,
     }),
   );

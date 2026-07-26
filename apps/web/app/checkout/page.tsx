@@ -24,7 +24,6 @@ import {
 import { SiteFooter } from "../ui/site-footer";
 import ppStyles from "../ui/page-primitives.module.css";
 import LandingCheckoutAnalytics from "../landing-checkout-analytics";
-import YandexMetrika from "../yandex-metrika";
 import { LANDING_ANALYTICS_EVENT } from "../../lib/landing-analytics-contract";
 
 export const dynamic = "force-dynamic";
@@ -72,7 +71,6 @@ export default async function CheckoutPage(props: {
 
   return (
     <InternalPageFrame navItems={buildAccountNavigation("dashboard")} footer={<SiteFooter />}>
-      <YandexMetrika pathname="/checkout" />
       <LandingCheckoutAnalytics
         submitEvent={
           isRequest
