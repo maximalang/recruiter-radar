@@ -27,8 +27,7 @@ describe('dashboard-alerts resolve button (F2 — scoped srOnly)', () => {
     expect(cls).not.toBe('sr-only');
     expect(cls).not.toBe('');
     // The hashed class name always carries the srOnly token fragment.
-    expect(cls.toLowerCase()).toContain('sr-only'.replace('-', '')) ||
-      expect(cls).toMatch(/srOnly/i);
+    expect(cls).toMatch(/sr.?only/i);
   });
 
   it('does not render the bare unscoped `sr-only` class anywhere', () => {

@@ -21,6 +21,15 @@ function makeProfile(overrides: Partial<ClientProfile> = {}): ClientProfile {
     isActive: true,
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',
+    contactPolicy: 'corporate_only',
+    roles: [],
+    excludedIndustries: [],
+    excludedLocations: [],
+    remoteFriendly: false,
+    hiringIntentMin: null,
+    signalFreshnessDays: null,
+    minOpenRoles: null,
+    hiringMode: 'auto',
     ...overrides,
   }
 }

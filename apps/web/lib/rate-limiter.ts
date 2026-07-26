@@ -110,6 +110,7 @@ export class SlidingWindowRateLimiter {
   private readonly maxRequests: number
   private readonly windowMs: number
   private readonly buckets = new Map<string, number[]>()
+  private lastSweepAt = 0
 
   constructor(config: SlidingWindowConfig) {
     this.maxRequests = config.maxRequests
@@ -123,6 +124,15 @@ export class SlidingWindowRateLimiter {
 
     if (redis) {
       return redisCheckAndAdd(redis, `rl:sw:${key}`, now, windowStart, this.maxRequests, this.windowMs)
+    }
+
+    if (now - this.lastSweepAt >= this.windowMs) {
+      for (const [bucketKey, bucketTimestamps] of this.buckets) {
+        const activeTimestamps = bucketTimestamps.filter((timestamp) => timestamp > windowStart)
+        if (activeTimestamps.length === 0) this.buckets.delete(bucketKey)
+        else this.buckets.set(bucketKey, activeTimestamps)
+      }
+      this.lastSweepAt = now
     }
 
     const timestamps = (this.buckets.get(key) ?? []).filter((t) => t > windowStart)
@@ -141,7 +151,10 @@ export class SlidingWindowRateLimiter {
       if (key) await redis.del(`rl:sw:${key}`)
     } else {
       if (key) this.buckets.delete(key)
-      else this.buckets.clear()
+      else {
+        this.buckets.clear()
+        this.lastSweepAt = 0
+      }
     }
   }
 }

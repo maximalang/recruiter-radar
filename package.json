@@ -11,6 +11,9 @@
     "guard:router": "node scripts/guard-no-src-app.mjs",
     "db:migrate": "node packages/db/scripts/migrate.mjs",
     "db:validate": "npm run validate --workspace @recruiter-radar/db",
+    "reconcile:payment-telemetry": "node packages/db/scripts/reconcile-payment-success-telemetry.mjs",
+    "test:payment-telemetry:db": "node packages/db/scripts/verify-payment-success-telemetry.mjs",
+    "test:db-migrations": "node packages/db/scripts/migrate.mjs && node packages/db/scripts/verify-payment-success-telemetry.mjs",
     "web:build": "npm run build --workspace @recruiter-radar/web",
     "web:check": "npm run check --workspace @recruiter-radar/web",
     "web:validate": "npm run validate --workspace @recruiter-radar/web",
@@ -118,6 +121,10 @@
     "digest:run": "node packages/db/scripts/report-digest.mjs",
     "lead:generate": "npm run test --workspace @recruiter-radar/web -- --testPathPattern=src/__tests__/scripts/lead-generate.smoke.test.ts",
     "smoke:e2e": "node scripts/smoke-e2e.mjs",
+    "test:landing:e2e": "npm run test:landing:e2e --workspace @recruiter-radar/web",
+    "test:responsive": "npm run test:responsive-surfaces",
+    "test:responsive-surfaces": "node scripts/verify-responsive-surfaces.mjs",
+    "verify:responsive-surfaces": "node scripts/verify-responsive-surfaces.mjs",
     "prepare": "husky"
   },
   "devDependencies": {
@@ -125,7 +132,8 @@
     "ts-node": "^10.9.2"
   },
   "overrides": {
-    "postcss": "^8.5.15",
+    "brace-expansion": "5.0.8",
+    "postcss": "^8.5.18",
     "sharp": "^0.35.3"
   },
   "version": "1.0.0",
@@ -155,7 +163,7 @@
     "babel-preset-jest": "^29.6.3",
     "balanced-match": "^1.0.2",
     "baseline-browser-mapping": "^2.10.32",
-    "brace-expansion": "^1.1.16",
+    "brace-expansion": "5.0.8",
     "braces": "^3.0.3",
     "browserslist": "^4.28.2",
     "bs-logger": "^0.2.6",
@@ -318,7 +326,7 @@
     "nanoid": "^3.3.12",
     "natural-compare": "^1.4.0",
     "neo-async": "^2.6.2",
-    "next": "^16.2.6",
+    "next": "^16.2.11",
     "node-int64": "^0.4.0",
     "node-releases": "^2.0.46",
     "normalize-path": "^3.0.0",
@@ -347,7 +355,7 @@
     "picomatch": "^2.3.2",
     "pirates": "^4.0.7",
     "pkg-dir": "^4.2.0",
-    "postcss": "^8.5.15",
+    "postcss": "^8.5.18",
     "postgres-array": "^2.0.0",
     "postgres-bytea": "^1.0.1",
     "postgres-date": "^1.0.7",

@@ -12,6 +12,7 @@ function makeLead(overrides: Partial<LeadItem> = {}): LeadItem {
   return {
     id: 'lead-1',
     orgId: 'org-1',
+    clientProfileId: 'profile-1',
     orgName: 'Рога и Копыта',
     sourceExternalId: null,
     score: 3.2,
@@ -20,6 +21,7 @@ function makeLead(overrides: Partial<LeadItem> = {}): LeadItem {
     distinctVacancyNamesCount: 2,
     latestPublishedAt: '2026-06-25',
     reasons: [],
+    structuredReasons: [],
     whyNow: 'Всплеск найма',
     lawfulContactPath: 'Карьерная страница',
     negativeSignals: [],
@@ -30,6 +32,11 @@ function makeLead(overrides: Partial<LeadItem> = {}): LeadItem {
     sourceFamilies: ['career-pages'],
     evidenceTitles: ['Senior Java Developer'],
     locationNames: ['Москва'],
+    hasAiHint: false,
+    isForeignEmployer: false,
+    foreignMatchedDomain: null,
+    contactPaths: [],
+    reviewStatus: 'auto_approved',
     // CRM identifiers (optional on LeadItem; populated by the export path's
     // includeOrgDetails join). Default to populated values so the identifier-
     // column tests have something to assert against.

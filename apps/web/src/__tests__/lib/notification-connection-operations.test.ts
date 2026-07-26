@@ -9,7 +9,7 @@
  * owned by someone else.
  */
 
-import { jest } from '@jest/globals'
+export {}
 
 const originalDatabaseUrl = process.env.DATABASE_URL
 
@@ -220,7 +220,7 @@ describe('notification connection cross-owner identity', () => {
       secretCiphertext: 'c',
       providerMetadata: { webhookUrl: 'https://x.test/tg' },
     })
-    const query = jest.fn(async () => ({ rowCount: 0, rows: [] }))
+    const query: jest.Mock = jest.fn(async () => ({ rowCount: 0, rows: [] }))
     // First call (before) -> empty. Second call (after) -> other owner's row.
     query
       .mockResolvedValueOnce({ rowCount: 0, rows: [] })

@@ -17,8 +17,8 @@ describe('deriveReviewReason (T4.5)', () => {
       isForeignEmployer: false,
       sourceCount: 2,
     });
-    expect(r.key).toBe('gate-c');
-    expect(r.icon).toBe(AlertIcon);
+    expect(r?.key).toBe('gate-c');
+    expect(r?.icon).toBe(AlertIcon);
   });
 
   it('flags a foreign employer as "foreign" with the GlobeIcon (priority over single-source)', () => {
@@ -27,8 +27,8 @@ describe('deriveReviewReason (T4.5)', () => {
       isForeignEmployer: true,
       sourceCount: 1,
     });
-    expect(r.key).toBe('foreign');
-    expect(r.icon).toBe(GlobeIcon);
+    expect(r?.key).toBe('foreign');
+    expect(r?.icon).toBe(GlobeIcon);
   });
 
   it('flags a single-source non-foreign candidate as "single-source" with the LayersIcon', () => {
@@ -37,8 +37,8 @@ describe('deriveReviewReason (T4.5)', () => {
       isForeignEmployer: false,
       sourceCount: 1,
     });
-    expect(r.key).toBe('single-source');
-    expect(r.icon).toBe(LayersIcon);
+    expect(r?.key).toBe('single-source');
+    expect(r?.icon).toBe(LayersIcon);
   });
 
   it('returns null when no review reason applies (gate A/B + multi-source + domestic)', () => {

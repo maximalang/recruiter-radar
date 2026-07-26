@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
+
+import hpStyles from "./home-page-components.module.css";
 
 /**
  * Thin progress bar at the very top of the viewport showing scroll position,
@@ -8,66 +10,87 @@ import { useEffect, useState } from "react";
  * prefers-reduced-motion (no transitions). No deps.
  */
 export default function ScrollProgress() {
-  const [progress, setProgress] = useState(0);
-  const [showTop, setShowTop] = useState(false);
+  const progressRef = useRef<HTMLDivElement | null>(null);
+  const ringRef = useRef<SVGCircleElement | null>(null);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
-    const onScroll = () => {
+    let rafId = 0;
+    let scheduled = false;
+
+    const update = () => {
+      scheduled = false;
       const doc = document.documentElement;
       const scrollTop = doc.scrollTop || document.body.scrollTop;
       const height = doc.scrollHeight - doc.clientHeight;
-      const pct = height > 0 ? Math.min(100, (scrollTop / height) * 100) : 0;
-      setProgress(pct);
-      setShowTop(scrollTop > 600);
+      const progress = height > 0 ? Math.min(1, Math.max(0, scrollTop / height)) : 0;
+      const visible = scrollTop > 600;
+
+      progressRef.current?.style.setProperty("--scroll-progress", String(progress));
+      if (ringRef.current) {
+        ringRef.current.style.strokeDashoffset = String(100 - progress * 100);
+      }
+      if (buttonRef.current) {
+        buttonRef.current.dataset.visible = String(visible);
+        buttonRef.current.setAttribute("aria-hidden", String(!visible));
+        buttonRef.current.tabIndex = visible ? 0 : -1;
+      }
     };
-    onScroll();
+    const onScroll = () => {
+      if (scheduled) return;
+      scheduled = true;
+      rafId = window.requestAnimationFrame(update);
+    };
+
+    update();
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    window.addEventListener("resize", onScroll, { passive: true });
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
   }, []);
+
+  const returnToTop = () => {
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" });
+  };
 
   return (
     <>
       <div
+        ref={progressRef}
+        className={hpStyles.scrollProgress}
+        data-scroll-progress
         aria-hidden="true"
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          height: "3px",
-          width: `${progress}%`,
-          background: "linear-gradient(90deg, #1d4ed8, #3b82f6)",
-          zIndex: 100,
-          transition: "width 0.1s linear",
-        }}
+        style={{ "--scroll-progress": 0 } as CSSProperties}
       />
-      {showTop ? (
-        <button
-          type="button"
-          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-          aria-label="Наверх"
-          style={{
-            position: "fixed",
-            bottom: "24px",
-            right: "24px",
-            width: "44px",
-            height: "44px",
-            borderRadius: "50%",
-            border: "1px solid var(--c-border, #e2e8f0)",
-            background: "#fff",
-            color: "var(--c-brand, #1d4ed8)",
-            boxShadow: "0 8px 24px rgba(15, 23, 42, 0.14)",
-            cursor: "pointer",
-            fontSize: "1.2rem",
-            fontWeight: 700,
-            zIndex: 100,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          ↑
-        </button>
-      ) : null}
+      <button
+        ref={buttonRef}
+        type="button"
+        className={hpStyles.scrollTopButton}
+        onClick={returnToTop}
+        aria-label="Вернуться наверх"
+        aria-hidden="true"
+        data-visible="false"
+        tabIndex={-1}
+      >
+        <svg className={hpStyles.scrollTopRing} viewBox="0 0 44 44" aria-hidden="true">
+          <circle className={hpStyles.scrollTopRingTrack} cx="22" cy="22" r="19" />
+          <circle
+            ref={ringRef}
+            className={hpStyles.scrollTopRingValue}
+            cx="22"
+            cy="22"
+            r="19"
+            pathLength="100"
+          />
+        </svg>
+        <svg className={hpStyles.scrollTopArrow} viewBox="0 0 20 20" aria-hidden="true">
+          <path d="m5.5 11.5 4.5-4.5 4.5 4.5M10 7v7" />
+        </svg>
+      </button>
     </>
   );
 }

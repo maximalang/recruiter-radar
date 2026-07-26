@@ -7,9 +7,13 @@ export function PageFrame(props: {
   children: ReactNode;
   maxWidth?: string;
   className?: string;
+  dataDeployAnchor?: string;
 }) {
   return (
-    <main className={`${styles.pageFrame}${props.className ? ` ${props.className}` : ""}`}>
+    <main
+      className={`${styles.pageFrame}${props.className ? ` ${props.className}` : ""}`}
+      data-deploy-anchor={props.dataDeployAnchor}
+    >
       <div
         style={{
           maxWidth: props.maxWidth ?? "1080px",

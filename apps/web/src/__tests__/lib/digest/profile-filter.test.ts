@@ -59,6 +59,7 @@ function mockProfile(overrides: Partial<ClientProfile> = {}): ClientProfile {
     hiringIntentMin: null,
     signalFreshnessDays: null,
     minOpenRoles: null,
+    hiringMode: 'auto',
     ...overrides,
   }
 }
@@ -208,7 +209,7 @@ describe('matchesClientProfile — signalFreshnessDays gate', () => {
   })
 
   it('keeps a candidate with no signal date (cannot prove staleness)', () => {
-    const item = mockItem({ latest_published_at: null })
+    const item = mockItem({ latest_published_at: null as unknown as string })
     expect(matchesClientProfile(item, mockProfile({ signalFreshnessDays: 14 }))).toBe(true)
   })
 

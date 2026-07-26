@@ -1,0 +1,56 @@
+name: Payment telemetry reconciliation
+
+on:
+  schedule:
+    - cron: '40 1 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: payment-telemetry-reconciliation-prod
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.RR_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan \
+            -p ${{ secrets.RR_SSH_PORT }} \
+            -t ed25519 \
+            ${{ secrets.RR_SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Reconcile payment telemetry
+        run: |
+          ssh \
+            -p ${{ secrets.RR_SSH_PORT }} \
+            -o LogLevel=ERROR \
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }} << 'SSH_EOF'
+          set -euo pipefail
+          cd /opt/recruiter-radar
+
+          set +e
+          flock -n -E 75 /tmp/recruiter-radar-payment-telemetry.lock \
+            docker compose exec -T web sh -eu -c '
+              test -n "${DATABASE_URL:-}" || {
+                echo "DATABASE_URL is unavailable inside the web container." >&2
+                exit 1
+              }
+              exec node packages/db/scripts/reconcile-payment-success-telemetry.mjs
+            '
+          status=$?
+          set -e
+
+          if [ "$status" = "75" ]; then
+            echo "Payment telemetry reconciliation is already running; skipping."
+            exit 0
+          fi
+          exit "$status"
+          SSH_EOF

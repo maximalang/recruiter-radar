@@ -3,11 +3,11 @@ import type { NextConfig } from "next";
 export function buildContentSecurityPolicy(environment: string | undefined): string {
   const isDevelopment = environment !== 'production';
   const scriptPolicy = isDevelopment
-    ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
-    : "script-src 'self' 'unsafe-inline'";
+    ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://mc.yandex.ru"
+    : "script-src 'self' 'unsafe-inline' https://mc.yandex.ru";
   const connectPolicy = isDevelopment
-    ? "connect-src 'self' ws: https://telegram.org"
-    : "connect-src 'self' https://telegram.org";
+    ? "connect-src 'self' ws: https://telegram.org https://mc.yandex.ru"
+    : "connect-src 'self' https://telegram.org https://mc.yandex.ru";
 
   return `default-src 'self'; ${scriptPolicy}; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; ${connectPolicy}; frame-ancestors 'none'`;
 }

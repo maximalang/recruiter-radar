@@ -2,6 +2,13 @@
 
 import { useEffect, useRef } from "react";
 
+import {
+  LANDING_MOTION_EVENT,
+  type LandingMotionDetail,
+} from "./landing-motion/motion-preference";
+import { useLandingMotion } from "./landing-motion/landing-motion-provider";
+import { dispatchLandingRadarSignal } from "./landing-radar-signal";
+
 /**
  * Background radar animation for the landing hero.
  *
@@ -11,6 +18,8 @@ import { useEffect, useRef } from "react";
  * pauses when the tab is hidden.
  */
 export default function RadarCanvas() {
+  const initialMotion = useLandingMotion();
+  const initialMotionRef = useRef(initialMotion);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -19,7 +28,10 @@ export default function RadarCanvas() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const motionMedia = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let reduceMotion = initialMotionRef.current.reduced;
+    let userPaused = initialMotionRef.current.paused;
+    let inViewport = true;
 
     let width = 0;
     let height = 0;
@@ -28,16 +40,18 @@ export default function RadarCanvas() {
     type Blip = { angle: number; radius: number; lit: number; label: string };
     let blips: Blip[] = [];
     let sweep = 0;
+    let lastSignalAt = 0;
+    let signalIndex = 0;
     let rafId = 0;
     let running = true;
 
     const labels = [
       "HR-отдел",
       "карьерный сайт",
-      "burst найма",
+      "всплеск найма",
       "новый регион",
       "3 роли",
-      "gate A",
+      "уровень доверия A",
       "2 источника",
     ];
 
@@ -130,6 +144,7 @@ export default function RadarCanvas() {
       if (!ctx) return;
       const cx = cxRef.current;
       const cy = cyRef.current;
+      const showLabels = width >= 720;
       for (const b of blips) {
         const x = cx + Math.cos(b.angle) * b.radius;
         const y = cy + Math.sin(b.angle) * b.radius;
@@ -150,7 +165,7 @@ export default function RadarCanvas() {
         ctx.arc(x, y, 2.6, 0, Math.PI * 2);
         ctx.fill();
         // label when freshly lit
-        if (b.lit > 0.5) {
+        if (showLabels && b.lit > 0.5) {
           ctx.fillStyle = `rgba(219, 234, 254, ${b.lit})`;
           ctx.font = "600 11px Inter, system-ui, sans-serif";
           ctx.fillText(b.label, x + 8, y + 4);
@@ -206,6 +221,12 @@ export default function RadarCanvas() {
         // blip is lit when the sweep just passed it (a small window)
         if (a < 0.08) {
           b.lit = 1;
+          const now = performance.now();
+          if (now - lastSignalAt >= 2_400) {
+            dispatchLandingRadarSignal(signalIndex);
+            signalIndex = (signalIndex + 1) % 3;
+            lastSignalAt = now;
+          }
         }
         b.lit *= 0.985;
       }
@@ -214,29 +235,59 @@ export default function RadarCanvas() {
       if (running) rafId = requestAnimationFrame(frame);
     }
 
-    function onVisibility() {
-      if (document.hidden) {
-        running = false;
-        cancelAnimationFrame(rafId);
-      } else if (!reduceMotion) {
+    function syncAnimation() {
+      running = false;
+      cancelAnimationFrame(rafId);
+      const shouldAnimate =
+        !reduceMotion && !userPaused && inViewport && !document.hidden;
+      if (shouldAnimate) {
         running = true;
         rafId = requestAnimationFrame(frame);
+      } else {
+        drawStatic();
       }
     }
 
-    resize();
-    if (reduceMotion) {
-      drawStatic();
-    } else {
-      rafId = requestAnimationFrame(frame);
+    function onVisibility() {
+      syncAnimation();
     }
-    window.addEventListener("resize", resize);
+
+    function onMotionPreference(event: Event) {
+      const detail = (event as CustomEvent<LandingMotionDetail>).detail;
+      userPaused = detail?.paused ?? false;
+      reduceMotion = detail?.reduced ?? motionMedia.matches;
+      syncAnimation();
+    }
+
+    function onReducedMotionChange() {
+      reduceMotion = motionMedia.matches;
+      syncAnimation();
+    }
+
+    resize();
+    syncAnimation();
+    const onResize = () => {
+      resize();
+      if (!running) drawStatic();
+    };
+    const intersectionObserver = new IntersectionObserver(([entry]) => {
+      inViewport = entry?.isIntersecting ?? true;
+      syncAnimation();
+    }, { rootMargin: "120px" });
+    intersectionObserver.observe(canvas);
+
+    window.addEventListener("resize", onResize);
+    window.addEventListener(LANDING_MOTION_EVENT, onMotionPreference);
+    motionMedia.addEventListener("change", onReducedMotionChange);
     document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
       running = false;
       cancelAnimationFrame(rafId);
-      window.removeEventListener("resize", resize);
+      intersectionObserver.disconnect();
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener(LANDING_MOTION_EVENT, onMotionPreference);
+      motionMedia.removeEventListener("change", onReducedMotionChange);
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, []);

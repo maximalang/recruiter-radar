@@ -3,6 +3,9 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
+ARG NEXT_PUBLIC_YANDEX_METRIKA_ID=""
+ENV NEXT_PUBLIC_YANDEX_METRIKA_ID=$NEXT_PUBLIC_YANDEX_METRIKA_ID
+
 # Copy package files for better layer caching
 COPY package*.json ./
 COPY apps/web/package*.json ./apps/web/
@@ -38,6 +41,7 @@ COPY --from=builder /app/apps/web/public ./apps/web/public
 
 # Copy migration tooling for startup migrations
 COPY --from=builder /app/packages/db/scripts/migrate.mjs ./packages/db/scripts/migrate.mjs
+COPY --from=builder /app/packages/db/scripts/reconcile-payment-success-telemetry.mjs ./packages/db/scripts/reconcile-payment-success-telemetry.mjs
 COPY --from=builder /app/packages/db/schema ./packages/db/schema
 COPY --from=builder /app/packages/db/migrations ./packages/db/migrations
 
@@ -61,5 +65,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 # Start the application (via entrypoint that runs migrations first)
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
+ENV PUBLIC_APP_ORIGIN="https://recruiter-radar.ru"
 
 CMD ["./docker-entrypoint.sh"]

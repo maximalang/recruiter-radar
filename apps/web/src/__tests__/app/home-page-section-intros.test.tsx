@@ -1,9 +1,16 @@
-import { Children, isValidElement, type ReactNode } from "react";
+import { Children, isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import Link from "next/link";
 
-import HomePage, { PreviewSection } from "@/app/page";
+import HomePage, { PreviewSection, PreviewSkeleton } from "@/app/page";
+import LandingDeliveryDemo from "@/app/landing-delivery-demo";
+import LandingMethodology from "@/app/landing-methodology";
+import LandingSourceArchitecture from "@/app/landing-source-architecture";
 import { NoticeBox, SectionIntro, SurfaceCard } from "@/app/ui/page-primitives";
+import {
+  LANDING_ANALYTICS_CONTEXT,
+  LANDING_ANALYTICS_EVENT,
+} from "@/lib/landing-analytics-contract";
 import {
   buildCheckoutHref,
   getPublicSampleDigestState,
@@ -28,11 +35,11 @@ const mockGetPublicSampleDigestState = getPublicSampleDigestState as jest.Mocked
   typeof getPublicSampleDigestState
 >;
 
-function collectElements(node: ReactNode, type: unknown): React.ReactElement[] {
-  const matches: React.ReactElement[] = [];
+function collectElements(node: ReactNode, type: unknown): ReactElement<Record<string, any>>[] {
+  const matches: ReactElement<Record<string, any>>[] = [];
 
   Children.forEach(node, (child) => {
-    if (!isValidElement(child)) return;
+    if (!isValidElement<Record<string, any>>(child)) return;
     if (child.type === type) matches.push(child);
     matches.push(...collectElements(child.props.children, type));
   });
@@ -45,7 +52,9 @@ function readVisibleText(node: ReactNode): string {
 
   const parts: string[] = [];
   Children.forEach(node, (child) => {
-    if (isValidElement(child)) parts.push(readVisibleText(child.props.children));
+    if (isValidElement<{ children?: ReactNode }>(child)) {
+      parts.push(readVisibleText(child.props.children));
+    }
     else if (typeof child === "string" || typeof child === "number") parts.push(String(child));
   });
   return parts.join(" ").replace(/\s+/g, " ").trim();
@@ -62,34 +71,37 @@ describe("landing section hierarchy", () => {
   });
 
   it("uses the brand-accent eyebrow on every public landing section", async () => {
-    // The live preview is now an async <PreviewSection> behind a <Suspense>
-    // boundary (the home page is `force-dynamic` and the digest query blocked
-    // the whole render — see page.tsx). HomePage's static tree no longer
-    // contains the preview's children, so we render both halves and combine:
-    // HomePage renders Проблема / Как работает / Проверка сигнала / Тарифы /
-    // FAQ (5 SectionIntros), PreviewSection renders Рабочий радар
-    // (1) — six total. The duplicate "Что внутри" block must not return.
+    // The stable preview wrapper and heading live outside Suspense. This keeps
+    // the anchor and section hierarchy available while Postgres is still
+    // resolving the real form/results workspace.
     const page = await HomePage({ searchParams: Promise.resolve({}) });
-    const preview = await PreviewSection({
-      previewInput: readPublicPreviewInput({}),
-      hasPreview: false,
-      checkoutHref: buildCheckoutHref(readPublicPreviewInput({})),
-    });
-    const sectionIntros = [
-      ...collectElements(page, SectionIntro),
-      ...collectElements(preview, SectionIntro),
-    ];
+    const sectionIntros = collectElements(page, SectionIntro);
 
     expect(sectionIntros).toHaveLength(6);
     expect(sectionIntros.every((section) => section.props.accent === true)).toBe(true);
     expect(sectionIntros.map((section) => section.props.eyebrow)).toEqual([
       "Проблема",
+      "Рабочий радар",
       "Как работает",
       "Проверка сигнала",
       "Тарифы",
       "FAQ",
-      "Рабочий радар",
     ]);
+  });
+
+  it("keeps the preview wrapper stable and exposes both CTA anchors during Suspense", async () => {
+    const page = await HomePage({ searchParams: Promise.resolve({}) });
+    const previewWrapper = collectElements(page, "section")
+      .find((section) => section.props.id === "preview");
+    const anchorHrefs = collectElements(page, "a").map((anchor) => anchor.props.href);
+    const skeletonMarkup = renderToStaticMarkup(<PreviewSkeleton />);
+
+    expect(previewWrapper).toBeDefined();
+    expect(previewWrapper?.props["data-section"]).toBe("preview");
+    expect(skeletonMarkup).toContain('id="preview-configurator"');
+    expect(skeletonMarkup).toContain('id="preview-results"');
+    expect(anchorHrefs).toContain("#preview-configurator");
+    expect(anchorHrefs).toContain("#preview-results");
   });
 
   it("keeps the hero concise and makes the pilot the obvious first decision", async () => {
@@ -124,40 +136,66 @@ describe("landing section hierarchy", () => {
       checkoutHref: buildCheckoutHref(input),
     });
     const previewText = readVisibleText(preview);
-    const previewIntro = collectElements(preview, SectionIntro)
-      .find((section) => section.props.eyebrow === "Рабочий радар");
 
-    expect(previewIntro?.props.title).toBe("Проверьте радар на своём профиле");
     expect(previewText).toContain("Обезличенный набор");
     expect(previewText).toContain("Радар для вашего профиля");
     expect(previewText).toContain("примерные данные");
     expect(previewText).not.toContain("временно недоступна");
     expect(previewText).not.toContain("восстановления источника");
     expect(previewText).toContain("Попробовать неделю");
-    expect(previewIntro?.props.description).toBe(
-      "Укажите специализацию и географию. Радар пересчитает приоритеты и покажет, почему каждая компания поднялась в выдаче.",
-    );
+  });
+
+  it("keeps CTA analytics aligned with the real funnel transition", async () => {
+    const page = await HomePage({ searchParams: Promise.resolve({}) });
+    const anchors = collectElements(page, "a");
+    const links = collectElements(page, Link);
+    const heroPrimary = anchors.find((anchor) => anchor.props.href === "#preview-configurator");
+    const heroResults = anchors.find((anchor) => anchor.props.href === "#preview-results");
+    const trackedLinks = links.filter((link) => link.props["data-analytics-event"]);
+
+    expect(heroPrimary?.props["data-analytics-event"])
+      .toBe(LANDING_ANALYTICS_EVENT.previewStarted);
+    expect(heroPrimary?.props["data-analytics-context"])
+      .toBe(LANDING_ANALYTICS_CONTEXT.heroPrimary);
+    expect(heroResults?.props["data-analytics-context"])
+      .toBe(LANDING_ANALYTICS_CONTEXT.heroSecondary);
+    expect(heroResults?.props["data-analytics-event"])
+      .toBe(LANDING_ANALYTICS_EVENT.previewResultsClicked);
+    expect(trackedLinks.some((link) =>
+      link.props["data-analytics-event"] === LANDING_ANALYTICS_EVENT.checkoutStarted
+    )).toBe(true);
+    expect(trackedLinks.some((link) =>
+      link.props["data-analytics-event"] === LANDING_ANALYTICS_EVENT.continuationCtaClicked
+    )).toBe(true);
+    expect(trackedLinks.some((link) =>
+      link.props["data-analytics-event"] === LANDING_ANALYTICS_EVENT.continuationRequested
+    )).toBe(false);
+    expect(trackedLinks.some((link) =>
+      link.props["data-analytics-event"] === LANDING_ANALYTICS_EVENT.paymentStarted
+    )).toBe(false);
   });
 
   it("explains the role and delivery status of every source group", async () => {
     const page = await HomePage({ searchParams: Promise.resolve({}) });
-    const pageText = readVisibleText(page);
+    const deliveryMarkup = renderToStaticMarkup(<LandingDeliveryDemo />);
+    const sourceMarkup = renderToStaticMarkup(<LandingSourceArchitecture />);
 
-    expect(pageText).toContain("Каждый источник отвечает за свою часть доказательства");
-    expect(pageText).toContain("Источники клиентской выдачи");
-    expect(pageText).toContain("hh.ru, Работа России и прямые карьерные страницы");
-    expect(pageText).toContain("Компания и путь контакта");
-    expect(pageText).toContain("Сайт компании и ЕГРЮЛ/ФНС");
-    expect(pageText).toContain("Почему сейчас");
-    expect(pageText).toContain("Корпоративные события, официальные публикации и отраслевой контекст");
-    expect(pageText).toContain("Что пока не попадает в клиентскую выдачу");
-    expect(pageText).toContain("SuperJob, Хабр Карьера, страницы компаний LinkedIn");
-    expect(pageText).toContain("проверки уверенности, качества данных и правомерности доступа");
-    expect(pageText).toContain("Telegram · основной");
-    expect(pageText).toContain("Email");
-    expect(pageText).toContain("Web push");
-    expect(pageText).toContain("VK");
-    expect(pageText).toContain("Webhook");
+    expect(collectElements(page, LandingSourceArchitecture)).toHaveLength(1);
+    expect(sourceMarkup).toContain("Каждый источник отвечает за свою часть доказательства");
+    expect(sourceMarkup).toContain("Источники клиентской выдачи");
+    expect(sourceMarkup).toContain("hh.ru, Работа России и прямые карьерные страницы");
+    expect(sourceMarkup).toContain("Компания и путь контакта");
+    expect(sourceMarkup).toContain("Сайт компании и ЕГРЮЛ/ФНС");
+    expect(sourceMarkup).toContain("Почему сейчас");
+    expect(sourceMarkup).toContain("Корпоративные события, официальные публикации и отраслевой контекст");
+    expect(sourceMarkup).toContain("Что пока не попадает в клиентскую выдачу");
+    expect(sourceMarkup).toContain("SuperJob, Хабр Карьера, страницы компаний LinkedIn");
+    expect(sourceMarkup).toContain("проверки уверенности, качества данных и правомерности доступа");
+    expect(deliveryMarkup).toContain("Telegram");
+    expect(deliveryMarkup).toContain("Email");
+    expect(deliveryMarkup).toContain("Web push");
+    expect(deliveryMarkup).toContain("VK");
+    expect(deliveryMarkup).toContain("Webhook");
   });
 
   it("keeps filter submit and reset actions anchored to the preview", async () => {
@@ -172,7 +210,7 @@ describe("landing section hierarchy", () => {
     const resetLink = links.find((link) => readVisibleText(link) === "Сбросить");
 
     expect(forms).toHaveLength(1);
-    expect(forms[0].props.action).toBe("/#preview");
+    expect(forms[0].props.action).toBe("/#preview-results");
     expect(resetLink?.props.href).toBe("/#preview");
   });
 
@@ -199,12 +237,16 @@ describe("landing section hierarchy", () => {
       items: [{
         rank: 1,
         org_id: "demo-industrial",
+        hh_employer_id: "demo-industrial",
         employer_name: "Производственная компания",
         vacancies_count: 14,
         distinct_vacancy_names_count: 6,
         latest_published_at: "2026-07-19T09:00:00.000Z",
         total_score: 348,
-        reasons: ["14 новых вакансий за 6 дней"],
+        reasons: [
+          "14 новых вакансий за 6 дней",
+          "Сигнал подтверждён двумя источниками",
+        ],
         opener: "Предложить точечный подбор по инженерным ролям",
         source_families: ["hh", "career-pages"],
         evidence_titles: ["Инженер-конструктор", "Руководитель производства"],
@@ -222,12 +264,16 @@ describe("landing section hierarchy", () => {
       }, {
         rank: 2,
         org_id: "demo-service",
+        hh_employer_id: "demo-service",
         employer_name: "Сервисная B2B-компания",
         vacancies_count: 9,
         distinct_vacancy_names_count: 5,
         latest_published_at: "2026-07-18T09:00:00.000Z",
         total_score: 312,
-        reasons: ["Команда найма расширяет коммерческий блок"],
+        reasons: [
+          "Команда найма расширяет коммерческий блок",
+          "Сигнал подтверждён карьерной страницей",
+        ],
         opener: "Уточнить приоритетные роли и предложить короткий пилот",
         source_families: ["career-pages", "egrul-fns"],
         evidence_titles: ["Руководитель отдела продаж", "Менеджер по развитию"],
@@ -270,8 +316,11 @@ describe("landing section hierarchy", () => {
   it("explains the four quality checks without duplicating the hero company card", async () => {
     const page = await HomePage({ searchParams: Promise.resolve({}) });
     const pageText = readVisibleText(page);
+    const methodologies = collectElements(page, LandingMethodology);
+    const methodologyMarkup = renderToStaticMarkup(<LandingMethodology />);
 
-    expect(pageText).toContain("Сигнал проходит четыре проверки");
+    expect(methodologies).toHaveLength(1);
+    expect(methodologyMarkup).toContain("Сигнал проходит четыре проверки");
     expect(pageText.match(/Производственная компания/g)).toHaveLength(1);
   });
 });

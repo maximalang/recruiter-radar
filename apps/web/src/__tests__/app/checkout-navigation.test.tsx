@@ -1,4 +1,4 @@
-import { Children, isValidElement, type ReactNode } from "react";
+import { Children, isValidElement, type ReactElement, type ReactNode } from "react";
 
 import CheckoutPage from "@/app/checkout/page";
 import { InternalBackLink } from "@/app/ui/internal-page";
@@ -15,11 +15,11 @@ jest.mock("@/lib/session", () => ({
   readOwnerSession: jest.fn().mockResolvedValue(null),
 }));
 
-function collectElements(node: ReactNode, type: unknown): React.ReactElement[] {
-  const matches: React.ReactElement[] = [];
+function collectElements(node: ReactNode, type: unknown): ReactElement<Record<string, any>>[] {
+  const matches: ReactElement<Record<string, any>>[] = [];
 
   Children.forEach(node, (child) => {
-    if (!isValidElement(child)) return;
+    if (!isValidElement<Record<string, any>>(child)) return;
     if (child.type === type) matches.push(child);
     matches.push(...collectElements(child.props.children, type));
   });

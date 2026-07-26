@@ -3,7 +3,7 @@
  * Phase 5 — Quality observability.
  */
 
-import type { GateDistribution, AcceptanceRate, QualityDashboardMetrics } from '@/app/api/dashboard/metrics/route'
+import type { GateDistribution, AcceptanceRate, QualityMetrics } from '@/lib/dashboard-data'
 
 // --- Types only (no DB required) ---
 
@@ -33,7 +33,7 @@ describe('AcceptanceRate type', () => {
 
 describe('QualityDashboardMetrics type', () => {
   it('has all required quality observability fields', () => {
-    const metrics: QualityDashboardMetrics = {
+    const metrics: QualityMetrics = {
       gateDistribution: [
         { gate: 'A', count: 20, percentage: 40 },
         { gate: 'B', count: 20, percentage: 40 },

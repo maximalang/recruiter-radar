@@ -1,5 +1,3 @@
-import { describe, it, expect, jest } from '@jest/globals'
-
 describe('Hiring Pattern Detection - Simple Version', () => {
   it('detects multiple vacancies from the same company', () => {
     const vacancies = [
@@ -9,7 +7,7 @@ describe('Hiring Pattern Detection - Simple Version', () => {
     ]
 
     // Group by employer
-    const companyVacancyCounts = vacancies.reduce((acc, vacancy) => {
+    const companyVacancyCounts = vacancies.reduce<Record<string, number>>((acc, vacancy) => {
       acc[vacancy.employer.id] = (acc[vacancy.employer.id] || 0) + 1
       return acc
     }, {})

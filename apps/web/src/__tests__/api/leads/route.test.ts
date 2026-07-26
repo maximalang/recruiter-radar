@@ -54,6 +54,7 @@ function makeProfile(id: string) {
     hiringIntentMin: null,
     signalFreshnessDays: null,
     minOpenRoles: 1,
+    hiringMode: 'auto' as const,
   };
 }
 
@@ -82,6 +83,10 @@ function makeLead(overrides: Partial<LeadItem> = {}): LeadItem {
     evidenceTitles: ['Backend', 'DevOps'],
     locationNames: ['Москва'],
     hasAiHint: true,
+    isForeignEmployer: false,
+    foreignMatchedDomain: null,
+    contactPaths: [],
+    reviewStatus: 'auto_approved',
     ...overrides,
   };
 }

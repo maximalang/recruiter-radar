@@ -18,22 +18,22 @@ describe('T3.3: marketContext maps to real MarketFitInput', () => {
       marketConditions: 'boom',
       industryGrowth: { fintech: 0.15 },
     })
-    expect(result.industryTrend).toBe('growing')
-    expect(result.growthSignals).toEqual(['fintech'])
+    expect(result?.industryTrend).toBe('growing')
+    expect(result?.growthSignals).toEqual(['fintech'])
   })
 
   it('normal → industryTrend "stable"', () => {
     const result = service.mapMarketContext({
       marketConditions: 'normal',
     })
-    expect(result.industryTrend).toBe('stable')
+    expect(result?.industryTrend).toBe('stable')
   })
 
   it('bust → industryTrend "declining"', () => {
     const result = service.mapMarketContext({
       marketConditions: 'bust',
     })
-    expect(result.industryTrend).toBe('declining')
+    expect(result?.industryTrend).toBe('declining')
   })
 
   it('undefined marketContext → undefined', () => {

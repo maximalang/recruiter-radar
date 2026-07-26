@@ -1,5 +1,3 @@
-import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals'
-
 // Mock getHhDigestItems before importing the generator
 const mockGetHhDigestItems = jest.fn()
 jest.mock('@/lib/hhDigest', () => ({
@@ -14,13 +12,13 @@ jest.mock('@/lib/hhDigest', () => ({
 // resolves past the mock registry, so the real network-backed router loads
 // regardless of the factory. We therefore inject the stub through the
 // constructor seam (`new MultiSourceLeadGenerator({ crawler })`) instead.
-const mockCrawlerFetch = jest.fn<(input: { url: string }) => Promise<unknown>>()
+const mockCrawlerFetch = jest.fn<Promise<unknown>, [{ url: string }]>()
 
 // Mock the DB pool so enrichWithCareerPages can resolve a corporate base URL.
 // Use the established pattern (jest.fn() in the factory + jest.mocked handle):
 // the global jest.setup.ts already mocks `lib/db`, so a literal-returning factory
 // here is shadowed and getPool() comes back null. Recover the handle post-import.
-const mockPoolQuery = jest.fn<(...args: unknown[]) => Promise<{ rows: unknown[] }>>()
+const mockPoolQuery = jest.fn<Promise<{ rows: unknown[] }>, unknown[]>()
 jest.mock('@/lib/db', () => ({
   getPool: jest.fn(),
 }))

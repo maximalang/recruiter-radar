@@ -5,6 +5,7 @@ describe('Content Security Policy', () => {
     const policy = buildContentSecurityPolicy('production');
 
     expect(policy).toContain("script-src 'self' 'unsafe-inline'");
+    expect(policy).toContain("https://mc.yandex.ru");
     expect(policy).not.toContain("'unsafe-eval'");
     expect(policy).not.toContain(' ws:');
   });
