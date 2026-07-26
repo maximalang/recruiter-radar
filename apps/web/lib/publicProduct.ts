@@ -26,17 +26,18 @@ export type PublicPlan = {
 
 /**
  * Identical capability set for every plan — the tariff differs only by term
- * (pilot = 1 week, monthly = 1 month, quarterly = 3 months with a saving).
+ * (pilot = 1 week, monthly = 1 month, quarterly = 3 months).
  * Do NOT diverge capabilities between plans: the product contract is that every
  * paying customer gets the same radar.
  */
 const SHARED_PLAN_BULLETS: string[] = [
-  "ежедневный радар с подтверждённым наймом по каждой компании",
-  "профиль поиска под вашу нишу и географию",
-  "Telegram — основной канал; при необходимости доступны email, web push, VK или webhook",
-  "оценка уверенности и понятное «почему сейчас» по каждому лиду",
-  "доказательства найма и безопасный путь контакта",
-  "обратная связь по компаниям — и всё меньше нерелевантных в радаре",
+  "1 профиль агентства",
+  "ежедневная выдача",
+  "Telegram",
+  "оценка FIUR: соответствие, намерение, актуальность и доступность",
+  "источники и доказательства",
+  "корпоративный путь контакта",
+  "обратная связь по компаниям",
 ]
 
 export type PublicPreviewInput = {
@@ -201,10 +202,10 @@ export const PUBLIC_PLANS: PublicPlan[] = [
     cadence: "30 дней",
     amountMinor: 1499000,
     currency: "RUB",
-    price: "14 990 ₽/мес",
+    price: "14 990 ₽",
     description: "Полный доступ к радару на месяц — всё то же, что в пилоте, на срок, удобный для проверки канала.",
     bullets: SHARED_PLAN_BULLETS,
-    ctaLabel: "Оставить заявку на месяц",
+    ctaLabel: "Оставить заявку на 30 дней",
     isPrimary: false,
     isRecurring: true
   },
@@ -214,10 +215,10 @@ export const PUBLIC_PLANS: PublicPlan[] = [
     cadence: "90 дней",
     amountMinor: 2999000,
     currency: "RUB",
-    price: "29 990 ₽/3 мес",
-    description: "Доступ на квартал со скидкой — выгоднее помесячной оплаты (~9 997 ₽/мес). Для команды, которая делает радар рабочим каналом на три месяца, а не на пробу.",
+    price: "29 990 ₽",
+    description: "Тот же радар на 90 дней для команды, которая уже готова использовать канал в регулярной работе.",
     bullets: SHARED_PLAN_BULLETS,
-    ctaLabel: "Оставить заявку на 3 месяца",
+    ctaLabel: "Оставить заявку на 90 дней",
     isPrimary: false,
     isRecurring: true
   }

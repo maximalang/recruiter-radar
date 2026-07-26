@@ -692,9 +692,11 @@
 :global(html[data-landing-motion="paused"]) .previewSkeletonLine,
 :global(html[data-landing-motion="paused"]) .previewSkeletonBar,
 :global(html[data-landing-motion="paused"]) .previewSkeletonCard,
+:global(html[data-landing-motion="paused"]) .productProofSkeleton span,
 :global(html[data-landing-motion="reduced"]) .previewSkeletonLine,
 :global(html[data-landing-motion="reduced"]) .previewSkeletonBar,
-:global(html[data-landing-motion="reduced"]) .previewSkeletonCard {
+:global(html[data-landing-motion="reduced"]) .previewSkeletonCard,
+:global(html[data-landing-motion="reduced"]) .productProofSkeleton span {
   animation-play-state: paused;
 }
 
@@ -897,7 +899,6 @@
      (padding-bottom A + margin + padding-top B), which read as "пусто / не
      грузится". 26px keeps content breathing but closes the dead bands. */
   padding: clamp(18px, 2.5vw, 26px) 0;
-  scroll-margin-top: 96px;
 }
 
 .scrollSection:first-of-type {
@@ -1989,7 +1990,8 @@
 @media (prefers-reduced-motion: reduce) {
   .previewSkeletonLine,
   .previewSkeletonBar,
-  .previewSkeletonCard {
+  .previewSkeletonCard,
+  .productProofSkeleton span {
     animation: none;
     background: rgba(15, 23, 42, 0.06);
   }
@@ -2462,55 +2464,248 @@
   line-height: 1.45;
 }
 
-/* ── Pricing — three equal-weight cards, pilot gently featured ── */
-.pricingGrid {
-  --plan-card-padding: 28px 26px;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  align-items: stretch;
+/* ── Live product proof — streamed independently from the landing shell. ── */
+.productProofSlot {
+  min-height: 190px;
 }
 
-/* All three plan cards share the same base weight so the row reads balanced;
-   the pilot is gently lifted by a top accent line + soft blue tint + a flag. */
-.primaryPlanCard,
-.secondaryPlanCard {
-  position: relative;
+.productProofSlot:empty {
+  display: none;
+}
+
+.productProof {
   display: grid;
-  gap: 16px;
-  border: 1px solid var(--c-border);
-  background-color: rgba(255, 255, 255, 0.92);
+  gap: 20px;
+  min-height: 190px;
+  padding: clamp(24px, 3vw, 34px);
+  border: 1px solid rgba(29, 78, 216, 0.16);
+  border-radius: var(--radius-card);
+  background: rgba(246, 249, 255, 0.96);
+}
+
+.productProofHeader {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.productProofHeader span {
+  color: var(--c-brand);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.productProofHeader h2 {
+  max-width: 20ch;
+  margin: 0;
+  color: var(--c-text-primary);
+  font-size: clamp(1.35rem, 2.2vw, 1.8rem);
+  line-height: 1.18;
+  letter-spacing: -0.025em;
+  text-align: right;
+  text-wrap: balance;
+}
+
+.productProofMetrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  border-top: 1px solid rgba(20, 40, 72, 0.12);
+}
+
+.productProofMetrics > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column-reverse;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 18px 20px 4px 0;
+}
+
+.productProofMetrics > div + div {
+  padding-left: 20px;
+  border-left: 1px solid rgba(20, 40, 72, 0.12);
+}
+
+.productProofMetrics dt {
+  color: var(--c-text-secondary);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.productProofMetrics dd {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  margin: 0;
+  color: var(--c-text-primary);
+  font-size: clamp(1.35rem, 2.2vw, 1.8rem);
+  font-weight: 760;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.productProofMetrics dd span {
+  color: var(--c-text-muted);
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0;
+}
+
+.productProofNote {
+  margin: 0;
+  color: var(--c-text-muted);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.productProofSkeleton {
   overflow: hidden;
-  box-shadow: 0 10px 30px rgba(15, 35, 68, 0.05);
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
-.primaryPlanCard:hover,
-.secondaryPlanCard:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 22px 48px rgba(31, 51, 89, 0.1);
+.productProofSkeleton span {
+  display: block;
+  height: 22px;
+  border-radius: 8px;
+  background: linear-gradient(
+    90deg,
+    rgba(148, 163, 184, 0.12),
+    rgba(148, 163, 184, 0.24),
+    rgba(148, 163, 184, 0.12)
+  );
+  background-size: 200% 100%;
+  animation: product-proof-shimmer 1.4s ease-in-out infinite;
 }
 
-.primaryPlanCard {
-  gap: 18px;
-  border-color: rgba(29, 78, 216, 0.28);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(239, 246, 255, 0.96) 100%);
-  box-shadow: 0 16px 40px rgba(29, 78, 216, 0.14);
+.productProofSkeleton span:first-child {
+  width: 32%;
 }
 
-/* A quiet accent line along the top edge of the featured plan. */
-.primaryPlanCard::before {
+.productProofSkeleton span:nth-child(2) {
+  width: 64%;
+  height: 44px;
+}
+
+@keyframes product-proof-shimmer {
+  to { background-position: -200% 0; }
+}
+
+/* ── Product fit — a quiet editorial comparison before pricing. ── */
+.fitSection {
+  padding-block: clamp(22px, 3vw, 34px);
+}
+
+.fitColumns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid rgba(20, 40, 72, 0.14);
+  border-bottom: 1px solid rgba(20, 40, 72, 0.14);
+}
+
+.fitColumn {
+  padding: clamp(24px, 3.5vw, 42px) clamp(18px, 4vw, 48px) clamp(24px, 3.5vw, 38px) 0;
+}
+
+.fitColumn + .fitColumn {
+  padding-right: 0;
+  padding-left: clamp(18px, 4vw, 48px);
+  border-left: 1px solid rgba(20, 40, 72, 0.14);
+}
+
+.fitColumn h3 {
+  margin: 0 0 16px;
+  color: var(--c-text-primary);
+  font-size: var(--fs-lg);
+  line-height: var(--lh-lg);
+}
+
+.fitColumn[data-tone="muted"] h3 {
+  color: var(--c-text-secondary);
+}
+
+.fitColumn ul {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fitColumn li {
+  position: relative;
+  padding-left: 19px;
+  color: var(--c-text-secondary);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.fitColumn li::before {
   content: "";
   position: absolute;
-  top: 0;
+  top: 0.68em;
   left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, var(--c-brand) 0%, #60a5fa 100%);
+  width: 7px;
+  height: 2px;
+  background: var(--c-brand);
 }
 
-/* Featured badge stays inside the card header so it cannot be clipped by the
-   SurfaceCard paint containment and remains aligned with the plan label. */
+.fitColumn[data-tone="muted"] li::before {
+  background: #94a3b8;
+}
+
+/* ── Pricing — one product, three periods, one capability set. ── */
+.pricingProduct {
+  --pricing-product-padding: clamp(24px, 3.5vw, 40px);
+  position: relative;
+  display: grid;
+  gap: 28px;
+  overflow: hidden;
+  border-color: rgba(29, 78, 216, 0.2);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 18px 50px rgba(29, 54, 100, 0.09);
+}
+
+.pricingProduct::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: linear-gradient(90deg, var(--c-brand), #60a5fa);
+}
+
+.pricingProductHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.pricingProductHeader > div {
+  display: grid;
+  gap: 8px;
+}
+
+.pricingProductHeader h3 {
+  max-width: 38ch;
+  margin: 0;
+  color: var(--c-text-primary);
+  font-size: clamp(1.18rem, 2vw, 1.5rem);
+  line-height: 1.25;
+  letter-spacing: -0.018em;
+}
+
+.pricingProductKicker,
+.afterPaymentEyebrow {
+  color: var(--c-brand);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .primaryPlanBadge {
   position: static;
   flex: 0 0 auto;
@@ -2526,98 +2721,137 @@
   box-shadow: 0 10px 22px rgba(29, 78, 216, 0.22);
 }
 
-/* A divider row with a bold label on the left and a muted note on the right —
-   the "what you get / how it bills" line on each plan card. */
-.planFeatureLine {
-  display: flex;
+.pricingProductBody {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+  gap: clamp(28px, 5vw, 64px);
+  align-items: start;
+}
+
+.pricingPeriods {
+  display: grid;
+}
+
+.pricingPeriod {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 20px;
   align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 12px 0;
+  padding: 18px 0;
   border-top: 1px solid var(--c-border);
-  border-bottom: 1px solid var(--c-border);
 }
 
-.planFeatureLine b {
-  font-size: 0.82rem;
+.pricingPeriod[data-primary="true"] {
+  margin-inline: -14px;
+  padding-inline: 14px;
+  border-top-color: transparent;
+  border-radius: 14px;
+  background: rgba(239, 246, 255, 0.92);
+}
+
+.pricingPeriodCopy {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  gap: 8px 14px;
+  align-items: baseline;
+}
+
+.pricingPeriodCopy > span {
+  color: var(--c-brand);
+  font-size: 0.8rem;
   font-weight: 800;
+  white-space: nowrap;
+}
+
+.pricingPeriodCopy strong {
   color: var(--c-text-primary);
+  font-size: 1.15rem;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
 }
 
-.planFeatureLine span {
-  color: var(--c-text-muted);
-  font-size: 0.72rem;
-  text-align: right;
-}
-
-.billingNote {
+.pricingPeriodCopy p {
+  grid-column: 1 / -1;
   margin: 0;
+  color: var(--c-text-secondary);
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.pricingPeriod > a {
+  min-width: 196px;
+  min-height: 44px;
+  box-sizing: border-box;
+  justify-content: center;
+  text-align: center;
+}
+
+.pricingSetupNote {
+  margin: 12px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--c-border);
+  color: var(--c-text-muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.afterPayment {
+  display: grid;
+  gap: 14px;
+  padding: 22px;
+  border: 1px solid rgba(29, 78, 216, 0.14);
+  border-radius: 16px;
+  background: #f8fbff;
+}
+
+.afterPayment h3 {
+  margin: 0;
+  color: var(--c-text-primary);
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.afterPayment ol {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.afterPayment li {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.afterPayment li > span {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid rgba(29, 78, 216, 0.22);
+  border-radius: 999px;
+  color: var(--c-brand);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.afterPayment li p {
+  margin: 2px 0 0;
+  color: var(--c-text-secondary);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.afterPaymentAssurances {
+  margin: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--c-border);
   color: var(--c-text-muted);
   font-size: 0.74rem;
   line-height: 1.5;
-  text-align: left;
-}
-
-.primaryPlanCardHead {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.savingsBadge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: var(--radius-pill);
-  border: 1px solid rgba(29, 78, 216, 0.22);
-  background: rgba(37, 99, 235, 0.08);
-  color: var(--c-brand);
-  font-size: 0.72rem;
-  font-weight: 720;
-  letter-spacing: 0.01em;
-}
-
-.planPriceRow {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.planPriceSmall {
-  font-size: var(--fs-lg);
-  line-height: var(--lh-lg);
-  letter-spacing: var(--ls-lg);
-  font-weight: var(--fw-lg);
-  color: var(--c-text-secondary);
-}
-
-/* Secondary plans now render directly in the same row — no nested grid. */
-.secondaryPlansRow {
-  display: contents;
-}
-
-/* Short plan description shown on every card so the row has equal density. */
-.planDescription {
-  margin: 0;
-  color: var(--c-text-secondary);
-  font-size: 0.9rem;
-  line-height: 1.55;
-}
-
-/* Push the CTA to the bottom of every plan card so the row stays aligned even
-   when descriptions differ in length. Works because each card is a grid with
-   stretched height (align-items: stretch on .pricingGrid). */
-.planCta {
-  margin-top: auto;
-  min-height: 45px;
-  box-sizing: border-box;
-  padding-inline: 14px;
-  font-size: 0.86rem;
-  text-align: center;
 }
 
 /* Single shared "what's included" block under pricing */
@@ -2628,6 +2862,12 @@
   border-radius: var(--radius-card-sm);
   border: 1px solid var(--c-border);
   background: rgba(248, 250, 252, 0.6);
+}
+
+.termsLink {
+  color: var(--c-brand);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .includedOnceLabel {
@@ -2765,15 +3005,13 @@
 /* ===================== Mobile responsiveness ===================== */
 
 @media (max-width: 1000px) {
-  /* Three pricing cards get cramped below ~1000px — collapse to a single column. */
-  .pricingGrid {
-    grid-template-columns: 1fr;
-  }
-
   .previewItemsGrid {
     grid-template-columns: 1fr;
   }
 
+  .pricingProductBody {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 1100px) and (min-width: 901px) {
@@ -2832,6 +3070,19 @@
   .heroProduct {
     width: 100%;
     box-sizing: border-box;
+  }
+
+  .productProofMetrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .productProofMetrics > div:nth-child(3) {
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .productProofMetrics > div:nth-child(n + 3) {
+    border-top: 1px solid rgba(20, 40, 72, 0.12);
   }
 
   .problemLayout,
@@ -2921,6 +3172,19 @@
     gap: 28px;
   }
 
+  .fitColumns {
+    grid-template-columns: 1fr;
+  }
+
+  .fitColumn,
+  .fitColumn + .fitColumn {
+    padding: 24px 0;
+    border-left: 0;
+  }
+
+  .fitColumn + .fitColumn {
+    border-top: 1px solid rgba(20, 40, 72, 0.14);
+  }
 }
 
 @media (max-width: 560px) {
@@ -2991,8 +3255,48 @@
     justify-self: start;
   }
 
-  .pricingGrid {
-    --plan-card-padding: 22px 20px;
+  .productProof {
+    min-height: 300px;
+    padding: 22px 18px;
+  }
+
+  .productProofSlot {
+    min-height: 300px;
+  }
+
+  .productProofHeader {
+    display: grid;
+    align-items: start;
+  }
+
+  .productProofHeader h2 {
+    text-align: left;
+  }
+
+  .productProofMetrics > div,
+  .productProofMetrics > div + div {
+    padding: 16px 12px 8px 0;
+  }
+
+  .productProofMetrics > div:nth-child(even) {
+    padding-left: 12px;
+  }
+
+  .pricingProduct {
+    --pricing-product-padding: 24px 20px;
+    gap: 22px;
+  }
+
+  .pricingProductHeader {
+    display: grid;
+  }
+
+  .pricingPeriod {
+    grid-template-columns: 1fr;
+  }
+
+  .pricingPeriod > a {
+    width: 100%;
   }
 
   .includedOnce {
@@ -3012,8 +3316,16 @@
     font-size: 0.76rem;
   }
 
+  .heroSection {
+    padding: 24px 16px 22px;
+  }
+
+  .heroContent {
+    gap: 20px;
+  }
+
   .heroCopy {
-    gap: 18px;
+    gap: 14px;
   }
 
   .heroTitle {
@@ -3026,30 +3338,86 @@
     width: 100%;
   }
 
-  .heroCta,
-  .heroSecondaryCta {
+  .heroCta {
     width: 100%;
     box-sizing: border-box;
   }
 
+  .heroSecondaryCta {
+    display: none;
+  }
+
+  .heroSubtitle {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
+
+  .heroFootnote {
+    margin-top: -4px;
+  }
+
   .heroProduct {
-    gap: 15px;
-    padding: 16px;
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .heroProductLabel {
+    max-width: 17ch;
+  }
+
+  .heroCompanyMeta {
+    display: none;
   }
 
   .heroEvidenceRow {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .heroEvidenceRow div {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 6px;
+    gap: 4px;
     align-items: start;
+    padding: 10px;
+  }
+
+  .heroEvidenceRow div:last-child {
+    grid-column: 1 / -1;
   }
 
   .heroEvidenceRow p {
     margin: 0;
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .heroSignalMeters {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .heroSignalMeter {
+    gap: 6px;
+    padding: 8px;
+  }
+
+  .heroSignalMeterHead {
+    display: grid;
+    gap: 4px;
+  }
+
+  .heroSignalMeterHead span,
+  .heroSignalMeterHead strong {
+    font-size: 0.62rem;
+    line-height: 1.25;
+  }
+
+  .pricingPeriodCopy {
+    grid-template-columns: 1fr auto;
   }
 
 }
@@ -3068,8 +3436,7 @@
 .heroEvidenceRow div,
 .qualityMethodCard,
 .deliveryCard,
-.primaryPlanCard,
-.secondaryPlanCard,
+.pricingProduct,
 .includedOnce,
 .faqCard,
 .closingBand {
@@ -3077,8 +3444,7 @@
 }
 
 .topBar,
-.primaryPlanCard,
-.secondaryPlanCard,
+.pricingProduct,
 .includedOnce,
 .faqCard {
   -webkit-backdrop-filter: saturate(150%) blur(16px);
@@ -3088,8 +3454,7 @@
 .topBar { background: rgba(255, 255, 255, 0.97); }
 .heroProduct { background: rgba(15, 27, 49, 0.82); }
 .heroEvidenceRow div { background: rgba(255, 255, 255, 0.06); }
-.primaryPlanCard { background: rgba(239, 246, 255, 0.98); }
-.secondaryPlanCard { background: rgba(255, 255, 255, 0.98); }
+.pricingProduct { background: rgba(255, 255, 255, 0.98); }
 .includedOnce { background: rgba(248, 250, 252, 0.96); }
 .faqCard { background: rgba(255, 255, 255, 0.98); }
 .closingBand { background: rgba(11, 19, 36, 0.96); }

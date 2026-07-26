@@ -48,6 +48,9 @@ import LandingMethodology from "./landing-methodology";
 import { LandingMotionProvider } from "./landing-motion/landing-motion-provider";
 import LandingPreviewInteractions from "./landing-preview-interactions";
 import LandingPreviewPresets from "./landing-preview-presets";
+import LandingProductProof, {
+  LandingProductProofSkeleton,
+} from "./landing-product-proof";
 import PreviewGeneratedEvent from "./preview-generated-event";
 import RadarCanvas from "./radar-canvas";
 import ScrollReveal from "./scroll-reveal";
@@ -277,112 +280,133 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         </div>
       </ScrollReveal>
 
-      {/* Pricing — hierarchy: primary week plan, then secondary plans */}
+      <div className={hpStyles.productProofSlot} data-product-proof-slot>
+        <Suspense fallback={<LandingProductProofSkeleton />}>
+          <LandingProductProof />
+        </Suspense>
+      </div>
+
+      {/* Product fit — an editorial split, not another card grid. */}
+      <ScrollReveal as="section" id="fit" className={`${hpStyles.scrollSection} ${hpStyles.fitSection}`}>
+        <SectionIntro
+          accent
+          eyebrow="Кому подходит"
+          title="Короткий список приоритетов вместо ручного мониторинга"
+          description="Recruiter Radar помогает агентству выбрать компании для осмысленного первого контакта. Он не заменяет решение команды и не рассылает сообщения автоматически."
+        />
+        <div className={hpStyles.fitColumns}>
+          <div className={hpStyles.fitColumn}>
+            <h3>Recruiter Radar полезен, если</h3>
+            <ul>
+              <li>агентство самостоятельно ищет новых заказчиков;</li>
+              <li>есть специализация по ролям, отраслям или географии;</li>
+              <li>собственник или BD вручную проверяет рынок;</li>
+              <li>нужен короткий ежедневный список приоритетов;</li>
+              <li>важно понимать, почему компании стоит написать сейчас.</li>
+            </ul>
+          </div>
+          <div className={hpStyles.fitColumn} data-tone="muted">
+            <h3>Продукт не подойдёт, если вам нужны</h3>
+            <ul>
+              <li>массовые автоматические рассылки;</li>
+              <li>личные контакты сотрудников;</li>
+              <li>покупная база компаний;</li>
+              <li>автоматическое принятие решений вместо команды;</li>
+              <li>тысячи необработанных вакансий без приоритизации.</li>
+            </ul>
+          </div>
+        </div>
+      </ScrollReveal>
+
+      {/* Pricing — one capability set with three honest access periods. */}
       <ScrollReveal as="section" id="pricing" className={hpStyles.scrollSection}>
         <SectionIntro
           accent
-          eyebrow="Тарифы"
-          title="Начните с недели. Продолжайте, только если радар полезен."
-          description="Пилот — разовая оплата без продления. Месяц и квартал подключаются по заявке после проверки качества."
+          eyebrow="Тариф"
+          title="Один продукт — три периода доступа"
+          description="Функции и ограничения одинаковы. Меняется только срок доступа; пилот на 7 дней остаётся основным вариантом для первого запуска."
         />
 
-        <div className={hpStyles.pricingGrid}>
-          <SurfaceCard
-            key={pilotPlan.code}
-            className={`${hpStyles.primaryPlanCard} ${hpStyles.revealCard}`}
-            padding="var(--plan-card-padding)"
-          >
-            <div className={hpStyles.primaryPlanCardHead}>
-              <div className={ppStyles.planPriceContainer}>
-                <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
-                  <StatusBadge tone="info" className={ppStyles.planBadge}>
-                    {pilotPlan.name}
-                  </StatusBadge>
-                </div>
-                <div className={hpStyles.planPriceRow}>
-                  <span className={ppStyles.planPrice}>{pilotPlan.price}</span>
-                </div>
-                <div className={ppStyles.planPriceCadence}>{pilotPlan.cadence}</div>
-              </div>
-              <span className={hpStyles.primaryPlanBadge}>Рекомендуем начать</span>
+        <SurfaceCard
+          className={`${hpStyles.pricingProduct} ${hpStyles.revealCard}`}
+          padding="var(--pricing-product-padding)"
+        >
+          <div className={hpStyles.pricingProductHeader}>
+            <div>
+              <span className={hpStyles.pricingProductKicker}>Доступ к Recruiter Radar</span>
+              <h3>Пилот оплачивается сразу. Длинные периоды подключаются по заявке.</h3>
             </div>
-            <p className={hpStyles.planDescription}>{pilotPlan.description}</p>
-            <div className={hpStyles.planFeatureLine}>
-              <b>Разовая оплата</b>
-              <span>Без автопродления</span>
-            </div>
-            <p className={hpStyles.billingNote}>После оплаты вы настраиваете профиль и подключаете Telegram.</p>
-            <Link
-              href={buildCheckoutHref({ ...previewInput, planCode: pilotPlan.code })}
-              className={`${ppStyles.primaryAction} ${hpStyles.planCta}`}
-              data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
-              data-analytics-context={LANDING_ANALYTICS_CONTEXT.pricingPilot}
-            >
-              {pilotPlan.ctaLabel}
-            </Link>
-          </SurfaceCard>
+            <span className={hpStyles.primaryPlanBadge}>Рекомендуем 7 дней</span>
+          </div>
 
-          <div className={hpStyles.secondaryPlansRow}>
-            {secondaryPlans.map((plan) => {
-              const isQuarterly = plan.code === "quarterly";
-              return (
-                <SurfaceCard
-                  key={plan.code}
-                  className={`${hpStyles.secondaryPlanCard} ${hpStyles.revealCard}`}
-                  padding="var(--plan-card-padding)"
-                >
-                  <div className={ppStyles.planPriceContainer}>
-                    <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
-                      <StatusBadge tone="neutral" className={ppStyles.planBadge}>
-                        {plan.name}
-                      </StatusBadge>
-                      {isQuarterly ? (
-                        <span className={hpStyles.savingsBadge}>экономия 14 980 ₽</span>
-                      ) : null}
-                    </div>
-                    <div className={hpStyles.planPriceRow}>
-                      <span className={ppStyles.planPrice}>{plan.price}</span>
-                      {isQuarterly ? (
-                        <span className={hpStyles.planPriceSmall}>~9 997 ₽/мес</span>
-                      ) : null}
-                    </div>
-                    <div className={ppStyles.planPriceCadence}>{plan.cadence}</div>
-                  </div>
-                  <p className={hpStyles.planDescription}>{plan.description}</p>
-                  <div className={hpStyles.planFeatureLine}>
-                    <b>Подключение по заявке</b>
-                    <span>Без автоматического списания</span>
-                  </div>
-                  <Link
-                    href={buildCheckoutHref({ ...previewInput, planCode: plan.code })}
-                    className={`${ppStyles.secondaryAction} ${hpStyles.planCta}`}
-                    data-analytics-event={LANDING_ANALYTICS_EVENT.continuationCtaClicked}
-                    data-analytics-context={
-                      isQuarterly
-                        ? LANDING_ANALYTICS_CONTEXT.quarterly
-                        : LANDING_ANALYTICS_CONTEXT.monthly
-                    }
+          <div className={hpStyles.pricingProductBody}>
+            <div className={hpStyles.pricingPeriods} role="list" aria-label="Периоды доступа">
+              {[pilotPlan, ...secondaryPlans].map((plan) => {
+                const isPilot = plan.code === "pilot";
+                const analyticsContext = plan.code === "quarterly"
+                  ? LANDING_ANALYTICS_CONTEXT.quarterly
+                  : plan.code === "monthly"
+                    ? LANDING_ANALYTICS_CONTEXT.monthly
+                    : LANDING_ANALYTICS_CONTEXT.pricingPilot;
+                return (
+                  <div
+                    key={plan.code}
+                    className={hpStyles.pricingPeriod}
+                    data-primary={isPilot ? "true" : undefined}
+                    role="listitem"
                   >
-                    {plan.ctaLabel}
-                  </Link>
-                </SurfaceCard>
-              );
-            })}
-          </div>
-        </div>
+                    <div className={hpStyles.pricingPeriodCopy}>
+                      <span>{plan.cadence}</span>
+                      <strong>{plan.price}</strong>
+                      <p>{plan.description}</p>
+                    </div>
+                    <Link
+                      href={buildCheckoutHref({ ...previewInput, planCode: plan.code })}
+                      className={isPilot ? ppStyles.primaryAction : ppStyles.secondaryAction}
+                      data-analytics-event={
+                        isPilot
+                          ? LANDING_ANALYTICS_EVENT.checkoutStarted
+                          : LANDING_ANALYTICS_EVENT.continuationCtaClicked
+                      }
+                      data-analytics-context={analyticsContext}
+                    >
+                      {plan.ctaLabel}
+                    </Link>
+                  </div>
+                );
+              })}
+              <p className={hpStyles.pricingSetupNote}>
+                Месяц и квартал подключаются после короткой настройки профиля.
+                Так мы заранее проверяем специализацию, географию и лимит выдачи.
+              </p>
+            </div>
 
-        <div className={hpStyles.includedOnce}>
-          <div className={hpStyles.includedOnceLabel}>В любой тариф входит</div>
-          <ul className={hpStyles.includedOnceList}>
-            {PUBLIC_PLANS[0].bullets.map((bullet) => (
-              <li key={bullet}>{bullet}</li>
-            ))}
-          </ul>
-          <div className={ppStyles.helperText} style={{ marginTop: "4px" }}>
-            Оплата через ЮKassa, чек по ФЗ-54.{" "}
-            <Link href="/terms" style={{ color: "var(--c-brand)", textDecoration: "underline" }}>Оферта</Link>.
+            <aside className={hpStyles.afterPayment} aria-labelledby="after-payment-title">
+              <span className={hpStyles.afterPaymentEyebrow}>После оплаты</span>
+              <h3 id="after-payment-title">Запуск без отдельной инструкции</h3>
+              <ol>
+                <li><span>1</span><p>Настройте профиль агентства — около 3–5 минут</p></li>
+                <li><span>2</span><p>Подключите Telegram</p></li>
+                <li><span>3</span><p>Первая выдача появится после ближайшего планового пересчёта.</p></li>
+              </ol>
+              <p className={hpStyles.afterPaymentAssurances}>
+                Разовая оплата · без автопродления · чек через ЮKassa
+              </p>
+            </aside>
           </div>
-        </div>
+          <div className={hpStyles.includedOnce}>
+            <div className={hpStyles.includedOnceLabel}>В каждый период входит</div>
+            <ul className={hpStyles.includedOnceList}>
+              {PUBLIC_PLANS[0].bullets.map((bullet) => (
+                <li key={bullet}>{bullet}</li>
+              ))}
+            </ul>
+            <div className={ppStyles.helperText}>
+              Пилот — разовая оплата через ЮKassa, чек по ФЗ-54.{" "}
+              <Link href="/terms" className={hpStyles.termsLink}>Оферта</Link>.
+            </div>
+          </div>
+        </SurfaceCard>
       </ScrollReveal>
 
       {/* FAQ */}
@@ -464,7 +488,7 @@ export async function PreviewSection(props: {
         context={LANDING_ANALYTICS_CONTEXT.preview}
       />
       <div className={hpStyles.previewWorkspace}>
-        <div id="preview-configurator" className={hpStyles.previewSurfaceAnchor}>
+        <div id="preview-configurator" className={hpStyles.previewSurfaceAnchor} data-scroll-anchor>
           <SurfaceCard
             className={hpStyles.previewConfigurator}
             padding="var(--preview-surface-padding)"
@@ -545,6 +569,7 @@ export async function PreviewSection(props: {
           id="preview-results"
           className={hpStyles.previewSurfaceAnchor}
           data-preview-results
+          data-scroll-anchor
         >
           <SurfaceCard
             className={`${hpStyles.previewCardContainer} ${hpStyles.previewResults}`}
@@ -653,7 +678,7 @@ export function PreviewSkeleton() {
   return (
     <div className={hpStyles.previewSectionContent} aria-busy="true" aria-label="Загрузка примера радара">
       <div className={hpStyles.previewWorkspace}>
-        <div id="preview-configurator" className={hpStyles.previewSurfaceAnchor}>
+        <div id="preview-configurator" className={hpStyles.previewSurfaceAnchor} data-scroll-anchor>
           <SurfaceCard
             className={hpStyles.previewConfigurator}
             padding="var(--preview-surface-padding)"
@@ -668,7 +693,7 @@ export function PreviewSkeleton() {
           </div>
           </SurfaceCard>
         </div>
-        <div id="preview-results" className={hpStyles.previewSurfaceAnchor}>
+        <div id="preview-results" className={hpStyles.previewSurfaceAnchor} data-scroll-anchor>
           <SurfaceCard
             className={`${hpStyles.previewCardContainer} ${hpStyles.previewResults}`}
             padding="var(--preview-surface-padding)"

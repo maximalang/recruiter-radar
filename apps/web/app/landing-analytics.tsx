@@ -30,6 +30,24 @@ export function sendLandingEvent(detail: LandingAnalyticsDetail) {
 export default function LandingAnalytics() {
   useEffect(() => {
     sendLandingEvent({ name: LANDING_ANALYTICS_EVENT.landingViewed });
+    const pricing = document.getElementById("pricing");
+    let pricingViewed = false;
+    const pricingObserver =
+      pricing && typeof IntersectionObserver !== "undefined"
+        ? new IntersectionObserver((entries) => {
+            const isMeaningfullyVisible = entries.some(
+              (entry) => entry.isIntersecting && entry.intersectionRatio >= 0.35,
+            );
+            if (!isMeaningfullyVisible || pricingViewed) return;
+            pricingViewed = true;
+            sendLandingEvent({
+              name: LANDING_ANALYTICS_EVENT.pricingViewed,
+              context: LANDING_ANALYTICS_CONTEXT.pricing,
+            });
+            pricingObserver?.disconnect();
+          }, { threshold: [0.35] })
+        : null;
+    if (pricing && pricingObserver) pricingObserver.observe(pricing);
 
     const handleCustomEvent = (event: Event) => {
       const detail = (event as CustomEvent<LandingAnalyticsDetail>).detail;
@@ -69,6 +87,7 @@ export default function LandingAnalytics() {
       window.removeEventListener(LANDING_ANALYTICS_DOM_EVENT, handleCustomEvent);
       document.removeEventListener("click", handleClick);
       document.removeEventListener("toggle", handleToggle, true);
+      pricingObserver?.disconnect();
     };
   }, []);
 

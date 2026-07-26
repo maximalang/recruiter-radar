@@ -77,14 +77,15 @@ describe("landing section hierarchy", () => {
     const page = await HomePage({ searchParams: Promise.resolve({}) });
     const sectionIntros = collectElements(page, SectionIntro);
 
-    expect(sectionIntros).toHaveLength(6);
+    expect(sectionIntros).toHaveLength(7);
     expect(sectionIntros.every((section) => section.props.accent === true)).toBe(true);
     expect(sectionIntros.map((section) => section.props.eyebrow)).toEqual([
       "Проблема",
       "Рабочий радар",
       "Как работает",
       "Проверка сигнала",
-      "Тарифы",
+      "Кому подходит",
+      "Тариф",
       "FAQ",
     ]);
   });
@@ -107,18 +108,20 @@ describe("landing section hierarchy", () => {
   it("keeps the hero concise and makes the pilot the obvious first decision", async () => {
     const page = await HomePage({ searchParams: Promise.resolve({}) });
     const pageText = readVisibleText(page);
-    const alignedPlanCards = collectElements(page, SurfaceCard)
-      .filter((card) => card.props.padding === "var(--plan-card-padding)");
+    const pricingProducts = collectElements(page, SurfaceCard)
+      .filter((card) => card.props.className?.includes("pricingProduct"));
     const pricingIntro = collectElements(page, SectionIntro)
-      .find((section) => section.props.eyebrow === "Тарифы");
+      .find((section) => section.props.eyebrow === "Тариф");
 
     expect(pageText).toContain("Компании, которым стоит написать сегодня. С доказательствами.");
-    expect(pricingIntro?.props.title).toBe("Начните с недели. Продолжайте, только если радар полезен.");
-    expect(pricingIntro?.props.description).toContain("Пилот — разовая оплата без продления.");
+    expect(pricingIntro?.props.title).toBe("Один продукт — три периода доступа");
+    expect(pricingIntro?.props.description).toContain("Меняется только срок доступа");
     expect(pageText).toContain("Проверьте новый канал за 7 дней");
-    expect(alignedPlanCards).toHaveLength(3);
+    expect(pricingProducts).toHaveLength(1);
+    expect(pageText).toContain("Рекомендуем 7 дней");
+    expect(pageText).toContain("Разовая оплата · без автопродления · чек через ЮKassa");
     expect(pageText).not.toContain("0 автоспама");
-    expect(pageText).not.toContain("Один радар — на неделю, месяц или квартал");
+    expect(pageText).not.toMatch(/скидк|экономи/i);
   });
 
   it("labels the resilient fallback as a personalized sample instead of live data", async () => {

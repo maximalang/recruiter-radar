@@ -40,6 +40,7 @@ describe("YandexMetrika", () => {
   afterEach(() => {
     cleanup();
     delete window.ym;
+    window.history.replaceState({}, "", "/");
     if (originalId === undefined) delete process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID;
     else process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID = originalId;
   });
@@ -54,8 +55,13 @@ describe("YandexMetrika", () => {
     expect(container.querySelector("#yandex-metrika-loader")).toBeNull();
   });
 
-  it("loads the official tag and emits explicit query-free SPA pageviews", async () => {
+  it("loads the official tag and sends only allowlisted campaign parameters", async () => {
     process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID = "12345678";
+    window.history.replaceState(
+      {},
+      "",
+      "/?utm_source=telegram&utm_campaign=pilot&specialization=private-profile",
+    );
     const ym = jest.fn();
     window.ym = ym;
     const { container, rerender } = render(<YandexMetrika />);
@@ -74,7 +80,7 @@ describe("YandexMetrika", () => {
     await waitFor(() => expect(ym).toHaveBeenCalledWith(
       12345678,
       "hit",
-      "/",
+      "/?utm_source=telegram&utm_campaign=pilot",
       expect.objectContaining({ title: expect.any(String) }),
     ));
     rerender(<YandexMetrika />);
@@ -83,8 +89,9 @@ describe("YandexMetrika", () => {
       const pageviews = ym.mock.calls
         .filter((call) => call[1] === "hit")
         .map((call) => call[2]);
-      expect(pageviews).toEqual(["/"]);
+      expect(pageviews).toEqual(["/?utm_source=telegram&utm_campaign=pilot"]);
     });
+    expect(JSON.stringify(ym.mock.calls)).not.toContain("private-profile");
   });
 
   it("does not mount Metrika globally or on routes with customer data", () => {

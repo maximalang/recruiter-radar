@@ -7,12 +7,30 @@ import LandingCheckoutAnalytics from "@/app/landing-checkout-analytics";
 
 describe("landing funnel analytics", () => {
   const fetchMock = jest.fn().mockResolvedValue({ status: 204 });
+  let intersectionCallback: IntersectionObserverCallback;
 
   beforeEach(() => {
     fetchMock.mockClear();
     global.fetch = fetchMock as typeof fetch;
     sessionStorage.clear();
     delete window.ym;
+    class TestIntersectionObserver {
+      constructor(callback: IntersectionObserverCallback) {
+        intersectionCallback = callback;
+      }
+      observe() {}
+      disconnect() {}
+      unobserve() {}
+      takeRecords() { return []; }
+      root = null;
+      rootMargin = "0px";
+      thresholds = [0.35];
+    }
+    Object.defineProperty(window, "IntersectionObserver", {
+      configurable: true,
+      writable: true,
+      value: TestIntersectionObserver,
+    });
   });
 
   it("keeps conversion events in first-party telemetry", () => {
@@ -93,5 +111,31 @@ describe("landing funnel analytics", () => {
     details.open = true;
     fireEvent(details, new Event("toggle", { bubbles: true }));
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("records pricing_viewed once when pricing becomes meaningfully visible", () => {
+    render(
+      <>
+        <section id="pricing">Тарифы</section>
+        <LandingAnalytics />
+      </>,
+    );
+    fetchMock.mockClear();
+    const pricing = document.getElementById("pricing")!;
+
+    intersectionCallback([{
+      target: pricing,
+      isIntersecting: true,
+      intersectionRatio: 0.6,
+    } as unknown as IntersectionObserverEntry], {} as IntersectionObserver);
+    intersectionCallback([{
+      target: pricing,
+      isIntersecting: true,
+      intersectionRatio: 0.8,
+    } as unknown as IntersectionObserverEntry], {} as IntersectionObserver);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][1]?.body).toContain('"name":"pricing_viewed"');
+    expect(fetchMock.mock.calls[0][1]?.body).toContain('"context":"pricing"');
   });
 });

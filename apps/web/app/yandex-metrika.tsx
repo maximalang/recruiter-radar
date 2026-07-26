@@ -8,6 +8,25 @@ function readCounterId(): string | null {
   return /^\d{5,12}$/.test(value) ? value : null;
 }
 
+const METRIKA_CAMPAIGN_PARAMS = [
+  "utm_source",
+  "utm_medium",
+  "utm_campaign",
+] as const;
+
+function buildMetrikaPagePath(search: string): string {
+  const source = new URLSearchParams(search);
+  const sanitized = new URLSearchParams();
+
+  for (const key of METRIKA_CAMPAIGN_PARAMS) {
+    const value = source.get(key)?.trim() ?? "";
+    if (/^[a-z0-9._~-]{1,64}$/i.test(value)) sanitized.set(key, value);
+  }
+
+  const query = sanitized.toString();
+  return query ? `/?${query}` : "/";
+}
+
 export default function YandexMetrika() {
   const counterId = readCounterId();
   const [ready, setReady] = useState(false);
@@ -30,7 +49,12 @@ export default function YandexMetrika() {
   `;
   useEffect(() => {
     if (!counterId || !ready || typeof window.ym !== "function") return;
-    window.ym(Number(counterId), "hit", "/", { title: document.title });
+    window.ym(
+      Number(counterId),
+      "hit",
+      buildMetrikaPagePath(window.location.search),
+      { title: document.title },
+    );
   }, [counterId, ready]);
 
   if (!counterId) return null;
