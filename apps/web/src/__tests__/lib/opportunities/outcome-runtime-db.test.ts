@@ -10,6 +10,7 @@ import {
   OutcomeTransitionConflictError,
   recordOpportunityOutcome,
 } from '@/lib/opportunities/outcome-repository'
+import type { OpportunityOutcomeInput } from '@/lib/opportunities/outcome-domain'
 import { applyOpportunityAction } from '@/lib/opportunities/repository'
 
 const describeWithDatabase = process.env.DATABASE_URL ? describe : describe.skip
@@ -447,7 +448,7 @@ describeWithDatabase('Opportunity Outcome production PostgreSQL runtime', () => 
   function record(
     eventType: Parameters<typeof outcomePayload>[0],
     offset: number,
-    override: Partial<ReturnType<typeof outcomePayload>> = {},
+    override: Partial<OpportunityOutcomeInput> = {},
   ) {
     return recordAt(eventType, Date.now() - 60_000 + offset * 1_000, override)
   }
@@ -455,7 +456,7 @@ describeWithDatabase('Opportunity Outcome production PostgreSQL runtime', () => 
   function recordAt(
     eventType: Parameters<typeof outcomePayload>[0],
     occurredAt: number,
-    override: Partial<ReturnType<typeof outcomePayload>> = {},
+    override: Partial<OpportunityOutcomeInput> = {},
   ) {
     return recordOpportunityOutcome({
       ownerId,
@@ -477,8 +478,8 @@ function outcomePayload(
     'meeting' | 'proposal' | 'won',
   idempotencyKey: string,
   occurredAt: number,
-  override: Record<string, unknown> = {},
-) {
+  override: Partial<OpportunityOutcomeInput> = {},
+): OpportunityOutcomeInput {
   return {
     eventType,
     occurredAt: new Date(occurredAt).toISOString(),
