@@ -8,7 +8,14 @@ import type { HiringEpisodeType } from './hiring-episode-detection'
 import {
   clampOpportunityPageSize,
   clampOpportunitySnoozeDays,
+  isOpportunityOutcomesEnabled,
 } from './config'
+import type {
+  DismissedReasonCode,
+  OpportunityContactPathType,
+  OpportunityOutcomeChannel,
+} from './outcome-domain'
+import { recordOpportunityOutcomeInTransaction } from './outcome-repository'
 import {
   DEFAULT_OPPORTUNITY_SCORING_CONFIG,
   OPPORTUNITY_STATUSES,
@@ -307,6 +314,11 @@ export async function applyOpportunityAction(input: {
   actionKey: string
   note?: string | null
   snoozeDays?: number
+  reasonCode?: DismissedReasonCode | null
+  channel?: OpportunityOutcomeChannel | null
+  contactPathType?: OpportunityContactPathType | null
+  contactReference?: string | null
+  occurredAt?: string
 }): Promise<{ opportunity: OpportunityItem; idempotent: boolean } | null> {
   if (!isOpportunityAction(input.action)) {
     throw new Error('Unsupported opportunity action.')
@@ -324,6 +336,10 @@ export async function applyOpportunityAction(input: {
     action: input.action,
     note,
     snoozeDays: input.action === 'snoozed' ? snoozeDays : null,
+    reasonCode: input.action === 'dismissed' ? input.reasonCode ?? null : null,
+    channel: input.action === 'contacted' ? input.channel ?? null : null,
+    contactPathType:
+      input.action === 'contacted' ? input.contactPathType ?? null : null,
   })
 
   try {
@@ -426,6 +442,17 @@ export async function applyOpportunityAction(input: {
         note,
         JSON.stringify({
           source: 'opportunity-api',
+          ...(input.action === 'dismissed' && input.reasonCode
+            ? { reasonCode: input.reasonCode }
+            : {}),
+          ...(input.action === 'contacted' && input.channel
+            ? {
+                channel: input.channel,
+                ...(input.contactPathType
+                  ? { contactPathType: input.contactPathType }
+                  : {}),
+              }
+            : {}),
           ...(input.action === 'snoozed'
             ? { snoozeDays }
             : {}),
@@ -435,7 +462,39 @@ export async function applyOpportunityAction(input: {
     if (actionInsert.rowCount !== 1) {
       throw new Error('Opportunity action insert returned no row.')
     }
-    await client.query(
+    if (isOpportunityOutcomesEnabled()) {
+      const outcome = await recordOpportunityOutcomeInTransaction({
+        ownerId: input.ownerId,
+        opportunityId: input.opportunityId,
+        actorType: 'user',
+        actorUserId: input.ownerId,
+        snoozeDays,
+        payload: {
+          eventType: input.action,
+          occurredAt: input.occurredAt ?? new Date().toISOString(),
+          reasonCode:
+            input.action === 'dismissed' ? input.reasonCode ?? null : null,
+          reasonNote: input.action === 'dismissed' ? note : null,
+          channel: input.action === 'contacted' ? input.channel ?? null : null,
+          contactPathType:
+            input.action === 'contacted'
+              ? input.contactPathType ?? null
+              : null,
+          contactReference:
+            input.action === 'contacted'
+              ? input.contactReference ?? null
+              : null,
+          valueMinor: null,
+          currency: null,
+          metadata: { source: 'opportunity_action' },
+          idempotencyKey: actionKey,
+        },
+      }, client)
+      if (!outcome) {
+        throw new Error('Outcome opportunity could not be reloaded.')
+      }
+    } else {
+      await client.query(
       `UPDATE opportunities
        SET
          status = $1,
@@ -450,7 +509,7 @@ export async function applyOpportunityAction(input: {
          AND superseded_at IS NULL`,
       [input.action, input.opportunityId, snoozeDays, String(input.ownerId)],
     )
-    await client.query(
+      await client.query(
       `INSERT INTO client_episode_state (
          client_profile_id,
          owner_id,
@@ -480,7 +539,8 @@ export async function applyOpportunityAction(input: {
         input.action,
         snoozeDays,
       ],
-    )
+      )
+    }
     const opportunity = await getOpportunityById(
       { ownerId: input.ownerId, opportunityId: input.opportunityId },
       client,
@@ -691,8 +751,21 @@ function createActionFingerprint(input: {
   action: OpportunityAction
   note: string | null
   snoozeDays: number | null
+  reasonCode: DismissedReasonCode | null
+  channel: OpportunityOutcomeChannel | null
+  contactPathType: OpportunityContactPathType | null
 }): string {
+  const payload = {
+    action: input.action,
+    note: input.note,
+    snoozeDays: input.snoozeDays,
+    ...(input.reasonCode ? { reasonCode: input.reasonCode } : {}),
+    ...(input.channel ? { channel: input.channel } : {}),
+    ...(input.contactPathType
+      ? { contactPathType: input.contactPathType }
+      : {}),
+  }
   return createHash('sha256')
-    .update(JSON.stringify(input))
+    .update(JSON.stringify(payload))
     .digest('hex')
 }
