@@ -19,6 +19,42 @@ const rollbackPath = resolve(
   'migrations',
   '20260726130000_add_opportunity_engine_v1.down.sql',
 )
+const hardeningMigrationPath = resolve(
+  process.cwd(),
+  '..',
+  '..',
+  'packages',
+  'db',
+  'migrations',
+  '20260727120000_add_opportunity_engine_hardening.sql',
+)
+const episodeStateMigrationPath = resolve(
+  process.cwd(),
+  '..',
+  '..',
+  'packages',
+  'db',
+  'migrations',
+  '20260727121000_add_opportunity_episode_state.sql',
+)
+const supersessionMigrationPath = resolve(
+  process.cwd(),
+  '..',
+  '..',
+  'packages',
+  'db',
+  'migrations',
+  '20260727122000_add_opportunity_supersession.sql',
+)
+const supersessionRollbackPath = resolve(
+  process.cwd(),
+  '..',
+  '..',
+  'packages',
+  'db',
+  'migrations',
+  '20260727122000_add_opportunity_supersession.down.sql',
+)
 
 describe('opportunity engine migration contract', () => {
   const migration = readFileSync(migrationPath, 'utf8')
@@ -108,6 +144,65 @@ describe('opportunity engine migration contract', () => {
     )
     expect(rollback.indexOf('DROP TABLE IF EXISTS hiring_episode_evidence')).toBeLessThan(
       rollback.indexOf('DROP TABLE IF EXISTS hiring_episodes'),
+    )
+  })
+})
+
+describe('opportunity engine hardening migrations', () => {
+  const hardening = readFileSync(hardeningMigrationPath, 'utf8').replace(/\s+/g, ' ')
+  const episodeState = readFileSync(episodeStateMigrationPath, 'utf8').replace(/\s+/g, ' ')
+  const supersession = readFileSync(supersessionMigrationPath, 'utf8').replace(/\s+/g, ' ')
+  const supersessionRollback = readFileSync(
+    supersessionRollbackPath,
+    'utf8',
+  ).replace(/\s+/g, ' ')
+
+  it('adds stable episode identity and safely renames role_cluster', () => {
+    expect(hardening).toContain('episode_identity TEXT')
+    expect(hardening).toContain('episode_generation INTEGER')
+    expect(hardening).toContain("episode_type = 'role_cluster'")
+    expect(hardening).toContain("'^new_role_cluster:'")
+    expect(hardening).toContain('hiring_episodes_identity_generation_uidx')
+    expect(hardening).toContain('input_fingerprint TEXT')
+    expect(hardening.indexOf('DROP CONSTRAINT hiring_episodes_type_check')).toBeLessThan(
+      hardening.indexOf("episode_type = 'role_cluster'"),
+    )
+  })
+
+  it('adds tenant-safe episode state and transition audit columns', () => {
+    expect(episodeState).toContain('CREATE TABLE client_episode_state')
+    expect(episodeState).toContain('FOREIGN KEY (client_profile_id, owner_id)')
+    expect(episodeState).toContain('FOREIGN KEY (hiring_episode_id, organization_id)')
+    expect(episodeState).toContain('previous_status')
+    expect(episodeState).toContain('new_status')
+  })
+
+  it('adds current-version uniqueness and deterministic provenance', () => {
+    expect(supersession).toContain('superseded_at TIMESTAMPTZ')
+    expect(supersession).toContain('opportunities_current_uidx')
+    expect(supersession).toContain('WITH ranked_current AS')
+    expect(supersession).toContain('current_rank > 1')
+    expect(supersession).toContain(
+      'ON digest_candidates ( client_profile_id, org_id, created_at DESC, id DESC ) INCLUDE (digest_run_id)',
+    )
+    for (const column of [
+      'episode_evidence_hash',
+      'profile_snapshot_hash',
+      'digest_candidate_id',
+      'fiur_version',
+      'scoring_config_hash',
+      'brief_builder_version',
+      'input_hash',
+    ]) {
+      expect(supersession).toContain(column)
+    }
+  })
+
+  it('preserves action audit records when supersession is rolled back', () => {
+    expect(supersessionRollback).toContain('UPDATE opportunity_actions action')
+    expect(supersessionRollback).toContain('rollbackOriginalOpportunityId')
+    expect(supersessionRollback.indexOf('UPDATE opportunity_actions action')).toBeLessThan(
+      supersessionRollback.indexOf('DELETE FROM opportunities'),
     )
   })
 })
