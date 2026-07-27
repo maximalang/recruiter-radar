@@ -26,7 +26,7 @@ describe('opportunity outcome projection rebuild contract', () => {
   it('rebuilds deterministically from append order and preserves tenant context', () => {
     expect(script).toContain('(ARRAY_AGG(id ORDER BY id DESC))[1] AS last_event_id')
     expect(script).toContain('commercial_stage AS current_stage')
-    expect(script).toContain('GROUP BY\n      owner_id,')
+    expect(script).toMatch(/GROUP BY\r?\n\s+owner_id,/)
     expect(script).toContain('ORDER BY owner_id, opportunity_id')
   })
 
