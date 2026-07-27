@@ -19,6 +19,7 @@ const rebuildScript = resolve(
   'rebuild-opportunity-outcomes.mjs',
 )
 const client = new Client({ connectionString: databaseUrl })
+const writer = new Client({ connectionString: databaseUrl })
 
 async function rebuild(args) {
   const result = await execFileAsync(process.execPath, [rebuildScript, ...args], {
@@ -35,6 +36,7 @@ async function rebuild(args) {
 }
 
 await client.connect()
+await writer.connect()
 try {
   const fixture = await client.query(
     `SELECT owner_id::TEXT AS "ownerId", opportunity_id::TEXT AS "opportunityId"
@@ -76,6 +78,59 @@ try {
 
   const stable = await rebuild(['--dry-run', '--owner-id', ownerId])
   assert.equal(stable.rebuildChanged, 0)
+
+  await writer.query('BEGIN')
+  await writer.query(
+    `SELECT pg_advisory_xact_lock_shared(
+       hashtextextended('opportunity-outcome-owner:' || $1, 0)
+     )`,
+    [ownerId],
+  )
+  const openedAt = new Date().toISOString()
+  const inserted = await writer.query(
+    `INSERT INTO opportunity_outcome_events (
+       owner_id, client_profile_id, opportunity_id, hiring_episode_id,
+       organization_id, event_type, previous_stage, new_stage, occurred_at,
+       actor_type, metadata, analytics_snapshot, idempotency_key, payload_hash
+     )
+     SELECT
+       state.owner_id, state.client_profile_id, state.opportunity_id,
+       opportunity.hiring_episode_id, opportunity.organization_id,
+       'opened', state.commercial_stage, state.commercial_stage, $3,
+       'system', '{}'::JSONB, '{}'::JSONB, $4, repeat('c', 64)
+     FROM opportunity_outcome_state state
+     JOIN opportunities opportunity
+       ON opportunity.id = state.opportunity_id
+      AND opportunity.owner_id = state.owner_id
+     WHERE state.owner_id = $1 AND state.opportunity_id = $2
+     RETURNING id::TEXT AS id`,
+    [ownerId, opportunityId, openedAt, `rebuild-concurrency:${Date.now()}`],
+  )
+  assert.ok(inserted.rows[0], 'writer fixture event must be inserted')
+  await writer.query(
+    `UPDATE opportunity_outcome_state
+     SET first_opened_at = COALESCE(first_opened_at, $3),
+         last_event_id = $4,
+         last_event_at = GREATEST(last_event_at, $3),
+         updated_at = NOW()
+     WHERE owner_id = $1 AND opportunity_id = $2`,
+    [ownerId, opportunityId, openedAt, inserted.rows[0].id],
+  )
+  const concurrentRebuild = rebuild(['--apply', '--owner-id', ownerId])
+  await writer.query('COMMIT')
+  await concurrentRebuild
+  const concurrentProjection = await client.query(
+    `SELECT first_opened_at IS NOT NULL AS "writerPreserved",
+       last_event_id = $3 AS "latestEventPreserved"
+     FROM opportunity_outcome_state
+     WHERE owner_id = $1 AND opportunity_id = $2`,
+    [ownerId, opportunityId, inserted.rows[0].id],
+  )
+  assert.equal(concurrentProjection.rows[0].writerPreserved, true)
+  assert.equal(concurrentProjection.rows[0].latestEventPreserved, true)
+
+  const stableAfterConcurrency = await rebuild(['--dry-run', '--owner-id', ownerId])
+  assert.equal(stableAfterConcurrency.rebuildChanged, 0)
   console.log(JSON.stringify({
     ok: true,
     checks: [
@@ -83,8 +138,11 @@ try {
       'apply_repairs_projection',
       'rebuild_is_idempotent',
       'owner_scope_preserved',
+      'concurrent_writer_projection_preserved',
     ],
   }, null, 2))
 } finally {
+  await writer.query('ROLLBACK').catch(() => undefined)
+  await writer.end()
   await client.end()
 }

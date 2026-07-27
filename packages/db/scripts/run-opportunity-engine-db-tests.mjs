@@ -33,15 +33,30 @@ const outcomeRebuildVerifierScript = resolve(
   'scripts',
   'verify-opportunity-outcome-rebuild.mjs',
 )
+const outcomeUpgradeVerifierScript = resolve(
+  root,
+  'packages',
+  'db',
+  'scripts',
+  'verify-opportunity-outcome-hardening-upgrade.mjs',
+)
 const jestScript = resolve(root, 'node_modules', 'jest', 'bin', 'jest.js')
 const webRoot = resolve(root, 'apps', 'web')
 const admin = new Client({ connectionString: databaseUrl })
 const databaseName = `rr_opportunity_runtime_${process.pid}_${Date.now()}`
 const upgradeDatabaseName = `rr_opportunity_upgrade_${process.pid}_${Date.now()}`
+const outcomeMeetingUpgradeDatabaseName =
+  `rr_outcome_meeting_upgrade_${process.pid}_${Date.now()}`
+const outcomeChronologyUpgradeDatabaseName =
+  `rr_outcome_chronology_upgrade_${process.pid}_${Date.now()}`
 const temporaryUrl = new URL(databaseUrl)
 temporaryUrl.pathname = `/${databaseName}`
 const upgradeUrl = new URL(databaseUrl)
 upgradeUrl.pathname = `/${upgradeDatabaseName}`
+const outcomeMeetingUpgradeUrl = new URL(databaseUrl)
+outcomeMeetingUpgradeUrl.pathname = `/${outcomeMeetingUpgradeDatabaseName}`
+const outcomeChronologyUpgradeUrl = new URL(databaseUrl)
+outcomeChronologyUpgradeUrl.pathname = `/${outcomeChronologyUpgradeDatabaseName}`
 const testEnvironment = {
   ...process.env,
   DATABASE_URL: temporaryUrl.toString(),
@@ -83,6 +98,22 @@ try {
     OPPORTUNITY_OUTCOMES_ENABLED: 'true',
   })
   await run(process.execPath, [outcomeRebuildVerifierScript])
+  await admin.query(
+    `CREATE DATABASE ${quoteIdentifier(outcomeMeetingUpgradeDatabaseName)}`,
+  )
+  await run(process.execPath, [outcomeUpgradeVerifierScript], root, {
+    ...process.env,
+    DATABASE_URL: outcomeMeetingUpgradeUrl.toString(),
+    OUTCOME_HARDENING_UPGRADE_CASE: 'valid-legacy-meeting',
+  })
+  await admin.query(
+    `CREATE DATABASE ${quoteIdentifier(outcomeChronologyUpgradeDatabaseName)}`,
+  )
+  await run(process.execPath, [outcomeUpgradeVerifierScript], root, {
+    ...process.env,
+    DATABASE_URL: outcomeChronologyUpgradeUrl.toString(),
+    OUTCOME_HARDENING_UPGRADE_CASE: 'invalid-chronology',
+  })
   await admin.query(`CREATE DATABASE ${quoteIdentifier(upgradeDatabaseName)}`)
   await run(process.execPath, [upgradeVerifierScript], root, {
     ...process.env,
@@ -91,5 +122,7 @@ try {
 } finally {
   await admin.query(`DROP DATABASE IF EXISTS ${quoteIdentifier(databaseName)} WITH (FORCE)`)
   await admin.query(`DROP DATABASE IF EXISTS ${quoteIdentifier(upgradeDatabaseName)} WITH (FORCE)`)
+  await admin.query(`DROP DATABASE IF EXISTS ${quoteIdentifier(outcomeMeetingUpgradeDatabaseName)} WITH (FORCE)`)
+  await admin.query(`DROP DATABASE IF EXISTS ${quoteIdentifier(outcomeChronologyUpgradeDatabaseName)} WITH (FORCE)`)
   await admin.end()
 }

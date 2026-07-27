@@ -45,13 +45,15 @@ export async function GET(request: NextRequest) {
   const confidenceGate = optionalParam(request, 'confidenceGate')
   const sourceFamily = optionalParam(request, 'sourceFamily')
   const scoreBucket = optionalParam(request, 'scoreBucket')
+  const cohort = optionalParam(request, 'cohort') ?? 'shown'
   if (
     (episodeType && !HIRING_EPISODE_TYPES.includes(
       episodeType as (typeof HIRING_EPISODE_TYPES)[number],
     )) ||
     (confidenceGate && !['A', 'B', 'C', 'D'].includes(confidenceGate)) ||
     (sourceFamily && !/^[a-z0-9_-]{1,64}$/i.test(sourceFamily)) ||
-    (scoreBucket && !/^(?:0-9|[1-9]0-[1-9]9|100)$/.test(scoreBucket))
+    (scoreBucket && !/^(?:0-9|[1-9]0-[1-9]9|100)$/.test(scoreBucket)) ||
+    !['shown', 'accepted'].includes(cohort)
   ) {
     return NextResponse.json({ error: 'invalid_filter' }, { status: 400 })
   }
@@ -65,6 +67,7 @@ export async function GET(request: NextRequest) {
       confidenceGate,
       sourceFamily,
       scoreBucket,
+      cohort: cohort as 'shown' | 'accepted',
     })
     return NextResponse.json(summary)
   } catch (error) {

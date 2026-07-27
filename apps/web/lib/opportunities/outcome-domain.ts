@@ -6,13 +6,17 @@ export const OPPORTUNITY_OUTCOME_EVENT_TYPES = [
   'accepted',
   'dismissed',
   'snoozed',
+  'resumed',
   'contacted',
   'replied',
   'meeting',
+  'meeting_cancelled',
+  'meeting_no_show',
   'proposal',
   'won',
   'lost',
   'exported',
+  'reverted',
 ] as const
 
 export type OpportunityOutcomeEventType =
@@ -23,7 +27,6 @@ export const OPPORTUNITY_OUTCOME_STAGES = [
   'review',
   'accepted',
   'dismissed',
-  'snoozed',
   'contacted',
   'replied',
   'meeting',
@@ -34,6 +37,14 @@ export const OPPORTUNITY_OUTCOME_STAGES = [
 
 export type OpportunityOutcomeStage =
   (typeof OPPORTUNITY_OUTCOME_STAGES)[number]
+
+export const OPPORTUNITY_OUTCOME_WORKFLOW_STATES = [
+  'active',
+  'snoozed',
+] as const
+
+export type OpportunityOutcomeWorkflowState =
+  (typeof OPPORTUNITY_OUTCOME_WORKFLOW_STATES)[number]
 
 export const DISMISSED_REASON_CODES = [
   'bad_fit',
@@ -113,13 +124,17 @@ export const OUTCOME_EVENT_LABELS: Readonly<
   accepted: 'Взято в работу',
   dismissed: 'Отклонено',
   snoozed: 'Отложено',
+  resumed: 'Возобновлено',
   contacted: 'Связались',
   replied: 'Получен ответ',
-  meeting: 'Встреча',
+  meeting: 'Встреча назначена',
+  meeting_cancelled: 'Встреча отменена',
+  meeting_no_show: 'Встреча не состоялась',
   proposal: 'Предложение',
   won: 'Выиграно',
   lost: 'Потеряно',
   exported: 'Экспортировано',
+  reverted: 'Последнее изменение отменено',
 }
 
 export const OUTCOME_REASON_LABELS: Readonly<Record<string, string>> = {
@@ -155,19 +170,37 @@ const OBSERVATIONAL_EVENTS = new Set<OpportunityOutcomeEventType>([
   'shown',
   'opened',
   'exported',
+  'meeting_cancelled',
+  'meeting_no_show',
+])
+
+const WORKFLOW_EVENTS = new Set<OpportunityOutcomeEventType>([
+  'snoozed',
+  'resumed',
+])
+
+const COMMERCIAL_STAGE_EVENTS = new Set<OpportunityOutcomeEventType>([
+  'accepted',
+  'dismissed',
+  'contacted',
+  'replied',
+  'meeting',
+  'proposal',
+  'won',
+  'lost',
+  'reverted',
 ])
 
 const ALLOWED_STAGE_EVENTS: Readonly<
   Record<OpportunityOutcomeStage, readonly OpportunityOutcomeEventType[]>
 > = {
-  new: ['accepted', 'dismissed', 'snoozed'],
-  review: ['accepted', 'dismissed', 'snoozed'],
-  snoozed: ['accepted', 'dismissed'],
-  accepted: ['contacted', 'dismissed', 'snoozed'],
-  contacted: ['replied', 'lost', 'snoozed'],
-  replied: ['meeting', 'lost', 'snoozed'],
-  meeting: ['proposal', 'lost', 'snoozed'],
-  proposal: ['won', 'lost', 'snoozed'],
+  new: ['accepted', 'dismissed'],
+  review: ['accepted', 'dismissed'],
+  accepted: ['contacted', 'dismissed'],
+  contacted: ['replied', 'lost'],
+  replied: ['meeting', 'lost'],
+  meeting: ['proposal', 'lost'],
+  proposal: ['won', 'lost'],
   dismissed: [],
   won: [],
   lost: [],
@@ -185,8 +218,6 @@ const ALLOWED_METADATA_KEYS = new Set([
 const ALLOWED_MEETING_STATUSES = new Set([
   'scheduled',
   'completed',
-  'cancelled',
-  'no_show',
 ])
 
 const MAX_FUTURE_SKEW_MS = 5 * 60 * 1000
@@ -210,6 +241,9 @@ export interface OpportunityOutcomeInput {
   channel: OpportunityOutcomeChannel | null
   contactPathType: OpportunityContactPathType | null
   contactReference: string | null
+  snoozeDays: number | null
+  snoozedUntil: string | null
+  revertsEventId: string | null
   valueMinor: number | null
   currency: 'RUB' | null
   metadata: Record<string, string>
@@ -225,12 +259,20 @@ export interface OutcomeProjectionEvent {
   reasonCode: OpportunityOutcomeReasonCode | null
   valueMinor: number | null
   currency: 'RUB' | null
+  snoozedUntil?: string | null
+  revertsEventId?: string | null
+  revertedEventType?: OpportunityOutcomeEventType | null
 }
 
 export interface OpportunityOutcomeProjection {
+  commercialStage: OpportunityOutcomeStage
   currentStage: OpportunityOutcomeStage
+  workflowState: OpportunityOutcomeWorkflowState
+  snoozedUntil: string | null
   lastEventId: string
   lastEventAt: string
+  lastStageEventId: string | null
+  lastStageEventAt: string | null
   firstShownAt: string | null
   firstOpenedAt: string | null
   acceptedAt: string | null
@@ -258,16 +300,33 @@ export function isOutcomeEventType(
 export function isOutcomeTransitionAllowed(
   stage: OpportunityOutcomeStage,
   eventType: OpportunityOutcomeEventType,
+  workflowState: OpportunityOutcomeWorkflowState = 'active',
 ): boolean {
-  return OBSERVATIONAL_EVENTS.has(eventType) ||
-    ALLOWED_STAGE_EVENTS[stage].includes(eventType)
+  if (
+    eventType === 'meeting_cancelled' ||
+    eventType === 'meeting_no_show'
+  ) {
+    return stage === 'meeting'
+  }
+  if (OBSERVATIONAL_EVENTS.has(eventType)) return true
+  if (eventType === 'snoozed') return workflowState === 'active'
+  if (eventType === 'resumed') return workflowState === 'snoozed'
+  if (workflowState === 'snoozed') return false
+  if (eventType === 'reverted') return true
+  return ALLOWED_STAGE_EVENTS[stage].includes(eventType)
 }
 
 export function getNextOutcomeStage(
   stage: OpportunityOutcomeStage,
   eventType: OpportunityOutcomeEventType,
 ): OpportunityOutcomeStage {
-  if (OBSERVATIONAL_EVENTS.has(eventType)) return stage
+  if (
+    OBSERVATIONAL_EVENTS.has(eventType) ||
+    WORKFLOW_EVENTS.has(eventType) ||
+    eventType === 'reverted'
+  ) {
+    return stage
+  }
   if (!isOutcomeTransitionAllowed(stage, eventType)) {
     throw new OutcomeValidationError('Outcome transition is not allowed.')
   }
@@ -294,6 +353,9 @@ export function validateOutcomeInput(
     'channel',
     'contactPathType',
     'contactReference',
+    'snoozeDays',
+    'snoozedUntil',
+    'revertsEventId',
     'valueMinor',
     'currency',
     'metadata',
@@ -339,6 +401,16 @@ export function validateOutcomeInput(
     'contactReference',
     320,
   )
+  const { snoozeDays, snoozedUntil } = validateSnooze(
+    payload.eventType,
+    payload.snoozeDays,
+    payload.snoozedUntil,
+    occurredAt,
+  )
+  const revertsEventId = validateRevertsEventId(
+    payload.eventType,
+    payload.revertsEventId,
+  )
 
   const { valueMinor, currency } = validateMoney(
     payload.eventType,
@@ -355,6 +427,9 @@ export function validateOutcomeInput(
     channel,
     contactPathType,
     contactReference,
+    snoozeDays,
+    snoozedUntil,
+    revertsEventId,
     valueMinor,
     currency,
     metadata,
@@ -373,9 +448,14 @@ export function reduceOutcomeProjection(
   const projection: OpportunityOutcomeProjection = state
     ? { ...state }
     : {
+        commercialStage: event.previousStage,
         currentStage: event.previousStage,
+        workflowState: 'active',
+        snoozedUntil: null,
         lastEventId: event.id,
         lastEventAt: event.occurredAt,
+        lastStageEventId: null,
+        lastStageEventAt: null,
         firstShownAt: null,
         firstOpenedAt: null,
         acceptedAt: null,
@@ -391,12 +471,24 @@ export function reduceOutcomeProjection(
         currency: null,
       }
 
-  projection.currentStage = event.newStage
   projection.lastEventId = event.id
   projection.lastEventAt = laterTimestamp(
     projection.lastEventAt,
     event.occurredAt,
   )
+
+  if (event.eventType === 'snoozed') {
+    projection.workflowState = 'snoozed'
+    projection.snoozedUntil = event.snoozedUntil ?? null
+  } else if (event.eventType === 'resumed') {
+    projection.workflowState = 'active'
+    projection.snoozedUntil = null
+  } else if (COMMERCIAL_STAGE_EVENTS.has(event.eventType)) {
+    projection.commercialStage = event.newStage
+    projection.currentStage = event.newStage
+    projection.lastStageEventId = event.id
+    projection.lastStageEventAt = event.occurredAt
+  }
 
   if (event.eventType === 'shown') {
     projection.firstShownAt = earlierTimestamp(
@@ -442,6 +534,8 @@ export function reduceOutcomeProjection(
     projection.lostReasonCode = event.reasonCode as LostReasonCode
   } else if (event.eventType === 'dismissed') {
     projection.dismissReasonCode = event.reasonCode as DismissedReasonCode
+  } else if (event.eventType === 'reverted' && event.revertedEventType) {
+    clearRevertedProjectionFields(projection, event.revertedEventType)
   }
 
   return projection
@@ -541,12 +635,118 @@ function validateMetadata(
     metadata[key] = normalized
   }
   if (
-    metadata.meetingStatus &&
-    (eventType !== 'meeting' || !ALLOWED_MEETING_STATUSES.has(metadata.meetingStatus))
+    eventType === 'meeting' &&
+    !ALLOWED_MEETING_STATUSES.has(metadata.meetingStatus)
   ) {
     throw new OutcomeValidationError('Invalid meetingStatus metadata.')
   }
+  if (eventType !== 'meeting' && metadata.meetingStatus) {
+    throw new OutcomeValidationError('meetingStatus is only valid for meeting.')
+  }
   return metadata
+}
+
+export function isObservationalOutcomeEvent(
+  eventType: OpportunityOutcomeEventType,
+): boolean {
+  return OBSERVATIONAL_EVENTS.has(eventType)
+}
+
+export function isCommercialOutcomeEvent(
+  eventType: OpportunityOutcomeEventType,
+): boolean {
+  return COMMERCIAL_STAGE_EVENTS.has(eventType)
+}
+
+function validateSnooze(
+  eventType: OpportunityOutcomeEventType,
+  rawDays: unknown,
+  rawUntil: unknown,
+  occurredAt: string,
+): { snoozeDays: number | null; snoozedUntil: string | null } {
+  const hasDays = rawDays !== undefined && rawDays !== null
+  const hasUntil = rawUntil !== undefined && rawUntil !== null
+  if (eventType !== 'snoozed') {
+    if (hasDays || hasUntil) {
+      throw new OutcomeValidationError(
+        'Snooze duration is only valid for snoozed.',
+      )
+    }
+    return { snoozeDays: null, snoozedUntil: null }
+  }
+  if (hasDays && hasUntil) {
+    throw new OutcomeValidationError(
+      'Provide snoozeDays or snoozedUntil, not both.',
+    )
+  }
+  if (hasUntil) {
+    const snoozedUntil = parseOccurredAt(rawUntil, new Date('9999-12-31T23:59:59Z'))
+    const duration = Date.parse(snoozedUntil) - Date.parse(occurredAt)
+    if (duration < 24 * 60 * 60 * 1000 || duration > 90 * 24 * 60 * 60 * 1000) {
+      throw new OutcomeValidationError(
+        'snoozedUntil must be between 1 and 90 days after occurredAt.',
+      )
+    }
+    return { snoozeDays: null, snoozedUntil }
+  }
+  const snoozeDays = hasDays ? Number(rawDays) : 7
+  if (
+    !Number.isInteger(snoozeDays) ||
+    snoozeDays < 1 ||
+    snoozeDays > 90
+  ) {
+    throw new OutcomeValidationError('snoozeDays must be an integer from 1 to 90.')
+  }
+  return {
+    snoozeDays,
+    snoozedUntil: new Date(
+      Date.parse(occurredAt) + snoozeDays * 24 * 60 * 60 * 1000,
+    ).toISOString(),
+  }
+}
+
+function validateRevertsEventId(
+  eventType: OpportunityOutcomeEventType,
+  value: unknown,
+): string | null {
+  if (eventType !== 'reverted') {
+    if (value !== undefined && value !== null) {
+      throw new OutcomeValidationError(
+        'revertsEventId is only valid for reverted.',
+      )
+    }
+    return null
+  }
+  if (
+    (typeof value !== 'string' && typeof value !== 'number') ||
+    !/^[1-9]\d*$/.test(String(value))
+  ) {
+    throw new OutcomeValidationError(
+      'revertsEventId must be a positive integer.',
+    )
+  }
+  return String(value)
+}
+
+function clearRevertedProjectionFields(
+  projection: OpportunityOutcomeProjection,
+  eventType: OpportunityOutcomeEventType,
+): void {
+  if (eventType === 'accepted') projection.acceptedAt = null
+  else if (eventType === 'contacted') projection.contactedAt = null
+  else if (eventType === 'replied') projection.repliedAt = null
+  else if (eventType === 'meeting') projection.meetingAt = null
+  else if (eventType === 'proposal') projection.proposalAt = null
+  else if (eventType === 'won') {
+    projection.wonAt = null
+    projection.dealValueMinor = null
+    projection.currency = null
+  } else if (eventType === 'lost') {
+    projection.lostAt = null
+    projection.lostReasonCode = null
+  } else if (eventType === 'dismissed') {
+    projection.dismissReasonCode = null
+  }
 }
 
 function requiredTrimmedString(

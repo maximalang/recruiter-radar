@@ -17,15 +17,23 @@ const script = readFileSync(
 describe('opportunity outcome projection rebuild contract', () => {
   it('is dry-run by default and applies only when explicitly requested', () => {
     expect(script).toContain("const apply = argumentsSet.has('--apply')")
-    expect(script).toContain("await client.query(apply ? 'COMMIT' : 'ROLLBACK')")
-    expect(script).toContain("'DELETE FROM opportunity_outcome_state WHERE owner_id = $1'")
+    expect(script).toContain('Cannot combine --apply with --dry-run.')
+    expect(script).toContain("await client.query('COMMIT')")
+    expect(script).toContain("await client.query('ROLLBACK')")
+    expect(script).toContain('NOT EXISTS (')
   })
 
   it('rebuilds deterministically from append order and preserves tenant context', () => {
-    expect(script).toContain('(ARRAY_AGG(new_stage ORDER BY id DESC))[1]')
-    expect(script).toContain('MAX(id) AS last_event_id')
+    expect(script).toContain('(ARRAY_AGG(id ORDER BY id DESC))[1] AS last_event_id')
+    expect(script).toContain('commercial_stage AS current_stage')
     expect(script).toContain('GROUP BY\n      owner_id,')
     expect(script).toContain('ORDER BY owner_id, opportunity_id')
+  })
+
+  it('takes an exclusive owner lock while writers use the shared lock', () => {
+    expect(script).toContain("hashtextextended('opportunity-outcome-owner:' || $1, 0)")
+    expect(script).toContain('SELECT DISTINCT owner_id::TEXT AS "ownerId"')
+    expect(script).toContain('for (const owner of owners.rows)')
   })
 
   it('reports the required observability counters without outcome payloads', () => {
@@ -33,6 +41,11 @@ describe('opportunity outcome projection rebuild contract', () => {
     expect(script).toContain("'opportunity_outcome.rebuild_completed'")
     expect(script).toContain("'opportunity_outcome.rebuild_failed'")
     expect(script).toContain('rebuildScanned')
+    expect(script).toContain('ownersScanned')
+    expect(script).toContain('opportunitiesScanned')
+    expect(script).toContain('eventsScanned')
+    expect(script).toContain('workflowStatesRebuilt')
+    expect(script).toContain('correctionsApplied')
     expect(script).toContain('rebuildChanged')
     expect(script).toContain('rebuildFailed')
     expect(script).not.toContain('reason_note')

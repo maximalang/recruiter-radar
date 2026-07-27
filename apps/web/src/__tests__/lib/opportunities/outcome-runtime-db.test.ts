@@ -5,6 +5,8 @@ import { Pool } from 'pg'
 
 import { getPool } from '@/lib/db-pool'
 import {
+  OutcomeChronologyConflictError,
+  OutcomeCorrectionConflictError,
   OutcomeIdempotencyConflictError,
   OutcomeSupersededConflictError,
   OutcomeTransitionConflictError,
@@ -12,6 +14,7 @@ import {
 } from '@/lib/opportunities/outcome-repository'
 import type { OpportunityOutcomeInput } from '@/lib/opportunities/outcome-domain'
 import { applyOpportunityAction } from '@/lib/opportunities/repository'
+import { OpportunityActionConflictError } from '@/lib/opportunities/repository'
 
 const describeWithDatabase = process.env.DATABASE_URL ? describe : describe.skip
 const hash = (value: string) => createHash('sha256').update(value).digest('hex')
@@ -23,6 +26,8 @@ describeWithDatabase('Opportunity Outcome production PostgreSQL runtime', () => 
   const token = `${Date.now()}-${process.pid}`
   const originalEngineFlag = process.env.OPPORTUNITY_ENGINE_V1_ENABLED
   const originalOutcomeFlag = process.env.OPPORTUNITY_OUTCOMES_ENABLED
+  const originalContactHashSecret =
+    process.env.OPPORTUNITY_OUTCOME_CONTACT_HASH_SECRET
   let ownerId = ''
   let otherOwnerId = ''
   let clientProfileId = ''
@@ -32,6 +37,8 @@ describeWithDatabase('Opportunity Outcome production PostgreSQL runtime', () => 
   beforeAll(async () => {
     process.env.OPPORTUNITY_ENGINE_V1_ENABLED = 'true'
     process.env.OPPORTUNITY_OUTCOMES_ENABLED = 'true'
+    process.env.OPPORTUNITY_OUTCOME_CONTACT_HASH_SECRET =
+      'outcome-runtime-contact-hash-secret-32-bytes-minimum'
     const owners = await database.query(
       `INSERT INTO users (email, full_name)
        VALUES
@@ -73,6 +80,10 @@ describeWithDatabase('Opportunity Outcome production PostgreSQL runtime', () => 
     }).recruiterRadarSharedPool
     restore('OPPORTUNITY_ENGINE_V1_ENABLED', originalEngineFlag)
     restore('OPPORTUNITY_OUTCOMES_ENABLED', originalOutcomeFlag)
+    restore(
+      'OPPORTUNITY_OUTCOME_CONTACT_HASH_SECRET',
+      originalContactHashSecret,
+    )
   })
 
   it('records the full funnel atomically and preserves outcome history', async () => {
@@ -298,6 +309,332 @@ describeWithDatabase('Opportunity Outcome production PostgreSQL runtime', () => 
     })
   })
 
+  it('fingerprints contact semantics and never stores raw contact values', async () => {
+    const episodeId = await insertEpisode('contact-idempotency')
+    const contactOpportunityId = await insertOpportunity(
+      episodeId,
+      'contact-idempotency',
+    )
+    await applyOpportunityAction({
+      ownerId,
+      opportunityId: contactOpportunityId,
+      action: 'accepted',
+      actionKey: `contact-idempotency:accepted:${token}`,
+    })
+    const actionKey = `contact-idempotency:contacted:${token}`
+    await applyOpportunityAction({
+      ownerId,
+      opportunityId: contactOpportunityId,
+      action: 'contacted',
+      actionKey,
+      channel: 'email',
+      contactPathType: 'corporate_email',
+      contactReference: 'sales@example.invalid',
+    })
+    await expect(applyOpportunityAction({
+      ownerId,
+      opportunityId: contactOpportunityId,
+      action: 'contacted',
+      actionKey,
+      channel: 'email',
+      contactPathType: 'corporate_email',
+      contactReference: 'another@example.invalid',
+    })).rejects.toBeInstanceOf(OpportunityActionConflictError)
+    await expect(applyOpportunityAction({
+      ownerId,
+      opportunityId: contactOpportunityId,
+      action: 'contacted',
+      actionKey,
+      channel: 'phone',
+      contactPathType: 'company_switchboard',
+      contactReference: 'sales@example.invalid',
+    })).rejects.toBeInstanceOf(OpportunityActionConflictError)
+
+    const stored = await database.query(
+      `SELECT
+         contact_reference AS raw,
+         contact_reference_hash AS hash,
+         contact_reference_label AS label
+       FROM opportunity_outcome_events
+       WHERE owner_id = $1
+         AND opportunity_id = $2
+         AND event_type = 'contacted'`,
+      [ownerId, contactOpportunityId],
+    )
+    expect(stored.rows[0]).toMatchObject({
+      raw: null,
+      hash: expect.stringMatching(/^[a-f0-9]{64}$/),
+      label: 's***@example.invalid',
+    })
+
+    const directEpisodeId = await insertEpisode('direct-contact-idempotency')
+    const directOpportunityId = await insertOpportunity(
+      directEpisodeId,
+      'direct-contact-idempotency',
+    )
+    const directBase = Date.now() - 5_000
+    await recordFor(directOpportunityId, 'accepted', directBase)
+    const directKey = `direct-contact:${token}`
+    await recordOpportunityOutcome({
+      ownerId,
+      opportunityId: directOpportunityId,
+      actorType: 'user',
+      actorUserId: ownerId,
+      payload: outcomePayload('contacted', directKey, directBase + 1_000, {
+        channel: 'email',
+        contactPathType: 'corporate_email',
+        contactReference: 'sales@example.invalid',
+      }),
+    })
+    await expect(recordOpportunityOutcome({
+      ownerId,
+      opportunityId: directOpportunityId,
+      actorType: 'user',
+      actorUserId: ownerId,
+      payload: outcomePayload('contacted', directKey, directBase + 1_000, {
+        channel: 'email',
+        contactPathType: 'corporate_email',
+        contactReference: 'another@example.invalid',
+      }),
+    })).rejects.toBeInstanceOf(OutcomeIdempotencyConflictError)
+
+    const reasonEpisodeId = await insertEpisode('reason-idempotency')
+    const reasonOpportunityId = await insertOpportunity(
+      reasonEpisodeId,
+      'reason-idempotency',
+    )
+    const reasonKey = `reason-idempotency:${token}`
+    await applyOpportunityAction({
+      ownerId,
+      opportunityId: reasonOpportunityId,
+      action: 'dismissed',
+      actionKey: reasonKey,
+      reasonCode: 'bad_fit',
+    })
+    await expect(applyOpportunityAction({
+      ownerId,
+      opportunityId: reasonOpportunityId,
+      action: 'dismissed',
+      actionKey: reasonKey,
+      reasonCode: 'wrong_roles',
+    })).rejects.toBeInstanceOf(OpportunityActionConflictError)
+
+    const snoozeEpisodeId = await insertEpisode('snooze-idempotency')
+    const snoozeOpportunityId = await insertOpportunity(
+      snoozeEpisodeId,
+      'snooze-idempotency',
+    )
+    const snoozeKey = `snooze-idempotency:${token}`
+    await applyOpportunityAction({
+      ownerId,
+      opportunityId: snoozeOpportunityId,
+      action: 'snoozed',
+      actionKey: snoozeKey,
+      snoozeDays: 3,
+    })
+    await expect(applyOpportunityAction({
+      ownerId,
+      opportunityId: snoozeOpportunityId,
+      action: 'snoozed',
+      actionKey: snoozeKey,
+      snoozeDays: 7,
+    })).rejects.toBeInstanceOf(OpportunityActionConflictError)
+  })
+
+  it('preserves commercial stage through snooze and explicit resume', async () => {
+    const episodeId = await insertEpisode('workflow')
+    const workflowOpportunityId = await insertOpportunity(episodeId, 'workflow')
+    const base = Date.now() - 30_000
+    await recordFor(workflowOpportunityId, 'accepted', base + 1_000)
+    await recordFor(workflowOpportunityId, 'contacted', base + 2_000, {
+      channel: 'email',
+      contactPathType: 'corporate_email',
+    })
+    await recordFor(workflowOpportunityId, 'snoozed', base + 3_000, {
+      snoozeDays: 3,
+    })
+    await expect(recordFor(
+      workflowOpportunityId,
+      'replied',
+      base + 4_000,
+    )).rejects.toBeInstanceOf(OutcomeTransitionConflictError)
+
+    const snoozed = await database.query(
+      `SELECT
+         commercial_stage AS "commercialStage",
+         workflow_state AS "workflowState",
+         snoozed_until IS NOT NULL AS "hasDeadline"
+       FROM opportunity_outcome_state
+       WHERE owner_id = $1 AND opportunity_id = $2`,
+      [ownerId, workflowOpportunityId],
+    )
+    expect(snoozed.rows[0]).toEqual({
+      commercialStage: 'contacted',
+      workflowState: 'snoozed',
+      hasDeadline: true,
+    })
+
+    await recordFor(workflowOpportunityId, 'resumed', base + 4_000)
+    await recordFor(workflowOpportunityId, 'replied', base + 5_000)
+    const resumed = await database.query(
+      `SELECT commercial_stage AS "commercialStage",
+         workflow_state AS "workflowState"
+       FROM opportunity_outcome_state
+       WHERE owner_id = $1 AND opportunity_id = $2`,
+      [ownerId, workflowOpportunityId],
+    )
+    expect(resumed.rows[0]).toEqual({
+      commercialStage: 'replied',
+      workflowState: 'active',
+    })
+  })
+
+  it('rejects backdated commercial events but permits observational backfill', async () => {
+    const episodeId = await insertEpisode('chronology')
+    const chronologyOpportunityId = await insertOpportunity(
+      episodeId,
+      'chronology',
+    )
+    const acceptedAt = Date.now() - 10_000
+    await recordFor(chronologyOpportunityId, 'accepted', acceptedAt)
+    await expect(recordFor(
+      chronologyOpportunityId,
+      'contacted',
+      acceptedAt - 10_000,
+      { channel: 'phone' },
+    )).rejects.toBeInstanceOf(OutcomeChronologyConflictError)
+    await expect(recordFor(
+      chronologyOpportunityId,
+      'opened',
+      acceptedAt - 20_000,
+      { metadata: { interactionId: `backfill:${token}` } },
+    )).resolves.toMatchObject({ idempotent: false })
+  })
+
+  it('rejects an interaction dedupe replay with different semantic payload', async () => {
+    const episodeId = await insertEpisode('interaction-dedupe')
+    const interactionOpportunityId = await insertOpportunity(
+      episodeId,
+      'interaction-dedupe',
+    )
+    const firstAt = Date.now() - 10_000
+    const interactionId = `interaction-dedupe:${token}`
+    await recordOpportunityOutcome({
+      ownerId,
+      opportunityId: interactionOpportunityId,
+      actorType: 'user',
+      actorUserId: ownerId,
+      payload: outcomePayload(
+        'opened',
+        `interaction-dedupe:first:${token}`,
+        firstAt,
+        { metadata: { interactionId } },
+      ),
+    })
+    await expect(recordOpportunityOutcome({
+      ownerId,
+      opportunityId: interactionOpportunityId,
+      actorType: 'user',
+      actorUserId: ownerId,
+      payload: outcomePayload(
+        'opened',
+        `interaction-dedupe:second:${token}`,
+        firstAt + 1_000,
+        { metadata: { interactionId } },
+      ),
+    })).rejects.toBeInstanceOf(OutcomeIdempotencyConflictError)
+  })
+
+  it('keeps meeting cancellation and no-show observational', async () => {
+    const episodeId = await insertEpisode('meeting-observations')
+    const meetingOpportunityId = await insertOpportunity(
+      episodeId,
+      'meeting-observations',
+    )
+    const base = Date.now() - 10_000
+    await expect(recordFor(
+      meetingOpportunityId,
+      'meeting_cancelled',
+      base - 1_000,
+    )).rejects.toBeInstanceOf(OutcomeTransitionConflictError)
+    await recordFor(meetingOpportunityId, 'accepted', base)
+    await recordFor(meetingOpportunityId, 'contacted', base + 1_000, {
+      channel: 'email',
+      contactPathType: 'corporate_email',
+    })
+    await recordFor(meetingOpportunityId, 'replied', base + 2_000)
+    await recordFor(meetingOpportunityId, 'meeting', base + 3_000, {
+      metadata: { meetingStatus: 'scheduled' },
+    })
+    await recordFor(meetingOpportunityId, 'meeting_cancelled', base + 4_000)
+    await expect(recordFor(
+      meetingOpportunityId,
+      'meeting_no_show',
+      base + 5_000,
+    )).rejects.toBeInstanceOf(OutcomeTransitionConflictError)
+
+    const state = await database.query(
+      `SELECT commercial_stage AS "commercialStage",
+         meeting_at IS NOT NULL AS "meetingRecorded"
+       FROM opportunity_outcome_state
+       WHERE owner_id = $1 AND opportunity_id = $2`,
+      [ownerId, meetingOpportunityId],
+    )
+    expect(state.rows[0]).toEqual({
+      commercialStage: 'meeting',
+      meetingRecorded: true,
+    })
+  })
+
+  it('reverts only the latest commercial event append-only', async () => {
+    const episodeId = await insertEpisode('correction')
+    const correctionOpportunityId = await insertOpportunity(
+      episodeId,
+      'correction',
+    )
+    const base = Date.now() - 10_000
+    const accepted = await recordFor(
+      correctionOpportunityId,
+      'accepted',
+      base,
+    )
+    const contacted = await recordFor(
+      correctionOpportunityId,
+      'contacted',
+      base + 1_000,
+      { channel: 'email' },
+    )
+    await expect(recordFor(
+      correctionOpportunityId,
+      'reverted',
+      base + 2_000,
+      { revertsEventId: accepted?.event.id ?? null },
+    )).rejects.toBeInstanceOf(OutcomeCorrectionConflictError)
+
+    const correction = await recordFor(
+      correctionOpportunityId,
+      'reverted',
+      base + 2_000,
+      { revertsEventId: contacted?.event.id ?? null },
+    )
+    expect(correction?.state).toMatchObject({
+      commercialStage: 'accepted',
+      contactedAt: null,
+    })
+    const audit = await database.query(
+      `SELECT event_type
+       FROM opportunity_outcome_events
+       WHERE owner_id = $1 AND opportunity_id = $2
+       ORDER BY id`,
+      [ownerId, correctionOpportunityId],
+    )
+    expect(audit.rows.map((row) => row.event_type)).toEqual([
+      'accepted',
+      'contacted',
+      'reverted',
+    ])
+  })
+
   it('rolls back the ledger insert when projection persistence fails', async () => {
     const episodeId = await insertEpisode('rollback')
     const rollbackOpportunityId = await insertOpportunity(episodeId, 'rollback')
@@ -382,6 +719,89 @@ describeWithDatabase('Opportunity Outcome production PostgreSQL runtime', () => 
        FROM opportunities
        WHERE id = $1`,
       [opportunityId, `missing-reason:${token}`],
+    )).rejects.toThrow()
+
+    const firstEpisodeId = await insertEpisode('projection-reference-a')
+    const secondEpisodeId = await insertEpisode('projection-reference-b')
+    const firstOpportunityId = await insertOpportunity(
+      firstEpisodeId,
+      'projection-reference-a',
+    )
+    const secondOpportunityId = await insertOpportunity(
+      secondEpisodeId,
+      'projection-reference-b',
+    )
+    const firstEvent = await recordFor(firstOpportunityId, 'shown', Date.now(), {
+      metadata: { surface: 'morning_brief', cycleId: `projection-a:${token}` },
+    })
+    const secondEvent = await recordFor(
+      secondOpportunityId,
+      'shown',
+      Date.now(),
+      {
+        metadata: {
+          surface: 'morning_brief',
+          cycleId: `projection-b:${token}`,
+        },
+      },
+    )
+    await expect(database.query(
+      `UPDATE opportunity_outcome_state
+       SET last_event_id = $3
+       WHERE owner_id = $1 AND opportunity_id = $2`,
+      [ownerId, firstOpportunityId, secondEvent?.event.id],
+    )).rejects.toThrow()
+
+    await expect(database.query(
+      `INSERT INTO opportunity_outcome_events (
+         owner_id, client_profile_id, opportunity_id, hiring_episode_id,
+         organization_id, event_type, previous_stage, new_stage,
+         reverts_event_id, occurred_at, actor_type, metadata,
+         analytics_snapshot, idempotency_key, payload_hash
+       )
+       SELECT
+         owner_id, client_profile_id, id, hiring_episode_id, organization_id,
+         'reverted', 'new', 'new', $2, NOW(), 'system',
+         '{}'::jsonb, '{}'::jsonb, $3, repeat('c', 64)
+       FROM opportunities
+       WHERE id = $1`,
+      [
+        firstOpportunityId,
+        firstEvent?.event.id,
+        `invalid-observational-correction:${token}`,
+      ],
+    )).rejects.toThrow()
+
+    await expect(database.query(
+      `INSERT INTO opportunity_outcome_events (
+         owner_id, client_profile_id, opportunity_id, hiring_episode_id,
+         organization_id, event_type, previous_stage, new_stage,
+         occurred_at, actor_type, actor_user_id, metadata,
+         analytics_snapshot, idempotency_key, payload_hash
+       )
+       SELECT
+         owner_id, client_profile_id, id, hiring_episode_id, organization_id,
+         'opened', 'new', 'new', NOW(), 'system', owner_id,
+         '{}'::JSONB, '{}'::JSONB, $2, repeat('d', 64)
+       FROM opportunities
+       WHERE id = $1`,
+      [firstOpportunityId, `invalid-system-actor:${token}`],
+    )).rejects.toThrow()
+
+    await expect(database.query(
+      `INSERT INTO opportunity_outcome_events (
+         owner_id, client_profile_id, opportunity_id, hiring_episode_id,
+         organization_id, event_type, previous_stage, new_stage,
+         reason_code, occurred_at, actor_type, metadata, analytics_snapshot,
+         idempotency_key, payload_hash
+       )
+       SELECT
+         owner_id, client_profile_id, id, hiring_episode_id, organization_id,
+         'lost', 'proposal', 'lost', 'price', NOW(), 'system',
+         '{}'::jsonb, '{}'::jsonb, $2, repeat('e', 64)
+       FROM opportunities
+       WHERE id = $1`,
+      [opportunityId, `conflicting-terminal:${token}`],
     )).rejects.toThrow()
   })
 
@@ -471,11 +891,30 @@ describeWithDatabase('Opportunity Outcome production PostgreSQL runtime', () => 
       ),
     })
   }
+
+  function recordFor(
+    targetOpportunityId: string,
+    eventType: OpportunityOutcomeInput['eventType'],
+    occurredAt: number,
+    override: Partial<OpportunityOutcomeInput> = {},
+  ) {
+    return recordOpportunityOutcome({
+      ownerId,
+      opportunityId: targetOpportunityId,
+      actorType: 'user',
+      actorUserId: ownerId,
+      payload: outcomePayload(
+        eventType,
+        `${eventType}:${targetOpportunityId}:${token}:${occurredAt}`,
+        occurredAt,
+        override,
+      ),
+    })
+  }
 })
 
 function outcomePayload(
-  eventType: 'shown' | 'opened' | 'accepted' | 'contacted' | 'replied' |
-    'meeting' | 'proposal' | 'won',
+  eventType: OpportunityOutcomeInput['eventType'],
   idempotencyKey: string,
   occurredAt: number,
   override: Partial<OpportunityOutcomeInput> = {},
@@ -488,6 +927,9 @@ function outcomePayload(
     channel: null,
     contactPathType: null,
     contactReference: null,
+    snoozeDays: null,
+    snoozedUntil: null,
+    revertsEventId: null,
     valueMinor: null,
     currency: null,
     metadata: {},

@@ -29,9 +29,23 @@ describe('opportunity outcome summary API', () => {
         from: '2026-07-01T00:00:00.000Z',
         to: '2026-07-27T00:00:00.000Z',
       },
+      cohort: {
+        eventType: 'shown',
+        policy: 'first_event_in_period_closed_window',
+        downstreamBefore: '2026-07-27T00:00:00.000Z',
+        size: 0,
+      },
       minimumConversionSample: 10,
-      stages: [],
+      activityCounts: [],
+      cohortCounts: [],
       conversions: [],
+      terminalOutcomes: {
+        won: 0,
+        lost: 0,
+        completed: 0,
+        winRate: null,
+        status: 'insufficient_data',
+      },
     })
     jest.clearAllMocks()
   })
@@ -56,6 +70,7 @@ describe('opportunity outcome summary API', () => {
       confidenceGate: 'A',
       sourceFamily: 'hh',
       scoreBucket: '80-89',
+      cohort: 'shown',
     })
   })
 

@@ -79,7 +79,7 @@ describe('opportunity outcome UI tracking', () => {
     expect(openedCalls).toHaveLength(1)
   })
 
-  it('requires a channel and uses the atomic legacy action for contacted', async () => {
+  it('requires a channel and safe contact path for contacted', async () => {
     global.fetch = jest.fn(async (url: string, options?: RequestInit) => {
       if (String(url).endsWith('/outcomes') && options?.method !== 'POST') {
         return {
@@ -97,6 +97,9 @@ describe('opportunity outcome UI tracking', () => {
     fireEvent.change(screen.getByLabelText('Канал обращения'), {
       target: { value: 'email' },
     })
+    fireEvent.change(screen.getByLabelText('Безопасный путь контакта'), {
+      target: { value: 'corporate_email' },
+    })
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }))
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
@@ -106,6 +109,9 @@ describe('opportunity outcome UI tracking', () => {
         body: expect.stringContaining('"channel":"email"'),
       }),
     ))
+    expect(jest.mocked(global.fetch).mock.calls.some(([, options]) =>
+      String(options?.body).includes('"contactPathType":"corporate_email"'),
+    )).toBe(true)
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledTimes(4)
       expect(refresh).toHaveBeenCalled()

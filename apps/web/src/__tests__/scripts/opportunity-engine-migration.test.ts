@@ -135,6 +135,14 @@ const opportunityPublicReferenceRollbackPath = resolve(
   process.cwd(), '..', '..', 'packages', 'db', 'migrations',
   '20260727152000_add_opportunity_public_reference.down.sql',
 )
+const outcomeHardeningMigrationPath = resolve(
+  process.cwd(), '..', '..', 'packages', 'db', 'migrations',
+  '20260728100000_harden_opportunity_outcome_ledger.sql',
+)
+const outcomeHardeningRollbackPath = resolve(
+  process.cwd(), '..', '..', 'packages', 'db', 'migrations',
+  '20260728100000_harden_opportunity_outcome_ledger.down.sql',
+)
 
 describe('opportunity engine migration contract', () => {
   const migration = readFileSync(migrationPath, 'utf8')
@@ -352,6 +360,14 @@ describe('opportunity outcome migrations', () => {
     opportunityPublicReferenceRollbackPath,
     'utf8',
   ).replace(/\s+/g, ' ')
+  const outcomeHardening = readFileSync(
+    outcomeHardeningMigrationPath,
+    'utf8',
+  ).replace(/\s+/g, ' ')
+  const outcomeHardeningRollback = readFileSync(
+    outcomeHardeningRollbackPath,
+    'utf8',
+  ).replace(/\s+/g, ' ')
 
   it('binds every ledger row to the complete tenant opportunity context', () => {
     expect(ledger).toContain('CREATE TABLE opportunity_outcome_events')
@@ -414,6 +430,54 @@ describe('opportunity outcome migrations', () => {
     expect(publicReference).toContain('opportunities_public_reference_uidx')
     expect(publicReferenceRollback).toContain(
       'ALTER TABLE opportunities DROP COLUMN IF EXISTS public_reference',
+    )
+  })
+
+  it('separates workflow state, chronology anchors, and commercial stage', () => {
+    expect(outcomeHardening).toContain('commercial_stage TEXT')
+    expect(outcomeHardening).toContain(
+      "workflow_state TEXT NOT NULL DEFAULT 'active'",
+    )
+    expect(outcomeHardening).toContain('last_stage_event_id BIGINT')
+    expect(outcomeHardening).toContain('last_stage_event_at TIMESTAMPTZ')
+    expect(outcomeHardening).toContain(
+      "event_type IN ( 'shown', 'opened', 'accepted', 'dismissed', 'snoozed', 'resumed'",
+    )
+    expect(outcomeHardening).toContain(
+      'current_stage = commercial_stage',
+    )
+  })
+
+  it('hardens event relationships, contact privacy, and correction links', () => {
+    expect(outcomeHardening).toContain(
+      'opportunity_outcome_events_stage_relation_check',
+    )
+    expect(outcomeHardening).toContain(
+      'FOREIGN KEY (last_event_id, owner_id, opportunity_id)',
+    )
+    expect(outcomeHardening).toContain('CHECK (contact_reference IS NULL)')
+    expect(outcomeHardening).toContain('contact_reference_hash TEXT')
+    expect(outcomeHardening).toContain('reverts_event_id BIGINT')
+    expect(outcomeHardening).toContain(
+      'opportunity_outcome_events_reverted_once_uidx',
+    )
+    expect(outcomeHardening).toContain(
+      "'{meetingStatus}', '\"scheduled\"'::jsonb",
+    )
+    expect(outcomeHardening).toContain(
+      'legacy commercial outcome chronology is invalid',
+    )
+    expect(outcomeHardening).toContain(
+      'CREATE TRIGGER opportunity_outcome_events_validate_insert',
+    )
+    expect(outcomeHardeningRollback).toContain(
+      'cannot roll back hardened outcomes while new semantic events exist',
+    )
+    expect(outcomeHardeningRollback).toContain(
+      'protected contact references exist',
+    )
+    expect(outcomeHardeningRollback).toContain(
+      'snoozed workflow state exists',
     )
   })
 })

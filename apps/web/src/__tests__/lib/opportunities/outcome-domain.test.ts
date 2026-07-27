@@ -18,7 +18,7 @@ describe('opportunity outcome domain', () => {
     ['meeting', 'proposal', 'proposal'],
     ['proposal', 'won', 'won'],
     ['contacted', 'lost', 'lost'],
-    ['meeting', 'snoozed', 'snoozed'],
+    ['meeting', 'snoozed', 'meeting'],
   ] as const)('allows %s + %s -> %s', (stage, eventType, expected) => {
     expect(isOutcomeTransitionAllowed(stage, eventType)).toBe(true)
     expect(getNextOutcomeStage(stage, eventType)).toBe(expected)
@@ -26,6 +26,8 @@ describe('opportunity outcome domain', () => {
 
   it.each([
     ['new', 'contacted'],
+    ['new', 'meeting_cancelled'],
+    ['new', 'meeting_no_show'],
     ['accepted', 'replied'],
     ['contacted', 'meeting'],
     ['replied', 'won'],
@@ -35,12 +37,81 @@ describe('opportunity outcome domain', () => {
     expect(isOutcomeTransitionAllowed(stage, eventType)).toBe(false)
   })
 
+  it.each(['meeting_cancelled', 'meeting_no_show'] as const)(
+    'allows %s only while the commercial stage is meeting',
+    (eventType) => {
+      expect(isOutcomeTransitionAllowed('meeting', eventType)).toBe(true)
+      expect(getNextOutcomeStage('meeting', eventType)).toBe('meeting')
+    },
+  )
+
   it.each(['shown', 'opened', 'exported'] as const)(
     'keeps the commercial stage for observational event %s',
     (eventType) => {
       expect(getNextOutcomeStage('accepted', eventType)).toBe('accepted')
     },
   )
+
+  it('separates snooze and resume from the commercial stage', () => {
+    const snoozed = reduceOutcomeProjection(null, {
+      id: '1',
+      eventType: 'snoozed',
+      previousStage: 'contacted',
+      newStage: 'contacted',
+      occurredAt: NOW.toISOString(),
+      snoozedUntil: '2026-08-03T12:00:00.000Z',
+      reasonCode: null,
+      valueMinor: null,
+      currency: null,
+    })
+    expect(snoozed).toMatchObject({
+      commercialStage: 'contacted',
+      currentStage: 'contacted',
+      workflowState: 'snoozed',
+      snoozedUntil: '2026-08-03T12:00:00.000Z',
+    })
+    expect(isOutcomeTransitionAllowed(
+      'contacted',
+      'replied',
+      'snoozed',
+    )).toBe(false)
+    expect(isOutcomeTransitionAllowed(
+      'contacted',
+      'resumed',
+      'snoozed',
+    )).toBe(true)
+
+    const resumed = reduceOutcomeProjection(snoozed, {
+      id: '2',
+      eventType: 'resumed',
+      previousStage: 'contacted',
+      newStage: 'contacted',
+      occurredAt: '2026-07-28T12:00:00.000Z',
+      reasonCode: null,
+      valueMinor: null,
+      currency: null,
+    })
+    expect(resumed).toMatchObject({
+      commercialStage: 'contacted',
+      workflowState: 'active',
+      snoozedUntil: null,
+    })
+  })
+
+  it('accepts only scheduled or completed meeting stage events', () => {
+    expect(() => validateOutcomeInput({
+      eventType: 'meeting',
+      occurredAt: NOW.toISOString(),
+      idempotencyKey: 'meeting:cancelled',
+      metadata: { meetingStatus: 'cancelled' },
+    }, NOW)).toThrow(OutcomeValidationError)
+    expect(validateOutcomeInput({
+      eventType: 'meeting_cancelled',
+      occurredAt: NOW.toISOString(),
+      idempotencyKey: 'meeting:cancelled:observation',
+      metadata: {},
+    }, NOW).eventType).toBe('meeting_cancelled')
+  })
 
   it('requires a controlled dismissed reason', () => {
     expect(() => validateOutcomeInput({

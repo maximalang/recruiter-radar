@@ -1,9 +1,9 @@
 # Opportunity Outcome Ledger
 
-Outcome Ledger связывает tenant агентства, opportunity, конкретный hiring episode,
-действие, канал и подтверждённый коммерческий результат. Он нужен для измерения
-качества evidence и scoring на реальных outcomes, но не является CRM: здесь нет
-контактной базы, задач продавцов, переписки, массового outreach или прогноза выручки.
+Outcome Ledger — append-only источник фактических коммерческих результатов
+Opportunity Engine. Он нужен для проверки качества opportunities и последующей
+калибровки scoring. Это не CRM: здесь нет контактной базы, переписки,
+автоматического outreach, прогноза выручки, Agency DNA или LLM.
 
 ## Feature flags
 
@@ -11,199 +11,212 @@ Outcome Ledger связывает tenant агентства, opportunity, кон
 OPPORTUNITY_OUTCOMES_ENABLED=false
 OPPORTUNITY_OUTCOMES_UI_ENABLED=false
 OPPORTUNITY_OUTCOMES_EXTERNAL_INGEST_ENABLED=false
-OPPORTUNITY_OUTCOMES_WEBHOOK_SECRET=
+OPPORTUNITY_OUTCOME_CONTACT_HASH_SECRET=
 ```
 
-Все flags выключены по умолчанию. UI и external ingestion дополнительно требуют
-server-side ledger flag. Секрет внешнего ingestion не используется в browser bundle.
+Все flags по умолчанию выключены. `OPPORTUNITY_OUTCOME_CONTACT_HASH_SECRET`
+обязателен для записи переданного пользователем contact reference и должен
+содержать не менее 32 байт секрета. Он используется только для tenant-scoped
+HMAC и не попадает в browser bundle.
 
-## Event taxonomy и stages
+External ingestion намеренно недоступен даже при legacy-флаге: один глобальный
+webhook secret не является tenant identity. Для включения нужен отдельный
+контракт интеграций с owner-bound credential, rotation, disable/replay policy,
+rate limit и lookup по `owner_id + public_reference`.
 
-Ledger принимает события `shown`, `opened`, `accepted`, `dismissed`, `snoozed`,
-`contacted`, `replied`, `meeting`, `proposal`, `won`, `lost`, `exported`.
+## Commercial stage и workflow state
 
-- `shown`, `opened`, `exported` наблюдательные и не меняют commercial stage.
-- `accepted` означает только «взято в работу» и никогда не означает контакт.
-- `contacted` требует фактического обращения и нормализованного channel.
-- `replied` означает содержательный ответ, а не bounce, auto-reply или receipt.
-- `meeting` использует `metadata.meetingStatus`, в UI — `scheduled`.
-- `won` означает заказ или договор; сумма, если известна, является подтверждённой,
-  а не прогнозируемой.
-- `lost` завершает уже начатый коммерческий цикл без сделки.
-
-Основная последовательность:
+Проекция хранит две независимые оси:
 
 ```text
+commercial_stage:
 new/review → accepted → contacted → replied → meeting → proposal → won
+                 ↘ dismissed             ↘ lost
+
+workflow_state:
+active → snoozed → active (resumed)
 ```
 
-Боковые переходы:
+`won`, `lost` и `dismissed` terminal. `shown`, `opened`, `exported`,
+`meeting_cancelled` и `meeting_no_show` — observational events и не двигают
+commercial stage. `meeting` означает только «встреча назначена»; cancelled и
+no-show не могут продвинуть opportunity. Cancelled/no-show допустимы только
+после последней действующей `meeting` с `meetingStatus=scheduled`, не раньше
+её `occurredAt` и только один раз для этого lifecycle.
+
+`snoozed` сохраняет текущую commercial stage, записывает deadline и блокирует
+следующий коммерческий переход. Контракт продолжения явный: сначала атомарный
+`resumed`, затем отдельное коммерческое событие. Expire/build jobs создают
+system `resumed`, когда deadline истёк. UI поддерживает 1/3/7/14/30 дней и
+ручную дату в разрешённом диапазоне 1–90 дней.
+
+Compatibility-поле `current_stage` пока сохраняется, но authoritative state —
+`commercial_stage + workflow_state + snoozed_until`.
+
+## Chronology и история
+
+Для любого stage-changing события действует:
 
 ```text
-new/review/accepted → dismissed
-accepted/contacted/replied/meeting/proposal → snoozed
-contacted/replied/meeting/proposal → lost
-snoozed → accepted/dismissed
+occurredAt >= last_stage_event_at
 ```
 
-`won`, `lost`, `dismissed` terminal. Backend всегда валидирует переход повторно и
-возвращает `409 outcome_transition_conflict`; UI лишь скрывает недоступные действия.
-Новые outcomes для superseded opportunity запрещены, а существующая история
-сохраняется.
+Нарушение возвращает `409 outcome_chronology_conflict`. Равные timestamp
+разрешены; стабильный tie-breaker — append-only `id`. Observational events
+можно backfill раньше последней коммерческой стадии: они не меняют
+`last_stage_event_at`.
 
-## Reasons, channels и money
+History API возвращает безопасные `occurredAt`, `recordedAt` и `appendOrder`.
+Порядок timeline детерминирован как `occurredAt, id`; append order при этом
+остаётся доступен для аудита.
 
-Причины `dismissed`:
+## Corrections
+
+История не редактируется и не удаляется. `reverted` — компенсирующее событие,
+которое может отменить только последний действующий stage-changing event этой
+же opportunity и tenant. Оно восстанавливает предыдущую проекцию, сохраняет
+оба события и само идемпотентно.
+
+Произвольная коррекция середины цепочки запрещена. UI называет операцию
+«Отменить последнее изменение».
+
+## Idempotency и транзакции
+
+Idempotency key tenant-scoped. Fingerprint строится deterministic canonical
+serialization всего семантического payload: action/event, normalized note,
+snooze deadline/duration, reason, channel, contact path type, tenant HMAC
+contact reference и остальные фактические поля. Автоматически созданный
+сервером timestamp legacy `/action` не входит в его fingerprint; явно переданный
+`occurredAt` в `/outcomes` является semantic payload и входит в ledger hash.
+
+Одинаковые key и payload возвращают replay. Повтор key с другим payload
+возвращает `409 idempotency_key_conflict`.
+
+Writer в одной PostgreSQL transaction:
+
+1. берёт shared advisory lock `opportunity-outcome-owner:<owner_id>`;
+2. сериализует idempotency key;
+3. блокирует tenant-scoped opportunity/state;
+4. проверяет transition, chronology и correction;
+5. вставляет append-only event;
+6. обновляет projection и совместимые legacy state.
+
+`BEFORE INSERT` trigger повторяет owner shared-lock и критические transition,
+chronology, correction и meeting lifecycle invariants для direct SQL/import
+writers. Поэтому такие writers не обходят tenant boundary и не теряют запись
+при конкурентном projection rebuild.
+
+Ошибка любого шага откатывает event и projection вместе. Новые события для
+superseded opportunity запрещены, существующая история сохраняется.
+
+## Data model и DB invariants
+
+`opportunity_outcome_events` содержит полный tenant context:
+`owner_id + client_profile_id + opportunity_id + hiring_episode_id +
+organization_id`. Composite foreign keys не позволяют подменить owner,
+opportunity или связанный контекст.
+
+Hardening migration добавляет:
+
+- event: `contact_reference_hash`, `contact_reference_label`,
+  `snoozed_until`, `reverts_event_id`;
+- state: `commercial_stage`, `workflow_state`, `snoozed_until`,
+  `last_stage_event_id`, `last_stage_event_at`;
+- composite event identity `(id, owner_id, opportunity_id)` для last-event и
+  correction references;
+- actor invariant: user/admin требуют `actor_user_id`, system/external
+  запрещают его;
+- constraints для stage relation, workflow, meeting status, contact privacy,
+  correction uniqueness и confirmed deal value;
+- insert trigger для projection-aligned previous stage, terminal exclusivity,
+  latest-effective correction, chronology и active scheduled meeting lifecycle;
+- owner/event/time и owner/opportunity/time indexes для funnel/rebuild.
+
+Upgrade backfills meeting rows, допустимые в predecessor schema без
+`meetingStatus`, как `scheduled`. Если legacy commercial timestamps идут назад
+в append order, migration останавливается до создания небезопасного chronology
+anchor; автоматическая перестановка audit history не выполняется.
+
+`last_event_id` и `last_stage_event_id` могут ссылаться только на event той же
+opportunity и tenant. UPDATE/DELETE ledger rows запрещены append-only trigger.
+
+## Contact privacy
+
+Raw contact reference не хранится в ledger, не возвращается API и не
+логируется. При наличии значения сохраняются только channel, contact path type,
+tenant-scoped HMAC и безопасная redacted label. Hash не публикуется.
+
+Старые raw значения очищаются additive migration. Если секрет для HMAC не
+настроен, запись с raw reference fail-closed с `503`; значение не оказывается
+в БД или логах. Если другому продукту нужен raw contact, ему требуется
+отдельное защищённое storage с retention, encryption, audit и access policy.
+
+## Funnel semantics
+
+Summary принимает один явный cohort:
 
 ```text
-bad_fit, wrong_roles, wrong_industry, wrong_region, company_too_small,
-company_too_large, low_commercial_value, internal_recruitment_only,
-no_external_need_signal, weak_evidence, duplicate, existing_client,
-do_not_contact, wrong_timing, other
+cohort=shown     (default)
+cohort=accepted
 ```
 
-Причины `lost`:
+Когорта — opportunities, у которых первое выбранное событие произошло в
+`[from, to)`. Downstream должен принадлежать той же opportunity, иметь
+`occurredAt >= upstream occurredAt` и произойти до `to`. Analytics filters
+применяются к immutable snapshot cohort event.
 
-```text
-no_response, not_interested, wrong_timing, internal_team, existing_supplier,
-price, no_budget, procurement_block, requirements_changed, position_closed,
-competitor_won, contact_unreachable, other
+API разделяет:
+
+- `activityCounts` — distinct opportunities с событиями в периоде;
+- `cohortCounts` — достигнутые стадии одной выбранной когорты;
+- `conversions` — same-opportunity intersections с явными `sampleSize` и
+  `converted`;
+- `terminalOutcomes` — mutually exclusive won/lost и win rate только среди
+  завершённых циклов.
+
+Lost не является линейной обязательной ступенью. Отдельно считаются ветви
+contacted/replied/meeting/proposal → lost и proposal → won. При sample меньше
+10 UI показывает «Недостаточно данных», но абсолютные numerator/denominator
+остаётся видны.
+
+Расчёт выполняется tenant-scoped SQL CTE, ledger целиком в Node.js не
+загружается. Локальный benchmark:
+
+```powershell
+npm.cmd run opportunity-outcomes:benchmark
 ```
 
-Причина обязательна; для `other` обязателен непустой note. API возвращает стабильный
-code и отдельный русский label. `contacted` поддерживает channels `email`, `phone`,
-`telegram`, `vk`, `linkedin`, `website_form`, `in_person`, `crm`, `other` и
-контролируемые contact path types. `contact_reference` необязателен, не попадает в
-history/aggregates/logs и доступен только в tenant-scoped storage.
-
-Для `won` разрешена неизвестная сумма либо пара `value_minor + currency`. Сейчас
-поддерживается `RUB`; integer minor units не могут быть отрицательными. UI подписывает
-поле «Сумма подтверждённой сделки».
-
-## Data model и append-only guarantee
-
-`opportunity_outcome_events` содержит полную tenant context:
-`owner_id + client_profile_id + opportunity_id + hiring_episode_id + organization_id`.
-Один composite foreign key ссылается на такую же уникальную комбинацию в
-`opportunities`, поэтому невозможно подменить профиль, episode или organization.
-Все связанные IDs выводятся server-side из authenticated opportunity.
-
-UPDATE и DELETE блокируются PostgreSQL trigger `55000`; product API предоставляет
-только insert/history. Коррекция должна быть отдельным компенсирующим событием;
-публичного correction UI в v1 нет. Удаление opportunity с историей также запрещено
-`ON DELETE RESTRICT`.
-
-Основные индексы покрывают owner/time, opportunity/time, profile/type/time,
-episode/type, внешний event и interaction dedupe. Идемпотентность scoped как
-`UNIQUE(owner_id, idempotency_key)`: ключ нельзя переиспользовать для другой
-opportunity или payload в одном tenant. Одинаковый payload возвращает `200`, другой —
-`409 idempotency_key_conflict`. Transaction-scoped advisory lock по той же паре
-`owner + idempotency key` сериализует конкурентные запросы к разным opportunities,
-чтобы database uniqueness race также завершался детерминированным `200/409`, а не `500`.
-
-`shown` дополнительно уникален по `owner + opportunity + shown + surface:cycleId`.
-Morning Brief использует дневной cycle; повторный render того же cycle не создаёт
-новую строку. `opened` уникален по interaction identity. SSR сам не пишет события,
-а `preview=1` и `demo=1` отключают outcome UI/tracking.
-
-## Projection и атомарность
-
-`opportunity_outcome_state` хранит current stage, последний event, первые timestamps
-основных stages, причины dismissal/loss и подтверждённую сумму. Ledger остаётся source
-of truth. Запись выполняется одной PostgreSQL transaction:
-
-```mermaid
-sequenceDiagram
-    participant UI as "UI/API"
-    participant S as "Outcome service"
-    participant DB as "PostgreSQL"
-    UI->>S: normalized outcome + idempotency key
-    S->>DB: BEGIN + lock opportunity/state
-    S->>S: validate transition and tenant context
-    S->>DB: insert ledger event
-    S->>DB: update projection
-    S->>DB: update opportunity/client episode state when applicable
-    S->>DB: COMMIT
-    DB-->>UI: event + safe projection
-```
-
-Если projection или legacy state update завершается ошибкой, transaction rollback
-удаляет и новый ledger insert. Существующие actions `accepted`, `dismissed`,
-`snoozed`, `contacted` сначала пишут `opportunity_actions`, затем Outcome Ledger,
-projection, `opportunities.status` и `client_episode_state` в той же transaction.
-Legacy `client_digest_org_state` не становится source of truth и organization-level
-suppression не возвращается.
+Он создаёт только TEMP fixture на 10 owners, 100 profiles, 10 000
+opportunities и 100 000 events, запускает `EXPLAIN (ANALYZE, BUFFERS)` и
+откатывает transaction. Его результат — локальное измерение, не обещание
+production latency.
 
 ## Projection rebuild
 
-Dry-run является безопасным режимом по умолчанию:
+Dry-run — режим по умолчанию:
 
 ```powershell
-$env:DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:5432/postgres'
 npm.cmd run opportunity-outcomes:rebuild
 npm.cmd run opportunity-outcomes:rebuild -- --owner-id 123
-```
-
-Применение требует явного `--apply`:
-
-```powershell
 npm.cmd run opportunity-outcomes:rebuild -- --apply --owner-id 123
 ```
 
-Rebuild читает events в стабильном append order, строит временную projection,
-сравнивает её с текущей и применяет замену атомарно. Owner scope присутствует и в
-чтении, и в удалении. Повторный dry-run после apply должен показывать
-`rebuildChanged=0`.
+`--apply` и `--dry-run` взаимоисключающие; неоднозначный запуск завершается до
+подключения к БД.
 
-## API
+Rebuild обрабатывает owners отдельно и перед чтением берёт exclusive
+transaction advisory lock того же owner namespace. Writers используют shared
+lock, поэтому rebuild и запись одного owner сериализуются без lost update;
+разные owners не блокируют друг друга.
 
-```text
-POST /api/opportunities/:id/outcomes
-GET  /api/opportunities/:id/outcomes
-GET  /api/opportunities/outcomes/summary
-POST /api/opportunities/outcomes/external
-```
+Reducer воспроизводит append order, commercial/workflow state, snooze/resume,
+corrections, first/last timestamps, last stage event, won/lost и deal value.
+Apply делает upsert и удаляет только stale projection rows выбранного owner.
+Повторный dry-run после apply обязан вернуть `rebuildChanged=0`.
 
-Session owner определяется сервером. Payload ограничен 16 KiB, metadata — 4 KiB и
-allowlist keys. `occurredAt` нормализуется в UTC и не может быть более чем на пять
-минут в будущем. History не возвращает owner/profile/episode/organization IDs,
-actor user ID, payload hash, contact reference или raw external payload.
-
-Summary считает tenant-scoped distinct opportunities, абсолютные значения,
-conversion и median duration. Conversion скрыт как «Недостаточно данных» при sample
-меньше 10; median скрыта при менее чем трёх валидных парах. Поддержаны period,
-episode type, confidence gate, source family и score bucket.
-
-## External ingestion
-
-External endpoint использует `X-Radar-*` HMAC-SHA256 envelope:
-
-```text
-X-Radar-Event: opportunity.outcome
-X-Radar-Event-Id: <nonce/external event id>
-X-Radar-Timestamp: <ISO timestamp>
-X-Radar-Signature: sha256=<hex hmac of timestamp.event-id.raw-body>
-```
-
-Timestamp и replay nonce криптографически связаны с raw body, freshness ограничена
-пятью минутами, а signature сравнивается constant-time. External event ID уникален
-в tenant/system scope и служит replay identity. Body
-передаёт UUID `opportunityRef`, но tenant и внутренний opportunity ID вычисляются
-сервером. Это generic callback contract, а не amoCRM/Bitrix24 integration. Flag
-external ingestion должен оставаться выключенным до отдельного security canary.
-
-## Analytics snapshot и privacy
-
-Каждый event сохраняет только контролируемый исторический snapshot:
-`scoringVersion`, `episodeType`, `confidenceGate`, `scoreBucket`, `sourceFamilies`,
-`externalSupportNeedBucket`. Пересчёт opportunity не изменяет старые snapshots.
-Raw opportunity payload не копируется.
-
-Structured events: `opportunity_outcome.recorded`, `idempotent_replay`,
-`transition_rejected`, `projection_updated`, `external_ingested`,
-`rebuild_started`, `rebuild_completed`, `rebuild_failed`. Logs содержат counters и
-технические IDs, но не contact values, полный reason note, raw metadata, deal value,
-tokens, secrets или signatures.
+Counters: `ownersScanned`, `opportunitiesScanned`, `eventsScanned`,
+`workflowStatesRebuilt`, `correctionsApplied`, `rebuildChanged`,
+`rebuildFailed`. Notes, contacts и deal amounts не логируются.
 
 ## Verification
 
@@ -213,46 +226,54 @@ npm.cmd run web:build
 npm.cmd run db:validate
 npm.cmd run test --workspace @recruiter-radar/web -- --runInBand --testPathPattern=opportunit
 
-$env:DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:5432/postgres'
+$env:DATABASE_URL='<isolated PostgreSQL admin URL>'
+npm.cmd run db:migrate
 npm.cmd run test:opportunity-engine:db
 npm.cmd run test:opportunity-engine:down
+npm.cmd run opportunity-outcomes:rebuild
+npm.cmd run opportunity-outcomes:rebuild -- --apply --owner-id <fixture-owner>
+npm.cmd run opportunity-outcomes:rebuild -- --owner-id <fixture-owner>
+npm.cmd run opportunity-outcomes:benchmark
 ```
-
-DB runner создаёт clean-install и upgrade databases, запускает production service
-tests, tenant/append-only/transition/idempotency/rollback assertions и намеренно
-повреждает projection для проверки dry-run/apply/idempotency rebuild. Down runner
-откатывает Outcome migrations перед v1 migrations.
 
 ## Rollout
 
-1. Применить migrations при всех Outcome flags `false`.
-2. Запустить PostgreSQL DB verifier и down verifier.
-3. Включить только `OPPORTUNITY_OUTCOMES_ENABLED=true` для internal tenant/runtime.
-4. Проверить atomic `accepted`, затем отдельный `contacted`; accepted не должен
-   создавать contacted timestamp.
-5. Включить `OPPORTUNITY_OUTCOMES_UI_ENABLED=true` для одного test owner.
-6. Вручную пройти `shown → opened → accepted → contacted → replied → meeting →
-   proposal → won` и отдельные dismissed/lost paths.
-7. Запустить owner-scoped rebuild dry-run, затем apply при расхождении и повторный
-   dry-run с `rebuildChanged=0`.
-8. Проверить funnel counts, small-sample labels и latency записи, затем расширять UI.
-9. `OPPORTUNITY_OUTCOMES_EXTERNAL_INGEST_ENABLED` оставить `false` до отдельного
-   signed-callback canary.
+1. Применить migrations при всех flags `false`.
+2. Выполнить PostgreSQL runtime/down verifiers и rebuild dry-run.
+3. Включить ledger backend для одного internal owner.
+4. Проверить snooze/resume, chronology rejection и projection parity.
+5. Включить UI canary для того же owner.
+6. Вручную пройти основную funnel и ветви won/lost.
+7. Сверить cohort denominators и immutable snapshot filters.
+8. Контролировать latency, lock contention и duplicate/replay counters.
+9. Расширять canary только после стабильного полного цикла.
+10. External ingestion оставить выключенным.
 
-Перед расширением canary проверить отсутствие duplicate shown/opened, атомарность
-actions, episode-scoped suppression, projection parity, tenant isolation, reason и
-minor-unit money, supersession history и migration rollback.
+Rollback начинается с выключения UI и ledger flags. После завершения активных
+transactions сохранить ledger/counters и оценить owner-scoped rebuild. Down
+migration имеет fail-safe guard: она не удаляет semantics новых событий
+молча, а также отказывается удалять active snooze state или единственное
+защищённое contact representation. Schema rollback допустим только после
+backup и отдельного одобрения.
 
-## Rollback и ограничения
+## Ограничения текущей аналитики
 
-Сначала выключить UI, external ingestion и server ledger flags. Это останавливает
-новые writes, не меняя digest/FIUR. Сохранить ledger backup и counters, завершить
-активные transactions, затем при необходимости откатывать migrations в обратном
-порядке: public reference → projection → ledger. Откат ledger удаляет outcome history,
-поэтому он допустим только после отдельного backup/approval.
+Funnel описательная, а не причинная; small sample не статистически значим.
+Downstream закрыт границей `to`, поэтому молодые cohorts имеют меньше времени
+на конверсию. Поддерживается RUB и подтверждённая сумма без revenue forecast.
+External ingestion остаётся недоступным до tenant credential design.
 
-Текущая версия не содержит correction UI, CRM connectors, outreach, forecasting,
-Agency DNA, ML или LLM generation. Funnel — описательная аналитика; small sample не
-трактуется как статистически значимый результат. Поддерживается только RUB и один
-generic external HMAC secret; tenant-specific secret rotation относится к будущему
-integration hardening.
+## Outcome Ledger Definition of Done
+
+- весь semantic payload участвует в idempotency;
+- snooze не меняет commercial stage, resume является отдельным event;
+- stage chronology enforced, observational backfill задокументирован;
+- funnel использует same-opportunity intersection и явную cohort;
+- concurrent rebuild/writer защищены общим owner-lock protocol;
+- meeting cancellation/no-show не продвигают stage;
+- actor, tenant, projection reference и deal invariants enforced в БД;
+- corrections append-only и ограничены последним stage event;
+- raw contact отсутствует в ledger/API/logs;
+- external ingestion выключен до owner-bound credentials;
+- clean/upgrade/down migrations, runtime DB tests, rebuild parity, Jest,
+  typecheck, production build и CI проходят при flags `false`.

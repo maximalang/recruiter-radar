@@ -1,9 +1,12 @@
-import { createHash } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 
 import { getClient, getPool } from '@/lib/db-pool'
 import { logEvent } from '@/lib/runtime'
-import { canonicalizeOpportunityUrl } from './canonical-hash'
+import {
+  canonicalizeOpportunityUrl,
+  hashCanonicalJson,
+} from './canonical-hash'
+import { protectOutcomeContactReference } from './outcome-contact-privacy'
 import type { HiringEpisodeType } from './hiring-episode-detection'
 import {
   clampOpportunityPageSize,
@@ -15,7 +18,10 @@ import type {
   OpportunityContactPathType,
   OpportunityOutcomeChannel,
 } from './outcome-domain'
-import { recordOpportunityOutcomeInTransaction } from './outcome-repository'
+import {
+  lockOutcomeOwnerShared,
+  recordOpportunityOutcomeInTransaction,
+} from './outcome-repository'
 import {
   DEFAULT_OPPORTUNITY_SCORING_CONFIG,
   OPPORTUNITY_STATUSES,
@@ -332,6 +338,10 @@ export async function applyOpportunityAction(input: {
   if (!client) throw new Error('DATABASE_URL is not set.')
   const note = normalizeNote(input.note)
   const snoozeDays = clampOpportunitySnoozeDays(input.snoozeDays)
+  const protectedContactReference = protectOutcomeContactReference(
+    input.ownerId,
+    input.action === 'contacted' ? input.contactReference ?? null : null,
+  )
   const actionFingerprint = createActionFingerprint({
     action: input.action,
     note,
@@ -340,10 +350,14 @@ export async function applyOpportunityAction(input: {
     channel: input.action === 'contacted' ? input.channel ?? null : null,
     contactPathType:
       input.action === 'contacted' ? input.contactPathType ?? null : null,
+    contactReferenceHash: protectedContactReference?.hash ?? null,
   })
 
   try {
     await client.query('BEGIN')
+    if (isOpportunityOutcomesEnabled()) {
+      await lockOutcomeOwnerShared(client, input.ownerId)
+    }
     const context = await client.query<{
       id: string
       clientProfileId: string
@@ -468,7 +482,7 @@ export async function applyOpportunityAction(input: {
         opportunityId: input.opportunityId,
         actorType: 'user',
         actorUserId: input.ownerId,
-        snoozeDays,
+        ownerLockHeld: true,
         payload: {
           eventType: input.action,
           occurredAt: input.occurredAt ?? new Date().toISOString(),
@@ -484,6 +498,9 @@ export async function applyOpportunityAction(input: {
             input.action === 'contacted'
               ? input.contactReference ?? null
               : null,
+          snoozeDays: input.action === 'snoozed' ? snoozeDays : null,
+          snoozedUntil: null,
+          revertsEventId: null,
           valueMinor: null,
           currency: null,
           metadata: { source: 'opportunity_action' },
@@ -754,6 +771,7 @@ function createActionFingerprint(input: {
   reasonCode: DismissedReasonCode | null
   channel: OpportunityOutcomeChannel | null
   contactPathType: OpportunityContactPathType | null
+  contactReferenceHash: string | null
 }): string {
   const payload = {
     action: input.action,
@@ -764,8 +782,7 @@ function createActionFingerprint(input: {
     ...(input.contactPathType
       ? { contactPathType: input.contactPathType }
       : {}),
+    contactReferenceHash: input.contactReferenceHash,
   }
-  return createHash('sha256')
-    .update(JSON.stringify(payload))
-    .digest('hex')
+  return hashCanonicalJson(payload)
 }

@@ -5,8 +5,11 @@ import {
   isOpportunityOutcomesEnabled,
 } from '@/lib/opportunities/config'
 import { OutcomeValidationError } from '@/lib/opportunities/outcome-domain'
+import { OutcomeContactPrivacyUnavailableError } from '@/lib/opportunities/outcome-contact-privacy'
 import {
   getOpportunityOutcomeHistory,
+  OutcomeChronologyConflictError,
+  OutcomeCorrectionConflictError,
   OutcomeIdempotencyConflictError,
   OutcomeSupersededConflictError,
   OutcomeTransitionConflictError,
@@ -66,7 +69,11 @@ export async function POST(
       return NextResponse.json({ error: 'not_found' }, { status: 404 })
     }
     const { id: _eventId, ...event } = result.event
-    const { lastEventId: _lastEventId, ...state } = result.state
+    const {
+      lastEventId: _lastEventId,
+      lastStageEventId: _lastStageEventId,
+      ...state
+    } = result.state
     return NextResponse.json(
       { event, state, idempotent: result.idempotent },
       { status: result.idempotent ? 200 : 201 },
@@ -81,8 +88,17 @@ export async function POST(
     if (error instanceof OutcomeTransitionConflictError) {
       return NextResponse.json({ error: error.code }, { status: 409 })
     }
+    if (
+      error instanceof OutcomeChronologyConflictError ||
+      error instanceof OutcomeCorrectionConflictError
+    ) {
+      return NextResponse.json({ error: error.code }, { status: 409 })
+    }
     if (error instanceof OutcomeSupersededConflictError) {
       return NextResponse.json({ error: error.code }, { status: 409 })
+    }
+    if (error instanceof OutcomeContactPrivacyUnavailableError) {
+      return NextResponse.json({ error: error.code }, { status: 503 })
     }
     logError('opportunity_outcome.api.record_failed', error, {
       ownerId,

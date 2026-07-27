@@ -24,7 +24,13 @@ import {
   OPPORTUNITY_ENGINE_LIMITS,
   clampOpportunityJobBatchSize,
   isOpportunityEngineV1Enabled,
+  isOpportunityOutcomesEnabled,
 } from './config'
+import {
+  lockOutcomeOwnerShared,
+  recordOpportunityOutcomeInTransaction,
+} from './outcome-repository'
+import type { OpportunityOutcomeStage } from './outcome-domain'
 import {
   DEFAULT_OPPORTUNITY_SCORING_CONFIG,
   OpportunityScoringService,
@@ -671,16 +677,23 @@ async function runExpireOpportunitiesJob(
       options.organizationId ?? null,
     ],
   )
-  const awakened = await db.query<{
+  const awakenedCandidates = await db.query<{
     id: string
     ownerId: string
     organizationId: string
     clientProfileId: string
     hiringEpisodeId: string
+    snoozedUntil: string
   }>(
-    `UPDATE opportunities o
-     SET status = 'new', snoozed_until = NULL, updated_at = NOW()
-     FROM hiring_episodes he
+    `SELECT
+       o.id::TEXT AS id,
+       o.owner_id::TEXT AS "ownerId",
+       o.organization_id::TEXT AS "organizationId",
+       o.client_profile_id::TEXT AS "clientProfileId",
+       o.hiring_episode_id::TEXT AS "hiringEpisodeId",
+       o.snoozed_until::TEXT AS "snoozedUntil"
+     FROM opportunities o
+     JOIN hiring_episodes he ON he.id = o.hiring_episode_id
      WHERE he.id = o.hiring_episode_id
        AND o.superseded_at IS NULL
        AND he.status = 'active'
@@ -688,15 +701,49 @@ async function runExpireOpportunitiesJob(
        AND o.snoozed_until <= $1::timestamptz
        AND (o.valid_until IS NULL OR o.valid_until >= $1::timestamptz)
        AND ($2::bigint IS NULL OR o.organization_id = $2)
-     RETURNING
-        o.id::TEXT AS id,
-        o.owner_id::TEXT AS "ownerId",
-        o.organization_id::TEXT AS "organizationId",
-       o.client_profile_id::TEXT AS "clientProfileId",
-       o.hiring_episode_id::TEXT AS "hiringEpisodeId"`,
+     ORDER BY o.owner_id, o.id`,
     [now.toISOString(), options.organizationId ?? null],
   )
-  if (awakened.rows.length > 0) {
+  const awakenedRows = []
+  for (const candidate of awakenedCandidates.rows) {
+    if (isOpportunityOutcomesEnabled()) {
+      const resumed = await recordOpportunityOutcomeInTransaction({
+        ownerId: candidate.ownerId,
+        opportunityId: candidate.id,
+        actorType: 'system',
+        payload: {
+          eventType: 'resumed',
+          occurredAt: now.toISOString(),
+          reasonCode: null,
+          reasonNote: null,
+          channel: null,
+          contactPathType: null,
+          contactReference: null,
+          snoozeDays: null,
+          snoozedUntil: null,
+          revertsEventId: null,
+          valueMinor: null,
+          currency: null,
+          metadata: { source: 'snooze_expiry' },
+          idempotencyKey: `system-resume:${candidate.id}:${candidate.snoozedUntil}`,
+        },
+      }, db)
+      if (resumed) awakenedRows.push(candidate)
+    } else {
+      await db.query(
+        `UPDATE opportunities
+         SET status = 'new', snoozed_until = NULL, updated_at = NOW()
+         WHERE id = $1 AND owner_id = $2 AND status = 'snoozed'`,
+        [candidate.id, candidate.ownerId],
+      )
+      awakenedRows.push(candidate)
+    }
+  }
+  const awakened = {
+    rows: awakenedRows,
+    rowCount: awakenedRows.length,
+  }
+  if (awakened.rows.length > 0 && !isOpportunityOutcomesEnabled()) {
     await db.query(
       `DELETE FROM client_episode_state
        WHERE (client_profile_id, owner_id, hiring_episode_id) IN (
@@ -1253,6 +1300,9 @@ async function persistOpportunityBuild(input: {
   const { row, score, brief, fiur, provenance, db } = input
   if (input.manageTransaction) await db.query('BEGIN')
   try {
+    if (isOpportunityOutcomesEnabled()) {
+      await lockOutcomeOwnerShared(db, row.ownerId)
+    }
     const currentResult = await db.query<{
       id: string
       inputHash: string
@@ -1296,6 +1346,8 @@ async function persistOpportunityBuild(input: {
     let lockedEpisodeState: LockedEpisodeState | null =
       episodeStateResult.rows[0] ?? null
     let elapsedSnoozeCleared = false
+    let resumedLegacyStatus:
+      'new' | 'review' | 'accepted' | 'dismissed' | 'contacted' | null = null
     if (!lockedEpisodeState && current?.status === 'snoozed') {
       const deadline = Date.parse(current.snoozedUntil ?? '')
       if (Number.isFinite(deadline) && deadline > input.now.getTime()) {
@@ -1327,7 +1379,10 @@ async function persistOpportunityBuild(input: {
           clientProfileId: row.clientProfileId,
         })
       } else {
-        elapsedSnoozeCleared = true
+        lockedEpisodeState = {
+          status: 'snoozed',
+          suppressedUntil: current.snoozedUntil,
+        }
       }
     }
     if (lockedEpisodeState?.status === 'snoozed') {
@@ -1336,20 +1391,52 @@ async function persistOpportunityBuild(input: {
         throw new Error('Snoozed episode state has an invalid suppressed_until.')
       }
       if (deadline <= input.now.getTime()) {
-        await db.query(
-          `DELETE FROM client_episode_state
-            WHERE client_profile_id = $1
-              AND hiring_episode_id = $2
-              AND owner_id = $3
-              AND status = 'snoozed'
-              AND suppressed_until <= $4::timestamptz`,
-           [
-             row.clientProfileId,
-             row.hiringEpisodeId,
-             row.ownerId,
-             input.now.toISOString(),
-           ],
-        )
+        if (isOpportunityOutcomesEnabled() && current) {
+          const resumed = await recordOpportunityOutcomeInTransaction({
+            ownerId: row.ownerId,
+            opportunityId: current.id,
+            actorType: 'system',
+            ownerLockHeld: true,
+            payload: {
+              eventType: 'resumed',
+              occurredAt: input.now.toISOString(),
+              reasonCode: null,
+              reasonNote: null,
+              channel: null,
+              contactPathType: null,
+              contactReference: null,
+              snoozeDays: null,
+              snoozedUntil: null,
+              revertsEventId: null,
+              valueMinor: null,
+              currency: null,
+              metadata: { source: 'snooze_expiry' },
+              idempotencyKey:
+                `system-resume:${current.id}:${lockedEpisodeState.suppressedUntil}`,
+            },
+          }, db)
+          if (!resumed) {
+            throw new Error('Snoozed opportunity could not be resumed.')
+          }
+          resumedLegacyStatus = toLegacyOutcomeStatus(
+            resumed.state.commercialStage,
+          )
+        } else {
+          await db.query(
+            `DELETE FROM client_episode_state
+              WHERE client_profile_id = $1
+                AND hiring_episode_id = $2
+                AND owner_id = $3
+                AND status = 'snoozed'
+                AND suppressed_until <= $4::timestamptz`,
+             [
+               row.clientProfileId,
+               row.hiringEpisodeId,
+               row.ownerId,
+               input.now.toISOString(),
+             ],
+          )
+        }
         logEvent('opportunity.snooze_elapsed_during_build', {
           hiringEpisodeId: row.hiringEpisodeId,
           clientProfileId: row.clientProfileId,
@@ -1378,6 +1465,7 @@ async function persistOpportunityBuild(input: {
     }
 
     const preservedStatus =
+      resumedLegacyStatus ??
       lockedEpisodeStatus ??
       (
         current?.status &&
@@ -1597,6 +1685,21 @@ async function persistOpportunityBuild(input: {
     }
     throw error
   }
+}
+
+function toLegacyOutcomeStatus(
+  stage: OpportunityOutcomeStage,
+): 'new' | 'review' | 'accepted' | 'dismissed' | 'contacted' {
+  if (
+    stage === 'new' ||
+    stage === 'review' ||
+    stage === 'accepted' ||
+    stage === 'dismissed' ||
+    stage === 'contacted'
+  ) {
+    return stage
+  }
+  return 'contacted'
 }
 
 function createOpportunityInputProvenance(

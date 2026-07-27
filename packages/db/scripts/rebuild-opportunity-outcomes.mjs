@@ -7,33 +7,83 @@ if (!databaseUrl) throw new Error('DATABASE_URL is required.')
 
 const argumentsSet = new Set(process.argv.slice(2))
 const apply = argumentsSet.has('--apply')
+if (apply && argumentsSet.has('--dry-run')) {
+  throw new Error('Cannot combine --apply with --dry-run.')
+}
 const ownerArgumentIndex = process.argv.indexOf('--owner-id')
-const ownerId = ownerArgumentIndex >= 0
+const requestedOwnerId = ownerArgumentIndex >= 0
   ? process.argv[ownerArgumentIndex + 1]
   : null
 
-if (ownerArgumentIndex >= 0 && (!ownerId || !/^[1-9]\d*$/.test(ownerId))) {
+if (
+  ownerArgumentIndex >= 0 &&
+  (!requestedOwnerId || !/^[1-9]\d*$/.test(requestedOwnerId))
+) {
   throw new Error('--owner-id requires a positive integer.')
 }
 
-const allowedArguments = new Set(['--apply', '--dry-run', '--owner-id', ownerId])
+const allowedArguments = new Set([
+  '--apply',
+  '--dry-run',
+  '--owner-id',
+  requestedOwnerId,
+])
 const unknownArgument = process.argv.slice(2).find((argument) =>
   !allowedArguments.has(argument),
 )
 if (unknownArgument) throw new Error(`Unknown argument: ${unknownArgument}`)
 
-const client = new Client({ connectionString: databaseUrl })
-const scopeClause = ownerId ? 'WHERE owner_id = $1' : ''
-const parameters = ownerId ? [ownerId] : []
+const comparableColumns = `
+  owner_id,
+  client_profile_id,
+  opportunity_id,
+  hiring_episode_id,
+  organization_id,
+  current_stage,
+  commercial_stage,
+  workflow_state,
+  snoozed_until,
+  last_event_id,
+  last_event_at,
+  last_stage_event_id,
+  last_stage_event_at,
+  first_shown_at,
+  first_opened_at,
+  accepted_at,
+  contacted_at,
+  replied_at,
+  meeting_at,
+  proposal_at,
+  won_at,
+  lost_at,
+  dismiss_reason_code,
+  lost_reason_code,
+  deal_value_minor,
+  currency
+`
 
 const projectionSql = `
   CREATE TEMP TABLE rebuilt_opportunity_outcome_state
   ON COMMIT DROP
   AS
-  WITH scoped_events AS (
+  WITH owner_events AS (
     SELECT *
     FROM opportunity_outcome_events
-    ${scopeClause}
+    WHERE owner_id = $1
+  ), active_events AS (
+    SELECT event.*
+    FROM owner_events event
+    WHERE event.event_type <> 'reverted'
+      AND NOT EXISTS (
+        SELECT 1
+        FROM owner_events correction
+        WHERE correction.event_type = 'reverted'
+          AND correction.reverts_event_id = event.id
+      )
+    UNION ALL
+    SELECT correction.*
+    FROM owner_events correction
+    WHERE correction.event_type = 'reverted'
   ), aggregated AS (
     SELECT
       owner_id,
@@ -41,9 +91,39 @@ const projectionSql = `
       opportunity_id,
       hiring_episode_id,
       organization_id,
-      (ARRAY_AGG(new_stage ORDER BY id DESC))[1] AS current_stage,
-      MAX(id) AS last_event_id,
+      COALESCE(
+        (ARRAY_AGG(new_stage ORDER BY id DESC)
+          FILTER (WHERE event_type IN (
+            'accepted', 'dismissed', 'contacted', 'replied', 'meeting',
+            'proposal', 'won', 'lost', 'reverted'
+          )))[1],
+        (ARRAY_AGG(previous_stage ORDER BY id ASC))[1]
+      ) AS commercial_stage,
+      CASE
+        WHEN (ARRAY_AGG(event_type ORDER BY id DESC)
+          FILTER (WHERE event_type IN ('snoozed', 'resumed')))[1] = 'snoozed'
+          THEN 'snoozed'
+        ELSE 'active'
+      END AS workflow_state,
+      CASE
+        WHEN (ARRAY_AGG(event_type ORDER BY id DESC)
+          FILTER (WHERE event_type IN ('snoozed', 'resumed')))[1] = 'snoozed'
+          THEN (ARRAY_AGG(snoozed_until ORDER BY id DESC)
+            FILTER (WHERE event_type = 'snoozed'))[1]
+        ELSE NULL
+      END AS snoozed_until,
+      (ARRAY_AGG(id ORDER BY id DESC))[1] AS last_event_id,
       MAX(occurred_at) AS last_event_at,
+      (ARRAY_AGG(id ORDER BY id DESC)
+        FILTER (WHERE event_type IN (
+          'accepted', 'dismissed', 'contacted', 'replied', 'meeting',
+          'proposal', 'won', 'lost', 'reverted'
+        )))[1] AS last_stage_event_id,
+      (ARRAY_AGG(occurred_at ORDER BY id DESC)
+        FILTER (WHERE event_type IN (
+          'accepted', 'dismissed', 'contacted', 'replied', 'meeting',
+          'proposal', 'won', 'lost', 'reverted'
+        )))[1] AS last_stage_event_at,
       MIN(occurred_at) FILTER (WHERE event_type = 'shown') AS first_shown_at,
       MIN(occurred_at) FILTER (WHERE event_type = 'opened') AS first_opened_at,
       MIN(occurred_at) FILTER (WHERE event_type = 'accepted') AS accepted_at,
@@ -61,7 +141,7 @@ const projectionSql = `
         FILTER (WHERE event_type = 'won'))[1] AS deal_value_minor,
       (ARRAY_AGG(currency ORDER BY id DESC)
         FILTER (WHERE event_type = 'won'))[1] AS currency
-    FROM scoped_events
+    FROM active_events
     GROUP BY
       owner_id,
       client_profile_id,
@@ -69,32 +149,35 @@ const projectionSql = `
       hiring_episode_id,
       organization_id
   )
-  SELECT *, NOW() AS updated_at
+  SELECT
+    owner_id,
+    client_profile_id,
+    opportunity_id,
+    hiring_episode_id,
+    organization_id,
+    commercial_stage AS current_stage,
+    commercial_stage,
+    workflow_state,
+    snoozed_until,
+    last_event_id,
+    last_event_at,
+    last_stage_event_id,
+    last_stage_event_at,
+    first_shown_at,
+    first_opened_at,
+    accepted_at,
+    contacted_at,
+    replied_at,
+    meeting_at,
+    proposal_at,
+    won_at,
+    lost_at,
+    dismiss_reason_code,
+    lost_reason_code,
+    deal_value_minor,
+    currency,
+    NOW() AS updated_at
   FROM aggregated
-`
-
-const comparableColumns = `
-  owner_id,
-  client_profile_id,
-  opportunity_id,
-  hiring_episode_id,
-  organization_id,
-  current_stage,
-  last_event_id,
-  last_event_at,
-  first_shown_at,
-  first_opened_at,
-  accepted_at,
-  contacted_at,
-  replied_at,
-  meeting_at,
-  proposal_at,
-  won_at,
-  lost_at,
-  dismiss_reason_code,
-  lost_reason_code,
-  deal_value_minor,
-  currency
 `
 
 function log(event, fields = {}) {
@@ -105,76 +188,160 @@ function log(event, fields = {}) {
   })}\n`)
 }
 
+const client = new Client({ connectionString: databaseUrl })
+const counters = {
+  ownersScanned: 0,
+  opportunitiesScanned: 0,
+  eventsScanned: 0,
+  workflowStatesRebuilt: 0,
+  correctionsApplied: 0,
+  rebuildChanged: 0,
+  rebuildFailed: 0,
+}
+
 await client.connect()
 log('opportunity_outcome.rebuild_started', {
   mode: apply ? 'apply' : 'dry_run',
-  ownerScoped: Boolean(ownerId),
+  ownerScoped: Boolean(requestedOwnerId),
 })
 
 try {
-  await client.query('BEGIN')
-  await client.query(projectionSql, parameters)
-
-  const comparison = await client.query(`
-    WITH existing AS (
-      SELECT ${comparableColumns}
-      FROM opportunity_outcome_state
-      ${scopeClause}
-    ), rebuilt AS (
-      SELECT ${comparableColumns}
-      FROM rebuilt_opportunity_outcome_state
+  const owners = requestedOwnerId
+    ? { rows: [{ ownerId: requestedOwnerId }] }
+    : await client.query(
+      `SELECT DISTINCT owner_id::TEXT AS "ownerId"
+       FROM opportunity_outcome_events
+       ORDER BY owner_id`,
     )
-    SELECT
-      (SELECT COUNT(*) FROM rebuilt)::INTEGER AS scanned,
-      (SELECT COUNT(*) FROM (
-        (SELECT * FROM existing EXCEPT SELECT * FROM rebuilt)
-        UNION ALL
-        (SELECT * FROM rebuilt EXCEPT SELECT * FROM existing)
-      ) differences)::INTEGER AS changed
-  `, parameters)
 
-  const rebuildScanned = comparison.rows[0]?.scanned ?? 0
-  const rebuildChanged = comparison.rows[0]?.changed ?? 0
-
-  if (apply) {
-    if (ownerId) {
-      await client.query(
-        'DELETE FROM opportunity_outcome_state WHERE owner_id = $1',
-        [ownerId],
-      )
-    } else {
-      await client.query('DELETE FROM opportunity_outcome_state')
-    }
-    await client.query(`
-      INSERT INTO opportunity_outcome_state (
-        ${comparableColumns},
-        updated_at
-      )
-      SELECT
-        ${comparableColumns},
-        updated_at
-      FROM rebuilt_opportunity_outcome_state
-      ORDER BY owner_id, opportunity_id
-    `)
+  for (const owner of owners.rows) {
+    await rebuildOwner(String(owner.ownerId))
   }
 
-  await client.query(apply ? 'COMMIT' : 'ROLLBACK')
   log('opportunity_outcome.rebuild_completed', {
     mode: apply ? 'apply' : 'dry_run',
-    rebuildScanned,
-    rebuildChanged,
-    rebuildFailed: 0,
+    ...counters,
+    rebuildScanned: counters.opportunitiesScanned,
   })
 } catch (error) {
+  counters.rebuildFailed += 1
   await client.query('ROLLBACK').catch(() => undefined)
   log('opportunity_outcome.rebuild_failed', {
     mode: apply ? 'apply' : 'dry_run',
-    rebuildScanned: 0,
-    rebuildChanged: 0,
-    rebuildFailed: 1,
+    ...counters,
+    rebuildScanned: counters.opportunitiesScanned,
     errorName: error instanceof Error ? error.name : 'UnknownError',
   })
   throw error
 } finally {
   await client.end()
+}
+
+async function rebuildOwner(ownerId) {
+  await client.query('BEGIN')
+  try {
+    await client.query(
+      `SELECT pg_advisory_xact_lock(
+         hashtextextended('opportunity-outcome-owner:' || $1, 0)
+       )`,
+      [ownerId],
+    )
+    await client.query(projectionSql, [ownerId])
+
+    const metrics = await client.query(
+      `SELECT
+         (SELECT COUNT(*) FROM rebuilt_opportunity_outcome_state)::INTEGER
+           AS opportunities,
+         (SELECT COUNT(*) FROM opportunity_outcome_events
+          WHERE owner_id = $1)::INTEGER AS events,
+         (SELECT COUNT(*) FROM rebuilt_opportunity_outcome_state)::INTEGER
+           AS workflows,
+         (SELECT COUNT(*) FROM opportunity_outcome_events
+          WHERE owner_id = $1 AND event_type = 'reverted')::INTEGER
+           AS corrections`,
+      [ownerId],
+    )
+    const comparison = await client.query(`
+      WITH existing AS (
+        SELECT ${comparableColumns}
+        FROM opportunity_outcome_state
+        WHERE owner_id = $1
+      ), rebuilt AS (
+        SELECT ${comparableColumns}
+        FROM rebuilt_opportunity_outcome_state
+      ), differences AS (
+        (SELECT * FROM existing EXCEPT SELECT * FROM rebuilt)
+        UNION
+        (SELECT * FROM rebuilt EXCEPT SELECT * FROM existing)
+      )
+      SELECT COUNT(DISTINCT (owner_id, opportunity_id))::INTEGER AS changed
+      FROM differences
+    `, [ownerId])
+
+    if (apply) {
+      await client.query(
+        `DELETE FROM opportunity_outcome_state state
+         WHERE state.owner_id = $1
+           AND NOT EXISTS (
+             SELECT 1
+             FROM rebuilt_opportunity_outcome_state rebuilt
+             WHERE rebuilt.owner_id = state.owner_id
+               AND rebuilt.opportunity_id = state.opportunity_id
+           )`,
+        [ownerId],
+      )
+      await client.query(`
+        INSERT INTO opportunity_outcome_state (
+          ${comparableColumns},
+          updated_at
+        )
+        SELECT
+          ${comparableColumns},
+          updated_at
+        FROM rebuilt_opportunity_outcome_state
+        ORDER BY owner_id, opportunity_id
+        ON CONFLICT (owner_id, opportunity_id)
+        DO UPDATE SET
+          client_profile_id = EXCLUDED.client_profile_id,
+          hiring_episode_id = EXCLUDED.hiring_episode_id,
+          organization_id = EXCLUDED.organization_id,
+          current_stage = EXCLUDED.current_stage,
+          commercial_stage = EXCLUDED.commercial_stage,
+          workflow_state = EXCLUDED.workflow_state,
+          snoozed_until = EXCLUDED.snoozed_until,
+          last_event_id = EXCLUDED.last_event_id,
+          last_event_at = EXCLUDED.last_event_at,
+          last_stage_event_id = EXCLUDED.last_stage_event_id,
+          last_stage_event_at = EXCLUDED.last_stage_event_at,
+          first_shown_at = EXCLUDED.first_shown_at,
+          first_opened_at = EXCLUDED.first_opened_at,
+          accepted_at = EXCLUDED.accepted_at,
+          contacted_at = EXCLUDED.contacted_at,
+          replied_at = EXCLUDED.replied_at,
+          meeting_at = EXCLUDED.meeting_at,
+          proposal_at = EXCLUDED.proposal_at,
+          won_at = EXCLUDED.won_at,
+          lost_at = EXCLUDED.lost_at,
+          dismiss_reason_code = EXCLUDED.dismiss_reason_code,
+          lost_reason_code = EXCLUDED.lost_reason_code,
+          deal_value_minor = EXCLUDED.deal_value_minor,
+          currency = EXCLUDED.currency,
+          updated_at = NOW()
+      `)
+      await client.query('COMMIT')
+    } else {
+      await client.query('ROLLBACK')
+    }
+
+    const row = metrics.rows[0] ?? {}
+    counters.ownersScanned += 1
+    counters.opportunitiesScanned += Number(row.opportunities ?? 0)
+    counters.eventsScanned += Number(row.events ?? 0)
+    counters.workflowStatesRebuilt += Number(row.workflows ?? 0)
+    counters.correctionsApplied += Number(row.corrections ?? 0)
+    counters.rebuildChanged += Number(comparison.rows[0]?.changed ?? 0)
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined)
+    throw error
+  }
 }

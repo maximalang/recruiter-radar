@@ -10,6 +10,12 @@ import {
   type DismissedReasonCode,
   validateOutcomeInput,
 } from '@/lib/opportunities/outcome-domain'
+import { OutcomeContactPrivacyUnavailableError } from '@/lib/opportunities/outcome-contact-privacy'
+import {
+  OutcomeChronologyConflictError,
+  OutcomeIdempotencyConflictError,
+  OutcomeTransitionConflictError as OutcomeLedgerTransitionConflictError,
+} from '@/lib/opportunities/outcome-repository'
 import { toPublicOpportunity } from '@/lib/opportunities/api-projection'
 import {
   applyOpportunityAction,
@@ -113,7 +119,10 @@ export async function POST(
       idempotent: result.idempotent,
     })
   } catch (error) {
-    if (error instanceof OpportunityActionConflictError) {
+    if (
+      error instanceof OpportunityActionConflictError ||
+      error instanceof OutcomeIdempotencyConflictError
+    ) {
       return NextResponse.json(
         { error: 'idempotency_key_conflict' },
         { status: 409 },
@@ -133,6 +142,15 @@ export async function POST(
     }
     if (error instanceof OutcomeValidationError) {
       return NextResponse.json({ error: error.code }, { status: 400 })
+    }
+    if (
+      error instanceof OutcomeChronologyConflictError ||
+      error instanceof OutcomeLedgerTransitionConflictError
+    ) {
+      return NextResponse.json({ error: error.code }, { status: 409 })
+    }
+    if (error instanceof OutcomeContactPrivacyUnavailableError) {
+      return NextResponse.json({ error: error.code }, { status: 503 })
     }
     logError('opportunity.api.action_failed', error, {
       ownerId,

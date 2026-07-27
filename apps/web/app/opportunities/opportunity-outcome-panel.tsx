@@ -5,18 +5,22 @@ import { useEffect, useRef, useState } from 'react'
 
 import styles from './opportunities.module.css'
 
-type OutcomeStage = 'new' | 'review' | 'accepted' | 'dismissed' | 'snoozed' |
+type OutcomeStage = 'new' | 'review' | 'accepted' | 'dismissed' |
   'contacted' | 'replied' | 'meeting' | 'proposal' | 'won' | 'lost'
 type OutcomeAction = 'accepted' | 'dismissed' | 'snoozed' | 'contacted' |
-  'replied' | 'meeting' | 'proposal' | 'won' | 'lost'
+  'resumed' | 'replied' | 'meeting' | 'proposal' | 'won' | 'lost' | 'reverted'
 
 interface HistoryEvent {
   eventType: string
   label: string
   occurredAt: string
+  recordedAt: string
+  appendOrder: string
   actorType: string
   reason: { code: string; label: string; note: string | null } | null
   channel: string | null
+  contactPathType: string | null
+  contactReferenceLabel: string | null
   valueMinor: number | null
   currency: string | null
   metadata: Record<string, string>
@@ -25,6 +29,9 @@ interface HistoryEvent {
 interface HistoryResponse {
   state: {
     currentStage: OutcomeStage
+    commercialStage: OutcomeStage
+    workflowState: 'active' | 'snoozed'
+    snoozedUntil: string | null
     lastEventAt?: string
     dealValueMinor?: number | null
     currency?: string | null
@@ -37,7 +44,6 @@ const STAGE_LABELS: Record<OutcomeStage, string> = {
   review: 'Нужна проверка',
   accepted: 'В работе',
   dismissed: 'Отклонена',
-  snoozed: 'Отложена',
   contacted: 'Связались',
   replied: 'Получен ответ',
   meeting: 'Встреча',
@@ -50,23 +56,24 @@ const ACTION_LABELS: Record<OutcomeAction, string> = {
   accepted: 'В работу',
   dismissed: 'Отклонить',
   snoozed: 'Отложить',
+  resumed: 'Возобновить',
   contacted: 'Связались',
   replied: 'Получили ответ',
   meeting: 'Назначили встречу',
   proposal: 'Отправили предложение',
   won: 'Выиграли',
   lost: 'Потеряли',
+  reverted: 'Отменить последнее изменение',
 }
 
 const NEXT_ACTIONS: Record<OutcomeStage, readonly OutcomeAction[]> = {
-  new: ['accepted', 'snoozed', 'dismissed'],
-  review: ['accepted', 'snoozed', 'dismissed'],
-  snoozed: ['accepted', 'dismissed'],
-  accepted: ['contacted', 'snoozed', 'dismissed'],
-  contacted: ['replied', 'snoozed', 'lost'],
-  replied: ['meeting', 'snoozed', 'lost'],
-  meeting: ['proposal', 'snoozed', 'lost'],
-  proposal: ['won', 'snoozed', 'lost'],
+  new: ['accepted', 'dismissed'],
+  review: ['accepted', 'dismissed'],
+  accepted: ['contacted', 'dismissed'],
+  contacted: ['replied', 'lost'],
+  replied: ['meeting', 'lost'],
+  meeting: ['proposal', 'lost'],
+  proposal: ['won', 'lost'],
   dismissed: [],
   won: [],
   lost: [],
@@ -117,6 +124,17 @@ const CHANNELS = [
   ['other', 'Другой'],
 ] as const
 
+const CONTACT_PATHS = [
+  ['corporate_email', 'Корпоративный email'],
+  ['company_phone', 'Телефон компании'],
+  ['website_form', 'Форма на сайте'],
+  ['messenger', 'Корпоративный мессенджер'],
+  ['social_profile', 'Официальный профиль'],
+  ['existing_relationship', 'Существующее знакомство'],
+  ['partner_intro', 'Интро партнёра'],
+  ['other', 'Другой безопасный путь'],
+] as const
+
 export function OpportunityOutcomeImpression(props: {
   opportunityId: string
   cycleId: string
@@ -149,6 +167,9 @@ export function OpportunityOutcomePanel(props: {
   const [reasonCode, setReasonCode] = useState('')
   const [reasonNote, setReasonNote] = useState('')
   const [channel, setChannel] = useState('')
+  const [contactPathType, setContactPathType] = useState('')
+  const [snoozeDays, setSnoozeDays] = useState('7')
+  const [snoozedUntil, setSnoozedUntil] = useState('')
   const [dealValue, setDealValue] = useState('')
   const [error, setError] = useState<string | null>(null)
   const openedSent = useRef(false)
@@ -156,6 +177,13 @@ export function OpportunityOutcomePanel(props: {
   const retryKeys = useRef<Partial<Record<OutcomeAction, string>>>({})
   const fallbackStage = isStage(props.fallbackStage) ? props.fallbackStage : 'new'
   const stage = history?.state?.currentStage ?? fallbackStage
+  const workflowState = history?.state?.workflowState ?? 'active'
+  const latestCommercialEvent = [...(history?.events ?? [])]
+    .reverse()
+    .find((event) => [
+      'accepted', 'dismissed', 'contacted', 'replied',
+      'meeting', 'proposal', 'won', 'lost',
+    ].includes(event.eventType))
 
   async function toggle() {
     const nextExpanded = !expanded
@@ -201,7 +229,16 @@ export function OpportunityOutcomePanel(props: {
   }
 
   async function submit(action: OutcomeAction) {
-    const validationError = validateDetails(action, reasonCode, reasonNote, channel, dealValue)
+    const validationError = validateDetails(
+      action,
+      reasonCode,
+      reasonNote,
+      channel,
+      contactPathType,
+      dealValue,
+      snoozeDays,
+      snoozedUntil,
+    )
     if (validationError) {
       setError(validationError)
       return
@@ -217,9 +254,13 @@ export function OpportunityOutcomePanel(props: {
         reasonCode,
         reasonNote,
         channel,
+        contactPathType,
         dealValue,
+        snoozeDays,
+        snoozedUntil,
+        latestCommercialEvent?.appendOrder ?? null,
       )
-      const legacyAction = ['accepted', 'dismissed', 'snoozed', 'contacted']
+      const legacyAction = ['accepted', 'dismissed', 'contacted']
         .includes(action)
       const response = await fetch(
         `/api/opportunities/${props.opportunityId}/${legacyAction ? 'action' : 'outcomes'}`,
@@ -243,15 +284,12 @@ export function OpportunityOutcomePanel(props: {
       setReasonCode('')
       setReasonNote('')
       setChannel('')
+      setContactPathType('')
       setDealValue('')
       await loadHistory()
       router.refresh()
     } catch (submitError) {
-      const conflict = submitError instanceof Error &&
-        submitError.message === 'outcome_transition_conflict'
-      setError(conflict
-        ? 'Статус уже изменился. Обновите историю и повторите действие.'
-        : 'Результат не сохранился. Повторите попытку — ключ останется тем же.')
+      setError(outcomeErrorMessage(submitError))
     } finally {
       setPending(null)
     }
@@ -283,6 +321,13 @@ export function OpportunityOutcomePanel(props: {
               Последнее событие: {formatDateTime(history.state.lastEventAt)}
             </p>
           ) : null}
+          {history?.state ? (
+            <p className={styles.outcomeMuted}>
+              Процесс: {workflowState === 'snoozed'
+                ? `отложено до ${formatDateTime(history.state.snoozedUntil ?? '')}`
+                : 'активен'}
+            </p>
+          ) : null}
           {history?.state?.currentStage === 'won' &&
           history.state.dealValueMinor != null && history.state.currency ? (
             <p className={styles.dealValue}>
@@ -302,6 +347,12 @@ export function OpportunityOutcomePanel(props: {
                   <strong>{event.label}</strong>
                   {event.reason ? <small>{event.reason.label}</small> : null}
                   {event.channel ? <small>Канал: {event.channel}</small> : null}
+                  {event.contactPathType ? (
+                    <small>Путь контакта: {event.contactPathType}</small>
+                  ) : null}
+                  {event.contactReferenceLabel ? (
+                    <small>Контакт: {event.contactReferenceLabel}</small>
+                  ) : null}
                 </li>
               ))}
             </ol>
@@ -309,7 +360,19 @@ export function OpportunityOutcomePanel(props: {
             <p className={styles.outcomeMuted}>Событий пока нет.</p>
           ) : null}
 
-          {NEXT_ACTIONS[stage].length > 0 ? (
+          {workflowState === 'snoozed' ? (
+            <div className={styles.outcomeActions}>
+              <button
+                type="button"
+                className={styles.actionButton}
+                data-tone="primary"
+                disabled={pending !== null}
+                onClick={() => selectAction('resumed')}
+              >
+                {pending === 'resumed' ? 'Возобновляем…' : 'Возобновить'}
+              </button>
+            </div>
+          ) : NEXT_ACTIONS[stage].length > 0 ? (
             <div className={styles.outcomeActions} aria-label="Следующие коммерческие действия">
               {NEXT_ACTIONS[stage].map((action) => (
                 <button
@@ -323,10 +386,30 @@ export function OpportunityOutcomePanel(props: {
                   {pending === action ? 'Сохраняем…' : ACTION_LABELS[action]}
                 </button>
               ))}
+              <button
+                type="button"
+                className={styles.actionButton}
+                disabled={pending !== null}
+                onClick={() => selectAction('snoozed')}
+              >
+                {pending === 'snoozed' ? 'Сохраняем…' : 'Отложить'}
+              </button>
             </div>
           ) : (
             <p className={styles.outcomeMuted}>Коммерческий цикл завершён.</p>
           )}
+          {workflowState === 'active' && latestCommercialEvent ? (
+            <button
+              type="button"
+              className={styles.actionButton}
+              disabled={pending !== null}
+              onClick={() => selectAction('reverted')}
+            >
+              {pending === 'reverted'
+                ? 'Отменяем…'
+                : 'Отменить последнее изменение'}
+            </button>
+          ) : null}
 
           {selectedAction ? (
             <OutcomeDetailsForm
@@ -334,11 +417,17 @@ export function OpportunityOutcomePanel(props: {
               reasonCode={reasonCode}
               reasonNote={reasonNote}
               channel={channel}
+              contactPathType={contactPathType}
+              snoozeDays={snoozeDays}
+              snoozedUntil={snoozedUntil}
               dealValue={dealValue}
               pending={pending !== null}
               onReasonCode={setReasonCode}
               onReasonNote={setReasonNote}
               onChannel={setChannel}
+              onContactPathType={setContactPathType}
+              onSnoozeDays={setSnoozeDays}
+              onSnoozedUntil={setSnoozedUntil}
               onDealValue={setDealValue}
               onCancel={() => setSelectedAction(null)}
               onSubmit={() => void submit(selectedAction)}
@@ -358,11 +447,17 @@ function OutcomeDetailsForm(props: {
   reasonCode: string
   reasonNote: string
   channel: string
+  contactPathType: string
+  snoozeDays: string
+  snoozedUntil: string
   dealValue: string
   pending: boolean
   onReasonCode: (value: string) => void
   onReasonNote: (value: string) => void
   onChannel: (value: string) => void
+  onContactPathType: (value: string) => void
+  onSnoozeDays: (value: string) => void
+  onSnoozedUntil: (value: string) => void
   onDealValue: (value: string) => void
   onCancel: () => void
   onSubmit: () => void
@@ -399,18 +494,60 @@ function OutcomeDetailsForm(props: {
         </>
       ) : null}
       {props.action === 'contacted' ? (
-        <label>
-          Канал обращения
-          <select
-            value={props.channel}
-            onChange={(event) => props.onChannel(event.target.value)}
-          >
-            <option value="">Выберите канал</option>
-            {CHANNELS.map(([code, label]) => (
-              <option key={code} value={code}>{label}</option>
-            ))}
-          </select>
-        </label>
+        <>
+          <label>
+            Канал обращения
+            <select
+              value={props.channel}
+              onChange={(event) => props.onChannel(event.target.value)}
+            >
+              <option value="">Выберите канал</option>
+              {CHANNELS.map(([code, label]) => (
+                <option key={code} value={code}>{label}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Безопасный путь контакта
+            <select
+              value={props.contactPathType}
+              onChange={(event) => props.onContactPathType(event.target.value)}
+            >
+              <option value="">Выберите путь</option>
+              {CONTACT_PATHS.map(([code, label]) => (
+                <option key={code} value={code}>{label}</option>
+              ))}
+            </select>
+          </label>
+        </>
+      ) : null}
+      {props.action === 'snoozed' ? (
+        <>
+          <label>
+            Отложить на
+            <select
+              value={props.snoozeDays}
+              onChange={(event) => {
+                props.onSnoozeDays(event.target.value)
+                props.onSnoozedUntil('')
+              }}
+            >
+              {[1, 3, 7, 14, 30].map((days) => (
+                <option key={days} value={days}>{days} дн.</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Или до даты
+            <input
+              type="date"
+              min={dateAfterDays(1)}
+              max={dateAfterDays(90)}
+              value={props.snoozedUntil}
+              onChange={(event) => props.onSnoozedUntil(event.target.value)}
+            />
+          </label>
+        </>
       ) : null}
       {props.action === 'won' ? (
         <label>
@@ -452,17 +589,20 @@ function actionPayload(
   reasonCode: string,
   reasonNote: string,
   channel: string,
+  contactPathType: string,
   dealValue: string,
+  snoozeDays: string,
+  snoozedUntil: string,
+  revertsEventId: string | null,
 ) {
-  if (['accepted', 'dismissed', 'snoozed', 'contacted'].includes(action)) {
+  if (['accepted', 'dismissed', 'contacted'].includes(action)) {
     return {
       action,
-      ...(action === 'snoozed' ? { snoozeDays: 7 } : {}),
       ...(action === 'dismissed' ? {
         reasonCode,
         ...(reasonNote.trim() ? { note: reasonNote.trim() } : {}),
       } : {}),
-      ...(action === 'contacted' ? { channel } : {}),
+      ...(action === 'contacted' ? { channel, contactPathType } : {}),
     }
   }
   const valueMinor = action === 'won' && dealValue.trim()
@@ -474,6 +614,13 @@ function actionPayload(
     reasonCode: action === 'lost' ? reasonCode : null,
     reasonNote: action === 'lost' && reasonNote.trim() ? reasonNote.trim() : null,
     channel: null,
+    contactPathType: null,
+    ...(action === 'snoozed'
+      ? snoozedUntil
+        ? { snoozedUntil: new Date(`${snoozedUntil}T23:59:59`).toISOString() }
+        : { snoozeDays: Number(snoozeDays) }
+      : {}),
+    ...(action === 'reverted' ? { revertsEventId } : {}),
     valueMinor,
     currency: valueMinor === null ? null : 'RUB',
     metadata: action === 'meeting' ? { meetingStatus: 'scheduled' } : {},
@@ -486,7 +633,10 @@ function validateDetails(
   reasonCode: string,
   reasonNote: string,
   channel: string,
+  contactPathType: string,
   dealValue: string,
+  snoozeDays: string,
+  snoozedUntil: string,
 ): string | null {
   if ((action === 'dismissed' || action === 'lost') && !reasonCode) {
     return 'Выберите нормализованную причину.'
@@ -496,6 +646,16 @@ function validateDetails(
     return 'Для другой причины добавьте короткий комментарий.'
   }
   if (action === 'contacted' && !channel) return 'Выберите канал обращения.'
+  if (action === 'contacted' && !contactPathType) {
+    return 'Выберите безопасный путь контакта.'
+  }
+  if (
+    action === 'snoozed' &&
+    !snoozedUntil &&
+    !['1', '3', '7', '14', '30'].includes(snoozeDays)
+  ) {
+    return 'Выберите срок отложения.'
+  }
   if (action === 'won' && dealValue.trim()) {
     try {
       rublesToMinor(dealValue)
@@ -506,8 +666,41 @@ function validateDetails(
   return null
 }
 
+function dateAfterDays(days: number): string {
+  const date = new Date()
+  date.setUTCDate(date.getUTCDate() + days)
+  return date.toISOString().slice(0, 10)
+}
+
 function requiresDetails(action: OutcomeAction): boolean {
-  return ['dismissed', 'contacted', 'won', 'lost'].includes(action)
+  return ['dismissed', 'snoozed', 'contacted', 'won', 'lost'].includes(action)
+}
+
+function outcomeErrorMessage(error: unknown): string {
+  const code = error instanceof Error ? error.message : ''
+  if (code === 'outcome_chronology_conflict') {
+    return 'Дата события раньше последнего коммерческого этапа.'
+  }
+  if (
+    code === 'outcome_transition_conflict' ||
+    code === 'opportunity_transition_conflict' ||
+    code === 'outcome_correction_conflict'
+  ) {
+    return 'Статус уже изменился. Обновите историю и повторите действие.'
+  }
+  if (code === 'idempotency_key_conflict') {
+    return 'Повторный запрос отличается от исходного. Начните действие заново.'
+  }
+  if (code === 'opportunity_superseded') {
+    return 'Эта версия возможности уже заменена новой.'
+  }
+  if (
+    code === 'outcome_contact_privacy_unavailable' ||
+    code === 'opportunity_outcome_failed'
+  ) {
+    return 'Сервис результатов временно недоступен.'
+  }
+  return 'Результат не сохранился. Повторите попытку — ключ останется тем же.'
 }
 
 async function postOutcome(

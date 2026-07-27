@@ -1,5 +1,11 @@
 # Opportunity Engine v1
 
+> Outcome Ledger hardening отделяет commercial stage от workflow state,
+> вводит chronology/correction invariants и cohort-correct funnel. Точный
+> текущий контракт и rollout описаны в [opportunity-outcomes.md](./opportunity-outcomes.md);
+> legacy `opportunities.status` ниже остаётся compatibility lifecycle, а не
+> authoritative outcome projection.
+
 Opportunity Engine преобразует уже собранные сигналы найма в три отдельные сущности:
 
 1. `HiringEpisode` — подтверждённое company-level изменение найма.
@@ -283,8 +289,14 @@ rollback-транзакции и production TypeScript runtime test через �
 `detectHiringEpisodesJob`, `buildOpportunitiesJob`, `applyOpportunityAction` и
 `expireOpportunitiesJob`. Во второй временной БД runner проходит полный upgrade от
 исходной v1-схемы с конфликтующими lifecycle-строками и проверяет восстановление
-последнего action и orphaned snooze. Down runner применяет шесть down migrations в
+последнего action и orphaned snooze. Down runner применяет десять down migrations в
 обратном порядке, проверяет сохранение audit provenance действий и удаление runtime tables.
+
+Outcome DB runner дополнительно создаёт отдельные upgrade fixtures: predecessor
+meeting без metadata безопасно становится `scheduled`, а commercial chronology,
+идущая назад по append order, блокирует hardening migration. Down runner проходит
+10 migrations и до отката проверяет fail-safe отказ при active snooze workflow и
+protected contact reference.
 
 Проверки покрывают:
 

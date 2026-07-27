@@ -35,10 +35,11 @@ export function isOpportunityOutcomesUiEnabled(
 }
 
 export function isOpportunityOutcomesExternalIngestEnabled(
-  env: Readonly<Record<string, string | undefined>> = process.env,
+  _env: Readonly<Record<string, string | undefined>> = process.env,
 ): boolean {
-  return isOpportunityOutcomesEnabled(env) &&
-    env[OPPORTUNITY_OUTCOMES_EXTERNAL_INGEST_FEATURE_FLAG] === 'true'
+  // A global webhook secret cannot authenticate a tenant. Keep the endpoint
+  // fail-closed until tenant-scoped integration identities and rotation exist.
+  return false
 }
 
 export function clampOpportunityPageSize(value: number): number {

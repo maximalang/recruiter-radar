@@ -35,7 +35,7 @@ describe('opportunity engine config', () => {
     })).toBe(false)
   })
 
-  it('requires the server ledger before UI or external ingestion', () => {
+  it('requires the ledger for UI and keeps global-secret ingestion blocked', () => {
     const ledger = { OPPORTUNITY_OUTCOMES_ENABLED: 'true' }
     expect(isOpportunityOutcomesEnabled(ledger)).toBe(true)
     expect(isOpportunityOutcomesUiEnabled({
@@ -45,6 +45,6 @@ describe('opportunity engine config', () => {
     expect(isOpportunityOutcomesExternalIngestEnabled({
       ...ledger,
       OPPORTUNITY_OUTCOMES_EXTERNAL_INGEST_ENABLED: 'true',
-    })).toBe(true)
+    })).toBe(false)
   })
 })

@@ -26,6 +26,7 @@ import {
   OpportunityActionConflictError,
   OpportunityTransitionConflictError,
 } from '@/lib/opportunities/repository'
+import { OutcomeIdempotencyConflictError } from '@/lib/opportunities/outcome-repository'
 import { GET as list } from '@/app/api/opportunities/route'
 import { GET as detail } from '@/app/api/opportunities/[id]/route'
 import { POST as action } from '@/app/api/opportunities/[id]/action/route'
@@ -192,6 +193,25 @@ describe('opportunities API', () => {
     )
 
     expect(response.status).toBe(409)
+  })
+
+  it('maps an outcome-ledger idempotency conflict to the same 409 contract', async () => {
+    mockedOwner.mockResolvedValue('7')
+    mockedAction.mockRejectedValue(new OutcomeIdempotencyConflictError())
+
+    const response = await action(
+      request('/api/opportunities/10/action', {
+        method: 'POST',
+        headers: { 'idempotency-key': 'owner-global-reused-key' },
+        body: JSON.stringify({ action: 'accepted' }),
+      }),
+      { params: Promise.resolve({ id: '10' }) },
+    )
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toEqual({
+      error: 'idempotency_key_conflict',
+    })
   })
 
   it('returns the state-machine conflict contract for a forbidden transition', async () => {

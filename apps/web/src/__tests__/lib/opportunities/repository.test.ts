@@ -1,5 +1,3 @@
-import { createHash } from 'node:crypto'
-
 import {
   applyOpportunityAction,
   getOpportunityById,
@@ -10,6 +8,7 @@ import {
   isOpportunityTransitionAllowed,
 } from '@/lib/opportunities/repository'
 import { getClient } from '@/lib/db-pool'
+import { hashCanonicalJson } from '@/lib/opportunities/canonical-hash'
 
 jest.mock('@/lib/db-pool', () => ({
   getClient: jest.fn(),
@@ -433,13 +432,12 @@ describe('opportunity repository tenant scope', () => {
   })
 
   it('replays an action with the same idempotency key and payload without mutating state', async () => {
-    const actionFingerprint = createHash('sha256')
-      .update(JSON.stringify({
-        action: 'accepted',
-        note: null,
-        snoozeDays: null,
-      }))
-      .digest('hex')
+    const actionFingerprint = hashCanonicalJson({
+      action: 'accepted',
+      contactReferenceHash: null,
+      note: null,
+      snoozeDays: null,
+    })
     const query = jest.fn(async (sql: string) => {
       if (
         sql.includes('FROM opportunities') &&
@@ -513,13 +511,12 @@ describe('opportunity repository tenant scope', () => {
   })
 
   it('superseded action replay returns the current opportunity status', async () => {
-    const actionFingerprint = createHash('sha256')
-      .update(JSON.stringify({
-        action: 'accepted',
-        note: null,
-        snoozeDays: null,
-      }))
-      .digest('hex')
+    const actionFingerprint = hashCanonicalJson({
+      action: 'accepted',
+      contactReferenceHash: null,
+      note: null,
+      snoozeDays: null,
+    })
     const query = jest.fn(async (sql: string, params?: readonly unknown[]) => {
       if (
         sql.includes('FROM opportunities') &&

@@ -15,6 +15,7 @@ const root = resolve(import.meta.dirname, '..', '..', '..')
 const migrationsDir = resolve(root, 'packages', 'db', 'migrations')
 const migrateScript = resolve(root, 'packages', 'db', 'scripts', 'migrate.mjs')
 const downMigrations = [
+  '20260728100000_harden_opportunity_outcome_ledger.down.sql',
   '20260727152000_add_opportunity_public_reference.down.sql',
   '20260727151000_add_opportunity_outcome_projection.down.sql',
   '20260727150000_add_opportunity_outcome_ledger.down.sql',
@@ -118,7 +119,161 @@ async function seedSupersessionRollbackFixture(database) {
        ($1, $2, 'dismissed', 'rollback:dismissed', repeat('0', 64), 'accepted', 'dismissed', '{"audit":"second"}'::jsonb)`,
     [ownerId, historicalOpportunityId],
   )
-  return { historicalOpportunityId, newerOpportunityId }
+  return {
+    ownerId,
+    clientProfileId: profile.rows[0].id,
+    organizationId: organization.rows[0].id,
+    hiringEpisodeId: episode.rows[0].id,
+    historicalOpportunityId,
+    newerOpportunityId,
+  }
+}
+
+async function verifyHardenedOutcomeRollbackGuards(database, fixture) {
+  const downSql = await readFile(
+    resolve(
+      migrationsDir,
+      '20260728100000_harden_opportunity_outcome_ledger.down.sql',
+    ),
+    'utf8',
+  )
+
+  const insertEvent = async ({
+    eventType,
+    previousStage,
+    newStage,
+    key,
+    contact = false,
+    snoozed = false,
+  }) => {
+    const result = await database.query(
+      `INSERT INTO opportunity_outcome_events (
+         owner_id, client_profile_id, opportunity_id, hiring_episode_id,
+         organization_id, event_type, previous_stage, new_stage, channel,
+         contact_reference_hash, contact_reference_label, snoozed_until,
+         occurred_at, actor_type, metadata, analytics_snapshot,
+         idempotency_key, payload_hash
+       )
+       VALUES (
+         $1, $2, $3, $4, $5, $6, $7, $8, $9,
+         $10, $11, $12::timestamptz, NOW(), 'system',
+         '{}'::jsonb, '{}'::jsonb, $13, repeat('a', 64)
+       )
+       RETURNING id::TEXT AS id, occurred_at::TEXT AS "occurredAt"`,
+      [
+        fixture.ownerId,
+        fixture.clientProfileId,
+        fixture.historicalOpportunityId,
+        fixture.hiringEpisodeId,
+        fixture.organizationId,
+        eventType,
+        previousStage,
+        newStage,
+        contact ? 'email' : null,
+        contact ? 'b'.repeat(64) : null,
+        contact ? 's***@example.invalid' : null,
+        snoozed ? new Date(Date.now() + 7 * 86_400_000).toISOString() : null,
+        key,
+      ],
+    )
+    return result.rows[0]
+  }
+
+  const rejectDown = async (message) => {
+    let rejected = false
+    try {
+      await database.query(downSql)
+    } catch (error) {
+      rejected = error instanceof Error && error.message.includes(message)
+      await database.query('ROLLBACK').catch(() => undefined)
+    }
+    if (!rejected) {
+      throw new Error(`Hardened outcome rollback did not reject: ${message}`)
+    }
+  }
+
+  const cleanup = async () => {
+    await database.query(
+      `DELETE FROM opportunity_outcome_state
+       WHERE owner_id = $1 AND opportunity_id = $2`,
+      [fixture.ownerId, fixture.historicalOpportunityId],
+    )
+    await database.query(
+      'ALTER TABLE opportunity_outcome_events DISABLE TRIGGER opportunity_outcome_events_append_only',
+    )
+    try {
+      await database.query(
+        `DELETE FROM opportunity_outcome_events
+         WHERE owner_id = $1 AND opportunity_id = $2`,
+        [fixture.ownerId, fixture.historicalOpportunityId],
+      )
+    } finally {
+      await database.query(
+        'ALTER TABLE opportunity_outcome_events ENABLE TRIGGER opportunity_outcome_events_append_only',
+      )
+    }
+  }
+
+  const contacted = await insertEvent({
+    eventType: 'contacted',
+    previousStage: 'accepted',
+    newStage: 'contacted',
+    key: `rollback-contact:${process.pid}`,
+    contact: true,
+  })
+  await database.query(
+    `INSERT INTO opportunity_outcome_state (
+       owner_id, client_profile_id, opportunity_id, hiring_episode_id,
+       organization_id, current_stage, commercial_stage, workflow_state,
+       last_event_id, last_event_at, last_stage_event_id, last_stage_event_at,
+       contacted_at
+     )
+     VALUES (
+       $1, $2, $3, $4, $5, 'contacted', 'contacted', 'active',
+       $6, $7::timestamptz, $6, $7::timestamptz, $7::timestamptz
+     )`,
+    [
+      fixture.ownerId,
+      fixture.clientProfileId,
+      fixture.historicalOpportunityId,
+      fixture.hiringEpisodeId,
+      fixture.organizationId,
+      contacted.id,
+      contacted.occurredAt,
+    ],
+  )
+  await rejectDown('protected contact references exist')
+  await cleanup()
+
+  const snoozed = await insertEvent({
+    eventType: 'snoozed',
+    previousStage: 'accepted',
+    newStage: 'accepted',
+    key: `rollback-snooze:${process.pid}`,
+    snoozed: true,
+  })
+  await database.query(
+    `INSERT INTO opportunity_outcome_state (
+       owner_id, client_profile_id, opportunity_id, hiring_episode_id,
+       organization_id, current_stage, commercial_stage, workflow_state,
+       snoozed_until, last_event_id, last_event_at
+     )
+     VALUES (
+       $1, $2, $3, $4, $5, 'accepted', 'accepted', 'snoozed',
+       NOW() + INTERVAL '7 days', $6, $7::timestamptz
+     )`,
+    [
+      fixture.ownerId,
+      fixture.clientProfileId,
+      fixture.historicalOpportunityId,
+      fixture.hiringEpisodeId,
+      fixture.organizationId,
+      snoozed.id,
+      snoozed.occurredAt,
+    ],
+  )
+  await rejectDown('snoozed workflow state exists')
+  await cleanup()
 }
 
 await admin.connect()
@@ -133,6 +288,7 @@ try {
   await database.connect()
   try {
     const fixture = await seedSupersessionRollbackFixture(database)
+    await verifyHardenedOutcomeRollbackGuards(database, fixture)
     for (const migration of downMigrations) {
       await database.query(await readFile(resolve(migrationsDir, migration), 'utf8'))
       if (migration === '20260727122000_add_opportunity_supersession.down.sql') {

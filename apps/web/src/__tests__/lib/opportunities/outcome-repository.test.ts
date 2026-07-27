@@ -226,9 +226,13 @@ describe('opportunity outcome funnel', () => {
     const query = jest.fn(async (_sql: string, _params?: unknown[]) => ({
       rowCount: 1,
       rows: [{
-        shownCount: '20', openedCount: '15', acceptedCount: '10',
-        contactedCount: '8', repliedCount: '4', meetingCount: '3',
-        proposalCount: '2', wonCount: '1', lostCount: '4',
+        cohortSize: '20',
+        activityCounts: '{"shown":"21","opened":"16"}',
+        shownCohortCount: '20', openedCohortCount: '15',
+        acceptedCohortCount: '10', contactedCohortCount: '8',
+        repliedCohortCount: '4', meetingCohortCount: '3',
+        proposalCohortCount: '2', wonCohortCount: '1',
+        lostCohortCount: '4',
         shownOpenedPairs: '15', shownOpenedMedianHours: '2.50',
         openedAcceptedPairs: '10', openedAcceptedMedianHours: '5.00',
         acceptedContactedPairs: '8', acceptedContactedMedianHours: '12.00',
@@ -252,9 +256,14 @@ describe('opportunity outcome funnel', () => {
     expect(String(query.mock.calls[0]?.[0])).toContain('owner_id = $1')
     expect(query.mock.calls[0]?.[1]).toEqual([
       '7', '2026-07-01T00:00:00.000Z', '2026-08-01T00:00:00.000Z',
-      'vacancy_spike', 'A', '80-89', 'hh',
+      'shown', 'vacancy_spike', 'A', '80-89', 'hh',
     ])
-    expect(summary.stages.find((stage) => stage.eventType === 'shown')?.count)
+    expect(String(query.mock.calls[0]?.[0])).toContain(
+      'JOIN active_events event USING (opportunity_id)',
+    )
+    expect(String(query.mock.calls[0]?.[0])).not.toContain('LEAST(')
+    expect(summary.cohortCounts.find((stage) =>
+      stage.eventType === 'shown')?.count)
       .toBe(20)
     expect(summary.conversions[0]).toMatchObject({
       from: 'shown', to: 'opened', sampleSize: 20, converted: 15,
@@ -265,7 +274,12 @@ describe('opportunity outcome funnel', () => {
   it('does not present small-sample conversion as significant', async () => {
     const query = jest.fn(async () => ({
       rowCount: 1,
-      rows: [{ shownCount: '4', openedCount: '3' }],
+      rows: [{
+        cohortSize: '4',
+        shownCohortCount: '4',
+        openedCohortCount: '3',
+        shownOpenedPairs: '3',
+      }],
     }))
     const summary = await getOutcomeFunnelSummary({
       ownerId: '7',

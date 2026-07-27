@@ -769,6 +769,160 @@ describe('opportunity background jobs', () => {
     expect(insertedParams).not.toContain(elapsedSnooze)
   })
 
+  it('preserves the resumed commercial stage during an outcome-enabled rebuild', async () => {
+    const originalFlag = process.env.OPPORTUNITY_OUTCOMES_ENABLED
+    process.env.OPPORTUNITY_OUTCOMES_ENABLED = 'true'
+    const resumeNow = new Date(Date.now() - 60_000)
+    const elapsedSnooze = new Date(
+      resumeNow.getTime() - 1_000,
+    ).toISOString()
+    const contactedAt = new Date(
+      resumeNow.getTime() - 86_400_000,
+    ).toISOString()
+    let updatedParams: readonly unknown[] = []
+    const db = dbWithQuery((sql, params) => {
+      if (sql.includes('WITH latest_candidates AS')) {
+        return {
+          rowCount: 1,
+          rows: [buildRow('8', {
+            currentOpportunityId: '100',
+            currentInputHash: '0'.repeat(64),
+            currentScoringVersion: 'opportunity-v1',
+          })],
+        }
+      }
+      if (
+        sql.includes('FROM opportunities') &&
+        sql.includes('input_hash') &&
+        sql.includes('FOR UPDATE')
+      ) {
+        return {
+          rowCount: 1,
+          rows: [{
+            id: '100',
+            inputHash: '0'.repeat(64),
+            scoringVersion: 'opportunity-v1',
+            status: 'snoozed',
+            snoozedUntil: elapsedSnooze,
+          }],
+        }
+      }
+      if (sql.includes('FROM client_episode_state') && sql.includes('FOR UPDATE')) {
+        return {
+          rowCount: 1,
+          rows: [{ status: 'snoozed', suppressedUntil: elapsedSnooze }],
+        }
+      }
+      if (sql.includes('JOIN hiring_episodes he') && sql.includes('FOR UPDATE')) {
+        return {
+          rowCount: 1,
+          rows: [{
+            id: '100',
+            ownerId: '7',
+            clientProfileId: '8',
+            organizationId: '10',
+            hiringEpisodeId: '20',
+            status: 'snoozed',
+            supersededAt: null,
+            scoringVersion: 'opportunity-v1',
+            confidenceGate: 'A',
+            opportunityScore: 0.8,
+            externalSupportNeedScore: 0.7,
+            episodeType: 'vacancy_spike',
+          }],
+        }
+      }
+      if (
+        sql.includes('FROM opportunity_outcome_events') &&
+        sql.includes('payload_hash')
+      ) {
+        return { rowCount: 0, rows: [] }
+      }
+      if (
+        sql.includes('FROM opportunity_outcome_state') &&
+        sql.includes('FOR UPDATE')
+      ) {
+        return {
+          rowCount: 1,
+          rows: [{
+            commercialStage: 'contacted',
+            currentStage: 'contacted',
+            workflowState: 'snoozed',
+            snoozedUntil: elapsedSnooze,
+            lastEventId: '90',
+            lastEventAt: elapsedSnooze,
+            lastStageEventId: '80',
+            lastStageEventAt: contactedAt,
+            firstShownAt: null,
+            firstOpenedAt: null,
+            acceptedAt: '2026-07-30T09:00:00.000Z',
+            contactedAt,
+            repliedAt: null,
+            meetingAt: null,
+            proposalAt: null,
+            wonAt: null,
+            lostAt: null,
+            dismissReasonCode: null,
+            lostReasonCode: null,
+            dealValueMinor: null,
+            currency: null,
+          }],
+        }
+      }
+      if (sql.includes('ARRAY_AGG(DISTINCT source_family')) {
+        return { rowCount: 1, rows: [{ sourceFamilies: [] }] }
+      }
+      if (sql.includes('INSERT INTO opportunity_outcome_events')) {
+        return {
+          rowCount: 1,
+          rows: [{
+            id: '91',
+            recordedAt: resumeNow.toISOString(),
+          }],
+        }
+      }
+      if (sql.includes('INSERT INTO opportunity_outcome_state')) {
+        return { rowCount: 1, rows: [] }
+      }
+      if (
+        sql.includes('UPDATE opportunities') &&
+        sql.includes('SET\n       status = $1')
+      ) {
+        return { rowCount: 1, rows: [] }
+      }
+      if (sql.includes('INSERT INTO client_episode_state')) {
+        return { rowCount: 1, rows: [] }
+      }
+      if (
+        sql.includes('UPDATE opportunities') &&
+        sql.includes('owner_id = $2')
+      ) {
+        updatedParams = params ?? []
+        return { rowCount: 1, rows: [{ id: '100' }] }
+      }
+      if (sql.includes('DELETE FROM opportunity_build_failures')) {
+        return { rowCount: 0, rows: [] }
+      }
+      throw new Error(`Unexpected SQL: ${sql}`)
+    })
+
+    try {
+      const result = await buildOpportunitiesJob({
+        enabled: true,
+        now: resumeNow,
+      }, db)
+      expect(result.updated).toBe(1)
+      expect(updatedParams[5]).toBe('contacted')
+      expect(updatedParams[31]).toBeNull()
+    } finally {
+      if (originalFlag === undefined) {
+        delete process.env.OPPORTUNITY_OUTCOMES_ENABLED
+      } else {
+        process.env.OPPORTUNITY_OUTCOMES_ENABLED = originalFlag
+      }
+    }
+  })
+
   it('clears an elapsed snooze even when the semantic input is unchanged', async () => {
     const elapsedSnooze = '2026-08-02T09:00:00.000Z'
     let selectionCount = 0
