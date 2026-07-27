@@ -346,7 +346,7 @@ describeWithDatabase('Opportunity Outcome production PostgreSQL runtime', () => 
       action: 'contacted',
       actionKey,
       channel: 'phone',
-      contactPathType: 'company_switchboard',
+      contactPathType: 'company_phone',
       contactReference: 'sales@example.invalid',
     })).rejects.toBeInstanceOf(OpportunityActionConflictError)
 
