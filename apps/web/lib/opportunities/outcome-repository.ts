@@ -117,6 +117,31 @@ export interface OutcomeHistoryResult {
   }
 }
 
+export interface OutcomeFunnelFilter {
+  ownerId: string | number
+  from: string
+  to: string
+  episodeType?: string | null
+  confidenceGate?: string | null
+  sourceFamily?: string | null
+  scoreBucket?: string | null
+}
+
+export interface OutcomeFunnelSummary {
+  period: { from: string; to: string }
+  minimumConversionSample: number
+  stages: Array<{ eventType: string; label: string; count: number }>
+  conversions: Array<{
+    from: string
+    to: string
+    sampleSize: number
+    converted: number
+    rate: number | null
+    medianHours: number | null
+    status: 'ready' | 'insufficient_data'
+  }>
+}
+
 export interface RecordOpportunityOutcomeInput {
   ownerId: string | number
   opportunityId: string | number
@@ -265,6 +290,140 @@ export async function getOpportunityOutcomeHistory(
       totalItems,
       totalPages: Math.ceil(totalItems / pageSize),
     },
+  }
+}
+
+export async function resolveOpportunityPublicReference(
+  publicReference: string,
+  db: OutcomeDb | null = getPool(),
+): Promise<{ ownerId: string; opportunityId: string } | null> {
+  if (!db) throw new Error('DATABASE_URL is not set.')
+  const result = await db.query<{ ownerId: string; opportunityId: string }>(
+    `SELECT
+       owner_id::TEXT AS "ownerId",
+       id::TEXT AS "opportunityId"
+     FROM opportunities
+     WHERE public_reference = $1::uuid
+       AND superseded_at IS NULL
+     LIMIT 1`,
+    [publicReference],
+  )
+  return result.rows[0] ?? null
+}
+
+export async function getOutcomeFunnelSummary(
+  input: OutcomeFunnelFilter,
+  db: OutcomeDb | null = getPool(),
+): Promise<OutcomeFunnelSummary> {
+  if (!db) throw new Error('DATABASE_URL is not set.')
+  const params: unknown[] = [String(input.ownerId), input.from, input.to]
+  const clauses = [
+    'owner_id = $1',
+    'occurred_at >= $2::timestamptz',
+    'occurred_at < $3::timestamptz',
+  ]
+  if (input.episodeType) {
+    params.push(input.episodeType)
+    clauses.push(`analytics_snapshot->>'episodeType' = $${params.length}`)
+  }
+  if (input.confidenceGate) {
+    params.push(input.confidenceGate)
+    clauses.push(`analytics_snapshot->>'confidenceGate' = $${params.length}`)
+  }
+  if (input.scoreBucket) {
+    params.push(input.scoreBucket)
+    clauses.push(`analytics_snapshot->>'scoreBucket' = $${params.length}`)
+  }
+  if (input.sourceFamily) {
+    params.push(input.sourceFamily)
+    clauses.push(
+      `analytics_snapshot->'sourceFamilies' ? $${params.length}`,
+    )
+  }
+
+  type FunnelRow = Record<string, string | null>
+  const result = await db.query<FunnelRow>(
+    `WITH filtered AS (
+       SELECT opportunity_id, event_type, occurred_at
+       FROM opportunity_outcome_events
+       WHERE ${clauses.join('\n         AND ')}
+     ), per_opportunity AS (
+       SELECT
+         opportunity_id,
+         MIN(occurred_at) FILTER (WHERE event_type = 'shown') AS shown_at,
+         MIN(occurred_at) FILTER (WHERE event_type = 'opened') AS opened_at,
+         MIN(occurred_at) FILTER (WHERE event_type = 'accepted') AS accepted_at,
+         MIN(occurred_at) FILTER (WHERE event_type = 'contacted') AS contacted_at,
+         MIN(occurred_at) FILTER (WHERE event_type = 'replied') AS replied_at,
+         MIN(occurred_at) FILTER (WHERE event_type = 'meeting') AS meeting_at,
+         MIN(occurred_at) FILTER (WHERE event_type = 'proposal') AS proposal_at,
+         MIN(occurred_at) FILTER (WHERE event_type = 'won') AS won_at,
+         MIN(occurred_at) FILTER (WHERE event_type = 'lost') AS lost_at
+       FROM filtered
+       GROUP BY opportunity_id
+     )
+     SELECT
+       COUNT(*) FILTER (WHERE shown_at IS NOT NULL)::TEXT AS "shownCount",
+       COUNT(*) FILTER (WHERE opened_at IS NOT NULL)::TEXT AS "openedCount",
+       COUNT(*) FILTER (WHERE accepted_at IS NOT NULL)::TEXT AS "acceptedCount",
+       COUNT(*) FILTER (WHERE contacted_at IS NOT NULL)::TEXT AS "contactedCount",
+       COUNT(*) FILTER (WHERE replied_at IS NOT NULL)::TEXT AS "repliedCount",
+       COUNT(*) FILTER (WHERE meeting_at IS NOT NULL)::TEXT AS "meetingCount",
+       COUNT(*) FILTER (WHERE proposal_at IS NOT NULL)::TEXT AS "proposalCount",
+       COUNT(*) FILTER (WHERE won_at IS NOT NULL)::TEXT AS "wonCount",
+       COUNT(*) FILTER (WHERE lost_at IS NOT NULL)::TEXT AS "lostCount",
+       ${medianSql('shown_at', 'opened_at', 'shownOpened')},
+       ${medianSql('opened_at', 'accepted_at', 'openedAccepted')},
+       ${medianSql('accepted_at', 'contacted_at', 'acceptedContacted')},
+       ${medianSql('contacted_at', 'replied_at', 'contactedReplied')},
+       ${medianSql('replied_at', 'meeting_at', 'repliedMeeting')},
+       ${medianSql('meeting_at', 'proposal_at', 'meetingProposal')},
+       ${medianSql('proposal_at', 'won_at', 'proposalWon')}
+     FROM per_opportunity`,
+    params,
+  )
+  const row = result.rows[0] ?? {}
+  const counts = Object.fromEntries(
+    ['shown', 'opened', 'accepted', 'contacted', 'replied', 'meeting', 'proposal', 'won', 'lost']
+      .map((eventType) => [eventType, numberValue(row[`${eventType}Count`])]),
+  ) as Record<string, number>
+  const pairs = [
+    ['shown', 'opened', 'shownOpened'],
+    ['opened', 'accepted', 'openedAccepted'],
+    ['accepted', 'contacted', 'acceptedContacted'],
+    ['contacted', 'replied', 'contactedReplied'],
+    ['replied', 'meeting', 'repliedMeeting'],
+    ['meeting', 'proposal', 'meetingProposal'],
+    ['proposal', 'won', 'proposalWon'],
+  ] as const
+  const minimumConversionSample = 10
+  return {
+    period: { from: input.from, to: input.to },
+    minimumConversionSample,
+    stages: Object.entries(counts).map(([eventType, count]) => ({
+      eventType,
+      label: OUTCOME_EVENT_LABELS[eventType as OpportunityOutcomeInput['eventType']],
+      count,
+    })),
+    conversions: pairs.map(([from, to, key]) => {
+      const sampleSize = counts[from]
+      const converted = Math.min(counts[to], sampleSize)
+      const ready = sampleSize >= minimumConversionSample
+      const medianSample = numberValue(row[`${key}Pairs`])
+      return {
+        from,
+        to,
+        sampleSize,
+        converted,
+        rate: ready && sampleSize > 0
+          ? Number((converted / sampleSize).toFixed(4))
+          : null,
+        medianHours: medianSample >= 3
+          ? nullableNumber(row[`${key}MedianHours`])
+          : null,
+        status: ready ? 'ready' : 'insufficient_data',
+      }
+    }),
   }
 }
 
@@ -881,4 +1040,25 @@ function supportNeedBucket(score: number): 'low' | 'medium' | 'high' {
   if (score >= 0.7) return 'high'
   if (score >= 0.4) return 'medium'
   return 'low'
+}
+
+function medianSql(left: string, right: string, key: string): string {
+  const valid = `${left} IS NOT NULL AND ${right} IS NOT NULL AND ${right} >= ${left}`
+  return `COUNT(*) FILTER (WHERE ${valid})::TEXT AS "${key}Pairs",
+       ROUND((
+         PERCENTILE_CONT(0.5) WITHIN GROUP (
+           ORDER BY EXTRACT(EPOCH FROM (${right} - ${left}))
+         ) FILTER (WHERE ${valid}) / 3600
+       )::NUMERIC, 2)::TEXT AS "${key}MedianHours"`
+}
+
+function numberValue(value: string | null | undefined): number {
+  const number = Number(value ?? 0)
+  return Number.isFinite(number) ? number : 0
+}
+
+function nullableNumber(value: string | null | undefined): number | null {
+  if (value === null || value === undefined) return null
+  const number = Number(value)
+  return Number.isFinite(number) ? number : null
 }

@@ -2,6 +2,7 @@ import { getClient } from '@/lib/db-pool'
 import {
   OutcomeIdempotencyConflictError,
   OutcomeTransitionConflictError,
+  getOutcomeFunnelSummary,
   recordOpportunityOutcome,
 } from '@/lib/opportunities/outcome-repository'
 
@@ -217,5 +218,67 @@ describe('opportunity outcome repository', () => {
     )).toBe(true)
     expect(query.mock.calls.some(([sql]) => String(sql) === 'ROLLBACK')).toBe(true)
     expect(query.mock.calls.some(([sql]) => String(sql) === 'COMMIT')).toBe(false)
+  })
+})
+
+describe('opportunity outcome funnel', () => {
+  it('scopes analytics to owner and controlled snapshot filters', async () => {
+    const query = jest.fn(async () => ({
+      rowCount: 1,
+      rows: [{
+        shownCount: '20', openedCount: '15', acceptedCount: '10',
+        contactedCount: '8', repliedCount: '4', meetingCount: '3',
+        proposalCount: '2', wonCount: '1', lostCount: '4',
+        shownOpenedPairs: '15', shownOpenedMedianHours: '2.50',
+        openedAcceptedPairs: '10', openedAcceptedMedianHours: '5.00',
+        acceptedContactedPairs: '8', acceptedContactedMedianHours: '12.00',
+        contactedRepliedPairs: '4', contactedRepliedMedianHours: '24.00',
+        repliedMeetingPairs: '3', repliedMeetingMedianHours: '48.00',
+        meetingProposalPairs: '2', meetingProposalMedianHours: '72.00',
+        proposalWonPairs: '1', proposalWonMedianHours: '96.00',
+      }],
+    }))
+
+    const summary = await getOutcomeFunnelSummary({
+      ownerId: '7',
+      from: '2026-07-01T00:00:00.000Z',
+      to: '2026-08-01T00:00:00.000Z',
+      episodeType: 'vacancy_spike',
+      confidenceGate: 'A',
+      sourceFamily: 'hh',
+      scoreBucket: '80-89',
+    }, { query } as never)
+
+    expect(String(query.mock.calls[0]?.[0])).toContain('owner_id = $1')
+    expect(query.mock.calls[0]?.[1]).toEqual([
+      '7', '2026-07-01T00:00:00.000Z', '2026-08-01T00:00:00.000Z',
+      'vacancy_spike', 'A', '80-89', 'hh',
+    ])
+    expect(summary.stages.find((stage) => stage.eventType === 'shown')?.count)
+      .toBe(20)
+    expect(summary.conversions[0]).toMatchObject({
+      from: 'shown', to: 'opened', sampleSize: 20, converted: 15,
+      rate: 0.75, medianHours: 2.5, status: 'ready',
+    })
+  })
+
+  it('does not present small-sample conversion as significant', async () => {
+    const query = jest.fn(async () => ({
+      rowCount: 1,
+      rows: [{ shownCount: '4', openedCount: '3' }],
+    }))
+    const summary = await getOutcomeFunnelSummary({
+      ownerId: '7',
+      from: '2026-07-01T00:00:00.000Z',
+      to: '2026-08-01T00:00:00.000Z',
+    }, { query } as never)
+
+    expect(summary.conversions[0]).toMatchObject({
+      sampleSize: 4,
+      converted: 3,
+      rate: null,
+      medianHours: null,
+      status: 'insufficient_data',
+    })
   })
 })
