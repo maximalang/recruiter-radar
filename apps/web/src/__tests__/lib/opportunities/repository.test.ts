@@ -616,4 +616,87 @@ describe('opportunity repository tenant scope', () => {
     )).toBe(false)
     expect(query.mock.calls.some(([sql]) => String(sql) === 'ROLLBACK')).toBe(true)
   })
+
+  it('writes legacy action, outcome ledger, projection, and episode state in one transaction', async () => {
+    const originalFlag = process.env.OPPORTUNITY_OUTCOMES_ENABLED
+    process.env.OPPORTUNITY_OUTCOMES_ENABLED = 'true'
+    const opportunity = {
+      id: '10', ownerId: '7', clientProfileId: '8', organizationId: '9',
+      hiringEpisodeId: '11', status: 'accepted', evidenceTimeline: [],
+    }
+    const query = jest.fn(async (sql: string) => {
+      if (sql.includes('FROM opportunities o') && sql.includes('FOR UPDATE')) {
+        return {
+          rowCount: 1,
+          rows: [{
+            id: '10', ownerId: '7', clientProfileId: '8', organizationId: '9',
+            hiringEpisodeId: '11', status: 'new', supersededAt: null,
+            scoringVersion: 'opportunity-v1', confidenceGate: 'A',
+            opportunityScore: 0.8, externalSupportNeedScore: 0.75,
+            episodeType: 'vacancy_spike',
+          }],
+        }
+      }
+      if (sql.includes('FROM opportunities') && sql.includes('FOR UPDATE')) {
+        return {
+          rowCount: 1,
+          rows: [{
+            id: '10', clientProfileId: '8', organizationId: '9',
+            hiringEpisodeId: '11', status: 'new', supersededAt: null,
+          }],
+        }
+      }
+      if (sql.includes('SELECT action_fingerprint')) {
+        return { rowCount: 0, rows: [] }
+      }
+      if (sql.includes('FROM opportunity_outcome_events')) {
+        return { rowCount: 0, rows: [] }
+      }
+      if (sql.includes('FROM opportunity_outcome_state')) {
+        return { rowCount: 0, rows: [] }
+      }
+      if (sql.includes('ARRAY_AGG')) {
+        return { rowCount: 1, rows: [{ sourceFamilies: ['hh'] }] }
+      }
+      if (sql.includes('INSERT INTO opportunity_outcome_events')) {
+        return {
+          rowCount: 1,
+          rows: [{ id: '21', recordedAt: '2026-07-27T12:00:01.000Z' }],
+        }
+      }
+      if (sql.includes('WHERE o.id = $1')) {
+        return { rowCount: 1, rows: [opportunity] }
+      }
+      return { rowCount: 1, rows: [] }
+    })
+    const release = jest.fn()
+    jest.mocked(getClient).mockResolvedValue(opportunityClient(query, release))
+
+    try {
+      const result = await applyOpportunityAction({
+        ownerId: '7', opportunityId: '10', action: 'accepted',
+        actionKey: 'accepted:atomic',
+        occurredAt: '2026-07-27T12:00:00.000Z',
+      })
+
+      expect(result?.opportunity.status).toBe('accepted')
+      const legacyAction = query.mock.calls.findIndex(([sql]) =>
+        String(sql).includes('INSERT INTO opportunity_actions'))
+      const ledgerEvent = query.mock.calls.findIndex(([sql]) =>
+        String(sql).includes('INSERT INTO opportunity_outcome_events'))
+      const projection = query.mock.calls.findIndex(([sql]) =>
+        String(sql).includes('INSERT INTO opportunity_outcome_state'))
+      const commit = query.mock.calls.findIndex(([sql]) => String(sql) === 'COMMIT')
+      expect(legacyAction).toBeGreaterThan(-1)
+      expect(ledgerEvent).toBeGreaterThan(legacyAction)
+      expect(projection).toBeGreaterThan(ledgerEvent)
+      expect(commit).toBeGreaterThan(projection)
+      expect(query.mock.calls.some(([sql]) =>
+        String(sql).includes('INSERT INTO client_episode_state')),
+      ).toBe(true)
+    } finally {
+      if (originalFlag === undefined) delete process.env.OPPORTUNITY_OUTCOMES_ENABLED
+      else process.env.OPPORTUNITY_OUTCOMES_ENABLED = originalFlag
+    }
+  })
 })

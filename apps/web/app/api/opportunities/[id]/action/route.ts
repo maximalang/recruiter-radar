@@ -1,7 +1,15 @@
 import { randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 
-import { isOpportunityEngineV1Enabled } from '@/lib/opportunities/config'
+import {
+  isOpportunityEngineV1Enabled,
+  isOpportunityOutcomesEnabled,
+} from '@/lib/opportunities/config'
+import {
+  OutcomeValidationError,
+  type DismissedReasonCode,
+  validateOutcomeInput,
+} from '@/lib/opportunities/outcome-domain'
 import { toPublicOpportunity } from '@/lib/opportunities/api-projection'
 import {
   applyOpportunityAction,
@@ -55,6 +63,31 @@ export async function POST(
     ? body.snoozeDays
     : undefined
   const note = typeof body.note === 'string' ? body.note : null
+  const occurredAt = new Date().toISOString()
+
+  let outcomeInput: ReturnType<typeof validateOutcomeInput> | null = null
+  if (isOpportunityOutcomesEnabled()) {
+    try {
+      outcomeInput = validateOutcomeInput({
+        eventType: body.action,
+        occurredAt,
+        reasonCode: body.reasonCode ?? null,
+        reasonNote: note,
+        channel: body.channel ?? null,
+        contactPathType: body.contactPathType ?? null,
+        contactReference: body.contactReference ?? null,
+        valueMinor: null,
+        currency: null,
+        metadata: { source: 'opportunity_action' },
+        idempotencyKey: actionKey,
+      })
+    } catch (error) {
+      if (error instanceof OutcomeValidationError) {
+        return NextResponse.json({ error: error.code }, { status: 400 })
+      }
+      throw error
+    }
+  }
 
   try {
     const result = await applyOpportunityAction({
@@ -64,6 +97,13 @@ export async function POST(
       actionKey,
       snoozeDays,
       note,
+      reasonCode: body.action === 'dismissed'
+        ? outcomeInput?.reasonCode as DismissedReasonCode | null
+        : null,
+      channel: outcomeInput?.channel ?? null,
+      contactPathType: outcomeInput?.contactPathType ?? null,
+      contactReference: outcomeInput?.contactReference ?? null,
+      occurredAt,
     })
     if (!result) {
       return NextResponse.json({ error: 'not_found' }, { status: 404 })
@@ -90,6 +130,9 @@ export async function POST(
         { error: error.code },
         { status: 409 },
       )
+    }
+    if (error instanceof OutcomeValidationError) {
+      return NextResponse.json({ error: error.code }, { status: 400 })
     }
     logError('opportunity.api.action_failed', error, {
       ownerId,
