@@ -21,5 +21,6 @@ declare module "pg" {
       values?: readonly unknown[]
     ): Promise<QueryResult<Row>>;
     connect(): Promise<PoolClient>;
+    end(): Promise<void>;
   }
 }

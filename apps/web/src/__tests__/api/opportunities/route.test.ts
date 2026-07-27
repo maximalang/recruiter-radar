@@ -35,7 +35,7 @@ const mockedList = jest.mocked(listOpportunities)
 const mockedDetail = jest.mocked(getOpportunityById)
 const mockedAction = jest.mocked(applyOpportunityAction)
 
-function request(path: string, init?: RequestInit) {
+function request(path: string, init?: ConstructorParameters<typeof NextRequest>[1]) {
   return new NextRequest(`https://recruiter-radar.ru${path}`, init)
 }
 

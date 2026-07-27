@@ -14,6 +14,8 @@ function episode(
     organizationId: '10',
     episodeType: 'vacancy_spike',
     episodeKey: 'vacancy_spike:all:2026-07-20',
+    episodeIdentity: '10:vacancy_spike:all',
+    episodeGeneration: 1,
     title: 'Компания ускорила найм',
     summary: 'За последние 14 дней опубликовано 8 вакансий.',
     startedAt: '2026-07-15T12:00:00.000Z',
@@ -47,8 +49,11 @@ function input(overrides: Partial<OpportunityScoringInput> = {}): OpportunitySco
       fit: 0.82,
       reachability: 0.74,
       reasons: {
-        fit: [{ key: 'fit.role.match' }],
-        reachability: [{ key: 'reachability.career-page' }],
+        fit: [{ key: 'fit.role.match', component: 'fit' }],
+        reachability: [{
+          key: 'reachability.career-page',
+          component: 'reachability',
+        }],
       },
     },
     confidenceGate: 'A',
