@@ -91,6 +91,42 @@ const authoritativeStateRepairRollbackPath = resolve(
   'migrations',
   '20260727140000_repair_opportunity_authoritative_state.down.sql',
 )
+const outcomeLedgerMigrationPath = resolve(
+  process.cwd(),
+  '..',
+  '..',
+  'packages',
+  'db',
+  'migrations',
+  '20260727150000_add_opportunity_outcome_ledger.sql',
+)
+const outcomeLedgerRollbackPath = resolve(
+  process.cwd(),
+  '..',
+  '..',
+  'packages',
+  'db',
+  'migrations',
+  '20260727150000_add_opportunity_outcome_ledger.down.sql',
+)
+const outcomeProjectionMigrationPath = resolve(
+  process.cwd(),
+  '..',
+  '..',
+  'packages',
+  'db',
+  'migrations',
+  '20260727151000_add_opportunity_outcome_projection.sql',
+)
+const outcomeProjectionRollbackPath = resolve(
+  process.cwd(),
+  '..',
+  '..',
+  'packages',
+  'db',
+  'migrations',
+  '20260727151000_add_opportunity_outcome_projection.down.sql',
+)
 
 describe('opportunity engine migration contract', () => {
   const migration = readFileSync(migrationPath, 'utf8')
@@ -286,5 +322,72 @@ describe('opportunity engine hardening migrations', () => {
     expect(authoritativeStateRepairRollback).toContain(
       'only repairs customer state from the append-only action log',
     )
+  })
+})
+
+describe('opportunity outcome migrations', () => {
+  const ledger = readFileSync(outcomeLedgerMigrationPath, 'utf8')
+    .replace(/\s+/g, ' ')
+  const ledgerRollback = readFileSync(outcomeLedgerRollbackPath, 'utf8')
+    .replace(/\s+/g, ' ')
+  const projection = readFileSync(outcomeProjectionMigrationPath, 'utf8')
+    .replace(/\s+/g, ' ')
+  const projectionRollback = readFileSync(
+    outcomeProjectionRollbackPath,
+    'utf8',
+  ).replace(/\s+/g, ' ')
+
+  it('binds every ledger row to the complete tenant opportunity context', () => {
+    expect(ledger).toContain('CREATE TABLE opportunity_outcome_events')
+    expect(ledger).toContain(
+      'FOREIGN KEY ( owner_id, client_profile_id, opportunity_id, hiring_episode_id, organization_id )',
+    )
+    expect(ledger).toContain(
+      'REFERENCES opportunities ( owner_id, client_profile_id, id, hiring_episode_id, organization_id )',
+    )
+    expect(ledger).toContain('ON DELETE RESTRICT')
+  })
+
+  it('enforces owner-scoped idempotency and interaction deduplication', () => {
+    expect(ledger).toContain(
+      'UNIQUE (owner_id, idempotency_key)',
+    )
+    expect(ledger).toContain('opportunity_outcome_events_interaction_uidx')
+    expect(ledger).toContain("event_type IN ('shown', 'opened')")
+    expect(ledger).toContain('opportunity_outcome_events_external_uidx')
+  })
+
+  it('makes the outcome ledger append-only at the database boundary', () => {
+    expect(ledger).toContain(
+      'BEFORE UPDATE OR DELETE ON opportunity_outcome_events',
+    )
+    expect(ledger).toContain(
+      "RAISE EXCEPTION 'opportunity_outcome_events is append-only'",
+    )
+    expect(ledgerRollback).toContain(
+      'DROP FUNCTION IF EXISTS reject_opportunity_outcome_event_mutation()',
+    )
+  })
+
+  it('adds the rebuildable current-state projection with a last-event link', () => {
+    expect(projection).toContain('CREATE TABLE opportunity_outcome_state')
+    expect(projection).toContain('PRIMARY KEY (owner_id, opportunity_id)')
+    expect(projection).toContain(
+      'FOREIGN KEY (last_event_id, owner_id)',
+    )
+    expect(projection).toContain(
+      'REFERENCES opportunity_outcome_events(id, owner_id)',
+    )
+    expect(projectionRollback).toContain(
+      'DROP TABLE IF EXISTS opportunity_outcome_state',
+    )
+  })
+
+  it('stores confirmed deal values as constrained minor units', () => {
+    expect(ledger).toContain('value_minor BIGINT')
+    expect(ledger).toContain("event_type = 'won'")
+    expect(ledger).toContain('value_minor >= 0')
+    expect(ledger).toContain("currency = 'RUB'")
+    expect(projection).toContain('deal_value_minor BIGINT')
   })
 })
