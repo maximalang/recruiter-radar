@@ -127,6 +127,14 @@ const outcomeProjectionRollbackPath = resolve(
   'migrations',
   '20260727151000_add_opportunity_outcome_projection.down.sql',
 )
+const opportunityPublicReferenceMigrationPath = resolve(
+  process.cwd(), '..', '..', 'packages', 'db', 'migrations',
+  '20260727152000_add_opportunity_public_reference.sql',
+)
+const opportunityPublicReferenceRollbackPath = resolve(
+  process.cwd(), '..', '..', 'packages', 'db', 'migrations',
+  '20260727152000_add_opportunity_public_reference.down.sql',
+)
 
 describe('opportunity engine migration contract', () => {
   const migration = readFileSync(migrationPath, 'utf8')
@@ -336,6 +344,14 @@ describe('opportunity outcome migrations', () => {
     outcomeProjectionRollbackPath,
     'utf8',
   ).replace(/\s+/g, ' ')
+  const publicReference = readFileSync(
+    opportunityPublicReferenceMigrationPath,
+    'utf8',
+  ).replace(/\s+/g, ' ')
+  const publicReferenceRollback = readFileSync(
+    opportunityPublicReferenceRollbackPath,
+    'utf8',
+  ).replace(/\s+/g, ' ')
 
   it('binds every ledger row to the complete tenant opportunity context', () => {
     expect(ledger).toContain('CREATE TABLE opportunity_outcome_events')
@@ -389,5 +405,15 @@ describe('opportunity outcome migrations', () => {
     expect(ledger).toContain('value_minor >= 0')
     expect(ledger).toContain("currency = 'RUB'")
     expect(projection).toContain('deal_value_minor BIGINT')
+  })
+
+  it('adds an unguessable public reference for signed external callbacks', () => {
+    expect(publicReference).toContain(
+      'ADD COLUMN public_reference UUID NOT NULL DEFAULT gen_random_uuid()',
+    )
+    expect(publicReference).toContain('opportunities_public_reference_uidx')
+    expect(publicReferenceRollback).toContain(
+      'ALTER TABLE opportunities DROP COLUMN IF EXISTS public_reference',
+    )
   })
 })
