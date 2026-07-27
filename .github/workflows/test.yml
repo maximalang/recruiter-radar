@@ -82,11 +82,11 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
         run: npm run db:validate
-      - name: Verify Opportunity Engine production runtime
+      - name: Verify Opportunity Engine and Outcome Ledger production runtime
         env:
           DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
         run: npm run test:opportunity-engine:db
-      - name: Verify Opportunity Engine down migrations on a clean database
+      - name: Verify Opportunity Engine and Outcome Ledger down migrations
         env:
           DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
         run: npm run test:opportunity-engine:down
