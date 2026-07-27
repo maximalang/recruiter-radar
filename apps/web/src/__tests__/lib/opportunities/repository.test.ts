@@ -17,18 +17,25 @@ jest.mock('@/lib/db-pool', () => ({
 }))
 
 type QueryCall = { sql: string; params: readonly unknown[] | undefined }
+type OpportunityDb = NonNullable<Parameters<typeof listOpportunities>[1]>
+type OpportunityClient = NonNullable<Awaited<ReturnType<typeof getClient>>>
+
+function opportunityClient(query: jest.Mock, release: jest.Mock): OpportunityClient {
+  return { query, release } as unknown as OpportunityClient
+}
 
 function createDb(rowsByCall: unknown[][]) {
   const calls: QueryCall[] = []
   return {
     calls,
-    db: {
-      query: jest.fn(async (sql: string, params?: readonly unknown[]) => {
+    db: (() => {
+      const query = jest.fn(async (sql: string, params?: readonly unknown[]) => {
         calls.push({ sql, params })
         const rows = rowsByCall[calls.length - 1] ?? []
         return { rowCount: rows.length, rows }
-      }),
-    },
+      })
+      return { query } as { query: typeof query } & OpportunityDb
+    })(),
   }
 }
 
@@ -178,13 +185,20 @@ describe('opportunity repository tenant scope', () => {
 
   it('rejects a cross-tenant action before any mutation query', async () => {
     const query = jest.fn(async (sql: string) => {
+      if (
+        sql.includes('FROM opportunities') &&
+        sql.includes('superseded_at IS NULL') &&
+        !sql.includes('WHERE o.id = $1')
+      ) {
+        return { rowCount: 1, rows: [{ id: '10' }] }
+      }
       if (sql.includes('FROM opportunities') && sql.includes('FOR UPDATE')) {
         return { rowCount: 0, rows: [] }
       }
       return { rowCount: 0, rows: [] }
     })
     const release = jest.fn()
-    jest.mocked(getClient).mockResolvedValue({ query, release })
+    jest.mocked(getClient).mockResolvedValue(opportunityClient(query, release))
 
     const result = await applyOpportunityAction({
       ownerId: '7',
@@ -258,7 +272,7 @@ describe('opportunity repository tenant scope', () => {
       return { rowCount: 0, rows: [] }
     })
     const release = jest.fn()
-    jest.mocked(getClient).mockResolvedValue({ query, release })
+    jest.mocked(getClient).mockResolvedValue(opportunityClient(query, release))
 
     const result = await applyOpportunityAction({
       ownerId: '7',
@@ -279,7 +293,60 @@ describe('opportunity repository tenant scope', () => {
       String(sql).includes('INSERT INTO client_digest_org_state'),
     )).toBe(false)
     expect(query.mock.calls.some(([sql]) => String(sql) === 'COMMIT')).toBe(true)
+    const currentReadIndex = query.mock.calls.findIndex(([sql]) =>
+      String(sql).includes('superseded_at IS NULL'))
+    const commitIndex = query.mock.calls.findIndex(([sql]) => String(sql) === 'COMMIT')
+    expect(currentReadIndex).toBeGreaterThan(-1)
+    expect(currentReadIndex).toBeLessThan(commitIndex)
     expect(release).toHaveBeenCalledTimes(1)
+  })
+
+  it('contacted episode does not create legacy organization suppression', async () => {
+    const query = jest.fn(async (sql: string) => {
+      if (sql.includes('FROM opportunities') && sql.includes('FOR UPDATE')) {
+        return {
+          rowCount: 1,
+          rows: [{
+            id: '10',
+            clientProfileId: '8',
+            organizationId: '9',
+            hiringEpisodeId: '11',
+            status: 'accepted',
+            supersededAt: null,
+          }],
+        }
+      }
+      if (sql.includes('SELECT action_fingerprint')) {
+        return { rowCount: 0, rows: [] }
+      }
+      if (sql.includes('INSERT INTO opportunity_actions')) {
+        return { rowCount: 1, rows: [] }
+      }
+      if (sql.includes('client_digest_org_state')) {
+        return { rowCount: 1, rows: [{ feedbackStatus: 'contacted' }] }
+      }
+      if (sql.includes('WHERE o.id = $1')) {
+        return {
+          rowCount: 1,
+          rows: [{ id: '10', ownerId: '7', status: 'contacted', evidenceCount: 0 }],
+        }
+      }
+      return { rowCount: 0, rows: [] }
+    })
+    const release = jest.fn()
+    jest.mocked(getClient).mockResolvedValue(opportunityClient(query, release))
+
+    const result = await applyOpportunityAction({
+      ownerId: '7',
+      opportunityId: '10',
+      action: 'contacted',
+      actionKey: 'contacted:request-1',
+    })
+
+    expect(result?.opportunity.status).toBe('contacted')
+    expect(query.mock.calls.some(([sql]) =>
+      String(sql).includes('client_digest_org_state'),
+    )).toBe(false)
   })
 
   it('rejects reuse of an idempotency key with another action payload', async () => {
@@ -305,7 +372,7 @@ describe('opportunity repository tenant scope', () => {
       return { rowCount: 0, rows: [] }
     })
     const release = jest.fn()
-    jest.mocked(getClient).mockResolvedValue({ query, release })
+    jest.mocked(getClient).mockResolvedValue(opportunityClient(query, release))
 
     await expect(applyOpportunityAction({
       ownerId: '7',
@@ -341,7 +408,7 @@ describe('opportunity repository tenant scope', () => {
       return { rowCount: 0, rows: [] }
     })
     const release = jest.fn()
-    jest.mocked(getClient).mockResolvedValue({ query, release })
+    jest.mocked(getClient).mockResolvedValue(opportunityClient(query, release))
 
     await expect(applyOpportunityAction({
       ownerId: '7',
@@ -365,6 +432,13 @@ describe('opportunity repository tenant scope', () => {
       }))
       .digest('hex')
     const query = jest.fn(async (sql: string) => {
+      if (
+        sql.includes('FROM opportunities') &&
+        sql.includes('superseded_at IS NULL') &&
+        !sql.includes('WHERE o.id = $1')
+      ) {
+        return { rowCount: 1, rows: [{ id: '10' }] }
+      }
       if (sql.includes('FROM opportunities') && sql.includes('FOR UPDATE')) {
         return {
           rowCount: 1,
@@ -397,7 +471,7 @@ describe('opportunity repository tenant scope', () => {
       return { rowCount: 0, rows: [] }
     })
     const release = jest.fn()
-    jest.mocked(getClient).mockResolvedValue({ query, release })
+    jest.mocked(getClient).mockResolvedValue(opportunityClient(query, release))
 
     const result = await applyOpportunityAction({
       ownerId: '7',
@@ -407,7 +481,7 @@ describe('opportunity repository tenant scope', () => {
     })
 
     expect(result?.idempotent).toBe(true)
-    expect(result?.opportunity.status).toBe('accepted')
+    expect(result?.opportunity.status).toBe('contacted')
     expect(query.mock.calls.some(([sql]) =>
       String(sql).startsWith('UPDATE opportunities'),
     )).toBe(false)
@@ -415,7 +489,78 @@ describe('opportunity repository tenant scope', () => {
       String(sql).includes('INSERT INTO client_digest_org_state'),
     )).toBe(false)
     expect(query.mock.calls.some(([sql]) => String(sql) === 'COMMIT')).toBe(true)
+    const currentRead = query.mock.calls.find(([sql]) =>
+      String(sql).includes('superseded_at IS NULL'))
+    expect(String(currentRead?.[0])).not.toContain('FOR UPDATE')
     expect(release).toHaveBeenCalledTimes(1)
+  })
+
+  it('superseded action replay returns the current opportunity status', async () => {
+    const actionFingerprint = createHash('sha256')
+      .update(JSON.stringify({
+        action: 'accepted',
+        note: null,
+        snoozeDays: null,
+      }))
+      .digest('hex')
+    const query = jest.fn(async (sql: string, params?: readonly unknown[]) => {
+      if (
+        sql.includes('FROM opportunities') &&
+        sql.includes('superseded_at IS NULL') &&
+        !sql.includes('WHERE o.id = $1')
+      ) {
+        return { rowCount: 1, rows: [{ id: '12' }] }
+      }
+      if (sql.includes('FROM opportunities') && sql.includes('FOR UPDATE')) {
+        return {
+          rowCount: 1,
+          rows: [{
+            id: '10',
+            clientProfileId: '8',
+            organizationId: '9',
+            hiringEpisodeId: '11',
+            status: 'accepted',
+            supersededAt: '2026-07-26T10:00:00.000Z',
+          }],
+        }
+      }
+      if (sql.includes('SELECT action_fingerprint')) {
+        return {
+          rowCount: 1,
+          rows: [{ actionFingerprint, newStatus: 'accepted' }],
+        }
+      }
+      if (sql.includes('WHERE o.id = $1')) {
+        if (String(params?.[0]) === '10') return { rowCount: 0, rows: [] }
+        return {
+          rowCount: 1,
+          rows: [{ id: '12', ownerId: '7', status: 'contacted', evidenceCount: 0 }],
+        }
+      }
+      return { rowCount: 0, rows: [] }
+    })
+    const release = jest.fn()
+    jest.mocked(getClient).mockResolvedValue(opportunityClient(query, release))
+
+    const result = await applyOpportunityAction({
+      ownerId: '7',
+      opportunityId: '10',
+      action: 'accepted',
+      actionKey: 'accepted:request-1',
+    })
+
+    expect(result?.idempotent).toBe(true)
+    expect(result?.opportunity.id).toBe('12')
+    expect(result?.opportunity.status).toBe('contacted')
+    expect(query.mock.calls.some(([sql]) =>
+      String(sql).startsWith('UPDATE opportunities'),
+    )).toBe(false)
+    const currentReadIndex = query.mock.calls.findIndex(([sql]) =>
+      String(sql).includes('superseded_at IS NULL'))
+    const commitIndex = query.mock.calls.findIndex(([sql]) => String(sql) === 'COMMIT')
+    expect(currentReadIndex).toBeGreaterThan(-1)
+    expect(currentReadIndex).toBeLessThan(commitIndex)
+    expect(String(query.mock.calls[currentReadIndex]?.[0])).not.toContain('FOR UPDATE')
   })
 
   it('rejects a new action after its opportunity row was superseded', async () => {
@@ -439,7 +584,7 @@ describe('opportunity repository tenant scope', () => {
       return { rowCount: 0, rows: [] }
     })
     const release = jest.fn()
-    jest.mocked(getClient).mockResolvedValue({ query, release })
+    jest.mocked(getClient).mockResolvedValue(opportunityClient(query, release))
 
     await expect(applyOpportunityAction({
       ownerId: '7',

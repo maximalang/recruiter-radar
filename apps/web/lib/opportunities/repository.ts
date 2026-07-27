@@ -2,7 +2,6 @@ import { createHash } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 
 import { getClient, getPool } from '@/lib/db-pool'
-import { updateDigestOrgStateFeedback } from '@/lib/digestFeedback'
 import { logEvent } from '@/lib/runtime'
 import { canonicalizeOpportunityUrl } from './canonical-hash'
 import type { HiringEpisodeType } from './hiring-episode-detection'
@@ -338,39 +337,29 @@ export async function applyOpportunityAction(input: {
       if (existingAction.rows[0].actionFingerprint !== actionFingerprint) {
         throw new OpportunityActionConflictError()
       }
-      await client.query('COMMIT')
-      let opportunity = await getOpportunityById(
-        { ownerId: input.ownerId, opportunityId: input.opportunityId },
-        client,
+      const current = await client.query<{ id: string }>(
+        `SELECT id::TEXT AS id
+         FROM opportunities
+         WHERE client_profile_id = $1
+            AND hiring_episode_id = $2
+            AND owner_id = $3
+            AND superseded_at IS NULL
+          LIMIT 1`,
+        [row.clientProfileId, row.hiringEpisodeId, String(input.ownerId)],
       )
-      if (!opportunity && row.supersededAt) {
-        const current = await client.query<{ id: string }>(
-          `SELECT id::TEXT AS id
-           FROM opportunities
-           WHERE client_profile_id = $1
-             AND hiring_episode_id = $2
-             AND owner_id = $3
-             AND superseded_at IS NULL
-           LIMIT 1`,
-          [row.clientProfileId, row.hiringEpisodeId, String(input.ownerId)],
-        )
-        if (current.rows[0]) {
-          opportunity = await getOpportunityById(
+      const opportunity = current.rows[0]
+        ? await getOpportunityById(
             { ownerId: input.ownerId, opportunityId: current.rows[0].id },
             client,
           )
-        }
-      }
+        : null
+      await client.query('COMMIT')
       if (!opportunity) return null
-      opportunity = {
-        ...opportunity,
-        status: existingAction.rows[0].newStatus ?? input.action,
-      }
-      logEvent('opportunity.action', {
+      logEvent('opportunity.replay_served', {
         ownerId: String(input.ownerId),
         opportunityId: String(input.opportunityId),
         action: input.action,
-        idempotent: true,
+        currentOpportunityId: opportunity.id,
       })
       return { opportunity, idempotent: true }
     }
@@ -468,19 +457,6 @@ export async function applyOpportunityAction(input: {
         snoozeDays,
       ],
     )
-    if (input.action === 'contacted') {
-      await updateDigestOrgStateFeedback(
-        {
-          clientProfileId: row.clientProfileId,
-          orgId: row.organizationId,
-          action: 'contacted',
-          note,
-          snoozeDays,
-        },
-        client,
-      )
-    }
-
     await client.query('COMMIT')
     const opportunity = await getOpportunityById(
       { ownerId: input.ownerId, opportunityId: input.opportunityId },
@@ -494,6 +470,13 @@ export async function applyOpportunityAction(input: {
       action: input.action,
       idempotent: false,
     })
+    if (input.action === 'contacted') {
+      logEvent('opportunity.contact_recorded', {
+        ownerId: String(input.ownerId),
+        opportunityId: String(input.opportunityId),
+        hiringEpisodeId: row.hiringEpisodeId,
+      })
+    }
     return { opportunity, idempotent: false }
   } catch (error) {
     await client.query('ROLLBACK').catch(() => undefined)

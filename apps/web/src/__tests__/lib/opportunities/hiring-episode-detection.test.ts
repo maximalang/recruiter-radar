@@ -240,6 +240,40 @@ describe('HiringEpisodeDetectionService', () => {
     expect(cluster?.vacancyCount).toBe(3)
   })
 
+  it('transitive vacancy bridge cannot merge conflicting provider ids', () => {
+    const episodes = service.detectOrganization({
+      organizationId: '10',
+      now: NOW,
+      signals: [
+        signal('hh-1001', 7, {
+          title: 'Java developer',
+          source: 'hh',
+          externalVacancyId: '1001',
+        }),
+        signal('career-java', 6, {
+          title: 'Java developer',
+          source: 'career-pages',
+          externalVacancyId: null,
+        }),
+        signal('hh-1002', 5, {
+          title: 'Java developer',
+          source: 'hh',
+          externalVacancyId: '1002',
+        }),
+        signal('node', 3, { title: 'Node.js developer' }),
+        signal('python', 1, { title: 'Python developer' }),
+      ],
+    })
+
+    const cluster = episodes.find((episode) => episode.episodeType === 'role_cluster')
+    expect(cluster?.vacancyCount).toBe(4)
+    expect(cluster?.signalIds).toEqual(expect.arrayContaining([
+      'hh-1001',
+      'career-java',
+      'hh-1002',
+    ]))
+  })
+
   it('detects a new region only relative to real organization history', () => {
     const withHistory = service.detectOrganization({
       organizationId: '10',

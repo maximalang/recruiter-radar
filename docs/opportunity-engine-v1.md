@@ -35,7 +35,9 @@ OPPORTUNITY_ENGINE_V1_ENABLED=false
   эпизода и поколения;
 - `20260727121000_add_opportunity_episode_state.sql` — клиентское состояние эпизода;
 - `20260727122000_add_opportunity_supersession.sql` — provenance и supersession
-  пересчитанных opportunities.
+  пересчитанных opportunities;
+- `20260727130000_fix_opportunity_hardening_edge_cases.sql` — восстановление
+  snooze deadline и constraint, запрещающий `snoozed` без `snoozed_until`.
 
 Для каждой migration рядом находится `.down.sql`.
 
@@ -88,7 +90,8 @@ Vacancy dedupe использует, по убыванию надёжности:
 2. канонический URL без tracking-параметров;
 3. fallback `organization + normalized title + normalized region`.
 
-Разные external id одного provider не склеиваются. Между разными providers
+Разные external id одного provider не склеиваются, в том числе через транзитивную
+цепочку публикаций без id. Между разными providers
 публикации могут объединиться по canonical URL или fallback fingerprint.
 Несколько публикаций одной
 канонической вакансии увеличивают `publicationCount`, но не `vacancy_count`.
@@ -141,8 +144,16 @@ confidence — в `review`.
 - `input_hash`;
 - `scoring_version`.
 
-`input_hash` включает содержимое episode/signals/evidence, организацию, digest
-payload и профиль, а не только идентификаторы строк. Одинаковый `input_hash` не
+`input_hash` включает семантическое содержимое episode/signals/evidence, организацию,
+digest payload и профиль, но не `digest_candidate_id` и другие database row ids.
+Из digest payload исключаются внутренние `corroborated_org_ids` и fallback-ключи
+`org:<database-id>`; доменные и провайдерские corroboration keys остаются семантическими.
+Detector-only `canonicalVacancyFingerprints` также не входят в hash: fallback этих
+идентификаторов содержит database organization id, а сами вакансии уже представлены
+семантическим содержимым signals.
+Ключи объектов канонически сортируются; только set-like массивы (source families,
+поля профиля и наборы signals/evidence) сортируются и dedupe-ятся в build job.
+Порядок семантических массивов, включая digest reasons, сохраняется. Одинаковый `input_hash` не
 вызывает запись. Повторная сборка той же scoring version обновляет текущую
 строку. Новая scoring version атомарно помечает предыдущую строку
 `superseded_at` и создаёт новую. Возврат canary на ранее использованную scoring
@@ -190,14 +201,17 @@ API не возвращает `owner_id`, raw metadata, внутренние has
 | `contacted`, `dismissed`, `expired` | нет |
 
 Запрещённый переход возвращает `409` и не создаёт `opportunity_actions`.
-Идемпотентный replay с тем же key и payload возвращает исходный результат.
+Идемпотентный replay с тем же key и payload не меняет данные и возвращает фактическую
+current opportunity, даже если исходная строка уже superseded или её статус изменился.
 Повторное использование key с другим payload возвращает `409`.
 
 `accepted` означает «клиент принял opportunity в работу» и записывается только в
-`client_episode_state`. Оно не suppress-ит всю организацию. Legacy
-`client_digest_org_state` обновляется только на `contacted`, когда контакт
-действительно состоялся. Поэтому принятие одного эпизода не скрывает будущий
-эпизод той же компании.
+`client_episode_state`. `contacted` также остаётся episode-scoped и не обновляет legacy
+`client_digest_org_state`. Поэтому завершение одного эпизода не скрывает будущий
+эпизод той же компании. При supersession или rollback scoring version статус `snoozed`
+и точный `client_episode_state.suppressed_until` переносятся в current opportunity.
+Если deadline уже истёк, build job атомарно удаляет episode state и возвращает current
+opportunity к рассчитанному статусу даже при неизменном `input_hash`.
 
 ## Jobs и конкурентность
 
@@ -242,15 +256,22 @@ npm.cmd run web:build
 npm.cmd run db:validate
 ```
 
-Реальная PostgreSQL-проверка запускается только в изолированной БД:
+Реальная PostgreSQL-проверка принимает URL административной БД и сама создаёт и
+удаляет изолированную временную БД:
 
 ```powershell
-$env:DATABASE_URL='postgresql://.../recruiter_radar_opportunity_verify'
-npm.cmd run db:migrate
+$env:DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:5432/postgres'
 npm.cmd run test:opportunity-engine:db
+npm.cmd run test:opportunity-engine:down
 ```
 
-Verifier работает внутри rollback-транзакции и проверяет:
+DB runner применяет всю migration chain к свежей схеме, запускает SQL verifier в
+rollback-транзакции и production TypeScript runtime test через реальные
+`detectHiringEpisodesJob`, `buildOpportunitiesJob`, `applyOpportunityAction` и
+`expireOpportunitiesJob`. Down runner применяет пять down migrations в обратном
+порядке и проверяет удаление runtime tables.
+
+Проверки покрывают:
 
 - актуальную форму схемы;
 - продолжение эпизода и новое поколение после неактивности;
@@ -267,6 +288,13 @@ Verifier работает внутри rollback-транзакции и пров
 - атомарное пробуждение snooze и последующий expire lifecycle;
 - взаимное исключение cron advisory lock;
 - `EXPLAIN` build query и отсутствие `CROSS JOIN`.
+
+Ключевые диагностические события: `canonical_vacancy.merge_rejected`,
+`hiring_episode.bounds_preserved`, `opportunity.snooze_preserved`,
+`opportunity.build.semantic_unchanged`, `opportunity.snooze_elapsed_during_build`,
+`opportunity.replay_served` и
+`opportunity.contact_recorded`. Они содержат только ids, версии и reason codes;
+raw URL и payload в них не пишутся.
 
 Для ручной оценки плана используйте тот же `EXPLAIN (FORMAT JSON)` из verifier.
 В плане не должно быть полного произведения `client_profiles × hiring_episodes`;

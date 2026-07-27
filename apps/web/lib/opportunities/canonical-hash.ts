@@ -42,10 +42,7 @@ function canonicalize(value: unknown): unknown {
   }
   if (value instanceof Date) return value.toISOString()
   if (Array.isArray(value)) {
-    return value
-      .map(canonicalize)
-      .sort((left, right) =>
-        JSON.stringify(left).localeCompare(JSON.stringify(right)))
+    return value.map(canonicalize)
   }
   if (value && typeof value === 'object') {
     return Object.fromEntries(

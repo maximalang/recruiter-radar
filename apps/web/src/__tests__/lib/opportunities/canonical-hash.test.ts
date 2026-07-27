@@ -5,18 +5,26 @@ import {
 } from '@/lib/opportunities/canonical-hash'
 
 describe('canonical opportunity input hashing', () => {
-  it('is stable for reordered object keys and set-like arrays', () => {
+  it('is stable for reordered object keys', () => {
     const first = {
       profile: { specialization: 'IT', regions: ['Москва', 'Казань'] },
       evidence: ['12', '11'],
     }
     const second = {
-      evidence: ['11', '12'],
-      profile: { regions: ['Казань', 'Москва'], specialization: 'IT' },
+      evidence: ['12', '11'],
+      profile: { regions: ['Москва', 'Казань'], specialization: 'IT' },
     }
 
     expect(canonicalJsonStringify(second)).toBe(canonicalJsonStringify(first))
     expect(hashCanonicalJson(second)).toBe(hashCanonicalJson(first))
+  })
+
+  it('preserves the order of semantically ordered arrays', () => {
+    const first = { steps: ['contact', 'follow-up'] }
+    const second = { steps: ['follow-up', 'contact'] }
+
+    expect(canonicalJsonStringify(second)).not.toBe(canonicalJsonStringify(first))
+    expect(hashCanonicalJson(second)).not.toBe(hashCanonicalJson(first))
   })
 
   it('canonicalizes tracking parameters and trailing slashes consistently', () => {

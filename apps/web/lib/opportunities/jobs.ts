@@ -535,13 +535,17 @@ async function runBuildOpportunitiesJob(
         scoringVersion,
       )
 
-      if (row.currentInputHash === provenance.inputHash) {
+      if (
+        stats.dryRun &&
+        !persistPreview &&
+        row.currentInputHash === provenance.inputHash
+      ) {
         stats.skipped += 1
         stats.skippedUnchanged += 1
         if (!stats.dryRun || persistPreview) {
           await clearBuildFailure(row, scoringVersion, db)
         }
-        logEvent('opportunity.build.skipped_unchanged', {
+        logEvent('opportunity.build.semantic_unchanged', {
           hiringEpisodeId: row.hiringEpisodeId,
           clientProfileId: row.clientProfileId,
           inputHashPrefix: provenance.inputHash.slice(0, 12),
@@ -569,6 +573,7 @@ async function runBuildOpportunitiesJob(
         fiur,
         provenance,
         validUntil,
+        now,
         db,
         manageTransaction: !persistPreview,
       })
@@ -888,12 +893,14 @@ async function upsertEpisode(
   const latestResult = await db.query<{
     id: string
     status: 'active' | 'closed'
+    startedAt: string
     lastSeenAt: string
     episodeGeneration: number
   }>(
     `SELECT
        id::TEXT AS id,
        status,
+       started_at::TEXT AS "startedAt",
        last_seen_at::TEXT AS "lastSeenAt",
        episode_generation AS "episodeGeneration"
      FROM hiring_episodes
@@ -935,10 +942,11 @@ async function upsertEpisode(
     ? await db.query<{ id: string; inserted: boolean }>(
       `UPDATE hiring_episodes
        SET
-         title = $2,
-         summary = $3,
-         started_at = $4::timestamptz,
-         last_seen_at = $5::timestamptz,
+          title = $2,
+          summary = $3,
+          started_at = LEAST(hiring_episodes.started_at, $4::timestamptz),
+          last_seen_at = GREATEST(hiring_episodes.last_seen_at, $5::timestamptz),
+          closed_at = NULL,
          signal_count = $6,
          vacancy_count = $7,
          strength_score = $8,
@@ -1008,6 +1016,21 @@ async function upsertEpisode(
     )
   const episode = result.rows[0]
   if (!episode) throw new Error('Hiring episode upsert returned no row.')
+  if (
+    continued &&
+    latest &&
+    (
+      Date.parse(candidate.startedAt) > Date.parse(latest.startedAt) ||
+      Date.parse(candidate.lastSeenAt) < Date.parse(latest.lastSeenAt)
+    )
+  ) {
+    logEvent('hiring_episode.bounds_preserved', {
+      hiringEpisodeId: episode.id,
+      organizationId: candidate.organizationId,
+      startedAtPreserved: Date.parse(candidate.startedAt) > Date.parse(latest.startedAt),
+      lastSeenAtPreserved: Date.parse(candidate.lastSeenAt) < Date.parse(latest.lastSeenAt),
+    })
+  }
 
   await db.query(
     `DELETE FROM hiring_episode_evidence
@@ -1212,6 +1235,7 @@ async function persistOpportunityBuild(input: {
   fiur: ReturnType<typeof computeFiurForOpportunity>
   provenance: OpportunityInputProvenance
   validUntil: string
+  now: Date
   db: OpportunityJobDb
   manageTransaction: boolean
 }): Promise<{
@@ -1244,10 +1268,14 @@ async function persistOpportunityBuild(input: {
     )
     const current = currentResult.rows[0]
 
-    const episodeStateResult = await db.query<{
+    type LockedEpisodeState = {
       status: 'accepted' | 'dismissed' | 'snoozed' | 'contacted'
-    }>(
-      `SELECT status
+      suppressedUntil: string | null
+    }
+    const episodeStateResult = await db.query<LockedEpisodeState>(
+      `SELECT
+         status,
+         suppressed_until::TEXT AS "suppressedUntil"
        FROM client_episode_state
        WHERE client_profile_id = $1
          AND hiring_episode_id = $2
@@ -1255,12 +1283,37 @@ async function persistOpportunityBuild(input: {
        FOR UPDATE`,
       [row.clientProfileId, row.hiringEpisodeId],
     )
-    const lockedEpisodeStatus = episodeStateResult.rows[0]?.status ?? null
+    let lockedEpisodeState: LockedEpisodeState | null =
+      episodeStateResult.rows[0] ?? null
+    let elapsedSnoozeCleared = false
+    if (lockedEpisodeState?.status === 'snoozed') {
+      const deadline = Date.parse(lockedEpisodeState.suppressedUntil ?? '')
+      if (!Number.isFinite(deadline)) {
+        throw new Error('Snoozed episode state has an invalid suppressed_until.')
+      }
+      if (deadline <= input.now.getTime()) {
+        await db.query(
+          `DELETE FROM client_episode_state
+           WHERE client_profile_id = $1
+             AND hiring_episode_id = $2
+             AND status = 'snoozed'
+             AND suppressed_until <= $3::timestamptz`,
+          [row.clientProfileId, row.hiringEpisodeId, input.now.toISOString()],
+        )
+        logEvent('opportunity.snooze_elapsed_during_build', {
+          hiringEpisodeId: row.hiringEpisodeId,
+          clientProfileId: row.clientProfileId,
+        })
+        lockedEpisodeState = null
+        elapsedSnoozeCleared = true
+      }
+    }
+    const lockedEpisodeStatus = lockedEpisodeState?.status ?? null
 
-    if (current?.inputHash === provenance.inputHash) {
+    if (current?.inputHash === provenance.inputHash && !elapsedSnoozeCleared) {
       await clearBuildFailure(row, provenance.scoringVersion, db)
       if (input.manageTransaction) await db.query('COMMIT')
-      logEvent('opportunity.build.skipped_unchanged', {
+      logEvent('opportunity.build.semantic_unchanged', {
         opportunityId: current.id,
         hiringEpisodeId: row.hiringEpisodeId,
         clientProfileId: row.clientProfileId,
@@ -1278,10 +1331,17 @@ async function persistOpportunityBuild(input: {
       lockedEpisodeStatus ??
       (
         current?.status &&
-        ['accepted', 'dismissed', 'snoozed', 'contacted'].includes(current.status)
+        ['accepted', 'dismissed', 'snoozed', 'contacted'].includes(current.status) &&
+        !(elapsedSnoozeCleared && current.status === 'snoozed')
           ? current.status
           : score.status
       )
+    const preservedSnoozedUntil = preservedStatus === 'snoozed'
+      ? lockedEpisodeState?.suppressedUntil ?? null
+      : null
+    if (preservedStatus === 'snoozed' && !preservedSnoozedUntil) {
+      throw new Error('Snoozed episode state is missing suppressed_until.')
+    }
     const metadata = JSON.stringify({
       morningBriefEligible: score.isMorningBriefEligible,
       components: score.components,
@@ -1330,6 +1390,7 @@ async function persistOpportunityBuild(input: {
       provenance.scoringConfigHash,
       provenance.briefBuilderVersion,
       provenance.inputHash,
+      preservedSnoozedUntil,
     ] as const
 
     let superseded = false
@@ -1401,8 +1462,9 @@ async function persistOpportunityBuild(input: {
            fiur_version = $28,
            scoring_config_hash = $29,
            brief_builder_version = $30,
-           input_hash = $31,
-           superseded_at = NULL,
+            input_hash = $31,
+            snoozed_until = $32::timestamptz,
+            superseded_at = NULL,
            updated_at = NOW()
          WHERE id = $1
          RETURNING id::TEXT AS id`,
@@ -1439,20 +1501,30 @@ async function persistOpportunityBuild(input: {
            fiur_version,
            scoring_config_hash,
            brief_builder_version,
-           input_hash
+           input_hash,
+           snoozed_until
          )
          VALUES (
            $1, $2, $3, $4, $5,
            $6, $7, $8, $9, $10, $11,
            $12, $13, $14, $15, $16, $17, $18,
            $19, $20, $21, $22, $23::jsonb,
-           $24, $25, $26, $27, $28, $29, $30
+            $24, $25, $26, $27, $28, $29, $30,
+            $31::timestamptz
          )
          RETURNING id::TEXT AS id`,
         values,
       )
     const storedRow = stored.rows[0]
     if (!storedRow) throw new Error('Opportunity persistence returned no row.')
+    if (preservedSnoozedUntil) {
+      logEvent('opportunity.snooze_preserved', {
+        opportunityId: storedRow.id,
+        hiringEpisodeId: row.hiringEpisodeId,
+        clientProfileId: row.clientProfileId,
+        scoringVersion: provenance.scoringVersion,
+      })
+    }
     await clearBuildFailure(row, provenance.scoringVersion, db)
     if (input.manageTransaction) await db.query('COMMIT')
     return {
@@ -1478,21 +1550,22 @@ function createOpportunityInputProvenance(
     agencyName: row.agencyName,
     targetCity: row.targetCity,
     specialization: row.specialization,
-    includeKeywords: toStringArray(row.includeKeywords),
-    excludeKeywords: toStringArray(row.excludeKeywords),
-    industries: toStringArray(row.industries),
-    companySizes: toStringArray(row.companySizes),
+    includeKeywords: sortSetLikeStrings(row.includeKeywords),
+    excludeKeywords: sortSetLikeStrings(row.excludeKeywords),
+    industries: sortSetLikeStrings(row.industries),
+    companySizes: sortSetLikeStrings(row.companySizes),
     contactPolicy: row.contactPolicy,
-    roles: toStringArray(row.roles),
-    excludedIndustries: toStringArray(row.excludedIndustries),
-    excludedLocations: toStringArray(row.excludedLocations),
+    roles: sortSetLikeStrings(row.roles),
+    excludedIndustries: sortSetLikeStrings(row.excludedIndustries),
+    excludedLocations: sortSetLikeStrings(row.excludedLocations),
     remoteFriendly: row.remoteFriendly,
     hiringMode: row.hiringMode,
   })
   const scoringConfigHash = hashCanonicalJson(DEFAULT_OPPORTUNITY_SCORING_CONFIG)
+  // Set-like inputs are normalized here. canonicalJsonStringify intentionally
+  // preserves every other array because digest reason and workflow order can be semantic.
   const buildInputsHash = hashCanonicalJson({
     organization: {
-      id: row.organizationId,
       name: row.organizationName,
       domain: row.organizationDomain,
       websiteUrl: row.organizationWebsiteUrl,
@@ -1501,34 +1574,87 @@ function createOpportunityInputProvenance(
       industry: row.organizationIndustry,
       city: row.organizationCity,
     },
-    episode,
-    signals: toRecordArray(row.signals)
-      .map((signal) => canonicalJsonStringify(signal))
-      .sort(),
-    evidence: toRecordArray(row.evidence)
-      .map((item) => canonicalJsonStringify(item))
-      .sort(),
+    episode: {
+      episodeType: episode.episodeType,
+      episodeGeneration: episode.episodeGeneration,
+      title: episode.title,
+      summary: episode.summary,
+      startedAt: episode.startedAt,
+      lastSeenAt: episode.lastSeenAt,
+      signalCount: episode.signalCount,
+      vacancyCount: episode.vacancyCount,
+      strengthScore: episode.strengthScore,
+      freshnessScore: episode.freshnessScore,
+      engineVersion: episode.engineVersion,
+      metadata: semanticEpisodeMetadata(episode.metadata),
+    },
+    signals: sortSetLikeStrings(
+      toRecordArray(row.signals).map((signal) =>
+        canonicalJsonStringify(withoutDatabaseId(signal))),
+    ),
+    evidence: sortSetLikeStrings(
+      toRecordArray(row.evidence).map((item) =>
+        canonicalJsonStringify(withoutDatabaseId(item))),
+    ),
     digest: {
-      candidateId: row.digestCandidateId,
-      payload: asRecord(row.digestPayload),
+      payload: semanticDigestPayload(row.digestPayload),
       reasons: row.digestReasons,
-      sourceFamilies: toStringArray(row.sourceFamilies).sort(),
+      sourceFamilies: sortSetLikeStrings(row.sourceFamilies),
     },
   })
-  const base = {
-    episodeEvidenceHash: episode.evidenceHash,
+  const semanticInput = {
     profileSnapshotHash,
     buildInputsHash,
-    digestCandidateId: row.digestCandidateId,
     fiurVersion: FIUR_VERSION,
     scoringVersion,
     scoringConfigHash,
     briefBuilderVersion: BRIEF_BUILDER_VERSION,
   }
   return {
-    ...base,
-    inputHash: hashCanonicalJson(base),
+    episodeEvidenceHash: episode.evidenceHash,
+    ...semanticInput,
+    digestCandidateId: row.digestCandidateId,
+    inputHash: hashCanonicalJson(semanticInput),
   }
+}
+
+function withoutDatabaseId(
+  value: Record<string, unknown>,
+): Record<string, unknown> {
+  const semanticValue = { ...value }
+  delete semanticValue.id
+  return semanticValue
+}
+
+function semanticEpisodeMetadata(
+  value: Record<string, unknown>,
+): Record<string, unknown> {
+  const semanticMetadata = { ...value }
+  // Detector fingerprints are implementation identities. Their fallback path
+  // includes organization_id, while the underlying signal content is hashed above.
+  delete semanticMetadata.canonicalVacancyFingerprints
+  return semanticMetadata
+}
+
+function semanticDigestPayload(value: unknown): Record<string, unknown> {
+  const semanticPayload = { ...asRecord(value) }
+  delete semanticPayload.corroborated_org_ids
+  delete semanticPayload.corroboratedOrgIds
+
+  const keyType = semanticPayload.corroboration_key_type ??
+    semanticPayload.corroborationKeyType
+  const key = semanticPayload.corroboration_key ?? semanticPayload.corroborationKey
+  if (
+    keyType === 'org_id' ||
+    (typeof key === 'string' && /^org:\d+$/.test(key))
+  ) {
+    delete semanticPayload.corroboration_key
+    delete semanticPayload.corroborationKey
+    delete semanticPayload.corroboration_key_type
+    delete semanticPayload.corroborationKeyType
+  }
+
+  return semanticPayload
 }
 
 async function clearBuildFailure(
@@ -1838,6 +1964,10 @@ function toStringArray(value: unknown): string[] {
     .filter((item): item is string => typeof item === 'string')
     .map((item) => item.trim())
     .filter(Boolean)
+}
+
+function sortSetLikeStrings(value: unknown): string[] {
+  return [...new Set(toStringArray(value))].sort()
 }
 
 function toCompanySizes(

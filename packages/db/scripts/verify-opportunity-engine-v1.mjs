@@ -209,26 +209,6 @@ async function transitionOpportunity({
       action,
     ],
   )
-  if (action === 'contacted') {
-    await client.query(
-      `INSERT INTO client_digest_org_state (
-         client_profile_id,
-         org_id,
-         feedback_status,
-         feedback_at
-       )
-       VALUES ($1, $2, 'contacted', NOW())
-       ON CONFLICT (client_profile_id, org_id)
-       DO UPDATE SET
-         feedback_status = 'contacted',
-         feedback_at = NOW(),
-         updated_at = NOW()`,
-      [
-        opportunity.rows[0].clientProfileId,
-        opportunity.rows[0].organizationId,
-      ],
-    )
-  }
   return { replayed: false }
 }
 
@@ -732,11 +712,12 @@ try {
     fingerprint: hash('contacted'),
   })
   const contactedState = await client.query(
-    `SELECT
+     `SELECT
        state.status,
+       state.suppressed_until::TEXT AS "suppressedUntil",
        legacy.feedback_status AS "legacyFeedback"
-     FROM client_episode_state state
-     JOIN client_digest_org_state legacy
+      FROM client_episode_state state
+      LEFT JOIN client_digest_org_state legacy
        ON legacy.client_profile_id = state.client_profile_id
       AND legacy.org_id = state.organization_id
      WHERE state.client_profile_id = $1
@@ -745,9 +726,10 @@ try {
   )
   assert.deepEqual(contactedState.rows[0], {
     status: 'contacted',
-    legacyFeedback: 'contacted',
+    suppressedUntil: null,
+    legacyFeedback: null,
   })
-  checks.push('accepted_then_contacted_suppression')
+  checks.push('accepted_then_episode_scoped_contacted')
   checks.push('action_idempotency')
 
   await expectDatabaseRejection('cross-tenant-action', () =>

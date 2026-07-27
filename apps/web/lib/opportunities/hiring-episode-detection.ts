@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 
+import { logEvent } from '@/lib/runtime'
 import { canonicalizeOpportunityUrl } from './canonical-hash'
 
 export const HIRING_EPISODE_ENGINE_VERSION = 'hiring-episode-v1' as const
@@ -553,6 +554,7 @@ function uniqueCanonicalVacancies(vacancies: CanonicalVacancy[]): CanonicalVacan
 
 function canonicalizeVacancies(signals: HiringSignalInput[]): CanonicalVacancy[] {
   const parent = signals.map((_, index) => index)
+  const explicitIdsByProvider = signals.map(explicitIdsForSignal)
   const find = (index: number): number => {
     while (parent[index] !== index) {
       parent[index] = parent[parent[index]]
@@ -563,7 +565,24 @@ function canonicalizeVacancies(signals: HiringSignalInput[]): CanonicalVacancy[]
   const union = (left: number, right: number) => {
     const leftRoot = find(left)
     const rightRoot = find(right)
-    if (leftRoot !== rightRoot) parent[rightRoot] = leftRoot
+    if (leftRoot === rightRoot) return
+    const conflictProvider = findConflictingExplicitIdProvider(
+      explicitIdsByProvider[leftRoot],
+      explicitIdsByProvider[rightRoot],
+    )
+    if (conflictProvider) {
+      logEvent('canonical_vacancy.merge_rejected', {
+        organizationId: signals[left].organizationId,
+        provider: conflictProvider,
+        reasonCode: 'conflicting_provider_external_ids',
+      })
+      return
+    }
+    parent[rightRoot] = leftRoot
+    explicitIdsByProvider[leftRoot] = mergeExplicitIdsByProvider(
+      explicitIdsByProvider[leftRoot],
+      explicitIdsByProvider[rightRoot],
+    )
   }
 
   signals.forEach((signal, index) => {
@@ -590,6 +609,41 @@ function canonicalizeVacancies(signals: HiringSignalInput[]): CanonicalVacancy[]
       Date.parse(left.occurredAt) - Date.parse(right.occurredAt) ||
       left.vacancyFingerprint.localeCompare(right.vacancyFingerprint),
   )
+}
+
+type ExplicitIdsByProvider = Map<string, Set<string>>
+
+function explicitIdsForSignal(signal: HiringSignalInput): ExplicitIdsByProvider {
+  if (!signal.externalVacancyId) return new Map()
+  return new Map([[
+    normalizeText(signal.source),
+    new Set([normalizeText(signal.externalVacancyId)]),
+  ]])
+}
+
+function findConflictingExplicitIdProvider(
+  left: ExplicitIdsByProvider,
+  right: ExplicitIdsByProvider,
+): string | null {
+  for (const [provider, leftIds] of left) {
+    const rightIds = right.get(provider)
+    if (!rightIds) continue
+    if (new Set([...leftIds, ...rightIds]).size > 1) return provider
+  }
+  return null
+}
+
+function mergeExplicitIdsByProvider(
+  left: ExplicitIdsByProvider,
+  right: ExplicitIdsByProvider,
+): ExplicitIdsByProvider {
+  const merged = new Map(
+    [...left].map(([provider, ids]) => [provider, new Set(ids)]),
+  )
+  for (const [provider, ids] of right) {
+    merged.set(provider, new Set([...(merged.get(provider) ?? []), ...ids]))
+  }
+  return merged
 }
 
 function buildCanonicalVacancy(

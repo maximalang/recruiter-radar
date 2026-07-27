@@ -55,6 +55,24 @@ const supersessionRollbackPath = resolve(
   'migrations',
   '20260727122000_add_opportunity_supersession.down.sql',
 )
+const edgeCaseMigrationPath = resolve(
+  process.cwd(),
+  '..',
+  '..',
+  'packages',
+  'db',
+  'migrations',
+  '20260727130000_fix_opportunity_hardening_edge_cases.sql',
+)
+const edgeCaseRollbackPath = resolve(
+  process.cwd(),
+  '..',
+  '..',
+  'packages',
+  'db',
+  'migrations',
+  '20260727130000_fix_opportunity_hardening_edge_cases.down.sql',
+)
 
 describe('opportunity engine migration contract', () => {
   const migration = readFileSync(migrationPath, 'utf8')
@@ -156,6 +174,8 @@ describe('opportunity engine hardening migrations', () => {
     supersessionRollbackPath,
     'utf8',
   ).replace(/\s+/g, ' ')
+  const edgeCases = readFileSync(edgeCaseMigrationPath, 'utf8').replace(/\s+/g, ' ')
+  const edgeCasesRollback = readFileSync(edgeCaseRollbackPath, 'utf8').replace(/\s+/g, ' ')
 
   it('adds stable episode identity and safely renames role_cluster', () => {
     expect(hardening).toContain('episode_identity TEXT')
@@ -203,6 +223,23 @@ describe('opportunity engine hardening migrations', () => {
     expect(supersessionRollback).toContain('rollbackOriginalOpportunityId')
     expect(supersessionRollback.indexOf('UPDATE opportunity_actions action')).toBeLessThan(
       supersessionRollback.indexOf('DELETE FROM opportunities'),
+    )
+  })
+
+  it('repairs snooze deadlines and safely strengthens the lifecycle constraint', () => {
+    expect(edgeCases).toContain('snoozed_until = state.suppressed_until')
+    expect(edgeCases).toContain('state.suppressed_until > NOW()')
+    expect(edgeCases).toContain("status = 'new'")
+    expect(edgeCases).toContain('snoozed_until <= NOW()')
+    expect(edgeCases).toContain('DROP CONSTRAINT opportunities_snoozed_until_check')
+    expect(edgeCases).toContain(
+      "status = 'snoozed' AND snoozed_until IS NOT NULL",
+    )
+    expect(edgeCases).toContain(
+      'snoozed_until IS NULL OR snoozed_until > created_at',
+    )
+    expect(edgeCasesRollback).toContain(
+      'CHECK (snoozed_until IS NULL OR snoozed_until > created_at)',
     )
   })
 })
