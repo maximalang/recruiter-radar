@@ -46,7 +46,6 @@ const testEnvironment = {
   ...process.env,
   DATABASE_URL: temporaryUrl.toString(),
   OPPORTUNITY_ENGINE_V1_ENABLED: 'true',
-  OPPORTUNITY_OUTCOMES_ENABLED: 'true',
 }
 
 function quoteIdentifier(value) {
@@ -73,8 +72,16 @@ try {
     '--runInBand',
     '--runTestsByPath',
     'src/__tests__/lib/opportunities/runtime-db.test.ts',
-    'src/__tests__/lib/opportunities/outcome-runtime-db.test.ts',
   ], webRoot)
+  await run(process.execPath, [
+    jestScript,
+    '--runInBand',
+    '--runTestsByPath',
+    'src/__tests__/lib/opportunities/outcome-runtime-db.test.ts',
+  ], webRoot, {
+    ...testEnvironment,
+    OPPORTUNITY_OUTCOMES_ENABLED: 'true',
+  })
   await run(process.execPath, [outcomeRebuildVerifierScript])
   await admin.query(`CREATE DATABASE ${quoteIdentifier(upgradeDatabaseName)}`)
   await run(process.execPath, [upgradeVerifierScript], root, {
