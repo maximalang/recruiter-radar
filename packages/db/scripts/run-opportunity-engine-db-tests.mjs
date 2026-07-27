@@ -26,6 +26,13 @@ const upgradeVerifierScript = resolve(
   'scripts',
   'verify-opportunity-authoritative-state-upgrade.mjs',
 )
+const outcomeRebuildVerifierScript = resolve(
+  root,
+  'packages',
+  'db',
+  'scripts',
+  'verify-opportunity-outcome-rebuild.mjs',
+)
 const jestScript = resolve(root, 'node_modules', 'jest', 'bin', 'jest.js')
 const webRoot = resolve(root, 'apps', 'web')
 const admin = new Client({ connectionString: databaseUrl })
@@ -39,6 +46,7 @@ const testEnvironment = {
   ...process.env,
   DATABASE_URL: temporaryUrl.toString(),
   OPPORTUNITY_ENGINE_V1_ENABLED: 'true',
+  OPPORTUNITY_OUTCOMES_ENABLED: 'true',
 }
 
 function quoteIdentifier(value) {
@@ -65,7 +73,9 @@ try {
     '--runInBand',
     '--runTestsByPath',
     'src/__tests__/lib/opportunities/runtime-db.test.ts',
+    'src/__tests__/lib/opportunities/outcome-runtime-db.test.ts',
   ], webRoot)
+  await run(process.execPath, [outcomeRebuildVerifierScript])
   await admin.query(`CREATE DATABASE ${quoteIdentifier(upgradeDatabaseName)}`)
   await run(process.execPath, [upgradeVerifierScript], root, {
     ...process.env,
