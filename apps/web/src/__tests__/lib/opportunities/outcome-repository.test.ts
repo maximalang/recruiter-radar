@@ -33,7 +33,7 @@ const opportunityContext = {
 }
 
 function successfulQuery(options: { projectionFails?: boolean } = {}) {
-  return jest.fn(async (sql: string) => {
+  return jest.fn(async (sql: string, _params?: unknown[]) => {
     if (sql.includes('FROM opportunities o') && sql.includes('FOR UPDATE')) {
       return { rowCount: 1, rows: [opportunityContext] }
     }
@@ -223,7 +223,7 @@ describe('opportunity outcome repository', () => {
 
 describe('opportunity outcome funnel', () => {
   it('scopes analytics to owner and controlled snapshot filters', async () => {
-    const query = jest.fn(async () => ({
+    const query = jest.fn(async (_sql: string, _params?: unknown[]) => ({
       rowCount: 1,
       rows: [{
         shownCount: '20', openedCount: '15', acceptedCount: '10',
