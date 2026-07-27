@@ -15,6 +15,9 @@ const root = resolve(import.meta.dirname, '..', '..', '..')
 const migrationsDir = resolve(root, 'packages', 'db', 'migrations')
 const migrateScript = resolve(root, 'packages', 'db', 'scripts', 'migrate.mjs')
 const downMigrations = [
+  '20260727152000_add_opportunity_public_reference.down.sql',
+  '20260727151000_add_opportunity_outcome_projection.down.sql',
+  '20260727150000_add_opportunity_outcome_ledger.down.sql',
   '20260727140000_repair_opportunity_authoritative_state.down.sql',
   '20260727130000_fix_opportunity_hardening_edge_cases.down.sql',
   '20260727122000_add_opportunity_supersession.down.sql',
