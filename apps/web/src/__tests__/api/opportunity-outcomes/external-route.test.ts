@@ -118,8 +118,10 @@ function signedRequest(
   override: { signature?: string; eventId?: string } = {},
 ) {
   const raw = JSON.stringify(body)
+  const eventId = override.eventId ?? body.externalEventId
+  const timestamp = new Date().toISOString()
   const signature = `sha256=${createHmac('sha256', SECRET)
-    .update(raw)
+    .update(`${timestamp}.${eventId}.${raw}`)
     .digest('hex')}`
   return new NextRequest(
     'https://recruiter-radar.ru/api/opportunities/outcomes/external',
@@ -128,8 +130,8 @@ function signedRequest(
       headers: {
         'content-type': 'application/json',
         'x-radar-event': 'opportunity.outcome',
-        'x-radar-event-id': override.eventId ?? body.externalEventId,
-        'x-radar-timestamp': new Date().toISOString(),
+        'x-radar-event-id': eventId,
+        'x-radar-timestamp': timestamp,
         'x-radar-signature': override.signature ?? signature,
       },
       body: raw,

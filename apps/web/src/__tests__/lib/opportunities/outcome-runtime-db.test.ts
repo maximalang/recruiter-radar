@@ -259,6 +259,42 @@ describeWithDatabase('Opportunity Outcome production PostgreSQL runtime', () => 
         metadata: { interactionId: `opened-${token}` },
       }),
     })).rejects.toBeInstanceOf(OutcomeIdempotencyConflictError)
+
+    const firstConcurrentEpisodeId = await insertEpisode('concurrent-idempotency-a')
+    const secondConcurrentEpisodeId = await insertEpisode('concurrent-idempotency-b')
+    const firstConcurrentOpportunityId = await insertOpportunity(
+      firstConcurrentEpisodeId,
+      'concurrent-idempotency-a',
+    )
+    const secondConcurrentOpportunityId = await insertOpportunity(
+      secondConcurrentEpisodeId,
+      'concurrent-idempotency-b',
+    )
+    const concurrentKey = `concurrent-idempotency:${token}`
+    const concurrentResults = await Promise.allSettled([
+      recordOpportunityOutcome({
+        ownerId,
+        opportunityId: firstConcurrentOpportunityId,
+        actorType: 'user',
+        actorUserId: ownerId,
+        payload: outcomePayload('accepted', concurrentKey, Date.now()),
+      }),
+      recordOpportunityOutcome({
+        ownerId,
+        opportunityId: secondConcurrentOpportunityId,
+        actorType: 'user',
+        actorUserId: ownerId,
+        payload: outcomePayload('accepted', concurrentKey, Date.now()),
+      }),
+    ])
+    expect(concurrentResults.filter((result) =>
+      result.status === 'fulfilled')).toHaveLength(1)
+    const rejected = concurrentResults.find((result) =>
+      result.status === 'rejected')
+    expect(rejected).toMatchObject({
+      status: 'rejected',
+      reason: expect.any(OutcomeIdempotencyConflictError),
+    })
   })
 
   it('rolls back the ledger insert when projection persistence fails', async () => {
