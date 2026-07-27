@@ -4,6 +4,10 @@ import {
 } from '../ui/internal-page'
 import type { OpportunityItem } from '@/lib/opportunities/repository'
 import { OpportunityActions } from './opportunity-actions'
+import {
+  OpportunityOutcomeImpression,
+  OpportunityOutcomePanel,
+} from './opportunity-outcome-panel'
 import styles from './opportunities.module.css'
 
 const EPISODE_LABELS: Record<string, string> = {
@@ -25,12 +29,22 @@ const STATUS_LABELS: Record<string, string> = {
   expired: 'Истекла',
 }
 
-export function OpportunityCard(props: { opportunity: OpportunityItem }) {
+export function OpportunityCard(props: {
+  opportunity: OpportunityItem
+  outcomesUiEnabled?: boolean
+  trackingCycleId?: string | null
+}) {
   const opportunity = props.opportunity
   const score = Math.round(opportunity.opportunityScore * 100)
 
   return (
     <article className={styles.card} data-status={opportunity.status}>
+      {props.outcomesUiEnabled && props.trackingCycleId ? (
+        <OpportunityOutcomeImpression
+          opportunityId={opportunity.id}
+          cycleId={props.trackingCycleId}
+        />
+      ) : null}
       <div className={styles.cardHeader}>
         <div>
           <div className={styles.eyebrow}>
@@ -121,11 +135,18 @@ export function OpportunityCard(props: { opportunity: OpportunityItem }) {
         <p>{opportunity.recommendedAction}</p>
       </div>
 
-      <OpportunityActions
-        opportunityId={opportunity.id}
-        currentStatus={opportunity.status}
-        detailHref={`#evidence-${opportunity.id}`}
-      />
+      {props.outcomesUiEnabled ? (
+        <OpportunityOutcomePanel
+          opportunityId={opportunity.id}
+          fallbackStage={opportunity.status}
+        />
+      ) : (
+        <OpportunityActions
+          opportunityId={opportunity.id}
+          currentStatus={opportunity.status}
+          detailHref={`#evidence-${opportunity.id}`}
+        />
+      )}
     </article>
   )
 }

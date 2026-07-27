@@ -2,7 +2,11 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
-import { isOpportunityEngineV1Enabled } from '@/lib/opportunities/config'
+import {
+  isOpportunityEngineV1Enabled,
+  isOpportunityOutcomesUiEnabled,
+} from '@/lib/opportunities/config'
+import { getOutcomeFunnelSummary } from '@/lib/opportunities/outcome-repository'
 import { listOpportunities } from '@/lib/opportunities/repository'
 import type { OpportunityStatus } from '@/lib/opportunities/opportunity-scoring'
 import { getOwnerIdFromSession } from '@/lib/session'
@@ -17,6 +21,7 @@ import {
 } from '../ui/internal-page'
 import { SiteFooter } from '../ui/site-footer'
 import { OpportunityCard } from './opportunity-card'
+import { OpportunityFunnel } from './opportunity-funnel'
 import { buildOpportunityNavigation } from './navigation'
 import styles from './opportunities.module.css'
 
@@ -30,7 +35,12 @@ export const metadata: Metadata = {
 const NAVIGATION = buildOpportunityNavigation()
 
 export default async function OpportunitiesPage(props: {
-  searchParams: Promise<{ status?: string; gate?: string }>
+  searchParams: Promise<{
+    status?: string
+    gate?: string
+    preview?: string
+    demo?: string
+  }>
 }) {
   if (!isOpportunityEngineV1Enabled()) notFound()
 
@@ -54,6 +64,13 @@ export default async function OpportunitiesPage(props: {
   }
 
   const params = await props.searchParams
+  const outcomesUiEnabled = isOpportunityOutcomesUiEnabled() &&
+    params.preview !== '1' && params.demo !== '1'
+  const trackingCycleId = outcomesUiEnabled
+    ? `morning-brief:${new Date().toISOString().slice(0, 10)}`
+    : null
+  const funnelTo = new Date()
+  const funnelFrom = new Date(funnelTo.getTime() - 30 * 24 * 60 * 60 * 1000)
   const statuses = parseStatusFilter(params.status)
   let result: Awaited<ReturnType<typeof listOpportunities>> | null = null
   try {
@@ -83,6 +100,14 @@ export default async function OpportunitiesPage(props: {
       </InternalPageFrame>
     )
   }
+
+  const funnel = outcomesUiEnabled
+    ? await getOutcomeFunnelSummary({
+        ownerId,
+        from: funnelFrom.toISOString(),
+        to: funnelTo.toISOString(),
+      }).catch(() => null)
+    : null
 
   const newCount = result.opportunities.filter(
     (opportunity) => opportunity.status === 'new',
@@ -133,6 +158,8 @@ export default async function OpportunitiesPage(props: {
           />
         </MetricGrid>
 
+        {funnel ? <OpportunityFunnel summary={funnel} /> : null}
+
         <nav className={styles.filters} aria-label="Фильтры Morning Brief">
           <FilterLink href="/opportunities" active={!params.status}>
             Активные
@@ -154,7 +181,12 @@ export default async function OpportunitiesPage(props: {
         {result.opportunities.length > 0 ? (
           <div className={styles.cardList}>
             {result.opportunities.map((opportunity) => (
-              <OpportunityCard key={opportunity.id} opportunity={opportunity} />
+              <OpportunityCard
+                key={opportunity.id}
+                opportunity={opportunity}
+                outcomesUiEnabled={outcomesUiEnabled}
+                trackingCycleId={trackingCycleId}
+              />
             ))}
           </div>
         ) : (
