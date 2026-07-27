@@ -97,7 +97,9 @@ UPDATE и DELETE блокируются PostgreSQL trigger `55000`; product API 
 episode/type, внешний event и interaction dedupe. Идемпотентность scoped как
 `UNIQUE(owner_id, idempotency_key)`: ключ нельзя переиспользовать для другой
 opportunity или payload в одном tenant. Одинаковый payload возвращает `200`, другой —
-`409 idempotency_key_conflict`.
+`409 idempotency_key_conflict`. Transaction-scoped advisory lock по той же паре
+`owner + idempotency key` сериализует конкурентные запросы к разным opportunities,
+чтобы database uniqueness race также завершался детерминированным `200/409`, а не `500`.
 
 `shown` дополнительно уникален по `owner + opportunity + shown + surface:cycleId`.
 Morning Brief использует дневной cycle; повторный render того же cycle не создаёт
@@ -174,17 +176,18 @@ episode type, confidence gate, source family и score bucket.
 
 ## External ingestion
 
-External endpoint использует существующий `X-Radar-*` raw-body HMAC-SHA256 contract:
+External endpoint использует `X-Radar-*` HMAC-SHA256 envelope:
 
 ```text
 X-Radar-Event: opportunity.outcome
 X-Radar-Event-Id: <nonce/external event id>
 X-Radar-Timestamp: <ISO timestamp>
-X-Radar-Signature: sha256=<hex hmac of raw body>
+X-Radar-Signature: sha256=<hex hmac of timestamp.event-id.raw-body>
 ```
 
-Timestamp freshness ограничена пятью минутами, signature сравнивается constant-time,
-а external event ID уникален в tenant/system scope и служит replay identity. Body
+Timestamp и replay nonce криптографически связаны с raw body, freshness ограничена
+пятью минутами, а signature сравнивается constant-time. External event ID уникален
+в tenant/system scope и служит replay identity. Body
 передаёт UUID `opportunityRef`, но tenant и внутренний opportunity ID вычисляются
 сервером. Это generic callback contract, а не amoCRM/Bitrix24 integration. Flag
 external ingestion должен оставаться выключенным до отдельного security canary.

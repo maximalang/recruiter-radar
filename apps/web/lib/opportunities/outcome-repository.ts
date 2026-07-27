@@ -476,6 +476,17 @@ export async function recordOpportunityOutcomeInTransaction(
     throw new Error('User outcome actor must match the tenant owner.')
   }
 
+  // The database uniqueness boundary is owner + key, while the opportunity row
+  // lock only serializes requests for one opportunity. Lock the same uniqueness
+  // scope so concurrent requests for different opportunities deterministically
+  // resolve as a replay or a 409 instead of leaking a unique-violation 500.
+  await db.query(
+    `SELECT pg_advisory_xact_lock(
+       hashtextextended('opportunity-outcome:' || $1 || ':' || $2, 0)
+     )`,
+    [context.ownerId, payload.idempotencyKey],
+  )
+
   const payloadHash = hashOutcomePayload({
     opportunityId: context.id,
     actorType: input.actorType,

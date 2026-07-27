@@ -198,6 +198,15 @@ describe('opportunity outcomes API', () => {
       ownerId: '7', opportunityId: '10', page: 1, pageSize: 50,
     })
   })
+
+  it('rejects pagination values outside the JavaScript safe integer range', async () => {
+    const response = await GET(
+      request('/api/opportunities/10/outcomes?page=999999999999999999999'),
+      context,
+    )
+    expect(response.status).toBe(400)
+    expect(mockedHistory).not.toHaveBeenCalled()
+  })
 })
 
 function restore(name: string, value: string | undefined) {

@@ -47,7 +47,13 @@ export async function POST(request: NextRequest) {
   const eventHeader = request.headers.get('x-radar-event')?.trim() ?? ''
   if (
     eventHeader !== 'opportunity.outcome' ||
-    !verifyExternalOutcomeSignature({ rawBody, timestamp, signature, secret })
+    !verifyExternalOutcomeSignature({
+      rawBody,
+      timestamp,
+      eventId: eventIdHeader,
+      signature,
+      secret,
+    })
   ) {
     return NextResponse.json({ error: 'invalid_signature' }, { status: 401 })
   }
