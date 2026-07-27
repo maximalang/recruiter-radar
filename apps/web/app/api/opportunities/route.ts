@@ -26,7 +26,7 @@ const STATUSES = new Set<OpportunityStatus>([
 const EPISODE_TYPES = new Set<HiringEpisodeType>([
   'vacancy_spike',
   'repeated_vacancies',
-  'new_role_cluster',
+  'role_cluster',
   'new_region',
   'hiring_restart',
   'sustained_hiring',

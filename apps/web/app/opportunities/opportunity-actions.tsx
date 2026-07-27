@@ -18,6 +18,16 @@ const ACTIONS: ReadonlyArray<{
   { action: 'dismissed', label: 'Не подходит', tone: 'neutral' },
 ]
 
+const ALLOWED_ACTIONS: Readonly<Record<string, readonly Action[]>> = {
+  new: ['accepted', 'dismissed', 'snoozed'],
+  review: ['accepted', 'dismissed', 'snoozed'],
+  snoozed: ['accepted', 'dismissed'],
+  accepted: ['contacted', 'dismissed', 'snoozed'],
+  contacted: [],
+  dismissed: [],
+  expired: [],
+}
+
 export function OpportunityActions(props: {
   opportunityId: string
   currentStatus: string
@@ -66,7 +76,10 @@ export function OpportunityActions(props: {
             type="button"
             className={styles.actionButton}
             data-tone={item.tone}
-            disabled={pending !== null || props.currentStatus === item.action}
+            disabled={
+              pending !== null ||
+              !ALLOWED_ACTIONS[props.currentStatus]?.includes(item.action)
+            }
             aria-pressed={props.currentStatus === item.action}
             onClick={() => void submit(item.action)}
           >

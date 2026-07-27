@@ -9,7 +9,7 @@ import styles from './opportunities.module.css'
 const EPISODE_LABELS: Record<string, string> = {
   vacancy_spike: 'Всплеск найма',
   repeated_vacancies: 'Повторные вакансии',
-  new_role_cluster: 'Новый кластер ролей',
+  role_cluster: 'Кластер ролей',
   new_region: 'Новый регион',
   hiring_restart: 'Возобновление найма',
   sustained_hiring: 'Устойчивый найм',
@@ -54,7 +54,10 @@ export function OpportunityCard(props: { opportunity: OpportunityItem }) {
 
       <div className={styles.badges}>
         <GateBadgeInline gate={opportunity.confidenceGate} />
-        <EvidenceTag>{opportunity.evidenceCount} источников</EvidenceTag>
+        <EvidenceTag>
+          {opportunity.factCount} фактов · {opportunity.sourceFamilyCount} источника ·{' '}
+          {opportunity.directEvidenceCount} прямое подтверждение
+        </EvidenceTag>
         <EvidenceTag>
           актуально до {formatDate(opportunity.validUntil)}
         </EvidenceTag>
@@ -68,7 +71,7 @@ export function OpportunityCard(props: { opportunity: OpportunityItem }) {
         />
         <BriefField
           label="Почему подходит агентству"
-          value={agencyFitExplanation(opportunity)}
+          value={opportunity.agencyFitExplanation}
         />
         <BriefField label="Рекомендуемый заход" value={opportunity.recommendedAngle} />
         <BriefField label="Кому адресовать" value={opportunity.recommendedPersona} />
@@ -134,24 +137,6 @@ function BriefField(props: { label: string; value: string }) {
       <p>{props.value}</p>
     </div>
   )
-}
-
-function agencyFitExplanation(opportunity: OpportunityItem): string {
-  const components = asRecord(opportunity.metadata.components)
-  const agencyFit = asRecord(components.agencyFit)
-  const reasons = Array.isArray(agencyFit.reasons) ? agencyFit.reasons : []
-  const message = reasons
-    .map((reason) => asRecord(reason).message)
-    .find((value): value is string =>
-      typeof value === 'string' && value.trim().length > 0)
-  return message?.trim() ??
-    'Соответствие подтверждено текущим профилем агентства и моделью FIUR Fit.'
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : {}
 }
 
 function formatDate(value: string | null): string {

@@ -6,6 +6,8 @@ const EPISODE: HiringEpisodeCandidate = {
   organizationId: '10',
   episodeType: 'vacancy_spike',
   episodeKey: 'vacancy_spike:backend:2026-07-20',
+  episodeIdentity: 'f'.repeat(64),
+  episodeGeneration: 1,
   title: 'Компания ускорила найм backend-разработчиков',
   summary: 'За последние 14 дней компания открыла 8 технических вакансий.',
   startedAt: '2026-07-15T00:00:00.000Z',
@@ -32,7 +34,7 @@ const SCORE = {
   components: {
     agencyFit: { score: 0.8, reasons: [] },
     hiringIntent: { score: 0.9, reasons: [] },
-    externalAgencyPropensity: { score: 0.85, reasons: [] },
+    externalSupportNeed: { score: 0.85, reasons: [] },
     timing: { score: 0.9, reasons: [] },
     reachability: { score: 0.7, reasons: [] },
     confidence: { score: 0.9, reasons: [] },
@@ -44,11 +46,32 @@ const SCORE = {
   scoringVersion: 'opportunity-v1',
 } satisfies OpportunityScoreResult
 
+const AGENCY = {
+  agencyName: 'Агентство',
+  specialization: 'Java и backend',
+  hiringMode: 'specialist',
+  matchedRoles: ['Java', 'Backend'],
+  matchedIndustries: [],
+  matchedRegions: ['Москва'],
+  includeKeywords: ['java'],
+  relevantFitReasons: ['Роли входят в специализацию агентства.'],
+}
+
 describe('OpportunityBriefBuilder', () => {
   it('builds deterministic cautious copy only from supplied facts', () => {
     const builder = new OpportunityBriefBuilder()
-    const first = builder.build({ organizationName: 'Пример', episode: EPISODE, score: SCORE })
-    const second = builder.build({ organizationName: 'Пример', episode: EPISODE, score: SCORE })
+    const first = builder.build({
+      organizationName: 'Пример',
+      episode: EPISODE,
+      score: SCORE,
+      agency: AGENCY,
+    })
+    const second = builder.build({
+      organizationName: 'Пример',
+      episode: EPISODE,
+      score: SCORE,
+      agency: AGENCY,
+    })
 
     expect(second).toEqual(first)
     expect(first.title).toBe('Пример ускорила найм backend-разработчиков')
@@ -57,6 +80,7 @@ describe('OpportunityBriefBuilder', () => {
     expect(first.whyNow).toContain('2,67')
     expect(first.problemHypothesis).toMatch(/есть признаки|может указывать/i)
     expect(first.recommendedAction).toMatch(/корпоративн/i)
+    expect(first.agencyFitExplanation).toMatch(/Java|backend/i)
   })
 
   it('does not claim an agency mandate, budget, decision maker identity, or invented contact', () => {
@@ -64,6 +88,7 @@ describe('OpportunityBriefBuilder', () => {
       organizationName: 'Пример',
       episode: EPISODE,
       score: SCORE,
+      agency: AGENCY,
     })
     const copy = Object.values(brief).join(' ').toLowerCase()
 
@@ -84,6 +109,7 @@ describe('OpportunityBriefBuilder', () => {
         metadata: {},
       },
       score: SCORE,
+      agency: AGENCY,
     })
 
     expect(brief.whyNow).toContain('возобновила найм')

@@ -4,6 +4,12 @@ export function toPublicOpportunity(opportunity: OpportunityItem) {
   const {
     ownerId: _ownerId,
     evidenceHash: _evidenceHash,
+    evidenceCount: _evidenceCount,
+    factCount,
+    publicationCount,
+    sourceFamilyCount,
+    directEvidenceCount,
+    agencyFitExplanation,
     metadata,
     ...publicOpportunity
   } = opportunity
@@ -11,6 +17,17 @@ export function toPublicOpportunity(opportunity: OpportunityItem) {
 
   return {
     ...publicOpportunity,
+    evidenceMetrics: {
+      factCount,
+      publicationCount,
+      sourceFamilyCount,
+      directEvidenceCount,
+    },
+    agencyFitExplanation,
+    model: {
+      modelType: 'heuristic' as const,
+      calibrationStatus: 'uncalibrated' as const,
+    },
     scoring: {
       components: toPublicComponents(safeMetadata.components),
       fiur: toPublicFiur(safeMetadata.fiur),
@@ -23,7 +40,7 @@ export function toPublicOpportunity(opportunity: OpportunityItem) {
 const COMPONENT_KEYS = [
   'agencyFit',
   'hiringIntent',
-  'externalAgencyPropensity',
+  'externalSupportNeed',
   'timing',
   'reachability',
   'confidence',

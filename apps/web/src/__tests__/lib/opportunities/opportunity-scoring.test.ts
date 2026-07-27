@@ -68,7 +68,7 @@ describe('OpportunityScoringService', () => {
     expect(Object.keys(result.components)).toEqual([
       'agencyFit',
       'hiringIntent',
-      'externalAgencyPropensity',
+      'externalSupportNeed',
       'timing',
       'reachability',
       'confidence',
@@ -126,7 +126,7 @@ describe('OpportunityScoringService', () => {
     )
   })
 
-  it('blocks low external agency propensity even when all other scores are high', () => {
+  it('blocks low external support need even when all other scores are high', () => {
     const result = service.score(
       input({
         episode: episode({
@@ -139,8 +139,8 @@ describe('OpportunityScoringService', () => {
       }),
     )
 
-    expect(result.components.externalAgencyPropensity.score).toBeLessThan(
-      DEFAULT_OPPORTUNITY_SCORING_CONFIG.minimumExternalAgencyPropensity,
+    expect(result.components.externalSupportNeed.score).toBeLessThan(
+      DEFAULT_OPPORTUNITY_SCORING_CONFIG.minimumExternalSupportNeed,
     )
     expect(result.isMorningBriefEligible).toBe(false)
   })

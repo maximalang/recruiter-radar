@@ -4,6 +4,7 @@ import type { Pool, PoolClient } from 'pg'
 import { getClient, getPool } from '@/lib/db-pool'
 import { updateDigestOrgStateFeedback } from '@/lib/digestFeedback'
 import { logEvent } from '@/lib/runtime'
+import { canonicalizeOpportunityUrl } from './canonical-hash'
 import type { HiringEpisodeType } from './hiring-episode-detection'
 import {
   clampOpportunityPageSize,
@@ -30,6 +31,39 @@ export class OpportunityActionConflictError extends Error {
     super('Opportunity action idempotency key was reused with another payload.')
     this.name = 'OpportunityActionConflictError'
   }
+}
+
+export class OpportunityTransitionConflictError extends Error {
+  readonly code = 'opportunity_transition_conflict'
+
+  constructor(
+    readonly previousStatus?: OpportunityStatus,
+    readonly requestedStatus?: OpportunityAction,
+  ) {
+    super('Opportunity status transition is not allowed.')
+    this.name = 'OpportunityTransitionConflictError'
+  }
+}
+
+export class OpportunitySupersededConflictError extends Error {
+  readonly code = 'opportunity_superseded'
+
+  constructor() {
+    super('Opportunity has been superseded by a newer scoring version.')
+    this.name = 'OpportunitySupersededConflictError'
+  }
+}
+
+const ALLOWED_OPPORTUNITY_TRANSITIONS: Readonly<
+  Record<OpportunityStatus, readonly OpportunityAction[]>
+> = {
+  new: ['accepted', 'dismissed', 'snoozed'],
+  review: ['accepted', 'dismissed', 'snoozed'],
+  snoozed: ['accepted', 'dismissed'],
+  accepted: ['contacted', 'dismissed', 'snoozed'],
+  contacted: [],
+  dismissed: [],
+  expired: [],
 }
 
 type OpportunityDb = Pick<Pool, 'query'> | Pick<PoolClient, 'query'>
@@ -64,6 +98,11 @@ interface OpportunityRow {
   createdAt: string
   updatedAt: string
   evidenceCount: number
+  factCount: number
+  publicationCount: number
+  sourceFamilyCount: number
+  directEvidenceCount: number
+  agencyFitExplanation: string
 }
 
 export interface OpportunityItem extends OpportunityRow {
@@ -115,7 +154,7 @@ export async function listOpportunities(
     : (requestedPage - 1) * pageSize
   const page = Math.floor(offset / pageSize) + 1
   const params: unknown[] = [String(input.ownerId)]
-  const clauses = ['o.owner_id = $1']
+  const clauses = ['o.owner_id = $1', 'o.superseded_at IS NULL']
 
   if (input.morningBriefOnly) {
     clauses.push(`o.metadata->>'morningBriefEligible' = 'true'`)
@@ -126,7 +165,7 @@ export async function listOpportunities(
     params.push(DEFAULT_OPPORTUNITY_SCORING_CONFIG.minimumAgencyFit)
     clauses.push(`o.agency_fit_score >= $${params.length}`)
     params.push(
-      DEFAULT_OPPORTUNITY_SCORING_CONFIG.minimumExternalAgencyPropensity,
+      DEFAULT_OPPORTUNITY_SCORING_CONFIG.minimumExternalSupportNeed,
     )
     clauses.push(`o.agency_propensity_score >= $${params.length}`)
   }
@@ -209,6 +248,7 @@ export async function getOpportunityById(
     `${OPPORTUNITY_SELECT}
      WHERE o.id = $1
        AND o.owner_id = $2
+       AND o.superseded_at IS NULL
      LIMIT 1`,
     [input.opportunityId, String(input.ownerId)],
   )
@@ -258,11 +298,17 @@ export async function applyOpportunityAction(input: {
       id: string
       clientProfileId: string
       organizationId: string
+      hiringEpisodeId: string
+      status: OpportunityStatus
+      supersededAt: string | null
     }>(
       `SELECT
          id::TEXT AS id,
          client_profile_id::TEXT AS "clientProfileId",
-         organization_id::TEXT AS "organizationId"
+         organization_id::TEXT AS "organizationId",
+         hiring_episode_id::TEXT AS "hiringEpisodeId",
+         status,
+         superseded_at::TEXT AS "supersededAt"
        FROM opportunities
        WHERE id = $1
          AND owner_id = $2
@@ -275,6 +321,74 @@ export async function applyOpportunityAction(input: {
       return null
     }
 
+    const existingAction = await client.query<{
+      actionFingerprint: string
+      newStatus: OpportunityAction
+    }>(
+      `SELECT action_fingerprint AS "actionFingerprint",
+         new_status AS "newStatus"
+       FROM opportunity_actions
+       WHERE opportunity_id = $1
+         AND owner_id = $2
+         AND action_key = $3
+       LIMIT 1`,
+      [input.opportunityId, String(input.ownerId), actionKey],
+    )
+    if (existingAction.rows[0]) {
+      if (existingAction.rows[0].actionFingerprint !== actionFingerprint) {
+        throw new OpportunityActionConflictError()
+      }
+      await client.query('COMMIT')
+      let opportunity = await getOpportunityById(
+        { ownerId: input.ownerId, opportunityId: input.opportunityId },
+        client,
+      )
+      if (!opportunity && row.supersededAt) {
+        const current = await client.query<{ id: string }>(
+          `SELECT id::TEXT AS id
+           FROM opportunities
+           WHERE client_profile_id = $1
+             AND hiring_episode_id = $2
+             AND owner_id = $3
+             AND superseded_at IS NULL
+           LIMIT 1`,
+          [row.clientProfileId, row.hiringEpisodeId, String(input.ownerId)],
+        )
+        if (current.rows[0]) {
+          opportunity = await getOpportunityById(
+            { ownerId: input.ownerId, opportunityId: current.rows[0].id },
+            client,
+          )
+        }
+      }
+      if (!opportunity) return null
+      opportunity = {
+        ...opportunity,
+        status: existingAction.rows[0].newStatus ?? input.action,
+      }
+      logEvent('opportunity.action', {
+        ownerId: String(input.ownerId),
+        opportunityId: String(input.opportunityId),
+        action: input.action,
+        idempotent: true,
+      })
+      return { opportunity, idempotent: true }
+    }
+
+    if (row.supersededAt) {
+      throw new OpportunitySupersededConflictError()
+    }
+
+    if (!isOpportunityTransitionAllowed(row.status, input.action)) {
+      logEvent('opportunity.transition_rejected', {
+        ownerId: String(input.ownerId),
+        opportunityId: String(input.opportunityId),
+        previousStatus: row.status,
+        requestedStatus: input.action,
+      })
+      throw new OpportunityTransitionConflictError(row.status, input.action)
+    }
+
     const actionInsert = await client.query(
       `INSERT INTO opportunity_actions (
          owner_id,
@@ -282,17 +396,20 @@ export async function applyOpportunityAction(input: {
          action_type,
          action_key,
          action_fingerprint,
+         previous_status,
+         new_status,
          note,
          metadata
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
-       ON CONFLICT (opportunity_id, action_key) DO NOTHING`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)`,
       [
         String(input.ownerId),
         input.opportunityId,
         input.action,
         actionKey,
         actionFingerprint,
+        row.status,
+        input.action,
         note,
         JSON.stringify({
           source: 'opportunity-api',
@@ -302,41 +419,61 @@ export async function applyOpportunityAction(input: {
         }),
       ],
     )
-    const idempotent = actionInsert.rowCount === 0
-
-    if (idempotent) {
-      const existing = await client.query<{ actionFingerprint: string }>(
-        `SELECT action_fingerprint AS "actionFingerprint"
-         FROM opportunity_actions
-         WHERE opportunity_id = $1
-           AND owner_id = $2
-           AND action_key = $3
-         LIMIT 1`,
-        [input.opportunityId, String(input.ownerId), actionKey],
-      )
-      if (existing.rows[0]?.actionFingerprint !== actionFingerprint) {
-        throw new OpportunityActionConflictError()
-      }
-    } else {
-      await client.query(
-        `UPDATE opportunities
-         SET
-           status = $1,
-           snoozed_until = CASE
-             WHEN $1 = 'snoozed'
-               THEN NOW() + ($3 * INTERVAL '1 day')
-             ELSE NULL
-           END,
-           updated_at = NOW()
-         WHERE id = $2
-           AND owner_id = $4`,
-        [input.action, input.opportunityId, snoozeDays, String(input.ownerId)],
-      )
+    if (actionInsert.rowCount !== 1) {
+      throw new Error('Opportunity action insert returned no row.')
+    }
+    await client.query(
+      `UPDATE opportunities
+       SET
+         status = $1,
+         snoozed_until = CASE
+           WHEN $1 = 'snoozed'
+             THEN NOW() + ($3 * INTERVAL '1 day')
+           ELSE NULL
+         END,
+         updated_at = NOW()
+       WHERE id = $2
+         AND owner_id = $4
+         AND superseded_at IS NULL`,
+      [input.action, input.opportunityId, snoozeDays, String(input.ownerId)],
+    )
+    await client.query(
+      `INSERT INTO client_episode_state (
+         client_profile_id,
+         owner_id,
+         hiring_episode_id,
+         organization_id,
+         status,
+         suppressed_until
+       )
+       VALUES (
+         $1, $2, $3, $4, $5,
+         CASE
+           WHEN $5 = 'snoozed'
+             THEN NOW() + ($6 * INTERVAL '1 day')
+           ELSE NULL
+         END
+       )
+       ON CONFLICT (client_profile_id, hiring_episode_id)
+       DO UPDATE SET
+         status = EXCLUDED.status,
+         suppressed_until = EXCLUDED.suppressed_until,
+         updated_at = NOW()`,
+      [
+        row.clientProfileId,
+        String(input.ownerId),
+        row.hiringEpisodeId,
+        row.organizationId,
+        input.action,
+        snoozeDays,
+      ],
+    )
+    if (input.action === 'contacted') {
       await updateDigestOrgStateFeedback(
         {
           clientProfileId: row.clientProfileId,
           orgId: row.organizationId,
-          action: input.action === 'snoozed' ? 'snooze' : input.action,
+          action: 'contacted',
           note,
           snoozeDays,
         },
@@ -355,9 +492,9 @@ export async function applyOpportunityAction(input: {
       ownerId: String(input.ownerId),
       opportunityId: String(input.opportunityId),
       action: input.action,
-      idempotent,
+      idempotent: false,
     })
-    return { opportunity, idempotent }
+    return { opportunity, idempotent: false }
   } catch (error) {
     await client.query('ROLLBACK').catch(() => undefined)
     throw error
@@ -369,6 +506,13 @@ export async function applyOpportunityAction(input: {
 export function isOpportunityAction(value: unknown): value is OpportunityAction {
   return typeof value === 'string' &&
     OPPORTUNITY_ACTIONS.includes(value as OpportunityAction)
+}
+
+export function isOpportunityTransitionAllowed(
+  status: OpportunityStatus,
+  action: OpportunityAction,
+): boolean {
+  return ALLOWED_OPPORTUNITY_TRANSITIONS[status].includes(action)
 }
 
 const OPPORTUNITY_SELECT = `
@@ -396,7 +540,7 @@ const OPPORTUNITY_SELECT = `
     jsonb_build_object(
       'agencyFit', o.agency_fit_score,
       'hiringIntent', o.hiring_intent_score,
-      'externalAgencyPropensity', o.agency_propensity_score,
+      'externalSupportNeed', o.agency_propensity_score,
       'timing', o.timing_score,
       'reachability', o.reachability_score,
       'confidence', o.confidence_score
@@ -406,13 +550,57 @@ const OPPORTUNITY_SELECT = `
     o.valid_until::TEXT AS "validUntil",
     o.snoozed_until::TEXT AS "snoozedUntil",
     o.metadata,
+    COALESCE(
+      NULLIF(o.metadata->>'agencyFitExplanation', ''),
+      'Соответствие требует ручной проверки по профилю агентства.'
+    ) AS "agencyFitExplanation",
     o.created_at::TEXT AS "createdAt",
     o.updated_at::TEXT AS "updatedAt",
     (
       SELECT COUNT(*)::INT
       FROM hiring_episode_evidence evidence_count
       WHERE evidence_count.hiring_episode_id = he.id
-    ) AS "evidenceCount"
+    ) AS "evidenceCount",
+    (
+      SELECT COUNT(DISTINCT COALESCE(
+        'signal:' || evidence_fact.signal_id::TEXT,
+        'evidence:' || evidence_fact.evidence_id::TEXT
+      ))::INT
+      FROM hiring_episode_evidence evidence_fact
+      WHERE evidence_fact.hiring_episode_id = he.id
+    ) AS "factCount",
+    (
+      SELECT COUNT(DISTINCT COALESCE(
+        NULLIF(publication_signal.source_url, ''),
+        NULLIF(publication_evidence.url, ''),
+        'signal:' || publication.signal_id::TEXT,
+        'evidence:' || publication.evidence_id::TEXT
+      ))::INT
+      FROM hiring_episode_evidence publication
+      LEFT JOIN signals publication_signal
+        ON publication_signal.id = publication.signal_id
+      LEFT JOIN evidence_items publication_evidence
+        ON publication_evidence.id = publication.evidence_id
+      WHERE publication.hiring_episode_id = he.id
+    ) AS "publicationCount",
+    (
+      SELECT COUNT(DISTINCT COALESCE(source_signal.source, source_evidence.source))::INT
+      FROM hiring_episode_evidence source_row
+      LEFT JOIN signals source_signal ON source_signal.id = source_row.signal_id
+      LEFT JOIN evidence_items source_evidence ON source_evidence.id = source_row.evidence_id
+      WHERE source_row.hiring_episode_id = he.id
+    ) AS "sourceFamilyCount",
+    (
+      SELECT COUNT(*)::INT
+      FROM hiring_episode_evidence direct_row
+      LEFT JOIN signals direct_signal ON direct_signal.id = direct_row.signal_id
+      LEFT JOIN evidence_items direct_evidence ON direct_evidence.id = direct_row.evidence_id
+      WHERE direct_row.hiring_episode_id = he.id
+        AND (
+          direct_signal.source = 'career-pages'
+          OR direct_evidence.tier = 'direct'
+        )
+    ) AS "directEvidenceCount"
   FROM opportunities o
   JOIN orgs org ON org.id = o.organization_id
   JOIN hiring_episodes he ON he.id = o.hiring_episode_id
@@ -449,6 +637,10 @@ async function getEvidenceForOpportunities(
   const byOpportunity = new Map<string, OpportunityEvidenceItem[]>()
   for (const row of result.rows) {
     const items = byOpportunity.get(row.opportunityId) ?? []
+    const publicationIdentity = canonicalPublicationIdentity(row)
+    if (items.some((item) => canonicalPublicationIdentity(item) === publicationIdentity)) {
+      continue
+    }
     items.push({
       id: row.id,
       kind: row.kind,
@@ -461,6 +653,14 @@ async function getEvidenceForOpportunities(
     byOpportunity.set(row.opportunityId, items)
   }
   return byOpportunity
+}
+
+function canonicalPublicationIdentity(
+  item: Pick<OpportunityEvidenceItem, 'id' | 'kind' | 'source' | 'url'>,
+): string {
+  const canonicalUrl = canonicalizeOpportunityUrl(item.url)
+  if (canonicalUrl) return `url:${canonicalUrl}`
+  return `${item.kind}:${item.source}:${item.id}`
 }
 
 function isOpportunityStatus(value: unknown): value is OpportunityStatus {

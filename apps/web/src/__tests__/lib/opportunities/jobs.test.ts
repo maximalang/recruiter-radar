@@ -10,8 +10,60 @@ function dbWithQuery(handler: (sql: string, params?: readonly unknown[]) => {
   rows: unknown[]
 }) {
   return {
-    query: jest.fn(async (sql: string, params?: readonly unknown[]) =>
-      handler(sql, params)),
+    query: jest.fn(async (sql: string, params?: readonly unknown[]) => {
+      try {
+        return handler(sql, params)
+      } catch (error) {
+        if (!(error instanceof Error) || !error.message.startsWith('Unexpected SQL:')) {
+          throw error
+        }
+        if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') {
+          return { rowCount: 0, rows: [] }
+        }
+        if (sql.includes('pg_advisory_xact_lock')) {
+          return { rowCount: 1, rows: [{ locked: true }] }
+        }
+        if (
+          sql.includes('FROM hiring_episodes') &&
+          sql.includes('episode_identity') &&
+          sql.includes('FOR UPDATE')
+        ) {
+          return { rowCount: 0, rows: [] }
+        }
+        if (sql.includes('DELETE FROM hiring_episode_evidence')) {
+          return { rowCount: 0, rows: [] }
+        }
+        if (
+          sql.includes('ARRAY_AGG(signal_id::TEXT') &&
+          sql.includes('FROM hiring_episode_evidence')
+        ) {
+          return {
+            rowCount: 1,
+            rows: [{ signalIds: ['1', '2', '3', '4'], evidenceIds: [] }],
+          }
+        }
+        if (
+          sql.includes('FROM opportunities') &&
+          sql.includes('input_hash') &&
+          sql.includes('FOR UPDATE')
+        ) {
+          return { rowCount: 0, rows: [] }
+        }
+        if (
+          sql.includes('FROM client_episode_state') &&
+          sql.includes('FOR UPDATE')
+        ) {
+          return { rowCount: 0, rows: [] }
+        }
+        if (
+          sql.includes('UPDATE hiring_episodes') &&
+          sql.includes('episode_identity <> ALL')
+        ) {
+          return { rowCount: 0, rows: [] }
+        }
+        throw error
+      }
+    }),
   }
 }
 
@@ -34,6 +86,8 @@ function buildRow(
     organizationCity: 'Москва',
     episodeType: 'vacancy_spike',
     episodeKey: 'vacancy_spike:all:2026-07-20',
+    episodeIdentity: 'f'.repeat(64),
+    episodeGeneration: 1,
     episodeTitle: 'Компания ускорила найм',
     episodeSummary: 'За последние 14 дней опубликовано 8 вакансий.',
     episodeStartedAt: '2026-07-15T09:00:00.000Z',
@@ -153,7 +207,7 @@ describe('opportunity background jobs', () => {
     )).toBe(false)
   })
 
-  it('uses conflict-safe episode writes and can be replayed', async () => {
+  it('reconciles episode evidence and checkpoint in one transaction', async () => {
     const now = new Date('2026-07-26T09:00:00.000Z')
     const sqlSeen: string[] = []
     const db = dbWithQuery((sql) => {
@@ -185,7 +239,7 @@ describe('opportunity background jobs', () => {
         }
       }
       if (sql.includes('INSERT INTO hiring_episodes')) {
-        return { rowCount: 1, rows: [{ id: '20', inserted: false }] }
+        return { rowCount: 1, rows: [{ id: '20', inserted: true }] }
       }
       if (sql.includes('INSERT INTO hiring_episode_evidence')) {
         return { rowCount: 4, rows: [] }
@@ -198,13 +252,55 @@ describe('opportunity background jobs', () => {
 
     const result = await detectHiringEpisodesJob({ enabled: true, now }, db)
 
-    expect(result.updated).toBeGreaterThan(0)
+    expect(result.created).toBeGreaterThan(0)
+    expect(result.reconciled).toBeGreaterThan(0)
+    expect(sqlSeen).toContain('BEGIN')
+    expect(sqlSeen).toContain('COMMIT')
+    expect(sqlSeen.some((sql) =>
+      sql.includes('DELETE FROM hiring_episode_evidence'),
+    )).toBe(true)
     expect(sqlSeen.find((sql) => sql.includes('INSERT INTO hiring_episodes')))
-      .toContain('ON CONFLICT (organization_id, episode_key, engine_version)')
+      .toContain('episode_identity')
     expect(sqlSeen.find((sql) => sql.includes('INSERT INTO hiring_episode_evidence')))
       .toContain('ON CONFLICT')
     expect(sqlSeen.find((sql) => sql.includes('INSERT INTO hiring_episode_detection_state')))
       .toContain('ON CONFLICT')
+  })
+
+  it('closes missing active identities only through the inactivity policy', async () => {
+    const sqlSeen: string[] = []
+    const now = new Date('2026-07-26T09:00:00.000Z')
+    const db = dbWithQuery((sql) => {
+      sqlSeen.push(sql)
+      if (sql.includes('MAX(s.updated_at)')) {
+        return {
+          rowCount: 1,
+          rows: [{
+            organizationId: '10',
+            lastSignalId: '1',
+            lastSignalUpdatedAt: now.toISOString(),
+            inputFingerprint: 'a'.repeat(32),
+          }],
+        }
+      }
+      if (sql.includes('FROM signals s')) {
+        return { rowCount: 0, rows: [] }
+      }
+      if (sql.includes('episode_identity <> ALL')) {
+        return { rowCount: 1, rows: [{ id: '20' }] }
+      }
+      if (sql.includes('INSERT INTO hiring_episode_detection_state')) {
+        return { rowCount: 1, rows: [] }
+      }
+      throw new Error(`Unexpected SQL: ${sql}`)
+    })
+
+    const result = await detectHiringEpisodesJob({ enabled: true, now }, db)
+
+    expect(result.skipped).toBe(1)
+    expect(result.updated).toBe(1)
+    expect(sqlSeen).toContain('BEGIN')
+    expect(sqlSeen).toContain('COMMIT')
   })
 
   it('quarantines a failed detection organization so later batches can progress', async () => {
@@ -264,12 +360,16 @@ describe('opportunity background jobs', () => {
   it('creates independent opportunities for two profiles and excludes up-to-date rows', async () => {
     const insertParams: readonly unknown[][] = []
     const db = dbWithQuery((sql, params) => {
-      if (sql.includes('FROM hiring_episodes he')) {
+      if (sql.includes('WITH latest_candidates AS')) {
         expect(sql).toContain('run.status = \'completed\'')
-        expect(sql).toContain('candidate.created_at >= he.last_seen_at')
-        expect(sql).toContain('candidate.created_at >= cp.updated_at')
-        expect(sql).toContain('dc.source_families ? source_signal.source')
+        expect(sql).toContain('dc.created_at >= he.last_seen_at')
+        expect(sql).toContain('dc.created_at >= cp.updated_at')
+        expect(sql).toContain('LEFT JOIN evidence_items source_evidence')
+        expect(sql).toMatch(
+          /dc\.source_families\s+\?\s+COALESCE\(\s*source_signal\.source,\s*source_evidence\.source\s*\)/,
+        )
         expect(sql).toContain('build_failure.next_retry_at')
+        expect(sql).not.toContain('CROSS JOIN client_profiles')
         expect(sql).toContain(
           '(build_failure.next_retry_at IS NOT NULL) ASC',
         )
@@ -298,10 +398,36 @@ describe('opportunity background jobs', () => {
     expect(insertParams.map((params) => params[1])).toEqual(['8', '18'])
   })
 
+  it('mentions only agency roles that match the episode vacancies', async () => {
+    let opportunityParams: readonly unknown[] = []
+    const db = dbWithQuery((sql, params) => {
+      if (sql.includes('WITH latest_candidates AS')) {
+        return {
+          rowCount: 1,
+          rows: [buildRow('8', { roles: ['Backend', 'Sales'] })],
+        }
+      }
+      if (sql.includes('INSERT INTO opportunities')) {
+        opportunityParams = params ?? []
+        return { rowCount: 1, rows: [{ id: '100', inserted: true }] }
+      }
+      if (sql.includes('DELETE FROM opportunity_build_failures')) {
+        return { rowCount: 0, rows: [] }
+      }
+      throw new Error(`Unexpected SQL: ${sql}`)
+    })
+
+    await buildOpportunitiesJob({ enabled: true }, db)
+
+    const metadata = JSON.parse(String(opportunityParams[22]))
+    expect(metadata.agencyFitExplanation).toContain('Backend')
+    expect(metadata.agencyFitExplanation).not.toContain('Sales')
+  })
+
   it('gives a vacancy keyword exclusion priority over strong hiring intent', async () => {
     let opportunityParams: readonly unknown[] = []
     const db = dbWithQuery((sql, params) => {
-      if (sql.includes('FROM hiring_episodes he')) {
+      if (sql.includes('WITH latest_candidates AS')) {
         return {
           rowCount: 1,
           rows: [buildRow('8', {
@@ -334,11 +460,251 @@ describe('opportunity background jobs', () => {
     expect(metadata).not.toHaveProperty('contactPaths')
   })
 
+  it('skips an unchanged build input without touching updated_at', async () => {
+    let inputHash: string | null = null
+    let selectionCount = 0
+    let insertCount = 0
+    let updateCount = 0
+    const db = dbWithQuery((sql, params) => {
+      if (sql.includes('WITH latest_candidates AS')) {
+        selectionCount += 1
+        return {
+          rowCount: 1,
+          rows: [buildRow('8', {
+            currentInputHash: selectionCount === 1 ? null : inputHash,
+            currentOpportunityId: selectionCount === 1 ? null : '100',
+            currentScoringVersion: selectionCount === 1 ? null : 'opportunity-v1',
+            ...(selectionCount === 3
+              ? { signals: [{
+                id: '1',
+                title: 'Changed backend vacancy',
+                region: 'Москва',
+                occurredAt: '2026-07-25T09:00:00.000Z',
+                tier: 'direct',
+              }] }
+              : {}),
+          })],
+        }
+      }
+      if (
+        sql.includes('FROM opportunities') &&
+        sql.includes('input_hash') &&
+        sql.includes('FOR UPDATE')
+      ) {
+        if (selectionCount < 3) return { rowCount: 0, rows: [] }
+        return {
+          rowCount: 1,
+          rows: [{
+            id: '100',
+            inputHash,
+            scoringVersion: 'opportunity-v1',
+            status: 'new',
+          }],
+        }
+      }
+      if (sql.includes('INSERT INTO opportunities')) {
+        insertCount += 1
+        inputHash = String(params?.[29])
+        return { rowCount: 1, rows: [{ id: '100' }] }
+      }
+      if (sql.includes('UPDATE opportunities') && sql.includes('owner_id = $2')) {
+        updateCount += 1
+        inputHash = String(params?.[30])
+        return { rowCount: 1, rows: [{ id: '100' }] }
+      }
+      if (sql.includes('DELETE FROM opportunity_build_failures')) {
+        return { rowCount: 0, rows: [] }
+      }
+      throw new Error(`Unexpected SQL: ${sql}`)
+    })
+
+    const first = await buildOpportunitiesJob({ enabled: true }, db)
+    const second = await buildOpportunitiesJob({ enabled: true }, db)
+    const third = await buildOpportunitiesJob({ enabled: true }, db)
+
+    expect(first.created).toBe(1)
+    expect(second.skippedUnchanged).toBe(1)
+    expect(third.updated).toBe(1)
+    expect(insertCount).toBe(1)
+    expect(updateCount).toBe(1)
+  })
+
+  it('supersedes the current row when the scoring version changes', async () => {
+    const sqlSeen: string[] = []
+    const db = dbWithQuery((sql) => {
+      sqlSeen.push(sql)
+      if (sql.includes('WITH latest_candidates AS')) {
+        return {
+          rowCount: 1,
+          rows: [buildRow('8', {
+            currentOpportunityId: '100',
+            currentInputHash: '0'.repeat(64),
+            currentScoringVersion: 'opportunity-v1',
+          })],
+        }
+      }
+      if (
+        sql.includes('FROM opportunities') &&
+        sql.includes('input_hash') &&
+        sql.includes('FOR UPDATE')
+      ) {
+        return {
+          rowCount: 1,
+          rows: [{
+            id: '100',
+            inputHash: '0'.repeat(64),
+            scoringVersion: 'opportunity-v1',
+            status: 'new',
+          }],
+        }
+      }
+      if (
+        sql.includes('FROM opportunities') &&
+        sql.includes('scoring_version = $3') &&
+        sql.includes('superseded_at IS NOT NULL')
+      ) {
+        return { rowCount: 0, rows: [] }
+      }
+      if (sql.includes('SET superseded_at = NOW()')) {
+        return { rowCount: 1, rows: [] }
+      }
+      if (sql.includes('INSERT INTO opportunities')) {
+        return { rowCount: 1, rows: [{ id: '101' }] }
+      }
+      if (sql.includes('DELETE FROM opportunity_build_failures')) {
+        return { rowCount: 0, rows: [] }
+      }
+      throw new Error(`Unexpected SQL: ${sql}`)
+    })
+
+    const result = await buildOpportunitiesJob(
+      { enabled: true, scoringVersion: 'opportunity-v2' },
+      db,
+    )
+
+    expect(result.created).toBe(1)
+    expect(result.superseded).toBe(1)
+    expect(sqlSeen.some((sql) => sql.includes('SET superseded_at = NOW()'))).toBe(true)
+  })
+
+  it('restores a superseded scoring row when a canary rolls back its version', async () => {
+    let restoredOpportunityId: string | null = null
+    let insertCount = 0
+    const db = dbWithQuery((sql, params) => {
+      if (sql.includes('WITH latest_candidates AS')) {
+        return {
+          rowCount: 1,
+          rows: [buildRow('8', {
+            currentOpportunityId: '101',
+            currentInputHash: '0'.repeat(64),
+            currentScoringVersion: 'opportunity-v2',
+          })],
+        }
+      }
+      if (
+        sql.includes('FROM opportunities') &&
+        sql.includes('input_hash') &&
+        sql.includes('FOR UPDATE')
+      ) {
+        return {
+          rowCount: 1,
+          rows: [{
+            id: '101',
+            inputHash: '0'.repeat(64),
+            scoringVersion: 'opportunity-v2',
+            status: 'new',
+          }],
+        }
+      }
+      if (
+        sql.includes('FROM opportunities') &&
+        sql.includes('scoring_version = $3') &&
+        sql.includes('superseded_at IS NOT NULL')
+      ) {
+        return { rowCount: 1, rows: [{ id: '100' }] }
+      }
+      if (sql.includes('SET superseded_at = NOW()')) {
+        return { rowCount: 1, rows: [] }
+      }
+      if (sql.includes('UPDATE opportunities') && sql.includes('owner_id = $2')) {
+        restoredOpportunityId = String(params?.[0])
+        return { rowCount: 1, rows: [{ id: restoredOpportunityId }] }
+      }
+      if (sql.includes('INSERT INTO opportunities')) {
+        insertCount += 1
+        return { rowCount: 1, rows: [{ id: '102' }] }
+      }
+      if (sql.includes('DELETE FROM opportunity_build_failures')) {
+        return { rowCount: 0, rows: [] }
+      }
+      throw new Error(`Unexpected SQL: ${sql}`)
+    })
+
+    const result = await buildOpportunitiesJob(
+      { enabled: true, scoringVersion: 'opportunity-v1' },
+      db,
+    )
+
+    expect(result.created).toBe(0)
+    expect(result.updated).toBe(1)
+    expect(result.superseded).toBe(1)
+    expect(restoredOpportunityId).toBe('100')
+    expect(insertCount).toBe(0)
+  })
+
+  it('re-reads locked episode state before persisting a concurrently contacted opportunity', async () => {
+    let storedStatus: unknown = null
+    const db = dbWithQuery((sql, params) => {
+      if (sql.includes('WITH latest_candidates AS')) {
+        return {
+          rowCount: 1,
+          rows: [buildRow('8', {
+            currentOpportunityId: '100',
+            currentInputHash: '0'.repeat(64),
+            currentScoringVersion: 'opportunity-v1',
+            episodeStateStatus: 'accepted',
+          })],
+        }
+      }
+      if (
+        sql.includes('FROM opportunities') &&
+        sql.includes('input_hash') &&
+        sql.includes('FOR UPDATE')
+      ) {
+        return {
+          rowCount: 1,
+          rows: [{
+            id: '100',
+            inputHash: '0'.repeat(64),
+            scoringVersion: 'opportunity-v1',
+            status: 'contacted',
+          }],
+        }
+      }
+      if (sql.includes('FROM client_episode_state') && sql.includes('FOR UPDATE')) {
+        return { rowCount: 1, rows: [{ status: 'contacted' }] }
+      }
+      if (sql.includes('UPDATE opportunities') && sql.includes('owner_id = $2')) {
+        storedStatus = params?.[5]
+        return { rowCount: 1, rows: [{ id: '100' }] }
+      }
+      if (sql.includes('DELETE FROM opportunity_build_failures')) {
+        return { rowCount: 0, rows: [] }
+      }
+      throw new Error(`Unexpected SQL: ${sql}`)
+    })
+
+    const result = await buildOpportunitiesJob({ enabled: true }, db)
+
+    expect(result.updated).toBe(1)
+    expect(storedStatus).toBe('contacted')
+  })
+
   it('quarantines a failed build pair so later bounded runs can progress', async () => {
     const sqlSeen: string[] = []
     const db = dbWithQuery((sql) => {
       sqlSeen.push(sql)
-      if (sql.includes('FROM hiring_episodes he')) {
+      if (sql.includes('WITH latest_candidates AS')) {
         return { rowCount: 1, rows: [buildRow('8')] }
       }
       if (sql.includes('INSERT INTO opportunities')) {
@@ -356,7 +722,7 @@ describe('opportunity background jobs', () => {
     )
 
     expect(result.failed).toBe(1)
-    expect(sqlSeen.find((sql) => sql.includes('FROM hiring_episodes he')))
+    expect(sqlSeen.find((sql) => sql.includes('WITH latest_candidates AS')))
       .toContain('build_failure.next_retry_at')
     expect(sqlSeen.find((sql) => sql.includes('INSERT INTO opportunity_build_failures')))
       .toContain("INTERVAL '5 minutes'")
@@ -407,7 +773,7 @@ describe('opportunity background jobs', () => {
       if (sql.includes('INSERT INTO hiring_episode_detection_state')) {
         return { rowCount: 1, rows: [] }
       }
-      if (sql.includes('FROM hiring_episodes he')) {
+      if (sql.includes('WITH latest_candidates AS')) {
         return { rowCount: 1, rows: [buildRow('8')] }
       }
       if (sql.includes('INSERT INTO opportunities')) {

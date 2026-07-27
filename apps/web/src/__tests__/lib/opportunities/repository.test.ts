@@ -5,6 +5,9 @@ import {
   getOpportunityById,
   listOpportunities,
   OpportunityActionConflictError,
+  OpportunitySupersededConflictError,
+  OpportunityTransitionConflictError,
+  isOpportunityTransitionAllowed,
 } from '@/lib/opportunities/repository'
 import { getClient } from '@/lib/db-pool'
 
@@ -30,6 +33,38 @@ function createDb(rowsByCall: unknown[][]) {
 }
 
 describe('opportunity repository tenant scope', () => {
+  it.each([
+    ['new', 'accepted'],
+    ['new', 'dismissed'],
+    ['new', 'snoozed'],
+    ['review', 'accepted'],
+    ['review', 'dismissed'],
+    ['review', 'snoozed'],
+    ['snoozed', 'accepted'],
+    ['snoozed', 'dismissed'],
+    ['accepted', 'contacted'],
+    ['accepted', 'dismissed'],
+    ['accepted', 'snoozed'],
+  ] as const)('allows transition %s -> %s', (status, action) => {
+    expect(isOpportunityTransitionAllowed(status, action)).toBe(true)
+  })
+
+  it.each([
+    ['new', 'contacted'],
+    ['snoozed', 'contacted'],
+    ['contacted', 'accepted'],
+    ['dismissed', 'accepted'],
+    ['expired', 'dismissed'],
+  ] as const)('rejects transition %s -> %s', (status, action) => {
+    expect(isOpportunityTransitionAllowed(status, action)).toBe(false)
+  })
+
+  it('uses a distinct transition conflict error contract', () => {
+    expect(new OpportunityTransitionConflictError()).toMatchObject({
+      code: 'opportunity_transition_conflict',
+    })
+  })
+
   it('scopes list, count, and evidence queries to the session owner', async () => {
     const { db, calls } = createDb([
       [{ count: '1' }],
@@ -106,6 +141,41 @@ describe('opportunity repository tenant scope', () => {
     expect(calls[0].params).toEqual(['999', '7'])
   })
 
+  it('deduplicates timeline publications by canonical URL', async () => {
+    const { db } = createDb([
+      [{ id: '10', ownerId: '7' }],
+      [
+        {
+          opportunityId: '10',
+          id: 'signal:1',
+          kind: 'signal',
+          source: 'hh',
+          label: 'Java developer',
+          url: 'https://example.test/jobs/java/?utm_source=hh',
+          publishedAt: '2026-07-25T09:00:00.000Z',
+          tier: 'corroboration',
+        },
+        {
+          opportunityId: '10',
+          id: 'evidence:2',
+          kind: 'evidence',
+          source: 'career-pages',
+          label: 'Java developer',
+          url: 'https://example.test/jobs/java?ref=careers',
+          publishedAt: '2026-07-25T09:00:00.000Z',
+          tier: 'direct',
+        },
+      ],
+    ])
+
+    const result = await getOpportunityById(
+      { ownerId: '7', opportunityId: '10' },
+      db,
+    )
+
+    expect(result?.evidenceTimeline).toHaveLength(1)
+  })
+
   it('rejects a cross-tenant action before any mutation query', async () => {
     const query = jest.fn(async (sql: string) => {
       if (sql.includes('FROM opportunities') && sql.includes('FOR UPDATE')) {
@@ -131,7 +201,7 @@ describe('opportunity repository tenant scope', () => {
     expect(release).toHaveBeenCalledTimes(1)
   })
 
-  it('persists an action and reuses digest feedback in the same transaction', async () => {
+  it('persists accepted episode state without creating legacy contacted suppression', async () => {
     const opportunity = {
       id: '10',
       ownerId: '7',
@@ -144,7 +214,7 @@ describe('opportunity repository tenant scope', () => {
       episodeStatus: 'active',
       episodeStartedAt: '2026-07-20T00:00:00.000Z',
       episodeLastSeenAt: '2026-07-26T00:00:00.000Z',
-      status: 'dismissed',
+      status: 'accepted',
       title: 'Возможность',
       whyNow: 'Почему сейчас',
       problemHypothesis: 'Гипотеза',
@@ -167,7 +237,13 @@ describe('opportunity repository tenant scope', () => {
       if (sql.includes('FROM opportunities') && sql.includes('FOR UPDATE')) {
         return {
           rowCount: 1,
-          rows: [{ id: '10', clientProfileId: '8', organizationId: '9' }],
+          rows: [{
+            id: '10',
+            clientProfileId: '8',
+            organizationId: '9',
+            hiringEpisodeId: '11',
+            status: 'new',
+          }],
         }
       }
       if (sql.includes('INSERT INTO opportunity_actions')) {
@@ -187,19 +263,21 @@ describe('opportunity repository tenant scope', () => {
     const result = await applyOpportunityAction({
       ownerId: '7',
       opportunityId: '10',
-      action: 'dismissed',
-      actionKey: 'dismissed:request-1',
-      note: 'Не наш сегмент',
+      action: 'accepted',
+      actionKey: 'accepted:request-1',
     })
 
     expect(result?.idempotent).toBe(false)
-    expect(result?.opportunity.status).toBe('dismissed')
+    expect(result?.opportunity.status).toBe('accepted')
     expect(query.mock.calls.some(([sql]) =>
       String(sql).includes('INSERT INTO opportunity_actions'),
     )).toBe(true)
     expect(query.mock.calls.some(([sql]) =>
-      String(sql).includes('INSERT INTO client_digest_org_state'),
+      String(sql).includes('INSERT INTO client_episode_state'),
     )).toBe(true)
+    expect(query.mock.calls.some(([sql]) =>
+      String(sql).includes('INSERT INTO client_digest_org_state'),
+    )).toBe(false)
     expect(query.mock.calls.some(([sql]) => String(sql) === 'COMMIT')).toBe(true)
     expect(release).toHaveBeenCalledTimes(1)
   })
@@ -209,11 +287,14 @@ describe('opportunity repository tenant scope', () => {
       if (sql.includes('FROM opportunities') && sql.includes('FOR UPDATE')) {
         return {
           rowCount: 1,
-          rows: [{ id: '10', clientProfileId: '8', organizationId: '9' }],
+          rows: [{
+            id: '10',
+            clientProfileId: '8',
+            organizationId: '9',
+            hiringEpisodeId: '11',
+            status: 'new',
+          }],
         }
-      }
-      if (sql.includes('INSERT INTO opportunity_actions')) {
-        return { rowCount: 0, rows: [] }
       }
       if (sql.includes('SELECT action_fingerprint')) {
         return {
@@ -240,6 +321,41 @@ describe('opportunity repository tenant scope', () => {
     expect(release).toHaveBeenCalledTimes(1)
   })
 
+  it('rejects a terminal-state transition before writing an action', async () => {
+    const query = jest.fn(async (sql: string) => {
+      if (sql.includes('FROM opportunities') && sql.includes('FOR UPDATE')) {
+        return {
+          rowCount: 1,
+          rows: [{
+            id: '10',
+            clientProfileId: '8',
+            organizationId: '9',
+            hiringEpisodeId: '11',
+            status: 'contacted',
+          }],
+        }
+      }
+      if (sql.includes('SELECT action_fingerprint')) {
+        return { rowCount: 0, rows: [] }
+      }
+      return { rowCount: 0, rows: [] }
+    })
+    const release = jest.fn()
+    jest.mocked(getClient).mockResolvedValue({ query, release })
+
+    await expect(applyOpportunityAction({
+      ownerId: '7',
+      opportunityId: '10',
+      action: 'accepted',
+      actionKey: 'invalid-transition',
+    })).rejects.toBeInstanceOf(OpportunityTransitionConflictError)
+
+    expect(query.mock.calls.some(([sql]) =>
+      String(sql).includes('INSERT INTO opportunity_actions'),
+    )).toBe(false)
+    expect(query.mock.calls.some(([sql]) => String(sql) === 'ROLLBACK')).toBe(true)
+  })
+
   it('replays an action with the same idempotency key and payload without mutating state', async () => {
     const actionFingerprint = createHash('sha256')
       .update(JSON.stringify({
@@ -252,16 +368,19 @@ describe('opportunity repository tenant scope', () => {
       if (sql.includes('FROM opportunities') && sql.includes('FOR UPDATE')) {
         return {
           rowCount: 1,
-          rows: [{ id: '10', clientProfileId: '8', organizationId: '9' }],
+          rows: [{
+            id: '10',
+            clientProfileId: '8',
+            organizationId: '9',
+            hiringEpisodeId: '11',
+            status: 'accepted',
+          }],
         }
-      }
-      if (sql.includes('INSERT INTO opportunity_actions')) {
-        return { rowCount: 0, rows: [] }
       }
       if (sql.includes('SELECT action_fingerprint')) {
         return {
           rowCount: 1,
-          rows: [{ actionFingerprint }],
+          rows: [{ actionFingerprint, newStatus: 'accepted' }],
         }
       }
       if (sql.includes('WHERE o.id = $1')) {
@@ -270,7 +389,7 @@ describe('opportunity repository tenant scope', () => {
           rows: [{
             id: '10',
             ownerId: '7',
-            status: 'accepted',
+            status: 'contacted',
             evidenceCount: 0,
           }],
         }
@@ -297,5 +416,41 @@ describe('opportunity repository tenant scope', () => {
     )).toBe(false)
     expect(query.mock.calls.some(([sql]) => String(sql) === 'COMMIT')).toBe(true)
     expect(release).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects a new action after its opportunity row was superseded', async () => {
+    const query = jest.fn(async (sql: string) => {
+      if (sql.includes('FROM opportunities') && sql.includes('FOR UPDATE')) {
+        return {
+          rowCount: 1,
+          rows: [{
+            id: '10',
+            clientProfileId: '8',
+            organizationId: '9',
+            hiringEpisodeId: '11',
+            status: 'new',
+            supersededAt: '2026-07-26T10:00:00.000Z',
+          }],
+        }
+      }
+      if (sql.includes('SELECT action_fingerprint')) {
+        return { rowCount: 0, rows: [] }
+      }
+      return { rowCount: 0, rows: [] }
+    })
+    const release = jest.fn()
+    jest.mocked(getClient).mockResolvedValue({ query, release })
+
+    await expect(applyOpportunityAction({
+      ownerId: '7',
+      opportunityId: '10',
+      action: 'accepted',
+      actionKey: 'accepted:late-request',
+    })).rejects.toBeInstanceOf(OpportunitySupersededConflictError)
+
+    expect(query.mock.calls.some(([sql]) =>
+      String(sql).includes('INSERT INTO opportunity_actions'),
+    )).toBe(false)
+    expect(query.mock.calls.some(([sql]) => String(sql) === 'ROLLBACK')).toBe(true)
   })
 })
