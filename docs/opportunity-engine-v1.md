@@ -26,6 +26,10 @@ OPPORTUNITY_ENGINE_V1_ENABLED=false
 При выключенном flag пользовательские routes отвечают `404`, а jobs не делают
 даже read-запросов.
 
+Коммерческие результаты после v1 фиксируются отдельным Outcome Ledger под
+независимыми выключенными по умолчанию flags. Его taxonomy, projection, API и
+rollout описаны в [opportunity-outcomes.md](./opportunity-outcomes.md).
+
 ## Миграции и модель данных
 
 Миграции применяются по порядку:
