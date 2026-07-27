@@ -1,4 +1,9 @@
 export const OPPORTUNITY_ENGINE_FEATURE_FLAG = 'OPPORTUNITY_ENGINE_V1_ENABLED'
+export const OPPORTUNITY_OUTCOMES_FEATURE_FLAG = 'OPPORTUNITY_OUTCOMES_ENABLED'
+export const OPPORTUNITY_OUTCOMES_UI_FEATURE_FLAG =
+  'OPPORTUNITY_OUTCOMES_UI_ENABLED'
+export const OPPORTUNITY_OUTCOMES_EXTERNAL_INGEST_FEATURE_FLAG =
+  'OPPORTUNITY_OUTCOMES_EXTERNAL_INGEST_ENABLED'
 
 export const OPPORTUNITY_ENGINE_LIMITS = {
   defaultPageSize: 20,
@@ -14,6 +19,26 @@ export function isOpportunityEngineV1Enabled(
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): boolean {
   return env[OPPORTUNITY_ENGINE_FEATURE_FLAG] === 'true'
+}
+
+export function isOpportunityOutcomesEnabled(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+  return env[OPPORTUNITY_OUTCOMES_FEATURE_FLAG] === 'true'
+}
+
+export function isOpportunityOutcomesUiEnabled(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+  return isOpportunityOutcomesEnabled(env) &&
+    env[OPPORTUNITY_OUTCOMES_UI_FEATURE_FLAG] === 'true'
+}
+
+export function isOpportunityOutcomesExternalIngestEnabled(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+  return isOpportunityOutcomesEnabled(env) &&
+    env[OPPORTUNITY_OUTCOMES_EXTERNAL_INGEST_FEATURE_FLAG] === 'true'
 }
 
 export function clampOpportunityPageSize(value: number): number {
