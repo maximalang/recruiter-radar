@@ -38,6 +38,9 @@ OPPORTUNITY_ENGINE_V1_ENABLED=false
   пересчитанных opportunities;
 - `20260727130000_fix_opportunity_hardening_edge_cases.sql` — восстановление
   snooze deadline и constraint, запрещающий `snoozed` без `snoozed_until`.
+- `20260727140000_repair_opportunity_authoritative_state.sql` — восстановление
+  последнего клиентского решения из append-only action log и backfill будущего
+  snooze, если episode state отсутствует.
 
 Для каждой migration рядом находится `.down.sql`.
 
@@ -90,7 +93,8 @@ Vacancy dedupe использует, по убыванию надёжности:
 2. канонический URL без tracking-параметров;
 3. fallback `organization + normalized title + normalized region`.
 
-Разные external id одного provider не склеиваются, в том числе через транзитивную
+External id сохраняет исходный регистр (после trim): регистр может быть частью
+идентификатора провайдера. Разные external id одного provider не склеиваются, в том числе через транзитивную
 цепочку публикаций без id. Между разными providers
 публикации могут объединиться по canonical URL или fallback fingerprint.
 Несколько публикаций одной
@@ -151,7 +155,8 @@ digest payload и профиль, но не `digest_candidate_id` и други�
 Detector-only `canonicalVacancyFingerprints` также не входят в hash: fallback этих
 идентификаторов содержит database organization id, а сами вакансии уже представлены
 семантическим содержимым signals.
-Ключи объектов канонически сортируются; только set-like массивы (source families,
+Ключи объектов канонически сортируются по Unicode code points без зависимости от
+системной locale; только set-like массивы (source families,
 поля профиля и наборы signals/evidence) сортируются и dedupe-ятся в build job.
 Порядок семантических массивов, включая digest reasons, сохраняется. Одинаковый `input_hash` не
 вызывает запись. Повторная сборка той же scoring version обновляет текущую
@@ -201,8 +206,10 @@ API не возвращает `owner_id`, raw metadata, внутренние has
 | `contacted`, `dismissed`, `expired` | нет |
 
 Запрещённый переход возвращает `409` и не создаёт `opportunity_actions`.
-Идемпотентный replay с тем же key и payload не меняет данные и возвращает фактическую
-current opportunity, даже если исходная строка уже superseded или её статус изменился.
+Идемпотентный replay с тем же key и payload не меняет данные и одной current-row
+выборкой возвращает фактическую current opportunity, даже если исходная строка уже
+superseded или её статус изменился. Обычное действие загружает ответ до `COMMIT`, пока
+заблокированная opportunity ещё не может быть конкурентно superseded.
 Повторное использование key с другим payload возвращает `409`.
 
 `accepted` означает «клиент принял opportunity в работу» и записывается только в
@@ -212,6 +219,8 @@ current opportunity, даже если исходная строка уже supe
 и точный `client_episode_state.suppressed_until` переносятся в current opportunity.
 Если deadline уже истёк, build job атомарно удаляет episode state и возвращает current
 opportunity к рассчитанному статусу даже при неизменном `input_hash`.
+Если у current opportunity сохранился будущий snooze deadline, но episode state
+отсутствует, build job восстанавливает state с тем же точным deadline до пересчёта.
 
 ## Jobs и конкурентность
 
@@ -268,8 +277,10 @@ npm.cmd run test:opportunity-engine:down
 DB runner применяет всю migration chain к свежей схеме, запускает SQL verifier в
 rollback-транзакции и production TypeScript runtime test через реальные
 `detectHiringEpisodesJob`, `buildOpportunitiesJob`, `applyOpportunityAction` и
-`expireOpportunitiesJob`. Down runner применяет пять down migrations в обратном
-порядке и проверяет удаление runtime tables.
+`expireOpportunitiesJob`. Во второй временной БД runner проходит полный upgrade от
+исходной v1-схемы с конфликтующими lifecycle-строками и проверяет восстановление
+последнего action и orphaned snooze. Down runner применяет шесть down migrations в
+обратном порядке, проверяет сохранение audit provenance действий и удаление runtime tables.
 
 Проверки покрывают:
 
@@ -281,18 +292,20 @@ rollback-транзакции и production TypeScript runtime test через �
 - tenant ownership;
 - illegal transition без action row;
 - идемпотентный replay;
+- single-snapshot replay и чтение ответа обычного action до commit;
 - `accepted → contacted` без преждевременного org-wide suppression;
 - стабильную повторную сборку с тем же input;
 - supersession новой scoring version и ровно одну current-запись;
 - исключение superseded rows из current query;
 - атомарное пробуждение snooze и последующий expire lifecycle;
+- восстановление последнего lifecycle action и orphaned будущего snooze при upgrade;
 - взаимное исключение cron advisory lock;
 - `EXPLAIN` build query и отсутствие `CROSS JOIN`.
 
 Ключевые диагностические события: `canonical_vacancy.merge_rejected`,
 `hiring_episode.bounds_preserved`, `opportunity.snooze_preserved`,
 `opportunity.build.semantic_unchanged`, `opportunity.snooze_elapsed_during_build`,
-`opportunity.replay_served` и
+`opportunity.snooze_state_repaired`, `opportunity.replay_served` и
 `opportunity.contact_recorded`. Они содержат только ids, версии и reason codes;
 raw URL и payload в них не пишутся.
 
@@ -352,10 +365,10 @@ jobs. Это мгновенно убирает пользовательскую 
    больше не нужны.
 
 Hardening migration при upgrade может закрыть лишние активные поколения,
-обнаруженные в старых данных. Supersession down migration переносит actions с
-исторических scorer-строк на оставшуюся current-строку, сохраняет исходные id и
-idempotency key в metadata, затем удаляет несовместимые со старой схемой
-исторические версии. Остальные down migrations удаляют новые ограничения и
+обнаруженные в старых данных. Supersession down migration удаляет только индексы
+и новые provenance-поля: исходная v1-схема уже допускает по одной opportunity на
+scoring version, поэтому historical scorer-строки, их actions и idempotency keys
+сохраняются без перепривязки. Остальные down migrations удаляют новые ограничения и
 поля, но намеренно не открывают закрытые поколения обратно: это необратимая
 нормализация статуса, которую нужно учитывать при rollback review.
 

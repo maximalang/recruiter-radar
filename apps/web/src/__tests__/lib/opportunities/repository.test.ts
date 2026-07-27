@@ -187,10 +187,18 @@ describe('opportunity repository tenant scope', () => {
     const query = jest.fn(async (sql: string) => {
       if (
         sql.includes('FROM opportunities') &&
-        sql.includes('superseded_at IS NULL') &&
-        !sql.includes('WHERE o.id = $1')
+        sql.includes('WHERE o.client_profile_id = $1') &&
+        sql.includes('superseded_at IS NULL')
       ) {
-        return { rowCount: 1, rows: [{ id: '10' }] }
+        return {
+          rowCount: 1,
+          rows: [{
+            id: '10',
+            ownerId: '7',
+            status: 'contacted',
+            evidenceCount: 0,
+          }],
+        }
       }
       if (sql.includes('FROM opportunities') && sql.includes('FOR UPDATE')) {
         return { rowCount: 0, rows: [] }
@@ -294,6 +302,7 @@ describe('opportunity repository tenant scope', () => {
     )).toBe(false)
     expect(query.mock.calls.some(([sql]) => String(sql) === 'COMMIT')).toBe(true)
     const currentReadIndex = query.mock.calls.findIndex(([sql]) =>
+      String(sql).includes('WHERE o.id = $1') &&
       String(sql).includes('superseded_at IS NULL'))
     const commitIndex = query.mock.calls.findIndex(([sql]) => String(sql) === 'COMMIT')
     expect(currentReadIndex).toBeGreaterThan(-1)
@@ -434,10 +443,18 @@ describe('opportunity repository tenant scope', () => {
     const query = jest.fn(async (sql: string) => {
       if (
         sql.includes('FROM opportunities') &&
-        sql.includes('superseded_at IS NULL') &&
-        !sql.includes('WHERE o.id = $1')
+        sql.includes('WHERE o.client_profile_id = $1') &&
+        sql.includes('superseded_at IS NULL')
       ) {
-        return { rowCount: 1, rows: [{ id: '10' }] }
+        return {
+          rowCount: 1,
+          rows: [{
+            id: '10',
+            ownerId: '7',
+            status: 'contacted',
+            evidenceCount: 0,
+          }],
+        }
       }
       if (sql.includes('FROM opportunities') && sql.includes('FOR UPDATE')) {
         return {
@@ -506,10 +523,13 @@ describe('opportunity repository tenant scope', () => {
     const query = jest.fn(async (sql: string, params?: readonly unknown[]) => {
       if (
         sql.includes('FROM opportunities') &&
-        sql.includes('superseded_at IS NULL') &&
-        !sql.includes('WHERE o.id = $1')
+        sql.includes('WHERE o.client_profile_id = $1') &&
+        sql.includes('superseded_at IS NULL')
       ) {
-        return { rowCount: 1, rows: [{ id: '12' }] }
+        return {
+          rowCount: 1,
+          rows: [{ id: '12', ownerId: '7', status: 'contacted', evidenceCount: 0 }],
+        }
       }
       if (sql.includes('FROM opportunities') && sql.includes('FOR UPDATE')) {
         return {
@@ -530,13 +550,7 @@ describe('opportunity repository tenant scope', () => {
           rows: [{ actionFingerprint, newStatus: 'accepted' }],
         }
       }
-      if (sql.includes('WHERE o.id = $1')) {
-        if (String(params?.[0]) === '10') return { rowCount: 0, rows: [] }
-        return {
-          rowCount: 1,
-          rows: [{ id: '12', ownerId: '7', status: 'contacted', evidenceCount: 0 }],
-        }
-      }
+      if (sql.includes('WHERE o.id = $1')) return { rowCount: 0, rows: [] }
       return { rowCount: 0, rows: [] }
     })
     const release = jest.fn()
@@ -561,6 +575,10 @@ describe('opportunity repository tenant scope', () => {
     expect(currentReadIndex).toBeGreaterThan(-1)
     expect(currentReadIndex).toBeLessThan(commitIndex)
     expect(String(query.mock.calls[currentReadIndex]?.[0])).not.toContain('FOR UPDATE')
+    expect(query.mock.calls.filter(([sql]) =>
+      String(sql).includes('WHERE o.id = $1') &&
+      String(sql).includes('superseded_at IS NULL'),
+    )).toHaveLength(0)
   })
 
   it('rejects a new action after its opportunity row was superseded', async () => {

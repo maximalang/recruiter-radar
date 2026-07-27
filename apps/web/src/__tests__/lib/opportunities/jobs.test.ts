@@ -915,6 +915,83 @@ describe('opportunity background jobs', () => {
     expect(sqlSeen.find((sql) => sql.includes('INSERT INTO opportunities')))
       .toContain('snoozed_until')
     expect(storedParams).toContain(snoozedUntil)
+    expect(sqlSeen.find((sql) =>
+      sql.includes('FROM opportunities') && sql.includes('input_hash'),
+    )).toContain('owner_id = $3')
+    expect(sqlSeen.find((sql) =>
+      sql.includes('FROM client_episode_state') && sql.includes('FOR UPDATE'),
+    )).toContain('owner_id = $3')
+    expect(sqlSeen.find((sql) => sql.includes('SET superseded_at = NOW()')))
+      .toContain('owner_id = $2')
+  })
+
+  it('repairs an orphaned future snooze before scoring supersession', async () => {
+    const snoozedUntil = '2026-08-02T09:00:00.000Z'
+    let repairedStateParams: readonly unknown[] = []
+    let storedParams: readonly unknown[] = []
+    const db = dbWithQuery((sql, params) => {
+      if (sql.includes('WITH latest_candidates AS')) {
+        return {
+          rowCount: 1,
+          rows: [buildRow('8', {
+            currentOpportunityId: '100',
+            currentInputHash: '0'.repeat(64),
+            currentScoringVersion: 'opportunity-v1',
+          })],
+        }
+      }
+      if (
+        sql.includes('FROM opportunities') &&
+        sql.includes('input_hash') &&
+        sql.includes('FOR UPDATE')
+      ) {
+        return {
+          rowCount: 1,
+          rows: [{
+            id: '100',
+            inputHash: '0'.repeat(64),
+            scoringVersion: 'opportunity-v1',
+            status: 'snoozed',
+            snoozedUntil,
+          }],
+        }
+      }
+      if (sql.includes('FROM client_episode_state') && sql.includes('FOR UPDATE')) {
+        return { rowCount: 0, rows: [] }
+      }
+      if (sql.includes('INSERT INTO client_episode_state')) {
+        repairedStateParams = params ?? []
+        return { rowCount: 1, rows: [] }
+      }
+      if (
+        sql.includes('FROM opportunities') &&
+        sql.includes('scoring_version = $3') &&
+        sql.includes('superseded_at IS NOT NULL')
+      ) {
+        return { rowCount: 0, rows: [] }
+      }
+      if (sql.includes('SET superseded_at = NOW()')) {
+        return { rowCount: 1, rows: [] }
+      }
+      if (sql.includes('INSERT INTO opportunities')) {
+        storedParams = params ?? []
+        return { rowCount: 1, rows: [{ id: '101' }] }
+      }
+      if (sql.includes('DELETE FROM opportunity_build_failures')) {
+        return { rowCount: 0, rows: [] }
+      }
+      throw new Error(`Unexpected SQL: ${sql}`)
+    })
+
+    const result = await buildOpportunitiesJob(
+      { enabled: true, scoringVersion: 'opportunity-v2' },
+      db,
+    )
+
+    expect(result.created).toBe(1)
+    expect(result.superseded).toBe(1)
+    expect(repairedStateParams).toEqual(['8', '7', '20', '10', snoozedUntil])
+    expect(storedParams).toContain(snoozedUntil)
   })
 
   it('snooze deadline survives scoring rollback', async () => {

@@ -265,6 +265,41 @@ export async function getOpportunityById(
   }
 }
 
+async function getCurrentOpportunityForEpisode(
+  input: {
+    ownerId: string | number
+    clientProfileId: string | number
+    hiringEpisodeId: string | number
+  },
+  db: OpportunityDb,
+): Promise<OpportunityItem | null> {
+  const result = await db.query<OpportunityRow>(
+    `${OPPORTUNITY_SELECT}
+     WHERE o.client_profile_id = $1
+       AND o.hiring_episode_id = $2
+       AND o.owner_id = $3
+       AND o.superseded_at IS NULL
+     LIMIT 1`,
+    [
+      String(input.clientProfileId),
+      String(input.hiringEpisodeId),
+      String(input.ownerId),
+    ],
+  )
+  const row = result.rows[0]
+  if (!row) return null
+
+  const evidence = await getEvidenceForOpportunities(
+    String(input.ownerId),
+    [row.id],
+    db,
+  )
+  return {
+    ...row,
+    evidenceTimeline: evidence.get(row.id) ?? [],
+  }
+}
+
 export async function applyOpportunityAction(input: {
   ownerId: string | number
   opportunityId: string | number
@@ -337,22 +372,11 @@ export async function applyOpportunityAction(input: {
       if (existingAction.rows[0].actionFingerprint !== actionFingerprint) {
         throw new OpportunityActionConflictError()
       }
-      const current = await client.query<{ id: string }>(
-        `SELECT id::TEXT AS id
-         FROM opportunities
-         WHERE client_profile_id = $1
-            AND hiring_episode_id = $2
-            AND owner_id = $3
-            AND superseded_at IS NULL
-          LIMIT 1`,
-        [row.clientProfileId, row.hiringEpisodeId, String(input.ownerId)],
-      )
-      const opportunity = current.rows[0]
-        ? await getOpportunityById(
-            { ownerId: input.ownerId, opportunityId: current.rows[0].id },
-            client,
-          )
-        : null
+      const opportunity = await getCurrentOpportunityForEpisode({
+        ownerId: input.ownerId,
+        clientProfileId: row.clientProfileId,
+        hiringEpisodeId: row.hiringEpisodeId,
+      }, client)
       await client.query('COMMIT')
       if (!opportunity) return null
       logEvent('opportunity.replay_served', {
@@ -457,12 +481,14 @@ export async function applyOpportunityAction(input: {
         snoozeDays,
       ],
     )
-    await client.query('COMMIT')
     const opportunity = await getOpportunityById(
       { ownerId: input.ownerId, opportunityId: input.opportunityId },
       client,
     )
-    if (!opportunity) return null
+    if (!opportunity) {
+      throw new Error('Updated opportunity could not be reloaded.')
+    }
+    await client.query('COMMIT')
 
     logEvent('opportunity.action', {
       ownerId: String(input.ownerId),

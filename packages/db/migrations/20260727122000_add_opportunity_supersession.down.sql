@@ -5,30 +5,10 @@ DROP INDEX IF EXISTS digest_candidates_opportunity_build_idx;
 DROP INDEX IF EXISTS opportunities_current_owner_status_score_idx;
 DROP INDEX IF EXISTS opportunities_current_uidx;
 
-WITH historical_action_targets AS (
-  SELECT
-    historical.id AS historical_opportunity_id,
-    current.id AS current_opportunity_id
-  FROM opportunities historical
-  JOIN opportunities current
-    ON current.client_profile_id = historical.client_profile_id
-   AND current.hiring_episode_id = historical.hiring_episode_id
-   AND current.superseded_at IS NULL
-  WHERE historical.superseded_at IS NOT NULL
-)
-UPDATE opportunity_actions action
-SET
-  opportunity_id = target.current_opportunity_id,
-  action_key = action.action_key || ':rollback:' || action.id::TEXT,
-  metadata = action.metadata || jsonb_build_object(
-    'rollbackOriginalOpportunityId', action.opportunity_id::TEXT,
-    'rollbackOriginalActionKey', action.action_key
-  )
-FROM historical_action_targets target
-WHERE action.opportunity_id = target.historical_opportunity_id;
-
-DELETE FROM opportunities
-WHERE superseded_at IS NOT NULL;
+-- The v1 schema already permits one row per scoring version. Keep every
+-- historical row and its original action relationship when supersession is
+-- removed; dropping the marker makes those versions visible to the old model
+-- without deleting audit history or rewriting idempotency keys.
 
 ALTER TABLE opportunities
   DROP CONSTRAINT IF EXISTS opportunities_brief_builder_version_not_blank,

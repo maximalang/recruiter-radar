@@ -673,6 +673,7 @@ async function runExpireOpportunitiesJob(
   )
   const awakened = await db.query<{
     id: string
+    ownerId: string
     organizationId: string
     clientProfileId: string
     hiringEpisodeId: string
@@ -688,8 +689,9 @@ async function runExpireOpportunitiesJob(
        AND (o.valid_until IS NULL OR o.valid_until >= $1::timestamptz)
        AND ($2::bigint IS NULL OR o.organization_id = $2)
      RETURNING
-       o.id::TEXT AS id,
-       o.organization_id::TEXT AS "organizationId",
+        o.id::TEXT AS id,
+        o.owner_id::TEXT AS "ownerId",
+        o.organization_id::TEXT AS "organizationId",
        o.client_profile_id::TEXT AS "clientProfileId",
        o.hiring_episode_id::TEXT AS "hiringEpisodeId"`,
     [now.toISOString(), options.organizationId ?? null],
@@ -697,19 +699,21 @@ async function runExpireOpportunitiesJob(
   if (awakened.rows.length > 0) {
     await db.query(
       `DELETE FROM client_episode_state
-       WHERE (client_profile_id, hiring_episode_id) IN (
-         SELECT *
-         FROM UNNEST($1::bigint[], $2::bigint[])
-       )
+       WHERE (client_profile_id, owner_id, hiring_episode_id) IN (
+          SELECT *
+          FROM UNNEST($1::bigint[], $2::bigint[], $3::bigint[])
+        )
          AND status = 'snoozed'`,
       [
         awakened.rows.map((row) => row.clientProfileId),
+        awakened.rows.map((row) => row.ownerId),
         awakened.rows.map((row) => row.hiringEpisodeId),
       ],
     )
   }
   const expired = await db.query<{
     id: string
+    ownerId: string
     organizationId: string
     clientProfileId: string
     hiringEpisodeId: string
@@ -723,7 +727,8 @@ async function runExpireOpportunitiesJob(
        AND (he.status = 'closed' OR o.valid_until < $1::timestamptz)
        AND ($2::bigint IS NULL OR o.organization_id = $2)
      RETURNING
-       o.id::TEXT AS id,
+        o.id::TEXT AS id,
+        o.owner_id::TEXT AS "ownerId",
        o.organization_id::TEXT AS "organizationId",
        o.client_profile_id::TEXT AS "clientProfileId",
        o.hiring_episode_id::TEXT AS "hiringEpisodeId"`,
@@ -732,13 +737,14 @@ async function runExpireOpportunitiesJob(
   if (expired.rows.length > 0) {
     await db.query(
       `DELETE FROM client_episode_state
-       WHERE (client_profile_id, hiring_episode_id) IN (
-         SELECT *
-         FROM UNNEST($1::bigint[], $2::bigint[])
-       )
+       WHERE (client_profile_id, owner_id, hiring_episode_id) IN (
+          SELECT *
+          FROM UNNEST($1::bigint[], $2::bigint[], $3::bigint[])
+        )
          AND status = 'snoozed'`,
       [
         expired.rows.map((row) => row.clientProfileId),
+        expired.rows.map((row) => row.ownerId),
         expired.rows.map((row) => row.hiringEpisodeId),
       ],
     )
@@ -1252,19 +1258,22 @@ async function persistOpportunityBuild(input: {
       inputHash: string
       scoringVersion: string
       status: OpportunityScoreResult['status']
+      snoozedUntil: string | null
     }>(
       `SELECT
          id::TEXT AS id,
          input_hash AS "inputHash",
          scoring_version AS "scoringVersion",
-         status
+         status,
+         snoozed_until::TEXT AS "snoozedUntil"
        FROM opportunities
-       WHERE client_profile_id = $1
-         AND hiring_episode_id = $2
+         WHERE client_profile_id = $1
+          AND hiring_episode_id = $2
+          AND owner_id = $3
          AND superseded_at IS NULL
        LIMIT 1
        FOR UPDATE`,
-      [row.clientProfileId, row.hiringEpisodeId],
+      [row.clientProfileId, row.hiringEpisodeId, row.ownerId],
     )
     const current = currentResult.rows[0]
 
@@ -1277,15 +1286,50 @@ async function persistOpportunityBuild(input: {
          status,
          suppressed_until::TEXT AS "suppressedUntil"
        FROM client_episode_state
-       WHERE client_profile_id = $1
-         AND hiring_episode_id = $2
+        WHERE client_profile_id = $1
+          AND hiring_episode_id = $2
+          AND owner_id = $3
        LIMIT 1
        FOR UPDATE`,
-      [row.clientProfileId, row.hiringEpisodeId],
+      [row.clientProfileId, row.hiringEpisodeId, row.ownerId],
     )
     let lockedEpisodeState: LockedEpisodeState | null =
       episodeStateResult.rows[0] ?? null
     let elapsedSnoozeCleared = false
+    if (!lockedEpisodeState && current?.status === 'snoozed') {
+      const deadline = Date.parse(current.snoozedUntil ?? '')
+      if (Number.isFinite(deadline) && deadline > input.now.getTime()) {
+        await db.query(
+          `INSERT INTO client_episode_state (
+             client_profile_id,
+             owner_id,
+             hiring_episode_id,
+             organization_id,
+             status,
+             suppressed_until
+           )
+           VALUES ($1, $2, $3, $4, 'snoozed', $5::timestamptz)
+           ON CONFLICT (client_profile_id, hiring_episode_id) DO NOTHING`,
+          [
+            row.clientProfileId,
+            row.ownerId,
+            row.hiringEpisodeId,
+            row.organizationId,
+            current.snoozedUntil,
+          ],
+        )
+        lockedEpisodeState = {
+          status: 'snoozed',
+          suppressedUntil: current.snoozedUntil,
+        }
+        logEvent('opportunity.snooze_state_repaired', {
+          hiringEpisodeId: row.hiringEpisodeId,
+          clientProfileId: row.clientProfileId,
+        })
+      } else {
+        elapsedSnoozeCleared = true
+      }
+    }
     if (lockedEpisodeState?.status === 'snoozed') {
       const deadline = Date.parse(lockedEpisodeState.suppressedUntil ?? '')
       if (!Number.isFinite(deadline)) {
@@ -1294,11 +1338,17 @@ async function persistOpportunityBuild(input: {
       if (deadline <= input.now.getTime()) {
         await db.query(
           `DELETE FROM client_episode_state
-           WHERE client_profile_id = $1
-             AND hiring_episode_id = $2
-             AND status = 'snoozed'
-             AND suppressed_until <= $3::timestamptz`,
-          [row.clientProfileId, row.hiringEpisodeId, input.now.toISOString()],
+            WHERE client_profile_id = $1
+              AND hiring_episode_id = $2
+              AND owner_id = $3
+              AND status = 'snoozed'
+              AND suppressed_until <= $4::timestamptz`,
+           [
+             row.clientProfileId,
+             row.hiringEpisodeId,
+             row.ownerId,
+             input.now.toISOString(),
+           ],
         )
         logEvent('opportunity.snooze_elapsed_during_build', {
           hiringEpisodeId: row.hiringEpisodeId,
@@ -1399,22 +1449,29 @@ async function persistOpportunityBuild(input: {
       const reusableResult = await db.query<{ id: string }>(
         `SELECT id::TEXT AS id
          FROM opportunities
-         WHERE client_profile_id = $1
-           AND hiring_episode_id = $2
-           AND scoring_version = $3
+          WHERE client_profile_id = $1
+            AND hiring_episode_id = $2
+            AND scoring_version = $3
+            AND owner_id = $4
            AND superseded_at IS NOT NULL
          ORDER BY updated_at DESC, id DESC
          LIMIT 1
          FOR UPDATE`,
-        [row.clientProfileId, row.hiringEpisodeId, provenance.scoringVersion],
+        [
+          row.clientProfileId,
+          row.hiringEpisodeId,
+          provenance.scoringVersion,
+          row.ownerId,
+        ],
       )
       reusableOpportunityId = reusableResult.rows[0]?.id ?? null
       await db.query(
         `UPDATE opportunities
          SET superseded_at = NOW(), updated_at = NOW()
-         WHERE id = $1
-           AND superseded_at IS NULL`,
-        [current.id],
+          WHERE id = $1
+            AND owner_id = $2
+            AND superseded_at IS NULL`,
+        [current.id, row.ownerId],
       )
       superseded = true
       logEvent('opportunity.superseded', {
@@ -1466,8 +1523,9 @@ async function persistOpportunityBuild(input: {
             snoozed_until = $32::timestamptz,
             superseded_at = NULL,
            updated_at = NOW()
-         WHERE id = $1
-         RETURNING id::TEXT AS id`,
+          WHERE id = $1
+            AND owner_id = $2
+          RETURNING id::TEXT AS id`,
         [updateTargetId, ...values],
       )
       : await db.query<{ id: string }>(

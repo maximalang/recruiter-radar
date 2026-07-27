@@ -19,12 +19,22 @@ const verifierScript = resolve(
   'scripts',
   'verify-opportunity-engine-v1.mjs',
 )
+const upgradeVerifierScript = resolve(
+  root,
+  'packages',
+  'db',
+  'scripts',
+  'verify-opportunity-authoritative-state-upgrade.mjs',
+)
 const jestScript = resolve(root, 'node_modules', 'jest', 'bin', 'jest.js')
 const webRoot = resolve(root, 'apps', 'web')
 const admin = new Client({ connectionString: databaseUrl })
 const databaseName = `rr_opportunity_runtime_${process.pid}_${Date.now()}`
+const upgradeDatabaseName = `rr_opportunity_upgrade_${process.pid}_${Date.now()}`
 const temporaryUrl = new URL(databaseUrl)
 temporaryUrl.pathname = `/${databaseName}`
+const upgradeUrl = new URL(databaseUrl)
+upgradeUrl.pathname = `/${upgradeDatabaseName}`
 const testEnvironment = {
   ...process.env,
   DATABASE_URL: temporaryUrl.toString(),
@@ -35,10 +45,10 @@ function quoteIdentifier(value) {
   return `"${String(value).replaceAll('"', '""')}"`
 }
 
-async function run(command, args, cwd = root) {
+async function run(command, args, cwd = root, environment = testEnvironment) {
   const result = await execFileAsync(command, args, {
     cwd,
-    env: testEnvironment,
+    env: environment,
     maxBuffer: 20 * 1024 * 1024,
   })
   if (result.stdout) process.stdout.write(result.stdout)
@@ -56,7 +66,13 @@ try {
     '--runTestsByPath',
     'src/__tests__/lib/opportunities/runtime-db.test.ts',
   ], webRoot)
+  await admin.query(`CREATE DATABASE ${quoteIdentifier(upgradeDatabaseName)}`)
+  await run(process.execPath, [upgradeVerifierScript], root, {
+    ...process.env,
+    DATABASE_URL: upgradeUrl.toString(),
+  })
 } finally {
   await admin.query(`DROP DATABASE IF EXISTS ${quoteIdentifier(databaseName)} WITH (FORCE)`)
+  await admin.query(`DROP DATABASE IF EXISTS ${quoteIdentifier(upgradeDatabaseName)} WITH (FORCE)`)
   await admin.end()
 }

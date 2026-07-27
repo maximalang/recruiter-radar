@@ -240,6 +240,30 @@ describe('HiringEpisodeDetectionService', () => {
     expect(cluster?.vacancyCount).toBe(3)
   })
 
+  it('keeps case-distinct external ids from the same provider separate', () => {
+    const episodes = service.detectOrganization({
+      organizationId: '10',
+      now: NOW,
+      signals: [
+        signal('case-1', 7, {
+          title: 'Java developer',
+          externalVacancyId: 'AbC',
+        }),
+        signal('case-2', 5, {
+          title: 'java developer',
+          externalVacancyId: 'abc',
+        }),
+        signal('case-3', 2, {
+          title: 'Python developer',
+          externalVacancyId: 'python-1',
+        }),
+      ],
+    })
+
+    const cluster = episodes.find((episode) => episode.episodeType === 'role_cluster')
+    expect(cluster?.vacancyCount).toBe(3)
+  })
+
   it('transitive vacancy bridge cannot merge conflicting provider ids', () => {
     const episodes = service.detectOrganization({
       organizationId: '10',
@@ -388,6 +412,20 @@ describe('episode continuation boundary', () => {
         { status: 'active', lastSeenAt: 'invalid' },
         '2026-05-02T00:00:00.000Z',
       ),
+    ).toBe(false)
+  })
+
+  it('allows bounded evidence contraction but rejects an unbounded stale candidate', () => {
+    const latest = {
+      status: 'active' as const,
+      lastSeenAt: '2026-05-25T00:00:00.000Z',
+    }
+
+    expect(
+      isEpisodeContinuation(latest, '2026-05-20T00:00:00.000Z'),
+    ).toBe(true)
+    expect(
+      isEpisodeContinuation(latest, '2025-05-20T00:00:00.000Z'),
     ).toBe(false)
   })
 })

@@ -162,7 +162,8 @@ export function isEpisodeContinuation(
   if (!Number.isFinite(latestTimestamp) || !Number.isFinite(candidateTimestamp)) {
     return false
   }
-  return candidateTimestamp - latestTimestamp <= config.continuationGapDays * DAY_MS
+  return Math.abs(candidateTimestamp - latestTimestamp) <=
+    config.continuationGapDays * DAY_MS
 }
 
 export function classifyOpportunityRoleFamily(title: string): string {
@@ -617,7 +618,7 @@ function explicitIdsForSignal(signal: HiringSignalInput): ExplicitIdsByProvider 
   if (!signal.externalVacancyId) return new Map()
   return new Map([[
     normalizeText(signal.source),
-    new Set([normalizeText(signal.externalVacancyId)]),
+    new Set([normalizeExternalVacancyId(signal.externalVacancyId)]),
   ]])
 }
 
@@ -662,7 +663,7 @@ function buildCanonicalVacancy(
 
 function explicitVacancyIdentity(signal: HiringSignalInput): string | null {
   if (signal.externalVacancyId) {
-    return `external:${normalizeText(signal.source)}:${normalizeText(signal.externalVacancyId)}`
+    return `external:${normalizeText(signal.source)}:${normalizeExternalVacancyId(signal.externalVacancyId)}`
   }
   return signal.sourceUrl ? `url:${signal.sourceUrl}` : null
 }
@@ -682,15 +683,15 @@ function publicationsReferToSameVacancy(
     normalizeText(left.source) === normalizeText(right.source) &&
     Boolean(left.externalVacancyId) &&
     Boolean(right.externalVacancyId) &&
-    normalizeText(left.externalVacancyId ?? '') !==
-      normalizeText(right.externalVacancyId ?? '')
+    normalizeExternalVacancyId(left.externalVacancyId ?? '') !==
+      normalizeExternalVacancyId(right.externalVacancyId ?? '')
   return !conflictingSameSourceIds
 }
 
 function canonicalVacancyIdentity(publications: HiringSignalInput[]): string {
   const externalIds = uniqueSorted(publications.flatMap((publication) =>
     publication.externalVacancyId
-      ? [`${normalizeText(publication.source)}:${normalizeText(publication.externalVacancyId)}`]
+      ? [`${normalizeText(publication.source)}:${normalizeExternalVacancyId(publication.externalVacancyId)}`]
       : [],
   ))
   if (externalIds.length === 1) return `external:${externalIds[0]}`
@@ -726,6 +727,10 @@ function normalizeRoleTitle(value: string): string {
 
 function normalizeText(value: string): string {
   return value.trim().toLocaleLowerCase('ru-RU')
+}
+
+function normalizeExternalVacancyId(value: string): string {
+  return value.trim()
 }
 
 function ageDays(timestamp: string, now: Date): number {

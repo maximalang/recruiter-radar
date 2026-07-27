@@ -19,6 +19,10 @@ describe('canonical opportunity input hashing', () => {
     expect(hashCanonicalJson(second)).toBe(hashCanonicalJson(first))
   })
 
+  it('orders object keys by code point instead of the host locale', () => {
+    expect(canonicalJsonStringify({ a: 2, Z: 1 })).toBe('{"Z":1,"a":2}')
+  })
+
   it('preserves the order of semantically ordered arrays', () => {
     const first = { steps: ['contact', 'follow-up'] }
     const second = { steps: ['follow-up', 'contact'] }
