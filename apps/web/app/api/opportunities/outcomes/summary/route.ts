@@ -45,7 +45,13 @@ export async function GET(request: NextRequest) {
   const confidenceGate = optionalParam(request, 'confidenceGate')
   const sourceFamily = optionalParam(request, 'sourceFamily')
   const scoreBucket = optionalParam(request, 'scoreBucket')
+  const externalSupportNeedBucket = optionalParam(
+    request,
+    'externalSupportNeedBucket',
+  )
   const cohort = optionalParam(request, 'cohort') ?? 'shown'
+  const rawMaturityDays = optionalParam(request, 'maturityDays')
+  const maturityDays = rawMaturityDays === null ? 30 : Number(rawMaturityDays)
   if (
     (episodeType && !HIRING_EPISODE_TYPES.includes(
       episodeType as (typeof HIRING_EPISODE_TYPES)[number],
@@ -53,7 +59,12 @@ export async function GET(request: NextRequest) {
     (confidenceGate && !['A', 'B', 'C', 'D'].includes(confidenceGate)) ||
     (sourceFamily && !/^[a-z0-9_-]{1,64}$/i.test(sourceFamily)) ||
     (scoreBucket && !/^(?:0-9|[1-9]0-[1-9]9|100)$/.test(scoreBucket)) ||
-    !['shown', 'accepted'].includes(cohort)
+    (externalSupportNeedBucket &&
+      !['low', 'medium', 'high'].includes(externalSupportNeedBucket)) ||
+    !['shown', 'accepted'].includes(cohort) ||
+    !Number.isInteger(maturityDays) ||
+    maturityDays < 1 ||
+    maturityDays > 365
   ) {
     return NextResponse.json({ error: 'invalid_filter' }, { status: 400 })
   }
@@ -67,7 +78,10 @@ export async function GET(request: NextRequest) {
       confidenceGate,
       sourceFamily,
       scoreBucket,
+      externalSupportNeedBucket: externalSupportNeedBucket as
+        'low' | 'medium' | 'high' | null,
       cohort: cohort as 'shown' | 'accepted',
+      maturityDays,
     })
     return NextResponse.json(summary)
   } catch (error) {

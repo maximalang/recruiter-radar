@@ -17,6 +17,7 @@ import type {
   DismissedReasonCode,
   OpportunityContactPathType,
   OpportunityOutcomeChannel,
+  OpportunityOutcomeStage,
 } from './outcome-domain'
 import {
   lockOutcomeOwnerShared,
@@ -80,6 +81,17 @@ const ALLOWED_OPPORTUNITY_TRANSITIONS: Readonly<
 
 type OpportunityDb = Pick<Pool, 'query'> | Pick<PoolClient, 'query'>
 
+export const OPPORTUNITY_VIEWS = [
+  'morning',
+  'accepted',
+  'pipeline',
+  'snoozed',
+  'completed',
+  'all',
+] as const
+
+export type OpportunityView = (typeof OPPORTUNITY_VIEWS)[number]
+
 interface OpportunityRow {
   id: string
   ownerId: string
@@ -93,6 +105,8 @@ interface OpportunityRow {
   episodeStartedAt: string
   episodeLastSeenAt: string
   status: OpportunityStatus
+  commercialStage: OpportunityOutcomeStage
+  workflowState: 'active' | 'snoozed'
   title: string
   whyNow: string
   problemHypothesis: string
@@ -135,6 +149,7 @@ export interface OpportunityListInput {
   ownerId: string | number
   clientProfileId?: string | null
   morningBriefOnly?: boolean
+  view?: OpportunityView
   statuses?: OpportunityStatus[]
   minimumScore?: number | null
   confidenceGate?: ConfidenceGate | null
@@ -153,6 +168,31 @@ export interface OpportunityListResult {
   nextOffset: number | null
 }
 
+export interface OpportunityOutcomeOperationalSummary {
+  newCount: number
+  acceptedCount: number
+  pipelineCount: number
+  snoozedCount: number
+  wonCount: number
+  lostCount: number
+  dismissedCount: number
+  overdueSnoozeCount: number
+}
+
+const EFFECTIVE_WORKFLOW_SQL = `COALESCE(
+  outcome_state.workflow_state,
+  CASE WHEN o.status = 'snoozed' THEN 'snoozed' ELSE 'active' END
+)`
+
+const EFFECTIVE_COMMERCIAL_STAGE_SQL = `COALESCE(
+  outcome_state.commercial_stage,
+  CASE
+    WHEN o.status IN ('new', 'review', 'accepted', 'contacted', 'dismissed')
+      THEN o.status
+    ELSE 'new'
+  END
+)`
+
 export async function listOpportunities(
   input: OpportunityListInput,
   db: OpportunityDb | null = getPool(),
@@ -167,10 +207,11 @@ export async function listOpportunities(
   const page = Math.floor(offset / pageSize) + 1
   const params: unknown[] = [String(input.ownerId)]
   const clauses = ['o.owner_id = $1', 'o.superseded_at IS NULL']
+  const view = input.view ?? (input.morningBriefOnly ? 'morning' : 'all')
+  if (view !== 'all') clauses.push(`o.status <> 'expired'`)
 
-  if (input.morningBriefOnly) {
+  if (view === 'morning') {
     clauses.push(`o.metadata->>'morningBriefEligible' = 'true'`)
-    clauses.push(`o.status <> 'dismissed'`)
     clauses.push(`he.status = 'active'`)
     clauses.push(`(o.valid_until IS NULL OR o.valid_until >= NOW())`)
     clauses.push(`o.confidence_gate <> 'D'`)
@@ -180,6 +221,25 @@ export async function listOpportunities(
       DEFAULT_OPPORTUNITY_SCORING_CONFIG.minimumExternalSupportNeed,
     )
     clauses.push(`o.agency_propensity_score >= $${params.length}`)
+  }
+  if (view === 'morning' || view === 'accepted' || view === 'pipeline') {
+    clauses.push(`${EFFECTIVE_WORKFLOW_SQL} = 'active'`)
+  } else if (view === 'snoozed') {
+    clauses.push(`${EFFECTIVE_WORKFLOW_SQL} = 'snoozed'`)
+  }
+  if (view === 'morning') {
+    clauses.push(`${EFFECTIVE_COMMERCIAL_STAGE_SQL} IN ('new', 'review')`)
+  } else if (view === 'accepted') {
+    clauses.push(`${EFFECTIVE_COMMERCIAL_STAGE_SQL} = 'accepted'`)
+  } else if (view === 'pipeline') {
+    clauses.push(
+      `${EFFECTIVE_COMMERCIAL_STAGE_SQL} ` +
+      `IN ('contacted', 'replied', 'meeting', 'proposal')`,
+    )
+  } else if (view === 'completed') {
+    clauses.push(
+      `${EFFECTIVE_COMMERCIAL_STAGE_SQL} IN ('won', 'lost', 'dismissed')`,
+    )
   }
   if (input.clientProfileId) {
     params.push(input.clientProfileId)
@@ -212,6 +272,9 @@ export async function listOpportunities(
     `SELECT COUNT(*)::TEXT AS count
      FROM opportunities o
      JOIN hiring_episodes he ON he.id = o.hiring_episode_id
+     LEFT JOIN opportunity_outcome_state outcome_state
+       ON outcome_state.owner_id = o.owner_id
+      AND outcome_state.opportunity_id = o.id
      WHERE ${where}`,
     params,
   )
@@ -247,6 +310,67 @@ export async function listOpportunities(
     page,
     pageSize,
     nextOffset: consumed < total ? consumed : null,
+  }
+}
+
+export async function getOpportunityOutcomeOperationalSummary(
+  ownerId: string | number,
+  db: OpportunityDb | null = getPool(),
+): Promise<OpportunityOutcomeOperationalSummary> {
+  if (!db) throw new Error('DATABASE_URL is not set.')
+  const result = await db.query<Record<
+    keyof OpportunityOutcomeOperationalSummary,
+    string
+  >>(
+    `SELECT
+       COUNT(*) FILTER (
+         WHERE ${EFFECTIVE_WORKFLOW_SQL} = 'active'
+           AND ${EFFECTIVE_COMMERCIAL_STAGE_SQL} IN ('new', 'review')
+       )::TEXT AS "newCount",
+       COUNT(*) FILTER (
+         WHERE ${EFFECTIVE_WORKFLOW_SQL} = 'active'
+           AND ${EFFECTIVE_COMMERCIAL_STAGE_SQL} = 'accepted'
+       )::TEXT AS "acceptedCount",
+       COUNT(*) FILTER (
+         WHERE ${EFFECTIVE_WORKFLOW_SQL} = 'active'
+           AND ${EFFECTIVE_COMMERCIAL_STAGE_SQL}
+             IN ('contacted', 'replied', 'meeting', 'proposal')
+       )::TEXT AS "pipelineCount",
+       COUNT(*) FILTER (
+         WHERE ${EFFECTIVE_WORKFLOW_SQL} = 'snoozed'
+       )::TEXT AS "snoozedCount",
+       COUNT(*) FILTER (
+         WHERE ${EFFECTIVE_COMMERCIAL_STAGE_SQL} = 'won'
+       )::TEXT AS "wonCount",
+       COUNT(*) FILTER (
+         WHERE ${EFFECTIVE_COMMERCIAL_STAGE_SQL} = 'lost'
+       )::TEXT AS "lostCount",
+       COUNT(*) FILTER (
+         WHERE ${EFFECTIVE_COMMERCIAL_STAGE_SQL} = 'dismissed'
+       )::TEXT AS "dismissedCount",
+       COUNT(*) FILTER (
+         WHERE ${EFFECTIVE_WORKFLOW_SQL} = 'snoozed'
+           AND COALESCE(outcome_state.snoozed_until, o.snoozed_until) < NOW()
+       )::TEXT AS "overdueSnoozeCount"
+     FROM opportunities o
+     LEFT JOIN opportunity_outcome_state outcome_state
+       ON outcome_state.owner_id = o.owner_id
+      AND outcome_state.opportunity_id = o.id
+     WHERE o.owner_id = $1
+       AND o.superseded_at IS NULL
+       AND o.status <> 'expired'`,
+    [String(ownerId)],
+  )
+  const row = result.rows[0]
+  return {
+    newCount: Number(row?.newCount ?? 0),
+    acceptedCount: Number(row?.acceptedCount ?? 0),
+    pipelineCount: Number(row?.pipelineCount ?? 0),
+    snoozedCount: Number(row?.snoozedCount ?? 0),
+    wonCount: Number(row?.wonCount ?? 0),
+    lostCount: Number(row?.lostCount ?? 0),
+    dismissedCount: Number(row?.dismissedCount ?? 0),
+    overdueSnoozeCount: Number(row?.overdueSnoozeCount ?? 0),
   }
 }
 
@@ -615,6 +739,8 @@ const OPPORTUNITY_SELECT = `
     he.started_at::TEXT AS "episodeStartedAt",
     he.last_seen_at::TEXT AS "episodeLastSeenAt",
     o.status,
+    ${EFFECTIVE_COMMERCIAL_STAGE_SQL} AS "commercialStage",
+    ${EFFECTIVE_WORKFLOW_SQL} AS "workflowState",
     o.title,
     o.why_now AS "whyNow",
     o.problem_hypothesis AS "problemHypothesis",
@@ -634,7 +760,10 @@ const OPPORTUNITY_SELECT = `
     o.evidence_hash AS "evidenceHash",
     o.valid_from::TEXT AS "validFrom",
     o.valid_until::TEXT AS "validUntil",
-    o.snoozed_until::TEXT AS "snoozedUntil",
+    COALESCE(
+      outcome_state.snoozed_until,
+      o.snoozed_until
+    )::TEXT AS "snoozedUntil",
     o.metadata,
     COALESCE(
       NULLIF(o.metadata->>'agencyFitExplanation', ''),
@@ -690,6 +819,9 @@ const OPPORTUNITY_SELECT = `
   FROM opportunities o
   JOIN orgs org ON org.id = o.organization_id
   JOIN hiring_episodes he ON he.id = o.hiring_episode_id
+  LEFT JOIN opportunity_outcome_state outcome_state
+    ON outcome_state.owner_id = o.owner_id
+   AND outcome_state.opportunity_id = o.id
 `
 
 async function getEvidenceForOpportunities(

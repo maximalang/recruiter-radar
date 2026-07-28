@@ -128,6 +128,34 @@ describe('opportunities API', () => {
     )
   })
 
+  it('passes a typed lifecycle view without weakening the session owner scope', async () => {
+    mockedOwner.mockResolvedValue('7')
+    mockedList.mockResolvedValue({
+      opportunities: [],
+      total: 0,
+      page: 1,
+      pageSize: 50,
+      nextOffset: null,
+    })
+
+    const response = await list(request('/api/opportunities?view=pipeline'))
+
+    expect(response.status).toBe(200)
+    expect(mockedList).toHaveBeenCalledWith(expect.objectContaining({
+      ownerId: '7',
+      view: 'pipeline',
+    }))
+  })
+
+  it('rejects an unknown lifecycle view', async () => {
+    mockedOwner.mockResolvedValue('7')
+
+    const response = await list(request('/api/opportunities?view=crm'))
+
+    expect(response.status).toBe(400)
+    expect(mockedList).not.toHaveBeenCalled()
+  })
+
   it('rejects malformed cursors instead of silently resetting pagination', async () => {
     mockedOwner.mockResolvedValue('7')
     const response = await list(request('/api/opportunities?cursor=not-a-cursor'))

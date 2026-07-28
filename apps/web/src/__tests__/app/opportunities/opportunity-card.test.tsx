@@ -24,6 +24,8 @@ const OPPORTUNITY: OpportunityItem = {
   episodeStartedAt: '2026-07-20T00:00:00.000Z',
   episodeLastSeenAt: '2026-07-26T00:00:00.000Z',
   status: 'new',
+  commercialStage: 'new',
+  workflowState: 'active',
   title: 'Пример ускорила найм',
   whyNow: 'За 14 дней открыто 8 вакансий.',
   problemHypothesis: 'Темп найма может повышать потребность в поддержке.',
@@ -87,6 +89,20 @@ describe('OpportunityCard', () => {
     }} />)
     expect(screen.queryByRole('link', { name: 'Backend developer' })).toBeNull()
     expect(screen.getByText('Backend developer')).toBeInTheDocument()
+  })
+
+  it('renders the authoritative projected stage when legacy status is stale', () => {
+    render(<OpportunityCard
+      opportunity={{
+        ...OPPORTUNITY,
+        status: 'contacted',
+        commercialStage: 'proposal',
+      }}
+      outcomesUiEnabled
+    />)
+
+    expect(screen.getByText('Предложение')).toBeInTheDocument()
+    expect(screen.queryByText('Связались')).toBeNull()
   })
 })
 

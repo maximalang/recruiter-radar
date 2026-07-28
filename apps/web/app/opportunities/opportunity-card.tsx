@@ -26,6 +26,11 @@ const STATUS_LABELS: Record<string, string> = {
   dismissed: 'Не подходит',
   snoozed: 'Отложена',
   contacted: 'Связались',
+  replied: 'Ответили',
+  meeting: 'Встреча',
+  proposal: 'Предложение',
+  won: 'Успешно',
+  lost: 'Проиграно',
   expired: 'Истекла',
 }
 
@@ -36,9 +41,12 @@ export function OpportunityCard(props: {
 }) {
   const opportunity = props.opportunity
   const score = Math.round(opportunity.opportunityScore * 100)
+  const displayStatus = opportunity.workflowState === 'snoozed'
+    ? 'snoozed'
+    : opportunity.commercialStage
 
   return (
-    <article className={styles.card} data-status={opportunity.status}>
+    <article className={styles.card} data-status={displayStatus}>
       {props.outcomesUiEnabled && props.trackingCycleId ? (
         <OpportunityOutcomeImpression
           opportunityId={opportunity.id}
@@ -50,7 +58,7 @@ export function OpportunityCard(props: {
           <div className={styles.eyebrow}>
             {EPISODE_LABELS[opportunity.episodeType] ?? opportunity.episodeType}
             <span aria-hidden="true"> · </span>
-            {STATUS_LABELS[opportunity.status] ?? opportunity.status}
+            {STATUS_LABELS[displayStatus] ?? displayStatus}
           </div>
           <h2 className={styles.cardTitle}>{opportunity.title}</h2>
           <p className={styles.organization}>
@@ -138,7 +146,7 @@ export function OpportunityCard(props: {
       {props.outcomesUiEnabled ? (
         <OpportunityOutcomePanel
           opportunityId={opportunity.id}
-          fallbackStage={opportunity.status}
+          fallbackStage={opportunity.commercialStage}
         />
       ) : (
         <OpportunityActions

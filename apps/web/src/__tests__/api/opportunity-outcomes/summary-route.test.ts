@@ -31,12 +31,18 @@ describe('opportunity outcome summary API', () => {
       },
       cohort: {
         eventType: 'shown',
-        policy: 'first_event_in_period_closed_window',
+        policy: 'first_effective_event_ever_closed_window',
         downstreamBefore: '2026-07-27T00:00:00.000Z',
         size: 0,
+        cohortAgeDays: 26,
+        observationWindowDays: 26,
+        matured: false,
+        maturityThresholdDays: 30,
       },
       minimumConversionSample: 10,
-      activityCounts: [],
+      effectiveActivityCounts: [],
+      ledgerActivityCounts: [],
+      correctionsCount: 0,
       cohortCounts: [],
       conversions: [],
       terminalOutcomes: {
@@ -45,6 +51,7 @@ describe('opportunity outcome summary API', () => {
         completed: 0,
         winRate: null,
         status: 'insufficient_data',
+        denominator: 'effective_won_plus_lost',
       },
     })
     jest.clearAllMocks()
@@ -58,7 +65,8 @@ describe('opportunity outcome summary API', () => {
   it('is tenant scoped and passes only controlled filters', async () => {
     const response = await GET(request(
       '?from=2026-07-01T00:00:00.000Z&to=2026-07-27T00:00:00.000Z' +
-      '&episodeType=vacancy_spike&confidenceGate=A&sourceFamily=hh&scoreBucket=80-89',
+      '&episodeType=vacancy_spike&confidenceGate=A&sourceFamily=hh&scoreBucket=80-89' +
+      '&externalSupportNeedBucket=high&maturityDays=45',
     ))
 
     expect(response.status).toBe(200)
@@ -70,7 +78,9 @@ describe('opportunity outcome summary API', () => {
       confidenceGate: 'A',
       sourceFamily: 'hh',
       scoreBucket: '80-89',
+      externalSupportNeedBucket: 'high',
       cohort: 'shown',
+      maturityDays: 45,
     })
   })
 
@@ -80,10 +90,12 @@ describe('opportunity outcome summary API', () => {
       '?from=2024-01-01T00:00:00.000Z&to=2026-01-02T00:00:00.000Z',
     ))
     const invalidFilter = await GET(request('?sourceFamily=hh%20OR%201=1'))
+    const invalidMaturity = await GET(request('?maturityDays=0'))
 
     expect(malformedPeriod.status).toBe(400)
     expect(broadPeriod.status).toBe(400)
     expect(invalidFilter.status).toBe(400)
+    expect(invalidMaturity.status).toBe(400)
     expect(mockedSummary).not.toHaveBeenCalled()
   })
 

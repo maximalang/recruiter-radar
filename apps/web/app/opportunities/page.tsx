@@ -7,7 +7,11 @@ import {
   isOpportunityOutcomesUiEnabled,
 } from '@/lib/opportunities/config'
 import { getOutcomeFunnelSummary } from '@/lib/opportunities/outcome-repository'
-import { listOpportunities } from '@/lib/opportunities/repository'
+import {
+  getOpportunityOutcomeOperationalSummary,
+  listOpportunities,
+  type OpportunityView,
+} from '@/lib/opportunities/repository'
 import type { OpportunityStatus } from '@/lib/opportunities/opportunity-scoring'
 import { getOwnerIdFromSession } from '@/lib/session'
 import {
@@ -37,6 +41,7 @@ const NAVIGATION = buildOpportunityNavigation()
 export default async function OpportunitiesPage(props: {
   searchParams: Promise<{
     status?: string
+    view?: string
     gate?: string
     preview?: string
     demo?: string
@@ -72,18 +77,28 @@ export default async function OpportunitiesPage(props: {
   const funnelTo = new Date()
   const funnelFrom = new Date(funnelTo.getTime() - 30 * 24 * 60 * 60 * 1000)
   const statuses = parseStatusFilter(params.status)
+  const view = outcomesUiEnabled ? parseView(params.view) : 'morning'
   let result: Awaited<ReturnType<typeof listOpportunities>> | null = null
+  let operationalSummary: Awaited<
+    ReturnType<typeof getOpportunityOutcomeOperationalSummary>
+  > | null = null
   try {
-    result = await listOpportunities({
-      ownerId,
-      morningBriefOnly: true,
-      statuses,
-      confidenceGate: params.gate === 'A' || params.gate === 'B' ||
-        params.gate === 'C' || params.gate === 'D'
-        ? params.gate
-        : null,
-      pageSize: 50,
-    })
+    [result, operationalSummary] = await Promise.all([
+      listOpportunities({
+        ownerId,
+        morningBriefOnly: view === 'morning',
+        view,
+        statuses,
+        confidenceGate: params.gate === 'A' || params.gate === 'B' ||
+          params.gate === 'C' || params.gate === 'D'
+          ? params.gate
+          : null,
+        pageSize: 50,
+      }),
+      outcomesUiEnabled
+        ? getOpportunityOutcomeOperationalSummary(ownerId)
+        : Promise.resolve(null),
+    ])
   } catch {
     result = null
   }
@@ -109,19 +124,6 @@ export default async function OpportunitiesPage(props: {
       }).catch(() => null)
     : null
 
-  const newCount = result.opportunities.filter(
-    (opportunity) => opportunity.status === 'new',
-  ).length
-  const attentionCount = result.opportunities.filter(
-    (opportunity) => opportunity.status === 'review',
-  ).length
-  const highConfidenceCount = result.opportunities.filter(
-    (opportunity) => opportunity.confidenceGate === 'A',
-  ).length
-  const expiringSoonCount = result.opportunities.filter(
-    (opportunity) => isExpiringSoon(opportunity.validUntil),
-  ).length
-
   return (
     <InternalPageFrame navItems={NAVIGATION} footer={<SiteFooter />}>
       <InternalPageHeader
@@ -135,48 +137,64 @@ export default async function OpportunitiesPage(props: {
       />
 
       <div className={styles.pageStack}>
-        <MetricGrid>
-          <MetricCard
-            label="Новые opportunities"
-            value={newCount}
-            tone="info"
-          />
-          <MetricCard
-            label="Требуют внимания"
-            value={attentionCount}
-            tone="neutral"
-          />
-          <MetricCard
-            label="Высокая достоверность"
-            value={highConfidenceCount}
-            tone="success"
-          />
-          <MetricCard
-            label="Истекают скоро"
-            value={expiringSoonCount}
-            tone="neutral"
-          />
-        </MetricGrid>
+        {outcomesUiEnabled ? (
+          <MetricGrid>
+            <MetricCard
+              label="Новые возможности"
+              value={operationalSummary?.newCount ?? 0}
+              tone="info"
+            />
+            <MetricCard
+              label="В работе"
+              value={operationalSummary?.acceptedCount ?? 0}
+              tone="neutral"
+            />
+            <MetricCard
+              label="Коммерческий pipeline"
+              value={operationalSummary?.pipelineCount ?? 0}
+              tone="success"
+            />
+            <MetricCard
+              label="Отложены"
+              value={operationalSummary?.snoozedCount ?? 0}
+              tone="neutral"
+            />
+          </MetricGrid>
+        ) : null}
 
         {funnel ? <OpportunityFunnel summary={funnel} /> : null}
 
-        <nav className={styles.filters} aria-label="Фильтры Morning Brief">
-          <FilterLink href="/opportunities" active={!params.status}>
-            Активные
+        {outcomesUiEnabled ? (
+          <nav className={styles.filters} aria-label="Фильтры Morning Brief">
+          <FilterLink href="/opportunities?view=morning" active={view === 'morning'}>
+            Новые возможности
           </FilterLink>
           <FilterLink
-            href="/opportunities?status=accepted,contacted"
-            active={params.status === 'accepted,contacted'}
+            href="/opportunities?view=accepted"
+            active={view === 'accepted'}
           >
             В работе
           </FilterLink>
           <FilterLink
-            href="/opportunities?status=snoozed"
-            active={params.status === 'snoozed'}
+            href="/opportunities?view=pipeline"
+            active={view === 'pipeline'}
+          >
+            Коммерческий pipeline
+          </FilterLink>
+          <FilterLink
+            href="/opportunities?view=snoozed"
+            active={view === 'snoozed'}
           >
             Отложенные
           </FilterLink>
-        </nav>
+          <FilterLink
+            href="/opportunities?view=completed"
+            active={view === 'completed'}
+          >
+            Завершённые
+          </FilterLink>
+          </nav>
+        ) : null}
 
         {result.opportunities.length > 0 ? (
           <div className={styles.cardList}>
@@ -203,14 +221,6 @@ export default async function OpportunitiesPage(props: {
   )
 }
 
-function isExpiringSoon(value: string | null): boolean {
-  if (!value) return false
-  const timestamp = Date.parse(value)
-  if (!Number.isFinite(timestamp)) return false
-  const remaining = timestamp - Date.now()
-  return remaining >= 0 && remaining <= 3 * 24 * 60 * 60 * 1000
-}
-
 function FilterLink(props: {
   href: string
   active: boolean
@@ -231,5 +241,12 @@ function FilterLink(props: {
 function parseStatusFilter(value: string | undefined): OpportunityStatus[] {
   if (value === 'accepted,contacted') return ['accepted', 'contacted']
   if (value === 'snoozed') return ['snoozed']
-  return ['new', 'review', 'accepted']
+  return []
+}
+
+function parseView(value: string | undefined): OpportunityView {
+  return value === 'accepted' || value === 'pipeline' || value === 'snoozed' ||
+    value === 'completed' || value === 'all'
+    ? value
+    : 'morning'
 }

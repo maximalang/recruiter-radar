@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { isOpportunityEngineV1Enabled } from '@/lib/opportunities/config'
 import { toPublicOpportunity } from '@/lib/opportunities/api-projection'
-import { listOpportunities } from '@/lib/opportunities/repository'
+import {
+  listOpportunities,
+  type OpportunityView,
+} from '@/lib/opportunities/repository'
 import type { HiringEpisodeType } from '@/lib/opportunities/hiring-episode-detection'
 import type {
   ConfidenceGate,
@@ -43,6 +46,10 @@ export async function GET(request: NextRequest) {
   }
 
   const params = request.nextUrl.searchParams
+  const view = parseView(params.get('view'))
+  if (params.has('view') && view === null) {
+    return NextResponse.json({ error: 'invalid_view' }, { status: 400 })
+  }
   const cursorValue = params.get('cursor')
   const cursorOffset = decodeCursor(cursorValue)
   if (cursorValue && cursorOffset === null) {
@@ -54,7 +61,8 @@ export async function GET(request: NextRequest) {
       undefined
     const result = await listOpportunities({
       ownerId,
-      morningBriefOnly: true,
+      morningBriefOnly: (view ?? 'morning') === 'morning',
+      view: view ?? 'morning',
       clientProfileId: positiveId(params.get('profile')),
       organizationId: positiveId(
         params.get('organizationId') ?? params.get('organization'),
@@ -114,11 +122,18 @@ function decodeCursor(value: string | null): number | null {
 }
 
 function parseStatuses(value: string | null): OpportunityStatus[] | undefined {
-  if (!value) return ['new', 'review', 'accepted']
+  if (!value) return undefined
   const statuses = value.split(',').filter(
     (item): item is OpportunityStatus => STATUSES.has(item as OpportunityStatus),
   )
-  return statuses.length > 0 ? statuses : ['new', 'review', 'accepted']
+  return statuses.length > 0 ? statuses : undefined
+}
+
+function parseView(value: string | null): OpportunityView | null {
+  return value === 'morning' || value === 'accepted' || value === 'pipeline' ||
+    value === 'snoozed' || value === 'completed' || value === 'all'
+    ? value
+    : null
 }
 
 function parseConfidenceGate(value: string | null): ConfidenceGate | null {

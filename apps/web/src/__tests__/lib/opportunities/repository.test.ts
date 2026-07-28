@@ -1,5 +1,6 @@
 import {
   applyOpportunityAction,
+  getOpportunityOutcomeOperationalSummary,
   getOpportunityById,
   listOpportunities,
   OpportunityActionConflictError,
@@ -131,6 +132,63 @@ describe('opportunity repository tenant scope', () => {
     expect(result.page).toBe(2)
     expect(result.nextOffset).toBe(4)
     expect(calls[1].params?.slice(-2)).toEqual([2, 2])
+  })
+
+  it.each([
+    ['morning', `CASE WHEN o.status = 'snoozed'`, `IN ('new', 'review')`],
+    ['accepted', `= 'active'`, `= 'accepted'`],
+    ['pipeline', `= 'active'`, `IN ('contacted', 'replied', 'meeting', 'proposal')`],
+    ['snoozed', `= 'snoozed'`, null],
+    ['completed', null, `IN ('won', 'lost', 'dismissed')`],
+    ['all', null, null],
+  ] as const)(
+    'uses the outcome projection with a legacy fallback for the %s view',
+    async (view, workflowClause, stageClause) => {
+      const { db, calls } = createDb([[{ count: '0' }], []])
+
+      await listOpportunities({ ownerId: '7', view }, db)
+
+      expect(calls[0].sql).toContain(
+        'LEFT JOIN opportunity_outcome_state outcome_state',
+      )
+      expect(calls[0].sql).toContain('outcome_state.owner_id = o.owner_id')
+      if (workflowClause) expect(calls[0].sql).toContain(workflowClause)
+      if (stageClause) expect(calls[0].sql).toContain(stageClause)
+      expect(calls[0].params?.[0]).toBe('7')
+    },
+  )
+
+  it('returns a tenant-scoped operational summary from projection-first lifecycle state', async () => {
+    const { db, calls } = createDb([[
+      {
+        newCount: '2',
+        acceptedCount: '3',
+        pipelineCount: '4',
+        snoozedCount: '5',
+        wonCount: '6',
+        lostCount: '7',
+        dismissedCount: '8',
+        overdueSnoozeCount: '1',
+      },
+    ]])
+
+    const summary = await getOpportunityOutcomeOperationalSummary('7', db)
+
+    expect(summary).toEqual({
+      newCount: 2,
+      acceptedCount: 3,
+      pipelineCount: 4,
+      snoozedCount: 5,
+      wonCount: 6,
+      lostCount: 7,
+      dismissedCount: 8,
+      overdueSnoozeCount: 1,
+    })
+    expect(calls[0].sql).toContain('WHERE o.owner_id = $1')
+    expect(calls[0].sql).toContain(
+      'LEFT JOIN opportunity_outcome_state outcome_state',
+    )
+    expect(calls[0].params).toEqual(['7'])
   })
 
   it('does not run an evidence lookup for a foreign or missing detail', async () => {
