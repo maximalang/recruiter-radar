@@ -1,12 +1,15 @@
 # Opportunity Engine v1
 
-Opportunity Engine превращает уже собранные сигналы найма в три отдельные сущности:
+Opportunity Engine преобразует уже собранные сигналы найма в три отдельные сущности:
 
-1. `HiringEpisode` — подтверждённое изменение найма компании.
+1. `HiringEpisode` — подтверждённое company-level изменение найма.
 2. `Opportunity` — tenant-scoped оценка эпизода для конкретного профиля агентства.
-3. `Morning Brief` — пользовательское представление приоритетных opportunities.
+3. `Morning Brief` — пользовательское представление приоритетных актуальных opportunities.
 
-Реализация аддитивна. Она не меняет существующие `signals`, FIUR, confidence gates, digest generation, billing/entitlement и delivery pipeline. Opportunity строится только для пары «активный клиентский профиль + организация», для которой уже существует `digest_candidate` текущего pipeline.
+Реализация аддитивна и не меняет существующие `signals`, FIUR, confidence gates,
+digest generation, billing/entitlement и delivery pipeline. Opportunity строится
+только для пары «активный клиентский профиль + организация», для которой есть
+кандидат из завершённого digest run.
 
 ## Feature flag
 
@@ -14,84 +17,214 @@ Opportunity Engine превращает уже собранные сигналы
 OPPORTUNITY_ENGINE_V1_ENABLED=false
 ```
 
-Значение по умолчанию — `false`. Только точная строка `true` без пробелов и
-изменения регистра включает:
+По умолчанию flag выключен. Только точная строка `true` включает:
 
 - `/opportunities`;
 - `/api/opportunities`;
 - opportunity cron jobs.
 
-При выключенном flag пользовательские routes возвращают `404`, jobs не выполняют даже read-запросы, а существующий pipeline продолжает работать без изменений.
+При выключенном flag пользовательские routes отвечают `404`, а jobs не делают
+даже read-запросов.
 
-## Схема данных
+## Миграции и модель данных
 
-Миграция:
+Миграции применяются по порядку:
 
-- `packages/db/migrations/20260726130000_add_opportunity_engine_v1.sql`;
-- rollback: `packages/db/migrations/20260726130000_add_opportunity_engine_v1.down.sql`.
+- `20260726130000_add_opportunity_engine_v1.sql` — исходная v1-схема;
+- `20260727120000_add_opportunity_engine_hardening.sql` — стабильная идентичность
+  эпизода и поколения;
+- `20260727121000_add_opportunity_episode_state.sql` — клиентское состояние эпизода;
+- `20260727122000_add_opportunity_supersession.sql` — provenance и supersession
+  пересчитанных opportunities;
+- `20260727130000_fix_opportunity_hardening_edge_cases.sql` — восстановление
+  snooze deadline и constraint, запрещающий `snoozed` без `snoozed_until`.
+- `20260727140000_repair_opportunity_authoritative_state.sql` — восстановление
+  последнего клиентского решения из append-only action log и backfill будущего
+  snooze, если episode state отсутствует.
 
-Новые таблицы:
+Для каждой migration рядом находится `.down.sql`.
 
-- `hiring_episodes` — глобальные company-level факты с versioned dedupe key;
-- `hiring_episode_evidence` — traceability до `signals` и `evidence_items`;
-- `hiring_episode_detection_state` — checkpoint последнего успешно
-  обработанного signal id/update по organization и engine version, включая
-  поздно пришедшие сигналы с более старым `occurred_at`;
+Основные сущности:
+
+- `hiring_episodes` — глобальные company-level факты;
+- `hiring_episode_evidence` — точная трассировка до всех исходных публикаций и
+  evidence items;
+- `hiring_episode_detection_state` — checkpoint последнего успешного detect;
 - `opportunities` — owner/profile-scoped score и детерминированный brief;
-- `opportunity_actions` — idempotent audit trail пользовательских действий;
-- `opportunity_build_failures` — retry-backoff для неуспешных
-  episode/profile pairs без блокировки следующих batch-строк.
+- `client_episode_state` — `accepted`, `dismissed`, `snoozed` или `contacted`
+  для конкретной пары profile/episode;
+- `opportunity_actions` — идемпотентный audit trail с предыдущим и новым статусом;
+- `opportunity_build_failures` — retry backoff для отдельной profile/episode пары.
 
-Composite foreign keys не позволяют связать opportunity с чужим профилем или записать действие от другого owner. Score columns ограничены диапазоном `0..1`, lifecycle и confidence gates — allowlist constraints.
+Composite foreign keys не позволяют связать opportunity с чужим профилем,
+эпизодом другой организации или записать действие от другого owner.
 
-Миграция не содержит backfill. На первом rollout она применяется с выключенным flag.
+### Идентичность HiringEpisode
 
-## Детекция HiringEpisode
+`episode_identity` — стабильная семантическая идентичность вида
+`organization:type:normalized-dimension`. Календарная дата в идентичность не
+входит. Читаемый формат позволяет безопасно продолжить legacy date-key эпизоды
+после upgrade без недоступной в базовом PostgreSQL функции SHA-256.
 
-Engine version: `hiring-episode-v1`.
+`episode_generation` начинается с `1`. Для одной комбинации
+`organization_id + episode_identity + engine_version` может существовать только
+один активный эпизод. Повторное обнаружение в течение `continuationGapDays`
+обновляет этот эпизод. После периода неактивности старый эпизод закрывается и
+создаётся следующее поколение. В v1 `continuationGapDays` и
+`inactivityCloseDays` равны 30 дням, чтобы правила продолжения и закрытия не
+образовывали неопределённое окно.
 
 Поддерживаемые типы:
 
 - `vacancy_spike`;
 - `repeated_vacancies`;
-- `new_role_cluster`;
+- `role_cluster`;
 - `new_region`;
 - `hiring_restart`;
 - `sustained_hiring`.
 
-Пороговые значения находятся в `DEFAULT_HIRING_EPISODE_CONFIG`, а runtime limits и feature flag — в `apps/web/lib/opportunities/config.ts`.
+Старое значение `new_role_cluster` мигрируется в `role_cluster`.
 
-Детекция:
+### Каноническая вакансия и evidence
 
-- читает только `job_posting` за history window;
-- нормализует и дедуплицирует сигналы;
-- создаёт стабильный `episode_key` и SHA-256 `evidence_hash`;
-- связывает эпизод с исходными signal/evidence IDs;
-- повторный запуск обновляет существующий versioned episode.
-- успешный apply-run сохраняет checkpoint даже при отсутствии episode, поэтому
-  следующий batch не застревает на первых организациях; dry-run checkpoint не
-  меняет.
+Vacancy dedupe использует, по убыванию надёжности:
 
-## Opportunity scoring
+1. внешний vacancy id;
+2. канонический URL без tracking-параметров;
+3. fallback `organization + normalized title + normalized region`.
+
+External id сохраняет исходный регистр (после trim): регистр может быть частью
+идентификатора провайдера. Разные external id одного provider не склеиваются, в том числе через транзитивную
+цепочку публикаций без id. Между разными providers
+публикации могут объединиться по canonical URL или fallback fingerprint.
+Несколько публикаций одной
+канонической вакансии увеличивают `publicationCount`, но не `vacancy_count`.
+При этом каждая исходная публикация остаётся отдельной evidence-связью.
+
+Reconciliation эпизода, его exact evidence set, `evidence_hash` и detection
+checkpoint выполняется одной транзакцией под per-organization advisory
+transaction lock. Checkpoint хранит fingerprint содержимого signal/evidence,
+поэтому evidence-only изменения и удаления также запускают reconciliation.
+Активные identity, исчезнувшие из полного результата детектора, закрываются в
+той же транзакции только после `inactivityCloseDays`; движение короткого окна
+само по себе не создаёт новую generation. Повторный detect:
+
+- добавляет появившиеся связи;
+- удаляет устаревшие связи;
+- пересчитывает SHA-256 по канонически отсортированному набору;
+- не оставляет частично обновлённый эпизод при ошибке.
+
+## Opportunity scoring и provenance
 
 Scoring version: `opportunity-v1`.
 
 Компоненты:
 
-- agency fit;
-- hiring intent;
-- external agency propensity;
-- timing;
-- reachability;
-- confidence.
+- `agencyFit`;
+- `hiringIntent`;
+- `externalSupportNeed`;
+- `timing`;
+- `reachability`;
+- `confidence`.
 
-Финальный score — геометрическое среднее шести нормализованных компонентов. Это не замена FIUR: FIUR fit/reachability и его структурированные reasons являются входом нового scorer. Confidence gate D не попадает в Morning Brief; explicit profile exclusions и низкий fit переводят запись в `dismissed`; закрытый episode — в `expired`.
+`externalSupportNeed` означает осторожную эвристику потребности во внешней
+поддержке. Это не утверждение, что компания уже решила привлечь агентство.
+Модель помечена как `heuristic` и `uncalibrated`; score предназначен для
+приоритизации, а не для вероятностной интерпретации.
 
-Brief builder использует только переданные факты и осторожные формулировки. Он не утверждает наличие бюджета, агентского мандата, конкретного ЛПР или персонального контакта.
+Итоговый score — геометрическое среднее шести нормализованных компонентов.
+Confidence gate D не входит в Morning Brief. Явное исключение профиля или
+`agencyFit < 0.35` переводит opportunity в `dismissed`; gate C/D или низкая
+confidence — в `review`.
 
-## Jobs
+Каждая запись сохраняет:
 
-Все endpoints требуют `x-api-key: $CRON_API_KEY`.
+- `episode_evidence_hash`;
+- `profile_snapshot_hash`;
+- `digest_candidate_id`;
+- `fiur_version`;
+- `scoring_config_hash`;
+- `brief_builder_version`;
+- `input_hash`;
+- `scoring_version`.
+
+`input_hash` включает семантическое содержимое episode/signals/evidence, организацию,
+digest payload и профиль, но не `digest_candidate_id` и другие database row ids.
+Из digest payload исключаются внутренние `corroborated_org_ids` и fallback-ключи
+`org:<database-id>`; доменные и провайдерские corroboration keys остаются семантическими.
+Detector-only `canonicalVacancyFingerprints` также не входят в hash: fallback этих
+идентификаторов содержит database organization id, а сами вакансии уже представлены
+семантическим содержимым signals.
+Ключи объектов канонически сортируются по Unicode code points без зависимости от
+системной locale; только set-like массивы (source families,
+поля профиля и наборы signals/evidence) сортируются и dedupe-ятся в build job.
+Порядок семантических массивов, включая digest reasons, сохраняется. Одинаковый `input_hash` не
+вызывает запись. Повторная сборка той же scoring version обновляет текущую
+строку. Новая scoring version атомарно помечает предыдущую строку
+`superseded_at` и создаёт новую. Возврат canary на ранее использованную scoring
+version восстанавливает её superseded-строку вместо конфликтующей повторной
+вставки. Частичный unique index
+гарантирует ровно одну current-запись для profile/episode. List и detail queries
+возвращают только `superseded_at IS NULL`.
+
+## Персонализированный brief и evidence metrics
+
+Brief builder использует только переданные факты и профиль агентства:
+специализацию, географию, роли, отрасли, keywords, hiring mode и contact policy.
+Он возвращает:
+
+- `whyNow`;
+- `problemHypothesis`;
+- `recommendedAngle`;
+- `recommendedPersona`;
+- `recommendedAction`;
+- `agencyFitExplanation`;
+- `limitations`.
+
+Формулировки не утверждают наличие бюджета, агентского мандата, конкретного ЛПР
+или персонального контакта. Outreach остаётся draft/assist.
+
+API и UI показывают отдельно:
+
+- число фактов;
+- число исходных публикаций;
+- число семейств источников;
+- число прямых подтверждений.
+
+API не возвращает `owner_id`, raw metadata, внутренние hashes или
+`digest_candidate_id`.
+
+## Lifecycle и suppression
+
+Разрешённые переходы:
+
+| Текущий статус | Разрешённые действия |
+| --- | --- |
+| `new`, `review` | `accepted`, `dismissed`, `snoozed` |
+| `snoozed` | `accepted`, `dismissed` |
+| `accepted` | `contacted`, `dismissed`, `snoozed` |
+| `contacted`, `dismissed`, `expired` | нет |
+
+Запрещённый переход возвращает `409` и не создаёт `opportunity_actions`.
+Идемпотентный replay с тем же key и payload не меняет данные и одной current-row
+выборкой возвращает фактическую current opportunity, даже если исходная строка уже
+superseded или её статус изменился. Обычное действие загружает ответ до `COMMIT`, пока
+заблокированная opportunity ещё не может быть конкурентно superseded.
+Повторное использование key с другим payload возвращает `409`.
+
+`accepted` означает «клиент принял opportunity в работу» и записывается только в
+`client_episode_state`. `contacted` также остаётся episode-scoped и не обновляет legacy
+`client_digest_org_state`. Поэтому завершение одного эпизода не скрывает будущий
+эпизод той же компании. При supersession или rollback scoring version статус `snoozed`
+и точный `client_episode_state.suppressed_until` переносятся в current opportunity.
+Если deadline уже истёк, build job атомарно удаляет episode state и возвращает current
+opportunity к рассчитанному статусу даже при неизменном `input_hash`.
+Если у current opportunity сохранился будущий snooze deadline, но episode state
+отсутствует, build job восстанавливает state с тем же точным deadline до пересчёта.
+
+## Jobs и конкурентность
+
+Endpoints требуют `x-api-key: $CRON_API_KEY`:
 
 ```text
 POST /api/cron/opportunities/detect-hiring-episodes
@@ -100,105 +233,26 @@ POST /api/cron/opportunities/expire-opportunities
 POST /api/cron/opportunities/backfill-opportunities
 ```
 
-Общие query parameters:
+Каждый top-level job получает отдельный PostgreSQL client и session advisory
+lock. Параллельный запуск того же job завершается безопасным skip с метриками
+`locked` и `skippedBecauseLocked`. Detect дополнительно сериализует запись
+каждой организации через transaction advisory lock.
 
-- `organization=<positive bigint>` — ограничить одной организацией;
-- `batchSize=1..500`;
-- `dryRun=true` — не выполнять writes для detect/build/expire.
+Основные счётчики: `scanned`, `created`, `continued`, `reconciled`,
+`skippedUnchanged`, `superseded`, `updated`, `skipped`, `failed`, `expired`,
+`locked`, `skippedBecauseLocked`.
 
-Backfill безопасен по умолчанию:
+Build начинается с последних кандидатов из завершённых digest runs, затем
+соединяет их с соответствующими профилями и эпизодами. Декартова матрица
+profile × episode не создаётся. Candidate должен быть не старше episode и
+profile snapshot, а его source families должны покрывать источники episode.
 
-```text
-POST /api/cron/opportunities/backfill-opportunities
-```
-
-выполняет полный detect → build внутри одной транзакции и завершает её
-`ROLLBACK`, поэтому preview совпадает с apply-путём даже на первой загрузке.
-Запись разрешается только явным:
+Backfill без `apply=true` выполняет detect → build в транзакции и завершает её
+`ROLLBACK`. Запись разрешена только явно:
 
 ```text
 POST /api/cron/opportunities/backfill-opportunities?apply=true
 ```
-
-Рекомендуемый график:
-
-1. `detect-hiring-episodes` после source ingest;
-2. `build-opportunities` после успешной генерации digest candidates;
-3. `expire-opportunities` ежедневно после build.
-
-Jobs изолируют ошибку одной organization/profile pair, ведут счётчики `scanned`, `created`, `updated`, `skipped`, `failed`, `expired` и пишут structured events:
-
-- `opportunity.job.started`;
-- `opportunity.job.entity_failed`;
-- `opportunity.job.completed`;
-- `opportunity.job.disabled`;
-- `opportunity.cron.failed`.
-
-Entity-level события:
-
-- `hiring_episode.created`;
-- `hiring_episode.updated`;
-- `hiring_episode.closed`;
-- `opportunity.created`;
-- `opportunity.updated`;
-- `opportunity.expired`;
-- `opportunity.action`.
-
-Build использует только candidate из завершённого digest run, созданный не
-раньше последнего сигнала episode и последнего изменения client profile.
-Source families candidate должны покрывать источники signal-ов episode. Уже
-актуальные opportunities отсекаются до `LIMIT`, поэтому повторные batch-run не
-застревают на первых строках. Ошибка конкретной organization/profile pair
-ставит её на пятиминутный retry-backoff, освобождая bounded batch для следующих
-строк.
-
-## API
-
-Все пользовательские endpoints требуют подписанную owner session и всегда добавляют owner predicate:
-
-```text
-GET  /api/opportunities
-GET  /api/opportunities/:id
-POST /api/opportunities/:id/action
-```
-
-List filters:
-
-- `profile`;
-- `organizationId`;
-- `status` (comma-separated allowlist);
-- `confidenceGate=A|B|C|D`;
-- `episodeType`;
-- `minimumScore=0..1`;
-- `limit=1..100`;
-- `cursor`.
-
-Для совместимости также принимаются прежние aliases `organization`, `gate`,
-`page` и `pageSize`.
-
-List endpoint и `/opportunities` всегда применяют
-`morningBriefEligible = true`; поэтому gate D и profile-excluded записи не
-попадают в Brief даже при прямой передаче соответствующего фильтра.
-
-Actions:
-
-- `accepted`;
-- `dismissed`;
-- `snoozed`;
-- `contacted`.
-
-Action request принимает `Idempotency-Key` header или `idempotencyKey` в JSON. `snoozed` также принимает `snoozeDays` и ограничивает его диапазоном `1..90`. Feedback синхронизируется через существующий `client_digest_org_state` core в той же транзакции.
-
-Idempotency key хранится вместе с SHA-256 fingerprint нормализованного payload.
-Повтор того же request безопасен, а повторное использование ключа с другим
-action/note/snooze payload возвращает `409`. UI сохраняет один request key для
-сетевого retry, но создаёт новый key для нового пользовательского намерения.
-Snoozed-записи не входят в default Brief; после истечения срока expire job
-возвращает ещё актуальную запись в `new`.
-
-Opportunity storage и API projection не дублируют contact paths. API также не
-возвращает `owner_id`, raw metadata, evidence hash или внутренний digest
-candidate ID.
 
 ## Проверки
 
@@ -207,51 +261,124 @@ candidate ID.
 ```powershell
 npm.cmd run test --workspace @recruiter-radar/web -- --runInBand --testPathPattern=opportunit
 npm.cmd run web:check
+npm.cmd run web:build
 npm.cmd run db:validate
 ```
 
-Проверка реальной PostgreSQL schema выполняется после миграции в изолированной БД:
+Реальная PostgreSQL-проверка принимает URL административной БД и сама создаёт и
+удаляет изолированную временную БД:
 
 ```powershell
-$env:DATABASE_URL='postgresql://...'
-npm.cmd run db:migrate
+$env:DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:5432/postgres'
 npm.cmd run test:opportunity-engine:db
+npm.cmd run test:opportunity-engine:down
 ```
 
-Verifier работает внутри транзакции с `ROLLBACK` и проверяет:
+DB runner применяет всю migration chain к свежей схеме, запускает SQL verifier в
+rollback-транзакции и production TypeScript runtime test через реальные
+`detectHiringEpisodesJob`, `buildOpportunitiesJob`, `applyOpportunityAction` и
+`expireOpportunitiesJob`. Во второй временной БД runner проходит полный upgrade от
+исходной v1-схемы с конфликтующими lifecycle-строками и проверяет восстановление
+последнего action и orphaned snooze. Down runner применяет шесть down migrations в
+обратном порядке, проверяет сохранение audit provenance действий и удаление runtime tables.
 
+Проверки покрывают:
+
+- актуальную форму схемы;
+- продолжение эпизода и новое поколение после неактивности;
+- unique active identity;
+- canonical vacancy count при нескольких публикациях;
+- expansion/contraction exact evidence set и hash;
 - tenant ownership;
-- action idempotency;
-- evidence traceability.
+- illegal transition без action row;
+- идемпотентный replay;
+- single-snapshot replay и чтение ответа обычного action до commit;
+- `accepted → contacted` без преждевременного org-wide suppression;
+- стабильную повторную сборку с тем же input;
+- supersession новой scoring version и ровно одну current-запись;
+- исключение superseded rows из current query;
+- атомарное пробуждение snooze и последующий expire lifecycle;
+- восстановление последнего lifecycle action и orphaned будущего snooze при upgrade;
+- взаимное исключение cron advisory lock;
+- `EXPLAIN` build query и отсутствие `CROSS JOIN`.
 
-## Rollout
+Ключевые диагностические события: `canonical_vacancy.merge_rejected`,
+`hiring_episode.bounds_preserved`, `opportunity.snooze_preserved`,
+`opportunity.build.semantic_unchanged`, `opportunity.snooze_elapsed_during_build`,
+`opportunity.snooze_state_repaired`, `opportunity.replay_served` и
+`opportunity.contact_recorded`. Они содержат только ids, версии и reason codes;
+raw URL и payload в них не пишутся.
 
-1. Применить migration при `OPPORTUNITY_ENGINE_V1_ENABLED=false`.
-2. Выполнить DB verifier в изолированной PostgreSQL.
-3. Запустить backfill без `apply=true` и проверить structured counters.
-4. Запустить canary backfill для одной organization с `apply=true`.
-5. Включить flag только на worker/cron и проверить episodes/opportunities.
-6. Включить flag на web runtime и проверить `/opportunities` для тестового owner.
-7. Наблюдать `failed`, долю gate C/D, объём dismissed/expired и latency jobs.
+Для ручной оценки плана используйте тот же `EXPLAIN (FORMAT JSON)` из verifier.
+В плане не должно быть полного произведения `client_profiles × hiring_episodes`;
+стартовый набор — `latest_candidates`.
 
-Экстренный rollback начинается с выключения flag. Down migration применяется только после остановки jobs и подтверждения, что данные v1 больше не нужны. Существующие leads/digests при этом не затрагиваются.
+## Canary rollout
 
-## Известные ограничения v1
+1. Применить migrations при `OPPORTUNITY_ENGINE_V1_ENABLED=false`.
+2. Запустить DB verifier в отдельной PostgreSQL БД.
+3. Выполнить dry-run backfill и сохранить counters.
+4. Запустить `apply=true` только для одной `organization`.
+5. Сверить количество active identities, evidence links, current
+   opportunities и долю `failed`.
+6. Включить flag только на worker/cron.
+7. Выполнить detect/build/expire и проверить отсутствие lock contention и
+   duplicate current rows.
+8. Включить flag на web runtime для одного тестового owner.
+9. Проверить Morning Brief, lifecycle и evidence metrics.
+10. Расширять canary только после стабильного полного цикла.
 
-- Episode detection использует текущие vacancy-level signals и не создаёт новые источники.
-- Opportunity строится только после появления `digest_candidate`; это сознательно сохраняет текущие gates.
-- Morning Brief не отправляет outreach и не генерирует массовые сообщения.
-- Связь evidence item с signal возможна только при существующей нормализованной ссылке; signal trace остаётся обязательным.
-- Scheduler configuration остаётся инфраструктурной задачей deployment environment; приложение предоставляет защищённые idempotent endpoints.
+Минимальные canary-инварианты:
 
-## Следующая версия
+```sql
+-- Не более одного активного поколения identity.
+SELECT organization_id, episode_identity, engine_version, COUNT(*)
+FROM hiring_episodes
+WHERE status = 'active'
+GROUP BY 1, 2, 3
+HAVING COUNT(*) > 1;
 
-После canary v1 рекомендуется:
+-- Ровно одна current opportunity на profile/episode.
+SELECT client_profile_id, hiring_episode_id, COUNT(*)
+FROM opportunities
+WHERE superseded_at IS NULL
+GROUP BY 1, 2
+HAVING COUNT(*) > 1;
+```
 
-1. измерить precision по `accepted`, `dismissed` и причинам;
-2. откалибровать thresholds только на размеченных outcomes;
-3. добавить новые company-level episode types лишь после появления надёжных
-   источников и evidence contracts;
-4. расширить outcome model без превращения Morning Brief в CRM;
-5. при необходимости заменить opaque offset cursor на keyset cursor для
-   очень больших tenant-выборок.
+Оба запроса должны вернуть 0 строк.
+
+## Rollback
+
+Аварийный rollback начинается с выключения feature flag и остановки opportunity
+jobs. Это мгновенно убирает пользовательскую поверхность и новые writes, не
+затрагивая основной digest pipeline.
+
+Далее:
+
+1. сохранить counters и проблемные identity/input hashes;
+2. дождаться завершения активных job-транзакций;
+3. для rollback только scoring canary вернуть предыдущую scoring version:
+   build восстановит её сохранённую superseded-строку как current;
+4. для полного schema rollback откатывать migrations в обратном порядке;
+5. базовую v1 down migration применять только если данные Opportunity Engine
+   больше не нужны.
+
+Hardening migration при upgrade может закрыть лишние активные поколения,
+обнаруженные в старых данных. Supersession down migration удаляет только индексы
+и новые provenance-поля: исходная v1-схема уже допускает по одной opportunity на
+scoring version, поэтому historical scorer-строки, их actions и idempotency keys
+сохраняются без перепривязки. Остальные down migrations удаляют новые ограничения и
+поля, но намеренно не открывают закрытые поколения обратно: это необратимая
+нормализация статуса, которую нужно учитывать при rollback review.
+
+## Ограничения v1
+
+- Detection использует существующие vacancy-level signals и не создаёт новые
+  источники.
+- Opportunity появляется только после завершённого digest candidate, сохраняя
+  существующие eligibility gates.
+- Эвристика `externalSupportNeed` пока не откалибрована на outcomes.
+- Morning Brief не отправляет outreach и не превращается в CRM.
+- Scheduler остаётся частью deployment environment; приложение предоставляет
+  защищённые идемпотентные endpoints и блокировки конкурентных запусков.

@@ -1,11 +1,14 @@
 import { createHash } from 'node:crypto'
 
+import { logEvent } from '@/lib/runtime'
+import { canonicalizeOpportunityUrl } from './canonical-hash'
+
 export const HIRING_EPISODE_ENGINE_VERSION = 'hiring-episode-v1' as const
 
 export const HIRING_EPISODE_TYPES = [
   'vacancy_spike',
   'repeated_vacancies',
-  'new_role_cluster',
+  'role_cluster',
   'new_region',
   'hiring_restart',
   'sustained_hiring',
@@ -29,6 +32,7 @@ export interface HiringEpisodeConfig {
   sustainedPeriods: number
   sustainedMinimumPerPeriod: number
   inactivityCloseDays: number
+  continuationGapDays: number
 }
 
 export const DEFAULT_HIRING_EPISODE_CONFIG: Readonly<HiringEpisodeConfig> = {
@@ -46,6 +50,7 @@ export const DEFAULT_HIRING_EPISODE_CONFIG: Readonly<HiringEpisodeConfig> = {
   sustainedPeriods: 3,
   sustainedMinimumPerPeriod: 2,
   inactivityCloseDays: 30,
+  continuationGapDays: 30,
 }
 
 export interface HiringSignalInput {
@@ -56,6 +61,7 @@ export interface HiringSignalInput {
   region: string | null
   source: string
   sourceUrl: string | null
+  externalVacancyId?: string | null
   occurredAt: string
   evidenceIds: string[]
 }
@@ -64,6 +70,8 @@ export interface HiringEpisodeCandidate {
   organizationId: string
   episodeType: HiringEpisodeType
   episodeKey: string
+  episodeIdentity: string
+  episodeGeneration: number
   title: string
   summary: string
   startedAt: string
@@ -90,12 +98,17 @@ interface CandidateFacts {
   dimension: string
   title: string
   summary: string
-  signals: HiringSignalInput[]
+  signals: CanonicalVacancy[]
   strengthScore: number
   metadata: Record<string, unknown>
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000
+
+interface CanonicalVacancy extends HiringSignalInput {
+  vacancyFingerprint: string
+  publications: HiringSignalInput[]
+}
 
 export class HiringEpisodeDetectionService {
   constructor(
@@ -105,7 +118,8 @@ export class HiringEpisodeDetectionService {
 
   detectOrganization(input: DetectOrganizationInput): HiringEpisodeCandidate[] {
     const now = input.now ?? new Date()
-    const signals = normalizeSignals(input.signals, input.organizationId, now, this.config)
+    const publications = normalizeSignals(input.signals, input.organizationId, now, this.config)
+    const signals = canonicalizeVacancies(publications)
     const activeSignals = signals.filter(
       (item) => ageDays(item.occurredAt, now) <= this.config.activeWindowDays,
     )
@@ -135,6 +149,21 @@ export function isEpisodeInactive(
   const timestamp = Date.parse(lastSeenAt)
   if (!Number.isFinite(timestamp)) return true
   return now.getTime() - timestamp > config.inactivityCloseDays * DAY_MS
+}
+
+export function isEpisodeContinuation(
+  latest: { status: HiringEpisodeStatus; lastSeenAt: string } | null,
+  candidateLastSeenAt: string,
+  config: Readonly<HiringEpisodeConfig> = DEFAULT_HIRING_EPISODE_CONFIG,
+): boolean {
+  if (!latest || latest.status !== 'active') return false
+  const latestTimestamp = Date.parse(latest.lastSeenAt)
+  const candidateTimestamp = Date.parse(candidateLastSeenAt)
+  if (!Number.isFinite(latestTimestamp) || !Number.isFinite(candidateTimestamp)) {
+    return false
+  }
+  return Math.abs(candidateTimestamp - latestTimestamp) <=
+    config.continuationGapDays * DAY_MS
 }
 
 export function classifyOpportunityRoleFamily(title: string): string {
@@ -179,6 +208,8 @@ function normalizeSignals(
       id: signal.id.trim(),
       title: signal.title.trim(),
       region: signal.region?.trim() || null,
+      sourceUrl: canonicalizeOpportunityUrl(signal.sourceUrl),
+      externalVacancyId: signal.externalVacancyId?.trim() || null,
       evidenceIds: uniqueSorted(signal.evidenceIds),
       occurredAt: new Date(occurredAt).toISOString(),
     })
@@ -192,8 +223,8 @@ function normalizeSignals(
 }
 
 function detectVacancySpike(
-  signals: HiringSignalInput[],
-  activeSignals: HiringSignalInput[],
+  signals: CanonicalVacancy[],
+  activeSignals: CanonicalVacancy[],
   config: Readonly<HiringEpisodeConfig>,
   now: Date,
 ): CandidateFacts[] {
@@ -240,34 +271,39 @@ function detectVacancySpike(
 }
 
 function detectRepeatedVacancies(
-  signals: HiringSignalInput[],
-  activeSignals: HiringSignalInput[],
+  signals: CanonicalVacancy[],
+  activeSignals: CanonicalVacancy[],
   config: Readonly<HiringEpisodeConfig>,
   now: Date,
 ): CandidateFacts[] {
-  const activeByTitle = groupBy(activeSignals, (item) => normalizeRoleTitle(item.title))
-  const repeated: Array<{ title: string; signals: HiringSignalInput[] }> = []
+  const repeated: Array<{ title: string; signals: CanonicalVacancy[] }> = []
 
-  for (const [normalizedTitle, current] of activeByTitle) {
-    if (!normalizedTitle) continue
+  for (const current of activeSignals) {
+    const identity = repeatedVacancyIdentity(current)
     const historical = signals.filter(
-      (item) =>
-        normalizeRoleTitle(item.title) === normalizedTitle &&
-        ageDays(item.occurredAt, now) >= config.repeatedVacancyGapDays,
+      (vacancy) =>
+        repeatedVacancyIdentity(vacancy) === identity &&
+        (
+          ageDays(vacancy.occurredAt, now) >= config.repeatedVacancyGapDays ||
+          vacancy.publications.some(
+            (publication) =>
+              ageDays(publication.occurredAt, now) >= config.repeatedVacancyGapDays,
+          )
+        ),
     )
     if (historical.length > 0) {
       repeated.push({
-        title: current[0].title,
-        signals: [...historical, ...current],
+        title: current.title,
+        signals: uniqueCanonicalVacancies([...historical, current]),
       })
     }
   }
   if (repeated.length === 0) return []
 
-  const supportingSignals = uniqueSignals(repeated.flatMap((item) => item.signals))
+  const supportingSignals = uniqueCanonicalVacancies(repeated.flatMap((item) => item.signals))
   return [{
     episodeType: 'repeated_vacancies',
-    dimension: stableDimension(repeated.map((item) => normalizeRoleTitle(item.title))),
+    dimension: 'all',
     title: repeated.length === 1
       ? `Повторно опубликована вакансия «${repeated[0].title}»`
       : 'Компания повторно опубликовала несколько вакансий',
@@ -284,7 +320,7 @@ function detectRepeatedVacancies(
 }
 
 function detectRoleClusters(
-  activeSignals: HiringSignalInput[],
+  activeSignals: CanonicalVacancy[],
   config: Readonly<HiringEpisodeConfig>,
 ): CandidateFacts[] {
   const groups = groupBy(activeSignals, (item) => classifyOpportunityRoleFamily(item.title))
@@ -293,7 +329,7 @@ function detectRoleClusters(
   for (const [family, familySignals] of groups) {
     if (family === 'other' || familySignals.length < config.roleClusterMinimum) continue
     candidates.push({
-      episodeType: 'new_role_cluster',
+      episodeType: 'role_cluster',
       dimension: family,
       title: `Компания формирует кластер ролей «${roleFamilyLabel(family)}»`,
       summary: `Одновременно опубликовано ${familySignals.length} вакансий одной функции.`,
@@ -311,8 +347,8 @@ function detectRoleClusters(
 }
 
 function detectNewRegions(
-  signals: HiringSignalInput[],
-  activeSignals: HiringSignalInput[],
+  signals: CanonicalVacancy[],
+  activeSignals: CanonicalVacancy[],
   config: Readonly<HiringEpisodeConfig>,
   now: Date,
 ): CandidateFacts[] {
@@ -326,7 +362,7 @@ function detectNewRegions(
   if (historicalRegions.size === 0) return []
 
   const currentByRegion = groupBy(
-    activeSignals.filter((item): item is HiringSignalInput & { region: string } => Boolean(item.region)),
+    activeSignals.filter((item): item is CanonicalVacancy & { region: string } => Boolean(item.region)),
     (item) => normalizeText(item.region),
   )
   const candidates: CandidateFacts[] = []
@@ -358,8 +394,8 @@ function detectNewRegions(
 }
 
 function detectHiringRestart(
-  signals: HiringSignalInput[],
-  activeSignals: HiringSignalInput[],
+  signals: CanonicalVacancy[],
+  activeSignals: CanonicalVacancy[],
   config: Readonly<HiringEpisodeConfig>,
   now: Date,
 ): CandidateFacts[] {
@@ -388,7 +424,7 @@ function detectHiringRestart(
 }
 
 function detectSustainedHiring(
-  signals: HiringSignalInput[],
+  signals: CanonicalVacancy[],
   config: Readonly<HiringEpisodeConfig>,
   now: Date,
 ): CandidateFacts[] {
@@ -428,37 +464,51 @@ function buildEpisodeCandidate(
   now: Date,
   config: Readonly<HiringEpisodeConfig>,
 ): HiringEpisodeCandidate {
-  const signals = uniqueSignals(facts.signals)
+  const canonicalVacancies = uniqueCanonicalVacancies(facts.signals)
+  const signals = uniqueSignals(
+    canonicalVacancies.flatMap((vacancy) => vacancy.publications),
+  )
   const startedAt = signals[0].occurredAt
   const lastSeenAt = signals[signals.length - 1].occurredAt
   const signalIds = signals.map((item) => item.id)
   const evidenceIds = uniqueSorted(signals.flatMap((item) => item.evidenceIds))
-  const dayBucket = startedAt.slice(0, 10)
+  const episodeDimension = stableDimension([facts.dimension])
+  const episodeIdentity =
+    `${organizationId}:${facts.episodeType}:${episodeDimension}`
 
   return {
     organizationId,
     episodeType: facts.episodeType,
-    episodeKey: `${facts.episodeType}:${stableDimension([facts.dimension])}:${dayBucket}`,
+    episodeKey: `${facts.episodeType}:${episodeDimension}`,
+    episodeIdentity,
+    episodeGeneration: 1,
     title: facts.title,
     summary: facts.summary,
     startedAt,
     lastSeenAt,
     signalCount: signalIds.length,
-    vacancyCount: uniqueSorted(signals.map((item) => normalizeRoleTitle(item.title))).length,
+    vacancyCount: canonicalVacancies.length,
     strengthScore: round(clamp01(facts.strengthScore)),
     freshnessScore: round(clamp01(1 - ageDays(lastSeenAt, now) / config.activeWindowDays)),
-    evidenceHash: hashEvidence(signalIds, evidenceIds),
+    evidenceHash: hashEpisodeEvidence(signalIds, evidenceIds),
     engineVersion: HIRING_EPISODE_ENGINE_VERSION,
     signalIds,
     evidenceIds,
     metadata: {
       ...facts.metadata,
       episodeDimension: facts.dimension,
+      publicationCount: signals.length,
+      canonicalVacancyFingerprints: canonicalVacancies.map(
+        (vacancy) => vacancy.vacancyFingerprint,
+      ),
     },
   }
 }
 
-function hashEvidence(signalIds: string[], evidenceIds: string[]): string {
+export function hashEpisodeEvidence(
+  signalIds: string[],
+  evidenceIds: string[],
+): string {
   const canonical = [
     ...signalIds.map((id) => `signal:${id}`),
     ...evidenceIds.map((id) => `evidence:${id}`),
@@ -493,6 +543,180 @@ function uniqueSignals(signals: HiringSignalInput[]): HiringSignalInput[] {
   )
 }
 
+function uniqueCanonicalVacancies(vacancies: CanonicalVacancy[]): CanonicalVacancy[] {
+  return [...new Map(
+    vacancies.map((vacancy) => [vacancy.vacancyFingerprint, vacancy]),
+  ).values()].sort(
+    (left, right) =>
+      Date.parse(left.occurredAt) - Date.parse(right.occurredAt) ||
+      left.vacancyFingerprint.localeCompare(right.vacancyFingerprint),
+  )
+}
+
+function canonicalizeVacancies(signals: HiringSignalInput[]): CanonicalVacancy[] {
+  const parent = signals.map((_, index) => index)
+  const explicitIdsByProvider = signals.map(explicitIdsForSignal)
+  const find = (index: number): number => {
+    while (parent[index] !== index) {
+      parent[index] = parent[parent[index]]
+      index = parent[index]
+    }
+    return index
+  }
+  const union = (left: number, right: number) => {
+    const leftRoot = find(left)
+    const rightRoot = find(right)
+    if (leftRoot === rightRoot) return
+    const conflictProvider = findConflictingExplicitIdProvider(
+      explicitIdsByProvider[leftRoot],
+      explicitIdsByProvider[rightRoot],
+    )
+    if (conflictProvider) {
+      logEvent('canonical_vacancy.merge_rejected', {
+        organizationId: signals[left].organizationId,
+        provider: conflictProvider,
+        reasonCode: 'conflicting_provider_external_ids',
+      })
+      return
+    }
+    parent[rightRoot] = leftRoot
+    explicitIdsByProvider[leftRoot] = mergeExplicitIdsByProvider(
+      explicitIdsByProvider[leftRoot],
+      explicitIdsByProvider[rightRoot],
+    )
+  }
+
+  signals.forEach((signal, index) => {
+    for (let otherIndex = 0; otherIndex < index; otherIndex += 1) {
+      if (publicationsReferToSameVacancy(signal, signals[otherIndex])) {
+        union(index, otherIndex)
+      }
+    }
+  })
+
+  const groups = new Map<number, HiringSignalInput[]>()
+  signals.forEach((signal, index) => {
+    const root = find(index)
+    const publications = groups.get(root) ?? []
+    publications.push(signal)
+    groups.set(root, publications)
+  })
+
+  const canonical = [...groups.values()].map((publications) =>
+    buildCanonicalVacancy(publications, canonicalVacancyIdentity(publications)))
+
+  return canonical.sort(
+    (left, right) =>
+      Date.parse(left.occurredAt) - Date.parse(right.occurredAt) ||
+      left.vacancyFingerprint.localeCompare(right.vacancyFingerprint),
+  )
+}
+
+type ExplicitIdsByProvider = Map<string, Set<string>>
+
+function explicitIdsForSignal(signal: HiringSignalInput): ExplicitIdsByProvider {
+  if (!signal.externalVacancyId) return new Map()
+  return new Map([[
+    normalizeText(signal.source),
+    new Set([normalizeExternalVacancyId(signal.externalVacancyId)]),
+  ]])
+}
+
+function findConflictingExplicitIdProvider(
+  left: ExplicitIdsByProvider,
+  right: ExplicitIdsByProvider,
+): string | null {
+  for (const [provider, leftIds] of left) {
+    const rightIds = right.get(provider)
+    if (!rightIds) continue
+    if (new Set([...leftIds, ...rightIds]).size > 1) return provider
+  }
+  return null
+}
+
+function mergeExplicitIdsByProvider(
+  left: ExplicitIdsByProvider,
+  right: ExplicitIdsByProvider,
+): ExplicitIdsByProvider {
+  const merged = new Map(
+    [...left].map(([provider, ids]) => [provider, new Set(ids)]),
+  )
+  for (const [provider, ids] of right) {
+    merged.set(provider, new Set([...(merged.get(provider) ?? []), ...ids]))
+  }
+  return merged
+}
+
+function buildCanonicalVacancy(
+  publications: HiringSignalInput[],
+  identity: string,
+): CanonicalVacancy {
+  const sorted = uniqueSignals(publications)
+  const latest = sorted[sorted.length - 1]
+  return {
+    ...latest,
+    vacancyFingerprint: createHash('sha256').update(identity).digest('hex'),
+    publications: sorted,
+    evidenceIds: uniqueSorted(sorted.flatMap((publication) => publication.evidenceIds)),
+  }
+}
+
+function explicitVacancyIdentity(signal: HiringSignalInput): string | null {
+  if (signal.externalVacancyId) {
+    return `external:${normalizeText(signal.source)}:${normalizeExternalVacancyId(signal.externalVacancyId)}`
+  }
+  return signal.sourceUrl ? `url:${signal.sourceUrl}` : null
+}
+
+function publicationsReferToSameVacancy(
+  left: HiringSignalInput,
+  right: HiringSignalInput,
+): boolean {
+  const leftExplicit = explicitVacancyIdentity(left)
+  const rightExplicit = explicitVacancyIdentity(right)
+  if (leftExplicit && leftExplicit === rightExplicit) return true
+  if (left.sourceUrl && left.sourceUrl === right.sourceUrl) return true
+  if (fallbackVacancyFingerprint(left) !== fallbackVacancyFingerprint(right)) {
+    return false
+  }
+  const conflictingSameSourceIds =
+    normalizeText(left.source) === normalizeText(right.source) &&
+    Boolean(left.externalVacancyId) &&
+    Boolean(right.externalVacancyId) &&
+    normalizeExternalVacancyId(left.externalVacancyId ?? '') !==
+      normalizeExternalVacancyId(right.externalVacancyId ?? '')
+  return !conflictingSameSourceIds
+}
+
+function canonicalVacancyIdentity(publications: HiringSignalInput[]): string {
+  const externalIds = uniqueSorted(publications.flatMap((publication) =>
+    publication.externalVacancyId
+      ? [`${normalizeText(publication.source)}:${normalizeExternalVacancyId(publication.externalVacancyId)}`]
+      : [],
+  ))
+  if (externalIds.length === 1) return `external:${externalIds[0]}`
+
+  const urls = uniqueSorted(publications.flatMap((publication) =>
+    publication.sourceUrl ? [publication.sourceUrl] : [],
+  ))
+  if (urls.length === 1) return `url:${urls[0]}`
+
+  const fallbacks = uniqueSorted(publications.map(fallbackVacancyFingerprint))
+  return `fallback:${fallbacks.join('||')}`
+}
+
+function fallbackVacancyFingerprint(signal: HiringSignalInput): string {
+  return [
+    signal.organizationId,
+    normalizeRoleTitle(signal.title),
+    normalizeRoleTitle(signal.region ?? ''),
+  ].join('|')
+}
+
+function repeatedVacancyIdentity(signal: HiringSignalInput): string {
+  return `role:${fallbackVacancyFingerprint(signal)}`
+}
+
 function uniqueSorted(values: string[]): string[] {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))].sort()
 }
@@ -503,6 +727,10 @@ function normalizeRoleTitle(value: string): string {
 
 function normalizeText(value: string): string {
   return value.trim().toLocaleLowerCase('ru-RU')
+}
+
+function normalizeExternalVacancyId(value: string): string {
+  return value.trim()
 }
 
 function ageDays(timestamp: string, now: Date): number {

@@ -41,6 +41,11 @@ const OPPORTUNITY: OpportunityItem = {
   createdAt: '2026-07-26T00:00:00.000Z',
   updatedAt: '2026-07-26T00:00:00.000Z',
   evidenceCount: 1,
+  factCount: 1,
+  publicationCount: 1,
+  sourceFamilyCount: 1,
+  directEvidenceCount: 1,
+  agencyFitExplanation: 'Роли совпадают со специализацией агентства.',
   evidenceTimeline: [{
     id: '1',
     kind: 'signal',

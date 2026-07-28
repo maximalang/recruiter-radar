@@ -19,6 +19,78 @@ const rollbackPath = resolve(
   'migrations',
   '20260726130000_add_opportunity_engine_v1.down.sql',
 )
+const hardeningMigrationPath = resolve(
+  process.cwd(),
+  '..',
+  '..',
+  'packages',
+  'db',
+  'migrations',
+  '20260727120000_add_opportunity_engine_hardening.sql',
+)
+const episodeStateMigrationPath = resolve(
+  process.cwd(),
+  '..',
+  '..',
+  'packages',
+  'db',
+  'migrations',
+  '20260727121000_add_opportunity_episode_state.sql',
+)
+const supersessionMigrationPath = resolve(
+  process.cwd(),
+  '..',
+  '..',
+  'packages',
+  'db',
+  'migrations',
+  '20260727122000_add_opportunity_supersession.sql',
+)
+const supersessionRollbackPath = resolve(
+  process.cwd(),
+  '..',
+  '..',
+  'packages',
+  'db',
+  'migrations',
+  '20260727122000_add_opportunity_supersession.down.sql',
+)
+const edgeCaseMigrationPath = resolve(
+  process.cwd(),
+  '..',
+  '..',
+  'packages',
+  'db',
+  'migrations',
+  '20260727130000_fix_opportunity_hardening_edge_cases.sql',
+)
+const edgeCaseRollbackPath = resolve(
+  process.cwd(),
+  '..',
+  '..',
+  'packages',
+  'db',
+  'migrations',
+  '20260727130000_fix_opportunity_hardening_edge_cases.down.sql',
+)
+const authoritativeStateRepairPath = resolve(
+  process.cwd(),
+  '..',
+  '..',
+  'packages',
+  'db',
+  'migrations',
+  '20260727140000_repair_opportunity_authoritative_state.sql',
+)
+const authoritativeStateRepairRollbackPath = resolve(
+  process.cwd(),
+  '..',
+  '..',
+  'packages',
+  'db',
+  'migrations',
+  '20260727140000_repair_opportunity_authoritative_state.down.sql',
+)
 
 describe('opportunity engine migration contract', () => {
   const migration = readFileSync(migrationPath, 'utf8')
@@ -108,6 +180,111 @@ describe('opportunity engine migration contract', () => {
     )
     expect(rollback.indexOf('DROP TABLE IF EXISTS hiring_episode_evidence')).toBeLessThan(
       rollback.indexOf('DROP TABLE IF EXISTS hiring_episodes'),
+    )
+  })
+})
+
+describe('opportunity engine hardening migrations', () => {
+  const hardening = readFileSync(hardeningMigrationPath, 'utf8').replace(/\s+/g, ' ')
+  const episodeState = readFileSync(episodeStateMigrationPath, 'utf8').replace(/\s+/g, ' ')
+  const supersession = readFileSync(supersessionMigrationPath, 'utf8').replace(/\s+/g, ' ')
+  const supersessionRollback = readFileSync(
+    supersessionRollbackPath,
+    'utf8',
+  ).replace(/\s+/g, ' ')
+  const edgeCases = readFileSync(edgeCaseMigrationPath, 'utf8').replace(/\s+/g, ' ')
+  const edgeCasesRollback = readFileSync(edgeCaseRollbackPath, 'utf8').replace(/\s+/g, ' ')
+  const authoritativeStateRepair = readFileSync(
+    authoritativeStateRepairPath,
+    'utf8',
+  ).replace(/\s+/g, ' ')
+  const authoritativeStateRepairRollback = readFileSync(
+    authoritativeStateRepairRollbackPath,
+    'utf8',
+  ).replace(/\s+/g, ' ')
+
+  it('adds stable episode identity and safely renames role_cluster', () => {
+    expect(hardening).toContain('episode_identity TEXT')
+    expect(hardening).toContain('episode_generation INTEGER')
+    expect(hardening).toContain("episode_type = 'role_cluster'")
+    expect(hardening).toContain("'^new_role_cluster:'")
+    expect(hardening).toContain('hiring_episodes_identity_generation_uidx')
+    expect(hardening).toContain('input_fingerprint TEXT')
+    expect(hardening.indexOf('DROP CONSTRAINT hiring_episodes_type_check')).toBeLessThan(
+      hardening.indexOf("episode_type = 'role_cluster'"),
+    )
+  })
+
+  it('adds tenant-safe episode state and transition audit columns', () => {
+    expect(episodeState).toContain('CREATE TABLE client_episode_state')
+    expect(episodeState).toContain('FOREIGN KEY (client_profile_id, owner_id)')
+    expect(episodeState).toContain('FOREIGN KEY (hiring_episode_id, organization_id)')
+    expect(episodeState).toContain('previous_status')
+    expect(episodeState).toContain('new_status')
+  })
+
+  it('adds current-version uniqueness and deterministic provenance', () => {
+    expect(supersession).toContain('superseded_at TIMESTAMPTZ')
+    expect(supersession).toContain('opportunities_current_uidx')
+    expect(supersession).toContain('WITH ranked_current AS')
+    expect(supersession).toContain('current_rank > 1')
+    expect(supersession).toContain(
+      'ON digest_candidates ( client_profile_id, org_id, created_at DESC, id DESC ) INCLUDE (digest_run_id)',
+    )
+    for (const column of [
+      'episode_evidence_hash',
+      'profile_snapshot_hash',
+      'digest_candidate_id',
+      'fiur_version',
+      'scoring_config_hash',
+      'brief_builder_version',
+      'input_hash',
+    ]) {
+      expect(supersession).toContain(column)
+    }
+  })
+
+  it('preserves action audit records when supersession is rolled back', () => {
+    expect(supersessionRollback).toContain('without deleting audit history')
+    expect(supersessionRollback).not.toContain('UPDATE opportunity_actions')
+    expect(supersessionRollback).not.toContain('DELETE FROM opportunities')
+  })
+
+  it('repairs snooze deadlines and safely strengthens the lifecycle constraint', () => {
+    expect(edgeCases).toContain('snoozed_until = state.suppressed_until')
+    expect(edgeCases).toContain('state.suppressed_until > NOW()')
+    expect(edgeCases).toContain("status = 'new'")
+    expect(edgeCases).toContain('snoozed_until <= NOW()')
+    expect(edgeCases).toContain('DROP CONSTRAINT opportunities_snoozed_until_check')
+    expect(edgeCases).toContain(
+      "status = 'snoozed' AND snoozed_until IS NOT NULL",
+    )
+    expect(edgeCases).toContain(
+      'snoozed_until IS NULL OR snoozed_until > created_at',
+    )
+    expect(edgeCasesRollback).toContain(
+      'CHECK (snoozed_until IS NULL OR snoozed_until > created_at)',
+    )
+  })
+
+  it('repairs authoritative state from the latest action and backfills orphan snoozes', () => {
+    expect(authoritativeStateRepair).toContain(
+      'SELECT DISTINCT ON (opportunity.client_profile_id, opportunity.hiring_episode_id)',
+    )
+    expect(authoritativeStateRepair).toContain('action.created_at DESC')
+    expect(authoritativeStateRepair).toContain('action.id DESC')
+    expect(authoritativeStateRepair).toContain(
+      'COALESCE(action.new_status, action.action_type)',
+    )
+    expect(authoritativeStateRepair).toContain("~ '^[0-9]{1,9}$'")
+    expect(authoritativeStateRepair).toContain(
+      "opportunity.status = 'snoozed'",
+    )
+    expect(authoritativeStateRepair).toContain(
+      'opportunity.snoozed_until > NOW()',
+    )
+    expect(authoritativeStateRepairRollback).toContain(
+      'only repairs customer state from the append-only action log',
     )
   })
 })

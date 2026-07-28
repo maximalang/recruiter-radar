@@ -45,6 +45,11 @@ describe('opportunity API projection', () => {
       createdAt: '2026-07-26T00:00:00.000Z',
       updatedAt: '2026-07-26T00:00:00.000Z',
       evidenceCount: 0,
+      factCount: 0,
+      publicationCount: 0,
+      sourceFamilyCount: 0,
+      directEvidenceCount: 0,
+      agencyFitExplanation: 'Роли совпадают со специализацией.',
       evidenceTimeline: [],
     })
     const serialized = JSON.stringify(publicItem)
@@ -55,6 +60,14 @@ describe('opportunity API projection', () => {
     expect(serialized).not.toContain('personal@example.test')
     expect(serialized).not.toContain('nested-private@example.test')
     expect(serialized).not.toContain('nested-private-id')
+    expect(serialized).not.toContain('"evidenceCount"')
+    expect(publicItem).not.toHaveProperty('factCount')
+    expect(publicItem.evidenceMetrics).toEqual({
+      factCount: 0,
+      publicationCount: 0,
+      sourceFamilyCount: 0,
+      directEvidenceCount: 0,
+    })
     expect(publicItem.morningBriefEligible).toBe(true)
     expect(publicItem.sourceFamilies).toEqual(['career-pages'])
   })

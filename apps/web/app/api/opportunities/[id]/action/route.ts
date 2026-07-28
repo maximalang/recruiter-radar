@@ -7,6 +7,8 @@ import {
   applyOpportunityAction,
   isOpportunityAction,
   OpportunityActionConflictError,
+  OpportunitySupersededConflictError,
+  OpportunityTransitionConflictError,
 } from '@/lib/opportunities/repository'
 import { logError } from '@/lib/runtime'
 import { getOwnerIdFromSession } from '@/lib/session'
@@ -74,6 +76,18 @@ export async function POST(
     if (error instanceof OpportunityActionConflictError) {
       return NextResponse.json(
         { error: 'idempotency_key_conflict' },
+        { status: 409 },
+      )
+    }
+    if (error instanceof OpportunityTransitionConflictError) {
+      return NextResponse.json(
+        { error: 'opportunity_transition_conflict' },
+        { status: 409 },
+      )
+    }
+    if (error instanceof OpportunitySupersededConflictError) {
+      return NextResponse.json(
+        { error: error.code },
         { status: 409 },
       )
     }

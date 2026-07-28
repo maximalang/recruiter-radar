@@ -10,10 +10,16 @@ import {
   HIRING_EPISODE_ENGINE_VERSION,
   HiringEpisodeDetectionService,
   classifyOpportunityRoleFamily,
+  hashEpisodeEvidence,
+  isEpisodeContinuation,
   type HiringEpisodeCandidate,
   type HiringSignalInput,
 } from './hiring-episode-detection'
-import { OpportunityBriefBuilder } from './opportunity-brief-builder'
+import {
+  OpportunityBriefBuilder,
+  type OpportunityBrief,
+} from './opportunity-brief-builder'
+import { canonicalJsonStringify, hashCanonicalJson } from './canonical-hash'
 import {
   OPPORTUNITY_ENGINE_LIMITS,
   clampOpportunityJobBatchSize,
@@ -23,9 +29,20 @@ import {
   DEFAULT_OPPORTUNITY_SCORING_CONFIG,
   OpportunityScoringService,
   type ConfidenceGate,
+  type OpportunityScoreResult,
 } from './opportunity-scoring'
 
 type OpportunityJobDb = Pick<Pool, 'query'> | Pick<PoolClient, 'query'>
+
+export const OPPORTUNITY_JOB_LOCK_KEYS = {
+  detect: 7_271_001,
+  build: 7_271_002,
+  expire: 7_271_003,
+  backfill: 7_271_004,
+} as const
+
+const FIUR_VERSION = 'fiur-v1'
+const BRIEF_BUILDER_VERSION = 'opportunity-brief-v2'
 
 export interface OpportunityJobOptions {
   organizationId?: string | number | null
@@ -33,6 +50,7 @@ export interface OpportunityJobOptions {
   dryRun?: boolean
   now?: Date
   enabled?: boolean
+  scoringVersion?: string
 }
 
 export interface OpportunityJobStats {
@@ -44,6 +62,12 @@ export interface OpportunityJobStats {
   skipped: number
   failed: number
   expired: number
+  continued: number
+  reconciled: number
+  skippedUnchanged: number
+  superseded: number
+  locked: number
+  skippedBecauseLocked: boolean
 }
 
 interface SignalRow {
@@ -54,6 +78,7 @@ interface SignalRow {
   region: string | null
   source: string
   sourceUrl: string | null
+  externalVacancyId: string | null
   occurredAt: string
   evidenceIds: unknown
 }
@@ -72,6 +97,8 @@ interface OpportunityBuildRow {
   organizationCity: string | null
   episodeType: HiringEpisodeCandidate['episodeType']
   episodeKey: string
+  episodeIdentity: string
+  episodeGeneration: number
   episodeTitle: string
   episodeSummary: string
   episodeStartedAt: string
@@ -104,15 +131,42 @@ interface OpportunityBuildRow {
   excludedLocations: unknown
   remoteFriendly: boolean
   hiringMode: 'auto' | 'specialist' | 'executive' | 'volume'
+  currentOpportunityId: string | null
+  currentInputHash: string | null
+  currentScoringVersion: string | null
+}
+
+interface OpportunityInputProvenance {
+  episodeEvidenceHash: string
+  profileSnapshotHash: string
+  digestCandidateId: string
+  fiurVersion: string
+  scoringVersion: string
+  scoringConfigHash: string
+  briefBuilderVersion: string
+  inputHash: string
 }
 
 export async function detectHiringEpisodesJob(
   options: OpportunityJobOptions = {},
-  db: OpportunityJobDb | null = getPool(),
+  db: OpportunityJobDb | null = null,
 ): Promise<OpportunityJobStats> {
   const stats = createStats(options)
   if (!stats.enabled) return disabledJob('detect-hiring-episodes', stats)
-  if (!db) throw new Error('DATABASE_URL is not set.')
+  return runWithJobLock(
+    'detect',
+    'detect-hiring-episodes',
+    options,
+    db,
+    (lockedDb) => runDetectHiringEpisodesJob(options, lockedDb),
+  )
+}
+
+async function runDetectHiringEpisodesJob(
+  options: OpportunityJobOptions = {},
+  db: OpportunityJobDb,
+): Promise<OpportunityJobStats> {
+  const stats = createStats(options)
 
   const now = options.now ?? new Date()
   const batchSize = clampOpportunityJobBatchSize(
@@ -128,30 +182,85 @@ export async function detectHiringEpisodesJob(
     organizationId: string
     lastSignalId: string
     lastSignalUpdatedAt: string
+    inputFingerprint: string
   }>(
-    `SELECT
-       s.org_id::TEXT AS "organizationId",
-       MAX(s.id)::TEXT AS "lastSignalId",
-       MAX(s.updated_at)::TEXT AS "lastSignalUpdatedAt"
-     FROM signals s
+    `WITH scoped_organizations AS (
+       SELECT DISTINCT s.org_id AS organization_id
+       FROM signals s
+       WHERE s.signal_type = 'job_posting'
+         AND s.occurred_at >= $1::timestamptz
+         AND ($2::bigint IS NULL OR s.org_id = $2)
+       UNION
+       SELECT state.organization_id
+       FROM hiring_episode_detection_state state
+       WHERE state.engine_version = $4
+         AND ($2::bigint IS NULL OR state.organization_id = $2)
+     ), current_inputs AS (
+       SELECT
+         scope.organization_id,
+         COALESCE(MAX(s.id), 0)::TEXT AS "lastSignalId",
+         COALESCE(
+           MAX(s.updated_at),
+           '1970-01-01T00:00:00Z'::timestamptz
+         )::TEXT AS "lastSignalUpdatedAt",
+         md5(COALESCE(
+           STRING_AGG(
+             CONCAT_WS(
+               E'\\x1f',
+               s.id::TEXT,
+               s.updated_at::TEXT,
+               s.occurred_at::TEXT,
+               s.source,
+               s.source_url,
+               s.external_id,
+               s.headline,
+               s.payload::TEXT,
+               evidence.fingerprint
+             ),
+             E'\\n' ORDER BY s.id
+           ) FILTER (WHERE s.id IS NOT NULL),
+           ''
+         )) AS "inputFingerprint"
+       FROM scoped_organizations scope
+       LEFT JOIN signals s
+         ON s.org_id = scope.organization_id
+        AND s.signal_type = 'job_posting'
+        AND s.occurred_at >= $1::timestamptz
+       LEFT JOIN LATERAL (
+         SELECT md5(COALESCE(STRING_AGG(
+           CONCAT_WS(
+             E'\\x1f',
+             ei.id::TEXT,
+             ei.source,
+             ei.url,
+             ei.fetched_at::TEXT,
+             ei.content_hash,
+             ei.tier
+           ),
+           E'\\n' ORDER BY ei.id
+         ), '')) AS fingerprint
+         FROM evidence_items ei
+         WHERE ei.org_id = s.org_id
+           AND ei.url = s.source_url
+       ) evidence ON s.id IS NOT NULL
+       GROUP BY scope.organization_id
+     )
+     SELECT
+       current_inputs.organization_id::TEXT AS "organizationId",
+       current_inputs."lastSignalId",
+       current_inputs."lastSignalUpdatedAt",
+       current_inputs."inputFingerprint"
+     FROM current_inputs
      LEFT JOIN hiring_episode_detection_state state
-       ON state.organization_id = s.org_id
+       ON state.organization_id = current_inputs.organization_id
       AND state.engine_version = $4
-     WHERE s.signal_type = 'job_posting'
-       AND s.occurred_at >= $1::timestamptz
-       AND ($2::bigint IS NULL OR s.org_id = $2)
-     GROUP BY s.org_id
-     HAVING
+     WHERE
        $2::bigint IS NOT NULL
-       OR MAX(s.id) > COALESCE(MAX(state.last_signal_id), 0)
-       OR MAX(s.updated_at) > COALESCE(
-         MAX(state.last_signal_updated_at),
-         '-infinity'::timestamptz
-       )
-       OR MAX(state.next_retry_at) <= NOW()
+       OR current_inputs."inputFingerprint" IS DISTINCT FROM state.input_fingerprint
+       OR state.next_retry_at <= NOW()
      ORDER BY
-       COALESCE(MAX(state.next_retry_at), '-infinity'::timestamptz) ASC,
-       s.org_id::TEXT
+       COALESCE(state.next_retry_at, '-infinity'::timestamptz) ASC,
+       current_inputs.organization_id::TEXT
      LIMIT $3`,
     [
       new Date(
@@ -185,6 +294,7 @@ export async function detectHiringEpisodesJob(
            ) AS region,
            s.source,
            s.source_url AS "sourceUrl",
+           s.external_id AS "externalVacancyId",
            s.occurred_at::TEXT AS "occurredAt",
            COALESCE(
              ARRAY_AGG(DISTINCT ei.id::TEXT)
@@ -219,12 +329,23 @@ export async function detectHiringEpisodesJob(
         now,
       })
 
-      if (candidates.length === 0) {
-        stats.skipped += 1
-        if (!stats.dryRun || persistPreview) {
-          await markDetectionState(organization, db)
-        }
-        continue
+      if (candidates.length === 0) stats.skipped += 1
+      const managesTransaction = !stats.dryRun && !shouldPersistPreview(options)
+      if (managesTransaction) {
+        await db.query('BEGIN')
+      }
+      if (!stats.dryRun || persistPreview) {
+        await db.query(
+          `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`,
+          [`opportunity:detect:organization:${organization.organizationId}`],
+        )
+        const closedMissing = await closeMissingActiveEpisodes(
+          organization.organizationId,
+          candidates.map((candidate) => candidate.episodeIdentity),
+          now,
+          db,
+        )
+        stats.updated += closedMissing
       }
       for (const candidate of candidates) {
         if (stats.dryRun && !persistPreview) {
@@ -234,12 +355,17 @@ export async function detectHiringEpisodesJob(
         const stored = await upsertEpisode(candidate, db)
         if (stored.inserted) stats.created += 1
         else stats.updated += 1
+        if (stored.continued) stats.continued += 1
+        stats.reconciled += 1
         logEvent(
-          stored.inserted ? 'hiring_episode.created' : 'hiring_episode.updated',
+          stored.inserted
+            ? 'hiring_episode.generation_created'
+            : 'hiring_episode.continued',
           {
             hiringEpisodeId: stored.id,
             organizationId: candidate.organizationId,
             episodeType: candidate.episodeType,
+            episodeGeneration: stored.generation,
             preview: persistPreview,
           },
         )
@@ -247,8 +373,14 @@ export async function detectHiringEpisodesJob(
       if (!stats.dryRun || persistPreview) {
         await markDetectionState(organization, db)
       }
+      if (managesTransaction) {
+        await db.query('COMMIT')
+      }
     } catch (error) {
       stats.failed += 1
+      if (!stats.dryRun && !shouldPersistPreview(options)) {
+        await db.query('ROLLBACK').catch(() => undefined)
+      }
       if (!stats.dryRun || persistPreview) {
         await markDetectionFailure(organization, db).catch((checkpointError) => {
           logError('opportunity.job.failure_checkpoint_failed', checkpointError, {
@@ -270,11 +402,24 @@ export async function detectHiringEpisodesJob(
 
 export async function buildOpportunitiesJob(
   options: OpportunityJobOptions = {},
-  db: OpportunityJobDb | null = getPool(),
+  db: OpportunityJobDb | null = null,
 ): Promise<OpportunityJobStats> {
   const stats = createStats(options)
   if (!stats.enabled) return disabledJob('build-opportunities', stats)
-  if (!db) throw new Error('DATABASE_URL is not set.')
+  return runWithJobLock(
+    'build',
+    'build-opportunities',
+    options,
+    db,
+    (lockedDb) => runBuildOpportunitiesJob(options, lockedDb),
+  )
+}
+
+async function runBuildOpportunitiesJob(
+  options: OpportunityJobOptions = {},
+  db: OpportunityJobDb,
+): Promise<OpportunityJobStats> {
+  const stats = createStats(options)
 
   const now = options.now ?? new Date()
   const batchSize = clampOpportunityJobBatchSize(
@@ -292,26 +437,28 @@ export async function buildOpportunitiesJob(
        AND cp.is_active = TRUE
        AND cp.owner_id IS NOT NULL
        AND ($1::bigint IS NULL OR he.organization_id = $1)
+       AND dc.created_at >= he.started_at
+       AND dc.created_at >= he.last_seen_at
+       AND dc.created_at >= cp.updated_at
        AND (
          build_failure.next_retry_at IS NULL
          OR build_failure.next_retry_at <= NOW()
        )
-       AND NOT EXISTS (
-         SELECT 1
-         FROM hiring_episode_evidence episode_source
-         JOIN signals source_signal ON source_signal.id = episode_source.signal_id
-         WHERE episode_source.hiring_episode_id = he.id
-           AND NOT (dc.source_families ? source_signal.source)
-       )
-       AND NOT EXISTS (
-         SELECT 1
-         FROM opportunities existing
-         WHERE existing.client_profile_id = cp.id
-           AND existing.hiring_episode_id = he.id
-           AND existing.scoring_version = 'opportunity-v1'
-           AND existing.evidence_hash = he.evidence_hash
-           AND existing.metadata->>'digestCandidateId' = dc.id::TEXT
-       )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM hiring_episode_evidence episode_source
+          LEFT JOIN signals source_signal
+            ON source_signal.id = episode_source.signal_id
+          LEFT JOIN evidence_items source_evidence
+            ON source_evidence.id = episode_source.evidence_id
+          WHERE episode_source.hiring_episode_id = he.id
+            AND NOT (
+              dc.source_families ? COALESCE(
+                source_signal.source,
+                source_evidence.source
+              )
+            )
+        )
      ORDER BY
        (build_failure.next_retry_at IS NOT NULL) ASC,
        build_failure.next_retry_at ASC NULLS FIRST,
@@ -322,6 +469,7 @@ export async function buildOpportunitiesJob(
     [
       options.organizationId == null ? null : String(options.organizationId),
       batchSize,
+      normalizeScoringVersion(options.scoringVersion),
     ],
   )
 
@@ -355,7 +503,55 @@ export async function buildOpportunitiesJob(
         organizationName: row.organizationName,
         episode,
         score,
+        agency: {
+          agencyName: row.agencyName,
+          specialization: row.specialization,
+          hiringMode: row.hiringMode,
+          matchedRoles: findMatchedAgencyRoles(row),
+          matchedIndustries: row.organizationIndustry &&
+            toStringArray(row.industries).some(
+              (industry) =>
+                industry.toLocaleLowerCase('ru-RU') ===
+                row.organizationIndustry?.toLocaleLowerCase('ru-RU'),
+            )
+            ? [row.organizationIndustry]
+            : [],
+          matchedRegions: row.targetCity &&
+            row.organizationCity &&
+            row.targetCity.toLocaleLowerCase('ru-RU') ===
+              row.organizationCity.toLocaleLowerCase('ru-RU')
+            ? [row.organizationCity]
+            : [],
+          includeKeywords: toStringArray(row.includeKeywords),
+          relevantFitReasons: score.components.agencyFit.reasons.map(
+            (reason) => reason.message,
+          ),
+        },
       })
+      const scoringVersion = normalizeScoringVersion(options.scoringVersion)
+      const provenance = createOpportunityInputProvenance(
+        row,
+        episode,
+        scoringVersion,
+      )
+
+      if (
+        stats.dryRun &&
+        !persistPreview &&
+        row.currentInputHash === provenance.inputHash
+      ) {
+        stats.skipped += 1
+        stats.skippedUnchanged += 1
+        if (!stats.dryRun || persistPreview) {
+          await clearBuildFailure(row, scoringVersion, db)
+        }
+        logEvent('opportunity.build.semantic_unchanged', {
+          hiringEpisodeId: row.hiringEpisodeId,
+          clientProfileId: row.clientProfileId,
+          inputHashPrefix: provenance.inputHash.slice(0, 12),
+        })
+        continue
+      }
 
       if (stats.dryRun && !persistPreview) {
         stats.created += 1
@@ -370,114 +566,24 @@ export async function buildOpportunitiesJob(
             60 *
             1000,
       ).toISOString()
-      const upsert = await db.query<{ id: string; inserted: boolean }>(
-        `INSERT INTO opportunities (
-           owner_id,
-           client_profile_id,
-           organization_id,
-           hiring_episode_id,
-           status,
-           title,
-           why_now,
-           problem_hypothesis,
-           recommended_angle,
-           recommended_persona,
-           recommended_action,
-           agency_fit_score,
-           hiring_intent_score,
-           agency_propensity_score,
-           timing_score,
-           reachability_score,
-           confidence_score,
-           opportunity_score,
-           confidence_gate,
-           scoring_version,
-           evidence_hash,
-           valid_until,
-           metadata
-         )
-         VALUES (
-           $1, $2, $3, $4, $5,
-           $6, $7, $8, $9, $10, $11,
-           $12, $13, $14, $15, $16, $17, $18,
-           $19, $20, $21, $22, $23::jsonb
-         )
-         ON CONFLICT (client_profile_id, hiring_episode_id, scoring_version)
-         DO UPDATE SET
-           title = EXCLUDED.title,
-           why_now = EXCLUDED.why_now,
-           problem_hypothesis = EXCLUDED.problem_hypothesis,
-           recommended_angle = EXCLUDED.recommended_angle,
-           recommended_persona = EXCLUDED.recommended_persona,
-           recommended_action = EXCLUDED.recommended_action,
-           agency_fit_score = EXCLUDED.agency_fit_score,
-           hiring_intent_score = EXCLUDED.hiring_intent_score,
-           agency_propensity_score = EXCLUDED.agency_propensity_score,
-           timing_score = EXCLUDED.timing_score,
-           reachability_score = EXCLUDED.reachability_score,
-           confidence_score = EXCLUDED.confidence_score,
-           opportunity_score = EXCLUDED.opportunity_score,
-           confidence_gate = EXCLUDED.confidence_gate,
-           evidence_hash = EXCLUDED.evidence_hash,
-           valid_until = EXCLUDED.valid_until,
-           metadata = EXCLUDED.metadata,
-           status = CASE
-             WHEN opportunities.status IN ('accepted', 'dismissed', 'snoozed', 'contacted')
-               THEN opportunities.status
-             ELSE EXCLUDED.status
-           END,
-           updated_at = NOW()
-         WHERE opportunities.evidence_hash IS DISTINCT FROM EXCLUDED.evidence_hash
-            OR opportunities.metadata IS DISTINCT FROM EXCLUDED.metadata
-         RETURNING id::TEXT AS id, (xmax = 0) AS inserted`,
-        [
-          row.ownerId,
-          row.clientProfileId,
-          row.organizationId,
-          row.hiringEpisodeId,
-          score.status,
-          brief.title,
-          brief.whyNow,
-          brief.problemHypothesis,
-          brief.recommendedAngle,
-          brief.recommendedPersona,
-          brief.recommendedAction,
-          score.components.agencyFit.score,
-          score.components.hiringIntent.score,
-          score.components.externalAgencyPropensity.score,
-          score.components.timing.score,
-          score.components.reachability.score,
-          score.components.confidence.score,
-          score.opportunityScore,
-          score.confidenceGate,
-          score.scoringVersion,
-          episode.evidenceHash,
-          validUntil,
-          JSON.stringify({
-            morningBriefEligible: score.isMorningBriefEligible,
-            components: score.components,
-            digestCandidateId: row.digestCandidateId,
-            digestReasons: row.digestReasons,
-            sourceFamilies: toStringArray(row.sourceFamilies),
-            fiur: {
-              fit: fiur.fit,
-              intent: fiur.intent,
-              urgency: fiur.urgency,
-              reachability: fiur.reachability,
-              total: fiur.total,
-            },
-          }),
-        ],
-      )
-      if (upsert.rowCount === 0) {
+      const stored = await persistOpportunityBuild({
+        row,
+        score,
+        brief,
+        fiur,
+        provenance,
+        validUntil,
+        now,
+        db,
+        manageTransaction: !persistPreview,
+      })
+      if (stored.skippedUnchanged) {
         stats.skipped += 1
+        stats.skippedUnchanged += 1
       } else {
-        const stored = upsert.rows[0]
-        if (!stored) {
-          throw new Error('Opportunity upsert returned no row.')
-        }
         if (stored.inserted) stats.created += 1
         else stats.updated += 1
+        if (stored.superseded) stats.superseded += 1
         logEvent(
           stored.inserted ? 'opportunity.created' : 'opportunity.updated',
           {
@@ -485,15 +591,19 @@ export async function buildOpportunitiesJob(
             hiringEpisodeId: row.hiringEpisodeId,
             clientProfileId: row.clientProfileId,
             organizationId: row.organizationId,
+            scoringVersion,
             preview: persistPreview,
           },
         )
       }
-      await clearBuildFailure(row, db)
     } catch (error) {
       stats.failed += 1
       if (!stats.dryRun || persistPreview) {
-        await markBuildFailure(row, db).catch((checkpointError) => {
+        await markBuildFailure(
+          row,
+          normalizeScoringVersion(options.scoringVersion),
+          db,
+        ).catch((checkpointError) => {
           logError('opportunity.job.failure_checkpoint_failed', checkpointError, {
             job: 'build-opportunities',
             hiringEpisodeId: row.hiringEpisodeId,
@@ -515,11 +625,24 @@ export async function buildOpportunitiesJob(
 
 export async function expireOpportunitiesJob(
   options: OpportunityJobOptions = {},
-  db: OpportunityJobDb | null = getPool(),
+  db: OpportunityJobDb | null = null,
 ): Promise<OpportunityJobStats> {
   const stats = createStats(options)
   if (!stats.enabled) return disabledJob('expire-opportunities', stats)
-  if (!db) throw new Error('DATABASE_URL is not set.')
+  return runWithJobLock(
+    'expire',
+    'expire-opportunities',
+    options,
+    db,
+    (lockedDb) => runExpireOpportunitiesJob(options, lockedDb),
+  )
+}
+
+async function runExpireOpportunitiesJob(
+  options: OpportunityJobOptions = {},
+  db: OpportunityJobDb,
+): Promise<OpportunityJobStats> {
+  const stats = createStats(options)
 
   const now = options.now ?? new Date()
   if (stats.dryRun) {
@@ -533,6 +656,8 @@ export async function expireOpportunitiesJob(
     return stats
   }
 
+  await db.query('BEGIN')
+  try {
   const closed = await db.query<{ id: string; organizationId: string }>(
     `UPDATE hiring_episodes
      SET status = 'closed', closed_at = $1::timestamptz, updated_at = NOW()
@@ -548,42 +673,83 @@ export async function expireOpportunitiesJob(
   )
   const awakened = await db.query<{
     id: string
+    ownerId: string
     organizationId: string
     clientProfileId: string
+    hiringEpisodeId: string
   }>(
     `UPDATE opportunities o
      SET status = 'new', snoozed_until = NULL, updated_at = NOW()
      FROM hiring_episodes he
      WHERE he.id = o.hiring_episode_id
+       AND o.superseded_at IS NULL
        AND he.status = 'active'
        AND o.status = 'snoozed'
        AND o.snoozed_until <= $1::timestamptz
        AND (o.valid_until IS NULL OR o.valid_until >= $1::timestamptz)
        AND ($2::bigint IS NULL OR o.organization_id = $2)
      RETURNING
-       o.id::TEXT AS id,
-       o.organization_id::TEXT AS "organizationId",
-       o.client_profile_id::TEXT AS "clientProfileId"`,
+        o.id::TEXT AS id,
+        o.owner_id::TEXT AS "ownerId",
+        o.organization_id::TEXT AS "organizationId",
+       o.client_profile_id::TEXT AS "clientProfileId",
+       o.hiring_episode_id::TEXT AS "hiringEpisodeId"`,
     [now.toISOString(), options.organizationId ?? null],
   )
+  if (awakened.rows.length > 0) {
+    await db.query(
+      `DELETE FROM client_episode_state
+       WHERE (client_profile_id, owner_id, hiring_episode_id) IN (
+          SELECT *
+          FROM UNNEST($1::bigint[], $2::bigint[], $3::bigint[])
+        )
+         AND status = 'snoozed'`,
+      [
+        awakened.rows.map((row) => row.clientProfileId),
+        awakened.rows.map((row) => row.ownerId),
+        awakened.rows.map((row) => row.hiringEpisodeId),
+      ],
+    )
+  }
   const expired = await db.query<{
     id: string
+    ownerId: string
     organizationId: string
     clientProfileId: string
+    hiringEpisodeId: string
   }>(
     `UPDATE opportunities o
      SET status = 'expired', updated_at = NOW()
      FROM hiring_episodes he
      WHERE he.id = o.hiring_episode_id
+       AND o.superseded_at IS NULL
        AND o.status IN ('new', 'review', 'snoozed')
        AND (he.status = 'closed' OR o.valid_until < $1::timestamptz)
        AND ($2::bigint IS NULL OR o.organization_id = $2)
      RETURNING
-       o.id::TEXT AS id,
+        o.id::TEXT AS id,
+        o.owner_id::TEXT AS "ownerId",
        o.organization_id::TEXT AS "organizationId",
-       o.client_profile_id::TEXT AS "clientProfileId"`,
+       o.client_profile_id::TEXT AS "clientProfileId",
+       o.hiring_episode_id::TEXT AS "hiringEpisodeId"`,
     [now.toISOString(), options.organizationId ?? null],
   )
+  if (expired.rows.length > 0) {
+    await db.query(
+      `DELETE FROM client_episode_state
+       WHERE (client_profile_id, owner_id, hiring_episode_id) IN (
+          SELECT *
+          FROM UNNEST($1::bigint[], $2::bigint[], $3::bigint[])
+        )
+         AND status = 'snoozed'`,
+      [
+        expired.rows.map((row) => row.clientProfileId),
+        expired.rows.map((row) => row.ownerId),
+        expired.rows.map((row) => row.hiringEpisodeId),
+      ],
+    )
+  }
+  await db.query('COMMIT')
   stats.scanned =
     (closed.rowCount ?? 0) +
     (awakened.rowCount ?? 0) +
@@ -613,9 +779,66 @@ export async function expireOpportunitiesJob(
   }
   logJobCompleted('expire-opportunities', stats)
   return stats
+  } catch (error) {
+    await db.query('ROLLBACK').catch(() => undefined)
+    throw error
+  }
 }
 
 export async function backfillOpportunitiesJob(
+  options: OpportunityJobOptions = {},
+  db: OpportunityJobDb | null = null,
+): Promise<{
+  detection: OpportunityJobStats
+  opportunities: OpportunityJobStats
+}> {
+  if (db || !createStats(options).enabled) {
+    return runBackfillOpportunitiesJob(options, db)
+  }
+  const client = await getClient()
+  if (!client) throw new Error('DATABASE_URL is not set.')
+  const lockKeys = [
+    OPPORTUNITY_JOB_LOCK_KEYS.backfill,
+    OPPORTUNITY_JOB_LOCK_KEYS.detect,
+    OPPORTUNITY_JOB_LOCK_KEYS.build,
+    OPPORTUNITY_JOB_LOCK_KEYS.expire,
+  ]
+  const acquiredLockKeys: number[] = []
+  try {
+    for (const lockKey of lockKeys) {
+      const result = await client.query<{ locked: boolean }>(
+        `SELECT pg_try_advisory_lock($1::bigint) AS locked`,
+        [lockKey],
+      )
+      if (result.rows[0]?.locked !== true) {
+        const detection = createStats(options)
+        detection.locked = 1
+        detection.skippedBecauseLocked = true
+        const opportunities = { ...detection }
+        logEvent('opportunity.job.locked', {
+          job: 'backfill-opportunities',
+          lockKey,
+        })
+        return { detection, opportunities }
+      }
+      acquiredLockKeys.push(lockKey)
+    }
+    return runBackfillOpportunitiesJob(options, client)
+  } finally {
+    for (const lockKey of acquiredLockKeys.reverse()) {
+      await client.query(`SELECT pg_advisory_unlock($1::bigint)`, [lockKey])
+        .catch((error) => {
+          logError('opportunity.job.unlock_failed', error, {
+            job: 'backfill-opportunities',
+            lockKey,
+          })
+        })
+    }
+    client.release()
+  }
+}
+
+async function runBackfillOpportunitiesJob(
   options: OpportunityJobOptions = {},
   db: OpportunityJobDb | null = null,
 ): Promise<{
@@ -667,12 +890,99 @@ export async function backfillOpportunitiesJob(
 async function upsertEpisode(
   candidate: HiringEpisodeCandidate,
   db: OpportunityJobDb,
-): Promise<{ id: string; inserted: boolean }> {
-  const result = await db.query<{ id: string; inserted: boolean }>(
-    `INSERT INTO hiring_episodes (
+): Promise<{
+  id: string
+  inserted: boolean
+  continued: boolean
+  generation: number
+}> {
+  const latestResult = await db.query<{
+    id: string
+    status: 'active' | 'closed'
+    startedAt: string
+    lastSeenAt: string
+    episodeGeneration: number
+  }>(
+    `SELECT
+       id::TEXT AS id,
+       status,
+       started_at::TEXT AS "startedAt",
+       last_seen_at::TEXT AS "lastSeenAt",
+       episode_generation AS "episodeGeneration"
+     FROM hiring_episodes
+     WHERE organization_id = $1
+       AND episode_identity = $2
+       AND engine_version = $3
+     ORDER BY episode_generation DESC, id DESC
+     LIMIT 1
+     FOR UPDATE`,
+    [
+      candidate.organizationId,
+      candidate.episodeIdentity,
+      candidate.engineVersion,
+    ],
+  )
+  const latest = latestResult.rows[0]
+  const continued = isEpisodeContinuation(
+    latest ?? null,
+    candidate.lastSeenAt,
+  )
+  const generation = continued
+    ? latest.episodeGeneration
+    : (latest?.episodeGeneration ?? 0) + 1
+  const episodeKey = `${candidate.episodeKey}:g${generation}`
+
+  if (latest?.status === 'active' && !continued) {
+    await db.query(
+      `UPDATE hiring_episodes
+       SET
+         status = 'closed',
+         closed_at = last_seen_at,
+         updated_at = NOW()
+       WHERE id = $1`,
+      [latest.id],
+    )
+  }
+
+  const result = continued
+    ? await db.query<{ id: string; inserted: boolean }>(
+      `UPDATE hiring_episodes
+       SET
+          title = $2,
+          summary = $3,
+          started_at = LEAST(hiring_episodes.started_at, $4::timestamptz),
+          last_seen_at = GREATEST(hiring_episodes.last_seen_at, $5::timestamptz),
+          closed_at = NULL,
+         signal_count = $6,
+         vacancy_count = $7,
+         strength_score = $8,
+         freshness_score = $9,
+         evidence_hash = $10,
+         metadata = $11::jsonb,
+         updated_at = NOW()
+       WHERE id = $1
+       RETURNING id::TEXT AS id, FALSE AS inserted`,
+      [
+        latest?.id,
+        candidate.title,
+        candidate.summary,
+        candidate.startedAt,
+        candidate.lastSeenAt,
+        candidate.signalCount,
+        candidate.vacancyCount,
+        candidate.strengthScore,
+        candidate.freshnessScore,
+        candidate.evidenceHash,
+        JSON.stringify(candidate.metadata),
+      ],
+    )
+    : await db.query<{ id: string; inserted: boolean }>(
+      `INSERT INTO hiring_episodes (
        organization_id,
        episode_type,
        episode_key,
+       episode_identity,
+       episode_generation,
        title,
        summary,
        started_at,
@@ -686,46 +996,58 @@ async function upsertEpisode(
        metadata
      )
      VALUES (
-       $1, $2, $3, $4, $5,
-       $6::timestamptz, $7::timestamptz,
-       $8, $9, $10, $11, $12, $13, $14::jsonb
+       $1, $2, $3, $4, $5, $6, $7,
+       $8::timestamptz, $9::timestamptz,
+       $10, $11, $12, $13, $14, $15, $16::jsonb
      )
-     ON CONFLICT (organization_id, episode_key, engine_version)
-     DO UPDATE SET
-       title = EXCLUDED.title,
-       summary = EXCLUDED.summary,
-       started_at = LEAST(hiring_episodes.started_at, EXCLUDED.started_at),
-       last_seen_at = GREATEST(hiring_episodes.last_seen_at, EXCLUDED.last_seen_at),
-       signal_count = EXCLUDED.signal_count,
-       vacancy_count = EXCLUDED.vacancy_count,
-       strength_score = EXCLUDED.strength_score,
-       freshness_score = EXCLUDED.freshness_score,
-       evidence_hash = EXCLUDED.evidence_hash,
-       metadata = EXCLUDED.metadata,
-       status = 'active',
-       closed_at = NULL,
-       updated_at = NOW()
      RETURNING id::TEXT AS id, (xmax = 0) AS inserted`,
-    [
-      candidate.organizationId,
-      candidate.episodeType,
-      candidate.episodeKey,
-      candidate.title,
-      candidate.summary,
-      candidate.startedAt,
-      candidate.lastSeenAt,
-      candidate.signalCount,
-      candidate.vacancyCount,
-      candidate.strengthScore,
-      candidate.freshnessScore,
-      candidate.evidenceHash,
-      candidate.engineVersion,
-      JSON.stringify(candidate.metadata),
-    ],
-  )
+      [
+        candidate.organizationId,
+        candidate.episodeType,
+        episodeKey,
+        candidate.episodeIdentity,
+        generation,
+        candidate.title,
+        candidate.summary,
+        candidate.startedAt,
+        candidate.lastSeenAt,
+        candidate.signalCount,
+        candidate.vacancyCount,
+        candidate.strengthScore,
+        candidate.freshnessScore,
+        candidate.evidenceHash,
+        candidate.engineVersion,
+        JSON.stringify(candidate.metadata),
+      ],
+    )
   const episode = result.rows[0]
   if (!episode) throw new Error('Hiring episode upsert returned no row.')
+  if (
+    continued &&
+    latest &&
+    (
+      Date.parse(candidate.startedAt) > Date.parse(latest.startedAt) ||
+      Date.parse(candidate.lastSeenAt) < Date.parse(latest.lastSeenAt)
+    )
+  ) {
+    logEvent('hiring_episode.bounds_preserved', {
+      hiringEpisodeId: episode.id,
+      organizationId: candidate.organizationId,
+      startedAtPreserved: Date.parse(candidate.startedAt) > Date.parse(latest.startedAt),
+      lastSeenAtPreserved: Date.parse(candidate.lastSeenAt) < Date.parse(latest.lastSeenAt),
+    })
+  }
 
+  await db.query(
+    `DELETE FROM hiring_episode_evidence
+     WHERE hiring_episode_id = $1
+       AND (
+         (signal_id IS NOT NULL AND NOT (signal_id = ANY($2::bigint[])))
+         OR
+         (evidence_id IS NOT NULL AND NOT (evidence_id = ANY($3::bigint[])))
+       )`,
+    [episode.id, candidate.signalIds, candidate.evidenceIds],
+  )
   if (candidate.signalIds.length > 0) {
     await db.query(
       `INSERT INTO hiring_episode_evidence (
@@ -754,7 +1076,75 @@ async function upsertEpisode(
       [episode.id, candidate.organizationId, candidate.evidenceIds],
     )
   }
-  return episode
+  const storedEvidence = await db.query<{
+    signalIds: unknown
+    evidenceIds: unknown
+  }>(
+    `SELECT
+       COALESCE(
+         ARRAY_AGG(signal_id::TEXT ORDER BY signal_id)
+           FILTER (WHERE signal_id IS NOT NULL),
+         ARRAY[]::TEXT[]
+       ) AS "signalIds",
+       COALESCE(
+         ARRAY_AGG(evidence_id::TEXT ORDER BY evidence_id)
+           FILTER (WHERE evidence_id IS NOT NULL),
+         ARRAY[]::TEXT[]
+       ) AS "evidenceIds"
+     FROM hiring_episode_evidence
+     WHERE hiring_episode_id = $1`,
+    [episode.id],
+  )
+  const storedSignalIds = toStringArray(storedEvidence.rows[0]?.signalIds)
+  const storedEvidenceIds = toStringArray(storedEvidence.rows[0]?.evidenceIds)
+  const storedHash = hashEpisodeEvidence(storedSignalIds, storedEvidenceIds)
+  if (storedHash !== candidate.evidenceHash) {
+    throw new Error('Hiring episode evidence reconciliation hash mismatch.')
+  }
+  logEvent('hiring_episode.evidence_reconciled', {
+    hiringEpisodeId: episode.id,
+    organizationId: candidate.organizationId,
+    signalCount: storedSignalIds.length,
+    evidenceCount: storedEvidenceIds.length,
+  })
+  return {
+    ...episode,
+    continued,
+    generation,
+  }
+}
+
+async function closeMissingActiveEpisodes(
+  organizationId: string,
+  activeIdentities: string[],
+  now: Date,
+  db: OpportunityJobDb,
+): Promise<number> {
+  const result = await db.query<{ id: string }>(
+    `UPDATE hiring_episodes
+     SET status = 'closed', closed_at = $4::timestamptz, updated_at = NOW()
+     WHERE organization_id = $1
+       AND engine_version = $2
+       AND status = 'active'
+       AND episode_identity <> ALL($3::text[])
+       AND last_seen_at < $4::timestamptz - ($5 * INTERVAL '1 day')
+     RETURNING id::TEXT AS id`,
+    [
+      organizationId,
+      HIRING_EPISODE_ENGINE_VERSION,
+      activeIdentities,
+      now.toISOString(),
+      DEFAULT_HIRING_EPISODE_CONFIG.inactivityCloseDays,
+    ],
+  )
+  for (const row of result.rows) {
+    logEvent('hiring_episode.closed', {
+      hiringEpisodeId: row.id,
+      organizationId,
+      reason: 'evidence_reconciled',
+    })
+  }
+  return result.rowCount ?? 0
 }
 
 async function markDetectionState(
@@ -762,6 +1152,7 @@ async function markDetectionState(
     organizationId: string
     lastSignalId: string
     lastSignalUpdatedAt: string
+    inputFingerprint: string
   },
   db: OpportunityJobDb,
 ): Promise<void> {
@@ -771,21 +1162,17 @@ async function markDetectionState(
        engine_version,
        last_signal_id,
        last_signal_updated_at,
+       input_fingerprint,
        failure_count,
        next_retry_at,
        last_scanned_at
      )
-     VALUES ($1, $2, $3::bigint, $4::timestamptz, 0, NULL, NOW())
+     VALUES ($1, $2, $3::bigint, $4::timestamptz, $5, 0, NULL, NOW())
      ON CONFLICT (organization_id, engine_version)
      DO UPDATE SET
-       last_signal_id = GREATEST(
-         hiring_episode_detection_state.last_signal_id,
-         EXCLUDED.last_signal_id
-       ),
-       last_signal_updated_at = GREATEST(
-         hiring_episode_detection_state.last_signal_updated_at,
-         EXCLUDED.last_signal_updated_at
-       ),
+       last_signal_id = EXCLUDED.last_signal_id,
+       last_signal_updated_at = EXCLUDED.last_signal_updated_at,
+       input_fingerprint = EXCLUDED.input_fingerprint,
        failure_count = 0,
        next_retry_at = NULL,
        last_scanned_at = NOW()`,
@@ -794,6 +1181,7 @@ async function markDetectionState(
       HIRING_EPISODE_ENGINE_VERSION,
       organization.lastSignalId,
       organization.lastSignalUpdatedAt,
+      organization.inputFingerprint,
     ],
   )
 }
@@ -803,6 +1191,7 @@ async function markDetectionFailure(
     organizationId: string
     lastSignalId: string
     lastSignalUpdatedAt: string
+    inputFingerprint: string
   },
   db: OpportunityJobDb,
 ): Promise<void> {
@@ -812,6 +1201,7 @@ async function markDetectionFailure(
        engine_version,
        last_signal_id,
        last_signal_updated_at,
+       input_fingerprint,
        failure_count,
        next_retry_at,
        last_scanned_at
@@ -821,20 +1211,16 @@ async function markDetectionFailure(
        $2,
        $3::bigint,
        $4::timestamptz,
+       $5,
        1,
        NOW() + INTERVAL '5 minutes',
        NOW()
      )
      ON CONFLICT (organization_id, engine_version)
      DO UPDATE SET
-       last_signal_id = GREATEST(
-         hiring_episode_detection_state.last_signal_id,
-         EXCLUDED.last_signal_id
-       ),
-       last_signal_updated_at = GREATEST(
-         hiring_episode_detection_state.last_signal_updated_at,
-         EXCLUDED.last_signal_updated_at
-       ),
+       last_signal_id = EXCLUDED.last_signal_id,
+       last_signal_updated_at = EXCLUDED.last_signal_updated_at,
+       input_fingerprint = EXCLUDED.input_fingerprint,
        failure_count = hiring_episode_detection_state.failure_count + 1,
        next_retry_at = NOW() + INTERVAL '5 minutes',
        last_scanned_at = NOW()`,
@@ -843,25 +1229,509 @@ async function markDetectionFailure(
       HIRING_EPISODE_ENGINE_VERSION,
       organization.lastSignalId,
       organization.lastSignalUpdatedAt,
+      organization.inputFingerprint,
     ],
   )
 }
 
+async function persistOpportunityBuild(input: {
+  row: OpportunityBuildRow
+  score: OpportunityScoreResult
+  brief: OpportunityBrief
+  fiur: ReturnType<typeof computeFiurForOpportunity>
+  provenance: OpportunityInputProvenance
+  validUntil: string
+  now: Date
+  db: OpportunityJobDb
+  manageTransaction: boolean
+}): Promise<{
+  id: string
+  inserted: boolean
+  superseded: boolean
+  skippedUnchanged: boolean
+}> {
+  const { row, score, brief, fiur, provenance, db } = input
+  if (input.manageTransaction) await db.query('BEGIN')
+  try {
+    const currentResult = await db.query<{
+      id: string
+      inputHash: string
+      scoringVersion: string
+      status: OpportunityScoreResult['status']
+      snoozedUntil: string | null
+    }>(
+      `SELECT
+         id::TEXT AS id,
+         input_hash AS "inputHash",
+         scoring_version AS "scoringVersion",
+         status,
+         snoozed_until::TEXT AS "snoozedUntil"
+       FROM opportunities
+         WHERE client_profile_id = $1
+          AND hiring_episode_id = $2
+          AND owner_id = $3
+         AND superseded_at IS NULL
+       LIMIT 1
+       FOR UPDATE`,
+      [row.clientProfileId, row.hiringEpisodeId, row.ownerId],
+    )
+    const current = currentResult.rows[0]
+
+    type LockedEpisodeState = {
+      status: 'accepted' | 'dismissed' | 'snoozed' | 'contacted'
+      suppressedUntil: string | null
+    }
+    const episodeStateResult = await db.query<LockedEpisodeState>(
+      `SELECT
+         status,
+         suppressed_until::TEXT AS "suppressedUntil"
+       FROM client_episode_state
+        WHERE client_profile_id = $1
+          AND hiring_episode_id = $2
+          AND owner_id = $3
+       LIMIT 1
+       FOR UPDATE`,
+      [row.clientProfileId, row.hiringEpisodeId, row.ownerId],
+    )
+    let lockedEpisodeState: LockedEpisodeState | null =
+      episodeStateResult.rows[0] ?? null
+    let elapsedSnoozeCleared = false
+    if (!lockedEpisodeState && current?.status === 'snoozed') {
+      const deadline = Date.parse(current.snoozedUntil ?? '')
+      if (Number.isFinite(deadline) && deadline > input.now.getTime()) {
+        await db.query(
+          `INSERT INTO client_episode_state (
+             client_profile_id,
+             owner_id,
+             hiring_episode_id,
+             organization_id,
+             status,
+             suppressed_until
+           )
+           VALUES ($1, $2, $3, $4, 'snoozed', $5::timestamptz)
+           ON CONFLICT (client_profile_id, hiring_episode_id) DO NOTHING`,
+          [
+            row.clientProfileId,
+            row.ownerId,
+            row.hiringEpisodeId,
+            row.organizationId,
+            current.snoozedUntil,
+          ],
+        )
+        lockedEpisodeState = {
+          status: 'snoozed',
+          suppressedUntil: current.snoozedUntil,
+        }
+        logEvent('opportunity.snooze_state_repaired', {
+          hiringEpisodeId: row.hiringEpisodeId,
+          clientProfileId: row.clientProfileId,
+        })
+      } else {
+        elapsedSnoozeCleared = true
+      }
+    }
+    if (lockedEpisodeState?.status === 'snoozed') {
+      const deadline = Date.parse(lockedEpisodeState.suppressedUntil ?? '')
+      if (!Number.isFinite(deadline)) {
+        throw new Error('Snoozed episode state has an invalid suppressed_until.')
+      }
+      if (deadline <= input.now.getTime()) {
+        await db.query(
+          `DELETE FROM client_episode_state
+            WHERE client_profile_id = $1
+              AND hiring_episode_id = $2
+              AND owner_id = $3
+              AND status = 'snoozed'
+              AND suppressed_until <= $4::timestamptz`,
+           [
+             row.clientProfileId,
+             row.hiringEpisodeId,
+             row.ownerId,
+             input.now.toISOString(),
+           ],
+        )
+        logEvent('opportunity.snooze_elapsed_during_build', {
+          hiringEpisodeId: row.hiringEpisodeId,
+          clientProfileId: row.clientProfileId,
+        })
+        lockedEpisodeState = null
+        elapsedSnoozeCleared = true
+      }
+    }
+    const lockedEpisodeStatus = lockedEpisodeState?.status ?? null
+
+    if (current?.inputHash === provenance.inputHash && !elapsedSnoozeCleared) {
+      await clearBuildFailure(row, provenance.scoringVersion, db)
+      if (input.manageTransaction) await db.query('COMMIT')
+      logEvent('opportunity.build.semantic_unchanged', {
+        opportunityId: current.id,
+        hiringEpisodeId: row.hiringEpisodeId,
+        clientProfileId: row.clientProfileId,
+        inputHashPrefix: provenance.inputHash.slice(0, 12),
+      })
+      return {
+        id: current.id,
+        inserted: false,
+        superseded: false,
+        skippedUnchanged: true,
+      }
+    }
+
+    const preservedStatus =
+      lockedEpisodeStatus ??
+      (
+        current?.status &&
+        ['accepted', 'dismissed', 'snoozed', 'contacted'].includes(current.status) &&
+        !(elapsedSnoozeCleared && current.status === 'snoozed')
+          ? current.status
+          : score.status
+      )
+    const preservedSnoozedUntil = preservedStatus === 'snoozed'
+      ? lockedEpisodeState?.suppressedUntil ?? null
+      : null
+    if (preservedStatus === 'snoozed' && !preservedSnoozedUntil) {
+      throw new Error('Snoozed episode state is missing suppressed_until.')
+    }
+    const metadata = JSON.stringify({
+      morningBriefEligible: score.isMorningBriefEligible,
+      components: score.components,
+      sourceFamilies: toStringArray(row.sourceFamilies),
+      agencyFitExplanation: brief.agencyFitExplanation,
+      limitations: brief.limitations,
+      modelType: 'heuristic',
+      calibrationStatus: 'uncalibrated',
+      digestReasons: row.digestReasons,
+      fiur: {
+        fit: fiur.fit,
+        intent: fiur.intent,
+        urgency: fiur.urgency,
+        reachability: fiur.reachability,
+        total: fiur.total,
+      },
+    })
+    const values = [
+      row.ownerId,
+      row.clientProfileId,
+      row.organizationId,
+      row.hiringEpisodeId,
+      preservedStatus,
+      brief.title,
+      brief.whyNow,
+      brief.problemHypothesis,
+      brief.recommendedAngle,
+      brief.recommendedPersona,
+      brief.recommendedAction,
+      score.components.agencyFit.score,
+      score.components.hiringIntent.score,
+      score.components.externalSupportNeed.score,
+      score.components.timing.score,
+      score.components.reachability.score,
+      score.components.confidence.score,
+      score.opportunityScore,
+      score.confidenceGate,
+      provenance.scoringVersion,
+      provenance.episodeEvidenceHash,
+      input.validUntil,
+      metadata,
+      provenance.episodeEvidenceHash,
+      provenance.profileSnapshotHash,
+      provenance.digestCandidateId,
+      provenance.fiurVersion,
+      provenance.scoringConfigHash,
+      provenance.briefBuilderVersion,
+      provenance.inputHash,
+      preservedSnoozedUntil,
+    ] as const
+
+    let superseded = false
+    let reusableOpportunityId: string | null = null
+    if (current && current.scoringVersion !== provenance.scoringVersion) {
+      const reusableResult = await db.query<{ id: string }>(
+        `SELECT id::TEXT AS id
+         FROM opportunities
+          WHERE client_profile_id = $1
+            AND hiring_episode_id = $2
+            AND scoring_version = $3
+            AND owner_id = $4
+           AND superseded_at IS NOT NULL
+         ORDER BY updated_at DESC, id DESC
+         LIMIT 1
+         FOR UPDATE`,
+        [
+          row.clientProfileId,
+          row.hiringEpisodeId,
+          provenance.scoringVersion,
+          row.ownerId,
+        ],
+      )
+      reusableOpportunityId = reusableResult.rows[0]?.id ?? null
+      await db.query(
+        `UPDATE opportunities
+         SET superseded_at = NOW(), updated_at = NOW()
+          WHERE id = $1
+            AND owner_id = $2
+            AND superseded_at IS NULL`,
+        [current.id, row.ownerId],
+      )
+      superseded = true
+      logEvent('opportunity.superseded', {
+        opportunityId: current.id,
+        hiringEpisodeId: row.hiringEpisodeId,
+        clientProfileId: row.clientProfileId,
+        previousScoringVersion: current.scoringVersion,
+        newScoringVersion: provenance.scoringVersion,
+      })
+    }
+
+    const updateTargetId = current && !superseded
+      ? current.id
+      : reusableOpportunityId
+    const stored = updateTargetId
+      ? await db.query<{ id: string }>(
+        `UPDATE opportunities
+         SET
+           owner_id = $2,
+           client_profile_id = $3,
+           organization_id = $4,
+           hiring_episode_id = $5,
+           status = $6,
+           title = $7,
+           why_now = $8,
+           problem_hypothesis = $9,
+           recommended_angle = $10,
+           recommended_persona = $11,
+           recommended_action = $12,
+           agency_fit_score = $13,
+           hiring_intent_score = $14,
+           agency_propensity_score = $15,
+           timing_score = $16,
+           reachability_score = $17,
+           confidence_score = $18,
+           opportunity_score = $19,
+           confidence_gate = $20,
+           scoring_version = $21,
+           evidence_hash = $22,
+           valid_until = $23,
+           metadata = $24::jsonb,
+           episode_evidence_hash = $25,
+           profile_snapshot_hash = $26,
+           digest_candidate_id = $27,
+           fiur_version = $28,
+           scoring_config_hash = $29,
+           brief_builder_version = $30,
+            input_hash = $31,
+            snoozed_until = $32::timestamptz,
+            superseded_at = NULL,
+           updated_at = NOW()
+          WHERE id = $1
+            AND owner_id = $2
+          RETURNING id::TEXT AS id`,
+        [updateTargetId, ...values],
+      )
+      : await db.query<{ id: string }>(
+        `INSERT INTO opportunities (
+           owner_id,
+           client_profile_id,
+           organization_id,
+           hiring_episode_id,
+           status,
+           title,
+           why_now,
+           problem_hypothesis,
+           recommended_angle,
+           recommended_persona,
+           recommended_action,
+           agency_fit_score,
+           hiring_intent_score,
+           agency_propensity_score,
+           timing_score,
+           reachability_score,
+           confidence_score,
+           opportunity_score,
+           confidence_gate,
+           scoring_version,
+           evidence_hash,
+           valid_until,
+           metadata,
+           episode_evidence_hash,
+           profile_snapshot_hash,
+           digest_candidate_id,
+           fiur_version,
+           scoring_config_hash,
+           brief_builder_version,
+           input_hash,
+           snoozed_until
+         )
+         VALUES (
+           $1, $2, $3, $4, $5,
+           $6, $7, $8, $9, $10, $11,
+           $12, $13, $14, $15, $16, $17, $18,
+           $19, $20, $21, $22, $23::jsonb,
+            $24, $25, $26, $27, $28, $29, $30,
+            $31::timestamptz
+         )
+         RETURNING id::TEXT AS id`,
+        values,
+      )
+    const storedRow = stored.rows[0]
+    if (!storedRow) throw new Error('Opportunity persistence returned no row.')
+    if (preservedSnoozedUntil) {
+      logEvent('opportunity.snooze_preserved', {
+        opportunityId: storedRow.id,
+        hiringEpisodeId: row.hiringEpisodeId,
+        clientProfileId: row.clientProfileId,
+        scoringVersion: provenance.scoringVersion,
+      })
+    }
+    await clearBuildFailure(row, provenance.scoringVersion, db)
+    if (input.manageTransaction) await db.query('COMMIT')
+    return {
+      id: storedRow.id,
+      inserted: !updateTargetId,
+      superseded,
+      skippedUnchanged: false,
+    }
+  } catch (error) {
+    if (input.manageTransaction) {
+      await db.query('ROLLBACK').catch(() => undefined)
+    }
+    throw error
+  }
+}
+
+function createOpportunityInputProvenance(
+  row: OpportunityBuildRow,
+  episode: HiringEpisodeCandidate,
+  scoringVersion: string,
+): OpportunityInputProvenance {
+  const profileSnapshotHash = hashCanonicalJson({
+    agencyName: row.agencyName,
+    targetCity: row.targetCity,
+    specialization: row.specialization,
+    includeKeywords: sortSetLikeStrings(row.includeKeywords),
+    excludeKeywords: sortSetLikeStrings(row.excludeKeywords),
+    industries: sortSetLikeStrings(row.industries),
+    companySizes: sortSetLikeStrings(row.companySizes),
+    contactPolicy: row.contactPolicy,
+    roles: sortSetLikeStrings(row.roles),
+    excludedIndustries: sortSetLikeStrings(row.excludedIndustries),
+    excludedLocations: sortSetLikeStrings(row.excludedLocations),
+    remoteFriendly: row.remoteFriendly,
+    hiringMode: row.hiringMode,
+  })
+  const scoringConfigHash = hashCanonicalJson(DEFAULT_OPPORTUNITY_SCORING_CONFIG)
+  // Set-like inputs are normalized here. canonicalJsonStringify intentionally
+  // preserves every other array because digest reason and workflow order can be semantic.
+  const buildInputsHash = hashCanonicalJson({
+    organization: {
+      name: row.organizationName,
+      domain: row.organizationDomain,
+      websiteUrl: row.organizationWebsiteUrl,
+      careerPageUrl: row.organizationCareerPageUrl,
+      country: row.organizationCountry,
+      industry: row.organizationIndustry,
+      city: row.organizationCity,
+    },
+    episode: {
+      episodeType: episode.episodeType,
+      episodeGeneration: episode.episodeGeneration,
+      title: episode.title,
+      summary: episode.summary,
+      startedAt: episode.startedAt,
+      lastSeenAt: episode.lastSeenAt,
+      signalCount: episode.signalCount,
+      vacancyCount: episode.vacancyCount,
+      strengthScore: episode.strengthScore,
+      freshnessScore: episode.freshnessScore,
+      engineVersion: episode.engineVersion,
+      metadata: semanticEpisodeMetadata(episode.metadata),
+    },
+    signals: sortSetLikeStrings(
+      toRecordArray(row.signals).map((signal) =>
+        canonicalJsonStringify(withoutDatabaseId(signal))),
+    ),
+    evidence: sortSetLikeStrings(
+      toRecordArray(row.evidence).map((item) =>
+        canonicalJsonStringify(withoutDatabaseId(item))),
+    ),
+    digest: {
+      payload: semanticDigestPayload(row.digestPayload),
+      reasons: row.digestReasons,
+      sourceFamilies: sortSetLikeStrings(row.sourceFamilies),
+    },
+  })
+  const semanticInput = {
+    profileSnapshotHash,
+    buildInputsHash,
+    fiurVersion: FIUR_VERSION,
+    scoringVersion,
+    scoringConfigHash,
+    briefBuilderVersion: BRIEF_BUILDER_VERSION,
+  }
+  return {
+    episodeEvidenceHash: episode.evidenceHash,
+    ...semanticInput,
+    digestCandidateId: row.digestCandidateId,
+    inputHash: hashCanonicalJson(semanticInput),
+  }
+}
+
+function withoutDatabaseId(
+  value: Record<string, unknown>,
+): Record<string, unknown> {
+  const semanticValue = { ...value }
+  delete semanticValue.id
+  return semanticValue
+}
+
+function semanticEpisodeMetadata(
+  value: Record<string, unknown>,
+): Record<string, unknown> {
+  const semanticMetadata = { ...value }
+  // Detector fingerprints are implementation identities. Their fallback path
+  // includes organization_id, while the underlying signal content is hashed above.
+  delete semanticMetadata.canonicalVacancyFingerprints
+  return semanticMetadata
+}
+
+function semanticDigestPayload(value: unknown): Record<string, unknown> {
+  const semanticPayload = { ...asRecord(value) }
+  delete semanticPayload.corroborated_org_ids
+  delete semanticPayload.corroboratedOrgIds
+
+  const keyType = semanticPayload.corroboration_key_type ??
+    semanticPayload.corroborationKeyType
+  const key = semanticPayload.corroboration_key ?? semanticPayload.corroborationKey
+  if (
+    keyType === 'org_id' ||
+    (typeof key === 'string' && /^org:\d+$/.test(key))
+  ) {
+    delete semanticPayload.corroboration_key
+    delete semanticPayload.corroborationKey
+    delete semanticPayload.corroboration_key_type
+    delete semanticPayload.corroborationKeyType
+  }
+
+  return semanticPayload
+}
+
 async function clearBuildFailure(
   row: Pick<OpportunityBuildRow, 'clientProfileId' | 'hiringEpisodeId'>,
+  scoringVersion: string,
   db: OpportunityJobDb,
 ): Promise<void> {
   await db.query(
     `DELETE FROM opportunity_build_failures
      WHERE client_profile_id = $1
        AND hiring_episode_id = $2
-       AND scoring_version = 'opportunity-v1'`,
-    [row.clientProfileId, row.hiringEpisodeId],
+       AND scoring_version = $3`,
+    [row.clientProfileId, row.hiringEpisodeId, scoringVersion],
   )
 }
 
 async function markBuildFailure(
   row: Pick<OpportunityBuildRow, 'clientProfileId' | 'hiringEpisodeId'>,
+  scoringVersion: string,
   db: OpportunityJobDb,
 ): Promise<void> {
   await db.query(
@@ -873,13 +1743,13 @@ async function markBuildFailure(
        next_retry_at,
        last_failed_at
      )
-     VALUES ($1, $2, 'opportunity-v1', 1, NOW() + INTERVAL '5 minutes', NOW())
+     VALUES ($1, $2, $3, 1, NOW() + INTERVAL '5 minutes', NOW())
      ON CONFLICT (client_profile_id, hiring_episode_id, scoring_version)
      DO UPDATE SET
        failure_count = opportunity_build_failures.failure_count + 1,
        next_retry_at = NOW() + INTERVAL '5 minutes',
        last_failed_at = NOW()`,
-    [row.clientProfileId, row.hiringEpisodeId],
+    [row.clientProfileId, row.hiringEpisodeId, scoringVersion],
   )
 }
 
@@ -892,6 +1762,7 @@ function mapHiringSignal(row: SignalRow): HiringSignalInput {
     region: row.region,
     source: row.source,
     sourceUrl: row.sourceUrl,
+    externalVacancyId: row.externalVacancyId,
     occurredAt: row.occurredAt,
     evidenceIds: toStringArray(row.evidenceIds),
   }
@@ -902,6 +1773,8 @@ function mapEpisode(row: OpportunityBuildRow): HiringEpisodeCandidate {
     organizationId: row.organizationId,
     episodeType: row.episodeType,
     episodeKey: row.episodeKey,
+    episodeIdentity: row.episodeIdentity,
+    episodeGeneration: row.episodeGeneration,
     title: row.episodeTitle,
     summary: row.episodeSummary,
     startedAt: row.episodeStartedAt,
@@ -1015,6 +1888,38 @@ function hasExplicitProfileExclusion(row: OpportunityBuildRow): boolean {
         location.includes(excluded) || excluded.includes(location)))
 }
 
+function findMatchedAgencyRoles(row: OpportunityBuildRow): string[] {
+  const episodeRoleValues = toRecordArray(row.signals).flatMap((signal) => {
+    const title = stringValue(signal.title)
+    return title
+      ? [normalizeMatchText(title), classifyOpportunityRoleFamily(title)]
+      : []
+  })
+  return [...new Set(toStringArray(row.roles))]
+    .filter((role) => {
+      const normalizedRole = normalizeMatchText(role)
+      return normalizedRole && episodeRoleValues.some(
+        (value) => containsNormalizedPhrase(value, normalizedRole),
+      )
+    })
+    .sort((left, right) => left.localeCompare(right, 'ru'))
+}
+
+function normalizeMatchText(value: string): string {
+  return value
+    .toLocaleLowerCase('ru-RU')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function containsNormalizedPhrase(value: string, phrase: string): boolean {
+  return value === phrase ||
+    value.startsWith(`${phrase} `) ||
+    value.endsWith(` ${phrase}`) ||
+    value.includes(` ${phrase} `)
+}
+
 function createStats(options: OpportunityJobOptions): OpportunityJobStats {
   return {
     enabled: isOpportunityEngineV1Enabled() && options.enabled !== false,
@@ -1025,6 +1930,51 @@ function createStats(options: OpportunityJobOptions): OpportunityJobStats {
     skipped: 0,
     failed: 0,
     expired: 0,
+    continued: 0,
+    reconciled: 0,
+    skippedUnchanged: 0,
+    superseded: 0,
+    locked: 0,
+    skippedBecauseLocked: false,
+  }
+}
+
+async function runWithJobLock(
+  lockName: keyof typeof OPPORTUNITY_JOB_LOCK_KEYS,
+  job: string,
+  options: OpportunityJobOptions,
+  providedDb: OpportunityJobDb | null,
+  run: (db: OpportunityJobDb) => Promise<OpportunityJobStats>,
+): Promise<OpportunityJobStats> {
+  if (providedDb) return run(providedDb)
+
+  const client = await getClient()
+  if (!client) throw new Error('DATABASE_URL is not set.')
+  const lockKey = OPPORTUNITY_JOB_LOCK_KEYS[lockName]
+  let locked = false
+  try {
+    const result = await client.query<{ locked: boolean }>(
+      `SELECT pg_try_advisory_lock($1::bigint) AS locked`,
+      [lockKey],
+    )
+    locked = result.rows[0]?.locked === true
+    if (!locked) {
+      const stats = createStats(options)
+      stats.locked = 1
+      stats.skippedBecauseLocked = true
+      logEvent('opportunity.job.locked', { job, lockKey })
+      logJobCompleted(job, stats)
+      return stats
+    }
+    return await run(client)
+  } finally {
+    if (locked) {
+      await client.query(`SELECT pg_advisory_unlock($1::bigint)`, [lockKey])
+        .catch((error) => {
+          logError('opportunity.job.unlock_failed', error, { job, lockKey })
+        })
+    }
+    client.release()
   }
 }
 
@@ -1047,6 +1997,14 @@ function normalizeConfidenceGate(value: string): ConfidenceGate {
   return value === 'A' || value === 'B' || value === 'C' ? value : 'D'
 }
 
+function normalizeScoringVersion(value: string | undefined): string {
+  const normalized = value?.trim() || 'opportunity-v1'
+  if (!/^[a-z0-9][a-z0-9._-]{0,63}$/i.test(normalized)) {
+    throw new Error('Invalid opportunity scoring version.')
+  }
+  return normalized
+}
+
 function normalizeEvidenceTier(value: unknown): EvidenceTier {
   return value === 'direct' || value === 'corroboration' ? value : 'context'
 }
@@ -1064,6 +2022,10 @@ function toStringArray(value: unknown): string[] {
     .filter((item): item is string => typeof item === 'string')
     .map((item) => item.trim())
     .filter(Boolean)
+}
+
+function sortSetLikeStrings(value: unknown): string[] {
+  return [...new Set(toStringArray(value))].sort()
 }
 
 function toCompanySizes(
@@ -1091,11 +2053,25 @@ const EXPIRABLE_COUNT_QUERY = `
   FROM opportunities o
   JOIN hiring_episodes he ON he.id = o.hiring_episode_id
   WHERE o.status IN ('new', 'review', 'snoozed')
+    AND o.superseded_at IS NULL
     AND (he.status = 'closed' OR o.valid_until < $1::timestamptz)
     AND ($2::bigint IS NULL OR o.organization_id = $2)
 `
 
 const OPPORTUNITY_BUILD_QUERY = `
+  WITH latest_candidates AS (
+    SELECT DISTINCT ON (candidate.client_profile_id, candidate.org_id)
+      candidate.*
+    FROM digest_candidates candidate
+    JOIN digest_runs run ON run.id = candidate.digest_run_id
+    WHERE run.status = 'completed'
+      AND ($1::bigint IS NULL OR candidate.org_id = $1)
+    ORDER BY
+      candidate.client_profile_id,
+      candidate.org_id,
+      candidate.created_at DESC,
+      candidate.id DESC
+  )
   SELECT
     cp.owner_id::TEXT AS "ownerId",
     cp.id::TEXT AS "clientProfileId",
@@ -1110,6 +2086,8 @@ const OPPORTUNITY_BUILD_QUERY = `
     org.city AS "organizationCity",
     he.episode_type AS "episodeType",
     he.episode_key AS "episodeKey",
+    he.episode_identity AS "episodeIdentity",
+    he.episode_generation AS "episodeGeneration",
     he.title AS "episodeTitle",
     he.summary AS "episodeSummary",
     he.started_at::TEXT AS "episodeStartedAt",
@@ -1141,27 +2119,22 @@ const OPPORTUNITY_BUILD_QUERY = `
     cp.excluded_industries AS "excludedIndustries",
     cp.excluded_locations AS "excludedLocations",
     cp.remote_friendly AS "remoteFriendly",
-    cp.hiring_mode AS "hiringMode"
-  FROM hiring_episodes he
+    cp.hiring_mode AS "hiringMode",
+    current_opportunity.id::TEXT AS "currentOpportunityId",
+    current_opportunity.input_hash AS "currentInputHash",
+    current_opportunity.scoring_version AS "currentScoringVersion"
+  FROM latest_candidates dc
+  JOIN client_profiles cp ON cp.id = dc.client_profile_id
+  JOIN hiring_episodes he ON he.organization_id = dc.org_id
   JOIN orgs org ON org.id = he.organization_id
-  CROSS JOIN client_profiles cp
   LEFT JOIN opportunity_build_failures build_failure
     ON build_failure.client_profile_id = cp.id
    AND build_failure.hiring_episode_id = he.id
-   AND build_failure.scoring_version = 'opportunity-v1'
-  JOIN LATERAL (
-    SELECT candidate.*
-    FROM digest_candidates candidate
-    JOIN digest_runs run ON run.id = candidate.digest_run_id
-    WHERE candidate.client_profile_id = cp.id
-      AND candidate.org_id = he.organization_id
-      AND run.status = 'completed'
-      AND candidate.created_at >= he.started_at
-      AND candidate.created_at >= he.last_seen_at
-      AND candidate.created_at >= cp.updated_at
-    ORDER BY candidate.created_at DESC, candidate.id DESC
-    LIMIT 1
-  ) dc ON TRUE
+   AND build_failure.scoring_version = $3
+  LEFT JOIN opportunities current_opportunity
+    ON current_opportunity.client_profile_id = cp.id
+   AND current_opportunity.hiring_episode_id = he.id
+   AND current_opportunity.superseded_at IS NULL
   LEFT JOIN LATERAL (
     SELECT
       ARRAY_AGG(DISTINCT hee.signal_id::TEXT)

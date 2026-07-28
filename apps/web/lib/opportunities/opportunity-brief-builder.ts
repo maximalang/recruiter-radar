@@ -8,12 +8,26 @@ export interface OpportunityBrief {
   recommendedAngle: string
   recommendedPersona: string
   recommendedAction: string
+  agencyFitExplanation: string
+  limitations: string
+}
+
+export interface AgencyBriefContext {
+  agencyName: string
+  specialization: string | null
+  hiringMode: string
+  matchedRoles: string[]
+  matchedIndustries: string[]
+  matchedRegions: string[]
+  includeKeywords: string[]
+  relevantFitReasons: string[]
 }
 
 interface OpportunityBriefInput {
   organizationName: string
   episode: HiringEpisodeCandidate
   score: OpportunityScoreResult
+  agency: AgencyBriefContext
 }
 
 export class OpportunityBriefBuilder {
@@ -29,8 +43,36 @@ export class OpportunityBriefBuilder {
       recommendedPersona: buildRecommendedPersona(family),
       recommendedAction:
         'Проверить доступный корпоративный канал связи и подготовить персональное обращение со ссылкой на подтверждённый контекст найма.',
+      agencyFitExplanation: buildAgencyFitExplanation(input.agency),
+      limitations:
+        'Оценка основана на публичных сигналах найма и не подтверждает коммерческие условия, готовность работать с агентством или конкретного ЛПР.',
     }
   }
+}
+
+function buildAgencyFitExplanation(context: AgencyBriefContext): string {
+  const details: string[] = []
+  const roles = uniqueText(context.matchedRoles)
+  const industries = uniqueText(context.matchedIndustries)
+  const regions = uniqueText(context.matchedRegions)
+  if (roles.length > 0) {
+    details.push(`Релевантные роли: ${roles.join(', ')}`)
+  }
+  if (context.specialization?.trim()) {
+    details.push(`специализация агентства: ${context.specialization.trim()}`)
+  }
+  if (industries.length > 0) {
+    details.push(`целевые отрасли: ${industries.join(', ')}`)
+  }
+  if (regions.length > 0) {
+    details.push(`целевые регионы: ${regions.join(', ')}`)
+  }
+  if (details.length === 0 && context.relevantFitReasons.length > 0) {
+    details.push(uniqueText(context.relevantFitReasons).slice(0, 2).join('; '))
+  }
+  return details.length > 0
+    ? `${details.join('; ')}.`
+    : 'Соответствие ограничено доступными настройками профиля агентства; перед обращением требуется ручная проверка.'
 }
 
 function buildTitle(
@@ -46,7 +88,7 @@ function buildTitle(
   const titles: Record<HiringEpisodeCandidate['episodeType'], string> = {
     vacancy_spike: `${organizationName} ускорила найм`,
     repeated_vacancies: `${organizationName} повторно открыла сложные позиции`,
-    new_role_cluster: `${organizationName} формирует новый кластер ролей`,
+    role_cluster: `${organizationName} формирует кластер ролей`,
     new_region: `${organizationName} начала найм в новом регионе`,
     hiring_restart: `${organizationName} возобновила найм`,
     sustained_hiring: `${organizationName} поддерживает повышенный темп найма`,
@@ -130,4 +172,10 @@ function formatDecimal(value: number): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   }).format(value)
+}
+
+function uniqueText(values: string[]): string[] {
+  return [...new Set(
+    values.map((value) => value.trim()).filter(Boolean),
+  )].sort((left, right) => left.localeCompare(right, 'ru'))
 }

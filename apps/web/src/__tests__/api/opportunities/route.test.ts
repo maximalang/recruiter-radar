@@ -10,6 +10,10 @@ jest.mock('@/lib/opportunities/repository', () => ({
   getOpportunityById: jest.fn(),
   applyOpportunityAction: jest.fn(),
   OpportunityActionConflictError: class OpportunityActionConflictError extends Error {},
+  OpportunitySupersededConflictError: class OpportunitySupersededConflictError extends Error {
+    code = 'opportunity_superseded'
+  },
+  OpportunityTransitionConflictError: class OpportunityTransitionConflictError extends Error {},
   isOpportunityAction: (value: unknown) =>
     ['accepted', 'dismissed', 'snoozed', 'contacted'].includes(String(value)),
 }))
@@ -20,6 +24,7 @@ import {
   getOpportunityById,
   listOpportunities,
   OpportunityActionConflictError,
+  OpportunityTransitionConflictError,
 } from '@/lib/opportunities/repository'
 import { GET as list } from '@/app/api/opportunities/route'
 import { GET as detail } from '@/app/api/opportunities/[id]/route'
@@ -30,7 +35,7 @@ const mockedList = jest.mocked(listOpportunities)
 const mockedDetail = jest.mocked(getOpportunityById)
 const mockedAction = jest.mocked(applyOpportunityAction)
 
-function request(path: string, init?: RequestInit) {
+function request(path: string, init?: ConstructorParameters<typeof NextRequest>[1]) {
   return new NextRequest(`https://recruiter-radar.ru${path}`, init)
 }
 
@@ -187,5 +192,23 @@ describe('opportunities API', () => {
     )
 
     expect(response.status).toBe(409)
+  })
+
+  it('returns the state-machine conflict contract for a forbidden transition', async () => {
+    mockedOwner.mockResolvedValue('7')
+    mockedAction.mockRejectedValue(new OpportunityTransitionConflictError())
+
+    const response = await action(
+      request('/api/opportunities/10/action', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'contacted' }),
+      }),
+      { params: Promise.resolve({ id: '10' }) },
+    )
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toEqual({
+      error: 'opportunity_transition_conflict',
+    })
   })
 })

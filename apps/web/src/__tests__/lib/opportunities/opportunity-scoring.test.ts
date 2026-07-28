@@ -14,6 +14,8 @@ function episode(
     organizationId: '10',
     episodeType: 'vacancy_spike',
     episodeKey: 'vacancy_spike:all:2026-07-20',
+    episodeIdentity: '10:vacancy_spike:all',
+    episodeGeneration: 1,
     title: 'Компания ускорила найм',
     summary: 'За последние 14 дней опубликовано 8 вакансий.',
     startedAt: '2026-07-15T12:00:00.000Z',
@@ -47,8 +49,11 @@ function input(overrides: Partial<OpportunityScoringInput> = {}): OpportunitySco
       fit: 0.82,
       reachability: 0.74,
       reasons: {
-        fit: [{ key: 'fit.role.match' }],
-        reachability: [{ key: 'reachability.career-page' }],
+        fit: [{ key: 'fit.role.match', component: 'fit' }],
+        reachability: [{
+          key: 'reachability.career-page',
+          component: 'reachability',
+        }],
       },
     },
     confidenceGate: 'A',
@@ -68,7 +73,7 @@ describe('OpportunityScoringService', () => {
     expect(Object.keys(result.components)).toEqual([
       'agencyFit',
       'hiringIntent',
-      'externalAgencyPropensity',
+      'externalSupportNeed',
       'timing',
       'reachability',
       'confidence',
@@ -126,7 +131,7 @@ describe('OpportunityScoringService', () => {
     )
   })
 
-  it('blocks low external agency propensity even when all other scores are high', () => {
+  it('blocks low external support need even when all other scores are high', () => {
     const result = service.score(
       input({
         episode: episode({
@@ -139,8 +144,8 @@ describe('OpportunityScoringService', () => {
       }),
     )
 
-    expect(result.components.externalAgencyPropensity.score).toBeLessThan(
-      DEFAULT_OPPORTUNITY_SCORING_CONFIG.minimumExternalAgencyPropensity,
+    expect(result.components.externalSupportNeed.score).toBeLessThan(
+      DEFAULT_OPPORTUNITY_SCORING_CONFIG.minimumExternalSupportNeed,
     )
     expect(result.isMorningBriefEligible).toBe(false)
   })

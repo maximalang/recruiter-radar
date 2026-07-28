@@ -241,6 +241,17 @@ describe('production deploy workflow contract', () => {
     expect(workflow).toContain('"dryRun":true')
   })
 
+  it('validates stack pull requests with the Opportunity Engine database gates', () => {
+    const pullRequestSection = testWorkflow.slice(
+      testWorkflow.indexOf('pull_request:'),
+      testWorkflow.indexOf('concurrency:'),
+    )
+
+    expect(pullRequestSection).toContain("'codex/**'")
+    expect(testWorkflow).toContain('npm run test:opportunity-engine:db')
+    expect(testWorkflow).toContain('npm run test:opportunity-engine:down')
+  })
+
   it('reconciles payment telemetry after migrations without blocking startup', () => {
     const migrationIndex = dockerEntrypoint.indexOf(
       'node packages/db/scripts/migrate.mjs',

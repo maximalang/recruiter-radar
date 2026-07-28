@@ -35,7 +35,7 @@ export interface OpportunityScoreResult {
   components: {
     agencyFit: OpportunityComponentScore
     hiringIntent: OpportunityComponentScore
-    externalAgencyPropensity: OpportunityComponentScore
+    externalSupportNeed: OpportunityComponentScore
     timing: OpportunityComponentScore
     reachability: OpportunityComponentScore
     confidence: OpportunityComponentScore
@@ -49,7 +49,7 @@ export interface OpportunityScoreResult {
 
 export interface OpportunityScoringConfig {
   minimumAgencyFit: number
-  minimumExternalAgencyPropensity: number
+  minimumExternalSupportNeed: number
   minimumMorningBriefScore: number
   confidenceReviewThreshold: number
   confidenceGateScores: Record<ConfidenceGate, number>
@@ -57,7 +57,7 @@ export interface OpportunityScoringConfig {
 
 export const DEFAULT_OPPORTUNITY_SCORING_CONFIG: Readonly<OpportunityScoringConfig> = {
   minimumAgencyFit: 0.35,
-  minimumExternalAgencyPropensity: 0.35,
+  minimumExternalSupportNeed: 0.35,
   minimumMorningBriefScore: 0.5,
   confidenceReviewThreshold: 0.55,
   confidenceGateScores: {
@@ -95,7 +95,7 @@ export class OpportunityScoringService {
     const evidenceIds = episodeEvidenceIds(input.episode)
     const agencyFit = this.scoreAgencyFit(input)
     const hiringIntent = scoreHiringIntent(input.episode, evidenceIds)
-    const externalAgencyPropensity = scoreExternalAgencyPropensity(
+    const externalSupportNeed = scoreExternalSupportNeed(
       input.episode,
       input.confidenceGate,
       evidenceIds,
@@ -106,7 +106,7 @@ export class OpportunityScoringService {
     const componentValues = [
       agencyFit.score,
       hiringIntent.score,
-      externalAgencyPropensity.score,
+      externalSupportNeed.score,
       timing.score,
       reachability.score,
       confidence.score,
@@ -134,14 +134,14 @@ export class OpportunityScoringService {
       status !== 'dismissed' &&
       input.confidenceGate !== 'D' &&
       agencyFit.score >= this.config.minimumAgencyFit &&
-      externalAgencyPropensity.score >= this.config.minimumExternalAgencyPropensity &&
+      externalSupportNeed.score >= this.config.minimumExternalSupportNeed &&
       opportunityScore >= this.config.minimumMorningBriefScore
 
     return {
       components: {
         agencyFit,
         hiringIntent,
-        externalAgencyPropensity,
+        externalSupportNeed,
         timing,
         reachability,
         confidence,
@@ -206,7 +206,7 @@ function scoreHiringIntent(
   const typeBoost: Record<HiringEpisodeCandidate['episodeType'], number> = {
     vacancy_spike: 0.18,
     repeated_vacancies: 0.2,
-    new_role_cluster: 0.16,
+    role_cluster: 0.16,
     new_region: 0.08,
     hiring_restart: 0.12,
     sustained_hiring: 0.2,
@@ -227,7 +227,7 @@ function scoreHiringIntent(
   }
 }
 
-function scoreExternalAgencyPropensity(
+function scoreExternalSupportNeed(
   episode: HiringEpisodeCandidate,
   confidenceGate: ConfidenceGate,
   evidenceIds: string[],
@@ -280,7 +280,7 @@ function scoreExternalAgencyPropensity(
 
   if (reasons.length === 0) {
     reasons.push(evidenceReason(
-      'LIMITED_AGENCY_PROPENSITY',
+      'LIMITED_EXTERNAL_SUPPORT_NEED',
       'Пока недостаточно признаков возможной потребности во внешнем подборе.',
       evidenceIds,
     ))
