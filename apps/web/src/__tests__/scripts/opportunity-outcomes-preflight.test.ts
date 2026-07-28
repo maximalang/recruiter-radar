@@ -52,9 +52,8 @@ describe('opportunity outcome migration preflight', () => {
 
   it('only permits a repeated meeting after cancellation or no-show', () => {
     expect(source).toContain('prior_meeting_event_type IS NOT NULL')
-    expect(source).toContain(
-      "prior_meeting_event_type NOT IN (\n" +
-      "          'meeting_cancelled', 'meeting_no_show'",
+    expect(source).toMatch(
+      /prior_meeting_event_type NOT IN \(\r?\n\s+'meeting_cancelled', 'meeting_no_show'/,
     )
   })
 })
