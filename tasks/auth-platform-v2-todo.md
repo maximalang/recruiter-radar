@@ -19,7 +19,7 @@
   - Verify: focused unit tests.
   - Files: config/security modules and tests (≤5).
 
-- [ ] Add challenge/session/audit/rate-limit migration
+- [x] Add challenge/session/audit/rate-limit migration
   - Acceptance: additive schema, hashed tokens, checks/indexes, safe down path.
   - Verify: syntax + clean/upgrade isolated PostgreSQL.
   - Files: up/down SQL, schema contract, DB test script (≤5).
