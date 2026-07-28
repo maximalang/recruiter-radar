@@ -10,6 +10,7 @@ export const OPPORTUNITY_OUTCOME_EVENT_TYPES = [
   'contacted',
   'replied',
   'meeting',
+  'meeting_completed',
   'meeting_cancelled',
   'meeting_no_show',
   'proposal',
@@ -45,6 +46,17 @@ export const OPPORTUNITY_OUTCOME_WORKFLOW_STATES = [
 
 export type OpportunityOutcomeWorkflowState =
   (typeof OPPORTUNITY_OUTCOME_WORKFLOW_STATES)[number]
+
+export const OPPORTUNITY_MEETING_STATUSES = [
+  'none',
+  'scheduled',
+  'completed',
+  'cancelled',
+  'no_show',
+] as const
+
+export type OpportunityMeetingStatus =
+  (typeof OPPORTUNITY_MEETING_STATUSES)[number]
 
 export const DISMISSED_REASON_CODES = [
   'bad_fit',
@@ -128,6 +140,7 @@ export const OUTCOME_EVENT_LABELS: Readonly<
   contacted: 'Связались',
   replied: 'Получен ответ',
   meeting: 'Встреча назначена',
+  meeting_completed: 'Встреча проведена',
   meeting_cancelled: 'Встреча отменена',
   meeting_no_show: 'Встреча не состоялась',
   proposal: 'Предложение',
@@ -170,6 +183,11 @@ const OBSERVATIONAL_EVENTS = new Set<OpportunityOutcomeEventType>([
   'shown',
   'opened',
   'exported',
+])
+
+const MEETING_LIFECYCLE_EVENTS = new Set<OpportunityOutcomeEventType>([
+  'meeting',
+  'meeting_completed',
   'meeting_cancelled',
   'meeting_no_show',
 ])
@@ -188,7 +206,6 @@ const COMMERCIAL_STAGE_EVENTS = new Set<OpportunityOutcomeEventType>([
   'proposal',
   'won',
   'lost',
-  'reverted',
 ])
 
 const ALLOWED_STAGE_EVENTS: Readonly<
@@ -213,11 +230,6 @@ const ALLOWED_METADATA_KEYS = new Set([
   'interactionId',
   'source',
   'exportFormat',
-])
-
-const ALLOWED_MEETING_STATUSES = new Set([
-  'scheduled',
-  'completed',
 ])
 
 const MAX_FUTURE_SKEW_MS = 5 * 60 * 1000
@@ -260,6 +272,7 @@ export interface OutcomeProjectionEvent {
   valueMinor: number | null
   currency: 'RUB' | null
   snoozedUntil?: string | null
+  meetingStatus?: 'scheduled' | 'completed' | null
   revertsEventId?: string | null
   revertedEventType?: OpportunityOutcomeEventType | null
 }
@@ -286,6 +299,10 @@ export interface OpportunityOutcomeProjection {
   lostReasonCode: LostReasonCode | null
   dealValueMinor: number | null
   currency: 'RUB' | null
+  meetingStatus: OpportunityMeetingStatus
+  activeMeetingEventId: string | null
+  lastMeetingEventAt: string | null
+  meetingAttemptCount: number
 }
 
 export function isOutcomeEventType(
@@ -301,33 +318,56 @@ export function isOutcomeTransitionAllowed(
   stage: OpportunityOutcomeStage,
   eventType: OpportunityOutcomeEventType,
   workflowState: OpportunityOutcomeWorkflowState = 'active',
+  meetingStatus: OpportunityMeetingStatus = 'none',
 ): boolean {
-  if (
-    eventType === 'meeting_cancelled' ||
-    eventType === 'meeting_no_show'
-  ) {
-    return stage === 'meeting'
-  }
   if (OBSERVATIONAL_EVENTS.has(eventType)) return true
   if (eventType === 'snoozed') return workflowState === 'active'
   if (eventType === 'resumed') return workflowState === 'snoozed'
+  if (eventType === 'reverted') return workflowState === 'active'
   if (workflowState === 'snoozed') return false
-  if (eventType === 'reverted') return true
+  if (eventType === 'meeting') {
+    return (
+      (stage === 'replied' && meetingStatus === 'none') ||
+      (stage === 'meeting' &&
+        (meetingStatus === 'cancelled' || meetingStatus === 'no_show'))
+    )
+  }
+  if (
+    eventType === 'meeting_completed' ||
+    eventType === 'meeting_cancelled' ||
+    eventType === 'meeting_no_show'
+  ) {
+    return stage === 'meeting' && meetingStatus === 'scheduled'
+  }
+  if (eventType === 'proposal' && stage === 'meeting') {
+    return meetingStatus === 'completed'
+  }
   return ALLOWED_STAGE_EVENTS[stage].includes(eventType)
 }
 
 export function getNextOutcomeStage(
   stage: OpportunityOutcomeStage,
   eventType: OpportunityOutcomeEventType,
+  workflowState: OpportunityOutcomeWorkflowState = 'active',
+  meetingStatus: OpportunityMeetingStatus = 'none',
 ): OpportunityOutcomeStage {
   if (
     OBSERVATIONAL_EVENTS.has(eventType) ||
+    (
+      MEETING_LIFECYCLE_EVENTS.has(eventType) &&
+      stage === 'meeting'
+    ) ||
     WORKFLOW_EVENTS.has(eventType) ||
     eventType === 'reverted'
   ) {
     return stage
   }
-  if (!isOutcomeTransitionAllowed(stage, eventType)) {
+  if (!isOutcomeTransitionAllowed(
+    stage,
+    eventType,
+    workflowState,
+    meetingStatus,
+  )) {
     throw new OutcomeValidationError('Outcome transition is not allowed.')
   }
   return eventType as OpportunityOutcomeStage
@@ -469,6 +509,10 @@ export function reduceOutcomeProjection(
         lostReasonCode: null,
         dealValueMinor: null,
         currency: null,
+        meetingStatus: 'none',
+        activeMeetingEventId: null,
+        lastMeetingEventAt: null,
+        meetingAttemptCount: 0,
       }
 
   projection.lastEventId = event.id
@@ -483,7 +527,13 @@ export function reduceOutcomeProjection(
   } else if (event.eventType === 'resumed') {
     projection.workflowState = 'active'
     projection.snoozedUntil = null
-  } else if (COMMERCIAL_STAGE_EVENTS.has(event.eventType)) {
+  } else if (
+    COMMERCIAL_STAGE_EVENTS.has(event.eventType) &&
+    (
+      event.eventType !== 'meeting' ||
+      event.previousStage !== 'meeting'
+    )
+  ) {
     projection.commercialStage = event.newStage
     projection.currentStage = event.newStage
     projection.lastStageEventId = event.id
@@ -536,6 +586,23 @@ export function reduceOutcomeProjection(
     projection.dismissReasonCode = event.reasonCode as DismissedReasonCode
   } else if (event.eventType === 'reverted' && event.revertedEventType) {
     clearRevertedProjectionFields(projection, event.revertedEventType)
+  }
+
+  if (event.eventType === 'meeting') {
+    projection.meetingStatus =
+      event.meetingStatus === 'completed' ? 'completed' : 'scheduled'
+    projection.activeMeetingEventId = event.id
+    projection.lastMeetingEventAt = event.occurredAt
+    projection.meetingAttemptCount += 1
+  } else if (event.eventType === 'meeting_completed') {
+    projection.meetingStatus = 'completed'
+    projection.lastMeetingEventAt = event.occurredAt
+  } else if (event.eventType === 'meeting_cancelled') {
+    projection.meetingStatus = 'cancelled'
+    projection.lastMeetingEventAt = event.occurredAt
+  } else if (event.eventType === 'meeting_no_show') {
+    projection.meetingStatus = 'no_show'
+    projection.lastMeetingEventAt = event.occurredAt
   }
 
   return projection
@@ -634,10 +701,7 @@ function validateMetadata(
     const normalized = requiredTrimmedString(raw, `metadata.${key}`, 160)
     metadata[key] = normalized
   }
-  if (
-    eventType === 'meeting' &&
-    !ALLOWED_MEETING_STATUSES.has(metadata.meetingStatus)
-  ) {
+  if (eventType === 'meeting' && metadata.meetingStatus !== 'scheduled') {
     throw new OutcomeValidationError('Invalid meetingStatus metadata.')
   }
   if (eventType !== 'meeting' && metadata.meetingStatus) {

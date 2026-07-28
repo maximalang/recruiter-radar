@@ -143,6 +143,33 @@ const outcomeHardeningRollbackPath = resolve(
   process.cwd(), '..', '..', 'packages', 'db', 'migrations',
   '20260728100000_harden_opportunity_outcome_ledger.down.sql',
 )
+const outcomeLifecycleMigrationPath = resolve(
+  process.cwd(), '..', '..', 'packages', 'db', 'migrations',
+  '20260728110000_complete_opportunity_meeting_lifecycle.sql',
+)
+const outcomeLifecycleRollbackPath = resolve(
+  process.cwd(), '..', '..', 'packages', 'db', 'migrations',
+  '20260728110000_complete_opportunity_meeting_lifecycle.down.sql',
+)
+const outcomeWriteBoundaryMigrationPath = resolve(
+  process.cwd(), '..', '..', 'packages', 'db', 'migrations',
+  '20260728111000_enforce_opportunity_outcome_write_boundary.sql',
+)
+const outcomeWriteBoundaryRollbackPath = resolve(
+  process.cwd(), '..', '..', 'packages', 'db', 'migrations',
+  '20260728111000_enforce_opportunity_outcome_write_boundary.down.sql',
+)
+const outcomeCorrectionCapabilityMigrationPath = resolve(
+  process.cwd(), '..', '..', 'packages', 'db', 'migrations',
+  '20260728112000_enforce_outcome_correction_capability.sql',
+)
+const outcomeCorrectionCapabilityRollbackPath = resolve(
+  process.cwd(), '..', '..', 'packages', 'db', 'migrations',
+  '20260728112000_enforce_outcome_correction_capability.down.sql',
+)
+const migratorPath = resolve(
+  process.cwd(), '..', '..', 'packages', 'db', 'scripts', 'migrate.mjs',
+)
 
 describe('opportunity engine migration contract', () => {
   const migration = readFileSync(migrationPath, 'utf8')
@@ -368,6 +395,31 @@ describe('opportunity outcome migrations', () => {
     outcomeHardeningRollbackPath,
     'utf8',
   ).replace(/\s+/g, ' ')
+  const lifecycle = readFileSync(
+    outcomeLifecycleMigrationPath,
+    'utf8',
+  ).replace(/\s+/g, ' ')
+  const lifecycleRollback = readFileSync(
+    outcomeLifecycleRollbackPath,
+    'utf8',
+  ).replace(/\s+/g, ' ')
+  const writeBoundary = readFileSync(
+    outcomeWriteBoundaryMigrationPath,
+    'utf8',
+  ).replace(/\s+/g, ' ')
+  const writeBoundaryRollback = readFileSync(
+    outcomeWriteBoundaryRollbackPath,
+    'utf8',
+  ).replace(/\s+/g, ' ')
+  const correctionCapability = readFileSync(
+    outcomeCorrectionCapabilityMigrationPath,
+    'utf8',
+  ).replace(/\s+/g, ' ')
+  const correctionCapabilityRollback = readFileSync(
+    outcomeCorrectionCapabilityRollbackPath,
+    'utf8',
+  ).replace(/\s+/g, ' ')
+  const migrator = readFileSync(migratorPath, 'utf8')
 
   it('binds every ledger row to the complete tenant opportunity context', () => {
     expect(ledger).toContain('CREATE TABLE opportunity_outcome_events')
@@ -479,5 +531,66 @@ describe('opportunity outcome migrations', () => {
     expect(outcomeHardeningRollback).toContain(
       'snoozed workflow state exists',
     )
+  })
+
+  it('projects the independent meeting lifecycle and fails closed on ambiguity', () => {
+    expect(lifecycle).toContain("'meeting_completed'")
+    expect(lifecycle).toContain("meeting_status TEXT NOT NULL DEFAULT 'none'")
+    expect(lifecycle).toContain('active_meeting_event_id BIGINT')
+    expect(lifecycle).toContain('last_meeting_event_at TIMESTAMPTZ')
+    expect(lifecycle).toContain(
+      'meeting_attempt_count INTEGER NOT NULL DEFAULT 0',
+    )
+    expect(lifecycle).toContain(
+      'legacy proposal has no explicit completed meeting',
+    )
+    expect(lifecycle).toContain('proposal requires a completed meeting')
+    expect(lifecycleRollback).toContain(
+      'meeting lifecycle rollback would lose completed or repeated attempts',
+    )
+  })
+
+  it('requires every committed ledger insert to advance its projection', () => {
+    expect(writeBoundary).toContain(
+      'CREATE CONSTRAINT TRIGGER opportunity_outcome_events_require_projection',
+    )
+    expect(writeBoundary).toContain('DEFERRABLE INITIALLY DEFERRED')
+    expect(writeBoundary).toContain(
+      'outcome event must be committed through recordOpportunityOutcome',
+    )
+    expect(writeBoundaryRollback).toContain(
+      'DROP FUNCTION require_opportunity_outcome_projection()',
+    )
+  })
+
+  it('enforces the authoritative correction target at the database boundary', () => {
+    expect(correctionCapability).toContain(
+      'CREATE TRIGGER opportunity_outcome_events_correction_capability',
+    )
+    expect(correctionCapability).toContain(
+      "current_workflow_state <> 'active'",
+    )
+    expect(correctionCapability).toContain(
+      'latest_effective_commercial_event_id IS DISTINCT FROM NEW.reverts_event_id',
+    )
+    expect(correctionCapability).toContain(
+      'NEW.reverts_event_id <= COALESCE(latest_correction_event_id, 0)',
+    )
+    expect(correctionCapability).toContain('pg_advisory_xact_lock_shared')
+    expect(correctionCapabilityRollback).toContain(
+      'DROP FUNCTION IF EXISTS validate_opportunity_outcome_correction_capability()',
+    )
+  })
+
+  it('keeps new migrations atomic under a serialized migrator', () => {
+    for (const sql of [lifecycle, writeBoundary, correctionCapability]) {
+      expect(sql).not.toContain('BEGIN;')
+      expect(sql).not.toContain('COMMIT;')
+      expect(sql).toContain("SET LOCAL lock_timeout = '5s'")
+    }
+    expect(migrator).toContain(
+      "hashtextextended('recruiter-radar:schema-migrations', 0)",
+    )
+    expect(migrator).toContain('pg_advisory_unlock')
   })
 })

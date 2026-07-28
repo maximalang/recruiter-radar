@@ -12,6 +12,7 @@ import {
   OUTCOME_EVENT_LABELS,
   OUTCOME_REASON_LABELS,
   type OpportunityOutcomeInput,
+  type OutcomeProjectionEvent,
   type OpportunityOutcomeProjection,
   type OpportunityOutcomeReasonCode,
   type OpportunityOutcomeStage,
@@ -60,7 +61,7 @@ export class OutcomeChronologyConflictError extends Error {
   readonly code = 'outcome_chronology_conflict'
 
   constructor() {
-    super('Commercial outcomes cannot be recorded before the latest stage event.')
+    super('Outcome chronology conflicts with the current projection.')
     this.name = 'OutcomeChronologyConflictError'
   }
 }
@@ -69,7 +70,7 @@ export class OutcomeCorrectionConflictError extends Error {
   readonly code = 'outcome_correction_conflict'
 
   constructor() {
-    super('Only the latest commercial outcome can be reverted.')
+    super('The selected effective outcome cannot be reverted.')
     this.name = 'OutcomeCorrectionConflictError'
   }
 }
@@ -82,11 +83,13 @@ interface OutcomeOpportunityContext {
   hiringEpisodeId: string
   status: string
   supersededAt: string | null
+  validUntil: string | null
   scoringVersion: string
   confidenceGate: string
   opportunityScore: number
   externalSupportNeedScore: number
   episodeType: string
+  episodeStatus: string
 }
 
 export interface PublicOutcomeEvent {
@@ -129,21 +132,33 @@ export interface PublicOutcomeHistoryEvent {
   currency: 'RUB' | null
   metadata: Record<string, string>
   revertsEventId: string | null
+  isEffective: boolean
+  isReverted: boolean
+  revertedByEventId: string | null
 }
 
 export type PublicOutcomeState = Omit<
   OpportunityOutcomeProjection,
-  'lastEventId' | 'lastStageEventId'
+  'lastEventId' | 'lastStageEventId' | 'activeMeetingEventId'
 >
+
+export interface OutcomeCorrectionCapability {
+  canRevert: boolean
+  targetEventId: string | null
+  targetEventType: string | null
+  targetOccurredAt: string | null
+}
 
 export interface OutcomeHistoryResult {
   events: PublicOutcomeHistoryEvent[]
   state: PublicOutcomeState | null
+  correction: OutcomeCorrectionCapability
   pagination: {
-    page: number
     pageSize: number
     totalItems: number
-    totalPages: number
+    sortOrder: 'append_desc'
+    hasMore: boolean
+    nextBeforeEventId: string | null
   }
 }
 
@@ -155,19 +170,37 @@ export interface OutcomeFunnelFilter {
   confidenceGate?: string | null
   sourceFamily?: string | null
   scoreBucket?: string | null
+  externalSupportNeedBucket?: 'low' | 'medium' | 'high' | null
   cohort?: 'shown' | 'accepted'
+  maturityDays?: number
 }
 
 export interface OutcomeFunnelSummary {
   period: { from: string; to: string }
   cohort: {
     eventType: 'shown' | 'accepted'
-    policy: 'first_event_in_period_closed_window'
+    policy: 'first_effective_event_ever_closed_window'
     downstreamBefore: string
     size: number
+    cohortAgeDays: number
+    observationWindowDays: number
+    matured: boolean
+    maturityThresholdDays: number
   }
   minimumConversionSample: number
-  activityCounts: Array<{ eventType: string; label: string; count: number }>
+  effectiveActivityCounts: Array<{
+    eventType: string
+    label: string
+    eventCount: number
+    opportunityCount: number
+  }>
+  ledgerActivityCounts: Array<{
+    eventType: string
+    label: string
+    eventCount: number
+    opportunityCount: number
+  }>
+  correctionsCount: number
   cohortCounts: Array<{ eventType: string; label: string; count: number }>
   conversions: Array<{
     from: string
@@ -176,7 +209,9 @@ export interface OutcomeFunnelSummary {
     converted: number
     rate: number | null
     medianHours: number | null
-    status: 'ready' | 'insufficient_data'
+    status: 'ready' | 'insufficient_data' | 'immature'
+    sampleStatus: 'ready' | 'insufficient_data'
+    maturityStatus: 'mature' | 'immature'
   }>
   terminalOutcomes: {
     won: number
@@ -184,6 +219,7 @@ export interface OutcomeFunnelSummary {
     completed: number
     winRate: number | null
     status: 'ready' | 'insufficient_data'
+    denominator: 'effective_won_plus_lost'
   }
 }
 
@@ -258,19 +294,20 @@ export async function getOpportunityOutcomeHistory(
   input: {
     ownerId: string | number
     opportunityId: string | number
-    page?: number
+    beforeEventId?: string | null
     pageSize?: number
   },
   db: OutcomeDb | null = getPool(),
 ): Promise<OutcomeHistoryResult | null> {
   if (!db) throw new Error('DATABASE_URL is not set.')
   const pageSize = Math.min(Math.max(Math.trunc(input.pageSize ?? 50), 1), 100)
-  const page = Math.max(Math.trunc(input.page ?? 1), 1)
-  const offset = (page - 1) * pageSize
   const ownerId = String(input.ownerId)
   const opportunityId = String(input.opportunityId)
-  const available = await db.query(
-    `SELECT 1
+  const available = await db.query<{
+    status: string
+    supersededAt: string | null
+  }>(
+    `SELECT status, superseded_at::TEXT AS "supersededAt"
      FROM opportunities
      WHERE id = $1 AND owner_id = $2
      LIMIT 1`,
@@ -301,34 +338,72 @@ export async function getOpportunityOutcomeHistory(
     currency: 'RUB' | null
     metadata: Record<string, string>
     revertsEventId: string | null
+    isEffective: boolean
+    isReverted: boolean
+    revertedByEventId: string | null
   }>(
-    `SELECT
-       id::TEXT AS id,
-       event_type AS "eventType",
-       previous_stage AS "previousStage",
-       new_stage AS "newStage",
-       occurred_at::TEXT AS "occurredAt",
-       recorded_at::TEXT AS "recordedAt",
-       actor_type AS "actorType",
-       reason_code AS "reasonCode",
-       reason_note AS "reasonNote",
-       channel,
-       contact_path_type AS "contactPathType",
-       contact_reference_label AS "contactReferenceLabel",
-       value_minor::DOUBLE PRECISION AS "valueMinor",
-       currency,
-       metadata,
-       reverts_event_id::TEXT AS "revertsEventId"
-     FROM opportunity_outcome_events
-     WHERE owner_id = $1 AND opportunity_id = $2
-     ORDER BY occurred_at ASC, id ASC
-     LIMIT $3 OFFSET $4`,
-    [ownerId, opportunityId, pageSize, offset],
+    `WITH page_events AS (
+       SELECT event.*
+       FROM opportunity_outcome_events event
+       WHERE event.owner_id = $1
+         AND event.opportunity_id = $2
+         AND ($3::bigint IS NULL OR event.id < $3::bigint)
+       ORDER BY event.id DESC
+       LIMIT $4
+     )
+     SELECT
+       event.id::TEXT AS id,
+       event.event_type AS "eventType",
+       event.previous_stage AS "previousStage",
+       event.new_stage AS "newStage",
+       event.occurred_at::TEXT AS "occurredAt",
+       event.recorded_at::TEXT AS "recordedAt",
+       event.actor_type AS "actorType",
+       event.reason_code AS "reasonCode",
+       event.reason_note AS "reasonNote",
+       event.channel,
+       event.contact_path_type AS "contactPathType",
+       event.contact_reference_label AS "contactReferenceLabel",
+       event.value_minor::DOUBLE PRECISION AS "valueMinor",
+       event.currency,
+       event.metadata,
+       event.reverts_event_id::TEXT AS "revertsEventId",
+       (event.event_type = 'reverted' OR correction.id IS NULL) AS "isEffective",
+       (correction.id IS NOT NULL) AS "isReverted",
+       correction.id::TEXT AS "revertedByEventId"
+     FROM page_events event
+     LEFT JOIN LATERAL (
+       SELECT reverted.id
+       FROM opportunity_outcome_events reverted
+       WHERE reverted.owner_id = event.owner_id
+         AND reverted.opportunity_id = event.opportunity_id
+         AND reverted.event_type = 'reverted'
+         AND reverted.reverts_event_id = event.id
+       ORDER BY reverted.id DESC
+       LIMIT 1
+     ) correction ON TRUE
+     ORDER BY event.id DESC`,
+    [ownerId, opportunityId, input.beforeEventId ?? null, pageSize + 1],
   )
   const state = await getOutcomeState(ownerId, opportunityId, db)
+  const correctionTarget = await getOutcomeCorrectionTarget(
+    ownerId,
+    opportunityId,
+    db,
+  )
   const totalItems = Number(count.rows[0]?.count ?? 0)
+  const hasMore = rows.rows.length > pageSize
+  const pageRows = rows.rows.slice(0, pageSize)
+  const canRevert = (
+    available.rows[0]?.supersededAt === null &&
+    (
+      state?.workflowState ??
+      (available.rows[0]?.status === 'snoozed' ? 'snoozed' : 'active')
+    ) === 'active' &&
+    correctionTarget !== null
+  )
   return {
-    events: rows.rows.map((event) => ({
+    events: pageRows.map((event) => ({
       eventType: event.eventType,
       label: OUTCOME_EVENT_LABELS[event.eventType],
       previousStage: event.previousStage,
@@ -351,15 +426,81 @@ export async function getOpportunityOutcomeHistory(
       currency: event.currency,
       metadata: event.metadata,
       revertsEventId: event.revertsEventId,
+      isEffective: event.isEffective,
+      isReverted: event.isReverted,
+      revertedByEventId: event.revertedByEventId,
     })),
     state: state ? toPublicOutcomeState(state) : null,
+    correction: canRevert
+      ? {
+          canRevert: true,
+          ...correctionTarget,
+        }
+      : {
+          canRevert: false,
+          targetEventId: null,
+          targetEventType: null,
+          targetOccurredAt: null,
+        },
     pagination: {
-      page,
       pageSize,
       totalItems,
-      totalPages: Math.ceil(totalItems / pageSize),
+      sortOrder: 'append_desc',
+      hasMore,
+      nextBeforeEventId: hasMore
+        ? pageRows.at(-1)?.id ?? null
+        : null,
     },
   }
+}
+
+async function getOutcomeCorrectionTarget(
+  ownerId: string,
+  opportunityId: string,
+  db: OutcomeDb,
+): Promise<Omit<OutcomeCorrectionCapability, 'canRevert'> | null> {
+  const result = await db.query<{
+    targetEventId: string
+    targetEventType: string
+    targetOccurredAt: string
+  }>(
+    `WITH effective_commercial AS (
+       SELECT event.id, event.event_type, event.occurred_at
+       FROM opportunity_outcome_events event
+       WHERE event.owner_id = $1
+         AND event.opportunity_id = $2
+         AND event.event_type IN (
+           'accepted', 'dismissed', 'contacted', 'replied',
+           'meeting', 'meeting_completed', 'meeting_cancelled',
+           'meeting_no_show', 'proposal', 'won', 'lost'
+         )
+         AND NOT EXISTS (
+           SELECT 1
+           FROM opportunity_outcome_events reverted
+           WHERE reverted.owner_id = event.owner_id
+             AND reverted.opportunity_id = event.opportunity_id
+             AND reverted.event_type = 'reverted'
+             AND reverted.reverts_event_id = event.id
+         )
+     ), latest_correction AS (
+       SELECT MAX(id) AS id
+       FROM opportunity_outcome_events
+       WHERE owner_id = $1
+         AND opportunity_id = $2
+         AND event_type = 'reverted'
+     )
+     SELECT
+       event.id::TEXT AS "targetEventId",
+       event.event_type AS "targetEventType",
+       event.occurred_at::TEXT AS "targetOccurredAt"
+     FROM effective_commercial event
+     CROSS JOIN latest_correction
+     WHERE event.id > COALESCE(latest_correction.id, 0)
+     ORDER BY event.id DESC
+     LIMIT 1`,
+    [ownerId, opportunityId],
+  )
+  return result.rows[0] ?? null
 }
 
 export async function resolveOpportunityPublicReference(
@@ -411,6 +552,12 @@ export async function getOutcomeFunnelSummary(
       `cohort_snapshot->'sourceFamilies' ? $${params.length}`,
     )
   }
+  if (input.externalSupportNeedBucket) {
+    params.push(input.externalSupportNeedBucket)
+    cohortClauses.push(
+      `cohort_snapshot->>'externalSupportNeedBucket' = $${params.length}`,
+    )
+  }
 
   type FunnelRow = Record<string, string | null>
   const result = await db.query<FunnelRow>(
@@ -434,22 +581,41 @@ export async function getOutcomeFunnelSummary(
            WHERE correction.event_type = 'reverted'
              AND correction.reverts_event_id = event.id
          )
-     ), activity AS (
-       SELECT event_type, COUNT(*)::TEXT AS count
+     ), effective_activity AS (
+       SELECT
+         event_type,
+         COUNT(*)::TEXT AS event_count,
+         COUNT(DISTINCT opportunity_id)::TEXT AS opportunity_count
+       FROM active_events
+       WHERE occurred_at >= $2::timestamptz
+         AND occurred_at < $3::timestamptz
+       GROUP BY event_type
+     ), ledger_activity AS (
+       SELECT
+         event_type,
+         COUNT(*)::TEXT AS event_count,
+         COUNT(DISTINCT opportunity_id)::TEXT AS opportunity_count
        FROM owner_events
        WHERE occurred_at >= $2::timestamptz
          AND occurred_at < $3::timestamptz
        GROUP BY event_type
-     ), cohort_candidates AS (
-       SELECT DISTINCT ON (opportunity_id)
+     ), cohort_ranked AS (
+       SELECT
          opportunity_id,
          occurred_at AS cohort_at,
-         analytics_snapshot AS cohort_snapshot
+         analytics_snapshot AS cohort_snapshot,
+         ROW_NUMBER() OVER (
+           PARTITION BY opportunity_id
+           ORDER BY occurred_at, id
+         ) AS cohort_rank
        FROM active_events
        WHERE event_type = $4
-         AND occurred_at >= $2::timestamptz
-         AND occurred_at < $3::timestamptz
-       ORDER BY opportunity_id, occurred_at, id
+     ), cohort_candidates AS (
+       SELECT opportunity_id, cohort_at, cohort_snapshot
+       FROM cohort_ranked
+       WHERE cohort_rank = 1
+         AND cohort_at >= $2::timestamptz
+         AND cohort_at < $3::timestamptz
      ), cohort AS (
        SELECT *
        FROM cohort_candidates
@@ -479,8 +645,37 @@ export async function getOutcomeFunnelSummary(
      )
      SELECT
        (SELECT COUNT(*) FROM cohort)::TEXT AS "cohortSize",
-       (SELECT COALESCE(JSONB_OBJECT_AGG(event_type, count), '{}'::jsonb)
-        FROM activity)::TEXT AS "activityCounts",
+       (SELECT COALESCE(
+          JSONB_AGG(
+            JSONB_BUILD_OBJECT(
+              'eventType', event_type,
+              'eventCount', event_count,
+              'opportunityCount', opportunity_count
+            )
+            ORDER BY event_type
+          ),
+          '[]'::jsonb
+        )
+        FROM effective_activity)::TEXT AS "effectiveActivityCounts",
+       (SELECT COALESCE(
+          JSONB_AGG(
+            JSONB_BUILD_OBJECT(
+              'eventType', event_type,
+              'eventCount', event_count,
+              'opportunityCount', opportunity_count
+            )
+            ORDER BY event_type
+          ),
+          '[]'::jsonb
+        )
+        FROM ledger_activity)::TEXT AS "ledgerActivityCounts",
+       (SELECT COUNT(*)::TEXT
+        FROM owner_events
+        WHERE event_type = 'reverted'
+          AND occurred_at >= $2::timestamptz
+          AND occurred_at < $3::timestamptz) AS "correctionsCount",
+       (SELECT MIN(cohort_at)::TEXT FROM cohort) AS "cohortFirstAt",
+       (SELECT MAX(cohort_at)::TEXT FROM cohort) AS "cohortLastAt",
        COUNT(*) FILTER (WHERE shown_at IS NOT NULL)::TEXT AS "shownCohortCount",
        COUNT(*) FILTER (WHERE opened_at IS NOT NULL)::TEXT AS "openedCohortCount",
        COUNT(*) FILTER (WHERE accepted_at IS NOT NULL)::TEXT AS "acceptedCohortCount",
@@ -512,10 +707,13 @@ export async function getOutcomeFunnelSummary(
         numberValue(row[`${eventType}CohortCount`]),
       ]),
   ) as Record<string, number>
-  const parsedActivity = parseJsonCounts(row.activityCounts)
-  const pairs = [
+  const effectiveActivity = parseActivityCounts(row.effectiveActivityCounts)
+  const ledgerActivity = parseActivityCounts(row.ledgerActivityCounts)
+  const discoveryPairs = [
     ['shown', 'opened', 'shownOpened'],
     ['opened', 'accepted', 'openedAccepted'],
+  ] as const
+  const commercialPairs = [
     ['accepted', 'contacted', 'acceptedContacted'],
     ['contacted', 'replied', 'contactedReplied'],
     ['replied', 'meeting', 'repliedMeeting'],
@@ -526,23 +724,42 @@ export async function getOutcomeFunnelSummary(
     ['meeting', 'lost', 'meetingLost'],
     ['proposal', 'lost', 'proposalLost'],
   ] as const
+  const pairs = cohortEvent === 'accepted'
+    ? commercialPairs
+    : [...discoveryPairs, ...commercialPairs]
   const minimumConversionSample = 10
+  const maturityThresholdDays = Math.max(
+    1,
+    Math.min(365, Math.trunc(input.maturityDays ?? 30)),
+  )
+  const cohortFirstAt = row.cohortFirstAt ?? input.from
+  const cohortLastAt = row.cohortLastAt ?? cohortFirstAt
+  const cohortAgeDays = daysBetween(cohortFirstAt, input.to)
+  const observationWindowDays = daysBetween(cohortLastAt, input.to)
+  const cohortSize = numberValue(row.cohortSize)
+  const matured =
+    cohortSize > 0 && observationWindowDays >= maturityThresholdDays
   return {
     period: { from: input.from, to: input.to },
     cohort: {
       eventType: cohortEvent,
-      policy: 'first_event_in_period_closed_window',
+      policy: 'first_effective_event_ever_closed_window',
       downstreamBefore: input.to,
-      size: numberValue(row.cohortSize),
+      size: cohortSize,
+      cohortAgeDays,
+      observationWindowDays,
+      matured,
+      maturityThresholdDays,
     },
     minimumConversionSample,
-    activityCounts: Object.entries(parsedActivity).map(([eventType, count]) => ({
-      eventType,
-      label: OUTCOME_EVENT_LABELS[eventType as OpportunityOutcomeInput['eventType']] ??
-        eventType,
-      count,
-    })),
-    cohortCounts: Object.entries(cohortCounts).map(([eventType, count]) => ({
+    effectiveActivityCounts: labelActivityCounts(effectiveActivity),
+    ledgerActivityCounts: labelActivityCounts(ledgerActivity),
+    correctionsCount: numberValue(row.correctionsCount),
+    cohortCounts: Object.entries(cohortCounts)
+      .filter(([eventType]) =>
+        cohortEvent === 'shown' ||
+        (eventType !== 'shown' && eventType !== 'opened'))
+      .map(([eventType, count]) => ({
       eventType,
       label: OUTCOME_EVENT_LABELS[eventType as OpportunityOutcomeInput['eventType']],
       count,
@@ -563,7 +780,13 @@ export async function getOutcomeFunnelSummary(
         medianHours: medianSample >= 3
           ? nullableNumber(row[`${key}MedianHours`])
           : null,
-        status: ready ? 'ready' : 'insufficient_data',
+        status: !ready
+          ? 'insufficient_data'
+          : matured
+            ? 'ready'
+            : 'immature',
+        sampleStatus: ready ? 'ready' : 'insufficient_data',
+        maturityStatus: matured ? 'mature' : 'immature',
       }
     }),
     terminalOutcomes: terminalOutcomeSummary(
@@ -603,11 +826,13 @@ export async function recordOpportunityOutcomeInTransaction(
        o.hiring_episode_id::TEXT AS "hiringEpisodeId",
        o.status,
        o.superseded_at::TEXT AS "supersededAt",
+       o.valid_until::TEXT AS "validUntil",
        o.scoring_version AS "scoringVersion",
        o.confidence_gate AS "confidenceGate",
        o.opportunity_score AS "opportunityScore",
        o.agency_propensity_score AS "externalSupportNeedScore",
-       he.episode_type AS "episodeType"
+       he.episode_type AS "episodeType",
+       he.status AS "episodeStatus"
      FROM opportunities o
      JOIN hiring_episodes he
        ON he.id = o.hiring_episode_id
@@ -682,17 +907,39 @@ export async function recordOpportunityOutcomeInTransaction(
   if (context.supersededAt) {
     throw new OutcomeSupersededConflictError()
   }
+  if (
+    payload.eventType === 'resumed' &&
+    (
+      context.status === 'expired' ||
+      context.episodeStatus !== 'active' ||
+      (
+        context.validUntil !== null &&
+        Date.parse(context.validUntil) < Date.parse(payload.occurredAt)
+      )
+    )
+  ) {
+    throw new OutcomeTransitionConflictError(undefined, payload.eventType)
+  }
 
   const lockedState = await getLockedOutcomeState(
     context.ownerId,
     context.id,
     db,
   )
-  const previousStage = lockedState?.commercialStage ?? toInitialStage(context.status)
-  const workflowState = lockedState?.workflowState ?? 'active'
+  const previousStage = lockedState?.commercialStage ??
+    toInitialStage(context.status) ??
+    (context.status === 'snoozed' ? 'new' : null)
+  const workflowState = lockedState?.workflowState ??
+    (context.status === 'snoozed' ? 'snoozed' : 'active')
+  const meetingStatus = lockedState?.meetingStatus ?? 'none'
   if (
     !previousStage ||
-    !isOutcomeTransitionAllowed(previousStage, payload.eventType, workflowState)
+    !isOutcomeTransitionAllowed(
+      previousStage,
+      payload.eventType,
+      workflowState,
+      meetingStatus,
+    )
   ) {
     logEvent('opportunity_outcome.transition_rejected', {
       ownerId: context.ownerId,
@@ -707,35 +954,118 @@ export async function recordOpportunityOutcomeInTransaction(
     )
   }
   let revertedEventType: OpportunityOutcomeInput['eventType'] | null = null
-  let newStage = getNextOutcomeStage(previousStage, payload.eventType)
+  let newStage = getNextOutcomeStage(
+    previousStage,
+    payload.eventType,
+    workflowState,
+    meetingStatus,
+  )
+  let correctionTargetsMeetingLifecycle = false
   if (payload.eventType === 'reverted') {
-    if (
-      !payload.revertsEventId ||
-      payload.revertsEventId !== lockedState?.lastStageEventId
-    ) {
-      throw new OutcomeCorrectionConflictError()
-    }
     const target = await db.query<{
       eventType: OpportunityOutcomeInput['eventType']
       previousStage: OpportunityOutcomeStage
+      newStage: OpportunityOutcomeStage
     }>(
       `SELECT
-         event_type AS "eventType",
-         previous_stage AS "previousStage"
-       FROM opportunity_outcome_events
-       WHERE id = $1
-         AND owner_id = $2
-         AND opportunity_id = $3
-         AND event_type IN (
+         target.event_type AS "eventType",
+         target.previous_stage AS "previousStage",
+         target.new_stage AS "newStage"
+       FROM opportunity_outcome_events target
+       WHERE target.id = $1
+         AND target.owner_id = $2
+         AND target.opportunity_id = $3
+         AND target.event_type IN (
            'accepted', 'dismissed', 'contacted', 'replied',
-           'meeting', 'proposal', 'won', 'lost'
+           'meeting', 'meeting_completed', 'meeting_cancelled',
+           'meeting_no_show', 'proposal', 'won', 'lost'
+         )
+         AND NOT EXISTS (
+           SELECT 1
+           FROM opportunity_outcome_events correction
+           WHERE correction.owner_id = target.owner_id
+             AND correction.opportunity_id = target.opportunity_id
+             AND correction.event_type = 'reverted'
+             AND correction.reverts_event_id = target.id
+         )
+         AND target.id > COALESCE((
+           SELECT MAX(latest_correction.id)
+           FROM opportunity_outcome_events latest_correction
+           WHERE latest_correction.owner_id = target.owner_id
+             AND latest_correction.opportunity_id = target.opportunity_id
+             AND latest_correction.event_type = 'reverted'
+         ), 0)
+         AND target.id = (
+           SELECT latest_effective.id
+           FROM opportunity_outcome_events latest_effective
+           WHERE latest_effective.owner_id = target.owner_id
+             AND latest_effective.opportunity_id = target.opportunity_id
+             AND latest_effective.event_type IN (
+               'accepted', 'dismissed', 'contacted', 'replied',
+               'meeting', 'meeting_completed', 'meeting_cancelled',
+               'meeting_no_show', 'proposal', 'won', 'lost'
+             )
+             AND NOT EXISTS (
+               SELECT 1
+               FROM opportunity_outcome_events latest_reverted
+               WHERE latest_reverted.owner_id = latest_effective.owner_id
+                 AND latest_reverted.opportunity_id =
+                   latest_effective.opportunity_id
+                 AND latest_reverted.event_type = 'reverted'
+                 AND latest_reverted.reverts_event_id = latest_effective.id
+             )
+           ORDER BY latest_effective.id DESC
+           LIMIT 1
          )
        LIMIT 1`,
       [payload.revertsEventId, context.ownerId, context.id],
     )
-    if (!target.rows[0]) throw new OutcomeCorrectionConflictError()
-    revertedEventType = target.rows[0].eventType
-    newStage = target.rows[0].previousStage
+    const correctionTarget = target.rows[0]
+    if (!correctionTarget) throw new OutcomeCorrectionConflictError()
+    const stageChanging =
+      correctionTarget.previousStage !== correctionTarget.newStage
+    if (
+      stageChanging &&
+      payload.revertsEventId !== lockedState?.lastStageEventId
+    ) {
+      throw new OutcomeCorrectionConflictError()
+    }
+    correctionTargetsMeetingLifecycle = [
+      'meeting',
+      'meeting_completed',
+      'meeting_cancelled',
+      'meeting_no_show',
+    ].includes(correctionTarget.eventType)
+    if (correctionTargetsMeetingLifecycle) {
+      const latestMeeting = await db.query<{ id: string }>(
+        `SELECT event.id::TEXT AS id
+         FROM opportunity_outcome_events event
+         WHERE event.owner_id = $1
+           AND event.opportunity_id = $2
+           AND event.event_type IN (
+             'meeting', 'meeting_completed', 'meeting_cancelled',
+             'meeting_no_show'
+           )
+           AND NOT EXISTS (
+             SELECT 1
+             FROM opportunity_outcome_events correction
+             WHERE correction.owner_id = event.owner_id
+               AND correction.opportunity_id = event.opportunity_id
+               AND correction.event_type = 'reverted'
+               AND correction.reverts_event_id = event.id
+           )
+         ORDER BY event.id DESC
+         LIMIT 1`,
+        [context.ownerId, context.id],
+      )
+      if (latestMeeting.rows[0]?.id !== payload.revertsEventId) {
+        throw new OutcomeCorrectionConflictError()
+      }
+    }
+    revertedEventType = correctionTarget.eventType
+    newStage = stageChanging
+      ? correctionTarget.previousStage
+      : previousStage
   }
   if (
     isCommercialOutcomeEvent(payload.eventType) &&
@@ -745,47 +1075,20 @@ export async function recordOpportunityOutcomeInTransaction(
     throw new OutcomeChronologyConflictError()
   }
   if (
-    payload.eventType === 'meeting_cancelled' ||
-    payload.eventType === 'meeting_no_show'
+    [
+      'meeting',
+      'meeting_completed',
+      'meeting_cancelled',
+      'meeting_no_show',
+    ].includes(payload.eventType) ||
+    correctionTargetsMeetingLifecycle
   ) {
-    const latestMeetingLifecycle = await db.query<{
-      eventType: OpportunityOutcomeInput['eventType']
-      meetingStatus: string | null
-      occurredAt: string
-    }>(
-      `SELECT
-         event.event_type AS "eventType",
-         event.metadata->>'meetingStatus' AS "meetingStatus",
-         event.occurred_at::TEXT AS "occurredAt"
-       FROM opportunity_outcome_events event
-       WHERE event.owner_id = $1
-         AND event.opportunity_id = $2
-         AND event.event_type IN (
-           'meeting', 'meeting_cancelled', 'meeting_no_show'
-         )
-         AND NOT EXISTS (
-           SELECT 1
-           FROM opportunity_outcome_events correction
-           WHERE correction.owner_id = event.owner_id
-             AND correction.opportunity_id = event.opportunity_id
-             AND correction.event_type = 'reverted'
-             AND correction.reverts_event_id = event.id
-         )
-       ORDER BY event.id DESC
-       LIMIT 1`,
-      [context.ownerId, context.id],
-    )
-    const latest = latestMeetingLifecycle.rows[0]
     if (
-      previousStage !== 'meeting' ||
-      latest?.eventType !== 'meeting' ||
-      latest.meetingStatus !== 'scheduled' ||
-      Date.parse(payload.occurredAt) < Date.parse(latest.occurredAt)
+      lockedState?.lastMeetingEventAt &&
+      Date.parse(payload.occurredAt) <
+        Date.parse(lockedState.lastMeetingEventAt)
     ) {
-      throw new OutcomeTransitionConflictError(
-        previousStage,
-        payload.eventType,
-      )
+      throw new OutcomeChronologyConflictError()
     }
   }
   const sourceFamilies = await getSourceFamilies(context.hiringEpisodeId, db)
@@ -891,7 +1194,7 @@ export async function recordOpportunityOutcomeInTransaction(
     contactReferenceLabel: protectedContactReference?.label ?? null,
     revertsEventId: payload.revertsEventId,
   }
-  const state = reduceOutcomeProjection(lockedState, {
+  const projectionEvent = {
     id: event.id,
     eventType: event.eventType,
     previousStage,
@@ -901,13 +1204,76 @@ export async function recordOpportunityOutcomeInTransaction(
     valueMinor: event.valueMinor,
     currency: event.currency,
     snoozedUntil: payload.snoozedUntil,
+    meetingStatus: payload.eventType === 'meeting'
+      ? payload.metadata.meetingStatus as 'scheduled'
+      : null,
     revertsEventId: payload.revertsEventId,
     revertedEventType,
-  })
+  }
+  const state = payload.eventType === 'reverted'
+    ? await rebuildOpportunityOutcomeProjection(
+        context,
+        projectionEvent,
+        db,
+      )
+    : reduceOutcomeProjection(lockedState, projectionEvent)
   await persistOutcomeState(context, state, db)
   await persistLegacyCommercialState(context, payload, state, db)
 
   return { event, state, idempotent: false }
+}
+
+async function rebuildOpportunityOutcomeProjection(
+  context: OutcomeOpportunityContext,
+  correctionEvent: OutcomeProjectionEvent,
+  db: OutcomeDb,
+): Promise<OpportunityOutcomeProjection> {
+  const events = await db.query<
+    OutcomeProjectionEvent & { effective: boolean }
+  >(
+    `SELECT
+       event.id::TEXT AS id,
+       event.event_type AS "eventType",
+       event.previous_stage AS "previousStage",
+       event.new_stage AS "newStage",
+       event.occurred_at::TEXT AS "occurredAt",
+       event.reason_code AS "reasonCode",
+       event.value_minor::DOUBLE PRECISION AS "valueMinor",
+       event.currency,
+       event.snoozed_until::TEXT AS "snoozedUntil",
+       event.metadata->>'meetingStatus' AS "meetingStatus",
+       NOT EXISTS (
+         SELECT 1
+         FROM opportunity_outcome_events correction
+         WHERE correction.owner_id = event.owner_id
+           AND correction.opportunity_id = event.opportunity_id
+           AND correction.event_type = 'reverted'
+           AND correction.reverts_event_id = event.id
+       ) AS effective
+     FROM opportunity_outcome_events event
+     WHERE event.owner_id = $1
+       AND event.opportunity_id = $2
+       AND event.event_type <> 'reverted'
+     ORDER BY event.id`,
+    [context.ownerId, context.id],
+  )
+  const initialStage = events.rows[0]?.previousStage ??
+    toInitialStage(context.status)
+  if (!initialStage) {
+    throw new Error('Outcome projection has no deterministic initial stage.')
+  }
+  let projection: OpportunityOutcomeProjection | null = null
+  for (const event of events.rows) {
+    if (!event.effective) continue
+    projection = reduceOutcomeProjection(projection, event)
+  }
+  const currentStage = projection?.commercialStage ?? initialStage
+  return reduceOutcomeProjection(projection, {
+    ...correctionEvent,
+    previousStage: currentStage,
+    newStage: currentStage,
+    revertedEventType: null,
+  })
 }
 
 async function findReplay(
@@ -1044,7 +1410,11 @@ async function getLockedOutcomeState(
        dismiss_reason_code AS "dismissReasonCode",
        lost_reason_code AS "lostReasonCode",
        deal_value_minor::DOUBLE PRECISION AS "dealValueMinor",
-       currency
+       currency,
+       meeting_status AS "meetingStatus",
+       active_meeting_event_id::TEXT AS "activeMeetingEventId",
+       last_meeting_event_at::TEXT AS "lastMeetingEventAt",
+       meeting_attempt_count AS "meetingAttemptCount"
      FROM opportunity_outcome_state
      WHERE owner_id = $1 AND opportunity_id = $2
      FOR UPDATE`,
@@ -1080,7 +1450,11 @@ async function getOutcomeState(
        dismiss_reason_code AS "dismissReasonCode",
        lost_reason_code AS "lostReasonCode",
        deal_value_minor::DOUBLE PRECISION AS "dealValueMinor",
-       currency
+       currency,
+       meeting_status AS "meetingStatus",
+       active_meeting_event_id::TEXT AS "activeMeetingEventId",
+       last_meeting_event_at::TEXT AS "lastMeetingEventAt",
+       meeting_attempt_count AS "meetingAttemptCount"
      FROM opportunity_outcome_state
      WHERE owner_id = $1 AND opportunity_id = $2`,
     [ownerId, opportunityId],
@@ -1094,6 +1468,7 @@ function toPublicOutcomeState(
   const {
     lastEventId: _lastEventId,
     lastStageEventId: _lastStageEventId,
+    activeMeetingEventId: _activeMeetingEventId,
     ...publicState
   } = state
   return publicState
@@ -1132,6 +1507,10 @@ async function persistOutcomeState(
        lost_reason_code,
        deal_value_minor,
        currency,
+       meeting_status,
+       active_meeting_event_id,
+       last_meeting_event_at,
+       meeting_attempt_count,
        updated_at
      )
      VALUES (
@@ -1140,7 +1519,7 @@ async function persistOutcomeState(
        $14::timestamptz, $15::timestamptz, $16::timestamptz,
        $17::timestamptz, $18::timestamptz, $19::timestamptz,
        $20::timestamptz, $21::timestamptz, $22::timestamptz,
-       $23, $24, $25, $26, NOW()
+       $23, $24, $25, $26, $27, $28, $29::timestamptz, $30, NOW()
      )
      ON CONFLICT (owner_id, opportunity_id)
      DO UPDATE SET
@@ -1168,6 +1547,10 @@ async function persistOutcomeState(
        lost_reason_code = EXCLUDED.lost_reason_code,
        deal_value_minor = EXCLUDED.deal_value_minor,
        currency = EXCLUDED.currency,
+       meeting_status = EXCLUDED.meeting_status,
+       active_meeting_event_id = EXCLUDED.active_meeting_event_id,
+       last_meeting_event_at = EXCLUDED.last_meeting_event_at,
+       meeting_attempt_count = EXCLUDED.meeting_attempt_count,
        updated_at = NOW()`,
     [
       context.ownerId,
@@ -1196,6 +1579,10 @@ async function persistOutcomeState(
       state.lostReasonCode,
       state.dealValueMinor,
       state.currency,
+      state.meetingStatus,
+      state.activeMeetingEventId,
+      state.lastMeetingEventAt,
+      state.meetingAttemptCount,
     ],
   )
   if (result.rowCount !== 1) {
@@ -1395,19 +1782,48 @@ function nullableNumber(value: string | null | undefined): number | null {
   return Number.isFinite(number) ? number : null
 }
 
-function parseJsonCounts(value: string | null | undefined): Record<string, number> {
-  if (!value) return {}
+function parseActivityCounts(
+  value: string | null | undefined,
+): Array<{ eventType: string; eventCount: number; opportunityCount: number }> {
+  if (!value) return []
   try {
-    const parsed = JSON.parse(value) as Record<string, unknown>
-    return Object.fromEntries(
-      Object.entries(parsed).map(([key, count]) => [
-        key,
-        numberValue(String(count)),
-      ]),
-    )
+    const parsed = JSON.parse(value) as unknown
+    if (!Array.isArray(parsed)) return []
+    return parsed.flatMap((entry) => {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return []
+      const row = entry as Record<string, unknown>
+      if (typeof row.eventType !== 'string') return []
+      const eventCount = Number(row.eventCount)
+      const opportunityCount = Number(row.opportunityCount)
+      if (!Number.isFinite(eventCount) || !Number.isFinite(opportunityCount)) {
+        return []
+      }
+      return [{
+        eventType: row.eventType,
+        eventCount,
+        opportunityCount,
+      }]
+    })
   } catch {
-    return {}
+    return []
   }
+}
+
+function labelActivityCounts(
+  activity: ReturnType<typeof parseActivityCounts>,
+): OutcomeFunnelSummary['effectiveActivityCounts'] {
+  return activity.map((item) => ({
+    ...item,
+    label: OUTCOME_EVENT_LABELS[
+      item.eventType as OpportunityOutcomeInput['eventType']
+    ] ?? item.eventType,
+  }))
+}
+
+function daysBetween(from: string, to: string): number {
+  const milliseconds = Date.parse(to) - Date.parse(from)
+  if (!Number.isFinite(milliseconds)) return 0
+  return Math.max(0, Math.floor(milliseconds / (24 * 60 * 60 * 1000)))
 }
 
 function terminalOutcomeSummary(
@@ -1425,5 +1841,6 @@ function terminalOutcomeSummary(
       ? Number((won / completed).toFixed(4))
       : null,
     status: ready ? 'ready' : 'insufficient_data',
+    denominator: 'effective_won_plus_lost',
   }
 }

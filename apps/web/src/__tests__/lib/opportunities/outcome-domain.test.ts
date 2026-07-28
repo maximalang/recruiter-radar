@@ -15,7 +15,6 @@ describe('opportunity outcome domain', () => {
     ['accepted', 'contacted', 'contacted'],
     ['contacted', 'replied', 'replied'],
     ['replied', 'meeting', 'meeting'],
-    ['meeting', 'proposal', 'proposal'],
     ['proposal', 'won', 'won'],
     ['contacted', 'lost', 'lost'],
     ['meeting', 'snoozed', 'meeting'],
@@ -38,12 +37,38 @@ describe('opportunity outcome domain', () => {
   })
 
   it.each(['meeting_cancelled', 'meeting_no_show'] as const)(
-    'allows %s only while the commercial stage is meeting',
+    'allows %s only for an active scheduled meeting',
     (eventType) => {
-      expect(isOutcomeTransitionAllowed('meeting', eventType)).toBe(true)
+      expect(isOutcomeTransitionAllowed(
+        'meeting',
+        eventType,
+        'active',
+        'scheduled',
+      )).toBe(true)
+      expect(isOutcomeTransitionAllowed(
+        'meeting',
+        eventType,
+        'active',
+        'cancelled',
+      )).toBe(false)
       expect(getNextOutcomeStage('meeting', eventType)).toBe('meeting')
     },
   )
+
+  it('requires a completed meeting before proposal', () => {
+    expect(isOutcomeTransitionAllowed(
+      'meeting',
+      'proposal',
+      'active',
+      'scheduled',
+    )).toBe(false)
+    expect(isOutcomeTransitionAllowed(
+      'meeting',
+      'proposal',
+      'active',
+      'completed',
+    )).toBe(true)
+  })
 
   it.each(['shown', 'opened', 'exported'] as const)(
     'keeps the commercial stage for observational event %s',
@@ -98,13 +123,25 @@ describe('opportunity outcome domain', () => {
     })
   })
 
-  it('accepts only scheduled or completed meeting stage events', () => {
+  it('uses distinct scheduled and completed meeting events', () => {
     expect(() => validateOutcomeInput({
       eventType: 'meeting',
       occurredAt: NOW.toISOString(),
       idempotencyKey: 'meeting:cancelled',
       metadata: { meetingStatus: 'cancelled' },
     }, NOW)).toThrow(OutcomeValidationError)
+    expect(() => validateOutcomeInput({
+      eventType: 'meeting',
+      occurredAt: NOW.toISOString(),
+      idempotencyKey: 'meeting:completed',
+      metadata: { meetingStatus: 'completed' },
+    }, NOW)).toThrow(OutcomeValidationError)
+    expect(validateOutcomeInput({
+      eventType: 'meeting_completed',
+      occurredAt: NOW.toISOString(),
+      idempotencyKey: 'meeting:completed:event',
+      metadata: {},
+    }, NOW).eventType).toBe('meeting_completed')
     expect(validateOutcomeInput({
       eventType: 'meeting_cancelled',
       occurredAt: NOW.toISOString(),
@@ -273,6 +310,84 @@ describe('opportunity outcome domain', () => {
       acceptedAt: '2026-07-27T09:00:00.000Z',
       contactedAt: '2026-07-27T10:00:00.000Z',
       repliedAt: '2026-07-27T11:00:00.000Z',
+    })
+  })
+
+  it('projects cancellation, reschedule, and completion independently', () => {
+    const scheduled = reduceOutcomeProjection(null, {
+      id: '10',
+      eventType: 'meeting',
+      previousStage: 'replied',
+      newStage: 'meeting',
+      occurredAt: '2026-07-27T09:00:00.000Z',
+      reasonCode: null,
+      valueMinor: null,
+      currency: null,
+    })
+    const cancelled = reduceOutcomeProjection(scheduled, {
+      id: '11',
+      eventType: 'meeting_cancelled',
+      previousStage: 'meeting',
+      newStage: 'meeting',
+      occurredAt: '2026-07-27T10:00:00.000Z',
+      reasonCode: null,
+      valueMinor: null,
+      currency: null,
+    })
+    const rescheduled = reduceOutcomeProjection(cancelled, {
+      id: '12',
+      eventType: 'meeting',
+      previousStage: 'meeting',
+      newStage: 'meeting',
+      occurredAt: '2026-07-27T11:00:00.000Z',
+      reasonCode: null,
+      valueMinor: null,
+      currency: null,
+    })
+    const completed = reduceOutcomeProjection(rescheduled, {
+      id: '13',
+      eventType: 'meeting_completed',
+      previousStage: 'meeting',
+      newStage: 'meeting',
+      occurredAt: '2026-07-27T12:00:00.000Z',
+      reasonCode: null,
+      valueMinor: null,
+      currency: null,
+    })
+
+    expect(cancelled).toMatchObject({
+      commercialStage: 'meeting',
+      meetingStatus: 'cancelled',
+      meetingAttemptCount: 1,
+      activeMeetingEventId: '10',
+    })
+    expect(completed).toMatchObject({
+      commercialStage: 'meeting',
+      meetingStatus: 'completed',
+      meetingAttemptCount: 2,
+      activeMeetingEventId: '12',
+      lastMeetingEventAt: '2026-07-27T12:00:00.000Z',
+    })
+  })
+
+  it('preserves a legacy completed meeting while rebuilding projection', () => {
+    const completed = reduceOutcomeProjection(null, {
+      id: '14',
+      eventType: 'meeting',
+      previousStage: 'replied',
+      newStage: 'meeting',
+      occurredAt: '2026-07-27T13:00:00.000Z',
+      reasonCode: null,
+      valueMinor: null,
+      currency: null,
+      meetingStatus: 'completed',
+    })
+
+    expect(completed).toMatchObject({
+      commercialStage: 'meeting',
+      meetingStatus: 'completed',
+      meetingAttemptCount: 1,
+      activeMeetingEventId: '14',
     })
   })
 

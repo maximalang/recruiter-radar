@@ -72,6 +72,7 @@ export async function POST(
     const {
       lastEventId: _lastEventId,
       lastStageEventId: _lastStageEventId,
+      activeMeetingEventId: _activeMeetingEventId,
       ...state
     } = result.state
     return NextResponse.json(
@@ -127,19 +128,20 @@ export async function GET(
   if (!isPositiveId(id)) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 })
   }
-  const page = parsePositiveInt(request.nextUrl.searchParams.get('page'), 1)
+  const rawBeforeEventId = request.nextUrl.searchParams.get('beforeEventId')
+  const beforeEventId = parsePositiveBigint(rawBeforeEventId)
   const pageSize = parsePositiveInt(
     request.nextUrl.searchParams.get('pageSize'),
     50,
   )
-  if (page === null || pageSize === null) {
+  if ((rawBeforeEventId !== null && beforeEventId === null) || pageSize === null) {
     return NextResponse.json({ error: 'invalid_pagination' }, { status: 400 })
   }
   try {
     const result = await getOpportunityOutcomeHistory({
       ownerId,
       opportunityId: id,
-      page,
+      beforeEventId,
       pageSize,
     })
     if (!result) {
@@ -171,4 +173,14 @@ function parsePositiveInt(value: string | null, fallback: number): number | null
   if (!/^[1-9]\d*$/.test(value)) return null
   const parsed = Number(value)
   return Number.isSafeInteger(parsed) ? parsed : null
+}
+
+function parsePositiveBigint(value: string | null): string | null {
+  if (value === null) return null
+  if (!/^[1-9]\d{0,18}$/.test(value)) return null
+  try {
+    return BigInt(value) <= BigInt('9223372036854775807') ? value : null
+  } catch {
+    return null
+  }
 }

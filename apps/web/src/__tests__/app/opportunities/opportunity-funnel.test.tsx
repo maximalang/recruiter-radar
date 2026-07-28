@@ -13,15 +13,31 @@ describe('OpportunityFunnel', () => {
       },
       cohort: {
         eventType: 'shown',
-        policy: 'first_event_in_period_closed_window',
+        policy: 'first_effective_event_ever_closed_window',
         downstreamBefore: '2026-07-27T00:00:00.000Z',
         size: 4,
+        cohortAgeDays: 26,
+        observationWindowDays: 26,
+        matured: false,
+        maturityThresholdDays: 30,
       },
       minimumConversionSample: 10,
-      activityCounts: [
-        { eventType: 'shown', label: 'Показано', count: 4 },
-        { eventType: 'opened', label: 'Открыто', count: 3 },
+      effectiveActivityCounts: [
+        {
+          eventType: 'shown',
+          label: 'Показано',
+          eventCount: 7,
+          opportunityCount: 4,
+        },
+        {
+          eventType: 'opened',
+          label: 'Открыто',
+          eventCount: 3,
+          opportunityCount: 3,
+        },
       ],
+      ledgerActivityCounts: [],
+      correctionsCount: 0,
       cohortCounts: [
         { eventType: 'shown', label: 'Показано', count: 4 },
         { eventType: 'opened', label: 'Открыто', count: 3 },
@@ -34,6 +50,8 @@ describe('OpportunityFunnel', () => {
         rate: null,
         medianHours: null,
         status: 'insufficient_data',
+        sampleStatus: 'insufficient_data',
+        maturityStatus: 'immature',
       }],
       terminalOutcomes: {
         won: 0,
@@ -41,12 +59,19 @@ describe('OpportunityFunnel', () => {
         completed: 0,
         winRate: null,
         status: 'insufficient_data',
+        denominator: 'effective_won_plus_lost',
       },
     }} />)
 
     expect(screen.getByText('Показано')).toBeInTheDocument()
     expect(screen.getByText('4')).toBeInTheDocument()
     expect(screen.getAllByText('Недостаточно данных')).toHaveLength(2)
+    expect(screen.getAllByText('Незрелая когорта', { exact: false }))
+      .toHaveLength(2)
+    expect(screen.getByText(
+      'Показано 7 раз · 4 возможности',
+      { exact: false },
+    )).toBeInTheDocument()
     expect(screen.queryByText('75%')).toBeNull()
   })
 })

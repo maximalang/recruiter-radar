@@ -72,6 +72,9 @@ export interface OpportunityJobStats {
   reconciled: number
   skippedUnchanged: number
   superseded: number
+  resumed: number
+  resumeLatencyMsTotal: number
+  resumeLatencyMsMax: number
   locked: number
   skippedBecauseLocked: boolean
 }
@@ -691,14 +694,34 @@ async function runExpireOpportunitiesJob(
        o.organization_id::TEXT AS "organizationId",
        o.client_profile_id::TEXT AS "clientProfileId",
        o.hiring_episode_id::TEXT AS "hiringEpisodeId",
-       o.snoozed_until::TEXT AS "snoozedUntil"
+       COALESCE(
+         outcome_state.snoozed_until,
+         o.snoozed_until
+       )::TEXT AS "snoozedUntil"
      FROM opportunities o
      JOIN hiring_episodes he ON he.id = o.hiring_episode_id
+     LEFT JOIN opportunity_outcome_state outcome_state
+       ON outcome_state.owner_id = o.owner_id
+      AND outcome_state.opportunity_id = o.id
      WHERE he.id = o.hiring_episode_id
        AND o.superseded_at IS NULL
        AND he.status = 'active'
-       AND o.status = 'snoozed'
-       AND o.snoozed_until <= $1::timestamptz
+       AND COALESCE(
+         outcome_state.workflow_state,
+         CASE WHEN o.status = 'snoozed' THEN 'snoozed' ELSE 'active' END
+       ) = 'snoozed'
+       AND COALESCE(
+         outcome_state.commercial_stage,
+         CASE
+           WHEN o.status IN (
+             'new', 'review', 'accepted', 'contacted', 'replied',
+             'meeting', 'proposal', 'won', 'lost', 'dismissed'
+           ) THEN o.status
+           ELSE 'new'
+         END
+       ) NOT IN ('won', 'lost', 'dismissed')
+       AND COALESCE(outcome_state.snoozed_until, o.snoozed_until)
+         <= $1::timestamptz
        AND (o.valid_until IS NULL OR o.valid_until >= $1::timestamptz)
        AND ($2::bigint IS NULL OR o.organization_id = $2)
      ORDER BY o.owner_id, o.id`,
@@ -770,7 +793,16 @@ async function runExpireOpportunitiesJob(
      FROM hiring_episodes he
      WHERE he.id = o.hiring_episode_id
        AND o.superseded_at IS NULL
-       AND o.status IN ('new', 'review', 'snoozed')
+       AND (
+         o.status IN ('new', 'review', 'snoozed')
+         OR EXISTS (
+           SELECT 1
+           FROM opportunity_outcome_state outcome_state
+           WHERE outcome_state.owner_id = o.owner_id
+             AND outcome_state.opportunity_id = o.id
+             AND outcome_state.workflow_state = 'snoozed'
+         )
+       )
        AND (he.status = 'closed' OR o.valid_until < $1::timestamptz)
        AND ($2::bigint IS NULL OR o.organization_id = $2)
      RETURNING
@@ -803,6 +835,17 @@ async function runExpireOpportunitiesJob(
     (expired.rowCount ?? 0)
   stats.expired = expired.rowCount ?? 0
   stats.updated = (closed.rowCount ?? 0) + (awakened.rowCount ?? 0)
+  stats.resumed = awakened.rowCount ?? 0
+  for (const opportunity of awakened.rows) {
+    const latency = Math.max(
+      0,
+      now.getTime() - Date.parse(opportunity.snoozedUntil),
+    )
+    if (Number.isFinite(latency)) {
+      stats.resumeLatencyMsTotal += latency
+      stats.resumeLatencyMsMax = Math.max(stats.resumeLatencyMsMax, latency)
+    }
+  }
   for (const episode of closed.rows) {
     logEvent('hiring_episode.closed', {
       hiringEpisodeId: episode.id,
@@ -2037,6 +2080,9 @@ function createStats(options: OpportunityJobOptions): OpportunityJobStats {
     reconciled: 0,
     skippedUnchanged: 0,
     superseded: 0,
+    resumed: 0,
+    resumeLatencyMsTotal: 0,
+    resumeLatencyMsMax: 0,
     locked: 0,
     skippedBecauseLocked: false,
   }

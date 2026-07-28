@@ -431,6 +431,50 @@ describe('opportunity background jobs', () => {
       .toBe(false)
   })
 
+  it('selects automatic resume candidates from active outcome projection only', async () => {
+    const db = dbWithQuery((sql) => {
+      if (
+        sql.includes('UPDATE hiring_episodes') &&
+        sql.includes("SET status = 'closed'")
+      ) {
+        return { rowCount: 0, rows: [] }
+      }
+      if (
+        sql.includes('FROM opportunities o') &&
+        sql.includes('AS "snoozedUntil"')
+      ) {
+        expect(sql).toContain('LEFT JOIN opportunity_outcome_state outcome_state')
+        expect(sql).toContain(
+          'COALESCE(\n         outcome_state.snoozed_until',
+        )
+        expect(sql).toContain(") = 'snoozed'")
+        expect(sql).toContain("NOT IN ('won', 'lost', 'dismissed')")
+        expect(sql).toContain('o.superseded_at IS NULL')
+        expect(sql).toContain("he.status = 'active'")
+        return { rowCount: 0, rows: [] }
+      }
+      if (
+        sql.includes('UPDATE opportunities o') &&
+        sql.includes("SET status = 'expired'")
+      ) {
+        expect(sql).toContain(
+          "outcome_state.workflow_state = 'snoozed'",
+        )
+        return { rowCount: 0, rows: [] }
+      }
+      throw new Error(`Unexpected SQL: ${sql}`)
+    })
+
+    const result = await expireOpportunitiesJob(
+      { enabled: true, now: new Date('2026-07-28T09:00:00.000Z') },
+      db,
+    )
+
+    expect(result.resumed).toBe(0)
+    expect(result.resumeLatencyMsTotal).toBe(0)
+    expect(result.resumeLatencyMsMax).toBe(0)
+  })
+
   it('creates independent opportunities for two profiles and excludes up-to-date rows', async () => {
     const insertParams: Array<readonly unknown[]> = []
     const db = dbWithQuery((sql, params) => {
@@ -824,11 +868,13 @@ describe('opportunity background jobs', () => {
             hiringEpisodeId: '20',
             status: 'snoozed',
             supersededAt: null,
+            validUntil: '2026-08-30T09:00:00.000Z',
             scoringVersion: 'opportunity-v1',
             confidenceGate: 'A',
             opportunityScore: 0.8,
             externalSupportNeedScore: 0.7,
             episodeType: 'vacancy_spike',
+            episodeStatus: 'active',
           }],
         }
       }

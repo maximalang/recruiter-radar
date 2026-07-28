@@ -8,7 +8,9 @@ import styles from './opportunities.module.css'
 type OutcomeStage = 'new' | 'review' | 'accepted' | 'dismissed' |
   'contacted' | 'replied' | 'meeting' | 'proposal' | 'won' | 'lost'
 type OutcomeAction = 'accepted' | 'dismissed' | 'snoozed' | 'contacted' |
-  'resumed' | 'replied' | 'meeting' | 'proposal' | 'won' | 'lost' | 'reverted'
+  'resumed' | 'replied' | 'meeting' | 'meeting_completed' |
+  'meeting_cancelled' | 'meeting_no_show' | 'proposal' | 'won' | 'lost' |
+  'reverted'
 
 interface HistoryEvent {
   eventType: string
@@ -24,6 +26,10 @@ interface HistoryEvent {
   valueMinor: number | null
   currency: string | null
   metadata: Record<string, string>
+  revertsEventId: string | null
+  isEffective: boolean
+  isReverted: boolean
+  revertedByEventId: string | null
 }
 
 interface HistoryResponse {
@@ -35,8 +41,24 @@ interface HistoryResponse {
     lastEventAt?: string
     dealValueMinor?: number | null
     currency?: string | null
+    meetingStatus: 'none' | 'scheduled' | 'completed' | 'cancelled' | 'no_show'
+    lastMeetingEventAt: string | null
+    meetingAttemptCount: number
   } | null
   events: HistoryEvent[]
+  correction: {
+    canRevert: boolean
+    targetEventId: string | null
+    targetEventType: string | null
+    targetOccurredAt: string | null
+  }
+  pagination: {
+    pageSize: number
+    totalItems: number
+    sortOrder: 'append_desc'
+    hasMore: boolean
+    nextBeforeEventId: string | null
+  }
 }
 
 const STAGE_LABELS: Record<OutcomeStage, string> = {
@@ -60,6 +82,9 @@ const ACTION_LABELS: Record<OutcomeAction, string> = {
   contacted: 'Связались',
   replied: 'Получили ответ',
   meeting: 'Назначили встречу',
+  meeting_completed: 'Встреча проведена',
+  meeting_cancelled: 'Встреча отменена',
+  meeting_no_show: 'Встреча не состоялась',
   proposal: 'Отправили предложение',
   won: 'Выиграли',
   lost: 'Потеряли',
@@ -72,7 +97,7 @@ const NEXT_ACTIONS: Record<OutcomeStage, readonly OutcomeAction[]> = {
   accepted: ['contacted', 'dismissed'],
   contacted: ['replied', 'lost'],
   replied: ['meeting', 'lost'],
-  meeting: ['proposal', 'lost'],
+  meeting: [],
   proposal: ['won', 'lost'],
   dismissed: [],
   won: [],
@@ -163,6 +188,7 @@ export function OpportunityOutcomePanel(props: {
   const [expanded, setExpanded] = useState(false)
   const [history, setHistory] = useState<HistoryResponse | null>(null)
   const [pending, setPending] = useState<OutcomeAction | 'opened' | null>(null)
+  const [loadingEarlier, setLoadingEarlier] = useState(false)
   const [selectedAction, setSelectedAction] = useState<OutcomeAction | null>(null)
   const [reasonCode, setReasonCode] = useState('')
   const [reasonNote, setReasonNote] = useState('')
@@ -178,12 +204,16 @@ export function OpportunityOutcomePanel(props: {
   const fallbackStage = isStage(props.fallbackStage) ? props.fallbackStage : 'new'
   const stage = history?.state?.currentStage ?? fallbackStage
   const workflowState = history?.state?.workflowState ?? 'active'
-  const latestCommercialEvent = [...(history?.events ?? [])]
-    .reverse()
-    .find((event) => [
-      'accepted', 'dismissed', 'contacted', 'replied',
-      'meeting', 'proposal', 'won', 'lost',
-    ].includes(event.eventType))
+  const meetingStatus = history?.state?.meetingStatus ?? 'none'
+  const availableActions: readonly OutcomeAction[] = stage === 'meeting'
+    ? meetingStatus === 'scheduled'
+      ? ['meeting_completed', 'meeting_cancelled', 'meeting_no_show', 'lost']
+      : meetingStatus === 'completed'
+        ? ['proposal', 'lost']
+        : meetingStatus === 'cancelled' || meetingStatus === 'no_show'
+          ? ['meeting', 'lost']
+          : []
+    : NEXT_ACTIONS[stage]
 
   async function toggle() {
     const nextExpanded = !expanded
@@ -211,12 +241,40 @@ export function OpportunityOutcomePanel(props: {
     }
   }
 
-  async function loadHistory() {
-    const response = await fetch(`/api/opportunities/${props.opportunityId}/outcomes`, {
+  async function loadHistory(beforeEventId: string | null = null) {
+    const query = beforeEventId
+      ? `?beforeEventId=${encodeURIComponent(beforeEventId)}&pageSize=50`
+      : ''
+    const response = await fetch(`/api/opportunities/${props.opportunityId}/outcomes${query}`, {
       cache: 'no-store',
     })
     if (!response.ok) throw new Error('history_failed')
-    setHistory(await response.json() as HistoryResponse)
+    const incoming = await response.json() as HistoryResponse
+    setHistory((current) => {
+      if (!beforeEventId || !current) return incoming
+      const events = [...current.events, ...incoming.events]
+        .filter((event, index, all) =>
+          all.findIndex((candidate) =>
+            candidate.appendOrder === event.appendOrder) === index)
+      return {
+        ...incoming,
+        events,
+      }
+    })
+  }
+
+  async function loadEarlier() {
+    const beforeEventId = history?.pagination?.nextBeforeEventId
+    if (!beforeEventId || loadingEarlier) return
+    setLoadingEarlier(true)
+    setError(null)
+    try {
+      await loadHistory(beforeEventId)
+    } catch {
+      setError('Более ранние события временно не загрузились.')
+    } finally {
+      setLoadingEarlier(false)
+    }
   }
 
   function selectAction(action: OutcomeAction) {
@@ -258,7 +316,7 @@ export function OpportunityOutcomePanel(props: {
         dealValue,
         snoozeDays,
         snoozedUntil,
-        latestCommercialEvent?.appendOrder ?? null,
+        history?.correction?.targetEventId ?? null,
       )
       const legacyAction = ['accepted', 'dismissed', 'contacted']
         .includes(action)
@@ -341,10 +399,14 @@ export function OpportunityOutcomePanel(props: {
 
           {history?.events.length ? (
             <ol className={styles.outcomeTimeline}>
-              {history.events.map((event, index) => (
-                <li key={`${event.eventType}:${event.occurredAt}:${index}`}>
+              {[...history.events].reverse().map((event) => (
+                <li
+                  key={event.appendOrder || `${event.eventType}:${event.recordedAt}`}
+                  data-effective={event.isEffective ? 'true' : 'false'}
+                >
                   <span>{formatDateTime(event.occurredAt)}</span>
                   <strong>{event.label}</strong>
+                  {event.isReverted ? <small>Отменено</small> : null}
                   {event.reason ? <small>{event.reason.label}</small> : null}
                   {event.channel ? <small>Канал: {event.channel}</small> : null}
                   {event.contactPathType ? (
@@ -359,6 +421,18 @@ export function OpportunityOutcomePanel(props: {
           ) : history ? (
             <p className={styles.outcomeMuted}>Событий пока нет.</p>
           ) : null}
+          {history?.pagination?.hasMore ? (
+            <button
+              type="button"
+              className={styles.actionButton}
+              disabled={loadingEarlier}
+              onClick={() => void loadEarlier()}
+            >
+              {loadingEarlier
+                ? 'Загружаем…'
+                : 'Показать более ранние события'}
+            </button>
+          ) : null}
 
           {workflowState === 'snoozed' ? (
             <div className={styles.outcomeActions}>
@@ -372,9 +446,9 @@ export function OpportunityOutcomePanel(props: {
                 {pending === 'resumed' ? 'Возобновляем…' : 'Возобновить'}
               </button>
             </div>
-          ) : NEXT_ACTIONS[stage].length > 0 ? (
+          ) : availableActions.length > 0 ? (
             <div className={styles.outcomeActions} aria-label="Следующие коммерческие действия">
-              {NEXT_ACTIONS[stage].map((action) => (
+              {availableActions.map((action) => (
                 <button
                   key={action}
                   type="button"
@@ -398,7 +472,7 @@ export function OpportunityOutcomePanel(props: {
           ) : (
             <p className={styles.outcomeMuted}>Коммерческий цикл завершён.</p>
           )}
-          {workflowState === 'active' && latestCommercialEvent ? (
+          {history?.correction?.canRevert ? (
             <button
               type="button"
               className={styles.actionButton}

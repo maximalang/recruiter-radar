@@ -2,6 +2,7 @@ import { getClient } from '@/lib/db-pool'
 import {
   OutcomeIdempotencyConflictError,
   OutcomeTransitionConflictError,
+  getOpportunityOutcomeHistory,
   getOutcomeFunnelSummary,
   recordOpportunityOutcome,
 } from '@/lib/opportunities/outcome-repository'
@@ -227,7 +228,15 @@ describe('opportunity outcome funnel', () => {
       rowCount: 1,
       rows: [{
         cohortSize: '20',
-        activityCounts: '{"shown":"21","opened":"16"}',
+        effectiveActivityCounts: JSON.stringify([
+          { eventType: 'shown', eventCount: '21', opportunityCount: '20' },
+          { eventType: 'opened', eventCount: '16', opportunityCount: '15' },
+        ]),
+        ledgerActivityCounts: JSON.stringify([
+          { eventType: 'shown', eventCount: '22', opportunityCount: '20' },
+          { eventType: 'reverted', eventCount: '1', opportunityCount: '1' },
+        ]),
+        correctionsCount: '1',
         shownCohortCount: '20', openedCohortCount: '15',
         acceptedCohortCount: '10', contactedCohortCount: '8',
         repliedCohortCount: '4', meetingCohortCount: '3',
@@ -251,17 +260,61 @@ describe('opportunity outcome funnel', () => {
       confidenceGate: 'A',
       sourceFamily: 'hh',
       scoreBucket: '80-89',
+      externalSupportNeedBucket: 'high',
+      maturityDays: 30,
     }, { query } as never)
 
     expect(String(query.mock.calls[0]?.[0])).toContain('owner_id = $1')
     expect(query.mock.calls[0]?.[1]).toEqual([
       '7', '2026-07-01T00:00:00.000Z', '2026-08-01T00:00:00.000Z',
-      'shown', 'vacancy_spike', 'A', '80-89', 'hh',
+      'shown', 'vacancy_spike', 'A', '80-89', 'hh', 'high',
     ])
     expect(String(query.mock.calls[0]?.[0])).toContain(
       'JOIN active_events event USING (opportunity_id)',
     )
+    expect(String(query.mock.calls[0]?.[0])).toContain(
+      'ROW_NUMBER() OVER',
+    )
+    expect(String(query.mock.calls[0]?.[0])).toContain(
+      'cohort_at >= $2::timestamptz',
+    )
     expect(String(query.mock.calls[0]?.[0])).not.toContain('LEAST(')
+    expect(summary.effectiveActivityCounts).toEqual([
+      {
+        eventType: 'shown',
+        label: 'Показано',
+        eventCount: 21,
+        opportunityCount: 20,
+      },
+      {
+        eventType: 'opened',
+        label: 'Открыто',
+        eventCount: 16,
+        opportunityCount: 15,
+      },
+    ])
+    expect(summary.ledgerActivityCounts).toEqual([
+      {
+        eventType: 'shown',
+        label: 'Показано',
+        eventCount: 22,
+        opportunityCount: 20,
+      },
+      {
+        eventType: 'reverted',
+        label: 'Последнее изменение отменено',
+        eventCount: 1,
+        opportunityCount: 1,
+      },
+    ])
+    expect(summary.correctionsCount).toBe(1)
+    expect(summary.cohort).toMatchObject({
+      policy: 'first_effective_event_ever_closed_window',
+      cohortAgeDays: 31,
+      observationWindowDays: 31,
+      matured: true,
+      maturityThresholdDays: 30,
+    })
     expect(summary.cohortCounts.find((stage) =>
       stage.eventType === 'shown')?.count)
       .toBe(20)
@@ -276,6 +329,7 @@ describe('opportunity outcome funnel', () => {
       rowCount: 1,
       rows: [{
         cohortSize: '4',
+        cohortFirstAt: '2026-07-25T00:00:00.000Z',
         shownCohortCount: '4',
         openedCohortCount: '3',
         shownOpenedPairs: '3',
@@ -285,6 +339,7 @@ describe('opportunity outcome funnel', () => {
       ownerId: '7',
       from: '2026-07-01T00:00:00.000Z',
       to: '2026-08-01T00:00:00.000Z',
+      maturityDays: 30,
     }, { query } as never)
 
     expect(summary.conversions[0]).toMatchObject({
@@ -293,6 +348,222 @@ describe('opportunity outcome funnel', () => {
       rate: null,
       medianHours: null,
       status: 'insufficient_data',
+      sampleStatus: 'insufficient_data',
+      maturityStatus: 'immature',
+    })
+    expect(summary.cohort.matured).toBe(false)
+  })
+
+  it('omits discovery transitions for an accepted cohort', async () => {
+    const query = jest.fn(async () => ({
+      rowCount: 1,
+      rows: [{
+        cohortSize: '12',
+        cohortFirstAt: '2026-07-01T00:00:00.000Z',
+        cohortLastAt: '2026-07-01T00:00:00.000Z',
+        acceptedCohortCount: '12',
+        contactedCohortCount: '10',
+        repliedCohortCount: '8',
+        meetingCohortCount: '6',
+        proposalCohortCount: '4',
+        wonCohortCount: '6',
+        lostCohortCount: '6',
+        acceptedContactedPairs: '10',
+        contactedRepliedPairs: '8',
+        repliedMeetingPairs: '6',
+        meetingProposalPairs: '4',
+        proposalWonPairs: '2',
+      }],
+    }))
+
+    const summary = await getOutcomeFunnelSummary({
+      ownerId: '7',
+      from: '2026-07-01T00:00:00.000Z',
+      to: '2026-08-01T00:00:00.000Z',
+      cohort: 'accepted',
+    }, { query } as never)
+
+    expect(summary.cohortCounts.map((stage) => stage.eventType)).toEqual([
+      'accepted', 'contacted', 'replied', 'meeting', 'proposal', 'won', 'lost',
+    ])
+    expect(summary.conversions.map(({ from, to }) => `${from}:${to}`)).toEqual([
+      'accepted:contacted',
+      'contacted:replied',
+      'replied:meeting',
+      'meeting:proposal',
+      'proposal:won',
+      'contacted:lost',
+      'replied:lost',
+      'meeting:lost',
+      'proposal:lost',
+    ])
+    expect(summary.terminalOutcomes).toMatchObject({
+      completed: 12,
+      winRate: 0.5,
+      denominator: 'effective_won_plus_lost',
+    })
+  })
+})
+
+describe('opportunity outcome history', () => {
+  it('pages by append cursor while correction capability uses the full ledger', async () => {
+    const query = jest.fn(async (sql: string, params?: unknown[]) => {
+      if (sql.includes('FROM opportunities') && sql.includes('superseded_at')) {
+        return {
+          rowCount: 1,
+          rows: [{ status: 'new', supersededAt: null }],
+        }
+      }
+      if (sql.includes('COUNT(*)::TEXT AS count')) {
+        return { rowCount: 1, rows: [{ count: '75' }] }
+      }
+      if (sql.includes('WITH page_events AS')) {
+        return {
+          rowCount: 26,
+          rows: Array.from({ length: 26 }, (_, index) => ({
+            id: String(49 - index),
+            eventType: 'proposal',
+            previousStage: 'meeting',
+            newStage: 'proposal',
+            occurredAt: '2026-07-27T12:00:00.000Z',
+            recordedAt: '2026-07-27T12:00:01.000Z',
+            actorType: 'user',
+            reasonCode: null,
+            reasonNote: null,
+            channel: null,
+            contactPathType: null,
+            contactReferenceLabel: null,
+            valueMinor: null,
+            currency: null,
+            metadata: {},
+            revertsEventId: null,
+            isEffective: true,
+            isReverted: false,
+            revertedByEventId: null,
+          })),
+        }
+      }
+      if (sql.includes('FROM opportunity_outcome_state')) {
+        return {
+          rowCount: 1,
+          rows: [{
+            commercialStage: 'won',
+            currentStage: 'won',
+            workflowState: 'active',
+            snoozedUntil: null,
+            lastEventId: '75',
+            lastEventAt: '2026-07-27T13:00:00.000Z',
+            lastStageEventId: '75',
+            lastStageEventAt: '2026-07-27T13:00:00.000Z',
+            firstShownAt: null,
+            firstOpenedAt: null,
+            acceptedAt: null,
+            contactedAt: null,
+            repliedAt: null,
+            meetingAt: null,
+            proposalAt: null,
+            wonAt: '2026-07-27T13:00:00.000Z',
+            lostAt: null,
+            dismissReasonCode: null,
+            lostReasonCode: null,
+            dealValueMinor: null,
+            currency: null,
+            meetingStatus: 'completed',
+            activeMeetingEventId: null,
+            lastMeetingEventAt: null,
+            meetingAttemptCount: 1,
+          }],
+        }
+      }
+      if (sql.includes('effective_commercial')) {
+        return {
+          rowCount: 1,
+          rows: [{
+            targetEventId: '75',
+            targetEventType: 'won',
+            targetOccurredAt: '2026-07-27T13:00:00.000Z',
+          }],
+        }
+      }
+      throw new Error(`Unexpected query: ${sql} ${JSON.stringify(params)}`)
+    })
+
+    const history = await getOpportunityOutcomeHistory({
+      ownerId: '7',
+      opportunityId: '10',
+      beforeEventId: '50',
+      pageSize: 25,
+    }, { query } as never)
+
+    expect(history).toMatchObject({
+      correction: {
+        canRevert: true,
+        targetEventId: '75',
+        targetEventType: 'won',
+        targetOccurredAt: '2026-07-27T13:00:00.000Z',
+      },
+      pagination: {
+        pageSize: 25,
+        sortOrder: 'append_desc',
+        totalItems: 75,
+        hasMore: true,
+        nextBeforeEventId: '25',
+      },
+    })
+    expect(history?.events[0]).toMatchObject({
+      appendOrder: '49',
+      isEffective: true,
+      isReverted: false,
+      revertedByEventId: null,
+    })
+    expect(history?.events).toHaveLength(25)
+    const pageQuery = query.mock.calls.find(([sql]) =>
+      String(sql).includes('WITH page_events AS'))
+    expect(String(pageQuery?.[0])).toContain('event.id < $3::bigint')
+    expect(String(pageQuery?.[0])).toContain('ORDER BY event.id DESC')
+    expect(pageQuery?.[1]).toEqual(['7', '10', '50', 26])
+  })
+
+  it('does not expose correction for a legacy snoozed opportunity', async () => {
+    const query = jest.fn(async (sql: string) => {
+      if (sql.includes('FROM opportunities') && sql.includes('superseded_at')) {
+        return {
+          rowCount: 1,
+          rows: [{ status: 'snoozed', supersededAt: null }],
+        }
+      }
+      if (sql.includes('COUNT(*)::TEXT AS count')) {
+        return { rowCount: 1, rows: [{ count: '1' }] }
+      }
+      if (sql.includes('WITH page_events AS')) {
+        return { rowCount: 0, rows: [] }
+      }
+      if (sql.includes('FROM opportunity_outcome_state')) {
+        return { rowCount: 0, rows: [] }
+      }
+      if (sql.includes('effective_commercial')) {
+        return {
+          rowCount: 1,
+          rows: [{
+            targetEventId: '1',
+            targetEventType: 'accepted',
+            targetOccurredAt: '2026-07-27T13:00:00.000Z',
+          }],
+        }
+      }
+      throw new Error(`Unexpected query: ${sql}`)
+    })
+
+    const history = await getOpportunityOutcomeHistory({
+      ownerId: '7',
+      opportunityId: '10',
+    }, { query } as never)
+
+    expect(history?.correction).toEqual({
+      canRevert: false,
+      targetEventId: null,
+      targetEventType: null,
+      targetOccurredAt: null,
     })
   })
 })

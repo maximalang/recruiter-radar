@@ -200,18 +200,62 @@ describe('opportunity outcomes API', () => {
     mockedHistory.mockResolvedValue({
       events: [],
       state: null,
-      pagination: { page: 1, pageSize: 50, totalItems: 0, totalPages: 0 },
+      correction: {
+        canRevert: false,
+        targetEventId: null,
+        targetEventType: null,
+        targetOccurredAt: null,
+      },
+      pagination: {
+        pageSize: 50,
+        totalItems: 0,
+        sortOrder: 'append_desc',
+        hasMore: false,
+        nextBeforeEventId: null,
+      },
     })
     const response = await GET(request('/api/opportunities/10/outcomes'), context)
     expect(response.status).toBe(200)
     expect(mockedHistory).toHaveBeenCalledWith({
-      ownerId: '7', opportunityId: '10', page: 1, pageSize: 50,
+      ownerId: '7', opportunityId: '10', beforeEventId: null, pageSize: 50,
     })
   })
 
-  it('rejects pagination values outside the JavaScript safe integer range', async () => {
+  it('passes a validated append cursor to history independently of correction', async () => {
+    mockedHistory.mockResolvedValue({
+      events: [],
+      state: null,
+      correction: {
+        canRevert: false,
+        targetEventId: null,
+        targetEventType: null,
+        targetOccurredAt: null,
+      },
+      pagination: {
+        pageSize: 25,
+        totalItems: 75,
+        sortOrder: 'append_desc',
+        hasMore: false,
+        nextBeforeEventId: null,
+      },
+    })
+
     const response = await GET(
-      request('/api/opportunities/10/outcomes?page=999999999999999999999'),
+      request('/api/opportunities/10/outcomes?beforeEventId=50&pageSize=25'),
+      context,
+    )
+
+    expect(response.status).toBe(200)
+    expect(mockedHistory).toHaveBeenCalledWith({
+      ownerId: '7', opportunityId: '10', beforeEventId: '50', pageSize: 25,
+    })
+  })
+
+  it('rejects pagination cursors outside the JavaScript safe integer range', async () => {
+    const response = await GET(
+      request(
+        '/api/opportunities/10/outcomes?beforeEventId=999999999999999999999',
+      ),
       context,
     )
     expect(response.status).toBe(400)

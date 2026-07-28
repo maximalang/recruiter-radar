@@ -65,19 +65,27 @@ try {
 
   const result = await client.query(`
     EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)
-    WITH cohort AS (
-      SELECT DISTINCT ON (event.opportunity_id)
+    WITH cohort_ranked AS (
+      SELECT
         event.opportunity_id,
-        event.occurred_at AS cohort_at
+        event.occurred_at AS cohort_at,
+        ROW_NUMBER() OVER (
+          PARTITION BY event.opportunity_id
+          ORDER BY event.occurred_at, event.id
+        ) AS cohort_rank
       FROM benchmark_outcome_events event
       JOIN benchmark_opportunities opportunity
         ON opportunity.id = event.opportunity_id
        AND opportunity.owner_id = event.owner_id
       WHERE event.owner_id = 1
         AND event.event_type = 'shown'
-        AND event.occurred_at >= TIMESTAMPTZ '2026-01-01 00:00:00+00'
-        AND event.occurred_at < TIMESTAMPTZ '2026-02-01 00:00:00+00'
-      ORDER BY event.opportunity_id, event.occurred_at, event.id
+    ),
+    cohort AS (
+      SELECT opportunity_id, cohort_at
+      FROM cohort_ranked
+      WHERE cohort_rank = 1
+        AND cohort_at >= TIMESTAMPTZ '2026-01-01 00:00:00+00'
+        AND cohort_at < TIMESTAMPTZ '2026-02-01 00:00:00+00'
     ),
     accepted AS (
       SELECT cohort.opportunity_id, MIN(event.occurred_at) AS occurred_at

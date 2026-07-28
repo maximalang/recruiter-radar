@@ -117,4 +117,168 @@ describe('opportunity outcome UI tracking', () => {
       expect(refresh).toHaveBeenCalled()
     })
   })
+
+  it('uses the server correction target and removes correction after revert', async () => {
+    let reverted = false
+    global.fetch = jest.fn(async (_url: string, options?: RequestInit) => {
+      const body = String(options?.body ?? '')
+      if (options?.method === 'POST') {
+        if (body.includes('"eventType":"reverted"')) reverted = true
+        return { ok: true, json: async () => ({}) }
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          state: {
+            currentStage: reverted ? 'proposal' : 'won',
+            commercialStage: reverted ? 'proposal' : 'won',
+            workflowState: 'active',
+          },
+          correction: reverted
+            ? {
+                canRevert: false,
+                targetEventId: null,
+                targetEventType: null,
+                targetOccurredAt: null,
+              }
+            : {
+                canRevert: true,
+                targetEventId: '75',
+                targetEventType: 'won',
+                targetOccurredAt: '2026-07-27T12:00:00.000Z',
+              },
+          pagination: {
+            pageSize: 50,
+            totalItems: reverted ? 2 : 1,
+            sortOrder: 'append_desc',
+            hasMore: false,
+            nextBeforeEventId: null,
+          },
+          events: reverted
+            ? [
+                {
+                  eventType: 'reverted',
+                  label: 'Исправление',
+                  occurredAt: '2026-07-27T12:05:00.000Z',
+                  recordedAt: '2026-07-27T12:05:01.000Z',
+                  appendOrder: '76',
+                  actorType: 'user',
+                  reason: null,
+                  channel: null,
+                  contactPathType: null,
+                  contactReferenceLabel: null,
+                  valueMinor: null,
+                  currency: null,
+                  metadata: {},
+                  revertsEventId: '75',
+                  isEffective: true,
+                  isReverted: false,
+                  revertedByEventId: null,
+                },
+                {
+                  eventType: 'won',
+                  label: 'Выиграно',
+                  occurredAt: '2026-07-27T12:00:00.000Z',
+                  recordedAt: '2026-07-27T12:00:01.000Z',
+                  appendOrder: '75',
+                  actorType: 'user',
+                  reason: null,
+                  channel: null,
+                  contactPathType: null,
+                  contactReferenceLabel: null,
+                  valueMinor: null,
+                  currency: null,
+                  metadata: {},
+                  revertsEventId: null,
+                  isEffective: false,
+                  isReverted: true,
+                  revertedByEventId: '76',
+                },
+              ]
+            : [],
+        }),
+      }
+    }) as jest.Mock
+    render(<OpportunityOutcomePanel opportunityId="10" fallbackStage="won" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Коммерческий статус' }))
+    fireEvent.click(await screen.findByRole('button', {
+      name: 'Отменить последнее изменение',
+    }))
+
+    await waitFor(() => {
+      expect(jest.mocked(global.fetch).mock.calls.some(([, options]) =>
+        String(options?.body).includes('"revertsEventId":"75"'),
+      )).toBe(true)
+      expect(screen.queryByRole('button', {
+        name: 'Отменить последнее изменение',
+      })).not.toBeInTheDocument()
+    })
+    expect(await screen.findByText('Отменено')).toBeInTheDocument()
+    expect(screen.getByText('Исправление')).toBeInTheDocument()
+  })
+
+  it('loads earlier append-cursor pages without duplicate events', async () => {
+    global.fetch = jest.fn(async (url: string, options?: RequestInit) => {
+      if (options?.method === 'POST') {
+        return { ok: true, json: async () => ({}) }
+      }
+      const earlier = String(url).includes('beforeEventId=75')
+      return {
+        ok: true,
+        json: async () => ({
+          state: { currentStage: 'accepted', workflowState: 'active' },
+          correction: {
+            canRevert: false,
+            targetEventId: null,
+            targetEventType: null,
+            targetOccurredAt: null,
+          },
+          pagination: {
+            pageSize: 50,
+            totalItems: 75,
+            sortOrder: 'append_desc',
+            hasMore: !earlier,
+            nextBeforeEventId: earlier ? null : '75',
+          },
+          events: [{
+            eventType: earlier ? 'shown' : 'accepted',
+            label: earlier ? 'Показано' : 'Взято в работу',
+            occurredAt: earlier
+              ? '2026-07-01T10:00:00.000Z'
+              : '2026-07-27T10:00:00.000Z',
+            recordedAt: earlier
+              ? '2026-07-01T10:00:01.000Z'
+              : '2026-07-27T10:00:01.000Z',
+            appendOrder: earlier ? '25' : '75',
+            actorType: 'user',
+            reason: null,
+            channel: null,
+            contactPathType: null,
+            contactReferenceLabel: null,
+            valueMinor: null,
+            currency: null,
+            metadata: {},
+            revertsEventId: null,
+            isEffective: true,
+            isReverted: false,
+            revertedByEventId: null,
+          }],
+        }),
+      }
+    }) as jest.Mock
+    render(<OpportunityOutcomePanel opportunityId="10" fallbackStage="accepted" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Коммерческий статус' }))
+    fireEvent.click(await screen.findByRole('button', {
+      name: 'Показать более ранние события',
+    }))
+
+    expect(await screen.findByText('Показано')).toBeInTheDocument()
+    expect(screen.getAllByText('Взято в работу')).toHaveLength(1)
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/opportunities/10/outcomes?beforeEventId=75&pageSize=50',
+      { cache: 'no-store' },
+    )
+  })
 })
