@@ -16,6 +16,7 @@ import {
 import {
   decodeLegacyOwnerSession,
   exchangeLegacyOwnerSession,
+  readLegacyOwnerSessionForAuthorization,
 } from "@/lib/auth-v2/legacy-session";
 
 const mockGetPool = jest.mocked(getPool);
@@ -134,6 +135,71 @@ describe("bounded auth v2 legacy session exchange", () => {
       now,
     })).resolves.toBeNull();
     expect(query).toHaveBeenCalledTimes(1);
+  });
+
+  test("authorizes eligible legacy sessions only inside the migration window", async () => {
+    const query = jest.fn().mockResolvedValue({
+      rows: [{ userId: "42" }],
+      rowCount: 1,
+    });
+    mockGetPool.mockReturnValue({ query } as never);
+    const token = legacyToken("42");
+
+    await expect(readLegacyOwnerSessionForAuthorization({
+      legacyToken: token,
+      env: enabledEnv,
+      now,
+    })).resolves.toBe("42");
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(String(query.mock.calls[0]?.[0])).toContain("account.status = 'active'");
+    expect(String(query.mock.calls[0]?.[0])).toContain(
+      "account.email_verified_at IS NOT NULL",
+    );
+    expect(String(query.mock.calls[0]?.[0])).toContain(
+      "prior_exchange.event_type = 'legacy_session_migrated'",
+    );
+    expect(query.mock.calls[0]?.[1]).toEqual([
+      "42",
+      expect.stringMatching(/^[a-f0-9]{64}$/),
+    ]);
+
+    await expect(readLegacyOwnerSessionForAuthorization({
+      legacyToken: token,
+      env: {
+        ...enabledEnv,
+        AUTH_LEGACY_SESSION_MIGRATION_DEADLINE: "2026-07-01T00:00:00Z",
+      },
+      now,
+    })).resolves.toBeNull();
+    expect(query).toHaveBeenCalledTimes(1);
+  });
+
+  test("denies replayed, suspended, or unverified legacy identities", async () => {
+    const query = jest.fn().mockResolvedValue({ rows: [], rowCount: 0 });
+    mockGetPool.mockReturnValue({ query } as never);
+
+    await expect(readLegacyOwnerSessionForAuthorization({
+      legacyToken: legacyToken("42"),
+      env: enabledEnv,
+      now,
+    })).resolves.toBeNull();
+  });
+
+  test("keeps non-canary users on the unchanged legacy path", async () => {
+    const query = jest.fn();
+    mockGetPool.mockReturnValue({ query } as never);
+
+    await expect(readLegacyOwnerSessionForAuthorization({
+      legacyToken: legacyToken("77"),
+      env: {
+        ...enabledEnv,
+        AUTH_PLATFORM_V2_ENABLED: "false",
+        AUTH_V2_CANARY_USER_IDS: "42",
+        AUTH_LEGACY_SESSION_MIGRATION_ENABLED: "false",
+      },
+      now,
+    })).resolves.toBe("77");
+    expect(query).not.toHaveBeenCalled();
   });
 });
 

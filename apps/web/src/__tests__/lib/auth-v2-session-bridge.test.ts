@@ -1,7 +1,8 @@
-import { createHmac } from "node:crypto";
-
 jest.mock("next/headers", () => ({
   cookies: jest.fn(),
+}));
+jest.mock("@/lib/auth-v2/legacy-session", () => ({
+  readLegacyOwnerSessionForAuthorization: jest.fn(),
 }));
 jest.mock("@/lib/auth-v2/session-cookie", () => ({
   clearAuthV2SessionCookie: jest.fn(),
@@ -18,6 +19,9 @@ import {
   readAuthV2SessionCookie,
 } from "@/lib/auth-v2/session-cookie";
 import {
+  readLegacyOwnerSessionForAuthorization,
+} from "@/lib/auth-v2/legacy-session";
+import {
   readAuthSession,
   revokeAuthSessionById,
 } from "@/lib/auth-v2/sessions";
@@ -30,17 +34,13 @@ import { cookies } from "next/headers";
 const mockCookies = jest.mocked(cookies);
 const mockReadV2Cookie = jest.mocked(readAuthV2SessionCookie);
 const mockClearV2Cookie = jest.mocked(clearAuthV2SessionCookie);
+const mockReadLegacyForAuthorization = jest.mocked(
+  readLegacyOwnerSessionForAuthorization,
+);
 const mockReadV2Session = jest.mocked(readAuthSession);
 const mockRevokeV2 = jest.mocked(revokeAuthSessionById);
 const originalSessionSecret = process.env.SESSION_SECRET;
 const originalPlatformFlag = process.env.AUTH_PLATFORM_V2_ENABLED;
-
-function legacyToken(userId: string): string {
-  const mac = createHmac("sha256", process.env.SESSION_SECRET!)
-    .update(`session:${userId}`)
-    .digest("hex");
-  return `${userId}.${mac}`;
-}
 
 describe("owner session compatibility bridge", () => {
   const deleteCookie = jest.fn();
@@ -69,6 +69,7 @@ describe("owner session compatibility bridge", () => {
     } as never);
     mockReadV2Cookie.mockResolvedValue(null);
     mockClearV2Cookie.mockResolvedValue(undefined);
+    mockReadLegacyForAuthorization.mockResolvedValue(null);
     mockReadV2Session.mockResolvedValue(null);
     mockRevokeV2.mockResolvedValue(true);
     getCookie.mockReturnValue(undefined);
@@ -79,19 +80,50 @@ describe("owner session compatibility bridge", () => {
     mockReadV2Session.mockResolvedValue({
       id: "17",
       userId: "42",
+      rotationDue: false,
     } as never);
 
     await expect(readOwnerSession()).resolves.toBe("42");
     expect(mockReadV2Session).toHaveBeenCalledWith("a".repeat(64));
   });
 
-  test("preserves a valid legacy owner session when no v2 cookie exists", async () => {
+  test("preserves only a policy-authorized legacy session", async () => {
+    const token = `42.${"c".repeat(64)}`;
     getCookie.mockImplementation((name: string) => (
-      name === "rr_sid" ? { value: legacyToken("42") } : undefined
+      name === "rr_sid" ? { value: token } : undefined
     ));
+    mockReadLegacyForAuthorization.mockResolvedValue("42");
 
     await expect(readOwnerSession()).resolves.toBe("42");
     expect(mockReadV2Session).not.toHaveBeenCalled();
+    expect(mockReadLegacyForAuthorization).toHaveBeenCalledWith({
+      legacyToken: token,
+    });
+  });
+
+  test("does not revive a legacy cookie rejected after one-time exchange", async () => {
+    const token = `42.${"d".repeat(64)}`;
+    getCookie.mockImplementation((name: string) => (
+      name === "rr_sid" ? { value: token } : undefined
+    ));
+    mockReadLegacyForAuthorization.mockResolvedValue(null);
+
+    await expect(readOwnerSession()).resolves.toBeNull();
+    expect(mockReadLegacyForAuthorization).toHaveBeenCalledWith({
+      legacyToken: token,
+    });
+  });
+
+  test("does not authorize a database session that requires rotation", async () => {
+    mockReadV2Cookie.mockResolvedValue("a".repeat(64));
+    mockReadV2Session.mockResolvedValue({
+      id: "17",
+      userId: "42",
+      rotationDue: true,
+    } as never);
+
+    await expect(readOwnerSession()).resolves.toBeNull();
+    expect(mockReadLegacyForAuthorization).not.toHaveBeenCalled();
   });
 
   test("does not accept a non-canary v2 session while the platform is disabled", async () => {
@@ -101,6 +133,7 @@ describe("owner session compatibility bridge", () => {
     mockReadV2Session.mockResolvedValue({
       id: "17",
       userId: "42",
+      rotationDue: false,
     } as never);
 
     await expect(readOwnerSession()).resolves.toBeNull();

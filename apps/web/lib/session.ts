@@ -1,4 +1,4 @@
-import { createHmac, randomBytes, timingSafeEqual } from "crypto";
+import { createHmac, randomBytes } from "crypto";
 import { cookies } from "next/headers";
 
 import {
@@ -6,6 +6,9 @@ import {
   readAuthV2SessionCookie,
 } from "./auth-v2/session-cookie";
 import { isAuthV2SessionReadEnabledForUser } from "./auth-v2/config";
+import {
+  readLegacyOwnerSessionForAuthorization,
+} from "./auth-v2/legacy-session";
 import {
   readAuthSession,
   revokeAuthSession,
@@ -33,31 +36,6 @@ function encode(ownerId: string): string {
   return `${ownerId}.${mac}`;
 }
 
-function decode(token: string): string | null {
-  try {
-    const dot = token.lastIndexOf(".");
-    if (dot < 1) return null;
-
-    const ownerId = token.slice(0, dot);
-    const mac = token.slice(dot + 1);
-
-    if (!/^[1-9]\d*$/.test(ownerId)) return null;
-
-    const secret = getSecret();
-    const expected = sign(`session:${ownerId}`, secret);
-
-    const macBuf = Buffer.from(mac, "hex");
-    const expectedBuf = Buffer.from(expected, "hex");
-
-    if (macBuf.length !== expectedBuf.length) return null;
-    if (!timingSafeEqual(macBuf, expectedBuf)) return null;
-
-    return ownerId;
-  } catch {
-    return null;
-  }
-}
-
 export async function getOwnerIdFromSession(): Promise<string | null> {
   return readOwnerSession();
 }
@@ -83,13 +61,14 @@ export async function readOwnerSession(): Promise<string | null> {
       session
       && isAuthV2SessionReadEnabledForUser(session.userId)
     ) {
+      if (session.rotationDue) return null;
       return session.userId;
     }
   }
 
   const token = await readLegacyOwnerSessionCookie();
   if (!token) return null;
-  return decode(token);
+  return readLegacyOwnerSessionForAuthorization({ legacyToken: token });
 }
 
 export async function readLegacyOwnerSessionCookie(): Promise<string | null> {

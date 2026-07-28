@@ -576,6 +576,12 @@ Rules:
 - expired/revoked/missing user/missing membership fails closed;
 - `last_seen_at` writes are throttled;
 - rotation is compare-and-swap under row lock;
+- once the current token reaches the 24-hour rotation boundary it no longer
+  authorizes through the shared server-side owner/session boundary; recovery
+  requires the strict same-origin refresh route;
+- the root refresh client rotates within the final five minutes before that
+  hard cutoff, while API-only and JavaScript-disabled clients fail closed at
+  the cutoff instead of extending the bearer token to absolute expiry;
 - previous hash grace may authorize the in-flight request but never creates
   another rotation or resurrects a revoked session;
 - login, reauth, privilege change, email change и workspace switch rotate token;
@@ -604,9 +610,12 @@ The writable `/api/auth/session/refresh` boundary performs due rotation and
 bounded legacy exchange. A small root client calls it on load and every five
 minutes; read-only Server Components never mutate cookies.
 
-Existing user с `email_verified_at IS NULL` keeps ordinary product access during
-the bounded compatibility window, but sensitive operations require a fresh
-verified-email challenge. Exchange never marks email verified by itself.
+Every legacy authorization for a v2-eligible user revalidates active account
+status, verified identity, the exact migration deadline and the durable
+`legacy_session_migrated` fingerprint ledger. After exchange, a copied
+`rr_sid` cannot authorize again. Users outside the global/canary v2 serving
+policy remain on the unchanged legacy read path until their rollout stage;
+exchange never marks email verified by itself.
 
 Removal condition:
 

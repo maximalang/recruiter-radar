@@ -56,7 +56,9 @@
   - Remediation completed locally: session-scoped recent auth, runtime rotation
     and legacy exchange, canary serving policy, same-origin confirm, stale-link
     invalidation, guarded reverse chain, split verification limits and bounded
-    challenge retention cleanup. Awaiting repeated independent review/CI.
+    challenge retention cleanup. The second review's legacy replay and
+    JavaScript-only rotation blockers are now enforced at the shared
+    authorization boundary; awaiting the next independent review/CI.
 
 ## PR 2 — Workspaces
 

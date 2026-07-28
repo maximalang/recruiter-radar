@@ -90,6 +90,30 @@ describe("auth v2 writable session refresh boundary", () => {
     });
   });
 
+  test("rotates shortly before the hard authorization cutoff", async () => {
+    const rotatedAt = new Date(Date.now() - ((24 * 60) - 4) * 60 * 1000);
+    mockReadCookie.mockResolvedValue("a".repeat(64));
+    mockReadSession.mockResolvedValue({
+      id: "17",
+      userId: "42",
+      rotationDue: false,
+      rotatedAt,
+    } as never);
+    mockRotate.mockResolvedValue({
+      token: "b".repeat(64),
+      session: { id: "17", userId: "42" },
+    } as never);
+
+    await POST(sameOriginRequest());
+
+    expect(mockRotate).toHaveBeenCalledWith(
+      "a".repeat(64),
+      expect.any(Date),
+      { force: true },
+    );
+    expect(mockWriteCookie).toHaveBeenCalledWith("b".repeat(64));
+  });
+
   test("exchanges an eligible legacy cookie once and clears it", async () => {
     const legacyToken = `42.${"c".repeat(64)}`;
     mockReadLegacy.mockResolvedValue(legacyToken);
