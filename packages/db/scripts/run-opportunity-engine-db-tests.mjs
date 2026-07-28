@@ -147,15 +147,32 @@ try {
       '--json',
     ],
   )
+  const canaryEnvironment = {
+    ...testEnvironment,
+    OPPORTUNITY_ENGINE_V1_ENABLED: 'false',
+    OPPORTUNITY_OUTCOMES_ENABLED: 'false',
+    OPPORTUNITY_OUTCOMES_UI_ENABLED: 'false',
+    OPPORTUNITY_OUTCOMES_EXTERNAL_INGEST_ENABLED: 'false',
+    OPPORTUNITY_CANARY_OWNER_IDS: '',
+  }
+  await run(
+    process.execPath,
+    [
+      outcomeCanaryScript,
+      '--owner-id',
+      String(fixtureOwnerId),
+      '--pre-activation',
+    ],
+    root,
+    canaryEnvironment,
+  )
   await run(
     process.execPath,
     [outcomeCanaryScript, '--owner-id', String(fixtureOwnerId)],
     root,
     {
-      ...testEnvironment,
-      OPPORTUNITY_OUTCOMES_ENABLED: 'true',
-      OPPORTUNITY_OUTCOMES_UI_ENABLED: 'true',
-      OPPORTUNITY_OUTCOMES_EXTERNAL_INGEST_ENABLED: 'false',
+      ...canaryEnvironment,
+      OPPORTUNITY_CANARY_OWNER_IDS: String(fixtureOwnerId),
     },
   )
   await admin.query(
