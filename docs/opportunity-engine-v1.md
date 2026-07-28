@@ -282,6 +282,7 @@ npm.cmd run db:validate
 $env:DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:5432/postgres'
 npm.cmd run test:opportunity-engine:db
 npm.cmd run test:opportunity-engine:down
+npm.cmd run opportunity-outcomes:canary -- --owner-id <fixture-owner>
 ```
 
 DB runner применяет всю migration chain к свежей схеме, запускает SQL verifier в
@@ -293,10 +294,14 @@ rollback-транзакции и production TypeScript runtime test через �
 обратном порядке, проверяет сохранение audit provenance действий и удаление runtime tables.
 
 Outcome DB runner дополнительно создаёт отдельные upgrade fixtures: predecessor
-meeting без metadata безопасно становится `scheduled`, а commercial chronology,
-идущая назад по append order, блокирует hardening migration. Down runner проходит
-10 migrations и до отката проверяет fail-safe отказ при active snooze workflow и
-protected contact reference.
+meeting без metadata безопасно становится `scheduled`, commercial chronology,
+идущая назад по append order, блокирует hardening migration, а proposal без
+отдельного `meeting_completed` блокирует lifecycle upgrade. Runtime fixture
+завершается owner-scoped Outcome canary, который проверяет rebuild parity,
+tenant isolation, chronology, meeting lifecycle, privacy, replay/cohort
+uniqueness и выключенный external ingestion. Down runner проходит 13 migrations
+и до отката проверяет fail-safe отказ при active snooze workflow, protected
+contact reference и данных, не представимых в predecessor meeting schema.
 
 Проверки покрывают:
 
@@ -329,6 +334,42 @@ raw URL и payload в них не пишутся.
 В плане не должно быть полного произведения `client_profiles × hiring_episodes`;
 стартовый набор — `latest_candidates`.
 
+## Queue semantics
+
+Opportunity list views используют Outcome projection как authority:
+`morning=active+(new|review)`, `accepted=active+accepted`,
+`pipeline=active+(contacted|replied|meeting|proposal)`,
+`snoozed=workflow snoozed`, `completed=(won|lost|dismissed)`. При отсутствии
+projection применяется tenant-scoped legacy fallback. Morning Brief не
+показывает accepted, pipeline, snoozed или completed opportunities.
+
+## Correction capability
+
+Backend вычисляет единственный допустимый revert target по полному effective
+ledger и возвращает capability независимо от страницы history. UI не выводит
+target из загруженных events. Double revert и target другой
+opportunity/tenant блокируются API и DB.
+
+## History pagination
+
+Первая history page содержит последние events в `append_desc`; следующая
+запрашивается через `beforeEventId`. Append-only ID является tie-breaker,
+поэтому concurrent append не создаёт duplicates или gaps.
+
+## Migration preflight
+
+Перед production migration обязателен read-only
+`npm.cmd run opportunity-outcomes:preflight [-- --owner-id <id>] [--json]`.
+Blocking violations дают non-zero exit. Команда не печатает contacts, notes,
+deal values или secrets и ничего не исправляет автоматически.
+
+## Canary acceptance criteria
+
+Полный ручной checklist (funnel, snooze/resume, correction, queues, rebuild
+parity, preflight, idempotency, privacy, disabled external ingest и tenant
+isolation) находится в `docs/opportunity-outcomes.md`. PR остаётся draft до
+его прохождения для одного внутреннего owner.
+
 ## Canary rollout
 
 1. Применить migrations при `OPPORTUNITY_ENGINE_V1_ENABLED=false`.
@@ -341,8 +382,11 @@ raw URL и payload в них не пишутся.
 7. Выполнить detect/build/expire и проверить отсутствие lock contention и
    duplicate current rows.
 8. Включить flag на web runtime для одного тестового owner.
-9. Проверить Morning Brief, lifecycle и evidence metrics.
-10. Расширять canary только после стабильного полного цикла.
+9. Запустить
+   `npm.cmd run opportunity-outcomes:canary -- --owner-id <owner>` и требовать
+   `ready=true`.
+10. Проверить Morning Brief, meeting lifecycle и first-ever cohort metrics.
+11. Расширять canary только после стабильного полного цикла.
 
 Минимальные canary-инварианты:
 
