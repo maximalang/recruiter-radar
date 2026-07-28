@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 
 import {
-  isOpportunityEngineV1Enabled,
-  isOpportunityOutcomesEnabled,
+  isOpportunityEngineV1EnabledForOwner,
+  isOpportunityOutcomesEnabledForOwner,
 } from '@/lib/opportunities/config'
 import {
   OutcomeValidationError,
@@ -34,10 +34,10 @@ export async function POST(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
-  if (!isOpportunityEngineV1Enabled()) {
+  const ownerId = await getOwnerIdFromSession()
+  if (!isOpportunityEngineV1EnabledForOwner(ownerId)) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 })
   }
-  const ownerId = await getOwnerIdFromSession()
   if (!ownerId) {
     return NextResponse.json({ error: 'authentication_required' }, { status: 401 })
   }
@@ -72,7 +72,7 @@ export async function POST(
   const occurredAt = new Date().toISOString()
 
   let outcomeInput: ReturnType<typeof validateOutcomeInput> | null = null
-  if (isOpportunityOutcomesEnabled()) {
+  if (isOpportunityOutcomesEnabledForOwner(ownerId)) {
     try {
       outcomeInput = validateOutcomeInput({
         eventType: body.action,

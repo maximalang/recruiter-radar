@@ -19,10 +19,12 @@ const mockedSummary = jest.mocked(getOutcomeFunnelSummary)
 describe('opportunity outcome summary API', () => {
   const originalEngine = process.env.OPPORTUNITY_ENGINE_V1_ENABLED
   const originalOutcomes = process.env.OPPORTUNITY_OUTCOMES_ENABLED
+  const originalCanaryOwners = process.env.OPPORTUNITY_CANARY_OWNER_IDS
 
   beforeEach(() => {
     process.env.OPPORTUNITY_ENGINE_V1_ENABLED = 'true'
     process.env.OPPORTUNITY_OUTCOMES_ENABLED = 'true'
+    delete process.env.OPPORTUNITY_CANARY_OWNER_IDS
     mockedOwner.mockResolvedValue('7')
     mockedSummary.mockResolvedValue({
       period: {
@@ -60,6 +62,7 @@ describe('opportunity outcome summary API', () => {
   afterAll(() => {
     restore('OPPORTUNITY_ENGINE_V1_ENABLED', originalEngine)
     restore('OPPORTUNITY_OUTCOMES_ENABLED', originalOutcomes)
+    restore('OPPORTUNITY_CANARY_OWNER_IDS', originalCanaryOwners)
   })
 
   it('is tenant scoped and passes only controlled filters', async () => {
@@ -104,6 +107,24 @@ describe('opportunity outcome summary API', () => {
     const response = await GET(request(''))
     expect(response.status).toBe(404)
     expect(mockedSummary).not.toHaveBeenCalled()
+  })
+
+  it('exposes analytics only to the configured canary owner', async () => {
+    process.env.OPPORTUNITY_ENGINE_V1_ENABLED = 'false'
+    process.env.OPPORTUNITY_OUTCOMES_ENABLED = 'false'
+    process.env.OPPORTUNITY_CANARY_OWNER_IDS = '7'
+
+    mockedOwner.mockResolvedValueOnce('8')
+    const denied = await GET(request(''))
+    expect(denied.status).toBe(404)
+    expect(mockedSummary).not.toHaveBeenCalled()
+
+    mockedOwner.mockResolvedValueOnce('7')
+    const allowed = await GET(request(''))
+    expect(allowed.status).toBe(200)
+    expect(mockedSummary).toHaveBeenCalledWith(expect.objectContaining({
+      ownerId: '7',
+    }))
   })
 })
 

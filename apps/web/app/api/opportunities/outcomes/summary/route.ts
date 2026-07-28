@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import {
-  isOpportunityEngineV1Enabled,
-  isOpportunityOutcomesEnabled,
+  isOpportunityEngineV1EnabledForOwner,
+  isOpportunityOutcomesEnabledForOwner,
 } from '@/lib/opportunities/config'
 import { HIRING_EPISODE_TYPES } from '@/lib/opportunities/hiring-episode-detection'
 import { getOutcomeFunnelSummary } from '@/lib/opportunities/outcome-repository'
@@ -15,10 +15,13 @@ export const dynamic = 'force-dynamic'
 const MAX_PERIOD_MS = 366 * 24 * 60 * 60 * 1000
 
 export async function GET(request: NextRequest) {
-  if (!isOpportunityEngineV1Enabled() || !isOpportunityOutcomesEnabled()) {
+  const ownerId = await getOwnerIdFromSession()
+  if (
+    !isOpportunityEngineV1EnabledForOwner(ownerId) ||
+    !isOpportunityOutcomesEnabledForOwner(ownerId)
+  ) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 })
   }
-  const ownerId = await getOwnerIdFromSession()
   if (!ownerId) {
     return NextResponse.json({ error: 'authentication_required' }, { status: 401 })
   }

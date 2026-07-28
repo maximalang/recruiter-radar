@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-import { isOpportunityEngineV1Enabled } from '@/lib/opportunities/config'
+import {
+  isOpportunityEngineV1EnabledForOwner,
+} from '@/lib/opportunities/config'
 import { toPublicOpportunity } from '@/lib/opportunities/api-projection'
 import { getOpportunityById } from '@/lib/opportunities/repository'
 import { logError } from '@/lib/runtime'
@@ -13,10 +15,10 @@ export async function GET(
   _request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
-  if (!isOpportunityEngineV1Enabled()) {
+  const ownerId = await getOwnerIdFromSession()
+  if (!isOpportunityEngineV1EnabledForOwner(ownerId)) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 })
   }
-  const ownerId = await getOwnerIdFromSession()
   if (!ownerId) {
     return NextResponse.json({ error: 'authentication_required' }, { status: 401 })
   }

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import {
-  isOpportunityEngineV1Enabled,
-  isOpportunityOutcomesEnabled,
+  isOpportunityEngineV1EnabledForOwner,
+  isOpportunityOutcomesEnabledForOwner,
 } from '@/lib/opportunities/config'
 import { OutcomeValidationError } from '@/lib/opportunities/outcome-domain'
 import { OutcomeContactPrivacyUnavailableError } from '@/lib/opportunities/outcome-contact-privacy'
@@ -27,10 +27,10 @@ export async function POST(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
-  if (!isOutcomeApiEnabled()) {
+  const ownerId = await getOwnerIdFromSession()
+  if (!isOutcomeApiEnabled(ownerId)) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 })
   }
-  const ownerId = await getOwnerIdFromSession()
   if (!ownerId) {
     return NextResponse.json({ error: 'authentication_required' }, { status: 401 })
   }
@@ -117,10 +117,10 @@ export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
-  if (!isOutcomeApiEnabled()) {
+  const ownerId = await getOwnerIdFromSession()
+  if (!isOutcomeApiEnabled(ownerId)) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 })
   }
-  const ownerId = await getOwnerIdFromSession()
   if (!ownerId) {
     return NextResponse.json({ error: 'authentication_required' }, { status: 401 })
   }
@@ -160,8 +160,11 @@ export async function GET(
   }
 }
 
-function isOutcomeApiEnabled(): boolean {
-  return isOpportunityEngineV1Enabled() && isOpportunityOutcomesEnabled()
+function isOutcomeApiEnabled(
+  ownerId: string | number | null | undefined,
+): boolean {
+  return isOpportunityEngineV1EnabledForOwner(ownerId) &&
+    isOpportunityOutcomesEnabledForOwner(ownerId)
 }
 
 function isPositiveId(value: string): boolean {

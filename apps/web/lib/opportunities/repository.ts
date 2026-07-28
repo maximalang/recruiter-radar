@@ -11,7 +11,7 @@ import type { HiringEpisodeType } from './hiring-episode-detection'
 import {
   clampOpportunityPageSize,
   clampOpportunitySnoozeDays,
-  isOpportunityOutcomesEnabled,
+  isOpportunityOutcomesEnabledForOwner,
 } from './config'
 import type {
   DismissedReasonCode,
@@ -479,7 +479,7 @@ export async function applyOpportunityAction(input: {
 
   try {
     await client.query('BEGIN')
-    if (isOpportunityOutcomesEnabled()) {
+    if (isOpportunityOutcomesEnabledForOwner(input.ownerId)) {
       await lockOutcomeOwnerShared(client, input.ownerId)
     }
     const context = await client.query<{
@@ -600,7 +600,7 @@ export async function applyOpportunityAction(input: {
     if (actionInsert.rowCount !== 1) {
       throw new Error('Opportunity action insert returned no row.')
     }
-    if (isOpportunityOutcomesEnabled()) {
+    if (isOpportunityOutcomesEnabledForOwner(input.ownerId)) {
       const outcome = await recordOpportunityOutcomeInTransaction({
         ownerId: input.ownerId,
         opportunityId: input.opportunityId,

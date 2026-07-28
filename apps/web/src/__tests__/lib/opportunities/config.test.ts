@@ -3,9 +3,12 @@ import {
   clampOpportunityPageSize,
   clampOpportunitySnoozeDays,
   isOpportunityEngineV1Enabled,
+  isOpportunityEngineV1EnabledForOwner,
   isOpportunityOutcomesEnabled,
+  isOpportunityOutcomesEnabledForOwner,
   isOpportunityOutcomesExternalIngestEnabled,
   isOpportunityOutcomesUiEnabled,
+  isOpportunityOutcomesUiEnabledForOwner,
 } from '@/lib/opportunities/config'
 
 describe('opportunity engine config', () => {
@@ -46,5 +49,50 @@ describe('opportunity engine config', () => {
       ...ledger,
       OPPORTUNITY_OUTCOMES_EXTERNAL_INGEST_ENABLED: 'true',
     })).toBe(false)
+  })
+
+  it('enables the internal canary only for exact allowlisted owner IDs', () => {
+    const canary = {
+      OPPORTUNITY_CANARY_OWNER_IDS: '7',
+    }
+
+    expect(isOpportunityEngineV1EnabledForOwner('7', canary)).toBe(true)
+    expect(isOpportunityOutcomesUiEnabledForOwner('7', canary)).toBe(true)
+
+    expect(isOpportunityEngineV1EnabledForOwner('70', canary)).toBe(false)
+    expect(isOpportunityEngineV1EnabledForOwner('07', canary)).toBe(false)
+    expect(isOpportunityEngineV1EnabledForOwner(null, canary)).toBe(false)
+    expect(isOpportunityOutcomesEnabledForOwner('8', canary)).toBe(false)
+    expect(isOpportunityOutcomesUiEnabledForOwner('8', canary)).toBe(false)
+
+    for (const invalid of [
+      '7,42',
+      '7,7',
+      '7,invalid',
+      '7,',
+      ',7',
+      '7,,',
+      '*',
+      '07',
+    ]) {
+      expect(isOpportunityEngineV1EnabledForOwner('7', {
+        OPPORTUNITY_CANARY_OWNER_IDS: invalid,
+      })).toBe(false)
+    }
+  })
+
+  it('preserves global enablement without allowing malformed owner IDs', () => {
+    expect(isOpportunityEngineV1EnabledForOwner(null, {
+      OPPORTUNITY_ENGINE_V1_ENABLED: 'true',
+    })).toBe(true)
+    expect(isOpportunityOutcomesEnabledForOwner('not-an-owner', {
+      OPPORTUNITY_ENGINE_V1_ENABLED: 'true',
+      OPPORTUNITY_OUTCOMES_ENABLED: 'true',
+    })).toBe(true)
+    expect(isOpportunityOutcomesUiEnabledForOwner('9', {
+      OPPORTUNITY_ENGINE_V1_ENABLED: 'true',
+      OPPORTUNITY_OUTCOMES_ENABLED: 'true',
+      OPPORTUNITY_OUTCOMES_UI_ENABLED: 'true',
+    })).toBe(true)
   })
 })

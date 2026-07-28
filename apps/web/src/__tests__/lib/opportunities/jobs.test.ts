@@ -141,14 +141,21 @@ function buildRow(
 
 describe('opportunity background jobs', () => {
   const originalFlag = process.env.OPPORTUNITY_ENGINE_V1_ENABLED
+  const originalCanaryOwners = process.env.OPPORTUNITY_CANARY_OWNER_IDS
 
   beforeEach(() => {
     process.env.OPPORTUNITY_ENGINE_V1_ENABLED = 'true'
+    delete process.env.OPPORTUNITY_CANARY_OWNER_IDS
   })
 
   afterAll(() => {
     if (originalFlag === undefined) delete process.env.OPPORTUNITY_ENGINE_V1_ENABLED
     else process.env.OPPORTUNITY_ENGINE_V1_ENABLED = originalFlag
+    if (originalCanaryOwners === undefined) {
+      delete process.env.OPPORTUNITY_CANARY_OWNER_IDS
+    } else {
+      process.env.OPPORTUNITY_CANARY_OWNER_IDS = originalCanaryOwners
+    }
   })
 
   it('is fully dark behind the feature flag and performs no database work', async () => {
@@ -157,6 +164,21 @@ describe('opportunity background jobs', () => {
     const detected = await detectHiringEpisodesJob({ enabled: false }, db)
     const built = await buildOpportunitiesJob({ enabled: false }, db)
     const expired = await expireOpportunitiesJob({ enabled: false }, db)
+
+    expect(detected.enabled).toBe(false)
+    expect(built.enabled).toBe(false)
+    expect(expired.enabled).toBe(false)
+    expect(db.query).not.toHaveBeenCalled()
+  })
+
+  it('keeps global jobs disabled when only the owner canary is enabled', async () => {
+    process.env.OPPORTUNITY_ENGINE_V1_ENABLED = 'false'
+    process.env.OPPORTUNITY_CANARY_OWNER_IDS = '7'
+    const db = dbWithQuery(() => ({ rowCount: 0, rows: [] }))
+
+    const detected = await detectHiringEpisodesJob({}, db)
+    const built = await buildOpportunitiesJob({}, db)
+    const expired = await expireOpportunitiesJob({}, db)
 
     expect(detected.enabled).toBe(false)
     expect(built.enabled).toBe(false)

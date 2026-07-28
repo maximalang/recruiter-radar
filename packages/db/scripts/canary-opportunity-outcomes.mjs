@@ -4,8 +4,13 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import pg from 'pg'
+import opportunityCanaryFlags from './lib/opportunity-canary-flags.cjs'
 
 const { Client } = pg
+const {
+  isOpportunityCanaryActivationReady,
+  resolveOpportunityCanaryFlags,
+} = opportunityCanaryFlags
 const execFileAsync = promisify(execFile)
 const databaseUrl = process.env.DATABASE_URL?.trim()
 if (!databaseUrl) throw new Error('DATABASE_URL is required.')
@@ -14,14 +19,24 @@ const args = process.argv.slice(2)
 const ownerIndex = args.indexOf('--owner-id')
 const ownerId = ownerIndex >= 0 ? args[ownerIndex + 1] : null
 const apply = args.includes('--apply')
+const preActivation = args.includes('--pre-activation')
 if (!ownerId || !/^[1-9]\d*$/.test(ownerId)) {
   throw new Error('--owner-id requires a positive integer.')
 }
-const allowed = new Set(['--owner-id', ownerId, '--apply', '--dry-run'])
+const allowed = new Set([
+  '--owner-id',
+  ownerId,
+  '--apply',
+  '--dry-run',
+  '--pre-activation',
+])
 const unknown = args.find((argument) => !allowed.has(argument))
 if (unknown) throw new Error(`Unknown argument: ${unknown}`)
 if (apply && args.includes('--dry-run')) {
   throw new Error('Cannot combine --apply with --dry-run.')
+}
+if (apply && preActivation) {
+  throw new Error('Pre-activation validation must remain read-only.')
 }
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
@@ -259,15 +274,18 @@ try {
   const projectionDrift = Number(rebuild.rebuildChanged ?? 0)
   const externalIngestEnabled =
     process.env.OPPORTUNITY_OUTCOMES_EXTERNAL_INGEST_ENABLED === 'true'
-  const flags = {
-    engine: process.env.OPPORTUNITY_ENGINE_V1_ENABLED === 'true',
-    outcomes: process.env.OPPORTUNITY_OUTCOMES_ENABLED === 'true',
-    ui: process.env.OPPORTUNITY_OUTCOMES_UI_ENABLED === 'true',
-  }
+  const flags = resolveOpportunityCanaryFlags(ownerId, process.env)
+  const activationReady = isOpportunityCanaryActivationReady(
+    ownerId,
+    preActivation ? 'pre_activation' : 'active',
+    process.env,
+  )
   const result = {
     ownerId,
     mode: apply ? 'apply' : 'dry_run',
+    phase: preActivation ? 'pre_activation' : 'active',
     flags,
+    activationReady,
     ownerOpportunityCount: Number(ownerScope.rows[0]?.count ?? 0),
     migrationsReady: Boolean(
       schema.rows[0]?.migration_ledger &&
@@ -288,9 +306,7 @@ try {
   const ready = (
     result.migrationsReady &&
     result.ownerOpportunityCount > 0 &&
-    result.flags.engine &&
-    result.flags.outcomes &&
-    result.flags.ui &&
+    result.activationReady &&
     result.tenantIsolationViolations === 0 &&
     result.projectionDrift === 0 &&
     result.cohortProjectionMismatches === 0 &&
