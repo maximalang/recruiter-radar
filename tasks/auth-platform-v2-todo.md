@@ -29,8 +29,8 @@
   - Verify: unit + PostgreSQL concurrency tests.
   - Files: challenge service, request action/route, tests (≤5).
 
-- [ ] Implement atomic challenge consume
-  - Acceptance: one user/workspace/session/event maximum under races.
+- [x] Implement atomic challenge consume
+  - Acceptance: one user, one session and one success-event pair maximum under races; workspace bootstrap joins this transaction in PR 2.
   - Verify: two-consumer/two-signup/resend-consume DB tests.
   - Files: challenge/session services and tests (≤5).
 

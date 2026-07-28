@@ -16,7 +16,10 @@ jest.mock("@/lib/runtime", () => ({
 
 import { getClient, getPool } from "@/lib/db-pool";
 import { sendEmail } from "@/lib/email/transport";
-import { requestAuthV2Login } from "@/lib/auth-v2/challenges";
+import {
+  consumeAuthV2Login,
+  requestAuthV2Login,
+} from "@/lib/auth-v2/challenges";
 
 const mockGetClient = jest.mocked(getClient);
 const mockGetPool = jest.mocked(getPool);
@@ -48,6 +51,33 @@ const verifierPath = resolve(
   "db",
   "scripts",
   "verify-auth-v2-challenges.mjs",
+);
+const consumeMigrationPath = resolve(
+  process.cwd(),
+  "..",
+  "..",
+  "packages",
+  "db",
+  "migrations",
+  "20260728122000_add_auth_challenge_consumption.sql",
+);
+const consumeRollbackPath = resolve(
+  process.cwd(),
+  "..",
+  "..",
+  "packages",
+  "db",
+  "migrations",
+  "20260728122000_add_auth_challenge_consumption.down.sql",
+);
+const consumeVerifierPath = resolve(
+  process.cwd(),
+  "..",
+  "..",
+  "packages",
+  "db",
+  "scripts",
+  "verify-auth-v2-consumption.mjs",
 );
 
 function fakeClient(issueResult: { issued: boolean; challengeId: string | null }) {
@@ -162,6 +192,72 @@ describe("auth v2 login challenge service", () => {
       ["failed", "19"],
     );
   });
+
+  test("consumes a challenge into one opaque database session", async () => {
+    const query = jest.fn(async (sql: string) => {
+      if (sql.includes("consume_auth_login_challenge")) {
+        return {
+          rows: [{
+            consumed: true,
+            userId: "42",
+            sessionId: "73",
+            email: "User@example.com",
+            fullName: null,
+            emailVerifiedAt: new Date("2026-07-28T12:00:00.000Z"),
+            returnTo: "/checkout?plan=pilot-week",
+          }],
+          rowCount: 1,
+        };
+      }
+      return { rows: [], rowCount: 0 };
+    });
+    const client = { query, release: jest.fn() };
+    mockGetClient.mockResolvedValue(client as never);
+
+    const result = await consumeAuthV2Login({
+      token: "a".repeat(64),
+      clientAddress: "192.0.2.10",
+    });
+
+    expect(result).toMatchObject({
+      account: {
+        id: "42",
+        email: "User@example.com",
+        fullName: null,
+      },
+      returnTo: "/checkout?plan=pilot-week",
+      session: { id: "73" },
+    });
+    expect(result?.session.token).toMatch(/^[a-f0-9]{64}$/);
+    const consumeCall = query.mock.calls.find(([sql]) =>
+      String(sql).includes("consume_auth_login_challenge"),
+    );
+    expect(consumeCall?.[1]).toHaveLength(3);
+    expect(consumeCall?.[1]?.[0]).toMatch(/^[a-f0-9]{64}$/);
+    expect(consumeCall?.[1]?.[0]).not.toBe("a".repeat(64));
+    expect(consumeCall?.[1]?.[1]).toMatch(/^[a-f0-9]{64}$/);
+    expect(consumeCall?.[1]?.[1]).not.toBe(result?.session.token);
+    expect(consumeCall?.[1]?.[2]).toMatch(/^[a-f0-9]{64}$/);
+    expect(consumeCall?.[1]).not.toContain("192.0.2.10");
+    expect(client.release).toHaveBeenCalled();
+  });
+
+  test("rejects malformed consume tokens before touching the database", async () => {
+    await expect(consumeAuthV2Login({
+      token: "not-a-token",
+      clientAddress: "unknown",
+    })).resolves.toBeNull();
+    expect(mockGetClient).not.toHaveBeenCalled();
+  });
+
+  test("fails closed when the consume database is unavailable", async () => {
+    mockGetClient.mockRejectedValue(new Error("database unavailable"));
+
+    await expect(consumeAuthV2Login({
+      token: "b".repeat(64),
+      clientAddress: "unknown",
+    })).resolves.toBeNull();
+  });
 });
 
 describe("auth v2 challenge issuance database contract", () => {
@@ -211,5 +307,41 @@ describe("auth v2 challenge issuance database contract", () => {
     expect(verifier).toContain("users_created_before_verification");
     expect(verifier).toContain("one_active_after_concurrent_resend");
     expect(verifier).toContain("rate_limit_denied");
+  });
+});
+
+describe("auth v2 atomic challenge consumption contract", () => {
+  const migration = readFileSync(consumeMigrationPath, "utf8");
+  const rollback = readFileSync(consumeRollbackPath, "utf8");
+  const verifier = readFileSync(consumeVerifierPath, "utf8");
+  const compact = migration.replace(/\s+/g, " ");
+
+  test("serializes identity resolution and creates verified users only on consume", () => {
+    expect(compact).toContain("CREATE FUNCTION consume_auth_login_challenge");
+    expect(compact).toContain("pg_advisory_xact_lock");
+    expect(compact).toContain("FOR UPDATE");
+    expect(compact).toContain("INSERT INTO users");
+    expect(compact).toContain("email_verified_at");
+    expect(compact).toContain("INSERT INTO auth_sessions");
+    expect(compact).toContain("UPDATE auth_challenges AS challenge SET consumed_at");
+  });
+
+  test("applies verification limits and writes bounded replay and success audit", () => {
+    expect(compact).toContain("'challenge_verify'");
+    expect(compact).toContain("challenge_replayed");
+    expect(compact).toContain("ON CONFLICT (subject_hash)");
+    expect(compact).toContain("login_succeeded");
+    expect(compact).toContain("session_created");
+    expect(compact).not.toContain("input_email");
+  });
+
+  test("ships a safe down path and real race verifier", () => {
+    expect(rollback).toContain(
+      "DROP FUNCTION IF EXISTS consume_auth_login_challenge",
+    );
+    expect(verifier).toContain("Promise.all");
+    expect(verifier).toContain("one_consumer_one_session");
+    expect(verifier).toContain("one_signup_identity");
+    expect(verifier).toContain("resend_consume_serialized");
   });
 });

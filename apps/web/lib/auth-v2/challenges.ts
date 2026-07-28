@@ -1,17 +1,30 @@
 import { createHash, createHmac, randomBytes } from "node:crypto";
 import type { PoolClient } from "pg";
 
-import { buildAccountLoginUrl } from "../account-auth";
+import {
+  buildAccountLoginUrl,
+  type AccountIdentity,
+} from "../account-auth";
 import { getClient, getPool } from "../db-pool";
 import { sendEmail } from "../email/transport";
 import { logError, logWarn } from "../runtime";
 import { normalizeAuthEmail, sanitizeAuthReturnTo } from "./security";
 
 const LOGIN_TTL_MINUTES = 15;
+const TOKEN_PATTERN = /^[a-f0-9]{64}$/;
 
 export type AuthV2LoginRequestResult =
   | { ok: true }
   | { ok: false; error: string };
+
+export type AuthV2LoginConsumeResult = {
+  account: AccountIdentity;
+  returnTo: string;
+  session: {
+    id: string;
+    token: string;
+  };
+};
 
 function authRateLimitSecret(): string {
   const secret = (
@@ -146,4 +159,81 @@ export async function requestAuthV2Login(input: {
   }
 
   return { ok: true };
+}
+
+export async function consumeAuthV2Login(input: {
+  token: string;
+  clientAddress: string;
+}): Promise<AuthV2LoginConsumeResult | null> {
+  const token = input.token.trim();
+  if (!TOKEN_PATTERN.test(token)) return null;
+
+  const sessionToken = randomBytes(32).toString("hex");
+  const verificationKeyHash = hashBoundary(
+    "challenge-verify",
+    input.clientAddress || "unknown",
+  );
+  let client: PoolClient | null = null;
+
+  try {
+    client = await getClient();
+    if (!client) return null;
+    await client.query("BEGIN");
+    const consumed = await client.query<{
+      consumed: boolean;
+      userId: string | null;
+      sessionId: string | null;
+      email: string | null;
+      fullName: string | null;
+      emailVerifiedAt: Date | null;
+      returnTo: string | null;
+    }>(
+      `SELECT
+         consumed,
+         user_id::TEXT AS "userId",
+         session_id::TEXT AS "sessionId",
+         email,
+         full_name AS "fullName",
+         email_verified_at AS "emailVerifiedAt",
+         return_to AS "returnTo"
+       FROM consume_auth_login_challenge($1, $2, $3)`,
+      [
+        hashToken(token),
+        hashToken(sessionToken),
+        verificationKeyHash,
+      ],
+    );
+    const row = consumed.rows[0];
+    if (
+      !row?.consumed
+      || !row.userId
+      || !row.sessionId
+      || !row.email
+      || !row.emailVerifiedAt
+    ) {
+      await client.query("COMMIT");
+      return null;
+    }
+
+    await client.query("COMMIT");
+    return {
+      account: {
+        id: row.userId,
+        email: row.email,
+        fullName: row.fullName,
+        emailVerifiedAt: row.emailVerifiedAt,
+      },
+      returnTo: sanitizeAuthReturnTo(row.returnTo),
+      session: {
+        id: row.sessionId,
+        token: sessionToken,
+      },
+    };
+  } catch (error) {
+    if (client) await rollbackQuietly(client);
+    logError("auth_v2.login_confirmation_failed", error);
+    return null;
+  } finally {
+    client?.release();
+  }
 }
