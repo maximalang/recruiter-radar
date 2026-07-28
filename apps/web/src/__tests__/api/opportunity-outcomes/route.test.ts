@@ -111,6 +111,10 @@ describe('opportunity outcomes API', () => {
         lostReasonCode: null,
         dealValueMinor: null,
         currency: null,
+        meetingStatus: 'none',
+        activeMeetingEventId: null,
+        lastMeetingEventAt: null,
+        meetingAttemptCount: 0,
       },
     })
 
@@ -164,6 +168,8 @@ describe('opportunity outcomes API', () => {
         contactedAt: null, repliedAt: null, meetingAt: null, proposalAt: null,
         wonAt: null, lostAt: null, dismissReasonCode: null,
         lostReasonCode: null, dealValueMinor: null, currency: null,
+        meetingStatus: 'none', activeMeetingEventId: null,
+        lastMeetingEventAt: null, meetingAttemptCount: 0,
       },
     })
 

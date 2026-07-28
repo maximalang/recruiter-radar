@@ -78,12 +78,14 @@ describe('opportunity cron API', () => {
         enabled: true, dryRun: true, scanned: 0, created: 0,
         updated: 0, skipped: 0, failed: 0, expired: 0,
         continued: 0, reconciled: 0, skippedUnchanged: 0, superseded: 0,
+        resumed: 0, resumeLatencyMsTotal: 0, resumeLatencyMsMax: 0,
         locked: 0, skippedBecauseLocked: false,
       },
       opportunities: {
         enabled: true, dryRun: true, scanned: 0, created: 0,
         updated: 0, skipped: 0, failed: 0, expired: 0,
         continued: 0, reconciled: 0, skippedUnchanged: 0, superseded: 0,
+        resumed: 0, resumeLatencyMsTotal: 0, resumeLatencyMsMax: 0,
         locked: 0, skippedBecauseLocked: false,
       },
     })

@@ -16,6 +16,8 @@ describe('opportunity API projection', () => {
       episodeStartedAt: '2026-07-20T00:00:00.000Z',
       episodeLastSeenAt: '2026-07-26T00:00:00.000Z',
       status: 'new',
+      commercialStage: 'new',
+      workflowState: 'active',
       title: 'Возможность',
       whyNow: 'Почему',
       problemHypothesis: 'Гипотеза',

@@ -1007,6 +1007,8 @@ describeWithDatabase('Opportunity Outcome production PostgreSQL runtime', () => 
       opportunityId: historyOpportunityId,
       pageSize: 50,
     }, database)
+    expect(first).not.toBeNull()
+    if (!first) throw new Error('Expected tenant-scoped history')
     expect(first.events).toHaveLength(50)
     expect(first.events.some((event) =>
       event.appendOrder === accepted?.event.id)).toBe(false)
@@ -1032,6 +1034,8 @@ describeWithDatabase('Opportunity Outcome production PostgreSQL runtime', () => 
       pageSize: 50,
       beforeEventId: first.pagination.nextBeforeEventId,
     }, database)
+    expect(second).not.toBeNull()
+    if (!second) throw new Error('Expected earlier tenant-scoped history')
     const loadedIds = [...first.events, ...second.events].map(
       (event) => event.appendOrder,
     )
@@ -1297,6 +1301,8 @@ describeWithDatabase('Opportunity Outcome production PostgreSQL runtime', () => 
       opportunityId: targetOpportunityId,
       pageSize: 5,
     }, database)
+    expect(corrected).not.toBeNull()
+    if (!corrected) throw new Error('Expected corrected tenant-scoped history')
     expect(corrected.correction.canRevert).toBe(false)
     expect(corrected.events.find((event) => event.appendOrder === wonEventId))
       .toMatchObject({
@@ -1320,6 +1326,8 @@ describeWithDatabase('Opportunity Outcome production PostgreSQL runtime', () => 
       opportunityId: targetOpportunityId,
       pageSize: 5,
     }, database)
+    expect(renewed).not.toBeNull()
+    if (!renewed) throw new Error('Expected renewed tenant-scoped history')
     expect(renewed.correction).toMatchObject({
       canRevert: true,
       targetEventId: wonAgain?.event.id,
@@ -1627,7 +1635,7 @@ function outcomePayload(
   occurredAt: number,
   override: Partial<OpportunityOutcomeInput> = {},
 ): OpportunityOutcomeInput {
-  const defaultMetadata = eventType === 'shown'
+  const defaultMetadata: Record<string, string> = eventType === 'shown'
     ? { surface: 'runtime_test', cycleId: idempotencyKey }
     : eventType === 'opened'
       ? { interactionId: idempotencyKey }
