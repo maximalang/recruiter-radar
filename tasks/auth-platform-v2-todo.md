@@ -14,7 +14,7 @@
   - Verify: self-review against Goal Definition of Done.
   - Files: spec + scoped plan/todo.
 
-- [ ] Add auth-v2 config and boundary primitives
+- [x] Add auth-v2 config and boundary primitives
   - Acceptance: exact-true flags, strict canary IDs, email/returnTo/proxy rules.
   - Verify: focused unit tests.
   - Files: config/security modules and tests (≤5).
