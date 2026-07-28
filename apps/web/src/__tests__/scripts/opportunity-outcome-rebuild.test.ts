@@ -26,13 +26,16 @@ describe('opportunity outcome projection rebuild contract', () => {
   it('rebuilds deterministically from append order and preserves tenant context', () => {
     expect(script).toContain('(ARRAY_AGG(id ORDER BY id DESC))[1] AS last_event_id')
     expect(script).toContain('commercial_stage AS current_stage')
-    expect(script).toMatch(/GROUP BY\r?\n\s+owner_id,/)
+    expect(script).toMatch(/GROUP BY\r?\n\s+context\.owner_id,/)
+    expect(script).toContain('meeting_attempt_count')
+    expect(script).toContain('active_meeting_event_id')
     expect(script).toContain('ORDER BY owner_id, opportunity_id')
   })
 
   it('takes an exclusive owner lock while writers use the shared lock', () => {
     expect(script).toContain("hashtextextended('opportunity-outcome-owner:' || $1, 0)")
-    expect(script).toContain('SELECT DISTINCT owner_id::TEXT AS "ownerId"')
+    expect(script).toContain('SELECT owner_id::TEXT AS "ownerId"')
+    expect(script).toContain('GROUP BY owner_id')
     expect(script).toContain('for (const owner of owners.rows)')
   })
 

@@ -59,7 +59,11 @@ const comparableColumns = `
   dismiss_reason_code,
   lost_reason_code,
   deal_value_minor,
-  currency
+  currency,
+  meeting_status,
+  active_meeting_event_id,
+  last_meeting_event_at,
+  meeting_attempt_count
 `
 
 const projectionSql = `
@@ -70,7 +74,7 @@ const projectionSql = `
     SELECT *
     FROM opportunity_outcome_events
     WHERE owner_id = $1
-  ), active_events AS (
+  ), effective_events AS (
     SELECT event.*
     FROM owner_events event
     WHERE event.event_type <> 'reverted'
@@ -80,27 +84,41 @@ const projectionSql = `
         WHERE correction.event_type = 'reverted'
           AND correction.reverts_event_id = event.id
       )
-    UNION ALL
-    SELECT correction.*
-    FROM owner_events correction
-    WHERE correction.event_type = 'reverted'
-  ), aggregated AS (
-    SELECT
+  ), contexts AS (
+    SELECT DISTINCT ON (opportunity_id)
       owner_id,
       client_profile_id,
       opportunity_id,
       hiring_episode_id,
       organization_id,
+      previous_stage AS initial_stage
+    FROM owner_events
+    WHERE event_type <> 'reverted'
+    ORDER BY opportunity_id, id
+  ), event_bounds AS (
+    SELECT
+      opportunity_id,
+      (ARRAY_AGG(id ORDER BY id DESC))[1] AS last_event_id,
+      MAX(occurred_at) AS last_event_at
+    FROM owner_events
+    GROUP BY opportunity_id
+  ), aggregated AS (
+    SELECT
+      context.owner_id,
+      context.client_profile_id,
+      context.opportunity_id,
+      context.hiring_episode_id,
+      context.organization_id,
       COALESCE(
-        (ARRAY_AGG(new_stage ORDER BY id DESC)
+        (ARRAY_AGG(event.new_stage ORDER BY event.id DESC)
           FILTER (WHERE event_type IN (
             'accepted', 'dismissed', 'contacted', 'replied', 'meeting',
-            'proposal', 'won', 'lost', 'reverted'
+            'proposal', 'won', 'lost'
           )))[1],
-        (ARRAY_AGG(previous_stage ORDER BY id ASC))[1]
+        context.initial_stage
       ) AS commercial_stage,
       CASE
-        WHEN (ARRAY_AGG(event_type ORDER BY id DESC)
+        WHEN (ARRAY_AGG(event.event_type ORDER BY event.id DESC)
           FILTER (WHERE event_type IN ('snoozed', 'resumed')))[1] = 'snoozed'
           THEN 'snoozed'
         ELSE 'active'
@@ -108,46 +126,83 @@ const projectionSql = `
       CASE
         WHEN (ARRAY_AGG(event_type ORDER BY id DESC)
           FILTER (WHERE event_type IN ('snoozed', 'resumed')))[1] = 'snoozed'
-          THEN (ARRAY_AGG(snoozed_until ORDER BY id DESC)
+          THEN (ARRAY_AGG(event.snoozed_until ORDER BY event.id DESC)
             FILTER (WHERE event_type = 'snoozed'))[1]
         ELSE NULL
       END AS snoozed_until,
-      (ARRAY_AGG(id ORDER BY id DESC))[1] AS last_event_id,
-      MAX(occurred_at) AS last_event_at,
-      (ARRAY_AGG(id ORDER BY id DESC)
+      bounds.last_event_id,
+      bounds.last_event_at,
+      (ARRAY_AGG(event.id ORDER BY event.id DESC)
         FILTER (WHERE event_type IN (
           'accepted', 'dismissed', 'contacted', 'replied', 'meeting',
-          'proposal', 'won', 'lost', 'reverted'
-        )))[1] AS last_stage_event_id,
-      (ARRAY_AGG(occurred_at ORDER BY id DESC)
+          'proposal', 'won', 'lost'
+        ) AND event.previous_stage <> event.new_stage))[1]
+        AS last_stage_event_id,
+      (ARRAY_AGG(event.occurred_at ORDER BY event.id DESC)
         FILTER (WHERE event_type IN (
           'accepted', 'dismissed', 'contacted', 'replied', 'meeting',
-          'proposal', 'won', 'lost', 'reverted'
-        )))[1] AS last_stage_event_at,
-      MIN(occurred_at) FILTER (WHERE event_type = 'shown') AS first_shown_at,
-      MIN(occurred_at) FILTER (WHERE event_type = 'opened') AS first_opened_at,
-      MIN(occurred_at) FILTER (WHERE event_type = 'accepted') AS accepted_at,
-      MIN(occurred_at) FILTER (WHERE event_type = 'contacted') AS contacted_at,
-      MIN(occurred_at) FILTER (WHERE event_type = 'replied') AS replied_at,
-      MIN(occurred_at) FILTER (WHERE event_type = 'meeting') AS meeting_at,
-      MIN(occurred_at) FILTER (WHERE event_type = 'proposal') AS proposal_at,
-      MIN(occurred_at) FILTER (WHERE event_type = 'won') AS won_at,
-      MIN(occurred_at) FILTER (WHERE event_type = 'lost') AS lost_at,
-      (ARRAY_AGG(reason_code ORDER BY id DESC)
+          'proposal', 'won', 'lost'
+        ) AND event.previous_stage <> event.new_stage))[1]
+        AS last_stage_event_at,
+      MIN(event.occurred_at) FILTER (WHERE event_type = 'shown') AS first_shown_at,
+      MIN(event.occurred_at) FILTER (WHERE event_type = 'opened') AS first_opened_at,
+      MIN(event.occurred_at) FILTER (WHERE event_type = 'accepted') AS accepted_at,
+      MIN(event.occurred_at) FILTER (WHERE event_type = 'contacted') AS contacted_at,
+      MIN(event.occurred_at) FILTER (WHERE event_type = 'replied') AS replied_at,
+      MIN(event.occurred_at) FILTER (WHERE event_type = 'meeting') AS meeting_at,
+      MIN(event.occurred_at) FILTER (WHERE event_type = 'proposal') AS proposal_at,
+      MIN(event.occurred_at) FILTER (WHERE event_type = 'won') AS won_at,
+      MIN(event.occurred_at) FILTER (WHERE event_type = 'lost') AS lost_at,
+      (ARRAY_AGG(event.reason_code ORDER BY event.id DESC)
         FILTER (WHERE event_type = 'dismissed'))[1] AS dismiss_reason_code,
-      (ARRAY_AGG(reason_code ORDER BY id DESC)
+      (ARRAY_AGG(event.reason_code ORDER BY event.id DESC)
         FILTER (WHERE event_type = 'lost'))[1] AS lost_reason_code,
-      (ARRAY_AGG(value_minor ORDER BY id DESC)
+      (ARRAY_AGG(event.value_minor ORDER BY event.id DESC)
         FILTER (WHERE event_type = 'won'))[1] AS deal_value_minor,
-      (ARRAY_AGG(currency ORDER BY id DESC)
-        FILTER (WHERE event_type = 'won'))[1] AS currency
-    FROM active_events
+      (ARRAY_AGG(event.currency ORDER BY event.id DESC)
+        FILTER (WHERE event_type = 'won'))[1] AS currency,
+      COALESCE(
+        (ARRAY_AGG(
+          CASE event.event_type
+            WHEN 'meeting' THEN CASE
+              WHEN event.metadata->>'meetingStatus' = 'completed'
+                THEN 'completed'
+              ELSE 'scheduled'
+            END
+            WHEN 'meeting_completed' THEN 'completed'
+            WHEN 'meeting_cancelled' THEN 'cancelled'
+            WHEN 'meeting_no_show' THEN 'no_show'
+          END
+          ORDER BY event.id DESC
+        ) FILTER (WHERE event.event_type IN (
+          'meeting', 'meeting_completed', 'meeting_cancelled',
+          'meeting_no_show'
+        )))[1],
+        'none'
+      ) AS meeting_status,
+      (ARRAY_AGG(event.id ORDER BY event.id DESC)
+        FILTER (WHERE event.event_type = 'meeting'))[1]
+        AS active_meeting_event_id,
+      (ARRAY_AGG(event.occurred_at ORDER BY event.id DESC)
+        FILTER (WHERE event.event_type IN (
+          'meeting', 'meeting_completed', 'meeting_cancelled',
+          'meeting_no_show'
+        )))[1] AS last_meeting_event_at,
+      COUNT(event.id) FILTER (WHERE event.event_type = 'meeting')::INTEGER
+        AS meeting_attempt_count
+    FROM contexts context
+    JOIN event_bounds bounds USING (opportunity_id)
+    LEFT JOIN effective_events event
+      ON event.opportunity_id = context.opportunity_id
     GROUP BY
-      owner_id,
-      client_profile_id,
-      opportunity_id,
-      hiring_episode_id,
-      organization_id
+      context.owner_id,
+      context.client_profile_id,
+      context.opportunity_id,
+      context.hiring_episode_id,
+      context.organization_id,
+      context.initial_stage,
+      bounds.last_event_id,
+      bounds.last_event_at
   )
   SELECT
     owner_id,
@@ -176,6 +231,10 @@ const projectionSql = `
     lost_reason_code,
     deal_value_minor,
     currency,
+    meeting_status,
+    active_meeting_event_id,
+    last_meeting_event_at,
+    meeting_attempt_count,
     NOW() AS updated_at
   FROM aggregated
 `
@@ -209,8 +268,9 @@ try {
   const owners = requestedOwnerId
     ? { rows: [{ ownerId: requestedOwnerId }] }
     : await client.query(
-      `SELECT DISTINCT owner_id::TEXT AS "ownerId"
+      `SELECT owner_id::TEXT AS "ownerId"
        FROM opportunity_outcome_events
+       GROUP BY owner_id
        ORDER BY owner_id`,
     )
 
@@ -326,6 +386,10 @@ async function rebuildOwner(ownerId) {
           lost_reason_code = EXCLUDED.lost_reason_code,
           deal_value_minor = EXCLUDED.deal_value_minor,
           currency = EXCLUDED.currency,
+          meeting_status = EXCLUDED.meeting_status,
+          active_meeting_event_id = EXCLUDED.active_meeting_event_id,
+          last_meeting_event_at = EXCLUDED.last_meeting_event_at,
+          meeting_attempt_count = EXCLUDED.meeting_attempt_count,
           updated_at = NOW()
       `)
       await client.query('COMMIT')

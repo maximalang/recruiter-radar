@@ -15,6 +15,9 @@ const root = resolve(import.meta.dirname, '..', '..', '..')
 const migrationsDir = resolve(root, 'packages', 'db', 'migrations')
 const migrateScript = resolve(root, 'packages', 'db', 'scripts', 'migrate.mjs')
 const downMigrations = [
+  '20260728112000_enforce_outcome_correction_capability.down.sql',
+  '20260728111000_enforce_opportunity_outcome_write_boundary.down.sql',
+  '20260728110000_complete_opportunity_meeting_lifecycle.down.sql',
   '20260728100000_harden_opportunity_outcome_ledger.down.sql',
   '20260727152000_add_opportunity_public_reference.down.sql',
   '20260727151000_add_opportunity_outcome_projection.down.sql',
@@ -287,9 +290,12 @@ try {
   const database = new Client({ connectionString: temporaryUrl.toString() })
   await database.connect()
   try {
+    for (const migration of downMigrations.slice(0, 3)) {
+      await database.query(await readFile(resolve(migrationsDir, migration), 'utf8'))
+    }
     const fixture = await seedSupersessionRollbackFixture(database)
     await verifyHardenedOutcomeRollbackGuards(database, fixture)
-    for (const migration of downMigrations) {
+    for (const migration of downMigrations.slice(3)) {
       await database.query(await readFile(resolve(migrationsDir, migration), 'utf8'))
       if (migration === '20260727122000_add_opportunity_supersession.down.sql') {
         const actions = await database.query(

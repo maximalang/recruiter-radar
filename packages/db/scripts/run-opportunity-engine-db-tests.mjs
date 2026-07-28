@@ -40,6 +40,27 @@ const outcomeUpgradeVerifierScript = resolve(
   'scripts',
   'verify-opportunity-outcome-hardening-upgrade.mjs',
 )
+const outcomeLifecycleUpgradeVerifierScript = resolve(
+  root,
+  'packages',
+  'db',
+  'scripts',
+  'verify-opportunity-outcome-lifecycle-upgrade.mjs',
+)
+const outcomeCanaryScript = resolve(
+  root,
+  'packages',
+  'db',
+  'scripts',
+  'canary-opportunity-outcomes.mjs',
+)
+const outcomePreflightScript = resolve(
+  root,
+  'packages',
+  'db',
+  'scripts',
+  'preflight-opportunity-outcomes.mjs',
+)
 const jestScript = resolve(root, 'node_modules', 'jest', 'bin', 'jest.js')
 const webRoot = resolve(root, 'apps', 'web')
 const admin = new Client({ connectionString: databaseUrl })
@@ -98,6 +119,45 @@ try {
     OPPORTUNITY_OUTCOMES_ENABLED: 'true',
   })
   await run(process.execPath, [outcomeRebuildVerifierScript])
+  const fixtureClient = new Client({
+    connectionString: temporaryUrl.toString(),
+  })
+  await fixtureClient.connect()
+  let fixtureOwnerId
+  try {
+    const fixtureOwner = await fixtureClient.query(
+      `SELECT owner_id
+       FROM opportunity_outcome_state
+       ORDER BY owner_id
+       LIMIT 1`,
+    )
+    fixtureOwnerId = fixtureOwner.rows[0]?.owner_id
+  } finally {
+    await fixtureClient.end()
+  }
+  if (!fixtureOwnerId) {
+    throw new Error('Outcome runtime fixture did not create an owner.')
+  }
+  await run(
+    process.execPath,
+    [
+      outcomePreflightScript,
+      '--owner-id',
+      String(fixtureOwnerId),
+      '--json',
+    ],
+  )
+  await run(
+    process.execPath,
+    [outcomeCanaryScript, '--owner-id', String(fixtureOwnerId)],
+    root,
+    {
+      ...testEnvironment,
+      OPPORTUNITY_OUTCOMES_ENABLED: 'true',
+      OPPORTUNITY_OUTCOMES_UI_ENABLED: 'true',
+      OPPORTUNITY_OUTCOMES_EXTERNAL_INGEST_ENABLED: 'false',
+    },
+  )
   await admin.query(
     `CREATE DATABASE ${quoteIdentifier(outcomeMeetingUpgradeDatabaseName)}`,
   )
@@ -105,6 +165,10 @@ try {
     ...process.env,
     DATABASE_URL: outcomeMeetingUpgradeUrl.toString(),
     OUTCOME_HARDENING_UPGRADE_CASE: 'valid-legacy-meeting',
+  })
+  await run(process.execPath, [outcomeLifecycleUpgradeVerifierScript], root, {
+    ...process.env,
+    DATABASE_URL: outcomeMeetingUpgradeUrl.toString(),
   })
   await admin.query(
     `CREATE DATABASE ${quoteIdentifier(outcomeChronologyUpgradeDatabaseName)}`,

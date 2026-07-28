@@ -17,6 +17,7 @@ if (!databaseUrl) {
 }
 
 const client = new Client({ connectionString: databaseUrl, connectionTimeoutMillis: 10000 });
+let migrationLockHeld = false;
 
 try {
   await client.connect();
@@ -83,6 +84,13 @@ try {
     .filter(f => f.endsWith('.sql') && !f.endsWith('.down.sql'))
     .sort();
 
+  await client.query(
+    `SELECT pg_advisory_lock(
+       hashtextextended('recruiter-radar:schema-migrations', 0)
+     )`
+  );
+  migrationLockHeld = true;
+
   const { rows: appliedRows } = await client.query(
     `SELECT version FROM schema_migrations ORDER BY version`
   );
@@ -117,7 +125,15 @@ try {
     } catch (error) {
       await client.query('ROLLBACK').catch(() => {});
       const message = error instanceof Error ? error.message : String(error);
-      console.error(`  ✗ ${filename} FAILED: ${message}`);
+      const position = (
+        error &&
+        typeof error === 'object' &&
+        'position' in error &&
+        typeof error.position === 'string'
+      )
+        ? ` (position ${error.position})`
+        : '';
+      console.error(`  ✗ ${filename} FAILED: ${message}${position}`);
       process.exitCode = 1;
       break;
     }
@@ -135,6 +151,13 @@ try {
   console.error(`Migration failed: ${message}`);
   process.exitCode = 1;
 } finally {
+  if (migrationLockHeld) {
+    await client.query(
+      `SELECT pg_advisory_unlock(
+         hashtextextended('recruiter-radar:schema-migrations', 0)
+       )`
+    ).catch(() => {});
+  }
   await client.end().catch(() => {});
 }
 
