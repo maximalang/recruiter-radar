@@ -69,6 +69,18 @@ try {
   if (replayAuthorization.rowCount !== 0) {
     throw new Error('Exchanged legacy fingerprint remained authorized.')
   }
+  const rollbackAuthorization = await pool.query(
+    `SELECT NOT EXISTS (
+       SELECT 1
+       FROM auth_security_events AS prior_exchange
+       WHERE prior_exchange.event_type = 'legacy_session_migrated'
+         AND prior_exchange.subject_hash = $1
+     ) AS authorized`,
+    [firstFingerprint],
+  )
+  if (rollbackAuthorization.rows[0]?.authorized !== false) {
+    throw new Error('Canary rollback revived an exchanged legacy fingerprint.')
+  }
 
   const concurrentFingerprint = digest('legacy-fingerprint-concurrent')
   const concurrent = await Promise.all([
@@ -120,6 +132,7 @@ try {
       'valid_exchange',
       'repeated_exchange_denied',
       'legacy_authorization_replay_denied',
+      'rollback_authorization_replay_denied',
       'concurrent_exchange_single_winner',
     ],
   }))

@@ -139,7 +139,10 @@ describe("bounded auth v2 legacy session exchange", () => {
 
   test("authorizes eligible legacy sessions only inside the migration window", async () => {
     const query = jest.fn().mockResolvedValue({
-      rows: [{ userId: "42" }],
+      rows: [{
+        previouslyMigrated: false,
+        eligibleIdentity: true,
+      }],
       rowCount: 1,
     });
     mockGetPool.mockReturnValue({ query } as never);
@@ -175,7 +178,13 @@ describe("bounded auth v2 legacy session exchange", () => {
   });
 
   test("denies replayed, suspended, or unverified legacy identities", async () => {
-    const query = jest.fn().mockResolvedValue({ rows: [], rowCount: 0 });
+    const query = jest.fn().mockResolvedValue({
+      rows: [{
+        previouslyMigrated: true,
+        eligibleIdentity: true,
+      }],
+      rowCount: 1,
+    });
     mockGetPool.mockReturnValue({ query } as never);
 
     await expect(readLegacyOwnerSessionForAuthorization({
@@ -186,7 +195,13 @@ describe("bounded auth v2 legacy session exchange", () => {
   });
 
   test("keeps non-canary users on the unchanged legacy path", async () => {
-    const query = jest.fn();
+    const query = jest.fn().mockResolvedValue({
+      rows: [{
+        previouslyMigrated: false,
+        eligibleIdentity: false,
+      }],
+      rowCount: 1,
+    });
     mockGetPool.mockReturnValue({ query } as never);
 
     await expect(readLegacyOwnerSessionForAuthorization({
@@ -199,7 +214,30 @@ describe("bounded auth v2 legacy session exchange", () => {
       },
       now,
     })).resolves.toBe("77");
-    expect(query).not.toHaveBeenCalled();
+    expect(query).toHaveBeenCalledTimes(1);
+  });
+
+  test("denies an exchanged legacy cookie after canary rollback", async () => {
+    const query = jest.fn().mockResolvedValue({
+      rows: [{
+        previouslyMigrated: true,
+        eligibleIdentity: true,
+      }],
+      rowCount: 1,
+    });
+    mockGetPool.mockReturnValue({ query } as never);
+
+    await expect(readLegacyOwnerSessionForAuthorization({
+      legacyToken: legacyToken("42"),
+      env: {
+        ...enabledEnv,
+        AUTH_PLATFORM_V2_ENABLED: "false",
+        AUTH_V2_CANARY_USER_IDS: "",
+        AUTH_LEGACY_SESSION_MIGRATION_ENABLED: "false",
+      },
+      now,
+    })).resolves.toBeNull();
+    expect(query).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -221,6 +259,7 @@ describe("legacy exchange PostgreSQL verifier", () => {
     expect(verifier).toContain("valid_exchange");
     expect(verifier).toContain("repeated_exchange_denied");
     expect(verifier).toContain("legacy_authorization_replay_denied");
+    expect(verifier).toContain("rollback_authorization_replay_denied");
     expect(verifier).toContain("concurrent_exchange_single_winner");
     expect(verifier).toContain("Promise.all");
   });

@@ -94,33 +94,41 @@ export async function readLegacyOwnerSessionForAuthorization(input: {
   const env = input.env ?? process.env;
   const now = input.now ?? new Date();
   const userId = decodeLegacyOwnerSession(input.legacyToken, env);
-  if (!userId) return null;
+  const fingerprint = legacyFingerprint(input.legacyToken, env);
+  if (!userId || !fingerprint) return null;
 
-  if (!isAuthPlatformV2EnabledForUser(userId, env)) return userId;
-  if (!isLegacySessionMigrationWindowOpen(env, now)) {
+  const v2Eligible = isAuthPlatformV2EnabledForUser(userId, env);
+  if (v2Eligible && !isLegacySessionMigrationWindowOpen(env, now)) {
     return null;
   }
 
-  const fingerprint = legacyFingerprint(input.legacyToken, env);
   const pool = getPool();
-  if (!fingerprint || !pool) return null;
+  if (!pool) return null;
   try {
-    const result = await pool.query<{ userId: string }>(
-      `SELECT account.id::TEXT AS "userId"
-       FROM users AS account
-       WHERE account.id = $1
-         AND account.status = 'active'
-         AND account.email_verified_at IS NOT NULL
-         AND NOT EXISTS (
+    const result = await pool.query<{
+      previouslyMigrated: boolean;
+      eligibleIdentity: boolean;
+    }>(
+      `SELECT
+         EXISTS (
            SELECT 1
            FROM auth_security_events AS prior_exchange
            WHERE prior_exchange.event_type = 'legacy_session_migrated'
              AND prior_exchange.subject_hash = $2
-         )
-       LIMIT 1`,
+         ) AS "previouslyMigrated",
+         EXISTS (
+           SELECT 1
+           FROM users AS account
+           WHERE account.id = $1
+             AND account.status = 'active'
+             AND account.email_verified_at IS NOT NULL
+         ) AS "eligibleIdentity"`,
       [userId, fingerprint],
     );
-    return result.rows[0]?.userId ?? null;
+    const state = result.rows[0];
+    if (!state || state.previouslyMigrated) return null;
+    if (v2Eligible && !state.eligibleIdentity) return null;
+    return userId;
   } catch (error) {
     logError("auth_v2.legacy_session_authorization_failed", error);
     return null;

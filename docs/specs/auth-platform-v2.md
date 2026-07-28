@@ -613,8 +613,9 @@ minutes; read-only Server Components never mutate cookies.
 Every legacy authorization for a v2-eligible user revalidates active account
 status, verified identity, the exact migration deadline and the durable
 `legacy_session_migrated` fingerprint ledger. After exchange, a copied
-`rr_sid` cannot authorize again. Users outside the global/canary v2 serving
-policy remain on the unchanged legacy read path until their rollout stage;
+`rr_sid` cannot authorize again, even if a canary/global serving flag is later
+removed during rollback. Never-migrated users outside the global/canary v2
+serving policy retain legacy identity semantics until their rollout stage;
 exchange never marks email verified by itself.
 
 Removal condition:
