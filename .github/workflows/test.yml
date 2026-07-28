@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main, develop, 'codex/**' ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, 'codex/**' ]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -82,6 +82,14 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
         run: npm run db:validate
+      - name: Verify Opportunity Engine and Outcome Ledger production runtime
+        env:
+          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+        run: npm run test:opportunity-engine:db
+      - name: Verify Opportunity Engine and Outcome Ledger down migrations
+        env:
+          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+        run: npm run test:opportunity-engine:down
       - name: Run Jest
         shell: bash
         run: |

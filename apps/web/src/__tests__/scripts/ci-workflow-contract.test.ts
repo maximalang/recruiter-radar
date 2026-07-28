@@ -7,10 +7,10 @@ const workflow = readFileSync(
 )
 
 describe('pull request CI workflow contract', () => {
-  it('runs the complete release gate for codex pushes and pull requests to main', () => {
+  it('runs the complete release gate for codex pushes and integration pull requests', () => {
     expect(workflow).toContain('codex/**')
     expect(workflow).toContain('pull_request:')
-    expect(workflow).toContain('branches: [ main ]')
+    expect(workflow).toContain("branches: [ main, 'codex/**' ]")
     expect(workflow).toContain('group: ${{ github.workflow }}-${{ github.ref }}')
     expect(workflow).toContain('cancel-in-progress: true')
 
