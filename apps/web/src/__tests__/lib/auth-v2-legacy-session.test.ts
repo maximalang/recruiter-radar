@@ -141,6 +141,7 @@ describe("bounded auth v2 legacy session exchange", () => {
     const query = jest.fn().mockResolvedValue({
       rows: [{
         previouslyMigrated: false,
+        v2LoginSucceeded: false,
         eligibleIdentity: true,
       }],
       rowCount: 1,
@@ -181,6 +182,7 @@ describe("bounded auth v2 legacy session exchange", () => {
     const query = jest.fn().mockResolvedValue({
       rows: [{
         previouslyMigrated: true,
+        v2LoginSucceeded: false,
         eligibleIdentity: true,
       }],
       rowCount: 1,
@@ -198,6 +200,7 @@ describe("bounded auth v2 legacy session exchange", () => {
     const query = jest.fn().mockResolvedValue({
       rows: [{
         previouslyMigrated: false,
+        v2LoginSucceeded: false,
         eligibleIdentity: false,
       }],
       rowCount: 1,
@@ -221,6 +224,7 @@ describe("bounded auth v2 legacy session exchange", () => {
     const query = jest.fn().mockResolvedValue({
       rows: [{
         previouslyMigrated: true,
+        v2LoginSucceeded: false,
         eligibleIdentity: true,
       }],
       rowCount: 1,
@@ -238,6 +242,27 @@ describe("bounded auth v2 legacy session exchange", () => {
       now,
     })).resolves.toBeNull();
     expect(query).toHaveBeenCalledTimes(1);
+  });
+
+  test("denies a copied legacy cookie after v2 login on another device", async () => {
+    const query = jest.fn().mockResolvedValue({
+      rows: [{
+        previouslyMigrated: false,
+        v2LoginSucceeded: true,
+        eligibleIdentity: true,
+      }],
+      rowCount: 1,
+    });
+    mockGetPool.mockReturnValue({ query } as never);
+
+    await expect(readLegacyOwnerSessionForAuthorization({
+      legacyToken: legacyToken("42"),
+      env: enabledEnv,
+      now,
+    })).resolves.toBeNull();
+    expect(String(query.mock.calls[0]?.[0])).toContain(
+      "v2_login.event_type = 'login_succeeded'",
+    );
   });
 });
 

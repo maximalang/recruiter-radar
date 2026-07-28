@@ -40,6 +40,7 @@ try {
   await verifyResendConsumeSerialization(pool)
   await verifyStaleBoundIdentityDenied(pool)
   await verifyMagicLoginRevokesLegacy(pool)
+  await verifyMagicLoginWithoutCookieRevokesUserLegacy(pool)
 
   console.log(JSON.stringify({
     ok: true,
@@ -50,6 +51,7 @@ try {
       'resend_consume_serialized',
       'stale_bound_identity_denied',
       'magic_login_legacy_revoked',
+      'magic_login_without_cookie_legacy_denied',
     ],
   }))
 } finally {
@@ -90,6 +92,59 @@ async function verifyMagicLoginRevokesLegacy(poolInstance) {
     || state.rows[0]?.legacy_authorized !== false
   ) {
     throw new Error('Magic login did not durably revoke the legacy cookie.')
+  }
+}
+
+async function verifyMagicLoginWithoutCookieRevokesUserLegacy(poolInstance) {
+  const email = 'legacy-user-revoke@example.invalid'
+  const challengeHash = digest('legacy-user-revoke-challenge')
+  const hypotheticalLegacyFingerprint = digest(
+    'legacy-user-revoke-hypothetical-fingerprint',
+  )
+  const issued = await issue(
+    poolInstance,
+    email,
+    challengeHash,
+    'legacy-user-revoke',
+  )
+  if (!issued.issued) {
+    throw new Error('Legacy user revoke challenge was not issued.')
+  }
+
+  const consumed = await consume(
+    poolInstance,
+    challengeHash,
+    digest('legacy-user-revoke-session'),
+    digest('legacy-user-revoke-verifier'),
+  )
+  const state = await poolInstance.query(
+    `SELECT
+       (SELECT COUNT(*)::INTEGER
+        FROM auth_security_events
+        WHERE event_type = 'login_succeeded'
+          AND user_id = $1) AS logins,
+       NOT EXISTS (
+         SELECT 1
+         FROM auth_security_events AS v2_login
+         WHERE v2_login.event_type = 'login_succeeded'
+           AND v2_login.user_id = $1
+       )
+       AND NOT EXISTS (
+         SELECT 1
+         FROM auth_security_events AS prior_exchange
+         WHERE prior_exchange.event_type = 'legacy_session_migrated'
+           AND prior_exchange.subject_hash = $2
+       ) AS legacy_authorized`,
+    [consumed.userId, hypotheticalLegacyFingerprint],
+  )
+  if (
+    !consumed.consumed
+    || state.rows[0]?.logins !== 1
+    || state.rows[0]?.legacy_authorized !== false
+  ) {
+    throw new Error(
+      'Magic login without a legacy cookie did not revoke user legacy access.',
+    )
   }
 }
 

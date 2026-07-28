@@ -107,6 +107,7 @@ export async function readLegacyOwnerSessionForAuthorization(input: {
   try {
     const result = await pool.query<{
       previouslyMigrated: boolean;
+      v2LoginSucceeded: boolean;
       eligibleIdentity: boolean;
     }>(
       `SELECT
@@ -118,6 +119,12 @@ export async function readLegacyOwnerSessionForAuthorization(input: {
          ) AS "previouslyMigrated",
          EXISTS (
            SELECT 1
+           FROM auth_security_events AS v2_login
+           WHERE v2_login.event_type = 'login_succeeded'
+             AND v2_login.user_id = $1
+         ) AS "v2LoginSucceeded",
+         EXISTS (
+           SELECT 1
            FROM users AS account
            WHERE account.id = $1
              AND account.status = 'active'
@@ -126,7 +133,9 @@ export async function readLegacyOwnerSessionForAuthorization(input: {
       [userId, fingerprint],
     );
     const state = result.rows[0];
-    if (!state || state.previouslyMigrated) return null;
+    if (!state || state.previouslyMigrated || state.v2LoginSucceeded) {
+      return null;
+    }
     if (v2Eligible && !state.eligibleIdentity) return null;
     return userId;
   } catch (error) {

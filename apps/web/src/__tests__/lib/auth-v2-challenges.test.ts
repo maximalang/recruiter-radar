@@ -437,6 +437,7 @@ describe("auth v2 atomic challenge consumption contract", () => {
     expect(verifier).toContain("resend_consume_serialized");
     expect(verifier).toContain("stale_bound_identity_denied");
     expect(verifier).toContain("magic_login_legacy_revoked");
+    expect(verifier).toContain("magic_login_without_cookie_legacy_denied");
     expect(rollback).toContain("rollback refused");
     expect(rollbackVerifier).toContain("full_reverse_chain");
     expect(rollbackVerifier).toContain("live_session_rollback_refused");

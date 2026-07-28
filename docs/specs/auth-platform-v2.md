@@ -618,11 +618,15 @@ removed during rollback. Never-migrated users outside the global/canary v2
 serving policy retain legacy identity semantics until their rollout stage;
 exchange never marks email verified by itself.
 
-A successful magic-link consume also fingerprints any valid legacy cookie from
-the confirming browser and appends the same durable revocation marker inside
-the challenge/session transaction. Clearing the browser cookie is therefore a
-cleanup step, not the security boundary: a copied legacy token is denied after
-either exchange or a fresh v2 login.
+A successful magic-link consume appends `login_succeeded` inside the
+challenge/session transaction. That event is the user-level, irreversible
+legacy-disable marker, so a copied `rr_sid` is denied across devices even when
+the confirming browser has no legacy cookie. If the confirming browser does
+have a valid legacy cookie, the consume also fingerprints it and appends
+`legacy_session_migrated`; that fingerprint remains necessary for the
+account-switch case where the legacy cookie and new v2 identity belong to
+different users. Clearing the browser cookie is therefore a cleanup step, not
+the security boundary.
 
 Removal condition:
 
