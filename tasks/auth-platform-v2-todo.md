@@ -24,7 +24,7 @@
   - Verify: syntax + clean/upgrade isolated PostgreSQL.
   - Files: up/down SQL, schema contract, DB test script (≤5).
 
-- [ ] Implement challenge request and resend
+- [x] Implement challenge request and resend
   - Acceptance: no user insert; generic response; old active challenge invalidated.
   - Verify: unit + PostgreSQL concurrency tests.
   - Files: challenge service, request action/route, tests (≤5).
