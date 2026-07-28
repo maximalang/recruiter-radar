@@ -39,6 +39,7 @@ try {
   await verifyOneSignupIdentity(pool)
   await verifyResendConsumeSerialization(pool)
   await verifyStaleBoundIdentityDenied(pool)
+  await verifyMagicLoginRevokesLegacy(pool)
 
   console.log(JSON.stringify({
     ok: true,
@@ -48,10 +49,48 @@ try {
       'bounded_replay_audit',
       'resend_consume_serialized',
       'stale_bound_identity_denied',
+      'magic_login_legacy_revoked',
     ],
   }))
 } finally {
   await pool.end()
+}
+
+async function verifyMagicLoginRevokesLegacy(poolInstance) {
+  const email = 'legacy-revoke@example.invalid'
+  const challengeHash = digest('legacy-revoke-challenge')
+  const legacyFingerprint = digest('legacy-revoke-fingerprint')
+  const issued = await issue(poolInstance, email, challengeHash, 'legacy-revoke')
+  if (!issued.issued) throw new Error('Legacy revoke challenge was not issued.')
+
+  const consumed = await consume(
+    poolInstance,
+    challengeHash,
+    digest('legacy-revoke-session'),
+    digest('legacy-revoke-verifier'),
+    legacyFingerprint,
+  )
+  const state = await poolInstance.query(
+    `SELECT
+       (SELECT COUNT(*)::INTEGER
+        FROM auth_security_events
+        WHERE event_type = 'legacy_session_migrated'
+          AND subject_hash = $1) AS revocations,
+       NOT EXISTS (
+         SELECT 1
+         FROM auth_security_events
+         WHERE event_type = 'legacy_session_migrated'
+           AND subject_hash = $1
+       ) AS legacy_authorized`,
+    [legacyFingerprint],
+  )
+  if (
+    !consumed.consumed
+    || state.rows[0]?.revocations !== 1
+    || state.rows[0]?.legacy_authorized !== false
+  ) {
+    throw new Error('Magic login did not durably revoke the legacy cookie.')
+  }
 }
 
 async function verifyStaleBoundIdentityDenied(poolInstance) {
@@ -319,18 +358,20 @@ async function consume(
   challengeTokenHash,
   sessionTokenHash,
   verificationKeyHash,
+  legacyFingerprint = null,
 ) {
   const result = await poolInstance.query(
     `SELECT
        consumed,
        user_id::TEXT AS "userId",
        session_id::TEXT AS "sessionId"
-     FROM consume_auth_login_challenge($1, $2, $3, $4)`,
+     FROM consume_auth_login_challenge($1, $2, $3, $4, $5)`,
     [
       challengeTokenHash,
       sessionTokenHash,
       digest('global-consumption-verifier'),
       verificationKeyHash,
+      legacyFingerprint,
     ],
   )
   return result.rows[0]

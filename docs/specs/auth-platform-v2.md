@@ -618,6 +618,12 @@ removed during rollback. Never-migrated users outside the global/canary v2
 serving policy retain legacy identity semantics until their rollout stage;
 exchange never marks email verified by itself.
 
+A successful magic-link consume also fingerprints any valid legacy cookie from
+the confirming browser and appends the same durable revocation marker inside
+the challenge/session transaction. Clearing the browser cookie is therefore a
+cleanup step, not the security boundary: a copied legacy token is denied after
+either exchange or a fresh v2 login.
+
 Removal condition:
 
 - backfill verifier green;

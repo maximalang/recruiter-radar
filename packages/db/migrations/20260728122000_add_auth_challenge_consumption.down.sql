@@ -27,6 +27,7 @@ DROP FUNCTION IF EXISTS consume_auth_login_challenge(
   TEXT,
   TEXT,
   TEXT,
+  TEXT,
   TIMESTAMPTZ
 );
 

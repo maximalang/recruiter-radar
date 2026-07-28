@@ -28,6 +28,7 @@ CREATE FUNCTION consume_auth_login_challenge(
   input_session_token_hash TEXT,
   input_global_verification_key_hash TEXT,
   input_verification_ip_key_hash TEXT,
+  input_legacy_fingerprint_hash TEXT DEFAULT NULL,
   input_now TIMESTAMPTZ DEFAULT clock_timestamp()
 )
 RETURNS TABLE (
@@ -56,6 +57,10 @@ BEGIN
      OR (
        input_verification_ip_key_hash IS NOT NULL
        AND input_verification_ip_key_hash !~ '^[a-f0-9]{64}$'
+     )
+     OR (
+       input_legacy_fingerprint_hash IS NOT NULL
+       AND input_legacy_fingerprint_hash !~ '^[a-f0-9]{64}$'
      ) THEN
     RAISE EXCEPTION 'invalid auth challenge consumption input';
   END IF;
@@ -350,6 +355,42 @@ BEGIN
     input_now
   )
   RETURNING auth_sessions.id INTO inserted_session_id;
+
+  IF input_legacy_fingerprint_hash IS NOT NULL THEN
+    INSERT INTO auth_security_events (
+      event_type,
+      user_id,
+      session_id,
+      subject_hash,
+      request_ip_hash,
+      user_agent_hash,
+      metadata,
+      created_at
+    )
+    VALUES (
+      'legacy_session_migrated',
+      resolved_user.id,
+      inserted_session_id,
+      input_legacy_fingerprint_hash,
+      locked_challenge.request_ip_hash,
+      locked_challenge.user_agent_hash,
+      JSONB_BUILD_OBJECT(
+        'auth_version',
+        'v2',
+        'method',
+        'magic_link',
+        'source',
+        'legacy',
+        'reason_code',
+        'v2_login_revocation'
+      ),
+      input_now
+    )
+    ON CONFLICT (subject_hash)
+      WHERE event_type = 'legacy_session_migrated'
+        AND subject_hash IS NOT NULL
+      DO NOTHING;
+  END IF;
 
   UPDATE auth_challenges AS challenge
   SET consumed_at = input_now

@@ -25,6 +25,7 @@ import {
 import {
   assertOwnerSessionConfigured,
   clearLegacyOwnerSession,
+  readLegacyOwnerSessionCookie,
   writeOwnerSession,
 } from "@/lib/session";
 
@@ -51,7 +52,12 @@ export async function confirmAccountLoginAction(): Promise<never> {
     const previousSession = previousToken
       ? await readAuthSession(previousToken)
       : null;
-    const result = await consumeAuthV2Login({ token, clientAddress });
+    const legacyToken = await readLegacyOwnerSessionCookie();
+    const result = await consumeAuthV2Login({
+      token,
+      clientAddress,
+      legacyToken,
+    });
     if (result) {
       if (
         previousSession

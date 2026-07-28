@@ -146,6 +146,15 @@ function legacyFingerprint(
     .digest("hex");
 }
 
+export function fingerprintLegacyOwnerSession(
+  token: string,
+  env: AuthEnvironment = process.env,
+): string | null {
+  return decodeLegacyOwnerSession(token, env)
+    ? legacyFingerprint(token, env)
+    : null;
+}
+
 function validOptionalHash(value: string | null | undefined): boolean {
   return value === null || value === undefined || HASH_PATTERN.test(value);
 }

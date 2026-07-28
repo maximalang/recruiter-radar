@@ -17,6 +17,7 @@ import {
   normalizeAuthEmail,
   sanitizeAuthReturnTo,
 } from "./security";
+import { fingerprintLegacyOwnerSession } from "./legacy-session";
 
 const LOGIN_TTL_MINUTES = 15;
 const TOKEN_PATTERN = /^[a-f0-9]{64}$/;
@@ -199,6 +200,7 @@ export async function requestAuthV2Login(input: {
 export async function consumeAuthV2Login(input: {
   token: string;
   clientAddress: string;
+  legacyToken?: string | null;
 }): Promise<AuthV2LoginConsumeResult | null> {
   const token = input.token.trim();
   if (!TOKEN_PATTERN.test(token)) return null;
@@ -215,6 +217,9 @@ export async function consumeAuthV2Login(input: {
     const verificationIpKeyHash = input.clientAddress === "unknown"
       ? null
       : hashBoundary("challenge-verify-ip", input.clientAddress);
+    const legacyFingerprintHash = input.legacyToken
+      ? fingerprintLegacyOwnerSession(input.legacyToken)
+      : null;
     client = await getClient();
     if (!client) return null;
     await client.query("BEGIN");
@@ -235,12 +240,13 @@ export async function consumeAuthV2Login(input: {
          full_name AS "fullName",
          email_verified_at AS "emailVerifiedAt",
          return_to AS "returnTo"
-       FROM consume_auth_login_challenge($1, $2, $3, $4)`,
+       FROM consume_auth_login_challenge($1, $2, $3, $4, $5)`,
       [
         hashToken(token),
         hashToken(sessionToken),
         globalVerificationKeyHash,
         verificationIpKeyHash,
+        legacyFingerprintHash,
       ],
     );
     const row = consumed.rows[0];

@@ -26,6 +26,7 @@ jest.mock("@/lib/auth-v2/sessions", () => ({
 jest.mock("@/lib/session", () => ({
   assertOwnerSessionConfigured: jest.fn(),
   clearLegacyOwnerSession: jest.fn(),
+  readLegacyOwnerSessionCookie: jest.fn(),
   writeOwnerSession: jest.fn(),
 }));
 
@@ -49,6 +50,7 @@ import {
 } from "@/lib/auth-v2/sessions";
 import {
   clearLegacyOwnerSession,
+  readLegacyOwnerSessionCookie,
   writeOwnerSession,
 } from "@/lib/session";
 import { headers } from "next/headers";
@@ -65,6 +67,7 @@ const mockWriteV2Cookie = jest.mocked(writeAuthV2SessionCookie);
 const mockReadV2Session = jest.mocked(readAuthSession);
 const mockRevokeV2 = jest.mocked(revokeAuthSessionById);
 const mockClearLegacy = jest.mocked(clearLegacyOwnerSession);
+const mockReadLegacyCookie = jest.mocked(readLegacyOwnerSessionCookie);
 const mockWriteLegacy = jest.mocked(writeOwnerSession);
 const mockRedirect = jest.mocked(redirect);
 const originalPlatformFlag = process.env.AUTH_PLATFORM_V2_ENABLED;
@@ -94,6 +97,7 @@ describe("auth v2 explicit confirm bridge", () => {
     mockClearPending.mockResolvedValue(undefined);
     mockReadV2Cookie.mockResolvedValue(null);
     mockReadV2Session.mockResolvedValue(null);
+    mockReadLegacyCookie.mockResolvedValue(null);
     mockRevokeV2.mockResolvedValue(true);
     mockReadV2Preview.mockResolvedValue(null);
   });
@@ -138,12 +142,15 @@ describe("auth v2 explicit confirm bridge", () => {
       id: "9",
       userId: "8",
     } as never);
+    const legacyToken = `8.${"d".repeat(64)}`;
+    mockReadLegacyCookie.mockResolvedValue(legacyToken);
 
     await confirmAccountLoginAction();
 
     expect(mockConsumeV2).toHaveBeenCalledWith({
       token: "a".repeat(64),
       clientAddress: "unknown",
+      legacyToken,
     });
     expect(mockRevokeV2).toHaveBeenCalledWith({
       userId: "8",

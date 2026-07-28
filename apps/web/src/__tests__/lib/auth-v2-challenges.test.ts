@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -113,6 +114,7 @@ describe("auth v2 login challenge service", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     process.env.AUTH_RATE_LIMIT_SECRET = "a".repeat(32);
+    process.env.SESSION_SECRET = "s".repeat(32);
     process.env.AUTH_SITE_URL = "https://radar.example";
   });
 
@@ -223,10 +225,16 @@ describe("auth v2 login challenge service", () => {
     });
     const client = { query, release: jest.fn() };
     mockGetClient.mockResolvedValue(client as never);
+    const legacyToken = `42.${
+      createHmac("sha256", process.env.SESSION_SECRET!)
+        .update("session:42")
+        .digest("hex")
+    }`;
 
     const result = await consumeAuthV2Login({
       token: "a".repeat(64),
       clientAddress: "192.0.2.10",
+      legacyToken,
     });
 
     expect(result).toMatchObject({
@@ -242,13 +250,15 @@ describe("auth v2 login challenge service", () => {
     const consumeCall = query.mock.calls.find(([sql]) =>
       String(sql).includes("consume_auth_login_challenge"),
     );
-    expect(consumeCall?.[1]).toHaveLength(4);
+    expect(consumeCall?.[1]).toHaveLength(5);
     expect(consumeCall?.[1]?.[0]).toMatch(/^[a-f0-9]{64}$/);
     expect(consumeCall?.[1]?.[0]).not.toBe("a".repeat(64));
     expect(consumeCall?.[1]?.[1]).toMatch(/^[a-f0-9]{64}$/);
     expect(consumeCall?.[1]?.[1]).not.toBe(result?.session.token);
     expect(consumeCall?.[1]?.[2]).toMatch(/^[a-f0-9]{64}$/);
     expect(consumeCall?.[1]?.[3]).toMatch(/^[a-f0-9]{64}$/);
+    expect(consumeCall?.[1]?.[4]).toMatch(/^[a-f0-9]{64}$/);
+    expect(consumeCall?.[1]?.[4]).not.toBe(legacyToken);
     expect(consumeCall?.[1]).not.toContain("192.0.2.10");
     expect(client.release).toHaveBeenCalled();
   });
@@ -306,6 +316,7 @@ describe("auth v2 login challenge service", () => {
     );
     expect(consumeCall?.[1]?.[2]).toMatch(/^[a-f0-9]{64}$/);
     expect(consumeCall?.[1]?.[3]).toBeNull();
+    expect(consumeCall?.[1]?.[4]).toBeNull();
   });
 
   test("routes an existing canary identity through the ordinary login form", async () => {
@@ -425,6 +436,7 @@ describe("auth v2 atomic challenge consumption contract", () => {
     expect(verifier).toContain("one_signup_identity");
     expect(verifier).toContain("resend_consume_serialized");
     expect(verifier).toContain("stale_bound_identity_denied");
+    expect(verifier).toContain("magic_login_legacy_revoked");
     expect(rollback).toContain("rollback refused");
     expect(rollbackVerifier).toContain("full_reverse_chain");
     expect(rollbackVerifier).toContain("live_session_rollback_refused");
