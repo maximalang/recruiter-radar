@@ -100,11 +100,14 @@ describe("auth v2 server-side sessions", () => {
       userId: "42",
       rotationDue: true,
     });
-    expect(String(query.mock.calls[0]?.[0])).toContain("INTERVAL '15 minutes'");
+    const sql = String(query.mock.calls[0]?.[0]);
+    expect(sql).toContain("MAKE_INTERVAL(mins => 5)");
+    expect(sql).toContain("selected.last_authenticated_at");
+    expect(sql).not.toContain("account.last_authenticated_at");
     expect(query.mock.calls[0]?.[1]?.[0]).not.toBe("c".repeat(64));
   });
 
-  test("rotates exactly the presented active token", async () => {
+  test("rotates exactly the presented active token with a bounded grace window", async () => {
     const query = jest.fn().mockResolvedValue({
       rows: [sessionRow({ rotatedAt: new Date("2026-07-28T12:00:00.000Z") })],
       rowCount: 1,
@@ -120,7 +123,12 @@ describe("auth v2 server-side sessions", () => {
     const values = query.mock.calls[0]?.[1] as unknown[];
     expect(values[0]).not.toBe("d".repeat(64));
     expect(values[1]).not.toBe(rotated?.token);
-    expect(String(query.mock.calls[0]?.[0])).toContain("session_rotated");
+    expect(values[3]).toBe(false);
+    const sql = String(query.mock.calls[0]?.[0]);
+    expect(sql).toContain("session_rotated");
+    expect(sql).toContain("previous_token_hash = session.token_hash");
+    expect(sql).toContain("INTERVAL '60 seconds'");
+    expect(sql).toContain("session.rotated_at <= $3 - INTERVAL '24 hours'");
   });
 
   test("revokes by both user and session id and scopes revoke-all to the user", async () => {
@@ -157,6 +165,24 @@ describe("auth v2 server-side sessions", () => {
       } as never,
       new Date("2026-07-28T12:00:00.000Z"),
     )).toBe(false);
+  });
+
+  test("creates recent-auth state on the session row instead of borrowing user state", async () => {
+    const query = jest.fn().mockResolvedValue({
+      rows: [sessionRow()],
+      rowCount: 1,
+    });
+    mockGetPool.mockReturnValue({ query } as never);
+
+    await createAuthSession({
+      userId: "42",
+      authMethod: "magic_link",
+    }, new Date("2026-07-28T12:00:00.000Z"));
+
+    const sql = String(query.mock.calls[0]?.[0]);
+    expect(sql).toContain("last_authenticated_at");
+    expect(sql).toContain("created.last_authenticated_at");
+    expect(sql).not.toContain("account.last_authenticated_at");
   });
 });
 
@@ -207,6 +233,8 @@ describe("auth v2 session PostgreSQL verifier", () => {
     expect(verifier).toContain("idle_and_absolute_expiry");
     expect(verifier).toContain("touch_throttled");
     expect(verifier).toContain("rotation_single_winner");
+    expect(verifier).toContain("rotation_previous_token_grace");
+    expect(verifier).toContain("recent_auth_session_scoped");
     expect(verifier).toContain("revoke_dominates_rotation");
     expect(verifier).toContain("revoke_all_scoped");
     expect(verifier).toContain("Promise.all");

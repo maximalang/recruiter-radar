@@ -44,6 +44,8 @@ try {
   await verifyExpiry(pool, userA)
   await verifyTouchThrottle(pool, userA)
   await verifyRotationRace(pool, userA)
+  await verifyPreviousTokenGrace(pool, userA)
+  await verifyRecentAuthenticationScope(pool, userA)
   await verifyRevokeDominatesRotation(pool, userA)
   await verifyRevokeAllScope(pool, revokeScopeUser, userB)
 
@@ -53,6 +55,8 @@ try {
       'idle_and_absolute_expiry',
       'touch_throttled',
       'rotation_single_winner',
+      'rotation_previous_token_grace',
+      'recent_auth_session_scoped',
       'revoke_dominates_rotation',
       'revoke_all_scoped',
     ],
@@ -108,7 +112,7 @@ async function verifyExpiry(poolInstance, userId) {
 async function verifyTouchThrottle(poolInstance, userId) {
   const recentHash = digest('touch-recent')
   const staleHash = digest('touch-stale')
-  const recentLastSeen = at('-5 minutes')
+  const recentLastSeen = at('-4 minutes')
   await insertSession(poolInstance, {
     userId,
     tokenHash: recentHash,
@@ -161,8 +165,10 @@ async function verifyRotationRace(poolInstance, userId) {
     rotateSession(poolInstance, currentHash, nextB),
   ])
   const state = await poolInstance.query(
-    `SELECT
+     `SELECT
        token_hash,
+       previous_token_hash,
+       previous_token_valid_until,
        revoked_at,
        (SELECT COUNT(*)::INTEGER
         FROM auth_security_events
@@ -175,10 +181,69 @@ async function verifyRotationRace(poolInstance, userId) {
   if (
     results.filter((result) => result.rowCount === 1).length !== 1
     || ![nextA, nextB].includes(state.rows[0]?.token_hash)
+    || state.rows[0]?.previous_token_hash !== currentHash
+    || state.rows[0]?.previous_token_valid_until.getTime()
+      !== at('+1 minute').getTime()
     || state.rows[0]?.revoked_at !== null
     || state.rows[0]?.events !== 1
   ) {
     throw new Error('Concurrent rotation did not produce one winner.')
+  }
+}
+
+async function verifyPreviousTokenGrace(poolInstance, userId) {
+  const currentHash = digest('rotation-grace-current')
+  const nextHash = digest('rotation-grace-next')
+  await insertActiveSession(poolInstance, userId, currentHash)
+  const rotated = await rotateSession(poolInstance, currentHash, nextHash)
+  const [currentRead, previousRead, expiredPreviousRead] = await Promise.all([
+    readSession(poolInstance, nextHash),
+    readSession(poolInstance, currentHash),
+    readSession(poolInstance, currentHash, at('+2 minutes')),
+  ])
+  if (
+    rotated.rowCount !== 1
+    || currentRead.rowCount !== 1
+    || previousRead.rowCount !== 1
+    || expiredPreviousRead.rowCount !== 0
+  ) {
+    throw new Error('Previous session token grace is not bounded.')
+  }
+}
+
+async function verifyRecentAuthenticationScope(poolInstance, userId) {
+  const freshId = await insertSession(poolInstance, {
+    userId,
+    tokenHash: digest('recent-auth-fresh'),
+    createdAt: at('-1 day'),
+    lastSeenAt: at('-5 minutes'),
+    idleExpiresAt: at('+13 days'),
+    absoluteExpiresAt: at('+29 days'),
+    rotatedAt: at('-1 day'),
+    lastAuthenticatedAt: now,
+  })
+  const staleId = await insertSession(poolInstance, {
+    userId,
+    tokenHash: digest('recent-auth-stale'),
+    createdAt: at('-1 day'),
+    lastSeenAt: at('-5 minutes'),
+    idleExpiresAt: at('+13 days'),
+    absoluteExpiresAt: at('+29 days'),
+    rotatedAt: at('-1 day'),
+    lastAuthenticatedAt: null,
+  })
+  const state = await poolInstance.query(
+    `SELECT id::TEXT AS id, last_authenticated_at
+     FROM auth_sessions
+     WHERE id IN ($1, $2)`,
+    [freshId, staleId],
+  )
+  const byId = new Map(state.rows.map((row) => [row.id, row]))
+  if (
+    byId.get(freshId)?.last_authenticated_at?.getTime() !== now.getTime()
+    || byId.get(staleId)?.last_authenticated_at !== null
+  ) {
+    throw new Error('Recent authentication leaked across sessions.')
   }
 }
 
@@ -242,7 +307,7 @@ async function verifyRevokeAllScope(poolInstance, userA, userB) {
   }
 }
 
-async function readSession(poolInstance, tokenHash) {
+async function readSession(poolInstance, tokenHash, readAt = now) {
   return poolInstance.query(
     `WITH invalidated AS (
        UPDATE auth_sessions AS session
@@ -253,7 +318,13 @@ async function readSession(poolInstance, tokenHash) {
            WHEN session.idle_expires_at <= $2 THEN 'idle_expired'
            ELSE 'account_unavailable'
          END
-       WHERE session.token_hash = $1
+       WHERE (
+           session.token_hash = $1
+           OR (
+             session.previous_token_hash = $1
+             AND session.previous_token_valid_until > $2
+           )
+         )
          AND session.revoked_at IS NULL
          AND (
            session.absolute_expires_at <= $2
@@ -298,12 +369,18 @@ async function readSession(poolInstance, tokenHash) {
            session.absolute_expires_at
          )
        FROM users AS account
-       WHERE session.token_hash = $1
+       WHERE (
+           session.token_hash = $1
+           OR (
+             session.previous_token_hash = $1
+             AND session.previous_token_valid_until > $2
+           )
+         )
          AND session.user_id = account.id
          AND session.revoked_at IS NULL
          AND session.idle_expires_at > $2
          AND session.absolute_expires_at > $2
-         AND session.last_seen_at <= $2 - INTERVAL '15 minutes'
+         AND session.last_seen_at <= $2 - INTERVAL '5 minutes'
          AND account.status = 'active'
          AND account.email_verified_at IS NOT NULL
        RETURNING session.*
@@ -312,7 +389,13 @@ async function readSession(poolInstance, tokenHash) {
        SELECT session.*
        FROM auth_sessions AS session
        JOIN users AS account ON account.id = session.user_id
-       WHERE session.token_hash = $1
+       WHERE (
+           session.token_hash = $1
+           OR (
+             session.previous_token_hash = $1
+             AND session.previous_token_valid_until > $2
+           )
+         )
          AND session.revoked_at IS NULL
          AND session.idle_expires_at > $2
          AND session.absolute_expires_at > $2
@@ -329,7 +412,7 @@ async function readSession(poolInstance, tokenHash) {
        selected.id::TEXT AS id,
        (SELECT COUNT(*) FROM invalidated_event) AS invalidated_events
      FROM selected`,
-    [tokenHash, now],
+    [tokenHash, readAt],
   )
 }
 
@@ -338,6 +421,11 @@ async function rotateSession(poolInstance, currentHash, nextHash) {
     `WITH rotated AS (
        UPDATE auth_sessions AS session
        SET
+         previous_token_hash = session.token_hash,
+         previous_token_valid_until = LEAST(
+           $3::TIMESTAMPTZ + INTERVAL '60 seconds',
+           session.absolute_expires_at
+         ),
          token_hash = $2,
          last_seen_at = $3,
          idle_expires_at = LEAST(
@@ -351,6 +439,7 @@ async function rotateSession(poolInstance, currentHash, nextHash) {
          AND session.revoked_at IS NULL
          AND session.idle_expires_at > $3
          AND session.absolute_expires_at > $3
+         AND session.rotated_at <= $3 - INTERVAL '24 hours'
          AND account.status = 'active'
          AND account.email_verified_at IS NOT NULL
        RETURNING session.*
@@ -495,9 +584,10 @@ async function insertSession(poolInstance, input) {
        last_seen_at,
        idle_expires_at,
        absolute_expires_at,
-       rotated_at
+       rotated_at,
+       last_authenticated_at
      )
-     VALUES ($1, $2, 'magic_link', $3, $4, $5, $6, $7)
+     VALUES ($1, $2, 'magic_link', $3, $4, $5, $6, $7, $8)
      RETURNING id::TEXT AS id`,
     [
       input.userId,
@@ -507,6 +597,7 @@ async function insertSession(poolInstance, input) {
       input.idleExpiresAt,
       input.absoluteExpiresAt,
       input.rotatedAt,
+      input.lastAuthenticatedAt ?? null,
     ],
   )
   return result.rows[0].id

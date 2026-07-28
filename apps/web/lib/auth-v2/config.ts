@@ -46,7 +46,7 @@ export function getAuthV2Flags(
     onboarding: workspaces && enabled(env.AUTH_ONBOARDING_V2_ENABLED),
     passkeys: platform && enabled(env.AUTH_PASSKEYS_ENABLED),
     legacySessionMigration:
-      workspaces && enabled(env.AUTH_LEGACY_SESSION_MIGRATION_ENABLED),
+      platform && enabled(env.AUTH_LEGACY_SESSION_MIGRATION_ENABLED),
   };
 }
 
@@ -61,11 +61,35 @@ export function isAuthPlatformV2EnabledForUser(
   return canaryIds?.has(userId) === true;
 }
 
+export function isAuthV2SessionReadEnabledForUser(
+  userId: string | null | undefined,
+  env: AuthEnvironment = process.env,
+): boolean {
+  return (
+    isAuthPlatformV2EnabledForUser(userId, env)
+    || enabled(env.AUTH_V2_SESSION_ROLLBACK_COMPAT_ENABLED)
+  );
+}
+
+export function shouldRunAuthV2SessionRefresh(
+  env: AuthEnvironment = process.env,
+): boolean {
+  if (
+    getAuthV2Flags(env).platform
+    || enabled(env.AUTH_V2_SESSION_ROLLBACK_COMPAT_ENABLED)
+    || enabled(env.AUTH_LEGACY_SESSION_MIGRATION_ENABLED)
+  ) {
+    return true;
+  }
+  const canaryIds = parseCanaryUserIds(env.AUTH_V2_CANARY_USER_IDS);
+  return canaryIds !== null && canaryIds.size > 0;
+}
+
 export function isLegacySessionMigrationWindowOpen(
   env: AuthEnvironment = process.env,
   now = new Date(),
 ): boolean {
-  if (!getAuthV2Flags(env).legacySessionMigration) return false;
+  if (!enabled(env.AUTH_LEGACY_SESSION_MIGRATION_ENABLED)) return false;
   if (!Number.isFinite(now.getTime())) return false;
 
   const rawDeadline = env.AUTH_LEGACY_SESSION_MIGRATION_DEADLINE?.trim() ?? "";

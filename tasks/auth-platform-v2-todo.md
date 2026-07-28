@@ -53,6 +53,10 @@
 - [ ] Complete PR 1 gate
   - Acceptance: independent review has no confirmed blockers.
   - Verify: web check/build, full Jest, DB gates, audit, CI.
+  - Remediation completed locally: session-scoped recent auth, runtime rotation
+    and legacy exchange, canary serving policy, same-origin confirm, stale-link
+    invalidation, guarded reverse chain, split verification limits and bounded
+    challenge retention cleanup. Awaiting repeated independent review/CI.
 
 ## PR 2 — Workspaces
 

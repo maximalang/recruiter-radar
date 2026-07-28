@@ -24,6 +24,7 @@ DECLARE
   email_allowed BOOLEAN;
   ip_allowed BOOLEAN := TRUE;
   inserted_challenge_id BIGINT;
+  action_now TIMESTAMPTZ;
 BEGIN
   IF input_email_normalized IS NULL
      OR input_token_hash !~ '^[a-f0-9]{64}$'
@@ -47,12 +48,23 @@ BEGIN
     )
   );
 
+  SELECT GREATEST(
+    input_now,
+    COALESCE(MAX(created_at), input_now)
+  )
+  INTO action_now
+  FROM auth_challenges
+  WHERE email_normalized = input_email_normalized
+    AND purpose IN ('login', 'signup')
+    AND consumed_at IS NULL
+    AND invalidated_at IS NULL;
+
   SELECT consume_auth_rate_limit(
     'global',
     input_global_key_hash,
     60,
     100,
-    input_now
+    action_now
   )
   INTO global_allowed;
   SELECT consume_auth_rate_limit(
@@ -60,7 +72,7 @@ BEGIN
     input_email_key_hash,
     900,
     3,
-    input_now
+    action_now
   )
   INTO email_allowed;
   IF input_request_ip_hash IS NOT NULL THEN
@@ -69,7 +81,7 @@ BEGIN
       input_request_ip_hash,
       900,
       10,
-      input_now
+      action_now
     )
     INTO ip_allowed;
   END IF;
@@ -101,7 +113,7 @@ BEGIN
   END IF;
 
   UPDATE auth_challenges
-  SET invalidated_at = input_now
+  SET invalidated_at = action_now
   WHERE email_normalized = input_email_normalized
     AND purpose IN ('login', 'signup')
     AND consumed_at IS NULL
@@ -128,8 +140,8 @@ BEGIN
     'pending',
     input_request_ip_hash,
     input_user_agent_hash,
-    input_now + INTERVAL '15 minutes',
-    input_now
+    action_now + INTERVAL '15 minutes',
+    action_now
   )
   RETURNING id INTO inserted_challenge_id;
 
@@ -149,7 +161,7 @@ BEGIN
     input_request_ip_hash,
     input_user_agent_hash,
     JSONB_BUILD_OBJECT('challenge_purpose', resolved_purpose),
-    input_now
+    action_now
   );
 
   RETURN QUERY SELECT TRUE, inserted_challenge_id;

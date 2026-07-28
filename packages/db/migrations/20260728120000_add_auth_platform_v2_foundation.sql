@@ -137,6 +137,8 @@ CREATE TABLE auth_sessions (
   user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   workspace_id BIGINT,
   token_hash CHAR(64) NOT NULL UNIQUE,
+  previous_token_hash CHAR(64),
+  previous_token_valid_until TIMESTAMPTZ,
   request_ip_hash CHAR(64),
   user_agent_hash CHAR(64),
   legacy_fingerprint_hash CHAR(64),
@@ -145,10 +147,31 @@ CREATE TABLE auth_sessions (
   idle_expires_at TIMESTAMPTZ NOT NULL,
   absolute_expires_at TIMESTAMPTZ NOT NULL,
   rotated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_authenticated_at TIMESTAMPTZ,
   revoked_at TIMESTAMPTZ,
   revoke_reason TEXT,
   CONSTRAINT auth_sessions_token_hash_check
     CHECK (token_hash ~ '^[a-f0-9]{64}$'),
+  CONSTRAINT auth_sessions_previous_token_hash_check
+    CHECK (
+      previous_token_hash IS NULL
+      OR (
+        previous_token_hash ~ '^[a-f0-9]{64}$'
+        AND previous_token_hash <> token_hash
+      )
+    ),
+  CONSTRAINT auth_sessions_previous_token_window_check
+    CHECK (
+      (previous_token_hash IS NULL) = (previous_token_valid_until IS NULL)
+      AND (
+        previous_token_valid_until IS NULL
+        OR (
+          previous_token_valid_until > rotated_at
+          AND previous_token_valid_until <= absolute_expires_at
+          AND previous_token_valid_until <= rotated_at + INTERVAL '60 seconds'
+        )
+      )
+    ),
   CONSTRAINT auth_sessions_request_ip_hash_check
     CHECK (
       request_ip_hash IS NULL
@@ -173,6 +196,13 @@ CREATE TABLE auth_sessions (
       AND absolute_expires_at <= created_at + INTERVAL '30 days'
       AND rotated_at >= created_at
       AND rotated_at <= absolute_expires_at
+      AND (
+        last_authenticated_at IS NULL
+        OR (
+          last_authenticated_at >= created_at
+          AND last_authenticated_at <= absolute_expires_at
+        )
+      )
     ),
   CONSTRAINT auth_sessions_revocation_check
     CHECK (
@@ -189,6 +219,9 @@ CREATE TABLE auth_sessions (
 CREATE UNIQUE INDEX auth_sessions_legacy_fingerprint_uidx
   ON auth_sessions (legacy_fingerprint_hash)
   WHERE legacy_fingerprint_hash IS NOT NULL;
+CREATE UNIQUE INDEX auth_sessions_previous_token_hash_uidx
+  ON auth_sessions (previous_token_hash)
+  WHERE previous_token_hash IS NOT NULL;
 CREATE INDEX auth_sessions_user_active_idx
   ON auth_sessions (user_id, last_seen_at DESC)
   WHERE revoked_at IS NULL;

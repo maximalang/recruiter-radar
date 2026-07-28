@@ -1,6 +1,29 @@
 BEGIN;
 
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM auth_sessions)
+     OR EXISTS (
+       SELECT 1
+       FROM auth_security_events
+       WHERE event_type IN (
+         'login_succeeded',
+         'challenge_replayed',
+         'session_created',
+         'session_rotated',
+         'session_revoked',
+         'all_sessions_revoked',
+         'legacy_session_migrated'
+       )
+     ) THEN
+    RAISE EXCEPTION
+      'auth v2 challenge consumption rollback refused: sessions or lifecycle events exist';
+  END IF;
+END;
+$$;
+
 DROP FUNCTION IF EXISTS consume_auth_login_challenge(
+  TEXT,
   TEXT,
   TEXT,
   TEXT,

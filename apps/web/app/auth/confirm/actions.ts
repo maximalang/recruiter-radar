@@ -5,8 +5,11 @@ import { redirect } from "next/navigation";
 
 import { clearPendingAccountLogin, readPendingAccountLogin } from "@/lib/account-login-cookie";
 import { consumeAccountLogin } from "@/lib/account-auth";
-import { consumeAuthV2Login } from "@/lib/auth-v2/challenges";
-import { getAuthV2Flags } from "@/lib/auth-v2/config";
+import {
+  consumeAuthV2Login,
+  readAuthV2LoginChallengePreview,
+} from "@/lib/auth-v2/challenges";
+import { isAuthPlatformV2EnabledForUser } from "@/lib/auth-v2/config";
 import {
   readAuthV2SessionCookie,
   writeAuthV2SessionCookie,
@@ -15,7 +18,10 @@ import {
   readAuthSession,
   revokeAuthSessionById,
 } from "@/lib/auth-v2/sessions";
-import { resolveAuthClientAddress } from "@/lib/auth-v2/security";
+import {
+  isAuthSameOriginRequest,
+  resolveAuthClientAddress,
+} from "@/lib/auth-v2/security";
 import {
   assertOwnerSessionConfigured,
   clearLegacyOwnerSession,
@@ -24,9 +30,19 @@ import {
 
 export async function confirmAccountLoginAction(): Promise<never> {
   assertOwnerSessionConfigured();
+  const requestHeaders = await headers();
+  if (!isAuthSameOriginRequest({ headers: requestHeaders })) {
+    return redirect("/login?error=invalid-origin");
+  }
   const token = await readPendingAccountLogin();
-  if (token && getAuthV2Flags().platform) {
-    const requestHeaders = await headers();
+  const v2Preview = token
+    ? await readAuthV2LoginChallengePreview(token).catch(() => null)
+    : null;
+  if (
+    token
+    && v2Preview
+    && isAuthPlatformV2EnabledForUser(v2Preview.userId)
+  ) {
     const clientAddress = resolveAuthClientAddress({
       directAddress: null,
       headers: requestHeaders,

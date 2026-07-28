@@ -4,8 +4,10 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { requestAccountLogin, sanitizeAccountReturnTo, type LoginRequestResult } from "@/lib/account-auth";
-import { requestAuthV2Login } from "@/lib/auth-v2/challenges";
-import { getAuthV2Flags } from "@/lib/auth-v2/config";
+import {
+  requestAuthV2Login,
+  shouldRequestAuthV2Login,
+} from "@/lib/auth-v2/challenges";
 import {
   resolveAuthClientAddress,
   sanitizeAuthReturnTo,
@@ -23,7 +25,7 @@ export async function requestLoginAction(
     directAddress: null,
     headers: requestHeaders,
   });
-  if (getAuthV2Flags().platform) {
+  if (await shouldRequestAuthV2Login(formData.get("email"))) {
     return requestAuthV2Login({
       email: formData.get("email"),
       returnTo: sanitizeAuthReturnTo(formData.get("returnTo")),

@@ -13,6 +13,7 @@ jest.mock("@/lib/account-auth", () => ({
 }));
 jest.mock("@/lib/auth-v2/challenges", () => ({
   consumeAuthV2Login: jest.fn(),
+  readAuthV2LoginChallengePreview: jest.fn(),
 }));
 jest.mock("@/lib/auth-v2/session-cookie", () => ({
   readAuthV2SessionCookie: jest.fn(),
@@ -34,7 +35,10 @@ import {
   readPendingAccountLogin,
 } from "@/lib/account-login-cookie";
 import { consumeAccountLogin } from "@/lib/account-auth";
-import { consumeAuthV2Login } from "@/lib/auth-v2/challenges";
+import {
+  consumeAuthV2Login,
+  readAuthV2LoginChallengePreview,
+} from "@/lib/auth-v2/challenges";
 import {
   readAuthV2SessionCookie,
   writeAuthV2SessionCookie,
@@ -55,6 +59,7 @@ const mockReadPending = jest.mocked(readPendingAccountLogin);
 const mockClearPending = jest.mocked(clearPendingAccountLogin);
 const mockConsumeLegacy = jest.mocked(consumeAccountLogin);
 const mockConsumeV2 = jest.mocked(consumeAuthV2Login);
+const mockReadV2Preview = jest.mocked(readAuthV2LoginChallengePreview);
 const mockReadV2Cookie = jest.mocked(readAuthV2SessionCookie);
 const mockWriteV2Cookie = jest.mocked(writeAuthV2SessionCookie);
 const mockReadV2Session = jest.mocked(readAuthSession);
@@ -63,6 +68,7 @@ const mockClearLegacy = jest.mocked(clearLegacyOwnerSession);
 const mockWriteLegacy = jest.mocked(writeOwnerSession);
 const mockRedirect = jest.mocked(redirect);
 const originalPlatformFlag = process.env.AUTH_PLATFORM_V2_ENABLED;
+const originalSiteUrl = process.env.AUTH_SITE_URL;
 
 describe("auth v2 explicit confirm bridge", () => {
   afterAll(() => {
@@ -71,20 +77,25 @@ describe("auth v2 explicit confirm bridge", () => {
     } else {
       process.env.AUTH_PLATFORM_V2_ENABLED = originalPlatformFlag;
     }
+    if (originalSiteUrl === undefined) delete process.env.AUTH_SITE_URL;
+    else process.env.AUTH_SITE_URL = originalSiteUrl;
   });
 
   beforeEach(() => {
     jest.clearAllMocks();
     process.env.AUTH_PLATFORM_V2_ENABLED = "false";
+    process.env.AUTH_SITE_URL = "https://radar.example";
     delete process.env.AUTH_TRUSTED_PROXY_HEADER;
-    mockHeaders.mockResolvedValue({
-      get: () => null,
-    } as never);
+    mockHeaders.mockResolvedValue(new Headers({
+      Origin: "https://radar.example",
+      "Sec-Fetch-Site": "same-origin",
+    }) as never);
     mockReadPending.mockResolvedValue("a".repeat(64));
     mockClearPending.mockResolvedValue(undefined);
     mockReadV2Cookie.mockResolvedValue(null);
     mockReadV2Session.mockResolvedValue(null);
     mockRevokeV2.mockResolvedValue(true);
+    mockReadV2Preview.mockResolvedValue(null);
   });
 
   test("preserves legacy confirm while auth v2 is disabled", async () => {
@@ -108,6 +119,10 @@ describe("auth v2 explicit confirm bridge", () => {
 
   test("creates the v2 cookie and revokes the replaced browser session", async () => {
     process.env.AUTH_PLATFORM_V2_ENABLED = "true";
+    mockReadV2Preview.mockResolvedValue({
+      maskedEmail: "o***r@e***e.com",
+      userId: "42",
+    });
     mockConsumeV2.mockResolvedValue({
       account: {
         id: "42",
@@ -144,6 +159,10 @@ describe("auth v2 explicit confirm bridge", () => {
 
   test("accepts an outstanding legacy challenge after v2 rollout", async () => {
     process.env.AUTH_PLATFORM_V2_ENABLED = "true";
+    mockReadV2Preview.mockResolvedValue({
+      maskedEmail: "o***r@e***e.com",
+      userId: "42",
+    });
     mockConsumeV2.mockResolvedValue(null);
     mockConsumeLegacy.mockResolvedValue({
       account: {
@@ -160,5 +179,17 @@ describe("auth v2 explicit confirm bridge", () => {
     expect(mockConsumeV2).toHaveBeenCalled();
     expect(mockConsumeLegacy).toHaveBeenCalledWith("a".repeat(64));
     expect(mockWriteLegacy).toHaveBeenCalledWith("42");
+  });
+
+  test("rejects cross-origin confirmation before consuming either challenge", async () => {
+    mockHeaders.mockResolvedValue(new Headers({
+      Origin: "https://attacker.example",
+    }) as never);
+
+    await confirmAccountLoginAction();
+
+    expect(mockConsumeV2).not.toHaveBeenCalled();
+    expect(mockConsumeLegacy).not.toHaveBeenCalled();
+    expect(mockRedirect).toHaveBeenCalledWith("/login?error=invalid-origin");
   });
 });

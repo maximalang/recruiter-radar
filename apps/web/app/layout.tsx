@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 import { Inter } from "next/font/google";
 
 import { PushReadinessBoot } from "./push-readiness-boot";
+import { shouldRunAuthV2SessionRefresh } from "@/lib/auth-v2/config";
+import { AuthSessionRefresh } from "./auth-session-refresh";
 import "./globals.css";
 
 const inter = Inter({
@@ -60,6 +62,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
         }}
       >
         <PushReadinessBoot />
+        {shouldRunAuthV2SessionRefresh() ? <AuthSessionRefresh /> : null}
         {children}
       </body>
     </html>

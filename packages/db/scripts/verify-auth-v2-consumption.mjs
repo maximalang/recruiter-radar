@@ -38,6 +38,7 @@ try {
   await verifyOneConsumerOneSession(pool)
   await verifyOneSignupIdentity(pool)
   await verifyResendConsumeSerialization(pool)
+  await verifyStaleBoundIdentityDenied(pool)
 
   console.log(JSON.stringify({
     ok: true,
@@ -46,10 +47,67 @@ try {
       'one_signup_identity',
       'bounded_replay_audit',
       'resend_consume_serialized',
+      'stale_bound_identity_denied',
     ],
   }))
 } finally {
   await pool.end()
+}
+
+async function verifyStaleBoundIdentityDenied(poolInstance) {
+  const originalEmail = 'stale-bound@example.invalid'
+  const replacementEmail = 'stale-bound-replaced@example.invalid'
+  const user = await poolInstance.query(
+    `INSERT INTO users (
+       email,
+       email_normalized,
+       email_verified_at,
+       created_at,
+       updated_at
+     )
+     VALUES ($1, $1, NOW(), NOW(), NOW())
+     RETURNING id::TEXT AS id`,
+    [originalEmail],
+  )
+  const challengeHash = digest('stale-bound-challenge')
+  const issued = await issue(poolInstance, originalEmail, challengeHash, 'stale')
+  if (!issued.issued) throw new Error('Bound identity challenge was not issued.')
+  await poolInstance.query(
+    `UPDATE users
+     SET email = $2, email_normalized = $2, updated_at = NOW()
+     WHERE id = $1`,
+    [user.rows[0].id, replacementEmail],
+  )
+
+  const consumed = await consume(
+    poolInstance,
+    challengeHash,
+    digest('stale-bound-session'),
+    digest('stale-bound-verifier'),
+  )
+  const state = await poolInstance.query(
+    `SELECT
+       (SELECT COUNT(*)::INTEGER
+        FROM auth_sessions
+        WHERE user_id = $1) AS sessions,
+       (SELECT invalidated_at IS NOT NULL
+        FROM auth_challenges
+        WHERE token_hash = $2) AS invalidated,
+       (SELECT COUNT(*)::INTEGER
+        FROM auth_security_events
+        WHERE event_type = 'login_failed'
+          AND user_id = $1
+          AND metadata @> '{"reason_code":"challenge_identity_changed"}') AS events`,
+    [user.rows[0].id, challengeHash],
+  )
+  if (
+    consumed.consumed
+    || state.rows[0]?.sessions !== 0
+    || state.rows[0]?.invalidated !== true
+    || state.rows[0]?.events !== 1
+  ) {
+    throw new Error('Stale bound identity challenge authenticated an old account.')
+  }
 }
 
 async function verifyOneConsumerOneSession(poolInstance) {
@@ -267,8 +325,13 @@ async function consume(
        consumed,
        user_id::TEXT AS "userId",
        session_id::TEXT AS "sessionId"
-     FROM consume_auth_login_challenge($1, $2, $3)`,
-    [challengeTokenHash, sessionTokenHash, verificationKeyHash],
+     FROM consume_auth_login_challenge($1, $2, $3, $4)`,
+    [
+      challengeTokenHash,
+      sessionTokenHash,
+      digest('global-consumption-verifier'),
+      verificationKeyHash,
+    ],
   )
   return result.rows[0]
 }

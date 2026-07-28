@@ -19,6 +19,7 @@ import { sendEmail } from "@/lib/email/transport";
 import {
   consumeAuthV2Login,
   requestAuthV2Login,
+  shouldRequestAuthV2Login,
 } from "@/lib/auth-v2/challenges";
 
 const mockGetClient = jest.mocked(getClient);
@@ -78,6 +79,15 @@ const consumeVerifierPath = resolve(
   "db",
   "scripts",
   "verify-auth-v2-consumption.mjs",
+);
+const rollbackVerifierPath = resolve(
+  process.cwd(),
+  "..",
+  "..",
+  "packages",
+  "db",
+  "scripts",
+  "verify-auth-v2-rollback.mjs",
 );
 
 function fakeClient(issueResult: { issued: boolean; challengeId: string | null }) {
@@ -232,12 +242,13 @@ describe("auth v2 login challenge service", () => {
     const consumeCall = query.mock.calls.find(([sql]) =>
       String(sql).includes("consume_auth_login_challenge"),
     );
-    expect(consumeCall?.[1]).toHaveLength(3);
+    expect(consumeCall?.[1]).toHaveLength(4);
     expect(consumeCall?.[1]?.[0]).toMatch(/^[a-f0-9]{64}$/);
     expect(consumeCall?.[1]?.[0]).not.toBe("a".repeat(64));
     expect(consumeCall?.[1]?.[1]).toMatch(/^[a-f0-9]{64}$/);
     expect(consumeCall?.[1]?.[1]).not.toBe(result?.session.token);
     expect(consumeCall?.[1]?.[2]).toMatch(/^[a-f0-9]{64}$/);
+    expect(consumeCall?.[1]?.[3]).toMatch(/^[a-f0-9]{64}$/);
     expect(consumeCall?.[1]).not.toContain("192.0.2.10");
     expect(client.release).toHaveBeenCalled();
   });
@@ -269,6 +280,54 @@ describe("auth v2 login challenge service", () => {
     })).resolves.toBeNull();
     expect(mockGetClient).not.toHaveBeenCalled();
   });
+
+  test("does not collapse unknown clients into one shared verification IP bucket", async () => {
+    const query = jest.fn().mockResolvedValue({
+      rows: [{
+        consumed: false,
+        userId: null,
+        sessionId: null,
+        email: null,
+        fullName: null,
+        emailVerifiedAt: null,
+        returnTo: null,
+      }],
+      rowCount: 1,
+    });
+    mockGetClient.mockResolvedValue({ query, release: jest.fn() } as never);
+
+    await consumeAuthV2Login({
+      token: "d".repeat(64),
+      clientAddress: "unknown",
+    });
+
+    const consumeCall = query.mock.calls.find(([sql]) =>
+      String(sql).includes("consume_auth_login_challenge"),
+    );
+    expect(consumeCall?.[1]?.[2]).toMatch(/^[a-f0-9]{64}$/);
+    expect(consumeCall?.[1]?.[3]).toBeNull();
+  });
+
+  test("routes an existing canary identity through the ordinary login form", async () => {
+    const previousPlatform = process.env.AUTH_PLATFORM_V2_ENABLED;
+    const previousCanary = process.env.AUTH_V2_CANARY_USER_IDS;
+    process.env.AUTH_PLATFORM_V2_ENABLED = "false";
+    process.env.AUTH_V2_CANARY_USER_IDS = "42";
+    mockGetPool.mockReturnValue({
+      query: jest.fn().mockResolvedValue({
+        rows: [{ userId: "42" }],
+        rowCount: 1,
+      }),
+    } as never);
+
+    try {
+      await expect(shouldRequestAuthV2Login("owner@example.com"))
+        .resolves.toBe(true);
+    } finally {
+      restoreEnv("AUTH_PLATFORM_V2_ENABLED", previousPlatform);
+      restoreEnv("AUTH_V2_CANARY_USER_IDS", previousCanary);
+    }
+  });
 });
 
 describe("auth v2 challenge issuance database contract", () => {
@@ -281,8 +340,9 @@ describe("auth v2 challenge issuance database contract", () => {
     expect(compact).toContain("CREATE FUNCTION issue_auth_login_challenge");
     expect(compact).toContain("pg_advisory_xact_lock");
     expect(compact).toContain(
-      "UPDATE auth_challenges SET invalidated_at = input_now",
+      "UPDATE auth_challenges SET invalidated_at = action_now",
     );
+    expect(compact).toContain("COALESCE(MAX(created_at), input_now)");
     expect(compact).toContain("INSERT INTO auth_challenges");
     expect(compact).not.toMatch(/INSERT\s+INTO\s+users/i);
   });
@@ -321,10 +381,16 @@ describe("auth v2 challenge issuance database contract", () => {
   });
 });
 
+function restoreEnv(name: string, value: string | undefined): void {
+  if (value === undefined) delete process.env[name];
+  else process.env[name] = value;
+}
+
 describe("auth v2 atomic challenge consumption contract", () => {
   const migration = readFileSync(consumeMigrationPath, "utf8");
   const rollback = readFileSync(consumeRollbackPath, "utf8");
   const verifier = readFileSync(consumeVerifierPath, "utf8");
+  const rollbackVerifier = readFileSync(rollbackVerifierPath, "utf8");
   const compact = migration.replace(/\s+/g, " ");
 
   test("serializes identity resolution and creates verified users only on consume", () => {
@@ -335,9 +401,13 @@ describe("auth v2 atomic challenge consumption contract", () => {
     expect(compact).toContain("email_verified_at");
     expect(compact).toContain("INSERT INTO auth_sessions");
     expect(compact).toContain("UPDATE auth_challenges AS challenge SET consumed_at");
+    expect(compact).toContain("challenge_identity_changed");
+    expect(compact).toContain("last_authenticated_at");
   });
 
   test("applies verification limits and writes bounded replay and success audit", () => {
+    expect(compact).toContain("input_global_verification_key_hash");
+    expect(compact).toContain("input_verification_ip_key_hash IS NOT NULL");
     expect(compact).toContain("'challenge_verify'");
     expect(compact).toContain("challenge_replayed");
     expect(compact).toContain("ON CONFLICT (subject_hash)");
@@ -354,5 +424,9 @@ describe("auth v2 atomic challenge consumption contract", () => {
     expect(verifier).toContain("one_consumer_one_session");
     expect(verifier).toContain("one_signup_identity");
     expect(verifier).toContain("resend_consume_serialized");
+    expect(verifier).toContain("stale_bound_identity_denied");
+    expect(rollback).toContain("rollback refused");
+    expect(rollbackVerifier).toContain("full_reverse_chain");
+    expect(rollbackVerifier).toContain("live_session_rollback_refused");
   });
 });

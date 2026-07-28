@@ -8,6 +8,7 @@ const HASH_PATTERN = /^[a-f0-9]{64}$/;
 const POSITIVE_ID_PATTERN = /^[1-9]\d*$/;
 const MAX_POSTGRES_BIGINT = BigInt("9223372036854775807");
 const RECENT_AUTH_SECONDS = 10 * 60;
+const SESSION_TOUCH_INTERVAL_MINUTES = 5;
 
 export type AuthSessionMethod =
   | "magic_link"
@@ -149,7 +150,8 @@ export async function createAuthSession(
            last_seen_at,
            idle_expires_at,
            absolute_expires_at,
-           rotated_at
+           rotated_at,
+           last_authenticated_at
          )
          SELECT
            account.id,
@@ -159,11 +161,15 @@ export async function createAuthSession(
            $4,
            $5,
            $6,
-           $7,
-           $7,
-           $7 + INTERVAL '14 days',
-           $7 + INTERVAL '30 days',
-           $7
+           $7::TIMESTAMPTZ,
+           $7::TIMESTAMPTZ,
+           $7::TIMESTAMPTZ + INTERVAL '14 days',
+           $7::TIMESTAMPTZ + INTERVAL '30 days',
+           $7::TIMESTAMPTZ,
+           CASE
+             WHEN $3::TEXT = 'legacy_exchange' THEN NULL
+             ELSE $7::TIMESTAMPTZ
+           END
          FROM users AS account
          WHERE account.id = $1
            AND account.status = 'active'
@@ -187,7 +193,7 @@ export async function createAuthSession(
            created.request_ip_hash,
            created.user_agent_hash,
            JSONB_BUILD_OBJECT('method', created.auth_method),
-           $7
+           $7::TIMESTAMPTZ
          FROM created
          RETURNING id
        )
@@ -202,7 +208,7 @@ export async function createAuthSession(
          created.idle_expires_at AS "idleExpiresAt",
          created.absolute_expires_at AS "absoluteExpiresAt",
          created.rotated_at AS "rotatedAt",
-         account.last_authenticated_at AS "lastAuthenticatedAt",
+         created.last_authenticated_at AS "lastAuthenticatedAt",
          FALSE AS "rotationDue",
          (SELECT COUNT(*) FROM recorded) AS "recordedCount"
        FROM created
@@ -244,7 +250,13 @@ export async function readAuthSession(
              WHEN session.idle_expires_at <= $2 THEN 'idle_expired'
              ELSE 'account_unavailable'
            END
-         WHERE session.token_hash = $1
+         WHERE (
+             session.token_hash = $1
+             OR (
+               session.previous_token_hash = $1
+               AND session.previous_token_valid_until > $2
+             )
+           )
            AND session.revoked_at IS NULL
            AND (
              session.absolute_expires_at <= $2
@@ -298,12 +310,19 @@ export async function readAuthSession(
              session.absolute_expires_at
            )
          FROM users AS account
-         WHERE session.token_hash = $1
+         WHERE (
+             session.token_hash = $1
+             OR (
+               session.previous_token_hash = $1
+               AND session.previous_token_valid_until > $2
+             )
+           )
            AND session.user_id = account.id
            AND session.revoked_at IS NULL
            AND session.idle_expires_at > $2
            AND session.absolute_expires_at > $2
-           AND session.last_seen_at <= $2 - INTERVAL '15 minutes'
+           AND session.last_seen_at <= $2
+             - MAKE_INTERVAL(mins => ${SESSION_TOUCH_INTERVAL_MINUTES})
            AND account.status = 'active'
            AND account.email_verified_at IS NOT NULL
          RETURNING session.*
@@ -312,7 +331,13 @@ export async function readAuthSession(
          SELECT session.*
          FROM auth_sessions AS session
          JOIN users AS account ON account.id = session.user_id
-         WHERE session.token_hash = $1
+         WHERE (
+             session.token_hash = $1
+             OR (
+               session.previous_token_hash = $1
+               AND session.previous_token_valid_until > $2
+             )
+           )
            AND session.revoked_at IS NULL
            AND session.idle_expires_at > $2
            AND session.absolute_expires_at > $2
@@ -336,8 +361,11 @@ export async function readAuthSession(
          selected.idle_expires_at AS "idleExpiresAt",
          selected.absolute_expires_at AS "absoluteExpiresAt",
          selected.rotated_at AS "rotatedAt",
-         account.last_authenticated_at AS "lastAuthenticatedAt",
-         (selected.rotated_at <= $2 - INTERVAL '24 hours') AS "rotationDue",
+         selected.last_authenticated_at AS "lastAuthenticatedAt",
+         (
+           selected.token_hash = $1
+           AND selected.rotated_at <= $2 - INTERVAL '24 hours'
+         ) AS "rotationDue",
          (SELECT COUNT(*) FROM invalidated_event) AS "invalidatedEventCount"
        FROM selected
        JOIN users AS account ON account.id = selected.user_id
@@ -363,6 +391,7 @@ export async function requireAuthSession(
 export async function rotateAuthSession(
   token: string,
   now = new Date(),
+  options: { force?: boolean } = {},
 ): Promise<AuthSessionWithToken | null> {
   if (!TOKEN_PATTERN.test(token)) return null;
   const pool = getPool();
@@ -374,6 +403,11 @@ export async function rotateAuthSession(
       `WITH rotated AS (
          UPDATE auth_sessions AS session
          SET
+           previous_token_hash = session.token_hash,
+           previous_token_valid_until = LEAST(
+             $3::TIMESTAMPTZ + INTERVAL '60 seconds',
+             session.absolute_expires_at
+           ),
            token_hash = $2,
            last_seen_at = $3,
            idle_expires_at = LEAST(
@@ -387,6 +421,10 @@ export async function rotateAuthSession(
            AND session.revoked_at IS NULL
            AND session.idle_expires_at > $3
            AND session.absolute_expires_at > $3
+           AND (
+             $4::BOOLEAN
+             OR session.rotated_at <= $3 - INTERVAL '24 hours'
+           )
            AND account.status = 'active'
            AND account.email_verified_at IS NOT NULL
          RETURNING session.*
@@ -425,7 +463,7 @@ export async function rotateAuthSession(
          rotated.idle_expires_at AS "idleExpiresAt",
          rotated.absolute_expires_at AS "absoluteExpiresAt",
          rotated.rotated_at AS "rotatedAt",
-         account.last_authenticated_at AS "lastAuthenticatedAt",
+         rotated.last_authenticated_at AS "lastAuthenticatedAt",
          FALSE AS "rotationDue",
          (SELECT COUNT(*) FROM recorded) AS "recordedCount"
        FROM rotated
@@ -434,6 +472,7 @@ export async function rotateAuthSession(
         hashAuthSessionToken(token),
         hashAuthSessionToken(nextToken),
         now,
+        options.force === true,
       ],
     );
     const session = mapSession(result.rows[0]);
@@ -450,7 +489,7 @@ export async function revokeAuthSession(
 ): Promise<boolean> {
   if (!TOKEN_PATTERN.test(token)) return false;
   return revokeAuthSessionWhere(
-    "session.token_hash = $1",
+    "(session.token_hash = $1 OR session.previous_token_hash = $1)",
     [hashAuthSessionToken(token), reason],
     reason,
   );

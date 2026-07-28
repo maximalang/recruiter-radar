@@ -8,6 +8,7 @@ import { getPool } from "../db-pool";
 import { logError } from "../runtime";
 import {
   type AuthEnvironment,
+  isAuthPlatformV2EnabledForUser,
   isLegacySessionMigrationWindowOpen,
 } from "./config";
 import {
@@ -136,7 +137,13 @@ export async function exchangeLegacyOwnerSession(input: {
 
   const userId = decodeLegacyOwnerSession(input.legacyToken, env);
   const fingerprint = legacyFingerprint(input.legacyToken, env);
-  if (!userId || !fingerprint) return null;
+  if (
+    !userId
+    || !fingerprint
+    || !isAuthPlatformV2EnabledForUser(userId, env)
+  ) {
+    return null;
+  }
 
   const pool = getPool();
   if (!pool) return null;
@@ -253,7 +260,7 @@ export async function exchangeLegacyOwnerSession(input: {
          created.idle_expires_at AS "idleExpiresAt",
          created.absolute_expires_at AS "absoluteExpiresAt",
          created.rotated_at AS "rotatedAt",
-         account.last_authenticated_at AS "lastAuthenticatedAt",
+         created.last_authenticated_at AS "lastAuthenticatedAt",
          FALSE AS "rotationDue",
          (SELECT COUNT(*) FROM migration_recorded) AS "migrationEventCount",
          (SELECT COUNT(*) FROM session_recorded) AS "sessionEventCount"

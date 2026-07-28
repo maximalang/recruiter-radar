@@ -26,7 +26,8 @@ CREATE UNIQUE INDEX auth_security_events_challenge_replay_uidx
 CREATE FUNCTION consume_auth_login_challenge(
   input_challenge_token_hash TEXT,
   input_session_token_hash TEXT,
-  input_verification_key_hash TEXT,
+  input_global_verification_key_hash TEXT,
+  input_verification_ip_key_hash TEXT,
   input_now TIMESTAMPTZ DEFAULT clock_timestamp()
 )
 RETURNS TABLE (
@@ -44,25 +45,40 @@ DECLARE
   challenge_identity TEXT;
   locked_challenge RECORD;
   resolved_user RECORD;
-  verification_allowed BOOLEAN;
+  global_verification_allowed BOOLEAN;
+  ip_verification_allowed BOOLEAN := TRUE;
   inserted_session_id BIGINT;
   replay_reason TEXT;
 BEGIN
   IF input_challenge_token_hash !~ '^[a-f0-9]{64}$'
      OR input_session_token_hash !~ '^[a-f0-9]{64}$'
-     OR input_verification_key_hash !~ '^[a-f0-9]{64}$' THEN
+     OR input_global_verification_key_hash !~ '^[a-f0-9]{64}$'
+     OR (
+       input_verification_ip_key_hash IS NOT NULL
+       AND input_verification_ip_key_hash !~ '^[a-f0-9]{64}$'
+     ) THEN
     RAISE EXCEPTION 'invalid auth challenge consumption input';
   END IF;
 
   SELECT consume_auth_rate_limit(
-    'challenge_verify',
-    input_verification_key_hash,
+    'global',
+    input_global_verification_key_hash,
     900,
-    10,
+    1000,
     input_now
   )
-  INTO verification_allowed;
-  IF NOT verification_allowed THEN
+  INTO global_verification_allowed;
+  IF input_verification_ip_key_hash IS NOT NULL THEN
+    SELECT consume_auth_rate_limit(
+      'challenge_verify',
+      input_verification_ip_key_hash,
+      900,
+      10,
+      input_now
+    )
+    INTO ip_verification_allowed;
+  END IF;
+  IF NOT global_verification_allowed OR NOT ip_verification_allowed THEN
     RETURN QUERY
       SELECT FALSE, NULL::BIGINT, NULL::BIGINT, NULL::TEXT,
         NULL::TEXT, NULL::TIMESTAMPTZ, NULL::TEXT;
@@ -175,18 +191,59 @@ BEGIN
   WHERE (
       locked_challenge.user_id IS NOT NULL
       AND account.id = locked_challenge.user_id
+      AND (
+        account.email_normalized = locked_challenge.email_normalized
+        OR (
+          account.email_normalized IS NULL
+          AND LOWER(account.email) = LOWER(locked_challenge.email_normalized)
+        )
+      )
     )
-    OR account.email_normalized = locked_challenge.email_normalized
     OR (
-      account.email_normalized IS NULL
-      AND LOWER(account.email) = LOWER(locked_challenge.email_normalized)
+      locked_challenge.user_id IS NULL
+      AND (
+        account.email_normalized = locked_challenge.email_normalized
+        OR (
+          account.email_normalized IS NULL
+          AND LOWER(account.email) = LOWER(locked_challenge.email_normalized)
+        )
+      )
     )
-  ORDER BY
-    (account.id = locked_challenge.user_id) DESC,
-    (account.email_normalized IS NOT NULL) DESC,
-    account.id
+  ORDER BY (account.email_normalized IS NOT NULL) DESC, account.id
   LIMIT 1
   FOR UPDATE;
+
+  IF resolved_user.id IS NULL AND locked_challenge.user_id IS NOT NULL THEN
+    UPDATE auth_challenges AS challenge
+    SET invalidated_at = input_now
+    WHERE challenge.id = locked_challenge.id;
+
+    INSERT INTO auth_security_events (
+      event_type,
+      outcome,
+      user_id,
+      subject_hash,
+      request_ip_hash,
+      user_agent_hash,
+      metadata,
+      created_at
+    )
+    VALUES (
+      'login_failed',
+      'denied',
+      locked_challenge.user_id,
+      input_challenge_token_hash,
+      locked_challenge.request_ip_hash,
+      locked_challenge.user_agent_hash,
+      JSONB_BUILD_OBJECT('reason_code', 'challenge_identity_changed'),
+      input_now
+    );
+
+    RETURN QUERY
+      SELECT FALSE, NULL::BIGINT, NULL::BIGINT, NULL::TEXT,
+        NULL::TEXT, NULL::TIMESTAMPTZ, NULL::TEXT;
+    RETURN;
+  END IF;
 
   IF resolved_user.id IS NOT NULL AND resolved_user.status <> 'active' THEN
     UPDATE auth_challenges AS challenge
@@ -275,7 +332,8 @@ BEGIN
     last_seen_at,
     idle_expires_at,
     absolute_expires_at,
-    rotated_at
+    rotated_at,
+    last_authenticated_at
   )
   VALUES (
     resolved_user.id,
@@ -288,6 +346,7 @@ BEGIN
     input_now,
     input_now + INTERVAL '14 days',
     input_now + INTERVAL '30 days',
+    input_now,
     input_now
   )
   RETURNING auth_sessions.id INTO inserted_session_id;

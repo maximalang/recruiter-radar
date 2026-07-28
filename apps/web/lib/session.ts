@@ -5,6 +5,7 @@ import {
   clearAuthV2SessionCookie,
   readAuthV2SessionCookie,
 } from "./auth-v2/session-cookie";
+import { isAuthV2SessionReadEnabledForUser } from "./auth-v2/config";
 import {
   readAuthSession,
   revokeAuthSession,
@@ -78,13 +79,22 @@ export async function readOwnerSession(): Promise<string | null> {
   const v2Token = await readAuthV2SessionCookie().catch(() => null);
   if (v2Token) {
     const session = await readAuthSession(v2Token);
-    if (session) return session.userId;
+    if (
+      session
+      && isAuthV2SessionReadEnabledForUser(session.userId)
+    ) {
+      return session.userId;
+    }
   }
 
-  const jar = await cookies();
-  const token = jar.get(COOKIE_NAME)?.value?.trim() ?? null;
+  const token = await readLegacyOwnerSessionCookie();
   if (!token) return null;
   return decode(token);
+}
+
+export async function readLegacyOwnerSessionCookie(): Promise<string | null> {
+  const jar = await cookies();
+  return jar.get(COOKIE_NAME)?.value?.trim() ?? null;
 }
 
 /**

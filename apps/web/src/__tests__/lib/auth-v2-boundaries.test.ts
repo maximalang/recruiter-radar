@@ -1,9 +1,12 @@
 import {
   getAuthV2Flags,
   isAuthPlatformV2EnabledForUser,
+  isAuthV2SessionReadEnabledForUser,
   parseCanaryUserIds,
 } from "@/lib/auth-v2/config";
 import {
+  isAuthSameOriginRequest,
+  maskAuthEmail,
   normalizeAuthEmail,
   resolveAuthClientAddress,
   sanitizeAuthReturnTo,
@@ -64,6 +67,12 @@ describe("auth v2 feature boundaries", () => {
     expect(isAuthPlatformV2EnabledForUser(null, env)).toBe(false);
     expect(isAuthPlatformV2EnabledForUser("18", env)).toBe(false);
     expect(isAuthPlatformV2EnabledForUser("17", env)).toBe(true);
+    expect(isAuthV2SessionReadEnabledForUser("17", env)).toBe(true);
+    expect(isAuthV2SessionReadEnabledForUser("18", env)).toBe(false);
+    expect(isAuthV2SessionReadEnabledForUser("18", {
+      ...env,
+      AUTH_V2_SESSION_ROLLBACK_COMPAT_ENABLED: "true",
+    })).toBe(true);
   });
 });
 
@@ -102,6 +111,25 @@ describe("auth v2 request boundaries", () => {
     expect(sanitizeAuthReturnTo("//attacker.example")).toBe("/dashboard");
     expect(sanitizeAuthReturnTo("/api/auth/logout")).toBe("/dashboard");
     expect(sanitizeAuthReturnTo("/dashboard\\@attacker.example")).toBe("/dashboard");
+  });
+
+  test("masks target identity and enforces the configured request origin", () => {
+    expect(maskAuthEmail("owner@example.com")).toBe("o***r@e***e.com");
+    const env = {
+      AUTH_SITE_URL: "https://radar.example",
+      NODE_ENV: "production",
+    };
+    expect(isAuthSameOriginRequest(new Request("https://radar.example", {
+      headers: {
+        Origin: "https://radar.example",
+        "Sec-Fetch-Site": "same-origin",
+      },
+    }), env)).toBe(true);
+    expect(isAuthSameOriginRequest(new Request("https://radar.example", {
+      headers: { Origin: "https://attacker.example" },
+    }), env)).toBe(false);
+    expect(isAuthSameOriginRequest(new Request("https://radar.example"), env))
+      .toBe(false);
   });
 
   test("ignores forwarding headers unless the deployment opts into one", () => {

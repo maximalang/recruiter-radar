@@ -94,6 +94,67 @@ export function sanitizeAuthReturnTo(value: unknown): string {
   }
 }
 
+export function maskAuthEmail(email: string): string {
+  const at = email.lastIndexOf("@");
+  if (at <= 0) return "***";
+  const local = email.slice(0, at);
+  const domain = email.slice(at + 1);
+  const dot = domain.lastIndexOf(".");
+  const domainName = dot > 0 ? domain.slice(0, dot) : domain;
+  const suffix = dot > 0 ? domain.slice(dot) : "";
+  const maskedLocal = local.length <= 2
+    ? `${local.slice(0, 1)}***`
+    : `${local.slice(0, 1)}***${local.slice(-1)}`;
+  const maskedDomain = domainName.length <= 2
+    ? `${domainName.slice(0, 1)}***`
+    : `${domainName.slice(0, 1)}***${domainName.slice(-1)}`;
+  return `${maskedLocal}@${maskedDomain}${suffix}`;
+}
+
+function configuredAuthOrigin(env: AuthEnvironment): string | null {
+  const raw = (
+    env.AUTH_SITE_URL
+    ?? env.PAYMENTS_SITE_URL
+    ?? env.NEXT_PUBLIC_APP_URL
+    ?? env.RR_APP_BASE_URL
+  )?.trim();
+  if (!raw) return env.NODE_ENV === "production"
+    ? null
+    : "http://localhost:3000";
+  try {
+    const url = new URL(raw);
+    const local = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+    if (
+      url.username
+      || url.password
+      || (url.protocol !== "https:" && !local)
+    ) {
+      return null;
+    }
+    return url.origin;
+  } catch {
+    return null;
+  }
+}
+
+export function isAuthSameOriginRequest(
+  request: Pick<Request, "headers">,
+  env: AuthEnvironment = process.env,
+): boolean {
+  const expectedOrigin = configuredAuthOrigin(env);
+  const rawOrigin = request.headers.get("origin")?.trim() ?? "";
+  if (!expectedOrigin || !rawOrigin) return false;
+  try {
+    if (new URL(rawOrigin).origin !== expectedOrigin) return false;
+  } catch {
+    return false;
+  }
+  const fetchSite = request.headers.get("sec-fetch-site");
+  return fetchSite === null
+    || fetchSite === "same-origin"
+    || fetchSite === "none";
+}
+
 type AuthClientAddressInput = {
   directAddress: string | null | undefined;
   headers: Pick<Headers, "get">;

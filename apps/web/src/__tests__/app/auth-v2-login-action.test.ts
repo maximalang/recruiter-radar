@@ -10,6 +10,7 @@ jest.mock("@/lib/account-auth", () => ({
 }));
 jest.mock("@/lib/auth-v2/challenges", () => ({
   requestAuthV2Login: jest.fn(),
+  shouldRequestAuthV2Login: jest.fn(),
 }));
 jest.mock("@/lib/session", () => ({
   clearOwnerSession: jest.fn(),
@@ -17,12 +18,16 @@ jest.mock("@/lib/session", () => ({
 
 import { requestLoginAction } from "@/app/login/actions";
 import { requestAccountLogin } from "@/lib/account-auth";
-import { requestAuthV2Login } from "@/lib/auth-v2/challenges";
+import {
+  requestAuthV2Login,
+  shouldRequestAuthV2Login,
+} from "@/lib/auth-v2/challenges";
 import { headers } from "next/headers";
 
 const mockHeaders = jest.mocked(headers);
 const mockLegacyRequest = jest.mocked(requestAccountLogin);
 const mockV2Request = jest.mocked(requestAuthV2Login);
+const mockShouldUseV2 = jest.mocked(shouldRequestAuthV2Login);
 const originalPlatformFlag = process.env.AUTH_PLATFORM_V2_ENABLED;
 const originalProxyHeader = process.env.AUTH_TRUSTED_PROXY_HEADER;
 const originalProxyHops = process.env.AUTH_TRUSTED_PROXY_HOPS;
@@ -51,6 +56,7 @@ describe("auth v2 login action rollout", () => {
     }) as never);
     mockLegacyRequest.mockResolvedValue({ ok: true });
     mockV2Request.mockResolvedValue({ ok: true });
+    mockShouldUseV2.mockResolvedValue(false);
   });
 
   test("preserves the legacy request path while the platform flag is false", async () => {
@@ -71,6 +77,7 @@ describe("auth v2 login action rollout", () => {
 
   test("uses auth v2 and only an explicitly trusted proxy address", async () => {
     process.env.AUTH_PLATFORM_V2_ENABLED = "true";
+    mockShouldUseV2.mockResolvedValue(true);
     process.env.AUTH_TRUSTED_PROXY_HEADER = "x-real-ip";
     const formData = new FormData();
     formData.set("email", "owner@example.com");

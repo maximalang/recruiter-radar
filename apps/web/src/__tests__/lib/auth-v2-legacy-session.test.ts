@@ -43,12 +43,12 @@ describe("bounded auth v2 legacy session exchange", () => {
     jest.clearAllMocks();
   });
 
-  test("opens only with dependency flags and an unexpired UTC deadline", () => {
+  test("opens only with its exact flag and an unexpired UTC deadline", () => {
     expect(isLegacySessionMigrationWindowOpen(enabledEnv, now)).toBe(true);
     expect(isLegacySessionMigrationWindowOpen({
       ...enabledEnv,
       AUTH_WORKSPACES_V2_ENABLED: "false",
-    }, now)).toBe(false);
+    }, now)).toBe(true);
     expect(isLegacySessionMigrationWindowOpen({
       ...enabledEnv,
       AUTH_LEGACY_SESSION_MIGRATION_DEADLINE: "not-a-date",

@@ -33,6 +33,7 @@ const mockClearV2Cookie = jest.mocked(clearAuthV2SessionCookie);
 const mockReadV2Session = jest.mocked(readAuthSession);
 const mockRevokeV2 = jest.mocked(revokeAuthSessionById);
 const originalSessionSecret = process.env.SESSION_SECRET;
+const originalPlatformFlag = process.env.AUTH_PLATFORM_V2_ENABLED;
 
 function legacyToken(userId: string): string {
   const mac = createHmac("sha256", process.env.SESSION_SECRET!)
@@ -51,11 +52,17 @@ describe("owner session compatibility bridge", () => {
     } else {
       process.env.SESSION_SECRET = originalSessionSecret;
     }
+    if (originalPlatformFlag === undefined) {
+      delete process.env.AUTH_PLATFORM_V2_ENABLED;
+    } else {
+      process.env.AUTH_PLATFORM_V2_ENABLED = originalPlatformFlag;
+    }
   });
 
   beforeEach(() => {
     jest.clearAllMocks();
     process.env.SESSION_SECRET = "s".repeat(32);
+    process.env.AUTH_PLATFORM_V2_ENABLED = "true";
     mockCookies.mockResolvedValue({
       delete: deleteCookie,
       get: getCookie,
@@ -85,6 +92,18 @@ describe("owner session compatibility bridge", () => {
 
     await expect(readOwnerSession()).resolves.toBe("42");
     expect(mockReadV2Session).not.toHaveBeenCalled();
+  });
+
+  test("does not accept a non-canary v2 session while the platform is disabled", async () => {
+    process.env.AUTH_PLATFORM_V2_ENABLED = "false";
+    delete process.env.AUTH_V2_CANARY_USER_IDS;
+    mockReadV2Cookie.mockResolvedValue("a".repeat(64));
+    mockReadV2Session.mockResolvedValue({
+      id: "17",
+      userId: "42",
+    } as never);
+
+    await expect(readOwnerSession()).resolves.toBeNull();
   });
 
   test("revokes the database session before clearing both cookies", async () => {

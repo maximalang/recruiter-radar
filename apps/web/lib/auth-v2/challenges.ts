@@ -8,7 +8,15 @@ import {
 import { getClient, getPool } from "../db-pool";
 import { sendEmail } from "../email/transport";
 import { logError, logWarn } from "../runtime";
-import { normalizeAuthEmail, sanitizeAuthReturnTo } from "./security";
+import {
+  getAuthV2Flags,
+  isAuthPlatformV2EnabledForUser,
+} from "./config";
+import {
+  maskAuthEmail,
+  normalizeAuthEmail,
+  sanitizeAuthReturnTo,
+} from "./security";
 
 const LOGIN_TTL_MINUTES = 15;
 const TOKEN_PATTERN = /^[a-f0-9]{64}$/;
@@ -49,6 +57,33 @@ function hashToken(token: string): string {
 
 async function rollbackQuietly(client: PoolClient): Promise<void> {
   await client.query("ROLLBACK").catch(() => undefined);
+}
+
+export async function shouldRequestAuthV2Login(emailInput: unknown): Promise<boolean> {
+  if (getAuthV2Flags().platform) return true;
+  const email = normalizeAuthEmail(emailInput);
+  if (!email) return false;
+  const pool = getPool();
+  if (!pool) return false;
+  try {
+    const result = await pool.query<{ userId: string }>(
+      `SELECT id::TEXT AS "userId"
+       FROM users
+       WHERE status = 'active'
+         AND email_verified_at IS NOT NULL
+         AND (
+           email_normalized = $1
+           OR (email_normalized IS NULL AND LOWER(email) = LOWER($1))
+         )
+       ORDER BY (email_normalized IS NOT NULL) DESC, id
+       LIMIT 1`,
+      [email.normalized],
+    );
+    return isAuthPlatformV2EnabledForUser(result.rows[0]?.userId);
+  } catch (error) {
+    logError("auth_v2.login_eligibility_failed", error);
+    return false;
+  }
 }
 
 export async function requestAuthV2Login(input: {
@@ -173,10 +208,13 @@ export async function consumeAuthV2Login(input: {
 
   try {
     sessionToken = randomBytes(32).toString("hex");
-    const verificationKeyHash = hashBoundary(
-      "challenge-verify",
-      input.clientAddress || "unknown",
+    const globalVerificationKeyHash = hashBoundary(
+      "challenge-verify-global",
+      "login",
     );
+    const verificationIpKeyHash = input.clientAddress === "unknown"
+      ? null
+      : hashBoundary("challenge-verify-ip", input.clientAddress);
     client = await getClient();
     if (!client) return null;
     await client.query("BEGIN");
@@ -197,11 +235,12 @@ export async function consumeAuthV2Login(input: {
          full_name AS "fullName",
          email_verified_at AS "emailVerifiedAt",
          return_to AS "returnTo"
-       FROM consume_auth_login_challenge($1, $2, $3)`,
+       FROM consume_auth_login_challenge($1, $2, $3, $4)`,
       [
         hashToken(token),
         hashToken(sessionToken),
-        verificationKeyHash,
+        globalVerificationKeyHash,
+        verificationIpKeyHash,
       ],
     );
     const row = consumed.rows[0];
@@ -263,5 +302,36 @@ export async function isAuthV2LoginChallengeActive(
   } catch (error) {
     logError("auth_v2.login_challenge_read_failed", error);
     return false;
+  }
+}
+
+export async function readAuthV2LoginChallengePreview(
+  token: string,
+): Promise<{ maskedEmail: string; userId: string | null } | null> {
+  const normalized = token.trim();
+  if (!TOKEN_PATTERN.test(normalized)) return null;
+  const pool = getPool();
+  if (!pool) return null;
+  try {
+    const result = await pool.query<{ email: string; userId: string | null }>(
+      `SELECT
+         email_normalized AS email,
+         user_id::TEXT AS "userId"
+       FROM auth_challenges
+       WHERE token_hash = $1
+         AND purpose IN ('login', 'signup')
+         AND consumed_at IS NULL
+         AND invalidated_at IS NULL
+         AND expires_at > NOW()
+       LIMIT 1`,
+      [hashToken(normalized)],
+    );
+    const row = result.rows[0];
+    return row
+      ? { maskedEmail: maskAuthEmail(row.email), userId: row.userId }
+      : null;
+  } catch (error) {
+    logError("auth_v2.login_challenge_preview_failed", error);
+    return null;
   }
 }

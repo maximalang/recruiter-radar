@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { readPendingAccountLogin } from "@/lib/account-login-cookie";
-import { isLoginChallengeActive } from "@/lib/account-auth";
-import { isAuthV2LoginChallengeActive } from "@/lib/auth-v2/challenges";
-import { getAuthV2Flags } from "@/lib/auth-v2/config";
+import { readLoginChallengePreview } from "@/lib/account-auth";
+import { readAuthV2LoginChallengePreview } from "@/lib/auth-v2/challenges";
+import { isAuthPlatformV2EnabledForUser } from "@/lib/auth-v2/config";
 import { readOwnerSession } from "@/lib/session";
 import { BrandLogo } from "../../ui/brand-logo";
 import loginStyles from "../../login/login.module.css";
@@ -19,16 +19,26 @@ export const dynamic = "force-dynamic";
 
 export default async function ConfirmAccountLoginPage() {
   const token = await readPendingAccountLogin();
-  let active = false;
-  if (token && getAuthV2Flags().platform) {
-    active = await isAuthV2LoginChallengeActive(token).catch(() => false);
-    if (!active) {
-      active = await isLoginChallengeActive(token).catch(() => false);
+  let target: { maskedEmail: string; userId: string | null } | null = null;
+  if (token) {
+    const v2Preview = await readAuthV2LoginChallengePreview(token)
+      .catch(() => null);
+    if (
+      v2Preview
+      && isAuthPlatformV2EnabledForUser(v2Preview.userId)
+    ) {
+      target = v2Preview;
+    } else {
+      target = await readLoginChallengePreview(token).catch(() => null);
     }
-  } else if (token) {
-    active = await isLoginChallengeActive(token).catch(() => false);
   }
+  const active = target !== null;
   const currentOwnerId = await readOwnerSession();
+  const replacingAnotherAccount = Boolean(
+    currentOwnerId
+    && target?.userId
+    && currentOwnerId !== target.userId,
+  );
 
   return (
     <main className={loginStyles.shell}>
@@ -37,10 +47,10 @@ export default async function ConfirmAccountLoginPage() {
         <p className={loginStyles.eyebrow}>Защищённый вход</p>
         <h1 className={loginStyles.title}>{active ? "Подтвердите вход" : "Ссылка больше не действует"}</h1>
         <p className={loginStyles.lead}>
-          {active
-            ? currentOwnerId
-              ? "После подтверждения текущий аккаунт будет явно заменён аккаунтом из письма."
-              : "Последний шаг: подтвердите вход на этом устройстве."
+          {target
+            ? replacingAnotherAccount
+              ? `Текущий аккаунт будет заменён. Продолжить как ${target.maskedEmail}?`
+              : `Продолжить как ${target.maskedEmail}?`
             : "Одноразовая ссылка истекла или уже была использована. Запросите новую — это займёт меньше минуты."}
         </p>
         {active ? (

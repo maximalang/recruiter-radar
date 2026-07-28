@@ -352,7 +352,7 @@ user_id BIGINT FK users
 active_workspace_id BIGINT nullable
 token_hash CHAR(64) unique
 previous_token_hash CHAR(64) nullable unique
-previous_token_expires_at TIMESTAMPTZ nullable
+previous_token_valid_until TIMESTAMPTZ nullable
 auth_method TEXT
 created_at TIMESTAMPTZ
 last_seen_at TIMESTAMPTZ
@@ -529,6 +529,14 @@ Consume transaction:
 Any duplicate/replay returns generic invalid-link state and creates no second
 user/workspace/session.
 
+### 9.4. Retention cleanup
+
+`auth:cleanup-challenges` is dry-run by default. `--apply` deletes only
+consumed, invalidated or expired challenges older than the configurable
+`AUTH_CHALLENGE_RETENTION_DAYS` window (default 14, allowed 1–90), in bounded
+`FOR UPDATE SKIP LOCKED` batches. It reports aggregate counters only and never
+deletes the append-only security event ledger.
+
 ## 10. Session lifecycle
 
 Cookie:
@@ -573,7 +581,9 @@ Rules:
 - login, reauth, privilege change, email change и workspace switch rotate token;
 - logout sets `revoked_at/revoked_reason` before clearing cookie;
 - logout-all revokes all user sessions in one transaction;
-- recent authentication uses server `last_authenticated_at`, not client time.
+- recent authentication uses the current session row's
+  `auth_sessions.last_authenticated_at`, never a user-global timestamp or
+  client time.
 
 ## 11. Legacy session migration
 
@@ -589,6 +599,10 @@ One-way exchange:
 6. append `legacy_session_migrated`;
 7. delete `rr_sid`;
 8. never issue or renew legacy cookie.
+
+The writable `/api/auth/session/refresh` boundary performs due rotation and
+bounded legacy exchange. A small root client calls it on load and every five
+minutes; read-only Server Components never mutate cookies.
 
 Existing user с `email_verified_at IS NULL` keeps ordinary product access during
 the bounded compatibility window, but sensitive operations require a fresh
@@ -856,8 +870,8 @@ References:
 ## 17. CSRF, origin и proxy policy
 
 - state-changing auth/account/team operations accept POST/PATCH/DELETE only;
-- verify `Origin` against canonical allowlist; absent Origin handled only for
-  explicitly documented same-site browser cases;
+- verify `Origin` exactly against the canonical configured origin; auth
+  mutation endpoints reject absent or foreign Origin;
 - SameSite=Lax is defense-in-depth, not sole CSRF control;
 - no unsafe GET mutation;
 - `returnTo` is local allowlist;
@@ -894,6 +908,7 @@ AUTH_ONBOARDING_V2_ENABLED=false
 AUTH_PASSKEYS_ENABLED=false
 AUTH_LEGACY_SESSION_MIGRATION_ENABLED=false
 AUTH_V2_CANARY_USER_IDS=
+AUTH_V2_SESSION_ROLLBACK_COMPAT_ENABLED=false
 ```
 
 Rules:
@@ -903,6 +918,8 @@ Rules:
 - allowlist accepts comma-separated positive decimal IDs only;
 - wildcard/negative/blank elements invalidate the whole allowlist;
 - global enable never follows from a non-empty canary list;
+- rollback compatibility is a separate exact-`true` emergency switch used
+  only to drain already-issued v2 sessions while issuance remains disabled;
 - admin auth ignores customer flags;
 - one request resolves exactly one customer identity path.
 
@@ -912,7 +929,7 @@ Dependencies:
 workspaces → platform v2
 onboarding → platform v2 + workspaces
 passkeys → platform v2
-legacy exchange → platform v2 + workspaces + verified backfill
+legacy exchange → exact migration flag + deadline + v2-eligible existing user
 ```
 
 ## 20. Tooling и commands
@@ -926,6 +943,7 @@ auth-v2:backfill           dry-run default, --apply required
 auth-v2:verify-backfill    read-only parity
 auth-v2:session-report     aggregate only
 auth-v2:canary             exact one-user readiness check
+auth:cleanup-challenges    dry-run default, --apply required
 ```
 
 Standard gates:
@@ -1055,11 +1073,13 @@ security sessions, team invite, passkey management
 Order:
 
 1. clear canary allowlist / disable v2 flags;
-2. keep additive schema and dual-written data;
-3. revert serving code to legacy reads;
-4. revoke suspicious v2 sessions if needed;
-5. do not delete workspaces/backfilled context during incident rollback;
-6. only run down migrations proven non-destructive on isolated upgrade fixtures.
+2. if already-issued sessions must drain, enable only
+   `AUTH_V2_SESSION_ROLLBACK_COMPAT_ENABLED=true`;
+3. keep additive schema and dual-written data;
+4. revert serving code to legacy reads;
+5. revoke suspicious v2 sessions if needed;
+6. do not delete workspaces/backfilled context during incident rollback;
+7. only run down migrations proven non-destructive on isolated upgrade fixtures.
 
 Legacy `owner_id/user_id` remains rollback authority throughout this Goal.
 

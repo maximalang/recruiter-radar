@@ -2,12 +2,26 @@ import { NextResponse } from "next/server";
 
 import { ACCOUNT_LOGIN_PENDING_COOKIE } from "@/lib/account-login-cookie";
 import { isLoginChallengeActive } from "@/lib/account-auth";
-import { isAuthV2LoginChallengeActive } from "@/lib/auth-v2/challenges";
-import { getAuthV2Flags } from "@/lib/auth-v2/config";
+import {
+  isAuthV2LoginChallengeActive,
+  readAuthV2LoginChallengePreview,
+} from "@/lib/auth-v2/challenges";
+import {
+  getAuthV2Flags,
+  isAuthPlatformV2EnabledForUser,
+} from "@/lib/auth-v2/config";
+import { isAuthSameOriginRequest } from "@/lib/auth-v2/security";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request): Promise<NextResponse> {
+  if (!isAuthSameOriginRequest(request)) {
+    return NextResponse.json(
+      { ok: false, next: "/login?error=invalid-origin" },
+      { status: 403, headers: { "Cache-Control": "no-store" } },
+    );
+  }
+
   let token = "";
   try {
     const body = await request.json() as { token?: unknown };
@@ -23,7 +37,13 @@ export async function POST(request: Request): Promise<NextResponse> {
       active = await isLoginChallengeActive(token).catch(() => false);
     }
   } else {
-    active = await isLoginChallengeActive(token).catch(() => false);
+    const preview = await readAuthV2LoginChallengePreview(token)
+      .catch(() => null);
+    if (preview && isAuthPlatformV2EnabledForUser(preview.userId)) {
+      active = true;
+    } else {
+      active = await isLoginChallengeActive(token).catch(() => false);
+    }
   }
   const response = NextResponse.json({
     ok: active,
@@ -35,7 +55,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     response.cookies.set(ACCOUNT_LOGIN_PENDING_COOKIE, token, {
       httpOnly: true,
       sameSite: "lax",
-      secure: process.env.SESSION_SECURE_COOKIE !== "false",
+      secure: true,
       path: "/",
       maxAge: 60 * 15,
     });

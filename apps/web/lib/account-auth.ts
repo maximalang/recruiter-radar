@@ -4,6 +4,7 @@ import type { PoolClient } from "pg";
 import { getClient, getPool } from "./db-pool";
 import { sendEmail } from "./email/transport";
 import { logError, logEvent, logWarn } from "./runtime";
+import { maskAuthEmail } from "./auth-v2/security";
 
 const ACCOUNT_PATHS = ["/dashboard", "/checkout", "/settings", "/profile", "/leads", "/review"];
 const TOKEN_PATTERN = /^[a-f0-9]{64}$/;
@@ -185,6 +186,28 @@ export async function isLoginChallengeActive(token: string): Promise<boolean> {
     [hashToken(token)],
   );
   return result.rowCount === 1;
+}
+
+export async function readLoginChallengePreview(
+  token: string,
+): Promise<{ maskedEmail: string; userId: string } | null> {
+  if (!TOKEN_PATTERN.test(token)) return null;
+  const pool = getPool();
+  if (!pool) return null;
+  const result = await pool.query<{ email: string; userId: string }>(
+    `SELECT account.email, account.id::TEXT AS "userId"
+     FROM account_login_challenges AS challenge
+     JOIN users AS account ON account.id = challenge.user_id
+     WHERE challenge.token_hash = $1
+       AND challenge.consumed_at IS NULL
+       AND challenge.expires_at > NOW()
+     LIMIT 1`,
+    [hashToken(token)],
+  );
+  const row = result.rows[0];
+  return row
+    ? { maskedEmail: maskAuthEmail(row.email), userId: row.userId }
+    : null;
 }
 
 export async function consumeAccountLogin(token: string): Promise<{ account: AccountIdentity; returnTo: string } | null> {
