@@ -672,9 +672,13 @@ describe('opportunity repository tenant scope', () => {
     expect(query.mock.calls.some(([sql]) => String(sql) === 'ROLLBACK')).toBe(true)
   })
 
-  it('writes legacy action, outcome ledger, projection, and episode state in one transaction', async () => {
-    const originalFlag = process.env.OPPORTUNITY_OUTCOMES_ENABLED
-    process.env.OPPORTUNITY_OUTCOMES_ENABLED = 'true'
+  it('writes the canary owner action, ledger, projection, and episode state in one transaction', async () => {
+    const originalEngine = process.env.OPPORTUNITY_ENGINE_V1_ENABLED
+    const originalOutcomes = process.env.OPPORTUNITY_OUTCOMES_ENABLED
+    const originalCanaryOwners = process.env.OPPORTUNITY_CANARY_OWNER_IDS
+    process.env.OPPORTUNITY_ENGINE_V1_ENABLED = 'false'
+    process.env.OPPORTUNITY_OUTCOMES_ENABLED = 'false'
+    process.env.OPPORTUNITY_CANARY_OWNER_IDS = '7'
     const opportunity = {
       id: '10', ownerId: '7', clientProfileId: '8', organizationId: '9',
       hiringEpisodeId: '11', status: 'accepted', evidenceTimeline: [],
@@ -750,8 +754,14 @@ describe('opportunity repository tenant scope', () => {
         String(sql).includes('INSERT INTO client_episode_state')),
       ).toBe(true)
     } finally {
-      if (originalFlag === undefined) delete process.env.OPPORTUNITY_OUTCOMES_ENABLED
-      else process.env.OPPORTUNITY_OUTCOMES_ENABLED = originalFlag
+      restoreEnv('OPPORTUNITY_ENGINE_V1_ENABLED', originalEngine)
+      restoreEnv('OPPORTUNITY_OUTCOMES_ENABLED', originalOutcomes)
+      restoreEnv('OPPORTUNITY_CANARY_OWNER_IDS', originalCanaryOwners)
     }
   })
 })
+
+function restoreEnv(name: string, value: string | undefined): void {
+  if (value === undefined) delete process.env[name]
+  else process.env[name] = value
+}

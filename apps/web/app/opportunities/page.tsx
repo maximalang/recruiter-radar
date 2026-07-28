@@ -3,8 +3,8 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 import {
-  isOpportunityEngineV1Enabled,
-  isOpportunityOutcomesUiEnabled,
+  isOpportunityEngineV1EnabledForOwner,
+  isOpportunityOutcomesUiEnabledForOwner,
 } from '@/lib/opportunities/config'
 import { getOutcomeFunnelSummary } from '@/lib/opportunities/outcome-repository'
 import {
@@ -47,9 +47,9 @@ export default async function OpportunitiesPage(props: {
     demo?: string
   }>
 }) {
-  if (!isOpportunityEngineV1Enabled()) notFound()
-
   const ownerId = await getOwnerIdFromSession()
+  if (!isOpportunityEngineV1EnabledForOwner(ownerId)) notFound()
+
   if (!ownerId) {
     return (
       <InternalPageFrame navItems={NAVIGATION} footer={<SiteFooter />}>
@@ -69,7 +69,7 @@ export default async function OpportunitiesPage(props: {
   }
 
   const params = await props.searchParams
-  const outcomesUiEnabled = isOpportunityOutcomesUiEnabled() &&
+  const outcomesUiEnabled = isOpportunityOutcomesUiEnabledForOwner(ownerId) &&
     params.preview !== '1' && params.demo !== '1'
   const trackingCycleId = outcomesUiEnabled
     ? `morning-brief:${new Date().toISOString().slice(0, 10)}`

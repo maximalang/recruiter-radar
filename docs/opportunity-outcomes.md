@@ -11,6 +11,7 @@ Opportunity Engine. Он нужен для проверки качества opp
 OPPORTUNITY_OUTCOMES_ENABLED=false
 OPPORTUNITY_OUTCOMES_UI_ENABLED=false
 OPPORTUNITY_OUTCOMES_EXTERNAL_INGEST_ENABLED=false
+OPPORTUNITY_CANARY_OWNER_IDS=
 OPPORTUNITY_OUTCOME_CONTACT_HASH_SECRET=
 ```
 
@@ -23,6 +24,13 @@ External ingestion намеренно недоступен даже при legac
 webhook secret не является tenant identity. Для включения нужен отдельный
 контракт интеграций с owner-bound credential, rotation, disable/replay policy,
 rate limit и lookup по `owner_id + public_reference`.
+
+`OPPORTUNITY_CANARY_OWNER_IDS` — временный серверный allowlist ровно одного
+точного положительного `owner_id`. Для этого owner он включает API, UI и ledger
+при глобальных Opportunity-флагах `false`; для остальных owners поведение
+остаётся fail-closed. Любое второе, duplicate или malformed значение выключает
+canary целиком. Allowlist не включает cron или другие глобальные фоновые jobs и
+не открывает external ingestion. Пустое значение тоже отключает canary.
 
 ## Commercial stage и workflow state
 
@@ -370,22 +378,38 @@ npm.cmd run opportunity-outcomes:benchmark
 
 1. Применить migrations при всех flags `false`.
 2. Выполнить PostgreSQL runtime/down verifiers и rebuild dry-run.
-3. Выбрать одного internal owner и включить backend только в его runtime
-   context.
-4. Выполнить owner-scoped dry-run:
-   `npm.cmd run opportunity-outcomes:canary -- --owner-id <owner>`.
-5. Требовать `ready=true`: migrations, tenant isolation, rebuild parity,
+3. Выбрать одного internal owner, но оставить
+   `OPPORTUNITY_CANARY_OWNER_IDS` пустым и все глобальные Opportunity-флаги
+   `false`.
+4. До активации выполнить read-only owner-scoped gate:
+   `npm.cmd run opportunity-outcomes:canary -- --owner-id <owner> --pre-activation`.
+5. Требовать `phase=pre_activation`, `activationReady=true` и `ready=true`:
+   migrations, tenant isolation, rebuild parity,
    non-empty owner scope, chronology, meeting lifecycle, replay keys, privacy и
-   cohort projection должны быть чистыми; engine/outcomes/UI flags включаются
-   только в canary process, external ingestion остаётся выключенным. При
+   cohort projection должны быть чистыми; все глобальные flags и external
+   ingestion выключены, allowlist пуст. При
    `ready=false` команда завершается с non-zero code.
-6. Проверить snooze/resume, reschedule/completed meeting и proposal gate.
-7. Включить UI canary для того же owner.
-8. Вручную пройти основную funnel и ветви won/lost.
-9. Сверить first-ever cohort denominators, maturity и immutable filters.
-10. Расширять canary только после стабильного полного цикла.
+6. До изменения serving runtime выполнить active probe в отдельном процессе,
+   передав `OPPORTUNITY_CANARY_OWNER_IDS=<owner>` только этой команде. Запустить
+   owner-scoped dry-run без `--pre-activation` и требовать `phase=active`,
+   `activationReady=true`, `ready=true`. Active gate отклоняет глобальные flags,
+   несколько owners, duplicate/malformed entries и включённый external
+   ingestion.
+7. Только после обоих успешных gates персистить ровно один точный owner ID в
+   `OPPORTUNITY_CANARY_OWNER_IDS` serving runtime и перезапустить приложение.
+   Сразу повторить active gate уже в runtime. При `ready=false` удалить owner из
+   allowlist и снова перезапустить приложение до любого ручного canary traffic.
+8. Проверить snooze/resume, reschedule/completed meeting и proposal gate.
+9. Вручную пройти основную funnel и ветви won/lost.
+10. Сверить first-ever cohort denominators, maturity и immutable filters.
+11. После owner-scoped rebuild apply повторить dry-run и требовать
+    `rebuildChanged=0`.
+12. После завершения canary удалить owner из
+    `OPPORTUNITY_CANARY_OWNER_IDS`; расширять rollout только после стабильного
+    полного цикла.
 
-Rollback начинается с выключения UI и ledger flags. После завершения активных
+Rollback canary начинается с удаления owner из `OPPORTUNITY_CANARY_OWNER_IDS`;
+глобальный rollback — с выключения UI и ledger flags. После завершения активных
 transactions сохранить ledger/counters и оценить owner-scoped rebuild. Down
 migration имеет fail-safe guard: она не удаляет semantics новых событий
 молча, а также отказывается удалять active snooze state или единственное

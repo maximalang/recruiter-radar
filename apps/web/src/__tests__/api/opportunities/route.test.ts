@@ -42,22 +42,109 @@ function request(path: string, init?: ConstructorParameters<typeof NextRequest>[
 
 describe('opportunities API', () => {
   const originalFlag = process.env.OPPORTUNITY_ENGINE_V1_ENABLED
+  const originalCanaryOwners = process.env.OPPORTUNITY_CANARY_OWNER_IDS
 
   beforeEach(() => {
     process.env.OPPORTUNITY_ENGINE_V1_ENABLED = 'true'
+    delete process.env.OPPORTUNITY_CANARY_OWNER_IDS
     jest.clearAllMocks()
   })
 
   afterAll(() => {
     if (originalFlag === undefined) delete process.env.OPPORTUNITY_ENGINE_V1_ENABLED
     else process.env.OPPORTUNITY_ENGINE_V1_ENABLED = originalFlag
+    if (originalCanaryOwners === undefined) {
+      delete process.env.OPPORTUNITY_CANARY_OWNER_IDS
+    } else {
+      process.env.OPPORTUNITY_CANARY_OWNER_IDS = originalCanaryOwners
+    }
   })
 
   it('is not discoverable when the feature is disabled', async () => {
     process.env.OPPORTUNITY_ENGINE_V1_ENABLED = 'false'
     const response = await list(request('/api/opportunities'))
     expect(response.status).toBe(404)
-    expect(mockedOwner).not.toHaveBeenCalled()
+    expect(mockedList).not.toHaveBeenCalled()
+  })
+
+  it('allows only the configured canary owner while the global flag is false', async () => {
+    process.env.OPPORTUNITY_ENGINE_V1_ENABLED = 'false'
+    process.env.OPPORTUNITY_CANARY_OWNER_IDS = '7'
+    mockedList.mockResolvedValue({
+      opportunities: [],
+      total: 0,
+      page: 1,
+      pageSize: 20,
+      nextOffset: null,
+    })
+
+    mockedOwner.mockResolvedValueOnce('8')
+    const denied = await list(request('/api/opportunities'))
+    expect(denied.status).toBe(404)
+    expect(mockedList).not.toHaveBeenCalled()
+
+    mockedOwner.mockResolvedValueOnce('7')
+    const allowed = await list(request('/api/opportunities'))
+    expect(allowed.status).toBe(200)
+    expect(mockedList).toHaveBeenCalledWith(expect.objectContaining({
+      ownerId: '7',
+    }))
+  })
+
+  it('returns detail only for the configured canary owner', async () => {
+    process.env.OPPORTUNITY_ENGINE_V1_ENABLED = 'false'
+    process.env.OPPORTUNITY_CANARY_OWNER_IDS = '7'
+    mockedDetail.mockResolvedValue(null)
+
+    mockedOwner.mockResolvedValueOnce('8')
+    const denied = await detail(
+      request('/api/opportunities/10'),
+      { params: Promise.resolve({ id: '10' }) },
+    )
+    expect(denied.status).toBe(404)
+    expect(mockedDetail).not.toHaveBeenCalled()
+
+    mockedOwner.mockResolvedValueOnce('7')
+    const allowed = await detail(
+      request('/api/opportunities/10'),
+      { params: Promise.resolve({ id: '10' }) },
+    )
+    expect(allowed.status).toBe(404)
+    expect(mockedDetail).toHaveBeenCalledWith({
+      ownerId: '7',
+      opportunityId: '10',
+    })
+  })
+
+  it('allows an action only for the configured canary owner', async () => {
+    process.env.OPPORTUNITY_ENGINE_V1_ENABLED = 'false'
+    process.env.OPPORTUNITY_CANARY_OWNER_IDS = '7'
+    mockedAction.mockResolvedValue(null)
+
+    mockedOwner.mockResolvedValueOnce('8')
+    const denied = await action(
+      request('/api/opportunities/10/action', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'accepted' }),
+      }),
+      { params: Promise.resolve({ id: '10' }) },
+    )
+    expect(denied.status).toBe(404)
+    expect(mockedAction).not.toHaveBeenCalled()
+
+    mockedOwner.mockResolvedValueOnce('7')
+    const allowed = await action(
+      request('/api/opportunities/10/action', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'accepted' }),
+      }),
+      { params: Promise.resolve({ id: '10' }) },
+    )
+    expect(allowed.status).toBe(404)
+    expect(mockedAction).toHaveBeenCalledWith(expect.objectContaining({
+      ownerId: '7',
+      action: 'accepted',
+    }))
   })
 
   it('requires a signed owner session', async () => {

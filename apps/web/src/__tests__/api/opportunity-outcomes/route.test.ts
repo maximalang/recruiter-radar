@@ -43,10 +43,12 @@ const context = { params: Promise.resolve({ id: '10' }) }
 describe('opportunity outcomes API', () => {
   const originalEngine = process.env.OPPORTUNITY_ENGINE_V1_ENABLED
   const originalOutcomes = process.env.OPPORTUNITY_OUTCOMES_ENABLED
+  const originalCanaryOwners = process.env.OPPORTUNITY_CANARY_OWNER_IDS
 
   beforeEach(() => {
     process.env.OPPORTUNITY_ENGINE_V1_ENABLED = 'true'
     process.env.OPPORTUNITY_OUTCOMES_ENABLED = 'true'
+    delete process.env.OPPORTUNITY_CANARY_OWNER_IDS
     jest.clearAllMocks()
     mockedOwner.mockResolvedValue('7')
   })
@@ -54,13 +56,50 @@ describe('opportunity outcomes API', () => {
   afterAll(() => {
     restore('OPPORTUNITY_ENGINE_V1_ENABLED', originalEngine)
     restore('OPPORTUNITY_OUTCOMES_ENABLED', originalOutcomes)
+    restore('OPPORTUNITY_CANARY_OWNER_IDS', originalCanaryOwners)
   })
 
   it('is not discoverable while the ledger flag is disabled', async () => {
     process.env.OPPORTUNITY_OUTCOMES_ENABLED = 'false'
     const response = await GET(request('/api/opportunities/10/outcomes'), context)
     expect(response.status).toBe(404)
-    expect(mockedOwner).not.toHaveBeenCalled()
+    expect(mockedOwner).toHaveBeenCalledTimes(1)
+    expect(mockedHistory).not.toHaveBeenCalled()
+  })
+
+  it('exposes the ledger only to the configured canary owner', async () => {
+    process.env.OPPORTUNITY_ENGINE_V1_ENABLED = 'false'
+    process.env.OPPORTUNITY_OUTCOMES_ENABLED = 'false'
+    process.env.OPPORTUNITY_CANARY_OWNER_IDS = '7'
+    mockedHistory.mockResolvedValue({
+      events: [],
+      state: null,
+      correction: {
+        canRevert: false,
+        targetEventId: null,
+        targetEventType: null,
+        targetOccurredAt: null,
+      },
+      pagination: {
+        pageSize: 50,
+        totalItems: 0,
+        sortOrder: 'append_desc',
+        hasMore: false,
+        nextBeforeEventId: null,
+      },
+    })
+
+    mockedOwner.mockResolvedValueOnce('8')
+    const denied = await GET(request('/api/opportunities/10/outcomes'), context)
+    expect(denied.status).toBe(404)
+    expect(mockedHistory).not.toHaveBeenCalled()
+
+    mockedOwner.mockResolvedValueOnce('7')
+    const allowed = await GET(request('/api/opportunities/10/outcomes'), context)
+    expect(allowed.status).toBe(200)
+    expect(mockedHistory).toHaveBeenCalledWith(expect.objectContaining({
+      ownerId: '7',
+    }))
   })
 
   it('requires an authenticated owner', async () => {

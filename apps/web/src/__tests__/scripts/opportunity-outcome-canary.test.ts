@@ -11,6 +11,9 @@ describe('opportunity outcome production canary', () => {
     ), 'utf8')
 
     expect(source).toContain("'--owner-id'")
+    expect(source).toContain("'--pre-activation'")
+    expect(source).toContain("phase: preActivation ? 'pre_activation' : 'active'")
+    expect(source).toContain('activationReady')
     expect(source).toContain("mode: apply ? 'apply' : 'dry_run'")
     expect(source).toContain('projectionDrift')
     expect(source).toContain('cohortProjectionMismatches')
