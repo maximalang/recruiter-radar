@@ -3,6 +3,8 @@ import Link from "next/link";
 
 import { readPendingAccountLogin } from "@/lib/account-login-cookie";
 import { isLoginChallengeActive } from "@/lib/account-auth";
+import { isAuthV2LoginChallengeActive } from "@/lib/auth-v2/challenges";
+import { getAuthV2Flags } from "@/lib/auth-v2/config";
 import { readOwnerSession } from "@/lib/session";
 import { BrandLogo } from "../../ui/brand-logo";
 import loginStyles from "../../login/login.module.css";
@@ -17,7 +19,15 @@ export const dynamic = "force-dynamic";
 
 export default async function ConfirmAccountLoginPage() {
   const token = await readPendingAccountLogin();
-  const active = token ? await isLoginChallengeActive(token).catch(() => false) : false;
+  let active = false;
+  if (token && getAuthV2Flags().platform) {
+    active = await isAuthV2LoginChallengeActive(token).catch(() => false);
+    if (!active) {
+      active = await isLoginChallengeActive(token).catch(() => false);
+    }
+  } else if (token) {
+    active = await isLoginChallengeActive(token).catch(() => false);
+  }
   const currentOwnerId = await readOwnerSession();
 
   return (

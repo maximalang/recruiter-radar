@@ -1,6 +1,16 @@
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 
+import {
+  clearAuthV2SessionCookie,
+  readAuthV2SessionCookie,
+} from "./auth-v2/session-cookie";
+import {
+  readAuthSession,
+  revokeAuthSession,
+  revokeAuthSessionById,
+} from "./auth-v2/sessions";
+
 const COOKIE_NAME = "rr_sid";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 90; // 90 days
 
@@ -65,6 +75,12 @@ export function generateOwnerId(): string {
  * Returns the ownerId string if valid, null otherwise.
  */
 export async function readOwnerSession(): Promise<string | null> {
+  const v2Token = await readAuthV2SessionCookie().catch(() => null);
+  if (v2Token) {
+    const session = await readAuthSession(v2Token);
+    if (session) return session.userId;
+  }
+
   const jar = await cookies();
   const token = jar.get(COOKIE_NAME)?.value?.trim() ?? null;
   if (!token) return null;
@@ -97,6 +113,24 @@ export function assertOwnerSessionConfigured(): void {
 }
 
 export async function clearOwnerSession(): Promise<void> {
+  const v2Token = await readAuthV2SessionCookie().catch(() => null);
+  if (v2Token) {
+    const session = await readAuthSession(v2Token);
+    if (session) {
+      await revokeAuthSessionById({
+        userId: session.userId,
+        sessionId: session.id,
+        reason: "logout",
+      });
+    } else {
+      await revokeAuthSession(v2Token, "logout");
+    }
+  }
+  await clearAuthV2SessionCookie();
+  await clearLegacyOwnerSession();
+}
+
+export async function clearLegacyOwnerSession(): Promise<void> {
   const jar = await cookies();
   jar.delete(COOKIE_NAME);
 }

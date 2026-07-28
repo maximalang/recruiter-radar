@@ -168,14 +168,15 @@ export async function consumeAuthV2Login(input: {
   const token = input.token.trim();
   if (!TOKEN_PATTERN.test(token)) return null;
 
-  const sessionToken = randomBytes(32).toString("hex");
-  const verificationKeyHash = hashBoundary(
-    "challenge-verify",
-    input.clientAddress || "unknown",
-  );
+  let sessionToken: string | null = null;
   let client: PoolClient | null = null;
 
   try {
+    sessionToken = randomBytes(32).toString("hex");
+    const verificationKeyHash = hashBoundary(
+      "challenge-verify",
+      input.clientAddress || "unknown",
+    );
     client = await getClient();
     if (!client) return null;
     await client.query("BEGIN");

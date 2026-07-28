@@ -23,6 +23,9 @@ import { headers } from "next/headers";
 const mockHeaders = jest.mocked(headers);
 const mockLegacyRequest = jest.mocked(requestAccountLogin);
 const mockV2Request = jest.mocked(requestAuthV2Login);
+const originalPlatformFlag = process.env.AUTH_PLATFORM_V2_ENABLED;
+const originalProxyHeader = process.env.AUTH_TRUSTED_PROXY_HEADER;
+const originalProxyHops = process.env.AUTH_TRUSTED_PROXY_HOPS;
 
 function requestHeaders(values: Record<string, string | null>): Headers {
   return {
@@ -31,6 +34,12 @@ function requestHeaders(values: Record<string, string | null>): Headers {
 }
 
 describe("auth v2 login action rollout", () => {
+  afterAll(() => {
+    restoreEnv("AUTH_PLATFORM_V2_ENABLED", originalPlatformFlag);
+    restoreEnv("AUTH_TRUSTED_PROXY_HEADER", originalProxyHeader);
+    restoreEnv("AUTH_TRUSTED_PROXY_HOPS", originalProxyHops);
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
     delete process.env.AUTH_TRUSTED_PROXY_HEADER;
@@ -80,3 +89,8 @@ describe("auth v2 login action rollout", () => {
     expect(mockLegacyRequest).not.toHaveBeenCalled();
   });
 });
+
+function restoreEnv(name: string, value: string | undefined): void {
+  if (value === undefined) delete process.env[name];
+  else process.env[name] = value;
+}

@@ -258,6 +258,17 @@ describe("auth v2 login challenge service", () => {
       clientAddress: "unknown",
     })).resolves.toBeNull();
   });
+
+  test("fails closed when the consume hashing secret is unavailable", async () => {
+    delete process.env.AUTH_RATE_LIMIT_SECRET;
+    delete process.env.SESSION_SECRET;
+
+    await expect(consumeAuthV2Login({
+      token: "c".repeat(64),
+      clientAddress: "unknown",
+    })).resolves.toBeNull();
+    expect(mockGetClient).not.toHaveBeenCalled();
+  });
 });
 
 describe("auth v2 challenge issuance database contract", () => {

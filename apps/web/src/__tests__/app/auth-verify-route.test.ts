@@ -13,8 +13,15 @@ const mockIsLoginChallengeActive = jest.mocked(isLoginChallengeActive);
 const mockIsAuthV2LoginChallengeActive = jest.mocked(
   isAuthV2LoginChallengeActive,
 );
+const originalPlatformFlag = process.env.AUTH_PLATFORM_V2_ENABLED;
+const originalSecureCookie = process.env.SESSION_SECURE_COOKIE;
 
 describe("magic-login verify bridge", () => {
+  afterAll(() => {
+    restoreEnv("AUTH_PLATFORM_V2_ENABLED", originalPlatformFlag);
+    restoreEnv("SESSION_SECURE_COOKIE", originalSecureCookie);
+  });
+
   beforeEach(() => {
     mockIsLoginChallengeActive.mockReset();
     mockIsAuthV2LoginChallengeActive.mockReset();
@@ -93,3 +100,8 @@ describe("magic-login verify bridge", () => {
     expect(response.headers.get("set-cookie")).toBeNull();
   });
 });
+
+function restoreEnv(name: string, value: string | undefined): void {
+  if (value === undefined) delete process.env[name];
+  else process.env[name] = value;
+}

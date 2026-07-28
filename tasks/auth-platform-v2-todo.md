@@ -45,7 +45,7 @@
   - Verify: valid/invalid/repeated exchange tests.
   - Files: legacy adapter/config/session tests (≤5).
 
-- [ ] Preserve login/logout compatibility behind flags
+- [x] Preserve login/logout compatibility behind flags
   - Acceptance: flags false preserve legacy; v2 confirm creates DB session.
   - Verify: route/action tests + checkout returnTo regression.
   - Files: login/verify/confirm/logout route group (split if >5).
