@@ -60,3 +60,31 @@ export function isAuthPlatformV2EnabledForUser(
   const canaryIds = parseCanaryUserIds(env.AUTH_V2_CANARY_USER_IDS);
   return canaryIds?.has(userId) === true;
 }
+
+export function isLegacySessionMigrationWindowOpen(
+  env: AuthEnvironment = process.env,
+  now = new Date(),
+): boolean {
+  if (!getAuthV2Flags(env).legacySessionMigration) return false;
+  if (!Number.isFinite(now.getTime())) return false;
+
+  const rawDeadline = env.AUTH_LEGACY_SESSION_MIGRATION_DEADLINE?.trim() ?? "";
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})Z$/.exec(
+    rawDeadline,
+  );
+  if (!match) return false;
+
+  const [, year, month, day, hour, minute, second] = match;
+  const deadlineMs = Date.UTC(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour),
+    Number(minute),
+    Number(second),
+  );
+  if (!Number.isFinite(deadlineMs)) return false;
+
+  const canonical = new Date(deadlineMs).toISOString().replace(".000Z", "Z");
+  return canonical === rawDeadline && deadlineMs > now.getTime();
+}

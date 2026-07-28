@@ -40,7 +40,7 @@
   - Files: session service/cookie adapter/tests (≤5).
   - Note: membership-validated active workspace rotation is added with the workspace schema in PR 2.
 
-- [ ] Implement bounded legacy exchange
+- [x] Implement bounded legacy exchange
   - Acceptance: one-way migration, no renewal, flag off by default.
   - Verify: valid/invalid/repeated exchange tests.
   - Files: legacy adapter/config/session tests (≤5).
