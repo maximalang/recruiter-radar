@@ -92,7 +92,10 @@ const rollbackVerifierPath = resolve(
 );
 
 function fakeClient(issueResult: { issued: boolean; challengeId: string | null }) {
-  const query = jest.fn(async (sql: string) => {
+  const query = jest.fn(async (
+    sql: string,
+    _values?: readonly unknown[],
+  ) => {
     if (sql.includes("issue_auth_login_challenge")) {
       return {
         rows: [{
@@ -206,7 +209,10 @@ describe("auth v2 login challenge service", () => {
   });
 
   test("consumes a challenge into one opaque database session", async () => {
-    const query = jest.fn(async (sql: string) => {
+    const query = jest.fn(async (
+      sql: string,
+      _values?: readonly unknown[],
+    ) => {
       if (sql.includes("consume_auth_login_challenge")) {
         return {
           rows: [{
