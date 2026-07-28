@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 
 import { ACCOUNT_LOGIN_PENDING_COOKIE } from "@/lib/account-login-cookie";
 import { isLoginChallengeActive } from "@/lib/account-auth";
+import { isAuthV2LoginChallengeActive } from "@/lib/auth-v2/challenges";
+import { getAuthV2Flags } from "@/lib/auth-v2/config";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +16,15 @@ export async function POST(request: Request): Promise<NextResponse> {
     token = "";
   }
 
-  const active = await isLoginChallengeActive(token).catch(() => false);
+  let active = false;
+  if (getAuthV2Flags().platform) {
+    active = await isAuthV2LoginChallengeActive(token).catch(() => false);
+    if (!active) {
+      active = await isLoginChallengeActive(token).catch(() => false);
+    }
+  } else {
+    active = await isLoginChallengeActive(token).catch(() => false);
+  }
   const response = NextResponse.json({
     ok: active,
     next: active ? "/auth/confirm" : "/login?error=invalid-link",

@@ -1,16 +1,65 @@
 jest.mock("@/lib/account-auth", () => ({
   isLoginChallengeActive: jest.fn(),
 }));
+jest.mock("@/lib/auth-v2/challenges", () => ({
+  isAuthV2LoginChallengeActive: jest.fn(),
+}));
 
 import { isLoginChallengeActive } from "@/lib/account-auth";
+import { isAuthV2LoginChallengeActive } from "@/lib/auth-v2/challenges";
 import { POST } from "@/app/api/auth/login/verify/route";
 
 const mockIsLoginChallengeActive = jest.mocked(isLoginChallengeActive);
+const mockIsAuthV2LoginChallengeActive = jest.mocked(
+  isAuthV2LoginChallengeActive,
+);
 
 describe("magic-login verify bridge", () => {
   beforeEach(() => {
     mockIsLoginChallengeActive.mockReset();
+    mockIsAuthV2LoginChallengeActive.mockReset();
+    process.env.AUTH_PLATFORM_V2_ENABLED = "false";
     process.env.SESSION_SECURE_COOKIE = "true";
+  });
+
+  test("prefers auth v2 but accepts an outstanding legacy link during rollout", async () => {
+    process.env.AUTH_PLATFORM_V2_ENABLED = "true";
+    mockIsAuthV2LoginChallengeActive
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+    mockIsLoginChallengeActive.mockResolvedValue(true);
+
+    const v2Token = "b".repeat(64);
+    const legacyToken = "c".repeat(64);
+    const v2Response = await POST(new Request(
+      "https://radar.example/api/auth/login/verify",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: v2Token }),
+      },
+    ));
+    const legacyResponse = await POST(new Request(
+      "https://radar.example/api/auth/login/verify",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: legacyToken }),
+      },
+    ));
+
+    expect(mockIsAuthV2LoginChallengeActive).toHaveBeenNthCalledWith(
+      1,
+      v2Token,
+    );
+    expect(mockIsLoginChallengeActive).not.toHaveBeenCalledWith(v2Token);
+    expect(mockIsAuthV2LoginChallengeActive).toHaveBeenNthCalledWith(
+      2,
+      legacyToken,
+    );
+    expect(mockIsLoginChallengeActive).toHaveBeenCalledWith(legacyToken);
+    await expect(v2Response.json()).resolves.toMatchObject({ ok: true });
+    await expect(legacyResponse.json()).resolves.toMatchObject({ ok: true });
   });
 
   test("moves an active fragment token into an httpOnly pending cookie", async () => {

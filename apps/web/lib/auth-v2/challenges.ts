@@ -237,3 +237,30 @@ export async function consumeAuthV2Login(input: {
     client?.release();
   }
 }
+
+export async function isAuthV2LoginChallengeActive(
+  token: string,
+): Promise<boolean> {
+  const normalized = token.trim();
+  if (!TOKEN_PATTERN.test(normalized)) return false;
+  const pool = getPool();
+  if (!pool) return false;
+
+  try {
+    const result = await pool.query(
+      `SELECT 1
+       FROM auth_challenges
+       WHERE token_hash = $1
+         AND purpose IN ('login', 'signup')
+         AND consumed_at IS NULL
+         AND invalidated_at IS NULL
+         AND expires_at > NOW()
+       LIMIT 1`,
+      [hashToken(normalized)],
+    );
+    return result.rowCount === 1;
+  } catch (error) {
+    logError("auth_v2.login_challenge_read_failed", error);
+    return false;
+  }
+}
