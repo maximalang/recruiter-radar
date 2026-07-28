@@ -1,0 +1,214 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+jest.mock("@/lib/db-pool", () => ({
+  getPool: jest.fn(),
+}));
+jest.mock("next/headers", () => ({
+  cookies: jest.fn(),
+}));
+
+import { getPool } from "@/lib/db-pool";
+import {
+  AUTH_V2_SESSION_COOKIE,
+  clearAuthV2SessionCookie,
+  readAuthV2SessionCookie,
+  writeAuthV2SessionCookie,
+} from "@/lib/auth-v2/session-cookie";
+import {
+  createAuthSession,
+  isRecentAuthentication,
+  readAuthSession,
+  revokeAllAuthSessions,
+  revokeAuthSessionById,
+  rotateAuthSession,
+} from "@/lib/auth-v2/sessions";
+import { cookies } from "next/headers";
+
+const mockGetPool = jest.mocked(getPool);
+const mockCookies = jest.mocked(cookies);
+const verifierPath = resolve(
+  process.cwd(),
+  "..",
+  "..",
+  "packages",
+  "db",
+  "scripts",
+  "verify-auth-v2-sessions.mjs",
+);
+
+function sessionRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "17",
+    userId: "42",
+    workspaceId: null,
+    authMethod: "magic_link",
+    deviceLabel: null,
+    createdAt: new Date("2026-07-01T00:00:00.000Z"),
+    lastSeenAt: new Date("2026-07-28T11:45:00.000Z"),
+    idleExpiresAt: new Date("2026-08-11T12:00:00.000Z"),
+    absoluteExpiresAt: new Date("2026-07-31T00:00:00.000Z"),
+    rotatedAt: new Date("2026-07-27T00:00:00.000Z"),
+    lastAuthenticatedAt: new Date("2026-07-28T11:55:00.000Z"),
+    rotationDue: true,
+    ...overrides,
+  };
+}
+
+describe("auth v2 server-side sessions", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test("creates an opaque session and sends only its hash to PostgreSQL", async () => {
+    const query = jest.fn().mockResolvedValue({
+      rows: [sessionRow()],
+      rowCount: 1,
+    });
+    mockGetPool.mockReturnValue({ query } as never);
+
+    const created = await createAuthSession({
+      userId: "42",
+      authMethod: "magic_link",
+      requestIpHash: "a".repeat(64),
+      userAgentHash: "b".repeat(64),
+    }, new Date("2026-07-28T12:00:00.000Z"));
+
+    expect(created?.token).toMatch(/^[a-f0-9]{64}$/);
+    expect(created?.session.id).toBe("17");
+    const values = query.mock.calls[0]?.[1] as unknown[];
+    expect(values[0]).toBe("42");
+    expect(values[1]).toMatch(/^[a-f0-9]{64}$/);
+    expect(values[1]).not.toBe(created?.token);
+    expect(values).not.toContain("192.0.2.10");
+  });
+
+  test("reads active sessions with throttled touch and rotation metadata", async () => {
+    const query = jest.fn().mockResolvedValue({
+      rows: [sessionRow()],
+      rowCount: 1,
+    });
+    mockGetPool.mockReturnValue({ query } as never);
+
+    const current = await readAuthSession(
+      "c".repeat(64),
+      new Date("2026-07-28T12:00:00.000Z"),
+    );
+
+    expect(current).toMatchObject({
+      id: "17",
+      userId: "42",
+      rotationDue: true,
+    });
+    expect(String(query.mock.calls[0]?.[0])).toContain("INTERVAL '15 minutes'");
+    expect(query.mock.calls[0]?.[1]?.[0]).not.toBe("c".repeat(64));
+  });
+
+  test("rotates exactly the presented active token", async () => {
+    const query = jest.fn().mockResolvedValue({
+      rows: [sessionRow({ rotatedAt: new Date("2026-07-28T12:00:00.000Z") })],
+      rowCount: 1,
+    });
+    mockGetPool.mockReturnValue({ query } as never);
+
+    const rotated = await rotateAuthSession(
+      "d".repeat(64),
+      new Date("2026-07-28T12:00:00.000Z"),
+    );
+
+    expect(rotated?.token).toMatch(/^[a-f0-9]{64}$/);
+    const values = query.mock.calls[0]?.[1] as unknown[];
+    expect(values[0]).not.toBe("d".repeat(64));
+    expect(values[1]).not.toBe(rotated?.token);
+    expect(String(query.mock.calls[0]?.[0])).toContain("session_rotated");
+  });
+
+  test("revokes by both user and session id and scopes revoke-all to the user", async () => {
+    const query = jest.fn()
+      .mockResolvedValueOnce({ rows: [{ revoked: true }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ revokedCount: 3 }], rowCount: 1 });
+    mockGetPool.mockReturnValue({ query } as never);
+
+    await expect(revokeAuthSessionById({
+      userId: "42",
+      sessionId: "17",
+      reason: "logout",
+    })).resolves.toBe(true);
+    await expect(revokeAllAuthSessions({
+      userId: "42",
+      exceptSessionId: "17",
+    })).resolves.toBe(3);
+
+    expect(query.mock.calls[0]?.[1]).toEqual(["42", "17", "logout"]);
+    expect(query.mock.calls[1]?.[1]?.slice(0, 2)).toEqual(["42", "17"]);
+    expect(String(query.mock.calls[1]?.[0])).toContain("all_sessions_revoked");
+  });
+
+  test("checks recent authentication without trusting client timestamps", () => {
+    const current = sessionRow();
+    expect(isRecentAuthentication(
+      current as never,
+      new Date("2026-07-28T12:00:00.000Z"),
+    )).toBe(true);
+    expect(isRecentAuthentication(
+      {
+        ...current,
+        lastAuthenticatedAt: new Date("2026-07-28T11:00:00.000Z"),
+      } as never,
+      new Date("2026-07-28T12:00:00.000Z"),
+    )).toBe(false);
+  });
+});
+
+describe("auth v2 session cookie", () => {
+  test("uses a host-only secure HttpOnly cookie", async () => {
+    const set = jest.fn();
+    mockCookies.mockResolvedValue({ set } as never);
+
+    await writeAuthV2SessionCookie("e".repeat(64));
+
+    expect(AUTH_V2_SESSION_COOKIE).toBe("__Host-rr_session");
+    expect(set).toHaveBeenCalledWith(
+      "__Host-rr_session",
+      "e".repeat(64),
+      expect.objectContaining({
+        httpOnly: true,
+        secure: true,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 30,
+      }),
+    );
+    expect(set.mock.calls[0]?.[2]).not.toHaveProperty("domain");
+  });
+
+  test("rejects malformed cookie values and clears the host cookie", async () => {
+    const set = jest.fn();
+    mockCookies.mockResolvedValue({
+      get: jest.fn().mockReturnValue({ value: "invalid" }),
+      set,
+    } as never);
+
+    await expect(readAuthV2SessionCookie()).resolves.toBeNull();
+    await clearAuthV2SessionCookie();
+
+    expect(set).toHaveBeenCalledWith(
+      "__Host-rr_session",
+      "",
+      expect.objectContaining({ maxAge: 0, secure: true, path: "/" }),
+    );
+  });
+});
+
+describe("auth v2 session PostgreSQL verifier", () => {
+  const verifier = readFileSync(verifierPath, "utf8");
+
+  test("covers expiry, touch, rotation and revocation races", () => {
+    expect(verifier).toContain("idle_and_absolute_expiry");
+    expect(verifier).toContain("touch_throttled");
+    expect(verifier).toContain("rotation_single_winner");
+    expect(verifier).toContain("revoke_dominates_rotation");
+    expect(verifier).toContain("revoke_all_scoped");
+    expect(verifier).toContain("Promise.all");
+  });
+});

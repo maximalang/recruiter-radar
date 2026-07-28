@@ -34,10 +34,11 @@
   - Verify: two-consumer/two-signup/resend-consume DB tests.
   - Files: challenge/session services and tests (≤5).
 
-- [ ] Implement server-side session lifecycle
+- [x] Implement server-side session lifecycle
   - Acceptance: opaque cookie, idle/absolute expiry, throttle, rotation/revoke/all.
   - Verify: unit + rotation/revoke race DB tests.
   - Files: session service/cookie adapter/tests (≤5).
+  - Note: membership-validated active workspace rotation is added with the workspace schema in PR 2.
 
 - [ ] Implement bounded legacy exchange
   - Acceptance: one-way migration, no renewal, flag off by default.
