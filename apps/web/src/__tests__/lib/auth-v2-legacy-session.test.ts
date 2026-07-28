@@ -220,6 +220,7 @@ describe("legacy exchange PostgreSQL verifier", () => {
   test("covers one-way and concurrent exchange", () => {
     expect(verifier).toContain("valid_exchange");
     expect(verifier).toContain("repeated_exchange_denied");
+    expect(verifier).toContain("legacy_authorization_replay_denied");
     expect(verifier).toContain("concurrent_exchange_single_winner");
     expect(verifier).toContain("Promise.all");
   });

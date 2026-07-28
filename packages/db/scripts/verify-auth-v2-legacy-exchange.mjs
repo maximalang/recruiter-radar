@@ -51,6 +51,24 @@ try {
   if (first.rowCount !== 1 || repeated.rowCount !== 0) {
     throw new Error('Repeated legacy exchange was not denied.')
   }
+  const replayAuthorization = await pool.query(
+    `SELECT account.id::TEXT AS id
+     FROM users AS account
+     WHERE account.id = $1
+       AND account.status = 'active'
+       AND account.email_verified_at IS NOT NULL
+       AND NOT EXISTS (
+         SELECT 1
+         FROM auth_security_events AS prior_exchange
+         WHERE prior_exchange.event_type = 'legacy_session_migrated'
+           AND prior_exchange.subject_hash = $2
+       )
+     LIMIT 1`,
+    [userId, firstFingerprint],
+  )
+  if (replayAuthorization.rowCount !== 0) {
+    throw new Error('Exchanged legacy fingerprint remained authorized.')
+  }
 
   const concurrentFingerprint = digest('legacy-fingerprint-concurrent')
   const concurrent = await Promise.all([
@@ -101,6 +119,7 @@ try {
     checks: [
       'valid_exchange',
       'repeated_exchange_denied',
+      'legacy_authorization_replay_denied',
       'concurrent_exchange_single_winner',
     ],
   }))
