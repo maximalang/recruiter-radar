@@ -969,25 +969,87 @@ bounce monitoring и retry policy. Code does not change DNS automatically.
 
 ## 16. Passkeys
 
-Use maintained standards-based WebAuthn library; do not implement crypto.
-Current candidate: `@simplewebauthn/server` + `@simplewebauthn/browser`, subject
-to dependency/provenance review in PR 5.
+WebAuthn crypto не реализуется вручную. PR 5 проверил и закрепил точные
+официальные пакеты SimpleWebAuthn:
+
+```text
+@simplewebauthn/server  13.3.2
+@simplewebauthn/browser 13.3.0
+license                 MIT
+server Node engine      >=20
+```
+
+Версии записаны без диапазона (`^`/`~`) в workspace package и lockfile.
+Upstream — репозиторий `MasterKale/SimpleWebAuthn`; npm provenance и runtime
+engine проверены перед добавлением. Локальный Node 24 и CI Node 22
+удовлетворяют server engine.
 
 Registration requires verified email + active session + recent auth.
 Authentication supports discoverable credentials and conditional UI when the
 browser supports it.
 
+Runtime configuration:
+
+```text
+AUTH_PASSKEYS_ENABLED=false
+AUTH_SITE_URL=https://exact-canonical-origin.example
+AUTH_PASSKEY_RP_ID=exact-canonical-origin.example
+```
+
+`AUTH_SITE_URL` принимается только как canonical origin без path/query/trailing
+slash. В production разрешён только HTTPS. Явный `AUTH_PASSKEY_RP_ID`, если
+задан, обязан точно совпадать с hostname origin; при отсутствии он
+детерминированно выводится из этого hostname. Для localhost/127.0.0.1
+допускается HTTP только вне production.
+
 Verification requires:
 
 - exact configured RP ID;
-- exact HTTPS origin allowlist;
-- stored single-use challenge;
+- exact canonical HTTPS origin;
+- 256-bit challenge, в БД только SHA-256 hash;
+- 5-minute stored single-use challenge;
 - user presence and required user verification;
 - credential uniqueness;
 - signature verification;
 - counter semantics treated as clone signal, not unconditional proof;
 - backup eligibility/state persistence;
 - replay-safe session creation.
+
+Discoverable authentication не раскрывает email/user ID до проверки
+credential. Успех атомарно создаёт новую opaque 256-bit server-side session,
+отзывает и аудирует предыдущую browser session в той же DB transaction и
+только после commit заменяет browser cookie.
+Ошибки неизвестного credential, подписи, origin/RP и replay имеют одинаковый
+публичный authentication-failed ответ.
+
+После commit добавления/удаления ключа и успешного passkey-входа на
+подтверждённый recovery email отправляется best-effort branded HTML/text
+security notice. Ошибка транспорта безопасно логируется без email и не
+откатывает уже завершённую WebAuthn транзакцию.
+
+Abuse boundaries:
+
+- authentication start: `global` 100/minute;
+- authentication start: подтверждённый trusted-IP 20/15 minutes;
+- authentication verify: отдельный HMAC boundary в `global` 500/15 minutes;
+- authentication verify: подтверждённый trusted-IP `passkey_verify`
+  10/15 minutes;
+- при отсутствии trusted IP применяется глобальная, но не ошибочно общая
+  authentication-граница 10/15 minutes;
+- registration start: HMACed per-user boundary 10/10 minutes;
+- registration verify: отдельный HMACed per-user boundary 20/10 minutes;
+- один user может хранить не более 20 passkeys; start и finish проверяют cap
+  под одним user-scoped advisory lock;
+- каждый rate-limit consume выполняется отдельным autocommit statement до
+  ceremony transaction, поэтому `ROLLBACK` неизвестного challenge, verifier
+  failure или конкурентного counter update не отменяет abuse hit.
+
+Down migration берёт `ACCESS EXCLUSIVE` lock и отказывается удалять непустую
+`user_passkeys`. После явной application-level очистки isolated verifier
+доказывает восстановление предыдущих `auth_challenges` constraints/index.
+Оба disposable PostgreSQL runner требуют явный
+`AUTH_V2_DISPOSABLE_DB_CONFIRMED=true`; без sentinel административное
+подключение не используется для создания временной БД.
 
 References:
 
@@ -1001,6 +1063,14 @@ References:
   https://www.w3.org/TR/webauthn-3/
 - SimpleWebAuthn server docs:
   https://simplewebauthn.dev/docs/packages/server
+- SimpleWebAuthn browser docs:
+  https://simplewebauthn.dev/docs/packages/browser/
+- SimpleWebAuthn passkeys guide:
+  https://simplewebauthn.dev/docs/advanced/passkeys/
+- SimpleWebAuthn upstream:
+  https://github.com/MasterKale/SimpleWebAuthn
+- npm server package:
+  https://www.npmjs.com/package/@simplewebauthn/server
 
 ## 17. CSRF, origin и proxy policy
 
@@ -1042,6 +1112,7 @@ AUTH_WORKSPACES_V2_ENABLED=false
 AUTH_ONBOARDING_V2_ENABLED=false
 AUTH_PASSKEYS_ENABLED=false
 AUTH_LEGACY_SESSION_MIGRATION_ENABLED=false
+AUTH_PASSKEY_RP_ID=
 AUTH_V2_CANARY_USER_IDS=
 AUTH_V2_SESSION_ROLLBACK_COMPAT_ENABLED=false
 ```
@@ -1091,6 +1162,8 @@ npm.cmd run test --workspace @recruiter-radar/web -- --runInBand
 npm.cmd run test:types --workspace @recruiter-radar/web
 npm.cmd run test:auth-v2:account-team:db
 npm.cmd run test:auth-v2:account-team:e2e
+npm.cmd run test:auth-v2:passkeys:db
+npm.cmd run test:auth-v2:passkeys:e2e
 npm.cmd run db:validate
 npm.cmd audit --omit=dev --audit-level=high
 ```
@@ -1117,6 +1190,18 @@ revocation after access changes, and audited ownership transfer. Screenshots
 and the JSON report are local ignored artifacts; the deterministic outbox,
 certificate, temporary tsconfig, and disposable database are removed in the
 runner cleanup.
+
+PR5 passkey DB gate создаёт fresh disposable database, применяет все миграции,
+проверяет schema constraints, challenge replay, конкурентный counter update,
+backup state и guarded down migration. Browser gate использует isolated
+Playwright Chromium virtual CTAP2 authenticator с resident credential и
+обязательной user verification. Он выполняет реальную регистрацию,
+discoverable explicit login, server-session replacement и email fallback.
+Conditional mediation в этом детерминированном browser gate отключается только
+init-script-ом, потому что Chromium virtual authenticator не возобновляет уже
+ожидающий `navigator.credentials.get()` при смене automatic presence; наличие
+`email webauthn` autocomplete проверяется отдельно. Production conditional UI
+остаётся включённым только при browser capability detection.
 
 ## 21. CI
 
