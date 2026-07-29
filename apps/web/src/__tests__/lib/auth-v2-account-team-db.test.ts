@@ -18,6 +18,7 @@ import {
   listAuthSessions,
   readAuthSession,
   revokeAllAuthSessions,
+  rotateAuthSession,
   type AuthSession,
 } from "@/lib/auth-v2/sessions";
 import {
@@ -52,6 +53,15 @@ const downMigration = resolve(
   "db",
   "migrations",
   "20260729130000_add_auth_account_security_and_team.down.sql",
+);
+const activeOwnerGuardDownMigration = resolve(
+  process.cwd(),
+  "..",
+  "..",
+  "packages",
+  "db",
+  "migrations",
+  "20260729131000_guard_auth_active_owner_writes.down.sql",
 );
 
 type Fixture = {
@@ -243,6 +253,52 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
     expect(challenge.rows[0]?.invalidated).toBe(true);
   });
 
+  test("a previous grace token cannot confirm or rotate a session during email change", async () => {
+    const account = await createFixture("email-grace");
+    const rotated = await rotateAuthSession(account.token, new Date(), {
+      force: true,
+    });
+    expect(rotated).not.toBeNull();
+    const previousTokenSession = await readAuthSession(
+      account.token,
+      new Date(),
+    );
+    expect(previousTokenSession?.id).toBe(account.session.id);
+
+    const newEmail = uniqueEmail("email-grace-confirmed");
+    await expect(requestAccountEmailChange({
+      session: account.session,
+      newEmail,
+    })).resolves.toEqual({ ok: true });
+    const token = await tokenFromOutbox(newEmail, "/auth/change-email");
+
+    await expect(confirmAccountEmailChange({
+      token,
+      currentSession: previousTokenSession,
+      currentSessionToken: account.token,
+    })).resolves.toEqual({ ok: false, code: "reauth_required" });
+    const unchanged = await pool!.query<{ email: string }>(
+      "SELECT email FROM users WHERE id = $1",
+      [account.userId],
+    );
+    expect(unchanged.rows[0]?.email).toBe(account.email);
+
+    await expect(confirmAccountEmailChange({
+      token,
+      currentSession: rotated!.session,
+      currentSessionToken: rotated!.token,
+    })).resolves.toEqual({
+      ok: true,
+      preservedCurrentSession: true,
+      sessionToken: expect.stringMatching(/^[a-f0-9]{64}$/),
+    });
+    const changed = await pool!.query<{ email: string }>(
+      "SELECT email FROM users WHERE id = $1",
+      [account.userId],
+    );
+    expect(changed.rows[0]?.email).toBe(newEmail);
+  });
+
   test("workspace invitation rate limits serialize concurrent sends", async () => {
     const owner = await createFixture("invite-rate-owner");
     const email = uniqueEmail("invite-rate-target");
@@ -299,6 +355,7 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
     const invited = await createFixture("team-invited");
     const wrongAccount = await createFixture("team-wrong");
     const secondAdmin = await createFixture("team-admin");
+    const transferredDelivery = await createDeliveryFixture(owner);
 
     await expect(inviteWorkspaceMember({
       actorUserId: owner.userId,
@@ -416,6 +473,59 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
       [owner.userId, invited.userId, owner.workspaceId],
     );
     expect(transferEvents.rows[0]?.count).toBe(1);
+    const transferredGraph = await pool!.query<{
+      profileOwnerId: string;
+      providerOwnerId: string;
+      ownerRole: string;
+    }>(
+      `SELECT
+         profile.owner_id::TEXT AS "profileOwnerId",
+         provider.owner_id::TEXT AS "providerOwnerId",
+         membership.role AS "ownerRole"
+       FROM client_profiles AS profile
+       JOIN notification_provider_accounts AS provider
+         ON provider.client_profile_id = profile.id
+       JOIN workspace_members AS membership
+         ON membership.workspace_id = profile.workspace_id
+        AND membership.user_id = $2
+       WHERE profile.id = $1`,
+      [transferredDelivery.profileId, invited.userId],
+    );
+    expect(transferredGraph.rows[0]).toEqual({
+      profileOwnerId: owner.userId,
+      providerOwnerId: owner.userId,
+      ownerRole: "owner",
+    });
+
+    await expect(requestAccountDeletion({
+      session: owner.session,
+      confirmation: ACCOUNT_DELETION_CONFIRMATION,
+    })).resolves.toEqual({
+      ok: false,
+      code: "workspace_data_transfer_required",
+    });
+    const graphAfterFormerOwnerDeletion = await pool!.query<{
+      profileActive: boolean;
+      providerActive: boolean;
+      workspaceActive: boolean;
+    }>(
+      `SELECT
+         profile.is_active AS "profileActive",
+         provider.status = 'active' AS "providerActive",
+         workspace.status = 'active' AS "workspaceActive"
+       FROM client_profiles AS profile
+       JOIN notification_provider_accounts AS provider
+         ON provider.client_profile_id = profile.id
+       JOIN workspaces AS workspace
+         ON workspace.id = profile.workspace_id
+       WHERE profile.id = $1`,
+      [transferredDelivery.profileId],
+    );
+    expect(graphAfterFormerOwnerDeletion.rows[0]).toEqual({
+      profileActive: true,
+      providerActive: true,
+      workspaceActive: true,
+    });
   });
 
   test("invite acceptance and owner deletion serialize on the workspace boundary", async () => {
@@ -670,8 +780,91 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
     await expect(securityEventCount(due.userId)).resolves.toBe(beforeAudit);
   });
 
+  test("an in-flight owner write serializes before deletion and cannot reactivate delivery afterward", async () => {
+    const account = await createFixture("delete-write-race");
+    const delivery = await createDeliveryFixture(account);
+    const inFlightWriter = await pool!.connect();
+    try {
+      await inFlightWriter.query("BEGIN");
+      await inFlightWriter.query(
+        `UPDATE client_profiles
+         SET updated_at = updated_at
+         WHERE id = $1`,
+        [delivery.profileId],
+      );
+
+      const deletion = requestAccountDeletion({
+        session: account.session,
+        confirmation: ACCOUNT_DELETION_CONFIRMATION,
+      });
+      await expect(Promise.race([
+        deletion.then(() => "resolved"),
+        delay(100).then(() => "blocked"),
+      ])).resolves.toBe("blocked");
+
+      await expect(inFlightWriter.query(
+        `UPDATE client_profiles
+         SET is_active = TRUE,
+             delivery_enabled = TRUE,
+             email_digest_enabled = TRUE,
+             digest_email = $2
+         WHERE id = $1`,
+        [delivery.profileId, account.email],
+      )).resolves.toMatchObject({ rowCount: 1 });
+      await inFlightWriter.query("COMMIT");
+      await expect(deletion).resolves.toEqual({ ok: true });
+
+      await expect(pool!.query(
+        `UPDATE notification_endpoints
+         SET status = 'active',
+             destination_id = 'reactivated-destination'
+         WHERE id = $1`,
+        [delivery.endpointId],
+      )).rejects.toMatchObject({ code: "42501" });
+      await expect(pool!.query(
+        `INSERT INTO lead_channel_deliveries (
+           channel, client_profile_id, dedupe_key, lead_count
+         )
+         VALUES ('email', $1, $2, 1)`,
+        [
+          delivery.profileId,
+          `post-delete-race-${delivery.profileId}`,
+        ],
+      )).rejects.toMatchObject({ code: "42501" });
+
+      const finalProfile = await pool!.query<{
+        active: boolean;
+        deliveryEnabled: boolean;
+        emailDigestEnabled: boolean;
+        digestEmail: string | null;
+      }>(
+        `SELECT
+           is_active AS active,
+           delivery_enabled AS "deliveryEnabled",
+           email_digest_enabled AS "emailDigestEnabled",
+           digest_email AS "digestEmail"
+         FROM client_profiles
+         WHERE id = $1`,
+        [delivery.profileId],
+      );
+      expect(finalProfile.rows[0]).toEqual({
+        active: false,
+        deliveryEnabled: false,
+        emailDigestEnabled: false,
+        digestEmail: null,
+      });
+    } finally {
+      await inFlightWriter.query("ROLLBACK").catch(() => undefined);
+      inFlightWriter.release();
+    }
+  });
+
   test("rollback refuses live security history and succeeds after disposable fixtures are cleared", async () => {
     const sql = await readFile(downMigration, "utf8");
+    const activeOwnerGuardDownSql = await readFile(
+      activeOwnerGuardDownMigration,
+      "utf8",
+    );
     const rollbackClient = await pool!.connect();
     try {
       await expect(rollbackClient.query(sql)).rejects.toThrow(
@@ -697,6 +890,9 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
       await rollbackClient.query("ROLLBACK");
 
       await rollbackClient.query("DELETE FROM account_deletion_requests");
+      await expect(
+        rollbackClient.query(activeOwnerGuardDownSql),
+      ).resolves.toBeDefined();
       await expect(rollbackClient.query(sql)).resolves.toBeDefined();
       const remaining = await rollbackClient.query<{ count: number }>(
         `SELECT COUNT(*)::INTEGER AS count
@@ -766,7 +962,7 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
 
   async function createDeliveryFixture(
     account: Fixture,
-  ): Promise<{ profileId: string }> {
+  ): Promise<{ profileId: string; endpointId: string }> {
     const profile = await pool!.query<{ id: string }>(
       `INSERT INTO client_profiles (
          owner_id,
@@ -884,7 +1080,7 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
         `account-delete-${profileId}`,
       ],
     );
-    return { profileId };
+    return { profileId, endpointId: endpoint.rows[0]!.id };
   }
 
   function uniqueEmail(prefix: string): string {

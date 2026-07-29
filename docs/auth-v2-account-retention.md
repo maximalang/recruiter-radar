@@ -27,7 +27,15 @@ AUTH_ACCOUNT_PURGE_AFTER_DAYS
 
 An account deletion request requires recent authentication and the exact
 confirmation phrase shown in the UI. It is refused while the account owns a
-workspace with another active member. On success, the transaction:
+workspace with another active member. During the additive workspace migration,
+it is also refused after role ownership transfer while an active workspace
+still contains profiles, billing, lead, preference, delivery or Opportunity
+rows keyed to the former owner's legacy `user_id`/`owner_id`. This fail-closed
+boundary avoids partially rewriting immutable audit history; workspace-scoped
+authorization and ownership migration must complete before that former account
+can be deleted.
+
+On success, the transaction:
 
 1. creates one pending `account_deletion_requests` record;
 2. disables owned client profiles, queued delivery jobs and every configured
@@ -42,6 +50,11 @@ workspace with another active member. On success, the transaction:
 
 Access, premium entitlement and outbound delivery are therefore removed
 immediately even when retention postpones identity purge.
+
+Database guards serialize owner-scoped profile and delivery writes with the
+account, membership and workspace rows. A write authorized before deletion
+cannot wait for the deletion transaction and then restore profile, endpoint or
+provider state.
 
 ## Safe operation
 

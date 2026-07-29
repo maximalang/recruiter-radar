@@ -80,4 +80,19 @@ describe("account security settings view", () => {
     expect(html).toContain("Текущая");
     expect(html).not.toContain('name="sessionId"');
   });
+
+  test("explains the legacy workspace-data deletion boundary", () => {
+    const html = renderToStaticMarkup(
+      <SecuritySettingsView
+        profile={profile}
+        sessions={[...sessions]}
+        status={{ deletion: "workspace_data_transfer_required" }}
+      />,
+    );
+
+    expect(html).toContain(
+      "Аккаунт пока связан с рабочими данными переданного пространства",
+    );
+    expect(html).toContain("после их безопасного переноса");
+  });
 });

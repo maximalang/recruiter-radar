@@ -5,6 +5,10 @@ import { getCanonicalAccountOrigin } from "../account-auth";
 import { getClient, getPool } from "../db-pool";
 import { sendEmail } from "../email/transport";
 import { logError, logWarn } from "../runtime";
+import {
+  type AuthEnvironment,
+  isAuthWorkspacesV2EnabledForUser,
+} from "./config";
 import { renderAuthEmail, type AuthEmailTemplateName } from "./email-templates";
 import {
   consumeAuthRateLimit,
@@ -211,6 +215,7 @@ export async function inviteWorkspaceMember(input: {
   const token = randomBytes(32).toString("hex");
   let inviteId: string | null = null;
   let workspaceName: string | null = null;
+  const targetBoundary = email.normalized.toLowerCase();
 
   try {
     await client.query("BEGIN");
@@ -226,7 +231,7 @@ export async function inviteWorkspaceMember(input: {
     workspaceName = actor.workspaceName;
     await client.query(
       "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
-      [`auth-workspace-invite:${input.workspaceId}:${email.normalized}`],
+      [`auth-workspace-invite:${input.workspaceId}:${targetBoundary}`],
     );
     const workspaceAllowed = await consumeAuthRateLimit(client, {
       scope: "workspace_invite",
@@ -238,17 +243,21 @@ export async function inviteWorkspaceMember(input: {
       limit: 20,
       now,
     });
+    if (!workspaceAllowed) {
+      await client.query("COMMIT");
+      return { ok: false, code: "rate_limited" };
+    }
     const targetAllowed = await consumeAuthRateLimit(client, {
       scope: "workspace_invite",
       keyHash: hashAuthRateLimitBoundary(
         "workspace-invite-target",
-        `${input.workspaceId}:${email.normalized}`,
+        `${input.workspaceId}:${targetBoundary}`,
       ),
       windowSeconds: 86_400,
       limit: 3,
       now,
     });
-    if (!workspaceAllowed || !targetAllowed) {
+    if (!targetAllowed) {
       await client.query("COMMIT");
       return { ok: false, code: "rate_limited" };
     }
@@ -419,6 +428,7 @@ export async function acceptWorkspaceInvite(input: {
   token: string;
   session: TeamSessionContext;
   now?: Date;
+  env?: AuthEnvironment;
 }): Promise<InviteAcceptanceResult> {
   const token = input.token.trim();
   const now = input.now ?? new Date();
@@ -429,6 +439,12 @@ export async function acceptWorkspaceInvite(input: {
     || !Number.isFinite(now.getTime())
   ) {
     return { ok: false, code: "invalid" };
+  }
+  if (!isAuthWorkspacesV2EnabledForUser(
+    input.session.userId,
+    input.env ?? process.env,
+  )) {
+    return { ok: false, code: "unavailable" };
   }
   const client = await getClient().catch(() => null);
   if (!client) return { ok: false, code: "unavailable" };
@@ -724,6 +740,20 @@ export async function transferWorkspaceOwnership(input: {
   let pair: MembershipPair | null = null;
   try {
     await client.query("BEGIN");
+    const lockedAccounts = await client.query(
+      `SELECT account.id
+       FROM users AS account
+       WHERE account.id IN ($1, $2)
+         AND account.status = 'active'
+         AND account.email_verified_at IS NOT NULL
+       ORDER BY account.id
+       FOR UPDATE OF account`,
+      [input.session.userId, input.targetUserId],
+    );
+    if ((lockedAccounts.rowCount ?? 0) !== 2) {
+      await client.query("ROLLBACK");
+      return { ok: false, code: "denied" };
+    }
     pair = await lockMembershipPair(
       client,
       input.session.userId,
@@ -964,7 +994,7 @@ async function lockMembershipPair(
        AND actor_membership.role IN ('owner', 'admin')
        AND workspace.status = 'active'
        AND workspace.deleted_at IS NULL
-     FOR UPDATE OF actor_membership, target_membership`,
+         FOR UPDATE OF actor_membership, target_membership, workspace`,
     [actorUserId, workspaceId, targetUserId],
   );
   return result.rows[0] ?? null;

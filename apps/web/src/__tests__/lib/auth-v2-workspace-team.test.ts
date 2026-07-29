@@ -36,6 +36,8 @@ describe("auth v2 workspace team lifecycle", () => {
     jest.clearAllMocks();
     process.env.AUTH_SITE_URL = "https://radar.example";
     process.env.SESSION_SECRET = "s".repeat(32);
+    process.env.AUTH_PLATFORM_V2_ENABLED = "true";
+    process.env.AUTH_WORKSPACES_V2_ENABLED = "true";
     mockSendEmail.mockResolvedValue({ ok: true });
     mockGetPool.mockReturnValue({
       query: jest.fn().mockResolvedValue({ rows: [], rowCount: 1 }),
@@ -54,7 +56,7 @@ describe("auth v2 workspace team lifecycle", () => {
   });
 
   test("binds invite acceptance to the current verified account email", async () => {
-    const query = jest.fn(async (sql: string) => {
+    const query = jest.fn(async (sql: string, _values?: unknown[]) => {
       if (sql.includes("FROM workspace_invites AS invite")) {
         return {
           rows: [{
@@ -87,6 +89,56 @@ describe("auth v2 workspace team lifecycle", () => {
     expect(query.mock.calls.some(([sql]) =>
       String(sql).includes("INSERT INTO workspace_members"),
     )).toBe(false);
+  });
+
+  test("fails invite acceptance closed outside the workspace rollout", async () => {
+    await expect(acceptWorkspaceInvite({
+      token: "a".repeat(64),
+      session: session(),
+      now,
+      env: {
+        AUTH_PLATFORM_V2_ENABLED: "true",
+        AUTH_WORKSPACES_V2_ENABLED: "false",
+      },
+    } as Parameters<typeof acceptWorkspaceInvite>[0])).resolves.toEqual({
+      ok: false,
+      code: "unavailable",
+    });
+    expect(mockGetClient).not.toHaveBeenCalled();
+  });
+
+  test("does not spend a target invite bucket after the workspace bucket denies", async () => {
+    const query = jest.fn(async (sql: string, _values?: unknown[]) => {
+      if (sql.includes("FOR UPDATE OF membership, workspace")) {
+        return {
+          rows: [{ actorRole: "owner", workspaceName: "Radar Team" }],
+          rowCount: 1,
+        };
+      }
+      if (sql.includes("consume_auth_rate_limit")) {
+        return { rows: [{ allowed: false }], rowCount: 1 };
+      }
+      return { rows: [], rowCount: 1 };
+    });
+    mockGetClient.mockResolvedValue({ query, release: jest.fn() } as never);
+
+    await expect(inviteWorkspaceMember({
+      actorUserId: "42",
+      workspaceId: "9",
+      email: "MiXeD@example.com",
+      role: "recruiter",
+      now,
+    })).resolves.toEqual({ ok: false, code: "rate_limited" });
+
+    expect(query.mock.calls.filter(([sql]) =>
+      String(sql).includes("consume_auth_rate_limit"),
+    )).toHaveLength(1);
+    const targetLock = query.mock.calls.find(([_sql, values]) =>
+      String(values?.[0]).startsWith("auth-workspace-invite:"),
+    );
+    expect(targetLock?.[1]).toEqual([
+      "auth-workspace-invite:9:mixed@example.com",
+    ]);
   });
 
   test("returns the accepted workspace only after single-use acceptance commits", async () => {
@@ -195,6 +247,12 @@ describe("auth v2 workspace team lifecycle", () => {
     })).resolves.toEqual({ ok: false, code: "reauth_required" });
 
     const query = jest.fn(async (sql: string) => {
+      if (
+        sql.includes("FROM users AS account")
+        && sql.includes("ORDER BY account.id")
+      ) {
+        return { rows: [{ id: "42" }, { id: "77" }], rowCount: 2 };
+      }
       if (sql.includes("FOR UPDATE OF actor_membership, target_membership")) {
         return {
           rows: [{
@@ -220,6 +278,9 @@ describe("auth v2 workspace team lifecycle", () => {
     expect(allSql).toContain("role = CASE");
     expect(allSql).toContain("WHEN user_id = $2 THEN 'admin'");
     expect(allSql).toContain("WHEN user_id = $3 THEN 'owner'");
+    expect(allSql).not.toContain("UPDATE client_profiles");
+    expect(allSql).not.toContain("UPDATE notification_provider_accounts");
+    expect(allSql).not.toContain("UPDATE opportunities");
     expect(allSql).toContain("UPDATE auth_sessions");
     expect(allSql).toContain("'ownership_transferred'");
   });

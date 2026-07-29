@@ -50,6 +50,7 @@ type MutationFailureCode =
   | "reauth_required"
   | "conflict"
   | "ownership_transfer_required"
+  | "workspace_data_transfer_required"
   | "confirmation_required"
   | "unavailable";
 
@@ -71,7 +72,10 @@ export type EmailChangeConfirmationResult =
     ok: true;
     preservedCurrentSession: false;
   }
-  | { ok: false; code: "invalid" | "conflict" | "unavailable" };
+  | {
+    ok: false;
+    code: "invalid" | "reauth_required" | "conflict" | "unavailable";
+  };
 
 type LockedAccount = {
   email: string;
@@ -93,6 +97,10 @@ type EmailChangeChallenge = {
 type OwnedWorkspaceLock = {
   workspaceId: string;
   hasActiveColleague: boolean;
+};
+
+type LegacyWorkspaceDataLock = {
+  workspaceId: string;
 };
 
 export async function getAccountSecurityProfile(input: {
@@ -162,6 +170,7 @@ export async function requestAccountEmailChange(input: {
   }
   const newEmail = normalizeAuthEmail(input.newEmail);
   if (!newEmail) return { ok: false, code: "invalid" };
+  const targetBoundary = newEmail.normalized.toLowerCase();
 
   const client = await getClient().catch(() => null);
   if (!client) return { ok: false, code: "unavailable" };
@@ -177,7 +186,7 @@ export async function requestAccountEmailChange(input: {
     );
     await client.query(
       "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
-      [`auth-email-change-target:${newEmail.normalized}`],
+      [`auth-email-change-target:${targetBoundary}`],
     );
     const locked = await client.query<LockedAccount>(
       `SELECT
@@ -219,17 +228,24 @@ export async function requestAccountEmailChange(input: {
       limit: 3,
       now,
     });
+    if (!userAllowed) {
+      await client.query("COMMIT");
+      logWarn("auth_v2.email_change_request_suppressed", {
+        reasonCode: "rate_limited",
+      });
+      return { ok: true };
+    }
     const targetAllowed = await consumeAuthRateLimit(client, {
       scope: "email_hash",
       keyHash: hashAuthRateLimitBoundary(
         "email-change-target",
-        newEmail.normalized,
+        targetBoundary,
       ),
       windowSeconds: 3_600,
       limit: 3,
       now,
     });
-    if (!userAllowed || !targetAllowed) {
+    if (!targetAllowed) {
       await client.query("COMMIT");
       logWarn("auth_v2.email_change_request_suppressed", {
         reasonCode: "rate_limited",
@@ -437,7 +453,7 @@ export async function confirmAccountEmailChange(input: {
     }
     await client.query(
       "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
-      [`auth-email-change-target:${challenge.newEmail}`],
+      [`auth-email-change-target:${challenge.newEmail.toLowerCase()}`],
     );
     const accountResult = await client.query<{
       email: string;
@@ -480,6 +496,13 @@ export async function confirmAccountEmailChange(input: {
       && input.currentSession.userId === challenge.userId
       && validId(input.currentSession.id),
     );
+    if (
+      input.currentSession?.userId === challenge.userId
+      && (!canPreserveCurrentSession || !nextSessionToken)
+    ) {
+      await client.query("ROLLBACK");
+      return { ok: false, code: "reauth_required" };
+    }
     let preservedSessionId: string | null = null;
     if (canPreserveCurrentSession && nextSessionToken) {
       const rotated = await client.query<{ rotated: boolean }>(
@@ -501,14 +524,7 @@ export async function confirmAccountEmailChange(input: {
              AND session.revoked_at IS NULL
              AND session.idle_expires_at > $5
              AND session.absolute_expires_at > $5
-             AND (
-               session.token_hash = $3
-               OR (
-                 session.previous_token_hash = $3
-                 AND session.previous_token_valid_until > $5
-                 AND session.previous_token_authorizes
-               )
-             )
+             AND session.token_hash = $3
            RETURNING session.*
          ),
          recorded AS (
@@ -554,6 +570,10 @@ export async function confirmAccountEmailChange(input: {
       preservedSessionId = preservedCurrentSession
         ? input.currentSession!.id
         : null;
+      if (!preservedCurrentSession) {
+        await client.query("ROLLBACK");
+        return { ok: false, code: "reauth_required" };
+      }
     }
 
     await client.query(
@@ -767,6 +787,108 @@ export async function requestAccountDeletion(input: {
     )) {
       await client.query("ROLLBACK");
       return { ok: false, code: "ownership_transfer_required" };
+    }
+    const legacyWorkspaceData = await client.query<LegacyWorkspaceDataLock>(
+      `SELECT workspace.id::TEXT AS "workspaceId"
+       FROM workspaces AS workspace
+       JOIN workspace_members AS successor
+         ON successor.workspace_id = workspace.id
+       WHERE successor.user_id <> $1
+         AND successor.role = 'owner'
+         AND successor.status = 'active'
+         AND workspace.status = 'active'
+         AND workspace.deleted_at IS NULL
+         AND (
+           EXISTS (
+             SELECT 1
+             FROM client_profiles AS profile
+             WHERE profile.owner_id = $1
+               AND (
+                 profile.workspace_id = workspace.id
+                 OR profile.workspace_id IS NULL
+               )
+           )
+           OR EXISTS (
+             SELECT 1
+             FROM subscriptions AS subscription
+             WHERE subscription.user_id = $1
+               AND (
+                 subscription.workspace_id = workspace.id
+                 OR subscription.workspace_id IS NULL
+               )
+           )
+           OR EXISTS (
+             SELECT 1
+             FROM checkout_orders AS checkout
+             WHERE checkout.user_id = $1
+               AND (
+                 checkout.workspace_id = workspace.id
+                 OR checkout.workspace_id IS NULL
+               )
+           )
+           OR EXISTS (
+             SELECT 1
+             FROM pilot_enrollments AS pilot
+             WHERE pilot.user_id = $1
+               AND (
+                 pilot.workspace_id = workspace.id
+                 OR pilot.workspace_id IS NULL
+               )
+           )
+           OR EXISTS (
+             SELECT 1
+             FROM leads AS lead
+             WHERE lead.user_id = $1
+               AND (
+                 lead.workspace_id = workspace.id
+                 OR lead.workspace_id IS NULL
+               )
+           )
+           OR EXISTS (
+             SELECT 1
+             FROM deliveries AS delivery
+             WHERE delivery.user_id = $1
+               AND (
+                 delivery.workspace_id = workspace.id
+                 OR delivery.workspace_id IS NULL
+               )
+           )
+           OR EXISTS (
+             SELECT 1
+             FROM user_search_preferences AS preference
+             WHERE preference.user_id = $1
+               AND (
+                 preference.workspace_id = workspace.id
+                 OR preference.workspace_id IS NULL
+               )
+           )
+           OR EXISTS (
+             SELECT 1
+             FROM notification_provider_accounts AS provider
+             WHERE provider.owner_id = $1
+               AND (
+                 provider.workspace_id = workspace.id
+                 OR provider.workspace_id IS NULL
+               )
+           )
+           OR EXISTS (
+             SELECT 1
+             FROM opportunities AS opportunity
+             WHERE opportunity.owner_id = $1
+               AND (
+                 opportunity.workspace_id = workspace.id
+                 OR opportunity.workspace_id IS NULL
+               )
+           )
+         )
+       ORDER BY workspace.id
+       LIMIT 1
+       FOR UPDATE OF successor, workspace`,
+      [session.userId],
+    );
+    if ((legacyWorkspaceData.rowCount ?? 0) > 0) {
+      await client.query("ROLLBACK");
+      return { ok: false, code: "workspace_data_transfer_required" };
     }
 
     await client.query(

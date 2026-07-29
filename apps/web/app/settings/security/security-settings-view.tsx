@@ -243,6 +243,8 @@ export function SecuritySettingsView(props: {
           <div className={styles.notice} data-tone="warning" role="alert">
             {props.status.deletion === "ownership_transfer_required"
               ? "Сначала передайте владение рабочим пространством другому участнику."
+              : props.status.deletion === "workspace_data_transfer_required"
+                ? "Аккаунт пока связан с рабочими данными переданного пространства. Удаление станет доступно после их безопасного переноса."
               : props.status.deletion === "reauth_required"
                 ? "Перед удалением войдите в аккаунт заново."
                 : "Запрос не создан. Проверьте подтверждение и повторите попытку."}

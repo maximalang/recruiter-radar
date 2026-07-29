@@ -84,7 +84,7 @@ describe("auth v2 account security", () => {
   });
 
   test("issues a new-email challenge and notifies the old address without changing primary email", async () => {
-    const query = jest.fn(async (sql: string) => {
+    const query = jest.fn(async (sql: string, _values?: unknown[]) => {
       if (sql.includes("FOR UPDATE OF account")) {
         return {
           rows: [{
@@ -126,6 +126,12 @@ describe("auth v2 account security", () => {
     expect(mockSendEmail).toHaveBeenCalledWith(expect.objectContaining({
       to: "owner@example.com",
     }));
+    const targetLock = query.mock.calls.find(([_sql, values]) =>
+      String(values?.[0]).startsWith("auth-email-change-target:"),
+    );
+    expect(targetLock?.[1]).toEqual([
+      "auth-email-change-target:new@example.com",
+    ]);
   });
 
   test("does not disclose an existing account or a rate-limit decision", async () => {
@@ -191,6 +197,9 @@ describe("auth v2 account security", () => {
     })).resolves.toEqual({ ok: true });
     expect(mockSendEmail).not.toHaveBeenCalled();
     expect(limitedQuery.mock.calls.at(-1)?.[0]).toBe("COMMIT");
+    expect(limitedQuery.mock.calls.filter(([sql]) =>
+      String(sql).includes("consume_auth_rate_limit"),
+    )).toHaveLength(1);
   });
 
   test("confirms the new email transactionally and revokes every other session", async () => {
@@ -245,12 +254,63 @@ describe("auth v2 account security", () => {
     expect(allSql).toContain("email_normalized = $2");
     expect(allSql).toContain("previous_token_hash = NULL");
     expect(allSql).toContain("previous_token_authorizes = FALSE");
+    expect(allSql).toContain("AND session.token_hash = $3");
+    expect(allSql).not.toContain("session.previous_token_hash = $3");
     expect(allSql).toContain("UPDATE auth_sessions");
     expect(allSql).toContain("session.id <> $2");
     expect(allSql).toContain("'email_changed'");
     expect(mockSendEmail).toHaveBeenCalledWith(expect.objectContaining({
       to: "owner@example.com",
     }));
+  });
+
+  test("rejects a previous grace token before changing the primary email", async () => {
+    const query = jest.fn(async (sql: string) => {
+      if (sql.includes("FROM auth_challenges AS challenge")) {
+        return {
+          rows: [{
+            challengeId: "81",
+            userId: "42",
+            workspaceId: "9",
+            newEmail: "new@example.com",
+            expiresAt: new Date("2026-07-29T13:00:00.000Z"),
+            consumedAt: null,
+            invalidatedAt: null,
+          }],
+          rowCount: 1,
+        };
+      }
+      if (sql.includes("FROM users AS account") && sql.includes("FOR UPDATE")) {
+        return {
+          rows: [{
+            email: "owner@example.com",
+            displayName: "Максим",
+          }],
+          rowCount: 1,
+        };
+      }
+      if (sql.includes("SELECT 1") && sql.includes("email_normalized")) {
+        return { rows: [], rowCount: 0 };
+      }
+      if (sql.includes("WITH rotated_session AS")) {
+        return { rows: [{ rotated: false }], rowCount: 1 };
+      }
+      return { rows: [], rowCount: 1 };
+    });
+    mockGetClient.mockResolvedValue({ query, release: jest.fn() } as never);
+
+    await expect(confirmAccountEmailChange({
+      token: "a".repeat(64),
+      currentSession: session(),
+      currentSessionToken: "b".repeat(64),
+      now,
+    })).resolves.toEqual({ ok: false, code: "reauth_required" });
+
+    const allSql = query.mock.calls.map(([sql]) => String(sql)).join("\n");
+    expect(allSql).toContain("AND session.token_hash = $3");
+    expect(allSql).not.toContain("UPDATE users");
+    expect(query.mock.calls.at(-1)?.[0]).toBe("ROLLBACK");
+    expect(mockSendEmail).not.toHaveBeenCalled();
   });
 
   test("requires explicit deletion text and leaves purge scheduling unset by default", async () => {
@@ -271,7 +331,13 @@ describe("auth v2 account security", () => {
           rowCount: 1,
         };
       }
-      if (sql.includes("AS blocking_workspace_id")) {
+      if (
+        sql.includes("FROM workspace_members AS owner_membership")
+        || (
+          sql.includes("FROM workspaces AS workspace")
+          && sql.includes("FROM subscriptions AS subscription")
+        )
+      ) {
         return { rows: [], rowCount: 0 };
       }
       return { rows: [], rowCount: 1 };
@@ -306,5 +372,7 @@ describe("auth v2 account security", () => {
     expect(allSql).toContain("telegram_chat_id = NULL");
     expect(allSql).toContain("UPDATE auth_sessions");
     expect(allSql).toContain("'account_deletion_requested'");
+    expect(allSql).toContain("profile.workspace_id IS NULL");
+    expect(allSql).toContain("subscription.workspace_id IS NULL");
   });
 });

@@ -19,6 +19,24 @@ const rollbackPath = resolve(
   "migrations",
   "20260729130000_add_auth_account_security_and_team.down.sql",
 );
+const activeOwnerGuardPath = resolve(
+  process.cwd(),
+  "..",
+  "..",
+  "packages",
+  "db",
+  "migrations",
+  "20260729131000_guard_auth_active_owner_writes.sql",
+);
+const activeOwnerGuardRollbackPath = resolve(
+  process.cwd(),
+  "..",
+  "..",
+  "packages",
+  "db",
+  "migrations",
+  "20260729131000_guard_auth_active_owner_writes.down.sql",
+);
 
 describe("auth v2 account security and team migration", () => {
   test("adds only privacy-safe session presentation fields", () => {
@@ -61,5 +79,23 @@ describe("auth v2 account security and team migration", () => {
     expect(sql).toContain("DROP COLUMN IF EXISTS environment_label");
     expect(sql).toContain("DROP COLUMN IF EXISTS send_status");
     expect(sql).toContain("DROP COLUMN IF EXISTS target_user_id");
+  });
+
+  test("serializes owner-scoped writes with account deletion", () => {
+    const sql = readFileSync(activeOwnerGuardPath, "utf8");
+    const rollback = readFileSync(activeOwnerGuardRollbackPath, "utf8");
+
+    expect(sql).toContain("CREATE FUNCTION auth_require_active_owner_write");
+    expect(sql).toContain("account.status = 'active'");
+    expect(sql).toContain("FOR KEY SHARE OF account");
+    expect(sql).toContain("ON client_profiles");
+    expect(sql).toContain("ON notification_endpoints");
+    expect(sql).toContain("ON notification_delivery_attempts");
+    expect(sql).toContain("ON notification_inbound_events");
+    expect(sql).toContain("ON web_push_subscriptions");
+    expect(sql).toContain("ON lead_channel_deliveries");
+    expect(rollback).toContain(
+      "DROP FUNCTION auth_require_active_owner_write",
+    );
   });
 });

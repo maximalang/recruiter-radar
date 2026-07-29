@@ -851,14 +851,31 @@ PR 4 implementation invariants:
 - the primary email remains unchanged before confirmation; a successful
   confirmation is single-use, updates the verified address transactionally and
   revokes every session except the matching current one;
+- when confirmation presents a session for the affected account, both the
+  email mutation and session preservation require the exact current
+  `token_hash`. A previous grace hash rolls the transaction back with a
+  reauthentication result and leaves the challenge available for a current
+  session; it never performs another sensitive rotation;
+- email-change and invite target limits use the same lowercase identity
+  boundary as conflict detection, and the target bucket is never consumed
+  after the principal/workspace bucket has denied the request;
 - deletion requires recent authentication and the exact confirmation phrase,
   blocks an owner while another active member still depends on that owner, then
   immediately revokes sessions, removes memberships, disables owned profiles,
   entitlement and every delivery path, clears delivery contact credentials and
   records a pending deletion request;
+- during the legacy owner compatibility window, deletion is also refused after
+  role ownership transfer if active workspace data is still keyed to the
+  former owner's `user_id`/`owner_id`. This preserves billing and immutable
+  Opportunity history instead of partially rewriting the tenant graph; the
+  workspace-scoped DAL migration removes this temporary safety boundary;
 - deletion and invite acceptance lock the same workspace row before deciding
   whether membership can change, so a concurrent invite cannot orphan an owned
   workspace during account deactivation;
+- owner-scoped profile and delivery writes take an active-account,
+  active-membership and active-workspace database lock. A writer authorized
+  before deletion either commits before deletion cleanup or waits and fails
+  closed; it cannot reactivate delivery afterward;
 - automatic purge is disabled when `AUTH_ACCOUNT_PURGE_AFTER_DAYS` is absent.
   When configured, only an integer from 1 through 3650 is accepted. The policy
   name is recorded from `AUTH_ACCOUNT_RETENTION_POLICY_KEY`, defaulting to
@@ -885,11 +902,15 @@ PR 4 implementation invariants:
   confirmation boundary as email change;
 - a wrong-email account cannot consume an invite, replay is rejected and two
   concurrent accepts create one membership and one success audit event;
+- invite acceptance checks the workspace rollout before opening a database
+  transaction, without requiring the invitee to already have a membership;
 - an admin cannot create or manage another admin, no actor can mutate itself,
   and no mutation can create a second owner;
 - ownership transfer atomically demotes the previous owner, promotes the
   selected active member, revokes both parties' sessions in that workspace and
-  records one target-bound audit event;
+  records one target-bound audit event. It does not rewrite legacy tenant or
+  immutable audit ownership columns; account deletion stays blocked while
+  those rows remain attached to the former owner;
 - member removal changes the membership first and revokes every affected
   workspace session in the same transaction.
 
