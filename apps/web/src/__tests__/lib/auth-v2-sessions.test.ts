@@ -22,6 +22,7 @@ import {
   revokeAllAuthSessions,
   revokeAuthSessionById,
   rotateAuthSession,
+  changeActiveWorkspace,
 } from "@/lib/auth-v2/sessions";
 import { cookies } from "next/headers";
 
@@ -41,7 +42,7 @@ function sessionRow(overrides: Record<string, unknown> = {}) {
   return {
     id: "17",
     userId: "42",
-    workspaceId: null,
+    workspaceId: "9",
     authMethod: "magic_link",
     deviceLabel: null,
     createdAt: new Date("2026-07-01T00:00:00.000Z"),
@@ -104,6 +105,10 @@ describe("auth v2 server-side sessions", () => {
     expect(sql).toContain("MAKE_INTERVAL(mins => 5)");
     expect(sql).toContain("selected.last_authenticated_at");
     expect(sql).not.toContain("account.last_authenticated_at");
+    expect(sql).toContain("workspace_access_lost");
+    expect(sql).toContain("workspace_members");
+    expect(sql).toContain("membership.status = 'active'");
+    expect(sql).toContain("workspace.status = 'active'");
     expect(query.mock.calls[0]?.[1]?.[0]).not.toBe("c".repeat(64));
   });
 
@@ -150,6 +155,29 @@ describe("auth v2 server-side sessions", () => {
     expect(query.mock.calls[0]?.[1]).toEqual(["42", "17", "logout"]);
     expect(query.mock.calls[1]?.[1]?.slice(0, 2)).toEqual(["42", "17"]);
     expect(String(query.mock.calls[1]?.[0])).toContain("all_sessions_revoked");
+  });
+
+  test("switches workspace through a current-token-only CAS and rotates immediately", async () => {
+    const query = jest.fn().mockResolvedValue({
+      rows: [sessionRow({ workspaceId: "11", rotationDue: false })],
+      rowCount: 1,
+    });
+    mockGetPool.mockReturnValue({ query } as never);
+
+    const switched = await changeActiveWorkspace({
+      token: "f".repeat(64),
+      workspaceId: "11",
+      now: new Date("2026-07-28T12:00:00.000Z"),
+    });
+
+    expect(switched?.session.workspaceId).toBe("11");
+    expect(switched?.token).toMatch(/^[a-f0-9]{64}$/);
+    const sql = String(query.mock.calls[0]?.[0]);
+    expect(sql).toContain("change_auth_session_workspace");
+    const values = query.mock.calls[0]?.[1] as unknown[];
+    expect(values[0]).not.toBe("f".repeat(64));
+    expect(values[1]).not.toBe(switched?.token);
+    expect(values[2]).toBe("11");
   });
 
   test("checks recent authentication without trusting client timestamps", () => {

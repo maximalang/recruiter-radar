@@ -24,7 +24,7 @@ const MAX_POSTGRES_BIGINT = BigInt("9223372036854775807");
 type LegacyExchangeRow = {
   id: string;
   userId: string;
-  workspaceId: string | null;
+  workspaceId: string;
   authMethod: "legacy_exchange";
   deviceLabel: string | null;
   createdAt: Date;
@@ -168,7 +168,8 @@ function validOptionalHash(value: string | null | undefined): boolean {
   return value === null || value === undefined || HASH_PATTERN.test(value);
 }
 
-function mapSession(row: LegacyExchangeRow): AuthSession {
+function mapSession(row: LegacyExchangeRow): AuthSession | null {
+  if (!validUserId(row.workspaceId)) return null;
   return {
     id: row.id,
     userId: row.userId,
@@ -344,7 +345,8 @@ export async function exchangeLegacyOwnerSession(input: {
       ],
     );
     const row = result.rows[0];
-    return row ? { session: mapSession(row), token: sessionToken } : null;
+    const session = row ? mapSession(row) : null;
+    return session ? { session, token: sessionToken } : null;
   } catch (error) {
     logError("auth_v2.legacy_session_exchange_failed", error);
     return null;

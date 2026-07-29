@@ -72,7 +72,7 @@ describe("bounded auth v2 legacy session exchange", () => {
       rows: [{
         id: "17",
         userId: "42",
-        workspaceId: null,
+        workspaceId: "9",
         authMethod: "legacy_exchange",
         deviceLabel: null,
         createdAt: now,

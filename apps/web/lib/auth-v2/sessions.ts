@@ -18,7 +18,7 @@ export type AuthSessionMethod =
 export type AuthSession = {
   id: string;
   userId: string;
-  workspaceId: string | null;
+  workspaceId: string;
   authMethod: AuthSessionMethod;
   deviceLabel: string | null;
   createdAt: Date;
@@ -45,7 +45,7 @@ export class AuthSessionRequiredError extends Error {
 type SessionRow = {
   id: string;
   userId: string;
-  workspaceId: string | null;
+  workspaceId: string;
   authMethod: AuthSessionMethod;
   deviceLabel: string | null;
   createdAt: Date;
@@ -96,7 +96,7 @@ function createOpaqueToken(): string {
 }
 
 function mapSession(row: SessionRow | undefined): AuthSession | null {
-  if (!row) return null;
+  if (!row || !validId(row.workspaceId)) return null;
   return {
     id: row.id,
     userId: row.userId,
@@ -248,6 +248,19 @@ export async function readAuthSession(
            revoke_reason = CASE
              WHEN session.absolute_expires_at <= $2 THEN 'absolute_expired'
              WHEN session.idle_expires_at <= $2 THEN 'idle_expired'
+             WHEN session.workspace_id IS NULL
+               OR NOT EXISTS (
+                 SELECT 1
+                 FROM workspace_members AS membership
+                 JOIN workspaces AS workspace
+                   ON workspace.id = membership.workspace_id
+                 WHERE membership.workspace_id = session.workspace_id
+                   AND membership.user_id = session.user_id
+                   AND membership.status = 'active'
+                   AND workspace.status = 'active'
+                   AND workspace.deleted_at IS NULL
+               )
+               THEN 'workspace_access_lost'
              ELSE 'account_unavailable'
            END
          WHERE (
@@ -267,6 +280,18 @@ export async function readAuthSession(
                WHERE account.id = session.user_id
                  AND account.status = 'active'
                  AND account.email_verified_at IS NOT NULL
+             )
+             OR session.workspace_id IS NULL
+             OR NOT EXISTS (
+               SELECT 1
+               FROM workspace_members AS membership
+               JOIN workspaces AS workspace
+                 ON workspace.id = membership.workspace_id
+               WHERE membership.workspace_id = session.workspace_id
+                 AND membership.user_id = session.user_id
+                 AND membership.status = 'active'
+                 AND workspace.status = 'active'
+                 AND workspace.deleted_at IS NULL
              )
            )
          RETURNING session.*
@@ -310,6 +335,10 @@ export async function readAuthSession(
              session.absolute_expires_at
            )
          FROM users AS account
+         JOIN workspace_members AS membership
+           ON membership.user_id = account.id
+         JOIN workspaces AS workspace
+           ON workspace.id = membership.workspace_id
          WHERE (
              session.token_hash = $1
              OR (
@@ -318,19 +347,33 @@ export async function readAuthSession(
              )
            )
            AND session.user_id = account.id
+           AND session.workspace_id = membership.workspace_id
            AND session.revoked_at IS NULL
+           AND NOT EXISTS (
+             SELECT 1
+             FROM invalidated
+             WHERE invalidated.id = session.id
+           )
            AND session.idle_expires_at > $2
            AND session.absolute_expires_at > $2
            AND session.last_seen_at <= $2
              - MAKE_INTERVAL(mins => ${SESSION_TOUCH_INTERVAL_MINUTES})
            AND account.status = 'active'
            AND account.email_verified_at IS NOT NULL
+           AND membership.status = 'active'
+           AND workspace.status = 'active'
+           AND workspace.deleted_at IS NULL
          RETURNING session.*
        ),
        current_session AS (
          SELECT session.*
          FROM auth_sessions AS session
          JOIN users AS account ON account.id = session.user_id
+         JOIN workspace_members AS membership
+           ON membership.workspace_id = session.workspace_id
+          AND membership.user_id = session.user_id
+         JOIN workspaces AS workspace
+           ON workspace.id = membership.workspace_id
          WHERE (
              session.token_hash = $1
              OR (
@@ -339,10 +382,18 @@ export async function readAuthSession(
              )
            )
            AND session.revoked_at IS NULL
+           AND NOT EXISTS (
+             SELECT 1
+             FROM invalidated
+             WHERE invalidated.id = session.id
+           )
            AND session.idle_expires_at > $2
            AND session.absolute_expires_at > $2
            AND account.status = 'active'
            AND account.email_verified_at IS NOT NULL
+           AND membership.status = 'active'
+           AND workspace.status = 'active'
+           AND workspace.deleted_at IS NULL
        ),
        selected AS (
          SELECT * FROM touched
@@ -416,8 +467,13 @@ export async function rotateAuthSession(
            ),
            rotated_at = $3
          FROM users AS account
+         JOIN workspace_members AS membership
+           ON membership.user_id = account.id
+         JOIN workspaces AS workspace
+           ON workspace.id = membership.workspace_id
          WHERE session.token_hash = $1
            AND session.user_id = account.id
+           AND session.workspace_id = membership.workspace_id
            AND session.revoked_at IS NULL
            AND session.idle_expires_at > $3
            AND session.absolute_expires_at > $3
@@ -427,6 +483,9 @@ export async function rotateAuthSession(
            )
            AND account.status = 'active'
            AND account.email_verified_at IS NOT NULL
+           AND membership.status = 'active'
+           AND workspace.status = 'active'
+           AND workspace.deleted_at IS NULL
          RETURNING session.*
        ),
        recorded AS (
@@ -479,6 +538,55 @@ export async function rotateAuthSession(
     return session ? { session, token: nextToken } : null;
   } catch (error) {
     logError("auth_v2.session_rotate_failed", error);
+    return null;
+  }
+}
+
+export async function changeActiveWorkspace(input: {
+  token: string;
+  workspaceId: string;
+  now?: Date;
+}): Promise<AuthSessionWithToken | null> {
+  const now = input.now ?? new Date();
+  if (
+    !TOKEN_PATTERN.test(input.token)
+    || !validId(input.workspaceId)
+    || !Number.isFinite(now.getTime())
+  ) {
+    return null;
+  }
+
+  const pool = getPool();
+  if (!pool) return null;
+  const nextToken = createOpaqueToken();
+
+  try {
+    const result = await pool.query<SessionRow>(
+      `SELECT
+         switched.id::TEXT AS id,
+         switched.user_id::TEXT AS "userId",
+         switched.workspace_id::TEXT AS "workspaceId",
+         switched.auth_method AS "authMethod",
+         switched.device_label AS "deviceLabel",
+         switched.created_at AS "createdAt",
+         switched.last_seen_at AS "lastSeenAt",
+         switched.idle_expires_at AS "idleExpiresAt",
+         switched.absolute_expires_at AS "absoluteExpiresAt",
+         switched.rotated_at AS "rotatedAt",
+         switched.last_authenticated_at AS "lastAuthenticatedAt",
+         FALSE AS "rotationDue"
+       FROM change_auth_session_workspace($1, $2, $3, $4) AS switched`,
+      [
+        hashAuthSessionToken(input.token),
+        hashAuthSessionToken(nextToken),
+        input.workspaceId,
+        now,
+      ],
+    );
+    const session = mapSession(result.rows[0]);
+    return session ? { session, token: nextToken } : null;
+  } catch (error) {
+    logError("auth_v2.workspace_switch_failed", error);
     return null;
   }
 }

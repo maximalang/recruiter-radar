@@ -61,6 +61,16 @@ export function isAuthPlatformV2EnabledForUser(
   return canaryIds?.has(userId) === true;
 }
 
+export function isAuthWorkspacesV2EnabledForUser(
+  userId: string | null | undefined,
+  env: AuthEnvironment = process.env,
+): boolean {
+  return (
+    enabled(env.AUTH_WORKSPACES_V2_ENABLED)
+    && isAuthPlatformV2EnabledForUser(userId, env)
+  );
+}
+
 export function isAuthV2SessionReadEnabledForUser(
   userId: string | null | undefined,
   env: AuthEnvironment = process.env,
