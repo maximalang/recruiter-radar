@@ -124,14 +124,19 @@
 - [x] Add rename/remove/recovery guard.
 - [x] Add email fallback UX.
 - [x] Add virtual-authenticator and abuse tests.
-- [ ] Complete PR 5 review/check/CI gate.
-  - Local evidence so far: exact origin/RP/UV/challenge/counter unit and route
+- [x] Complete PR 5 review/check/CI gate.
+  - Local evidence: exact origin/RP/UV/challenge/counter unit and route
     tests, per-user abuse/cap controls, atomic prior-session replacement,
     fresh PostgreSQL concurrency plus guarded rollback, and real Playwright
     Chromium virtual-CTAP2 registration/login/email fallback all pass. The
     independent exact-worktree re-review returned GO with no confirmed
     blockers after its registration-cap, atomic-session, disposable-runner and
-    persistent-rate-limit findings were fixed. GitHub CI remains.
+    persistent-rate-limit findings were fixed.
+  - Completed in PR #100. On code SHA
+    `87d8894f40cd0fe05236295ed198ffc2dbdbaa88`, GitHub Actions runs
+    `30499183387` and `30499187402` completed all 12 checks successfully:
+    security audit, lint/application/test types, unit/PostgreSQL regressions,
+    production web build, Docker build, and landing Playwright.
 
 ## PR 6 — Integration/rollout
 
