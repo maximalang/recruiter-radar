@@ -1,6 +1,7 @@
 import {
   getAuthV2Flags,
   isAuthPlatformV2EnabledForUser,
+  isAuthWorkspacesV2EnabledForUser,
   isAuthV2SessionReadEnabledForUser,
   parseCanaryUserIds,
 } from "@/lib/auth-v2/config";
@@ -73,6 +74,21 @@ describe("auth v2 feature boundaries", () => {
       ...env,
       AUTH_V2_SESSION_ROLLBACK_COMPAT_ENABLED: "true",
     })).toBe(true);
+  });
+
+  test("requires both the workspace flag and per-user platform eligibility", () => {
+    const env = {
+      AUTH_PLATFORM_V2_ENABLED: "false",
+      AUTH_WORKSPACES_V2_ENABLED: "true",
+      AUTH_V2_CANARY_USER_IDS: "17",
+    };
+
+    expect(isAuthWorkspacesV2EnabledForUser("17", env)).toBe(true);
+    expect(isAuthWorkspacesV2EnabledForUser("18", env)).toBe(false);
+    expect(isAuthWorkspacesV2EnabledForUser("17", {
+      ...env,
+      AUTH_WORKSPACES_V2_ENABLED: "TRUE",
+    })).toBe(false);
   });
 });
 

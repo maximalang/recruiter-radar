@@ -8,6 +8,12 @@ export type AuthV2Flags = {
   legacySessionMigration: boolean;
 };
 
+export type AuthWorkspaceV2RolloutPolicy = {
+  enabled: boolean;
+  global: boolean;
+  canaryUserIds: readonly string[];
+};
+
 const MAX_POSTGRES_BIGINT = BigInt("9223372036854775807");
 const POSITIVE_DECIMAL = /^[1-9]\d*$/;
 
@@ -59,6 +65,33 @@ export function isAuthPlatformV2EnabledForUser(
 
   const canaryIds = parseCanaryUserIds(env.AUTH_V2_CANARY_USER_IDS);
   return canaryIds?.has(userId) === true;
+}
+
+export function isAuthWorkspacesV2EnabledForUser(
+  userId: string | null | undefined,
+  env: AuthEnvironment = process.env,
+): boolean {
+  const policy = getAuthWorkspacesV2RolloutPolicy(env);
+  return (
+    policy.enabled
+    && (
+      policy.global
+      || (userId !== null
+        && userId !== undefined
+        && policy.canaryUserIds.includes(userId))
+    )
+  );
+}
+
+export function getAuthWorkspacesV2RolloutPolicy(
+  env: AuthEnvironment = process.env,
+): AuthWorkspaceV2RolloutPolicy {
+  const canaryIds = parseCanaryUserIds(env.AUTH_V2_CANARY_USER_IDS);
+  return {
+    enabled: enabled(env.AUTH_WORKSPACES_V2_ENABLED),
+    global: enabled(env.AUTH_PLATFORM_V2_ENABLED),
+    canaryUserIds: canaryIds === null ? [] : [...canaryIds],
+  };
 }
 
 export function isAuthV2SessionReadEnabledForUser(

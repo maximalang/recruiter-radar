@@ -50,28 +50,28 @@
   - Verify: route/action tests + checkout returnTo regression.
   - Files: login/verify/confirm/logout route group (split if >5).
 
-- [ ] Complete PR 1 gate
+- [x] Complete PR 1 gate
   - Acceptance: independent review has no confirmed blockers.
   - Verify: web check/build, full Jest, DB gates, audit, CI.
-  - Remediation completed locally: session-scoped recent auth, runtime rotation
-    and legacy exchange, canary serving policy, same-origin confirm, stale-link
-    invalidation, guarded reverse chain, split verification limits and bounded
-    challenge retention cleanup. The second review's legacy replay and
-    JavaScript-only rotation blockers are now enforced at the shared
-    authorization boundary; awaiting the next independent review/CI.
+  - Completed in PR #96; final independent review found no confirmed blockers,
+    both GitHub Actions runs were green, and the PR was merged only to
+    `codex/auth-platform-v2`.
 
 ## PR 2 — Workspaces
 
-- [ ] Add workspace/member/invite schema and tests.
-- [ ] Add nullable workspace context to first tenant-parent batch.
-- [ ] Add read-only preflight JSON report.
-- [ ] Add dry-run-default resumable backfill.
-- [ ] Add aggregate/parity verifier.
-- [ ] Add composite tenant constraints.
-- [ ] Add session workspace switch.
-- [ ] Add dual-read/dual-write compatibility.
-- [ ] Prove workspace isolation and concurrency.
-- [ ] Complete PR 2 review/check/CI gate.
+- [x] Add workspace/member/invite schema and tests.
+- [x] Add nullable workspace context to first tenant-parent batch.
+- [x] Add read-only preflight JSON report.
+- [x] Add dry-run-default resumable backfill.
+- [x] Add aggregate/parity verifier.
+- [x] Add composite tenant constraints.
+- [x] Add session workspace switch.
+- [x] Add dual-read/dual-write compatibility.
+- [x] Prove workspace isolation and concurrency.
+- [x] Complete PR 2 review/check/CI gate.
+  - Completed in PR #97; independent review of the final implementation found
+    no confirmed blockers, local unit/type/build/audit and fresh PostgreSQL
+    gates passed, and both initial GitHub Actions runs were terminal green.
 
 ## PR 3 — UX/onboarding
 
