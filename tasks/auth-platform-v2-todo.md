@@ -68,7 +68,10 @@
 - [x] Add session workspace switch.
 - [x] Add dual-read/dual-write compatibility.
 - [x] Prove workspace isolation and concurrency.
-- [ ] Complete PR 2 review/check/CI gate.
+- [x] Complete PR 2 review/check/CI gate.
+  - Completed in PR #97; independent review of the final implementation found
+    no confirmed blockers, local unit/type/build/audit and fresh PostgreSQL
+    gates passed, and both initial GitHub Actions runs were terminal green.
 
 ## PR 3 — UX/onboarding
 
