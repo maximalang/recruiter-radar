@@ -96,6 +96,7 @@ describe("auth v2 email-change and invite routes", () => {
     mockConfirmEmail.mockResolvedValue({
       ok: true,
       preservedCurrentSession: true,
+      sessionToken: "f".repeat(64),
     });
     mockAcceptInvite.mockResolvedValue({
       ok: true,
@@ -159,7 +160,9 @@ describe("auth v2 email-change and invite routes", () => {
     expect(mockConfirmEmail).toHaveBeenCalledWith({
       token: "a".repeat(64),
       currentSession: session,
+      currentSessionToken: "b".repeat(64),
     });
+    expect(mockWriteSessionCookie).toHaveBeenCalledWith("f".repeat(64));
     expect(mockClearPending).toHaveBeenCalledWith("email_change");
     await expect(response.json()).resolves.toEqual({
       ok: true,

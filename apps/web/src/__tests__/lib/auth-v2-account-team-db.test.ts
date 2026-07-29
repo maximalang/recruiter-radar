@@ -16,6 +16,8 @@ import {
   changeActiveWorkspace,
   createAuthSession,
   listAuthSessions,
+  readAuthSession,
+  revokeAllAuthSessions,
   type AuthSession,
 } from "@/lib/auth-v2/sessions";
 import {
@@ -130,18 +132,30 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
       confirmAccountEmailChange({
         token,
         currentSession: account.session,
+        currentSessionToken: account.token,
       }),
       confirmAccountEmailChange({
         token,
         currentSession: account.session,
+        currentSessionToken: account.token,
       }),
     ]);
     expect(confirmations.filter((result) => result.ok)).toHaveLength(1);
-    expect(confirmations).toContainEqual({
+    const confirmed = confirmations.find((result) => result.ok);
+    expect(confirmed).toEqual({
       ok: true,
       preservedCurrentSession: true,
+      sessionToken: expect.stringMatching(/^[a-f0-9]{64}$/),
     });
     expect(confirmations).toContainEqual({ ok: false, code: "invalid" });
+    if (!confirmed?.ok || !confirmed.preservedCurrentSession) {
+      throw new Error("Email confirmation did not rotate the current session.");
+    }
+    await expect(readAuthSession(account.token)).resolves.toBeNull();
+    await expect(readAuthSession(confirmed.sessionToken)).resolves.toMatchObject({
+      id: account.session.id,
+      userId: account.userId,
+    });
 
     const after = await pool!.query<{
       email: string;
@@ -198,6 +212,33 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
     });
     expect(summaries[0]).not.toHaveProperty("requestIpHash");
     expect(summaries[0]).not.toHaveProperty("userAgentHash");
+  });
+
+  test("logout-all invalidates a pending email-change challenge", async () => {
+    const account = await createFixture("email-revoke");
+    const newEmail = uniqueEmail("email-revoke-target");
+    await expect(requestAccountEmailChange({
+      session: account.session,
+      newEmail,
+    })).resolves.toEqual({ ok: true, delivery: "sent" });
+    const token = await tokenFromOutbox(newEmail, "/auth/change-email");
+
+    await expect(revokeAllAuthSessions({
+      userId: account.userId,
+    })).resolves.toBe(1);
+    await expect(confirmAccountEmailChange({
+      token,
+      currentSession: null,
+      currentSessionToken: null,
+    })).resolves.toEqual({ ok: false, code: "invalid" });
+
+    const challenge = await pool!.query<{ invalidated: boolean }>(
+      `SELECT invalidated_at IS NOT NULL AS invalidated
+       FROM auth_challenges
+       WHERE token_hash = ENCODE(DIGEST($1, 'sha256'), 'hex')`,
+      [token],
+    );
+    expect(challenge.rows[0]?.invalidated).toBe(true);
   });
 
   test("invite email binding, single use, role ceilings, removal, and ownership transfer are atomic", async () => {

@@ -153,19 +153,30 @@ describe("auth v2 account security", () => {
       if (sql.includes("SELECT 1") && sql.includes("email_normalized")) {
         return { rows: [], rowCount: 0 };
       }
+      if (sql.includes("WITH rotated_session AS")) {
+        return { rows: [{ rotated: true }], rowCount: 1 };
+      }
       return { rows: [], rowCount: 1 };
     });
     mockGetClient.mockResolvedValue({ query, release: jest.fn() } as never);
 
-    await expect(confirmAccountEmailChange({
+    const result = await confirmAccountEmailChange({
       token: "a".repeat(64),
       currentSession: session(),
+      currentSessionToken: "b".repeat(64),
       now,
-    })).resolves.toEqual({ ok: true, preservedCurrentSession: true });
+    });
+    expect(result).toEqual({
+      ok: true,
+      preservedCurrentSession: true,
+      sessionToken: expect.stringMatching(/^[a-f0-9]{64}$/),
+    });
 
     const allSql = query.mock.calls.map(([sql]) => String(sql)).join("\n");
     expect(allSql).toContain("UPDATE users");
     expect(allSql).toContain("email_normalized = $2");
+    expect(allSql).toContain("previous_token_hash = NULL");
+    expect(allSql).toContain("previous_token_authorizes = FALSE");
     expect(allSql).toContain("UPDATE auth_sessions");
     expect(allSql).toContain("session.id <> $2");
     expect(allSql).toContain("'email_changed'");

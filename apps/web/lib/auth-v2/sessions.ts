@@ -763,7 +763,10 @@ async function revokeAuthSessionWhere(
       `WITH revoked_session AS (
          UPDATE auth_sessions AS session
          SET
-           revoked_at = clock_timestamp(),
+           revoked_at = GREATEST(
+             session.created_at,
+             clock_timestamp()
+           ),
            revoke_reason = $${reasonParameter}
          WHERE ${predicate}
            AND session.revoked_at IS NULL
@@ -831,7 +834,10 @@ export async function revokeAllAuthSessions(input: {
       `WITH revoked_sessions AS (
          UPDATE auth_sessions AS session
          SET
-           revoked_at = clock_timestamp(),
+           revoked_at = GREATEST(
+             session.created_at,
+             clock_timestamp()
+           ),
            revoke_reason = 'logout_all'
          WHERE session.user_id = $1
            AND ($2::BIGINT IS NULL OR session.id <> $2::BIGINT)

@@ -58,7 +58,15 @@ export type EmailChangeRequestResult =
   | { ok: false; code: MutationFailureCode };
 
 export type EmailChangeConfirmationResult =
-  | { ok: true; preservedCurrentSession: boolean }
+  | {
+    ok: true;
+    preservedCurrentSession: true;
+    sessionToken: string;
+  }
+  | {
+    ok: true;
+    preservedCurrentSession: false;
+  }
   | { ok: false; code: "invalid" | "conflict" | "unavailable" };
 
 type LockedAccount = {
@@ -342,9 +350,11 @@ export async function requestAccountEmailChange(input: {
 export async function confirmAccountEmailChange(input: {
   token: string;
   currentSession?: AccountSessionContext | null;
+  currentSessionToken?: string | null;
   now?: Date;
 }): Promise<EmailChangeConfirmationResult> {
   const token = input.token.trim();
+  const currentSessionToken = input.currentSessionToken?.trim() ?? "";
   const now = input.now ?? new Date();
   if (!TOKEN_PATTERN.test(token) || !Number.isFinite(now.getTime())) {
     return { ok: false, code: "invalid" };
@@ -355,6 +365,12 @@ export async function confirmAccountEmailChange(input: {
   let oldEmail: string | null = null;
   let displayName: string | null = null;
   let preservedCurrentSession = false;
+  const nextSessionToken = (
+    input.currentSession
+    && TOKEN_PATTERN.test(currentSessionToken)
+  )
+    ? randomBytes(32).toString("hex")
+    : null;
 
   try {
     await client.query("BEGIN");
@@ -425,14 +441,86 @@ export async function confirmAccountEmailChange(input: {
       return { ok: false, code: "conflict" };
     }
 
-    preservedCurrentSession = Boolean(
+    const canPreserveCurrentSession = Boolean(
       input.currentSession
       && input.currentSession.userId === challenge.userId
       && validId(input.currentSession.id),
     );
-    const preservedSessionId = preservedCurrentSession
-      ? input.currentSession!.id
-      : null;
+    let preservedSessionId: string | null = null;
+    if (canPreserveCurrentSession && nextSessionToken) {
+      const rotated = await client.query<{ rotated: boolean }>(
+        `WITH rotated_session AS (
+           UPDATE auth_sessions AS session
+           SET
+             token_hash = $4,
+             previous_token_hash = NULL,
+             previous_token_valid_until = NULL,
+             previous_token_authorizes = FALSE,
+             last_seen_at = $5,
+             idle_expires_at = LEAST(
+               $5::TIMESTAMPTZ + INTERVAL '14 days',
+               session.absolute_expires_at
+             ),
+             rotated_at = $5
+           WHERE session.id = $2
+             AND session.user_id = $1
+             AND session.revoked_at IS NULL
+             AND session.idle_expires_at > $5
+             AND session.absolute_expires_at > $5
+             AND (
+               session.token_hash = $3
+               OR (
+                 session.previous_token_hash = $3
+                 AND session.previous_token_valid_until > $5
+                 AND session.previous_token_authorizes
+               )
+             )
+           RETURNING session.*
+         ),
+         recorded AS (
+           INSERT INTO auth_security_events (
+             event_type,
+             user_id,
+             workspace_id,
+             session_id,
+             request_ip_hash,
+             user_agent_hash,
+             metadata,
+             created_at
+           )
+           SELECT
+             'session_rotated',
+             rotated_session.user_id,
+             rotated_session.workspace_id,
+             rotated_session.id,
+             rotated_session.request_ip_hash,
+             rotated_session.user_agent_hash,
+             JSONB_BUILD_OBJECT(
+               'method',
+               rotated_session.auth_method,
+               'reason_code',
+               'email_changed'
+             ),
+             $5
+           FROM rotated_session
+           RETURNING id
+         )
+         SELECT
+           EXISTS(SELECT 1 FROM rotated_session) AS rotated,
+           (SELECT COUNT(*) FROM recorded) AS "recordedCount"`,
+        [
+          challenge.userId,
+          input.currentSession!.id,
+          hashToken(currentSessionToken),
+          hashToken(nextSessionToken),
+          now,
+        ],
+      );
+      preservedCurrentSession = rotated.rows[0]?.rotated === true;
+      preservedSessionId = preservedCurrentSession
+        ? input.currentSession!.id
+        : null;
+    }
 
     await client.query(
       `UPDATE users
@@ -554,7 +642,13 @@ export async function confirmAccountEmailChange(input: {
       logError("auth_v2.email_changed_notice_failed", error);
     });
   }
-  return { ok: true, preservedCurrentSession };
+  return preservedCurrentSession && nextSessionToken
+    ? {
+      ok: true,
+      preservedCurrentSession: true,
+      sessionToken: nextSessionToken,
+    }
+    : { ok: true, preservedCurrentSession: false };
 }
 
 export async function requestAccountDeletion(input: {

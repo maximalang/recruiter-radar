@@ -126,4 +126,26 @@ CREATE INDEX auth_security_events_target_user_created_idx
   ON auth_security_events (target_user_id, created_at DESC)
   WHERE target_user_id IS NOT NULL;
 
+CREATE FUNCTION invalidate_email_change_on_session_revoke()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF OLD.revoked_at IS NULL AND NEW.revoked_at IS NOT NULL THEN
+    UPDATE auth_challenges AS challenge
+    SET invalidated_at = GREATEST(challenge.created_at, NEW.revoked_at)
+    WHERE challenge.user_id = NEW.user_id
+      AND challenge.purpose = 'change_email'
+      AND challenge.consumed_at IS NULL
+      AND challenge.invalidated_at IS NULL;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER auth_sessions_invalidate_email_change_after_revoke
+AFTER UPDATE OF revoked_at ON auth_sessions
+FOR EACH ROW
+EXECUTE FUNCTION invalidate_email_change_on_session_revoke();
+
 COMMIT;

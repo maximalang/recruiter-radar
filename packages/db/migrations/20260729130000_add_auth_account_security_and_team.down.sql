@@ -27,6 +27,10 @@ BEGIN
 END;
 $$;
 
+DROP TRIGGER auth_sessions_invalidate_email_change_after_revoke
+  ON auth_sessions;
+DROP FUNCTION invalidate_email_change_on_session_revoke();
+
 DROP INDEX auth_security_events_target_user_created_idx;
 
 ALTER TABLE auth_security_events
