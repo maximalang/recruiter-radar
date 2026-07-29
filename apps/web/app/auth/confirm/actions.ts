@@ -9,7 +9,10 @@ import {
   consumeAuthV2Login,
   readAuthV2LoginChallengePreview,
 } from "@/lib/auth-v2/challenges";
-import { isAuthPlatformV2EnabledForUser } from "@/lib/auth-v2/config";
+import {
+  isAuthOnboardingV2EnabledForUser,
+  isAuthPlatformV2EnabledForUser,
+} from "@/lib/auth-v2/config";
 import {
   readAuthV2SessionCookie,
   writeAuthV2SessionCookie,
@@ -72,7 +75,13 @@ export async function confirmAccountLoginAction(): Promise<never> {
       await writeAuthV2SessionCookie(result.session.token);
       await clearLegacyOwnerSession();
       await clearPendingAccountLogin();
-      return redirect(result.returnTo);
+      const destination =
+        result.onboardingRequired
+        && result.returnTo === "/dashboard"
+        && isAuthOnboardingV2EnabledForUser(result.account.id)
+          ? "/onboarding"
+          : result.returnTo;
+      return redirect(destination);
     }
   }
 

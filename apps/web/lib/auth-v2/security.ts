@@ -111,6 +111,20 @@ export function maskAuthEmail(email: string): string {
   return `${maskedLocal}@${maskedDomain}${suffix}`;
 }
 
+export function shouldWarnAuthAccountReplacement(
+  currentUserId: string | null | undefined,
+  targetUserId: string | null | undefined,
+): boolean {
+  return Boolean(
+    currentUserId
+    && (
+      targetUserId === null
+      || targetUserId === undefined
+      || targetUserId !== currentUserId
+    ),
+  );
+}
+
 function configuredAuthOrigin(env: AuthEnvironment): string | null {
   const raw = (
     env.AUTH_SITE_URL

@@ -74,6 +74,8 @@ const mockReadLegacyCookie = jest.mocked(readLegacyOwnerSessionCookie);
 const mockWriteLegacy = jest.mocked(writeOwnerSession);
 const mockRedirect = jest.mocked(redirect);
 const originalPlatformFlag = process.env.AUTH_PLATFORM_V2_ENABLED;
+const originalWorkspacesFlag = process.env.AUTH_WORKSPACES_V2_ENABLED;
+const originalOnboardingFlag = process.env.AUTH_ONBOARDING_V2_ENABLED;
 const originalSiteUrl = process.env.AUTH_SITE_URL;
 
 describe("auth v2 explicit confirm bridge", () => {
@@ -85,11 +87,15 @@ describe("auth v2 explicit confirm bridge", () => {
     }
     if (originalSiteUrl === undefined) delete process.env.AUTH_SITE_URL;
     else process.env.AUTH_SITE_URL = originalSiteUrl;
+    restoreEnv("AUTH_WORKSPACES_V2_ENABLED", originalWorkspacesFlag);
+    restoreEnv("AUTH_ONBOARDING_V2_ENABLED", originalOnboardingFlag);
   });
 
   beforeEach(() => {
     jest.clearAllMocks();
     process.env.AUTH_PLATFORM_V2_ENABLED = "false";
+    delete process.env.AUTH_WORKSPACES_V2_ENABLED;
+    delete process.env.AUTH_ONBOARDING_V2_ENABLED;
     process.env.AUTH_SITE_URL = "https://radar.example";
     delete process.env.AUTH_TRUSTED_PROXY_HEADER;
     mockHeaders.mockResolvedValue(new Headers({
@@ -138,6 +144,7 @@ describe("auth v2 explicit confirm bridge", () => {
         emailVerifiedAt: new Date(),
       },
       returnTo: "/dashboard",
+      onboardingRequired: false,
       session: { id: "17", token: "b".repeat(64) },
     });
     mockReadV2Cookie.mockResolvedValue("c".repeat(64));
@@ -165,6 +172,32 @@ describe("auth v2 explicit confirm bridge", () => {
     expect(mockClearPending).toHaveBeenCalled();
     expect(mockWriteLegacy).not.toHaveBeenCalled();
     expect(mockRedirect).toHaveBeenCalledWith("/dashboard");
+  });
+
+  test("sends an incomplete new account to onboarding from the default destination", async () => {
+    process.env.AUTH_PLATFORM_V2_ENABLED = "true";
+    process.env.AUTH_WORKSPACES_V2_ENABLED = "true";
+    process.env.AUTH_ONBOARDING_V2_ENABLED = "true";
+    mockReadV2Preview.mockResolvedValue({
+      maskedEmail: "n***w@e***e.com",
+      userId: "42",
+    });
+    mockConsumeV2.mockResolvedValue({
+      account: {
+        id: "42",
+        email: "new@example.com",
+        fullName: null,
+        emailVerifiedAt: new Date(),
+      },
+      returnTo: "/dashboard",
+      onboardingRequired: true,
+      session: { id: "17", token: "b".repeat(64) },
+    });
+
+    await confirmAccountLoginAction();
+
+    expect(mockWriteV2Cookie).toHaveBeenCalledWith("b".repeat(64));
+    expect(mockRedirect).toHaveBeenCalledWith("/onboarding");
   });
 
   test("accepts an outstanding legacy challenge after v2 rollout", async () => {
@@ -212,3 +245,8 @@ describe("auth v2 explicit confirm bridge", () => {
     expect(mockRedirect).toHaveBeenCalledWith("/login");
   });
 });
+
+function restoreEnv(name: string, value: string | undefined): void {
+  if (value === undefined) delete process.env[name];
+  else process.env[name] = value;
+}

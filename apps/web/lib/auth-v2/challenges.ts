@@ -29,6 +29,7 @@ export type AuthV2LoginRequestResult =
 
 export type AuthV2LoginConsumeResult = {
   account: AccountIdentity;
+  onboardingRequired: boolean;
   returnTo: string;
   session: {
     id: string;
@@ -233,17 +234,27 @@ export async function consumeAuthV2Login(input: {
       email: string | null;
       fullName: string | null;
       emailVerifiedAt: Date | null;
+      onboardingStatus: string | null;
       returnTo: string | null;
     }>(
       `SELECT
-         consumed,
-         user_id::TEXT AS "userId",
-         session_id::TEXT AS "sessionId",
-         email,
-         full_name AS "fullName",
-         email_verified_at AS "emailVerifiedAt",
-         return_to AS "returnTo"
-       FROM consume_auth_login_challenge($1, $2, $3, $4, $5)`,
+         consumed_result.consumed,
+         consumed_result.user_id::TEXT AS "userId",
+         consumed_result.session_id::TEXT AS "sessionId",
+         consumed_result.email,
+         consumed_result.full_name AS "fullName",
+         consumed_result.email_verified_at AS "emailVerifiedAt",
+         account.onboarding_status AS "onboardingStatus",
+         consumed_result.return_to AS "returnTo"
+       FROM consume_auth_login_challenge(
+         $1,
+         $2,
+         $3,
+         $4,
+         $5
+       ) AS consumed_result
+       LEFT JOIN users AS account
+         ON account.id = consumed_result.user_id`,
       [
         hashToken(token),
         hashToken(sessionToken),
@@ -272,6 +283,7 @@ export async function consumeAuthV2Login(input: {
         fullName: row.fullName,
         emailVerifiedAt: row.emailVerifiedAt,
       },
+      onboardingRequired: row.onboardingStatus !== "completed",
       returnTo: sanitizeAuthReturnTo(row.returnTo),
       session: {
         id: row.sessionId,

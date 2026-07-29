@@ -223,6 +223,7 @@ describe("auth v2 login challenge service", () => {
             email: "User@example.com",
             fullName: null,
             emailVerifiedAt: new Date("2026-07-28T12:00:00.000Z"),
+            onboardingStatus: "not_started",
             returnTo: "/checkout?plan=pilot-week",
           }],
           rowCount: 1,
@@ -250,6 +251,7 @@ describe("auth v2 login challenge service", () => {
         email: "User@example.com",
         fullName: null,
       },
+      onboardingRequired: true,
       returnTo: "/checkout?plan=pilot-week",
       session: { id: "73" },
     });
@@ -258,6 +260,7 @@ describe("auth v2 login challenge service", () => {
       String(sql).includes("consume_auth_login_challenge"),
     );
     expect(consumeCall?.[1]).toHaveLength(5);
+    expect(String(consumeCall?.[0])).toContain("account.onboarding_status");
     expect(consumeCall?.[1]?.[0]).toMatch(/^[a-f0-9]{64}$/);
     expect(consumeCall?.[1]?.[0]).not.toBe("a".repeat(64));
     expect(consumeCall?.[1]?.[1]).toMatch(/^[a-f0-9]{64}$/);

@@ -8,6 +8,7 @@ import {
 } from "@/lib/account-auth";
 import { readAuthV2LoginChallengeState } from "@/lib/auth-v2/challenges";
 import { isAuthPlatformV2EnabledForUser } from "@/lib/auth-v2/config";
+import { shouldWarnAuthAccountReplacement } from "@/lib/auth-v2/security";
 import { readOwnerSession } from "@/lib/session";
 import { AuthShell } from "../../login/auth-shell";
 import loginStyles from "../../login/login.module.css";
@@ -64,12 +65,9 @@ export default async function ConfirmAccountLoginPage() {
   const currentOwnerId = await readOwnerSession();
   const currentAccount = await getAccountById(currentOwnerId).catch(() => null);
   const active = challenge.status === "active";
-  const replacingAnotherAccount = Boolean(
+  const replacingAnotherAccount =
     active
-    && currentOwnerId
-    && challenge.userId
-    && currentOwnerId !== challenge.userId
-  );
+    && shouldWarnAuthAccountReplacement(currentOwnerId, challenge.userId);
 
   if (!active) {
     const copy = INACTIVE_COPY[challenge.status];
