@@ -105,23 +105,38 @@
   - `npm.cmd run test:auth-v2:account-team:e2e` covers explicit email-change
     confirmation, wrong-email invite rejection, bounded invite role, role-change
     session revocation, and audited ownership transfer in isolated browsers.
-- [ ] Complete PR 4 review/check/CI gate.
+- [x] Complete PR 4 review/check/CI gate.
   - PostgreSQL evidence: the disposable account/team runner applies all
     migrations, exercises real production core functions and deterministic
     outbox delivery, proves concurrent email/invite single-use behavior,
     role ceilings, immediate session revocation, ownership transfer and
     due-only ledger-preserving purge.
+  - Completed in PR #99; final independent security review found no confirmed
+    blockers, all local PostgreSQL/browser/project gates passed, and all 12
+    GitHub checks were green before merge to `codex/auth-platform-v2`.
 
 ## PR 5 — Passkeys
 
-- [ ] Review/pin WebAuthn dependency and provenance.
-- [ ] Add passkey schema and ceremony challenges.
-- [ ] Add registration flow.
-- [ ] Add discoverable/conditional login.
-- [ ] Add rename/remove/recovery guard.
-- [ ] Add email fallback UX.
-- [ ] Add virtual-authenticator and abuse tests.
-- [ ] Complete PR 5 review/check/CI gate.
+- [x] Review/pin WebAuthn dependency and provenance.
+- [x] Add passkey schema and ceremony challenges.
+- [x] Add registration flow.
+- [x] Add discoverable/conditional login.
+- [x] Add rename/remove/recovery guard.
+- [x] Add email fallback UX.
+- [x] Add virtual-authenticator and abuse tests.
+- [x] Complete PR 5 review/check/CI gate.
+  - Local evidence: exact origin/RP/UV/challenge/counter unit and route
+    tests, per-user abuse/cap controls, atomic prior-session replacement,
+    fresh PostgreSQL concurrency plus guarded rollback, and real Playwright
+    Chromium virtual-CTAP2 registration/login/email fallback all pass. The
+    independent exact-worktree re-review returned GO with no confirmed
+    blockers after its registration-cap, atomic-session, disposable-runner and
+    persistent-rate-limit findings were fixed.
+  - Completed in PR #100. On code SHA
+    `87d8894f40cd0fe05236295ed198ffc2dbdbaa88`, GitHub Actions runs
+    `30499183387` and `30499187402` completed all 12 checks successfully:
+    security audit, lint/application/test types, unit/PostgreSQL regressions,
+    production web build, Docker build, and landing Playwright.
 
 ## PR 6 — Integration/rollout
 

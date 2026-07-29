@@ -6,8 +6,13 @@ import { useActionState, useEffect, useState } from "react";
 import { getAuthWebmailUrl } from "@/lib/auth-v2/webmail";
 import { requestLoginAction, type LoginFormState } from "./actions";
 import styles from "./login.module.css";
+import { PasskeyLogin } from "./passkey-login";
 
-export default function LoginForm(props: { returnTo: string; initialEmail?: string }) {
+export default function LoginForm(props: {
+  returnTo: string;
+  initialEmail?: string;
+  passkeysAvailable?: boolean;
+}) {
   const [revision, setRevision] = useState(0);
   const [initialEmail, setInitialEmail] = useState(props.initialEmail ?? "");
 
@@ -21,6 +26,7 @@ export default function LoginForm(props: { returnTo: string; initialEmail?: stri
       key={revision}
       returnTo={props.returnTo}
       initialEmail={initialEmail}
+      passkeysAvailable={props.passkeysAvailable === true}
       onChooseAnotherEmail={chooseAnotherEmail}
     />
   );
@@ -29,6 +35,7 @@ export default function LoginForm(props: { returnTo: string; initialEmail?: stri
 function LoginFormFlow(props: {
   returnTo: string;
   initialEmail: string;
+  passkeysAvailable: boolean;
   onChooseAnotherEmail: () => void;
 }) {
   const [state, formAction, pending] = useActionState<LoginFormState, FormData>(requestLoginAction, null);
@@ -45,7 +52,11 @@ function LoginFormFlow(props: {
   }
 
   return (
-    <form action={formAction} className={styles.form}>
+    <div className={styles.loginMethods}>
+      {props.passkeysAvailable ? (
+        <PasskeyLogin returnTo={props.returnTo} />
+      ) : null}
+      <form action={formAction} className={styles.form}>
       <input type="hidden" name="returnTo" value={props.returnTo} />
       <label className={styles.field}>
         <span>Рабочий email</span>
@@ -54,7 +65,7 @@ function LoginFormFlow(props: {
           name="email"
           type="email"
           inputMode="email"
-          autoComplete="email"
+          autoComplete={props.passkeysAvailable ? "email webauthn" : "email"}
           defaultValue={props.initialEmail}
           placeholder="you@company.ru"
           maxLength={254}
@@ -69,7 +80,8 @@ function LoginFormFlow(props: {
         Продолжая, вы принимаете <Link href="/terms">условия использования</Link>
         {" "}и <Link href="/privacy">политику конфиденциальности</Link>.
       </p>
-    </form>
+      </form>
+    </div>
   );
 }
 

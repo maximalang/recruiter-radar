@@ -1,6 +1,8 @@
 import {
   getAuthV2Flags,
   isAuthOnboardingV2EnabledForUser,
+  isAuthPasskeyLoginAvailable,
+  isAuthPasskeysEnabledForUser,
   isAuthPlatformV2EnabledForUser,
   isAuthWorkspacesV2EnabledForUser,
   isAuthV2SessionReadEnabledForUser,
@@ -106,6 +108,26 @@ describe("auth v2 feature boundaries", () => {
     expect(isAuthOnboardingV2EnabledForUser("17", {
       ...env,
       AUTH_ONBOARDING_V2_ENABLED: "TRUE",
+    })).toBe(false);
+  });
+
+  test("keeps passkeys exact-flagged and scoped to an eligible user", () => {
+    const env = {
+      AUTH_PLATFORM_V2_ENABLED: "false",
+      AUTH_PASSKEYS_ENABLED: "true",
+      AUTH_V2_CANARY_USER_IDS: "17",
+    };
+
+    expect(isAuthPasskeysEnabledForUser("17", env)).toBe(true);
+    expect(isAuthPasskeysEnabledForUser("18", env)).toBe(false);
+    expect(isAuthPasskeyLoginAvailable(env)).toBe(true);
+    expect(isAuthPasskeyLoginAvailable({
+      ...env,
+      AUTH_V2_CANARY_USER_IDS: "17,*",
+    })).toBe(false);
+    expect(isAuthPasskeyLoginAvailable({
+      ...env,
+      AUTH_PASSKEYS_ENABLED: "TRUE",
     })).toBe(false);
   });
 });

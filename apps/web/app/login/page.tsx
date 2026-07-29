@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { getAccountById, sanitizeAccountReturnTo } from "@/lib/account-auth";
+import { isAuthPasskeyLoginAvailable } from "@/lib/auth-v2/config";
 import { readOwnerSession } from "@/lib/session";
 import { AuthShell } from "./auth-shell";
 import LoginForm from "./login-form";
@@ -43,7 +44,11 @@ export default async function LoginPage(props: {
       {query.loggedOut ? (
         <p className={styles.success} role="status">Вы вышли из аккаунта.</p>
       ) : null}
-      <LoginForm returnTo={returnTo} initialEmail={query.email} />
+      <LoginForm
+        returnTo={returnTo}
+        initialEmail={query.email}
+        passkeysAvailable={isAuthPasskeyLoginAvailable()}
+      />
       {account ? (
         <Link className={styles.back} href={returnTo}>
           Продолжить в кабинете →

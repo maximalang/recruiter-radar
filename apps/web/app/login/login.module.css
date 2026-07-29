@@ -184,6 +184,63 @@
   max-width: 440px;
 }
 
+.loginMethods,
+.passkeyLogin {
+  display: grid;
+  gap: 15px;
+  width: 100%;
+  max-width: 440px;
+}
+
+.passkeyButton {
+  min-height: 50px;
+  border: 1px solid #9b5c38;
+  border-radius: 11px;
+  background: #fffaf5;
+  color: #6f3f27;
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.passkeyButton:hover:not(:disabled) {
+  background: #fbf1e9;
+}
+
+.passkeyButton:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
+.passkeyButton:focus-visible {
+  outline: 3px solid rgba(182, 107, 61, 0.42);
+  outline-offset: 3px;
+}
+
+.passkeyMessage {
+  margin: 0;
+  color: #5c6675;
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.divider {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  color: #77736c;
+  font-size: 0.76rem;
+}
+
+.divider::before,
+.divider::after {
+  height: 1px;
+  background: #ddd6cc;
+  content: "";
+}
+
 .field {
   display: grid;
   gap: 8px;

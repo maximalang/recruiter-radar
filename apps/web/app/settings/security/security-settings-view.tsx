@@ -13,6 +13,10 @@ import {
   requestEmailChangeAction,
   revokeSessionAction,
 } from "./actions";
+import {
+  PasskeySettings,
+  type PasskeyView,
+} from "./passkey-settings";
 import styles from "./security-settings.module.css";
 
 export type SecuritySettingsStatus = {
@@ -87,6 +91,8 @@ export function SecuritySettingsView(props: {
   profile: AccountSecurityProfile;
   sessions: AuthSessionSummary[];
   status: SecuritySettingsStatus;
+  passkeys?: PasskeyView[];
+  passkeysEnabled?: boolean;
 }) {
   const notice = emailNotice(props.status.email);
   const sessionStatus = sessionNotice(props.status.sessions);
@@ -162,6 +168,10 @@ export function SecuritySettingsView(props: {
           </button>
         </form>
       </section>
+
+      {props.passkeysEnabled ? (
+        <PasskeySettings initialPasskeys={props.passkeys ?? []} />
+      ) : null}
 
       <section className={styles.card} aria-labelledby="active-sessions">
         <div className={styles.sectionHeading}>
