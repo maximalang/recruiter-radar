@@ -19,6 +19,7 @@ import { getClient, getPool } from "@/lib/db-pool";
 import { sendEmail } from "@/lib/email/transport";
 import {
   consumeAuthV2Login,
+  readAuthV2LoginChallengeState,
   requestAuthV2Login,
   shouldRequestAuthV2Login,
 } from "@/lib/auth-v2/challenges";
@@ -222,6 +223,7 @@ describe("auth v2 login challenge service", () => {
             email: "User@example.com",
             fullName: null,
             emailVerifiedAt: new Date("2026-07-28T12:00:00.000Z"),
+            onboardingStatus: "not_started",
             returnTo: "/checkout?plan=pilot-week",
           }],
           rowCount: 1,
@@ -249,6 +251,7 @@ describe("auth v2 login challenge service", () => {
         email: "User@example.com",
         fullName: null,
       },
+      onboardingRequired: true,
       returnTo: "/checkout?plan=pilot-week",
       session: { id: "73" },
     });
@@ -257,6 +260,7 @@ describe("auth v2 login challenge service", () => {
       String(sql).includes("consume_auth_login_challenge"),
     );
     expect(consumeCall?.[1]).toHaveLength(5);
+    expect(String(consumeCall?.[0])).toContain("account.onboarding_status");
     expect(consumeCall?.[1]?.[0]).toMatch(/^[a-f0-9]{64}$/);
     expect(consumeCall?.[1]?.[0]).not.toBe("a".repeat(64));
     expect(consumeCall?.[1]?.[1]).toMatch(/^[a-f0-9]{64}$/);
@@ -344,6 +348,61 @@ describe("auth v2 login challenge service", () => {
       restoreEnv("AUTH_PLATFORM_V2_ENABLED", previousPlatform);
       restoreEnv("AUTH_V2_CANARY_USER_IDS", previousCanary);
     }
+  });
+
+  test.each([
+    {
+      name: "active",
+      row: {
+        email: "owner@example.com",
+        userId: "42",
+        expiresAt: new Date("2026-07-29T12:15:00.000Z"),
+        consumedAt: null,
+        invalidatedAt: null,
+      },
+      expected: {
+        status: "active",
+        maskedEmail: "o***r@e***e.com",
+        userId: "42",
+      },
+    },
+    {
+      name: "expired",
+      row: {
+        email: "owner@example.com",
+        userId: "42",
+        expiresAt: new Date("2026-07-29T11:59:00.000Z"),
+        consumedAt: null,
+        invalidatedAt: null,
+      },
+      expected: { status: "expired", userId: "42" },
+    },
+    {
+      name: "used",
+      row: {
+        email: "owner@example.com",
+        userId: "42",
+        expiresAt: new Date("2026-07-29T12:15:00.000Z"),
+        consumedAt: new Date("2026-07-29T12:01:00.000Z"),
+        invalidatedAt: null,
+      },
+      expected: { status: "used", userId: "42" },
+    },
+  ])("reports a $name challenge without consuming it", async ({ row, expected }) => {
+    mockGetPool.mockReturnValue({
+      query: jest.fn().mockResolvedValue({ rows: [row], rowCount: 1 }),
+    } as never);
+
+    await expect(readAuthV2LoginChallengeState(
+      "e".repeat(64),
+      new Date("2026-07-29T12:00:00.000Z"),
+    )).resolves.toEqual(expected);
+  });
+
+  test("reports a malformed challenge separately", async () => {
+    await expect(readAuthV2LoginChallengeState("damaged"))
+      .resolves.toEqual({ status: "invalid", userId: null });
+    expect(mockGetPool).not.toHaveBeenCalled();
   });
 });
 

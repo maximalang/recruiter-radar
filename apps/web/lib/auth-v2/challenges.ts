@@ -8,6 +8,7 @@ import {
 import { getClient, getPool } from "../db-pool";
 import { sendEmail } from "../email/transport";
 import { logError, logWarn } from "../runtime";
+import { renderAuthEmail } from "./email-templates";
 import {
   getAuthV2Flags,
   isAuthPlatformV2EnabledForUser,
@@ -28,12 +29,24 @@ export type AuthV2LoginRequestResult =
 
 export type AuthV2LoginConsumeResult = {
   account: AccountIdentity;
+  onboardingRequired: boolean;
   returnTo: string;
   session: {
     id: string;
     token: string;
   };
 };
+
+export type AuthV2LoginChallengeState =
+  | {
+    status: "active";
+    maskedEmail: string;
+    userId: string | null;
+  }
+  | {
+    status: "expired" | "used" | "invalid";
+    userId: string | null;
+  };
 
 function authRateLimitSecret(): string {
   const secret = (
@@ -157,23 +170,14 @@ export async function requestAuthV2Login(input: {
   let sendStatus: "sent" | "failed" = "failed";
   try {
     const verifyUrl = buildAccountLoginUrl(token);
+    const message = renderAuthEmail({
+      template: "login_signup",
+      actionUrl: verifyUrl,
+      expiresInMinutes: LOGIN_TTL_MINUTES,
+    });
     const sent = await sendEmail({
+      ...message,
       to: email.canonical,
-      subject: "Вход в Recruiter Radar",
-      text: [
-        `Подтвердите вход: ${verifyUrl}`,
-        "",
-        `Ссылка действует ${LOGIN_TTL_MINUTES} минут.`,
-        "Если вы не запрашивали вход, просто проигнорируйте письмо.",
-      ].join("\n"),
-      html: [
-        '<div style="font-family:Inter,Arial,sans-serif;color:#0f172a;line-height:1.6">',
-        "<h2>Вход в Recruiter Radar</h2>",
-        "<p>Подтвердите рабочий email, чтобы войти или создать аккаунт.</p>",
-        `<p><a href="${verifyUrl}" style="display:inline-block;padding:12px 18px;border-radius:12px;background:#142d63;color:#fff;text-decoration:none;font-weight:700">Подтвердить вход</a></p>`,
-        `<p style="color:#667085">Ссылка действует ${LOGIN_TTL_MINUTES} минут. Если вы не запрашивали вход, проигнорируйте письмо.</p>`,
-        "</div>",
-      ].join(""),
     });
     sendStatus = sent.ok ? "sent" : "failed";
     if (!sent.ok) {
@@ -230,17 +234,27 @@ export async function consumeAuthV2Login(input: {
       email: string | null;
       fullName: string | null;
       emailVerifiedAt: Date | null;
+      onboardingStatus: string | null;
       returnTo: string | null;
     }>(
       `SELECT
-         consumed,
-         user_id::TEXT AS "userId",
-         session_id::TEXT AS "sessionId",
-         email,
-         full_name AS "fullName",
-         email_verified_at AS "emailVerifiedAt",
-         return_to AS "returnTo"
-       FROM consume_auth_login_challenge($1, $2, $3, $4, $5)`,
+         consumed_result.consumed,
+         consumed_result.user_id::TEXT AS "userId",
+         consumed_result.session_id::TEXT AS "sessionId",
+         consumed_result.email,
+         consumed_result.full_name AS "fullName",
+         consumed_result.email_verified_at AS "emailVerifiedAt",
+         account.onboarding_status AS "onboardingStatus",
+         consumed_result.return_to AS "returnTo"
+       FROM consume_auth_login_challenge(
+         $1,
+         $2,
+         $3,
+         $4,
+         $5
+       ) AS consumed_result
+       LEFT JOIN users AS account
+         ON account.id = consumed_result.user_id`,
       [
         hashToken(token),
         hashToken(sessionToken),
@@ -269,6 +283,7 @@ export async function consumeAuthV2Login(input: {
         fullName: row.fullName,
         emailVerifiedAt: row.emailVerifiedAt,
       },
+      onboardingRequired: row.onboardingStatus !== "completed",
       returnTo: sanitizeAuthReturnTo(row.returnTo),
       session: {
         id: row.sessionId,
@@ -314,30 +329,57 @@ export async function isAuthV2LoginChallengeActive(
 export async function readAuthV2LoginChallengePreview(
   token: string,
 ): Promise<{ maskedEmail: string; userId: string | null } | null> {
+  const state = await readAuthV2LoginChallengeState(token);
+  return state.status === "active"
+    ? { maskedEmail: state.maskedEmail, userId: state.userId }
+    : null;
+}
+
+export async function readAuthV2LoginChallengeState(
+  token: string,
+  now = new Date(),
+): Promise<AuthV2LoginChallengeState> {
   const normalized = token.trim();
-  if (!TOKEN_PATTERN.test(normalized)) return null;
+  if (!TOKEN_PATTERN.test(normalized) || !Number.isFinite(now.getTime())) {
+    return { status: "invalid", userId: null };
+  }
   const pool = getPool();
-  if (!pool) return null;
+  if (!pool) return { status: "invalid", userId: null };
   try {
-    const result = await pool.query<{ email: string; userId: string | null }>(
+    const result = await pool.query<{
+      email: string;
+      userId: string | null;
+      expiresAt: Date;
+      consumedAt: Date | null;
+      invalidatedAt: Date | null;
+    }>(
       `SELECT
          email_normalized AS email,
-         user_id::TEXT AS "userId"
+         user_id::TEXT AS "userId",
+         expires_at AS "expiresAt",
+         consumed_at AS "consumedAt",
+         invalidated_at AS "invalidatedAt"
        FROM auth_challenges
        WHERE token_hash = $1
          AND purpose IN ('login', 'signup')
-         AND consumed_at IS NULL
-         AND invalidated_at IS NULL
-         AND expires_at > NOW()
        LIMIT 1`,
       [hashToken(normalized)],
     );
     const row = result.rows[0];
-    return row
-      ? { maskedEmail: maskAuthEmail(row.email), userId: row.userId }
-      : null;
+    if (!row) return { status: "invalid", userId: null };
+    if (row.consumedAt || row.invalidatedAt) {
+      return { status: "used", userId: row.userId };
+    }
+    if (row.expiresAt.getTime() <= now.getTime()) {
+      return { status: "expired", userId: row.userId };
+    }
+    return {
+      status: "active",
+      maskedEmail: maskAuthEmail(row.email),
+      userId: row.userId,
+    };
   } catch (error) {
     logError("auth_v2.login_challenge_preview_failed", error);
-    return null;
+    return { status: "invalid", userId: null };
   }
 }

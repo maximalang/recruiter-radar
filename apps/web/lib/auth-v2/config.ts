@@ -83,6 +83,16 @@ export function isAuthWorkspacesV2EnabledForUser(
   );
 }
 
+export function isAuthOnboardingV2EnabledForUser(
+  userId: string | null | undefined,
+  env: AuthEnvironment = process.env,
+): boolean {
+  return (
+    enabled(env.AUTH_ONBOARDING_V2_ENABLED)
+    && isAuthWorkspacesV2EnabledForUser(userId, env)
+  );
+}
+
 export function getAuthWorkspacesV2RolloutPolicy(
   env: AuthEnvironment = process.env,
 ): AuthWorkspaceV2RolloutPolicy {

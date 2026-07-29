@@ -1,5 +1,6 @@
 import {
   getAuthV2Flags,
+  isAuthOnboardingV2EnabledForUser,
   isAuthPlatformV2EnabledForUser,
   isAuthWorkspacesV2EnabledForUser,
   isAuthV2SessionReadEnabledForUser,
@@ -11,6 +12,7 @@ import {
   normalizeAuthEmail,
   resolveAuthClientAddress,
   sanitizeAuthReturnTo,
+  shouldWarnAuthAccountReplacement,
 } from "@/lib/auth-v2/security";
 
 describe("auth v2 feature boundaries", () => {
@@ -90,6 +92,22 @@ describe("auth v2 feature boundaries", () => {
       AUTH_WORKSPACES_V2_ENABLED: "TRUE",
     })).toBe(false);
   });
+
+  test("scopes onboarding to an eligible workspace user and an exact flag", () => {
+    const env = {
+      AUTH_PLATFORM_V2_ENABLED: "false",
+      AUTH_WORKSPACES_V2_ENABLED: "true",
+      AUTH_ONBOARDING_V2_ENABLED: "true",
+      AUTH_V2_CANARY_USER_IDS: "17",
+    };
+
+    expect(isAuthOnboardingV2EnabledForUser("17", env)).toBe(true);
+    expect(isAuthOnboardingV2EnabledForUser("18", env)).toBe(false);
+    expect(isAuthOnboardingV2EnabledForUser("17", {
+      ...env,
+      AUTH_ONBOARDING_V2_ENABLED: "TRUE",
+    })).toBe(false);
+  });
 });
 
 describe("auth v2 request boundaries", () => {
@@ -159,6 +177,13 @@ describe("auth v2 request boundaries", () => {
       headers,
       env: {},
     })).toBe("192.0.2.5");
+  });
+
+  test("warns about session replacement for a different or not-yet-created account", () => {
+    expect(shouldWarnAuthAccountReplacement("42", "42")).toBe(false);
+    expect(shouldWarnAuthAccountReplacement("42", "73")).toBe(true);
+    expect(shouldWarnAuthAccountReplacement("42", null)).toBe(true);
+    expect(shouldWarnAuthAccountReplacement(null, "73")).toBe(false);
   });
 
   test("resolves a configured X-Forwarded-For chain from the trusted edge", () => {

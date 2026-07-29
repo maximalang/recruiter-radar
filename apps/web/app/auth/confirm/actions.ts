@@ -9,7 +9,10 @@ import {
   consumeAuthV2Login,
   readAuthV2LoginChallengePreview,
 } from "@/lib/auth-v2/challenges";
-import { isAuthPlatformV2EnabledForUser } from "@/lib/auth-v2/config";
+import {
+  isAuthOnboardingV2EnabledForUser,
+  isAuthPlatformV2EnabledForUser,
+} from "@/lib/auth-v2/config";
 import {
   readAuthV2SessionCookie,
   writeAuthV2SessionCookie,
@@ -72,7 +75,13 @@ export async function confirmAccountLoginAction(): Promise<never> {
       await writeAuthV2SessionCookie(result.session.token);
       await clearLegacyOwnerSession();
       await clearPendingAccountLogin();
-      return redirect(result.returnTo);
+      const destination =
+        result.onboardingRequired
+        && result.returnTo === "/dashboard"
+        && isAuthOnboardingV2EnabledForUser(result.account.id)
+          ? "/onboarding"
+          : result.returnTo;
+      return redirect(destination);
     }
   }
 
@@ -84,4 +93,13 @@ export async function confirmAccountLoginAction(): Promise<never> {
   await writeOwnerSession(legacyResult.account.id);
   await clearPendingAccountLogin();
   return redirect(legacyResult.returnTo);
+}
+
+export async function cancelAccountLoginAction(): Promise<never> {
+  const requestHeaders = await headers();
+  if (!isAuthSameOriginRequest({ headers: requestHeaders })) {
+    return redirect("/login?error=invalid-origin");
+  }
+  await clearPendingAccountLogin();
+  return redirect("/login");
 }

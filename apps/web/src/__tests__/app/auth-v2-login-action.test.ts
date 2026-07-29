@@ -66,6 +66,9 @@ describe("auth v2 login action rollout", () => {
 
     await expect(requestLoginAction(null, formData)).resolves.toEqual({
       ok: true,
+      email: "owner@example.com",
+      returnTo: "/dashboard",
+      requestedAt: expect.any(Number),
     });
 
     expect(mockLegacyRequest).toHaveBeenCalledWith(expect.objectContaining({
@@ -85,6 +88,9 @@ describe("auth v2 login action rollout", () => {
 
     await expect(requestLoginAction(null, formData)).resolves.toEqual({
       ok: true,
+      email: "owner@example.com",
+      returnTo: "/checkout?plan=pilot-week",
+      requestedAt: expect.any(Number),
     });
 
     expect(mockV2Request).toHaveBeenCalledWith({

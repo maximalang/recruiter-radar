@@ -4,6 +4,7 @@ import type { PoolClient } from "pg";
 import { getClient, getPool } from "./db-pool";
 import { sendEmail } from "./email/transport";
 import { logError, logEvent, logWarn } from "./runtime";
+import { renderAuthEmail } from "./auth-v2/email-templates";
 import { maskAuthEmail } from "./auth-v2/security";
 
 const ACCOUNT_PATHS = ["/dashboard", "/checkout", "/settings", "/profile", "/leads", "/review"];
@@ -159,11 +160,14 @@ export async function requestAccountLogin(input: {
   if (!token) return { ok: true };
   try {
     const verifyUrl = buildAccountLoginUrl(token);
+    const message = renderAuthEmail({
+      template: "login_signup",
+      actionUrl: verifyUrl,
+      expiresInMinutes: LOGIN_TTL_MINUTES,
+    });
     const sent = await sendEmail({
+      ...message,
       to: email,
-      subject: "Вход в Recruiter Radar",
-      text: `Подтвердите вход: ${verifyUrl}\n\nСсылка действует ${LOGIN_TTL_MINUTES} минут. Если вы не запрашивали вход, проигнорируйте письмо.`,
-      html: `<div style="font-family:Inter,Arial,sans-serif;color:#0f172a;line-height:1.6"><h2>Вход в Recruiter Radar</h2><p>Нажмите кнопку, чтобы подтвердить вход или создать аккаунт.</p><p><a href="${verifyUrl}" style="display:inline-block;padding:12px 18px;border-radius:12px;background:#142d63;color:#fff;text-decoration:none;font-weight:700">Подтвердить вход</a></p><p style="color:#667085">Ссылка действует ${LOGIN_TTL_MINUTES} минут. Если вы не запрашивали вход, проигнорируйте письмо.</p></div>`,
     });
     await getPool()?.query(
       "UPDATE account_login_challenges SET send_status = $2 WHERE token_hash = $1",
@@ -191,23 +195,54 @@ export async function isLoginChallengeActive(token: string): Promise<boolean> {
 export async function readLoginChallengePreview(
   token: string,
 ): Promise<{ maskedEmail: string; userId: string } | null> {
-  if (!TOKEN_PATTERN.test(token)) return null;
+  const state = await readLoginChallengeState(token);
+  return state.status === "active"
+    ? { maskedEmail: state.maskedEmail, userId: state.userId }
+    : null;
+}
+
+export type LoginChallengeState =
+  | { status: "active"; maskedEmail: string; userId: string }
+  | { status: "expired" | "used"; userId: string }
+  | { status: "invalid"; userId: null };
+
+export async function readLoginChallengeState(
+  token: string,
+  now = new Date(),
+): Promise<LoginChallengeState> {
+  if (!TOKEN_PATTERN.test(token) || !Number.isFinite(now.getTime())) {
+    return { status: "invalid", userId: null };
+  }
   const pool = getPool();
-  if (!pool) return null;
-  const result = await pool.query<{ email: string; userId: string }>(
-    `SELECT account.email, account.id::TEXT AS "userId"
+  if (!pool) return { status: "invalid", userId: null };
+  const result = await pool.query<{
+    email: string;
+    userId: string;
+    expiresAt: Date;
+    consumedAt: Date | null;
+  }>(
+    `SELECT
+       account.email,
+       account.id::TEXT AS "userId",
+       challenge.expires_at AS "expiresAt",
+       challenge.consumed_at AS "consumedAt"
      FROM account_login_challenges AS challenge
      JOIN users AS account ON account.id = challenge.user_id
      WHERE challenge.token_hash = $1
-       AND challenge.consumed_at IS NULL
-       AND challenge.expires_at > NOW()
      LIMIT 1`,
     [hashToken(token)],
   );
   const row = result.rows[0];
-  return row
-    ? { maskedEmail: maskAuthEmail(row.email), userId: row.userId }
-    : null;
+  if (!row) return { status: "invalid", userId: null };
+  if (row.consumedAt) return { status: "used", userId: row.userId };
+  if (row.expiresAt.getTime() <= now.getTime()) {
+    return { status: "expired", userId: row.userId };
+  }
+  return {
+    status: "active",
+    maskedEmail: maskAuthEmail(row.email),
+    userId: row.userId,
+  };
 }
 
 export async function consumeAccountLogin(token: string): Promise<{ account: AccountIdentity; returnTo: string } | null> {
