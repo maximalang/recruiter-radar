@@ -54,6 +54,43 @@ describe("auth v2 account and team operational contracts", () => {
       "node packages/db/scripts/purge-auth-v2-accounts.mjs",
     );
   });
+
+  test("browser gate uses a disposable database and deterministic outbox for responsive account/team flows", async () => {
+    const runner = await readProjectFile(
+      "packages/db/scripts/run-auth-v2-account-team-e2e.mjs",
+    );
+    const nextConfig = await readProjectFile("apps/web/next.config.ts");
+    const packageJson = JSON.parse(
+      await readProjectFile("package.json"),
+    ) as { scripts?: Record<string, string> };
+
+    expect(runner).toContain("auth_v2_e2e_account_team_");
+    expect(runner).toContain("CREATE DATABASE");
+    expect(runner).toContain("DROP DATABASE IF EXISTS");
+    expect(runner).toContain("AUTH_EMAIL_TRANSPORT");
+    expect(runner).toContain("AUTH_V2_E2E_DIST_DIR");
+    expect(runner).toContain("AUTH_V2_E2E_TSCONFIG");
+    expect(runner).toContain("--experimental-https");
+    expect(runner).toContain("ignoreHTTPSErrors: true");
+    expect(nextConfig).toContain("AUTH_V2_E2E_DIST_DIR");
+    expect(nextConfig).toContain("AUTH_V2_E2E_TSCONFIG");
+    expect(nextConfig).toContain(".next-auth-v2-e2e-");
+    expect(nextConfig).toContain("devIndicators:");
+    expect(runner).toContain("chromium.launch");
+    expect(runner).toContain("width: 390");
+    expect(runner).toContain("width: 1440");
+    expect(runner).toContain("consoleFindings");
+    expect(runner).toContain("document.documentElement.scrollWidth");
+    expect(runner).toContain("ariaSnapshot");
+    expect(runner).toContain("/settings/security");
+    expect(runner).toContain("/settings/team");
+    expect(runner).toContain("/auth/invite#");
+    expect(runner).toContain("/auth/change-email#");
+    expect(runner).toContain("email_mismatch");
+    expect(packageJson.scripts?.["test:auth-v2:account-team:e2e"]).toBe(
+      "node packages/db/scripts/run-auth-v2-account-team-e2e.mjs",
+    );
+  });
 });
 
 async function readProjectFile(pathname: string): Promise<string> {
