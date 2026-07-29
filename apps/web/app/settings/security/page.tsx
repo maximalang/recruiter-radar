@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { getAccountSecurityProfile } from "@/lib/auth-v2/account-security";
+import { isAuthPasskeysEnabledForUser } from "@/lib/auth-v2/config";
 import { readCurrentAuthSession } from "@/lib/auth-v2/current-session";
+import { listUserPasskeys } from "@/lib/auth-v2/passkeys";
 import { listAuthSessions } from "@/lib/auth-v2/sessions";
 import { buildAccountNavigation } from "../../ui/account-navigation";
 import {
@@ -35,7 +37,8 @@ export default async function SecuritySettingsPage(props: {
     redirect("/login?returnTo=/settings/security");
   }
 
-  const [profile, sessions, searchParams] = await Promise.all([
+  const passkeysEnabled = isAuthPasskeysEnabledForUser(session.userId);
+  const [profile, sessions, passkeys, searchParams] = await Promise.all([
     getAccountSecurityProfile({
       userId: session.userId,
       workspaceId: session.workspaceId,
@@ -44,6 +47,7 @@ export default async function SecuritySettingsPage(props: {
       userId: session.userId,
       currentSessionId: session.id,
     }),
+    passkeysEnabled ? listUserPasskeys(session.userId) : Promise.resolve([]),
     props.searchParams,
   ]);
 
@@ -85,6 +89,12 @@ export default async function SecuritySettingsPage(props: {
       <SecuritySettingsView
         profile={profile}
         sessions={sessions}
+        passkeysEnabled={passkeysEnabled}
+        passkeys={passkeys.map((passkey) => ({
+          ...passkey,
+          createdAt: passkey.createdAt.toISOString(),
+          lastUsedAt: passkey.lastUsedAt?.toISOString() ?? null,
+        }))}
         status={status}
       />
     </InternalPageFrame>

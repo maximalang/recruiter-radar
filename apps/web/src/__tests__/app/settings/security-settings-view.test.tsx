@@ -36,6 +36,19 @@ const sessions = [
   },
 ] as const;
 
+const passkeys = [
+  {
+    id: "99",
+    name: "YubiKey 5",
+    deviceType: "multiDevice",
+    backedUp: true,
+    backupEligible: true,
+    transports: ["usb", "internal"],
+    createdAt: "2026-07-27T10:00:00.000Z",
+    lastUsedAt: "2026-07-29T10:00:00.000Z",
+  },
+] as const;
+
 describe("account security settings view", () => {
   test("shows profile and privacy-safe session labels without network identifiers", () => {
     const html = renderToStaticMarkup(
@@ -79,6 +92,28 @@ describe("account security settings view", () => {
 
     expect(html).toContain("Текущая");
     expect(html).not.toContain('name="sessionId"');
+  });
+
+  test("shows optional passkey management with an explicit verified-email recovery path", () => {
+    const html = renderToStaticMarkup(
+      <SecuritySettingsView
+        profile={profile}
+        sessions={[...sessions]}
+        passkeysEnabled
+        passkeys={[...passkeys]}
+        status={{}}
+      />,
+    );
+
+    expect(html).toContain('aria-labelledby="passkey-settings"');
+    expect(html).toContain("Ключи доступа");
+    expect(html).toContain("подтверждённый email остаётся");
+    expect(html).toContain('value="YubiKey 5"');
+    expect(html).toContain("Синхронизируемый ключ");
+    expect(html).toContain("резервная копия включена");
+    expect(html).toContain("Последний вход:");
+    expect(html).toContain("Сохранить");
+    expect(html).toContain("Удалить");
   });
 
   test("explains the legacy workspace-data deletion boundary", () => {
