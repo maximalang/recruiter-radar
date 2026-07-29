@@ -21,6 +21,7 @@ import {
   readAuthSession,
   revokeAuthSessionById,
 } from "@/lib/auth-v2/sessions";
+import { classifyAuthSessionEnvironment } from "@/lib/auth-v2/session-environment";
 import {
   isAuthSameOriginRequest,
   resolveAuthClientAddress,
@@ -60,6 +61,9 @@ export async function confirmAccountLoginAction(): Promise<never> {
       token,
       clientAddress,
       legacyToken,
+      sessionEnvironment: classifyAuthSessionEnvironment(
+        requestHeaders.get("user-agent"),
+      ),
     });
     if (result) {
       if (

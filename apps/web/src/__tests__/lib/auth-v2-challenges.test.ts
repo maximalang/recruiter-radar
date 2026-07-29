@@ -243,6 +243,11 @@ describe("auth v2 login challenge service", () => {
       token: "a".repeat(64),
       clientAddress: "192.0.2.10",
       legacyToken,
+      sessionEnvironment: {
+        deviceLabel: "Компьютер",
+        browserLabel: "Chrome",
+        environmentLabel: "Windows",
+      },
     });
 
     expect(result).toMatchObject({
@@ -270,6 +275,17 @@ describe("auth v2 login challenge service", () => {
     expect(consumeCall?.[1]?.[4]).toMatch(/^[a-f0-9]{64}$/);
     expect(consumeCall?.[1]?.[4]).not.toBe(legacyToken);
     expect(consumeCall?.[1]).not.toContain("192.0.2.10");
+    const environmentCall = query.mock.calls.find(([sql]) =>
+      String(sql).includes("SET device_label"),
+    );
+    expect(environmentCall?.[1]).toEqual([
+      "73",
+      "42",
+      "Компьютер",
+      "Chrome",
+      "Windows",
+    ]);
+    expect(environmentCall?.[1]).not.toContain(expect.stringContaining("Mozilla"));
     expect(client.release).toHaveBeenCalled();
   });
 

@@ -101,6 +101,7 @@ describe("auth v2 explicit confirm bridge", () => {
     mockHeaders.mockResolvedValue(new Headers({
       Origin: "https://radar.example",
       "Sec-Fetch-Site": "same-origin",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0) Chrome/126.0.0.0 Safari/537.36",
     }) as never);
     mockReadPending.mockResolvedValue("a".repeat(64));
     mockClearPending.mockResolvedValue(undefined);
@@ -161,6 +162,11 @@ describe("auth v2 explicit confirm bridge", () => {
       token: "a".repeat(64),
       clientAddress: "unknown",
       legacyToken,
+      sessionEnvironment: {
+        deviceLabel: "Компьютер",
+        browserLabel: "Chrome",
+        environmentLabel: "Windows",
+      },
     });
     expect(mockRevokeV2).toHaveBeenCalledWith({
       userId: "8",

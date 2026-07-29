@@ -188,6 +188,8 @@ function mapSession(
     workspaceId: row.workspaceId,
     authMethod: row.authMethod,
     deviceLabel: row.deviceLabel,
+    browserLabel: null,
+    environmentLabel: null,
     createdAt: row.createdAt,
     lastSeenAt: row.lastSeenAt,
     idleExpiresAt: row.idleExpiresAt,

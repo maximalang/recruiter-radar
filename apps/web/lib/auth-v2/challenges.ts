@@ -19,6 +19,10 @@ import {
   sanitizeAuthReturnTo,
 } from "./security";
 import { fingerprintLegacyOwnerSession } from "./legacy-session";
+import {
+  isAuthSessionEnvironment,
+  type AuthSessionEnvironment,
+} from "./session-environment";
 
 const LOGIN_TTL_MINUTES = 15;
 const TOKEN_PATTERN = /^[a-f0-9]{64}$/;
@@ -205,9 +209,19 @@ export async function consumeAuthV2Login(input: {
   token: string;
   clientAddress: string;
   legacyToken?: string | null;
+  sessionEnvironment?: AuthSessionEnvironment | null;
 }): Promise<AuthV2LoginConsumeResult | null> {
   const token = input.token.trim();
-  if (!TOKEN_PATTERN.test(token)) return null;
+  if (
+    !TOKEN_PATTERN.test(token)
+    || (
+      input.sessionEnvironment !== null
+      && input.sessionEnvironment !== undefined
+      && !isAuthSessionEnvironment(input.sessionEnvironment)
+    )
+  ) {
+    return null;
+  }
 
   let sessionToken: string | null = null;
   let client: PoolClient | null = null;
@@ -273,6 +287,24 @@ export async function consumeAuthV2Login(input: {
     ) {
       await client.query("COMMIT");
       return null;
+    }
+
+    if (input.sessionEnvironment) {
+      await client.query(
+        `UPDATE auth_sessions
+         SET device_label = $3,
+             browser_label = $4,
+             environment_label = $5
+         WHERE id = $1
+           AND user_id = $2`,
+        [
+          row.sessionId,
+          row.userId,
+          input.sessionEnvironment.deviceLabel,
+          input.sessionEnvironment.browserLabel,
+          input.sessionEnvironment.environmentLabel,
+        ],
+      );
     }
 
     await client.query("COMMIT");

@@ -45,6 +45,8 @@ function sessionRow(overrides: Record<string, unknown> = {}) {
     workspaceId: "9",
     authMethod: "magic_link",
     deviceLabel: null,
+    browserLabel: null,
+    environmentLabel: null,
     createdAt: new Date("2026-07-01T00:00:00.000Z"),
     lastSeenAt: new Date("2026-07-28T11:45:00.000Z"),
     idleExpiresAt: new Date("2026-08-11T12:00:00.000Z"),
