@@ -54,7 +54,13 @@ immediately even when retention postpones identity purge.
 Database guards serialize owner-scoped profile and delivery writes with the
 account, membership and workspace rows. A write authorized before deletion
 cannot wait for the deletion transaction and then restore profile, endpoint or
-provider state.
+provider state. Every guarded statement takes a shared transaction advisory
+fence; deletion takes the matching exclusive fence before its row locks.
+Ordinary writes remain concurrent, while deletion briefly pauses new guarded
+writes and returns unavailable after a five-second lock wait rather than
+deadlocking. For compatibility rows with `workspace_id=NULL`, the row guard
+resolves and locks the existing bootstrap workspace context without rewriting
+the retained legacy row.
 
 ## Safe operation
 

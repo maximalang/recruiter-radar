@@ -84,8 +84,13 @@ describe("auth v2 account security and team migration", () => {
   test("serializes owner-scoped writes with account deletion", () => {
     const sql = readFileSync(activeOwnerGuardPath, "utf8");
     const rollback = readFileSync(activeOwnerGuardRollbackPath, "utf8");
+    const normalizedSql = sql.toLowerCase();
 
     expect(sql).toContain("CREATE FUNCTION auth_require_active_owner_write");
+    expect(sql).toContain("CREATE FUNCTION auth_lock_owner_writes");
+    expect(normalizedSql).toContain("pg_advisory_xact_lock_shared");
+    expect(sql).toContain("FOR EACH STATEMENT");
+    expect(sql).toContain("auth_workspace_resolve_user");
     expect(sql).toContain("account.status = 'active'");
     expect(sql).toContain("FOR KEY SHARE OF account");
     expect(sql).toContain("ON client_profiles");
@@ -97,5 +102,6 @@ describe("auth v2 account security and team migration", () => {
     expect(rollback).toContain(
       "DROP FUNCTION auth_require_active_owner_write",
     );
+    expect(rollback).toContain("DROP FUNCTION auth_lock_owner_writes");
   });
 });

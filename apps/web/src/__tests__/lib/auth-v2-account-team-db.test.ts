@@ -859,6 +859,111 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
     }
   });
 
+  test("a deletion that starts first fences later owner writes without a deadlock", async () => {
+    const account = await createFixture("delete-first-race");
+    const delivery = await createDeliveryFixture(account);
+    const workspaceBlocker = await pool!.connect();
+    await workspaceBlocker.query("BEGIN");
+    try {
+      await workspaceBlocker.query(
+        "SELECT id FROM workspaces WHERE id = $1 FOR UPDATE",
+        [account.workspaceId],
+      );
+      const deletion = requestAccountDeletion({
+        session: account.session,
+        confirmation: ACCOUNT_DELETION_CONFIRMATION,
+      });
+      await expect(Promise.race([
+        deletion.then(() => "resolved"),
+        delay(100).then(() => "blocked"),
+      ])).resolves.toBe("blocked");
+
+      const writerOutcome = pool!.query(
+        `UPDATE client_profiles
+         SET is_active = TRUE,
+             delivery_enabled = TRUE
+         WHERE id = $1`,
+        [delivery.profileId],
+      ).then(
+        (result) => ({ ok: true as const, result }),
+        (error: unknown) => ({ ok: false as const, error }),
+      );
+      await expect(Promise.race([
+        writerOutcome.then(() => "resolved"),
+        delay(100).then(() => "blocked"),
+      ])).resolves.toBe("blocked");
+
+      await workspaceBlocker.query("COMMIT");
+      await expect(deletion).resolves.toEqual({ ok: true });
+      await expect(writerOutcome).resolves.toMatchObject({
+        ok: false,
+        error: { code: "42501" },
+      });
+    } finally {
+      await workspaceBlocker.query("ROLLBACK").catch(() => undefined);
+      workspaceBlocker.release();
+    }
+  });
+
+  test("guarded child writes remain compatible with a legacy null workspace profile", async () => {
+    const account = await createFixture("legacy-null-write");
+    const delivery = await createDeliveryFixture(account);
+    const legacySeeder = await pool!.connect();
+    try {
+      await legacySeeder.query("BEGIN");
+      await legacySeeder.query(
+        "ALTER TABLE notification_provider_accounts DISABLE TRIGGER notification_provider_accounts_assign_workspace",
+      );
+      await legacySeeder.query(
+        "ALTER TABLE notification_provider_accounts DISABLE TRIGGER notification_provider_accounts_require_active_owner",
+      );
+      await legacySeeder.query(
+        "ALTER TABLE client_profiles DISABLE TRIGGER client_profiles_assign_workspace",
+      );
+      await legacySeeder.query(
+        "ALTER TABLE client_profiles DISABLE TRIGGER client_profiles_require_active_owner",
+      );
+      await legacySeeder.query(
+        "UPDATE notification_provider_accounts SET workspace_id = NULL WHERE id = $1",
+        [delivery.providerId],
+      );
+      await legacySeeder.query(
+        "UPDATE client_profiles SET workspace_id = NULL WHERE id = $1",
+        [delivery.profileId],
+      );
+      await legacySeeder.query(
+        "ALTER TABLE client_profiles ENABLE TRIGGER client_profiles_require_active_owner",
+      );
+      await legacySeeder.query(
+        "ALTER TABLE client_profiles ENABLE TRIGGER client_profiles_assign_workspace",
+      );
+      await legacySeeder.query(
+        "ALTER TABLE notification_provider_accounts ENABLE TRIGGER notification_provider_accounts_require_active_owner",
+      );
+      await legacySeeder.query(
+        "ALTER TABLE notification_provider_accounts ENABLE TRIGGER notification_provider_accounts_assign_workspace",
+      );
+      await legacySeeder.query("COMMIT");
+    } finally {
+      await legacySeeder.query("ROLLBACK").catch(() => undefined);
+      legacySeeder.release();
+    }
+
+    await expect(pool!.query(
+      `UPDATE notification_endpoints
+       SET destination_label = 'legacy-compatible'
+       WHERE id = $1`,
+      [delivery.endpointId],
+    )).resolves.toMatchObject({ rowCount: 1 });
+    const legacyProfile = await pool!.query<{ workspaceId: string | null }>(
+      `SELECT workspace_id::TEXT AS "workspaceId"
+       FROM client_profiles
+       WHERE id = $1`,
+      [delivery.profileId],
+    );
+    expect(legacyProfile.rows[0]?.workspaceId).toBeNull();
+  });
+
   test("rollback refuses live security history and succeeds after disposable fixtures are cleared", async () => {
     const sql = await readFile(downMigration, "utf8");
     const activeOwnerGuardDownSql = await readFile(
@@ -962,7 +1067,7 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
 
   async function createDeliveryFixture(
     account: Fixture,
-  ): Promise<{ profileId: string; endpointId: string }> {
+  ): Promise<{ profileId: string; endpointId: string; providerId: string }> {
     const profile = await pool!.query<{ id: string }>(
       `INSERT INTO client_profiles (
          owner_id,
@@ -1080,7 +1185,11 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
         `account-delete-${profileId}`,
       ],
     );
-    return { profileId, endpointId: endpoint.rows[0]!.id };
+    return {
+      profileId,
+      endpointId: endpoint.rows[0]!.id,
+      providerId: provider.rows[0]!.id,
+    };
   }
 
   function uniqueEmail(prefix: string): string {

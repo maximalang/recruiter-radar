@@ -876,6 +876,13 @@ PR 4 implementation invariants:
   active-membership and active-workspace database lock. A writer authorized
   before deletion either commits before deletion cleanup or waits and fails
   closed; it cannot reactivate delivery afterward;
+- guarded write statements first take a shared transaction fence, while
+  account deletion takes the matching exclusive fence before account and
+  workspace locks. Ordinary writers remain concurrent; the rare deletion
+  transaction briefly pauses new guarded writes and fails after a five-second
+  lock timeout instead of deadlocking. Legacy child rows whose profile still
+  has `workspace_id=NULL` resolve the existing bootstrap workspace for the
+  active-context check without rewriting that compatibility row;
 - automatic purge is disabled when `AUTH_ACCOUNT_PURGE_AFTER_DAYS` is absent.
   When configured, only an integer from 1 through 3650 is accepted. The policy
   name is recorded from `AUTH_ACCOUNT_RETENTION_POLICY_KEY`, defaulting to

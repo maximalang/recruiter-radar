@@ -372,6 +372,10 @@ describe("auth v2 account security", () => {
     expect(allSql).toContain("telegram_chat_id = NULL");
     expect(allSql).toContain("UPDATE auth_sessions");
     expect(allSql).toContain("'account_deletion_requested'");
+    expect(allSql).toContain("SET LOCAL lock_timeout = '5s'");
+    expect(query.mock.calls.some(([_sql, values]) =>
+      values?.includes("auth-owner-scoped-writes"),
+    )).toBe(true);
     expect(allSql).toContain("profile.workspace_id IS NULL");
     expect(allSql).toContain("subscription.workspace_id IS NULL");
   });
