@@ -30,7 +30,10 @@ jest.mock("@/lib/session", () => ({
   writeOwnerSession: jest.fn(),
 }));
 
-import { confirmAccountLoginAction } from "@/app/auth/confirm/actions";
+import {
+  cancelAccountLoginAction,
+  confirmAccountLoginAction,
+} from "@/app/auth/confirm/actions";
 import {
   clearPendingAccountLogin,
   readPendingAccountLogin,
@@ -198,5 +201,14 @@ describe("auth v2 explicit confirm bridge", () => {
     expect(mockConsumeV2).not.toHaveBeenCalled();
     expect(mockConsumeLegacy).not.toHaveBeenCalled();
     expect(mockRedirect).toHaveBeenCalledWith("/login?error=invalid-origin");
+  });
+
+  test("cancels without consuming and clears the pending token", async () => {
+    await cancelAccountLoginAction();
+
+    expect(mockConsumeV2).not.toHaveBeenCalled();
+    expect(mockConsumeLegacy).not.toHaveBeenCalled();
+    expect(mockClearPending).toHaveBeenCalled();
+    expect(mockRedirect).toHaveBeenCalledWith("/login");
   });
 });

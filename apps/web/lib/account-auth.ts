@@ -195,23 +195,54 @@ export async function isLoginChallengeActive(token: string): Promise<boolean> {
 export async function readLoginChallengePreview(
   token: string,
 ): Promise<{ maskedEmail: string; userId: string } | null> {
-  if (!TOKEN_PATTERN.test(token)) return null;
+  const state = await readLoginChallengeState(token);
+  return state.status === "active"
+    ? { maskedEmail: state.maskedEmail, userId: state.userId }
+    : null;
+}
+
+export type LoginChallengeState =
+  | { status: "active"; maskedEmail: string; userId: string }
+  | { status: "expired" | "used"; userId: string }
+  | { status: "invalid"; userId: null };
+
+export async function readLoginChallengeState(
+  token: string,
+  now = new Date(),
+): Promise<LoginChallengeState> {
+  if (!TOKEN_PATTERN.test(token) || !Number.isFinite(now.getTime())) {
+    return { status: "invalid", userId: null };
+  }
   const pool = getPool();
-  if (!pool) return null;
-  const result = await pool.query<{ email: string; userId: string }>(
-    `SELECT account.email, account.id::TEXT AS "userId"
+  if (!pool) return { status: "invalid", userId: null };
+  const result = await pool.query<{
+    email: string;
+    userId: string;
+    expiresAt: Date;
+    consumedAt: Date | null;
+  }>(
+    `SELECT
+       account.email,
+       account.id::TEXT AS "userId",
+       challenge.expires_at AS "expiresAt",
+       challenge.consumed_at AS "consumedAt"
      FROM account_login_challenges AS challenge
      JOIN users AS account ON account.id = challenge.user_id
      WHERE challenge.token_hash = $1
-       AND challenge.consumed_at IS NULL
-       AND challenge.expires_at > NOW()
      LIMIT 1`,
     [hashToken(token)],
   );
   const row = result.rows[0];
-  return row
-    ? { maskedEmail: maskAuthEmail(row.email), userId: row.userId }
-    : null;
+  if (!row) return { status: "invalid", userId: null };
+  if (row.consumedAt) return { status: "used", userId: row.userId };
+  if (row.expiresAt.getTime() <= now.getTime()) {
+    return { status: "expired", userId: row.userId };
+  }
+  return {
+    status: "active",
+    maskedEmail: maskAuthEmail(row.email),
+    userId: row.userId,
+  };
 }
 
 export async function consumeAccountLogin(token: string): Promise<{ account: AccountIdentity; returnTo: string } | null> {

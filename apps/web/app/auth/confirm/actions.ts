@@ -85,3 +85,12 @@ export async function confirmAccountLoginAction(): Promise<never> {
   await clearPendingAccountLogin();
   return redirect(legacyResult.returnTo);
 }
+
+export async function cancelAccountLoginAction(): Promise<never> {
+  const requestHeaders = await headers();
+  if (!isAuthSameOriginRequest({ headers: requestHeaders })) {
+    return redirect("/login?error=invalid-origin");
+  }
+  await clearPendingAccountLogin();
+  return redirect("/login");
+}

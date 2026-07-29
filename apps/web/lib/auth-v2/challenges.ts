@@ -36,6 +36,17 @@ export type AuthV2LoginConsumeResult = {
   };
 };
 
+export type AuthV2LoginChallengeState =
+  | {
+    status: "active";
+    maskedEmail: string;
+    userId: string | null;
+  }
+  | {
+    status: "expired" | "used" | "invalid";
+    userId: string | null;
+  };
+
 function authRateLimitSecret(): string {
   const secret = (
     process.env.AUTH_RATE_LIMIT_SECRET
@@ -306,30 +317,57 @@ export async function isAuthV2LoginChallengeActive(
 export async function readAuthV2LoginChallengePreview(
   token: string,
 ): Promise<{ maskedEmail: string; userId: string | null } | null> {
+  const state = await readAuthV2LoginChallengeState(token);
+  return state.status === "active"
+    ? { maskedEmail: state.maskedEmail, userId: state.userId }
+    : null;
+}
+
+export async function readAuthV2LoginChallengeState(
+  token: string,
+  now = new Date(),
+): Promise<AuthV2LoginChallengeState> {
   const normalized = token.trim();
-  if (!TOKEN_PATTERN.test(normalized)) return null;
+  if (!TOKEN_PATTERN.test(normalized) || !Number.isFinite(now.getTime())) {
+    return { status: "invalid", userId: null };
+  }
   const pool = getPool();
-  if (!pool) return null;
+  if (!pool) return { status: "invalid", userId: null };
   try {
-    const result = await pool.query<{ email: string; userId: string | null }>(
+    const result = await pool.query<{
+      email: string;
+      userId: string | null;
+      expiresAt: Date;
+      consumedAt: Date | null;
+      invalidatedAt: Date | null;
+    }>(
       `SELECT
          email_normalized AS email,
-         user_id::TEXT AS "userId"
+         user_id::TEXT AS "userId",
+         expires_at AS "expiresAt",
+         consumed_at AS "consumedAt",
+         invalidated_at AS "invalidatedAt"
        FROM auth_challenges
        WHERE token_hash = $1
          AND purpose IN ('login', 'signup')
-         AND consumed_at IS NULL
-         AND invalidated_at IS NULL
-         AND expires_at > NOW()
        LIMIT 1`,
       [hashToken(normalized)],
     );
     const row = result.rows[0];
-    return row
-      ? { maskedEmail: maskAuthEmail(row.email), userId: row.userId }
-      : null;
+    if (!row) return { status: "invalid", userId: null };
+    if (row.consumedAt || row.invalidatedAt) {
+      return { status: "used", userId: row.userId };
+    }
+    if (row.expiresAt.getTime() <= now.getTime()) {
+      return { status: "expired", userId: row.userId };
+    }
+    return {
+      status: "active",
+      maskedEmail: maskAuthEmail(row.email),
+      userId: row.userId,
+    };
   } catch (error) {
     logError("auth_v2.login_challenge_preview_failed", error);
-    return null;
+    return { status: "invalid", userId: null };
   }
 }
