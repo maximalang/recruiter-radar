@@ -101,7 +101,10 @@
 - [x] Add membership role/remove actions.
 - [x] Add safe ownership transfer.
 - [x] Add security emails and audit events.
-- [ ] Add takeover/escalation/invite E2E.
+- [x] Add takeover/escalation/invite E2E.
+  - `npm.cmd run test:auth-v2:account-team:e2e` covers explicit email-change
+    confirmation, wrong-email invite rejection, bounded invite role, role-change
+    session revocation, and audited ownership transfer in isolated browsers.
 - [ ] Complete PR 4 review/check/CI gate.
   - PostgreSQL evidence: the disposable account/team runner applies all
     migrations, exercises real production core functions and deterministic
