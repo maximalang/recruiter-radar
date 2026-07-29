@@ -1,5 +1,6 @@
 jest.mock("@/lib/auth-v2/config", () => ({
   isAuthPlatformV2EnabledForUser: jest.fn(),
+  isAuthWorkspacesV2EnabledForUser: jest.fn(),
 }));
 jest.mock("@/lib/auth-v2/session-cookie", () => ({
   readAuthV2SessionCookie: jest.fn(),
@@ -8,7 +9,10 @@ jest.mock("@/lib/auth-v2/sessions", () => ({
   readAuthSession: jest.fn(),
 }));
 
-import { isAuthPlatformV2EnabledForUser } from "@/lib/auth-v2/config";
+import {
+  isAuthPlatformV2EnabledForUser,
+  isAuthWorkspacesV2EnabledForUser,
+} from "@/lib/auth-v2/config";
 import { readCurrentAuthSession } from "@/lib/auth-v2/current-session";
 import { readAuthV2SessionCookie } from "@/lib/auth-v2/session-cookie";
 import {
@@ -17,6 +21,7 @@ import {
 } from "@/lib/auth-v2/sessions";
 
 const mockEnabled = jest.mocked(isAuthPlatformV2EnabledForUser);
+const mockWorkspacesEnabled = jest.mocked(isAuthWorkspacesV2EnabledForUser);
 const mockReadCookie = jest.mocked(readAuthV2SessionCookie);
 const mockReadSession = jest.mocked(readAuthSession);
 const sessionTimestamp = new Date("2026-07-29T12:00:00.000Z");
@@ -43,6 +48,7 @@ describe("auth v2 current server session boundary", () => {
     mockReadCookie.mockResolvedValue("a".repeat(64));
     mockReadSession.mockResolvedValue(session);
     mockEnabled.mockReturnValue(true);
+    mockWorkspacesEnabled.mockReturnValue(true);
   });
 
   test("returns the database session without exposing the cookie token", async () => {
@@ -77,5 +83,14 @@ describe("auth v2 current server session boundary", () => {
     await expect(readCurrentAuthSession({
       requireWorkspace: true,
     })).resolves.toBeNull();
+  });
+
+  test("fails closed when a workspace route is outside the workspace rollout", async () => {
+    mockWorkspacesEnabled.mockReturnValue(false);
+
+    await expect(readCurrentAuthSession({
+      requireWorkspace: true,
+    })).resolves.toBeNull();
+    expect(mockWorkspacesEnabled).toHaveBeenCalledWith("42");
   });
 });

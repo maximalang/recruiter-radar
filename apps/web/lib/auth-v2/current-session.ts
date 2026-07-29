@@ -1,4 +1,7 @@
-import { isAuthPlatformV2EnabledForUser } from "./config";
+import {
+  isAuthPlatformV2EnabledForUser,
+  isAuthWorkspacesV2EnabledForUser,
+} from "./config";
 import { readAuthV2SessionCookie } from "./session-cookie";
 import { readAuthSession, type AuthSession } from "./sessions";
 
@@ -12,7 +15,13 @@ export async function readCurrentAuthSession(
   if (
     !session
     || !isAuthPlatformV2EnabledForUser(session.userId)
-    || (options.requireWorkspace === true && !session.workspaceId)
+    || (
+      options.requireWorkspace === true
+      && (
+        !session.workspaceId
+        || !isAuthWorkspacesV2EnabledForUser(session.userId)
+      )
+    )
   ) {
     return null;
   }

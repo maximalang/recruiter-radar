@@ -141,6 +141,9 @@ describe("auth v2 request boundaries", () => {
     expect(sanitizeAuthReturnTo("/checkout?plan=pilot-week")).toBe("/checkout?plan=pilot-week");
     expect(sanitizeAuthReturnTo("/opportunities/42#outcome")).toBe("/opportunities/42#outcome");
     expect(sanitizeAuthReturnTo("/onboarding")).toBe("/onboarding");
+    expect(sanitizeAuthReturnTo("/auth/invite")).toBe("/auth/invite");
+    expect(sanitizeAuthReturnTo("/auth/email-change")).toBe("/dashboard");
+    expect(sanitizeAuthReturnTo("/auth/invite/extra")).toBe("/dashboard");
     expect(sanitizeAuthReturnTo("https://attacker.example")).toBe("/dashboard");
     expect(sanitizeAuthReturnTo("//attacker.example")).toBe("/dashboard");
     expect(sanitizeAuthReturnTo("/api/auth/logout")).toBe("/dashboard");

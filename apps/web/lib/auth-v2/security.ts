@@ -14,6 +14,7 @@ const AUTH_PATHS = [
   "/review",
   "/settings",
 ] as const;
+const AUTH_EXACT_PATHS = ["/auth/invite"] as const;
 
 const LOCAL_PART_PATTERN =
   /^[\p{L}\p{N}\p{M}!#$%&'*+/=?^_`{|}~.-]+$/u;
@@ -83,9 +84,10 @@ export function sanitizeAuthReturnTo(value: unknown): string {
     const parsed = new URL(value, "https://account.invalid");
     if (parsed.origin !== "https://account.invalid") return "/dashboard";
 
-    const allowed = AUTH_PATHS.some(
-      (path) => parsed.pathname === path || parsed.pathname.startsWith(`${path}/`),
-    );
+    const allowed = AUTH_EXACT_PATHS.some((path) => parsed.pathname === path)
+      || AUTH_PATHS.some(
+        (path) => parsed.pathname === path || parsed.pathname.startsWith(`${path}/`),
+      );
     return allowed
       ? `${parsed.pathname}${parsed.search}${parsed.hash}`
       : "/dashboard";
