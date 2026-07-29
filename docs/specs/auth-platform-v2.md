@@ -349,7 +349,7 @@ passkey_authentication
 ```text
 id BIGSERIAL PK
 user_id BIGINT FK users
-active_workspace_id BIGINT nullable
+workspace_id BIGINT nullable at DB compatibility layer
 token_hash CHAR(64) unique
 previous_token_hash CHAR(64) nullable unique
 previous_token_valid_until TIMESTAMPTZ nullable
@@ -368,8 +368,10 @@ device_label TEXT nullable
 legacy_migrated_at TIMESTAMPTZ nullable
 ```
 
-`active_workspace_id` защищается membership lookup в каждой session read и
-composite FK там, где PostgreSQL shape это позволяет.
+`workspace_id` назначается DB trigger при создании session. Runtime тип требует
+не-null значение, а каждый session read/rotation проверяет active membership и
+active workspace; legacy null или потеря доступа fail-closed с
+`workspace_access_lost`.
 
 ### 7.4. `workspaces`
 
@@ -656,6 +658,20 @@ never accepts customer session, workspace role or client-provided role.
 Permissions are explicit maps over workspace roles. Route params, localStorage,
 cookie workspace IDs и form fields не являются authorization proof.
 
+Минимальная least-privilege matrix, зафиксированная в
+`apps/web/lib/auth-v2/workspaces.ts`:
+
+| Role | Product read/write | Team | Billing | Workspace |
+|---|---|---|---|---|
+| `owner` | read/write/export | read/invite/manage | read/manage | read/update |
+| `admin` | read/write/export | read/invite/manage | read | read/update |
+| `recruiter` | read/write/export | read | none | read |
+| `viewer` | read only | read | none | read |
+| `billing` | none | none | read/manage | read |
+
+`super_admin` отсутствует в workspace roles. Customer DAL не импортирует и не
+заменяет operator/admin authorization boundary.
+
 Migration order for consumers:
 
 1. DAL introduced behind v2 flag with legacy compatibility adapter.
@@ -686,19 +702,15 @@ leads
 deliveries
 user_search_preferences
 notification_provider_accounts
-notification_endpoints
-notification_routes
-notification_delivery_jobs
-notification_audit_log
 opportunities
-opportunity_actions
-opportunity_outcome_events
-product_telemetry_events
 ```
 
-Tables already transitively scoped only by `client_profile_id` receive direct
-`workspace_id` only where it improves DB-enforced consistency without duplicating
-mutable authority. Exact list is finalized by verifier-driven schema inventory.
+Notification endpoints/routes/jobs остаются транзитивно scoped через усиленные
+composite profile/provider/endpoint/route FK. Opportunity actions и append-only
+Outcome Ledger остаются scoped через существующий строгий opportunity context.
+`notification_audit_log`, `product_telemetry_events` и
+`auth_security_events` сохраняют историческую/transitive модель: migration не
+создаёт для них вторую mutable workspace authority и не переписывает ledger.
 
 ### 13.2. Backfill
 
@@ -707,8 +719,8 @@ For each existing user with any tenant-owned record:
 1. deterministic workspace key from existing user ID;
 2. create workspace if absent;
 3. create owner membership if absent;
-4. set workspace on profile/order/subscription/entitlement;
-5. propagate through notification and Opportunity composite context;
+4. set workspace on all nine direct tenant roots;
+5. derive provider/opportunity/delivery context from their authoritative parent;
 6. preserve all existing primary IDs and provider/external IDs;
 7. never update append-only Outcome events outside migration with verified
    context and counts;
@@ -721,11 +733,12 @@ is required for writes.
 
 After verified backfill:
 
-- unique `(id, workspace_id)` on parent tenant tables;
-- composite FK ensures profile/workspace, opportunity/workspace и
-  outcome/workspace agree;
+- composite unique keys preserve legacy owner/user together with workspace;
+- composite FKs ensure profile/provider/workspace, lead/delivery/workspace и
+  notification descendant context agree;
+- Outcome events remain protected by the existing immutable opportunity context;
 - membership/workspace checks for sessions;
-- new v2 writes require workspace;
+- DB triggers dual-write workspace on new and updated legacy rows;
 - legacy columns remain during dual-write window;
 - `NOT NULL` is added only after zero-null verifier and canary evidence.
 
@@ -755,6 +768,21 @@ Verifier detects:
 - profiles with null/hostile owner state;
 - invalid active workspace;
 - count or external-ID loss.
+
+Operational commands:
+
+```text
+npm.cmd run auth-v2:workspaces:preflight
+npm.cmd run auth-v2:workspaces:backfill
+npm.cmd run auth-v2:workspaces:backfill -- --apply --batch-size=100
+npm.cmd run auth-v2:workspaces:verify
+npm.cmd run test:auth-v2:workspaces:db
+npm.cmd run test:auth-v2:workspace-sessions:db
+```
+
+Preflight и verify используют read-only transactions и aggregate JSON без PII.
+Backfill dry-run по умолчанию, bounded через batch/max-batches, использует
+`FOR UPDATE ... SKIP LOCKED` и допускает безопасный resumable rerun.
 
 ## 14. UX flows
 
