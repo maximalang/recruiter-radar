@@ -8,11 +8,7 @@ BEGIN
   IF EXISTS (
     SELECT 1
     FROM auth_security_events
-    WHERE event_type IN (
-      'membership_role_changed',
-      'membership_removed',
-      'ownership_transferred'
-    )
+    WHERE target_user_id IS NOT NULL
   ) THEN
     RAISE EXCEPTION
       'cannot roll back auth account/team schema while team audit events exist';

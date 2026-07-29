@@ -30,13 +30,18 @@ confirmation phrase shown in the UI. It is refused while the account owns a
 workspace with another active member. On success, the transaction:
 
 1. creates one pending `account_deletion_requests` record;
-2. marks solo owned workspaces `deletion_pending`;
-3. removes active memberships;
-4. revokes all sessions;
-5. marks the account `deletion_pending`;
-6. records `account_deletion_requested`.
+2. disables owned client profiles, queued delivery jobs and every configured
+   delivery route;
+3. revokes push subscriptions, notification endpoints and provider accounts,
+   and clears their contact destinations and provider credentials;
+4. marks solo owned workspaces `deletion_pending`;
+5. removes active memberships;
+6. revokes all sessions;
+7. marks the account `deletion_pending`;
+8. records `account_deletion_requested`.
 
-Access is therefore removed immediately even when retention postpones purge.
+Access, premium entitlement and outbound delivery are therefore removed
+immediately even when retention postpones identity purge.
 
 ## Safe operation
 
@@ -72,8 +77,11 @@ LOCKED`, so concurrent workers do not process the same request.
 For each due account, one transaction:
 
 - keeps every session revoked and invalidates unconsumed auth challenges;
-- replaces retained account/challenge/invite email identity with a unique
+- replaces retained account/challenge email identity, accepted invites and
+  outstanding invites targeting the previous account email with a unique
   non-deliverable `deleted+<id>@deleted.invalid` address;
+- deletes revoked browser push endpoint keys; notification destinations and
+  provider credentials were already cleared by the confirmed request;
 - clears account name, Telegram identifiers, onboarding payload and recent-auth
   state;
 - removes memberships and marks an empty solo `deletion_pending` workspace

@@ -853,8 +853,9 @@ PR 4 implementation invariants:
   revokes every session except the matching current one;
 - deletion requires recent authentication and the exact confirmation phrase,
   blocks an owner while another active member still depends on that owner, then
-  immediately revokes sessions, removes memberships and records a pending
-  deletion request;
+  immediately revokes sessions, removes memberships, disables owned profiles,
+  entitlement and every delivery path, clears delivery contact credentials and
+  records a pending deletion request;
 - deletion and invite acceptance lock the same workspace row before deciding
   whether membership can change, so a concurrent invite cannot orphan an owned
   workspace during account deactivation;
@@ -864,9 +865,10 @@ PR 4 implementation invariants:
   `manual_review`; these settings are operational configuration, not a legal
   retention determination;
 - `auth-v2:accounts:purge` is dry-run by default. `--apply` processes a bounded,
-  due-only locked batch, anonymizes identity fields, completes the request and
-  preserves subscriptions plus security audit events. The operating procedure
-  is in `docs/auth-v2-account-retention.md`.
+  due-only locked batch, anonymizes identity fields and outstanding invites
+  targeting the previous email, deletes revoked push endpoint keys, completes
+  the request and preserves subscriptions plus security audit events. The
+  operating procedure is in `docs/auth-v2-account-retention.md`.
 
 ### 14.4. `/settings/team`
 

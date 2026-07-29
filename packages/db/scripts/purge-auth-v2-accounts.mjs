@@ -82,6 +82,21 @@ async function purgeDueAccounts(database, limit) {
 
 async function purgeOneAccount(database, requestId, userId) {
   const deletedEmail = `deleted+${userId}@deleted.invalid`
+  const identity = await database.query(
+    `SELECT
+       account.email_normalized AS "emailNormalized",
+       account.email
+     FROM users AS account
+     WHERE account.id = $1
+       AND account.status = 'deletion_pending'
+     FOR UPDATE`,
+    [userId],
+  )
+  if ((identity.rowCount ?? 0) !== 1) {
+    throw new Error(`Deletion-pending account ${userId} was not found.`)
+  }
+  const previousEmail = identity.rows[0].emailNormalized
+    ?? identity.rows[0].email.toLowerCase()
 
   await database.query(
     `UPDATE auth_sessions
@@ -103,8 +118,18 @@ async function purgeOneAccount(database, requestId, userId) {
   await database.query(
     `UPDATE workspace_invites
      SET email_normalized = $2
-     WHERE accepted_by = $1`,
-    [userId, deletedEmail],
+     WHERE accepted_by = $1
+        OR LOWER(email_normalized) = LOWER($3)`,
+    [userId, deletedEmail, previousEmail],
+  )
+  await database.query(
+    `DELETE FROM web_push_subscriptions
+     WHERE client_profile_id IN (
+       SELECT profile.id
+       FROM client_profiles AS profile
+       WHERE profile.owner_id = $1
+     )`,
+    [userId],
   )
   await database.query(
     `UPDATE workspace_members

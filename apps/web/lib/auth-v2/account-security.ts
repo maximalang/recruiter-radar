@@ -787,6 +787,137 @@ export async function requestAccountDeletion(input: {
       ],
     );
     await client.query(
+      `UPDATE notification_delivery_jobs AS job
+       SET status = CASE
+             WHEN job.status IN ('queued', 'sending', 'failed')
+               THEN 'cancelled'
+             ELSE job.status
+           END,
+           last_error_code = NULL,
+           last_error_message = NULL,
+           updated_at = GREATEST(
+             job.updated_at,
+             $2::TIMESTAMPTZ
+           )
+       WHERE job.client_profile_id IN (
+         SELECT profile.id
+         FROM client_profiles AS profile
+         WHERE profile.owner_id = $1
+       )`,
+      [session.userId, now],
+    );
+    await client.query(
+      `UPDATE notification_delivery_attempts AS attempt
+       SET provider_message_id = NULL,
+           provider_error_code = NULL,
+           provider_error_message = NULL,
+           response_snapshot = '{}'::JSONB
+       WHERE attempt.job_id IN (
+         SELECT job.id
+         FROM notification_delivery_jobs AS job
+         JOIN client_profiles AS profile
+           ON profile.id = job.client_profile_id
+         WHERE profile.owner_id = $1
+       )`,
+      [session.userId],
+    );
+    await client.query(
+      `UPDATE notification_inbound_events AS inbound
+       SET provider_event_id = NULL,
+           payload = '{}'::JSONB,
+           error_message = NULL
+       WHERE inbound.provider_account_id IN (
+         SELECT provider.id
+         FROM notification_provider_accounts AS provider
+         WHERE provider.owner_id = $1
+       )`,
+      [session.userId],
+    );
+    await client.query(
+      `UPDATE notification_routes AS route
+       SET status = 'disabled',
+           quiet_hours = '{}'::JSONB,
+           route_config = '{}'::JSONB,
+           updated_at = GREATEST(
+             route.updated_at,
+             $2::TIMESTAMPTZ
+           )
+       WHERE route.client_profile_id IN (
+         SELECT profile.id
+         FROM client_profiles AS profile
+         WHERE profile.owner_id = $1
+       )`,
+      [session.userId, now],
+    );
+    await client.query(
+      `UPDATE notification_endpoints AS endpoint
+       SET status = 'revoked',
+           destination_id = NULL,
+           destination_label = NULL,
+           bind_token_hash = NULL,
+           bind_token_expires_at = NULL,
+           endpoint_config = '{}'::JSONB,
+           provider_state = '{}'::JSONB,
+           last_error_code = NULL,
+           updated_at = GREATEST(
+             endpoint.updated_at,
+             $2::TIMESTAMPTZ
+           )
+       WHERE endpoint.client_profile_id IN (
+         SELECT profile.id
+         FROM client_profiles AS profile
+         WHERE profile.owner_id = $1
+       )`,
+      [session.userId, now],
+    );
+    await client.query(
+      `UPDATE notification_provider_accounts AS provider
+       SET display_name = 'Deleted account',
+           status = 'revoked',
+           external_account_id = NULL,
+           external_account_name = NULL,
+           secret_ciphertext = 'purged',
+           capabilities = '{}'::JSONB,
+           provider_metadata = '{}'::JSONB,
+           last_error_code = NULL,
+           last_error_message = NULL,
+           updated_at = GREATEST(
+             provider.updated_at,
+             $2::TIMESTAMPTZ
+           )
+       WHERE provider.owner_id = $1`,
+      [session.userId, now],
+    );
+    await client.query(
+      `UPDATE web_push_subscriptions AS subscription
+       SET revoked_at = GREATEST(
+             subscription.created_at,
+             $2::TIMESTAMPTZ
+           )
+       WHERE subscription.client_profile_id IN (
+         SELECT profile.id
+         FROM client_profiles AS profile
+         WHERE profile.owner_id = $1
+       )
+         AND subscription.revoked_at IS NULL`,
+      [session.userId, now],
+    );
+    await client.query(
+      `UPDATE client_profiles AS profile
+       SET is_active = FALSE,
+           delivery_enabled = FALSE,
+           web_push_enabled = FALSE,
+           email_digest_enabled = FALSE,
+           digest_email = NULL,
+           telegram_chat_id = NULL,
+           updated_at = GREATEST(
+             profile.updated_at,
+             $2::TIMESTAMPTZ
+           )
+       WHERE profile.owner_id = $1`,
+      [session.userId, now],
+    );
+    await client.query(
       `UPDATE workspaces AS workspace
        SET status = 'deletion_pending',
            updated_at = GREATEST(

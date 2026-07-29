@@ -47,6 +47,9 @@ describe("auth v2 account and team operational contracts", () => {
     expect(purge).toContain("account.status = 'deletion_pending'");
     expect(purge).toContain("FOR UPDATE OF request SKIP LOCKED");
     expect(purge).toContain("deleted.invalid");
+    expect(purge).toContain('email_normalized AS "emailNormalized"');
+    expect(purge).toContain("LOWER(email_normalized) = LOWER($3)");
+    expect(purge).toContain("DELETE FROM web_push_subscriptions");
     expect(purge).toContain("status = 'completed'");
     expect(purge).not.toMatch(/DELETE\s+FROM\s+(auth_security_events|billing_events|subscriptions)/i);
     expect(purge).not.toMatch(/INTERVAL\s+'[0-9]+\s+days?'/i);

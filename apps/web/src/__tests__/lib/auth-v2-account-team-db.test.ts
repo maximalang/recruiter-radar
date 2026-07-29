@@ -28,6 +28,8 @@ import {
   transferWorkspaceOwnership,
 } from "@/lib/auth-v2/workspace-team";
 
+const { hasPremiumEntitlement } =
+  jest.requireActual<typeof import("@/lib/db")>("@/lib/db");
 const execFileAsync = promisify(execFile);
 const describeDatabase =
   process.env.AUTH_V2_ACCOUNT_TEAM_DB_TEST === "true"
@@ -498,6 +500,11 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
        VALUES ($1, 'auth-purge-test', 'active', NOW(), NOW(), NOW())`,
       [due.userId],
     );
+    await expect(hasPremiumEntitlement(Number(due.userId))).resolves.toEqual({
+      allowed: true,
+      reason: null,
+    });
+    const deliveryFixture = await createDeliveryFixture(due);
     await expect(requestAccountDeletion({
       session: due.session,
       confirmation: ACCOUNT_DELETION_CONFIRMATION,
@@ -506,6 +513,66 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
         AUTH_ACCOUNT_PURGE_AFTER_DAYS: "7",
       },
     })).resolves.toEqual({ ok: true });
+    await expect(hasPremiumEntitlement(Number(due.userId))).resolves.toEqual({
+      allowed: false,
+      reason: "No active subscription or pilot.",
+    });
+    const deactivated = await pool!.query<{
+      profileInactive: boolean;
+      deliveryDisabled: boolean;
+      webPushDisabled: boolean;
+      emailDisabled: boolean;
+      pushRevoked: boolean;
+      providerRevoked: boolean;
+      endpointRevoked: boolean;
+      routeDisabled: boolean;
+      jobCancelled: boolean;
+      profileContactsCleared: boolean;
+      providerSecretPurged: boolean;
+      endpointDestinationCleared: boolean;
+    }>(
+      `SELECT
+         NOT profile.is_active AS "profileInactive",
+         NOT profile.delivery_enabled AS "deliveryDisabled",
+         NOT profile.web_push_enabled AS "webPushDisabled",
+         NOT profile.email_digest_enabled AS "emailDisabled",
+         subscription.revoked_at IS NOT NULL AS "pushRevoked",
+         provider.status = 'revoked' AS "providerRevoked",
+         endpoint.status = 'revoked' AS "endpointRevoked",
+         route.status = 'disabled' AS "routeDisabled",
+         job.status = 'cancelled' AS "jobCancelled",
+         profile.digest_email IS NULL
+           AND profile.telegram_chat_id IS NULL AS "profileContactsCleared",
+         provider.secret_ciphertext = 'purged' AS "providerSecretPurged",
+         endpoint.destination_id IS NULL AS "endpointDestinationCleared"
+       FROM client_profiles AS profile
+       JOIN web_push_subscriptions AS subscription
+         ON subscription.client_profile_id = profile.id
+       JOIN notification_provider_accounts AS provider
+         ON provider.client_profile_id = profile.id
+       JOIN notification_endpoints AS endpoint
+         ON endpoint.provider_account_id = provider.id
+       JOIN notification_routes AS route
+         ON route.endpoint_id = endpoint.id
+       JOIN notification_delivery_jobs AS job
+         ON job.route_id = route.id
+       WHERE profile.id = $1`,
+      [deliveryFixture.profileId],
+    );
+    expect(deactivated.rows[0]).toEqual({
+      profileInactive: true,
+      deliveryDisabled: true,
+      webPushDisabled: true,
+      emailDisabled: true,
+      pushRevoked: true,
+      providerRevoked: true,
+      endpointRevoked: true,
+      routeDisabled: true,
+      jobCancelled: true,
+      profileContactsCleared: true,
+      providerSecretPurged: true,
+      endpointDestinationCleared: true,
+    });
     await pool!.query(
       `UPDATE account_deletion_requests
        SET requested_at = due.due_at,
@@ -525,6 +592,13 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
         AUTH_ACCOUNT_PURGE_AFTER_DAYS: "30",
       },
     })).resolves.toEqual({ ok: true });
+    const inviter = await createFixture("delete-invite-owner");
+    await expect(inviteWorkspaceMember({
+      actorUserId: inviter.userId,
+      workspaceId: inviter.workspaceId,
+      email: due.email,
+      role: "viewer",
+    })).resolves.toEqual({ ok: true, delivery: "sent" });
 
     const beforeAudit = await securityEventCount(due.userId);
     const dryRun = await runPurge([]);
@@ -556,6 +630,38 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
       activeSessions: 0,
       subscriptionCount: 1,
     });
+    const purgedDelivery = await pool!.query<{
+      digestEmail: string | null;
+      telegramChatId: string | null;
+      pushCount: number;
+      inviteEmail: string;
+    }>(
+      `SELECT
+         profile.digest_email AS "digestEmail",
+         profile.telegram_chat_id::TEXT AS "telegramChatId",
+         (
+           SELECT COUNT(*)::INTEGER
+           FROM web_push_subscriptions
+           WHERE client_profile_id = profile.id
+         ) AS "pushCount",
+         (
+           SELECT email_normalized
+           FROM workspace_invites
+           WHERE workspace_id = $2
+             AND invited_by = $3
+           ORDER BY id DESC
+           LIMIT 1
+         ) AS "inviteEmail"
+       FROM client_profiles AS profile
+       WHERE profile.id = $1`,
+      [deliveryFixture.profileId, inviter.workspaceId, inviter.userId],
+    );
+    expect(purgedDelivery.rows[0]).toEqual({
+      digestEmail: null,
+      telegramChatId: null,
+      pushCount: 0,
+      inviteEmail: `deleted+${due.userId}@deleted.invalid`,
+    });
     await expect(accountState(future.userId)).resolves.toMatchObject({
       status: "deletion_pending",
       requestStatus: "pending",
@@ -579,11 +685,7 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
       );
       await rollbackClient.query(
         `DELETE FROM auth_security_events
-         WHERE event_type IN (
-           'membership_role_changed',
-           'membership_removed',
-           'ownership_transferred'
-         )`,
+         WHERE target_user_id IS NOT NULL`,
       );
       await rollbackClient.query(
         `ALTER TABLE auth_security_events
@@ -660,6 +762,129 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
       session: session.session,
       token: session.token,
     };
+  }
+
+  async function createDeliveryFixture(
+    account: Fixture,
+  ): Promise<{ profileId: string }> {
+    const profile = await pool!.query<{ id: string }>(
+      `INSERT INTO client_profiles (
+         owner_id,
+         workspace_id,
+         agency_name,
+         telegram_chat_id,
+         is_active,
+         delivery_enabled,
+         web_push_enabled,
+         email_digest_enabled,
+         digest_email
+       )
+       VALUES (
+         $1,
+         $2,
+         'Deletion delivery fixture',
+         $1,
+         TRUE,
+         TRUE,
+         TRUE,
+         TRUE,
+         $3
+       )
+       RETURNING id::TEXT AS id`,
+      [account.userId, account.workspaceId, account.email],
+    );
+    const profileId = profile.rows[0]!.id;
+    await pool!.query(
+      `INSERT INTO web_push_subscriptions (
+         client_profile_id,
+         endpoint,
+         p256dh,
+         auth
+       )
+       VALUES ($1, $2, 'fixture-p256dh', 'fixture-auth')`,
+      [profileId, `https://push.example.invalid/${profileId}`],
+    );
+    const provider = await pool!.query<{ id: string }>(
+      `INSERT INTO notification_provider_accounts (
+         owner_id,
+         workspace_id,
+         client_profile_id,
+         provider,
+         auth_mode,
+         display_name,
+         status,
+         secret_ciphertext
+       )
+       VALUES (
+         $1,
+         $2,
+         $3,
+         'telegram',
+         'byob',
+         'Deletion fixture',
+         'active',
+         'fixture-ciphertext'
+       )
+       RETURNING id::TEXT AS id`,
+      [account.userId, account.workspaceId, profileId],
+    );
+    const endpoint = await pool!.query<{ id: string }>(
+      `INSERT INTO notification_endpoints (
+         provider_account_id,
+         client_profile_id,
+         endpoint_type,
+         status,
+         destination_id
+       )
+       VALUES (
+         $1,
+         $2,
+         'telegram_private_chat',
+         'active',
+         $3
+       )
+       RETURNING id::TEXT AS id`,
+      [provider.rows[0]!.id, profileId, `chat-${profileId}`],
+    );
+    const route = await pool!.query<{ id: string }>(
+      `INSERT INTO notification_routes (
+         endpoint_id,
+         client_profile_id,
+         event_kind,
+         status
+       )
+       VALUES ($1, $2, 'daily_digest', 'active')
+       RETURNING id::TEXT AS id`,
+      [endpoint.rows[0]!.id, profileId],
+    );
+    await pool!.query(
+      `INSERT INTO notification_delivery_jobs (
+         client_profile_id,
+         route_id,
+         endpoint_id,
+         provider_account_id,
+         event_kind,
+         idempotency_key,
+         status
+       )
+       VALUES (
+         $1,
+         $2,
+         $3,
+         $4,
+         'daily_digest',
+         $5,
+         'queued'
+       )`,
+      [
+        profileId,
+        route.rows[0]!.id,
+        endpoint.rows[0]!.id,
+        provider.rows[0]!.id,
+        `account-delete-${profileId}`,
+      ],
+    );
+    return { profileId };
   }
 
   function uniqueEmail(prefix: string): string {

@@ -55,6 +55,7 @@ describe("auth v2 account security and team migration", () => {
     expect(sql).toContain(
       "while account deletion requests exist",
     );
+    expect(sql).toContain("target_user_id IS NOT NULL");
     expect(sql).toContain("DROP TABLE account_deletion_requests");
     expect(sql).toContain("DROP COLUMN IF EXISTS browser_label");
     expect(sql).toContain("DROP COLUMN IF EXISTS environment_label");
