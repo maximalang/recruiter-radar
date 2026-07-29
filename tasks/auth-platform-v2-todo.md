@@ -83,12 +83,14 @@
 - [x] Add resumable onboarding steps.
 - [x] Add responsive/a11y/visual regression.
 - [x] Complete new/existing user E2E.
-- [ ] Complete PR 3 review/check/CI gate.
+- [x] Complete PR 3 review/check/CI gate.
   - Local evidence: focused RED/GREEN tests, full Jest, typecheck, production
     build, dependency audit, fresh PostgreSQL onboarding concurrency/isolation,
     and isolated Playwright new/existing/account-switch/onboarding flows passed.
-  - Remaining before completion: independent final-diff review, push/PR checks,
-    and merge only to `codex/auth-platform-v2`.
+  - Completed in PR #98: three independently confirmed onboarding blockers were
+    closed and the final independent review found no confirmed blockers.
+  - Initial push run `30458272782` and PR run `30458326737` both completed
+    successfully; the PR remains scoped only to `codex/auth-platform-v2`.
 
 ## PR 4 — Security/team
 
