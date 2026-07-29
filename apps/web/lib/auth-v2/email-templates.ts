@@ -3,6 +3,7 @@ import type { EmailMessage } from "../email/transport";
 export const AUTH_EMAIL_TEMPLATE_NAMES = [
   "login_signup",
   "change_email",
+  "email_change_requested",
   "workspace_invite",
   "new_login",
   "email_changed",
@@ -52,6 +53,13 @@ const COPY: Readonly<Record<AuthEmailTemplateName, TemplateCopy>> = {
     actionLabel: "Подтвердить новый email",
     actionRequired: true,
     securityNote: "Если вы не меняли email, не открывайте ссылку и проверьте безопасность аккаунта.",
+  },
+  email_change_requested: {
+    subject: "Запрошена смена email — Recruiter Radar",
+    eyebrow: "Безопасность аккаунта",
+    heading: "Получен запрос на смену email",
+    body: "Основной адрес аккаунта пока не изменён. Новый email станет активным только после подтверждения защищённой ссылки на новом адресе.",
+    securityNote: "Если это были не вы, завершите другие активные сессии и защитите доступ к рабочей почте.",
   },
   workspace_invite: {
     subject: "Приглашение в команду — Recruiter Radar",
@@ -103,13 +111,11 @@ const COPY: Readonly<Record<AuthEmailTemplateName, TemplateCopy>> = {
     securityNote: "Если это были не вы, защитите доступ к рабочей почте перед новым входом.",
   },
   account_deletion: {
-    subject: "Подтверждение удаления аккаунта — Recruiter Radar",
+    subject: "Запрос на удаление аккаунта — Recruiter Radar",
     eyebrow: "Удаление аккаунта",
-    heading: "Подтвердите запрос на удаление",
-    body: "Откройте защищённую ссылку, только если действительно хотите продолжить удаление аккаунта.",
-    actionLabel: "Продолжить удаление",
-    actionRequired: true,
-    securityNote: "Если вы не запрашивали удаление, не открывайте ссылку и проверьте безопасность аккаунта.",
+    heading: "Запрос на удаление принят",
+    body: "Доступ к аккаунту и активные сессии деактивированы. Дальнейшая обработка выполняется по настроенной политике хранения Recruiter Radar.",
+    securityNote: "Если вы не отправляли запрос, обратитесь в поддержку и защитите доступ к рабочей почте.",
   },
 };
 
