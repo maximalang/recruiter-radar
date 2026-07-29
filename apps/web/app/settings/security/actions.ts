@@ -97,11 +97,7 @@ export async function requestEmailChangeAction(
     newEmail: formData.get("email"),
   });
   if (result.ok) {
-    redirect(
-      result.delivery === "sent"
-        ? "/settings/security?email=requested"
-        : "/settings/security?email=delivery",
-    );
+    redirect("/settings/security?email=requested");
   }
   redirect(
     result.code === "reauth_required"

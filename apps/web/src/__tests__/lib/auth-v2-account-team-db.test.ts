@@ -113,13 +113,13 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
     await expect(requestAccountEmailChange({
       session: account.session,
       newEmail: conflict.email,
-    })).resolves.toEqual({ ok: false, code: "conflict" });
+    })).resolves.toEqual({ ok: true });
 
     const newEmail = uniqueEmail("email-confirmed");
     await expect(requestAccountEmailChange({
       session: account.session,
       newEmail,
-    })).resolves.toEqual({ ok: true, delivery: "sent" });
+    })).resolves.toEqual({ ok: true });
 
     const before = await pool!.query<{ email: string }>(
       "SELECT email FROM users WHERE id = $1",
@@ -220,7 +220,7 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
     await expect(requestAccountEmailChange({
       session: account.session,
       newEmail,
-    })).resolves.toEqual({ ok: true, delivery: "sent" });
+    })).resolves.toEqual({ ok: true });
     const token = await tokenFromOutbox(newEmail, "/auth/change-email");
 
     await expect(revokeAllAuthSessions({
@@ -239,6 +239,57 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
       [token],
     );
     expect(challenge.rows[0]?.invalidated).toBe(true);
+  });
+
+  test("workspace invitation rate limits serialize concurrent sends", async () => {
+    const owner = await createFixture("invite-rate-owner");
+    const email = uniqueEmail("invite-rate-target");
+
+    const results = await Promise.all(
+      Array.from({ length: 4 }, () =>
+        inviteWorkspaceMember({
+          actorUserId: owner.userId,
+          workspaceId: owner.workspaceId,
+          email,
+          role: "viewer",
+        }),
+      ),
+    );
+
+    expect(results.filter((result) => result.ok)).toHaveLength(3);
+    expect(results).toContainEqual({ ok: false, code: "rate_limited" });
+    const state = await pool!.query<{
+      createdEvents: number;
+      bucketHits: number;
+      activeInvites: number;
+    }>(
+      `SELECT
+         (
+           SELECT COUNT(*)::INTEGER
+           FROM auth_security_events
+           WHERE event_type = 'invite_created'
+             AND workspace_id = $1
+         ) AS "createdEvents",
+         (
+           SELECT MAX(hit_count)::INTEGER
+           FROM auth_rate_limit_buckets
+           WHERE bucket_scope = 'workspace_invite'
+         ) AS "bucketHits",
+         (
+           SELECT COUNT(*)::INTEGER
+           FROM workspace_invites
+           WHERE workspace_id = $1
+             AND email_normalized = $2
+             AND accepted_at IS NULL
+             AND revoked_at IS NULL
+         ) AS "activeInvites"`,
+      [owner.workspaceId, email],
+    );
+    expect(state.rows[0]).toEqual({
+      createdEvents: 3,
+      bucketHits: 4,
+      activeInvites: 1,
+    });
   });
 
   test("invite email binding, single use, role ceilings, removal, and ownership transfer are atomic", async () => {
@@ -457,7 +508,9 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
     })).resolves.toEqual({ ok: true });
     await pool!.query(
       `UPDATE account_deletion_requests
-       SET purge_after = requested_at
+       SET requested_at = due.due_at,
+           purge_after = due.due_at
+       FROM (SELECT clock_timestamp() AS due_at) AS due
        WHERE user_id = $1
          AND status = 'pending'`,
       [due.userId],

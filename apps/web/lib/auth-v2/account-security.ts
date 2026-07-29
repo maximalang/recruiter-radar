@@ -6,6 +6,10 @@ import { getClient, getPool } from "../db-pool";
 import { sendEmail } from "../email/transport";
 import { logError, logWarn } from "../runtime";
 import { renderAuthEmail } from "./email-templates";
+import {
+  consumeAuthRateLimit,
+  hashAuthRateLimitBoundary,
+} from "./rate-limits";
 import { normalizeAuthEmail } from "./security";
 import {
   RecentAuthenticationRequiredError,
@@ -54,7 +58,7 @@ export type AccountMutationResult =
   | { ok: false; code: MutationFailureCode };
 
 export type EmailChangeRequestResult =
-  | { ok: true; delivery: "sent" | "failed" }
+  | { ok: true }
   | { ok: false; code: MutationFailureCode };
 
 export type EmailChangeConfirmationResult =
@@ -205,6 +209,33 @@ export async function requestAccountEmailChange(input: {
       await client.query("ROLLBACK");
       return { ok: false, code: "invalid" };
     }
+    const userAllowed = await consumeAuthRateLimit(client, {
+      scope: "email_hash",
+      keyHash: hashAuthRateLimitBoundary(
+        "email-change-user",
+        session.userId,
+      ),
+      windowSeconds: 3_600,
+      limit: 3,
+      now,
+    });
+    const targetAllowed = await consumeAuthRateLimit(client, {
+      scope: "email_hash",
+      keyHash: hashAuthRateLimitBoundary(
+        "email-change-target",
+        newEmail.normalized,
+      ),
+      windowSeconds: 3_600,
+      limit: 3,
+      now,
+    });
+    if (!userAllowed || !targetAllowed) {
+      await client.query("COMMIT");
+      logWarn("auth_v2.email_change_request_suppressed", {
+        reasonCode: "rate_limited",
+      });
+      return { ok: true };
+    }
     const conflict = await client.query(
       `SELECT 1
        FROM users
@@ -218,8 +249,11 @@ export async function requestAccountEmailChange(input: {
       [session.userId, newEmail.normalized],
     );
     if ((conflict.rowCount ?? 0) > 0) {
-      await client.query("ROLLBACK");
-      return { ok: false, code: "conflict" };
+      await client.query("COMMIT");
+      logWarn("auth_v2.email_change_request_suppressed", {
+        reasonCode: "identity_conflict",
+      });
+      return { ok: true };
     }
 
     await client.query(
@@ -344,7 +378,7 @@ export async function requestAccountEmailChange(input: {
       reasonCode: delivery.reason,
     });
   }
-  return { ok: true, delivery: sendStatus };
+  return { ok: true };
 }
 
 export async function confirmAccountEmailChange(input: {

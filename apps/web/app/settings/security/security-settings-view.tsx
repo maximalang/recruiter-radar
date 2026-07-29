@@ -48,13 +48,7 @@ function emailNotice(status: string | undefined) {
   if (status === "requested") {
     return {
       tone: "success",
-      text: "Письмо отправлено на новый адрес. Основной email изменится только после подтверждения.",
-    } as const;
-  }
-  if (status === "delivery") {
-    return {
-      tone: "warning",
-      text: "Запрос создан, но письмо не доставлено. Повторите попытку позже.",
+      text: "Если адрес доступен, на него придёт письмо. Основной email изменится только после подтверждения.",
     } as const;
   }
   if (status === "reauth") {
@@ -62,12 +56,6 @@ function emailNotice(status: string | undefined) {
       tone: "warning",
       text: "Для смены email нужен недавний вход.",
       action: true,
-    } as const;
-  }
-  if (status === "conflict") {
-    return {
-      tone: "warning",
-      text: "Этот email уже используется другим аккаунтом.",
     } as const;
   }
   if (status === "invalid") {

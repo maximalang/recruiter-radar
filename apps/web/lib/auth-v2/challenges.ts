@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import type { PoolClient } from "pg";
 
 import {
@@ -19,6 +19,7 @@ import {
   sanitizeAuthReturnTo,
 } from "./security";
 import { fingerprintLegacyOwnerSession } from "./legacy-session";
+import { hashAuthRateLimitBoundary } from "./rate-limits";
 import {
   isAuthSessionEnvironment,
   type AuthSessionEnvironment,
@@ -51,23 +52,6 @@ export type AuthV2LoginChallengeState =
     status: "expired" | "used" | "invalid";
     userId: string | null;
   };
-
-function authRateLimitSecret(): string {
-  const secret = (
-    process.env.AUTH_RATE_LIMIT_SECRET
-    ?? process.env.SESSION_SECRET
-  )?.trim();
-  if (!secret || secret.length < 32) {
-    throw new Error("AUTH_RATE_LIMIT_SECRET must be at least 32 characters.");
-  }
-  return secret;
-}
-
-function hashBoundary(kind: string, value: string): string {
-  return createHmac("sha256", authRateLimitSecret())
-    .update(`auth-v2:${kind}:${value}`)
-    .digest("hex");
-}
 
 function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
@@ -120,13 +104,13 @@ export async function requestAuthV2Login(input: {
   let token: string | null = null;
   let challengeId: string | null = null;
   try {
-    const globalHash = hashBoundary("global", "login");
-    const emailHash = hashBoundary("email", email.normalized);
+    const globalHash = hashAuthRateLimitBoundary("global", "login");
+    const emailHash = hashAuthRateLimitBoundary("email", email.normalized);
     const requestIpHash = input.clientAddress === "unknown"
       ? null
-      : hashBoundary("ip", input.clientAddress);
+      : hashAuthRateLimitBoundary("ip", input.clientAddress);
     const userAgentHash = input.userAgent
-      ? hashBoundary("user-agent", input.userAgent.slice(0, 512))
+      ? hashAuthRateLimitBoundary("user-agent", input.userAgent.slice(0, 512))
       : null;
 
     client = await getClient();
@@ -228,13 +212,13 @@ export async function consumeAuthV2Login(input: {
 
   try {
     sessionToken = randomBytes(32).toString("hex");
-    const globalVerificationKeyHash = hashBoundary(
+    const globalVerificationKeyHash = hashAuthRateLimitBoundary(
       "challenge-verify-global",
       "login",
     );
     const verificationIpKeyHash = input.clientAddress === "unknown"
       ? null
-      : hashBoundary("challenge-verify-ip", input.clientAddress);
+      : hashAuthRateLimitBoundary("challenge-verify-ip", input.clientAddress);
     const legacyFingerprintHash = input.legacyToken
       ? fingerprintLegacyOwnerSession(input.legacyToken)
       : null;

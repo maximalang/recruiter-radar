@@ -99,6 +99,9 @@ describe("auth v2 account security", () => {
       if (sql.includes("SELECT 1") && sql.includes("email_normalized")) {
         return { rows: [], rowCount: 0 };
       }
+      if (sql.includes("consume_auth_rate_limit")) {
+        return { rows: [{ allowed: true }], rowCount: 1 };
+      }
       if (sql.includes("INSERT INTO auth_challenges")) {
         return { rows: [{ id: "81" }], rowCount: 1 };
       }
@@ -110,7 +113,7 @@ describe("auth v2 account security", () => {
       session: session(),
       newEmail: "New@Example.com",
       now,
-    })).resolves.toEqual({ ok: true, delivery: "sent" });
+    })).resolves.toEqual({ ok: true });
 
     const allSql = query.mock.calls.map(([sql]) => String(sql)).join("\n");
     expect(allSql).toContain("INSERT INTO auth_challenges");
@@ -123,6 +126,71 @@ describe("auth v2 account security", () => {
     expect(mockSendEmail).toHaveBeenCalledWith(expect.objectContaining({
       to: "owner@example.com",
     }));
+  });
+
+  test("does not disclose an existing account or a rate-limit decision", async () => {
+    const conflictQuery = jest.fn(async (sql: string) => {
+      if (sql.includes("FOR UPDATE OF account")) {
+        return {
+          rows: [{
+            email: "owner@example.com",
+            emailNormalized: "owner@example.com",
+            displayName: "Максим",
+            workspaceName: "Radar Team",
+          }],
+          rowCount: 1,
+        };
+      }
+      if (sql.includes("consume_auth_rate_limit")) {
+        return { rows: [{ allowed: true }], rowCount: 1 };
+      }
+      if (sql.includes("SELECT 1") && sql.includes("email_normalized")) {
+        return { rows: [{}], rowCount: 1 };
+      }
+      return { rows: [], rowCount: 1 };
+    });
+    mockGetClient.mockResolvedValue({
+      query: conflictQuery,
+      release: jest.fn(),
+    } as never);
+
+    await expect(requestAccountEmailChange({
+      session: session(),
+      newEmail: "existing@example.com",
+      now,
+    })).resolves.toEqual({ ok: true });
+    expect(mockSendEmail).not.toHaveBeenCalled();
+    expect(conflictQuery.mock.calls.at(-1)?.[0]).toBe("COMMIT");
+
+    const limitedQuery = jest.fn(async (sql: string) => {
+      if (sql.includes("FOR UPDATE OF account")) {
+        return {
+          rows: [{
+            email: "owner@example.com",
+            emailNormalized: "owner@example.com",
+            displayName: "Максим",
+            workspaceName: "Radar Team",
+          }],
+          rowCount: 1,
+        };
+      }
+      if (sql.includes("consume_auth_rate_limit")) {
+        return { rows: [{ allowed: false }], rowCount: 1 };
+      }
+      return { rows: [], rowCount: 1 };
+    });
+    mockGetClient.mockResolvedValue({
+      query: limitedQuery,
+      release: jest.fn(),
+    } as never);
+
+    await expect(requestAccountEmailChange({
+      session: session(),
+      newEmail: "limited@example.com",
+      now,
+    })).resolves.toEqual({ ok: true });
+    expect(mockSendEmail).not.toHaveBeenCalled();
+    expect(limitedQuery.mock.calls.at(-1)?.[0]).toBe("COMMIT");
   });
 
   test("confirms the new email transactionally and revokes every other session", async () => {

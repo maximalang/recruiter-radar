@@ -6,6 +6,10 @@ import { getClient, getPool } from "../db-pool";
 import { sendEmail } from "../email/transport";
 import { logError, logWarn } from "../runtime";
 import { renderAuthEmail, type AuthEmailTemplateName } from "./email-templates";
+import {
+  consumeAuthRateLimit,
+  hashAuthRateLimitBoundary,
+} from "./rate-limits";
 import { normalizeAuthEmail } from "./security";
 import {
   RecentAuthenticationRequiredError,
@@ -62,6 +66,7 @@ type TeamFailureCode =
   | "denied"
   | "conflict"
   | "email_mismatch"
+  | "rate_limited"
   | "reauth_required"
   | "unavailable";
 
@@ -223,6 +228,30 @@ export async function inviteWorkspaceMember(input: {
       "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
       [`auth-workspace-invite:${input.workspaceId}:${email.normalized}`],
     );
+    const workspaceAllowed = await consumeAuthRateLimit(client, {
+      scope: "workspace_invite",
+      keyHash: hashAuthRateLimitBoundary(
+        "workspace-invite-workspace",
+        input.workspaceId,
+      ),
+      windowSeconds: 3_600,
+      limit: 20,
+      now,
+    });
+    const targetAllowed = await consumeAuthRateLimit(client, {
+      scope: "workspace_invite",
+      keyHash: hashAuthRateLimitBoundary(
+        "workspace-invite-target",
+        `${input.workspaceId}:${email.normalized}`,
+      ),
+      windowSeconds: 86_400,
+      limit: 3,
+      now,
+    });
+    if (!workspaceAllowed || !targetAllowed) {
+      await client.query("COMMIT");
+      return { ok: false, code: "rate_limited" };
+    }
     const existingMember = await client.query(
       `SELECT 1
        FROM workspace_members AS membership

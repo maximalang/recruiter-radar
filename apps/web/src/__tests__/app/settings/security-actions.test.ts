@@ -67,7 +67,7 @@ describe("auth v2 account security actions", () => {
     mockReadSession.mockResolvedValue(session);
     mockRevokeById.mockResolvedValue(true);
     mockRevokeAll.mockResolvedValue(2);
-    mockEmailChange.mockResolvedValue({ ok: true, delivery: "sent" });
+    mockEmailChange.mockResolvedValue({ ok: true });
     mockDelete.mockResolvedValue({ ok: true });
   });
 
