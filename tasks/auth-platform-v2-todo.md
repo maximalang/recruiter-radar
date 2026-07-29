@@ -75,15 +75,20 @@
 
 ## PR 3 — UX/onboarding
 
-- [ ] Build premium responsive auth shell.
-- [ ] Build complete email-sent/resend states.
-- [ ] Build verify/confirm/account-switch states.
-- [ ] Add branded escaped HTML/text templates.
-- [ ] Add deterministic test outbox.
-- [ ] Add resumable onboarding steps.
-- [ ] Add responsive/a11y/visual regression.
-- [ ] Complete new/existing user E2E.
+- [x] Build premium responsive auth shell.
+- [x] Build complete email-sent/resend states.
+- [x] Build verify/confirm/account-switch states.
+- [x] Add branded escaped HTML/text templates.
+- [x] Add deterministic test outbox.
+- [x] Add resumable onboarding steps.
+- [x] Add responsive/a11y/visual regression.
+- [x] Complete new/existing user E2E.
 - [ ] Complete PR 3 review/check/CI gate.
+  - Local evidence: focused RED/GREEN tests, full Jest, typecheck, production
+    build, dependency audit, fresh PostgreSQL onboarding concurrency/isolation,
+    and isolated Playwright new/existing/account-switch/onboarding flows passed.
+  - Remaining before completion: independent final-diff review, push/PR checks,
+    and merge only to `codex/auth-platform-v2`.
 
 ## PR 4 — Security/team
 
