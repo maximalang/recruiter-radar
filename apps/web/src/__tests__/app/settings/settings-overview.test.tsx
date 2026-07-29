@@ -23,6 +23,14 @@ describe("SettingsOverview", () => {
     expect(screen.getByText("Telegram не подключён")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Изменить профиль/ })).toHaveAttribute("href", "/profile#agency");
     expect(screen.getByRole("link", { name: /Настроить каналы/ })).toHaveAttribute("href", "/profile#delivery");
+    expect(screen.getByRole("link", { name: /^Безопасность/ })).toHaveAttribute(
+      "href",
+      "/settings/security",
+    );
+    expect(screen.getByRole("link", { name: /^Команда/ })).toHaveAttribute(
+      "href",
+      "/settings/team",
+    );
   });
   it("does not claim delivery is ready when no channel is connected", () => {
     render(

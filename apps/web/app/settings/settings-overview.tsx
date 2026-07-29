@@ -65,6 +65,16 @@ export default function SettingsOverview(props: {
           <Link href="/profile#delivery">Настроить каналы</Link>
         </article>
       </div>
+      <nav className={styles.accountLinks} aria-label="Доступ к аккаунту">
+        <Link href="/settings/security">
+          <strong>Безопасность</strong>
+          <span>Профиль, email, активные сессии и удаление аккаунта</span>
+        </Link>
+        <Link href="/settings/team">
+          <strong>Команда</strong>
+          <span>Участники, приглашения, роли и передача владения</span>
+        </Link>
+      </nav>
     </div>
   );
 }
