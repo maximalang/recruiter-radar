@@ -58,6 +58,18 @@ type Fixture = {
   token: string;
 };
 
+type AccountState = {
+  email: string;
+  normalized: string;
+  displayName: string | null;
+  fullName: string | null;
+  status: string;
+  requestStatus: string;
+  workspaceStatus: string;
+  activeSessions: number;
+  subscriptionCount: number;
+};
+
 describeDatabase("auth v2 account and team PostgreSQL integration", () => {
   const pool = getPool();
   let sequence = 0;
@@ -638,18 +650,8 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
     return result.rows[0]?.count ?? 0;
   }
 
-  async function accountState(userId: string): Promise<{
-    email: string;
-    normalized: string;
-    displayName: string | null;
-    fullName: string | null;
-    status: string;
-    requestStatus: string;
-    workspaceStatus: string;
-    activeSessions: number;
-    subscriptionCount: number;
-  }> {
-    const result = await pool!.query(
+  async function accountState(userId: string): Promise<AccountState> {
+    const result = await pool!.query<AccountState>(
       `SELECT
          account.email,
          account.email_normalized AS normalized,

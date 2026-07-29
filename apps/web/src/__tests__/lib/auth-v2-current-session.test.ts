@@ -11,17 +11,31 @@ jest.mock("@/lib/auth-v2/sessions", () => ({
 import { isAuthPlatformV2EnabledForUser } from "@/lib/auth-v2/config";
 import { readCurrentAuthSession } from "@/lib/auth-v2/current-session";
 import { readAuthV2SessionCookie } from "@/lib/auth-v2/session-cookie";
-import { readAuthSession } from "@/lib/auth-v2/sessions";
+import {
+  readAuthSession,
+  type AuthSession,
+} from "@/lib/auth-v2/sessions";
 
 const mockEnabled = jest.mocked(isAuthPlatformV2EnabledForUser);
 const mockReadCookie = jest.mocked(readAuthV2SessionCookie);
 const mockReadSession = jest.mocked(readAuthSession);
-const session = {
+const sessionTimestamp = new Date("2026-07-29T12:00:00.000Z");
+const session: AuthSession = {
   id: "17",
   userId: "42",
   workspaceId: "9",
+  authMethod: "magic_link",
+  deviceLabel: null,
+  browserLabel: null,
+  environmentLabel: null,
+  createdAt: sessionTimestamp,
+  lastSeenAt: sessionTimestamp,
+  idleExpiresAt: sessionTimestamp,
+  absoluteExpiresAt: sessionTimestamp,
+  rotatedAt: sessionTimestamp,
+  lastAuthenticatedAt: sessionTimestamp,
   rotationDue: false,
-} as never;
+};
 
 describe("auth v2 current server session boundary", () => {
   beforeEach(() => {
@@ -54,7 +68,7 @@ describe("auth v2 current server session boundary", () => {
     mockReadSession.mockResolvedValue({
       ...session,
       workspaceId: null,
-    } as never);
+    });
 
     await expect(readCurrentAuthSession()).resolves.toMatchObject({
       userId: "42",

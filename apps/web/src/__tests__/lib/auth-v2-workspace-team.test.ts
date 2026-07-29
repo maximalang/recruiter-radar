@@ -153,7 +153,7 @@ describe("auth v2 workspace team lifecycle", () => {
   });
 
   test("removal revokes only the target member's sessions in this workspace", async () => {
-    const query = jest.fn(async (sql: string) => {
+    const query = jest.fn(async (sql: string, _values?: unknown[]) => {
       if (sql.includes("FOR UPDATE OF actor_membership, target_membership")) {
         return {
           rows: [{

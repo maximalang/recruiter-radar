@@ -35,7 +35,10 @@ import {
   readAuthV2SessionCookie,
   writeAuthV2SessionCookie,
 } from "@/lib/auth-v2/session-cookie";
-import { changeActiveWorkspace } from "@/lib/auth-v2/sessions";
+import {
+  changeActiveWorkspace,
+  type AuthSession,
+} from "@/lib/auth-v2/sessions";
 import { acceptWorkspaceInvite } from "@/lib/auth-v2/workspace-team";
 
 const mockConfirmEmail = jest.mocked(confirmAccountEmailChange);
@@ -47,11 +50,23 @@ const mockReadSessionCookie = jest.mocked(readAuthV2SessionCookie);
 const mockWriteSessionCookie = jest.mocked(writeAuthV2SessionCookie);
 const mockChangeWorkspace = jest.mocked(changeActiveWorkspace);
 const mockAcceptInvite = jest.mocked(acceptWorkspaceInvite);
-const session = {
+const sessionTimestamp = new Date("2026-07-29T12:00:00.000Z");
+const session: AuthSession = {
   id: "77",
   userId: "42",
   workspaceId: "9",
-} as never;
+  authMethod: "magic_link",
+  deviceLabel: null,
+  browserLabel: null,
+  environmentLabel: null,
+  createdAt: sessionTimestamp,
+  lastSeenAt: sessionTimestamp,
+  idleExpiresAt: sessionTimestamp,
+  absoluteExpiresAt: sessionTimestamp,
+  rotatedAt: sessionTimestamp,
+  lastAuthenticatedAt: sessionTimestamp,
+  rotationDue: false,
+};
 
 function request(
   pathname: string,
@@ -89,7 +104,7 @@ describe("auth v2 email-change and invite routes", () => {
     mockChangeWorkspace.mockResolvedValue({
       token: "c".repeat(64),
       session: { ...session, workspaceId: "19" },
-    } as never);
+    });
   });
 
   afterAll(() => {

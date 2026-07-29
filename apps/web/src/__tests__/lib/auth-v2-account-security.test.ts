@@ -182,7 +182,7 @@ describe("auth v2 account security", () => {
     })).resolves.toEqual({ ok: false, code: "confirmation_required" });
     expect(mockGetClient).not.toHaveBeenCalled();
 
-    const query = jest.fn(async (sql: string) => {
+    const query = jest.fn(async (sql: string, _values?: unknown[]) => {
       if (sql.includes("FROM users AS account") && sql.includes("FOR UPDATE")) {
         return {
           rows: [{
