@@ -94,6 +94,12 @@ describe("auth v2 server-side sessions", () => {
     const current = await readAuthSession(
       "c".repeat(64),
       new Date("2026-07-28T12:00:00.000Z"),
+      {
+        env: {
+          AUTH_PLATFORM_V2_ENABLED: "true",
+          AUTH_WORKSPACES_V2_ENABLED: "true",
+        },
+      },
     );
 
     expect(current).toMatchObject({
@@ -109,7 +115,36 @@ describe("auth v2 server-side sessions", () => {
     expect(sql).toContain("workspace_members");
     expect(sql).toContain("membership.status = 'active'");
     expect(sql).toContain("workspace.status = 'active'");
+    expect(sql).toContain("previous_token_authorizes");
     expect(query.mock.calls[0]?.[1]?.[0]).not.toBe("c".repeat(64));
+  });
+
+  test("preserves pre-backfill sessions while workspace rollout is disabled", async () => {
+    const query = jest.fn().mockResolvedValue({
+      rows: [sessionRow({ workspaceId: null })],
+      rowCount: 1,
+    });
+    mockGetPool.mockReturnValue({ query } as never);
+
+    const current = await readAuthSession(
+      "a".repeat(64),
+      new Date("2026-07-28T12:00:00.000Z"),
+      {
+        env: {
+          AUTH_PLATFORM_V2_ENABLED: "true",
+          AUTH_WORKSPACES_V2_ENABLED: "false",
+        },
+      },
+    );
+
+    expect(current?.workspaceId).toBeNull();
+    expect(query.mock.calls[0]?.[1]).toEqual([
+      expect.any(String),
+      new Date("2026-07-28T12:00:00.000Z"),
+      false,
+      true,
+      [],
+    ]);
   });
 
   test("rotates exactly the presented active token with a bounded grace window", async () => {
@@ -132,6 +167,7 @@ describe("auth v2 server-side sessions", () => {
     const sql = String(query.mock.calls[0]?.[0]);
     expect(sql).toContain("session_rotated");
     expect(sql).toContain("previous_token_hash = session.token_hash");
+    expect(sql).toContain("previous_token_authorizes = TRUE");
     expect(sql).toContain("INTERVAL '60 seconds'");
     expect(sql).toContain("session.rotated_at <= $3 - INTERVAL '24 hours'");
   });
@@ -158,26 +194,53 @@ describe("auth v2 server-side sessions", () => {
   });
 
   test("switches workspace through a current-token-only CAS and rotates immediately", async () => {
-    const query = jest.fn().mockResolvedValue({
-      rows: [sessionRow({ workspaceId: "11", rotationDue: false })],
-      rowCount: 1,
-    });
+    const query = jest.fn()
+      .mockResolvedValueOnce({
+        rows: [sessionRow({ workspaceId: "9", rotationDue: false })],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [sessionRow({ workspaceId: "11", rotationDue: false })],
+        rowCount: 1,
+      });
     mockGetPool.mockReturnValue({ query } as never);
 
     const switched = await changeActiveWorkspace({
       token: "f".repeat(64),
       workspaceId: "11",
       now: new Date("2026-07-28T12:00:00.000Z"),
+      env: {
+        AUTH_PLATFORM_V2_ENABLED: "true",
+        AUTH_WORKSPACES_V2_ENABLED: "true",
+      },
     });
 
     expect(switched?.session.workspaceId).toBe("11");
     expect(switched?.token).toMatch(/^[a-f0-9]{64}$/);
-    const sql = String(query.mock.calls[0]?.[0]);
+    const sql = String(query.mock.calls[1]?.[0]);
     expect(sql).toContain("change_auth_session_workspace");
-    const values = query.mock.calls[0]?.[1] as unknown[];
+    const values = query.mock.calls[1]?.[1] as unknown[];
     expect(values[0]).not.toBe("f".repeat(64));
     expect(values[1]).not.toBe(switched?.token);
     expect(values[2]).toBe("11");
+  });
+
+  test("keeps workspace switching unavailable when its rollout flag is off", async () => {
+    const query = jest.fn().mockResolvedValue({
+      rows: [sessionRow({ workspaceId: null, rotationDue: false })],
+      rowCount: 1,
+    });
+    mockGetPool.mockReturnValue({ query } as never);
+
+    await expect(changeActiveWorkspace({
+      token: "f".repeat(64),
+      workspaceId: "11",
+      env: {
+        AUTH_PLATFORM_V2_ENABLED: "true",
+        AUTH_WORKSPACES_V2_ENABLED: "false",
+      },
+    })).resolves.toBeNull();
+    expect(query).toHaveBeenCalledTimes(1);
   });
 
   test("checks recent authentication without trusting client timestamps", () => {

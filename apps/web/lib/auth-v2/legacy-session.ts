@@ -9,6 +9,7 @@ import { logError } from "../runtime";
 import {
   type AuthEnvironment,
   isAuthPlatformV2EnabledForUser,
+  isAuthWorkspacesV2EnabledForUser,
   isLegacySessionMigrationWindowOpen,
 } from "./config";
 import {
@@ -24,7 +25,7 @@ const MAX_POSTGRES_BIGINT = BigInt("9223372036854775807");
 type LegacyExchangeRow = {
   id: string;
   userId: string;
-  workspaceId: string;
+  workspaceId: string | null;
   authMethod: "legacy_exchange";
   deviceLabel: string | null;
   createdAt: Date;
@@ -168,8 +169,19 @@ function validOptionalHash(value: string | null | undefined): boolean {
   return value === null || value === undefined || HASH_PATTERN.test(value);
 }
 
-function mapSession(row: LegacyExchangeRow): AuthSession | null {
-  if (!validUserId(row.workspaceId)) return null;
+function mapSession(
+  row: LegacyExchangeRow,
+  env: AuthEnvironment,
+): AuthSession | null {
+  if (
+    (row.workspaceId !== null && !validUserId(row.workspaceId))
+    || (
+      row.workspaceId === null
+      && isAuthWorkspacesV2EnabledForUser(row.userId, env)
+    )
+  ) {
+    return null;
+  }
   return {
     id: row.id,
     userId: row.userId,
@@ -345,7 +357,7 @@ export async function exchangeLegacyOwnerSession(input: {
       ],
     );
     const row = result.rows[0];
-    const session = row ? mapSession(row) : null;
+    const session = row ? mapSession(row, env) : null;
     return session ? { session, token: sessionToken } : null;
   } catch (error) {
     logError("auth_v2.legacy_session_exchange_failed", error);

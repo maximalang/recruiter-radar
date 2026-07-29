@@ -2,6 +2,11 @@ import { createHash, randomBytes } from "node:crypto";
 
 import { getPool } from "../db-pool";
 import { logError } from "../runtime";
+import {
+  type AuthEnvironment,
+  getAuthWorkspacesV2RolloutPolicy,
+  isAuthWorkspacesV2EnabledForUser,
+} from "./config";
 
 const TOKEN_PATTERN = /^[a-f0-9]{64}$/;
 const HASH_PATTERN = /^[a-f0-9]{64}$/;
@@ -18,7 +23,7 @@ export type AuthSessionMethod =
 export type AuthSession = {
   id: string;
   userId: string;
-  workspaceId: string;
+  workspaceId: string | null;
   authMethod: AuthSessionMethod;
   deviceLabel: string | null;
   createdAt: Date;
@@ -45,7 +50,7 @@ export class AuthSessionRequiredError extends Error {
 type SessionRow = {
   id: string;
   userId: string;
-  workspaceId: string;
+  workspaceId: string | null;
   authMethod: AuthSessionMethod;
   deviceLabel: string | null;
   createdAt: Date;
@@ -95,8 +100,22 @@ function createOpaqueToken(): string {
   return randomBytes(32).toString("hex");
 }
 
-function mapSession(row: SessionRow | undefined): AuthSession | null {
-  if (!row || !validId(row.workspaceId)) return null;
+function mapSession(
+  row: SessionRow | undefined,
+  env: AuthEnvironment = process.env,
+): AuthSession | null {
+  if (
+    !row
+    || !validId(row.id)
+    || !validId(row.userId)
+    || (row.workspaceId !== null && !validId(row.workspaceId))
+    || (
+      row.workspaceId === null
+      && isAuthWorkspacesV2EnabledForUser(row.userId, env)
+    )
+  ) {
+    return null;
+  }
   return {
     id: row.id,
     userId: row.userId,
@@ -234,11 +253,14 @@ export async function createAuthSession(
 export async function readAuthSession(
   token: string,
   now = new Date(),
+  options: { env?: AuthEnvironment } = {},
 ): Promise<AuthSession | null> {
   if (!TOKEN_PATTERN.test(token)) return null;
   const pool = getPool();
   if (!pool) return null;
 
+  const env = options.env ?? process.env;
+  const rollout = getAuthWorkspacesV2RolloutPolicy(env);
   try {
     const result = await pool.query<SessionRow>(
       `WITH invalidated AS (
@@ -248,18 +270,24 @@ export async function readAuthSession(
            revoke_reason = CASE
              WHEN session.absolute_expires_at <= $2 THEN 'absolute_expired'
              WHEN session.idle_expires_at <= $2 THEN 'idle_expired'
-             WHEN session.workspace_id IS NULL
-               OR NOT EXISTS (
-                 SELECT 1
-                 FROM workspace_members AS membership
-                 JOIN workspaces AS workspace
-                   ON workspace.id = membership.workspace_id
-                 WHERE membership.workspace_id = session.workspace_id
-                   AND membership.user_id = session.user_id
-                   AND membership.status = 'active'
-                   AND workspace.status = 'active'
-                   AND workspace.deleted_at IS NULL
+             WHEN (
+               $3::BOOLEAN
+               AND ($4::BOOLEAN OR session.user_id = ANY($5::BIGINT[]))
+               AND (
+                 session.workspace_id IS NULL
+                 OR NOT EXISTS (
+                   SELECT 1
+                   FROM workspace_members AS membership
+                   JOIN workspaces AS workspace
+                     ON workspace.id = membership.workspace_id
+                   WHERE membership.workspace_id = session.workspace_id
+                     AND membership.user_id = session.user_id
+                     AND membership.status = 'active'
+                     AND workspace.status = 'active'
+                     AND workspace.deleted_at IS NULL
+                 )
                )
+             )
                THEN 'workspace_access_lost'
              ELSE 'account_unavailable'
            END
@@ -268,6 +296,7 @@ export async function readAuthSession(
              OR (
                session.previous_token_hash = $1
                AND session.previous_token_valid_until > $2
+               AND session.previous_token_authorizes
              )
            )
            AND session.revoked_at IS NULL
@@ -281,17 +310,23 @@ export async function readAuthSession(
                  AND account.status = 'active'
                  AND account.email_verified_at IS NOT NULL
              )
-             OR session.workspace_id IS NULL
-             OR NOT EXISTS (
-               SELECT 1
-               FROM workspace_members AS membership
-               JOIN workspaces AS workspace
-                 ON workspace.id = membership.workspace_id
-               WHERE membership.workspace_id = session.workspace_id
-                 AND membership.user_id = session.user_id
-                 AND membership.status = 'active'
-                 AND workspace.status = 'active'
-                 AND workspace.deleted_at IS NULL
+             OR (
+               $3::BOOLEAN
+               AND ($4::BOOLEAN OR session.user_id = ANY($5::BIGINT[]))
+               AND (
+                 session.workspace_id IS NULL
+                 OR NOT EXISTS (
+                   SELECT 1
+                   FROM workspace_members AS membership
+                   JOIN workspaces AS workspace
+                     ON workspace.id = membership.workspace_id
+                   WHERE membership.workspace_id = session.workspace_id
+                     AND membership.user_id = session.user_id
+                     AND membership.status = 'active'
+                     AND workspace.status = 'active'
+                     AND workspace.deleted_at IS NULL
+                 )
+               )
              )
            )
          RETURNING session.*
@@ -335,19 +370,15 @@ export async function readAuthSession(
              session.absolute_expires_at
            )
          FROM users AS account
-         JOIN workspace_members AS membership
-           ON membership.user_id = account.id
-         JOIN workspaces AS workspace
-           ON workspace.id = membership.workspace_id
          WHERE (
              session.token_hash = $1
              OR (
                session.previous_token_hash = $1
                AND session.previous_token_valid_until > $2
+               AND session.previous_token_authorizes
              )
            )
            AND session.user_id = account.id
-           AND session.workspace_id = membership.workspace_id
            AND session.revoked_at IS NULL
            AND NOT EXISTS (
              SELECT 1
@@ -360,25 +391,35 @@ export async function readAuthSession(
              - MAKE_INTERVAL(mins => ${SESSION_TOUCH_INTERVAL_MINUTES})
            AND account.status = 'active'
            AND account.email_verified_at IS NOT NULL
-           AND membership.status = 'active'
-           AND workspace.status = 'active'
-           AND workspace.deleted_at IS NULL
+           AND (
+             NOT (
+               $3::BOOLEAN
+               AND ($4::BOOLEAN OR session.user_id = ANY($5::BIGINT[]))
+             )
+             OR EXISTS (
+               SELECT 1
+               FROM workspace_members AS membership
+               JOIN workspaces AS workspace
+                 ON workspace.id = membership.workspace_id
+               WHERE membership.workspace_id = session.workspace_id
+                 AND membership.user_id = session.user_id
+                 AND membership.status = 'active'
+                 AND workspace.status = 'active'
+                 AND workspace.deleted_at IS NULL
+             )
+           )
          RETURNING session.*
        ),
        current_session AS (
          SELECT session.*
          FROM auth_sessions AS session
          JOIN users AS account ON account.id = session.user_id
-         JOIN workspace_members AS membership
-           ON membership.workspace_id = session.workspace_id
-          AND membership.user_id = session.user_id
-         JOIN workspaces AS workspace
-           ON workspace.id = membership.workspace_id
          WHERE (
              session.token_hash = $1
              OR (
                session.previous_token_hash = $1
                AND session.previous_token_valid_until > $2
+               AND session.previous_token_authorizes
              )
            )
            AND session.revoked_at IS NULL
@@ -391,9 +432,23 @@ export async function readAuthSession(
            AND session.absolute_expires_at > $2
            AND account.status = 'active'
            AND account.email_verified_at IS NOT NULL
-           AND membership.status = 'active'
-           AND workspace.status = 'active'
-           AND workspace.deleted_at IS NULL
+           AND (
+             NOT (
+               $3::BOOLEAN
+               AND ($4::BOOLEAN OR session.user_id = ANY($5::BIGINT[]))
+             )
+             OR EXISTS (
+               SELECT 1
+               FROM workspace_members AS membership
+               JOIN workspaces AS workspace
+                 ON workspace.id = membership.workspace_id
+               WHERE membership.workspace_id = session.workspace_id
+                 AND membership.user_id = session.user_id
+                 AND membership.status = 'active'
+                 AND workspace.status = 'active'
+                 AND workspace.deleted_at IS NULL
+             )
+           )
        ),
        selected AS (
          SELECT * FROM touched
@@ -421,9 +476,15 @@ export async function readAuthSession(
        FROM selected
        JOIN users AS account ON account.id = selected.user_id
        LIMIT 1`,
-      [hashAuthSessionToken(token), now],
+      [
+        hashAuthSessionToken(token),
+        now,
+        rollout.enabled,
+        rollout.global,
+        rollout.canaryUserIds,
+      ],
     );
-    return mapSession(result.rows[0]);
+    return mapSession(result.rows[0], env);
   } catch (error) {
     logError("auth_v2.session_read_failed", error);
     return null;
@@ -442,12 +503,14 @@ export async function requireAuthSession(
 export async function rotateAuthSession(
   token: string,
   now = new Date(),
-  options: { force?: boolean } = {},
+  options: { force?: boolean; env?: AuthEnvironment } = {},
 ): Promise<AuthSessionWithToken | null> {
   if (!TOKEN_PATTERN.test(token)) return null;
   const pool = getPool();
   if (!pool) return null;
   const nextToken = createOpaqueToken();
+  const env = options.env ?? process.env;
+  const rollout = getAuthWorkspacesV2RolloutPolicy(env);
 
   try {
     const result = await pool.query<SessionRow>(
@@ -459,6 +522,7 @@ export async function rotateAuthSession(
              $3::TIMESTAMPTZ + INTERVAL '60 seconds',
              session.absolute_expires_at
            ),
+           previous_token_authorizes = TRUE,
            token_hash = $2,
            last_seen_at = $3,
            idle_expires_at = LEAST(
@@ -467,13 +531,8 @@ export async function rotateAuthSession(
            ),
            rotated_at = $3
          FROM users AS account
-         JOIN workspace_members AS membership
-           ON membership.user_id = account.id
-         JOIN workspaces AS workspace
-           ON workspace.id = membership.workspace_id
          WHERE session.token_hash = $1
            AND session.user_id = account.id
-           AND session.workspace_id = membership.workspace_id
            AND session.revoked_at IS NULL
            AND session.idle_expires_at > $3
            AND session.absolute_expires_at > $3
@@ -483,9 +542,23 @@ export async function rotateAuthSession(
            )
            AND account.status = 'active'
            AND account.email_verified_at IS NOT NULL
-           AND membership.status = 'active'
-           AND workspace.status = 'active'
-           AND workspace.deleted_at IS NULL
+           AND (
+             NOT (
+               $5::BOOLEAN
+               AND ($6::BOOLEAN OR session.user_id = ANY($7::BIGINT[]))
+             )
+             OR EXISTS (
+               SELECT 1
+               FROM workspace_members AS membership
+               JOIN workspaces AS workspace
+                 ON workspace.id = membership.workspace_id
+               WHERE membership.workspace_id = session.workspace_id
+                 AND membership.user_id = session.user_id
+                 AND membership.status = 'active'
+                 AND workspace.status = 'active'
+                 AND workspace.deleted_at IS NULL
+             )
+           )
          RETURNING session.*
        ),
        recorded AS (
@@ -532,9 +605,12 @@ export async function rotateAuthSession(
         hashAuthSessionToken(nextToken),
         now,
         options.force === true,
+        rollout.enabled,
+        rollout.global,
+        rollout.canaryUserIds,
       ],
     );
-    const session = mapSession(result.rows[0]);
+    const session = mapSession(result.rows[0], env);
     return session ? { session, token: nextToken } : null;
   } catch (error) {
     logError("auth_v2.session_rotate_failed", error);
@@ -546,12 +622,22 @@ export async function changeActiveWorkspace(input: {
   token: string;
   workspaceId: string;
   now?: Date;
+  env?: AuthEnvironment;
 }): Promise<AuthSessionWithToken | null> {
   const now = input.now ?? new Date();
+  const env = input.env ?? process.env;
   if (
     !TOKEN_PATTERN.test(input.token)
     || !validId(input.workspaceId)
     || !Number.isFinite(now.getTime())
+  ) {
+    return null;
+  }
+
+  const currentSession = await readAuthSession(input.token, now, { env });
+  if (
+    !currentSession
+    || !isAuthWorkspacesV2EnabledForUser(currentSession.userId, env)
   ) {
     return null;
   }
@@ -583,7 +669,7 @@ export async function changeActiveWorkspace(input: {
         now,
       ],
     );
-    const session = mapSession(result.rows[0]);
+    const session = mapSession(result.rows[0], env);
     return session ? { session, token: nextToken } : null;
   } catch (error) {
     logError("auth_v2.workspace_switch_failed", error);

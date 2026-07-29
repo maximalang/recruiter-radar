@@ -1,5 +1,8 @@
 BEGIN;
 
+ALTER TABLE auth_sessions
+  ADD COLUMN previous_token_authorizes BOOLEAN NOT NULL DEFAULT TRUE;
+
 CREATE FUNCTION change_auth_session_workspace(
   input_current_token_hash TEXT,
   input_next_token_hash TEXT,
@@ -25,9 +28,13 @@ BEGIN
     UPDATE auth_sessions AS session
     SET
       workspace_id = input_target_workspace_id,
+      previous_token_hash = session.token_hash,
+      previous_token_valid_until = LEAST(
+        input_now + INTERVAL '60 seconds',
+        session.absolute_expires_at
+      ),
+      previous_token_authorizes = FALSE,
       token_hash = input_next_token_hash,
-      previous_token_hash = NULL,
-      previous_token_valid_until = NULL,
       last_seen_at = input_now,
       idle_expires_at = LEAST(
         input_now + INTERVAL '14 days',

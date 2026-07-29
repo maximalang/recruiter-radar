@@ -45,6 +45,12 @@ try {
       UNION ALL
       SELECT 'opportunities', COUNT(*)::INTEGER, COUNT(workspace_id)::INTEGER
       FROM opportunities
+      UNION ALL
+      SELECT 'authSessions', COUNT(*)::INTEGER, COUNT(workspace_id)::INTEGER
+      FROM auth_sessions
+      UNION ALL
+      SELECT 'authChallenges', COUNT(*)::INTEGER, COUNT(workspace_id)::INTEGER
+      FROM auth_challenges
     ),
     mismatches AS (
       SELECT (

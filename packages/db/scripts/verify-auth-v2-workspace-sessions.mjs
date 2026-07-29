@@ -100,7 +100,8 @@ try {
          switched.id::TEXT AS id,
          switched.workspace_id::TEXT AS "workspaceId",
          switched.token_hash AS "tokenHash",
-         switched.previous_token_hash AS "previousTokenHash"
+         switched.previous_token_hash AS "previousTokenHash",
+         switched.previous_token_authorizes AS "previousTokenAuthorizes"
        FROM change_auth_session_workspace($1, $2, $3, NOW()) AS switched`,
       [currentTokenHash, nextHash, targetWorkspaceId],
     )
@@ -117,6 +118,7 @@ try {
        session.token_hash AS "tokenHash",
        session.previous_token_hash AS "previousTokenHash",
        session.previous_token_valid_until AS "previousTokenValidUntil",
+       session.previous_token_authorizes AS "previousTokenAuthorizes",
        (
          SELECT COUNT(*)::INTEGER
          FROM auth_security_events AS event
@@ -130,8 +132,9 @@ try {
   if (
     switchState.rows[0]?.workspaceId !== targetWorkspaceId
     || switchState.rows[0]?.tokenHash !== winningHash
-    || switchState.rows[0]?.previousTokenHash !== null
-    || switchState.rows[0]?.previousTokenValidUntil !== null
+    || switchState.rows[0]?.previousTokenHash !== currentTokenHash
+    || switchState.rows[0]?.previousTokenValidUntil === null
+    || switchState.rows[0]?.previousTokenAuthorizes !== false
     || switchState.rows[0]?.events !== 1
   ) {
     throw new Error('Workspace switch did not rotate and audit atomically.')
@@ -167,6 +170,56 @@ try {
     throw new Error('Session switched into a foreign workspace.')
   }
 
+  const revokedAfterSwitch = await pool.query(
+    `UPDATE auth_sessions AS session
+     SET revoked_at = NOW(), revoke_reason = 'logout'
+     WHERE (
+         session.token_hash = $1
+         OR session.previous_token_hash = $1
+       )
+       AND session.revoked_at IS NULL
+     RETURNING
+       session.token_hash AS "tokenHash",
+       session.revoke_reason AS reason`,
+    [currentTokenHash],
+  )
+  if (
+    revokedAfterSwitch.rowCount !== 1
+    || revokedAfterSwitch.rows[0]?.tokenHash !== winningHash
+    || revokedAfterSwitch.rows[0]?.reason !== 'logout'
+  ) {
+    throw new Error('Logout did not dominate a completed workspace switch.')
+  }
+
+  const membershipSession = await pool.query(
+    `INSERT INTO auth_sessions (
+       user_id,
+       workspace_id,
+       token_hash,
+       auth_method,
+       created_at,
+       last_seen_at,
+       idle_expires_at,
+       absolute_expires_at,
+       rotated_at,
+       last_authenticated_at
+     )
+     VALUES (
+       $1,
+       $2,
+       $3,
+       'magic_link',
+       NOW(),
+       NOW(),
+       NOW() + INTERVAL '14 days',
+       NOW() + INTERVAL '30 days',
+       NOW(),
+       NOW()
+     )
+     RETURNING id::TEXT AS id`,
+    [ownerId, targetWorkspaceId, digest('workspace-membership-session')],
+  )
+
   await pool.query(
     `UPDATE workspace_members
      SET status = 'suspended', updated_at = NOW()
@@ -190,7 +243,7 @@ try {
            AND workspace.deleted_at IS NULL
        )
      RETURNING revoke_reason AS reason`,
-    [session.rows[0].id],
+    [membershipSession.rows[0].id],
   )
   if (revoked.rows[0]?.reason !== 'workspace_access_lost') {
     throw new Error('Inactive membership did not revoke the session.')
@@ -199,11 +252,22 @@ try {
   const rollback = await readFile(resolve(migrationsDir, rollbackFile), 'utf8')
   await pool.query(rollback)
   const reverse = await pool.query(
-    `SELECT TO_REGPROCEDURE(
-       'change_auth_session_workspace(text,text,bigint,timestamp with time zone)'
-     ) IS NULL AS removed`,
+    `SELECT
+       TO_REGPROCEDURE(
+         'change_auth_session_workspace(text,text,bigint,timestamp with time zone)'
+       ) IS NULL AS removed,
+       NOT EXISTS (
+         SELECT 1
+         FROM information_schema.columns
+         WHERE table_schema = 'public'
+           AND table_name = 'auth_sessions'
+           AND column_name = 'previous_token_authorizes'
+       ) AS "columnRemoved"`,
   )
-  if (reverse.rows[0]?.removed !== true) {
+  if (
+    reverse.rows[0]?.removed !== true
+    || reverse.rows[0]?.columnRemoved !== true
+  ) {
     throw new Error('Workspace session switch reverse path was incomplete.')
   }
 
@@ -215,6 +279,7 @@ try {
       'workspace_switch_audited',
       'old_token_replay_rejected',
       'foreign_workspace_rejected',
+      'revoke_dominates_workspace_switch',
       'inactive_membership_revokes_session',
       'clean_reverse',
     ],

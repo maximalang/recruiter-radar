@@ -33,7 +33,8 @@ describe("auth v2 workspace session migration", () => {
     expect(migration).not.toContain("session.previous_token_hash = input_current_token_hash");
     expect(migration).toContain("membership.status = 'active'");
     expect(migration).toContain("workspace.status = 'active'");
-    expect(migration).toContain("previous_token_hash = NULL");
+    expect(migration).toContain("previous_token_hash = session.token_hash");
+    expect(migration).toContain("previous_token_authorizes = FALSE");
     expect(migration).toContain("'workspace_switched'");
   });
 
@@ -42,8 +43,10 @@ describe("auth v2 workspace session migration", () => {
     const verifier = readFileSync(verifierPath, "utf8");
 
     expect(rollback).toContain("DROP FUNCTION change_auth_session_workspace");
+    expect(rollback).toContain("DROP COLUMN previous_token_authorizes");
     expect(verifier).toContain("workspace_switch_single_winner");
     expect(verifier).toContain("workspace_switch_rotates_token");
+    expect(verifier).toContain("revoke_dominates_workspace_switch");
     expect(verifier).toContain("inactive_membership_revokes_session");
     expect(verifier).toContain("foreign_workspace_rejected");
     expect(verifier).toContain("Promise.all");
