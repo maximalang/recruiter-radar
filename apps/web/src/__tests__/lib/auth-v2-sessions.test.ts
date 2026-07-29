@@ -195,6 +195,15 @@ describe("auth v2 server-side sessions", () => {
     expect(String(query.mock.calls[1]?.[0])).toContain("all_sessions_revoked");
   });
 
+  test("distinguishes revoke-all database failure from an empty success", async () => {
+    const query = jest.fn().mockRejectedValue(new Error("database down"));
+    mockGetPool.mockReturnValue({ query } as never);
+
+    await expect(revokeAllAuthSessions({
+      userId: "42",
+    })).resolves.toBeNull();
+  });
+
   test("switches workspace through a current-token-only CAS and rotates immediately", async () => {
     const query = jest.fn()
       .mockResolvedValueOnce({

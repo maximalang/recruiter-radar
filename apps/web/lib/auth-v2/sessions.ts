@@ -812,7 +812,7 @@ async function revokeAuthSessionWhere(
 export async function revokeAllAuthSessions(input: {
   userId: string;
   exceptSessionId?: string | null;
-}): Promise<number> {
+}): Promise<number | null> {
   if (
     !validId(input.userId)
     || (
@@ -821,10 +821,10 @@ export async function revokeAllAuthSessions(input: {
       && !validId(input.exceptSessionId)
     )
   ) {
-    return 0;
+    return null;
   }
   const pool = getPool();
-  if (!pool) return 0;
+  if (!pool) return null;
 
   try {
     const result = await pool.query<{ revokedCount: number }>(
@@ -867,7 +867,7 @@ export async function revokeAllAuthSessions(input: {
     return result.rows[0]?.revokedCount ?? 0;
   } catch (error) {
     logError("auth_v2.session_revoke_all_failed", error);
-    return 0;
+    return null;
   }
 }
 

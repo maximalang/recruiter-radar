@@ -122,6 +122,42 @@ describe("auth v2 account security actions", () => {
     expect(mockRedirect).toHaveBeenCalledWith("/login?loggedOut=all");
   });
 
+  test("keeps the cookie when current-session revocation fails", async () => {
+    mockRevokeById.mockResolvedValue(false);
+
+    await endCurrentSessionAction();
+
+    expect(mockClearCookie).not.toHaveBeenCalled();
+    expect(mockRedirect).toHaveBeenCalledWith(
+      "/settings/security?sessions=unavailable",
+    );
+  });
+
+  test("does not claim other-session success when the database is unavailable", async () => {
+    mockRevokeAll.mockResolvedValue(null);
+
+    await endOtherSessionsAction();
+
+    expect(mockRedirect).toHaveBeenCalledWith(
+      "/settings/security?sessions=unavailable",
+    );
+    expect(mockRedirect).not.toHaveBeenCalledWith(
+      "/settings/security?sessions=others-ended",
+    );
+  });
+
+  test("keeps the cookie when all-session revocation is unavailable", async () => {
+    mockRevokeAll.mockResolvedValue(null);
+
+    await endAllSessionsAction();
+
+    expect(mockClearCookie).not.toHaveBeenCalled();
+    expect(mockRedirect).toHaveBeenCalledWith(
+      "/settings/security?sessions=unavailable",
+    );
+    expect(mockRedirect).not.toHaveBeenCalledWith("/login?loggedOut=all");
+  });
+
   test("rejects cross-origin mutations before resolving a session", async () => {
     mockHeaders.mockResolvedValue(new Headers({
       Origin: "https://attacker.example",

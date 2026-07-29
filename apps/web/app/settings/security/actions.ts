@@ -54,27 +54,36 @@ export async function revokeSessionAction(formData: FormData): Promise<never> {
 
 export async function endCurrentSessionAction(): Promise<never> {
   const session = await requireSecuritySession();
-  await revokeAuthSessionById({
+  const revoked = await revokeAuthSessionById({
     userId: session.userId,
     sessionId: session.id,
     reason: "logout",
   });
+  if (!revoked) {
+    return redirect("/settings/security?sessions=unavailable");
+  }
   await clearAuthV2SessionCookie();
   redirect("/login?loggedOut=1");
 }
 
 export async function endOtherSessionsAction(): Promise<never> {
   const session = await requireSecuritySession();
-  await revokeAllAuthSessions({
+  const revoked = await revokeAllAuthSessions({
     userId: session.userId,
     exceptSessionId: session.id,
   });
+  if (revoked === null) {
+    return redirect("/settings/security?sessions=unavailable");
+  }
   redirect("/settings/security?sessions=others-ended");
 }
 
 export async function endAllSessionsAction(): Promise<never> {
   const session = await requireSecuritySession();
-  await revokeAllAuthSessions({ userId: session.userId });
+  const revoked = await revokeAllAuthSessions({ userId: session.userId });
+  if (revoked === null) {
+    return redirect("/settings/security?sessions=unavailable");
+  }
   await clearAuthV2SessionCookie();
   redirect("/login?loggedOut=all");
 }
