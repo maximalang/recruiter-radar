@@ -8,6 +8,7 @@ import {
 import { getClient, getPool } from "../db-pool";
 import { sendEmail } from "../email/transport";
 import { logError, logWarn } from "../runtime";
+import { renderAuthEmail } from "./email-templates";
 import {
   getAuthV2Flags,
   isAuthPlatformV2EnabledForUser,
@@ -157,23 +158,14 @@ export async function requestAuthV2Login(input: {
   let sendStatus: "sent" | "failed" = "failed";
   try {
     const verifyUrl = buildAccountLoginUrl(token);
+    const message = renderAuthEmail({
+      template: "login_signup",
+      actionUrl: verifyUrl,
+      expiresInMinutes: LOGIN_TTL_MINUTES,
+    });
     const sent = await sendEmail({
+      ...message,
       to: email.canonical,
-      subject: "Вход в Recruiter Radar",
-      text: [
-        `Подтвердите вход: ${verifyUrl}`,
-        "",
-        `Ссылка действует ${LOGIN_TTL_MINUTES} минут.`,
-        "Если вы не запрашивали вход, просто проигнорируйте письмо.",
-      ].join("\n"),
-      html: [
-        '<div style="font-family:Inter,Arial,sans-serif;color:#0f172a;line-height:1.6">',
-        "<h2>Вход в Recruiter Radar</h2>",
-        "<p>Подтвердите рабочий email, чтобы войти или создать аккаунт.</p>",
-        `<p><a href="${verifyUrl}" style="display:inline-block;padding:12px 18px;border-radius:12px;background:#142d63;color:#fff;text-decoration:none;font-weight:700">Подтвердить вход</a></p>`,
-        `<p style="color:#667085">Ссылка действует ${LOGIN_TTL_MINUTES} минут. Если вы не запрашивали вход, проигнорируйте письмо.</p>`,
-        "</div>",
-      ].join(""),
     });
     sendStatus = sent.ok ? "sent" : "failed";
     if (!sent.ok) {
