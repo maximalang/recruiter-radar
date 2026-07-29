@@ -1051,6 +1051,7 @@ npm.cmd run web:build
 npm.cmd run test --workspace @recruiter-radar/web -- --runInBand
 npm.cmd run test:types --workspace @recruiter-radar/web
 npm.cmd run test:auth-v2:account-team:db
+npm.cmd run test:auth-v2:account-team:e2e
 npm.cmd run db:validate
 npm.cmd audit --omit=dev --audit-level=high
 ```
@@ -1065,6 +1066,18 @@ npm.cmd run auth-v2:accounts:purge -- --apply --batch-size=100
 Migration gates use fresh isolated PostgreSQL and upgrade fixtures; never the
 user database. E2E uses deterministic test email outbox and WebAuthn-compatible
 browser fixtures/authenticators.
+
+The PR4 account/team browser gate requires an administrative `DATABASE_URL` and
+OpenSSL. It creates and force-drops only a process-named disposable database,
+runs Next.js over a one-day local HTTPS certificate in a process-scoped build
+directory, and uses isolated Playwright Chromium contexts. It verifies the
+security and team surfaces at 390 and 1440 pixels, accessibility semantics,
+unexpected console/network findings, other-session revocation, fragment-based
+email confirmation, invite email binding, bounded role changes, session
+revocation after access changes, and audited ownership transfer. Screenshots
+and the JSON report are local ignored artifacts; the deterministic outbox,
+certificate, temporary tsconfig, and disposable database are removed in the
+runner cleanup.
 
 ## 21. CI
 
