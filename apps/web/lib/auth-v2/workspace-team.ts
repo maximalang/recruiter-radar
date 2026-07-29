@@ -297,7 +297,7 @@ export async function inviteWorkspaceMember(input: {
          $3,
          $4,
          $5,
-         $6 + INTERVAL '24 hours',
+         $6::TIMESTAMPTZ + INTERVAL '24 hours',
          'pending',
          $6
        )
@@ -369,7 +369,10 @@ export async function inviteWorkspaceMember(input: {
   await getPool()?.query(
     `UPDATE workspace_invites
      SET send_status = $1,
-         last_sent_at = CASE WHEN $1 = 'sent' THEN $2 ELSE NULL END
+         last_sent_at = CASE
+           WHEN $1 = 'sent' THEN $2::TIMESTAMPTZ
+           ELSE NULL
+         END
      WHERE id = $3`,
     [sendStatus, now, inviteId],
   ).catch((error) => {
@@ -488,7 +491,11 @@ export async function acceptWorkspaceInvite(input: {
          role = EXCLUDED.role,
          status = 'active',
          invited_by = EXCLUDED.invited_by,
-         updated_at = EXCLUDED.updated_at`,
+         updated_at = GREATEST(
+           workspace_members.joined_at,
+           workspace_members.updated_at,
+           EXCLUDED.updated_at
+         )`,
       [invite.inviteId, input.session.userId, now],
     );
     const accepted = await client.query(
@@ -705,7 +712,7 @@ export async function transferWorkspaceOwnership(input: {
          WHEN user_id = $3 THEN 'owner'
          ELSE role
        END,
-       updated_at = $4
+       updated_at = GREATEST(updated_at, $4::TIMESTAMPTZ)
        WHERE workspace_id = $1
          AND user_id IN ($2, $3)
          AND status = 'active'`,
@@ -713,7 +720,7 @@ export async function transferWorkspaceOwnership(input: {
     );
     await client.query(
       `UPDATE auth_sessions
-       SET revoked_at = $4,
+       SET revoked_at = GREATEST(created_at, $4::TIMESTAMPTZ),
            revoke_reason = 'security_action'
        WHERE workspace_id = $1
          AND user_id IN ($2, $3)
@@ -785,15 +792,14 @@ async function mutateMember(input: {
     if (input.kind === "role" && input.role) {
       await client.query(
         `UPDATE workspace_members
-         SET role = $4,
-             updated_at = $5
+         SET role = $3,
+             updated_at = GREATEST(updated_at, $4::TIMESTAMPTZ)
          WHERE workspace_id = $1
-           AND user_id = $3
+           AND user_id = $2
            AND status = 'active'
            AND role <> 'owner'`,
         [
           input.workspaceId,
-          input.actorUserId,
           input.targetUserId,
           input.role,
           input.now,
@@ -803,14 +809,13 @@ async function mutateMember(input: {
       await client.query(
         `UPDATE workspace_members
          SET status = 'removed',
-             updated_at = $4
+             updated_at = GREATEST(updated_at, $3::TIMESTAMPTZ)
          WHERE workspace_id = $1
-           AND user_id = $3
+           AND user_id = $2
            AND status = 'active'
            AND role <> 'owner'`,
         [
           input.workspaceId,
-          input.actorUserId,
           input.targetUserId,
           input.now,
         ],
@@ -818,7 +823,10 @@ async function mutateMember(input: {
     }
     await client.query(
       `UPDATE auth_sessions AS session
-       SET revoked_at = $4,
+       SET revoked_at = GREATEST(
+             session.created_at,
+             $3::TIMESTAMPTZ
+           ),
            revoke_reason = 'workspace_access_lost'
        WHERE session.workspace_id = $1
          AND session.user_id = $2
@@ -826,7 +834,6 @@ async function mutateMember(input: {
       [
         input.workspaceId,
         input.targetUserId,
-        input.actorUserId,
         input.now,
       ],
     );

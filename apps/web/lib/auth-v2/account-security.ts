@@ -238,7 +238,7 @@ export async function requestAccountEmailChange(input: {
          $4,
          '/settings/security',
          'pending',
-         $5 + INTERVAL '1 hour',
+         $5::TIMESTAMPTZ + INTERVAL '1 hour',
          $5
        )
        RETURNING id::TEXT AS id`,
@@ -460,7 +460,10 @@ export async function confirmAccountEmailChange(input: {
     await client.query(
       `WITH revoked_sessions AS (
          UPDATE auth_sessions AS session
-         SET revoked_at = $3,
+         SET revoked_at = GREATEST(
+               session.created_at,
+               $3::TIMESTAMPTZ
+             ),
              revoke_reason = 'security_action'
          WHERE session.user_id = $1
            AND ($2::BIGINT IS NULL OR session.id <> $2)
@@ -647,7 +650,10 @@ export async function requestAccountDeletion(input: {
     await client.query(
       `UPDATE workspaces AS workspace
        SET status = 'deletion_pending',
-           updated_at = $2
+           updated_at = GREATEST(
+             workspace.updated_at,
+             $2::TIMESTAMPTZ
+           )
        WHERE workspace.id IN (
          SELECT membership.workspace_id
          FROM workspace_members AS membership
@@ -665,27 +671,36 @@ export async function requestAccountDeletion(input: {
       [session.userId, now],
     );
     await client.query(
-      `UPDATE workspace_members
+      `UPDATE workspace_members AS membership
        SET status = 'removed',
-           updated_at = $2
-       WHERE user_id = $1
-         AND status = 'active'`,
+           updated_at = GREATEST(
+             membership.updated_at,
+             $2::TIMESTAMPTZ
+           )
+       WHERE membership.user_id = $1
+         AND membership.status = 'active'`,
       [session.userId, now],
     );
     await client.query(
-      `UPDATE auth_sessions
-       SET revoked_at = $2,
+      `UPDATE auth_sessions AS session
+       SET revoked_at = GREATEST(
+             session.created_at,
+             $2::TIMESTAMPTZ
+           ),
            revoke_reason = 'account_unavailable'
-       WHERE user_id = $1
-         AND revoked_at IS NULL`,
+       WHERE session.user_id = $1
+         AND session.revoked_at IS NULL`,
       [session.userId, now],
     );
     await client.query(
-      `UPDATE users
+      `UPDATE users AS account
        SET status = 'deletion_pending',
-           updated_at = $2
-       WHERE id = $1
-         AND status = 'active'`,
+           updated_at = GREATEST(
+             account.updated_at,
+             $2::TIMESTAMPTZ
+           )
+       WHERE account.id = $1
+         AND account.status = 'active'`,
       [session.userId, now],
     );
     await client.query(
