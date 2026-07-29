@@ -3,6 +3,10 @@ import type { Metadata } from "next";
 import { getAccountById } from "@/lib/account-auth";
 import { getClientProfileByOwnerId } from "@/lib/clientProfiles";
 import { getDeliveryPreferencesByOwnerId } from "@/lib/deliveryPreferences";
+import {
+  isAuthPlatformV2EnabledForUser,
+  isAuthWorkspacesV2EnabledForUser,
+} from "@/lib/auth-v2/config";
 import { computeProfileCompletion } from "@/lib/profileCompletion";
 import { readOwnerSession } from "@/lib/session";
 import { buildAccountNavigation } from "../ui/account-navigation";
@@ -84,6 +88,10 @@ export default async function SettingsIndexPage() {
         telegramConnected={Boolean(profile.telegramChatId)}
         emailEnabled={preferences?.emailDigestEnabled ?? false}
         webPushEnabled={preferences?.webPushEnabled ?? false}
+        authSecurityEnabled={
+          isAuthPlatformV2EnabledForUser(account.id)
+          && isAuthWorkspacesV2EnabledForUser(account.id)
+        }
       />
       <ContentCard>
         <ContentCardTitle>Доступ к аккаунту</ContentCardTitle>

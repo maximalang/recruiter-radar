@@ -15,6 +15,7 @@ describe("SettingsOverview", () => {
         telegramConnected={false}
         emailEnabled
         webPushEnabled={false}
+        authSecurityEnabled
       />,
     );
 
@@ -42,9 +43,12 @@ describe("SettingsOverview", () => {
         telegramConnected={false}
         emailEnabled={false}
         webPushEnabled={false}
+        authSecurityEnabled={false}
       />,
     );
 
     expect(screen.getByText("Доставка ожидает канал")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /^Безопасность/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: /^Команда/ })).toBeNull();
   });
 });
