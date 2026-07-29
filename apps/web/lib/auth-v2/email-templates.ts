@@ -231,6 +231,7 @@ function normalizeActionUrl(value: string | undefined): string | null {
     || url.username
     || url.password
     || url.origin === "null"
+    || url.origin !== canonicalAuthOrigin()
   ) {
     throw new Error("Auth email action URL must be a canonical HTTPS URL.");
   }
@@ -241,6 +242,42 @@ function normalizeActionUrl(value: string | undefined): string | null {
     throw new Error("Auth email action URL must not expose secrets or PII.");
   }
   return url.toString();
+}
+
+function canonicalAuthOrigin(): string {
+  const raw = (
+    process.env.AUTH_SITE_URL
+    ?? process.env.PAYMENTS_SITE_URL
+    ?? process.env.NEXT_PUBLIC_APP_URL
+    ?? process.env.RR_APP_BASE_URL
+  )?.trim();
+  const fallback = process.env.NODE_ENV === "production"
+    ? null
+    : "http://localhost:3000";
+  if (!raw && !fallback) {
+    throw new Error("Auth email action URL must use the canonical HTTPS origin.");
+  }
+
+  let url: URL;
+  try {
+    url = new URL(raw ?? fallback!);
+  } catch {
+    throw new Error("Auth email action URL must use the canonical HTTPS origin.");
+  }
+  const localDevelopment = (
+    process.env.NODE_ENV !== "production"
+    && url.protocol === "http:"
+    && (url.hostname === "localhost" || url.hostname === "127.0.0.1")
+  );
+  if (
+    (url.protocol !== "https:" && !localDevelopment)
+    || url.username
+    || url.password
+    || url.origin === "null"
+  ) {
+    throw new Error("Auth email action URL must use the canonical HTTPS origin.");
+  }
+  return url.origin;
 }
 
 function normalizeDisplayValue(

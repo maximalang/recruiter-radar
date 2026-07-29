@@ -3,7 +3,18 @@ import {
   renderAuthEmail,
 } from "@/lib/auth-v2/email-templates";
 
+const originalAuthSiteUrl = process.env.AUTH_SITE_URL;
+
 describe("auth email templates", () => {
+  beforeEach(() => {
+    process.env.AUTH_SITE_URL = "https://radar.example";
+  });
+
+  afterAll(() => {
+    if (originalAuthSiteUrl === undefined) delete process.env.AUTH_SITE_URL;
+    else process.env.AUTH_SITE_URL = originalAuthSiteUrl;
+  });
+
   test.each(AUTH_EMAIL_TEMPLATE_NAMES)(
     "%s has branded HTML, plain text, and a security notice",
     (template) => {
@@ -56,6 +67,14 @@ describe("auth email templates", () => {
     expect(() => renderAuthEmail({
       template: "login_signup",
       actionUrl: "https://user:pass@radar.example/auth/verify#secret",
+      expiresInMinutes: 15,
+    })).toThrow("canonical HTTPS");
+  });
+
+  test("rejects an HTTPS action URL on a different origin", () => {
+    expect(() => renderAuthEmail({
+      template: "login_signup",
+      actionUrl: "https://attacker.example/auth/verify#secret",
       expiresInMinutes: 15,
     })).toThrow("canonical HTTPS");
   });
