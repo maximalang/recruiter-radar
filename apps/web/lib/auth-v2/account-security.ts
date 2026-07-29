@@ -11,6 +11,7 @@ import {
   hashAuthRateLimitBoundary,
 } from "./rate-limits";
 import { normalizeAuthEmail } from "./security";
+import { acquireAuthOwnerDeletionFence } from "./owner-write-fence";
 import {
   RecentAuthenticationRequiredError,
   requireRecentAuthentication,
@@ -744,10 +745,7 @@ export async function requestAccountDeletion(input: {
   try {
     await client.query("BEGIN");
     await client.query("SET LOCAL lock_timeout = '5s'");
-    await client.query(
-      "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
-      ["auth-owner-scoped-writes"],
-    );
+    await acquireAuthOwnerDeletionFence(client);
     const accountResult = await client.query<{
       email: string;
       displayName: string | null;

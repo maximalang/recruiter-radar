@@ -58,9 +58,12 @@ provider state. Every guarded statement takes a shared transaction advisory
 fence; deletion takes the matching exclusive fence before its row locks.
 Ordinary writes remain concurrent, while deletion briefly pauses new guarded
 writes and returns unavailable after a five-second lock wait rather than
-deadlocking. For compatibility rows with `workspace_id=NULL`, the row guard
-resolves and locks the existing bootstrap workspace context without rewriting
-the retained legacy row.
+deadlocking. Application transactions that pre-lock an account, workspace or
+notification endpoint acquire the same shared fence immediately after `BEGIN`,
+before those row locks; this includes onboarding profile sync and notification
+binding. For compatibility rows with `workspace_id=NULL`, the row guard resolves
+and locks the existing bootstrap workspace context without rewriting the
+retained legacy row.
 
 ## Safe operation
 

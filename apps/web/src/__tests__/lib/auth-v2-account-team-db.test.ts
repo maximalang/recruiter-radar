@@ -13,6 +13,10 @@ import {
   requestAccountEmailChange,
 } from "@/lib/auth-v2/account-security";
 import {
+  saveOnboardingProgress,
+  type OnboardingDbClient,
+} from "@/lib/auth-v2/onboarding";
+import {
   changeActiveWorkspace,
   createAuthSession,
   listAuthSessions,
@@ -347,6 +351,57 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
       createdEvents: 3,
       bucketHits: 4,
       activeInvites: 1,
+    });
+  });
+
+  test("invite replacement clamps a stale timestamp to the replaced invite history", async () => {
+    const owner = await createFixture("invite-history-owner");
+    const email = uniqueEmail("invite-history-target");
+    const later = new Date("2026-07-29T12:01:00.000Z");
+    const earlier = new Date("2026-07-29T12:00:00.000Z");
+
+    await expect(inviteWorkspaceMember({
+      actorUserId: owner.userId,
+      workspaceId: owner.workspaceId,
+      email,
+      role: "viewer",
+      now: later,
+    })).resolves.toMatchObject({ ok: true });
+    await expect(inviteWorkspaceMember({
+      actorUserId: owner.userId,
+      workspaceId: owner.workspaceId,
+      email,
+      role: "viewer",
+      now: earlier,
+    })).resolves.toMatchObject({ ok: true });
+
+    const history = await pool!.query<{
+      activeInvites: number;
+      validRevocations: boolean;
+      revokedEvents: number;
+    }>(
+      `SELECT
+         COUNT(*) FILTER (
+           WHERE accepted_at IS NULL AND revoked_at IS NULL
+         )::INTEGER AS "activeInvites",
+         BOOL_AND(
+           revoked_at IS NULL OR revoked_at >= created_at
+         ) AS "validRevocations",
+         (
+           SELECT COUNT(*)::INTEGER
+           FROM auth_security_events
+           WHERE event_type = 'invite_revoked'
+             AND workspace_id = $1
+         ) AS "revokedEvents"
+       FROM workspace_invites
+       WHERE workspace_id = $1
+         AND email_normalized = $2`,
+      [owner.workspaceId, email],
+    );
+    expect(history.rows[0]).toEqual({
+      activeInvites: 1,
+      validRevocations: true,
+      revokedEvents: 1,
     });
   });
 
@@ -902,6 +957,90 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
     } finally {
       await workspaceBlocker.query("ROLLBACK").catch(() => undefined);
       workspaceBlocker.release();
+    }
+  });
+
+  test("onboarding takes the owner-write fence before parent locks and cannot deadlock deletion", async () => {
+    const account = await createFixture("onboarding-delete-race");
+    await pool!.query(
+      `UPDATE users
+       SET onboarding_status = 'in_progress',
+           onboarding_step = 'profile',
+           onboarding_data = $2::JSONB,
+           updated_at = NOW()
+       WHERE id = $1`,
+      [
+        account.userId,
+        JSON.stringify({
+          fullName: "Owner",
+          agencyName: "Deletion race workspace",
+          teamRole: "leader",
+        }),
+      ],
+    );
+
+    const onboardingClient = await pool!.connect();
+    let releaseProfileWrite: () => void = () => {};
+    const profileWriteGate = new Promise<void>((resolve) => {
+      releaseProfileWrite = resolve;
+    });
+    let markProfileWriteReached: () => void = () => {};
+    const profileWriteReached = new Promise<void>((resolve) => {
+      markProfileWriteReached = resolve;
+    });
+    const onboardingDb = {
+      query: async (sqlValue: unknown, values?: unknown[]) => {
+        const sql = String(sqlValue);
+        if (sql.includes("INSERT INTO client_profiles")) {
+          markProfileWriteReached();
+          await profileWriteGate;
+        }
+        return onboardingClient.query(sql, values);
+      },
+    } as unknown as OnboardingDbClient;
+
+    try {
+      const onboarding = saveOnboardingProgress({
+        userId: account.userId,
+        workspaceId: account.workspaceId,
+        workspaceName: "Deletion race workspace",
+        workspaceRole: "owner",
+        sessionId: account.session.id,
+      }, {
+        step: "profile",
+        intent: "next",
+        values: {
+          specialization: "Product",
+          roles: ["product"],
+          industries: ["it"],
+          geography: "Москва",
+          hiringMode: "specialist",
+        },
+      }, onboardingDb);
+      await expect(Promise.race([
+        profileWriteReached.then(() => "reached"),
+        delay(1_000).then(() => "timed_out"),
+      ])).resolves.toBe("reached");
+
+      const deletion = requestAccountDeletion({
+        session: account.session,
+        confirmation: ACCOUNT_DELETION_CONFIRMATION,
+      });
+      await expect(Promise.race([
+        deletion.then(() => "resolved"),
+        delay(100).then(() => "blocked"),
+      ])).resolves.toBe("blocked");
+
+      releaseProfileWrite();
+      await expect(onboarding).resolves.toMatchObject({
+        status: "in_progress",
+        step: "complete",
+      });
+      await expect(deletion).resolves.toEqual({ ok: true });
+    } finally {
+      releaseProfileWrite();
+      await onboardingClient.query("ROLLBACK").catch(() => undefined);
+      onboardingClient.release();
     }
   });
 

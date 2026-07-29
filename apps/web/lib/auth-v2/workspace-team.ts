@@ -199,7 +199,7 @@ export async function inviteWorkspaceMember(input: {
   role: WorkspaceRole;
   now?: Date;
 }): Promise<InviteMutationResult> {
-  const now = input.now ?? new Date();
+  let now = input.now ?? new Date();
   const email = normalizeAuthEmail(input.email);
   if (
     !validId(input.actorUserId)
@@ -233,6 +233,7 @@ export async function inviteWorkspaceMember(input: {
       "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
       [`auth-workspace-invite:${input.workspaceId}:${targetBoundary}`],
     );
+    if (input.now === undefined) now = new Date();
     const workspaceAllowed = await consumeAuthRateLimit(client, {
       scope: "workspace_invite",
       keyHash: hashAuthRateLimitBoundary(
@@ -281,13 +282,13 @@ export async function inviteWorkspaceMember(input: {
     }
     await client.query(
       `WITH revoked AS (
-         UPDATE workspace_invites
-         SET revoked_at = $3
-         WHERE workspace_id = $1
-           AND LOWER(email_normalized) = LOWER($2)
-           AND accepted_at IS NULL
-           AND revoked_at IS NULL
-         RETURNING id
+          UPDATE workspace_invites
+          SET revoked_at = GREATEST($3::TIMESTAMPTZ, created_at)
+          WHERE workspace_id = $1
+            AND LOWER(email_normalized) = LOWER($2)
+            AND accepted_at IS NULL
+            AND revoked_at IS NULL
+          RETURNING id, revoked_at
        )
        INSERT INTO auth_security_events (
          event_type,
@@ -308,8 +309,8 @@ export async function inviteWorkspaceMember(input: {
            'source',
            'web'
          ),
-         $3
-       WHERE EXISTS (SELECT 1 FROM revoked)`,
+          revoked.revoked_at
+        FROM revoked`,
       [
         input.workspaceId,
         email.normalized,

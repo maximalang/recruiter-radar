@@ -175,6 +175,10 @@ describe("auth v2 onboarding persistence", () => {
     });
 
     expect(query.mock.calls[0]?.[0]).toBe("BEGIN");
+    expect(String(query.mock.calls[1]?.[0])).toContain(
+      "pg_advisory_xact_lock_shared",
+    );
+    expect(query.mock.calls[1]?.[1]).toEqual(["auth-owner-scoped-writes"]);
     const lockCall = query.mock.calls.find(([sql]) =>
       String(sql).includes("FOR UPDATE OF account, membership, workspace"));
     expect(lockCall?.[1]).toEqual(["42", "9"]);

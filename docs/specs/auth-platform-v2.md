@@ -859,6 +859,9 @@ PR 4 implementation invariants:
 - email-change and invite target limits use the same lowercase identity
   boundary as conflict detection, and the target bucket is never consumed
   after the principal/workspace bucket has denied the request;
+- a default invite timestamp is refreshed after the per-target advisory lock,
+  and replacement revocation is clamped to the replaced invite's `created_at`;
+  concurrent sends cannot create an invalid historical ordering;
 - deletion requires recent authentication and the exact confirmation phrase,
   blocks an owner while another active member still depends on that owner, then
   immediately revokes sessions, removes memberships, disables owned profiles,
@@ -880,7 +883,10 @@ PR 4 implementation invariants:
   account deletion takes the matching exclusive fence before account and
   workspace locks. Ordinary writers remain concurrent; the rare deletion
   transaction briefly pauses new guarded writes and fails after a five-second
-  lock timeout instead of deadlocking. Legacy child rows whose profile still
+  lock timeout instead of deadlocking. Application transactions that pre-lock
+  an account, workspace or notification endpoint acquire the shared fence
+  immediately after `BEGIN`, before those row locks; this includes onboarding
+  profile sync and notification binding. Legacy child rows whose profile still
   has `workspace_id=NULL` resolve the existing bootstrap workspace for the
   active-context check without rewriting that compatibility row;
 - automatic purge is disabled when `AUTH_ACCOUNT_PURGE_AFTER_DAYS` is absent.
