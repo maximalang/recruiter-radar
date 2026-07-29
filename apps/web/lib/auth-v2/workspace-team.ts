@@ -73,6 +73,10 @@ export type InviteMutationResult =
   | { ok: true; delivery: "sent" | "failed" }
   | { ok: false; code: TeamFailureCode };
 
+export type InviteAcceptanceResult =
+  | { ok: true; workspaceId: string }
+  | { ok: false; code: TeamFailureCode };
+
 type ActorWorkspace = {
   actorRole: WorkspaceRole;
   workspaceName: string;
@@ -383,7 +387,7 @@ export async function acceptWorkspaceInvite(input: {
   token: string;
   session: TeamSessionContext;
   now?: Date;
-}): Promise<TeamMutationResult> {
+}): Promise<InviteAcceptanceResult> {
   const token = input.token.trim();
   const now = input.now ?? new Date();
   if (
@@ -533,7 +537,7 @@ export async function acceptWorkspaceInvite(input: {
       ],
     );
     await client.query("COMMIT");
-    return { ok: true };
+    return { ok: true, workspaceId: invite.workspaceId };
   } catch (error) {
     await rollbackQuietly(client);
     logError("auth_v2.workspace_invite_accept_failed", error);

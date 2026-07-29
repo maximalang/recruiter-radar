@@ -89,6 +89,51 @@ describe("auth v2 workspace team lifecycle", () => {
     )).toBe(false);
   });
 
+  test("returns the accepted workspace only after single-use acceptance commits", async () => {
+    const query = jest.fn(async (sql: string) => {
+      if (sql.includes("FROM workspace_invites AS invite")) {
+        return {
+          rows: [{
+            inviteId: "81",
+            workspaceId: "19",
+            emailNormalized: "invited@example.com",
+            role: "recruiter",
+            expiresAt: new Date("2026-07-30T12:00:00.000Z"),
+            acceptedAt: null,
+            revokedAt: null,
+          }],
+          rowCount: 1,
+        };
+      }
+      if (sql.includes("FROM users AS account") && sql.includes("FOR UPDATE")) {
+        return {
+          rows: [{
+            email: "invited@example.com",
+            emailNormalized: "invited@example.com",
+          }],
+          rowCount: 1,
+        };
+      }
+      if (sql.includes("FROM workspace_members")) {
+        return { rows: [], rowCount: 0 };
+      }
+      if (sql.includes("UPDATE workspace_invites")) {
+        return { rows: [], rowCount: 1 };
+      }
+      return { rows: [], rowCount: 1 };
+    });
+    mockGetClient.mockResolvedValue({ query, release: jest.fn() } as never);
+
+    await expect(acceptWorkspaceInvite({
+      token: "a".repeat(64),
+      session: session(),
+      now,
+    })).resolves.toEqual({ ok: true, workspaceId: "19" });
+
+    expect(query.mock.calls.at(-2)?.[0]).toContain("invite_accepted");
+    expect(query.mock.calls.at(-1)?.[0]).toBe("COMMIT");
+  });
+
   test("prevents self-escalation and generic owner assignment", async () => {
     await expect(changeWorkspaceMemberRole({
       actorUserId: "42",
