@@ -93,6 +93,25 @@ export function isAuthOnboardingV2EnabledForUser(
   );
 }
 
+export function isAuthPasskeysEnabledForUser(
+  userId: string | null | undefined,
+  env: AuthEnvironment = process.env,
+): boolean {
+  return (
+    enabled(env.AUTH_PASSKEYS_ENABLED)
+    && isAuthPlatformV2EnabledForUser(userId, env)
+  );
+}
+
+export function isAuthPasskeyLoginAvailable(
+  env: AuthEnvironment = process.env,
+): boolean {
+  if (!enabled(env.AUTH_PASSKEYS_ENABLED)) return false;
+  if (getAuthV2Flags(env).platform) return true;
+  const canaryIds = parseCanaryUserIds(env.AUTH_V2_CANARY_USER_IDS);
+  return canaryIds !== null && canaryIds.size > 0;
+}
+
 export function getAuthWorkspacesV2RolloutPolicy(
   env: AuthEnvironment = process.env,
 ): AuthWorkspaceV2RolloutPolicy {
