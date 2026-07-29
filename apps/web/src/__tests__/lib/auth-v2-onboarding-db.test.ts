@@ -198,6 +198,49 @@ describeDatabase("auth v2 onboarding PostgreSQL integration", () => {
     });
   });
 
+  test("profile skip still creates the missing minimal owner profile", async () => {
+    const freshOwner = await createFixture("owner");
+    await saveOnboardingProgress(freshOwner, {
+      step: "agency",
+      intent: "next",
+      values: {
+        fullName: "Мария Соколова",
+        agencyName: "Signal Bureau",
+        teamRole: "founder",
+      },
+    });
+    await saveOnboardingProgress(freshOwner, {
+      step: "profile",
+      intent: "skip",
+      values: {
+        specialization: null,
+        roles: [],
+        industries: [],
+        geography: null,
+        hiringMode: "auto",
+      },
+    });
+
+    const profile = await pool!.query<{
+      count: number;
+      agencyName: string;
+      workspaceId: string;
+    }>(
+      `SELECT
+         COUNT(*)::INTEGER AS count,
+         MIN(agency_name) AS "agencyName",
+         MIN(workspace_id)::TEXT AS "workspaceId"
+       FROM client_profiles
+       WHERE owner_id = $1`,
+      [freshOwner.userId],
+    );
+    expect(profile.rows[0]).toEqual({
+      count: 1,
+      agencyName: "Signal Bureau",
+      workspaceId: freshOwner.workspaceId,
+    });
+  });
+
   test("owner agency save renames workspace and profile skip preserves canonical fields", async () => {
     const existingOwner = await createFixture("owner");
     await pool!.query(
