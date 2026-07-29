@@ -368,9 +368,12 @@ device_label TEXT nullable
 legacy_migrated_at TIMESTAMPTZ nullable
 ```
 
-`workspace_id` назначается DB trigger при создании session. Runtime тип требует
-не-null значение, а каждый session read/rotation проверяет active membership и
-active workspace; legacy null или потеря доступа fail-closed с
+`workspace_id` назначается DB trigger при создании session. Во время
+compatibility window runtime тип остаётся nullable: pre-backfill session с
+`workspace_id=NULL` не мутируется, пока workspace rollout выключен для этого
+user. После точного `AUTH_WORKSPACES_V2_ENABLED=true` и platform/global либо
+canary eligibility каждый session read/rotation требует non-null active
+workspace и active membership; потеря доступа fail-closed с
 `workspace_access_lost`.
 
 ### 7.4. `workspaces`
@@ -586,6 +589,9 @@ Rules:
   the cutoff instead of extending the bearer token to absolute expiry;
 - previous hash grace may authorize the in-flight request but never creates
   another rotation or resurrects a revoked session;
+- workspace switch сохраняет предъявленный hash как non-authorizing revoke
+  capability: старый token не читает и не переключает session, но concurrent
+  logout/revoke всё ещё находит уже выданный новый token;
 - login, reauth, privilege change, email change и workspace switch rotate token;
 - logout sets `revoked_at/revoked_reason` before clearing cookie;
 - logout-all revokes all user sessions in one transaction;
@@ -748,6 +754,8 @@ Must match:
 
 ```text
 users
+auth sessions
+user-bound auth challenges (anonymous signup challenges stay unbound)
 client_profiles
 subscriptions and active entitlement
 checkout/payment provider references
