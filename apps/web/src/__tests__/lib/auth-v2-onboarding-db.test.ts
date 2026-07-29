@@ -125,6 +125,10 @@ describeDatabase("auth v2 onboarding PostgreSQL integration", () => {
   });
 
   test("does not let a non-owner member create or overwrite a team profile", async () => {
+    const workspaceBefore = await pool!.query<{ name: string }>(
+      "SELECT name FROM workspaces WHERE id = $1",
+      [recruiter.workspaceId],
+    );
     await saveOnboardingProgress(recruiter, {
       step: "agency",
       intent: "next",
@@ -153,6 +157,133 @@ describeDatabase("auth v2 onboarding PostgreSQL integration", () => {
       [recruiter.userId],
     );
     expect(profile.rows[0]?.count).toBe(0);
+    const workspaceAfter = await pool!.query<{ name: string }>(
+      "SELECT name FROM workspaces WHERE id = $1",
+      [recruiter.workspaceId],
+    );
+    expect(workspaceAfter.rows[0]?.name).toBe(workspaceBefore.rows[0]?.name);
+  });
+
+  test("rejects direct completion before required persisted steps", async () => {
+    const freshOwner = await createFixture("owner");
+
+    await expect(saveOnboardingProgress(freshOwner, {
+      step: "complete",
+      intent: "finish",
+      values: {},
+    })).rejects.toMatchObject({ name: "OnboardingValidationError" });
+
+    const state = await pool!.query<{
+      status: string;
+      step: string | null;
+      eventCount: number;
+    }>(
+      `SELECT
+         account.onboarding_status AS status,
+         account.onboarding_step AS step,
+         (
+           SELECT COUNT(*)::INTEGER
+           FROM auth_security_events AS event
+           WHERE event.event_type = 'onboarding_completed'
+             AND event.user_id = account.id
+         ) AS "eventCount"
+       FROM users AS account
+       WHERE account.id = $1`,
+      [freshOwner.userId],
+    );
+    expect(state.rows[0]).toEqual({
+      status: "not_started",
+      step: null,
+      eventCount: 0,
+    });
+  });
+
+  test("owner agency save renames workspace and profile skip preserves canonical fields", async () => {
+    const existingOwner = await createFixture("owner");
+    await pool!.query(
+      `INSERT INTO client_profiles (
+         owner_id,
+         workspace_id,
+         agency_name,
+         target_city,
+         specialization,
+         industries,
+         roles,
+         contact_policy,
+         hiring_mode,
+         updated_at
+       )
+       VALUES (
+         $1,
+         $2,
+         'Legacy Agency',
+         'Москва',
+         'Executive search',
+         '["finance"]'::JSONB,
+         ARRAY['executive']::TEXT[],
+         'corporate_only',
+         'specialist',
+         NOW()
+       )`,
+      [existingOwner.userId, existingOwner.workspaceId],
+    );
+
+    await expect(saveOnboardingProgress(existingOwner, {
+      step: "agency",
+      intent: "next",
+      values: {
+        fullName: "Ольга Иванова",
+        agencyName: "North Star",
+        teamRole: "founder",
+      },
+    })).resolves.toMatchObject({
+      workspaceName: "North Star",
+      step: "profile",
+    });
+    await saveOnboardingProgress(existingOwner, {
+      step: "profile",
+      intent: "skip",
+      values: {
+        specialization: null,
+        roles: [],
+        industries: [],
+        geography: null,
+        hiringMode: "auto",
+      },
+    });
+
+    const persisted = await pool!.query<{
+      workspaceName: string;
+      agencyName: string;
+      targetCity: string | null;
+      specialization: string | null;
+      industries: string[];
+      roles: string[];
+      hiringMode: string;
+    }>(
+      `SELECT
+         workspace.name AS "workspaceName",
+         profile.agency_name AS "agencyName",
+         profile.target_city AS "targetCity",
+         profile.specialization,
+         profile.industries,
+         profile.roles,
+         profile.hiring_mode AS "hiringMode"
+       FROM client_profiles AS profile
+       JOIN workspaces AS workspace
+         ON workspace.id = profile.workspace_id
+       WHERE profile.owner_id = $1`,
+      [existingOwner.userId],
+    );
+    expect(persisted.rows[0]).toEqual({
+      workspaceName: "North Star",
+      agencyName: "North Star",
+      targetCity: "Москва",
+      specialization: "Executive search",
+      industries: ["finance"],
+      roles: ["executive"],
+      hiringMode: "specialist",
+    });
   });
 
   async function createFixture(

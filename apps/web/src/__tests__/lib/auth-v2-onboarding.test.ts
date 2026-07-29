@@ -18,13 +18,16 @@ const ownerContext: OnboardingContext = {
 function createDb(
   lockedRow: Record<string, unknown>,
 ): { db: OnboardingDbClient; query: jest.Mock } {
-  const query = jest.fn(async (sqlValue: unknown) => {
+  const query = jest.fn(async (sqlValue: unknown, params?: unknown[]) => {
     const sql = String(sqlValue);
     if (sql.includes("FOR UPDATE OF account, membership, workspace")) {
       return { rows: [lockedRow], rowCount: 1 };
     }
     if (sql.includes("INSERT INTO client_profiles")) {
       return { rows: [{ id: "5" }], rowCount: 1 };
+    }
+    if (sql.includes("UPDATE workspaces")) {
+      return { rows: [{ name: params?.[1] }], rowCount: 1 };
     }
     return { rows: [], rowCount: 1 };
   });
@@ -94,6 +97,55 @@ describe("auth v2 onboarding input boundaries", () => {
 });
 
 describe("auth v2 onboarding persistence", () => {
+  test("rejects forged completion before the persisted flow reaches the final step", async () => {
+    const { db, query } = createDb({
+      onboardingStatus: "not_started",
+      onboardingStep: null,
+      onboardingData: {},
+      workspaceRole: "owner",
+      workspaceName: "Workspace 42",
+    });
+
+    await expect(saveOnboardingProgress(ownerContext, {
+      step: "complete",
+      intent: "finish",
+      values: {},
+    }, db)).rejects.toBeInstanceOf(OnboardingValidationError);
+
+    expect(query.mock.calls.some(([sql]) =>
+      String(sql).includes("onboarding_completed"))).toBe(false);
+    expect(query.mock.calls.some(([sql]) =>
+      String(sql).includes("UPDATE users"))).toBe(false);
+    expect(query.mock.calls.at(-1)?.[0]).toBe("ROLLBACK");
+  });
+
+  test("persists an owner's agency name as the canonical workspace name", async () => {
+    const { db, query } = createDb({
+      onboardingStatus: "not_started",
+      onboardingStep: null,
+      onboardingData: {},
+      workspaceRole: "owner",
+      workspaceName: "Workspace 42",
+    });
+
+    await expect(saveOnboardingProgress(ownerContext, {
+      step: "agency",
+      intent: "next",
+      values: {
+        fullName: "Анна Смирнова",
+        agencyName: "North Star",
+        teamRole: "leader",
+      },
+    }, db)).resolves.toMatchObject({
+      workspaceName: "North Star",
+      step: "profile",
+    });
+
+    const workspaceUpdate = query.mock.calls.find(([sql]) =>
+      String(sql).includes("UPDATE workspaces"));
+    expect(workspaceUpdate?.[1]).toEqual(["9", "North Star"]);
+  });
+
   test("locks and scopes an owner save to the authenticated user and workspace", async () => {
     const { db, query } = createDb({
       onboardingStatus: "in_progress",
@@ -136,6 +188,39 @@ describe("auth v2 onboarding persistence", () => {
     );
     expect(profileCall?.[1]).toEqual(expect.arrayContaining(["42", "9"]));
     expect(query.mock.calls.at(-1)?.[0]).toBe("COMMIT");
+  });
+
+  test("profile skip creates missing owner profile without erasing canonical optional fields", async () => {
+    const { db, query } = createDb({
+      onboardingStatus: "in_progress",
+      onboardingStep: "profile",
+      onboardingData: {
+        fullName: "Анна Смирнова",
+        agencyName: "North Star",
+        teamRole: "leader",
+      },
+      workspaceRole: "owner",
+      workspaceName: "Workspace 42",
+    });
+
+    await saveOnboardingProgress(ownerContext, {
+      step: "profile",
+      intent: "skip",
+      values: {
+        specialization: null,
+        roles: [],
+        industries: [],
+        geography: null,
+        hiringMode: "auto",
+      },
+    }, db);
+
+    const profileCall = query.mock.calls.find(([sql]) =>
+      String(sql).includes("INSERT INTO client_profiles"));
+    expect(String(profileCall?.[0])).toContain(
+      "CASE WHEN $9 THEN client_profiles.specialization",
+    );
+    expect(profileCall?.[1]?.at(-1)).toBe(true);
   });
 
   test("never mutates a team profile for a non-owner member", async () => {

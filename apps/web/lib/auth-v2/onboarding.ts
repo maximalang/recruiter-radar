@@ -331,6 +331,7 @@ function normalizePersistedData(value: unknown): OnboardingData {
 
 function normalizeStep(value: unknown, status: unknown): OnboardingStep {
   if (status === "completed") return "complete";
+  if (status !== "in_progress") return "agency";
   return typeof value === "string"
     && (ONBOARDING_STEPS as readonly string[]).includes(value)
     ? value as OnboardingStep
@@ -507,6 +508,7 @@ function mergeSubmission(
   status: OnboardingStatus;
   step: OnboardingStep;
   syncProfile: boolean;
+  preserveOptionalProfile: boolean;
   recordCompletion: boolean;
 } {
   if (submission.step === "agency") {
@@ -519,6 +521,7 @@ function mergeSubmission(
       status: "in_progress",
       step: "profile",
       syncProfile: false,
+      preserveOptionalProfile: false,
       recordCompletion: false,
     };
   }
@@ -530,6 +533,7 @@ function mergeSubmission(
         status: "in_progress",
         step: "complete",
         syncProfile: true,
+        preserveOptionalProfile: true,
         recordCompletion: false,
       };
     }
@@ -546,6 +550,7 @@ function mergeSubmission(
       status: "in_progress",
       step: submission.intent === "back" ? "agency" : "complete",
       syncProfile: submission.intent === "next",
+      preserveOptionalProfile: false,
       recordCompletion: false,
     };
   }
@@ -556,6 +561,7 @@ function mergeSubmission(
       status: "in_progress",
       step: "profile",
       syncProfile: false,
+      preserveOptionalProfile: false,
       recordCompletion: false,
     };
   }
@@ -565,6 +571,7 @@ function mergeSubmission(
     status: "completed",
     step: "complete",
     syncProfile: false,
+    preserveOptionalProfile: false,
     recordCompletion: true,
   };
 }
@@ -574,6 +581,7 @@ async function syncOwnerProfile(
   context: OnboardingContext,
   workspaceName: string,
   data: OnboardingData,
+  preserveOptionalProfile: boolean,
 ): Promise<void> {
   const agencyName = data.agencyName ?? workspaceName;
   const result = await db.query<{ id: string }>(
@@ -605,12 +613,26 @@ async function syncOwnerProfile(
      DO UPDATE SET
        workspace_id = EXCLUDED.workspace_id,
        agency_name = EXCLUDED.agency_name,
-       target_city = EXCLUDED.target_city,
-       specialization = EXCLUDED.specialization,
-       industries = EXCLUDED.industries,
-       roles = EXCLUDED.roles,
+       target_city = CASE
+         WHEN $9 THEN client_profiles.target_city
+         ELSE EXCLUDED.target_city
+       END,
+       specialization = CASE WHEN $9 THEN client_profiles.specialization
+         ELSE EXCLUDED.specialization
+       END,
+       industries = CASE
+         WHEN $9 THEN client_profiles.industries
+         ELSE EXCLUDED.industries
+       END,
+       roles = CASE
+         WHEN $9 THEN client_profiles.roles
+         ELSE EXCLUDED.roles
+       END,
        contact_policy = 'corporate_only',
-       hiring_mode = EXCLUDED.hiring_mode,
+       hiring_mode = CASE
+         WHEN $9 THEN client_profiles.hiring_mode
+         ELSE EXCLUDED.hiring_mode
+       END,
        updated_at = NOW()
      WHERE client_profiles.workspace_id = EXCLUDED.workspace_id
         OR client_profiles.workspace_id IS NULL
@@ -624,6 +646,7 @@ async function syncOwnerProfile(
       JSON.stringify(data.industries ?? []),
       data.roles ?? [],
       data.hiringMode ?? "auto",
+      preserveOptionalProfile,
     ],
   );
   if (result.rowCount !== 1) throw new OnboardingAccessError();
@@ -671,12 +694,39 @@ export async function saveOnboardingProgress(
     if (!row || !currentRole) throw new OnboardingAccessError();
 
     const existingData = normalizePersistedData(row.onboardingData);
-    const merged = normalizeStatus(row.onboardingStatus) === "completed"
+    const currentStatus = normalizeStatus(row.onboardingStatus);
+    const currentStep = normalizeStep(row.onboardingStep, currentStatus);
+    const submissionStepIndex = ONBOARDING_STEPS.indexOf(submission.step);
+    const currentStepIndex = ONBOARDING_STEPS.indexOf(currentStep);
+    if (
+      currentStatus !== "completed"
+      && (
+        submissionStepIndex < 0
+        || submissionStepIndex > currentStepIndex
+      )
+    ) {
+      throw new OnboardingValidationError();
+    }
+    if (
+      currentStatus !== "completed"
+      && currentStep !== "agency"
+      && (
+        !existingData.fullName
+        || !existingData.agencyName
+        || !existingData.teamRole
+      )
+    ) {
+      throw new OnboardingValidationError();
+    }
+    const merged =
+      currentStatus === "completed"
+      || submissionStepIndex < currentStepIndex
       ? {
           data: existingData,
-          status: "completed" as const,
-          step: "complete" as const,
+          status: currentStatus,
+          step: currentStep,
           syncProfile: false,
+          preserveOptionalProfile: false,
           recordCompletion: false,
         }
       : mergeSubmission(existingData, submission);
@@ -699,12 +749,35 @@ export async function saveOnboardingProgress(
       ],
     );
 
+    let workspaceName = row.workspaceName;
+    if (
+      currentRole === "owner"
+      && submission.step === "agency"
+      && submissionStepIndex === currentStepIndex
+      && merged.data.agencyName
+    ) {
+      const renamed = await db.query<{ name: string }>(
+        `UPDATE workspaces
+         SET name = $2, updated_at = NOW()
+         WHERE id = $1
+           AND status = 'active'
+           AND deleted_at IS NULL
+         RETURNING name`,
+        [context.workspaceId, merged.data.agencyName],
+      );
+      if (renamed.rowCount !== 1 || !renamed.rows[0]?.name) {
+        throw new OnboardingAccessError();
+      }
+      workspaceName = renamed.rows[0].name;
+    }
+
     if (merged.syncProfile && currentRole === "owner") {
       await syncOwnerProfile(
         db,
         context,
-        row.workspaceName,
+        workspaceName,
         merged.data,
+        merged.preserveOptionalProfile,
       );
     }
 
@@ -739,7 +812,7 @@ export async function saveOnboardingProgress(
       status: merged.status,
       step: merged.step,
       data: merged.data,
-      workspaceName: row.workspaceName,
+      workspaceName,
       workspaceRole: currentRole,
     };
   } catch (error) {
