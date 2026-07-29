@@ -111,7 +111,10 @@ describe("auth v2 passkeys", () => {
     mockGenerateRegistrationOptions.mockResolvedValue({
       challenge: rawChallenge,
     } as never);
-    const query = jest.fn(async (sql: string) => {
+    const query = jest.fn(async (
+      sql: string,
+      _values?: readonly unknown[],
+    ) => {
       if (sql.includes("FROM auth_sessions AS session")) {
         return {
           rows: [{
@@ -262,6 +265,9 @@ describe("auth v2 passkeys", () => {
     });
     mockGetClient.mockResolvedValue({ query, release: jest.fn() } as never);
     mockVerifyRegistrationResponse.mockImplementation(async (options) => {
+      if (typeof options.expectedChallenge !== "function") {
+        throw new Error("Expected a hashed-challenge verifier callback.");
+      }
       expect(await options.expectedChallenge(rawChallenge)).toBe(true);
       expect(options.expectedOrigin).toBe("https://radar.example");
       expect(options.expectedRPID).toBe("radar.example");
@@ -415,7 +421,10 @@ describe("auth v2 passkeys", () => {
     mockGenerateAuthenticationOptions.mockResolvedValue({
       challenge: rawChallenge,
     } as never);
-    const startQuery = jest.fn(async (sql: string) => (
+    const startQuery = jest.fn(async (
+      sql: string,
+      _values?: readonly unknown[],
+    ) => (
       sql.includes("consume_auth_rate_limit")
         ? { rows: [{ allowed: true }], rowCount: 1 }
         : { rows: [], rowCount: 1 }
@@ -452,7 +461,10 @@ describe("auth v2 passkeys", () => {
         userHandle: null,
       },
     } as never;
-    const finishQuery = jest.fn(async (sql: string) => {
+    const finishQuery = jest.fn(async (
+      sql: string,
+      _values?: readonly unknown[],
+    ) => {
       if (sql.includes("consume_auth_rate_limit")) {
         return { rows: [{ allowed: true }], rowCount: 1 };
       }
@@ -496,6 +508,9 @@ describe("auth v2 passkeys", () => {
       release: jest.fn(),
     } as never);
     mockVerifyAuthenticationResponse.mockImplementation(async (options) => {
+      if (typeof options.expectedChallenge !== "function") {
+        throw new Error("Expected a hashed-challenge verifier callback.");
+      }
       expect(await options.expectedChallenge(rawChallenge)).toBe(true);
       expect(options.expectedOrigin).toBe("https://radar.example");
       expect(options.expectedRPID).toBe("radar.example");

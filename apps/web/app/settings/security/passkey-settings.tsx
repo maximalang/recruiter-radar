@@ -16,7 +16,7 @@ export type PasskeyView = {
   deviceType: "singleDevice" | "multiDevice";
   backedUp: boolean;
   backupEligible: boolean;
-  transports: string[];
+  transports: readonly string[];
   createdAt: string;
   lastUsedAt: string | null;
 };
