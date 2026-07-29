@@ -405,9 +405,30 @@ export async function checkTelegramChatOwnsClientProfile(telegramChatId: string,
 export async function hasPremiumEntitlement(userId: number): Promise<EntitlementResult> {
   const pool = getPool();
   if (!pool) throw new Error("DATABASE_URL is not set.");
-  const activeSubscription = await pool.query<{ ok: boolean }>(`SELECT TRUE AS ok FROM subscriptions WHERE user_id = $1 AND status IN ('trial', 'active', 'past_due') LIMIT 1`, [userId]);
+  const activeSubscription = await pool.query<{ ok: boolean }>(
+    `SELECT TRUE AS ok
+     FROM subscriptions AS subscription
+     JOIN users AS account
+       ON account.id = subscription.user_id
+      AND account.status = 'active'
+     WHERE subscription.user_id = $1
+       AND subscription.status IN ('trial', 'active', 'past_due')
+     LIMIT 1`,
+    [userId],
+  );
   if (activeSubscription.rowCount === 1) return { allowed: true, reason: null };
-  const activePilot = await pool.query<{ ok: boolean }>(`SELECT TRUE AS ok FROM pilot_enrollments WHERE user_id = $1 AND status = 'active' AND (ends_at IS NULL OR ends_at > NOW()) LIMIT 1`, [userId]);
+  const activePilot = await pool.query<{ ok: boolean }>(
+    `SELECT TRUE AS ok
+     FROM pilot_enrollments AS pilot
+     JOIN users AS account
+       ON account.id = pilot.user_id
+      AND account.status = 'active'
+     WHERE pilot.user_id = $1
+       AND pilot.status = 'active'
+       AND (pilot.ends_at IS NULL OR pilot.ends_at > NOW())
+     LIMIT 1`,
+    [userId],
+  );
   if (activePilot.rowCount === 1) return { allowed: true, reason: null };
   return { allowed: false, reason: "No active subscription or pilot." };
 }

@@ -1,5 +1,20 @@
 import type { NextConfig } from "next";
 
+const requestedE2eDistDir = process.env.AUTH_V2_E2E_DIST_DIR?.trim();
+const distDir = (
+  requestedE2eDistDir
+  && /^\.next-auth-v2-e2e-[1-9]\d*$/.test(requestedE2eDistDir)
+)
+  ? requestedE2eDistDir
+  : ".next";
+const requestedE2eTsconfig = process.env.AUTH_V2_E2E_TSCONFIG?.trim();
+const tsconfigPath = (
+  requestedE2eTsconfig
+  && /^\.auth-v2-e2e-tsconfig-[1-9]\d*\.json$/.test(requestedE2eTsconfig)
+)
+  ? requestedE2eTsconfig
+  : "tsconfig.json";
+
 export function buildContentSecurityPolicy(environment: string | undefined): string {
   const isDevelopment = environment !== 'production';
   const scriptPolicy = isDevelopment
@@ -13,6 +28,12 @@ export function buildContentSecurityPolicy(environment: string | undefined): str
 }
 
 const nextConfig: NextConfig = {
+  // Browser gates use a process-scoped cache so they never take the regular
+  // developer server's `.next/dev` lock.
+  distDir,
+  devIndicators: distDir === ".next" ? undefined : false,
+  typescript: { tsconfigPath },
+
   // Enable standalone output for Docker
   output: 'standalone',
 

@@ -8,6 +8,7 @@ import {
 import { getClient, getPool } from "../db-pool";
 import { logError } from "../runtime";
 import { isAuthOnboardingV2EnabledForUser } from "./config";
+import { acquireAuthOwnerWriteFence } from "./owner-write-fence";
 import { readAuthV2SessionCookie } from "./session-cookie";
 import { readAuthSession } from "./sessions";
 import {
@@ -668,6 +669,7 @@ export async function saveOnboardingProgress(
 
   try {
     await db.query("BEGIN");
+    await acquireAuthOwnerWriteFence(db);
     const locked = await db.query<LockedOnboardingRow>(
       `SELECT
          account.onboarding_status AS "onboardingStatus",

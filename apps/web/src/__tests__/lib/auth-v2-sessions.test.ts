@@ -45,6 +45,8 @@ function sessionRow(overrides: Record<string, unknown> = {}) {
     workspaceId: "9",
     authMethod: "magic_link",
     deviceLabel: null,
+    browserLabel: null,
+    environmentLabel: null,
     createdAt: new Date("2026-07-01T00:00:00.000Z"),
     lastSeenAt: new Date("2026-07-28T11:45:00.000Z"),
     idleExpiresAt: new Date("2026-08-11T12:00:00.000Z"),
@@ -191,6 +193,15 @@ describe("auth v2 server-side sessions", () => {
     expect(query.mock.calls[0]?.[1]).toEqual(["42", "17", "logout"]);
     expect(query.mock.calls[1]?.[1]?.slice(0, 2)).toEqual(["42", "17"]);
     expect(String(query.mock.calls[1]?.[0])).toContain("all_sessions_revoked");
+  });
+
+  test("distinguishes revoke-all database failure from an empty success", async () => {
+    const query = jest.fn().mockRejectedValue(new Error("database down"));
+    mockGetPool.mockReturnValue({ query } as never);
+
+    await expect(revokeAllAuthSessions({
+      userId: "42",
+    })).resolves.toBeNull();
   });
 
   test("switches workspace through a current-token-only CAS and rotates immediately", async () => {

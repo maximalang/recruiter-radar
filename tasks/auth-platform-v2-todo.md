@@ -94,15 +94,23 @@
 
 ## PR 4 — Security/team
 
-- [ ] Build active sessions UI and revoke actions.
-- [ ] Add recent-auth protected email change.
-- [ ] Add account deletion request lifecycle.
-- [ ] Add workspace invite lifecycle.
-- [ ] Add membership role/remove actions.
-- [ ] Add safe ownership transfer.
-- [ ] Add security emails and audit events.
-- [ ] Add takeover/escalation/invite E2E.
+- [x] Build active sessions UI and revoke actions.
+- [x] Add recent-auth protected email change.
+- [x] Add account deletion request lifecycle.
+- [x] Add workspace invite lifecycle.
+- [x] Add membership role/remove actions.
+- [x] Add safe ownership transfer.
+- [x] Add security emails and audit events.
+- [x] Add takeover/escalation/invite E2E.
+  - `npm.cmd run test:auth-v2:account-team:e2e` covers explicit email-change
+    confirmation, wrong-email invite rejection, bounded invite role, role-change
+    session revocation, and audited ownership transfer in isolated browsers.
 - [ ] Complete PR 4 review/check/CI gate.
+  - PostgreSQL evidence: the disposable account/team runner applies all
+    migrations, exercises real production core functions and deterministic
+    outbox delivery, proves concurrent email/invite single-use behavior,
+    role ceilings, immediate session revocation, ownership transfer and
+    due-only ledger-preserving purge.
 
 ## PR 5 — Passkeys
 

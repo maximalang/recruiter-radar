@@ -841,12 +841,91 @@ pilot onboarding data is migrated/reused rather than duplicated.
 - passkey management;
 - account deletion request with configurable retention policy.
 
+PR 4 implementation invariants:
+
+- every mutation derives the account and current session server-side and
+  enforces exact canonical Origin;
+- the email token travels only in the URL fragment, is moved by the client into
+  a short-lived HttpOnly pending-action cookie, and is consumed only after an
+  explicit POST confirmation;
+- the primary email remains unchanged before confirmation; a successful
+  confirmation is single-use, updates the verified address transactionally and
+  revokes every session except the matching current one;
+- when confirmation presents a session for the affected account, both the
+  email mutation and session preservation require the exact current
+  `token_hash`. A previous grace hash rolls the transaction back with a
+  reauthentication result and leaves the challenge available for a current
+  session; it never performs another sensitive rotation;
+- email-change and invite target limits use the same lowercase identity
+  boundary as conflict detection, and the target bucket is never consumed
+  after the principal/workspace bucket has denied the request;
+- a default invite timestamp is refreshed after the per-target advisory lock,
+  and replacement revocation is clamped to the replaced invite's `created_at`;
+  concurrent sends cannot create an invalid historical ordering;
+- deletion requires recent authentication and the exact confirmation phrase,
+  blocks an owner while another active member still depends on that owner, then
+  immediately revokes sessions, removes memberships, disables owned profiles,
+  entitlement and every delivery path, clears delivery contact credentials and
+  records a pending deletion request;
+- during the legacy owner compatibility window, deletion is also refused after
+  role ownership transfer if active workspace data is still keyed to the
+  former owner's `user_id`/`owner_id`. This preserves billing and immutable
+  Opportunity history instead of partially rewriting the tenant graph; the
+  workspace-scoped DAL migration removes this temporary safety boundary;
+- deletion and invite acceptance lock the same workspace row before deciding
+  whether membership can change, so a concurrent invite cannot orphan an owned
+  workspace during account deactivation;
+- owner-scoped profile and delivery writes take an active-account,
+  active-membership and active-workspace database lock. A writer authorized
+  before deletion either commits before deletion cleanup or waits and fails
+  closed; it cannot reactivate delivery afterward;
+- guarded write statements first take a shared transaction fence, while
+  account deletion takes the matching exclusive fence before account and
+  workspace locks. Ordinary writers remain concurrent; the rare deletion
+  transaction briefly pauses new guarded writes and fails after a five-second
+  lock timeout instead of deadlocking. Application transactions that pre-lock
+  an account, workspace or notification endpoint acquire the shared fence
+  immediately after `BEGIN`, before those row locks; this includes onboarding
+  profile sync and notification binding. Legacy child rows whose profile still
+  has `workspace_id=NULL` resolve the existing bootstrap workspace for the
+  active-context check without rewriting that compatibility row;
+- automatic purge is disabled when `AUTH_ACCOUNT_PURGE_AFTER_DAYS` is absent.
+  When configured, only an integer from 1 through 3650 is accepted. The policy
+  name is recorded from `AUTH_ACCOUNT_RETENTION_POLICY_KEY`, defaulting to
+  `manual_review`; these settings are operational configuration, not a legal
+  retention determination;
+- `auth-v2:accounts:purge` is dry-run by default. `--apply` processes a bounded,
+  due-only locked batch, anonymizes identity fields and outstanding invites
+  targeting the previous email, deletes revoked push endpoint keys, completes
+  the request and preserves subscriptions plus security audit events. The
+  operating procedure is in `docs/auth-v2-account-retention.md`.
+
 ### 14.4. `/settings/team`
 
 - list members/invites;
 - invite, change allowed role, revoke invite, remove member;
 - safe ownership transfer;
 - no self-promotion, last-owner removal or cross-email accept.
+
+PR 4 implementation invariants:
+
+- invites are workspace-bound, normalized-email-bound, role-bounded,
+  single-use and expire after 24 hours;
+- the fragment token follows the same pending HttpOnly cookie and explicit POST
+  confirmation boundary as email change;
+- a wrong-email account cannot consume an invite, replay is rejected and two
+  concurrent accepts create one membership and one success audit event;
+- invite acceptance checks the workspace rollout before opening a database
+  transaction, without requiring the invitee to already have a membership;
+- an admin cannot create or manage another admin, no actor can mutate itself,
+  and no mutation can create a second owner;
+- ownership transfer atomically demotes the previous owner, promotes the
+  selected active member, revokes both parties' sessions in that workspace and
+  records one target-bound audit event. It does not rewrite legacy tenant or
+  immutable audit ownership columns; account deletion stays blocked while
+  those rows remain attached to the former owner;
+- member removal changes the membership first and revokes every affected
+  workspace session in the same transaction.
 
 ### 14.5. Accessibility
 
@@ -1010,13 +1089,34 @@ npm.cmd run web:check
 npm.cmd run web:build
 npm.cmd run test --workspace @recruiter-radar/web -- --runInBand
 npm.cmd run test:types --workspace @recruiter-radar/web
+npm.cmd run test:auth-v2:account-team:db
+npm.cmd run test:auth-v2:account-team:e2e
 npm.cmd run db:validate
 npm.cmd audit --omit=dev --audit-level=high
+```
+
+Account deletion operations:
+
+```text
+npm.cmd run auth-v2:accounts:purge
+npm.cmd run auth-v2:accounts:purge -- --apply --batch-size=100
 ```
 
 Migration gates use fresh isolated PostgreSQL and upgrade fixtures; never the
 user database. E2E uses deterministic test email outbox and WebAuthn-compatible
 browser fixtures/authenticators.
+
+The PR4 account/team browser gate requires an administrative `DATABASE_URL` and
+OpenSSL. It creates and force-drops only a process-named disposable database,
+runs Next.js over a one-day local HTTPS certificate in a process-scoped build
+directory, and uses isolated Playwright Chromium contexts. It verifies the
+security and team surfaces at 390 and 1440 pixels, accessibility semantics,
+unexpected console/network findings, other-session revocation, fragment-based
+email confirmation, invite email binding, bounded role changes, session
+revocation after access changes, and audited ownership transfer. Screenshots
+and the JSON report are local ignored artifacts; the deterministic outbox,
+certificate, temporary tsconfig, and disposable database are removed in the
+runner cleanup.
 
 ## 21. CI
 

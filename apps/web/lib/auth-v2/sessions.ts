@@ -7,6 +7,10 @@ import {
   getAuthWorkspacesV2RolloutPolicy,
   isAuthWorkspacesV2EnabledForUser,
 } from "./config";
+import {
+  isAuthSessionEnvironment,
+  type AuthSessionEnvironment,
+} from "./session-environment";
 
 const TOKEN_PATTERN = /^[a-f0-9]{64}$/;
 const HASH_PATTERN = /^[a-f0-9]{64}$/;
@@ -26,6 +30,8 @@ export type AuthSession = {
   workspaceId: string | null;
   authMethod: AuthSessionMethod;
   deviceLabel: string | null;
+  browserLabel: string | null;
+  environmentLabel: string | null;
   createdAt: Date;
   lastSeenAt: Date;
   idleExpiresAt: Date;
@@ -47,12 +53,32 @@ export class AuthSessionRequiredError extends Error {
   }
 }
 
+export class RecentAuthenticationRequiredError extends Error {
+  constructor() {
+    super("Recent authentication required.");
+    this.name = "RecentAuthenticationRequiredError";
+  }
+}
+
+export type AuthSessionSummary = {
+  id: string;
+  authMethod: AuthSessionMethod;
+  deviceLabel: string | null;
+  browserLabel: string | null;
+  environmentLabel: string | null;
+  createdAt: Date;
+  lastSeenAt: Date;
+  current: boolean;
+};
+
 type SessionRow = {
   id: string;
   userId: string;
   workspaceId: string | null;
   authMethod: AuthSessionMethod;
   deviceLabel: string | null;
+  browserLabel: string | null;
+  environmentLabel: string | null;
   createdAt: Date;
   lastSeenAt: Date;
   idleExpiresAt: Date;
@@ -122,6 +148,8 @@ function mapSession(
     workspaceId: row.workspaceId,
     authMethod: row.authMethod,
     deviceLabel: row.deviceLabel,
+    browserLabel: row.browserLabel ?? null,
+    environmentLabel: row.environmentLabel ?? null,
     createdAt: row.createdAt,
     lastSeenAt: row.lastSeenAt,
     idleExpiresAt: row.idleExpiresAt,
@@ -139,6 +167,7 @@ export async function createAuthSession(
     requestIpHash?: string | null;
     userAgentHash?: string | null;
     deviceLabel?: string | null;
+    sessionEnvironment?: AuthSessionEnvironment | null;
   },
   now = new Date(),
 ): Promise<AuthSessionWithToken | null> {
@@ -147,6 +176,11 @@ export async function createAuthSession(
     || !validHash(input.requestIpHash)
     || !validHash(input.userAgentHash)
     || !validDeviceLabel(input.deviceLabel)
+    || (
+      input.sessionEnvironment !== null
+      && input.sessionEnvironment !== undefined
+      && !isAuthSessionEnvironment(input.sessionEnvironment)
+    )
   ) {
     return null;
   }
@@ -165,6 +199,8 @@ export async function createAuthSession(
            request_ip_hash,
            user_agent_hash,
            device_label,
+           browser_label,
+           environment_label,
            created_at,
            last_seen_at,
            idle_expires_at,
@@ -180,14 +216,16 @@ export async function createAuthSession(
            $4,
            $5,
            $6,
-           $7::TIMESTAMPTZ,
-           $7::TIMESTAMPTZ,
-           $7::TIMESTAMPTZ + INTERVAL '14 days',
-           $7::TIMESTAMPTZ + INTERVAL '30 days',
-           $7::TIMESTAMPTZ,
+           $7,
+           $8,
+           $9::TIMESTAMPTZ,
+           $9::TIMESTAMPTZ,
+           $9::TIMESTAMPTZ + INTERVAL '14 days',
+           $9::TIMESTAMPTZ + INTERVAL '30 days',
+           $9::TIMESTAMPTZ,
            CASE
              WHEN $3::TEXT = 'legacy_exchange' THEN NULL
-             ELSE $7::TIMESTAMPTZ
+             ELSE $9::TIMESTAMPTZ
            END
          FROM users AS account
          WHERE account.id = $1
@@ -212,7 +250,7 @@ export async function createAuthSession(
            created.request_ip_hash,
            created.user_agent_hash,
            JSONB_BUILD_OBJECT('method', created.auth_method),
-           $7::TIMESTAMPTZ
+           $9::TIMESTAMPTZ
          FROM created
          RETURNING id
        )
@@ -222,6 +260,8 @@ export async function createAuthSession(
          created.workspace_id::TEXT AS "workspaceId",
          created.auth_method AS "authMethod",
          created.device_label AS "deviceLabel",
+         created.browser_label AS "browserLabel",
+         created.environment_label AS "environmentLabel",
          created.created_at AS "createdAt",
          created.last_seen_at AS "lastSeenAt",
          created.idle_expires_at AS "idleExpiresAt",
@@ -238,7 +278,9 @@ export async function createAuthSession(
         input.authMethod,
         input.requestIpHash ?? null,
         input.userAgentHash ?? null,
-        input.deviceLabel ?? null,
+        input.sessionEnvironment?.deviceLabel ?? input.deviceLabel ?? null,
+        input.sessionEnvironment?.browserLabel ?? null,
+        input.sessionEnvironment?.environmentLabel ?? null,
         now,
       ],
     );
@@ -462,6 +504,8 @@ export async function readAuthSession(
          selected.workspace_id::TEXT AS "workspaceId",
          selected.auth_method AS "authMethod",
          selected.device_label AS "deviceLabel",
+         selected.browser_label AS "browserLabel",
+         selected.environment_label AS "environmentLabel",
          selected.created_at AS "createdAt",
          selected.last_seen_at AS "lastSeenAt",
          selected.idle_expires_at AS "idleExpiresAt",
@@ -590,6 +634,8 @@ export async function rotateAuthSession(
          rotated.workspace_id::TEXT AS "workspaceId",
          rotated.auth_method AS "authMethod",
          rotated.device_label AS "deviceLabel",
+         rotated.browser_label AS "browserLabel",
+         rotated.environment_label AS "environmentLabel",
          rotated.created_at AS "createdAt",
          rotated.last_seen_at AS "lastSeenAt",
          rotated.idle_expires_at AS "idleExpiresAt",
@@ -654,6 +700,8 @@ export async function changeActiveWorkspace(input: {
          switched.workspace_id::TEXT AS "workspaceId",
          switched.auth_method AS "authMethod",
          switched.device_label AS "deviceLabel",
+         switched.browser_label AS "browserLabel",
+         switched.environment_label AS "environmentLabel",
          switched.created_at AS "createdAt",
          switched.last_seen_at AS "lastSeenAt",
          switched.idle_expires_at AS "idleExpiresAt",
@@ -715,7 +763,10 @@ async function revokeAuthSessionWhere(
       `WITH revoked_session AS (
          UPDATE auth_sessions AS session
          SET
-           revoked_at = clock_timestamp(),
+           revoked_at = GREATEST(
+             session.created_at,
+             clock_timestamp()
+           ),
            revoke_reason = $${reasonParameter}
          WHERE ${predicate}
            AND session.revoked_at IS NULL
@@ -764,7 +815,7 @@ async function revokeAuthSessionWhere(
 export async function revokeAllAuthSessions(input: {
   userId: string;
   exceptSessionId?: string | null;
-}): Promise<number> {
+}): Promise<number | null> {
   if (
     !validId(input.userId)
     || (
@@ -773,17 +824,20 @@ export async function revokeAllAuthSessions(input: {
       && !validId(input.exceptSessionId)
     )
   ) {
-    return 0;
+    return null;
   }
   const pool = getPool();
-  if (!pool) return 0;
+  if (!pool) return null;
 
   try {
     const result = await pool.query<{ revokedCount: number }>(
       `WITH revoked_sessions AS (
          UPDATE auth_sessions AS session
          SET
-           revoked_at = clock_timestamp(),
+           revoked_at = GREATEST(
+             session.created_at,
+             clock_timestamp()
+           ),
            revoke_reason = 'logout_all'
          WHERE session.user_id = $1
            AND ($2::BIGINT IS NULL OR session.id <> $2::BIGINT)
@@ -819,7 +873,54 @@ export async function revokeAllAuthSessions(input: {
     return result.rows[0]?.revokedCount ?? 0;
   } catch (error) {
     logError("auth_v2.session_revoke_all_failed", error);
-    return 0;
+    return null;
+  }
+}
+
+export async function listAuthSessions(input: {
+  userId: string;
+  currentSessionId: string;
+  now?: Date;
+}): Promise<AuthSessionSummary[]> {
+  const now = input.now ?? new Date();
+  if (
+    !validId(input.userId)
+    || !validId(input.currentSessionId)
+    || !Number.isFinite(now.getTime())
+  ) {
+    return [];
+  }
+  const pool = getPool();
+  if (!pool) return [];
+
+  try {
+    const result = await pool.query<Omit<AuthSessionSummary, "current">>(
+      `SELECT
+         session.id::TEXT AS id,
+         session.auth_method AS "authMethod",
+         session.device_label AS "deviceLabel",
+         session.browser_label AS "browserLabel",
+         session.environment_label AS "environmentLabel",
+         session.created_at AS "createdAt",
+         session.last_seen_at AS "lastSeenAt"
+       FROM auth_sessions AS session
+       WHERE session.user_id = $1
+         AND session.revoked_at IS NULL
+         AND session.idle_expires_at > $2
+         AND session.absolute_expires_at > $2
+       ORDER BY
+         (session.id = $3::BIGINT) DESC,
+         session.last_seen_at DESC,
+         session.id DESC`,
+      [input.userId, now, input.currentSessionId],
+    );
+    return result.rows.map((row) => ({
+      ...row,
+      current: row.id === input.currentSessionId,
+    }));
+  } catch (error) {
+    logError("auth_v2.session_list_failed", error);
+    return [];
   }
 }
 
@@ -839,4 +940,14 @@ export function isRecentAuthentication(
   }
   const age = now.getTime() - authenticatedAt;
   return age >= 0 && age <= maxAgeSeconds * 1000;
+}
+
+export function requireRecentAuthentication(
+  session: Pick<AuthSession, "lastAuthenticatedAt">,
+  now = new Date(),
+  maxAgeSeconds = RECENT_AUTH_SECONDS,
+): void {
+  if (!isRecentAuthentication(session, now, maxAgeSeconds)) {
+    throw new RecentAuthenticationRequiredError();
+  }
 }

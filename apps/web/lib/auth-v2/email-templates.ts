@@ -3,7 +3,11 @@ import type { EmailMessage } from "../email/transport";
 export const AUTH_EMAIL_TEMPLATE_NAMES = [
   "login_signup",
   "change_email",
+  "email_change_requested",
   "workspace_invite",
+  "workspace_role_changed",
+  "workspace_removed",
+  "workspace_ownership_transferred",
   "new_login",
   "email_changed",
   "passkey_added",
@@ -53,6 +57,13 @@ const COPY: Readonly<Record<AuthEmailTemplateName, TemplateCopy>> = {
     actionRequired: true,
     securityNote: "Если вы не меняли email, не открывайте ссылку и проверьте безопасность аккаунта.",
   },
+  email_change_requested: {
+    subject: "Запрошена смена email — Recruiter Radar",
+    eyebrow: "Безопасность аккаунта",
+    heading: "Получен запрос на смену email",
+    body: "Основной адрес аккаунта пока не изменён. Новый email станет активным только после подтверждения защищённой ссылки на новом адресе.",
+    securityNote: "Если это были не вы, завершите другие активные сессии и защитите доступ к рабочей почте.",
+  },
   workspace_invite: {
     subject: "Приглашение в команду — Recruiter Radar",
     eyebrow: "Команда",
@@ -61,6 +72,27 @@ const COPY: Readonly<Record<AuthEmailTemplateName, TemplateCopy>> = {
     actionLabel: "Принять приглашение",
     actionRequired: true,
     securityNote: "Если вы не ожидали приглашение, безопасно проигнорируйте письмо или уточните его у администратора команды.",
+  },
+  workspace_role_changed: {
+    subject: "Роль в команде изменена — Recruiter Radar",
+    eyebrow: "Безопасность команды",
+    heading: "Ваша роль в workspace изменена",
+    body: "Доступ в рабочем пространстве обновлён. Активные сессии для этого workspace завершены, чтобы новые права применились сразу.",
+    securityNote: "Если изменение неожиданно, свяжитесь с владельцем workspace.",
+  },
+  workspace_removed: {
+    subject: "Доступ к workspace завершён — Recruiter Radar",
+    eyebrow: "Безопасность команды",
+    heading: "Вы удалены из рабочего пространства",
+    body: "Доступ к данным workspace закрыт, связанные активные сессии завершены.",
+    securityNote: "Если удаление было ошибочным, обратитесь к владельцу workspace.",
+  },
+  workspace_ownership_transferred: {
+    subject: "Ownership workspace передан — Recruiter Radar",
+    eyebrow: "Безопасность команды",
+    heading: "Владелец рабочего пространства изменён",
+    body: "Ownership передан через защищённый flow. Сессии участников изменения завершены для немедленного применения новых прав.",
+    securityNote: "Если вы не подтверждали передачу, немедленно свяжитесь с поддержкой.",
   },
   new_login: {
     subject: "Новый вход — Recruiter Radar",
@@ -103,13 +135,11 @@ const COPY: Readonly<Record<AuthEmailTemplateName, TemplateCopy>> = {
     securityNote: "Если это были не вы, защитите доступ к рабочей почте перед новым входом.",
   },
   account_deletion: {
-    subject: "Подтверждение удаления аккаунта — Recruiter Radar",
+    subject: "Запрос на удаление аккаунта — Recruiter Radar",
     eyebrow: "Удаление аккаунта",
-    heading: "Подтвердите запрос на удаление",
-    body: "Откройте защищённую ссылку, только если действительно хотите продолжить удаление аккаунта.",
-    actionLabel: "Продолжить удаление",
-    actionRequired: true,
-    securityNote: "Если вы не запрашивали удаление, не открывайте ссылку и проверьте безопасность аккаунта.",
+    heading: "Запрос на удаление принят",
+    body: "Доступ к аккаунту и активные сессии деактивированы. Дальнейшая обработка выполняется по настроенной политике хранения Recruiter Radar.",
+    securityNote: "Если вы не отправляли запрос, обратитесь в поддержку и защитите доступ к рабочей почте.",
   },
 };
 
@@ -195,7 +225,15 @@ function buildContext(
   workspaceName: string | null,
   deviceLabel: string | null,
 ): string | null {
-  if (template === "workspace_invite" && workspaceName) {
+  if (
+    (
+      template === "workspace_invite"
+      || template === "workspace_role_changed"
+      || template === "workspace_removed"
+      || template === "workspace_ownership_transferred"
+    )
+    && workspaceName
+  ) {
     return `Рабочее пространство: ${workspaceName}.`;
   }
   if (

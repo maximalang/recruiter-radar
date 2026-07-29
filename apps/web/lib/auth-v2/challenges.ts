@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import type { PoolClient } from "pg";
 
 import {
@@ -19,6 +19,11 @@ import {
   sanitizeAuthReturnTo,
 } from "./security";
 import { fingerprintLegacyOwnerSession } from "./legacy-session";
+import { hashAuthRateLimitBoundary } from "./rate-limits";
+import {
+  isAuthSessionEnvironment,
+  type AuthSessionEnvironment,
+} from "./session-environment";
 
 const LOGIN_TTL_MINUTES = 15;
 const TOKEN_PATTERN = /^[a-f0-9]{64}$/;
@@ -47,23 +52,6 @@ export type AuthV2LoginChallengeState =
     status: "expired" | "used" | "invalid";
     userId: string | null;
   };
-
-function authRateLimitSecret(): string {
-  const secret = (
-    process.env.AUTH_RATE_LIMIT_SECRET
-    ?? process.env.SESSION_SECRET
-  )?.trim();
-  if (!secret || secret.length < 32) {
-    throw new Error("AUTH_RATE_LIMIT_SECRET must be at least 32 characters.");
-  }
-  return secret;
-}
-
-function hashBoundary(kind: string, value: string): string {
-  return createHmac("sha256", authRateLimitSecret())
-    .update(`auth-v2:${kind}:${value}`)
-    .digest("hex");
-}
 
 function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
@@ -116,13 +104,13 @@ export async function requestAuthV2Login(input: {
   let token: string | null = null;
   let challengeId: string | null = null;
   try {
-    const globalHash = hashBoundary("global", "login");
-    const emailHash = hashBoundary("email", email.normalized);
+    const globalHash = hashAuthRateLimitBoundary("global", "login");
+    const emailHash = hashAuthRateLimitBoundary("email", email.normalized);
     const requestIpHash = input.clientAddress === "unknown"
       ? null
-      : hashBoundary("ip", input.clientAddress);
+      : hashAuthRateLimitBoundary("ip", input.clientAddress);
     const userAgentHash = input.userAgent
-      ? hashBoundary("user-agent", input.userAgent.slice(0, 512))
+      ? hashAuthRateLimitBoundary("user-agent", input.userAgent.slice(0, 512))
       : null;
 
     client = await getClient();
@@ -205,22 +193,32 @@ export async function consumeAuthV2Login(input: {
   token: string;
   clientAddress: string;
   legacyToken?: string | null;
+  sessionEnvironment?: AuthSessionEnvironment | null;
 }): Promise<AuthV2LoginConsumeResult | null> {
   const token = input.token.trim();
-  if (!TOKEN_PATTERN.test(token)) return null;
+  if (
+    !TOKEN_PATTERN.test(token)
+    || (
+      input.sessionEnvironment !== null
+      && input.sessionEnvironment !== undefined
+      && !isAuthSessionEnvironment(input.sessionEnvironment)
+    )
+  ) {
+    return null;
+  }
 
   let sessionToken: string | null = null;
   let client: PoolClient | null = null;
 
   try {
     sessionToken = randomBytes(32).toString("hex");
-    const globalVerificationKeyHash = hashBoundary(
+    const globalVerificationKeyHash = hashAuthRateLimitBoundary(
       "challenge-verify-global",
       "login",
     );
     const verificationIpKeyHash = input.clientAddress === "unknown"
       ? null
-      : hashBoundary("challenge-verify-ip", input.clientAddress);
+      : hashAuthRateLimitBoundary("challenge-verify-ip", input.clientAddress);
     const legacyFingerprintHash = input.legacyToken
       ? fingerprintLegacyOwnerSession(input.legacyToken)
       : null;
@@ -273,6 +271,24 @@ export async function consumeAuthV2Login(input: {
     ) {
       await client.query("COMMIT");
       return null;
+    }
+
+    if (input.sessionEnvironment) {
+      await client.query(
+        `UPDATE auth_sessions
+         SET device_label = $3,
+             browser_label = $4,
+             environment_label = $5
+         WHERE id = $1
+           AND user_id = $2`,
+        [
+          row.sessionId,
+          row.userId,
+          input.sessionEnvironment.deviceLabel,
+          input.sessionEnvironment.browserLabel,
+          input.sessionEnvironment.environmentLabel,
+        ],
+      );
     }
 
     await client.query("COMMIT");
