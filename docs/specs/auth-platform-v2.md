@@ -841,12 +841,52 @@ pilot onboarding data is migrated/reused rather than duplicated.
 - passkey management;
 - account deletion request with configurable retention policy.
 
+PR 4 implementation invariants:
+
+- every mutation derives the account and current session server-side and
+  enforces exact canonical Origin;
+- the email token travels only in the URL fragment, is moved by the client into
+  a short-lived HttpOnly pending-action cookie, and is consumed only after an
+  explicit POST confirmation;
+- the primary email remains unchanged before confirmation; a successful
+  confirmation is single-use, updates the verified address transactionally and
+  revokes every session except the matching current one;
+- deletion requires recent authentication and the exact confirmation phrase,
+  blocks an owner while another active member still depends on that owner, then
+  immediately revokes sessions, removes memberships and records a pending
+  deletion request;
+- automatic purge is disabled when `AUTH_ACCOUNT_PURGE_AFTER_DAYS` is absent.
+  When configured, only an integer from 1 through 3650 is accepted. The policy
+  name is recorded from `AUTH_ACCOUNT_RETENTION_POLICY_KEY`, defaulting to
+  `manual_review`; these settings are operational configuration, not a legal
+  retention determination;
+- `auth-v2:accounts:purge` is dry-run by default. `--apply` processes a bounded,
+  due-only locked batch, anonymizes identity fields, completes the request and
+  preserves subscriptions plus security audit events. The operating procedure
+  is in `docs/auth-v2-account-retention.md`.
+
 ### 14.4. `/settings/team`
 
 - list members/invites;
 - invite, change allowed role, revoke invite, remove member;
 - safe ownership transfer;
 - no self-promotion, last-owner removal or cross-email accept.
+
+PR 4 implementation invariants:
+
+- invites are workspace-bound, normalized-email-bound, role-bounded,
+  single-use and expire after 24 hours;
+- the fragment token follows the same pending HttpOnly cookie and explicit POST
+  confirmation boundary as email change;
+- a wrong-email account cannot consume an invite, replay is rejected and two
+  concurrent accepts create one membership and one success audit event;
+- an admin cannot create or manage another admin, no actor can mutate itself,
+  and no mutation can create a second owner;
+- ownership transfer atomically demotes the previous owner, promotes the
+  selected active member, revokes both parties' sessions in that workspace and
+  records one target-bound audit event;
+- member removal changes the membership first and revokes every affected
+  workspace session in the same transaction.
 
 ### 14.5. Accessibility
 
@@ -1010,8 +1050,16 @@ npm.cmd run web:check
 npm.cmd run web:build
 npm.cmd run test --workspace @recruiter-radar/web -- --runInBand
 npm.cmd run test:types --workspace @recruiter-radar/web
+npm.cmd run test:auth-v2:account-team:db
 npm.cmd run db:validate
 npm.cmd audit --omit=dev --audit-level=high
+```
+
+Account deletion operations:
+
+```text
+npm.cmd run auth-v2:accounts:purge
+npm.cmd run auth-v2:accounts:purge -- --apply --batch-size=100
 ```
 
 Migration gates use fresh isolated PostgreSQL and upgrade fixtures; never the

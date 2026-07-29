@@ -94,15 +94,20 @@
 
 ## PR 4 — Security/team
 
-- [ ] Build active sessions UI and revoke actions.
-- [ ] Add recent-auth protected email change.
-- [ ] Add account deletion request lifecycle.
-- [ ] Add workspace invite lifecycle.
-- [ ] Add membership role/remove actions.
-- [ ] Add safe ownership transfer.
-- [ ] Add security emails and audit events.
+- [x] Build active sessions UI and revoke actions.
+- [x] Add recent-auth protected email change.
+- [x] Add account deletion request lifecycle.
+- [x] Add workspace invite lifecycle.
+- [x] Add membership role/remove actions.
+- [x] Add safe ownership transfer.
+- [x] Add security emails and audit events.
 - [ ] Add takeover/escalation/invite E2E.
 - [ ] Complete PR 4 review/check/CI gate.
+  - PostgreSQL evidence: the disposable account/team runner applies all
+    migrations, exercises real production core functions and deterministic
+    outbox delivery, proves concurrent email/invite single-use behavior,
+    role ceilings, immediate session revocation, ownership transfer and
+    due-only ledger-preserving purge.
 
 ## PR 5 — Passkeys
 
