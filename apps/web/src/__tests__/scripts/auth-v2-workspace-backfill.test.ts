@@ -87,7 +87,8 @@ describe("auth v2 workspace tenant-context migration", () => {
     expect(verify).toContain("crossWorkspaceGuards");
     expect(verify).toContain("idempotentRerun");
     expect(verify).toContain("SELECT 'authSessions'");
-    expect(verify).toContain("SELECT 'authChallenges'");
+    expect(verify).toContain("'authUserChallenges'");
+    expect(verify).toContain("WHERE user_id IS NOT NULL");
   });
 
   test("keeps rollback guarded and legacy ownership authoritative during rollout", () => {

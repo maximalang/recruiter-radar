@@ -97,6 +97,20 @@ try {
   ) {
     throw new Error('Workspace parity verification failed.')
   }
+  const anonymousChallenge = await pool.query(
+    `SELECT
+       challenge.user_id IS NULL AS "userUnbound",
+       challenge.workspace_id IS NULL AS "workspaceUnbound"
+     FROM auth_challenges AS challenge
+     WHERE challenge.email_normalized =
+       'anonymous-workspace-signup@example.invalid'`,
+  )
+  if (
+    anonymousChallenge.rows[0]?.userUnbound !== true
+    || anonymousChallenge.rows[0]?.workspaceUnbound !== true
+  ) {
+    throw new Error('Anonymous signup challenge gained tenant authority.')
+  }
 
   const rerun = await runTool(
     'backfill-auth-v2-workspaces.mjs',
@@ -158,6 +172,7 @@ try {
       'dry_run_no_writes',
       'batched_apply',
       'row_count_parity',
+      'anonymous_signup_challenge_allowed',
       'stable_identity_parity',
       'outcome_ledger_unchanged',
       'cross_workspace_guards',
@@ -188,6 +203,24 @@ async function seedLegacyTenant() {
      RETURNING id::TEXT AS id`,
   )
   const userId = user.rows[0].id
+  await pool.query(
+    `INSERT INTO auth_challenges (
+       purpose,
+       email_normalized,
+       token_hash,
+       send_status,
+       expires_at,
+       created_at
+     )
+     VALUES (
+       'signup',
+       'anonymous-workspace-signup@example.invalid',
+       repeat('f', 64),
+       'sent',
+       NOW() + INTERVAL '10 minutes',
+       NOW()
+     )`,
+  )
   const profile = await pool.query(
     `INSERT INTO client_profiles (agency_name, owner_id)
      VALUES ('Workspace tenancy fixture', $1)

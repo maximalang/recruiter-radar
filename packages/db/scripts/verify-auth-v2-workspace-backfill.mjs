@@ -49,7 +49,10 @@ try {
       SELECT 'authSessions', COUNT(*)::INTEGER, COUNT(workspace_id)::INTEGER
       FROM auth_sessions
       UNION ALL
-      SELECT 'authChallenges', COUNT(*)::INTEGER, COUNT(workspace_id)::INTEGER
+      SELECT
+        'authUserChallenges',
+        COUNT(*) FILTER (WHERE user_id IS NOT NULL)::INTEGER,
+        COUNT(workspace_id) FILTER (WHERE user_id IS NOT NULL)::INTEGER
       FROM auth_challenges
     ),
     mismatches AS (
