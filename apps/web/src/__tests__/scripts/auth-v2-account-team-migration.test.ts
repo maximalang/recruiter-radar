@@ -52,6 +52,9 @@ describe("auth v2 account security and team migration", () => {
   test("provides a rollback for every additive schema object", () => {
     const sql = readFileSync(rollbackPath, "utf8");
 
+    expect(sql).toContain(
+      "while account deletion requests exist",
+    );
     expect(sql).toContain("DROP TABLE account_deletion_requests");
     expect(sql).toContain("DROP COLUMN IF EXISTS browser_label");
     expect(sql).toContain("DROP COLUMN IF EXISTS environment_label");

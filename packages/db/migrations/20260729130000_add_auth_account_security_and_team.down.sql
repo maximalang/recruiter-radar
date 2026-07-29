@@ -17,6 +17,13 @@ BEGIN
     RAISE EXCEPTION
       'cannot roll back auth account/team schema while team audit events exist';
   END IF;
+  IF EXISTS (
+    SELECT 1
+    FROM account_deletion_requests
+  ) THEN
+    RAISE EXCEPTION
+      'cannot roll back auth account/team schema while account deletion requests exist';
+  END IF;
 END;
 $$;
 

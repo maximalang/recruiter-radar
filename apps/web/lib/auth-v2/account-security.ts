@@ -78,6 +78,11 @@ type EmailChangeChallenge = {
   invalidatedAt: Date | null;
 };
 
+type OwnedWorkspaceLock = {
+  workspaceId: string;
+  hasActiveColleague: boolean;
+};
+
 export async function getAccountSecurityProfile(input: {
   userId: string;
   workspaceId: string;
@@ -608,24 +613,30 @@ export async function requestAccountDeletion(input: {
       await client.query("ROLLBACK");
       return { ok: false, code: "unavailable" };
     }
-    const blockingOwner = await client.query<{ blockingWorkspaceId: string }>(
-      `SELECT owner_membership.workspace_id::TEXT AS blocking_workspace_id
-       FROM workspace_members AS owner_membership
-       WHERE owner_membership.user_id = $1
-         AND owner_membership.role = 'owner'
-         AND owner_membership.status = 'active'
-         AND EXISTS (
+    const ownedWorkspaces = await client.query<OwnedWorkspaceLock>(
+      `SELECT
+         owner_membership.workspace_id::TEXT AS "workspaceId",
+         EXISTS (
            SELECT 1
            FROM workspace_members AS colleague
            WHERE colleague.workspace_id = owner_membership.workspace_id
              AND colleague.user_id <> owner_membership.user_id
              AND colleague.status = 'active'
-         )
-       LIMIT 1
-       FOR UPDATE OF owner_membership`,
+         ) AS "hasActiveColleague"
+       FROM workspace_members AS owner_membership
+       JOIN workspaces AS owned_workspace
+         ON owned_workspace.id = owner_membership.workspace_id
+       WHERE owner_membership.user_id = $1
+         AND owner_membership.role = 'owner'
+         AND owner_membership.status = 'active'
+         AND owned_workspace.deleted_at IS NULL
+       ORDER BY owner_membership.workspace_id
+       FOR UPDATE OF owner_membership, owned_workspace`,
       [session.userId],
     );
-    if ((blockingOwner.rowCount ?? 0) > 0) {
+    if (ownedWorkspaces.rows.some((workspace) =>
+      workspace.hasActiveColleague
+    )) {
       await client.query("ROLLBACK");
       return { ok: false, code: "ownership_transfer_required" };
     }

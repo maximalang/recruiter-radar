@@ -855,6 +855,9 @@ PR 4 implementation invariants:
   blocks an owner while another active member still depends on that owner, then
   immediately revokes sessions, removes memberships and records a pending
   deletion request;
+- deletion and invite acceptance lock the same workspace row before deciding
+  whether membership can change, so a concurrent invite cannot orphan an owned
+  workspace during account deactivation;
 - automatic purge is disabled when `AUTH_ACCOUNT_PURGE_AFTER_DAYS` is absent.
   When configured, only an integer from 1 through 3650 is accepted. The policy
   name is recorded from `AUTH_ACCOUNT_RETENTION_POLICY_KEY`, defaulting to

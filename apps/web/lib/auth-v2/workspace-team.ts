@@ -420,7 +420,7 @@ export async function acceptWorkspaceInvite(input: {
          AND workspace.status = 'active'
          AND workspace.deleted_at IS NULL
        LIMIT 1
-       FOR UPDATE OF invite`,
+       FOR UPDATE OF invite, workspace`,
       [hashToken(token)],
     );
     const invite = inviteResult.rows[0];

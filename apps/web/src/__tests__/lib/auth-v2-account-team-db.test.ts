@@ -1,5 +1,7 @@
 import { execFile } from "node:child_process";
+import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import { promisify } from "node:util";
 
 import { getPool } from "@/lib/db-pool";
@@ -37,6 +39,15 @@ const purgeScript = resolve(
   "db",
   "scripts",
   "purge-auth-v2-accounts.mjs",
+);
+const downMigration = resolve(
+  process.cwd(),
+  "..",
+  "..",
+  "packages",
+  "db",
+  "migrations",
+  "20260729130000_add_auth_account_security_and_team.down.sql",
 );
 
 type Fixture = {
@@ -301,6 +312,53 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
     expect(transferEvents.rows[0]?.count).toBe(1);
   });
 
+  test("invite acceptance and owner deletion serialize on the workspace boundary", async () => {
+    const owner = await createFixture("workspace-lock-owner");
+    const invited = await createFixture("workspace-lock-invited");
+
+    await expect(inviteWorkspaceMember({
+      actorUserId: owner.userId,
+      workspaceId: owner.workspaceId,
+      email: invited.email,
+      role: "recruiter",
+    })).resolves.toEqual({ ok: true, delivery: "sent" });
+    const inviteToken = await tokenFromOutbox(
+      invited.email,
+      "/auth/invite",
+    );
+
+    const accepted = await runBehindWorkspaceLock(
+      owner.workspaceId,
+      "FROM workspace_invites AS invite",
+      () => acceptWorkspaceInvite({
+        token: inviteToken,
+        session: invited.session,
+      }),
+    );
+    expect(accepted).toEqual({
+      ok: true,
+      workspaceId: owner.workspaceId,
+    });
+    await expect(requestAccountDeletion({
+      session: owner.session,
+      confirmation: ACCOUNT_DELETION_CONFIRMATION,
+    })).resolves.toEqual({
+      ok: false,
+      code: "ownership_transfer_required",
+    });
+
+    const soloOwner = await createFixture("workspace-lock-solo-owner");
+    const deletion = await runBehindWorkspaceLock(
+      soloOwner.workspaceId,
+      "FROM workspace_members AS owner_membership",
+      () => requestAccountDeletion({
+        session: soloOwner.session,
+        confirmation: ACCOUNT_DELETION_CONFIRMATION,
+      }),
+    );
+    expect(deletion).toEqual({ ok: true });
+  });
+
   test("deletion requires ownership resolution and purge is explicit, due-only, and ledger-preserving", async () => {
     const due = await createFixture("delete-due");
     const colleague = await createFixture("delete-colleague");
@@ -346,7 +404,7 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
     })).resolves.toEqual({ ok: true });
     await pool!.query(
       `UPDATE account_deletion_requests
-       SET purge_after = NOW() - INTERVAL '1 second'
+       SET purge_after = requested_at
        WHERE user_id = $1
          AND status = 'pending'`,
       [due.userId],
@@ -398,6 +456,64 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
       workspaceStatus: "deletion_pending",
     });
     await expect(securityEventCount(due.userId)).resolves.toBe(beforeAudit);
+  });
+
+  test("rollback refuses live security history and succeeds after disposable fixtures are cleared", async () => {
+    const sql = await readFile(downMigration, "utf8");
+    const rollbackClient = await pool!.connect();
+    try {
+      await expect(rollbackClient.query(sql)).rejects.toThrow(
+        /while team audit events exist/,
+      );
+      await rollbackClient.query("ROLLBACK");
+
+      await rollbackClient.query(
+        `ALTER TABLE auth_security_events
+         DISABLE TRIGGER auth_security_events_append_only`,
+      );
+      await rollbackClient.query(
+        `DELETE FROM auth_security_events
+         WHERE event_type IN (
+           'membership_role_changed',
+           'membership_removed',
+           'ownership_transferred'
+         )`,
+      );
+      await rollbackClient.query(
+        `ALTER TABLE auth_security_events
+         ENABLE TRIGGER auth_security_events_append_only`,
+      );
+      await expect(rollbackClient.query(sql)).rejects.toThrow(
+        /while account deletion requests exist/,
+      );
+      await rollbackClient.query("ROLLBACK");
+
+      await rollbackClient.query("DELETE FROM account_deletion_requests");
+      await expect(rollbackClient.query(sql)).resolves.toBeDefined();
+      const remaining = await rollbackClient.query<{ count: number }>(
+        `SELECT COUNT(*)::INTEGER AS count
+         FROM information_schema.columns
+         WHERE table_schema = 'public'
+           AND (
+             (table_name = 'auth_sessions'
+               AND column_name IN ('browser_label', 'environment_label'))
+             OR (table_name = 'workspace_invites'
+               AND column_name IN ('send_status', 'last_sent_at'))
+             OR (table_name = 'auth_security_events'
+               AND column_name = 'target_user_id')
+           )`,
+      );
+      expect(remaining.rows[0]?.count).toBe(0);
+      const deletionTable = await rollbackClient.query<{ exists: boolean }>(
+        `SELECT TO_REGCLASS(
+           'public.account_deletion_requests'
+         ) IS NOT NULL AS exists`,
+      );
+      expect(deletionTable.rows[0]?.exists).toBe(false);
+    } finally {
+      await rollbackClient.query("ROLLBACK").catch(() => undefined);
+      rollbackClient.release();
+    }
   });
 
   async function createFixture(prefix: string): Promise<Fixture> {
@@ -464,6 +580,52 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
       env: process.env,
       maxBuffer: 1024 * 1024,
     });
+  }
+
+  async function runBehindWorkspaceLock<T>(
+    workspaceId: string,
+    queryMarker: string,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    const blocker = await pool!.connect();
+    let operationPromise: Promise<T> | null = null;
+    try {
+      await blocker.query("BEGIN");
+      await blocker.query(
+        "SELECT id FROM workspaces WHERE id = $1 FOR UPDATE",
+        [workspaceId],
+      );
+      operationPromise = operation();
+      let settled = false;
+      void operationPromise.then(
+        () => { settled = true; },
+        () => { settled = true; },
+      );
+      let blocked = false;
+      for (let attempt = 0; attempt < 40 && !settled; attempt += 1) {
+        const activity = await pool!.query<{ blocked: boolean }>(
+          `SELECT EXISTS (
+             SELECT 1
+             FROM pg_stat_activity
+             WHERE datname = CURRENT_DATABASE()
+               AND pid <> PG_BACKEND_PID()
+               AND wait_event_type = 'Lock'
+               AND query LIKE '%' || $1 || '%'
+               AND CARDINALITY(pg_blocking_pids(pid)) > 0
+           ) AS blocked`,
+          [queryMarker],
+        );
+        blocked = activity.rows[0]?.blocked === true;
+        if (blocked) break;
+        await delay(25);
+      }
+      expect(blocked).toBe(true);
+      await blocker.query("ROLLBACK");
+      return await operationPromise;
+    } finally {
+      await blocker.query("ROLLBACK").catch(() => undefined);
+      blocker.release();
+    }
   }
 
   async function securityEventCount(userId: string): Promise<number> {
