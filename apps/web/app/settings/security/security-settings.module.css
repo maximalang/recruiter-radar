@@ -1,0 +1,384 @@
+.stack {
+  display: grid;
+  gap: 18px;
+}
+
+.subnav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px;
+  width: fit-content;
+  max-width: 100%;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.76);
+  box-shadow: 0 12px 36px rgba(15, 23, 42, 0.06);
+}
+
+.subnav a {
+  padding: 9px 14px;
+  border-radius: 11px;
+  color: #526071;
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.subnav a[aria-current="page"] {
+  background: #111827;
+  color: #fff;
+}
+
+.hero,
+.card,
+.dangerCard {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 18px 60px rgba(15, 23, 42, 0.07);
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.85fr);
+  gap: 28px;
+  padding: 30px;
+  background:
+    radial-gradient(circle at 92% 8%, rgba(37, 99, 235, 0.12), transparent 38%),
+    rgba(255, 255, 255, 0.94);
+}
+
+.hero h2,
+.card h2,
+.dangerCard h2 {
+  margin: 4px 0 0;
+  color: #111827;
+  letter-spacing: -0.025em;
+}
+
+.hero h2 {
+  font-size: clamp(1.65rem, 3vw, 2.25rem);
+}
+
+.hero p,
+.dangerCard p {
+  margin: 8px 0 0;
+  color: #526071;
+}
+
+.eyebrow {
+  color: #526071;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.profileFacts {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+.profileFacts div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.07);
+}
+
+.profileFacts dt {
+  color: #667085;
+  font-size: 0.84rem;
+}
+
+.profileFacts dd {
+  margin: 0;
+  color: #111827;
+  font-size: 0.88rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.card,
+.dangerCard {
+  padding: 26px;
+}
+
+.sectionHeading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.verified,
+.count,
+.sessionTitle span {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #ecfdf3;
+  color: #087443;
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.count {
+  min-width: 28px;
+  text-align: center;
+}
+
+.muted {
+  max-width: 68ch;
+  margin: 10px 0 18px;
+  color: #667085;
+  line-height: 1.6;
+}
+
+.notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 0 18px;
+  padding: 12px 14px;
+  border: 1px solid rgba(29, 78, 216, 0.12);
+  border-radius: 14px;
+  background: #f4f8ff;
+  color: #1e3a8a;
+  line-height: 1.5;
+}
+
+.notice[data-tone="success"] {
+  border-color: rgba(4, 120, 87, 0.14);
+  background: #f2fbf6;
+  color: #166534;
+}
+
+.notice[data-tone="warning"] {
+  border-color: rgba(194, 65, 12, 0.14);
+  background: #fff8f1;
+  color: #9a3412;
+}
+
+.notice a {
+  color: inherit;
+  font-weight: 800;
+}
+
+.inlineForm {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+}
+
+.inlineForm label,
+.deleteForm label {
+  display: grid;
+  gap: 7px;
+  color: #344054;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.inlineForm input,
+.deleteForm input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  border-radius: 13px;
+  background: #fff;
+  color: #111827;
+  font: inherit;
+}
+
+.inlineForm input:focus-visible,
+.deleteForm input:focus-visible,
+.subnav a:focus-visible,
+.primaryButton:focus-visible,
+.secondaryButton:focus-visible,
+.quietButton:focus-visible,
+.dangerButton:focus-visible,
+.dangerDisclosure summary:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.3);
+  outline-offset: 2px;
+}
+
+.primaryButton,
+.secondaryButton,
+.quietButton,
+.dangerButton {
+  min-height: 42px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.primaryButton {
+  border: 1px solid #1d4ed8;
+  background: linear-gradient(135deg, #1d4ed8, #1e3a8a);
+  color: #fff;
+  box-shadow: 0 12px 24px rgba(29, 78, 216, 0.2);
+}
+
+.secondaryButton,
+.quietButton {
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: #fff;
+  color: #344054;
+}
+
+.quietButton {
+  min-height: 36px;
+  padding: 7px 11px;
+}
+
+.dangerButton {
+  border: 1px solid rgba(185, 28, 28, 0.2);
+  background: #fff7f7;
+  color: #991b1b;
+}
+
+.sessionList {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid rgba(15, 23, 42, 0.07);
+}
+
+.sessionItem {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 0;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.07);
+}
+
+.sessionMark {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 5px rgba(34, 197, 94, 0.1);
+}
+
+.sessionCopy {
+  min-width: 0;
+}
+
+.sessionTitle {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sessionTitle strong {
+  overflow-wrap: anywhere;
+}
+
+.sessionCopy p,
+.sessionCopy time {
+  display: block;
+  margin: 4px 0 0;
+  color: #667085;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.actionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.dangerCard {
+  border-color: rgba(185, 28, 28, 0.14);
+  background:
+    linear-gradient(145deg, rgba(255, 247, 247, 0.78), rgba(255, 255, 255, 0.96));
+}
+
+.dangerDisclosure {
+  margin-top: 18px;
+  border: 1px solid rgba(185, 28, 28, 0.13);
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.dangerDisclosure summary {
+  padding: 13px 15px;
+  color: #991b1b;
+  font-size: 0.86rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.deleteForm {
+  display: grid;
+  gap: 12px;
+  padding: 0 15px 15px;
+}
+
+.deleteForm small {
+  color: #667085;
+  line-height: 1.5;
+}
+
+.deleteForm .dangerButton {
+  justify-self: start;
+}
+
+@media (max-width: 720px) {
+  .hero {
+    grid-template-columns: 1fr;
+    padding: 22px;
+  }
+
+  .card,
+  .dangerCard {
+    padding: 20px;
+  }
+
+  .inlineForm {
+    grid-template-columns: 1fr;
+  }
+
+  .inlineForm .primaryButton {
+    width: 100%;
+  }
+
+  .sessionItem {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .sessionItem form {
+    grid-column: 2;
+  }
+
+  .actionRow,
+  .actionRow form,
+  .actionRow button {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .primaryButton,
+  .secondaryButton,
+  .quietButton,
+  .dangerButton {
+    scroll-behavior: auto;
+  }
+}
