@@ -1,11 +1,15 @@
+import { execFile } from 'node:child_process'
 import { readFile, readdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
+import { promisify } from 'node:util'
 
 import pg from 'pg'
 
 const { Pool } = pg
+const execFileAsync = promisify(execFile)
 const databaseUrl = process.env.DATABASE_URL?.trim()
 const targetMigration = '20260728121000_add_auth_challenge_issuance.sql'
+const cleanupLockKey = 2_026_073_005
 
 if (!databaseUrl) throw new Error('DATABASE_URL is required.')
 if (process.env.AUTH_V2_DB_TEST_ISOLATED !== 'true') {
@@ -14,6 +18,13 @@ if (process.env.AUTH_V2_DB_TEST_ISOLATED !== 'true') {
 
 const root = resolve(import.meta.dirname, '..', '..', '..')
 const migrationsDir = resolve(root, 'packages', 'db', 'migrations')
+const cleanupScript = resolve(
+  root,
+  'packages',
+  'db',
+  'scripts',
+  'cleanup-auth-v2-challenges.mjs',
+)
 const pool = new Pool({ connectionString: databaseUrl, max: 5 })
 
 try {
@@ -163,6 +174,66 @@ try {
     throw new Error('Email rate limit did not deny the fourth issue.')
   }
 
+  await pool.query(
+    `UPDATE auth_challenges
+     SET created_at = NOW() - INTERVAL '20 days 10 minutes',
+         invalidated_at = NOW() - INTERVAL '20 days',
+         expires_at = NOW() - INTERVAL '20 days'
+     WHERE id = $1`,
+    [first.challengeId],
+  )
+  const cleanupDryRun = await runCleanup()
+  if (
+    cleanupDryRun.exitCode !== 0
+    || cleanupDryRun.report?.ok !== true
+    || cleanupDryRun.report?.mode !== 'dry-run'
+    || !Number.isInteger(cleanupDryRun.report?.eligible)
+    || cleanupDryRun.report.eligible < 1
+    || cleanupDryRun.report?.remaining !== cleanupDryRun.report?.eligible
+    || !Number.isInteger(cleanupDryRun.report?.durationMs)
+    || cleanupDryRun.report.durationMs < 0
+  ) {
+    throw new Error('Challenge cleanup dry-run aggregate was invalid.')
+  }
+
+  const cleanupApply = await runCleanup(['--apply'])
+  const cleanupAfter = await runCleanup()
+  if (
+    cleanupApply.exitCode !== 0
+    || cleanupApply.report?.ok !== true
+    || cleanupApply.report?.mode !== 'apply'
+    || !Number.isInteger(cleanupApply.report?.deleted)
+    || cleanupApply.report.deleted < 1
+    || cleanupApply.report?.remaining !== 0
+    || cleanupAfter.exitCode !== 0
+    || cleanupAfter.report?.eligible !== 0
+    || cleanupAfter.report?.remaining !== 0
+  ) {
+    throw new Error('Challenge cleanup apply was not idempotent.')
+  }
+
+  const lockClient = await pool.connect()
+  try {
+    await lockClient.query(
+      'SELECT pg_advisory_lock($1)',
+      [cleanupLockKey],
+    )
+    const concurrentCleanup = await runCleanup()
+    if (
+      concurrentCleanup.exitCode === 0
+      || concurrentCleanup.report?.ok !== false
+      || concurrentCleanup.report?.reason !== 'lock_unavailable'
+    ) {
+      throw new Error('Concurrent challenge cleanup was not rejected.')
+    }
+  } finally {
+    await lockClient.query(
+      'SELECT pg_advisory_unlock($1)',
+      [cleanupLockKey],
+    )
+    lockClient.release()
+  }
+
   console.log(JSON.stringify({
     ok: true,
     checks: [
@@ -171,10 +242,36 @@ try {
       'one_active_after_concurrent_resend',
       'existing_user_linked_privately',
       'rate_limit_denied',
+      'challenge_cleanup_aggregate_complete',
+      'challenge_cleanup_idempotent',
+      'challenge_cleanup_concurrency_rejected',
     ],
   }))
 } finally {
   await pool.end()
+}
+
+async function runCleanup(args = []) {
+  try {
+    const result = await execFileAsync(
+      process.execPath,
+      [cleanupScript, ...args],
+      {
+        cwd: root,
+        env: { ...process.env, DATABASE_URL: databaseUrl },
+        maxBuffer: 1024 * 1024,
+      },
+    )
+    return {
+      exitCode: 0,
+      report: JSON.parse(result.stdout.trim()),
+    }
+  } catch (error) {
+    return {
+      exitCode: Number(error?.code) || 1,
+      report: JSON.parse(error?.stdout?.trim() || '{}'),
+    }
+  }
 }
 
 async function issue(poolInstance, input) {
