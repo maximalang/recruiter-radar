@@ -3,13 +3,14 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 jest.mock("@/lib/db-pool", () => ({
+  getClient: jest.fn(),
   getPool: jest.fn(),
 }));
 jest.mock("@/lib/runtime", () => ({
   logError: jest.fn(),
 }));
 
-import { getPool } from "@/lib/db-pool";
+import { getClient, getPool } from "@/lib/db-pool";
 import {
   isLegacySessionMigrationWindowOpen,
 } from "@/lib/auth-v2/config";
@@ -21,6 +22,7 @@ import {
 } from "@/lib/auth-v2/legacy-session";
 
 const mockGetPool = jest.mocked(getPool);
+const mockGetClient = jest.mocked(getClient);
 const sessionSecret = "s".repeat(32);
 const migrationSecret = "m".repeat(32);
 const now = new Date("2026-07-28T12:00:00.000Z");
@@ -69,7 +71,7 @@ describe("bounded auth v2 legacy session exchange", () => {
   });
 
   test("exchanges a valid legacy cookie into one opaque database session", async () => {
-    const query = jest.fn().mockResolvedValue({
+    const exchangeResult = {
       rows: [{
         id: "17",
         userId: "42",
@@ -85,8 +87,14 @@ describe("bounded auth v2 legacy session exchange", () => {
         rotationDue: false,
       }],
       rowCount: 1,
-    });
-    mockGetPool.mockReturnValue({ query } as never);
+    };
+    const query = jest.fn()
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+      .mockResolvedValueOnce({ rows: [{}], rowCount: 1 })
+      .mockResolvedValueOnce(exchangeResult)
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 });
+    const release = jest.fn();
+    mockGetClient.mockResolvedValue({ query, release } as never);
     const token = legacyToken("42");
 
     const exchanged = await exchangeLegacyOwnerSession({
@@ -103,39 +111,52 @@ describe("bounded auth v2 legacy session exchange", () => {
       userId: "42",
       authMethod: "legacy_exchange",
     });
-    const values = query.mock.calls[0]?.[1] as unknown[];
+    expect(query.mock.calls.map(([sql]) => sql)).toEqual([
+      "BEGIN",
+      expect.stringContaining("pg_advisory_xact_lock"),
+      expect.stringContaining("WITH created AS"),
+      "COMMIT",
+    ]);
+    const values = query.mock.calls[2]?.[1] as unknown[];
     expect(values[0]).toBe("42");
     expect(values[1]).toMatch(/^[a-f0-9]{64}$/);
     expect(values[1]).not.toBe(exchanged?.token);
     expect(values[2]).toMatch(/^[a-f0-9]{64}$/);
     expect(values[2]).not.toBe(token);
-    expect(String(query.mock.calls[0]?.[0])).toContain("legacy_session_migrated");
+    expect(String(query.mock.calls[2]?.[0])).toContain("legacy_session_migrated");
+    expect(release).toHaveBeenCalledTimes(1);
   });
 
   test("fails closed when disabled, invalid, or already exchanged", async () => {
-    const query = jest.fn().mockResolvedValue({ rows: [], rowCount: 0 });
-    mockGetPool.mockReturnValue({ query } as never);
+    const query = jest.fn()
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+      .mockResolvedValueOnce({ rows: [{}], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 });
+    const release = jest.fn();
+    mockGetClient.mockResolvedValue({ query, release } as never);
 
     await expect(exchangeLegacyOwnerSession({
       legacyToken: legacyToken("42"),
       env: { ...enabledEnv, AUTH_PLATFORM_V2_ENABLED: "false" },
       now,
     })).resolves.toBeNull();
-    expect(query).not.toHaveBeenCalled();
+    expect(mockGetClient).not.toHaveBeenCalled();
 
     await expect(exchangeLegacyOwnerSession({
       legacyToken: "invalid",
       env: enabledEnv,
       now,
     })).resolves.toBeNull();
-    expect(query).not.toHaveBeenCalled();
+    expect(mockGetClient).not.toHaveBeenCalled();
 
     await expect(exchangeLegacyOwnerSession({
       legacyToken: legacyToken("42"),
       env: enabledEnv,
       now,
     })).resolves.toBeNull();
-    expect(query).toHaveBeenCalledTimes(1);
+    expect(query).toHaveBeenCalledTimes(4);
+    expect(release).toHaveBeenCalledTimes(1);
   });
 
   test("authorizes eligible legacy sessions only inside the migration window", async () => {
@@ -267,11 +288,16 @@ describe("bounded auth v2 legacy session exchange", () => {
   });
 
   test("writes only a hashed append-only tombstone for legacy logout", async () => {
-    const query = jest.fn().mockResolvedValue({
-      rows: [{ revoked: true }],
-      rowCount: 1,
-    });
-    mockGetPool.mockReturnValue({ query } as never);
+    const query = jest.fn()
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+      .mockResolvedValueOnce({ rows: [{}], rowCount: 1 })
+      .mockResolvedValueOnce({
+        rows: [{ revoked: true }],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 });
+    const release = jest.fn();
+    mockGetClient.mockResolvedValue({ query, release } as never);
     const token = legacyToken("42");
 
     await expect(revokeLegacyOwnerSessionForLogout(
@@ -280,26 +306,80 @@ describe("bounded auth v2 legacy session exchange", () => {
       now,
     )).resolves.toBe("revoked");
 
-    const sql = String(query.mock.calls[0]?.[0]);
-    const values = query.mock.calls[0]?.[1] as unknown[];
+    const sql = String(query.mock.calls[2]?.[0]);
+    const values = query.mock.calls[2]?.[1] as unknown[];
     expect(sql).toContain("'legacy_session_revoked'");
     expect(sql).toContain("auth_security_events");
     expect(values[0]).toBe("42");
     expect(values[1]).toMatch(/^[a-f0-9]{64}$/);
     expect(values[1]).not.toBe(token);
     expect(values).not.toContain(token);
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  test("serializes legacy logout and revokes already-exchanged v2 sessions", async () => {
+    const query = jest.fn(async (sql: string) => {
+      if (sql === "BEGIN" || sql === "COMMIT") {
+        return { rows: [], rowCount: 0 };
+      }
+      if (sql.includes("pg_advisory_xact_lock")) {
+        return { rows: [{}], rowCount: 1 };
+      }
+      return {
+        rows: [{ revoked: true }],
+        rowCount: 1,
+      };
+    });
+    const release = jest.fn();
+    mockGetPool.mockReturnValue(null);
+    mockGetClient.mockResolvedValue({ query, release } as never);
+    const token = legacyToken("42");
+
+    await expect(revokeLegacyOwnerSessionForLogout(
+      token,
+      enabledEnv,
+      now,
+    )).resolves.toBe("revoked");
+
+    expect(query.mock.calls.map(([sql]) => sql)).toEqual([
+      "BEGIN",
+      expect.stringContaining("pg_advisory_xact_lock"),
+      expect.stringContaining("UPDATE auth_sessions"),
+      "COMMIT",
+    ]);
+    const mutationSql = String(query.mock.calls[2]?.[0]);
+    const values = query.mock.calls[2]?.[1] as unknown[];
+    expect(mutationSql).toContain("legacy_fingerprint_hash = $2");
+    expect(mutationSql).toContain("'session_revoked'");
+    expect(mutationSql).toContain("'legacy_session_revoked'");
+    expect(values[0]).toBe("42");
+    expect(values[1]).toMatch(/^[a-f0-9]{64}$/);
+    expect(values).not.toContain(token);
+    expect(release).toHaveBeenCalledTimes(1);
   });
 
   test("fails legacy logout closed when the tombstone store is unavailable", async () => {
-    const query = jest.fn().mockRejectedValue(new Error("database down"));
-    mockGetPool.mockReturnValue({ query } as never);
+    const query = jest.fn(async (sql: string) => {
+      if (sql.includes("pg_advisory_xact_lock")) {
+        throw new Error("database down");
+      }
+      return { rows: [], rowCount: 0 };
+    });
+    const release = jest.fn();
+    mockGetClient.mockResolvedValueOnce({ query, release } as never);
 
     await expect(revokeLegacyOwnerSessionForLogout(
       legacyToken("42"),
       enabledEnv,
       now,
     )).resolves.toBe("unavailable");
-    mockGetPool.mockReturnValue(null);
+    expect(query.mock.calls.map(([sql]) => sql)).toEqual([
+      "BEGIN",
+      expect.stringContaining("pg_advisory_xact_lock"),
+      "ROLLBACK",
+    ]);
+    expect(release).toHaveBeenCalledTimes(1);
+    mockGetClient.mockResolvedValueOnce(null);
     await expect(revokeLegacyOwnerSessionForLogout(
       legacyToken("42"),
       enabledEnv,
@@ -329,7 +409,10 @@ describe("legacy exchange PostgreSQL verifier", () => {
     expect(verifier).toContain("rollback_authorization_replay_denied");
     expect(verifier).toContain("concurrent_exchange_single_winner");
     expect(verifier).toContain("legacy_logout_replay_denied");
+    expect(verifier).toContain("pre_exchanged_logout_revokes_v2");
+    expect(verifier).toContain("concurrent_exchange_logout_safe");
     expect(verifier).toContain("legacy_logout_rollback_denied");
+    expect(verifier).toContain("pg_advisory_xact_lock");
     expect(verifier).toContain("Promise.all");
   });
 });

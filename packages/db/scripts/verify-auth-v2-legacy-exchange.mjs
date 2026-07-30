@@ -164,6 +164,75 @@ try {
     throw new Error('Legacy logout tombstone did not deny replay.')
   }
 
+  const preExchangedFingerprint = digest(
+    'legacy-fingerprint-pre-exchanged-logout',
+  )
+  const preExchanged = await exchange(
+    pool,
+    userId,
+    digest('legacy-session-pre-exchanged-logout'),
+    preExchangedFingerprint,
+  )
+  const preExchangedLogout = await logout(
+    pool,
+    userId,
+    preExchangedFingerprint,
+  )
+  const preExchangedState = await readLogoutState(
+    pool,
+    preExchangedFingerprint,
+  )
+  const preExchangedReplay = await exchange(
+    pool,
+    userId,
+    digest('legacy-session-pre-exchanged-replay'),
+    preExchangedFingerprint,
+  )
+  if (
+    preExchanged.rowCount !== 1
+    || preExchangedLogout.rows[0]?.revoked !== true
+    || preExchangedState.activeSessions !== 0
+    || preExchangedState.revokedSessions !== 1
+    || preExchangedState.sessionRevocations !== 1
+    || preExchangedState.logoutTombstones !== 1
+    || preExchangedReplay.rowCount !== 0
+  ) {
+    throw new Error(
+      'Logout did not revoke a previously exchanged legacy session.',
+    )
+  }
+
+  const raceFingerprint = digest('legacy-fingerprint-exchange-logout-race')
+  const [raceExchange, raceLogout] = await Promise.all([
+    exchange(
+      pool,
+      userId,
+      digest('legacy-session-exchange-logout-race'),
+      raceFingerprint,
+    ),
+    logout(pool, userId, raceFingerprint),
+  ])
+  const raceState = await readLogoutState(pool, raceFingerprint)
+  const raceReplay = await exchange(
+    pool,
+    userId,
+    digest('legacy-session-exchange-logout-race-replay'),
+    raceFingerprint,
+  )
+  if (
+    ![0, 1].includes(raceExchange.rowCount)
+    || raceLogout.rows[0]?.revoked !== true
+    || raceState.activeSessions !== 0
+    || raceState.revokedSessions !== raceExchange.rowCount
+    || raceState.sessionRevocations !== raceExchange.rowCount
+    || raceState.logoutTombstones !== 1
+    || raceReplay.rowCount !== 0
+  ) {
+    throw new Error(
+      'Concurrent legacy exchange and logout left an active session.',
+    )
+  }
+
   let duplicateLogoutRejected = false
   try {
     await pool.query(
@@ -217,13 +286,18 @@ try {
         FROM auth_security_events
         WHERE user_id = $1
           AND event_type = 'session_created'
-          AND metadata->>'method' = 'legacy_exchange') AS session_events`,
+          AND metadata->>'method' = 'legacy_exchange') AS session_events,
+       (SELECT COUNT(*)::INTEGER
+        FROM auth_security_events
+        WHERE user_id = $1
+          AND event_type = 'legacy_session_revoked') AS logout_tombstones`,
     [userId],
   )
   if (
-    state.rows[0]?.sessions !== 2
-    || state.rows[0]?.migrations !== 2
-    || state.rows[0]?.session_events !== 2
+    ![3, 4].includes(state.rows[0]?.sessions)
+    || state.rows[0]?.migrations !== state.rows[0]?.sessions
+    || state.rows[0]?.session_events !== state.rows[0]?.sessions
+    || state.rows[0]?.logout_tombstones !== 3
   ) {
     throw new Error('Legacy exchange ledger and sessions diverged.')
   }
@@ -237,6 +311,8 @@ try {
       'rollback_authorization_replay_denied',
       'concurrent_exchange_single_winner',
       'legacy_logout_replay_denied',
+      'pre_exchanged_logout_revokes_v2',
+      'concurrent_exchange_logout_safe',
       'legacy_logout_rollback_denied',
       'legacy_revocation_clean_down_upgrade',
     ],
@@ -246,8 +322,15 @@ try {
 }
 
 async function exchange(poolInstance, userId, sessionHash, fingerprint) {
-  return poolInstance.query(
-    `WITH created AS (
+  const client = await poolInstance.connect()
+  try {
+    await client.query('BEGIN')
+    await client.query(
+      'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+      [fingerprint],
+    )
+    const result = await client.query(
+      `WITH created AS (
        INSERT INTO auth_sessions (
          user_id,
          token_hash,
@@ -339,8 +422,133 @@ async function exchange(poolInstance, userId, sessionHash, fingerprint) {
        (SELECT COUNT(*) FROM session_recorded) AS session_events
      FROM created
      WHERE EXISTS (SELECT 1 FROM migration_recorded)`,
-    [userId, sessionHash, fingerprint, now],
+      [userId, sessionHash, fingerprint, now],
+    )
+    await client.query('COMMIT')
+    return result
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined)
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+async function logout(poolInstance, userId, fingerprint) {
+  const client = await poolInstance.connect()
+  try {
+    await client.query('BEGIN')
+    await client.query(
+      'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+      [fingerprint],
+    )
+    const result = await client.query(
+      `WITH revoked_sessions AS (
+         UPDATE auth_sessions AS session
+         SET
+           revoked_at = GREATEST(
+             session.created_at,
+             $3::TIMESTAMPTZ
+           ),
+           revoke_reason = 'logout'
+         WHERE session.user_id = $1
+           AND session.legacy_fingerprint_hash = $2
+           AND session.revoked_at IS NULL
+         RETURNING session.*
+       ),
+       session_recorded AS (
+         INSERT INTO auth_security_events (
+           event_type,
+           user_id,
+           workspace_id,
+           session_id,
+           request_ip_hash,
+           user_agent_hash,
+           metadata,
+           created_at
+         )
+         SELECT
+           'session_revoked',
+           revoked_session.user_id,
+           revoked_session.workspace_id,
+           revoked_session.id,
+           revoked_session.request_ip_hash,
+           revoked_session.user_agent_hash,
+           JSONB_BUILD_OBJECT(
+             'reason_code',
+             'logout',
+             'revoke_scope',
+             'current'
+           ),
+           revoked_session.revoked_at
+         FROM revoked_sessions AS revoked_session
+         RETURNING id
+       ),
+       tombstone_recorded AS (
+         INSERT INTO auth_security_events (
+           event_type,
+           user_id,
+           subject_hash,
+           metadata,
+           created_at
+         )
+         VALUES (
+           'legacy_session_revoked',
+           $1,
+           $2,
+           '{"reason_code":"logout","source":"legacy"}'::JSONB,
+           $3::TIMESTAMPTZ
+         )
+         ON CONFLICT (subject_hash)
+           WHERE event_type = 'legacy_session_revoked'
+             AND subject_hash IS NOT NULL
+           DO NOTHING
+         RETURNING id
+       )
+       SELECT
+         (
+           EXISTS (SELECT 1 FROM revoked_sessions)
+           OR EXISTS (SELECT 1 FROM tombstone_recorded)
+         ) AS revoked,
+         (SELECT COUNT(*) FROM session_recorded) AS session_events`,
+      [userId, fingerprint, now],
+    )
+    await client.query('COMMIT')
+    return result
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined)
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+async function readLogoutState(poolInstance, fingerprint) {
+  const result = await poolInstance.query(
+    `SELECT
+       (SELECT COUNT(*)::INTEGER
+        FROM auth_sessions
+        WHERE legacy_fingerprint_hash = $1
+          AND revoked_at IS NULL) AS "activeSessions",
+       (SELECT COUNT(*)::INTEGER
+        FROM auth_sessions
+        WHERE legacy_fingerprint_hash = $1
+          AND revoked_at IS NOT NULL) AS "revokedSessions",
+       (SELECT COUNT(*)::INTEGER
+        FROM auth_security_events
+        WHERE event_type = 'session_revoked'
+          AND session_id IN (
+            SELECT id
+            FROM auth_sessions
+            WHERE legacy_fingerprint_hash = $1
+          )) AS "sessionRevocations",
+       (SELECT COUNT(*)::INTEGER
+        FROM auth_security_events
+        WHERE event_type = 'legacy_session_revoked'
+          AND subject_hash = $1) AS "logoutTombstones"`,
+    [fingerprint],
   )
+  return result.rows[0]
 }
 
 async function createVerifiedUser(poolInstance, email) {
