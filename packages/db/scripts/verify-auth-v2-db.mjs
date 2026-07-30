@@ -40,6 +40,8 @@ const expectedMigrations = [
   '20260728122000_add_auth_challenge_consumption',
   '20260729120000_add_auth_workspaces',
   '20260729121000_add_auth_workspace_tenant_context',
+  '20260729121100_add_auth_workspace_tenant_indexes',
+  '20260729121200_add_auth_workspace_tenant_guards',
   '20260729122000_add_auth_workspace_session_switch',
   '20260729130000_add_auth_account_security_and_team',
   '20260729131000_guard_auth_active_owner_writes',

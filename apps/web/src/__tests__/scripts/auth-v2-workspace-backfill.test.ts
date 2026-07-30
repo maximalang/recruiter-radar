@@ -9,6 +9,27 @@ const migrationPath = resolve(
   "migrations",
   "20260729121000_add_auth_workspace_tenant_context.sql",
 );
+const indexMigrationPath = resolve(
+  repositoryPath,
+  "packages",
+  "db",
+  "migrations",
+  "20260729121100_add_auth_workspace_tenant_indexes.sql",
+);
+const guardMigrationPath = resolve(
+  repositoryPath,
+  "packages",
+  "db",
+  "migrations",
+  "20260729121200_add_auth_workspace_tenant_guards.sql",
+);
+const migratorPath = resolve(
+  repositoryPath,
+  "packages",
+  "db",
+  "scripts",
+  "migrate.mjs",
+);
 const rollbackPath = resolve(
   repositoryPath,
   "packages",
@@ -39,8 +60,35 @@ const verifyPath = resolve(
 );
 
 describe("auth v2 workspace tenant-context migration", () => {
+  test("builds tenant indexes concurrently through the bounded migrator path", () => {
+    const indexMigration = readFileSync(indexMigrationPath, "utf8");
+    const transactionalMigrations = [
+      migrationPath,
+      guardMigrationPath,
+    ].map((path) => readFileSync(path, "utf8"));
+    const migrator = readFileSync(migratorPath, "utf8");
+
+    expect(indexMigration).toContain("-- migrate:concurrent-indexes");
+    expect(indexMigration).not.toMatch(/\bBEGIN\b|\bCOMMIT\b/i);
+    expect(indexMigration.match(/CREATE (?:UNIQUE )?INDEX CONCURRENTLY/g))
+      .toHaveLength(17);
+    expect(migrator).toContain("parseConcurrentIndexMigration");
+    expect(migrator).toContain("DROP INDEX CONCURRENTLY");
+    expect(migrator).toContain("SET lock_timeout");
+    expect(migrator).toContain("SET statement_timeout");
+    for (const migration of transactionalMigrations) {
+      expect(migration).not.toMatch(/^\s*(?:BEGIN|COMMIT)\s*;/im);
+      expect(migration).toContain("SET LOCAL lock_timeout");
+      expect(migration).toContain("SET LOCAL statement_timeout");
+    }
+  });
+
   test("adds authoritative nullable workspace context without rewriting ledgers", () => {
-    const migration = readFileSync(migrationPath, "utf8");
+    const migration = [
+      migrationPath,
+      indexMigrationPath,
+      guardMigrationPath,
+    ].map((path) => readFileSync(path, "utf8")).join("\n");
 
     for (const table of [
       "client_profiles",
@@ -92,7 +140,11 @@ describe("auth v2 workspace tenant-context migration", () => {
   });
 
   test("keeps rollback guarded and legacy ownership authoritative during rollout", () => {
-    const migration = readFileSync(migrationPath, "utf8");
+    const migration = [
+      migrationPath,
+      indexMigrationPath,
+      guardMigrationPath,
+    ].map((path) => readFileSync(path, "utf8")).join("\n");
     const rollback = readFileSync(rollbackPath, "utf8");
 
     expect(migration).toContain("workspace_id BIGINT");

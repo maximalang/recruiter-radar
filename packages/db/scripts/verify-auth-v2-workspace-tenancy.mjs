@@ -9,6 +9,11 @@ const { Pool } = pg
 const execFileAsync = promisify(execFile)
 const databaseUrl = process.env.DATABASE_URL?.trim()
 const targetMigration = '20260729121000_add_auth_workspace_tenant_context.sql'
+const tenantMigrations = [
+  targetMigration,
+  '20260729121100_add_auth_workspace_tenant_indexes.sql',
+  '20260729121200_add_auth_workspace_tenant_guards.sql',
+]
 const rollbackFile =
   '20260729121000_add_auth_workspace_tenant_context.down.sql'
 
@@ -45,9 +50,21 @@ try {
   const beforeIdentity = await readIdentitySnapshot(fixture)
   const beforeOutcomeChecksum = await readOutcomeChecksum()
 
-  await pool.query(
-    await readFile(resolve(migrationsDir, targetMigration), 'utf8'),
-  )
+  for (const filename of tenantMigrations) {
+    const sql = await readFile(resolve(migrationsDir, filename), 'utf8')
+    if (sql.trimStart().startsWith('-- migrate:concurrent-indexes')) {
+      for (const statement of sql.split(';')) {
+        const executableSql = statement
+          .split(/\r?\n/)
+          .filter((line) => !line.trim().startsWith('--'))
+          .join('\n')
+          .trim()
+        if (executableSql) await pool.query(executableSql)
+      }
+    } else {
+      await pool.query(sql)
+    }
+  }
 
   const preflight = await runTool('preflight-auth-v2-workspaces.mjs')
   if (!preflight.ok) {
