@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 
 import { getAccountById } from "@/lib/account-auth";
+import { getSession } from "@/lib/auth-v2/authorization";
 import { getClientProfileByOwnerId } from "@/lib/clientProfiles";
 import { getDashboardTodayRadar } from "@/lib/dashboard-data";
 import { getDeliveryPreferencesByOwnerId } from "@/lib/deliveryPreferences";
 import { computeProfileCompletion } from "@/lib/profileCompletion";
-import { readOwnerSession } from "@/lib/session";
 import DashboardAccountOverview from "./dashboard-account-overview";
 import DashboardTodayRadar from "./dashboard-today-radar";
 import { buildAccountNavigation } from "../ui/account-navigation";
@@ -29,9 +29,10 @@ export const dynamic = "force-dynamic";
 const DASHBOARD_NAV = buildAccountNavigation("dashboard");
 
 export default async function DashboardPage() {
-  const account = await getAccountById(await readOwnerSession()).catch(() => null);
+  const authorization = await getSession({ permission: "workspace:read" });
+  const account = await getAccountById(authorization?.userId ?? null).catch(() => null);
 
-  if (!account) {
+  if (!authorization || !account) {
     return (
       <InternalPageFrame navItems={DASHBOARD_NAV} footer={<SiteFooter />}>
         <InternalPageHeader
@@ -50,9 +51,9 @@ export default async function DashboardPage() {
   }
 
   const [profile, todayRadar, deliveryPreferences] = await Promise.all([
-    getClientProfileByOwnerId(account.id).catch(() => null),
-    getDashboardTodayRadar(account.id).catch(() => null),
-    getDeliveryPreferencesByOwnerId(account.id).catch(() => null),
+    getClientProfileByOwnerId(authorization.dataOwnerId).catch(() => null),
+    getDashboardTodayRadar(authorization.dataOwnerId).catch(() => null),
+    getDeliveryPreferencesByOwnerId(authorization.dataOwnerId).catch(() => null),
   ]);
 
   if (!profile) {

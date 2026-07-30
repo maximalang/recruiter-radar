@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { getAccountById } from "@/lib/account-auth";
+import { getAuthorizedUserId } from "@/lib/auth-v2/authorization";
 import { startCheckoutOrder } from "@/lib/payments";
 import {
   buildCheckoutHref,
@@ -11,7 +12,6 @@ import {
   readCheckoutPlanCode,
   readPublicPreviewInput,
 } from "@/lib/publicProduct";
-import { readOwnerSession } from "@/lib/session";
 import { buildAccountNavigation } from "../ui/account-navigation";
 import {
   InternalPageFrame,
@@ -44,11 +44,11 @@ export default async function CheckoutPage(props: {
   const previewHref = buildPublicPreviewHref(input);
   const loginHref = `/login?returnTo=${encodeURIComponent(checkoutHref)}`;
   const isRequest = plan.isRecurring;
-  const account = await getAccountById(await readOwnerSession()).catch(() => null);
+  const account = await getAccountById(await getAuthorizedUserId("billing:manage")).catch(() => null);
 
   async function startCheckoutAction(formData: FormData) {
     "use server";
-    const currentAccount = await getAccountById(await readOwnerSession());
+    const currentAccount = await getAccountById(await getAuthorizedUserId("billing:manage"));
     if (!currentAccount) redirect(`/login?returnTo=${encodeURIComponent(checkoutHref)}`);
     const agencyNameValue = formData.get("agencyName");
     const agencyName = typeof agencyNameValue === "string" ? agencyNameValue.trim() : "";

@@ -2,8 +2,8 @@
 
 import { NextRequest } from 'next/server'
 
-jest.mock('@/lib/session', () => ({
-  getOwnerIdFromSession: jest.fn(),
+jest.mock('@/lib/auth-v2/authorization', () => ({
+  getAuthorizedOwnerId: jest.fn(),
 }))
 jest.mock('@/lib/opportunities/repository', () => ({
   listOpportunities: jest.fn(),
@@ -18,7 +18,7 @@ jest.mock('@/lib/opportunities/repository', () => ({
     ['accepted', 'dismissed', 'snoozed', 'contacted'].includes(String(value)),
 }))
 
-import { getOwnerIdFromSession } from '@/lib/session'
+import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization'
 import {
   applyOpportunityAction,
   getOpportunityById,
@@ -31,7 +31,7 @@ import { GET as list } from '@/app/api/opportunities/route'
 import { GET as detail } from '@/app/api/opportunities/[id]/route'
 import { POST as action } from '@/app/api/opportunities/[id]/action/route'
 
-const mockedOwner = jest.mocked(getOwnerIdFromSession)
+const mockedOwner = jest.mocked(getAuthorizedOwnerId)
 const mockedList = jest.mocked(listOpportunities)
 const mockedDetail = jest.mocked(getOpportunityById)
 const mockedAction = jest.mocked(applyOpportunityAction)

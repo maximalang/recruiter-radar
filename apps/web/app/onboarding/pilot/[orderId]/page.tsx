@@ -39,7 +39,7 @@ import {
 import { getTelegramBotToken } from "../../../../lib/telegram";
 import { getTelegramConnectLinkState } from "../../../../lib/telegramConnect";
 import { getWebPushConnectLinkState } from "../../../../lib/webPushConnect";
-import { readOwnerSession } from "../../../../lib/session";
+import { getAuthorizedUserId } from "../../../../lib/auth-v2/authorization";
 import {
   completePilotOnboardingAction,
   confirmPilotProfileAction,
@@ -102,7 +102,7 @@ export default async function PilotOnboardingPage({
   const resolvedSearchParams = (await searchParams) ?? {};
   const errorMessage = getSearchParamValue(resolvedSearchParams, "error");
   const notice = getSearchParamValue(resolvedSearchParams, "notice");
-  const ownerId = await readOwnerSession();
+  const ownerId = await getAuthorizedUserId("billing:manage");
 
   if (!ownerId) {
     notFound();

@@ -3,7 +3,7 @@ import { getPool } from "../../../lib/db";
 import { formatReason, type ScoringReason } from "../../../lib/scoring/scoring-reasons";
 import { extractPayloadFields } from "../../../lib/leads-data";
 import { updateDigestOrgStateFeedback } from "../../../lib/digestFeedback";
-import { getOwnerIdFromSession } from "../../../lib/session";
+import { getAuthorizedOwnerId } from "../../../lib/auth-v2/authorization";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -56,7 +56,7 @@ export async function GET(request: Request) {
 
   // Owner-scope: reject reads of another tenant's review queue. The JOIN +
   // owner predicate below also defends against a forged clientProfileId.
-  const ownerId = await getOwnerIdFromSession();
+  const ownerId = await getAuthorizedOwnerId("leads:read");
   if (!ownerId) {
     return NextResponse.json({ error: "Access denied: no active session." }, { status: 401 });
   }
@@ -204,7 +204,7 @@ export async function POST(request: Request) {
   // Owner-scope: only the profile's owner (or a pilot/anonymous profile) may
   // approve/reject its candidates. The owner predicate is enforced inside the
   // UPDATE so a forged clientProfileId simply matches no rows → 404.
-  const ownerId = await getOwnerIdFromSession();
+  const ownerId = await getAuthorizedOwnerId("leads:write");
   if (!ownerId) {
     return NextResponse.json({ error: "Access denied: no active session." }, { status: 401 });
   }

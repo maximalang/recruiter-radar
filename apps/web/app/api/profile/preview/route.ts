@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getClientProfileByOwnerId } from '@/lib/clientProfiles';
 import { countMatchingCandidatesForProfile } from '@/lib/digest';
 import { computeProfileCompletion } from '@/lib/profileCompletion';
-import { getOwnerIdFromSession } from '@/lib/session';
+import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization';
 
 /**
  * GET /api/profile/preview — approximate current match count for the owner's
@@ -20,7 +20,7 @@ import { getOwnerIdFromSession } from '@/lib/session';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const ownerId = await getOwnerIdFromSession();
+  const ownerId = await getAuthorizedOwnerId('profiles:read');
   if (!ownerId) {
     return NextResponse.json({ hasProfile: false, matchCount: null, completion: null });
   }

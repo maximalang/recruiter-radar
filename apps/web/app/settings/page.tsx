@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { getAccountById } from "@/lib/account-auth";
+import { getSession } from "@/lib/auth-v2/authorization";
 import { getClientProfileByOwnerId } from "@/lib/clientProfiles";
 import { getDeliveryPreferencesByOwnerId } from "@/lib/deliveryPreferences";
 import {
@@ -8,7 +9,6 @@ import {
   isAuthWorkspacesV2EnabledForUser,
 } from "@/lib/auth-v2/config";
 import { computeProfileCompletion } from "@/lib/profileCompletion";
-import { readOwnerSession } from "@/lib/session";
 import { buildAccountNavigation } from "../ui/account-navigation";
 import { logoutAction } from "../login/actions";
 import { ContentCard, ContentCardTitle, EmptyState, InternalPageFrame, InternalPageHeader } from "../ui/internal-page";
@@ -24,10 +24,10 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function SettingsIndexPage() {
-  const ownerId = await readOwnerSession();
-  const account = await getAccountById(ownerId).catch(() => null);
+  const authorization = await getSession({ permission: "workspace:read" });
+  const account = await getAccountById(authorization?.userId ?? null).catch(() => null);
 
-  if (!account) {
+  if (!authorization || !account) {
     return (
       <InternalPageFrame navItems={buildAccountNavigation("settings")} footer={<SiteFooter />}>
         <InternalPageHeader title="Настройки аккаунта" subtitle="Для доступа к настройкам нужен вход." />
@@ -43,8 +43,8 @@ export default async function SettingsIndexPage() {
   }
 
   const [profile, preferences] = await Promise.all([
-    getClientProfileByOwnerId(account.id).catch(() => null),
-    getDeliveryPreferencesByOwnerId(account.id).catch(() => null),
+    getClientProfileByOwnerId(authorization.dataOwnerId).catch(() => null),
+    getDeliveryPreferencesByOwnerId(authorization.dataOwnerId).catch(() => null),
   ]);
 
   if (!profile) {

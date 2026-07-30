@@ -78,6 +78,7 @@ export type ActiveWorkspace = {
   name: string;
   slug: string;
   role: WorkspaceRole;
+  bootstrapUserId: string;
 };
 
 type WorkspaceRow = ActiveWorkspace;
@@ -123,7 +124,8 @@ export async function getActiveWorkspace(input: {
          workspace.id::TEXT AS id,
          workspace.name,
          workspace.slug,
-         membership.role
+         membership.role,
+         workspace.bootstrap_user_id::TEXT AS "bootstrapUserId"
        FROM workspace_members AS membership
        JOIN workspaces AS workspace
          ON workspace.id = membership.workspace_id
@@ -136,7 +138,13 @@ export async function getActiveWorkspace(input: {
       [input.userId, input.workspaceId],
     );
     const workspace = result.rows[0];
-    if (!workspace || !isWorkspaceRole(workspace.role)) return null;
+    if (
+      !workspace
+      || !isWorkspaceRole(workspace.role)
+      || !validId(workspace.bootstrapUserId)
+    ) {
+      return null;
+    }
     return workspace;
   } catch (error) {
     logError("auth_v2.workspace_read_failed", error);

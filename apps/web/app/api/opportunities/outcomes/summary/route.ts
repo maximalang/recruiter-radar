@@ -7,7 +7,7 @@ import {
 import { HIRING_EPISODE_TYPES } from '@/lib/opportunities/hiring-episode-detection'
 import { getOutcomeFunnelSummary } from '@/lib/opportunities/outcome-repository'
 import { logError } from '@/lib/runtime'
-import { getOwnerIdFromSession } from '@/lib/session'
+import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic'
 const MAX_PERIOD_MS = 366 * 24 * 60 * 60 * 1000
 
 export async function GET(request: NextRequest) {
-  const ownerId = await getOwnerIdFromSession()
+  const ownerId = await getAuthorizedOwnerId('opportunities:read')
   if (
     !isOpportunityEngineV1EnabledForOwner(ownerId) ||
     !isOpportunityOutcomesEnabledForOwner(ownerId)

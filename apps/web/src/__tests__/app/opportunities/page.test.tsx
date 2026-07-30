@@ -2,8 +2,8 @@
 
 import { render, screen } from '@testing-library/react'
 
-jest.mock('@/lib/session', () => ({
-  getOwnerIdFromSession: jest.fn(),
+jest.mock('@/lib/auth-v2/authorization', () => ({
+  getAuthorizedOwnerId: jest.fn(),
 }))
 jest.mock('@/lib/opportunities/repository', () => ({
   getOpportunityOutcomeOperationalSummary: jest.fn(),
@@ -18,7 +18,7 @@ import {
   getOpportunityOutcomeOperationalSummary,
   listOpportunities,
 } from '@/lib/opportunities/repository'
-import { getOwnerIdFromSession } from '@/lib/session'
+import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization'
 
 describe('opportunities page', () => {
   const originalFlag = process.env.OPPORTUNITY_ENGINE_V1_ENABLED
@@ -33,7 +33,7 @@ describe('opportunities page', () => {
     process.env.OPPORTUNITY_OUTCOMES_ENABLED = 'true'
     process.env.OPPORTUNITY_OUTCOMES_UI_ENABLED = 'true'
     delete process.env.OPPORTUNITY_CANARY_OWNER_IDS
-    jest.mocked(getOwnerIdFromSession).mockResolvedValue('7')
+    jest.mocked(getAuthorizedOwnerId).mockResolvedValue('7')
     jest.mocked(listOpportunities).mockResolvedValue({
       opportunities: [],
       total: 0,

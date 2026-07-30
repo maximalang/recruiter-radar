@@ -2,8 +2,8 @@
 
 import { NextRequest } from 'next/server'
 
-jest.mock('@/lib/session', () => ({
-  getOwnerIdFromSession: jest.fn(),
+jest.mock('@/lib/auth-v2/authorization', () => ({
+  getAuthorizedOwnerId: jest.fn(),
 }))
 jest.mock('@/lib/opportunities/outcome-repository', () => ({
   recordOpportunityOutcome: jest.fn(),
@@ -19,7 +19,7 @@ jest.mock('@/lib/opportunities/outcome-repository', () => ({
   },
 }))
 
-import { getOwnerIdFromSession } from '@/lib/session'
+import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization'
 import {
   getOpportunityOutcomeHistory,
   OutcomeTransitionConflictError,
@@ -30,7 +30,7 @@ import {
   POST,
 } from '@/app/api/opportunities/[id]/outcomes/route'
 
-const mockedOwner = jest.mocked(getOwnerIdFromSession)
+const mockedOwner = jest.mocked(getAuthorizedOwnerId)
 const mockedRecord = jest.mocked(recordOpportunityOutcome)
 const mockedHistory = jest.mocked(getOpportunityOutcomeHistory)
 
