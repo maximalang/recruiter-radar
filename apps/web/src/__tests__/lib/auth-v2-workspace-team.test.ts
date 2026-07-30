@@ -15,6 +15,7 @@ import {
 } from "@/lib/auth-v2/workspace-team";
 import { getClient, getPool } from "@/lib/db-pool";
 import { sendEmail } from "@/lib/email/transport";
+import { hashAuthRateLimitBoundary } from "@/lib/auth-v2/rate-limits";
 
 const mockGetClient = jest.mocked(getClient);
 const mockGetPool = jest.mocked(getPool);
@@ -178,6 +179,51 @@ describe("auth v2 workspace team lifecycle", () => {
     expect(targetLock?.[1]).toEqual([
       "auth-workspace-invite:9:MiXeD@example.com",
     ]);
+  });
+
+  test("folds only the invite abuse bucket while keeping the identity lock exact", async () => {
+    const query = jest.fn(async (sql: string, _values?: unknown[]) => {
+      if (sql.includes("FOR UPDATE OF membership, workspace")) {
+        return {
+          rows: [{ actorRole: "owner", workspaceName: "Radar Team" }],
+          rowCount: 1,
+        };
+      }
+      if (sql.includes("consume_auth_rate_limit")) {
+        return { rows: [{ allowed: true }], rowCount: 1 };
+      }
+      if (sql.includes("FROM workspace_members AS membership")) {
+        return { rows: [], rowCount: 0 };
+      }
+      if (sql.includes("INSERT INTO workspace_invites")) {
+        return { rows: [{ id: "81" }], rowCount: 1 };
+      }
+      return { rows: [], rowCount: 1 };
+    });
+    mockGetClient.mockResolvedValue({ query, release: jest.fn() } as never);
+
+    await expect(inviteWorkspaceMember({
+      actorUserId: "42",
+      workspaceId: "9",
+      email: "MiXeD@example.com",
+      role: "recruiter",
+      now,
+    })).resolves.toEqual({ ok: true, delivery: "sent" });
+
+    const targetLock = query.mock.calls.find(([_sql, values]) =>
+      String(values?.[0]).startsWith("auth-workspace-invite:"),
+    );
+    expect(targetLock?.[1]).toEqual([
+      "auth-workspace-invite:9:MiXeD@example.com",
+    ]);
+    const rateCalls = query.mock.calls.filter(([sql]) =>
+      String(sql).includes("consume_auth_rate_limit"),
+    );
+    expect(rateCalls).toHaveLength(2);
+    expect(rateCalls[1]?.[1]?.[1]).toBe(hashAuthRateLimitBoundary(
+      "workspace-invite-target",
+      "9:mixed@example.com",
+    ));
   });
 
   test("returns the accepted workspace only after single-use acceptance commits", async () => {

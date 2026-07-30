@@ -27,6 +27,16 @@ ALTER TABLE users
     ),
   ADD CONSTRAINT users_auth_v2_verified_identity_check
     CHECK (email_normalized IS NULL OR email_verified_at IS NOT NULL),
+  ADD CONSTRAINT users_auth_v2_identity_consistency_check
+    CHECK (
+      email_normalized IS NULL
+      OR (
+        split_part(email, '@', 1)
+          = split_part(email_normalized, '@', 1)
+        AND LOWER(split_part(email, '@', 2))
+          = split_part(email_normalized, '@', 2)
+      )
+    ),
   ADD CONSTRAINT users_auth_v2_status_check
     CHECK (status IN ('active', 'suspended', 'deletion_pending', 'deleted')),
   ADD CONSTRAINT users_auth_v2_onboarding_status_check
@@ -40,6 +50,15 @@ CREATE UNIQUE INDEX users_email_normalized_active_uidx
   ON users (email_normalized)
   WHERE email_normalized IS NOT NULL
     AND status <> 'deleted';
+
+CREATE UNIQUE INDEX users_auth_v2_identity_active_uidx
+  ON users (
+    (split_part(COALESCE(email_normalized, email), '@', 1)),
+    (LOWER(split_part(COALESCE(email_normalized, email), '@', 2)))
+  )
+  WHERE status <> 'deleted';
+
+DROP INDEX IF EXISTS users_email_uidx;
 
 CREATE TABLE auth_challenges (
   id BIGSERIAL PRIMARY KEY,

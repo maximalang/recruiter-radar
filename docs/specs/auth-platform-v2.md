@@ -856,9 +856,11 @@ PR 4 implementation invariants:
   `token_hash`. A previous grace hash rolls the transaction back with a
   reauthentication result and leaves the challenge available for a current
   session; it never performs another sensitive rotation;
-- email-change and invite target limits use the same lowercase identity
-  boundary as conflict detection, and the target bucket is never consumed
-  after the principal/workspace bucket has denied the request;
+- email-change and invite target limits use a lowercase abuse boundary so
+  case variants cannot bypass the target quota; authorization, conflict,
+  replacement and acceptance still use exact `email_normalized`, and the
+  target bucket is never consumed after the principal/workspace bucket has
+  denied the request;
 - a default invite timestamp is refreshed after the per-target advisory lock,
   and replacement revocation is clamped to the replaced invite's `created_at`;
   concurrent sends cannot create an invalid historical ordering;

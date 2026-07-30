@@ -216,6 +216,7 @@ export async function inviteWorkspaceMember(input: {
   let inviteId: string | null = null;
   let workspaceName: string | null = null;
   const targetBoundary = email.normalized;
+  const targetRateLimitBoundary = email.normalized.toLowerCase();
 
   try {
     await client.query("BEGIN");
@@ -252,7 +253,7 @@ export async function inviteWorkspaceMember(input: {
       scope: "workspace_invite",
       keyHash: hashAuthRateLimitBoundary(
         "workspace-invite-target",
-        `${input.workspaceId}:${targetBoundary}`,
+        `${input.workspaceId}:${targetRateLimitBoundary}`,
       ),
       windowSeconds: 86_400,
       limit: 3,
@@ -273,7 +274,9 @@ export async function inviteWorkspaceMember(input: {
            account.email_normalized = $2
            OR (
              account.email_normalized IS NULL
-             AND account.email = $2
+             AND split_part(account.email, '@', 1) = split_part($2, '@', 1)
+             AND LOWER(split_part(account.email, '@', 2))
+               = split_part($2, '@', 2)
            )
          )
        LIMIT 1`,

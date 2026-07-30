@@ -105,7 +105,35 @@ try {
                 OR email_normalized !~ '^[^@[:space:]]+@[a-z0-9][a-z0-9.-]*[a-z0-9]$'
                 OR split_part(email_normalized, '@', 2)
                    <> LOWER(split_part(email_normalized, '@', 2))
+                OR split_part(email, '@', 1)
+                   <> split_part(email_normalized, '@', 1)
+                OR LOWER(split_part(email, '@', 2))
+                   <> split_part(email_normalized, '@', 2)
               )
+          ),
+          'legacyFoldedIdentityIndexPresent', (
+            SELECT CASE
+              WHEN TO_REGCLASS('public.users_email_uidx') IS NULL THEN 0
+              ELSE 1
+            END
+          ),
+          'canonicalIdentityIndexMissing', (
+            SELECT CASE
+              WHEN TO_REGCLASS(
+                'public.users_auth_v2_identity_active_uidx'
+              ) IS NULL THEN 1
+              ELSE 0
+            END
+          ),
+          'activeAccountsWithoutNormalizedIdentity', (
+            SELECT CASE
+              WHEN $2::BOOLEAN THEN COUNT(*)::INTEGER
+              ELSE 0
+            END
+            FROM users
+            WHERE status = 'active'
+              AND email_verified_at IS NOT NULL
+              AND email_normalized IS NULL
           ),
           'workspaceWithoutBootstrapAccount', (
             SELECT COUNT(*)::INTEGER
@@ -238,7 +266,10 @@ try {
               + (SELECT COUNT(*) FROM opportunities WHERE workspace_id IS NULL)
           )::INTEGER
         ) AS counters
-    `, [canaryIds === null ? 1 : 0])
+    `, [
+      canaryIds === null ? 1 : 0,
+      process.env.AUTH_PLATFORM_V2_ENABLED === 'true',
+    ])
     await pool.query('COMMIT')
 
     const blockingViolations = result.rows[0].blockingViolations

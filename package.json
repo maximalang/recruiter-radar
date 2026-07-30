@@ -26,6 +26,7 @@
     "test:auth-v2:workspace-sessions:db": "node packages/db/scripts/verify-auth-v2-workspace-sessions.mjs",
     "test:auth-v2:tenancy:db": "node packages/db/scripts/run-auth-v2-tenancy-db-tests.mjs",
     "test:auth-v2:account-team:db": "node packages/db/scripts/run-auth-v2-account-team-db-tests.mjs",
+    "test:auth-v2:identity:db": "node packages/db/scripts/verify-auth-v2-identity.mjs",
     "test:auth-v2:account-team:e2e": "node packages/db/scripts/run-auth-v2-account-team-e2e.mjs",
     "test:auth-v2:passkeys:db": "node packages/db/scripts/run-auth-v2-passkey-db-tests.mjs",
     "test:auth-v2:passkeys:e2e": "node packages/db/scripts/run-auth-v2-passkey-e2e.mjs",

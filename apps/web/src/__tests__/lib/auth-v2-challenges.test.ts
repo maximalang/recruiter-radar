@@ -92,7 +92,10 @@ const rollbackVerifierPath = resolve(
   "verify-auth-v2-rollback.mjs",
 );
 
-function fakeClient(issueResult: { issued: boolean; challengeId: string | null }) {
+function fakeClient(
+  issueResult: { issued: boolean; challengeId: string | null },
+  deliveryEmail = "User+sales@example.com",
+) {
   const query = jest.fn(async (
     sql: string,
     _values?: readonly unknown[],
@@ -103,6 +106,15 @@ function fakeClient(issueResult: { issued: boolean; challengeId: string | null }
           issued: issueResult.issued,
           challengeId: issueResult.challengeId,
         }],
+        rowCount: 1,
+      };
+    }
+    if (
+      sql.includes("FROM auth_challenges AS challenge")
+      && sql.includes('AS "deliveryEmail"')
+    ) {
+      return {
+        rows: [{ deliveryEmail }],
         rowCount: 1,
       };
     }
@@ -168,6 +180,33 @@ describe("auth v2 login challenge service", () => {
     expect(client.release).toHaveBeenCalled();
   });
 
+  test("sends a legacy login challenge only to the stored verified mailbox", async () => {
+    const client = fakeClient(
+      { issued: true, challengeId: "18" },
+      "Alice@example.com",
+    );
+    mockGetClient.mockResolvedValue(client as never);
+    mockGetPool.mockReturnValue({
+      query: jest.fn().mockResolvedValue({ rows: [], rowCount: 1 }),
+    } as never);
+    mockSendEmail.mockResolvedValue({ ok: true });
+
+    await expect(requestAuthV2Login({
+      email: "Alice@EXAMPLE.COM",
+      returnTo: "/dashboard",
+      clientAddress: "unknown",
+      userAgent: null,
+    })).resolves.toEqual({ ok: true });
+
+    expect(mockSendEmail).toHaveBeenCalledWith(expect.objectContaining({
+      to: "Alice@example.com",
+    }));
+    const deliveryLookup = client.query.mock.calls.find(([sql]) =>
+      String(sql).includes('AS "deliveryEmail"'),
+    );
+    expect(deliveryLookup?.[1]).toEqual(["18"]);
+  });
+
   test("keeps rate limits enumeration-safe and does not send an email", async () => {
     const client = fakeClient({ issued: false, challengeId: null });
     mockGetClient.mockResolvedValue(client as never);
@@ -184,7 +223,10 @@ describe("auth v2 login challenge service", () => {
   });
 
   test("keeps database and SMTP failures enumeration-safe", async () => {
-    const client = fakeClient({ issued: true, challengeId: "19" });
+    const client = fakeClient(
+      { issued: true, challengeId: "19" },
+      "second@example.com",
+    );
     mockGetClient
       .mockRejectedValueOnce(new Error("database unavailable"))
       .mockResolvedValueOnce(client as never);
@@ -366,6 +408,34 @@ describe("auth v2 login challenge service", () => {
     }
   });
 
+  test("never folds a legacy mailbox local part when selecting a canary identity", async () => {
+    const previousPlatform = process.env.AUTH_PLATFORM_V2_ENABLED;
+    const previousCanary = process.env.AUTH_V2_CANARY_USER_IDS;
+    process.env.AUTH_PLATFORM_V2_ENABLED = "false";
+    process.env.AUTH_V2_CANARY_USER_IDS = "42";
+    const query = jest.fn().mockResolvedValue({
+      rows: [],
+      rowCount: 0,
+    });
+    mockGetPool.mockReturnValue({ query } as never);
+
+    try {
+      await expect(shouldRequestAuthV2Login("alice@example.com"))
+        .resolves.toBe(false);
+      const sql = String(query.mock.calls[0]?.[0]).replace(/\s+/g, " ");
+      expect(sql).not.toContain("LOWER(email) = LOWER($1)");
+      expect(sql).toContain(
+        "split_part(email, '@', 1) = split_part($1, '@', 1)",
+      );
+      expect(sql).toContain(
+        "LOWER(split_part(email, '@', 2)) = split_part($1, '@', 2)",
+      );
+    } finally {
+      restoreEnv("AUTH_PLATFORM_V2_ENABLED", previousPlatform);
+      restoreEnv("AUTH_V2_CANARY_USER_IDS", previousCanary);
+    }
+  });
+
   test.each([
     {
       name: "active",
@@ -455,7 +525,12 @@ describe("auth v2 challenge issuance database contract", () => {
 
   test("resolves login versus signup internally and writes redacted audit", () => {
     expect(compact).toContain("email_normalized = input_email_normalized");
-    expect(compact).toContain("LOWER(email) = LOWER(input_email_normalized)");
+    expect(compact).not.toContain(
+      "LOWER(email) = LOWER(input_email_normalized)",
+    );
+    expect(compact).toContain(
+      "split_part(email, '@', 1) = split_part(input_email_normalized, '@', 1)",
+    );
     expect(compact).toContain("resolved_purpose := 'login'");
     expect(compact).toContain("resolved_purpose := 'signup'");
     expect(compact).toContain("INSERT INTO auth_security_events");
@@ -495,6 +570,12 @@ describe("auth v2 atomic challenge consumption contract", () => {
     expect(compact).toContain("UPDATE auth_challenges AS challenge SET consumed_at");
     expect(compact).toContain("challenge_identity_changed");
     expect(compact).toContain("last_authenticated_at");
+    expect(compact).not.toContain(
+      "LOWER(account.email) = LOWER(locked_challenge.email_normalized)",
+    );
+    expect(compact).toContain(
+      "split_part(account.email, '@', 1) = split_part(locked_challenge.email_normalized, '@', 1)",
+    );
   });
 
   test("applies verification limits and writes bounded replay and success audit", () => {

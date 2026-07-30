@@ -5,7 +5,10 @@ import { getClient, getPool } from "./db-pool";
 import { sendEmail } from "./email/transport";
 import { logError, logEvent, logWarn } from "./runtime";
 import { renderAuthEmail } from "./auth-v2/email-templates";
-import { maskAuthEmail } from "./auth-v2/security";
+import {
+  maskAuthEmail,
+  normalizeAuthEmail,
+} from "./auth-v2/security";
 
 const ACCOUNT_PATHS = ["/dashboard", "/checkout", "/settings", "/profile", "/leads", "/review"];
 const TOKEN_PATTERN = /^[a-f0-9]{64}$/;
@@ -19,13 +22,7 @@ export type AccountIdentity = {
 };
 
 export function normalizeAccountEmail(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const email = value.trim().toLowerCase();
-  if (email.length < 3 || email.length > 254 || /[\r\n,;]/.test(email)) return null;
-  if (!/^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i.test(email)) {
-    return null;
-  }
-  return email;
+  return normalizeAuthEmail(value)?.canonical ?? null;
 }
 
 export function sanitizeAccountReturnTo(value: unknown): string {
@@ -105,6 +102,10 @@ export async function requestAccountLogin(input: {
     await client.query("BEGIN");
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", ["account-login-global"]);
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`account-login-source:${sourceHash}`]);
+    await client.query(
+      "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+      [`account-login-email:${email}`],
+    );
     const rate = await client.query<{ global_count: string; source_count: string }>(
       `SELECT
          (SELECT COUNT(*)::text FROM account_login_challenges WHERE created_at > NOW() - INTERVAL '1 minute') AS global_count,
@@ -118,9 +119,34 @@ export async function requestAccountLogin(input: {
     }
 
     const user = await client.query<{ id: string }>(
-      `INSERT INTO users (email) VALUES ($1)
-       ON CONFLICT (LOWER(email)) DO UPDATE SET email = users.email
-       RETURNING id::text AS id`,
+      `WITH existing AS (
+         SELECT id
+         FROM users
+         WHERE status <> 'deleted'
+           AND (
+             email_normalized = $1
+             OR (
+               email_normalized IS NULL
+               AND split_part(email, '@', 1) = split_part($1, '@', 1)
+               AND LOWER(split_part(email, '@', 2))
+                 = split_part($1, '@', 2)
+             )
+           )
+         ORDER BY (email_normalized IS NOT NULL) DESC, id
+         LIMIT 1
+         FOR UPDATE
+       ),
+       inserted AS (
+         INSERT INTO users (email)
+         SELECT $1
+         WHERE NOT EXISTS (SELECT 1 FROM existing)
+         ON CONFLICT DO NOTHING
+         RETURNING id
+       )
+       SELECT id::TEXT AS id FROM existing
+       UNION ALL
+       SELECT id::TEXT AS id FROM inserted
+       LIMIT 1`,
       [email],
     );
     const userId = user.rows[0]?.id;

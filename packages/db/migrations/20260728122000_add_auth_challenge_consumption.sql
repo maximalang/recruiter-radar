@@ -200,7 +200,10 @@ BEGIN
         account.email_normalized = locked_challenge.email_normalized
         OR (
           account.email_normalized IS NULL
-          AND LOWER(account.email) = LOWER(locked_challenge.email_normalized)
+          AND split_part(account.email, '@', 1)
+            = split_part(locked_challenge.email_normalized, '@', 1)
+          AND LOWER(split_part(account.email, '@', 2))
+            = split_part(locked_challenge.email_normalized, '@', 2)
         )
       )
     )
@@ -210,7 +213,10 @@ BEGIN
         account.email_normalized = locked_challenge.email_normalized
         OR (
           account.email_normalized IS NULL
-          AND LOWER(account.email) = LOWER(locked_challenge.email_normalized)
+          AND split_part(account.email, '@', 1)
+            = split_part(locked_challenge.email_normalized, '@', 1)
+          AND LOWER(split_part(account.email, '@', 2))
+            = split_part(locked_challenge.email_normalized, '@', 2)
         )
       )
     )

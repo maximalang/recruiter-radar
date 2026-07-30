@@ -13,6 +13,7 @@ import {
   requestAccountDeletion,
   requestAccountEmailChange,
 } from "@/lib/auth-v2/account-security";
+import { hashAuthRateLimitBoundary } from "@/lib/auth-v2/rate-limits";
 import { getClient, getPool } from "@/lib/db-pool";
 import { sendEmail } from "@/lib/email/transport";
 
@@ -130,8 +131,15 @@ describe("auth v2 account security", () => {
       String(values?.[0]).startsWith("auth-email-change-target:"),
     );
     expect(targetLock?.[1]).toEqual([
-      "auth-email-change-target:new@example.com",
+      "auth-email-change-target:New@example.com",
     ]);
+    const rateCalls = query.mock.calls.filter(([sql]) =>
+      String(sql).includes("consume_auth_rate_limit"),
+    );
+    expect(rateCalls[1]?.[1]?.[1]).toBe(hashAuthRateLimitBoundary(
+      "email-change-target",
+      "new@example.com",
+    ));
   });
 
   test("does not disclose an existing account or a rate-limit decision", async () => {
