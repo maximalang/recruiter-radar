@@ -149,6 +149,25 @@ describe("magic-login verify bridge", () => {
     expect(response.headers.get("set-cookie")).toBeNull();
   });
 
+  test("rejects an oversized request before challenge lookup", async () => {
+    const response = await POST(new Request(
+      "https://radar.example/api/auth/login/verify",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Origin: "https://radar.example",
+        },
+        body: JSON.stringify({ token: "a".repeat(2_048) }),
+      },
+    ));
+
+    expect(response.status).toBe(400);
+    expect(mockReadLoginChallengeState).not.toHaveBeenCalled();
+    expect(mockReadAuthV2LoginChallengeState).not.toHaveBeenCalled();
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
   test("preserves a known expired token for the explanatory confirm state", async () => {
     mockReadLoginChallengeState.mockResolvedValue({
       status: "expired",

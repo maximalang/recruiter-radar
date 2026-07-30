@@ -3,6 +3,8 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 
+import { executeMigrationSql } from './migration-execution.mjs';
+
 const { Client } = pg;
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const rootEnvPath = resolve(scriptDir, '../../../.env');
@@ -28,7 +30,7 @@ const client = new Client({ connectionString: databaseUrl, connectionTimeoutMill
 
 try {
   await client.connect();
-  await client.query(sql);
+  await executeMigrationSql(client, sql);
   console.log(JSON.stringify({ ok: true, migration: migrationPath }, null, 2));
 } catch (error) {
   const message = error instanceof Error ? error.stack ?? error.message : String(error);

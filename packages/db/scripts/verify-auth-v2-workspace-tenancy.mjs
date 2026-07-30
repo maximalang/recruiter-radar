@@ -5,10 +5,17 @@ import { promisify } from 'node:util'
 
 import pg from 'pg'
 
+import { executeMigrationSql } from './migration-execution.mjs'
+
 const { Pool } = pg
 const execFileAsync = promisify(execFile)
 const databaseUrl = process.env.DATABASE_URL?.trim()
 const targetMigration = '20260729121000_add_auth_workspace_tenant_context.sql'
+const tenantMigrations = [
+  targetMigration,
+  '20260729121100_add_auth_workspace_tenant_indexes.sql',
+  '20260729121200_add_auth_workspace_tenant_guards.sql',
+]
 const rollbackFile =
   '20260729121000_add_auth_workspace_tenant_context.down.sql'
 
@@ -45,9 +52,10 @@ try {
   const beforeIdentity = await readIdentitySnapshot(fixture)
   const beforeOutcomeChecksum = await readOutcomeChecksum()
 
-  await pool.query(
-    await readFile(resolve(migrationsDir, targetMigration), 'utf8'),
-  )
+  for (const filename of tenantMigrations) {
+    const sql = await readFile(resolve(migrationsDir, filename), 'utf8')
+    await executeMigrationSql(pool, sql)
+  }
 
   const preflight = await runTool('preflight-auth-v2-workspaces.mjs')
   if (!preflight.ok) {
