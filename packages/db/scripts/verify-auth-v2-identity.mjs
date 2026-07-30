@@ -77,16 +77,34 @@ try {
     [storedEmail],
   )
   const legacyUserId = legacy.rows[0]?.id
-  const canaryPreflight = await runPreflight(false)
-  const globalPreflight = await runPreflight(true)
+  const canaryPreflight = await runPreflight({
+    platformEnabled: false,
+    trustedProxyHeader: 'x-real-ip',
+    expectedExit: 0,
+  })
+  const globalPreflight = await runPreflight({
+    platformEnabled: true,
+    trustedProxyHeader: 'x-real-ip',
+    expectedExit: 2,
+  })
+  const missingProxyCanaryPreflight = await runPreflight({
+    platformEnabled: false,
+    canaryIds: legacyUserId,
+    trustedProxyHeader: '',
+    expectedExit: 2,
+  })
   if (
     canaryPreflight.blockingViolations
       ?.activeAccountsWithoutNormalizedIdentity !== 0
     || globalPreflight.blockingViolations
       ?.activeAccountsWithoutNormalizedIdentity !== 1
+    || missingProxyCanaryPreflight.blockingViolations
+      ?.trustedClientAddressNotReady !== 1
+    || missingProxyCanaryPreflight.configuration
+      ?.trustedClientAddressRequired !== true
   ) {
     throw new Error(
-      'Preflight did not gate global enablement on legacy identities.',
+      'Preflight did not gate identity or trusted proxy readiness.',
     )
   }
 
@@ -207,6 +225,7 @@ try {
       'exact_legacy_login',
       'stored_delivery_mailbox',
       'global_preflight_legacy_identity_gate',
+      'canary_preflight_trusted_proxy_gate',
       'clean_down_upgrade_chain',
       'installed_function_rewrite',
       'canonical_identity_uniqueness',
@@ -313,7 +332,12 @@ async function assertInstalledIdentityContract(expected) {
   }
 }
 
-async function runPreflight(platformEnabled) {
+async function runPreflight({
+  platformEnabled,
+  canaryIds = '',
+  trustedProxyHeader,
+  expectedExit,
+}) {
   const scriptPath = resolve(
     root,
     'packages',
@@ -326,7 +350,14 @@ async function runPreflight(platformEnabled) {
       ...process.env,
       DATABASE_URL: databaseUrl,
       AUTH_PLATFORM_V2_ENABLED: platformEnabled ? 'true' : 'false',
-      AUTH_V2_CANARY_USER_IDS: '',
+      AUTH_WORKSPACES_V2_ENABLED: 'false',
+      AUTH_ONBOARDING_V2_ENABLED: 'false',
+      AUTH_PASSKEYS_ENABLED: 'false',
+      AUTH_LEGACY_SESSION_MIGRATION_ENABLED: 'false',
+      AUTH_V2_SESSION_ROLLBACK_COMPAT_ENABLED: 'false',
+      AUTH_V2_CANARY_USER_IDS: canaryIds,
+      AUTH_TRUSTED_PROXY_HEADER: trustedProxyHeader,
+      AUTH_TRUSTED_PROXY_HOPS: '',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
@@ -344,10 +375,7 @@ async function runPreflight(platformEnabled) {
     child.once('error', reject)
     child.once('close', resolveExit)
   })
-  if (
-    (platformEnabled && exitCode !== 2)
-    || (!platformEnabled && exitCode !== 0)
-  ) {
+  if (exitCode !== expectedExit) {
     throw new Error(
       `Unexpected preflight exit ${exitCode}: ${stderr || stdout}`,
     )

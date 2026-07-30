@@ -12,6 +12,7 @@ import {
   isAuthSameOriginRequest,
   maskAuthEmail,
   normalizeAuthEmail,
+  readAuthTrustedProxyConfiguration,
   resolveAuthClientAddress,
   sanitizeAuthReturnTo,
   shouldWarnAuthAccountReplacement,
@@ -247,5 +248,43 @@ describe("auth v2 request boundaries", () => {
         AUTH_TRUSTED_PROXY_HOPS: "0",
       },
     })).toBe("192.0.2.5");
+  });
+
+  test("validates trusted proxy configuration without ambiguous hops", () => {
+    expect(readAuthTrustedProxyConfiguration({})).toEqual({
+      valid: true,
+      header: null,
+      trustedHops: null,
+    });
+    expect(readAuthTrustedProxyConfiguration({
+      AUTH_TRUSTED_PROXY_HEADER: "x-real-ip",
+    })).toEqual({
+      valid: true,
+      header: "x-real-ip",
+      trustedHops: null,
+    });
+    expect(readAuthTrustedProxyConfiguration({
+      AUTH_TRUSTED_PROXY_HEADER: "x-real-ip",
+      AUTH_TRUSTED_PROXY_HOPS: "1",
+    })).toEqual({
+      valid: false,
+      header: null,
+      trustedHops: null,
+    });
+    expect(readAuthTrustedProxyConfiguration({
+      AUTH_TRUSTED_PROXY_HEADER: "x-forwarded-for",
+      AUTH_TRUSTED_PROXY_HOPS: "11",
+    })).toEqual({
+      valid: false,
+      header: null,
+      trustedHops: null,
+    });
+    expect(readAuthTrustedProxyConfiguration({
+      AUTH_TRUSTED_PROXY_HEADER: "forwarded",
+    })).toEqual({
+      valid: false,
+      header: null,
+      trustedHops: null,
+    });
   });
 });

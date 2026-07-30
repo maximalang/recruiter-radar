@@ -89,8 +89,16 @@ describe("Auth v2 rollout operations", () => {
     );
     expect(runbook).toContain("AUTH_PLATFORM_V2_ENABLED=false");
     expect(runbook).toContain("AUTH_V2_CANARY_USER_IDS");
+    expect(runbook).toContain("AUTH_TRUSTED_PROXY_HEADER=x-real-ip");
+    expect(runbook).toContain("trustedClientAddressNotReady: 0");
+    expect(runbook).toContain("configure-caddy-real-ip.sh");
     expect(runbook).toContain("rollback");
     expect(runbook).toContain("deliverability");
     expect(runbook).toContain("do not create");
+
+    const preflight = script("preflight-auth-v2.mjs");
+    expect(preflight).toContain("trustedClientAddressNotReady");
+    expect(preflight).toContain("AUTH_TRUSTED_PROXY_HEADER");
+    expect(preflight).toContain("AUTH_TRUSTED_PROXY_HOPS");
   });
 });

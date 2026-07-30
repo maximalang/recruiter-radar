@@ -8,6 +8,15 @@ if (!databaseUrl) {
 }
 
 const canaryIds = parseCanaryIds(process.env.AUTH_V2_CANARY_USER_IDS)
+const trustedProxyConfiguration = parseTrustedProxyConfiguration(process.env)
+const trustedClientAddressRequired =
+  authRolloutRequiresTrustedClientAddress(canaryIds)
+const trustedClientAddressNotReady =
+  !trustedProxyConfiguration.valid
+  || (
+    trustedClientAddressRequired
+    && !trustedProxyConfiguration.configured
+  )
 const pool = new Pool({
   connectionString: databaseUrl,
   max: 1,
@@ -42,12 +51,18 @@ try {
       blockingViolations: {
         schemaNotReady: 10 - installedTables,
         invalidCanaryConfiguration: canaryIds === null ? 1 : 0,
+        trustedClientAddressNotReady:
+          trustedClientAddressNotReady ? 1 : 0,
       },
       counters: {
         installedTables,
         expectedTables: 10,
       },
-      configuration: safeConfiguration(canaryIds),
+      configuration: safeConfiguration(
+        canaryIds,
+        trustedProxyConfiguration,
+        trustedClientAddressRequired,
+      ),
     }))
     process.exitCode = 2
   } else {
@@ -272,14 +287,22 @@ try {
     ])
     await pool.query('COMMIT')
 
-    const blockingViolations = result.rows[0].blockingViolations
+    const blockingViolations = {
+      ...result.rows[0].blockingViolations,
+      trustedClientAddressNotReady:
+        trustedClientAddressNotReady ? 1 : 0,
+    }
     const ok = Object.values(blockingViolations)
       .every((count) => count === 0)
     console.log(JSON.stringify({
       ok,
       blockingViolations,
       counters: result.rows[0].counters,
-      configuration: safeConfiguration(canaryIds),
+      configuration: safeConfiguration(
+        canaryIds,
+        trustedProxyConfiguration,
+        trustedClientAddressRequired,
+      ),
     }))
     if (!ok) process.exitCode = 2
   }
@@ -302,7 +325,74 @@ function parseCanaryIds(rawValue) {
   return ids
 }
 
-function safeConfiguration(ids) {
+function parseTrustedProxyConfiguration(env) {
+  const header = env.AUTH_TRUSTED_PROXY_HEADER?.trim() ?? ''
+  const hops = env.AUTH_TRUSTED_PROXY_HOPS?.trim() ?? ''
+
+  if (!header) {
+    return {
+      configured: false,
+      valid: hops === '',
+      header: null,
+      trustedHops: null,
+    }
+  }
+  if (header === 'cf-connecting-ip' || header === 'x-real-ip') {
+    return {
+      configured: true,
+      valid: hops === '',
+      header: hops === '' ? header : null,
+      trustedHops: null,
+    }
+  }
+  if (
+    header !== 'x-forwarded-for'
+    || !/^[1-9]\d*$/.test(hops)
+  ) {
+    return {
+      configured: true,
+      valid: false,
+      header: null,
+      trustedHops: null,
+    }
+  }
+
+  const trustedHops = Number(hops)
+  if (!Number.isSafeInteger(trustedHops) || trustedHops > 10) {
+    return {
+      configured: true,
+      valid: false,
+      header: null,
+      trustedHops: null,
+    }
+  }
+  return {
+    configured: true,
+    valid: true,
+    header,
+    trustedHops,
+  }
+}
+
+function authRolloutRequiresTrustedClientAddress(ids) {
+  return (
+    (Array.isArray(ids) && ids.length > 0)
+    || [
+      'AUTH_PLATFORM_V2_ENABLED',
+      'AUTH_WORKSPACES_V2_ENABLED',
+      'AUTH_ONBOARDING_V2_ENABLED',
+      'AUTH_PASSKEYS_ENABLED',
+      'AUTH_LEGACY_SESSION_MIGRATION_ENABLED',
+      'AUTH_V2_SESSION_ROLLBACK_COMPAT_ENABLED',
+    ].some((name) => process.env[name] === 'true')
+  )
+}
+
+function safeConfiguration(
+  ids,
+  trustedProxy,
+  clientAddressRequired,
+) {
   return {
     platformEnabled: process.env.AUTH_PLATFORM_V2_ENABLED === 'true',
     workspacesEnabled: process.env.AUTH_WORKSPACES_V2_ENABLED === 'true',
@@ -312,5 +402,10 @@ function safeConfiguration(ids) {
       process.env.AUTH_V2_SESSION_ROLLBACK_COMPAT_ENABLED === 'true',
     canaryConfigurationValid: ids !== null,
     canaryUserCount: ids?.length ?? 0,
+    trustedClientAddressRequired: clientAddressRequired,
+    trustedProxyConfigured: trustedProxy.configured,
+    trustedProxyConfigurationValid: trustedProxy.valid,
+    trustedProxyHeader: trustedProxy.header,
+    trustedProxyHops: trustedProxy.trustedHops,
   }
 }

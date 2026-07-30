@@ -13,12 +13,30 @@ AUTH_PASSKEYS_ENABLED=false
 AUTH_LEGACY_SESSION_MIGRATION_ENABLED=false
 AUTH_V2_SESSION_ROLLBACK_COMPAT_ENABLED=false
 AUTH_V2_CANARY_USER_IDS=
+AUTH_TRUSTED_PROXY_HEADER=x-real-ip
+AUTH_TRUSTED_PROXY_HOPS=
 ```
 
 Never print or copy session cookies, raw tokens, magic links, challenge values,
 email addresses, IP addresses, user-agent strings, credential IDs, or their
 hashes into tickets, logs, or rollout evidence. The operational commands below
 emit aggregate JSON only.
+
+The production Caddy ingress is the only trusted client-address writer. Before
+adding a canary user, apply the reviewed
+`scripts/deploy/configure-caddy-real-ip.sh` change, verify that the application
+port is not publicly reachable around Caddy, and set
+`AUTH_TRUSTED_PROXY_HEADER=x-real-ip`. Leave `AUTH_TRUSTED_PROXY_HOPS` empty for
+this single-value header. Caddy overwrites every client-supplied `X-Real-IP`
+value with `{remote_host}`; trusting the header without that enforced ingress
+boundary is prohibited.
+
+For a different reviewed ingress, `cf-connecting-ip` is accepted as another
+single-value header, or `x-forwarded-for` may be used only with an explicit
+`AUTH_TRUSTED_PROXY_HOPS` value from `1` through `10`. Do not copy a hop count
+between environments. Preflight blocks malformed configuration and blocks any
+canary or enabled Auth v2 capability when no trusted client-address source is
+configured.
 
 The canary must be an existing internal test account. Operators **do not create**
 a production user with direct SQL, migrations, fixtures, or the canary command.
@@ -62,7 +80,10 @@ npm.cmd run auth-v2:session-report
 
 Do not proceed if any verifier exits non-zero, row-count parity fails, tenant
 relationships conflict, active workspaces lack membership, or aggregate session
-alerts are unexplained.
+alerts are unexplained. The preflight JSON must also report
+`trustedClientAddressNotReady: 0`,
+`trustedProxyConfigurationValid: true`, and `trustedProxyConfigured: true`
+before canary.
 
 ## Single-user canary
 
