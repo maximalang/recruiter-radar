@@ -21,6 +21,7 @@ import {
   readAuthSession,
   revokeAllAuthSessions,
   revokeAuthSessionById,
+  revokeAuthSessionForLogout,
   rotateAuthSession,
   changeActiveWorkspace,
 } from "@/lib/auth-v2/sessions";
@@ -202,6 +203,29 @@ describe("auth v2 server-side sessions", () => {
     await expect(revokeAllAuthSessions({
       userId: "42",
     })).resolves.toBeNull();
+  });
+
+  test("distinguishes logout revocation from inactivity and database failure", async () => {
+    const query = jest.fn()
+      .mockResolvedValueOnce({ rows: [{ revoked: true }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ revoked: false }], rowCount: 1 })
+      .mockRejectedValueOnce(new Error("database down"));
+    mockGetPool.mockReturnValue({ query } as never);
+
+    await expect(
+      revokeAuthSessionForLogout("a".repeat(64)),
+    ).resolves.toBe("revoked");
+    await expect(
+      revokeAuthSessionForLogout("b".repeat(64)),
+    ).resolves.toBe("inactive");
+    await expect(
+      revokeAuthSessionForLogout("c".repeat(64)),
+    ).resolves.toBe("unavailable");
+
+    mockGetPool.mockReturnValue(null);
+    await expect(
+      revokeAuthSessionForLogout("d".repeat(64)),
+    ).resolves.toBe("unavailable");
   });
 
   test("switches workspace through a current-token-only CAS and rotates immediately", async () => {

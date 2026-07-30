@@ -16,18 +16,22 @@ jest.mock("@/lib/session", () => ({
   clearOwnerSession: jest.fn(),
 }));
 
-import { requestLoginAction } from "@/app/login/actions";
+import { logoutAction, requestLoginAction } from "@/app/login/actions";
 import { requestAccountLogin } from "@/lib/account-auth";
 import {
   requestAuthV2Login,
   shouldRequestAuthV2Login,
 } from "@/lib/auth-v2/challenges";
+import { clearOwnerSession } from "@/lib/session";
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 
 const mockHeaders = jest.mocked(headers);
 const mockLegacyRequest = jest.mocked(requestAccountLogin);
 const mockV2Request = jest.mocked(requestAuthV2Login);
 const mockShouldUseV2 = jest.mocked(shouldRequestAuthV2Login);
+const mockClearOwnerSession = jest.mocked(clearOwnerSession);
+const mockRedirect = jest.mocked(redirect);
 const originalPlatformFlag = process.env.AUTH_PLATFORM_V2_ENABLED;
 const originalProxyHeader = process.env.AUTH_TRUSTED_PROXY_HEADER;
 const originalProxyHops = process.env.AUTH_TRUSTED_PROXY_HOPS;
@@ -57,6 +61,7 @@ describe("auth v2 login action rollout", () => {
     mockLegacyRequest.mockResolvedValue({ ok: true });
     mockV2Request.mockResolvedValue({ ok: true });
     mockShouldUseV2.mockResolvedValue(false);
+    mockClearOwnerSession.mockResolvedValue(true);
   });
 
   test("preserves the legacy request path while the platform flag is false", async () => {
@@ -100,6 +105,23 @@ describe("auth v2 login action rollout", () => {
       userAgent: null,
     });
     expect(mockLegacyRequest).not.toHaveBeenCalled();
+  });
+
+  test("reports logout success only after server-side revocation succeeds", async () => {
+    await logoutAction();
+
+    expect(mockRedirect).toHaveBeenCalledWith("/login?loggedOut=1");
+  });
+
+  test("keeps the active session when server-side revocation is unavailable", async () => {
+    mockClearOwnerSession.mockResolvedValue(false);
+
+    await logoutAction();
+
+    expect(mockRedirect).toHaveBeenCalledWith(
+      "/settings/security?sessions=unavailable",
+    );
+    expect(mockRedirect).not.toHaveBeenCalledWith("/login?loggedOut=1");
   });
 });
 

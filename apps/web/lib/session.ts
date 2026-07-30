@@ -3,7 +3,6 @@ import { cookies } from "next/headers";
 
 import {
   clearAuthV2SessionCookie,
-  readAuthV2SessionCookie,
   readAuthV2SessionCookieState,
 } from "./auth-v2/session-cookie";
 import { isAuthV2SessionReadEnabledForUser } from "./auth-v2/config";
@@ -12,8 +11,7 @@ import {
 } from "./auth-v2/legacy-session";
 import {
   readAuthSession,
-  revokeAuthSession,
-  revokeAuthSessionById,
+  revokeAuthSessionForLogout,
 } from "./auth-v2/sessions";
 
 const COOKIE_NAME = "rr_sid";
@@ -102,22 +100,15 @@ export function assertOwnerSessionConfigured(): void {
   getSecret();
 }
 
-export async function clearOwnerSession(): Promise<void> {
-  const v2Token = await readAuthV2SessionCookie().catch(() => null);
-  if (v2Token) {
-    const session = await readAuthSession(v2Token);
-    if (session) {
-      await revokeAuthSessionById({
-        userId: session.userId,
-        sessionId: session.id,
-        reason: "logout",
-      });
-    } else {
-      await revokeAuthSession(v2Token, "logout");
-    }
+export async function clearOwnerSession(): Promise<boolean> {
+  const v2Cookie = await readAuthV2SessionCookieState();
+  if (v2Cookie.status === "valid") {
+    const revocation = await revokeAuthSessionForLogout(v2Cookie.token);
+    if (revocation === "unavailable") return false;
   }
   await clearAuthV2SessionCookie();
   await clearLegacyOwnerSession();
+  return true;
 }
 
 export async function clearLegacyOwnerSession(): Promise<void> {

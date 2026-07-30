@@ -6,18 +6,15 @@ jest.mock("@/lib/auth-v2/legacy-session", () => ({
 }));
 jest.mock("@/lib/auth-v2/session-cookie", () => ({
   clearAuthV2SessionCookie: jest.fn(),
-  readAuthV2SessionCookie: jest.fn(),
   readAuthV2SessionCookieState: jest.fn(),
 }));
 jest.mock("@/lib/auth-v2/sessions", () => ({
   readAuthSession: jest.fn(),
-  revokeAuthSession: jest.fn(),
-  revokeAuthSessionById: jest.fn(),
+  revokeAuthSessionForLogout: jest.fn(),
 }));
 
 import {
   clearAuthV2SessionCookie,
-  readAuthV2SessionCookie,
   readAuthV2SessionCookieState,
 } from "@/lib/auth-v2/session-cookie";
 import {
@@ -25,7 +22,7 @@ import {
 } from "@/lib/auth-v2/legacy-session";
 import {
   readAuthSession,
-  revokeAuthSessionById,
+  revokeAuthSessionForLogout,
 } from "@/lib/auth-v2/sessions";
 import {
   clearOwnerSession,
@@ -34,14 +31,13 @@ import {
 import { cookies } from "next/headers";
 
 const mockCookies = jest.mocked(cookies);
-const mockReadV2Cookie = jest.mocked(readAuthV2SessionCookie);
 const mockReadV2CookieState = jest.mocked(readAuthV2SessionCookieState);
 const mockClearV2Cookie = jest.mocked(clearAuthV2SessionCookie);
 const mockReadLegacyForAuthorization = jest.mocked(
   readLegacyOwnerSessionForAuthorization,
 );
 const mockReadV2Session = jest.mocked(readAuthSession);
-const mockRevokeV2 = jest.mocked(revokeAuthSessionById);
+const mockRevokeV2ForLogout = jest.mocked(revokeAuthSessionForLogout);
 const originalSessionSecret = process.env.SESSION_SECRET;
 const originalPlatformFlag = process.env.AUTH_PLATFORM_V2_ENABLED;
 
@@ -70,12 +66,11 @@ describe("owner session compatibility bridge", () => {
       delete: deleteCookie,
       get: getCookie,
     } as never);
-    mockReadV2Cookie.mockResolvedValue(null);
     mockReadV2CookieState.mockResolvedValue({ status: "absent" });
     mockClearV2Cookie.mockResolvedValue(undefined);
     mockReadLegacyForAuthorization.mockResolvedValue(null);
     mockReadV2Session.mockResolvedValue(null);
-    mockRevokeV2.mockResolvedValue(true);
+    mockRevokeV2ForLogout.mockResolvedValue("revoked");
     getCookie.mockReturnValue(undefined);
   });
 
@@ -182,20 +177,53 @@ describe("owner session compatibility bridge", () => {
   });
 
   test("revokes the database session before clearing both cookies", async () => {
-    mockReadV2Cookie.mockResolvedValue("b".repeat(64));
-    mockReadV2Session.mockResolvedValue({
-      id: "17",
-      userId: "42",
-    } as never);
-
-    await clearOwnerSession();
-
-    expect(mockRevokeV2).toHaveBeenCalledWith({
-      userId: "42",
-      sessionId: "17",
-      reason: "logout",
+    mockReadV2CookieState.mockResolvedValue({
+      status: "valid",
+      token: "b".repeat(64),
     });
+
+    await expect(clearOwnerSession()).resolves.toBe(true);
+
+    expect(mockRevokeV2ForLogout).toHaveBeenCalledWith(
+      "b".repeat(64),
+    );
     expect(mockClearV2Cookie).toHaveBeenCalled();
     expect(deleteCookie).toHaveBeenCalledWith("rr_sid");
+  });
+
+  test("clears an already inactive database session cookie", async () => {
+    mockReadV2CookieState.mockResolvedValue({
+      status: "valid",
+      token: "b".repeat(64),
+    });
+    mockRevokeV2ForLogout.mockResolvedValue("inactive");
+
+    await expect(clearOwnerSession()).resolves.toBe(true);
+
+    expect(mockClearV2Cookie).toHaveBeenCalled();
+    expect(deleteCookie).toHaveBeenCalledWith("rr_sid");
+  });
+
+  test("keeps both cookies when database revocation is unavailable", async () => {
+    mockReadV2CookieState.mockResolvedValue({
+      status: "valid",
+      token: "b".repeat(64),
+    });
+    mockRevokeV2ForLogout.mockResolvedValue("unavailable");
+
+    await expect(clearOwnerSession()).resolves.toBe(false);
+
+    expect(mockClearV2Cookie).not.toHaveBeenCalled();
+    expect(deleteCookie).not.toHaveBeenCalled();
+  });
+
+  test("keeps both cookies when the presented session token cannot be read", async () => {
+    mockReadV2CookieState.mockRejectedValue(new Error("cookie store unavailable"));
+
+    await expect(clearOwnerSession()).rejects.toThrow("cookie store unavailable");
+
+    expect(mockRevokeV2ForLogout).not.toHaveBeenCalled();
+    expect(mockClearV2Cookie).not.toHaveBeenCalled();
+    expect(deleteCookie).not.toHaveBeenCalled();
   });
 });
