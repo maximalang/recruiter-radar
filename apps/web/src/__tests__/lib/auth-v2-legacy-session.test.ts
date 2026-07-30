@@ -318,7 +318,10 @@ describe("bounded auth v2 legacy session exchange", () => {
   });
 
   test("serializes legacy logout and revokes already-exchanged v2 sessions", async () => {
-    const query = jest.fn(async (sql: string) => {
+    const query = jest.fn(async (
+      sql: string,
+      _values?: unknown[],
+    ) => {
       if (sql === "BEGIN" || sql === "COMMIT") {
         return { rows: [], rowCount: 0 };
       }
