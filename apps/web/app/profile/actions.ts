@@ -16,7 +16,7 @@ import {
   normalizeDeliveryFrequency,
 } from "../../lib/deliveryPreferences";
 import { countMatchingCandidatesForProfile } from "../../lib/digest";
-import { readOwnerSession } from "../../lib/session";
+import { getAuthorizedOwnerId } from "../../lib/auth-v2/authorization";
 
 function readRequiredText(formData: FormData, key: string): string {
   const value = formData.get(key);
@@ -76,7 +76,7 @@ export async function saveSettingsProfileAction(
   _prev: SaveProfileResult | null,
   formData: FormData
 ): Promise<SaveProfileResult> {
-  const ownerId = await readOwnerSession();
+  const ownerId = await getAuthorizedOwnerId("profiles:write");
   if (!ownerId) {
     return { ok: false, error: "Требуется вход в аккаунт." };
   }
@@ -145,7 +145,7 @@ export async function saveDeliveryPreferencesAction(
   _prev: SaveDeliveryResult | null,
   formData: FormData
 ): Promise<SaveDeliveryResult> {
-  const ownerId = await readOwnerSession();
+  const ownerId = await getAuthorizedOwnerId("profiles:write");
   if (!ownerId) {
     return { ok: false, error: "Требуется вход в аккаунт." };
   }

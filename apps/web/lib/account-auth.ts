@@ -4,6 +4,11 @@ import type { PoolClient } from "pg";
 import { getClient, getPool } from "./db-pool";
 import { sendEmail } from "./email/transport";
 import { logError, logEvent, logWarn } from "./runtime";
+import { renderAuthEmail } from "./auth-v2/email-templates";
+import {
+  maskAuthEmail,
+  normalizeAuthEmail,
+} from "./auth-v2/security";
 
 const ACCOUNT_PATHS = ["/dashboard", "/checkout", "/settings", "/profile", "/leads", "/review"];
 const TOKEN_PATTERN = /^[a-f0-9]{64}$/;
@@ -17,13 +22,7 @@ export type AccountIdentity = {
 };
 
 export function normalizeAccountEmail(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const email = value.trim().toLowerCase();
-  if (email.length < 3 || email.length > 254 || /[\r\n,;]/.test(email)) return null;
-  if (!/^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i.test(email)) {
-    return null;
-  }
-  return email;
+  return normalizeAuthEmail(value)?.canonical ?? null;
 }
 
 export function sanitizeAccountReturnTo(value: unknown): string {
@@ -103,6 +102,10 @@ export async function requestAccountLogin(input: {
     await client.query("BEGIN");
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", ["account-login-global"]);
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`account-login-source:${sourceHash}`]);
+    await client.query(
+      "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+      [`account-login-email:${email}`],
+    );
     const rate = await client.query<{ global_count: string; source_count: string }>(
       `SELECT
          (SELECT COUNT(*)::text FROM account_login_challenges WHERE created_at > NOW() - INTERVAL '1 minute') AS global_count,
@@ -116,9 +119,34 @@ export async function requestAccountLogin(input: {
     }
 
     const user = await client.query<{ id: string }>(
-      `INSERT INTO users (email) VALUES ($1)
-       ON CONFLICT (LOWER(email)) DO UPDATE SET email = users.email
-       RETURNING id::text AS id`,
+      `WITH existing AS (
+         SELECT id
+         FROM users
+         WHERE status <> 'deleted'
+           AND (
+             email_normalized = $1
+             OR (
+               email_normalized IS NULL
+               AND split_part(email, '@', 1) = split_part($1, '@', 1)
+               AND LOWER(split_part(email, '@', 2))
+                 = split_part($1, '@', 2)
+             )
+           )
+         ORDER BY (email_normalized IS NOT NULL) DESC, id
+         LIMIT 1
+         FOR UPDATE
+       ),
+       inserted AS (
+         INSERT INTO users (email)
+         SELECT $1
+         WHERE NOT EXISTS (SELECT 1 FROM existing)
+         ON CONFLICT DO NOTHING
+         RETURNING id
+       )
+       SELECT id::TEXT AS id FROM existing
+       UNION ALL
+       SELECT id::TEXT AS id FROM inserted
+       LIMIT 1`,
       [email],
     );
     const userId = user.rows[0]?.id;
@@ -158,11 +186,14 @@ export async function requestAccountLogin(input: {
   if (!token) return { ok: true };
   try {
     const verifyUrl = buildAccountLoginUrl(token);
+    const message = renderAuthEmail({
+      template: "login_signup",
+      actionUrl: verifyUrl,
+      expiresInMinutes: LOGIN_TTL_MINUTES,
+    });
     const sent = await sendEmail({
+      ...message,
       to: email,
-      subject: "Вход в Recruiter Radar",
-      text: `Подтвердите вход: ${verifyUrl}\n\nСсылка действует ${LOGIN_TTL_MINUTES} минут. Если вы не запрашивали вход, проигнорируйте письмо.`,
-      html: `<div style="font-family:Inter,Arial,sans-serif;color:#0f172a;line-height:1.6"><h2>Вход в Recruiter Radar</h2><p>Нажмите кнопку, чтобы подтвердить вход или создать аккаунт.</p><p><a href="${verifyUrl}" style="display:inline-block;padding:12px 18px;border-radius:12px;background:#142d63;color:#fff;text-decoration:none;font-weight:700">Подтвердить вход</a></p><p style="color:#667085">Ссылка действует ${LOGIN_TTL_MINUTES} минут. Если вы не запрашивали вход, проигнорируйте письмо.</p></div>`,
     });
     await getPool()?.query(
       "UPDATE account_login_challenges SET send_status = $2 WHERE token_hash = $1",
@@ -185,6 +216,59 @@ export async function isLoginChallengeActive(token: string): Promise<boolean> {
     [hashToken(token)],
   );
   return result.rowCount === 1;
+}
+
+export async function readLoginChallengePreview(
+  token: string,
+): Promise<{ maskedEmail: string; userId: string } | null> {
+  const state = await readLoginChallengeState(token);
+  return state.status === "active"
+    ? { maskedEmail: state.maskedEmail, userId: state.userId }
+    : null;
+}
+
+export type LoginChallengeState =
+  | { status: "active"; maskedEmail: string; userId: string }
+  | { status: "expired" | "used"; userId: string }
+  | { status: "invalid"; userId: null };
+
+export async function readLoginChallengeState(
+  token: string,
+  now = new Date(),
+): Promise<LoginChallengeState> {
+  if (!TOKEN_PATTERN.test(token) || !Number.isFinite(now.getTime())) {
+    return { status: "invalid", userId: null };
+  }
+  const pool = getPool();
+  if (!pool) return { status: "invalid", userId: null };
+  const result = await pool.query<{
+    email: string;
+    userId: string;
+    expiresAt: Date;
+    consumedAt: Date | null;
+  }>(
+    `SELECT
+       account.email,
+       account.id::TEXT AS "userId",
+       challenge.expires_at AS "expiresAt",
+       challenge.consumed_at AS "consumedAt"
+     FROM account_login_challenges AS challenge
+     JOIN users AS account ON account.id = challenge.user_id
+     WHERE challenge.token_hash = $1
+     LIMIT 1`,
+    [hashToken(token)],
+  );
+  const row = result.rows[0];
+  if (!row) return { status: "invalid", userId: null };
+  if (row.consumedAt) return { status: "used", userId: row.userId };
+  if (row.expiresAt.getTime() <= now.getTime()) {
+    return { status: "expired", userId: row.userId };
+  }
+  return {
+    status: "active",
+    maskedEmail: maskAuthEmail(row.email),
+    userId: row.userId,
+  };
 }
 
 export async function consumeAccountLogin(token: string): Promise<{ account: AccountIdentity; returnTo: string } | null> {

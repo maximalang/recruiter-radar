@@ -5,7 +5,7 @@ import {
   normalizeDeliveryFrequency,
   type DeliveryFrequency,
 } from '@/lib/deliveryPreferences';
-import { getOwnerIdFromSession } from '@/lib/session';
+import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization';
 
 /**
  * PATCH /api/profile/preferences — update the owner's delivery preferences.
@@ -37,7 +37,7 @@ type PatchBody = {
 };
 
 export async function PATCH(request: NextRequest) {
-  const ownerId = await getOwnerIdFromSession();
+  const ownerId = await getAuthorizedOwnerId('profiles:write');
   if (!ownerId) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }

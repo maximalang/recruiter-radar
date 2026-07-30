@@ -1,5 +1,19 @@
-import { createHmac, randomBytes, timingSafeEqual } from "crypto";
+import { createHmac, randomBytes } from "crypto";
 import { cookies } from "next/headers";
+
+import {
+  clearAuthV2SessionCookie,
+  readAuthV2SessionCookieState,
+} from "./auth-v2/session-cookie";
+import { isAuthV2SessionReadEnabledForUser } from "./auth-v2/config";
+import {
+  readLegacyOwnerSessionForAuthorization,
+  revokeLegacyOwnerSessionForLogout,
+} from "./auth-v2/legacy-session";
+import {
+  readAuthSession,
+  revokeAuthSessionForLogout,
+} from "./auth-v2/sessions";
 
 const COOKIE_NAME = "rr_sid";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 90; // 90 days
@@ -22,31 +36,6 @@ function encode(ownerId: string): string {
   return `${ownerId}.${mac}`;
 }
 
-function decode(token: string): string | null {
-  try {
-    const dot = token.lastIndexOf(".");
-    if (dot < 1) return null;
-
-    const ownerId = token.slice(0, dot);
-    const mac = token.slice(dot + 1);
-
-    if (!/^[1-9]\d*$/.test(ownerId)) return null;
-
-    const secret = getSecret();
-    const expected = sign(`session:${ownerId}`, secret);
-
-    const macBuf = Buffer.from(mac, "hex");
-    const expectedBuf = Buffer.from(expected, "hex");
-
-    if (macBuf.length !== expectedBuf.length) return null;
-    if (!timingSafeEqual(macBuf, expectedBuf)) return null;
-
-    return ownerId;
-  } catch {
-    return null;
-  }
-}
-
 export async function getOwnerIdFromSession(): Promise<string | null> {
   return readOwnerSession();
 }
@@ -65,10 +54,26 @@ export function generateOwnerId(): string {
  * Returns the ownerId string if valid, null otherwise.
  */
 export async function readOwnerSession(): Promise<string | null> {
-  const jar = await cookies();
-  const token = jar.get(COOKIE_NAME)?.value?.trim() ?? null;
+  const v2Cookie = await readAuthV2SessionCookieState().catch(
+    () => ({ status: "invalid" as const }),
+  );
+  if (v2Cookie.status === "invalid") return null;
+  if (v2Cookie.status === "valid") {
+    const session = await readAuthSession(v2Cookie.token);
+    if (!session) return null;
+    if (!isAuthV2SessionReadEnabledForUser(session.userId)) return null;
+    if (session.rotationDue) return null;
+    return session.userId;
+  }
+
+  const token = await readLegacyOwnerSessionCookie();
   if (!token) return null;
-  return decode(token);
+  return readLegacyOwnerSessionForAuthorization({ legacyToken: token });
+}
+
+export async function readLegacyOwnerSessionCookie(): Promise<string | null> {
+  const jar = await cookies();
+  return jar.get(COOKIE_NAME)?.value?.trim() ?? null;
 }
 
 /**
@@ -96,7 +101,23 @@ export function assertOwnerSessionConfigured(): void {
   getSecret();
 }
 
-export async function clearOwnerSession(): Promise<void> {
+export async function clearOwnerSession(): Promise<boolean> {
+  const v2Cookie = await readAuthV2SessionCookieState();
+  const legacyToken = await readLegacyOwnerSessionCookie();
+  if (v2Cookie.status === "valid") {
+    const revocation = await revokeAuthSessionForLogout(v2Cookie.token);
+    if (revocation === "unavailable") return false;
+  }
+  if (legacyToken) {
+    const revocation = await revokeLegacyOwnerSessionForLogout(legacyToken);
+    if (revocation === "unavailable") return false;
+  }
+  await clearAuthV2SessionCookie();
+  await clearLegacyOwnerSession();
+  return true;
+}
+
+export async function clearLegacyOwnerSession(): Promise<void> {
   const jar = await cookies();
   jar.delete(COOKIE_NAME);
 }

@@ -15,7 +15,7 @@ import {
   createWebhookNotificationConnection,
   testNotificationConnection,
 } from "../../lib/notifications";
-import { readOwnerSession } from "../../lib/session";
+import { getAuthorizedOwnerId } from "../../lib/auth-v2/authorization";
 
 export type NotificationActionResult = {
   ok: boolean;
@@ -38,7 +38,7 @@ function safeError(error: unknown, fallback: string): NotificationActionResult {
 }
 
 async function ownerContext() {
-  const ownerId = await readOwnerSession();
+  const ownerId = await getAuthorizedOwnerId("notifications:write");
   if (!ownerId) throw new Error("Требуется вход в аккаунт.");
   const profile = await getClientProfileByOwnerId(ownerId);
   if (!profile) throw new Error("Профиль не найден. Сначала активируйте радар.");

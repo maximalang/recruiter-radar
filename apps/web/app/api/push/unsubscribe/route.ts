@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getClientProfileByOwnerId } from "@/lib/clientProfiles";
-import { readOwnerSession } from "@/lib/session";
+import { getAuthorizedOwnerId } from "@/lib/auth-v2/authorization";
 import { revokeSubscription } from "@/lib/webPush";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +14,7 @@ export const runtime = "nodejs";
  * caller cannot revoke another profile's subscription by guessing an endpoint.
  */
 export async function POST(request: Request) {
-  const ownerId = await readOwnerSession();
+  const ownerId = await getAuthorizedOwnerId("notifications:write");
   if (!ownerId) {
     return NextResponse.json({ error: "Требуется вход в аккаунт." }, { status: 401 });
   }

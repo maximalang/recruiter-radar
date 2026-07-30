@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 
+import { acquireAuthOwnerWriteFence } from "./auth-v2/owner-write-fence";
 import { getPool } from "./db-pool";
 import {
   configureTelegramWebhook,
@@ -576,6 +577,7 @@ export async function createNotificationBindingInstructions(input: {
   const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
   try {
     await client.query("BEGIN");
+    await acquireAuthOwnerWriteFence(client);
     let endpoint = await client.query<{ id: string }>(
       `
         SELECT id::text AS id
@@ -832,6 +834,7 @@ export async function bindNotificationEndpoint(input: {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    await acquireAuthOwnerWriteFence(client);
     const pending = await client.query<{ id: string; bindTokenHash: string }>(
       `
         SELECT id::text AS id, bind_token_hash AS "bindTokenHash"

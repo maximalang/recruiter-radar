@@ -3,6 +3,11 @@ import { dirname, resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 
+import {
+  executeConcurrentIndexMigration,
+  parseConcurrentIndexMigration,
+} from './migration-execution.mjs';
+
 const { Client } = pg;
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const rootEnvPath = resolve(scriptDir, '../../../.env');
@@ -112,18 +117,34 @@ try {
     const sql = readFileSync(filePath, 'utf8');
 
     console.log(`Applying migration: ${filename}`);
+    let transactionStarted = false;
     try {
-      await client.query('BEGIN');
-      await client.query(sql);
+      const concurrentIndexes = parseConcurrentIndexMigration(sql);
+      if (concurrentIndexes) {
+        await executeConcurrentIndexMigration(client, concurrentIndexes);
+      } else {
+        await client.query('BEGIN');
+        transactionStarted = true;
+        await client.query(sql);
+      }
+      if (!transactionStarted) {
+        await client.query('BEGIN');
+        transactionStarted = true;
+      }
       await client.query(
         `INSERT INTO schema_migrations (version) VALUES ($1)`,
         [version]
       );
       await client.query('COMMIT');
+      transactionStarted = false;
       appliedCount++;
       console.log(`  ✓ ${filename} applied.`);
     } catch (error) {
-      await client.query('ROLLBACK').catch(() => {});
+      if (transactionStarted) {
+        await client.query('ROLLBACK').catch(() => {});
+      }
+      await client.query('RESET statement_timeout').catch(() => {});
+      await client.query('RESET lock_timeout').catch(() => {});
       const message = error instanceof Error ? error.message : String(error);
       const position = (
         error &&

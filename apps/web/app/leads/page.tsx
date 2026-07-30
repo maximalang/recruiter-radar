@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getLeadsForAllProfiles, getPendingReviewCount, type LeadItem, VALID_FEEDBACK_STATUSES } from '@/lib/leads-data';
 import { listClientProfiles, resolveHiringMode, type ClientProfile } from '@/lib/clientProfiles';
-import { getOwnerIdFromSession } from '@/lib/session';
+import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization';
 import { buildFitExplanation, FIT_DIMENSION_ICON } from '@/lib/leads/fit-explanation';
 import { deriveRoleNames, splitRolesForDisplay, deriveUrgencyCue } from '@/lib/leads/lead-quality';
 import { formatVacanciesCount } from '@/lib/format/plural';
@@ -309,7 +309,7 @@ export default async function LeadsPage({
 
   // Owner-scope every read: without a session there are no accessible profiles,
   // so the page renders empty rather than leaking another tenant's leads.
-  const ownerId = await getOwnerIdFromSession();
+  const ownerId = await getAuthorizedOwnerId('leads:read');
 
   let profiles: ClientProfile[];
   try {

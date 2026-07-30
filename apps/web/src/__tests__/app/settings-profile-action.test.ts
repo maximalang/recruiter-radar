@@ -12,7 +12,7 @@
 
 const getClientProfileByOwnerId = jest.fn()
 const saveClientProfile = jest.fn()
-const readOwnerSession = jest.fn()
+const getAuthorizedOwnerId = jest.fn()
 const countMatchingCandidatesForProfile = jest.fn()
 
 jest.mock('@/lib/clientProfiles', () => ({
@@ -21,8 +21,8 @@ jest.mock('@/lib/clientProfiles', () => ({
   saveClientProfile,
 }))
 
-jest.mock('@/lib/session', () => ({
-  readOwnerSession,
+jest.mock('@/lib/auth-v2/authorization', () => ({
+  getAuthorizedOwnerId,
 }))
 
 jest.mock('next/cache', () => ({
@@ -77,7 +77,7 @@ describe('saveSettingsProfileAction', () => {
   })
 
   it('refuses without a session and never writes', async () => {
-    readOwnerSession.mockResolvedValue(null)
+    getAuthorizedOwnerId.mockResolvedValue(null)
     const save = await loadAction()
 
     const result = await save(null, form({ agencyName: 'X' }))
@@ -87,7 +87,7 @@ describe('saveSettingsProfileAction', () => {
   })
 
   it('refuses when the owner has no profile yet', async () => {
-    readOwnerSession.mockResolvedValue('77')
+    getAuthorizedOwnerId.mockResolvedValue('77')
     getClientProfileByOwnerId.mockResolvedValue(null)
     const save = await loadAction()
 
@@ -98,7 +98,7 @@ describe('saveSettingsProfileAction', () => {
   })
 
   it('loads by ownerId and saves under the loaded id, ignoring a forged form id', async () => {
-    readOwnerSession.mockResolvedValue('77')
+    getAuthorizedOwnerId.mockResolvedValue('77')
     getClientProfileByOwnerId.mockResolvedValue(OWNER_PROFILE)
     saveClientProfile.mockResolvedValue(OWNER_PROFILE)
     countMatchingCandidatesForProfile.mockResolvedValue({ count: 3, capped: false })
@@ -133,7 +133,7 @@ describe('saveSettingsProfileAction', () => {
   })
 
   it('surfaces a save error as a result, not a throw', async () => {
-    readOwnerSession.mockResolvedValue('77')
+    getAuthorizedOwnerId.mockResolvedValue('77')
     getClientProfileByOwnerId.mockResolvedValue(OWNER_PROFILE)
     saveClientProfile.mockRejectedValue(new Error('Telegram занят'))
     const save = await loadAction()

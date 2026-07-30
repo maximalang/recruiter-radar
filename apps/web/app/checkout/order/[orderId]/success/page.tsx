@@ -5,7 +5,7 @@ import {
   ensurePilotOrderOnboardingReady,
   syncCheckoutOrderAfterSuccessReturn
 } from "../../../../../lib/payments";
-import { readOwnerSession } from "../../../../../lib/session";
+import { getAuthorizedUserId } from "../../../../../lib/auth-v2/authorization";
 import {
   NoticeBox,
   PageFrame,
@@ -28,7 +28,7 @@ type CheckoutSuccessPageProps = {
 export default async function CheckoutSuccessPage({ params, searchParams }: CheckoutSuccessPageProps) {
   const resolvedParams = await params;
   const resolvedSearchParams = (await searchParams) ?? {};
-  const ownerId = await readOwnerSession();
+  const ownerId = await getAuthorizedUserId("billing:read");
 
   if (!ownerId) {
     notFound();

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getAccountById } from "../../lib/account-auth";
+import { getAuthorizedOwnerId } from "../../lib/auth-v2/authorization";
 import {
   InternalPageFrame,
   InternalPageHeader,
@@ -13,7 +13,6 @@ import { getDeliveryPreferencesByOwnerId } from "../../lib/deliveryPreferences";
 import { countMatchingCandidatesForProfile } from "../../lib/digest";
 import { listNotificationConnectionsByOwnerId } from "../../lib/notifications";
 import { computeProfileCompletion } from "../../lib/profileCompletion";
-import { readOwnerSession } from "../../lib/session";
 import { ProfileForm } from "./profile-form";
 import { DeliveryForm } from "./delivery-form";
 import { NotificationChannels } from "./notification-channels";
@@ -29,8 +28,7 @@ export const metadata: Metadata = {
 const PROFILE_NAV = buildAccountNavigation("profile");
 
 export default async function ProfilePage() {
-  const account = await getAccountById(await readOwnerSession()).catch(() => null);
-  const ownerId = account?.id ?? null;
+  const ownerId = await getAuthorizedOwnerId("profiles:read");
   const profile = ownerId ? await getClientProfileByOwnerId(ownerId) : null;
   const deliveryPreferences =
     ownerId && profile ? await getDeliveryPreferencesByOwnerId(ownerId) : null;

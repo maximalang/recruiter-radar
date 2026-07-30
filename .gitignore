@@ -30,6 +30,8 @@ docker-data/
 .codegraph/
 agent-skills/
 apps/web/.cache/
+apps/web/.next-auth-v2-e2e-*/
+apps/web/.auth-v2-e2e-tsconfig-*.json
 # Generated from the canonical SVGs by scripts/generate-app-icons.mjs before dev/build.
 apps/web/public/app-icons/
 apps/web/public/tab-icons/

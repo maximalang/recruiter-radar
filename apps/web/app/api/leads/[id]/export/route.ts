@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getLeadDetail } from '@/lib/leads-data';
 import { getClientProfileById } from '@/lib/clientProfiles';
-import { getOwnerIdFromSession } from '@/lib/session';
+import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization';
 import { singleLeadToCsv } from '@/lib/leads-csv';
 
 /**
@@ -30,7 +30,7 @@ export async function GET(
 ) {
   const { id } = await context.params;
 
-  const ownerId = await getOwnerIdFromSession();
+  const ownerId = await getAuthorizedOwnerId('exports:create');
   const lead = ownerId ? await getLeadDetail({ candidateId: id, ownerId }) : null;
 
   if (!lead) {

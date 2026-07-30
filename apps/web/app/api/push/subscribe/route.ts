@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getClientProfileByOwnerId } from "@/lib/clientProfiles";
-import { readOwnerSession } from "@/lib/session";
+import { getAuthorizedOwnerId } from "@/lib/auth-v2/authorization";
 import { saveSubscription, type WebPushSubscriptionInput } from "@/lib/webPush";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +15,7 @@ export const runtime = "nodejs";
  * id cannot attach a subscription to someone else's profile.
  */
 export async function POST(request: Request) {
-  const ownerId = await readOwnerSession();
+  const ownerId = await getAuthorizedOwnerId("notifications:write");
   if (!ownerId) {
     return NextResponse.json({ error: "Требуется вход в аккаунт." }, { status: 401 });
   }
