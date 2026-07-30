@@ -5,6 +5,8 @@ import { resolve } from 'node:path'
 
 import pg from 'pg'
 
+import { executeMigrationSql } from './migration-execution.mjs'
+
 const { Pool } = pg
 const databaseUrl = process.env.DATABASE_URL?.trim()
 const targetMigration = '20260730100000_harden_auth_email_identity.sql'
@@ -35,7 +37,10 @@ try {
     .sort()
   for (const filename of migrations) {
     if (filename > targetMigration) break
-    await pool.query(await readFile(resolve(migrationsDir, filename), 'utf8'))
+    await executeMigrationSql(
+      pool,
+      await readFile(resolve(migrationsDir, filename), 'utf8'),
+    )
   }
 
   const hardeningSql = await readFile(

@@ -3,6 +3,11 @@ import { resolve } from 'node:path'
 
 import pg from 'pg'
 
+import {
+  executeConcurrentIndexMigration,
+  parseConcurrentIndexMigration,
+} from './migration-execution.mjs'
+
 const { Client } = pg
 const databaseUrl = process.env.DATABASE_URL?.trim()
 if (!databaseUrl) throw new Error('DATABASE_URL is required.')
@@ -26,16 +31,30 @@ try {
   let fixture = null
   for (const filename of migrations) {
     const sql = await readFile(resolve(migrationsDir, filename), 'utf8')
-    await client.query('BEGIN')
+    let transactionStarted = false
     try {
-      await client.query(sql)
+      const concurrentIndexes = parseConcurrentIndexMigration(sql)
+      if (concurrentIndexes) {
+        await executeConcurrentIndexMigration(client, concurrentIndexes)
+      } else {
+        await client.query('BEGIN')
+        transactionStarted = true
+        await client.query(sql)
+      }
+      if (!transactionStarted) {
+        await client.query('BEGIN')
+        transactionStarted = true
+      }
       await client.query(
         'INSERT INTO schema_migrations (version) VALUES ($1)',
         [filename.replace(/\.sql$/, '')],
       )
       await client.query('COMMIT')
+      transactionStarted = false
     } catch (error) {
-      await client.query('ROLLBACK')
+      if (transactionStarted) {
+        await client.query('ROLLBACK')
+      }
       throw error
     }
     if (filename === '20260726130000_add_opportunity_engine_v1.sql') {

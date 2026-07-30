@@ -30,6 +30,13 @@ const migratorPath = resolve(
   "scripts",
   "migrate.mjs",
 );
+const migrationExecutionPath = resolve(
+  repositoryPath,
+  "packages",
+  "db",
+  "scripts",
+  "migration-execution.mjs",
+);
 const rollbackPath = resolve(
   repositoryPath,
   "packages",
@@ -67,15 +74,16 @@ describe("auth v2 workspace tenant-context migration", () => {
       guardMigrationPath,
     ].map((path) => readFileSync(path, "utf8"));
     const migrator = readFileSync(migratorPath, "utf8");
+    const migrationExecution = readFileSync(migrationExecutionPath, "utf8");
 
     expect(indexMigration).toContain("-- migrate:concurrent-indexes");
     expect(indexMigration).not.toMatch(/\bBEGIN\b|\bCOMMIT\b/i);
     expect(indexMigration.match(/CREATE (?:UNIQUE )?INDEX CONCURRENTLY/g))
       .toHaveLength(17);
     expect(migrator).toContain("parseConcurrentIndexMigration");
-    expect(migrator).toContain("DROP INDEX CONCURRENTLY");
-    expect(migrator).toContain("SET lock_timeout");
-    expect(migrator).toContain("SET statement_timeout");
+    expect(migrationExecution).toContain("DROP INDEX CONCURRENTLY");
+    expect(migrationExecution).toContain("SET lock_timeout");
+    expect(migrationExecution).toContain("SET statement_timeout");
     for (const migration of transactionalMigrations) {
       expect(migration).not.toMatch(/^\s*(?:BEGIN|COMMIT)\s*;/im);
       expect(migration).toContain("SET LOCAL lock_timeout");

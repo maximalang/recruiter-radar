@@ -5,6 +5,8 @@ import { promisify } from 'node:util'
 
 import pg from 'pg'
 
+import { executeMigrationSql } from './migration-execution.mjs'
+
 const { Pool } = pg
 const execFileAsync = promisify(execFile)
 const databaseUrl = process.env.DATABASE_URL?.trim()
@@ -52,18 +54,7 @@ try {
 
   for (const filename of tenantMigrations) {
     const sql = await readFile(resolve(migrationsDir, filename), 'utf8')
-    if (sql.trimStart().startsWith('-- migrate:concurrent-indexes')) {
-      for (const statement of sql.split(';')) {
-        const executableSql = statement
-          .split(/\r?\n/)
-          .filter((line) => !line.trim().startsWith('--'))
-          .join('\n')
-          .trim()
-        if (executableSql) await pool.query(executableSql)
-      }
-    } else {
-      await pool.query(sql)
-    }
+    await executeMigrationSql(pool, sql)
   }
 
   const preflight = await runTool('preflight-auth-v2-workspaces.mjs')
