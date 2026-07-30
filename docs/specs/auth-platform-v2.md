@@ -1117,9 +1117,11 @@ AUTH_WORKSPACES_V2_ENABLED=false
 AUTH_ONBOARDING_V2_ENABLED=false
 AUTH_PASSKEYS_ENABLED=false
 AUTH_LEGACY_SESSION_MIGRATION_ENABLED=false
+AUTH_LEGACY_SESSION_MIGRATION_DEADLINE=
 AUTH_PASSKEY_RP_ID=
 AUTH_V2_CANARY_USER_IDS=
 AUTH_V2_SESSION_ROLLBACK_COMPAT_ENABLED=false
+AUTH_V2_SESSION_ROLLBACK_COMPAT_DEADLINE=
 AUTH_TRUSTED_PROXY_HEADER=x-real-ip
 AUTH_TRUSTED_PROXY_HOPS=
 ```
@@ -1132,7 +1134,8 @@ Rules:
 - wildcard/negative/blank elements invalidate the whole allowlist;
 - global enable never follows from a non-empty canary list;
 - rollback compatibility is a separate exact-`true` emergency switch used
-  only to drain already-issued v2 sessions while issuance remains disabled;
+  only to drain already-issued v2 sessions while issuance remains disabled,
+  and requires its own canonical future UTC deadline;
 - admin auth ignores customer flags;
 - one request resolves exactly one customer identity path.
 
@@ -1143,6 +1146,7 @@ workspaces → platform v2
 onboarding → platform v2 + workspaces
 passkeys → platform v2
 legacy exchange → exact migration flag + deadline + v2-eligible existing user
+rollback session reads → exact compatibility flag + separate future deadline
 ```
 
 ## 20. Tooling и commands
@@ -1322,7 +1326,8 @@ Order:
 
 1. clear canary allowlist / disable v2 flags;
 2. if already-issued sessions must drain, enable only
-   `AUTH_V2_SESSION_ROLLBACK_COMPAT_ENABLED=true`;
+   `AUTH_V2_SESSION_ROLLBACK_COMPAT_ENABLED=true` with a separately reviewed
+   future `AUTH_V2_SESSION_ROLLBACK_COMPAT_DEADLINE`;
 3. keep additive schema and dual-written data;
 4. revert serving code to legacy reads;
 5. revoke suspicious v2 sessions if needed;

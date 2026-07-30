@@ -126,20 +126,22 @@ export function getAuthWorkspacesV2RolloutPolicy(
 export function isAuthV2SessionReadEnabledForUser(
   userId: string | null | undefined,
   env: AuthEnvironment = process.env,
+  now = new Date(),
 ): boolean {
   return (
     isAuthPlatformV2EnabledForUser(userId, env)
-    || enabled(env.AUTH_V2_SESSION_ROLLBACK_COMPAT_ENABLED)
+    || isAuthV2RollbackCompatibilityWindowOpen(env, now)
   );
 }
 
 export function shouldRunAuthV2SessionRefresh(
   env: AuthEnvironment = process.env,
+  now = new Date(),
 ): boolean {
   if (
     getAuthV2Flags(env).platform
-    || enabled(env.AUTH_V2_SESSION_ROLLBACK_COMPAT_ENABLED)
-    || enabled(env.AUTH_LEGACY_SESSION_MIGRATION_ENABLED)
+    || isAuthV2RollbackCompatibilityWindowOpen(env, now)
+    || isLegacySessionMigrationWindowOpen(env, now)
   ) {
     return true;
   }
@@ -151,10 +153,34 @@ export function isLegacySessionMigrationWindowOpen(
   env: AuthEnvironment = process.env,
   now = new Date(),
 ): boolean {
-  if (!enabled(env.AUTH_LEGACY_SESSION_MIGRATION_ENABLED)) return false;
-  if (!Number.isFinite(now.getTime())) return false;
+  return (
+    enabled(env.AUTH_LEGACY_SESSION_MIGRATION_ENABLED)
+    && isFutureCanonicalUtcDeadline(
+      env.AUTH_LEGACY_SESSION_MIGRATION_DEADLINE,
+      now,
+    )
+  );
+}
 
-  const rawDeadline = env.AUTH_LEGACY_SESSION_MIGRATION_DEADLINE?.trim() ?? "";
+export function isAuthV2RollbackCompatibilityWindowOpen(
+  env: AuthEnvironment = process.env,
+  now = new Date(),
+): boolean {
+  return (
+    enabled(env.AUTH_V2_SESSION_ROLLBACK_COMPAT_ENABLED)
+    && isFutureCanonicalUtcDeadline(
+      env.AUTH_V2_SESSION_ROLLBACK_COMPAT_DEADLINE,
+      now,
+    )
+  );
+}
+
+function isFutureCanonicalUtcDeadline(
+  value: string | undefined,
+  now: Date,
+): boolean {
+  if (!Number.isFinite(now.getTime())) return false;
+  const rawDeadline = value?.trim() ?? "";
   const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})Z$/.exec(
     rawDeadline,
   );

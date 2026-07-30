@@ -11,7 +11,9 @@ AUTH_WORKSPACES_V2_ENABLED=false
 AUTH_ONBOARDING_V2_ENABLED=false
 AUTH_PASSKEYS_ENABLED=false
 AUTH_LEGACY_SESSION_MIGRATION_ENABLED=false
+AUTH_LEGACY_SESSION_MIGRATION_DEADLINE=
 AUTH_V2_SESSION_ROLLBACK_COMPAT_ENABLED=false
+AUTH_V2_SESSION_ROLLBACK_COMPAT_DEADLINE=
 AUTH_V2_CANARY_USER_IDS=
 AUTH_TRUSTED_PROXY_HEADER=x-real-ip
 AUTH_TRUSTED_PROXY_HOPS=
@@ -85,6 +87,38 @@ alerts are unexplained. The preflight JSON must also report
 `trustedProxyConfigurationValid: true`, and `trustedProxyConfigured: true`
 before canary.
 
+## Transitional deadlines and challenge retention
+
+The two compatibility switches are unusable without separate, canonical,
+future UTC deadlines in exact `YYYY-MM-DDTHH:MM:SSZ` form:
+
+```dotenv
+AUTH_LEGACY_SESSION_MIGRATION_ENABLED=true
+AUTH_LEGACY_SESSION_MIGRATION_DEADLINE=<approved-UTC-end>
+
+AUTH_V2_SESSION_ROLLBACK_COMPAT_ENABLED=true
+AUTH_V2_SESSION_ROLLBACK_COMPAT_DEADLINE=<approved-UTC-end>
+```
+
+Never enable both merely as a precaution. The reviewed change must record the
+owner, start, end, cohort, rollback trigger, and removal change. Runtime and
+preflight fail closed when a deadline is absent, malformed, or expired. Clear
+the flag and its deadline at the end of the approved window.
+
+Before canary, configure the deployment scheduler to run the bounded challenge
+cleanup once per day:
+
+```powershell
+npm.cmd run auth:cleanup-challenges
+npm.cmd run auth:cleanup-challenges -- --apply
+```
+
+The first command is a dry-run. The scheduled apply uses the default 14-day
+retention and bounded locked batches; any non-zero exit or a backlog that does
+not decrease is an operational alert. Record only aggregate JSON. Scheduling is
+an environment prerequisite and is not performed automatically by this
+repository or by the Goal.
+
 ## Single-user canary
 
 Keep the global platform flag explicitly false. Set exactly one existing
@@ -153,12 +187,18 @@ Rollback order:
 4. set `AUTH_WORKSPACES_V2_ENABLED=false`;
 5. set `AUTH_PLATFORM_V2_ENABLED=false`;
 6. set `AUTH_V2_SESSION_ROLLBACK_COMPAT_ENABLED=true` only for the bounded
-   compatibility window needed to read already-issued v2 sessions;
+   compatibility window needed to read already-issued v2 sessions, with a
+   separately reviewed future `AUTH_V2_SESSION_ROLLBACK_COMPAT_DEADLINE`;
 7. clear `AUTH_V2_CANARY_USER_IDS`;
 8. re-run `auth-v2:preflight` and `auth-v2:session-report`;
 9. verify legacy login, checkout/payment, profile, delivery, opportunities,
    outcomes, admin, exports, public routes, and safe `returnTo`;
 10. record the incident and assign session cleanup and deliverability follow-up.
+
+When the compatibility window ends, clear both
+`AUTH_V2_SESSION_ROLLBACK_COMPAT_ENABLED` and
+`AUTH_V2_SESSION_ROLLBACK_COMPAT_DEADLINE`. A stale `true` flag cannot extend an
+expired window.
 
 Database migrations are additive and are not rolled back during the first
 response. Do not run down migrations or delete auth/workspace data as an

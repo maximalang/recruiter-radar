@@ -4,9 +4,11 @@ import {
   isAuthPasskeyLoginAvailable,
   isAuthPasskeysEnabledForUser,
   isAuthPlatformV2EnabledForUser,
+  isAuthV2RollbackCompatibilityWindowOpen,
   isAuthWorkspacesV2EnabledForUser,
   isAuthV2SessionReadEnabledForUser,
   parseCanaryUserIds,
+  shouldRunAuthV2SessionRefresh,
 } from "@/lib/auth-v2/config";
 import {
   isAuthSameOriginRequest,
@@ -65,6 +67,7 @@ describe("auth v2 feature boundaries", () => {
   });
 
   test("does not turn a canary list into global enablement", () => {
+    const now = new Date("2026-07-30T12:00:00.000Z");
     const env = {
       AUTH_PLATFORM_V2_ENABLED: "false",
       AUTH_V2_CANARY_USER_IDS: "17,42",
@@ -78,7 +81,35 @@ describe("auth v2 feature boundaries", () => {
     expect(isAuthV2SessionReadEnabledForUser("18", {
       ...env,
       AUTH_V2_SESSION_ROLLBACK_COMPAT_ENABLED: "true",
-    })).toBe(true);
+      AUTH_V2_SESSION_ROLLBACK_COMPAT_DEADLINE: "2026-08-01T12:00:00Z",
+    }, now)).toBe(true);
+  });
+
+  test("fails rollback compatibility closed outside an explicit UTC window", () => {
+    const now = new Date("2026-07-30T12:00:00.000Z");
+    const enabledWindow = {
+      AUTH_V2_SESSION_ROLLBACK_COMPAT_ENABLED: "true",
+      AUTH_V2_SESSION_ROLLBACK_COMPAT_DEADLINE: "2026-08-01T12:00:00Z",
+    };
+
+    expect(isAuthV2RollbackCompatibilityWindowOpen(
+      enabledWindow,
+      now,
+    )).toBe(true);
+    expect(shouldRunAuthV2SessionRefresh(enabledWindow, now)).toBe(true);
+    expect(isAuthV2RollbackCompatibilityWindowOpen({
+      ...enabledWindow,
+      AUTH_V2_SESSION_ROLLBACK_COMPAT_DEADLINE: undefined,
+    }, now)).toBe(false);
+    expect(isAuthV2RollbackCompatibilityWindowOpen({
+      ...enabledWindow,
+      AUTH_V2_SESSION_ROLLBACK_COMPAT_DEADLINE: "2026-07-30T11:59:59Z",
+    }, now)).toBe(false);
+    expect(isAuthV2RollbackCompatibilityWindowOpen({
+      ...enabledWindow,
+      AUTH_V2_SESSION_ROLLBACK_COMPAT_DEADLINE:
+        "2026-08-01T12:00:00+00:00",
+    }, now)).toBe(false);
   });
 
   test("requires both the workspace flag and per-user platform eligibility", () => {

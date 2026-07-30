@@ -93,6 +93,25 @@ try {
     trustedProxyHeader: '',
     expectedExit: 2,
   })
+  const missingWindowPreflight = await runPreflight({
+    platformEnabled: false,
+    trustedProxyHeader: 'x-real-ip',
+    legacyMigrationEnabled: true,
+    rollbackCompatibilityEnabled: true,
+    expectedExit: 2,
+  })
+  const futureDeadline = new Date(Date.now() + 60 * 60 * 1000)
+    .toISOString()
+    .replace(/\.\d{3}Z$/, 'Z')
+  const validWindowPreflight = await runPreflight({
+    platformEnabled: false,
+    trustedProxyHeader: 'x-real-ip',
+    legacyMigrationEnabled: true,
+    legacyMigrationDeadline: futureDeadline,
+    rollbackCompatibilityEnabled: true,
+    rollbackCompatibilityDeadline: futureDeadline,
+    expectedExit: 0,
+  })
   if (
     canaryPreflight.blockingViolations
       ?.activeAccountsWithoutNormalizedIdentity !== 0
@@ -102,9 +121,17 @@ try {
       ?.trustedClientAddressNotReady !== 1
     || missingProxyCanaryPreflight.configuration
       ?.trustedClientAddressRequired !== true
+    || missingWindowPreflight.blockingViolations
+      ?.legacySessionMigrationWindowNotReady !== 1
+    || missingWindowPreflight.blockingViolations
+      ?.rollbackCompatibilityWindowNotReady !== 1
+    || validWindowPreflight.blockingViolations
+      ?.legacySessionMigrationWindowNotReady !== 0
+    || validWindowPreflight.blockingViolations
+      ?.rollbackCompatibilityWindowNotReady !== 0
   ) {
     throw new Error(
-      'Preflight did not gate identity or trusted proxy readiness.',
+      'Preflight did not gate identity, proxy, or transitional readiness.',
     )
   }
 
@@ -226,6 +253,7 @@ try {
       'stored_delivery_mailbox',
       'global_preflight_legacy_identity_gate',
       'canary_preflight_trusted_proxy_gate',
+      'transitional_deadline_preflight_gate',
       'clean_down_upgrade_chain',
       'installed_function_rewrite',
       'canonical_identity_uniqueness',
@@ -336,6 +364,10 @@ async function runPreflight({
   platformEnabled,
   canaryIds = '',
   trustedProxyHeader,
+  legacyMigrationEnabled = false,
+  legacyMigrationDeadline = '',
+  rollbackCompatibilityEnabled = false,
+  rollbackCompatibilityDeadline = '',
   expectedExit,
 }) {
   const scriptPath = resolve(
@@ -353,8 +385,13 @@ async function runPreflight({
       AUTH_WORKSPACES_V2_ENABLED: 'false',
       AUTH_ONBOARDING_V2_ENABLED: 'false',
       AUTH_PASSKEYS_ENABLED: 'false',
-      AUTH_LEGACY_SESSION_MIGRATION_ENABLED: 'false',
-      AUTH_V2_SESSION_ROLLBACK_COMPAT_ENABLED: 'false',
+      AUTH_LEGACY_SESSION_MIGRATION_ENABLED:
+        legacyMigrationEnabled ? 'true' : 'false',
+      AUTH_LEGACY_SESSION_MIGRATION_DEADLINE: legacyMigrationDeadline,
+      AUTH_V2_SESSION_ROLLBACK_COMPAT_ENABLED:
+        rollbackCompatibilityEnabled ? 'true' : 'false',
+      AUTH_V2_SESSION_ROLLBACK_COMPAT_DEADLINE:
+        rollbackCompatibilityDeadline,
       AUTH_V2_CANARY_USER_IDS: canaryIds,
       AUTH_TRUSTED_PROXY_HEADER: trustedProxyHeader,
       AUTH_TRUSTED_PROXY_HOPS: '',

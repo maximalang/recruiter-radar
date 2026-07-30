@@ -122,6 +122,10 @@ describe("Auth v2 rollout operations", () => {
     expect(runbook).toContain("AUTH_TRUSTED_PROXY_HEADER=x-real-ip");
     expect(runbook).toContain("trustedClientAddressNotReady: 0");
     expect(runbook).toContain("configure-caddy-real-ip.sh");
+    expect(runbook).toContain("AUTH_LEGACY_SESSION_MIGRATION_DEADLINE");
+    expect(runbook).toContain("AUTH_V2_SESSION_ROLLBACK_COMPAT_DEADLINE");
+    expect(runbook).toContain("auth:cleanup-challenges -- --apply");
+    expect(runbook).toContain("once per day");
     expect(runbook).toContain("rollback");
     expect(runbook).toContain("deliverability");
     expect(runbook).toContain("do not create");
@@ -130,5 +134,7 @@ describe("Auth v2 rollout operations", () => {
     expect(preflight).toContain("trustedClientAddressNotReady");
     expect(preflight).toContain("AUTH_TRUSTED_PROXY_HEADER");
     expect(preflight).toContain("AUTH_TRUSTED_PROXY_HOPS");
+    expect(preflight).toContain("legacySessionMigrationWindowNotReady");
+    expect(preflight).toContain("rollbackCompatibilityWindowNotReady");
   });
 });

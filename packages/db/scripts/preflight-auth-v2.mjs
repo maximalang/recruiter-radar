@@ -17,6 +17,14 @@ const trustedClientAddressNotReady =
     trustedClientAddressRequired
     && !trustedProxyConfiguration.configured
   )
+const legacySessionMigrationWindowReady = transitionalWindowReady(
+  process.env.AUTH_LEGACY_SESSION_MIGRATION_ENABLED,
+  process.env.AUTH_LEGACY_SESSION_MIGRATION_DEADLINE,
+)
+const rollbackCompatibilityWindowReady = transitionalWindowReady(
+  process.env.AUTH_V2_SESSION_ROLLBACK_COMPAT_ENABLED,
+  process.env.AUTH_V2_SESSION_ROLLBACK_COMPAT_DEADLINE,
+)
 const pool = new Pool({
   connectionString: databaseUrl,
   max: 1,
@@ -53,6 +61,10 @@ try {
         invalidCanaryConfiguration: canaryIds === null ? 1 : 0,
         trustedClientAddressNotReady:
           trustedClientAddressNotReady ? 1 : 0,
+        legacySessionMigrationWindowNotReady:
+          legacySessionMigrationWindowReady ? 0 : 1,
+        rollbackCompatibilityWindowNotReady:
+          rollbackCompatibilityWindowReady ? 0 : 1,
       },
       counters: {
         installedTables,
@@ -291,6 +303,10 @@ try {
       ...result.rows[0].blockingViolations,
       trustedClientAddressNotReady:
         trustedClientAddressNotReady ? 1 : 0,
+      legacySessionMigrationWindowNotReady:
+        legacySessionMigrationWindowReady ? 0 : 1,
+      rollbackCompatibilityWindowNotReady:
+        rollbackCompatibilityWindowReady ? 0 : 1,
     }
     const ok = Object.values(blockingViolations)
       .every((count) => count === 0)
@@ -388,6 +404,33 @@ function authRolloutRequiresTrustedClientAddress(ids) {
   )
 }
 
+function transitionalWindowReady(flag, rawDeadline) {
+  if (flag !== 'true') return true
+  const deadline = canonicalFutureUtcDeadline(rawDeadline)
+  return deadline !== null
+}
+
+function canonicalFutureUtcDeadline(rawValue) {
+  const rawDeadline = rawValue?.trim() ?? ''
+  const match =
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})Z$/
+      .exec(rawDeadline)
+  if (!match) return null
+
+  const [, year, month, day, hour, minute, second] = match
+  const deadlineMs = Date.UTC(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour),
+    Number(minute),
+    Number(second),
+  )
+  if (!Number.isFinite(deadlineMs) || deadlineMs <= Date.now()) return null
+  const canonical = new Date(deadlineMs).toISOString().replace('.000Z', 'Z')
+  return canonical === rawDeadline ? deadlineMs : null
+}
+
 function safeConfiguration(
   ids,
   trustedProxy,
@@ -398,8 +441,16 @@ function safeConfiguration(
     workspacesEnabled: process.env.AUTH_WORKSPACES_V2_ENABLED === 'true',
     onboardingEnabled: process.env.AUTH_ONBOARDING_V2_ENABLED === 'true',
     passkeysEnabled: process.env.AUTH_PASSKEYS_ENABLED === 'true',
+    legacySessionMigrationEnabled:
+      process.env.AUTH_LEGACY_SESSION_MIGRATION_ENABLED === 'true',
     rollbackCompatibilityEnabled:
       process.env.AUTH_V2_SESSION_ROLLBACK_COMPAT_ENABLED === 'true',
+    legacySessionMigrationDeadlineConfigured:
+      Boolean(process.env.AUTH_LEGACY_SESSION_MIGRATION_DEADLINE?.trim()),
+    legacySessionMigrationWindowReady,
+    rollbackCompatibilityDeadlineConfigured:
+      Boolean(process.env.AUTH_V2_SESSION_ROLLBACK_COMPAT_DEADLINE?.trim()),
+    rollbackCompatibilityWindowReady,
     canaryConfigurationValid: ids !== null,
     canaryUserCount: ids?.length ?? 0,
     trustedClientAddressRequired: clientAddressRequired,
