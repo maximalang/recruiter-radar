@@ -1,5 +1,8 @@
 const DEFAULT_MAX_BYTES = 256 * 1024;
 
+export const PASSKEY_AUTHENTICATION_OPTIONS_MAX_BYTES = 2 * 1024;
+export const PASSKEY_AUTHENTICATION_VERIFY_MAX_BYTES = 32 * 1024;
+
 export async function readLimitedJsonObject(
   request: Request,
   maxBytes = DEFAULT_MAX_BYTES,
