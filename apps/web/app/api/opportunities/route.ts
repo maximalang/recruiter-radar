@@ -14,7 +14,7 @@ import type {
   OpportunityStatus,
 } from '@/lib/opportunities/opportunity-scoring'
 import { logError } from '@/lib/runtime'
-import { getOwnerIdFromSession } from '@/lib/session'
+import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -38,7 +38,7 @@ const EPISODE_TYPES = new Set<HiringEpisodeType>([
 ])
 
 export async function GET(request: NextRequest) {
-  const ownerId = await getOwnerIdFromSession()
+  const ownerId = await getAuthorizedOwnerId('opportunities:read')
   if (!isOpportunityEngineV1EnabledForOwner(ownerId)) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 })
   }

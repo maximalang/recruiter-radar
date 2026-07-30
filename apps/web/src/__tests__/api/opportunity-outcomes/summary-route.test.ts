@@ -2,8 +2,8 @@
 
 import { NextRequest } from 'next/server'
 
-jest.mock('@/lib/session', () => ({
-  getOwnerIdFromSession: jest.fn(),
+jest.mock('@/lib/auth-v2/authorization', () => ({
+  getAuthorizedOwnerId: jest.fn(),
 }))
 jest.mock('@/lib/opportunities/outcome-repository', () => ({
   getOutcomeFunnelSummary: jest.fn(),
@@ -11,9 +11,9 @@ jest.mock('@/lib/opportunities/outcome-repository', () => ({
 
 import { GET } from '@/app/api/opportunities/outcomes/summary/route'
 import { getOutcomeFunnelSummary } from '@/lib/opportunities/outcome-repository'
-import { getOwnerIdFromSession } from '@/lib/session'
+import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization'
 
-const mockedOwner = jest.mocked(getOwnerIdFromSession)
+const mockedOwner = jest.mocked(getAuthorizedOwnerId)
 const mockedSummary = jest.mocked(getOutcomeFunnelSummary)
 
 describe('opportunity outcome summary API', () => {

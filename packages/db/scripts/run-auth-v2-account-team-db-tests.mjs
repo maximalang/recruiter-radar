@@ -13,6 +13,11 @@ const databaseUrl = process.env.DATABASE_URL
 if (!databaseUrl) {
   throw new Error('DATABASE_URL is required.')
 }
+if (process.env.AUTH_V2_DISPOSABLE_DB_CONFIRMED !== 'true') {
+  throw new Error(
+    'AUTH_V2_DISPOSABLE_DB_CONFIRMED=true is required before creating a disposable database.',
+  )
+}
 
 const root = resolve(import.meta.dirname, '..', '..', '..')
 const webRoot = resolve(root, 'apps', 'web')

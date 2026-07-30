@@ -6,12 +6,12 @@
  */
 
 import { GET } from '@/app/api/leads/[id]/route';
+import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization';
 import { getLeadDetail, type LeadDetail } from '@/lib/leads-data';
 import { getClientProfileById } from '@/lib/clientProfiles';
-import { getOwnerIdFromSession } from '@/lib/session';
 
-jest.mock('@/lib/session', () => ({
-  getOwnerIdFromSession: jest.fn(),
+jest.mock('@/lib/auth-v2/authorization', () => ({
+  getAuthorizedOwnerId: jest.fn(),
 }));
 jest.mock('@/lib/clientProfiles', () => ({
   getClientProfileById: jest.fn(),
@@ -21,7 +21,7 @@ jest.mock('@/lib/leads-data', () => ({
   formatLawfulContactPath: (v: string | null) => v,
 }));
 
-const mockOwner = getOwnerIdFromSession as jest.MockedFunction<typeof getOwnerIdFromSession>;
+const mockOwner = getAuthorizedOwnerId as jest.MockedFunction<typeof getAuthorizedOwnerId>;
 const mockDetail = getLeadDetail as jest.MockedFunction<typeof getLeadDetail>;
 const mockProfile = getClientProfileById as jest.MockedFunction<typeof getClientProfileById>;
 

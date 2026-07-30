@@ -2,7 +2,7 @@
 
 import { updateLeadFeedback } from "@/lib/leads-data";
 import { getPool } from "@/lib/db";
-import { getOwnerIdFromSession } from "@/lib/session";
+import { getAuthorizedOwnerId } from "@/lib/auth-v2/authorization";
 
 /**
  * Verify the current session owns the given client profile.
@@ -15,7 +15,7 @@ import { getOwnerIdFromSession } from "@/lib/session";
  * Returns true if access is granted, false otherwise.
  */
 async function verifyProfileOwnership(clientProfileId: string): Promise<boolean> {
-  const ownerId = await getOwnerIdFromSession();
+  const ownerId = await getAuthorizedOwnerId("leads:write");
   // No session → deny
   if (!ownerId) return false;
 

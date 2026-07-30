@@ -3,7 +3,7 @@ import type { ReactElement, SVGProps } from 'react';
 import Link from 'next/link';
 import { getLeadDetail, formatLawfulContactPath } from '@/lib/leads-data';
 import { getClientProfileById, resolveHiringMode } from '@/lib/clientProfiles';
-import { getOwnerIdFromSession } from '@/lib/session';
+import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization';
 import { buildFitExplanation, FIT_DIMENSION_ICON } from '@/lib/leads/fit-explanation';
 import { buildCompanySummary } from '@/lib/leads/company-summary';
 import { deriveRoleNames, splitRolesForDisplay, deriveUrgencyCue } from '@/lib/leads/lead-quality';
@@ -54,7 +54,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
 
   // Owner-scoped reads: without a session the lead lookup returns null,
   // rendering NotFoundState (correct: no access).
-  const ownerId = await getOwnerIdFromSession();
+  const ownerId = await getAuthorizedOwnerId('leads:read');
   const lead = ownerId ? await getLeadDetail({ candidateId: id, ownerId }) : null;
 
   if (!lead) {

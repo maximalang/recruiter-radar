@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import {
   clearAuthV2SessionCookie,
   readAuthV2SessionCookie,
+  readAuthV2SessionCookieState,
 } from "./auth-v2/session-cookie";
 import { isAuthV2SessionReadEnabledForUser } from "./auth-v2/config";
 import {
@@ -54,16 +55,16 @@ export function generateOwnerId(): string {
  * Returns the ownerId string if valid, null otherwise.
  */
 export async function readOwnerSession(): Promise<string | null> {
-  const v2Token = await readAuthV2SessionCookie().catch(() => null);
-  if (v2Token) {
-    const session = await readAuthSession(v2Token);
-    if (
-      session
-      && isAuthV2SessionReadEnabledForUser(session.userId)
-    ) {
-      if (session.rotationDue) return null;
-      return session.userId;
-    }
+  const v2Cookie = await readAuthV2SessionCookieState().catch(
+    () => ({ status: "invalid" as const }),
+  );
+  if (v2Cookie.status === "invalid") return null;
+  if (v2Cookie.status === "valid") {
+    const session = await readAuthSession(v2Cookie.token);
+    if (!session) return null;
+    if (!isAuthV2SessionReadEnabledForUser(session.userId)) return null;
+    if (session.rotationDue) return null;
+    return session.userId;
   }
 
   const token = await readLegacyOwnerSessionCookie();

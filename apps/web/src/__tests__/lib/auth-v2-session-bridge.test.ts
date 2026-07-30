@@ -7,6 +7,7 @@ jest.mock("@/lib/auth-v2/legacy-session", () => ({
 jest.mock("@/lib/auth-v2/session-cookie", () => ({
   clearAuthV2SessionCookie: jest.fn(),
   readAuthV2SessionCookie: jest.fn(),
+  readAuthV2SessionCookieState: jest.fn(),
 }));
 jest.mock("@/lib/auth-v2/sessions", () => ({
   readAuthSession: jest.fn(),
@@ -17,6 +18,7 @@ jest.mock("@/lib/auth-v2/sessions", () => ({
 import {
   clearAuthV2SessionCookie,
   readAuthV2SessionCookie,
+  readAuthV2SessionCookieState,
 } from "@/lib/auth-v2/session-cookie";
 import {
   readLegacyOwnerSessionForAuthorization,
@@ -33,6 +35,7 @@ import { cookies } from "next/headers";
 
 const mockCookies = jest.mocked(cookies);
 const mockReadV2Cookie = jest.mocked(readAuthV2SessionCookie);
+const mockReadV2CookieState = jest.mocked(readAuthV2SessionCookieState);
 const mockClearV2Cookie = jest.mocked(clearAuthV2SessionCookie);
 const mockReadLegacyForAuthorization = jest.mocked(
   readLegacyOwnerSessionForAuthorization,
@@ -68,6 +71,7 @@ describe("owner session compatibility bridge", () => {
       get: getCookie,
     } as never);
     mockReadV2Cookie.mockResolvedValue(null);
+    mockReadV2CookieState.mockResolvedValue({ status: "absent" });
     mockClearV2Cookie.mockResolvedValue(undefined);
     mockReadLegacyForAuthorization.mockResolvedValue(null);
     mockReadV2Session.mockResolvedValue(null);
@@ -76,7 +80,10 @@ describe("owner session compatibility bridge", () => {
   });
 
   test("prefers a valid database session without exposing its token", async () => {
-    mockReadV2Cookie.mockResolvedValue("a".repeat(64));
+    mockReadV2CookieState.mockResolvedValue({
+      status: "valid",
+      token: "a".repeat(64),
+    });
     mockReadV2Session.mockResolvedValue({
       id: "17",
       userId: "42",
@@ -85,6 +92,35 @@ describe("owner session compatibility bridge", () => {
 
     await expect(readOwnerSession()).resolves.toBe("42");
     expect(mockReadV2Session).toHaveBeenCalledWith("a".repeat(64));
+  });
+
+  test("does not fall back to legacy identity for a malformed present v2 cookie", async () => {
+    const token = `42.${"c".repeat(64)}`;
+    mockReadV2CookieState.mockResolvedValue({ status: "invalid" });
+    getCookie.mockImplementation((name: string) => (
+      name === "rr_sid" ? { value: token } : undefined
+    ));
+    mockReadLegacyForAuthorization.mockResolvedValue("42");
+
+    await expect(readOwnerSession()).resolves.toBeNull();
+    expect(mockReadV2Session).not.toHaveBeenCalled();
+    expect(mockReadLegacyForAuthorization).not.toHaveBeenCalled();
+  });
+
+  test("does not fall back to legacy identity for an unknown v2 session", async () => {
+    const token = `42.${"c".repeat(64)}`;
+    mockReadV2CookieState.mockResolvedValue({
+      status: "valid",
+      token: "a".repeat(64),
+    });
+    getCookie.mockImplementation((name: string) => (
+      name === "rr_sid" ? { value: token } : undefined
+    ));
+    mockReadLegacyForAuthorization.mockResolvedValue("42");
+    mockReadV2Session.mockResolvedValue(null);
+
+    await expect(readOwnerSession()).resolves.toBeNull();
+    expect(mockReadLegacyForAuthorization).not.toHaveBeenCalled();
   });
 
   test("preserves only a policy-authorized legacy session", async () => {
@@ -115,7 +151,10 @@ describe("owner session compatibility bridge", () => {
   });
 
   test("does not authorize a database session that requires rotation", async () => {
-    mockReadV2Cookie.mockResolvedValue("a".repeat(64));
+    mockReadV2CookieState.mockResolvedValue({
+      status: "valid",
+      token: "a".repeat(64),
+    });
     mockReadV2Session.mockResolvedValue({
       id: "17",
       userId: "42",
@@ -129,7 +168,10 @@ describe("owner session compatibility bridge", () => {
   test("does not accept a non-canary v2 session while the platform is disabled", async () => {
     process.env.AUTH_PLATFORM_V2_ENABLED = "false";
     delete process.env.AUTH_V2_CANARY_USER_IDS;
-    mockReadV2Cookie.mockResolvedValue("a".repeat(64));
+    mockReadV2CookieState.mockResolvedValue({
+      status: "valid",
+      token: "a".repeat(64),
+    });
     mockReadV2Session.mockResolvedValue({
       id: "17",
       userId: "42",

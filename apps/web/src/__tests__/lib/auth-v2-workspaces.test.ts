@@ -25,6 +25,7 @@ describe("auth v2 workspace authorization DAL", () => {
         name: "Agency",
         slug: "agency",
         role: "recruiter",
+        bootstrapUserId: "42",
       }],
       rowCount: 1,
     });
@@ -62,6 +63,7 @@ describe("auth v2 workspace authorization DAL", () => {
         name: "Agency",
         slug: "agency",
         role: "viewer",
+        bootstrapUserId: "42",
       }],
       rowCount: 1,
     });

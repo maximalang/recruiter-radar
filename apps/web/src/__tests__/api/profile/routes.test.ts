@@ -6,15 +6,15 @@
 
 import { GET as previewGET } from '@/app/api/profile/preview/route';
 import { PATCH as preferencesPATCH } from '@/app/api/profile/preferences/route';
+import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization';
 import { getClientProfileByOwnerId } from '@/lib/clientProfiles';
 import { countMatchingCandidatesForProfile } from '@/lib/digest';
 import {
   getDeliveryPreferencesByOwnerId,
   saveDeliveryPreferencesByOwnerId,
 } from '@/lib/deliveryPreferences';
-import { getOwnerIdFromSession } from '@/lib/session';
 
-jest.mock('@/lib/session', () => ({ getOwnerIdFromSession: jest.fn() }));
+jest.mock('@/lib/auth-v2/authorization', () => ({ getAuthorizedOwnerId: jest.fn() }));
 jest.mock('@/lib/clientProfiles', () => ({ getClientProfileByOwnerId: jest.fn() }));
 jest.mock('@/lib/digest', () => ({ countMatchingCandidatesForProfile: jest.fn() }));
 jest.mock('@/lib/deliveryPreferences', () => ({
@@ -29,7 +29,7 @@ jest.mock('@/lib/deliveryPreferences', () => ({
   }),
 }));
 
-const mockOwner = getOwnerIdFromSession as jest.MockedFunction<typeof getOwnerIdFromSession>;
+const mockOwner = getAuthorizedOwnerId as jest.MockedFunction<typeof getAuthorizedOwnerId>;
 const mockProfile = getClientProfileByOwnerId as jest.MockedFunction<typeof getClientProfileByOwnerId>;
 const mockCount = countMatchingCandidatesForProfile as jest.MockedFunction<typeof countMatchingCandidatesForProfile>;
 const mockGetPrefs = getDeliveryPreferencesByOwnerId as jest.MockedFunction<typeof getDeliveryPreferencesByOwnerId>;

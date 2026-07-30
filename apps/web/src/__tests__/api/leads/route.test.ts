@@ -6,12 +6,12 @@
  */
 
 import { GET } from '@/app/api/leads/route';
+import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization';
 import { getLeadsForAllProfiles, type LeadItem } from '@/lib/leads-data';
 import { listClientProfiles } from '@/lib/clientProfiles';
-import { getOwnerIdFromSession } from '@/lib/session';
 
-jest.mock('@/lib/session', () => ({
-  getOwnerIdFromSession: jest.fn(),
+jest.mock('@/lib/auth-v2/authorization', () => ({
+  getAuthorizedOwnerId: jest.fn(),
 }));
 jest.mock('@/lib/clientProfiles', () => ({
   listClientProfiles: jest.fn(),
@@ -27,7 +27,7 @@ jest.mock('@/lib/leads-data', () => ({
   VALID_FEEDBACK_STATUSES: new Set(['none', 'contacted', 'replied', 'won', 'badfit', 'snooze', 'dismissed']),
 }));
 
-const mockOwner = getOwnerIdFromSession as jest.MockedFunction<typeof getOwnerIdFromSession>;
+const mockOwner = getAuthorizedOwnerId as jest.MockedFunction<typeof getAuthorizedOwnerId>;
 const mockList = listClientProfiles as jest.MockedFunction<typeof listClientProfiles>;
 const mockLeads = getLeadsForAllProfiles as jest.MockedFunction<typeof getLeadsForAllProfiles>;
 

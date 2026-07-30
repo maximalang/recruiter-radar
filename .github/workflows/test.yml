@@ -252,6 +252,110 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
+  auth-v2-verification:
+    name: Auth v2 / ${{ matrix.gate }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - gate: unit
+          - gate: postgresql
+          - gate: migration-upgrade
+          - gate: tenancy-isolation
+          - gate: e2e
+          - gate: accessibility
+          - gate: security-smoke
+    env:
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+      AUTH_V2_DISPOSABLE_DB_CONFIRMED: 'true'
+      SESSION_SECRET: auth-v2-ci-session-secret-at-least-32-characters
+      AUTH_RATE_LIMIT_SECRET: auth-v2-ci-rate-limit-secret-at-least-32-characters
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Auth unit and type contracts
+        if: matrix.gate == 'unit'
+        run: |
+          npm run test:types --workspace @recruiter-radar/web
+          npm test --workspace @recruiter-radar/web -- --runInBand --testPathPattern=auth-v2
+      - name: Auth PostgreSQL contracts
+        if: matrix.gate == 'postgresql'
+        run: |
+          npm run test:auth-v2:account-team:db
+          npm run test:auth-v2:passkeys:db
+      - name: Auth migration upgrade and operational verification
+        if: matrix.gate == 'migration-upgrade'
+        env:
+          AUTH_PLATFORM_V2_ENABLED: 'false'
+          AUTH_WORKSPACES_V2_ENABLED: 'false'
+          AUTH_ONBOARDING_V2_ENABLED: 'false'
+          AUTH_PASSKEYS_ENABLED: 'false'
+        run: |
+          npm run db:migrate
+          npm run auth-v2:verify-db
+          npm run auth-v2:preflight
+          npm run auth-v2:backfill
+          npm run auth-v2:verify-backfill
+      - name: Auth tenant isolation contracts
+        if: matrix.gate == 'tenancy-isolation'
+        run: npm run test:auth-v2:tenancy:db
+      - name: Install Chromium
+        if: matrix.gate == 'e2e' || matrix.gate == 'accessibility'
+        run: npx playwright install --with-deps chromium
+      - name: Auth browser end-to-end contracts
+        if: matrix.gate == 'e2e'
+        run: |
+          npm run test:auth-v2:account-team:e2e
+          npm run test:auth-v2:passkeys:e2e
+      - name: Auth accessibility and responsive contracts
+        if: matrix.gate == 'accessibility'
+        run: npm run test:auth-v2:account-team:e2e
+      - name: Auth security smoke
+        if: matrix.gate == 'security-smoke'
+        env:
+          AUTH_PLATFORM_V2_ENABLED: 'false'
+          AUTH_WORKSPACES_V2_ENABLED: 'false'
+          AUTH_ONBOARDING_V2_ENABLED: 'false'
+          AUTH_PASSKEYS_ENABLED: 'false'
+        run: |
+          npm run db:migrate
+          npm run auth-v2:verify-db
+          npm run auth-v2:preflight
+          npm run auth-v2:session-report
+          npm test --workspace @recruiter-radar/web -- --runInBand --runTestsByPath src/__tests__/scripts/pre-deep-security-regression.test.ts src/__tests__/scripts/auth-v2-dal-migration.test.ts src/__tests__/scripts/auth-v2-rollout-operations.test.ts
+          npm audit --omit=dev --audit-level=high
+      - name: Upload Auth v2 browser evidence
+        if: always() && (matrix.gate == 'e2e' || matrix.gate == 'accessibility')
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-v2-${{ matrix.gate }}-evidence
+          path: |
+            apps/web/scripts/auth-v2-account-team-e2e-report.json
+            apps/web/scripts/auth-v2-passkey-e2e-report.json
+            apps/web/scripts/auth-v2-*.png
+          if-no-files-found: error
+          retention-days: 7
+
   security-audit:
     runs-on: ubuntu-latest
     steps:

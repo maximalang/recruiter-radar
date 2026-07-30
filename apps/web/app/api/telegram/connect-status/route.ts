@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getPool } from "../../../../lib/db";
-import { readOwnerSession } from "../../../../lib/session";
+import { getAuthorizedOwnerId } from "../../../../lib/auth-v2/authorization";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Missing or invalid orderId." }, { status: 400 });
   }
 
-  const ownerId = await readOwnerSession();
+  const ownerId = await getAuthorizedOwnerId("notifications:read");
 
   if (!ownerId) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 401 });

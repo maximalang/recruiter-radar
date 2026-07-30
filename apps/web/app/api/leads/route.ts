@@ -5,7 +5,7 @@ import {
   VALID_FEEDBACK_STATUSES,
 } from '@/lib/leads-data';
 import { listClientProfiles } from '@/lib/clientProfiles';
-import { getOwnerIdFromSession } from '@/lib/session';
+import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization';
 import { buildWhyMatch, type WhyMatchProfile } from '@/lib/leads/why-match';
 import { scoreBand, formatSignalStrength } from '@/lib/scoring/score-display';
 
@@ -49,7 +49,7 @@ type ApiLead = {
 };
 
 export async function GET(request: Request) {
-  const ownerId = await getOwnerIdFromSession();
+  const ownerId = await getAuthorizedOwnerId('leads:read');
   if (!ownerId) {
     return NextResponse.json({ leads: [], total: 0, page: 1, pageSize: DEFAULT_PAGE_SIZE });
   }

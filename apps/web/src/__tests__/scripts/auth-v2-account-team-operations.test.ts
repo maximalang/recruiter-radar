@@ -90,6 +90,24 @@ describe("auth v2 account and team operational contracts", () => {
     expect(runner).toContain("/auth/invite#");
     expect(runner).toContain("/auth/change-email#");
     expect(runner).toContain("email_mismatch");
+    expect(runner).toContain("coreMagicLink");
+    expect(runner).toContain("resendInvalidation");
+    expect(runner).toContain("expiredLink");
+    expect(runner).toContain("accountSwitch");
+    expect(runner).toContain("onboarding");
+    expect(runner).toContain("logout");
+    for (const screenshot of [
+      "login-desktop-1440",
+      "login-mobile-390",
+      "email-sent-390",
+      "invalid-link-390",
+      "confirm-new-session-390",
+      "confirm-account-switch-1440",
+      "onboarding-step-1-1440",
+      "onboarding-step-2-390",
+    ]) {
+      expect(runner).toContain(screenshot);
+    }
     expect(packageJson.scripts?.["test:auth-v2:account-team:e2e"]).toBe(
       "node packages/db/scripts/run-auth-v2-account-team-e2e.mjs",
     );

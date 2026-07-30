@@ -25,7 +25,7 @@ import {
   OpportunityTransitionConflictError,
 } from '@/lib/opportunities/repository'
 import { logError } from '@/lib/runtime'
-import { getOwnerIdFromSession } from '@/lib/session'
+import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -34,7 +34,7 @@ export async function POST(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
-  const ownerId = await getOwnerIdFromSession()
+  const ownerId = await getAuthorizedOwnerId('opportunities:write')
   if (!isOpportunityEngineV1EnabledForOwner(ownerId)) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 })
   }

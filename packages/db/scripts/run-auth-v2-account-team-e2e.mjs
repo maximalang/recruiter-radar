@@ -18,6 +18,11 @@ const databaseUrl = process.env.DATABASE_URL
 if (!databaseUrl) {
   throw new Error('DATABASE_URL is required.')
 }
+if (process.env.AUTH_V2_DISPOSABLE_DB_CONFIRMED !== 'true') {
+  throw new Error(
+    'AUTH_V2_DISPOSABLE_DB_CONFIRMED=true is required before creating a disposable database.',
+  )
+}
 
 const root = resolve(import.meta.dirname, '..', '..', '..')
 const webRoot = resolve(root, 'apps', 'web')
@@ -263,11 +268,23 @@ async function seedFixtures() {
   const owner = await createUser('owner')
   const invited = await createUser('invited')
   const wrong = await createUser('wrong')
+  const switcher = await createUser('switcher')
+  const switchTarget = await createUser('switch-target')
   await database.query(
     `UPDATE workspaces
      SET name = 'Signal Bureau', updated_at = NOW()
      WHERE id = $1`,
     [owner.workspaceId],
+  )
+  await database.query(
+    `UPDATE users
+     SET
+       onboarding_status = 'completed',
+       onboarding_step = 'complete',
+       onboarding_data = '{}'::JSONB,
+       updated_at = NOW()
+     WHERE id = $1`,
+    [switchTarget.userId],
   )
   owner.session = await createSession(owner, {
     device: 'Owner workstation',
@@ -289,7 +306,12 @@ async function seedFixtures() {
     browser: 'Chromium',
     environment: 'Windows 11',
   })
-  return { owner, invited, wrong }
+  switcher.session = await createSession(switcher, {
+    device: 'Account switch workstation',
+    browser: 'Chromium',
+    environment: 'Windows 11',
+  })
+  return { owner, invited, wrong, switcher, switchTarget }
 }
 
 async function waitForWebServer(baseUrl) {
@@ -480,8 +502,22 @@ async function authenticatedContext(token, viewport) {
   return context
 }
 
-async function inspectSurface(page, key, pathname, screenshotName) {
-  await page.goto(`${baseUrl}${pathname}`, { waitUntil: 'domcontentloaded' })
+async function anonymousContext(viewport) {
+  return browser.newContext({
+    viewport,
+    locale: 'ru-RU',
+    colorScheme: 'light',
+    ignoreHTTPSErrors: true,
+  })
+}
+
+async function inspectCurrentSurface(
+  page,
+  key,
+  pathname,
+  screenshotName,
+  expectedSemantics = ['heading', 'button'],
+) {
   await page.locator('main').waitFor({ state: 'visible' })
   await page.locator('#__next-route-announcer__').waitFor({
     state: 'attached',
@@ -520,10 +556,16 @@ async function inspectSurface(page, key, pathname, screenshotName) {
         const label = element instanceof HTMLElement
           ? element.closest('label')
           : null
+        const associatedLabel = 'labels' in element
+          ? [...(element.labels ?? [])].some(
+              (candidate) => candidate.textContent?.trim(),
+            )
+          : false
         return !(
           element.getAttribute('aria-label')?.trim()
           || labelledByText
           || label?.textContent?.trim()
+          || associatedLabel
           || element.textContent?.trim()
         )
       })
@@ -534,10 +576,12 @@ async function inspectSurface(page, key, pathname, screenshotName) {
     `${pathname} has unlabeled visible controls: ${unlabeledControls.join(', ')}`,
   )
   const aria = await page.locator('body').ariaSnapshot()
-  assert(
-    aria.includes('heading') && aria.includes('button'),
-    `${pathname} accessibility snapshot is missing expected semantics.`,
-  )
+  for (const semantic of expectedSemantics) {
+    assert(
+      aria.includes(semantic),
+      `${pathname} accessibility snapshot is missing ${semantic} semantics.`,
+    )
+  }
   await page.keyboard.press('Tab')
   const focusMoved = await page.evaluate(
     () => document.activeElement !== document.body,
@@ -561,7 +605,12 @@ async function inspectSurface(page, key, pathname, screenshotName) {
   report.screenshots[key] = screenshotPath
 }
 
-async function waitForOutboxToken(email, pathname) {
+async function inspectSurface(page, key, pathname, screenshotName) {
+  await page.goto(`${baseUrl}${pathname}`, { waitUntil: 'domcontentloaded' })
+  await inspectCurrentSurface(page, key, pathname, screenshotName)
+}
+
+async function waitForOutboxToken(email, pathname, excludedToken = null) {
   const deadline = Date.now() + 10_000
   while (Date.now() < deadline) {
     try {
@@ -570,7 +619,7 @@ async function waitForOutboxToken(email, pathname) {
         (entry) => entry.to === email && entry.text.includes(pathname),
       )
       const token = message?.text.match(/#([a-f0-9]{64})(?:\s|$)/)?.[1]
-      if (token) return token
+      if (token && token !== excludedToken) return token
     } catch (error) {
       if (
         !error
@@ -584,6 +633,107 @@ async function waitForOutboxToken(email, pathname) {
     await delay(100)
   }
   throw new Error(`Token for ${pathname} was not recorded for ${email}.`)
+}
+
+async function requestMagicLink(page, email, returnTo = '/dashboard') {
+  await page.goto(
+    `${baseUrl}/login?returnTo=${encodeURIComponent(returnTo)}`,
+    { waitUntil: 'domcontentloaded' },
+  )
+  const form = page.locator('form').filter({
+    has: page.locator('input[name="email"]:not([type="hidden"])'),
+  })
+  await form.locator('input[name="email"]').fill(email)
+  await form.locator('button[type="submit"]').click()
+  await page.locator(
+    'form input[type="hidden"][name="email"]',
+  ).waitFor({ state: 'attached' })
+  return waitForOutboxToken(email, '/auth/verify')
+}
+
+async function resendMagicLink(page, email, previousToken) {
+  await page.evaluate(() => {
+    const advancedNow = Date.now() + 31_000
+    Date.now = () => advancedNow
+  })
+  const resendButton = page.locator(
+    'form:has(input[type="hidden"][name="email"]) button[type="submit"]',
+  )
+  await page.waitForFunction(() => {
+    const button = document.querySelector(
+      'form:has(input[type="hidden"][name="email"]) button[type="submit"]',
+    )
+    return button instanceof HTMLButtonElement && !button.disabled
+  })
+  await resendButton.click()
+  return waitForOutboxToken(email, '/auth/verify', previousToken)
+}
+
+async function openMagicLogin(page, token) {
+  await page.goto(`${baseUrl}/auth/verify#${token}`, {
+    waitUntil: 'domcontentloaded',
+  })
+  await page.waitForURL((url) => url.pathname === '/auth/confirm')
+  await page.waitForFunction(() => window.location.hash === '')
+  await page.locator('main').waitFor({ state: 'visible' })
+}
+
+async function challengeState(token) {
+  const result = await database.query(
+    `SELECT
+       invalidated_at IS NOT NULL AS invalidated,
+       consumed_at IS NOT NULL AS consumed,
+       expires_at <= NOW() AS expired
+     FROM auth_challenges
+     WHERE token_hash = $1`,
+    [hashToken(token)],
+  )
+  assert(result.rowCount === 1, 'Auth challenge fixture was not found.')
+  return result.rows[0]
+}
+
+async function expireChallenge(token) {
+  const result = await database.query(
+    `UPDATE auth_challenges
+     SET expires_at = NOW() + INTERVAL '100 milliseconds'
+     WHERE token_hash = $1
+       AND consumed_at IS NULL
+       AND invalidated_at IS NULL`,
+    [hashToken(token)],
+  )
+  assert(result.rowCount === 1, 'Auth challenge could not be expired.')
+  await delay(300)
+}
+
+async function accountByEmail(email) {
+  const result = await database.query(
+    `SELECT
+       id::TEXT AS id,
+       onboarding_status AS "onboardingStatus",
+       onboarding_step AS "onboardingStep"
+     FROM users
+     WHERE email_normalized = $1`,
+    [email],
+  )
+  return result.rows[0] ?? null
+}
+
+async function currentSessionForContext(context) {
+  const cookies = await context.cookies(baseUrl)
+  const token = cookies.find(
+    (cookie) => cookie.name === '__Host-rr_session',
+  )?.value
+  if (!token) return null
+  const result = await database.query(
+    `SELECT
+       id::TEXT AS id,
+       user_id::TEXT AS "userId",
+       revoked_at IS NOT NULL AS revoked
+     FROM auth_sessions
+     WHERE token_hash = $1`,
+    [hashToken(token)],
+  )
+  return result.rows[0] ?? null
 }
 
 async function openPendingAction(page, fragmentPath, token, preparePath) {
@@ -664,6 +814,270 @@ async function verifyOwnershipTransfer(owner, invited) {
     'Ownership transfer did not revoke the previous owner session.',
   )
   return { roles, auditCount: audit.rows[0].count }
+}
+
+async function runCoreAuthFlows(fixtures) {
+  const signupEmail =
+    `signup-${process.pid}-${Date.now()}@example.invalid`
+  const signupContext = await anonymousContext({ width: 1440, height: 1000 })
+  const signupPage = await signupContext.newPage()
+  observePage(signupPage, 'core-signup')
+
+  try {
+    await signupPage.goto(`${baseUrl}/login?returnTo=/dashboard`, {
+      waitUntil: 'domcontentloaded',
+    })
+    await inspectCurrentSurface(
+      signupPage,
+      'login-desktop-1440',
+      '/login',
+      'auth-v2-account-team-e2e-shot-login-desktop-1440.png',
+    )
+    await signupPage.setViewportSize({ width: 390, height: 844 })
+    await inspectCurrentSurface(
+      signupPage,
+      'login-mobile-390',
+      '/login',
+      'auth-v2-account-team-e2e-shot-login-mobile-390.png',
+    )
+
+    const firstSignupToken = await requestMagicLink(
+      signupPage,
+      signupEmail,
+    )
+    assert(
+      await accountByEmail(signupEmail) === null,
+      'Signup request created an account before email confirmation.',
+    )
+    await inspectCurrentSurface(
+      signupPage,
+      'email-sent-390',
+      '/login',
+      'auth-v2-account-team-e2e-shot-email-sent-390.png',
+    )
+    const secondSignupToken = await resendMagicLink(
+      signupPage,
+      signupEmail,
+      firstSignupToken,
+    )
+    const firstChallenge = await challengeState(firstSignupToken)
+    assert(
+      firstChallenge.invalidated === true
+        && firstChallenge.consumed === false,
+      'Resend did not invalidate the prior unused challenge.',
+    )
+    report.flows.resendInvalidation = {
+      previousInvalidated: true,
+      replacementDistinct: secondSignupToken !== firstSignupToken,
+      userStillAbsent: await accountByEmail(signupEmail) === null,
+    }
+
+    await openMagicLogin(signupPage, secondSignupToken)
+    assert(
+      new URL(signupPage.url()).searchParams.get('status') !== 'invalid',
+      'Fresh signup challenge was rejected before confirmation.',
+    )
+    await inspectCurrentSurface(
+      signupPage,
+      'confirm-new-session-390',
+      '/auth/confirm',
+      'auth-v2-account-team-e2e-shot-confirm-new-session-390.png',
+    )
+    assert(
+      await accountByEmail(signupEmail) === null,
+      'Challenge preview created a user before explicit confirmation.',
+    )
+    const confirmSignup = signupPage.locator(
+      'form button[type="submit"]',
+    ).first()
+    await Promise.all([
+      signupPage.waitForURL((url) => url.pathname === '/onboarding'),
+      confirmSignup.click(),
+    ])
+    const signupAccount = await accountByEmail(signupEmail)
+    const signupSession = await currentSessionForContext(signupContext)
+    assert(
+      signupAccount
+        && signupSession
+        && signupSession.userId === signupAccount.id
+        && signupSession.revoked === false,
+      'Explicit signup confirmation did not create the expected DB session.',
+    )
+
+    await signupPage.setViewportSize({ width: 1440, height: 1000 })
+    await signupPage.locator('input[name="fullName"]').waitFor({
+      state: 'visible',
+    })
+    await inspectCurrentSurface(
+      signupPage,
+      'onboarding-step-1-1440',
+      '/onboarding',
+      'auth-v2-account-team-e2e-shot-onboarding-step-1-1440.png',
+    )
+    await signupPage.locator('input[name="fullName"]').fill('Core E2E User')
+    await signupPage.locator('input[name="agencyName"]').fill('Core Signal')
+    await signupPage.locator('select[name="teamRole"]').selectOption('founder')
+    await signupPage.locator(
+      'button[name="intent"][value="next"]',
+    ).click()
+    await signupPage.locator('input[name="specialization"]').waitFor({
+      state: 'visible',
+    })
+    await signupPage.reload({ waitUntil: 'domcontentloaded' })
+    await signupPage.locator('input[name="specialization"]').waitFor({
+      state: 'visible',
+    })
+    await signupPage.setViewportSize({ width: 390, height: 844 })
+    await inspectCurrentSurface(
+      signupPage,
+      'onboarding-step-2-390',
+      '/onboarding',
+      'auth-v2-account-team-e2e-shot-onboarding-step-2-390.png',
+    )
+    await signupPage.locator('input[name="specialization"]').fill(
+      'IT and product recruiting',
+    )
+    await signupPage.locator(
+      'input[name="roles"][value="it-engineering"]',
+    ).check()
+    await signupPage.locator(
+      'input[name="industries"][value="it"]',
+    ).check()
+    await signupPage.locator('textarea[name="geography"]').fill(
+      'Москва, удалённо',
+    )
+    await signupPage.locator('select[name="hiringMode"]').selectOption('auto')
+    await signupPage.locator(
+      'button[name="intent"][value="next"]',
+    ).click()
+    await signupPage.locator(
+      'form input[type="hidden"][name="step"][value="complete"]',
+    ).waitFor({ state: 'attached' })
+    await Promise.all([
+      signupPage.waitForURL((url) => url.pathname === '/dashboard'),
+      signupPage.locator(
+        'button[name="intent"][value="finish"]',
+      ).click(),
+    ])
+    const completedAccount = await accountByEmail(signupEmail)
+    assert(
+      completedAccount?.onboardingStatus === 'completed'
+        && completedAccount.onboardingStep === 'complete',
+      'Onboarding did not persist completion.',
+    )
+    report.flows.coreMagicLink = {
+      userAbsentBeforeConfirmation: true,
+      explicitConfirmation: true,
+      databaseSessionCreated: true,
+      onboarding: {
+        resumedAfterReload: true,
+        completed: true,
+      },
+    }
+  } finally {
+    await signupContext.close()
+  }
+
+  const expiredContext = await anonymousContext({ width: 390, height: 844 })
+  const expiredPage = await expiredContext.newPage()
+  observePage(expiredPage, 'expired-link')
+  try {
+    const expiredEmail =
+      `expired-${process.pid}-${Date.now()}@example.invalid`
+    const expiredToken = await requestMagicLink(expiredPage, expiredEmail)
+    await expireChallenge(expiredToken)
+    await openMagicLogin(expiredPage, expiredToken)
+    assert(
+      await expiredPage.locator('form button[type="submit"]').count() === 0,
+      'Expired magic link exposed an active confirmation action.',
+    )
+    await inspectCurrentSurface(
+      expiredPage,
+      'invalid-link-390',
+      '/auth/confirm',
+      'auth-v2-account-team-e2e-shot-invalid-link-390.png',
+      ['heading', 'link'],
+    )
+    const expiredChallenge = await challengeState(expiredToken)
+    assert(
+      expiredChallenge.expired === true
+        && await accountByEmail(expiredEmail) === null,
+      'Expired link created an account or was not expired.',
+    )
+    report.flows.expiredLink = {
+      rejected: true,
+      userStillAbsent: true,
+    }
+  } finally {
+    await expiredContext.close()
+  }
+
+  const switchContext = await authenticatedContext(
+    fixtures.switcher.session.token,
+    { width: 1440, height: 1000 },
+  )
+  const switchPage = await switchContext.newPage()
+  observePage(switchPage, 'account-switch')
+  try {
+    const switchToken = await requestMagicLink(
+      switchPage,
+      fixtures.switchTarget.email,
+    )
+    await openMagicLogin(switchPage, switchToken)
+    const switchNotice = switchPage.locator('[role="note"]')
+    assert(
+      await switchNotice.count() === 1
+        && (await switchNotice.innerText()).includes(fixtures.switcher.email),
+      'Account-switch confirmation did not expose the replacement warning.',
+    )
+    await inspectCurrentSurface(
+      switchPage,
+      'confirm-account-switch-1440',
+      '/auth/confirm',
+      'auth-v2-account-team-e2e-shot-confirm-account-switch-1440.png',
+    )
+    await Promise.all([
+      switchPage.waitForURL((url) => url.pathname === '/dashboard'),
+      switchPage.locator('form button[type="submit"]').first().click(),
+    ])
+    const switchedSession = await currentSessionForContext(switchContext)
+    assert(
+      (await sessionState(fixtures.switcher.session.id)).revoked === true
+        && switchedSession?.userId === fixtures.switchTarget.userId
+        && switchedSession.revoked === false,
+      'Account switch did not revoke the old session and replace its actor.',
+    )
+    report.flows.accountSwitch = {
+      explicitConfirmation: true,
+      previousSessionRevoked: true,
+      targetSessionCreated: true,
+    }
+
+    await switchPage.goto(`${baseUrl}/settings`, {
+      waitUntil: 'domcontentloaded',
+    })
+    const sessionBeforeLogout = await currentSessionForContext(switchContext)
+    assert(sessionBeforeLogout, 'Switched session disappeared before logout.')
+    await Promise.all([
+      switchPage.waitForURL((url) =>
+        url.pathname === '/login'
+          && url.searchParams.get('loggedOut') === '1'),
+      switchPage.locator('form button[type="submit"]').last().click(),
+    ])
+    const remainingCookies = await switchContext.cookies(baseUrl)
+    assert(
+      (await sessionState(sessionBeforeLogout.id)).revoked === true
+        && !remainingCookies.some((cookie) =>
+          cookie.name === '__Host-rr_session' || cookie.name === 'rr_sid'),
+      'Logout did not revoke the DB session and clear auth cookies.',
+    )
+    report.flows.logout = {
+      serverSessionRevoked: true,
+      authCookiesCleared: true,
+    }
+  } finally {
+    await switchContext.close()
+  }
 }
 
 async function restoreNextEnv() {
@@ -758,6 +1172,7 @@ try {
   webServerListenerPid = await findWindowsListenerPid(port)
 
   browser = await chromium.launch({ headless: true })
+  await runCoreAuthFlows(fixtures)
   const ownerContext = await authenticatedContext(
     fixtures.owner.session.token,
     { width: 390, height: 844 },

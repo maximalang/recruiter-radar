@@ -13,7 +13,7 @@ import {
   type OpportunityView,
 } from '@/lib/opportunities/repository'
 import type { OpportunityStatus } from '@/lib/opportunities/opportunity-scoring'
-import { getOwnerIdFromSession } from '@/lib/session'
+import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization'
 import {
   ContentCard,
   EmptyState,
@@ -47,7 +47,7 @@ export default async function OpportunitiesPage(props: {
     demo?: string
   }>
 }) {
-  const ownerId = await getOwnerIdFromSession()
+  const ownerId = await getAuthorizedOwnerId('opportunities:read')
   if (!isOpportunityEngineV1EnabledForOwner(ownerId)) notFound()
 
   if (!ownerId) {

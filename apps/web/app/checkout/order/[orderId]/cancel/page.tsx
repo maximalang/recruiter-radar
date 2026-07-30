@@ -6,7 +6,7 @@ import {
   ensurePilotOrderOnboardingReady,
   markCheckoutOrderCanceled
 } from "../../../../../lib/payments";
-import { readOwnerSession } from "../../../../../lib/session";
+import { getAuthorizedUserId } from "../../../../../lib/auth-v2/authorization";
 import {
   NoticeBox,
   PageFrame,
@@ -49,7 +49,7 @@ function describeReason(reason: string | null): string {
 export default async function CheckoutCancelPage({ params, searchParams }: CheckoutCancelPageProps) {
   const resolvedParams = await params;
   const resolvedSearchParams = (await searchParams) ?? {};
-  const ownerId = await readOwnerSession();
+  const ownerId = await getAuthorizedUserId("billing:read");
 
   if (!ownerId) {
     notFound();

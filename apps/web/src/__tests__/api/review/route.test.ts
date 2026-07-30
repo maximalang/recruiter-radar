@@ -24,8 +24,8 @@ jest.mock('@/lib/digestFeedback', () => ({
 // Owner-scope guard: the route now calls getOwnerIdFromSession() before touching
 // the DB. Outside a Next request scope cookies() throws, so mock the session to a
 // fixed owner — the route's owner-scoped SQL still runs against the mock pool.
-jest.mock('@/lib/session', () => ({
-  getOwnerIdFromSession: jest.fn(async () => 'owner-1'),
+jest.mock('@/lib/auth-v2/authorization', () => ({
+  getAuthorizedOwnerId: jest.fn(async () => 'owner-1'),
 }));
 
 const mockQuery = jest.fn();

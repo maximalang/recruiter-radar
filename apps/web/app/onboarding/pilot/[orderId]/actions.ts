@@ -6,7 +6,7 @@ import {
   sendPilotOrderTestDigest
 } from "../../../../lib/payments";
 import { VALID_INDUSTRIES, VALID_COMPANY_SIZES, VALID_ROLES } from "../../../../lib/clientProfiles";
-import { readOwnerSession } from "../../../../lib/session";
+import { getAuthorizedUserId } from "../../../../lib/auth-v2/authorization";
 
 function readRequiredText(formData: FormData, key: string): string {
   const value = formData.get(key);
@@ -57,7 +57,7 @@ function readOptionalNumber(formData: FormData, key: string): number | null {
 }
 
 async function requireOwnerId(): Promise<string> {
-  const ownerId = await readOwnerSession();
+  const ownerId = await getAuthorizedUserId("billing:manage");
   if (!ownerId) throw new Error("Owner identification is required.");
   return ownerId;
 }

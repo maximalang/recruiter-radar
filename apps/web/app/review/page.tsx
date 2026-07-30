@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import type { ReactElement, SVGProps } from 'react';
 import Link from 'next/link';
 import { listClientProfiles, type ClientProfile } from '@/lib/clientProfiles';
-import { getOwnerIdFromSession } from '@/lib/session';
+import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization';
 import {
   InternalPageFrame,
   InternalPageHeader,
@@ -213,7 +213,7 @@ export default async function ReviewPage({
   const params = await searchParams;
   // Owner-scope the profile list: without a session, show no profiles (and thus
   // no review queue) rather than another tenant's candidates.
-  const ownerId = await getOwnerIdFromSession();
+  const ownerId = await getAuthorizedOwnerId('leads:read');
   const profiles = ownerId ? await listClientProfiles(ownerId) : [];
 
   const activeProfileId =
