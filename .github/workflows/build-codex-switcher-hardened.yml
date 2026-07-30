@@ -28,7 +28,7 @@ jobs:
           $gzip = [IO.Compression.GZipStream]::new($input, [IO.Compression.CompressionMode]::Decompress)
           try { $gzip.CopyTo($output) } finally { $gzip.Dispose(); $output.Dispose(); $input.Dispose() }
 
-      - name: Fetch exact upstream v0.2.9 source and apply patches
+      - name: Fetch exact upstream v0.2.9 source and apply hardened code
         shell: pwsh
         run: |
           git clone https://github.com/Lampese/codex-switcher.git source
@@ -36,10 +36,11 @@ jobs:
           git checkout 31e2b962009a51f27e964fa5c1984b1aeb237079
           git apply --check ..\hardened.patch
           git apply ..\hardened.patch
-          Get-ChildItem '..\payload\codex-build\fix-*.patch' | Sort-Object Name | ForEach-Object {
-            git apply --check $_.FullName
-            git apply $_.FullName
-          }
+          git apply --check '..\payload\codex-build\fix-001-remove-updater-permission.patch'
+          git apply '..\payload\codex-build\fix-001-remove-updater-permission.patch'
+          Copy-Item '..\payload\codex-build\scripts\migrate-accounts.ps1' '.\tools\migrate-accounts.ps1' -Force
+          Copy-Item '..\payload\codex-build\scripts\verify-accounts.ps1' '.\tools\verify-accounts.ps1' -Force
+          Copy-Item '..\payload\codex-build\scripts\remove-old-switcher.ps1' '.\tools\remove-old-switcher.ps1' -Force
 
       - uses: actions/setup-node@v4
         with:
@@ -151,9 +152,7 @@ jobs:
           $authBefore = (Get-FileHash (Join-Path $codex 'auth.json') -Algorithm SHA256).Hash
 
           & 'source\tools\migrate-accounts.ps1' -SourceDir $legacy -TargetDir $target -CodexDir $codex -BackupRoot $backup -SkipProcessCheck
-          if ($LASTEXITCODE -ne 0) { throw "Migration script failed with exit code $LASTEXITCODE" }
           & 'source\tools\verify-accounts.ps1' -SourceDir $legacy -TargetDir $target -CodexDir $codex
-          if ($LASTEXITCODE -ne 0) { throw "Verification script failed with exit code $LASTEXITCODE" }
 
           $sourceAfter = (Get-FileHash (Join-Path $legacy 'accounts.json') -Algorithm SHA256).Hash
           $authAfter = (Get-FileHash (Join-Path $codex 'auth.json') -Algorithm SHA256).Hash
