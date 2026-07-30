@@ -58,9 +58,11 @@ jobs:
         working-directory: source
         run: pnpm build
 
-      - name: Check Rust formatting
+      - name: Format and verify Rust
         working-directory: source
-        run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+        run: |
+          cargo fmt --manifest-path src-tauri/Cargo.toml
+          cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 
       - name: Run Rust tests
         working-directory: source
