@@ -20,8 +20,7 @@ jest.mock("@/lib/auth-v2/session-cookie", () => ({
   writeAuthV2SessionCookie: jest.fn(),
 }));
 jest.mock("@/lib/auth-v2/sessions", () => ({
-  readAuthSession: jest.fn(),
-  revokeAuthSessionById: jest.fn(),
+  revokeAuthSessionForAccountSwitch: jest.fn(),
 }));
 jest.mock("@/lib/session", () => ({
   assertOwnerSessionConfigured: jest.fn(),
@@ -48,8 +47,7 @@ import {
   writeAuthV2SessionCookie,
 } from "@/lib/auth-v2/session-cookie";
 import {
-  readAuthSession,
-  revokeAuthSessionById,
+  revokeAuthSessionForAccountSwitch,
 } from "@/lib/auth-v2/sessions";
 import {
   clearLegacyOwnerSession,
@@ -67,8 +65,7 @@ const mockConsumeV2 = jest.mocked(consumeAuthV2Login);
 const mockReadV2Preview = jest.mocked(readAuthV2LoginChallengePreview);
 const mockReadV2Cookie = jest.mocked(readAuthV2SessionCookie);
 const mockWriteV2Cookie = jest.mocked(writeAuthV2SessionCookie);
-const mockReadV2Session = jest.mocked(readAuthSession);
-const mockRevokeV2 = jest.mocked(revokeAuthSessionById);
+const mockRevokeV2 = jest.mocked(revokeAuthSessionForAccountSwitch);
 const mockClearLegacy = jest.mocked(clearLegacyOwnerSession);
 const mockReadLegacyCookie = jest.mocked(readLegacyOwnerSessionCookie);
 const mockWriteLegacy = jest.mocked(writeOwnerSession);
@@ -106,9 +103,8 @@ describe("auth v2 explicit confirm bridge", () => {
     mockReadPending.mockResolvedValue("a".repeat(64));
     mockClearPending.mockResolvedValue(undefined);
     mockReadV2Cookie.mockResolvedValue(null);
-    mockReadV2Session.mockResolvedValue(null);
     mockReadLegacyCookie.mockResolvedValue(null);
-    mockRevokeV2.mockResolvedValue(true);
+    mockRevokeV2.mockResolvedValue("revoked");
     mockReadV2Preview.mockResolvedValue(null);
   });
 
@@ -149,10 +145,6 @@ describe("auth v2 explicit confirm bridge", () => {
       session: { id: "17", token: "b".repeat(64) },
     });
     mockReadV2Cookie.mockResolvedValue("c".repeat(64));
-    mockReadV2Session.mockResolvedValue({
-      id: "9",
-      userId: "8",
-    } as never);
     const legacyToken = `8.${"d".repeat(64)}`;
     mockReadLegacyCookie.mockResolvedValue(legacyToken);
 
@@ -168,16 +160,43 @@ describe("auth v2 explicit confirm bridge", () => {
         environmentLabel: "Windows",
       },
     });
-    expect(mockRevokeV2).toHaveBeenCalledWith({
-      userId: "8",
-      sessionId: "9",
-      reason: "security_action",
-    });
+    expect(mockRevokeV2).toHaveBeenCalledWith("c".repeat(64));
     expect(mockWriteV2Cookie).toHaveBeenCalledWith("b".repeat(64));
     expect(mockClearLegacy).toHaveBeenCalled();
     expect(mockClearPending).toHaveBeenCalled();
     expect(mockWriteLegacy).not.toHaveBeenCalled();
     expect(mockRedirect).toHaveBeenCalledWith("/dashboard");
+  });
+
+  test("does not replace the browser cookie when previous-session revocation is unavailable", async () => {
+    process.env.AUTH_PLATFORM_V2_ENABLED = "true";
+    mockReadV2Preview.mockResolvedValue({
+      maskedEmail: "o***r@e***e.com",
+      userId: "42",
+    });
+    mockConsumeV2.mockResolvedValue({
+      account: {
+        id: "42",
+        email: "owner@example.com",
+        fullName: null,
+        emailVerifiedAt: new Date(),
+      },
+      returnTo: "/dashboard",
+      onboardingRequired: false,
+      session: { id: "17", token: "b".repeat(64) },
+    });
+    mockReadV2Cookie.mockResolvedValue("c".repeat(64));
+    mockRevokeV2.mockResolvedValue("unavailable");
+
+    await confirmAccountLoginAction();
+
+    expect(mockRevokeV2).toHaveBeenCalledWith("c".repeat(64));
+    expect(mockWriteV2Cookie).not.toHaveBeenCalled();
+    expect(mockClearLegacy).not.toHaveBeenCalled();
+    expect(mockClearPending).toHaveBeenCalled();
+    expect(mockRedirect).toHaveBeenCalledWith(
+      "/login?error=session-switch-unavailable",
+    );
   });
 
   test("sends an incomplete new account to onboarding from the default destination", async () => {

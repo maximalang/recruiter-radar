@@ -15,6 +15,7 @@ import {
 import {
   hashAuthSessionToken,
   type AuthSession,
+  type AuthSessionLogoutRevocation,
   type AuthSessionWithToken,
 } from "./sessions";
 
@@ -107,17 +108,20 @@ export async function readLegacyOwnerSessionForAuthorization(input: {
   if (!pool) return null;
   try {
     const result = await pool.query<{
-      previouslyMigrated: boolean;
+      legacyDenied: boolean;
       v2LoginSucceeded: boolean;
       eligibleIdentity: boolean;
     }>(
       `SELECT
          EXISTS (
            SELECT 1
-           FROM auth_security_events AS prior_exchange
-           WHERE prior_exchange.event_type = 'legacy_session_migrated'
-             AND prior_exchange.subject_hash = $2
-         ) AS "previouslyMigrated",
+           FROM auth_security_events AS prior_denial
+           WHERE prior_denial.event_type IN (
+             'legacy_session_migrated',
+             'legacy_session_revoked'
+           )
+             AND prior_denial.subject_hash = $2
+         ) AS "legacyDenied",
          EXISTS (
            SELECT 1
            FROM auth_security_events AS v2_login
@@ -134,7 +138,7 @@ export async function readLegacyOwnerSessionForAuthorization(input: {
       [userId, fingerprint],
     );
     const state = result.rows[0];
-    if (!state || state.previouslyMigrated || state.v2LoginSucceeded) {
+    if (!state || state.legacyDenied || state.v2LoginSucceeded) {
       return null;
     }
     if (v2Eligible && !state.eligibleIdentity) return null;
@@ -163,6 +167,65 @@ export function fingerprintLegacyOwnerSession(
   return decodeLegacyOwnerSession(token, env)
     ? legacyFingerprint(token, env)
     : null;
+}
+
+export async function revokeLegacyOwnerSessionForLogout(
+  token: string,
+  env: AuthEnvironment = process.env,
+  now = new Date(),
+): Promise<AuthSessionLogoutRevocation> {
+  const userId = decodeLegacyOwnerSession(token, env);
+  const fingerprint = legacyFingerprint(token, env);
+  if (!userId || !fingerprint || !Number.isFinite(now.getTime())) {
+    return "inactive";
+  }
+  const pool = getPool();
+  if (!pool) return "unavailable";
+
+  try {
+    const result = await pool.query<{ revoked: boolean }>(
+      `WITH recorded AS (
+         INSERT INTO auth_security_events (
+           event_type,
+           user_id,
+           subject_hash,
+           metadata,
+           created_at
+         )
+         SELECT
+           'legacy_session_revoked',
+           $1,
+           $2,
+           JSONB_BUILD_OBJECT(
+             'reason_code',
+             'logout',
+             'source',
+             'legacy'
+           ),
+           $3::TIMESTAMPTZ
+         WHERE NOT EXISTS (
+           SELECT 1
+           FROM auth_security_events AS prior_denial
+           WHERE prior_denial.event_type IN (
+             'legacy_session_migrated',
+             'legacy_session_revoked'
+           )
+             AND prior_denial.subject_hash = $2
+         )
+         ON CONFLICT (subject_hash)
+           WHERE event_type = 'legacy_session_revoked'
+             AND subject_hash IS NOT NULL
+           DO NOTHING
+         RETURNING id
+       )
+       SELECT EXISTS (SELECT 1 FROM recorded) AS revoked`,
+      [userId, fingerprint, now],
+    );
+    return result.rows[0]?.revoked === true ? "revoked" : "inactive";
+  } catch (error) {
+    logError("auth_v2.legacy_session_logout_failed", error);
+    return "unavailable";
+  }
 }
 
 function validOptionalHash(value: string | null | undefined): boolean {
@@ -267,9 +330,12 @@ export async function exchangeLegacyOwnerSession(input: {
            AND account.email_verified_at IS NOT NULL
            AND NOT EXISTS (
              SELECT 1
-             FROM auth_security_events AS prior_exchange
-             WHERE prior_exchange.event_type = 'legacy_session_migrated'
-               AND prior_exchange.subject_hash = $3
+             FROM auth_security_events AS prior_denial
+             WHERE prior_denial.event_type IN (
+               'legacy_session_migrated',
+               'legacy_session_revoked'
+             )
+               AND prior_denial.subject_hash = $3
            )
          ON CONFLICT (legacy_fingerprint_hash)
            WHERE legacy_fingerprint_hash IS NOT NULL

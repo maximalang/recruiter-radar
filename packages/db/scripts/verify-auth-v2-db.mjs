@@ -44,6 +44,8 @@ const expectedMigrations = [
   '20260729130000_add_auth_account_security_and_team',
   '20260729131000_guard_auth_active_owner_writes',
   '20260729132000_add_auth_passkeys',
+  '20260730100000_harden_auth_email_identity',
+  '20260730101000_add_legacy_session_revocation',
 ]
 
 const pool = new Pool({
@@ -105,12 +107,14 @@ try {
         WHERE schemaname = 'public'
           AND indexname = ANY(ARRAY[
             'users_email_normalized_active_uidx',
+            'users_auth_v2_identity_active_uidx',
             'auth_sessions_user_active_idx',
             'auth_security_events_type_created_idx',
             'workspace_members_user_active_idx',
             'workspace_invites_active_email_uidx',
             'account_deletion_requests_user_pending_uidx',
-            'user_passkeys_user_activity_idx'
+            'user_passkeys_user_activity_idx',
+            'auth_security_events_legacy_revocation_uidx'
           ])
       ) AS "installedIndexes"
   `, [expectedTables, expectedFunctions, expectedMigrations])
@@ -124,7 +128,7 @@ try {
       && counts.appliedMigrations === expectedMigrations.length
       && counts.installedConstraints === 7
       && counts.installedTriggers === 5
-      && counts.installedIndexes === 7,
+      && counts.installedIndexes === 9,
     schema: {
       tables: {
         installed: counts.installedTables,
@@ -144,7 +148,7 @@ try {
       },
       indexes: {
         installed: counts.installedIndexes,
-        expected: 7,
+        expected: 9,
       },
     },
     migrations: {

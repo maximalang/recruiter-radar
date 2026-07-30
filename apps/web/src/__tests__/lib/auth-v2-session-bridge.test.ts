@@ -3,6 +3,7 @@ jest.mock("next/headers", () => ({
 }));
 jest.mock("@/lib/auth-v2/legacy-session", () => ({
   readLegacyOwnerSessionForAuthorization: jest.fn(),
+  revokeLegacyOwnerSessionForLogout: jest.fn(),
 }));
 jest.mock("@/lib/auth-v2/session-cookie", () => ({
   clearAuthV2SessionCookie: jest.fn(),
@@ -19,6 +20,7 @@ import {
 } from "@/lib/auth-v2/session-cookie";
 import {
   readLegacyOwnerSessionForAuthorization,
+  revokeLegacyOwnerSessionForLogout,
 } from "@/lib/auth-v2/legacy-session";
 import {
   readAuthSession,
@@ -35,6 +37,9 @@ const mockReadV2CookieState = jest.mocked(readAuthV2SessionCookieState);
 const mockClearV2Cookie = jest.mocked(clearAuthV2SessionCookie);
 const mockReadLegacyForAuthorization = jest.mocked(
   readLegacyOwnerSessionForAuthorization,
+);
+const mockRevokeLegacyForLogout = jest.mocked(
+  revokeLegacyOwnerSessionForLogout,
 );
 const mockReadV2Session = jest.mocked(readAuthSession);
 const mockRevokeV2ForLogout = jest.mocked(revokeAuthSessionForLogout);
@@ -71,6 +76,7 @@ describe("owner session compatibility bridge", () => {
     mockReadLegacyForAuthorization.mockResolvedValue(null);
     mockReadV2Session.mockResolvedValue(null);
     mockRevokeV2ForLogout.mockResolvedValue("revoked");
+    mockRevokeLegacyForLogout.mockResolvedValue("revoked");
     getCookie.mockReturnValue(undefined);
   });
 
@@ -181,14 +187,46 @@ describe("owner session compatibility bridge", () => {
       status: "valid",
       token: "b".repeat(64),
     });
+    const legacyToken = `42.${"c".repeat(64)}`;
+    getCookie.mockImplementation((name: string) => (
+      name === "rr_sid" ? { value: legacyToken } : undefined
+    ));
 
     await expect(clearOwnerSession()).resolves.toBe(true);
 
     expect(mockRevokeV2ForLogout).toHaveBeenCalledWith(
       "b".repeat(64),
     );
+    expect(mockRevokeLegacyForLogout).toHaveBeenCalledWith(legacyToken);
     expect(mockClearV2Cookie).toHaveBeenCalled();
     expect(deleteCookie).toHaveBeenCalledWith("rr_sid");
+  });
+
+  test("persists a legacy-only logout tombstone before deleting the cookie", async () => {
+    const legacyToken = `42.${"d".repeat(64)}`;
+    getCookie.mockImplementation((name: string) => (
+      name === "rr_sid" ? { value: legacyToken } : undefined
+    ));
+
+    await expect(clearOwnerSession()).resolves.toBe(true);
+
+    expect(mockRevokeV2ForLogout).not.toHaveBeenCalled();
+    expect(mockRevokeLegacyForLogout).toHaveBeenCalledWith(legacyToken);
+    expect(mockClearV2Cookie).toHaveBeenCalled();
+    expect(deleteCookie).toHaveBeenCalledWith("rr_sid");
+  });
+
+  test("keeps a legacy-only cookie when its tombstone cannot be persisted", async () => {
+    const legacyToken = `42.${"e".repeat(64)}`;
+    getCookie.mockImplementation((name: string) => (
+      name === "rr_sid" ? { value: legacyToken } : undefined
+    ));
+    mockRevokeLegacyForLogout.mockResolvedValue("unavailable");
+
+    await expect(clearOwnerSession()).resolves.toBe(false);
+
+    expect(mockClearV2Cookie).not.toHaveBeenCalled();
+    expect(deleteCookie).not.toHaveBeenCalled();
   });
 
   test("clears an already inactive database session cookie", async () => {

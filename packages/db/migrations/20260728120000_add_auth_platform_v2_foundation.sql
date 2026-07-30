@@ -402,6 +402,7 @@ CREATE TABLE auth_security_events (
         'session_revoked',
         'all_sessions_revoked',
         'legacy_session_migrated',
+        'legacy_session_revoked',
         'workspace_created',
         'workspace_switched',
         'invite_created',
@@ -424,7 +425,10 @@ CREATE TABLE auth_security_events (
     ),
   CONSTRAINT auth_security_events_legacy_subject_check
     CHECK (
-      event_type <> 'legacy_session_migrated'
+      event_type NOT IN (
+        'legacy_session_migrated',
+        'legacy_session_revoked'
+      )
       OR subject_hash IS NOT NULL
     ),
   CONSTRAINT auth_security_events_request_ip_hash_check
@@ -449,6 +453,10 @@ CREATE INDEX auth_security_events_type_created_idx
 CREATE UNIQUE INDEX auth_security_events_legacy_exchange_uidx
   ON auth_security_events (subject_hash)
   WHERE event_type = 'legacy_session_migrated'
+    AND subject_hash IS NOT NULL;
+CREATE UNIQUE INDEX auth_security_events_legacy_revocation_uidx
+  ON auth_security_events (subject_hash)
+  WHERE event_type = 'legacy_session_revoked'
     AND subject_hash IS NOT NULL;
 
 CREATE FUNCTION reject_auth_security_event_mutation()

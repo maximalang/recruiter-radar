@@ -753,6 +753,17 @@ export async function revokeAuthSessionForLogout(
   );
 }
 
+export async function revokeAuthSessionForAccountSwitch(
+  token: string,
+): Promise<AuthSessionLogoutRevocation> {
+  if (!TOKEN_PATTERN.test(token)) return "inactive";
+  return revokeAuthSessionWhereResult(
+    "(session.token_hash = $1 OR session.previous_token_hash = $1)",
+    [hashAuthSessionToken(token), "security_action"],
+    "security_action",
+  );
+}
+
 export async function revokeAuthSessionById(input: {
   userId: string;
   sessionId: string;

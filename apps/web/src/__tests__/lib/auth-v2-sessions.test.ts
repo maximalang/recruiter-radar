@@ -21,6 +21,7 @@ import {
   readAuthSession,
   revokeAllAuthSessions,
   revokeAuthSessionById,
+  revokeAuthSessionForAccountSwitch,
   revokeAuthSessionForLogout,
   rotateAuthSession,
   changeActiveWorkspace,
@@ -226,6 +227,25 @@ describe("auth v2 server-side sessions", () => {
     await expect(
       revokeAuthSessionForLogout("d".repeat(64)),
     ).resolves.toBe("unavailable");
+  });
+
+  test("uses tri-state token revocation for account switching", async () => {
+    const query = jest.fn()
+      .mockResolvedValueOnce({ rows: [{ revoked: true }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ revoked: false }], rowCount: 1 })
+      .mockRejectedValueOnce(new Error("database down"));
+    mockGetPool.mockReturnValue({ query } as never);
+
+    await expect(
+      revokeAuthSessionForAccountSwitch("a".repeat(64)),
+    ).resolves.toBe("revoked");
+    await expect(
+      revokeAuthSessionForAccountSwitch("b".repeat(64)),
+    ).resolves.toBe("inactive");
+    await expect(
+      revokeAuthSessionForAccountSwitch("c".repeat(64)),
+    ).resolves.toBe("unavailable");
+    expect(query.mock.calls[0]?.[1]?.at(-1)).toBe("security_action");
   });
 
   test("switches workspace through a current-token-only CAS and rotates immediately", async () => {

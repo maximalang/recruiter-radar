@@ -6,7 +6,9 @@ import pg from 'pg'
 
 const { Pool } = pg
 const databaseUrl = process.env.DATABASE_URL?.trim()
-const targetMigration = '20260728122000_add_auth_challenge_consumption.sql'
+const targetMigration = '20260730101000_add_legacy_session_revocation.sql'
+const rollbackMigration =
+  '20260730101000_add_legacy_session_revocation.down.sql'
 const now = new Date('2026-07-28T12:00:00.000Z')
 
 if (!databaseUrl) throw new Error('DATABASE_URL is required.')
@@ -33,6 +35,18 @@ try {
     if (filename > targetMigration) break
     await pool.query(await readFile(resolve(migrationsDir, filename), 'utf8'))
   }
+  const migrationSql = await readFile(
+    resolve(migrationsDir, targetMigration),
+    'utf8',
+  )
+  const rollbackSql = await readFile(
+    resolve(migrationsDir, rollbackMigration),
+    'utf8',
+  )
+  await pool.query(rollbackSql)
+  await assertRevocationSchema(false)
+  await pool.query(migrationSql)
+  await assertRevocationSchema(true)
 
   const userId = await createVerifiedUser(pool, 'legacy@example.invalid')
   const firstFingerprint = digest('legacy-fingerprint-first')
@@ -59,9 +73,12 @@ try {
        AND account.email_verified_at IS NOT NULL
        AND NOT EXISTS (
          SELECT 1
-         FROM auth_security_events AS prior_exchange
-         WHERE prior_exchange.event_type = 'legacy_session_migrated'
-           AND prior_exchange.subject_hash = $2
+         FROM auth_security_events AS prior_denial
+         WHERE prior_denial.event_type IN (
+           'legacy_session_migrated',
+           'legacy_session_revoked'
+         )
+           AND prior_denial.subject_hash = $2
        )
      LIMIT 1`,
     [userId, firstFingerprint],
@@ -72,9 +89,12 @@ try {
   const rollbackAuthorization = await pool.query(
     `SELECT NOT EXISTS (
        SELECT 1
-       FROM auth_security_events AS prior_exchange
-       WHERE prior_exchange.event_type = 'legacy_session_migrated'
-         AND prior_exchange.subject_hash = $1
+       FROM auth_security_events AS prior_denial
+       WHERE prior_denial.event_type IN (
+         'legacy_session_migrated',
+         'legacy_session_revoked'
+       )
+         AND prior_denial.subject_hash = $1
      ) AS authorized`,
     [firstFingerprint],
   )
@@ -99,6 +119,88 @@ try {
   ])
   if (concurrent.filter((result) => result.rowCount === 1).length !== 1) {
     throw new Error('Concurrent legacy exchange produced multiple winners.')
+  }
+
+  const logoutFingerprint = digest('legacy-fingerprint-logout')
+  await pool.query(
+    `INSERT INTO auth_security_events (
+       event_type,
+       user_id,
+       subject_hash,
+       metadata,
+       created_at
+     )
+     VALUES (
+       'legacy_session_revoked',
+       $1,
+       $2,
+       '{"reason_code":"logout","source":"legacy"}'::JSONB,
+       $3
+     )`,
+    [userId, logoutFingerprint, now],
+  )
+  const logoutReplay = await exchange(
+    pool,
+    userId,
+    digest('legacy-session-after-logout'),
+    logoutFingerprint,
+  )
+  const logoutAuthorization = await pool.query(
+    `SELECT NOT EXISTS (
+       SELECT 1
+       FROM auth_security_events AS prior_denial
+       WHERE prior_denial.event_type IN (
+         'legacy_session_migrated',
+         'legacy_session_revoked'
+       )
+         AND prior_denial.subject_hash = $1
+     ) AS authorized`,
+    [logoutFingerprint],
+  )
+  if (
+    logoutReplay.rowCount !== 0
+    || logoutAuthorization.rows[0]?.authorized !== false
+  ) {
+    throw new Error('Legacy logout tombstone did not deny replay.')
+  }
+
+  let duplicateLogoutRejected = false
+  try {
+    await pool.query(
+      `INSERT INTO auth_security_events (
+         event_type,
+         user_id,
+         subject_hash,
+         metadata,
+         created_at
+       )
+       VALUES (
+         'legacy_session_revoked',
+         $1,
+         $2,
+         '{"reason_code":"logout","source":"legacy"}'::JSONB,
+         $3
+       )`,
+      [userId, logoutFingerprint, now],
+    )
+  } catch (error) {
+    duplicateLogoutRejected = error?.code === '23505'
+  }
+  if (!duplicateLogoutRejected) {
+    throw new Error('Duplicate legacy logout tombstone was accepted.')
+  }
+
+  let logoutRollbackRefused = false
+  try {
+    await pool.query(rollbackSql)
+  } catch (error) {
+    logoutRollbackRefused = error?.message?.includes(
+      'legacy session revocation rollback refused',
+    )
+    await pool.query('ROLLBACK').catch(() => undefined)
+  }
+  if (!logoutRollbackRefused) {
+    throw new Error('Legacy logout tombstone was removed by rollback.')
   }
 
   const state = await pool.query(
@@ -134,6 +236,9 @@ try {
       'legacy_authorization_replay_denied',
       'rollback_authorization_replay_denied',
       'concurrent_exchange_single_winner',
+      'legacy_logout_replay_denied',
+      'legacy_logout_rollback_denied',
+      'legacy_revocation_clean_down_upgrade',
     ],
   }))
 } finally {
@@ -170,9 +275,12 @@ async function exchange(poolInstance, userId, sessionHash, fingerprint) {
          AND account.email_verified_at IS NOT NULL
          AND NOT EXISTS (
            SELECT 1
-           FROM auth_security_events AS prior_exchange
-           WHERE prior_exchange.event_type = 'legacy_session_migrated'
-             AND prior_exchange.subject_hash = $3
+           FROM auth_security_events AS prior_denial
+           WHERE prior_denial.event_type IN (
+             'legacy_session_migrated',
+             'legacy_session_revoked'
+           )
+             AND prior_denial.subject_hash = $3
          )
        ON CONFLICT (legacy_fingerprint_hash)
          WHERE legacy_fingerprint_hash IS NOT NULL
@@ -251,4 +359,30 @@ async function createVerifiedUser(poolInstance, email) {
 
 function digest(value) {
   return createHash('sha256').update(value).digest('hex')
+}
+
+async function assertRevocationSchema(enabled) {
+  const state = await pool.query(
+    `SELECT
+       TO_REGCLASS(
+         'public.auth_security_events_legacy_revocation_uidx'
+       ) IS NOT NULL AS "indexPresent",
+       POSITION(
+         'legacy_session_revoked'
+         IN pg_get_constraintdef(
+           (
+             SELECT oid
+             FROM pg_constraint
+             WHERE conrelid = 'auth_security_events'::REGCLASS
+               AND conname = 'auth_security_events_type_check'
+           )
+         )
+       ) > 0 AS "eventAllowed"`,
+  )
+  if (
+    state.rows[0]?.indexPresent !== enabled
+    || state.rows[0]?.eventAllowed !== enabled
+  ) {
+    throw new Error('Legacy revocation schema state did not match.')
+  }
 }

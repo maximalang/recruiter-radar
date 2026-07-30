@@ -17,6 +17,7 @@ import {
   decodeLegacyOwnerSession,
   exchangeLegacyOwnerSession,
   readLegacyOwnerSessionForAuthorization,
+  revokeLegacyOwnerSessionForLogout,
 } from "@/lib/auth-v2/legacy-session";
 
 const mockGetPool = jest.mocked(getPool);
@@ -140,7 +141,7 @@ describe("bounded auth v2 legacy session exchange", () => {
   test("authorizes eligible legacy sessions only inside the migration window", async () => {
     const query = jest.fn().mockResolvedValue({
       rows: [{
-        previouslyMigrated: false,
+        legacyDenied: false,
         v2LoginSucceeded: false,
         eligibleIdentity: true,
       }],
@@ -160,7 +161,7 @@ describe("bounded auth v2 legacy session exchange", () => {
       "account.email_verified_at IS NOT NULL",
     );
     expect(String(query.mock.calls[0]?.[0])).toContain(
-      "prior_exchange.event_type = 'legacy_session_migrated'",
+      "prior_denial.event_type IN (",
     );
     expect(query.mock.calls[0]?.[1]).toEqual([
       "42",
@@ -181,7 +182,7 @@ describe("bounded auth v2 legacy session exchange", () => {
   test("denies replayed, suspended, or unverified legacy identities", async () => {
     const query = jest.fn().mockResolvedValue({
       rows: [{
-        previouslyMigrated: true,
+        legacyDenied: true,
         v2LoginSucceeded: false,
         eligibleIdentity: true,
       }],
@@ -199,7 +200,7 @@ describe("bounded auth v2 legacy session exchange", () => {
   test("keeps non-canary users on the unchanged legacy path", async () => {
     const query = jest.fn().mockResolvedValue({
       rows: [{
-        previouslyMigrated: false,
+        legacyDenied: false,
         v2LoginSucceeded: false,
         eligibleIdentity: false,
       }],
@@ -223,7 +224,7 @@ describe("bounded auth v2 legacy session exchange", () => {
   test("denies an exchanged legacy cookie after canary rollback", async () => {
     const query = jest.fn().mockResolvedValue({
       rows: [{
-        previouslyMigrated: true,
+        legacyDenied: true,
         v2LoginSucceeded: false,
         eligibleIdentity: true,
       }],
@@ -247,7 +248,7 @@ describe("bounded auth v2 legacy session exchange", () => {
   test("denies a copied legacy cookie after v2 login on another device", async () => {
     const query = jest.fn().mockResolvedValue({
       rows: [{
-        previouslyMigrated: false,
+        legacyDenied: false,
         v2LoginSucceeded: true,
         eligibleIdentity: true,
       }],
@@ -263,6 +264,47 @@ describe("bounded auth v2 legacy session exchange", () => {
     expect(String(query.mock.calls[0]?.[0])).toContain(
       "v2_login.event_type = 'login_succeeded'",
     );
+  });
+
+  test("writes only a hashed append-only tombstone for legacy logout", async () => {
+    const query = jest.fn().mockResolvedValue({
+      rows: [{ revoked: true }],
+      rowCount: 1,
+    });
+    mockGetPool.mockReturnValue({ query } as never);
+    const token = legacyToken("42");
+
+    await expect(revokeLegacyOwnerSessionForLogout(
+      token,
+      enabledEnv,
+      now,
+    )).resolves.toBe("revoked");
+
+    const sql = String(query.mock.calls[0]?.[0]);
+    const values = query.mock.calls[0]?.[1] as unknown[];
+    expect(sql).toContain("'legacy_session_revoked'");
+    expect(sql).toContain("auth_security_events");
+    expect(values[0]).toBe("42");
+    expect(values[1]).toMatch(/^[a-f0-9]{64}$/);
+    expect(values[1]).not.toBe(token);
+    expect(values).not.toContain(token);
+  });
+
+  test("fails legacy logout closed when the tombstone store is unavailable", async () => {
+    const query = jest.fn().mockRejectedValue(new Error("database down"));
+    mockGetPool.mockReturnValue({ query } as never);
+
+    await expect(revokeLegacyOwnerSessionForLogout(
+      legacyToken("42"),
+      enabledEnv,
+      now,
+    )).resolves.toBe("unavailable");
+    mockGetPool.mockReturnValue(null);
+    await expect(revokeLegacyOwnerSessionForLogout(
+      legacyToken("42"),
+      enabledEnv,
+      now,
+    )).resolves.toBe("unavailable");
   });
 });
 
@@ -286,6 +328,8 @@ describe("legacy exchange PostgreSQL verifier", () => {
     expect(verifier).toContain("legacy_authorization_replay_denied");
     expect(verifier).toContain("rollback_authorization_replay_denied");
     expect(verifier).toContain("concurrent_exchange_single_winner");
+    expect(verifier).toContain("legacy_logout_replay_denied");
+    expect(verifier).toContain("legacy_logout_rollback_denied");
     expect(verifier).toContain("Promise.all");
   });
 });

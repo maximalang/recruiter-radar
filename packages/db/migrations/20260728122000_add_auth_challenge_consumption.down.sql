@@ -13,7 +13,8 @@ BEGIN
          'session_rotated',
          'session_revoked',
          'all_sessions_revoked',
-         'legacy_session_migrated'
+         'legacy_session_migrated',
+         'legacy_session_revoked'
        )
      ) THEN
     RAISE EXCEPTION

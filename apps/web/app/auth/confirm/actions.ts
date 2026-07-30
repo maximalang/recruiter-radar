@@ -18,8 +18,7 @@ import {
   writeAuthV2SessionCookie,
 } from "@/lib/auth-v2/session-cookie";
 import {
-  readAuthSession,
-  revokeAuthSessionById,
+  revokeAuthSessionForAccountSwitch,
 } from "@/lib/auth-v2/sessions";
 import { classifyAuthSessionEnvironment } from "@/lib/auth-v2/session-environment";
 import {
@@ -53,9 +52,6 @@ export async function confirmAccountLoginAction(): Promise<never> {
       headers: requestHeaders,
     });
     const previousToken = await readAuthV2SessionCookie();
-    const previousSession = previousToken
-      ? await readAuthSession(previousToken)
-      : null;
     const legacyToken = await readLegacyOwnerSessionCookie();
     const result = await consumeAuthV2Login({
       token,
@@ -66,15 +62,14 @@ export async function confirmAccountLoginAction(): Promise<never> {
       ),
     });
     if (result) {
-      if (
-        previousSession
-        && previousSession.id !== result.session.id
-      ) {
-        await revokeAuthSessionById({
-          userId: previousSession.userId,
-          sessionId: previousSession.id,
-          reason: "security_action",
-        });
+      if (previousToken) {
+        const revocation = await revokeAuthSessionForAccountSwitch(
+          previousToken,
+        );
+        if (revocation === "unavailable") {
+          await clearPendingAccountLogin();
+          return redirect("/login?error=session-switch-unavailable");
+        }
       }
       await writeAuthV2SessionCookie(result.session.token);
       await clearLegacyOwnerSession();

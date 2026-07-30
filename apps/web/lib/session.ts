@@ -8,6 +8,7 @@ import {
 import { isAuthV2SessionReadEnabledForUser } from "./auth-v2/config";
 import {
   readLegacyOwnerSessionForAuthorization,
+  revokeLegacyOwnerSessionForLogout,
 } from "./auth-v2/legacy-session";
 import {
   readAuthSession,
@@ -102,8 +103,13 @@ export function assertOwnerSessionConfigured(): void {
 
 export async function clearOwnerSession(): Promise<boolean> {
   const v2Cookie = await readAuthV2SessionCookieState();
+  const legacyToken = await readLegacyOwnerSessionCookie();
   if (v2Cookie.status === "valid") {
     const revocation = await revokeAuthSessionForLogout(v2Cookie.token);
+    if (revocation === "unavailable") return false;
+  }
+  if (legacyToken) {
+    const revocation = await revokeLegacyOwnerSessionForLogout(legacyToken);
     if (revocation === "unavailable") return false;
   }
   await clearAuthV2SessionCookie();
