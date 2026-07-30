@@ -99,7 +99,10 @@ BEGIN
       email_normalized = input_email_normalized
       OR (
         email_normalized IS NULL
-        AND LOWER(email) = LOWER(input_email_normalized)
+        AND split_part(email, '@', 1)
+          = split_part(input_email_normalized, '@', 1)
+        AND LOWER(split_part(email, '@', 2))
+          = split_part(input_email_normalized, '@', 2)
       )
     )
   ORDER BY (email_normalized IS NOT NULL) DESC, id

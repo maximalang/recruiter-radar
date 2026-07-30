@@ -171,7 +171,8 @@ export async function requestAccountEmailChange(input: {
   }
   const newEmail = normalizeAuthEmail(input.newEmail);
   if (!newEmail) return { ok: false, code: "invalid" };
-  const targetBoundary = newEmail.normalized.toLowerCase();
+  const targetIdentity = newEmail.normalized;
+  const targetRateLimitBoundary = newEmail.normalized.toLowerCase();
 
   const client = await getClient().catch(() => null);
   if (!client) return { ok: false, code: "unavailable" };
@@ -187,7 +188,7 @@ export async function requestAccountEmailChange(input: {
     );
     await client.query(
       "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
-      [`auth-email-change-target:${targetBoundary}`],
+      [`auth-email-change-target:${targetIdentity}`],
     );
     const locked = await client.query<LockedAccount>(
       `SELECT
@@ -240,7 +241,7 @@ export async function requestAccountEmailChange(input: {
       scope: "email_hash",
       keyHash: hashAuthRateLimitBoundary(
         "email-change-target",
-        targetBoundary,
+        targetRateLimitBoundary,
       ),
       windowSeconds: 3_600,
       limit: 3,
@@ -260,7 +261,12 @@ export async function requestAccountEmailChange(input: {
          AND status <> 'deleted'
          AND (
            email_normalized = $2
-           OR LOWER(email) = LOWER($2)
+           OR (
+             email_normalized IS NULL
+             AND split_part(email, '@', 1) = split_part($2, '@', 1)
+             AND LOWER(split_part(email, '@', 2))
+               = split_part($2, '@', 2)
+           )
          )
        LIMIT 1`,
       [session.userId, newEmail.normalized],
@@ -454,7 +460,7 @@ export async function confirmAccountEmailChange(input: {
     }
     await client.query(
       "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
-      [`auth-email-change-target:${challenge.newEmail.toLowerCase()}`],
+      [`auth-email-change-target:${challenge.newEmail}`],
     );
     const accountResult = await client.query<{
       email: string;
@@ -482,7 +488,12 @@ export async function confirmAccountEmailChange(input: {
          AND status <> 'deleted'
          AND (
            email_normalized = $2
-           OR LOWER(email) = LOWER($2)
+           OR (
+             email_normalized IS NULL
+             AND split_part(email, '@', 1) = split_part($2, '@', 1)
+             AND LOWER(split_part(email, '@', 2))
+               = split_part($2, '@', 2)
+           )
          )
        LIMIT 1`,
       [challenge.userId, challenge.newEmail],
@@ -1163,12 +1174,10 @@ function resolveDeletionPolicy(
 }
 
 function sameEmail(account: LockedAccount, nextEmail: string): boolean {
-  return (
-    account.emailNormalized?.toLocaleLowerCase("en-US")
-      === nextEmail.toLocaleLowerCase("en-US")
-    || account.email.toLocaleLowerCase("en-US")
-      === nextEmail.toLocaleLowerCase("en-US")
-  );
+  if (account.emailNormalized !== null) {
+    return account.emailNormalized === nextEmail;
+  }
+  return normalizeAuthEmail(account.email)?.normalized === nextEmail;
 }
 
 function validId(value: string): boolean {

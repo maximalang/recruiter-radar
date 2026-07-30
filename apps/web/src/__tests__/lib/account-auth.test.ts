@@ -9,7 +9,7 @@ import { generateOwnerId } from "@/lib/session";
 describe("account authentication boundaries", () => {
   test("normalizes one conventional mailbox", () => {
     expect(normalizeAccountEmail("  User.Name+sales@Example.COM ")).toBe(
-      "user.name+sales@example.com",
+      "User.Name+sales@example.com",
     );
   });
 

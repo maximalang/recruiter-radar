@@ -96,6 +96,24 @@ function request(pathname: string, body?: unknown, origin = "https://radar.examp
   });
 }
 
+function requestWithDeclaredLength(
+  pathname: string,
+  body: string,
+  contentLength: number,
+): Request {
+  return new Request(`https://radar.example${pathname}`, {
+    method: "POST",
+    headers: {
+      Origin: "https://radar.example",
+      "Sec-Fetch-Site": "same-origin",
+      "Content-Type": "application/json",
+      "Content-Length": String(contentLength),
+      "User-Agent": "Test Browser",
+    },
+    body,
+  });
+}
+
 describe("auth v2 passkey HTTP boundaries", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -226,6 +244,24 @@ describe("auth v2 passkey HTTP boundaries", () => {
       code: "authentication_failed",
     });
     expect(mockWriteSessionCookie).not.toHaveBeenCalled();
+  });
+
+  test("rejects oversized public passkey bodies before ceremony work", async () => {
+    const options = await authenticationOptions(requestWithDeclaredLength(
+      "/api/auth/passkeys/authentication/options",
+      "{}",
+      2 * 1024 + 1,
+    ));
+    const verification = await authenticationVerify(requestWithDeclaredLength(
+      "/api/auth/passkeys/authentication/verify",
+      '{"response":{}}',
+      32 * 1024 + 1,
+    ));
+
+    expect(options.status).toBe(400);
+    expect(verification.status).toBe(400);
+    expect(mockBeginAuthentication).not.toHaveBeenCalled();
+    expect(mockFinishAuthentication).not.toHaveBeenCalled();
   });
 
   test("scopes rename and removal to the current account", async () => {

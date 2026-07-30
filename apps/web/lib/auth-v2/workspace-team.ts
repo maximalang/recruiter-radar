@@ -215,7 +215,8 @@ export async function inviteWorkspaceMember(input: {
   const token = randomBytes(32).toString("hex");
   let inviteId: string | null = null;
   let workspaceName: string | null = null;
-  const targetBoundary = email.normalized.toLowerCase();
+  const targetBoundary = email.normalized;
+  const targetRateLimitBoundary = email.normalized.toLowerCase();
 
   try {
     await client.query("BEGIN");
@@ -252,7 +253,7 @@ export async function inviteWorkspaceMember(input: {
       scope: "workspace_invite",
       keyHash: hashAuthRateLimitBoundary(
         "workspace-invite-target",
-        `${input.workspaceId}:${targetBoundary}`,
+        `${input.workspaceId}:${targetRateLimitBoundary}`,
       ),
       windowSeconds: 86_400,
       limit: 3,
@@ -271,7 +272,12 @@ export async function inviteWorkspaceMember(input: {
          AND account.status = 'active'
          AND (
            account.email_normalized = $2
-           OR LOWER(account.email) = LOWER($2)
+           OR (
+             account.email_normalized IS NULL
+             AND split_part(account.email, '@', 1) = split_part($2, '@', 1)
+             AND LOWER(split_part(account.email, '@', 2))
+               = split_part($2, '@', 2)
+           )
          )
        LIMIT 1`,
       [input.workspaceId, email.normalized],
@@ -285,7 +291,7 @@ export async function inviteWorkspaceMember(input: {
           UPDATE workspace_invites
           SET revoked_at = GREATEST($3::TIMESTAMPTZ, created_at)
           WHERE workspace_id = $1
-            AND LOWER(email_normalized) = LOWER($2)
+            AND email_normalized = $2
             AND accepted_at IS NULL
             AND revoked_at IS NULL
           RETURNING id, revoked_at
@@ -1025,11 +1031,15 @@ function emailMatches(
   account: { email: string; emailNormalized: string | null },
   inviteEmail: string,
 ): boolean {
-  const expected = inviteEmail.toLocaleLowerCase("en-US");
-  return (
-    account.email.toLocaleLowerCase("en-US") === expected
-    || account.emailNormalized?.toLocaleLowerCase("en-US") === expected
-  );
+  const normalizedStoredEmail = normalizeAuthEmail(account.email)?.normalized;
+  if (!normalizedStoredEmail) return false;
+  if (
+    account.emailNormalized !== null
+    && account.emailNormalized !== normalizedStoredEmail
+  ) {
+    return false;
+  }
+  return normalizedStoredEmail === inviteEmail;
 }
 
 function isInvitableRole(role: WorkspaceRole): role is Exclude<WorkspaceRole, "owner"> {

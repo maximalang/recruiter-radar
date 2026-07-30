@@ -4,7 +4,10 @@ import type { AuthenticationResponseJSON } from "@simplewebauthn/server";
 import {
   isAuthOnboardingV2EnabledForUser,
 } from "@/lib/auth-v2/config";
-import { readLimitedJsonObject } from "@/lib/auth-v2/passkey-http";
+import {
+  PASSKEY_AUTHENTICATION_VERIFY_MAX_BYTES,
+  readLimitedJsonObject,
+} from "@/lib/auth-v2/passkey-http";
 import { finishPasskeyAuthentication } from "@/lib/auth-v2/passkeys";
 import {
   readAuthV2SessionCookie,
@@ -25,7 +28,10 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (!isAuthSameOriginRequest(request)) {
     return json({ ok: false, code: "invalid_origin" }, 403);
   }
-  const body = await readLimitedJsonObject(request);
+  const body = await readLimitedJsonObject(
+    request,
+    PASSKEY_AUTHENTICATION_VERIFY_MAX_BYTES,
+  );
   if (!body || typeof body.response !== "object" || body.response === null) {
     return json({ ok: false, code: "invalid_request" }, 400);
   }

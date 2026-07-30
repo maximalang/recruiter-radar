@@ -121,7 +121,10 @@ describe("auth v2 foundation migration contract", () => {
       "CREATE UNIQUE INDEX auth_security_events_legacy_exchange_uidx",
     );
     expect(compact).toContain(
-      "event_type <> 'legacy_session_migrated' OR subject_hash IS NOT NULL",
+      "CREATE UNIQUE INDEX auth_security_events_legacy_revocation_uidx",
+    );
+    expect(compact).toContain(
+      "event_type NOT IN ( 'legacy_session_migrated', 'legacy_session_revoked' ) OR subject_hash IS NOT NULL",
     );
     expect(compact).toContain(
       "BEFORE TRUNCATE ON auth_security_events",

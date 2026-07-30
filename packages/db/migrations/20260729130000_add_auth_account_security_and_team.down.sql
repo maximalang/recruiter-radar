@@ -47,6 +47,7 @@ ALTER TABLE auth_security_events
         'session_revoked',
         'all_sessions_revoked',
         'legacy_session_migrated',
+        'legacy_session_revoked',
         'workspace_created',
         'workspace_switched',
         'invite_created',

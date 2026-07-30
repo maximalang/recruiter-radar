@@ -620,11 +620,14 @@ minutes; read-only Server Components never mutate cookies.
 
 Every legacy authorization for a v2-eligible user revalidates active account
 status, verified identity, the exact migration deadline and the durable
-`legacy_session_migrated` fingerprint ledger. After exchange, a copied
-`rr_sid` cannot authorize again, even if a canary/global serving flag is later
-removed during rollback. Never-migrated users outside the global/canary v2
-serving policy retain legacy identity semantics until their rollout stage;
-exchange never marks email verified by itself.
+fingerprint deny-ledger containing `legacy_session_migrated` and
+`legacy_session_revoked`. Legacy-only logout appends the latter before
+clearing `rr_sid` and fails closed when the ledger is unavailable. After
+exchange or logout, a copied `rr_sid` cannot authorize again, even if a
+canary/global serving flag is later removed during rollback. Never-migrated
+users outside the global/canary v2 serving policy retain legacy identity
+semantics until their rollout stage; exchange never marks email verified by
+itself.
 
 A successful magic-link consume appends `login_succeeded` inside the
 challenge/session transaction. That event is the user-level, irreversible
@@ -856,9 +859,11 @@ PR 4 implementation invariants:
   `token_hash`. A previous grace hash rolls the transaction back with a
   reauthentication result and leaves the challenge available for a current
   session; it never performs another sensitive rotation;
-- email-change and invite target limits use the same lowercase identity
-  boundary as conflict detection, and the target bucket is never consumed
-  after the principal/workspace bucket has denied the request;
+- email-change and invite target limits use a lowercase abuse boundary so
+  case variants cannot bypass the target quota; authorization, conflict,
+  replacement and acceptance still use exact `email_normalized`, and the
+  target bucket is never consumed after the principal/workspace bucket has
+  denied the request;
 - a default invite timestamp is refreshed after the per-target advisory lock,
   and replacement revocation is clamped to the replaced invite's `created_at`;
   concurrent sends cannot create an invalid historical ordering;
@@ -1092,7 +1097,7 @@ Events:
 login_requested, login_email_sent, login_email_failed,
 login_succeeded, login_failed, challenge_replayed,
 session_created, session_rotated, session_revoked,
-all_sessions_revoked, legacy_session_migrated,
+all_sessions_revoked, legacy_session_migrated, legacy_session_revoked,
 workspace_created, workspace_switched,
 invite_created, invite_accepted, invite_revoked,
 email_change_requested, email_changed,
@@ -1112,9 +1117,13 @@ AUTH_WORKSPACES_V2_ENABLED=false
 AUTH_ONBOARDING_V2_ENABLED=false
 AUTH_PASSKEYS_ENABLED=false
 AUTH_LEGACY_SESSION_MIGRATION_ENABLED=false
+AUTH_LEGACY_SESSION_MIGRATION_DEADLINE=
 AUTH_PASSKEY_RP_ID=
 AUTH_V2_CANARY_USER_IDS=
 AUTH_V2_SESSION_ROLLBACK_COMPAT_ENABLED=false
+AUTH_V2_SESSION_ROLLBACK_COMPAT_DEADLINE=
+AUTH_TRUSTED_PROXY_HEADER=x-real-ip
+AUTH_TRUSTED_PROXY_HOPS=
 ```
 
 Rules:
@@ -1125,7 +1134,8 @@ Rules:
 - wildcard/negative/blank elements invalidate the whole allowlist;
 - global enable never follows from a non-empty canary list;
 - rollback compatibility is a separate exact-`true` emergency switch used
-  only to drain already-issued v2 sessions while issuance remains disabled;
+  only to drain already-issued v2 sessions while issuance remains disabled,
+  and requires its own canonical future UTC deadline;
 - admin auth ignores customer flags;
 - one request resolves exactly one customer identity path.
 
@@ -1136,6 +1146,7 @@ workspaces → platform v2
 onboarding → platform v2 + workspaces
 passkeys → platform v2
 legacy exchange → exact migration flag + deadline + v2-eligible existing user
+rollback session reads → exact compatibility flag + separate future deadline
 ```
 
 ## 20. Tooling и commands
@@ -1315,7 +1326,8 @@ Order:
 
 1. clear canary allowlist / disable v2 flags;
 2. if already-issued sessions must drain, enable only
-   `AUTH_V2_SESSION_ROLLBACK_COMPAT_ENABLED=true`;
+   `AUTH_V2_SESSION_ROLLBACK_COMPAT_ENABLED=true` with a separately reviewed
+   future `AUTH_V2_SESSION_ROLLBACK_COMPAT_DEADLINE`;
 3. keep additive schema and dual-written data;
 4. revert serving code to legacy reads;
 5. revoke suspicious v2 sessions if needed;

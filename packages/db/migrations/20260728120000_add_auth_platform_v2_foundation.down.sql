@@ -44,12 +44,16 @@ DROP FUNCTION IF EXISTS auth_security_metadata_is_safe(JSONB);
 DROP TABLE IF EXISTS auth_sessions;
 DROP TABLE IF EXISTS auth_challenges;
 
+DROP INDEX IF EXISTS users_auth_v2_identity_active_uidx;
 DROP INDEX IF EXISTS users_email_normalized_active_uidx;
+CREATE UNIQUE INDEX IF NOT EXISTS users_email_uidx
+  ON users (LOWER(email));
 ALTER TABLE users
   DROP CONSTRAINT IF EXISTS users_auth_v2_deleted_state_check,
   DROP CONSTRAINT IF EXISTS users_auth_v2_onboarding_data_object_check,
   DROP CONSTRAINT IF EXISTS users_auth_v2_onboarding_status_check,
   DROP CONSTRAINT IF EXISTS users_auth_v2_status_check,
+  DROP CONSTRAINT IF EXISTS users_auth_v2_identity_consistency_check,
   DROP CONSTRAINT IF EXISTS users_auth_v2_verified_identity_check,
   DROP CONSTRAINT IF EXISTS users_auth_v2_email_normalized_check,
   DROP COLUMN IF EXISTS deleted_at,

@@ -23,7 +23,7 @@ export type EmailMessage = {
 
 export type SendEmailResult =
   | { ok: true }
-  | { ok: false; reason: "not_configured" | "send_failed"; error?: string };
+  | { ok: false; reason: "not_configured" | "send_failed" };
 
 export type TestEmailOutboxEntry = EmailMessage & {
   sequence: number;
@@ -108,20 +108,15 @@ export async function sendEmail(message: EmailMessage): Promise<SendEmailResult>
   if (testOutboxPath) {
     try {
       await enqueueTestEmail(testOutboxPath, message);
-      logEvent("email.test_outbox_recorded", {
-        to: redactEmail(message.to),
-        subject: message.subject,
-      });
+      logEvent("email.test_outbox_recorded", {});
       return { ok: true };
     } catch (error) {
-      logError("email.test_outbox_failed", error, {
-        to: redactEmail(message.to),
-      });
-      return {
-        ok: false,
-        reason: "send_failed",
-        error: error instanceof Error ? error.message : "unknown",
-      };
+      logError(
+        "email.test_outbox_failed",
+        new Error("test_outbox_write_failed"),
+        getSafeFileFailureMetadata(error),
+      );
+      return { ok: false, reason: "send_failed" };
     }
   }
 
@@ -140,11 +135,15 @@ export async function sendEmail(message: EmailMessage): Promise<SendEmailResult>
       html: message.html,
       text: message.text,
     });
-    logEvent("email.sent", { to: redactEmail(message.to), subject: message.subject });
+    logEvent("email.sent", {});
     return { ok: true };
   } catch (error) {
-    logError("email.send_failed", error, { to: redactEmail(message.to) });
-    return { ok: false, reason: "send_failed", error: error instanceof Error ? error.message : "unknown" };
+    logError(
+      "email.send_failed",
+      new Error("smtp_send_failed"),
+      getSafeSmtpFailureMetadata(error),
+    );
+    return { ok: false, reason: "send_failed" };
   }
 }
 
@@ -232,9 +231,102 @@ function parseTestOutboxEntry(
   return entry as TestEmailOutboxEntry;
 }
 
-/** Redacts an address for logs: `john@example.com` → `j***@example.com`. */
-function redactEmail(value: string): string {
-  const at = value.indexOf("@");
-  if (at <= 1) return "***";
-  return `${value[0]}***${value.slice(at)}`;
+/** Returns only allowlisted, non-sensitive SMTP diagnostics. */
+function getSafeSmtpFailureMetadata(
+  error: unknown,
+): Record<string, string | number> {
+  const code = getErrorProperty(error, "code");
+  const command = getErrorProperty(error, "command");
+  const responseCode = getErrorProperty(error, "responseCode");
+  const metadata: Record<string, string | number> = {
+    failureCategory: classifySmtpFailure(code),
+  };
+
+  const safeCommand = classifySmtpCommand(command);
+  if (safeCommand) metadata.smtpCommand = safeCommand;
+  if (
+    typeof responseCode === "number"
+    && Number.isInteger(responseCode)
+    && responseCode >= 400
+    && responseCode <= 599
+  ) {
+    metadata.responseCode = responseCode;
+  }
+  return metadata;
+}
+
+function getSafeFileFailureMetadata(
+  error: unknown,
+): Record<string, string> {
+  const code = getErrorProperty(error, "code");
+  const safeCodes = new Set([
+    "EACCES",
+    "EBUSY",
+    "EEXIST",
+    "EISDIR",
+    "EMFILE",
+    "ENFILE",
+    "ENOENT",
+    "ENOSPC",
+    "ENOTDIR",
+    "EROFS",
+  ]);
+  return {
+    failureCategory:
+      typeof code === "string" && safeCodes.has(code)
+        ? code.toLowerCase()
+        : "filesystem_error",
+  };
+}
+
+function getErrorProperty(error: unknown, key: string): unknown {
+  if (!error || typeof error !== "object" || !(key in error)) {
+    return undefined;
+  }
+  return (error as Record<string, unknown>)[key];
+}
+
+function classifySmtpFailure(code: unknown): string {
+  switch (code) {
+    case "EAUTH":
+      return "authentication";
+    case "ECONNECTION":
+    case "ECONNREFUSED":
+    case "ECONNRESET":
+      return "connection";
+    case "EDNS":
+      return "dns";
+    case "EENVELOPE":
+      return "envelope";
+    case "EMESSAGE":
+      return "message";
+    case "ETIMEDOUT":
+      return "timeout";
+    default:
+      return "smtp_error";
+  }
+}
+
+function classifySmtpCommand(command: unknown): string | null {
+  switch (command) {
+    case "CONN":
+    case "CONNECT":
+      return "connect";
+    case "EHLO":
+    case "HELO":
+      return "hello";
+    case "AUTH":
+    case "AUTH PLAIN":
+    case "AUTH LOGIN":
+    case "AUTH XOAUTH2":
+      return "authenticate";
+    case "MAIL FROM":
+      return "mail_from";
+    case "RCPT TO":
+      return "recipient";
+    case "DATA":
+      return "data";
+    default:
+      return null;
+  }
 }

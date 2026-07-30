@@ -8,6 +8,23 @@ if (!databaseUrl) {
 }
 
 const canaryIds = parseCanaryIds(process.env.AUTH_V2_CANARY_USER_IDS)
+const trustedProxyConfiguration = parseTrustedProxyConfiguration(process.env)
+const trustedClientAddressRequired =
+  authRolloutRequiresTrustedClientAddress(canaryIds)
+const trustedClientAddressNotReady =
+  !trustedProxyConfiguration.valid
+  || (
+    trustedClientAddressRequired
+    && !trustedProxyConfiguration.configured
+  )
+const legacySessionMigrationWindowReady = transitionalWindowReady(
+  process.env.AUTH_LEGACY_SESSION_MIGRATION_ENABLED,
+  process.env.AUTH_LEGACY_SESSION_MIGRATION_DEADLINE,
+)
+const rollbackCompatibilityWindowReady = transitionalWindowReady(
+  process.env.AUTH_V2_SESSION_ROLLBACK_COMPAT_ENABLED,
+  process.env.AUTH_V2_SESSION_ROLLBACK_COMPAT_DEADLINE,
+)
 const pool = new Pool({
   connectionString: databaseUrl,
   max: 1,
@@ -42,12 +59,22 @@ try {
       blockingViolations: {
         schemaNotReady: 10 - installedTables,
         invalidCanaryConfiguration: canaryIds === null ? 1 : 0,
+        trustedClientAddressNotReady:
+          trustedClientAddressNotReady ? 1 : 0,
+        legacySessionMigrationWindowNotReady:
+          legacySessionMigrationWindowReady ? 0 : 1,
+        rollbackCompatibilityWindowNotReady:
+          rollbackCompatibilityWindowReady ? 0 : 1,
       },
       counters: {
         installedTables,
         expectedTables: 10,
       },
-      configuration: safeConfiguration(canaryIds),
+      configuration: safeConfiguration(
+        canaryIds,
+        trustedProxyConfiguration,
+        trustedClientAddressRequired,
+      ),
     }))
     process.exitCode = 2
   } else {
@@ -105,7 +132,35 @@ try {
                 OR email_normalized !~ '^[^@[:space:]]+@[a-z0-9][a-z0-9.-]*[a-z0-9]$'
                 OR split_part(email_normalized, '@', 2)
                    <> LOWER(split_part(email_normalized, '@', 2))
+                OR split_part(email, '@', 1)
+                   <> split_part(email_normalized, '@', 1)
+                OR LOWER(split_part(email, '@', 2))
+                   <> split_part(email_normalized, '@', 2)
               )
+          ),
+          'legacyFoldedIdentityIndexPresent', (
+            SELECT CASE
+              WHEN TO_REGCLASS('public.users_email_uidx') IS NULL THEN 0
+              ELSE 1
+            END
+          ),
+          'canonicalIdentityIndexMissing', (
+            SELECT CASE
+              WHEN TO_REGCLASS(
+                'public.users_auth_v2_identity_active_uidx'
+              ) IS NULL THEN 1
+              ELSE 0
+            END
+          ),
+          'activeAccountsWithoutNormalizedIdentity', (
+            SELECT CASE
+              WHEN $2::BOOLEAN THEN COUNT(*)::INTEGER
+              ELSE 0
+            END
+            FROM users
+            WHERE status = 'active'
+              AND email_verified_at IS NOT NULL
+              AND email_normalized IS NULL
           ),
           'workspaceWithoutBootstrapAccount', (
             SELECT COUNT(*)::INTEGER
@@ -238,17 +293,32 @@ try {
               + (SELECT COUNT(*) FROM opportunities WHERE workspace_id IS NULL)
           )::INTEGER
         ) AS counters
-    `, [canaryIds === null ? 1 : 0])
+    `, [
+      canaryIds === null ? 1 : 0,
+      process.env.AUTH_PLATFORM_V2_ENABLED === 'true',
+    ])
     await pool.query('COMMIT')
 
-    const blockingViolations = result.rows[0].blockingViolations
+    const blockingViolations = {
+      ...result.rows[0].blockingViolations,
+      trustedClientAddressNotReady:
+        trustedClientAddressNotReady ? 1 : 0,
+      legacySessionMigrationWindowNotReady:
+        legacySessionMigrationWindowReady ? 0 : 1,
+      rollbackCompatibilityWindowNotReady:
+        rollbackCompatibilityWindowReady ? 0 : 1,
+    }
     const ok = Object.values(blockingViolations)
       .every((count) => count === 0)
     console.log(JSON.stringify({
       ok,
       blockingViolations,
       counters: result.rows[0].counters,
-      configuration: safeConfiguration(canaryIds),
+      configuration: safeConfiguration(
+        canaryIds,
+        trustedProxyConfiguration,
+        trustedClientAddressRequired,
+      ),
     }))
     if (!ok) process.exitCode = 2
   }
@@ -271,15 +341,122 @@ function parseCanaryIds(rawValue) {
   return ids
 }
 
-function safeConfiguration(ids) {
+function parseTrustedProxyConfiguration(env) {
+  const header = env.AUTH_TRUSTED_PROXY_HEADER?.trim() ?? ''
+  const hops = env.AUTH_TRUSTED_PROXY_HOPS?.trim() ?? ''
+
+  if (!header) {
+    return {
+      configured: false,
+      valid: hops === '',
+      header: null,
+      trustedHops: null,
+    }
+  }
+  if (header === 'cf-connecting-ip' || header === 'x-real-ip') {
+    return {
+      configured: true,
+      valid: hops === '',
+      header: hops === '' ? header : null,
+      trustedHops: null,
+    }
+  }
+  if (
+    header !== 'x-forwarded-for'
+    || !/^[1-9]\d*$/.test(hops)
+  ) {
+    return {
+      configured: true,
+      valid: false,
+      header: null,
+      trustedHops: null,
+    }
+  }
+
+  const trustedHops = Number(hops)
+  if (!Number.isSafeInteger(trustedHops) || trustedHops > 10) {
+    return {
+      configured: true,
+      valid: false,
+      header: null,
+      trustedHops: null,
+    }
+  }
+  return {
+    configured: true,
+    valid: true,
+    header,
+    trustedHops,
+  }
+}
+
+function authRolloutRequiresTrustedClientAddress(ids) {
+  return (
+    (Array.isArray(ids) && ids.length > 0)
+    || [
+      'AUTH_PLATFORM_V2_ENABLED',
+      'AUTH_WORKSPACES_V2_ENABLED',
+      'AUTH_ONBOARDING_V2_ENABLED',
+      'AUTH_PASSKEYS_ENABLED',
+      'AUTH_LEGACY_SESSION_MIGRATION_ENABLED',
+      'AUTH_V2_SESSION_ROLLBACK_COMPAT_ENABLED',
+    ].some((name) => process.env[name] === 'true')
+  )
+}
+
+function transitionalWindowReady(flag, rawDeadline) {
+  if (flag !== 'true') return true
+  const deadline = canonicalFutureUtcDeadline(rawDeadline)
+  return deadline !== null
+}
+
+function canonicalFutureUtcDeadline(rawValue) {
+  const rawDeadline = rawValue?.trim() ?? ''
+  const match =
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})Z$/
+      .exec(rawDeadline)
+  if (!match) return null
+
+  const [, year, month, day, hour, minute, second] = match
+  const deadlineMs = Date.UTC(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour),
+    Number(minute),
+    Number(second),
+  )
+  if (!Number.isFinite(deadlineMs) || deadlineMs <= Date.now()) return null
+  const canonical = new Date(deadlineMs).toISOString().replace('.000Z', 'Z')
+  return canonical === rawDeadline ? deadlineMs : null
+}
+
+function safeConfiguration(
+  ids,
+  trustedProxy,
+  clientAddressRequired,
+) {
   return {
     platformEnabled: process.env.AUTH_PLATFORM_V2_ENABLED === 'true',
     workspacesEnabled: process.env.AUTH_WORKSPACES_V2_ENABLED === 'true',
     onboardingEnabled: process.env.AUTH_ONBOARDING_V2_ENABLED === 'true',
     passkeysEnabled: process.env.AUTH_PASSKEYS_ENABLED === 'true',
+    legacySessionMigrationEnabled:
+      process.env.AUTH_LEGACY_SESSION_MIGRATION_ENABLED === 'true',
     rollbackCompatibilityEnabled:
       process.env.AUTH_V2_SESSION_ROLLBACK_COMPAT_ENABLED === 'true',
+    legacySessionMigrationDeadlineConfigured:
+      Boolean(process.env.AUTH_LEGACY_SESSION_MIGRATION_DEADLINE?.trim()),
+    legacySessionMigrationWindowReady,
+    rollbackCompatibilityDeadlineConfigured:
+      Boolean(process.env.AUTH_V2_SESSION_ROLLBACK_COMPAT_DEADLINE?.trim()),
+    rollbackCompatibilityWindowReady,
     canaryConfigurationValid: ids !== null,
     canaryUserCount: ids?.length ?? 0,
+    trustedClientAddressRequired: clientAddressRequired,
+    trustedProxyConfigured: trustedProxy.configured,
+    trustedProxyConfigurationValid: trustedProxy.valid,
+    trustedProxyHeader: trustedProxy.header,
+    trustedProxyHops: trustedProxy.trustedHops,
   }
 }

@@ -75,7 +75,12 @@ export async function shouldRequestAuthV2Login(emailInput: unknown): Promise<boo
          AND email_verified_at IS NOT NULL
          AND (
            email_normalized = $1
-           OR (email_normalized IS NULL AND LOWER(email) = LOWER($1))
+           OR (
+             email_normalized IS NULL
+             AND split_part(email, '@', 1) = split_part($1, '@', 1)
+             AND LOWER(split_part(email, '@', 2))
+               = split_part($1, '@', 2)
+           )
          )
        ORDER BY (email_normalized IS NOT NULL) DESC, id
        LIMIT 1`,
@@ -103,6 +108,7 @@ export async function requestAuthV2Login(input: {
   let client: PoolClient | null = null;
   let token: string | null = null;
   let challengeId: string | null = null;
+  let deliveryEmail: string | null = null;
   try {
     const globalHash = hashAuthRateLimitBoundary("global", "login");
     const emailHash = hashAuthRateLimitBoundary("email", email.normalized);
@@ -145,6 +151,26 @@ export async function requestAuthV2Login(input: {
     }
     challengeId = issued.rows[0].challengeId;
     if (!challengeId) throw new Error("Challenge issuance returned no identifier.");
+    const delivery = await client.query<{ deliveryEmail: string }>(
+      `SELECT
+         COALESCE(account.email, challenge.email_normalized) AS "deliveryEmail"
+       FROM auth_challenges AS challenge
+       LEFT JOIN users AS account ON account.id = challenge.user_id
+       WHERE challenge.id = $1
+         AND challenge.purpose IN ('login', 'signup')
+       LIMIT 1`,
+      [challengeId],
+    );
+    const normalizedDelivery = normalizeAuthEmail(
+      delivery.rows[0]?.deliveryEmail,
+    );
+    if (
+      !normalizedDelivery
+      || normalizedDelivery.normalized !== email.normalized
+    ) {
+      throw new Error("Challenge delivery identity mismatch.");
+    }
+    deliveryEmail = normalizedDelivery.canonical;
     await client.query("COMMIT");
   } catch (error) {
     if (client) await rollbackQuietly(client);
@@ -154,7 +180,7 @@ export async function requestAuthV2Login(input: {
     client?.release();
   }
 
-  if (!token || !challengeId) return { ok: true };
+  if (!token || !challengeId || !deliveryEmail) return { ok: true };
   let sendStatus: "sent" | "failed" = "failed";
   try {
     const verifyUrl = buildAccountLoginUrl(token);
@@ -165,7 +191,7 @@ export async function requestAuthV2Login(input: {
     });
     const sent = await sendEmail({
       ...message,
-      to: email.canonical,
+      to: deliveryEmail,
     });
     sendStatus = sent.ok ? "sent" : "failed";
     if (!sent.ok) {

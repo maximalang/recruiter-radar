@@ -15,6 +15,7 @@ import {
 } from "@/lib/auth-v2/workspace-team";
 import { getClient, getPool } from "@/lib/db-pool";
 import { sendEmail } from "@/lib/email/transport";
+import { hashAuthRateLimitBoundary } from "@/lib/auth-v2/rate-limits";
 
 const mockGetClient = jest.mocked(getClient);
 const mockGetPool = jest.mocked(getPool);
@@ -91,6 +92,45 @@ describe("auth v2 workspace team lifecycle", () => {
     )).toBe(false);
   });
 
+  test("does not merge case-distinct mailbox local parts during invite acceptance", async () => {
+    const query = jest.fn(async (sql: string, _values?: unknown[]) => {
+      if (sql.includes("FROM workspace_invites AS invite")) {
+        return {
+          rows: [{
+            inviteId: "81",
+            workspaceId: "9",
+            emailNormalized: "Alice@example.com",
+            role: "recruiter",
+            expiresAt: new Date("2026-07-30T12:00:00.000Z"),
+            acceptedAt: null,
+            revokedAt: null,
+          }],
+          rowCount: 1,
+        };
+      }
+      if (sql.includes("FROM users AS account") && sql.includes("FOR UPDATE")) {
+        return {
+          rows: [{
+            email: "alice@example.com",
+            emailNormalized: "alice@example.com",
+          }],
+          rowCount: 1,
+        };
+      }
+      return { rows: [], rowCount: 1 };
+    });
+    mockGetClient.mockResolvedValue({ query, release: jest.fn() } as never);
+
+    await expect(acceptWorkspaceInvite({
+      token: "a".repeat(64),
+      session: session(),
+      now,
+    })).resolves.toEqual({ ok: false, code: "email_mismatch" });
+    expect(query.mock.calls.some(([sql]) =>
+      String(sql).includes("INSERT INTO workspace_members"),
+    )).toBe(false);
+  });
+
   test("fails invite acceptance closed outside the workspace rollout", async () => {
     await expect(acceptWorkspaceInvite({
       token: "a".repeat(64),
@@ -137,8 +177,53 @@ describe("auth v2 workspace team lifecycle", () => {
       String(values?.[0]).startsWith("auth-workspace-invite:"),
     );
     expect(targetLock?.[1]).toEqual([
-      "auth-workspace-invite:9:mixed@example.com",
+      "auth-workspace-invite:9:MiXeD@example.com",
     ]);
+  });
+
+  test("folds only the invite abuse bucket while keeping the identity lock exact", async () => {
+    const query = jest.fn(async (sql: string, _values?: unknown[]) => {
+      if (sql.includes("FOR UPDATE OF membership, workspace")) {
+        return {
+          rows: [{ actorRole: "owner", workspaceName: "Radar Team" }],
+          rowCount: 1,
+        };
+      }
+      if (sql.includes("consume_auth_rate_limit")) {
+        return { rows: [{ allowed: true }], rowCount: 1 };
+      }
+      if (sql.includes("FROM workspace_members AS membership")) {
+        return { rows: [], rowCount: 0 };
+      }
+      if (sql.includes("INSERT INTO workspace_invites")) {
+        return { rows: [{ id: "81" }], rowCount: 1 };
+      }
+      return { rows: [], rowCount: 1 };
+    });
+    mockGetClient.mockResolvedValue({ query, release: jest.fn() } as never);
+
+    await expect(inviteWorkspaceMember({
+      actorUserId: "42",
+      workspaceId: "9",
+      email: "MiXeD@example.com",
+      role: "recruiter",
+      now,
+    })).resolves.toEqual({ ok: true, delivery: "sent" });
+
+    const targetLock = query.mock.calls.find(([_sql, values]) =>
+      String(values?.[0]).startsWith("auth-workspace-invite:"),
+    );
+    expect(targetLock?.[1]).toEqual([
+      "auth-workspace-invite:9:MiXeD@example.com",
+    ]);
+    const rateCalls = query.mock.calls.filter(([sql]) =>
+      String(sql).includes("consume_auth_rate_limit"),
+    );
+    expect(rateCalls).toHaveLength(2);
+    expect(rateCalls[1]?.[1]?.[1]).toBe(hashAuthRateLimitBoundary(
+      "workspace-invite-target",
+      "9:mixed@example.com",
+    ));
   });
 
   test("returns the accepted workspace only after single-use acceptance commits", async () => {

@@ -405,6 +405,62 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
     });
   });
 
+  test("keeps case-distinct invite targets and mailbox identities separate", async () => {
+    const owner = await createFixture("invite-case-owner");
+    const caseVariant = await createFixture("invite-case-variant");
+    const foldedEmail = uniqueEmail("invite-case-binding");
+    const exactEmail = foldedEmail.replace(
+      "invite-case-binding-",
+      "Invite-Case-Binding-",
+    );
+    expect(exactEmail).not.toBe(foldedEmail);
+
+    await pool!.query(
+      `UPDATE users
+       SET email = $2, email_normalized = $2, updated_at = NOW()
+       WHERE id = $1`,
+      [caseVariant.userId, foldedEmail],
+    );
+
+    await expect(inviteWorkspaceMember({
+      actorUserId: owner.userId,
+      workspaceId: owner.workspaceId,
+      email: exactEmail,
+      role: "recruiter",
+    })).resolves.toEqual({ ok: true, delivery: "sent" });
+    const exactToken = await tokenFromOutbox(exactEmail, "/auth/invite");
+
+    await expect(inviteWorkspaceMember({
+      actorUserId: owner.userId,
+      workspaceId: owner.workspaceId,
+      email: foldedEmail,
+      role: "viewer",
+    })).resolves.toEqual({ ok: true, delivery: "sent" });
+    const foldedToken = await tokenFromOutbox(foldedEmail, "/auth/invite");
+
+    const activeInvites = await pool!.query<{ email: string }>(
+      `SELECT email_normalized AS email
+       FROM workspace_invites
+       WHERE workspace_id = $1
+         AND accepted_at IS NULL
+         AND revoked_at IS NULL
+       ORDER BY email_normalized`,
+      [owner.workspaceId],
+    );
+    expect(activeInvites.rows.map((row) => row.email).sort()).toEqual(
+      [exactEmail, foldedEmail].sort(),
+    );
+
+    await expect(acceptWorkspaceInvite({
+      token: exactToken,
+      session: caseVariant.session,
+    })).resolves.toEqual({ ok: false, code: "email_mismatch" });
+    await expect(acceptWorkspaceInvite({
+      token: foldedToken,
+      session: caseVariant.session,
+    })).resolves.toEqual({ ok: true, workspaceId: owner.workspaceId });
+  });
+
   test("invite email binding, single use, role ceilings, removal, and ownership transfer are atomic", async () => {
     const owner = await createFixture("team-owner");
     const invited = await createFixture("team-invited");

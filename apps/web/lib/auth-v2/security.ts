@@ -182,23 +182,74 @@ function validAddress(value: string | null | undefined): string | null {
   return isIP(address) > 0 ? address : null;
 }
 
+type AuthTrustedProxyConfiguration =
+  | { valid: true; header: null; trustedHops: null }
+  | {
+      valid: true;
+      header: "cf-connecting-ip" | "x-real-ip";
+      trustedHops: null;
+    }
+  | {
+      valid: true;
+      header: "x-forwarded-for";
+      trustedHops: number;
+    }
+  | { valid: false; header: null; trustedHops: null };
+
+export function readAuthTrustedProxyConfiguration(
+  env: AuthEnvironment = process.env,
+): AuthTrustedProxyConfiguration {
+  const header = env.AUTH_TRUSTED_PROXY_HEADER?.trim() ?? "";
+  const hops = env.AUTH_TRUSTED_PROXY_HOPS?.trim() ?? "";
+
+  if (!header) {
+    return hops
+      ? { valid: false, header: null, trustedHops: null }
+      : { valid: true, header: null, trustedHops: null };
+  }
+  if (header === "cf-connecting-ip" || header === "x-real-ip") {
+    return hops
+      ? { valid: false, header: null, trustedHops: null }
+      : { valid: true, header, trustedHops: null };
+  }
+  if (
+    header !== "x-forwarded-for"
+    || !/^[1-9]\d*$/.test(hops)
+  ) {
+    return { valid: false, header: null, trustedHops: null };
+  }
+
+  const trustedHops = Number(hops);
+  if (!Number.isSafeInteger(trustedHops) || trustedHops > 10) {
+    return { valid: false, header: null, trustedHops: null };
+  }
+  return { valid: true, header, trustedHops };
+}
+
 export function resolveAuthClientAddress({
   directAddress,
   headers,
   env = process.env,
 }: AuthClientAddressInput): string {
   const direct = validAddress(directAddress) ?? "unknown";
-  const configuredHeader = env.AUTH_TRUSTED_PROXY_HEADER;
+  const configuration = readAuthTrustedProxyConfiguration(env);
 
-  if (configuredHeader === "cf-connecting-ip" || configuredHeader === "x-real-ip") {
-    return validAddress(headers.get(configuredHeader)) ?? direct;
+  if (!configuration.valid || configuration.header === null) {
+    return direct;
   }
-
-  if (configuredHeader !== "x-forwarded-for") return direct;
-  if (!/^[1-9]\d*$/.test(env.AUTH_TRUSTED_PROXY_HOPS ?? "")) return direct;
-
-  const trustedHops = Number(env.AUTH_TRUSTED_PROXY_HOPS);
-  if (!Number.isSafeInteger(trustedHops) || trustedHops > 10) return direct;
+  if (
+    configuration.header === "cf-connecting-ip"
+    || configuration.header === "x-real-ip"
+  ) {
+    return validAddress(headers.get(configuration.header)) ?? direct;
+  }
+  if (
+    configuration.header !== "x-forwarded-for"
+    || configuration.trustedHops === null
+  ) {
+    return direct;
+  }
+  const trustedHops = configuration.trustedHops;
 
   const chain = (headers.get("x-forwarded-for") ?? "")
     .split(",")

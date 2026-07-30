@@ -61,6 +61,9 @@ export async function requestLoginAction(
 }
 
 export async function logoutAction(): Promise<never> {
-  await clearOwnerSession();
+  const cleared = await clearOwnerSession();
+  if (!cleared) {
+    return redirect("/settings/security?sessions=unavailable");
+  }
   redirect("/login?loggedOut=1");
 }

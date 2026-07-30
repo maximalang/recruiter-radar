@@ -4,7 +4,7 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 
-import { getPool } from "../db-pool";
+import { getClient, getPool } from "../db-pool";
 import { logError } from "../runtime";
 import {
   type AuthEnvironment,
@@ -15,6 +15,7 @@ import {
 import {
   hashAuthSessionToken,
   type AuthSession,
+  type AuthSessionLogoutRevocation,
   type AuthSessionWithToken,
 } from "./sessions";
 
@@ -107,17 +108,20 @@ export async function readLegacyOwnerSessionForAuthorization(input: {
   if (!pool) return null;
   try {
     const result = await pool.query<{
-      previouslyMigrated: boolean;
+      legacyDenied: boolean;
       v2LoginSucceeded: boolean;
       eligibleIdentity: boolean;
     }>(
       `SELECT
          EXISTS (
            SELECT 1
-           FROM auth_security_events AS prior_exchange
-           WHERE prior_exchange.event_type = 'legacy_session_migrated'
-             AND prior_exchange.subject_hash = $2
-         ) AS "previouslyMigrated",
+           FROM auth_security_events AS prior_denial
+           WHERE prior_denial.event_type IN (
+             'legacy_session_migrated',
+             'legacy_session_revoked'
+           )
+             AND prior_denial.subject_hash = $2
+         ) AS "legacyDenied",
          EXISTS (
            SELECT 1
            FROM auth_security_events AS v2_login
@@ -134,7 +138,7 @@ export async function readLegacyOwnerSessionForAuthorization(input: {
       [userId, fingerprint],
     );
     const state = result.rows[0];
-    if (!state || state.previouslyMigrated || state.v2LoginSucceeded) {
+    if (!state || state.legacyDenied || state.v2LoginSucceeded) {
       return null;
     }
     if (v2Eligible && !state.eligibleIdentity) return null;
@@ -163,6 +167,114 @@ export function fingerprintLegacyOwnerSession(
   return decodeLegacyOwnerSession(token, env)
     ? legacyFingerprint(token, env)
     : null;
+}
+
+export async function revokeLegacyOwnerSessionForLogout(
+  token: string,
+  env: AuthEnvironment = process.env,
+  now = new Date(),
+): Promise<AuthSessionLogoutRevocation> {
+  const userId = decodeLegacyOwnerSession(token, env);
+  const fingerprint = legacyFingerprint(token, env);
+  if (!userId || !fingerprint || !Number.isFinite(now.getTime())) {
+    return "inactive";
+  }
+  let client: Awaited<ReturnType<typeof getClient>> = null;
+  try {
+    client = await getClient();
+    if (!client) return "unavailable";
+    await client.query("BEGIN");
+    await client.query(
+      "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+      [fingerprint],
+    );
+    const result = await client.query<{ revoked: boolean }>(
+      `WITH revoked_sessions AS (
+         UPDATE auth_sessions AS session
+         SET
+           revoked_at = GREATEST(
+             session.created_at,
+             $3::TIMESTAMPTZ
+           ),
+           revoke_reason = 'logout'
+         WHERE session.user_id = $1
+           AND session.legacy_fingerprint_hash = $2
+           AND session.revoked_at IS NULL
+         RETURNING session.*
+       ),
+       session_recorded AS (
+         INSERT INTO auth_security_events (
+           event_type,
+           user_id,
+           workspace_id,
+           session_id,
+           request_ip_hash,
+           user_agent_hash,
+           metadata,
+           created_at
+         )
+         SELECT
+           'session_revoked',
+           revoked_session.user_id,
+           revoked_session.workspace_id,
+           revoked_session.id,
+           revoked_session.request_ip_hash,
+           revoked_session.user_agent_hash,
+           JSONB_BUILD_OBJECT(
+             'reason_code',
+             'logout',
+             'revoke_scope',
+             'current'
+           ),
+           revoked_session.revoked_at
+         FROM revoked_sessions AS revoked_session
+         RETURNING id
+       ),
+       tombstone_recorded AS (
+         INSERT INTO auth_security_events (
+           event_type,
+           user_id,
+           subject_hash,
+           metadata,
+           created_at
+         )
+         VALUES (
+           'legacy_session_revoked',
+           $1,
+           $2,
+           JSONB_BUILD_OBJECT(
+             'reason_code',
+             'logout',
+             'source',
+             'legacy'
+           ),
+           $3::TIMESTAMPTZ
+         )
+         ON CONFLICT (subject_hash)
+           WHERE event_type = 'legacy_session_revoked'
+             AND subject_hash IS NOT NULL
+           DO NOTHING
+         RETURNING id
+       )
+       SELECT
+         (
+           EXISTS (SELECT 1 FROM revoked_sessions)
+           OR EXISTS (SELECT 1 FROM tombstone_recorded)
+         ) AS revoked,
+         (SELECT COUNT(*) FROM session_recorded) AS "sessionEventCount"`,
+      [userId, fingerprint, now],
+    );
+    await client.query("COMMIT");
+    return result.rows[0]?.revoked === true ? "revoked" : "inactive";
+  } catch (error) {
+    if (client) {
+      await client.query("ROLLBACK").catch(() => undefined);
+    }
+    logError("auth_v2.legacy_session_logout_failed", error);
+    return "unavailable";
+  } finally {
+    client?.release();
+  }
 }
 
 function validOptionalHash(value: string | null | undefined): boolean {
@@ -227,12 +339,17 @@ export async function exchangeLegacyOwnerSession(input: {
     return null;
   }
 
-  const pool = getPool();
-  if (!pool) return null;
   const sessionToken = randomBytes(32).toString("hex");
-
+  let client: Awaited<ReturnType<typeof getClient>> = null;
   try {
-    const result = await pool.query<LegacyExchangeRow>(
+    client = await getClient();
+    if (!client) return null;
+    await client.query("BEGIN");
+    await client.query(
+      "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+      [fingerprint],
+    );
+    const result = await client.query<LegacyExchangeRow>(
       `WITH created AS (
          INSERT INTO auth_sessions (
            user_id,
@@ -267,9 +384,12 @@ export async function exchangeLegacyOwnerSession(input: {
            AND account.email_verified_at IS NOT NULL
            AND NOT EXISTS (
              SELECT 1
-             FROM auth_security_events AS prior_exchange
-             WHERE prior_exchange.event_type = 'legacy_session_migrated'
-               AND prior_exchange.subject_hash = $3
+             FROM auth_security_events AS prior_denial
+             WHERE prior_denial.event_type IN (
+               'legacy_session_migrated',
+               'legacy_session_revoked'
+             )
+               AND prior_denial.subject_hash = $3
            )
          ON CONFLICT (legacy_fingerprint_hash)
            WHERE legacy_fingerprint_hash IS NOT NULL
@@ -358,11 +478,17 @@ export async function exchangeLegacyOwnerSession(input: {
         now,
       ],
     );
+    await client.query("COMMIT");
     const row = result.rows[0];
     const session = row ? mapSession(row, env) : null;
     return session ? { session, token: sessionToken } : null;
   } catch (error) {
+    if (client) {
+      await client.query("ROLLBACK").catch(() => undefined);
+    }
     logError("auth_v2.legacy_session_exchange_failed", error);
     return null;
+  } finally {
+    client?.release();
   }
 }

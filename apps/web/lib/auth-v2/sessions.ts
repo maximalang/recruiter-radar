@@ -95,6 +95,11 @@ type RevokeReason =
   | "workspace_access_lost"
   | "account_unavailable";
 
+export type AuthSessionLogoutRevocation =
+  | "revoked"
+  | "inactive"
+  | "unavailable";
+
 function validId(value: string): boolean {
   if (!POSITIVE_ID_PATTERN.test(value)) return false;
   try {
@@ -737,6 +742,28 @@ export async function revokeAuthSession(
   );
 }
 
+export async function revokeAuthSessionForLogout(
+  token: string,
+): Promise<AuthSessionLogoutRevocation> {
+  if (!TOKEN_PATTERN.test(token)) return "inactive";
+  return revokeAuthSessionWhereResult(
+    "(session.token_hash = $1 OR session.previous_token_hash = $1)",
+    [hashAuthSessionToken(token), "logout"],
+    "logout",
+  );
+}
+
+export async function revokeAuthSessionForAccountSwitch(
+  token: string,
+): Promise<AuthSessionLogoutRevocation> {
+  if (!TOKEN_PATTERN.test(token)) return "inactive";
+  return revokeAuthSessionWhereResult(
+    "(session.token_hash = $1 OR session.previous_token_hash = $1)",
+    [hashAuthSessionToken(token), "security_action"],
+    "security_action",
+  );
+}
+
 export async function revokeAuthSessionById(input: {
   userId: string;
   sessionId: string;
@@ -755,8 +782,20 @@ async function revokeAuthSessionWhere(
   values: string[],
   reason: RevokeReason,
 ): Promise<boolean> {
+  return (await revokeAuthSessionWhereResult(
+    predicate,
+    values,
+    reason,
+  )) === "revoked";
+}
+
+async function revokeAuthSessionWhereResult(
+  predicate: string,
+  values: string[],
+  reason: RevokeReason,
+): Promise<AuthSessionLogoutRevocation> {
   const pool = getPool();
-  if (!pool) return false;
+  if (!pool) return "unavailable";
   const reasonParameter = values.length;
   try {
     const result = await pool.query<{ revoked: boolean }>(
@@ -805,10 +844,10 @@ async function revokeAuthSessionWhere(
          (SELECT COUNT(*) FROM recorded) AS "recordedCount"`,
       values,
     );
-    return result.rows[0]?.revoked === true;
+    return result.rows[0]?.revoked === true ? "revoked" : "inactive";
   } catch (error) {
     logError("auth_v2.session_revoke_failed", error, { reasonCode: reason });
-    return false;
+    return "unavailable";
   }
 }
 
