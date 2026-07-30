@@ -28,7 +28,7 @@ jobs:
           $gzip = [IO.Compression.GZipStream]::new($input, [IO.Compression.CompressionMode]::Decompress)
           try { $gzip.CopyTo($output) } finally { $gzip.Dispose(); $output.Dispose(); $input.Dispose() }
 
-      - name: Fetch exact upstream v0.2.9 source and apply patch
+      - name: Fetch exact upstream v0.2.9 source and apply patches
         shell: pwsh
         run: |
           git clone https://github.com/Lampese/codex-switcher.git source
@@ -36,6 +36,10 @@ jobs:
           git checkout 31e2b962009a51f27e964fa5c1984b1aeb237079
           git apply --check ..\hardened.patch
           git apply ..\hardened.patch
+          Get-ChildItem '..\payload\codex-build\fix-*.patch' | Sort-Object Name | ForEach-Object {
+            git apply --check $_.FullName
+            git apply $_.FullName
+          }
 
       - uses: actions/setup-node@v4
         with:
