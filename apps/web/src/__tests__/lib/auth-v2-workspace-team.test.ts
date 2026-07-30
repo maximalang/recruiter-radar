@@ -91,6 +91,45 @@ describe("auth v2 workspace team lifecycle", () => {
     )).toBe(false);
   });
 
+  test("does not merge case-distinct mailbox local parts during invite acceptance", async () => {
+    const query = jest.fn(async (sql: string, _values?: unknown[]) => {
+      if (sql.includes("FROM workspace_invites AS invite")) {
+        return {
+          rows: [{
+            inviteId: "81",
+            workspaceId: "9",
+            emailNormalized: "Alice@example.com",
+            role: "recruiter",
+            expiresAt: new Date("2026-07-30T12:00:00.000Z"),
+            acceptedAt: null,
+            revokedAt: null,
+          }],
+          rowCount: 1,
+        };
+      }
+      if (sql.includes("FROM users AS account") && sql.includes("FOR UPDATE")) {
+        return {
+          rows: [{
+            email: "alice@example.com",
+            emailNormalized: "alice@example.com",
+          }],
+          rowCount: 1,
+        };
+      }
+      return { rows: [], rowCount: 1 };
+    });
+    mockGetClient.mockResolvedValue({ query, release: jest.fn() } as never);
+
+    await expect(acceptWorkspaceInvite({
+      token: "a".repeat(64),
+      session: session(),
+      now,
+    })).resolves.toEqual({ ok: false, code: "email_mismatch" });
+    expect(query.mock.calls.some(([sql]) =>
+      String(sql).includes("INSERT INTO workspace_members"),
+    )).toBe(false);
+  });
+
   test("fails invite acceptance closed outside the workspace rollout", async () => {
     await expect(acceptWorkspaceInvite({
       token: "a".repeat(64),
@@ -137,7 +176,7 @@ describe("auth v2 workspace team lifecycle", () => {
       String(values?.[0]).startsWith("auth-workspace-invite:"),
     );
     expect(targetLock?.[1]).toEqual([
-      "auth-workspace-invite:9:mixed@example.com",
+      "auth-workspace-invite:9:MiXeD@example.com",
     ]);
   });
 
