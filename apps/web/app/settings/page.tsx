@@ -24,7 +24,13 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function SettingsIndexPage() {
-  const authorization = await getSession({ permission: "workspace:read" });
+  const authorization = await getSession({
+    permissions: [
+      "workspace:read",
+      "profiles:read",
+      "notifications:read",
+    ],
+  });
   const account = await getAccountById(authorization?.userId ?? null).catch(() => null);
 
   if (!authorization || !account) {

@@ -25,6 +25,8 @@ describe("Auth v2 rollout operations", () => {
         "node packages/db/scripts/report-auth-v2-sessions.mjs",
       "auth-v2:canary":
         "node packages/db/scripts/check-auth-v2-canary.mjs",
+      "test:auth-v2:tenancy:db":
+        "node packages/db/scripts/run-auth-v2-tenancy-db-tests.mjs",
     }));
   });
 
@@ -41,6 +43,19 @@ describe("Auth v2 rollout operations", () => {
     }
     expect(script("check-auth-v2-canary.mjs")).toContain("--user-id=");
     expect(script("report-auth-v2-sessions.mjs")).toContain("alerts");
+    expect(script("report-auth-v2-sessions.mjs")).toContain(
+      "process.exitCode = 1",
+    );
+  });
+
+  test("runs tenancy verifiers only against correctly named disposable databases", () => {
+    const source = script("run-auth-v2-tenancy-db-tests.mjs");
+    expect(source).toContain("AUTH_V2_DISPOSABLE_DB_CONFIRMED");
+    expect(source).toContain("AUTH_V2_DB_TEST_ISOLATED");
+    expect(source).toContain("auth_v2_test_workspace_tenancy_");
+    expect(source).toContain("auth_v2_test_workspace_sessions_");
+    expect(source).toContain("verify-auth-v2-workspace-tenancy.mjs");
+    expect(source).toContain("verify-auth-v2-workspace-sessions.mjs");
   });
 
   test("adds the seven required auth-specific CI matrix gates", () => {
@@ -60,6 +75,11 @@ describe("Auth v2 rollout operations", () => {
       expect(workflow).toContain(`gate: ${gate}`);
     }
     expect(workflow).toContain("AUTH_V2_DISPOSABLE_DB_CONFIRMED: 'true'");
+    expect(workflow).toContain("npm run test:auth-v2:tenancy:db");
+    expect(workflow).not.toContain("npm run test:auth-v2:workspaces:db\n");
+    expect(workflow).not.toContain(
+      "npm run test:auth-v2:workspace-sessions:db\n",
+    );
   });
 
   test("documents fail-closed rollout, rollback, and deliverability ownership", () => {

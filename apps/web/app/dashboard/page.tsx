@@ -29,7 +29,14 @@ export const dynamic = "force-dynamic";
 const DASHBOARD_NAV = buildAccountNavigation("dashboard");
 
 export default async function DashboardPage() {
-  const authorization = await getSession({ permission: "workspace:read" });
+  const authorization = await getSession({
+    permissions: [
+      "workspace:read",
+      "profiles:read",
+      "leads:read",
+      "notifications:read",
+    ],
+  });
   const account = await getAccountById(authorization?.userId ?? null).catch(() => null);
 
   if (!authorization || !account) {

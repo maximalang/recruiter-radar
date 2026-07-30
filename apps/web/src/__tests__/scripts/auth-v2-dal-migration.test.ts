@@ -45,26 +45,37 @@ describe("Auth v2 DAL migration contract", () => {
   });
 
   test("uses explicit least-privilege permissions on representative surfaces", () => {
-    const expectedPermissions: Record<string, string> = {
-      "app/dashboard/page.tsx": "workspace:read",
-      "app/checkout/page.tsx": "billing:manage",
-      "app/profile/page.tsx": "profiles:read",
-      "app/profile/actions.ts": "profiles:write",
-      "app/profile/notification-actions.ts": "notifications:write",
-      "app/leads/page.tsx": "leads:read",
-      "app/api/leads/export/route.ts": "exports:create",
-      "app/review/page.tsx": "leads:read",
-      "app/api/review/route.ts": "leads:write",
-      "app/opportunities/page.tsx": "opportunities:read",
-      "app/api/opportunities/[id]/action/route.ts": "opportunities:write",
-      "app/api/push/subscribe/route.ts": "notifications:write",
-      "app/api/telegram/connect-status/route.ts": "notifications:read",
+    const expectedPermissions: Record<string, string[]> = {
+      "app/dashboard/page.tsx": [
+        "workspace:read",
+        "profiles:read",
+        "leads:read",
+        "notifications:read",
+      ],
+      "app/settings/page.tsx": [
+        "workspace:read",
+        "profiles:read",
+        "notifications:read",
+      ],
+      "app/checkout/page.tsx": ["billing:manage"],
+      "app/profile/page.tsx": ["profiles:read"],
+      "app/profile/actions.ts": ["profiles:write"],
+      "app/profile/notification-actions.ts": ["notifications:write"],
+      "app/leads/page.tsx": ["leads:read"],
+      "app/api/leads/export/route.ts": ["exports:create"],
+      "app/review/page.tsx": ["leads:read"],
+      "app/api/review/route.ts": ["leads:write"],
+      "app/opportunities/page.tsx": ["opportunities:read"],
+      "app/api/opportunities/[id]/action/route.ts": ["opportunities:write"],
+      "app/api/push/subscribe/route.ts": ["notifications:write"],
+      "app/api/telegram/connect-status/route.ts": ["notifications:read"],
     };
 
-    for (const [file, permission] of Object.entries(expectedPermissions)) {
-      expect(readFileSync(resolve(webRoot, file), "utf8")).toMatch(
-        new RegExp(`["']${permission}["']`),
-      );
+    for (const [file, permissions] of Object.entries(expectedPermissions)) {
+      const source = readFileSync(resolve(webRoot, file), "utf8");
+      for (const permission of permissions) {
+        expect(source).toMatch(new RegExp(`["']${permission}["']`));
+      }
     }
   });
 });

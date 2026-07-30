@@ -4,7 +4,7 @@ import {
   isAuthV2SessionReadEnabledForUser,
   isAuthWorkspacesV2EnabledForUser,
 } from "./config";
-import { readAuthV2SessionCookie } from "./session-cookie";
+import { readAuthV2SessionCookieState } from "./session-cookie";
 import {
   readAuthSession,
   requireRecentAuthentication as requireSessionRecentAuthentication,
@@ -12,7 +12,7 @@ import {
 } from "./sessions";
 import {
   getActiveWorkspace,
-  requireWorkspacePermission,
+  hasWorkspacePermission,
   type WorkspacePermission,
   type WorkspaceRole,
 } from "./workspaces";
@@ -40,12 +40,19 @@ export class SystemAdminRequiredError extends Error {
   }
 }
 
+type CustomerAuthorizationOptions = {
+  permission?: WorkspacePermission;
+  permissions?: readonly WorkspacePermission[];
+};
+
 export async function getSession(
-  options: { permission?: WorkspacePermission } = {},
+  options: CustomerAuthorizationOptions = {},
 ): Promise<CustomerAuthorization | null> {
-  const v2Token = await readAuthV2SessionCookie();
-  if (v2Token) {
-    const session = await readAuthSession(v2Token);
+  const v2Cookie = await readAuthV2SessionCookieState();
+  if (v2Cookie.status === "invalid") return null;
+
+  if (v2Cookie.status === "valid") {
+    const session = await readAuthSession(v2Cookie.token);
     if (
       !session
       || session.rotationDue
@@ -58,20 +65,27 @@ export async function getSession(
       if (!session.workspaceId) return null;
       let workspace;
       try {
-        workspace = options.permission
-          ? await requireWorkspacePermission({
-              userId: session.userId,
-              workspaceId: session.workspaceId,
-              permission: options.permission,
-            })
-          : await getActiveWorkspace({
-              userId: session.userId,
-              workspaceId: session.workspaceId,
-            });
+        workspace = await getActiveWorkspace({
+          userId: session.userId,
+          workspaceId: session.workspaceId,
+        });
       } catch {
         return null;
       }
       if (!workspace) return null;
+
+      const requiredPermissions = [
+        ...(options.permission ? [options.permission] : []),
+        ...(options.permissions ?? []),
+      ];
+      if (
+        requiredPermissions.some(
+          (permission) => !hasWorkspacePermission(workspace.role, permission),
+        )
+      ) {
+        return null;
+      }
+
       return {
         mode: "auth_v2",
         userId: session.userId,
@@ -105,7 +119,7 @@ export async function getSession(
 }
 
 export async function requireSession(
-  options: { permission?: WorkspacePermission } = {},
+  options: CustomerAuthorizationOptions = {},
 ): Promise<CustomerAuthorization> {
   const authorization = await getSession(options);
   if (!authorization) throw new AuthorizationRequiredError();

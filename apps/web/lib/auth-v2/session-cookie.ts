@@ -11,10 +11,25 @@ const COOKIE_OPTIONS = {
   path: "/",
 };
 
-export async function readAuthV2SessionCookie(): Promise<string | null> {
+export type AuthV2SessionCookieState =
+  | { status: "absent" }
+  | { status: "invalid" }
+  | { status: "valid"; token: string };
+
+export async function readAuthV2SessionCookieState(): Promise<AuthV2SessionCookieState> {
   const jar = await cookies();
-  const token = jar.get(AUTH_V2_SESSION_COOKIE)?.value?.trim() ?? "";
-  return TOKEN_PATTERN.test(token) ? token : null;
+  const cookie = jar.get(AUTH_V2_SESSION_COOKIE);
+  if (!cookie) return { status: "absent" };
+
+  const token = cookie.value?.trim() ?? "";
+  return TOKEN_PATTERN.test(token)
+    ? { status: "valid", token }
+    : { status: "invalid" };
+}
+
+export async function readAuthV2SessionCookie(): Promise<string | null> {
+  const state = await readAuthV2SessionCookieState();
+  return state.status === "valid" ? state.token : null;
 }
 
 export async function writeAuthV2SessionCookie(token: string): Promise<void> {

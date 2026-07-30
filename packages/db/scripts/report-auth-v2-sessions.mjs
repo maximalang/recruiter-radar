@@ -109,8 +109,9 @@ try {
     saturatedRateLimits: row.saturatedRateLimitBuckets > 0,
     expiredChallengeCleanupDue: row.expiredOpenChallenges > 0,
   }
+  const ok = !Object.values(alerts).some(Boolean)
   console.log(JSON.stringify({
-    ok: !Object.values(alerts).some(Boolean),
+    ok,
     generatedAt: new Date().toISOString(),
     sessions: row.sessions,
     eventsLast24Hours: row.eventsLast24Hours,
@@ -123,6 +124,7 @@ try {
     },
     alerts,
   }))
+  if (!ok) process.exitCode = 1
 } catch (error) {
   await pool.query('ROLLBACK').catch(() => {})
   throw error

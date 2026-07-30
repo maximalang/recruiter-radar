@@ -318,10 +318,7 @@ jobs:
           npm run auth-v2:verify-backfill
       - name: Auth tenant isolation contracts
         if: matrix.gate == 'tenancy-isolation'
-        run: |
-          npm run db:migrate
-          npm run test:auth-v2:workspaces:db
-          npm run test:auth-v2:workspace-sessions:db
+        run: npm run test:auth-v2:tenancy:db
       - name: Install Chromium
         if: matrix.gate == 'e2e' || matrix.gate == 'accessibility'
         run: npx playwright install --with-deps chromium
