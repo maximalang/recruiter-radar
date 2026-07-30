@@ -54,6 +54,11 @@ jobs:
           targets: x86_64-pc-windows-msvc
           components: rustfmt
 
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: source/src-tauri -> target
+          cache-on-failure: true
+
       - name: Install dependencies
         working-directory: source
         run: pnpm install --frozen-lockfile
@@ -62,15 +67,111 @@ jobs:
         working-directory: source
         run: pnpm build
 
+      - name: Validate migration scripts
+        shell: pwsh
+        run: |
+          $scripts = @(
+            'source\tools\migrate-accounts.ps1',
+            'source\tools\verify-accounts.ps1',
+            'source\tools\remove-old-switcher.ps1'
+          )
+          foreach ($script in $scripts) {
+            $tokens = $null
+            $parseErrors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path $script),
+              [ref]$tokens,
+              [ref]$parseErrors
+            ) | Out-Null
+            if (@($parseErrors).Count -gt 0) {
+              $messages = @($parseErrors | ForEach-Object Message) -join "`n"
+              throw "PowerShell parse failure in $script`n$messages"
+            }
+          }
+
+          function ConvertTo-Base64Url([string]$Text) {
+            [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Text)).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+          }
+
+          $root = Join-Path $env:RUNNER_TEMP 'codex-switcher-migration-test'
+          $legacy = Join-Path $root 'legacy'
+          $target = Join-Path $root 'target'
+          $codex = Join-Path $root 'codex'
+          $backup = Join-Path $root 'backup'
+          Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $legacy, $codex -Force | Out-Null
+
+          $header = ConvertTo-Base64Url '{"alg":"none","typ":"JWT"}'
+          $payload = ConvertTo-Base64Url '{"sub":"user-test-1","email":"test@example.com"}'
+          $idToken = "$header.$payload.signature"
+          $store = [ordered]@{
+            version = 1
+            accounts = @(
+              [ordered]@{
+                id = 'account-1'
+                name = 'Primary'
+                email = 'test@example.com'
+                plan_type = 'plus'
+                auth_mode = 'chat_g_pt'
+                auth_data = [ordered]@{
+                  type = 'chat_g_pt'
+                  id_token = $idToken
+                  access_token = 'access-1'
+                  refresh_token = 'refresh-1'
+                  account_id = 'workspace-1'
+                }
+                created_at = '2026-01-01T00:00:00Z'
+                last_used_at = $null
+              },
+              [ordered]@{
+                id = 'account-2'
+                name = 'API account'
+                email = $null
+                plan_type = $null
+                auth_mode = 'api_key'
+                auth_data = [ordered]@{ type = 'api_key'; key = 'sk-test-only' }
+                created_at = '2026-01-01T00:00:00Z'
+                last_used_at = $null
+              }
+            )
+            active_account_id = 'account-1'
+            masked_account_ids = @()
+          }
+          [IO.File]::WriteAllText(
+            (Join-Path $legacy 'accounts.json'),
+            ($store | ConvertTo-Json -Depth 20),
+            [Text.UTF8Encoding]::new($false)
+          )
+          [IO.File]::WriteAllText(
+            (Join-Path $codex 'auth.json'),
+            (@{ tokens = @{ id_token = $idToken; access_token = 'access-live'; refresh_token = 'refresh-live'; account_id = 'workspace-1' } } | ConvertTo-Json -Depth 10),
+            [Text.UTF8Encoding]::new($false)
+          )
+          $sourceBefore = (Get-FileHash (Join-Path $legacy 'accounts.json') -Algorithm SHA256).Hash
+          $authBefore = (Get-FileHash (Join-Path $codex 'auth.json') -Algorithm SHA256).Hash
+
+          & 'source\tools\migrate-accounts.ps1' -SourceDir $legacy -TargetDir $target -CodexDir $codex -BackupRoot $backup -SkipProcessCheck
+          if ($LASTEXITCODE -ne 0) { throw "Migration script failed with exit code $LASTEXITCODE" }
+          & 'source\tools\verify-accounts.ps1' -SourceDir $legacy -TargetDir $target -CodexDir $codex
+          if ($LASTEXITCODE -ne 0) { throw "Verification script failed with exit code $LASTEXITCODE" }
+
+          $sourceAfter = (Get-FileHash (Join-Path $legacy 'accounts.json') -Algorithm SHA256).Hash
+          $authAfter = (Get-FileHash (Join-Path $codex 'auth.json') -Algorithm SHA256).Hash
+          if ($sourceBefore -ne $sourceAfter) { throw 'Synthetic test changed legacy accounts.json' }
+          if ($authBefore -ne $authAfter) { throw 'Synthetic test changed Codex auth.json' }
+          $migrated = Get-Content (Join-Path $target 'accounts.json') -Raw | ConvertFrom-Json
+          if (@($migrated.accounts).Count -ne 2) { throw 'Synthetic migration lost accounts' }
+          if ([string]$migrated.accounts[0].user_id -ne 'user-test-1') { throw 'JWT user identity was not migrated' }
+
       - name: Format and verify Rust
         working-directory: source
         run: |
           cargo fmt --manifest-path src-tauri/Cargo.toml
           cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 
-      - name: Run Rust tests
+      - name: Run release Rust tests
         working-directory: source
-        run: cargo test --manifest-path src-tauri/Cargo.toml
+        run: cargo test --release --target x86_64-pc-windows-msvc --manifest-path src-tauri/Cargo.toml
 
       - name: Build Windows installer
         working-directory: source
@@ -87,7 +188,11 @@ jobs:
           Copy-Item 'source\tools\verify-accounts.ps1' deliverables\
           Copy-Item 'source\tools\remove-old-switcher.ps1' deliverables\
           Copy-Item 'source\HARDENED-README.md' deliverables\
-          Get-FileHash deliverables\* -Algorithm SHA256 | Format-Table -AutoSize | Out-File 'deliverables\SHA256SUMS.txt'
+          $lines = Get-ChildItem deliverables -File | Sort-Object Name | ForEach-Object {
+            $hash = Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256
+            "$($hash.Hash)  $($_.Name)"
+          }
+          [IO.File]::WriteAllLines((Join-Path (Resolve-Path deliverables) 'SHA256SUMS.txt'), $lines, [Text.UTF8Encoding]::new($false))
 
       - uses: actions/upload-artifact@v4
         with:
