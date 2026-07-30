@@ -301,6 +301,7 @@ jobs:
       - name: Auth PostgreSQL contracts
         if: matrix.gate == 'postgresql'
         run: |
+          npm run test:auth-v2:core:db
           npm run test:auth-v2:account-team:db
           npm run test:auth-v2:passkeys:db
       - name: Auth migration upgrade and operational verification

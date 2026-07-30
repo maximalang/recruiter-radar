@@ -27,6 +27,8 @@ describe("Auth v2 rollout operations", () => {
         "node packages/db/scripts/check-auth-v2-canary.mjs",
       "test:auth-v2:tenancy:db":
         "node packages/db/scripts/run-auth-v2-tenancy-db-tests.mjs",
+      "test:auth-v2:core:db":
+        "node packages/db/scripts/run-auth-v2-core-db-tests.mjs",
     }));
   });
 
@@ -75,11 +77,39 @@ describe("Auth v2 rollout operations", () => {
       expect(workflow).toContain(`gate: ${gate}`);
     }
     expect(workflow).toContain("AUTH_V2_DISPOSABLE_DB_CONFIRMED: 'true'");
+    expect(workflow).toContain("npm run test:auth-v2:core:db");
     expect(workflow).toContain("npm run test:auth-v2:tenancy:db");
     expect(workflow).not.toContain("npm run test:auth-v2:workspaces:db\n");
     expect(workflow).not.toContain(
       "npm run test:auth-v2:workspace-sessions:db\n",
     );
+  });
+
+  test("runs every core database verifier in an isolated disposable database", () => {
+    const source = script("run-auth-v2-core-db-tests.mjs");
+    expect(source).toContain("AUTH_V2_DISPOSABLE_DB_CONFIRMED");
+    expect(source).toContain("AUTH_V2_DB_TEST_ISOLATED");
+    expect(source).toContain("DROP DATABASE IF EXISTS");
+    for (const verifier of [
+      "verify-auth-v2-foundation.mjs",
+      "verify-auth-v2-challenges.mjs",
+      "verify-auth-v2-consumption.mjs",
+      "verify-auth-v2-sessions.mjs",
+      "verify-auth-v2-legacy-exchange.mjs",
+      "verify-auth-v2-rollback.mjs",
+      "verify-auth-v2-identity.mjs",
+    ]) {
+      expect(source).toContain(verifier);
+    }
+    for (const verificationCase of [
+      "AUTH_V2_DB_CASE: 'clean'",
+      "AUTH_V2_DB_CASE: 'upgrade'",
+      "AUTH_V2_DB_CASE: 'down'",
+      "AUTH_V2_ROLLBACK_CASE: 'clean'",
+      "AUTH_V2_ROLLBACK_CASE: 'guard'",
+    ]) {
+      expect(source).toContain(verificationCase);
+    }
   });
 
   test("documents fail-closed rollout, rollback, and deliverability ownership", () => {
