@@ -1,0 +1,1 @@
+Build Codex Switcher Hardened 0.3.0 for Windows x64.
