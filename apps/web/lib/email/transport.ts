@@ -1,5 +1,5 @@
 /**
- * Email transport — nodemailer over SMTP.
+ * Email transport — Yandex Cloud Postbox over HTTPS, with SMTP fallback.
  *
  * Provider-agnostic (any SMTP works from Russia). Config comes from env; when
  * absent the module degrades gracefully (`isEmailConfigured()` is false and
@@ -8,6 +8,7 @@
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute } from "node:path";
+import { createHash, createHmac } from "node:crypto";
 
 import nodemailer, { type Transporter } from "nodemailer";
 
@@ -40,6 +41,51 @@ type SmtpConfig = {
   replyTo: string | null;
   secure: boolean;
 };
+
+type PostboxConfig = {
+  accessKeyId: string;
+  secretAccessKey: string;
+  endpoint: string;
+  region: string;
+  from: string;
+  replyTo: string | null;
+  timeoutMs: number;
+};
+
+function readPostboxConfig(): PostboxConfig | null {
+  const accessKeyId = process.env.POSTBOX_ACCESS_KEY_ID?.trim();
+  const secretAccessKey = process.env.POSTBOX_SECRET_ACCESS_KEY?.trim();
+  const from = process.env.POSTBOX_FROM?.trim();
+  const endpoint = (process.env.POSTBOX_ENDPOINT?.trim()
+    || "https://postbox.cloud.yandex.net").replace(/\/+$/, "");
+  const region = process.env.POSTBOX_REGION?.trim() || "ru-central1";
+  const replyTo = process.env.POSTBOX_REPLY_TO?.trim() || null;
+  const timeoutRaw = process.env.POSTBOX_TIMEOUT_MS?.trim() || "10000";
+  const timeoutMs = Number(timeoutRaw);
+
+  if (
+    !accessKeyId
+    || !secretAccessKey
+    || !from
+    || !endpoint.startsWith("https://")
+    || !region
+    || !Number.isInteger(timeoutMs)
+    || timeoutMs < 1000
+    || timeoutMs > 60000
+  ) {
+    return null;
+  }
+
+  return {
+    accessKeyId,
+    secretAccessKey,
+    endpoint,
+    region,
+    from,
+    replyTo,
+    timeoutMs,
+  };
+}
 
 function readSmtpConfig(): SmtpConfig | null {
   const host = process.env.SMTP_HOST?.trim();
@@ -75,12 +121,14 @@ export function isEmailConfigured(): boolean {
   if (process.env.AUTH_EMAIL_TRANSPORT === "test") {
     return resolveTestEmailOutboxPath() !== null;
   }
-  return resolveTestEmailOutboxPath() !== null || readSmtpConfig() !== null;
+  return resolveTestEmailOutboxPath() !== null
+    || readPostboxConfig() !== null
+    || readSmtpConfig() !== null;
 }
 
 /** The configured From address, or null when email is not configured. */
 export function getEmailFromAddress(): string | null {
-  return readSmtpConfig()?.from ?? null;
+  return readPostboxConfig()?.from ?? readSmtpConfig()?.from ?? null;
 }
 
 let cachedTransporter: Transporter | null = null;
@@ -120,6 +168,22 @@ export async function sendEmail(message: EmailMessage): Promise<SendEmailResult>
     }
   }
 
+  const postboxConfig = readPostboxConfig();
+  if (postboxConfig) {
+    try {
+      await sendViaPostbox(postboxConfig, message);
+      logEvent("email.sent", { provider: "postbox" });
+      return { ok: true };
+    } catch (error) {
+      logError(
+        "email.send_failed",
+        new Error("postbox_send_failed"),
+        getSafePostboxFailureMetadata(error),
+      );
+      return { ok: false, reason: "send_failed" };
+    }
+  }
+
   const config = readSmtpConfig();
   if (!config) {
     return { ok: false, reason: "not_configured" };
@@ -145,6 +209,113 @@ export async function sendEmail(message: EmailMessage): Promise<SendEmailResult>
     );
     return { ok: false, reason: "send_failed" };
   }
+}
+
+async function sendViaPostbox(
+  config: PostboxConfig,
+  message: EmailMessage,
+): Promise<void> {
+  const endpoint = new URL("/v2/email/outbound-emails", config.endpoint);
+  const body = JSON.stringify({
+    FromEmailAddress: config.from,
+    ...(config.replyTo ? { ReplyToAddresses: [config.replyTo] } : {}),
+    Destination: { ToAddresses: [message.to] },
+    Content: {
+      Simple: {
+        Subject: { Data: message.subject, Charset: "UTF-8" },
+        Body: {
+          Text: { Data: message.text, Charset: "UTF-8" },
+          Html: { Data: message.html, Charset: "UTF-8" },
+        },
+      },
+    },
+  });
+  const amzDate = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+  const dateStamp = amzDate.slice(0, 8);
+  const payloadHash = createHash("sha256").update(body).digest("hex");
+  const host = endpoint.host;
+  const canonicalHeaders = `content-type:application/x-amz-json-1.0\nhost:${host}\nx-amz-content-sha256:${payloadHash}\nx-amz-date:${amzDate}\n`;
+  const signedHeaders = "content-type;host;x-amz-content-sha256;x-amz-date";
+  const canonicalRequest = [
+    "POST",
+    endpoint.pathname,
+    "",
+    canonicalHeaders,
+    signedHeaders,
+    payloadHash,
+  ].join("\n");
+  const credentialScope = `${dateStamp}/${config.region}/ses/aws4_request`;
+  const stringToSign = [
+    "AWS4-HMAC-SHA256",
+    amzDate,
+    credentialScope,
+    createHash("sha256").update(canonicalRequest).digest("hex"),
+  ].join("\n");
+  const signingKey = hmac(
+    hmac(
+      hmac(
+        hmac(`AWS4${config.secretAccessKey}`, dateStamp),
+        config.region,
+      ),
+      "ses",
+    ),
+    "aws4_request",
+  );
+  const signature = hmac(signingKey, stringToSign, "hex");
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-amz-json-1.0",
+        "host": host,
+        "x-amz-content-sha256": payloadHash,
+        "x-amz-date": amzDate,
+        authorization: `AWS4-HMAC-SHA256 Credential=${config.accessKeyId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`,
+      },
+      body,
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      throw Object.assign(new Error("postbox_http_error"), {
+        code: "HTTP",
+        status: response.status,
+      });
+    }
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function hmac(key: string | Buffer, value: string): Buffer;
+function hmac(key: string | Buffer, value: string, encoding: "hex"): string;
+function hmac(
+  key: string | Buffer,
+  value: string,
+  encoding?: "hex",
+): string | Buffer {
+  return encoding
+    ? createHmac("sha256", key).update(value).digest("hex")
+    : createHmac("sha256", key).update(value).digest();
+}
+
+function getSafePostboxFailureMetadata(
+  error: unknown,
+): Record<string, string | number> {
+  const status = getErrorProperty(error, "status");
+  if (
+    typeof status === "number"
+    && Number.isInteger(status)
+    && status >= 400
+    && status <= 599
+  ) {
+    return { failureCategory: "provider_http", responseCode: status };
+  }
+  if (error instanceof Error && error.name === "AbortError") {
+    return { failureCategory: "timeout" };
+  }
+  return { failureCategory: "postbox_error" };
 }
 
 export async function readTestEmailOutbox(
