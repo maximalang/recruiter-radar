@@ -1,2 +1,2 @@
 Build Codex Switcher Hardened 0.3.0 for Windows x64.
-CI attempt 5: migration tests and artifact packaging.
+CI attempt 6: direct scripts and synthetic migration.
