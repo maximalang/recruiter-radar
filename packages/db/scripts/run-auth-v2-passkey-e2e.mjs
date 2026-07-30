@@ -59,12 +59,80 @@ const report = {
   browser: 'Playwright Chromium virtual CTAP2 authenticator',
   flows: {},
   screenshots: {},
+  accessibility: {},
+  responsive: {},
   consoleFindings: [],
   networkFindings: [],
 }
 
 function assert(condition, message) {
   if (!condition) throw new Error(message)
+}
+
+async function inspectAccessibility(page, key) {
+  await page.locator('main').waitFor({ state: 'visible' })
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - window.innerWidth,
+  )
+  assert(overflow <= 0, `${key} overflows horizontally by ${overflow}px.`)
+  const unlabeledControls = await page.evaluate(() => {
+    const visible = (element) => {
+      const style = window.getComputedStyle(element)
+      const rect = element.getBoundingClientRect()
+      return (
+        style.visibility !== 'hidden'
+        && style.display !== 'none'
+        && rect.width > 0
+        && rect.height > 0
+      )
+    }
+    return [...document.querySelectorAll('button, input, select, textarea')]
+      .filter((element) => {
+        if (
+          element instanceof HTMLInputElement
+          && element.type === 'hidden'
+        ) return false
+        if (!visible(element)) return false
+        const labelledBy = element.getAttribute('aria-labelledby')
+        const labelledByText = labelledBy
+          ? labelledBy.split(/\s+/).every((id) =>
+            document.getElementById(id)?.textContent?.trim())
+          : false
+        const label = element instanceof HTMLElement
+          ? element.closest('label')
+          : null
+        return !(
+          element.getAttribute('aria-label')?.trim()
+          || labelledByText
+          || label?.textContent?.trim()
+          || element.textContent?.trim()
+        )
+      })
+      .map((element) => element.outerHTML.slice(0, 180))
+  })
+  assert(
+    unlabeledControls.length === 0,
+    `${key} has unlabeled visible controls: ${unlabeledControls.join(', ')}`,
+  )
+  const aria = await page.locator('body').ariaSnapshot()
+  assert(
+    aria.includes('heading'),
+    `${key} accessibility snapshot is missing a heading.`,
+  )
+  await page.keyboard.press('Tab')
+  const focusMoved = await page.evaluate(
+    () => document.activeElement !== document.body,
+  )
+  assert(focusMoved, `${key} did not expose a keyboard focus target.`)
+  report.accessibility[key] = {
+    labelledControls: true,
+    ariaSnapshotLines: aria.split('\n').length,
+    keyboardFocus: true,
+  }
+  report.responsive[key] = {
+    viewport: page.viewportSize(),
+    overflowPixels: overflow,
+  }
 }
 
 function quoteIdentifier(value) {
@@ -469,6 +537,7 @@ try {
       && message.subject === 'Ключ доступа добавлен — Recruiter Radar'),
     'Passkey registration did not send its security notice.',
   )
+  await inspectAccessibility(page, 'management1440')
   const securityScreenshot = resolve(
     artifactsDirectory,
     'auth-v2-passkey-e2e-shot-management-1440.png',
@@ -577,6 +646,7 @@ try {
     'auth-v2-passkey-e2e-shot-login-fallback-390.png',
   )
   await page.setViewportSize({ width: 390, height: 844 })
+  await inspectAccessibility(page, 'loginFallback390')
   await page.screenshot({
     path: loginScreenshot,
     fullPage: true,
