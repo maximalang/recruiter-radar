@@ -6,9 +6,12 @@ import { readAuthV2LoginChallengeState } from "@/lib/auth-v2/challenges";
 import {
   isAuthPlatformV2EnabledForUser,
 } from "@/lib/auth-v2/config";
+import { readLimitedJsonObject } from "@/lib/auth-v2/passkey-http";
 import { isAuthSameOriginRequest } from "@/lib/auth-v2/security";
 
 export const dynamic = "force-dynamic";
+
+const LOGIN_VERIFY_MAX_BYTES = 1_024;
 
 export async function POST(request: Request): Promise<NextResponse> {
   if (!isAuthSameOriginRequest(request)) {
@@ -18,13 +21,20 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  let token = "";
-  try {
-    const body = await request.json() as { token?: unknown };
-    token = typeof body.token === "string" ? body.token.trim() : "";
-  } catch {
-    token = "";
+  const body = await readLimitedJsonObject(request, LOGIN_VERIFY_MAX_BYTES);
+  if (!body) {
+    return NextResponse.json(
+      { ok: false, next: "/auth/confirm?status=invalid", status: "invalid" },
+      {
+        status: 400,
+        headers: {
+          "Cache-Control": "no-store, max-age=0",
+          "Referrer-Policy": "no-referrer",
+        },
+      },
+    );
   }
+  const token = typeof body.token === "string" ? body.token.trim() : "";
 
   const v2State = await readAuthV2LoginChallengeState(token)
     .catch(() => ({ status: "invalid" as const, userId: null }));
