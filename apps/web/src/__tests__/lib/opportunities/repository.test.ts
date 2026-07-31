@@ -267,7 +267,9 @@ describe('opportunity repository tenant scope', () => {
       [{ id: '10', ownerId: '7', status: 'accepted' }],
       [],
     ])
-    mockedPool.mockReturnValue(db)
+    mockedPool.mockReturnValue(
+      db as unknown as ReturnType<typeof getPool>,
+    )
 
     const result = await applyOpportunityAction({
       ownerId: '7',
