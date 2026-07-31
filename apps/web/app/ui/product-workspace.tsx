@@ -3,11 +3,11 @@ import Link from "next/link";
 
 import {
   BriefcaseIcon,
-  ChartBarIcon,
   LayersIcon,
   SearchIcon,
   ShieldIcon,
   TargetIcon,
+  TrendUpIcon,
 } from "./icons";
 import { BrandLogo } from "./brand-logo";
 import type { NavItem } from "./internal-page";
@@ -16,7 +16,7 @@ import styles from "./product-workspace.module.css";
 type WorkspaceIcon = (props: SVGProps<SVGSVGElement>) => ReactElement;
 
 const NAV_ICONS: Record<string, WorkspaceIcon> = {
-  "/dashboard": ChartBarIcon,
+  "/dashboard": TrendUpIcon,
   "/leads": SearchIcon,
   "/review": ShieldIcon,
   "/profile": TargetIcon,
