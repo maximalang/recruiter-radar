@@ -1,7 +1,7 @@
 import { getPaymentProviderSetupState } from './paymentsProvider'
 
 export type PaymentReadinessReport = {
-  provider: 'stripe' | null
+  provider: 'stripe' | 'yookassa' | null
   mode: 'test' | 'live' | null
   checkoutConfigured: boolean
   webhookConfigured: boolean
@@ -9,8 +9,8 @@ export type PaymentReadinessReport = {
   selfServePilotReady: boolean
   recurringBillingReady: false
   rfProvider: {
-    status: 'blocked'
-    provider: null
+    status: 'blocked' | 'ready'
+    provider: 'yookassa' | null
     blockers: string[]
   }
   customerFlow: {
@@ -23,8 +23,15 @@ export type PaymentReadinessReport = {
 export function buildPaymentReadinessReport(
   setup = getPaymentProviderSetupState(),
 ): PaymentReadinessReport {
+  const yookassaSelected = setup.provider === 'yookassa'
   const selfServePilotReady =
-    setup.configured && setup.webhookConfigured && setup.siteUrlConfigured
+    yookassaSelected && setup.configured && setup.webhookConfigured && setup.siteUrlConfigured
+  const blockers: string[] = []
+
+  if (!yookassaSelected) blockers.push('PAYMENTS_PROVIDER must be set to yookassa.')
+  if (!setup.configured) blockers.push('YooKassa shop_id and secret key are not configured.')
+  if (!setup.webhookConfigured) blockers.push('The public YooKassa webhook URL is not configured.')
+  if (!setup.siteUrlConfigured) blockers.push('PAYMENTS_SITE_URL is not configured.')
 
   return {
     provider: setup.provider,
@@ -35,13 +42,9 @@ export function buildPaymentReadinessReport(
     selfServePilotReady,
     recurringBillingReady: false,
     rfProvider: {
-      status: 'blocked',
-      provider: null,
-      blockers: [
-        'RF payment provider has not been selected and implemented.',
-        'Production merchant credentials and sandbox/live webhook verification are absent from application code.',
-        'Receipt, refund, cancellation and accounting requirements need provider-specific legal review.',
-      ],
+      status: selfServePilotReady ? 'ready' : 'blocked',
+      provider: yookassaSelected ? 'yookassa' : null,
+      blockers,
     },
     customerFlow: {
       pilot: selfServePilotReady ? 'self_service_payment' : 'saved_request',
