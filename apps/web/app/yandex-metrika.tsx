@@ -71,6 +71,14 @@ export default function YandexMetrika() {
 
   if (!mounted || consent === "rejected") return null;
 
+  const consentButtonBase = {
+    minHeight: 44,
+    borderRadius: 999,
+    padding: "9px 15px",
+    font: "inherit",
+    cursor: "pointer",
+  } as const;
+
   return (
     <aside
       role="dialog"
@@ -101,10 +109,18 @@ export default function YandexMetrika() {
         </span>
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-        <button type="button" onClick={() => decide("accepted")} style={{ border: 0, borderRadius: 999, padding: "9px 15px", background: "#0f172a", color: "white", font: "inherit", fontWeight: 650, cursor: "pointer" }}>
+        <button
+          type="button"
+          onClick={() => decide("accepted")}
+          style={{ ...consentButtonBase, border: 0, background: "#0f172a", color: "white", fontWeight: 650 }}
+        >
           Разрешить аналитику
         </button>
-        <button type="button" onClick={() => decide("rejected")} style={{ border: "1px solid rgba(15, 23, 42, 0.16)", borderRadius: 999, padding: "9px 15px", background: "transparent", color: "#334155", font: "inherit", fontWeight: 600, cursor: "pointer" }}>
+        <button
+          type="button"
+          onClick={() => decide("rejected")}
+          style={{ ...consentButtonBase, border: "1px solid rgba(15, 23, 42, 0.16)", background: "transparent", color: "#334155", fontWeight: 600 }}
+        >
           Только необходимые cookies
         </button>
       </div>
