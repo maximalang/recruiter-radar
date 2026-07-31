@@ -3,28 +3,21 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import {
   isOpportunityEngineV1EnabledForContext,
-  isOpportunityOutcomesEnabledForContext,
 } from '@/lib/opportunities/config'
-import {
-  OutcomeValidationError,
-  type DismissedReasonCode,
-  validateOutcomeInput,
-} from '@/lib/opportunities/outcome-domain'
+import { OutcomeValidationError } from '@/lib/opportunities/outcome-domain'
 import { OutcomeContactPrivacyUnavailableError } from '@/lib/opportunities/outcome-contact-privacy'
 import {
   OutcomeChronologyConflictError,
   OutcomeIdempotencyConflictError,
+  OutcomeSupersededConflictError,
   OutcomeTransitionConflictError as OutcomeLedgerTransitionConflictError,
 } from '@/lib/opportunities/outcome-repository'
 import { toPublicOpportunity } from '@/lib/opportunities/api-projection'
 import {
   applyOpportunityAction,
   isOpportunityAction,
-  OpportunityActionConflictError,
-  OpportunitySupersededConflictError,
-  OpportunityTransitionConflictError,
 } from '@/lib/opportunities/repository'
-import { logError } from '@/lib/runtime'
+import { logError, logEvent } from '@/lib/runtime'
 import {
   getOpportunityAuthorizationContext,
   getOpportunityDataAccessContext,
@@ -45,29 +38,28 @@ export async function POST(
     workspaceId: null,
   }
   if (!isOpportunityEngineV1EnabledForContext(featureContext)) {
-    return NextResponse.json({ error: 'not_found' }, { status: 404 })
+    return legacyJson({ error: 'not_found' }, 404)
   }
   if (!authorization) {
-    return NextResponse.json({ error: 'authentication_required' }, { status: 401 })
+    return legacyJson({ error: 'authentication_required' }, 401)
   }
   const access = getOpportunityDataAccessContext(authorization)
   if (!access) {
-    return NextResponse.json({ error: 'not_found' }, { status: 404 })
+    return legacyJson({ error: 'not_found' }, 404)
   }
-  const outcomesEnabled = isOpportunityOutcomesEnabledForContext(authorization)
   const { id } = await context.params
   if (!/^[1-9]\d*$/.test(id)) {
-    return NextResponse.json({ error: 'not_found' }, { status: 404 })
+    return legacyJson({ error: 'not_found' }, 404, id)
   }
 
   let body: Record<string, unknown>
   try {
     body = await request.json() as Record<string, unknown>
   } catch {
-    return NextResponse.json({ error: 'invalid_json' }, { status: 400 })
+    return legacyJson({ error: 'invalid_json' }, 400, id)
   }
   if (!isOpportunityAction(body.action)) {
-    return NextResponse.json({ error: 'invalid_action' }, { status: 400 })
+    return legacyJson({ error: 'invalid_action' }, 400, id)
   }
 
   const headerKey = request.headers.get('idempotency-key')?.trim()
@@ -76,38 +68,19 @@ export async function POST(
     : ''
   const requestedActionKey = headerKey || bodyKey
   if (requestedActionKey.length > 160) {
-    return NextResponse.json({ error: 'invalid_idempotency_key' }, { status: 400 })
+    return legacyJson({ error: 'invalid_idempotency_key' }, 400, id)
   }
   const actionKey = requestedActionKey || randomUUID()
   const snoozeDays = typeof body.snoozeDays === 'number'
     ? body.snoozeDays
     : undefined
   const note = typeof body.note === 'string' ? body.note : null
-  const occurredAt = new Date().toISOString()
-
-  let outcomeInput: ReturnType<typeof validateOutcomeInput> | null = null
-  if (outcomesEnabled) {
-    try {
-      outcomeInput = validateOutcomeInput({
-        eventType: body.action,
-        occurredAt,
-        reasonCode: body.reasonCode ?? null,
-        reasonNote: note,
-        channel: body.channel ?? null,
-        contactPathType: body.contactPathType ?? null,
-        contactReference: body.contactReference ?? null,
-        valueMinor: null,
-        currency: null,
-        metadata: { source: 'opportunity_action' },
-        idempotencyKey: actionKey,
-      })
-    } catch (error) {
-      if (error instanceof OutcomeValidationError) {
-        return NextResponse.json({ error: error.code }, { status: 400 })
-      }
-      throw error
-    }
-  }
+  logEvent('opportunity.api.legacy_action_adapter_used', {
+    ownerId: access.ownerId,
+    workspaceId: access.workspaceId,
+    opportunityId: id,
+    action: body.action,
+  })
 
   try {
     const result = await applyOpportunityAction({
@@ -119,58 +92,52 @@ export async function POST(
       snoozeDays,
       note,
       reasonCode: body.action === 'dismissed'
-        ? outcomeInput?.reasonCode as DismissedReasonCode | null
+        ? body.reasonCode as Parameters<typeof applyOpportunityAction>[0]['reasonCode']
         : null,
-      channel: outcomeInput?.channel ?? null,
-      contactPathType: outcomeInput?.contactPathType ?? null,
-      contactReference: outcomeInput?.contactReference ?? null,
-      occurredAt,
+      channel: body.action === 'contacted'
+        ? body.channel as Parameters<typeof applyOpportunityAction>[0]['channel']
+        : null,
+      contactPathType: body.action === 'contacted'
+        ? body.contactPathType as Parameters<typeof applyOpportunityAction>[0]['contactPathType']
+        : null,
+      contactReference:
+        body.action === 'contacted' && typeof body.contactReference === 'string'
+          ? body.contactReference
+          : null,
       actorUserId: access.actorUserId,
       actorWorkspaceId: access.actorWorkspaceId,
       actorRoleSnapshot: access.actorRoleSnapshot,
       authMode: access.authMode,
-      outcomesEnabled,
     })
     if (!result) {
-      return NextResponse.json({ error: 'not_found' }, { status: 404 })
+      return legacyJson({ error: 'not_found' }, 404, id)
     }
-    return NextResponse.json({
+    return legacyJson({
       opportunity: toPublicOpportunity(result.opportunity),
       idempotent: result.idempotent,
-    })
+    }, 200, id)
   } catch (error) {
-    if (
-      error instanceof OpportunityActionConflictError ||
-      error instanceof OutcomeIdempotencyConflictError
-    ) {
-      return NextResponse.json(
+    if (error instanceof OutcomeIdempotencyConflictError) {
+      return legacyJson(
         { error: 'idempotency_key_conflict' },
-        { status: 409 },
-      )
-    }
-    if (error instanceof OpportunityTransitionConflictError) {
-      return NextResponse.json(
-        { error: 'opportunity_transition_conflict' },
-        { status: 409 },
-      )
-    }
-    if (error instanceof OpportunitySupersededConflictError) {
-      return NextResponse.json(
-        { error: error.code },
-        { status: 409 },
+        409,
+        id,
       )
     }
     if (error instanceof OutcomeValidationError) {
-      return NextResponse.json({ error: error.code }, { status: 400 })
+      return legacyJson({ error: error.code }, 400, id)
     }
     if (
       error instanceof OutcomeChronologyConflictError ||
       error instanceof OutcomeLedgerTransitionConflictError
     ) {
-      return NextResponse.json({ error: error.code }, { status: 409 })
+      return legacyJson({ error: error.code }, 409, id)
+    }
+    if (error instanceof OutcomeSupersededConflictError) {
+      return legacyJson({ error: error.code }, 409, id)
     }
     if (error instanceof OutcomeContactPrivacyUnavailableError) {
-      return NextResponse.json({ error: error.code }, { status: 503 })
+      return legacyJson({ error: error.code }, 503, id)
     }
     logError('opportunity.api.action_failed', error, {
       ownerId: access.ownerId,
@@ -178,9 +145,26 @@ export async function POST(
       opportunityId: id,
       action: body.action,
     })
-    return NextResponse.json(
+    return legacyJson(
       { error: 'opportunity_action_failed' },
-      { status: 500 },
+      500,
+      id,
     )
   }
+}
+
+function legacyJson(
+  body: Record<string, unknown>,
+  status: number,
+  opportunityId?: string,
+): NextResponse {
+  const response = NextResponse.json(body, { status })
+  response.headers.set('Deprecation', 'true')
+  if (opportunityId && /^[1-9]\d*$/.test(opportunityId)) {
+    response.headers.set(
+      'Link',
+      `</api/opportunities/${opportunityId}/outcomes>; rel="successor-version"`,
+    )
+  }
+  return response
 }

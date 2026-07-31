@@ -243,6 +243,11 @@ export interface RecordOpportunityOutcomeInput {
   actorRoleSnapshot?: WorkspaceRole | null
   authMode?: 'auth_v2' | 'auth_v2_compat' | 'legacy'
   payload: unknown
+  /**
+   * Stable semantic command used only by compatibility adapters whose source
+   * request has no occurredAt field. The canonical endpoint hashes `payload`.
+   */
+  idempotencyPayload?: unknown
   externalSystem?: string | null
   externalEventId?: string | null
   dedupeKey?: string | null
@@ -959,11 +964,13 @@ export async function recordOpportunityOutcomeInTransaction(
   const payloadHash = hashOutcomePayload({
     opportunityId: context.id,
     actorType: input.actorType,
-    payload: {
-      ...payload,
-      contactReference: undefined,
-      contactReferenceHash: protectedContactReference?.hash ?? null,
-    },
+    payload: input.idempotencyPayload === undefined
+      ? {
+          ...payload,
+          contactReference: undefined,
+          contactReferenceHash: protectedContactReference?.hash ?? null,
+        }
+      : input.idempotencyPayload,
     externalSystem,
     externalEventId,
     dedupeKey,
