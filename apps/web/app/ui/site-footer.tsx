@@ -9,8 +9,8 @@ import { BrandLogo } from "./brand-logo";
  * Site-wide footer — a quiet, minimal closer for every page surface.
  *
  * Three lines, no more: brand + nav links; one operator-requisites line (ФИО,
- * ИНН, email); the copyright. The full status and service description live on
- * /legal. Public operator data is imported from one source of truth.
+ * ИНН and contacts); the copyright. The full status and service description
+ * live on /legal. Public operator data is imported from one source of truth.
  *
  * The /admin link is operator-gated: it renders ONLY for a browser that
  * carries the signed `rr_op` operator session (see lib/operator-auth.ts).
@@ -57,6 +57,17 @@ export async function SiteFooter(props: { tone?: "light" | "dark" }) {
           <span>ИНН <span className={s.footerOperatorInn}>{OPERATOR_REQUISITES.inn}</span></span>
           <span className={s.footerOperatorSep} aria-hidden="true">·</span>
           <a href={`mailto:${OPERATOR_REQUISITES.email}`} className={s.footerOperatorEmail}>{OPERATOR_REQUISITES.email}</a>
+          {OPERATOR_REQUISITES.phone ? (
+            <>
+              <span className={s.footerOperatorSep} aria-hidden="true">·</span>
+              <a
+                href={`tel:${OPERATOR_REQUISITES.phone.replace(/[^+\d]/g, "")}`}
+                className={s.footerOperatorEmail}
+              >
+                {OPERATOR_REQUISITES.phone}
+              </a>
+            </>
+          ) : null}
         </div>
 
         <div className={s.footerCopy}>
