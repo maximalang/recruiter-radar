@@ -4,9 +4,10 @@ main[data-deploy-anchor="recruiter-radar-landing-v4"] {
   color-scheme: dark;
 }
 
-/* The old landing ambience is a pale fixed layer. Inside the new isolated
-   cinematic stacking context it paints above the main background, washing out
-   the hero and sticky scenes. The cinematic radar replaces it completely. */
+/* The original landing ambience is a pale fixed layer. Depending on the
+   provider wrapper it can be either a direct child or one level deeper. The
+   cinematic radar owns the background, so both placements must be disabled. */
+main[data-deploy-anchor="recruiter-radar-landing-v4"] > div[aria-hidden="true"],
 main[data-deploy-anchor="recruiter-radar-landing-v4"] > div > div[aria-hidden="true"] {
   display: none !important;
 }
@@ -25,6 +26,91 @@ main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero]
 
 main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] p {
   color: rgba(247, 244, 235, 0.74) !important;
+}
+
+/* Every chapter owns an opaque scene background. This prevents legacy pale
+   module backgrounds from appearing as horizontal bands between sticky acts. */
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #preview,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #how-it-works,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #quality,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #pricing,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #faq {
+  background:
+    radial-gradient(circle at 82% 18%, rgba(var(--rr-scene-accent-rgb), 0.09), transparent 30rem),
+    linear-gradient(145deg, rgba(6, 11, 20, 0.99), rgba(2, 5, 10, 0.995)) !important;
+  color: #f7f4eb !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #preview [data-preview-section-content] {
+  position: relative;
+  z-index: 1;
+  background: transparent !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #preview [data-preview-section-content]::before,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #preview [data-preview-section-content]::after {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Delivery used a bright email-client treatment while the methodology card was
+   already dark. Keep the channel metaphor, but render it as part of the same
+   evidence console rather than a second, unrelated website. */
+main[data-deploy-anchor="recruiter-radar-landing-v4"] [data-testid="landing-delivery-demo"] {
+  border: 1px solid rgba(255, 255, 255, 0.13) !important;
+  border-radius: 2px !important;
+  background:
+    linear-gradient(145deg, rgba(var(--rr-scene-accent-rgb), 0.075), transparent 44%),
+    rgba(7, 12, 21, 0.92) !important;
+  color: #f7f4eb !important;
+  box-shadow: 18px 18px 0 rgba(var(--rr-scene-accent-rgb), 0.055) !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] [data-testid="landing-delivery-demo"] > div,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] [data-testid="landing-delivery-demo"] > p {
+  color: inherit !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] [data-testid="landing-delivery-demo"] [role="tablist"] {
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  background: rgba(255, 255, 255, 0.025) !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] [data-testid="landing-delivery-demo"] button {
+  border-color: rgba(255, 255, 255, 0.16) !important;
+  background: rgba(255, 255, 255, 0.035) !important;
+  color: rgba(247, 244, 235, 0.76) !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] [data-testid="landing-delivery-demo"] button:hover,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] [data-testid="landing-delivery-demo"] button:focus-visible {
+  border-color: rgba(var(--rr-scene-accent-rgb), 0.55) !important;
+  color: #ffffff !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] [data-testid="landing-delivery-demo"] button[aria-selected="true"],
+main[data-deploy-anchor="recruiter-radar-landing-v4"] [data-testid="landing-delivery-demo"] button[aria-pressed="true"] {
+  border-color: var(--rr-scene-accent) !important;
+  background: var(--rr-scene-accent) !important;
+  color: #07090d !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] [data-testid="landing-delivery-demo"] [role="tabpanel"] {
+  border: 1px solid rgba(255, 255, 255, 0.13) !important;
+  background:
+    linear-gradient(135deg, rgba(var(--rr-scene-accent-rgb), 0.08), transparent 52%),
+    rgba(2, 7, 15, 0.92) !important;
+  color: #f7f4eb !important;
+  box-shadow: none !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] [data-testid="landing-delivery-demo"] [role="tabpanel"] * {
+  color: inherit !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] [data-testid="landing-delivery-demo"] [role="tabpanel"] > div > span,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] [data-testid="landing-delivery-demo"] > p:last-child {
+  color: rgba(247, 244, 235, 0.56) !important;
 }
 
 /* The included-features panel was the last remaining white SaaS surface. */
@@ -52,5 +138,9 @@ main[data-deploy-anchor="recruiter-radar-landing-v4"] #pricing > div:last-child 
     white-space: nowrap !important;
     overflow-wrap: normal;
     letter-spacing: -0.045em !important;
+  }
+
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] [data-testid="landing-delivery-demo"] {
+    box-shadow: 10px 10px 0 rgba(var(--rr-scene-accent-rgb), 0.05) !important;
   }
 }
