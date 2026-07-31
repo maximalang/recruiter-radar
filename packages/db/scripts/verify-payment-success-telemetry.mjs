@@ -64,6 +64,14 @@ try {
   );
   const userId = userResult.rows[0].id;
 
+  const yookassaUserResult = await client.query(
+    `INSERT INTO users (email, full_name)
+     VALUES ($1, $2)
+     RETURNING id`,
+    ["yookassa-contract-test@example.invalid", "YooKassa Contract User"],
+  );
+  const yookassaUserId = yookassaUserResult.rows[0].id;
+
   for (const initialStatus of initialStatuses) {
     const orderResult = await client.query(
       `INSERT INTO checkout_orders (
@@ -190,7 +198,7 @@ try {
      VALUES ($1, 'pilot', 2990, 'RUB', 'pending', $2, $3, $4::jsonb, 'yookassa', 'payment-yookassa-verified')
      RETURNING id`,
     [
-      userId,
+      yookassaUserId,
       "YooKassa Contract Test",
       "yookassa-contract@example.invalid",
       JSON.stringify(verifiedYooKassaPayload),
@@ -227,7 +235,7 @@ try {
     `INSERT INTO pilot_enrollments (user_id, status, starts_at, ends_at, activated_by, notes)
      VALUES ($1, 'active', NOW() - INTERVAL '1 hour', NOW() + INTERVAL '6 days', 'yookassa_contract_test', 'before_full_refund')
      RETURNING id`,
-    [userId],
+    [yookassaUserId],
   );
   const enrollmentId = enrollmentResult.rows[0].id;
 
@@ -264,7 +272,7 @@ try {
       enrollment_status: "canceled",
       activated_by: "refund_reconciliation",
     },
-    "full YooKassa refund must become terminal and revoke the active pilot entitlement",
+    "full YooKassa refund must become terminal and revoke the final active pilot entitlement",
   );
 
   await expectStatementFailure({
@@ -289,7 +297,7 @@ try {
      VALUES ($1, 'pilot', 2990, 'RUB', 'pending', 'Bad Amount', 'bad-amount@example.invalid', $2::jsonb, 'yookassa')
      RETURNING id`,
     [
-      userId,
+      yookassaUserId,
       JSON.stringify({
         paymentProviderPayload: {
           amount: { value: "1.00", currency: "RUB" },
@@ -319,7 +327,7 @@ try {
      VALUES ($1, 'pilot', 2990, 'RUB', 'pending', 'Bad Currency', 'bad-currency@example.invalid', $2::jsonb, 'yookassa')
      RETURNING id`,
     [
-      userId,
+      yookassaUserId,
       JSON.stringify({
         paymentProviderPayload: {
           amount: { value: "2990.00", currency: "USD" },
@@ -442,7 +450,7 @@ try {
         verifiedPendingToPaid: true,
         paidDowngradeRejected: true,
         fullRefundTerminal: true,
-        entitlementRevoked: true,
+        finalEntitlementRevoked: true,
         amountMismatchRejected: true,
         currencyMismatchRejected: true,
       },
