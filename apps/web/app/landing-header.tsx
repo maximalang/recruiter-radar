@@ -88,7 +88,8 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
     <header
       ref={headerRef}
       className={hpStyles.topBar}
-      data-brand-header="recruiter-radar-v4"
+      data-deploy-anchor="recruiter-radar-landing-v3"
+      data-brand-header="recruiter-radar-v3"
       style={{
         position: "fixed",
         top: "14px",
