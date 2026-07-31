@@ -1,54 +1,76 @@
-import fs from 'node:fs'
-import path from 'node:path'
+/** @jest-environment node */
 
-import { buildPaymentReadinessReport } from '@/lib/payment-readiness'
+describe("payment readiness", () => {
+  const originalEnv = { ...process.env };
 
-describe('payment readiness', () => {
-  test('reports sales-assisted state when no provider is configured', () => {
-    expect(buildPaymentReadinessReport({
+  afterEach(() => {
+    process.env = { ...originalEnv };
+    jest.resetModules();
+  });
+
+  test("fails closed when YooKassa is not selected", async () => {
+    process.env.OPERATOR_PUBLIC_POSTAL_ADDRESS = "г. Москва, адрес для корреспонденции";
+    const { buildPaymentReadinessReport } = await import("@/lib/payment-readiness");
+    const report = buildPaymentReadinessReport({
       provider: null,
       configured: false,
       mode: null,
       webhookConfigured: false,
-      siteUrlConfigured: true,
-    })).toMatchObject({
-      selfServePilotReady: false,
-      recurringBillingReady: false,
-      customerFlow: {
-        pilot: 'saved_request',
-        monthly: 'sales_request',
-        quarterly: 'sales_request',
-      },
-      rfProvider: { status: 'blocked', provider: null },
-    })
-  })
+      siteUrlConfigured: false,
+    });
 
-  test('marks only the pilot as self-service when Stripe is fully configured', () => {
-    expect(buildPaymentReadinessReport({
-      provider: 'stripe',
+    expect(report).toMatchObject({
+      selfServePilotReady: false,
+      liveLaunchReady: false,
+      recurringBillingReady: false,
+      rfProvider: { status: "blocked", provider: null },
+      customerFlow: { pilot: "saved_request", monthly: "sales_request", quarterly: "sales_request" },
+    });
+  });
+
+  test("separates technical integration from verified live launch", async () => {
+    process.env.OPERATOR_PUBLIC_POSTAL_ADDRESS = "г. Москва, адрес для корреспонденции";
+    const { buildPaymentReadinessReport } = await import("@/lib/payment-readiness");
+    const report = buildPaymentReadinessReport({
+      provider: "yookassa",
       configured: true,
-      mode: 'live',
+      mode: "test",
       webhookConfigured: true,
       siteUrlConfigured: true,
-    })).toMatchObject({
-      selfServePilotReady: true,
-      recurringBillingReady: false,
-      customerFlow: {
-        pilot: 'self_service_payment',
-        monthly: 'sales_request',
-        quarterly: 'sales_request',
-      },
-      rfProvider: { status: 'blocked' },
-    })
-  })
+    });
 
-  test('checkout copy does not imply automatic recurring billing', () => {
-    const checkoutPage = fs.readFileSync(path.resolve(process.cwd(), 'app/checkout/page.tsx'), 'utf8')
-    const payments = fs.readFileSync(path.resolve(process.cwd(), 'lib/payments.ts'), 'utf8')
+    expect(report.selfServePilotReady).toBe(true);
+    expect(report.merchantModerationReady).toBe(true);
+    expect(report.liveLaunchReady).toBe(false);
+    expect(report.launch.blockers).toEqual(expect.arrayContaining([
+      expect.stringContaining("YOOKASSA_MODE"),
+      expect.stringContaining("тестовый платёж"),
+      expect.stringContaining("чека НПД"),
+      expect.stringContaining("Роскомнадзора"),
+    ]));
+  });
 
-    expect(checkoutPage).toContain('без автоматического списания')
-    expect(checkoutPage).toContain('Оставить заявку')
-    expect(payments).toContain('Recurring plans must NEVER reach the payment provider')
-    expect(payments).toContain('status: "unavailable"')
-  })
-})
+  test("requires explicit ISO verification records before live-ready", async () => {
+    process.env.OPERATOR_PUBLIC_POSTAL_ADDRESS = "г. Москва, адрес для корреспонденции";
+    process.env.YOOKASSA_LAUNCH_VERIFIED_AT = "2026-07-31T18:30:00.000Z";
+    process.env.NPD_RECEIPT_FLOW_VERIFIED_AT = "2026-07-31T18:31:00.000Z";
+    process.env.PDN_COMPLIANCE_VERIFIED_AT = "2026-07-31T18:32:00.000Z";
+    const { buildPaymentReadinessReport } = await import("@/lib/payment-readiness");
+    const report = buildPaymentReadinessReport({
+      provider: "yookassa",
+      configured: true,
+      mode: "live",
+      webhookConfigured: true,
+      siteUrlConfigured: true,
+    });
+
+    expect(report.liveLaunchReady).toBe(true);
+    expect(report.launch).toMatchObject({
+      status: "ready",
+      technicalVerificationRecorded: true,
+      npdReceiptVerificationRecorded: true,
+      pdnComplianceVerificationRecorded: true,
+      blockers: [],
+    });
+  });
+});

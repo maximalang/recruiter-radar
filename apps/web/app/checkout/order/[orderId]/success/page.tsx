@@ -6,6 +6,7 @@ import {
   syncCheckoutOrderAfterSuccessReturn
 } from "../../../../../lib/payments";
 import { getAuthorizedUserId } from "../../../../../lib/auth-v2/authorization";
+import { OPERATOR_REQUISITES } from "../../../../../lib/operatorRequisites";
 import {
   NoticeBox,
   PageFrame,
@@ -29,64 +30,48 @@ export default async function CheckoutSuccessPage({ params, searchParams }: Chec
   const resolvedParams = await params;
   const resolvedSearchParams = (await searchParams) ?? {};
   const ownerId = await getAuthorizedUserId("billing:read");
-
-  if (!ownerId) {
-    notFound();
-  }
+  if (!ownerId) notFound();
 
   const ownedOrder = await ensurePilotOrderOnboardingReady(resolvedParams.orderId, { ownerId });
-
-  if (!ownedOrder) {
-    notFound();
-  }
+  if (!ownedOrder) notFound();
 
   const order =
-    ownedOrder.status === "paid"
+    ownedOrder.status === "paid" || ownedOrder.status === "refunded"
       ? ownedOrder
-      : (await syncCheckoutOrderAfterSuccessReturn({
-          orderId: ownedOrder.id,
-          ownerId,
-          searchParams: resolvedSearchParams
-        })) ?? ownedOrder;
+      : (await syncCheckoutOrderAfterSuccessReturn({ orderId: ownedOrder.id, ownerId, searchParams: resolvedSearchParams })) ?? ownedOrder;
 
-  if (order.status === "paid") {
-    redirect(`/onboarding/pilot/${order.id}`);
-  }
+  if (order.status === "paid") redirect(`/onboarding/pilot/${order.id}`);
 
-  const onboardingHref = `/onboarding/pilot/${order.id}`;
-
+  const isRefunded = order.status === "refunded";
   return (
     <PageFrame maxWidth="720px">
-      <Link href="/" className={ppStyles.backLink}>
-        На главную
-      </Link>
-
+      <Link href="/" className={ppStyles.backLink}>На главную</Link>
       <SurfaceCard style={{ display: "grid", gap: "20px" }}>
-        <StatusBadge tone="warning">Ждём подтверждение оплаты</StatusBadge>
-
+        <StatusBadge tone="warning">{isRefunded ? "Средства возвращены" : "Ждём подтверждение оплаты"}</StatusBadge>
         <SectionIntro
-          title="Платёж ещё подтверждается"
-          description="Провайдер пока не сообщил об успешной оплате. Это занимает до нескольких минут."
+          title={isRefunded ? "Этот заказ полностью возвращён" : "Платёж ещё подтверждается"}
+          description={
+            isRefunded
+              ? "Старая ссылка успешной оплаты не может восстановить доступ или повторно изменить финансовый статус заказа."
+              : "Статус проверяется по API платёжного провайдера. Возврат браузера на эту страницу сам по себе не выдаёт доступ."
+          }
         />
-
         <NoticeBox
           tone="info"
           title="Что делать"
-          description="Можно открыть онбординг — он подхватит оплату автоматически, как только она подтвердится."
+          description={
+            isRefunded
+              ? `Для нового периода оформите новый заказ. Вопросы: ${OPERATOR_REQUISITES.email}.`
+              : "Подождите несколько минут и обновите страницу. Если платёж списан, но статус не изменился, обратитесь в поддержку и не оплачивайте заказ повторно."
+          }
         />
-
         <div className={ppStyles.summaryBox}>
           <SummaryRow label="Тариф" value={order.payload.planName} />
           <SummaryRow label="Статус оплаты" value={translateOrderStatus(order.status)} />
         </div>
-
         <div className={ipStyles.chipWrap}>
-          <Link href={onboardingHref} className={ppStyles.primaryAction}>
-            Перейти к онбордингу
-          </Link>
-          <Link href="/" className={ppStyles.secondaryAction}>
-            На главную
-          </Link>
+          {!isRefunded ? <Link href={`/onboarding/pilot/${order.id}`} className={ppStyles.primaryAction}>Проверить статус</Link> : null}
+          <Link href="/" className={isRefunded ? ppStyles.primaryAction : ppStyles.secondaryAction}>На главную</Link>
         </div>
       </SurfaceCard>
     </PageFrame>

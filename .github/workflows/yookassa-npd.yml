@@ -1,0 +1,61 @@
+name: YooKassa and NPD contracts
+
+on:
+  push:
+    branches: [ main, develop, 'codex/**', 'feat/yookassa-npd-readiness' ]
+  pull_request:
+    branches: [ main ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  yookassa-npd-contracts:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    env:
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Apply all migrations
+        run: node packages/db/scripts/migrate.mjs
+      - name: Verify NPD receipt database operations
+        run: node packages/db/scripts/verify-npd-receipt-operations.mjs
+      - name: Verify registration preflight contract
+        working-directory: apps/web
+        env:
+          OPERATOR_PUBLIC_EMAIL: support@recruiter-radar.ru
+          OPERATOR_PUBLIC_PHONE: '+7 900 966-60-92'
+          OPERATOR_PUBLIC_POSTAL_ADDRESS: '123456, Россия, г. Тестовый, ул. Тестовая, д. 1'
+          PAYMENTS_PROVIDER: yookassa
+          PAYMENTS_SITE_URL: https://recruiter-radar.ru
+          YOOKASSA_WEBHOOK_URL: https://recruiter-radar.ru/api/billing/webhook/yookassa
+          POSTBOX_FROM: 'Recruiter Radar <support@recruiter-radar.ru>'
+          ADMIN_OPERATOR_PASSWORD: test-operator-password
+          ADMIN_API_KEY: test-admin-api-key-at-least-24-characters
+          CRON_API_KEY: test-cron-api-key-at-least-24-characters
+          SESSION_SECRET: test-session-secret-at-least-32-characters
+        run: node scripts/verify-yookassa-readiness.mjs --stage=registration --no-network
+      - name: Type check web application
+        run: npm run web:check
+      - name: Run YooKassa and readiness tests
+        run: npm test --workspace @recruiter-radar/web -- --runInBand --testPathPattern='paymentsYookassa|payment-readiness|readiness-routes|yandex-metrika'
