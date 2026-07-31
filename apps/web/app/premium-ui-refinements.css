@@ -171,8 +171,10 @@ main[class*="internalPageFrame"] div[class*="emptyStateIcon"] svg {
   }
 
   [data-deploy-anchor^="recruiter-radar-landing"] [class*="heroTitleAccent"] {
-    font-size: 0.72em;
-    white-space: normal;
+    font-size: clamp(1.7rem, 8vw, 2.05rem);
+    line-height: 1.08;
+    letter-spacing: -0.055em;
+    white-space: nowrap;
   }
 
   main[class*="internalPageFrame"] div[class*="emptyState"]:not([class*="emptyStateIcon"]),
