@@ -40,10 +40,10 @@ export type CheckoutOrderPayload = {
   excludedLocations: string[];
   remoteFriendly: boolean;
   comment: string | null;
-  legalAcceptedAt: string | null;
-  termsRevision: string | null;
-  privacyRevision: string | null;
-  personalDataConsentRevision: string | null;
+  legalAcceptedAt?: string | null;
+  termsRevision?: string | null;
+  privacyRevision?: string | null;
+  personalDataConsentRevision?: string | null;
   pilotApplicationId: string | null;
   clientProfileId: string | null;
   onboardingStatus: CheckoutOrderOnboardingStatus;
