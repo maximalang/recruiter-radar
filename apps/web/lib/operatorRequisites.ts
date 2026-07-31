@@ -26,8 +26,8 @@ export const OPERATOR_REQUISITES = {
   status: "Самозанятый, плательщик НПД (налог на профессиональный доход)",
   /** Service description — shown on /legal. */
   service: "Recruiter Radar — ежедневный радар по компаниям с активным наймом",
-  /** Public operator/support email registered for recruiter-radar.ru. */
-  email: "2.dkv@recruiter-radar.ru",
+  /** Public customer-support email created for recruiter-radar.ru. */
+  email: "support@recruiter-radar.ru",
   /** Public support phone required for merchant moderation; never invent a value. */
   phone: readPublicRequisite(process.env.OPERATOR_PUBLIC_PHONE),
   /** Public postal/contact address required for merchant moderation. */
