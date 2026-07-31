@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getAccountById } from "@/lib/account-auth";
 import { getAuthorizedUserId } from "@/lib/auth-v2/authorization";
 import { buildLegalAcceptanceAudit } from "@/lib/legalDocuments";
+import { OPERATOR_REQUISITES } from "@/lib/operatorRequisites";
 import { startCheckoutOrder } from "@/lib/payments";
 import {
   buildCheckoutHref,
@@ -31,7 +32,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Оформление — Recruiter Radar",
-  description: "Безопасное оформление пробной недели или заявки на подключение Recruiter Radar.",
+  description: "Проверка тарифа, условий цифрового доступа и безопасная оплата Recruiter Radar через ЮKassa.",
 };
 
 export default async function CheckoutPage(props: {
@@ -90,7 +91,7 @@ export default async function CheckoutPage(props: {
       />
       <InternalPageHeader
         title={isRequest ? `Подключение: ${plan.name}` : "Оформление пробной недели"}
-        subtitle="Заказ привязан к подтверждённому аккаунту — статусы и настройки не потеряются после оплаты."
+        subtitle="До подтверждения вы увидите тариф, срок, итоговую стоимость, порядок получения доступа и юридические условия."
       />
       <div className={ipStyles.narrowLayout}>
         <ContentCard>
@@ -98,12 +99,26 @@ export default async function CheckoutPage(props: {
           <p className={ipStyles.bodyText}>
             {isRequest
               ? "Оставьте заявку на долгосрочный тариф. Мы свяжемся по рабочему email и согласуем подключение без автоматического списания."
-              : "Оплата запускается только после явного подтверждения. Затем вы настроите профиль поиска и получите первый тестовый радар."}
+              : "Разовая оплата через ЮKassa. После подтверждения платежа вы перейдёте к настройке профиля и активации цифрового доступа."}
           </p>
-          <div className={ipStyles.fieldRow}>Тариф: <strong className={ipStyles.fieldRowStrong}>{plan.name}</strong></div>
-          <div className={ipStyles.fieldRow}>Стоимость: <strong className={ipStyles.fieldRowStrong}>{plan.price}</strong></div>
+
+          <div className={ppStyles.summaryBox} style={{ marginTop: 16 }}>
+            <div className={ipStyles.fieldRow}>Услуга: <strong className={ipStyles.fieldRowStrong}>Доступ к Recruiter Radar</strong></div>
+            <div className={ipStyles.fieldRow}>Тариф: <strong className={ipStyles.fieldRowStrong}>{plan.name}</strong></div>
+            <div className={ipStyles.fieldRow}>Срок доступа: <strong className={ipStyles.fieldRowStrong}>{plan.cadence}</strong></div>
+            <div className={ipStyles.fieldRow}>Итого: <strong className={ipStyles.fieldRowStrong}>{plan.price}</strong></div>
+            <div className={ipStyles.fieldRow}>Продление: <strong className={ipStyles.fieldRowStrong}>не автоматическое</strong></div>
+          </div>
+
           {input.specialization ? <div className={ipStyles.fieldRow}>Специализация: <strong className={ipStyles.fieldRowStrong}>{input.specialization}</strong></div> : null}
           {input.targetCity ? <div className={ipStyles.fieldRow}>Город: <strong className={ipStyles.fieldRowStrong}>{input.targetCity}</strong></div> : null}
+
+          {!isRequest ? (
+            <div className={ipStyles.bodyTextMutedBlock} style={{ marginTop: 16 }}>
+              <strong>Получение услуги.</strong> Физической доставки нет. После успешной оплаты откроется настройка профиля в личном кабинете; если потребуется ручная проверка, первый рабочий радар будет подготовлен не позднее одного рабочего дня. Чек НПД направляется в электронной форме. Подробности — на странице{" "}
+              <Link href="/payment-and-delivery">«Оплата и возврат»</Link>.
+            </div>
+          ) : null}
 
           {account ? (
             <form
@@ -122,7 +137,9 @@ export default async function CheckoutPage(props: {
                 </p>
               ) : null}
 
-              <p className={ipStyles.bodyTextMutedBlock}>Аккаунт: {account.email}. На этот адрес придут документы и ссылка для возврата к настройке.</p>
+              <p className={ipStyles.bodyTextMutedBlock}>
+                Аккаунт и контакт для документов: <strong>{account.email}</strong>. На этот адрес будет направлен чек НПД и сообщения по заказу.
+              </p>
 
               <label style={{ display: "flex", alignItems: "flex-start", gap: 10, lineHeight: 1.45 }}>
                 <input
@@ -132,20 +149,23 @@ export default async function CheckoutPage(props: {
                   style={{ marginTop: 4, width: 18, height: 18, flex: "0 0 auto" }}
                 />
                 <span>
-                  Я принимаю <Link href="/terms">публичную оферту</Link> и подтверждаю,
-                  что ознакомлен с <Link href="/privacy">политикой обработки персональных данных</Link>.
+                  Я принимаю <Link href="/terms">публичную оферту</Link>, подтверждаю выбранные тариф, срок и стоимость, а также ознакомлен с <Link href="/privacy">политикой обработки персональных данных</Link> и <Link href="/payment-and-delivery">порядком оплаты и возврата</Link>.
                 </span>
               </label>
 
               {checkoutError === "legal" ? (
                 <p role="alert" style={{ margin: 0, color: "var(--danger, #b42318)" }}>
-                  Для продолжения необходимо принять оферту и ознакомиться с политикой обработки данных.
+                  Для продолжения необходимо подтвердить условия заказа и принять оферту.
                 </p>
               ) : null}
 
               <button type="submit" className={ppStyles.primaryAction}>
-                {isRequest ? "Оставить заявку" : "Перейти к оплате"}
+                {isRequest ? "Оставить заявку" : `Оплатить ${plan.price} через ЮKassa`}
               </button>
+
+              <p className={ipStyles.bodyTextMutedBlock} style={{ margin: 0 }}>
+                Вопросы до оплаты: <a href={`mailto:${OPERATOR_REQUISITES.email}`}>{OPERATOR_REQUISITES.email}</a>. Данные банковской карты вводятся на стороне ЮKassa.
+              </p>
             </form>
           ) : (
             <div style={{ display: "grid", gap: 12, marginTop: 18 }}>
