@@ -118,7 +118,7 @@ export function createYooKassaPaymentAdapter(): PaymentProviderAdapter {
       if (!paymentId || !credentials) return null;
 
       const payment = await fetchPayment(paymentId, credentials);
-      const orderId = normalizeOptionalText(payment.metadata?.order_id);
+      const orderId = readOptionalString(payment.metadata?.order_id);
       if (orderId && orderId !== order.id) {
         throw new Error("YooKassa payment metadata does not match the checkout order.");
       }
@@ -142,8 +142,8 @@ export function createYooKassaPaymentAdapter(): PaymentProviderAdapter {
         return webhookError(400, "Invalid YooKassa notification type.");
       }
 
-      const event = normalizeOptionalText(notification.event);
-      const paymentId = normalizeOptionalText(notification.object?.id);
+      const event = readOptionalString(notification.event);
+      const paymentId = readOptionalString(notification.object?.id);
       if (!event || !paymentId) {
         return webhookError(400, "Missing YooKassa event or payment id.");
       }
@@ -166,7 +166,7 @@ export function createYooKassaPaymentAdapter(): PaymentProviderAdapter {
         return webhookError(502, "Unable to verify YooKassa payment.");
       }
 
-      const orderId = normalizeOptionalText(payment.metadata?.order_id);
+      const orderId = readOptionalString(payment.metadata?.order_id);
       if (!orderId) {
         return webhookError(400, "YooKassa payment has no order_id metadata.");
       }
@@ -244,16 +244,16 @@ async function yooKassaRequest<T>(
 }
 
 function mapPaymentToSyncResult(payment: YooKassaPayment): PaymentSyncResult {
-  const providerPaymentId = normalizeOptionalText(payment.id);
+  const providerPaymentId = readOptionalString(payment.id);
   const status = mapStatus(payment.status);
-  const cancellationReason = normalizeOptionalText(payment.cancellation_details?.reason);
+  const cancellationReason = readOptionalString(payment.cancellation_details?.reason);
 
   return {
     status,
     providerPaymentId,
     paidAt:
       status === "paid"
-        ? normalizeOptionalText(payment.captured_at) ?? new Date().toISOString()
+        ? readOptionalString(payment.captured_at) ?? new Date().toISOString()
         : null,
     payload: buildSafePayload(payment),
     message:
@@ -266,7 +266,7 @@ function mapPaymentToSyncResult(payment: YooKassaPayment): PaymentSyncResult {
 }
 
 function mapStatus(value: unknown): CheckoutOrderStatus {
-  switch (normalizeOptionalText(value)) {
+  switch (readOptionalString(value)) {
     case "succeeded":
       return "paid";
     case "canceled":
@@ -281,21 +281,21 @@ function mapStatus(value: unknown): CheckoutOrderStatus {
 
 function buildSafePayload(payment: YooKassaPayment): Record<string, unknown> {
   return {
-    id: normalizeOptionalText(payment.id),
-    status: normalizeOptionalText(payment.status),
+    id: readOptionalString(payment.id),
+    status: readOptionalString(payment.status),
     paid: payment.paid === true,
     amount: {
-      value: normalizeOptionalText(payment.amount?.value),
-      currency: normalizeOptionalText(payment.amount?.currency),
+      value: readOptionalString(payment.amount?.value),
+      currency: readOptionalString(payment.amount?.currency),
     },
-    createdAt: normalizeOptionalText(payment.created_at),
-    capturedAt: normalizeOptionalText(payment.captured_at),
-    canceledAt: normalizeOptionalText(payment.canceled_at),
+    createdAt: readOptionalString(payment.created_at),
+    capturedAt: readOptionalString(payment.captured_at),
+    canceledAt: readOptionalString(payment.canceled_at),
     test: payment.test === true,
     cancellation: payment.cancellation_details
       ? {
-          party: normalizeOptionalText(payment.cancellation_details.party),
-          reason: normalizeOptionalText(payment.cancellation_details.reason),
+          party: readOptionalString(payment.cancellation_details.party),
+          reason: readOptionalString(payment.cancellation_details.reason),
         }
       : null,
   };
@@ -316,8 +316,12 @@ function formatAmount(amountMinor: number): string {
   return (amountMinor / 100).toFixed(2);
 }
 
+function readOptionalString(value: unknown): string | null {
+  return typeof value === "string" ? normalizeOptionalText(value) : null;
+}
+
 function readRequiredString(value: unknown, message: string): string {
-  const normalized = normalizeOptionalText(value);
+  const normalized = readOptionalString(value);
   if (!normalized) throw new Error(message);
   return normalized;
 }
@@ -325,7 +329,7 @@ function readRequiredString(value: unknown, message: string): string {
 function readErrorDescription(value: unknown): string | null {
   if (!value || typeof value !== "object") return null;
   const candidate = value as Record<string, unknown>;
-  return normalizeOptionalText(candidate.description) ?? normalizeOptionalText(candidate.code);
+  return readOptionalString(candidate.description) ?? readOptionalString(candidate.code);
 }
 
 function webhookError(status: number, body: string): PaymentWebhookParseResult {
