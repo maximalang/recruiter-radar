@@ -188,10 +188,28 @@ await page.getByRole("heading", {
   name: /Компании, которым стоит написать сегодня/,
 }).waitFor();
 await assertNoHorizontalOverflow(page, "desktop");
-assert.equal(await page.locator("#yandex-metrika-loader").count(), 1);
+assert.equal(await page.locator("#yandex-metrika-loader").count(), 0);
+assert.equal(
+  await page.evaluate(() =>
+    performance
+      .getEntriesByType("resource")
+      .filter((entry) => entry.name.includes("mc.yandex.ru")).length
+  ),
+  0,
+  "Yandex Metrika must not load before explicit consent",
+);
+const analyticsConsentDialog = page.getByRole("dialog", { name: "Настройки аналитики" });
+await analyticsConsentDialog.waitFor();
+await analyticsConsentDialog.getByRole("button", { name: "Разрешить аналитику" }).click();
+await page.locator("#yandex-metrika-loader").waitFor();
 await page.waitForFunction(() =>
   Array.isArray(window.ym?.a) &&
   window.ym.a.some((args) => args[1] === "hit" && args[2] === "/")
+);
+await page.waitForFunction(() =>
+  performance
+    .getEntriesByType("resource")
+    .some((entry) => entry.name.includes("mc.yandex.ru/metrika/tag.js"))
 );
 assertSingleEvent(analyticsEvents, "landing_viewed");
 
@@ -388,9 +406,11 @@ if (checkoutFixture) {
     return request.postDataJSON().name === "payment_started";
   });
   await page.locator('[data-checkout-form] input[name="agencyName"]').fill("Private Agency");
+  await page.locator('[data-checkout-form] input[name="offerAccepted"]').check();
+  await page.locator('[data-checkout-form] input[name="personalDataAccepted"]').check();
   await Promise.all([
     paymentEventRequest,
-    page.locator("[data-checkout-form]").getByRole("button", { name: /Перейти к оплате/ }).click(),
+    page.locator("[data-checkout-form]").getByRole("button", { name: /Оплатить .* через ЮKassa/ }).click(),
   ]);
   assertSingleEvent(analyticsEvents, "payment_started", "checkout");
   assert.equal(JSON.stringify(analyticsEvents).includes("Private Agency"), false);
@@ -411,6 +431,8 @@ if (checkoutFixture) {
     return request.postDataJSON().name === "continuation_requested";
   });
   await page.locator('[data-checkout-form] input[name="agencyName"]').fill("Private Agency");
+  await page.locator('[data-checkout-form] input[name="offerAccepted"]').check();
+  await page.locator('[data-checkout-form] input[name="personalDataAccepted"]').check();
   await Promise.all([
     continuationEventRequest,
     page.locator("[data-checkout-form]").getByRole("button", { name: /Оставить заявку/ }).click(),
