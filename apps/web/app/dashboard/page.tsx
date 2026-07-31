@@ -20,11 +20,11 @@ import {
   ProductWorkspaceHeader,
 } from "../ui/product-workspace";
 import { SiteFooter } from "../ui/site-footer";
-import dashStyles from "./dashboard-workspace.module.css";
+import dashStyles from "./dashboard-v2.module.css";
 
 export const metadata: Metadata = {
-  title: "Командный центр — Recruiter Radar",
-  description: "Компании на сегодня, очередь проверки и готовность личного радара.",
+  title: "Morning Brief — Recruiter Radar",
+  description: "Коммерческие возможности на сегодня, очередь проверки и готовность Agency DNA.",
 };
 
 export const dynamic = "force-dynamic";
@@ -93,13 +93,13 @@ export default async function DashboardPage() {
   return (
     <ProductWorkspaceFrame navItems={DASHBOARD_NAV} footer={<SiteFooter />}>
       <ProductWorkspaceHeader
-        eyebrow="Утренний обзор"
-        title="Командный центр"
-        subtitle="Приоритетные компании, очередь проверки и состояние радара — в одном рабочем контексте."
-        status="Наблюдение активно"
+        eyebrow="Evidence-first revenue intelligence"
+        title="Сегодня для агентства"
+        subtitle="Morning Brief показывает не рынок целиком, а конкретные коммерческие окна: почему сейчас, насколько сигнал подтверждён и что делать дальше."
+        status="Радар активен"
         actions={(
           <Link href="/leads" className={dashStyles.workspaceCta}>
-            Открыть все возможности
+            Все возможности
           </Link>
         )}
       />
