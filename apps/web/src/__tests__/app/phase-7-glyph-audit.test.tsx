@@ -53,6 +53,7 @@ const RENDER_FILES = [
   'legal/page.tsx',
   'terms/page.tsx',
   'privacy/page.tsx',
+  'personal-data-consent/page.tsx',
   'admin/page.tsx',
   'checkout/page.tsx',
   'ui/internal-page.tsx',
