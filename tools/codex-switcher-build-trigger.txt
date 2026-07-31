@@ -1,3 +1,3 @@
 Build Codex Switcher Hardened 0.3.1 for Windows x64.
-Run through registered Hardening smoke workflow.
-Retry after workflow registration delay.
+Run through isolated Tests workflow.
+Retry after storage test-helper fix.
