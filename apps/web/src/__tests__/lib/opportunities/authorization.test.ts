@@ -3,13 +3,67 @@ jest.mock('@/lib/auth-v2/authorization', () => ({
 }))
 
 import { getSession } from '@/lib/auth-v2/authorization'
-import { getOpportunityAuthorizationContext } from '@/lib/opportunities/authorization'
+import {
+  getOpportunityAuthorizationContext,
+  getOpportunityDataAccessContext,
+} from '@/lib/opportunities/authorization'
 
 const mockGetSession = jest.mocked(getSession)
 
 describe('opportunity authorization context', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+  })
+
+  it('keeps owner-era data access when workspace context is disabled', () => {
+    expect(getOpportunityDataAccessContext({
+      dataOwnerId: '7',
+      workspaceId: '9',
+      actorUserId: '42',
+      actorRole: 'recruiter',
+      permissions: ['opportunities:read', 'opportunities:write'],
+      authMode: 'auth_v2',
+    }, {})).toEqual({
+      ownerId: '7',
+      workspaceId: null,
+      actorUserId: '7',
+      actorWorkspaceId: null,
+      actorRoleSnapshot: null,
+      authMode: 'legacy',
+    })
+  })
+
+  it('uses the real actor only for a complete enabled Auth v2 workspace', () => {
+    expect(getOpportunityDataAccessContext({
+      dataOwnerId: '7',
+      workspaceId: '9',
+      actorUserId: '42',
+      actorRole: 'recruiter',
+      permissions: ['opportunities:read', 'opportunities:write'],
+      authMode: 'auth_v2',
+    }, {
+      OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED: 'true',
+    })).toEqual({
+      ownerId: '7',
+      workspaceId: '9',
+      actorUserId: '42',
+      actorWorkspaceId: '9',
+      actorRoleSnapshot: 'recruiter',
+      authMode: 'auth_v2',
+    })
+  })
+
+  it('fails closed instead of downgrading incomplete enabled Auth v2 context', () => {
+    expect(getOpportunityDataAccessContext({
+      dataOwnerId: '7',
+      workspaceId: null,
+      actorUserId: '42',
+      actorRole: null,
+      permissions: ['opportunities:read'],
+      authMode: 'auth_v2',
+    }, {
+      OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED: 'true',
+    })).toBeNull()
   })
 
   it('preserves the real actor, active workspace, role, and granted permissions', async () => {

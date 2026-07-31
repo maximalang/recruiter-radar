@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 
 import {
-  isOpportunityEngineV1EnabledForOwner,
-  isOpportunityOutcomesEnabledForOwner,
+  isOpportunityEngineV1EnabledForContext,
+  isOpportunityOutcomesEnabledForContext,
 } from '@/lib/opportunities/config'
 import {
   OutcomeValidationError,
@@ -25,7 +25,10 @@ import {
   OpportunityTransitionConflictError,
 } from '@/lib/opportunities/repository'
 import { logError } from '@/lib/runtime'
-import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization'
+import {
+  getOpportunityAuthorizationContext,
+  getOpportunityDataAccessContext,
+} from '@/lib/opportunities/authorization'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -34,13 +37,24 @@ export async function POST(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
-  const ownerId = await getAuthorizedOwnerId('opportunities:write')
-  if (!isOpportunityEngineV1EnabledForOwner(ownerId)) {
+  const authorization = await getOpportunityAuthorizationContext(
+    'opportunities:write',
+  )
+  const featureContext = authorization ?? {
+    dataOwnerId: null,
+    workspaceId: null,
+  }
+  if (!isOpportunityEngineV1EnabledForContext(featureContext)) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 })
   }
-  if (!ownerId) {
+  if (!authorization) {
     return NextResponse.json({ error: 'authentication_required' }, { status: 401 })
   }
+  const access = getOpportunityDataAccessContext(authorization)
+  if (!access) {
+    return NextResponse.json({ error: 'not_found' }, { status: 404 })
+  }
+  const outcomesEnabled = isOpportunityOutcomesEnabledForContext(authorization)
   const { id } = await context.params
   if (!/^[1-9]\d*$/.test(id)) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 })
@@ -72,7 +86,7 @@ export async function POST(
   const occurredAt = new Date().toISOString()
 
   let outcomeInput: ReturnType<typeof validateOutcomeInput> | null = null
-  if (isOpportunityOutcomesEnabledForOwner(ownerId)) {
+  if (outcomesEnabled) {
     try {
       outcomeInput = validateOutcomeInput({
         eventType: body.action,
@@ -97,7 +111,8 @@ export async function POST(
 
   try {
     const result = await applyOpportunityAction({
-      ownerId,
+      ownerId: access.ownerId,
+      workspaceId: access.workspaceId,
       opportunityId: id,
       action: body.action,
       actionKey,
@@ -110,6 +125,11 @@ export async function POST(
       contactPathType: outcomeInput?.contactPathType ?? null,
       contactReference: outcomeInput?.contactReference ?? null,
       occurredAt,
+      actorUserId: access.actorUserId,
+      actorWorkspaceId: access.actorWorkspaceId,
+      actorRoleSnapshot: access.actorRoleSnapshot,
+      authMode: access.authMode,
+      outcomesEnabled,
     })
     if (!result) {
       return NextResponse.json({ error: 'not_found' }, { status: 404 })
@@ -153,7 +173,8 @@ export async function POST(
       return NextResponse.json({ error: error.code }, { status: 503 })
     }
     logError('opportunity.api.action_failed', error, {
-      ownerId,
+      ownerId: access.ownerId,
+      workspaceId: access.workspaceId,
       opportunityId: id,
       action: body.action,
     })

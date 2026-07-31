@@ -19,6 +19,10 @@ interface HistoryEvent {
   recordedAt: string
   appendOrder: string
   actorType: string
+  actorUserId?: string | null
+  actorWorkspaceId?: string | null
+  actorRoleSnapshot?: string | null
+  actorAttribution?: 'workspace' | 'legacy'
   reason: { code: string; label: string; note: string | null } | null
   channel: string | null
   contactPathType: string | null
@@ -406,6 +410,14 @@ export function OpportunityOutcomePanel(props: {
                 >
                   <span>{formatDateTime(event.occurredAt)}</span>
                   <strong>{event.label}</strong>
+                  {event.actorAttribution === 'workspace' &&
+                  event.actorUserId &&
+                  event.actorRoleSnapshot ? (
+                    <small>
+                      Действие: {event.actorRoleSnapshot} · пользователь #
+                      {event.actorUserId}
+                    </small>
+                  ) : null}
                   {event.isReverted ? <small>Отменено</small> : null}
                   {event.reason ? <small>{event.reason.label}</small> : null}
                   {event.channel ? <small>Канал: {event.channel}</small> : null}

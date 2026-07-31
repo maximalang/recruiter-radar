@@ -18,14 +18,21 @@ if (!databaseUrl) throw new Error('DATABASE_URL is required.')
 const args = process.argv.slice(2)
 const ownerIndex = args.indexOf('--owner-id')
 const ownerId = ownerIndex >= 0 ? args[ownerIndex + 1] : null
+const workspaceIndex = args.indexOf('--workspace-id')
+const workspaceId = workspaceIndex >= 0 ? args[workspaceIndex + 1] : null
 const apply = args.includes('--apply')
 const preActivation = args.includes('--pre-activation')
 if (!ownerId || !/^[1-9]\d*$/.test(ownerId)) {
   throw new Error('--owner-id requires a positive integer.')
 }
+if (workspaceId !== null && !/^[1-9]\d*$/.test(workspaceId)) {
+  throw new Error('--workspace-id requires a positive integer.')
+}
 const allowed = new Set([
   '--owner-id',
   ownerId,
+  '--workspace-id',
+  ...(workspaceId ? [workspaceId] : []),
   '--apply',
   '--dry-run',
   '--pre-activation',
@@ -274,14 +281,20 @@ try {
   const projectionDrift = Number(rebuild.rebuildChanged ?? 0)
   const externalIngestEnabled =
     process.env.OPPORTUNITY_OUTCOMES_EXTERNAL_INGEST_ENABLED === 'true'
-  const flags = resolveOpportunityCanaryFlags(ownerId, process.env)
+  const flags = resolveOpportunityCanaryFlags(
+    ownerId,
+    process.env,
+    workspaceId,
+  )
   const activationReady = isOpportunityCanaryActivationReady(
     ownerId,
     preActivation ? 'pre_activation' : 'active',
     process.env,
+    workspaceId,
   )
   const result = {
     ownerId,
+    workspaceId,
     mode: apply ? 'apply' : 'dry_run',
     phase: preActivation ? 'pre_activation' : 'active',
     flags,

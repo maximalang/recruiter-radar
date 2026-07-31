@@ -2,9 +2,23 @@
 
 import { NextRequest } from 'next/server'
 
-jest.mock('@/lib/auth-v2/authorization', () => ({
-  getAuthorizedOwnerId: jest.fn(),
-}))
+jest.mock('@/lib/auth-v2/authorization', () => {
+  const getAuthorizedOwnerId = jest.fn()
+  return {
+    getAuthorizedOwnerId,
+    getSession: jest.fn(async ({ permission }) => {
+      const ownerId = await getAuthorizedOwnerId(permission)
+      return ownerId ? {
+        mode: 'legacy',
+        userId: ownerId,
+        dataOwnerId: ownerId,
+        workspaceId: null,
+        role: null,
+        session: null,
+      } : null
+    }),
+  }
+})
 jest.mock('@/lib/opportunities/repository', () => ({
   listOpportunities: jest.fn(),
   getOpportunityById: jest.fn(),
@@ -18,7 +32,10 @@ jest.mock('@/lib/opportunities/repository', () => ({
     ['accepted', 'dismissed', 'snoozed', 'contacted'].includes(String(value)),
 }))
 
-import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization'
+import {
+  getAuthorizedOwnerId,
+  getSession,
+} from '@/lib/auth-v2/authorization'
 import {
   applyOpportunityAction,
   getOpportunityById,
@@ -32,6 +49,7 @@ import { GET as detail } from '@/app/api/opportunities/[id]/route'
 import { POST as action } from '@/app/api/opportunities/[id]/action/route'
 
 const mockedOwner = jest.mocked(getAuthorizedOwnerId)
+const mockedSession = jest.mocked(getSession)
 const mockedList = jest.mocked(listOpportunities)
 const mockedDetail = jest.mocked(getOpportunityById)
 const mockedAction = jest.mocked(applyOpportunityAction)
@@ -42,11 +60,16 @@ function request(path: string, init?: ConstructorParameters<typeof NextRequest>[
 
 describe('opportunities API', () => {
   const originalFlag = process.env.OPPORTUNITY_ENGINE_V1_ENABLED
+  const originalOutcomes = process.env.OPPORTUNITY_OUTCOMES_ENABLED
   const originalCanaryOwners = process.env.OPPORTUNITY_CANARY_OWNER_IDS
+  const originalWorkspaceContext =
+    process.env.OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED
 
   beforeEach(() => {
     process.env.OPPORTUNITY_ENGINE_V1_ENABLED = 'true'
     delete process.env.OPPORTUNITY_CANARY_OWNER_IDS
+    delete process.env.OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED
+    delete process.env.OPPORTUNITY_OUTCOMES_ENABLED
     jest.clearAllMocks()
   })
 
@@ -57,6 +80,17 @@ describe('opportunities API', () => {
       delete process.env.OPPORTUNITY_CANARY_OWNER_IDS
     } else {
       process.env.OPPORTUNITY_CANARY_OWNER_IDS = originalCanaryOwners
+    }
+    if (originalWorkspaceContext === undefined) {
+      delete process.env.OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED
+    } else {
+      process.env.OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED =
+        originalWorkspaceContext
+    }
+    if (originalOutcomes === undefined) {
+      delete process.env.OPPORTUNITY_OUTCOMES_ENABLED
+    } else {
+      process.env.OPPORTUNITY_OUTCOMES_ENABLED = originalOutcomes
     }
   })
 
@@ -112,6 +146,7 @@ describe('opportunities API', () => {
     expect(allowed.status).toBe(404)
     expect(mockedDetail).toHaveBeenCalledWith({
       ownerId: '7',
+      workspaceId: null,
       opportunityId: '10',
     })
   })
@@ -144,6 +179,40 @@ describe('opportunities API', () => {
     expect(mockedAction).toHaveBeenCalledWith(expect.objectContaining({
       ownerId: '7',
       action: 'accepted',
+    }))
+  })
+
+  it('passes active workspace and real actor through an Auth v2 action', async () => {
+    process.env.OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED = 'true'
+    process.env.OPPORTUNITY_OUTCOMES_ENABLED = 'true'
+    mockedSession.mockResolvedValueOnce({
+      mode: 'auth_v2',
+      userId: '42',
+      dataOwnerId: '7',
+      workspaceId: '9',
+      role: 'recruiter',
+      session: null,
+    })
+    mockedAction.mockResolvedValue(null)
+
+    const response = await action(
+      request('/api/opportunities/10/action', {
+        method: 'POST',
+        headers: { 'idempotency-key': 'accepted:workspace-actor' },
+        body: JSON.stringify({ action: 'accepted' }),
+      }),
+      { params: Promise.resolve({ id: '10' }) },
+    )
+
+    expect(response.status).toBe(404)
+    expect(mockedAction).toHaveBeenCalledWith(expect.objectContaining({
+      ownerId: '7',
+      workspaceId: '9',
+      actorUserId: '42',
+      actorWorkspaceId: '9',
+      actorRoleSnapshot: 'recruiter',
+      authMode: 'auth_v2',
+      outcomesEnabled: true,
     }))
   })
 
@@ -261,6 +330,7 @@ describe('opportunities API', () => {
     expect(response.status).toBe(404)
     expect(mockedDetail).toHaveBeenCalledWith({
       ownerId: '7',
+      workspaceId: null,
       opportunityId: '99',
     })
   })

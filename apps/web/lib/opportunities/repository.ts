@@ -1,5 +1,6 @@
 import type { Pool, PoolClient } from 'pg'
 
+import type { WorkspaceRole } from '@/lib/auth-v2/workspaces'
 import { getClient, getPool } from '@/lib/db-pool'
 import { logEvent } from '@/lib/runtime'
 import {
@@ -147,6 +148,7 @@ export interface OpportunityEvidenceItem {
 
 export interface OpportunityListInput {
   ownerId: string | number
+  workspaceId?: string | number | null
   clientProfileId?: string | null
   morningBriefOnly?: boolean
   view?: OpportunityView
@@ -207,6 +209,10 @@ export async function listOpportunities(
   const page = Math.floor(offset / pageSize) + 1
   const params: unknown[] = [String(input.ownerId)]
   const clauses = ['o.owner_id = $1', 'o.superseded_at IS NULL']
+  if (input.workspaceId != null) {
+    params.push(String(input.workspaceId))
+    clauses.push(`o.workspace_id = $${params.length}`)
+  }
   const view = input.view ?? (input.morningBriefOnly ? 'morning' : 'all')
   if (view !== 'all') clauses.push(`o.status <> 'expired'`)
 
@@ -316,8 +322,14 @@ export async function listOpportunities(
 export async function getOpportunityOutcomeOperationalSummary(
   ownerId: string | number,
   db: OpportunityDb | null = getPool(),
+  workspaceId: string | number | null = null,
 ): Promise<OpportunityOutcomeOperationalSummary> {
   if (!db) throw new Error('DATABASE_URL is not set.')
+  const params: unknown[] = [String(ownerId)]
+  const workspaceClause = workspaceId == null
+    ? ''
+    : '\n       AND o.workspace_id = $2'
+  if (workspaceId != null) params.push(String(workspaceId))
   const result = await db.query<Record<
     keyof OpportunityOutcomeOperationalSummary,
     string
@@ -357,9 +369,10 @@ export async function getOpportunityOutcomeOperationalSummary(
        ON outcome_state.owner_id = o.owner_id
       AND outcome_state.opportunity_id = o.id
      WHERE o.owner_id = $1
+       ${workspaceClause}
        AND o.superseded_at IS NULL
        AND o.status <> 'expired'`,
-    [String(ownerId)],
+    params,
   )
   const row = result.rows[0]
   return {
@@ -375,18 +388,28 @@ export async function getOpportunityOutcomeOperationalSummary(
 }
 
 export async function getOpportunityById(
-  input: { ownerId: string | number; opportunityId: string | number },
+  input: {
+    ownerId: string | number
+    workspaceId?: string | number | null
+    opportunityId: string | number
+  },
   db: OpportunityDb | null = getPool(),
 ): Promise<OpportunityItem | null> {
   if (!db) throw new Error('DATABASE_URL is not set.')
 
+  const params: unknown[] = [input.opportunityId, String(input.ownerId)]
+  const workspaceClause = input.workspaceId == null
+    ? ''
+    : `\n       AND o.workspace_id = $3`
+  if (input.workspaceId != null) params.push(String(input.workspaceId))
   const result = await db.query<OpportunityRow>(
     `${OPPORTUNITY_SELECT}
      WHERE o.id = $1
        AND o.owner_id = $2
+       ${workspaceClause}
        AND o.superseded_at IS NULL
      LIMIT 1`,
-    [input.opportunityId, String(input.ownerId)],
+    params,
   )
   const row = result.rows[0]
   if (!row) return null
@@ -439,6 +462,7 @@ async function getCurrentOpportunityForEpisode(
 
 export async function applyOpportunityAction(input: {
   ownerId: string | number
+  workspaceId?: string | number | null
   opportunityId: string | number
   action: OpportunityAction
   actionKey: string
@@ -449,6 +473,11 @@ export async function applyOpportunityAction(input: {
   contactPathType?: OpportunityContactPathType | null
   contactReference?: string | null
   occurredAt?: string
+  actorUserId?: string | number | null
+  actorWorkspaceId?: string | number | null
+  actorRoleSnapshot?: WorkspaceRole | null
+  authMode?: 'auth_v2' | 'auth_v2_compat' | 'legacy'
+  outcomesEnabled?: boolean
 }): Promise<{ opportunity: OpportunityItem; idempotent: boolean } | null> {
   if (!isOpportunityAction(input.action)) {
     throw new Error('Unsupported opportunity action.')
@@ -476,10 +505,22 @@ export async function applyOpportunityAction(input: {
       input.action === 'contacted' ? input.contactPathType ?? null : null,
     contactReferenceHash: protectedContactReference?.hash ?? null,
   })
+  const outcomesEnabled = input.outcomesEnabled ??
+    isOpportunityOutcomesEnabledForOwner(input.ownerId)
+  const contextParams: unknown[] = [
+    input.opportunityId,
+    String(input.ownerId),
+  ]
+  const workspaceClause = input.workspaceId == null
+    ? ''
+    : '\n         AND workspace_id = $3'
+  if (input.workspaceId != null) {
+    contextParams.push(String(input.workspaceId))
+  }
 
   try {
     await client.query('BEGIN')
-    if (isOpportunityOutcomesEnabledForOwner(input.ownerId)) {
+    if (outcomesEnabled) {
       await lockOutcomeOwnerShared(client, input.ownerId)
     }
     const context = await client.query<{
@@ -500,8 +541,9 @@ export async function applyOpportunityAction(input: {
        FROM opportunities
        WHERE id = $1
          AND owner_id = $2
+         ${workspaceClause}
        FOR UPDATE`,
-      [input.opportunityId, String(input.ownerId)],
+      contextParams,
     )
     const row = context.rows[0]
     if (!row) {
@@ -600,12 +642,16 @@ export async function applyOpportunityAction(input: {
     if (actionInsert.rowCount !== 1) {
       throw new Error('Opportunity action insert returned no row.')
     }
-    if (isOpportunityOutcomesEnabledForOwner(input.ownerId)) {
+    if (outcomesEnabled) {
       const outcome = await recordOpportunityOutcomeInTransaction({
         ownerId: input.ownerId,
+        workspaceId: input.workspaceId,
         opportunityId: input.opportunityId,
         actorType: 'user',
-        actorUserId: input.ownerId,
+        actorUserId: input.actorUserId ?? input.ownerId,
+        actorWorkspaceId: input.actorWorkspaceId,
+        actorRoleSnapshot: input.actorRoleSnapshot,
+        authMode: input.authMode,
         ownerLockHeld: true,
         payload: {
           eventType: input.action,
@@ -683,7 +729,11 @@ export async function applyOpportunityAction(input: {
       )
     }
     const opportunity = await getOpportunityById(
-      { ownerId: input.ownerId, opportunityId: input.opportunityId },
+      {
+        ownerId: input.ownerId,
+        workspaceId: input.workspaceId,
+        opportunityId: input.opportunityId,
+      },
       client,
     )
     if (!opportunity) {

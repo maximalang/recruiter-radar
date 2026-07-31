@@ -3,8 +3,8 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 import {
-  isOpportunityEngineV1EnabledForOwner,
-  isOpportunityOutcomesUiEnabledForOwner,
+  isOpportunityEngineV1EnabledForContext,
+  isOpportunityOutcomesUiEnabledForContext,
 } from '@/lib/opportunities/config'
 import { getOutcomeFunnelSummary } from '@/lib/opportunities/outcome-repository'
 import {
@@ -13,7 +13,10 @@ import {
   type OpportunityView,
 } from '@/lib/opportunities/repository'
 import type { OpportunityStatus } from '@/lib/opportunities/opportunity-scoring'
-import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization'
+import {
+  getOpportunityAuthorizationContext,
+  getOpportunityDataAccessContext,
+} from '@/lib/opportunities/authorization'
 import {
   ContentCard,
   EmptyState,
@@ -47,10 +50,16 @@ export default async function OpportunitiesPage(props: {
     demo?: string
   }>
 }) {
-  const ownerId = await getAuthorizedOwnerId('opportunities:read')
-  if (!isOpportunityEngineV1EnabledForOwner(ownerId)) notFound()
+  const authorization = await getOpportunityAuthorizationContext(
+    'opportunities:read',
+  )
+  const featureContext = authorization ?? {
+    dataOwnerId: null,
+    workspaceId: null,
+  }
+  if (!isOpportunityEngineV1EnabledForContext(featureContext)) notFound()
 
-  if (!ownerId) {
+  if (!authorization) {
     return (
       <InternalPageFrame navItems={NAVIGATION} footer={<SiteFooter />}>
         <InternalPageHeader
@@ -67,9 +76,12 @@ export default async function OpportunitiesPage(props: {
       </InternalPageFrame>
     )
   }
+  const access = getOpportunityDataAccessContext(authorization)
+  if (!access) notFound()
 
   const params = await props.searchParams
-  const outcomesUiEnabled = isOpportunityOutcomesUiEnabledForOwner(ownerId) &&
+  const outcomesUiEnabled =
+    isOpportunityOutcomesUiEnabledForContext(authorization) &&
     params.preview !== '1' && params.demo !== '1'
   const trackingCycleId = outcomesUiEnabled
     ? `morning-brief:${new Date().toISOString().slice(0, 10)}`
@@ -85,7 +97,8 @@ export default async function OpportunitiesPage(props: {
   try {
     [result, operationalSummary] = await Promise.all([
       listOpportunities({
-        ownerId,
+        ownerId: access.ownerId,
+        workspaceId: access.workspaceId,
         morningBriefOnly: view === 'morning',
         view,
         statuses,
@@ -96,7 +109,11 @@ export default async function OpportunitiesPage(props: {
         pageSize: 50,
       }),
       outcomesUiEnabled
-        ? getOpportunityOutcomeOperationalSummary(ownerId)
+        ? getOpportunityOutcomeOperationalSummary(
+            access.ownerId,
+            undefined,
+            access.workspaceId,
+          )
         : Promise.resolve(null),
     ])
   } catch {
@@ -118,7 +135,8 @@ export default async function OpportunitiesPage(props: {
 
   const funnel = outcomesUiEnabled
     ? await getOutcomeFunnelSummary({
-        ownerId,
+        ownerId: access.ownerId,
+        workspaceId: access.workspaceId,
         from: funnelFrom.toISOString(),
         to: funnelTo.toISOString(),
       }).catch(() => null)

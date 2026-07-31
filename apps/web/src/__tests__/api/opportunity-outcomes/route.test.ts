@@ -2,9 +2,23 @@
 
 import { NextRequest } from 'next/server'
 
-jest.mock('@/lib/auth-v2/authorization', () => ({
-  getAuthorizedOwnerId: jest.fn(),
-}))
+jest.mock('@/lib/auth-v2/authorization', () => {
+  const getAuthorizedOwnerId = jest.fn()
+  return {
+    getAuthorizedOwnerId,
+    getSession: jest.fn(async ({ permission }) => {
+      const ownerId = await getAuthorizedOwnerId(permission)
+      return ownerId ? {
+        mode: 'legacy',
+        userId: ownerId,
+        dataOwnerId: ownerId,
+        workspaceId: null,
+        role: null,
+        session: null,
+      } : null
+    }),
+  }
+})
 jest.mock('@/lib/opportunities/outcome-repository', () => ({
   recordOpportunityOutcome: jest.fn(),
   getOpportunityOutcomeHistory: jest.fn(),
@@ -262,7 +276,11 @@ describe('opportunity outcomes API', () => {
     const response = await GET(request('/api/opportunities/10/outcomes'), context)
     expect(response.status).toBe(200)
     expect(mockedHistory).toHaveBeenCalledWith({
-      ownerId: '7', opportunityId: '10', beforeEventId: null, pageSize: 50,
+      ownerId: '7',
+      workspaceId: null,
+      opportunityId: '10',
+      beforeEventId: null,
+      pageSize: 50,
     })
   })
 
@@ -292,7 +310,11 @@ describe('opportunity outcomes API', () => {
 
     expect(response.status).toBe(200)
     expect(mockedHistory).toHaveBeenCalledWith({
-      ownerId: '7', opportunityId: '10', beforeEventId: '50', pageSize: 25,
+      ownerId: '7',
+      workspaceId: null,
+      opportunityId: '10',
+      beforeEventId: '50',
+      pageSize: 25,
     })
   })
 
