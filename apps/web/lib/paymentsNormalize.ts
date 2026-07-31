@@ -110,8 +110,8 @@ export function mergeCheckoutOrderPayload(
   };
 }
 
-function optionalPatch(value: string | null | undefined, current: string | null): string | null {
-  return value === undefined ? current : normalizeOptionalText(value);
+function optionalPatch(value: string | null | undefined, current: string | null | undefined): string | null {
+  return value === undefined ? normalizeOptionalText(current) : normalizeOptionalText(value);
 }
 
 function normalizeAllowedList(value: unknown, allowed: ReadonlySet<string>): string[] {
