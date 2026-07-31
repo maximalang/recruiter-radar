@@ -62,14 +62,6 @@ export default function LegalPage() {
           </div>
         </SurfaceCard>
 
-        {SELF_EMPLOYED.phone && SELF_EMPLOYED.postalAddress ? null : (
-          <NoticeBox
-            tone="warning"
-            title="Контактные реквизиты готовятся к публикации"
-            description="До включения приёма платежей оператор дополнит страницу публичным телефоном поддержки и почтовым адресом. Оплата останется выключенной, пока эти данные не настроены."
-          />
-        )}
-
         <NoticeBox
           tone="info"
           title="Чек плательщика НПД"
