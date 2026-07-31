@@ -13,14 +13,10 @@ import { OPERATOR_REQUISITES } from "../../lib/operatorRequisites";
 export const metadata: Metadata = {
   title: "Реквизиты — Recruiter Radar",
   description:
-    "Реквизиты самозанятого — плательщика НПД, оператора сервиса Recruiter Radar. ИНН для оплаты через ЮKassa.",
+    "Реквизиты самозанятого — плательщика НПД, оператора сервиса Recruiter Radar.",
   robots: { index: true, follow: true },
 };
 
-// The requisites live in lib/operatorRequisites (the single source the footer
-// and this page share). This page renders the full block (status + service
-// description); the footer carries only the legally-required minimum + a link
-// here. ИНН is the operational key for ЮKassa receipts (ФЗ-54).
 const SELF_EMPLOYED = OPERATOR_REQUISITES;
 
 export default function LegalPage() {
@@ -30,7 +26,7 @@ export default function LegalPage() {
         <SectionIntro
           eyebrow="Реквизиты"
           title="Реквизиты оператора сервиса"
-          description="Оператор Recruiter Radar — самозанятый, плательщик налога на профессиональный доход (НПД). Реквизиты применяются при формировании чеков через ЮKassa."
+          description="Оператор Recruiter Radar — самозанятый, плательщик налога на профессиональный доход (НПД). Оплата на сайте обрабатывается ЮKassa."
         />
 
         <SurfaceCard>
@@ -59,8 +55,8 @@ export default function LegalPage() {
 
         <NoticeBox
           tone="info"
-          title="ИНН для оплаты"
-          description="Этот ИНН применяется при формировании чеков через ЮKassa в соответствии с ФЗ-54. Полные условия оказания услуг — в оферте."
+          title="Чек плательщика НПД"
+          description="После подтверждения оплаты оператор формирует чек в приложении «Мой налог» и направляет его заказчику в электронной форме. ЮKassa обрабатывает платёж, но не заменяет чек плательщика НПД."
         />
       </section>
       <SiteFooter />
