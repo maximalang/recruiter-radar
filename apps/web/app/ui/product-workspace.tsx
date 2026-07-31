@@ -7,7 +7,7 @@ import {
   SearchIcon,
   ShieldIcon,
   TargetIcon,
-  TrendUpIcon,
+  TrendIcon,
 } from "./icons";
 import { BrandLogo } from "./brand-logo";
 import type { NavItem } from "./internal-page";
@@ -16,7 +16,7 @@ import styles from "./product-workspace.module.css";
 type WorkspaceIcon = (props: SVGProps<SVGSVGElement>) => ReactElement;
 
 const NAV_ICONS: Record<string, WorkspaceIcon> = {
-  "/dashboard": TrendUpIcon,
+  "/dashboard": TrendIcon,
   "/leads": SearchIcon,
   "/review": ShieldIcon,
   "/profile": TargetIcon,
