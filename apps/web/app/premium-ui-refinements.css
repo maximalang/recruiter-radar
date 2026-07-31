@@ -1,0 +1,185 @@
+/* Targeted refinements discovered by production screenshot review. */
+
+/* Keep programmatic and test-driven scroll positioning deterministic. Smooth
+   navigation remains owned by the landing interaction components instead of a
+   global browser rule. */
+html {
+  scroll-behavior: auto;
+}
+
+[data-deploy-anchor^="recruiter-radar-landing"] [class*="heroSection"] {
+  padding-top: clamp(132px, 11vw, 158px) !important;
+  padding-bottom: clamp(52px, 7vw, 84px) !important;
+}
+
+[data-deploy-anchor^="recruiter-radar-landing"] h1[class*="heroTitle"] {
+  max-width: 10.5ch !important;
+  font-size: clamp(3rem, 5.45vw, 5.1rem) !important;
+}
+
+[data-deploy-anchor^="recruiter-radar-landing"] [class*="heroTitleAccent"] {
+  display: block;
+  max-width: 100%;
+  margin-top: 0.08em;
+  font-size: 0.61em;
+  line-height: 1.04;
+  letter-spacing: -0.045em;
+  white-space: nowrap;
+}
+
+/* The generic state selector in the foundation deliberately gives the outer
+   state a generous canvas. Reset its named descendants so titles, copy and CTA
+   do not inherit container sizing through CSS-module substring matching. */
+main[class*="internalPageFrame"] p[class*="emptyStateTitle"],
+main[class*="internalPageFrame"] p[class*="emptyStateText"],
+main[class*="internalPageFrame"] a[class*="emptyStateAction"],
+main[class*="internalPageFrame"] div[class*="emptyStateIcon"],
+main[class*="internalPageFrame"] div[class*="errorStateTitle"],
+main[class*="internalPageFrame"] div[class*="errorStateText"],
+main[class*="internalPageFrame"] a[class*="errorStateAction"] {
+  min-height: 0;
+  padding: 0 !important;
+  display: initial;
+  place-items: initial;
+  align-content: initial;
+}
+
+main[class*="internalPageFrame"] div[class*="emptyState"]:not([class*="emptyStateIcon"]),
+main[class*="internalPageFrame"] div[class*="errorState"] {
+  position: relative;
+  isolation: isolate;
+  min-height: 360px;
+  padding: clamp(40px, 7vw, 72px) !important;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 14px;
+  overflow: hidden;
+}
+
+main[class*="internalPageFrame"] div[class*="emptyState"]:not([class*="emptyStateIcon"])::before,
+main[class*="internalPageFrame"] div[class*="errorState"]::before {
+  position: absolute;
+  z-index: -1;
+  top: 50%;
+  left: 50%;
+  width: 270px;
+  height: 270px;
+  border: 1px solid rgba(49, 95, 200, 0.08);
+  border-radius: 50%;
+  content: "";
+  transform: translate(-50%, -50%);
+  box-shadow:
+    0 0 0 54px rgba(49, 95, 200, 0.022),
+    0 0 0 108px rgba(49, 95, 200, 0.014);
+}
+
+main[class*="internalPageFrame"] p[class*="emptyStateTitle"],
+main[class*="internalPageFrame"] div[class*="errorStateTitle"] {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  max-width: 28ch;
+  color: #13223a;
+  font-size: clamp(1.22rem, 2.2vw, 1.65rem);
+  line-height: 1.15;
+  font-weight: 760;
+  letter-spacing: -0.035em;
+  text-align: center;
+}
+
+main[class*="internalPageFrame"] p[class*="emptyStateText"],
+main[class*="internalPageFrame"] div[class*="errorStateText"] {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  max-width: 58ch;
+  color: #6d7a90;
+  font-size: 0.93rem;
+  line-height: 1.62;
+  text-align: center;
+}
+
+main[class*="internalPageFrame"] a[class*="emptyStateAction"],
+main[class*="internalPageFrame"] a[class*="errorStateAction"] {
+  position: relative;
+  z-index: 1;
+  min-width: 176px;
+  min-height: 48px;
+  margin-top: 8px;
+  padding: 0 20px !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 13px;
+  background: linear-gradient(135deg, #17386f, #315fc8);
+  color: #ffffff;
+  font-size: 0.88rem;
+  line-height: 1.2;
+  font-weight: 720;
+  text-align: center;
+  text-decoration: none;
+  box-shadow:
+    0 14px 30px rgba(49, 95, 200, 0.23),
+    0 1px 0 rgba(255, 255, 255, 0.24) inset;
+  transition:
+    transform 180ms var(--ui-ease),
+    box-shadow 180ms ease,
+    filter 180ms ease !important;
+}
+
+main[class*="internalPageFrame"] a[class*="emptyStateAction"]:hover,
+main[class*="internalPageFrame"] a[class*="errorStateAction"]:hover {
+  color: #ffffff;
+  filter: brightness(1.06);
+  transform: translateY(-2px);
+  box-shadow:
+    0 20px 42px rgba(49, 95, 200, 0.3),
+    0 1px 0 rgba(255, 255, 255, 0.28) inset;
+}
+
+main[class*="internalPageFrame"] div[class*="emptyStateIcon"] {
+  position: relative;
+  z-index: 1;
+  width: 54px;
+  height: 54px;
+  margin-bottom: 4px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(49, 95, 200, 0.13);
+  border-radius: 17px;
+  background: rgba(255, 255, 255, 0.76);
+  color: #315fc8;
+  box-shadow: 0 14px 30px rgba(18, 38, 70, 0.09);
+}
+
+main[class*="internalPageFrame"] div[class*="emptyStateIcon"] svg {
+  width: 25px;
+  height: 25px;
+}
+
+@media (max-width: 720px) {
+  [data-deploy-anchor^="recruiter-radar-landing"] [class*="heroSection"] {
+    padding-top: 112px !important;
+  }
+
+  [data-deploy-anchor^="recruiter-radar-landing"] h1[class*="heroTitle"] {
+    max-width: 11ch !important;
+    font-size: clamp(2.65rem, 14vw, 3.75rem) !important;
+  }
+
+  [data-deploy-anchor^="recruiter-radar-landing"] [class*="heroTitleAccent"] {
+    font-size: clamp(1.7rem, 8vw, 2.05rem);
+    line-height: 1.08;
+    letter-spacing: -0.055em;
+    white-space: nowrap;
+  }
+
+  main[class*="internalPageFrame"] div[class*="emptyState"]:not([class*="emptyStateIcon"]),
+  main[class*="internalPageFrame"] div[class*="errorState"] {
+    min-height: 300px;
+    padding: 34px 20px !important;
+  }
+}

@@ -1,0 +1,716 @@
+/*
+ * Recruiter Radar — cinematic landing layer.
+ *
+ * This stylesheet deliberately does not imitate the artwork, characters or
+ * brand assets of Love, Death & Robots. It borrows the interaction grammar:
+ * full-screen chapters, graphic typography, persistent motion, editorial
+ * pacing and a single visual metaphor that evolves while the user scrolls.
+ *
+ * Everything is scoped to the public landing deploy anchor, so product pages
+ * and the authenticated application remain untouched.
+ */
+
+:root {
+  --rr-scene-accent: #f1b95e;
+  --rr-scene-accent-rgb: 241, 185, 94;
+  --rr-scene-cold: #6f8cff;
+  --rr-scene-progress: 0;
+  --rr-scene-rotation: 0deg;
+}
+
+html[data-landing-scene="preview"] {
+  --rr-scene-accent: #7d91ff;
+  --rr-scene-accent-rgb: 125, 145, 255;
+}
+
+html[data-landing-scene="how-it-works"] {
+  --rr-scene-accent: #58d4c3;
+  --rr-scene-accent-rgb: 88, 212, 195;
+}
+
+html[data-landing-scene="quality"] {
+  --rr-scene-accent: #f1b95e;
+  --rr-scene-accent-rgb: 241, 185, 94;
+}
+
+html[data-landing-scene="pricing"],
+html[data-landing-scene="faq"] {
+  --rr-scene-accent: #ff765f;
+  --rr-scene-accent-rgb: 255, 118, 95;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] {
+  position: relative;
+  isolation: isolate;
+  overflow: clip;
+  padding: 0 !important;
+  background:
+    radial-gradient(circle at var(--ui-pointer-x, 76vw) var(--ui-pointer-y, 18vh), rgba(var(--rr-scene-accent-rgb), 0.09), transparent 25rem),
+    linear-gradient(180deg, #03060b 0%, #070b13 48%, #03050a 100%);
+  color: #f6f3ea;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] > div {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: none !important;
+  padding: 0 !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"]::before,
+main[data-deploy-anchor="recruiter-radar-landing-v4"]::after {
+  position: fixed;
+  top: 52%;
+  left: 76%;
+  z-index: 0;
+  width: min(66vw, 900px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  pointer-events: none;
+  content: "";
+  transform: translate(-50%, -50%) rotate(var(--rr-scene-rotation));
+  transform-origin: center;
+  will-change: transform, opacity;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"]::before {
+  opacity: 0.68;
+  background:
+    radial-gradient(circle, transparent 0 9%, rgba(255, 255, 255, 0.14) 9.2% 9.45%, transparent 9.7% 19%),
+    radial-gradient(circle, transparent 0 24%, rgba(var(--rr-scene-accent-rgb), 0.38) 24.2% 24.55%, transparent 24.8% 37%),
+    radial-gradient(circle, transparent 0 43%, rgba(255, 255, 255, 0.11) 43.15% 43.35%, transparent 43.65% 56%),
+    radial-gradient(circle, transparent 0 63%, rgba(var(--rr-scene-accent-rgb), 0.24) 63.1% 63.35%, transparent 63.65% 77%),
+    radial-gradient(circle, transparent 0 87%, rgba(255, 255, 255, 0.08) 87.1% 87.3%, transparent 87.6%),
+    repeating-conic-gradient(from 8deg, rgba(255, 255, 255, 0.12) 0 0.35deg, transparent 0.35deg 12deg);
+  filter: drop-shadow(0 0 55px rgba(var(--rr-scene-accent-rgb), 0.16));
+  transition: filter 500ms ease, opacity 500ms ease;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"]::after {
+  opacity: 0.42;
+  background: conic-gradient(
+    from 214deg,
+    transparent 0deg 315deg,
+    rgba(var(--rr-scene-accent-rgb), 0.02) 318deg,
+    rgba(var(--rr-scene-accent-rgb), 0.38) 338deg,
+    rgba(255, 255, 255, 0.72) 345deg,
+    rgba(var(--rr-scene-accent-rgb), 0.05) 350deg,
+    transparent 356deg 360deg
+  );
+  -webkit-mask: radial-gradient(circle, transparent 0 8%, #000 9% 78%, transparent 79%);
+  mask: radial-gradient(circle, transparent 0 8%, #000 9% 78%, transparent 79%);
+  mix-blend-mode: screen;
+  transition: opacity 500ms ease;
+}
+
+html[data-landing-ready="true"] main[data-deploy-anchor="recruiter-radar-landing-v4"]::after {
+  animation: rrRadarBreathe 4.8s ease-in-out infinite;
+}
+
+@keyframes rrRadarBreathe {
+  0%, 100% { opacity: 0.27; }
+  50% { opacity: 0.56; }
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] header[data-brand-header="recruiter-radar-v3"] {
+  top: 18px !important;
+  width: min(1220px, calc(100vw - 36px)) !important;
+  min-height: 58px;
+  padding: 7px 8px 7px 18px !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 999px !important;
+  background: rgba(4, 7, 12, 0.66) !important;
+  color: #f7f4eb !important;
+  box-shadow: 0 16px 55px rgba(0, 0, 0, 0.34) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(145%) !important;
+  backdrop-filter: blur(20px) saturate(145%) !important;
+  transition: background 240ms ease, border-color 240ms ease, transform 240ms ease !important;
+}
+
+html[data-ui-scrolled="true"] main[data-deploy-anchor="recruiter-radar-landing-v4"] header[data-brand-header="recruiter-radar-v3"] {
+  background: rgba(3, 5, 9, 0.88) !important;
+  border-color: rgba(var(--rr-scene-accent-rgb), 0.3) !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] header a,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] header button {
+  color: rgba(247, 244, 235, 0.72) !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] header a:hover,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] header a[aria-current="location"] {
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.07) !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] header [data-analytics-context="header"] {
+  border: 1px solid rgba(var(--rr-scene-accent-rgb), 0.56) !important;
+  background: var(--rr-scene-accent) !important;
+  color: #090a0d !important;
+  box-shadow: 0 0 30px rgba(var(--rr-scene-accent-rgb), 0.18) !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] section {
+  scroll-margin-top: 90px;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero],
+main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] + section,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #preview,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #how-it-works,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #quality,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #pricing,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #faq {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: none;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] {
+  min-height: 100svh !important;
+  padding: clamp(118px, 13vh, 170px) clamp(24px, 6vw, 96px) clamp(64px, 9vh, 112px) !important;
+  overflow: hidden !important;
+  display: flex !important;
+  align-items: center !important;
+  color: #f7f4eb !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero]::before,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero]::after,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] + section::before,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #preview::before,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #how-it-works::before,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #quality::before,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #pricing::before,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #faq::before {
+  position: absolute;
+  top: 112px;
+  left: clamp(22px, 4vw, 64px);
+  z-index: 2;
+  color: rgba(255, 255, 255, 0.36);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero]::before { content: "00 / acquire"; }
+main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] + section::before { content: "01 / noise"; }
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #preview::before { content: "02 / target"; }
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #how-it-works::before { content: "03 / process"; }
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #quality::before { content: "04 / evidence"; }
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #pricing::before { content: "05 / activate"; }
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #faq::before { content: "06 / control"; }
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero]::after {
+  right: clamp(24px, 5vw, 76px);
+  bottom: 34px;
+  left: auto;
+  top: auto;
+  content: "SCROLL TO SCAN ↓";
+  color: rgba(255, 255, 255, 0.5);
+  animation: rrScrollPrompt 1.8s ease-in-out infinite;
+}
+
+@keyframes rrScrollPrompt {
+  0%, 100% { transform: translateY(0); opacity: 0.35; }
+  50% { transform: translateY(7px); opacity: 0.8; }
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] > :last-child {
+  width: min(1380px, 100%);
+  margin: 0 auto;
+  grid-template-columns: minmax(0, 1.16fr) minmax(320px, 0.84fr) !important;
+  gap: clamp(40px, 7vw, 112px) !important;
+  align-items: center !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] [data-hero-step] {
+  opacity: 1 !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] h1 {
+  max-width: 10.5ch;
+  margin: 0;
+  color: #f8f5ed !important;
+  font-size: clamp(3.4rem, 6.75vw, 8.5rem) !important;
+  font-weight: 860 !important;
+  line-height: 0.87 !important;
+  letter-spacing: -0.072em !important;
+  text-wrap: balance;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] h1 span {
+  display: block !important;
+  margin-top: 0.08em;
+  color: var(--rr-scene-accent) !important;
+  font-size: 0.72em !important;
+  letter-spacing: -0.055em !important;
+  text-shadow: 0 0 42px rgba(var(--rr-scene-accent-rgb), 0.18);
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] p {
+  max-width: 55ch;
+  color: rgba(240, 237, 229, 0.68) !important;
+  font-size: clamp(1rem, 1.35vw, 1.24rem) !important;
+  line-height: 1.68 !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] [data-analytics-context="hero_primary"],
+main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] [data-analytics-context="hero_secondary"] {
+  min-height: 54px;
+  border-radius: 0 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.76rem !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] [data-analytics-context="hero_primary"] {
+  border: 1px solid var(--rr-scene-accent) !important;
+  background: var(--rr-scene-accent) !important;
+  color: #07080b !important;
+  box-shadow: 10px 10px 0 rgba(255, 255, 255, 0.08) !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] [data-analytics-context="hero_primary"]:hover {
+  transform: translate(-3px, -3px) !important;
+  box-shadow: 15px 15px 0 rgba(255, 255, 255, 0.11) !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] [data-analytics-context="hero_secondary"] {
+  border-color: rgba(255, 255, 255, 0.24) !important;
+  background: rgba(255, 255, 255, 0.03) !important;
+  color: #f7f4eb !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] [data-hero-tilt] {
+  position: relative;
+  overflow: visible !important;
+  border: 1px solid rgba(var(--rr-scene-accent-rgb), 0.36) !important;
+  border-radius: 2px !important;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.025)),
+    rgba(4, 8, 14, 0.78) !important;
+  color: #f7f4eb !important;
+  box-shadow:
+    26px 26px 0 rgba(var(--rr-scene-accent-rgb), 0.08),
+    0 36px 90px rgba(0, 0, 0, 0.46) !important;
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] [data-hero-tilt]::before {
+  position: absolute;
+  top: -30px;
+  right: -1px;
+  padding: 7px 10px;
+  border: 1px solid rgba(var(--rr-scene-accent-rgb), 0.4);
+  background: var(--rr-scene-accent);
+  color: #07080b;
+  content: "LIVE / 087";
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] [data-hero-tilt] * {
+  color: inherit;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] + section,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #preview,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #how-it-works,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #quality {
+  min-height: 100svh;
+  padding: clamp(138px, 16vh, 190px) clamp(24px, 7vw, 110px) clamp(84px, 11vh, 140px) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.09) !important;
+  display: grid !important;
+  grid-template-columns: minmax(260px, 0.7fr) minmax(0, 1.45fr) !important;
+  gap: clamp(46px, 8vw, 130px) !important;
+  align-items: start;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] + section {
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px) !important;
+  background-size: 56px 56px !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] + section > :first-child,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #preview > :first-child,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #how-it-works > :first-child,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #quality > :first-child {
+  position: sticky;
+  top: 126px;
+  align-self: start;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] + section > :not(:first-child),
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #preview > :not(:first-child),
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #how-it-works > :not(:first-child),
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #quality > :not(:first-child) {
+  grid-column: 2;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] + section h2,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #preview > :first-child h2,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #how-it-works > :first-child h2,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #quality > :first-child h2,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #pricing > :first-child h2,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #faq > :first-child h2 {
+  max-width: 11ch;
+  margin: 0;
+  color: #f7f4eb !important;
+  font-size: clamp(2.7rem, 5.2vw, 6.6rem) !important;
+  font-weight: 820 !important;
+  line-height: 0.94 !important;
+  letter-spacing: -0.058em !important;
+  text-wrap: balance;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] + section > :first-child p,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #preview > :first-child p,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #how-it-works > :first-child p,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #quality > :first-child p,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #pricing > :first-child p,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #faq > :first-child p {
+  max-width: 38ch;
+  color: rgba(247, 244, 235, 0.56) !important;
+  font-size: 1rem !important;
+  line-height: 1.72 !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] + section ol {
+  display: grid;
+  gap: 0 !important;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] + section li {
+  min-height: 168px;
+  padding: 30px 0 !important;
+  border: 0 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14) !important;
+  background: transparent !important;
+  color: #f7f4eb !important;
+  transition: padding-left 220ms ease, border-color 220ms ease, color 220ms ease;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] + section li:hover {
+  padding-left: 22px !important;
+  border-color: rgba(var(--rr-scene-accent-rgb), 0.68) !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] + section li h3 {
+  color: #f7f4eb !important;
+  font-size: clamp(1.35rem, 2vw, 2rem) !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] + section li p {
+  color: rgba(247, 244, 235, 0.52) !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #preview section,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #how-it-works section,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #quality section,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #pricing section {
+  border: 1px solid rgba(255, 255, 255, 0.13) !important;
+  border-radius: 2px !important;
+  background: rgba(8, 13, 22, 0.74) !important;
+  color: #f7f4eb !important;
+  box-shadow: 18px 18px 0 rgba(var(--rr-scene-accent-rgb), 0.055) !important;
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #preview section:hover,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #how-it-works section:hover,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #quality section:hover,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #pricing section:hover {
+  border-color: rgba(var(--rr-scene-accent-rgb), 0.52) !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #preview section *,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #how-it-works section *,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #quality section *,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #pricing section * {
+  color: inherit;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #preview input,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #preview select,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #preview textarea,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #pricing input {
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  border-radius: 0 !important;
+  background: rgba(255, 255, 255, 0.045) !important;
+  color: #f7f4eb !important;
+  caret-color: var(--rr-scene-accent);
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #preview input::placeholder {
+  color: rgba(247, 244, 235, 0.34) !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #preview button,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #preview a,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #pricing a {
+  border-radius: 0 !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #preview button[type="submit"] {
+  background: var(--rr-scene-accent) !important;
+  color: #06080d !important;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #preview [data-lead-card],
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #faq details {
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  border-radius: 0 !important;
+  background: rgba(255, 255, 255, 0.025) !important;
+  color: #f7f4eb !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #preview [data-lead-card][open] {
+  border-color: rgba(var(--rr-scene-accent-rgb), 0.46) !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #pricing,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #faq {
+  min-height: 100svh;
+  padding: clamp(140px, 16vh, 190px) clamp(24px, 8vw, 130px) clamp(90px, 12vh, 150px) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.09) !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #pricing > :first-child,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #faq > :first-child {
+  width: min(1180px, 100%);
+  margin: 0 auto clamp(56px, 8vw, 104px);
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #pricing > :first-child h2,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #faq > :first-child h2 {
+  max-width: 13ch;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #pricing > :not(:first-child),
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #faq > :not(:first-child) {
+  width: min(1180px, 100%);
+  margin-right: auto;
+  margin-left: auto;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #pricing section {
+  min-height: 100%;
+  transition: transform 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #pricing section:hover {
+  transform: translateY(-8px);
+  box-shadow: 24px 24px 0 rgba(var(--rr-scene-accent-rgb), 0.08) !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #pricing [data-analytics-event] {
+  border: 1px solid rgba(var(--rr-scene-accent-rgb), 0.55) !important;
+  background: transparent !important;
+  color: #f7f4eb !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #pricing [data-analytics-context="pricing_pilot"] {
+  background: var(--rr-scene-accent) !important;
+  color: #08090c !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #faq details {
+  border-top: 1px solid rgba(255, 255, 255, 0.13) !important;
+  border-right: 0 !important;
+  border-bottom: 0 !important;
+  border-left: 0 !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #faq details:last-of-type {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.13) !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #faq summary {
+  min-height: 92px;
+  color: #f7f4eb !important;
+  font-size: clamp(1.05rem, 1.8vw, 1.5rem) !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #faq details[open] {
+  border-color: rgba(var(--rr-scene-accent-rgb), 0.7) !important;
+  background: rgba(var(--rr-scene-accent-rgb), 0.045) !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #faq details div {
+  color: rgba(247, 244, 235, 0.62) !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #faq + section {
+  position: relative;
+  width: min(1180px, calc(100% - 48px));
+  margin: 0 auto clamp(40px, 8vw, 110px) !important;
+  border: 1px solid rgba(var(--rr-scene-accent-rgb), 0.48) !important;
+  border-radius: 0 !important;
+  background:
+    linear-gradient(120deg, rgba(var(--rr-scene-accent-rgb), 0.14), transparent 46%),
+    rgba(9, 13, 20, 0.82) !important;
+  color: #f7f4eb !important;
+  box-shadow: 26px 26px 0 rgba(var(--rr-scene-accent-rgb), 0.075) !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #faq + section h2,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #faq + section p {
+  color: inherit !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+  background: #020408 !important;
+  color: rgba(247, 244, 235, 0.52) !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] footer a {
+  color: rgba(247, 244, 235, 0.72) !important;
+}
+
+@media (max-width: 980px) {
+  main[data-deploy-anchor="recruiter-radar-landing-v4"]::before,
+  main[data-deploy-anchor="recruiter-radar-landing-v4"]::after {
+    top: 31%;
+    left: 78%;
+    width: min(94vw, 680px);
+    opacity: 0.38;
+  }
+
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] > :last-child {
+    grid-template-columns: 1fr !important;
+  }
+
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] h1 {
+    max-width: 12ch;
+    font-size: clamp(3.1rem, 9vw, 6rem) !important;
+  }
+
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] [data-hero-tilt] {
+    width: min(720px, 100%);
+  }
+
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] + section,
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] #preview,
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] #how-it-works,
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] #quality {
+    min-height: auto;
+    grid-template-columns: 1fr !important;
+    gap: 48px !important;
+  }
+
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] + section > :first-child,
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] #preview > :first-child,
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] #how-it-works > :first-child,
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] #quality > :first-child {
+    position: relative;
+    top: auto;
+  }
+
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] + section > :not(:first-child),
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] #preview > :not(:first-child),
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] #how-it-works > :not(:first-child),
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] #quality > :not(:first-child) {
+    grid-column: 1;
+  }
+}
+
+@media (max-width: 680px) {
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] header[data-brand-header="recruiter-radar-v3"] {
+    top: 10px !important;
+    width: calc(100vw - 20px) !important;
+    min-height: 54px;
+    padding: 5px 6px 5px 12px !important;
+  }
+
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] {
+    min-height: 100svh !important;
+    padding: 108px 20px 74px !important;
+  }
+
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero]::before,
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] + section::before,
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] #preview::before,
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] #how-it-works::before,
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] #quality::before,
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] #pricing::before,
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] #faq::before {
+    top: 86px;
+    left: 20px;
+  }
+
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] h1 {
+    max-width: 100%;
+    font-size: clamp(2.65rem, 13.2vw, 4.5rem) !important;
+    line-height: 0.91 !important;
+    letter-spacing: -0.062em !important;
+  }
+
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] h1 span {
+    font-size: 0.68em !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+  }
+
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] [data-hero-tilt] {
+    box-shadow: 12px 12px 0 rgba(var(--rr-scene-accent-rgb), 0.07) !important;
+  }
+
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] + section,
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] #preview,
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] #how-it-works,
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] #quality,
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] #pricing,
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] #faq {
+    padding: 124px 20px 76px !important;
+  }
+
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] + section h2,
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] #preview > :first-child h2,
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] #how-it-works > :first-child h2,
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] #quality > :first-child h2,
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] #pricing > :first-child h2,
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] #faq > :first-child h2 {
+    max-width: 100%;
+    font-size: clamp(2.35rem, 11vw, 4rem) !important;
+  }
+
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] #faq + section {
+    width: calc(100% - 40px);
+    box-shadow: 12px 12px 0 rgba(var(--rr-scene-accent-rgb), 0.075) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  main[data-deploy-anchor="recruiter-radar-landing-v4"]::before,
+  main[data-deploy-anchor="recruiter-radar-landing-v4"]::after,
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero]::after {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] * {
+    scroll-behavior: auto !important;
+  }
+}

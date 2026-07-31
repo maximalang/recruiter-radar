@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { getAccountById } from "@/lib/account-auth";
 import { getSession } from "@/lib/auth-v2/authorization";
@@ -13,14 +14,16 @@ import {
   ContentCard,
   EmptyState,
   ErrorState,
-  InternalPageFrame,
-  InternalPageHeader,
 } from "../ui/internal-page";
+import {
+  ProductWorkspaceFrame,
+  ProductWorkspaceHeader,
+} from "../ui/product-workspace";
 import { SiteFooter } from "../ui/site-footer";
-import dashStyles from "./dashboard.module.css";
+import dashStyles from "./dashboard-workspace.module.css";
 
 export const metadata: Metadata = {
-  title: "Рабочий стол — Recruiter Radar",
+  title: "Командный центр — Recruiter Radar",
   description: "Компании на сегодня, очередь проверки и готовность личного радара.",
 };
 
@@ -41,8 +44,9 @@ export default async function DashboardPage() {
 
   if (!authorization || !account) {
     return (
-      <InternalPageFrame navItems={DASHBOARD_NAV} footer={<SiteFooter />}>
-        <InternalPageHeader
+      <ProductWorkspaceFrame navItems={DASHBOARD_NAV} footer={<SiteFooter />}>
+        <ProductWorkspaceHeader
+          eyebrow="Защищённое рабочее пространство"
           title="Личный кабинет"
           subtitle="Войдите, чтобы видеть только свой профиль, лиды и историю работы."
         />
@@ -53,7 +57,7 @@ export default async function DashboardPage() {
             action={{ href: "/login", label: "Войти в аккаунт" }}
           />
         </ContentCard>
-      </InternalPageFrame>
+      </ProductWorkspaceFrame>
     );
   }
 
@@ -65,9 +69,10 @@ export default async function DashboardPage() {
 
   if (!profile) {
     return (
-      <InternalPageFrame navItems={DASHBOARD_NAV} footer={<SiteFooter />}>
-        <InternalPageHeader
-          title="Завершите активацию"
+      <ProductWorkspaceFrame navItems={DASHBOARD_NAV} footer={<SiteFooter />}>
+        <ProductWorkspaceHeader
+          eyebrow="Активация"
+          title="Завершите настройку радара"
           subtitle="Аккаунт найден, но рабочий профиль ещё не создан."
         />
         <ContentCard variant="hero">
@@ -77,7 +82,7 @@ export default async function DashboardPage() {
             action={{ href: "/checkout", label: "Активировать радар" }}
           />
         </ContentCard>
-      </InternalPageFrame>
+      </ProductWorkspaceFrame>
     );
   }
 
@@ -86,11 +91,19 @@ export default async function DashboardPage() {
   const completionPercent = Math.round(completion.ratio * 100);
 
   return (
-    <InternalPageFrame navItems={DASHBOARD_NAV} footer={<SiteFooter />}>
-      <InternalPageHeader
-        title="Ваш радар"
-        subtitle="Один экран для приоритетных компаний, очереди проверки и готовности аккаунта."
+    <ProductWorkspaceFrame navItems={DASHBOARD_NAV} footer={<SiteFooter />}>
+      <ProductWorkspaceHeader
+        eyebrow="Утренний обзор"
+        title="Командный центр"
+        subtitle="Приоритетные компании, очередь проверки и состояние радара — в одном рабочем контексте."
+        status="Наблюдение активно"
+        actions={(
+          <Link href="/leads" className={dashStyles.workspaceCta}>
+            Открыть все возможности
+          </Link>
+        )}
       />
+
       <div className={dashStyles.dashboardStack}>
         <DashboardAccountOverview
           agencyName={profile.agencyName}
@@ -114,6 +127,6 @@ export default async function DashboardPage() {
           />
         )}
       </div>
-    </InternalPageFrame>
+    </ProductWorkspaceFrame>
   );
 }
