@@ -167,6 +167,14 @@ const outcomeCorrectionCapabilityRollbackPath = resolve(
   process.cwd(), '..', '..', 'packages', 'db', 'migrations',
   '20260728112000_enforce_outcome_correction_capability.down.sql',
 )
+const outcomeWorkspaceActorMigrationPath = resolve(
+  process.cwd(), '..', '..', 'packages', 'db', 'migrations',
+  '20260731100000_add_opportunity_workspace_actor_context.sql',
+)
+const outcomeWorkspaceActorRollbackPath = resolve(
+  process.cwd(), '..', '..', 'packages', 'db', 'migrations',
+  '20260731100000_add_opportunity_workspace_actor_context.down.sql',
+)
 const migratorPath = resolve(
   process.cwd(), '..', '..', 'packages', 'db', 'scripts', 'migrate.mjs',
 )
@@ -419,6 +427,14 @@ describe('opportunity outcome migrations', () => {
     outcomeCorrectionCapabilityRollbackPath,
     'utf8',
   ).replace(/\s+/g, ' ')
+  const workspaceActor = readFileSync(
+    outcomeWorkspaceActorMigrationPath,
+    'utf8',
+  ).replace(/\s+/g, ' ')
+  const workspaceActorRollback = readFileSync(
+    outcomeWorkspaceActorRollbackPath,
+    'utf8',
+  ).replace(/\s+/g, ' ')
   const migrator = readFileSync(migratorPath, 'utf8')
 
   it('binds every ledger row to the complete tenant opportunity context', () => {
@@ -582,8 +598,34 @@ describe('opportunity outcome migrations', () => {
     )
   })
 
+  it('adds immutable workspace actor attribution without guessing history', () => {
+    expect(workspaceActor).toContain('actor_workspace_id BIGINT')
+    expect(workspaceActor).toContain('actor_role_snapshot TEXT')
+    expect(workspaceActor).toContain('REFERENCES workspaces(id)')
+    expect(workspaceActor).toContain(
+      'opportunity_outcome_events_actor_context_check',
+    )
+    expect(workspaceActor).not.toMatch(
+      /UPDATE\s+opportunity_outcome_events/i,
+    )
+    expect(workspaceActorRollback).toContain(
+      'workspace actor attribution exists',
+    )
+    expect(workspaceActorRollback).toContain(
+      'DROP COLUMN actor_role_snapshot',
+    )
+    expect(workspaceActorRollback).toContain(
+      'DROP COLUMN actor_workspace_id',
+    )
+  })
+
   it('keeps new migrations atomic under a serialized migrator', () => {
-    for (const sql of [lifecycle, writeBoundary, correctionCapability]) {
+    for (const sql of [
+      lifecycle,
+      writeBoundary,
+      correctionCapability,
+      workspaceActor,
+    ]) {
       expect(sql).not.toContain('BEGIN;')
       expect(sql).not.toContain('COMMIT;')
       expect(sql).toContain("SET LOCAL lock_timeout = '5s'")

@@ -21,6 +21,7 @@ function clientFrom(query: jest.Mock, release = jest.fn()): OpportunityClient {
 const opportunityContext = {
   id: '10',
   ownerId: '7',
+  workspaceId: '9',
   clientProfileId: '8',
   organizationId: '9',
   hiringEpisodeId: '11',
@@ -96,6 +97,89 @@ describe('opportunity outcome repository', () => {
     )).toBe(true)
     expect(query.mock.calls.some(([sql]) => String(sql) === 'COMMIT')).toBe(true)
     expect(release).toHaveBeenCalledTimes(1)
+  })
+
+  it('records the real Auth v2 actor and immutable workspace role snapshot', async () => {
+    const query = successfulQuery()
+    jest.mocked(getClient).mockResolvedValue(clientFrom(query))
+
+    await recordOpportunityOutcome({
+      ownerId: '7',
+      workspaceId: '9',
+      opportunityId: '10',
+      actorType: 'user',
+      actorUserId: '42',
+      actorWorkspaceId: '9',
+      actorRoleSnapshot: 'recruiter',
+      authMode: 'auth_v2',
+      payload: {
+        eventType: 'accepted',
+        occurredAt: '2026-07-27T12:00:00.000Z',
+        idempotencyKey: 'accepted:workspace-actor',
+        metadata: {},
+      },
+    })
+
+    const contextRead = query.mock.calls.find(([sql]) =>
+      String(sql).includes('FROM opportunities o') &&
+      String(sql).includes('FOR UPDATE'))
+    expect(String(contextRead?.[0])).toContain('o.workspace_id = $3')
+    expect(contextRead?.[1]).toEqual(['10', '7', '9'])
+
+    const eventInsert = query.mock.calls.find(([sql]) =>
+      String(sql).includes('INSERT INTO opportunity_outcome_events'))
+    expect(String(eventInsert?.[0])).toContain('actor_workspace_id')
+    expect(String(eventInsert?.[0])).toContain('actor_role_snapshot')
+    expect(eventInsert?.[1]).toEqual(expect.arrayContaining([
+      '42',
+      '9',
+      'recruiter',
+    ]))
+  })
+
+  it('rejects incomplete Auth v2 actor attribution before inserting an event', async () => {
+    const query = successfulQuery()
+    jest.mocked(getClient).mockResolvedValue(clientFrom(query))
+
+    await expect(recordOpportunityOutcome({
+      ownerId: '7',
+      workspaceId: '9',
+      opportunityId: '10',
+      actorType: 'user',
+      actorUserId: '42',
+      actorWorkspaceId: '9',
+      actorRoleSnapshot: null,
+      authMode: 'auth_v2',
+      payload: {
+        eventType: 'accepted',
+        occurredAt: '2026-07-27T12:00:00.000Z',
+        idempotencyKey: 'accepted:missing-role',
+        metadata: {},
+      },
+    })).rejects.toThrow('Auth v2 outcome actor context is incomplete.')
+
+    expect(query.mock.calls.some(([sql]) =>
+      String(sql).includes('INSERT INTO opportunity_outcome_events'),
+    )).toBe(false)
+  })
+
+  it('keeps legacy user attribution owner-scoped', async () => {
+    const query = successfulQuery()
+    jest.mocked(getClient).mockResolvedValue(clientFrom(query))
+
+    await expect(recordOpportunityOutcome({
+      ownerId: '7',
+      opportunityId: '10',
+      actorType: 'user',
+      actorUserId: '42',
+      authMode: 'legacy',
+      payload: {
+        eventType: 'accepted',
+        occurredAt: '2026-07-27T12:00:00.000Z',
+        idempotencyKey: 'accepted:legacy-foreign-actor',
+        metadata: {},
+      },
+    })).rejects.toThrow('User outcome actor must match the tenant owner.')
   })
 
   it('does not treat accepted as contacted', async () => {
