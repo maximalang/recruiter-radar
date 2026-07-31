@@ -6,9 +6,11 @@ import { PushReadinessBoot } from "./push-readiness-boot";
 import { shouldRunAuthV2SessionRefresh } from "@/lib/auth-v2/config";
 import { AuthSessionRefresh } from "./auth-session-refresh";
 import { PremiumUiEffects } from "./premium-ui-effects";
+import { CinematicLandingShell } from "./cinematic-landing-shell";
 import "./globals.css";
 import "./premium-ui.css";
 import "./premium-ui-refinements.css";
+import "./cinematic-landing.css";
 
 const inter = Inter({
   subsets: ["cyrillic", "latin"],
@@ -61,6 +63,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
         }}
       >
         <PremiumUiEffects />
+        <CinematicLandingShell />
         <PushReadinessBoot />
         {shouldRunAuthV2SessionRefresh() ? <AuthSessionRefresh /> : null}
         {children}
