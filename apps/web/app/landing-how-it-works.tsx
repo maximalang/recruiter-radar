@@ -29,7 +29,7 @@ export default function LandingHowItWorks() {
           key={step.title}
           className={`${hpStyles.step} ${hpStyles.revealCard}`}
         >
-          <div className={hpStyles.stepButton}>
+          <div className={hpStyles.stepButton} style={{ cursor: "default" }}>
             <span className={hpStyles.stepIndex}>{step.eyebrow}</span>
             <strong className={hpStyles.stepTitle}>{step.title}</strong>
             <span className={hpStyles.stepDescription}>{step.description}</span>

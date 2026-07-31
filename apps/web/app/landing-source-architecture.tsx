@@ -45,7 +45,7 @@ export default function LandingSourceArchitecture() {
             className={hpStyles.sourceLayer}
             data-source-role={layer.role}
           >
-            <div className={hpStyles.sourceLayerButton}>
+            <div className={hpStyles.sourceLayerButton} style={{ cursor: "default" }}>
               <span className={hpStyles.sourceLayerMeta}>
                 <span>{layer.label}</span>
                 <em>{layer.badge}</em>
