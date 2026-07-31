@@ -1,6 +1,6 @@
 import type { OutcomeFunnelSummary } from '@/lib/opportunities/outcome-repository'
 
-import styles from './opportunities.module.css'
+import styles from './opportunities-v2.module.css'
 
 export function OpportunityFunnel(props: { summary: OutcomeFunnelSummary }) {
   return (
