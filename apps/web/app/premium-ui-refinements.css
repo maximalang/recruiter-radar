@@ -1,0 +1,42 @@
+/* Targeted refinements discovered by production screenshot review. */
+
+/* Keep programmatic and test-driven scroll positioning deterministic. Smooth
+   navigation remains owned by the landing interaction components instead of a
+   global browser rule. */
+html {
+  scroll-behavior: auto;
+}
+
+[data-deploy-anchor^="recruiter-radar-landing"] [class*="heroSection"] {
+  padding-top: clamp(132px, 11vw, 158px) !important;
+  padding-bottom: clamp(52px, 7vw, 84px) !important;
+}
+
+[data-deploy-anchor^="recruiter-radar-landing"] h1[class*="heroTitle"] {
+  max-width: 10.5ch !important;
+  font-size: clamp(3rem, 5.45vw, 5.1rem) !important;
+}
+
+[data-deploy-anchor^="recruiter-radar-landing"] [class*="heroTitleAccent"] {
+  display: block;
+  max-width: 100%;
+  margin-top: 0.08em;
+  font-size: 0.7em;
+  line-height: 1.04;
+  letter-spacing: -0.045em;
+}
+
+@media (max-width: 720px) {
+  [data-deploy-anchor^="recruiter-radar-landing"] [class*="heroSection"] {
+    padding-top: 112px !important;
+  }
+
+  [data-deploy-anchor^="recruiter-radar-landing"] h1[class*="heroTitle"] {
+    max-width: 11ch !important;
+    font-size: clamp(2.65rem, 14vw, 3.75rem) !important;
+  }
+
+  [data-deploy-anchor^="recruiter-radar-landing"] [class*="heroTitleAccent"] {
+    font-size: 0.76em;
+  }
+}
