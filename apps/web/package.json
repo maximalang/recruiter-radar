@@ -12,7 +12,7 @@
     "check": "tsc --noEmit",
     "test": "jest",
     "test:types": "tsc -p tsconfig.test.json --noEmit",
-    "test:landing:e2e": "node scripts/verify-landing-production.mjs",
+    "test:landing:e2e": "node scripts/run-landing-production-audit.mjs",
     "sync:digest-evidence": "node scripts/sync-digest-evidence-query.mjs",
     "sync:digest-evidence:check": "node scripts/sync-digest-evidence-query.mjs --check",
     "quality:evaluate": "node scripts/evaluate-fiur.mjs",
