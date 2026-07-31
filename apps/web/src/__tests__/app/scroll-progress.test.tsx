@@ -30,21 +30,21 @@ describe("ScrollProgress", () => {
     window.scrollTo = jest.fn();
   });
 
-  it("updates progress through CSS and keeps the back-to-top control mounted", () => {
+  it("updates the compact progress ring and reveals the back-to-top control", () => {
     const { container } = render(<ScrollProgress />);
     const button = container.querySelector<HTMLButtonElement>(
       'button[aria-label="Вернуться наверх"]',
     );
-    const progress = container.querySelector("[data-scroll-progress]");
+    const ring = container.querySelectorAll<SVGCircleElement>("circle")[1];
 
     expect(button).not.toBeNull();
     expect(button).toHaveAttribute("aria-hidden", "true");
-    expect(progress).toHaveStyle("--scroll-progress: 0");
+    expect(ring.style.strokeDashoffset).toBe("100");
 
     document.documentElement.scrollTop = 750;
     fireEvent.scroll(window);
 
-    expect(progress).toHaveStyle("--scroll-progress: 0.75");
+    expect(ring.style.strokeDashoffset).toBe("25");
     expect(button).toHaveAttribute("aria-hidden", "false");
     expect(button).toHaveAttribute("data-visible", "true");
   });

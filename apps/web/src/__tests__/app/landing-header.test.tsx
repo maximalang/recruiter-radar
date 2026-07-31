@@ -19,7 +19,7 @@ describe("landing header accessibility", () => {
       unobserve() {}
       takeRecords() { return []; }
       root = null;
-      rootMargin = "-80px 0px -55% 0px";
+      rootMargin = "-92px 0px -55% 0px";
       thresholds = [0, 0.15, 0.4, 0.75];
     }
     Object.defineProperty(window, "IntersectionObserver", {
@@ -41,19 +41,15 @@ describe("landing header accessibility", () => {
   it("offers a clear activation path without hiding account access", () => {
     renderHeader();
 
-    expect(screen.getByRole("link", { name: "Настроить радар" })).toHaveAttribute(
-      "href",
-      "#preview-configurator",
-    );
-    expect(screen.getByRole("link", { name: "Настроить радар" }))
-      .toHaveAttribute("data-analytics-event", "preview_started");
-    expect(screen.getByRole("link", { name: "Настроить радар" }))
-      .toHaveAttribute("data-analytics-context", "header");
-    expect(screen.getByRole("link", { name: "Войти" })).toHaveAttribute(
+    const activation = screen.getByRole("link", { name: "Проверить свою нишу" });
+    expect(activation).toHaveAttribute("href", "#preview-configurator");
+    expect(activation).toHaveAttribute("data-analytics-event", "preview_started");
+    expect(activation).toHaveAttribute("data-analytics-context", "header");
+    expect(screen.getByRole("link", { name: "Личный кабинет" })).toHaveAttribute(
       "href",
       "/dashboard",
     );
-    expect(screen.getByRole("link", { name: "Проверка" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Как проверяем" })).toHaveAttribute(
       "href",
       "#quality",
     );
@@ -102,7 +98,7 @@ describe("landing header accessibility", () => {
       } as unknown as IntersectionObserverEntry,
     ], {} as IntersectionObserver));
 
-    expect(screen.getAllByRole("link", { name: "Проверка" })[0]).toHaveAttribute(
+    expect(screen.getAllByRole("link", { name: "Как проверяем" })[0]).toHaveAttribute(
       "aria-current",
       "location",
     );
@@ -140,7 +136,7 @@ describe("landing header accessibility", () => {
       },
     ] as unknown as IntersectionObserverEntry[], {} as IntersectionObserver));
 
-    expect(screen.getAllByRole("link", { name: "Проверка" })[0]).toHaveAttribute(
+    expect(screen.getAllByRole("link", { name: "Как проверяем" })[0]).toHaveAttribute(
       "aria-current",
       "location",
     );
