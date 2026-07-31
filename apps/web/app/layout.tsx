@@ -8,6 +8,7 @@ import { AuthSessionRefresh } from "./auth-session-refresh";
 import { PremiumUiEffects } from "./premium-ui-effects";
 import "./globals.css";
 import "./premium-ui.css";
+import "./premium-ui-refinements.css";
 
 const inter = Inter({
   subsets: ["cyrillic", "latin"],
