@@ -8,6 +8,7 @@ import {
   LANDING_ANALYTICS_EVENT,
 } from "../lib/landing-analytics-contract";
 import hpStyles from "./home-page-components.module.css";
+import LandingMotionPreference from "./landing-motion/motion-preference";
 import { BrandLogo } from "./ui/brand-logo";
 
 const NAV_ITEMS = [
@@ -88,7 +89,8 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
     <header
       ref={headerRef}
       className={hpStyles.topBar}
-      data-brand-header="recruiter-radar-v4"
+      data-deploy-anchor="recruiter-radar-landing-v3"
+      data-brand-header="recruiter-radar-v3"
       style={{
         position: "fixed",
         top: "14px",
@@ -116,6 +118,7 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
           ))}
         </span>
         <span className={hpStyles.topNavActions}>
+          <LandingMotionPreference />
           <Link href="/dashboard" className={hpStyles.topNavLogin}>Личный кабинет</Link>
           <Link
             href={previewHref}
