@@ -3,7 +3,7 @@
 import { Children, isValidElement, type ComponentProps, type ReactNode } from "react";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { cleanup, render, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import RootLayout from "@/app/layout";
 import YandexMetrika from "@/app/yandex-metrika";
@@ -39,6 +39,7 @@ describe("YandexMetrika", () => {
 
   afterEach(() => {
     cleanup();
+    window.localStorage.clear();
     delete window.ym;
     if (originalId === undefined) delete process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID;
     else process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID = originalId;
@@ -54,12 +55,32 @@ describe("YandexMetrika", () => {
     expect(container.querySelector("#yandex-metrika-loader")).toBeNull();
   });
 
-  it("loads the official tag and emits explicit query-free SPA pageviews", async () => {
+  it("does not load analytics before explicit consent", async () => {
+    process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID = "12345678";
+    const { container } = render(<YandexMetrika />);
+
+    expect(container.querySelector("#yandex-metrika-loader")).toBeNull();
+    expect(await screen.findByRole("dialog", { name: "Настройки аналитики" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Только необходимые cookies" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Настройки аналитики" })).toBeNull());
+    expect(container.querySelector("#yandex-metrika-loader")).toBeNull();
+    expect(window.localStorage.getItem("rr_analytics_consent_v1")).toBe("rejected");
+  });
+
+  it("loads the official tag and emits a query-free pageview after opt-in", async () => {
     process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID = "12345678";
     const ym = jest.fn();
     window.ym = ym;
     const { container, rerender } = render(<YandexMetrika />);
-    const loader = container.querySelector("#yandex-metrika-loader");
+
+    fireEvent.click(await screen.findByRole("button", { name: "Разрешить аналитику" }));
+
+    const loader = await waitFor(() => {
+      const element = container.querySelector("#yandex-metrika-loader");
+      expect(element).not.toBeNull();
+      return element;
+    });
     const initialization = loader?.textContent ?? "";
 
     expect(initialization).toContain("https://mc.yandex.ru/metrika/tag.js");
@@ -70,6 +91,7 @@ describe("YandexMetrika", () => {
     expect(initialization).toContain("webvisor:false");
     expect(initialization).not.toContain("window.location");
     expect(initialization).not.toContain("location.search");
+    expect(window.localStorage.getItem("rr_analytics_consent_v1")).toBe("accepted");
 
     await waitFor(() => expect(ym).toHaveBeenCalledWith(
       12345678,
