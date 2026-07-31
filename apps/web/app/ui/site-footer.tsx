@@ -8,12 +8,9 @@ import { BrandLogo } from "./brand-logo";
 /**
  * Site-wide footer — a quiet, minimal closer for every page surface.
  *
- * Three lines, no more: brand + nav links; one operator-requisites line (the
- * legally-required minimum — ФИО, ИНН, email); the copyright. The full
- * requisites (status, service description) live on /legal, so the footer
- * carries only what the law requires on every page and points to /legal for
- * the rest. Replaces the heavier footer that repeated the status and a
- * tagline-style copyright line.
+ * Three lines, no more: brand + nav links; one operator-requisites line (ФИО,
+ * ИНН, email); the copyright. The full status and service description live on
+ * /legal. Public operator data is imported from one source of truth.
  *
  * The /admin link is operator-gated: it renders ONLY for a browser that
  * carries the signed `rr_op` operator session (see lib/operator-auth.ts).
@@ -54,12 +51,6 @@ export async function SiteFooter(props: { tone?: "light" | "dark" }) {
           </nav>
         </div>
 
-        {/* Operator requisites — the legally-required minimum on every page:
-            ФИО + ИНН + контактный email. Full status/service on /legal. The
-            operator's identifying details live in one place (lib/operatorRequisites)
-            so the footer and /legal never drift apart. These stay on every page
-            by law (152-ФЗ / 54-ФЗ for a self-employed seller accepting payments
-            online) — removing them would be a compliance regression. */}
         <div className={s.footerOperator}>
           <span className={s.footerOperatorName}>{OPERATOR_REQUISITES.fullName}</span>
           <span className={s.footerOperatorSep} aria-hidden="true">·</span>
