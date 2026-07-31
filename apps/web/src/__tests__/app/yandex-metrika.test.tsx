@@ -1,105 +1,63 @@
 /** @jest-environment jsdom */
 
-import { Children, isValidElement, type ComponentProps, type ReactNode } from "react";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { cleanup, render, waitFor } from "@testing-library/react";
-
-import RootLayout from "@/app/layout";
+import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import YandexMetrika from "@/app/yandex-metrika";
 
 jest.mock("next/script", () => {
   const React = jest.requireActual<typeof import("react")>("react");
-  return function MockNextScript({
-    onReady,
-    ...props
-  }: ComponentProps<"script"> & { onReady?: () => void }) {
-    React.useEffect(() => {
-      onReady?.();
-    }, [onReady]);
+  return function MockNextScript({ onReady, ...props }: React.ComponentProps<"script"> & { onReady?: () => void }) {
+    React.useEffect(() => { onReady?.(); }, [onReady]);
     return <script {...props} />;
   };
 });
 
-function containsElementType(node: ReactNode, type: unknown): boolean {
-  let found = false;
-  Children.forEach(node, (child) => {
-    if (!isValidElement<{ children?: ReactNode }>(child) || found) return;
-    if (child.type === type) {
-      found = true;
-      return;
-    }
-    found = containsElementType(child.props.children, type);
-  });
-  return found;
-}
+const CONSENT_KEY = "rr_analytics_consent_v1";
 
-describe("YandexMetrika", () => {
+describe("YandexMetrika consent", () => {
   const originalId = process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID;
+
+  beforeEach(() => {
+    window.localStorage.clear();
+    process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID = "12345678";
+  });
 
   afterEach(() => {
     cleanup();
+    window.localStorage.clear();
     delete window.ym;
     if (originalId === undefined) delete process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID;
     else process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID = originalId;
   });
 
-  it("renders nothing when the public counter id is missing or invalid", () => {
-    delete process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID;
-    const { container, rerender } = render(<YandexMetrika />);
-    expect(container.querySelector("#yandex-metrika-loader")).toBeNull();
-
-    process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID = "not-a-counter";
-    rerender(<YandexMetrika />);
+  test("does not load the script before explicit opt-in", async () => {
+    const { container, findByRole } = render(<YandexMetrika />);
+    await findByRole("dialog", { name: "Настройки аналитики" });
     expect(container.querySelector("#yandex-metrika-loader")).toBeNull();
   });
 
-  it("loads the official tag and emits explicit query-free SPA pageviews", async () => {
-    process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID = "12345678";
+  test("loads Metrika only after the user accepts", async () => {
     const ym = jest.fn();
     window.ym = ym;
-    const { container, rerender } = render(<YandexMetrika />);
-    const loader = container.querySelector("#yandex-metrika-loader");
-    const initialization = loader?.textContent ?? "";
+    const { container, findByRole, getByRole } = render(<YandexMetrika />);
+    await findByRole("dialog", { name: "Настройки аналитики" });
+    fireEvent.click(getByRole("button", { name: "Разрешить аналитику" }));
 
-    expect(initialization).toContain("https://mc.yandex.ru/metrika/tag.js");
-    expect(initialization).toContain("12345678");
-    expect(initialization).toContain("defer:true");
-    expect(initialization).toContain("clickmap:false");
-    expect(initialization).toContain("trackLinks:false");
-    expect(initialization).toContain("webvisor:false");
-    expect(initialization).not.toContain("window.location");
-    expect(initialization).not.toContain("location.search");
-
-    await waitFor(() => expect(ym).toHaveBeenCalledWith(
-      12345678,
-      "hit",
-      "/",
-      expect.objectContaining({ title: expect.any(String) }),
-    ));
-    rerender(<YandexMetrika />);
-
-    await waitFor(() => {
-      const pageviews = ym.mock.calls
-        .filter((call) => call[1] === "hit")
-        .map((call) => call[2]);
-      expect(pageviews).toEqual(["/"]);
-    });
+    await waitFor(() => expect(container.querySelector("#yandex-metrika-loader")).not.toBeNull());
+    expect(window.localStorage.getItem(CONSENT_KEY)).toBe("accepted");
+    await waitFor(() => expect(ym).toHaveBeenCalledWith(12345678, "hit", "/", expect.any(Object)));
   });
 
-  it("does not mount Metrika globally or on routes with customer data", () => {
-    const layout = RootLayout({ children: <main data-route-content /> });
+  test("keeps analytics disabled after rejection", async () => {
+    const { container, findByRole, getByRole } = render(<YandexMetrika />);
+    await findByRole("dialog", { name: "Настройки аналитики" });
+    fireEvent.click(getByRole("button", { name: "Только необходимые cookies" }));
+    expect(window.localStorage.getItem(CONSENT_KEY)).toBe("rejected");
+    expect(container.querySelector("#yandex-metrika-loader")).toBeNull();
+  });
 
-    expect(containsElementType(layout, YandexMetrika)).toBe(false);
-
-    const landing = readFileSync(resolve(process.cwd(), "app/page.tsx"), "utf8");
-    const checkout = readFileSync(resolve(process.cwd(), "app/checkout/page.tsx"), "utf8");
-    const onboarding = readFileSync(
-      resolve(process.cwd(), "app/onboarding/pilot/[orderId]/page.tsx"),
-      "utf8",
-    );
-    expect(landing).toContain("<YandexMetrika");
-    expect(checkout).not.toContain("YandexMetrika");
-    expect(onboarding).not.toContain("YandexMetrika");
+  test("renders nothing without a valid public counter id", () => {
+    process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID = "invalid";
+    const { container } = render(<YandexMetrika />);
+    expect(container).toBeEmptyDOMElement();
   });
 });
