@@ -1,43 +1,93 @@
-# Russia-first payment readiness
+# ЮKassa для Recruiter Radar: запуск самозанятого
 
-**Статус:** provider selection blocked; Stripe-only adapter exists.
+**Статус кода:** адаптер ЮKassa и webhook подготовлены. Включение оплаты заблокировано только регистрацией магазина, выдачей credentials и заполнением обязательных публичных контактов.
 
-## Runtime truth
+## Текущая модель оплаты
 
-- `paymentsProvider.ts` поддерживает только `PAYMENTS_PROVIDER=stripe`.
-- Self-service pilot считается готовым только когда одновременно настроены checkout, webhook и публичный site URL.
-- Monthly и quarterly не проходят через payment provider. Это сохранённые sales requests без автоматического списания.
-- При недоступном pilot provider заказ сохраняется, а пользователь получает понятный fallback вместо технической ошибки.
+- Самостоятельно через ЮKassa оплачивается тариф «Неделя» — разовый платёж 2 990 ₽.
+- «Месяц» и «Три месяца» пока остаются заявками без автоматического списания и без попытки создать платёж.
+- После подтверждённой оплаты активируется семидневный доступ и запускается onboarding.
+- Карточные данные обрабатываются на стороне ЮKassa и не проходят через Recruiter Radar.
+- Webhook считается доверенным только после повторного запроса платежа к API ЮKassa с credentials магазина.
 
-Operator state доступен через:
+## Важное правило для НПД
 
-```text
-GET /api/health/payment-readiness
-x-api-key: <CRON_API_KEY>
+Оператор применяет налог на профессиональный доход и не использует онлайн-кассу в этой конфигурации. Опция «Чеки от ЮKassa» для 54-ФЗ не подключается.
+
+После каждого поступления оператор формирует чек самозанятого в приложении «Мой налог» либо через разрешённого оператора и направляет его клиенту. На первом запуске этот процесс остаётся ручным и должен входить в операционный регламент.
+
+## Публичные страницы
+
+Перед отправкой сайта на проверку должны открываться без авторизации:
+
+- `https://recruiter-radar.ru/` — описание услуги и актуальные цены;
+- `https://recruiter-radar.ru/terms` — публичная оферта;
+- `https://recruiter-radar.ru/privacy` — политика обработки персональных данных;
+- `https://recruiter-radar.ru/legal` — ФИО, статус НПД, ИНН и контакты;
+- `https://recruiter-radar.ru/checkout?...` — состав заказа, цена и явное принятие оферты перед оплатой.
+
+Для модерации нужно дополнить публичные контакты реальным номером поддержки и почтовым адресом оператора. Эти значения нельзя подставлять фиктивно.
+
+## Регистрация магазина ЮKassa
+
+1. Создать аккаунт ЮKassa и выбрать подключение для самозанятого.
+2. Указать ИНН и подтвердить статус плательщика НПД.
+3. Заполнить данные договора и пройти идентификацию по запросу ЮKassa.
+4. Указать сайт `https://recruiter-radar.ru` и описание: «информационно-аналитический онлайн-сервис для рекрутинговых агентств».
+5. Отправить сайт на проверку только после публикации документов, контактов, тарифов и понятного порядка предоставления цифровой услуги.
+6. После одобрения получить `shopId` и секретный ключ сначала для тестового, затем для рабочего магазина.
+
+## Переменные окружения
+
+```dotenv
+PAYMENTS_PROVIDER=yookassa
+PAYMENTS_SITE_URL=https://recruiter-radar.ru
+
+YOOKASSA_MODE=test
+YOOKASSA_SHOP_ID=
+YOOKASSA_SECRET_KEY=
+YOOKASSA_WEBHOOK_URL=https://recruiter-radar.ru/api/billing/webhook/yookassa
 ```
 
-Endpoint не возвращает secret names/values, customer contacts или provider payment IDs.
+После успешной проверки тестов переключить:
 
-## Что требуется для RF provider
+```dotenv
+YOOKASSA_MODE=live
+```
 
-Перед статусом production-ready нужно отдельно подтвердить:
+`YOOKASSA_SECRET_KEY` нельзя хранить в Git, клиентском JavaScript, логах или telemetry.
 
-1. Выбранный merchant provider и договор для текущей формы бизнеса.
-2. Sandbox credentials и создание платежа с idempotency key.
-3. Подписанный webhook и replay-safe event ledger.
-4. Live credentials и production callback URL.
-5. Формирование чеков и обязательные реквизиты.
-6. Refund, cancellation, partial refund и failed-payment semantics.
-7. Entitlement expiry/revocation после отмены или возврата.
-8. Accounting/legal review для самозанятого, ИП или ООО в фактической конфигурации продавца.
+## Webhook в личном кабинете ЮKassa
 
-## Запрещённые shortcuts
+Указать URL:
 
-- Нельзя выставлять `configured=true` без реальных credentials и webhook.
-- Нельзя называть monthly/quarterly автоподпиской, пока нет recurring contract.
-- Нельзя использовать fixture как подтверждение live payment.
-- Нельзя хранить provider payload, ключи или customer contact в telemetry.
+```text
+https://recruiter-radar.ru/api/billing/webhook/yookassa
+```
 
-## Текущий внешний blocker
+Минимальные события:
 
-Выбор конкретного RF provider и merchant configuration не находится в репозитории. Код может подготовить adapter boundary и contract tests, но не может самостоятельно создать merchant account, пройти KYC, получить credentials или определить налоговый/чековый режим без фактических данных владельца.
+- `payment.succeeded`;
+- `payment.canceled`;
+- `payment.waiting_for_capture` — можно включить для наблюдаемости, хотя текущая схема использует автоматическое подтверждение платежа.
+
+Endpoint не требует пользовательского секретного заголовка: уведомление проверяется серверным запросом к API ЮKassa. Повторы событий подавляются через `billing_webhook_events`.
+
+## Проверка перед live
+
+1. `GET /api/health/payment-readiness` с `x-api-key: <CRON_API_KEY>` возвращает `pilot-ready`.
+2. Тестовый платёж создаётся только после checkbox оферты.
+3. После оплаты заказ меняет статус `pending → paid` по webhook или проверке на success URL.
+4. Повтор того же webhook не выдаёт доступ второй раз.
+5. Отмена оставляет заказ без entitlement.
+6. В БД и логах нет номера карты, CVC и секретного ключа.
+7. После тестового поступления сформирован и отправлен чек НПД.
+8. Проверены возврат и отображение понятного статуса пользователю.
+
+## Что нельзя делать
+
+- включать live credentials до успешного тестового платежа и webhook;
+- отправлять в ЮKassa объект кассового `receipt` как будто оператор применяет 54-ФЗ;
+- обещать автопродление для monthly/quarterly — его в текущем продукте нет;
+- считать redirect на success доказательством оплаты без проверки API/webhook;
+- публиковать фиктивный телефон или адрес ради прохождения модерации.
