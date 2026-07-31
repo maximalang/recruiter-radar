@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import {
   NoticeBox,
@@ -13,7 +14,7 @@ import { OPERATOR_REQUISITES } from "../../lib/operatorRequisites";
 export const metadata: Metadata = {
   title: "Реквизиты — Recruiter Radar",
   description:
-    "Реквизиты самозанятого — плательщика НПД, оператора сервиса Recruiter Radar.",
+    "Полные публичные реквизиты самозанятого — оператора информационно-аналитического сервиса Recruiter Radar.",
   robots: { index: true, follow: true },
 };
 
@@ -25,8 +26,8 @@ export default function LegalPage() {
       <section style={{ display: "grid", gap: "18px", padding: "32px 0" }}>
         <SectionIntro
           eyebrow="Реквизиты"
-          title="Реквизиты оператора сервиса"
-          description="Оператор Recruiter Radar — самозанятый, плательщик налога на профессиональный доход (НПД). Оплата на сайте обрабатывается ЮKassa."
+          title="Реквизиты продавца и оператора сервиса"
+          description="Recruiter Radar оказывает цифровые информационно-аналитические услуги. Оператор зарегистрирован как самозанятый и применяет налог на профессиональный доход."
         />
 
         <SurfaceCard>
@@ -41,9 +42,15 @@ export default function LegalPage() {
               }
             />
             <SummaryRow label="Статус" value={SELF_EMPLOYED.status} />
-            <SummaryRow label="Сервис" value={SELF_EMPLOYED.service} />
+            <SummaryRow label="ОГРН / ОГРНИП" value={SELF_EMPLOYED.ogrnNote} />
+            <SummaryRow label="Наименование сервиса" value={SELF_EMPLOYED.brandName} />
+            <SummaryRow label="Вид услуг" value={SELF_EMPLOYED.service} />
             <SummaryRow
-              label="E-mail"
+              label="Сайт"
+              value={<a href={SELF_EMPLOYED.website} style={{ color: "inherit" }}>{SELF_EMPLOYED.website}</a>}
+            />
+            <SummaryRow
+              label="E-mail поддержки"
               value={
                 <a href={`mailto:${SELF_EMPLOYED.email}`} style={{ color: "inherit" }}>
                   {SELF_EMPLOYED.email}
@@ -57,16 +64,21 @@ export default function LegalPage() {
               />
             ) : null}
             {SELF_EMPLOYED.postalAddress ? (
-              <SummaryRow label="Почтовый адрес" value={SELF_EMPLOYED.postalAddress} />
+              <SummaryRow label="Адрес для корреспонденции" value={SELF_EMPLOYED.postalAddress} />
             ) : null}
           </div>
         </SurfaceCard>
 
         <NoticeBox
           tone="info"
-          title="Чек плательщика НПД"
-          description="После подтверждения оплаты оператор формирует чек в приложении «Мой налог» и направляет его заказчику в электронной форме. ЮKassa обрабатывает платёж, но не заменяет чек плательщика НПД."
+          title="Оплата и чек"
+          description="Платёж на сайте обрабатывает ЮKassa. После подтверждения оплаты оператор формирует чек плательщика НПД в приложении «Мой налог» и направляет его заказчику в электронной форме."
         />
+
+        <p style={{ margin: 0 }}>
+          Порядок оформления, предоставления цифрового доступа и возврата средств описан на странице{" "}
+          <Link href="/payment-and-delivery">«Оплата и возврат»</Link>.
+        </p>
       </section>
       <SiteFooter />
     </PageFrame>
