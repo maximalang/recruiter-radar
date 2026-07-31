@@ -32,12 +32,14 @@ export async function GET(request: NextRequest) {
   }
 
   const report = buildPaymentReadinessReport()
+  const status = report.liveLaunchReady
+    ? 'live-ready'
+    : report.selfServePilotReady
+      ? 'integration-ready'
+      : 'sales-assisted'
+
   return NextResponse.json(
-    {
-      ok: true,
-      status: report.selfServePilotReady ? 'pilot-ready' : 'sales-assisted',
-      report,
-    },
+    { ok: true, status, report },
     { status: 200, headers: { 'Cache-Control': 'no-store' } },
   )
 }
