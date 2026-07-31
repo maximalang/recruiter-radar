@@ -34,7 +34,7 @@ export interface LegacyOpportunityActionInput {
 }
 
 export interface LegacyOutcomeCommand {
-  payload: OpportunityOutcomeInput
+  payload: Omit<OpportunityOutcomeInput, 'snoozedUntil'>
   idempotencyPayload:
     | OpportunityOutcomeInput
     | Omit<OpportunityOutcomeInput, 'occurredAt' | 'snoozedUntil'>
@@ -54,7 +54,7 @@ export function toLegacyOutcomeCommand(
     | 'occurredAt'
   >,
 ): LegacyOutcomeCommand {
-  const payload = validateOutcomeInput({
+  const validatedPayload = validateOutcomeInput({
     eventType: input.action,
     occurredAt: input.occurredAt ?? new Date().toISOString(),
     reasonCode: input.action === 'dismissed' ? input.reasonCode ?? null : null,
@@ -75,16 +75,17 @@ export function toLegacyOutcomeCommand(
     metadata: { source: 'legacy_action' },
     idempotencyKey: input.actionKey,
   })
+  const { snoozedUntil: _snoozedUntil, ...payload } = validatedPayload
   const {
     occurredAt: _occurredAt,
-    snoozedUntil: _snoozedUntil,
+    snoozedUntil: _idempotencySnoozedUntil,
     ...idempotencyPayload
-  } = payload
+  } = validatedPayload
   return {
     payload,
     idempotencyPayload: input.occurredAt === undefined
       ? idempotencyPayload
-      : payload,
+      : validatedPayload,
   }
 }
 

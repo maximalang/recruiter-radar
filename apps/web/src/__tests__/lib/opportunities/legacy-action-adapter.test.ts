@@ -72,6 +72,19 @@ describe('legacy opportunity action adapter', () => {
     expect(first.idempotencyPayload).toEqual(retry.idempotencyPayload)
   })
 
+  it('leaves derived snooze time for the canonical writer to compute', () => {
+    const command = toLegacyOutcomeCommand({
+      action: 'snoozed',
+      actionKey: 'snooze-key',
+      snoozeDays: 7,
+    })
+
+    expect(command.payload).toEqual(expect.objectContaining({
+      snoozeDays: 7,
+    }))
+    expect(command.payload).not.toHaveProperty('snoozedUntil')
+  })
+
   it('uses canonical validation for required action details', () => {
     expect(() => toLegacyOutcomeCommand({
       action: 'dismissed',
