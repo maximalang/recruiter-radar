@@ -89,12 +89,13 @@ describe("landing section hierarchy", () => {
     ]);
   });
 
-  it("keeps the preview wrapper stable and exposes both CTA anchors during Suspense", async () => {
+  it("renders navigation before main content and keeps preview anchors stable", async () => {
     const page = await HomePage({ searchParams: Promise.resolve({}) });
     const previewWrapper = collectElements(page, "section")
       .find((section) => section.props.id === "preview");
     const anchorHrefs = collectElements(page, "a").map((anchor) => anchor.props.href);
     const skeletonMarkup = renderToStaticMarkup(<PreviewSkeleton />);
+    const pageMarkup = renderToStaticMarkup(page);
 
     expect(previewWrapper).toBeDefined();
     expect(previewWrapper?.props["data-section"]).toBe("preview");
@@ -102,9 +103,11 @@ describe("landing section hierarchy", () => {
     expect(skeletonMarkup).toContain('id="preview-results"');
     expect(anchorHrefs).toContain("#preview-configurator");
     expect(anchorHrefs).toContain("#preview-results");
+    expect(pageMarkup.indexOf("<header")).toBeGreaterThanOrEqual(0);
+    expect(pageMarkup.indexOf("<header")).toBeLessThan(pageMarkup.indexOf('id="main-content"'));
   });
 
-  it("keeps the hero concise and makes the pilot the obvious first decision", async () => {
+  it("keeps the hero concise and makes the unavailable-payment state explicit", async () => {
     const page = await HomePage({ searchParams: Promise.resolve({}) });
     const pageText = readVisibleText(page);
     const alignedPlanCards = collectElements(page, SurfaceCard)
@@ -114,8 +117,11 @@ describe("landing section hierarchy", () => {
 
     expect(pageText).toContain("Компании, которым стоит написать сегодня. С доказательствами.");
     expect(pricingIntro?.props.title).toBe("Начните с недели. Продолжайте, только если радар полезен.");
-    expect(pricingIntro?.props.description).toContain("Пилот — разовая оплата без продления.");
+    expect(pricingIntro?.props.description).toContain("Сейчас пилот оформляется как заявка без списания.");
     expect(pageText).toContain("Проверьте новый канал за 7 дней");
+    expect(pageText).toContain("Оставить заявку на неделю");
+    expect(pageText).toContain("Сейчас заявка сохраняется без списания");
+    expect(pageText).not.toContain("Оплата через ЮKassa");
     expect(alignedPlanCards).toHaveLength(3);
     expect(pageText).not.toContain("0 автоспама");
     expect(pageText).not.toContain("Один радар — на неделю, месяц или квартал");
@@ -175,27 +181,23 @@ describe("landing section hierarchy", () => {
     )).toBe(false);
   });
 
-  it("explains the role and delivery status of every source group", async () => {
+  it("explains signal verification without exposing internal source backlog", async () => {
     const page = await HomePage({ searchParams: Promise.resolve({}) });
     const deliveryMarkup = renderToStaticMarkup(<LandingDeliveryDemo />);
     const sourceMarkup = renderToStaticMarkup(<LandingSourceArchitecture />);
 
     expect(collectElements(page, LandingSourceArchitecture)).toHaveLength(1);
-    expect(sourceMarkup).toContain("Каждый источник отвечает за свою часть доказательства");
-    expect(sourceMarkup).toContain("Источники клиентской выдачи");
-    expect(sourceMarkup).toContain("hh.ru, Работа России и прямые карьерные страницы");
-    expect(sourceMarkup).toContain("Компания и путь контакта");
-    expect(sourceMarkup).toContain("Сайт компании и ЕГРЮЛ/ФНС");
-    expect(sourceMarkup).toContain("Почему сейчас");
-    expect(sourceMarkup).toContain("Корпоративные события, официальные публикации и отраслевой контекст");
-    expect(sourceMarkup).toContain("Что пока не попадает в клиентскую выдачу");
-    expect(sourceMarkup).toContain("SuperJob, Хабр Карьера, страницы компаний LinkedIn");
-    expect(sourceMarkup).toContain("проверки уверенности, качества данных и правомерности доступа");
+    expect(sourceMarkup).toContain("Почему рекомендация заслуживает внимания");
+    expect(sourceMarkup).toContain("Находим реальное изменение в найме");
+    expect(sourceMarkup).toContain("Подтверждаем компанию и силу сигнала");
+    expect(sourceMarkup).toContain("Формируем понятный следующий шаг");
+    expect(sourceMarkup).not.toContain("production-выдачи");
+    expect(sourceMarkup).not.toContain("LinkedIn");
     expect(deliveryMarkup).toContain("Telegram");
     expect(deliveryMarkup).toContain("Email");
-    expect(deliveryMarkup).toContain("Web push");
-    expect(deliveryMarkup).toContain("VK");
-    expect(deliveryMarkup).toContain("Webhook");
+    expect(deliveryMarkup).not.toContain("Web push");
+    expect(deliveryMarkup).not.toContain(">VK<");
+    expect(deliveryMarkup).not.toContain("Webhook");
   });
 
   it("keeps filter submit and reset actions anchored to the preview", async () => {
@@ -320,7 +322,8 @@ describe("landing section hierarchy", () => {
     const methodologyMarkup = renderToStaticMarkup(<LandingMethodology />);
 
     expect(methodologies).toHaveLength(1);
-    expect(methodologyMarkup).toContain("Сигнал проходит четыре проверки");
+    expect(methodologyMarkup).toContain("Баллы всегда можно объяснить");
+    expect(methodologyMarkup).toContain("4 проверки · без чёрного ящика");
     expect(pageText.match(/Производственная компания/g)).toHaveLength(1);
   });
 });

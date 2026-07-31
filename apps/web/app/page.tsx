@@ -61,7 +61,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Recruiter Radar — ежедневный радар по нанимающим компаниям",
   description:
-    "Каждый день Recruiter Radar находит лучшие компании под специализацию агентства: что меняется, почему сейчас и как выйти на них корректно. Telegram — основной канал доставки, доступны и дополнительные каналы. Для рекрутинговых агентств и BD-команд.",
+    "Каждый день Recruiter Radar находит лучшие компании под специализацию агентства: что меняется, почему сейчас и как выйти на них корректно. Telegram — основной канал доставки, email подключается по запросу. Для рекрутинговых агентств и BD-команд.",
 };
 
 const VISIBLE_PREVIEW_ITEMS = 2;
@@ -96,7 +96,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const secondaryPlans = PUBLIC_PLANS.filter((p) => p.code !== "pilot");
 
   return (
-    <PageFrame maxWidth="1160px" dataDeployAnchor="recruiter-radar-landing-v3">
+    <PageFrame maxWidth="1160px" dataDeployAnchor="recruiter-radar-landing-v4">
       <LandingMotionProvider>
       <YandexMetrika />
       <LandingAnalytics />
@@ -106,6 +106,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         <span className={hpStyles.ambientGrid} />
       </div>
       <a href="#main-content" className={ppStyles.skipLink}>Перейти к содержанию</a>
+      <LandingHeader previewHref="#preview-configurator" />
 
       {/* Hero */}
       <section
@@ -206,8 +207,6 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         </div>
       </section>
 
-      <LandingHeader previewHref="#preview-configurator" />
-
       {/* Problem — why this radar exists */}
       <ScrollReveal as="section" className={`${hpStyles.scrollSection} ${hpStyles.problemSection}`}>
         <div className={hpStyles.problemLayout}>
@@ -283,7 +282,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           accent
           eyebrow="Тарифы"
           title="Начните с недели. Продолжайте, только если радар полезен."
-          description="Пилот — разовая оплата без продления. Месяц и квартал подключаются по заявке после проверки качества."
+          description={paymentSetup.configured
+            ? "Пилот — разовая оплата без продления. Месяц и квартал подключаются по заявке после проверки качества."
+            : "Сейчас пилот оформляется как заявка без списания. Профиль сохранится, а к запуску можно будет вернуться после подключения оплаты."}
         />
 
         <div className={hpStyles.pricingGrid}>
@@ -308,17 +309,21 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             </div>
             <p className={hpStyles.planDescription}>{pilotPlan.description}</p>
             <div className={hpStyles.planFeatureLine}>
-              <b>Разовая оплата</b>
-              <span>Без автопродления</span>
+              <b>{paymentSetup.configured ? "Разовая оплата" : "Заявка без списания"}</b>
+              <span>{paymentSetup.configured ? "Без автопродления" : "Профиль сохранится"}</span>
             </div>
-            <p className={hpStyles.billingNote}>После оплаты вы настраиваете профиль и подключаете Telegram.</p>
+            <p className={hpStyles.billingNote}>
+              {paymentSetup.configured
+                ? "После оплаты вы настраиваете профиль и подключаете Telegram."
+                : "Заполните заявку и профиль сейчас; оплата появится после подключения платёжного провайдера."}
+            </p>
             <Link
               href={buildCheckoutHref({ ...previewInput, planCode: pilotPlan.code })}
               className={`${ppStyles.primaryAction} ${hpStyles.planCta}`}
               data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
               data-analytics-context={LANDING_ANALYTICS_CONTEXT.pricingPilot}
             >
-              {pilotPlan.ctaLabel}
+              {paymentSetup.configured ? pilotPlan.ctaLabel : "Оставить заявку на неделю"}
             </Link>
           </SurfaceCard>
 
@@ -379,8 +384,17 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             ))}
           </ul>
           <div className={ppStyles.helperText} style={{ marginTop: "4px" }}>
-            Оплата через ЮKassa, чек по ФЗ-54.{" "}
-            <Link href="/terms" style={{ color: "var(--c-brand)", textDecoration: "underline" }}>Оферта</Link>.
+            {paymentSetup.configured ? (
+              <>
+                Оплата через ЮKassa, чек по ФЗ-54.{" "}
+                <Link href="/terms" style={{ color: "var(--c-brand)", textDecoration: "underline" }}>Оферта</Link>.
+              </>
+            ) : (
+              <>
+                Сейчас заявка сохраняется без списания.{" "}
+                <Link href="/terms" style={{ color: "var(--c-brand)", textDecoration: "underline" }}>Условия сервиса</Link>.
+              </>
+            )}
           </div>
         </div>
       </ScrollReveal>
@@ -424,7 +438,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.closing}
           >
-            Активировать неделю — 2 990 ₽
+            {paymentSetup.configured
+              ? `Активировать неделю — ${pilotPlan.price}`
+              : "Оставить заявку на неделю"}
           </Link>
           <a href="#preview" className={hpStyles.heroSecondaryCta}>Посмотреть пример</a>
         </div>
