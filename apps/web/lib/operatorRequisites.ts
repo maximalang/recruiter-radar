@@ -17,8 +17,8 @@ export const OPERATOR_REQUISITES = {
   brandName: "Recruiter Radar",
   website: "https://recruiter-radar.ru",
   service: "Информационно-аналитический онлайн-сервис для рекрутинговых агентств",
-  email: "support@recruiter-radar.ru",
-  phone: "+7 900 966-60-92",
+  email: readPublicValue(process.env.OPERATOR_PUBLIC_EMAIL) ?? "support@recruiter-radar.ru",
+  phone: readPublicValue(process.env.OPERATOR_PUBLIC_PHONE) ?? "+7 900 966-60-92",
   /** Реальный адрес для корреспонденции. Placeholder публично не выводится. */
   postalAddress: readPublicValue(process.env.OPERATOR_PUBLIC_POSTAL_ADDRESS),
 } as const;
