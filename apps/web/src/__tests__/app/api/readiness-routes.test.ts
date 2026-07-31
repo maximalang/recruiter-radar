@@ -100,8 +100,21 @@ describe('protected readiness endpoints', () => {
       webhookConfigured: false,
       siteUrlConfigured: true,
       selfServePilotReady: false,
+      merchantModerationReady: false,
+      liveLaunchReady: false,
       recurringBillingReady: false,
       rfProvider: { status: 'blocked', provider: null, blockers: ['credentials absent'] },
+      merchantModeration: {
+        status: 'blocked',
+        publicSupportEmailConfigured: true,
+        publicPhoneConfigured: false,
+        publicPostalAddressConfigured: false,
+        requiredPagesPublished: true,
+        tariffsPublished: true,
+        digitalFulfillmentDescribed: true,
+        blockers: ['phone absent', 'postal address absent'],
+      },
+      launch: { status: 'blocked', blockers: ['credentials absent', 'phone absent'] },
       customerFlow: { pilot: 'saved_request', monthly: 'sales_request', quarterly: 'sales_request' },
     })
 
