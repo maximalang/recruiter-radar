@@ -27,7 +27,7 @@ type CheckoutCancelPageProps = {
 };
 
 function readReason(searchParams: Record<string, string | string[] | undefined>): string | null {
-  const value = searchParams["reason"];
+  const value = searchParams.reason;
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed.slice(0, 64) : null;
@@ -35,14 +35,10 @@ function readReason(searchParams: Record<string, string | string[] | undefined>)
 
 function describeReason(reason: string | null): string {
   switch (reason) {
-    case "request-received":
-      return "Заявка на подключение тарифа получена. Мы свяжемся, чтобы согласовать запуск и оплату.";
-    case "payment-unavailable":
-      return "Оплата сейчас недоступна. Попробуйте ещё раз через несколько минут.";
-    case "payment-error":
-      return "Провайдер вернул ошибку при создании платежа. Можно повторить попытку.";
-    default:
-      return "Оплата не была завершена. Это можно повторить в любой момент.";
+    case "request-received": return "Заявка на подключение тарифа получена. Мы свяжемся, чтобы согласовать запуск и оплату.";
+    case "payment-unavailable": return "Оплата сейчас недоступна. Попробуйте ещё раз позднее.";
+    case "payment-error": return "При создании платежа произошла ошибка. Можно повторить попытку без повторного списания по старому заказу.";
+    default: return "Оплата не была завершена. Это можно повторить в любой момент.";
   }
 }
 
@@ -50,74 +46,53 @@ export default async function CheckoutCancelPage({ params, searchParams }: Check
   const resolvedParams = await params;
   const resolvedSearchParams = (await searchParams) ?? {};
   const ownerId = await getAuthorizedUserId("billing:read");
-
-  if (!ownerId) {
-    notFound();
-  }
+  if (!ownerId) notFound();
 
   const order = await ensurePilotOrderOnboardingReady(resolvedParams.orderId, { ownerId });
-
-  if (!order) {
-    notFound();
-  }
+  if (!order) notFound();
 
   const reason = readReason(resolvedSearchParams);
-
-  if (order.status !== "paid") {
+  if (order.status !== "paid" && order.status !== "refunded") {
     await markCheckoutOrderCanceled(order.id, reason, { ownerId }).catch(() => null);
   }
 
-  // Recurring plans land here as a captured sales request, not a failed payment.
   const isRequest = reason === "request-received";
+  const isRefunded = order.status === "refunded";
   const retryHref = buildCheckoutRetryHref(order);
 
   return (
     <PageFrame maxWidth="720px">
-      <Link href="/" className={ppStyles.backLink}>
-        На главную
-      </Link>
-
+      <Link href="/" className={ppStyles.backLink}>На главную</Link>
       <SurfaceCard style={{ display: "grid", gap: "20px" }}>
         <StatusBadge tone={isRequest ? "info" : "warning"}>
-          {isRequest ? "Заявка получена" : "Оплата не завершена"}
+          {isRefunded ? "Средства возвращены" : isRequest ? "Заявка получена" : "Оплата не завершена"}
         </StatusBadge>
-
         <SectionIntro
-          title={isRequest ? "Спасибо, заявка сохранена" : "Платёж не прошёл"}
-          description={describeReason(reason)}
+          title={isRefunded ? "Заказ полностью возвращён" : isRequest ? "Спасибо, заявка сохранена" : "Платёж не прошёл"}
+          description={isRefunded ? "Повторный переход по старой ссылке не изменит статус и не восстановит доступ." : describeReason(reason)}
         />
-
         <NoticeBox
           tone="info"
-          title={isRequest ? "Что дальше" : "Что можно сделать"}
+          title={isRefunded ? "Что дальше" : isRequest ? "Что дальше" : "Что можно сделать"}
           description={
-            isRequest
-              ? "Мы свяжемся по указанному контакту, чтобы подключить тариф и согласовать оплату. Параметры профиля сохранены."
-              : "Вернитесь к настройкам пилота и повторите оплату. Параметры профиля сохранятся."
+            isRefunded
+              ? "Для нового периода оформите новый заказ. По вопросам возврата напишите в поддержку."
+              : isRequest
+                ? "Мы свяжемся по указанному контакту, чтобы подключить тариф и согласовать оплату."
+                : "Вернитесь к оформлению и создайте новую попытку оплаты. Параметры профиля сохранятся."
           }
         />
-
         <div className={ppStyles.summaryBox}>
           <SummaryRow label="Тариф" value={order.payload.planName} />
-          <SummaryRow
-            label={isRequest ? "Статус заявки" : "Статус оплаты"}
-            value={translateOrderStatus(order.status)}
-          />
+          <SummaryRow label={isRequest ? "Статус заявки" : "Статус оплаты"} value={translateOrderStatus(order.status)} />
         </div>
-
         <div className={ipStyles.chipWrap}>
-          {isRequest ? (
-            <Link href="/" className={ppStyles.primaryAction}>
-              На главную
-            </Link>
+          {isRequest || isRefunded ? (
+            <Link href="/" className={ppStyles.primaryAction}>На главную</Link>
           ) : (
             <>
-              <Link href={retryHref} className={ppStyles.primaryAction}>
-                Повторить оплату
-              </Link>
-              <Link href="/" className={ppStyles.secondaryAction}>
-                На главную
-              </Link>
+              <Link href={retryHref} className={ppStyles.primaryAction}>Повторить оплату</Link>
+              <Link href="/" className={ppStyles.secondaryAction}>На главную</Link>
             </>
           )}
         </div>
