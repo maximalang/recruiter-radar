@@ -4,6 +4,10 @@ CREATE OR REPLACE FUNCTION enforce_checkout_order_payment_transition()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
+DECLARE
+  provider_amount_text TEXT;
+  provider_currency TEXT;
+  provider_amount_minor BIGINT;
 BEGIN
   IF OLD.status = 'refunded' AND NEW.status <> 'refunded' THEN
     RAISE EXCEPTION 'refunded checkout order % is terminal', OLD.id;
@@ -11,6 +15,25 @@ BEGIN
 
   IF OLD.status = 'paid' AND NEW.status NOT IN ('paid', 'refunded') THEN
     RAISE EXCEPTION 'paid checkout order % cannot be downgraded to %', OLD.id, NEW.status;
+  END IF;
+
+  IF NEW.provider = 'yookassa' AND NEW.status IN ('paid', 'refunded') THEN
+    provider_amount_text := NEW.payload->'paymentProviderPayload'->'amount'->>'value';
+    provider_currency := upper(COALESCE(NEW.payload->'paymentProviderPayload'->'amount'->>'currency', ''));
+
+    IF provider_amount_text IS NULL OR provider_amount_text !~ '^\d+(\.\d{1,2})?$' THEN
+      RAISE EXCEPTION 'verified YooKassa amount is absent for checkout order %', NEW.id;
+    END IF;
+
+    provider_amount_minor := round(provider_amount_text::numeric * 100)::bigint;
+
+    IF provider_amount_minor <> NEW.amount_minor THEN
+      RAISE EXCEPTION 'YooKassa amount mismatch for checkout order %: % <> %', NEW.id, provider_amount_minor, NEW.amount_minor;
+    END IF;
+
+    IF provider_currency = '' OR provider_currency <> upper(NEW.currency) THEN
+      RAISE EXCEPTION 'YooKassa currency mismatch for checkout order %: % <> %', NEW.id, provider_currency, upper(NEW.currency);
+    END IF;
   END IF;
 
   RETURN NEW;
