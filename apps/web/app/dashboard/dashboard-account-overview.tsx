@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { CheckIcon, MailIcon, SearchIcon, TargetIcon } from "../ui/icons";
-import styles from "./dashboard.module.css";
+import styles from "./dashboard-workspace.module.css";
 
 export default function DashboardAccountOverview(props: {
   agencyName: string;
@@ -15,12 +15,12 @@ export default function DashboardAccountOverview(props: {
   return (
     <section className={styles.accountOverview} aria-labelledby="account-overview-title">
       <div className={styles.accountOverviewLead}>
-        <span className={styles.accountEyebrow}>Рабочий стол</span>
+        <span className={styles.accountEyebrow}>Радар возможностей</span>
         <h2 id="account-overview-title" className={styles.accountTitle}>
           {props.agencyName}: фокус на сегодня
         </h2>
         <p className={styles.accountDescription}>
-          Сначала разберите компании с сильным сигналом, затем очередь проверки. Настройки профиля и доставки показываем рядом, чтобы радар не работал вслепую.
+          Сначала разберите компании с сильным сигналом, затем очередь проверки. Состояние профиля и доставки видно рядом, чтобы радар не работал вслепую.
         </p>
         <div className={styles.accountPrimaryActions}>
           <Link href="/leads" className={styles.accountPrimaryAction}>
