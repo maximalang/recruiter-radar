@@ -100,7 +100,7 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
       }}
     >
       <Link href="/" className={hpStyles.brandMark} aria-label="Recruiter Radar — на главную">
-        <BrandLogo joined />
+        <BrandLogo joined tone="dark" />
       </Link>
       <nav className={hpStyles.topNavLinks} aria-label="Навигация по лендингу Recruiter Radar">
         <span className={hpStyles.topNavAnchors}>

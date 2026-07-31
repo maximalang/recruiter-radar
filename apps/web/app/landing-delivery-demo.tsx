@@ -70,7 +70,10 @@ export default function LandingDeliveryDemo() {
   const confirmation = FEEDBACK.find((item) => item.id === feedback)?.confirmation ?? "";
 
   return (
-    <article className={`${hpStyles.deliveryCard} ${hpStyles.deliveryDemo}`}>
+    <article
+      className={`${hpStyles.deliveryCard} ${hpStyles.deliveryDemo}`}
+      data-testid="landing-delivery-demo"
+    >
       <div className={hpStyles.deliveryTopbar}>
         <span className={hpStyles.deliveryMark} aria-hidden="true">RR</span>
         <div>
