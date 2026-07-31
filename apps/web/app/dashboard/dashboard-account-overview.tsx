@@ -18,7 +18,7 @@ export default function DashboardAccountOverview(props: {
         <div className={styles.accountOverviewLead}>
           <span className={styles.accountEyebrow}>Morning Brief · {props.agencyName}</span>
           <h2 id="account-overview-title" className={styles.accountTitle}>
-            Сегодня в радаре —{" "}
+            {props.agencyName}: сегодня в радаре —{" "}
             <span className={styles.accountTitleAccent}>
               {props.todayLeads} {leadLabel}
             </span>
@@ -28,10 +28,10 @@ export default function DashboardAccountOverview(props: {
           </p>
           <div className={styles.accountPrimaryActions}>
             <Link href="/leads" className={styles.accountPrimaryAction}>
-              Разобрать возможности
+              Открыть {props.todayLeads} {leadLabel}
             </Link>
             <Link href="/review" className={styles.accountSecondaryAction}>
-              Очередь проверки · {props.pendingReview}
+              Проверить {props.pendingReview}
             </Link>
           </div>
         </div>
@@ -82,7 +82,7 @@ export default function DashboardAccountOverview(props: {
           <span className={styles.accountStatusLabel}>Доставка радара</span>
           <strong>{props.deliveryReady ? "Подключена" : "Нужна настройка"}</strong>
           <Link href="/profile#delivery" className={styles.statusAction}>
-            {props.deliveryReady ? "Проверить расписание" : "Настроить канал"}
+            {props.deliveryReady ? "Проверить расписание" : "Настроить доставку"}
           </Link>
         </article>
       </div>
