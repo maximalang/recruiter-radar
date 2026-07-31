@@ -21,9 +21,10 @@ html {
   display: block;
   max-width: 100%;
   margin-top: 0.08em;
-  font-size: 0.7em;
+  font-size: 0.61em;
   line-height: 1.04;
   letter-spacing: -0.045em;
+  white-space: nowrap;
 }
 
 /* The generic state selector in the foundation deliberately gives the outer
@@ -170,7 +171,8 @@ main[class*="internalPageFrame"] div[class*="emptyStateIcon"] svg {
   }
 
   [data-deploy-anchor^="recruiter-radar-landing"] [class*="heroTitleAccent"] {
-    font-size: 0.76em;
+    font-size: 0.72em;
+    white-space: normal;
   }
 
   main[class*="internalPageFrame"] div[class*="emptyState"]:not([class*="emptyStateIcon"]),
