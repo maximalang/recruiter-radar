@@ -29,6 +29,7 @@ export default function ScrollProgress() {
         ringRef.current.style.strokeDashoffset = String(100 - progress * 100);
       }
       if (buttonRef.current) {
+        buttonRef.current.style.setProperty("--scroll-progress", String(progress));
         buttonRef.current.dataset.visible = String(visible);
         buttonRef.current.setAttribute("aria-hidden", String(!visible));
         buttonRef.current.tabIndex = visible ? 0 : -1;
@@ -64,6 +65,7 @@ export default function ScrollProgress() {
       onClick={returnToTop}
       aria-label="Вернуться наверх"
       aria-hidden="true"
+      data-scroll-progress
       data-visible="false"
       tabIndex={-1}
     >
