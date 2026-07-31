@@ -44,15 +44,23 @@ export default async function CheckoutPage(props: {
   const previewHref = buildPublicPreviewHref(input);
   const loginHref = `/login?returnTo=${encodeURIComponent(checkoutHref)}`;
   const isRequest = plan.isRecurring;
+  const checkoutError = typeof searchParams.error === "string" ? searchParams.error : null;
   const account = await getAccountById(await getAuthorizedUserId("billing:manage")).catch(() => null);
 
   async function startCheckoutAction(formData: FormData) {
     "use server";
     const currentAccount = await getAccountById(await getAuthorizedUserId("billing:manage"));
     if (!currentAccount) redirect(`/login?returnTo=${encodeURIComponent(checkoutHref)}`);
+
     const agencyNameValue = formData.get("agencyName");
     const agencyName = typeof agencyNameValue === "string" ? agencyNameValue.trim() : "";
-    if (!agencyName || agencyName.length > 160) redirect(`${checkoutHref}${checkoutHref.includes("?") ? "&" : "?"}error=agency`);
+    if (!agencyName || agencyName.length > 160) {
+      redirect(`${checkoutHref}${checkoutHref.includes("?") ? "&" : "?"}error=agency`);
+    }
+
+    if (formData.get("legalAccepted") !== "on") {
+      redirect(`${checkoutHref}${checkoutHref.includes("?") ? "&" : "?"}error=legal`);
+    }
 
     const result = await startCheckoutOrder({
       userId: currentAccount.id,
@@ -105,7 +113,34 @@ export default async function CheckoutPage(props: {
                 <span className={ppStyles.fieldLabel}>Название агентства или команды</span>
                 <input className={ppStyles.input} name="agencyName" required maxLength={160} autoComplete="organization" placeholder="Например, Northstar Recruiting" />
               </label>
+
+              {checkoutError === "agency" ? (
+                <p role="alert" style={{ margin: 0, color: "var(--danger, #b42318)" }}>
+                  Укажите корректное название агентства или команды.
+                </p>
+              ) : null}
+
               <p className={ipStyles.bodyTextMutedBlock}>Аккаунт: {account.email}. На этот адрес придут документы и ссылка для возврата к настройке.</p>
+
+              <label style={{ display: "flex", alignItems: "flex-start", gap: 10, lineHeight: 1.45 }}>
+                <input
+                  type="checkbox"
+                  name="legalAccepted"
+                  required
+                  style={{ marginTop: 4, width: 18, height: 18, flex: "0 0 auto" }}
+                />
+                <span>
+                  Я принимаю <Link href="/terms">публичную оферту</Link> и подтверждаю,
+                  что ознакомлен с <Link href="/privacy">политикой обработки персональных данных</Link>.
+                </span>
+              </label>
+
+              {checkoutError === "legal" ? (
+                <p role="alert" style={{ margin: 0, color: "var(--danger, #b42318)" }}>
+                  Для продолжения необходимо принять оферту и ознакомиться с политикой обработки данных.
+                </p>
+              ) : null}
+
               <button type="submit" className={ppStyles.primaryAction}>
                 {isRequest ? "Оставить заявку" : "Перейти к оплате"}
               </button>
