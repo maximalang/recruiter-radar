@@ -21,6 +21,7 @@ function clientFrom(query: jest.Mock, release = jest.fn()): OpportunityClient {
 const opportunityContext = {
   id: '10',
   ownerId: '7',
+  workspaceId: '9',
   clientProfileId: '8',
   organizationId: '9',
   hiringEpisodeId: '11',
@@ -96,6 +97,121 @@ describe('opportunity outcome repository', () => {
     )).toBe(true)
     expect(query.mock.calls.some(([sql]) => String(sql) === 'COMMIT')).toBe(true)
     expect(release).toHaveBeenCalledTimes(1)
+  })
+
+  it('records the real Auth v2 actor and immutable workspace role snapshot', async () => {
+    const query = successfulQuery()
+    jest.mocked(getClient).mockResolvedValue(clientFrom(query))
+
+    await recordOpportunityOutcome({
+      ownerId: '7',
+      workspaceId: '9',
+      opportunityId: '10',
+      actorType: 'user',
+      actorUserId: '42',
+      actorWorkspaceId: '9',
+      actorRoleSnapshot: 'recruiter',
+      authMode: 'auth_v2',
+      payload: {
+        eventType: 'accepted',
+        occurredAt: '2026-07-27T12:00:00.000Z',
+        idempotencyKey: 'accepted:workspace-actor',
+        metadata: {},
+      },
+    })
+
+    const contextRead = query.mock.calls.find(([sql]) =>
+      String(sql).includes('FROM opportunities o') &&
+      String(sql).includes('FOR UPDATE'))
+    expect(String(contextRead?.[0])).toContain('o.workspace_id = $3')
+    expect(contextRead?.[1]).toEqual(['10', '7', '9'])
+
+    const eventInsert = query.mock.calls.find(([sql]) =>
+      String(sql).includes('INSERT INTO opportunity_outcome_events'))
+    expect(String(eventInsert?.[0])).toContain('actor_workspace_id')
+    expect(String(eventInsert?.[0])).toContain('actor_role_snapshot')
+    expect(eventInsert?.[1]).toEqual(expect.arrayContaining([
+      '42',
+      '9',
+      'recruiter',
+    ]))
+  })
+
+  it('workspace-scopes funnel events through their opportunity tenant', async () => {
+    const query = jest.fn(async (sql: string, params?: readonly unknown[]) => {
+      expect(sql).toContain('JOIN opportunities scoped_opportunity')
+      expect(sql).toContain('scoped_opportunity.workspace_id = $5')
+      expect(params?.slice(0, 5)).toEqual([
+        '7',
+        '2026-07-01T00:00:00.000Z',
+        '2026-08-01T00:00:00.000Z',
+        'shown',
+        '9',
+      ])
+      return {
+        rowCount: 1,
+        rows: [{
+          cohortSize: '0',
+          effectiveActivity: [],
+          ledgerActivity: [],
+          correctionsCount: '0',
+          cohortCounts: {},
+          conversionHours: {},
+        }],
+      }
+    })
+
+    await getOutcomeFunnelSummary({
+      ownerId: '7',
+      workspaceId: '9',
+      from: '2026-07-01T00:00:00.000Z',
+      to: '2026-08-01T00:00:00.000Z',
+    }, { query } as never)
+  })
+
+  it('rejects incomplete Auth v2 actor attribution before inserting an event', async () => {
+    const query = successfulQuery()
+    jest.mocked(getClient).mockResolvedValue(clientFrom(query))
+
+    await expect(recordOpportunityOutcome({
+      ownerId: '7',
+      workspaceId: '9',
+      opportunityId: '10',
+      actorType: 'user',
+      actorUserId: '42',
+      actorWorkspaceId: '9',
+      actorRoleSnapshot: null,
+      authMode: 'auth_v2',
+      payload: {
+        eventType: 'accepted',
+        occurredAt: '2026-07-27T12:00:00.000Z',
+        idempotencyKey: 'accepted:missing-role',
+        metadata: {},
+      },
+    })).rejects.toThrow('Auth v2 outcome actor context is incomplete.')
+
+    expect(query.mock.calls.some(([sql]) =>
+      String(sql).includes('INSERT INTO opportunity_outcome_events'),
+    )).toBe(false)
+  })
+
+  it('keeps legacy user attribution owner-scoped', async () => {
+    const query = successfulQuery()
+    jest.mocked(getClient).mockResolvedValue(clientFrom(query))
+
+    await expect(recordOpportunityOutcome({
+      ownerId: '7',
+      opportunityId: '10',
+      actorType: 'user',
+      actorUserId: '42',
+      authMode: 'legacy',
+      payload: {
+        eventType: 'accepted',
+        occurredAt: '2026-07-27T12:00:00.000Z',
+        idempotencyKey: 'accepted:legacy-foreign-actor',
+        metadata: {},
+      },
+    })).rejects.toThrow('User outcome actor must match the tenant owner.')
   })
 
   it('does not treat accepted as contacted', async () => {
@@ -564,6 +680,75 @@ describe('opportunity outcome history', () => {
       targetEventId: null,
       targetEventType: null,
       targetOccurredAt: null,
+    })
+  })
+
+  it('workspace-scopes history availability and exposes immutable actor attribution', async () => {
+    const query = jest.fn(async (sql: string, params?: readonly unknown[]) => {
+      if (sql.includes('FROM opportunities') && sql.includes('superseded_at')) {
+        expect(sql).toContain('workspace_id = $3')
+        expect(params).toEqual(['10', '7', '9'])
+        return {
+          rowCount: 1,
+          rows: [{ status: 'accepted', supersededAt: null }],
+        }
+      }
+      if (sql.includes('COUNT(*)::TEXT AS count')) {
+        return { rowCount: 1, rows: [{ count: '1' }] }
+      }
+      if (sql.includes('WITH page_events AS')) {
+        expect(sql).toContain('event.actor_user_id')
+        expect(sql).toContain('event.actor_workspace_id')
+        expect(sql).toContain('event.actor_role_snapshot')
+        return {
+          rowCount: 1,
+          rows: [{
+            id: '80',
+            eventType: 'accepted',
+            previousStage: 'new',
+            newStage: 'accepted',
+            occurredAt: '2026-07-31T10:00:00.000Z',
+            recordedAt: '2026-07-31T10:00:00.000Z',
+            actorType: 'user',
+            actorUserId: '42',
+            actorWorkspaceId: '9',
+            actorRoleSnapshot: 'recruiter',
+            reasonCode: null,
+            reasonNote: null,
+            channel: null,
+            contactPathType: null,
+            contactReferenceLabel: null,
+            valueMinor: null,
+            currency: null,
+            metadata: {},
+            revertsEventId: null,
+            isEffective: true,
+            isReverted: false,
+            revertedByEventId: null,
+          }],
+        }
+      }
+      if (sql.includes('FROM opportunity_outcome_state')) {
+        return { rowCount: 0, rows: [] }
+      }
+      if (sql.includes('effective_commercial')) {
+        return { rowCount: 0, rows: [] }
+      }
+      throw new Error(`Unexpected query: ${sql}`)
+    })
+
+    const history = await getOpportunityOutcomeHistory({
+      ownerId: '7',
+      workspaceId: '9',
+      opportunityId: '10',
+    }, { query } as never)
+
+    expect(history?.events[0]).toMatchObject({
+      actorType: 'user',
+      actorUserId: '42',
+      actorWorkspaceId: '9',
+      actorRoleSnapshot: 'recruiter',
+      actorAttribution: 'workspace',
     })
   })
 })

@@ -1,5 +1,9 @@
 import type { PoolClient } from 'pg'
 
+import {
+  WORKSPACE_ROLES,
+  type WorkspaceRole,
+} from '@/lib/auth-v2/workspaces'
 import { getClient, getPool } from '@/lib/db-pool'
 import { logEvent } from '@/lib/runtime'
 import {
@@ -78,6 +82,7 @@ export class OutcomeCorrectionConflictError extends Error {
 interface OutcomeOpportunityContext {
   id: string
   ownerId: string
+  workspaceId: string | null
   clientProfileId: string
   organizationId: string
   hiringEpisodeId: string
@@ -124,6 +129,10 @@ export interface PublicOutcomeHistoryEvent {
   recordedAt: string
   appendOrder: string
   actorType: OutcomeActorType
+  actorUserId: string | null
+  actorWorkspaceId: string | null
+  actorRoleSnapshot: WorkspaceRole | null
+  actorAttribution: 'workspace' | 'legacy'
   reason: { code: string; label: string; note: string | null } | null
   channel: OpportunityOutcomeInput['channel']
   contactPathType: OpportunityOutcomeInput['contactPathType']
@@ -164,6 +173,7 @@ export interface OutcomeHistoryResult {
 
 export interface OutcomeFunnelFilter {
   ownerId: string | number
+  workspaceId?: string | number | null
   from: string
   to: string
   episodeType?: string | null
@@ -225,9 +235,13 @@ export interface OutcomeFunnelSummary {
 
 export interface RecordOpportunityOutcomeInput {
   ownerId: string | number
+  workspaceId?: string | number | null
   opportunityId: string | number
   actorType: OutcomeActorType
   actorUserId?: string | number | null
+  actorWorkspaceId?: string | number | null
+  actorRoleSnapshot?: WorkspaceRole | null
+  authMode?: 'auth_v2' | 'auth_v2_compat' | 'legacy'
   payload: unknown
   externalSystem?: string | null
   externalEventId?: string | null
@@ -293,6 +307,7 @@ export async function recordOpportunityOutcome(
 export async function getOpportunityOutcomeHistory(
   input: {
     ownerId: string | number
+    workspaceId?: string | number | null
     opportunityId: string | number
     beforeEventId?: string | null
     pageSize?: number
@@ -303,15 +318,22 @@ export async function getOpportunityOutcomeHistory(
   const pageSize = Math.min(Math.max(Math.trunc(input.pageSize ?? 50), 1), 100)
   const ownerId = String(input.ownerId)
   const opportunityId = String(input.opportunityId)
+  const availabilityParams: unknown[] = [opportunityId, ownerId]
+  const workspaceClause = input.workspaceId == null
+    ? ''
+    : ' AND workspace_id = $3'
+  if (input.workspaceId != null) {
+    availabilityParams.push(String(input.workspaceId))
+  }
   const available = await db.query<{
     status: string
     supersededAt: string | null
   }>(
     `SELECT status, superseded_at::TEXT AS "supersededAt"
      FROM opportunities
-     WHERE id = $1 AND owner_id = $2
+     WHERE id = $1 AND owner_id = $2${workspaceClause}
      LIMIT 1`,
-    [opportunityId, ownerId],
+    availabilityParams,
   )
   if (!available.rows[0]) return null
 
@@ -329,6 +351,9 @@ export async function getOpportunityOutcomeHistory(
     occurredAt: string
     recordedAt: string
     actorType: OutcomeActorType
+    actorUserId: string | null
+    actorWorkspaceId: string | null
+    actorRoleSnapshot: WorkspaceRole | null
     reasonCode: string | null
     reasonNote: string | null
     channel: OpportunityOutcomeInput['channel']
@@ -359,6 +384,9 @@ export async function getOpportunityOutcomeHistory(
        event.occurred_at::TEXT AS "occurredAt",
        event.recorded_at::TEXT AS "recordedAt",
        event.actor_type AS "actorType",
+       event.actor_user_id::TEXT AS "actorUserId",
+       event.actor_workspace_id::TEXT AS "actorWorkspaceId",
+       event.actor_role_snapshot AS "actorRoleSnapshot",
        event.reason_code AS "reasonCode",
        event.reason_note AS "reasonNote",
        event.channel,
@@ -412,6 +440,13 @@ export async function getOpportunityOutcomeHistory(
       recordedAt: event.recordedAt,
       appendOrder: event.id,
       actorType: event.actorType,
+      actorUserId: event.actorUserId,
+      actorWorkspaceId: event.actorWorkspaceId,
+      actorRoleSnapshot: event.actorRoleSnapshot,
+      actorAttribution:
+        event.actorWorkspaceId && event.actorRoleSnapshot
+          ? 'workspace'
+          : 'legacy',
       reason: event.reasonCode
         ? {
             code: event.reasonCode,
@@ -534,6 +569,17 @@ export async function getOutcomeFunnelSummary(
     cohortEvent,
   ]
   const cohortClauses: string[] = []
+  const workspaceJoin = input.workspaceId == null
+    ? ''
+    : `JOIN opportunities scoped_opportunity
+         ON scoped_opportunity.id = event.opportunity_id
+        AND scoped_opportunity.owner_id = event.owner_id`
+  const workspaceClause = input.workspaceId == null
+    ? ''
+    : `AND scoped_opportunity.workspace_id = $5`
+  if (input.workspaceId != null) {
+    params.push(String(input.workspaceId))
+  }
   if (input.episodeType) {
     params.push(input.episodeType)
     cohortClauses.push(`cohort_snapshot->>'episodeType' = $${params.length}`)
@@ -563,14 +609,16 @@ export async function getOutcomeFunnelSummary(
   const result = await db.query<FunnelRow>(
     `WITH owner_events AS (
        SELECT
-         id,
-         opportunity_id,
-         event_type,
-         occurred_at,
-         analytics_snapshot,
-         reverts_event_id
-       FROM opportunity_outcome_events
-       WHERE owner_id = $1
+         event.id,
+         event.opportunity_id,
+         event.event_type,
+         event.occurred_at,
+         event.analytics_snapshot,
+         event.reverts_event_id
+       FROM opportunity_outcome_events event
+       ${workspaceJoin}
+       WHERE event.owner_id = $1
+         ${workspaceClause}
      ), active_events AS (
        SELECT event.*
        FROM owner_events event
@@ -802,6 +850,31 @@ export async function recordOpportunityOutcomeInTransaction(
   db: OutcomeDb,
 ): Promise<RecordOutcomeResult | null> {
   const payload = validateOutcomeInput(input.payload)
+  const authMode = input.authMode ?? 'legacy'
+  const hasWorkspaceActorContext = authMode === 'auth_v2'
+  if (
+    hasWorkspaceActorContext &&
+    (
+      input.actorType !== 'user' ||
+      input.actorUserId == null ||
+      input.workspaceId == null ||
+      input.actorWorkspaceId == null ||
+      String(input.workspaceId) !== String(input.actorWorkspaceId) ||
+      input.actorRoleSnapshot == null ||
+      !WORKSPACE_ROLES.includes(input.actorRoleSnapshot)
+    )
+  ) {
+    throw new Error('Auth v2 outcome actor context is incomplete.')
+  }
+  if (
+    !hasWorkspaceActorContext &&
+    (
+      input.actorWorkspaceId != null ||
+      input.actorRoleSnapshot != null
+    )
+  ) {
+    throw new Error('Legacy outcome actor cannot carry workspace attribution.')
+  }
   const externalSystem = normalizeExternalIdentifier(
     input.externalSystem,
     'externalSystem',
@@ -821,6 +894,7 @@ export async function recordOpportunityOutcomeInTransaction(
     `SELECT
        o.id::TEXT AS id,
        o.owner_id::TEXT AS "ownerId",
+       o.workspace_id::TEXT AS "workspaceId",
        o.client_profile_id::TEXT AS "clientProfileId",
        o.organization_id::TEXT AS "organizationId",
        o.hiring_episode_id::TEXT AS "hiringEpisodeId",
@@ -837,15 +911,21 @@ export async function recordOpportunityOutcomeInTransaction(
      JOIN hiring_episodes he
        ON he.id = o.hiring_episode_id
       AND he.organization_id = o.organization_id
-     WHERE o.id = $1
-       AND o.owner_id = $2
-     FOR UPDATE`,
-    [String(input.opportunityId), String(input.ownerId)],
+      WHERE o.id = $1
+        AND o.owner_id = $2
+        AND ($3::BIGINT IS NULL OR o.workspace_id = $3)
+      FOR UPDATE`,
+    [
+      String(input.opportunityId),
+      String(input.ownerId),
+      input.workspaceId == null ? null : String(input.workspaceId),
+    ],
   )
   const context = contextResult.rows[0]
   if (!context) return null
   if (
     input.actorType === 'user' &&
+    !hasWorkspaceActorContext &&
     String(input.actorUserId ?? '') !== context.ownerId
   ) {
     throw new Error('User outcome actor must match the tenant owner.')
@@ -1129,6 +1209,8 @@ export async function recordOpportunityOutcomeInTransaction(
        occurred_at,
        actor_type,
        actor_user_id,
+       actor_workspace_id,
+       actor_role_snapshot,
        metadata,
        analytics_snapshot,
        idempotency_key,
@@ -1138,7 +1220,8 @@ export async function recordOpportunityOutcomeInTransaction(
      VALUES (
        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
        $14, $15, $16::timestamptz, $17, $18, $19, $20, $21,
-       $22::timestamptz, $23, $24, $25::jsonb, $26::jsonb, $27, $28, $29
+       $22::timestamptz, $23, $24, $25, $26, $27::jsonb, $28::jsonb,
+       $29, $30, $31
      )
      RETURNING id::TEXT AS id, recorded_at::TEXT AS "recordedAt"`,
     [
@@ -1166,6 +1249,10 @@ export async function recordOpportunityOutcomeInTransaction(
       payload.occurredAt,
       input.actorType,
       input.actorUserId == null ? null : String(input.actorUserId),
+      input.actorWorkspaceId == null
+        ? null
+        : String(input.actorWorkspaceId),
+      input.actorRoleSnapshot ?? null,
       JSON.stringify(payload.metadata),
       JSON.stringify(analyticsSnapshot),
       payload.idempotencyKey,

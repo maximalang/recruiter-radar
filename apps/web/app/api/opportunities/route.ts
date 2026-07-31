@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import {
-  isOpportunityEngineV1EnabledForOwner,
+  isOpportunityEngineV1EnabledForContext,
 } from '@/lib/opportunities/config'
 import { toPublicOpportunity } from '@/lib/opportunities/api-projection'
 import {
@@ -14,7 +14,10 @@ import type {
   OpportunityStatus,
 } from '@/lib/opportunities/opportunity-scoring'
 import { logError } from '@/lib/runtime'
-import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization'
+import {
+  getOpportunityAuthorizationContext,
+  getOpportunityDataAccessContext,
+} from '@/lib/opportunities/authorization'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -38,13 +41,22 @@ const EPISODE_TYPES = new Set<HiringEpisodeType>([
 ])
 
 export async function GET(request: NextRequest) {
-  const ownerId = await getAuthorizedOwnerId('opportunities:read')
-  if (!isOpportunityEngineV1EnabledForOwner(ownerId)) {
+  const authorization = await getOpportunityAuthorizationContext(
+    'opportunities:read',
+  )
+  const featureContext = authorization ?? {
+    dataOwnerId: null,
+    workspaceId: null,
+  }
+  if (!isOpportunityEngineV1EnabledForContext(featureContext)) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 })
   }
-
-  if (!ownerId) {
+  if (!authorization) {
     return NextResponse.json({ error: 'authentication_required' }, { status: 401 })
+  }
+  const access = getOpportunityDataAccessContext(authorization)
+  if (!access) {
+    return NextResponse.json({ error: 'not_found' }, { status: 404 })
   }
 
   const params = request.nextUrl.searchParams
@@ -62,7 +74,8 @@ export async function GET(request: NextRequest) {
       positiveInteger(params.get('pageSize')) ??
       undefined
     const result = await listOpportunities({
-      ownerId,
+      ownerId: access.ownerId,
+      workspaceId: access.workspaceId,
       morningBriefOnly: (view ?? 'morning') === 'morning',
       view: view ?? 'morning',
       clientProfileId: positiveId(params.get('profile')),
@@ -90,7 +103,10 @@ export async function GET(request: NextRequest) {
         : encodeCursor(result.nextOffset),
     })
   } catch (error) {
-    logError('opportunity.api.list_failed', error, { ownerId })
+    logError('opportunity.api.list_failed', error, {
+      ownerId: access.ownerId,
+      workspaceId: access.workspaceId,
+    })
     return NextResponse.json(
       { error: 'opportunities_unavailable' },
       { status: 500 },

@@ -5,6 +5,10 @@ import { Pool } from 'pg'
 
 import { getPool } from '@/lib/db-pool'
 import {
+  getActiveWorkspace,
+  hasWorkspacePermission,
+} from '@/lib/auth-v2/workspaces'
+import {
   OutcomeChronologyConflictError,
   OutcomeCorrectionConflictError,
   OutcomeIdempotencyConflictError,
@@ -314,6 +318,206 @@ describeWithDatabase('Opportunity Outcome production PostgreSQL runtime', () => 
     expect(rejected).toMatchObject({
       status: 'rejected',
       reason: expect.any(OutcomeIdempotencyConflictError),
+    })
+  })
+
+  it('enforces workspace roles, isolation, switching, and immutable actor history', async () => {
+    const ownerWorkspace = await workspaceFor(ownerId)
+    const otherWorkspace = await workspaceFor(otherOwnerId)
+    const actorUsers = await database.query(
+      `INSERT INTO users (email, full_name)
+       VALUES
+         ($1, 'Workspace recruiter'),
+         ($2, 'Workspace admin'),
+         ($3, 'Workspace viewer'),
+         ($4, 'Workspace billing')
+       RETURNING id::TEXT AS id`,
+      [
+        `workspace-recruiter-${token}@example.invalid`,
+        `workspace-admin-${token}@example.invalid`,
+        `workspace-viewer-${token}@example.invalid`,
+        `workspace-billing-${token}@example.invalid`,
+      ],
+    )
+    const recruiterId = String(actorUsers.rows[0].id)
+    const adminId = String(actorUsers.rows[1].id)
+    const viewerId = String(actorUsers.rows[2].id)
+    const billingId = String(actorUsers.rows[3].id)
+    await database.query(
+      `INSERT INTO workspace_members (workspace_id, user_id, role)
+       VALUES
+         ($1, $2, 'recruiter'),
+         ($1, $3, 'admin'),
+         ($1, $4, 'viewer'),
+         ($1, $5, 'billing'),
+         ($6, $2, 'admin')`,
+      [
+        ownerWorkspace,
+        recruiterId,
+        adminId,
+        viewerId,
+        billingId,
+        otherWorkspace,
+      ],
+    )
+
+    const recruiterInOwner = await getActiveWorkspace({
+      userId: recruiterId,
+      workspaceId: ownerWorkspace,
+    })
+    const recruiterInOther = await getActiveWorkspace({
+      userId: recruiterId,
+      workspaceId: otherWorkspace,
+    })
+    expect(recruiterInOwner?.role).toBe('recruiter')
+    expect(recruiterInOther?.role).toBe('admin')
+    expect(hasWorkspacePermission('recruiter', 'opportunities:write')).toBe(true)
+    expect(hasWorkspacePermission('admin', 'opportunities:write')).toBe(true)
+    expect(hasWorkspacePermission('viewer', 'opportunities:write')).toBe(false)
+    expect(hasWorkspacePermission('billing', 'opportunities:read')).toBe(false)
+    expect(hasWorkspacePermission('billing', 'opportunities:write')).toBe(false)
+    expect(await getActiveWorkspace({
+      userId: viewerId,
+      workspaceId: ownerWorkspace,
+    })).toMatchObject({ role: 'viewer' })
+
+    const recruiterEpisode = await insertEpisode('workspace-recruiter')
+    const recruiterOpportunity = await insertOpportunity(
+      recruiterEpisode,
+      'workspace-recruiter',
+    )
+    const adminEpisode = await insertEpisode('workspace-admin')
+    const adminOpportunity = await insertOpportunity(
+      adminEpisode,
+      'workspace-admin',
+    )
+    const legacyEpisode = await insertEpisode('workspace-legacy')
+    const legacyOpportunity = await insertOpportunity(
+      legacyEpisode,
+      'workspace-legacy',
+    )
+
+    const recruiterOutcome = await recordOpportunityOutcome({
+      ownerId,
+      workspaceId: ownerWorkspace,
+      opportunityId: recruiterOpportunity,
+      actorType: 'user',
+      actorUserId: recruiterId,
+      actorWorkspaceId: ownerWorkspace,
+      actorRoleSnapshot: 'recruiter',
+      authMode: 'auth_v2',
+      payload: outcomePayload(
+        'accepted',
+        `workspace-recruiter:${token}`,
+        Date.now(),
+      ),
+    })
+    const adminOutcome = await recordOpportunityOutcome({
+      ownerId,
+      workspaceId: ownerWorkspace,
+      opportunityId: adminOpportunity,
+      actorType: 'user',
+      actorUserId: adminId,
+      actorWorkspaceId: ownerWorkspace,
+      actorRoleSnapshot: 'admin',
+      authMode: 'auth_v2',
+      payload: outcomePayload(
+        'accepted',
+        `workspace-admin:${token}`,
+        Date.now() + 1,
+      ),
+    })
+    expect(recruiterOutcome?.event.id).toBeTruthy()
+    expect(adminOutcome?.event.id).toBeTruthy()
+    const storedActors = await database.query(
+      `SELECT
+         actor_user_id::TEXT AS "actorUserId",
+         actor_workspace_id::TEXT AS "actorWorkspaceId",
+         actor_role_snapshot AS "actorRoleSnapshot"
+       FROM opportunity_outcome_events
+       WHERE id = ANY($1::BIGINT[])
+       ORDER BY id`,
+      [[recruiterOutcome?.event.id, adminOutcome?.event.id]],
+    )
+    expect(storedActors.rows).toEqual([
+      {
+        actorUserId: recruiterId,
+        actorWorkspaceId: ownerWorkspace,
+        actorRoleSnapshot: 'recruiter',
+      },
+      {
+        actorUserId: adminId,
+        actorWorkspaceId: ownerWorkspace,
+        actorRoleSnapshot: 'admin',
+      },
+    ])
+
+    await expect(recordOpportunityOutcome({
+      ownerId,
+      workspaceId: otherWorkspace,
+      opportunityId: recruiterOpportunity,
+      actorType: 'user',
+      actorUserId: recruiterId,
+      actorWorkspaceId: otherWorkspace,
+      actorRoleSnapshot: 'admin',
+      authMode: 'auth_v2',
+      payload: outcomePayload(
+        'accepted',
+        `workspace-cross:${token}`,
+        Date.now() + 2,
+      ),
+    })).resolves.toBeNull()
+    expect((await listOpportunities({
+      ownerId,
+      workspaceId: otherWorkspace,
+    })).opportunities).toHaveLength(0)
+    await expect(getOpportunityOutcomeHistory({
+      ownerId,
+      workspaceId: otherWorkspace,
+      opportunityId: recruiterOpportunity,
+    })).resolves.toBeNull()
+
+    await database.query(
+      `DELETE FROM workspace_members
+       WHERE workspace_id = $1 AND user_id = $2`,
+      [ownerWorkspace, recruiterId],
+    )
+    const survivingHistory = await getOpportunityOutcomeHistory({
+      ownerId,
+      workspaceId: ownerWorkspace,
+      opportunityId: recruiterOpportunity,
+    })
+    expect(survivingHistory?.events[0]).toMatchObject({
+      actorUserId: recruiterId,
+      actorWorkspaceId: ownerWorkspace,
+      actorRoleSnapshot: 'recruiter',
+      actorAttribution: 'workspace',
+    })
+
+    const legacy = await recordOpportunityOutcome({
+      ownerId,
+      opportunityId: legacyOpportunity,
+      actorType: 'user',
+      actorUserId: ownerId,
+      authMode: 'legacy',
+      payload: outcomePayload(
+        'shown',
+        `workspace-legacy:${token}`,
+        Date.now() + 3,
+      ),
+    })
+    expect(legacy?.event.id).toBeTruthy()
+    const legacyActor = await database.query(
+      `SELECT
+         actor_workspace_id,
+         actor_role_snapshot
+       FROM opportunity_outcome_events
+       WHERE id = $1`,
+      [legacy?.event.id],
+    )
+    expect(legacyActor.rows[0]).toEqual({
+      actor_workspace_id: null,
+      actor_role_snapshot: null,
     })
   })
 
@@ -1544,6 +1748,21 @@ describeWithDatabase('Opportunity Outcome production PostgreSQL runtime', () => 
       ],
     )
     return String(episode.rows[0].id)
+  }
+
+  async function workspaceFor(userId: string): Promise<string> {
+    const result = await database.query(
+      `SELECT id::TEXT AS id
+       FROM workspaces
+       WHERE bootstrap_user_id = $1`,
+      [userId],
+    )
+    if (result.rows[0]?.id) return String(result.rows[0].id)
+    const ensured = await database.query(
+      `SELECT ensure_auth_user_workspace($1)::TEXT AS id`,
+      [userId],
+    )
+    return String(ensured.rows[0].id)
   }
 
   async function insertOpportunity(episodeId: string, suffix: string): Promise<string> {

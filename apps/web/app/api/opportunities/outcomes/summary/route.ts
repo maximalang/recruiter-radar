@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import {
-  isOpportunityEngineV1EnabledForOwner,
-  isOpportunityOutcomesEnabledForOwner,
+  isOpportunityEngineV1EnabledForContext,
+  isOpportunityOutcomesEnabledForContext,
 } from '@/lib/opportunities/config'
 import { HIRING_EPISODE_TYPES } from '@/lib/opportunities/hiring-episode-detection'
 import { getOutcomeFunnelSummary } from '@/lib/opportunities/outcome-repository'
 import { logError } from '@/lib/runtime'
-import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization'
+import {
+  getOpportunityAuthorizationContext,
+  getOpportunityDataAccessContext,
+} from '@/lib/opportunities/authorization'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -15,15 +18,25 @@ export const dynamic = 'force-dynamic'
 const MAX_PERIOD_MS = 366 * 24 * 60 * 60 * 1000
 
 export async function GET(request: NextRequest) {
-  const ownerId = await getAuthorizedOwnerId('opportunities:read')
+  const authorization = await getOpportunityAuthorizationContext(
+    'opportunities:read',
+  )
+  const featureContext = authorization ?? {
+    dataOwnerId: null,
+    workspaceId: null,
+  }
   if (
-    !isOpportunityEngineV1EnabledForOwner(ownerId) ||
-    !isOpportunityOutcomesEnabledForOwner(ownerId)
+    !isOpportunityEngineV1EnabledForContext(featureContext) ||
+    !isOpportunityOutcomesEnabledForContext(featureContext)
   ) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 })
   }
-  if (!ownerId) {
+  if (!authorization) {
     return NextResponse.json({ error: 'authentication_required' }, { status: 401 })
+  }
+  const access = getOpportunityDataAccessContext(authorization)
+  if (!access) {
+    return NextResponse.json({ error: 'not_found' }, { status: 404 })
   }
   const now = new Date()
   const rawTo = request.nextUrl.searchParams.get('to')
@@ -74,7 +87,8 @@ export async function GET(request: NextRequest) {
 
   try {
     const summary = await getOutcomeFunnelSummary({
-      ownerId,
+      ownerId: access.ownerId,
+      workspaceId: access.workspaceId,
       from: from.toISOString(),
       to: to.toISOString(),
       episodeType,
@@ -88,7 +102,10 @@ export async function GET(request: NextRequest) {
     })
     return NextResponse.json(summary)
   } catch (error) {
-    logError('opportunity_outcome.api.summary_failed', error, { ownerId })
+    logError('opportunity_outcome.api.summary_failed', error, {
+      ownerId: access.ownerId,
+      workspaceId: access.workspaceId,
+    })
     return NextResponse.json(
       { error: 'opportunity_outcome_summary_failed' },
       { status: 500 },

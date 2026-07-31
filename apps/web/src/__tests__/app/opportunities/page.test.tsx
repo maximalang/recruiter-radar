@@ -2,9 +2,23 @@
 
 import { render, screen } from '@testing-library/react'
 
-jest.mock('@/lib/auth-v2/authorization', () => ({
-  getAuthorizedOwnerId: jest.fn(),
-}))
+jest.mock('@/lib/auth-v2/authorization', () => {
+  const getAuthorizedOwnerId = jest.fn()
+  return {
+    getAuthorizedOwnerId,
+    getSession: jest.fn(async ({ permission }) => {
+      const ownerId = await getAuthorizedOwnerId(permission)
+      return ownerId ? {
+        mode: 'legacy',
+        userId: ownerId,
+        dataOwnerId: ownerId,
+        workspaceId: null,
+        role: null,
+        session: null,
+      } : null
+    }),
+  }
+})
 jest.mock('@/lib/opportunities/repository', () => ({
   getOpportunityOutcomeOperationalSummary: jest.fn(),
   listOpportunities: jest.fn(),
@@ -103,7 +117,11 @@ describe('opportunities page', () => {
 
     render(await OpportunitiesPage({ searchParams: Promise.resolve({}) }))
 
-    expect(getOpportunityOutcomeOperationalSummary).toHaveBeenCalledWith('7')
+    expect(getOpportunityOutcomeOperationalSummary).toHaveBeenCalledWith(
+      '7',
+      undefined,
+      null,
+    )
     expect(listOpportunities).toHaveBeenCalledWith(expect.objectContaining({
       ownerId: '7',
     }))

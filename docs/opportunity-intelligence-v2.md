@@ -156,11 +156,11 @@ lifecycle, terminal reasons и confirmed won value.
 
 | Identifier | Current meaning | Authority | Ограничение |
 | --- | --- | --- | --- |
-| `workspace_id` | Логический tenant Auth v2 и active workspace сессии | `workspaces`, `workspace_members`, `auth_sessions.workspace_id` | Nullable на compatibility product rows; отсутствует в outcome events/state |
+| `workspace_id` | Логический tenant Auth v2 и active workspace сессии | `workspaces`, `workspace_members`, `auth_sessions.workspace_id` | Nullable на compatibility product rows; outcome events получают actor workspace attribution в Phase 1 |
 | `dataOwnerId` | Runtime compatibility partition owner | `CustomerAuthorization` | Для `auth_v2` равен `workspace.bootstrap_user_id`; для compat/legacy равен session/legacy user |
 | `owner_id` | Persisted compatibility partition key | Product tables и текущие Opportunity queries | Не является фактическим actor team action |
-| `user_id` | Реальный account/session user и workspace member | `users`, `auth_sessions`, `workspace_members` | Opportunity routes сейчас не передают его writer-у |
-| `actor_user_id` | Идентификатор пользователя, записавшего outcome | `opportunity_outcome_events` | Current user writer требует равенство `owner_id`, поэтому team actor теряется |
+| `user_id` | Реальный account/session user и workspace member | `users`, `auth_sessions`, `workspace_members` | Auth v2 Opportunity routes передают его writer-у при включённом workspace context |
+| `actor_user_id` | Идентификатор пользователя, записавшего outcome | `opportunity_outcome_events` | Auth v2 writer сохраняет реального actor; legacy сохраняет compatibility owner |
 
 ### Auth modes
 
@@ -183,9 +183,11 @@ type CustomerAuthorization = {
   определяется;
 - `legacy`: использует legacy owner session, workspace отсутствует.
 
-Current Opportunity routes вызывают `getAuthorizedOwnerId(permission)`.
-Функция возвращает только `dataOwnerId`, поэтому после проверки теряются
-`userId`, `workspaceId`, `role` и полный permission context.
+Phase 1 Opportunity routes вызывают
+`getOpportunityAuthorizationContext(permission)` и затем строят
+`OpportunityDataAccessContext`. При выключенном workspace context сохраняется
+owner-mode compatibility path; при включённом Auth v2 передаются actor,
+workspace и role snapshot.
 
 ### Current role policy
 
@@ -208,8 +210,10 @@ keys и triggers связывают его с `(workspace_id, owner_id)` members
 profile context. Application Opportunity queries всё ещё фильтруют по
 `owner_id`; `workspace_id` не передаётся в repository contracts.
 
-Outcome events и projection пока не имеют `workspace_id`. Их tenant isolation
-транзитивно зависит от `owner_id` и composite opportunity context.
+Outcome events сохраняют `actor_workspace_id` и `actor_role_snapshot` с
+nullable legacy compatibility. Их tenant isolation остаётся транзитивно
+связанной с composite opportunity context и дополнительно проверяется
+`opportunities.workspace_id` в workspace-enabled repository queries.
 
 ## Current state machine
 
@@ -290,7 +294,9 @@ Correction capability вычисляется сервером по полной 
 | `OPPORTUNITY_ENGINE_V1_ENABLED` | Включает engine/API/jobs только при точном `true` |
 | `OPPORTUNITY_OUTCOMES_ENABLED` | Включает ledger API только при точном `true` |
 | `OPPORTUNITY_OUTCOMES_UI_ENABLED` | Включает Outcome UI только вместе с ledger и при точном `true` |
+| `OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED` | Включает workspace-scoped repository reads и реального Auth v2 actor только при точном `true` |
 | `OPPORTUNITY_CANARY_OWNER_IDS` | Временный allowlist ровно одного положительного owner ID |
+| `OPPORTUNITY_CANARY_WORKSPACE_IDS` | Временный allowlist ровно одного положительного workspace ID; одновременно с owner allowlist запрещён |
 | `OPPORTUNITY_OUTCOMES_EXTERNAL_INGEST_ENABLED` | Не может включить endpoint: runtime helper всегда возвращает `false` |
 | `OPPORTUNITY_OUTCOME_CONTACT_HASH_SECRET` | Server-only secret для tenant-scoped contact hashing |
 
@@ -306,11 +312,10 @@ external ingest.
 - `AUTH_LEGACY_SESSION_MIGRATION_ENABLED` и deadline;
 - `AUTH_V2_SESSION_ROLLBACK_COMPAT_ENABLED` и deadline.
 
-Новые phase flags из v2 objective пока отсутствуют в коде и не считаются
+Следующие phase flags из v2 objective пока отсутствуют в коде и не считаются
 готовыми:
 
 ```text
-OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED
 AGENCY_DNA_V1_ENABLED
 OPPORTUNITY_SCORING_V2_ENABLED
 OPPORTUNITY_STRATEGIST_V1_ENABLED
@@ -388,13 +393,14 @@ organizationSizeBucket
 
 ## Known contract drift
 
-1. **Actor attribution.** Auth v2 знает реального `userId`, но user-facing
-   outcome writer получает `dataOwnerId` и сохраняет его как `actor_user_id`.
-   Team member action поэтому выглядит как действие bootstrap owner.
-2. **Workspace audit.** Ledger не хранит `actor_workspace_id` и
-   `actor_role_snapshot`; historical role/workspace attribution отсутствует.
-3. **Repository tenant contract.** Product rows имеют `workspace_id`, но
-   Opportunity repository interfaces и queries используют только `owner_id`.
+1. **Actor attribution.** Resolved in Phase 1 for enabled Auth v2 context;
+   legacy/compatibility rows remain explicitly unattributed.
+2. **Workspace audit.** Resolved in Phase 1 with immutable
+   `actor_workspace_id` and `actor_role_snapshot`; historical rows are not
+   guessed or backfilled.
+3. **Repository tenant contract.** Resolved in Phase 1 for list/detail/action,
+   history, funnel, and operational-summary queries when workspace context is
+   enabled.
 4. **Dual writers.** `/action` имеет собственную transition/idempotency logic и
    отдельную запись `opportunity_actions`; `/outcomes` — параллельный command
    path.
@@ -402,8 +408,9 @@ organizationSizeBucket
    `/action`.
 6. **User actor invariant.** Outcome repository запрещает
    `actor_user_id != owner_id`, что несовместимо с recruiter/admin action.
-7. **Canary identity.** Opportunity canary owner-scoped и не умеет
-   workspace-scoped allowlist.
+7. **Canary identity.** Phase 1 supports exactly one owner or workspace
+   allowlist; production activation remains disabled pending a real owner and
+   opportunity.
 8. **Agency DNA versioning.** `client_profiles` не имеет
    `agency_dna_version` и `agency_dna_snapshot_hash`; opportunity хранит hash,
    но не immutable DNA snapshot.
@@ -413,9 +420,9 @@ organizationSizeBucket
     workspace credential model и поэтому принудительно выключена.
 11. **Auth compatibility.** `auth_v2_compat` и `legacy` не имеют role/
     permission snapshot; они допустимы только на ограниченный rollout period.
-12. **Historical actor deletion.** `actor_user_id` использует
-    `ON DELETE SET NULL`; membership removal не удаляет event, но current public
-    history не показывает actor user identity.
+12. **Historical actor deletion.** Membership removal не удаляет event;
+    Phase 1 public history показывает workspace actor role and user id without
+    storing personal contact data.
 
 ## Legacy compatibility paths и removal plan
 

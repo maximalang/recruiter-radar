@@ -134,6 +134,25 @@ describe('opportunity repository tenant scope', () => {
     expect(calls[1].params?.slice(-2)).toEqual([2, 2])
   })
 
+  it('adds the active workspace to list and detail tenant fences', async () => {
+    const list = createDb([[{ count: '0' }], []])
+    await listOpportunities({ ownerId: '7', workspaceId: '9' }, list.db)
+
+    expect(list.calls[0].sql).toContain('o.workspace_id = $2')
+    expect(list.calls[0].params?.slice(0, 2)).toEqual(['7', '9'])
+    expect(list.calls[1].sql).toContain('o.workspace_id = $2')
+
+    const detail = createDb([[]])
+    await getOpportunityById({
+      ownerId: '7',
+      workspaceId: '9',
+      opportunityId: '10',
+    }, detail.db)
+
+    expect(detail.calls[0].sql).toContain('o.workspace_id = $3')
+    expect(detail.calls[0].params).toEqual(['10', '7', '9'])
+  })
+
   it.each([
     ['morning', `CASE WHEN o.status = 'snoozed'`, `IN ('new', 'review')`],
     ['accepted', `= 'active'`, `= 'accepted'`],
@@ -278,6 +297,35 @@ describe('opportunity repository tenant scope', () => {
     )).toBe(false)
     expect(query.mock.calls.some(([sql]) => String(sql) === 'ROLLBACK')).toBe(true)
     expect(release).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects a cross-workspace action before any mutation query', async () => {
+    const query = jest.fn(async (sql: string, _params?: unknown[]) => {
+      if (sql.includes('FROM opportunities') && sql.includes('FOR UPDATE')) {
+        return { rowCount: 0, rows: [] }
+      }
+      return { rowCount: 0, rows: [] }
+    })
+    const release = jest.fn()
+    jest.mocked(getClient).mockResolvedValue(opportunityClient(query, release))
+
+    const result = await applyOpportunityAction({
+      ownerId: '7',
+      workspaceId: '9',
+      opportunityId: '10',
+      action: 'accepted',
+      actionKey: 'accepted:workspace-fence',
+    })
+
+    expect(result).toBeNull()
+    const lockedRead = query.mock.calls.find(([sql]) =>
+      String(sql).includes('FROM opportunities') &&
+      String(sql).includes('FOR UPDATE'))
+    expect(String(lockedRead?.[0])).toContain('workspace_id = $3')
+    expect(lockedRead?.[1]).toEqual(['10', '7', '9'])
+    expect(query.mock.calls.some(([sql]) =>
+      String(sql).includes('INSERT INTO opportunity_actions'),
+    )).toBe(false)
   })
 
   it('persists accepted episode state without creating legacy contacted suppression', async () => {

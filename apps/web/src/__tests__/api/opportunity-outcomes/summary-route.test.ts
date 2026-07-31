@@ -2,9 +2,23 @@
 
 import { NextRequest } from 'next/server'
 
-jest.mock('@/lib/auth-v2/authorization', () => ({
-  getAuthorizedOwnerId: jest.fn(),
-}))
+jest.mock('@/lib/auth-v2/authorization', () => {
+  const getAuthorizedOwnerId = jest.fn()
+  return {
+    getAuthorizedOwnerId,
+    getSession: jest.fn(async ({ permission }) => {
+      const ownerId = await getAuthorizedOwnerId(permission)
+      return ownerId ? {
+        mode: 'legacy',
+        userId: ownerId,
+        dataOwnerId: ownerId,
+        workspaceId: null,
+        role: null,
+        session: null,
+      } : null
+    }),
+  }
+})
 jest.mock('@/lib/opportunities/outcome-repository', () => ({
   getOutcomeFunnelSummary: jest.fn(),
 }))
@@ -75,6 +89,7 @@ describe('opportunity outcome summary API', () => {
     expect(response.status).toBe(200)
     expect(mockedSummary).toHaveBeenCalledWith({
       ownerId: '7',
+      workspaceId: null,
       from: '2026-07-01T00:00:00.000Z',
       to: '2026-07-27T00:00:00.000Z',
       episodeType: 'vacancy_spike',
