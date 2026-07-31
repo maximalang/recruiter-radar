@@ -182,7 +182,7 @@ export type PaymentProviderAdapter = {
 };
 
 export type PaymentProviderSetupState = {
-  provider: "stripe" | null;
+  provider: "stripe" | "yookassa" | null;
   configured: boolean;
   mode: "test" | "live" | null;
   webhookConfigured: boolean;
