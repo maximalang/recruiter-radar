@@ -104,7 +104,15 @@ main[data-deploy-anchor="recruiter-radar-landing-v4"] [data-testid="landing-deli
   box-shadow: none !important;
 }
 
-main[data-deploy-anchor="recruiter-radar-landing-v4"] [data-testid="landing-delivery-demo"] [role="tabpanel"] * {
+main[data-deploy-anchor="recruiter-radar-landing-v4"] [data-testid="landing-delivery-demo"] [role="tabpanel"] > div {
+  border: 0 !important;
+  background: transparent !important;
+  color: #f7f4eb !important;
+  box-shadow: none !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] [data-testid="landing-delivery-demo"] [role="tabpanel"] *,
+main[data-deploy-anchor="recruiter-radar-landing-v4"] [data-testid="landing-delivery-demo"] > div:not([role="tablist"]) :where(h3, p, span, strong) {
   color: inherit !important;
 }
 
