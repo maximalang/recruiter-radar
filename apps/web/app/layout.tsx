@@ -9,6 +9,7 @@ import { PremiumUiEffects } from "./premium-ui-effects";
 import "./globals.css";
 import "./premium-ui.css";
 import "./premium-ui-refinements.css";
+import "./internal-workspace-bridge.css";
 import "./landing-cinematic.css";
 import "./landing-cinematic-refinements.css";
 
