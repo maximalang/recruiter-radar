@@ -158,6 +158,67 @@ describe('opportunity outcome repository', () => {
     )
   })
 
+  it('normalizes adapter fingerprints to protected contact hashes', async () => {
+    const baseQuery = successfulQuery()
+    const query = jest.fn(async (sql: string, params?: unknown[]) => {
+      if (
+        sql.includes('FROM opportunity_outcome_state') &&
+        sql.includes('FOR UPDATE')
+      ) {
+        return {
+          rowCount: 1,
+          rows: [{
+            commercialStage: 'accepted',
+            currentStage: 'accepted',
+            workflowState: 'active',
+            meetingStatus: 'none',
+          }],
+        }
+      }
+      return baseQuery(sql, params)
+    })
+    jest.mocked(getClient).mockResolvedValue(clientFrom(query))
+    const occurredAt = new Date(Date.now() - 60_000).toISOString()
+    const previousSecret = process.env.OPPORTUNITY_OUTCOME_CONTACT_HASH_SECRET
+    process.env.OPPORTUNITY_OUTCOME_CONTACT_HASH_SECRET = 'a'.repeat(32)
+    const payload = {
+      eventType: 'contacted',
+      occurredAt,
+      channel: 'email',
+      contactPathType: 'corporate_email',
+      contactReference: 'hr@example.test',
+      idempotencyKey: 'contacted:legacy-key',
+      metadata: { source: 'legacy_action' },
+    }
+
+    try {
+      await recordOpportunityOutcome({
+        ownerId: '7',
+        opportunityId: '10',
+        actorType: 'user',
+        actorUserId: '7',
+        payload,
+        idempotencyPayload: {
+          ...payload,
+          occurredAt: undefined,
+          snoozedUntil: undefined,
+        },
+      })
+    } finally {
+      if (previousSecret === undefined) {
+        delete process.env.OPPORTUNITY_OUTCOME_CONTACT_HASH_SECRET
+      } else {
+        process.env.OPPORTUNITY_OUTCOME_CONTACT_HASH_SECRET = previousSecret
+      }
+    }
+
+    const eventInsert = query.mock.calls.find(([sql]) =>
+      String(sql).includes('INSERT INTO opportunity_outcome_events'))
+    const payloadHash = String(eventInsert?.[1]?.[30])
+    expect(payloadHash).toMatch(/^[a-f0-9]{64}$/)
+    expect(payloadHash).not.toContain('hr@example.test')
+  })
+
   it('workspace-scopes funnel events through their opportunity tenant', async () => {
     const query = jest.fn(async (sql: string, params?: readonly unknown[]) => {
       expect(sql).toContain('JOIN opportunities scoped_opportunity')

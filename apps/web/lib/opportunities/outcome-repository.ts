@@ -1040,13 +1040,10 @@ export async function recordOpportunityOutcomeInTransaction(
   const payloadHash = hashOutcomePayload({
     opportunityId: context.id,
     actorType: input.actorType,
-    payload: input.idempotencyPayload === undefined
-      ? {
-          ...payload,
-          contactReference: undefined,
-          contactReferenceHash: protectedContactReference?.hash ?? null,
-        }
-      : input.idempotencyPayload,
+    payload: normalizeOutcomeFingerprintPayload(
+      input.idempotencyPayload === undefined ? payload : input.idempotencyPayload,
+      protectedContactReference?.hash ?? null,
+    ),
     externalSystem,
     externalEventId,
     dedupeKey,
@@ -1403,6 +1400,20 @@ export async function recordOpportunityOutcomeInTransaction(
   await persistLegacyCommercialState(context, payload, state, db)
 
   return { event, state, idempotent: false }
+}
+
+function normalizeOutcomeFingerprintPayload(
+  value: unknown,
+  contactReferenceHash: string | null,
+): unknown {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return value
+  }
+  return {
+    ...(value as Record<string, unknown>),
+    contactReference: undefined,
+    contactReferenceHash,
+  }
 }
 
 async function rebuildOpportunityOutcomeProjection(
