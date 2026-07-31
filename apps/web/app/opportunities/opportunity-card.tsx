@@ -145,7 +145,7 @@ export function OpportunityCard(props: {
       <details className={styles.evidenceDisclosure} id={`evidence-${opportunity.id}`}>
         <summary className={styles.evidenceSummary}>
           <span className={styles.evidenceSummaryLead}>
-            <strong>Лента доказательств</strong>
+            <h3>Лента доказательств</h3>
             <span>
               {opportunity.evidenceTimeline.length} событий, связанных с эпизодом найма
             </span>
@@ -158,7 +158,7 @@ export function OpportunityCard(props: {
 
         <div className={styles.evidenceBody}>
           <div className={styles.sectionHeading}>
-            <h3>Evidence timeline</h3>
+            <h4>Evidence timeline</h4>
             <span>
               {opportunity.directEvidenceCount} прямых · {opportunity.factCount} всего
             </span>
