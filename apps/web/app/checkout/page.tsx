@@ -139,11 +139,11 @@ export default async function CheckoutPage(props: {
 
               <label style={{ display: "flex", alignItems: "flex-start", gap: 10, lineHeight: 1.45 }}>
                 <input type="checkbox" name="personalDataAccepted" required style={{ marginTop: 4, width: 18, height: 18, flex: "0 0 auto" }} />
-                <span>Я даю согласие на обработку данных, необходимых для аккаунта, оформления и исполнения заказа, и ознакомлен с <Link href="/privacy">политикой обработки персональных данных</Link>.</span>
+                <span>Я отдельно подтверждаю <Link href="/personal-data-consent">согласие на обработку персональных данных</Link> для аккаунта и исполнения заказа и ознакомлен с <Link href="/privacy">политикой обработки персональных данных</Link>.</span>
               </label>
 
               {checkoutError === "offer" ? <p role="alert" style={{ margin: 0, color: "var(--danger, #b42318)" }}>Для продолжения необходимо принять оферту и условия заказа.</p> : null}
-              {checkoutError === "personal-data" ? <p role="alert" style={{ margin: 0, color: "var(--danger, #b42318)" }}>Для оформления необходимо согласие на обработку данных заказа.</p> : null}
+              {checkoutError === "personal-data" ? <p role="alert" style={{ margin: 0, color: "var(--danger, #b42318)" }}>Для оформления необходимо отдельное согласие на обработку данных заказа.</p> : null}
 
               <button type="submit" className={ppStyles.primaryAction}>
                 {isRequest ? "Оставить заявку" : `Оплатить ${plan.price} через ЮKassa`}
