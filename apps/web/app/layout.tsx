@@ -5,7 +5,9 @@ import { Inter } from "next/font/google";
 import { PushReadinessBoot } from "./push-readiness-boot";
 import { shouldRunAuthV2SessionRefresh } from "@/lib/auth-v2/config";
 import { AuthSessionRefresh } from "./auth-session-refresh";
+import { PremiumUiEffects } from "./premium-ui-effects";
 import "./globals.css";
+import "./premium-ui.css";
 
 const inter = Inter({
   subsets: ["cyrillic", "latin"],
@@ -39,8 +41,8 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: "Recruiter Radar",
-    statusBarStyle: "default"
-  }
+    statusBarStyle: "default",
+  },
 };
 
 type RootLayoutProps = {
@@ -54,13 +56,10 @@ export default function RootLayout({ children }: RootLayoutProps) {
         className={`${inter.variable} font-sans`}
         style={{
           margin: 0,
-          /* Shared calm background; the landing adds its own radar field. */
-          background:
-            "radial-gradient(125% 90% at 50% -12%, #dde6fb 0%, var(--c-bg-page, #f7faff) 46%, #f3f6fe 100%)",
-          backgroundAttachment: "fixed",
           color: "var(--c-text-primary, #0f172a)",
         }}
       >
+        <PremiumUiEffects />
         <PushReadinessBoot />
         {shouldRunAuthV2SessionRefresh() ? <AuthSessionRefresh /> : null}
         {children}
