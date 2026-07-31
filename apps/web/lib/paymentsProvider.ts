@@ -2,6 +2,10 @@ import {
   createStripePaymentAdapter,
   getStripePaymentSetupState
 } from "./paymentsStripe";
+import {
+  createYooKassaPaymentAdapter,
+  getYooKassaPaymentSetupState
+} from "./paymentsYookassa";
 import { normalizeOptionalText } from "./paymentsNormalize";
 import {
   type PaymentProviderAdapter,
@@ -11,6 +15,18 @@ import {
 export function getPaymentProviderSetupState(): PaymentProviderSetupState {
   const providerCode = normalizeOptionalText(process.env.PAYMENTS_PROVIDER)?.toLocaleLowerCase("en-US");
   const siteUrlConfigured = normalizeOptionalText(process.env.PAYMENTS_SITE_URL) !== null;
+
+  if (providerCode === "yookassa") {
+    const yookassaSetup = getYooKassaPaymentSetupState();
+
+    return {
+      provider: "yookassa",
+      configured: yookassaSetup.checkoutConfigured,
+      mode: yookassaSetup.mode,
+      webhookConfigured: yookassaSetup.webhookConfigured,
+      siteUrlConfigured
+    };
+  }
 
   if (providerCode === "stripe") {
     const stripeSetup = getStripePaymentSetupState();
@@ -36,6 +52,10 @@ export function getPaymentProviderSetupState(): PaymentProviderSetupState {
 export function getConfiguredPaymentProvider(): PaymentProviderAdapter | null {
   const providerCode = normalizeOptionalText(process.env.PAYMENTS_PROVIDER)?.toLocaleLowerCase("en-US");
 
+  if (providerCode === "yookassa") {
+    return createYooKassaPaymentAdapter();
+  }
+
   if (providerCode === "stripe") {
     return createStripePaymentAdapter();
   }
@@ -48,6 +68,10 @@ export function getPaymentProvider(providerCode: string | null): PaymentProvider
 
   if (!normalizedProviderCode) {
     return null;
+  }
+
+  if (normalizedProviderCode === "yookassa") {
+    return createYooKassaPaymentAdapter();
   }
 
   if (normalizedProviderCode === "stripe") {
