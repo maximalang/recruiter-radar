@@ -201,7 +201,7 @@ assert.equal(
 const analyticsConsentDialog = page.getByRole("dialog", { name: "Настройки аналитики" });
 await analyticsConsentDialog.waitFor();
 await analyticsConsentDialog.getByRole("button", { name: "Разрешить аналитику" }).click();
-await page.locator("#yandex-metrika-loader").waitFor();
+await page.locator("#yandex-metrika-loader").waitFor({ state: "attached" });
 await page.waitForFunction(() =>
   Array.isArray(window.ym?.a) &&
   window.ym.a.some((args) => args[1] === "hit" && args[2] === "/")
