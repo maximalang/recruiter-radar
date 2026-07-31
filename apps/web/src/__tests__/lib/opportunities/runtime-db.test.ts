@@ -29,6 +29,7 @@ describeWithDatabase('Opportunity Engine production PostgreSQL runtime', () => {
   jest.setTimeout(90_000)
 
   const originalFlag = process.env.OPPORTUNITY_ENGINE_V1_ENABLED
+  const originalOutcomesFlag = process.env.OPPORTUNITY_OUTCOMES_ENABLED
   const database = new Pool({ connectionString: process.env.DATABASE_URL })
   const token = `${Date.now()}-${process.pid}`
   let ownerId = ''
@@ -37,6 +38,7 @@ describeWithDatabase('Opportunity Engine production PostgreSQL runtime', () => {
 
   beforeAll(async () => {
     process.env.OPPORTUNITY_ENGINE_V1_ENABLED = 'true'
+    process.env.OPPORTUNITY_OUTCOMES_ENABLED = 'true'
     const owner = await database.query(
       `INSERT INTO users (email, full_name)
        VALUES ($1, 'Opportunity Runtime Test')
@@ -66,8 +68,9 @@ describeWithDatabase('Opportunity Engine production PostgreSQL runtime', () => {
   })
 
   afterAll(async () => {
-    if (ownerId) await database.query('DELETE FROM users WHERE id = $1', [ownerId])
-    if (organizationId) await database.query('DELETE FROM orgs WHERE id = $1', [organizationId])
+    // The outcome ledger is intentionally append-only and retains fixture
+    // history. This runtime database is disposable, so row-level cleanup
+    // would violate the ledger contract and is not attempted here.
     await database.end()
     const sharedPool = getPool()
     if (sharedPool) await sharedPool.end()
@@ -76,6 +79,8 @@ describeWithDatabase('Opportunity Engine production PostgreSQL runtime', () => {
     }).recruiterRadarSharedPool
     if (originalFlag === undefined) delete process.env.OPPORTUNITY_ENGINE_V1_ENABLED
     else process.env.OPPORTUNITY_ENGINE_V1_ENABLED = originalFlag
+    if (originalOutcomesFlag === undefined) delete process.env.OPPORTUNITY_OUTCOMES_ENABLED
+    else process.env.OPPORTUNITY_OUTCOMES_ENABLED = originalOutcomesFlag
   })
 
   async function insertSignals(

@@ -745,6 +745,7 @@ async function runExpireOpportunitiesJob(
         ownerId: candidate.ownerId,
         opportunityId: candidate.id,
         actorType: 'system',
+        validationNow: now,
         payload: {
           eventType: 'resumed',
           occurredAt: now.toISOString(),
@@ -1468,6 +1469,7 @@ async function persistOpportunityBuild(input: {
             opportunityId: current.id,
             actorType: 'system',
             ownerLockHeld: true,
+            validationNow: input.now,
             payload: {
               eventType: 'resumed',
               occurredAt: input.now.toISOString(),

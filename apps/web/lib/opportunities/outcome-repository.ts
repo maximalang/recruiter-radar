@@ -268,6 +268,11 @@ export interface RecordOpportunityOutcomeInput {
   externalEventId?: string | null
   dedupeKey?: string | null
   ownerLockHeld?: boolean
+  /**
+   * Clock used by trusted system jobs when validating lifecycle timestamps,
+   * including deterministic runtime checks.
+   */
+  validationNow?: Date
 }
 
 export async function lockOutcomeOwnerShared(
@@ -928,7 +933,10 @@ export async function recordOpportunityOutcomeInTransaction(
   input: RecordOpportunityOutcomeInput,
   db: OutcomeDb,
 ): Promise<RecordOutcomeResult | null> {
-  const payload = validateOutcomeInput(input.payload)
+  const payload = validateOutcomeInput(
+    input.payload,
+    input.validationNow ?? new Date(),
+  )
   const authMode = input.authMode ?? 'legacy'
   const hasWorkspaceActorContext = authMode === 'auth_v2'
   if (

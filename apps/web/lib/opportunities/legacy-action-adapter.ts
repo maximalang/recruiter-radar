@@ -59,7 +59,7 @@ export function toLegacyOutcomeCommand(
     occurredAt: input.occurredAt ?? new Date().toISOString(),
     reasonCode: input.action === 'dismissed' ? input.reasonCode ?? null : null,
     reasonNote: input.action === 'dismissed' ? input.note ?? null : null,
-    channel: input.action === 'contacted' ? input.channel ?? null : null,
+    channel: input.action === 'contacted' ? input.channel ?? 'other' : null,
     contactPathType:
       input.action === 'contacted' ? input.contactPathType ?? null : null,
     contactReference:

@@ -90,10 +90,12 @@ describe('legacy opportunity action adapter', () => {
       action: 'dismissed',
       actionKey: 'dismissed-key',
     })).toThrow('A controlled reasonCode is required for dismissed.')
-    expect(() => toLegacyOutcomeCommand({
+    expect(toLegacyOutcomeCommand({
       action: 'contacted',
       actionKey: 'contacted-key',
-    })).toThrow('channel is required for contacted.')
+    }).payload).toEqual(expect.objectContaining({
+      channel: 'other',
+    }))
   })
 
   it('uses the canonical writer and preserves workspace actor attribution', async () => {

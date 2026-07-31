@@ -450,11 +450,67 @@ export async function applyOpportunityAction(input: {
     actionKey,
   })
   if (!outcome) return null
-  const opportunity = await getOpportunityById({
+  let opportunity = await getOpportunityById({
     ownerId: input.ownerId,
     workspaceId: input.workspaceId,
     opportunityId: input.opportunityId,
   })
+  if (!opportunity && outcome.idempotent) {
+    const contextParams: unknown[] = [
+      input.opportunityId,
+      String(input.ownerId),
+    ]
+    const workspaceClause = input.workspaceId == null
+      ? ''
+      : '\n         AND workspace_id = $3'
+    if (input.workspaceId != null) {
+      contextParams.push(String(input.workspaceId))
+    }
+    const client = await getClient()
+    if (!client) throw new Error('DATABASE_URL is not set.')
+    try {
+      const context = await client.query<{
+        clientProfileId: string
+        hiringEpisodeId: string
+      }>(
+        `SELECT
+           client_profile_id::TEXT AS "clientProfileId",
+           hiring_episode_id::TEXT AS "hiringEpisodeId"
+         FROM opportunities
+         WHERE id = $1
+           AND owner_id = $2
+           ${workspaceClause}
+         LIMIT 1`,
+        contextParams,
+      )
+      const row = context.rows[0]
+      if (row) {
+        const current = await client.query<OpportunityRow>(
+          `${OPPORTUNITY_SELECT}
+           WHERE o.client_profile_id = $1
+             AND o.hiring_episode_id = $2
+             AND o.owner_id = $3
+             AND o.superseded_at IS NULL
+           LIMIT 1`,
+          [row.clientProfileId, row.hiringEpisodeId, String(input.ownerId)],
+        )
+        const currentRow = current.rows[0]
+        if (currentRow) {
+          const evidence = await getEvidenceForOpportunities(
+            String(input.ownerId),
+            [currentRow.id],
+            client,
+          )
+          opportunity = {
+            ...currentRow,
+            evidenceTimeline: evidence.get(currentRow.id) ?? [],
+          }
+        }
+      }
+    } finally {
+      client.release()
+    }
+  }
   if (!opportunity) {
     throw new Error('Updated opportunity could not be reloaded.')
   }
