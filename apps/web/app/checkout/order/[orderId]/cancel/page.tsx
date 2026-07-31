@@ -7,6 +7,7 @@ import {
   markCheckoutOrderCanceled
 } from "../../../../../lib/payments";
 import { getAuthorizedUserId } from "../../../../../lib/auth-v2/authorization";
+import { OPERATOR_REQUISITES } from "../../../../../lib/operatorRequisites";
 import {
   NoticeBox,
   PageFrame,
@@ -18,6 +19,7 @@ import {
 import ppStyles from "../../../../ui/page-primitives.module.css";
 import { translateOrderStatus } from "../../../../onboarding/pilot/[orderId]/pilot-onboarding-components";
 import { internalPageClasses as ipStyles } from "../../../../ui/internal-page";
+import { SiteFooter } from "../../../../ui/site-footer";
 
 export const dynamic = "force-dynamic";
 
@@ -38,11 +40,11 @@ function describeReason(reason: string | null): string {
     case "request-received":
       return "Заявка на подключение тарифа получена. Мы свяжемся, чтобы согласовать запуск и оплату.";
     case "payment-unavailable":
-      return "Оплата сейчас недоступна. Попробуйте ещё раз через несколько минут.";
+      return "Оплата сейчас недоступна. Деньги не списаны; попробуйте ещё раз позже.";
     case "payment-error":
-      return "Провайдер вернул ошибку при создании платежа. Можно повторить попытку.";
+      return "Не удалось создать платёж в ЮKassa. Деньги не списаны; заказ можно оплатить повторно.";
     default:
-      return "Оплата не была завершена. Это можно повторить в любой момент.";
+      return "Оплата не была завершена. Автоматического повторного списания не будет.";
   }
 }
 
@@ -51,15 +53,10 @@ export default async function CheckoutCancelPage({ params, searchParams }: Check
   const resolvedSearchParams = (await searchParams) ?? {};
   const ownerId = await getAuthorizedUserId("billing:read");
 
-  if (!ownerId) {
-    notFound();
-  }
+  if (!ownerId) notFound();
 
   const order = await ensurePilotOrderOnboardingReady(resolvedParams.orderId, { ownerId });
-
-  if (!order) {
-    notFound();
-  }
+  if (!order) notFound();
 
   const reason = readReason(resolvedSearchParams);
 
@@ -67,15 +64,12 @@ export default async function CheckoutCancelPage({ params, searchParams }: Check
     await markCheckoutOrderCanceled(order.id, reason, { ownerId }).catch(() => null);
   }
 
-  // Recurring plans land here as a captured sales request, not a failed payment.
   const isRequest = reason === "request-received";
   const retryHref = buildCheckoutRetryHref(order);
 
   return (
     <PageFrame maxWidth="720px">
-      <Link href="/" className={ppStyles.backLink}>
-        На главную
-      </Link>
+      <Link href="/" className={ppStyles.backLink}>На главную</Link>
 
       <SurfaceCard style={{ display: "grid", gap: "20px" }}>
         <StatusBadge tone={isRequest ? "info" : "warning"}>
@@ -83,7 +77,7 @@ export default async function CheckoutCancelPage({ params, searchParams }: Check
         </StatusBadge>
 
         <SectionIntro
-          title={isRequest ? "Спасибо, заявка сохранена" : "Платёж не прошёл"}
+          title={isRequest ? "Спасибо, заявка сохранена" : "Платёж не завершён"}
           description={describeReason(reason)}
         />
 
@@ -92,8 +86,8 @@ export default async function CheckoutCancelPage({ params, searchParams }: Check
           title={isRequest ? "Что дальше" : "Что можно сделать"}
           description={
             isRequest
-              ? "Мы свяжемся по указанному контакту, чтобы подключить тариф и согласовать оплату. Параметры профиля сохранены."
-              : "Вернитесь к настройкам пилота и повторите оплату. Параметры профиля сохранятся."
+              ? "Мы свяжемся по указанному контакту, чтобы подключить тариф и согласовать разовую оплату. Параметры профиля сохранены."
+              : "Вернитесь к оформлению и создайте новый платёж. Тариф, сумма и параметры радара останутся теми же."
           }
         />
 
@@ -107,21 +101,18 @@ export default async function CheckoutCancelPage({ params, searchParams }: Check
 
         <div className={ipStyles.chipWrap}>
           {isRequest ? (
-            <Link href="/" className={ppStyles.primaryAction}>
-              На главную
-            </Link>
+            <Link href="/" className={ppStyles.primaryAction}>На главную</Link>
           ) : (
-            <>
-              <Link href={retryHref} className={ppStyles.primaryAction}>
-                Повторить оплату
-              </Link>
-              <Link href="/" className={ppStyles.secondaryAction}>
-                На главную
-              </Link>
-            </>
+            <Link href={retryHref} className={ppStyles.primaryAction}>Повторить оплату</Link>
           )}
+          <Link href="/payment-and-delivery" className={ppStyles.secondaryAction}>Оплата и возврат</Link>
         </div>
+
+        <p className={ipStyles.bodyTextMutedBlock} style={{ margin: 0 }}>
+          Поддержка по оплате: <a href={`mailto:${OPERATOR_REQUISITES.email}`}>{OPERATOR_REQUISITES.email}</a>.
+        </p>
       </SurfaceCard>
+      <SiteFooter />
     </PageFrame>
   );
 }
