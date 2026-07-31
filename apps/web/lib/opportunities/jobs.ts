@@ -37,6 +37,7 @@ import {
   type ConfidenceGate,
   type OpportunityScoreResult,
 } from './opportunity-scoring'
+import { createOpportunityAnalyticsCohort } from './analytics-cohort'
 
 type OpportunityJobDb = Pick<Pool, 'query'> | Pick<PoolClient, 'query'>
 
@@ -508,6 +509,23 @@ async function runBuildOpportunitiesJob(
         profileExcluded: hasExplicitProfileExclusion(row),
         now,
       })
+      const matchedRoles = findMatchedAgencyRoles(row)
+      const matchedRoleFamilies = matchedRoles.map((role) =>
+        classifyOpportunityRoleFamily(role))
+      const matchedIndustries = row.organizationIndustry &&
+        toStringArray(row.industries).some(
+          (industry) =>
+            industry.toLocaleLowerCase('ru-RU') ===
+            row.organizationIndustry?.toLocaleLowerCase('ru-RU'),
+        )
+        ? [row.organizationIndustry]
+        : []
+      const matchedRegions = row.targetCity &&
+        row.organizationCity &&
+        row.targetCity.toLocaleLowerCase('ru-RU') ===
+          row.organizationCity.toLocaleLowerCase('ru-RU')
+        ? [row.organizationCity]
+        : []
       const brief = briefBuilder.build({
         organizationName: row.organizationName,
         episode,
@@ -516,21 +534,9 @@ async function runBuildOpportunitiesJob(
           agencyName: row.agencyName,
           specialization: row.specialization,
           hiringMode: row.hiringMode,
-          matchedRoles: findMatchedAgencyRoles(row),
-          matchedIndustries: row.organizationIndustry &&
-            toStringArray(row.industries).some(
-              (industry) =>
-                industry.toLocaleLowerCase('ru-RU') ===
-                row.organizationIndustry?.toLocaleLowerCase('ru-RU'),
-            )
-            ? [row.organizationIndustry]
-            : [],
-          matchedRegions: row.targetCity &&
-            row.organizationCity &&
-            row.targetCity.toLocaleLowerCase('ru-RU') ===
-              row.organizationCity.toLocaleLowerCase('ru-RU')
-            ? [row.organizationCity]
-            : [],
+          matchedRoles,
+          matchedIndustries,
+          matchedRegions,
           includeKeywords: toStringArray(row.includeKeywords),
           relevantFitReasons: score.components.agencyFit.reasons.map(
             (reason) => reason.message,
@@ -581,6 +587,11 @@ async function runBuildOpportunitiesJob(
         brief,
         fiur,
         provenance,
+        matchedRoleFamilies,
+        matchedIndustries,
+        matchedRegions,
+        episodeType: episode.episodeType,
+        confidenceGate: gate,
         validUntil,
         now,
         db,
@@ -1330,6 +1341,11 @@ async function persistOpportunityBuild(input: {
   brief: OpportunityBrief
   fiur: ReturnType<typeof computeFiurForOpportunity>
   provenance: OpportunityInputProvenance
+  matchedRoleFamilies: readonly string[]
+  matchedIndustries: readonly string[]
+  matchedRegions: readonly string[]
+  episodeType: string
+  confidenceGate: string
   validUntil: string
   now: Date
   db: OpportunityJobDb
@@ -1340,7 +1356,19 @@ async function persistOpportunityBuild(input: {
   superseded: boolean
   skippedUnchanged: boolean
 }> {
-  const { row, score, brief, fiur, provenance, db } = input
+  const {
+    row,
+    score,
+    brief,
+    fiur,
+    provenance,
+    matchedRoleFamilies,
+    matchedIndustries,
+    matchedRegions,
+    episodeType,
+    confidenceGate,
+    db,
+  } = input
   if (input.manageTransaction) await db.query('BEGIN')
   try {
     if (isOpportunityOutcomesEnabled()) {
@@ -1532,6 +1560,23 @@ async function persistOpportunityBuild(input: {
       modelType: 'heuristic',
       calibrationStatus: 'uncalibrated',
       digestReasons: row.digestReasons,
+      analyticsCohort: createOpportunityAnalyticsCohort({
+        clientProfileId: row.clientProfileId,
+        clientProfileVersion: provenance.profileSnapshotHash,
+        agencyDnaVersion: provenance.profileSnapshotHash,
+        hiringMode: row.hiringMode,
+        specialization: row.specialization,
+        matchedRoleFamilies,
+        matchedIndustries,
+        matchedRegions,
+        organizationSizeBucket: 'unknown',
+        episodeType,
+        confidenceGate,
+        opportunityScore: score.opportunityScore,
+        externalSupportNeedScore: score.components.externalSupportNeed.score,
+        sourceFamilies: toStringArray(row.sourceFamilies),
+        scoringVersion: provenance.scoringVersion,
+      }),
       fiur: {
         fit: fiur.fit,
         intent: fiur.intent,

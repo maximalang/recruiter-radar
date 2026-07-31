@@ -245,9 +245,15 @@ cohort=accepted
 identity определяется следующим действующим событием; равные timestamps
 разрешаются append-only `id`. Downstream должен принадлежать той же
 opportunity, иметь `occurredAt >= cohort occurredAt` и произойти до `to`.
-Фильтры `profile`, `region`, `organizationSize`, `hiringMode` и
-`externalSupportNeedBucket` применяются к immutable snapshot первого
-действующего cohort event, а не к текущей mutable opportunity.
+Immutable cohort filters применяются к snapshot первого действующего cohort
+event, а не к текущей mutable opportunity. API использует следующие query
+параметры: `clientProfileId`, `clientProfileVersion`, `agencyDnaVersion`,
+`hiringMode`, `specialization`, `matchedRoleFamily`, `matchedIndustry`,
+`matchedRegion`, `organizationSizeBucket`, `episodeType`, `confidenceGate`,
+`scoreBucket`, `externalSupportNeedBucket`, `sourceFamily` и
+`scoringVersion`. `organizationSizeBucket=unknown` означает, что размер
+работодателя не был доказан в сохранённом snapshot; профиль не перечитывается
+для исторической когорты.
 
 API разделяет:
 

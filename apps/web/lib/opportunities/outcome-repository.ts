@@ -27,6 +27,10 @@ import {
 import {
   protectOutcomeContactReference,
 } from './outcome-contact-privacy'
+import {
+  createOpportunityAnalyticsCohort,
+  isCompleteOpportunityAnalyticsCohort,
+} from './analytics-cohort'
 
 type OutcomeDb = Pick<PoolClient, 'query'>
 type OutcomeActorType = 'user' | 'system' | 'external' | 'admin'
@@ -95,6 +99,8 @@ interface OutcomeOpportunityContext {
   externalSupportNeedScore: number
   episodeType: string
   episodeStatus: string
+  profileSnapshotHash: string | null
+  analyticsCohort: unknown
 }
 
 export interface PublicOutcomeEvent {
@@ -176,11 +182,21 @@ export interface OutcomeFunnelFilter {
   workspaceId?: string | number | null
   from: string
   to: string
+  clientProfileId?: string | null
+  clientProfileVersion?: string | null
+  agencyDnaVersion?: string | null
+  hiringMode?: string | null
+  specialization?: string | null
+  matchedRoleFamily?: string | null
+  matchedIndustry?: string | null
+  matchedRegion?: string | null
+  organizationSizeBucket?: string | null
   episodeType?: string | null
   confidenceGate?: string | null
   sourceFamily?: string | null
   scoreBucket?: string | null
   externalSupportNeedBucket?: 'low' | 'medium' | 'high' | null
+  scoringVersion?: string | null
   cohort?: 'shown' | 'accepted'
   maturityDays?: number
 }
@@ -585,6 +601,58 @@ export async function getOutcomeFunnelSummary(
   if (input.workspaceId != null) {
     params.push(String(input.workspaceId))
   }
+  if (input.clientProfileId) {
+    params.push(input.clientProfileId)
+    cohortClauses.push(
+      `cohort_snapshot->>'clientProfileId' = $${params.length}`,
+    )
+  }
+  if (input.clientProfileVersion) {
+    params.push(input.clientProfileVersion)
+    cohortClauses.push(
+      `cohort_snapshot->>'clientProfileVersion' = $${params.length}`,
+    )
+  }
+  if (input.agencyDnaVersion) {
+    params.push(input.agencyDnaVersion)
+    cohortClauses.push(
+      `cohort_snapshot->>'agencyDnaVersion' = $${params.length}`,
+    )
+  }
+  if (input.hiringMode) {
+    params.push(input.hiringMode)
+    cohortClauses.push(`cohort_snapshot->>'hiringMode' = $${params.length}`)
+  }
+  if (input.specialization) {
+    params.push(input.specialization)
+    cohortClauses.push(
+      `cohort_snapshot->>'specialization' = $${params.length}`,
+    )
+  }
+  if (input.matchedRoleFamily) {
+    params.push(input.matchedRoleFamily)
+    cohortClauses.push(
+      `cohort_snapshot->'matchedRoleFamilies' ? $${params.length}`,
+    )
+  }
+  if (input.matchedIndustry) {
+    params.push(input.matchedIndustry)
+    cohortClauses.push(
+      `cohort_snapshot->'matchedIndustries' ? $${params.length}`,
+    )
+  }
+  if (input.matchedRegion) {
+    params.push(input.matchedRegion)
+    cohortClauses.push(
+      `cohort_snapshot->'matchedRegions' ? $${params.length}`,
+    )
+  }
+  if (input.organizationSizeBucket) {
+    params.push(input.organizationSizeBucket)
+    cohortClauses.push(
+      `cohort_snapshot->>'organizationSizeBucket' = $${params.length}`,
+    )
+  }
   if (input.episodeType) {
     params.push(input.episodeType)
     cohortClauses.push(`cohort_snapshot->>'episodeType' = $${params.length}`)
@@ -607,6 +675,12 @@ export async function getOutcomeFunnelSummary(
     params.push(input.externalSupportNeedBucket)
     cohortClauses.push(
       `cohort_snapshot->>'externalSupportNeedBucket' = $${params.length}`,
+    )
+  }
+  if (input.scoringVersion) {
+    params.push(input.scoringVersion)
+    cohortClauses.push(
+      `cohort_snapshot->>'scoringVersion' = $${params.length}`,
     )
   }
 
@@ -910,6 +984,8 @@ export async function recordOpportunityOutcomeInTransaction(
        o.confidence_gate AS "confidenceGate",
        o.opportunity_score AS "opportunityScore",
        o.agency_propensity_score AS "externalSupportNeedScore",
+       o.profile_snapshot_hash AS "profileSnapshotHash",
+       o.metadata->'analyticsCohort' AS "analyticsCohort",
        he.episode_type AS "episodeType",
        he.status AS "episodeStatus"
      FROM opportunities o
@@ -1178,17 +1254,29 @@ export async function recordOpportunityOutcomeInTransaction(
       throw new OutcomeChronologyConflictError()
     }
   }
-  const sourceFamilies = await getSourceFamilies(context.hiringEpisodeId, db)
-  const analyticsSnapshot = {
-    scoringVersion: context.scoringVersion,
-    episodeType: context.episodeType,
-    confidenceGate: context.confidenceGate,
-    scoreBucket: scoreBucket(context.opportunityScore),
-    sourceFamilies,
-    externalSupportNeedBucket: supportNeedBucket(
-      context.externalSupportNeedScore,
-    ),
-  }
+  const storedCohort = isCompleteOpportunityAnalyticsCohort(
+    context.analyticsCohort,
+  )
+    ? context.analyticsCohort
+    : null
+  const analyticsSnapshot = storedCohort ??
+    createOpportunityAnalyticsCohort({
+      clientProfileId: context.clientProfileId,
+      clientProfileVersion: context.profileSnapshotHash,
+      agencyDnaVersion: context.profileSnapshotHash,
+      hiringMode: null,
+      specialization: null,
+      matchedRoleFamilies: [],
+      matchedIndustries: [],
+      matchedRegions: [],
+      organizationSizeBucket: 'unknown',
+      episodeType: context.episodeType,
+      confidenceGate: context.confidenceGate,
+      opportunityScore: context.opportunityScore,
+      externalSupportNeedScore: context.externalSupportNeedScore,
+      sourceFamilies: await getSourceFamilies(context.hiringEpisodeId, db),
+      scoringVersion: context.scoringVersion,
+    })
 
   const inserted = await db.query<{ id: string; recordedAt: string }>(
     `INSERT INTO opportunity_outcome_events (
@@ -1840,19 +1928,6 @@ function normalizeExternalIdentifier(
     throw new Error(`${field} has an invalid length.`)
   }
   return normalized
-}
-
-function scoreBucket(score: number): string {
-  const percent = Math.min(Math.max(Math.floor(score * 100), 0), 100)
-  if (percent === 100) return '100'
-  const lower = Math.floor(percent / 10) * 10
-  return `${lower}-${lower + 9}`
-}
-
-function supportNeedBucket(score: number): 'low' | 'medium' | 'high' {
-  if (score >= 0.7) return 'high'
-  if (score >= 0.4) return 'medium'
-  return 'low'
 }
 
 function medianSql(left: string, right: string, key: string): string {

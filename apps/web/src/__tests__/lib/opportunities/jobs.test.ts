@@ -562,6 +562,23 @@ describe('opportunity background jobs', () => {
     const metadata = JSON.parse(String(opportunityParams[22]))
     expect(metadata.agencyFitExplanation).toContain('Backend')
     expect(metadata.agencyFitExplanation).not.toContain('Sales')
+    expect(metadata.analyticsCohort).toEqual({
+      clientProfileId: '8',
+      clientProfileVersion: expect.stringMatching(/^[a-f0-9]{64}$/),
+      agencyDnaVersion: expect.stringMatching(/^[a-f0-9]{64}$/),
+      hiringMode: 'auto',
+      specialization: 'IT recruitment',
+      matchedRoleFamilies: ['backend'],
+      matchedIndustries: [],
+      matchedRegions: ['москва'],
+      organizationSizeBucket: 'unknown',
+      episodeType: 'vacancy_spike',
+      confidenceGate: 'A',
+      scoreBucket: expect.stringMatching(/^(?:0-9|[1-9]0-[1-9]9|100)$/),
+      externalSupportNeedBucket: expect.stringMatching(/^(?:low|medium|high)$/),
+      sourceFamilies: ['career-pages'],
+      scoringVersion: 'opportunity-v1',
+    })
   })
 
   it('gives a vacancy keyword exclusion priority over strong hiring intent', async () => {

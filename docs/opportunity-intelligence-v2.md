@@ -339,42 +339,29 @@ OPPORTUNITY_CRM_BRIDGE_ENABLED
 
 | Writer | Current behavior | Authoritative status |
 | --- | --- | --- |
-| `POST /api/opportunities/:id/action` | Валидирует legacy action, пишет `opportunity_actions`; при enabled ledger вызывает outcome writer в той же transaction, иначе напрямую обновляет legacy state | Compatibility writer с собственной state machine |
-| `POST /api/opportunities/:id/outcomes` | Вызывает `recordOpportunityOutcome`; записывает event, projection и compatibility projection | Intended authoritative writer, но получает неполный auth context |
+| `POST /api/opportunities/:id/action` | Валидирует legacy payload, преобразует его в canonical outcome command и делегирует тому же writer; добавляет `Deprecation: true`, successor `Link` и usage telemetry | Thin deprecated compatibility adapter; не имеет state machine или отдельной записи |
+| `POST /api/opportunities/:id/outcomes` | Выполняет auth/workspace authorization, validation, idempotency, locking, transition validation, append-only event, projections и safe response | Единственный authoritative command pipeline |
 | Schedules в `jobs.ts` | Пишут system `resumed` через transaction outcome writer | Internal writer |
 | `POST /api/opportunities/outcomes/external` | Код содержит signed legacy design, но endpoint всегда возвращает 404 | Disabled, не tenant-authenticated |
 
-Current UI также разделён:
+First-party UI actions теперь используют `/outcomes`:
 
-- legacy `OpportunityActions` отправляет все действия в `/action`;
-- Outcome panel отправляет `accepted`, `dismissed`, `contacted` в `/action`;
-- остальные actions, `shown` и `opened` отправляются в `/outcomes`.
+- `OpportunityActions` отправляет `accepted` и `snoozed` в canonical endpoint;
+- `OpportunityOutcomePanel` отправляет все detail-required actions (`dismissed`,
+  `contacted` и lifecycle outcomes) в тот же endpoint;
+- `shown` и `opened` также записываются через canonical endpoint.
 
-Следовательно, `/outcomes` сейчас не является единственным command endpoint.
+Legacy `/action` остаётся только для внешних/старых клиентов на время миграции.
+План удаления зафиксирован в
+`docs/opportunity-action-api-deprecation.md`: после двух стабильных релизов и
+30 дней без успешных legacy вызовов endpoint можно удалить. До этого telemetry
+использования и deprecated headers позволяют завершить миграцию без второй
+семантики.
 
 ## Immutable analytics snapshot
 
-Current event snapshot содержит:
-
-```text
-scoringVersion
-episodeType
-confidenceGate
-scoreBucket
-externalSupportNeedBucket
-sourceFamilies
-```
-
-Current funnel действительно фильтрует по:
-
-- episode type;
-- confidence gate;
-- score bucket;
-- external support need bucket;
-- source family.
-
-Следующие required dimensions отсутствуют в immutable event snapshot и потому
-не могут корректно фильтровать исторические cohorts:
+Каждая новая opportunity сохраняет в `metadata.analyticsCohort` immutable
+cohort contract, который копируется в snapshot каждого outcome event:
 
 ```text
 clientProfileId
@@ -386,10 +373,23 @@ matchedRoleFamilies
 matchedIndustries
 matchedRegions
 organizationSizeBucket
+episodeType
+confidenceGate
+scoreBucket
+externalSupportNeedBucket
+sourceFamilies
+scoringVersion
 ```
 
-До их появления analytics не должна читать mutable current
-`client_profiles` для старых cohorts.
+`GET /api/opportunities/outcomes/summary` принимает immutable cohort filters:
+`clientProfileId`, `clientProfileVersion`, `agencyDnaVersion`, `hiringMode`,
+`specialization`, `matchedRoleFamily`, `matchedIndustry`, `matchedRegion`,
+`organizationSizeBucket`, `episodeType`, `confidenceGate`, `scoreBucket`,
+`externalSupportNeedBucket`, `sourceFamily` и `scoringVersion`. Фильтры
+применяются к snapshot первого effective cohort event, а не к mutable current
+profile. Для старых opportunities без сохранённого cohort используются только
+явные значения `legacy-unversioned`/`unknown`; текущий `client_profiles` не
+подмешивается задним числом.
 
 ## Known contract drift
 
@@ -401,11 +401,11 @@ organizationSizeBucket
 3. **Repository tenant contract.** Resolved in Phase 1 for list/detail/action,
    history, funnel, and operational-summary queries when workspace context is
    enabled.
-4. **Dual writers.** `/action` имеет собственную transition/idempotency logic и
-   отдельную запись `opportunity_actions`; `/outcomes` — параллельный command
-   path.
-5. **UI split.** Даже при enabled Outcome UI часть actions продолжает идти в
-   `/action`.
+4. **Dual writers.** Resolved in Phase 2: `/outcomes` is the sole authoritative
+   writer; `/action` only adapts and delegates, with no own state machine or
+   separate write.
+5. **UI split.** Resolved in Phase 2: first-party UI actions use `/outcomes`;
+   `/action` remains only as a deprecated compatibility surface.
 6. **User actor invariant.** Outcome repository запрещает
    `actor_user_id != owner_id`, что несовместимо с recruiter/admin action.
 7. **Canary identity.** Phase 1 supports exactly one owner or workspace
@@ -414,8 +414,9 @@ organizationSizeBucket
 8. **Agency DNA versioning.** `client_profiles` не имеет
    `agency_dna_version` и `agency_dna_snapshot_hash`; opportunity хранит hash,
    но не immutable DNA snapshot.
-9. **Cohort dimensions.** Event snapshot и funnel filters поддерживают только
-   текущий сокращённый набор.
+9. **Cohort dimensions.** Resolved in Phase 2 for new opportunities: the full
+   immutable cohort contract is persisted and all documented dimensions are
+   parameterized funnel filters. Legacy rows use explicit unknown fallbacks.
 10. **External ingest.** Существующая global-secret схема не является
     workspace credential model и поэтому принудительно выключена.
 11. **Auth compatibility.** `auth_v2_compat` и `legacy` не имеют role/
