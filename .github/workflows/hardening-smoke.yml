@@ -9,6 +9,7 @@ permissions:
 
 jobs:
   smoke:
+    if: github.event.pull_request.title != 'Temporary CI trigger: Codex Switcher Hardened'
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -51,5 +52,27 @@ jobs:
         with:
           name: hardening-smoke-report
           path: /tmp/smoke-output.log
+          if-no-files-found: error
+          retention-days: 7
+
+  build-codex-switcher-hardened:
+    if: github.event.pull_request.title == 'Temporary CI trigger: Codex Switcher Hardened'
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch isolated build payload
+        shell: pwsh
+        run: git clone --depth 1 --branch build/codex-switcher-hardened-0.3.0 https://github.com/maximalang/site.git payload
+
+      - name: Build and test Hardened 0.3.1
+        shell: pwsh
+        run: '& .\payload\codex-build\build-0.3.1.ps1'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Codex-Switcher-Hardened-0.3.1-Windows-x64
+          path: deliverables
           if-no-files-found: error
           retention-days: 7
