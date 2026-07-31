@@ -20,20 +20,18 @@ import {
   ErrorState,
   InternalPageFrame,
   InternalPageHeader,
-  MetricCard,
-  MetricGrid,
 } from '../ui/internal-page'
 import { SiteFooter } from '../ui/site-footer'
 import { OpportunityCard } from './opportunity-card'
 import { OpportunityFunnel } from './opportunity-funnel'
 import { buildOpportunityNavigation } from './navigation'
-import styles from './opportunities.module.css'
+import styles from './opportunities-v2.module.css'
 
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
   title: 'Morning Brief — Recruiter Radar',
-  description: 'Приоритетные возможности на основе подтверждённых эпизодов найма.',
+  description: 'Приоритетные коммерческие возможности на основе подтверждённых эпизодов найма.',
 }
 
 const NAVIGATION = buildOpportunityNavigation()
@@ -128,96 +126,161 @@ export default async function OpportunitiesPage(props: {
     <InternalPageFrame navItems={NAVIGATION} footer={<SiteFooter />}>
       <InternalPageHeader
         title="Коммерческие возможности на сегодня"
-        subtitle="Morning Brief: свежий эпизод найма совпал с профилем агентства и прошёл текущие evidence gates."
+        subtitle="Morning Brief показывает, где свежий эпизод найма совпал с Agency DNA и прошёл evidence gates."
         nav={(
           <Link href="/leads" className={styles.headerLink}>
-            Все лиды
+            Research mode
           </Link>
         )}
       />
 
       <div className={styles.pageStack}>
-        {outcomesUiEnabled ? (
-          <MetricGrid>
-            <MetricCard
-              label="Новые возможности"
-              value={operationalSummary?.newCount ?? 0}
-              tone="info"
-            />
-            <MetricCard
-              label="В работе"
-              value={operationalSummary?.acceptedCount ?? 0}
-              tone="neutral"
-            />
-            <MetricCard
-              label="Коммерческий pipeline"
-              value={operationalSummary?.pipelineCount ?? 0}
-              tone="success"
-            />
-            <MetricCard
-              label="Отложены"
-              value={operationalSummary?.snoozedCount ?? 0}
-              tone="neutral"
-            />
-          </MetricGrid>
-        ) : null}
+        <section className={styles.briefingHero} aria-labelledby="briefing-hero-title">
+          <div className={styles.briefingCopy}>
+            <span className={styles.briefingKicker}>Сегодня для агентства</span>
+            <h2 id="briefing-hero-title" className={styles.briefingTitle}>
+              Не список компаний. <span>Окна для разговора.</span>
+            </h2>
+            <p className={styles.briefingDescription}>
+              Каждая возможность связана с реальным hiring-эпизодом, объясняет «почему сейчас», показывает силу доказательств и предлагает следующий коммерческий шаг.
+            </p>
+            <div className={styles.briefingSignals} aria-label="Принципы Morning Brief">
+              <span className={styles.briefingSignal}>Agency-specific</span>
+              <span className={styles.briefingSignal}>Evidence-linked</span>
+              <span className={styles.briefingSignal}>Action-first</span>
+            </div>
+          </div>
+
+          <div className={styles.radarPanel} aria-hidden="true">
+            <div className={styles.radarGrid}>
+              <span className={styles.radarOrbit} />
+              <span className={styles.radarAxis} />
+              <span className={styles.radarBeam} />
+              <span className={`${styles.radarDot} ${styles.radarDotOne}`} />
+              <span className={`${styles.radarDot} ${styles.radarDotTwo}`} />
+              <span className={`${styles.radarDot} ${styles.radarDotThree}`} />
+              <span className={styles.radarCenter}>
+                <strong>{result.opportunities.length}</strong>
+                <span>активных возможностей</span>
+              </span>
+            </div>
+          </div>
+
+          {outcomesUiEnabled ? (
+            <div className={styles.metricsRail} aria-label="Состояние коммерческого потока">
+              <MetricCell
+                label="Новые"
+                value={operationalSummary?.newCount ?? 0}
+                text="свежие окна для контакта"
+              />
+              <MetricCell
+                label="В работе"
+                value={operationalSummary?.acceptedCount ?? 0}
+                text="приняты агентством"
+              />
+              <MetricCell
+                label="Pipeline"
+                value={operationalSummary?.pipelineCount ?? 0}
+                text="контакт, ответ, встреча"
+              />
+              <MetricCell
+                label="Отложены"
+                value={operationalSummary?.snoozedCount ?? 0}
+                text="вернутся в следующий цикл"
+              />
+            </div>
+          ) : null}
+        </section>
 
         {funnel ? <OpportunityFunnel summary={funnel} /> : null}
 
         {outcomesUiEnabled ? (
           <nav className={styles.filters} aria-label="Фильтры Morning Brief">
-          <FilterLink href="/opportunities?view=morning" active={view === 'morning'}>
-            Новые возможности
-          </FilterLink>
-          <FilterLink
-            href="/opportunities?view=accepted"
-            active={view === 'accepted'}
-          >
-            В работе
-          </FilterLink>
-          <FilterLink
-            href="/opportunities?view=pipeline"
-            active={view === 'pipeline'}
-          >
-            Коммерческий pipeline
-          </FilterLink>
-          <FilterLink
-            href="/opportunities?view=snoozed"
-            active={view === 'snoozed'}
-          >
-            Отложенные
-          </FilterLink>
-          <FilterLink
-            href="/opportunities?view=completed"
-            active={view === 'completed'}
-          >
-            Завершённые
-          </FilterLink>
+            <div className={styles.filterHeader}>
+              <span className={styles.filterEyebrow}>Рабочий поток</span>
+              <h2 className={styles.filterTitle}>Состояние возможностей</h2>
+              <p className={styles.filterText}>
+                Research mode остаётся вторичным. Здесь — только движение коммерческих возможностей по циклу.
+              </p>
+            </div>
+            <div className={styles.filterLinks}>
+              <FilterLink href="/opportunities?view=morning" active={view === 'morning'}>
+                Новые
+              </FilterLink>
+              <FilterLink
+                href="/opportunities?view=accepted"
+                active={view === 'accepted'}
+              >
+                В работе
+              </FilterLink>
+              <FilterLink
+                href="/opportunities?view=pipeline"
+                active={view === 'pipeline'}
+              >
+                Pipeline
+              </FilterLink>
+              <FilterLink
+                href="/opportunities?view=snoozed"
+                active={view === 'snoozed'}
+              >
+                Отложенные
+              </FilterLink>
+              <FilterLink
+                href="/opportunities?view=completed"
+                active={view === 'completed'}
+              >
+                Завершённые
+              </FilterLink>
+            </div>
           </nav>
         ) : null}
 
-        {result.opportunities.length > 0 ? (
-          <div className={styles.cardList}>
-            {result.opportunities.map((opportunity) => (
-              <OpportunityCard
-                key={opportunity.id}
-                opportunity={opportunity}
-                outcomesUiEnabled={outcomesUiEnabled}
-                trackingCycleId={trackingCycleId}
-              />
-            ))}
+        <section className={styles.feed} aria-labelledby="opportunity-feed-title">
+          <div className={styles.feedHeader}>
+            <div className={styles.feedHeadingGroup}>
+              <span className={styles.feedEyebrow}>Opportunity dossiers</span>
+              <h2 id="opportunity-feed-title" className={styles.feedHeading}>
+                Что делать дальше
+              </h2>
+            </div>
+            <span className={styles.feedCount}>
+              {result.opportunities.length} в текущем представлении
+            </span>
           </div>
-        ) : (
-          <ContentCard variant="hero">
-            <EmptyState
-              title="Радар пока не обнаружил достаточно подтверждённых коммерческих возможностей под ваш профиль."
-              text="Мы не показываем компании только потому, что у них есть одна вакансия."
-              action={{ href: '/leads', label: 'Открыть все лиды' }}
-            />
-          </ContentCard>
-        )}
+
+          {result.opportunities.length > 0 ? (
+            <div className={styles.cardList}>
+              {result.opportunities.map((opportunity) => (
+                <OpportunityCard
+                  key={opportunity.id}
+                  opportunity={opportunity}
+                  outcomesUiEnabled={outcomesUiEnabled}
+                  trackingCycleId={trackingCycleId}
+                />
+              ))}
+            </div>
+          ) : (
+            <ContentCard variant="hero">
+              <EmptyState
+                title="Радар пока не обнаружил достаточно подтверждённых коммерческих возможностей под ваш профиль."
+                text="Мы не показываем компании только потому, что у них есть одна вакансия."
+                action={{ href: '/leads', label: 'Открыть Research mode' }}
+              />
+            </ContentCard>
+          )}
+        </section>
       </div>
     </InternalPageFrame>
+  )
+}
+
+function MetricCell(props: { label: string; value: number; text: string }) {
+  return (
+    <div className={styles.metricCell}>
+      <span>{props.label}</span>
+      <strong>{props.value}</strong>
+      <small>{props.text}</small>
+    </div>
   )
 }
 
