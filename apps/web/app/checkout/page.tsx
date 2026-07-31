@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { getAccountById } from "@/lib/account-auth";
 import { getAuthorizedUserId } from "@/lib/auth-v2/authorization";
+import { buildLegalAcceptanceAudit } from "@/lib/legalDocuments";
 import { startCheckoutOrder } from "@/lib/payments";
 import {
   buildCheckoutHref,
@@ -72,6 +73,7 @@ export default async function CheckoutPage(props: {
       includeKeywords: input.includeKeywords || null,
       excludeKeywords: input.excludeKeywords || null,
       dailyDigestLimit: input.dailyDigestLimit,
+      comment: buildLegalAcceptanceAudit(new Date().toISOString()),
       siteUrl: process.env.PAYMENTS_SITE_URL ?? "http://localhost:3000",
     });
     redirect(result.redirectUrl);
