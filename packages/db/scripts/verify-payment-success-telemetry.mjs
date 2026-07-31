@@ -22,6 +22,24 @@ const client = new Client({
 
 const initialStatuses = ["pending", "canceled", "failed", "processing"];
 
+async function expectStatementFailure({ savepoint, sql, params, messagePattern }) {
+  await client.query(`SAVEPOINT ${savepoint}`);
+  let rejected = false;
+  try {
+    await client.query(sql, params);
+  } catch (error) {
+    rejected = true;
+    assert.match(
+      error instanceof Error ? error.message : String(error),
+      messagePattern,
+      `${savepoint} must fail for the expected database invariant`,
+    );
+    await client.query(`ROLLBACK TO SAVEPOINT ${savepoint}`);
+  }
+  assert.equal(rejected, true, `${savepoint} unexpectedly succeeded`);
+  await client.query(`RELEASE SAVEPOINT ${savepoint}`);
+}
+
 try {
   await client.connect();
   await client.query("BEGIN");
@@ -146,6 +164,176 @@ try {
     );
   }
 
+  const verifiedYooKassaPayload = {
+    paymentProviderPayload: {
+      id: "payment-yookassa-verified",
+      status: "succeeded",
+      paid: true,
+      amount: { value: "2990.00", currency: "RUB" },
+      refundedAmount: { value: "0.00", currency: "RUB" },
+      test: true,
+    },
+  };
+  const yooKassaOrderResult = await client.query(
+    `INSERT INTO checkout_orders (
+       user_id,
+       plan_code,
+       amount_rub,
+       currency,
+       status,
+       customer_name,
+       customer_contact,
+       payload,
+       provider,
+       provider_payment_id
+     )
+     VALUES ($1, 'pilot', 2990, 'RUB', 'pending', $2, $3, $4::jsonb, 'yookassa', 'payment-yookassa-verified')
+     RETURNING id`,
+    [
+      userId,
+      "YooKassa Contract Test",
+      "yookassa-contract@example.invalid",
+      JSON.stringify(verifiedYooKassaPayload),
+    ],
+  );
+  const yooKassaOrderId = yooKassaOrderResult.rows[0].id;
+
+  await client.query(
+    `UPDATE checkout_orders
+     SET status = 'paid', paid_at = NOW()
+     WHERE id = $1`,
+    [yooKassaOrderId],
+  );
+  const verifiedPaidOrder = await client.query(
+    `SELECT status, amount_rub, currency
+     FROM checkout_orders
+     WHERE id = $1`,
+    [yooKassaOrderId],
+  );
+  assert.deepEqual(
+    verifiedPaidOrder.rows[0],
+    { status: "paid", amount_rub: 2990, currency: "RUB" },
+    "verified YooKassa amount and currency must permit pending -> paid",
+  );
+
+  await expectStatementFailure({
+    savepoint: "paid_downgrade_guard",
+    sql: "UPDATE checkout_orders SET status = 'pending' WHERE id = $1",
+    params: [yooKassaOrderId],
+    messagePattern: /cannot be downgraded/,
+  });
+
+  const enrollmentResult = await client.query(
+    `INSERT INTO pilot_enrollments (user_id, status, starts_at, ends_at, activated_by, notes)
+     VALUES ($1, 'active', NOW() - INTERVAL '1 hour', NOW() + INTERVAL '6 days', 'yookassa_contract_test', 'before_full_refund')
+     RETURNING id`,
+    [userId],
+  );
+  const enrollmentId = enrollmentResult.rows[0].id;
+
+  const refundedPayload = {
+    ...verifiedYooKassaPayload,
+    paymentProviderPayload: {
+      ...verifiedYooKassaPayload.paymentProviderPayload,
+      refundedAmount: { value: "2990.00", currency: "RUB" },
+      refund: {
+        id: "refund-yookassa-verified",
+        status: "succeeded",
+        amount: { value: "2990.00", currency: "RUB" },
+      },
+    },
+  };
+  await client.query(
+    `UPDATE checkout_orders
+     SET status = 'refunded', payload = $2::jsonb
+     WHERE id = $1`,
+    [yooKassaOrderId, JSON.stringify(refundedPayload)],
+  );
+
+  const refundState = await client.query(
+    `SELECT o.status AS order_status, e.status::text AS enrollment_status, e.activated_by
+     FROM checkout_orders o
+     JOIN pilot_enrollments e ON e.id = $2
+     WHERE o.id = $1`,
+    [yooKassaOrderId, enrollmentId],
+  );
+  assert.deepEqual(
+    refundState.rows[0],
+    {
+      order_status: "refunded",
+      enrollment_status: "canceled",
+      activated_by: "refund_reconciliation",
+    },
+    "full YooKassa refund must become terminal and revoke the active pilot entitlement",
+  );
+
+  await expectStatementFailure({
+    savepoint: "refunded_terminal_guard",
+    sql: "UPDATE checkout_orders SET status = 'paid' WHERE id = $1",
+    params: [yooKassaOrderId],
+    messagePattern: /refunded checkout order .* is terminal/,
+  });
+
+  const badAmountOrder = await client.query(
+    `INSERT INTO checkout_orders (
+       user_id,
+       plan_code,
+       amount_rub,
+       currency,
+       status,
+       customer_name,
+       customer_contact,
+       payload,
+       provider
+     )
+     VALUES ($1, 'pilot', 2990, 'RUB', 'pending', 'Bad Amount', 'bad-amount@example.invalid', $2::jsonb, 'yookassa')
+     RETURNING id`,
+    [
+      userId,
+      JSON.stringify({
+        paymentProviderPayload: {
+          amount: { value: "1.00", currency: "RUB" },
+        },
+      }),
+    ],
+  );
+  await expectStatementFailure({
+    savepoint: "yookassa_amount_guard",
+    sql: "UPDATE checkout_orders SET status = 'paid' WHERE id = $1",
+    params: [badAmountOrder.rows[0].id],
+    messagePattern: /YooKassa amount mismatch/,
+  });
+
+  const badCurrencyOrder = await client.query(
+    `INSERT INTO checkout_orders (
+       user_id,
+       plan_code,
+       amount_rub,
+       currency,
+       status,
+       customer_name,
+       customer_contact,
+       payload,
+       provider
+     )
+     VALUES ($1, 'pilot', 2990, 'RUB', 'pending', 'Bad Currency', 'bad-currency@example.invalid', $2::jsonb, 'yookassa')
+     RETURNING id`,
+    [
+      userId,
+      JSON.stringify({
+        paymentProviderPayload: {
+          amount: { value: "2990.00", currency: "USD" },
+        },
+      }),
+    ],
+  );
+  await expectStatementFailure({
+    savepoint: "yookassa_currency_guard",
+    sql: "UPDATE checkout_orders SET status = 'paid' WHERE id = $1",
+    params: [badCurrencyOrder.rows[0].id],
+    messagePattern: /YooKassa currency mismatch/,
+  });
+
   const failureOrderResult = await client.query(
     `INSERT INTO checkout_orders (
        user_id,
@@ -250,6 +438,14 @@ try {
       transitions: initialStatuses.map((status) => `${status}->paid`),
       duplicateProtection: ["paid->paid", "webhook-replay"],
       telemetryFailureDoesNotBlockPayment: true,
+      yookassaDatabaseContract: {
+        verifiedPendingToPaid: true,
+        paidDowngradeRejected: true,
+        fullRefundTerminal: true,
+        entitlementRevoked: true,
+        amountMismatchRejected: true,
+        currencyMismatchRejected: true,
+      },
       reconciliation: {
         emptySummary,
         firstRunInserted: firstReconciliationCount,
