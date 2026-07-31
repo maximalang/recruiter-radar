@@ -1,0 +1,56 @@
+/* Final visual corrections from production Playwright screenshots. */
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] {
+  color-scheme: dark;
+}
+
+/* The old landing ambience is a pale fixed layer. Inside the new isolated
+   cinematic stacking context it paints above the main background, washing out
+   the hero and sticky scenes. The cinematic radar replaces it completely. */
+main[data-deploy-anchor="recruiter-radar-landing-v4"] > div > div[aria-hidden="true"] {
+  display: none !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] {
+  background:
+    radial-gradient(circle at 72% 47%, rgba(var(--rr-scene-accent-rgb), 0.07), transparent 27rem),
+    linear-gradient(135deg, rgba(11, 17, 29, 0.92), rgba(2, 5, 10, 0.98)) !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] canvas {
+  opacity: 0.76;
+  filter: saturate(1.16) contrast(1.08);
+  mix-blend-mode: screen;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] p {
+  color: rgba(247, 244, 235, 0.74) !important;
+}
+
+/* The included-features panel was the last remaining white SaaS surface. */
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #pricing > div:last-child {
+  border: 1px solid rgba(255, 255, 255, 0.13) !important;
+  border-radius: 0 !important;
+  background:
+    linear-gradient(120deg, rgba(var(--rr-scene-accent-rgb), 0.08), transparent 42%),
+    rgba(7, 11, 18, 0.84) !important;
+  color: rgba(247, 244, 235, 0.72) !important;
+  box-shadow: 18px 18px 0 rgba(var(--rr-scene-accent-rgb), 0.055) !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #pricing > div:last-child * {
+  color: inherit !important;
+}
+
+main[data-deploy-anchor="recruiter-radar-landing-v4"] #pricing > div:last-child a {
+  color: var(--rr-scene-accent) !important;
+}
+
+@media (max-width: 680px) {
+  main[data-deploy-anchor="recruiter-radar-landing-v4"] section[data-landing-hero] h1 span {
+    font-size: 0.56em !important;
+    white-space: nowrap !important;
+    overflow-wrap: normal;
+    letter-spacing: -0.045em !important;
+  }
+}
