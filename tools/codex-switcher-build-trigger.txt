@@ -1,0 +1,2 @@
+Build Codex Switcher Hardened 0.3.1 for Windows x64.
+Run through registered Hardening smoke workflow.
