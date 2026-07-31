@@ -1,0 +1,849 @@
+.dashboardStack {
+  display: grid;
+  gap: clamp(22px, 3vw, 34px);
+}
+
+.workspaceCta,
+.accountPrimaryAction,
+.accountSecondaryAction,
+.statusAction,
+.todayRadarReviewPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 780;
+  text-decoration: none;
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.workspaceCta {
+  padding: 0 18px;
+  border: 1px solid #152033;
+  background: #152033;
+  color: #fff;
+  box-shadow: 0 12px 30px rgba(15, 25, 40, 0.14);
+}
+
+.workspaceCta:hover,
+.accountPrimaryAction:hover,
+.accountSecondaryAction:hover,
+.statusAction:hover,
+.todayRadarReviewPill:hover {
+  transform: translateY(-2px);
+}
+
+.workspaceCta:hover {
+  background: #223149;
+  box-shadow: 0 16px 34px rgba(15, 25, 40, 0.2);
+}
+
+.workspaceCta:focus-visible,
+.accountPrimaryAction:focus-visible,
+.accountSecondaryAction:focus-visible,
+.statusAction:focus-visible,
+.todayRadarCard:focus-visible,
+.todayRadarReviewPill:focus-visible {
+  outline: 3px solid rgba(117, 217, 202, 0.5);
+  outline-offset: 3px;
+}
+
+.accountOverview {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: 560px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 30px;
+  background:
+    radial-gradient(circle at 78% 28%, rgba(117, 217, 202, 0.18), transparent 18rem),
+    radial-gradient(circle at 92% 86%, rgba(221, 165, 83, 0.11), transparent 18rem),
+    linear-gradient(142deg, #07101d 0%, #0a1727 56%, #0b1c2f 100%);
+  color: #f2f7ff;
+  box-shadow: 0 36px 90px rgba(19, 31, 48, 0.2);
+}
+
+.accountOverview::before {
+  position: absolute;
+  inset: 0;
+  z-index: -3;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 54px 54px;
+  mask-image: linear-gradient(to right, #000 0%, transparent 72%);
+  content: "";
+}
+
+.accountOverviewMain {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(360px, 0.85fr);
+  min-height: 430px;
+}
+
+.accountOverviewLead {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: clamp(34px, 5vw, 72px);
+}
+
+.accountEyebrow,
+.sectionEyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
+  color: #75d9ca;
+  font-size: 0.66rem;
+  font-weight: 840;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.accountEyebrow::before,
+.sectionEyebrow::before {
+  width: 28px;
+  height: 1px;
+  background: currentColor;
+  content: "";
+}
+
+.accountTitle {
+  max-width: 760px;
+  margin: 20px 0 0;
+  color: #fff;
+  font-size: clamp(2.65rem, 5.3vw, 5.9rem);
+  font-weight: 720;
+  letter-spacing: -0.068em;
+  line-height: 0.94;
+}
+
+.accountTitleAccent {
+  color: #75d9ca;
+}
+
+.accountDescription {
+  max-width: 640px;
+  margin: 24px 0 0;
+  color: rgba(230, 238, 249, 0.66);
+  font-size: clamp(0.9rem, 1.2vw, 1rem);
+  line-height: 1.72;
+}
+
+.accountPrimaryActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 32px;
+}
+
+.accountPrimaryAction {
+  padding: 0 19px;
+  border: 1px solid #75d9ca;
+  background: #75d9ca;
+  color: #06111d;
+  box-shadow: 0 16px 38px rgba(117, 217, 202, 0.18);
+}
+
+.accountPrimaryAction:hover {
+  background: #90e6d8;
+}
+
+.accountSecondaryAction {
+  padding: 0 18px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.045);
+  color: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(12px);
+}
+
+.accountSecondaryAction:hover {
+  border-color: rgba(117, 217, 202, 0.45);
+  background: rgba(255, 255, 255, 0.075);
+  color: #fff;
+}
+
+.radarStage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 430px;
+  overflow: hidden;
+}
+
+.radarStage::after {
+  position: absolute;
+  right: -18%;
+  bottom: -45%;
+  width: 420px;
+  height: 420px;
+  border-radius: 50%;
+  background: rgba(117, 217, 202, 0.08);
+  filter: blur(50px);
+  content: "";
+}
+
+.radarVisual {
+  position: relative;
+  width: min(72%, 330px);
+  aspect-ratio: 1;
+}
+
+.radarRing,
+.radarRing::before,
+.radarRing::after {
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(117, 217, 202, 0.2);
+  border-radius: 50%;
+  content: "";
+}
+
+.radarRing::before {
+  inset: 18%;
+  border-color: rgba(117, 217, 202, 0.28);
+}
+
+.radarRing::after {
+  inset: 36%;
+  border-color: rgba(117, 217, 202, 0.4);
+  box-shadow: 0 0 52px rgba(117, 217, 202, 0.08) inset;
+}
+
+.radarCrosshair::before,
+.radarCrosshair::after {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  background: rgba(117, 217, 202, 0.12);
+  content: "";
+  transform: translate(-50%, -50%);
+}
+
+.radarCrosshair::before {
+  width: 100%;
+  height: 1px;
+}
+
+.radarCrosshair::after {
+  width: 1px;
+  height: 100%;
+}
+
+.radarSweep {
+  position: absolute;
+  inset: 7%;
+  border-radius: 50%;
+  background: conic-gradient(from 268deg, transparent 0deg, rgba(117, 217, 202, 0.02) 225deg, rgba(117, 217, 202, 0.28) 355deg, transparent 360deg);
+  transform-origin: center;
+  animation: radar-sweep 8s linear infinite;
+}
+
+.radarCore {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: grid;
+  width: 112px;
+  height: 112px;
+  place-items: center;
+  border: 1px solid rgba(117, 217, 202, 0.38);
+  border-radius: 50%;
+  background: rgba(7, 16, 29, 0.78);
+  box-shadow:
+    0 0 0 14px rgba(117, 217, 202, 0.035),
+    0 22px 60px rgba(0, 0, 0, 0.28);
+  transform: translate(-50%, -50%);
+  backdrop-filter: blur(14px);
+}
+
+.radarCore strong {
+  color: #fff;
+  font-size: 2.25rem;
+  letter-spacing: -0.06em;
+}
+
+.radarCore span {
+  max-width: 74px;
+  color: rgba(230, 238, 249, 0.52);
+  font-size: 0.58rem;
+  font-weight: 760;
+  letter-spacing: 0.08em;
+  line-height: 1.35;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.radarPoint {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border: 2px solid #0a1727;
+  border-radius: 50%;
+  background: #75d9ca;
+  box-shadow: 0 0 0 8px rgba(117, 217, 202, 0.08), 0 0 24px rgba(117, 217, 202, 0.6);
+}
+
+.radarPointOne {
+  right: 16%;
+  top: 30%;
+}
+
+.radarPointTwo {
+  left: 21%;
+  bottom: 24%;
+  width: 9px;
+  height: 9px;
+  background: #e8b56a;
+  box-shadow: 0 0 0 7px rgba(232, 181, 106, 0.08), 0 0 22px rgba(232, 181, 106, 0.45);
+}
+
+.radarPointThree {
+  right: 30%;
+  bottom: 12%;
+  width: 7px;
+  height: 7px;
+  opacity: 0.65;
+}
+
+.accountStatusGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.025);
+  backdrop-filter: blur(16px);
+}
+
+.accountStatusCard {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    "icon label"
+    "icon value"
+    "icon action";
+  align-items: start;
+  gap: 5px 14px;
+  min-height: 130px;
+  padding: 24px;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  transition: background 180ms ease;
+}
+
+.accountStatusCard:last-child {
+  border-right: 0;
+}
+
+.accountStatusCard:hover {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.accountStatusIconWrap {
+  grid-area: icon;
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid rgba(117, 217, 202, 0.2);
+  border-radius: 13px;
+  background: rgba(117, 217, 202, 0.07);
+}
+
+.accountStatusIcon {
+  width: 20px;
+  height: 20px;
+  color: #75d9ca;
+}
+
+.accountStatusCard[data-ready="false"] .accountStatusIconWrap {
+  border-color: rgba(232, 181, 106, 0.2);
+  background: rgba(232, 181, 106, 0.07);
+}
+
+.accountStatusCard[data-ready="false"] .accountStatusIcon,
+.accountStatusCard[data-ready="false"] .statusAction {
+  color: #e8b56a;
+}
+
+.accountStatusLabel {
+  grid-area: label;
+  color: rgba(230, 238, 249, 0.42);
+  font-size: 0.61rem;
+  font-weight: 790;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.accountStatusCard strong {
+  grid-area: value;
+  color: #fff;
+  font-size: clamp(1.15rem, 1.8vw, 1.55rem);
+  font-weight: 720;
+  letter-spacing: -0.04em;
+}
+
+.statusAction {
+  grid-area: action;
+  justify-content: flex-start;
+  min-height: 0;
+  width: fit-content;
+  padding: 0;
+  color: #75d9ca;
+  font-size: 0.69rem;
+}
+
+.todayRadarSection {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(26px, 4vw, 48px);
+  border: 1px solid rgba(18, 32, 51, 0.1);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at 92% 4%, rgba(117, 217, 202, 0.1), transparent 17rem),
+    rgba(255, 255, 255, 0.88);
+  box-shadow: 0 28px 70px rgba(29, 44, 68, 0.09);
+  backdrop-filter: blur(18px);
+}
+
+.todayRadarHeader {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+
+.todayRadarHeadingGroup {
+  display: grid;
+  gap: 10px;
+}
+
+.analyticsHeading {
+  margin: 0;
+  color: #142137;
+  font-size: clamp(1.9rem, 3.8vw, 3.7rem);
+  font-weight: 720;
+  letter-spacing: -0.058em;
+  line-height: 1;
+}
+
+.todayRadarIntro {
+  max-width: 650px;
+  margin: 0;
+  color: #68758a;
+  font-size: 0.84rem;
+  line-height: 1.65;
+}
+
+.todayRadarReviewPill {
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid rgba(21, 32, 51, 0.11);
+  background: rgba(247, 249, 252, 0.9);
+  color: #647085;
+}
+
+.todayRadarReviewPill::before {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #8d99aa;
+  content: "";
+}
+
+.todayRadarReviewPill[data-pending="true"] {
+  border-color: rgba(215, 151, 59, 0.22);
+  background: rgba(232, 181, 106, 0.11);
+  color: #81531b;
+}
+
+.todayRadarReviewPill[data-pending="true"]::before {
+  background: #d7973b;
+  box-shadow: 0 0 0 5px rgba(215, 151, 59, 0.1);
+}
+
+.todayRadarList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.todayRadarCard {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  min-height: 300px;
+  padding: 24px;
+  overflow: hidden;
+  border: 1px solid rgba(21, 32, 51, 0.09);
+  border-radius: 20px;
+  background:
+    linear-gradient(145deg, rgba(117, 217, 202, 0.035), transparent 46%),
+    #fbfcfe;
+  color: #152033;
+  text-decoration: none;
+  transition:
+    transform 220ms ease,
+    border-color 220ms ease,
+    box-shadow 220ms ease;
+}
+
+.todayRadarCard::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: linear-gradient(180deg, #75d9ca, transparent 70%);
+  content: "";
+  opacity: 0.55;
+}
+
+.todayRadarCard:hover {
+  transform: translateY(-5px);
+  border-color: rgba(75, 159, 144, 0.28);
+  box-shadow: 0 22px 45px rgba(29, 44, 68, 0.12);
+}
+
+.todayRadarCard[data-rank="0"] {
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.34fr);
+  grid-template-rows: auto 1fr auto;
+  column-gap: 34px;
+  min-height: 360px;
+  padding: clamp(28px, 4vw, 44px);
+  border-color: rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(circle at 86% 24%, rgba(117, 217, 202, 0.15), transparent 16rem),
+    linear-gradient(143deg, #0b1728, #07101d);
+  color: #eef5ff;
+  box-shadow: 0 28px 60px rgba(7, 16, 29, 0.17);
+}
+
+.todayRadarCard[data-rank="0"]::before {
+  width: 4px;
+  opacity: 1;
+}
+
+.todayRadarCardTop {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.todayRadarRank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 28px;
+  border: 1px solid rgba(21, 32, 51, 0.1);
+  border-radius: 999px;
+  color: #7a879a;
+  font-size: 0.64rem;
+  font-weight: 820;
+  letter-spacing: 0.08em;
+}
+
+.todayRadarCard[data-rank="0"] .todayRadarRank {
+  border-color: rgba(117, 217, 202, 0.22);
+  background: rgba(117, 217, 202, 0.07);
+  color: #75d9ca;
+}
+
+.todayRadarOrg {
+  margin-right: auto;
+  overflow: hidden;
+  color: #142137;
+  font-size: clamp(1.2rem, 2vw, 1.65rem);
+  font-weight: 740;
+  letter-spacing: -0.035em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.todayRadarCard[data-rank="0"] .todayRadarOrg {
+  color: #fff;
+  font-size: clamp(2rem, 4.2vw, 4.3rem);
+  letter-spacing: -0.06em;
+}
+
+.todayRadarScorePanel {
+  display: grid;
+  align-content: start;
+  justify-items: end;
+  gap: 8px;
+}
+
+.todayRadarCard[data-rank="0"] .todayRadarScorePanel {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  justify-items: center;
+}
+
+.todayRadarScoreValue {
+  display: grid;
+  width: 112px;
+  height: 112px;
+  place-items: center;
+  border: 1px solid rgba(117, 217, 202, 0.28);
+  border-radius: 50%;
+  background: rgba(117, 217, 202, 0.055);
+  box-shadow: 0 0 0 12px rgba(117, 217, 202, 0.025);
+}
+
+.todayRadarScoreValue strong {
+  color: #fff;
+  font-size: 2.35rem;
+  font-weight: 720;
+  letter-spacing: -0.06em;
+}
+
+.todayRadarScoreValue span {
+  color: rgba(230, 238, 249, 0.44);
+  font-size: 0.58rem;
+  font-weight: 760;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.todayRadarScore {
+  width: min(100%, 330px);
+  margin-top: 18px;
+}
+
+.todayRadarFreshness {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 15px 0 18px;
+}
+
+.todayRadarBody {
+  min-width: 0;
+}
+
+.todayRadarLine {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 16px;
+  padding: 13px 0;
+  border-top: 1px solid rgba(21, 32, 51, 0.075);
+}
+
+.todayRadarCard[data-rank="0"] .todayRadarLine {
+  max-width: 760px;
+  border-color: rgba(255, 255, 255, 0.085);
+}
+
+.todayRadarLineLabel {
+  color: #8290a4;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.todayRadarLineText {
+  color: #4e5d72;
+  font-size: 0.8rem;
+  line-height: 1.58;
+}
+
+.todayRadarCard[data-rank="0"] .todayRadarLineLabel {
+  color: rgba(230, 238, 249, 0.4);
+}
+
+.todayRadarCard[data-rank="0"] .todayRadarLineText {
+  color: rgba(238, 245, 255, 0.74);
+  font-size: 0.86rem;
+}
+
+.todayRadarFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(21, 32, 51, 0.075);
+}
+
+.todayRadarCard[data-rank="0"] .todayRadarFooter {
+  grid-column: 1;
+  border-color: rgba(255, 255, 255, 0.085);
+}
+
+.todayRadarEvidence {
+  color: #78869a;
+  font-size: 0.68rem;
+}
+
+.todayRadarCard[data-rank="0"] .todayRadarEvidence {
+  color: rgba(230, 238, 249, 0.46);
+}
+
+.todayRadarOpen {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #348778;
+  font-size: 0.72rem;
+  font-weight: 780;
+}
+
+.todayRadarOpen::after {
+  content: "↗";
+  transition: transform 180ms ease;
+}
+
+.todayRadarCard:hover .todayRadarOpen::after {
+  transform: translate(2px, -2px);
+}
+
+.todayRadarCard[data-rank="0"] .todayRadarOpen {
+  color: #75d9ca;
+}
+
+@keyframes radar-sweep {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 1080px) {
+  .accountOverviewMain {
+    grid-template-columns: 1fr;
+  }
+
+  .radarStage {
+    position: absolute;
+    right: -5%;
+    top: 2%;
+    width: 44%;
+    min-height: 300px;
+    opacity: 0.55;
+    pointer-events: none;
+  }
+
+  .accountOverviewLead {
+    position: relative;
+    z-index: 1;
+    max-width: 74%;
+  }
+
+  .todayRadarCard[data-rank="0"] {
+    grid-template-columns: minmax(0, 1fr) 150px;
+  }
+}
+
+@media (max-width: 760px) {
+  .accountOverview {
+    min-height: 0;
+    border-radius: 22px;
+  }
+
+  .accountOverviewLead {
+    max-width: none;
+    padding: 32px 22px 36px;
+  }
+
+  .accountTitle {
+    font-size: clamp(2.5rem, 13vw, 4.2rem);
+  }
+
+  .radarStage {
+    right: -26%;
+    top: 10%;
+    width: 76%;
+    opacity: 0.28;
+  }
+
+  .accountStatusGrid,
+  .todayRadarList {
+    grid-template-columns: 1fr;
+  }
+
+  .accountStatusCard {
+    min-height: 112px;
+    border-right: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .accountStatusCard:last-child {
+    border-bottom: 0;
+  }
+
+  .todayRadarSection {
+    padding: 24px 18px;
+    border-radius: 22px;
+  }
+
+  .todayRadarHeader {
+    display: grid;
+  }
+
+  .todayRadarReviewPill {
+    width: fit-content;
+  }
+
+  .todayRadarCard,
+  .todayRadarCard[data-rank="0"] {
+    grid-column: auto;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    min-height: 0;
+    padding: 22px 18px;
+  }
+
+  .todayRadarCard[data-rank="0"] .todayRadarScorePanel {
+    grid-column: auto;
+    grid-row: auto;
+    justify-items: start;
+  }
+
+  .todayRadarScoreValue {
+    width: 86px;
+    height: 86px;
+  }
+
+  .todayRadarScoreValue strong {
+    font-size: 1.85rem;
+  }
+
+  .todayRadarLine {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+
+  .todayRadarFooter,
+  .todayRadarCard[data-rank="0"] .todayRadarFooter {
+    grid-column: auto;
+    align-items: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .radarSweep {
+    animation: none;
+  }
+
+  .workspaceCta,
+  .accountPrimaryAction,
+  .accountSecondaryAction,
+  .statusAction,
+  .todayRadarCard,
+  .todayRadarOpen::after,
+  .todayRadarReviewPill {
+    transition: none;
+  }
+}

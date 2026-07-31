@@ -11,7 +11,7 @@ import {
   UrgencyCueChip,
 } from "../ui/internal-page";
 import { SearchIcon } from "../ui/icons";
-import styles from "./dashboard-workspace.module.css";
+import styles from "./dashboard-v2.module.css";
 
 interface DashboardTodayRadarProps {
   /** Top candidates worth contacting now, ranked by score. */
@@ -30,9 +30,15 @@ export default function DashboardTodayRadar({
   return (
     <section className={styles.todayRadarSection} aria-labelledby="today-radar-heading">
       <div className={styles.todayRadarHeader}>
-        <h2 id="today-radar-heading" className={styles.analyticsHeading}>
-          Возможности на сегодня
-        </h2>
+        <div className={styles.todayRadarHeadingGroup}>
+          <span className={styles.sectionEyebrow}>Opportunity feed</span>
+          <h2 id="today-radar-heading" className={styles.analyticsHeading}>
+            Что разобрать сегодня
+          </h2>
+          <p className={styles.todayRadarIntro}>
+            Приоритет задаёт не размер компании, а сочетание свежести сигнала, силы доказательств и совпадения с Agency DNA.
+          </p>
+        </div>
         <Link href="/review" className={styles.todayRadarReviewPill} data-pending={pendingReview > 0}>
           На проверке: {pendingReview}
         </Link>
@@ -65,36 +71,58 @@ export default function DashboardTodayRadar({
                 data-rank={index}
               >
                 <div className={styles.todayRadarCardTop}>
+                  <span className={styles.todayRadarRank}>0{index + 1}</span>
                   <span className={styles.todayRadarOrg}>{lead.orgName}</span>
-                  <ScoreBandChip score={lead.score} />
+                  {index > 0 ? <ScoreBandChip score={lead.score} /> : null}
                   <ForeignEmployerBadge isForeign={lead.isForeignEmployer} />
                 </div>
 
-                <div className={styles.todayRadarScore}>
-                  <ScoreBar score={lead.score} />
-                </div>
-
-                <div className={styles.todayRadarFreshness}>
-                  <UrgencyCueChip level={urgency.level} label={urgency.label} />
-                  {lead.latestPublishedAt ? (
-                    <SignalFreshnessChip latestPublishedAt={lead.latestPublishedAt} />
-                  ) : null}
-                </div>
-
-                {lead.whyNow ? (
-                  <div className={styles.todayRadarLine}>
-                    <span className={styles.todayRadarLineLabel}>Почему сейчас</span>
-                    <span className={styles.todayRadarLineText}>{lead.whyNow}</span>
+                {index === 0 ? (
+                  <div className={styles.todayRadarScorePanel}>
+                    <div className={styles.todayRadarScoreValue}>
+                      <strong>{Math.round(lead.score)}</strong>
+                      <span>opportunity score</span>
+                    </div>
+                    <ScoreBandChip score={lead.score} />
                   </div>
                 ) : null}
 
-                <div className={styles.todayRadarLine}>
-                  <span className={styles.todayRadarLineLabel}>Роли</span>
-                  <span className={styles.todayRadarLineText}>
-                    {shownRoles.length > 0
-                      ? `${shownRoles.join(" · ")}${moreRoles > 0 ? ` + ещё ${moreRoles}` : ""}`
-                      : "роли не определены"}
+                <div className={styles.todayRadarBody}>
+                  {index > 0 ? (
+                    <div className={styles.todayRadarScore}>
+                      <ScoreBar score={lead.score} />
+                    </div>
+                  ) : null}
+
+                  <div className={styles.todayRadarFreshness}>
+                    <UrgencyCueChip level={urgency.level} label={urgency.label} />
+                    {lead.latestPublishedAt ? (
+                      <SignalFreshnessChip latestPublishedAt={lead.latestPublishedAt} />
+                    ) : null}
+                  </div>
+
+                  {lead.whyNow ? (
+                    <div className={styles.todayRadarLine}>
+                      <span className={styles.todayRadarLineLabel}>Почему сейчас</span>
+                      <span className={styles.todayRadarLineText}>{lead.whyNow}</span>
+                    </div>
+                  ) : null}
+
+                  <div className={styles.todayRadarLine}>
+                    <span className={styles.todayRadarLineLabel}>Роли</span>
+                    <span className={styles.todayRadarLineText}>
+                      {shownRoles.length > 0
+                        ? `${shownRoles.join(" · ")}${moreRoles > 0 ? ` + ещё ${moreRoles}` : ""}`
+                        : "роли не определены"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className={styles.todayRadarFooter}>
+                  <span className={styles.todayRadarEvidence}>
+                    {lead.evidenceTitles.length} фактов · {lead.vacanciesCount} вакансий в эпизоде
                   </span>
+                  <span className={styles.todayRadarOpen}>Открыть opportunity brief</span>
                 </div>
               </Link>
             );
