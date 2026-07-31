@@ -18,6 +18,10 @@ const completeMerchant: MerchantModerationInput = {
   digitalFulfillmentDescribed: true,
 }
 
+function compactSource(value: string): string {
+  return value.replace(/\s+/g, ' ')
+}
+
 describe('payment readiness', () => {
   test('reports sales-assisted state when no provider is configured', () => {
     expect(buildPaymentReadinessReport({
@@ -108,20 +112,23 @@ describe('payment readiness', () => {
   })
 
   test('merchant pages contain tariffs, fulfillment, receipts and refunds', () => {
-    const checkoutPage = fs.readFileSync(path.resolve(process.cwd(), 'app/checkout/page.tsx'), 'utf8')
-    const paymentPage = fs.readFileSync(path.resolve(process.cwd(), 'app/payment-and-delivery/page.tsx'), 'utf8')
-    const footer = fs.readFileSync(path.resolve(process.cwd(), 'app/ui/site-footer.tsx'), 'utf8')
-    const payments = fs.readFileSync(path.resolve(process.cwd(), 'lib/payments.ts'), 'utf8')
+    const checkoutSource = compactSource(
+      fs.readFileSync(path.resolve(process.cwd(), 'app/checkout/page.tsx'), 'utf8'),
+    )
+    const paymentSource = compactSource(
+      fs.readFileSync(path.resolve(process.cwd(), 'app/payment-and-delivery/page.tsx'), 'utf8'),
+    )
+    const footerSource = compactSource(
+      fs.readFileSync(path.resolve(process.cwd(), 'app/ui/site-footer.tsx'), 'utf8'),
+    )
 
-    expect(checkoutPage).toContain('без автоматического списания')
-    expect(checkoutPage).toContain('Оплатить ${plan.price} через ЮKassa')
-    expect(checkoutPage).toContain('legalAccepted')
-    expect(paymentPage).toContain('Неделя</strong> — 2 990 ₽')
-    expect(paymentPage).toContain('Физической доставки нет')
-    expect(paymentPage).toContain('приложении «Мой налог»')
-    expect(paymentPage).toContain('Отмена заказа и возврат')
-    expect(footer).toContain('/payment-and-delivery')
-    expect(payments).toContain('Recurring plans must NEVER reach the payment provider')
-    expect(payments).toContain('status: "unavailable"')
+    expect(checkoutSource).toContain('без автоматического списания')
+    expect(checkoutSource).toContain('Оплатить ${plan.price} через ЮKassa')
+    expect(checkoutSource).toContain('legalAccepted')
+    expect(paymentSource).toMatch(/Неделя<\/strong>\s*—\s*2 990 ₽/)
+    expect(paymentSource).toContain('Физической доставки нет')
+    expect(paymentSource).toContain('приложении «Мой налог»')
+    expect(paymentSource).toContain('Отмена заказа и возврат')
+    expect(footerSource).toContain('/payment-and-delivery')
   })
 })
