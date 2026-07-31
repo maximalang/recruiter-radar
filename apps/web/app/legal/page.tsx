@@ -43,15 +43,32 @@ export default function LegalPage() {
             <SummaryRow label="Статус" value={SELF_EMPLOYED.status} />
             <SummaryRow label="Сервис" value={SELF_EMPLOYED.service} />
             <SummaryRow
-              label="Контакт"
+              label="E-mail"
               value={
                 <a href={`mailto:${SELF_EMPLOYED.email}`} style={{ color: "inherit" }}>
                   {SELF_EMPLOYED.email}
                 </a>
               }
             />
+            {SELF_EMPLOYED.phone ? (
+              <SummaryRow
+                label="Телефон"
+                value={<a href={`tel:${SELF_EMPLOYED.phone.replace(/[^+\d]/g, "")}`} style={{ color: "inherit" }}>{SELF_EMPLOYED.phone}</a>}
+              />
+            ) : null}
+            {SELF_EMPLOYED.postalAddress ? (
+              <SummaryRow label="Почтовый адрес" value={SELF_EMPLOYED.postalAddress} />
+            ) : null}
           </div>
         </SurfaceCard>
+
+        {SELF_EMPLOYED.phone && SELF_EMPLOYED.postalAddress ? null : (
+          <NoticeBox
+            tone="warning"
+            title="Контактные реквизиты готовятся к публикации"
+            description="До включения приёма платежей оператор дополнит страницу публичным телефоном поддержки и почтовым адресом. Оплата останется выключенной, пока эти данные не настроены."
+          />
+        )}
 
         <NoticeBox
           tone="info"
