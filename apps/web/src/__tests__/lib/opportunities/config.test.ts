@@ -3,12 +3,17 @@ import {
   clampOpportunityPageSize,
   clampOpportunitySnoozeDays,
   isOpportunityEngineV1Enabled,
+  isOpportunityEngineV1EnabledForContext,
   isOpportunityEngineV1EnabledForOwner,
   isOpportunityOutcomesEnabled,
+  isOpportunityOutcomesEnabledForContext,
   isOpportunityOutcomesEnabledForOwner,
   isOpportunityOutcomesExternalIngestEnabled,
   isOpportunityOutcomesUiEnabled,
+  isOpportunityOutcomesUiEnabledForContext,
   isOpportunityOutcomesUiEnabledForOwner,
+  isOpportunityWorkspaceContextEnabled,
+  isOpportunityWorkspaceContextEnabledForContext,
 } from '@/lib/opportunities/config'
 
 describe('opportunity engine config', () => {
@@ -93,6 +98,69 @@ describe('opportunity engine config', () => {
       OPPORTUNITY_ENGINE_V1_ENABLED: 'true',
       OPPORTUNITY_OUTCOMES_ENABLED: 'true',
       OPPORTUNITY_OUTCOMES_UI_ENABLED: 'true',
+    })).toBe(true)
+  })
+
+  it('enables a workspace canary only for one exact workspace identity', () => {
+    const context = { dataOwnerId: '7', workspaceId: '9' }
+    const canary = {
+      OPPORTUNITY_CANARY_WORKSPACE_IDS: '9',
+    }
+
+    expect(isOpportunityEngineV1EnabledForContext(context, canary)).toBe(true)
+    expect(isOpportunityOutcomesEnabledForContext(context, canary)).toBe(true)
+    expect(isOpportunityOutcomesUiEnabledForContext(context, canary)).toBe(true)
+    expect(
+      isOpportunityWorkspaceContextEnabledForContext(context, canary),
+    ).toBe(true)
+
+    expect(isOpportunityEngineV1EnabledForContext(
+      { dataOwnerId: '7', workspaceId: '90' },
+      canary,
+    )).toBe(false)
+    expect(isOpportunityEngineV1EnabledForContext(
+      { dataOwnerId: '9', workspaceId: null },
+      canary,
+    )).toBe(false)
+  })
+
+  it('fails closed for malformed or ambiguous workspace canary configuration', () => {
+    const context = { dataOwnerId: '7', workspaceId: '9' }
+
+    for (const invalid of [
+      '9,10',
+      '9,9',
+      '9,invalid',
+      '9,',
+      ',9',
+      '*',
+      '09',
+    ]) {
+      expect(isOpportunityEngineV1EnabledForContext(context, {
+        OPPORTUNITY_CANARY_WORKSPACE_IDS: invalid,
+      })).toBe(false)
+    }
+
+    expect(isOpportunityEngineV1EnabledForContext(context, {
+      OPPORTUNITY_CANARY_OWNER_IDS: '7',
+      OPPORTUNITY_CANARY_WORKSPACE_IDS: '9',
+    })).toBe(false)
+  })
+
+  it('keeps workspace context fail-closed outside an explicit flag or canary', () => {
+    const context = { dataOwnerId: '7', workspaceId: '9' }
+
+    expect(isOpportunityWorkspaceContextEnabled({})).toBe(false)
+    expect(isOpportunityWorkspaceContextEnabled({
+      OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED: ' TRUE ',
+    })).toBe(false)
+    expect(isOpportunityWorkspaceContextEnabled({
+      OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED: 'true',
+    })).toBe(true)
+    expect(isOpportunityWorkspaceContextEnabledForContext(context, {}))
+      .toBe(false)
+    expect(isOpportunityWorkspaceContextEnabledForContext(context, {
+      OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED: 'true',
     })).toBe(true)
   })
 })
