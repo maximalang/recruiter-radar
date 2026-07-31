@@ -23,9 +23,9 @@ describe('payment readiness', () => {
     })
   })
 
-  test('marks only the pilot as self-service when Stripe is fully configured', () => {
+  test('marks only the pilot as self-service when YooKassa is fully configured', () => {
     expect(buildPaymentReadinessReport({
-      provider: 'stripe',
+      provider: 'yookassa',
       configured: true,
       mode: 'live',
       webhookConfigured: true,
@@ -38,7 +38,20 @@ describe('payment readiness', () => {
         monthly: 'sales_request',
         quarterly: 'sales_request',
       },
-      rfProvider: { status: 'blocked' },
+      rfProvider: { status: 'ready', provider: 'yookassa', blockers: [] },
+    })
+  })
+
+  test('does not treat Stripe as a Russia-ready provider', () => {
+    expect(buildPaymentReadinessReport({
+      provider: 'stripe',
+      configured: true,
+      mode: 'live',
+      webhookConfigured: true,
+      siteUrlConfigured: true,
+    })).toMatchObject({
+      selfServePilotReady: false,
+      rfProvider: { status: 'blocked', provider: null },
     })
   })
 
@@ -48,6 +61,7 @@ describe('payment readiness', () => {
 
     expect(checkoutPage).toContain('без автоматического списания')
     expect(checkoutPage).toContain('Оставить заявку')
+    expect(checkoutPage).toContain('legalAccepted')
     expect(payments).toContain('Recurring plans must NEVER reach the payment provider')
     expect(payments).toContain('status: "unavailable"')
   })
