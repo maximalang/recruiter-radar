@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { usePathname } from "next/navigation";
 
 const SCENES = [
@@ -74,7 +74,7 @@ export function CinematicLandingShell() {
         "--rr-scroll-progress": progress,
         "--rr-pointer-x": `${pointer.x}%`,
         "--rr-pointer-y": `${pointer.y}%`,
-      } as React.CSSProperties}
+      } as CSSProperties}
       aria-hidden="true"
     >
       <div className="rr-cinematic-noise" />
