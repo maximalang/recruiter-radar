@@ -1,0 +1,562 @@
+# Opportunity Intelligence v2: current-state contract
+
+Статус: Phase 0, архитектурный контракт
+Дата среза: 2026-07-31
+Базовый commit: `48247cc4d6cfa8b8dc1bbf1ff69a992cd9b39e7f`
+
+Этот документ описывает только поведение, которое существует в коде на
+указанном commit, и границы последующих фаз. Он не является заявлением о
+готовности будущих функций.
+
+## Архитектурные решения
+
+Следующие границы обязательны для Opportunity Intelligence v2:
+
+```text
+Outcome Ledger:
+authoritative commercial event history
+
+Outcome State:
+rebuildable projection
+
+client_profiles:
+base of Agency DNA
+
+Auth v2 workspace:
+logical tenant and authorization boundary
+
+owner_id:
+temporary compatibility data partition key
+
+actor_user_id:
+actual user who performed the action
+```
+
+Следствия:
+
+- новый коммерческий ledger, параллельная воронка или отдельная модель lead
+  feedback не создаются;
+- `opportunity_outcome_events` не обновляется и не удаляется;
+- `opportunity_outcome_state` может быть полностью перестроен из ledger;
+- `opportunities.status`, `client_episode_state` и `opportunity_actions`
+  сохраняются только как compatibility paths до контролируемого удаления;
+- `workspace_id` должен стать tenant key для авторизации, но не заменяет
+  реального `actor_user_id`;
+- историческая атрибуция не восстанавливается догадками.
+
+## Current-state map
+
+### Evidence и Hiring Episode
+
+| Authority | Current source | Назначение |
+| --- | --- | --- |
+| Публичные hiring facts | `signals`, `evidence_items`, source adapters | Нормализованные сигналы и supporting evidence |
+| Каноническая вакансия | `apps/web/lib/opportunities/hiring-episode-detection.ts` | Дедупликация публикаций перед episode detection |
+| Hiring Episode | `hiring_episodes`, `hiring_episode_evidence` | Детерминированная группировка evidence по компании и эпизоду |
+| Detection checkpoint | `hiring_episode_detection_state` | Идемпотентный progress и retry state |
+
+`hiring_episodes` не tenant-scoped: это company/evidence layer. Tenant-specific
+решение начинается на `client_profiles`, `digest_candidates`,
+`client_episode_state` и `opportunities`.
+
+### Agency profile, FIUR и Opportunity
+
+`client_profiles` — текущая база профиля агентства. В ней уже существуют:
+
+- agency name;
+- specialization;
+- roles;
+- industries;
+- target city и excluded locations;
+- company sizes;
+- include/exclude keywords и excluded industries;
+- remote-friendly;
+- hiring mode;
+- FIUR thresholds;
+- contact policy;
+- delivery preferences.
+
+`apps/web/lib/clientProfiles.ts` преобразует persisted profile в
+`AgencyProfile`. `apps/web/lib/scoring/fiur.ts` остаётся объяснимым feature
+layer. Он учитывает fit, intent, urgency и reachability, но не является
+вероятностью сделки.
+
+`apps/web/lib/opportunities/opportunity-scoring.ts` формирует компоненты
+`agencyFit`, `hiringIntent`, `externalSupportNeed`, `timing`, `reachability` и
+`confidence`. Текущая версия — `opportunity-v1`. Hard gates сохраняют
+profile exclusions, minimum fit, minimum external-support need и confidence
+review.
+
+`apps/web/lib/opportunities/opportunity-brief-builder.ts` строит
+детерминированный brief без LLM. Он использует episode facts и ограниченный
+agency context. В opportunity сохраняются:
+
+- score components и `confidence_gate`;
+- `scoring_version`, `fiur_version`, `brief_builder_version`;
+- `episode_evidence_hash`, `profile_snapshot_hash`,
+  `scoring_config_hash`, `input_hash`;
+- детерминированные title, why-now, hypothesis, angle, persona и action;
+- safe limitations и evidence timeline через API projection.
+
+`profile_snapshot_hash` фиксирует hash выбранных profile dimensions, но
+immutable snapshot самого профиля и монотонная Agency DNA version сейчас не
+хранятся.
+
+### Opportunity identity и supersession
+
+Tenant-specific opportunity сохраняется в `opportunities` и имеет
+`owner_id`, `client_profile_id`, `organization_id`, `hiring_episode_id` и
+nullable `workspace_id`.
+
+Current opportunity определяется комбинацией profile + episode и
+`superseded_at IS NULL`. Смена scoring version supersede-ит прежнюю строку;
+исторические строки и их audit history не должны удаляться.
+
+### Outcome Ledger
+
+`opportunity_outcome_events` — единственная authoritative история
+коммерческих событий. Граница контекста события:
+
+```text
+owner_id
++ client_profile_id
++ opportunity_id
++ hiring_episode_id
++ organization_id
+```
+
+Composite foreign key не позволяет смешивать сущности разных owner contexts.
+Таблица append-only: UPDATE и DELETE отклоняются trigger-ом. Идемпотентность
+использует tenant-scoped key и canonical payload hash.
+
+Raw contact reference не сохраняется. Writer перед записью создаёт
+tenant-scoped hash и безопасный label. Публичный API не возвращает внутренний
+hash.
+
+`opportunity_outcome_state` — синхронная rebuildable projection. Её
+authoritative поля:
+
+```text
+commercial_stage
+workflow_state
+snoozed_until
+meeting_status
+```
+
+`current_stage` остаётся compatibility alias для `commercial_stage`.
+Projection также хранит first/last timestamps, correction pointers, meeting
+lifecycle, terminal reasons и confirmed won value.
+
+`packages/db/scripts/rebuild-opportunity-outcomes.mjs` работает owner-scoped,
+по умолчанию в dry-run и требует `--apply` для изменения projection.
+`packages/db/scripts/preflight-opportunity-outcomes.mjs` выполняет read-only
+проверку ledger/projection invariants.
+
+## Tenant и actor identifiers
+
+| Identifier | Current meaning | Authority | Ограничение |
+| --- | --- | --- | --- |
+| `workspace_id` | Логический tenant Auth v2 и active workspace сессии | `workspaces`, `workspace_members`, `auth_sessions.workspace_id` | Nullable на compatibility product rows; отсутствует в outcome events/state |
+| `dataOwnerId` | Runtime compatibility partition owner | `CustomerAuthorization` | Для `auth_v2` равен `workspace.bootstrap_user_id`; для compat/legacy равен session/legacy user |
+| `owner_id` | Persisted compatibility partition key | Product tables и текущие Opportunity queries | Не является фактическим actor team action |
+| `user_id` | Реальный account/session user и workspace member | `users`, `auth_sessions`, `workspace_members` | Opportunity routes сейчас не передают его writer-у |
+| `actor_user_id` | Идентификатор пользователя, записавшего outcome | `opportunity_outcome_events` | Current user writer требует равенство `owner_id`, поэтому team actor теряется |
+
+### Auth modes
+
+`apps/web/lib/auth-v2/authorization.ts` возвращает:
+
+```ts
+type CustomerAuthorization = {
+  mode: 'auth_v2' | 'auth_v2_compat' | 'legacy'
+  userId: string
+  dataOwnerId: string
+  workspaceId: string | null
+  role: WorkspaceRole | null
+  session: AuthSession | null
+}
+```
+
+- `auth_v2`: проверяет active membership, active workspace и запрошенные
+  workspace permissions; `dataOwnerId` берётся из `bootstrapUserId`;
+- `auth_v2_compat`: использует v2 session user как data owner, role не
+  определяется;
+- `legacy`: использует legacy owner session, workspace отсутствует.
+
+Current Opportunity routes вызывают `getAuthorizedOwnerId(permission)`.
+Функция возвращает только `dataOwnerId`, поэтому после проверки теряются
+`userId`, `workspaceId`, `role` и полный permission context.
+
+### Current role policy
+
+| Role | Opportunity read | Opportunity write |
+| --- | --- | --- |
+| owner | да | да |
+| admin | да | да |
+| recruiter | да | да |
+| viewer | да | нет |
+| billing | нет | нет |
+
+Permission checks являются workspace-aware только в `auth_v2`. Compat и legacy
+остаются временными owner-mode paths.
+
+### Current DB workspace guard
+
+Auth workspace migrations добавили nullable `workspace_id` в
+`client_profiles`, `opportunities` и другие product tables. Composite foreign
+keys и triggers связывают его с `(workspace_id, owner_id)` membership и
+profile context. Application Opportunity queries всё ещё фильтруют по
+`owner_id`; `workspace_id` не передаётся в repository contracts.
+
+Outcome events и projection пока не имеют `workspace_id`. Их tenant isolation
+транзитивно зависит от `owner_id` и composite opportunity context.
+
+## Current state machine
+
+### Commercial stage
+
+Основная последовательность:
+
+```text
+new | review
+→ accepted
+→ contacted
+→ replied
+→ meeting
+→ proposal
+→ won | lost
+```
+
+Допустимые terminal/negative переходы:
+
+```text
+new | review → dismissed
+accepted → dismissed
+contacted | replied | meeting | proposal → lost
+```
+
+Meeting lifecycle:
+
+```text
+replied
+→ meeting(scheduled)
+→ meeting_completed
+→ proposal
+```
+
+После `meeting_cancelled` или `meeting_no_show` commercial stage остаётся
+`meeting`; новая `meeting(scheduled)` разрешена. `proposal` разрешён только
+после completed meeting.
+
+### Workflow state
+
+`snoozed` и `resumed` не меняют commercial stage:
+
+```text
+active → snoozed → active
+```
+
+Во время snooze commercial transitions и correction запрещены; observational
+events остаются допустимыми. Системный resume выполняется jobs после deadline.
+
+### Observations и corrections
+
+`shown`, `opened`, `exported` не меняют commercial stage. `reverted` добавляет
+новое событие и перестраивает projection; исходное событие остаётся в ledger.
+Correction capability вычисляется сервером по полной effective history, а не
+по загруженной странице UI.
+
+## Queue semantics
+
+При наличии projection очереди используют:
+
+| View | Current filter |
+| --- | --- |
+| Morning | `workflow_state=active`, `commercial_stage IN (new, review)` и существующие evidence/score gates |
+| Accepted | `workflow_state=active`, `commercial_stage=accepted` |
+| Pipeline | `workflow_state=active`, `commercial_stage IN (contacted, replied, meeting, proposal)` |
+| Snoozed | `workflow_state=snoozed` |
+| Completed | `commercial_stage IN (won, lost, dismissed)` |
+
+Только при отсутствии projection используется legacy fallback из
+`opportunities.status`.
+
+## Feature flags
+
+Все существующие Opportunity flags fail-closed:
+
+| Flag | Current behavior |
+| --- | --- |
+| `OPPORTUNITY_ENGINE_V1_ENABLED` | Включает engine/API/jobs только при точном `true` |
+| `OPPORTUNITY_OUTCOMES_ENABLED` | Включает ledger API только при точном `true` |
+| `OPPORTUNITY_OUTCOMES_UI_ENABLED` | Включает Outcome UI только вместе с ledger и при точном `true` |
+| `OPPORTUNITY_CANARY_OWNER_IDS` | Временный allowlist ровно одного положительного owner ID |
+| `OPPORTUNITY_OUTCOMES_EXTERNAL_INGEST_ENABLED` | Не может включить endpoint: runtime helper всегда возвращает `false` |
+| `OPPORTUNITY_OUTCOME_CONTACT_HASH_SECRET` | Server-only secret для tenant-scoped contact hashing |
+
+Owner canary включает engine, ledger и UI для одного owner, но не включает
+external ingest.
+
+Связанные Auth v2 flags:
+
+- `AUTH_PLATFORM_V2_ENABLED`;
+- `AUTH_WORKSPACES_V2_ENABLED`;
+- `AUTH_ONBOARDING_V2_ENABLED`;
+- `AUTH_V2_CANARY_USER_IDS`;
+- `AUTH_LEGACY_SESSION_MIGRATION_ENABLED` и deadline;
+- `AUTH_V2_SESSION_ROLLBACK_COMPAT_ENABLED` и deadline.
+
+Новые phase flags из v2 objective пока отсутствуют в коде и не считаются
+готовыми:
+
+```text
+OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED
+AGENCY_DNA_V1_ENABLED
+OPPORTUNITY_SCORING_V2_ENABLED
+OPPORTUNITY_STRATEGIST_V1_ENABLED
+OPPORTUNITY_TEAM_WORKFLOW_ENABLED
+OPPORTUNITY_CRM_BRIDGE_ENABLED
+```
+
+## API и writers
+
+### Read paths
+
+| Surface | Permission | Current tenant input |
+| --- | --- | --- |
+| `GET /api/opportunities` | `opportunities:read` | `dataOwnerId` |
+| `GET /api/opportunities/:id` | `opportunities:read` | `dataOwnerId` |
+| `GET /api/opportunities/:id/outcomes` | `opportunities:read` | `dataOwnerId` |
+| `GET /api/opportunities/outcomes/summary` | `opportunities:read` | `dataOwnerId` |
+| `/opportunities` page | `opportunities:read` | `dataOwnerId` |
+
+### Command paths
+
+| Writer | Current behavior | Authoritative status |
+| --- | --- | --- |
+| `POST /api/opportunities/:id/action` | Валидирует legacy action, пишет `opportunity_actions`; при enabled ledger вызывает outcome writer в той же transaction, иначе напрямую обновляет legacy state | Compatibility writer с собственной state machine |
+| `POST /api/opportunities/:id/outcomes` | Вызывает `recordOpportunityOutcome`; записывает event, projection и compatibility projection | Intended authoritative writer, но получает неполный auth context |
+| Schedules в `jobs.ts` | Пишут system `resumed` через transaction outcome writer | Internal writer |
+| `POST /api/opportunities/outcomes/external` | Код содержит signed legacy design, но endpoint всегда возвращает 404 | Disabled, не tenant-authenticated |
+
+Current UI также разделён:
+
+- legacy `OpportunityActions` отправляет все действия в `/action`;
+- Outcome panel отправляет `accepted`, `dismissed`, `contacted` в `/action`;
+- остальные actions, `shown` и `opened` отправляются в `/outcomes`.
+
+Следовательно, `/outcomes` сейчас не является единственным command endpoint.
+
+## Immutable analytics snapshot
+
+Current event snapshot содержит:
+
+```text
+scoringVersion
+episodeType
+confidenceGate
+scoreBucket
+externalSupportNeedBucket
+sourceFamilies
+```
+
+Current funnel действительно фильтрует по:
+
+- episode type;
+- confidence gate;
+- score bucket;
+- external support need bucket;
+- source family.
+
+Следующие required dimensions отсутствуют в immutable event snapshot и потому
+не могут корректно фильтровать исторические cohorts:
+
+```text
+clientProfileId
+clientProfileVersion
+agencyDnaVersion
+hiringMode
+specialization
+matchedRoleFamilies
+matchedIndustries
+matchedRegions
+organizationSizeBucket
+```
+
+До их появления analytics не должна читать mutable current
+`client_profiles` для старых cohorts.
+
+## Known contract drift
+
+1. **Actor attribution.** Auth v2 знает реального `userId`, но user-facing
+   outcome writer получает `dataOwnerId` и сохраняет его как `actor_user_id`.
+   Team member action поэтому выглядит как действие bootstrap owner.
+2. **Workspace audit.** Ledger не хранит `actor_workspace_id` и
+   `actor_role_snapshot`; historical role/workspace attribution отсутствует.
+3. **Repository tenant contract.** Product rows имеют `workspace_id`, но
+   Opportunity repository interfaces и queries используют только `owner_id`.
+4. **Dual writers.** `/action` имеет собственную transition/idempotency logic и
+   отдельную запись `opportunity_actions`; `/outcomes` — параллельный command
+   path.
+5. **UI split.** Даже при enabled Outcome UI часть actions продолжает идти в
+   `/action`.
+6. **User actor invariant.** Outcome repository запрещает
+   `actor_user_id != owner_id`, что несовместимо с recruiter/admin action.
+7. **Canary identity.** Opportunity canary owner-scoped и не умеет
+   workspace-scoped allowlist.
+8. **Agency DNA versioning.** `client_profiles` не имеет
+   `agency_dna_version` и `agency_dna_snapshot_hash`; opportunity хранит hash,
+   но не immutable DNA snapshot.
+9. **Cohort dimensions.** Event snapshot и funnel filters поддерживают только
+   текущий сокращённый набор.
+10. **External ingest.** Существующая global-secret схема не является
+    workspace credential model и поэтому принудительно выключена.
+11. **Auth compatibility.** `auth_v2_compat` и `legacy` не имеют role/
+    permission snapshot; они допустимы только на ограниченный rollout period.
+12. **Historical actor deletion.** `actor_user_id` использует
+    `ON DELETE SET NULL`; membership removal не удаляет event, но current public
+    history не показывает actor user identity.
+
+## Legacy compatibility paths и removal plan
+
+| Path | Почему существует | Условие удаления |
+| --- | --- | --- |
+| `owner_id` как tenant selector | Большинство product tables и jobs построены вокруг owner partition | Все Opportunity reads/writes проверяют workspace и DB invariants доказаны canary |
+| `auth_v2_compat` | Переход с legacy session на workspace tenancy | Закрыто migration/rollback window и нет compat sessions |
+| legacy owner session | Rollback/migration safety | Auth v2 rollout завершён, legacy exchange отключён и telemetry равна нулю |
+| `opportunities.status` | Compatibility UI/jobs и fallback без projection | Все supported opportunities имеют rebuildable projection; fallback telemetry равна нулю |
+| `client_episode_state` | Episode suppression и legacy lifecycle | Outcome projection/workflow полностью покрывает suppression и rebuild |
+| `opportunity_actions` | Legacy action audit/idempotency | `/action` стал thin adapter, UI usage равно нулю, retention/ledger parity подтверждены |
+| `POST .../:id/action` | Старый client contract | Все UI/clients используют `/outcomes`, deprecation telemetry равно нулю |
+| owner-only canary | Существующий безопасный rollout boundary | Workspace canary fail-closed и проверен на одном tenant |
+| global external ingest route | Ранее подготовленный webhook contract | Не включать; заменить tenant integration credentials в Phase 8 |
+
+Удаление выполняется отдельными additive/deprecation фазами. Immutable
+migrations и audit rows не переписываются и не удаляются.
+
+## Phased rollout
+
+### Phase 0 — current-state contract
+
+- только этот документ;
+- без runtime, schema и flag changes;
+- phase branch и PR в `codex/opportunity-intelligence-v2`.
+
+### Phase 1 — workspace и actor correctness
+
+- единый `OpportunityAuthorizationContext`;
+- additive actor workspace/role fields;
+- workspace-aware reads/writes и canary compatibility;
+- real PostgreSQL tenant/actor tests;
+- новый flag остаётся off.
+
+Gate: реальный session actor и active workspace записываются без ослабления
+legacy compatibility.
+
+### Phase 2 — единый Outcome Writer
+
+- `/outcomes` становится единственным authoritative command pipeline;
+- `/action` превращается в thin deprecated adapter;
+- UI переходит на `/outcomes`;
+- immutable cohort snapshot расширяется до документированного контракта.
+
+Gate: одинаковая transition, replay и conflict semantics для обоих endpoints.
+
+### Phase 3 — production canary evidence
+
+- read-only preflight;
+- workspace-scoped allowlist;
+- основной и correction/snooze/meeting сценарии;
+- rebuild apply, затем dry-run с `rebuildChanged=0`;
+- evidence document без PII/secrets.
+
+Gate: фактический canary либо явный external blocker. Health/preflight без
+реального owner opportunity не считаются canary.
+
+### Phase 4 — Agency DNA v1
+
+- additive extension существующего `client_profiles`;
+- отдельные tenant-scoped account restrictions;
+- immutable version и snapshot;
+- backward-compatible profile UX.
+
+### Phase 5 — Opportunity Intelligence Scoring v2
+
+- versioned gated component scoring;
+- reproducible inputs;
+- offline evaluation на anonymized outcomes;
+- без автоматического weight tuning.
+
+### Phase 6 — Evidence-bound Sales Strategist v1
+
+- deterministic, evidence-linked brief;
+- case matching только по structured DNA;
+- optional LLM допускается только как wording editor.
+
+### Phase 7 — daily commercial workflow
+
+- минимальные assignment/next-action поля;
+- append-only audit activity;
+- Today/Pipeline/Completed без хранения переписки.
+
+### Phase 8 — export и CRM bridge
+
+- export, signed outbound webhook, templates;
+- затем tenant-scoped inbound credentials;
+- global external ingest остаётся 404.
+
+### Phase 9 — outcome analytics
+
+- immutable cohort filters;
+- maturity/sample status и confirmed outcomes;
+- PII-free calibration export;
+- без revenue forecast до достаточных данных.
+
+### Phase 10 — product UX completion
+
+- action-first Opportunity surface;
+- Research Mode остаётся вторичным;
+- responsive, keyboard, screen-reader и explicit data/error states.
+
+Для каждой implementation phase порядок rollout:
+
+```text
+migration
+→ preflight
+→ dry-run
+→ tenant/workspace canary
+→ explicit enablement
+→ monitoring
+→ rollback
+```
+
+Глобальные flags не включаются автоматически.
+
+## Explicitly out of scope
+
+- универсальная база компаний или Контур-подобный продукт;
+- полноценная CRM;
+- массовый outreach и автоматические cold sequences;
+- хранение email-переписки;
+- покупка или scraping личных контактов;
+- raw personal contact data в ledger или logs;
+- LLM как источник фактов, gate или score;
+- heuristic score как вероятность сделки;
+- автоматическое изменение weights по малой выборке;
+- ослабление FIUR/confidence gates ради количества;
+- второй outcome ledger или параллельная funnel model;
+- изменение immutable migration files;
+- автоматическое включение production flags;
+- утверждение canary/production evidence без фактического запуска.
+
+## Phase 0 verification scope
+
+Phase 0 не меняет runtime, schema, API или UI. Для него обязательны:
+
+- review документа против указанных source files и migrations;
+- `git diff --check`;
+- staged secret scan;
+- repository documentation checks, если они определены.
+
+Полные runtime/DB/browser gates остаются обязательными для соответствующих
+implementation phases и не могут быть засчитаны результатом Phase 0.
