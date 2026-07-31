@@ -6,25 +6,14 @@ import s from "./site-footer.module.css";
 import { BrandLogo } from "./brand-logo";
 
 /**
- * Site-wide footer — a quiet, minimal closer for every page surface.
- *
- * Three lines, no more: brand + nav links; one operator-requisites line (ФИО,
- * ИНН and contacts); the copyright. The full status and service description
- * live on /legal. Public operator data is imported from one source of truth.
- *
- * The /admin link is operator-gated: it renders ONLY for a browser that
- * carries the signed `rr_op` operator session (see lib/operator-auth.ts).
- * The /admin page itself is auth-gated too, but the link must not advertise
- * the operator panel to ordinary users on the public landing/legal pages.
- * Server-side check (server component), so the link is absent from the HTML.
- *
- * `tone` lets a dark surface request the light-on-dark variant; internal +
- * legal pages use the default light tone.
+ * Site-wide footer with public merchant information and legal navigation.
+ * The /admin link is rendered only for a signed operator session.
  */
 export async function SiteFooter(props: { tone?: "light" | "dark" }) {
   const tone = props.tone ?? "light";
   const year = new Date().getFullYear();
   const isOperator = await readOperatorSession().catch(() => false);
+
   return (
     <footer className={s.siteFooter} data-tone={tone}>
       <div className={s.footerInner}>
@@ -42,6 +31,7 @@ export async function SiteFooter(props: { tone?: "light" | "dark" }) {
             <BrandLogo size="small" tone={tone} joined={false} />
           </Link>
           <nav className={s.footerLinks} aria-label="Подвал">
+            <Link href="/payment-and-delivery" className={s.footerLink}>Оплата и возврат</Link>
             <Link href="/legal" className={s.footerLink}>Реквизиты</Link>
             <Link href="/terms" className={s.footerLink}>Оферта</Link>
             <Link href="/privacy" className={s.footerLink}>Конфиденциальность</Link>
@@ -70,9 +60,7 @@ export async function SiteFooter(props: { tone?: "light" | "dark" }) {
           ) : null}
         </div>
 
-        <div className={s.footerCopy}>
-          © {year} Recruiter Radar
-        </div>
+        <div className={s.footerCopy}>© {year} Recruiter Radar</div>
       </div>
     </footer>
   );
