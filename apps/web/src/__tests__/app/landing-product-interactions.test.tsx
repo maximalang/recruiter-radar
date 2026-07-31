@@ -15,8 +15,8 @@ describe("landing product interactions", () => {
   it("selects how-it-works stages with pointer and keyboard", () => {
     render(<LandingHowItWorks />);
 
-    const profile = screen.getByRole("button", { name: /Настраиваем профиль/ });
-    const signal = screen.getByRole("button", { name: /Находим и проверяем сигнал/ });
+    const profile = screen.getByRole("button", { name: /Задаёте свою специализацию/ });
+    const signal = screen.getByRole("button", { name: /Проверяем изменения в найме/ });
     expect(profile).toHaveAttribute("aria-pressed", "true");
 
     fireEvent.mouseEnter(signal);
@@ -24,22 +24,23 @@ describe("landing product interactions", () => {
     expect(screen.getByTestId("how-it-works-flow")).toHaveAttribute("data-active-step", "2");
 
     fireEvent.keyDown(signal, { key: "ArrowRight" });
-    const delivery = screen.getByRole("button", { name: /Доставляем приоритет/ });
+    const delivery = screen.getByRole("button", { name: /Доставляем короткий список действий/ });
     expect(delivery).toHaveFocus();
     expect(delivery).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("highlights source roles while keeping excluded sources explicit", () => {
+  it("separates signal, verification and action without exposing internal source backlog", () => {
     render(<LandingSourceArchitecture />);
 
-    const origin = screen.getByRole("button", { name: /Создаёт сигнал/ });
-    const verification = screen.getByRole("button", { name: /Подтверждает/ });
+    const origin = screen.getByRole("button", { name: /Находим реальное изменение в найме/ });
+    const verification = screen.getByRole("button", { name: /Подтверждаем компанию и силу сигнала/ });
     expect(origin).toHaveAttribute("aria-pressed", "true");
 
     fireEvent.focus(verification);
     expect(verification).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByTestId("source-flow")).toHaveAttribute("data-active-layer", "2");
-    expect(screen.getAllByText(/исключены из production-выдачи/i)).toHaveLength(2);
+    expect(screen.getByText(/Слабые и противоречивые сигналы/)).toBeVisible();
+    expect(screen.queryByText(/production-выдачи/i)).not.toBeInTheDocument();
   });
 
   it("maps a radar signal to evidence, score confirmation and one FIUR meter", () => {
