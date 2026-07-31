@@ -11,8 +11,8 @@ import {
 } from "./icons";
 import { BrandLogo } from "./brand-logo";
 import type { NavItem } from "./internal-page";
-import refinements from "./product-workspace-refinements.module.css";
 import styles from "./product-workspace.module.css";
+import refinements from "./product-workspace-refinements.module.css";
 
 type WorkspaceIcon = (props: SVGProps<SVGSVGElement>) => ReactElement;
 
