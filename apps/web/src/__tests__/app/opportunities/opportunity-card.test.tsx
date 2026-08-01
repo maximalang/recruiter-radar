@@ -13,6 +13,7 @@ jest.mock('next/navigation', () => ({
 
 const OPPORTUNITY: OpportunityItem = {
   id: '10',
+  publicReference: '2bc92f8e-8930-4af1-b743-14c0c0df2650',
   ownerId: '7',
   clientProfileId: '8',
   organizationId: '9',
