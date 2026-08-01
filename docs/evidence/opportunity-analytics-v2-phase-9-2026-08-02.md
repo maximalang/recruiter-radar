@@ -16,7 +16,7 @@ canary acceptance.
 
 ## PostgreSQL evidence
 
-Disposable PostgreSQL ran all migrations, runtime suites and downgrade
+Disposable PostgreSQL ran all 78 migrations, runtime suites and 20 downgrade
 verifiers. The Phase 9 runtime case proved:
 
 - exact workspace isolation returns an empty foreign-workspace cohort;
@@ -25,6 +25,7 @@ verifiers. The Phase 9 runtime case proved:
 - confirmed RUB value is derived only from the effective won event and remains
   a decimal string;
 - event-time assignee attribution is captured without historical backfill;
+- a cross-workspace assignee is rejected by PostgreSQL;
 - calibration output uses a public reference and exposes no assigned identity;
 - down migration refuses to erase captured assignment attribution.
 
@@ -47,17 +48,20 @@ npm.cmd run opportunity-outcomes:benchmark
 Final local disposable-PostgreSQL result:
 
 ```text
-fixture: 10 owners, 10 workspaces, 100 profiles, 10,000 opportunities,
-         100,000 outcome events, 1,000 corrections
-legacy funnel: 10.219 ms execution, 0.772 ms planning
-Analytics v2: 36.997 ms execution, 0.506 ms planning
-index: benchmark_outcome_owner_opportunity_time_idx
+fixture: 10 owners, 10 workspaces, 1,000 profiles,
+         20,000 opportunities, 200,000 outcome events
+target workspace: 100,000 outcome events, 1,000 corrections
+legacy funnel: 93.423 ms execution, 0.880 ms planning
+Analytics v2 summary: 416.023 ms execution, 1.259 ms planning
+calibration export: 386.349 ms execution, 0.818 ms planning
+indexes: owner/type/time, owner/opportunity/time and owner/reverts
 regression guard: 1,000 ms
 ```
 
-The controlled plan stayed below the guard and used an owner-scoped event
-index, so no additional production schema index was justified. These numbers
-are local evidence and do not promise production latency.
+Both controlled plans stayed below the guard and used the modeled production
+owner-scoped event/correction indexes, so no additional production schema index
+was justified. These numbers are local evidence and do not promise production
+latency.
 
 ## Rollout boundary
 

@@ -282,10 +282,11 @@ contacted/replied/meeting/proposal → lost и proposal → won. При sample �
 npm.cmd run opportunity-outcomes:benchmark
 ```
 
-Он создаёт только TEMP fixture на 10 owners, 100 profiles, 10 000
-opportunities и 100 000 events, запускает `EXPLAIN (ANALYZE, BUFFERS)` и
-откатывает transaction. Его результат — локальное измерение, не обещание
-production latency.
+Он создаёт только TEMP fixture на 10 owners, 1000 profiles, 20 000
+opportunities и 200 000 events. Проверяемый workspace содержит ровно 100 000
+events и 1000 corrections; отдельно запускаются production-подобные summary и
+calibration-export `EXPLAIN (ANALYZE, BUFFERS)`. Transaction откатывается. Его
+результат — локальное измерение, не обещание production latency.
 
 ## Outcome Analytics v2
 
@@ -324,7 +325,8 @@ Calibration CSV использует тот же tenant scope и effective-event
 входят только public opportunity reference, immutable cohort dimensions,
 timestamps, terminal status/controlled reason, maturity/sample status и
 confirmed RUB value. Owner/workspace/internal IDs, assigned-user identity,
-названия компаний, контакты, notes, metadata и evidence URLs отсутствуют.
+`clientProfileId`, свободный `specialization`, названия компаний, контакты,
+notes, metadata и evidence URLs отсутствуют.
 Экспорт детерминирован, защищён от spreadsheet formula injection и возвращает
 ошибку при размере больше 5000 строк вместо неполного файла.
 

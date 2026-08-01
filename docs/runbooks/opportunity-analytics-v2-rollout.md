@@ -32,9 +32,10 @@ accepted; legacy and compatibility sessions receive no Phase 9 surface.
 4. Require PostgreSQL proof for exact workspace isolation, effective-event
    corrections, mature/immature rate gating, confirmed RUB revenue and the
    calibration allowlist.
-5. Require the 100k-event benchmark to stay below its 1000 ms regression guard
-   and to use an owner-scoped outcome-event index. Treat it as local evidence,
-   not a production latency promise.
+5. Require both summary and calibration-export plans over the 100k-event target
+   workspace to stay below their 1000 ms regression guard and to use
+   owner-scoped outcome-event and correction indexes. Treat them as local
+   evidence, not a production latency promise.
 6. Verify that the down migration succeeds on a clean schema and refuses when
    any event-time assignment attribution exists.
 
@@ -68,7 +69,8 @@ After separate activation approval:
 6. Verify an immature or sub-10 cohort returns `rate=null` and `winRate=null`;
    verify median time remains `null` below three observations.
 7. Inspect the CSV for the explicit column allowlist, deterministic ordering,
-   spreadsheet-formula neutralization, and absence of PII/internal IDs.
+   spreadsheet-formula neutralization, and absence of PII/internal IDs,
+   including `clientProfileId` and free-text `specialization`.
 8. Monitor only privacy-safe events:
    `opportunity_analytics_v2.summary_completed`, `.summary_failed`,
    `.request_rejected`, `.export_completed`, `.export_failed` and

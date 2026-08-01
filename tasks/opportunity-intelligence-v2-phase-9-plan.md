@@ -56,7 +56,7 @@ confirmed RUB deal values. Revenue forecast is explicitly absent.
 | Reverted events | Corrected outcomes still count | effective-event anti-join shared by summary and export |
 | Revenue | Forecast or imputed values appear as fact | confirmed values only; expose won-with-value and won-without-value counts |
 | Small/young cohorts | False statistical confidence | independent sample and maturity states; rates hidden until both are ready |
-| Query volume | Unbounded scans or exports | maximum 366-day period, bounded export rows, one aggregate query, measured PostgreSQL plan |
+| Query volume | Unbounded scans or exports | maximum 366-day period, index-backed first-cohort history, closed downstream window, bounded export rows, one query per surface, measured PostgreSQL plans |
 | Telemetry | PII or high-cardinality payload leakage | stable event names and bounded counts/durations only; never log filters, bodies or exported rows |
 
 ## API and storage slices
