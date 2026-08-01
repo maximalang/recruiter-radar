@@ -70,6 +70,7 @@ describe('Agency DNA profile actions', () => {
       currentCapacity: 'high',
       caseStudy0RoleFamilies: 'backend, data',
       caseStudy0Industries: 'it',
+      caseStudy0HiringModes: ['specialist'],
       caseStudy0Result: '8 hires in 45 days',
       caseStudy0Description: 'Product engineering team.',
     }))
@@ -85,7 +86,10 @@ describe('Agency DNA profile actions', () => {
       workspaceId: '9',
       serviceTypes: ['permanent', 'executive'],
       minimumEngagementValueMinor: 15000000,
-      caseStudies: [expect.objectContaining({ roleFamilies: ['backend', 'data'] })],
+      caseStudies: [expect.objectContaining({
+        roleFamilies: ['backend', 'data'],
+        hiringModes: ['specialist'],
+      })],
     }))
   })
 
@@ -99,6 +103,19 @@ describe('Agency DNA profile actions', () => {
       ok: false,
       error: 'Не удалось сохранить Agency DNA.',
     })
+  })
+
+  it('rejects a forged case-study hiring mode at the form boundary', async () => {
+    const { saveAgencyDnaProfileAction } = await import('@/app/profile/agency-dna-actions')
+
+    await expect(saveAgencyDnaProfileAction(null, form({
+      caseStudy0HiringModes: ['unsupported-mode'],
+      caseStudy0Description: 'Public-safe case.',
+    }))).resolves.toEqual({
+      ok: false,
+      error: 'Не удалось сохранить Agency DNA.',
+    })
+    expect(saveAgencyDnaProfile).not.toHaveBeenCalled()
   })
 
   it('writes and deletes restrictions under session actor and tenant scope', async () => {

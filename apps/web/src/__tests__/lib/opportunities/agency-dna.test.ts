@@ -72,6 +72,7 @@ describe('Agency DNA v1 opportunity context', () => {
       industries: ['it'],
       companySizeBucket: 'medium',
       region: 'Москва',
+      hiringModes: ['specialist'],
       measurableResult: 'Закрыли 8 позиций за 45 дней',
       publicSafeDescription: 'Подбор инженерной команды для продуктовой компании.',
     }])).toEqual([{
@@ -79,6 +80,7 @@ describe('Agency DNA v1 opportunity context', () => {
       industries: ['it'],
       companySizeBucket: 'medium',
       region: 'Москва',
+      hiringModes: ['specialist'],
       measurableResult: 'Закрыли 8 позиций за 45 дней',
       publicSafeDescription: 'Подбор инженерной команды для продуктовой компании.',
     }])
@@ -87,5 +89,12 @@ describe('Agency DNA v1 opportunity context', () => {
       measurableResult: 'Позвоните +7 999 123-45-67',
       publicSafeDescription: 'Контакт recruiter@example.test',
     }])).toThrow(AgencyDnaValidationError)
+
+    const forgedCaseStudies = [{
+      hiringModes: ['unsupported-mode'],
+      publicSafeDescription: 'Безопасное описание.',
+    }] as unknown as Parameters<typeof normalizeAgencyDnaCaseStudies>[0]
+    expect(() => normalizeAgencyDnaCaseStudies(forgedCaseStudies))
+      .toThrow(AgencyDnaValidationError)
   })
 })

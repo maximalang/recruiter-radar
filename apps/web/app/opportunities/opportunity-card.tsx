@@ -3,6 +3,10 @@ import {
   GateBadgeInline,
 } from '../ui/internal-page'
 import type { OpportunityItem } from '@/lib/opportunities/repository'
+import type {
+  OpportunityStrategistBrief,
+  OpportunityStrategistConclusion,
+} from '@/lib/opportunities/opportunity-strategist-v1'
 import { OpportunityActions } from './opportunity-actions'
 import {
   OpportunityOutcomeImpression,
@@ -85,19 +89,26 @@ export function OpportunityCard(props: {
         </EvidenceTag>
       </div>
 
-      <div className={styles.briefGrid}>
-        <BriefField label="Что изменилось" value={opportunity.whyNow} />
-        <BriefField
-          label="Почему это может быть важно"
-          value={opportunity.problemHypothesis}
+      {opportunity.strategistBrief ? (
+        <StrategistCard
+          opportunityId={opportunity.id}
+          brief={opportunity.strategistBrief}
         />
-        <BriefField
-          label="Почему подходит агентству"
-          value={opportunity.agencyFitExplanation}
-        />
-        <BriefField label="Рекомендуемый заход" value={opportunity.recommendedAngle} />
-        <BriefField label="Кому адресовать" value={opportunity.recommendedPersona} />
-      </div>
+      ) : (
+        <div className={styles.briefGrid}>
+          <BriefField label="Что изменилось" value={opportunity.whyNow} />
+          <BriefField
+            label="Почему это может быть важно"
+            value={opportunity.problemHypothesis}
+          />
+          <BriefField
+            label="Почему подходит агентству"
+            value={opportunity.agencyFitExplanation}
+          />
+          <BriefField label="Рекомендуемый заход" value={opportunity.recommendedAngle} />
+          <BriefField label="Кому адресовать" value={opportunity.recommendedPersona} />
+        </div>
+      )}
 
       <section className={styles.evidenceSection} aria-labelledby={`evidence-${opportunity.id}`}>
         <div className={styles.sectionHeading}>
@@ -108,7 +119,7 @@ export function OpportunityCard(props: {
         </div>
         {opportunity.evidenceTimeline.length > 0 ? (
           <ol className={styles.timeline}>
-            {opportunity.evidenceTimeline.slice(0, 6).map((item) => {
+            {opportunity.evidenceTimeline.map((item) => {
               const safeUrl = safeEvidenceUrl(item.url)
               return (
                 <li key={`${item.kind}:${item.id}`} className={styles.timelineItem}>
@@ -140,7 +151,15 @@ export function OpportunityCard(props: {
 
       <div className={styles.recommendedAction}>
         <span>Следующий шаг</span>
-        <p>{opportunity.recommendedAction}</p>
+        <p>
+          {opportunity.strategistBrief?.recommendedNextAction.text ??
+            opportunity.recommendedAction}
+        </p>
+        {opportunity.strategistBrief ? (
+          <ConclusionBasis
+            value={opportunity.strategistBrief.recommendedNextAction}
+          />
+        ) : null}
       </div>
 
       {props.outcomesUiEnabled ? (
@@ -156,6 +175,90 @@ export function OpportunityCard(props: {
         />
       )}
     </article>
+  )
+}
+
+function StrategistCard(props: {
+  opportunityId: string
+  brief: OpportunityStrategistBrief
+}) {
+  const headingId = `strategist-${props.opportunityId}`
+  return (
+    <section className={styles.strategistCard} aria-labelledby={headingId}>
+      <div className={styles.strategistHeading}>
+        <h3 id={headingId}>Стратегическая карточка</h3>
+        <span>evidence-bound v1</span>
+      </div>
+      <div className={styles.briefGrid}>
+        <StrategistField label="Что изменилось" value={props.brief.whatChanged} />
+        <StrategistField label="Почему сейчас" value={props.brief.whyNow} />
+        <StrategistField label="Гипотеза проблемы" value={props.brief.problemHypothesis} />
+        <StrategistField
+          label="Почему подходит агентству"
+          value={props.brief.agencyFitExplanation}
+        />
+        <StrategistField
+          label="Нужна ли внешняя поддержка"
+          value={props.brief.externalSupportNeedExplanation}
+        />
+        <StrategistField label="Кому адресовать" value={props.brief.recommendedPersona} />
+        <StrategistField label="Рекомендуемый заход" value={props.brief.recommendedAngle} />
+        <StrategistField label="Релевантный кейс" value={props.brief.recommendedCaseStudy} />
+      </div>
+      <StrategistList label="Риски" values={props.brief.riskSignals} />
+      <StrategistList label="Ограничения" values={props.brief.limitations} />
+    </section>
+  )
+}
+
+function StrategistField(props: {
+  label: string
+  value: OpportunityStrategistConclusion
+}) {
+  return (
+    <div className={styles.briefField}>
+      <span>{props.label}</span>
+      <p>{props.value.text}</p>
+      <ConclusionBasis value={props.value} />
+    </div>
+  )
+}
+
+function StrategistList(props: {
+  label: string
+  values: OpportunityStrategistConclusion[]
+}) {
+  if (props.values.length === 0) return null
+  return (
+    <div className={styles.strategistList}>
+      <span>{props.label}</span>
+      <ul>
+        {props.values.map((value, index) => (
+          <li key={`${value.basis}:${index}:${value.text}`}>
+            <p>{value.text}</p>
+            <ConclusionBasis value={value} />
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function ConclusionBasis(props: { value: OpportunityStrategistConclusion }) {
+  return (
+    <div className={styles.conclusionBasis} data-basis={props.value.basis}>
+      <span>
+        {props.value.basis === 'evidence'
+          ? 'Основано на доказательствах'
+          : 'Гипотеза — проверьте вручную'}
+      </span>
+      {props.value.supportingEvidenceIds.length > 0 ? (
+        <small>
+          Подтверждения: {props.value.supportingEvidenceIds
+            .map((id) => `№${id}`).join(', ')}
+        </small>
+      ) : null}
+    </div>
   )
 }
 

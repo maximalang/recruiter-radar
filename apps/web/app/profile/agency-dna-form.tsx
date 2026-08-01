@@ -40,6 +40,13 @@ const ENGAGEMENT_OPTIONS = [
   ['project', 'Фиксированный проект'],
 ] as const
 
+const CASE_HIRING_MODE_OPTIONS = [
+  ['auto', 'Автоматический радар'],
+  ['specialist', 'Точечный подбор'],
+  ['executive', 'Executive search'],
+  ['volume', 'Массовый найм'],
+] as const
+
 const RESTRICTION_LABELS = {
   existing_client: 'Действующий клиент',
   former_client: 'Бывший клиент',
@@ -319,6 +326,31 @@ function CaseStudyFields(props: {
           <span className={ppStyles.fieldLabel}>Регион</span>
           <input className={ppStyles.input} name={`caseStudy${index}Region`} defaultValue={study?.region ?? ''} />
         </label>
+        <div
+          className={styles.caseModes}
+          role="group"
+          aria-labelledby={`case-study-${index}-hiring-modes`}
+        >
+          <span
+            className={ppStyles.fieldLabel}
+            id={`case-study-${index}-hiring-modes`}
+          >
+            Режим найма кейса {index + 1}
+          </span>
+          <div className={styles.chips}>
+            {CASE_HIRING_MODE_OPTIONS.map(([value, label]) => (
+              <label key={value}>
+                <input
+                  type="checkbox"
+                  name={`caseStudy${index}HiringModes`}
+                  value={value}
+                  defaultChecked={study?.hiringModes.includes(value) ?? false}
+                />
+                <span>{label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
         <label className={ppStyles.field}>
           <span className={ppStyles.fieldLabel}>Измеримый результат</span>
           <input className={ppStyles.input} name={`caseStudy${index}Result`} defaultValue={study?.measurableResult ?? ''} placeholder="Закрыли 8 ролей за 45 дней" />

@@ -17,6 +17,8 @@ import {
   isOpportunityScoringV2Enabled,
   isOpportunityScoringV2EnabledForContext,
   isOpportunityScoringV2ShadowEnabledForContext,
+  isOpportunityStrategistV1Enabled,
+  isOpportunityStrategistV1EnabledForContext,
   isOpportunityWorkspaceContextEnabled,
   isOpportunityWorkspaceContextEnabledForContext,
 } from '@/lib/opportunities/config'
@@ -252,5 +254,44 @@ describe('opportunity engine config', () => {
         OPPORTUNITY_SCORING_V2_SHADOW_CANARY_WORKSPACE_IDS: invalid,
       })).toBe(false)
     }
+  })
+
+  it('keeps Strategist v1 fail-closed and requires Agency DNA in the same workspace', () => {
+    const context = { dataOwnerId: '7', workspaceId: '9' }
+
+    expect(isOpportunityStrategistV1Enabled({})).toBe(false)
+    expect(isOpportunityStrategistV1Enabled({
+      OPPORTUNITY_STRATEGIST_V1_ENABLED: ' TRUE ',
+    })).toBe(false)
+    expect(isOpportunityStrategistV1EnabledForContext(context, {
+      OPPORTUNITY_STRATEGIST_V1_CANARY_WORKSPACE_IDS: '9',
+    })).toBe(false)
+    expect(isOpportunityStrategistV1EnabledForContext(context, {
+      AGENCY_DNA_V1_CANARY_WORKSPACE_IDS: '9',
+      OPPORTUNITY_STRATEGIST_V1_CANARY_WORKSPACE_IDS: '9',
+    })).toBe(true)
+    expect(isOpportunityStrategistV1EnabledForContext(context, {
+      AGENCY_DNA_V1_ENABLED: 'true',
+      OPPORTUNITY_STRATEGIST_V1_ENABLED: 'true',
+    })).toBe(true)
+  })
+
+  it('rejects malformed or cross-workspace Strategist v1 canaries', () => {
+    const context = { dataOwnerId: '7', workspaceId: '9' }
+    const agencyDna = { AGENCY_DNA_V1_CANARY_WORKSPACE_IDS: '9' }
+
+    for (const invalid of ['9,10', '9,9', '09', '*', '']) {
+      expect(isOpportunityStrategistV1EnabledForContext(context, {
+        ...agencyDna,
+        OPPORTUNITY_STRATEGIST_V1_CANARY_WORKSPACE_IDS: invalid,
+      })).toBe(false)
+    }
+    expect(isOpportunityStrategistV1EnabledForContext(
+      { dataOwnerId: '7', workspaceId: '10' },
+      {
+        AGENCY_DNA_V1_CANARY_WORKSPACE_IDS: '9',
+        OPPORTUNITY_STRATEGIST_V1_CANARY_WORKSPACE_IDS: '9',
+      },
+    )).toBe(false)
   })
 })

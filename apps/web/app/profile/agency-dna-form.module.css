@@ -173,6 +173,13 @@
   margin-top: 14px;
 }
 
+.caseModes {
+  display: flex;
+  grid-column: 1 / -1;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .preview {
   display: flex;
   flex-direction: column;

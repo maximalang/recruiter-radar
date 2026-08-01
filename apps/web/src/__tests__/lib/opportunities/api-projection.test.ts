@@ -44,6 +44,23 @@ describe('opportunity API projection', () => {
         digestCandidateId: 'private-internal-id',
         contactPaths: [{ category: 'email', value: 'personal@example.test' }],
       },
+      strategistBrief: {
+        version: 'opportunity-strategist-v1',
+        whatChanged: evidenceConclusion('Открыто 8 вакансий.', ['11']),
+        whyNow: evidenceConclusion('Сигналы свежие.', ['11']),
+        problemHypothesis: heuristicConclusion('Может понадобиться поддержка.'),
+        agencyFitExplanation: heuristicConclusion('Есть профильное совпадение.'),
+        externalSupportNeedExplanation: evidenceConclusion(
+          'Темп найма вырос.',
+          ['11'],
+        ),
+        recommendedPersona: heuristicConclusion('Проверить функцию HRD.'),
+        recommendedAngle: heuristicConclusion('Обсудить сложные роли.'),
+        recommendedCaseStudy: heuristicConclusion('Точного кейса нет.'),
+        recommendedNextAction: heuristicConclusion('Проверить доказательства.'),
+        riskSignals: [heuristicConclusion('Бюджет не подтверждён.')],
+        limitations: [heuristicConclusion('Нужна ручная проверка.')],
+      },
       createdAt: '2026-07-26T00:00:00.000Z',
       updatedAt: '2026-07-26T00:00:00.000Z',
       evidenceCount: 0,
@@ -72,5 +89,17 @@ describe('opportunity API projection', () => {
     })
     expect(publicItem.morningBriefEligible).toBe(true)
     expect(publicItem.sourceFamilies).toEqual(['career-pages'])
+    expect(publicItem.strategistBrief).toEqual(expect.objectContaining({
+      version: 'opportunity-strategist-v1',
+      evidenceTimeline: [],
+    }))
   })
 })
+
+function evidenceConclusion(text: string, supportingEvidenceIds: string[]) {
+  return { text, basis: 'evidence' as const, supportingEvidenceIds }
+}
+
+function heuristicConclusion(text: string) {
+  return { text, basis: 'heuristic' as const, supportingEvidenceIds: [] }
+}

@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 
 import { AgencyDnaForm } from '@/app/profile/agency-dna-form'
 import type { AgencyDnaProfile } from '@/lib/agencyDnaProfile'
@@ -63,5 +63,33 @@ describe('AgencyDnaForm', () => {
 
     expect(screen.getByText(/профиль узкий/i)).toBeTruthy()
     expect(screen.getAllByText(/публично безопасное описание/i)).not.toHaveLength(0)
+  })
+
+  it('renders labeled native hiring-mode checkboxes for a case study', () => {
+    render(
+      <AgencyDnaForm
+        profile={{
+          ...PROFILE,
+          caseStudies: [{
+            roleFamilies: ['backend'],
+            industries: ['it'],
+            companySizeBucket: 'medium',
+            region: 'Москва',
+            hiringModes: ['specialist'],
+            measurableResult: null,
+            publicSafeDescription: 'Backend-команда.',
+          }],
+        }}
+        restrictions={[]}
+        organizations={[]}
+        matchCount={null}
+      />,
+    )
+
+    const group = screen.getByRole('group', { name: 'Режим найма кейса 1' })
+    expect(within(group).getByRole('checkbox', { name: 'Точечный подбор' }))
+      .toBeChecked()
+    expect(within(group).getByRole('checkbox', { name: 'Executive search' }))
+      .not.toBeChecked()
   })
 })
