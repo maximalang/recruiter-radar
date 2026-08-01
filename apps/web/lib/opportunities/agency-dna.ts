@@ -29,16 +29,26 @@ export const AGENCY_DNA_ENGAGEMENT_TYPES = [
 
 export const AGENCY_DNA_CAPACITIES = ['low', 'normal', 'high'] as const
 
+export const AGENCY_DNA_CASE_HIRING_MODES = [
+  'auto',
+  'specialist',
+  'executive',
+  'volume',
+] as const
+
 export type AgencyDnaServiceType = typeof AGENCY_DNA_SERVICE_TYPES[number]
 export type AgencyDnaRestrictionType =
   typeof AGENCY_DNA_RESTRICTION_TYPES[number]
 export type AgencyDnaCapacity = 'low' | 'normal' | 'high'
+export type AgencyDnaCaseHiringMode =
+  typeof AGENCY_DNA_CASE_HIRING_MODES[number]
 
 export type AgencyDnaCaseStudy = {
   roleFamilies: string[]
   industries: string[]
   companySizeBucket: string | null
   region: string | null
+  hiringModes: AgencyDnaCaseHiringMode[]
   measurableResult: string | null
   publicSafeDescription: string | null
 }
@@ -132,6 +142,7 @@ export function normalizeAgencyDnaCaseStudies(
       industries: normalizeStringList(caseStudy.industries, 20, 80),
       companySizeBucket: normalizeText(caseStudy.companySizeBucket, 80),
       region: normalizeText(caseStudy.region, 120),
+      hiringModes: normalizeCaseHiringModes(caseStudy.hiringModes),
       measurableResult: normalizeText(caseStudy.measurableResult, 500),
       publicSafeDescription: normalizeText(caseStudy.publicSafeDescription, 1000),
     }
@@ -149,6 +160,18 @@ export function normalizeAgencyDnaCaseStudies(
 
     return normalized
   })
+}
+
+function normalizeCaseHiringModes(
+  values: readonly string[] | undefined,
+): AgencyDnaCaseHiringMode[] {
+  const normalized = uniqueStrings(values ?? [])
+  if (normalized.some((value) =>
+    !AGENCY_DNA_CASE_HIRING_MODES.includes(value as AgencyDnaCaseHiringMode),
+  )) {
+    throw new AgencyDnaValidationError('Unsupported case-study hiring mode')
+  }
+  return normalized as AgencyDnaCaseHiringMode[]
 }
 
 function resolveRestriction(type: AgencyDnaRestrictionType | null) {

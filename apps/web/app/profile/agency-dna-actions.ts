@@ -11,7 +11,9 @@ import {
 import { getSession } from '../../lib/auth-v2/authorization'
 import { isAgencyDnaV1EnabledForContext } from '../../lib/opportunities/config'
 import {
+  AGENCY_DNA_CASE_HIRING_MODES,
   AgencyDnaValidationError,
+  type AgencyDnaCaseHiringMode,
   type AgencyDnaCaseStudy,
 } from '../../lib/opportunities/agency-dna'
 
@@ -181,6 +183,7 @@ function readCaseStudies(formData: FormData): Partial<AgencyDnaCaseStudy>[] {
       industries: readList(formData, `${prefix}Industries`),
       companySizeBucket: readText(formData, `${prefix}CompanySizeBucket`),
       region: readText(formData, `${prefix}Region`),
+      hiringModes: readCaseHiringModes(formData, `${prefix}HiringModes`),
       measurableResult: readText(formData, `${prefix}Result`),
       publicSafeDescription: readText(formData, `${prefix}Description`),
     }
@@ -189,6 +192,7 @@ function readCaseStudies(formData: FormData): Partial<AgencyDnaCaseStudy>[] {
       study.industries?.length ||
       study.companySizeBucket ||
       study.region ||
+      study.hiringModes?.length ||
       study.measurableResult ||
       study.publicSafeDescription
     ) {
@@ -196,6 +200,19 @@ function readCaseStudies(formData: FormData): Partial<AgencyDnaCaseStudy>[] {
     }
   }
   return studies
+}
+
+function readCaseHiringModes(
+  formData: FormData,
+  key: string,
+): AgencyDnaCaseHiringMode[] {
+  const values = readMultiple(formData, key)
+  if (values.some((value) =>
+    !AGENCY_DNA_CASE_HIRING_MODES.includes(value as AgencyDnaCaseHiringMode),
+  )) {
+    throw new Error('Unsupported case-study hiring mode.')
+  }
+  return values as AgencyDnaCaseHiringMode[]
 }
 
 function readList(formData: FormData, key: string): string[] {

@@ -19,6 +19,10 @@ export const OPPORTUNITY_SCORING_V2_CANARY_WORKSPACE_IDS_FEATURE_FLAG =
   'OPPORTUNITY_SCORING_V2_CANARY_WORKSPACE_IDS'
 export const OPPORTUNITY_SCORING_V2_SHADOW_CANARY_WORKSPACE_IDS_FEATURE_FLAG =
   'OPPORTUNITY_SCORING_V2_SHADOW_CANARY_WORKSPACE_IDS'
+export const OPPORTUNITY_STRATEGIST_V1_FEATURE_FLAG =
+  'OPPORTUNITY_STRATEGIST_V1_ENABLED'
+export const OPPORTUNITY_STRATEGIST_V1_CANARY_WORKSPACE_IDS_FEATURE_FLAG =
+  'OPPORTUNITY_STRATEGIST_V1_CANARY_WORKSPACE_IDS'
 
 export type OpportunityFeatureContext = {
   dataOwnerId: string | number | null | undefined
@@ -101,6 +105,23 @@ export function isOpportunityScoringV2ShadowEnabledForContext(
   return matchesSingleCanaryId(
     context.workspaceId,
     env[OPPORTUNITY_SCORING_V2_SHADOW_CANARY_WORKSPACE_IDS_FEATURE_FLAG],
+  )
+}
+
+export function isOpportunityStrategistV1Enabled(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+  return env[OPPORTUNITY_STRATEGIST_V1_FEATURE_FLAG] === 'true'
+}
+
+export function isOpportunityStrategistV1EnabledForContext(
+  context: OpportunityFeatureContext,
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+  if (!isAgencyDnaV1EnabledForContext(context, env)) return false
+  return isOpportunityStrategistV1Enabled(env) || matchesSingleCanaryId(
+    context.workspaceId,
+    env[OPPORTUNITY_STRATEGIST_V1_CANARY_WORKSPACE_IDS_FEATURE_FLAG],
   )
 }
 
