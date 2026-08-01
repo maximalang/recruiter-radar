@@ -348,8 +348,8 @@ export async function listOpportunities(
   if (query) {
     params.push(`%${escapeLikePattern(query)}%`)
     clauses.push(`(
-      o.organization_name ILIKE $${params.length} ESCAPE '\\'
-      OR o.organization_domain ILIKE $${params.length} ESCAPE '\\'
+      org.name ILIKE $${params.length} ESCAPE '\\'
+      OR org.domain ILIKE $${params.length} ESCAPE '\\'
       OR o.title ILIKE $${params.length} ESCAPE '\\'
     )`)
   }
@@ -358,6 +358,7 @@ export async function listOpportunities(
   const countResult = await db.query<{ count: string }>(
     `SELECT COUNT(*)::TEXT AS count
      FROM opportunities o
+     JOIN orgs org ON org.id = o.organization_id
      JOIN hiring_episodes he ON he.id = o.hiring_episode_id
      LEFT JOIN opportunity_outcome_state outcome_state
        ON outcome_state.owner_id = o.owner_id

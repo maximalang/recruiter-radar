@@ -478,7 +478,7 @@ describeWithDatabase('Opportunity workflow PostgreSQL runtime', () => {
     })
   })
 
-  it('serves the workspace Today projection without publishing internal notes', async () => {
+  it('serves tenant-scoped Today, follow-up, overdue, and search projections', async () => {
     const names = [
       'OPPORTUNITY_ENGINE_V1_ENABLED',
       'OPPORTUNITY_OUTCOMES_ENABLED',
@@ -502,6 +502,47 @@ describeWithDatabase('Opportunity workflow PostgreSQL runtime', () => {
       expect(opportunity?.workflow?.internalNote).toBeTruthy()
       expect(JSON.stringify(toPublicOpportunity(opportunity!)))
         .not.toContain(String(opportunity?.workflow?.internalNote))
+
+      const followUp = await listOpportunities({
+        ownerId,
+        workspaceId,
+        view: 'follow_up',
+        query: 'Runtime Organization',
+        pageSize: 20,
+      })
+      expect(followUp.opportunities.map((item) => item.id))
+        .toContain(opportunityId)
+
+      await updateOpportunityWorkflow({
+        ownerId,
+        workspaceId,
+        opportunityId,
+        actorUserId: ownerId,
+        actorRole: 'owner',
+        idempotencyKey: `runtime-overdue:${token}`,
+        patch: {
+          nextActionDueAt: new Date(Date.now() - 24 * 60 * 60 * 1000)
+            .toISOString(),
+        },
+      })
+      const overdue = await listOpportunities({
+        ownerId,
+        workspaceId,
+        view: 'overdue',
+        pageSize: 20,
+      })
+      expect(overdue.opportunities.map((item) => item.id))
+        .toContain(opportunityId)
+
+      const crossWorkspaceSearch = await listOpportunities({
+        ownerId,
+        workspaceId: otherWorkspaceId,
+        view: 'all',
+        query: 'Runtime Organization',
+        pageSize: 20,
+      })
+      expect(crossWorkspaceSearch.opportunities.map((item) => item.id))
+        .not.toContain(opportunityId)
 
       const assignees = await listOpportunityWorkflowAssignees(workspaceId)
       expect(assignees).toEqual(expect.arrayContaining([

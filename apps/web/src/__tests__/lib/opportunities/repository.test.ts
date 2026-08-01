@@ -296,8 +296,8 @@ describe('opportunity repository tenant scope', () => {
 
     expect(calls[0].sql).toContain('o.owner_id = $1')
     expect(calls[0].sql).toContain('o.workspace_id = $2')
-    expect(calls[0].sql).toContain('o.organization_name ILIKE $3')
-    expect(calls[0].sql).toContain('o.organization_domain ILIKE $3')
+    expect(calls[0].sql).toContain('org.name ILIKE $3')
+    expect(calls[0].sql).toContain('org.domain ILIKE $3')
     expect(calls[0].sql).toContain('o.title ILIKE $3')
     expect(calls[0].params?.[2]).toBe('%50\\%\\_рост%')
     expect(calls[0].sql).not.toContain('internal_note ILIKE')
