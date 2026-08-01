@@ -12,5 +12,5 @@
 - [x] Add route loading and explicit permission/error/empty/no-data states.
 - [x] Verify 320/768/1024/1440, keyboard, screen-reader structure and console.
 - [x] Run full checks and five-axis pre-merge review.
-- [ ] Commit atomically, push and open one PR to the integration branch.
+- [x] Commit atomically, push and open PR #128 to `codex/opportunity-intelligence-v2`.
 - [ ] Merge only after the final green merge-gate.
