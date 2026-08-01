@@ -5,11 +5,12 @@ import {
 import type { OpportunityItem } from '@/lib/opportunities/repository'
 import type { WorkspaceRole } from '@/lib/auth-v2/workspaces'
 import type { OpportunityWorkflowAssignee } from '@/lib/opportunities/opportunity-workflow-repository'
-import type {
-  OpportunityStrategistBrief,
-  OpportunityStrategistConclusion,
-} from '@/lib/opportunities/opportunity-strategist-v1'
 import { OpportunityActions } from './opportunity-actions'
+import {
+  OpportunityDecisionContext,
+  OpportunityDecisionPlan,
+} from './opportunity-decision-brief'
+import { OpportunityEvidenceSection } from './opportunity-evidence'
 import {
   OpportunityOutcomeImpression,
   OpportunityOutcomePanel,
@@ -55,9 +56,16 @@ export function OpportunityCard(props: {
   const displayStatus = opportunity.workflowState === 'snoozed'
     ? 'snoozed'
     : opportunity.commercialStage
+  const contentState = opportunity.strategistBrief ? 'complete' : 'insufficient'
+  const freshness = isStale(opportunity.validUntil) ? 'stale' : 'current'
 
   return (
-    <article className={styles.card} data-status={displayStatus}>
+    <article
+      className={styles.card}
+      data-status={displayStatus}
+      data-content-state={contentState}
+      data-freshness={freshness}
+    >
       {props.outcomesUiEnabled && props.trackingCycleId ? (
         <OpportunityOutcomeImpression
           opportunityId={opportunity.id}
@@ -96,78 +104,21 @@ export function OpportunityCard(props: {
         </EvidenceTag>
       </div>
 
-      {opportunity.strategistBrief ? (
-        <StrategistCard
-          opportunityId={opportunity.id}
-          brief={opportunity.strategistBrief}
-        />
-      ) : (
-        <div className={styles.briefGrid}>
-          <BriefField label="Что изменилось" value={opportunity.whyNow} />
-          <BriefField
-            label="Почему это может быть важно"
-            value={opportunity.problemHypothesis}
-          />
-          <BriefField
-            label="Почему подходит агентству"
-            value={opportunity.agencyFitExplanation}
-          />
-          <BriefField label="Рекомендуемый заход" value={opportunity.recommendedAngle} />
-          <BriefField label="Кому адресовать" value={opportunity.recommendedPersona} />
-        </div>
-      )}
-
-      <section className={styles.evidenceSection} aria-labelledby={`evidence-${opportunity.id}`}>
-        <div className={styles.sectionHeading}>
-          <h3 id={`evidence-${opportunity.id}`}>Лента доказательств</h3>
-          <span>
-            {formatDate(opportunity.episodeStartedAt)} — {formatDate(opportunity.episodeLastSeenAt)}
-          </span>
-        </div>
-        {opportunity.evidenceTimeline.length > 0 ? (
-          <ol className={styles.timeline}>
-            {opportunity.evidenceTimeline.map((item) => {
-              const safeUrl = safeEvidenceUrl(item.url)
-              return (
-                <li key={`${item.kind}:${item.id}`} className={styles.timelineItem}>
-                  <span className={styles.timelineDot} aria-hidden="true" />
-                  <div>
-                    <span className={styles.timelineDate}>{formatDate(item.occurredAt)}</span>
-                    {safeUrl ? (
-                      <a href={safeUrl} target="_blank" rel="noreferrer">
-                        {item.title}
-                      </a>
-                    ) : (
-                      <strong>{item.title}</strong>
-                    )}
-                    <small>
-                      {item.source}
-                      {item.tier ? ` · ${tierLabel(item.tier)}` : ''}
-                    </small>
-                  </div>
-                </li>
-              )
-            })}
-          </ol>
-        ) : (
-          <p className={styles.evidenceFallback}>
-            Источники связаны с эпизодом, но их публичное представление пока недоступно.
-          </p>
-        )}
-      </section>
-
-      <div className={styles.recommendedAction}>
-        <span>Следующий шаг</span>
-        <p>
-          {opportunity.strategistBrief?.recommendedNextAction.text ??
-            opportunity.recommendedAction}
+      {contentState === 'insufficient' ? (
+        <p className={styles.cardState} data-state="insufficient" role="status">
+          Для части выводов пока недостаточно подтверждённых данных.
         </p>
-        {opportunity.strategistBrief ? (
-          <ConclusionBasis
-            value={opportunity.strategistBrief.recommendedNextAction}
-          />
-        ) : null}
-      </div>
+      ) : null}
+      {freshness === 'stale' ? (
+        <p className={styles.cardState} data-state="stale" role="status">
+          Срок актуальности закончился {formatDate(opportunity.validUntil)}. Проверьте
+          доказательства перед действием.
+        </p>
+      ) : null}
+
+      <OpportunityDecisionContext opportunity={opportunity} />
+      <OpportunityEvidenceSection opportunity={opportunity} />
+      <OpportunityDecisionPlan opportunity={opportunity} />
 
       {props.workflowEnabled && props.actorUserId ? (
         <OpportunityWorkflowPanel
@@ -179,112 +130,30 @@ export function OpportunityCard(props: {
         />
       ) : null}
 
-      {props.outcomesUiEnabled ? (
-        <OpportunityOutcomePanel
-          opportunityId={opportunity.id}
-          fallbackStage={opportunity.commercialStage}
-        />
-      ) : (
-        <OpportunityActions
-          opportunityId={opportunity.id}
-          currentStatus={opportunity.status}
-          detailHref={`#evidence-${opportunity.id}`}
-        />
-      )}
+      <section
+        className={`${styles.decisionSection} ${styles.commercialHistory}`}
+        aria-labelledby={`commercial-history-${opportunity.id}`}
+      >
+        <h3 id={`commercial-history-${opportunity.id}`}>Коммерческая история</h3>
+        {props.outcomesUiEnabled ? (
+          <OpportunityOutcomePanel
+            opportunityId={opportunity.id}
+            fallbackStage={opportunity.commercialStage}
+          />
+        ) : (
+          <>
+            <p className={styles.insufficientValue}>
+              История недоступна в текущем режиме.
+            </p>
+            <OpportunityActions
+              opportunityId={opportunity.id}
+              currentStatus={opportunity.status}
+              detailHref={`#evidence-${opportunity.id}`}
+            />
+          </>
+        )}
+      </section>
     </article>
-  )
-}
-
-function StrategistCard(props: {
-  opportunityId: string
-  brief: OpportunityStrategistBrief
-}) {
-  const headingId = `strategist-${props.opportunityId}`
-  return (
-    <section className={styles.strategistCard} aria-labelledby={headingId}>
-      <div className={styles.strategistHeading}>
-        <h3 id={headingId}>Стратегическая карточка</h3>
-        <span>evidence-bound v1</span>
-      </div>
-      <div className={styles.briefGrid}>
-        <StrategistField label="Что изменилось" value={props.brief.whatChanged} />
-        <StrategistField label="Почему сейчас" value={props.brief.whyNow} />
-        <StrategistField label="Гипотеза проблемы" value={props.brief.problemHypothesis} />
-        <StrategistField
-          label="Почему подходит агентству"
-          value={props.brief.agencyFitExplanation}
-        />
-        <StrategistField
-          label="Нужна ли внешняя поддержка"
-          value={props.brief.externalSupportNeedExplanation}
-        />
-        <StrategistField label="Кому адресовать" value={props.brief.recommendedPersona} />
-        <StrategistField label="Рекомендуемый заход" value={props.brief.recommendedAngle} />
-        <StrategistField label="Релевантный кейс" value={props.brief.recommendedCaseStudy} />
-      </div>
-      <StrategistList label="Риски" values={props.brief.riskSignals} />
-      <StrategistList label="Ограничения" values={props.brief.limitations} />
-    </section>
-  )
-}
-
-function StrategistField(props: {
-  label: string
-  value: OpportunityStrategistConclusion
-}) {
-  return (
-    <div className={styles.briefField}>
-      <span>{props.label}</span>
-      <p>{props.value.text}</p>
-      <ConclusionBasis value={props.value} />
-    </div>
-  )
-}
-
-function StrategistList(props: {
-  label: string
-  values: OpportunityStrategistConclusion[]
-}) {
-  if (props.values.length === 0) return null
-  return (
-    <div className={styles.strategistList}>
-      <span>{props.label}</span>
-      <ul>
-        {props.values.map((value, index) => (
-          <li key={`${value.basis}:${index}:${value.text}`}>
-            <p>{value.text}</p>
-            <ConclusionBasis value={value} />
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-}
-
-function ConclusionBasis(props: { value: OpportunityStrategistConclusion }) {
-  return (
-    <div className={styles.conclusionBasis} data-basis={props.value.basis}>
-      <span>
-        {props.value.basis === 'evidence'
-          ? 'Основано на доказательствах'
-          : 'Гипотеза — проверьте вручную'}
-      </span>
-      {props.value.supportingEvidenceIds.length > 0 ? (
-        <small>
-          Подтверждения: {props.value.supportingEvidenceIds
-            .map((id) => `№${id}`).join(', ')}
-        </small>
-      ) : null}
-    </div>
-  )
-}
-
-function BriefField(props: { label: string; value: string }) {
-  return (
-    <div className={styles.briefField}>
-      <span>{props.label}</span>
-      <p>{props.value}</p>
-    </div>
   )
 }
 
@@ -299,20 +168,8 @@ function formatDate(value: string | null): string {
   }).format(new Date(timestamp))
 }
 
-function safeEvidenceUrl(value: string | null): string | null {
-  if (!value) return null
-  try {
-    const url = new URL(value)
-    return url.protocol === 'https:' || url.protocol === 'http:'
-      ? url.toString()
-      : null
-  } catch {
-    return null
-  }
-}
-
-function tierLabel(value: string): string {
-  if (value === 'direct') return 'прямое подтверждение'
-  if (value === 'corroboration') return 'подтверждение'
-  return 'контекст'
+function isStale(value: string | null): boolean {
+  if (!value) return false
+  const timestamp = Date.parse(value)
+  return Number.isFinite(timestamp) && timestamp < Date.now()
 }

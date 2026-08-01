@@ -9,7 +9,7 @@ describe('opportunities responsive contract', () => {
     )
     expect(css).toContain('@media (max-width: 680px)')
     expect(css).toMatch(/\.cardHeader\s*\{[\s\S]*?grid-template-columns:\s*1fr/)
-    expect(css).toMatch(/\.briefGrid\s*\{[\s\S]*?grid-template-columns:\s*1fr/)
+    expect(css).toMatch(/\.decisionGrid\s*\{[\s\S]*?grid-template-columns:\s*1fr/)
     expect(css).toContain('.actionButtons,')
     expect(css).toContain('width: 100%')
   })

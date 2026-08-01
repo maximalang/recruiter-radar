@@ -249,7 +249,24 @@
   margin-top: 18px;
 }
 
-.briefGrid {
+.cardState {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.cardState[data-state="stale"] {
+  border-color: #fed7aa;
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.decisionGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1px;
@@ -260,49 +277,61 @@
   background: #e2e8f0;
 }
 
-.strategistCard {
-  margin-top: 22px;
-}
-
-.strategistHeading {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 10px;
-}
-
-.strategistHeading h3 {
-  margin: 0;
-  color: #0f172a;
-  font-size: 0.92rem;
-}
-
-.strategistHeading > span {
-  color: #64748b;
-  font-size: 0.68rem;
-}
-
-.briefField {
+.decisionSection {
+  min-width: 0;
   padding: 16px;
   background: #f8fafc;
 }
 
-.briefField > span,
-.recommendedAction > span {
-  color: #64748b;
+.decisionSection h3 {
+  margin: 0;
+  color: #475569;
   font-size: 0.66rem;
   font-weight: 760;
   letter-spacing: 0.07em;
   text-transform: uppercase;
 }
 
-.briefField p,
-.recommendedAction p {
+.decisionSection > p,
+.decisionList p {
   margin: 6px 0 0;
   color: #1e293b;
   font-size: 0.84rem;
   line-height: 1.55;
+}
+
+.decisionSection[data-state="insufficient"] {
+  background: #fff;
+}
+
+.decisionSection .insufficientValue {
+  color: #64748b;
+  font-style: italic;
+}
+
+.decisionList {
+  margin-top: 12px;
+}
+
+.decisionList > span {
+  color: #9a3412;
+  font-size: 0.68rem;
+  font-weight: 720;
+}
+
+.decisionList ul,
+.decisionSection > ul {
+  display: grid;
+  gap: 12px;
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.commercialHistory {
+  margin-top: 20px;
+  border: 1px solid #e2e8f0;
+  border-radius: 15px;
+  background: #fff;
 }
 
 .conclusionBasis {
@@ -324,36 +353,6 @@
 .conclusionBasis small {
   color: inherit;
   font-size: inherit;
-}
-
-.strategistList {
-  margin-top: 12px;
-  padding: 14px 16px;
-  border: 1px solid #e2e8f0;
-  border-radius: 13px;
-  background: #fff;
-}
-
-.strategistList > span {
-  color: #475569;
-  font-size: 0.68rem;
-  font-weight: 760;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-}
-
-.strategistList ul {
-  display: grid;
-  gap: 12px;
-  margin: 10px 0 0;
-  padding-left: 18px;
-}
-
-.strategistList p {
-  margin: 0;
-  color: #334155;
-  font-size: 0.8rem;
-  line-height: 1.5;
 }
 
 .evidenceSection {
@@ -450,14 +449,6 @@
   margin: 13px 0 0;
   color: #64748b;
   font-size: 0.78rem;
-}
-
-.recommendedAction {
-  margin-top: 18px;
-  padding: 14px 16px;
-  border-left: 3px solid #3b82f6;
-  border-radius: 0 12px 12px 0;
-  background: #eff6ff;
 }
 
 .actions {
@@ -929,7 +920,7 @@
     justify-content: flex-start;
   }
 
-  .briefGrid {
+  .decisionGrid {
     grid-template-columns: 1fr;
   }
 
