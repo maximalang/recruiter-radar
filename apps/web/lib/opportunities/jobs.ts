@@ -28,11 +28,13 @@ import {
   OPPORTUNITY_ENGINE_LIMITS,
   AGENCY_DNA_V1_CANARY_WORKSPACE_IDS_FEATURE_FLAG,
   OPPORTUNITY_SCORING_V2_CANARY_WORKSPACE_IDS_FEATURE_FLAG,
+  OPPORTUNITY_SCORING_V2_SHADOW_CANARY_WORKSPACE_IDS_FEATURE_FLAG,
   clampOpportunityJobBatchSize,
   isAgencyDnaV1EnabledForContext,
   isOpportunityEngineV1Enabled,
   isOpportunityOutcomesEnabled,
   isOpportunityScoringV2EnabledForContext,
+  isOpportunityScoringV2ShadowEnabledForContext,
 } from './config'
 import {
   AGENCY_DNA_CAPACITIES,
@@ -104,6 +106,8 @@ export interface OpportunityJobStats {
   resumeLatencyMsMax: number
   locked: number
   skippedBecauseLocked: boolean
+  scoringV2ShadowEvaluated: number
+  scoringV2ShadowSnapshotsCreated: number
 }
 
 interface SignalRow {
@@ -201,6 +205,7 @@ interface OpportunityScoringSelection {
   forcedVersion: string | null
   globalV2: boolean
   canaryWorkspaceId: string | null
+  shadowWorkspaceId: string | null
 }
 
 interface AgencyDnaBuildState {
@@ -551,6 +556,9 @@ async function runBuildOpportunitiesJob(
         row,
         scoringSelection,
       )
+      const scoringV2Shadow = scoringVersion === OPPORTUNITY_SCORING_VERSION_V1 &&
+        scoringSelection.shadowWorkspaceId !== null &&
+        row.workspaceId === scoringSelection.shadowWorkspaceId
       const episode = mapEpisode(row)
       const payload = extractPayloadFields(row.digestPayload)
       const gate = normalizeConfidenceGate(payload.confidenceGate)
@@ -596,7 +604,8 @@ async function runBuildOpportunitiesJob(
         profileExcluded,
         now,
       })
-      const scoringV2 = scoringVersion === OPPORTUNITY_SCORING_VERSION_V2
+      const scoringV2 = scoringVersion === OPPORTUNITY_SCORING_VERSION_V2 ||
+        scoringV2Shadow
         ? scorerV2.score({
           episode,
           fiur: {
@@ -622,6 +631,7 @@ async function runBuildOpportunitiesJob(
           now,
         })
         : null
+      if (scoringV2Shadow) stats.scoringV2ShadowEvaluated += 1
       const brief = briefBuilder.build({
         organizationName: row.organizationName,
         episode,
@@ -645,6 +655,14 @@ async function runBuildOpportunitiesJob(
         scoringVersion,
         agencyDnaState,
       )
+      const scoringV2Provenance = scoringV2
+        ? createOpportunityInputProvenance(
+          row,
+          episode,
+          OPPORTUNITY_SCORING_VERSION_V2,
+          agencyDnaState,
+        )
+        : null
 
       if (
         stats.dryRun &&
@@ -681,6 +699,7 @@ async function runBuildOpportunitiesJob(
         row,
         score,
         scoringV2,
+        scoringV2Provenance,
         brief,
         fiur,
         provenance,
@@ -713,6 +732,18 @@ async function runBuildOpportunitiesJob(
             preview: persistPreview,
           },
         )
+      }
+      if (scoringV2Shadow) {
+        if (stored.scoringSnapshotInserted) {
+          stats.scoringV2ShadowSnapshotsCreated += 1
+        }
+        logEvent('opportunity.scoring_v2.shadow_evaluated', {
+          opportunityId: stored.id,
+          hiringEpisodeId: row.hiringEpisodeId,
+          clientProfileId: row.clientProfileId,
+          snapshotCreated: stored.scoringSnapshotInserted,
+          inputHashPrefix: scoringV2Provenance?.inputHash.slice(0, 12),
+        })
       }
     } catch (error) {
       stats.failed += 1
@@ -1438,6 +1469,7 @@ async function persistOpportunityBuild(input: {
   row: OpportunityBuildRow
   score: OpportunityScoreResult
   scoringV2: OpportunityScoringV2Result | null
+  scoringV2Provenance: OpportunityInputProvenance | null
   brief: OpportunityBrief
   fiur: ReturnType<typeof computeFiurForOpportunity>
   provenance: OpportunityInputProvenance
@@ -1456,11 +1488,13 @@ async function persistOpportunityBuild(input: {
   inserted: boolean
   superseded: boolean
   skippedUnchanged: boolean
+  scoringSnapshotInserted: boolean
 }> {
   const {
     row,
     score,
     scoringV2,
+    scoringV2Provenance,
     brief,
     fiur,
     provenance,
@@ -1472,6 +1506,10 @@ async function persistOpportunityBuild(input: {
     confidenceGate,
     db,
   } = input
+  const activeScoringV2 = provenance.scoringVersion ===
+    OPPORTUNITY_SCORING_VERSION_V2
+    ? scoringV2
+    : null
   if (input.manageTransaction) await db.query('BEGIN')
   try {
     if (isOpportunityOutcomesEnabled()) {
@@ -1623,6 +1661,16 @@ async function persistOpportunityBuild(input: {
     const lockedEpisodeStatus = lockedEpisodeState?.status ?? null
 
     if (current?.inputHash === provenance.inputHash && !elapsedSnoozeCleared) {
+      const scoringSnapshotInserted = scoringV2 && scoringV2Provenance
+        ? await persistOpportunityScoringSnapshot({
+          opportunityId: current.id,
+          row,
+          score,
+          scoringV2,
+          provenance: scoringV2Provenance,
+          db,
+        })
+        : false
       await clearBuildFailure(row, provenance.scoringVersion, db)
       if (input.manageTransaction) await db.query('COMMIT')
       logEvent('opportunity.build.semantic_unchanged', {
@@ -1636,6 +1684,7 @@ async function persistOpportunityBuild(input: {
         inserted: false,
         superseded: false,
         skippedUnchanged: true,
+        scoringSnapshotInserted,
       }
     }
 
@@ -1647,7 +1696,7 @@ async function persistOpportunityBuild(input: {
         ['accepted', 'dismissed', 'snoozed', 'contacted'].includes(current.status) &&
         !(elapsedSnoozeCleared && current.status === 'snoozed')
           ? current.status
-          : scoringV2?.status ?? score.status
+          : activeScoringV2?.status ?? score.status
       )
     const preservedSnoozedUntil = preservedStatus === 'snoozed'
       ? lockedEpisodeState?.suppressedUntil ?? null
@@ -1655,14 +1704,14 @@ async function persistOpportunityBuild(input: {
     if (preservedStatus === 'snoozed' && !preservedSnoozedUntil) {
       throw new Error('Snoozed episode state is missing suppressed_until.')
     }
-    const activeComponents = scoringV2?.components ?? score.components
-    const activeRankingScore = scoringV2?.rankingScore ?? score.opportunityScore
-    const actionQueueEligible = scoringV2?.isActionQueueEligible ??
+    const activeComponents = activeScoringV2?.components ?? score.components
+    const activeRankingScore = activeScoringV2?.rankingScore ?? score.opportunityScore
+    const actionQueueEligible = activeScoringV2?.isActionQueueEligible ??
       score.isMorningBriefEligible
-    const featureSchemaVersion = scoringV2?.featureSchemaVersion ??
+    const featureSchemaVersion = activeScoringV2?.featureSchemaVersion ??
       OPPORTUNITY_FEATURE_SCHEMA_V1
-    const gateVersion = scoringV2?.gateVersion ?? OPPORTUNITY_GATE_VERSION_V1
-    const hardGateResults = scoringV2?.hardGates ?? []
+    const gateVersion = activeScoringV2?.gateVersion ?? OPPORTUNITY_GATE_VERSION_V1
+    const hardGateResults = activeScoringV2?.hardGates ?? []
     const metadata = JSON.stringify({
       morningBriefEligible: actionQueueEligible,
       actionQueueEligible,
@@ -1899,16 +1948,16 @@ async function persistOpportunityBuild(input: {
         db,
       })
     }
-    if (scoringV2) {
-      await persistOpportunityScoringSnapshot({
+    const scoringSnapshotInserted = scoringV2 && scoringV2Provenance
+      ? await persistOpportunityScoringSnapshot({
         opportunityId: storedRow.id,
         row,
         score,
         scoringV2,
-        provenance,
+        provenance: scoringV2Provenance,
         db,
       })
-    }
+      : false
     if (preservedSnoozedUntil) {
       logEvent('opportunity.snooze_preserved', {
         opportunityId: storedRow.id,
@@ -1924,6 +1973,7 @@ async function persistOpportunityBuild(input: {
       inserted: !updateTargetId,
       superseded,
       skippedUnchanged: false,
+      scoringSnapshotInserted,
     }
   } catch (error) {
     if (input.manageTransaction) {
@@ -2058,11 +2108,11 @@ async function persistOpportunityScoringSnapshot(input: {
   scoringV2: OpportunityScoringV2Result
   provenance: OpportunityInputProvenance
   db: OpportunityJobDb
-}): Promise<void> {
+}): Promise<boolean> {
   if (!input.row.workspaceId) {
     throw new Error('Opportunity scoring snapshot requires workspace context.')
   }
-  await input.db.query(
+  const result = await input.db.query(
     `INSERT INTO opportunity_scoring_snapshots (
        opportunity_id,
        owner_id,
@@ -2092,7 +2142,8 @@ async function persistOpportunityScoringSnapshot(input: {
        $11, $12, $13, $14, $15,
        $16::jsonb, $17::jsonb, $18::jsonb, $19, $20, $21, $22
      )
-     ON CONFLICT (opportunity_id, scoring_version, input_hash) DO NOTHING`,
+     ON CONFLICT (opportunity_id, scoring_version, input_hash) DO NOTHING
+     RETURNING id`,
     [
       input.opportunityId,
       input.row.ownerId,
@@ -2118,6 +2169,7 @@ async function persistOpportunityScoringSnapshot(input: {
       input.scoringV2.isActionQueueEligible,
     ],
   )
+  return result.rowCount === 1
 }
 
 function createOpportunityInputProvenance(
@@ -2475,6 +2527,8 @@ function createStats(options: OpportunityJobOptions): OpportunityJobStats {
     resumeLatencyMsMax: 0,
     locked: 0,
     skippedBecauseLocked: false,
+    scoringV2ShadowEvaluated: 0,
+    scoringV2ShadowSnapshotsCreated: 0,
   }
 }
 
@@ -2547,7 +2601,12 @@ function createOpportunityScoringSelection(
     ? requestedVersion
     : null
   if (forcedVersion) {
-    return { forcedVersion, globalV2: false, canaryWorkspaceId: null }
+    return {
+      forcedVersion,
+      globalV2: false,
+      canaryWorkspaceId: null,
+      shadowWorkspaceId: null,
+    }
   }
 
   const globalV2 = isOpportunityScoringV2EnabledForContext({
@@ -2568,12 +2627,23 @@ function createOpportunityScoringSelection(
       workspaceId,
     }),
   )
+  const shadowWorkspaceId = parseSingleCanaryId(
+    process.env[OPPORTUNITY_SCORING_V2_SHADOW_CANARY_WORKSPACE_IDS_FEATURE_FLAG],
+  )
+  const enabledShadowWorkspaceId = shadowWorkspaceId &&
+    isOpportunityScoringV2ShadowEnabledForContext({
+      dataOwnerId: null,
+      workspaceId: shadowWorkspaceId,
+    })
+    ? shadowWorkspaceId
+    : null
   return {
     forcedVersion: null,
     globalV2,
     canaryWorkspaceId: enabledCanaries.length === 1
       ? enabledCanaries[0]
       : null,
+    shadowWorkspaceId: globalV2 ? null : enabledShadowWorkspaceId,
   }
 }
 

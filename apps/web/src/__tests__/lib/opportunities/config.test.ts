@@ -16,6 +16,7 @@ import {
   isOpportunityOutcomesUiEnabledForOwner,
   isOpportunityScoringV2Enabled,
   isOpportunityScoringV2EnabledForContext,
+  isOpportunityScoringV2ShadowEnabledForContext,
   isOpportunityWorkspaceContextEnabled,
   isOpportunityWorkspaceContextEnabledForContext,
 } from '@/lib/opportunities/config'
@@ -227,5 +228,29 @@ describe('opportunity engine config', () => {
         OPPORTUNITY_SCORING_V2_CANARY_WORKSPACE_IDS: '9',
       },
     )).toBe(false)
+  })
+
+  it('keeps Scoring v2 shadow evaluation fail-closed and separate from activation', () => {
+    const context = { dataOwnerId: '7', workspaceId: '9' }
+
+    expect(isOpportunityScoringV2ShadowEnabledForContext(context, {})).toBe(false)
+    expect(isOpportunityScoringV2ShadowEnabledForContext(context, {
+      OPPORTUNITY_SCORING_V2_SHADOW_CANARY_WORKSPACE_IDS: '9',
+    })).toBe(false)
+    expect(isOpportunityScoringV2ShadowEnabledForContext(context, {
+      AGENCY_DNA_V1_CANARY_WORKSPACE_IDS: '9',
+      OPPORTUNITY_SCORING_V2_SHADOW_CANARY_WORKSPACE_IDS: '9',
+    })).toBe(true)
+    expect(isOpportunityScoringV2EnabledForContext(context, {
+      AGENCY_DNA_V1_CANARY_WORKSPACE_IDS: '9',
+      OPPORTUNITY_SCORING_V2_SHADOW_CANARY_WORKSPACE_IDS: '9',
+    })).toBe(false)
+
+    for (const invalid of ['9,10', '9,9', '09', '*', '']) {
+      expect(isOpportunityScoringV2ShadowEnabledForContext(context, {
+        AGENCY_DNA_V1_CANARY_WORKSPACE_IDS: '9',
+        OPPORTUNITY_SCORING_V2_SHADOW_CANARY_WORKSPACE_IDS: invalid,
+      })).toBe(false)
+    }
   })
 })
