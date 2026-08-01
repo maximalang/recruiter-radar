@@ -607,8 +607,9 @@ describe('opportunity background jobs', () => {
     expect(snapshotParams.slice(0, 6)).toEqual([
       '100', '7', '9', '8', 4, 'd'.repeat(64),
     ])
-    expect(JSON.parse(String(snapshotParams[6]))).toEqual(snapshot)
-    expect(JSON.parse(String(snapshotParams[8]))).toEqual({
+    expect(snapshotParams[6]).toEqual(expect.stringMatching(/^[a-f0-9]{64}$/))
+    expect(JSON.parse(String(snapshotParams[7]))).toEqual(snapshot)
+    expect(JSON.parse(String(snapshotParams[9]))).toEqual({
       type: 'do_not_contact',
       opportunityMode: 'blocked',
       blocksOpportunity: true,

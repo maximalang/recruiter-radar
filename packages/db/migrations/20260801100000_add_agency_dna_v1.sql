@@ -339,6 +339,7 @@ CREATE TABLE opportunity_agency_dna_snapshots (
   client_profile_id BIGINT NOT NULL,
   agency_dna_version BIGINT NOT NULL,
   agency_dna_snapshot_hash TEXT NOT NULL,
+  opportunity_input_hash TEXT NOT NULL,
   snapshot JSONB NOT NULL,
   capability_matches JSONB NOT NULL,
   restriction_snapshot JSONB NOT NULL DEFAULT '{}'::JSONB,
@@ -356,6 +357,8 @@ CREATE TABLE opportunity_agency_dna_snapshots (
     CHECK (agency_dna_version > 0),
   CONSTRAINT opportunity_agency_dna_snapshots_hash_check
     CHECK (agency_dna_snapshot_hash ~ '^[a-f0-9]{64}$'),
+  CONSTRAINT opportunity_agency_dna_snapshots_input_hash_check
+    CHECK (opportunity_input_hash ~ '^[a-f0-9]{64}$'),
   CONSTRAINT opportunity_agency_dna_snapshots_snapshot_check
     CHECK (JSONB_TYPEOF(snapshot) = 'object'),
   CONSTRAINT opportunity_agency_dna_snapshots_matches_check
@@ -365,7 +368,12 @@ CREATE TABLE opportunity_agency_dna_snapshots (
   CONSTRAINT opportunity_agency_dna_snapshots_fit_not_blank
     CHECK (BTRIM(fit_explanation) <> ''),
   CONSTRAINT opportunity_agency_dna_snapshots_unique
-    UNIQUE (opportunity_id, agency_dna_version, agency_dna_snapshot_hash)
+    UNIQUE (
+      opportunity_id,
+      opportunity_input_hash,
+      agency_dna_version,
+      agency_dna_snapshot_hash
+    )
 );
 
 ALTER TABLE opportunities
@@ -378,6 +386,7 @@ CREATE INDEX opportunity_agency_dna_snapshots_lookup_idx
     workspace_id,
     client_profile_id,
     opportunity_id,
+    opportunity_input_hash,
     agency_dna_version DESC
   );
 

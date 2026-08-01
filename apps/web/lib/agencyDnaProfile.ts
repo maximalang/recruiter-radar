@@ -27,7 +27,7 @@ export type AgencyDnaProfile = {
   caseStudies: AgencyDnaCaseStudy[]
   currentCapacity: AgencyDnaCapacity
   agencyDnaVersion: number
-  agencyDnaSnapshotHash: string
+  agencyDnaSnapshotHash: string | null
   updatedAt: string
 }
 

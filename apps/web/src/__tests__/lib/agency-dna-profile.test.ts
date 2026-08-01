@@ -41,6 +41,13 @@ describe('Agency DNA profile repository', () => {
     )
   })
 
+  it('keeps an unbackfilled snapshot hash explicit', async () => {
+    const db = dbReturning([{ ...PROFILE_ROW, agencyDnaSnapshotHash: null }])
+
+    await expect(getAgencyDnaProfile({ ownerId: '7', workspaceId: '9' }, db))
+      .resolves.toMatchObject({ agencyDnaSnapshotHash: null })
+  })
+
   it('saves only the scoped profile and normalizes structured values', async () => {
     const db = dbReturning([PROFILE_ROW])
 

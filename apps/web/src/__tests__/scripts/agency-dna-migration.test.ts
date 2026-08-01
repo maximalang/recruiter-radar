@@ -69,6 +69,7 @@ describe('Agency DNA v1 migration contract', () => {
     expect(migration).toContain('CREATE TABLE opportunity_agency_dna_snapshots')
     expect(migration).toContain('agency_dna_version BIGINT NOT NULL')
     expect(migration).toContain('agency_dna_snapshot_hash TEXT NOT NULL')
+    expect(migration).toContain('opportunity_input_hash TEXT NOT NULL')
     expect(migration).toContain('snapshot JSONB NOT NULL')
     expect(migration).toContain('capability_matches JSONB NOT NULL')
     expect(migration).toContain('restriction_snapshot JSONB NOT NULL')

@@ -1799,6 +1799,7 @@ async function persistOpportunityBuild(input: {
     if (agencyDnaState) {
       await persistAgencyDnaSnapshot({
         opportunityId: storedRow.id,
+        opportunityInputHash: provenance.inputHash,
         row,
         agencyDnaState,
         fitExplanation: brief.agencyFitExplanation,
@@ -1896,6 +1897,7 @@ function resolveAgencyDnaBuildState(input: {
 
 async function persistAgencyDnaSnapshot(input: {
   opportunityId: string
+  opportunityInputHash: string
   row: OpportunityBuildRow
   agencyDnaState: AgencyDnaBuildState
   fitExplanation: string
@@ -1914,14 +1916,19 @@ async function persistAgencyDnaSnapshot(input: {
        client_profile_id,
        agency_dna_version,
        agency_dna_snapshot_hash,
+       opportunity_input_hash,
        snapshot,
        capability_matches,
        restriction_snapshot,
        fit_explanation
      )
-     VALUES ($1, $2, $3, $4, $5, $6, $7::JSONB, $8::JSONB, $9::JSONB, $10)
+     VALUES (
+       $1, $2, $3, $4, $5, $6, $7,
+       $8::JSONB, $9::JSONB, $10::JSONB, $11
+     )
      ON CONFLICT (
        opportunity_id,
+       opportunity_input_hash,
        agency_dna_version,
        agency_dna_snapshot_hash
      ) DO NOTHING`,
@@ -1932,6 +1939,7 @@ async function persistAgencyDnaSnapshot(input: {
       input.row.clientProfileId,
       input.agencyDnaState.version,
       input.agencyDnaState.snapshotHash,
+      input.opportunityInputHash,
       JSON.stringify(input.agencyDnaState.snapshot),
       JSON.stringify(input.agencyDnaState.context.capabilityMatches),
       JSON.stringify(input.agencyDnaState.context.restrictionSnapshot),
