@@ -169,6 +169,20 @@ describe('OpportunityScoringV2Service', () => {
     expect(result.isActionQueueEligible).toBe(false)
   })
 
+  it('uses the versioned confidence threshold consistently for status and action', () => {
+    const strictService = new OpportunityScoringV2Service({
+      minimumAgencyFit: 0,
+      minimumExternalSupportNeed: 0,
+      minimumEvidenceConfidence: 0.95,
+      minimumActionQueueRankingScore: 0,
+    })
+
+    const result = strictService.score(input({ confidenceScore: 0.9 }))
+
+    expect(result.status).toBe('review')
+    expect(result.isActionQueueEligible).toBe(false)
+  })
+
   it('attributes evidence-derived reasons to immutable evidence identifiers', () => {
     const result = service.score(input())
     const reasons = Object.values(result.components)

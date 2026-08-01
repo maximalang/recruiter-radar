@@ -36,8 +36,8 @@ Scoring v2 включается только для одного workspace, ес
 7. commercial value.
 
 До ранжирования применяются шесть hard gates: profile exclusion, подтверждённое
-разрешение сущности, допустимое hiring evidence, account restriction,
-корпоративный contact policy и минимальное capability match. Любой провал
+разрешение сущности, допустимое hiring evidence, неистёкший hiring episode,
+account restriction и корпоративный contact policy. Любой провал
 обнуляет eligibility и итоговый rank. `do_not_contact` и `conflict` блокируют
 действие; `existing_client` и `former_client` сохраняют отдельные grow/reactivate
 сценарии. В action queue допускаются только результаты без проваленных gates и с

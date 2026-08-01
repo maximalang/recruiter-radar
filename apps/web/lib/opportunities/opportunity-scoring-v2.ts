@@ -171,7 +171,12 @@ export class OpportunityScoringV2Service {
     const rankingScore = geometricMean(
       Object.values(components).map((component) => component.score),
     )
-    const status = resolveStatus(input, failedGates, evidenceConfidence.score)
+    const status = resolveStatus(
+      input,
+      failedGates,
+      evidenceConfidence.score,
+      this.config.minimumEvidenceConfidence,
+    )
     const isActionQueueEligible =
       failedGates.length === 0 &&
       (input.confidenceGate === 'A' || input.confidenceGate === 'B') &&
@@ -308,6 +313,7 @@ function resolveStatus(
   input: OpportunityScoringV2Input,
   failedGates: OpportunityScoringV2HardGate[],
   evidenceConfidenceScore: number,
+  minimumEvidenceConfidence: number,
 ): OpportunityStatus {
   if (input.episodeStatus === 'closed') return 'expired'
   if (failedGates.some((gate) =>
@@ -320,8 +326,7 @@ function resolveStatus(
     failedGates.length > 0 ||
     input.confidenceGate === 'C' ||
     input.confidenceGate === 'D' ||
-    evidenceConfidenceScore <
-      DEFAULT_OPPORTUNITY_SCORING_V2_CONFIG.minimumEvidenceConfidence
+    evidenceConfidenceScore < minimumEvidenceConfidence
   ) {
     return 'review'
   }
