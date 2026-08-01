@@ -8,7 +8,7 @@ export function OpportunityDecisionContext(props: { opportunity: OpportunityItem
   const brief = props.opportunity.strategistBrief
 
   return (
-    <div className={styles.decisionGrid}>
+    <div className={`${styles.decisionGrid} ${styles.decisionContext}`}>
       <DecisionSection
         id={`changed-${props.opportunity.id}`}
         heading="Что изменилось"

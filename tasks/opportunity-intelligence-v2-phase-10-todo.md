@@ -10,7 +10,7 @@
 - [x] Implement the action-first Today surface and secondary Research Mode.
 - [x] Implement all eleven card sections and insufficient/stale states.
 - [x] Add route loading and explicit permission/error/empty/no-data states.
-- [ ] Verify 320/768/1024/1440, keyboard, screen-reader structure and console.
+- [x] Verify 320/768/1024/1440, keyboard, screen-reader structure and console.
 - [ ] Run full checks and five-axis pre-merge review.
 - [ ] Commit atomically, push and open one PR to the integration branch.
 - [ ] Merge only after the final green merge-gate.
