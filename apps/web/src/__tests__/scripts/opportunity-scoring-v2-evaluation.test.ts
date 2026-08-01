@@ -33,6 +33,7 @@ describe('Opportunity Scoring v2 evaluation contract', () => {
   it('keeps small samples explicit and never auto-tunes weights', () => {
     expect(evaluator).toContain("'insufficient_data'")
     expect(evaluator).toContain('absoluteCounts')
+    expect(evaluator).toContain("evaluationPopulation: 'labeled_outcomes_only'")
     expect(evaluator).toContain('automaticWeightTuning: false')
     expect(evaluator).not.toMatch(/UPDATE\s+.*scor|INSERT\s+INTO\s+.*config/i)
   })
@@ -40,6 +41,7 @@ describe('Opportunity Scoring v2 evaluation contract', () => {
   it('reads one workspace and emits no company or contact identity', () => {
     expect(cli).toContain("requireWorkspaceId(args)")
     expect(cli).toContain('snapshot.workspace_id = $1')
+    expect(cli).toContain('snapshot.comparison_input_hash AS "sampleKey"')
     expect(cli).not.toMatch(/organization_name|agency_name|contact_reference|email|phone/i)
     expect(cli).not.toMatch(/\bUPDATE\b|\bDELETE\b|\bINSERT\b/i)
   })

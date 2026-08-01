@@ -29,6 +29,7 @@ try {
         snapshot.hiring_episode_id,
         snapshot.baseline_ranking_score AS "v1Score",
         snapshot.ranking_score AS "v2Score",
+        snapshot.comparison_input_hash AS "sampleKey",
         snapshot.action_queue_eligible AS "actionQueueEligible",
         snapshot.hard_gate_results AS "hardGates",
         snapshot.confidence_gate AS "confidenceGate",

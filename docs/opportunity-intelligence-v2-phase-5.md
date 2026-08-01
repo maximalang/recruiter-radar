@@ -92,7 +92,10 @@ npm.cmd run opportunity-scoring-v2:evaluate -- --workspace-id <workspace-id> --r
 
 Отчёт включает Precision@5, Precision@10, NDCG@10, acceptance/contact/reply/
 meeting rates по score decile, bad-fit и false-positive taxonomy, а также разрезы
-по source family и episode type. До 30 observations или до 10 размеченных
+по source family и episode type. Метрики качества считаются только по размеченным
+outcomes: незавершённые opportunities не считаются отрицательными примерами. Равные
+score упорядочиваются воспроизводимо по непрозрачному comparison hash, который не
+выводится в отчёт. До 30 observations или до 10 размеченных
 исходов все значения сопровождаются абсолютными counts и статусом
 `insufficient_data`; они не являются доказательством качества и не меняют веса.
 

@@ -10,13 +10,14 @@ export function evaluateOpportunityScoringRows(
   const rows = inputRows.map(normalizeRow)
   const minimumSample = options.minimumSample ?? DEFAULT_MINIMUM_SAMPLE
   const minimumLabeled = options.minimumLabeled ?? DEFAULT_MINIMUM_LABELED
-  const labeledCount = rows.filter(isLabeled).length
+  const labeledRows = rows.filter(isLabeled)
+  const labeledCount = labeledRows.length
   const dataStatus = rows.length >= minimumSample &&
     labeledCount >= minimumLabeled
     ? 'sufficient_data'
     : 'insufficient_data'
-  const v1 = evaluateModel(rows, 'v1Score', dataStatus)
-  const v2 = evaluateModel(rows, 'v2Score', dataStatus)
+  const v1 = evaluateModel(labeledRows, 'v1Score', dataStatus)
+  const v2 = evaluateModel(labeledRows, 'v2Score', dataStatus)
   const actionQueueSafetyViolations = rows.filter((row) =>
     row.actionQueueEligible && (
       row.hardGates.length !== EXPECTED_HARD_GATE_COUNT ||
@@ -67,9 +68,9 @@ export function evaluateOpportunityScoringRows(
       },
     },
     badFitReasonDistribution: countValues(
-      rows.map((row) => row.dismissReasonCode).filter(Boolean),
+      labeledRows.map((row) => row.dismissReasonCode).filter(Boolean),
     ),
-    falsePositiveTaxonomy: countValues(rows
+    falsePositiveTaxonomy: countValues(labeledRows
       .filter((row) =>
         row.v2Score >= 0.8 &&
         !row.accepted &&
@@ -77,17 +78,18 @@ export function evaluateOpportunityScoringRows(
       )
       .map((row) => row.dismissReasonCode || row.lostReasonCode)),
     sourceFamilyPerformance: performanceByGroup(
-      rows.flatMap((row) => row.sourceFamilies.map((sourceFamily) => ({
+      labeledRows.flatMap((row) => row.sourceFamilies.map((sourceFamily) => ({
         key: sourceFamily,
         row,
       }))),
       dataStatus,
     ),
     episodeTypePerformance: performanceByGroup(
-      rows.map((row) => ({ key: row.episodeType, row })),
+      labeledRows.map((row) => ({ key: row.episodeType, row })),
       dataStatus,
     ),
     methodology: {
+      evaluationPopulation: 'labeled_outcomes_only',
       relevance: 'accepted_or_later',
       ndcgGrades: {
         accepted: 1,
@@ -193,6 +195,7 @@ function rateMetric(rows, field, status) {
 
 function normalizeRow(row) {
   return {
+    sampleKey: normalizeSampleKey(row.sampleKey),
     v1Score: clamp01(row.v1Score),
     v2Score: clamp01(row.v2Score),
     actionQueueEligible: row.actionQueueEligible === true,
@@ -223,7 +226,12 @@ function isLabeled(row) {
 }
 
 function sortByScore(rows, scoreKey) {
-  return [...rows].sort((left, right) => right[scoreKey] - left[scoreKey])
+  return [...rows].sort((left, right) => {
+    const scoreDifference = right[scoreKey] - left[scoreKey]
+    return scoreDifference === 0
+      ? left.sampleKey.localeCompare(right.sampleKey)
+      : scoreDifference
+  })
 }
 
 function relevanceGrade(row) {
@@ -259,6 +267,14 @@ function countValues(values) {
 function normalizeLabel(value) {
   const normalized = typeof value === 'string' ? value.trim() : ''
   return normalized || null
+}
+
+function normalizeSampleKey(value) {
+  const normalized = typeof value === 'string' ? value.trim() : ''
+  if (!/^[a-f0-9]{64}$/.test(normalized)) {
+    throw new Error('Evaluation sampleKey must be a lowercase SHA-256 hash')
+  }
+  return normalized
 }
 
 function clamp01(value) {
