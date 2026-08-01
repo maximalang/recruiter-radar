@@ -40,6 +40,7 @@ const OPPORTUNITY: OpportunityItem = {
   validUntil: '2026-08-15T00:00:00.000Z',
   snoozedUntil: null,
   metadata: {},
+  strategistBrief: null,
   createdAt: '2026-07-26T00:00:00.000Z',
   updatedAt: '2026-07-26T00:00:00.000Z',
   evidenceCount: 1,
@@ -104,6 +105,41 @@ describe('OpportunityCard', () => {
     expect(screen.getByText('Предложение')).toBeInTheDocument()
     expect(screen.queryByText('Связались')).toBeNull()
   })
+
+  it('renders the complete strategist card with explicit evidence and heuristic labels', () => {
+    render(<OpportunityCard opportunity={{
+      ...OPPORTUNITY,
+      strategistBrief: {
+        version: 'opportunity-strategist-v1',
+        whatChanged: evidenceConclusion('Открыто 8 вакансий.', ['1']),
+        whyNow: evidenceConclusion('Сигнал появился на этой неделе.', ['1']),
+        problemHypothesis: heuristicConclusion('Команде может требоваться помощь.'),
+        agencyFitExplanation: heuristicConclusion('Есть профильное совпадение.'),
+        externalSupportNeedExplanation: evidenceConclusion(
+          'Темп найма вырос.',
+          ['1'],
+        ),
+        recommendedPersona: heuristicConclusion('Проверить функцию HRD.'),
+        recommendedAngle: heuristicConclusion('Начать со сложных ролей.'),
+        recommendedCaseStudy: heuristicConclusion('Точного кейса нет.'),
+        recommendedNextAction: heuristicConclusion('Подготовить ручной черновик.'),
+        riskSignals: [heuristicConclusion('Бюджет не подтверждён.')],
+        limitations: [heuristicConclusion('Нужна ручная проверка.')],
+      },
+    }} />)
+
+    expect(screen.getByRole('heading', {
+      name: 'Стратегическая карточка',
+    })).toBeInTheDocument()
+    expect(screen.getAllByText('Основано на доказательствах').length)
+      .toBeGreaterThan(0)
+    expect(screen.getAllByText('Гипотеза — проверьте вручную').length)
+      .toBeGreaterThan(0)
+    expect(screen.getAllByText('Подтверждения: №1').length).toBeGreaterThan(0)
+    expect(screen.getByText('Риски')).toBeInTheDocument()
+    expect(screen.getByText('Ограничения')).toBeInTheDocument()
+    expect(screen.getByText('Подготовить ручной черновик.')).toBeInTheDocument()
+  })
 })
 
 describe('OpportunityActions', () => {
@@ -140,3 +176,11 @@ describe('OpportunityActions', () => {
     )
   })
 })
+
+function evidenceConclusion(text: string, supportingEvidenceIds: string[]) {
+  return { text, basis: 'evidence' as const, supportingEvidenceIds }
+}
+
+function heuristicConclusion(text: string) {
+  return { text, basis: 'heuristic' as const, supportingEvidenceIds: [] }
+}

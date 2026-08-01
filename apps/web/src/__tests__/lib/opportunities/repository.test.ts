@@ -100,6 +100,7 @@ describe('opportunity repository tenant scope', () => {
 
     expect(result.total).toBe(1)
     expect(result.nextOffset).toBeNull()
+    expect(result.opportunities[0]?.strategistBrief).toBeNull()
     expect(calls).toHaveLength(3)
     expect(calls[0].sql).toContain('o.owner_id = $1')
     expect(calls[1].sql).toContain('o.owner_id = $1')

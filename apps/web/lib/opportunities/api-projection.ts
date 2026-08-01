@@ -1,4 +1,5 @@
 import type { OpportunityItem } from './repository'
+import { parseOpportunityStrategistBrief } from './opportunity-strategist-v1'
 
 export function toPublicOpportunity(opportunity: OpportunityItem) {
   const {
@@ -10,10 +11,12 @@ export function toPublicOpportunity(opportunity: OpportunityItem) {
     sourceFamilyCount,
     directEvidenceCount,
     agencyFitExplanation,
+    strategistBrief,
     metadata,
     ...publicOpportunity
   } = opportunity
   const safeMetadata = asRecord(metadata)
+  const safeStrategistBrief = parseOpportunityStrategistBrief(strategistBrief)
 
   return {
     ...publicOpportunity,
@@ -34,6 +37,12 @@ export function toPublicOpportunity(opportunity: OpportunityItem) {
     },
     sourceFamilies: toStringArray(safeMetadata.sourceFamilies),
     morningBriefEligible: safeMetadata.morningBriefEligible === true,
+    strategistBrief: safeStrategistBrief
+      ? {
+        ...safeStrategistBrief,
+        evidenceTimeline: publicOpportunity.evidenceTimeline,
+      }
+      : null,
   }
 }
 

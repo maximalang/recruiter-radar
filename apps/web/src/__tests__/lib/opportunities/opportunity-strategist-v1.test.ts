@@ -1,5 +1,6 @@
 import {
   OpportunityStrategistV1,
+  parseOpportunityStrategistBrief,
   type OpportunityStrategistInput,
 } from '@/lib/opportunities/opportunity-strategist-v1'
 import type { HiringEpisodeCandidate } from '@/lib/opportunities/hiring-episode-detection'
@@ -183,5 +184,40 @@ describe('OpportunityStrategistV1', () => {
     expect(brief.limitations.some((item) =>
       item.text.toLocaleLowerCase('ru-RU').includes('размер'),
     )).toBe(true)
+  })
+
+  it('parses only a complete versioned brief with valid evidence lineage', () => {
+    const brief = new OpportunityStrategistV1().build(INPUT)
+
+    expect(parseOpportunityStrategistBrief(brief)).toEqual(brief)
+    expect(parseOpportunityStrategistBrief({
+      ...brief,
+      whatChanged: {
+        ...brief.whatChanged,
+        supportingEvidenceIds: [],
+      },
+    })).toBeNull()
+    expect(parseOpportunityStrategistBrief({
+      ...brief,
+      recommendedPersona: {
+        ...brief.recommendedPersona,
+        supportingEvidenceIds: ['personal@example.test'],
+      },
+    })).toBeNull()
+    expect(parseOpportunityStrategistBrief({
+      ...brief,
+      whatChanged: {
+        ...brief.whatChanged,
+        text: 'Написать на personal@example.test',
+      },
+    })).toBeNull()
+    expect(parseOpportunityStrategistBrief({
+      ...brief,
+      version: 'opportunity-strategist-v2',
+    })).toBeNull()
+    expect(parseOpportunityStrategistBrief({
+      version: 'opportunity-strategist-v1',
+      whatChanged: brief.whatChanged,
+    })).toBeNull()
   })
 })

@@ -130,6 +130,29 @@
   background: #e2e8f0;
 }
 
+.strategistCard {
+  margin-top: 22px;
+}
+
+.strategistHeading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.strategistHeading h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 0.92rem;
+}
+
+.strategistHeading > span {
+  color: #64748b;
+  font-size: 0.68rem;
+}
+
 .briefField {
   padding: 16px;
   background: #f8fafc;
@@ -150,6 +173,57 @@
   color: #1e293b;
   font-size: 0.84rem;
   line-height: 1.55;
+}
+
+.conclusionBasis {
+  display: grid;
+  gap: 3px;
+  margin-top: 10px;
+  color: #64748b;
+  font-size: 0.68rem;
+}
+
+.conclusionBasis > span {
+  font-weight: 680;
+}
+
+.conclusionBasis[data-basis="evidence"] > span {
+  color: #166534;
+}
+
+.conclusionBasis small {
+  color: inherit;
+  font-size: inherit;
+}
+
+.strategistList {
+  margin-top: 12px;
+  padding: 14px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 13px;
+  background: #fff;
+}
+
+.strategistList > span {
+  color: #475569;
+  font-size: 0.68rem;
+  font-weight: 760;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.strategistList ul {
+  display: grid;
+  gap: 12px;
+  margin: 10px 0 0;
+  padding-left: 18px;
+}
+
+.strategistList p {
+  margin: 0;
+  color: #334155;
+  font-size: 0.8rem;
+  line-height: 1.5;
 }
 
 .evidenceSection {

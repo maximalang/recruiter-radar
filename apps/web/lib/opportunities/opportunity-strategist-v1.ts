@@ -60,6 +60,54 @@ export type OpportunityStrategistInput = {
   }
 }
 
+const CONCLUSION_KEYS = [
+  'whatChanged',
+  'whyNow',
+  'problemHypothesis',
+  'agencyFitExplanation',
+  'externalSupportNeedExplanation',
+  'recommendedPersona',
+  'recommendedAngle',
+  'recommendedCaseStudy',
+  'recommendedNextAction',
+] as const
+
+export function parseOpportunityStrategistBrief(
+  value: unknown,
+): OpportunityStrategistBrief | null {
+  const input = asRecord(value)
+  if (input.version !== OPPORTUNITY_STRATEGIST_V1_VERSION) return null
+
+  const conclusions = Object.fromEntries(CONCLUSION_KEYS.flatMap((key) => {
+    const conclusion = parseConclusion(input[key])
+    return conclusion ? [[key, conclusion]] : []
+  })) as Partial<Record<
+    typeof CONCLUSION_KEYS[number],
+    OpportunityStrategistConclusion
+  >>
+  if (CONCLUSION_KEYS.some((key) => !conclusions[key])) return null
+
+  const riskSignals = parseConclusionList(input.riskSignals)
+  const limitations = parseConclusionList(input.limitations)
+  if (!riskSignals || !limitations) return null
+
+  return {
+    version: OPPORTUNITY_STRATEGIST_V1_VERSION,
+    whatChanged: conclusions.whatChanged!,
+    whyNow: conclusions.whyNow!,
+    problemHypothesis: conclusions.problemHypothesis!,
+    agencyFitExplanation: conclusions.agencyFitExplanation!,
+    externalSupportNeedExplanation:
+      conclusions.externalSupportNeedExplanation!,
+    recommendedPersona: conclusions.recommendedPersona!,
+    recommendedAngle: conclusions.recommendedAngle!,
+    recommendedCaseStudy: conclusions.recommendedCaseStudy!,
+    recommendedNextAction: conclusions.recommendedNextAction!,
+    riskSignals,
+    limitations,
+  }
+}
+
 export class OpportunityStrategistV1 {
   build(input: OpportunityStrategistInput): OpportunityStrategistBrief {
     const evidenceIds = episodeEvidenceIds(input.episode)
@@ -327,6 +375,39 @@ function uniqueText(values: readonly string[]): string[] {
   return Array.from(new Set(
     values.map((value) => value.trim()).filter(Boolean),
   )).sort((left, right) => left.localeCompare(right, 'en'))
+}
+
+function parseConclusion(value: unknown): OpportunityStrategistConclusion | null {
+  const input = asRecord(value)
+  const text = typeof input.text === 'string' ? input.text.trim() : ''
+  if (!text || text.length > 2_000 || containsPersonalContact(text)) return null
+  const basis = input.basis
+  if (basis !== 'evidence' && basis !== 'heuristic') return null
+  if (!Array.isArray(input.supportingEvidenceIds)) return null
+  const evidenceIds = uniqueText(input.supportingEvidenceIds.filter(
+    (id): id is string => typeof id === 'string' && /^\d+$/.test(id.trim()),
+  ))
+  if (evidenceIds.length !== input.supportingEvidenceIds.length) return null
+  if (evidenceIds.length > 100) return null
+  if (basis === 'evidence' && evidenceIds.length === 0) return null
+  if (basis === 'heuristic' && evidenceIds.length > 0) return null
+  return { text, basis, supportingEvidenceIds: evidenceIds }
+}
+
+function parseConclusionList(
+  value: unknown,
+): OpportunityStrategistConclusion[] | null {
+  if (!Array.isArray(value) || value.length > 20) return null
+  const conclusions = value.map(parseConclusion)
+  return conclusions.some((item) => item === null)
+    ? null
+    : conclusions as OpportunityStrategistConclusion[]
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
 }
 
 function normalizedSet(values: readonly string[]): Set<string> {

@@ -23,6 +23,10 @@ import {
   type ConfidenceGate,
   type OpportunityStatus,
 } from './opportunity-scoring'
+import {
+  parseOpportunityStrategistBrief,
+  type OpportunityStrategistBrief,
+} from './opportunity-strategist-v1'
 
 export const OPPORTUNITY_ACTIONS = [
   'accepted',
@@ -127,6 +131,7 @@ interface OpportunityRow {
 
 export interface OpportunityItem extends OpportunityRow {
   evidenceTimeline: OpportunityEvidenceItem[]
+  strategistBrief: OpportunityStrategistBrief | null
 }
 
 export interface OpportunityEvidenceItem {
@@ -301,10 +306,10 @@ export async function listOpportunities(
   const total = Number(countResult.rows[0]?.count ?? 0)
   const consumed = offset + rows.rows.length
   return {
-    opportunities: rows.rows.map((row) => ({
-      ...row,
-      evidenceTimeline: evidenceByOpportunity.get(row.id) ?? [],
-    })),
+    opportunities: rows.rows.map((row) => toOpportunityItem(
+      row,
+      evidenceByOpportunity.get(row.id) ?? [],
+    )),
     total,
     page,
     pageSize,
@@ -412,10 +417,7 @@ export async function getOpportunityById(
     [row.id],
     db,
   )
-  return {
-    ...row,
-    evidenceTimeline: evidence.get(row.id) ?? [],
-  }
+  return toOpportunityItem(row, evidence.get(row.id) ?? [])
 }
 
 export async function applyOpportunityAction(input: {
@@ -501,10 +503,10 @@ export async function applyOpportunityAction(input: {
             [currentRow.id],
             client,
           )
-          opportunity = {
-            ...currentRow,
-            evidenceTimeline: evidence.get(currentRow.id) ?? [],
-          }
+          opportunity = toOpportunityItem(
+            currentRow,
+            evidence.get(currentRow.id) ?? [],
+          )
         }
       }
     } finally {
@@ -683,6 +685,19 @@ function canonicalPublicationIdentity(
   const canonicalUrl = canonicalizeOpportunityUrl(item.url)
   if (canonicalUrl) return `url:${canonicalUrl}`
   return `${item.kind}:${item.source}:${item.id}`
+}
+
+function toOpportunityItem(
+  row: OpportunityRow,
+  evidenceTimeline: OpportunityEvidenceItem[],
+): OpportunityItem {
+  return {
+    ...row,
+    evidenceTimeline,
+    strategistBrief: parseOpportunityStrategistBrief(
+      row.metadata?.strategistBrief,
+    ),
+  }
 }
 
 function isOpportunityStatus(value: unknown): value is OpportunityStatus {
