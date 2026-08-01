@@ -915,7 +915,7 @@ try {
        AND dc.created_at >= cp.updated_at
      ORDER BY he.last_seen_at DESC, he.id DESC, cp.id DESC
      LIMIT $2`,
-    [organizationId, 50, 'opportunity-v2'],
+    [organizationId, 50, 'opportunity-v2', false, null],
   )
   assert.ok(explain.rows[0]['QUERY PLAN'][0].Plan)
   checks.push('build_query_explain_without_cross_join')
