@@ -9,6 +9,7 @@ import {
 import type { HiringEpisodeType } from './hiring-episode-detection'
 import {
   clampOpportunityPageSize,
+  isOpportunityStrategistV1EnabledForContext,
 } from './config'
 import type {
   DismissedReasonCode,
@@ -305,10 +306,15 @@ export async function listOpportunities(
 
   const total = Number(countResult.rows[0]?.count ?? 0)
   const consumed = offset + rows.rows.length
+  const strategistEnabled = isOpportunityStrategistV1EnabledForContext({
+    dataOwnerId: input.ownerId,
+    workspaceId: input.workspaceId,
+  })
   return {
     opportunities: rows.rows.map((row) => toOpportunityItem(
       row,
       evidenceByOpportunity.get(row.id) ?? [],
+      strategistEnabled,
     )),
     total,
     page,
@@ -417,7 +423,14 @@ export async function getOpportunityById(
     [row.id],
     db,
   )
-  return toOpportunityItem(row, evidence.get(row.id) ?? [])
+  return toOpportunityItem(
+    row,
+    evidence.get(row.id) ?? [],
+    isOpportunityStrategistV1EnabledForContext({
+      dataOwnerId: input.ownerId,
+      workspaceId: input.workspaceId,
+    }),
+  )
 }
 
 export async function applyOpportunityAction(input: {
@@ -506,6 +519,10 @@ export async function applyOpportunityAction(input: {
           opportunity = toOpportunityItem(
             currentRow,
             evidence.get(currentRow.id) ?? [],
+            isOpportunityStrategistV1EnabledForContext({
+              dataOwnerId: input.ownerId,
+              workspaceId: input.workspaceId,
+            }),
           )
         }
       }
@@ -690,13 +707,14 @@ function canonicalPublicationIdentity(
 function toOpportunityItem(
   row: OpportunityRow,
   evidenceTimeline: OpportunityEvidenceItem[],
+  strategistEnabled: boolean,
 ): OpportunityItem {
   return {
     ...row,
     evidenceTimeline,
-    strategistBrief: parseOpportunityStrategistBrief(
-      row.metadata?.strategistBrief,
-    ),
+    strategistBrief: strategistEnabled
+      ? parseOpportunityStrategistBrief(row.metadata?.strategistBrief)
+      : null,
   }
 }
 

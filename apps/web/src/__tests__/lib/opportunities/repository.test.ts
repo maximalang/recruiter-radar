@@ -156,6 +156,44 @@ describe('opportunity repository tenant scope', () => {
     expect(detail.calls[0].params).toEqual(['10', '7', '9'])
   })
 
+  it('hides persisted strategist metadata immediately when its workspace flag is off', async () => {
+    const originalAgencyCanary = process.env.AGENCY_DNA_V1_CANARY_WORKSPACE_IDS
+    const originalStrategistCanary =
+      process.env.OPPORTUNITY_STRATEGIST_V1_CANARY_WORKSPACE_IDS
+    const row = {
+      id: '10',
+      ownerId: '7',
+      metadata: { strategistBrief: strategistBriefFixture() },
+    }
+    try {
+      delete process.env.AGENCY_DNA_V1_CANARY_WORKSPACE_IDS
+      delete process.env.OPPORTUNITY_STRATEGIST_V1_CANARY_WORKSPACE_IDS
+      const disabled = createDb([[{ count: '1' }], [row], []])
+      const disabledResult = await listOpportunities({
+        ownerId: '7',
+        workspaceId: '9',
+      }, disabled.db)
+      expect(disabledResult.opportunities[0]?.strategistBrief).toBeNull()
+
+      process.env.AGENCY_DNA_V1_CANARY_WORKSPACE_IDS = '9'
+      process.env.OPPORTUNITY_STRATEGIST_V1_CANARY_WORKSPACE_IDS = '9'
+      const enabled = createDb([[{ count: '1' }], [row], []])
+      const enabledResult = await listOpportunities({
+        ownerId: '7',
+        workspaceId: '9',
+      }, enabled.db)
+      expect(enabledResult.opportunities[0]?.strategistBrief).toEqual(
+        expect.objectContaining({ version: 'opportunity-strategist-v1' }),
+      )
+    } finally {
+      restoreEnv('AGENCY_DNA_V1_CANARY_WORKSPACE_IDS', originalAgencyCanary)
+      restoreEnv(
+        'OPPORTUNITY_STRATEGIST_V1_CANARY_WORKSPACE_IDS',
+        originalStrategistCanary,
+      )
+    }
+  })
+
   it.each([
     ['morning', `CASE WHEN o.status = 'snoozed'`, `IN ('new', 'review')`],
     ['accepted', `= 'active'`, `= 'accepted'`],
@@ -323,3 +361,34 @@ describe('opportunity repository tenant scope', () => {
     expect(mockedLegacyWriter).not.toHaveBeenCalled()
   })
 })
+
+function strategistBriefFixture() {
+  const heuristic = {
+    text: 'Требуется ручная проверка.',
+    basis: 'heuristic' as const,
+    supportingEvidenceIds: [],
+  }
+  return {
+    version: 'opportunity-strategist-v1',
+    whatChanged: {
+      text: 'Открыта вакансия.',
+      basis: 'evidence' as const,
+      supportingEvidenceIds: ['11'],
+    },
+    whyNow: heuristic,
+    problemHypothesis: heuristic,
+    agencyFitExplanation: heuristic,
+    externalSupportNeedExplanation: heuristic,
+    recommendedPersona: heuristic,
+    recommendedAngle: heuristic,
+    recommendedCaseStudy: heuristic,
+    recommendedNextAction: heuristic,
+    riskSignals: [heuristic],
+    limitations: [heuristic],
+  }
+}
+
+function restoreEnv(name: string, value: string | undefined) {
+  if (value === undefined) delete process.env[name]
+  else process.env[name] = value
+}
