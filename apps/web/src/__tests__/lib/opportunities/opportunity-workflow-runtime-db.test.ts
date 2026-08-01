@@ -1,10 +1,16 @@
 /** @jest-environment node */
 
 import { createHash } from 'node:crypto'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { Pool } from 'pg'
 
 import { getPool } from '@/lib/db-pool'
 import { toPublicOpportunity } from '@/lib/opportunities/api-projection'
+import { getOutcomeAnalyticsV2Summary } from '@/lib/opportunities/outcome-analytics-v2'
+import { getOutcomeCalibrationDataset } from '@/lib/opportunities/outcome-calibration-export'
+import { recordOpportunityOutcome } from '@/lib/opportunities/outcome-repository'
+import type { OpportunityOutcomeInput } from '@/lib/opportunities/outcome-domain'
 import { listOpportunities } from '@/lib/opportunities/repository'
 import {
   OpportunityWorkflowAccessError,
@@ -26,6 +32,7 @@ describeWithDatabase('Opportunity workflow PostgreSQL runtime', () => {
   let recruiterId = ''
   let secondRecruiterId = ''
   let viewerId = ''
+  let otherOwnerId = ''
   let workspaceId = ''
   let otherWorkspaceId = ''
   let opportunityId = ''
@@ -53,7 +60,7 @@ describeWithDatabase('Opportunity workflow PostgreSQL runtime', () => {
     recruiterId = String(users.rows[1].id)
     secondRecruiterId = String(users.rows[2].id)
     viewerId = String(users.rows[3].id)
-    const otherOwnerId = String(users.rows[4].id)
+    otherOwnerId = String(users.rows[4].id)
 
     workspaceId = await ensureWorkspace(ownerId)
     otherWorkspaceId = await ensureWorkspace(otherOwnerId)
@@ -243,6 +250,234 @@ describeWithDatabase('Opportunity workflow PostgreSQL runtime', () => {
     })).rejects.toBeInstanceOf(OpportunityWorkflowAssigneeError)
   })
 
+  it('proves event-time assignment, maturity, corrections, revenue and tenant isolation', async () => {
+    const base = Date.now() - 20_000
+    const events: Array<{
+      eventType: OpportunityOutcomeInput['eventType']
+      override?: Partial<OpportunityOutcomeInput>
+    }> = [
+      { eventType: 'shown' },
+      { eventType: 'accepted' },
+      {
+        eventType: 'contacted',
+        override: {
+          channel: 'email',
+          contactPathType: 'corporate_email',
+        },
+      },
+      { eventType: 'replied' },
+      {
+        eventType: 'meeting',
+        override: { metadata: { meetingStatus: 'scheduled' } },
+      },
+      { eventType: 'meeting_completed' },
+      { eventType: 'proposal' },
+      {
+        eventType: 'won',
+        override: { valueMinor: 250_000, currency: 'RUB' },
+      },
+    ]
+    let wonEventId: string | null = null
+    for (let index = 0; index < events.length; index += 1) {
+      const event = events[index]
+      const result = await recordOpportunityOutcome({
+        ownerId,
+        workspaceId,
+        opportunityId,
+        actorType: 'user',
+        actorUserId: ownerId,
+        actorWorkspaceId: workspaceId,
+        actorRoleSnapshot: 'owner',
+        authMode: 'auth_v2',
+        payload: outcomePayload(
+          event.eventType,
+          `analytics:${event.eventType}:${token}`,
+          base + index * 1_000,
+          event.override,
+        ),
+      })
+      if (event.eventType === 'won') wonEventId = result?.event.id ?? null
+    }
+    await recordOpportunityOutcome({
+      ownerId,
+      workspaceId,
+      opportunityId,
+      actorType: 'user',
+      actorUserId: ownerId,
+      actorWorkspaceId: workspaceId,
+      actorRoleSnapshot: 'owner',
+      authMode: 'auth_v2',
+      payload: outcomePayload(
+        'reverted',
+        `analytics:reverted:${token}`,
+        base + 9_000,
+        { revertsEventId: wonEventId },
+      ),
+    })
+    const finalWon = await recordOpportunityOutcome({
+      ownerId,
+      workspaceId,
+      opportunityId,
+      actorType: 'user',
+      actorUserId: ownerId,
+      actorWorkspaceId: workspaceId,
+      actorRoleSnapshot: 'owner',
+      authMode: 'auth_v2',
+      payload: outcomePayload(
+        'won',
+        `analytics:won-again:${token}`,
+        base + 10_000,
+        { valueMinor: 250_000, currency: 'RUB' },
+      ),
+    })
+
+    const capturedAssignment = await database.query(
+      `SELECT DISTINCT assigned_user_id::TEXT AS "assignedUserId"
+       FROM opportunity_outcome_events
+       WHERE owner_id = $1 AND opportunity_id = $2`,
+      [ownerId, opportunityId],
+    )
+    expect(capturedAssignment.rows).toEqual([
+      { assignedUserId: secondRecruiterId },
+    ])
+    const invalidAssigneeClient = await database.connect()
+    try {
+      await invalidAssigneeClient.query('BEGIN')
+      await invalidAssigneeClient.query(
+        `ALTER TABLE opportunity_outcome_events
+         DISABLE TRIGGER opportunity_outcome_events_validate_insert`,
+      )
+      await expect(invalidAssigneeClient.query(
+        `INSERT INTO opportunity_outcome_events (
+           owner_id, client_profile_id, opportunity_id, hiring_episode_id,
+           organization_id, event_type, previous_stage, new_stage,
+           reason_code, reason_note, channel, contact_path_type,
+           contact_reference, contact_reference_hash, contact_reference_label,
+           snoozed_until, reverts_event_id, external_system, external_event_id,
+           value_minor, currency, occurred_at, actor_type, actor_user_id,
+           actor_workspace_id, actor_role_snapshot, assigned_user_id, metadata,
+           analytics_snapshot, idempotency_key, dedupe_key, payload_hash
+         )
+         SELECT
+           owner_id, client_profile_id, opportunity_id, hiring_episode_id,
+           organization_id, event_type, previous_stage, new_stage,
+           reason_code, reason_note, channel, contact_path_type,
+           contact_reference, contact_reference_hash, contact_reference_label,
+           snoozed_until, reverts_event_id, external_system, external_event_id,
+           value_minor, currency, NOW(), actor_type, actor_user_id,
+           actor_workspace_id, actor_role_snapshot, $3, metadata,
+           analytics_snapshot, $4, NULL, payload_hash
+         FROM opportunity_outcome_events
+         WHERE owner_id = $1
+           AND opportunity_id = $2
+           AND event_type = 'shown'
+         ORDER BY id
+         LIMIT 1`,
+        [
+          ownerId,
+          opportunityId,
+          otherOwnerId,
+          `analytics:foreign-assignee:${token}`,
+        ],
+      )).rejects.toThrow(
+        'outcome event assignee must belong to the opportunity workspace',
+      )
+    } finally {
+      await invalidAssigneeClient.query('ROLLBACK').catch(() => undefined)
+      invalidAssigneeClient.release()
+    }
+    const rollbackSql = readFileSync(resolve(
+      process.cwd(),
+      '..',
+      '..',
+      'packages',
+      'db',
+      'migrations',
+      '20260801150000_add_opportunity_analytics_v2.down.sql',
+    ), 'utf8')
+    const rollbackClient = await database.connect()
+    try {
+      await expect(rollbackClient.query(rollbackSql)).rejects.toThrow(
+        'assigned-user attribution exists',
+      )
+      await rollbackClient.query('ROLLBACK')
+    } finally {
+      rollbackClient.release()
+    }
+
+    const from = new Date(base - 1_000).toISOString()
+    const immatureTo = new Date(base + 24 * 60 * 60 * 1_000).toISOString()
+    const matureTo = new Date(base + 31 * 24 * 60 * 60 * 1_000).toISOString()
+    const filter = {
+      ownerId,
+      workspaceId,
+      from,
+      to: matureTo,
+      cohort: 'contacted' as const,
+      channel: 'email',
+      contactPathType: 'corporate_email',
+      assignedUserId: secondRecruiterId,
+      maturityDays: 30,
+    }
+    const mature = await getOutcomeAnalyticsV2Summary(filter, database)
+    const immature = await getOutcomeAnalyticsV2Summary({
+      ...filter,
+      to: immatureTo,
+    }, database)
+    const foreignWorkspace = await getOutcomeAnalyticsV2Summary({
+      ...filter,
+      workspaceId: otherWorkspaceId,
+    }, database)
+
+    expect(mature.cohort).toMatchObject({ size: 1, matured: true })
+    expect(immature.cohort).toMatchObject({ size: 1, matured: false })
+    expect(foreignWorkspace.cohort.size).toBe(0)
+    expect(mature.terminalOutcomes).toMatchObject({ won: 1, lost: 0 })
+    expect(mature.confirmedRevenue).toMatchObject({
+      confirmedValueMinor: '250000',
+      wonWithConfirmedValue: 1,
+      wonWithoutConfirmedValue: 0,
+    })
+
+    const calibration = await getOutcomeCalibrationDataset(filter, database)
+    expect(calibration).toHaveLength(1)
+    expect(calibration[0]).toMatchObject({
+      opportunityReference: expect.any(String),
+      terminalStatus: 'won',
+      confirmedRevenueMinor: '250000',
+      maturityStatus: 'mature',
+    })
+    expect(calibration[0]).not.toHaveProperty('assignedUserId')
+
+    await recordOpportunityOutcome({
+      ownerId,
+      workspaceId,
+      opportunityId,
+      actorType: 'user',
+      actorUserId: ownerId,
+      actorWorkspaceId: workspaceId,
+      actorRoleSnapshot: 'owner',
+      authMode: 'auth_v2',
+      payload: outcomePayload(
+        'reverted',
+        `analytics:cleanup:${token}`,
+        base + 11_000,
+        { revertsEventId: finalWon?.event.id ?? null },
+      ),
+    })
+    await updateOpportunityWorkflow({
+      ownerId,
+      workspaceId,
+      opportunityId,
+      actorUserId: ownerId,
+      actorRole: 'owner',
+      idempotencyKey: `analytics:cleanup-workflow:${token}`,
+      patch: {
+        nextActionDueAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+      },
+    })
+  })
+
   it('serves the workspace Today projection without publishing internal notes', async () => {
     const names = [
       'OPPORTUNITY_ENGINE_V1_ENABLED',
@@ -336,5 +571,35 @@ describeWithDatabase('Opportunity workflow PostgreSQL runtime', () => {
       [userId],
     )
     return String(result.rows[0].id)
+  }
+
+  function outcomePayload(
+    eventType: OpportunityOutcomeInput['eventType'],
+    idempotencyKey: string,
+    occurredAt: number,
+    override: Partial<OpportunityOutcomeInput> = {},
+  ): OpportunityOutcomeInput {
+    const metadata: Record<string, string> = eventType === 'shown'
+      ? { surface: 'runtime_test', cycleId: idempotencyKey }
+      : eventType === 'opened'
+        ? { interactionId: idempotencyKey }
+        : {}
+    return {
+      eventType,
+      occurredAt: new Date(occurredAt).toISOString(),
+      reasonCode: null,
+      reasonNote: null,
+      channel: null,
+      contactPathType: null,
+      contactReference: null,
+      snoozeDays: null,
+      snoozedUntil: null,
+      revertsEventId: null,
+      valueMinor: null,
+      currency: null,
+      metadata,
+      idempotencyKey,
+      ...override,
+    }
   }
 })

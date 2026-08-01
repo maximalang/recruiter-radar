@@ -309,6 +309,8 @@ Correction capability вычисляется сервером по полной 
 | `OPPORTUNITY_STRATEGIST_V1_CANARY_WORKSPACE_IDS` | Временный allowlist ровно одного положительного workspace ID для Strategist; при очистке сохранённая карточка сразу скрывается |
 | `OPPORTUNITY_WORKFLOW_V1_ENABLED` | Включает Phase 7 глобально только вместе с engine, Outcome Ledger и workspace context; UI дополнительно требует Outcome UI |
 | `OPPORTUNITY_WORKFLOW_V1_CANARY_WORKSPACE_IDS` | Временный allowlist ровно одного положительного workspace ID для Phase 7; общий workspace canary должен включать prerequisite boundaries |
+| `OPPORTUNITY_CRM_BRIDGE_ENABLED` | Включает Phase 8 только вместе с engine, Outcome Ledger и workspace context; по умолчанию `false` |
+| `OPPORTUNITY_ANALYTICS_V2_ENABLED` | Включает Phase 9 только вместе с engine, Outcome Ledger и точным Auth v2 workspace context; по умолчанию `false` |
 
 Owner canary включает engine, ledger и UI для одного owner, но не включает
 external ingest.
@@ -322,13 +324,6 @@ external ingest.
 - `AUTH_LEGACY_SESSION_MIGRATION_ENABLED` и deadline;
 - `AUTH_V2_SESSION_ROLLBACK_COMPAT_ENABLED` и deadline.
 
-Следующие phase flags из v2 objective пока отсутствуют в коде и не считаются
-готовыми:
-
-```text
-OPPORTUNITY_CRM_BRIDGE_ENABLED
-```
-
 ## API и writers
 
 ### Read paths
@@ -339,6 +334,8 @@ OPPORTUNITY_CRM_BRIDGE_ENABLED
 | `GET /api/opportunities/:id` | `opportunities:read` | `dataOwnerId` |
 | `GET /api/opportunities/:id/outcomes` | `opportunities:read` | `dataOwnerId` |
 | `GET /api/opportunities/outcomes/summary` | `opportunities:read` | `dataOwnerId` |
+| `GET /api/opportunities/outcomes/analytics` | `opportunities:read` | Точные `dataOwnerId` и Auth v2 `workspaceId`; Phase 9 flag обязателен |
+| `GET /api/opportunities/outcomes/calibration-export` | `exports:create` | Точные `dataOwnerId` и Auth v2 `workspaceId`; Phase 9 flag обязателен |
 | `/opportunities` page | `opportunities:read` | `dataOwnerId`; при Phase 7 также точный `workspaceId` |
 
 ### Command paths
@@ -537,10 +534,21 @@ Gate: фактический canary либо явный external blocker. Health
 
 ### Phase 9 — outcome analytics
 
-- immutable cohort filters;
-- maturity/sample status и confirmed outcomes;
-- PII-free calibration export;
-- без revenue forecast до достаточных данных.
+- tenant-scoped first-effective-event cohorts `shown`, `accepted` и
+  `contacted` с immutable snapshot filters, event-time assignment и closed
+  downstream window;
+- абсолютные cohort/conversion counts остаются видимыми, а rate/win rate
+  публикуются только при sample не меньше 10 и полностью mature cohort;
+  median time требует не меньше трёх наблюдений;
+- effective won/lost, только controlled reason codes и подтверждённая RUB
+  выручка строкой без потери точности;
+- deterministic PII-free calibration CSV по явному allowlist, с лимитом 5000
+  строк и отказом вместо скрытого truncation;
+- revenue forecast отсутствует; глобальный flag остаётся `false`, production
+  rollout требует отдельного разрешения и runbook gates.
+
+Полный rollout/rollback контракт:
+`docs/runbooks/opportunity-analytics-v2-rollout.md`.
 
 ### Phase 10 — product UX completion
 

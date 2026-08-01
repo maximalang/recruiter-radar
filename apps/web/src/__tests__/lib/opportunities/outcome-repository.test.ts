@@ -33,6 +33,7 @@ const opportunityContext = {
   externalSupportNeedScore: 0.8,
   episodeType: 'vacancy_spike',
   profileSnapshotHash: 'b'.repeat(64),
+  assignedUserId: '42',
   analyticsCohort: {
     clientProfileId: '8',
     clientProfileVersion: 'b'.repeat(64),
@@ -142,18 +143,23 @@ describe('opportunity outcome repository', () => {
       String(sql).includes('FROM opportunities o') &&
       String(sql).includes('FOR UPDATE'))
     expect(String(contextRead?.[0])).toContain('o.workspace_id = $3')
+    expect(String(contextRead?.[0])).toContain(
+      'workflow_state.assigned_to_user_id',
+    )
     expect(contextRead?.[1]).toEqual(['10', '7', '9'])
 
     const eventInsert = query.mock.calls.find(([sql]) =>
       String(sql).includes('INSERT INTO opportunity_outcome_events'))
     expect(String(eventInsert?.[0])).toContain('actor_workspace_id')
     expect(String(eventInsert?.[0])).toContain('actor_role_snapshot')
+    expect(String(eventInsert?.[0])).toContain('assigned_user_id')
     expect(eventInsert?.[1]).toEqual(expect.arrayContaining([
       '42',
       '9',
       'recruiter',
     ]))
-    expect(JSON.parse(String(eventInsert?.[1]?.[27]))).toEqual(
+    expect(eventInsert?.[1]?.[26]).toBe('42')
+    expect(JSON.parse(String(eventInsert?.[1]?.[28]))).toEqual(
       opportunityContext.analyticsCohort,
     )
   })
@@ -214,7 +220,7 @@ describe('opportunity outcome repository', () => {
 
     const eventInsert = query.mock.calls.find(([sql]) =>
       String(sql).includes('INSERT INTO opportunity_outcome_events'))
-    const payloadHash = String(eventInsert?.[1]?.[30])
+    const payloadHash = String(eventInsert?.[1]?.[31])
     expect(payloadHash).toMatch(/^[a-f0-9]{64}$/)
     expect(payloadHash).not.toContain('hr@example.test')
   })
