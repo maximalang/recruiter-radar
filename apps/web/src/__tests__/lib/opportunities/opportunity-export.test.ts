@@ -50,6 +50,21 @@ describe('opportunity export', () => {
     expect(worksheet).not.toMatch(/ownerId|workspaceId|evidenceHash|internalNote/)
   })
 
+  it('neutralizes line-prefixed formulas and replaces invalid XML characters', () => {
+    const hostile = {
+      ...RECORD,
+      organizationName: '\n=1+1',
+      title: `unsafe\u0000xml\u000Btext`,
+    }
+    const csv = opportunitiesToCsv([hostile])
+    const archive = unzipSync(opportunitiesToXlsx([hostile]))
+    const worksheet = strFromU8(archive['xl/worksheets/sheet1.xml'])
+
+    expect(csv).toContain(`"'\n=1+1"`)
+    expect(worksheet).not.toMatch(/[\u0000\u000B]/)
+    expect(worksheet).toContain('unsafe�xml�text')
+  })
+
   it('projects only public CRM fields from an opportunity', () => {
     const record = toOpportunityExportRecord({
       publicReference: RECORD.opportunityReference,

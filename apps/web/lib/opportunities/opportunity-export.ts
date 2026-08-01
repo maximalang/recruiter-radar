@@ -153,7 +153,7 @@ function exportValue(
 }
 
 function neutralizeSpreadsheetFormula(value: string): string {
-  return /^[\t\r ]*[=+\-@]/.test(value) ? `'${value}` : value
+  return /^[\t\n\v\f\r ]*[=+\-@]/.test(value) ? `'${value}` : value
 }
 
 function csvCell(value: string): string {
@@ -183,12 +183,32 @@ function columnName(index: number): string {
 }
 
 function escapeXml(value: string): string {
-  return value
+  return sanitizeXmlText(value)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&apos;')
+}
+
+function sanitizeXmlText(value: string): string {
+  let sanitized = ''
+  for (const character of value) {
+    const codePoint = character.codePointAt(0) ?? 0
+    if (
+      codePoint === 0x09 ||
+      codePoint === 0x0a ||
+      codePoint === 0x0d ||
+      (codePoint >= 0x20 && codePoint <= 0xd7ff) ||
+      (codePoint >= 0xe000 && codePoint <= 0xfffd) ||
+      (codePoint >= 0x10000 && codePoint <= 0x10ffff)
+    ) {
+      sanitized += character
+    } else {
+      sanitized += '\uFFFD'
+    }
+  }
+  return sanitized
 }
 
 function xml(body: string): string {

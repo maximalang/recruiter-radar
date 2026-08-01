@@ -57,4 +57,3 @@ Implementation order:
 - Full Jest and test type contracts.
 - Five-axis review, staged secret scan and CodeGraph signature/impact gate.
 - Feature flag remains false; global external ingest stays 404.
-

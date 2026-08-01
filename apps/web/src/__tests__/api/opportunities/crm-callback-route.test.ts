@@ -3,15 +3,29 @@
 import { NextRequest } from 'next/server'
 
 jest.mock('@/lib/opportunities/crm-callback-repository', () => ({
-  CrmCallbackAuthenticationError: class CrmCallbackAuthenticationError extends Error {},
-  CrmCallbackReplayConflictError: class CrmCallbackReplayConflictError extends Error {},
+  CrmCallbackAuthenticationError: class CrmCallbackAuthenticationError extends Error {
+    readonly code = 'invalid_signature'
+  },
+  CrmCallbackReplayConflictError: class CrmCallbackReplayConflictError extends Error {
+    readonly code = 'crm_callback_replay_conflict'
+  },
   ingestCrmOutcomeCallback: jest.fn(),
+}))
+jest.mock('@/lib/runtime', () => ({
+  logError: jest.fn(),
+  logEvent: jest.fn(),
 }))
 
 import { POST } from '@/app/api/opportunities/integrations/[integrationReference]/outcomes/route'
-import { ingestCrmOutcomeCallback } from '@/lib/opportunities/crm-callback-repository'
+import {
+  CrmCallbackAuthenticationError,
+  CrmCallbackReplayConflictError,
+  ingestCrmOutcomeCallback,
+} from '@/lib/opportunities/crm-callback-repository'
+import { logEvent } from '@/lib/runtime'
 
 const mockedIngest = jest.mocked(ingestCrmOutcomeCallback)
+const mockedLogEvent = jest.mocked(logEvent)
 const INTEGRATION_REFERENCE = 'b6e8c6c1-e8af-40a4-9120-3ac67fe8d17c'
 
 describe('tenant CRM callback route', () => {
@@ -65,6 +79,60 @@ describe('tenant CRM callback route', () => {
 
     expect(response.status).toBe(404)
     expect(mockedIngest).not.toHaveBeenCalled()
+  })
+
+  it('cancels a chunked request as soon as the callback body exceeds the limit', async () => {
+    let pulls = 0
+    let cancelled = false
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulls += 1
+        controller.enqueue(new Uint8Array(8 * 1024))
+        if (pulls === 4) controller.close()
+      },
+      cancel() {
+        cancelled = true
+      },
+    })
+    const request = new NextRequest('https://example.test/callback', {
+      method: 'POST',
+      body: stream,
+      duplex: 'half',
+    } as unknown as ConstructorParameters<typeof NextRequest>[1])
+
+    const response = await POST(request, {
+      params: Promise.resolve({ integrationReference: INTEGRATION_REFERENCE }),
+    })
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toEqual({ error: 'payload_too_large' })
+    expect(cancelled).toBe(true)
+    expect(mockedIngest).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    [new CrmCallbackAuthenticationError(), 401, 'invalid_signature'],
+    [new CrmCallbackReplayConflictError(), 409, 'crm_callback_replay_conflict'],
+  ])('counts privacy-safe authentication and replay rejection', async (
+    error,
+    expectedStatus,
+    expectedCode,
+  ) => {
+    mockedIngest.mockRejectedValueOnce(error)
+
+    const response = await POST(callbackRequest(), {
+      params: Promise.resolve({ integrationReference: INTEGRATION_REFERENCE }),
+    })
+
+    expect(response.status).toBe(expectedStatus)
+    expect(mockedLogEvent).toHaveBeenCalledWith(
+      'opportunity_crm.callback_rejected',
+      {
+        status: expectedStatus,
+        code: expectedCode,
+        callbacksRejected: 1,
+      },
+    )
   })
 })
 

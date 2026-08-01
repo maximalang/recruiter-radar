@@ -36,6 +36,7 @@ Application events:
 - `opportunity_crm.credential_revoked`
 - `opportunity_crm.delivery_completed`
 - `opportunity_crm.callback_completed`
+- `opportunity_crm.callback_rejected`
 
 Database evidence comes from append-only
 `opportunity_crm_deliveries` and `opportunity_crm_callback_receipts`. Monitor
