@@ -7,8 +7,8 @@
 - [x] Record statistical-honesty, privacy, tenancy and performance boundaries.
 - [x] Add fail-closed Phase 9 configuration.
 - [x] Add event-time assigned-user attribution migration and down migration.
-- [ ] Add tenant-scoped outcome analytics with all required dimensions.
-- [ ] Add effective won/lost reasons and confirmed revenue summaries.
+- [x] Add tenant-scoped outcome analytics with all required dimensions.
+- [x] Add effective won/lost reasons and confirmed revenue summaries.
 - [ ] Add deterministic PII-free calibration CSV export.
 - [ ] Prove tenant isolation, corrections, maturity and revenue in PostgreSQL.
 - [ ] Measure and guard the 100k-event query plan.
