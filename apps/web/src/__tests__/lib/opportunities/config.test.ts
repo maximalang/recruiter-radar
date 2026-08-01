@@ -14,6 +14,7 @@ import {
   isOpportunityOutcomesUiEnabled,
   isOpportunityOutcomesUiEnabledForContext,
   isOpportunityOutcomesUiEnabledForOwner,
+  isOpportunityCrmBridgePublicCallbackEnabled,
   isOpportunityScoringV2Enabled,
   isOpportunityScoringV2EnabledForContext,
   isOpportunityScoringV2ShadowEnabledForContext,
@@ -171,6 +172,22 @@ describe('opportunity engine config', () => {
     expect(isOpportunityWorkspaceContextEnabledForContext(context, {
       OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED: 'true',
     })).toBe(true)
+  })
+
+  it('requires every global tenant boundary before exposing the public CRM callback', () => {
+    const enabled = {
+      OPPORTUNITY_ENGINE_V1_ENABLED: 'true',
+      OPPORTUNITY_OUTCOMES_ENABLED: 'true',
+      OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED: 'true',
+      OPPORTUNITY_CRM_BRIDGE_ENABLED: 'true',
+    }
+    expect(isOpportunityCrmBridgePublicCallbackEnabled(enabled)).toBe(true)
+    for (const missing of Object.keys(enabled)) {
+      expect(isOpportunityCrmBridgePublicCallbackEnabled({
+        ...enabled,
+        [missing]: 'false',
+      })).toBe(false)
+    }
   })
 
   it('keeps daily workflow dark and requires the workspace ledger boundary', () => {

@@ -233,6 +233,15 @@ export function isOpportunityCrmBridgeEnabledForContext(
   return env[OPPORTUNITY_CRM_BRIDGE_FEATURE_FLAG] === 'true'
 }
 
+export function isOpportunityCrmBridgePublicCallbackEnabled(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+  return isOpportunityEngineV1Enabled(env) &&
+    isOpportunityOutcomesEnabled(env) &&
+    isOpportunityWorkspaceContextEnabled(env) &&
+    env[OPPORTUNITY_CRM_BRIDGE_FEATURE_FLAG] === 'true'
+}
+
 export function isOpportunityOutcomesExternalIngestEnabled(
   _env: Readonly<Record<string, string | undefined>> = process.env,
 ): boolean {

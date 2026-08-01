@@ -59,6 +59,8 @@ CREATE TABLE opportunity_crm_credentials (
   revoked_at TIMESTAMPTZ,
   CONSTRAINT opportunity_crm_credentials_id_workspace_unique
     UNIQUE (id, workspace_id),
+  CONSTRAINT opportunity_crm_credentials_identity_unique
+    UNIQUE (id, integration_id, workspace_id),
   CONSTRAINT opportunity_crm_credentials_public_reference_unique
     UNIQUE (public_reference),
   CONSTRAINT opportunity_crm_credentials_integration_fkey
@@ -111,13 +113,14 @@ CREATE TABLE opportunity_crm_callback_receipts (
   credential_id BIGINT NOT NULL,
   external_event_id TEXT NOT NULL,
   request_hash CHAR(64) NOT NULL,
-  opportunity_reference UUID NOT NULL,
+  opportunity_reference UUID,
   outcome_event_id BIGINT,
   response_status INTEGER NOT NULL,
+  response_code TEXT NOT NULL,
   received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT opportunity_crm_callback_receipts_credential_fkey
-    FOREIGN KEY (credential_id, workspace_id)
-    REFERENCES opportunity_crm_credentials(id, workspace_id)
+    FOREIGN KEY (credential_id, integration_id, workspace_id)
+    REFERENCES opportunity_crm_credentials(id, integration_id, workspace_id)
     ON DELETE RESTRICT,
   CONSTRAINT opportunity_crm_callback_receipts_integration_fkey
     FOREIGN KEY (integration_id, workspace_id)
@@ -133,6 +136,12 @@ CREATE TABLE opportunity_crm_callback_receipts (
     CHECK (request_hash ~ '^[a-f0-9]{64}$'),
   CONSTRAINT opportunity_crm_callback_receipts_status_check
     CHECK (response_status BETWEEN 200 AND 499),
+  CONSTRAINT opportunity_crm_callback_receipts_code_check
+    CHECK (
+      BTRIM(response_code) = response_code
+      AND response_code ~ '^[a-z0-9_]+$'
+      AND CHAR_LENGTH(response_code) BETWEEN 1 AND 80
+    ),
   CONSTRAINT opportunity_crm_callback_receipts_event_unique
     UNIQUE (credential_id, external_event_id)
 );
@@ -141,6 +150,7 @@ CREATE TABLE opportunity_crm_deliveries (
   id BIGSERIAL PRIMARY KEY,
   workspace_id BIGINT NOT NULL,
   integration_id BIGINT NOT NULL,
+  credential_id BIGINT NOT NULL,
   owner_id BIGINT NOT NULL,
   opportunity_id BIGINT NOT NULL,
   event_id UUID NOT NULL DEFAULT gen_random_uuid(),
@@ -151,6 +161,10 @@ CREATE TABLE opportunity_crm_deliveries (
   CONSTRAINT opportunity_crm_deliveries_integration_fkey
     FOREIGN KEY (integration_id, workspace_id)
     REFERENCES opportunity_crm_integrations(id, workspace_id)
+    ON DELETE RESTRICT,
+  CONSTRAINT opportunity_crm_deliveries_credential_fkey
+    FOREIGN KEY (credential_id, integration_id, workspace_id)
+    REFERENCES opportunity_crm_credentials(id, integration_id, workspace_id)
     ON DELETE RESTRICT,
   CONSTRAINT opportunity_crm_deliveries_opportunity_fkey
     FOREIGN KEY (opportunity_id, owner_id, workspace_id)

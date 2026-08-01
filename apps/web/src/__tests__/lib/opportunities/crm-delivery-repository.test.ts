@@ -19,6 +19,7 @@ function clientWithResults(results: QueryResult[]) {
 describe('CRM outbound delivery repository', () => {
   const row = {
     integrationId: '17',
+    credentialId: '21',
     integrationReference: 'b6e8c6c1-e8af-40a4-9120-3ac67fe8d17c',
     outboundWebhookUrl: 'https://hooks.example.test/opportunity',
     credentialReference: '49c9fae8-d1ed-463f-854c-8965a8cf331d',

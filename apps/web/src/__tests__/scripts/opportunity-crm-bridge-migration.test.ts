@@ -33,6 +33,11 @@ describe('Opportunity CRM bridge migration contract', () => {
     expect(migration).toContain('external_event_id TEXT NOT NULL')
     expect(migration).toContain('request_hash CHAR(64) NOT NULL')
     expect(migration).toContain('UNIQUE (credential_id, external_event_id)')
+    expect(compact).toContain(
+      'FOREIGN KEY (credential_id, integration_id, workspace_id) REFERENCES opportunity_crm_credentials(id, integration_id, workspace_id)',
+    )
+    expect(migration).toContain('response_code TEXT NOT NULL')
+    expect(migration).toContain('credential_id BIGINT NOT NULL')
     expect(migration).toContain('opportunity_crm_callback_receipts_append_only')
   })
 

@@ -47,6 +47,7 @@ type ClientProvider = () => Promise<PoolClient | null>
 type ReplayRow = { status: 'succeeded' | 'failed'; httpStatus: number | null }
 type DeliveryRow = {
   integrationId: string
+  credentialId: string
   integrationReference: string
   outboundWebhookUrl: string
   credentialReference: string
@@ -186,16 +187,18 @@ export async function deliverOpportunityToCrm(
       `INSERT INTO opportunity_crm_deliveries (
          workspace_id,
          integration_id,
+         credential_id,
          owner_id,
          opportunity_id,
          event_id,
          request_hash,
          status,
          http_status
-       ) VALUES ($1, $2, $3, $4, $5::UUID, $6, $7, $8)`,
+       ) VALUES ($1, $2, $3, $4, $5, $6::UUID, $7, $8, $9)`,
       [
         workspaceId,
         delivery.integrationId,
+        delivery.credentialId,
         ownerId,
         opportunityId,
         eventId,
@@ -249,6 +252,7 @@ async function loadDelivery(
   const result = await client.query<DeliveryRow>(
     `SELECT
        integration.id::TEXT AS "integrationId",
+       credential.id::TEXT AS "credentialId",
        integration.public_reference::TEXT AS "integrationReference",
        integration.outbound_webhook_url AS "outboundWebhookUrl",
        credential.public_reference::TEXT AS "credentialReference",
