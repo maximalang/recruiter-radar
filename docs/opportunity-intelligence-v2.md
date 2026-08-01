@@ -304,6 +304,8 @@ Correction capability вычисляется сервером по полной 
 | `OPPORTUNITY_SCORING_V2_ENABLED` | Включает Phase 5 глобально только при точном `true` и включённом Agency DNA v1 |
 | `OPPORTUNITY_SCORING_V2_CANARY_WORKSPACE_IDS` | Временный allowlist ровно одного положительного workspace ID только для Scoring v2 |
 | `OPPORTUNITY_SCORING_V2_SHADOW_CANARY_WORKSPACE_IDS` | Временный allowlist ровно одного workspace для append-only v2 comparison snapshots; активные rank и action queue остаются на v1 |
+| `OPPORTUNITY_STRATEGIST_V1_ENABLED` | Включает Phase 6 глобально только при точном `true` и включённом Agency DNA v1; read и write paths используют один контекст |
+| `OPPORTUNITY_STRATEGIST_V1_CANARY_WORKSPACE_IDS` | Временный allowlist ровно одного положительного workspace ID для Strategist; при очистке сохранённая карточка сразу скрывается |
 
 Owner canary включает engine, ledger и UI для одного owner, но не включает
 external ingest.
@@ -321,7 +323,6 @@ external ingest.
 готовыми:
 
 ```text
-OPPORTUNITY_STRATEGIST_V1_ENABLED
 OPPORTUNITY_TEAM_WORKFLOW_ENABLED
 OPPORTUNITY_CRM_BRIDGE_ENABLED
 ```
@@ -500,9 +501,14 @@ Gate: фактический canary либо явный external blocker. Health
 
 ### Phase 6 — Evidence-bound Sales Strategist v1
 
-- deterministic, evidence-linked brief;
-- case matching только по structured DNA;
-- optional LLM допускается только как wording editor.
+- versioned deterministic `opportunity-strategist-v1` с evidence/heuristic
+  lineage для каждого вывода;
+- case matching только при совпадении role family, industry, company size,
+  region и hiring mode;
+- строгий persisted JSON parser, безопасная API-проекция и полная evidence
+  timeline в карточке;
+- read/write workspace gates и мгновенный rollback при очистке флага;
+- LLM не вызывается; будущий optional LLM допускается только как wording editor.
 
 ### Phase 7 — daily commercial workflow
 
