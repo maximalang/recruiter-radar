@@ -86,6 +86,8 @@ export const OPPORTUNITY_VIEWS = [
   'today',
   'morning',
   'accepted',
+  'follow_up',
+  'overdue',
   'pipeline',
   'snoozed',
   'completed',
@@ -161,6 +163,7 @@ export interface OpportunityListInput {
   confidenceGate?: ConfidenceGate | null
   episodeType?: HiringEpisodeType | null
   organizationId?: string | null
+  query?: string | null
   page?: number
   pageSize?: number
   offset?: number
@@ -183,6 +186,8 @@ export interface OpportunityOutcomeOperationalSummary {
   lostCount: number
   dismissedCount: number
   overdueSnoozeCount: number
+  followUpCount: number
+  overdueCount: number
 }
 
 const EFFECTIVE_WORKFLOW_SQL = `COALESCE(
@@ -270,7 +275,10 @@ export async function listOpportunities(
         AND COALESCE(outcome_state.snoozed_until, o.snoozed_until) < NOW()
       )
     )`)
-  } else if (view === 'morning' || view === 'accepted' || view === 'pipeline') {
+  } else if (
+    view === 'morning' || view === 'accepted' || view === 'follow_up' ||
+    view === 'pipeline'
+  ) {
     clauses.push(`${EFFECTIVE_WORKFLOW_SQL} = 'active'`)
   } else if (view === 'snoozed') {
     clauses.push(`${EFFECTIVE_WORKFLOW_SQL} = 'snoozed'`)
@@ -279,6 +287,28 @@ export async function listOpportunities(
     clauses.push(`${EFFECTIVE_COMMERCIAL_STAGE_SQL} IN ('new', 'review')`)
   } else if (view === 'accepted') {
     clauses.push(`${EFFECTIVE_COMMERCIAL_STAGE_SQL} = 'accepted'`)
+  } else if (view === 'follow_up') {
+    clauses.push(
+      `${EFFECTIVE_COMMERCIAL_STAGE_SQL} NOT IN ('won', 'lost', 'dismissed')`,
+    )
+    clauses.push(`workflow_state.next_action_type = 'follow_up'`)
+    clauses.push(
+      `workflow_state.next_action_due_at >= ${MOSCOW_TODAY_START_SQL}`,
+    )
+  } else if (view === 'overdue') {
+    clauses.push(
+      `${EFFECTIVE_COMMERCIAL_STAGE_SQL} NOT IN ('won', 'lost', 'dismissed')`,
+    )
+    clauses.push(`(
+      (
+        ${EFFECTIVE_WORKFLOW_SQL} = 'active'
+        AND workflow_state.next_action_due_at < ${MOSCOW_TODAY_START_SQL}
+      )
+      OR (
+        ${EFFECTIVE_WORKFLOW_SQL} = 'snoozed'
+        AND COALESCE(outcome_state.snoozed_until, o.snoozed_until) < NOW()
+      )
+    )`)
   } else if (view === 'pipeline') {
     clauses.push(
       `${EFFECTIVE_COMMERCIAL_STAGE_SQL} ` +
@@ -314,11 +344,21 @@ export async function listOpportunities(
     params.push(input.organizationId)
     clauses.push(`o.organization_id = $${params.length}`)
   }
+  const query = normalizeOpportunityQuery(input.query)
+  if (query) {
+    params.push(`%${escapeLikePattern(query)}%`)
+    clauses.push(`(
+      org.name ILIKE $${params.length} ESCAPE '\\'
+      OR org.domain ILIKE $${params.length} ESCAPE '\\'
+      OR o.title ILIKE $${params.length} ESCAPE '\\'
+    )`)
+  }
 
   const where = clauses.join('\n      AND ')
   const countResult = await db.query<{ count: string }>(
     `SELECT COUNT(*)::TEXT AS count
      FROM opportunities o
+     JOIN orgs org ON org.id = o.organization_id
      JOIN hiring_episodes he ON he.id = o.hiring_episode_id
      LEFT JOIN opportunity_outcome_state outcome_state
        ON outcome_state.owner_id = o.owner_id
@@ -331,7 +371,7 @@ export async function listOpportunities(
     params,
   )
 
-  const orderBy = view === 'today'
+  const orderBy = view === 'today' || view === 'follow_up' || view === 'overdue'
     ? `CASE
          WHEN workflow_state.next_action_due_at < NOW() THEN 0
          WHEN workflow_state.next_action_due_at < ${MOSCOW_TOMORROW_START_SQL} THEN 1
@@ -433,11 +473,36 @@ export async function getOpportunityOutcomeOperationalSummary(
        COUNT(*) FILTER (
          WHERE ${EFFECTIVE_WORKFLOW_SQL} = 'snoozed'
            AND COALESCE(outcome_state.snoozed_until, o.snoozed_until) < NOW()
-       )::TEXT AS "overdueSnoozeCount"
+       )::TEXT AS "overdueSnoozeCount",
+       COUNT(*) FILTER (
+         WHERE ${EFFECTIVE_WORKFLOW_SQL} = 'active'
+           AND ${EFFECTIVE_COMMERCIAL_STAGE_SQL}
+             NOT IN ('won', 'lost', 'dismissed')
+           AND workflow_state.next_action_type = 'follow_up'
+           AND workflow_state.next_action_due_at >= ${MOSCOW_TODAY_START_SQL}
+       )::TEXT AS "followUpCount",
+       COUNT(*) FILTER (
+         WHERE ${EFFECTIVE_COMMERCIAL_STAGE_SQL}
+             NOT IN ('won', 'lost', 'dismissed')
+           AND (
+             (
+               ${EFFECTIVE_WORKFLOW_SQL} = 'active'
+               AND workflow_state.next_action_due_at < ${MOSCOW_TODAY_START_SQL}
+             )
+             OR (
+               ${EFFECTIVE_WORKFLOW_SQL} = 'snoozed'
+               AND COALESCE(outcome_state.snoozed_until, o.snoozed_until) < NOW()
+             )
+           )
+       )::TEXT AS "overdueCount"
      FROM opportunities o
      LEFT JOIN opportunity_outcome_state outcome_state
        ON outcome_state.owner_id = o.owner_id
       AND outcome_state.opportunity_id = o.id
+     LEFT JOIN opportunity_workflow_state workflow_state
+       ON workflow_state.owner_id = o.owner_id
+      AND workflow_state.workspace_id = o.workspace_id
+      AND workflow_state.opportunity_id = o.id
      WHERE o.owner_id = $1
        ${workspaceClause}
        AND o.superseded_at IS NULL
@@ -454,7 +519,17 @@ export async function getOpportunityOutcomeOperationalSummary(
     lostCount: Number(row?.lostCount ?? 0),
     dismissedCount: Number(row?.dismissedCount ?? 0),
     overdueSnoozeCount: Number(row?.overdueSnoozeCount ?? 0),
+    followUpCount: Number(row?.followUpCount ?? 0),
+    overdueCount: Number(row?.overdueCount ?? 0),
   }
+}
+
+function normalizeOpportunityQuery(value: string | null | undefined): string {
+  return value?.trim().slice(0, 80) ?? ''
+}
+
+function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, '\\$&')
 }
 
 export async function getOpportunityById(

@@ -253,10 +253,63 @@ describe('opportunity repository tenant scope', () => {
     expect(calls[1].sql).toContain('workflow_state.next_action_due_at ASC')
   })
 
+  it('keeps scheduled follow-ups separate from overdue work', async () => {
+    const followUp = createDb([[{ count: '0' }], []])
+    await listOpportunities({
+      ownerId: '7',
+      workspaceId: '9',
+      view: 'follow_up',
+    }, followUp.db)
+
+    expect(followUp.calls[0].sql).toContain(
+      "workflow_state.next_action_type = 'follow_up'",
+    )
+    expect(followUp.calls[0].sql).toContain(
+      'workflow_state.next_action_due_at >=',
+    )
+    expect(followUp.calls[0].sql).toContain("NOT IN ('won', 'lost', 'dismissed')")
+
+    const overdue = createDb([[{ count: '0' }], []])
+    await listOpportunities({
+      ownerId: '7',
+      workspaceId: '9',
+      view: 'overdue',
+    }, overdue.db)
+
+    expect(overdue.calls[0].sql).toContain(
+      'workflow_state.next_action_due_at <',
+    )
+    expect(overdue.calls[0].sql).toContain(
+      'COALESCE(outcome_state.snoozed_until, o.snoozed_until) < NOW()',
+    )
+    expect(overdue.calls[0].sql).toContain("NOT IN ('won', 'lost', 'dismissed')")
+  })
+
+  it('searches only parameterized company-level fields and title inside tenant scope', async () => {
+    const { db, calls } = createDb([[{ count: '0' }], []])
+
+    await listOpportunities({
+      ownerId: '7',
+      workspaceId: '9',
+      query: '  50%_рост  ',
+    }, db)
+
+    expect(calls[0].sql).toContain('o.owner_id = $1')
+    expect(calls[0].sql).toContain('o.workspace_id = $2')
+    expect(calls[0].sql).toContain('org.name ILIKE $3')
+    expect(calls[0].sql).toContain('org.domain ILIKE $3')
+    expect(calls[0].sql).toContain('o.title ILIKE $3')
+    expect(calls[0].params?.[2]).toBe('%50\\%\\_рост%')
+    expect(calls[0].sql).not.toContain('internal_note ILIKE')
+    expect(calls[0].sql).not.toContain('reason_note ILIKE')
+  })
+
   it.each([
     ['today', null, null],
     ['morning', `CASE WHEN o.status = 'snoozed'`, `IN ('new', 'review')`],
     ['accepted', `= 'active'`, `= 'accepted'`],
+    ['follow_up', `= 'active'`, `NOT IN ('won', 'lost', 'dismissed')`],
+    ['overdue', null, `NOT IN ('won', 'lost', 'dismissed')`],
     ['pipeline', `= 'active'`, `IN ('contacted', 'replied', 'meeting', 'proposal')`],
     ['snoozed', `= 'snoozed'`, null],
     ['completed', null, `IN ('won', 'lost', 'dismissed')`],
@@ -289,6 +342,8 @@ describe('opportunity repository tenant scope', () => {
         lostCount: '7',
         dismissedCount: '8',
         overdueSnoozeCount: '1',
+        followUpCount: '9',
+        overdueCount: '10',
       },
     ]])
 
@@ -303,11 +358,20 @@ describe('opportunity repository tenant scope', () => {
       lostCount: 7,
       dismissedCount: 8,
       overdueSnoozeCount: 1,
+      followUpCount: 9,
+      overdueCount: 10,
     })
     expect(calls[0].sql).toContain('WHERE o.owner_id = $1')
     expect(calls[0].sql).toContain(
       'LEFT JOIN opportunity_outcome_state outcome_state',
     )
+    expect(calls[0].sql).toContain(
+      'LEFT JOIN opportunity_workflow_state workflow_state',
+    )
+    expect(calls[0].sql).toContain(
+      "workflow_state.next_action_type = 'follow_up'",
+    )
+    expect(calls[0].sql).toContain("AT TIME ZONE 'Europe/Moscow'")
     expect(calls[0].params).toEqual(['7'])
   })
 

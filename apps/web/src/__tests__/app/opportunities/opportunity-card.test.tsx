@@ -63,13 +63,27 @@ const OPPORTUNITY: OpportunityItem = {
 }
 
 describe('OpportunityCard', () => {
+  const DECISION_HEADINGS = [
+    'Что изменилось',
+    'Почему сейчас',
+    'Почему подходит агентству',
+    'Доказательства',
+    'Предполагаемая задача',
+    'Рекомендуемая персона',
+    'Рекомендуемый заход',
+    'Релевантный кейс',
+    'Ограничения',
+    'Следующее действие',
+    'Коммерческая история',
+  ]
+
   it('renders evidence-backed brief copy and the evidence timeline', () => {
     render(<OpportunityCard opportunity={OPPORTUNITY} />)
 
     expect(screen.getByRole('heading', { name: 'Пример ускорила найм' })).toBeInTheDocument()
     expect(screen.getByText('За 14 дней открыто 8 вакансий.')).toBeInTheDocument()
     expect(screen.getByText('Почему подходит агентству')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Лента доказательств' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Доказательства' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Backend developer' })).toHaveAttribute(
       'href',
       'https://example.test/jobs/1',
@@ -80,6 +94,34 @@ describe('OpportunityCard', () => {
       '#evidence-10',
     )
     expect(screen.getByLabelText('Оценка возможности: 82 из 100')).toBeInTheDocument()
+  })
+
+  it('keeps all eleven decision sections and marks missing strategist data honestly', () => {
+    render(<OpportunityCard opportunity={OPPORTUNITY} />)
+
+    for (const heading of DECISION_HEADINGS) {
+      expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument()
+    }
+    expect(screen.getByRole('article')).toHaveAttribute(
+      'data-content-state',
+      'insufficient',
+    )
+    expect(screen.getByText(
+      'Для части выводов пока недостаточно подтверждённых данных.',
+    )).toBeInTheDocument()
+    expect(screen.getAllByText('Недостаточно подтверждённых данных.').length)
+      .toBeGreaterThan(0)
+  })
+
+  it('marks an expired validity window as stale without hiding evidence', () => {
+    render(<OpportunityCard opportunity={{
+      ...OPPORTUNITY,
+      validUntil: '2020-01-01T00:00:00.000Z',
+    }} />)
+
+    expect(screen.getByRole('article')).toHaveAttribute('data-freshness', 'stale')
+    expect(screen.getByText(/Срок актуальности закончился/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Backend developer' })).toBeInTheDocument()
   })
 
   it('does not make a non-http evidence URL clickable', () => {
@@ -130,9 +172,13 @@ describe('OpportunityCard', () => {
       },
     }} />)
 
-    expect(screen.getByRole('heading', {
-      name: 'Стратегическая карточка',
-    })).toBeInTheDocument()
+    for (const heading of DECISION_HEADINGS) {
+      expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument()
+    }
+    expect(screen.getByRole('article')).toHaveAttribute(
+      'data-content-state',
+      'complete',
+    )
     expect(screen.getAllByText('Основано на доказательствах').length)
       .toBeGreaterThan(0)
     expect(screen.getAllByText('Гипотеза — проверьте вручную').length)
