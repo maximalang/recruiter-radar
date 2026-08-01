@@ -1,8 +1,8 @@
 # Opportunity Intelligence v2: current-state contract
 
-Статус: Phase 0, архитектурный контракт
-Дата среза: 2026-07-31
-Базовый commit: `48247cc4d6cfa8b8dc1bbf1ff69a992cd9b39e7f`
+Статус: current-state contract через Phase 7; rollout flags выключены
+Дата среза: 2026-08-01
+Базовый commit: `ef09ce0`
 
 Этот документ описывает только поведение, которое существует в коде на
 указанном commit, и границы последующих фаз. Он не является заявлением о
@@ -276,6 +276,7 @@ Correction capability вычисляется сервером по полной 
 
 | View | Current filter |
 | --- | --- |
+| Today | Действия со сроком сегодня, просроченные follow-up, новые high-priority, истёкшие snooze и неназначенные активные возможности |
 | Morning | `workflow_state=active`, `commercial_stage IN (new, review)` и существующие evidence/score gates |
 | Accepted | `workflow_state=active`, `commercial_stage=accepted` |
 | Pipeline | `workflow_state=active`, `commercial_stage IN (contacted, replied, meeting, proposal)` |
@@ -306,6 +307,8 @@ Correction capability вычисляется сервером по полной 
 | `OPPORTUNITY_SCORING_V2_SHADOW_CANARY_WORKSPACE_IDS` | Временный allowlist ровно одного workspace для append-only v2 comparison snapshots; активные rank и action queue остаются на v1 |
 | `OPPORTUNITY_STRATEGIST_V1_ENABLED` | Включает Phase 6 глобально только при точном `true` и включённом Agency DNA v1; read и write paths используют один контекст |
 | `OPPORTUNITY_STRATEGIST_V1_CANARY_WORKSPACE_IDS` | Временный allowlist ровно одного положительного workspace ID для Strategist; при очистке сохранённая карточка сразу скрывается |
+| `OPPORTUNITY_WORKFLOW_V1_ENABLED` | Включает Phase 7 глобально только вместе с engine, Outcome Ledger и workspace context; UI дополнительно требует Outcome UI |
+| `OPPORTUNITY_WORKFLOW_V1_CANARY_WORKSPACE_IDS` | Временный allowlist ровно одного положительного workspace ID для Phase 7; общий workspace canary должен включать prerequisite boundaries |
 
 Owner canary включает engine, ledger и UI для одного owner, но не включает
 external ingest.
@@ -323,7 +326,6 @@ external ingest.
 готовыми:
 
 ```text
-OPPORTUNITY_TEAM_WORKFLOW_ENABLED
 OPPORTUNITY_CRM_BRIDGE_ENABLED
 ```
 
@@ -333,11 +335,11 @@ OPPORTUNITY_CRM_BRIDGE_ENABLED
 
 | Surface | Permission | Current tenant input |
 | --- | --- | --- |
-| `GET /api/opportunities` | `opportunities:read` | `dataOwnerId` |
+| `GET /api/opportunities` | `opportunities:read` | `dataOwnerId`; при Phase 7 также точный `workspaceId` |
 | `GET /api/opportunities/:id` | `opportunities:read` | `dataOwnerId` |
 | `GET /api/opportunities/:id/outcomes` | `opportunities:read` | `dataOwnerId` |
 | `GET /api/opportunities/outcomes/summary` | `opportunities:read` | `dataOwnerId` |
-| `/opportunities` page | `opportunities:read` | `dataOwnerId` |
+| `/opportunities` page | `opportunities:read` | `dataOwnerId`; при Phase 7 также точный `workspaceId` |
 
 ### Command paths
 
@@ -345,6 +347,7 @@ OPPORTUNITY_CRM_BRIDGE_ENABLED
 | --- | --- | --- |
 | `POST /api/opportunities/:id/action` | Валидирует legacy payload, преобразует его в canonical outcome command и делегирует тому же writer; добавляет `Deprecation: true`, successor `Link` и usage telemetry | Thin deprecated compatibility adapter; не имеет state machine или отдельной записи |
 | `POST /api/opportunities/:id/outcomes` | Выполняет auth/workspace authorization, validation, idempotency, locking, transition validation, append-only event, projections и safe response | Единственный authoritative command pipeline |
+| `PATCH /api/opportunities/:id/workflow` | Принимает только пять workflow-полей, обязательный `Idempotency-Key` header и реального Auth v2 workspace actor; foreign/superseded rows скрываются | Отдельный append-only activity writer, не коммерческий ledger и не CRM |
 | Schedules в `jobs.ts` | Пишут system `resumed` через transaction outcome writer | Internal writer |
 | `POST /api/opportunities/outcomes/external` | Код содержит signed legacy design, но endpoint всегда возвращает 404 | Disabled, не tenant-authenticated |
 
@@ -512,9 +515,19 @@ Gate: фактический canary либо явный external blocker. Health
 
 ### Phase 7 — daily commercial workflow
 
-- минимальные assignment/next-action поля;
-- append-only audit activity;
-- Today/Pipeline/Completed без хранения переписки.
+- отдельный append-only `opportunity_workflow_events` и rebuildable/current
+  `opportunity_workflow_state` для assignment, next action, priority и
+  внутренней заметки;
+- обязательная tenant/workspace/actor attribution и idempotency, immutable
+  events и запрет viewer/billing writes;
+- Today/Pipeline/Completed, server-side Moscow day boundary и active-member
+  assignee list без email;
+- внутренняя заметка видна workspace readers, но удаляется из API analytics
+  projection и не попадает в Outcome cohort snapshots;
+- переписка, контакты, sequences, CRM entities и automatic outreach не
+  добавляются.
+
+Подробный контракт: `docs/opportunity-intelligence-v2-phase-7.md`.
 
 ### Phase 8 — export и CRM bridge
 
