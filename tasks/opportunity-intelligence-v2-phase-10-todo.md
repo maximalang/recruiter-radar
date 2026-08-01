@@ -13,4 +13,4 @@
 - [x] Verify 320/768/1024/1440, keyboard, screen-reader structure and console.
 - [x] Run full checks and five-axis pre-merge review.
 - [x] Commit atomically, push and open PR #128 to `codex/opportunity-intelligence-v2`.
-- [ ] Merge only after the final green merge-gate.
+- [x] Record the green pre-merge gate for PR #128; merge only after this final docs commit is green.
