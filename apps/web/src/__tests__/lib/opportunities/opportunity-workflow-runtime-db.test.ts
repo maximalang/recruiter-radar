@@ -1,10 +1,16 @@
 /** @jest-environment node */
 
 import { createHash } from 'node:crypto'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { Pool } from 'pg'
 
 import { getPool } from '@/lib/db-pool'
 import { toPublicOpportunity } from '@/lib/opportunities/api-projection'
+import { getOutcomeAnalyticsV2Summary } from '@/lib/opportunities/outcome-analytics-v2'
+import { getOutcomeCalibrationDataset } from '@/lib/opportunities/outcome-calibration-export'
+import { recordOpportunityOutcome } from '@/lib/opportunities/outcome-repository'
+import type { OpportunityOutcomeInput } from '@/lib/opportunities/outcome-domain'
 import { listOpportunities } from '@/lib/opportunities/repository'
 import {
   OpportunityWorkflowAccessError,
@@ -243,6 +249,188 @@ describeWithDatabase('Opportunity workflow PostgreSQL runtime', () => {
     })).rejects.toBeInstanceOf(OpportunityWorkflowAssigneeError)
   })
 
+  it('proves event-time assignment, maturity, corrections, revenue and tenant isolation', async () => {
+    const base = Date.now() - 20_000
+    const events: Array<{
+      eventType: OpportunityOutcomeInput['eventType']
+      override?: Partial<OpportunityOutcomeInput>
+    }> = [
+      { eventType: 'shown' },
+      { eventType: 'accepted' },
+      {
+        eventType: 'contacted',
+        override: {
+          channel: 'email',
+          contactPathType: 'corporate_email',
+        },
+      },
+      { eventType: 'replied' },
+      {
+        eventType: 'meeting',
+        override: { metadata: { meetingStatus: 'scheduled' } },
+      },
+      { eventType: 'meeting_completed' },
+      { eventType: 'proposal' },
+      {
+        eventType: 'won',
+        override: { valueMinor: 250_000, currency: 'RUB' },
+      },
+    ]
+    let wonEventId: string | null = null
+    for (let index = 0; index < events.length; index += 1) {
+      const event = events[index]
+      const result = await recordOpportunityOutcome({
+        ownerId,
+        workspaceId,
+        opportunityId,
+        actorType: 'user',
+        actorUserId: ownerId,
+        actorWorkspaceId: workspaceId,
+        actorRoleSnapshot: 'owner',
+        authMode: 'auth_v2',
+        payload: outcomePayload(
+          event.eventType,
+          `analytics:${event.eventType}:${token}`,
+          base + index * 1_000,
+          event.override,
+        ),
+      })
+      if (event.eventType === 'won') wonEventId = result?.event.id ?? null
+    }
+    await recordOpportunityOutcome({
+      ownerId,
+      workspaceId,
+      opportunityId,
+      actorType: 'user',
+      actorUserId: ownerId,
+      actorWorkspaceId: workspaceId,
+      actorRoleSnapshot: 'owner',
+      authMode: 'auth_v2',
+      payload: outcomePayload(
+        'reverted',
+        `analytics:reverted:${token}`,
+        base + 9_000,
+        { revertsEventId: wonEventId },
+      ),
+    })
+    const finalWon = await recordOpportunityOutcome({
+      ownerId,
+      workspaceId,
+      opportunityId,
+      actorType: 'user',
+      actorUserId: ownerId,
+      actorWorkspaceId: workspaceId,
+      actorRoleSnapshot: 'owner',
+      authMode: 'auth_v2',
+      payload: outcomePayload(
+        'won',
+        `analytics:won-again:${token}`,
+        base + 10_000,
+        { valueMinor: 250_000, currency: 'RUB' },
+      ),
+    })
+
+    const capturedAssignment = await database.query(
+      `SELECT DISTINCT assigned_user_id::TEXT AS "assignedUserId"
+       FROM opportunity_outcome_events
+       WHERE owner_id = $1 AND opportunity_id = $2`,
+      [ownerId, opportunityId],
+    )
+    expect(capturedAssignment.rows).toEqual([
+      { assignedUserId: secondRecruiterId },
+    ])
+    const rollbackSql = readFileSync(resolve(
+      process.cwd(),
+      '..',
+      '..',
+      'packages',
+      'db',
+      'migrations',
+      '20260801150000_add_opportunity_analytics_v2.down.sql',
+    ), 'utf8')
+    const rollbackClient = await database.connect()
+    try {
+      await expect(rollbackClient.query(rollbackSql)).rejects.toThrow(
+        'assigned-user attribution exists',
+      )
+      await rollbackClient.query('ROLLBACK')
+    } finally {
+      rollbackClient.release()
+    }
+
+    const from = new Date(base - 1_000).toISOString()
+    const immatureTo = new Date(base + 24 * 60 * 60 * 1_000).toISOString()
+    const matureTo = new Date(base + 31 * 24 * 60 * 60 * 1_000).toISOString()
+    const filter = {
+      ownerId,
+      workspaceId,
+      from,
+      to: matureTo,
+      cohort: 'contacted' as const,
+      channel: 'email',
+      contactPathType: 'corporate_email',
+      assignedUserId: secondRecruiterId,
+      maturityDays: 30,
+    }
+    const mature = await getOutcomeAnalyticsV2Summary(filter, database)
+    const immature = await getOutcomeAnalyticsV2Summary({
+      ...filter,
+      to: immatureTo,
+    }, database)
+    const foreignWorkspace = await getOutcomeAnalyticsV2Summary({
+      ...filter,
+      workspaceId: otherWorkspaceId,
+    }, database)
+
+    expect(mature.cohort).toMatchObject({ size: 1, matured: true })
+    expect(immature.cohort).toMatchObject({ size: 1, matured: false })
+    expect(foreignWorkspace.cohort.size).toBe(0)
+    expect(mature.terminalOutcomes).toMatchObject({ won: 1, lost: 0 })
+    expect(mature.confirmedRevenue).toMatchObject({
+      confirmedValueMinor: '250000',
+      wonWithConfirmedValue: 1,
+      wonWithoutConfirmedValue: 0,
+    })
+
+    const calibration = await getOutcomeCalibrationDataset(filter, database)
+    expect(calibration).toHaveLength(1)
+    expect(calibration[0]).toMatchObject({
+      opportunityReference: expect.any(String),
+      terminalStatus: 'won',
+      confirmedRevenueMinor: '250000',
+      maturityStatus: 'mature',
+    })
+    expect(calibration[0]).not.toHaveProperty('assignedUserId')
+
+    await recordOpportunityOutcome({
+      ownerId,
+      workspaceId,
+      opportunityId,
+      actorType: 'user',
+      actorUserId: ownerId,
+      actorWorkspaceId: workspaceId,
+      actorRoleSnapshot: 'owner',
+      authMode: 'auth_v2',
+      payload: outcomePayload(
+        'reverted',
+        `analytics:cleanup:${token}`,
+        base + 11_000,
+        { revertsEventId: finalWon?.event.id ?? null },
+      ),
+    })
+    await updateOpportunityWorkflow({
+      ownerId,
+      workspaceId,
+      opportunityId,
+      actorUserId: ownerId,
+      actorRole: 'owner',
+      idempotencyKey: `analytics:cleanup-workflow:${token}`,
+      patch: {
+        nextActionDueAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+      },
+    })
+  })
+
   it('serves the workspace Today projection without publishing internal notes', async () => {
     const names = [
       'OPPORTUNITY_ENGINE_V1_ENABLED',
@@ -336,5 +524,35 @@ describeWithDatabase('Opportunity workflow PostgreSQL runtime', () => {
       [userId],
     )
     return String(result.rows[0].id)
+  }
+
+  function outcomePayload(
+    eventType: OpportunityOutcomeInput['eventType'],
+    idempotencyKey: string,
+    occurredAt: number,
+    override: Partial<OpportunityOutcomeInput> = {},
+  ): OpportunityOutcomeInput {
+    const metadata = eventType === 'shown'
+      ? { surface: 'runtime_test', cycleId: idempotencyKey }
+      : eventType === 'opened'
+        ? { interactionId: idempotencyKey }
+        : {}
+    return {
+      eventType,
+      occurredAt: new Date(occurredAt).toISOString(),
+      reasonCode: null,
+      reasonNote: null,
+      channel: null,
+      contactPathType: null,
+      contactReference: null,
+      snoozeDays: null,
+      snoozedUntil: null,
+      revertsEventId: null,
+      valueMinor: null,
+      currency: null,
+      metadata,
+      idempotencyKey,
+      ...override,
+    }
   }
 })
