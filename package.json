@@ -39,6 +39,7 @@
     "opportunity-outcomes:preflight": "node packages/db/scripts/preflight-opportunity-outcomes.mjs",
     "opportunity-outcomes:benchmark": "node packages/db/scripts/benchmark-opportunity-outcome-funnel.mjs",
     "opportunity-outcomes:canary": "node packages/db/scripts/canary-opportunity-outcomes.mjs",
+    "opportunity-outcomes:verify-canary-evidence": "node packages/db/scripts/verify-opportunity-canary-evidence.mjs",
     "test:db-migrations": "node packages/db/scripts/migrate.mjs && node packages/db/scripts/verify-payment-success-telemetry.mjs",
     "web:build": "npm run build --workspace @recruiter-radar/web",
     "web:check": "npm run check --workspace @recruiter-radar/web",
