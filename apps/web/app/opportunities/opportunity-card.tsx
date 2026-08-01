@@ -3,6 +3,8 @@ import {
   GateBadgeInline,
 } from '../ui/internal-page'
 import type { OpportunityItem } from '@/lib/opportunities/repository'
+import type { WorkspaceRole } from '@/lib/auth-v2/workspaces'
+import type { OpportunityWorkflowAssignee } from '@/lib/opportunities/opportunity-workflow-repository'
 import type {
   OpportunityStrategistBrief,
   OpportunityStrategistConclusion,
@@ -12,6 +14,7 @@ import {
   OpportunityOutcomeImpression,
   OpportunityOutcomePanel,
 } from './opportunity-outcome-panel'
+import { OpportunityWorkflowPanel } from './opportunity-workflow-panel'
 import styles from './opportunities.module.css'
 
 const EPISODE_LABELS: Record<string, string> = {
@@ -42,6 +45,10 @@ export function OpportunityCard(props: {
   opportunity: OpportunityItem
   outcomesUiEnabled?: boolean
   trackingCycleId?: string | null
+  workflowEnabled?: boolean
+  workflowAssignees?: OpportunityWorkflowAssignee[]
+  actorUserId?: string
+  actorRole?: WorkspaceRole | null
 }) {
   const opportunity = props.opportunity
   const score = Math.round(opportunity.opportunityScore * 100)
@@ -161,6 +168,16 @@ export function OpportunityCard(props: {
           />
         ) : null}
       </div>
+
+      {props.workflowEnabled && props.actorUserId ? (
+        <OpportunityWorkflowPanel
+          opportunityId={opportunity.id}
+          workflow={opportunity.workflow}
+          assignees={props.workflowAssignees ?? []}
+          actorUserId={props.actorUserId}
+          actorRole={props.actorRole ?? null}
+        />
+      ) : null}
 
       {props.outcomesUiEnabled ? (
         <OpportunityOutcomePanel

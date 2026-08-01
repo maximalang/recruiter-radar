@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation'
 import {
   isOpportunityEngineV1EnabledForContext,
   isOpportunityOutcomesUiEnabledForContext,
+  isOpportunityWorkflowV1EnabledForContext,
 } from '@/lib/opportunities/config'
 import { getOutcomeFunnelSummary } from '@/lib/opportunities/outcome-repository'
 import {
@@ -13,6 +14,10 @@ import {
   type OpportunityView,
 } from '@/lib/opportunities/repository'
 import type { OpportunityStatus } from '@/lib/opportunities/opportunity-scoring'
+import {
+  listOpportunityWorkflowAssignees,
+  type OpportunityWorkflowAssignee,
+} from '@/lib/opportunities/opportunity-workflow-repository'
 import {
   getOpportunityAuthorizationContext,
   getOpportunityDataAccessContext,
@@ -83,19 +88,26 @@ export default async function OpportunitiesPage(props: {
   const outcomesUiEnabled =
     isOpportunityOutcomesUiEnabledForContext(authorization) &&
     params.preview !== '1' && params.demo !== '1'
+  const workflowEnabled = outcomesUiEnabled &&
+    isOpportunityWorkflowV1EnabledForContext(authorization)
   const trackingCycleId = outcomesUiEnabled
-    ? `morning-brief:${new Date().toISOString().slice(0, 10)}`
+    ? `${workflowEnabled ? 'today' : 'morning-brief'}:${new Date().toISOString().slice(0, 10)}`
     : null
   const funnelTo = new Date()
   const funnelFrom = new Date(funnelTo.getTime() - 30 * 24 * 60 * 60 * 1000)
   const statuses = parseStatusFilter(params.status)
-  const view = outcomesUiEnabled ? parseView(params.view) : 'morning'
+  const view = workflowEnabled
+    ? parseView(params.view, 'today')
+    : outcomesUiEnabled
+      ? parseView(params.view, 'morning')
+      : 'morning'
   let result: Awaited<ReturnType<typeof listOpportunities>> | null = null
+  let workflowAssignees: OpportunityWorkflowAssignee[] = []
   let operationalSummary: Awaited<
     ReturnType<typeof getOpportunityOutcomeOperationalSummary>
   > | null = null
   try {
-    [result, operationalSummary] = await Promise.all([
+    [result, operationalSummary, workflowAssignees] = await Promise.all([
       listOpportunities({
         ownerId: access.ownerId,
         workspaceId: access.workspaceId,
@@ -115,6 +127,9 @@ export default async function OpportunitiesPage(props: {
             access.workspaceId,
           )
         : Promise.resolve(null),
+      workflowEnabled && access.workspaceId
+        ? listOpportunityWorkflowAssignees(access.workspaceId)
+        : Promise.resolve([]),
     ])
   } catch {
     result = null
@@ -182,7 +197,21 @@ export default async function OpportunitiesPage(props: {
 
         {funnel ? <OpportunityFunnel summary={funnel} /> : null}
 
-        {outcomesUiEnabled ? (
+        {workflowEnabled ? (
+          <nav className={styles.filters} aria-label="Рабочие представления возможностей">
+            <FilterLink href="/opportunities?view=today" active={view === 'today'}>
+              Сегодня
+            </FilterLink>
+            <FilterLink href="/opportunities?view=pipeline" active={view === 'pipeline'}>
+              Pipeline
+            </FilterLink>
+            <FilterLink href="/opportunities?view=completed" active={view === 'completed'}>
+              Завершённые
+            </FilterLink>
+          </nav>
+        ) : null}
+
+        {outcomesUiEnabled && !workflowEnabled ? (
           <nav className={styles.filters} aria-label="Фильтры Morning Brief">
           <FilterLink href="/opportunities?view=morning" active={view === 'morning'}>
             Новые возможности
@@ -222,6 +251,10 @@ export default async function OpportunitiesPage(props: {
                 opportunity={opportunity}
                 outcomesUiEnabled={outcomesUiEnabled}
                 trackingCycleId={trackingCycleId}
+                workflowEnabled={workflowEnabled}
+                workflowAssignees={workflowAssignees}
+                actorUserId={access.actorUserId}
+                actorRole={access.actorRoleSnapshot}
               />
             ))}
           </div>
@@ -262,9 +295,12 @@ function parseStatusFilter(value: string | undefined): OpportunityStatus[] {
   return []
 }
 
-function parseView(value: string | undefined): OpportunityView {
-  return value === 'accepted' || value === 'pipeline' || value === 'snoozed' ||
+function parseView(
+  value: string | undefined,
+  fallback: OpportunityView,
+): OpportunityView {
+  return value === 'today' || value === 'accepted' || value === 'pipeline' || value === 'snoozed' ||
     value === 'completed' || value === 'all'
     ? value
-    : 'morning'
+    : fallback
 }
