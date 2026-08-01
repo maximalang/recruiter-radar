@@ -119,6 +119,12 @@ try {
     OPPORTUNITY_OUTCOMES_ENABLED: 'true',
   })
   await run(process.execPath, [outcomeRebuildVerifierScript])
+  await run(process.execPath, [
+    jestScript,
+    '--runInBand',
+    '--runTestsByPath',
+    'src/__tests__/lib/opportunities/opportunity-workflow-runtime-db.test.ts',
+  ], webRoot)
   const fixtureClient = new Client({
     connectionString: temporaryUrl.toString(),
   })

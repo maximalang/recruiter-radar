@@ -19,10 +19,20 @@ const rollbackPath = resolve(
   'migrations',
   '20260801130000_add_opportunity_workflow_v1.down.sql',
 )
+const downVerifierPath = resolve(
+  process.cwd(),
+  '..',
+  '..',
+  'packages',
+  'db',
+  'scripts',
+  'verify-opportunity-engine-down.mjs',
+)
 
 describe('Opportunity workflow v1 migration contract', () => {
   const migration = readFileSync(migrationPath, 'utf8')
   const rollback = readFileSync(rollbackPath, 'utf8')
+  const downVerifier = readFileSync(downVerifierPath, 'utf8')
   const compactMigration = migration.replace(/\s+/g, ' ')
 
   it('adds an append-only workspace activity log with immutable actor context', () => {
@@ -70,5 +80,9 @@ describe('Opportunity workflow v1 migration contract', () => {
     expect(rollback).toContain('opportunity workflow v1 rollback refused')
     expect(rollback).toContain('opportunity_workflow_events')
     expect(rollback).toContain('opportunity_workflow_state')
+    expect(downVerifier).toContain(
+      '20260801130000_add_opportunity_workflow_v1.down.sql',
+    )
+    expect(downVerifier).toContain('PRE_FIXTURE_DOWN_MIGRATIONS = 6')
   })
 })
