@@ -92,7 +92,7 @@ export async function getOutcomeAnalyticsV2Summary(
   db: AnalyticsDb | null = getPool(),
 ): Promise<OutcomeAnalyticsV2Summary> {
   if (!db) throw new Error('DATABASE_URL is not set.')
-  const scope = buildAnalyticsScope(input)
+  const scope = buildOutcomeAnalyticsV2Scope(input)
   const result = await db.query<AnalyticsRow>(
     `${scope.cte}, per_opportunity AS (
        SELECT
@@ -167,12 +167,14 @@ export async function getOutcomeAnalyticsV2Summary(
   return toSummary(input, result.rows[0] ?? {})
 }
 
-interface AnalyticsScope {
+export interface OutcomeAnalyticsV2SqlScope {
   cte: string
   params: unknown[]
 }
 
-function buildAnalyticsScope(input: OutcomeAnalyticsV2Filter): AnalyticsScope {
+export function buildOutcomeAnalyticsV2Scope(
+  input: OutcomeAnalyticsV2Filter,
+): OutcomeAnalyticsV2SqlScope {
   const cohortEvent = input.cohort ?? 'shown'
   const params: unknown[] = [
     String(input.ownerId),

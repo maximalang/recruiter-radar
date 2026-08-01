@@ -5,8 +5,12 @@ import {
   getOpportunityDataAccessContext,
 } from '@/lib/opportunities/authorization'
 import { isOpportunityAnalyticsV2EnabledForContext } from '@/lib/opportunities/config'
-import { getOutcomeAnalyticsV2Summary } from '@/lib/opportunities/outcome-analytics-v2'
 import { parseOutcomeAnalyticsV2Filters } from '@/lib/opportunities/outcome-analytics-v2-request'
+import {
+  OutcomeCalibrationExportLimitError,
+  getOutcomeCalibrationDataset,
+  outcomeCalibrationToCsv,
+} from '@/lib/opportunities/outcome-calibration-export'
 import { logError, logEvent } from '@/lib/runtime'
 
 export const runtime = 'nodejs'
@@ -14,7 +18,7 @@ export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   const authorization = await getOpportunityAuthorizationContext(
-    'opportunities:read',
+    'exports:create',
   )
   const featureContext = authorization ?? {
     dataOwnerId: null,
@@ -36,7 +40,7 @@ export async function GET(request: NextRequest) {
     new Date(),
   )
   if ('error' in parsed) {
-    logEvent('opportunity_analytics_v2.request_rejected', {
+    logEvent('opportunity_analytics_v2.export_rejected', {
       reasonCode: parsed.error,
       rejected: 1,
     })
@@ -45,29 +49,44 @@ export async function GET(request: NextRequest) {
 
   const startedAt = Date.now()
   try {
-    const summary = await getOutcomeAnalyticsV2Summary({
+    const records = await getOutcomeCalibrationDataset({
       ownerId: access.ownerId,
       workspaceId: access.workspaceId,
       ...parsed.filters,
     })
-    logEvent('opportunity_analytics_v2.summary_completed', {
+    const csv = outcomeCalibrationToCsv(records)
+    logEvent('opportunity_analytics_v2.export_completed', {
       durationMs: Date.now() - startedAt,
-      cohortSize: summary.cohort.size,
-      wonWithConfirmedValue:
-        summary.confirmedRevenue.wonWithConfirmedValue,
-      wonWithoutConfirmedValue:
-        summary.confirmedRevenue.wonWithoutConfirmedValue,
+      recordCount: records.length,
       completed: 1,
     })
-    return json(summary, 200)
+    return new NextResponse(csv, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition':
+          'attachment; filename="opportunity-calibration.csv"',
+        'Cache-Control': 'no-store',
+        'X-Content-Type-Options': 'nosniff',
+      },
+    })
   } catch (error) {
-    logError('opportunity_analytics_v2.summary_failed', error, {
+    if (error instanceof OutcomeCalibrationExportLimitError) {
+      logEvent('opportunity_analytics_v2.export_rejected', {
+        reasonCode: error.code,
+        durationMs: Date.now() - startedAt,
+        rejected: 1,
+      })
+      return json({ error: error.code }, 422)
+    }
+    logError('opportunity_analytics_v2.export_failed', error, {
       durationMs: Date.now() - startedAt,
       failed: 1,
     })
-    return json({ error: 'opportunity_analytics_v2_unavailable' }, 500)
+    return json({ error: 'opportunity_calibration_export_unavailable' }, 500)
   }
 }
+
 function json(body: unknown, status: number): NextResponse {
   return NextResponse.json(body, {
     status,
