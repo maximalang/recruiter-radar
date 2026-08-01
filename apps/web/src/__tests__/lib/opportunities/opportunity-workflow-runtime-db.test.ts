@@ -32,6 +32,7 @@ describeWithDatabase('Opportunity workflow PostgreSQL runtime', () => {
   let recruiterId = ''
   let secondRecruiterId = ''
   let viewerId = ''
+  let otherOwnerId = ''
   let workspaceId = ''
   let otherWorkspaceId = ''
   let opportunityId = ''
@@ -59,7 +60,7 @@ describeWithDatabase('Opportunity workflow PostgreSQL runtime', () => {
     recruiterId = String(users.rows[1].id)
     secondRecruiterId = String(users.rows[2].id)
     viewerId = String(users.rows[3].id)
-    const otherOwnerId = String(users.rows[4].id)
+    otherOwnerId = String(users.rows[4].id)
 
     workspaceId = await ensureWorkspace(ownerId)
     otherWorkspaceId = await ensureWorkspace(otherOwnerId)
@@ -339,6 +340,52 @@ describeWithDatabase('Opportunity workflow PostgreSQL runtime', () => {
     expect(capturedAssignment.rows).toEqual([
       { assignedUserId: secondRecruiterId },
     ])
+    const invalidAssigneeClient = await database.connect()
+    try {
+      await invalidAssigneeClient.query('BEGIN')
+      await invalidAssigneeClient.query(
+        `ALTER TABLE opportunity_outcome_events
+         DISABLE TRIGGER opportunity_outcome_events_validate_insert`,
+      )
+      await expect(invalidAssigneeClient.query(
+        `INSERT INTO opportunity_outcome_events (
+           owner_id, client_profile_id, opportunity_id, hiring_episode_id,
+           organization_id, event_type, previous_stage, new_stage,
+           reason_code, reason_note, channel, contact_path_type,
+           contact_reference, contact_reference_hash, contact_reference_label,
+           snoozed_until, reverts_event_id, external_system, external_event_id,
+           value_minor, currency, occurred_at, actor_type, actor_user_id,
+           actor_workspace_id, actor_role_snapshot, assigned_user_id, metadata,
+           analytics_snapshot, idempotency_key, dedupe_key, payload_hash
+         )
+         SELECT
+           owner_id, client_profile_id, opportunity_id, hiring_episode_id,
+           organization_id, event_type, previous_stage, new_stage,
+           reason_code, reason_note, channel, contact_path_type,
+           contact_reference, contact_reference_hash, contact_reference_label,
+           snoozed_until, reverts_event_id, external_system, external_event_id,
+           value_minor, currency, NOW(), actor_type, actor_user_id,
+           actor_workspace_id, actor_role_snapshot, $3, metadata,
+           analytics_snapshot, $4, NULL, payload_hash
+         FROM opportunity_outcome_events
+         WHERE owner_id = $1
+           AND opportunity_id = $2
+           AND event_type = 'shown'
+         ORDER BY id
+         LIMIT 1`,
+        [
+          ownerId,
+          opportunityId,
+          otherOwnerId,
+          `analytics:foreign-assignee:${token}`,
+        ],
+      )).rejects.toThrow(
+        'outcome event assignee must belong to the opportunity workspace',
+      )
+    } finally {
+      await invalidAssigneeClient.query('ROLLBACK').catch(() => undefined)
+      invalidAssigneeClient.release()
+    }
     const rollbackSql = readFileSync(resolve(
       process.cwd(),
       '..',

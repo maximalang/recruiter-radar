@@ -249,50 +249,37 @@ export function buildOutcomeAnalyticsV2Scope(
 
   return {
     params,
-    cte: `WITH scoped_events AS (
-       SELECT
-         event.id,
-         event.opportunity_id,
-         event.event_type,
-         event.occurred_at,
-         event.analytics_snapshot,
-         event.reverts_event_id,
-         event.reason_code,
-         event.channel,
-         event.contact_path_type,
-         event.assigned_user_id,
-         event.value_minor,
-         event.currency
-       FROM opportunity_outcome_events event
-       JOIN opportunities scoped_opportunity
-         ON scoped_opportunity.id = event.opportunity_id
-        AND scoped_opportunity.owner_id = event.owner_id
-       WHERE event.owner_id = $1
+    cte: `WITH scoped_opportunities AS (
+       SELECT scoped_opportunity.id
+       FROM opportunities scoped_opportunity
+       WHERE scoped_opportunity.owner_id = $1
          AND scoped_opportunity.workspace_id = $2
-     ), active_events AS (
-       SELECT event.*
-       FROM scoped_events event
-       WHERE event.event_type <> 'reverted'
-         AND NOT EXISTS (
-           SELECT 1
-           FROM scoped_events correction
-           WHERE correction.event_type = 'reverted'
-             AND correction.reverts_event_id = event.id
-         )
      ), cohort_ranked AS (
        SELECT
-         opportunity_id,
-         occurred_at AS cohort_at,
-         analytics_snapshot AS cohort_snapshot,
-         channel AS cohort_channel,
-         contact_path_type AS cohort_contact_path_type,
-         assigned_user_id AS cohort_assigned_user_id,
+         event.opportunity_id,
+         event.occurred_at AS cohort_at,
+         event.analytics_snapshot AS cohort_snapshot,
+         event.channel AS cohort_channel,
+         event.contact_path_type AS cohort_contact_path_type,
+         event.assigned_user_id AS cohort_assigned_user_id,
          ROW_NUMBER() OVER (
-           PARTITION BY opportunity_id
-           ORDER BY occurred_at, id
+           PARTITION BY event.opportunity_id
+           ORDER BY event.occurred_at, event.id
          ) AS cohort_rank
-       FROM active_events
-       WHERE event_type = $5
+       FROM opportunity_outcome_events event
+       JOIN scoped_opportunities scoped_opportunity
+         ON scoped_opportunity.id = event.opportunity_id
+       WHERE event.owner_id = $1
+         AND event.event_type = $5
+         AND event.occurred_at < $4::timestamptz
+         AND NOT EXISTS (
+           SELECT 1
+           FROM opportunity_outcome_events correction
+           WHERE correction.owner_id = event.owner_id
+             AND correction.opportunity_id = event.opportunity_id
+             AND correction.event_type = 'reverted'
+             AND correction.reverts_event_id = event.id
+         )
      ), cohort_candidates AS (
        SELECT
          opportunity_id,
@@ -310,11 +297,28 @@ export function buildOutcomeAnalyticsV2Scope(
        FROM cohort_candidates
        ${clauses.length > 0 ? `WHERE ${clauses.join('\n         AND ')}` : ''}
      ), cohort_events AS (
-       SELECT event.*
+       SELECT
+         event.*,
+         cohort.cohort_at,
+         cohort.cohort_snapshot,
+         cohort.cohort_channel,
+         cohort.cohort_contact_path_type,
+         cohort.cohort_assigned_user_id
        FROM cohort
-       JOIN active_events event USING (opportunity_id)
-       WHERE event.occurred_at >= cohort.cohort_at
+       JOIN opportunity_outcome_events event
+         ON event.owner_id = $1
+        AND event.opportunity_id = cohort.opportunity_id
+       WHERE event.event_type <> 'reverted'
+         AND event.occurred_at >= cohort.cohort_at
          AND event.occurred_at < $4::timestamptz
+         AND NOT EXISTS (
+           SELECT 1
+           FROM opportunity_outcome_events correction
+           WHERE correction.owner_id = event.owner_id
+             AND correction.opportunity_id = event.opportunity_id
+             AND correction.event_type = 'reverted'
+             AND correction.reverts_event_id = event.id
+         )
      )`,
   }
 }

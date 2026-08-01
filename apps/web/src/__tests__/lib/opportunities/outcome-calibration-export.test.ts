@@ -28,8 +28,19 @@ const SNAPSHOT = {
 const RECORD: OutcomeCalibrationRecord = {
   opportunityReference: '11111111-1111-4111-8111-111111111111',
   cohortAt: '2026-07-01T00:00:00.000Z',
-  ...SNAPSHOT,
-  specialization: '\n=HYPERLINK("https://bad.invalid")',
+  clientProfileVersion: SNAPSHOT.clientProfileVersion,
+  agencyDnaVersion: SNAPSHOT.agencyDnaVersion,
+  hiringMode: SNAPSHOT.hiringMode,
+  matchedRoleFamilies: ['\n=HYPERLINK("https://bad.invalid")'],
+  matchedIndustries: SNAPSHOT.matchedIndustries,
+  matchedRegions: SNAPSHOT.matchedRegions,
+  organizationSizeBucket: SNAPSHOT.organizationSizeBucket,
+  episodeType: SNAPSHOT.episodeType,
+  confidenceGate: SNAPSHOT.confidenceGate,
+  scoreBucket: SNAPSHOT.scoreBucket,
+  externalSupportNeedBucket: SNAPSHOT.externalSupportNeedBucket,
+  sourceFamilies: SNAPSHOT.sourceFamilies,
+  scoringVersion: SNAPSHOT.scoringVersion,
   cohortChannel: 'email', cohortContactPathType: 'corporate_email',
   shownAt: '2026-07-01T00:00:00.000Z', openedAt: null,
   acceptedAt: '2026-07-02T00:00:00.000Z',
@@ -63,10 +74,15 @@ describe('Outcome calibration export', () => {
     expect(String(sql)).toContain('scoped_opportunity.workspace_id = $2')
     expect(String(sql)).toContain("correction.event_type = 'reverted'")
     expect(params.at(-1)).toBe(5001)
-    expect(rows).toEqual([{ ...RECORD, specialization: 'IT recruitment' }])
+    expect(rows).toEqual([{
+      ...RECORD,
+      matchedRoleFamilies: ['backend'],
+    }])
     expect(rows[0]).not.toHaveProperty('assignedUserId')
     expect(rows[0]).not.toHaveProperty('ownerId')
     expect(rows[0]).not.toHaveProperty('workspaceId')
+    expect(rows[0]).not.toHaveProperty('clientProfileId')
+    expect(rows[0]).not.toHaveProperty('specialization')
   })
 
   it('emits deterministic formula-safe CSV with no forbidden columns', () => {
@@ -77,7 +93,7 @@ describe('Outcome calibration export', () => {
     expect(csv).toContain(`"'\n=HYPERLINK(""https://bad.invalid"")"`)
     expect(header).toContain('opportunityReference,cohortAt')
     expect(header).not.toMatch(
-      /ownerId|workspaceId|assignedUser|organizationName|email|reasonNote|metadata|evidenceUrl/i,
+      /ownerId|workspaceId|assignedUser|clientProfileId|specialization|organizationName|email|reasonNote|metadata|evidenceUrl/i,
     )
   })
 

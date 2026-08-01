@@ -98,10 +98,14 @@ describe('Outcome Analytics v2 route', () => {
   it('rejects biased or malformed filters before querying the ledger', async () => {
     const biased = await GET(request('?cohort=accepted&channel=email'))
     const badAssignee = await GET(request('?assignedUserId=7%2C8'))
+    const oversizedAssignee = await GET(request(
+      '?assignedUserId=9999999999999999999',
+    ))
     const badPeriod = await GET(request('?from=never'))
 
     expect(biased.status).toBe(400)
     expect(badAssignee.status).toBe(400)
+    expect(oversizedAssignee.status).toBe(400)
     expect(badPeriod.status).toBe(400)
     expect(mockedSummary).not.toHaveBeenCalled()
   })

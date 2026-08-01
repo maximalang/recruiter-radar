@@ -14,7 +14,8 @@ try {
       id BIGINT PRIMARY KEY,
       owner_id BIGINT NOT NULL,
       workspace_id BIGINT NOT NULL,
-      client_profile_id BIGINT NOT NULL
+      client_profile_id BIGINT NOT NULL,
+      public_reference UUID NOT NULL
     ) ON COMMIT DROP;
 
     CREATE TEMP TABLE benchmark_outcome_events (
@@ -36,10 +37,17 @@ try {
     INSERT INTO benchmark_opportunities
     SELECT
       opportunity_id,
-      1 + ((opportunity_id - 1) % 10),
-      1 + ((opportunity_id - 1) % 10),
-      1 + ((opportunity_id - 1) % 100)
-    FROM generate_series(1, 10000) AS opportunity_id;
+      CASE
+        WHEN opportunity_id <= 10000 THEN 1
+        ELSE 2 + ((opportunity_id - 10001) % 9)
+      END,
+      CASE
+        WHEN opportunity_id <= 10000 THEN 1
+        ELSE 2 + ((opportunity_id - 10001) % 9)
+      END,
+      1 + ((opportunity_id - 1) % 1000),
+      MD5(opportunity_id::TEXT)::UUID
+    FROM generate_series(1, 20000) AS opportunity_id;
 
     INSERT INTO benchmark_outcome_events
     SELECT
@@ -74,7 +82,7 @@ try {
       1 + (opportunity.id % 25),
       CASE WHEN kind.event_type = 'won' THEN 250000 END,
       CASE WHEN kind.event_type = 'won' THEN 'RUB' END
-    FROM generate_series(1, 100000) AS event_id
+    FROM generate_series(1, 200000) AS event_id
     JOIN benchmark_opportunities opportunity
       ON opportunity.id = 1 + ((event_id - 1) / 10)
     CROSS JOIN LATERAL (
@@ -96,6 +104,9 @@ try {
       ON benchmark_outcome_events (
         owner_id, opportunity_id, occurred_at, event_type, id
       );
+    CREATE INDEX benchmark_outcome_owner_reverts_idx
+      ON benchmark_outcome_events (owner_id, reverts_event_id)
+      WHERE reverts_event_id IS NOT NULL;
     ANALYZE benchmark_opportunities;
     ANALYZE benchmark_outcome_events;
   `)
@@ -149,39 +160,46 @@ try {
       (SELECT COUNT(*) FROM contacted) AS contacted_count;
   `)
 
-  const analyticsResult = await client.query(`
-    EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)
-    WITH scoped_events AS (
-      SELECT event.*
-      FROM benchmark_outcome_events event
-      JOIN benchmark_opportunities scoped_opportunity
-        ON scoped_opportunity.id = event.opportunity_id
-       AND scoped_opportunity.owner_id = event.owner_id
-      WHERE event.owner_id = 1
+  const analyticsCte = `
+    WITH scoped_opportunities AS (
+      SELECT scoped_opportunity.id
+      FROM benchmark_opportunities scoped_opportunity
+      WHERE scoped_opportunity.owner_id = 1
         AND scoped_opportunity.workspace_id = 1
-    ), active_events AS (
-      SELECT event.*
-      FROM scoped_events event
-      WHERE event.event_type <> 'reverted'
-        AND NOT EXISTS (
-          SELECT 1
-          FROM scoped_events correction
-          WHERE correction.event_type = 'reverted'
-            AND correction.reverts_event_id = event.id
-        )
     ), cohort_ranked AS (
       SELECT
-        opportunity_id,
-        occurred_at AS cohort_at,
-        analytics_snapshot AS cohort_snapshot,
+        event.opportunity_id,
+        event.occurred_at AS cohort_at,
+        event.analytics_snapshot AS cohort_snapshot,
+        event.channel AS cohort_channel,
+        event.contact_path_type AS cohort_contact_path_type,
+        event.assigned_user_id AS cohort_assigned_user_id,
         ROW_NUMBER() OVER (
-          PARTITION BY opportunity_id
-          ORDER BY occurred_at, id
+          PARTITION BY event.opportunity_id
+          ORDER BY event.occurred_at, event.id
         ) AS cohort_rank
-      FROM active_events
-      WHERE event_type = 'shown'
+      FROM benchmark_outcome_events event
+      JOIN scoped_opportunities scoped_opportunity
+        ON scoped_opportunity.id = event.opportunity_id
+      WHERE event.owner_id = 1
+        AND event.event_type = 'shown'
+        AND event.occurred_at < TIMESTAMPTZ '2026-02-01 00:00:00+00'
+        AND NOT EXISTS (
+          SELECT 1
+          FROM benchmark_outcome_events correction
+          WHERE correction.owner_id = event.owner_id
+            AND correction.opportunity_id = event.opportunity_id
+            AND correction.event_type = 'reverted'
+            AND correction.reverts_event_id = event.id
+        )
     ), cohort AS (
-      SELECT opportunity_id, cohort_at
+      SELECT
+        opportunity_id,
+        cohort_at,
+        cohort_snapshot,
+        cohort_channel,
+        cohort_contact_path_type,
+        cohort_assigned_user_id
       FROM cohort_ranked
       WHERE cohort_rank = 1
         AND cohort_at >= TIMESTAMPTZ '2026-01-01 00:00:00+00'
@@ -189,42 +207,138 @@ try {
         AND cohort_snapshot->>'agencyDnaVersion' = 'dna-v2'
         AND cohort_snapshot->'matchedRoleFamilies' ? 'backend'
     ), cohort_events AS (
-      SELECT event.*
+      SELECT
+        event.*,
+        cohort.cohort_at,
+        cohort.cohort_snapshot,
+        cohort.cohort_channel,
+        cohort.cohort_contact_path_type,
+        cohort.cohort_assigned_user_id
       FROM cohort
-      JOIN active_events event USING (opportunity_id)
-      WHERE event.occurred_at >= cohort.cohort_at
+      JOIN benchmark_outcome_events event
+        ON event.owner_id = 1
+       AND event.opportunity_id = cohort.opportunity_id
+      WHERE event.event_type <> 'reverted'
+        AND event.occurred_at >= cohort.cohort_at
         AND event.occurred_at < TIMESTAMPTZ '2026-02-01 00:00:00+00'
-    ), per_opportunity AS (
+        AND NOT EXISTS (
+          SELECT 1
+          FROM benchmark_outcome_events correction
+          WHERE correction.owner_id = event.owner_id
+            AND correction.opportunity_id = event.opportunity_id
+            AND correction.event_type = 'reverted'
+            AND correction.reverts_event_id = event.id
+        )
+    )`
+
+  const analyticsResult = await client.query(`
+    EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)
+    ${analyticsCte}, per_opportunity AS (
       SELECT
         opportunity_id,
+        MIN(occurred_at) FILTER (WHERE event_type = 'shown') AS shown_at,
+        MIN(occurred_at) FILTER (WHERE event_type = 'opened') AS opened_at,
         MIN(occurred_at) FILTER (WHERE event_type = 'accepted') AS accepted_at,
         MIN(occurred_at) FILTER (WHERE event_type = 'contacted') AS contacted_at,
+        MIN(occurred_at) FILTER (WHERE event_type = 'replied') AS replied_at,
+        MIN(occurred_at) FILTER (WHERE event_type = 'meeting') AS meeting_at,
+        MIN(occurred_at) FILTER (WHERE event_type = 'proposal') AS proposal_at,
         MIN(occurred_at) FILTER (WHERE event_type = 'won') AS won_at,
         MIN(occurred_at) FILTER (WHERE event_type = 'lost') AS lost_at
       FROM cohort_events
       GROUP BY opportunity_id
+    ), reason_counts AS (
+      SELECT event_type, reason_code, COUNT(*) AS reason_count
+      FROM cohort_events
+      WHERE event_type IN ('dismissed', 'lost')
+        AND reason_code IS NOT NULL
+      GROUP BY event_type, reason_code
     )
     SELECT
       COUNT(*) AS cohort_size,
       COUNT(*) FILTER (WHERE contacted_at IS NOT NULL) AS contacted_count,
       COUNT(*) FILTER (WHERE won_at IS NOT NULL) AS won_count,
       COUNT(*) FILTER (WHERE lost_at IS NOT NULL) AS lost_count,
+      PERCENTILE_CONT(0.5) WITHIN GROUP (
+        ORDER BY EXTRACT(EPOCH FROM (contacted_at - accepted_at))
+      ) FILTER (
+        WHERE accepted_at IS NOT NULL
+          AND contacted_at IS NOT NULL
+          AND contacted_at >= accepted_at
+      ) AS accepted_contacted_median_seconds,
+      (SELECT JSONB_AGG(reason_counts ORDER BY event_type, reason_code)
+       FROM reason_counts) AS reasons,
       (SELECT COALESCE(SUM(value_minor), 0)
        FROM cohort_events
        WHERE event_type = 'won' AND currency = 'RUB') AS confirmed_revenue_minor
     FROM per_opportunity;
   `)
 
+  const calibrationResult = await client.query(`
+    EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)
+    ${analyticsCte}, per_opportunity AS (
+      SELECT
+        event.opportunity_id,
+        event.cohort_at,
+        event.cohort_snapshot,
+        MIN(event.occurred_at) FILTER (
+          WHERE event.event_type = 'accepted'
+        ) AS accepted_at,
+        MIN(event.occurred_at) FILTER (
+          WHERE event.event_type = 'contacted'
+        ) AS contacted_at,
+        MIN(event.occurred_at) FILTER (
+          WHERE event.event_type = 'won'
+        ) AS won_at,
+        MIN(event.occurred_at) FILTER (
+          WHERE event.event_type = 'lost'
+        ) AS lost_at,
+        MAX(event.value_minor) FILTER (
+          WHERE event.event_type = 'won' AND event.currency = 'RUB'
+        ) AS confirmed_revenue_minor
+      FROM cohort_events event
+      GROUP BY
+        event.opportunity_id,
+        event.cohort_at,
+        event.cohort_snapshot
+    )
+    SELECT
+      scoped_opportunity.public_reference,
+      event.cohort_at,
+      event.cohort_snapshot,
+      event.accepted_at,
+      event.contacted_at,
+      event.won_at,
+      event.lost_at,
+      event.confirmed_revenue_minor,
+      COUNT(*) OVER () AS cohort_size
+    FROM per_opportunity event
+    JOIN benchmark_opportunities scoped_opportunity
+      ON scoped_opportunity.id = event.opportunity_id
+     AND scoped_opportunity.owner_id = 1
+     AND scoped_opportunity.workspace_id = 1
+    ORDER BY event.cohort_at, scoped_opportunity.public_reference
+    LIMIT 5001;
+  `)
+
   const legacy = planMetrics(legacyResult.rows[0]['QUERY PLAN'][0])
   const analyticsV2 = planMetrics(analyticsResult.rows[0]['QUERY PLAN'][0])
-  if (analyticsV2.executionTimeMs > 1000) {
-    throw new Error(
-      `Opportunity Analytics v2 benchmark exceeded 1000ms: ${analyticsV2.executionTimeMs}`,
-    )
-  }
-  if (!analyticsV2.indexesUsed.some((name) =>
-    name.startsWith('benchmark_outcome_owner_'))) {
-    throw new Error('Opportunity Analytics v2 benchmark used no owner-scoped event index.')
+  const calibration = planMetrics(calibrationResult.rows[0]['QUERY PLAN'][0])
+  for (const [name, metrics] of [
+    ['summary', analyticsV2],
+    ['calibration export', calibration],
+  ]) {
+    if (metrics.executionTimeMs > 1000) {
+      throw new Error(
+        `Opportunity Analytics v2 ${name} benchmark exceeded 1000ms: ${metrics.executionTimeMs}`,
+      )
+    }
+    if (!metrics.indexesUsed.some((indexName) =>
+      indexName.startsWith('benchmark_outcome_owner_'))) {
+      throw new Error(
+        `Opportunity Analytics v2 ${name} benchmark used no owner-scoped event index.`,
+      )
+    }
   }
 
   console.log(JSON.stringify({
@@ -232,14 +346,17 @@ try {
     fixture: {
       owners: 10,
       workspaces: 10,
-      profiles: 100,
-      opportunities: 10000,
-      outcomeEvents: 100000,
-      corrections: 1000,
+      profiles: 1000,
+      opportunities: 20000,
+      outcomeEvents: 200000,
+      targetOutcomeEvents: 100000,
+      corrections: 2000,
+      targetCorrections: 1000,
     },
     regressionGuardMs: 1000,
     legacyFunnel: legacy,
     analyticsV2,
+    calibrationExport: calibration,
   }, null, 2))
 } finally {
   await client.query('ROLLBACK').catch(() => undefined)

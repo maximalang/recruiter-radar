@@ -69,7 +69,7 @@ export function parseOutcomeAnalyticsV2Filters(
   const maturityDays = rawMaturityDays === null ? 30 : Number(rawMaturityDays)
 
   if (
-    (clientProfileId && !isPositiveId(clientProfileId)) ||
+    (clientProfileId && !isPositiveDatabaseId(clientProfileId)) ||
     (clientProfileVersion && !isSafeIdentifier(clientProfileVersion)) ||
     (agencyDnaVersion && !isSafeIdentifier(agencyDnaVersion)) ||
     (hiringMode && ![...OPPORTUNITY_HIRING_MODES, 'unknown'].includes(
@@ -99,7 +99,7 @@ export function parseOutcomeAnalyticsV2Filters(
     )) ||
     (assignedUserId &&
       assignedUserId !== 'unknown' &&
-      !isPositiveId(assignedUserId)) ||
+      !isPositiveDatabaseId(assignedUserId)) ||
     !['shown', 'accepted', 'contacted'].includes(cohort) ||
     ((channel || contactPathType) && cohort !== 'contacted') ||
     !Number.isInteger(maturityDays) ||
@@ -149,8 +149,9 @@ function parseTimestamp(value: string | null): Date | null {
   return Number.isFinite(timestamp) ? new Date(timestamp) : null
 }
 
-function isPositiveId(value: string): boolean {
-  return /^[1-9]\d{0,18}$/.test(value)
+function isPositiveDatabaseId(value: string): boolean {
+  if (!/^[1-9]\d{0,18}$/.test(value)) return false
+  return BigInt(value) <= BigInt('9223372036854775807')
 }
 
 function isSafeIdentifier(value: string): boolean {

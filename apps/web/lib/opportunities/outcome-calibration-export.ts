@@ -15,6 +15,11 @@ type CalibrationDb = Pick<PoolClient, 'query'>
 
 export const MAX_OUTCOME_CALIBRATION_RECORDS = 5_000
 
+type PrivacySafeCalibrationCohort = Omit<
+  OpportunityAnalyticsCohort,
+  'clientProfileId' | 'specialization'
+>
+
 export class OutcomeCalibrationExportLimitError extends Error {
   readonly code = 'outcome_calibration_export_too_large'
 
@@ -24,7 +29,7 @@ export class OutcomeCalibrationExportLimitError extends Error {
   }
 }
 
-export interface OutcomeCalibrationRecord extends OpportunityAnalyticsCohort {
+export interface OutcomeCalibrationRecord extends PrivacySafeCalibrationCohort {
   opportunityReference: string
   cohortAt: string
   cohortChannel: string | null
@@ -78,69 +83,87 @@ export async function getOutcomeCalibrationDataset(
   ]
   const limitParameter = `$${params.length}`
   const result = await db.query<CalibrationRow>(
-    `${scope.cte}
+    `${scope.cte}, per_opportunity AS (
+       SELECT
+         event.opportunity_id,
+         event.cohort_at,
+         event.cohort_snapshot,
+         event.cohort_channel,
+         event.cohort_contact_path_type,
+         MIN(event.occurred_at) FILTER (
+           WHERE event.event_type = 'shown'
+         )::TEXT AS "shownAt",
+         MIN(event.occurred_at) FILTER (
+           WHERE event.event_type = 'opened'
+         )::TEXT AS "openedAt",
+         MIN(event.occurred_at) FILTER (
+           WHERE event.event_type = 'accepted'
+         )::TEXT AS "acceptedAt",
+         MIN(event.occurred_at) FILTER (
+           WHERE event.event_type = 'contacted'
+         )::TEXT AS "contactedAt",
+         MIN(event.occurred_at) FILTER (
+           WHERE event.event_type = 'replied'
+         )::TEXT AS "repliedAt",
+         MIN(event.occurred_at) FILTER (
+           WHERE event.event_type = 'meeting'
+         )::TEXT AS "meetingAt",
+         MIN(event.occurred_at) FILTER (
+           WHERE event.event_type = 'proposal'
+         )::TEXT AS "proposalAt",
+         MIN(event.occurred_at) FILTER (
+           WHERE event.event_type = 'won'
+         )::TEXT AS "wonAt",
+         MIN(event.occurred_at) FILTER (
+           WHERE event.event_type = 'lost'
+         )::TEXT AS "lostAt",
+         CASE
+           WHEN BOOL_OR(event.event_type = 'won') THEN 'won'
+           WHEN BOOL_OR(event.event_type = 'lost') THEN 'lost'
+           WHEN BOOL_OR(event.event_type = 'dismissed') THEN 'dismissed'
+           ELSE 'open'
+         END AS "terminalStatus",
+         MIN(event.reason_code) FILTER (
+           WHERE event.event_type IN ('dismissed', 'lost')
+         ) AS "terminalReasonCode",
+         (MAX(event.value_minor) FILTER (
+           WHERE event.event_type = 'won'
+             AND event.value_minor IS NOT NULL
+             AND event.currency = 'RUB'
+         ))::TEXT AS "confirmedRevenueMinor"
+       FROM cohort_events event
+       GROUP BY
+         event.opportunity_id,
+         event.cohort_at,
+         event.cohort_snapshot,
+         event.cohort_channel,
+         event.cohort_contact_path_type
+     )
      SELECT
        scoped_opportunity.public_reference::TEXT AS "opportunityReference",
-       cohort.cohort_at::TEXT AS "cohortAt",
-       cohort.cohort_snapshot AS "cohortSnapshot",
-       cohort.cohort_channel AS "cohortChannel",
-       cohort.cohort_contact_path_type AS "cohortContactPathType",
-       MIN(event.occurred_at) FILTER (
-         WHERE event.event_type = 'shown'
-       )::TEXT AS "shownAt",
-       MIN(event.occurred_at) FILTER (
-         WHERE event.event_type = 'opened'
-       )::TEXT AS "openedAt",
-       MIN(event.occurred_at) FILTER (
-         WHERE event.event_type = 'accepted'
-       )::TEXT AS "acceptedAt",
-       MIN(event.occurred_at) FILTER (
-         WHERE event.event_type = 'contacted'
-       )::TEXT AS "contactedAt",
-       MIN(event.occurred_at) FILTER (
-         WHERE event.event_type = 'replied'
-       )::TEXT AS "repliedAt",
-       MIN(event.occurred_at) FILTER (
-         WHERE event.event_type = 'meeting'
-       )::TEXT AS "meetingAt",
-       MIN(event.occurred_at) FILTER (
-         WHERE event.event_type = 'proposal'
-       )::TEXT AS "proposalAt",
-       MIN(event.occurred_at) FILTER (
-         WHERE event.event_type = 'won'
-       )::TEXT AS "wonAt",
-       MIN(event.occurred_at) FILTER (
-         WHERE event.event_type = 'lost'
-       )::TEXT AS "lostAt",
-       CASE
-         WHEN BOOL_OR(event.event_type = 'won') THEN 'won'
-         WHEN BOOL_OR(event.event_type = 'lost') THEN 'lost'
-         WHEN BOOL_OR(event.event_type = 'dismissed') THEN 'dismissed'
-         ELSE 'open'
-       END AS "terminalStatus",
-       MIN(event.reason_code) FILTER (
-         WHERE event.event_type IN ('dismissed', 'lost')
-       ) AS "terminalReasonCode",
-       (MAX(event.value_minor) FILTER (
-         WHERE event.event_type = 'won'
-           AND event.value_minor IS NOT NULL
-           AND event.currency = 'RUB'
-       ))::TEXT AS "confirmedRevenueMinor",
+       event.cohort_at::TEXT AS "cohortAt",
+       event.cohort_snapshot AS "cohortSnapshot",
+       event.cohort_channel AS "cohortChannel",
+       event.cohort_contact_path_type AS "cohortContactPathType",
+       event."shownAt",
+       event."openedAt",
+       event."acceptedAt",
+       event."contactedAt",
+       event."repliedAt",
+       event."meetingAt",
+       event."proposalAt",
+       event."wonAt",
+       event."lostAt",
+       event."terminalStatus",
+       event."terminalReasonCode",
+       event."confirmedRevenueMinor",
        COUNT(*) OVER ()::TEXT AS "cohortSize"
-     FROM cohort
+     FROM per_opportunity event
      JOIN opportunities scoped_opportunity
-       ON scoped_opportunity.id = cohort.opportunity_id
+       ON scoped_opportunity.id = event.opportunity_id
       AND scoped_opportunity.owner_id = $1
       AND scoped_opportunity.workspace_id = $2
-     LEFT JOIN cohort_events event
-       ON event.opportunity_id = cohort.opportunity_id
-     GROUP BY
-       scoped_opportunity.public_reference,
-       cohort.cohort_at,
-       cohort.cohort_snapshot,
-       cohort.cohort_channel,
-       cohort.cohort_contact_path_type
-     ORDER BY cohort.cohort_at, scoped_opportunity.public_reference
+     ORDER BY event.cohort_at, scoped_opportunity.public_reference
      LIMIT ${limitParameter}`,
     params,
   )
@@ -153,11 +176,9 @@ export async function getOutcomeCalibrationDataset(
 const COLUMNS = [
   'opportunityReference',
   'cohortAt',
-  'clientProfileId',
   'clientProfileVersion',
   'agencyDnaVersion',
   'hiringMode',
-  'specialization',
   'matchedRoleFamilies',
   'matchedIndustries',
   'matchedRegions',
@@ -221,7 +242,7 @@ function toCalibrationRecord(
   return {
     opportunityReference: row.opportunityReference,
     cohortAt: row.cohortAt,
-    ...snapshot,
+    ...toPrivacySafeCalibrationCohort(snapshot),
     cohortChannel: row.cohortChannel,
     cohortContactPathType: row.cohortContactPathType,
     shownAt: row.shownAt,
@@ -244,6 +265,26 @@ function toCalibrationRecord(
     confirmedRevenueMinor: /^\d+$/.test(row.confirmedRevenueMinor ?? '')
       ? row.confirmedRevenueMinor
       : null,
+  }
+}
+
+function toPrivacySafeCalibrationCohort(
+  snapshot: OpportunityAnalyticsCohort,
+): PrivacySafeCalibrationCohort {
+  return {
+    clientProfileVersion: snapshot.clientProfileVersion,
+    agencyDnaVersion: snapshot.agencyDnaVersion,
+    hiringMode: snapshot.hiringMode,
+    matchedRoleFamilies: snapshot.matchedRoleFamilies,
+    matchedIndustries: snapshot.matchedIndustries,
+    matchedRegions: snapshot.matchedRegions,
+    organizationSizeBucket: snapshot.organizationSizeBucket,
+    episodeType: snapshot.episodeType,
+    confidenceGate: snapshot.confidenceGate,
+    scoreBucket: snapshot.scoreBucket,
+    externalSupportNeedBucket: snapshot.externalSupportNeedBucket,
+    sourceFamilies: snapshot.sourceFamilies,
+    scoringVersion: snapshot.scoringVersion,
   }
 }
 
