@@ -8,7 +8,7 @@
 - [x] Add authenticated tenant-scoped opportunity export route.
 - [x] Add integration and credential migrations with down migration.
 - [x] Add create, rotate and revoke credential lifecycle with one-time secret response.
-- [ ] Add signed outbound webhook delivery with SSRF and audit controls.
+- [x] Add signed outbound webhook delivery with SSRF and audit controls.
 - [ ] Add tenant-scoped inbound callback with signature, replay, rate and idempotency controls.
 - [ ] Prove cross-workspace, revoked-credential and altered-replay rejection in PostgreSQL.
 - [ ] Add n8n, amoCRM and Bitrix24 templates without secrets.
