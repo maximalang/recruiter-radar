@@ -1,4 +1,4 @@
-import type { PoolClient, QueryResult } from 'pg'
+import type { Pool, PoolClient, QueryResult } from 'pg'
 
 import { hashCanonicalJson } from '@/lib/opportunities/canonical-hash'
 import {
@@ -7,6 +7,7 @@ import {
   OpportunityWorkflowIdempotencyConflictError,
   OpportunityWorkflowNextActionRequiredError,
   OpportunityWorkflowNoChangeError,
+  type OpportunityWorkflowState,
   listOpportunityWorkflowAssignees,
   updateOpportunityWorkflow,
 } from '@/lib/opportunities/opportunity-workflow-repository'
@@ -35,7 +36,7 @@ function clientFor(handler: QueryHandler) {
   }
 }
 
-const BASE_STATE = {
+const BASE_STATE: OpportunityWorkflowState = {
   assignedToUserId: null,
   nextActionType: null,
   nextActionDueAt: null,
@@ -77,18 +78,26 @@ function successfulHandler(overrides: Partial<typeof BASE_STATE> = {}): QueryHan
 
 describe('Opportunity workflow repository', () => {
   it('lists only active assignable members without exposing email addresses', async () => {
-    const query = jest.fn(async () => ({
+    const queryMock = jest.fn(async (
+      _queryText: string,
+      _values?: readonly unknown[],
+    ) => ({
+      command: 'SELECT',
+      fields: [],
+      oid: 0,
+      rowCount: 2,
       rows: [
-        { userId: '7', displayName: 'Мария', role: 'owner' },
-        { userId: '42', displayName: 'Участник 42', role: 'recruiter' },
+        { userId: '7', displayName: 'Мария', role: 'owner' as const },
+        { userId: '42', displayName: 'Участник 42', role: 'recruiter' as const },
       ],
     }))
+    const query = queryMock as unknown as Pick<Pool, 'query'>['query']
 
     await expect(listOpportunityWorkflowAssignees('9', { query })).resolves.toEqual([
       { userId: '7', displayName: 'Мария', role: 'owner' },
       { userId: '42', displayName: 'Участник 42', role: 'recruiter' },
     ])
-    const [sql, values] = query.mock.calls[0]
+    const [sql, values] = queryMock.mock.calls[0]
     expect(sql).toContain("membership.status = 'active'")
     expect(sql).toContain("membership.role IN ('owner', 'admin', 'recruiter')")
     expect(sql).not.toContain('account.email')

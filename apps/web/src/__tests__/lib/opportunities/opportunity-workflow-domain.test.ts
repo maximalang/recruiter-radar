@@ -2,7 +2,23 @@ import {
   canApplyOpportunityWorkflowPatch,
   normalizeOpportunityWorkflowPatch,
   OpportunityWorkflowValidationError,
+  type OpportunityWorkflowValidationCode,
 } from '@/lib/opportunities/opportunity-workflow-domain'
+
+const INVALID_WORKFLOW_PATCHES: Array<[
+  Record<string, unknown>,
+  OpportunityWorkflowValidationCode,
+]> = [
+  [{}, 'workflow_patch_empty'],
+  [{ unknown: true }, 'workflow_field_unknown'],
+  [{ assignedToUserId: '0' }, 'workflow_assignee_invalid'],
+  [{ nextActionType: 'email_sequence' }, 'workflow_next_action_invalid'],
+  [{ nextActionDueAt: 'tomorrow' }, 'workflow_due_at_invalid'],
+  [{ workflowPriority: 'critical' }, 'workflow_priority_invalid'],
+  [{ internalNote: 'a'.repeat(2_001) }, 'workflow_note_invalid'],
+  [{ internalNote: 'Пишите recruiter@example.ru' }, 'workflow_note_personal_contact'],
+  [{ internalNote: 'Позвонить +7 (999) 123-45-67' }, 'workflow_note_personal_contact'],
+]
 
 describe('Opportunity workflow domain', () => {
   it('normalizes the five-field workflow patch without inventing CRM data', () => {
@@ -35,21 +51,14 @@ describe('Opportunity workflow domain', () => {
     })
   })
 
-  it.each([
-    [{}, 'workflow_patch_empty'],
-    [{ unknown: true }, 'workflow_field_unknown'],
-    [{ assignedToUserId: '0' }, 'workflow_assignee_invalid'],
-    [{ nextActionType: 'email_sequence' }, 'workflow_next_action_invalid'],
-    [{ nextActionDueAt: 'tomorrow' }, 'workflow_due_at_invalid'],
-    [{ workflowPriority: 'critical' }, 'workflow_priority_invalid'],
-    [{ internalNote: 'a'.repeat(2_001) }, 'workflow_note_invalid'],
-    [{ internalNote: 'Пишите recruiter@example.ru' }, 'workflow_note_personal_contact'],
-    [{ internalNote: 'Позвонить +7 (999) 123-45-67' }, 'workflow_note_personal_contact'],
-  ])('rejects invalid or expansive input %#', (payload, code) => {
-    expect(() => normalizeOpportunityWorkflowPatch(payload)).toThrow(
-      expect.objectContaining<Partial<OpportunityWorkflowValidationError>>({ code }),
-    )
-  })
+  it.each(INVALID_WORKFLOW_PATCHES)(
+    'rejects invalid or expansive input %#',
+    (payload, code) => {
+      expect(() => normalizeOpportunityWorkflowPatch(payload)).toThrow(
+        expect.objectContaining<Partial<OpportunityWorkflowValidationError>>({ code }),
+      )
+    },
+  )
 
   it('allows owner and admin to assign eligible workspace members', () => {
     for (const actorRole of ['owner', 'admin'] as const) {

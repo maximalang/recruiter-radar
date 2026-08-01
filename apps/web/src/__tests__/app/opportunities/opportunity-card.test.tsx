@@ -41,6 +41,7 @@ const OPPORTUNITY: OpportunityItem = {
   snoozedUntil: null,
   metadata: {},
   strategistBrief: null,
+  workflow: null,
   createdAt: '2026-07-26T00:00:00.000Z',
   updatedAt: '2026-07-26T00:00:00.000Z',
   evidenceCount: 1,

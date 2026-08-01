@@ -138,6 +138,7 @@ Canary немедленно выключается и не расширяетс�
 
 ```powershell
 npm.cmd run web:check
+npm.cmd run test:types --workspace @recruiter-radar/web
 npm.cmd run db:validate
 npm.cmd run test --workspace @recruiter-radar/web -- --runInBand `
   src/__tests__/lib/opportunities/opportunity-workflow-domain.test.ts `
