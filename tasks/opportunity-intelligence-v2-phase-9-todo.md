@@ -14,5 +14,5 @@
 - [x] Measure and guard the 100k-event query plan.
 - [x] Add rollout documentation and privacy-safe telemetry.
 - [x] Run full checks and five-axis pre-merge review.
-- [ ] Commit atomically, push and open one PR to `codex/opportunity-intelligence-v2`.
-- [ ] Merge only after the final green merge-gate, then start Phase 10.
+- [x] Commit atomically, push and open PR #127 to `codex/opportunity-intelligence-v2`.
+- [x] Merge after the final green merge-gate, then start Phase 10 from `d7d07d3`.

@@ -552,9 +552,17 @@ Gate: фактический canary либо явный external blocker. Health
 
 ### Phase 10 — product UX completion
 
-- action-first Opportunity surface;
-- Research Mode остаётся вторичным;
-- responsive, keyboard, screen-reader и explicit data/error states.
+- action-first Opportunity surface с `Сегодня`, новыми возможностями,
+  необходимостью связаться, ожидаемым follow-up, просроченными действиями и
+  активным pipeline;
+- Research Mode остаётся вторичным и ищет только по company-level полям и
+  заголовку opportunity;
+- карточка всегда сохраняет одиннадцать decision sections, не подменяя
+  отсутствующие данные декоративным AI-текстом;
+- responsive, keyboard, screen-reader и explicit loading/empty/error/no-data/
+  insufficient/stale/permission-denied states.
+
+Подробный контракт: `docs/opportunity-intelligence-v2-phase-10.md`.
 
 Для каждой implementation phase порядок rollout:
 
