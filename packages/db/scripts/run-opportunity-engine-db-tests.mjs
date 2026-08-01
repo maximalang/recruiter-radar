@@ -124,19 +124,25 @@ try {
   })
   await fixtureClient.connect()
   let fixtureOwnerId
+  let fixtureWorkspaceId
   try {
     const fixtureOwner = await fixtureClient.query(
-      `SELECT owner_id
-       FROM opportunity_outcome_state
-       ORDER BY owner_id
+      `SELECT state.owner_id, opportunity.workspace_id
+       FROM opportunity_outcome_state state
+       JOIN opportunities opportunity
+         ON opportunity.owner_id = state.owner_id
+        AND opportunity.id = state.opportunity_id
+       WHERE opportunity.workspace_id IS NOT NULL
+       ORDER BY state.owner_id, opportunity.workspace_id
        LIMIT 1`,
     )
     fixtureOwnerId = fixtureOwner.rows[0]?.owner_id
+    fixtureWorkspaceId = fixtureOwner.rows[0]?.workspace_id
   } finally {
     await fixtureClient.end()
   }
-  if (!fixtureOwnerId) {
-    throw new Error('Outcome runtime fixture did not create an owner.')
+  if (!fixtureOwnerId || !fixtureWorkspaceId) {
+    throw new Error('Outcome runtime fixture did not create a workspace scope.')
   }
   await run(
     process.execPath,
@@ -163,6 +169,8 @@ try {
       outcomeCanaryScript,
       '--owner-id',
       String(fixtureOwnerId),
+      '--workspace-id',
+      String(fixtureWorkspaceId),
       '--pre-activation',
     ],
     root,
@@ -170,11 +178,17 @@ try {
   )
   await run(
     process.execPath,
-    [outcomeCanaryScript, '--owner-id', String(fixtureOwnerId)],
+    [
+      outcomeCanaryScript,
+      '--owner-id',
+      String(fixtureOwnerId),
+      '--workspace-id',
+      String(fixtureWorkspaceId),
+    ],
     root,
     {
       ...canaryEnvironment,
-      OPPORTUNITY_CANARY_OWNER_IDS: String(fixtureOwnerId),
+      OPPORTUNITY_CANARY_WORKSPACE_IDS: String(fixtureWorkspaceId),
     },
   )
   await admin.query(

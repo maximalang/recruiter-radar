@@ -367,20 +367,26 @@ npm.cmd run opportunity-outcomes:benchmark
 
 До снятия draft для одного внутреннего owner вручную подтверждаются:
 
-1. `shown → opened → accepted → contacted → replied → meeting → proposal → won`.
+1. `shown → opened → accepted → contacted → replied → meeting → meeting_completed → proposal → won`.
 2. `contacted → snoozed → resumed → replied`.
-3. `won → reverted → proposal`.
-4. Morning Brief скрывает snoozed и completed.
-5. Pipeline показывает contacted/replied/meeting/proposal.
-6. Rebuild apply, затем dry-run возвращает `rebuildChanged=0`.
-7. Preflight возвращает `ok=true`.
-8. Повтор того же idempotency key возвращает replay.
-9. Другой payload с тем же key возвращает `409`.
-10. Raw contact отсутствует в DB/API/logs.
-11. External ingestion возвращает `404` независимо от legacy secret.
-12. Cross-tenant доступ отсутствует.
+3. `meeting → meeting_cancelled → meeting → meeting_completed`.
+4. `won → reverted → proposal`.
+5. Morning Brief скрывает snoozed и completed.
+6. Pipeline показывает contacted/replied/meeting/proposal.
+7. Rebuild apply, затем dry-run возвращает `rebuildChanged=0`.
+8. Preflight возвращает `ok=true`.
+9. Повтор того же idempotency key возвращает replay.
+10. Другой payload с тем же key возвращает `409`.
+11. Raw contact отсутствует в DB/API/logs.
+12. External ingestion возвращает `404` независимо от legacy secret.
+13. Cross-tenant доступ отсутствует.
 
-## Rollout
+Полный workspace-scoped Phase 3 runbook и privacy-safe evidence contract:
+[`docs/opportunity-canary-runbook.md`](opportunity-canary-runbook.md). Датированный
+результат хранится в `docs/evidence/`; без отдельного production approval он
+должен оставаться `status: blocked`.
+
+## Legacy owner-scoped rollout reference
 
 1. Применить migrations при всех flags `false`.
 2. Выполнить PostgreSQL runtime/down verifiers и rebuild dry-run.
