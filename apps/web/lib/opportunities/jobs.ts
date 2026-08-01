@@ -2082,6 +2082,7 @@ async function persistOpportunityScoringSnapshot(input: {
        component_scores,
        baseline_component_scores,
        hard_gate_results,
+       confidence_gate,
        ranking_score,
        baseline_ranking_score,
        action_queue_eligible
@@ -2089,7 +2090,7 @@ async function persistOpportunityScoringSnapshot(input: {
      VALUES (
        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
        $11, $12, $13, $14, $15,
-       $16::jsonb, $17::jsonb, $18::jsonb, $19, $20, $21
+       $16::jsonb, $17::jsonb, $18::jsonb, $19, $20, $21, $22
      )
      ON CONFLICT (opportunity_id, scoring_version, input_hash) DO NOTHING`,
     [
@@ -2111,6 +2112,7 @@ async function persistOpportunityScoringSnapshot(input: {
       JSON.stringify(input.scoringV2.components),
       JSON.stringify(input.score.components),
       JSON.stringify(input.scoringV2.hardGates),
+      input.scoringV2.confidenceGate,
       input.scoringV2.rankingScore,
       input.score.opportunityScore,
       input.scoringV2.isActionQueueEligible,

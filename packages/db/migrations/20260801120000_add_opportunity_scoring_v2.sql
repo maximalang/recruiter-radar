@@ -79,6 +79,7 @@ CREATE TABLE opportunity_scoring_snapshots (
   component_scores JSONB NOT NULL,
   baseline_component_scores JSONB NOT NULL,
   hard_gate_results JSONB NOT NULL,
+  confidence_gate TEXT NOT NULL,
   ranking_score DOUBLE PRECISION NOT NULL,
   baseline_ranking_score DOUBLE PRECISION NOT NULL,
   action_queue_eligible BOOLEAN NOT NULL,
@@ -121,6 +122,8 @@ CREATE TABLE opportunity_scoring_snapshots (
     CHECK (JSONB_TYPEOF(baseline_component_scores) = 'object'),
   CONSTRAINT opportunity_scoring_snapshots_hard_gates_check
     CHECK (JSONB_TYPEOF(hard_gate_results) = 'array'),
+  CONSTRAINT opportunity_scoring_snapshots_confidence_gate_check
+    CHECK (confidence_gate IN ('A', 'B', 'C', 'D')),
   CONSTRAINT opportunity_scoring_snapshots_ranking_score_check
     CHECK (ranking_score BETWEEN 0 AND 1),
   CONSTRAINT opportunity_scoring_snapshots_baseline_score_check

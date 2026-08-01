@@ -41,6 +41,7 @@ const snapshotInsert = `
     component_scores,
     baseline_component_scores,
     hard_gate_results,
+    confidence_gate,
     ranking_score,
     baseline_ranking_score,
     action_queue_eligible
@@ -53,7 +54,7 @@ const snapshotInsert = `
     repeat('d', 64),
     '{"eligibility":{"score":1}}'::jsonb,
     '{"agencyFit":{"score":0.5}}'::jsonb,
-    '[]'::jsonb, 0.6, 0.5, TRUE
+    '[]'::jsonb, 'A', 0.6, 0.5, TRUE
   )
   ON CONFLICT (opportunity_id, scoring_version, input_hash) DO NOTHING
   RETURNING id::TEXT AS id

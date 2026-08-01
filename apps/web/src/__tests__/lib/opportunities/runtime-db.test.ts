@@ -291,6 +291,7 @@ describeWithDatabase('Opportunity Engine production PostgreSQL runtime', () => {
       baselineScoringVersion: string
       featureSchemaVersion: string
       gateVersion: string
+      confidenceGate: string
       comparisonInputHash: string
     }>(
       `SELECT
@@ -298,6 +299,7 @@ describeWithDatabase('Opportunity Engine production PostgreSQL runtime', () => {
          baseline_scoring_version AS "baselineScoringVersion",
          feature_schema_version AS "featureSchemaVersion",
          gate_version AS "gateVersion",
+         confidence_gate AS "confidenceGate",
          comparison_input_hash AS "comparisonInputHash"
        FROM opportunity_scoring_snapshots
        WHERE owner_id = $1
@@ -310,6 +312,7 @@ describeWithDatabase('Opportunity Engine production PostgreSQL runtime', () => {
       baselineScoringVersion: 'opportunity-v1',
       featureSchemaVersion: 'opportunity-features-v2',
       gateVersion: 'opportunity-gates-v2',
+      confidenceGate: 'A',
       comparisonInputHash: expect.stringMatching(/^[a-f0-9]{64}$/),
     })
     await buildOpportunitiesJob({
