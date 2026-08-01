@@ -11,8 +11,8 @@
 - [x] Add signed outbound webhook delivery with SSRF and audit controls.
 - [x] Add tenant-scoped inbound callback with signature, replay, rate and idempotency controls.
 - [x] Prove cross-workspace, revoked-credential and altered-replay rejection in PostgreSQL.
-- [ ] Add n8n, amoCRM and Bitrix24 templates without secrets.
-- [ ] Add fail-closed config, counters and rollout documentation.
+- [x] Add n8n, amoCRM and Bitrix24 templates without secrets.
+- [x] Add fail-closed config, counters and rollout documentation.
 - [ ] Run full checks and five-axis pre-merge review.
 - [ ] Commit atomically, push, open one PR to `codex/opportunity-intelligence-v2`.
 - [ ] Merge only after the final green merge-gate, then start Phase 9.
