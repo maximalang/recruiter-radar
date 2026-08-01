@@ -5,7 +5,7 @@
 - [x] Restore the exact outcome-analytics and calibration contract.
 - [x] Map existing funnel dimensions, maturity rules and data gaps.
 - [x] Record statistical-honesty, privacy, tenancy and performance boundaries.
-- [ ] Add fail-closed Phase 9 configuration.
+- [x] Add fail-closed Phase 9 configuration.
 - [ ] Add event-time assigned-user attribution migration and down migration.
 - [ ] Add tenant-scoped outcome analytics with all required dimensions.
 - [ ] Add effective won/lost reasons and confirmed revenue summaries.

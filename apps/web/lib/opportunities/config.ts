@@ -29,6 +29,8 @@ export const OPPORTUNITY_WORKFLOW_V1_CANARY_WORKSPACE_IDS_FEATURE_FLAG =
   'OPPORTUNITY_WORKFLOW_V1_CANARY_WORKSPACE_IDS'
 export const OPPORTUNITY_CRM_BRIDGE_FEATURE_FLAG =
   'OPPORTUNITY_CRM_BRIDGE_ENABLED'
+export const OPPORTUNITY_ANALYTICS_V2_FEATURE_FLAG =
+  'OPPORTUNITY_ANALYTICS_V2_ENABLED'
 
 export type OpportunityFeatureContext = {
   dataOwnerId: string | number | null | undefined
@@ -240,6 +242,23 @@ export function isOpportunityCrmBridgePublicCallbackEnabled(
     isOpportunityOutcomesEnabled(env) &&
     isOpportunityWorkspaceContextEnabled(env) &&
     env[OPPORTUNITY_CRM_BRIDGE_FEATURE_FLAG] === 'true'
+}
+
+export function isOpportunityAnalyticsV2Enabled(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+  return env[OPPORTUNITY_ANALYTICS_V2_FEATURE_FLAG] === 'true'
+}
+
+export function isOpportunityAnalyticsV2EnabledForContext(
+  context: OpportunityFeatureContext,
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+  if (context.workspaceId == null) return false
+  if (!isOpportunityEngineV1EnabledForContext(context, env)) return false
+  if (!isOpportunityOutcomesEnabledForContext(context, env)) return false
+  if (!isOpportunityWorkspaceContextEnabledForContext(context, env)) return false
+  return isOpportunityAnalyticsV2Enabled(env)
 }
 
 export function isOpportunityOutcomesExternalIngestEnabled(

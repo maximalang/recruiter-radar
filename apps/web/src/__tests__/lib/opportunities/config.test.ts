@@ -7,6 +7,8 @@ import {
   isOpportunityEngineV1Enabled,
   isOpportunityEngineV1EnabledForContext,
   isOpportunityEngineV1EnabledForOwner,
+  isOpportunityAnalyticsV2Enabled,
+  isOpportunityAnalyticsV2EnabledForContext,
   isOpportunityOutcomesEnabled,
   isOpportunityOutcomesEnabledForContext,
   isOpportunityOutcomesEnabledForOwner,
@@ -184,6 +186,33 @@ describe('opportunity engine config', () => {
     expect(isOpportunityCrmBridgePublicCallbackEnabled(enabled)).toBe(true)
     for (const missing of Object.keys(enabled)) {
       expect(isOpportunityCrmBridgePublicCallbackEnabled({
+        ...enabled,
+        [missing]: 'false',
+      })).toBe(false)
+    }
+  })
+
+  it('keeps analytics v2 dark and requires every workspace ledger boundary', () => {
+    const context = { dataOwnerId: '7', workspaceId: '9' }
+    const enabled = {
+      OPPORTUNITY_ENGINE_V1_ENABLED: 'true',
+      OPPORTUNITY_OUTCOMES_ENABLED: 'true',
+      OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED: 'true',
+      OPPORTUNITY_ANALYTICS_V2_ENABLED: 'true',
+    }
+
+    expect(isOpportunityAnalyticsV2Enabled({})).toBe(false)
+    expect(isOpportunityAnalyticsV2Enabled({
+      OPPORTUNITY_ANALYTICS_V2_ENABLED: ' TRUE ',
+    })).toBe(false)
+    expect(isOpportunityAnalyticsV2EnabledForContext(context, enabled)).toBe(true)
+    expect(isOpportunityAnalyticsV2EnabledForContext(
+      { dataOwnerId: '7', workspaceId: null },
+      enabled,
+    )).toBe(false)
+
+    for (const missing of Object.keys(enabled)) {
+      expect(isOpportunityAnalyticsV2EnabledForContext(context, {
         ...enabled,
         [missing]: 'false',
       })).toBe(false)
