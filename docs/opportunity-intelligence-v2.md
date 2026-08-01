@@ -301,8 +301,9 @@ Correction capability вычисляется сервером по полной 
 | `OPPORTUNITY_OUTCOME_CONTACT_HASH_SECRET` | Server-only secret для tenant-scoped contact hashing |
 | `AGENCY_DNA_V1_ENABLED` | Включает Phase 4 только при точном `true`; по умолчанию `false` |
 | `AGENCY_DNA_V1_CANARY_WORKSPACE_IDS` | Временный allowlist ровно одного положительного workspace ID только для Agency DNA |
-| `OPPORTUNITY_SCORING_V2_ENABLED` | Включает Phase 5 только при точном `true`, точном workspace canary и включённом Agency DNA v1 |
+| `OPPORTUNITY_SCORING_V2_ENABLED` | Включает Phase 5 глобально только при точном `true` и включённом Agency DNA v1 |
 | `OPPORTUNITY_SCORING_V2_CANARY_WORKSPACE_IDS` | Временный allowlist ровно одного положительного workspace ID только для Scoring v2 |
+| `OPPORTUNITY_SCORING_V2_SHADOW_CANARY_WORKSPACE_IDS` | Временный allowlist ровно одного workspace для append-only v2 comparison snapshots; активные rank и action queue остаются на v1 |
 
 Owner canary включает engine, ledger и UI для одного owner, но не включает
 external ingest.

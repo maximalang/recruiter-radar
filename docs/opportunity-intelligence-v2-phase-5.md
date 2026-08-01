@@ -7,15 +7,33 @@ Scoring v2 — это версионированный эвристически�
 подбирает веса автоматически: имеющейся истории исходов для этого недостаточно.
 FIUR v1, его evidence rules и текущий Opportunity Score v1 не изменяются.
 
-Scoring v2 включается только для одного workspace, если одновременно доступны:
+Активный Scoring v2 включается только при включённом Agency DNA v1 и одном из
+двух явных режимов:
 
-- `OPPORTUNITY_SCORING_V2_ENABLED=true`;
-- ровно один ID в `OPPORTUNITY_SCORING_V2_CANARY_WORKSPACE_IDS`;
-- Agency DNA v1 для того же workspace.
+- `OPPORTUNITY_SCORING_V2_ENABLED=true` для отдельного согласованного global
+  rollout;
+- ровно один ID в `OPPORTUNITY_SCORING_V2_CANARY_WORKSPACE_IDS` для workspace
+  canary.
 
 Некорректный, пустой или множественный canary allowlist оставляет v2 выключенным.
 Явный запрос v2 в job не обходит эти проверки. Явный v1 остаётся безопасным
 способом немедленно вернуть прежний scoring path.
+
+До active canary можно собирать сравнение в shadow-mode. Для этого Agency DNA v1
+должен быть включён для того же workspace, а
+`OPPORTUNITY_SCORING_V2_SHADOW_CANARY_WORKSPACE_IDS` должен содержать ровно один
+положительный workspace ID. Shadow-mode:
+
+- сохраняет активные `opportunities` со scoring/features/gates v1;
+- не меняет status, rank, action eligibility или порядок action queue;
+- вычисляет v2 только для append-only `opportunity_scoring_snapshots`;
+- дозаписывает отсутствующий snapshot для семантически неизменной v1 opportunity;
+- сообщает `scoringV2ShadowEvaluated` и
+  `scoringV2ShadowSnapshotsCreated` в job stats;
+- отключается очисткой shadow allowlist или явным `scoringVersion=opportunity-v1`.
+
+Если для workspace разрешён active v2, active path имеет приоритет над shadow.
+Shadow flag сам по себе никогда не активирует v2 для продукта.
 
 ## Контракт scoring
 
@@ -80,7 +98,10 @@ meeting rates по score decile, bad-fit и false-positive taxonomy, а такж
 
 Локальная проверка SQL-path на чистой изолированной базе ожидаемо дала 0 samples
 и `insufficient_data`. Реальное offline-сравнение возможно только после накопления
-анонимизированных canary outcomes; Phase 5 не подменяет их синтетикой.
+анонимизированных shadow или canary outcomes; Phase 5 не подменяет их синтетикой.
+Сначала следует собрать shadow snapshots при неизменном v1 action path, затем
+выполнить evaluator и только после достаточного отчёта отдельно решать вопрос об
+active canary.
 
 ## Проверки и stop conditions
 
@@ -97,6 +118,8 @@ npm.cmd run test:opportunity-engine:db
 - workspace/owner/profile scope не совпадает;
 - snapshot отсутствует, изменяется или не воспроизводит версии и hashes;
 - любой failed hard gate или confidence C/D попадает в action queue;
+- shadow-mode меняет v1 opportunity, status, rank или action eligibility;
+- shadow allowlist содержит больше одного workspace или не совпадает с Agency DNA;
 - Precision@5, Precision@10 или NDCG@10 ухудшается на достаточной выборке;
 - отчёт содержит company/contact identity;
 - v1 FIUR, outcome lifecycle, snooze или supersession semantics изменились;
