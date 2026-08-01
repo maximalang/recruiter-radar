@@ -334,6 +334,146 @@
   margin-top: 20px;
 }
 
+.workflowPanel {
+  display: grid;
+  gap: 14px;
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.workflowHeading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.workflowHeading > div {
+  display: grid;
+  gap: 3px;
+}
+
+.workflowHeading span,
+.workflowSummary dt {
+  color: #64748b;
+  font-size: 0.66rem;
+  font-weight: 760;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.workflowHeading h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 0.94rem;
+}
+
+.workflowHeading > strong {
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 0.7rem;
+}
+
+.workflowHeading > strong[data-priority="high"] {
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.workflowSummary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.workflowSummary > div {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.workflowSummary dd {
+  margin: 0;
+  color: #1e293b;
+  font-size: 0.78rem;
+  font-weight: 680;
+}
+
+.workflowNote {
+  margin: 0;
+  padding: 11px 12px;
+  border-left: 3px solid #94a3b8;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.workflowEditor {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 12px;
+}
+
+.workflowEditor summary {
+  width: fit-content;
+  color: #1d4ed8;
+  cursor: pointer;
+  font-size: 0.76rem;
+  font-weight: 720;
+}
+
+.workflowForm {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.workflowForm label {
+  display: grid;
+  gap: 6px;
+  color: #334155;
+  font-size: 0.74rem;
+  font-weight: 680;
+}
+
+.workflowForm select,
+.workflowForm input,
+.workflowForm textarea {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  background: #fff;
+  color: #0f172a;
+  font: inherit;
+  font-size: 0.78rem;
+}
+
+.workflowForm textarea {
+  min-height: 84px;
+  resize: vertical;
+}
+
+.workflowNoteField {
+  grid-column: 1 / -1;
+}
+
+.workflowNoteField small {
+  color: #64748b;
+  font-size: 0.68rem;
+  font-weight: 500;
+}
+
 .outcomePanel {
   margin-top: 20px;
   overflow: hidden;
@@ -608,6 +748,10 @@
 .actionButton:focus-visible,
 .filterLink:focus-visible,
 .headerLink:focus-visible,
+.workflowEditor summary:focus-visible,
+.workflowForm select:focus-visible,
+.workflowForm input:focus-visible,
+.workflowForm textarea:focus-visible,
 .timelineItem a:focus-visible {
   outline: 3px solid rgba(59, 130, 246, 0.34);
   outline-offset: 2px;
@@ -636,6 +780,15 @@
 
   .briefGrid {
     grid-template-columns: 1fr;
+  }
+
+  .workflowSummary,
+  .workflowForm {
+    grid-template-columns: 1fr;
+  }
+
+  .workflowNoteField {
+    grid-column: 1;
   }
 
   .sectionHeading {

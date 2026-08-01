@@ -12,14 +12,25 @@ export function toPublicOpportunity(opportunity: OpportunityItem) {
     directEvidenceCount,
     agencyFitExplanation,
     strategistBrief,
+    workflow,
     metadata,
     ...publicOpportunity
   } = opportunity
   const safeMetadata = asRecord(metadata)
   const safeStrategistBrief = parseOpportunityStrategistBrief(strategistBrief)
+  const publicWorkflow = workflow
+    ? {
+      assignedToUserId: workflow.assignedToUserId,
+      nextActionType: workflow.nextActionType,
+      nextActionDueAt: workflow.nextActionDueAt,
+      workflowPriority: workflow.workflowPriority,
+      updatedAt: workflow.updatedAt,
+    }
+    : null
 
   return {
     ...publicOpportunity,
+    workflow: publicWorkflow,
     evidenceMetrics: {
       factCount,
       publicationCount,

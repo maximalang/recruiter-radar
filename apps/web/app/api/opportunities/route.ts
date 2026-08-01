@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import {
   isOpportunityEngineV1EnabledForContext,
+  isOpportunityWorkflowV1EnabledForContext,
 } from '@/lib/opportunities/config'
 import { toPublicOpportunity } from '@/lib/opportunities/api-projection'
 import {
@@ -70,14 +71,19 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'invalid_cursor' }, { status: 400 })
   }
   try {
+    const selectedView = view ?? (
+      isOpportunityWorkflowV1EnabledForContext(authorization)
+        ? 'today'
+        : 'morning'
+    )
     const pageSize = positiveInteger(params.get('limit')) ??
       positiveInteger(params.get('pageSize')) ??
       undefined
     const result = await listOpportunities({
       ownerId: access.ownerId,
       workspaceId: access.workspaceId,
-      morningBriefOnly: (view ?? 'morning') === 'morning',
-      view: view ?? 'morning',
+      morningBriefOnly: selectedView === 'morning',
+      view: selectedView,
       clientProfileId: positiveId(params.get('profile')),
       organizationId: positiveId(
         params.get('organizationId') ?? params.get('organization'),
@@ -148,7 +154,7 @@ function parseStatuses(value: string | null): OpportunityStatus[] | undefined {
 }
 
 function parseView(value: string | null): OpportunityView | null {
-  return value === 'morning' || value === 'accepted' || value === 'pipeline' ||
+  return value === 'today' || value === 'morning' || value === 'accepted' || value === 'pipeline' ||
     value === 'snoozed' || value === 'completed' || value === 'all'
     ? value
     : null

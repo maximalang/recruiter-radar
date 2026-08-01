@@ -21,6 +21,8 @@ import {
   isOpportunityStrategistV1EnabledForContext,
   isOpportunityWorkspaceContextEnabled,
   isOpportunityWorkspaceContextEnabledForContext,
+  isOpportunityWorkflowV1Enabled,
+  isOpportunityWorkflowV1EnabledForContext,
 } from '@/lib/opportunities/config'
 
 describe('opportunity engine config', () => {
@@ -169,6 +171,54 @@ describe('opportunity engine config', () => {
     expect(isOpportunityWorkspaceContextEnabledForContext(context, {
       OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED: 'true',
     })).toBe(true)
+  })
+
+  it('keeps daily workflow dark and requires the workspace ledger boundary', () => {
+    const context = { dataOwnerId: '7', workspaceId: '9' }
+
+    expect(isOpportunityWorkflowV1Enabled({})).toBe(false)
+    expect(isOpportunityWorkflowV1Enabled({
+      OPPORTUNITY_WORKFLOW_V1_ENABLED: ' TRUE ',
+    })).toBe(false)
+    expect(isOpportunityWorkflowV1EnabledForContext(context, {
+      OPPORTUNITY_WORKFLOW_V1_ENABLED: 'true',
+    })).toBe(false)
+    expect(isOpportunityWorkflowV1EnabledForContext(context, {
+      OPPORTUNITY_ENGINE_V1_ENABLED: 'true',
+      OPPORTUNITY_OUTCOMES_ENABLED: 'true',
+      OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED: 'true',
+      OPPORTUNITY_WORKFLOW_V1_ENABLED: 'true',
+    })).toBe(true)
+  })
+
+  it('accepts one exact workflow workspace canary without broad activation', () => {
+    const prerequisites = {
+      OPPORTUNITY_CANARY_WORKSPACE_IDS: '9',
+      OPPORTUNITY_WORKFLOW_V1_CANARY_WORKSPACE_IDS: '9',
+    }
+
+    expect(isOpportunityWorkflowV1EnabledForContext(
+      { dataOwnerId: '7', workspaceId: '9' },
+      prerequisites,
+    )).toBe(true)
+    expect(isOpportunityWorkflowV1EnabledForContext(
+      { dataOwnerId: '7', workspaceId: '10' },
+      prerequisites,
+    )).toBe(false)
+    expect(isOpportunityWorkflowV1EnabledForContext(
+      { dataOwnerId: '7', workspaceId: null },
+      prerequisites,
+    )).toBe(false)
+
+    for (const invalid of ['9,10', '9,9', '09', '*', '']) {
+      expect(isOpportunityWorkflowV1EnabledForContext(
+        { dataOwnerId: '7', workspaceId: '9' },
+        {
+          OPPORTUNITY_CANARY_WORKSPACE_IDS: '9',
+          OPPORTUNITY_WORKFLOW_V1_CANARY_WORKSPACE_IDS: invalid,
+        },
+      )).toBe(false)
+    }
   })
 
   it('keeps Agency DNA v1 fail-closed with a phase-specific workspace canary', () => {
