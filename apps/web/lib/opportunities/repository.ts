@@ -96,6 +96,7 @@ export type OpportunityView = (typeof OPPORTUNITY_VIEWS)[number]
 
 interface OpportunityRow {
   id: string
+  publicReference: string
   ownerId: string
   clientProfileId: string
   organizationId: string
@@ -624,6 +625,7 @@ export function isOpportunityTransitionAllowed(
 const OPPORTUNITY_SELECT = `
   SELECT
     o.id::TEXT AS id,
+    o.public_reference::TEXT AS "publicReference",
     o.owner_id::TEXT AS "ownerId",
     o.client_profile_id::TEXT AS "clientProfileId",
     o.organization_id::TEXT AS "organizationId",

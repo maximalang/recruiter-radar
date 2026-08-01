@@ -4,8 +4,8 @@
 - [x] Create Phase 8 from integration merge `ca9a052`.
 - [x] Map export, workspace authorization, public reference and Outcome Ledger boundaries.
 - [x] Record the Phase 8 contract and threat model.
-- [ ] Add public export projection and CSV/XLSX serializers with leak regression tests.
-- [ ] Add authenticated tenant-scoped opportunity export route.
+- [x] Add public export projection and CSV/XLSX serializers with leak regression tests.
+- [x] Add authenticated tenant-scoped opportunity export route.
 - [ ] Add integration and credential migrations with down migration.
 - [ ] Add create, rotate and revoke credential lifecycle with one-time secret response.
 - [ ] Add signed outbound webhook delivery with SSRF and audit controls.
