@@ -10,9 +10,9 @@
 - [x] Add tenant-scoped outcome analytics with all required dimensions.
 - [x] Add effective won/lost reasons and confirmed revenue summaries.
 - [x] Add deterministic PII-free calibration CSV export.
-- [ ] Prove tenant isolation, corrections, maturity and revenue in PostgreSQL.
-- [ ] Measure and guard the 100k-event query plan.
-- [ ] Add rollout documentation and privacy-safe telemetry.
+- [x] Prove tenant isolation, corrections, maturity and revenue in PostgreSQL.
+- [x] Measure and guard the 100k-event query plan.
+- [x] Add rollout documentation and privacy-safe telemetry.
 - [ ] Run full checks and five-axis pre-merge review.
 - [ ] Commit atomically, push and open one PR to `codex/opportunity-intelligence-v2`.
 - [ ] Merge only after the final green merge-gate, then start Phase 10.

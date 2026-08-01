@@ -287,6 +287,55 @@ opportunities и 100 000 events, запускает `EXPLAIN (ANALYZE, BUFFERS)`
 откатывает transaction. Его результат — локальное измерение, не обещание
 production latency.
 
+## Outcome Analytics v2
+
+Phase 9 добавляет отдельные read-only surfaces, не меняя authoritative ledger
+и его projection:
+
+- `GET /api/opportunities/outcomes/analytics` требует
+  `opportunities:read`;
+- `GET /api/opportunities/outcomes/calibration-export` требует
+  `exports:create`;
+- оба endpoint требуют точные Auth v2 `dataOwnerId` и `workspaceId`, все
+  prerequisite Opportunity flags и `OPPORTUNITY_ANALYTICS_V2_ENABLED=true`;
+  по умолчанию flag выключен.
+
+Общие фильтры: `clientProfileId`, `clientProfileVersion`,
+`agencyDnaVersion`, `hiringMode`, `specialization`, `matchedRoleFamily`,
+`matchedIndustry`, `matchedRegion`, `organizationSizeBucket`, `episodeType`,
+`confidenceGate`, `scoreBucket`, `externalSupportNeedBucket`, `sourceFamily`,
+`scoringVersion`, `channel`, `contactPathType` и `assignedUserId`. Значение
+`assignedUserId=unknown` выбирает исторические события без атрибуции. Assignment
+фиксируется writer-ом на outcome event в момент события; текущий assignee не
+подмешивается задним числом. `channel` и `contactPathType` допустимы только для
+когорты `contacted`, чтобы не создавать survivorship bias.
+
+Когорты `shown`, `accepted` и `contacted` определяются первым действующим
+событием за всю историю в `[from, to)`. Downstream ограничен тем же `to`, а
+`reverted` и компенсированные события исключаются. Ответ показывает cohort
+size, converted и sample size, maturity/sample status, median time, effective
+won/lost, controlled dismissed/lost reasons и подтверждённую RUB-выручку.
+Conversion rate и terminal win rate равны `null`, пока sample меньше 10 или
+когорта не прошла полное maturity window; median равна `null` при менее чем
+трёх наблюдениях. Сумма возвращается decimal string. Revenue forecast в Phase 9
+не рассчитывается.
+
+Calibration CSV использует тот же tenant scope и effective-event CTE. В него
+входят только public opportunity reference, immutable cohort dimensions,
+timestamps, terminal status/controlled reason, maturity/sample status и
+confirmed RUB value. Owner/workspace/internal IDs, assigned-user identity,
+названия компаний, контакты, notes, metadata и evidence URLs отсутствуют.
+Экспорт детерминирован, защищён от spreadsheet formula injection и возвращает
+ошибку при размере больше 5000 строк вместо неполного файла.
+
+Privacy-safe telemetry сообщает только outcome (`completed`, `rejected`,
+`failed`), duration и counts. Фильтры, строки экспорта, IDs, reasons, amounts и
+tenant values не логируются. Локальный 100k-event benchmark обязан укладываться
+в 1000 ms и использовать owner-scoped event index; датированное измерение и
+rollout gates зафиксированы в
+`docs/evidence/opportunity-analytics-v2-phase-9-2026-08-02.md` и
+`docs/runbooks/opportunity-analytics-v2-rollout.md`.
+
 ## Projection rebuild
 
 Dry-run — режим по умолчанию:
