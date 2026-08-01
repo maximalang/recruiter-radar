@@ -13,6 +13,6 @@
 - [x] Prove tenant isolation, corrections, maturity and revenue in PostgreSQL.
 - [x] Measure and guard the 100k-event query plan.
 - [x] Add rollout documentation and privacy-safe telemetry.
-- [ ] Run full checks and five-axis pre-merge review.
+- [x] Run full checks and five-axis pre-merge review.
 - [ ] Commit atomically, push and open one PR to `codex/opportunity-intelligence-v2`.
 - [ ] Merge only after the final green merge-gate, then start Phase 10.
