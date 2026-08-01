@@ -4,6 +4,7 @@ import {
   outcomeCalibrationToCsv,
   type OutcomeCalibrationRecord,
 } from '@/lib/opportunities/outcome-calibration-export'
+import type { OpportunityAnalyticsCohort } from '@/lib/opportunities/analytics-cohort'
 
 const INPUT = {
   ownerId: '7', workspaceId: '9',
@@ -22,7 +23,7 @@ const SNAPSHOT = {
   confidenceGate: 'A', scoreBucket: '80-89',
   externalSupportNeedBucket: 'high', sourceFamilies: ['hh'],
   scoringVersion: 'opportunity-v2',
-}
+} satisfies OpportunityAnalyticsCohort
 
 const RECORD: OutcomeCalibrationRecord = {
   opportunityReference: '11111111-1111-4111-8111-111111111111',
@@ -41,7 +42,7 @@ const RECORD: OutcomeCalibrationRecord = {
 
 describe('Outcome calibration export', () => {
   it('maps only allowlisted cohort facts from effective workspace events', async () => {
-    const query = jest.fn(async () => ({
+    const query = jest.fn(async (_sql: string, _params: unknown[]) => ({
       rowCount: 1,
       rows: [{
         opportunityReference: RECORD.opportunityReference,
@@ -81,7 +82,7 @@ describe('Outcome calibration export', () => {
   })
 
   it('refuses to silently truncate a cohort over 5,000 rows', async () => {
-    const query = jest.fn(async () => ({
+    const query = jest.fn(async (_sql: string, _params: unknown[]) => ({
       rowCount: 5001,
       rows: Array.from({ length: 5001 }, () => ({
         opportunityReference: RECORD.opportunityReference,

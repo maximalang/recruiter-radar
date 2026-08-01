@@ -44,7 +44,10 @@ const BASE_ROW = {
 
 describe('Outcome Analytics v2 repository', () => {
   it('scopes effective cohorts to one workspace and reports mature facts', async () => {
-    const query = jest.fn(async () => ({ rows: [BASE_ROW], rowCount: 1 }))
+    const query = jest.fn(async (_sql: string, _params: unknown[]) => ({
+      rows: [BASE_ROW],
+      rowCount: 1,
+    }))
 
     const result = await getOutcomeAnalyticsV2Summary({
       ...BASE_INPUT,
@@ -102,7 +105,7 @@ describe('Outcome Analytics v2 repository', () => {
   })
 
   it('hides rates for an immature cohort even when the sample is sufficient', async () => {
-    const query = jest.fn(async () => ({
+    const query = jest.fn(async (_sql: string, _params: unknown[]) => ({
       rows: [{
         ...BASE_ROW,
         cohortLastAt: '2026-08-01T00:00:00.000Z',

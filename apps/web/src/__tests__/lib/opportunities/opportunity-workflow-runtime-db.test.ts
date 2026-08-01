@@ -532,7 +532,7 @@ describeWithDatabase('Opportunity workflow PostgreSQL runtime', () => {
     occurredAt: number,
     override: Partial<OpportunityOutcomeInput> = {},
   ): OpportunityOutcomeInput {
-    const metadata = eventType === 'shown'
+    const metadata: Record<string, string> = eventType === 'shown'
       ? { surface: 'runtime_test', cycleId: idempotencyKey }
       : eventType === 'opened'
         ? { interactionId: idempotencyKey }
