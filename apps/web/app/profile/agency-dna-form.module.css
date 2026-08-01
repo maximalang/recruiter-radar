@@ -1,0 +1,267 @@
+.shell {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--c-brand, #1d4ed8);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.25rem;
+  letter-spacing: -0.02em;
+}
+
+.subtitle,
+.step > p,
+.restrictions p {
+  margin: 6px 0 0;
+  color: var(--c-text-muted, #667085);
+  font-size: 0.86rem;
+  line-height: 1.5;
+  max-width: 68ch;
+}
+
+.progress {
+  display: flex;
+  flex: 0 0 190px;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--c-text-muted, #667085);
+  font-size: 0.78rem;
+}
+
+.progress progress {
+  width: 100%;
+  accent-color: var(--c-brand, #1d4ed8);
+}
+
+.form,
+.restrictions {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.step {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+  padding: 0 0 24px;
+  border: 0;
+  border-bottom: 1px solid var(--c-border, rgba(15, 23, 42, 0.08));
+}
+
+.step legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.step legend span {
+  display: inline-grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 1px solid var(--c-border, rgba(15, 23, 42, 0.12));
+  border-radius: 50%;
+  font-size: 0.75rem;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chips label {
+  cursor: pointer;
+}
+
+.chips input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+}
+
+.chips span {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  padding: 7px 11px;
+  border: 1px solid var(--c-border, rgba(15, 23, 42, 0.1));
+  border-radius: 10px;
+  background: var(--c-bg-card, #fff);
+  font-size: 0.84rem;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.chips input:focus-visible + span {
+  outline: 2px solid var(--c-brand, #1d4ed8);
+  outline-offset: 2px;
+}
+
+.chips input:checked + span {
+  border-color: var(--c-brand, #1d4ed8);
+  background: rgba(29, 78, 216, 0.06);
+}
+
+.scopeNote,
+.preview,
+.empty {
+  padding: 10px 12px;
+  border-left: 3px solid var(--c-border, #d0d5dd);
+  background: var(--c-bg-subtle, #f8fafc);
+  color: var(--c-text-muted, #475467);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.scopeNote[data-tone='broad'],
+.scopeNote[data-tone='narrow'] {
+  border-left-color: var(--c-warning, #b54708);
+}
+
+.twoCol,
+.caseFields,
+.restrictionControls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.caseList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.case {
+  padding: 10px 12px;
+  border: 1px solid var(--c-border, rgba(15, 23, 42, 0.08));
+  border-radius: 10px;
+}
+
+.case summary {
+  min-height: 24px;
+  cursor: pointer;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.caseFields {
+  margin-top: 14px;
+}
+
+.preview {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  border-left-color: var(--c-brand, #1d4ed8);
+}
+
+.submitRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  color: var(--c-text-muted, #667085);
+  font-size: 0.8rem;
+}
+
+.restrictions {
+  padding-top: 24px;
+  border-top: 1px solid var(--c-border, rgba(15, 23, 42, 0.08));
+}
+
+.restrictions h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.restrictionControls {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+.restrictionList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.restrictionList li {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--c-border, rgba(15, 23, 42, 0.08));
+  border-radius: 10px;
+}
+
+.restrictionList li span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.8rem;
+  color: var(--c-text-muted, #667085);
+}
+
+.restrictionList button {
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--c-danger, #b42318);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8rem;
+}
+
+@media (max-width: 720px) {
+  .header,
+  .restrictionList li {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .progress {
+    flex-basis: auto;
+  }
+
+  .twoCol,
+  .caseFields,
+  .restrictionControls {
+    grid-template-columns: 1fr;
+  }
+
+  .chips span,
+  .restrictionList button {
+    min-height: 44px;
+  }
+}

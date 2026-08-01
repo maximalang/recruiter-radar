@@ -299,6 +299,8 @@ Correction capability вычисляется сервером по полной 
 | `OPPORTUNITY_CANARY_WORKSPACE_IDS` | Временный allowlist ровно одного положительного workspace ID; одновременно с owner allowlist запрещён |
 | `OPPORTUNITY_OUTCOMES_EXTERNAL_INGEST_ENABLED` | Не может включить endpoint: runtime helper всегда возвращает `false` |
 | `OPPORTUNITY_OUTCOME_CONTACT_HASH_SECRET` | Server-only secret для tenant-scoped contact hashing |
+| `AGENCY_DNA_V1_ENABLED` | Включает Phase 4 только при точном `true`; по умолчанию `false` |
+| `AGENCY_DNA_V1_CANARY_WORKSPACE_IDS` | Временный allowlist ровно одного положительного workspace ID только для Agency DNA |
 
 Owner canary включает engine, ledger и UI для одного owner, но не включает
 external ingest.
@@ -316,7 +318,6 @@ external ingest.
 готовыми:
 
 ```text
-AGENCY_DNA_V1_ENABLED
 OPPORTUNITY_SCORING_V2_ENABLED
 OPPORTUNITY_STRATEGIST_V1_ENABLED
 OPPORTUNITY_TEAM_WORKFLOW_ENABLED

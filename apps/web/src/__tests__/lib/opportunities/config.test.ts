@@ -2,6 +2,8 @@ import {
   clampOpportunityJobBatchSize,
   clampOpportunityPageSize,
   clampOpportunitySnoozeDays,
+  isAgencyDnaV1Enabled,
+  isAgencyDnaV1EnabledForContext,
   isOpportunityEngineV1Enabled,
   isOpportunityEngineV1EnabledForContext,
   isOpportunityEngineV1EnabledForOwner,
@@ -162,5 +164,27 @@ describe('opportunity engine config', () => {
     expect(isOpportunityWorkspaceContextEnabledForContext(context, {
       OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED: 'true',
     })).toBe(true)
+  })
+
+  it('keeps Agency DNA v1 fail-closed with a phase-specific workspace canary', () => {
+    const context = { dataOwnerId: '7', workspaceId: '9' }
+
+    expect(isAgencyDnaV1Enabled({})).toBe(false)
+    expect(isAgencyDnaV1Enabled({ AGENCY_DNA_V1_ENABLED: ' TRUE ' })).toBe(false)
+    expect(isAgencyDnaV1Enabled({ AGENCY_DNA_V1_ENABLED: 'true' })).toBe(true)
+    expect(isAgencyDnaV1EnabledForContext(context, {})).toBe(false)
+    expect(isAgencyDnaV1EnabledForContext(context, {
+      AGENCY_DNA_V1_CANARY_WORKSPACE_IDS: '9',
+    })).toBe(true)
+
+    for (const invalid of ['9,10', '09', '*', '']) {
+      expect(isAgencyDnaV1EnabledForContext(context, {
+        AGENCY_DNA_V1_CANARY_WORKSPACE_IDS: invalid,
+      })).toBe(false)
+    }
+    expect(isAgencyDnaV1EnabledForContext(
+      { dataOwnerId: '7', workspaceId: null },
+      { AGENCY_DNA_V1_CANARY_WORKSPACE_IDS: '9' },
+    )).toBe(false)
   })
 })

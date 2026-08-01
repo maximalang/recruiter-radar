@@ -142,10 +142,15 @@ function buildRow(
 describe('opportunity background jobs', () => {
   const originalFlag = process.env.OPPORTUNITY_ENGINE_V1_ENABLED
   const originalCanaryOwners = process.env.OPPORTUNITY_CANARY_OWNER_IDS
+  const originalAgencyDnaFlag = process.env.AGENCY_DNA_V1_ENABLED
+  const originalAgencyDnaCanary =
+    process.env.AGENCY_DNA_V1_CANARY_WORKSPACE_IDS
 
   beforeEach(() => {
     process.env.OPPORTUNITY_ENGINE_V1_ENABLED = 'true'
     delete process.env.OPPORTUNITY_CANARY_OWNER_IDS
+    delete process.env.AGENCY_DNA_V1_ENABLED
+    delete process.env.AGENCY_DNA_V1_CANARY_WORKSPACE_IDS
   })
 
   afterAll(() => {
@@ -155,6 +160,16 @@ describe('opportunity background jobs', () => {
       delete process.env.OPPORTUNITY_CANARY_OWNER_IDS
     } else {
       process.env.OPPORTUNITY_CANARY_OWNER_IDS = originalCanaryOwners
+    }
+    if (originalAgencyDnaFlag === undefined) {
+      delete process.env.AGENCY_DNA_V1_ENABLED
+    } else {
+      process.env.AGENCY_DNA_V1_ENABLED = originalAgencyDnaFlag
+    }
+    if (originalAgencyDnaCanary === undefined) {
+      delete process.env.AGENCY_DNA_V1_CANARY_WORKSPACE_IDS
+    } else {
+      process.env.AGENCY_DNA_V1_CANARY_WORKSPACE_IDS = originalAgencyDnaCanary
     }
   })
 
@@ -536,6 +551,69 @@ describe('opportunity background jobs', () => {
 
     expect(result.created).toBe(2)
     expect(insertParams.map((params) => params[1])).toEqual(['8', '18'])
+  })
+
+  it('persists the exact Agency DNA version, capability matches, and restriction snapshot', async () => {
+    process.env.AGENCY_DNA_V1_CANARY_WORKSPACE_IDS = '9'
+    let opportunitySql = ''
+    let opportunityParams: readonly unknown[] = []
+    let snapshotParams: readonly unknown[] = []
+    const snapshot = {
+      agencyName: 'Agency 8',
+      serviceTypes: ['permanent'],
+      targetSeniorities: ['executive'],
+    }
+    const db = dbWithQuery((sql, params) => {
+      if (sql.includes('WITH latest_candidates AS')) {
+        expect(sql).toContain('agency_dna_profile_snapshot(cp)')
+        expect(sql).toContain('agency_account_restrictions')
+        return {
+          rowCount: 1,
+          rows: [buildRow('8', {
+            workspaceId: '9',
+            agencyDnaVersion: '4',
+            agencyDnaSnapshotHash: 'd'.repeat(64),
+            agencyDnaSnapshot: snapshot,
+            serviceTypes: ['permanent'],
+            targetSeniorities: ['executive'],
+            preferredEngagementTypes: ['retainer'],
+            currentCapacity: 'normal',
+            restrictionType: 'do_not_contact',
+            episodeTitle: 'РџРѕРёСЃРє РґРёСЂРµРєС‚РѕСЂР° РїРѕ С„РёРЅР°РЅСЃР°Рј',
+          })],
+        }
+      }
+      if (sql.includes('INSERT INTO opportunities')) {
+        opportunitySql = sql
+        opportunityParams = params ?? []
+        return { rowCount: 1, rows: [{ id: '100' }] }
+      }
+      if (sql.includes('INSERT INTO opportunity_agency_dna_snapshots')) {
+        snapshotParams = params ?? []
+        return { rowCount: 1, rows: [{ id: '200' }] }
+      }
+      if (sql.includes('DELETE FROM opportunity_build_failures')) {
+        return { rowCount: 0, rows: [] }
+      }
+      throw new Error(`Unexpected SQL: ${sql}`)
+    })
+
+    const result = await buildOpportunitiesJob({ enabled: true }, db)
+
+    expect(result.created).toBe(1)
+    expect(opportunitySql).toContain('agency_dna_version')
+    expect(opportunityParams).toContain(4)
+    expect(opportunityParams[4]).toBe('dismissed')
+    expect(snapshotParams.slice(0, 6)).toEqual([
+      '100', '7', '9', '8', 4, 'd'.repeat(64),
+    ])
+    expect(snapshotParams[6]).toEqual(expect.stringMatching(/^[a-f0-9]{64}$/))
+    expect(JSON.parse(String(snapshotParams[7]))).toEqual(snapshot)
+    expect(JSON.parse(String(snapshotParams[9]))).toEqual({
+      type: 'do_not_contact',
+      opportunityMode: 'blocked',
+      blocksOpportunity: true,
+    })
   })
 
   it('mentions only agency roles that match the episode vacancies', async () => {

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getAuthorizedOwnerId } from "../../lib/auth-v2/authorization";
+import { getSession } from "../../lib/auth-v2/authorization";
 import {
   InternalPageFrame,
   InternalPageHeader,
@@ -17,6 +17,13 @@ import { ProfileForm } from "./profile-form";
 import { DeliveryForm } from "./delivery-form";
 import { NotificationChannels } from "./notification-channels";
 import ProfileCompletionPanel from "./profile-completion-panel";
+import {
+  getAgencyDnaProfile,
+  listAgencyAccountRestrictions,
+  listAgencyRestrictionOrganizationOptions,
+} from "../../lib/agencyDnaProfile";
+import { isAgencyDnaV1EnabledForContext } from "../../lib/opportunities/config";
+import { AgencyDnaForm } from "./agency-dna-form";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +35,8 @@ export const metadata: Metadata = {
 const PROFILE_NAV = buildAccountNavigation("profile");
 
 export default async function ProfilePage() {
-  const ownerId = await getAuthorizedOwnerId("profiles:read");
+  const session = await getSession({ permission: "profiles:read" });
+  const ownerId = session?.dataOwnerId ?? null;
   const profile = ownerId ? await getClientProfileByOwnerId(ownerId) : null;
   const deliveryPreferences =
     ownerId && profile ? await getDeliveryPreferencesByOwnerId(ownerId) : null;
@@ -53,6 +61,35 @@ export default async function ProfilePage() {
   // — not just what radio card is checked. Degrades to 'specialist' when there
   // is no profile.
   const resolvedHiringMode = profile ? resolveHiringMode(profile) : "specialist";
+  const agencyDnaEnabled = Boolean(
+    profile &&
+    session?.workspaceId &&
+    isAgencyDnaV1EnabledForContext({
+      dataOwnerId: session.dataOwnerId,
+      workspaceId: session.workspaceId,
+    }),
+  );
+  const agencyDnaProfile = agencyDnaEnabled && session?.workspaceId
+    ? await getAgencyDnaProfile({
+      ownerId: session.dataOwnerId,
+      workspaceId: session.workspaceId,
+    })
+    : null;
+  const [agencyRestrictions, restrictionOrganizations] =
+    agencyDnaProfile && session?.workspaceId
+      ? await Promise.all([
+        listAgencyAccountRestrictions({
+          profileId: agencyDnaProfile.profileId,
+          ownerId: session.dataOwnerId,
+          workspaceId: session.workspaceId,
+        }),
+        listAgencyRestrictionOrganizationOptions({
+          profileId: agencyDnaProfile.profileId,
+          ownerId: session.dataOwnerId,
+          workspaceId: session.workspaceId,
+        }),
+      ])
+      : [[], []];
 
   return (
     <InternalPageFrame navItems={PROFILE_NAV} footer={<SiteFooter />}>
@@ -80,6 +117,16 @@ export default async function ProfilePage() {
           />
         )}
       </ContentCard>
+      {agencyDnaProfile ? (
+        <ContentCard>
+          <AgencyDnaForm
+            profile={agencyDnaProfile}
+            restrictions={agencyRestrictions}
+            organizations={restrictionOrganizations}
+            matchCount={matchCount}
+          />
+        </ContentCard>
+      ) : null}
       {profile ? (
         <div id="notification-channels">
           <ContentCard>

@@ -23,9 +23,19 @@ import { canonicalJsonStringify, hashCanonicalJson } from './canonical-hash'
 import {
   OPPORTUNITY_ENGINE_LIMITS,
   clampOpportunityJobBatchSize,
+  isAgencyDnaV1EnabledForContext,
   isOpportunityEngineV1Enabled,
   isOpportunityOutcomesEnabled,
 } from './config'
+import {
+  AGENCY_DNA_CAPACITIES,
+  AGENCY_DNA_SERVICE_TYPES,
+  resolveAgencyDnaOpportunityContext,
+  type AgencyDnaCapacity,
+  type AgencyDnaOpportunityContext,
+  type AgencyDnaRestrictionType,
+  type AgencyDnaServiceType,
+} from './agency-dna'
 import {
   lockOutcomeOwnerShared,
   recordOpportunityOutcomeInTransaction,
@@ -95,6 +105,7 @@ interface SignalRow {
 
 interface OpportunityBuildRow {
   ownerId: string
+  workspaceId: string | null
   clientProfileId: string
   organizationId: string
   hiringEpisodeId: string
@@ -141,6 +152,14 @@ interface OpportunityBuildRow {
   excludedLocations: unknown
   remoteFriendly: boolean
   hiringMode: 'auto' | 'specialist' | 'executive' | 'volume'
+  serviceTypes: unknown
+  targetSeniorities: unknown
+  preferredEngagementTypes: unknown
+  currentCapacity: string
+  agencyDnaVersion: string | number
+  agencyDnaSnapshotHash: string | null
+  agencyDnaSnapshot: unknown
+  restrictionType: AgencyDnaRestrictionType | null
   currentOpportunityId: string | null
   currentInputHash: string | null
   currentScoringVersion: string | null
@@ -155,6 +174,14 @@ interface OpportunityInputProvenance {
   scoringConfigHash: string
   briefBuilderVersion: string
   inputHash: string
+  agencyDnaVersion: number | null
+}
+
+interface AgencyDnaBuildState {
+  version: number
+  snapshotHash: string
+  snapshot: Record<string, unknown>
+  context: AgencyDnaOpportunityContext
 }
 
 export async function detectHiringEpisodesJob(
@@ -493,22 +520,6 @@ async function runBuildOpportunitiesJob(
       const payload = extractPayloadFields(row.digestPayload)
       const gate = normalizeConfidenceGate(payload.confidenceGate)
       const fiur = computeFiurForOpportunity(row, payload.contactPaths, now)
-      const score = scorer.score({
-        episode,
-        fiur: {
-          fit: fiur.fit,
-          reachability: fiur.reachability,
-          reasons: {
-            fit: fiur.reasons.fit,
-            reachability: fiur.reasons.reachability,
-          },
-        },
-        confidenceGate: gate,
-        confidenceScore:
-          DEFAULT_OPPORTUNITY_SCORING_CONFIG.confidenceGateScores[gate],
-        profileExcluded: hasExplicitProfileExclusion(row),
-        now,
-      })
       const matchedRoles = findMatchedAgencyRoles(row)
       const matchedRoleFamilies = matchedRoles.map((role) =>
         classifyOpportunityRoleFamily(role))
@@ -526,6 +537,29 @@ async function runBuildOpportunitiesJob(
           row.organizationCity.toLocaleLowerCase('ru-RU')
         ? [row.organizationCity]
         : []
+      const agencyDnaState = resolveAgencyDnaBuildState({
+        row,
+        matchedRoleFamilies,
+        matchedIndustries,
+        matchedRegions,
+      })
+      const score = scorer.score({
+        episode,
+        fiur: {
+          fit: fiur.fit,
+          reachability: fiur.reachability,
+          reasons: {
+            fit: fiur.reasons.fit,
+            reachability: fiur.reasons.reachability,
+          },
+        },
+        confidenceGate: gate,
+        confidenceScore:
+          DEFAULT_OPPORTUNITY_SCORING_CONFIG.confidenceGateScores[gate],
+        profileExcluded: hasExplicitProfileExclusion(row) ||
+          Boolean(agencyDnaState?.context.blocksOpportunity),
+        now,
+      })
       const brief = briefBuilder.build({
         organizationName: row.organizationName,
         episode,
@@ -548,6 +582,7 @@ async function runBuildOpportunitiesJob(
         row,
         episode,
         scoringVersion,
+        agencyDnaState,
       )
 
       if (
@@ -590,6 +625,7 @@ async function runBuildOpportunitiesJob(
         matchedRoleFamilies,
         matchedIndustries,
         matchedRegions,
+        agencyDnaState,
         episodeType: episode.episodeType,
         confidenceGate: gate,
         validUntil,
@@ -1345,6 +1381,7 @@ async function persistOpportunityBuild(input: {
   matchedRoleFamilies: readonly string[]
   matchedIndustries: readonly string[]
   matchedRegions: readonly string[]
+  agencyDnaState: AgencyDnaBuildState | null
   episodeType: string
   confidenceGate: string
   validUntil: string
@@ -1366,6 +1403,7 @@ async function persistOpportunityBuild(input: {
     matchedRoleFamilies,
     matchedIndustries,
     matchedRegions,
+    agencyDnaState,
     episodeType,
     confidenceGate,
     db,
@@ -1565,7 +1603,9 @@ async function persistOpportunityBuild(input: {
       analyticsCohort: createOpportunityAnalyticsCohort({
         clientProfileId: row.clientProfileId,
         clientProfileVersion: provenance.profileSnapshotHash,
-        agencyDnaVersion: provenance.profileSnapshotHash,
+        agencyDnaVersion: provenance.agencyDnaVersion === null
+          ? provenance.profileSnapshotHash
+          : String(provenance.agencyDnaVersion),
         hiringMode: row.hiringMode,
         specialization: row.specialization,
         matchedRoleFamilies,
@@ -1619,6 +1659,7 @@ async function persistOpportunityBuild(input: {
       provenance.briefBuilderVersion,
       provenance.inputHash,
       preservedSnoozedUntil,
+      provenance.agencyDnaVersion,
     ] as const
 
     let superseded = false
@@ -1699,6 +1740,7 @@ async function persistOpportunityBuild(input: {
            brief_builder_version = $30,
             input_hash = $31,
             snoozed_until = $32::timestamptz,
+            agency_dna_version = $33,
             superseded_at = NULL,
            updated_at = NOW()
           WHERE id = $1
@@ -1738,7 +1780,8 @@ async function persistOpportunityBuild(input: {
            scoring_config_hash,
            brief_builder_version,
            input_hash,
-           snoozed_until
+           snoozed_until,
+           agency_dna_version
          )
          VALUES (
            $1, $2, $3, $4, $5,
@@ -1746,13 +1789,23 @@ async function persistOpportunityBuild(input: {
            $12, $13, $14, $15, $16, $17, $18,
            $19, $20, $21, $22, $23::jsonb,
             $24, $25, $26, $27, $28, $29, $30,
-            $31::timestamptz
+            $31::timestamptz, $32
          )
          RETURNING id::TEXT AS id`,
         values,
       )
     const storedRow = stored.rows[0]
     if (!storedRow) throw new Error('Opportunity persistence returned no row.')
+    if (agencyDnaState) {
+      await persistAgencyDnaSnapshot({
+        opportunityId: storedRow.id,
+        opportunityInputHash: provenance.inputHash,
+        row,
+        agencyDnaState,
+        fitExplanation: brief.agencyFitExplanation,
+        db,
+      })
+    }
     if (preservedSnoozedUntil) {
       logEvent('opportunity.snooze_preserved', {
         opportunityId: storedRow.id,
@@ -1792,26 +1845,131 @@ function toLegacyOutcomeStatus(
   return 'contacted'
 }
 
+function resolveAgencyDnaBuildState(input: {
+  row: OpportunityBuildRow
+  matchedRoleFamilies: readonly string[]
+  matchedIndustries: readonly string[]
+  matchedRegions: readonly string[]
+}): AgencyDnaBuildState | null {
+  const { row } = input
+  if (!isAgencyDnaV1EnabledForContext({
+    dataOwnerId: row.ownerId,
+    workspaceId: row.workspaceId,
+  })) {
+    return null
+  }
+
+  const version = Number(row.agencyDnaVersion)
+  const snapshotHash = row.agencyDnaSnapshotHash?.trim() ?? ''
+  const snapshot = asRecord(row.agencyDnaSnapshot)
+  if (
+    !row.workspaceId ||
+    !Number.isSafeInteger(version) ||
+    version <= 0 ||
+    !/^[a-f0-9]{64}$/.test(snapshotHash) ||
+    Object.keys(snapshot).length === 0
+  ) {
+    throw new Error('Agency DNA is enabled but its versioned snapshot is unavailable.')
+  }
+
+  const serviceTypes = toStringArray(row.serviceTypes).filter(
+    (value): value is AgencyDnaServiceType =>
+      AGENCY_DNA_SERVICE_TYPES.includes(value as AgencyDnaServiceType),
+  )
+  const currentCapacity = AGENCY_DNA_CAPACITIES.includes(
+    row.currentCapacity as AgencyDnaCapacity,
+  ) ? row.currentCapacity as AgencyDnaCapacity : 'normal'
+  const context = resolveAgencyDnaOpportunityContext({
+    serviceTypes,
+    targetSeniorities: toStringArray(row.targetSeniorities),
+    preferredEngagementTypes: toStringArray(row.preferredEngagementTypes),
+    currentCapacity,
+    matchedRoleFamilies: input.matchedRoleFamilies,
+    matchedIndustries: input.matchedIndustries,
+    matchedRegions: input.matchedRegions,
+    episodeTitle: row.episodeTitle,
+    vacancyCount: row.vacancyCount,
+    restrictionType: row.restrictionType,
+  })
+
+  return { version, snapshotHash, snapshot, context }
+}
+
+async function persistAgencyDnaSnapshot(input: {
+  opportunityId: string
+  opportunityInputHash: string
+  row: OpportunityBuildRow
+  agencyDnaState: AgencyDnaBuildState
+  fitExplanation: string
+  db: OpportunityJobDb
+}): Promise<void> {
+  if (!input.row.workspaceId) {
+    throw new Error('Agency DNA snapshot requires workspace context.')
+  }
+  const fitExplanation = input.fitExplanation.trim() ||
+    'Agency DNA restrictions and evidenced capabilities applied.'
+  await input.db.query(
+    `INSERT INTO opportunity_agency_dna_snapshots (
+       opportunity_id,
+       owner_id,
+       workspace_id,
+       client_profile_id,
+       agency_dna_version,
+       agency_dna_snapshot_hash,
+       opportunity_input_hash,
+       snapshot,
+       capability_matches,
+       restriction_snapshot,
+       fit_explanation
+     )
+     VALUES (
+       $1, $2, $3, $4, $5, $6, $7,
+       $8::JSONB, $9::JSONB, $10::JSONB, $11
+     )
+     ON CONFLICT (
+       opportunity_id,
+       opportunity_input_hash,
+       agency_dna_version,
+       agency_dna_snapshot_hash
+     ) DO NOTHING`,
+    [
+      input.opportunityId,
+      input.row.ownerId,
+      input.row.workspaceId,
+      input.row.clientProfileId,
+      input.agencyDnaState.version,
+      input.agencyDnaState.snapshotHash,
+      input.opportunityInputHash,
+      JSON.stringify(input.agencyDnaState.snapshot),
+      JSON.stringify(input.agencyDnaState.context.capabilityMatches),
+      JSON.stringify(input.agencyDnaState.context.restrictionSnapshot),
+      fitExplanation,
+    ],
+  )
+}
+
 function createOpportunityInputProvenance(
   row: OpportunityBuildRow,
   episode: HiringEpisodeCandidate,
   scoringVersion: string,
+  agencyDnaState: AgencyDnaBuildState | null,
 ): OpportunityInputProvenance {
-  const profileSnapshotHash = hashCanonicalJson({
-    agencyName: row.agencyName,
-    targetCity: row.targetCity,
-    specialization: row.specialization,
-    includeKeywords: sortSetLikeStrings(row.includeKeywords),
-    excludeKeywords: sortSetLikeStrings(row.excludeKeywords),
-    industries: sortSetLikeStrings(row.industries),
-    companySizes: sortSetLikeStrings(row.companySizes),
-    contactPolicy: row.contactPolicy,
-    roles: sortSetLikeStrings(row.roles),
-    excludedIndustries: sortSetLikeStrings(row.excludedIndustries),
-    excludedLocations: sortSetLikeStrings(row.excludedLocations),
-    remoteFriendly: row.remoteFriendly,
-    hiringMode: row.hiringMode,
-  })
+  const profileSnapshotHash = agencyDnaState?.snapshotHash ??
+    hashCanonicalJson({
+      agencyName: row.agencyName,
+      targetCity: row.targetCity,
+      specialization: row.specialization,
+      includeKeywords: sortSetLikeStrings(row.includeKeywords),
+      excludeKeywords: sortSetLikeStrings(row.excludeKeywords),
+      industries: sortSetLikeStrings(row.industries),
+      companySizes: sortSetLikeStrings(row.companySizes),
+      contactPolicy: row.contactPolicy,
+      roles: sortSetLikeStrings(row.roles),
+      excludedIndustries: sortSetLikeStrings(row.excludedIndustries),
+      excludedLocations: sortSetLikeStrings(row.excludedLocations),
+      remoteFriendly: row.remoteFriendly,
+      hiringMode: row.hiringMode,
+    })
   const scoringConfigHash = hashCanonicalJson(DEFAULT_OPPORTUNITY_SCORING_CONFIG)
   // Set-like inputs are normalized here. canonicalJsonStringify intentionally
   // preserves every other array because digest reason and workflow order can be semantic.
@@ -1855,6 +2013,8 @@ function createOpportunityInputProvenance(
   })
   const semanticInput = {
     profileSnapshotHash,
+    agencyDnaVersion: agencyDnaState?.version ?? null,
+    agencyDnaRestriction: agencyDnaState?.context.restrictionSnapshot ?? null,
     buildInputsHash,
     fiurVersion: FIUR_VERSION,
     scoringVersion,
@@ -2270,6 +2430,7 @@ const OPPORTUNITY_BUILD_QUERY = `
   )
   SELECT
     cp.owner_id::TEXT AS "ownerId",
+    cp.workspace_id::TEXT AS "workspaceId",
     cp.id::TEXT AS "clientProfileId",
     he.organization_id::TEXT AS "organizationId",
     he.id::TEXT AS "hiringEpisodeId",
@@ -2316,6 +2477,14 @@ const OPPORTUNITY_BUILD_QUERY = `
     cp.excluded_locations AS "excludedLocations",
     cp.remote_friendly AS "remoteFriendly",
     cp.hiring_mode AS "hiringMode",
+    cp.service_types AS "serviceTypes",
+    cp.target_seniorities AS "targetSeniorities",
+    cp.preferred_engagement_types AS "preferredEngagementTypes",
+    cp.current_capacity AS "currentCapacity",
+    cp.agency_dna_version::TEXT AS "agencyDnaVersion",
+    cp.agency_dna_snapshot_hash AS "agencyDnaSnapshotHash",
+    agency_dna_profile_snapshot(cp) AS "agencyDnaSnapshot",
+    account_restriction.restriction_type AS "restrictionType",
     current_opportunity.id::TEXT AS "currentOpportunityId",
     current_opportunity.input_hash AS "currentInputHash",
     current_opportunity.scoring_version AS "currentScoringVersion"
@@ -2323,6 +2492,11 @@ const OPPORTUNITY_BUILD_QUERY = `
   JOIN client_profiles cp ON cp.id = dc.client_profile_id
   JOIN hiring_episodes he ON he.organization_id = dc.org_id
   JOIN orgs org ON org.id = he.organization_id
+  LEFT JOIN agency_account_restrictions account_restriction
+    ON account_restriction.client_profile_id = cp.id
+   AND account_restriction.owner_id = cp.owner_id
+   AND account_restriction.workspace_id = cp.workspace_id
+   AND account_restriction.organization_id = he.organization_id
   LEFT JOIN opportunity_build_failures build_failure
     ON build_failure.client_profile_id = cp.id
    AND build_failure.hiring_episode_id = he.id
