@@ -213,6 +213,14 @@ export async function updateOpportunityWorkflow(
       idempotencyKey,
     )
     if (replay) {
+      const replayActor = await findActiveMember(
+        client,
+        workspaceId,
+        actorUserId,
+      )
+      if (!replayActor || replayActor.role !== input.actorRole) {
+        throw new OpportunityWorkflowAccessError()
+      }
       if (
         replay.payloadHash !== payloadHash ||
         replay.opportunityId !== opportunityId

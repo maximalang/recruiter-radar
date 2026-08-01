@@ -175,6 +175,9 @@ describe('Opportunity workflow repository', () => {
       if (text.includes('FROM opportunity_workflow_events')) {
         return { rows: [replay] }
       }
+      if (text.includes('FROM workspace_members')) {
+        return { rows: [{ userId: '7', role: 'owner' }] }
+      }
       return { rows: [] }
     })
 
@@ -195,10 +198,48 @@ describe('Opportunity workflow repository', () => {
     ).toBe(false)
   })
 
+  it('rejects an exact replay after the actor membership is removed', async () => {
+    const patch = { workflowPriority: 'high' as const }
+    const payloadHash = hashCanonicalJson({ opportunityId: '10', patch })
+    const { client } = clientFor((text) => {
+      if (text.includes('FROM opportunity_workflow_events')) {
+        return { rows: [{
+          eventId: '91',
+          payloadHash,
+          opportunityId: '10',
+          assignedToUserId: '42',
+          nextActionType: null,
+          nextActionDueAt: null,
+          workflowPriority: 'high',
+          internalNote: 'Внутренняя заметка',
+          changedFields: ['workflowPriority'],
+          recordedAt: '2026-08-01T11:00:00.000Z',
+        }] }
+      }
+      if (text.includes('FROM workspace_members')) return { rows: [] }
+      return { rows: [] }
+    })
+
+    await expect(updateOpportunityWorkflow({
+      ownerId: '7',
+      workspaceId: '9',
+      opportunityId: '10',
+      actorUserId: '7',
+      actorRole: 'owner',
+      idempotencyKey: 'workflow:priority:10',
+      patch,
+    }, async () => client)).rejects.toBeInstanceOf(
+      OpportunityWorkflowAccessError,
+    )
+  })
+
   it('rejects a changed payload under the same idempotency key', async () => {
     const { client } = clientFor((text) => {
       if (text.includes('FROM opportunity_workflow_events')) {
         return { rows: [{ payloadHash: 'a'.repeat(64) }] }
+      }
+      if (text.includes('FROM workspace_members')) {
+        return { rows: [{ userId: '7', role: 'owner' }] }
       }
       return { rows: [] }
     })

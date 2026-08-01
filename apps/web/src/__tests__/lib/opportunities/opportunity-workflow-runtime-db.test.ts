@@ -29,6 +29,7 @@ describeWithDatabase('Opportunity workflow PostgreSQL runtime', () => {
   let workspaceId = ''
   let otherWorkspaceId = ''
   let opportunityId = ''
+  let concurrentDueAt = ''
 
   beforeAll(async () => {
     const users = await database.query(
@@ -142,6 +143,7 @@ describeWithDatabase('Opportunity workflow PostgreSQL runtime', () => {
   })
 
   it('serializes an exact concurrent claim into one immutable event', async () => {
+    concurrentDueAt = new Date(Date.now() + 86_400_000).toISOString()
     const command = {
       ownerId,
       workspaceId,
@@ -152,7 +154,7 @@ describeWithDatabase('Opportunity workflow PostgreSQL runtime', () => {
       patch: {
         assignedToUserId: recruiterId,
         nextActionType: 'follow_up' as const,
-        nextActionDueAt: new Date(Date.now() + 86_400_000).toISOString(),
+        nextActionDueAt: concurrentDueAt,
         workflowPriority: 'high' as const,
         internalNote: 'Согласовать следующий шаг внутри команды.',
       },
@@ -298,6 +300,21 @@ describeWithDatabase('Opportunity workflow PostgreSQL runtime', () => {
        WHERE workspace_id = $1 AND user_id = $2`,
       [workspaceId, recruiterId],
     )
+    await expect(updateOpportunityWorkflow({
+      ownerId,
+      workspaceId,
+      opportunityId,
+      actorUserId: recruiterId,
+      actorRole: 'recruiter',
+      idempotencyKey: `workflow-concurrent:${token}`,
+      patch: {
+        assignedToUserId: recruiterId,
+        nextActionType: 'follow_up',
+        nextActionDueAt: concurrentDueAt,
+        workflowPriority: 'high',
+        internalNote: 'Согласовать следующий шаг внутри команды.',
+      },
+    })).rejects.toBeInstanceOf(OpportunityWorkflowAccessError)
     const history = await database.query(
       `SELECT actor_user_id::TEXT AS "actorUserId",
               actor_role_snapshot AS "actorRoleSnapshot"
