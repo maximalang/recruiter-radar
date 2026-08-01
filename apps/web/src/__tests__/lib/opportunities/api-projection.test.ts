@@ -18,6 +18,15 @@ describe('opportunity API projection', () => {
       status: 'new',
       commercialStage: 'new',
       workflowState: 'active',
+      workflow: {
+        assignedToUserId: '42',
+        nextActionType: 'follow_up',
+        nextActionDueAt: '2026-08-02T06:30:00.000Z',
+        workflowPriority: 'high',
+        internalNote: 'Не публиковать в аналитическом snapshot.',
+        lastEventId: '81',
+        updatedAt: '2026-08-01T12:00:00.000Z',
+      },
       title: 'Возможность',
       whyNow: 'Почему',
       problemHypothesis: 'Гипотеза',
@@ -79,6 +88,15 @@ describe('opportunity API projection', () => {
     expect(serialized).not.toContain('personal@example.test')
     expect(serialized).not.toContain('nested-private@example.test')
     expect(serialized).not.toContain('nested-private-id')
+    expect(serialized).not.toContain('Не публиковать')
+    expect(serialized).not.toContain('lastEventId')
+    expect(publicItem.workflow).toEqual({
+      assignedToUserId: '42',
+      nextActionType: 'follow_up',
+      nextActionDueAt: '2026-08-02T06:30:00.000Z',
+      workflowPriority: 'high',
+      updatedAt: '2026-08-01T12:00:00.000Z',
+    })
     expect(serialized).not.toContain('"evidenceCount"')
     expect(publicItem).not.toHaveProperty('factCount')
     expect(publicItem.evidenceMetrics).toEqual({

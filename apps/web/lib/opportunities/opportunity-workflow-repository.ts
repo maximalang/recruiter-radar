@@ -1,7 +1,7 @@
-import type { PoolClient } from 'pg'
+import type { Pool, PoolClient } from 'pg'
 
 import type { WorkspaceRole } from '@/lib/auth-v2/workspaces'
-import { getClient } from '@/lib/db-pool'
+import { getClient, getPool } from '@/lib/db-pool'
 import { hashCanonicalJson } from './canonical-hash'
 import {
   canApplyOpportunityWorkflowPatch,
@@ -29,6 +29,12 @@ export interface OpportunityWorkflowUpdateResult {
     changedFields: OpportunityWorkflowField[]
   }
   idempotent: boolean
+}
+
+export interface OpportunityWorkflowAssignee {
+  userId: string
+  displayName: string
+  role: Extract<WorkspaceRole, 'owner' | 'admin' | 'recruiter'>
 }
 
 export type OpportunityWorkflowField =
@@ -121,6 +127,40 @@ const WORKFLOW_FIELD_ORDER: readonly OpportunityWorkflowField[] = [
 const WRITABLE_ROLES = new Set<WorkspaceRole>(['owner', 'admin', 'recruiter'])
 const POSITIVE_ID_PATTERN = /^[1-9]\d*$/
 const MAX_POSTGRES_BIGINT = BigInt('9223372036854775807')
+
+export async function listOpportunityWorkflowAssignees(
+  workspaceIdInput: string | number,
+  db: Pick<Pool, 'query'> | null = getPool(),
+): Promise<OpportunityWorkflowAssignee[]> {
+  const workspaceId = positiveId(workspaceIdInput)
+  if (!workspaceId) throw new OpportunityWorkflowAccessError()
+  if (!db) throw new Error('DATABASE_URL is not set.')
+
+  const result = await db.query<OpportunityWorkflowAssignee>(
+    `SELECT
+       membership.user_id::TEXT AS "userId",
+       COALESCE(
+         NULLIF(BTRIM(account.display_name), ''),
+         NULLIF(BTRIM(account.full_name), ''),
+         'Участник ' || membership.user_id::TEXT
+       ) AS "displayName",
+       membership.role
+     FROM workspace_members membership
+     JOIN users account ON account.id = membership.user_id
+     WHERE membership.workspace_id = $1
+       AND membership.status = 'active'
+       AND membership.role IN ('owner', 'admin', 'recruiter')
+       AND account.status = 'active'
+     ORDER BY
+       CASE membership.role
+         WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2
+       END,
+       LOWER(COALESCE(account.display_name, account.full_name, '')),
+       membership.user_id`,
+    [workspaceId],
+  )
+  return result.rows
+}
 
 export async function updateOpportunityWorkflow(
   input: {

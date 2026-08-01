@@ -10,7 +10,9 @@ import type { HiringEpisodeType } from './hiring-episode-detection'
 import {
   clampOpportunityPageSize,
   isOpportunityStrategistV1EnabledForContext,
+  isOpportunityWorkflowV1EnabledForContext,
 } from './config'
+import type { OpportunityWorkflowState } from './opportunity-workflow-repository'
 import type {
   DismissedReasonCode,
   OpportunityContactPathType,
@@ -81,6 +83,7 @@ const ALLOWED_OPPORTUNITY_TRANSITIONS: Readonly<
 type OpportunityDb = Pick<Pool, 'query'> | Pick<PoolClient, 'query'>
 
 export const OPPORTUNITY_VIEWS = [
+  'today',
   'morning',
   'accepted',
   'pipeline',
@@ -106,6 +109,7 @@ interface OpportunityRow {
   status: OpportunityStatus
   commercialStage: OpportunityOutcomeStage
   workflowState: 'active' | 'snoozed'
+  workflow: OpportunityWorkflowState | null
   title: string
   whyNow: string
   problemHypothesis: string
@@ -194,6 +198,16 @@ const EFFECTIVE_COMMERCIAL_STAGE_SQL = `COALESCE(
   END
 )`
 
+const MOSCOW_TODAY_START_SQL = `(
+  DATE_TRUNC('day', NOW() AT TIME ZONE 'Europe/Moscow')
+  AT TIME ZONE 'Europe/Moscow'
+)`
+
+const MOSCOW_TOMORROW_START_SQL = `(
+  (DATE_TRUNC('day', NOW() AT TIME ZONE 'Europe/Moscow') + INTERVAL '1 day')
+  AT TIME ZONE 'Europe/Moscow'
+)`
+
 export async function listOpportunities(
   input: OpportunityListInput,
   db: OpportunityDb | null = getPool(),
@@ -227,7 +241,35 @@ export async function listOpportunities(
     )
     clauses.push(`o.agency_propensity_score >= $${params.length}`)
   }
-  if (view === 'morning' || view === 'accepted' || view === 'pipeline') {
+  if (view === 'today') {
+    clauses.push(
+      `${EFFECTIVE_COMMERCIAL_STAGE_SQL} NOT IN ('won', 'lost', 'dismissed')`,
+    )
+    clauses.push(`(
+      (
+        ${EFFECTIVE_WORKFLOW_SQL} = 'active'
+        AND (
+          (
+            workflow_state.next_action_due_at >= ${MOSCOW_TODAY_START_SQL}
+            AND workflow_state.next_action_due_at < ${MOSCOW_TOMORROW_START_SQL}
+          )
+          OR (
+            workflow_state.next_action_type = 'follow_up'
+            AND workflow_state.next_action_due_at < ${MOSCOW_TODAY_START_SQL}
+          )
+          OR (
+            workflow_state.workflow_priority = 'high'
+            AND ${EFFECTIVE_COMMERCIAL_STAGE_SQL} IN ('new', 'review')
+          )
+          OR workflow_state.assigned_to_user_id IS NULL
+        )
+      )
+      OR (
+        ${EFFECTIVE_WORKFLOW_SQL} = 'snoozed'
+        AND COALESCE(outcome_state.snoozed_until, o.snoozed_until) < NOW()
+      )
+    )`)
+  } else if (view === 'morning' || view === 'accepted' || view === 'pipeline') {
     clauses.push(`${EFFECTIVE_WORKFLOW_SQL} = 'active'`)
   } else if (view === 'snoozed') {
     clauses.push(`${EFFECTIVE_WORKFLOW_SQL} = 'snoozed'`)
@@ -280,19 +322,37 @@ export async function listOpportunities(
      LEFT JOIN opportunity_outcome_state outcome_state
        ON outcome_state.owner_id = o.owner_id
       AND outcome_state.opportunity_id = o.id
+     LEFT JOIN opportunity_workflow_state workflow_state
+       ON workflow_state.owner_id = o.owner_id
+      AND workflow_state.workspace_id = o.workspace_id
+      AND workflow_state.opportunity_id = o.id
      WHERE ${where}`,
     params,
   )
 
+  const orderBy = view === 'today'
+    ? `CASE
+         WHEN workflow_state.next_action_due_at < NOW() THEN 0
+         WHEN workflow_state.next_action_due_at < ${MOSCOW_TOMORROW_START_SQL} THEN 1
+         WHEN ${EFFECTIVE_WORKFLOW_SQL} = 'snoozed' THEN 2
+         WHEN workflow_state.workflow_priority = 'high' THEN 3
+         ELSE 4
+       END,
+       workflow_state.next_action_due_at ASC NULLS LAST,
+       CASE workflow_state.workflow_priority
+         WHEN 'high' THEN 0 WHEN 'normal' THEN 1 ELSE 2
+       END,
+       o.opportunity_score DESC,
+       o.id DESC`
+    : `o.opportunity_score DESC,
+       o.valid_until ASC NULLS LAST,
+       o.created_at DESC,
+       o.id DESC`
   params.push(pageSize, offset)
   const rows = await db.query<OpportunityRow>(
     `${OPPORTUNITY_SELECT}
      WHERE ${where}
-     ORDER BY
-       o.opportunity_score DESC,
-       o.valid_until ASC NULLS LAST,
-       o.created_at DESC,
-       o.id DESC
+     ORDER BY ${orderBy}
      LIMIT $${params.length - 1}
      OFFSET $${params.length}`,
     params,
@@ -310,11 +370,16 @@ export async function listOpportunities(
     dataOwnerId: input.ownerId,
     workspaceId: input.workspaceId,
   })
+  const workflowEnabled = isOpportunityWorkflowV1EnabledForContext({
+    dataOwnerId: input.ownerId,
+    workspaceId: input.workspaceId,
+  })
   return {
     opportunities: rows.rows.map((row) => toOpportunityItem(
       row,
       evidenceByOpportunity.get(row.id) ?? [],
       strategistEnabled,
+      workflowEnabled,
     )),
     total,
     page,
@@ -430,6 +495,10 @@ export async function getOpportunityById(
       dataOwnerId: input.ownerId,
       workspaceId: input.workspaceId,
     }),
+    isOpportunityWorkflowV1EnabledForContext({
+      dataOwnerId: input.ownerId,
+      workspaceId: input.workspaceId,
+    }),
   )
 }
 
@@ -523,6 +592,10 @@ export async function applyOpportunityAction(input: {
               dataOwnerId: input.ownerId,
               workspaceId: input.workspaceId,
             }),
+            isOpportunityWorkflowV1EnabledForContext({
+              dataOwnerId: input.ownerId,
+              workspaceId: input.workspaceId,
+            }),
           )
         }
       }
@@ -564,6 +637,17 @@ const OPPORTUNITY_SELECT = `
     o.status,
     ${EFFECTIVE_COMMERCIAL_STAGE_SQL} AS "commercialStage",
     ${EFFECTIVE_WORKFLOW_SQL} AS "workflowState",
+    CASE WHEN workflow_state.opportunity_id IS NULL THEN NULL ELSE
+      jsonb_build_object(
+        'assignedToUserId', workflow_state.assigned_to_user_id::TEXT,
+        'nextActionType', workflow_state.next_action_type,
+        'nextActionDueAt', workflow_state.next_action_due_at,
+        'workflowPriority', workflow_state.workflow_priority,
+        'internalNote', workflow_state.internal_note,
+        'lastEventId', workflow_state.last_event_id::TEXT,
+        'updatedAt', workflow_state.updated_at
+      )
+    END AS workflow,
     o.title,
     o.why_now AS "whyNow",
     o.problem_hypothesis AS "problemHypothesis",
@@ -645,6 +729,10 @@ const OPPORTUNITY_SELECT = `
   LEFT JOIN opportunity_outcome_state outcome_state
     ON outcome_state.owner_id = o.owner_id
    AND outcome_state.opportunity_id = o.id
+  LEFT JOIN opportunity_workflow_state workflow_state
+    ON workflow_state.owner_id = o.owner_id
+   AND workflow_state.workspace_id = o.workspace_id
+   AND workflow_state.opportunity_id = o.id
 `
 
 async function getEvidenceForOpportunities(
@@ -708,9 +796,11 @@ function toOpportunityItem(
   row: OpportunityRow,
   evidenceTimeline: OpportunityEvidenceItem[],
   strategistEnabled: boolean,
+  workflowEnabled: boolean,
 ): OpportunityItem {
   return {
     ...row,
+    workflow: workflowEnabled ? row.workflow : null,
     evidenceTimeline,
     strategistBrief: strategistEnabled
       ? parseOpportunityStrategistBrief(row.metadata?.strategistBrief)

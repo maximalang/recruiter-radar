@@ -7,6 +7,7 @@ import {
   OpportunityWorkflowIdempotencyConflictError,
   OpportunityWorkflowNextActionRequiredError,
   OpportunityWorkflowNoChangeError,
+  listOpportunityWorkflowAssignees,
   updateOpportunityWorkflow,
 } from '@/lib/opportunities/opportunity-workflow-repository'
 
@@ -75,6 +76,25 @@ function successfulHandler(overrides: Partial<typeof BASE_STATE> = {}): QueryHan
 }
 
 describe('Opportunity workflow repository', () => {
+  it('lists only active assignable members without exposing email addresses', async () => {
+    const query = jest.fn(async () => ({
+      rows: [
+        { userId: '7', displayName: 'Мария', role: 'owner' },
+        { userId: '42', displayName: 'Участник 42', role: 'recruiter' },
+      ],
+    }))
+
+    await expect(listOpportunityWorkflowAssignees('9', { query })).resolves.toEqual([
+      { userId: '7', displayName: 'Мария', role: 'owner' },
+      { userId: '42', displayName: 'Участник 42', role: 'recruiter' },
+    ])
+    const [sql, values] = query.mock.calls[0]
+    expect(sql).toContain("membership.status = 'active'")
+    expect(sql).toContain("membership.role IN ('owner', 'admin', 'recruiter')")
+    expect(sql).not.toContain('account.email')
+    expect(values).toEqual(['9'])
+  })
+
   it('writes an actor-attributed append-only event and current projection atomically', async () => {
     const { client, query, release } = clientFor(successfulHandler())
 

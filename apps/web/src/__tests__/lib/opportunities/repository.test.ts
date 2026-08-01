@@ -194,7 +194,67 @@ describe('opportunity repository tenant scope', () => {
     }
   })
 
+  it('hides workflow notes unless the same workspace passes every Phase 7 flag', async () => {
+    const names = [
+      'OPPORTUNITY_ENGINE_V1_ENABLED',
+      'OPPORTUNITY_OUTCOMES_ENABLED',
+      'OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED',
+      'OPPORTUNITY_WORKFLOW_V1_ENABLED',
+    ] as const
+    const original = Object.fromEntries(names.map((name) => [name, process.env[name]]))
+    const row = {
+      id: '10',
+      ownerId: '7',
+      metadata: {},
+      workflow: {
+        assignedToUserId: '42',
+        nextActionType: 'follow_up',
+        nextActionDueAt: '2026-08-02T06:30:00.000Z',
+        workflowPriority: 'high',
+        internalNote: 'Только для команды.',
+        lastEventId: '81',
+        updatedAt: '2026-08-01T12:00:00.000Z',
+      },
+    }
+    try {
+      names.forEach((name) => delete process.env[name])
+      const disabled = createDb([[{ count: '1' }], [row], []])
+      const disabledResult = await listOpportunities({
+        ownerId: '7',
+        workspaceId: '9',
+      }, disabled.db)
+      expect(disabledResult.opportunities[0]?.workflow).toBeNull()
+
+      names.forEach((name) => { process.env[name] = 'true' })
+      const enabled = createDb([[{ count: '1' }], [row], []])
+      const enabledResult = await listOpportunities({
+        ownerId: '7',
+        workspaceId: '9',
+      }, enabled.db)
+      expect(enabledResult.opportunities[0]?.workflow).toEqual(
+        expect.objectContaining({ internalNote: 'Только для команды.' }),
+      )
+    } finally {
+      names.forEach((name) => restoreEnv(name, original[name]))
+    }
+  })
+
+  it('builds Today from due work, overdue follow-ups, high priority, expired snoozes, and unassigned work', async () => {
+    const { db, calls } = createDb([[{ count: '0' }], []])
+
+    await listOpportunities({ ownerId: '7', workspaceId: '9', view: 'today' }, db)
+
+    expect(calls[0].sql).toContain('workflow_state.next_action_due_at')
+    expect(calls[0].sql).toContain("workflow_state.next_action_type = 'follow_up'")
+    expect(calls[0].sql).toContain("workflow_state.workflow_priority = 'high'")
+    expect(calls[0].sql).toContain('workflow_state.assigned_to_user_id IS NULL')
+    expect(calls[0].sql).toContain('AT TIME ZONE \'Europe/Moscow\'')
+    expect(calls[1].sql).toContain('workflow_state.internal_note')
+    expect(calls[1].sql).toContain('workflow_state.next_action_due_at ASC')
+  })
+
   it.each([
+    ['today', null, null],
     ['morning', `CASE WHEN o.status = 'snoozed'`, `IN ('new', 'review')`],
     ['accepted', `= 'active'`, `= 'accepted'`],
     ['pipeline', `= 'active'`, `IN ('contacted', 'replied', 'meeting', 'proposal')`],

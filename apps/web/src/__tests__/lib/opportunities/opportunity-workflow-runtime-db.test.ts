@@ -4,10 +4,13 @@ import { createHash } from 'node:crypto'
 import { Pool } from 'pg'
 
 import { getPool } from '@/lib/db-pool'
+import { toPublicOpportunity } from '@/lib/opportunities/api-projection'
+import { listOpportunities } from '@/lib/opportunities/repository'
 import {
   OpportunityWorkflowAccessError,
   OpportunityWorkflowAssigneeError,
   OpportunityWorkflowIdempotencyConflictError,
+  listOpportunityWorkflowAssignees,
   updateOpportunityWorkflow,
 } from '@/lib/opportunities/opportunity-workflow-repository'
 
@@ -236,6 +239,46 @@ describeWithDatabase('Opportunity workflow PostgreSQL runtime', () => {
       idempotencyKey: `workflow-viewer:${token}`,
       patch: { assignedToUserId: viewerId },
     })).rejects.toBeInstanceOf(OpportunityWorkflowAssigneeError)
+  })
+
+  it('serves the workspace Today projection without publishing internal notes', async () => {
+    const names = [
+      'OPPORTUNITY_ENGINE_V1_ENABLED',
+      'OPPORTUNITY_OUTCOMES_ENABLED',
+      'OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED',
+      'OPPORTUNITY_WORKFLOW_V1_ENABLED',
+    ] as const
+    const original = Object.fromEntries(names.map((name) => [name, process.env[name]]))
+    try {
+      names.forEach((name) => { process.env[name] = 'true' })
+      const result = await listOpportunities({
+        ownerId,
+        workspaceId,
+        view: 'today',
+        pageSize: 20,
+      })
+      const opportunity = result.opportunities.find((item) => item.id === opportunityId)
+      expect(opportunity?.workflow).toEqual(expect.objectContaining({
+        assignedToUserId: secondRecruiterId,
+        workflowPriority: 'high',
+      }))
+      expect(opportunity?.workflow?.internalNote).toBeTruthy()
+      expect(JSON.stringify(toPublicOpportunity(opportunity!)))
+        .not.toContain(String(opportunity?.workflow?.internalNote))
+
+      const assignees = await listOpportunityWorkflowAssignees(workspaceId)
+      expect(assignees).toEqual(expect.arrayContaining([
+        expect.objectContaining({ userId: ownerId, role: 'owner' }),
+        expect.objectContaining({ userId: recruiterId, role: 'recruiter' }),
+        expect.objectContaining({ userId: secondRecruiterId, role: 'recruiter' }),
+      ]))
+      expect(JSON.stringify(assignees)).not.toContain('@example.invalid')
+    } finally {
+      for (const name of names) {
+        if (original[name] === undefined) delete process.env[name]
+        else process.env[name] = original[name]
+      }
+    }
   })
 
   it('does not cross workspace boundaries or rewrite historical actor data', async () => {

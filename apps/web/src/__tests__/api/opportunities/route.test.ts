@@ -71,12 +71,14 @@ describe('opportunities API', () => {
   const originalCanaryOwners = process.env.OPPORTUNITY_CANARY_OWNER_IDS
   const originalWorkspaceContext =
     process.env.OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED
+  const originalWorkflow = process.env.OPPORTUNITY_WORKFLOW_V1_ENABLED
 
   beforeEach(() => {
     process.env.OPPORTUNITY_ENGINE_V1_ENABLED = 'true'
     delete process.env.OPPORTUNITY_CANARY_OWNER_IDS
     delete process.env.OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED
     delete process.env.OPPORTUNITY_OUTCOMES_ENABLED
+    delete process.env.OPPORTUNITY_WORKFLOW_V1_ENABLED
     jest.clearAllMocks()
   })
 
@@ -98,6 +100,11 @@ describe('opportunities API', () => {
       delete process.env.OPPORTUNITY_OUTCOMES_ENABLED
     } else {
       process.env.OPPORTUNITY_OUTCOMES_ENABLED = originalOutcomes
+    }
+    if (originalWorkflow === undefined) {
+      delete process.env.OPPORTUNITY_WORKFLOW_V1_ENABLED
+    } else {
+      process.env.OPPORTUNITY_WORKFLOW_V1_ENABLED = originalWorkflow
     }
   })
 
@@ -219,6 +226,37 @@ describe('opportunities API', () => {
       actorWorkspaceId: '9',
       actorRoleSnapshot: 'recruiter',
       authMode: 'auth_v2',
+    }))
+  })
+
+  it('uses Today as the default only for an enabled Phase 7 workspace', async () => {
+    process.env.OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED = 'true'
+    process.env.OPPORTUNITY_OUTCOMES_ENABLED = 'true'
+    process.env.OPPORTUNITY_WORKFLOW_V1_ENABLED = 'true'
+    mockedSession.mockResolvedValueOnce({
+      mode: 'auth_v2',
+      userId: '42',
+      dataOwnerId: '7',
+      workspaceId: '9',
+      role: 'recruiter',
+      session: null,
+    })
+    mockedList.mockResolvedValue({
+      opportunities: [],
+      total: 0,
+      page: 1,
+      pageSize: 20,
+      nextOffset: null,
+    })
+
+    const response = await list(request('/api/opportunities'))
+
+    expect(response.status).toBe(200)
+    expect(mockedList).toHaveBeenCalledWith(expect.objectContaining({
+      ownerId: '7',
+      workspaceId: '9',
+      morningBriefOnly: false,
+      view: 'today',
     }))
   })
 
