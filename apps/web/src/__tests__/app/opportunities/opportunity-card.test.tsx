@@ -118,12 +118,14 @@ describe('OpportunityActions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'В работу' }))
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
-      '/api/opportunities/10/action',
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({ action: 'accepted' }),
-      }),
+      '/api/opportunities/10/outcomes',
+      expect.objectContaining({ method: 'POST' }),
     ))
+    const requestInit = jest.mocked(global.fetch).mock.calls[0]?.[1]
+    expect(JSON.parse(String(requestInit?.body))).toEqual({
+      eventType: 'accepted',
+      occurredAt: expect.any(String),
+    })
     expect(refresh).toHaveBeenCalledTimes(1)
   })
 

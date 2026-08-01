@@ -82,8 +82,13 @@ describe('opportunity outcome summary API', () => {
   it('is tenant scoped and passes only controlled filters', async () => {
     const response = await GET(request(
       '?from=2026-07-01T00:00:00.000Z&to=2026-07-27T00:00:00.000Z' +
-      '&episodeType=vacancy_spike&confidenceGate=A&sourceFamily=hh&scoreBucket=80-89' +
-      '&externalSupportNeedBucket=high&maturityDays=45',
+      '&clientProfileId=8&clientProfileVersion=' + 'b'.repeat(64) +
+      '&agencyDnaVersion=' + 'c'.repeat(64) +
+      '&hiringMode=auto&specialization=it%20recruitment' +
+      '&matchedRoleFamily=backend&matchedIndustry=it&matchedRegion=%D0%BC%D0%BE%D1%81%D0%BA%D0%B2%D0%B0' +
+      '&organizationSizeBucket=unknown&episodeType=vacancy_spike' +
+      '&confidenceGate=A&sourceFamily=hh&scoreBucket=80-89' +
+      '&externalSupportNeedBucket=high&scoringVersion=opportunity-v1&maturityDays=45',
     ))
 
     expect(response.status).toBe(200)
@@ -92,11 +97,21 @@ describe('opportunity outcome summary API', () => {
       workspaceId: null,
       from: '2026-07-01T00:00:00.000Z',
       to: '2026-07-27T00:00:00.000Z',
+      clientProfileId: '8',
+      clientProfileVersion: 'b'.repeat(64),
+      agencyDnaVersion: 'c'.repeat(64),
+      hiringMode: 'auto',
+      specialization: 'it recruitment',
+      matchedRoleFamily: 'backend',
+      matchedIndustry: 'it',
+      matchedRegion: 'москва',
+      organizationSizeBucket: 'unknown',
       episodeType: 'vacancy_spike',
       confidenceGate: 'A',
       sourceFamily: 'hh',
       scoreBucket: '80-89',
       externalSupportNeedBucket: 'high',
+      scoringVersion: 'opportunity-v1',
       cohort: 'shown',
       maturityDays: 45,
     })

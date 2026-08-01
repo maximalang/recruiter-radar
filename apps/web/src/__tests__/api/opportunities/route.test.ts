@@ -31,6 +31,10 @@ jest.mock('@/lib/opportunities/repository', () => ({
   isOpportunityAction: (value: unknown) =>
     ['accepted', 'dismissed', 'snoozed', 'contacted'].includes(String(value)),
 }))
+jest.mock('@/lib/runtime', () => ({
+  logError: jest.fn(),
+  logEvent: jest.fn(),
+}))
 
 import {
   getAuthorizedOwnerId,
@@ -40,10 +44,12 @@ import {
   applyOpportunityAction,
   getOpportunityById,
   listOpportunities,
-  OpportunityActionConflictError,
-  OpportunityTransitionConflictError,
 } from '@/lib/opportunities/repository'
-import { OutcomeIdempotencyConflictError } from '@/lib/opportunities/outcome-repository'
+import {
+  OutcomeIdempotencyConflictError,
+  OutcomeTransitionConflictError,
+} from '@/lib/opportunities/outcome-repository'
+import { logEvent } from '@/lib/runtime'
 import { GET as list } from '@/app/api/opportunities/route'
 import { GET as detail } from '@/app/api/opportunities/[id]/route'
 import { POST as action } from '@/app/api/opportunities/[id]/action/route'
@@ -53,6 +59,7 @@ const mockedSession = jest.mocked(getSession)
 const mockedList = jest.mocked(listOpportunities)
 const mockedDetail = jest.mocked(getOpportunityById)
 const mockedAction = jest.mocked(applyOpportunityAction)
+const mockedLogEvent = jest.mocked(logEvent)
 
 function request(path: string, init?: ConstructorParameters<typeof NextRequest>[1]) {
   return new NextRequest(`https://recruiter-radar.ru${path}`, init)
@@ -212,7 +219,6 @@ describe('opportunities API', () => {
       actorWorkspaceId: '9',
       actorRoleSnapshot: 'recruiter',
       authMode: 'auth_v2',
-      outcomesEnabled: true,
     }))
   })
 
@@ -362,11 +368,23 @@ describe('opportunities API', () => {
       action: 'accepted',
       actionKey: 'request-1',
     }))
+    expect(valid.headers.get('deprecation')).toBe('true')
+    expect(valid.headers.get('link')).toContain(
+      '</api/opportunities/10/outcomes>; rel="successor-version"',
+    )
+    expect(mockedLogEvent).toHaveBeenCalledWith(
+      'opportunity.api.legacy_action_adapter_used',
+      expect.objectContaining({
+        ownerId: '7',
+        opportunityId: '10',
+        action: 'accepted',
+      }),
+    )
   })
 
   it('returns a conflict when an idempotency key is reused with another payload', async () => {
     mockedOwner.mockResolvedValue('7')
-    mockedAction.mockRejectedValue(new OpportunityActionConflictError())
+    mockedAction.mockRejectedValue(new OutcomeIdempotencyConflictError())
 
     const response = await action(
       request('/api/opportunities/10/action', {
@@ -401,7 +419,7 @@ describe('opportunities API', () => {
 
   it('returns the state-machine conflict contract for a forbidden transition', async () => {
     mockedOwner.mockResolvedValue('7')
-    mockedAction.mockRejectedValue(new OpportunityTransitionConflictError())
+    mockedAction.mockRejectedValue(new OutcomeTransitionConflictError())
 
     const response = await action(
       request('/api/opportunities/10/action', {
@@ -413,7 +431,7 @@ describe('opportunities API', () => {
 
     expect(response.status).toBe(409)
     await expect(response.json()).resolves.toEqual({
-      error: 'opportunity_transition_conflict',
+      error: 'outcome_transition_conflict',
     })
   })
 })

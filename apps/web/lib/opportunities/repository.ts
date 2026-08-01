@@ -5,14 +5,10 @@ import { getClient, getPool } from '@/lib/db-pool'
 import { logEvent } from '@/lib/runtime'
 import {
   canonicalizeOpportunityUrl,
-  hashCanonicalJson,
 } from './canonical-hash'
-import { protectOutcomeContactReference } from './outcome-contact-privacy'
 import type { HiringEpisodeType } from './hiring-episode-detection'
 import {
   clampOpportunityPageSize,
-  clampOpportunitySnoozeDays,
-  isOpportunityOutcomesEnabledForOwner,
 } from './config'
 import type {
   DismissedReasonCode,
@@ -20,10 +16,7 @@ import type {
   OpportunityOutcomeChannel,
   OpportunityOutcomeStage,
 } from './outcome-domain'
-import {
-  lockOutcomeOwnerShared,
-  recordOpportunityOutcomeInTransaction,
-} from './outcome-repository'
+import { recordLegacyOpportunityAction } from './legacy-action-adapter'
 import {
   DEFAULT_OPPORTUNITY_SCORING_CONFIG,
   OPPORTUNITY_STATUSES,
@@ -425,41 +418,6 @@ export async function getOpportunityById(
   }
 }
 
-async function getCurrentOpportunityForEpisode(
-  input: {
-    ownerId: string | number
-    clientProfileId: string | number
-    hiringEpisodeId: string | number
-  },
-  db: OpportunityDb,
-): Promise<OpportunityItem | null> {
-  const result = await db.query<OpportunityRow>(
-    `${OPPORTUNITY_SELECT}
-     WHERE o.client_profile_id = $1
-       AND o.hiring_episode_id = $2
-       AND o.owner_id = $3
-       AND o.superseded_at IS NULL
-     LIMIT 1`,
-    [
-      String(input.clientProfileId),
-      String(input.hiringEpisodeId),
-      String(input.ownerId),
-    ],
-  )
-  const row = result.rows[0]
-  if (!row) return null
-
-  const evidence = await getEvidenceForOpportunities(
-    String(input.ownerId),
-    [row.id],
-    db,
-  )
-  return {
-    ...row,
-    evidenceTimeline: evidence.get(row.id) ?? [],
-  }
-}
-
 export async function applyOpportunityAction(input: {
   ownerId: string | number
   workspaceId?: string | number | null
@@ -487,280 +445,76 @@ export async function applyOpportunityAction(input: {
     throw new Error('Invalid opportunity action key.')
   }
 
-  const client = await getClient()
-  if (!client) throw new Error('DATABASE_URL is not set.')
-  const note = normalizeNote(input.note)
-  const snoozeDays = clampOpportunitySnoozeDays(input.snoozeDays)
-  const protectedContactReference = protectOutcomeContactReference(
-    input.ownerId,
-    input.action === 'contacted' ? input.contactReference ?? null : null,
-  )
-  const actionFingerprint = createActionFingerprint({
-    action: input.action,
-    note,
-    snoozeDays: input.action === 'snoozed' ? snoozeDays : null,
-    reasonCode: input.action === 'dismissed' ? input.reasonCode ?? null : null,
-    channel: input.action === 'contacted' ? input.channel ?? null : null,
-    contactPathType:
-      input.action === 'contacted' ? input.contactPathType ?? null : null,
-    contactReferenceHash: protectedContactReference?.hash ?? null,
+  const outcome = await recordLegacyOpportunityAction({
+    ...input,
+    actionKey,
   })
-  const outcomesEnabled = input.outcomesEnabled ??
-    isOpportunityOutcomesEnabledForOwner(input.ownerId)
-  const contextParams: unknown[] = [
-    input.opportunityId,
-    String(input.ownerId),
-  ]
-  const workspaceClause = input.workspaceId == null
-    ? ''
-    : '\n         AND workspace_id = $3'
-  if (input.workspaceId != null) {
-    contextParams.push(String(input.workspaceId))
-  }
-
-  try {
-    await client.query('BEGIN')
-    if (outcomesEnabled) {
-      await lockOutcomeOwnerShared(client, input.ownerId)
+  if (!outcome) return null
+  let opportunity = await getOpportunityById({
+    ownerId: input.ownerId,
+    workspaceId: input.workspaceId,
+    opportunityId: input.opportunityId,
+  })
+  if (!opportunity && outcome.idempotent) {
+    const contextParams: unknown[] = [
+      input.opportunityId,
+      String(input.ownerId),
+    ]
+    const workspaceClause = input.workspaceId == null
+      ? ''
+      : '\n         AND workspace_id = $3'
+    if (input.workspaceId != null) {
+      contextParams.push(String(input.workspaceId))
     }
-    const context = await client.query<{
-      id: string
-      clientProfileId: string
-      organizationId: string
-      hiringEpisodeId: string
-      status: OpportunityStatus
-      supersededAt: string | null
-    }>(
-      `SELECT
-         id::TEXT AS id,
-         client_profile_id::TEXT AS "clientProfileId",
-         organization_id::TEXT AS "organizationId",
-         hiring_episode_id::TEXT AS "hiringEpisodeId",
-         status,
-         superseded_at::TEXT AS "supersededAt"
-       FROM opportunities
-       WHERE id = $1
-         AND owner_id = $2
-         ${workspaceClause}
-       FOR UPDATE`,
-      contextParams,
-    )
-    const row = context.rows[0]
-    if (!row) {
-      await client.query('ROLLBACK')
-      return null
-    }
-
-    const existingAction = await client.query<{
-      actionFingerprint: string
-      newStatus: OpportunityAction
-    }>(
-      `SELECT action_fingerprint AS "actionFingerprint",
-         new_status AS "newStatus"
-       FROM opportunity_actions
-       WHERE opportunity_id = $1
-         AND owner_id = $2
-         AND action_key = $3
-       LIMIT 1`,
-      [input.opportunityId, String(input.ownerId), actionKey],
-    )
-    if (existingAction.rows[0]) {
-      if (existingAction.rows[0].actionFingerprint !== actionFingerprint) {
-        throw new OpportunityActionConflictError()
-      }
-      const opportunity = await getCurrentOpportunityForEpisode({
-        ownerId: input.ownerId,
-        clientProfileId: row.clientProfileId,
-        hiringEpisodeId: row.hiringEpisodeId,
-      }, client)
-      await client.query('COMMIT')
-      if (!opportunity) return null
-      logEvent('opportunity.replay_served', {
-        ownerId: String(input.ownerId),
-        opportunityId: String(input.opportunityId),
-        action: input.action,
-        currentOpportunityId: opportunity.id,
-      })
-      return { opportunity, idempotent: true }
-    }
-
-    if (row.supersededAt) {
-      throw new OpportunitySupersededConflictError()
-    }
-
-    if (!isOpportunityTransitionAllowed(row.status, input.action)) {
-      logEvent('opportunity.transition_rejected', {
-        ownerId: String(input.ownerId),
-        opportunityId: String(input.opportunityId),
-        previousStatus: row.status,
-        requestedStatus: input.action,
-      })
-      throw new OpportunityTransitionConflictError(row.status, input.action)
-    }
-
-    const actionInsert = await client.query(
-      `INSERT INTO opportunity_actions (
-         owner_id,
-         opportunity_id,
-         action_type,
-         action_key,
-         action_fingerprint,
-         previous_status,
-         new_status,
-         note,
-         metadata
-       )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)`,
-      [
-        String(input.ownerId),
-        input.opportunityId,
-        input.action,
-        actionKey,
-        actionFingerprint,
-        row.status,
-        input.action,
-        note,
-        JSON.stringify({
-          source: 'opportunity-api',
-          ...(input.action === 'dismissed' && input.reasonCode
-            ? { reasonCode: input.reasonCode }
-            : {}),
-          ...(input.action === 'contacted' && input.channel
-            ? {
-                channel: input.channel,
-                ...(input.contactPathType
-                  ? { contactPathType: input.contactPathType }
-                  : {}),
-              }
-            : {}),
-          ...(input.action === 'snoozed'
-            ? { snoozeDays }
-            : {}),
-        }),
-      ],
-    )
-    if (actionInsert.rowCount !== 1) {
-      throw new Error('Opportunity action insert returned no row.')
-    }
-    if (outcomesEnabled) {
-      const outcome = await recordOpportunityOutcomeInTransaction({
-        ownerId: input.ownerId,
-        workspaceId: input.workspaceId,
-        opportunityId: input.opportunityId,
-        actorType: 'user',
-        actorUserId: input.actorUserId ?? input.ownerId,
-        actorWorkspaceId: input.actorWorkspaceId,
-        actorRoleSnapshot: input.actorRoleSnapshot,
-        authMode: input.authMode,
-        ownerLockHeld: true,
-        payload: {
-          eventType: input.action,
-          occurredAt: input.occurredAt ?? new Date().toISOString(),
-          reasonCode:
-            input.action === 'dismissed' ? input.reasonCode ?? null : null,
-          reasonNote: input.action === 'dismissed' ? note : null,
-          channel: input.action === 'contacted' ? input.channel ?? null : null,
-          contactPathType:
-            input.action === 'contacted'
-              ? input.contactPathType ?? null
-              : null,
-          contactReference:
-            input.action === 'contacted'
-              ? input.contactReference ?? null
-              : null,
-          snoozeDays: input.action === 'snoozed' ? snoozeDays : null,
-          snoozedUntil: null,
-          revertsEventId: null,
-          valueMinor: null,
-          currency: null,
-          metadata: { source: 'opportunity_action' },
-          idempotencyKey: actionKey,
-        },
-      }, client)
-      if (!outcome) {
-        throw new Error('Outcome opportunity could not be reloaded.')
-      }
-    } else {
-      await client.query(
-      `UPDATE opportunities
-       SET
-         status = $1,
-         snoozed_until = CASE
-           WHEN $1 = 'snoozed'
-             THEN NOW() + ($3 * INTERVAL '1 day')
-           ELSE NULL
-         END,
-         updated_at = NOW()
-       WHERE id = $2
-         AND owner_id = $4
-         AND superseded_at IS NULL`,
-      [input.action, input.opportunityId, snoozeDays, String(input.ownerId)],
-    )
-      await client.query(
-      `INSERT INTO client_episode_state (
-         client_profile_id,
-         owner_id,
-         hiring_episode_id,
-         organization_id,
-         status,
-         suppressed_until
-       )
-       VALUES (
-         $1, $2, $3, $4, $5,
-         CASE
-           WHEN $5 = 'snoozed'
-             THEN NOW() + ($6 * INTERVAL '1 day')
-           ELSE NULL
-         END
-       )
-       ON CONFLICT (client_profile_id, hiring_episode_id)
-       DO UPDATE SET
-         status = EXCLUDED.status,
-         suppressed_until = EXCLUDED.suppressed_until,
-         updated_at = NOW()`,
-      [
-        row.clientProfileId,
-        String(input.ownerId),
-        row.hiringEpisodeId,
-        row.organizationId,
-        input.action,
-        snoozeDays,
-      ],
+    const client = await getClient()
+    if (!client) throw new Error('DATABASE_URL is not set.')
+    try {
+      const context = await client.query<{
+        clientProfileId: string
+        hiringEpisodeId: string
+      }>(
+        `SELECT
+           client_profile_id::TEXT AS "clientProfileId",
+           hiring_episode_id::TEXT AS "hiringEpisodeId"
+         FROM opportunities
+         WHERE id = $1
+           AND owner_id = $2
+           ${workspaceClause}
+         LIMIT 1`,
+        contextParams,
       )
+      const row = context.rows[0]
+      if (row) {
+        const current = await client.query<OpportunityRow>(
+          `${OPPORTUNITY_SELECT}
+           WHERE o.client_profile_id = $1
+             AND o.hiring_episode_id = $2
+             AND o.owner_id = $3
+             AND o.superseded_at IS NULL
+           LIMIT 1`,
+          [row.clientProfileId, row.hiringEpisodeId, String(input.ownerId)],
+        )
+        const currentRow = current.rows[0]
+        if (currentRow) {
+          const evidence = await getEvidenceForOpportunities(
+            String(input.ownerId),
+            [currentRow.id],
+            client,
+          )
+          opportunity = {
+            ...currentRow,
+            evidenceTimeline: evidence.get(currentRow.id) ?? [],
+          }
+        }
+      }
+    } finally {
+      client.release()
     }
-    const opportunity = await getOpportunityById(
-      {
-        ownerId: input.ownerId,
-        workspaceId: input.workspaceId,
-        opportunityId: input.opportunityId,
-      },
-      client,
-    )
-    if (!opportunity) {
-      throw new Error('Updated opportunity could not be reloaded.')
-    }
-    await client.query('COMMIT')
-
-    logEvent('opportunity.action', {
-      ownerId: String(input.ownerId),
-      opportunityId: String(input.opportunityId),
-      action: input.action,
-      idempotent: false,
-    })
-    if (input.action === 'contacted') {
-      logEvent('opportunity.contact_recorded', {
-        ownerId: String(input.ownerId),
-        opportunityId: String(input.opportunityId),
-        hiringEpisodeId: row.hiringEpisodeId,
-      })
-    }
-    return { opportunity, idempotent: false }
-  } catch (error) {
-    await client.query('ROLLBACK').catch(() => undefined)
-    throw error
-  } finally {
-    client.release()
   }
+  if (!opportunity) {
+    throw new Error('Updated opportunity could not be reloaded.')
+  }
+  return { opportunity, idempotent: outcome.idempotent }
 }
 
 export function isOpportunityAction(value: unknown): value is OpportunityAction {
@@ -938,33 +692,4 @@ function isOpportunityStatus(value: unknown): value is OpportunityStatus {
 
 function isConfidenceGate(value: unknown): value is ConfidenceGate {
   return value === 'A' || value === 'B' || value === 'C' || value === 'D'
-}
-
-function normalizeNote(value: string | null | undefined): string | null {
-  if (typeof value !== 'string') return null
-  const normalized = value.trim()
-  return normalized ? normalized.slice(0, 1000) : null
-}
-
-function createActionFingerprint(input: {
-  action: OpportunityAction
-  note: string | null
-  snoozeDays: number | null
-  reasonCode: DismissedReasonCode | null
-  channel: OpportunityOutcomeChannel | null
-  contactPathType: OpportunityContactPathType | null
-  contactReferenceHash: string | null
-}): string {
-  const payload = {
-    action: input.action,
-    note: input.note,
-    snoozeDays: input.snoozeDays,
-    ...(input.reasonCode ? { reasonCode: input.reasonCode } : {}),
-    ...(input.channel ? { channel: input.channel } : {}),
-    ...(input.contactPathType
-      ? { contactPathType: input.contactPathType }
-      : {}),
-    contactReferenceHash: input.contactReferenceHash,
-  }
-  return hashCanonicalJson(payload)
 }

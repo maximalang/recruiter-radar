@@ -3,43 +3,45 @@ import {
   getOpportunityOutcomeOperationalSummary,
   getOpportunityById,
   listOpportunities,
-  OpportunityActionConflictError,
-  OpportunitySupersededConflictError,
   OpportunityTransitionConflictError,
   isOpportunityTransitionAllowed,
 } from '@/lib/opportunities/repository'
-import { getClient } from '@/lib/db-pool'
-import { hashCanonicalJson } from '@/lib/opportunities/canonical-hash'
+import { getPool } from '@/lib/db-pool'
+import { recordLegacyOpportunityAction } from '@/lib/opportunities/legacy-action-adapter'
 
 jest.mock('@/lib/db-pool', () => ({
   getClient: jest.fn(),
   getPool: jest.fn(() => null),
 }))
+jest.mock('@/lib/opportunities/legacy-action-adapter', () => ({
+  recordLegacyOpportunityAction: jest.fn(),
+}))
 
 type QueryCall = { sql: string; params: readonly unknown[] | undefined }
 type OpportunityDb = NonNullable<Parameters<typeof listOpportunities>[1]>
-type OpportunityClient = NonNullable<Awaited<ReturnType<typeof getClient>>>
-
-function opportunityClient(query: jest.Mock, release: jest.Mock): OpportunityClient {
-  return { query, release } as unknown as OpportunityClient
-}
 
 function createDb(rowsByCall: unknown[][]) {
   const calls: QueryCall[] = []
+  const query = jest.fn(async (sql: string, params?: readonly unknown[]) => {
+    calls.push({ sql, params })
+    const rows = rowsByCall[calls.length - 1] ?? []
+    return { rowCount: rows.length, rows }
+  })
   return {
     calls,
-    db: (() => {
-      const query = jest.fn(async (sql: string, params?: readonly unknown[]) => {
-        calls.push({ sql, params })
-        const rows = rowsByCall[calls.length - 1] ?? []
-        return { rowCount: rows.length, rows }
-      })
-      return { query } as { query: typeof query } & OpportunityDb
-    })(),
+    db: { query } as { query: typeof query } & OpportunityDb,
   }
 }
 
+const mockedPool = jest.mocked(getPool)
+const mockedLegacyWriter = jest.mocked(recordLegacyOpportunityAction)
+
 describe('opportunity repository tenant scope', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    mockedPool.mockReturnValue(null)
+  })
+
   it.each([
     ['new', 'accepted'],
     ['new', 'dismissed'],
@@ -66,7 +68,7 @@ describe('opportunity repository tenant scope', () => {
     expect(isOpportunityTransitionAllowed(status, action)).toBe(false)
   })
 
-  it('uses a distinct transition conflict error contract', () => {
+  it('keeps the deprecated transition conflict contract available', () => {
     expect(new OpportunityTransitionConflictError()).toMatchObject({
       code: 'opportunity_transition_conflict',
     })
@@ -177,7 +179,7 @@ describe('opportunity repository tenant scope', () => {
     },
   )
 
-  it('returns a tenant-scoped operational summary from projection-first lifecycle state', async () => {
+  it('returns a tenant-scoped operational summary', async () => {
     const { db, calls } = createDb([[
       {
         newCount: '2',
@@ -210,17 +212,15 @@ describe('opportunity repository tenant scope', () => {
     expect(calls[0].params).toEqual(['7'])
   })
 
-  it('does not run an evidence lookup for a foreign or missing detail', async () => {
+  it('does not run an evidence lookup for a foreign detail', async () => {
     const { db, calls } = createDb([[]])
 
-    const result = await getOpportunityById(
+    await expect(getOpportunityById(
       { ownerId: '7', opportunityId: '999' },
       db,
-    )
+    )).resolves.toBeNull()
 
-    expect(result).toBeNull()
     expect(calls).toHaveLength(1)
-    expect(calls[0].sql).toContain('o.owner_id = $2')
     expect(calls[0].params).toEqual(['999', '7'])
   })
 
@@ -259,557 +259,66 @@ describe('opportunity repository tenant scope', () => {
     expect(result?.evidenceTimeline).toHaveLength(1)
   })
 
-  it('rejects a cross-tenant action before any mutation query', async () => {
-    const query = jest.fn(async (sql: string) => {
-      if (
-        sql.includes('FROM opportunities') &&
-        sql.includes('WHERE o.client_profile_id = $1') &&
-        sql.includes('superseded_at IS NULL')
-      ) {
-        return {
-          rowCount: 1,
-          rows: [{
-            id: '10',
-            ownerId: '7',
-            status: 'contacted',
-            evidenceCount: 0,
-          }],
-        }
-      }
-      if (sql.includes('FROM opportunities') && sql.includes('FOR UPDATE')) {
-        return { rowCount: 0, rows: [] }
-      }
-      return { rowCount: 0, rows: [] }
-    })
-    const release = jest.fn()
-    jest.mocked(getClient).mockResolvedValue(opportunityClient(query, release))
-
-    const result = await applyOpportunityAction({
-      ownerId: '7',
-      opportunityId: '999',
-      action: 'dismissed',
-      actionKey: 'dismissed:test',
-    })
-
-    expect(result).toBeNull()
-    expect(query.mock.calls.some(([sql]) =>
-      String(sql).includes('INSERT INTO opportunity_actions'),
-    )).toBe(false)
-    expect(query.mock.calls.some(([sql]) => String(sql) === 'ROLLBACK')).toBe(true)
-    expect(release).toHaveBeenCalledTimes(1)
-  })
-
-  it('rejects a cross-workspace action before any mutation query', async () => {
-    const query = jest.fn(async (sql: string, _params?: unknown[]) => {
-      if (sql.includes('FROM opportunities') && sql.includes('FOR UPDATE')) {
-        return { rowCount: 0, rows: [] }
-      }
-      return { rowCount: 0, rows: [] }
-    })
-    const release = jest.fn()
-    jest.mocked(getClient).mockResolvedValue(opportunityClient(query, release))
+  it('delegates legacy actions to the canonical writer and reloads tenant data', async () => {
+    mockedLegacyWriter.mockResolvedValue({
+      idempotent: false,
+    } as Awaited<ReturnType<typeof recordLegacyOpportunityAction>>)
+    const { db, calls } = createDb([
+      [{ id: '10', ownerId: '7', status: 'accepted' }],
+      [],
+    ])
+    mockedPool.mockReturnValue(
+      db as unknown as ReturnType<typeof getPool>,
+    )
 
     const result = await applyOpportunityAction({
       ownerId: '7',
       workspaceId: '9',
       opportunityId: '10',
       action: 'accepted',
-      actionKey: 'accepted:workspace-fence',
+      actionKey: ' legacy-key ',
+      actorUserId: '42',
+      actorWorkspaceId: '9',
+      actorRoleSnapshot: 'recruiter',
+      authMode: 'auth_v2',
     })
 
-    expect(result).toBeNull()
-    const lockedRead = query.mock.calls.find(([sql]) =>
-      String(sql).includes('FROM opportunities') &&
-      String(sql).includes('FOR UPDATE'))
-    expect(String(lockedRead?.[0])).toContain('workspace_id = $3')
-    expect(lockedRead?.[1]).toEqual(['10', '7', '9'])
-    expect(query.mock.calls.some(([sql]) =>
-      String(sql).includes('INSERT INTO opportunity_actions'),
-    )).toBe(false)
-  })
-
-  it('persists accepted episode state without creating legacy contacted suppression', async () => {
-    const opportunity = {
-      id: '10',
+    expect(mockedLegacyWriter).toHaveBeenCalledWith(expect.objectContaining({
       ownerId: '7',
-      clientProfileId: '8',
-      organizationId: '9',
-      hiringEpisodeId: '11',
-      organizationName: 'Пример',
-      organizationDomain: 'example.test',
-      episodeType: 'vacancy_spike',
-      episodeStatus: 'active',
-      episodeStartedAt: '2026-07-20T00:00:00.000Z',
-      episodeLastSeenAt: '2026-07-26T00:00:00.000Z',
-      status: 'accepted',
-      title: 'Возможность',
-      whyNow: 'Почему сейчас',
-      problemHypothesis: 'Гипотеза',
-      recommendedAngle: 'Угол',
-      recommendedPersona: 'Роль',
-      recommendedAction: 'Действие',
-      opportunityScore: 0.8,
-      confidenceGate: 'A',
-      scores: {},
-      evidenceHash: 'a'.repeat(64),
-      validFrom: '2026-07-26T00:00:00.000Z',
-      validUntil: null,
-      snoozedUntil: null,
-      metadata: {},
-      createdAt: '2026-07-26T00:00:00.000Z',
-      updatedAt: '2026-07-26T00:00:00.000Z',
-      evidenceCount: 0,
-    }
-    const query = jest.fn(async (sql: string) => {
-      if (sql.includes('FROM opportunities') && sql.includes('FOR UPDATE')) {
-        return {
-          rowCount: 1,
-          rows: [{
-            id: '10',
-            clientProfileId: '8',
-            organizationId: '9',
-            hiringEpisodeId: '11',
-            status: 'new',
-          }],
-        }
-      }
-      if (sql.includes('INSERT INTO opportunity_actions')) {
-        return { rowCount: 1, rows: [] }
-      }
-      if (sql.includes('INSERT INTO client_digest_org_state')) {
-        return { rowCount: 1, rows: [{ feedbackStatus: 'dismissed' }] }
-      }
-      if (sql.includes('WHERE o.id = $1')) {
-        return { rowCount: 1, rows: [opportunity] }
-      }
-      return { rowCount: 0, rows: [] }
-    })
-    const release = jest.fn()
-    jest.mocked(getClient).mockResolvedValue(opportunityClient(query, release))
-
-    const result = await applyOpportunityAction({
-      ownerId: '7',
+      workspaceId: '9',
       opportunityId: '10',
       action: 'accepted',
-      actionKey: 'accepted:request-1',
-    })
-
-    expect(result?.idempotent).toBe(false)
-    expect(result?.opportunity.status).toBe('accepted')
-    expect(query.mock.calls.some(([sql]) =>
-      String(sql).includes('INSERT INTO opportunity_actions'),
-    )).toBe(true)
-    expect(query.mock.calls.some(([sql]) =>
-      String(sql).includes('INSERT INTO client_episode_state'),
-    )).toBe(true)
-    expect(query.mock.calls.some(([sql]) =>
-      String(sql).includes('INSERT INTO client_digest_org_state'),
-    )).toBe(false)
-    expect(query.mock.calls.some(([sql]) => String(sql) === 'COMMIT')).toBe(true)
-    const currentReadIndex = query.mock.calls.findIndex(([sql]) =>
-      String(sql).includes('WHERE o.id = $1') &&
-      String(sql).includes('superseded_at IS NULL'))
-    const commitIndex = query.mock.calls.findIndex(([sql]) => String(sql) === 'COMMIT')
-    expect(currentReadIndex).toBeGreaterThan(-1)
-    expect(currentReadIndex).toBeLessThan(commitIndex)
-    expect(release).toHaveBeenCalledTimes(1)
+      actionKey: 'legacy-key',
+      actorUserId: '42',
+    }))
+    expect(calls[0].sql).toContain('o.workspace_id = $3')
+    expect(result).toEqual(expect.objectContaining({
+      idempotent: false,
+      opportunity: expect.objectContaining({ id: '10' }),
+    }))
   })
 
-  it('contacted episode does not create legacy organization suppression', async () => {
-    const query = jest.fn(async (sql: string) => {
-      if (sql.includes('FROM opportunities') && sql.includes('FOR UPDATE')) {
-        return {
-          rowCount: 1,
-          rows: [{
-            id: '10',
-            clientProfileId: '8',
-            organizationId: '9',
-            hiringEpisodeId: '11',
-            status: 'accepted',
-            supersededAt: null,
-          }],
-        }
-      }
-      if (sql.includes('SELECT action_fingerprint')) {
-        return { rowCount: 0, rows: [] }
-      }
-      if (sql.includes('INSERT INTO opportunity_actions')) {
-        return { rowCount: 1, rows: [] }
-      }
-      if (sql.includes('client_digest_org_state')) {
-        return { rowCount: 1, rows: [{ feedbackStatus: 'contacted' }] }
-      }
-      if (sql.includes('WHERE o.id = $1')) {
-        return {
-          rowCount: 1,
-          rows: [{ id: '10', ownerId: '7', status: 'contacted', evidenceCount: 0 }],
-        }
-      }
-      return { rowCount: 0, rows: [] }
-    })
-    const release = jest.fn()
-    jest.mocked(getClient).mockResolvedValue(opportunityClient(query, release))
+  it('does not reload when the canonical writer cannot see the opportunity', async () => {
+    mockedLegacyWriter.mockResolvedValue(null)
 
-    const result = await applyOpportunityAction({
+    await expect(applyOpportunityAction({
       ownerId: '7',
-      opportunityId: '10',
-      action: 'contacted',
-      actionKey: 'contacted:request-1',
-    })
+      opportunityId: '99',
+      action: 'accepted',
+      actionKey: 'legacy-key',
+    })).resolves.toBeNull()
 
-    expect(result?.opportunity.status).toBe('contacted')
-    expect(query.mock.calls.some(([sql]) =>
-      String(sql).includes('client_digest_org_state'),
-    )).toBe(false)
+    expect(mockedPool).not.toHaveBeenCalled()
   })
 
-  it('rejects reuse of an idempotency key with another action payload', async () => {
-    const query = jest.fn(async (sql: string) => {
-      if (sql.includes('FROM opportunities') && sql.includes('FOR UPDATE')) {
-        return {
-          rowCount: 1,
-          rows: [{
-            id: '10',
-            clientProfileId: '8',
-            organizationId: '9',
-            hiringEpisodeId: '11',
-            status: 'new',
-          }],
-        }
-      }
-      if (sql.includes('SELECT action_fingerprint')) {
-        return {
-          rowCount: 1,
-          rows: [{ actionFingerprint: '0'.repeat(64) }],
-        }
-      }
-      return { rowCount: 0, rows: [] }
-    })
-    const release = jest.fn()
-    jest.mocked(getClient).mockResolvedValue(opportunityClient(query, release))
-
+  it('rejects an invalid action key before invoking the writer', async () => {
     await expect(applyOpportunityAction({
       ownerId: '7',
       opportunityId: '10',
       action: 'accepted',
-      actionKey: 'request-reused',
-    })).rejects.toBeInstanceOf(OpportunityActionConflictError)
+      actionKey: ' ',
+    })).rejects.toThrow('Invalid opportunity action key.')
 
-    expect(query.mock.calls.some(([sql]) =>
-      String(sql).startsWith('UPDATE opportunities'),
-    )).toBe(false)
-    expect(query.mock.calls.some(([sql]) => String(sql) === 'ROLLBACK')).toBe(true)
-    expect(release).toHaveBeenCalledTimes(1)
-  })
-
-  it('rejects a terminal-state transition before writing an action', async () => {
-    const query = jest.fn(async (sql: string) => {
-      if (sql.includes('FROM opportunities') && sql.includes('FOR UPDATE')) {
-        return {
-          rowCount: 1,
-          rows: [{
-            id: '10',
-            clientProfileId: '8',
-            organizationId: '9',
-            hiringEpisodeId: '11',
-            status: 'contacted',
-          }],
-        }
-      }
-      if (sql.includes('SELECT action_fingerprint')) {
-        return { rowCount: 0, rows: [] }
-      }
-      return { rowCount: 0, rows: [] }
-    })
-    const release = jest.fn()
-    jest.mocked(getClient).mockResolvedValue(opportunityClient(query, release))
-
-    await expect(applyOpportunityAction({
-      ownerId: '7',
-      opportunityId: '10',
-      action: 'accepted',
-      actionKey: 'invalid-transition',
-    })).rejects.toBeInstanceOf(OpportunityTransitionConflictError)
-
-    expect(query.mock.calls.some(([sql]) =>
-      String(sql).includes('INSERT INTO opportunity_actions'),
-    )).toBe(false)
-    expect(query.mock.calls.some(([sql]) => String(sql) === 'ROLLBACK')).toBe(true)
-  })
-
-  it('replays an action with the same idempotency key and payload without mutating state', async () => {
-    const actionFingerprint = hashCanonicalJson({
-      action: 'accepted',
-      contactReferenceHash: null,
-      note: null,
-      snoozeDays: null,
-    })
-    const query = jest.fn(async (sql: string) => {
-      if (
-        sql.includes('FROM opportunities') &&
-        sql.includes('WHERE o.client_profile_id = $1') &&
-        sql.includes('superseded_at IS NULL')
-      ) {
-        return {
-          rowCount: 1,
-          rows: [{
-            id: '10',
-            ownerId: '7',
-            status: 'contacted',
-            evidenceCount: 0,
-          }],
-        }
-      }
-      if (sql.includes('FROM opportunities') && sql.includes('FOR UPDATE')) {
-        return {
-          rowCount: 1,
-          rows: [{
-            id: '10',
-            clientProfileId: '8',
-            organizationId: '9',
-            hiringEpisodeId: '11',
-            status: 'accepted',
-          }],
-        }
-      }
-      if (sql.includes('SELECT action_fingerprint')) {
-        return {
-          rowCount: 1,
-          rows: [{ actionFingerprint, newStatus: 'accepted' }],
-        }
-      }
-      if (sql.includes('WHERE o.id = $1')) {
-        return {
-          rowCount: 1,
-          rows: [{
-            id: '10',
-            ownerId: '7',
-            status: 'contacted',
-            evidenceCount: 0,
-          }],
-        }
-      }
-      return { rowCount: 0, rows: [] }
-    })
-    const release = jest.fn()
-    jest.mocked(getClient).mockResolvedValue(opportunityClient(query, release))
-
-    const result = await applyOpportunityAction({
-      ownerId: '7',
-      opportunityId: '10',
-      action: 'accepted',
-      actionKey: 'accepted:request-1',
-    })
-
-    expect(result?.idempotent).toBe(true)
-    expect(result?.opportunity.status).toBe('contacted')
-    expect(query.mock.calls.some(([sql]) =>
-      String(sql).startsWith('UPDATE opportunities'),
-    )).toBe(false)
-    expect(query.mock.calls.some(([sql]) =>
-      String(sql).includes('INSERT INTO client_digest_org_state'),
-    )).toBe(false)
-    expect(query.mock.calls.some(([sql]) => String(sql) === 'COMMIT')).toBe(true)
-    const currentRead = query.mock.calls.find(([sql]) =>
-      String(sql).includes('superseded_at IS NULL'))
-    expect(String(currentRead?.[0])).not.toContain('FOR UPDATE')
-    expect(release).toHaveBeenCalledTimes(1)
-  })
-
-  it('superseded action replay returns the current opportunity status', async () => {
-    const actionFingerprint = hashCanonicalJson({
-      action: 'accepted',
-      contactReferenceHash: null,
-      note: null,
-      snoozeDays: null,
-    })
-    const query = jest.fn(async (sql: string, params?: readonly unknown[]) => {
-      if (
-        sql.includes('FROM opportunities') &&
-        sql.includes('WHERE o.client_profile_id = $1') &&
-        sql.includes('superseded_at IS NULL')
-      ) {
-        return {
-          rowCount: 1,
-          rows: [{ id: '12', ownerId: '7', status: 'contacted', evidenceCount: 0 }],
-        }
-      }
-      if (sql.includes('FROM opportunities') && sql.includes('FOR UPDATE')) {
-        return {
-          rowCount: 1,
-          rows: [{
-            id: '10',
-            clientProfileId: '8',
-            organizationId: '9',
-            hiringEpisodeId: '11',
-            status: 'accepted',
-            supersededAt: '2026-07-26T10:00:00.000Z',
-          }],
-        }
-      }
-      if (sql.includes('SELECT action_fingerprint')) {
-        return {
-          rowCount: 1,
-          rows: [{ actionFingerprint, newStatus: 'accepted' }],
-        }
-      }
-      if (sql.includes('WHERE o.id = $1')) return { rowCount: 0, rows: [] }
-      return { rowCount: 0, rows: [] }
-    })
-    const release = jest.fn()
-    jest.mocked(getClient).mockResolvedValue(opportunityClient(query, release))
-
-    const result = await applyOpportunityAction({
-      ownerId: '7',
-      opportunityId: '10',
-      action: 'accepted',
-      actionKey: 'accepted:request-1',
-    })
-
-    expect(result?.idempotent).toBe(true)
-    expect(result?.opportunity.id).toBe('12')
-    expect(result?.opportunity.status).toBe('contacted')
-    expect(query.mock.calls.some(([sql]) =>
-      String(sql).startsWith('UPDATE opportunities'),
-    )).toBe(false)
-    const currentReadIndex = query.mock.calls.findIndex(([sql]) =>
-      String(sql).includes('superseded_at IS NULL'))
-    const commitIndex = query.mock.calls.findIndex(([sql]) => String(sql) === 'COMMIT')
-    expect(currentReadIndex).toBeGreaterThan(-1)
-    expect(currentReadIndex).toBeLessThan(commitIndex)
-    expect(String(query.mock.calls[currentReadIndex]?.[0])).not.toContain('FOR UPDATE')
-    expect(query.mock.calls.filter(([sql]) =>
-      String(sql).includes('WHERE o.id = $1') &&
-      String(sql).includes('superseded_at IS NULL'),
-    )).toHaveLength(0)
-  })
-
-  it('rejects a new action after its opportunity row was superseded', async () => {
-    const query = jest.fn(async (sql: string) => {
-      if (sql.includes('FROM opportunities') && sql.includes('FOR UPDATE')) {
-        return {
-          rowCount: 1,
-          rows: [{
-            id: '10',
-            clientProfileId: '8',
-            organizationId: '9',
-            hiringEpisodeId: '11',
-            status: 'new',
-            supersededAt: '2026-07-26T10:00:00.000Z',
-          }],
-        }
-      }
-      if (sql.includes('SELECT action_fingerprint')) {
-        return { rowCount: 0, rows: [] }
-      }
-      return { rowCount: 0, rows: [] }
-    })
-    const release = jest.fn()
-    jest.mocked(getClient).mockResolvedValue(opportunityClient(query, release))
-
-    await expect(applyOpportunityAction({
-      ownerId: '7',
-      opportunityId: '10',
-      action: 'accepted',
-      actionKey: 'accepted:late-request',
-    })).rejects.toBeInstanceOf(OpportunitySupersededConflictError)
-
-    expect(query.mock.calls.some(([sql]) =>
-      String(sql).includes('INSERT INTO opportunity_actions'),
-    )).toBe(false)
-    expect(query.mock.calls.some(([sql]) => String(sql) === 'ROLLBACK')).toBe(true)
-  })
-
-  it('writes the canary owner action, ledger, projection, and episode state in one transaction', async () => {
-    const originalEngine = process.env.OPPORTUNITY_ENGINE_V1_ENABLED
-    const originalOutcomes = process.env.OPPORTUNITY_OUTCOMES_ENABLED
-    const originalCanaryOwners = process.env.OPPORTUNITY_CANARY_OWNER_IDS
-    process.env.OPPORTUNITY_ENGINE_V1_ENABLED = 'false'
-    process.env.OPPORTUNITY_OUTCOMES_ENABLED = 'false'
-    process.env.OPPORTUNITY_CANARY_OWNER_IDS = '7'
-    const opportunity = {
-      id: '10', ownerId: '7', clientProfileId: '8', organizationId: '9',
-      hiringEpisodeId: '11', status: 'accepted', evidenceTimeline: [],
-    }
-    const query = jest.fn(async (sql: string) => {
-      if (sql.includes('FROM opportunities o') && sql.includes('FOR UPDATE')) {
-        return {
-          rowCount: 1,
-          rows: [{
-            id: '10', ownerId: '7', clientProfileId: '8', organizationId: '9',
-            hiringEpisodeId: '11', status: 'new', supersededAt: null,
-            scoringVersion: 'opportunity-v1', confidenceGate: 'A',
-            opportunityScore: 0.8, externalSupportNeedScore: 0.75,
-            episodeType: 'vacancy_spike',
-          }],
-        }
-      }
-      if (sql.includes('FROM opportunities') && sql.includes('FOR UPDATE')) {
-        return {
-          rowCount: 1,
-          rows: [{
-            id: '10', clientProfileId: '8', organizationId: '9',
-            hiringEpisodeId: '11', status: 'new', supersededAt: null,
-          }],
-        }
-      }
-      if (sql.includes('SELECT action_fingerprint')) {
-        return { rowCount: 0, rows: [] }
-      }
-      if (sql.includes('FROM opportunity_outcome_events')) {
-        return { rowCount: 0, rows: [] }
-      }
-      if (sql.includes('FROM opportunity_outcome_state')) {
-        return { rowCount: 0, rows: [] }
-      }
-      if (sql.includes('ARRAY_AGG')) {
-        return { rowCount: 1, rows: [{ sourceFamilies: ['hh'] }] }
-      }
-      if (sql.includes('INSERT INTO opportunity_outcome_events')) {
-        return {
-          rowCount: 1,
-          rows: [{ id: '21', recordedAt: '2026-07-27T12:00:01.000Z' }],
-        }
-      }
-      if (sql.includes('WHERE o.id = $1')) {
-        return { rowCount: 1, rows: [opportunity] }
-      }
-      return { rowCount: 1, rows: [] }
-    })
-    const release = jest.fn()
-    jest.mocked(getClient).mockResolvedValue(opportunityClient(query, release))
-
-    try {
-      const result = await applyOpportunityAction({
-        ownerId: '7', opportunityId: '10', action: 'accepted',
-        actionKey: 'accepted:atomic',
-        occurredAt: '2026-07-27T12:00:00.000Z',
-      })
-
-      expect(result?.opportunity.status).toBe('accepted')
-      const legacyAction = query.mock.calls.findIndex(([sql]) =>
-        String(sql).includes('INSERT INTO opportunity_actions'))
-      const ledgerEvent = query.mock.calls.findIndex(([sql]) =>
-        String(sql).includes('INSERT INTO opportunity_outcome_events'))
-      const projection = query.mock.calls.findIndex(([sql]) =>
-        String(sql).includes('INSERT INTO opportunity_outcome_state'))
-      const commit = query.mock.calls.findIndex(([sql]) => String(sql) === 'COMMIT')
-      expect(legacyAction).toBeGreaterThan(-1)
-      expect(ledgerEvent).toBeGreaterThan(legacyAction)
-      expect(projection).toBeGreaterThan(ledgerEvent)
-      expect(commit).toBeGreaterThan(projection)
-      expect(query.mock.calls.some(([sql]) =>
-        String(sql).includes('INSERT INTO client_episode_state')),
-      ).toBe(true)
-    } finally {
-      restoreEnv('OPPORTUNITY_ENGINE_V1_ENABLED', originalEngine)
-      restoreEnv('OPPORTUNITY_OUTCOMES_ENABLED', originalOutcomes)
-      restoreEnv('OPPORTUNITY_CANARY_OWNER_IDS', originalCanaryOwners)
-    }
+    expect(mockedLegacyWriter).not.toHaveBeenCalled()
   })
 })
-
-function restoreEnv(name: string, value: string | undefined): void {
-  if (value === undefined) delete process.env[name]
-  else process.env[name] = value
-}

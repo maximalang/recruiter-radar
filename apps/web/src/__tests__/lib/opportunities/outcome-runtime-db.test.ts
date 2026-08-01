@@ -21,7 +21,6 @@ import {
 import type { OpportunityOutcomeInput } from '@/lib/opportunities/outcome-domain'
 import { expireOpportunitiesJob } from '@/lib/opportunities/jobs'
 import {
-  OpportunityActionConflictError,
   applyOpportunityAction,
   getOpportunityOutcomeOperationalSummary,
   listOpportunities,
@@ -551,7 +550,7 @@ describeWithDatabase('Opportunity Outcome production PostgreSQL runtime', () => 
       channel: 'email',
       contactPathType: 'corporate_email',
       contactReference: 'another@example.invalid',
-    })).rejects.toBeInstanceOf(OpportunityActionConflictError)
+    })).rejects.toBeInstanceOf(OutcomeIdempotencyConflictError)
     await expect(applyOpportunityAction({
       ownerId,
       opportunityId: contactOpportunityId,
@@ -560,7 +559,7 @@ describeWithDatabase('Opportunity Outcome production PostgreSQL runtime', () => 
       channel: 'phone',
       contactPathType: 'company_phone',
       contactReference: 'sales@example.invalid',
-    })).rejects.toBeInstanceOf(OpportunityActionConflictError)
+    })).rejects.toBeInstanceOf(OutcomeIdempotencyConflictError)
 
     const stored = await database.query(
       `SELECT
@@ -629,7 +628,7 @@ describeWithDatabase('Opportunity Outcome production PostgreSQL runtime', () => 
       action: 'dismissed',
       actionKey: reasonKey,
       reasonCode: 'wrong_roles',
-    })).rejects.toBeInstanceOf(OpportunityActionConflictError)
+    })).rejects.toBeInstanceOf(OutcomeIdempotencyConflictError)
 
     const snoozeEpisodeId = await insertEpisode('snooze-idempotency')
     const snoozeOpportunityId = await insertOpportunity(
@@ -650,7 +649,7 @@ describeWithDatabase('Opportunity Outcome production PostgreSQL runtime', () => 
       action: 'snoozed',
       actionKey: snoozeKey,
       snoozeDays: 7,
-    })).rejects.toBeInstanceOf(OpportunityActionConflictError)
+    })).rejects.toBeInstanceOf(OutcomeIdempotencyConflictError)
   })
 
   it('preserves commercial stage through snooze and explicit resume', async () => {

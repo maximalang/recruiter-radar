@@ -103,12 +103,15 @@ describe('opportunity outcome UI tracking', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }))
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
-      '/api/opportunities/10/action',
+      '/api/opportunities/10/outcomes',
       expect.objectContaining({
         method: 'POST',
-        body: expect.stringContaining('"channel":"email"'),
+        body: expect.stringContaining('"eventType":"contacted"'),
       }),
     ))
+    expect(jest.mocked(global.fetch).mock.calls.some(([, options]) =>
+      String(options?.body).includes('"channel":"email"'),
+    )).toBe(true)
     expect(jest.mocked(global.fetch).mock.calls.some(([, options]) =>
       String(options?.body).includes('"contactPathType":"corporate_email"'),
     )).toBe(true)
@@ -116,6 +119,46 @@ describe('opportunity outcome UI tracking', () => {
       expect(global.fetch).toHaveBeenCalledTimes(4)
       expect(refresh).toHaveBeenCalled()
     })
+  })
+
+  it('retries the same canonical command without changing its payload', async () => {
+    let acceptedAttempts = 0
+    global.fetch = jest.fn(async (url: string, options?: RequestInit) => {
+      const body = String(options?.body ?? '')
+      if (body.includes('"eventType":"accepted"')) {
+        acceptedAttempts += 1
+        return { ok: acceptedAttempts > 1, json: async () => (
+          acceptedAttempts > 1 ? {} : { error: 'temporary_failure' }
+        ) }
+      }
+      if (String(url).endsWith('/outcomes') && options?.method !== 'POST') {
+        return {
+          ok: true,
+          json: async () => ({
+            state: { currentStage: 'new', workflowState: 'active' },
+            events: [],
+          }),
+        }
+      }
+      return { ok: true, json: async () => ({}) }
+    }) as jest.Mock
+    render(<OpportunityOutcomePanel opportunityId="10" fallbackStage="new" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Коммерческий статус' }))
+    const accepted = await screen.findByRole('button', { name: 'В работу' })
+    await waitFor(() => expect(accepted).toBeEnabled())
+    fireEvent.click(accepted)
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(
+      'Результат не сохранился',
+    ))
+    fireEvent.click(screen.getByRole('button', { name: 'В работу' }))
+
+    await waitFor(() => expect(acceptedAttempts).toBe(2))
+    const acceptedBodies = jest.mocked(global.fetch).mock.calls
+      .map(([, options]) => String(options?.body ?? ''))
+      .filter((body) => body.includes('"eventType":"accepted"'))
+    expect(acceptedBodies).toHaveLength(2)
+    expect(acceptedBodies[1]).toBe(acceptedBodies[0])
   })
 
   it('uses the server correction target and removes correction after revert', async () => {
