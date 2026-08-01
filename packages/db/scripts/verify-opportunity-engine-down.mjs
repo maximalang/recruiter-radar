@@ -15,6 +15,7 @@ const root = resolve(import.meta.dirname, '..', '..', '..')
 const migrationsDir = resolve(root, 'packages', 'db', 'migrations')
 const migrateScript = resolve(root, 'packages', 'db', 'scripts', 'migrate.mjs')
 const downMigrations = [
+  '20260801100000_add_agency_dna_v1.down.sql',
   '20260731100000_add_opportunity_workspace_actor_context.down.sql',
   '20260728112000_enforce_outcome_correction_capability.down.sql',
   '20260728111000_enforce_opportunity_outcome_write_boundary.down.sql',
