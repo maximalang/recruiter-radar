@@ -23,6 +23,10 @@ export const OPPORTUNITY_STRATEGIST_V1_FEATURE_FLAG =
   'OPPORTUNITY_STRATEGIST_V1_ENABLED'
 export const OPPORTUNITY_STRATEGIST_V1_CANARY_WORKSPACE_IDS_FEATURE_FLAG =
   'OPPORTUNITY_STRATEGIST_V1_CANARY_WORKSPACE_IDS'
+export const OPPORTUNITY_WORKFLOW_V1_FEATURE_FLAG =
+  'OPPORTUNITY_WORKFLOW_V1_ENABLED'
+export const OPPORTUNITY_WORKFLOW_V1_CANARY_WORKSPACE_IDS_FEATURE_FLAG =
+  'OPPORTUNITY_WORKFLOW_V1_CANARY_WORKSPACE_IDS'
 
 export type OpportunityFeatureContext = {
   dataOwnerId: string | number | null | undefined
@@ -194,6 +198,27 @@ export function isOpportunityWorkspaceContextEnabledForContext(
 ): boolean {
   return isOpportunityWorkspaceContextEnabled(env) ||
     isOpportunityCanaryWorkspace(context.workspaceId, env)
+}
+
+export function isOpportunityWorkflowV1Enabled(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+  return env[OPPORTUNITY_WORKFLOW_V1_FEATURE_FLAG] === 'true'
+}
+
+export function isOpportunityWorkflowV1EnabledForContext(
+  context: OpportunityFeatureContext,
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+  if (context.workspaceId == null) return false
+  if (!isOpportunityEngineV1EnabledForContext(context, env)) return false
+  if (!isOpportunityOutcomesEnabledForContext(context, env)) return false
+  if (!isOpportunityWorkspaceContextEnabledForContext(context, env)) return false
+
+  return isOpportunityWorkflowV1Enabled(env) || matchesSingleCanaryId(
+    context.workspaceId,
+    env[OPPORTUNITY_WORKFLOW_V1_CANARY_WORKSPACE_IDS_FEATURE_FLAG],
+  )
 }
 
 export function isOpportunityOutcomesExternalIngestEnabled(
