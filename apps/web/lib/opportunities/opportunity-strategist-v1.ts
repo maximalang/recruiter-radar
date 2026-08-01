@@ -1,5 +1,5 @@
 import type { HiringEpisodeCandidate } from './hiring-episode-detection'
-import type { OpportunityScoreResult } from './opportunity-scoring'
+import type { ConfidenceGate } from './opportunity-scoring'
 
 export const OPPORTUNITY_STRATEGIST_V1_VERSION =
   'opportunity-strategist-v1' as const
@@ -37,7 +37,18 @@ export type OpportunityStrategistCaseStudyInput = {
 export type OpportunityStrategistInput = {
   organizationName: string
   episode: HiringEpisodeCandidate
-  score: OpportunityScoreResult
+  score: {
+    confidenceGate: ConfidenceGate
+    components: {
+      externalSupportNeed: {
+        reasons: readonly {
+          message: string
+          evidenceIds: readonly string[]
+          basis: 'evidence' | 'profile' | 'policy'
+        }[]
+      }
+    }
+  }
   agency: {
     specialization: string | null
     matchedRoleFamilies: readonly string[]

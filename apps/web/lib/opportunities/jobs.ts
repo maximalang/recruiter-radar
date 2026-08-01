@@ -35,12 +35,16 @@ import {
   isOpportunityOutcomesEnabled,
   isOpportunityScoringV2EnabledForContext,
   isOpportunityScoringV2ShadowEnabledForContext,
+  isOpportunityStrategistV1EnabledForContext,
 } from './config'
 import {
   AGENCY_DNA_CAPACITIES,
+  AGENCY_DNA_CASE_HIRING_MODES,
   AGENCY_DNA_SERVICE_TYPES,
+  normalizeAgencyDnaCaseStudies,
   resolveAgencyDnaOpportunityContext,
   type AgencyDnaCapacity,
+  type AgencyDnaCaseHiringMode,
   type AgencyDnaOpportunityContext,
   type AgencyDnaRestrictionType,
   type AgencyDnaServiceType,
@@ -63,6 +67,10 @@ import {
   type OpportunityScoringV2Result,
 } from './opportunity-scoring-v2'
 import { createOpportunityAnalyticsCohort } from './analytics-cohort'
+import {
+  OpportunityStrategistV1,
+  type OpportunityStrategistBrief,
+} from './opportunity-strategist-v1'
 
 type OpportunityJobDb = Pick<Pool, 'query'> | Pick<PoolClient, 'query'>
 
@@ -75,6 +83,7 @@ export const OPPORTUNITY_JOB_LOCK_KEYS = {
 
 const FIUR_VERSION = 'fiur-v1'
 const BRIEF_BUILDER_VERSION = 'opportunity-brief-v2'
+const STRATEGIST_BRIEF_BUILDER_VERSION = 'opportunity-brief-v3'
 const OPPORTUNITY_SCORING_VERSION_V1 = 'opportunity-v1'
 const OPPORTUNITY_FEATURE_SCHEMA_V1 = 'opportunity-features-v1'
 const OPPORTUNITY_GATE_VERSION_V1 = 'opportunity-gates-v1'
@@ -548,6 +557,7 @@ async function runBuildOpportunitiesJob(
   const scorer = new OpportunityScoringService()
   const scorerV2 = new OpportunityScoringV2Service()
   const briefBuilder = new OpportunityBriefBuilder()
+  const strategist = new OpportunityStrategistV1()
   const persistPreview = shouldPersistPreview(options)
   for (const row of result.rows) {
     stats.scanned += 1
@@ -649,11 +659,38 @@ async function runBuildOpportunitiesJob(
           ),
         },
       })
+      const strategistEnabled = isOpportunityStrategistV1EnabledForContext({
+        dataOwnerId: row.ownerId,
+        workspaceId: row.workspaceId,
+      })
+      const strategistBrief = strategistEnabled
+        ? strategist.build({
+          organizationName: row.organizationName,
+          episode,
+          score: scoringV2 ?? score,
+          agency: {
+            specialization: row.specialization,
+            matchedRoleFamilies,
+            matchedIndustries,
+            matchedRegions,
+            hiringMode: row.hiringMode,
+            organizationCompanySizeBucket:
+              agencyDnaState?.context.capabilityMatches.companySizeBucket ?? null,
+            caseStudies: agencyDnaState
+              ? extractAgencyDnaCaseStudies(agencyDnaState.snapshot)
+              : [],
+          },
+        })
+        : null
+      const briefBuilderVersion = strategistEnabled
+        ? STRATEGIST_BRIEF_BUILDER_VERSION
+        : BRIEF_BUILDER_VERSION
       const provenance = createOpportunityInputProvenance(
         row,
         episode,
         scoringVersion,
         agencyDnaState,
+        briefBuilderVersion,
       )
       const scoringV2Provenance = scoringV2
         ? createOpportunityInputProvenance(
@@ -661,6 +698,7 @@ async function runBuildOpportunitiesJob(
           episode,
           OPPORTUNITY_SCORING_VERSION_V2,
           agencyDnaState,
+          briefBuilderVersion,
         )
         : null
 
@@ -701,6 +739,7 @@ async function runBuildOpportunitiesJob(
         scoringV2,
         scoringV2Provenance,
         brief,
+        strategistBrief,
         fiur,
         provenance,
         matchedRoleFamilies,
@@ -1471,6 +1510,7 @@ async function persistOpportunityBuild(input: {
   scoringV2: OpportunityScoringV2Result | null
   scoringV2Provenance: OpportunityInputProvenance | null
   brief: OpportunityBrief
+  strategistBrief: OpportunityStrategistBrief | null
   fiur: ReturnType<typeof computeFiurForOpportunity>
   provenance: OpportunityInputProvenance
   matchedRoleFamilies: readonly string[]
@@ -1496,6 +1536,7 @@ async function persistOpportunityBuild(input: {
     scoringV2,
     scoringV2Provenance,
     brief,
+    strategistBrief,
     fiur,
     provenance,
     matchedRoleFamilies,
@@ -1720,6 +1761,7 @@ async function persistOpportunityBuild(input: {
       sourceFamilies: toStringArray(row.sourceFamilies),
       agencyFitExplanation: brief.agencyFitExplanation,
       limitations: brief.limitations,
+      ...(strategistBrief ? { strategistBrief } : {}),
       modelType: 'heuristic',
       calibrationStatus: 'uncalibrated',
       digestReasons: row.digestReasons,
@@ -2177,6 +2219,7 @@ function createOpportunityInputProvenance(
   episode: HiringEpisodeCandidate,
   scoringVersion: string,
   agencyDnaState: AgencyDnaBuildState | null,
+  briefBuilderVersion: string,
 ): OpportunityInputProvenance {
   const profileSnapshotHash = agencyDnaState?.snapshotHash ??
     hashCanonicalJson({
@@ -2248,7 +2291,7 @@ function createOpportunityInputProvenance(
     agencyDnaRestriction: agencyDnaState?.context.restrictionSnapshot ?? null,
     buildInputsHash,
     fiurVersion: FIUR_VERSION,
-    briefBuilderVersion: BRIEF_BUILDER_VERSION,
+    briefBuilderVersion,
   }
   const semanticInput = {
     ...comparisonInput,
@@ -2767,6 +2810,32 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown>
     : {}
+}
+
+function extractAgencyDnaCaseStudies(
+  snapshot: Record<string, unknown>,
+) {
+  const caseStudies = Array.isArray(snapshot.caseStudies)
+    ? snapshot.caseStudies
+    : []
+  return normalizeAgencyDnaCaseStudies(caseStudies.map((value) => {
+    const caseStudy = asRecord(value)
+    return {
+      roleFamilies: toStringArray(caseStudy.roleFamilies),
+      industries: toStringArray(caseStudy.industries),
+      companySizeBucket: stringValue(caseStudy.companySizeBucket) || null,
+      region: stringValue(caseStudy.region) || null,
+      hiringModes: toStringArray(caseStudy.hiringModes).filter(
+        (value): value is AgencyDnaCaseHiringMode =>
+          AGENCY_DNA_CASE_HIRING_MODES.includes(
+            value as AgencyDnaCaseHiringMode,
+          ),
+      ),
+      measurableResult: stringValue(caseStudy.measurableResult) || null,
+      publicSafeDescription:
+        stringValue(caseStudy.publicSafeDescription) || null,
+    }
+  }))
 }
 
 function stringValue(value: unknown): string {
