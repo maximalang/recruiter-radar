@@ -101,6 +101,7 @@ interface OutcomeOpportunityContext {
   episodeStatus: string
   profileSnapshotHash: string | null
   analyticsCohort: unknown
+  assignedUserId: string | null
 }
 
 export interface PublicOutcomeEvent {
@@ -994,16 +995,21 @@ export async function recordOpportunityOutcomeInTransaction(
        o.agency_propensity_score AS "externalSupportNeedScore",
        o.profile_snapshot_hash AS "profileSnapshotHash",
        o.metadata->'analyticsCohort' AS "analyticsCohort",
+       workflow_state.assigned_to_user_id::TEXT AS "assignedUserId",
        he.episode_type AS "episodeType",
        he.status AS "episodeStatus"
      FROM opportunities o
      JOIN hiring_episodes he
        ON he.id = o.hiring_episode_id
       AND he.organization_id = o.organization_id
+     LEFT JOIN opportunity_workflow_state workflow_state
+       ON workflow_state.owner_id = o.owner_id
+      AND workflow_state.workspace_id = o.workspace_id
+      AND workflow_state.opportunity_id = o.id
       WHERE o.id = $1
         AND o.owner_id = $2
         AND ($3::BIGINT IS NULL OR o.workspace_id = $3)
-      FOR UPDATE`,
+      FOR UPDATE OF o`,
     [
       String(input.opportunityId),
       String(input.ownerId),
@@ -1311,6 +1317,7 @@ export async function recordOpportunityOutcomeInTransaction(
        actor_user_id,
        actor_workspace_id,
        actor_role_snapshot,
+       assigned_user_id,
        metadata,
        analytics_snapshot,
        idempotency_key,
@@ -1320,8 +1327,8 @@ export async function recordOpportunityOutcomeInTransaction(
      VALUES (
        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
        $14, $15, $16::timestamptz, $17, $18, $19, $20, $21,
-       $22::timestamptz, $23, $24, $25, $26, $27::jsonb, $28::jsonb,
-       $29, $30, $31
+       $22::timestamptz, $23, $24, $25, $26, $27, $28::jsonb, $29::jsonb,
+       $30, $31, $32
      )
      RETURNING id::TEXT AS id, recorded_at::TEXT AS "recordedAt"`,
     [
@@ -1353,6 +1360,7 @@ export async function recordOpportunityOutcomeInTransaction(
         ? null
         : String(input.actorWorkspaceId),
       input.actorRoleSnapshot ?? null,
+      context.assignedUserId,
       JSON.stringify(payload.metadata),
       JSON.stringify(analyticsSnapshot),
       payload.idempotencyKey,

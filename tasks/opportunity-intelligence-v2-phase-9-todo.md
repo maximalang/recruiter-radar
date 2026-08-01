@@ -6,7 +6,7 @@
 - [x] Map existing funnel dimensions, maturity rules and data gaps.
 - [x] Record statistical-honesty, privacy, tenancy and performance boundaries.
 - [x] Add fail-closed Phase 9 configuration.
-- [ ] Add event-time assigned-user attribution migration and down migration.
+- [x] Add event-time assigned-user attribution migration and down migration.
 - [ ] Add tenant-scoped outcome analytics with all required dimensions.
 - [ ] Add effective won/lost reasons and confirmed revenue summaries.
 - [ ] Add deterministic PII-free calibration CSV export.
