@@ -3,6 +3,136 @@
   gap: 22px;
 }
 
+.todayLanes {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.todayLane {
+  display: grid;
+  min-height: 94px;
+  align-content: space-between;
+  gap: 14px;
+  padding: 15px;
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  border-radius: 14px;
+  background: #fff;
+  color: #334155;
+  text-decoration: none;
+}
+
+.todayLane > span {
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.todayLane > strong {
+  color: #0f172a;
+  font-size: 1.65rem;
+  letter-spacing: -0.04em;
+}
+
+.todayLane[data-tone="attention"] {
+  border-color: rgba(37, 99, 235, 0.34);
+}
+
+.todayLane[data-tone="danger"] {
+  border-color: rgba(185, 28, 28, 0.32);
+}
+
+.todayLane[data-active="true"] {
+  border-color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.researchMode {
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 14px;
+  background: rgba(248, 250, 252, 0.74);
+}
+
+.researchMode > summary {
+  display: list-item;
+  min-height: 44px;
+  padding: 0 15px;
+  color: #475569;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 720;
+  line-height: 44px;
+}
+
+.researchBody {
+  display: grid;
+  gap: 16px;
+  padding: 0 15px 15px;
+  border-top: 1px solid rgba(148, 163, 184, 0.24);
+}
+
+.researchForm {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(180px, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+  padding-top: 15px;
+}
+
+.researchForm label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.researchForm label > span {
+  color: #64748b;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.researchForm input,
+.researchForm select {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+  color: #0f172a;
+  font: inherit;
+  font-size: 0.8rem;
+}
+
+.researchActions {
+  display: flex;
+  gap: 8px;
+}
+
+.researchActions button,
+.researchActions a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+  color: #334155;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.researchActions button {
+  border-color: #1d4ed8;
+  background: #1d4ed8;
+  color: #fff;
+}
+
 .headerLink {
   display: inline-flex;
   min-height: 40px;
@@ -746,6 +876,12 @@
 }
 
 .actionButton:focus-visible,
+.todayLane:focus-visible,
+.researchMode > summary:focus-visible,
+.researchForm input:focus-visible,
+.researchForm select:focus-visible,
+.researchActions button:focus-visible,
+.researchActions a:focus-visible,
 .filterLink:focus-visible,
 .headerLink:focus-visible,
 .workflowEditor summary:focus-visible,
@@ -769,6 +905,21 @@
 }
 
 @media (max-width: 680px) {
+  .todayLanes,
+  .researchForm {
+    grid-template-columns: 1fr;
+  }
+
+  .todayLane {
+    min-height: 82px;
+  }
+
+  .researchActions,
+  .researchActions button,
+  .researchActions a {
+    width: 100%;
+  }
+
   .cardHeader {
     grid-template-columns: 1fr;
     gap: 10px;
@@ -820,10 +971,25 @@
   }
 }
 
+@media (min-width: 681px) and (max-width: 1040px) {
+  .todayLanes {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .researchForm {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .researchActions {
+    grid-column: 1 / -1;
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .card,
   .actionButton,
-  .filterLink {
+  .filterLink,
+  .todayLane {
     transition:
       border-color 160ms ease,
       box-shadow 160ms ease,
