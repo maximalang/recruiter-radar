@@ -62,6 +62,12 @@ function dbWithQuery(handler: (sql: string, params?: readonly unknown[]) => {
         ) {
           return { rowCount: 0, rows: [] }
         }
+        if (
+          sql.includes('INSERT INTO opportunity_agency_dna_snapshots') ||
+          sql.includes('INSERT INTO opportunity_scoring_snapshots')
+        ) {
+          return { rowCount: 1, rows: [{ id: 'snapshot' }] }
+        }
         throw error
       }
     })
@@ -75,6 +81,7 @@ function buildRow(
   const now = new Date('2026-07-26T09:00:00.000Z')
   return {
     ownerId: clientProfileId === '8' ? '7' : '17',
+    workspaceId: clientProfileId === '8' ? '9' : '19',
     clientProfileId,
     organizationId: '10',
     hiringEpisodeId: '20',
@@ -82,6 +89,8 @@ function buildRow(
     organizationDomain: 'example.test',
     organizationWebsiteUrl: 'https://example.test',
     organizationCareerPageUrl: 'https://example.test/careers',
+    organizationInn: null,
+    organizationOgrn: null,
     organizationCountry: 'Россия',
     organizationIndustry: null,
     organizationCity: 'Москва',
@@ -135,6 +144,19 @@ function buildRow(
     excludedLocations: [],
     remoteFriendly: false,
     hiringMode: 'auto',
+    serviceTypes: [],
+    targetSeniorities: [],
+    preferredEngagementTypes: [],
+    currentCapacity: 'normal',
+    agencyDnaVersion: '1',
+    agencyDnaSnapshotHash: 'd'.repeat(64),
+    agencyDnaSnapshot: { agencyName: `Agency ${clientProfileId}` },
+    restrictionType: null,
+    buildScoringVersion:
+      process.env.OPPORTUNITY_SCORING_V2_ENABLED === 'true' &&
+      process.env.AGENCY_DNA_V1_ENABLED === 'true'
+        ? 'opportunity-v2'
+        : 'opportunity-v1',
     ...overrides,
   }
 }
@@ -145,12 +167,20 @@ describe('opportunity background jobs', () => {
   const originalAgencyDnaFlag = process.env.AGENCY_DNA_V1_ENABLED
   const originalAgencyDnaCanary =
     process.env.AGENCY_DNA_V1_CANARY_WORKSPACE_IDS
+  const originalScoringV2Flag = process.env.OPPORTUNITY_SCORING_V2_ENABLED
+  const originalScoringV2Canary =
+    process.env.OPPORTUNITY_SCORING_V2_CANARY_WORKSPACE_IDS
+  const originalScoringV2ShadowCanary =
+    process.env.OPPORTUNITY_SCORING_V2_SHADOW_CANARY_WORKSPACE_IDS
 
   beforeEach(() => {
     process.env.OPPORTUNITY_ENGINE_V1_ENABLED = 'true'
     delete process.env.OPPORTUNITY_CANARY_OWNER_IDS
     delete process.env.AGENCY_DNA_V1_ENABLED
     delete process.env.AGENCY_DNA_V1_CANARY_WORKSPACE_IDS
+    delete process.env.OPPORTUNITY_SCORING_V2_ENABLED
+    delete process.env.OPPORTUNITY_SCORING_V2_CANARY_WORKSPACE_IDS
+    delete process.env.OPPORTUNITY_SCORING_V2_SHADOW_CANARY_WORKSPACE_IDS
   })
 
   afterAll(() => {
@@ -170,6 +200,23 @@ describe('opportunity background jobs', () => {
       delete process.env.AGENCY_DNA_V1_CANARY_WORKSPACE_IDS
     } else {
       process.env.AGENCY_DNA_V1_CANARY_WORKSPACE_IDS = originalAgencyDnaCanary
+    }
+    if (originalScoringV2Flag === undefined) {
+      delete process.env.OPPORTUNITY_SCORING_V2_ENABLED
+    } else {
+      process.env.OPPORTUNITY_SCORING_V2_ENABLED = originalScoringV2Flag
+    }
+    if (originalScoringV2Canary === undefined) {
+      delete process.env.OPPORTUNITY_SCORING_V2_CANARY_WORKSPACE_IDS
+    } else {
+      process.env.OPPORTUNITY_SCORING_V2_CANARY_WORKSPACE_IDS =
+        originalScoringV2Canary
+    }
+    if (originalScoringV2ShadowCanary === undefined) {
+      delete process.env.OPPORTUNITY_SCORING_V2_SHADOW_CANARY_WORKSPACE_IDS
+    } else {
+      process.env.OPPORTUNITY_SCORING_V2_SHADOW_CANARY_WORKSPACE_IDS =
+        originalScoringV2ShadowCanary
     }
   })
 
@@ -616,6 +663,237 @@ describe('opportunity background jobs', () => {
     })
   })
 
+  it('persists same-input v1 and v2 scoring only for the workspace canary', async () => {
+    process.env.AGENCY_DNA_V1_CANARY_WORKSPACE_IDS = '9'
+    process.env.OPPORTUNITY_SCORING_V2_CANARY_WORKSPACE_IDS = '9'
+    let opportunityParams: readonly unknown[] = []
+    let scoringSnapshotParams: readonly unknown[] = []
+    const db = dbWithQuery((sql, params) => {
+      if (sql.includes('WITH latest_candidates AS')) {
+        expect(sql).toContain('cp.workspace_id = $5::BIGINT')
+        expect(params?.[4]).toBe('9')
+        return {
+          rowCount: 1,
+          rows: [buildRow('8', {
+            serviceTypes: ['permanent'],
+            roles: ['Backend'],
+            buildScoringVersion: 'opportunity-v2',
+          })],
+        }
+      }
+      if (sql.includes('INSERT INTO opportunities')) {
+        opportunityParams = params ?? []
+        return { rowCount: 1, rows: [{ id: '100' }] }
+      }
+      if (sql.includes('INSERT INTO opportunity_agency_dna_snapshots')) {
+        return { rowCount: 1, rows: [{ id: '200' }] }
+      }
+      if (sql.includes('INSERT INTO opportunity_scoring_snapshots')) {
+        scoringSnapshotParams = params ?? []
+        return { rowCount: 1, rows: [{ id: '300' }] }
+      }
+      if (sql.includes('DELETE FROM opportunity_build_failures')) {
+        return { rowCount: 0, rows: [] }
+      }
+      throw new Error(`Unexpected SQL: ${sql}`)
+    })
+
+    const result = await buildOpportunitiesJob({ enabled: true }, db)
+
+    expect(result.created).toBe(1)
+    expect(opportunityParams).toContain('opportunity-v2')
+    expect(opportunityParams).toContain('opportunity-features-v2')
+    expect(opportunityParams).toContain('opportunity-gates-v2')
+    expect(JSON.parse(String(opportunityParams[34]))).toHaveProperty(
+      'eligibility.score',
+      1,
+    )
+    expect(JSON.parse(String(opportunityParams[35])))
+      .toEqual(expect.arrayContaining([
+        expect.objectContaining({ code: 'HIRING_EVIDENCE_MISSING', passed: true }),
+        expect.objectContaining({ code: 'CONTACT_POLICY_BLOCKED', passed: true }),
+      ]))
+    expect(scoringSnapshotParams.slice(0, 9)).toEqual([
+      '100',
+      '7',
+      '9',
+      '8',
+      '20',
+      'opportunity-v2',
+      'opportunity-v1',
+      'opportunity-features-v2',
+      'opportunity-gates-v2',
+    ])
+    expect(scoringSnapshotParams[13]).toEqual(
+      expect.stringMatching(/^[a-f0-9]{64}$/),
+    )
+    expect(scoringSnapshotParams[14]).toEqual(
+      expect.stringMatching(/^[a-f0-9]{64}$/),
+    )
+  })
+
+  it('persists a v2 shadow snapshot while keeping v1 authoritative', async () => {
+    process.env.AGENCY_DNA_V1_CANARY_WORKSPACE_IDS = '9'
+    process.env.OPPORTUNITY_SCORING_V2_SHADOW_CANARY_WORKSPACE_IDS = '9'
+    let opportunityParams: readonly unknown[] = []
+    let scoringSnapshotParams: readonly unknown[] = []
+    const db = dbWithQuery((sql, params) => {
+      if (sql.includes('WITH latest_candidates AS')) {
+        return {
+          rowCount: 1,
+          rows: [buildRow('8', {
+            serviceTypes: ['permanent'],
+            roles: ['Backend'],
+            buildScoringVersion: 'opportunity-v1',
+          })],
+        }
+      }
+      if (sql.includes('INSERT INTO opportunities')) {
+        opportunityParams = params ?? []
+        return { rowCount: 1, rows: [{ id: '100' }] }
+      }
+      if (sql.includes('INSERT INTO opportunity_agency_dna_snapshots')) {
+        return { rowCount: 1, rows: [{ id: '200' }] }
+      }
+      if (sql.includes('INSERT INTO opportunity_scoring_snapshots')) {
+        scoringSnapshotParams = params ?? []
+        return { rowCount: 1, rows: [{ id: '300' }] }
+      }
+      if (sql.includes('DELETE FROM opportunity_build_failures')) {
+        return { rowCount: 0, rows: [] }
+      }
+      throw new Error(`Unexpected SQL: ${sql}`)
+    })
+
+    const result = await buildOpportunitiesJob({ enabled: true }, db)
+
+    expect(result.created).toBe(1)
+    expect(result.scoringV2ShadowEvaluated).toBe(1)
+    expect(result.scoringV2ShadowSnapshotsCreated).toBe(1)
+    expect(opportunityParams).toContain('opportunity-v1')
+    expect(opportunityParams).toContain('opportunity-features-v1')
+    expect(opportunityParams).toContain('opportunity-gates-v1')
+    expect(scoringSnapshotParams.slice(0, 9)).toEqual([
+      '100',
+      '7',
+      '9',
+      '8',
+      '20',
+      'opportunity-v2',
+      'opportunity-v1',
+      'opportunity-features-v2',
+      'opportunity-gates-v2',
+    ])
+  })
+
+  it('backfills a missing shadow snapshot without rewriting unchanged v1', async () => {
+    process.env.AGENCY_DNA_V1_CANARY_WORKSPACE_IDS = '9'
+    process.env.OPPORTUNITY_SCORING_V2_SHADOW_CANARY_WORKSPACE_IDS = '9'
+    let selectionCount = 0
+    let opportunityInsertCount = 0
+    let scoringSnapshotInsertCount = 0
+    let storedInputHash: string | null = null
+    const db = dbWithQuery((sql, params) => {
+      if (sql.includes('WITH latest_candidates AS')) {
+        selectionCount += 1
+        return {
+          rowCount: 1,
+          rows: [buildRow('8', {
+            serviceTypes: ['permanent'],
+            roles: ['Backend'],
+            currentOpportunityId: selectionCount === 1 ? null : '100',
+            currentInputHash: selectionCount === 1 ? null : storedInputHash,
+            currentScoringVersion: 'opportunity-v1',
+            buildScoringVersion: 'opportunity-v1',
+          })],
+        }
+      }
+      if (
+        sql.includes('FROM opportunities') &&
+        sql.includes('input_hash') &&
+        sql.includes('FOR UPDATE')
+      ) {
+        return selectionCount === 1
+          ? { rowCount: 0, rows: [] }
+          : {
+            rowCount: 1,
+            rows: [{
+              id: '100',
+              inputHash: storedInputHash,
+              scoringVersion: 'opportunity-v1',
+              status: 'new',
+              snoozedUntil: null,
+            }],
+          }
+      }
+      if (sql.includes('INSERT INTO opportunities')) {
+        opportunityInsertCount += 1
+        storedInputHash = String(params?.[29])
+        return { rowCount: 1, rows: [{ id: '100' }] }
+      }
+      if (sql.includes('INSERT INTO opportunity_agency_dna_snapshots')) {
+        return { rowCount: 1, rows: [{ id: '200' }] }
+      }
+      if (sql.includes('INSERT INTO opportunity_scoring_snapshots')) {
+        scoringSnapshotInsertCount += 1
+        return scoringSnapshotInsertCount === 1
+          ? { rowCount: 1, rows: [{ id: '300' }] }
+          : { rowCount: 0, rows: [] }
+      }
+      if (sql.includes('DELETE FROM opportunity_build_failures')) {
+        return { rowCount: 0, rows: [] }
+      }
+      throw new Error(`Unexpected SQL: ${sql}`)
+    })
+
+    const first = await buildOpportunitiesJob({ enabled: true }, db)
+    const second = await buildOpportunitiesJob({ enabled: true }, db)
+
+    expect(first.scoringV2ShadowSnapshotsCreated).toBe(1)
+    expect(second.skippedUnchanged).toBe(1)
+    expect(second.scoringV2ShadowEvaluated).toBe(1)
+    expect(second.scoringV2ShadowSnapshotsCreated).toBe(0)
+    expect(opportunityInsertCount).toBe(1)
+    expect(scoringSnapshotInsertCount).toBe(2)
+  })
+
+  it('treats an explicit v1 request as a shadow rollback boundary', async () => {
+    process.env.AGENCY_DNA_V1_CANARY_WORKSPACE_IDS = '9'
+    process.env.OPPORTUNITY_SCORING_V2_SHADOW_CANARY_WORKSPACE_IDS = '9'
+    let scoringSnapshotInsertCount = 0
+    const db = dbWithQuery((sql) => {
+      if (sql.includes('WITH latest_candidates AS')) {
+        return {
+          rowCount: 1,
+          rows: [buildRow('8', { buildScoringVersion: 'opportunity-v1' })],
+        }
+      }
+      if (sql.includes('INSERT INTO opportunities')) {
+        return { rowCount: 1, rows: [{ id: '100' }] }
+      }
+      if (sql.includes('INSERT INTO opportunity_agency_dna_snapshots')) {
+        return { rowCount: 1, rows: [{ id: '200' }] }
+      }
+      if (sql.includes('INSERT INTO opportunity_scoring_snapshots')) {
+        scoringSnapshotInsertCount += 1
+        return { rowCount: 1, rows: [{ id: '300' }] }
+      }
+      if (sql.includes('DELETE FROM opportunity_build_failures')) {
+        return { rowCount: 0, rows: [] }
+      }
+      throw new Error(`Unexpected SQL: ${sql}`)
+    })
+
+    const result = await buildOpportunitiesJob({
+      enabled: true,
+      scoringVersion: 'opportunity-v1',
+    }, db)
+
+    expect(result.scoringV2ShadowEvaluated).toBe(0)
+    expect(result.scoringV2ShadowSnapshotsCreated).toBe(0)
+    expect(scoringSnapshotInsertCount).toBe(0)
+  })
+
   it('mentions only agency roles that match the episode vacancies', async () => {
     let opportunityParams: readonly unknown[] = []
     const db = dbWithQuery((sql, params) => {
@@ -859,6 +1137,8 @@ describe('opportunity background jobs', () => {
   })
 
   it('does not revive an elapsed snooze during scoring supersession', async () => {
+    process.env.AGENCY_DNA_V1_ENABLED = 'true'
+    process.env.OPPORTUNITY_SCORING_V2_ENABLED = 'true'
     const elapsedSnooze = '2026-08-02T09:00:00.000Z'
     let deletedElapsedState = false
     let insertedParams: readonly unknown[] = []
@@ -1165,6 +1445,8 @@ describe('opportunity background jobs', () => {
   })
 
   it('snooze deadline survives scoring supersession', async () => {
+    process.env.AGENCY_DNA_V1_ENABLED = 'true'
+    process.env.OPPORTUNITY_SCORING_V2_ENABLED = 'true'
     const sqlSeen: string[] = []
     const snoozedUntil = '2026-08-02T09:00:00.000Z'
     let storedParams: readonly unknown[] = []
@@ -1243,6 +1525,8 @@ describe('opportunity background jobs', () => {
   })
 
   it('repairs an orphaned future snooze before scoring supersession', async () => {
+    process.env.AGENCY_DNA_V1_ENABLED = 'true'
+    process.env.OPPORTUNITY_SCORING_V2_ENABLED = 'true'
     const snoozedUntil = '2026-08-02T09:00:00.000Z'
     let repairedStateParams: readonly unknown[] = []
     let storedParams: readonly unknown[] = []

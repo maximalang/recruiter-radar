@@ -13,6 +13,12 @@ export const OPPORTUNITY_WORKSPACE_CONTEXT_FEATURE_FLAG =
 export const AGENCY_DNA_V1_FEATURE_FLAG = 'AGENCY_DNA_V1_ENABLED'
 export const AGENCY_DNA_V1_CANARY_WORKSPACE_IDS_FEATURE_FLAG =
   'AGENCY_DNA_V1_CANARY_WORKSPACE_IDS'
+export const OPPORTUNITY_SCORING_V2_FEATURE_FLAG =
+  'OPPORTUNITY_SCORING_V2_ENABLED'
+export const OPPORTUNITY_SCORING_V2_CANARY_WORKSPACE_IDS_FEATURE_FLAG =
+  'OPPORTUNITY_SCORING_V2_CANARY_WORKSPACE_IDS'
+export const OPPORTUNITY_SCORING_V2_SHADOW_CANARY_WORKSPACE_IDS_FEATURE_FLAG =
+  'OPPORTUNITY_SCORING_V2_SHADOW_CANARY_WORKSPACE_IDS'
 
 export type OpportunityFeatureContext = {
   dataOwnerId: string | number | null | undefined
@@ -67,6 +73,34 @@ export function isAgencyDnaV1EnabledForContext(
   return isAgencyDnaV1Enabled(env) || matchesSingleCanaryId(
     context.workspaceId,
     env[AGENCY_DNA_V1_CANARY_WORKSPACE_IDS_FEATURE_FLAG],
+  )
+}
+
+export function isOpportunityScoringV2Enabled(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+  return env[OPPORTUNITY_SCORING_V2_FEATURE_FLAG] === 'true'
+}
+
+export function isOpportunityScoringV2EnabledForContext(
+  context: OpportunityFeatureContext,
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+  if (!isAgencyDnaV1EnabledForContext(context, env)) return false
+  return isOpportunityScoringV2Enabled(env) || matchesSingleCanaryId(
+    context.workspaceId,
+    env[OPPORTUNITY_SCORING_V2_CANARY_WORKSPACE_IDS_FEATURE_FLAG],
+  )
+}
+
+export function isOpportunityScoringV2ShadowEnabledForContext(
+  context: OpportunityFeatureContext,
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+  if (!isAgencyDnaV1EnabledForContext(context, env)) return false
+  return matchesSingleCanaryId(
+    context.workspaceId,
+    env[OPPORTUNITY_SCORING_V2_SHADOW_CANARY_WORKSPACE_IDS_FEATURE_FLAG],
   )
 }
 
