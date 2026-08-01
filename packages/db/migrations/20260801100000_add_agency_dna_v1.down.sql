@@ -25,6 +25,12 @@ DROP TRIGGER IF EXISTS opportunity_agency_dna_snapshots_append_only
   ON opportunity_agency_dna_snapshots;
 DROP FUNCTION IF EXISTS reject_opportunity_agency_dna_snapshot_mutation();
 DROP TABLE opportunity_agency_dna_snapshots;
+DROP TRIGGER IF EXISTS agency_account_restrictions_maintain_version
+  ON agency_account_restrictions;
+DROP TRIGGER IF EXISTS agency_account_restrictions_lock_profile
+  ON agency_account_restrictions;
+DROP FUNCTION IF EXISTS maintain_agency_dna_restriction_version();
+DROP FUNCTION IF EXISTS lock_agency_dna_profile_for_restriction();
 DROP TABLE agency_account_restrictions;
 
 ALTER TABLE opportunities

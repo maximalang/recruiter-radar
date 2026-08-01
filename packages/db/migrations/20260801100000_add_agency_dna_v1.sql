@@ -209,6 +209,128 @@ CREATE INDEX agency_account_restrictions_profile_type_idx
     organization_id
   );
 
+-- Account restrictions remain relational, but they are still part of the
+-- versioned Agency DNA contract. Including their canonical identity in the
+-- hash makes a restriction change invalidate the previous build input without
+-- copying the restriction table into client_profiles.
+CREATE OR REPLACE FUNCTION hash_agency_dna_profile(
+  profile client_profiles
+)
+RETURNS TEXT
+LANGUAGE SQL
+STABLE
+STRICT
+AS $$
+  SELECT ENCODE(
+    DIGEST(
+      CONVERT_TO(
+        JSONB_BUILD_OBJECT(
+          'profile', agency_dna_profile_snapshot(profile),
+          'accountRestrictions', COALESCE(
+            (
+              SELECT JSONB_AGG(
+                JSONB_BUILD_OBJECT(
+                  'organizationId', restriction.organization_id::TEXT,
+                  'restrictionType', restriction.restriction_type
+                )
+                ORDER BY restriction.organization_id, restriction.restriction_type
+              )
+              FROM agency_account_restrictions restriction
+              WHERE restriction.client_profile_id = profile.id
+                AND restriction.owner_id = profile.owner_id
+                AND restriction.workspace_id = profile.workspace_id
+            ),
+            '[]'::JSONB
+          )
+        )::TEXT,
+        'UTF8'
+      ),
+      'sha256'
+    ),
+    'hex'
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION lock_agency_dna_profile_for_restriction()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  scoped agency_account_restrictions;
+BEGIN
+  scoped := CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+
+  IF TG_OP = 'UPDATE' AND (
+    OLD.workspace_id,
+    OLD.client_profile_id,
+    OLD.owner_id,
+    OLD.organization_id
+  ) IS DISTINCT FROM (
+    NEW.workspace_id,
+    NEW.client_profile_id,
+    NEW.owner_id,
+    NEW.organization_id
+  ) THEN
+    RAISE EXCEPTION 'agency account restriction scope is immutable';
+  END IF;
+
+  PERFORM 1
+  FROM client_profiles profile
+  WHERE profile.id = scoped.client_profile_id
+    AND profile.owner_id = scoped.owner_id
+    AND profile.workspace_id = scoped.workspace_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'agency account restriction profile scope is unavailable';
+  END IF;
+
+  IF TG_OP = 'DELETE' THEN
+    RETURN OLD;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION maintain_agency_dna_restriction_version()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  scoped agency_account_restrictions;
+BEGIN
+  IF TG_OP = 'UPDATE'
+     AND OLD.restriction_type IS NOT DISTINCT FROM NEW.restriction_type THEN
+    RETURN NEW;
+  END IF;
+
+  scoped := CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+  UPDATE client_profiles profile
+  SET
+    agency_dna_version = profile.agency_dna_version + 1,
+    agency_dna_snapshot_hash = hash_agency_dna_profile(profile),
+    updated_at = NOW()
+  WHERE profile.id = scoped.client_profile_id
+    AND profile.owner_id = scoped.owner_id
+    AND profile.workspace_id = scoped.workspace_id;
+
+  IF TG_OP = 'DELETE' THEN
+    RETURN OLD;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER agency_account_restrictions_lock_profile
+BEFORE INSERT OR UPDATE OR DELETE ON agency_account_restrictions
+FOR EACH ROW
+EXECUTE FUNCTION lock_agency_dna_profile_for_restriction();
+
+CREATE TRIGGER agency_account_restrictions_maintain_version
+AFTER INSERT OR UPDATE OR DELETE ON agency_account_restrictions
+FOR EACH ROW
+EXECUTE FUNCTION maintain_agency_dna_restriction_version();
+
 CREATE TABLE opportunity_agency_dna_snapshots (
   id BIGSERIAL PRIMARY KEY,
   opportunity_id BIGINT NOT NULL,

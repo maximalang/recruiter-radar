@@ -79,7 +79,13 @@ describe('Agency DNA v1 migration contract', () => {
   it('versions only Agency DNA changes and leaves backfill explicit', () => {
     expect(migration).toContain('maintain_agency_dna_version')
     expect(migration).toContain('agency_dna_profile_snapshot')
-    expect(migration).not.toMatch(/UPDATE\s+client_profiles/i)
+    expect(migration).toContain('accountRestrictions')
+    expect(migration).toContain('agency_account_restrictions_lock_profile')
+    expect(migration).toContain('agency_account_restrictions_maintain_version')
+    expect(migration).toContain('maintain_agency_dna_restriction_version')
+    expect(migration).not.toMatch(
+      /UPDATE\s+client_profiles\s+SET\s+agency_dna_snapshot_hash\s*=/i,
+    )
     expect(backfill).toContain("args.includes('--apply')")
     expect(backfill).toContain("args.includes('--dry-run')")
     expect(backfill).toContain("args.indexOf('--workspace-id')")
