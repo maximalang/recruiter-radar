@@ -11,9 +11,9 @@ import styles from './opportunities.module.css'
 export default function OpportunitiesError(props: { reset: () => void }) {
   return (
     <InternalPageFrame navItems={buildOpportunityNavigation()}>
-      <InternalPageHeader title="Morning Brief" />
+      <InternalPageHeader title="Сегодня" />
       <ErrorState
-        title="Brief временно не загрузился"
+        title="Возможности временно не загрузились"
         description="Повторите загрузку. Данные других аккаунтов при ошибке не показываются."
       />
       <div className={styles.errorAction}>

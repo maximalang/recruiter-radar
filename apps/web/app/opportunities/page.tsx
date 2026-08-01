@@ -146,7 +146,7 @@ export default async function OpportunitiesPage(props: {
       <InternalPageFrame navItems={NAVIGATION} footer={<SiteFooter />}>
         <InternalPageHeader title="Сегодня" />
         <ErrorState
-          title="Brief временно не загрузился"
+          title="Возможности временно не загрузились"
           description="Данные других аккаунтов не показываются. Обновите страницу через минуту."
           action={{ href: '/opportunities', label: 'Обновить' }}
         />
