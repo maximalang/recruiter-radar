@@ -35,6 +35,7 @@
     "test:payment-telemetry:db": "node packages/db/scripts/verify-payment-success-telemetry.mjs",
     "test:opportunity-engine:db": "node packages/db/scripts/run-opportunity-engine-db-tests.mjs",
     "test:agency-dna:db": "node packages/db/scripts/verify-agency-dna-v1.mjs",
+    "test:opportunity-scoring-v2:db": "node packages/db/scripts/verify-opportunity-scoring-v2.mjs",
     "test:opportunity-engine:down": "node packages/db/scripts/verify-opportunity-engine-down.mjs",
     "opportunity-outcomes:rebuild": "node packages/db/scripts/rebuild-opportunity-outcomes.mjs",
     "opportunity-outcomes:preflight": "node packages/db/scripts/preflight-opportunity-outcomes.mjs",
