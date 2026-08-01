@@ -39,14 +39,24 @@ await client.connect()
 await writer.connect()
 try {
   const fixture = await client.query(
-    `SELECT owner_id::TEXT AS "ownerId", opportunity_id::TEXT AS "opportunityId"
-     FROM opportunity_outcome_state
-     WHERE first_shown_at IS NOT NULL
-     ORDER BY owner_id, opportunity_id
+    `SELECT state.owner_id::TEXT AS "ownerId",
+            state.opportunity_id::TEXT AS "opportunityId",
+            opportunity.workspace_id::TEXT AS "workspaceId"
+     FROM opportunity_outcome_state state
+     JOIN opportunities opportunity
+       ON opportunity.owner_id = state.owner_id
+      AND opportunity.id = state.opportunity_id
+     WHERE state.first_shown_at IS NOT NULL
+       AND opportunity.workspace_id IS NOT NULL
+     ORDER BY state.owner_id, opportunity.workspace_id, state.opportunity_id
      LIMIT 1`,
   )
   assert.ok(fixture.rows[0], 'runtime test must leave a shown projection fixture')
-  const { ownerId, opportunityId } = fixture.rows[0]
+  const { ownerId, opportunityId, workspaceId } = fixture.rows[0]
+  const workspaceScope = [
+    '--owner-id', ownerId,
+    '--workspace-id', workspaceId,
+  ]
 
   await client.query(
     `UPDATE opportunity_outcome_state
@@ -55,7 +65,7 @@ try {
     [ownerId, opportunityId],
   )
 
-  const dryRun = await rebuild(['--dry-run', '--owner-id', ownerId])
+  const dryRun = await rebuild(['--dry-run', ...workspaceScope])
   assert.ok(dryRun.rebuildScanned >= 1)
   assert.ok(dryRun.rebuildChanged >= 1)
   const stillCorrupt = await client.query(
@@ -66,7 +76,7 @@ try {
   )
   assert.equal(stillCorrupt.rows[0].corrupt, true)
 
-  const applied = await rebuild(['--apply', '--owner-id', ownerId])
+  const applied = await rebuild(['--apply', ...workspaceScope])
   assert.ok(applied.rebuildChanged >= 1)
   const repaired = await client.query(
     `SELECT first_shown_at IS NOT NULL AS repaired
@@ -76,7 +86,7 @@ try {
   )
   assert.equal(repaired.rows[0].repaired, true)
 
-  const stable = await rebuild(['--dry-run', '--owner-id', ownerId])
+  const stable = await rebuild(['--dry-run', ...workspaceScope])
   assert.equal(stable.rebuildChanged, 0)
 
   await writer.query('BEGIN')
@@ -116,7 +126,7 @@ try {
      WHERE owner_id = $1 AND opportunity_id = $2`,
     [ownerId, opportunityId, openedAt, inserted.rows[0].id],
   )
-  const concurrentRebuild = rebuild(['--apply', '--owner-id', ownerId])
+  const concurrentRebuild = rebuild(['--apply', ...workspaceScope])
   await writer.query('COMMIT')
   await concurrentRebuild
   const concurrentProjection = await client.query(
@@ -129,7 +139,7 @@ try {
   assert.equal(concurrentProjection.rows[0].writerPreserved, true)
   assert.equal(concurrentProjection.rows[0].latestEventPreserved, true)
 
-  const stableAfterConcurrency = await rebuild(['--dry-run', '--owner-id', ownerId])
+  const stableAfterConcurrency = await rebuild(['--dry-run', ...workspaceScope])
   assert.equal(stableAfterConcurrency.rebuildChanged, 0)
   console.log(JSON.stringify({
     ok: true,
@@ -138,6 +148,7 @@ try {
       'apply_repairs_projection',
       'rebuild_is_idempotent',
       'owner_scope_preserved',
+      'workspace_scope_preserved',
       'concurrent_writer_projection_preserved',
     ],
   }, null, 2))
