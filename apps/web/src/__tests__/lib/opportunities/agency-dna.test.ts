@@ -90,9 +90,11 @@ describe('Agency DNA v1 opportunity context', () => {
       publicSafeDescription: 'Контакт recruiter@example.test',
     }])).toThrow(AgencyDnaValidationError)
 
-    expect(() => normalizeAgencyDnaCaseStudies([{
+    const forgedCaseStudies = [{
       hiringModes: ['unsupported-mode'],
       publicSafeDescription: 'Безопасное описание.',
-    }])).toThrow(AgencyDnaValidationError)
+    }] as unknown as Parameters<typeof normalizeAgencyDnaCaseStudies>[0]
+    expect(() => normalizeAgencyDnaCaseStudies(forgedCaseStudies))
+      .toThrow(AgencyDnaValidationError)
   })
 })
