@@ -158,6 +158,7 @@ describe('opportunity repository tenant scope', () => {
 
   it('hides persisted strategist metadata immediately when its workspace flag is off', async () => {
     const originalAgencyCanary = process.env.AGENCY_DNA_V1_CANARY_WORKSPACE_IDS
+    const originalBaseCanary = process.env.OPPORTUNITY_CANARY_WORKSPACE_IDS
     const originalStrategistCanary =
       process.env.OPPORTUNITY_STRATEGIST_V1_CANARY_WORKSPACE_IDS
     const row = {
@@ -167,6 +168,7 @@ describe('opportunity repository tenant scope', () => {
     }
     try {
       delete process.env.AGENCY_DNA_V1_CANARY_WORKSPACE_IDS
+      delete process.env.OPPORTUNITY_CANARY_WORKSPACE_IDS
       delete process.env.OPPORTUNITY_STRATEGIST_V1_CANARY_WORKSPACE_IDS
       const disabled = createDb([[{ count: '1' }], [row], []])
       const disabledResult = await listOpportunities({
@@ -175,6 +177,7 @@ describe('opportunity repository tenant scope', () => {
       }, disabled.db)
       expect(disabledResult.opportunities[0]?.strategistBrief).toBeNull()
 
+      process.env.OPPORTUNITY_CANARY_WORKSPACE_IDS = '9'
       process.env.AGENCY_DNA_V1_CANARY_WORKSPACE_IDS = '9'
       process.env.OPPORTUNITY_STRATEGIST_V1_CANARY_WORKSPACE_IDS = '9'
       const enabled = createDb([[{ count: '1' }], [row], []])
@@ -187,6 +190,7 @@ describe('opportunity repository tenant scope', () => {
       )
     } finally {
       restoreEnv('AGENCY_DNA_V1_CANARY_WORKSPACE_IDS', originalAgencyCanary)
+      restoreEnv('OPPORTUNITY_CANARY_WORKSPACE_IDS', originalBaseCanary)
       restoreEnv(
         'OPPORTUNITY_STRATEGIST_V1_CANARY_WORKSPACE_IDS',
         originalStrategistCanary,

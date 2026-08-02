@@ -30,6 +30,8 @@ describeWithDatabase('Opportunity Engine production PostgreSQL runtime', () => {
 
   const originalFlag = process.env.OPPORTUNITY_ENGINE_V1_ENABLED
   const originalOutcomesFlag = process.env.OPPORTUNITY_OUTCOMES_ENABLED
+  const originalWorkspaceContextFlag =
+    process.env.OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED
   const originalAgencyDnaFlag = process.env.AGENCY_DNA_V1_ENABLED
   const originalScoringV2Flag = process.env.OPPORTUNITY_SCORING_V2_ENABLED
   const database = new Pool({ connectionString: process.env.DATABASE_URL })
@@ -41,6 +43,7 @@ describeWithDatabase('Opportunity Engine production PostgreSQL runtime', () => {
   beforeAll(async () => {
     process.env.OPPORTUNITY_ENGINE_V1_ENABLED = 'true'
     process.env.OPPORTUNITY_OUTCOMES_ENABLED = 'true'
+    process.env.OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED = 'true'
     delete process.env.AGENCY_DNA_V1_ENABLED
     delete process.env.OPPORTUNITY_SCORING_V2_ENABLED
     const owner = await database.query(
@@ -92,6 +95,12 @@ describeWithDatabase('Opportunity Engine production PostgreSQL runtime', () => {
     else process.env.OPPORTUNITY_ENGINE_V1_ENABLED = originalFlag
     if (originalOutcomesFlag === undefined) delete process.env.OPPORTUNITY_OUTCOMES_ENABLED
     else process.env.OPPORTUNITY_OUTCOMES_ENABLED = originalOutcomesFlag
+    if (originalWorkspaceContextFlag === undefined) {
+      delete process.env.OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED
+    } else {
+      process.env.OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED =
+        originalWorkspaceContextFlag
+    }
     if (originalAgencyDnaFlag === undefined) delete process.env.AGENCY_DNA_V1_ENABLED
     else process.env.AGENCY_DNA_V1_ENABLED = originalAgencyDnaFlag
     if (originalScoringV2Flag === undefined) {

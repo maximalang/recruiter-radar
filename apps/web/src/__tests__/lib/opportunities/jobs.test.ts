@@ -163,7 +163,11 @@ function buildRow(
 
 describe('opportunity background jobs', () => {
   const originalFlag = process.env.OPPORTUNITY_ENGINE_V1_ENABLED
+  const originalOutcomesFlag = process.env.OPPORTUNITY_OUTCOMES_ENABLED
+  const originalWorkspaceContextFlag =
+    process.env.OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED
   const originalCanaryOwners = process.env.OPPORTUNITY_CANARY_OWNER_IDS
+  const originalCanaryWorkspaces = process.env.OPPORTUNITY_CANARY_WORKSPACE_IDS
   const originalAgencyDnaFlag = process.env.AGENCY_DNA_V1_ENABLED
   const originalAgencyDnaCanary =
     process.env.AGENCY_DNA_V1_CANARY_WORKSPACE_IDS
@@ -179,7 +183,10 @@ describe('opportunity background jobs', () => {
 
   beforeEach(() => {
     process.env.OPPORTUNITY_ENGINE_V1_ENABLED = 'true'
+    delete process.env.OPPORTUNITY_OUTCOMES_ENABLED
+    delete process.env.OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED
     delete process.env.OPPORTUNITY_CANARY_OWNER_IDS
+    delete process.env.OPPORTUNITY_CANARY_WORKSPACE_IDS
     delete process.env.AGENCY_DNA_V1_ENABLED
     delete process.env.AGENCY_DNA_V1_CANARY_WORKSPACE_IDS
     delete process.env.OPPORTUNITY_SCORING_V2_ENABLED
@@ -192,10 +199,26 @@ describe('opportunity background jobs', () => {
   afterAll(() => {
     if (originalFlag === undefined) delete process.env.OPPORTUNITY_ENGINE_V1_ENABLED
     else process.env.OPPORTUNITY_ENGINE_V1_ENABLED = originalFlag
+    if (originalOutcomesFlag === undefined) {
+      delete process.env.OPPORTUNITY_OUTCOMES_ENABLED
+    } else {
+      process.env.OPPORTUNITY_OUTCOMES_ENABLED = originalOutcomesFlag
+    }
+    if (originalWorkspaceContextFlag === undefined) {
+      delete process.env.OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED
+    } else {
+      process.env.OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED =
+        originalWorkspaceContextFlag
+    }
     if (originalCanaryOwners === undefined) {
       delete process.env.OPPORTUNITY_CANARY_OWNER_IDS
     } else {
       process.env.OPPORTUNITY_CANARY_OWNER_IDS = originalCanaryOwners
+    }
+    if (originalCanaryWorkspaces === undefined) {
+      delete process.env.OPPORTUNITY_CANARY_WORKSPACE_IDS
+    } else {
+      process.env.OPPORTUNITY_CANARY_WORKSPACE_IDS = originalCanaryWorkspaces
     }
     if (originalAgencyDnaFlag === undefined) {
       delete process.env.AGENCY_DNA_V1_ENABLED
@@ -618,6 +641,7 @@ describe('opportunity background jobs', () => {
   })
 
   it('persists the exact Agency DNA version, capability matches, and restriction snapshot', async () => {
+    process.env.OPPORTUNITY_CANARY_WORKSPACE_IDS = '9'
     process.env.AGENCY_DNA_V1_CANARY_WORKSPACE_IDS = '9'
     let opportunitySql = ''
     let opportunityParams: readonly unknown[] = []
@@ -681,6 +705,7 @@ describe('opportunity background jobs', () => {
   })
 
   it('persists a versioned strategist brief only for the exact workspace canary', async () => {
+    process.env.OPPORTUNITY_CANARY_WORKSPACE_IDS = '9'
     process.env.AGENCY_DNA_V1_CANARY_WORKSPACE_IDS = '9'
     process.env.OPPORTUNITY_STRATEGIST_V1_CANARY_WORKSPACE_IDS = '9'
     let opportunityParams: readonly unknown[] = []
@@ -735,6 +760,7 @@ describe('opportunity background jobs', () => {
   })
 
   it('keeps legacy brief persistence unchanged when Strategist is disabled', async () => {
+    process.env.OPPORTUNITY_CANARY_WORKSPACE_IDS = '9'
     process.env.AGENCY_DNA_V1_CANARY_WORKSPACE_IDS = '9'
     let opportunityParams: readonly unknown[] = []
     const db = dbWithQuery((sql, params) => {
@@ -763,6 +789,7 @@ describe('opportunity background jobs', () => {
   })
 
   it('persists same-input v1 and v2 scoring only for the workspace canary', async () => {
+    process.env.OPPORTUNITY_CANARY_WORKSPACE_IDS = '9'
     process.env.AGENCY_DNA_V1_CANARY_WORKSPACE_IDS = '9'
     process.env.OPPORTUNITY_SCORING_V2_CANARY_WORKSPACE_IDS = '9'
     let opportunityParams: readonly unknown[] = []
@@ -832,6 +859,7 @@ describe('opportunity background jobs', () => {
   })
 
   it('persists a v2 shadow snapshot while keeping v1 authoritative', async () => {
+    process.env.OPPORTUNITY_CANARY_WORKSPACE_IDS = '9'
     process.env.AGENCY_DNA_V1_CANARY_WORKSPACE_IDS = '9'
     process.env.OPPORTUNITY_SCORING_V2_SHADOW_CANARY_WORKSPACE_IDS = '9'
     let opportunityParams: readonly unknown[] = []
@@ -886,6 +914,7 @@ describe('opportunity background jobs', () => {
   })
 
   it('backfills a missing shadow snapshot without rewriting unchanged v1', async () => {
+    process.env.OPPORTUNITY_CANARY_WORKSPACE_IDS = '9'
     process.env.AGENCY_DNA_V1_CANARY_WORKSPACE_IDS = '9'
     process.env.OPPORTUNITY_SCORING_V2_SHADOW_CANARY_WORKSPACE_IDS = '9'
     let selectionCount = 0
@@ -957,6 +986,7 @@ describe('opportunity background jobs', () => {
   })
 
   it('treats an explicit v1 request as a shadow rollback boundary', async () => {
+    process.env.OPPORTUNITY_CANARY_WORKSPACE_IDS = '9'
     process.env.AGENCY_DNA_V1_CANARY_WORKSPACE_IDS = '9'
     process.env.OPPORTUNITY_SCORING_V2_SHADOW_CANARY_WORKSPACE_IDS = '9'
     let scoringSnapshotInsertCount = 0
@@ -1236,8 +1266,9 @@ describe('opportunity background jobs', () => {
   })
 
   it('does not revive an elapsed snooze during scoring supersession', async () => {
-    process.env.AGENCY_DNA_V1_ENABLED = 'true'
-    process.env.OPPORTUNITY_SCORING_V2_ENABLED = 'true'
+    process.env.OPPORTUNITY_CANARY_WORKSPACE_IDS = '9'
+    process.env.AGENCY_DNA_V1_CANARY_WORKSPACE_IDS = '9'
+    process.env.OPPORTUNITY_SCORING_V2_CANARY_WORKSPACE_IDS = '9'
     const elapsedSnooze = '2026-08-02T09:00:00.000Z'
     let deletedElapsedState = false
     let insertedParams: readonly unknown[] = []
@@ -1249,6 +1280,7 @@ describe('opportunity background jobs', () => {
             currentOpportunityId: '100',
             currentInputHash: '0'.repeat(64),
             currentScoringVersion: 'opportunity-v1',
+            buildScoringVersion: 'opportunity-v2',
           })],
         }
       }
@@ -1544,8 +1576,9 @@ describe('opportunity background jobs', () => {
   })
 
   it('snooze deadline survives scoring supersession', async () => {
-    process.env.AGENCY_DNA_V1_ENABLED = 'true'
-    process.env.OPPORTUNITY_SCORING_V2_ENABLED = 'true'
+    process.env.OPPORTUNITY_CANARY_WORKSPACE_IDS = '9'
+    process.env.AGENCY_DNA_V1_CANARY_WORKSPACE_IDS = '9'
+    process.env.OPPORTUNITY_SCORING_V2_CANARY_WORKSPACE_IDS = '9'
     const sqlSeen: string[] = []
     const snoozedUntil = '2026-08-02T09:00:00.000Z'
     let storedParams: readonly unknown[] = []
@@ -1558,6 +1591,7 @@ describe('opportunity background jobs', () => {
             currentOpportunityId: '100',
             currentInputHash: '0'.repeat(64),
             currentScoringVersion: 'opportunity-v1',
+            buildScoringVersion: 'opportunity-v2',
           })],
         }
       }
@@ -1624,8 +1658,9 @@ describe('opportunity background jobs', () => {
   })
 
   it('repairs an orphaned future snooze before scoring supersession', async () => {
-    process.env.AGENCY_DNA_V1_ENABLED = 'true'
-    process.env.OPPORTUNITY_SCORING_V2_ENABLED = 'true'
+    process.env.OPPORTUNITY_CANARY_WORKSPACE_IDS = '9'
+    process.env.AGENCY_DNA_V1_CANARY_WORKSPACE_IDS = '9'
+    process.env.OPPORTUNITY_SCORING_V2_CANARY_WORKSPACE_IDS = '9'
     const snoozedUntil = '2026-08-02T09:00:00.000Z'
     let repairedStateParams: readonly unknown[] = []
     let storedParams: readonly unknown[] = []
@@ -1637,6 +1672,7 @@ describe('opportunity background jobs', () => {
             currentOpportunityId: '100',
             currentInputHash: '0'.repeat(64),
             currentScoringVersion: 'opportunity-v1',
+            buildScoringVersion: 'opportunity-v2',
           })],
         }
       }

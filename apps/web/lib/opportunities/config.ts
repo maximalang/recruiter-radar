@@ -82,6 +82,9 @@ export function isAgencyDnaV1EnabledForContext(
   context: OpportunityFeatureContext,
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): boolean {
+  if (!hasOpportunityIntelligencePrerequisitesForContext(context, env)) {
+    return false
+  }
   return isAgencyDnaV1Enabled(env) || matchesSingleCanaryId(
     context.workspaceId,
     env[AGENCY_DNA_V1_CANARY_WORKSPACE_IDS_FEATURE_FLAG],
@@ -238,10 +241,15 @@ export function isOpportunityCrmBridgeEnabledForContext(
 export function isOpportunityCrmBridgePublicCallbackEnabled(
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): boolean {
-  return isOpportunityEngineV1Enabled(env) &&
+  if (env[OPPORTUNITY_CRM_BRIDGE_FEATURE_FLAG] !== 'true') return false
+  const globalPrerequisites = isOpportunityEngineV1Enabled(env) &&
     isOpportunityOutcomesEnabled(env) &&
-    isOpportunityWorkspaceContextEnabled(env) &&
-    env[OPPORTUNITY_CRM_BRIDGE_FEATURE_FLAG] === 'true'
+    isOpportunityWorkspaceContextEnabled(env)
+  if (globalPrerequisites) return true
+  if (hasAmbiguousCanaryConfiguration(env)) return false
+  return parseSingleCanaryId(
+    env[OPPORTUNITY_CANARY_WORKSPACE_IDS_FEATURE_FLAG],
+  ) !== null
 }
 
 export function isOpportunityAnalyticsV2Enabled(
@@ -308,15 +316,29 @@ function matchesSingleCanaryId(
     ? ''
     : String(value)
   if (!/^[1-9]\d*$/.test(normalizedId)) return false
-  if (!rawAllowlist?.trim()) return false
+  return parseSingleCanaryId(rawAllowlist) === normalizedId
+}
 
+function parseSingleCanaryId(rawAllowlist: string | undefined): string | null {
+  if (!rawAllowlist?.trim()) return null
   const candidates = rawAllowlist
     .split(',')
     .map((candidate) => candidate.trim())
+  if (candidates.length !== 1 || !/^[1-9]\d{0,18}$/.test(candidates[0])) {
+    return null
+  }
+  return BigInt(candidates[0]) <= BigInt('9223372036854775807')
+    ? candidates[0]
+    : null
+}
 
-  return candidates.length === 1 &&
-    /^[1-9]\d*$/.test(candidates[0]) &&
-    candidates[0] === normalizedId
+function hasOpportunityIntelligencePrerequisitesForContext(
+  context: OpportunityFeatureContext,
+  env: Readonly<Record<string, string | undefined>>,
+): boolean {
+  return isOpportunityEngineV1EnabledForContext(context, env) &&
+    isOpportunityOutcomesEnabledForContext(context, env) &&
+    isOpportunityWorkspaceContextEnabledForContext(context, env)
 }
 
 export function clampOpportunityPageSize(value: number): number {

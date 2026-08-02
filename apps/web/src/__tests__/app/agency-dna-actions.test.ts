@@ -26,10 +26,12 @@ function form(entries: Record<string, string | string[]>): FormData {
 
 describe('Agency DNA profile actions', () => {
   const originalCanary = process.env.AGENCY_DNA_V1_CANARY_WORKSPACE_IDS
+  const originalBaseCanary = process.env.OPPORTUNITY_CANARY_WORKSPACE_IDS
 
   beforeEach(() => {
     jest.clearAllMocks()
     process.env.AGENCY_DNA_V1_CANARY_WORKSPACE_IDS = '9'
+    process.env.OPPORTUNITY_CANARY_WORKSPACE_IDS = '9'
     getSession.mockResolvedValue({
       userId: '5',
       dataOwnerId: '7',
@@ -43,6 +45,11 @@ describe('Agency DNA profile actions', () => {
       delete process.env.AGENCY_DNA_V1_CANARY_WORKSPACE_IDS
     } else {
       process.env.AGENCY_DNA_V1_CANARY_WORKSPACE_IDS = originalCanary
+    }
+    if (originalBaseCanary === undefined) {
+      delete process.env.OPPORTUNITY_CANARY_WORKSPACE_IDS
+    } else {
+      process.env.OPPORTUNITY_CANARY_WORKSPACE_IDS = originalBaseCanary
     }
   })
 
