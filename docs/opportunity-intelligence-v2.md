@@ -1,12 +1,13 @@
 # Opportunity Intelligence v2: current-state contract
 
-Статус: current-state contract через Phase 7; rollout flags выключены
-Дата среза: 2026-08-01
-Базовый commit: `ef09ce0`
+Статус: current-state contract через Phase 10; production rollout flags выключены
+Дата среза: 2026-08-02
+Implementation baseline: `046dc4f` (Phase 10 integration merge)
 
-Этот документ описывает только поведение, которое существует в коде на
-указанном commit, и границы последующих фаз. Он не является заявлением о
-готовности будущих функций.
+Этот документ описывает текущее согласованное поведение Phase 0–10. Исторические
+phase-документы сохраняют решения отдельных срезов, но при расхождении
+authoritative является этот current-state contract вместе с актуальной schema и
+runtime-кодом. Production deploy и включение flags не являются частью merge.
 
 ## Архитектурные решения
 
@@ -395,7 +396,7 @@ profile. Для старых opportunities без сохранённого cohor
 явные значения `legacy-unversioned`/`unknown`; текущий `client_profiles` не
 подмешивается задним числом.
 
-## Known contract drift
+## Resolved drift and intentional compatibility
 
 1. **Actor attribution.** Resolved in Phase 1 for enabled Auth v2 context;
    legacy/compatibility rows remain explicitly unattributed.
@@ -410,19 +411,24 @@ profile. Для старых opportunities без сохранённого cohor
    separate write.
 5. **UI split.** Resolved in Phase 2: first-party UI actions use `/outcomes`;
    `/action` remains only as a deprecated compatibility surface.
-6. **User actor invariant.** Outcome repository запрещает
-   `actor_user_id != owner_id`, что несовместимо с recruiter/admin action.
+6. **User actor invariant.** Resolved in Phase 1: enabled Auth v2 writes persist
+   the real workspace member as `actor_user_id`; PostgreSQL verifies recruiter,
+   admin, workspace switching and removed-membership history. Legacy mode keeps
+   compatibility owner attribution and cannot be silently downgraded while the
+   workspace boundary is enabled.
 7. **Canary identity.** Phase 1 supports exactly one owner or workspace
    allowlist; production activation remains disabled pending a real owner and
    opportunity.
-8. **Agency DNA versioning.** `client_profiles` не имеет
-   `agency_dna_version` и `agency_dna_snapshot_hash`; opportunity хранит hash,
-   но не immutable DNA snapshot.
+8. **Agency DNA versioning.** Resolved in Phase 4: `client_profiles` owns a
+   monotonic `agency_dna_version` and deterministic snapshot hash; immutable
+   opportunity DNA snapshots preserve the version used for scoring.
 9. **Cohort dimensions.** Resolved in Phase 2 for new opportunities: the full
    immutable cohort contract is persisted and all documented dimensions are
    parameterized funnel filters. Legacy rows use explicit unknown fallbacks.
-10. **External ingest.** Существующая global-secret схема не является
-    workspace credential model и поэтому принудительно выключена.
+10. **External ingest.** Resolved for supported integrations in Phase 8 through
+    workspace-scoped credentials, rotation/revocation, signed callbacks and a
+    replay ledger. The old global-secret route remains intentionally
+    fail-closed and is not a rollout path.
 11. **Auth compatibility.** `auth_v2_compat` и `legacy` не имеют role/
     permission snapshot; они допустимы только на ограниченный rollout period.
 12. **Historical actor deletion.** Membership removal не удаляет event;

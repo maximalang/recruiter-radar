@@ -14,5 +14,5 @@
 - [x] Add n8n, amoCRM and Bitrix24 templates without secrets.
 - [x] Add fail-closed config, counters and rollout documentation.
 - [x] Run full checks and five-axis pre-merge review.
-- [ ] Commit atomically, push, open one PR to `codex/opportunity-intelligence-v2`.
-- [ ] Merge only after the final green merge-gate, then start Phase 9.
+- [x] Commit atomically, push, open PR #126 to `codex/opportunity-intelligence-v2`.
+- [x] Merge after the final green merge-gate (`8cbe22e`), then start Phase 9.
