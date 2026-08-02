@@ -1127,7 +1127,11 @@ describe('opportunity background jobs', () => {
     })
 
     const result = await buildOpportunitiesJob(
-      { enabled: true, scoringVersion: 'opportunity-v2' },
+      {
+        enabled: true,
+        scoringVersion: 'opportunity-v2',
+        now: new Date('2026-08-01T09:00:00.000Z'),
+      },
       db,
     )
 
@@ -1206,7 +1210,11 @@ describe('opportunity background jobs', () => {
     })
 
     const result = await buildOpportunitiesJob(
-      { enabled: true, scoringVersion: 'opportunity-v2' },
+      {
+        enabled: true,
+        scoringVersion: 'opportunity-v2',
+        now: new Date('2026-08-01T09:00:00.000Z'),
+      },
       db,
     )
 
