@@ -1,14 +1,19 @@
 jest.mock('@/lib/auth-v2/authorization', () => ({
   getSession: jest.fn(),
 }))
+jest.mock('@/lib/runtime', () => ({
+  logEvent: jest.fn(),
+}))
 
 import { getSession } from '@/lib/auth-v2/authorization'
+import { logEvent } from '@/lib/runtime'
 import {
   getOpportunityAuthorizationContext,
   getOpportunityDataAccessContext,
 } from '@/lib/opportunities/authorization'
 
 const mockGetSession = jest.mocked(getSession)
+const mockLogEvent = jest.mocked(logEvent)
 
 describe('opportunity authorization context', () => {
   beforeEach(() => {
@@ -130,5 +135,9 @@ describe('opportunity authorization context', () => {
     await expect(
       getOpportunityAuthorizationContext('opportunities:write'),
     ).resolves.toBeNull()
+    expect(mockLogEvent).toHaveBeenCalledWith(
+      'opportunity.authorization_rejected',
+      { permission: 'opportunities:write' },
+    )
   })
 })

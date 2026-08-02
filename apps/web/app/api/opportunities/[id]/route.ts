@@ -14,6 +14,8 @@ import {
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
+const MAX_POSTGRES_BIGINT = BigInt('9223372036854775807')
+
 export async function GET(
   _request: NextRequest,
   context: { params: Promise<{ id: string }> },
@@ -37,7 +39,7 @@ export async function GET(
   }
 
   const { id } = await context.params
-  if (!/^[1-9]\d*$/.test(id)) {
+  if (!isPositivePostgresId(id)) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 })
   }
 
@@ -62,4 +64,9 @@ export async function GET(
       { status: 500 },
     )
   }
+}
+
+function isPositivePostgresId(value: string): boolean {
+  if (!/^[1-9]\d{0,18}$/.test(value)) return false
+  return BigInt(value) <= MAX_POSTGRES_BIGINT
 }

@@ -26,6 +26,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 const MAX_BODY_BYTES = 16 * 1024
+const MAX_POSTGRES_BIGINT = BigInt('9223372036854775807')
 
 export async function POST(
   request: NextRequest,
@@ -195,7 +196,8 @@ function isOutcomeApiEnabled(
 }
 
 function isPositiveId(value: string): boolean {
-  return /^[1-9]\d*$/.test(value)
+  if (!/^[1-9]\d{0,18}$/.test(value)) return false
+  return BigInt(value) <= MAX_POSTGRES_BIGINT
 }
 
 function parsePositiveInt(value: string | null, fallback: number): number | null {
@@ -209,7 +211,7 @@ function parsePositiveBigint(value: string | null): string | null {
   if (value === null) return null
   if (!/^[1-9]\d{0,18}$/.test(value)) return null
   try {
-    return BigInt(value) <= BigInt('9223372036854775807') ? value : null
+    return BigInt(value) <= MAX_POSTGRES_BIGINT ? value : null
   } catch {
     return null
   }

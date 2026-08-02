@@ -356,6 +356,18 @@ describe('opportunities API', () => {
     expect(mockedList).not.toHaveBeenCalled()
   })
 
+  it('rejects out-of-range database filters instead of widening the query', async () => {
+    mockedOwner.mockResolvedValue('7')
+
+    const response = await list(request(
+      '/api/opportunities?profile=9223372036854775808',
+    ))
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toEqual({ error: 'invalid_filter' })
+    expect(mockedList).not.toHaveBeenCalled()
+  })
+
   it('rejects malformed cursors instead of silently resetting pagination', async () => {
     mockedOwner.mockResolvedValue('7')
     const response = await list(request('/api/opportunities?cursor=not-a-cursor'))
@@ -377,6 +389,53 @@ describe('opportunities API', () => {
       workspaceId: null,
       opportunityId: '99',
     })
+  })
+
+  it('rejects PostgreSQL bigint overflow ids before repository access', async () => {
+    mockedOwner.mockResolvedValue('7')
+    const overflowId = '9223372036854775808'
+
+    const detailResponse = await detail(
+      request(`/api/opportunities/${overflowId}`),
+      { params: Promise.resolve({ id: overflowId }) },
+    )
+    const actionResponse = await action(
+      request(`/api/opportunities/${overflowId}/action`, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'accepted' }),
+      }),
+      { params: Promise.resolve({ id: overflowId }) },
+    )
+
+    expect(detailResponse.status).toBe(404)
+    expect(actionResponse.status).toBe(404)
+    expect(mockedDetail).not.toHaveBeenCalled()
+    expect(mockedAction).not.toHaveBeenCalled()
+  })
+
+  it('rejects non-object and oversized legacy action payloads', async () => {
+    mockedOwner.mockResolvedValue('7')
+
+    const nonObject = await action(
+      request('/api/opportunities/10/action', {
+        method: 'POST',
+        body: 'null',
+      }),
+      { params: Promise.resolve({ id: '10' }) },
+    )
+    const oversized = await action(
+      request('/api/opportunities/10/action', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'accepted', note: 'x'.repeat(17 * 1024) }),
+      }),
+      { params: Promise.resolve({ id: '10' }) },
+    )
+
+    expect(nonObject.status).toBe(400)
+    await expect(nonObject.json()).resolves.toEqual({ error: 'invalid_json' })
+    expect(oversized.status).toBe(400)
+    await expect(oversized.json()).resolves.toEqual({ error: 'payload_too_large' })
+    expect(mockedAction).not.toHaveBeenCalled()
   })
 
   it('validates actions and forwards an idempotency key', async () => {

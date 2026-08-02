@@ -1,4 +1,5 @@
 import { getSession } from '@/lib/auth-v2/authorization'
+import { logEvent } from '@/lib/runtime'
 import {
   hasWorkspacePermission,
   WORKSPACE_PERMISSIONS,
@@ -29,7 +30,10 @@ export async function getOpportunityAuthorizationContext(
   permission: WorkspacePermission,
 ): Promise<OpportunityAuthorizationContext | null> {
   const authorization = await getSession({ permission })
-  if (!authorization) return null
+  if (!authorization) {
+    logEvent('opportunity.authorization_rejected', { permission })
+    return null
+  }
   const role = authorization.role
 
   return {

@@ -23,6 +23,8 @@ import {
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
+const MAX_POSTGRES_BIGINT = BigInt('9223372036854775807')
+
 const STATUSES = new Set<OpportunityStatus>([
   'new',
   'review',
@@ -70,6 +72,17 @@ export async function GET(request: NextRequest) {
   if (cursorValue && cursorOffset === null) {
     return NextResponse.json({ error: 'invalid_cursor' }, { status: 400 })
   }
+  const rawClientProfileId = params.get('profile')
+  const clientProfileId = positiveId(rawClientProfileId)
+  const rawOrganizationId = params.get('organizationId') ??
+    params.get('organization')
+  const organizationId = positiveId(rawOrganizationId)
+  if (
+    (rawClientProfileId !== null && clientProfileId === null) ||
+    (rawOrganizationId !== null && organizationId === null)
+  ) {
+    return NextResponse.json({ error: 'invalid_filter' }, { status: 400 })
+  }
   try {
     const selectedView = view ?? (
       isOpportunityWorkflowV1EnabledForContext(authorization)
@@ -84,10 +97,8 @@ export async function GET(request: NextRequest) {
       workspaceId: access.workspaceId,
       morningBriefOnly: selectedView === 'morning',
       view: selectedView,
-      clientProfileId: positiveId(params.get('profile')),
-      organizationId: positiveId(
-        params.get('organizationId') ?? params.get('organization'),
-      ),
+      clientProfileId,
+      organizationId,
       statuses: parseStatuses(params.get('status')),
       confidenceGate: parseConfidenceGate(
         params.get('confidenceGate') ?? params.get('gate'),
@@ -173,7 +184,8 @@ function parseEpisodeType(value: string | null): HiringEpisodeType | null {
 }
 
 function positiveId(value: string | null): string | null {
-  return value && /^[1-9]\d*$/.test(value) ? value : null
+  if (!value || !/^[1-9]\d{0,18}$/.test(value)) return null
+  return BigInt(value) <= MAX_POSTGRES_BIGINT ? value : null
 }
 
 function positiveInteger(value: string | null): number | null {

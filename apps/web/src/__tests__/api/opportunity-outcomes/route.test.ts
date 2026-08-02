@@ -123,6 +123,31 @@ describe('opportunity outcomes API', () => {
     expect(mockedHistory).not.toHaveBeenCalled()
   })
 
+  it('rejects PostgreSQL bigint overflow ids before repository access', async () => {
+    const overflowId = '9223372036854775808'
+    const overflowContext = { params: Promise.resolve({ id: overflowId }) }
+
+    const historyResponse = await GET(
+      request(`/api/opportunities/${overflowId}/outcomes`),
+      overflowContext,
+    )
+    const recordResponse = await POST(
+      request(`/api/opportunities/${overflowId}/outcomes`, {
+        method: 'POST',
+        body: JSON.stringify({
+          eventType: 'accepted',
+          idempotencyKey: 'accepted:overflow',
+        }),
+      }),
+      overflowContext,
+    )
+
+    expect(historyResponse.status).toBe(404)
+    expect(recordResponse.status).toBe(404)
+    expect(mockedHistory).not.toHaveBeenCalled()
+    expect(mockedRecord).not.toHaveBeenCalled()
+  })
+
   it('returns 201 for a new event and strips internal identifiers', async () => {
     mockedRecord.mockResolvedValue({
       idempotent: false,

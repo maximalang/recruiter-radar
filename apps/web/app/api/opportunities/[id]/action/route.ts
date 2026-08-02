@@ -26,6 +26,9 @@ import {
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
+const MAX_BODY_BYTES = 16 * 1024
+const MAX_POSTGRES_BIGINT = BigInt('9223372036854775807')
+
 export async function POST(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
@@ -48,13 +51,21 @@ export async function POST(
     return legacyJson({ error: 'not_found' }, 404)
   }
   const { id } = await context.params
-  if (!/^[1-9]\d*$/.test(id)) {
+  if (!isPositivePostgresId(id)) {
     return legacyJson({ error: 'not_found' }, 404, id)
   }
 
   let body: Record<string, unknown>
   try {
-    body = await request.json() as Record<string, unknown>
+    const raw = await request.text()
+    if (Buffer.byteLength(raw, 'utf8') > MAX_BODY_BYTES) {
+      return legacyJson({ error: 'payload_too_large' }, 400, id)
+    }
+    const parsed = JSON.parse(raw) as unknown
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return legacyJson({ error: 'invalid_json' }, 400, id)
+    }
+    body = parsed as Record<string, unknown>
   } catch {
     return legacyJson({ error: 'invalid_json' }, 400, id)
   }
@@ -160,11 +171,16 @@ function legacyJson(
 ): NextResponse {
   const response = NextResponse.json(body, { status })
   response.headers.set('Deprecation', 'true')
-  if (opportunityId && /^[1-9]\d*$/.test(opportunityId)) {
+  if (opportunityId && isPositivePostgresId(opportunityId)) {
     response.headers.set(
       'Link',
       `</api/opportunities/${opportunityId}/outcomes>; rel="successor-version"`,
     )
   }
   return response
+}
+
+function isPositivePostgresId(value: string): boolean {
+  if (!/^[1-9]\d{0,18}$/.test(value)) return false
+  return BigInt(value) <= MAX_POSTGRES_BIGINT
 }
