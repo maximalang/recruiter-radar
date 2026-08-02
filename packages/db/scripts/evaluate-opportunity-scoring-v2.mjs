@@ -72,6 +72,7 @@ try {
         outcome.hiring_episode_id
     )
     SELECT
+      latest_v2."sampleKey",
       latest_v2."v1Score",
       latest_v2."v2Score",
       latest_v2."actionQueueEligible",
