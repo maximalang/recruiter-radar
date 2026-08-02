@@ -1,0 +1,42 @@
+{
+  "templateVersion": "1.0",
+  "provider": "bitrix24",
+  "officialDocumentation": "https://apidocs.bitrix24.ru/api-reference/crm/universal/crm-item-add.html",
+  "operation": {
+    "method": "crm.item.add",
+    "authentication": "automation_platform_credential",
+    "entityTypeId": 2
+  },
+  "deduplication": {
+    "source": "X-RR-Webhook-Id",
+    "persistInCustomField": "UF_CRM_RR_EVENT",
+    "opportunityIdentityField": "UF_CRM_RR_OPPORTUNITY"
+  },
+  "params": {
+    "entityTypeId": 2,
+    "fields": {
+      "title": "{{opportunity.title}}",
+      "sourceDescription": "Recruiter Radar",
+      "UF_CRM_RR_OPPORTUNITY": "{{opportunity.opportunityReference}}",
+      "UF_CRM_RR_EVENT": "{{eventId}}",
+      "UF_CRM_RR_ORGANIZATION": "{{opportunity.organizationName}}",
+      "UF_CRM_RR_WHY_NOW": "{{opportunity.whyNow}}",
+      "UF_CRM_RR_ANGLE": "{{opportunity.recommendedAngle}}",
+      "UF_CRM_RR_SCORE": "{{opportunity.opportunityScore}}",
+      "UF_CRM_RR_EVIDENCE": "{{opportunity.evidenceUrls}}"
+    }
+  },
+  "outcomeMapping": {
+    "contacted": "contacted",
+    "replied": "replied",
+    "meeting": "meeting",
+    "proposal": "proposal",
+    "won": "won",
+    "lost": "lost"
+  },
+  "callbackBody": {
+    "opportunityReference": "{{UF_CRM_RR_OPPORTUNITY}}",
+    "eventType": "{{mappedOutcome}}",
+    "occurredAt": "{{providerEventOccurredAt}}"
+  }
+}

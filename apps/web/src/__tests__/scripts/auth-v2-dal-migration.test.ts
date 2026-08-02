@@ -61,7 +61,7 @@ describe("Auth v2 DAL migration contract", () => {
       "app/profile/page.tsx": ["profiles:read"],
       "app/profile/actions.ts": ["profiles:write"],
       "app/profile/notification-actions.ts": ["notifications:write"],
-      "app/leads/page.tsx": ["leads:read"],
+      "app/leads/leads-page-content.tsx": ["leads:read"],
       "app/api/leads/export/route.ts": ["exports:create"],
       "app/review/page.tsx": ["leads:read"],
       "app/api/review/route.ts": ["leads:write"],

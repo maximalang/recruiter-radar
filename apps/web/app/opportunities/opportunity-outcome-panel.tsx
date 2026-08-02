@@ -11,6 +11,10 @@ type OutcomeAction = 'accepted' | 'dismissed' | 'snoozed' | 'contacted' |
   'resumed' | 'replied' | 'meeting' | 'meeting_completed' |
   'meeting_cancelled' | 'meeting_no_show' | 'proposal' | 'won' | 'lost' |
   'reverted'
+type PendingOutcomeCommand = {
+  idempotencyKey: string
+  occurredAt: string
+}
 
 interface HistoryEvent {
   eventType: string
@@ -19,6 +23,10 @@ interface HistoryEvent {
   recordedAt: string
   appendOrder: string
   actorType: string
+  actorUserId?: string | null
+  actorWorkspaceId?: string | null
+  actorRoleSnapshot?: string | null
+  actorAttribution?: 'workspace' | 'legacy'
   reason: { code: string; label: string; note: string | null } | null
   channel: string | null
   contactPathType: string | null
@@ -200,7 +208,9 @@ export function OpportunityOutcomePanel(props: {
   const [error, setError] = useState<string | null>(null)
   const openedSent = useRef(false)
   const interactionId = useRef(createKey())
-  const retryKeys = useRef<Partial<Record<OutcomeAction, string>>>({})
+  const retryCommands = useRef<
+    Partial<Record<OutcomeAction, PendingOutcomeCommand>>
+  >({})
   const fallbackStage = isStage(props.fallbackStage) ? props.fallbackStage : 'new'
   const stage = history?.state?.currentStage ?? fallbackStage
   const workflowState = history?.state?.workflowState ?? 'active'
@@ -301,14 +311,17 @@ export function OpportunityOutcomePanel(props: {
       setError(validationError)
       return
     }
-    const idempotencyKey = retryKeys.current[action] ?? createKey()
-    retryKeys.current[action] = idempotencyKey
+    const command = retryCommands.current[action] ?? {
+      idempotencyKey: createKey(),
+      occurredAt: new Date().toISOString(),
+    }
+    retryCommands.current[action] = command
     setPending(action)
     setError(null)
     try {
       const body = actionPayload(
         action,
-        idempotencyKey,
+        command,
         reasonCode,
         reasonNote,
         channel,
@@ -318,15 +331,13 @@ export function OpportunityOutcomePanel(props: {
         snoozedUntil,
         history?.correction?.targetEventId ?? null,
       )
-      const legacyAction = ['accepted', 'dismissed', 'contacted']
-        .includes(action)
       const response = await fetch(
-        `/api/opportunities/${props.opportunityId}/${legacyAction ? 'action' : 'outcomes'}`,
+        `/api/opportunities/${props.opportunityId}/outcomes`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Idempotency-Key': idempotencyKey,
+            'Idempotency-Key': command.idempotencyKey,
           },
           body: JSON.stringify(body),
         },
@@ -337,7 +348,7 @@ export function OpportunityOutcomePanel(props: {
         } | null
         throw new Error(responseBody?.error ?? 'action_failed')
       }
-      delete retryKeys.current[action]
+      delete retryCommands.current[action]
       setSelectedAction(null)
       setReasonCode('')
       setReasonNote('')
@@ -406,6 +417,14 @@ export function OpportunityOutcomePanel(props: {
                 >
                   <span>{formatDateTime(event.occurredAt)}</span>
                   <strong>{event.label}</strong>
+                  {event.actorAttribution === 'workspace' &&
+                  event.actorUserId &&
+                  event.actorRoleSnapshot ? (
+                    <small>
+                      Действие: {event.actorRoleSnapshot} · пользователь #
+                      {event.actorUserId}
+                    </small>
+                  ) : null}
                   {event.isReverted ? <small>Отменено</small> : null}
                   {event.reason ? <small>{event.reason.label}</small> : null}
                   {event.channel ? <small>Канал: {event.channel}</small> : null}
@@ -659,7 +678,7 @@ function OutcomeDetailsForm(props: {
 
 function actionPayload(
   action: OutcomeAction,
-  idempotencyKey: string,
+  command: PendingOutcomeCommand,
   reasonCode: string,
   reasonNote: string,
   channel: string,
@@ -669,26 +688,20 @@ function actionPayload(
   snoozedUntil: string,
   revertsEventId: string | null,
 ) {
-  if (['accepted', 'dismissed', 'contacted'].includes(action)) {
-    return {
-      action,
-      ...(action === 'dismissed' ? {
-        reasonCode,
-        ...(reasonNote.trim() ? { note: reasonNote.trim() } : {}),
-      } : {}),
-      ...(action === 'contacted' ? { channel, contactPathType } : {}),
-    }
-  }
   const valueMinor = action === 'won' && dealValue.trim()
     ? rublesToMinor(dealValue)
     : null
   return {
     eventType: action,
-    occurredAt: new Date().toISOString(),
-    reasonCode: action === 'lost' ? reasonCode : null,
-    reasonNote: action === 'lost' && reasonNote.trim() ? reasonNote.trim() : null,
-    channel: null,
-    contactPathType: null,
+    occurredAt: command.occurredAt,
+    reasonCode:
+      action === 'dismissed' || action === 'lost' ? reasonCode : null,
+    reasonNote:
+      (action === 'dismissed' || action === 'lost') && reasonNote.trim()
+        ? reasonNote.trim()
+        : null,
+    channel: action === 'contacted' ? channel : null,
+    contactPathType: action === 'contacted' ? contactPathType : null,
     ...(action === 'snoozed'
       ? snoozedUntil
         ? { snoozedUntil: new Date(`${snoozedUntil}T23:59:59`).toISOString() }
@@ -698,7 +711,7 @@ function actionPayload(
     valueMinor,
     currency: valueMinor === null ? null : 'RUB',
     metadata: action === 'meeting' ? { meetingStatus: 'scheduled' } : {},
-    idempotencyKey,
+    idempotencyKey: command.idempotencyKey,
   }
 }
 

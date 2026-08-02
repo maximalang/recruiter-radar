@@ -19,10 +19,12 @@ const {
     ownerId: string,
     phase: 'pre_activation' | 'active',
     env: Readonly<Record<string, string | undefined>>,
+    workspaceId?: string | null,
   ) => boolean
   resolveOpportunityCanaryFlags: (
     ownerId: string,
     env: Readonly<Record<string, string | undefined>>,
+    workspaceId?: string | null,
   ) => CanaryFlags
 }
 
@@ -154,5 +156,40 @@ describe('opportunity canary effective flags', () => {
       'active',
       { ...active, OPPORTUNITY_OUTCOMES_EXTERNAL_INGEST_ENABLED: 'true' },
     )).toBe(false)
+  })
+
+  it('supports one exact workspace canary while keeping all global flags false', () => {
+    const active = {
+      OPPORTUNITY_ENGINE_V1_ENABLED: 'false',
+      OPPORTUNITY_OUTCOMES_ENABLED: 'false',
+      OPPORTUNITY_OUTCOMES_UI_ENABLED: 'false',
+      OPPORTUNITY_OUTCOMES_EXTERNAL_INGEST_ENABLED: 'false',
+      OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED: 'false',
+      OPPORTUNITY_CANARY_OWNER_IDS: '',
+      OPPORTUNITY_CANARY_WORKSPACE_IDS: '9',
+    }
+
+    expect(resolveOpportunityCanaryFlags('7', active, '9')).toEqual({
+      engine: true,
+      outcomes: true,
+      ui: true,
+    })
+    expect(isOpportunityCanaryActivationReady(
+      '7',
+      'active',
+      active,
+      '9',
+    )).toBe(true)
+    expect(isOpportunityCanaryActivationReady(
+      '7',
+      'pre_activation',
+      active,
+      '9',
+    )).toBe(false)
+    expect(resolveOpportunityCanaryFlags('7', active, '8')).toEqual({
+      engine: false,
+      outcomes: false,
+      ui: false,
+    })
   })
 })

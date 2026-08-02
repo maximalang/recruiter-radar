@@ -13,6 +13,7 @@ jest.mock('next/navigation', () => ({
 
 const OPPORTUNITY: OpportunityItem = {
   id: '10',
+  publicReference: '2bc92f8e-8930-4af1-b743-14c0c0df2650',
   ownerId: '7',
   clientProfileId: '8',
   organizationId: '9',
@@ -40,6 +41,8 @@ const OPPORTUNITY: OpportunityItem = {
   validUntil: '2026-08-15T00:00:00.000Z',
   snoozedUntil: null,
   metadata: {},
+  strategistBrief: null,
+  workflow: null,
   createdAt: '2026-07-26T00:00:00.000Z',
   updatedAt: '2026-07-26T00:00:00.000Z',
   evidenceCount: 1,
@@ -60,13 +63,27 @@ const OPPORTUNITY: OpportunityItem = {
 }
 
 describe('OpportunityCard', () => {
+  const DECISION_HEADINGS = [
+    'Что изменилось',
+    'Почему сейчас',
+    'Почему подходит агентству',
+    'Доказательства',
+    'Предполагаемая задача',
+    'Рекомендуемая персона',
+    'Рекомендуемый заход',
+    'Релевантный кейс',
+    'Ограничения',
+    'Следующее действие',
+    'Коммерческая история',
+  ]
+
   it('renders evidence-backed brief copy and the evidence timeline', () => {
     render(<OpportunityCard opportunity={OPPORTUNITY} />)
 
     expect(screen.getByRole('heading', { name: 'Пример ускорила найм' })).toBeInTheDocument()
     expect(screen.getByText('За 14 дней открыто 8 вакансий.')).toBeInTheDocument()
     expect(screen.getByText('Почему подходит агентству')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Лента доказательств' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Доказательства' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Backend developer' })).toHaveAttribute(
       'href',
       'https://example.test/jobs/1',
@@ -77,6 +94,34 @@ describe('OpportunityCard', () => {
       '#evidence-10',
     )
     expect(screen.getByLabelText('Оценка возможности: 82 из 100')).toBeInTheDocument()
+  })
+
+  it('keeps all eleven decision sections and marks missing strategist data honestly', () => {
+    render(<OpportunityCard opportunity={OPPORTUNITY} />)
+
+    for (const heading of DECISION_HEADINGS) {
+      expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument()
+    }
+    expect(screen.getByRole('article')).toHaveAttribute(
+      'data-content-state',
+      'insufficient',
+    )
+    expect(screen.getByText(
+      'Для части выводов пока недостаточно подтверждённых данных.',
+    )).toBeInTheDocument()
+    expect(screen.getAllByText('Недостаточно подтверждённых данных.').length)
+      .toBeGreaterThan(0)
+  })
+
+  it('marks an expired validity window as stale without hiding evidence', () => {
+    render(<OpportunityCard opportunity={{
+      ...OPPORTUNITY,
+      validUntil: '2020-01-01T00:00:00.000Z',
+    }} />)
+
+    expect(screen.getByRole('article')).toHaveAttribute('data-freshness', 'stale')
+    expect(screen.getByText(/Срок актуальности закончился/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Backend developer' })).toBeInTheDocument()
   })
 
   it('does not make a non-http evidence URL clickable', () => {
@@ -104,6 +149,45 @@ describe('OpportunityCard', () => {
     expect(screen.getByText('Предложение')).toBeInTheDocument()
     expect(screen.queryByText('Связались')).toBeNull()
   })
+
+  it('renders the complete strategist card with explicit evidence and heuristic labels', () => {
+    render(<OpportunityCard opportunity={{
+      ...OPPORTUNITY,
+      strategistBrief: {
+        version: 'opportunity-strategist-v1',
+        whatChanged: evidenceConclusion('Открыто 8 вакансий.', ['1']),
+        whyNow: evidenceConclusion('Сигнал появился на этой неделе.', ['1']),
+        problemHypothesis: heuristicConclusion('Команде может требоваться помощь.'),
+        agencyFitExplanation: heuristicConclusion('Есть профильное совпадение.'),
+        externalSupportNeedExplanation: evidenceConclusion(
+          'Темп найма вырос.',
+          ['1'],
+        ),
+        recommendedPersona: heuristicConclusion('Проверить функцию HRD.'),
+        recommendedAngle: heuristicConclusion('Начать со сложных ролей.'),
+        recommendedCaseStudy: heuristicConclusion('Точного кейса нет.'),
+        recommendedNextAction: heuristicConclusion('Подготовить ручной черновик.'),
+        riskSignals: [heuristicConclusion('Бюджет не подтверждён.')],
+        limitations: [heuristicConclusion('Нужна ручная проверка.')],
+      },
+    }} />)
+
+    for (const heading of DECISION_HEADINGS) {
+      expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument()
+    }
+    expect(screen.getByRole('article')).toHaveAttribute(
+      'data-content-state',
+      'complete',
+    )
+    expect(screen.getAllByText('Основано на доказательствах').length)
+      .toBeGreaterThan(0)
+    expect(screen.getAllByText('Гипотеза — проверьте вручную').length)
+      .toBeGreaterThan(0)
+    expect(screen.getAllByText('Подтверждения: №1').length).toBeGreaterThan(0)
+    expect(screen.getByText('Риски')).toBeInTheDocument()
+    expect(screen.getByText('Ограничения')).toBeInTheDocument()
+    expect(screen.getByText('Подготовить ручной черновик.')).toBeInTheDocument()
+  })
 })
 
 describe('OpportunityActions', () => {
@@ -118,12 +202,14 @@ describe('OpportunityActions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'В работу' }))
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
-      '/api/opportunities/10/action',
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({ action: 'accepted' }),
-      }),
+      '/api/opportunities/10/outcomes',
+      expect.objectContaining({ method: 'POST' }),
     ))
+    const requestInit = jest.mocked(global.fetch).mock.calls[0]?.[1]
+    expect(JSON.parse(String(requestInit?.body))).toEqual({
+      eventType: 'accepted',
+      occurredAt: expect.any(String),
+    })
     expect(refresh).toHaveBeenCalledTimes(1)
   })
 
@@ -138,3 +224,11 @@ describe('OpportunityActions', () => {
     )
   })
 })
+
+function evidenceConclusion(text: string, supportingEvidenceIds: string[]) {
+  return { text, basis: 'evidence' as const, supportingEvidenceIds }
+}
+
+function heuristicConclusion(text: string) {
+  return { text, basis: 'heuristic' as const, supportingEvidenceIds: [] }
+}

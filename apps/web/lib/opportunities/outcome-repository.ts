@@ -1,5 +1,9 @@
 import type { PoolClient } from 'pg'
 
+import {
+  WORKSPACE_ROLES,
+  type WorkspaceRole,
+} from '@/lib/auth-v2/workspaces'
 import { getClient, getPool } from '@/lib/db-pool'
 import { logEvent } from '@/lib/runtime'
 import {
@@ -23,6 +27,10 @@ import {
 import {
   protectOutcomeContactReference,
 } from './outcome-contact-privacy'
+import {
+  createOpportunityAnalyticsCohort,
+  isCompleteOpportunityAnalyticsCohort,
+} from './analytics-cohort'
 
 type OutcomeDb = Pick<PoolClient, 'query'>
 type OutcomeActorType = 'user' | 'system' | 'external' | 'admin'
@@ -78,6 +86,7 @@ export class OutcomeCorrectionConflictError extends Error {
 interface OutcomeOpportunityContext {
   id: string
   ownerId: string
+  workspaceId: string | null
   clientProfileId: string
   organizationId: string
   hiringEpisodeId: string
@@ -90,6 +99,9 @@ interface OutcomeOpportunityContext {
   externalSupportNeedScore: number
   episodeType: string
   episodeStatus: string
+  profileSnapshotHash: string | null
+  analyticsCohort: unknown
+  assignedUserId: string | null
 }
 
 export interface PublicOutcomeEvent {
@@ -124,6 +136,10 @@ export interface PublicOutcomeHistoryEvent {
   recordedAt: string
   appendOrder: string
   actorType: OutcomeActorType
+  actorUserId: string | null
+  actorWorkspaceId: string | null
+  actorRoleSnapshot: WorkspaceRole | null
+  actorAttribution: 'workspace' | 'legacy'
   reason: { code: string; label: string; note: string | null } | null
   channel: OpportunityOutcomeInput['channel']
   contactPathType: OpportunityOutcomeInput['contactPathType']
@@ -164,13 +180,24 @@ export interface OutcomeHistoryResult {
 
 export interface OutcomeFunnelFilter {
   ownerId: string | number
+  workspaceId?: string | number | null
   from: string
   to: string
+  clientProfileId?: string | null
+  clientProfileVersion?: string | null
+  agencyDnaVersion?: string | null
+  hiringMode?: string | null
+  specialization?: string | null
+  matchedRoleFamily?: string | null
+  matchedIndustry?: string | null
+  matchedRegion?: string | null
+  organizationSizeBucket?: string | null
   episodeType?: string | null
   confidenceGate?: string | null
   sourceFamily?: string | null
   scoreBucket?: string | null
   externalSupportNeedBucket?: 'low' | 'medium' | 'high' | null
+  scoringVersion?: string | null
   cohort?: 'shown' | 'accepted'
   maturityDays?: number
 }
@@ -225,14 +252,28 @@ export interface OutcomeFunnelSummary {
 
 export interface RecordOpportunityOutcomeInput {
   ownerId: string | number
+  workspaceId?: string | number | null
   opportunityId: string | number
   actorType: OutcomeActorType
   actorUserId?: string | number | null
+  actorWorkspaceId?: string | number | null
+  actorRoleSnapshot?: WorkspaceRole | null
+  authMode?: 'auth_v2' | 'auth_v2_compat' | 'legacy'
   payload: unknown
+  /**
+   * Stable semantic command used only by compatibility adapters whose source
+   * request has no occurredAt field. The canonical endpoint hashes `payload`.
+   */
+  idempotencyPayload?: unknown
   externalSystem?: string | null
   externalEventId?: string | null
   dedupeKey?: string | null
   ownerLockHeld?: boolean
+  /**
+   * Clock used by trusted system jobs when validating lifecycle timestamps,
+   * including deterministic runtime checks.
+   */
+  validationNow?: Date
 }
 
 export async function lockOutcomeOwnerShared(
@@ -293,6 +334,7 @@ export async function recordOpportunityOutcome(
 export async function getOpportunityOutcomeHistory(
   input: {
     ownerId: string | number
+    workspaceId?: string | number | null
     opportunityId: string | number
     beforeEventId?: string | null
     pageSize?: number
@@ -303,15 +345,22 @@ export async function getOpportunityOutcomeHistory(
   const pageSize = Math.min(Math.max(Math.trunc(input.pageSize ?? 50), 1), 100)
   const ownerId = String(input.ownerId)
   const opportunityId = String(input.opportunityId)
+  const availabilityParams: unknown[] = [opportunityId, ownerId]
+  const workspaceClause = input.workspaceId == null
+    ? ''
+    : ' AND workspace_id = $3'
+  if (input.workspaceId != null) {
+    availabilityParams.push(String(input.workspaceId))
+  }
   const available = await db.query<{
     status: string
     supersededAt: string | null
   }>(
     `SELECT status, superseded_at::TEXT AS "supersededAt"
      FROM opportunities
-     WHERE id = $1 AND owner_id = $2
+     WHERE id = $1 AND owner_id = $2${workspaceClause}
      LIMIT 1`,
-    [opportunityId, ownerId],
+    availabilityParams,
   )
   if (!available.rows[0]) return null
 
@@ -329,6 +378,9 @@ export async function getOpportunityOutcomeHistory(
     occurredAt: string
     recordedAt: string
     actorType: OutcomeActorType
+    actorUserId: string | null
+    actorWorkspaceId: string | null
+    actorRoleSnapshot: WorkspaceRole | null
     reasonCode: string | null
     reasonNote: string | null
     channel: OpportunityOutcomeInput['channel']
@@ -359,6 +411,9 @@ export async function getOpportunityOutcomeHistory(
        event.occurred_at::TEXT AS "occurredAt",
        event.recorded_at::TEXT AS "recordedAt",
        event.actor_type AS "actorType",
+       event.actor_user_id::TEXT AS "actorUserId",
+       event.actor_workspace_id::TEXT AS "actorWorkspaceId",
+       event.actor_role_snapshot AS "actorRoleSnapshot",
        event.reason_code AS "reasonCode",
        event.reason_note AS "reasonNote",
        event.channel,
@@ -412,6 +467,13 @@ export async function getOpportunityOutcomeHistory(
       recordedAt: event.recordedAt,
       appendOrder: event.id,
       actorType: event.actorType,
+      actorUserId: event.actorUserId,
+      actorWorkspaceId: event.actorWorkspaceId,
+      actorRoleSnapshot: event.actorRoleSnapshot,
+      actorAttribution:
+        event.actorWorkspaceId && event.actorRoleSnapshot
+          ? 'workspace'
+          : 'legacy',
       reason: event.reasonCode
         ? {
             code: event.reasonCode,
@@ -534,6 +596,69 @@ export async function getOutcomeFunnelSummary(
     cohortEvent,
   ]
   const cohortClauses: string[] = []
+  const workspaceJoin = input.workspaceId == null
+    ? ''
+    : `JOIN opportunities scoped_opportunity
+         ON scoped_opportunity.id = event.opportunity_id
+        AND scoped_opportunity.owner_id = event.owner_id`
+  const workspaceClause = input.workspaceId == null
+    ? ''
+    : `AND scoped_opportunity.workspace_id = $5`
+  if (input.workspaceId != null) {
+    params.push(String(input.workspaceId))
+  }
+  if (input.clientProfileId) {
+    params.push(input.clientProfileId)
+    cohortClauses.push(
+      `cohort_snapshot->>'clientProfileId' = $${params.length}`,
+    )
+  }
+  if (input.clientProfileVersion) {
+    params.push(input.clientProfileVersion)
+    cohortClauses.push(
+      `cohort_snapshot->>'clientProfileVersion' = $${params.length}`,
+    )
+  }
+  if (input.agencyDnaVersion) {
+    params.push(input.agencyDnaVersion)
+    cohortClauses.push(
+      `cohort_snapshot->>'agencyDnaVersion' = $${params.length}`,
+    )
+  }
+  if (input.hiringMode) {
+    params.push(input.hiringMode)
+    cohortClauses.push(`cohort_snapshot->>'hiringMode' = $${params.length}`)
+  }
+  if (input.specialization) {
+    params.push(input.specialization)
+    cohortClauses.push(
+      `cohort_snapshot->>'specialization' = $${params.length}`,
+    )
+  }
+  if (input.matchedRoleFamily) {
+    params.push(input.matchedRoleFamily)
+    cohortClauses.push(
+      `cohort_snapshot->'matchedRoleFamilies' ? $${params.length}`,
+    )
+  }
+  if (input.matchedIndustry) {
+    params.push(input.matchedIndustry)
+    cohortClauses.push(
+      `cohort_snapshot->'matchedIndustries' ? $${params.length}`,
+    )
+  }
+  if (input.matchedRegion) {
+    params.push(input.matchedRegion)
+    cohortClauses.push(
+      `cohort_snapshot->'matchedRegions' ? $${params.length}`,
+    )
+  }
+  if (input.organizationSizeBucket) {
+    params.push(input.organizationSizeBucket)
+    cohortClauses.push(
+      `cohort_snapshot->>'organizationSizeBucket' = $${params.length}`,
+    )
+  }
   if (input.episodeType) {
     params.push(input.episodeType)
     cohortClauses.push(`cohort_snapshot->>'episodeType' = $${params.length}`)
@@ -558,19 +683,27 @@ export async function getOutcomeFunnelSummary(
       `cohort_snapshot->>'externalSupportNeedBucket' = $${params.length}`,
     )
   }
+  if (input.scoringVersion) {
+    params.push(input.scoringVersion)
+    cohortClauses.push(
+      `cohort_snapshot->>'scoringVersion' = $${params.length}`,
+    )
+  }
 
   type FunnelRow = Record<string, string | null>
   const result = await db.query<FunnelRow>(
     `WITH owner_events AS (
        SELECT
-         id,
-         opportunity_id,
-         event_type,
-         occurred_at,
-         analytics_snapshot,
-         reverts_event_id
-       FROM opportunity_outcome_events
-       WHERE owner_id = $1
+         event.id,
+         event.opportunity_id,
+         event.event_type,
+         event.occurred_at,
+         event.analytics_snapshot,
+         event.reverts_event_id
+       FROM opportunity_outcome_events event
+       ${workspaceJoin}
+       WHERE event.owner_id = $1
+         ${workspaceClause}
      ), active_events AS (
        SELECT event.*
        FROM owner_events event
@@ -801,7 +934,35 @@ export async function recordOpportunityOutcomeInTransaction(
   input: RecordOpportunityOutcomeInput,
   db: OutcomeDb,
 ): Promise<RecordOutcomeResult | null> {
-  const payload = validateOutcomeInput(input.payload)
+  const payload = validateOutcomeInput(
+    input.payload,
+    input.validationNow ?? new Date(),
+  )
+  const authMode = input.authMode ?? 'legacy'
+  const hasWorkspaceActorContext = authMode === 'auth_v2'
+  if (
+    hasWorkspaceActorContext &&
+    (
+      input.actorType !== 'user' ||
+      input.actorUserId == null ||
+      input.workspaceId == null ||
+      input.actorWorkspaceId == null ||
+      String(input.workspaceId) !== String(input.actorWorkspaceId) ||
+      input.actorRoleSnapshot == null ||
+      !WORKSPACE_ROLES.includes(input.actorRoleSnapshot)
+    )
+  ) {
+    throw new Error('Auth v2 outcome actor context is incomplete.')
+  }
+  if (
+    !hasWorkspaceActorContext &&
+    (
+      input.actorWorkspaceId != null ||
+      input.actorRoleSnapshot != null
+    )
+  ) {
+    throw new Error('Legacy outcome actor cannot carry workspace attribution.')
+  }
   const externalSystem = normalizeExternalIdentifier(
     input.externalSystem,
     'externalSystem',
@@ -821,6 +982,7 @@ export async function recordOpportunityOutcomeInTransaction(
     `SELECT
        o.id::TEXT AS id,
        o.owner_id::TEXT AS "ownerId",
+       o.workspace_id::TEXT AS "workspaceId",
        o.client_profile_id::TEXT AS "clientProfileId",
        o.organization_id::TEXT AS "organizationId",
        o.hiring_episode_id::TEXT AS "hiringEpisodeId",
@@ -831,21 +993,34 @@ export async function recordOpportunityOutcomeInTransaction(
        o.confidence_gate AS "confidenceGate",
        o.opportunity_score AS "opportunityScore",
        o.agency_propensity_score AS "externalSupportNeedScore",
+       o.profile_snapshot_hash AS "profileSnapshotHash",
+       o.metadata->'analyticsCohort' AS "analyticsCohort",
+       workflow_state.assigned_to_user_id::TEXT AS "assignedUserId",
        he.episode_type AS "episodeType",
        he.status AS "episodeStatus"
      FROM opportunities o
      JOIN hiring_episodes he
        ON he.id = o.hiring_episode_id
       AND he.organization_id = o.organization_id
-     WHERE o.id = $1
-       AND o.owner_id = $2
-     FOR UPDATE`,
-    [String(input.opportunityId), String(input.ownerId)],
+     LEFT JOIN opportunity_workflow_state workflow_state
+       ON workflow_state.owner_id = o.owner_id
+      AND workflow_state.workspace_id = o.workspace_id
+      AND workflow_state.opportunity_id = o.id
+      WHERE o.id = $1
+        AND o.owner_id = $2
+        AND ($3::BIGINT IS NULL OR o.workspace_id = $3)
+      FOR UPDATE OF o`,
+    [
+      String(input.opportunityId),
+      String(input.ownerId),
+      input.workspaceId == null ? null : String(input.workspaceId),
+    ],
   )
   const context = contextResult.rows[0]
   if (!context) return null
   if (
     input.actorType === 'user' &&
+    !hasWorkspaceActorContext &&
     String(input.actorUserId ?? '') !== context.ownerId
   ) {
     throw new Error('User outcome actor must match the tenant owner.')
@@ -879,11 +1054,10 @@ export async function recordOpportunityOutcomeInTransaction(
   const payloadHash = hashOutcomePayload({
     opportunityId: context.id,
     actorType: input.actorType,
-    payload: {
-      ...payload,
-      contactReference: undefined,
-      contactReferenceHash: protectedContactReference?.hash ?? null,
-    },
+    payload: normalizeOutcomeFingerprintPayload(
+      input.idempotencyPayload === undefined ? payload : input.idempotencyPayload,
+      protectedContactReference?.hash ?? null,
+    ),
     externalSystem,
     externalEventId,
     dedupeKey,
@@ -1091,17 +1265,29 @@ export async function recordOpportunityOutcomeInTransaction(
       throw new OutcomeChronologyConflictError()
     }
   }
-  const sourceFamilies = await getSourceFamilies(context.hiringEpisodeId, db)
-  const analyticsSnapshot = {
-    scoringVersion: context.scoringVersion,
-    episodeType: context.episodeType,
-    confidenceGate: context.confidenceGate,
-    scoreBucket: scoreBucket(context.opportunityScore),
-    sourceFamilies,
-    externalSupportNeedBucket: supportNeedBucket(
-      context.externalSupportNeedScore,
-    ),
-  }
+  const storedCohort = isCompleteOpportunityAnalyticsCohort(
+    context.analyticsCohort,
+  )
+    ? context.analyticsCohort
+    : null
+  const analyticsSnapshot = storedCohort ??
+    createOpportunityAnalyticsCohort({
+      clientProfileId: context.clientProfileId,
+      clientProfileVersion: context.profileSnapshotHash,
+      agencyDnaVersion: context.profileSnapshotHash,
+      hiringMode: null,
+      specialization: null,
+      matchedRoleFamilies: [],
+      matchedIndustries: [],
+      matchedRegions: [],
+      organizationSizeBucket: 'unknown',
+      episodeType: context.episodeType,
+      confidenceGate: context.confidenceGate,
+      opportunityScore: context.opportunityScore,
+      externalSupportNeedScore: context.externalSupportNeedScore,
+      sourceFamilies: await getSourceFamilies(context.hiringEpisodeId, db),
+      scoringVersion: context.scoringVersion,
+    })
 
   const inserted = await db.query<{ id: string; recordedAt: string }>(
     `INSERT INTO opportunity_outcome_events (
@@ -1129,6 +1315,9 @@ export async function recordOpportunityOutcomeInTransaction(
        occurred_at,
        actor_type,
        actor_user_id,
+       actor_workspace_id,
+       actor_role_snapshot,
+       assigned_user_id,
        metadata,
        analytics_snapshot,
        idempotency_key,
@@ -1138,7 +1327,8 @@ export async function recordOpportunityOutcomeInTransaction(
      VALUES (
        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
        $14, $15, $16::timestamptz, $17, $18, $19, $20, $21,
-       $22::timestamptz, $23, $24, $25::jsonb, $26::jsonb, $27, $28, $29
+       $22::timestamptz, $23, $24, $25, $26, $27, $28::jsonb, $29::jsonb,
+       $30, $31, $32
      )
      RETURNING id::TEXT AS id, recorded_at::TEXT AS "recordedAt"`,
     [
@@ -1166,6 +1356,11 @@ export async function recordOpportunityOutcomeInTransaction(
       payload.occurredAt,
       input.actorType,
       input.actorUserId == null ? null : String(input.actorUserId),
+      input.actorWorkspaceId == null
+        ? null
+        : String(input.actorWorkspaceId),
+      input.actorRoleSnapshot ?? null,
+      context.assignedUserId,
       JSON.stringify(payload.metadata),
       JSON.stringify(analyticsSnapshot),
       payload.idempotencyKey,
@@ -1221,6 +1416,20 @@ export async function recordOpportunityOutcomeInTransaction(
   await persistLegacyCommercialState(context, payload, state, db)
 
   return { event, state, idempotent: false }
+}
+
+function normalizeOutcomeFingerprintPayload(
+  value: unknown,
+  contactReferenceHash: string | null,
+): unknown {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return value
+  }
+  return {
+    ...(value as Record<string, unknown>),
+    contactReference: undefined,
+    contactReferenceHash,
+  }
 }
 
 async function rebuildOpportunityOutcomeProjection(
@@ -1746,19 +1955,6 @@ function normalizeExternalIdentifier(
     throw new Error(`${field} has an invalid length.`)
   }
   return normalized
-}
-
-function scoreBucket(score: number): string {
-  const percent = Math.min(Math.max(Math.floor(score * 100), 0), 100)
-  if (percent === 100) return '100'
-  const lower = Math.floor(percent / 10) * 10
-  return `${lower}-${lower + 9}`
-}
-
-function supportNeedBucket(score: number): 'low' | 'medium' | 'high' {
-  if (score >= 0.7) return 'high'
-  if (score >= 0.4) return 'medium'
-  return 'low'
 }
 
 function medianSql(left: string, right: string, key: string): string {

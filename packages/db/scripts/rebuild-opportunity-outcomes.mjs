@@ -14,6 +14,10 @@ const ownerArgumentIndex = process.argv.indexOf('--owner-id')
 const requestedOwnerId = ownerArgumentIndex >= 0
   ? process.argv[ownerArgumentIndex + 1]
   : null
+const workspaceArgumentIndex = process.argv.indexOf('--workspace-id')
+const requestedWorkspaceId = workspaceArgumentIndex >= 0
+  ? process.argv[workspaceArgumentIndex + 1]
+  : null
 
 if (
   ownerArgumentIndex >= 0 &&
@@ -21,12 +25,23 @@ if (
 ) {
   throw new Error('--owner-id requires a positive integer.')
 }
+if (
+  workspaceArgumentIndex >= 0 &&
+  (!requestedWorkspaceId || !/^[1-9]\d*$/.test(requestedWorkspaceId))
+) {
+  throw new Error('--workspace-id requires a positive integer.')
+}
+if (requestedWorkspaceId && !requestedOwnerId) {
+  throw new Error('--workspace-id requires --owner-id.')
+}
 
 const allowedArguments = new Set([
   '--apply',
   '--dry-run',
   '--owner-id',
   requestedOwnerId,
+  '--workspace-id',
+  requestedWorkspaceId,
 ])
 const unknownArgument = process.argv.slice(2).find((argument) =>
   !allowedArguments.has(argument),
@@ -71,9 +86,13 @@ const projectionSql = `
   ON COMMIT DROP
   AS
   WITH owner_events AS (
-    SELECT *
-    FROM opportunity_outcome_events
-    WHERE owner_id = $1
+    SELECT event.*
+    FROM opportunity_outcome_events event
+    JOIN opportunities opportunity
+      ON opportunity.owner_id = event.owner_id
+     AND opportunity.id = event.opportunity_id
+    WHERE event.owner_id = $1
+      AND ($2::BIGINT IS NULL OR opportunity.workspace_id = $2)
   ), effective_events AS (
     SELECT event.*
     FROM owner_events event
@@ -262,6 +281,7 @@ await client.connect()
 log('opportunity_outcome.rebuild_started', {
   mode: apply ? 'apply' : 'dry_run',
   ownerScoped: Boolean(requestedOwnerId),
+  workspaceScoped: Boolean(requestedWorkspaceId),
 })
 
 try {
@@ -306,26 +326,46 @@ async function rebuildOwner(ownerId) {
        )`,
       [ownerId],
     )
-    await client.query(projectionSql, [ownerId])
+    await client.query(projectionSql, [
+      ownerId,
+      requestedWorkspaceId,
+    ])
 
     const metrics = await client.query(
       `SELECT
          (SELECT COUNT(*) FROM rebuilt_opportunity_outcome_state)::INTEGER
            AS opportunities,
-         (SELECT COUNT(*) FROM opportunity_outcome_events
-          WHERE owner_id = $1)::INTEGER AS events,
+         (SELECT COUNT(*)
+          FROM opportunity_outcome_events event
+          JOIN opportunities opportunity
+            ON opportunity.owner_id = event.owner_id
+           AND opportunity.id = event.opportunity_id
+          WHERE event.owner_id = $1
+            AND ($2::BIGINT IS NULL OR opportunity.workspace_id = $2)
+         )::INTEGER AS events,
          (SELECT COUNT(*) FROM rebuilt_opportunity_outcome_state)::INTEGER
            AS workflows,
-         (SELECT COUNT(*) FROM opportunity_outcome_events
-          WHERE owner_id = $1 AND event_type = 'reverted')::INTEGER
+         (SELECT COUNT(*)
+          FROM opportunity_outcome_events event
+          JOIN opportunities opportunity
+            ON opportunity.owner_id = event.owner_id
+           AND opportunity.id = event.opportunity_id
+          WHERE event.owner_id = $1
+            AND event.event_type = 'reverted'
+            AND ($2::BIGINT IS NULL OR opportunity.workspace_id = $2)
+         )::INTEGER
            AS corrections`,
-      [ownerId],
+      [ownerId, requestedWorkspaceId],
     )
     const comparison = await client.query(`
       WITH existing AS (
-        SELECT ${comparableColumns}
-        FROM opportunity_outcome_state
-        WHERE owner_id = $1
+        SELECT ${comparableColumns.replaceAll('\n  ', '\n          state.')}
+        FROM opportunity_outcome_state state
+        JOIN opportunities opportunity
+          ON opportunity.owner_id = state.owner_id
+         AND opportunity.id = state.opportunity_id
+        WHERE state.owner_id = $1
+          AND ($2::BIGINT IS NULL OR opportunity.workspace_id = $2)
       ), rebuilt AS (
         SELECT ${comparableColumns}
         FROM rebuilt_opportunity_outcome_state
@@ -336,19 +376,23 @@ async function rebuildOwner(ownerId) {
       )
       SELECT COUNT(DISTINCT (owner_id, opportunity_id))::INTEGER AS changed
       FROM differences
-    `, [ownerId])
+    `, [ownerId, requestedWorkspaceId])
 
     if (apply) {
       await client.query(
         `DELETE FROM opportunity_outcome_state state
-         WHERE state.owner_id = $1
+         USING opportunities opportunity
+         WHERE opportunity.owner_id = state.owner_id
+           AND opportunity.id = state.opportunity_id
+           AND state.owner_id = $1
+           AND ($2::BIGINT IS NULL OR opportunity.workspace_id = $2)
            AND NOT EXISTS (
              SELECT 1
              FROM rebuilt_opportunity_outcome_state rebuilt
              WHERE rebuilt.owner_id = state.owner_id
                AND rebuilt.opportunity_id = state.opportunity_id
            )`,
-        [ownerId],
+        [ownerId, requestedWorkspaceId],
       )
       await client.query(`
         INSERT INTO opportunity_outcome_state (

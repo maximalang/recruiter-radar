@@ -6,9 +6,7 @@
  * Both URL-embedded ("bot<id>:<auth>") and bare ("<id>:<auth>") forms must be redacted.
  */
 
-import { __test } from '@/app/api/telegram/webhook/route';
-
-const { sanitizeError } = __test;
+import { sanitizeTelegramWebhookError as sanitizeError } from '@/lib/telegram-webhook-security';
 
 // Realistic-looking token: 10-digit id + ":" + 35-char auth (mix of letters, digits, _ and -).
 const AUTH_35 = 'AAH1bCdEfGhIjKlMnOpQrStUvWxYz012-_3';

@@ -698,27 +698,6 @@
   animation-play-state: paused;
 }
 
-:global(html[data-landing-motion="paused"]) [data-landing-motion-root] *,
-:global(html[data-landing-motion="paused"]) [data-landing-motion-root] *::before,
-:global(html[data-landing-motion="paused"]) [data-landing-motion-root] *::after,
-:global(html[data-landing-motion="reduced"]) [data-landing-motion-root] *,
-:global(html[data-landing-motion="reduced"]) [data-landing-motion-root] *::before,
-:global(html[data-landing-motion="reduced"]) [data-landing-motion-root] *::after {
-  transition-duration: 0.01ms !important;
-}
-
-:global(html[data-landing-motion="paused"]) [data-landing-motion-root] *,
-:global(html[data-landing-motion="paused"]) [data-landing-motion-root] *::before,
-:global(html[data-landing-motion="paused"]) [data-landing-motion-root] *::after {
-  animation-play-state: paused !important;
-}
-
-:global(html[data-landing-motion="reduced"]) [data-landing-motion-root] *,
-:global(html[data-landing-motion="reduced"]) [data-landing-motion-root] *::before,
-:global(html[data-landing-motion="reduced"]) [data-landing-motion-root] *::after {
-  animation: none !important;
-}
-
 .heroEvidenceRow [data-hero-evidence-index],
 .heroSignalMeter[data-hero-fiur-index] {
   transition: border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease;

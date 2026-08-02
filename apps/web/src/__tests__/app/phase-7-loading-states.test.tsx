@@ -24,7 +24,7 @@ function readApp(rel: string): string {
 
 describe('T7.1 — flat Загрузка fallbacks replaced by LoadingState', () => {
   it('leads/page.tsx routes Suspense fallbacks through LoadingState, not flat text', () => {
-    const src = readApp('leads/page.tsx')
+    const src = readApp('leads/leads-page-content.tsx')
     // LoadingState is imported from the internal-page module.
     expect(src).toMatch(/LoadingState/)
     // No flat `<div ...>Загрузка...</div>` Suspense fallback remains.

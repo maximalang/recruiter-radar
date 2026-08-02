@@ -1,0 +1,66 @@
+{
+  "name": "Recruiter Radar - signed opportunity outcome callback",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "70489988-047f-4e1e-a3cf-2a86b2261500",
+      "name": "Authenticated CRM Event",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [-360, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst secret = process.env.RR_CRM_CREDENTIAL_SECRET;\nconst callbackUrl = process.env.RR_CRM_CALLBACK_URL;\nconst credentialId = process.env.RR_CRM_CREDENTIAL_ID;\nif (!secret || !callbackUrl || !credentialId) throw new Error('RR_CRM_* environment is incomplete');\nconst allowed = new Set(['accepted','dismissed','snoozed','resumed','contacted','replied','meeting','meeting_completed','meeting_cancelled','meeting_no_show','proposal','won','lost']);\nif (!allowed.has($json.eventType)) throw new Error('Unsupported outcome event');\nif (!/^[A-Za-z0-9._:-]{1,120}$/.test($json.eventId)) throw new Error('Stable provider eventId is required');\nconst body = { opportunityReference: $json.opportunityReference, eventType: $json.eventType, occurredAt: $json.occurredAt };\nfor (const key of ['reasonCode','reasonNote','channel','contactPathType','snoozeDays','snoozedUntil','valueMinor','currency']) if ($json[key] !== undefined) body[key] = $json[key];\nconst rawBody = JSON.stringify(body);\nconst timestamp = String(Math.floor(Date.now() / 1000));\nconst key = crypto.createHash('sha256').update(secret, 'utf8').digest();\nconst signature = 'v1=' + crypto.createHmac('sha256', key).update(`${timestamp}\\n${$json.eventId}\\n${rawBody}`, 'utf8').digest('hex');\nreturn [{ json: { callbackUrl, rawBody, headers: { 'X-RR-Credential-Id': credentialId, 'X-RR-Webhook-Timestamp': timestamp, 'X-RR-Webhook-Id': $json.eventId, 'X-RR-Signature': signature } } }];"
+      },
+      "id": "09b54116-8238-4dda-b618-a9cff278678f",
+      "name": "Build Signed Callback",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-100, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.callbackUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-RR-Credential-Id", "value": "={{ $json.headers['X-RR-Credential-Id'] }}" },
+            { "name": "X-RR-Webhook-Timestamp", "value": "={{ $json.headers['X-RR-Webhook-Timestamp'] }}" },
+            { "name": "X-RR-Webhook-Id", "value": "={{ $json.headers['X-RR-Webhook-Id'] }}" },
+            { "name": "X-RR-Signature", "value": "={{ $json.headers['X-RR-Signature'] }}" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.rawBody }}",
+        "options": {
+          "redirect": { "redirect": { "followRedirects": false } },
+          "timeout": 5000
+        }
+      },
+      "id": "1e801482-5f30-46d1-b266-b611529322c0",
+      "name": "Send to Recruiter Radar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [180, 0]
+    }
+  ],
+  "connections": {
+    "Authenticated CRM Event": {
+      "main": [[{ "node": "Build Signed Callback", "type": "main", "index": 0 }]]
+    },
+    "Build Signed Callback": {
+      "main": [[{ "node": "Send to Recruiter Radar", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "versionId": "21aa9398-4bdb-445a-81a4-e74c2da33509",
+  "meta": { "templateCredsSetupCompleted": false },
+  "tags": []
+}

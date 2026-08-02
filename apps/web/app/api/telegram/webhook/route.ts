@@ -6,6 +6,7 @@ import { isDigestFeedbackAction, updateDigestOrgStateFeedback, type DigestFeedba
 import { answerTelegramCallbackQuery, getTelegramBotToken, sendTelegramTextMessage } from "../../../../lib/telegram";
 import { consumeTelegramConnectToken } from "../../../../lib/telegramConnect";
 import { verifyDigestFeedbackCallback, type SignedDigestFeedbackCallback } from "../../../../lib/telegramDigestFeedback";
+import { sanitizeTelegramWebhookError } from "../../../../lib/telegram-webhook-security";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -139,7 +140,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, replaySafe: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to process Telegram callback feedback.";
-    await pool.query(`UPDATE webhook_events SET status = 'failed', processed_at = NOW(), error_message = LEFT($2, 1000) WHERE id = $1 AND processing_claim_token = $3`, [eventRow.id, sanitizeError(message), claimToken]);
+    await pool.query(`UPDATE webhook_events SET status = 'failed', processed_at = NOW(), error_message = LEFT($2, 1000) WHERE id = $1 AND processing_claim_token = $3`, [eventRow.id, sanitizeTelegramWebhookError(message), claimToken]);
     await answerTelegramCallbackQuery({ callbackQueryId, botToken, text: "Не удалось сохранить фидбек" }).catch(() => {});
     return NextResponse.json({ error: message }, { status: 500 });
   }
@@ -158,10 +159,6 @@ function getDigestFeedbackConfirmationText(action: DigestFeedbackAction): string
 }
 function isPositiveIntegerString(value: string | null | undefined): value is string { return typeof value === "string" && /^\d+$/.test(value); }
 function normalizeNonEmptyString(value: string | null | undefined): string | null { if (typeof value !== "string") return null; const normalizedValue = value.trim(); return normalizedValue === "" ? null : normalizedValue; }
-// Redacts Telegram bot tokens in both forms: URL-embedded ("bot<id>:<auth>") and bare ("<id>:<auth>").
-// Token shape: numeric bot id (>= 8 digits) ":" 35-char auth string. Length floors avoid redacting benign "key:value".
-function sanitizeError(value: string): string { return value.replace(/(?:bot)?\d{8,}:[A-Za-z0-9_-]{35,}/g, "[redacted-token]"); }
-
 function parseStartToken(value: string | null | undefined): string | null {
   if (typeof value !== "string") return null;
   const normalized = value.trim();
@@ -175,6 +172,3 @@ function normalizeTelegramChatId(value: string | number | null | undefined): str
   if (typeof value === "string" && value.trim() !== "") return value.trim();
   return null;
 }
-
-/** Internal helpers exposed for unit testing only. Not part of the route's public contract. */
-export const __test = { sanitizeError };

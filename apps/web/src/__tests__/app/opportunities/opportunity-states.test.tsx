@@ -8,13 +8,16 @@ import OpportunitiesLoading from '@/app/opportunities/loading'
 describe('opportunities page states', () => {
   it('renders a named loading state', () => {
     render(<OpportunitiesLoading />)
-    expect(screen.getByRole('heading', { name: 'Morning Brief' })).toBeInTheDocument()
-    expect(screen.getByText('Собираем свежие эпизоды и доказательства.')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Сегодня' })).toBeInTheDocument()
+    expect(screen.getByText(
+      'Собираем очереди действий и проверяем актуальность доказательств.',
+    )).toBeInTheDocument()
   })
 
   it('renders a recoverable error boundary', () => {
     render(<OpportunitiesError reset={jest.fn()} />)
-    expect(screen.getByText('Brief временно не загрузился')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Сегодня' })).toBeInTheDocument()
+    expect(screen.getByText('Возможности временно не загрузились')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Попробовать снова' })).toBeInTheDocument()
   })
 })

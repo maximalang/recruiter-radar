@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import {
-  isOpportunityEngineV1EnabledForOwner,
+  isOpportunityEngineV1EnabledForContext,
+  isOpportunityWorkflowV1EnabledForContext,
 } from '@/lib/opportunities/config'
 import { toPublicOpportunity } from '@/lib/opportunities/api-projection'
 import {
@@ -14,10 +15,15 @@ import type {
   OpportunityStatus,
 } from '@/lib/opportunities/opportunity-scoring'
 import { logError } from '@/lib/runtime'
-import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization'
+import {
+  getOpportunityAuthorizationContext,
+  getOpportunityDataAccessContext,
+} from '@/lib/opportunities/authorization'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+
+const MAX_POSTGRES_BIGINT = BigInt('9223372036854775807')
 
 const STATUSES = new Set<OpportunityStatus>([
   'new',
@@ -38,13 +44,22 @@ const EPISODE_TYPES = new Set<HiringEpisodeType>([
 ])
 
 export async function GET(request: NextRequest) {
-  const ownerId = await getAuthorizedOwnerId('opportunities:read')
-  if (!isOpportunityEngineV1EnabledForOwner(ownerId)) {
+  const authorization = await getOpportunityAuthorizationContext(
+    'opportunities:read',
+  )
+  const featureContext = authorization ?? {
+    dataOwnerId: null,
+    workspaceId: null,
+  }
+  if (!isOpportunityEngineV1EnabledForContext(featureContext)) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 })
   }
-
-  if (!ownerId) {
+  if (!authorization) {
     return NextResponse.json({ error: 'authentication_required' }, { status: 401 })
+  }
+  const access = getOpportunityDataAccessContext(authorization)
+  if (!access) {
+    return NextResponse.json({ error: 'not_found' }, { status: 404 })
   }
 
   const params = request.nextUrl.searchParams
@@ -57,18 +72,33 @@ export async function GET(request: NextRequest) {
   if (cursorValue && cursorOffset === null) {
     return NextResponse.json({ error: 'invalid_cursor' }, { status: 400 })
   }
+  const rawClientProfileId = params.get('profile')
+  const clientProfileId = positiveId(rawClientProfileId)
+  const rawOrganizationId = params.get('organizationId') ??
+    params.get('organization')
+  const organizationId = positiveId(rawOrganizationId)
+  if (
+    (rawClientProfileId !== null && clientProfileId === null) ||
+    (rawOrganizationId !== null && organizationId === null)
+  ) {
+    return NextResponse.json({ error: 'invalid_filter' }, { status: 400 })
+  }
   try {
+    const selectedView = view ?? (
+      isOpportunityWorkflowV1EnabledForContext(authorization)
+        ? 'today'
+        : 'morning'
+    )
     const pageSize = positiveInteger(params.get('limit')) ??
       positiveInteger(params.get('pageSize')) ??
       undefined
     const result = await listOpportunities({
-      ownerId,
-      morningBriefOnly: (view ?? 'morning') === 'morning',
-      view: view ?? 'morning',
-      clientProfileId: positiveId(params.get('profile')),
-      organizationId: positiveId(
-        params.get('organizationId') ?? params.get('organization'),
-      ),
+      ownerId: access.ownerId,
+      workspaceId: access.workspaceId,
+      morningBriefOnly: selectedView === 'morning',
+      view: selectedView,
+      clientProfileId,
+      organizationId,
       statuses: parseStatuses(params.get('status')),
       confidenceGate: parseConfidenceGate(
         params.get('confidenceGate') ?? params.get('gate'),
@@ -90,7 +120,10 @@ export async function GET(request: NextRequest) {
         : encodeCursor(result.nextOffset),
     })
   } catch (error) {
-    logError('opportunity.api.list_failed', error, { ownerId })
+    logError('opportunity.api.list_failed', error, {
+      ownerId: access.ownerId,
+      workspaceId: access.workspaceId,
+    })
     return NextResponse.json(
       { error: 'opportunities_unavailable' },
       { status: 500 },
@@ -132,7 +165,7 @@ function parseStatuses(value: string | null): OpportunityStatus[] | undefined {
 }
 
 function parseView(value: string | null): OpportunityView | null {
-  return value === 'morning' || value === 'accepted' || value === 'pipeline' ||
+  return value === 'today' || value === 'morning' || value === 'accepted' || value === 'pipeline' ||
     value === 'snoozed' || value === 'completed' || value === 'all'
     ? value
     : null
@@ -151,7 +184,8 @@ function parseEpisodeType(value: string | null): HiringEpisodeType | null {
 }
 
 function positiveId(value: string | null): string | null {
-  return value && /^[1-9]\d*$/.test(value) ? value : null
+  if (!value || !/^[1-9]\d{0,18}$/.test(value)) return null
+  return BigInt(value) <= MAX_POSTGRES_BIGINT ? value : null
 }
 
 function positiveInteger(value: string | null): number | null {

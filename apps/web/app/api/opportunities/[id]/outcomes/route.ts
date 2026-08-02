@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import {
-  isOpportunityEngineV1EnabledForOwner,
-  isOpportunityOutcomesEnabledForOwner,
+  isOpportunityEngineV1EnabledForContext,
+  isOpportunityOutcomesEnabledForContext,
 } from '@/lib/opportunities/config'
 import { OutcomeValidationError } from '@/lib/opportunities/outcome-domain'
 import { OutcomeContactPrivacyUnavailableError } from '@/lib/opportunities/outcome-contact-privacy'
@@ -16,23 +16,34 @@ import {
   recordOpportunityOutcome,
 } from '@/lib/opportunities/outcome-repository'
 import { logError } from '@/lib/runtime'
-import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization'
+import {
+  getOpportunityAuthorizationContext,
+  getOpportunityDataAccessContext,
+  type OpportunityAuthorizationContext,
+} from '@/lib/opportunities/authorization'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 const MAX_BODY_BYTES = 16 * 1024
+const MAX_POSTGRES_BIGINT = BigInt('9223372036854775807')
 
 export async function POST(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
-  const ownerId = await getAuthorizedOwnerId('opportunities:write')
-  if (!isOutcomeApiEnabled(ownerId)) {
+  const authorization = await getOpportunityAuthorizationContext(
+    'opportunities:write',
+  )
+  if (!isOutcomeApiEnabled(authorization)) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 })
   }
-  if (!ownerId) {
+  if (!authorization) {
     return NextResponse.json({ error: 'authentication_required' }, { status: 401 })
+  }
+  const access = getOpportunityDataAccessContext(authorization)
+  if (!access) {
+    return NextResponse.json({ error: 'not_found' }, { status: 404 })
   }
   const { id } = await context.params
   if (!isPositiveId(id)) {
@@ -59,10 +70,14 @@ export async function POST(
 
   try {
     const result = await recordOpportunityOutcome({
-      ownerId,
+      ownerId: access.ownerId,
+      workspaceId: access.workspaceId,
       opportunityId: id,
       actorType: 'user',
-      actorUserId: ownerId,
+      actorUserId: access.actorUserId,
+      actorWorkspaceId: access.actorWorkspaceId,
+      actorRoleSnapshot: access.actorRoleSnapshot,
+      authMode: access.authMode,
       payload: body,
     })
     if (!result) {
@@ -102,7 +117,8 @@ export async function POST(
       return NextResponse.json({ error: error.code }, { status: 503 })
     }
     logError('opportunity_outcome.api.record_failed', error, {
-      ownerId,
+      ownerId: access.ownerId,
+      workspaceId: access.workspaceId,
       opportunityId: id,
       eventType: typeof body.eventType === 'string' ? body.eventType : null,
     })
@@ -117,12 +133,18 @@ export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
-  const ownerId = await getAuthorizedOwnerId('opportunities:read')
-  if (!isOutcomeApiEnabled(ownerId)) {
+  const authorization = await getOpportunityAuthorizationContext(
+    'opportunities:read',
+  )
+  if (!isOutcomeApiEnabled(authorization)) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 })
   }
-  if (!ownerId) {
+  if (!authorization) {
     return NextResponse.json({ error: 'authentication_required' }, { status: 401 })
+  }
+  const access = getOpportunityDataAccessContext(authorization)
+  if (!access) {
+    return NextResponse.json({ error: 'not_found' }, { status: 404 })
   }
   const { id } = await context.params
   if (!isPositiveId(id)) {
@@ -139,7 +161,8 @@ export async function GET(
   }
   try {
     const result = await getOpportunityOutcomeHistory({
-      ownerId,
+      ownerId: access.ownerId,
+      workspaceId: access.workspaceId,
       opportunityId: id,
       beforeEventId,
       pageSize,
@@ -150,7 +173,8 @@ export async function GET(
     return NextResponse.json(result)
   } catch (error) {
     logError('opportunity_outcome.api.history_failed', error, {
-      ownerId,
+      ownerId: access.ownerId,
+      workspaceId: access.workspaceId,
       opportunityId: id,
     })
     return NextResponse.json(
@@ -161,14 +185,19 @@ export async function GET(
 }
 
 function isOutcomeApiEnabled(
-  ownerId: string | number | null | undefined,
+  context: OpportunityAuthorizationContext | null,
 ): boolean {
-  return isOpportunityEngineV1EnabledForOwner(ownerId) &&
-    isOpportunityOutcomesEnabledForOwner(ownerId)
+  const featureContext = context ?? {
+    dataOwnerId: null,
+    workspaceId: null,
+  }
+  return isOpportunityEngineV1EnabledForContext(featureContext) &&
+    isOpportunityOutcomesEnabledForContext(featureContext)
 }
 
 function isPositiveId(value: string): boolean {
-  return /^[1-9]\d*$/.test(value)
+  if (!/^[1-9]\d{0,18}$/.test(value)) return false
+  return BigInt(value) <= MAX_POSTGRES_BIGINT
 }
 
 function parsePositiveInt(value: string | null, fallback: number): number | null {
@@ -182,7 +211,7 @@ function parsePositiveBigint(value: string | null): string | null {
   if (value === null) return null
   if (!/^[1-9]\d{0,18}$/.test(value)) return null
   try {
-    return BigInt(value) <= BigInt('9223372036854775807') ? value : null
+    return BigInt(value) <= MAX_POSTGRES_BIGINT ? value : null
   } catch {
     return null
   }
