@@ -24,7 +24,7 @@ describe('Agency DNA v1 opportunity context', () => {
       industries: ['finance'],
       regions: ['Москва'],
       seniorities: ['executive'],
-      serviceTypes: ['permanent', 'executive'],
+      serviceTypes: ['permanent', 'executive', 'project'],
       engagementTypes: [],
       companySizeBucket: null,
     })
@@ -34,6 +34,26 @@ describe('Agency DNA v1 opportunity context', () => {
       blocksOpportunity: false,
     })
     expect(context.blocksOpportunity).toBe(false)
+  })
+
+  it('does not mark a low-capacity agency as ready for volume work', () => {
+    const context = resolveAgencyDnaOpportunityContext({
+      serviceTypes: ['permanent', 'volume', 'project'],
+      targetSeniorities: [],
+      preferredEngagementTypes: [],
+      currentCapacity: 'low',
+      matchedRoleFamilies: [],
+      matchedIndustries: [],
+      matchedRegions: [],
+      episodeTitle: 'Компания ускорила найм',
+      vacancyCount: 12,
+      restrictionType: null,
+    })
+
+    expect(context.capabilityMatches.serviceTypes).toEqual([
+      'permanent',
+      'project',
+    ])
   })
 
   it.each([
