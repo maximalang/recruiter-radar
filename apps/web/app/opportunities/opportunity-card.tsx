@@ -3,11 +3,19 @@ import {
   GateBadgeInline,
 } from '../ui/internal-page'
 import type { OpportunityItem } from '@/lib/opportunities/repository'
+import type { WorkspaceRole } from '@/lib/auth-v2/workspaces'
+import type { OpportunityWorkflowAssignee } from '@/lib/opportunities/opportunity-workflow-repository'
 import { OpportunityActions } from './opportunity-actions'
+import {
+  OpportunityDecisionContext,
+  OpportunityDecisionPlan,
+} from './opportunity-decision-brief'
+import { OpportunityEvidenceSection } from './opportunity-evidence'
 import {
   OpportunityOutcomeImpression,
   OpportunityOutcomePanel,
 } from './opportunity-outcome-panel'
+import { OpportunityWorkflowPanel } from './opportunity-workflow-panel'
 import styles from './opportunities.module.css'
 
 const EPISODE_LABELS: Record<string, string> = {
@@ -38,15 +46,26 @@ export function OpportunityCard(props: {
   opportunity: OpportunityItem
   outcomesUiEnabled?: boolean
   trackingCycleId?: string | null
+  workflowEnabled?: boolean
+  workflowAssignees?: OpportunityWorkflowAssignee[]
+  actorUserId?: string
+  actorRole?: WorkspaceRole | null
 }) {
   const opportunity = props.opportunity
   const score = Math.round(opportunity.opportunityScore * 100)
   const displayStatus = opportunity.workflowState === 'snoozed'
     ? 'snoozed'
     : opportunity.commercialStage
+  const contentState = opportunity.strategistBrief ? 'complete' : 'insufficient'
+  const freshness = isStale(opportunity.validUntil) ? 'stale' : 'current'
 
   return (
-    <article className={styles.card} data-status={displayStatus}>
+    <article
+      className={styles.card}
+      data-status={displayStatus}
+      data-content-state={contentState}
+      data-freshness={freshness}
+    >
       {props.outcomesUiEnabled && props.trackingCycleId ? (
         <OpportunityOutcomeImpression
           opportunityId={opportunity.id}
@@ -85,86 +104,56 @@ export function OpportunityCard(props: {
         </EvidenceTag>
       </div>
 
-      <div className={styles.briefGrid}>
-        <BriefField label="Что изменилось" value={opportunity.whyNow} />
-        <BriefField
-          label="Почему это может быть важно"
-          value={opportunity.problemHypothesis}
-        />
-        <BriefField
-          label="Почему подходит агентству"
-          value={opportunity.agencyFitExplanation}
-        />
-        <BriefField label="Рекомендуемый заход" value={opportunity.recommendedAngle} />
-        <BriefField label="Кому адресовать" value={opportunity.recommendedPersona} />
-      </div>
+      {contentState === 'insufficient' ? (
+        <p className={styles.cardState} data-state="insufficient" role="status">
+          Для части выводов пока недостаточно подтверждённых данных.
+        </p>
+      ) : null}
+      {freshness === 'stale' ? (
+        <p className={styles.cardState} data-state="stale" role="status">
+          Срок актуальности закончился {formatDate(opportunity.validUntil)}. Проверьте
+          доказательства перед действием.
+        </p>
+      ) : null}
 
-      <section className={styles.evidenceSection} aria-labelledby={`evidence-${opportunity.id}`}>
-        <div className={styles.sectionHeading}>
-          <h3 id={`evidence-${opportunity.id}`}>Лента доказательств</h3>
-          <span>
-            {formatDate(opportunity.episodeStartedAt)} — {formatDate(opportunity.episodeLastSeenAt)}
-          </span>
-        </div>
-        {opportunity.evidenceTimeline.length > 0 ? (
-          <ol className={styles.timeline}>
-            {opportunity.evidenceTimeline.slice(0, 6).map((item) => {
-              const safeUrl = safeEvidenceUrl(item.url)
-              return (
-                <li key={`${item.kind}:${item.id}`} className={styles.timelineItem}>
-                  <span className={styles.timelineDot} aria-hidden="true" />
-                  <div>
-                    <span className={styles.timelineDate}>{formatDate(item.occurredAt)}</span>
-                    {safeUrl ? (
-                      <a href={safeUrl} target="_blank" rel="noreferrer">
-                        {item.title}
-                      </a>
-                    ) : (
-                      <strong>{item.title}</strong>
-                    )}
-                    <small>
-                      {item.source}
-                      {item.tier ? ` · ${tierLabel(item.tier)}` : ''}
-                    </small>
-                  </div>
-                </li>
-              )
-            })}
-          </ol>
+      <OpportunityDecisionContext opportunity={opportunity} />
+      <OpportunityEvidenceSection opportunity={opportunity} />
+      <OpportunityDecisionPlan opportunity={opportunity} />
+
+      {props.workflowEnabled && props.actorUserId ? (
+        <OpportunityWorkflowPanel
+          opportunityId={opportunity.id}
+          workflow={opportunity.workflow}
+          assignees={props.workflowAssignees ?? []}
+          actorUserId={props.actorUserId}
+          actorRole={props.actorRole ?? null}
+        />
+      ) : null}
+
+      <section
+        className={`${styles.decisionSection} ${styles.commercialHistory}`}
+        aria-labelledby={`commercial-history-${opportunity.id}`}
+      >
+        <h3 id={`commercial-history-${opportunity.id}`}>Коммерческая история</h3>
+        {props.outcomesUiEnabled ? (
+          <OpportunityOutcomePanel
+            opportunityId={opportunity.id}
+            fallbackStage={opportunity.commercialStage}
+          />
         ) : (
-          <p className={styles.evidenceFallback}>
-            Источники связаны с эпизодом, но их публичное представление пока недоступно.
-          </p>
+          <>
+            <p className={styles.insufficientValue}>
+              История недоступна в текущем режиме.
+            </p>
+            <OpportunityActions
+              opportunityId={opportunity.id}
+              currentStatus={opportunity.status}
+              detailHref={`#evidence-${opportunity.id}`}
+            />
+          </>
         )}
       </section>
-
-      <div className={styles.recommendedAction}>
-        <span>Следующий шаг</span>
-        <p>{opportunity.recommendedAction}</p>
-      </div>
-
-      {props.outcomesUiEnabled ? (
-        <OpportunityOutcomePanel
-          opportunityId={opportunity.id}
-          fallbackStage={opportunity.commercialStage}
-        />
-      ) : (
-        <OpportunityActions
-          opportunityId={opportunity.id}
-          currentStatus={opportunity.status}
-          detailHref={`#evidence-${opportunity.id}`}
-        />
-      )}
     </article>
-  )
-}
-
-function BriefField(props: { label: string; value: string }) {
-  return (
-    <div className={styles.briefField}>
-      <span>{props.label}</span>
-      <p>{props.value}</p>
-    </div>
   )
 }
 
@@ -179,20 +168,8 @@ function formatDate(value: string | null): string {
   }).format(new Date(timestamp))
 }
 
-function safeEvidenceUrl(value: string | null): string | null {
-  if (!value) return null
-  try {
-    const url = new URL(value)
-    return url.protocol === 'https:' || url.protocol === 'http:'
-      ? url.toString()
-      : null
-  } catch {
-    return null
-  }
-}
-
-function tierLabel(value: string): string {
-  if (value === 'direct') return 'прямое подтверждение'
-  if (value === 'corroboration') return 'подтверждение'
-  return 'контекст'
+function isStale(value: string | null): boolean {
+  if (!value) return false
+  const timestamp = Date.parse(value)
+  return Number.isFinite(timestamp) && timestamp < Date.now()
 }

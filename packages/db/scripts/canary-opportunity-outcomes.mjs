@@ -18,14 +18,21 @@ if (!databaseUrl) throw new Error('DATABASE_URL is required.')
 const args = process.argv.slice(2)
 const ownerIndex = args.indexOf('--owner-id')
 const ownerId = ownerIndex >= 0 ? args[ownerIndex + 1] : null
+const workspaceIndex = args.indexOf('--workspace-id')
+const workspaceId = workspaceIndex >= 0 ? args[workspaceIndex + 1] : null
 const apply = args.includes('--apply')
 const preActivation = args.includes('--pre-activation')
 if (!ownerId || !/^[1-9]\d*$/.test(ownerId)) {
   throw new Error('--owner-id requires a positive integer.')
 }
+if (workspaceId !== null && !/^[1-9]\d*$/.test(workspaceId)) {
+  throw new Error('--workspace-id requires a positive integer.')
+}
 const allowed = new Set([
   '--owner-id',
   ownerId,
+  '--workspace-id',
+  ...(workspaceId ? [workspaceId] : []),
   '--apply',
   '--dry-run',
   '--pre-activation',
@@ -45,6 +52,7 @@ const rebuildScript = path.join(
   'packages/db/scripts/rebuild-opportunity-outcomes.mjs',
 )
 const client = new Client({ connectionString: databaseUrl })
+const scopeParams = [ownerId, workspaceId]
 
 await client.connect()
 try {
@@ -93,13 +101,17 @@ try {
   )
   const ownerScope = await client.query(
     `SELECT COUNT(*)::INTEGER AS count
-     FROM opportunities
-     WHERE owner_id = $1`,
-    [ownerId],
+     FROM opportunities opportunity
+     WHERE opportunity.owner_id = $1
+       AND ($2::BIGINT IS NULL OR opportunity.workspace_id = $2)`,
+    scopeParams,
   )
   const isolation = await client.query(
     `SELECT COUNT(*)::INTEGER AS count
      FROM opportunity_outcome_events event
+     LEFT JOIN opportunities scoped_opportunity
+       ON scoped_opportunity.owner_id = event.owner_id
+      AND scoped_opportunity.id = event.opportunity_id
      LEFT JOIN opportunities opportunity
        ON opportunity.owner_id = event.owner_id
       AND opportunity.client_profile_id = event.client_profile_id
@@ -107,48 +119,65 @@ try {
       AND opportunity.hiring_episode_id = event.hiring_episode_id
       AND opportunity.organization_id = event.organization_id
      WHERE event.owner_id = $1
+       AND (
+         $2::BIGINT IS NULL
+         OR scoped_opportunity.workspace_id = $2
+         OR scoped_opportunity.id IS NULL
+       )
        AND opportunity.id IS NULL`,
-    [ownerId],
+    scopeParams,
   )
   const privacy = await client.query(
     `SELECT COUNT(*)::INTEGER AS count
-     FROM opportunity_outcome_events
-     WHERE owner_id = $1
+     FROM opportunity_outcome_events event
+     JOIN opportunities opportunity
+       ON opportunity.owner_id = event.owner_id
+      AND opportunity.id = event.opportunity_id
+     WHERE event.owner_id = $1
+       AND ($2::BIGINT IS NULL OR opportunity.workspace_id = $2)
        AND (
-         contact_reference IS NOT NULL
+         event.contact_reference IS NOT NULL
          OR (
-           contact_reference_label IS NOT NULL
+           event.contact_reference_label IS NOT NULL
            AND NOT (
-             contact_reference_label ~ '^.\\*{3}@[^@[:space:]]+$'
-             OR contact_reference_label
+             event.contact_reference_label ~ '^.\\*{3}@[^@[:space:]]+$'
+             OR event.contact_reference_label
                ~ '^\\+?[0-9] \\*{3} \\*{3}-[0-9]{2}-[0-9]{2}$'
-             OR contact_reference_label
+             OR event.contact_reference_label
                ~ '^[[:alpha:]][[:alnum:]+.-]*://[^/[:space:]]+/…$'
-             OR contact_reference_label ~ '^.\\*{3}$'
+             OR event.contact_reference_label ~ '^.\\*{3}$'
            )
          )
-         OR metadata::TEXT
+         OR event.metadata::TEXT
            ~* '[[:alnum:]._%+-]+@[[:alnum:].-]+\\.[[:alpha:]]{2,}'
-         OR metadata::TEXT ~ '\\+[0-9][0-9 ()-]{6,}[0-9]'
+         OR event.metadata::TEXT ~ '\\+[0-9][0-9 ()-]{6,}[0-9]'
        )`,
-    [ownerId],
+    scopeParams,
   )
   const duplicateKeys = await client.query(
     `SELECT COUNT(*)::INTEGER AS count
      FROM (
-       SELECT idempotency_key
-       FROM opportunity_outcome_events
-       WHERE owner_id = $1
-       GROUP BY idempotency_key
+       SELECT event.idempotency_key
+       FROM opportunity_outcome_events event
+       JOIN opportunities opportunity
+         ON opportunity.owner_id = event.owner_id
+        AND opportunity.id = event.opportunity_id
+       WHERE event.owner_id = $1
+         AND ($2::BIGINT IS NULL OR opportunity.workspace_id = $2)
+       GROUP BY event.idempotency_key
        HAVING COUNT(*) > 1
      ) duplicate`,
-    [ownerId],
+    scopeParams,
   )
   const chronology = await client.query(
     `WITH effective AS (
        SELECT event.*
        FROM opportunity_outcome_events event
+       JOIN opportunities opportunity
+         ON opportunity.owner_id = event.owner_id
+        AND opportunity.id = event.opportunity_id
        WHERE event.owner_id = $1
+         AND ($2::BIGINT IS NULL OR opportunity.workspace_id = $2)
          AND event.event_type <> 'reverted'
          AND NOT EXISTS (
            SELECT 1
@@ -180,13 +209,17 @@ try {
      SELECT COUNT(*)::INTEGER AS count
      FROM ordered
      WHERE occurred_at < previous_at`,
-    [ownerId],
+    scopeParams,
   )
   const meeting = await client.query(
     `WITH effective AS (
        SELECT event.*
        FROM opportunity_outcome_events event
+       JOIN opportunities opportunity
+         ON opportunity.owner_id = event.owner_id
+        AND opportunity.id = event.opportunity_id
        WHERE event.owner_id = $1
+         AND ($2::BIGINT IS NULL OR opportunity.workspace_id = $2)
          AND event.event_type <> 'reverted'
          AND NOT EXISTS (
            SELECT 1
@@ -218,9 +251,13 @@ try {
            WHERE event.event_type = 'meeting'
          )::INTEGER AS attempt_count
        FROM opportunity_outcome_state state
+       JOIN opportunities opportunity
+         ON opportunity.owner_id = state.owner_id
+        AND opportunity.id = state.opportunity_id
        LEFT JOIN effective event
          ON event.opportunity_id = state.opportunity_id
        WHERE state.owner_id = $1
+         AND ($2::BIGINT IS NULL OR opportunity.workspace_id = $2)
        GROUP BY state.opportunity_id
      )
      SELECT COUNT(*)::INTEGER AS count
@@ -230,13 +267,17 @@ try {
       AND state.opportunity_id = expected.opportunity_id
      WHERE state.meeting_status <> expected.meeting_status
         OR state.meeting_attempt_count <> expected.attempt_count`,
-    [ownerId],
+    scopeParams,
   )
   const cohort = await client.query(
     `WITH effective AS (
        SELECT event.*
        FROM opportunity_outcome_events event
+       JOIN opportunities opportunity
+         ON opportunity.owner_id = event.owner_id
+        AND opportunity.id = event.opportunity_id
        WHERE event.owner_id = $1
+         AND ($2::BIGINT IS NULL OR opportunity.workspace_id = $2)
          AND event.event_type = 'shown'
          AND NOT EXISTS (
            SELECT 1
@@ -260,7 +301,7 @@ try {
        ON state.owner_id = $1
       AND state.opportunity_id = expected.opportunity_id
      WHERE state.first_shown_at IS DISTINCT FROM expected.first_shown_at`,
-    [ownerId],
+    scopeParams,
   )
   const lockContention = await client.query(
     `SELECT COUNT(*)::INTEGER AS count
@@ -269,19 +310,27 @@ try {
        AND NOT granted`,
   )
 
-  if (apply) await runRebuild(['--owner-id', ownerId, '--apply'])
-  const rebuild = await runRebuild(['--owner-id', ownerId, '--dry-run'])
+  const rebuildScope = ['--owner-id', ownerId]
+  if (workspaceId) rebuildScope.push('--workspace-id', workspaceId)
+  if (apply) await runRebuild([...rebuildScope, '--apply'])
+  const rebuild = await runRebuild([...rebuildScope, '--dry-run'])
   const projectionDrift = Number(rebuild.rebuildChanged ?? 0)
   const externalIngestEnabled =
     process.env.OPPORTUNITY_OUTCOMES_EXTERNAL_INGEST_ENABLED === 'true'
-  const flags = resolveOpportunityCanaryFlags(ownerId, process.env)
+  const flags = resolveOpportunityCanaryFlags(
+    ownerId,
+    process.env,
+    workspaceId,
+  )
   const activationReady = isOpportunityCanaryActivationReady(
     ownerId,
     preActivation ? 'pre_activation' : 'active',
     process.env,
+    workspaceId,
   )
   const result = {
     ownerId,
+    workspaceId,
     mode: apply ? 'apply' : 'dry_run',
     phase: preActivation ? 'pre_activation' : 'active',
     flags,

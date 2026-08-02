@@ -5,7 +5,11 @@ import { useRef, useState } from 'react'
 
 import styles from './opportunities.module.css'
 
-type Action = 'accepted' | 'dismissed' | 'snoozed' | 'contacted'
+type Action = 'accepted' | 'snoozed'
+type PendingCommand = {
+  idempotencyKey: string
+  occurredAt: string
+}
 
 const ACTIONS: ReadonlyArray<{
   action: Action
@@ -13,16 +17,14 @@ const ACTIONS: ReadonlyArray<{
   tone: 'primary' | 'neutral'
 }> = [
   { action: 'accepted', label: 'В работу', tone: 'primary' },
-  { action: 'contacted', label: 'Связались', tone: 'neutral' },
   { action: 'snoozed', label: 'Отложить', tone: 'neutral' },
-  { action: 'dismissed', label: 'Не подходит', tone: 'neutral' },
 ]
 
 const ALLOWED_ACTIONS: Readonly<Record<string, readonly Action[]>> = {
-  new: ['accepted', 'dismissed', 'snoozed'],
-  review: ['accepted', 'dismissed', 'snoozed'],
-  snoozed: ['accepted', 'dismissed'],
-  accepted: ['contacted', 'dismissed', 'snoozed'],
+  new: ['accepted', 'snoozed'],
+  review: ['accepted', 'snoozed'],
+  snoozed: ['accepted'],
+  accepted: ['snoozed'],
   contacted: [],
   dismissed: [],
   expired: [],
@@ -36,29 +38,33 @@ export function OpportunityActions(props: {
   const router = useRouter()
   const [pending, setPending] = useState<Action | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const retryKeys = useRef<Partial<Record<Action, string>>>({})
+  const retryCommands = useRef<Partial<Record<Action, PendingCommand>>>({})
 
   async function submit(action: Action) {
     setPending(action)
     setError(null)
-    const actionKey = retryKeys.current[action] ?? createActionKey()
-    retryKeys.current[action] = actionKey
+    const command = retryCommands.current[action] ?? {
+      idempotencyKey: createActionKey(),
+      occurredAt: new Date().toISOString(),
+    }
+    retryCommands.current[action] = command
     try {
-      const response = await fetch(`/api/opportunities/${props.opportunityId}/action`, {
+      const response = await fetch(`/api/opportunities/${props.opportunityId}/outcomes`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Idempotency-Key': actionKey,
+          'Idempotency-Key': command.idempotencyKey,
         },
         body: JSON.stringify({
-          action,
+          eventType: action,
+          occurredAt: command.occurredAt,
           ...(action === 'snoozed' ? { snoozeDays: 7 } : {}),
         }),
       })
       if (!response.ok) {
         throw new Error('action_failed')
       }
-      delete retryKeys.current[action]
+      delete retryCommands.current[action]
       router.refresh()
     } catch {
       setError('Действие не сохранилось. Повторите через минуту.')

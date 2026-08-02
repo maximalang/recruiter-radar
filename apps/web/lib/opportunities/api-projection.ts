@@ -1,4 +1,5 @@
 import type { OpportunityItem } from './repository'
+import { parseOpportunityStrategistBrief } from './opportunity-strategist-v1'
 
 export function toPublicOpportunity(opportunity: OpportunityItem) {
   const {
@@ -10,13 +11,26 @@ export function toPublicOpportunity(opportunity: OpportunityItem) {
     sourceFamilyCount,
     directEvidenceCount,
     agencyFitExplanation,
+    strategistBrief,
+    workflow,
     metadata,
     ...publicOpportunity
   } = opportunity
   const safeMetadata = asRecord(metadata)
+  const safeStrategistBrief = parseOpportunityStrategistBrief(strategistBrief)
+  const publicWorkflow = workflow
+    ? {
+      assignedToUserId: workflow.assignedToUserId,
+      nextActionType: workflow.nextActionType,
+      nextActionDueAt: workflow.nextActionDueAt,
+      workflowPriority: workflow.workflowPriority,
+      updatedAt: workflow.updatedAt,
+    }
+    : null
 
   return {
     ...publicOpportunity,
+    workflow: publicWorkflow,
     evidenceMetrics: {
       factCount,
       publicationCount,
@@ -34,6 +48,12 @@ export function toPublicOpportunity(opportunity: OpportunityItem) {
     },
     sourceFamilies: toStringArray(safeMetadata.sourceFamilies),
     morningBriefEligible: safeMetadata.morningBriefEligible === true,
+    strategistBrief: safeStrategistBrief
+      ? {
+        ...safeStrategistBrief,
+        evidenceTimeline: publicOpportunity.evidenceTimeline,
+      }
+      : null,
   }
 }
 

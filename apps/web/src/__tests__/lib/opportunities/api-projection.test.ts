@@ -5,6 +5,7 @@ describe('opportunity API projection', () => {
   it('omits ownership, hashes, internal candidate IDs, and raw contact paths', () => {
     const publicItem = toPublicOpportunity({
       id: '10',
+      publicReference: '2bc92f8e-8930-4af1-b743-14c0c0df2650',
       ownerId: '7',
       clientProfileId: '8',
       organizationId: '9',
@@ -18,6 +19,15 @@ describe('opportunity API projection', () => {
       status: 'new',
       commercialStage: 'new',
       workflowState: 'active',
+      workflow: {
+        assignedToUserId: '42',
+        nextActionType: 'follow_up',
+        nextActionDueAt: '2026-08-02T06:30:00.000Z',
+        workflowPriority: 'high',
+        internalNote: 'Не публиковать в аналитическом snapshot.',
+        lastEventId: '81',
+        updatedAt: '2026-08-01T12:00:00.000Z',
+      },
       title: 'Возможность',
       whyNow: 'Почему',
       problemHypothesis: 'Гипотеза',
@@ -44,6 +54,23 @@ describe('opportunity API projection', () => {
         digestCandidateId: 'private-internal-id',
         contactPaths: [{ category: 'email', value: 'personal@example.test' }],
       },
+      strategistBrief: {
+        version: 'opportunity-strategist-v1',
+        whatChanged: evidenceConclusion('Открыто 8 вакансий.', ['11']),
+        whyNow: evidenceConclusion('Сигналы свежие.', ['11']),
+        problemHypothesis: heuristicConclusion('Может понадобиться поддержка.'),
+        agencyFitExplanation: heuristicConclusion('Есть профильное совпадение.'),
+        externalSupportNeedExplanation: evidenceConclusion(
+          'Темп найма вырос.',
+          ['11'],
+        ),
+        recommendedPersona: heuristicConclusion('Проверить функцию HRD.'),
+        recommendedAngle: heuristicConclusion('Обсудить сложные роли.'),
+        recommendedCaseStudy: heuristicConclusion('Точного кейса нет.'),
+        recommendedNextAction: heuristicConclusion('Проверить доказательства.'),
+        riskSignals: [heuristicConclusion('Бюджет не подтверждён.')],
+        limitations: [heuristicConclusion('Нужна ручная проверка.')],
+      },
       createdAt: '2026-07-26T00:00:00.000Z',
       updatedAt: '2026-07-26T00:00:00.000Z',
       evidenceCount: 0,
@@ -62,6 +89,15 @@ describe('opportunity API projection', () => {
     expect(serialized).not.toContain('personal@example.test')
     expect(serialized).not.toContain('nested-private@example.test')
     expect(serialized).not.toContain('nested-private-id')
+    expect(serialized).not.toContain('Не публиковать')
+    expect(serialized).not.toContain('lastEventId')
+    expect(publicItem.workflow).toEqual({
+      assignedToUserId: '42',
+      nextActionType: 'follow_up',
+      nextActionDueAt: '2026-08-02T06:30:00.000Z',
+      workflowPriority: 'high',
+      updatedAt: '2026-08-01T12:00:00.000Z',
+    })
     expect(serialized).not.toContain('"evidenceCount"')
     expect(publicItem).not.toHaveProperty('factCount')
     expect(publicItem.evidenceMetrics).toEqual({
@@ -72,5 +108,17 @@ describe('opportunity API projection', () => {
     })
     expect(publicItem.morningBriefEligible).toBe(true)
     expect(publicItem.sourceFamilies).toEqual(['career-pages'])
+    expect(publicItem.strategistBrief).toEqual(expect.objectContaining({
+      version: 'opportunity-strategist-v1',
+      evidenceTimeline: [],
+    }))
   })
 })
+
+function evidenceConclusion(text: string, supportingEvidenceIds: string[]) {
+  return { text, basis: 'evidence' as const, supportingEvidenceIds }
+}
+
+function heuristicConclusion(text: string) {
+  return { text, basis: 'heuristic' as const, supportingEvidenceIds: [] }
+}

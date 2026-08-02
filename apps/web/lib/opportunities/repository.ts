@@ -1,34 +1,35 @@
 import type { Pool, PoolClient } from 'pg'
 
+import type { WorkspaceRole } from '@/lib/auth-v2/workspaces'
 import { getClient, getPool } from '@/lib/db-pool'
 import { logEvent } from '@/lib/runtime'
 import {
   canonicalizeOpportunityUrl,
-  hashCanonicalJson,
 } from './canonical-hash'
-import { protectOutcomeContactReference } from './outcome-contact-privacy'
 import type { HiringEpisodeType } from './hiring-episode-detection'
 import {
   clampOpportunityPageSize,
-  clampOpportunitySnoozeDays,
-  isOpportunityOutcomesEnabledForOwner,
+  isOpportunityStrategistV1EnabledForContext,
+  isOpportunityWorkflowV1EnabledForContext,
 } from './config'
+import type { OpportunityWorkflowState } from './opportunity-workflow-repository'
 import type {
   DismissedReasonCode,
   OpportunityContactPathType,
   OpportunityOutcomeChannel,
   OpportunityOutcomeStage,
 } from './outcome-domain'
-import {
-  lockOutcomeOwnerShared,
-  recordOpportunityOutcomeInTransaction,
-} from './outcome-repository'
+import { recordLegacyOpportunityAction } from './legacy-action-adapter'
 import {
   DEFAULT_OPPORTUNITY_SCORING_CONFIG,
   OPPORTUNITY_STATUSES,
   type ConfidenceGate,
   type OpportunityStatus,
 } from './opportunity-scoring'
+import {
+  parseOpportunityStrategistBrief,
+  type OpportunityStrategistBrief,
+} from './opportunity-strategist-v1'
 
 export const OPPORTUNITY_ACTIONS = [
   'accepted',
@@ -82,8 +83,11 @@ const ALLOWED_OPPORTUNITY_TRANSITIONS: Readonly<
 type OpportunityDb = Pick<Pool, 'query'> | Pick<PoolClient, 'query'>
 
 export const OPPORTUNITY_VIEWS = [
+  'today',
   'morning',
   'accepted',
+  'follow_up',
+  'overdue',
   'pipeline',
   'snoozed',
   'completed',
@@ -94,6 +98,7 @@ export type OpportunityView = (typeof OPPORTUNITY_VIEWS)[number]
 
 interface OpportunityRow {
   id: string
+  publicReference: string
   ownerId: string
   clientProfileId: string
   organizationId: string
@@ -107,6 +112,7 @@ interface OpportunityRow {
   status: OpportunityStatus
   commercialStage: OpportunityOutcomeStage
   workflowState: 'active' | 'snoozed'
+  workflow: OpportunityWorkflowState | null
   title: string
   whyNow: string
   problemHypothesis: string
@@ -133,6 +139,7 @@ interface OpportunityRow {
 
 export interface OpportunityItem extends OpportunityRow {
   evidenceTimeline: OpportunityEvidenceItem[]
+  strategistBrief: OpportunityStrategistBrief | null
 }
 
 export interface OpportunityEvidenceItem {
@@ -147,6 +154,7 @@ export interface OpportunityEvidenceItem {
 
 export interface OpportunityListInput {
   ownerId: string | number
+  workspaceId?: string | number | null
   clientProfileId?: string | null
   morningBriefOnly?: boolean
   view?: OpportunityView
@@ -155,6 +163,7 @@ export interface OpportunityListInput {
   confidenceGate?: ConfidenceGate | null
   episodeType?: HiringEpisodeType | null
   organizationId?: string | null
+  query?: string | null
   page?: number
   pageSize?: number
   offset?: number
@@ -177,6 +186,8 @@ export interface OpportunityOutcomeOperationalSummary {
   lostCount: number
   dismissedCount: number
   overdueSnoozeCount: number
+  followUpCount: number
+  overdueCount: number
 }
 
 const EFFECTIVE_WORKFLOW_SQL = `COALESCE(
@@ -193,6 +204,16 @@ const EFFECTIVE_COMMERCIAL_STAGE_SQL = `COALESCE(
   END
 )`
 
+const MOSCOW_TODAY_START_SQL = `(
+  DATE_TRUNC('day', NOW() AT TIME ZONE 'Europe/Moscow')
+  AT TIME ZONE 'Europe/Moscow'
+)`
+
+const MOSCOW_TOMORROW_START_SQL = `(
+  (DATE_TRUNC('day', NOW() AT TIME ZONE 'Europe/Moscow') + INTERVAL '1 day')
+  AT TIME ZONE 'Europe/Moscow'
+)`
+
 export async function listOpportunities(
   input: OpportunityListInput,
   db: OpportunityDb | null = getPool(),
@@ -207,6 +228,10 @@ export async function listOpportunities(
   const page = Math.floor(offset / pageSize) + 1
   const params: unknown[] = [String(input.ownerId)]
   const clauses = ['o.owner_id = $1', 'o.superseded_at IS NULL']
+  if (input.workspaceId != null) {
+    params.push(String(input.workspaceId))
+    clauses.push(`o.workspace_id = $${params.length}`)
+  }
   const view = input.view ?? (input.morningBriefOnly ? 'morning' : 'all')
   if (view !== 'all') clauses.push(`o.status <> 'expired'`)
 
@@ -222,7 +247,38 @@ export async function listOpportunities(
     )
     clauses.push(`o.agency_propensity_score >= $${params.length}`)
   }
-  if (view === 'morning' || view === 'accepted' || view === 'pipeline') {
+  if (view === 'today') {
+    clauses.push(
+      `${EFFECTIVE_COMMERCIAL_STAGE_SQL} NOT IN ('won', 'lost', 'dismissed')`,
+    )
+    clauses.push(`(
+      (
+        ${EFFECTIVE_WORKFLOW_SQL} = 'active'
+        AND (
+          (
+            workflow_state.next_action_due_at >= ${MOSCOW_TODAY_START_SQL}
+            AND workflow_state.next_action_due_at < ${MOSCOW_TOMORROW_START_SQL}
+          )
+          OR (
+            workflow_state.next_action_type = 'follow_up'
+            AND workflow_state.next_action_due_at < ${MOSCOW_TODAY_START_SQL}
+          )
+          OR (
+            workflow_state.workflow_priority = 'high'
+            AND ${EFFECTIVE_COMMERCIAL_STAGE_SQL} IN ('new', 'review')
+          )
+          OR workflow_state.assigned_to_user_id IS NULL
+        )
+      )
+      OR (
+        ${EFFECTIVE_WORKFLOW_SQL} = 'snoozed'
+        AND COALESCE(outcome_state.snoozed_until, o.snoozed_until) < NOW()
+      )
+    )`)
+  } else if (
+    view === 'morning' || view === 'accepted' || view === 'follow_up' ||
+    view === 'pipeline'
+  ) {
     clauses.push(`${EFFECTIVE_WORKFLOW_SQL} = 'active'`)
   } else if (view === 'snoozed') {
     clauses.push(`${EFFECTIVE_WORKFLOW_SQL} = 'snoozed'`)
@@ -231,6 +287,28 @@ export async function listOpportunities(
     clauses.push(`${EFFECTIVE_COMMERCIAL_STAGE_SQL} IN ('new', 'review')`)
   } else if (view === 'accepted') {
     clauses.push(`${EFFECTIVE_COMMERCIAL_STAGE_SQL} = 'accepted'`)
+  } else if (view === 'follow_up') {
+    clauses.push(
+      `${EFFECTIVE_COMMERCIAL_STAGE_SQL} NOT IN ('won', 'lost', 'dismissed')`,
+    )
+    clauses.push(`workflow_state.next_action_type = 'follow_up'`)
+    clauses.push(
+      `workflow_state.next_action_due_at >= ${MOSCOW_TODAY_START_SQL}`,
+    )
+  } else if (view === 'overdue') {
+    clauses.push(
+      `${EFFECTIVE_COMMERCIAL_STAGE_SQL} NOT IN ('won', 'lost', 'dismissed')`,
+    )
+    clauses.push(`(
+      (
+        ${EFFECTIVE_WORKFLOW_SQL} = 'active'
+        AND workflow_state.next_action_due_at < ${MOSCOW_TODAY_START_SQL}
+      )
+      OR (
+        ${EFFECTIVE_WORKFLOW_SQL} = 'snoozed'
+        AND COALESCE(outcome_state.snoozed_until, o.snoozed_until) < NOW()
+      )
+    )`)
   } else if (view === 'pipeline') {
     clauses.push(
       `${EFFECTIVE_COMMERCIAL_STAGE_SQL} ` +
@@ -266,28 +344,56 @@ export async function listOpportunities(
     params.push(input.organizationId)
     clauses.push(`o.organization_id = $${params.length}`)
   }
+  const query = normalizeOpportunityQuery(input.query)
+  if (query) {
+    params.push(`%${escapeLikePattern(query)}%`)
+    clauses.push(`(
+      org.name ILIKE $${params.length} ESCAPE '\\'
+      OR org.domain ILIKE $${params.length} ESCAPE '\\'
+      OR o.title ILIKE $${params.length} ESCAPE '\\'
+    )`)
+  }
 
   const where = clauses.join('\n      AND ')
   const countResult = await db.query<{ count: string }>(
     `SELECT COUNT(*)::TEXT AS count
      FROM opportunities o
+     JOIN orgs org ON org.id = o.organization_id
      JOIN hiring_episodes he ON he.id = o.hiring_episode_id
      LEFT JOIN opportunity_outcome_state outcome_state
        ON outcome_state.owner_id = o.owner_id
       AND outcome_state.opportunity_id = o.id
+     LEFT JOIN opportunity_workflow_state workflow_state
+       ON workflow_state.owner_id = o.owner_id
+      AND workflow_state.workspace_id = o.workspace_id
+      AND workflow_state.opportunity_id = o.id
      WHERE ${where}`,
     params,
   )
 
+  const orderBy = view === 'today' || view === 'follow_up' || view === 'overdue'
+    ? `CASE
+         WHEN workflow_state.next_action_due_at < NOW() THEN 0
+         WHEN workflow_state.next_action_due_at < ${MOSCOW_TOMORROW_START_SQL} THEN 1
+         WHEN ${EFFECTIVE_WORKFLOW_SQL} = 'snoozed' THEN 2
+         WHEN workflow_state.workflow_priority = 'high' THEN 3
+         ELSE 4
+       END,
+       workflow_state.next_action_due_at ASC NULLS LAST,
+       CASE workflow_state.workflow_priority
+         WHEN 'high' THEN 0 WHEN 'normal' THEN 1 ELSE 2
+       END,
+       o.opportunity_score DESC,
+       o.id DESC`
+    : `o.opportunity_score DESC,
+       o.valid_until ASC NULLS LAST,
+       o.created_at DESC,
+       o.id DESC`
   params.push(pageSize, offset)
   const rows = await db.query<OpportunityRow>(
     `${OPPORTUNITY_SELECT}
      WHERE ${where}
-     ORDER BY
-       o.opportunity_score DESC,
-       o.valid_until ASC NULLS LAST,
-       o.created_at DESC,
-       o.id DESC
+     ORDER BY ${orderBy}
      LIMIT $${params.length - 1}
      OFFSET $${params.length}`,
     params,
@@ -301,11 +407,21 @@ export async function listOpportunities(
 
   const total = Number(countResult.rows[0]?.count ?? 0)
   const consumed = offset + rows.rows.length
+  const strategistEnabled = isOpportunityStrategistV1EnabledForContext({
+    dataOwnerId: input.ownerId,
+    workspaceId: input.workspaceId,
+  })
+  const workflowEnabled = isOpportunityWorkflowV1EnabledForContext({
+    dataOwnerId: input.ownerId,
+    workspaceId: input.workspaceId,
+  })
   return {
-    opportunities: rows.rows.map((row) => ({
-      ...row,
-      evidenceTimeline: evidenceByOpportunity.get(row.id) ?? [],
-    })),
+    opportunities: rows.rows.map((row) => toOpportunityItem(
+      row,
+      evidenceByOpportunity.get(row.id) ?? [],
+      strategistEnabled,
+      workflowEnabled,
+    )),
     total,
     page,
     pageSize,
@@ -316,8 +432,14 @@ export async function listOpportunities(
 export async function getOpportunityOutcomeOperationalSummary(
   ownerId: string | number,
   db: OpportunityDb | null = getPool(),
+  workspaceId: string | number | null = null,
 ): Promise<OpportunityOutcomeOperationalSummary> {
   if (!db) throw new Error('DATABASE_URL is not set.')
+  const params: unknown[] = [String(ownerId)]
+  const workspaceClause = workspaceId == null
+    ? ''
+    : '\n       AND o.workspace_id = $2'
+  if (workspaceId != null) params.push(String(workspaceId))
   const result = await db.query<Record<
     keyof OpportunityOutcomeOperationalSummary,
     string
@@ -351,15 +473,41 @@ export async function getOpportunityOutcomeOperationalSummary(
        COUNT(*) FILTER (
          WHERE ${EFFECTIVE_WORKFLOW_SQL} = 'snoozed'
            AND COALESCE(outcome_state.snoozed_until, o.snoozed_until) < NOW()
-       )::TEXT AS "overdueSnoozeCount"
+       )::TEXT AS "overdueSnoozeCount",
+       COUNT(*) FILTER (
+         WHERE ${EFFECTIVE_WORKFLOW_SQL} = 'active'
+           AND ${EFFECTIVE_COMMERCIAL_STAGE_SQL}
+             NOT IN ('won', 'lost', 'dismissed')
+           AND workflow_state.next_action_type = 'follow_up'
+           AND workflow_state.next_action_due_at >= ${MOSCOW_TODAY_START_SQL}
+       )::TEXT AS "followUpCount",
+       COUNT(*) FILTER (
+         WHERE ${EFFECTIVE_COMMERCIAL_STAGE_SQL}
+             NOT IN ('won', 'lost', 'dismissed')
+           AND (
+             (
+               ${EFFECTIVE_WORKFLOW_SQL} = 'active'
+               AND workflow_state.next_action_due_at < ${MOSCOW_TODAY_START_SQL}
+             )
+             OR (
+               ${EFFECTIVE_WORKFLOW_SQL} = 'snoozed'
+               AND COALESCE(outcome_state.snoozed_until, o.snoozed_until) < NOW()
+             )
+           )
+       )::TEXT AS "overdueCount"
      FROM opportunities o
      LEFT JOIN opportunity_outcome_state outcome_state
        ON outcome_state.owner_id = o.owner_id
       AND outcome_state.opportunity_id = o.id
+     LEFT JOIN opportunity_workflow_state workflow_state
+       ON workflow_state.owner_id = o.owner_id
+      AND workflow_state.workspace_id = o.workspace_id
+      AND workflow_state.opportunity_id = o.id
      WHERE o.owner_id = $1
+       ${workspaceClause}
        AND o.superseded_at IS NULL
        AND o.status <> 'expired'`,
-    [String(ownerId)],
+    params,
   )
   const row = result.rows[0]
   return {
@@ -371,22 +519,42 @@ export async function getOpportunityOutcomeOperationalSummary(
     lostCount: Number(row?.lostCount ?? 0),
     dismissedCount: Number(row?.dismissedCount ?? 0),
     overdueSnoozeCount: Number(row?.overdueSnoozeCount ?? 0),
+    followUpCount: Number(row?.followUpCount ?? 0),
+    overdueCount: Number(row?.overdueCount ?? 0),
   }
 }
 
+function normalizeOpportunityQuery(value: string | null | undefined): string {
+  return value?.trim().slice(0, 80) ?? ''
+}
+
+function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, '\\$&')
+}
+
 export async function getOpportunityById(
-  input: { ownerId: string | number; opportunityId: string | number },
+  input: {
+    ownerId: string | number
+    workspaceId?: string | number | null
+    opportunityId: string | number
+  },
   db: OpportunityDb | null = getPool(),
 ): Promise<OpportunityItem | null> {
   if (!db) throw new Error('DATABASE_URL is not set.')
 
+  const params: unknown[] = [input.opportunityId, String(input.ownerId)]
+  const workspaceClause = input.workspaceId == null
+    ? ''
+    : `\n       AND o.workspace_id = $3`
+  if (input.workspaceId != null) params.push(String(input.workspaceId))
   const result = await db.query<OpportunityRow>(
     `${OPPORTUNITY_SELECT}
      WHERE o.id = $1
        AND o.owner_id = $2
+       ${workspaceClause}
        AND o.superseded_at IS NULL
      LIMIT 1`,
-    [input.opportunityId, String(input.ownerId)],
+    params,
   )
   const row = result.rows[0]
   if (!row) return null
@@ -396,49 +564,23 @@ export async function getOpportunityById(
     [row.id],
     db,
   )
-  return {
-    ...row,
-    evidenceTimeline: evidence.get(row.id) ?? [],
-  }
-}
-
-async function getCurrentOpportunityForEpisode(
-  input: {
-    ownerId: string | number
-    clientProfileId: string | number
-    hiringEpisodeId: string | number
-  },
-  db: OpportunityDb,
-): Promise<OpportunityItem | null> {
-  const result = await db.query<OpportunityRow>(
-    `${OPPORTUNITY_SELECT}
-     WHERE o.client_profile_id = $1
-       AND o.hiring_episode_id = $2
-       AND o.owner_id = $3
-       AND o.superseded_at IS NULL
-     LIMIT 1`,
-    [
-      String(input.clientProfileId),
-      String(input.hiringEpisodeId),
-      String(input.ownerId),
-    ],
+  return toOpportunityItem(
+    row,
+    evidence.get(row.id) ?? [],
+    isOpportunityStrategistV1EnabledForContext({
+      dataOwnerId: input.ownerId,
+      workspaceId: input.workspaceId,
+    }),
+    isOpportunityWorkflowV1EnabledForContext({
+      dataOwnerId: input.ownerId,
+      workspaceId: input.workspaceId,
+    }),
   )
-  const row = result.rows[0]
-  if (!row) return null
-
-  const evidence = await getEvidenceForOpportunities(
-    String(input.ownerId),
-    [row.id],
-    db,
-  )
-  return {
-    ...row,
-    evidenceTimeline: evidence.get(row.id) ?? [],
-  }
 }
 
 export async function applyOpportunityAction(input: {
   ownerId: string | number
+  workspaceId?: string | number | null
   opportunityId: string | number
   action: OpportunityAction
   actionKey: string
@@ -449,6 +591,11 @@ export async function applyOpportunityAction(input: {
   contactPathType?: OpportunityContactPathType | null
   contactReference?: string | null
   occurredAt?: string
+  actorUserId?: string | number | null
+  actorWorkspaceId?: string | number | null
+  actorRoleSnapshot?: WorkspaceRole | null
+  authMode?: 'auth_v2' | 'auth_v2_compat' | 'legacy'
+  outcomesEnabled?: boolean
 }): Promise<{ opportunity: OpportunityItem; idempotent: boolean } | null> {
   if (!isOpportunityAction(input.action)) {
     throw new Error('Unsupported opportunity action.')
@@ -458,259 +605,84 @@ export async function applyOpportunityAction(input: {
     throw new Error('Invalid opportunity action key.')
   }
 
-  const client = await getClient()
-  if (!client) throw new Error('DATABASE_URL is not set.')
-  const note = normalizeNote(input.note)
-  const snoozeDays = clampOpportunitySnoozeDays(input.snoozeDays)
-  const protectedContactReference = protectOutcomeContactReference(
-    input.ownerId,
-    input.action === 'contacted' ? input.contactReference ?? null : null,
-  )
-  const actionFingerprint = createActionFingerprint({
-    action: input.action,
-    note,
-    snoozeDays: input.action === 'snoozed' ? snoozeDays : null,
-    reasonCode: input.action === 'dismissed' ? input.reasonCode ?? null : null,
-    channel: input.action === 'contacted' ? input.channel ?? null : null,
-    contactPathType:
-      input.action === 'contacted' ? input.contactPathType ?? null : null,
-    contactReferenceHash: protectedContactReference?.hash ?? null,
+  const outcome = await recordLegacyOpportunityAction({
+    ...input,
+    actionKey,
   })
-
-  try {
-    await client.query('BEGIN')
-    if (isOpportunityOutcomesEnabledForOwner(input.ownerId)) {
-      await lockOutcomeOwnerShared(client, input.ownerId)
+  if (!outcome) return null
+  let opportunity = await getOpportunityById({
+    ownerId: input.ownerId,
+    workspaceId: input.workspaceId,
+    opportunityId: input.opportunityId,
+  })
+  if (!opportunity && outcome.idempotent) {
+    const contextParams: unknown[] = [
+      input.opportunityId,
+      String(input.ownerId),
+    ]
+    const workspaceClause = input.workspaceId == null
+      ? ''
+      : '\n         AND workspace_id = $3'
+    if (input.workspaceId != null) {
+      contextParams.push(String(input.workspaceId))
     }
-    const context = await client.query<{
-      id: string
-      clientProfileId: string
-      organizationId: string
-      hiringEpisodeId: string
-      status: OpportunityStatus
-      supersededAt: string | null
-    }>(
-      `SELECT
-         id::TEXT AS id,
-         client_profile_id::TEXT AS "clientProfileId",
-         organization_id::TEXT AS "organizationId",
-         hiring_episode_id::TEXT AS "hiringEpisodeId",
-         status,
-         superseded_at::TEXT AS "supersededAt"
-       FROM opportunities
-       WHERE id = $1
-         AND owner_id = $2
-       FOR UPDATE`,
-      [input.opportunityId, String(input.ownerId)],
-    )
-    const row = context.rows[0]
-    if (!row) {
-      await client.query('ROLLBACK')
-      return null
-    }
-
-    const existingAction = await client.query<{
-      actionFingerprint: string
-      newStatus: OpportunityAction
-    }>(
-      `SELECT action_fingerprint AS "actionFingerprint",
-         new_status AS "newStatus"
-       FROM opportunity_actions
-       WHERE opportunity_id = $1
-         AND owner_id = $2
-         AND action_key = $3
-       LIMIT 1`,
-      [input.opportunityId, String(input.ownerId), actionKey],
-    )
-    if (existingAction.rows[0]) {
-      if (existingAction.rows[0].actionFingerprint !== actionFingerprint) {
-        throw new OpportunityActionConflictError()
-      }
-      const opportunity = await getCurrentOpportunityForEpisode({
-        ownerId: input.ownerId,
-        clientProfileId: row.clientProfileId,
-        hiringEpisodeId: row.hiringEpisodeId,
-      }, client)
-      await client.query('COMMIT')
-      if (!opportunity) return null
-      logEvent('opportunity.replay_served', {
-        ownerId: String(input.ownerId),
-        opportunityId: String(input.opportunityId),
-        action: input.action,
-        currentOpportunityId: opportunity.id,
-      })
-      return { opportunity, idempotent: true }
-    }
-
-    if (row.supersededAt) {
-      throw new OpportunitySupersededConflictError()
-    }
-
-    if (!isOpportunityTransitionAllowed(row.status, input.action)) {
-      logEvent('opportunity.transition_rejected', {
-        ownerId: String(input.ownerId),
-        opportunityId: String(input.opportunityId),
-        previousStatus: row.status,
-        requestedStatus: input.action,
-      })
-      throw new OpportunityTransitionConflictError(row.status, input.action)
-    }
-
-    const actionInsert = await client.query(
-      `INSERT INTO opportunity_actions (
-         owner_id,
-         opportunity_id,
-         action_type,
-         action_key,
-         action_fingerprint,
-         previous_status,
-         new_status,
-         note,
-         metadata
-       )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)`,
-      [
-        String(input.ownerId),
-        input.opportunityId,
-        input.action,
-        actionKey,
-        actionFingerprint,
-        row.status,
-        input.action,
-        note,
-        JSON.stringify({
-          source: 'opportunity-api',
-          ...(input.action === 'dismissed' && input.reasonCode
-            ? { reasonCode: input.reasonCode }
-            : {}),
-          ...(input.action === 'contacted' && input.channel
-            ? {
-                channel: input.channel,
-                ...(input.contactPathType
-                  ? { contactPathType: input.contactPathType }
-                  : {}),
-              }
-            : {}),
-          ...(input.action === 'snoozed'
-            ? { snoozeDays }
-            : {}),
-        }),
-      ],
-    )
-    if (actionInsert.rowCount !== 1) {
-      throw new Error('Opportunity action insert returned no row.')
-    }
-    if (isOpportunityOutcomesEnabledForOwner(input.ownerId)) {
-      const outcome = await recordOpportunityOutcomeInTransaction({
-        ownerId: input.ownerId,
-        opportunityId: input.opportunityId,
-        actorType: 'user',
-        actorUserId: input.ownerId,
-        ownerLockHeld: true,
-        payload: {
-          eventType: input.action,
-          occurredAt: input.occurredAt ?? new Date().toISOString(),
-          reasonCode:
-            input.action === 'dismissed' ? input.reasonCode ?? null : null,
-          reasonNote: input.action === 'dismissed' ? note : null,
-          channel: input.action === 'contacted' ? input.channel ?? null : null,
-          contactPathType:
-            input.action === 'contacted'
-              ? input.contactPathType ?? null
-              : null,
-          contactReference:
-            input.action === 'contacted'
-              ? input.contactReference ?? null
-              : null,
-          snoozeDays: input.action === 'snoozed' ? snoozeDays : null,
-          snoozedUntil: null,
-          revertsEventId: null,
-          valueMinor: null,
-          currency: null,
-          metadata: { source: 'opportunity_action' },
-          idempotencyKey: actionKey,
-        },
-      }, client)
-      if (!outcome) {
-        throw new Error('Outcome opportunity could not be reloaded.')
-      }
-    } else {
-      await client.query(
-      `UPDATE opportunities
-       SET
-         status = $1,
-         snoozed_until = CASE
-           WHEN $1 = 'snoozed'
-             THEN NOW() + ($3 * INTERVAL '1 day')
-           ELSE NULL
-         END,
-         updated_at = NOW()
-       WHERE id = $2
-         AND owner_id = $4
-         AND superseded_at IS NULL`,
-      [input.action, input.opportunityId, snoozeDays, String(input.ownerId)],
-    )
-      await client.query(
-      `INSERT INTO client_episode_state (
-         client_profile_id,
-         owner_id,
-         hiring_episode_id,
-         organization_id,
-         status,
-         suppressed_until
-       )
-       VALUES (
-         $1, $2, $3, $4, $5,
-         CASE
-           WHEN $5 = 'snoozed'
-             THEN NOW() + ($6 * INTERVAL '1 day')
-           ELSE NULL
-         END
-       )
-       ON CONFLICT (client_profile_id, hiring_episode_id)
-       DO UPDATE SET
-         status = EXCLUDED.status,
-         suppressed_until = EXCLUDED.suppressed_until,
-         updated_at = NOW()`,
-      [
-        row.clientProfileId,
-        String(input.ownerId),
-        row.hiringEpisodeId,
-        row.organizationId,
-        input.action,
-        snoozeDays,
-      ],
+    const client = await getClient()
+    if (!client) throw new Error('DATABASE_URL is not set.')
+    try {
+      const context = await client.query<{
+        clientProfileId: string
+        hiringEpisodeId: string
+      }>(
+        `SELECT
+           client_profile_id::TEXT AS "clientProfileId",
+           hiring_episode_id::TEXT AS "hiringEpisodeId"
+         FROM opportunities
+         WHERE id = $1
+           AND owner_id = $2
+           ${workspaceClause}
+         LIMIT 1`,
+        contextParams,
       )
+      const row = context.rows[0]
+      if (row) {
+        const current = await client.query<OpportunityRow>(
+          `${OPPORTUNITY_SELECT}
+           WHERE o.client_profile_id = $1
+             AND o.hiring_episode_id = $2
+             AND o.owner_id = $3
+             AND o.superseded_at IS NULL
+           LIMIT 1`,
+          [row.clientProfileId, row.hiringEpisodeId, String(input.ownerId)],
+        )
+        const currentRow = current.rows[0]
+        if (currentRow) {
+          const evidence = await getEvidenceForOpportunities(
+            String(input.ownerId),
+            [currentRow.id],
+            client,
+          )
+          opportunity = toOpportunityItem(
+            currentRow,
+            evidence.get(currentRow.id) ?? [],
+            isOpportunityStrategistV1EnabledForContext({
+              dataOwnerId: input.ownerId,
+              workspaceId: input.workspaceId,
+            }),
+            isOpportunityWorkflowV1EnabledForContext({
+              dataOwnerId: input.ownerId,
+              workspaceId: input.workspaceId,
+            }),
+          )
+        }
+      }
+    } finally {
+      client.release()
     }
-    const opportunity = await getOpportunityById(
-      { ownerId: input.ownerId, opportunityId: input.opportunityId },
-      client,
-    )
-    if (!opportunity) {
-      throw new Error('Updated opportunity could not be reloaded.')
-    }
-    await client.query('COMMIT')
-
-    logEvent('opportunity.action', {
-      ownerId: String(input.ownerId),
-      opportunityId: String(input.opportunityId),
-      action: input.action,
-      idempotent: false,
-    })
-    if (input.action === 'contacted') {
-      logEvent('opportunity.contact_recorded', {
-        ownerId: String(input.ownerId),
-        opportunityId: String(input.opportunityId),
-        hiringEpisodeId: row.hiringEpisodeId,
-      })
-    }
-    return { opportunity, idempotent: false }
-  } catch (error) {
-    await client.query('ROLLBACK').catch(() => undefined)
-    throw error
-  } finally {
-    client.release()
   }
+  if (!opportunity) {
+    throw new Error('Updated opportunity could not be reloaded.')
+  }
+  return { opportunity, idempotent: outcome.idempotent }
 }
 
 export function isOpportunityAction(value: unknown): value is OpportunityAction {
@@ -728,6 +700,7 @@ export function isOpportunityTransitionAllowed(
 const OPPORTUNITY_SELECT = `
   SELECT
     o.id::TEXT AS id,
+    o.public_reference::TEXT AS "publicReference",
     o.owner_id::TEXT AS "ownerId",
     o.client_profile_id::TEXT AS "clientProfileId",
     o.organization_id::TEXT AS "organizationId",
@@ -741,6 +714,17 @@ const OPPORTUNITY_SELECT = `
     o.status,
     ${EFFECTIVE_COMMERCIAL_STAGE_SQL} AS "commercialStage",
     ${EFFECTIVE_WORKFLOW_SQL} AS "workflowState",
+    CASE WHEN workflow_state.opportunity_id IS NULL THEN NULL ELSE
+      jsonb_build_object(
+        'assignedToUserId', workflow_state.assigned_to_user_id::TEXT,
+        'nextActionType', workflow_state.next_action_type,
+        'nextActionDueAt', workflow_state.next_action_due_at,
+        'workflowPriority', workflow_state.workflow_priority,
+        'internalNote', workflow_state.internal_note,
+        'lastEventId', workflow_state.last_event_id::TEXT,
+        'updatedAt', workflow_state.updated_at
+      )
+    END AS workflow,
     o.title,
     o.why_now AS "whyNow",
     o.problem_hypothesis AS "problemHypothesis",
@@ -822,6 +806,10 @@ const OPPORTUNITY_SELECT = `
   LEFT JOIN opportunity_outcome_state outcome_state
     ON outcome_state.owner_id = o.owner_id
    AND outcome_state.opportunity_id = o.id
+  LEFT JOIN opportunity_workflow_state workflow_state
+    ON workflow_state.owner_id = o.owner_id
+   AND workflow_state.workspace_id = o.workspace_id
+   AND workflow_state.opportunity_id = o.id
 `
 
 async function getEvidenceForOpportunities(
@@ -881,6 +869,22 @@ function canonicalPublicationIdentity(
   return `${item.kind}:${item.source}:${item.id}`
 }
 
+function toOpportunityItem(
+  row: OpportunityRow,
+  evidenceTimeline: OpportunityEvidenceItem[],
+  strategistEnabled: boolean,
+  workflowEnabled: boolean,
+): OpportunityItem {
+  return {
+    ...row,
+    workflow: workflowEnabled ? row.workflow : null,
+    evidenceTimeline,
+    strategistBrief: strategistEnabled
+      ? parseOpportunityStrategistBrief(row.metadata?.strategistBrief)
+      : null,
+  }
+}
+
 function isOpportunityStatus(value: unknown): value is OpportunityStatus {
   return typeof value === 'string' &&
     OPPORTUNITY_STATUSES.includes(value as OpportunityStatus)
@@ -888,33 +892,4 @@ function isOpportunityStatus(value: unknown): value is OpportunityStatus {
 
 function isConfidenceGate(value: unknown): value is ConfidenceGate {
   return value === 'A' || value === 'B' || value === 'C' || value === 'D'
-}
-
-function normalizeNote(value: string | null | undefined): string | null {
-  if (typeof value !== 'string') return null
-  const normalized = value.trim()
-  return normalized ? normalized.slice(0, 1000) : null
-}
-
-function createActionFingerprint(input: {
-  action: OpportunityAction
-  note: string | null
-  snoozeDays: number | null
-  reasonCode: DismissedReasonCode | null
-  channel: OpportunityOutcomeChannel | null
-  contactPathType: OpportunityContactPathType | null
-  contactReferenceHash: string | null
-}): string {
-  const payload = {
-    action: input.action,
-    note: input.note,
-    snoozeDays: input.snoozeDays,
-    ...(input.reasonCode ? { reasonCode: input.reasonCode } : {}),
-    ...(input.channel ? { channel: input.channel } : {}),
-    ...(input.contactPathType
-      ? { contactPathType: input.contactPathType }
-      : {}),
-    contactReferenceHash: input.contactReferenceHash,
-  }
-  return hashCanonicalJson(payload)
 }

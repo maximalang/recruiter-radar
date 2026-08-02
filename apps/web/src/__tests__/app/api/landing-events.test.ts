@@ -2,10 +2,12 @@
 
 import {
   POST,
+} from "@/app/api/landing-events/route";
+import {
   isAllowedLandingOrigin,
   resetLandingEventRateLimitsForTests,
   resolveLandingAnalyticsRateLimitSecret,
-} from "@/app/api/landing-events/route";
+} from "@/lib/landing-events-security";
 import { tryRecordProductEvent } from "@/lib/telemetry";
 
 jest.mock("@/lib/telemetry", () => ({

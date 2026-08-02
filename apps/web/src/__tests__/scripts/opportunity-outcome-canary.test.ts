@@ -28,4 +28,22 @@ describe('opportunity outcome production canary', () => {
     expect(source).toContain('process.exitCode = 2')
     expect(source).toContain('correction_boundary')
   })
+
+  it('applies workspace scope to every data gate and delegated rebuild', () => {
+    const source = fs.readFileSync(path.resolve(
+      process.cwd(),
+      '../../packages/db/scripts/canary-opportunity-outcomes.mjs',
+    ), 'utf8')
+
+    expect(source).toContain('const scopeParams = [ownerId, workspaceId]')
+    expect(source).toContain(
+      '($2::BIGINT IS NULL OR opportunity.workspace_id = $2)',
+    )
+    expect(source).toContain('LEFT JOIN opportunities scoped_opportunity')
+    expect(source).toContain('OR scoped_opportunity.id IS NULL')
+    expect(source).toContain("const rebuildScope = ['--owner-id', ownerId]")
+    expect(source).toContain("rebuildScope.push('--workspace-id', workspaceId)")
+    expect(source).toContain("await runRebuild([...rebuildScope, '--apply'])")
+    expect(source).toContain("await runRebuild([...rebuildScope, '--dry-run'])")
+  })
 })

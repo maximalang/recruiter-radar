@@ -22,6 +22,7 @@
     "@mendable/firecrawl-js": "^4.25.1",
     "@simplewebauthn/browser": "13.3.0",
     "@simplewebauthn/server": "13.3.2",
+    "fflate": "0.8.3",
     "ioredis": "^5.11.1",
     "next": "^16.2.11",
     "nodemailer": "^9.0.1",
@@ -30,6 +31,7 @@
     "playwright": "^1.60.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "undici": "^6.27.0",
     "web-push": "^3.6.7"
   },
   "devDependencies": {

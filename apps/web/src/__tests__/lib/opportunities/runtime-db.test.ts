@@ -29,6 +29,11 @@ describeWithDatabase('Opportunity Engine production PostgreSQL runtime', () => {
   jest.setTimeout(90_000)
 
   const originalFlag = process.env.OPPORTUNITY_ENGINE_V1_ENABLED
+  const originalOutcomesFlag = process.env.OPPORTUNITY_OUTCOMES_ENABLED
+  const originalWorkspaceContextFlag =
+    process.env.OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED
+  const originalAgencyDnaFlag = process.env.AGENCY_DNA_V1_ENABLED
+  const originalScoringV2Flag = process.env.OPPORTUNITY_SCORING_V2_ENABLED
   const database = new Pool({ connectionString: process.env.DATABASE_URL })
   const token = `${Date.now()}-${process.pid}`
   let ownerId = ''
@@ -37,6 +42,10 @@ describeWithDatabase('Opportunity Engine production PostgreSQL runtime', () => {
 
   beforeAll(async () => {
     process.env.OPPORTUNITY_ENGINE_V1_ENABLED = 'true'
+    process.env.OPPORTUNITY_OUTCOMES_ENABLED = 'true'
+    process.env.OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED = 'true'
+    delete process.env.AGENCY_DNA_V1_ENABLED
+    delete process.env.OPPORTUNITY_SCORING_V2_ENABLED
     const owner = await database.query(
       `INSERT INTO users (email, full_name)
        VALUES ($1, 'Opportunity Runtime Test')
@@ -63,11 +72,19 @@ describeWithDatabase('Opportunity Engine production PostgreSQL runtime', () => {
       [`opportunity-runtime-${token}.example.invalid`],
     )
     organizationId = String(organization.rows[0].id)
+    await database.query(
+      'UPDATE orgs SET career_page_url = $2 WHERE id = $1',
+      [
+        organizationId,
+        `https://opportunity-runtime-${token}.example.invalid/careers`,
+      ],
+    )
   })
 
   afterAll(async () => {
-    if (ownerId) await database.query('DELETE FROM users WHERE id = $1', [ownerId])
-    if (organizationId) await database.query('DELETE FROM orgs WHERE id = $1', [organizationId])
+    // The outcome ledger is intentionally append-only and retains fixture
+    // history. This runtime database is disposable, so row-level cleanup
+    // would violate the ledger contract and is not attempted here.
     await database.end()
     const sharedPool = getPool()
     if (sharedPool) await sharedPool.end()
@@ -76,6 +93,21 @@ describeWithDatabase('Opportunity Engine production PostgreSQL runtime', () => {
     }).recruiterRadarSharedPool
     if (originalFlag === undefined) delete process.env.OPPORTUNITY_ENGINE_V1_ENABLED
     else process.env.OPPORTUNITY_ENGINE_V1_ENABLED = originalFlag
+    if (originalOutcomesFlag === undefined) delete process.env.OPPORTUNITY_OUTCOMES_ENABLED
+    else process.env.OPPORTUNITY_OUTCOMES_ENABLED = originalOutcomesFlag
+    if (originalWorkspaceContextFlag === undefined) {
+      delete process.env.OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED
+    } else {
+      process.env.OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED =
+        originalWorkspaceContextFlag
+    }
+    if (originalAgencyDnaFlag === undefined) delete process.env.AGENCY_DNA_V1_ENABLED
+    else process.env.AGENCY_DNA_V1_ENABLED = originalAgencyDnaFlag
+    if (originalScoringV2Flag === undefined) {
+      delete process.env.OPPORTUNITY_SCORING_V2_ENABLED
+    } else {
+      process.env.OPPORTUNITY_SCORING_V2_ENABLED = originalScoringV2Flag
+    }
   })
 
   async function insertSignals(
@@ -255,12 +287,43 @@ describeWithDatabase('Opportunity Engine production PostgreSQL runtime', () => {
     expect(snoozed?.opportunity.snoozedUntil).toBeTruthy()
     const snoozedUntil = snoozed?.opportunity.snoozedUntil as string
 
+    process.env.AGENCY_DNA_V1_ENABLED = 'true'
+    process.env.OPPORTUNITY_SCORING_V2_ENABLED = 'true'
     await buildOpportunitiesJob({
       enabled: true,
       organizationId,
       scoringVersion: 'opportunity-v2',
     })
     expect((await currentOpportunity('vacancy_spike')).snoozedUntil).toBe(snoozedUntil)
+    const scoringSnapshot = await database.query<{
+      scoringVersion: string
+      baselineScoringVersion: string
+      featureSchemaVersion: string
+      gateVersion: string
+      confidenceGate: string
+      comparisonInputHash: string
+    }>(
+      `SELECT
+         scoring_version AS "scoringVersion",
+         baseline_scoring_version AS "baselineScoringVersion",
+         feature_schema_version AS "featureSchemaVersion",
+         gate_version AS "gateVersion",
+         confidence_gate AS "confidenceGate",
+         comparison_input_hash AS "comparisonInputHash"
+       FROM opportunity_scoring_snapshots
+       WHERE owner_id = $1
+       ORDER BY id DESC
+       LIMIT 1`,
+      [ownerId],
+    )
+    expect(scoringSnapshot.rows[0]).toEqual({
+      scoringVersion: 'opportunity-v2',
+      baselineScoringVersion: 'opportunity-v1',
+      featureSchemaVersion: 'opportunity-features-v2',
+      gateVersion: 'opportunity-gates-v2',
+      confidenceGate: 'A',
+      comparisonInputHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+    })
     await buildOpportunitiesJob({
       enabled: true,
       organizationId,

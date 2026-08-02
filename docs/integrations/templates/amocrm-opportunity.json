@@ -1,0 +1,68 @@
+{
+  "templateVersion": "1.0",
+  "provider": "amocrm",
+  "officialDocumentation": "https://www.amocrm.ru/developers/content/crm_platform/leads-api",
+  "operation": {
+    "method": "POST",
+    "path": "/api/v4/leads",
+    "authentication": "automation_platform_credential",
+    "contentType": "application/json"
+  },
+  "deduplication": {
+    "source": "X-RR-Webhook-Id",
+    "persistInCustomFieldCode": "RR_EVENT_ID",
+    "opportunityIdentityFieldCode": "RR_OPPORTUNITY_ID"
+  },
+  "requestBody": [
+    {
+      "name": "{{opportunity.title}}",
+      "request_id": "{{eventId}}",
+      "custom_fields_values": [
+        {
+          "field_code": "RR_OPPORTUNITY_ID",
+          "values": [{ "value": "{{opportunity.opportunityReference}}" }]
+        },
+        {
+          "field_code": "RR_EVENT_ID",
+          "values": [{ "value": "{{eventId}}" }]
+        },
+        {
+          "field_code": "RR_ORGANIZATION",
+          "values": [{ "value": "{{opportunity.organizationName}}" }]
+        },
+        {
+          "field_code": "RR_WHY_NOW",
+          "values": [{ "value": "{{opportunity.whyNow}}" }]
+        },
+        {
+          "field_code": "RR_ANGLE",
+          "values": [{ "value": "{{opportunity.recommendedAngle}}" }]
+        },
+        {
+          "field_code": "RR_SCORE",
+          "values": [{ "value": "{{opportunity.opportunityScore}}" }]
+        },
+        {
+          "field_code": "RR_EVIDENCE",
+          "values": [{ "value": "{{opportunity.evidenceUrls}}" }]
+        }
+      ],
+      "_embedded": {
+        "tags": [{ "name": "Recruiter Radar" }]
+      }
+    }
+  ],
+  "outcomeMapping": {
+    "contacted": "contacted",
+    "replied": "replied",
+    "meeting": "meeting",
+    "proposal": "proposal",
+    "won": "won",
+    "lost": "lost"
+  },
+  "callbackBody": {
+    "opportunityReference": "{{RR_OPPORTUNITY_ID}}",
+    "eventType": "{{mappedOutcome}}",
+    "occurredAt": "{{providerEventOccurredAt}}"
+  }
+}

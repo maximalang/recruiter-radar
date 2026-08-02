@@ -59,6 +59,27 @@
   box-sizing: border-box;
 }
 
+html[data-landing-motion="paused"] [data-landing-motion-root] *,
+html[data-landing-motion="paused"] [data-landing-motion-root] *::before,
+html[data-landing-motion="paused"] [data-landing-motion-root] *::after,
+html[data-landing-motion="reduced"] [data-landing-motion-root] *,
+html[data-landing-motion="reduced"] [data-landing-motion-root] *::before,
+html[data-landing-motion="reduced"] [data-landing-motion-root] *::after {
+  transition-duration: 0.01ms !important;
+}
+
+html[data-landing-motion="paused"] [data-landing-motion-root] *,
+html[data-landing-motion="paused"] [data-landing-motion-root] *::before,
+html[data-landing-motion="paused"] [data-landing-motion-root] *::after {
+  animation-play-state: paused !important;
+}
+
+html[data-landing-motion="reduced"] [data-landing-motion-root] *,
+html[data-landing-motion="reduced"] [data-landing-motion-root] *::before,
+html[data-landing-motion="reduced"] [data-landing-motion-root] *::after {
+  animation: none !important;
+}
+
 html {
   color-scheme: light;
   background: #f7faff;

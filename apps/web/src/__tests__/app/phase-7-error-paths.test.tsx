@@ -79,7 +79,7 @@ describe('T7.2 — surfaces route errors through human paths (source-level)', ()
   })
 
   it('leads/page.tsx surfaces an error state instead of silently swallowing the leads fetch', () => {
-    const src = readApp('leads/page.tsx')
+    const src = readApp('leads/leads-page-content.tsx')
     // The leads fetch catch block must not silently set empty arrays and render
     // an empty list that reads as "no data". It must propagate an error flag
     // the page renders as an ErrorState.

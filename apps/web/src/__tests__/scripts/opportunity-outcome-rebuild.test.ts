@@ -39,6 +39,20 @@ describe('opportunity outcome projection rebuild contract', () => {
     expect(script).toContain('for (const owner of owners.rows)')
   })
 
+  it('limits an explicitly requested rebuild to one workspace', () => {
+    expect(script).toContain("process.argv.indexOf('--workspace-id')")
+    expect(script).toContain('--workspace-id requires --owner-id.')
+    expect(script).toContain(
+      '($2::BIGINT IS NULL OR opportunity.workspace_id = $2)',
+    )
+    expect(script).toContain('await client.query(projectionSql, [')
+    expect(script).toContain('requestedWorkspaceId')
+    expect(script).toMatch(
+      /DELETE FROM opportunity_outcome_state state\s+USING opportunities opportunity/,
+    )
+    expect(script).toContain('workspaceScoped: Boolean(requestedWorkspaceId)')
+  })
+
   it('reports the required observability counters without outcome payloads', () => {
     expect(script).toContain("'opportunity_outcome.rebuild_started'")
     expect(script).toContain("'opportunity_outcome.rebuild_completed'")
