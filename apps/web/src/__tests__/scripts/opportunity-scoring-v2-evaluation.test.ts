@@ -10,6 +10,7 @@ const cli = readFileSync(
   resolve(scriptsRoot, 'evaluate-opportunity-scoring-v2.mjs'),
   'utf8',
 )
+const compactCli = cli.replace(/\s+/g, ' ')
 
 describe('Opportunity Scoring v2 evaluation contract', () => {
   it('reports every required offline comparison metric', () => {
@@ -42,6 +43,9 @@ describe('Opportunity Scoring v2 evaluation contract', () => {
     expect(cli).toContain("requireWorkspaceId(args)")
     expect(cli).toContain('snapshot.workspace_id = $1')
     expect(cli).toContain('snapshot.comparison_input_hash AS "sampleKey"')
+    expect(compactCli).toContain(
+      'SELECT latest_v2."sampleKey", latest_v2."v1Score", latest_v2."v2Score",',
+    )
     expect(cli).not.toMatch(/organization_name|agency_name|contact_reference|email|phone/i)
     expect(cli).not.toMatch(/\bUPDATE\b|\bDELETE\b|\bINSERT\b/i)
   })
