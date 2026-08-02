@@ -8,7 +8,7 @@ Status: **APPROVE FOR MERGE; production activation remains a separate gated oper
 - Current `main` synchronized at: `b3f9529994c38c9671ecb754854e0b7bac2a7c41`.
 - Synchronization merge: `e237371`.
 - Release fixes: `a7a680c`, `8af8ad8`, `c91611b`, `74d0019`, `e15b898`,
-  `bf8fbc5`, `7ce8bb9`.
+  `bf8fbc5`, `7ce8bb9`, `4a3eda8`.
 - Production deployment and feature-flag activation were deliberately not performed.
 
 ## Phase 0–10 requirement matrix
@@ -23,7 +23,7 @@ Status: **APPROVE FOR MERGE; production activation remains a separate gated oper
 | 5 — Scoring v2 | Versioned deterministic components, immutable inputs and offline evaluation; no automatic tuning. | PostgreSQL verifier: 7/7; evaluation verifier: 7/7. | Complete; flags off. |
 | 6 — Strategist | Deterministic evidence-bound brief, strict persisted parser, lineage and safe API projection. | Unit/contract tests included in the full Jest run; no LLM execution is required. | Complete; flags off. |
 | 7 — workflow | Append-only workflow events, rebuildable state, assignments, next actions, Moscow Today boundary and role gates. | Isolated PostgreSQL workflow runtime: 6/6, including concurrency, idempotency, eligibility, queues and isolation. | Complete; flags off. |
-| 8 — CRM bridge | Tenant credentials, signed outbound delivery, revocation/replay/SSRF/rate boundaries; short-lived delivery claims keep network I/O outside database transactions; legacy global ingest remains unavailable. | Isolated PostgreSQL CRM runtime: 2/2 plus migration/security/route tests in Jest. | Complete; flags off. |
+| 8 — CRM bridge | Tenant credentials, signed outbound delivery, revocation/replay/SSRF/rate boundaries; short-lived delivery claims keep network I/O outside database transactions; legacy global ingest remains unavailable. | Isolated PostgreSQL CRM runtime: 3/3 plus migration/security/route tests in Jest. | Complete; flags off. |
 | 9 — analytics | First-effective-event cohorts, maturity/sample suppression, correction-aware outcomes, exact revenue and bounded PII-free export. | Controlled PostgreSQL fixture: 20,000 opportunities / 200,000 events; analytics 360.265 ms and calibration 357.085 ms under the 1,000 ms guard with expected indexes. | Complete; flags off. |
 | 10 — product UX | Action-first Today workspace, secondary Research Mode, eleven explicit decision sections and honest data states. | Browser audit at 320/768/1024/1440 px: no overflow, unlabeled controls, undersized controls, focus trap, console/page/request errors; keyboard search and Research Mode passed. | Complete; flags off. |
 
@@ -53,12 +53,20 @@ Status: **APPROVE FOR MERGE; production activation remains a separate gated oper
    request. It now claims work in a short transaction, performs HTTP after
    releasing the connection, finalizes in a second short transaction, rejects
    concurrent same-event delivery and applies workspace/process rate limits.
+10. The public callback preflight could open the route for a workspace canary
+    before the credential workspace was known. The repository now rechecks the
+    resolved credential workspace against the exact prerequisite context.
+11. A stale delivery takeover rebuilt its timestamp and body for the same event
+    ID. Claims now persist and reuse the exact signed body and timestamp.
+12. The delivery-claim rollback emptiness check raced concurrent inserts. It
+    now takes an access-exclusive table lock first; a PostgreSQL concurrency
+    test proves the rollback waits, refuses and preserves the active claim.
 
 ## Final gates
 
 - `npm.cmd run web:check`: pass.
 - `npm.cmd run db:validate`: pass; 136 database scripts validated.
-- Full Jest: 294 passed suites, 7 skipped; 2,507 passed tests, 52 skipped;
+- Full Jest: 294 passed suites, 7 skipped; 2,508 passed tests, 53 skipped;
   0 failures. Expected failure-injection logs were reviewed.
 - Next.js 16 production build with Webpack: pass; TypeScript, page-data
   collection and 21/21 static pages completed. Turbopack cannot traverse the
@@ -67,7 +75,7 @@ Status: **APPROVE FOR MERGE; production activation remains a separate gated oper
 - Staged secret scan: 0 matches.
 - Clean PostgreSQL 16 migration: 79 applied, 0 skipped.
 - Opportunity runtime: engine 1/1, outcome 19/19, workflow 6/6, down verifier
-  21 migrations, CRM 2/2.
+  21 migrations, CRM 3/3.
 - Agency DNA: 8/8; Scoring v2: 7/7; evaluation: 7/7.
 - Analytics benchmark: 360.265 ms; calibration export: 357.085 ms, both under
   the 1,000 ms release guard on the final isolated PostgreSQL run.
