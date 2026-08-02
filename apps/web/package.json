@@ -31,6 +31,7 @@
     "playwright": "^1.60.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "undici": "^6.27.0",
     "web-push": "^3.6.7"
   },
   "devDependencies": {
