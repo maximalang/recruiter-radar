@@ -1,0 +1,15 @@
+main:has(> nav[aria-label="Основная навигация"]) > nav[aria-label="Основная навигация"] > div > div {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+main:has(> nav[aria-label="Основная навигация"]) > nav[aria-label="Основная навигация"] a:first-child [role="img"] > span > span:first-child {
+  color: #ffffff !important;
+}
+
+main:has(> nav[aria-label="Основная навигация"]) > nav[aria-label="Основная навигация"] a:first-child [role="img"] > span > span:last-child {
+  color: #75d9ca !important;
+}

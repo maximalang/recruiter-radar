@@ -12,11 +12,11 @@ import LandingMotionPreference from "./landing-motion/motion-preference";
 import { BrandLogo } from "./ui/brand-logo";
 
 const NAV_ITEMS = [
-  { id: "preview", label: "Пример" },
+  { id: "preview", label: "Пример выдачи" },
   { id: "how-it-works", label: "Как работает" },
-  { id: "quality", label: "Проверка" },
+  { id: "quality", label: "Как проверяем" },
   { id: "pricing", label: "Тарифы" },
-  { id: "faq", label: "FAQ" },
+  { id: "faq", label: "Вопросы" },
 ] as const;
 
 export default function LandingHeader({ previewHref }: { previewHref: string }) {
@@ -42,12 +42,12 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
         }
       }
       const next = [...visible.entries()].sort((left, right) => {
-        const offsetDifference = Math.abs(left[1].top - 80) - Math.abs(right[1].top - 80);
+        const offsetDifference = Math.abs(left[1].top - 92) - Math.abs(right[1].top - 92);
         return offsetDifference || right[1].ratio - left[1].ratio;
       })[0]?.[0];
       if (next) setActiveSection(next);
     }, {
-      rootMargin: "-80px 0px -55% 0px",
+      rootMargin: "-92px 0px -55% 0px",
       threshold: [0, 0.15, 0.4, 0.75],
     });
 
@@ -89,12 +89,20 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
     <header
       ref={headerRef}
       className={hpStyles.topBar}
+      data-deploy-anchor="recruiter-radar-landing-v3"
       data-brand-header="recruiter-radar-v3"
+      style={{
+        position: "fixed",
+        top: "14px",
+        left: "50%",
+        width: "min(1160px, calc(100vw - 32px))",
+        transform: "translateX(-50%)",
+      }}
     >
       <Link href="/" className={hpStyles.brandMark} aria-label="Recruiter Radar — на главную">
-        <BrandLogo joined />
+        <BrandLogo joined tone="dark" />
       </Link>
-      <nav className={hpStyles.topNavLinks} aria-label="Разделы лендинга">
+      <nav className={hpStyles.topNavLinks} aria-label="Навигация по лендингу Recruiter Radar">
         <span className={hpStyles.topNavAnchors}>
           {NAV_ITEMS.map((item) => (
             <a
@@ -111,14 +119,14 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
         </span>
         <span className={hpStyles.topNavActions}>
           <LandingMotionPreference />
-          <Link href="/dashboard" className={hpStyles.topNavLogin}>Войти</Link>
+          <Link href="/dashboard" className={hpStyles.topNavLogin}>Личный кабинет</Link>
           <Link
             href={previewHref}
             className={hpStyles.topNavCta}
             data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.header}
           >
-            Настроить радар
+            Проверить свою нишу
           </Link>
           <button
             ref={triggerRef}
@@ -138,7 +146,7 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
       <nav
         id="landing-mobile-menu"
         className={hpStyles.mobileMenu}
-        aria-label="Мобильные разделы лендинга"
+        aria-label="Мобильная навигация по лендингу"
         hidden={!menuOpen}
       >
         {NAV_ITEMS.map((item) => (
@@ -152,7 +160,7 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
             {item.label}
           </a>
         ))}
-        <Link href="/dashboard" onClick={() => setMenuOpen(false)}>Войти</Link>
+        <Link href="/dashboard" onClick={() => setMenuOpen(false)}>Личный кабинет</Link>
         <Link
           href={previewHref}
           className={hpStyles.mobileMenuActivation}
@@ -160,7 +168,7 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
           data-analytics-context={LANDING_ANALYTICS_CONTEXT.header}
           onClick={() => setMenuOpen(false)}
         >
-          Настроить радар
+          Проверить свою нишу
         </Link>
       </nav>
     </header>

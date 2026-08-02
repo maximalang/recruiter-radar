@@ -13,26 +13,23 @@ import hpStyles from "./home-page-components.module.css";
 const CHANNELS = [
   { id: "telegram", label: "Telegram" },
   { id: "email", label: "Email" },
-  { id: "web-push", label: "Web push" },
-  { id: "vk", label: "VK" },
-  { id: "webhook", label: "Webhook" },
 ] as const;
 
 const FEEDBACK = [
   {
     id: "take",
     label: "Беру в работу",
-    confirmation: "Будущая выдача усилит похожие подтверждённые сигналы.",
+    confirmation: "В рабочем профиле такой сигнал можно сразу передать ответственному менеджеру.",
   },
   {
     id: "later",
     label: "Позже",
-    confirmation: "Будущая выдача сохранит сигнал, но снизит его срочность.",
+    confirmation: "Сигнал можно отложить без автоматического обращения к компании.",
   },
   {
     id: "reject",
     label: "Не подходит",
-    confirmation: "Будущая выдача будет реже показывать похожие компании.",
+    confirmation: "Причину отказа можно использовать, чтобы точнее настроить профиль выдачи.",
   },
 ] as const;
 
@@ -73,12 +70,15 @@ export default function LandingDeliveryDemo() {
   const confirmation = FEEDBACK.find((item) => item.id === feedback)?.confirmation ?? "";
 
   return (
-    <article className={`${hpStyles.deliveryCard} ${hpStyles.deliveryDemo}`}>
+    <article
+      className={`${hpStyles.deliveryCard} ${hpStyles.deliveryDemo}`}
+      data-testid="landing-delivery-demo"
+    >
       <div className={hpStyles.deliveryTopbar}>
         <span className={hpStyles.deliveryMark} aria-hidden="true">RR</span>
         <div>
-          <strong>Каналы доставки</strong>
-          <span>демонстрация интерфейса</span>
+          <strong>Доставка результата</strong>
+          <span>Telegram — основной канал, Email — по запросу</span>
         </div>
       </div>
 
@@ -148,7 +148,7 @@ export default function LandingDeliveryDemo() {
       </div>
 
       <p className={hpStyles.deliveryNote}>
-        Это демонстрация интерфейса: выбор остаётся локальным и не отправляется в настоящий профиль. Продукт не пишет компаниям автоматически.
+        Это демонстрация интерфейса: выбор остаётся локальным. Recruiter Radar не пишет компаниям автоматически; другие каналы не входят в обещание пилота.
       </p>
     </article>
   );
@@ -158,48 +158,19 @@ function ChannelPreview({ channel }: { channel: ChannelId }) {
   if (channel === "email") {
     return (
       <div className={hpStyles.emailPreview}>
-        <span>Тема: инженерный найм усилился — сигнал уровня A</span>
-        <h3>Компания для сегодняшнего контакта</h3>
-        <p>14 новых вакансий за 6 дней, включая редкую инженерную роль. Доступна корпоративная HR-форма.</p>
+        <span>Тема: появился подтверждённый повод для контакта</span>
+        <h3>Компания для сегодняшнего приоритета</h3>
+        <p>Изменение в найме, подтверждающие факты и корпоративный путь контакта собраны в одной карточке.</p>
         <strong>Открыть карточку лида</strong>
       </div>
     );
   }
-  if (channel === "web-push") {
-    return (
-      <div className={hpStyles.pushPreview}>
-        <span>Recruiter Radar · сейчас</span>
-        <h3>Новый подтверждённый сигнал</h3>
-        <p>Производственная компания усилила инженерный найм.</p>
-      </div>
-    );
-  }
-  if (channel === "vk") {
-    return (
-      <div className={hpStyles.botPreview}>
-        <span>VK-бот Recruiter Radar</span>
-        <h3>Начните с этого сигнала</h3>
-        <p>Найм подтверждён карьерной страницей и вакансией. Корпоративный контакт найден.</p>
-      </div>
-    );
-  }
-  if (channel === "webhook") {
-    return (
-      <pre className={hpStyles.webhookPreview} aria-label="Пример JSON webhook">
-{`{
-  "company": "Производственная компания",
-  "confidence_gate": "A",
-  "why_now": "14 вакансий за 6 дней",
-  "contact_path": "corporate_hr_form"
-}`}
-      </pre>
-    );
-  }
+
   return (
     <div className={hpStyles.botPreview}>
-      <span>Утренний радар · 5 компаний</span>
+      <span>Утренний радар · короткий список</span>
       <h3>Начните с этого сигнала</h3>
-      <p><strong>Производственная компания</strong> усилила инженерный найм. Уровень доверия A, доступна корпоративная HR-форма.</p>
+      <p><strong>Производственная компания</strong> усилила инженерный найм. В карточке есть факты, оценка уверенности и корпоративный путь контакта.</p>
     </div>
   );
 }
