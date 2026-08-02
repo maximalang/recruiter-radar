@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 
 import type { PublicPreviewInput } from "../../lib/publicProduct";
+import { SiteFooter } from "../ui/site-footer";
 import DetectionScene from "./detection-scene";
 import EvidenceScene from "./evidence-scene";
 import LandingHeader from "./landing-header";
@@ -13,9 +14,12 @@ export default function LandingPage(props: {
   previewInput: PublicPreviewInput;
   hasPreview: boolean;
   checkoutHref: string;
+  paymentConfigured: boolean;
+  faqItems: ReadonlyArray<{ question: string; answer: string }>;
 }) {
   return (
     <div className={styles.landingPage} data-landing-experience="signal-lock">
+      <a href="#main-content" className={styles.skipLink}>Перейти к содержанию</a>
       <LandingHeader previewHref="#preview-configurator" />
       <main id="main-content">
         <DetectionScene previewHref="#preview-configurator" />
@@ -26,6 +30,7 @@ export default function LandingPage(props: {
           <WorkspaceScene {...props} />
         </Suspense>
       </main>
+      <SiteFooter tone="dark" />
     </div>
   );
 }

@@ -12,6 +12,7 @@ import {
 } from "../../lib/landing-analytics-contract";
 import LandingPreviewInteractions from "../landing-preview-interactions";
 import PreviewGeneratedEvent from "../preview-generated-event";
+import ConversionPanel from "./conversion-panel";
 import WorkspaceLead from "./workspace-lead";
 import styles from "./landing.module.css";
 
@@ -25,6 +26,8 @@ export default async function WorkspaceScene(props: {
   previewInput: PublicPreviewInput;
   hasPreview: boolean;
   checkoutHref: string;
+  paymentConfigured: boolean;
+  faqItems: ReadonlyArray<{ question: string; answer: string }>;
 }) {
   const previewState = await getPublicSampleDigestState(props.previewInput);
   const appliedProfile = [props.previewInput.specialization, props.previewInput.targetCity].filter(Boolean);
@@ -146,9 +149,15 @@ export default async function WorkspaceScene(props: {
             data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.preview}
           >
-            Получать такой радар каждое утро <span aria-hidden="true">↗</span>
+            {previewState.items.length > 0 ? "Получать такой радар каждое утро" : "Попробовать неделю"} <span aria-hidden="true">↗</span>
           </Link>
         </div>
+
+        <ConversionPanel
+          previewInput={props.previewInput}
+          paymentConfigured={props.paymentConfigured}
+          faqItems={props.faqItems}
+        />
       </div>
     </section>
   );

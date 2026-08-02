@@ -37,7 +37,7 @@ export default function WorkspaceLead({ item, defaultOpen }: { item: PreviewItem
   ] as const;
 
   return (
-    <details className={styles.workspaceLead} open={defaultOpen} name="signal-lock-leads" data-lead-card="true">
+    <details className={styles.workspaceLead} open={defaultOpen} name="preview-leads" data-lead-card="true">
       <summary>
         <span className={styles.workspaceRank}>{String(item.rank).padStart(2, "0")}</span>
         <span className={styles.workspaceCompany}><strong>{employerName}</strong><small>{[location, vacanciesCaption].filter(Boolean).join(" · ")}</small></span>

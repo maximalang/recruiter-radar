@@ -32,6 +32,21 @@
   color: inherit;
 }
 
+.skipLink {
+  position: fixed;
+  z-index: 100;
+  top: -5rem;
+  left: 1rem;
+  padding: .8rem 1rem;
+  background: var(--signal);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: .68rem;
+  text-decoration: none;
+}
+
+.skipLink:focus { top: 1rem; }
+
 .header {
   position: absolute;
   z-index: 20;
@@ -865,6 +880,62 @@
 .workspaceSkeleton { display: grid; gap: .75rem; }
 .workspaceSkeleton span { height: 5rem; background: linear-gradient(90deg, rgba(243, 241, 235, .03), rgba(243, 241, 235, .08), rgba(243, 241, 235, .03)); background-size: 200% 100%; animation: workspaceShimmer 1.6s linear infinite; }
 
+.conversionPanel { display: grid; gap: clamp(5rem, 10vh, 8rem); padding-top: 4rem; border-top: 1px solid var(--line-dark); }
+
+.pricingStage {
+  display: grid;
+  grid-template-columns: minmax(18rem, .75fr) minmax(21rem, .9fr) minmax(16rem, .65fr);
+  grid-template-areas: "intro pilot secondary";
+  gap: clamp(1.5rem, 4vw, 4rem);
+}
+
+.pricingIntro { grid-area: intro; align-self: start; }
+.pricingIntro > span,
+.faqHeading > span,
+.finalCall > span { color: var(--signal); font-family: var(--mono); font-size: .59rem; letter-spacing: .09em; text-transform: uppercase; }
+.pricingIntro h2,
+.faqHeading h2 { margin: 1rem 0 0; font-size: clamp(2rem, 3.5vw, 3.6rem); font-weight: 500; letter-spacing: -.055em; line-height: 1; }
+.pricingIntro p { margin: 1.2rem 0 0; color: var(--paper-dim); font-size: .9rem; line-height: 1.5; }
+
+.pilotOffer { grid-area: pilot; padding: 1.5rem; border: 1px solid var(--signal); background: rgba(141, 214, 189, .04); }
+.pilotMeta { display: flex; justify-content: space-between; gap: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--line-dark); }
+.pilotMeta span { color: var(--signal); font-family: var(--mono); font-size: .56rem; text-transform: uppercase; }
+.pilotMeta strong { font-size: .85rem; font-weight: 560; }
+.pilotPrice { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; padding: 1.4rem 0 1rem; }
+.pilotPrice strong { font-size: clamp(2.6rem, 5vw, 4.8rem); font-weight: 450; letter-spacing: -.07em; }
+.pilotPrice span { color: var(--paper-dim); font-family: var(--mono); font-size: .58rem; }
+.pilotOffer > p { margin: 0; color: rgba(243, 241, 235, .7); font-size: .82rem; line-height: 1.45; }
+.pilotOffer ul { margin: 1.2rem 0; padding: 0; border-top: 1px solid var(--line-dark); list-style: none; }
+.pilotOffer li { padding: .7rem 0; border-bottom: 1px solid var(--line-dark); color: rgba(243, 241, 235, .72); font-size: .75rem; }
+.pilotOffer li::before { margin-right: .55rem; color: var(--signal); content: "↳"; }
+.pilotOffer > a { display: flex; justify-content: space-between; gap: 1rem; padding: .85rem 1rem; background: var(--signal); color: var(--ink); font-family: var(--mono); font-size: .62rem; font-weight: 700; text-decoration: none; text-transform: uppercase; }
+.pilotOffer > small { display: block; margin-top: .75rem; color: var(--paper-dim); font-family: var(--mono); font-size: .55rem; }
+
+.secondaryOffers { grid-area: secondary; display: grid; align-content: start; }
+.secondaryOffers article { display: grid; gap: .65rem; padding: 1.2rem 0; border-top: 1px solid var(--line-dark); }
+.secondaryOffers article:last-child { border-bottom: 1px solid var(--line-dark); }
+.secondaryOffers article > span { color: var(--copper); font-family: var(--mono); font-size: .58rem; text-transform: uppercase; }
+.secondaryOffers article > strong { font-size: 1.65rem; font-weight: 500; }
+.secondaryOffers p { margin: 0; color: var(--paper-dim); font-size: .75rem; line-height: 1.4; }
+.secondaryOffers a { width: fit-content; color: var(--signal); font-family: var(--mono); font-size: .58rem; text-decoration: none; text-transform: uppercase; }
+
+.faqStage { display: grid; grid-template-columns: minmax(17rem, .65fr) minmax(31rem, 1.35fr); gap: clamp(3rem, 8vw, 8rem); padding-top: 3rem; border-top: 1px solid var(--line-dark); }
+.faqList { border-top: 1px solid var(--line-dark); }
+.faqList details { border-bottom: 1px solid var(--line-dark); }
+.faqList summary { display: grid; grid-template-columns: 2rem 1fr auto; gap: 1rem; min-height: 4.5rem; align-items: center; cursor: pointer; list-style: none; color: rgba(243, 241, 235, .78); font-size: .9rem; }
+.faqList summary::-webkit-details-marker { display: none; }
+.faqList summary span { color: var(--copper); font-family: var(--mono); font-size: .57rem; }
+.faqList summary i { color: var(--signal); font-style: normal; }
+.faqList details[open] summary i { transform: rotate(45deg); }
+.faqList details p { margin: 0; padding: 0 2.5rem 1.25rem 3rem; color: var(--paper-dim); font-size: .8rem; line-height: 1.55; }
+
+.finalCall { padding: clamp(2rem, 6vw, 5rem); border-top: 1px solid var(--signal); border-bottom: 1px solid var(--line-dark); background: var(--ink-soft); }
+.finalCall h2 { max-width: 12ch; margin: 1.1rem 0 0; font-size: clamp(3rem, 7vw, 7rem); font-weight: 470; letter-spacing: -.07em; line-height: .92; }
+.finalCall p { max-width: 36rem; margin: 1.6rem 0 0; color: var(--paper-dim); font-size: 1rem; line-height: 1.5; }
+.finalCall div { display: flex; flex-wrap: wrap; align-items: center; gap: 1.2rem; margin-top: 2rem; }
+.finalCall div a:first-child { display: inline-flex; gap: .8rem; padding: .85rem 1rem; background: var(--signal); color: var(--ink); font-family: var(--mono); font-size: .63rem; font-weight: 700; text-decoration: none; text-transform: uppercase; }
+.finalCall div a:last-child { color: var(--paper-dim); font-family: var(--mono); font-size: .6rem; text-decoration: none; text-transform: uppercase; }
+
 @keyframes workspaceShimmer { to { background-position: -200% 0; } }
 
 @keyframes signalRing {
@@ -919,6 +990,9 @@
   .workspaceForm { grid-template-columns: 1fr 1fr; }
   .workspaceForm button,
   .workspaceForm > a { width: 100%; }
+
+  .pricingStage { grid-template-columns: 1fr 1fr; grid-template-areas: "intro intro" "pilot secondary"; }
+  .faqStage { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 760px) {
@@ -1089,6 +1163,13 @@
   .workspaceProof div:last-child { border-bottom: 0; }
   .workspaceFiur { grid-template-columns: 1fr 1fr; }
   .workspaceLeadFooter { align-items: flex-start; flex-direction: column; }
+
+  .conversionPanel { gap: 4.5rem; padding-top: 2rem; }
+  .pricingStage { grid-template-columns: 1fr; grid-template-areas: "intro" "pilot" "secondary"; }
+  .pilotOffer { padding: 1.1rem; }
+  .faqStage { gap: 2rem; }
+  .faqList details p { padding-left: 2rem; padding-right: 0; }
+  .finalCall { margin: 0 -1.1rem; padding: 3rem 1.1rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
