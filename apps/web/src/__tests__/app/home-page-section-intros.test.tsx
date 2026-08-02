@@ -2,7 +2,7 @@ import { Children, isValidElement, type ReactElement, type ReactNode } from "rea
 import { renderToStaticMarkup } from "react-dom/server";
 import Link from "next/link";
 
-import HomePage, { PreviewSection, PreviewSkeleton } from "@/app/page";
+import HomePage, { PreviewSection, PreviewSkeleton } from "@/app/home-page-content";
 import LandingDeliveryDemo from "@/app/landing-delivery-demo";
 import LandingHeader from "@/app/landing-header";
 import LandingMethodology from "@/app/landing-methodology";

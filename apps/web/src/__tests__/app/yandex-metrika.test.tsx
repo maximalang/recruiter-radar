@@ -92,7 +92,7 @@ describe("YandexMetrika", () => {
 
     expect(containsElementType(layout, YandexMetrika)).toBe(false);
 
-    const landing = readFileSync(resolve(process.cwd(), "app/page.tsx"), "utf8");
+    const landing = readFileSync(resolve(process.cwd(), "app/home-page-content.tsx"), "utf8");
     const checkout = readFileSync(resolve(process.cwd(), "app/checkout/page.tsx"), "utf8");
     const onboarding = readFileSync(
       resolve(process.cwd(), "app/onboarding/pilot/[orderId]/page.tsx"),

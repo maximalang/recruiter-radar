@@ -5,7 +5,7 @@ import { render, screen } from "@testing-library/react";
 import {
   OnboardingView,
   type OnboardingViewSnapshot,
-} from "@/app/onboarding/page";
+} from "@/app/onboarding/onboarding-page-content";
 
 jest.mock("@/app/onboarding/actions", () => ({
   saveOnboardingAction: jest.fn(),
