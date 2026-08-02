@@ -1,4 +1,6 @@
 import { Pool } from 'pg'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 import {
   CrmCallbackAuthenticationError,
@@ -22,8 +24,18 @@ describeWithDatabase('Opportunity CRM bridge PostgreSQL runtime', () => {
     await pool.end()
   })
 
-  function ingest(input: Parameters<typeof ingestCrmOutcomeCallback>[0]) {
-    return ingestCrmOutcomeCallback(input, () => pool.connect())
+  const globallyEnabledEnv = {
+    OPPORTUNITY_ENGINE_V1_ENABLED: 'true',
+    OPPORTUNITY_OUTCOMES_ENABLED: 'true',
+    OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED: 'true',
+    OPPORTUNITY_CRM_BRIDGE_ENABLED: 'true',
+  }
+
+  function ingest(
+    input: Parameters<typeof ingestCrmOutcomeCallback>[0],
+    env: Readonly<Record<string, string | undefined>> = globallyEnabledEnv,
+  ) {
+    return ingestCrmOutcomeCallback(input, () => pool.connect(), new Date(), env)
   }
 
   it('enforces tenant scope, revocation and altered-replay rejection in one ledger', async () => {
@@ -31,6 +43,19 @@ describeWithDatabase('Opportunity CRM bridge PostgreSQL runtime', () => {
     const foreign = await seedTenant('foreign')
     const active = await seedIntegration(tenant, 'active')
     const revoked = await seedIntegration(tenant, 'revoked')
+    const foreignActive = await seedIntegration(foreign, 'active')
+
+    await expect(ingest(signed({
+      integrationReference: foreignActive.integrationReference,
+      credentialReference: foreignActive.credentialReference,
+      credentialSecretHash: foreignActive.credentialSecretHash,
+      eventId: 'foreign-canary-credential-1',
+      rawBody: body(foreign.opportunityReference, 'accepted'),
+    }), {
+      OPPORTUNITY_CANARY_WORKSPACE_IDS: tenant.workspaceId,
+      OPPORTUNITY_CRM_BRIDGE_ENABLED: 'true',
+    })).rejects.toBeInstanceOf(CrmCallbackAuthenticationError)
+    expect(await outcomeCount(foreign.opportunityId)).toBe(0)
 
     const crossBody = body(foreign.opportunityReference, 'accepted')
     await expect(ingest(signed({
@@ -143,9 +168,30 @@ describeWithDatabase('Opportunity CRM bridge PostgreSQL runtime', () => {
       () => pool.connect(),
     )).rejects.toBeInstanceOf(CrmDeliveryInProgressError)
 
+    await pool.query(
+      `UPDATE opportunity_crm_delivery_claims
+       SET claimed_at = NOW() - INTERVAL '31 seconds'`,
+    )
+    const takeoverSender = jest.fn(async () => ({
+      status: 'succeeded' as const,
+      httpStatus: 202,
+    }))
+    await expect(deliverOpportunityToCrm(
+      input,
+      takeoverSender,
+      () => pool.connect(),
+    )).resolves.toEqual(expect.objectContaining({
+      status: 'succeeded', idempotent: false,
+    }))
+    expect(takeoverSender).toHaveBeenCalledTimes(1)
+    expect(takeoverSender.mock.calls[0]?.[0].body)
+      .toBe(sender.mock.calls[0]?.[0].body)
+    expect(takeoverSender.mock.calls[0]?.[0].timestamp)
+      .toBe(sender.mock.calls[0]?.[0].timestamp)
+
     releaseSender()
     await expect(first).resolves.toEqual(expect.objectContaining({
-      status: 'succeeded', idempotent: false,
+      status: 'succeeded', idempotent: true,
     }))
     await expect(deliverOpportunityToCrm(
       input,
@@ -163,6 +209,77 @@ describeWithDatabase('Opportunity CRM bridge PostgreSQL runtime', () => {
            AS deliveries`,
     )
     expect(finalized.rows[0]).toEqual({ claims: 0, deliveries: 1 })
+  })
+
+  it('locks claim insertion before refusing a non-empty rollback', async () => {
+    const tenant = await seedTenant('rollback-lock')
+    const integration = await seedIntegration(tenant, 'active')
+    const claimClient = await pool.connect()
+    const downClient = await pool.connect()
+    try {
+      await claimClient.query('BEGIN')
+      await claimClient.query(
+        `INSERT INTO opportunity_crm_delivery_claims (
+           event_id, workspace_id, integration_id, credential_id,
+           owner_id, opportunity_id, request_hash, request_body,
+           request_timestamp, claim_token
+         ) VALUES (
+           gen_random_uuid(), $1, $2, $3, $4, $5,
+           repeat('a', 64), '{}', $6, gen_random_uuid()
+         )`,
+        [
+          tenant.workspaceId,
+          integration.integrationId,
+          integration.credentialId,
+          tenant.ownerId,
+          tenant.opportunityId,
+          String(Math.floor(Date.now() / 1_000)),
+        ],
+      )
+      const backend = await downClient.query<{ pid: number }>(
+        'SELECT pg_backend_pid() AS pid',
+      )
+      const downSql = readFileSync(resolve(
+        process.cwd(), '..', '..', 'packages', 'db', 'migrations',
+        '20260802100000_add_opportunity_crm_delivery_claims.down.sql',
+      ), 'utf8')
+      const downAttempt = downClient.query(downSql).then(
+        () => ({ ok: true as const, error: null }),
+        (error: unknown) => ({ ok: false as const, error }),
+      )
+      await waitFor(async () => {
+        const activity = await pool.query<{ waitEventType: string | null }>(
+          `SELECT wait_event_type AS "waitEventType"
+           FROM pg_stat_activity
+           WHERE pid = $1`,
+          [backend.rows[0].pid],
+        )
+        return activity.rows[0]?.waitEventType === 'Lock'
+      })
+      await claimClient.query('COMMIT')
+      const result = await downAttempt
+      expect(result.ok).toBe(false)
+      expect(result.error).toEqual(expect.objectContaining({
+        message: expect.stringContaining('active claims exist'),
+      }))
+      await downClient.query('ROLLBACK')
+      const preserved = await pool.query(
+        `SELECT
+           TO_REGCLASS('public.opportunity_crm_delivery_claims') AS relation,
+           (SELECT COUNT(*)::INTEGER
+            FROM opportunity_crm_delivery_claims) AS count`,
+      )
+      expect(preserved.rows[0]).toEqual({
+        relation: 'opportunity_crm_delivery_claims',
+        count: 1,
+      })
+      await pool.query('DELETE FROM opportunity_crm_delivery_claims')
+    } finally {
+      await claimClient.query('ROLLBACK').catch(() => undefined)
+      await downClient.query('ROLLBACK').catch(() => undefined)
+      claimClient.release()
+      downClient.release()
+    }
   })
 
   async function seedTenant(label: string) {
@@ -276,6 +393,7 @@ describeWithDatabase('Opportunity CRM bridge PostgreSQL runtime', () => {
       ],
     )
     return {
+      integrationId: integration.rows[0].id as string,
       integrationReference: integration.rows[0].reference as string,
       credentialId: credential.rows[0].id as string,
       credentialReference: credential.rows[0].reference as string,
@@ -324,9 +442,9 @@ describeWithDatabase('Opportunity CRM bridge PostgreSQL runtime', () => {
     return result.rows[0].count as number
   }
 
-  async function waitFor(predicate: () => boolean) {
+  async function waitFor(predicate: () => boolean | Promise<boolean>) {
     for (let attempt = 0; attempt < 100; attempt += 1) {
-      if (predicate()) return
+      if (await predicate()) return
       await new Promise((resolve) => setTimeout(resolve, 10))
     }
     throw new Error('Timed out waiting for CRM sender.')

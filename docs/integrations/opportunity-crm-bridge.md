@@ -71,7 +71,8 @@ workspace per minute or 1,000 requests per application process per minute.
 
 If the process stops after the receiver accepted a request but before the
 result was persisted, a retry may resend the same deterministic event ID after
-the stale claim expires. Receivers must deduplicate by `X-RR-Webhook-Id`.
+the stale claim expires. The retry reuses the exact stored body and timestamp;
+receivers must still deduplicate by `X-RR-Webhook-Id`.
 
 ## Outbound envelope
 

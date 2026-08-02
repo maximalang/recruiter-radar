@@ -50,10 +50,20 @@ describe('CRM outbound delivery repository', () => {
       { rows: [{ role: 'recruiter' }] },
       { rows: [] },
       { rows: [row] },
-      { rows: [{ ownsClaim: true }] },
+      { rows: [{
+        ownsClaim: true,
+        requestBody: JSON.stringify({ opportunityReference: row.opportunityReference }),
+        requestHash: 'b'.repeat(64),
+        requestTimestamp: '1785585600',
+      }] },
       { rows: [] },
       { rows: [] },
-      { rows: [{ ownsClaim: true }] },
+      { rows: [{
+        ownsClaim: true,
+        requestBody: JSON.stringify({ opportunityReference: row.opportunityReference }),
+        requestHash: 'b'.repeat(64),
+        requestTimestamp: '1785585600',
+      }] },
       { rows: [{ status: 'succeeded', httpStatus: 202 }], rowCount: 1 },
       { rows: [], rowCount: 1 },
       { rows: [] },
@@ -112,7 +122,12 @@ describe('CRM outbound delivery repository', () => {
       { rows: [{ role: 'recruiter' }] },
       { rows: [] },
       { rows: [row] },
-      { rows: [{ ownsClaim: true }] },
+      { rows: [{
+        ownsClaim: true,
+        requestBody: JSON.stringify({ opportunityReference: row.opportunityReference }),
+        requestHash: 'b'.repeat(64),
+        requestTimestamp: '1785585600',
+      }] },
       { rows: [] },
     ])
     const finalized = clientWithResults([

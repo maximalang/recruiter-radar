@@ -11,6 +11,8 @@ CREATE TABLE opportunity_crm_delivery_claims (
   owner_id BIGINT NOT NULL,
   opportunity_id BIGINT NOT NULL,
   request_hash CHAR(64) NOT NULL,
+  request_body TEXT NOT NULL,
+  request_timestamp CHAR(10) NOT NULL,
   claim_token UUID NOT NULL,
   claimed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT opportunity_crm_delivery_claims_integration_fkey
@@ -26,7 +28,11 @@ CREATE TABLE opportunity_crm_delivery_claims (
     REFERENCES opportunities(id, owner_id, workspace_id)
     ON DELETE CASCADE,
   CONSTRAINT opportunity_crm_delivery_claims_hash_check
-    CHECK (request_hash ~ '^[a-f0-9]{64}$')
+    CHECK (request_hash ~ '^[a-f0-9]{64}$'),
+  CONSTRAINT opportunity_crm_delivery_claims_body_check
+    CHECK (OCTET_LENGTH(request_body) BETWEEN 1 AND 65536),
+  CONSTRAINT opportunity_crm_delivery_claims_timestamp_check
+    CHECK (request_timestamp ~ '^[0-9]{10}$')
 );
 
 CREATE INDEX opportunity_crm_delivery_claims_stale_idx

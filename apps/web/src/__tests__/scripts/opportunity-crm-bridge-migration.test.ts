@@ -61,8 +61,12 @@ describe('Opportunity CRM bridge migration contract', () => {
     expect(claimsMigration).toContain('CREATE TABLE opportunity_crm_delivery_claims')
     expect(claimsMigration).toContain('event_id UUID PRIMARY KEY')
     expect(claimsMigration).toContain('claim_token UUID NOT NULL')
+    expect(claimsMigration).toContain('request_body TEXT NOT NULL')
+    expect(claimsMigration).toContain('request_timestamp CHAR(10) NOT NULL')
     expect(claimsMigration).toContain('opportunity_crm_delivery_claims_stale_idx')
     expect(claimsRollback).toContain('active claims exist')
+    expect(claimsRollback.indexOf('LOCK TABLE opportunity_crm_delivery_claims'))
+      .toBeLessThan(claimsRollback.indexOf('IF EXISTS'))
   })
 })
 

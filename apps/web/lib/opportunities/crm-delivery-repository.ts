@@ -188,17 +188,30 @@ async function prepareDelivery(
     const body = buildDeliveryBody(input.eventId, occurredAt, delivery)
     const requestHash = createHash('sha256').update(body, 'utf8').digest('hex')
     const claimToken = randomUUID()
-    const claim = await client.query<{ ownsClaim: boolean }>(
+    const timestamp = String(Math.floor(Date.parse(occurredAt) / 1_000))
+    const claim = await client.query<{
+      ownsClaim: boolean
+      requestBody: string
+      requestHash: string
+      requestTimestamp: string
+    }>(
       `INSERT INTO opportunity_crm_delivery_claims (
          event_id, workspace_id, integration_id, credential_id,
-         owner_id, opportunity_id, request_hash, claim_token
-       ) VALUES ($1::UUID, $2, $3, $4, $5, $6, $7, $8::UUID)
+         owner_id, opportunity_id, request_hash, request_body,
+         request_timestamp, claim_token
+       ) VALUES ($1::UUID, $2, $3, $4, $5, $6, $7, $8, $9, $10::UUID)
        ON CONFLICT (event_id) DO UPDATE SET
          claim_token = EXCLUDED.claim_token,
          claimed_at = NOW()
        WHERE opportunity_crm_delivery_claims.claimed_at <
          NOW() - INTERVAL '30 seconds'
-       RETURNING claim_token = $8::UUID AS "ownsClaim"`,
+         AND opportunity_crm_delivery_claims.credential_id =
+           EXCLUDED.credential_id
+       RETURNING
+         claim_token = $10::UUID AS "ownsClaim",
+         request_body AS "requestBody",
+         request_hash AS "requestHash",
+         request_timestamp AS "requestTimestamp"`,
       [
         input.eventId,
         input.workspaceId,
@@ -207,6 +220,8 @@ async function prepareDelivery(
         input.ownerId,
         input.opportunityId,
         requestHash,
+        body,
+        timestamp,
         claimToken,
       ],
     )
@@ -225,14 +240,14 @@ async function prepareDelivery(
       workspaceId: input.workspaceId,
       opportunityId: input.opportunityId,
       delivery,
-      requestHash,
+      requestHash: claim.rows[0].requestHash,
       outboundRequest: {
         destinationUrl: delivery.outboundWebhookUrl,
         credentialReference: delivery.credentialReference,
         credentialSecretHash: delivery.credentialSecretHash,
-        timestamp: String(Math.floor(Date.parse(occurredAt) / 1_000)),
+        timestamp: claim.rows[0].requestTimestamp,
         eventId: input.eventId,
-        body,
+        body: claim.rows[0].requestBody,
       },
     }
   } catch (error) {

@@ -43,6 +43,12 @@ describe('tenant CRM callback repository', () => {
     valueMinor: 500000,
     currency: 'RUB',
   })
+  const enabledEnv = {
+    OPPORTUNITY_ENGINE_V1_ENABLED: 'true',
+    OPPORTUNITY_OUTCOMES_ENABLED: 'true',
+    OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED: 'true',
+    OPPORTUNITY_CRM_BRIDGE_ENABLED: 'true',
+  }
 
   beforeEach(() => {
     jest.clearAllMocks()
@@ -69,7 +75,9 @@ describe('tenant CRM callback repository', () => {
       { rows: [] },
     ])
 
-    const result = await ingestCrmOutcomeCallback(signedInput(), async () => client, now)
+    const result = await ingestCrmOutcomeCallback(
+      signedInput(), async () => client, now, enabledEnv,
+    )
 
     expect(result).toEqual({
       status: 200, code: 'accepted', accepted: true, idempotent: false,
@@ -117,7 +125,7 @@ describe('tenant CRM callback repository', () => {
     ])
 
     await expect(ingestCrmOutcomeCallback(
-      signedInput(), async () => client, now,
+      signedInput(), async () => client, now, enabledEnv,
     )).rejects.toBeInstanceOf(CrmCallbackReplayConflictError)
     expect(recordOpportunityOutcomeInTransaction).not.toHaveBeenCalled()
     expect(query).toHaveBeenLastCalledWith('ROLLBACK')
@@ -131,7 +139,7 @@ describe('tenant CRM callback repository', () => {
     ])
 
     await expect(ingestCrmOutcomeCallback(
-      signedInput(), async () => client, now,
+      signedInput(), async () => client, now, enabledEnv,
     )).rejects.toBeInstanceOf(CrmCallbackAuthenticationError)
     expect(recordOpportunityOutcomeInTransaction).not.toHaveBeenCalled()
     expect(query).toHaveBeenLastCalledWith('ROLLBACK')
@@ -153,7 +161,7 @@ describe('tenant CRM callback repository', () => {
     ])
 
     await expect(ingestCrmOutcomeCallback(
-      signedInput(), async () => client, now,
+      signedInput(), async () => client, now, enabledEnv,
     )).resolves.toEqual({
       status: 429, code: 'rate_limited', accepted: false, idempotent: false,
     })
@@ -162,6 +170,28 @@ describe('tenant CRM callback repository', () => {
       String(sql).includes('INSERT INTO opportunity_crm_callback_receipts'))
     expect(receipt?.[1]).toContain('rate_limited')
     expect(query).toHaveBeenLastCalledWith('COMMIT')
+  })
+
+  it('rejects a valid credential outside the exact base workspace canary', async () => {
+    const { client, query } = clientWithResults([
+      { rows: [] },
+      { rows: [{
+        workspaceId: '10', integrationId: '17', credentialId: '21',
+        credentialSecretHash, allowedEventTypes: ['won'],
+        rateLimitMaxRequests: 60, rateLimitWindowSeconds: 60,
+        replayWindowSeconds: 300,
+      }] },
+      { rows: [] },
+    ])
+
+    await expect(ingestCrmOutcomeCallback(
+      signedInput(), async () => client, now, {
+        OPPORTUNITY_CANARY_WORKSPACE_IDS: '9',
+        OPPORTUNITY_CRM_BRIDGE_ENABLED: 'true',
+      },
+    )).rejects.toBeInstanceOf(CrmCallbackAuthenticationError)
+    expect(recordOpportunityOutcomeInTransaction).not.toHaveBeenCalled()
+    expect(query).toHaveBeenLastCalledWith('ROLLBACK')
   })
 
   function signedInput() {

@@ -11,6 +11,7 @@ import {
   recordOpportunityOutcomeInTransaction,
 } from './outcome-repository'
 import { verifyCrmWebhookSignature } from './crm-webhook'
+import { isOpportunityCrmBridgeEnabledForContext } from './config'
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -88,6 +89,7 @@ export async function ingestCrmOutcomeCallback(
   },
   provideClient: ClientProvider = getClient,
   now: Date = new Date(),
+  env: Readonly<Record<string, string | undefined>> = process.env,
 ): Promise<CrmCallbackResult> {
   if (
     !UUID_PATTERN.test(input.integrationReference) ||
@@ -104,6 +106,12 @@ export async function ingestCrmOutcomeCallback(
     await client.query('BEGIN')
     const credential = await lockCredential(client, input)
     if (!credential) throw new CrmCallbackAuthenticationError()
+    if (!isOpportunityCrmBridgeEnabledForContext({
+      dataOwnerId: null,
+      workspaceId: credential.workspaceId,
+    }, env)) {
+      throw new CrmCallbackAuthenticationError()
+    }
     if (
       !verifyCrmWebhookSignature({
         credentialSecretHash: credential.credentialSecretHash,
