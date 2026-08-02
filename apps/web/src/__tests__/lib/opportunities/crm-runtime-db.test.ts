@@ -11,6 +11,7 @@ import { createCrmCredentialSecret } from '@/lib/opportunities/crm-credential-se
 import {
   CrmDeliveryInProgressError,
   deliverOpportunityToCrm,
+  type CrmOutboundSender,
 } from '@/lib/opportunities/crm-delivery-repository'
 import { createCrmWebhookSignature } from '@/lib/opportunities/crm-webhook'
 
@@ -139,7 +140,7 @@ describeWithDatabase('Opportunity CRM bridge PostgreSQL runtime', () => {
     const integration = await seedIntegration(tenant, 'active')
     let releaseSender!: () => void
     const senderGate = new Promise<void>((resolve) => { releaseSender = resolve })
-    const sender = jest.fn(async () => {
+    const sender = jest.fn<ReturnType<CrmOutboundSender>, Parameters<CrmOutboundSender>>(async () => {
       await senderGate
       return { status: 'succeeded' as const, httpStatus: 202 }
     })
@@ -172,10 +173,10 @@ describeWithDatabase('Opportunity CRM bridge PostgreSQL runtime', () => {
       `UPDATE opportunity_crm_delivery_claims
        SET claimed_at = NOW() - INTERVAL '31 seconds'`,
     )
-    const takeoverSender = jest.fn(async () => ({
-      status: 'succeeded' as const,
-      httpStatus: 202,
-    }))
+    const takeoverSender = jest.fn<
+      ReturnType<CrmOutboundSender>,
+      Parameters<CrmOutboundSender>
+    >(async () => ({ status: 'succeeded' as const, httpStatus: 202 }))
     await expect(deliverOpportunityToCrm(
       input,
       takeoverSender,
