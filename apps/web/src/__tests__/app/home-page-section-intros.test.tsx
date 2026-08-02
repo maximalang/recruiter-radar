@@ -98,14 +98,13 @@ describe("landing section hierarchy", () => {
     const page = await HomePage({ searchParams: Promise.resolve({}) });
     const intros = collectElements(page, SectionIntro);
 
-    expect(intros).toHaveLength(6);
+    expect(intros).toHaveLength(5);
     expect(intros.every((section) => section.props.accent === true)).toBe(true);
     expect(intros.map((section) => section.props.eyebrow)).toEqual([
-      "Почему обычный поиск не работает",
-      "Как работает радар",
+      "Что меняется",
       "Продукт в работе",
-      "Evidence-first",
-      "Для рекрутинговых агентств",
+      "Стандарт доказательств",
+      "Рабочий ритм",
       "Вопросы",
     ]);
     expect(collectElements(page, "section").some((section) => section.props.id === "pricing")).toBe(false);
@@ -135,7 +134,7 @@ describe("landing section hierarchy", () => {
       (section) => section.props["data-final-cta"] === "true",
     );
 
-    expect(pageText).toContain("Находите компании, которым нужен подбор — до массового отклика агентств");
+    expect(pageText).toContain("Компании, которым нужен подбор. До того, как это станет очевидно всем.");
     expect(pageText).toContain("Обезличенный пример");
     expect(pageText).toContain("заявка без списания, профиль сохранится");
     expect(pageText).toContain("Оставить заявку на пилот");

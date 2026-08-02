@@ -11,10 +11,10 @@ import hpStyles from "./home-page-components.module.css";
 import { BrandLogo } from "./ui/brand-logo";
 
 const NAV_ITEMS = [
-  { id: "how-it-works", label: "Как работает" },
+  { id: "workflow", label: "Что меняется" },
   { id: "preview", label: "Продукт" },
   { id: "quality", label: "Доказательства" },
-  { id: "for-agencies", label: "Для агентств" },
+  { id: "delivery", label: "Рабочий ритм" },
   { id: "faq", label: "Вопросы" },
 ] as const;
 
@@ -49,6 +49,7 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
     <header
       ref={headerRef}
       className={hpStyles.topBar}
+      data-landing-scroll-snap="sections"
       data-deploy-anchor="recruiter-radar-landing-v3"
       data-brand-header="recruiter-radar-evidence-v2"
     >

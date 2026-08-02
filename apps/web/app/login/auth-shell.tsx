@@ -6,7 +6,7 @@ import styles from "./login.module.css";
 
 export function AuthShell(props: { children: ReactNode }) {
   return (
-    <main className={styles.shell}>
+    <main className={styles.shell} data-ui-system="recruiter-radar-v6">
       <div className={styles.frame}>
         <aside className={styles.story} aria-label="О Recruiter Radar">
           <Link href="/" className={styles.brand}>

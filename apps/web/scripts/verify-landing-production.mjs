@@ -185,8 +185,39 @@ await page.route("**/api/landing-events", async (route) => {
 await page.goto(baseUrl, { waitUntil: "networkidle" });
 await page.getByRole("heading", {
   level: 1,
-  name: /Находите компании, которым нужен подбор/,
+  name: /Компании, которым нужен подбор/,
 }).waitFor();
+const landingScrollContract = await page.evaluate(() => {
+  const rootStyle = getComputedStyle(document.documentElement);
+  const workflow = document.querySelector("#workflow");
+  const preview = document.querySelector("#preview");
+  return {
+    rootSnapType: rootStyle.scrollSnapType,
+    rootScrollBehavior: rootStyle.scrollBehavior,
+    workflowSnapAlign: workflow ? getComputedStyle(workflow).scrollSnapAlign : null,
+    workflowSnapStop: workflow ? getComputedStyle(workflow).scrollSnapStop : null,
+    previewSnapStop: preview ? getComputedStyle(preview).scrollSnapStop : null,
+  };
+});
+assert.deepEqual(landingScrollContract, {
+  rootSnapType: "y mandatory",
+  rootScrollBehavior: "auto",
+  workflowSnapAlign: "start",
+  workflowSnapStop: "always",
+  previewSnapStop: "normal",
+});
+await page.evaluate(() => window.scrollTo(0, 0));
+await page.mouse.move(720, 450);
+await page.mouse.wheel(0, 1050);
+await page.waitForTimeout(900);
+const snappedWorkflowTop = await page.locator("#workflow").evaluate((element) =>
+  Math.round(element.getBoundingClientRect().top)
+);
+assert.ok(
+  Math.abs(snappedWorkflowTop - 84) <= 2,
+  `wheel navigation must settle on the next section; workflow top=${snappedWorkflowTop}`,
+);
+await page.evaluate(() => window.scrollTo(0, 0));
 await assertNoHorizontalOverflow(page, "desktop");
 assert.equal(await page.locator("#yandex-metrika-loader").count(), 1);
 assert.equal(await page.locator("canvas").count(), 0);
@@ -253,7 +284,7 @@ await screenshot(page.locator("#opportunity-example"), "opportunity-example-1440
 await screenshot(page.locator("#preview"), "preview-desktop-1440x900");
 
 assert.equal(await page.locator('header a[href="#quality"]:visible').count(), 1);
-assert.equal(await page.locator('header a[href="#for-agencies"]:visible').count(), 1);
+assert.equal(await page.locator('header a[href="#workflow"]:visible').count(), 1);
 
 const firstPreset = page.getByRole("radio").first();
 await firstPreset.waitFor();
@@ -325,10 +356,17 @@ await methodology.getByText("Reachability").waitFor();
 assert.equal(await methodology.getByRole("button").count(), 0);
 await screenshot(methodology, "methodology-1440x900");
 
-const howItWorks = page.getByTestId("how-it-works-flow");
-assert.equal(await howItWorks.getByRole("listitem").count(), 4);
-assert.equal(await howItWorks.getByRole("button").count(), 0);
-await screenshot(page.locator("#for-agencies"), "for-agencies-1440x900");
+const workflow = page.locator("#workflow");
+assert.equal(await workflow.getByRole("article").count(), 3);
+assert.equal(await workflow.getByRole("button").count(), 0);
+await screenshot(workflow, "workflow-1440x900");
+
+const delivery = page.locator("#delivery");
+await delivery.getByRole("heading", { name: "От сигнала до первого разговора — за одно утро" }).waitFor();
+assert.equal(await delivery.locator("ol > li").count(), 3);
+assert.equal(await delivery.getByRole("button").count(), 0);
+await screenshot(delivery, "delivery-1440x900");
+
 const faq = page.locator("#faq");
 analyticsEvents.length = 0;
 const faqOpenedResponse = page.waitForResponse((response) => {
@@ -352,6 +390,11 @@ await Promise.all([
   page.waitForURL(/\/checkout/),
   page.locator('[data-final-cta] [data-analytics-context="closing"]').click(),
 ]);
+assert.equal(
+  await page.evaluate(() => getComputedStyle(document.documentElement).scrollSnapType),
+  "none",
+  "landing scroll snap must not leak into checkout",
+);
 const checkoutMetrikaCalls = await page.evaluate(() => window.ym?.a ?? []);
 assert.equal(
   checkoutMetrikaCalls.some(

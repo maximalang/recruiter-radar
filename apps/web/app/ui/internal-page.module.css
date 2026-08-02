@@ -12,6 +12,13 @@
   will-change: opacity, transform;
 }
 
+:global([data-product-workspace="true"]) .internalPageFrameInner {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
 /* ── Skip link (a11y) ── */
 .skipLink {
   position: absolute;
@@ -154,7 +161,7 @@
 
 /* ── Page header ── */
 .internalPageHeader {
-  margin-bottom: 32px;
+  margin-bottom: 30px;
 }
 
 .internalPageHeaderTop {
@@ -169,16 +176,30 @@
 }
 
 .internalPageTitle {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--c-text-primary);
+  max-width: 760px;
+  font-size: clamp(2.2rem, 4.1vw, 4.35rem);
+  font-weight: 735;
+  color: #14201c;
+  letter-spacing: -0.058em;
+  line-height: 0.96;
   margin: 0;
 }
 
+.internalPageTitle::before {
+  display: block;
+  width: 22px;
+  height: 1px;
+  margin-bottom: 14px;
+  background: #23806f;
+  content: "";
+}
+
 .internalPageSubtitle {
-  font-size: 0.875rem;
-  color: var(--c-text-muted);
-  margin-top: 4px;
+  max-width: 680px;
+  font-size: 0.94rem;
+  color: #65706a;
+  line-height: 1.62;
+  margin-top: 16px;
 }
 
 /* ── Back / nav link ── */
@@ -273,15 +294,15 @@
 
 /* ── Content card (detail sections, sidebar blocks) ── */
 .contentCard {
-  background-color: var(--c-bg-card);
-  border-radius: var(--radius-card-sm);
+  background-color: rgba(255, 255, 252, 0.88);
+  border-radius: 12px;
   padding: 20px;
-  border: 1px solid var(--c-border);
+  border: 1px solid rgba(24, 35, 31, 0.12);
   transition: box-shadow 0.2s ease;
 }
 
 .contentCard:hover {
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 12px 28px rgba(20, 32, 28, 0.07);
 }
 
 .contentCard[data-tone="danger"] {
@@ -292,13 +313,13 @@
    a tinted left accent and brand-tinted surface lift them above the supporting
    evidence/action cards without shouting. */
 .contentCard[data-variant="hero"] {
-  border-color: rgba(29, 78, 216, 0.22);
-  border-left: 3px solid var(--c-brand);
-  background-color: rgba(29, 78, 216, 0.04);
+  border-color: rgba(35, 128, 111, 0.24);
+  border-left: 3px solid #23806f;
+  background-color: rgba(35, 128, 111, 0.035);
 }
 
 .contentCard[data-variant="hero"] .contentCardTitle {
-  color: var(--c-brand);
+  color: #1a6f60;
 }
 
 /* Muted: advisory blocks (AI hint) recede — they inform but never drive the
@@ -909,9 +930,16 @@
 
 /* ── Empty / not-found states ── */
 .emptyState {
+  min-height: 260px;
+  box-sizing: border-box;
+  display: grid;
+  place-content: center;
   text-align: center;
-  padding: 48px 24px;
-  color: var(--c-text-muted);
+  padding: clamp(42px, 7vw, 76px) 24px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #65706a;
 }
 
 .emptyStateIcon {
@@ -920,29 +948,37 @@
   display: flex;
   justify-content: center;
   margin-bottom: 12px;
-  color: var(--c-text-muted);
+  color: #23806f;
 }
 
 .emptyStateIcon svg {
-  width: 2rem;
-  height: 2rem;
+  width: 2.25rem;
+  height: 2.25rem;
 }
 
 .emptyStateTitle {
-  font-weight: 500;
-  margin-bottom: 4px;
+  color: #14201c;
+  font-size: 1.02rem;
+  font-weight: 720;
+  margin-bottom: 7px;
 }
 
 .emptyStateText {
-  font-size: 0.85rem;
+  max-width: 620px;
+  font-size: 0.88rem;
+  line-height: 1.58;
 }
 
 .emptyStateAction {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: center;
+  min-width: 240px;
   margin-top: 16px;
   padding: 9px 18px;
   border-radius: 10px;
-  background-color: var(--c-brand);
+  background-color: #183d34;
   color: #fff;
   font-size: 0.85rem;
   font-weight: 600;

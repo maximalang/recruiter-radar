@@ -2,6 +2,7 @@ import { Children, isValidElement, type ReactElement, type ReactNode } from "rea
 import Link from "next/link";
 
 import HomePage from "@/app/page";
+import ScrollReveal from "@/app/scroll-reveal";
 import { SectionIntro } from "@/app/ui/page-primitives";
 import {
   LANDING_ANALYTICS_CONTEXT,
@@ -60,11 +61,10 @@ describe("evidence-first landing v2 contract", () => {
     const intros = collectElements(page, SectionIntro);
 
     expect(intros.map((intro) => intro.props.eyebrow)).toEqual([
-      "Почему обычный поиск не работает",
-      "Как работает радар",
+      "Что меняется",
       "Продукт в работе",
-      "Evidence-first",
-      "Для рекрутинговых агентств",
+      "Стандарт доказательств",
+      "Рабочий ритм",
       "Вопросы",
     ]);
     expect(collectElements(page, "section").some((section) => section.props.id === "pricing")).toBe(false);
@@ -75,14 +75,28 @@ describe("evidence-first landing v2 contract", () => {
     const pageText = readVisibleText(page);
 
     expect(collectElements(page, "h1")).toHaveLength(1);
-    expect(pageText).toContain("Находите компании, которым нужен подбор — до массового отклика агентств");
+    expect(pageText).toContain("Компании, которым нужен подбор. До того, как это станет очевидно всем.");
     expect(pageText).toContain("Обезличенный пример");
     expect(pageText).toContain("31 июля 2026");
     expect(pageText).toContain("Карьерная страница");
     expect(pageText).toContain("hh.ru");
-    expect(pageText).toContain("Угол первого сообщения");
+    expect(pageText).toContain("Следующий шаг");
     expect(pageText).not.toContain("Пауза");
     expect(collectElements(page, "canvas")).toHaveLength(0);
+  });
+
+  it("makes the agency audience and the daily decision rhythm explicit", async () => {
+    const page = await HomePage({ searchParams: Promise.resolve({}) });
+    const pageText = readVisibleText(page);
+    const deliverySection = collectElements(page, ScrollReveal)
+      .find((section) => section.props.id === "delivery");
+    const deliveryText = readVisibleText(deliverySection);
+
+    expect(pageText).toContain("Для рекрутинговых агентств");
+    expect(deliverySection).toBeDefined();
+    expect(deliveryText).toContain("Радар проверяет рынок до начала рабочего дня");
+    expect(deliveryText).toContain("Команда выбирает следующий шаг");
+    expect(deliveryText).toContain("Ни одного автоматического сообщения");
   });
 
   it("keeps the real preview path and ends with one primary activation action", async () => {

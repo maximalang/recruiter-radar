@@ -1,14 +1,14 @@
 /* Design Tokens */
 :root {
   /* Colors */
-  --c-text-primary: #0f172a;
-  --c-text-secondary: #475569;
-  --c-text-muted: #667085;
-  --c-bg-page: #f7faff;
-  --c-bg-card: rgba(255, 255, 255, 0.94);
-  --c-border: rgba(15, 23, 42, 0.08);
-  --c-brand: #1d4ed8;
-  --c-accent: #1e40af;
+  --c-text-primary: #17211d;
+  --c-text-secondary: #4d5b54;
+  --c-text-muted: #69756e;
+  --c-bg-page: #e9ece8;
+  --c-bg-card: rgba(251, 252, 248, 0.94);
+  --c-border: rgba(24, 35, 31, 0.11);
+  --c-brand: #1a6f60;
+  --c-accent: #0f594c;
 
   /* Type — the font family comes from next/font's --font-inter variable (set
      on <html> by layout.tsx); the fallback chain keeps the page legible before
@@ -60,8 +60,8 @@
   --space-card-padding-lg: 32px;
 
   /* Radius */
-  --radius-card: 24px;
-  --radius-card-sm: 18px;
+  --radius-card: 18px;
+  --radius-card-sm: 12px;
   --radius-pill: 999px;
 
   /* Gate badge colors */
@@ -138,9 +138,9 @@
 .surfaceCard {
   contain: layout paint;
   border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 18px 60px rgba(15, 23, 42, 0.08);
+  border-radius: 16px;
+  background: rgba(251, 252, 248, 0.94);
+  box-shadow: 0 16px 44px rgba(20, 32, 28, 0.08);
   backdrop-filter: blur(10px);
   min-width: 0;
   will-change: transform;
@@ -148,8 +148,8 @@
 }
 
 .surfaceCard:hover {
-  box-shadow: 0 24px 72px rgba(15, 23, 42, 0.12);
-  transform: translateY(-2px);
+  box-shadow: 0 20px 52px rgba(20, 32, 28, 0.11);
+  transform: translateY(-1px);
 }
 
 /* Back link */
@@ -255,10 +255,10 @@
   align-items: center;
   justify-content: center;
   padding: 12px 18px;
-  border-radius: 14px;
-  border: 1px solid rgba(15, 23, 42, 0.9);
-  background: linear-gradient(135deg, #111827 0%, #1f3a8a 100%);
-  box-shadow: 0 14px 30px rgba(30, 64, 175, 0.24);
+  border-radius: 10px;
+  border: 1px solid #183d34;
+  background: #183d34;
+  box-shadow: 0 10px 24px rgba(15, 45, 38, 0.16);
   color: #ffffff;
   text-decoration: none;
   font-size: 0.94rem;
@@ -274,14 +274,7 @@
 
 /* Shimmer sweep on hover — a soft light band travels across the button. */
 .primaryAction::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 0;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-  transition: width 0.5s ease;
+  content: none;
 }
 
 .primaryAction:hover::before {
@@ -289,7 +282,8 @@
 }
 
 .primaryAction:hover {
-  box-shadow: 0 18px 40px rgba(30, 64, 175, 0.32);
+  background: #0f2d26;
+  box-shadow: 0 14px 30px rgba(15, 45, 38, 0.22);
   transform: translateY(-1px);
 }
 
@@ -308,7 +302,7 @@
   align-items: center;
   justify-content: center;
   padding: 12px 18px;
-  border-radius: 14px;
+  border-radius: 10px;
   border: 1px solid rgba(15, 23, 42, 0.1);
   background-color: rgba(255, 255, 255, 0.86);
   color: #111827;

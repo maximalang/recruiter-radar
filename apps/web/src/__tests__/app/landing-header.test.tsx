@@ -19,9 +19,13 @@ describe("landing header accessibility", () => {
   }
 
   it("offers one clear activation path without hiding account access", () => {
-    renderHeader();
+    const { container } = renderHeader();
 
     const activation = screen.getAllByRole("link", { name: "Проверить свою нишу" })[0];
+    expect(container.querySelector("header")).toHaveAttribute(
+      "data-landing-scroll-snap",
+      "sections",
+    );
     expect(activation).toHaveAttribute("href", "#preview-configurator");
     expect(activation).toHaveAttribute("data-analytics-event", "preview_started");
     expect(activation).toHaveAttribute("data-analytics-context", "header");
@@ -30,10 +34,7 @@ describe("landing header accessibility", () => {
       "href",
       "#quality",
     );
-    expect(screen.getAllByRole("link", { name: "Для агентств" })[0]).toHaveAttribute(
-      "href",
-      "#for-agencies",
-    );
+    expect(screen.queryByRole("link", { name: "Для агентств" })).not.toBeInTheDocument();
   });
 
   it("closes the mobile menu with Escape and restores focus to the trigger", () => {

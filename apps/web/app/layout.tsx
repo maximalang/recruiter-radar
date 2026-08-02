@@ -9,8 +9,6 @@ import { PremiumUiEffects } from "./premium-ui-effects";
 import "./globals.css";
 import "./premium-ui.css";
 import "./premium-ui-refinements.css";
-import "./internal-workspace-bridge.css";
-import "./internal-workspace-refinements.css";
 
 const inter = Inter({
   subsets: ["cyrillic", "latin"],

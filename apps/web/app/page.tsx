@@ -41,7 +41,6 @@ import FiurPopover from "./fiur-popover";
 import LandingAnalytics from "./landing-analytics";
 import LandingDetailsInteractions from "./landing-details-interactions";
 import LandingHeader from "./landing-header";
-import LandingHowItWorks from "./landing-how-it-works";
 import LandingMethodology from "./landing-methodology";
 import LandingPreviewInteractions from "./landing-preview-interactions";
 import LandingPreviewPresets from "./landing-preview-presets";
@@ -55,7 +54,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Recruiter Radar — клиентские возможности для рекрутинговых агентств",
   description:
-    "Evidence-first радар для рекрутинговых агентств: компании с актуальной потребностью в найме, проверяемые сигналы, приоритет и безопасный путь контакта.",
+    "Компании, которым нужен подбор, до того, как это станет очевидно всем: свежие сигналы найма, объяснимый приоритет и безопасный путь контакта.",
 };
 
 const VISIBLE_PREVIEW_ITEMS = 2;
@@ -79,7 +78,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   // below. The home page is `force-dynamic`, so without the boundary the whole
   // server render blocked on getPublicSampleDigestState (a Postgres query) and
   // first-contentful-paint sat at ~2.5s — the "half the landing doesn't load"
-  // symptom. Now hero + problem + how-it-works + quality + agency proof + FAQ
+  // symptom. Now hero + outcome + quality + FAQ
   // paint immediately and the live preview streams in.
   const previewInput = readPublicPreviewInput(resolvedSearchParams);
   const hasPreview = hasPublicPreviewInput(previewInput);
@@ -91,7 +90,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     <PageFrame
       maxWidth="1240px"
       className={hpStyles.landingRoot}
-      dataDeployAnchor="recruiter-radar-landing-v4"
+      dataDeployAnchor="recruiter-radar-landing-v6"
     >
       <YandexMetrika />
       <LandingAnalytics />
@@ -107,13 +106,14 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         <div className={hpStyles.heroContent}>
           <div className={hpStyles.heroCopy}>
             <div className={hpStyles.heroEyebrow}>
-              Evidence-first радар для рекрутинговых агентств
+              Для рекрутинговых агентств
             </div>
             <h1 className={hpStyles.heroTitle}>
-              Находите компании, которым нужен подбор — до массового отклика агентств
+              <span>Компании, которым нужен подбор.</span>
+              <span className={hpStyles.heroTitleAccent}>До того, как это станет очевидно всем.</span>
             </h1>
             <p className={hpStyles.heroSubtitle}>
-              Recruiter Radar анализирует изменения в найме, объединяет факты по компании и показывает, кому стоит написать сейчас — с датами, источниками и понятной причиной.
+              Каждое утро Recruiter Radar находит компании с подтверждённой потребностью в найме, объясняет приоритет и показывает безопасный путь к первому разговору.
             </p>
             <div className={hpStyles.heroActions}>
               <a
@@ -130,19 +130,22 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                 data-analytics-event={LANDING_ANALYTICS_EVENT.previewResultsClicked}
                 data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroSecondary}
               >
-                Посмотреть пример
+                Посмотреть живой пример
               </a>
             </div>
-            <p className={hpStyles.heroFootnote}>
-              Для руководителей и BD-команд агентств · без массовых рассылок и покупки личных контактов
-            </p>
+            <ul className={hpStyles.heroTrustList} aria-label="Что входит в рекомендацию">
+              <li><strong>Свежий сигнал</strong><span>Что изменилось в найме</span></li>
+              <li><strong>Проверяемые факты</strong><span>Источники и даты рядом</span></li>
+              <li><strong>Корректный выход</strong><span>Без массовых рассылок</span></li>
+            </ul>
           </div>
 
           <article id="opportunity-example" className={hpStyles.heroProduct} aria-labelledby="opportunity-title">
             <div className={hpStyles.heroProductTopbar}>
-              <span className={hpStyles.heroProductLabel}>Обезличенный пример</span>
-              <span className={hpStyles.heroProductDate}>Обновлено <time dateTime="2026-07-31">31 июля 2026</time></span>
+              <span className={hpStyles.heroProductLabel}>Утренняя рекомендация</span>
+              <span className={hpStyles.heroProductIndex}>01 / 07</span>
             </div>
+            <div className={hpStyles.heroProductDate}>Обезличенный пример · обновлено <time dateTime="2026-07-31">31 июля 2026</time></div>
             <div className={hpStyles.heroCompanyRow}>
               <div>
                 <h2 id="opportunity-title" className={hpStyles.heroCompanyName}>Промышленная группа</h2>
@@ -157,11 +160,11 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             </div>
             <div className={hpStyles.heroRecommendation}>
               <div>
-                <span>Почему сейчас</span>
+                <span>Причина для выхода</span>
                 <p>Найм ускорился, а сложная роль остаётся открытой. У агентства есть конкретный повод предложить помощь.</p>
               </div>
               <div>
-                <span>Угол первого сообщения</span>
+                <span>Следующий шаг</span>
                 <p>Предложить точечный подбор по инженерным ролям с опорой на свежую динамику вакансий.</p>
               </div>
             </div>
@@ -175,47 +178,42 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         </div>
       </section>
 
-      <ScrollReveal as="section" className={`${hpStyles.scrollSection} ${hpStyles.problemSection}`}>
-        <div className={hpStyles.problemLayout}>
-          <SectionIntro
-            accent
-            eyebrow="Почему обычный поиск не работает"
-            title="База показывает кому. Радар — почему сейчас."
-            description="Список контактов не объясняет момент для обращения. Recruiter Radar начинает с изменений в найме и только потом формирует приоритет."
-          />
-          <ol className={hpStyles.problemList}>
-            <li className={hpStyles.problemRow}>
-              <span className={hpStyles.problemIndex}>01</span>
-              <div><h3>Слишком рано или слишком поздно</h3><p>Одна вакансия не показывает, когда потребность стала системной и кому уже предложили помощь конкуренты.</p></div>
-            </li>
-            <li className={hpStyles.problemRow}>
-              <span className={hpStyles.problemIndex}>02</span>
-              <div><h3>Нет причины для персонального выхода</h3><p>Без дат, динамики и контекста первое сообщение остаётся общим и легко теряется среди массового outreach.</p></div>
-            </li>
-            <li className={hpStyles.problemRow}>
-              <span className={hpStyles.problemIndex}>03</span>
-              <div><h3>Ручная проверка съедает день</h3><p>Вакансии, карьерные страницы и корпоративные события приходится сопоставлять вручную, пока сигнал теряет свежесть.</p></div>
-            </li>
-          </ol>
-        </div>
-      </ScrollReveal>
-
-      <ScrollReveal as="section" id="how-it-works" className={hpStyles.scrollSection}>
+      <ScrollReveal as="section" id="workflow" className={`${hpStyles.scrollSection} ${hpStyles.outcomeSection}`}>
         <SectionIntro
           accent
-          eyebrow="Как работает радар"
-          title="От открытого сигнала — к понятному следующему шагу"
-          description="Система не выдаёт непрозрачный список. Каждый этап оставляет факты, которые можно проверить."
+          eyebrow="Что меняется"
+          title="Не ещё одна база. Готовое решение, кому писать сегодня"
+          description="Для руководителя агентства и команды развития бизнеса: меньше ручного мониторинга, больше ясных поводов для своевременного обращения."
         />
-        <LandingHowItWorks />
+        <div className={hpStyles.outcomeLedger}>
+          <article>
+            <span>01 / Момент</span>
+            <h3>Видно, что изменилось</h3>
+            <p>Свежая динамика вакансий, редкие роли и изменения на карьерной странице собраны в одну хронологию.</p>
+          </article>
+          <article>
+            <span>02 / Решение</span>
+            <h3>Понятно, почему сейчас</h3>
+            <p>Приоритет объяснён человеческим языком: без чёрного ящика и без необходимости перепроверять весь интернет.</p>
+          </article>
+          <article>
+            <span>03 / Действие</span>
+            <h3>Есть корректный первый шаг</h3>
+            <p>Радар показывает публичный корпоративный канал и рабочий угол для персонального обращения.</p>
+          </article>
+        </div>
+        <p className={hpStyles.outcomeNote}>
+          <span>Радар берёт на себя поиск и проверку.</span>
+          Команда агентства сохраняет решение, тон и контроль над каждым обращением.
+        </p>
       </ScrollReveal>
 
-      <section id="preview" data-section="preview" className={hpStyles.scrollSection}>
+      <section id="preview" data-section="preview" className={`${hpStyles.scrollSection} ${hpStyles.previewPanel}`}>
         <SectionIntro
           accent
           eyebrow="Продукт в работе"
-          title="Соберите выдачу под специализацию агентства"
-          description="Укажите нишу и географию. Радар пересчитает приоритет и покажет факты, ограничения и безопасный путь контакта."
+          title="Настройте радар под свою специализацию"
+          description="Укажите нишу и географию — и посмотрите рекомендации в том же формате, в котором их получает команда."
         />
         <Suspense fallback={<PreviewSkeleton />}>
           <PreviewSection previewInput={previewInput} hasPreview={hasPreview} checkoutHref={checkoutHref} />
@@ -223,12 +221,12 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         <LandingPreviewInteractions />
       </section>
 
-      <ScrollReveal as="section" id="quality" className={hpStyles.scrollSection}>
+      <ScrollReveal as="section" id="quality" className={`${hpStyles.scrollSection} ${hpStyles.qualitySection}`}>
         <SectionIntro
           accent
-          eyebrow="Evidence-first"
-          title="Приоритет можно проверить, а не принять на веру"
-          description="Рядом с оценкой остаются факты, даты, источники и ограничения. Неподтверждённый контекст не становится лидом."
+          eyebrow="Стандарт доказательств"
+          title="Каждая рекомендация объясняет себя"
+          description="Факты, даты, источники и ограничения остаются рядом с оценкой. Неподтверждённый контекст не становится лидом."
         />
         <div className={hpStyles.qualityGrid}>
           <LandingMethodology />
@@ -245,69 +243,120 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         </div>
       </ScrollReveal>
 
-      <ScrollReveal as="section" id="for-agencies" className={hpStyles.scrollSection}>
+      <ScrollReveal as="section" id="delivery" className={`${hpStyles.scrollSection} ${hpStyles.deliverySection}`}>
         <SectionIntro
           accent
-          eyebrow="Для рекрутинговых агентств"
-          title="Один рабочий контекст для руководителя, BD и рекрутера"
-          description="Радар помогает команде договориться, какие компании действительно заслуживают внимания сегодня."
+          eyebrow="Рабочий ритм"
+          title="От сигнала до первого разговора — за одно утро"
+          description="Радар превращает мониторинг рынка в короткую рабочую очередь. Никакой новой CRM: только контекст для решения и следующий шаг."
         />
-        <div className={hpStyles.agencyGrid}>
-          <div className={hpStyles.agencyRoles}>
-            <div><span>Руководителю</span><p>Видеть, почему компания в приоритете и на каких фактах строится решение.</p></div>
-            <div><span>BD-команде</span><p>Начинать день с короткого списка и конкретных поводов для первого сообщения.</p></div>
-            <div><span>Рекрутеру</span><p>Подключаться к диалогу с контекстом по ролям, динамике найма и ограничениям.</p></div>
-          </div>
-          <div className={hpStyles.agencyOutcome}>
-            <span>Практический результат</span>
-            <h3>Меньше ручного исследования. Точнее выбор компаний. Своевременнее выход.</h3>
-            <p>Команда сохраняет контроль над обращением, а радар отвечает за поиск, проверку и объяснение приоритета.</p>
-          </div>
+        <div className={hpStyles.deliveryLayout}>
+          <ol className={hpStyles.deliveryTimeline}>
+            <li>
+              <span>До начала дня</span>
+              <div>
+                <h3>Радар проверяет рынок до начала рабочего дня</h3>
+                <p>Собирает свежие сигналы найма, объединяет их по компаниям и отбрасывает неподтверждённый шум.</p>
+              </div>
+            </li>
+            <li>
+              <span>Утренняя выдача</span>
+              <div>
+                <h3>Команда получает короткий список</h3>
+                <p>Сначала — компании с сильным моментом, понятной причиной и доступным корпоративным путём контакта.</p>
+              </div>
+            </li>
+            <li>
+              <span>Решение</span>
+              <div>
+                <h3>Команда выбирает следующий шаг</h3>
+                <p>Взять в работу, проверить позже или пропустить. Обратная связь улучшает следующие выдачи.</p>
+              </div>
+            </li>
+          </ol>
+
+          <aside className={hpStyles.decisionDesk} aria-label="Пример рабочей очереди Recruiter Radar">
+            <div className={hpStyles.decisionDeskTopbar}>
+              <span>Рабочая очередь · сегодня</span>
+              <span>Пример</span>
+            </div>
+            <div className={hpStyles.decisionDeskLead}>
+              <span className={hpStyles.decisionDeskPriority}>01 · Связаться сегодня</span>
+              <div className={hpStyles.decisionDeskCompany}>
+                <div>
+                  <strong>Промышленная группа</strong>
+                  <small>Инженерный найм · Москва</small>
+                </div>
+                <b>87<small>/100</small></b>
+              </div>
+              <p>Найм ускорился, редкая роль открыта повторно, на карьерной странице появился прямой путь к HR.</p>
+              <dl>
+                <div><dt>Почему сейчас</dt><dd>3 свежих подтверждения</dd></div>
+                <div><dt>Действие</dt><dd>Предложить точечный подбор</dd></div>
+              </dl>
+            </div>
+            <div className={hpStyles.decisionDeskQueue}>
+              <div><span>02</span><p><strong>Проверить контекст</strong><small>Сигнал сильный, нужен корпоративный канал</small></p></div>
+              <div><span>03</span><p><strong>Наблюдать</strong><small>Компания подходит, момент ещё не подтверждён</small></p></div>
+            </div>
+            <p className={hpStyles.decisionDeskSafety}>Ни одного автоматического сообщения · финальное решение всегда за командой</p>
+          </aside>
         </div>
       </ScrollReveal>
 
-      <ScrollReveal as="section" id="faq" className={hpStyles.scrollSection}>
+      <ScrollReveal as="section" id="faq" className={`${hpStyles.scrollSection} ${hpStyles.faqSection}`}>
         <SectionIntro
           accent
           eyebrow="Вопросы"
-          title="Что важно знать до запуска"
-          description="Коротко о данных, контактах, доставке и следующем шаге."
+          title="До запуска — только главное"
+          description="Коротко о данных, контактах, доставке и пилоте."
         />
-        {faqItems.map((item) => (
-          <details
-            key={item.question}
-            className={`${hpStyles.faqCard} ${hpStyles.revealCard}`}
-            data-analytics-event={LANDING_ANALYTICS_EVENT.faqOpened}
-            data-animated-details
-          >
-            <summary className={hpStyles.faqSummary}>
-              <span>{item.question}</span>
-              <svg className={hpStyles.faqChevron} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </summary>
-            <div className={hpStyles.faqAnswer}>{item.answer}</div>
-          </details>
-        ))}
+        <div className={hpStyles.faqList}>
+          {faqItems.map((item) => (
+            <details
+              key={item.question}
+              className={`${hpStyles.faqCard} ${hpStyles.revealCard}`}
+              data-analytics-event={LANDING_ANALYTICS_EVENT.faqOpened}
+              data-animated-details
+            >
+              <summary className={hpStyles.faqSummary}>
+                <span>{item.question}</span>
+                <svg className={hpStyles.faqChevron} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </summary>
+              <div className={hpStyles.faqAnswer}>{item.answer}</div>
+            </details>
+          ))}
+        </div>
       </ScrollReveal>
 
       <section className={hpStyles.closingBand} data-final-cta="true">
-        <span className={hpStyles.closingEyebrow}>Пилот Recruiter Radar</span>
-        <h2 className={hpStyles.closingTitle}>Проверьте радар на своей нише за 7 дней</h2>
-        <p className={hpStyles.closingText}>
-          Настройте профиль, получите первую выдачу и оцените качество рекомендаций на реальных задачах агентства.
-        </p>
-        <p className={hpStyles.closingTerms}>
-          {pilotPlan.price} · {pilotPlan.cadence} · {paymentSetup.configured ? "без автопродления" : "заявка без списания, профиль сохранится"}
-        </p>
-        <Link
-          href={checkoutHref}
-          className={hpStyles.heroCta}
-          data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
-          data-analytics-context={LANDING_ANALYTICS_CONTEXT.closing}
-        >
-          {paymentSetup.configured ? `Активировать пилот — ${pilotPlan.price}` : "Оставить заявку на пилот"}
-        </Link>
+        <div className={hpStyles.closingCopy}>
+          <span className={hpStyles.closingEyebrow}>Пилот Recruiter Radar</span>
+          <h2 className={hpStyles.closingTitle}>Проверьте радар на своей нише за 7 дней</h2>
+          <p className={hpStyles.closingText}>
+            Настройте профиль под нишу агентства, получите первую выдачу и оцените качество рекомендаций на реальных задачах команды.
+          </p>
+          <ul className={hpStyles.closingIncluded} aria-label="Что входит в пилот">
+            <li>Профиль под вашу специализацию</li>
+            <li>Ежедневная выдача в Telegram</li>
+            <li>Факты, источники и следующий шаг</li>
+          </ul>
+        </div>
+        <div className={hpStyles.closingAction}>
+          <p className={hpStyles.closingTerms}>
+            {pilotPlan.price} · {pilotPlan.cadence} · {paymentSetup.configured ? "без автопродления" : "заявка без списания, профиль сохранится"}
+          </p>
+          <Link
+            href={checkoutHref}
+            className={hpStyles.heroCta}
+            data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
+            data-analytics-context={LANDING_ANALYTICS_CONTEXT.closing}
+          >
+            {paymentSetup.configured ? `Активировать пилот — ${pilotPlan.price}` : "Оставить заявку на пилот"}
+          </Link>
+        </div>
       </section>
 
       <SiteFooter />
