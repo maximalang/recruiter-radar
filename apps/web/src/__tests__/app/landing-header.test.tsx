@@ -1,57 +1,38 @@
 /** @jest-environment jsdom */
 
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 
-import { LandingMotionProvider } from "@/app/landing-motion/landing-motion-provider";
 import LandingHeader from "@/app/landing-header";
 
 describe("landing header accessibility", () => {
-  let intersectionCallback: IntersectionObserverCallback;
-
   beforeEach(() => {
     window.sessionStorage.clear();
-    class TestIntersectionObserver {
-      constructor(callback: IntersectionObserverCallback) {
-        intersectionCallback = callback;
-      }
-      observe() {}
-      disconnect() {}
-      unobserve() {}
-      takeRecords() { return []; }
-      root = null;
-      rootMargin = "-92px 0px -55% 0px";
-      thresholds = [0, 0.15, 0.4, 0.75];
-    }
-    Object.defineProperty(window, "IntersectionObserver", {
-      configurable: true,
-      writable: true,
-      value: TestIntersectionObserver,
-    });
   });
 
   function renderHeader(children?: React.ReactNode) {
     return render(
-      <LandingMotionProvider>
+      <>
         <LandingHeader previewHref="#preview-configurator" />
         {children}
-      </LandingMotionProvider>,
+      </>,
     );
   }
 
-  it("offers a clear activation path without hiding account access", () => {
+  it("offers one clear activation path without hiding account access", () => {
     renderHeader();
 
-    const activation = screen.getByRole("link", { name: "Проверить свою нишу" });
+    const activation = screen.getAllByRole("link", { name: "Проверить свою нишу" })[0];
     expect(activation).toHaveAttribute("href", "#preview-configurator");
     expect(activation).toHaveAttribute("data-analytics-event", "preview_started");
     expect(activation).toHaveAttribute("data-analytics-context", "header");
-    expect(screen.getByRole("link", { name: "Личный кабинет" })).toHaveAttribute(
-      "href",
-      "/dashboard",
-    );
-    expect(screen.getByRole("link", { name: "Как проверяем" })).toHaveAttribute(
+    expect(screen.getAllByRole("link", { name: "Войти" })[0]).toHaveAttribute("href", "/login");
+    expect(screen.getAllByRole("link", { name: "Доказательства" })[0]).toHaveAttribute(
       "href",
       "#quality",
+    );
+    expect(screen.getAllByRole("link", { name: "Для агентств" })[0]).toHaveAttribute(
+      "href",
+      "#for-agencies",
     );
   });
 
@@ -76,69 +57,5 @@ describe("landing header accessibility", () => {
     fireEvent.pointerDown(screen.getByRole("button", { name: "Вне меню" }));
 
     expect(trigger).toHaveAttribute("aria-expanded", "false");
-  });
-
-  it("marks the observed section active and updates immediately on click", () => {
-    renderHeader(
-      <>
-        <section id="preview" />
-        <section id="how-it-works" />
-        <section id="quality" />
-        <section id="pricing" />
-        <section id="faq" />
-      </>,
-    );
-
-    act(() => intersectionCallback([
-      {
-        target: document.getElementById("quality"),
-        isIntersecting: true,
-        intersectionRatio: 0.8,
-        boundingClientRect: { top: 120 },
-      } as unknown as IntersectionObserverEntry,
-    ], {} as IntersectionObserver));
-
-    expect(screen.getAllByRole("link", { name: "Как проверяем" })[0]).toHaveAttribute(
-      "aria-current",
-      "location",
-    );
-
-    fireEvent.click(screen.getAllByRole("link", { name: "Тарифы" })[0]);
-    expect(screen.getAllByRole("link", { name: "Тарифы" })[0]).toHaveAttribute(
-      "aria-current",
-      "location",
-    );
-  });
-
-  it("prefers the section nearest the sticky header over a smaller section with a higher ratio", () => {
-    renderHeader(
-      <>
-        <section id="preview" />
-        <section id="how-it-works" />
-        <section id="quality" />
-        <section id="pricing" />
-        <section id="faq" />
-      </>,
-    );
-
-    act(() => intersectionCallback([
-      {
-        target: document.getElementById("how-it-works"),
-        isIntersecting: true,
-        intersectionRatio: 0.75,
-        boundingClientRect: { top: -420 },
-      },
-      {
-        target: document.getElementById("quality"),
-        isIntersecting: true,
-        intersectionRatio: 0.35,
-        boundingClientRect: { top: 96 },
-      },
-    ] as unknown as IntersectionObserverEntry[], {} as IntersectionObserver));
-
-    expect(screen.getAllByRole("link", { name: "Как проверяем" })[0]).toHaveAttribute(
-      "aria-current",
-      "location",
-    );
   });
 });

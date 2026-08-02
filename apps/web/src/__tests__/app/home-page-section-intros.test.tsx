@@ -3,11 +3,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import Link from "next/link";
 
 import HomePage, { PreviewSection, PreviewSkeleton } from "@/app/page";
-import LandingDeliveryDemo from "@/app/landing-delivery-demo";
 import LandingHeader from "@/app/landing-header";
 import LandingMethodology from "@/app/landing-methodology";
-import LandingSourceArchitecture from "@/app/landing-source-architecture";
-import { SectionIntro, SurfaceCard } from "@/app/ui/page-primitives";
+import { SectionIntro } from "@/app/ui/page-primitives";
 import {
   LANDING_ANALYTICS_CONTEXT,
   LANDING_ANALYTICS_EVENT,
@@ -57,15 +55,6 @@ function readVisibleText(node: ReactNode): string {
   return parts.join(" ").replace(/\s+/g, " ").trim();
 }
 
-function getLandingChildren(page: ReactElement): ReactNode[] {
-  const frameChildren = Children.toArray(
-    (page as ReactElement<{ children?: ReactNode }>).props.children,
-  );
-  const motionShell = frameChildren.find((child) => isValidElement(child));
-  if (!isValidElement<{ children?: ReactNode }>(motionShell)) return [];
-  return Children.toArray(motionShell.props.children);
-}
-
 function makePreviewItem(overrides: Partial<PreviewItem> = {}): PreviewItem {
   return {
     rank: 1,
@@ -74,7 +63,7 @@ function makePreviewItem(overrides: Partial<PreviewItem> = {}): PreviewItem {
     employer_name: "Производственная компания",
     vacancies_count: 14,
     distinct_vacancy_names_count: 6,
-    latest_published_at: "2026-07-19T09:00:00.000Z",
+    latest_published_at: "2026-07-31T09:00:00.000Z",
     total_score: 348,
     reasons: ["14 новых вакансий за 6 дней", "Сигнал подтверждён двумя источниками"],
     opener: "Предложить точечный подбор по инженерным ролям",
@@ -105,66 +94,54 @@ describe("landing section hierarchy", () => {
     });
   });
 
-  it("uses the brand-accent eyebrow on every public landing section", async () => {
+  it("uses one deliberate editorial sequence", async () => {
     const page = await HomePage({ searchParams: Promise.resolve({}) });
-    const sectionIntros = collectElements(page, SectionIntro);
+    const intros = collectElements(page, SectionIntro);
 
-    expect(sectionIntros).toHaveLength(6);
-    expect(sectionIntros.every((section) => section.props.accent === true)).toBe(true);
-    expect(sectionIntros.map((section) => section.props.eyebrow)).toEqual([
-      "Проблема",
-      "Рабочий радар",
-      "Как работает",
-      "Проверка сигнала",
-      "Тарифы",
-      "FAQ",
+    expect(intros).toHaveLength(6);
+    expect(intros.every((section) => section.props.accent === true)).toBe(true);
+    expect(intros.map((section) => section.props.eyebrow)).toEqual([
+      "Почему обычный поиск не работает",
+      "Как работает радар",
+      "Продукт в работе",
+      "Evidence-first",
+      "Для рекрутинговых агентств",
+      "Вопросы",
     ]);
+    expect(collectElements(page, "section").some((section) => section.props.id === "pricing")).toBe(false);
   });
 
   it("places navigation before main content and keeps preview anchors stable", async () => {
     const page = await HomePage({ searchParams: Promise.resolve({}) });
-    const previewWrapper = collectElements(page, "section")
-      .find((section) => section.props.id === "preview");
-    const anchorHrefs = collectElements(page, "a").map((anchor) => anchor.props.href);
+    const children = Children.toArray((page as ReactElement<{ children?: ReactNode }>).props.children);
+    const previewWrapper = collectElements(page, "section").find((section) => section.props.id === "preview");
     const skeletonMarkup = renderToStaticMarkup(<PreviewSkeleton />);
-    const landingChildren = getLandingChildren(page);
-    const headerIndex = landingChildren.findIndex(
-      (child) => isValidElement(child) && child.type === LandingHeader,
-    );
-    const mainIndex = landingChildren.findIndex(
-      (child) => isValidElement<Record<string, any>>(child)
-        && child.type === "section"
-        && child.props.id === "main-content",
+    const headerIndex = children.findIndex((child) => isValidElement(child) && child.type === LandingHeader);
+    const mainIndex = children.findIndex((child) =>
+      isValidElement<Record<string, any>>(child) && child.type === "section" && child.props.id === "main-content"
     );
 
-    expect(previewWrapper).toBeDefined();
     expect(previewWrapper?.props["data-section"]).toBe("preview");
     expect(skeletonMarkup).toContain('id="preview-configurator"');
     expect(skeletonMarkup).toContain('id="preview-results"');
-    expect(anchorHrefs).toContain("#preview-configurator");
-    expect(anchorHrefs).toContain("#preview-results");
     expect(headerIndex).toBeGreaterThanOrEqual(0);
     expect(mainIndex).toBeGreaterThan(headerIndex);
   });
 
-  it("keeps the hero concise and makes the unavailable-payment state explicit", async () => {
+  it("keeps activation honest while payment is unavailable", async () => {
     const page = await HomePage({ searchParams: Promise.resolve({}) });
     const pageText = readVisibleText(page);
-    const alignedPlanCards = collectElements(page, SurfaceCard)
-      .filter((card) => card.props.padding === "var(--plan-card-padding)");
-    const pricingIntro = collectElements(page, SectionIntro)
-      .find((section) => section.props.eyebrow === "Тарифы");
+    const finalCta = collectElements(page, "section").find(
+      (section) => section.props["data-final-cta"] === "true",
+    );
 
-    expect(pageText).toContain("Компании, которым стоит написать сегодня. С доказательствами.");
-    expect(pricingIntro?.props.title).toBe("Начните с недели. Продолжайте, только если радар полезен.");
-    expect(pricingIntro?.props.description).toContain("Сейчас пилот оформляется как заявка без списания.");
-    expect(pageText).toContain("Проверьте новый канал за 7 дней");
-    expect(pageText).toContain("Оставить заявку на неделю");
-    expect(pageText).toContain("Сейчас заявка сохраняется без списания");
+    expect(pageText).toContain("Находите компании, которым нужен подбор — до массового отклика агентств");
+    expect(pageText).toContain("Обезличенный пример");
+    expect(pageText).toContain("заявка без списания, профиль сохранится");
+    expect(pageText).toContain("Оставить заявку на пилот");
     expect(pageText).not.toContain("Оплата через ЮKassa");
-    expect(alignedPlanCards).toHaveLength(3);
-    expect(pageText).not.toContain("0 автоспама");
-    expect(pageText).not.toContain("Один радар — на неделю, месяц или квартал");
+    expect(pageText).not.toContain("14 990 ₽/мес");
+    expect(collectElements(finalCta, Link)).toHaveLength(1);
   });
 
   it("labels the resilient fallback as a personalized sample instead of live data", async () => {
@@ -185,54 +162,23 @@ describe("landing section hierarchy", () => {
     expect(previewText).toContain("Обезличенный набор");
     expect(previewText).toContain("Радар для вашего профиля");
     expect(previewText).toContain("примерные данные");
-    expect(previewText).not.toContain("временно недоступна");
-    expect(previewText).not.toContain("восстановления источника");
     expect(previewText).toContain("Попробовать неделю");
   });
 
-  it("keeps CTA analytics aligned with the real funnel transition", async () => {
+  it("keeps analytics aligned with preview and checkout transitions", async () => {
     const page = await HomePage({ searchParams: Promise.resolve({}) });
     const anchors = collectElements(page, "a");
     const links = collectElements(page, Link);
     const heroPrimary = anchors.find((anchor) => anchor.props.href === "#preview-configurator");
-    const heroResults = anchors.find((anchor) => anchor.props.href === "#preview-results");
+    const heroExample = anchors.find((anchor) => anchor.props.href === "#opportunity-example");
     const trackedLinks = links.filter((link) => link.props["data-analytics-event"]);
 
     expect(heroPrimary?.props["data-analytics-event"]).toBe(LANDING_ANALYTICS_EVENT.previewStarted);
     expect(heroPrimary?.props["data-analytics-context"]).toBe(LANDING_ANALYTICS_CONTEXT.heroPrimary);
-    expect(heroResults?.props["data-analytics-context"]).toBe(LANDING_ANALYTICS_CONTEXT.heroSecondary);
-    expect(heroResults?.props["data-analytics-event"]).toBe(LANDING_ANALYTICS_EVENT.previewResultsClicked);
-    expect(trackedLinks.some((link) =>
-      link.props["data-analytics-event"] === LANDING_ANALYTICS_EVENT.checkoutStarted
-    )).toBe(true);
-    expect(trackedLinks.some((link) =>
-      link.props["data-analytics-event"] === LANDING_ANALYTICS_EVENT.continuationCtaClicked
-    )).toBe(true);
-    expect(trackedLinks.some((link) =>
-      link.props["data-analytics-event"] === LANDING_ANALYTICS_EVENT.continuationRequested
-    )).toBe(false);
-    expect(trackedLinks.some((link) =>
-      link.props["data-analytics-event"] === LANDING_ANALYTICS_EVENT.paymentStarted
-    )).toBe(false);
-  });
-
-  it("explains verification without exposing internal backlog or unready channels", async () => {
-    const page = await HomePage({ searchParams: Promise.resolve({}) });
-    const deliveryMarkup = renderToStaticMarkup(<LandingDeliveryDemo />);
-    const sourceMarkup = renderToStaticMarkup(<LandingSourceArchitecture />);
-
-    expect(collectElements(page, LandingSourceArchitecture)).toHaveLength(1);
-    expect(sourceMarkup).toContain("Почему рекомендация заслуживает внимания");
-    expect(sourceMarkup).toContain("Находим реальное изменение в найме");
-    expect(sourceMarkup).toContain("Подтверждаем компанию и силу сигнала");
-    expect(sourceMarkup).toContain("Формируем понятный следующий шаг");
-    expect(sourceMarkup).not.toContain("production-выдачи");
-    expect(sourceMarkup).not.toContain("LinkedIn");
-    expect(deliveryMarkup).toContain("Telegram");
-    expect(deliveryMarkup).toContain("Email");
-    expect(deliveryMarkup).not.toContain("Web push");
-    expect(deliveryMarkup).not.toContain(">VK<");
-    expect(deliveryMarkup).not.toContain("Webhook");
+    expect(heroExample?.props["data-analytics-event"]).toBe(LANDING_ANALYTICS_EVENT.previewResultsClicked);
+    expect(heroExample?.props["data-analytics-context"]).toBe(LANDING_ANALYTICS_CONTEXT.heroSecondary);
+    expect(trackedLinks.some((link) => link.props["data-analytics-event"] === LANDING_ANALYTICS_EVENT.checkoutStarted)).toBe(true);
+    expect(trackedLinks.some((link) => link.props["data-analytics-event"] === LANDING_ANALYTICS_EVENT.continuationCtaClicked)).toBe(false);
   });
 
   it("keeps filter/reset actions anchored and constrains public profile fields", async () => {
@@ -246,7 +192,6 @@ describe("landing section hierarchy", () => {
     const links = collectElements(preview, Link);
     const inputs = collectElements(preview, "input");
 
-    expect(forms).toHaveLength(1);
     expect(forms[0].props.action).toBe("/#preview-results");
     expect(links.find((link) => readVisibleText(link) === "Сбросить")?.props.href).toBe("/#preview");
     expect(inputs.find((input) => input.props.name === "specialization")?.props.maxLength).toBe(160);
@@ -281,26 +226,24 @@ describe("landing section hierarchy", () => {
     const previewMarkup = renderToStaticMarkup(preview);
 
     expect(previewMarkup.match(/data-lead-card="true"/g)).toHaveLength(2);
-    expect(previewMarkup.match(/name="preview-leads"/g)).toHaveLength(2);
-    expect(previewMarkup.match(/padding:var\(--preview-surface-padding\)/g)).toHaveLength(2);
-    expect(previewMarkup).not.toContain('data-lead-columns="true"');
     expect(previewMarkup.match(/<details(?=[^>]*data-lead-card="true")(?=[^>]*open="")[^>]*>/g)).toHaveLength(1);
     expect(previewMarkup).toContain("Рекомендация на сегодня");
     expect(previewMarkup).toContain("Почему сейчас");
     expect(previewMarkup).toContain("Факты и источники");
     expect(previewMarkup).toContain("Следующий шаг");
-    expect(previewMarkup).not.toContain("Проверка и источники");
   });
 
-  it("explains the four quality checks without duplicating the hero company card", async () => {
+  it("explains all four quality dimensions without an interaction tax", async () => {
     const page = await HomePage({ searchParams: Promise.resolve({}) });
-    const pageText = readVisibleText(page);
     const methodologies = collectElements(page, LandingMethodology);
     const methodologyMarkup = renderToStaticMarkup(<LandingMethodology />);
 
     expect(methodologies).toHaveLength(1);
-    expect(methodologyMarkup).toContain("Баллы всегда можно объяснить");
-    expect(methodologyMarkup).toContain("4 проверки · без чёрного ящика");
-    expect(pageText.match(/Производственная компания/g)).toHaveLength(1);
+    expect(methodologyMarkup).toContain("Из чего складывается Radar Score");
+    expect(methodologyMarkup).toContain("Fit");
+    expect(methodologyMarkup).toContain("Intent");
+    expect(methodologyMarkup).toContain("Urgency");
+    expect(methodologyMarkup).toContain("Reachability");
+    expect(methodologyMarkup).not.toContain("<button");
   });
 });

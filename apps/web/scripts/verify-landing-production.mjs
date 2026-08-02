@@ -185,10 +185,13 @@ await page.route("**/api/landing-events", async (route) => {
 await page.goto(baseUrl, { waitUntil: "networkidle" });
 await page.getByRole("heading", {
   level: 1,
-  name: /Компании, которым стоит написать сегодня/,
+  name: /Находите компании, которым нужен подбор/,
 }).waitFor();
 await assertNoHorizontalOverflow(page, "desktop");
 assert.equal(await page.locator("#yandex-metrika-loader").count(), 1);
+assert.equal(await page.locator("canvas").count(), 0);
+assert.equal(await page.locator('[data-scroll-progress]').count(), 0);
+assert.equal(await page.locator('header a[href="/login"]:visible').count(), 1);
 await page.waitForFunction(() =>
   Array.isArray(window.ym?.a) &&
   window.ym.a.some((args) => args[1] === "hit" && args[2] === "/")
@@ -196,17 +199,41 @@ await page.waitForFunction(() =>
 assertSingleEvent(analyticsEvents, "landing_viewed");
 
 analyticsEvents.length = 0;
-await page.getByRole("link", { name: "Настроить мой радар" }).click();
+await Promise.all([
+  page.waitForResponse((response) => {
+    const request = response.request();
+    return request.url().endsWith("/api/landing-events") &&
+      request.postDataJSON().name === "preview_started" &&
+      request.postDataJSON().context === "hero_primary";
+  }),
+  page.locator('[data-analytics-context="hero_primary"]').click(),
+]);
 await page.waitForFunction(() => window.location.hash === "#preview-configurator");
 assertSingleEvent(analyticsEvents, "preview_started", "hero_primary");
 
 analyticsEvents.length = 0;
-await page.getByRole("link", { name: "Посмотреть результат" }).first().click();
-await page.waitForFunction(() => window.location.hash === "#preview-results");
+await Promise.all([
+  page.waitForResponse((response) => {
+    const request = response.request();
+    return request.url().endsWith("/api/landing-events") &&
+      request.postDataJSON().name === "preview_results_clicked" &&
+      request.postDataJSON().context === "hero_secondary";
+  }),
+  page.locator('[data-analytics-context="hero_secondary"]').click(),
+]);
+await page.waitForFunction(() => window.location.hash === "#opportunity-example");
 assertSingleEvent(analyticsEvents, "preview_results_clicked", "hero_secondary");
 
 analyticsEvents.length = 0;
-await page.locator('header [data-analytics-context="header"]').first().click();
+await Promise.all([
+  page.waitForResponse((response) => {
+    const request = response.request();
+    return request.url().endsWith("/api/landing-events") &&
+      request.postDataJSON().name === "preview_started" &&
+      request.postDataJSON().context === "header";
+  }),
+  page.locator('header [data-analytics-context="header"]:visible').click(),
+]);
 await page.waitForFunction(() => window.location.hash === "#preview-configurator");
 assertSingleEvent(analyticsEvents, "preview_started", "header");
 
@@ -222,16 +249,11 @@ const jsTransfer = await page.evaluate(() => {
 });
 
 await screenshot(page.locator("#main-content"), "hero-desktop-1440x900");
+await screenshot(page.locator("#opportunity-example"), "opportunity-example-1440x900");
 await screenshot(page.locator("#preview"), "preview-desktop-1440x900");
 
-await page.locator("#quality").evaluate((section) => {
-  window.scrollTo({
-    top: section.getBoundingClientRect().top + window.scrollY - 96,
-  });
-});
-await page.waitForFunction(
-  () => document.querySelector('header a[href="#quality"]')?.getAttribute("aria-current") === "location",
-);
+assert.equal(await page.locator('header a[href="#quality"]:visible').count(), 1);
+assert.equal(await page.locator('header a[href="#for-agencies"]:visible').count(), 1);
 
 const firstPreset = page.getByRole("radio").first();
 await firstPreset.waitFor();
@@ -298,42 +320,15 @@ await page.keyboard.press("Escape");
 assert.equal(await lead.getByRole("tooltip").count(), 0);
 
 const methodology = page.getByTestId("landing-methodology");
-await methodology.getByRole("button", { name: /Доступность/ }).click();
-assert.equal(
-  await methodology.getByRole("button", { name: /Доступность/ }).getAttribute("aria-pressed"),
-  "true",
-);
+assert.equal(await methodology.getByRole("listitem").count(), 4);
+await methodology.getByText("Reachability").waitFor();
+assert.equal(await methodology.getByRole("button").count(), 0);
 await screenshot(methodology, "methodology-1440x900");
 
 const howItWorks = page.getByTestId("how-it-works-flow");
-await howItWorks.getByRole("button").last().click();
-assert.equal(await howItWorks.getAttribute("data-active-step"), "3");
-
-const sourceFlow = page.getByTestId("source-flow");
-await sourceFlow.getByRole("button").nth(1).click();
-assert.equal(await sourceFlow.getAttribute("data-active-layer"), "2");
-
-const delivery = page
-  .getByRole("tablist", { name: "Канал доставки примера" })
-  .locator("..");
-await delivery.getByRole("tab", { name: "Email" }).click();
-assert.equal(
-  await delivery.getByRole("tab", { name: "Email" }).getAttribute("aria-selected"),
-  "true",
-);
-await delivery.getByRole("button", { name: "Беру в работу" }).click();
-assert.equal(
-  await delivery.getByRole("button", { name: "Беру в работу" }).getAttribute("aria-pressed"),
-  "true",
-);
-await delivery.getByRole("button", { name: "Сбросить пример" }).click();
-assert.equal(
-  await delivery.getByRole("button", { name: "Беру в работу" }).getAttribute("aria-pressed"),
-  "false",
-);
-await screenshot(delivery, "delivery-tabs-1440x900");
-
-await screenshot(page.locator("#pricing"), "pricing-1440x900");
+assert.equal(await howItWorks.getByRole("listitem").count(), 4);
+assert.equal(await howItWorks.getByRole("button").count(), 0);
+await screenshot(page.locator("#for-agencies"), "for-agencies-1440x900");
 const faq = page.locator("#faq");
 analyticsEvents.length = 0;
 const faqOpenedResponse = page.waitForResponse((response) => {
@@ -355,7 +350,7 @@ await screenshot(page.locator('[class*="closingBand"]'), "closing-cta-1440x900")
 analyticsEvents.length = 0;
 await Promise.all([
   page.waitForURL(/\/checkout/),
-  page.locator('#pricing [data-analytics-context="pricing_pilot"]').click(),
+  page.locator('[data-final-cta] [data-analytics-context="closing"]').click(),
 ]);
 const checkoutMetrikaCalls = await page.evaluate(() => window.ym?.a ?? []);
 assert.equal(
@@ -364,7 +359,7 @@ assert.equal(
   ),
   false,
 );
-assertSingleEvent(analyticsEvents, "checkout_started", "pricing_pilot");
+assertSingleEvent(analyticsEvents, "checkout_started", "closing");
 assert.equal(eventsMatching(analyticsEvents, "payment_started").length, 0);
 await screenshot(page.locator("main"), "checkout-desktop-1440x900");
 const directCheckoutContext = await browser.newContext({
@@ -396,48 +391,6 @@ if (checkoutFixture) {
   assert.equal(JSON.stringify(analyticsEvents).includes("Private Agency"), false);
 }
 await page.goto(baseUrl, { waitUntil: "networkidle" });
-
-analyticsEvents.length = 0;
-await Promise.all([
-  page.waitForURL(/\/checkout/),
-  page.locator('#pricing [data-analytics-context="monthly"]').click(),
-]);
-assertSingleEvent(analyticsEvents, "continuation_cta_clicked", "monthly");
-assert.equal(eventsMatching(analyticsEvents, "continuation_requested").length, 0);
-if (checkoutFixture) {
-  analyticsEvents.length = 0;
-  const continuationEventRequest = page.waitForRequest((request) => {
-    if (!request.url().endsWith("/api/landing-events")) return false;
-    return request.postDataJSON().name === "continuation_requested";
-  });
-  await page.locator('[data-checkout-form] input[name="agencyName"]').fill("Private Agency");
-  await Promise.all([
-    continuationEventRequest,
-    page.locator("[data-checkout-form]").getByRole("button", { name: /Оставить заявку/ }).click(),
-  ]);
-  assertSingleEvent(analyticsEvents, "continuation_requested", "checkout");
-  assert.equal(JSON.stringify(analyticsEvents).includes("Private Agency"), false);
-}
-await page.goto(baseUrl, { waitUntil: "networkidle" });
-
-await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-const backToTop = page.getByRole("button", { name: "Вернуться наверх" });
-await backToTop.waitFor();
-assert.equal(await backToTop.getAttribute("data-visible"), "true");
-const scrollProgress = await page.locator("[data-scroll-progress]").evaluate((element) =>
-  Number.parseFloat(getComputedStyle(element).getPropertyValue("--scroll-progress")),
-);
-assert.ok(scrollProgress > 0.95, `scroll progress should be near completion, received ${scrollProgress}`);
-await backToTop.click();
-await page.waitForFunction(() => window.scrollY < 4);
-
-const motionControl = page.locator("header button[aria-pressed]");
-await motionControl.click();
-assert.equal(await motionControl.getAttribute("aria-pressed"), "true");
-assert.equal(
-  await page.evaluate(() => document.documentElement.dataset.landingMotion),
-  "paused",
-);
 
 const mobileContext = await browser.newContext({
   viewport: { width: 360, height: 800 },
@@ -488,15 +441,10 @@ await reducedContext.route("https://mc.yandex.ru/**", (route) =>
 );
 const reducedPage = await reducedContext.newPage();
 await reducedPage.goto(baseUrl, { waitUntil: "networkidle" });
-const reducedControl = reducedPage.getByRole("button", {
-  name: "Движение сокращено настройками системы",
-});
-await reducedControl.waitFor();
-assert.equal(await reducedControl.isDisabled(), true);
-assert.equal(
-  await reducedPage.evaluate(() => document.documentElement.dataset.landingMotion),
-  "reduced",
-);
+await reducedPage.getByRole("heading", { level: 1 }).waitFor();
+await assertNoHorizontalOverflow(reducedPage, "reduced-motion");
+assert.equal(await reducedPage.locator("canvas").count(), 0);
+assert.equal(await reducedPage.locator('header button[aria-pressed]').count(), 0);
 
 const slowContext = await browser.newContext({
   viewport: { width: 1280, height: 800 },
@@ -526,7 +474,7 @@ await endpointErrorPage.route("**/api/landing-events", (route) =>
   route.fulfill({ status: 500, contentType: "application/json", body: '{"error":"test"}' })
 );
 await endpointErrorPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
-await endpointErrorPage.getByRole("link", { name: "Настроить мой радар" }).click();
+await endpointErrorPage.locator('[data-analytics-context="hero_primary"]').click();
 await endpointErrorPage.waitForFunction(
   () => window.location.hash === "#preview-configurator",
 );
@@ -551,7 +499,7 @@ const internalPage = await internalContext.newPage();
 await internalPage.goto(`${baseUrl}/dashboard`, { waitUntil: "domcontentloaded" });
 assert.equal(await internalPage.locator('[id^="yandex-metrika-"]').count(), 0);
 await slowPage.goto(baseUrl, { waitUntil: "commit" });
-const heroPreviewCta = slowPage.getByRole("link", { name: "Настроить мой радар" });
+const heroPreviewCta = slowPage.locator('[data-analytics-context="hero_primary"]');
 await heroPreviewCta.waitFor();
 await heroPreviewCta.click();
 await slowPage.waitForFunction(() => window.location.hash === "#preview-configurator");
