@@ -18,6 +18,10 @@ describeWithDatabase('Opportunity CRM bridge PostgreSQL runtime', () => {
     await pool.end()
   })
 
+  function ingest(input: Parameters<typeof ingestCrmOutcomeCallback>[0]) {
+    return ingestCrmOutcomeCallback(input, () => pool.connect())
+  }
+
   it('enforces tenant scope, revocation and altered-replay rejection in one ledger', async () => {
     const tenant = await seedTenant('primary')
     const foreign = await seedTenant('foreign')
@@ -25,7 +29,7 @@ describeWithDatabase('Opportunity CRM bridge PostgreSQL runtime', () => {
     const revoked = await seedIntegration(tenant, 'revoked')
 
     const crossBody = body(foreign.opportunityReference, 'accepted')
-    await expect(ingestCrmOutcomeCallback(signed({
+    await expect(ingest(signed({
       integrationReference: active.integrationReference,
       credentialReference: active.credentialReference,
       credentialSecretHash: active.credentialSecretHash,
@@ -40,7 +44,7 @@ describeWithDatabase('Opportunity CRM bridge PostgreSQL runtime', () => {
     expect(await outcomeCount(foreign.opportunityId)).toBe(0)
 
     const revokedBody = body(tenant.opportunityReference, 'accepted')
-    await expect(ingestCrmOutcomeCallback(signed({
+    await expect(ingest(signed({
       integrationReference: revoked.integrationReference,
       credentialReference: revoked.credentialReference,
       credentialSecretHash: revoked.credentialSecretHash,
@@ -61,7 +65,7 @@ describeWithDatabase('Opportunity CRM bridge PostgreSQL runtime', () => {
       eventId: 'accepted-1',
       rawBody: acceptedBody,
     })
-    await expect(ingestCrmOutcomeCallback(acceptedInput)).resolves.toEqual({
+    await expect(ingest(acceptedInput)).resolves.toEqual({
       status: 200,
       code: 'accepted',
       accepted: true,
@@ -74,7 +78,7 @@ describeWithDatabase('Opportunity CRM bridge PostgreSQL runtime', () => {
       occurredAt,
       channel: 'crm',
     })
-    await expect(ingestCrmOutcomeCallback(signed({
+    await expect(ingest(signed({
       integrationReference: active.integrationReference,
       credentialReference: active.credentialReference,
       credentialSecretHash: active.credentialSecretHash,
