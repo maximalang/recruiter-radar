@@ -8,8 +8,10 @@ import { isOpportunityCrmBridgeEnabledForContext } from '@/lib/opportunities/con
 import {
   CrmDeliveryAccessError,
   CrmDeliveryIdempotencyKeyError,
+  CrmDeliveryInProgressError,
   deliverOpportunityToCrm,
 } from '@/lib/opportunities/crm-delivery-repository'
+import { checkCrmDeliveryRateLimit } from '@/lib/opportunities/crm-delivery-rate-limit'
 import { sendSignedCrmWebhook } from '@/lib/opportunities/crm-webhook'
 import { logError, logEvent } from '@/lib/runtime'
 
@@ -37,6 +39,12 @@ export async function POST(
   const access = getOpportunityDataAccessContext(authorization)
   if (!access || access.authMode !== 'auth_v2' || access.workspaceId == null) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 })
+  }
+  if (!(await checkCrmDeliveryRateLimit(access.workspaceId))) {
+    return NextResponse.json({ error: 'crm_delivery_rate_limited' }, {
+      status: 429,
+      headers: { 'Retry-After': '60', 'Cache-Control': 'no-store' },
+    })
   }
   const { id } = await context.params
   if (!isPositivePostgresId(id)) {
@@ -106,10 +114,13 @@ export async function POST(
   } catch (error) {
     if (
       error instanceof CrmDeliveryAccessError ||
-      error instanceof CrmDeliveryIdempotencyKeyError
+      error instanceof CrmDeliveryIdempotencyKeyError ||
+      error instanceof CrmDeliveryInProgressError
     ) {
       return NextResponse.json({ error: error.code }, {
-        status: error instanceof CrmDeliveryAccessError ? 403 : 400,
+        status: error instanceof CrmDeliveryAccessError
+          ? 403
+          : error instanceof CrmDeliveryInProgressError ? 409 : 400,
       })
     }
     logError('opportunity_crm.delivery_failed', error, {

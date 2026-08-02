@@ -12,7 +12,7 @@ Ledger, CRM bridge and Analytics v2 checks remain authoritative in:
 ## 1. Prerequisites
 
 1. Record the exact deployed SHA and require it to contain all Opportunity v2
-   migrations through `20260801151000`.
+   migrations through `20260802100000`.
 2. Confirm the release CI, production build, full Jest, DB validation, isolated
    PostgreSQL runtime suite, migration upgrade/down verification, dependency
    audit and browser/accessibility audit are green for that SHA.

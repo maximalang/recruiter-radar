@@ -47,10 +47,14 @@ describe('CRM outbound delivery repository', () => {
   it('serializes only public opportunity data, signs once and appends an audit row', async () => {
     const { client, query } = clientWithResults([
       { rows: [] },
-      { rows: [] },
       { rows: [{ role: 'recruiter' }] },
       { rows: [] },
       { rows: [row] },
+      { rows: [{ ownsClaim: true }] },
+      { rows: [] },
+      { rows: [] },
+      { rows: [{ ownsClaim: true }] },
+      { rows: [{ status: 'succeeded', httpStatus: 202 }], rowCount: 1 },
       { rows: [], rowCount: 1 },
       { rows: [] },
     ])
@@ -83,7 +87,6 @@ describe('CRM outbound delivery repository', () => {
   it('replays a completed event without another outbound request', async () => {
     const { client } = clientWithResults([
       { rows: [] },
-      { rows: [] },
       { rows: [{ role: 'recruiter' }] },
       { rows: [{ status: 'succeeded', httpStatus: 200 }] },
       { rows: [] },
@@ -101,5 +104,45 @@ describe('CRM outbound delivery repository', () => {
       status: 'succeeded', httpStatus: 200, idempotent: true,
     }))
     expect(sender).not.toHaveBeenCalled()
+  })
+
+  it('releases the preparation transaction before outbound network I/O', async () => {
+    const prepared = clientWithResults([
+      { rows: [] },
+      { rows: [{ role: 'recruiter' }] },
+      { rows: [] },
+      { rows: [row] },
+      { rows: [{ ownsClaim: true }] },
+      { rows: [] },
+    ])
+    const finalized = clientWithResults([
+      { rows: [] },
+      { rows: [{ ownsClaim: true }] },
+      { rows: [{ status: 'succeeded', httpStatus: 202 }], rowCount: 1 },
+      { rows: [], rowCount: 1 },
+      { rows: [] },
+    ])
+    const provideClient = jest.fn()
+      .mockResolvedValueOnce(prepared.client)
+      .mockResolvedValueOnce(finalized.client)
+    const sender = jest.fn<ReturnType<CrmOutboundSender>, Parameters<CrmOutboundSender>>(
+      async () => {
+        expect(prepared.client.release).toHaveBeenCalledTimes(1)
+        expect(provideClient).toHaveBeenCalledTimes(1)
+        return { status: 'succeeded', httpStatus: 202 }
+      },
+    )
+
+    const result = await deliverOpportunityToCrm({
+      ownerId: '7', workspaceId: '9', opportunityId: '31',
+      actorUserId: '42',
+      integrationReference: row.integrationReference,
+      idempotencyKey: 'crm-send-outside-transaction',
+    }, sender, provideClient)
+
+    expect(result).toEqual(expect.objectContaining({
+      status: 'succeeded', idempotent: false,
+    }))
+    expect(finalized.client.release).toHaveBeenCalledTimes(1)
   })
 })

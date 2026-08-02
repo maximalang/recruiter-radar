@@ -7,6 +7,7 @@ jest.mock('@/lib/opportunities/authorization', () => ({
   getOpportunityDataAccessContext: jest.fn(),
 }))
 jest.mock('@/lib/opportunities/crm-delivery-repository', () => ({
+  ...jest.requireActual('@/lib/opportunities/crm-delivery-repository'),
   deliverOpportunityToCrm: jest.fn(),
 }))
 
@@ -15,7 +16,11 @@ import {
   getOpportunityAuthorizationContext,
   getOpportunityDataAccessContext,
 } from '@/lib/opportunities/authorization'
-import { deliverOpportunityToCrm } from '@/lib/opportunities/crm-delivery-repository'
+import {
+  CrmDeliveryInProgressError,
+  deliverOpportunityToCrm,
+} from '@/lib/opportunities/crm-delivery-repository'
+import { resetCrmDeliveryRateLimitsForTests } from '@/lib/opportunities/crm-delivery-rate-limit'
 
 const mockedAuthorization = jest.mocked(getOpportunityAuthorizationContext)
 const mockedAccess = jest.mocked(getOpportunityDataAccessContext)
@@ -29,7 +34,8 @@ describe('CRM delivery route', () => {
     bridge: process.env.OPPORTUNITY_CRM_BRIDGE_ENABLED,
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    await resetCrmDeliveryRateLimitsForTests()
     process.env.OPPORTUNITY_ENGINE_V1_ENABLED = 'true'
     process.env.OPPORTUNITY_OUTCOMES_ENABLED = 'true'
     process.env.OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED = 'true'
@@ -77,6 +83,33 @@ describe('CRM delivery route', () => {
 
     expect(response.status).toBe(400)
     expect(mockedDeliver).not.toHaveBeenCalled()
+  })
+
+  it('returns a retryable conflict while the idempotency claim is active', async () => {
+    mockedDeliver.mockRejectedValueOnce(new CrmDeliveryInProgressError())
+
+    const response = await POST(request('crm-send-active'), {
+      params: Promise.resolve({ id: '31' }),
+    })
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toEqual({
+      error: 'crm_delivery_in_progress',
+    })
+  })
+
+  it('rate-limits distinct delivery attempts per workspace', async () => {
+    for (let index = 0; index < 30; index += 1) {
+      const response = await POST(request(`crm-send-${index}`), {
+        params: Promise.resolve({ id: '31' }),
+      })
+      expect(response.status).toBe(202)
+    }
+    const limited = await POST(request('crm-send-over-limit'), {
+      params: Promise.resolve({ id: '31' }),
+    })
+    expect(limited.status).toBe(429)
+    expect(limited.headers.get('retry-after')).toBe('60')
   })
 })
 

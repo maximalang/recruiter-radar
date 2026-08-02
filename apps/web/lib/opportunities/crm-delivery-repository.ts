@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import type { PoolClient } from 'pg'
 
 import { getClient } from '@/lib/db-pool'
@@ -43,6 +43,15 @@ export class CrmDeliveryIdempotencyKeyError extends Error {
   }
 }
 
+export class CrmDeliveryInProgressError extends Error {
+  readonly code = 'crm_delivery_in_progress'
+
+  constructor() {
+    super('A delivery with this idempotency key is already in progress.')
+    this.name = 'CrmDeliveryInProgressError'
+  }
+}
+
 type ClientProvider = () => Promise<PoolClient | null>
 type ReplayRow = { status: 'succeeded' | 'failed'; httpStatus: number | null }
 type DeliveryRow = {
@@ -71,6 +80,23 @@ type DeliveryRow = {
   workflowPriority: string | null
   evidenceUrls: string[]
 }
+
+type PreparedDelivery = {
+  kind: 'prepared'
+  claimToken: string
+  eventId: string
+  ownerId: string
+  workspaceId: string
+  opportunityId: string
+  delivery: DeliveryRow
+  requestHash: string
+  outboundRequest: CrmOutboundRequest
+}
+
+type PreparationResult =
+  | PreparedDelivery
+  | { kind: 'missing' }
+  | { kind: 'replay'; result: CrmDeliveryResult }
 
 export async function deliverOpportunityToCrm(
   input: {
@@ -107,114 +133,247 @@ export async function deliverOpportunityToCrm(
     idempotencyKey,
   ].join('\0'))
 
+  const preparation = await prepareDelivery({
+    ownerId,
+    workspaceId,
+    opportunityId,
+    actorUserId,
+    integrationReference: input.integrationReference,
+    eventId,
+  }, provideClient)
+  if (preparation.kind === 'missing') return null
+  if (preparation.kind === 'replay') return preparation.result
+
+  const attempt = await send(preparation.outboundRequest)
+  return finalizeDelivery(preparation, attempt, provideClient)
+}
+
+async function prepareDelivery(
+  input: {
+    ownerId: string
+    workspaceId: string
+    opportunityId: string
+    actorUserId: string
+    integrationReference: string
+    eventId: string
+  },
+  provideClient: ClientProvider,
+): Promise<PreparationResult> {
   const client = await provideClient()
   if (!client) throw new Error('DATABASE_URL is not set.')
+  let committed = false
   try {
     await client.query('BEGIN')
-    await client.query(
-      'SELECT pg_advisory_xact_lock(hashtextextended($1::TEXT, 0))',
-      [`opportunity-crm-delivery:${eventId}`],
-    )
-    await requireDeliveryActor(client, workspaceId, actorUserId)
-
-    const replay = await client.query<ReplayRow>(
-      `SELECT status, http_status AS "httpStatus"
-       FROM opportunity_crm_deliveries
-       WHERE workspace_id = $1 AND event_id = $2::UUID
-       LIMIT 1`,
-      [workspaceId, eventId],
-    )
-    if (replay.rows[0]) {
+    await requireDeliveryActor(client, input.workspaceId, input.actorUserId)
+    const replay = await findReplay(client, input.workspaceId, input.eventId)
+    if (replay) {
       await client.query('COMMIT')
-      return {
-        eventId,
-        status: replay.rows[0].status,
-        httpStatus: replay.rows[0].httpStatus,
-        idempotent: true,
-      }
+      committed = true
+      return { kind: 'replay', result: replay }
     }
 
     const delivery = await loadDelivery(
       client,
-      workspaceId,
-      ownerId,
-      opportunityId,
+      input.workspaceId,
+      input.ownerId,
+      input.opportunityId,
       input.integrationReference,
     )
     if (!delivery) {
       await client.query('COMMIT')
-      return null
+      committed = true
+      return { kind: 'missing' }
     }
     const occurredAt = new Date().toISOString()
-    const timestamp = String(Math.floor(Date.parse(occurredAt) / 1_000))
-    const body = canonicalJsonStringify({
-      schemaVersion: '2026-08-01',
-      eventType: 'opportunity.upserted',
-      eventId,
-      occurredAt,
-      integrationReference: delivery.integrationReference,
-      opportunity: {
-        opportunityReference: delivery.opportunityReference,
-        organizationName: delivery.organizationName,
-        organizationDomain: delivery.organizationDomain,
-        title: delivery.title,
-        commercialStage: delivery.commercialStage,
-        workflowState: delivery.workflowState,
-        whyNow: delivery.whyNow,
-        problemHypothesis: delivery.problemHypothesis,
-        recommendedAngle: delivery.recommendedAngle,
-        recommendedPersona: delivery.recommendedPersona,
-        recommendedAction: delivery.recommendedAction,
-        opportunityScore: delivery.opportunityScore,
-        confidenceGate: delivery.confidenceGate,
-        validUntil: delivery.validUntil,
-        nextActionType: delivery.nextActionType,
-        nextActionDueAt: delivery.nextActionDueAt,
-        workflowPriority: delivery.workflowPriority,
-        evidenceUrls: delivery.evidenceUrls,
-      },
-    })
-    const attempt = await send({
-      destinationUrl: delivery.outboundWebhookUrl,
-      credentialReference: delivery.credentialReference,
-      credentialSecretHash: delivery.credentialSecretHash,
-      timestamp,
-      eventId,
-      body,
-    })
+    const body = buildDeliveryBody(input.eventId, occurredAt, delivery)
     const requestHash = createHash('sha256').update(body, 'utf8').digest('hex')
-    await client.query(
-      `INSERT INTO opportunity_crm_deliveries (
-         workspace_id,
-         integration_id,
-         credential_id,
-         owner_id,
-         opportunity_id,
-         event_id,
-         request_hash,
-         status,
-         http_status
-       ) VALUES ($1, $2, $3, $4, $5, $6::UUID, $7, $8, $9)`,
+    const claimToken = randomUUID()
+    const claim = await client.query<{ ownsClaim: boolean }>(
+      `INSERT INTO opportunity_crm_delivery_claims (
+         event_id, workspace_id, integration_id, credential_id,
+         owner_id, opportunity_id, request_hash, claim_token
+       ) VALUES ($1::UUID, $2, $3, $4, $5, $6, $7, $8::UUID)
+       ON CONFLICT (event_id) DO UPDATE SET
+         claim_token = EXCLUDED.claim_token,
+         claimed_at = NOW()
+       WHERE opportunity_crm_delivery_claims.claimed_at <
+         NOW() - INTERVAL '30 seconds'
+       RETURNING claim_token = $8::UUID AS "ownsClaim"`,
       [
-        workspaceId,
+        input.eventId,
+        input.workspaceId,
         delivery.integrationId,
         delivery.credentialId,
-        ownerId,
-        opportunityId,
-        eventId,
+        input.ownerId,
+        input.opportunityId,
         requestHash,
-        attempt.status,
-        attempt.httpStatus,
+        claimToken,
       ],
     )
+    if (!claim.rows[0]?.ownsClaim) {
+      await client.query('COMMIT')
+      committed = true
+      throw new CrmDeliveryInProgressError()
+    }
     await client.query('COMMIT')
-    return { eventId, ...attempt, idempotent: false }
+    committed = true
+    return {
+      kind: 'prepared',
+      claimToken,
+      eventId: input.eventId,
+      ownerId: input.ownerId,
+      workspaceId: input.workspaceId,
+      opportunityId: input.opportunityId,
+      delivery,
+      requestHash,
+      outboundRequest: {
+        destinationUrl: delivery.outboundWebhookUrl,
+        credentialReference: delivery.credentialReference,
+        credentialSecretHash: delivery.credentialSecretHash,
+        timestamp: String(Math.floor(Date.parse(occurredAt) / 1_000)),
+        eventId: input.eventId,
+        body,
+      },
+    }
   } catch (error) {
-    await client.query('ROLLBACK').catch(() => undefined)
+    if (!committed) await client.query('ROLLBACK').catch(() => undefined)
     throw error
   } finally {
     client.release()
   }
+}
+
+async function finalizeDelivery(
+  prepared: PreparedDelivery,
+  attempt: CrmOutboundAttempt,
+  provideClient: ClientProvider,
+): Promise<CrmDeliveryResult> {
+  const client = await provideClient()
+  if (!client) throw new Error('DATABASE_URL is not set.')
+  let committed = false
+  try {
+    await client.query('BEGIN')
+    const ownership = await client.query<{ ownsClaim: boolean }>(
+      `SELECT claim_token = $2::UUID AS "ownsClaim"
+       FROM opportunity_crm_delivery_claims
+       WHERE event_id = $1::UUID
+       FOR UPDATE`,
+      [prepared.eventId, prepared.claimToken],
+    )
+    if (!ownership.rows[0]?.ownsClaim) {
+      const replay = await findReplay(
+        client,
+        prepared.workspaceId,
+        prepared.eventId,
+      )
+      await client.query('COMMIT')
+      committed = true
+      if (replay) return replay
+      throw new CrmDeliveryInProgressError()
+    }
+
+    const inserted = await client.query<ReplayRow>(
+      `INSERT INTO opportunity_crm_deliveries (
+         workspace_id, integration_id, credential_id, owner_id,
+         opportunity_id, event_id, request_hash, status, http_status
+       ) VALUES ($1, $2, $3, $4, $5, $6::UUID, $7, $8, $9)
+       ON CONFLICT (event_id) DO NOTHING
+       RETURNING status, http_status AS "httpStatus"`,
+      [
+        prepared.workspaceId,
+        prepared.delivery.integrationId,
+        prepared.delivery.credentialId,
+        prepared.ownerId,
+        prepared.opportunityId,
+        prepared.eventId,
+        prepared.requestHash,
+        attempt.status,
+        attempt.httpStatus,
+      ],
+    )
+    const replay = inserted.rows[0] ?? await findReplayRow(
+      client,
+      prepared.workspaceId,
+      prepared.eventId,
+    )
+    await client.query(
+      `DELETE FROM opportunity_crm_delivery_claims
+       WHERE event_id = $1::UUID AND claim_token = $2::UUID`,
+      [prepared.eventId, prepared.claimToken],
+    )
+    await client.query('COMMIT')
+    committed = true
+    if (!replay) throw new Error('CRM delivery finalization was not persisted.')
+    return {
+      eventId: prepared.eventId,
+      status: replay.status,
+      httpStatus: replay.httpStatus,
+      idempotent: inserted.rows[0] === undefined,
+    }
+  } catch (error) {
+    if (!committed) await client.query('ROLLBACK').catch(() => undefined)
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+async function findReplay(
+  client: PoolClient,
+  workspaceId: string,
+  eventId: string,
+): Promise<CrmDeliveryResult | null> {
+  const row = await findReplayRow(client, workspaceId, eventId)
+  return row ? { eventId, ...row, idempotent: true } : null
+}
+
+async function findReplayRow(
+  client: PoolClient,
+  workspaceId: string,
+  eventId: string,
+): Promise<ReplayRow | null> {
+  const result = await client.query<ReplayRow>(
+    `SELECT status, http_status AS "httpStatus"
+     FROM opportunity_crm_deliveries
+     WHERE workspace_id = $1 AND event_id = $2::UUID
+     LIMIT 1`,
+    [workspaceId, eventId],
+  )
+  return result.rows[0] ?? null
+}
+
+function buildDeliveryBody(
+  eventId: string,
+  occurredAt: string,
+  delivery: DeliveryRow,
+): string {
+  return canonicalJsonStringify({
+    schemaVersion: '2026-08-01',
+    eventType: 'opportunity.upserted',
+    eventId,
+    occurredAt,
+    integrationReference: delivery.integrationReference,
+    opportunity: {
+      opportunityReference: delivery.opportunityReference,
+      organizationName: delivery.organizationName,
+      organizationDomain: delivery.organizationDomain,
+      title: delivery.title,
+      commercialStage: delivery.commercialStage,
+      workflowState: delivery.workflowState,
+      whyNow: delivery.whyNow,
+      problemHypothesis: delivery.problemHypothesis,
+      recommendedAngle: delivery.recommendedAngle,
+      recommendedPersona: delivery.recommendedPersona,
+      recommendedAction: delivery.recommendedAction,
+      opportunityScore: delivery.opportunityScore,
+      confidenceGate: delivery.confidenceGate,
+      validUntil: delivery.validUntil,
+      nextActionType: delivery.nextActionType,
+      nextActionDueAt: delivery.nextActionDueAt,
+      workflowPriority: delivery.workflowPriority,
+      evidenceUrls: delivery.evidenceUrls,
+    },
+  })
 }
 
 async function requireDeliveryActor(
@@ -263,7 +422,7 @@ async function loadDelivery(
        opportunity.title,
        COALESCE(outcome_state.current_stage, opportunity.status)
          AS "commercialStage",
-       COALESCE(workflow_state.workflow_state, 'active') AS "workflowState",
+       COALESCE(outcome_state.workflow_state, 'active') AS "workflowState",
        opportunity.why_now AS "whyNow",
        opportunity.problem_hypothesis AS "problemHypothesis",
        opportunity.recommended_angle AS "recommendedAngle",

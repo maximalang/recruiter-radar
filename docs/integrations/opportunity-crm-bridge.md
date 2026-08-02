@@ -61,6 +61,18 @@ answer is non-public, pins the connection to a checked address, disables
 redirect following, times out after five seconds and caps the response at
 64 KiB.
 
+Delivery uses two short database transactions around the network request. The
+first transaction validates access and acquires a 30-second delivery claim;
+the HTTP request runs with no database transaction or row lock held; the
+second transaction appends the immutable delivery result and releases the
+claim. A concurrent request for the same deterministic event returns `409`.
+The route also returns `429` with `Retry-After: 60` after 30 requests per
+workspace per minute or 1,000 requests per application process per minute.
+
+If the process stops after the receiver accepted a request but before the
+result was persisted, a retry may resend the same deterministic event ID after
+the stale claim expires. Receivers must deduplicate by `X-RR-Webhook-Id`.
+
 ## Outbound envelope
 
 The event type is `opportunity.upserted`. The `opportunity` object contains only

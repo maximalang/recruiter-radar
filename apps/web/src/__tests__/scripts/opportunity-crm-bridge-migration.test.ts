@@ -3,6 +3,8 @@ import { resolve } from 'node:path'
 
 const migration = read('20260801140000_add_opportunity_crm_bridge.sql')
 const rollback = read('20260801140000_add_opportunity_crm_bridge.down.sql')
+const claimsMigration = read('20260802100000_add_opportunity_crm_delivery_claims.sql')
+const claimsRollback = read('20260802100000_add_opportunity_crm_delivery_claims.down.sql')
 const compact = migration.replace(/\s+/g, ' ')
 const downVerifier = readScript('verify-opportunity-engine-down.mjs')
 
@@ -47,9 +49,20 @@ describe('Opportunity CRM bridge migration contract', () => {
     expect(rollback).toContain('opportunity_crm_deliveries')
     expect(rollback).toContain('opportunity_crm_credentials')
     expect(downVerifier).toContain(
+      '20260802100000_add_opportunity_crm_delivery_claims.down.sql',
+    )
+    expect(downVerifier).toContain(
       '20260801140000_add_opportunity_crm_bridge.down.sql',
     )
-    expect(downVerifier).toContain('PRE_FIXTURE_DOWN_MIGRATIONS = 9')
+    expect(downVerifier).toContain('PRE_FIXTURE_DOWN_MIGRATIONS = 10')
+  })
+
+  it('coordinates outbound delivery without keeping the audit ledger mutable', () => {
+    expect(claimsMigration).toContain('CREATE TABLE opportunity_crm_delivery_claims')
+    expect(claimsMigration).toContain('event_id UUID PRIMARY KEY')
+    expect(claimsMigration).toContain('claim_token UUID NOT NULL')
+    expect(claimsMigration).toContain('opportunity_crm_delivery_claims_stale_idx')
+    expect(claimsRollback).toContain('active claims exist')
   })
 })
 

@@ -6,6 +6,10 @@ import {
   ingestCrmOutcomeCallback,
 } from '@/lib/opportunities/crm-callback-repository'
 import { createCrmCredentialSecret } from '@/lib/opportunities/crm-credential-security'
+import {
+  CrmDeliveryInProgressError,
+  deliverOpportunityToCrm,
+} from '@/lib/opportunities/crm-delivery-repository'
 import { createCrmWebhookSignature } from '@/lib/opportunities/crm-webhook'
 
 const databaseUrl = process.env.DATABASE_URL
@@ -105,6 +109,62 @@ describeWithDatabase('Opportunity CRM bridge PostgreSQL runtime', () => {
     expect(acceptedReceipts.rows[0]?.count).toBe(1)
   })
 
+  it('claims outbound delivery without holding a transaction across network I/O', async () => {
+    const tenant = await seedTenant('outbound')
+    const integration = await seedIntegration(tenant, 'active')
+    let releaseSender!: () => void
+    const senderGate = new Promise<void>((resolve) => { releaseSender = resolve })
+    const sender = jest.fn(async () => {
+      await senderGate
+      return { status: 'succeeded' as const, httpStatus: 202 }
+    })
+    const input = {
+      ownerId: tenant.ownerId,
+      workspaceId: tenant.workspaceId,
+      opportunityId: tenant.opportunityId,
+      actorUserId: tenant.ownerId,
+      integrationReference: integration.integrationReference,
+      idempotencyKey: 'postgres-claim-1',
+    }
+
+    const first = deliverOpportunityToCrm(input, sender, () => pool.connect())
+    await waitFor(() => sender.mock.calls.length === 1)
+    const duringSend = await pool.query(
+      `SELECT
+         (SELECT COUNT(*) FROM opportunity_crm_delivery_claims)::INTEGER
+           AS claims,
+         (SELECT COUNT(*) FROM opportunity_crm_deliveries)::INTEGER
+           AS deliveries`,
+    )
+    expect(duringSend.rows[0]).toEqual({ claims: 1, deliveries: 0 })
+    await expect(deliverOpportunityToCrm(
+      input,
+      sender,
+      () => pool.connect(),
+    )).rejects.toBeInstanceOf(CrmDeliveryInProgressError)
+
+    releaseSender()
+    await expect(first).resolves.toEqual(expect.objectContaining({
+      status: 'succeeded', idempotent: false,
+    }))
+    await expect(deliverOpportunityToCrm(
+      input,
+      sender,
+      () => pool.connect(),
+    )).resolves.toEqual(expect.objectContaining({
+      status: 'succeeded', idempotent: true,
+    }))
+    expect(sender).toHaveBeenCalledTimes(1)
+    const finalized = await pool.query(
+      `SELECT
+         (SELECT COUNT(*) FROM opportunity_crm_delivery_claims)::INTEGER
+           AS claims,
+         (SELECT COUNT(*) FROM opportunity_crm_deliveries)::INTEGER
+           AS deliveries`,
+    )
+    expect(finalized.rows[0]).toEqual({ claims: 0, deliveries: 1 })
+  })
+
   async function seedTenant(label: string) {
     const token = `${label}-${Date.now()}-${Math.random().toString(16).slice(2)}`
     const owner = await pool.query(
@@ -191,6 +251,12 @@ describeWithDatabase('Opportunity CRM bridge PostgreSQL runtime', () => {
        RETURNING id::TEXT AS id, public_reference::TEXT AS reference`,
       [tenant.workspaceId, `CRM ${status}`, tenant.ownerId],
     )
+    await pool.query(
+      `UPDATE opportunity_crm_integrations
+       SET outbound_webhook_url = 'https://hooks.example.test/opportunity'
+       WHERE id = $1`,
+      [integration.rows[0].id],
+    )
     const secret = createCrmCredentialSecret()
     const credential = await pool.query(
       `INSERT INTO opportunity_crm_credentials (
@@ -256,5 +322,13 @@ describeWithDatabase('Opportunity CRM bridge PostgreSQL runtime', () => {
       [opportunityId],
     )
     return result.rows[0].count as number
+  }
+
+  async function waitFor(predicate: () => boolean) {
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      if (predicate()) return
+      await new Promise((resolve) => setTimeout(resolve, 10))
+    }
+    throw new Error('Timed out waiting for CRM sender.')
   }
 })
