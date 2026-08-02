@@ -11,8 +11,6 @@ import "./premium-ui.css";
 import "./premium-ui-refinements.css";
 import "./internal-workspace-bridge.css";
 import "./internal-workspace-refinements.css";
-import "./landing-cinematic.css";
-import "./landing-cinematic-refinements.css";
 
 const inter = Inter({
   subsets: ["cyrillic", "latin"],

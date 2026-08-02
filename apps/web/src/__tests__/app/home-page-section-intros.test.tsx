@@ -1,6 +1,8 @@
 import { Children, isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import Link from "next/link";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 import HomePage, { PreviewSection, PreviewSkeleton } from "@/app/home-page-content";
 import ConversionPanel from "@/app/landing/conversion-panel";
@@ -223,5 +225,17 @@ describe("signal lock landing contract", () => {
     expect(text).not.toContain("Оплата через ЮKassa");
     expect(links.some((link) => link.props["data-analytics-event"] === LANDING_ANALYTICS_EVENT.checkoutStarted)).toBe(true);
     expect(links.some((link) => link.props["data-analytics-event"] === LANDING_ANALYTICS_EVENT.continuationCtaClicked)).toBe(true);
+  });
+
+  it("keeps motion CSS-only, reduced-motion complete and detached from legacy landing styles", () => {
+    const css = readFileSync(resolve(process.cwd(), "app/landing/landing.module.css"), "utf8");
+    const page = readFileSync(resolve(process.cwd(), "app/home-page-content.tsx"), "utf8");
+    const layout = readFileSync(resolve(process.cwd(), "app/layout.tsx"), "utf8");
+
+    expect(css).toContain("@media (prefers-reduced-motion: reduce)");
+    expect(css).not.toContain("requestAnimationFrame");
+    expect(page).not.toContain("home-page-components.module.css");
+    expect(layout).not.toContain("landing-cinematic.css");
+    expect(layout).not.toContain("landing-cinematic-refinements.css");
   });
 });
