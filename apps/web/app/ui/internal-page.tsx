@@ -1,6 +1,7 @@
 import type { ReactNode, ReactElement, SVGProps } from "react";
 import Link from "next/link";
 import { BrandLogo } from "./brand-logo";
+import { ProductWorkspaceFrame } from "./product-workspace";
 
 import s from "./internal-page.module.css";
 import { repairPossiblyMojibakeText } from "../../lib/copy/repair";
@@ -118,9 +119,20 @@ export function InternalPageFrame(props: {
    *  next/headers dependency would leak into the client bundle. */
   footer?: ReactNode;
 }) {
+  if (props.navItems) {
+    return (
+      <ProductWorkspaceFrame navItems={props.navItems} footer={props.footer}>
+        <div className={`${s.internalPageFrameInner}${props.className ? ` ${props.className}` : ""}`}>
+          {props.children}
+        </div>
+      </ProductWorkspaceFrame>
+    );
+  }
+
   return (
     <main
       className={`${s.internalPageFrame}${props.className ? ` ${props.className}` : ""}`}
+      data-ui-system="recruiter-radar-v6"
     >
       <a href="#main-content" className={s.skipLink}>Перейти к содержанию</a>
       {props.navItems ? <TopNav items={props.navItems} /> : null}

@@ -577,188 +577,13 @@ main[class*="internalPageFrame"] a[class*="accountPrimaryAction"]:hover {
   box-shadow: 0 16px 34px rgba(0, 0, 0, 0.2);
 }
 
-/* --------------------------------------------------------------------------
-   Public landing
-   -------------------------------------------------------------------------- */
-
-[data-deploy-anchor^="recruiter-radar-landing"] {
-  --c-bg-card: rgba(255, 255, 255, 0.86);
-  --c-border: rgba(18, 38, 70, 0.1);
-  padding: 18px clamp(14px, 2.2vw, 28px) 86px !important;
-}
-
-[data-deploy-anchor^="recruiter-radar-landing"] [class*="ambientBg"] {
-  background:
-    radial-gradient(760px 520px at 8% 4%, rgba(82, 127, 222, 0.2), transparent 68%),
-    radial-gradient(720px 520px at 94% 48%, rgba(175, 127, 82, 0.13), transparent 70%),
-    linear-gradient(180deg, #e8eef6 0%, #f3f5f7 43%, #e8edf4 100%) !important;
-}
-
-[data-deploy-anchor^="recruiter-radar-landing"] [class*="topBar"] {
-  top: 12px !important;
-  min-height: 68px;
-  padding: 9px 10px 9px 15px !important;
-  border: 1px solid rgba(255, 255, 255, 0.78) !important;
-  border-radius: 21px !important;
-  background: rgba(248, 250, 252, 0.78) !important;
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.94) inset,
-    0 22px 64px rgba(12, 28, 52, 0.15) !important;
-  backdrop-filter: blur(22px) saturate(160%) !important;
-}
-
-[data-deploy-anchor^="recruiter-radar-landing"] [class*="heroSection"] {
-  min-height: min(880px, calc(100svh - 36px)) !important;
-  border-radius: 34px !important;
-  padding: clamp(48px, 6vw, 78px) clamp(28px, 6vw, 78px) !important;
-  background:
-    radial-gradient(680px 500px at 78% 12%, rgba(64, 119, 239, 0.28), transparent 65%),
-    radial-gradient(500px 380px at 2% 100%, rgba(183, 122, 73, 0.15), transparent 68%),
-    linear-gradient(135deg, #050c17 0%, #0a1930 48%, #102a52 100%) !important;
-  box-shadow:
-    0 44px 110px rgba(2, 8, 20, 0.28),
-    0 1px 0 rgba(255, 255, 255, 0.08) inset !important;
-}
-
-[data-deploy-anchor^="recruiter-radar-landing"] [class*="heroSection"]::after {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  border-radius: inherit;
-  content: "";
-  background-image:
-    linear-gradient(rgba(142, 177, 243, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(142, 177, 243, 0.04) 1px, transparent 1px);
-  background-size: 48px 48px;
-  mask-image: radial-gradient(circle at 70% 40%, black, transparent 74%);
-}
-
-[data-deploy-anchor^="recruiter-radar-landing"] h1[class*="heroTitle"] {
-  max-width: 11ch !important;
-  font-size: clamp(3rem, 6.2vw, 5.75rem) !important;
-  line-height: 0.94 !important;
-  letter-spacing: -0.065em !important;
-}
-
-[data-deploy-anchor^="recruiter-radar-landing"] [class*="heroSubtitle"] {
-  max-width: 48ch !important;
-  font-size: clamp(1.02rem, 1.45vw, 1.2rem) !important;
-}
-
-[data-deploy-anchor^="recruiter-radar-landing"] [class*="heroCta"],
-[data-deploy-anchor^="recruiter-radar-landing"] [class*="heroSecondaryCta"] {
-  min-height: 52px;
-  padding-inline: 22px !important;
-  border-radius: 15px !important;
-  transition:
-    transform 200ms var(--ui-ease),
-    box-shadow 200ms ease,
-    background 200ms ease !important;
-}
-
-[data-deploy-anchor^="recruiter-radar-landing"] [class*="heroCta"]:hover,
-[data-deploy-anchor^="recruiter-radar-landing"] [class*="heroSecondaryCta"]:hover {
-  transform: translateY(-3px) !important;
-}
-
-[data-deploy-anchor^="recruiter-radar-landing"] [class*="heroPanel"],
-[data-deploy-anchor^="recruiter-radar-landing"] [class*="radarCard"] {
-  border-color: rgba(175, 205, 255, 0.16) !important;
-  border-radius: 23px !important;
-  background: rgba(255, 255, 255, 0.065) !important;
-  box-shadow:
-    0 24px 70px rgba(0, 0, 0, 0.22),
-    0 1px 0 rgba(255, 255, 255, 0.12) inset !important;
-  backdrop-filter: blur(18px);
-}
-
-[data-deploy-anchor^="recruiter-radar-landing"] [class*="scrollSection"] {
-  padding-block: clamp(58px, 8vw, 104px) !important;
-}
-
-[data-deploy-anchor^="recruiter-radar-landing"] [class*="sectionIntro"] h2,
-[data-deploy-anchor^="recruiter-radar-landing"] h2[class*="sectionTitle"] {
-  color: #0a1528 !important;
-  font-size: clamp(2rem, 4.4vw, 4rem) !important;
-  line-height: 0.98 !important;
-  letter-spacing: -0.055em !important;
-  text-wrap: balance;
-}
-
-[data-deploy-anchor^="recruiter-radar-landing"] [class*="surfaceCard"],
-[data-deploy-anchor^="recruiter-radar-landing"] [class*="previewCard"],
-[data-deploy-anchor^="recruiter-radar-landing"] [class*="planCard"] {
-  position: relative;
-  overflow: hidden;
-  border-color: rgba(255, 255, 255, 0.78) !important;
-  border-radius: 26px !important;
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(246, 249, 253, 0.78)) !important;
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.96) inset,
-    0 24px 66px rgba(18, 38, 70, 0.11) !important;
-  transition:
-    transform 280ms var(--ui-ease),
-    box-shadow 280ms var(--ui-ease),
-    border-color 280ms ease !important;
-}
-
-[data-deploy-anchor^="recruiter-radar-landing"] [class*="surfaceCard"]:hover,
-[data-deploy-anchor^="recruiter-radar-landing"] [class*="previewCard"]:hover,
-[data-deploy-anchor^="recruiter-radar-landing"] [class*="planCard"]:hover {
-  border-color: rgba(49, 95, 200, 0.18) !important;
-  transform: translateY(-5px) !important;
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.98) inset,
-    0 34px 88px rgba(18, 38, 70, 0.16) !important;
-}
-
-[data-deploy-anchor^="recruiter-radar-landing"] [class*="pricingGrid"] {
-  gap: 18px !important;
-}
-
-[data-deploy-anchor^="recruiter-radar-landing"] [class*="planCard"] {
-  min-height: 100%;
-  padding: clamp(24px, 3vw, 34px) !important;
-}
-
-[data-deploy-anchor^="recruiter-radar-landing"] details {
-  border: 1px solid rgba(255, 255, 255, 0.72) !important;
-  border-radius: 18px !important;
-  background: rgba(255, 255, 255, 0.78) !important;
-  box-shadow: 0 12px 32px rgba(18, 38, 70, 0.07);
-  transition:
-    border-color 180ms ease,
-    box-shadow 180ms ease,
-    transform 180ms var(--ui-ease);
-}
-
-[data-deploy-anchor^="recruiter-radar-landing"] details:hover,
-[data-deploy-anchor^="recruiter-radar-landing"] details[open] {
-  border-color: rgba(49, 95, 200, 0.2) !important;
-  box-shadow: 0 18px 44px rgba(18, 38, 70, 0.11);
-  transform: translateY(-1px);
-}
-
-[data-deploy-anchor^="recruiter-radar-landing"] [class*="closing"] {
-  border-radius: 32px !important;
-  background:
-    radial-gradient(520px 300px at 80% 0%, rgba(79, 132, 244, 0.24), transparent 65%),
-    linear-gradient(135deg, #07101e 0%, #112746 100%) !important;
-  box-shadow: 0 34px 90px rgba(6, 17, 34, 0.2) !important;
-}
-
 /* Shared micro-interactions. */
 main[class*="internalPageFrame"] [role="button"],
-main[class*="internalPageFrame"] button,
-[data-deploy-anchor^="recruiter-radar-landing"] button,
-[data-deploy-anchor^="recruiter-radar-landing"] a {
+main[class*="internalPageFrame"] button {
   transition-duration: 180ms !important;
 }
 
-main[class*="internalPageFrame"] button:active,
-[data-deploy-anchor^="recruiter-radar-landing"] button:active,
-[data-deploy-anchor^="recruiter-radar-landing"] a:active {
+main[class*="internalPageFrame"] button:active {
   transform: translateY(0) scale(0.985);
 }
 
@@ -771,9 +596,6 @@ main[class*="internalPageFrame"] button:active,
     min-height: 0;
   }
 
-  [data-deploy-anchor^="recruiter-radar-landing"] [class*="heroSection"] {
-    min-height: auto !important;
-  }
 }
 
 @media (max-width: 720px) {
@@ -832,27 +654,6 @@ main[class*="internalPageFrame"] button:active,
     font-size: clamp(1.9rem, 10vw, 2.6rem) !important;
   }
 
-  [data-deploy-anchor^="recruiter-radar-landing"] {
-    padding: 10px 10px 58px !important;
-  }
-
-  [data-deploy-anchor^="recruiter-radar-landing"] [class*="heroSection"] {
-    border-radius: 25px !important;
-    padding: 82px 20px 28px !important;
-  }
-
-  [data-deploy-anchor^="recruiter-radar-landing"] h1[class*="heroTitle"] {
-    font-size: clamp(2.7rem, 15vw, 4rem) !important;
-  }
-
-  [data-deploy-anchor^="recruiter-radar-landing"] [class*="scrollSection"] {
-    padding-block: 52px !important;
-  }
-
-  [data-deploy-anchor^="recruiter-radar-landing"] [class*="sectionIntro"] h2,
-  [data-deploy-anchor^="recruiter-radar-landing"] h2[class*="sectionTitle"] {
-    font-size: clamp(2rem, 10vw, 3rem) !important;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

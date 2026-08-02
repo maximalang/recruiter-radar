@@ -1,90 +1,27 @@
 /** @jest-environment jsdom */
 
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 
-import LandingHeroInteractions from "@/app/landing-hero-interactions";
 import LandingHowItWorks from "@/app/landing-how-it-works";
-import { LandingMotionProvider } from "@/app/landing-motion/landing-motion-provider";
-import {
-  LANDING_RADAR_SIGNAL_EVENT,
-  type LandingRadarSignalDetail,
-} from "@/app/landing-radar-signal";
-import LandingSourceArchitecture from "@/app/landing-source-architecture";
 
-describe("landing product interactions", () => {
-  it("selects how-it-works stages with pointer and keyboard", () => {
+describe("landing product explanation", () => {
+  it("explains the workflow as four visible, ordered steps", () => {
     render(<LandingHowItWorks />);
 
-    const profile = screen.getByRole("button", { name: /Задаёте свою специализацию/ });
-    const signal = screen.getByRole("button", { name: /Проверяем изменения в найме/ });
-    expect(profile).toHaveAttribute("aria-pressed", "true");
-
-    fireEvent.mouseEnter(signal);
-    expect(signal).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByTestId("how-it-works-flow")).toHaveAttribute("data-active-step", "2");
-
-    fireEvent.keyDown(signal, { key: "ArrowRight" });
-    const delivery = screen.getByRole("button", { name: /Доставляем короткий список действий/ });
-    expect(delivery).toHaveFocus();
-    expect(delivery).toHaveAttribute("aria-pressed", "true");
+    const flow = screen.getByTestId("how-it-works-flow");
+    expect(flow.tagName).toBe("OL");
+    expect(screen.getAllByRole("listitem")).toHaveLength(4);
+    expect(screen.getByRole("heading", { name: "Собираем сигналы найма" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Объединяем факты по компании" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Рассчитываем приоритет" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Показываем следующий шаг" })).toBeVisible();
   });
 
-  it("separates signal, verification and action without exposing internal source backlog", () => {
-    render(<LandingSourceArchitecture />);
+  it("does not require pointer, keyboard or canvas interaction to understand the process", () => {
+    render(<LandingHowItWorks />);
 
-    const origin = screen.getByRole("button", { name: /Находим реальное изменение в найме/ });
-    const verification = screen.getByRole("button", { name: /Подтверждаем компанию и силу сигнала/ });
-    expect(origin).toHaveAttribute("aria-pressed", "true");
-
-    fireEvent.focus(verification);
-    expect(verification).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByTestId("source-flow")).toHaveAttribute("data-active-layer", "2");
-    expect(screen.getByText(/Слабые и противоречивые сигналы/)).toBeVisible();
-    expect(screen.queryByText(/production-выдачи/i)).not.toBeInTheDocument();
-  });
-
-  it("maps a radar signal to evidence, score confirmation and one FIUR meter", () => {
-    jest.useFakeTimers();
-    render(
-      <LandingMotionProvider>
-        <section data-landing-hero>
-          <div data-hero-tilt />
-          <div data-hero-evidence-index="0" />
-          <div data-hero-evidence-index="1" />
-          <div data-hero-evidence-index="2" />
-          <div data-hero-score-track />
-          <div data-hero-fiur-index="0" />
-          <div data-hero-fiur-index="1" />
-          <div data-hero-fiur-index="2" />
-          <LandingHeroInteractions />
-        </section>
-      </LandingMotionProvider>,
-    );
-
-    act(() => {
-      window.dispatchEvent(new CustomEvent<LandingRadarSignalDetail>(
-        LANDING_RADAR_SIGNAL_EVENT,
-        { detail: { index: 1 } },
-      ));
-    });
-
-    expect(document.querySelector('[data-hero-evidence-index="1"]')).toHaveAttribute(
-      "data-signal-active",
-      "true",
-    );
-    expect(document.querySelector("[data-hero-score-track]")).toHaveAttribute(
-      "data-confirmation-pulse",
-      "true",
-    );
-    expect(document.querySelector('[data-hero-fiur-index="1"]')).toHaveAttribute(
-      "data-signal-active",
-      "true",
-    );
-
-    act(() => jest.advanceTimersByTime(900));
-    expect(document.querySelector("[data-hero-score-track]")).not.toHaveAttribute(
-      "data-confirmation-pulse",
-    );
-    jest.useRealTimers();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(document.querySelector("canvas")).not.toBeInTheDocument();
+    expect(screen.getByText(/корпоративный контакт/)).toBeVisible();
   });
 });

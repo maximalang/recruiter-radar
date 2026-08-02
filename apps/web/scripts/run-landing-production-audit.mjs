@@ -1,7 +1,9 @@
 import { spawn } from "node:child_process";
 import process from "node:process";
 
-const auditScript = new URL("./verify-landing-production.mjs", import.meta.url);
+import { resolveAuditScriptPath } from "./landing-audit-path.mjs";
+
+const auditScript = resolveAuditScriptPath(import.meta.url);
 const maxAttempts = 2;
 
 function wait(milliseconds) {
@@ -10,7 +12,7 @@ function wait(milliseconds) {
 
 function runAudit() {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [auditScript.pathname], {
+    const child = spawn(process.execPath, [auditScript], {
       cwd: process.cwd(),
       env: process.env,
       stdio: ["inherit", "pipe", "pipe"],

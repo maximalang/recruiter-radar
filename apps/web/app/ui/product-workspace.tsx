@@ -12,7 +12,6 @@ import {
 import { BrandLogo } from "./brand-logo";
 import type { NavItem } from "./internal-page";
 import styles from "./product-workspace.module.css";
-import refinements from "./product-workspace-refinements.module.css";
 
 type WorkspaceIcon = (props: SVGProps<SVGSVGElement>) => ReactElement;
 
@@ -30,7 +29,11 @@ export function ProductWorkspaceFrame(props: {
   footer?: ReactNode;
 }) {
   return (
-    <div className={`${styles.workspace} ${refinements.workspace}`} data-product-workspace="true">
+    <div
+      className={styles.workspace}
+      data-product-workspace="true"
+      data-ui-system="recruiter-radar-v6"
+    >
       <a href="#main-content" className={styles.skipLink}>Перейти к содержимому</a>
 
       <aside className={styles.sidebar} aria-label="Рабочее пространство Recruiter Radar">

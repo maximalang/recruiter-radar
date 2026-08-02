@@ -1,30 +1,8 @@
 /* Targeted refinements discovered by production screenshot review. */
 
-/* Keep programmatic and test-driven scroll positioning deterministic. Smooth
-   navigation remains owned by the landing interaction components instead of a
-   global browser rule. */
+/* Keep programmatic and test-driven scroll positioning deterministic. */
 html {
   scroll-behavior: auto;
-}
-
-[data-deploy-anchor^="recruiter-radar-landing"] [class*="heroSection"] {
-  padding-top: clamp(132px, 11vw, 158px) !important;
-  padding-bottom: clamp(52px, 7vw, 84px) !important;
-}
-
-[data-deploy-anchor^="recruiter-radar-landing"] h1[class*="heroTitle"] {
-  max-width: 10.5ch !important;
-  font-size: clamp(3rem, 5.45vw, 5.1rem) !important;
-}
-
-[data-deploy-anchor^="recruiter-radar-landing"] [class*="heroTitleAccent"] {
-  display: block;
-  max-width: 100%;
-  margin-top: 0.08em;
-  font-size: 0.61em;
-  line-height: 1.04;
-  letter-spacing: -0.045em;
-  white-space: nowrap;
 }
 
 /* The generic state selector in the foundation deliberately gives the outer
@@ -161,22 +139,6 @@ main[class*="internalPageFrame"] div[class*="emptyStateIcon"] svg {
 }
 
 @media (max-width: 720px) {
-  [data-deploy-anchor^="recruiter-radar-landing"] [class*="heroSection"] {
-    padding-top: 112px !important;
-  }
-
-  [data-deploy-anchor^="recruiter-radar-landing"] h1[class*="heroTitle"] {
-    max-width: 11ch !important;
-    font-size: clamp(2.65rem, 14vw, 3.75rem) !important;
-  }
-
-  [data-deploy-anchor^="recruiter-radar-landing"] [class*="heroTitleAccent"] {
-    font-size: clamp(1.7rem, 8vw, 2.05rem);
-    line-height: 1.08;
-    letter-spacing: -0.055em;
-    white-space: nowrap;
-  }
-
   main[class*="internalPageFrame"] div[class*="emptyState"]:not([class*="emptyStateIcon"]),
   main[class*="internalPageFrame"] div[class*="errorState"] {
     min-height: 300px;
