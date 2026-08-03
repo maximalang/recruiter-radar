@@ -5,12 +5,14 @@ import { useEffect } from "react";
 /**
  * Shared interaction layer for the visual system.
  *
- * Product pages consume pointer and coarse scroll state. No navigation,
- * analytics or product behavior is changed here.
+ * Product pages consume pointer and coarse scroll state. The public Signal Lock
+ * landing uses native scroll and CSS-only scene motion, so no landing-specific
+ * progress loop or global state is maintained here.
  */
 export function PremiumUiEffects() {
   useEffect(() => {
     const root = document.documentElement;
+
     let pointerFrame = 0;
     let scrollFrame = 0;
 

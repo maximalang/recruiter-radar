@@ -1,11 +1,17 @@
 import { Children, isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import Link from "next/link";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
-import HomePage, { PreviewSection, PreviewSkeleton } from "@/app/page";
-import LandingHeader from "@/app/landing-header";
-import LandingMethodology from "@/app/landing-methodology";
-import { SectionIntro } from "@/app/ui/page-primitives";
+import HomePage, { PreviewSection, PreviewSkeleton } from "@/app/home-page-content";
+import ConversionPanel from "@/app/landing/conversion-panel";
+import DetectionScene from "@/app/landing/detection-scene";
+import EvidenceScene from "@/app/landing/evidence-scene";
+import LandingHeader from "@/app/landing/landing-header";
+import OutreachScene from "@/app/landing/outreach-scene";
+import SignalTimelineScene from "@/app/landing/signal-timeline-scene";
+import WorkspaceScene from "@/app/landing/workspace-scene";
 import {
   LANDING_ANALYTICS_CONTEXT,
   LANDING_ANALYTICS_EVENT,
@@ -63,7 +69,7 @@ function makePreviewItem(overrides: Partial<PreviewItem> = {}): PreviewItem {
     employer_name: "Производственная компания",
     vacancies_count: 14,
     distinct_vacancy_names_count: 6,
-    latest_published_at: "2026-07-31T09:00:00.000Z",
+    latest_published_at: "2026-07-19T09:00:00.000Z",
     total_score: 348,
     reasons: ["14 новых вакансий за 6 дней", "Сигнал подтверждён двумя источниками"],
     opener: "Предложить точечный подбор по инженерным ролям",
@@ -79,12 +85,12 @@ function makePreviewItem(overrides: Partial<PreviewItem> = {}): PreviewItem {
     curationLabels: [],
     lawfulContactPath: "career-page",
     negativeSignals: [],
-    relevanceSignals: { fit: 0, intent: 0, urgency: 0, reachability: 0 },
+    relevanceSignals: { fit: 0.88, intent: 0.84, urgency: 0.94, reachability: 0.82 },
     ...overrides,
   };
 }
 
-describe("landing section hierarchy", () => {
+describe("signal lock landing contract", () => {
   beforeEach(() => {
     mockGetPublicSampleDigestState.mockResolvedValue({
       isLive: true,
@@ -94,56 +100,55 @@ describe("landing section hierarchy", () => {
     });
   });
 
-  it("uses one deliberate editorial sequence", async () => {
+  it("composes five connected scenes without the legacy marketing-section stack", async () => {
     const page = await HomePage({ searchParams: Promise.resolve({}) });
-    const intros = collectElements(page, SectionIntro);
 
-    expect(intros).toHaveLength(5);
-    expect(intros.every((section) => section.props.accent === true)).toBe(true);
-    expect(intros.map((section) => section.props.eyebrow)).toEqual([
-      "Что меняется",
-      "Продукт в работе",
-      "Стандарт доказательств",
-      "Рабочий ритм",
-      "Вопросы",
-    ]);
-    expect(collectElements(page, "section").some((section) => section.props.id === "pricing")).toBe(false);
+    expect(collectElements(page, LandingHeader)).toHaveLength(1);
+    expect(collectElements(page, DetectionScene)).toHaveLength(1);
+    expect(collectElements(page, SignalTimelineScene)).toHaveLength(1);
+    expect(collectElements(page, EvidenceScene)).toHaveLength(1);
+    expect(collectElements(page, OutreachScene)).toHaveLength(1);
+    expect(collectElements(page, WorkspaceScene)).toHaveLength(1);
+    expect(collectElements(page, "main").find((main) => main.props.id === "main-content")).toBeDefined();
   });
 
-  it("places navigation before main content and keeps preview anchors stable", async () => {
-    const page = await HomePage({ searchParams: Promise.resolve({}) });
-    const children = Children.toArray((page as ReactElement<{ children?: ReactNode }>).props.children);
-    const previewWrapper = collectElements(page, "section").find((section) => section.props.id === "preview");
-    const skeletonMarkup = renderToStaticMarkup(<PreviewSkeleton />);
-    const headerIndex = children.findIndex((child) => isValidElement(child) && child.type === LandingHeader);
-    const mainIndex = children.findIndex((child) =>
-      isValidElement<Record<string, any>>(child) && child.type === "section" && child.props.id === "main-content"
-    );
+  it("explains the product in the first scene and preserves hero analytics", () => {
+    const markup = renderToStaticMarkup(<DetectionScene previewHref="#preview-configurator" />);
 
-    expect(previewWrapper?.props["data-section"]).toBe("preview");
-    expect(skeletonMarkup).toContain('id="preview-configurator"');
-    expect(skeletonMarkup).toContain('id="preview-results"');
-    expect(headerIndex).toBeGreaterThanOrEqual(0);
-    expect(mainIndex).toBeGreaterThan(headerIndex);
+    expect(markup).toContain("Кому написать сегодня");
+    expect(markup).toContain("видно по сигналам");
+    expect(markup).toContain("Клиентский радар для рекрутинговых агентств");
+    expect(markup).toContain("Собрать мой радар");
+    expect(markup).toContain(`data-analytics-event="${LANDING_ANALYTICS_EVENT.previewStarted}"`);
+    expect(markup).toContain(`data-analytics-context="${LANDING_ANALYTICS_CONTEXT.heroPrimary}"`);
+    expect(markup).not.toContain("data-hero-tilt");
   });
 
-  it("keeps activation honest while payment is unavailable", async () => {
-    const page = await HomePage({ searchParams: Promise.resolve({}) });
-    const pageText = readVisibleText(page);
-    const finalCta = collectElements(page, "section").find(
-      (section) => section.props["data-final-cta"] === "true",
-    );
+  it("uses one opportunity across signal, evidence and manual outreach scenes", () => {
+    const timeline = renderToStaticMarkup(<SignalTimelineScene />);
+    const evidence = renderToStaticMarkup(<EvidenceScene />);
+    const outreach = renderToStaticMarkup(<OutreachScene />);
 
-    expect(pageText).toContain("Компании, которым нужен подбор. До того, как это станет очевидно всем.");
-    expect(pageText).toContain("Обезличенный пример");
-    expect(pageText).toContain("заявка без списания, профиль сохранится");
-    expect(pageText).toContain("Оставить заявку на пилот");
-    expect(pageText).not.toContain("Оплата через ЮKassa");
-    expect(pageText).not.toContain("14 990 ₽/мес");
-    expect(collectElements(finalCta, Link)).toHaveLength(1);
+    for (const markup of [timeline, evidence, outreach]) {
+      expect(markup).toContain("Производственная компания");
+    }
+    expect(timeline).toContain("Последовательность");
+    expect(evidence).toContain("RADAR SCORE");
+    expect(evidence).toContain("EVIDENCE STACK");
+    expect(outreach).toContain("DRAFT / НЕ ОТПРАВЛЕНО");
+    expect(outreach).toContain("не отправляет сообщения компаниям автоматически");
+    expect(outreach).not.toContain("частный email");
   });
 
-  it("labels the resilient fallback as a personalized sample instead of live data", async () => {
+  it("keeps preview anchors in the Suspense fallback", () => {
+    const markup = renderToStaticMarkup(<PreviewSkeleton />);
+    expect(markup).toContain('id="scene-workspace"');
+    expect(markup).toContain('id="preview-configurator"');
+    expect(markup).toContain('id="preview-results"');
+    expect(markup).toContain('aria-busy="true"');
+  });
+
+  it("labels resilient preview data honestly and keeps checkout available", async () => {
     mockGetPublicSampleDigestState.mockResolvedValueOnce({
       isLive: false,
       isPersonalized: true,
@@ -156,93 +161,81 @@ describe("landing section hierarchy", () => {
       hasPreview: hasPublicPreviewInput(input),
       checkoutHref: buildCheckoutHref(input),
     });
-    const previewText = readVisibleText(preview);
+    const text = readVisibleText(preview);
 
-    expect(previewText).toContain("Обезличенный набор");
-    expect(previewText).toContain("Радар для вашего профиля");
-    expect(previewText).toContain("примерные данные");
-    expect(previewText).toContain("Попробовать неделю");
+    expect(text).toContain("Обезличенный набор");
+    expect(text).toContain("Радар для вашего профиля");
+    expect(text).toContain("примерные данные");
+    expect(text).toContain("Попробовать неделю");
+    expect(text).not.toContain("восстановления источника");
   });
 
-  it("keeps analytics aligned with preview and checkout transitions", async () => {
-    const page = await HomePage({ searchParams: Promise.resolve({}) });
-    const anchors = collectElements(page, "a");
-    const links = collectElements(page, Link);
-    const heroPrimary = anchors.find((anchor) => anchor.props.href === "#preview-configurator");
-    const heroExample = anchors.find((anchor) => anchor.props.href === "#opportunity-example");
-    const trackedLinks = links.filter((link) => link.props["data-analytics-event"]);
-
-    expect(heroPrimary?.props["data-analytics-event"]).toBe(LANDING_ANALYTICS_EVENT.previewStarted);
-    expect(heroPrimary?.props["data-analytics-context"]).toBe(LANDING_ANALYTICS_CONTEXT.heroPrimary);
-    expect(heroExample?.props["data-analytics-event"]).toBe(LANDING_ANALYTICS_EVENT.previewResultsClicked);
-    expect(heroExample?.props["data-analytics-context"]).toBe(LANDING_ANALYTICS_CONTEXT.heroSecondary);
-    expect(trackedLinks.some((link) => link.props["data-analytics-event"] === LANDING_ANALYTICS_EVENT.checkoutStarted)).toBe(true);
-    expect(trackedLinks.some((link) => link.props["data-analytics-event"] === LANDING_ANALYTICS_EVENT.continuationCtaClicked)).toBe(false);
-  });
-
-  it("keeps filter/reset actions anchored and constrains public profile fields", async () => {
+  it("keeps filter, reset and public input limits wired", async () => {
     const input = readPublicPreviewInput({ specialization: "инженерный подбор" });
     const preview = await PreviewSection({
       previewInput: input,
-      hasPreview: hasPublicPreviewInput(input),
+      hasPreview: true,
       checkoutHref: buildCheckoutHref(input),
     });
     const forms = collectElements(preview, "form");
     const links = collectElements(preview, Link);
     const inputs = collectElements(preview, "input");
 
+    expect(forms).toHaveLength(1);
     expect(forms[0].props.action).toBe("/#preview-results");
-    expect(links.find((link) => readVisibleText(link) === "Сбросить")?.props.href).toBe("/#preview");
+    expect(links.find((link) => readVisibleText(link) === "Сбросить")?.props.href).toBe("/#scene-workspace");
     expect(inputs.find((input) => input.props.name === "specialization")?.props.maxLength).toBe(160);
     expect(inputs.find((input) => input.props.name === "targetCity")?.props.maxLength).toBe(120);
   });
 
-  it("renders lead cards as a scannable list with one recommendation expanded", async () => {
+  it("renders an evidence-backed lead list with one expanded recommendation", async () => {
     mockGetPublicSampleDigestState.mockResolvedValueOnce({
       isLive: false,
       isPersonalized: false,
       hasExactMatches: true,
       items: [
         makePreviewItem(),
-        makePreviewItem({
-          rank: 2,
-          org_id: "demo-service",
-          hh_employer_id: "demo-service",
-          employer_name: "Сервисная B2B-компания",
-          total_score: 312,
-          confidence_gate: "B",
-          confidenceLabel: "medium",
-          location_names: ["Санкт-Петербург"],
-        }),
+        makePreviewItem({ rank: 2, org_id: "demo-service", employer_name: "Сервисная B2B-компания" }),
       ],
     });
     const input = readPublicPreviewInput({});
-    const preview = await PreviewSection({
-      previewInput: input,
-      hasPreview: false,
-      checkoutHref: buildCheckoutHref(input),
-    });
-    const previewMarkup = renderToStaticMarkup(preview);
+    const preview = await PreviewSection({ previewInput: input, hasPreview: false, checkoutHref: buildCheckoutHref(input) });
+    const markup = renderToStaticMarkup(preview);
 
-    expect(previewMarkup.match(/data-lead-card="true"/g)).toHaveLength(2);
-    expect(previewMarkup.match(/<details(?=[^>]*data-lead-card="true")(?=[^>]*open="")[^>]*>/g)).toHaveLength(1);
-    expect(previewMarkup).toContain("Рекомендация на сегодня");
-    expect(previewMarkup).toContain("Почему сейчас");
-    expect(previewMarkup).toContain("Факты и источники");
-    expect(previewMarkup).toContain("Следующий шаг");
+    expect(markup.match(/data-lead-card="true"/g)).toHaveLength(2);
+    expect(markup.match(/name="preview-leads"/g)).toHaveLength(2);
+    expect(markup.match(/<details(?=[^>]*data-lead-card="true")(?=[^>]*open="")[^>]*>/g)).toHaveLength(1);
+    expect(markup).toContain("Почему сейчас");
+    expect(markup).toContain("Факты и источники");
+    expect(markup).toContain("Без автоматической отправки");
   });
 
-  it("explains all four quality dimensions without an interaction tax", async () => {
-    const page = await HomePage({ searchParams: Promise.resolve({}) });
-    const methodologies = collectElements(page, LandingMethodology);
-    const methodologyMarkup = renderToStaticMarkup(<LandingMethodology />);
+  it("keeps payment-state copy and checkout analytics in the conversion panel", () => {
+    const input = readPublicPreviewInput({});
+    const panel = ConversionPanel({
+      previewInput: input,
+      paymentConfigured: false,
+      faqItems: [{ question: "Как работает?", answer: "По проверяемым сигналам." }],
+    });
+    const text = readVisibleText(panel);
+    const links = collectElements(panel, Link);
 
-    expect(methodologies).toHaveLength(1);
-    expect(methodologyMarkup).toContain("Из чего складывается Radar Score");
-    expect(methodologyMarkup).toContain("Fit");
-    expect(methodologyMarkup).toContain("Intent");
-    expect(methodologyMarkup).toContain("Urgency");
-    expect(methodologyMarkup).toContain("Reachability");
-    expect(methodologyMarkup).not.toContain("<button");
+    expect(text).toContain("Сейчас пилот оформляется как заявка без списания");
+    expect(text).toContain("Оставить заявку на неделю");
+    expect(text).not.toContain("Оплата через ЮKassa");
+    expect(links.some((link) => link.props["data-analytics-event"] === LANDING_ANALYTICS_EVENT.checkoutStarted)).toBe(true);
+    expect(links.some((link) => link.props["data-analytics-event"] === LANDING_ANALYTICS_EVENT.continuationCtaClicked)).toBe(true);
+  });
+
+  it("keeps motion CSS-only, reduced-motion complete and detached from legacy landing styles", () => {
+    const css = readFileSync(resolve(process.cwd(), "app/landing/landing.module.css"), "utf8");
+    const page = readFileSync(resolve(process.cwd(), "app/home-page-content.tsx"), "utf8");
+    const layout = readFileSync(resolve(process.cwd(), "app/layout.tsx"), "utf8");
+
+    expect(css).toContain("@media (prefers-reduced-motion: reduce)");
+    expect(css).not.toContain("requestAnimationFrame");
+    expect(page).not.toContain("home-page-components.module.css");
+    expect(layout).not.toContain("landing-cinematic.css");
+    expect(layout).not.toContain("landing-cinematic-refinements.css");
   });
 });
