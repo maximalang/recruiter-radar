@@ -8,7 +8,7 @@ describe('Content Security Policy', () => {
     expect(policy).toContain("https://mc.yandex.ru");
     expect(policy).toContain("https://mc.yandex.com");
     expect(policy).toContain(
-      "connect-src 'self' https://telegram.org https://mc.yandex.ru https://mc.yandex.com wss://mc.yandex.ru",
+      "connect-src 'self' https://telegram.org https://mc.yandex.ru https://mc.yandex.com wss://mc.yandex.ru wss://mc.yandex.com",
     );
     expect(policy).not.toContain("'unsafe-eval'");
     expect(policy).not.toContain(' ws:');

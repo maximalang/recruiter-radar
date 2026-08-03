@@ -21,8 +21,8 @@ export function buildContentSecurityPolicy(environment: string | undefined): str
     ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://mc.yandex.ru https://mc.yandex.com"
     : "script-src 'self' 'unsafe-inline' https://mc.yandex.ru https://mc.yandex.com";
   const connectPolicy = isDevelopment
-    ? "connect-src 'self' ws: https://telegram.org https://mc.yandex.ru https://mc.yandex.com wss://mc.yandex.ru"
-    : "connect-src 'self' https://telegram.org https://mc.yandex.ru https://mc.yandex.com wss://mc.yandex.ru";
+    ? "connect-src 'self' ws: https://telegram.org https://mc.yandex.ru https://mc.yandex.com wss://mc.yandex.ru wss://mc.yandex.com"
+    : "connect-src 'self' https://telegram.org https://mc.yandex.ru https://mc.yandex.com wss://mc.yandex.ru wss://mc.yandex.com";
 
   return `default-src 'self'; ${scriptPolicy}; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; ${connectPolicy}; frame-ancestors 'none'`;
 }
