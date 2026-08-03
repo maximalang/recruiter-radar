@@ -22,7 +22,7 @@ describeIfDatabase('Company Events v1 PostgreSQL runtime', () => {
   let careerSignalId = ''
 
   beforeAll(async () => {
-    const organization = await database.query(
+    const organization = await database.query<{ id: string }>(
       `INSERT INTO orgs (name, domain)
        VALUES ('Company Events runtime', $1)
        RETURNING id::TEXT AS id`,
@@ -30,7 +30,13 @@ describeIfDatabase('Company Events v1 PostgreSQL runtime', () => {
     )
     organizationId = organization.rows[0].id
 
-    const signals = await database.query(
+    const signals = await database.query<{
+      id: string
+      source: string
+      sourceUrl: string
+      externalId: string
+      payload: Record<string, unknown>
+    }>(
       `INSERT INTO signals (
          org_id, signal_type, source, external_id, headline, source_url,
          occurred_at, payload
@@ -49,7 +55,7 @@ describeIfDatabase('Company Events v1 PostgreSQL runtime', () => {
         `https://company.example.invalid/${token}/career/java`,
       ],
     )
-    const evidence = await database.query(
+    const evidence = await database.query<{ id: string; source: string }>(
       `INSERT INTO evidence_items (
          org_id, source, url, fetched_at, content_hash, tier
        )
@@ -70,10 +76,15 @@ describeIfDatabase('Company Events v1 PostgreSQL runtime', () => {
     )
 
     expect(signals.rowCount).toBe(2)
-    hhSignalId = signals.rows.find((row) => row.source === 'hh').id
-    careerSignalId = signals.rows.find(
+    const hhSignal = signals.rows.find((row) => row.source === 'hh')
+    const careerSignal = signals.rows.find(
       (row) => row.source === 'career-pages',
-    ).id
+    )
+    if (!hhSignal || !careerSignal) {
+      throw new Error('Expected both Company Events runtime source records.')
+    }
+    hhSignalId = hhSignal.id
+    careerSignalId = careerSignal.id
     expect(Object.keys(evidenceBySource)).toHaveLength(2)
   })
 
@@ -169,7 +180,7 @@ describeIfDatabase('Company Events v1 PostgreSQL runtime', () => {
     )
     expect(counts.rows[0]).toEqual({ events: 1, publications: 3, evidence: 2 })
 
-    const secondOrganization = await database.query(
+    const secondOrganization = await database.query<{ id: string }>(
       `INSERT INTO orgs (name, domain)
        VALUES ('Company Events queue successor', $1)
        RETURNING id::TEXT AS id`,

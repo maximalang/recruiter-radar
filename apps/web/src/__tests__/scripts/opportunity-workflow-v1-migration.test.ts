@@ -83,6 +83,6 @@ describe('Opportunity workflow v1 migration contract', () => {
     expect(downVerifier).toContain(
       '20260801130000_add_opportunity_workflow_v1.down.sql',
     )
-    expect(downVerifier).toContain('PRE_FIXTURE_DOWN_MIGRATIONS = 10')
+    expect(downVerifier).toContain('PRE_FIXTURE_DOWN_MIGRATIONS = 11')
   })
 })
