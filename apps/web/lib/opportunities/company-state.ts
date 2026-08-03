@@ -252,7 +252,7 @@ export function buildCompanyStateSnapshot(
   const inputHash = sha256([
     COMPANY_STATE_FEATURE_VERSION,
     snapshotBucket.toISOString(),
-    ...events.map((item) => item.eventFingerprint),
+    ...events.map((item) => canonicalJson(item)),
   ])
   const observationStartedAt = events[0].occurredAt
   const observationEndedAt = [...events]

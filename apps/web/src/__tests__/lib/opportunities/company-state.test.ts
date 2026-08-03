@@ -186,6 +186,28 @@ describe('Company State v1', () => {
     }])
   })
 
+  it('changes the input hash when same-day event evidence advances', () => {
+    const original = event(1, 2)
+    const advanced = {
+      ...original,
+      evidenceIds: [...original.evidenceIds, '2001'],
+      lastSeenAt: new Date(
+        SNAPSHOT_AT.getTime() - 60 * 60 * 1000,
+      ).toISOString(),
+    }
+    const first = buildCompanyStateSnapshot([original], {
+      organizationId: '10',
+      snapshotAt: SNAPSHOT_AT,
+    })
+    const second = buildCompanyStateSnapshot([advanced], {
+      organizationId: '10',
+      snapshotAt: SNAPSHOT_AT,
+    })
+
+    expect(second.snapshot?.inputHash).not.toBe(first.snapshot?.inputHash)
+    expect(second.snapshot?.evidenceHash).not.toBe(first.snapshot?.evidenceHash)
+  })
+
   it('classifies Russian seniority and recruiting-capacity titles', () => {
     const result = buildCompanyStateSnapshot([
       ...historicalPeriods(1),

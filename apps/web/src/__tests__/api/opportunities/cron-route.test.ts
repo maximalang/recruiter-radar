@@ -13,12 +13,18 @@ jest.mock('@/lib/opportunities/company-event-job', () => ({
   normalizeCompanyEventsJob: jest.fn(),
 }))
 
+jest.mock('@/lib/opportunities/company-state-job', () => ({
+  buildCompanyStateJob: jest.fn(),
+}))
+
 import { backfillOpportunitiesJob } from '@/lib/opportunities/jobs'
 import { normalizeCompanyEventsJob } from '@/lib/opportunities/company-event-job'
+import { buildCompanyStateJob } from '@/lib/opportunities/company-state-job'
 import { GET, POST } from '@/app/api/cron/opportunities/[job]/route'
 
 const mockedBackfill = jest.mocked(backfillOpportunitiesJob)
 const mockedNormalizeCompanyEvents = jest.mocked(normalizeCompanyEventsJob)
+const mockedBuildCompanyState = jest.mocked(buildCompanyStateJob)
 
 function request(path: string, key?: string) {
   return new NextRequest(`https://recruiter-radar.ru${path}`, {
@@ -38,11 +44,13 @@ describe('opportunity cron API', () => {
   const originalKey = process.env.CRON_API_KEY
   const originalFlag = process.env.OPPORTUNITY_ENGINE_V1_ENABLED
   const originalCompanyEventsFlag = process.env.COMPANY_EVENTS_V1_ENABLED
+  const originalCompanyStateFlag = process.env.COMPANY_STATE_V1_ENABLED
 
   beforeEach(() => {
     process.env.CRON_API_KEY = testKey
     process.env.OPPORTUNITY_ENGINE_V1_ENABLED = 'true'
     process.env.COMPANY_EVENTS_V1_ENABLED = 'false'
+    process.env.COMPANY_STATE_V1_ENABLED = 'false'
     jest.clearAllMocks()
   })
 
@@ -53,6 +61,8 @@ describe('opportunity cron API', () => {
     else process.env.OPPORTUNITY_ENGINE_V1_ENABLED = originalFlag
     if (originalCompanyEventsFlag === undefined) delete process.env.COMPANY_EVENTS_V1_ENABLED
     else process.env.COMPANY_EVENTS_V1_ENABLED = originalCompanyEventsFlag
+    if (originalCompanyStateFlag === undefined) delete process.env.COMPANY_STATE_V1_ENABLED
+    else process.env.COMPANY_STATE_V1_ENABLED = originalCompanyStateFlag
   })
 
   it('fails closed for missing credentials and a disabled engine', async () => {
@@ -221,5 +231,53 @@ describe('opportunity cron API', () => {
 
     expect(response.status).toBe(400)
     expect(mockedNormalizeCompanyEvents).not.toHaveBeenCalled()
+  })
+
+  it('keeps Company State separately dark and defaults to dry-run', async () => {
+    process.env.OPPORTUNITY_ENGINE_V1_ENABLED = 'false'
+    process.env.COMPANY_EVENTS_V1_ENABLED = 'true'
+    process.env.COMPANY_STATE_V1_ENABLED = 'false'
+
+    const disabled = await POST(
+      request('/api/cron/opportunities/build-company-state', testKey),
+      { params: Promise.resolve({ job: 'build-company-state' }) },
+    )
+    expect(disabled.status).toBe(404)
+    expect(mockedBuildCompanyState).not.toHaveBeenCalled()
+
+    process.env.COMPANY_STATE_V1_ENABLED = 'true'
+    mockedBuildCompanyState.mockResolvedValue({
+      enabled: true,
+      dryRun: true,
+      scanned: 0,
+      built: 0,
+      lowHistory: 0,
+      changesDetected: 0,
+      snapshotsPersisted: 0,
+      changesPersisted: 0,
+      rejected: 0,
+      failed: 0,
+    })
+    const dryRun = await POST(
+      request('/api/cron/opportunities/build-company-state', testKey),
+      { params: Promise.resolve({ job: 'build-company-state' }) },
+    )
+    expect(dryRun.status).toBe(200)
+    expect(mockedBuildCompanyState).toHaveBeenLastCalledWith(
+      expect.objectContaining({ dryRun: true }),
+    )
+  })
+
+  it('requires explicit Company State apply scope and enforces its limit', async () => {
+    process.env.COMPANY_STATE_V1_ENABLED = 'true'
+    expect((await POST(
+      request('/api/cron/opportunities/build-company-state?apply=true', testKey),
+      { params: Promise.resolve({ job: 'build-company-state' }) },
+    )).status).toBe(400)
+    expect((await POST(
+      request('/api/cron/opportunities/build-company-state?batchSize=26', testKey),
+      { params: Promise.resolve({ job: 'build-company-state' }) },
+    )).status).toBe(400)
+    expect(mockedBuildCompanyState).not.toHaveBeenCalled()
   })
 })

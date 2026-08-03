@@ -1,9 +1,11 @@
 import {
   clampOpportunityJobBatchSize,
   clampCompanyEventsJobBatchSize,
+  clampCompanyStateJobBatchSize,
   clampOpportunityPageSize,
   clampOpportunitySnoozeDays,
   isCompanyEventsV1Enabled,
+  isCompanyStateV1Enabled,
   isAgencyDnaV1Enabled,
   isAgencyDnaV1EnabledForContext,
   isOpportunityEngineV1Enabled,
@@ -45,6 +47,19 @@ describe('opportunity engine config', () => {
     expect(clampCompanyEventsJobBatchSize(Number.NaN)).toBe(10)
     expect(clampCompanyEventsJobBatchSize(0)).toBe(1)
     expect(clampCompanyEventsJobBatchSize(26)).toBe(25)
+  })
+
+  it('keeps Company State v1 independently dark and tightly bounded', () => {
+    expect(isCompanyStateV1Enabled({})).toBe(false)
+    expect(isCompanyStateV1Enabled({ COMPANY_STATE_V1_ENABLED: '1' }))
+      .toBe(false)
+    expect(isCompanyStateV1Enabled({ COMPANY_STATE_V1_ENABLED: 'true' }))
+      .toBe(true)
+    expect(isCompanyStateV1Enabled({ COMPANY_STATE_V1_ENABLED: ' TRUE ' }))
+      .toBe(false)
+    expect(clampCompanyStateJobBatchSize(Number.NaN)).toBe(10)
+    expect(clampCompanyStateJobBatchSize(0)).toBe(1)
+    expect(clampCompanyStateJobBatchSize(26)).toBe(25)
   })
 
   it('is dark by default and only accepts an explicit true value', () => {

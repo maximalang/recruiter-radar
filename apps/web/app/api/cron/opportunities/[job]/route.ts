@@ -2,14 +2,20 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import {
   COMPANY_EVENTS_V1_LIMITS,
+  COMPANY_STATE_V1_LIMITS,
   OPPORTUNITY_ENGINE_LIMITS,
   isCompanyEventsV1Enabled,
+  isCompanyStateV1Enabled,
   isOpportunityEngineV1Enabled,
 } from '@/lib/opportunities/config'
 import {
   normalizeCompanyEventsJob,
   type CompanyEventJobOptions,
 } from '@/lib/opportunities/company-event-job'
+import {
+  buildCompanyStateJob,
+  type CompanyStateJobOptions,
+} from '@/lib/opportunities/company-state-job'
 import {
   backfillOpportunitiesJob,
   buildOpportunitiesJob,
@@ -28,9 +34,11 @@ const JOBS = new Set([
   'expire-opportunities',
   'backfill-opportunities',
   'normalize-company-events',
+  'build-company-state',
 ])
 
 const COMPANY_EVENTS_JOB = 'normalize-company-events'
+const COMPANY_STATE_JOB = 'build-company-state'
 
 export async function GET(
   request: NextRequest,
@@ -47,7 +55,7 @@ export async function GET(
     ok: true,
     job,
     enabled: true,
-    hint: 'Use POST with x-api-key. Backfill and Company Events are dry-run unless apply=true.',
+    hint: 'Use POST with x-api-key. Backfill, Company Events, and Company State are dry-run unless apply=true.',
   })
 }
 
@@ -71,7 +79,9 @@ export async function POST(
   const batchSize = positiveInteger(batchSizeValue)
   const maximumBatchSize = job === COMPANY_EVENTS_JOB
     ? COMPANY_EVENTS_V1_LIMITS.maximumJobBatchSize
-    : OPPORTUNITY_ENGINE_LIMITS.maximumJobBatchSize
+    : job === COMPANY_STATE_JOB
+      ? COMPANY_STATE_V1_LIMITS.maximumJobBatchSize
+      : OPPORTUNITY_ENGINE_LIMITS.maximumJobBatchSize
   if (
     (organizationValue !== null && organizationId === null) ||
     (batchSizeValue !== null && (
@@ -84,7 +94,7 @@ export async function POST(
     return NextResponse.json({ error: 'invalid_parameters' }, { status: 400 })
   }
   if (
-    job === COMPANY_EVENTS_JOB &&
+    (job === COMPANY_EVENTS_JOB || job === COMPANY_STATE_JOB) &&
     applyValue === 'true' &&
     organizationId === null
   ) {
@@ -108,10 +118,16 @@ export async function POST(
     ...commonOptions,
     dryRun: applyValue !== 'true',
   }
+  const companyStateOptions: CompanyStateJobOptions = {
+    ...commonOptions,
+    dryRun: applyValue !== 'true',
+  }
 
   try {
     const result = job === COMPANY_EVENTS_JOB
       ? await normalizeCompanyEventsJob(companyEventOptions)
+      : job === COMPANY_STATE_JOB
+        ? await buildCompanyStateJob(companyStateOptions)
       : job === 'detect-hiring-episodes'
       ? await detectHiringEpisodesJob(opportunityOptions)
       : job === 'build-opportunities'
@@ -132,6 +148,8 @@ export async function POST(
 function isJobEnabled(job: string): boolean {
   return job === COMPANY_EVENTS_JOB
     ? isCompanyEventsV1Enabled()
+    : job === COMPANY_STATE_JOB
+      ? isCompanyStateV1Enabled()
     : isOpportunityEngineV1Enabled()
 }
 
