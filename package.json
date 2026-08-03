@@ -166,7 +166,8 @@
     "ts-node": "^10.9.2"
   },
   "overrides": {
-    "brace-expansion": "5.0.8",
+    "brace-expansion": "5.0.9",
+    "ip-address": "10.4.0",
     "postcss": "^8.5.18",
     "sharp": "^0.35.3"
   },
@@ -197,7 +198,7 @@
     "babel-preset-jest": "^29.6.3",
     "balanced-match": "^1.0.2",
     "baseline-browser-mapping": "^2.10.32",
-    "brace-expansion": "5.0.8",
+    "brace-expansion": "5.0.9",
     "braces": "^3.0.3",
     "browserslist": "^4.28.2",
     "bs-logger": "^0.2.6",
