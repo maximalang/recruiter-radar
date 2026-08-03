@@ -21,6 +21,10 @@ const downSql = await readFile(
   resolve(migrations, '20260803120000_add_company_events_v1.down.sql'),
   'utf8',
 )
+const companyStateDownSql = await readFile(
+  resolve(migrations, '20260804100000_add_company_state_v1.down.sql'),
+  'utf8',
+)
 assert.ok(
   downSql.indexOf('LOCK TABLE company_events IN ACCESS EXCLUSIVE MODE') > -1 &&
   downSql.indexOf('LOCK TABLE company_events IN ACCESS EXCLUSIVE MODE') <
@@ -272,12 +276,14 @@ try {
   )
   await database.query('ROLLBACK')
   await database.query('TRUNCATE TABLE company_events CASCADE')
+  await database.query(companyStateDownSql)
   await database.query(downSql)
 
   const removed = await database.query(
     `SELECT TO_REGCLASS('public.company_events') AS events,
             TO_REGCLASS('public.company_event_publications') AS publications,
             TO_REGCLASS('public.company_event_evidence') AS evidence,
+            TO_REGCLASS('public.company_state_snapshots') AS "stateSnapshots",
             TO_REGCLASS('public.signals_company_events_job_posting_idx')
               AS "signalIndex",
             TO_REGCLASS('public.evidence_items_company_events_url_idx')
@@ -287,6 +293,7 @@ try {
     events: null,
     publications: null,
     evidence: null,
+    stateSnapshots: null,
     signalIndex: null,
     evidenceIndex: null,
   })
@@ -303,6 +310,7 @@ try {
       'event_evidence_monotonic',
       'publication_append_only',
       'rollback_refuses_data_loss',
+      'dependent_company_state_rolls_back_first',
       'rollback_locks_before_empty_check',
       'rollback_removes_schema_when_empty',
     ],
