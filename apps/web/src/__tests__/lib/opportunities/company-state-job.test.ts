@@ -17,7 +17,28 @@ const NOW = new Date('2026-08-04T12:00:00.000Z')
 function queryResult<Row extends Record<string, unknown>>(
   rows: Row[] = [],
 ): QueryResult<Row> {
-  return { command: '', rowCount: rows.length, oid: 0, fields: [], rows }
+  return { rowCount: rows.length, rows }
+}
+
+type JobQueryImplementation = (
+  sql: string,
+  values?: readonly unknown[],
+) => Promise<QueryResult<Record<string, unknown>>>
+
+function createJobDb(
+  implementation: JobQueryImplementation = async () => queryResult(),
+): { db: CompanyStateJobDb; query: jest.Mock } {
+  const query = jest.fn(implementation)
+  return {
+    db: {
+      query: <Row = Record<string, unknown>>(
+        sql: string,
+        values?: readonly unknown[],
+      ) => query(sql, values) as Promise<QueryResult<Row>>,
+      release: jest.fn(),
+    },
+    query,
+  }
 }
 
 function eventRow(organizationId = '10') {
@@ -48,38 +69,37 @@ describe('Company State job', () => {
   })
 
   it('stays dark unless the phase-specific flag is exactly true', async () => {
-    const db: CompanyStateJobDb = { query: jest.fn() }
+    const { db, query } = createJobDb()
     await expect(buildCompanyStateJob({ env: {} }, db)).resolves.toMatchObject({
       enabled: false,
       scanned: 0,
       snapshotsPersisted: 0,
     })
-    expect(db.query).not.toHaveBeenCalled()
+    expect(query).not.toHaveBeenCalled()
   })
 
   it('requires one explicit organization before apply mode', async () => {
+    const { db } = createJobDb()
     await expect(buildCompanyStateJob({
       env: { COMPANY_STATE_V1_ENABLED: 'true' },
       dryRun: false,
-    }, { query: jest.fn() })).rejects.toBeInstanceOf(
+    }, db)).rejects.toBeInstanceOf(
       CompanyStateApplyScopeRequiredError,
     )
   })
 
   it('defaults to dry-run and builds only bounded Company Event input', async () => {
-    const statements: Array<{ sql: string; values?: unknown[] }> = []
-    const db: CompanyStateJobDb = {
-      query: jest.fn(async (sql, values) => {
-        statements.push({ sql, values })
-        if (sql.includes('SELECT event.organization_id')) {
-          return queryResult([{ organizationId: '10' }])
-        }
-        if (sql.includes('FROM company_events event')) {
-          return queryResult([eventRow()])
-        }
-        return queryResult()
-      }),
-    }
+    const statements: Array<{ sql: string; values?: readonly unknown[] }> = []
+    const { db } = createJobDb(async (sql, values) => {
+      statements.push({ sql, values })
+      if (sql.includes('SELECT event.organization_id')) {
+        return queryResult([{ organizationId: '10' }])
+      }
+      if (sql.includes('FROM company_events event')) {
+        return queryResult([eventRow()])
+      }
+      return queryResult()
+    })
 
     await expect(buildCompanyStateJob({
       env: { COMPANY_STATE_V1_ENABLED: 'true' },
@@ -103,21 +123,19 @@ describe('Company State job', () => {
   })
 
   it('persists only in explicit apply mode and isolates organization failures', async () => {
-    const db: CompanyStateJobDb = {
-      query: jest.fn(async (sql, values) => {
-        if (sql.includes('SELECT event.organization_id')) {
-          return queryResult([
-            { organizationId: '10' },
-            { organizationId: '20' },
-          ])
-        }
-        if (sql.includes('FROM company_events event')) {
-          if (values?.[0] === '10') throw new Error('poison organization')
-          return queryResult([eventRow('20')])
-        }
-        return queryResult()
-      }),
-    }
+    const { db } = createJobDb(async (sql, values) => {
+      if (sql.includes('SELECT event.organization_id')) {
+        return queryResult([
+          { organizationId: '10' },
+          { organizationId: '20' },
+        ])
+      }
+      if (sql.includes('FROM company_events event')) {
+        if (values?.[0] === '10') throw new Error('poison organization')
+        return queryResult([eventRow('20')])
+      }
+      return queryResult()
+    })
 
     await expect(buildCompanyStateJob({
       env: { COMPANY_STATE_V1_ENABLED: 'true' },
@@ -140,15 +158,13 @@ describe('Company State job', () => {
       eventFingerprint: (index + 1).toString(16).padStart(64, '0'),
       evidenceIds: [String(index + 101)],
     }))
-    const db: CompanyStateJobDb = {
-      query: jest.fn(async (sql) => {
-        if (sql.includes('SELECT event.organization_id')) {
-          return queryResult([{ organizationId: '10' }])
-        }
-        if (sql.includes('FROM company_events event')) return queryResult(rows)
-        return queryResult()
-      }),
-    }
+    const { db } = createJobDb(async (sql) => {
+      if (sql.includes('SELECT event.organization_id')) {
+        return queryResult([{ organizationId: '10' }])
+      }
+      if (sql.includes('FROM company_events event')) return queryResult(rows)
+      return queryResult()
+    })
 
     await expect(buildCompanyStateJob({
       env: { COMPANY_STATE_V1_ENABLED: 'true' },

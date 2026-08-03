@@ -14,12 +14,26 @@ function queryResult<Row extends Record<string, unknown>>(
   rows: Row[] = [],
   rowCount = rows.length,
 ): QueryResult<Row> {
+  return { rowCount, rows }
+}
+
+type RepositoryQueryImplementation = (
+  sql: string,
+  values?: unknown[],
+) => Promise<QueryResult<Record<string, unknown>>>
+
+function createRepositoryDb(
+  implementation: RepositoryQueryImplementation = async () => queryResult(),
+): { db: CompanyStateDb; query: jest.Mock } {
+  const query = jest.fn(implementation)
   return {
-    command: '',
-    rowCount,
-    oid: 0,
-    fields: [],
-    rows,
+    db: {
+      query: <Row extends Record<string, unknown> = Record<string, unknown>>(
+        sql: string,
+        values?: unknown[],
+      ) => query(sql, values) as Promise<QueryResult<Row>>,
+    },
+    query,
   }
 }
 
@@ -96,26 +110,24 @@ function buildResult(): CompanyStateBuildResult {
 describe('Company State repository', () => {
   it('persists one atomic snapshot, change, and relational provenance', async () => {
     const statements: string[] = []
-    const db: CompanyStateDb = {
-      query: jest.fn(async (sql) => {
-        statements.push(sql)
-        if (sql.includes('INSERT INTO company_state_snapshots')) {
-          return queryResult([{ id: '501' }])
-        }
-        if (sql.includes('INSERT INTO company_state_changes')) {
-          return queryResult([{ id: '601' }])
-        }
-        if (
-          sql.includes('INSERT INTO company_state_snapshot_events') ||
-          sql.includes('INSERT INTO company_state_snapshot_evidence') ||
-          sql.includes('INSERT INTO company_state_change_events') ||
-          sql.includes('INSERT INTO company_state_change_evidence')
-        ) {
-          return queryResult([], 2)
-        }
-        return queryResult()
-      }),
-    }
+    const { db } = createRepositoryDb(async (sql) => {
+      statements.push(sql)
+      if (sql.includes('INSERT INTO company_state_snapshots')) {
+        return queryResult([{ id: '501' }])
+      }
+      if (sql.includes('INSERT INTO company_state_changes')) {
+        return queryResult([{ id: '601' }])
+      }
+      if (
+        sql.includes('INSERT INTO company_state_snapshot_events') ||
+        sql.includes('INSERT INTO company_state_snapshot_evidence') ||
+        sql.includes('INSERT INTO company_state_change_events') ||
+        sql.includes('INSERT INTO company_state_change_evidence')
+      ) {
+        return queryResult([], 2)
+      }
+      return queryResult()
+    })
 
     await expect(persistCompanyStateBuild(buildResult(), db)).resolves.toEqual({
       snapshotId: '501',
@@ -136,23 +148,21 @@ describe('Company State repository', () => {
   })
 
   it('reconciles deterministic replay to the existing snapshot and change', async () => {
-    const db: CompanyStateDb = {
-      query: jest.fn(async (sql) => {
-        if (sql.includes('INSERT INTO company_state_snapshots')) {
-          return queryResult([], 0)
-        }
-        if (sql.includes('FROM company_state_snapshots')) {
-          return queryResult([{ id: '501', organizationId: '10' }])
-        }
-        if (sql.includes('INSERT INTO company_state_changes')) {
-          return queryResult([], 0)
-        }
-        if (sql.includes('FROM company_state_changes')) {
-          return queryResult([{ id: '601', snapshotId: '501' }])
-        }
-        return queryResult([], sql.includes('INSERT INTO') ? 0 : 0)
-      }),
-    }
+    const { db } = createRepositoryDb(async (sql) => {
+      if (sql.includes('INSERT INTO company_state_snapshots')) {
+        return queryResult([], 0)
+      }
+      if (sql.includes('FROM company_state_snapshots')) {
+        return queryResult([{ id: '501', organizationId: '10' }])
+      }
+      if (sql.includes('INSERT INTO company_state_changes')) {
+        return queryResult([], 0)
+      }
+      if (sql.includes('FROM company_state_changes')) {
+        return queryResult([{ id: '601', snapshotId: '501' }])
+      }
+      return queryResult([], sql.includes('INSERT INTO') ? 0 : 0)
+    })
 
     await expect(persistCompanyStateBuild(buildResult(), db)).resolves.toEqual({
       snapshotId: '501',
@@ -166,28 +176,26 @@ describe('Company State repository', () => {
   it('rejects change provenance that is outside its snapshot', async () => {
     const result = buildResult()
     result.changes[0].eventIds = ['999']
-    const db: CompanyStateDb = { query: jest.fn() }
+    const { db, query } = createRepositoryDb()
 
     await expect(persistCompanyStateBuild(result, db)).rejects.toBeInstanceOf(
       CompanyStateProvenanceError,
     )
-    expect(db.query).not.toHaveBeenCalled()
+    expect(query).not.toHaveBeenCalled()
   })
 
   it('rolls back the whole organization when provenance persistence fails', async () => {
     const statements: string[] = []
-    const db: CompanyStateDb = {
-      query: jest.fn(async (sql) => {
-        statements.push(sql)
-        if (sql.includes('INSERT INTO company_state_snapshots')) {
-          return queryResult([{ id: '501' }])
-        }
-        if (sql.includes('INSERT INTO company_state_snapshot_evidence')) {
-          throw new Error('tenant evidence mismatch')
-        }
-        return queryResult()
-      }),
-    }
+    const { db } = createRepositoryDb(async (sql) => {
+      statements.push(sql)
+      if (sql.includes('INSERT INTO company_state_snapshots')) {
+        return queryResult([{ id: '501' }])
+      }
+      if (sql.includes('INSERT INTO company_state_snapshot_evidence')) {
+        throw new Error('tenant evidence mismatch')
+      }
+      return queryResult()
+    })
 
     await expect(persistCompanyStateBuild(buildResult(), db)).rejects.toThrow(
       'tenant evidence mismatch',
@@ -197,7 +205,7 @@ describe('Company State repository', () => {
   })
 
   it('does nothing when there is no evidence-backed snapshot', async () => {
-    const db: CompanyStateDb = { query: jest.fn() }
+    const { db, query } = createRepositoryDb()
     await expect(persistCompanyStateBuild({
       snapshot: null,
       changes: [],
@@ -209,6 +217,6 @@ describe('Company State repository', () => {
       eventsAttached: 0,
       evidenceAttached: 0,
     })
-    expect(db.query).not.toHaveBeenCalled()
+    expect(query).not.toHaveBeenCalled()
   })
 })
