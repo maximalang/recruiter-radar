@@ -9,10 +9,16 @@ jest.mock('@/lib/opportunities/jobs', () => ({
   backfillOpportunitiesJob: jest.fn(),
 }))
 
+jest.mock('@/lib/opportunities/company-event-job', () => ({
+  normalizeCompanyEventsJob: jest.fn(),
+}))
+
 import { backfillOpportunitiesJob } from '@/lib/opportunities/jobs'
+import { normalizeCompanyEventsJob } from '@/lib/opportunities/company-event-job'
 import { GET, POST } from '@/app/api/cron/opportunities/[job]/route'
 
 const mockedBackfill = jest.mocked(backfillOpportunitiesJob)
+const mockedNormalizeCompanyEvents = jest.mocked(normalizeCompanyEventsJob)
 
 function request(path: string, key?: string) {
   return new NextRequest(`https://recruiter-radar.ru${path}`, {
@@ -31,10 +37,12 @@ describe('opportunity cron API', () => {
   const testKey = ['test', 'opportunity', 'cron', 'key'].join('-')
   const originalKey = process.env.CRON_API_KEY
   const originalFlag = process.env.OPPORTUNITY_ENGINE_V1_ENABLED
+  const originalCompanyEventsFlag = process.env.COMPANY_EVENTS_V1_ENABLED
 
   beforeEach(() => {
     process.env.CRON_API_KEY = testKey
     process.env.OPPORTUNITY_ENGINE_V1_ENABLED = 'true'
+    process.env.COMPANY_EVENTS_V1_ENABLED = 'false'
     jest.clearAllMocks()
   })
 
@@ -43,6 +51,8 @@ describe('opportunity cron API', () => {
     else process.env.CRON_API_KEY = originalKey
     if (originalFlag === undefined) delete process.env.OPPORTUNITY_ENGINE_V1_ENABLED
     else process.env.OPPORTUNITY_ENGINE_V1_ENABLED = originalFlag
+    if (originalCompanyEventsFlag === undefined) delete process.env.COMPANY_EVENTS_V1_ENABLED
+    else process.env.COMPANY_EVENTS_V1_ENABLED = originalCompanyEventsFlag
   })
 
   it('fails closed for missing credentials and a disabled engine', async () => {
@@ -121,5 +131,95 @@ describe('opportunity cron API', () => {
 
     expect(response.status).toBe(400)
     expect(mockedBackfill).not.toHaveBeenCalled()
+  })
+
+  it('keeps Company Events separately fail-closed from the Opportunity Engine', async () => {
+    process.env.OPPORTUNITY_ENGINE_V1_ENABLED = 'true'
+    process.env.COMPANY_EVENTS_V1_ENABLED = 'false'
+
+    const disabledCompanyEvents = await POST(
+      request('/api/cron/opportunities/normalize-company-events', testKey),
+      { params: Promise.resolve({ job: 'normalize-company-events' }) },
+    )
+    expect(disabledCompanyEvents.status).toBe(404)
+    expect(mockedNormalizeCompanyEvents).not.toHaveBeenCalled()
+
+    process.env.OPPORTUNITY_ENGINE_V1_ENABLED = 'false'
+    process.env.COMPANY_EVENTS_V1_ENABLED = 'true'
+    const disabledOpportunityEngine = await POST(
+      request('/api/cron/opportunities/backfill-opportunities', testKey),
+      { params: Promise.resolve({ job: 'backfill-opportunities' }) },
+    )
+    expect(disabledOpportunityEngine.status).toBe(404)
+    expect(mockedBackfill).not.toHaveBeenCalled()
+  })
+
+  it('requires apply=true before the Company Events job can persist', async () => {
+    process.env.OPPORTUNITY_ENGINE_V1_ENABLED = 'false'
+    process.env.COMPANY_EVENTS_V1_ENABLED = 'true'
+    mockedNormalizeCompanyEvents.mockResolvedValue({
+      enabled: true,
+      dryRun: true,
+      scanned: 0,
+      normalized: 0,
+      rejected: 0,
+      persisted: 0,
+      publicationsAttached: 0,
+      evidenceAttached: 0,
+      failed: 0,
+    })
+
+    const dryRun = await POST(
+      request('/api/cron/opportunities/normalize-company-events', testKey),
+      { params: Promise.resolve({ job: 'normalize-company-events' }) },
+    )
+    expect(dryRun.status).toBe(200)
+    expect(mockedNormalizeCompanyEvents).toHaveBeenLastCalledWith(expect.objectContaining({
+      dryRun: true,
+    }))
+
+    await POST(
+      request(
+        '/api/cron/opportunities/normalize-company-events?apply=true&organization=10',
+        testKey,
+      ),
+      { params: Promise.resolve({ job: 'normalize-company-events' }) },
+    )
+    expect(mockedNormalizeCompanyEvents).toHaveBeenLastCalledWith(expect.objectContaining({
+      dryRun: false,
+    }))
+  })
+
+  it('requires one explicit organization for Company Events writes', async () => {
+    process.env.COMPANY_EVENTS_V1_ENABLED = 'true'
+
+    const response = await POST(
+      request(
+        '/api/cron/opportunities/normalize-company-events?apply=true',
+        testKey,
+      ),
+      { params: Promise.resolve({ job: 'normalize-company-events' }) },
+    )
+
+    expect(response.status).toBe(400)
+    expect(await response.json()).toMatchObject({
+      error: 'organization_required_for_apply',
+    })
+    expect(mockedNormalizeCompanyEvents).not.toHaveBeenCalled()
+  })
+
+  it('rejects Company Events batches above its smaller safety limit', async () => {
+    process.env.COMPANY_EVENTS_V1_ENABLED = 'true'
+
+    const response = await POST(
+      request(
+        '/api/cron/opportunities/normalize-company-events?batchSize=26',
+        testKey,
+      ),
+      { params: Promise.resolve({ job: 'normalize-company-events' }) },
+    )
+
+    expect(response.status).toBe(400)
+    expect(mockedNormalizeCompanyEvents).not.toHaveBeenCalled()
   })
 })

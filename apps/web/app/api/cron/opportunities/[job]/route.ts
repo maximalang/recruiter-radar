@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import {
+  COMPANY_EVENTS_V1_LIMITS,
   OPPORTUNITY_ENGINE_LIMITS,
+  isCompanyEventsV1Enabled,
   isOpportunityEngineV1Enabled,
 } from '@/lib/opportunities/config'
+import {
+  normalizeCompanyEventsJob,
+  type CompanyEventJobOptions,
+} from '@/lib/opportunities/company-event-job'
 import {
   backfillOpportunitiesJob,
   buildOpportunitiesJob,
@@ -21,27 +27,27 @@ const JOBS = new Set([
   'build-opportunities',
   'expire-opportunities',
   'backfill-opportunities',
+  'normalize-company-events',
 ])
+
+const COMPANY_EVENTS_JOB = 'normalize-company-events'
 
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ job: string }> },
 ) {
-  if (!isOpportunityEngineV1Enabled()) {
+  const { job } = await context.params
+  if (!JOBS.has(job) || !isJobEnabled(job)) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 })
   }
   const authError = authorizeCron(request)
   if (authError) return authError
 
-  const { job } = await context.params
-  if (!JOBS.has(job)) {
-    return NextResponse.json({ error: 'not_found' }, { status: 404 })
-  }
   return NextResponse.json({
     ok: true,
     job,
-    enabled: isOpportunityEngineV1Enabled(),
-    hint: 'Use POST with x-api-key. Backfill is dry-run unless apply=true.',
+    enabled: true,
+    hint: 'Use POST with x-api-key. Backfill and Company Events are dry-run unless apply=true.',
   })
 }
 
@@ -49,16 +55,13 @@ export async function POST(
   request: NextRequest,
   context: { params: Promise<{ job: string }> },
 ) {
-  if (!isOpportunityEngineV1Enabled()) {
+  const { job } = await context.params
+  if (!JOBS.has(job) || !isJobEnabled(job)) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 })
   }
   const authError = authorizeCron(request)
   if (authError) return authError
 
-  const { job } = await context.params
-  if (!JOBS.has(job)) {
-    return NextResponse.json({ error: 'not_found' }, { status: 404 })
-  }
   const params = request.nextUrl.searchParams
   const organizationValue = params.get('organization')
   const batchSizeValue = params.get('batchSize')
@@ -66,34 +69,56 @@ export async function POST(
   const applyValue = params.get('apply')
   const organizationId = positiveId(organizationValue)
   const batchSize = positiveInteger(batchSizeValue)
+  const maximumBatchSize = job === COMPANY_EVENTS_JOB
+    ? COMPANY_EVENTS_V1_LIMITS.maximumJobBatchSize
+    : OPPORTUNITY_ENGINE_LIMITS.maximumJobBatchSize
   if (
     (organizationValue !== null && organizationId === null) ||
     (batchSizeValue !== null && (
       batchSize === null ||
-      batchSize > OPPORTUNITY_ENGINE_LIMITS.maximumJobBatchSize
+      batchSize > maximumBatchSize
     )) ||
     (dryRunValue !== null && dryRunValue !== 'true' && dryRunValue !== 'false') ||
     (applyValue !== null && applyValue !== 'true' && applyValue !== 'false')
   ) {
     return NextResponse.json({ error: 'invalid_parameters' }, { status: 400 })
   }
-  const options: OpportunityJobOptions = {
+  if (
+    job === COMPANY_EVENTS_JOB &&
+    applyValue === 'true' &&
+    organizationId === null
+  ) {
+    return NextResponse.json(
+      { error: 'organization_required_for_apply' },
+      { status: 400 },
+    )
+  }
+  const commonOptions = {
     enabled: true,
     organizationId,
     batchSize: batchSize ?? undefined,
+  }
+  const opportunityOptions: OpportunityJobOptions = {
+    ...commonOptions,
     dryRun: job === 'backfill-opportunities'
       ? applyValue !== 'true'
       : dryRunValue === 'true',
   }
+  const companyEventOptions: CompanyEventJobOptions = {
+    ...commonOptions,
+    dryRun: applyValue !== 'true',
+  }
 
   try {
-    const result = job === 'detect-hiring-episodes'
-      ? await detectHiringEpisodesJob(options)
+    const result = job === COMPANY_EVENTS_JOB
+      ? await normalizeCompanyEventsJob(companyEventOptions)
+      : job === 'detect-hiring-episodes'
+      ? await detectHiringEpisodesJob(opportunityOptions)
       : job === 'build-opportunities'
-        ? await buildOpportunitiesJob(options)
+        ? await buildOpportunitiesJob(opportunityOptions)
         : job === 'expire-opportunities'
-          ? await expireOpportunitiesJob(options)
-          : await backfillOpportunitiesJob(options)
+          ? await expireOpportunitiesJob(opportunityOptions)
+          : await backfillOpportunitiesJob(opportunityOptions)
     return NextResponse.json({ success: true, job, result })
   } catch (error) {
     logError('opportunity.cron.failed', error, { job })
@@ -102,6 +127,12 @@ export async function POST(
       { status: 500 },
     )
   }
+}
+
+function isJobEnabled(job: string): boolean {
+  return job === COMPANY_EVENTS_JOB
+    ? isCompanyEventsV1Enabled()
+    : isOpportunityEngineV1Enabled()
 }
 
 function authorizeCron(request: NextRequest): NextResponse | null {
