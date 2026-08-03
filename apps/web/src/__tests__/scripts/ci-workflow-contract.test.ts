@@ -24,6 +24,7 @@ describe('pull request CI workflow contract', () => {
     ]) {
       expect(workflow).toContain(job)
     }
+    expect(workflow).toContain('npm run test:company-events-v1:db')
   })
 
   it('runs landing and responsive browser audits and retains failure artifacts', () => {
