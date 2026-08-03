@@ -293,6 +293,7 @@ Correction capability вычисляется сервером по полной 
 
 | Flag | Current behavior |
 | --- | --- |
+| `COMPANY_EVENTS_V1_ENABLED` | Включает аддитивную Phase 1 нормализацию Company Events только при точном `true`; по умолчанию `false`, downstream readers не переключает |
 | `OPPORTUNITY_ENGINE_V1_ENABLED` | Включает engine/API/jobs только при точном `true` |
 | `OPPORTUNITY_OUTCOMES_ENABLED` | Включает ledger API только при точном `true` |
 | `OPPORTUNITY_OUTCOMES_UI_ENABLED` | Включает Outcome UI только вместе с ledger и при точном `true` |
