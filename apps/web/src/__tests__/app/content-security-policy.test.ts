@@ -6,6 +6,10 @@ describe('Content Security Policy', () => {
 
     expect(policy).toContain("script-src 'self' 'unsafe-inline'");
     expect(policy).toContain("https://mc.yandex.ru");
+    expect(policy).toContain("https://mc.yandex.com");
+    expect(policy).toContain(
+      "connect-src 'self' https://telegram.org https://mc.yandex.ru https://mc.yandex.com wss://mc.yandex.ru",
+    );
     expect(policy).not.toContain("'unsafe-eval'");
     expect(policy).not.toContain(' ws:');
   });
