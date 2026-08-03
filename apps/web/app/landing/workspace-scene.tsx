@@ -13,6 +13,7 @@ import {
 import LandingPreviewInteractions from "../landing-preview-interactions";
 import PreviewGeneratedEvent from "../preview-generated-event";
 import ConversionPanel from "./conversion-panel";
+import { ArrowGlyph } from "./brand-glyphs";
 import WorkspaceLead from "./workspace-lead";
 import styles from "./landing.module.css";
 
@@ -149,7 +150,7 @@ export default async function WorkspaceScene(props: {
             data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.preview}
           >
-            {previewState.items.length > 0 ? "Получать такой радар каждое утро" : "Попробовать неделю"} <span aria-hidden="true">↗</span>
+            {previewState.items.length > 0 ? "Получать такой радар каждое утро" : "Попробовать неделю"} <ArrowGlyph />
           </Link>
         </div>
 

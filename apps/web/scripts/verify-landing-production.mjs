@@ -10,7 +10,10 @@ const screenshotDirectory = process.env.LANDING_SCREENSHOT_DIR
   ?? path.join(os.tmpdir(), "recruiter-radar-signal-lock");
 
 const viewportMatrix = [
+  { width: 320, height: 720, name: "mobile-320x720" },
   { width: 390, height: 844, name: "mobile-390x844" },
+  { width: 768, height: 1024, name: "tablet-768x1024" },
+  { width: 1024, height: 768, name: "desktop-1024x768" },
   { width: 1280, height: 800, name: "desktop-1280x800" },
   { width: 1440, height: 1000, name: "desktop-1440x1000" },
 ];
@@ -101,7 +104,7 @@ try {
     });
     const page = await openLanding(context, viewport.name);
 
-    if (viewport.width === 390) {
+    if (viewport.width <= 390) {
       const touchTargets = await page.locator("a, button, summary").evaluateAll((elements) =>
         elements
           .filter((element) => {
@@ -119,6 +122,20 @@ try {
 
     await context.close();
   }
+
+  const keyboardContext = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const keyboardPage = await keyboardContext.newPage();
+  await keyboardPage.route("**/api/landing-events", (route) => route.fulfill({ status: 204 }));
+  await keyboardPage.goto(baseUrl, { waitUntil: "networkidle" });
+  await keyboardPage.keyboard.press("Tab");
+  const skipLink = keyboardPage.getByRole("link", { name: "Перейти к содержанию" });
+  await skipLink.waitFor();
+  assert.ok(await skipLink.evaluate((element) => element === document.activeElement), "keyboard: skip link is not the first focus target");
+  const skipLinkBox = await skipLink.boundingBox();
+  assert.ok(skipLinkBox && skipLinkBox.y >= 0, "keyboard: focused skip link remains off-screen");
+  await keyboardPage.keyboard.press("Enter");
+  assert.equal(new URL(keyboardPage.url()).hash, "#main-content", "keyboard: skip link did not move to main content");
+  await keyboardContext.close();
 
   const interactionContext = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const interactionPage = await interactionContext.newPage();

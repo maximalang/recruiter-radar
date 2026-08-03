@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { LANDING_ANALYTICS_CONTEXT, LANDING_ANALYTICS_EVENT } from "../../lib/landing-analytics-contract";
 import { DEMO_COMPANY } from "./landing-copy";
-import { RadarField, SignalGlyph } from "./brand-glyphs";
+import { ArrowGlyph, RadarField, SignalGlyph } from "./brand-glyphs";
 import styles from "./landing.module.css";
 
 export default function DetectionScene({ previewHref }: { previewHref: string }) {
@@ -31,7 +31,7 @@ export default function DetectionScene({ previewHref }: { previewHref: string })
             data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroPrimary}
           >
-            Собрать мой радар <span aria-hidden="true">↗</span>
+            Собрать мой радар <ArrowGlyph />
           </a>
           <a
             href="#scene-evidence"
@@ -39,7 +39,7 @@ export default function DetectionScene({ previewHref }: { previewHref: string })
             data-analytics-event={LANDING_ANALYTICS_EVENT.previewResultsClicked}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroSecondary}
           >
-            Разобрать один сигнал <span aria-hidden="true">↓</span>
+            Разобрать один сигнал <ArrowGlyph className={styles.downArrow} />
           </a>
         </div>
         <p className={styles.microcopy}>Пилот на 7 дней · без автопродления</p>
@@ -52,12 +52,12 @@ export default function DetectionScene({ previewHref }: { previewHref: string })
           <strong>{DEMO_COMPANY.signal}</strong>
           <span>{DEMO_COMPANY.name} · {DEMO_COMPANY.location}</span>
         </div>
-        <Link href="#scene-timeline" className={styles.lockArrow} aria-label="Разобрать сигнал компании">↘</Link>
+        <Link href="#scene-timeline" className={styles.lockArrow} aria-label="Разобрать сигнал компании"><ArrowGlyph className={styles.diagonalArrow} size={20} /></Link>
       </div>
 
       <div className={styles.detectionFooter}>
         <span>Сигнал → Доказательство → Действие</span>
-        <a href="#scene-timeline">Прокрутите, чтобы разобрать возможность <span aria-hidden="true">↓</span></a>
+        <a href="#scene-timeline">Прокрутите, чтобы разобрать возможность <ArrowGlyph className={styles.downArrow} /></a>
       </div>
     </section>
   );

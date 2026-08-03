@@ -1,5 +1,5 @@
 import { DEMO_COMPANY, DEMO_EVIDENCE } from "./landing-copy";
-import { EvidenceGlyph } from "./brand-glyphs";
+import { ArrowGlyph, DocumentGlyph, EvidenceGlyph } from "./brand-glyphs";
 import styles from "./landing.module.css";
 
 const SOURCE_ROWS = [
@@ -74,7 +74,10 @@ export default function EvidenceScene() {
                 <span>{row.discovered}</span>
                 <span>{row.eventDate}</span>
                 <span className={styles.ledgerConfidence}>{row.confidence}</span>
-                <a href="#scene-workspace" aria-label={`Открыть ${row.source} в рабочем радаре`}>↗</a>
+                <a href="#scene-workspace" aria-label={`Открыть ${row.source} в рабочем радаре`}>
+                  <DocumentGlyph size={16} />
+                  <ArrowGlyph size={14} />
+                </a>
               </li>
             ))}
           </ul>

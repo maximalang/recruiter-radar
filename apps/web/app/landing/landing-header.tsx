@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { LANDING_ANALYTICS_CONTEXT, LANDING_ANALYTICS_EVENT } from "../../lib/landing-analytics-contract";
 import { BrandLogo } from "../ui/brand-logo";
+import { ArrowGlyph } from "./brand-glyphs";
 import { LANDING_SCENES } from "./landing-copy";
 import styles from "./landing.module.css";
 
@@ -27,7 +28,7 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
           data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
           data-analytics-context={LANDING_ANALYTICS_CONTEXT.header}
         >
-          Собрать радар <span aria-hidden="true">↗</span>
+          Собрать радар <ArrowGlyph />
         </a>
       </div>
     </header>

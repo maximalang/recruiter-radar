@@ -9,6 +9,7 @@ import {
   formatVacancyFreshness,
   pickEvidenceTitles,
 } from "../home-page-components";
+import { ArrowGlyph, RouteGlyph } from "./brand-glyphs";
 import styles from "./landing.module.css";
 
 type PreviewItem = Awaited<ReturnType<typeof getPublicSampleDigestState>>["items"][number];
@@ -43,7 +44,7 @@ export default function WorkspaceLead({ item, defaultOpen }: { item: PreviewItem
         <span className={styles.workspaceCompany}><strong>{employerName}</strong><small>{[location, vacanciesCaption].filter(Boolean).join(" · ")}</small></span>
         <span className={styles.workspaceSignal}>{whyNow}</span>
         <span className={styles.workspaceScore}><strong>{points}</strong><small>/100</small></span>
-        <span aria-hidden="true">↓</span>
+        <span className={styles.leadChevron} aria-hidden="true"><ArrowGlyph size={16} /></span>
       </summary>
       <div className={styles.workspaceLeadBody}>
         <div className={styles.workspaceProof}>
@@ -62,7 +63,7 @@ export default function WorkspaceLead({ item, defaultOpen }: { item: PreviewItem
         </div>
         <div className={styles.workspaceEvidence}>
           <span>Факты и источники</span>
-          <ul>{evidence.map((fact) => <li key={fact}>{fact}</li>)}</ul>
+          <ul>{evidence.map((fact) => <li key={fact}><RouteGlyph size={14} />{fact}</li>)}</ul>
         </div>
         <div className={styles.workspaceLeadFooter}>
           <span>Сила сигнала {score}/100 · уровень доверия {item.confidence_gate ?? "требует проверки"}</span>

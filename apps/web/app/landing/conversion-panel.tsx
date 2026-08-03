@@ -9,6 +9,7 @@ import {
   buildCheckoutHref,
   type PublicPreviewInput,
 } from "../../lib/publicProduct";
+import { ArrowGlyph, PlusGlyph } from "./brand-glyphs";
 import styles from "./landing.module.css";
 
 export default function ConversionPanel(props: {
@@ -43,14 +44,14 @@ export default function ConversionPanel(props: {
           </div>
           <p>{pilotPlan.description}</p>
           <ul>
-            {pilotPlan.bullets.slice(0, 4).map((bullet) => <li key={bullet}>{bullet}</li>)}
+            {pilotPlan.bullets.slice(0, 4).map((bullet) => <li key={bullet}><ArrowGlyph size={14} />{bullet}</li>)}
           </ul>
           <Link
             href={buildCheckoutHref({ ...props.previewInput, planCode: pilotPlan.code })}
             data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.pricingPilot}
           >
-            {props.paymentConfigured ? pilotPlan.ctaLabel : "Оставить заявку на неделю"} <span aria-hidden="true">↗</span>
+            {props.paymentConfigured ? pilotPlan.ctaLabel : "Оставить заявку на неделю"} <ArrowGlyph />
           </Link>
           <small>{props.paymentConfigured ? "Разовая оплата · без автопродления" : "Заявка без списания · профиль сохранится"}</small>
         </div>
@@ -68,7 +69,7 @@ export default function ConversionPanel(props: {
                   data-analytics-event={LANDING_ANALYTICS_EVENT.continuationCtaClicked}
                   data-analytics-context={quarterly ? LANDING_ANALYTICS_CONTEXT.quarterly : LANDING_ANALYTICS_CONTEXT.monthly}
                 >
-                  {plan.ctaLabel} <span aria-hidden="true">↗</span>
+                  {plan.ctaLabel} <ArrowGlyph />
                 </Link>
               </article>
             );
@@ -84,7 +85,7 @@ export default function ConversionPanel(props: {
         <div className={styles.faqList}>
           {props.faqItems.map((item, index) => (
             <details key={item.question} data-analytics-event={LANDING_ANALYTICS_EVENT.faqOpened}>
-              <summary><span>{String(index + 1).padStart(2, "0")}</span>{item.question}<i aria-hidden="true">＋</i></summary>
+              <summary><span>{String(index + 1).padStart(2, "0")}</span>{item.question}<i aria-hidden="true"><PlusGlyph /></i></summary>
               <p>{item.answer}</p>
             </details>
           ))}
@@ -101,9 +102,9 @@ export default function ConversionPanel(props: {
             data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.closing}
           >
-            {props.paymentConfigured ? `Активировать неделю — ${pilotPlan.price}` : "Оставить заявку на неделю"} <span aria-hidden="true">↗</span>
+            {props.paymentConfigured ? `Активировать неделю — ${pilotPlan.price}` : "Оставить заявку на неделю"} <ArrowGlyph />
           </Link>
-          <a href="#preview-configurator">Вернуться к preview ↑</a>
+          <a href="#preview-configurator">Вернуться к preview <ArrowGlyph /></a>
         </div>
       </div>
     </div>

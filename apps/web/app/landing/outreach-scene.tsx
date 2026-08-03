@@ -1,4 +1,4 @@
-import { ActionGlyph } from "./brand-glyphs";
+import { ActionGlyph, RouteGlyph } from "./brand-glyphs";
 import { DEMO_COMPANY, DEMO_CONTACT_PATHS, DEMO_OUTREACH_COPY } from "./landing-copy";
 import styles from "./landing.module.css";
 
@@ -31,7 +31,7 @@ export default function OutreachScene() {
             <span>Корректный путь контакта</span>
             <ul className={styles.contactPaths}>
               {DEMO_CONTACT_PATHS.map((path, index) => (
-                <li key={path}><span>{String(index + 1).padStart(2, "0")}</span>{path}</li>
+                <li key={path}><span>{String(index + 1).padStart(2, "0")}</span><RouteGlyph size={15} />{path}</li>
               ))}
             </ul>
             <small>Только корпоративные каналы · без частных телефонов и email</small>

@@ -143,12 +143,35 @@
   text-decoration: none;
   text-transform: uppercase;
   min-height: 44px;
-  transition: border-color .2s ease, background-color .2s ease;
+  transition: border-color .2s ease, background-color .2s ease, color .2s ease;
 }
 
 .headerCta:hover {
   border-color: var(--signal);
   background: rgba(141, 214, 189, .1);
+}
+
+.headerCta :global(svg),
+.primaryButton :global(svg),
+.textButton :global(svg),
+.sceneCta :global(svg),
+.workspaceCheckout :global(svg),
+.pilotOffer > a :global(svg),
+.secondaryOffers a :global(svg),
+.finalCall div a:first-child :global(svg) {
+  flex: 0 0 auto;
+  transition: transform .2s ease;
+}
+
+.headerCta:hover :global(svg),
+.primaryButton:hover :global(svg),
+.textButton:hover :global(svg),
+.sceneCta:hover :global(svg),
+.workspaceCheckout:hover :global(svg),
+.pilotOffer > a:hover :global(svg),
+.secondaryOffers a:hover :global(svg),
+.finalCall div a:first-child:hover :global(svg) {
+  transform: translateX(2px);
 }
 
 .scene {
@@ -189,6 +212,13 @@
   opacity: .78;
 }
 
+.radarSweep {
+  fill: rgba(141, 214, 189, .1);
+  mix-blend-mode: screen;
+  transform-origin: 380px 380px;
+  animation: radarSweep 9s linear infinite;
+}
+
 .radarField {
   display: block;
   width: 100%;
@@ -207,6 +237,21 @@
   stroke-width: 1;
   stroke-dasharray: 1 10;
   opacity: .3;
+}
+
+.radarTicks {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+  opacity: .58;
+}
+
+.radarCoordinates {
+  fill: currentColor;
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 1.5px;
+  opacity: .42;
 }
 
 .radarQuietSignals circle {
@@ -352,7 +397,7 @@
 }
 
 .microcopy {
-  margin: 1.1rem 0 0;
+  margin: .6rem 0 0;
   color: rgba(243, 241, 235, .46);
   font-family: var(--mono);
   font-size: .66rem;
@@ -372,7 +417,7 @@
   animation: lockReveal .9s .45s both cubic-bezier(.2, .8, .2, 1);
 }
 
-.detectionLock :global(svg) {
+.detectionLock > :global(svg) {
   flex: 0 0 auto;
   color: var(--signal);
 }
@@ -429,7 +474,7 @@
 .detectionFooter {
   position: absolute;
   right: var(--scene-pad);
-  bottom: 2rem;
+  bottom: 0;
   left: var(--scene-pad);
   display: flex;
   align-items: center;
@@ -455,8 +500,15 @@
 }
 
 .glyph {
+  display: block;
   overflow: visible;
 }
+
+.downArrow { transform: rotate(90deg); }
+.diagonalArrow { transform: rotate(45deg); }
+.textButton:hover .downArrow,
+.detectionFooter a:hover .downArrow { transform: rotate(90deg) translateX(2px); }
+.lockArrow:hover .diagonalArrow { transform: rotate(45deg) translateX(2px); }
 
 .timelineScene {
   min-height: 108svh;
@@ -478,6 +530,12 @@
 
 .timelineIntro .sceneHeading {
   margin-top: 1.25rem;
+}
+
+.timelineIntro .sceneHeading em {
+  display: block;
+  font-size: clamp(2rem, 3.65vw, 3.5rem);
+  line-height: .98;
 }
 
 .timelineIntro .sceneHeading em,
@@ -695,7 +753,7 @@
 .ledgerFact strong { color: var(--paper); font-family: var(--font-sans); font-size: .98rem; font-weight: 560; }
 .ledgerFact small { color: var(--paper-dim); font-size: .58rem; }
 .ledgerConfidence { color: var(--signal); text-transform: uppercase; }
-.evidenceStack a { display: grid; width: 44px; height: 44px; place-items: center; color: var(--signal); font-size: 1rem; text-decoration: none; }
+.evidenceStack a { display: inline-flex; width: 44px; height: 44px; align-items: center; justify-content: center; gap: .2rem; color: var(--signal); font-size: 1rem; text-decoration: none; }
 
 .outreachScene {
   min-height: 106svh;
@@ -751,6 +809,7 @@
 .contactPaths { margin-top: .8rem; border-top: 1px solid var(--line-light); }
 .contactPaths li { display: flex; align-items: center; gap: .8rem; min-height: 2.9rem; border-bottom: 1px solid var(--line-light); font-size: .85rem; }
 .contactPaths li span { color: var(--copper); font-family: var(--mono); font-size: .58rem; }
+.contactPaths li :global(svg) { flex: 0 0 auto; color: var(--copper); }
 .contactPathBlock small { display: block; margin-top: .8rem; color: rgba(9, 19, 30, .5); font-family: var(--mono); font-size: .58rem; }
 
 .messageDraft {
@@ -875,6 +934,8 @@
 .workspaceScore strong { color: var(--signal); font-size: 2rem; font-weight: 480; letter-spacing: -.05em; }
 .workspaceScore small { color: var(--paper-dim); font-family: var(--mono); font-size: .55rem; }
 .workspaceLead[open] summary { color: var(--signal-strong); }
+.leadChevron { display: grid; place-items: center; color: var(--paper-dim); transition: color .2s ease, transform .2s ease; }
+.workspaceLead[open] .leadChevron { color: var(--signal); transform: rotate(90deg); }
 
 .workspaceLeadBody { display: grid; gap: 1.5rem; padding: 1.5rem 0 2rem 3.5rem; }
 .workspaceProof { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line-dark); border-bottom: 1px solid var(--line-dark); }
@@ -892,8 +953,8 @@
 .workspaceFiur strong { color: var(--signal); font-family: var(--mono); font-size: .58rem; font-weight: 500; }
 
 .workspaceEvidence ul { display: grid; margin: .8rem 0 0; padding: 0; list-style: none; }
-.workspaceEvidence li { padding: .65rem 0; border-bottom: 1px solid var(--line-dark); color: rgba(243, 241, 235, .72); font-size: .75rem; }
-.workspaceEvidence li::before { margin-right: .6rem; color: var(--signal); content: "↳"; }
+.workspaceEvidence li { display: flex; align-items: flex-start; gap: .6rem; padding: .65rem 0; border-bottom: 1px solid var(--line-dark); color: rgba(243, 241, 235, .72); font-size: .75rem; }
+.workspaceEvidence li :global(svg) { flex: 0 0 auto; margin-top: .08rem; color: var(--signal); }
 .workspaceLeadFooter { display: flex; justify-content: space-between; gap: 1rem; color: var(--paper-dim); font-family: var(--mono); font-size: .56rem; }
 .workspaceLeadFooter strong { color: var(--warning); font-weight: 500; }
 
@@ -931,8 +992,8 @@
 .pilotPrice span { color: var(--paper-dim); font-family: var(--mono); font-size: .58rem; }
 .pilotOffer > p { margin: 0; color: rgba(243, 241, 235, .7); font-size: .82rem; line-height: 1.45; }
 .pilotOffer ul { margin: 1.2rem 0; padding: 0; border-top: 1px solid var(--line-dark); list-style: none; }
-.pilotOffer li { padding: .7rem 0; border-bottom: 1px solid var(--line-dark); color: rgba(243, 241, 235, .72); font-size: .75rem; }
-.pilotOffer li::before { margin-right: .55rem; color: var(--signal); content: "↳"; }
+.pilotOffer li { display: flex; align-items: flex-start; gap: .55rem; padding: .7rem 0; border-bottom: 1px solid var(--line-dark); color: rgba(243, 241, 235, .72); font-size: .75rem; }
+.pilotOffer li :global(svg) { flex: 0 0 auto; margin-top: .1rem; color: var(--signal); }
 .pilotOffer > a { display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: 1rem; padding: .85rem 1rem; background: var(--signal); color: var(--ink); font-family: var(--mono); font-size: .62rem; font-weight: 700; text-decoration: none; text-transform: uppercase; }
 .pilotOffer > small { display: block; margin-top: .75rem; color: var(--paper-dim); font-family: var(--mono); font-size: .55rem; }
 
@@ -950,7 +1011,7 @@
 .faqList summary { display: grid; grid-template-columns: 2rem 1fr auto; gap: 1rem; min-height: 4.5rem; align-items: center; cursor: pointer; list-style: none; color: rgba(243, 241, 235, .78); font-size: .9rem; }
 .faqList summary::-webkit-details-marker { display: none; }
 .faqList summary span { color: var(--copper); font-family: var(--mono); font-size: .57rem; }
-.faqList summary i { color: var(--signal); font-style: normal; }
+.faqList summary i { display: grid; width: 1.5rem; height: 1.5rem; place-items: center; color: var(--signal); font-style: normal; transition: transform .2s ease; }
 .faqList details[open] summary i { transform: rotate(45deg); }
 .faqList details p { margin: 0; padding: 0 2.5rem 1.25rem 3rem; color: var(--paper-dim); font-size: .8rem; line-height: 1.55; }
 
@@ -960,6 +1021,8 @@
 .finalCall div { display: flex; flex-wrap: wrap; align-items: center; gap: 1.2rem; margin-top: 2rem; }
 .finalCall div a:first-child { display: inline-flex; min-height: 44px; align-items: center; gap: .8rem; padding: .85rem 1rem; background: var(--signal); color: var(--ink); font-family: var(--mono); font-size: .63rem; font-weight: 700; text-decoration: none; text-transform: uppercase; }
 .finalCall div a:last-child { display: inline-flex; min-height: 44px; align-items: center; color: var(--paper-dim); font-family: var(--mono); font-size: .6rem; text-decoration: none; text-transform: uppercase; }
+.finalCall div a:last-child :global(svg) { transform: rotate(-90deg); }
+.finalCall div a:last-child:hover :global(svg) { transform: rotate(-90deg) translateX(2px); }
 
 @keyframes workspaceShimmer { to { background-position: -200% 0; } }
 
@@ -968,9 +1031,19 @@
   80%, 100% { opacity: 0; transform: scale(1); }
 }
 
+@keyframes radarSweep {
+  to { transform: rotate(360deg); }
+}
+
 @keyframes lockReveal {
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 1024px) {
+  .landingPage {
+    margin: -24px -16px -60px;
+  }
 }
 
 @media (max-width: 1080px) {
@@ -1020,10 +1093,7 @@
   .faqStage { grid-template-columns: 1fr; }
 }
 
-@media (max-width: 760px) {
-  .landingPage {
-    margin: -20px -14px -48px;
-  }
+@media (max-width: 820px) {
 
   .header {
     grid-template-columns: 1fr auto;
@@ -1095,7 +1165,7 @@
     padding-left: .7rem;
   }
 
-  .detectionLock :global(svg) { width: 3.5rem; height: 3.5rem; }
+  .detectionLock > :global(svg) { width: 3.5rem; height: 3.5rem; }
 
   .detectionFooter {
     position: relative;
@@ -1108,6 +1178,8 @@
     margin-top: 1rem;
     font-size: .55rem;
   }
+
+  .microcopy { margin-top: 1.1rem; }
 
   .lightScene,
   .darkScene { padding: 5.5rem 1.1rem; }
@@ -1205,6 +1277,12 @@
   .finalCall { margin: 0 -1.1rem; padding: 3rem 1.1rem; }
 }
 
+@media (max-width: 640px) {
+  .landingPage {
+    margin: -20px -14px -48px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .landingPage *,
   .landingPage *::before,
@@ -1217,6 +1295,7 @@
 
   .detectionLock { opacity: 1; transform: none; }
   .radarActiveSignal circle:not(:first-child) { opacity: .32; transform: none; }
+  .radarSweep { animation: none; opacity: .04; }
 }
 
 /* Shared scene primitives added in later vertical slices. They are defined

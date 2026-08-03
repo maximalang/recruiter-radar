@@ -10,8 +10,7 @@ export function SignalGlyph({ size = 52, className }: GlyphProps) {
       height={size}
       viewBox="0 0 52 52"
       fill="none"
-      role="img"
-      aria-label="Сигнал"
+      aria-hidden="true"
     >
       <circle cx="26" cy="26" r="3.5" fill="currentColor" />
       <circle cx="26" cy="26" r="12" stroke="currentColor" strokeWidth="1.5" opacity=".55" />
@@ -28,8 +27,7 @@ export function EvidenceGlyph({ size = 52, className }: GlyphProps) {
       height={size}
       viewBox="0 0 52 52"
       fill="none"
-      role="img"
-      aria-label="Доказательство"
+      aria-hidden="true"
     >
       <circle cx="26" cy="26" r="4" fill="currentColor" />
       <circle cx="26" cy="26" r="12" stroke="currentColor" strokeWidth="1.5" opacity=".8" />
@@ -47,13 +45,46 @@ export function ActionGlyph({ size = 52, className }: GlyphProps) {
       height={size}
       viewBox="0 0 52 52"
       fill="none"
-      role="img"
-      aria-label="Действие"
+      aria-hidden="true"
     >
       <circle cx="10" cy="42" r="3" fill="currentColor" />
       <path d="M12 40 38 14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
       <path d="m29 14 9-1 1 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
       <circle cx="38" cy="14" r="7" stroke="currentColor" strokeWidth="1.3" opacity=".45" />
+    </svg>
+  );
+}
+
+export function ArrowGlyph({ size = 18, className }: GlyphProps) {
+  return (
+    <svg className={`${styles.glyph} ${className ?? ""}`} width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M4 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="square" strokeLinejoin="miter" />
+    </svg>
+  );
+}
+
+export function DocumentGlyph({ size = 18, className }: GlyphProps) {
+  return (
+    <svg className={`${styles.glyph} ${className ?? ""}`} width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M6 3.5h8l4 4v13H6zM14 3.5v4h4M9 12h6M9 15.5h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="square" />
+    </svg>
+  );
+}
+
+export function RouteGlyph({ size = 18, className }: GlyphProps) {
+  return (
+    <svg className={`${styles.glyph} ${className ?? ""}`} width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="5" cy="18" r="2" fill="currentColor" />
+      <path d="M7 18c7 0 3-11 10-11h2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="square" strokeDasharray="2 2" />
+      <path d="m16 4 3 3-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="square" />
+    </svg>
+  );
+}
+
+export function PlusGlyph({ size = 16, className }: GlyphProps) {
+  return (
+    <svg className={`${styles.glyph} ${className ?? ""}`} width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.1" strokeLinecap="square" />
     </svg>
   );
 }
@@ -79,8 +110,18 @@ export function RadarField() {
         <circle cx="380" cy="380" r="212" />
         <circle cx="380" cy="380" r="316" />
       </g>
+      <path className={styles.radarSweep} d="M380 380 684 218A380 380 0 0 0 534 682Z" />
       <path className={styles.radarAxis} d="M64 380h632M380 64v632" />
       <path className={styles.radarAxis} d="M116 116 644 644M644 116 116 644" opacity=".25" />
+      <g className={styles.radarTicks}>
+        <path d="M380 62v14M698 380h-14M380 698v-14M62 380h14" />
+      </g>
+      <g className={styles.radarCoordinates} aria-hidden="true">
+        <text x="380" y="50" textAnchor="middle">NORTH / 01</text>
+        <text x="706" y="384">EAST / 02</text>
+        <text x="380" y="716" textAnchor="middle">SOUTH / 03</text>
+        <text x="54" y="384" textAnchor="end">WEST / 04</text>
+      </g>
       <g className={styles.radarQuietSignals}>
         <circle cx="246" cy="270" r="3" />
         <circle cx="562" cy="318" r="3" />
