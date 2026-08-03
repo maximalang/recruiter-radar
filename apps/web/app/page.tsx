@@ -1,3 +1,8 @@
-export { default, metadata } from "./home-page-content";
+export {
+  default,
+  metadata,
+  PreviewSection,
+  PreviewSkeleton,
+} from "./home-page-content";
 
 export const dynamic = "force-dynamic";

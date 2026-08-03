@@ -13,6 +13,7 @@ export function PageFrame(props: {
     <main
       className={`${styles.pageFrame}${props.className ? ` ${props.className}` : ""}`}
       data-deploy-anchor={props.dataDeployAnchor}
+      data-ui-system="recruiter-radar-v6"
     >
       <div
         style={{

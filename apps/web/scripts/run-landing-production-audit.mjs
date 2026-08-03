@@ -1,8 +1,9 @@
 import { spawn } from "node:child_process";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
 
-const auditScript = fileURLToPath(new URL("./verify-landing-production.mjs", import.meta.url));
+import { resolveAuditScriptPath } from "./landing-audit-path.mjs";
+
+const auditScript = resolveAuditScriptPath(import.meta.url);
 const maxAttempts = 2;
 
 function wait(milliseconds) {
