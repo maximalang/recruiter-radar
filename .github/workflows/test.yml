@@ -213,7 +213,7 @@ jobs:
           echo "$!" > /tmp/landing-server.pid
           for i in $(seq 1 30); do
             if curl -fsS -o /tmp/landing-ready.html http://127.0.0.1:3000/ \
-              && grep -q 'data-deploy-anchor="recruiter-radar-landing-v3"' /tmp/landing-ready.html; then
+              && grep -q 'data-deploy-anchor="recruiter-radar-signal-lock"' /tmp/landing-ready.html; then
               exit 0
             fi
             sleep 2
