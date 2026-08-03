@@ -1,7 +1,9 @@
 import {
   clampOpportunityJobBatchSize,
+  clampCompanyEventsJobBatchSize,
   clampOpportunityPageSize,
   clampOpportunitySnoozeDays,
+  isCompanyEventsV1Enabled,
   isAgencyDnaV1Enabled,
   isAgencyDnaV1EnabledForContext,
   isOpportunityEngineV1Enabled,
@@ -29,6 +31,22 @@ import {
 } from '@/lib/opportunities/config'
 
 describe('opportunity engine config', () => {
+  it('keeps Company Events v1 dark unless the flag is exactly true', () => {
+    expect(isCompanyEventsV1Enabled({})).toBe(false)
+    expect(isCompanyEventsV1Enabled({ COMPANY_EVENTS_V1_ENABLED: '1' }))
+      .toBe(false)
+    expect(isCompanyEventsV1Enabled({ COMPANY_EVENTS_V1_ENABLED: 'true' }))
+      .toBe(true)
+    expect(isCompanyEventsV1Enabled({ COMPANY_EVENTS_V1_ENABLED: ' TRUE ' }))
+      .toBe(false)
+  })
+
+  it('clamps Company Events cron batches to the smaller safe range', () => {
+    expect(clampCompanyEventsJobBatchSize(Number.NaN)).toBe(10)
+    expect(clampCompanyEventsJobBatchSize(0)).toBe(1)
+    expect(clampCompanyEventsJobBatchSize(26)).toBe(25)
+  })
+
   it('is dark by default and only accepts an explicit true value', () => {
     expect(isOpportunityEngineV1Enabled({})).toBe(false)
     expect(isOpportunityEngineV1Enabled({ OPPORTUNITY_ENGINE_V1_ENABLED: '1' })).toBe(false)

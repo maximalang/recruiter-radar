@@ -31,6 +31,7 @@ export const OPPORTUNITY_CRM_BRIDGE_FEATURE_FLAG =
   'OPPORTUNITY_CRM_BRIDGE_ENABLED'
 export const OPPORTUNITY_ANALYTICS_V2_FEATURE_FLAG =
   'OPPORTUNITY_ANALYTICS_V2_ENABLED'
+export const COMPANY_EVENTS_V1_FEATURE_FLAG = 'COMPANY_EVENTS_V1_ENABLED'
 
 export type OpportunityFeatureContext = {
   dataOwnerId: string | number | null | undefined
@@ -47,10 +48,23 @@ export const OPPORTUNITY_ENGINE_LIMITS = {
   maximumSnoozeDays: 90,
 } as const
 
+export const COMPANY_EVENTS_V1_LIMITS = {
+  defaultJobBatchSize: 10,
+  maximumJobBatchSize: 25,
+  maximumSourceRecordsPerOrganization: 5_000,
+  statementTimeoutMs: 15_000,
+} as const
+
 export function isOpportunityEngineV1Enabled(
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): boolean {
   return env[OPPORTUNITY_ENGINE_FEATURE_FLAG] === 'true'
+}
+
+export function isCompanyEventsV1Enabled(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+  return env[COMPANY_EVENTS_V1_FEATURE_FLAG] === 'true'
 }
 
 export function isOpportunityOutcomesEnabled(
@@ -354,6 +368,16 @@ export function clampOpportunityJobBatchSize(value: number): number {
   return Math.min(
     Math.max(Math.trunc(value), 1),
     OPPORTUNITY_ENGINE_LIMITS.maximumJobBatchSize,
+  )
+}
+
+export function clampCompanyEventsJobBatchSize(value: number): number {
+  if (!Number.isFinite(value)) {
+    return COMPANY_EVENTS_V1_LIMITS.defaultJobBatchSize
+  }
+  return Math.min(
+    Math.max(Math.trunc(value), 1),
+    COMPANY_EVENTS_V1_LIMITS.maximumJobBatchSize,
   )
 }
 
