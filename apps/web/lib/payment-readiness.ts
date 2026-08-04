@@ -51,18 +51,27 @@ export function buildPaymentReadinessReport(
   const refundSetup = getRobokassaRefundSetupState()
   const refundsConfigured = refundSetup.configured
   const npdReceiptsConfigured = process.env.ROBOKASSA_SMZ_RECEIPTS_ENABLED?.trim().toLowerCase() === 'true'
-  const postalAddressConfigured = Boolean(process.env.OPERATOR_PUBLIC_POSTAL_ADDRESS?.trim())
-  const merchantModerationReady = selfServeCheckoutReady && postalAddressConfigured
+  const sellerLocationConfigured = Boolean(
+    process.env.OPERATOR_PUBLIC_CITY?.trim() || process.env.OPERATOR_PUBLIC_POSTAL_ADDRESS?.trim(),
+  )
+  const merchantModerationReady = selfServeCheckoutReady && sellerLocationConfigured
 
   const launchBlockers = [...integrationBlockers]
-  if (!postalAddressConfigured) launchBlockers.push('OPERATOR_PUBLIC_POSTAL_ADDRESS is required before merchant moderation.')
+  if (!sellerLocationConfigured) launchBlockers.push('OPERATOR_PUBLIC_CITY (or an actual postal address) is required before Robokassa moderation.')
   if (setup.mode !== 'live') launchBlockers.push('ROBOKASSA_MODE must be live for production launch.')
   if (!refundsConfigured) launchBlockers.push('ROBOKASSA_PASSWORD_3 and Refund JWT configuration are required for live refunds.')
   if (!npdReceiptsConfigured) launchBlockers.push('Robocheck SMZ / My Tax receipt integration must be connected and explicitly enabled.')
+  if (!isIsoTimestamp(process.env.ROBOKASSA_SITE_CRITERIA_VERIFIED_AT)) launchBlockers.push('Public Robokassa site criteria have not been verified against the deployed origin.')
   if (!isIsoTimestamp(process.env.ROBOKASSA_TEST_FLOW_VERIFIED_AT)) launchBlockers.push('A real Robokassa test payment flow has not been verified.')
   if (!isIsoTimestamp(process.env.ROBOKASSA_REFUND_FLOW_VERIFIED_AT)) launchBlockers.push('The Robokassa full/partial refund flow has not been verified.')
   if (!isIsoTimestamp(process.env.ROBOKASSA_NPD_RECEIPT_FLOW_VERIFIED_AT)) launchBlockers.push('The NPD receipt issue/correction flow has not been verified.')
-  if (!isIsoTimestamp(process.env.PDN_COMPLIANCE_VERIFIED_AT)) launchBlockers.push('Personal-data localization/compliance has not been verified.')
+  if (!isIsoTimestamp(process.env.PDN_OPERATOR_NOTIFICATION_VERIFIED_AT)) launchBlockers.push('The applicable Roskomnadzor operator notification has not been verified.')
+  if (!isIsoTimestamp(process.env.PDN_LOCALIZATION_VERIFIED_AT)) launchBlockers.push('Russian primary-database localization has not been verified.')
+  if (!isIsoTimestamp(process.env.PDN_PROCESSORS_VERIFIED_AT)) launchBlockers.push('Processor agreements and public disclosure have not been verified.')
+  if (process.env.TELEGRAM_BOT_TOKEN?.trim() && !isIsoTimestamp(process.env.PDN_CROSS_BORDER_VERIFIED_AT)) {
+    launchBlockers.push('Telegram cross-border transfer prerequisites have not been verified.')
+  }
+  if (!isIsoTimestamp(process.env.PDN_COMPLIANCE_VERIFIED_AT)) launchBlockers.push('The complete personal-data compliance review has not been signed off.')
   if (!isIsoTimestamp(process.env.ROBOKASSA_LIVE_FLOW_VERIFIED_AT)) launchBlockers.push('A live control payment and refund have not been verified.')
 
   const liveLaunchReady = launchBlockers.length === 0
