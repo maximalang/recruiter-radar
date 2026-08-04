@@ -16,7 +16,7 @@ const OPERATOR = {
   fullName: "Головий Наталья Ярославна",
   inn: "622809740837",
   status: "Самозанятый, плательщик НПД (налог на профессиональный доход)",
-  email: "6uunn9@gmail.com",
+  email: "support@recruiter-radar.ru",
   service: "Recruiter Radar — ежедневный радар по компаниям с активным наймом",
 };
 
@@ -30,16 +30,11 @@ export default function TermsPage() {
           description="Использование сервиса Recruiter Radar означает согласие с условиями ниже. Договор-оферта вступает в силу с момента оплаты выбранного тарифа."
         />
 
-        {/* Operator line — a single quiet intro, not a card. Full requisites on /legal. */}
         <p className={s.docOperator}>
           Оператор: <strong>{OPERATOR.fullName}</strong>, самозанятый, ИНН {OPERATOR.inn}.{" "}
           <Link href="/legal" className={s.docLink}>Полные реквизиты</Link>.
         </p>
 
-        {/* The document body — one continuous prose flow with numbered section
-            headings, NOT a stack of cards. A legal document should read as a
-            document: headings + paragraphs, separated by whitespace, no card
-            chrome around every clause. */}
         <div className={s.docBody}>
           <TermsSection n="1" title="Предмет договора">
             Оператор предоставляет Заказчику доступ к сервису Recruiter Radar — ежедневной подборке
