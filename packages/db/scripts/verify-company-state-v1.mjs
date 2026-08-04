@@ -27,6 +27,13 @@ const commercialThesesDownSql = await readFile(
   resolve(migrations, '20260804120000_add_commercial_theses_v1.down.sql'),
   'utf8',
 )
+const externalAgencyPropensityDownSql = await readFile(
+  resolve(
+    migrations,
+    '20260804130000_add_external_agency_propensity_v1.down.sql',
+  ),
+  'utf8',
+)
 const hash = (character) => character.repeat(64)
 
 try {
@@ -252,6 +259,7 @@ try {
   await database.query('ROLLBACK')
 
   await database.query('TRUNCATE TABLE company_state_snapshots CASCADE')
+  await database.query(externalAgencyPropensityDownSql)
   await database.query(commercialThesesDownSql)
   await database.query(signalEpisodesDownSql)
   await database.query(downSql)
