@@ -1,0 +1,45 @@
+name: Fix Robokassa branch security lockfile
+
+on:
+  push:
+    branches: [feat/robokassa-primary-billing]
+    paths:
+      - '.github/workflows/fix-robokassa-security-lockfile.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/robokassa-primary-billing
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Apply patched transitive versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          pkg.overrides = {
+            ...(pkg.overrides || {}),
+            'brace-expansion': '5.0.9',
+            'ip-address': '10.3.1'
+          };
+          fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          NODE
+          npm install --package-lock-only --ignore-scripts
+          npm audit --omit=dev --audit-level=high
+          rm -f .github/workflows/fix-robokassa-security-lockfile.yml
+          git add package.json package-lock.json .github/workflows/fix-robokassa-security-lockfile.yml
+          git config user.name 'Recruiter Radar CI'
+          git config user.email 'support@recruiter-radar.ru'
+          git commit -m 'chore: patch audited transitive dependencies'
+          git push origin HEAD:feat/robokassa-primary-billing
