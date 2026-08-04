@@ -3,7 +3,6 @@ import Link from "next/link";
 import { LANDING_ANALYTICS_CONTEXT, LANDING_ANALYTICS_EVENT } from "../../lib/landing-analytics-contract";
 import { DEMO_COMPANY } from "./landing-copy";
 import { ArrowGlyph, RadarField, SignalGlyph } from "./brand-glyphs";
-import polish from "./landing-polish.module.css";
 import styles from "./landing.module.css";
 
 export default function DetectionScene({ previewHref }: { previewHref: string }) {
@@ -15,7 +14,7 @@ export default function DetectionScene({ previewHref }: { previewHref: string })
       <div className={styles.sceneKicker}>
         <span className={styles.kickerRule} aria-hidden="true" />
         <span>RADAR / SIGNAL LOCK</span>
-        <span className={styles.kickerMeta}>01 — Обзор</span>
+        <span className={styles.kickerMeta}>01 — Обнаружение</span>
       </div>
       <div className={styles.detectionCopy}>
         <p className={styles.serviceLabel}>Клиентский радар для рекрутинговых агентств</p>
@@ -23,7 +22,7 @@ export default function DetectionScene({ previewHref }: { previewHref: string })
           Кому написать сегодня — <em>видно по сигналам.</em>
         </h1>
         <p className={styles.heroDescription}>
-          Recruiter Radar отслеживает hiring signals российских компаний и каждое утро собирает короткий список: кому писать, почему сейчас и на какие факты сослаться.
+          Recruiter Radar отслеживает сигналы найма российских компаний и собирает короткий список: кому написать, почему сейчас и на какие факты сослаться.
         </p>
         <div className={styles.heroActions}>
           <a
@@ -35,30 +34,15 @@ export default function DetectionScene({ previewHref }: { previewHref: string })
             Собрать мой радар <ArrowGlyph />
           </a>
           <a
-            href="#scene-timeline"
+            href="#scene-evidence"
             className={styles.textButton}
             data-analytics-event={LANDING_ANALYTICS_EVENT.previewResultsClicked}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroSecondary}
           >
-            Как строится приоритет <ArrowGlyph className={styles.downArrow} />
+            Разобрать один сигнал <ArrowGlyph className={styles.downArrow} />
           </a>
         </div>
-        <p className={styles.microcopy}>Пилот на 7 дней · без автопродления · отправка сообщений только вручную</p>
-
-        <dl className={polish.outcomeRail} aria-label="Что агентство получает от Recruiter Radar">
-          <div>
-            <dt>Кому писать</dt>
-            <dd>Короткая очередь компаний вместо бесконечной базы.</dd>
-          </div>
-          <div>
-            <dt>Почему сейчас</dt>
-            <dd>Сигналы, даты и источники рядом с оценкой.</dd>
-          </div>
-          <div>
-            <dt>С каким поводом</dt>
-            <dd>Готовый угол разговора без автоматического спама.</dd>
-          </div>
-        </dl>
+        <p className={styles.microcopy}>Пилот на 7 дней · без автопродления</p>
       </div>
 
       <div className={styles.detectionLock} aria-label={`Новый сигнал: ${DEMO_COMPANY.signal}`}>
@@ -68,12 +52,12 @@ export default function DetectionScene({ previewHref }: { previewHref: string })
           <strong>{DEMO_COMPANY.signal}</strong>
           <span>{DEMO_COMPANY.name} · {DEMO_COMPANY.location}</span>
         </div>
-        <Link href="#scene-workspace" className={styles.lockArrow} aria-label="Открыть компанию в рабочем радаре"><ArrowGlyph className={styles.diagonalArrow} size={20} /></Link>
+        <Link href="#scene-timeline" className={styles.lockArrow} aria-label="Разобрать сигнал компании"><ArrowGlyph className={styles.diagonalArrow} size={20} /></Link>
       </div>
 
       <div className={styles.detectionFooter}>
         <span>Сигнал → Доказательство → Действие</span>
-        <a href="#scene-workspace">Сначала посмотрите сам продукт <ArrowGlyph className={styles.downArrow} /></a>
+        <a href="#scene-timeline">Прокрутите, чтобы разобрать возможность <ArrowGlyph className={styles.downArrow} /></a>
       </div>
     </section>
   );
