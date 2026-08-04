@@ -7,7 +7,7 @@ export default function OutreachScene() {
     <section id="scene-outreach" className={`${styles.scene} ${styles.lightScene} ${styles.outreachScene}`} aria-labelledby="outreach-title">
       <div className={styles.outreachLayout}>
         <div className={styles.outreachIntro}>
-          <p className={styles.sceneLabel}>04 — Действие</p>
+          <p className={styles.sceneLabel}>05 — Действие</p>
           <h2 id="outreach-title" className={styles.sceneHeading}>
             Сначала причина для контакта. <em>Потом сообщение.</em>
           </h2>
