@@ -1,43 +1,22 @@
 import { getHhDigestItems, type HhDigestItem } from "./hhDigest"
 import { deriveLawfulContactPath, deriveNegativeSignals } from "./leads-data"
 import { rankPreviewItems, type PreviewRelevanceSignals } from "./preview-relevance"
+import {
+  PUBLIC_PLANS,
+  getPublicPlanByCode,
+  isPublicPlanCode,
+  normalizeLegacyPlanCode,
+  type PublicPlan,
+  type PublicPlanCode,
+} from "./pricingCatalog"
 
-export type PublicPlanCode = "pilot" | "monthly" | "quarterly"
-
-export type PublicPlan = {
-  code: PublicPlanCode
-  name: string
-  cadence: string
-  amountMinor: number
-  currency: string
-  price: string
-  description: string
-  bullets: string[]
-  ctaLabel: string
-  isPrimary: boolean
-  /**
-   * Recurring plans (monthly, quarterly) are billed per period. With the billing
-   * provider stubbed there is no real subscription flow, so a checkout for these
-   * is captured as a sales request — NOT a self-serve pilot. Drives whether the
-   * pilot application + pilot onboarding funnel is triggered. See payments.ts.
-   */
-  isRecurring: boolean
+export {
+  PUBLIC_PLANS,
+  getPublicPlanByCode,
+  isPublicPlanCode,
+  normalizeLegacyPlanCode,
 }
-
-/**
- * Identical capability set for every plan — the tariff differs only by term
- * (pilot = 1 week, monthly = 1 month, quarterly = 3 months with a saving).
- * Do NOT diverge capabilities between plans: the product contract is that every
- * paying customer gets the same radar.
- */
-const SHARED_PLAN_BULLETS: string[] = [
-  "ежедневный радар с подтверждённым наймом по каждой компании",
-  "профиль поиска под вашу нишу и географию",
-  "Telegram — основной канал; email подключается по запросу",
-  "оценка уверенности и понятное «почему сейчас» по каждому лиду",
-  "доказательства найма и безопасный путь контакта",
-  "обратная связь по компаниям — и всё меньше нерелевантных в радаре",
-]
+export type { PublicPlan, PublicPlanCode }
 
 export type PublicPreviewInput = {
   specialization: string
@@ -181,87 +160,6 @@ function buildPublicDemoDigestItems(referenceDate = new Date()): HhDigestItem[] 
   ]
 }
 
-export const PUBLIC_PLANS: PublicPlan[] = [
-  {
-    code: "pilot",
-    name: "Неделя",
-    cadence: "7 дней",
-    amountMinor: 299000,
-    currency: "RUB",
-    price: "2 990 ₽",
-    description: "Короткий запуск: за неделю увидите компании, которым стоит написать сегодня, — с доказательствами найма, оценкой уверенности и безопасным поводом для первого касания.",
-    bullets: SHARED_PLAN_BULLETS,
-    ctaLabel: "Попробовать неделю",
-    isPrimary: true,
-    isRecurring: false
-  },
-  {
-    code: "monthly",
-    name: "Месяц",
-    cadence: "30 дней",
-    amountMinor: 1499000,
-    currency: "RUB",
-    price: "14 990 ₽/мес",
-    description: "Полный доступ к радару на месяц — всё то же, что в пилоте, на срок, удобный для проверки канала.",
-    bullets: SHARED_PLAN_BULLETS,
-    ctaLabel: "Оставить заявку на месяц",
-    isPrimary: false,
-    isRecurring: true
-  },
-  {
-    code: "quarterly",
-    name: "Три месяца",
-    cadence: "90 дней",
-    amountMinor: 2999000,
-    currency: "RUB",
-    price: "29 990 ₽/3 мес",
-    description: "Доступ на квартал со скидкой — выгоднее помесячной оплаты (~9 997 ₽/мес). Для команды, которая делает радар рабочим каналом на три месяца, а не на пробу.",
-    bullets: SHARED_PLAN_BULLETS,
-    ctaLabel: "Оставить заявку на 3 месяца",
-    isPrimary: false,
-    isRecurring: true
-  }
-]
-
-const PUBLIC_PLAN_BY_CODE = Object.fromEntries(
-  PUBLIC_PLANS.map((plan) => [plan.code, plan])
-) as Record<PublicPlanCode, PublicPlan>
-
-/** True when `code` is a known plan code. Single source of truth for plan validation. */
-export function isPublicPlanCode(code: unknown): code is PublicPlanCode {
-  return typeof code === "string" && Object.prototype.hasOwnProperty.call(PUBLIC_PLAN_BY_CODE, code)
-}
-
-/**
- * Map a legacy plan code onto the current one. The pricing model changed twice:
- *   v1  pilot/monthly/premium (different capabilities)
- *   v2  pilot/monthly/yearly  (identical capabilities, yearly term)
- *   v3  pilot/monthly/quarterly (current — week / month / 3 months)
- * Existing DB orders and old checkout links may still carry "premium" or
- * "yearly" — fold both onto the quarterly plan so historical data does not
- * throw. The pilot and monthly codes are unchanged.
- */
-export function normalizeLegacyPlanCode(code: string): PublicPlanCode {
-  const normalized = code.trim().toLocaleLowerCase("en-US")
-  if (normalized === "premium") return "quarterly"
-  if (normalized === "yearly") return "quarterly"
-  if (isPublicPlanCode(normalized)) return normalized
-  throw new Error(`Unknown product code: ${code}`)
-}
-
-export function getPublicPlanByCode(code: PublicPlanCode | string): PublicPlan {
-  const normalized = code.trim().toLocaleLowerCase("en-US")
-  if (isPublicPlanCode(normalized)) {
-    return PUBLIC_PLAN_BY_CODE[normalized]
-  }
-  // Legacy "premium"/"yearly" → quarterly, so historical orders/links don't throw.
-  if (normalized === "premium" || normalized === "yearly") {
-    return PUBLIC_PLAN_BY_CODE.quarterly
-  }
-
-  throw new Error(`Unknown product code: ${code}`)
-}
-
 type PublicPreviewHrefInput = {
   specialization?: string | null
   targetCity?: string | null
@@ -387,8 +285,6 @@ export function buildCheckoutHref(input: {
   if (input.ownerId != null && String(input.ownerId).trim() !== "") {
     params.set("ownerId", String(input.ownerId).trim())
   }
-  // Default plan is pilot; only emit the param for non-default plans to keep
-  // existing pilot links unchanged.
   if (input.planCode && input.planCode !== "pilot") {
     params.set("plan", input.planCode)
   }
@@ -397,7 +293,6 @@ export function buildCheckoutHref(input: {
   return query === "" ? "/checkout" : `/checkout?${query}`
 }
 
-/** Read & validate the `plan` checkout param, defaulting to pilot. */
 export function readCheckoutPlanCode(
   searchParams: Record<string, string | string[] | undefined>
 ): PublicPlanCode {
@@ -442,12 +337,6 @@ function toPublicPreviewItem(
     sourceKeys: item.candidate_source_keys,
     structuredSignalCount: item.evidence_titles.length,
     curationLabels: sourceFamilies,
-    // On the public preview `reasons` are raw Russian strings, not structured
-    // ScoringReason keys — so these derivations lean on source families, the
-    // confidence gate, and vacancy counts (gate/count-driven, key-agnostic),
-    // never on reason keys that don't exist in preview data.
-    // A direct career surface is a more actionable corporate path than registry
-    // context. Prefer it in the public card when both source families exist.
     lawfulContactPath,
     negativeSignals: deriveNegativeSignals({
       reasons: item.reasons,
@@ -460,16 +349,11 @@ function toPublicPreviewItem(
   }
 }
 
-/** Neutral relevance for the un-personalised preview (no ICP input to score against). */
 function defaultRelevanceSignals(): PreviewRelevanceSignals {
   return { fit: 0, intent: 0, urgency: 0, reachability: 0 }
 }
 
 function deriveConfidenceLabel(totalScore: number): string {
-  // NOTE: preview-only score band for the public landing page — NOT the
-  // confidence gate from lib/scoring/gates. Gates classify evidence
-  // quality (A/B/C/D); this helper buckets a numeric score into
-  // high/medium/low for marketing copy. Do not conflate the two.
   if (totalScore >= 80) return "high"
   if (totalScore >= 50) return "medium"
   return "low"
