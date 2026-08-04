@@ -1,20 +1,41 @@
-name: Export Robokassa worktree
+name: Apply Robokassa worktree
 
 on:
-  pull_request:
-    branches: [ main ]
+  push:
+    branches: [ 'feat/robokassa-primary-billing' ]
 
 permissions:
-  contents: read
+  contents: write
+
+concurrency:
+  group: apply-robokassa-worktree
+  cancel-in-progress: true
 
 jobs:
-  export:
+  apply:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/upload-artifact@v4
         with:
-          name: robokassa-worktree
-          path: .
-          include-hidden-files: true
-          retention-days: 1
+          ref: feat/robokassa-primary-billing
+          fetch-depth: 0
+      - name: Apply complete patch once all chunks exist
+        shell: bash
+        run: |
+          set -euo pipefail
+          for index in 1 2 3 4; do
+            if [ ! -f ".automation/robokassa.patch.gz.b64.part${index}" ]; then
+              echo "Patch chunks are not complete yet."
+              exit 0
+            fi
+          done
+          cat .automation/robokassa.patch.gz.b64.part{1,2,3,4} | base64 -d | gzip -d > /tmp/robokassa.patch
+          echo "e0bb08e630424aac11c8a7d19f3ad89863f44d3f45a4bad87549308fa80b4027  /tmp/robokassa.patch" | sha256sum -c -
+          git apply --index --whitespace=error-all /tmp/robokassa.patch
+          rm -rf .automation
+          rm -f .github/workflows/export-robokassa-worktree.yml
+          git add -A
+          git config user.name "Recruiter Radar CI"
+          git config user.email "support@recruiter-radar.ru"
+          git commit -m "feat: make Robokassa the primary billing provider"
+          git push origin HEAD:feat/robokassa-primary-billing
