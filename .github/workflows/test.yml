@@ -114,6 +114,10 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
         run: npm run test:query-planner-v2:db
+      - name: Verify Commercial Signal evaluation exports
+        env:
+          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+        run: npm run test:commercial-signal:evaluation:db
       - name: Verify Opportunity Engine and Outcome Ledger production runtime
         env:
           DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
