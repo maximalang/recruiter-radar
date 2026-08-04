@@ -64,6 +64,7 @@ jobs:
           bash -n scripts/test/docker-entrypoint-reconciliation.sh
           bash -n scripts/test/landing-events-caddy-smoke.sh
           bash -n scripts/test/landing-events-caddy-smoke-contract.sh
+          bash -n scripts/test/wait-for-landing-server.sh
       - name: Verify deployment rollback and runtime preflights
         run: |
           bash scripts/test/deploy-rollback-guard.sh
@@ -209,21 +210,11 @@ jobs:
           node apps/web/.next/standalone/apps/web/server.js > /tmp/landing-server.log 2>&1 &
           server_pid="$!"
           echo "$server_pid" > /tmp/landing-server.pid
-          for i in $(seq 1 90); do
-            if ! kill -0 "$server_pid" 2>/dev/null; then
-              echo "Standalone server exited before becoming ready."
-              cat /tmp/landing-server.log
-              exit 1
-            fi
-            if curl --connect-timeout 2 --max-time 10 -fsS -o /tmp/landing-ready.html http://127.0.0.1:3000/ \
-              && grep -q 'data-deploy-anchor="recruiter-radar-landing-v3"' /tmp/landing-ready.html; then
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "Standalone server did not become ready within 180 seconds."
-          cat /tmp/landing-server.log
-          exit 1
+          bash scripts/test/wait-for-landing-server.sh \
+            http://127.0.0.1:3000 \
+            "$server_pid" \
+            /tmp/landing-server.log \
+            /tmp/landing-ready.html
       - name: Landing production audit
         run: npm run test:landing:e2e
       - name: Responsive surface audit
