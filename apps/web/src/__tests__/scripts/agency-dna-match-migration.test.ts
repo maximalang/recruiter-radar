@@ -23,6 +23,22 @@ const testWorkflow = readFileSync(
   resolve(root, '.github', 'workflows', 'test.yml'),
   'utf8',
 )
+const ancestorRollbackVerifiers = [
+  'verify-company-events-v1.mjs',
+  'verify-company-state-v1.mjs',
+  'verify-signal-episodes-v2.mjs',
+  'verify-commercial-theses-v1.mjs',
+].map((name) => ({
+  name,
+  source: readFileSync(resolve(root, 'packages', 'db', 'scripts', name), 'utf8'),
+}))
+const opportunityDownVerifier = readFileSync(resolve(
+  root,
+  'packages',
+  'db',
+  'scripts',
+  'verify-opportunity-engine-down.mjs',
+), 'utf8')
 const dbRunner = readFileSync(resolve(
   root,
   'packages',
@@ -176,17 +192,40 @@ describe('Agency DNA Match v2 migration contract', () => {
       .toBeLessThan(rollback.indexOf('DROP TABLE agency_dna_match_snapshots'))
   })
 
-  it('tears down the child schema before the parent propensity verifier', () => {
-    const childDown = parentVerifier.indexOf('agencyDnaMatchDownSql')
-    const childApply = parentVerifier.indexOf(
-      'await database.query(agencyDnaMatchDownSql)',
-    )
-    const parentApply = parentVerifier.indexOf('await database.query(downSql)')
+  it('tears down the child schema before every ancestor verifier', () => {
+    for (const { name, source } of [
+      { name: 'verify-external-agency-propensity-v1.mjs', source: parentVerifier },
+      ...ancestorRollbackVerifiers,
+    ]) {
+      const childDown = source.indexOf('agencyDnaMatchDownSql')
+      const childApply = source.indexOf(
+        'await database.query(agencyDnaMatchDownSql)',
+      )
+      const propensityApply = source.indexOf(
+        'await database.query(externalAgencyPropensityDownSql)',
+      )
+      const directParentApply = source.indexOf('await database.query(downSql)')
+      const parentApply = propensityApply > -1 ? propensityApply : directParentApply
 
-    expect(childDown).toBeGreaterThan(-1)
-    expect(childApply).toBeGreaterThan(childDown)
-    expect(parentApply).toBeGreaterThan(childApply)
-    expect(parentVerifier).not.toContain('CASCADE')
+      expect(childDown).toBeGreaterThan(-1)
+      expect(childApply).toBeGreaterThan(childDown)
+      expect(parentApply).toBeGreaterThan(childApply)
+      expect(source).not.toContain('DROP TABLE agency_dna_match_snapshots CASCADE')
+      expect(name).toMatch(/^verify-/)
+    }
+
+    const matchDown = opportunityDownVerifier.indexOf(
+      "'20260804140000_add_agency_dna_match_v2.down.sql'",
+    )
+    const propensityDown = opportunityDownVerifier.indexOf(
+      "'20260804130000_add_external_agency_propensity_v1.down.sql'",
+    )
+    expect(matchDown).toBeGreaterThan(-1)
+    expect(propensityDown).toBeGreaterThan(matchDown)
+    expect(opportunityDownVerifier).toContain(
+      'const PRE_FIXTURE_DOWN_MIGRATIONS = 16',
+    )
+    expect(opportunityDownVerifier).not.toContain('CASCADE')
   })
 
   it('registers an isolated PostgreSQL gate after External Agency Propensity', () => {

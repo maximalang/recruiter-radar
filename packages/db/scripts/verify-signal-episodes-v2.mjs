@@ -30,6 +30,10 @@ const externalAgencyPropensityDownSql = await readFile(
   ),
   'utf8',
 )
+const agencyDnaMatchDownSql = await readFile(
+  resolve(migrations, '20260804140000_add_agency_dna_match_v2.down.sql'),
+  'utf8',
+)
 const hash = (character) => character.repeat(64)
 
 async function insertEvent(organizationId, evidenceId, suffix) {
@@ -280,6 +284,7 @@ try {
   await database.query('ROLLBACK')
 
   await database.query('TRUNCATE TABLE signal_episodes CASCADE')
+  await database.query(agencyDnaMatchDownSql)
   await database.query(externalAgencyPropensityDownSql)
   await database.query(commercialThesesDownSql)
   await database.query(downSql)

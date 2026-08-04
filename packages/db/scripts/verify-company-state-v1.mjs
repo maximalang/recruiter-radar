@@ -34,6 +34,10 @@ const externalAgencyPropensityDownSql = await readFile(
   ),
   'utf8',
 )
+const agencyDnaMatchDownSql = await readFile(
+  resolve(migrations, '20260804140000_add_agency_dna_match_v2.down.sql'),
+  'utf8',
+)
 const hash = (character) => character.repeat(64)
 
 try {
@@ -259,6 +263,7 @@ try {
   await database.query('ROLLBACK')
 
   await database.query('TRUNCATE TABLE company_state_snapshots CASCADE')
+  await database.query(agencyDnaMatchDownSql)
   await database.query(externalAgencyPropensityDownSql)
   await database.query(commercialThesesDownSql)
   await database.query(signalEpisodesDownSql)
