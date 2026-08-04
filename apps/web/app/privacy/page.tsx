@@ -15,7 +15,7 @@ const OPERATOR = {
   fullName: "Головий Наталья Ярославна",
   inn: "622809740837",
   status: "Самозанятый, плательщик НПД (налог на профессиональный доход)",
-  email: "6uunn9@gmail.com",
+  email: "support@recruiter-radar.ru",
   service: "Recruiter Radar — ежедневный радар по компаниям с активным наймом",
 };
 
