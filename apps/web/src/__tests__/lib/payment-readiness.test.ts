@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 import { buildPaymentReadinessReport } from '@/lib/payment-readiness'
+import { PUBLIC_PLANS } from '@/lib/pricingCatalog'
 
 describe('payment readiness', () => {
   const originalEnv = process.env
@@ -94,10 +95,10 @@ describe('payment readiness', () => {
 
   test('checkout and tariff catalog explicitly disable recurring charges', () => {
     const checkoutPage = fs.readFileSync(path.resolve(process.cwd(), 'app/checkout/page.tsx'), 'utf8')
-    const pricingCatalog = fs.readFileSync(path.resolve(process.cwd(), 'lib/pricingCatalog.ts'), 'utf8')
 
     expect(checkoutPage).toContain('Автопродления и скрытых списаний нет')
     expect(checkoutPage).toContain('Оплатить {plan.price} через Robokassa')
-    expect(pricingCatalog.match(/isRecurring: false/g)).toHaveLength(3)
+    expect(PUBLIC_PLANS).toHaveLength(3)
+    expect(PUBLIC_PLANS.every((plan) => plan.isRecurring === false)).toBe(true)
   })
 })
