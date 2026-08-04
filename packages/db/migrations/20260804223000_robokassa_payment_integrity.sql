@@ -7,6 +7,7 @@ AS $$
 DECLARE
   provider_amount_text TEXT;
   provider_currency TEXT;
+  provider_plan TEXT;
   provider_amount_minor BIGINT;
   order_amount_minor BIGINT;
   signature_verified BOOLEAN;
@@ -23,6 +24,7 @@ BEGIN
   IF NEW.provider = 'robokassa' AND NEW.status IN ('paid', 'refunded') THEN
     provider_amount_text := NEW.payload->'paymentProviderPayload'->'amount'->>'value';
     provider_currency := upper(COALESCE(NEW.payload->'paymentProviderPayload'->'amount'->>'currency', ''));
+    provider_plan := COALESCE(NEW.payload->'paymentProviderPayload'->'shp'->>'Shp_plan', NEW.plan_code);
     signature_verified := COALESCE((NEW.payload->'paymentProviderPayload'->>'signatureVerified')::boolean, false);
     verification_source := COALESCE(NEW.payload->'paymentProviderPayload'->>'verifiedBy', '');
 
@@ -39,6 +41,10 @@ BEGIN
 
     IF provider_currency <> upper(NEW.currency) OR provider_currency <> 'RUB' THEN
       RAISE EXCEPTION 'Robokassa currency mismatch for checkout order %: % <> %', NEW.id, provider_currency, upper(NEW.currency);
+    END IF;
+
+    IF provider_plan <> NEW.plan_code THEN
+      RAISE EXCEPTION 'Robokassa plan mismatch for checkout order %: % <> %', NEW.id, provider_plan, NEW.plan_code;
     END IF;
 
     IF NOT signature_verified AND verification_source <> 'OpStateExt' THEN
