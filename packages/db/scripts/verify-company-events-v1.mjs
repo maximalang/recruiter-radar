@@ -29,6 +29,10 @@ const signalEpisodesDownSql = await readFile(
   resolve(migrations, '20260804110000_add_signal_episodes_v2.down.sql'),
   'utf8',
 )
+const commercialThesesDownSql = await readFile(
+  resolve(migrations, '20260804120000_add_commercial_theses_v1.down.sql'),
+  'utf8',
+)
 assert.ok(
   downSql.indexOf('LOCK TABLE company_events IN ACCESS EXCLUSIVE MODE') > -1 &&
   downSql.indexOf('LOCK TABLE company_events IN ACCESS EXCLUSIVE MODE') <
@@ -280,6 +284,7 @@ try {
   )
   await database.query('ROLLBACK')
   await database.query('TRUNCATE TABLE company_events CASCADE')
+  await database.query(commercialThesesDownSql)
   await database.query(signalEpisodesDownSql)
   await database.query(companyStateDownSql)
   await database.query(downSql)

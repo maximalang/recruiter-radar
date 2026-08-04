@@ -91,6 +91,6 @@ describe('Opportunity Scoring v2 migration contract', () => {
     expect(downVerifier).toContain(
       '20260801120000_add_opportunity_scoring_v2.down.sql',
     )
-    expect(downVerifier).toContain('PRE_FIXTURE_DOWN_MIGRATIONS = 13')
+    expect(downVerifier).toContain('PRE_FIXTURE_DOWN_MIGRATIONS = 14')
   })
 })

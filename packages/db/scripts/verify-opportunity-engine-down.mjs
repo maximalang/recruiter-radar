@@ -15,6 +15,7 @@ const root = resolve(import.meta.dirname, '..', '..', '..')
 const migrationsDir = resolve(root, 'packages', 'db', 'migrations')
 const migrateScript = resolve(root, 'packages', 'db', 'scripts', 'migrate.mjs')
 const downMigrations = [
+  '20260804120000_add_commercial_theses_v1.down.sql',
   '20260804110000_add_signal_episodes_v2.down.sql',
   '20260804100000_add_company_state_v1.down.sql',
   '20260803120000_add_company_events_v1.down.sql',
@@ -40,7 +41,7 @@ const downMigrations = [
   '20260727120000_add_opportunity_engine_hardening.down.sql',
   '20260726130000_add_opportunity_engine_v1.down.sql',
 ]
-const PRE_FIXTURE_DOWN_MIGRATIONS = 13
+const PRE_FIXTURE_DOWN_MIGRATIONS = 14
 
 const admin = new Client({ connectionString: databaseUrl })
 const databaseName = `rr_opportunity_down_${process.pid}_${Date.now()}`

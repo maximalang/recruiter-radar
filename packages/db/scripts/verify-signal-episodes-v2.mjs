@@ -19,6 +19,10 @@ const downSql = await readFile(
   resolve(migrations, '20260804110000_add_signal_episodes_v2.down.sql'),
   'utf8',
 )
+const commercialThesesDownSql = await readFile(
+  resolve(migrations, '20260804120000_add_commercial_theses_v1.down.sql'),
+  'utf8',
+)
 const hash = (character) => character.repeat(64)
 
 async function insertEvent(organizationId, evidenceId, suffix) {
@@ -269,6 +273,7 @@ try {
   await database.query('ROLLBACK')
 
   await database.query('TRUNCATE TABLE signal_episodes CASCADE')
+  await database.query(commercialThesesDownSql)
   await database.query(downSql)
   const removed = await database.query(
     `SELECT

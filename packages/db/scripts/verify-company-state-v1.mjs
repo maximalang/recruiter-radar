@@ -23,6 +23,10 @@ const signalEpisodesDownSql = await readFile(
   resolve(migrations, '20260804110000_add_signal_episodes_v2.down.sql'),
   'utf8',
 )
+const commercialThesesDownSql = await readFile(
+  resolve(migrations, '20260804120000_add_commercial_theses_v1.down.sql'),
+  'utf8',
+)
 const hash = (character) => character.repeat(64)
 
 try {
@@ -248,6 +252,7 @@ try {
   await database.query('ROLLBACK')
 
   await database.query('TRUNCATE TABLE company_state_snapshots CASCADE')
+  await database.query(commercialThesesDownSql)
   await database.query(signalEpisodesDownSql)
   await database.query(downSql)
   const removed = await database.query(
