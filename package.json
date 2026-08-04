@@ -36,6 +36,7 @@
     "test:opportunity-engine:db": "node packages/db/scripts/run-opportunity-engine-db-tests.mjs",
     "test:company-events-v1:db": "node packages/db/scripts/run-company-events-v1-db-tests.mjs",
     "test:company-state-v1:db": "node packages/db/scripts/run-company-state-v1-db-tests.mjs",
+    "test:signal-episodes-v2:db": "node packages/db/scripts/run-signal-episodes-v2-db-tests.mjs",
     "test:opportunity-crm-bridge:db": "node packages/db/scripts/run-opportunity-crm-bridge-db-tests.mjs",
     "test:agency-dna:db": "node packages/db/scripts/verify-agency-dna-v1.mjs",
     "test:opportunity-scoring-v2:db": "node packages/db/scripts/verify-opportunity-scoring-v2.mjs",

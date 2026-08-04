@@ -90,6 +90,10 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
         run: npm run test:company-state-v1:db
+      - name: Verify Signal Episodes v2 migration and runtime
+        env:
+          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+        run: npm run test:signal-episodes-v2:db
       - name: Verify Opportunity Engine and Outcome Ledger production runtime
         env:
           DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
