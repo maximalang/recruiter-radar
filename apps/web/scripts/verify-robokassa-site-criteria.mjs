@@ -67,7 +67,7 @@ for (const token of [
   "Когда предоставляется доступ",
   "Чек самозанятого",
   "Отказ от услуги и возврат",
-  "ошибочный",
+  "Ошибочный",
   "OPERATOR_REQUISITES.email",
 ]) requireText("paymentAndRefund", token, `payment/refund disclosure ${token}`);
 
@@ -104,7 +104,7 @@ for (const token of [
   "Robokassa",
 ]) requireText("checkout", token, `checkout requirement ${token}`);
 
-if ((sources.pricing.match(/isRecurring: false/g) ?? []).length !== 3) {
+if ((sources.pricing.match(/isRecurring: false,/g) ?? []).length !== 3) {
   fail("pricing: every public plan must be a one-off purchase without recurring charges");
 }
 for (const token of ["299000", "999000", "2499000", "durationDays: 7", "durationDays: 30", "durationDays: 90"]) {
