@@ -1,15 +1,19 @@
 export const LEGAL_DOCUMENTS = {
   terms: {
-    revision: "2026-08-04",
-    displayDate: "4 августа 2026 года",
+    revision: "2026-08-05",
+    displayDate: "5 августа 2026 года",
+  },
+  paymentAndRefund: {
+    revision: "2026-08-05",
+    displayDate: "5 августа 2026 года",
   },
   privacy: {
-    revision: "2026-08-04",
-    displayDate: "4 августа 2026 года",
+    revision: "2026-08-05",
+    displayDate: "5 августа 2026 года",
   },
   personalDataConsent: {
-    revision: "2026-08-04",
-    displayDate: "4 августа 2026 года",
+    revision: "2026-08-05",
+    displayDate: "5 августа 2026 года",
   },
 } as const;
 
