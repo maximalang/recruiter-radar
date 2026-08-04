@@ -29,7 +29,6 @@ export default async function WorkspaceScene(props: {
   checkoutHref: string;
   paymentConfigured: boolean;
   faqItems: ReadonlyArray<{ question: string; answer: string }>;
-  showConversionPanel?: boolean;
 }) {
   const previewState = await getPublicSampleDigestState(props.previewInput);
   const appliedProfile = [props.previewInput.specialization, props.previewInput.targetCity].filter(Boolean);
@@ -43,12 +42,12 @@ export default async function WorkspaceScene(props: {
         />
         <LandingPreviewInteractions />
         <div className={styles.workspaceIntro}>
-          <p className={styles.sceneLabel}>02 — Рабочий preview</p>
+          <p className={styles.sceneLabel}>05 — Рабочий радар</p>
           <h2 id="workspace-title" className={styles.sceneHeading}>
-            Проверьте радар на своей специализации — <em>до оплаты.</em>
+            Один сигнал становится <em>частью рабочего приоритета.</em>
           </h2>
           <p className={styles.sceneLead}>
-            Укажите направление и географию. Preview пересчитает приоритет компаний и покажет, какие факты стоят за каждой рекомендацией.
+            Настройте специализацию и географию. Существующая логика preview пересчитает порядок компаний и покажет доказательства.
           </p>
         </div>
 
@@ -151,17 +150,15 @@ export default async function WorkspaceScene(props: {
             data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.preview}
           >
-            {previewState.items.length > 0 ? "Получать такой список каждое утро" : "Попробовать неделю"} <ArrowGlyph />
+            {previewState.items.length > 0 ? "Получать такой радар каждое утро" : "Попробовать неделю"} <ArrowGlyph />
           </Link>
         </div>
 
-        {props.showConversionPanel !== false ? (
-          <ConversionPanel
-            previewInput={props.previewInput}
-            paymentConfigured={props.paymentConfigured}
-            faqItems={props.faqItems}
-          />
-        ) : null}
+        <ConversionPanel
+          previewInput={props.previewInput}
+          paymentConfigured={props.paymentConfigured}
+          faqItems={props.faqItems}
+        />
       </div>
     </section>
   );
@@ -172,8 +169,8 @@ export function WorkspaceSkeleton() {
     <section id="scene-workspace" className={`${styles.scene} ${styles.darkScene} ${styles.workspaceScene}`} aria-labelledby="workspace-loading-title">
       <div className={styles.workspaceLayout} data-preview-section-content aria-busy="true">
         <div className={styles.workspaceIntro}>
-          <p className={styles.sceneLabel}>02 — Рабочий preview</p>
-          <h2 id="workspace-loading-title" className={styles.sceneHeading}>Проверьте радар на своей специализации — до оплаты.</h2>
+          <p className={styles.sceneLabel}>05 — Рабочий радар</p>
+          <h2 id="workspace-loading-title" className={styles.sceneHeading}>Один сигнал становится частью рабочего приоритета.</h2>
         </div>
         <div id="preview-configurator" className={styles.workspaceSkeletonLine} />
         <div id="preview-results" className={styles.workspaceSkeleton}>
