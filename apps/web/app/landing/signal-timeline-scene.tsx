@@ -7,7 +7,7 @@ export default function SignalTimelineScene() {
     <section id="scene-timeline" className={`${styles.scene} ${styles.lightScene} ${styles.timelineScene}`} aria-labelledby="timeline-title">
       <div className={styles.timelineLayout}>
         <div className={styles.timelineIntro}>
-          <p className={styles.sceneLabel}>03 — Сигнал</p>
+          <p className={styles.sceneLabel}>02 — Сигнал</p>
           <h2 id="timeline-title" className={styles.sceneHeading}>
             Одна вакансия ничего не доказывает. <em>Последовательность — доказывает.</em>
           </h2>
