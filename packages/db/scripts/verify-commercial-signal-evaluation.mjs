@@ -8,6 +8,10 @@ import {
   MODEL_KEYS,
   evaluateCommercialSignalDatasets,
 } from './lib/commercial-signal-evaluation.mjs'
+import {
+  anonymizeEvaluationRow,
+  mapFalsePositiveReason,
+} from './lib/commercial-signal-evaluation-export.mjs'
 
 const root = resolve(
   import.meta.dirname,
@@ -93,6 +97,63 @@ assert.throws(
   /Holdout sample overlaps/,
 )
 
+const rawRow = {
+  profileId: '10',
+  episodeId: '20',
+  opportunityId: '30',
+  episodeType: 'vacancy_spike',
+  sourceFamilies: ['hh'],
+  observedAt: '2026-07-20T00:00:00.000Z',
+  vacancyCount: 5,
+  oldFiur: 0.5,
+  opportunityV2: 0.6,
+  opportunityV3: null,
+  accepted: false,
+  contacted: false,
+  replied: false,
+  meeting: false,
+  dismissReasonCode: null,
+  lostReasonCode: null,
+  hasOutcome: false,
+}
+const exportKey = 'a'.repeat(32)
+const observational = anonymizeEvaluationRow(
+  rawRow,
+  'anonymized_labeled',
+  exportKey,
+)
+assert.deepEqual(observational.labels, {
+  qualified: null,
+  accepted: null,
+  contacted: null,
+  replied: null,
+  meeting: null,
+  falsePositiveCategory: null,
+})
+const dismissed = anonymizeEvaluationRow({
+  ...rawRow,
+  hasOutcome: true,
+  dismissReasonCode: 'wrong_roles',
+}, 'anonymized_labeled', exportKey)
+assert.deepEqual(dismissed.labels, {
+  qualified: false,
+  accepted: false,
+  contacted: false,
+  replied: false,
+  meeting: false,
+  falsePositiveCategory: 'wrong_role',
+})
+const progressedLoss = anonymizeEvaluationRow({
+  ...rawRow,
+  hasOutcome: true,
+  accepted: true,
+  contacted: true,
+  lostReasonCode: 'price',
+}, 'anonymized_labeled', exportKey)
+assert.equal(progressedLoss.labels.qualified, true)
+assert.equal(progressedLoss.labels.falsePositiveCategory, null)
+assert.equal(mapFalsePositiveReason('other'), null)
+
 process.stdout.write(`${JSON.stringify({
   ok: true,
   checks: [
@@ -106,5 +167,8 @@ process.stdout.write(`${JSON.stringify({
     'holdout_isolation',
     'no_false_calibration_claim',
     'unavailable_is_null_not_zero',
+    'observational_outcomes_remain_unlabeled',
+    'terminal_false_positive_mapping',
+    'progressed_losses_are_not_false_positives',
   ],
 })}\n`)

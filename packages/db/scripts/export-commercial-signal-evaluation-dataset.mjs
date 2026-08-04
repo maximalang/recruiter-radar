@@ -1,8 +1,13 @@
-import { createHmac } from 'node:crypto'
-
 import pg from 'pg'
 
 import { COMMERCIAL_SIGNAL_DATASET_SCHEMA } from './lib/commercial-signal-evaluation.mjs'
+import {
+  anonymizeEvaluationRow,
+  datasetLimitations,
+  pseudonym,
+  splitBucket,
+  splitGroup,
+} from './lib/commercial-signal-evaluation-export.mjs'
 
 const { Pool } = pg
 const args = process.argv.slice(2)
@@ -37,7 +42,8 @@ try {
   if (rawRows.length > 5_000) {
     throw new Error('Evaluation export exceeds the 5,000-row safety limit.')
   }
-  const transformed = rawRows.map((row) => anonymizeRow(row, kind, anonymizationKey))
+  const transformed = rawRows.map((row) =>
+    anonymizeEvaluationRow(row, kind, anonymizationKey))
   const rows = kind === 'holdout'
     ? transformed.filter((row) => splitBucket(row.sampleKey) === 0)
     : kind === 'anonymized_labeled'
@@ -60,7 +66,7 @@ try {
     ...(status === 'unavailable' ? {
       unavailableReason: 'No rows matched the workspace, time window, and split.',
     } : {}),
-    limitations: limitations(kind),
+    limitations: datasetLimitations(kind),
     rows,
   }, null, 2)}\n`)
 } catch (error) {
@@ -91,6 +97,7 @@ async function labeledOpportunityRows(client, workspaceId, from, to) {
       JOIN opportunities opportunity
         ON opportunity.id = snapshot.opportunity_id
        AND opportunity.workspace_id = snapshot.workspace_id
+       AND opportunity.owner_id = snapshot.owner_id
        AND opportunity.client_profile_id = snapshot.client_profile_id
       JOIN hiring_episodes episode
         ON episode.id = snapshot.hiring_episode_id
@@ -131,7 +138,14 @@ async function labeledOpportunityRows(client, workspaceId, from, to) {
       outcome.meeting_at IS NOT NULL AS meeting,
       outcome.dismiss_reason_code AS "dismissReasonCode",
       outcome.lost_reason_code AS "lostReasonCode",
-      outcome.owner_id IS NOT NULL AS "hasOutcome"
+      (
+        outcome.accepted_at IS NOT NULL
+        OR outcome.contacted_at IS NOT NULL
+        OR outcome.replied_at IS NOT NULL
+        OR outcome.meeting_at IS NOT NULL
+        OR outcome.dismiss_reason_code IS NOT NULL
+        OR outcome.lost_reason_code IS NOT NULL
+      ) AS "hasOutcome"
     FROM latest_v2 latest
     LEFT JOIN opportunity_outcome_state outcome
       ON outcome.opportunity_id = latest."opportunityId"
@@ -186,118 +200,6 @@ async function productionShadowRows(client, workspaceId, from, to) {
     LIMIT 5001
   `, [workspaceId, from, to])
   return result.rows
-}
-
-function anonymizeRow(row, kind, key) {
-  const sampleKey = pseudonym(
-    key,
-    `profile:${row.profileId}:episode:${row.episodeId}:item:${row.opportunityId}`,
-  )
-  const hasOutcome = row.hasOutcome === true
-  const progressed = row.accepted === true || row.contacted === true ||
-    row.replied === true || row.meeting === true
-  const category = progressed ? null : mapFalsePositiveReason(
-    row.dismissReasonCode ?? row.lostReasonCode,
-  )
-  return {
-    sampleKey,
-    agencyProfileKey: pseudonym(key, `profile:${row.profileId}`),
-    episodeType: safeIdentifier(row.episodeType, 'unknown'),
-    sourceFamilies: jsonStringArray(row.sourceFamilies),
-    queryPlanKey: null,
-    observedAt: new Date(row.observedAt).toISOString(),
-    vacancyCount: row.vacancyCount == null ? null : Number(row.vacancyCount),
-    scores: {
-      oldFiur: finiteOrNull(row.oldFiur),
-      opportunityV2: finiteOrNull(row.opportunityV2),
-      opportunityV3: finiteOrNull(row.opportunityV3),
-    },
-    labels: {
-      qualified: kind === 'production_shadow' ? null
-        : progressed ? true : category ? false : null,
-      accepted: hasOutcome ? row.accepted === true : null,
-      contacted: hasOutcome ? row.contacted === true : null,
-      replied: hasOutcome ? row.replied === true : null,
-      meeting: hasOutcome ? row.meeting === true : null,
-      falsePositiveCategory: category,
-    },
-  }
-}
-
-function mapFalsePositiveReason(reason) {
-  const mappings = {
-    bad_fit: 'weak_agency_fit',
-    wrong_roles: 'wrong_role',
-    wrong_industry: 'weak_agency_fit',
-    wrong_region: 'wrong_region',
-    company_too_small: 'weak_agency_fit',
-    company_too_large: 'weak_agency_fit',
-    low_commercial_value: 'bad_economics',
-    internal_recruitment_only: 'internal_only',
-    no_external_need_signal: 'weak_external_need',
-    weak_evidence: 'unverified_company',
-    duplicate: 'duplicate_event',
-    wrong_timing: 'stale_signal',
-    internal_team: 'internal_only',
-    price: 'bad_economics',
-    no_budget: 'bad_economics',
-    procurement_block: 'bad_economics',
-    position_closed: 'stale_signal',
-  }
-  return mappings[reason] ?? null
-}
-
-function pseudonym(key, value) {
-  return createHmac('sha256', key).update(value).digest('hex')
-}
-
-function splitBucket(sampleKey) {
-  return Number.parseInt(sampleKey.slice(0, 8), 16) % 5
-}
-
-function splitGroup(kind) {
-  if (kind === 'holdout') return 'holdout-real'
-  if (kind === 'production_shadow') return 'production-shadow'
-  return 'labeled-real'
-}
-
-function limitations(kind) {
-  const common = [
-    'Identifiers are keyed pseudonyms; no company or contact identity is exported.',
-    'The exporter is read-only and workspace scoped.',
-    'Missing values remain null and are not inferred as zero.',
-  ]
-  if (kind === 'production_shadow') return [
-    ...common,
-    'V3 shadow candidates are not joined to legacy outcomes without an explicit lineage key.',
-    'Shadow rows do not constitute rollout or canary acceptance.',
-  ]
-  return [
-    ...common,
-    'Legacy outcome reasons are mapped only when they have an unambiguous taxonomy category.',
-    'V3 remains null until a reviewed cross-version lineage contract exists.',
-  ]
-}
-
-function jsonStringArray(value) {
-  const input = Array.isArray(value) ? value : []
-  return [...new Set(input.map((item) => String(item).trim().toLowerCase())
-    .filter((item) => /^[a-z0-9][a-z0-9._-]{0,127}$/.test(item)))]
-    .sort()
-}
-
-function safeIdentifier(value, fallback) {
-  const normalized = String(value ?? '').trim().toLowerCase()
-    .replace(/[^a-z0-9._-]+/g, '_')
-    .replace(/^[_-]+|[_-]+$/g, '')
-    .slice(0, 128)
-  return normalized || fallback
-}
-
-function finiteOrNull(value) {
-  if (value == null) return null
-  const number = Number(value)
-  return Number.isFinite(number) ? number : null
 }
 
 function positiveInteger(value, label) {

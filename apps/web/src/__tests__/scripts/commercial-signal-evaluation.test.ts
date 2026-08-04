@@ -14,6 +14,11 @@ const exporterPath = resolve(
   scriptsRoot,
   'export-commercial-signal-evaluation-dataset.mjs',
 )
+const exportHelperPath = resolve(
+  scriptsRoot,
+  'lib',
+  'commercial-signal-evaluation-export.mjs',
+)
 
 describe('Commercial Signal Engine evaluation contract', () => {
   it('runs all dataset manifests and reports v2/v3 without calibration claims', () => {
@@ -69,14 +74,18 @@ describe('Commercial Signal Engine evaluation contract', () => {
 
   it('keeps real export read-only, workspace-scoped, and pseudonymous', () => {
     const exporter = readFileSync(exporterPath, 'utf8')
+    const exportHelper = readFileSync(exportHelperPath, 'utf8')
     expect(exporter).toContain('BEGIN TRANSACTION READ ONLY')
     expect(exporter).toContain("optionValue(args, '--workspace-id')")
-    expect(exporter).toContain('createHmac')
+    expect(exportHelper).toContain('createHmac')
     expect(exporter).toContain('EVALUATION_ANONYMIZATION_KEY')
     expect(exporter).toContain('LIMIT 5001')
     expect(exporter).not.toMatch(
       /client\.query\(\s*[`'"]\s*(?:INSERT|UPDATE|DELETE|UPSERT)\b/i,
     )
     expect(exporter).not.toMatch(/organization_name|legal_entity_name|email|phone/i)
+    expect(exportHelper).not.toMatch(
+      /organization_name|legal_entity_name|email|phone/i,
+    )
   })
 })

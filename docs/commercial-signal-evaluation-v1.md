@@ -111,7 +111,8 @@ It opens `BEGIN TRANSACTION READ ONLY`, applies a 30-second statement timeout,
 scopes every query to one workspace and a half-open time window, and caps output
 at 5,000 rows. HMAC-SHA-256 produces stable non-identity keys. The labeled and
 holdout exports use a deterministic 80/20 split from the same pseudonymous
-sample key.
+sample key. Rows with only observational `shown`/`opened` history remain
+unlabeled; accepted-or-later and terminal dismiss/lost history provide labels.
 
 The exporter prints JSON to stdout and never writes a repository fixture or
 production row. Review and secure storage of a real export remain separate,
