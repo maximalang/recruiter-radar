@@ -1,8 +1,8 @@
 name: Export Robokassa worktree
 
 on:
-  push:
-    branches: [ 'feat/robokassa-primary-billing' ]
+  pull_request:
+    branches: [ main ]
 
 permissions:
   contents: read
