@@ -25,11 +25,16 @@ jest.mock('@/lib/opportunities/commercial-thesis-job', () => ({
   buildCommercialThesesJob: jest.fn(),
 }))
 
+jest.mock('@/lib/opportunities/external-agency-propensity-job', () => ({
+  buildExternalAgencyPropensityJob: jest.fn(),
+}))
+
 import { backfillOpportunitiesJob } from '@/lib/opportunities/jobs'
 import { normalizeCompanyEventsJob } from '@/lib/opportunities/company-event-job'
 import { buildCompanyStateJob } from '@/lib/opportunities/company-state-job'
 import { buildSignalEpisodesJob } from '@/lib/opportunities/signal-episode-job'
 import { buildCommercialThesesJob } from '@/lib/opportunities/commercial-thesis-job'
+import { buildExternalAgencyPropensityJob } from '@/lib/opportunities/external-agency-propensity-job'
 import { GET, POST } from '@/app/api/cron/opportunities/[job]/route'
 
 const mockedBackfill = jest.mocked(backfillOpportunitiesJob)
@@ -37,6 +42,9 @@ const mockedNormalizeCompanyEvents = jest.mocked(normalizeCompanyEventsJob)
 const mockedBuildCompanyState = jest.mocked(buildCompanyStateJob)
 const mockedBuildSignalEpisodes = jest.mocked(buildSignalEpisodesJob)
 const mockedBuildCommercialTheses = jest.mocked(buildCommercialThesesJob)
+const mockedBuildExternalAgencyPropensity = jest.mocked(
+  buildExternalAgencyPropensityJob,
+)
 
 function request(path: string, key?: string) {
   return new NextRequest(`https://recruiter-radar.ru${path}`, {
@@ -59,6 +67,8 @@ describe('opportunity cron API', () => {
   const originalCompanyStateFlag = process.env.COMPANY_STATE_V1_ENABLED
   const originalSignalEpisodesFlag = process.env.SIGNAL_EPISODES_V2_ENABLED
   const originalCommercialThesisFlag = process.env.COMMERCIAL_THESIS_V1_ENABLED
+  const originalExternalPropensityFlag =
+    process.env.EXTERNAL_AGENCY_PROPENSITY_V1_ENABLED
 
   beforeEach(() => {
     process.env.CRON_API_KEY = testKey
@@ -67,6 +77,7 @@ describe('opportunity cron API', () => {
     process.env.COMPANY_STATE_V1_ENABLED = 'false'
     process.env.SIGNAL_EPISODES_V2_ENABLED = 'false'
     process.env.COMMERCIAL_THESIS_V1_ENABLED = 'false'
+    process.env.EXTERNAL_AGENCY_PROPENSITY_V1_ENABLED = 'false'
     jest.clearAllMocks()
   })
 
@@ -83,6 +94,12 @@ describe('opportunity cron API', () => {
     else process.env.SIGNAL_EPISODES_V2_ENABLED = originalSignalEpisodesFlag
     if (originalCommercialThesisFlag === undefined) delete process.env.COMMERCIAL_THESIS_V1_ENABLED
     else process.env.COMMERCIAL_THESIS_V1_ENABLED = originalCommercialThesisFlag
+    if (originalExternalPropensityFlag === undefined) {
+      delete process.env.EXTERNAL_AGENCY_PROPENSITY_V1_ENABLED
+    } else {
+      process.env.EXTERNAL_AGENCY_PROPENSITY_V1_ENABLED =
+        originalExternalPropensityFlag
+    }
   })
 
   it('fails closed for missing credentials and a disabled engine', async () => {
@@ -379,5 +396,72 @@ describe('opportunity cron API', () => {
       { params: Promise.resolve({ job: 'build-commercial-theses' }) },
     )).status).toBe(400)
     expect(mockedBuildCommercialTheses).not.toHaveBeenCalled()
+  })
+
+  it('keeps External Agency Propensity separately dark and dry-run by default', async () => {
+    process.env.OPPORTUNITY_ENGINE_V1_ENABLED = 'false'
+    process.env.COMMERCIAL_THESIS_V1_ENABLED = 'true'
+    process.env.EXTERNAL_AGENCY_PROPENSITY_V1_ENABLED = 'false'
+
+    expect((await POST(
+      request('/api/cron/opportunities/build-external-agency-propensity', testKey),
+      { params: Promise.resolve({ job: 'build-external-agency-propensity' }) },
+    )).status).toBe(404)
+    expect(mockedBuildExternalAgencyPropensity).not.toHaveBeenCalled()
+
+    process.env.EXTERNAL_AGENCY_PROPENSITY_V1_ENABLED = 'true'
+    mockedBuildExternalAgencyPropensity.mockResolvedValue({
+      enabled: true, dryRun: true, scanned: 0, built: 0,
+      high: 0, medium: 0, low: 0, insufficientEvidence: 0,
+      persisted: 0, replayed: 0, failed: 0,
+    })
+    const response = await POST(
+      request(
+        '/api/cron/opportunities/build-external-agency-propensity' +
+        '?workspace=20&organization=10',
+        testKey,
+      ),
+      { params: Promise.resolve({ job: 'build-external-agency-propensity' }) },
+    )
+    expect(response.status).toBe(200)
+    expect(mockedBuildExternalAgencyPropensity).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        workspaceId: '20',
+        organizationId: '10',
+        dryRun: true,
+      }),
+    )
+  })
+
+  it('requires both External Agency Propensity apply scopes and its tight limit', async () => {
+    process.env.EXTERNAL_AGENCY_PROPENSITY_V1_ENABLED = 'true'
+    const missingWorkspace = await POST(
+      request(
+        '/api/cron/opportunities/build-external-agency-propensity' +
+        '?apply=true&organization=10',
+        testKey,
+      ),
+      { params: Promise.resolve({ job: 'build-external-agency-propensity' }) },
+    )
+    expect(missingWorkspace.status).toBe(400)
+    expect(await missingWorkspace.json()).toMatchObject({
+      error: 'workspace_and_organization_required_for_apply',
+    })
+    expect((await POST(
+      request(
+        '/api/cron/opportunities/build-external-agency-propensity' +
+        '?apply=true&workspace=20',
+        testKey,
+      ),
+      { params: Promise.resolve({ job: 'build-external-agency-propensity' }) },
+    )).status).toBe(400)
+    expect((await POST(
+      request(
+        '/api/cron/opportunities/build-external-agency-propensity?batchSize=26',
+        testKey,
+      ),
+      { params: Promise.resolve({ job: 'build-external-agency-propensity' }) },
+    )).status).toBe(400)
+    expect(mockedBuildExternalAgencyPropensity).not.toHaveBeenCalled()
   })
 })

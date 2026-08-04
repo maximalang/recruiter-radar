@@ -4,12 +4,14 @@ import {
   clampCompanyStateJobBatchSize,
   clampSignalEpisodesJobBatchSize,
   clampCommercialThesisJobBatchSize,
+  clampExternalAgencyPropensityJobBatchSize,
   clampOpportunityPageSize,
   clampOpportunitySnoozeDays,
   isCompanyEventsV1Enabled,
   isCompanyStateV1Enabled,
   isSignalEpisodesV2Enabled,
   isCommercialThesisV1Enabled,
+  isExternalAgencyPropensityV1Enabled,
   isAgencyDnaV1Enabled,
   isAgencyDnaV1EnabledForContext,
   isOpportunityEngineV1Enabled,
@@ -92,6 +94,22 @@ describe('opportunity engine config', () => {
     expect(clampCommercialThesisJobBatchSize(Number.NaN)).toBe(10)
     expect(clampCommercialThesisJobBatchSize(0)).toBe(1)
     expect(clampCommercialThesisJobBatchSize(26)).toBe(25)
+  })
+
+  it('keeps External Agency Propensity v1 independently dark and bounded', () => {
+    expect(isExternalAgencyPropensityV1Enabled({})).toBe(false)
+    expect(isExternalAgencyPropensityV1Enabled({
+      EXTERNAL_AGENCY_PROPENSITY_V1_ENABLED: '1',
+    })).toBe(false)
+    expect(isExternalAgencyPropensityV1Enabled({
+      EXTERNAL_AGENCY_PROPENSITY_V1_ENABLED: 'true',
+    })).toBe(true)
+    expect(isExternalAgencyPropensityV1Enabled({
+      EXTERNAL_AGENCY_PROPENSITY_V1_ENABLED: ' TRUE ',
+    })).toBe(false)
+    expect(clampExternalAgencyPropensityJobBatchSize(Number.NaN)).toBe(10)
+    expect(clampExternalAgencyPropensityJobBatchSize(0)).toBe(1)
+    expect(clampExternalAgencyPropensityJobBatchSize(26)).toBe(25)
   })
 
   it('is dark by default and only accepts an explicit true value', () => {

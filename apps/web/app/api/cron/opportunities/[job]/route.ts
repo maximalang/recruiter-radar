@@ -5,11 +5,13 @@ import {
   COMPANY_STATE_V1_LIMITS,
   SIGNAL_EPISODES_V2_LIMITS,
   COMMERCIAL_THESIS_V1_LIMITS,
+  EXTERNAL_AGENCY_PROPENSITY_V1_LIMITS,
   OPPORTUNITY_ENGINE_LIMITS,
   isCompanyEventsV1Enabled,
   isCompanyStateV1Enabled,
   isSignalEpisodesV2Enabled,
   isCommercialThesisV1Enabled,
+  isExternalAgencyPropensityV1Enabled,
   isOpportunityEngineV1Enabled,
 } from '@/lib/opportunities/config'
 import {
@@ -28,6 +30,10 @@ import {
   buildCommercialThesesJob,
   type CommercialThesisJobOptions,
 } from '@/lib/opportunities/commercial-thesis-job'
+import {
+  buildExternalAgencyPropensityJob,
+  type ExternalAgencyPropensityJobOptions,
+} from '@/lib/opportunities/external-agency-propensity-job'
 import {
   backfillOpportunitiesJob,
   buildOpportunitiesJob,
@@ -49,12 +55,14 @@ const JOBS = new Set([
   'build-company-state',
   'build-signal-episodes',
   'build-commercial-theses',
+  'build-external-agency-propensity',
 ])
 
 const COMPANY_EVENTS_JOB = 'normalize-company-events'
 const COMPANY_STATE_JOB = 'build-company-state'
 const SIGNAL_EPISODES_JOB = 'build-signal-episodes'
 const COMMERCIAL_THESIS_JOB = 'build-commercial-theses'
+const EXTERNAL_AGENCY_PROPENSITY_JOB = 'build-external-agency-propensity'
 
 export async function GET(
   request: NextRequest,
@@ -88,10 +96,12 @@ export async function POST(
 
   const params = request.nextUrl.searchParams
   const organizationValue = params.get('organization')
+  const workspaceValue = params.get('workspace')
   const batchSizeValue = params.get('batchSize')
   const dryRunValue = params.get('dryRun')
   const applyValue = params.get('apply')
   const organizationId = positiveId(organizationValue)
+  const workspaceId = positiveId(workspaceValue)
   const batchSize = positiveInteger(batchSizeValue)
   const maximumBatchSize = job === COMPANY_EVENTS_JOB
     ? COMPANY_EVENTS_V1_LIMITS.maximumJobBatchSize
@@ -101,9 +111,12 @@ export async function POST(
         ? SIGNAL_EPISODES_V2_LIMITS.maximumJobBatchSize
         : job === COMMERCIAL_THESIS_JOB
           ? COMMERCIAL_THESIS_V1_LIMITS.maximumJobBatchSize
+          : job === EXTERNAL_AGENCY_PROPENSITY_JOB
+            ? EXTERNAL_AGENCY_PROPENSITY_V1_LIMITS.maximumJobBatchSize
       : OPPORTUNITY_ENGINE_LIMITS.maximumJobBatchSize
   if (
     (organizationValue !== null && organizationId === null) ||
+    (workspaceValue !== null && workspaceId === null) ||
     (batchSizeValue !== null && (
       batchSize === null ||
       batchSize > maximumBatchSize
@@ -118,13 +131,21 @@ export async function POST(
       job === COMPANY_EVENTS_JOB ||
       job === COMPANY_STATE_JOB ||
       job === SIGNAL_EPISODES_JOB ||
-      job === COMMERCIAL_THESIS_JOB
+      job === COMMERCIAL_THESIS_JOB ||
+      job === EXTERNAL_AGENCY_PROPENSITY_JOB
     ) &&
     applyValue === 'true' &&
-    organizationId === null
+    (
+      organizationId === null ||
+      (job === EXTERNAL_AGENCY_PROPENSITY_JOB && workspaceId === null)
+    )
   ) {
     return NextResponse.json(
-      { error: 'organization_required_for_apply' },
+      {
+        error: job === EXTERNAL_AGENCY_PROPENSITY_JOB
+          ? 'workspace_and_organization_required_for_apply'
+          : 'organization_required_for_apply',
+      },
       { status: 400 },
     )
   }
@@ -155,6 +176,11 @@ export async function POST(
     ...commonOptions,
     dryRun: applyValue !== 'true',
   }
+  const externalAgencyPropensityOptions: ExternalAgencyPropensityJobOptions = {
+    ...commonOptions,
+    workspaceId,
+    dryRun: applyValue !== 'true',
+  }
 
   try {
     const result = job === COMPANY_EVENTS_JOB
@@ -165,6 +191,10 @@ export async function POST(
           ? await buildSignalEpisodesJob(signalEpisodesOptions)
           : job === COMMERCIAL_THESIS_JOB
             ? await buildCommercialThesesJob(commercialThesisOptions)
+            : job === EXTERNAL_AGENCY_PROPENSITY_JOB
+              ? await buildExternalAgencyPropensityJob(
+                externalAgencyPropensityOptions,
+              )
       : job === 'detect-hiring-episodes'
       ? await detectHiringEpisodesJob(opportunityOptions)
       : job === 'build-opportunities'
@@ -191,6 +221,8 @@ function isJobEnabled(job: string): boolean {
         ? isSignalEpisodesV2Enabled()
         : job === COMMERCIAL_THESIS_JOB
           ? isCommercialThesisV1Enabled()
+          : job === EXTERNAL_AGENCY_PROPENSITY_JOB
+            ? isExternalAgencyPropensityV1Enabled()
     : isOpportunityEngineV1Enabled()
 }
 

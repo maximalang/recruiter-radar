@@ -35,6 +35,8 @@ export const COMPANY_EVENTS_V1_FEATURE_FLAG = 'COMPANY_EVENTS_V1_ENABLED'
 export const COMPANY_STATE_V1_FEATURE_FLAG = 'COMPANY_STATE_V1_ENABLED'
 export const SIGNAL_EPISODES_V2_FEATURE_FLAG = 'SIGNAL_EPISODES_V2_ENABLED'
 export const COMMERCIAL_THESIS_V1_FEATURE_FLAG = 'COMMERCIAL_THESIS_V1_ENABLED'
+export const EXTERNAL_AGENCY_PROPENSITY_V1_FEATURE_FLAG =
+  'EXTERNAL_AGENCY_PROPENSITY_V1_ENABLED'
 
 export type OpportunityFeatureContext = {
   dataOwnerId: string | number | null | undefined
@@ -84,6 +86,12 @@ export const COMMERCIAL_THESIS_V1_LIMITS = {
   statementTimeoutMs: 15_000,
 } as const
 
+export const EXTERNAL_AGENCY_PROPENSITY_V1_LIMITS = {
+  defaultJobBatchSize: 10,
+  maximumJobBatchSize: 25,
+  statementTimeoutMs: 15_000,
+} as const
+
 export function isOpportunityEngineV1Enabled(
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): boolean {
@@ -112,6 +120,12 @@ export function isCommercialThesisV1Enabled(
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): boolean {
   return env[COMMERCIAL_THESIS_V1_FEATURE_FLAG] === 'true'
+}
+
+export function isExternalAgencyPropensityV1Enabled(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+  return env[EXTERNAL_AGENCY_PROPENSITY_V1_FEATURE_FLAG] === 'true'
 }
 
 export function isOpportunityOutcomesEnabled(
@@ -455,6 +469,16 @@ export function clampCommercialThesisJobBatchSize(value: number): number {
   return Math.min(
     Math.max(Math.trunc(value), 1),
     COMMERCIAL_THESIS_V1_LIMITS.maximumJobBatchSize,
+  )
+}
+
+export function clampExternalAgencyPropensityJobBatchSize(value: number): number {
+  if (!Number.isFinite(value)) {
+    return EXTERNAL_AGENCY_PROPENSITY_V1_LIMITS.defaultJobBatchSize
+  }
+  return Math.min(
+    Math.max(Math.trunc(value), 1),
+    EXTERNAL_AGENCY_PROPENSITY_V1_LIMITS.maximumJobBatchSize,
   )
 }
 

@@ -9,6 +9,10 @@ import {
   type ExternalAgencyPropensityDraft,
 } from '@/lib/opportunities/external-agency-propensity'
 import {
+  buildExternalAgencyPropensityJob,
+  type ExternalAgencyPropensityJobDb,
+} from '@/lib/opportunities/external-agency-propensity-job'
+import {
   persistExternalAgencyPropensity,
   type ExternalAgencyPropensityDb,
 } from '@/lib/opportunities/external-agency-propensity-repository'
@@ -23,6 +27,7 @@ const describeIfDatabase = databaseUrl && isolatedDatabaseAcknowledged
 describeIfDatabase('External Agency Propensity v1 PostgreSQL runtime', () => {
   const database = new Pool({ connectionString: databaseUrl })
   const repositoryDb = database as unknown as ExternalAgencyPropensityDb
+  const jobDb = database as unknown as ExternalAgencyPropensityJobDb
   const token = randomUUID()
   const now = new Date('2026-08-04T12:00:00.000Z')
   const ownerIds: string[] = []
@@ -286,39 +291,76 @@ describeIfDatabase('External Agency Propensity v1 PostgreSQL runtime', () => {
     await database.end()
   })
 
-  it('persists, replays, and advances when Agency DNA changes', async () => {
-    const first = await currentDraft()
-    const inserted = await persistExternalAgencyPropensity(first, repositoryDb)
-    expect(inserted).toMatchObject({
-      propensityGeneration: 1,
-      inserted: true,
-      evidenceAttached: 2,
+  it('previews, applies, no-ops, and advances when Agency DNA changes', async () => {
+    const options = {
+      env: { EXTERNAL_AGENCY_PROPENSITY_V1_ENABLED: 'true' },
+      workspaceId,
+      organizationId,
+      now,
+    }
+    await expect(buildExternalAgencyPropensityJob(options, jobDb)).resolves
+      .toMatchObject({
+        dryRun: true,
+        scanned: 1,
+        built: 1,
+        high: 1,
+        persisted: 0,
+        failed: 0,
+      })
+    await expect(buildExternalAgencyPropensityJob({
+      ...options,
+      dryRun: false,
+    }, jobDb)).resolves.toMatchObject({
+      dryRun: false,
+      scanned: 1,
+      built: 1,
+      high: 1,
+      persisted: 1,
+      failed: 0,
     })
-    persistedSnapshotId = inserted.propensitySnapshotId
-    await expect(persistExternalAgencyPropensity(first, repositoryDb)).resolves
-      .toMatchObject({ propensityGeneration: 1, inserted: false })
+    await expect(buildExternalAgencyPropensityJob({
+      ...options,
+      dryRun: false,
+    }, jobDb)).resolves.toMatchObject({
+      scanned: 0,
+      built: 0,
+      persisted: 0,
+      replayed: 0,
+    })
 
     await database.query(
       `UPDATE client_profiles SET current_capacity = 'high' WHERE id = $1`,
       [profileId],
     )
-    const refreshed = await persistExternalAgencyPropensity(
-      await currentDraft(),
-      repositoryDb,
-    )
-    expect(refreshed).toMatchObject({ propensityGeneration: 2, inserted: true })
-    const stored = await database.query(
-      `SELECT propensity_generation AS generation,
+    await expect(buildExternalAgencyPropensityJob({
+      ...options,
+      dryRun: false,
+    }, jobDb)).resolves.toMatchObject({
+      scanned: 1,
+      built: 1,
+      persisted: 1,
+      failed: 0,
+    })
+    const stored = await database.query<{
+      id: string
+      generation: number
+      agencyDnaVersion: number
+    }>(
+      `SELECT id::TEXT AS id, propensity_generation AS generation,
          agency_dna_version::INTEGER AS "agencyDnaVersion"
        FROM external_agency_propensity_snapshots
        WHERE workspace_id = $1 AND client_profile_id = $2
        ORDER BY propensity_generation`,
       [workspaceId, profileId],
     )
-    expect(stored.rows).toEqual([
+    expect(stored.rows.map(({ generation, agencyDnaVersion }) => ({
+      generation,
+      agencyDnaVersion,
+    }))).toEqual([
       { generation: 1, agencyDnaVersion: 1 },
       { generation: 2, agencyDnaVersion: 2 },
     ])
+    persistedSnapshotId = stored.rows[0].id
   })
 
   it('rejects cross-tenant profile scope and evidence outside the thesis', async () => {
