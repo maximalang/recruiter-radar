@@ -18,6 +18,18 @@ const parentVerifier = readFileSync(resolve(
   'scripts',
   'verify-external-agency-propensity-v1.mjs',
 ), 'utf8')
+const rootPackage = readFileSync(resolve(root, 'package.json'), 'utf8')
+const testWorkflow = readFileSync(
+  resolve(root, '.github', 'workflows', 'test.yml'),
+  'utf8',
+)
+const dbRunner = readFileSync(resolve(
+  root,
+  'packages',
+  'db',
+  'scripts',
+  'run-agency-dna-match-v2-db-tests.mjs',
+), 'utf8')
 const compact = migration.replace(/\s+/g, ' ')
 
 describe('Agency DNA Match v2 migration contract', () => {
@@ -151,5 +163,20 @@ describe('Agency DNA Match v2 migration contract', () => {
     expect(childApply).toBeGreaterThan(childDown)
     expect(parentApply).toBeGreaterThan(childApply)
     expect(parentVerifier).not.toContain('CASCADE')
+  })
+
+  it('registers an isolated PostgreSQL gate after External Agency Propensity', () => {
+    expect(rootPackage).toContain('"test:agency-dna-match-v2:db"')
+    expect(dbRunner).toContain('AGENCY_DNA_MATCH_V2_DB_TEST_ACK')
+    expect(dbRunner).toContain('agency-dna-match-runtime-db.test.ts')
+    expect(dbRunner).toContain('verify-agency-dna-match-v2.mjs')
+    const propensityGate = testWorkflow.indexOf(
+      'run: npm run test:external-agency-propensity-v1:db',
+    )
+    const matchGate = testWorkflow.indexOf(
+      'run: npm run test:agency-dna-match-v2:db',
+    )
+    expect(propensityGate).toBeGreaterThan(-1)
+    expect(matchGate).toBeGreaterThan(propensityGate)
   })
 })
