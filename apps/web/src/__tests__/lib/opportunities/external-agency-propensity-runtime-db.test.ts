@@ -360,7 +360,7 @@ describeIfDatabase('External Agency Propensity v1 PostgreSQL runtime', () => {
       { generation: 1, agencyDnaVersion: 1 },
       { generation: 2, agencyDnaVersion: 2 },
     ])
-    persistedSnapshotId = stored.rows[0].id
+    persistedSnapshotId = stored.rows.at(-1)?.id ?? ''
   })
 
   it('rejects cross-tenant profile scope and evidence outside the thesis', async () => {
@@ -378,6 +378,50 @@ describeIfDatabase('External Agency Propensity v1 PostgreSQL runtime', () => {
     })
     await expect(persistExternalAgencyPropensity(unsupported, repositoryDb))
       .rejects.toMatchObject({ code: '23514' })
+  })
+
+  it('fails closed when required JSON feature or reason fields are missing', async () => {
+    await expect(database.query(
+      `INSERT INTO external_agency_propensity_snapshots (
+         organization_id, workspace_id, owner_id, client_profile_id,
+         commercial_thesis_id, commercial_thesis_generation,
+         agency_dna_version, agency_dna_snapshot_hash, propensity_identity,
+         propensity_generation, score, level, positive_reasons,
+         negative_reasons, feature_snapshot, evidence_hash, input_hash,
+         feature_version
+       )
+       SELECT
+         organization_id, workspace_id, owner_id, client_profile_id,
+         commercial_thesis_id, commercial_thesis_generation,
+         agency_dna_version, agency_dna_snapshot_hash, propensity_identity,
+         3, score, level, positive_reasons,
+         negative_reasons, feature_snapshot - 'evidenceCount', evidence_hash,
+         $2, feature_version
+       FROM external_agency_propensity_snapshots
+       WHERE id = $1`,
+      [persistedSnapshotId, 'f'.repeat(64)],
+    )).rejects.toMatchObject({ code: '23514' })
+
+    await expect(database.query(
+      `INSERT INTO external_agency_propensity_snapshots (
+         organization_id, workspace_id, owner_id, client_profile_id,
+         commercial_thesis_id, commercial_thesis_generation,
+         agency_dna_version, agency_dna_snapshot_hash, propensity_identity,
+         propensity_generation, score, level, positive_reasons,
+         negative_reasons, feature_snapshot, evidence_hash, input_hash,
+         feature_version
+       )
+       SELECT
+         organization_id, workspace_id, owner_id, client_profile_id,
+         commercial_thesis_id, commercial_thesis_generation,
+         agency_dna_version, agency_dna_snapshot_hash, propensity_identity,
+         3, score, level, positive_reasons #- '{0,basis}',
+         negative_reasons, feature_snapshot, evidence_hash,
+         $2, feature_version
+       FROM external_agency_propensity_snapshots
+       WHERE id = $1`,
+      [persistedSnapshotId, '0'.repeat(64)],
+    )).rejects.toMatchObject({ code: '23514' })
   })
 
   it('keeps rows append-only and refuses a data-loss rollback', async () => {

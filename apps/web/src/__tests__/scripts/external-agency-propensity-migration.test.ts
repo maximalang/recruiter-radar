@@ -85,10 +85,16 @@ describe('External Agency Propensity v1 migration contract', () => {
       expect(migration).toContain(`'${basis}'`)
     }
     expect(compact).toContain(
+      "COALESCE(item->>'basis', '') NOT IN ( 'evidence', 'agency_profile', 'policy' )",
+    )
+    expect(compact).toContain(
       "item->>'basis' = 'evidence' AND JSONB_ARRAY_LENGTH(item->'evidenceIds') = 0",
     )
     expect(compact).toContain(
       "item->>'basis' <> 'evidence' AND JSONB_ARRAY_LENGTH(item->'evidenceIds') <> 0",
+    )
+    expect(compact).toMatch(
+      /SELECT COALESCE\( JSONB_TYPEOF\(features\).* FALSE \);/,
     )
   })
 

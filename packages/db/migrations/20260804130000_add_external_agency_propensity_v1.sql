@@ -18,7 +18,9 @@ AS $$
       WHERE JSONB_TYPEOF(item) <> 'object'
          OR COALESCE(item->>'code', '') !~ '^[A-Z][A-Z0-9_]{1,63}$'
          OR BTRIM(COALESCE(item->>'message', '')) = ''
-         OR item->>'basis' NOT IN ('evidence', 'agency_profile', 'policy')
+         OR COALESCE(item->>'basis', '') NOT IN (
+              'evidence', 'agency_profile', 'policy'
+            )
          OR JSONB_TYPEOF(item->'contribution') IS DISTINCT FROM 'number'
          OR JSONB_TYPEOF(item->'evidenceIds') IS DISTINCT FROM 'array'
          OR CASE
@@ -49,7 +51,7 @@ RETURNS BOOLEAN
 LANGUAGE SQL
 IMMUTABLE
 AS $$
-  SELECT
+  SELECT COALESCE(
     JSONB_TYPEOF(features) = 'object'
     AND features->>'episodeType' IN (
       'vacancy_acceleration',
@@ -81,7 +83,9 @@ AS $$
     )
     AND features->>'opportunityMode' IN (
       'new', 'grow', 'reactivate', 'blocked'
-    );
+    ),
+    FALSE
+  );
 $$;
 
 CREATE TABLE external_agency_propensity_snapshots (
