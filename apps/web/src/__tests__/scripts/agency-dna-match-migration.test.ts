@@ -128,6 +128,27 @@ describe('Agency DNA Match v2 migration contract', () => {
     expect(migration).toContain('validate_agency_dna_match_evidence')
     expect(migration).toContain('require_agency_dna_match_evidence')
     expect(compact).toContain('DEFERRABLE INITIALLY DEFERRED')
+    expect(compact).toContain(
+      "NEW.feature_snapshot #>> '{propensity,episodeStage}' = propensity.feature_snapshot->>'episodeStage'",
+    )
+    expect(compact).toContain(
+      "NEW.feature_snapshot #> '{company,roleFamilies}' = propensity.feature_snapshot->'roleFamilies'",
+    )
+    expect(compact).toContain(
+      "NEW.feature_snapshot #> '{company,episodeRegions}' = TO_JSONB(ARRAY(",
+    )
+    expect(compact).toContain(
+      "NEW.feature_snapshot #> '{company,remoteStatus}' = 'null'::JSONB",
+    )
+    expect(migration).toContain('agency_dna_match_normalized_text_array')
+    expect(migration).toContain('agency_dna_match_specialization_terms')
+    expect(migration).toContain('agency_dna_match_case_studies_equal')
+    expect(compact).toContain(
+      "NEW.feature_snapshot #> '{agency,roles}' = agency_dna_match_normalized_text_array(TO_JSONB(profile.roles))",
+    )
+    expect(compact).toContain(
+      "NEW.feature_snapshot #>> '{agency,accountRestriction}' IS NOT DISTINCT FROM (",
+    )
     expect(compact).toMatch(
       /UNIQUE \( workspace_id, client_profile_id, organization_id, feature_version, match_identity, match_generation \)/,
     )
@@ -148,6 +169,9 @@ describe('Agency DNA Match v2 migration contract', () => {
     )
     expect(rollback).toContain('agency DNA match v2 rollback refused')
     expect(rollback).toContain('Agency DNA v2 profile rollback refused')
+    expect(rollback).toContain(
+      'DROP FUNCTION agency_dna_match_case_studies_equal(JSONB, JSONB)',
+    )
     expect(rollback.indexOf('DROP TABLE agency_dna_match_evidence'))
       .toBeLessThan(rollback.indexOf('DROP TABLE agency_dna_match_snapshots'))
   })

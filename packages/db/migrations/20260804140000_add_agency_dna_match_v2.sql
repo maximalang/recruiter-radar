@@ -214,6 +214,112 @@ AS $$
   );
 $$;
 
+CREATE OR REPLACE FUNCTION agency_dna_match_normalized_text_array(
+  items JSONB
+)
+RETURNS JSONB
+LANGUAGE SQL
+IMMUTABLE
+AS $$
+  SELECT COALESCE(JSONB_AGG(value ORDER BY value), '[]'::JSONB)
+  FROM (
+    SELECT DISTINCT LOWER(BTRIM(item #>> '{}')) AS value
+    FROM JSONB_ARRAY_ELEMENTS(
+      CASE WHEN JSONB_TYPEOF(items) = 'array' THEN items ELSE '[]'::JSONB END
+    ) AS item
+    WHERE JSONB_TYPEOF(item) = 'string'
+      AND BTRIM(item #>> '{}') <> ''
+  ) normalized;
+$$;
+
+CREATE OR REPLACE FUNCTION agency_dna_match_specialization_terms(
+  specialization TEXT
+)
+RETURNS JSONB
+LANGUAGE SQL
+IMMUTABLE
+AS $$
+  SELECT COALESCE(JSONB_AGG(value ORDER BY value), '[]'::JSONB)
+  FROM (
+    SELECT DISTINCT LOWER(BTRIM(term)) AS value
+    FROM REGEXP_SPLIT_TO_TABLE(
+      COALESCE(specialization, ''),
+      '[;,/|]+'
+    ) AS term
+    WHERE BTRIM(term) <> ''
+  ) normalized;
+$$;
+
+CREATE OR REPLACE FUNCTION agency_dna_match_normalized_case_study(
+  study JSONB
+)
+RETURNS JSONB
+LANGUAGE SQL
+IMMUTABLE
+AS $$
+  SELECT JSONB_BUILD_OBJECT(
+    'roleFamilies', agency_dna_match_normalized_text_array(
+      study->'roleFamilies'
+    ),
+    'industries', agency_dna_match_normalized_text_array(
+      study->'industries'
+    ),
+    'companySizeBucket', NULLIF(
+      LOWER(BTRIM(study->>'companySizeBucket')),
+      ''
+    ),
+    'region', NULLIF(LOWER(BTRIM(study->>'region')), ''),
+    'hiringModes', agency_dna_match_normalized_text_array(
+      study->'hiringModes'
+    ),
+    'measurableResult', NULLIF(
+      LOWER(BTRIM(study->>'measurableResult')),
+      ''
+    ),
+    'publicSafeDescription', NULLIF(
+      LOWER(BTRIM(study->>'publicSafeDescription')),
+      ''
+    )
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION agency_dna_match_case_studies_equal(
+  source_studies JSONB,
+  feature_studies JSONB
+)
+RETURNS BOOLEAN
+LANGUAGE SQL
+IMMUTABLE
+AS $$
+  SELECT COALESCE(
+    JSONB_TYPEOF(source_studies) = 'array'
+    AND JSONB_TYPEOF(feature_studies) = 'array'
+    AND NOT EXISTS (
+      (
+        SELECT agency_dna_match_normalized_case_study(source_item)
+        FROM JSONB_ARRAY_ELEMENTS(source_studies) AS source_item
+      )
+      EXCEPT ALL
+      (
+        SELECT feature_item
+        FROM JSONB_ARRAY_ELEMENTS(feature_studies) AS feature_item
+      )
+    )
+    AND NOT EXISTS (
+      (
+        SELECT feature_item
+        FROM JSONB_ARRAY_ELEMENTS(feature_studies) AS feature_item
+      )
+      EXCEPT ALL
+      (
+        SELECT agency_dna_match_normalized_case_study(source_item)
+        FROM JSONB_ARRAY_ELEMENTS(source_studies) AS source_item
+      )
+    ),
+    FALSE
+  );
+$$;
+
 CREATE OR REPLACE FUNCTION agency_dna_match_reasons_valid(
   reasons JSONB
 )
@@ -616,6 +722,15 @@ BEGIN
       ON profile.id = NEW.client_profile_id
      AND profile.owner_id = NEW.owner_id
      AND profile.workspace_id = NEW.workspace_id
+    JOIN commercial_theses thesis
+      ON thesis.id = propensity.commercial_thesis_id
+     AND thesis.organization_id = propensity.organization_id
+     AND thesis.thesis_generation = propensity.commercial_thesis_generation
+    JOIN signal_episodes episode
+      ON episode.id = thesis.signal_episode_id
+     AND episode.organization_id = thesis.organization_id
+     AND episode.episode_generation = thesis.signal_episode_generation
+    JOIN orgs org ON org.id = propensity.organization_id
     WHERE propensity.id = NEW.propensity_snapshot_id
       AND propensity.organization_id = NEW.organization_id
       AND propensity.workspace_id = NEW.workspace_id
@@ -638,6 +753,110 @@ BEGIN
       AND (NEW.feature_snapshot #>> '{propensity,score}')::NUMERIC =
         propensity.score
       AND NEW.feature_snapshot #>> '{propensity,level}' = propensity.level
+      AND NEW.feature_snapshot #>> '{propensity,episodeStage}' =
+        propensity.feature_snapshot->>'episodeStage'
+      AND (NEW.feature_snapshot #>>
+        '{propensity,evidenceSourceFamilyCount}')::INTEGER =
+        (propensity.feature_snapshot->>'evidenceSourceFamilyCount')::INTEGER
+      AND NEW.feature_snapshot #> '{company,roleFamilies}' =
+        propensity.feature_snapshot->'roleFamilies'
+      AND NEW.feature_snapshot #> '{company,seniorityDistribution}' =
+        propensity.feature_snapshot->'seniorityDistribution'
+      AND NEW.feature_snapshot #> '{company,episodeRegions}' = TO_JSONB(ARRAY(
+        SELECT normalized_region
+        FROM (
+          SELECT DISTINCT LOWER(BTRIM(region)) AS normalized_region
+          FROM UNNEST(COALESCE(episode.regions, ARRAY[]::TEXT[])) AS region
+          WHERE BTRIM(region) <> ''
+        ) normalized_regions
+        ORDER BY normalized_region
+      ))
+      AND NEW.feature_snapshot #>> '{company,organizationIndustry}'
+        IS NOT DISTINCT FROM NULLIF(BTRIM(LOWER(org.industry)), '')
+      AND NEW.feature_snapshot #>> '{company,organizationCity}'
+        IS NOT DISTINCT FROM NULLIF(BTRIM(LOWER(org.city)), '')
+      AND NEW.feature_snapshot #>> '{company,organizationCountry}'
+        IS NOT DISTINCT FROM NULLIF(BTRIM(LOWER(org.country)), '')
+      AND NEW.feature_snapshot #> '{company,technologyQualificationTags}' =
+        '[]'::JSONB
+      AND NEW.feature_snapshot #> '{company,serviceTypes}' = CASE
+        WHEN COALESCE(
+          (propensity.feature_snapshot #>>
+            '{seniorityDistribution,executive}')::NUMERIC,
+          0
+        ) > 0 THEN '["executive"]'::JSONB
+        ELSE '[]'::JSONB
+      END
+      AND NEW.feature_snapshot #> '{company,engagementTypes}' = '[]'::JSONB
+      AND NEW.feature_snapshot #> '{company,remoteStatus}' = 'null'::JSONB
+      AND NEW.feature_snapshot #> '{company,companySizeBucket}' = 'null'::JSONB
+      AND NEW.feature_snapshot #> '{company,estimatedFeeMinor}' = 'null'::JSONB
+      AND NEW.feature_snapshot #> '{company,estimatedOpportunityValueMinor}' =
+        'null'::JSONB
+      AND NEW.feature_snapshot #> '{agency,specializationTerms}' =
+        agency_dna_match_specialization_terms(profile.specialization)
+      AND NEW.feature_snapshot #> '{agency,roles}' =
+        agency_dna_match_normalized_text_array(TO_JSONB(profile.roles))
+      AND NEW.feature_snapshot #> '{agency,technologyQualificationTags}' =
+        agency_dna_match_normalized_text_array(
+          TO_JSONB(profile.technology_qualification_tags)
+        )
+      AND NEW.feature_snapshot #> '{agency,industries}' =
+        agency_dna_match_normalized_text_array(profile.industries)
+      AND NEW.feature_snapshot #> '{agency,targetRegions}' =
+        agency_dna_match_normalized_text_array(
+          TO_JSONB(profile.preferred_regions) ||
+            JSONB_BUILD_ARRAY(profile.target_city)
+        )
+      AND NEW.feature_snapshot #> '{agency,excludedIndustries}' =
+        agency_dna_match_normalized_text_array(
+          TO_JSONB(profile.excluded_industries)
+        )
+      AND NEW.feature_snapshot #> '{agency,excludedLocations}' =
+        agency_dna_match_normalized_text_array(
+          TO_JSONB(profile.excluded_locations)
+        )
+      AND (NEW.feature_snapshot #>> '{agency,remoteFriendly}')::BOOLEAN =
+        profile.remote_friendly
+      AND NEW.feature_snapshot #> '{agency,serviceTypes}' =
+        agency_dna_match_normalized_text_array(TO_JSONB(profile.service_types))
+      AND NEW.feature_snapshot #> '{agency,targetSeniorities}' =
+        agency_dna_match_normalized_text_array(
+          TO_JSONB(profile.target_seniorities)
+        )
+      AND NEW.feature_snapshot #>> '{agency,minimumFeeMinor}'
+        IS NOT DISTINCT FROM profile.minimum_fee_minor::TEXT
+      AND NEW.feature_snapshot #>> '{agency,averageFeeMinor}'
+        IS NOT DISTINCT FROM profile.average_fee_minor::TEXT
+      AND NEW.feature_snapshot #>> '{agency,minimumOpportunityValueMinor}'
+        IS NOT DISTINCT FROM profile.minimum_opportunity_value_minor::TEXT
+      AND NEW.feature_snapshot #> '{agency,preferredEngagementTypes}' =
+        agency_dna_match_normalized_text_array(
+          TO_JSONB(profile.preferred_engagement_types)
+        )
+      AND NEW.feature_snapshot #> '{agency,companySizes}' =
+        agency_dna_match_normalized_text_array(profile.company_sizes)
+      AND NEW.feature_snapshot #>> '{agency,hiringMode}' =
+        LOWER(BTRIM(profile.hiring_mode))
+      AND NEW.feature_snapshot #> '{agency,undesirableHiringTypes}' =
+        agency_dna_match_normalized_text_array(
+          TO_JSONB(profile.undesirable_hiring_types)
+        )
+      AND NEW.feature_snapshot #>> '{agency,currentCapacity}' =
+        profile.current_capacity
+      AND agency_dna_match_case_studies_equal(
+        profile.case_studies,
+        NEW.feature_snapshot #> '{agency,caseStudies}'
+      )
+      AND NEW.feature_snapshot #>> '{agency,accountRestriction}'
+        IS NOT DISTINCT FROM (
+          SELECT restriction.restriction_type
+          FROM agency_account_restrictions restriction
+          WHERE restriction.workspace_id = profile.workspace_id
+            AND restriction.client_profile_id = profile.id
+            AND restriction.owner_id = profile.owner_id
+            AND restriction.organization_id = NEW.organization_id
+        )
   ) THEN
     RAISE EXCEPTION 'agency DNA match source snapshot mismatch'
       USING ERRCODE = '23514';

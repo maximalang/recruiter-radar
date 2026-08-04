@@ -214,7 +214,7 @@ describeIfDatabase('Agency DNA Match v2 PostgreSQL runtime', () => {
     ])
   })
 
-  it('rejects cross-tenant, altered source snapshot, and non-propensity evidence', async () => {
+  it('rejects cross-tenant, altered source facts, and non-propensity evidence', async () => {
     const valid = await currentDraft()
     await expect(persistAgencyDnaMatch({
       ...valid,
@@ -226,6 +226,42 @@ describeIfDatabase('Agency DNA Match v2 PostgreSQL runtime', () => {
       ...valid,
       agencyDnaSourceSnapshot: { altered: true },
       inputHash: '5'.repeat(64),
+    }, matchDb)).rejects.toMatchObject({ code: '23514' })
+
+    await expect(persistAgencyDnaMatch({
+      ...valid,
+      featureSnapshot: {
+        ...valid.featureSnapshot,
+        propensity: {
+          ...valid.featureSnapshot.propensity,
+          episodeStage: 'cooling',
+        },
+      },
+      inputHash: '0'.repeat(64),
+    }, matchDb)).rejects.toMatchObject({ code: '23514' })
+
+    await expect(persistAgencyDnaMatch({
+      ...valid,
+      featureSnapshot: {
+        ...valid.featureSnapshot,
+        company: {
+          ...valid.featureSnapshot.company,
+          roleFamilies: ['tampered-role'],
+        },
+      },
+      inputHash: 'a'.repeat(64),
+    }, matchDb)).rejects.toMatchObject({ code: '23514' })
+
+    await expect(persistAgencyDnaMatch({
+      ...valid,
+      featureSnapshot: {
+        ...valid.featureSnapshot,
+        agency: {
+          ...valid.featureSnapshot.agency,
+          roles: ['tampered-agency-role'],
+        },
+      },
+      inputHash: 'b'.repeat(64),
     }, matchDb)).rejects.toMatchObject({ code: '23514' })
 
     await expect(persistAgencyDnaMatch({

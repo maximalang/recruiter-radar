@@ -36,6 +36,10 @@ DROP FUNCTION agency_dna_match_selection_policy_valid(JSONB);
 DROP FUNCTION agency_dna_match_unknown_dimensions_valid(JSONB);
 DROP FUNCTION agency_dna_match_dimensions_valid(JSONB);
 DROP FUNCTION agency_dna_match_reasons_valid(JSONB);
+DROP FUNCTION agency_dna_match_case_studies_equal(JSONB, JSONB);
+DROP FUNCTION agency_dna_match_normalized_case_study(JSONB);
+DROP FUNCTION agency_dna_match_specialization_terms(TEXT);
+DROP FUNCTION agency_dna_match_normalized_text_array(JSONB);
 DROP FUNCTION agency_dna_match_json_text_array_valid(JSONB);
 
 CREATE OR REPLACE FUNCTION agency_dna_profile_snapshot(
