@@ -12,6 +12,10 @@ const rollback = fs.readFileSync(path.join(
 ), 'utf8')
 const rootPackage = fs.readFileSync(path.join(root, 'package.json'), 'utf8')
 const workflow = fs.readFileSync(path.join(root, '.github/workflows/test.yml'), 'utf8')
+const dbRunner = fs.readFileSync(path.join(
+  root,
+  'packages/db/scripts/run-query-planner-v2-db-tests.mjs',
+), 'utf8')
 const downVerifier = fs.readFileSync(path.join(
   root,
   'packages/db/scripts/verify-opportunity-engine-down.mjs',
@@ -84,6 +88,7 @@ describe('Query Planner v2 migration', () => {
       'profile_consumers = ARRAY[client_profile_id]::BIGINT[]',
     )
     expect(migration).toContain('validate_query_plan_consumer_request')
+    expect(migration).toContain('HASHTEXTEXTENDED(')
   })
 
   it('keeps shared fetch identity separate from per-profile exclusions and feedback', () => {
@@ -133,6 +138,8 @@ describe('Query Planner v2 migration', () => {
     )
     expect(parentGate).toBeGreaterThan(-1)
     expect(plannerGate).toBeGreaterThan(parentGate)
+    expect(dbRunner).toContain('query-planner-v2-repository.test.ts')
+    expect(dbRunner).toContain('query-planner-v2-runtime-db.test.ts')
   })
 
   it('rolls the child schema down before every ancestor', () => {

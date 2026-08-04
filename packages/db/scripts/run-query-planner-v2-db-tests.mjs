@@ -53,6 +53,8 @@ try {
     '--runInBand',
     '--runTestsByPath',
     'src/__tests__/lib/lead-discovery/query-planner-v2.test.ts',
+    'src/__tests__/lib/lead-discovery/query-planner-v2-repository.test.ts',
+    'src/__tests__/lib/lead-discovery/query-planner-v2-runtime-db.test.ts',
   ], webRoot)
   await run(process.execPath, [verifierScript])
 } finally {
