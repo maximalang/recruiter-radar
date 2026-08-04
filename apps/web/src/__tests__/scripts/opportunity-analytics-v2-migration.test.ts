@@ -28,7 +28,7 @@ describe('Opportunity Analytics v2 migration contract', () => {
     expect(downVerifier).toContain(
       '20260801150000_add_opportunity_analytics_v2.down.sql',
     )
-    expect(downVerifier).toContain('PRE_FIXTURE_DOWN_MIGRATIONS = 16')
+    expect(downVerifier).toContain('PRE_FIXTURE_DOWN_MIGRATIONS = 17')
   })
 
   it('enforces event-time assignee membership inside PostgreSQL', () => {

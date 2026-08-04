@@ -21,6 +21,10 @@ import {
   buildExternalAgencyPropensityJob,
   type ExternalAgencyPropensityJobDb,
 } from '@/lib/opportunities/external-agency-propensity-job'
+import {
+  buildOpportunityScoringV3Job,
+  type OpportunityScoringV3JobDb,
+} from '@/lib/opportunities/opportunity-scoring-v3-job'
 
 const databaseUrl = process.env.DATABASE_URL
 const isolated = process.env.AGENCY_DNA_MATCH_V2_DB_TEST_ACK === 'isolated'
@@ -31,6 +35,7 @@ describeIfDatabase('Agency DNA Match v2 PostgreSQL runtime', () => {
   const matchDb = database as unknown as AgencyDnaMatchDb
   const matchJobDb = database as unknown as AgencyDnaMatchJobDb
   const propensityJobDb = database as unknown as ExternalAgencyPropensityJobDb
+  const scoringV3JobDb = database as unknown as OpportunityScoringV3JobDb
   const token = randomUUID()
   const now = new Date('2026-08-04T12:00:00.000Z')
   const ownerIds: string[] = []
@@ -269,6 +274,76 @@ describeIfDatabase('Agency DNA Match v2 PostgreSQL runtime', () => {
       evidenceIds: [...valid.evidenceIds, unlinkedEvidenceId],
       inputHash: '6'.repeat(64),
     }, matchDb)).rejects.toMatchObject({ code: '23514' })
+  })
+
+  it('persists and replays a quality candidate without contact suppression', async () => {
+    const options = {
+      env: { OPPORTUNITY_SCORING_V3_ENABLED: 'true' },
+      workspaceId,
+      organizationId,
+      now,
+    }
+    await expect(buildOpportunityScoringV3Job(options, scoringV3JobDb)).resolves
+      .toMatchObject({
+        dryRun: true,
+        scanned: 1,
+        built: 1,
+        qualifiedNeedsEnrichment: 1,
+        persisted: 0,
+        failed: 0,
+      })
+    await expect(buildOpportunityScoringV3Job({
+      ...options,
+      dryRun: false,
+    }, scoringV3JobDb)).resolves.toMatchObject({
+      persisted: 1,
+      replayed: 0,
+      failed: 0,
+    })
+    await expect(buildOpportunityScoringV3Job({
+      ...options,
+      dryRun: false,
+    }, scoringV3JobDb)).resolves.toMatchObject({
+      persisted: 0,
+      replayed: 1,
+      failed: 0,
+    })
+
+    const stored = await database.query<{
+      id: string
+      status: string
+      qualityScore: string
+      actionabilityScore: string
+      contacts: unknown
+      evidenceCount: string
+    }>(
+      `SELECT candidate.id::TEXT AS id, candidate.status,
+         candidate.quality_score::TEXT AS "qualityScore",
+         candidate.actionability_score::TEXT AS "actionabilityScore",
+         candidate.feature_snapshot #>
+           '{actionability,corporateContactPathCategories}' AS contacts,
+         COUNT(evidence.evidence_id)::TEXT AS "evidenceCount"
+       FROM opportunity_candidates candidate
+       JOIN opportunity_candidate_evidence evidence
+         ON evidence.candidate_id = candidate.id
+       WHERE candidate.workspace_id = $1
+         AND candidate.client_profile_id = $2
+         AND candidate.organization_id = $3
+       GROUP BY candidate.id`,
+      [workspaceId, profileId, organizationId],
+    )
+    expect(stored.rows).toHaveLength(1)
+    expect(stored.rows[0]).toMatchObject({
+      status: 'qualified_needs_enrichment',
+      actionabilityScore: '0.00000',
+      contacts: [],
+      evidenceCount: '2',
+    })
+    expect(Number(stored.rows[0].qualityScore)).toBeGreaterThan(0.62)
+    await expect(database.query(
+      `UPDATE opportunity_candidates SET quality_score = 0 WHERE id = $1`,
+      [stored.rows[0].id],
+    )).rejects.toMatchObject({ code: '55000' })
   })
 
   it('fails closed for incomplete mode, dimension, and reason JSON', async () => {

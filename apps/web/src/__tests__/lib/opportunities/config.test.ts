@@ -6,6 +6,7 @@ import {
   clampCommercialThesisJobBatchSize,
   clampExternalAgencyPropensityJobBatchSize,
   clampAgencyDnaMatchJobBatchSize,
+  clampOpportunityScoringV3JobBatchSize,
   clampOpportunityPageSize,
   clampOpportunitySnoozeDays,
   isCompanyEventsV1Enabled,
@@ -14,6 +15,7 @@ import {
   isCommercialThesisV1Enabled,
   isExternalAgencyPropensityV1Enabled,
   isAgencyDnaMatchV2Enabled,
+  isOpportunityScoringV3Enabled,
   isAgencyDnaV1Enabled,
   isAgencyDnaV1EnabledForContext,
   isOpportunityEngineV1Enabled,
@@ -41,6 +43,22 @@ import {
 } from '@/lib/opportunities/config'
 
 describe('opportunity engine config', () => {
+  it('keeps Opportunity Scoring v3 independently dark and tightly bounded', () => {
+    expect(isOpportunityScoringV3Enabled({})).toBe(false)
+    expect(isOpportunityScoringV3Enabled({
+      OPPORTUNITY_SCORING_V3_ENABLED: '1',
+    })).toBe(false)
+    expect(isOpportunityScoringV3Enabled({
+      OPPORTUNITY_SCORING_V3_ENABLED: 'true',
+    })).toBe(true)
+    expect(isOpportunityScoringV3Enabled({
+      OPPORTUNITY_SCORING_V3_ENABLED: ' TRUE ',
+    })).toBe(false)
+    expect(clampOpportunityScoringV3JobBatchSize(Number.NaN)).toBe(10)
+    expect(clampOpportunityScoringV3JobBatchSize(0)).toBe(1)
+    expect(clampOpportunityScoringV3JobBatchSize(26)).toBe(25)
+  })
+
   it('keeps Company Events v1 dark unless the flag is exactly true', () => {
     expect(isCompanyEventsV1Enabled({})).toBe(false)
     expect(isCompanyEventsV1Enabled({ COMPANY_EVENTS_V1_ENABLED: '1' }))

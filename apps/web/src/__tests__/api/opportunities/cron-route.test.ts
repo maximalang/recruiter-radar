@@ -33,6 +33,10 @@ jest.mock('@/lib/opportunities/agency-dna-match-job', () => ({
   buildAgencyDnaMatchJob: jest.fn(),
 }))
 
+jest.mock('@/lib/opportunities/opportunity-scoring-v3-job', () => ({
+  buildOpportunityScoringV3Job: jest.fn(),
+}))
+
 import { backfillOpportunitiesJob } from '@/lib/opportunities/jobs'
 import { normalizeCompanyEventsJob } from '@/lib/opportunities/company-event-job'
 import { buildCompanyStateJob } from '@/lib/opportunities/company-state-job'
@@ -40,6 +44,7 @@ import { buildSignalEpisodesJob } from '@/lib/opportunities/signal-episode-job'
 import { buildCommercialThesesJob } from '@/lib/opportunities/commercial-thesis-job'
 import { buildExternalAgencyPropensityJob } from '@/lib/opportunities/external-agency-propensity-job'
 import { buildAgencyDnaMatchJob } from '@/lib/opportunities/agency-dna-match-job'
+import { buildOpportunityScoringV3Job } from '@/lib/opportunities/opportunity-scoring-v3-job'
 import { GET, POST } from '@/app/api/cron/opportunities/[job]/route'
 
 const mockedBackfill = jest.mocked(backfillOpportunitiesJob)
@@ -51,6 +56,9 @@ const mockedBuildExternalAgencyPropensity = jest.mocked(
   buildExternalAgencyPropensityJob,
 )
 const mockedBuildAgencyDnaMatch = jest.mocked(buildAgencyDnaMatchJob)
+const mockedBuildOpportunityScoringV3 = jest.mocked(
+  buildOpportunityScoringV3Job,
+)
 
 function request(path: string, key?: string) {
   return new NextRequest(`https://recruiter-radar.ru${path}`, {
@@ -76,6 +84,8 @@ describe('opportunity cron API', () => {
   const originalExternalPropensityFlag =
     process.env.EXTERNAL_AGENCY_PROPENSITY_V1_ENABLED
   const originalAgencyDnaMatchFlag = process.env.AGENCY_DNA_MATCH_V2_ENABLED
+  const originalOpportunityScoringV3Flag =
+    process.env.OPPORTUNITY_SCORING_V3_ENABLED
 
   beforeEach(() => {
     process.env.CRON_API_KEY = testKey
@@ -86,6 +96,7 @@ describe('opportunity cron API', () => {
     process.env.COMMERCIAL_THESIS_V1_ENABLED = 'false'
     process.env.EXTERNAL_AGENCY_PROPENSITY_V1_ENABLED = 'false'
     process.env.AGENCY_DNA_MATCH_V2_ENABLED = 'false'
+    process.env.OPPORTUNITY_SCORING_V3_ENABLED = 'false'
     jest.clearAllMocks()
   })
 
@@ -112,6 +123,11 @@ describe('opportunity cron API', () => {
       delete process.env.AGENCY_DNA_MATCH_V2_ENABLED
     } else {
       process.env.AGENCY_DNA_MATCH_V2_ENABLED = originalAgencyDnaMatchFlag
+    }
+    if (originalOpportunityScoringV3Flag === undefined) {
+      delete process.env.OPPORTUNITY_SCORING_V3_ENABLED
+    } else {
+      process.env.OPPORTUNITY_SCORING_V3_ENABLED = originalOpportunityScoringV3Flag
     }
   })
 
@@ -525,5 +541,50 @@ describe('opportunity cron API', () => {
       )).status).toBe(400)
     }
     expect(mockedBuildAgencyDnaMatch).not.toHaveBeenCalled()
+  })
+
+  it('keeps Opportunity Scoring v3 separately dark and dry-run by default', async () => {
+    expect((await POST(
+      request('/api/cron/opportunities/build-opportunity-candidates-v3', testKey),
+      { params: Promise.resolve({ job: 'build-opportunity-candidates-v3' }) },
+    )).status).toBe(404)
+    expect(mockedBuildOpportunityScoringV3).not.toHaveBeenCalled()
+
+    process.env.OPPORTUNITY_SCORING_V3_ENABLED = 'true'
+    mockedBuildOpportunityScoringV3.mockResolvedValue({
+      enabled: true, dryRun: true, rolloutMode: 'shadow', scanned: 0, built: 0,
+      qualifiedActionable: 0, qualifiedNeedsEnrichment: 0, review: 0,
+      blocked: 0, expired: 0, dismissed: 0, persisted: 0, replayed: 0,
+      failed: 0,
+    })
+    const response = await POST(
+      request(
+        '/api/cron/opportunities/build-opportunity-candidates-v3' +
+        '?workspace=20&organization=10',
+        testKey,
+      ),
+      { params: Promise.resolve({ job: 'build-opportunity-candidates-v3' }) },
+    )
+    expect(response.status).toBe(200)
+    expect(mockedBuildOpportunityScoringV3).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceId: '20', organizationId: '10', dryRun: true,
+      }),
+    )
+  })
+
+  it('requires both Scoring v3 apply scopes and its tight limit', async () => {
+    process.env.OPPORTUNITY_SCORING_V3_ENABLED = 'true'
+    for (const path of [
+      '/api/cron/opportunities/build-opportunity-candidates-v3?apply=true&organization=10',
+      '/api/cron/opportunities/build-opportunity-candidates-v3?apply=true&workspace=20',
+      '/api/cron/opportunities/build-opportunity-candidates-v3?batchSize=26',
+    ]) {
+      expect((await POST(
+        request(path, testKey),
+        { params: Promise.resolve({ job: 'build-opportunity-candidates-v3' }) },
+      )).status).toBe(400)
+    }
+    expect(mockedBuildOpportunityScoringV3).not.toHaveBeenCalled()
   })
 })

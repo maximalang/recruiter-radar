@@ -7,6 +7,7 @@ import {
   COMMERCIAL_THESIS_V1_LIMITS,
   EXTERNAL_AGENCY_PROPENSITY_V1_LIMITS,
   AGENCY_DNA_MATCH_V2_LIMITS,
+  OPPORTUNITY_SCORING_V3_LIMITS,
   OPPORTUNITY_ENGINE_LIMITS,
   isCompanyEventsV1Enabled,
   isCompanyStateV1Enabled,
@@ -14,6 +15,7 @@ import {
   isCommercialThesisV1Enabled,
   isExternalAgencyPropensityV1Enabled,
   isAgencyDnaMatchV2Enabled,
+  isOpportunityScoringV3Enabled,
   isOpportunityEngineV1Enabled,
 } from '@/lib/opportunities/config'
 import {
@@ -41,6 +43,10 @@ import {
   type AgencyDnaMatchJobOptions,
 } from '@/lib/opportunities/agency-dna-match-job'
 import {
+  buildOpportunityScoringV3Job,
+  type OpportunityScoringV3JobOptions,
+} from '@/lib/opportunities/opportunity-scoring-v3-job'
+import {
   backfillOpportunitiesJob,
   buildOpportunitiesJob,
   detectHiringEpisodesJob,
@@ -63,6 +69,7 @@ const JOBS = new Set([
   'build-commercial-theses',
   'build-external-agency-propensity',
   'build-agency-dna-matches',
+  'build-opportunity-candidates-v3',
 ])
 
 const COMPANY_EVENTS_JOB = 'normalize-company-events'
@@ -71,6 +78,7 @@ const SIGNAL_EPISODES_JOB = 'build-signal-episodes'
 const COMMERCIAL_THESIS_JOB = 'build-commercial-theses'
 const EXTERNAL_AGENCY_PROPENSITY_JOB = 'build-external-agency-propensity'
 const AGENCY_DNA_MATCH_JOB = 'build-agency-dna-matches'
+const OPPORTUNITY_SCORING_V3_JOB = 'build-opportunity-candidates-v3'
 
 export async function GET(
   request: NextRequest,
@@ -123,6 +131,8 @@ export async function POST(
             ? EXTERNAL_AGENCY_PROPENSITY_V1_LIMITS.maximumJobBatchSize
             : job === AGENCY_DNA_MATCH_JOB
               ? AGENCY_DNA_MATCH_V2_LIMITS.maximumJobBatchSize
+              : job === OPPORTUNITY_SCORING_V3_JOB
+                ? OPPORTUNITY_SCORING_V3_LIMITS.maximumJobBatchSize
       : OPPORTUNITY_ENGINE_LIMITS.maximumJobBatchSize
   if (
     (organizationValue !== null && organizationId === null) ||
@@ -143,19 +153,22 @@ export async function POST(
       job === SIGNAL_EPISODES_JOB ||
       job === COMMERCIAL_THESIS_JOB ||
       job === EXTERNAL_AGENCY_PROPENSITY_JOB ||
-      job === AGENCY_DNA_MATCH_JOB
+      job === AGENCY_DNA_MATCH_JOB ||
+      job === OPPORTUNITY_SCORING_V3_JOB
     ) &&
     applyValue === 'true' &&
     (
       organizationId === null ||
       ((job === EXTERNAL_AGENCY_PROPENSITY_JOB ||
-        job === AGENCY_DNA_MATCH_JOB) && workspaceId === null)
+        job === AGENCY_DNA_MATCH_JOB ||
+        job === OPPORTUNITY_SCORING_V3_JOB) && workspaceId === null)
     )
   ) {
     return NextResponse.json(
       {
         error: job === EXTERNAL_AGENCY_PROPENSITY_JOB ||
-          job === AGENCY_DNA_MATCH_JOB
+          job === AGENCY_DNA_MATCH_JOB ||
+          job === OPPORTUNITY_SCORING_V3_JOB
           ? 'workspace_and_organization_required_for_apply'
           : 'organization_required_for_apply',
       },
@@ -199,6 +212,12 @@ export async function POST(
     workspaceId,
     dryRun: applyValue !== 'true',
   }
+  const opportunityScoringV3Options: OpportunityScoringV3JobOptions = {
+    ...commonOptions,
+    workspaceId,
+    dryRun: applyValue !== 'true',
+    rolloutMode: 'shadow',
+  }
 
   try {
     const result = job === COMPANY_EVENTS_JOB
@@ -215,6 +234,10 @@ export async function POST(
               )
               : job === AGENCY_DNA_MATCH_JOB
                 ? await buildAgencyDnaMatchJob(agencyDnaMatchOptions)
+                : job === OPPORTUNITY_SCORING_V3_JOB
+                  ? await buildOpportunityScoringV3Job(
+                    opportunityScoringV3Options,
+                  )
       : job === 'detect-hiring-episodes'
       ? await detectHiringEpisodesJob(opportunityOptions)
       : job === 'build-opportunities'
@@ -245,6 +268,8 @@ function isJobEnabled(job: string): boolean {
             ? isExternalAgencyPropensityV1Enabled()
             : job === AGENCY_DNA_MATCH_JOB
               ? isAgencyDnaMatchV2Enabled()
+              : job === OPPORTUNITY_SCORING_V3_JOB
+                ? isOpportunityScoringV3Enabled()
     : isOpportunityEngineV1Enabled()
 }
 

@@ -405,7 +405,7 @@ AS $$
 DECLARE
   expected_generation INTEGER;
 BEGIN
-  PERFORM PG_ADVISORY_XACT_LOCK(HASHTEXTENDED(
+  PERFORM PG_ADVISORY_XACT_LOCK(HASHTEXTEXTENDED(
     NEW.workspace_id::TEXT || ':' || NEW.client_profile_id::TEXT || ':' ||
     NEW.organization_id::TEXT || ':' || NEW.score_version || ':' ||
     NEW.candidate_identity,
@@ -547,7 +547,7 @@ BEGIN
         CASE WHEN match.selection_policy->>'capacity' = 'low'
           THEN 0.75 ELSE 0.62 END
       AND NEW.feature_snapshot #>> '{actionability,contactPolicy}' =
-        profile.contact_policy
+        profile.contact_policy::TEXT
       AND NEW.feature_snapshot #> '{actionability,decisionMakerFunctions}' =
         COALESCE((
           SELECT JSONB_AGG(code ORDER BY code)

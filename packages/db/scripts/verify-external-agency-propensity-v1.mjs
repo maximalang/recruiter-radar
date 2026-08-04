@@ -24,6 +24,10 @@ const agencyDnaMatchDownSql = await readFile(
   resolve(migrations, '20260804140000_add_agency_dna_match_v2.down.sql'),
   'utf8',
 )
+const opportunityScoringV3DownSql = await readFile(
+  resolve(migrations, '20260804150000_add_opportunity_candidates_v3.down.sql'),
+  'utf8',
+)
 
 try {
   const relations = await database.query(
@@ -88,6 +92,7 @@ try {
     `SELECT TO_REGCLASS('public.agency_dna_match_snapshots')::TEXT AS snapshots`,
   )
   if (childSchema.rows[0]?.snapshots) {
+    await database.query(opportunityScoringV3DownSql)
     await database.query(agencyDnaMatchDownSql)
   }
   await database.query(downSql)

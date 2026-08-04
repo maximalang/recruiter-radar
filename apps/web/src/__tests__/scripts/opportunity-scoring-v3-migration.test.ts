@@ -10,6 +10,24 @@ const rollback = fs.readFileSync(path.join(
   root,
   'packages/db/migrations/20260804150000_add_opportunity_candidates_v3.down.sql',
 ), 'utf8')
+const rootPackage = fs.readFileSync(path.join(root, 'package.json'), 'utf8')
+const workflow = fs.readFileSync(path.join(root, '.github/workflows/test.yml'), 'utf8')
+const downVerifier = fs.readFileSync(path.join(
+  root,
+  'packages/db/scripts/verify-opportunity-engine-down.mjs',
+), 'utf8')
+const ancestorVerifiers = [
+  'verify-company-events-v1.mjs',
+  'verify-company-state-v1.mjs',
+  'verify-signal-episodes-v2.mjs',
+  'verify-commercial-theses-v1.mjs',
+  'verify-external-agency-propensity-v1.mjs',
+  'verify-agency-dna-match-v2.mjs',
+].map((name) => fs.readFileSync(path.join(
+  root,
+  'packages/db/scripts',
+  name,
+), 'utf8'))
 
 describe('Opportunity Quality and Actionability v3 migration', () => {
   it('adds an append-only candidate layer without changing opportunities', () => {
@@ -101,6 +119,7 @@ describe('Opportunity Quality and Actionability v3 migration', () => {
 
   it('rejects stale generations and evidence outside the Agency Match source', () => {
     expect(migration).toContain('validate_opportunity_candidate_generation')
+    expect(migration).toContain('PG_ADVISORY_XACT_LOCK(HASHTEXTEXTENDED(')
     expect(migration).toContain(
       'opportunity candidate generation must append exactly once',
     )
@@ -139,5 +158,42 @@ describe('Opportunity Quality and Actionability v3 migration', () => {
     expect(rollback).toContain('opportunity scoring v3 rollback refused')
     expect(rollback.indexOf('DROP TABLE opportunity_candidate_evidence'))
       .toBeLessThan(rollback.indexOf('DROP TABLE opportunity_candidates'))
+  })
+
+  it('runs its isolated PostgreSQL gate after Agency Match', () => {
+    expect(rootPackage).toContain('"test:opportunity-scoring-v3:db"')
+    const parentGate = workflow.indexOf(
+      'run: npm run test:agency-dna-match-v2:db',
+    )
+    const scoringGate = workflow.indexOf(
+      'run: npm run test:opportunity-scoring-v3:db',
+    )
+    expect(parentGate).toBeGreaterThan(-1)
+    expect(scoringGate).toBeGreaterThan(parentGate)
+  })
+
+  it('rolls the child schema down before every ancestor', () => {
+    for (const verifier of ancestorVerifiers) {
+      const child = verifier.indexOf(
+        'database.query(opportunityScoringV3DownSql)',
+      )
+      const namedParent = verifier.indexOf(
+        'database.query(agencyDnaMatchDownSql)',
+      )
+      const parent = namedParent > -1
+        ? namedParent
+        : verifier.indexOf('database.query(downSql)', child)
+      expect(child).toBeGreaterThan(-1)
+      expect(parent).toBeGreaterThan(child)
+    }
+    const childDown = downVerifier.indexOf(
+      "'20260804150000_add_opportunity_candidates_v3.down.sql'",
+    )
+    const parentDown = downVerifier.indexOf(
+      "'20260804140000_add_agency_dna_match_v2.down.sql'",
+    )
+    expect(childDown).toBeGreaterThan(-1)
+    expect(parentDown).toBeGreaterThan(childDown)
+    expect(downVerifier).toContain('PRE_FIXTURE_DOWN_MIGRATIONS = 17')
   })
 })
