@@ -42,8 +42,12 @@ export default function LegalPage() {
             <SummaryRow label="Налоговый статус" value={requisites.status} />
             <SummaryRow label="Регистрация" value={requisites.ogrnNote} />
             <SummaryRow label="Услуга" value={requisites.service} />
+            {requisites.city ? <SummaryRow label="Город" value={requisites.city} /> : null}
+            {requisites.postalAddress ? (
+              <SummaryRow label="Адрес для корреспонденции" value={requisites.postalAddress} />
+            ) : null}
             <SummaryRow
-              label="E-mail"
+              label="E-mail поддержки"
               value={<a href={`mailto:${requisites.email}`} style={{ color: "inherit" }}>{requisites.email}</a>}
             />
             <SummaryRow
@@ -54,24 +58,21 @@ export default function LegalPage() {
               label="Сайт"
               value={<a href={requisites.website} style={{ color: "inherit" }}>{requisites.website}</a>}
             />
-            {requisites.postalAddress ? (
-              <SummaryRow label="Адрес для корреспонденции" value={requisites.postalAddress} />
-            ) : null}
           </div>
         </SurfaceCard>
 
-        {requisites.postalAddress ? null : (
+        {requisites.city || requisites.postalAddress ? null : (
           <NoticeBox
             tone="warning"
-            title="Адрес будет добавлен до модерации"
-            description="Для подачи сайта на модерацию платёжного оператора необходимо указать фактический адрес для корреспонденции. Временный или выдуманный адрес публично не показывается."
+            title="До модерации нужно указать город"
+            description="Robokassa требует идентифицировать самозанятого продавца в footer. Для самозанятого достаточно города; выдуманный или избыточный домашний адрес не публикуется."
           />
         )}
 
         <NoticeBox
           tone="info"
           title="Чек НПД"
-          description="После оплаты продавец формирует чек плательщика НПД через «Мой налог» или подключённого оператора электронной площадки и передаёт его покупателю. Онлайн-касса по 54-ФЗ для плательщика НПД не применяется."
+          description="После оплаты продавец формирует чек плательщика НПД через «Мой налог» или сервис «Робочеки СМЗ» и передаёт его покупателю. Самозанятый на НПД освобождён от применения онлайн-кассы по 54-ФЗ, но обязан выдать чек по каждому расчёту."
         />
       </section>
       <SiteFooter />
