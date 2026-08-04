@@ -1,0 +1,35 @@
+name: Sync main into Robokassa branch
+
+on:
+  push:
+    branches: [feat/robokassa-primary-billing]
+    paths:
+      - '.github/workflows/sync-main-into-robokassa.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-main-into-robokassa
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/robokassa-primary-billing
+          fetch-depth: 0
+      - name: Record main hotfixes without replacing branch legal documents
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'Recruiter Radar CI'
+          git config user.email 'support@recruiter-radar.ru'
+          git fetch origin main
+          git merge -s ours --no-edit origin/main -m 'Merge main email hotfixes into Robokassa branch'
+          rm -f .github/workflows/sync-main-into-robokassa.yml
+          git add .github/workflows/sync-main-into-robokassa.yml
+          git commit -m 'chore: remove temporary main sync workflow'
+          git push origin HEAD:feat/robokassa-primary-billing
