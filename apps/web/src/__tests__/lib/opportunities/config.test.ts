@@ -2,10 +2,12 @@ import {
   clampOpportunityJobBatchSize,
   clampCompanyEventsJobBatchSize,
   clampCompanyStateJobBatchSize,
+  clampSignalEpisodesJobBatchSize,
   clampOpportunityPageSize,
   clampOpportunitySnoozeDays,
   isCompanyEventsV1Enabled,
   isCompanyStateV1Enabled,
+  isSignalEpisodesV2Enabled,
   isAgencyDnaV1Enabled,
   isAgencyDnaV1EnabledForContext,
   isOpportunityEngineV1Enabled,
@@ -60,6 +62,19 @@ describe('opportunity engine config', () => {
     expect(clampCompanyStateJobBatchSize(Number.NaN)).toBe(10)
     expect(clampCompanyStateJobBatchSize(0)).toBe(1)
     expect(clampCompanyStateJobBatchSize(26)).toBe(25)
+  })
+
+  it('keeps Signal Episodes v2 independently dark and tightly bounded', () => {
+    expect(isSignalEpisodesV2Enabled({})).toBe(false)
+    expect(isSignalEpisodesV2Enabled({ SIGNAL_EPISODES_V2_ENABLED: '1' }))
+      .toBe(false)
+    expect(isSignalEpisodesV2Enabled({ SIGNAL_EPISODES_V2_ENABLED: 'true' }))
+      .toBe(true)
+    expect(isSignalEpisodesV2Enabled({ SIGNAL_EPISODES_V2_ENABLED: ' TRUE ' }))
+      .toBe(false)
+    expect(clampSignalEpisodesJobBatchSize(Number.NaN)).toBe(10)
+    expect(clampSignalEpisodesJobBatchSize(0)).toBe(1)
+    expect(clampSignalEpisodesJobBatchSize(26)).toBe(25)
   })
 
   it('is dark by default and only accepts an explicit true value', () => {

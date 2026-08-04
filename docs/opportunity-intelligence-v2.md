@@ -295,6 +295,7 @@ Correction capability вычисляется сервером по полной 
 | --- | --- |
 | `COMPANY_EVENTS_V1_ENABLED` | Включает аддитивную Phase 1 нормализацию Company Events только при точном `true`; по умолчанию `false`, downstream readers не переключает |
 | `COMPANY_STATE_V1_ENABLED` | Включает аддитивный Phase 2 Company State build только при точном `true`; по умолчанию `false`, требует отдельного `apply=true&organization=<id>` и не переключает downstream readers |
+| `SIGNAL_EPISODES_V2_ENABLED` | Включает аддитивный Phase 3 Signal Episodes build только при точном `true`; по умолчанию `false`, требует отдельного `apply=true&organization=<id>` и не пишет legacy Hiring Episode/Opportunity и не переключает downstream readers |
 | `OPPORTUNITY_ENGINE_V1_ENABLED` | Включает engine/API/jobs только при точном `true` |
 | `OPPORTUNITY_OUTCOMES_ENABLED` | Включает ledger API только при точном `true` |
 | `OPPORTUNITY_OUTCOMES_UI_ENABLED` | Включает Outcome UI только вместе с ledger и при точном `true` |

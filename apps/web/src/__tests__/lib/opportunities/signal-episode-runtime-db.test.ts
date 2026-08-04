@@ -11,6 +11,10 @@ import {
   persistSignalEpisode,
   type SignalEpisodeDb,
 } from '@/lib/opportunities/signal-episode-repository'
+import {
+  buildSignalEpisodesJob,
+  type SignalEpisodesJobDb,
+} from '@/lib/opportunities/signal-episode-job'
 
 const databaseUrl = process.env.DATABASE_URL
 const isolatedDatabaseAcknowledged =
@@ -22,6 +26,7 @@ const describeIfDatabase = databaseUrl && isolatedDatabaseAcknowledged
 describeIfDatabase('Signal Episodes v2 PostgreSQL runtime', () => {
   const database = new Pool({ connectionString: databaseUrl })
   const repositoryDb = database as unknown as SignalEpisodeDb
+  const jobDb = database as unknown as SignalEpisodesJobDb
   const token = randomUUID()
   const now = new Date('2026-08-04T12:00:00.000Z')
   let organizationId = ''
@@ -157,6 +162,50 @@ describeIfDatabase('Signal Episodes v2 PostgreSQL runtime', () => {
     )
     expect(stored.rows).toEqual([
       { generation: 1, type: 'vacancy_acceleration' },
+      { generation: 2, type: 'leadership_led_expansion' },
+    ])
+  })
+
+  it('discovers new context and persists a refreshed generation through the job', async () => {
+    await database.query('TRUNCATE TABLE signal_episodes CASCADE')
+    await insertEvent(6, 'leadership_change')
+    const first = await buildSignalEpisodesJob({
+      env: { SIGNAL_EPISODES_V2_ENABLED: 'true' },
+      organizationId,
+      dryRun: false,
+      now,
+    }, jobDb)
+    expect(first).toMatchObject({
+      scanned: 1,
+      built: 1,
+      active: 1,
+      episodesPersisted: 1,
+      failed: 0,
+    })
+
+    await insertEvent(7, 'leadership_change')
+    const refreshed = await buildSignalEpisodesJob({
+      env: { SIGNAL_EPISODES_V2_ENABLED: 'true' },
+      organizationId,
+      dryRun: false,
+      now,
+    }, jobDb)
+    expect(refreshed).toMatchObject({
+      scanned: 1,
+      built: 1,
+      active: 1,
+      episodesPersisted: 1,
+      failed: 0,
+    })
+    const stored = await database.query(
+      `SELECT episode_generation AS generation, episode_type AS type
+       FROM signal_episodes
+       WHERE organization_id = $1
+       ORDER BY episode_generation`,
+      [organizationId],
+    )
+    expect(stored.rows).toEqual([
+      { generation: 1, type: 'leadership_led_expansion' },
       { generation: 2, type: 'leadership_led_expansion' },
     ])
   })

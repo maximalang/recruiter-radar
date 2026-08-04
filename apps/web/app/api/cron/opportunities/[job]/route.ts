@@ -3,9 +3,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import {
   COMPANY_EVENTS_V1_LIMITS,
   COMPANY_STATE_V1_LIMITS,
+  SIGNAL_EPISODES_V2_LIMITS,
   OPPORTUNITY_ENGINE_LIMITS,
   isCompanyEventsV1Enabled,
   isCompanyStateV1Enabled,
+  isSignalEpisodesV2Enabled,
   isOpportunityEngineV1Enabled,
 } from '@/lib/opportunities/config'
 import {
@@ -16,6 +18,10 @@ import {
   buildCompanyStateJob,
   type CompanyStateJobOptions,
 } from '@/lib/opportunities/company-state-job'
+import {
+  buildSignalEpisodesJob,
+  type SignalEpisodesJobOptions,
+} from '@/lib/opportunities/signal-episode-job'
 import {
   backfillOpportunitiesJob,
   buildOpportunitiesJob,
@@ -35,10 +41,12 @@ const JOBS = new Set([
   'backfill-opportunities',
   'normalize-company-events',
   'build-company-state',
+  'build-signal-episodes',
 ])
 
 const COMPANY_EVENTS_JOB = 'normalize-company-events'
 const COMPANY_STATE_JOB = 'build-company-state'
+const SIGNAL_EPISODES_JOB = 'build-signal-episodes'
 
 export async function GET(
   request: NextRequest,
@@ -55,7 +63,7 @@ export async function GET(
     ok: true,
     job,
     enabled: true,
-    hint: 'Use POST with x-api-key. Backfill, Company Events, and Company State are dry-run unless apply=true.',
+    hint: 'Use POST with x-api-key. Backfill, Company Events, Company State, and Signal Episodes are dry-run unless apply=true.',
   })
 }
 
@@ -81,6 +89,8 @@ export async function POST(
     ? COMPANY_EVENTS_V1_LIMITS.maximumJobBatchSize
     : job === COMPANY_STATE_JOB
       ? COMPANY_STATE_V1_LIMITS.maximumJobBatchSize
+      : job === SIGNAL_EPISODES_JOB
+        ? SIGNAL_EPISODES_V2_LIMITS.maximumJobBatchSize
       : OPPORTUNITY_ENGINE_LIMITS.maximumJobBatchSize
   if (
     (organizationValue !== null && organizationId === null) ||
@@ -94,7 +104,11 @@ export async function POST(
     return NextResponse.json({ error: 'invalid_parameters' }, { status: 400 })
   }
   if (
-    (job === COMPANY_EVENTS_JOB || job === COMPANY_STATE_JOB) &&
+    (
+      job === COMPANY_EVENTS_JOB ||
+      job === COMPANY_STATE_JOB ||
+      job === SIGNAL_EPISODES_JOB
+    ) &&
     applyValue === 'true' &&
     organizationId === null
   ) {
@@ -122,12 +136,18 @@ export async function POST(
     ...commonOptions,
     dryRun: applyValue !== 'true',
   }
+  const signalEpisodesOptions: SignalEpisodesJobOptions = {
+    ...commonOptions,
+    dryRun: applyValue !== 'true',
+  }
 
   try {
     const result = job === COMPANY_EVENTS_JOB
       ? await normalizeCompanyEventsJob(companyEventOptions)
       : job === COMPANY_STATE_JOB
         ? await buildCompanyStateJob(companyStateOptions)
+        : job === SIGNAL_EPISODES_JOB
+          ? await buildSignalEpisodesJob(signalEpisodesOptions)
       : job === 'detect-hiring-episodes'
       ? await detectHiringEpisodesJob(opportunityOptions)
       : job === 'build-opportunities'
@@ -150,6 +170,8 @@ function isJobEnabled(job: string): boolean {
     ? isCompanyEventsV1Enabled()
     : job === COMPANY_STATE_JOB
       ? isCompanyStateV1Enabled()
+      : job === SIGNAL_EPISODES_JOB
+        ? isSignalEpisodesV2Enabled()
     : isOpportunityEngineV1Enabled()
 }
 

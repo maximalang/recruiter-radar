@@ -33,6 +33,7 @@ export const OPPORTUNITY_ANALYTICS_V2_FEATURE_FLAG =
   'OPPORTUNITY_ANALYTICS_V2_ENABLED'
 export const COMPANY_EVENTS_V1_FEATURE_FLAG = 'COMPANY_EVENTS_V1_ENABLED'
 export const COMPANY_STATE_V1_FEATURE_FLAG = 'COMPANY_STATE_V1_ENABLED'
+export const SIGNAL_EPISODES_V2_FEATURE_FLAG = 'SIGNAL_EPISODES_V2_ENABLED'
 
 export type OpportunityFeatureContext = {
   dataOwnerId: string | number | null | undefined
@@ -64,6 +65,17 @@ export const COMPANY_STATE_V1_LIMITS = {
   statementTimeoutMs: 15_000,
 } as const
 
+export const SIGNAL_EPISODES_V2_LIMITS = {
+  defaultJobBatchSize: 10,
+  maximumJobBatchSize: 25,
+  maximumStateChangesPerOrganization: 1_000,
+  maximumEventsPerOrganization: 5_000,
+  inputHistoryWindowDays: 120,
+  episodeLookbackDays: 90,
+  contextWindowDays: 30,
+  statementTimeoutMs: 15_000,
+} as const
+
 export function isOpportunityEngineV1Enabled(
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): boolean {
@@ -80,6 +92,12 @@ export function isCompanyStateV1Enabled(
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): boolean {
   return env[COMPANY_STATE_V1_FEATURE_FLAG] === 'true'
+}
+
+export function isSignalEpisodesV2Enabled(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+  return env[SIGNAL_EPISODES_V2_FEATURE_FLAG] === 'true'
 }
 
 export function isOpportunityOutcomesEnabled(
@@ -403,6 +421,16 @@ export function clampCompanyStateJobBatchSize(value: number): number {
   return Math.min(
     Math.max(Math.trunc(value), 1),
     COMPANY_STATE_V1_LIMITS.maximumJobBatchSize,
+  )
+}
+
+export function clampSignalEpisodesJobBatchSize(value: number): number {
+  if (!Number.isFinite(value)) {
+    return SIGNAL_EPISODES_V2_LIMITS.defaultJobBatchSize
+  }
+  return Math.min(
+    Math.max(Math.trunc(value), 1),
+    SIGNAL_EPISODES_V2_LIMITS.maximumJobBatchSize,
   )
 }
 
