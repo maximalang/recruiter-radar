@@ -12,6 +12,10 @@ import {
   persistQueryPlanMetricSnapshot,
   type QueryPlannerV2Db,
 } from '@/lib/lead-discovery/query-planner-v2-repository'
+import {
+  buildQueryPlansV2Job,
+  type QueryPlannerV2JobDb,
+} from '@/lib/lead-discovery/query-planner-v2-job'
 
 const databaseUrl = process.env.DATABASE_URL
 const isolated = process.env.QUERY_PLANNER_V2_DB_TEST_ACK === 'isolated'
@@ -20,6 +24,7 @@ const describeIfDatabase = databaseUrl && isolated ? describe : describe.skip
 describeIfDatabase('Query Planner v2 PostgreSQL runtime', () => {
   const database = new Pool({ connectionString: databaseUrl })
   const plannerDb = database as unknown as QueryPlannerV2Db
+  const plannerJobDb = database as unknown as QueryPlannerV2JobDb
   const token = randomUUID()
   const ownerIds: string[] = []
   let workspaceId = ''
@@ -183,6 +188,34 @@ describeIfDatabase('Query Planner v2 PostgreSQL runtime', () => {
     expect(first.inserted).toBe(true)
     await expect(persistQueryPlanMetricSnapshot(input, plannerDb)).resolves
       .toEqual({ metricSnapshotId: first.metricSnapshotId, inserted: false })
+  })
+
+  it('loads and applies one exact profile through the dark job boundary', async () => {
+    const options = {
+      env: { QUERY_PLANNER_V2_ENABLED: 'true' },
+      workspaceId,
+      clientProfileId: profileId,
+      sources: ['superjob'] as const,
+    }
+    await expect(buildQueryPlansV2Job(options, plannerJobDb)).resolves
+      .toMatchObject({
+        dryRun: true,
+        profilesScanned: 1,
+        plansBuilt: 1,
+        ready: 1,
+        persisted: 0,
+        failedProfiles: 0,
+      })
+    await expect(buildQueryPlansV2Job({
+      ...options,
+      dryRun: false,
+    }, plannerJobDb)).resolves.toMatchObject({
+      profilesScanned: 1,
+      plansBuilt: 1,
+      persisted: 1,
+      consumersLinked: 1,
+      failedProfiles: 0,
+    })
   })
 
   function buildPlans(overrides: Partial<QueryPlannerV2ProfileInput> = {}) {

@@ -121,6 +121,11 @@ export type SharedQueryPlanV2 = {
   profileConsumers: string[]
 }
 
+export type SharedQueryPlanExecutionV2<Result> = {
+  request: SharedQueryPlanV2
+  result: Result
+}
+
 export type QueryPlanMetricCounts = {
   executionCount: number
   zeroResultExecutions: number
@@ -363,6 +368,26 @@ export function groupSharedQueryPlans(
   return [...groups.values()].sort((a, b) =>
     a.source.localeCompare(b.source) ||
     a.sharedRequestHash.localeCompare(b.sharedRequestHash))
+}
+
+export async function executeSharedQueryPlans<Result>(
+  plans: readonly ProfileScopedQueryPlanV2[],
+  executor: (request: SharedQueryPlanV2) => Promise<Result>,
+): Promise<Array<SharedQueryPlanExecutionV2<Result>>> {
+  const executions: Array<SharedQueryPlanExecutionV2<Result>> = []
+  for (const request of groupSharedQueryPlans(plans)) {
+    const immutableRequest = {
+      ...request,
+      queryEnv: { ...request.queryEnv },
+      planIdentities: [...request.planIdentities],
+      profileConsumers: [...request.profileConsumers],
+    }
+    executions.push({
+      request: immutableRequest,
+      result: await executor(immutableRequest),
+    })
+  }
+  return executions
 }
 
 export function buildQueryPlanMetrics(

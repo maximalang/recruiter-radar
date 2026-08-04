@@ -16,6 +16,15 @@ const dbRunner = fs.readFileSync(path.join(
   root,
   'packages/db/scripts/run-query-planner-v2-db-tests.mjs',
 ), 'utf8')
+const envExample = fs.readFileSync(path.join(root, '.env.example'), 'utf8')
+const plannerJob = fs.readFileSync(path.join(
+  root,
+  'apps/web/lib/lead-discovery/query-planner-v2-job.ts',
+), 'utf8')
+const plannerDocs = fs.readFileSync(path.join(
+  root,
+  'docs/query-planner-v2.md',
+), 'utf8')
 const downVerifier = fs.readFileSync(path.join(
   root,
   'packages/db/scripts/verify-opportunity-engine-down.mjs',
@@ -140,6 +149,14 @@ describe('Query Planner v2 migration', () => {
     expect(plannerGate).toBeGreaterThan(parentGate)
     expect(dbRunner).toContain('query-planner-v2-repository.test.ts')
     expect(dbRunner).toContain('query-planner-v2-runtime-db.test.ts')
+  })
+
+  it('keeps the job dark and feedback reads profile scoped', () => {
+    expect(envExample).toContain('QUERY_PLANNER_V2_ENABLED=false')
+    expect(plannerJob).toContain('state.client_profile_id = profile.id')
+    expect(plannerJob).toContain('preference.user_id = profile.owner_id')
+    expect(plannerDocs).toContain('does not switch the')
+    expect(plannerDocs).toContain('apply=true')
   })
 
   it('rolls the child schema down before every ancestor', () => {

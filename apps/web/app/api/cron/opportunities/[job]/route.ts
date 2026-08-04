@@ -47,6 +47,14 @@ import {
   type OpportunityScoringV3JobOptions,
 } from '@/lib/opportunities/opportunity-scoring-v3-job'
 import {
+  QUERY_PLANNER_V2_LIMITS,
+  isQueryPlannerV2Enabled,
+} from '@/lib/lead-discovery/query-planner-v2-config'
+import {
+  buildQueryPlansV2Job,
+  type QueryPlannerV2JobOptions,
+} from '@/lib/lead-discovery/query-planner-v2-job'
+import {
   backfillOpportunitiesJob,
   buildOpportunitiesJob,
   detectHiringEpisodesJob,
@@ -70,6 +78,7 @@ const JOBS = new Set([
   'build-external-agency-propensity',
   'build-agency-dna-matches',
   'build-opportunity-candidates-v3',
+  'build-query-plans-v2',
 ])
 
 const COMPANY_EVENTS_JOB = 'normalize-company-events'
@@ -79,6 +88,7 @@ const COMMERCIAL_THESIS_JOB = 'build-commercial-theses'
 const EXTERNAL_AGENCY_PROPENSITY_JOB = 'build-external-agency-propensity'
 const AGENCY_DNA_MATCH_JOB = 'build-agency-dna-matches'
 const OPPORTUNITY_SCORING_V3_JOB = 'build-opportunity-candidates-v3'
+const QUERY_PLANNER_V2_JOB = 'build-query-plans-v2'
 
 export async function GET(
   request: NextRequest,
@@ -113,11 +123,13 @@ export async function POST(
   const params = request.nextUrl.searchParams
   const organizationValue = params.get('organization')
   const workspaceValue = params.get('workspace')
+  const profileValue = params.get('profile')
   const batchSizeValue = params.get('batchSize')
   const dryRunValue = params.get('dryRun')
   const applyValue = params.get('apply')
   const organizationId = positiveId(organizationValue)
   const workspaceId = positiveId(workspaceValue)
+  const clientProfileId = positiveId(profileValue)
   const batchSize = positiveInteger(batchSizeValue)
   const maximumBatchSize = job === COMPANY_EVENTS_JOB
     ? COMPANY_EVENTS_V1_LIMITS.maximumJobBatchSize
@@ -133,10 +145,13 @@ export async function POST(
               ? AGENCY_DNA_MATCH_V2_LIMITS.maximumJobBatchSize
               : job === OPPORTUNITY_SCORING_V3_JOB
                 ? OPPORTUNITY_SCORING_V3_LIMITS.maximumJobBatchSize
+                : job === QUERY_PLANNER_V2_JOB
+                  ? QUERY_PLANNER_V2_LIMITS.maximumProfileBatchSize
       : OPPORTUNITY_ENGINE_LIMITS.maximumJobBatchSize
   if (
     (organizationValue !== null && organizationId === null) ||
     (workspaceValue !== null && workspaceId === null) ||
+    (profileValue !== null && clientProfileId === null) ||
     (batchSizeValue !== null && (
       batchSize === null ||
       batchSize > maximumBatchSize
@@ -145,6 +160,16 @@ export async function POST(
     (applyValue !== null && applyValue !== 'true' && applyValue !== 'false')
   ) {
     return NextResponse.json({ error: 'invalid_parameters' }, { status: 400 })
+  }
+  if (
+    job === QUERY_PLANNER_V2_JOB &&
+    applyValue === 'true' &&
+    (workspaceId === null || clientProfileId === null)
+  ) {
+    return NextResponse.json(
+      { error: 'workspace_and_profile_required_for_apply' },
+      { status: 400 },
+    )
   }
   if (
     (
@@ -218,9 +243,18 @@ export async function POST(
     dryRun: applyValue !== 'true',
     rolloutMode: 'shadow',
   }
+  const queryPlannerV2Options: QueryPlannerV2JobOptions = {
+    enabled: true,
+    workspaceId,
+    clientProfileId,
+    profileBatchSize: batchSize ?? undefined,
+    dryRun: applyValue !== 'true',
+  }
 
   try {
-    const result = job === COMPANY_EVENTS_JOB
+    const result = job === QUERY_PLANNER_V2_JOB
+      ? await buildQueryPlansV2Job(queryPlannerV2Options)
+      : job === COMPANY_EVENTS_JOB
       ? await normalizeCompanyEventsJob(companyEventOptions)
       : job === COMPANY_STATE_JOB
         ? await buildCompanyStateJob(companyStateOptions)
@@ -256,7 +290,9 @@ export async function POST(
 }
 
 function isJobEnabled(job: string): boolean {
-  return job === COMPANY_EVENTS_JOB
+  return job === QUERY_PLANNER_V2_JOB
+    ? isQueryPlannerV2Enabled()
+    : job === COMPANY_EVENTS_JOB
     ? isCompanyEventsV1Enabled()
     : job === COMPANY_STATE_JOB
       ? isCompanyStateV1Enabled()

@@ -37,6 +37,10 @@ jest.mock('@/lib/opportunities/opportunity-scoring-v3-job', () => ({
   buildOpportunityScoringV3Job: jest.fn(),
 }))
 
+jest.mock('@/lib/lead-discovery/query-planner-v2-job', () => ({
+  buildQueryPlansV2Job: jest.fn(),
+}))
+
 import { backfillOpportunitiesJob } from '@/lib/opportunities/jobs'
 import { normalizeCompanyEventsJob } from '@/lib/opportunities/company-event-job'
 import { buildCompanyStateJob } from '@/lib/opportunities/company-state-job'
@@ -45,6 +49,7 @@ import { buildCommercialThesesJob } from '@/lib/opportunities/commercial-thesis-
 import { buildExternalAgencyPropensityJob } from '@/lib/opportunities/external-agency-propensity-job'
 import { buildAgencyDnaMatchJob } from '@/lib/opportunities/agency-dna-match-job'
 import { buildOpportunityScoringV3Job } from '@/lib/opportunities/opportunity-scoring-v3-job'
+import { buildQueryPlansV2Job } from '@/lib/lead-discovery/query-planner-v2-job'
 import { GET, POST } from '@/app/api/cron/opportunities/[job]/route'
 
 const mockedBackfill = jest.mocked(backfillOpportunitiesJob)
@@ -59,6 +64,7 @@ const mockedBuildAgencyDnaMatch = jest.mocked(buildAgencyDnaMatchJob)
 const mockedBuildOpportunityScoringV3 = jest.mocked(
   buildOpportunityScoringV3Job,
 )
+const mockedBuildQueryPlansV2 = jest.mocked(buildQueryPlansV2Job)
 
 function request(path: string, key?: string) {
   return new NextRequest(`https://recruiter-radar.ru${path}`, {
@@ -86,6 +92,7 @@ describe('opportunity cron API', () => {
   const originalAgencyDnaMatchFlag = process.env.AGENCY_DNA_MATCH_V2_ENABLED
   const originalOpportunityScoringV3Flag =
     process.env.OPPORTUNITY_SCORING_V3_ENABLED
+  const originalQueryPlannerV2Flag = process.env.QUERY_PLANNER_V2_ENABLED
 
   beforeEach(() => {
     process.env.CRON_API_KEY = testKey
@@ -97,6 +104,7 @@ describe('opportunity cron API', () => {
     process.env.EXTERNAL_AGENCY_PROPENSITY_V1_ENABLED = 'false'
     process.env.AGENCY_DNA_MATCH_V2_ENABLED = 'false'
     process.env.OPPORTUNITY_SCORING_V3_ENABLED = 'false'
+    process.env.QUERY_PLANNER_V2_ENABLED = 'false'
     jest.clearAllMocks()
   })
 
@@ -128,6 +136,11 @@ describe('opportunity cron API', () => {
       delete process.env.OPPORTUNITY_SCORING_V3_ENABLED
     } else {
       process.env.OPPORTUNITY_SCORING_V3_ENABLED = originalOpportunityScoringV3Flag
+    }
+    if (originalQueryPlannerV2Flag === undefined) {
+      delete process.env.QUERY_PLANNER_V2_ENABLED
+    } else {
+      process.env.QUERY_PLANNER_V2_ENABLED = originalQueryPlannerV2Flag
     }
   })
 
@@ -586,5 +599,50 @@ describe('opportunity cron API', () => {
       )).status).toBe(400)
     }
     expect(mockedBuildOpportunityScoringV3).not.toHaveBeenCalled()
+  })
+
+  it('keeps Query Planner v2 separately dark and dry-run by default', async () => {
+    expect((await POST(
+      request('/api/cron/opportunities/build-query-plans-v2', testKey),
+      { params: Promise.resolve({ job: 'build-query-plans-v2' }) },
+    )).status).toBe(404)
+    expect(mockedBuildQueryPlansV2).not.toHaveBeenCalled()
+
+    process.env.QUERY_PLANNER_V2_ENABLED = 'true'
+    mockedBuildQueryPlansV2.mockResolvedValue({
+      enabled: true, dryRun: true, profilesScanned: 0, plansBuilt: 0,
+      ready: 0, review: 0, blocked: 0, sharedRequests: 0,
+      persisted: 0, replayed: 0, sharedRequestsInserted: 0,
+      consumersLinked: 0, failedProfiles: 0,
+    })
+    const response = await POST(
+      request(
+        '/api/cron/opportunities/build-query-plans-v2' +
+        '?workspace=20&profile=40',
+        testKey,
+      ),
+      { params: Promise.resolve({ job: 'build-query-plans-v2' }) },
+    )
+    expect(response.status).toBe(200)
+    expect(mockedBuildQueryPlansV2).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceId: '20', clientProfileId: '40', dryRun: true,
+      }),
+    )
+  })
+
+  it('requires exact Query Planner apply scope and enforces its limit', async () => {
+    process.env.QUERY_PLANNER_V2_ENABLED = 'true'
+    for (const path of [
+      '/api/cron/opportunities/build-query-plans-v2?apply=true&workspace=20',
+      '/api/cron/opportunities/build-query-plans-v2?apply=true&profile=40',
+      '/api/cron/opportunities/build-query-plans-v2?batchSize=101',
+    ]) {
+      expect((await POST(
+        request(path, testKey),
+        { params: Promise.resolve({ job: 'build-query-plans-v2' }) },
+      )).status).toBe(400)
+    }
+    expect(mockedBuildQueryPlansV2).not.toHaveBeenCalled()
   })
 })

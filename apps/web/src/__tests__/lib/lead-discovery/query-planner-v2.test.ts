@@ -2,6 +2,7 @@ import {
   QUERY_PLANNER_VERSION_V2,
   buildProfileScopedQueryPlans,
   buildQueryPlanMetrics,
+  executeSharedQueryPlans,
   groupSharedQueryPlans,
   resolveQueryPlanGeography,
   type QueryPlannerV2ProfileInput,
@@ -267,6 +268,25 @@ describe('Query Planner v2 shared execution and metrics', () => {
       sources: ['hh'],
     })
     expect(groupSharedQueryPlans(plans)).toHaveLength(2)
+  })
+
+  it('executes one identical request and returns every profile consumer', async () => {
+    const plans = buildProfileScopedQueryPlans({
+      profiles: [
+        profile({ clientProfileId: '30' }),
+        profile({ clientProfileId: '31', profileSnapshotHash: HASH_B }),
+      ],
+      sources: ['hh'],
+    })
+    const executor = jest.fn(async () => ({ fetchedRecords: 12 }))
+
+    await expect(executeSharedQueryPlans(plans, executor)).resolves.toEqual([
+      expect.objectContaining({
+        request: expect.objectContaining({ profileConsumers: ['30', '31'] }),
+        result: { fetchedRecords: 12 },
+      }),
+    ])
+    expect(executor).toHaveBeenCalledTimes(1)
   })
 
   it('calculates query-plan yield without inventing unavailable denominators', () => {
