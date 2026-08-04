@@ -42,7 +42,6 @@ export function ProductWorkspaceFrame(props: {
           <Link href="/" aria-label="Recruiter Radar — на главную">
             <BrandLogo tone="dark" joined />
           </Link>
-          <span className={styles.workspaceLabel}>Радар клиентских возможностей</span>
         </div>
 
         <nav className={styles.sidebarNav} aria-label="Разделы кабинета">
@@ -65,10 +64,7 @@ export function ProductWorkspaceFrame(props: {
 
         <div className={`${styles.sidebarStatus} ${polish.sidebarStatus}`}>
           <span className={styles.statusDot} aria-hidden="true" />
-          <div>
-            <strong>Наблюдение активно</strong>
-            <span>Новые сигналы попадут в очередь после проверки доказательств</span>
-          </div>
+          <strong>Радар активен</strong>
         </div>
       </aside>
 
@@ -77,18 +73,6 @@ export function ProductWorkspaceFrame(props: {
           <Link href="/" aria-label="Recruiter Radar — на главную">
             <BrandLogo joined />
           </Link>
-          <span>Рабочий радар</span>
-        </div>
-
-        <div className={`${styles.contextBar} ${polish.contextBar}`} aria-label="Контекст рабочего пространства">
-          <div>
-            <span className={styles.contextKicker}>Recruiter Radar</span>
-            <strong>Клиентские возможности на сегодня</strong>
-          </div>
-          <div className={styles.contextMeta}>
-            <span>Сигналы + доказательства</span>
-            <span>Рынок РФ</span>
-          </div>
         </div>
 
         <main id="main-content" className={`${styles.content} ${polish.content}`} tabIndex={-1}>
