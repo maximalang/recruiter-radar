@@ -3,14 +3,13 @@ name: Fix Robokassa branch security lockfile
 on:
   push:
     branches: [feat/robokassa-primary-billing]
-    paths:
-      - '.github/workflows/fix-robokassa-security-lockfile.yml'
 
 permissions:
   contents: write
 
 jobs:
   refresh:
+    if: github.actor != 'Recruiter Radar CI'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
