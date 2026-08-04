@@ -1,0 +1,20 @@
+name: Export Robokassa worktree
+
+on:
+  push:
+    branches: [ 'feat/robokassa-primary-billing' ]
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: robokassa-worktree
+          path: .
+          include-hidden-files: true
+          retention-days: 1
