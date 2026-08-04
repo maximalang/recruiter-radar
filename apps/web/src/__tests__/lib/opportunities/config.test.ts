@@ -5,6 +5,7 @@ import {
   clampSignalEpisodesJobBatchSize,
   clampCommercialThesisJobBatchSize,
   clampExternalAgencyPropensityJobBatchSize,
+  clampAgencyDnaMatchJobBatchSize,
   clampOpportunityPageSize,
   clampOpportunitySnoozeDays,
   isCompanyEventsV1Enabled,
@@ -12,6 +13,7 @@ import {
   isSignalEpisodesV2Enabled,
   isCommercialThesisV1Enabled,
   isExternalAgencyPropensityV1Enabled,
+  isAgencyDnaMatchV2Enabled,
   isAgencyDnaV1Enabled,
   isAgencyDnaV1EnabledForContext,
   isOpportunityEngineV1Enabled,
@@ -110,6 +112,20 @@ describe('opportunity engine config', () => {
     expect(clampExternalAgencyPropensityJobBatchSize(Number.NaN)).toBe(10)
     expect(clampExternalAgencyPropensityJobBatchSize(0)).toBe(1)
     expect(clampExternalAgencyPropensityJobBatchSize(26)).toBe(25)
+  })
+
+  it('keeps Agency DNA Match v2 independently dark and bounded', () => {
+    expect(isAgencyDnaMatchV2Enabled({})).toBe(false)
+    expect(isAgencyDnaMatchV2Enabled({ AGENCY_DNA_MATCH_V2_ENABLED: '1' }))
+      .toBe(false)
+    expect(isAgencyDnaMatchV2Enabled({ AGENCY_DNA_MATCH_V2_ENABLED: 'true' }))
+      .toBe(true)
+    expect(isAgencyDnaMatchV2Enabled({
+      AGENCY_DNA_MATCH_V2_ENABLED: ' TRUE ',
+    })).toBe(false)
+    expect(clampAgencyDnaMatchJobBatchSize(Number.NaN)).toBe(10)
+    expect(clampAgencyDnaMatchJobBatchSize(0)).toBe(1)
+    expect(clampAgencyDnaMatchJobBatchSize(26)).toBe(25)
   })
 
   it('is dark by default and only accepts an explicit true value', () => {

@@ -6,12 +6,14 @@ import {
   SIGNAL_EPISODES_V2_LIMITS,
   COMMERCIAL_THESIS_V1_LIMITS,
   EXTERNAL_AGENCY_PROPENSITY_V1_LIMITS,
+  AGENCY_DNA_MATCH_V2_LIMITS,
   OPPORTUNITY_ENGINE_LIMITS,
   isCompanyEventsV1Enabled,
   isCompanyStateV1Enabled,
   isSignalEpisodesV2Enabled,
   isCommercialThesisV1Enabled,
   isExternalAgencyPropensityV1Enabled,
+  isAgencyDnaMatchV2Enabled,
   isOpportunityEngineV1Enabled,
 } from '@/lib/opportunities/config'
 import {
@@ -35,6 +37,10 @@ import {
   type ExternalAgencyPropensityJobOptions,
 } from '@/lib/opportunities/external-agency-propensity-job'
 import {
+  buildAgencyDnaMatchJob,
+  type AgencyDnaMatchJobOptions,
+} from '@/lib/opportunities/agency-dna-match-job'
+import {
   backfillOpportunitiesJob,
   buildOpportunitiesJob,
   detectHiringEpisodesJob,
@@ -56,6 +62,7 @@ const JOBS = new Set([
   'build-signal-episodes',
   'build-commercial-theses',
   'build-external-agency-propensity',
+  'build-agency-dna-matches',
 ])
 
 const COMPANY_EVENTS_JOB = 'normalize-company-events'
@@ -63,6 +70,7 @@ const COMPANY_STATE_JOB = 'build-company-state'
 const SIGNAL_EPISODES_JOB = 'build-signal-episodes'
 const COMMERCIAL_THESIS_JOB = 'build-commercial-theses'
 const EXTERNAL_AGENCY_PROPENSITY_JOB = 'build-external-agency-propensity'
+const AGENCY_DNA_MATCH_JOB = 'build-agency-dna-matches'
 
 export async function GET(
   request: NextRequest,
@@ -113,6 +121,8 @@ export async function POST(
           ? COMMERCIAL_THESIS_V1_LIMITS.maximumJobBatchSize
           : job === EXTERNAL_AGENCY_PROPENSITY_JOB
             ? EXTERNAL_AGENCY_PROPENSITY_V1_LIMITS.maximumJobBatchSize
+            : job === AGENCY_DNA_MATCH_JOB
+              ? AGENCY_DNA_MATCH_V2_LIMITS.maximumJobBatchSize
       : OPPORTUNITY_ENGINE_LIMITS.maximumJobBatchSize
   if (
     (organizationValue !== null && organizationId === null) ||
@@ -132,17 +142,20 @@ export async function POST(
       job === COMPANY_STATE_JOB ||
       job === SIGNAL_EPISODES_JOB ||
       job === COMMERCIAL_THESIS_JOB ||
-      job === EXTERNAL_AGENCY_PROPENSITY_JOB
+      job === EXTERNAL_AGENCY_PROPENSITY_JOB ||
+      job === AGENCY_DNA_MATCH_JOB
     ) &&
     applyValue === 'true' &&
     (
       organizationId === null ||
-      (job === EXTERNAL_AGENCY_PROPENSITY_JOB && workspaceId === null)
+      ((job === EXTERNAL_AGENCY_PROPENSITY_JOB ||
+        job === AGENCY_DNA_MATCH_JOB) && workspaceId === null)
     )
   ) {
     return NextResponse.json(
       {
-        error: job === EXTERNAL_AGENCY_PROPENSITY_JOB
+        error: job === EXTERNAL_AGENCY_PROPENSITY_JOB ||
+          job === AGENCY_DNA_MATCH_JOB
           ? 'workspace_and_organization_required_for_apply'
           : 'organization_required_for_apply',
       },
@@ -181,6 +194,11 @@ export async function POST(
     workspaceId,
     dryRun: applyValue !== 'true',
   }
+  const agencyDnaMatchOptions: AgencyDnaMatchJobOptions = {
+    ...commonOptions,
+    workspaceId,
+    dryRun: applyValue !== 'true',
+  }
 
   try {
     const result = job === COMPANY_EVENTS_JOB
@@ -195,6 +213,8 @@ export async function POST(
               ? await buildExternalAgencyPropensityJob(
                 externalAgencyPropensityOptions,
               )
+              : job === AGENCY_DNA_MATCH_JOB
+                ? await buildAgencyDnaMatchJob(agencyDnaMatchOptions)
       : job === 'detect-hiring-episodes'
       ? await detectHiringEpisodesJob(opportunityOptions)
       : job === 'build-opportunities'
@@ -223,6 +243,8 @@ function isJobEnabled(job: string): boolean {
           ? isCommercialThesisV1Enabled()
           : job === EXTERNAL_AGENCY_PROPENSITY_JOB
             ? isExternalAgencyPropensityV1Enabled()
+            : job === AGENCY_DNA_MATCH_JOB
+              ? isAgencyDnaMatchV2Enabled()
     : isOpportunityEngineV1Enabled()
 }
 

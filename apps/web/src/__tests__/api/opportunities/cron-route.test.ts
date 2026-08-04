@@ -29,12 +29,17 @@ jest.mock('@/lib/opportunities/external-agency-propensity-job', () => ({
   buildExternalAgencyPropensityJob: jest.fn(),
 }))
 
+jest.mock('@/lib/opportunities/agency-dna-match-job', () => ({
+  buildAgencyDnaMatchJob: jest.fn(),
+}))
+
 import { backfillOpportunitiesJob } from '@/lib/opportunities/jobs'
 import { normalizeCompanyEventsJob } from '@/lib/opportunities/company-event-job'
 import { buildCompanyStateJob } from '@/lib/opportunities/company-state-job'
 import { buildSignalEpisodesJob } from '@/lib/opportunities/signal-episode-job'
 import { buildCommercialThesesJob } from '@/lib/opportunities/commercial-thesis-job'
 import { buildExternalAgencyPropensityJob } from '@/lib/opportunities/external-agency-propensity-job'
+import { buildAgencyDnaMatchJob } from '@/lib/opportunities/agency-dna-match-job'
 import { GET, POST } from '@/app/api/cron/opportunities/[job]/route'
 
 const mockedBackfill = jest.mocked(backfillOpportunitiesJob)
@@ -45,6 +50,7 @@ const mockedBuildCommercialTheses = jest.mocked(buildCommercialThesesJob)
 const mockedBuildExternalAgencyPropensity = jest.mocked(
   buildExternalAgencyPropensityJob,
 )
+const mockedBuildAgencyDnaMatch = jest.mocked(buildAgencyDnaMatchJob)
 
 function request(path: string, key?: string) {
   return new NextRequest(`https://recruiter-radar.ru${path}`, {
@@ -69,6 +75,7 @@ describe('opportunity cron API', () => {
   const originalCommercialThesisFlag = process.env.COMMERCIAL_THESIS_V1_ENABLED
   const originalExternalPropensityFlag =
     process.env.EXTERNAL_AGENCY_PROPENSITY_V1_ENABLED
+  const originalAgencyDnaMatchFlag = process.env.AGENCY_DNA_MATCH_V2_ENABLED
 
   beforeEach(() => {
     process.env.CRON_API_KEY = testKey
@@ -78,6 +85,7 @@ describe('opportunity cron API', () => {
     process.env.SIGNAL_EPISODES_V2_ENABLED = 'false'
     process.env.COMMERCIAL_THESIS_V1_ENABLED = 'false'
     process.env.EXTERNAL_AGENCY_PROPENSITY_V1_ENABLED = 'false'
+    process.env.AGENCY_DNA_MATCH_V2_ENABLED = 'false'
     jest.clearAllMocks()
   })
 
@@ -99,6 +107,11 @@ describe('opportunity cron API', () => {
     } else {
       process.env.EXTERNAL_AGENCY_PROPENSITY_V1_ENABLED =
         originalExternalPropensityFlag
+    }
+    if (originalAgencyDnaMatchFlag === undefined) {
+      delete process.env.AGENCY_DNA_MATCH_V2_ENABLED
+    } else {
+      process.env.AGENCY_DNA_MATCH_V2_ENABLED = originalAgencyDnaMatchFlag
     }
   })
 
@@ -463,5 +476,54 @@ describe('opportunity cron API', () => {
       { params: Promise.resolve({ job: 'build-external-agency-propensity' }) },
     )).status).toBe(400)
     expect(mockedBuildExternalAgencyPropensity).not.toHaveBeenCalled()
+  })
+
+  it('keeps Agency DNA Match separately dark and dry-run by default', async () => {
+    process.env.OPPORTUNITY_ENGINE_V1_ENABLED = 'false'
+    process.env.EXTERNAL_AGENCY_PROPENSITY_V1_ENABLED = 'true'
+
+    expect((await POST(
+      request('/api/cron/opportunities/build-agency-dna-matches', testKey),
+      { params: Promise.resolve({ job: 'build-agency-dna-matches' }) },
+    )).status).toBe(404)
+    expect(mockedBuildAgencyDnaMatch).not.toHaveBeenCalled()
+
+    process.env.AGENCY_DNA_MATCH_V2_ENABLED = 'true'
+    mockedBuildAgencyDnaMatch.mockResolvedValue({
+      enabled: true, dryRun: true, scanned: 0, built: 0,
+      strong: 0, supported: 0, weak: 0, insufficientEvidence: 0, blocked: 0,
+      persisted: 0, replayed: 0, failed: 0,
+    })
+    const response = await POST(
+      request(
+        '/api/cron/opportunities/build-agency-dna-matches' +
+        '?workspace=20&organization=10',
+        testKey,
+      ),
+      { params: Promise.resolve({ job: 'build-agency-dna-matches' }) },
+    )
+    expect(response.status).toBe(200)
+    expect(mockedBuildAgencyDnaMatch).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        workspaceId: '20',
+        organizationId: '10',
+        dryRun: true,
+      }),
+    )
+  })
+
+  it('requires both Agency DNA Match apply scopes and its tight limit', async () => {
+    process.env.AGENCY_DNA_MATCH_V2_ENABLED = 'true'
+    for (const path of [
+      '/api/cron/opportunities/build-agency-dna-matches?apply=true&organization=10',
+      '/api/cron/opportunities/build-agency-dna-matches?apply=true&workspace=20',
+      '/api/cron/opportunities/build-agency-dna-matches?batchSize=26',
+    ]) {
+      expect((await POST(
+        request(path, testKey),
+        { params: Promise.resolve({ job: 'build-agency-dna-matches' }) },
+      )).status).toBe(400)
+    }
+    expect(mockedBuildAgencyDnaMatch).not.toHaveBeenCalled()
   })
 })

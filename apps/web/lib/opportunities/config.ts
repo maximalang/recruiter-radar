@@ -37,6 +37,8 @@ export const SIGNAL_EPISODES_V2_FEATURE_FLAG = 'SIGNAL_EPISODES_V2_ENABLED'
 export const COMMERCIAL_THESIS_V1_FEATURE_FLAG = 'COMMERCIAL_THESIS_V1_ENABLED'
 export const EXTERNAL_AGENCY_PROPENSITY_V1_FEATURE_FLAG =
   'EXTERNAL_AGENCY_PROPENSITY_V1_ENABLED'
+export const AGENCY_DNA_MATCH_V2_FEATURE_FLAG =
+  'AGENCY_DNA_MATCH_V2_ENABLED'
 
 export type OpportunityFeatureContext = {
   dataOwnerId: string | number | null | undefined
@@ -92,6 +94,12 @@ export const EXTERNAL_AGENCY_PROPENSITY_V1_LIMITS = {
   statementTimeoutMs: 15_000,
 } as const
 
+export const AGENCY_DNA_MATCH_V2_LIMITS = {
+  defaultJobBatchSize: 10,
+  maximumJobBatchSize: 25,
+  statementTimeoutMs: 15_000,
+} as const
+
 export function isOpportunityEngineV1Enabled(
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): boolean {
@@ -126,6 +134,12 @@ export function isExternalAgencyPropensityV1Enabled(
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): boolean {
   return env[EXTERNAL_AGENCY_PROPENSITY_V1_FEATURE_FLAG] === 'true'
+}
+
+export function isAgencyDnaMatchV2Enabled(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+  return env[AGENCY_DNA_MATCH_V2_FEATURE_FLAG] === 'true'
 }
 
 export function isOpportunityOutcomesEnabled(
@@ -479,6 +493,16 @@ export function clampExternalAgencyPropensityJobBatchSize(value: number): number
   return Math.min(
     Math.max(Math.trunc(value), 1),
     EXTERNAL_AGENCY_PROPENSITY_V1_LIMITS.maximumJobBatchSize,
+  )
+}
+
+export function clampAgencyDnaMatchJobBatchSize(value: number): number {
+  if (!Number.isFinite(value)) {
+    return AGENCY_DNA_MATCH_V2_LIMITS.defaultJobBatchSize
+  }
+  return Math.min(
+    Math.max(Math.trunc(value), 1),
+    AGENCY_DNA_MATCH_V2_LIMITS.maximumJobBatchSize,
   )
 }
 
