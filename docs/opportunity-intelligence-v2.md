@@ -298,6 +298,7 @@ Correction capability вычисляется сервером по полной 
 | `SIGNAL_EPISODES_V2_ENABLED` | Включает аддитивный Phase 3 Signal Episodes build только при точном `true`; по умолчанию `false`, требует отдельного `apply=true&organization=<id>` и не пишет legacy Hiring Episode/Opportunity и не переключает downstream readers |
 | `COMMERCIAL_THESIS_V1_ENABLED` | Включает аддитивный Phase 4 Commercial Thesis build только при точном `true`; по умолчанию `false`, apply требует одну явную organization, Agency DNA/score/eligibility не вычисляет и downstream readers не переключает |
 | `EXTERNAL_AGENCY_PROPENSITY_V1_ENABLED` | Включает аддитивный tenant-scoped Phase 5 External Agency Propensity build только при точном `true`; по умолчанию `false`, apply требует одновременно явные workspace и organization, score не является probability, Agency DNA Match/Opportunity/readers не переключает |
+| `AGENCY_DNA_MATCH_V2_ENABLED` | Включает аддитивный tenant-scoped Phase 6 Agency DNA Match build только при точном `true`; по умолчанию `false`, apply требует одновременно workspace и organization, Find/Grow/Reactivate и capacity policy сохраняются отдельно, Opportunity/Today/readers не переключаются |
 | `OPPORTUNITY_ENGINE_V1_ENABLED` | Включает engine/API/jobs только при точном `true` |
 | `OPPORTUNITY_OUTCOMES_ENABLED` | Включает ledger API только при точном `true` |
 | `OPPORTUNITY_OUTCOMES_UI_ENABLED` | Включает Outcome UI только вместе с ledger и при точном `true` |
