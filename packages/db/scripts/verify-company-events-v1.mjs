@@ -48,6 +48,10 @@ const opportunityScoringV3DownSql = await readFile(
   resolve(migrations, '20260804150000_add_opportunity_candidates_v3.down.sql'),
   'utf8',
 )
+const queryPlannerV2DownSql = await readFile(
+  resolve(migrations, '20260804160000_add_query_planner_v2.down.sql'),
+  'utf8',
+)
 assert.ok(
   downSql.indexOf('LOCK TABLE company_events IN ACCESS EXCLUSIVE MODE') > -1 &&
   downSql.indexOf('LOCK TABLE company_events IN ACCESS EXCLUSIVE MODE') <
@@ -299,6 +303,7 @@ try {
   )
   await database.query('ROLLBACK')
   await database.query('TRUNCATE TABLE company_events CASCADE')
+  await database.query(queryPlannerV2DownSql)
   await database.query(opportunityScoringV3DownSql)
   await database.query(agencyDnaMatchDownSql)
   await database.query(externalAgencyPropensityDownSql)

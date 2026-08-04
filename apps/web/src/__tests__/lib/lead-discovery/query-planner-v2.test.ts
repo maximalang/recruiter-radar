@@ -205,6 +205,36 @@ describe('Query Planner v2 profile isolation', () => {
     expect(plan.pageBudget).toBe(7)
     expect(plan.queryEnv.HH_PAGES).toBe('7')
   })
+
+  it('preserves unavailable historical yield as null instead of inferred zero', () => {
+    const [plan] = buildProfileScopedQueryPlans({
+      profiles: [profile({
+        historicalYield: {
+          fetchedRecords: null,
+          uniqueEvents: null,
+          uniqueCompanies: null,
+          episodes: null,
+          qualifiedOpportunities: null,
+          accepted: null,
+          contacted: null,
+          replied: null,
+          meetings: null,
+        },
+      })],
+      sources: ['hh'],
+    })
+    expect(plan.historicalYield).toEqual({
+      fetchedRecords: null,
+      uniqueEvents: null,
+      uniqueCompanies: null,
+      episodes: null,
+      qualifiedOpportunities: null,
+      accepted: null,
+      contacted: null,
+      replied: null,
+      meetings: null,
+    })
+  })
 })
 
 describe('Query Planner v2 shared execution and metrics', () => {

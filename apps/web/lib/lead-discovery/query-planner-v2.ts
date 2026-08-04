@@ -35,15 +35,15 @@ export type QueryPlanRemoteRelation =
   | 'unspecified'
 
 export type QueryPlanHistoricalYield = {
-  fetchedRecords: number
-  uniqueEvents: number
-  uniqueCompanies: number
-  episodes: number
-  qualifiedOpportunities: number
-  accepted: number
-  contacted: number
-  replied: number
-  meetings: number
+  fetchedRecords: number | null
+  uniqueEvents: number | null
+  uniqueCompanies: number | null
+  episodes: number | null
+  qualifiedOpportunities: number | null
+  accepted: number | null
+  contacted: number | null
+  replied: number | null
+  meetings: number | null
 }
 
 export type QueryPlannerV2ProfileInput = {
@@ -121,9 +121,18 @@ export type SharedQueryPlanV2 = {
   profileConsumers: string[]
 }
 
-export type QueryPlanMetricCounts = QueryPlanHistoricalYield & {
+export type QueryPlanMetricCounts = {
   executionCount: number
   zeroResultExecutions: number
+  fetchedRecords: number
+  uniqueEvents: number
+  uniqueCompanies: number
+  episodes: number
+  qualifiedOpportunities: number
+  accepted: number
+  contacted: number
+  replied: number
+  meetings: number
 }
 
 export type QueryPlanMetrics = QueryPlanMetricCounts & {
@@ -628,6 +637,28 @@ function normalizeHistoricalYield(
   raw: QueryPlanHistoricalYield,
 ): QueryPlanHistoricalYield {
   return {
+    fetchedRecords: nullableCount(raw.fetchedRecords, 'fetched records'),
+    uniqueEvents: nullableCount(raw.uniqueEvents, 'unique events'),
+    uniqueCompanies: nullableCount(raw.uniqueCompanies, 'unique companies'),
+    episodes: nullableCount(raw.episodes, 'episodes'),
+    qualifiedOpportunities: nullableCount(
+      raw.qualifiedOpportunities,
+      'qualified opportunities',
+    ),
+    accepted: nullableCount(raw.accepted, 'accepted'),
+    contacted: nullableCount(raw.contacted, 'contacted'),
+    replied: nullableCount(raw.replied, 'replied'),
+    meetings: nullableCount(raw.meetings, 'meetings'),
+  }
+}
+
+function normalizeMetricCounts(raw: QueryPlanMetricCounts): QueryPlanMetricCounts {
+  return {
+    executionCount: count(raw.executionCount, 'execution count'),
+    zeroResultExecutions: count(
+      raw.zeroResultExecutions,
+      'zero-result executions',
+    ),
     fetchedRecords: count(raw.fetchedRecords, 'fetched records'),
     uniqueEvents: count(raw.uniqueEvents, 'unique events'),
     uniqueCompanies: count(raw.uniqueCompanies, 'unique companies'),
@@ -640,17 +671,6 @@ function normalizeHistoricalYield(
     contacted: count(raw.contacted, 'contacted'),
     replied: count(raw.replied, 'replied'),
     meetings: count(raw.meetings, 'meetings'),
-  }
-}
-
-function normalizeMetricCounts(raw: QueryPlanMetricCounts): QueryPlanMetricCounts {
-  return {
-    executionCount: count(raw.executionCount, 'execution count'),
-    zeroResultExecutions: count(
-      raw.zeroResultExecutions,
-      'zero-result executions',
-    ),
-    ...normalizeHistoricalYield(raw),
   }
 }
 
@@ -757,6 +777,11 @@ function count(value: unknown, label: string): number {
     throw new TypeError(`Invalid ${label}.`)
   }
   return Number(value)
+}
+
+function nullableCount(value: unknown, label: string): number | null {
+  if (value == null) return null
+  return count(value, label)
 }
 
 function rate(numerator: number, denominator: number): number | null {

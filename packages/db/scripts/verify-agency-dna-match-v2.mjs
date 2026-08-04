@@ -24,6 +24,10 @@ const opportunityScoringV3DownSql = await readFile(
   resolve(migrations, '20260804150000_add_opportunity_candidates_v3.down.sql'),
   'utf8',
 )
+const queryPlannerV2DownSql = await readFile(
+  resolve(migrations, '20260804160000_add_query_planner_v2.down.sql'),
+  'utf8',
+)
 
 try {
   const relations = await database.query(
@@ -107,6 +111,7 @@ try {
     assert.ok(definitions.has(name), `missing trigger ${name}`)
   }
 
+  await database.query(queryPlannerV2DownSql)
   await database.query(opportunityScoringV3DownSql)
   await database.query(downSql)
   const removed = await database.query(
