@@ -18,6 +18,8 @@ const verifierScript = resolve(
   'scripts',
   'verify-signal-episodes-v2.mjs',
 )
+const jestScript = resolve(root, 'node_modules', 'jest', 'bin', 'jest.js')
+const webRoot = resolve(root, 'apps', 'web')
 const admin = new Client({ connectionString: databaseUrl })
 const databaseName = `rr_signal_episodes_${process.pid}_${Date.now()}`
 const temporaryUrl = new URL(databaseUrl)
@@ -32,9 +34,9 @@ function quoteIdentifier(value) {
   return `"${String(value).replaceAll('"', '""')}"`
 }
 
-async function run(command, args) {
+async function run(command, args, cwd = root) {
   const result = await execFileAsync(command, args, {
-    cwd: root,
+    cwd,
     env: testEnvironment,
     maxBuffer: 20 * 1024 * 1024,
   })
@@ -46,6 +48,12 @@ await admin.connect()
 try {
   await admin.query(`CREATE DATABASE ${quoteIdentifier(databaseName)}`)
   await run(process.execPath, [migrateScript])
+  await run(process.execPath, [
+    jestScript,
+    '--runInBand',
+    '--runTestsByPath',
+    'src/__tests__/lib/opportunities/signal-episode-runtime-db.test.ts',
+  ], webRoot)
   await run(process.execPath, [verifierScript])
 } finally {
   await admin.query(
