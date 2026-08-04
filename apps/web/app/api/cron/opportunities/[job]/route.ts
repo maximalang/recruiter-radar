@@ -4,10 +4,12 @@ import {
   COMPANY_EVENTS_V1_LIMITS,
   COMPANY_STATE_V1_LIMITS,
   SIGNAL_EPISODES_V2_LIMITS,
+  COMMERCIAL_THESIS_V1_LIMITS,
   OPPORTUNITY_ENGINE_LIMITS,
   isCompanyEventsV1Enabled,
   isCompanyStateV1Enabled,
   isSignalEpisodesV2Enabled,
+  isCommercialThesisV1Enabled,
   isOpportunityEngineV1Enabled,
 } from '@/lib/opportunities/config'
 import {
@@ -22,6 +24,10 @@ import {
   buildSignalEpisodesJob,
   type SignalEpisodesJobOptions,
 } from '@/lib/opportunities/signal-episode-job'
+import {
+  buildCommercialThesesJob,
+  type CommercialThesisJobOptions,
+} from '@/lib/opportunities/commercial-thesis-job'
 import {
   backfillOpportunitiesJob,
   buildOpportunitiesJob,
@@ -42,11 +48,13 @@ const JOBS = new Set([
   'normalize-company-events',
   'build-company-state',
   'build-signal-episodes',
+  'build-commercial-theses',
 ])
 
 const COMPANY_EVENTS_JOB = 'normalize-company-events'
 const COMPANY_STATE_JOB = 'build-company-state'
 const SIGNAL_EPISODES_JOB = 'build-signal-episodes'
+const COMMERCIAL_THESIS_JOB = 'build-commercial-theses'
 
 export async function GET(
   request: NextRequest,
@@ -63,7 +71,7 @@ export async function GET(
     ok: true,
     job,
     enabled: true,
-    hint: 'Use POST with x-api-key. Backfill, Company Events, Company State, and Signal Episodes are dry-run unless apply=true.',
+    hint: 'Use POST with x-api-key. Backfill and additive intelligence jobs are dry-run unless apply=true.',
   })
 }
 
@@ -91,6 +99,8 @@ export async function POST(
       ? COMPANY_STATE_V1_LIMITS.maximumJobBatchSize
       : job === SIGNAL_EPISODES_JOB
         ? SIGNAL_EPISODES_V2_LIMITS.maximumJobBatchSize
+        : job === COMMERCIAL_THESIS_JOB
+          ? COMMERCIAL_THESIS_V1_LIMITS.maximumJobBatchSize
       : OPPORTUNITY_ENGINE_LIMITS.maximumJobBatchSize
   if (
     (organizationValue !== null && organizationId === null) ||
@@ -107,7 +117,8 @@ export async function POST(
     (
       job === COMPANY_EVENTS_JOB ||
       job === COMPANY_STATE_JOB ||
-      job === SIGNAL_EPISODES_JOB
+      job === SIGNAL_EPISODES_JOB ||
+      job === COMMERCIAL_THESIS_JOB
     ) &&
     applyValue === 'true' &&
     organizationId === null
@@ -140,6 +151,10 @@ export async function POST(
     ...commonOptions,
     dryRun: applyValue !== 'true',
   }
+  const commercialThesisOptions: CommercialThesisJobOptions = {
+    ...commonOptions,
+    dryRun: applyValue !== 'true',
+  }
 
   try {
     const result = job === COMPANY_EVENTS_JOB
@@ -148,6 +163,8 @@ export async function POST(
         ? await buildCompanyStateJob(companyStateOptions)
         : job === SIGNAL_EPISODES_JOB
           ? await buildSignalEpisodesJob(signalEpisodesOptions)
+          : job === COMMERCIAL_THESIS_JOB
+            ? await buildCommercialThesesJob(commercialThesisOptions)
       : job === 'detect-hiring-episodes'
       ? await detectHiringEpisodesJob(opportunityOptions)
       : job === 'build-opportunities'
@@ -172,6 +189,8 @@ function isJobEnabled(job: string): boolean {
       ? isCompanyStateV1Enabled()
       : job === SIGNAL_EPISODES_JOB
         ? isSignalEpisodesV2Enabled()
+        : job === COMMERCIAL_THESIS_JOB
+          ? isCommercialThesisV1Enabled()
     : isOpportunityEngineV1Enabled()
 }
 

@@ -3,11 +3,13 @@ import {
   clampCompanyEventsJobBatchSize,
   clampCompanyStateJobBatchSize,
   clampSignalEpisodesJobBatchSize,
+  clampCommercialThesisJobBatchSize,
   clampOpportunityPageSize,
   clampOpportunitySnoozeDays,
   isCompanyEventsV1Enabled,
   isCompanyStateV1Enabled,
   isSignalEpisodesV2Enabled,
+  isCommercialThesisV1Enabled,
   isAgencyDnaV1Enabled,
   isAgencyDnaV1EnabledForContext,
   isOpportunityEngineV1Enabled,
@@ -75,6 +77,21 @@ describe('opportunity engine config', () => {
     expect(clampSignalEpisodesJobBatchSize(Number.NaN)).toBe(10)
     expect(clampSignalEpisodesJobBatchSize(0)).toBe(1)
     expect(clampSignalEpisodesJobBatchSize(26)).toBe(25)
+  })
+
+  it('keeps Commercial Thesis v1 independently dark and tightly bounded', () => {
+    expect(isCommercialThesisV1Enabled({})).toBe(false)
+    expect(isCommercialThesisV1Enabled({ COMMERCIAL_THESIS_V1_ENABLED: '1' }))
+      .toBe(false)
+    expect(isCommercialThesisV1Enabled({
+      COMMERCIAL_THESIS_V1_ENABLED: 'true',
+    })).toBe(true)
+    expect(isCommercialThesisV1Enabled({
+      COMMERCIAL_THESIS_V1_ENABLED: ' TRUE ',
+    })).toBe(false)
+    expect(clampCommercialThesisJobBatchSize(Number.NaN)).toBe(10)
+    expect(clampCommercialThesisJobBatchSize(0)).toBe(1)
+    expect(clampCommercialThesisJobBatchSize(26)).toBe(25)
   })
 
   it('is dark by default and only accepts an explicit true value', () => {

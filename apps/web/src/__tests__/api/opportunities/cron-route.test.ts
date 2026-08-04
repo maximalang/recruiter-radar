@@ -21,16 +21,22 @@ jest.mock('@/lib/opportunities/signal-episode-job', () => ({
   buildSignalEpisodesJob: jest.fn(),
 }))
 
+jest.mock('@/lib/opportunities/commercial-thesis-job', () => ({
+  buildCommercialThesesJob: jest.fn(),
+}))
+
 import { backfillOpportunitiesJob } from '@/lib/opportunities/jobs'
 import { normalizeCompanyEventsJob } from '@/lib/opportunities/company-event-job'
 import { buildCompanyStateJob } from '@/lib/opportunities/company-state-job'
 import { buildSignalEpisodesJob } from '@/lib/opportunities/signal-episode-job'
+import { buildCommercialThesesJob } from '@/lib/opportunities/commercial-thesis-job'
 import { GET, POST } from '@/app/api/cron/opportunities/[job]/route'
 
 const mockedBackfill = jest.mocked(backfillOpportunitiesJob)
 const mockedNormalizeCompanyEvents = jest.mocked(normalizeCompanyEventsJob)
 const mockedBuildCompanyState = jest.mocked(buildCompanyStateJob)
 const mockedBuildSignalEpisodes = jest.mocked(buildSignalEpisodesJob)
+const mockedBuildCommercialTheses = jest.mocked(buildCommercialThesesJob)
 
 function request(path: string, key?: string) {
   return new NextRequest(`https://recruiter-radar.ru${path}`, {
@@ -52,6 +58,7 @@ describe('opportunity cron API', () => {
   const originalCompanyEventsFlag = process.env.COMPANY_EVENTS_V1_ENABLED
   const originalCompanyStateFlag = process.env.COMPANY_STATE_V1_ENABLED
   const originalSignalEpisodesFlag = process.env.SIGNAL_EPISODES_V2_ENABLED
+  const originalCommercialThesisFlag = process.env.COMMERCIAL_THESIS_V1_ENABLED
 
   beforeEach(() => {
     process.env.CRON_API_KEY = testKey
@@ -59,6 +66,7 @@ describe('opportunity cron API', () => {
     process.env.COMPANY_EVENTS_V1_ENABLED = 'false'
     process.env.COMPANY_STATE_V1_ENABLED = 'false'
     process.env.SIGNAL_EPISODES_V2_ENABLED = 'false'
+    process.env.COMMERCIAL_THESIS_V1_ENABLED = 'false'
     jest.clearAllMocks()
   })
 
@@ -73,6 +81,8 @@ describe('opportunity cron API', () => {
     else process.env.COMPANY_STATE_V1_ENABLED = originalCompanyStateFlag
     if (originalSignalEpisodesFlag === undefined) delete process.env.SIGNAL_EPISODES_V2_ENABLED
     else process.env.SIGNAL_EPISODES_V2_ENABLED = originalSignalEpisodesFlag
+    if (originalCommercialThesisFlag === undefined) delete process.env.COMMERCIAL_THESIS_V1_ENABLED
+    else process.env.COMMERCIAL_THESIS_V1_ENABLED = originalCommercialThesisFlag
   })
 
   it('fails closed for missing credentials and a disabled engine', async () => {
@@ -329,5 +339,45 @@ describe('opportunity cron API', () => {
       { params: Promise.resolve({ job: 'build-signal-episodes' }) },
     )).status).toBe(400)
     expect(mockedBuildSignalEpisodes).not.toHaveBeenCalled()
+  })
+
+  it('keeps Commercial Thesis separately dark and defaults to dry-run', async () => {
+    process.env.OPPORTUNITY_ENGINE_V1_ENABLED = 'false'
+    process.env.SIGNAL_EPISODES_V2_ENABLED = 'true'
+    process.env.COMMERCIAL_THESIS_V1_ENABLED = 'false'
+
+    expect((await POST(
+      request('/api/cron/opportunities/build-commercial-theses', testKey),
+      { params: Promise.resolve({ job: 'build-commercial-theses' }) },
+    )).status).toBe(404)
+    expect(mockedBuildCommercialTheses).not.toHaveBeenCalled()
+
+    process.env.COMMERCIAL_THESIS_V1_ENABLED = 'true'
+    mockedBuildCommercialTheses.mockResolvedValue({
+      enabled: true, dryRun: true, scanned: 0, episodesScanned: 0,
+      built: 0, active: 0, cooling: 0, expired: 0,
+      thesesPersisted: 0, replayed: 0, rejected: 0, failed: 0,
+    })
+    const response = await POST(
+      request('/api/cron/opportunities/build-commercial-theses', testKey),
+      { params: Promise.resolve({ job: 'build-commercial-theses' }) },
+    )
+    expect(response.status).toBe(200)
+    expect(mockedBuildCommercialTheses).toHaveBeenLastCalledWith(
+      expect.objectContaining({ dryRun: true }),
+    )
+  })
+
+  it('requires explicit Commercial Thesis apply scope and enforces its limit', async () => {
+    process.env.COMMERCIAL_THESIS_V1_ENABLED = 'true'
+    expect((await POST(
+      request('/api/cron/opportunities/build-commercial-theses?apply=true', testKey),
+      { params: Promise.resolve({ job: 'build-commercial-theses' }) },
+    )).status).toBe(400)
+    expect((await POST(
+      request('/api/cron/opportunities/build-commercial-theses?batchSize=26', testKey),
+      { params: Promise.resolve({ job: 'build-commercial-theses' }) },
+    )).status).toBe(400)
+    expect(mockedBuildCommercialTheses).not.toHaveBeenCalled()
   })
 })
