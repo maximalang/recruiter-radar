@@ -31,7 +31,7 @@ export default function EvidenceScene() {
     <section id="scene-evidence" className={`${styles.scene} ${styles.darkScene} ${styles.evidenceScene}`} aria-labelledby="evidence-title">
       <div className={styles.evidenceLayout}>
         <div className={styles.evidenceIntro}>
-          <p className={styles.sceneLabel}>04 — Доказательство</p>
+          <p className={styles.sceneLabel}>03 — Доказательство</p>
           <h2 id="evidence-title" className={styles.sceneHeading}>
             Радар не просит верить оценке. <em>Он показывает, из чего она собрана.</em>
           </h2>
