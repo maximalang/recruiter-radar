@@ -1,4 +1,3 @@
-import { OPERATOR_REQUISITES } from './operatorRequisites'
 import { getPaymentProviderSetupState } from './paymentsProvider'
 import { getRobokassaRefundSetupState } from './paymentsRobokassaRefunds'
 import type { PaymentProviderCode, PaymentProviderSetupState } from './paymentsTypes'
@@ -52,10 +51,11 @@ export function buildPaymentReadinessReport(
   const refundSetup = getRobokassaRefundSetupState()
   const refundsConfigured = refundSetup.configured
   const npdReceiptsConfigured = process.env.ROBOKASSA_SMZ_RECEIPTS_ENABLED?.trim().toLowerCase() === 'true'
-  const merchantModerationReady = selfServeCheckoutReady && Boolean(OPERATOR_REQUISITES.postalAddress)
+  const postalAddressConfigured = Boolean(process.env.OPERATOR_PUBLIC_POSTAL_ADDRESS?.trim())
+  const merchantModerationReady = selfServeCheckoutReady && postalAddressConfigured
 
   const launchBlockers = [...integrationBlockers]
-  if (!OPERATOR_REQUISITES.postalAddress) launchBlockers.push('OPERATOR_PUBLIC_POSTAL_ADDRESS is required before merchant moderation.')
+  if (!postalAddressConfigured) launchBlockers.push('OPERATOR_PUBLIC_POSTAL_ADDRESS is required before merchant moderation.')
   if (setup.mode !== 'live') launchBlockers.push('ROBOKASSA_MODE must be live for production launch.')
   if (!refundsConfigured) launchBlockers.push('ROBOKASSA_PASSWORD_3 and Refund JWT configuration are required for live refunds.')
   if (!npdReceiptsConfigured) launchBlockers.push('Robocheck SMZ / My Tax receipt integration must be connected and explicitly enabled.')
