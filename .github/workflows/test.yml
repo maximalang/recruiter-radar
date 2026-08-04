@@ -152,7 +152,7 @@ jobs:
   landing-playwright:
     needs: web-build
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     env:
       DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
       LANDING_BASE_URL: http://127.0.0.1:3000
@@ -205,15 +205,23 @@ jobs:
           CRON_API_KEY: test-cron-api-key-at-least-32-chars
           NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
         run: |
+          set -euo pipefail
           node apps/web/.next/standalone/apps/web/server.js > /tmp/landing-server.log 2>&1 &
-          echo "$!" > /tmp/landing-server.pid
-          for i in $(seq 1 30); do
-            if curl -fsS -o /tmp/landing-ready.html http://127.0.0.1:3000/ \
+          server_pid="$!"
+          echo "$server_pid" > /tmp/landing-server.pid
+          for i in $(seq 1 90); do
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              echo "Standalone server exited before becoming ready."
+              cat /tmp/landing-server.log
+              exit 1
+            fi
+            if curl --connect-timeout 2 --max-time 10 -fsS -o /tmp/landing-ready.html http://127.0.0.1:3000/ \
               && grep -q 'data-deploy-anchor="recruiter-radar-landing-v3"' /tmp/landing-ready.html; then
               exit 0
             fi
             sleep 2
           done
+          echo "Standalone server did not become ready within 180 seconds."
           cat /tmp/landing-server.log
           exit 1
       - name: Landing production audit
