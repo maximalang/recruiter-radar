@@ -11,6 +11,18 @@ const rollback = readFileSync(resolve(
   migrations,
   '20260804130000_add_external_agency_propensity_v1.down.sql',
 ), 'utf8')
+const rootPackage = readFileSync(resolve(root, 'package.json'), 'utf8')
+const testWorkflow = readFileSync(
+  resolve(root, '.github', 'workflows', 'test.yml'),
+  'utf8',
+)
+const dbRunner = readFileSync(resolve(
+  root,
+  'packages',
+  'db',
+  'scripts',
+  'run-external-agency-propensity-v1-db-tests.mjs',
+), 'utf8')
 const compact = migration.replace(/\s+/g, ' ')
 
 describe('External Agency Propensity v1 migration contract', () => {
@@ -108,5 +120,20 @@ describe('External Agency Propensity v1 migration contract', () => {
       .toBeLessThan(
         rollback.indexOf('DROP TABLE external_agency_propensity_snapshots'),
       )
+  })
+
+  it('registers an isolated PostgreSQL runtime gate after Commercial Thesis', () => {
+    expect(rootPackage).toContain('"test:external-agency-propensity-v1:db"')
+    expect(dbRunner).toContain('EXTERNAL_AGENCY_PROPENSITY_V1_DB_TEST_ACK')
+    expect(dbRunner).toContain('external-agency-propensity-runtime-db.test.ts')
+    expect(dbRunner).toContain('verify-external-agency-propensity-v1.mjs')
+    const thesisGate = testWorkflow.indexOf(
+      'run: npm run test:commercial-theses-v1:db',
+    )
+    const propensityGate = testWorkflow.indexOf(
+      'run: npm run test:external-agency-propensity-v1:db',
+    )
+    expect(thesisGate).toBeGreaterThan(-1)
+    expect(propensityGate).toBeGreaterThan(thesisGate)
   })
 })

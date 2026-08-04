@@ -98,6 +98,10 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
         run: npm run test:commercial-theses-v1:db
+      - name: Verify External Agency Propensity v1 migration and runtime
+        env:
+          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+        run: npm run test:external-agency-propensity-v1:db
       - name: Verify Opportunity Engine and Outcome Ledger production runtime
         env:
           DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
