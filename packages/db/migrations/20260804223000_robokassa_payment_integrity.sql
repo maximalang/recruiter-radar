@@ -56,8 +56,9 @@ BEFORE UPDATE OF status ON checkout_orders
 FOR EACH ROW
 EXECUTE FUNCTION enforce_checkout_order_payment_transition();
 
-CREATE UNIQUE INDEX IF NOT EXISTS checkout_orders_provider_payment_uidx
-  ON checkout_orders (provider, provider_payment_id)
-  WHERE provider IS NOT NULL AND provider_payment_id IS NOT NULL;
+-- ResultURL may be retried by Robokassa. Replay protection belongs to
+-- billing_webhook_events, where the provider event is claimed idempotently;
+-- checkout_orders must remain reconcilable when the same external operation is
+-- delivered again.
 
 COMMIT;
