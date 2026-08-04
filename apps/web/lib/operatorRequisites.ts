@@ -24,14 +24,14 @@
 export const OPERATOR_REQUISITES = {
   /** ФИО — the self-employed seller's full name. Shown in the footer + /legal. */
   fullName: "Головий Наталья Ярославна",
-  /** ИНН — tax ID, used for ЮKassa receipts (ФЗ-54). Shown in the footer + /legal. */
+  /** ИНН — tax ID. Shown in the footer + /legal. */
   inn: "622809740837",
   /** Legal status — shown on /legal (the full block); abbreviated from the footer. */
   status: "Самозанятый, плательщик НПД (налог на профессиональный доход)",
   /** Service description — shown on /legal. */
   service: "Recruiter Radar — ежедневный радар по компаниям с активным наймом",
-  /** Contact email — shown in the footer + /legal. */
-  email: "6uunn9@gmail.com",
+  /** Public support mailbox — shown in the footer + /legal. */
+  email: "support@recruiter-radar.ru",
 } as const;
 
 export type OperatorRequisites = typeof OPERATOR_REQUISITES;
