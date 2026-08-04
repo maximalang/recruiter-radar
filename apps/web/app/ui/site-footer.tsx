@@ -6,9 +6,9 @@ import s from "./site-footer.module.css";
 import { BrandLogo } from "./brand-logo";
 
 /**
- * Site-wide footer. Robokassa requires a self-employed seller's full name and
- * INN in the footer, so identity is kept here in one quiet line and not
- * repeated across product screens. Full details live on /legal.
+ * Robokassa moderation requires the self-employed seller's full name and INN
+ * in the footer. Public support contacts are kept here as a quiet, consistent
+ * line; expanded information lives on /legal.
  */
 export async function SiteFooter(props: { tone?: "light" | "dark" }) {
   const tone = props.tone ?? "light";
@@ -34,7 +34,8 @@ export async function SiteFooter(props: { tone?: "light" | "dark" }) {
           <nav className={s.footerLinks} aria-label="Подвал">
             <Link href="/legal" className={s.footerLink}>Реквизиты</Link>
             <Link href="/terms" className={s.footerLink}>Оферта</Link>
-            <Link href="/privacy" className={s.footerLink}>Конфиденциальность</Link>
+            <Link href="/payment-and-refund" className={s.footerLink}>Оплата и возврат</Link>
+            <Link href="/privacy" className={s.footerLink}>Персональные данные</Link>
             {isOperator ? <Link href="/admin" className={s.footerLink}>Оператор</Link> : null}
             {isOperator ? <Link href="/admin/payments" className={s.footerLink}>Платежи</Link> : null}
           </nav>
@@ -44,6 +45,14 @@ export async function SiteFooter(props: { tone?: "light" | "dark" }) {
           <span className={s.footerOperatorName}>Самозанятый {OPERATOR_REQUISITES.fullName}</span>
           <span className={s.footerOperatorSep} aria-hidden="true">·</span>
           <span>ИНН <span className={s.footerOperatorInn}>{OPERATOR_REQUISITES.inn}</span></span>
+          {OPERATOR_REQUISITES.city ? (
+            <>
+              <span className={s.footerOperatorSep} aria-hidden="true">·</span>
+              <span>{OPERATOR_REQUISITES.city}</span>
+            </>
+          ) : null}
+          <span className={s.footerOperatorSep} aria-hidden="true">·</span>
+          <a href="tel:+79009666092" className={s.footerOperatorEmail}>{OPERATOR_REQUISITES.phone}</a>
           <span className={s.footerOperatorSep} aria-hidden="true">·</span>
           <a href={`mailto:${OPERATOR_REQUISITES.email}`} className={s.footerOperatorEmail}>{OPERATOR_REQUISITES.email}</a>
         </div>
