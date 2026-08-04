@@ -20,6 +20,10 @@ const downSql = await readFile(
   resolve(migrations, '20260804130000_add_external_agency_propensity_v1.down.sql'),
   'utf8',
 )
+const agencyDnaMatchDownSql = await readFile(
+  resolve(migrations, '20260804140000_add_agency_dna_match_v2.down.sql'),
+  'utf8',
+)
 
 try {
   const relations = await database.query(
@@ -80,6 +84,12 @@ try {
     assert.ok(triggerDefinitions.has(name), `missing trigger ${name}`)
   }
 
+  const childSchema = await database.query(
+    `SELECT TO_REGCLASS('public.agency_dna_match_snapshots')::TEXT AS snapshots`,
+  )
+  if (childSchema.rows[0]?.snapshots) {
+    await database.query(agencyDnaMatchDownSql)
+  }
   await database.query(downSql)
   const removed = await database.query(
     `SELECT
