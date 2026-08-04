@@ -12,55 +12,66 @@ import { OPERATOR_REQUISITES } from "../../lib/operatorRequisites";
 
 export const metadata: Metadata = {
   title: "Реквизиты — Recruiter Radar",
-  description:
-    "Реквизиты самозанятого — плательщика НПД, оператора сервиса Recruiter Radar. ИНН для оплаты через ЮKassa.",
+  description: "Публичные реквизиты самозанятого продавца и оператора Recruiter Radar.",
   robots: { index: true, follow: true },
 };
 
-// The requisites live in lib/operatorRequisites (the single source the footer
-// and this page share). This page renders the full block (status + service
-// description); the footer carries only the legally-required minimum + a link
-// here. ИНН is the operational key for ЮKassa receipts (ФЗ-54).
-const SELF_EMPLOYED = OPERATOR_REQUISITES;
-
 export default function LegalPage() {
+  const requisites = OPERATOR_REQUISITES;
+
   return (
     <PageFrame maxWidth="820px">
       <section style={{ display: "grid", gap: "18px", padding: "32px 0" }}>
         <SectionIntro
           eyebrow="Реквизиты"
-          title="Реквизиты оператора сервиса"
-          description="Оператор Recruiter Radar — самозанятый, плательщик налога на профессиональный доход (НПД). Реквизиты применяются при формировании чеков через ЮKassa."
+          title="Реквизиты продавца"
+          description="Данные самозанятого продавца, принимающего оплату за цифровой доступ к Recruiter Radar."
         />
 
         <SurfaceCard>
           <div style={{ display: "grid", gap: "14px" }}>
-            <SummaryRow label="ФИО" value={SELF_EMPLOYED.fullName} />
+            <SummaryRow label="Продавец" value={`Самозанятый ${requisites.fullName}`} />
             <SummaryRow
               label="ИНН"
               value={
                 <span style={{ fontFamily: "ui-monospace, SFMono-Regular, monospace", fontSize: "1.05em" }}>
-                  {SELF_EMPLOYED.inn}
+                  {requisites.inn}
                 </span>
               }
             />
-            <SummaryRow label="Статус" value={SELF_EMPLOYED.status} />
-            <SummaryRow label="Сервис" value={SELF_EMPLOYED.service} />
+            <SummaryRow label="Налоговый статус" value={requisites.status} />
+            <SummaryRow label="Регистрация" value={requisites.ogrnNote} />
+            <SummaryRow label="Услуга" value={requisites.service} />
             <SummaryRow
-              label="Контакт"
-              value={
-                <a href={`mailto:${SELF_EMPLOYED.email}`} style={{ color: "inherit" }}>
-                  {SELF_EMPLOYED.email}
-                </a>
-              }
+              label="E-mail"
+              value={<a href={`mailto:${requisites.email}`} style={{ color: "inherit" }}>{requisites.email}</a>}
             />
+            <SummaryRow
+              label="Телефон"
+              value={<a href="tel:+79009666092" style={{ color: "inherit" }}>{requisites.phone}</a>}
+            />
+            <SummaryRow
+              label="Сайт"
+              value={<a href={requisites.website} style={{ color: "inherit" }}>{requisites.website}</a>}
+            />
+            {requisites.postalAddress ? (
+              <SummaryRow label="Адрес для корреспонденции" value={requisites.postalAddress} />
+            ) : null}
           </div>
         </SurfaceCard>
 
+        {requisites.postalAddress ? null : (
+          <NoticeBox
+            tone="warning"
+            title="Адрес будет добавлен до модерации"
+            description="Для подачи сайта на модерацию платёжного оператора необходимо указать фактический адрес для корреспонденции. Временный или выдуманный адрес публично не показывается."
+          />
+        )}
+
         <NoticeBox
           tone="info"
-          title="ИНН для оплаты"
-          description="Этот ИНН применяется при формировании чеков через ЮKassa в соответствии с ФЗ-54. Полные условия оказания услуг — в оферте."
+          title="Чек НПД"
+          description="После оплаты продавец формирует чек плательщика НПД через «Мой налог» или подключённого оператора электронной площадки и передаёт его покупателю. Онлайн-касса по 54-ФЗ для плательщика НПД не применяется."
         />
       </section>
       <SiteFooter />
