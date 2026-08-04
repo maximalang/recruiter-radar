@@ -129,6 +129,24 @@ describe('Opportunity Scoring v3 dark job', () => {
     expect(mockedPersist).not.toHaveBeenCalled()
   })
 
+  it('does not build a candidate when no Agency DNA Match exists', async () => {
+    const { db } = database([])
+
+    await expect(buildOpportunityScoringV3Job({
+      env: { OPPORTUNITY_SCORING_V3_ENABLED: 'true' },
+      workspaceId: '20',
+      organizationId: '10',
+    }, db)).resolves.toMatchObject({
+      enabled: true,
+      dryRun: true,
+      scanned: 0,
+      built: 0,
+      persisted: 0,
+      failed: 0,
+    })
+    expect(mockedPersist).not.toHaveBeenCalled()
+  })
+
   it('requires exact workspace and organization scope before apply', async () => {
     const { db, query } = database()
 

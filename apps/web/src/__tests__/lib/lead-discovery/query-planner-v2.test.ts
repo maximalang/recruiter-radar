@@ -168,6 +168,40 @@ describe('Query Planner v2 profile isolation', () => {
     expect(second.keywordCluster).toContain('айти')
   })
 
+  it('keeps feedback from one workspace out of another workspace plan', () => {
+    const plans = buildProfileScopedQueryPlans({
+      profiles: [
+        profile({
+          workspaceId: '10',
+          clientProfileId: '30',
+          industries: ['finance'],
+          feedbackEvents: Array.from({ length: 3 }, () => ({
+            industry: 'finance',
+            role: null,
+            sentiment: 'negative' as const,
+          })),
+        }),
+        profile({
+          workspaceId: '11',
+          clientProfileId: '31',
+          profileSnapshotHash: HASH_B,
+          industries: ['finance'],
+          feedbackEvents: [],
+        }),
+      ],
+      sources: ['hh'],
+    })
+
+    const first = plans.find((item) => item.workspaceId === '10')!
+    const second = plans.find((item) => item.workspaceId === '11')!
+    expect(first.feedbackAdjustments.demote).toEqual([
+      expect.objectContaining({ axis: 'industry', value: 'finance' }),
+    ])
+    expect(second.feedbackAdjustments.demote).toEqual([])
+    expect(second.negativeTerms).not.toContain('finance')
+    expect(second.inputHash).not.toBe(first.inputHash)
+  })
+
   it('keeps unknown geography as an auditable rejected plan', () => {
     const [plan] = buildProfileScopedQueryPlans({
       profiles: [profile({ targetCity: 'Неизвестный регион' })],

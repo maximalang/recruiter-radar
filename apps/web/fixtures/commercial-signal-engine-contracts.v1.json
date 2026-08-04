@@ -1,0 +1,302 @@
+{
+  "schemaVersion": "commercial-signal-contract-matrix-v1",
+  "pipelineInvariant": "Source Record -> Company Event -> Company State Change -> Signal Episode -> Commercial Thesis -> External Agency Propensity -> Agency DNA Match -> Opportunity -> Actionable Lead",
+  "contracts": [
+    {
+      "id": "CSE-01",
+      "requirement": "One ordinary vacancy does not create an actionable opportunity.",
+      "layer": "signal_episode",
+      "evidence": [
+        {
+          "kind": "unit",
+          "file": "src/__tests__/lib/opportunities/signal-episode.test.ts",
+          "testName": "does not turn ordinary vacancy volume into an episode without a state change"
+        },
+        {
+          "kind": "unit",
+          "file": "src/__tests__/lib/opportunities/opportunity-scoring-v3.test.ts",
+          "testName": "does not qualify an ordinary event without a confirmed state change"
+        }
+      ]
+    },
+    {
+      "id": "CSE-02",
+      "requirement": "Duplicate publications of one vacancy do not increase vacancy count or score.",
+      "layer": "company_event",
+      "evidence": [
+        {
+          "kind": "unit",
+          "file": "src/__tests__/lib/opportunities/company-event-normalization.test.ts",
+          "testName": "deduplicates one vacancy across sources and preserves every publication"
+        },
+        {
+          "kind": "unit",
+          "file": "src/__tests__/lib/opportunities/hiring-episode-detection.test.ts",
+          "testName": "counts the same canonical vacancy from two publications once"
+        }
+      ]
+    },
+    {
+      "id": "CSE-03",
+      "requirement": "Four ordinary vacancies at a baseline of four do not create a strong episode.",
+      "layer": "company_state_change",
+      "evidence": [
+        {
+          "kind": "unit",
+          "file": "src/__tests__/lib/opportunities/company-state.test.ts",
+          "testName": "does not classify four ordinary vacancies as acceleration for a company whose own baseline is four"
+        }
+      ]
+    },
+    {
+      "id": "CSE-04",
+      "requirement": "Four vacancies can create an episode when they strongly exceed a low company baseline.",
+      "layer": "company_state_change",
+      "evidence": [
+        {
+          "kind": "unit",
+          "file": "src/__tests__/lib/opportunities/company-state.test.ts",
+          "testName": "detects a company-specific acceleration when four vacancies strongly exceed a low baseline"
+        },
+        {
+          "kind": "unit",
+          "file": "src/__tests__/lib/opportunities/signal-episode.test.ts",
+          "testName": "creates a baseline-aware acceleration episode for the same four vacancies"
+        }
+      ]
+    },
+    {
+      "id": "CSE-05",
+      "requirement": "A new CTO without hiring evidence remains context rather than a lead.",
+      "layer": "signal_episode",
+      "evidence": [
+        {
+          "kind": "unit",
+          "file": "src/__tests__/lib/opportunities/signal-episode.test.ts",
+          "testName": "keeps a new CTO as context when hiring evidence has not changed"
+        }
+      ]
+    },
+    {
+      "id": "CSE-06",
+      "requirement": "A new CTO plus technical hiring acceleration creates one combined episode.",
+      "layer": "signal_episode",
+      "evidence": [
+        {
+          "kind": "unit",
+          "file": "src/__tests__/lib/opportunities/signal-episode.test.ts",
+          "testName": "combines a CTO change and technical acceleration into one episode"
+        }
+      ]
+    },
+    {
+      "id": "CSE-07",
+      "requirement": "A strong episode without Agency DNA Match does not become a lead.",
+      "layer": "agency_dna_match",
+      "evidence": [
+        {
+          "kind": "unit",
+          "file": "src/__tests__/lib/opportunities/opportunity-scoring-v3-job.test.ts",
+          "testName": "does not build a candidate when no Agency DNA Match exists"
+        }
+      ]
+    },
+    {
+      "id": "CSE-08",
+      "requirement": "A strong opportunity without a contact path is queued for enrichment.",
+      "layer": "opportunity_scoring",
+      "evidence": [
+        {
+          "kind": "unit",
+          "file": "src/__tests__/lib/opportunities/opportunity-scoring-v3.test.ts",
+          "testName": "keeps strong quality without a contact path and queues enrichment"
+        },
+        {
+          "kind": "postgresql",
+          "file": "src/__tests__/lib/opportunities/agency-dna-match-runtime-db.test.ts",
+          "testName": "persists and replays a quality candidate without contact suppression",
+          "gate": "test:opportunity-scoring-v3:db"
+        }
+      ]
+    },
+    {
+      "id": "CSE-09",
+      "requirement": "Low External Agency Propensity cannot receive a qualified status.",
+      "layer": "external_agency_propensity",
+      "evidence": [
+        {
+          "kind": "unit",
+          "file": "src/__tests__/lib/opportunities/opportunity-scoring-v3.test.ts",
+          "testName": "keeps low external propensity out of qualified statuses"
+        }
+      ]
+    },
+    {
+      "id": "CSE-10",
+      "requirement": "An existing client becomes a Grow opportunity.",
+      "layer": "agency_dna_match",
+      "evidence": [
+        {
+          "kind": "unit",
+          "file": "src/__tests__/lib/opportunities/opportunity-scoring-v3.test.ts",
+          "testName": "supports Find, Grow, and Reactivate without merging their identity"
+        }
+      ]
+    },
+    {
+      "id": "CSE-11",
+      "requirement": "A former client becomes a Reactivate opportunity.",
+      "layer": "agency_dna_match",
+      "evidence": [
+        {
+          "kind": "unit",
+          "file": "src/__tests__/lib/opportunities/opportunity-scoring-v3.test.ts",
+          "testName": "supports Find, Grow, and Reactivate without merging their identity"
+        }
+      ]
+    },
+    {
+      "id": "CSE-12",
+      "requirement": "Do-not-contact always blocks commercial action.",
+      "layer": "opportunity_scoring",
+      "evidence": [
+        {
+          "kind": "unit",
+          "file": "src/__tests__/lib/opportunities/opportunity-scoring-v3.test.ts",
+          "testName": "blocks commercial action for %s regardless of other scores",
+          "fixtureToken": "do_not_contact"
+        }
+      ]
+    },
+    {
+      "id": "CSE-13",
+      "requirement": "New negative evidence can lower a previously high score.",
+      "layer": "opportunity_scoring",
+      "evidence": [
+        {
+          "kind": "unit",
+          "file": "src/__tests__/lib/opportunities/opportunity-scoring-v3.test.ts",
+          "testName": "is reproducible and changes the input hash for negative evidence"
+        }
+      ]
+    },
+    {
+      "id": "CSE-14",
+      "requirement": "A model input change creates a reproducible immutable scoring generation.",
+      "layer": "opportunity_scoring",
+      "evidence": [
+        {
+          "kind": "unit",
+          "file": "src/__tests__/lib/opportunities/opportunity-scoring-v3-repository.test.ts",
+          "testName": "allocates a new immutable generation for a changed evidence input"
+        },
+        {
+          "kind": "postgresql",
+          "file": "src/__tests__/lib/opportunities/agency-dna-match-runtime-db.test.ts",
+          "testName": "previews, applies, no-ops, and advances only after upstream Agency DNA refresh",
+          "gate": "test:opportunity-scoring-v3:db"
+        }
+      ]
+    },
+    {
+      "id": "CSE-15",
+      "requirement": "Repeated ingestion is idempotent.",
+      "layer": "company_event",
+      "evidence": [
+        {
+          "kind": "postgresql",
+          "file": "src/__tests__/lib/opportunities/company-events-runtime-db.test.ts",
+          "testName": "stays dark unless the flag is exactly true and replays idempotently",
+          "gate": "test:company-events-v1:db"
+        }
+      ]
+    },
+    {
+      "id": "CSE-16",
+      "requirement": "Feedback from one workspace cannot change another workspace.",
+      "layer": "query_planner",
+      "evidence": [
+        {
+          "kind": "unit",
+          "file": "src/__tests__/lib/lead-discovery/query-planner-v2.test.ts",
+          "testName": "keeps feedback from one workspace out of another workspace plan"
+        },
+        {
+          "kind": "postgresql",
+          "file": "src/__tests__/lib/lead-discovery/query-planner-v2-runtime-db.test.ts",
+          "testName": "rejects cross-tenant provenance and append-only mutation",
+          "gate": "test:query-planner-v2:db"
+        }
+      ]
+    },
+    {
+      "id": "CSE-17",
+      "requirement": "Query-plan exclusions remain tenant and profile scoped.",
+      "layer": "query_planner",
+      "evidence": [
+        {
+          "kind": "unit",
+          "file": "src/__tests__/lib/lead-discovery/query-planner-v2.test.ts",
+          "testName": "does not union one profile exclusions or feedback into another profile"
+        },
+        {
+          "kind": "postgresql",
+          "file": "src/__tests__/lib/lead-discovery/query-planner-v2-runtime-db.test.ts",
+          "testName": "rejects cross-tenant provenance and append-only mutation",
+          "gate": "test:query-planner-v2:db"
+        }
+      ]
+    },
+    {
+      "id": "CSE-18",
+      "requirement": "A stale episode expires and leaves qualified output.",
+      "layer": "signal_episode",
+      "evidence": [
+        {
+          "kind": "unit",
+          "file": "src/__tests__/lib/opportunities/opportunity-scoring-v3.test.ts",
+          "testName": "expires current scoring when the source episode is no longer active"
+        },
+        {
+          "kind": "unit",
+          "file": "src/__tests__/lib/opportunities/signal-episode.test.ts",
+          "testName": "builds a stale situation as expired instead of reviving it"
+        }
+      ]
+    },
+    {
+      "id": "CSE-19",
+      "requirement": "Untrusted LLM text cannot change score or status.",
+      "layer": "commercial_thesis",
+      "evidence": [
+        {
+          "kind": "unit",
+          "file": "src/__tests__/lib/opportunities/opportunity-scoring-v3.test.ts",
+          "testName": "ignores untrusted LLM text when calculating score and status"
+        },
+        {
+          "kind": "unit",
+          "file": "src/__tests__/lib/opportunities/commercial-thesis.test.ts",
+          "testName": "keeps an expired situation auditable without claiming urgency"
+        }
+      ]
+    },
+    {
+      "id": "CSE-20",
+      "requirement": "Every evidence-based reason contains real evidence IDs.",
+      "layer": "opportunity_scoring",
+      "evidence": [
+        {
+          "kind": "unit",
+          "file": "src/__tests__/lib/opportunities/opportunity-scoring-v3.test.ts",
+          "testName": "binds every evidence-based reason to real input evidence IDs"
+        },
+        {
+          "kind": "unit",
+          "file": "src/__tests__/lib/opportunities/commercial-thesis.test.ts",
+          "testName": "uses episode evidence for derived claims but not for declared unknowns"
+        }
+      ]
+    }
+  ]
+}
