@@ -1,0 +1,48 @@
+name: Robokassa billing contracts
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [feat/robokassa-primary-billing]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    env:
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Apply all migrations
+        run: node packages/db/scripts/migrate.mjs
+      - name: Verify Robokassa entitlement and refund transitions
+        run: node packages/db/scripts/verify-robokassa-billing.mjs
+      - name: Type check web application
+        run: npm run web:check
+      - name: Type check tests
+        run: npm run test:types --workspace @recruiter-radar/web
+      - name: Run Robokassa unit contracts
+        run: npm test --workspace @recruiter-radar/web -- --runInBand --testPathPattern='paymentsRobokassa|payment-readiness|readiness-routes'
