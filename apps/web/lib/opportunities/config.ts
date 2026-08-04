@@ -41,6 +41,8 @@ export const AGENCY_DNA_MATCH_V2_FEATURE_FLAG =
   'AGENCY_DNA_MATCH_V2_ENABLED'
 export const OPPORTUNITY_SCORING_V3_FEATURE_FLAG =
   'OPPORTUNITY_SCORING_V3_ENABLED'
+export const OPPORTUNITY_COMMERCIAL_SIGNAL_UI_FEATURE_FLAG =
+  'OPPORTUNITY_COMMERCIAL_SIGNAL_UI_ENABLED'
 
 export type OpportunityFeatureContext = {
   dataOwnerId: string | number | null | undefined
@@ -154,6 +156,22 @@ export function isOpportunityScoringV3Enabled(
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): boolean {
   return env[OPPORTUNITY_SCORING_V3_FEATURE_FLAG] === 'true'
+}
+
+export function isOpportunityCommercialSignalUiEnabledForContext(
+  context: OpportunityFeatureContext,
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+  if (context.workspaceId == null) return false
+  return env[OPPORTUNITY_COMMERCIAL_SIGNAL_UI_FEATURE_FLAG] === 'true' &&
+    hasOpportunityIntelligencePrerequisitesForContext(context, env) &&
+    isCompanyEventsV1Enabled(env) &&
+    isCompanyStateV1Enabled(env) &&
+    isSignalEpisodesV2Enabled(env) &&
+    isCommercialThesisV1Enabled(env) &&
+    isExternalAgencyPropensityV1Enabled(env) &&
+    isAgencyDnaMatchV2Enabled(env) &&
+    isOpportunityScoringV3Enabled(env)
 }
 
 export function isOpportunityOutcomesEnabled(

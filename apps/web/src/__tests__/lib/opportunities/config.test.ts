@@ -16,6 +16,7 @@ import {
   isExternalAgencyPropensityV1Enabled,
   isAgencyDnaMatchV2Enabled,
   isOpportunityScoringV3Enabled,
+  isOpportunityCommercialSignalUiEnabledForContext,
   isAgencyDnaV1Enabled,
   isAgencyDnaV1EnabledForContext,
   isOpportunityEngineV1Enabled,
@@ -57,6 +58,38 @@ describe('opportunity engine config', () => {
     expect(clampOpportunityScoringV3JobBatchSize(Number.NaN)).toBe(10)
     expect(clampOpportunityScoringV3JobBatchSize(0)).toBe(1)
     expect(clampOpportunityScoringV3JobBatchSize(26)).toBe(25)
+  })
+
+  it('keeps Commercial Signal UI dark until every tenant-safe prerequisite is on', () => {
+    const context = { dataOwnerId: '7', workspaceId: '9' }
+    const enabled = {
+      OPPORTUNITY_ENGINE_V1_ENABLED: 'true',
+      OPPORTUNITY_OUTCOMES_ENABLED: 'true',
+      OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED: 'true',
+      COMPANY_EVENTS_V1_ENABLED: 'true',
+      COMPANY_STATE_V1_ENABLED: 'true',
+      SIGNAL_EPISODES_V2_ENABLED: 'true',
+      COMMERCIAL_THESIS_V1_ENABLED: 'true',
+      EXTERNAL_AGENCY_PROPENSITY_V1_ENABLED: 'true',
+      AGENCY_DNA_MATCH_V2_ENABLED: 'true',
+      OPPORTUNITY_SCORING_V3_ENABLED: 'true',
+      OPPORTUNITY_COMMERCIAL_SIGNAL_UI_ENABLED: 'true',
+    }
+
+    expect(isOpportunityCommercialSignalUiEnabledForContext(context, {}))
+      .toBe(false)
+    expect(isOpportunityCommercialSignalUiEnabledForContext(context, enabled))
+      .toBe(true)
+    expect(isOpportunityCommercialSignalUiEnabledForContext(
+      { dataOwnerId: '7', workspaceId: null },
+      enabled,
+    )).toBe(false)
+    for (const missing of Object.keys(enabled)) {
+      expect(isOpportunityCommercialSignalUiEnabledForContext(context, {
+        ...enabled,
+        [missing]: 'false',
+      })).toBe(false)
+    }
   })
 
   it('keeps Company Events v1 dark unless the flag is exactly true', () => {

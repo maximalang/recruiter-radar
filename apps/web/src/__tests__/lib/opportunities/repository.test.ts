@@ -137,6 +137,25 @@ describe('opportunity repository tenant scope', () => {
     expect(calls[1].params?.slice(-2)).toEqual([2, 2])
   })
 
+  it('keeps Today fail-closed to versioned strong Commercial Signal snapshots', async () => {
+    const { db, calls } = createDb([[{ count: '0' }], []])
+
+    await listOpportunities({
+      ownerId: '7',
+      workspaceId: '9',
+      view: 'today',
+      commercialSignalOnly: true,
+    }, db)
+
+    for (const call of calls.slice(0, 2)) {
+      expect(call.sql).toContain(
+        `o.metadata->'commercialSignalCard'->>'version' = `,
+      )
+      expect(call.sql).toContain('qualified_actionable')
+      expect(call.sql).toContain('qualified_needs_enrichment')
+    }
+  })
+
   it('adds the active workspace to list and detail tenant fences', async () => {
     const list = createDb([[{ count: '0' }], []])
     await listOpportunities({ ownerId: '7', workspaceId: '9' }, list.db)

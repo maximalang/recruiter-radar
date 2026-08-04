@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 import {
+  isOpportunityCommercialSignalUiEnabledForContext,
   isOpportunityEngineV1EnabledForContext,
   isOpportunityOutcomesUiEnabledForContext,
   isOpportunityWorkflowV1EnabledForContext,
@@ -98,6 +99,8 @@ export default async function OpportunitiesPage(props: {
     params.preview !== '1' && params.demo !== '1'
   const workflowEnabled = outcomesUiEnabled &&
     isOpportunityWorkflowV1EnabledForContext(authorization)
+  const commercialSignalUiEnabled =
+    isOpportunityCommercialSignalUiEnabledForContext(authorization)
   const trackingCycleId = outcomesUiEnabled
     ? `${workflowEnabled ? 'today' : 'morning-brief'}:${new Date().toISOString().slice(0, 10)}`
     : null
@@ -109,6 +112,9 @@ export default async function OpportunitiesPage(props: {
     : outcomesUiEnabled
       ? parseView(params.view, 'morning')
       : 'morning'
+  const researchModeActive = Boolean(
+    query || confidenceGate || view === 'completed' || view === 'all',
+  )
   let result: Awaited<ReturnType<typeof listOpportunities>> | null = null
   let workflowAssignees: OpportunityWorkflowAssignee[] = []
   let operationalSummary: Awaited<
@@ -124,6 +130,8 @@ export default async function OpportunitiesPage(props: {
         statuses,
         confidenceGate: confidenceGate || null,
         query: query || null,
+        commercialSignalOnly:
+          commercialSignalUiEnabled && !researchModeActive,
         pageSize: 50,
       }),
       outcomesUiEnabled
@@ -227,6 +235,7 @@ export default async function OpportunitiesPage(props: {
                 workflowAssignees={workflowAssignees}
                 actorUserId={access.actorUserId}
                 actorRole={access.actorRoleSnapshot}
+                commercialSignalUiEnabled={commercialSignalUiEnabled}
               />
             ))}
           </div>

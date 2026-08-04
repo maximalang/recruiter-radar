@@ -164,6 +164,7 @@ export interface OpportunityListInput {
   episodeType?: HiringEpisodeType | null
   organizationId?: string | null
   query?: string | null
+  commercialSignalOnly?: boolean
   page?: number
   pageSize?: number
   offset?: number
@@ -343,6 +344,16 @@ export async function listOpportunities(
   if (input.organizationId) {
     params.push(input.organizationId)
     clauses.push(`o.organization_id = $${params.length}`)
+  }
+  if (input.commercialSignalOnly) {
+    clauses.push(
+      `o.metadata->'commercialSignalCard'->>'version' = ` +
+      `'commercial-signal-card-v1'`,
+    )
+    clauses.push(
+      `o.metadata->'commercialSignalCard'->>'status' IN (` +
+      `'qualified_actionable', 'qualified_needs_enrichment')`,
+    )
   }
   const query = normalizeOpportunityQuery(input.query)
   if (query) {

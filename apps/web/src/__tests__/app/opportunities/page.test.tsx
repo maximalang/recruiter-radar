@@ -40,6 +40,19 @@ import { getSession } from '@/lib/auth-v2/authorization'
 import { listOpportunityWorkflowAssignees } from '@/lib/opportunities/opportunity-workflow-repository'
 
 describe('opportunities page', () => {
+  const commercialSignalFlags = [
+    'COMPANY_EVENTS_V1_ENABLED',
+    'COMPANY_STATE_V1_ENABLED',
+    'SIGNAL_EPISODES_V2_ENABLED',
+    'COMMERCIAL_THESIS_V1_ENABLED',
+    'EXTERNAL_AGENCY_PROPENSITY_V1_ENABLED',
+    'AGENCY_DNA_MATCH_V2_ENABLED',
+    'OPPORTUNITY_SCORING_V3_ENABLED',
+    'OPPORTUNITY_COMMERCIAL_SIGNAL_UI_ENABLED',
+  ] as const
+  const originalCommercialSignalFlags = Object.fromEntries(
+    commercialSignalFlags.map((name) => [name, process.env[name]]),
+  )
   const originalFlag = process.env.OPPORTUNITY_ENGINE_V1_ENABLED
   const originalOutcomesUiFlag =
     process.env.OPPORTUNITY_OUTCOMES_UI_ENABLED
@@ -56,6 +69,7 @@ describe('opportunities page', () => {
     delete process.env.OPPORTUNITY_CANARY_OWNER_IDS
     delete process.env.OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED
     delete process.env.OPPORTUNITY_WORKFLOW_V1_ENABLED
+    for (const name of commercialSignalFlags) delete process.env[name]
     jest.mocked(getAuthorizedOwnerId).mockResolvedValue('7')
     jest.mocked(listOpportunities).mockResolvedValue({
       opportunities: [],
@@ -99,6 +113,9 @@ describe('opportunities page', () => {
     }
     restore('OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED', originalWorkspace)
     restore('OPPORTUNITY_WORKFLOW_V1_ENABLED', originalWorkflow)
+    for (const name of commercialSignalFlags) {
+      restore(name, originalCommercialSignalFlags[name])
+    }
   })
 
   it('shows the four Morning Brief counters and evidence-first empty state', async () => {
@@ -238,6 +255,35 @@ describe('opportunities page', () => {
     }))
   })
 
+  it('limits Today to strong versioned snapshots only when Commercial Signal UI is ready', async () => {
+    enableWorkflowSession()
+    enableCommercialSignalUi(commercialSignalFlags)
+
+    render(await OpportunitiesPage({ searchParams: Promise.resolve({}) }))
+
+    expect(listOpportunities).toHaveBeenCalledWith(expect.objectContaining({
+      ownerId: '7',
+      workspaceId: '9',
+      view: 'today',
+      commercialSignalOnly: true,
+    }))
+  })
+
+  it('keeps weak and legacy candidates available in an active Research Mode', async () => {
+    enableWorkflowSession()
+    enableCommercialSignalUi(commercialSignalFlags)
+
+    render(await OpportunitiesPage({
+      searchParams: Promise.resolve({ q: 'Север' }),
+    }))
+
+    expect(listOpportunities).toHaveBeenCalledWith(expect.objectContaining({
+      view: 'today',
+      query: 'Север',
+      commercialSignalOnly: false,
+    }))
+  })
+
   it('renders permission denied without querying opportunity data', async () => {
     jest.mocked(getAuthorizedOwnerId).mockResolvedValue(null)
 
@@ -280,4 +326,9 @@ function enableWorkflowSession() {
 function restore(name: string, value: string | undefined) {
   if (value === undefined) delete process.env[name]
   else process.env[name] = value
+}
+
+function enableCommercialSignalUi(flags: readonly string[]) {
+  process.env.OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED = 'true'
+  for (const name of flags) process.env[name] = 'true'
 }
