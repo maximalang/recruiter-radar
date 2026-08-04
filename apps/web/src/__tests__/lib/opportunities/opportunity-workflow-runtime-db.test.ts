@@ -559,6 +559,76 @@ describeWithDatabase('Opportunity workflow PostgreSQL runtime', () => {
     }
   })
 
+  it('executes the strong Commercial Signal JSONB filter inside the workspace fence', async () => {
+    try {
+      await database.query(
+        `UPDATE opportunities
+         SET metadata = $1::JSONB
+         WHERE id = $2
+           AND owner_id = $3`,
+        [
+          JSON.stringify({
+            commercialSignalCard: {
+              version: 'commercial-signal-card-v1',
+              status: 'qualified_needs_enrichment',
+            },
+          }),
+          opportunityId,
+          ownerId,
+        ],
+      )
+
+      const strong = await listOpportunities({
+        ownerId,
+        workspaceId,
+        view: 'all',
+        commercialSignalOnly: true,
+        pageSize: 20,
+      })
+      expect(strong.opportunities.map((item) => item.id))
+        .toContain(opportunityId)
+
+      await database.query(
+        `UPDATE opportunities
+         SET metadata = jsonb_set(
+           metadata,
+           '{commercialSignalCard,status}',
+           '"review"'::JSONB
+         )
+         WHERE id = $1
+           AND owner_id = $2`,
+        [opportunityId, ownerId],
+      )
+      const weak = await listOpportunities({
+        ownerId,
+        workspaceId,
+        view: 'all',
+        commercialSignalOnly: true,
+        pageSize: 20,
+      })
+      expect(weak.opportunities.map((item) => item.id))
+        .not.toContain(opportunityId)
+
+      const otherWorkspace = await listOpportunities({
+        ownerId,
+        workspaceId: otherWorkspaceId,
+        view: 'all',
+        commercialSignalOnly: true,
+        pageSize: 20,
+      })
+      expect(otherWorkspace.opportunities.map((item) => item.id))
+        .not.toContain(opportunityId)
+    } finally {
+      await database.query(
+        `UPDATE opportunities
+         SET metadata = '{}'::JSONB
+         WHERE id = $1
+           AND owner_id = $2`,
+        [opportunityId, ownerId],
+      )
+    }
+  })
+
   it('does not cross workspace boundaries or rewrite historical actor data', async () => {
     await expect(updateOpportunityWorkflow({
       ownerId,
