@@ -43,7 +43,6 @@ jobs:
           fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
           NODE
           npm install --package-lock-only --ignore-scripts
-          npm ls brace-expansion ip-address
           npm audit --omit=dev --audit-level=high
           rm -f .github/workflows/fix-robokassa-security-lockfile.yml
           git add package.json package-lock.json .github/workflows/fix-robokassa-security-lockfile.yml
