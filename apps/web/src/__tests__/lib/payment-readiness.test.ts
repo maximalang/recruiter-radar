@@ -9,14 +9,23 @@ describe('payment readiness', () => {
 
   beforeEach(() => {
     process.env = { ...originalEnv }
-    delete process.env.ROBOKASSA_PASSWORD_3
-    delete process.env.ROBOKASSA_SMZ_RECEIPTS_ENABLED
-    delete process.env.OPERATOR_PUBLIC_POSTAL_ADDRESS
-    delete process.env.ROBOKASSA_TEST_FLOW_VERIFIED_AT
-    delete process.env.ROBOKASSA_REFUND_FLOW_VERIFIED_AT
-    delete process.env.ROBOKASSA_NPD_RECEIPT_FLOW_VERIFIED_AT
-    delete process.env.PDN_COMPLIANCE_VERIFIED_AT
-    delete process.env.ROBOKASSA_LIVE_FLOW_VERIFIED_AT
+    for (const key of [
+      'ROBOKASSA_PASSWORD_3',
+      'ROBOKASSA_SMZ_RECEIPTS_ENABLED',
+      'OPERATOR_PUBLIC_CITY',
+      'OPERATOR_PUBLIC_POSTAL_ADDRESS',
+      'ROBOKASSA_SITE_CRITERIA_VERIFIED_AT',
+      'ROBOKASSA_TEST_FLOW_VERIFIED_AT',
+      'ROBOKASSA_REFUND_FLOW_VERIFIED_AT',
+      'ROBOKASSA_NPD_RECEIPT_FLOW_VERIFIED_AT',
+      'ROBOKASSA_LIVE_FLOW_VERIFIED_AT',
+      'PDN_OPERATOR_NOTIFICATION_VERIFIED_AT',
+      'PDN_LOCALIZATION_VERIFIED_AT',
+      'PDN_PROCESSORS_VERIFIED_AT',
+      'PDN_CROSS_BORDER_VERIFIED_AT',
+      'PDN_COMPLIANCE_VERIFIED_AT',
+      'TELEGRAM_BOT_TOKEN',
+    ]) delete process.env[key]
   })
 
   afterAll(() => {
@@ -65,16 +74,50 @@ describe('payment readiness', () => {
     })
   })
 
-  test('requires external evidence before reporting live-ready', () => {
-    process.env.OPERATOR_PUBLIC_POSTAL_ADDRESS = '123456, Россия, г. Тестовый, ул. Тестовая, д. 1'
+  test('accepts a public city instead of a full home address for moderation', () => {
+    process.env.OPERATOR_PUBLIC_CITY = 'г. Тестовый'
+    const report = buildPaymentReadinessReport({
+      provider: 'robokassa',
+      configured: true,
+      mode: 'test',
+      webhookConfigured: true,
+      siteUrlConfigured: true,
+    })
+    expect(report.merchantModerationReady).toBe(true)
+    expect(report.launch.blockers).not.toContain(
+      'OPERATOR_PUBLIC_CITY (or an actual postal address) is required before Robokassa moderation.',
+    )
+  })
+
+  test('requires cross-border verification when Telegram delivery is configured', () => {
+    process.env.OPERATOR_PUBLIC_CITY = 'г. Тестовый'
+    process.env.TELEGRAM_BOT_TOKEN = '123456:test-token'
+    const report = buildPaymentReadinessReport({
+      provider: 'robokassa',
+      configured: true,
+      mode: 'live',
+      webhookConfigured: true,
+      siteUrlConfigured: true,
+    })
+    expect(report.launch.blockers).toContain(
+      'Telegram cross-border transfer prerequisites have not been verified.',
+    )
+  })
+
+  test('requires all external evidence before reporting live-ready', () => {
+    process.env.OPERATOR_PUBLIC_CITY = 'г. Тестовый'
     process.env.ROBOKASSA_MODE = 'live'
     process.env.ROBOKASSA_PASSWORD_3 = 'refund-password-three'
     process.env.ROBOKASSA_SMZ_RECEIPTS_ENABLED = 'true'
-    process.env.ROBOKASSA_TEST_FLOW_VERIFIED_AT = '2026-08-04T18:00:00.000Z'
-    process.env.ROBOKASSA_REFUND_FLOW_VERIFIED_AT = '2026-08-04T18:10:00.000Z'
-    process.env.ROBOKASSA_NPD_RECEIPT_FLOW_VERIFIED_AT = '2026-08-04T18:20:00.000Z'
-    process.env.PDN_COMPLIANCE_VERIFIED_AT = '2026-08-04T18:30:00.000Z'
-    process.env.ROBOKASSA_LIVE_FLOW_VERIFIED_AT = '2026-08-04T18:40:00.000Z'
+    process.env.ROBOKASSA_SITE_CRITERIA_VERIFIED_AT = '2026-08-05T18:00:00.000Z'
+    process.env.ROBOKASSA_TEST_FLOW_VERIFIED_AT = '2026-08-05T18:10:00.000Z'
+    process.env.ROBOKASSA_REFUND_FLOW_VERIFIED_AT = '2026-08-05T18:20:00.000Z'
+    process.env.ROBOKASSA_NPD_RECEIPT_FLOW_VERIFIED_AT = '2026-08-05T18:30:00.000Z'
+    process.env.PDN_OPERATOR_NOTIFICATION_VERIFIED_AT = '2026-08-05T18:40:00.000Z'
+    process.env.PDN_LOCALIZATION_VERIFIED_AT = '2026-08-05T18:50:00.000Z'
+    process.env.PDN_PROCESSORS_VERIFIED_AT = '2026-08-05T19:00:00.000Z'
+    process.env.PDN_COMPLIANCE_VERIFIED_AT = '2026-08-05T19:10:00.000Z'
+    process.env.ROBOKASSA_LIVE_FLOW_VERIFIED_AT = '2026-08-05T19:20:00.000Z'
 
     const report = buildPaymentReadinessReport({
       provider: 'robokassa',
