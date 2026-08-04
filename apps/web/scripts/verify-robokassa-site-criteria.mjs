@@ -23,9 +23,11 @@ requireText("operator", expectedEmail, "confirmed public support mailbox");
 requireText("operator", 'phone: "+7 900 966-60-92"', "confirmed public phone");
 requireText("operator", "OPERATOR_PUBLIC_CITY", "public seller city setting");
 
-for (const [name, source] of Object.entries(sources)) {
+for (const runtimeFile of collectRuntimeFiles()) {
+  const source = fs.readFileSync(runtimeFile, "utf8");
+  const relative = path.relative(workspaceRoot, runtimeFile);
   for (const forbidden of forbiddenEmails) {
-    if (source.includes(forbidden)) fail(`${name}: forbidden public/technical email is present: ${forbidden}`);
+    if (source.includes(forbidden)) fail(`${relative}: forbidden public/technical email is present: ${forbidden}`);
   }
 }
 
@@ -56,7 +58,7 @@ for (const token of [
   "разовая оплата без автоматического продления",
   "payment-and-refund",
   "чек через «Мой налог»",
-  expectedEmail,
+  "OPERATOR_REQUISITES.email",
 ]) requireText("terms", token, `offer requirement ${token}`);
 
 for (const token of [
@@ -66,6 +68,7 @@ for (const token of [
   "Чек самозанятого",
   "Отказ от услуги и возврат",
   "ошибочный",
+  "OPERATOR_REQUISITES.email",
 ]) requireText("paymentAndRefund", token, `payment/refund disclosure ${token}`);
 
 for (const token of [
@@ -79,7 +82,7 @@ for (const token of [
   "5 лет",
   "14 месяцев",
   "до 30 дней",
-  expectedEmail,
+  "OPERATOR_REQUISITES.email",
 ]) requireText("privacy", token, `privacy policy requirement ${token}`);
 
 for (const token of [
@@ -88,7 +91,7 @@ for (const token of [
   "Что не входит в это согласие",
   "Яндекс Метрики",
   "Telegram",
-  expectedEmail,
+  "OPERATOR_REQUISITES.email",
 ]) requireText("consent", token, `consent requirement ${token}`);
 
 for (const token of [
@@ -113,7 +116,7 @@ for (const token of [
   'consent === "granted"',
   "Только необходимые",
   "Разрешить аналитику",
-  "14",
+  "CONSENT_TTL_MS = 426",
 ]) requireText("metrika", token, `analytics consent requirement ${token}`);
 
 if (process.argv.includes("--network")) await verifyDeployedOrigin();
@@ -182,6 +185,21 @@ async function verifyDeployedOrigin() {
   const home = await fetch(new URL("/", base)).then((response) => response.text()).catch(() => "");
   for (const token of [expectedEmail, "+7 900 966-60-92", "622809740837", "Самозанятый"]) {
     if (!home.includes(token)) fail(`network: footer does not expose ${token}`);
+  }
+}
+
+function collectRuntimeFiles() {
+  const result = [];
+  for (const root of [path.resolve(workspaceRoot, "app"), path.resolve(workspaceRoot, "lib")]) walk(root, result);
+  return result;
+}
+
+function walk(directory, result) {
+  if (!fs.existsSync(directory)) return;
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const absolute = path.join(directory, entry.name);
+    if (entry.isDirectory()) walk(absolute, result);
+    else if (/\.(?:ts|tsx|js|jsx|mjs)$/.test(entry.name)) result.push(absolute);
   }
 }
 
