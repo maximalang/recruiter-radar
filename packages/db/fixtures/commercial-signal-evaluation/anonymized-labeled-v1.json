@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "commercial-signal-evaluation-dataset-v1",
+  "datasetId": "anonymized-labeled-v1",
+  "datasetVersion": "unavailable-2026-08-04",
+  "kind": "anonymized_labeled",
+  "status": "unavailable",
+  "provenance": "anonymized_real",
+  "splitGroup": "labeled-real",
+  "exclusionSplitGroups": [],
+  "minimumSample": 30,
+  "minimumLabeled": 10,
+  "unavailableReason": "No reviewed real anonymized labels were present in the repository at implementation time.",
+  "limitations": [
+    "Populate only through the read-only workspace-scoped exporter and human label review.",
+    "Do not replace with synthetic rows."
+  ],
+  "rows": []
+}

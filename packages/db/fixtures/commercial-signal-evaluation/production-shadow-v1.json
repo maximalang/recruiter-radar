@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "commercial-signal-evaluation-dataset-v1",
+  "datasetId": "production-shadow-v1",
+  "datasetVersion": "unavailable-2026-08-04",
+  "kind": "production_shadow",
+  "status": "unavailable",
+  "provenance": "anonymized_real",
+  "splitGroup": "production-shadow",
+  "exclusionSplitGroups": [],
+  "minimumSample": 30,
+  "minimumLabeled": 10,
+  "unavailableReason": "Production shadow export was not authorized and no production data was accessed.",
+  "limitations": [
+    "Run only after explicit production access and workspace approval.",
+    "A shadow export is evaluation evidence, not a rollout or canary."
+  ],
+  "rows": []
+}

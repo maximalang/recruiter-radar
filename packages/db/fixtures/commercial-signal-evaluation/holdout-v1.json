@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "commercial-signal-evaluation-dataset-v1",
+  "datasetId": "holdout-v1",
+  "datasetVersion": "unavailable-2026-08-04",
+  "kind": "holdout",
+  "status": "unavailable",
+  "provenance": "anonymized_real",
+  "splitGroup": "holdout-real",
+  "exclusionSplitGroups": ["labeled-real", "production-shadow"],
+  "minimumSample": 30,
+  "minimumLabeled": 10,
+  "unavailableReason": "A leakage-reviewed real holdout split has not been approved or exported.",
+  "limitations": [
+    "Sample keys must not overlap labeled or production-shadow split groups.",
+    "Holdout labels must remain unavailable to scorer tuning."
+  ],
+  "rows": []
+}
