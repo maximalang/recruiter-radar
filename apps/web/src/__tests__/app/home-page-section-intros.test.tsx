@@ -1,7 +1,8 @@
 import { Children, isValidElement, type ReactElement, type ReactNode } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToPipeableStream, renderToStaticMarkup } from "react-dom/server";
 import Link from "next/link";
 import { existsSync, readFileSync } from "node:fs";
+import { PassThrough } from "node:stream";
 import { resolve } from "node:path";
 
 import HomePage, { PreviewSection, PreviewSkeleton } from "@/app/home-page-content";
@@ -64,6 +65,40 @@ function readVisibleText(node: ReactNode): string {
     }
   });
   return parts.join(" ").replace(/\s+/g, " ").trim();
+}
+
+function renderServerHtml(node: ReactNode): Promise<string> {
+  return new Promise((resolveHtml, reject) => {
+    const output = new PassThrough();
+    let html = "";
+    let settled = false;
+
+    output.setEncoding("utf8");
+    output.on("data", (chunk) => {
+      html += chunk;
+    });
+    output.on("end", () => {
+      if (settled) return;
+      settled = true;
+      resolveHtml(html);
+    });
+    output.on("error", (error) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    });
+
+    const stream = renderToPipeableStream(node, {
+      onAllReady() {
+        stream.pipe(output);
+      },
+      onShellError(error) {
+        if (settled) return;
+        settled = true;
+        reject(error);
+      },
+    });
+  });
 }
 
 function makePreviewItem(overrides: Partial<PreviewItem> = {}): PreviewItem {
@@ -175,16 +210,47 @@ describe("final unified evidence-first landing contract", () => {
     expect(skeleton).toContain('aria-busy="true"');
   });
 
-  it("fails open when preview data throws and preserves the next action", async () => {
+  it("fails open when preview data throws and preserves checkout analytics", async () => {
     mockGetPublicSampleDigestState.mockRejectedValueOnce(new Error("database unavailable"));
-    const input = readPublicPreviewInput({});
-    const results = await WorkspaceResults({ previewInput: input, checkoutHref: buildCheckoutHref(input) });
+    const input = readPublicPreviewInput({ specialization: "инженерный подбор", targetCity: "Москва" });
+    const checkoutHref = buildCheckoutHref(input);
+    const results = await WorkspaceResults({ previewInput: input, checkoutHref });
     const markup = renderToStaticMarkup(results);
+    const checkoutLink = collectElements(results, Link).find((link) => readVisibleText(link).includes("Оставить заявку на неделю"));
+
     expect(markup).toContain('id="preview-results"');
     expect(markup).toContain("data-preview-results-ready");
     expect(markup).toContain("Временная ошибка загрузки");
     expect(markup).toContain("Тарифы, FAQ и следующий шаг доступны ниже");
-    expect(markup).toContain("Оставить заявку на неделю");
+    expect(checkoutLink).toBeDefined();
+    expect(checkoutLink?.props.href).toBe(checkoutHref);
+    expect(checkoutLink?.props["data-analytics-event"]).toBe(LANDING_ANALYTICS_EVENT.checkoutStarted);
+    expect(checkoutLink?.props["data-analytics-context"]).toBe(LANDING_ANALYTICS_CONTEXT.preview);
+    expect(readVisibleText(checkoutLink)).toContain("Оставить заявку на неделю");
+    expect(source("app/landing/workspace-scene.module.css")).toMatch(/\.checkout\s*\{[^}]*min-height:\s*52px/s);
+  });
+
+  it("streams the complete landing composition when preview data throws", async () => {
+    mockGetPublicSampleDigestState.mockRejectedValueOnce(new Error("database unavailable"));
+    const page = await HomePage({
+      searchParams: Promise.resolve({ specialization: "инженерный подбор", targetCity: "Москва" }),
+    });
+    const html = await renderServerHtml(page);
+
+    expect(html).toContain('id="scene-workspace"');
+    expect(html).toContain("Не обещание продукта");
+    expect(html).toContain('id="preview-configurator"');
+    expect(html).toContain('id="preview-results"');
+    expect(html).toContain("Временная ошибка загрузки");
+    expect(html).toContain('id="scene-evidence"');
+    expect(html).toContain('id="scene-delivery"');
+    expect(html).toContain('id="scene-outreach"');
+    expect(html).toContain('id="pricing"');
+    expect(html).toContain('id="faq"');
+    expect(html).toContain("Соберите радар под свою специализацию");
+    expect(html).toContain("<footer");
+    expect(html).toContain("Оферта");
+    expect(html).toContain("Конфиденциальность");
   });
 
   it("renders an evidence-backed lead list with one expanded recommendation", async () => {
@@ -260,6 +326,7 @@ describe("final unified evidence-first landing contract", () => {
 
   it("keeps active navigation, tone switching and a trapped mobile dialog", () => {
     const header = source("app/landing/landing-header.tsx");
+    const headerCss = source("app/landing/landing-header.module.css");
     expect(header).toContain("IntersectionObserver");
     expect(header).toContain("aria-current");
     expect(header).toContain("data-tone={tone}");
@@ -271,6 +338,7 @@ describe("final unified evidence-first landing contract", () => {
     expect(header).toContain("scrollbarWidth");
     expect(header).toContain("menuButtonRef.current?.focus");
     expect(header).toContain("Получить пример");
+    expect(headerCss).toMatch(/\.navLink\s*\{[^}]*min-width:\s*44px[^}]*min-height:\s*44px/s);
   });
 
   it("uses one bounded observer instead of fixed delayed hash scrolling", () => {
