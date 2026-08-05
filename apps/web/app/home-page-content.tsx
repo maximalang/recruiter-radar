@@ -56,12 +56,7 @@ export async function PreviewSection(props: {
   hasPreview: boolean;
   checkoutHref: string;
 }) {
-  const paymentSetup = getPaymentProviderSetupState();
-  return WorkspaceScene({
-    ...props,
-    paymentConfigured: paymentSetup.configured,
-    faqItems: buildFaqItems(paymentSetup.configured),
-  });
+  return WorkspaceScene(props);
 }
 
 export function PreviewSkeleton() {
