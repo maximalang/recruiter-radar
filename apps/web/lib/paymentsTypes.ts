@@ -50,9 +50,10 @@ export type CheckoutLegalAcceptance = {
 export type CheckoutOrderPayload = {
   planName: string;
   planCadence: string;
-  payerType: CheckoutPayerType;
-  buyerInn: string | null;
-  legalAcceptance: CheckoutLegalAcceptance | null;
+  /** Added for B2B receipts; optional while legacy orders are still readable. */
+  payerType?: CheckoutPayerType;
+  buyerInn?: string | null;
+  legalAcceptance?: CheckoutLegalAcceptance | null;
   specialization: string | null;
   city: string | null;
   includeKeywords: string[];
@@ -201,9 +202,10 @@ export type StartCheckoutOrderInput = {
   productCode: PublicPlan["code"];
   customerName: string;
   customerContact: string;
-  payerType: CheckoutPayerType;
+  /** Optional for compatibility with non-UI callers; the public checkout records both fields. */
+  payerType?: CheckoutPayerType;
   buyerInn?: string | null;
-  legalAcceptance: CheckoutLegalAcceptance;
+  legalAcceptance?: CheckoutLegalAcceptance;
   specialization?: string | null;
   city?: string | null;
   includeKeywords?: string | null;
