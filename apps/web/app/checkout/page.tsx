@@ -84,7 +84,14 @@ export default async function CheckoutPage(props: {
       includeKeywords: input.includeKeywords || null,
       excludeKeywords: input.excludeKeywords || null,
       dailyDigestLimit: input.dailyDigestLimit,
-      comment: null,
+      comment: JSON.stringify({
+        schema: "checkout-details-v2",
+        legalAcceptance,
+        payer: {
+          type: payerType,
+          buyerInn: payerType === "business" ? buyerInn : null,
+        },
+      }),
       siteUrl: process.env.PAYMENTS_SITE_URL ?? "http://localhost:3000",
     });
     redirect(result.redirectUrl);
