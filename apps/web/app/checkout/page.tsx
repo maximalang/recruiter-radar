@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getAccountById } from "@/lib/account-auth";
 import { getAuthorizedUserId } from "@/lib/auth-v2/authorization";
 import { buildLegalAcceptanceAudit } from "@/lib/legalDocuments";
+import { OPERATOR_REQUISITES } from "@/lib/operatorRequisites";
 import { startCheckoutOrder } from "@/lib/payments";
 import {
   buildCheckoutHref,
@@ -26,12 +27,14 @@ import { SiteFooter } from "../ui/site-footer";
 import ppStyles from "../ui/page-primitives.module.css";
 import LandingCheckoutAnalytics from "../landing-checkout-analytics";
 import { LANDING_ANALYTICS_EVENT } from "../../lib/landing-analytics-contract";
+import s from "./checkout.module.css";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Оплата доступа — Recruiter Radar",
   description: "Разовая безопасная оплата доступа к Recruiter Radar через Robokassa.",
+  robots: { index: false, follow: false },
 };
 
 export default async function CheckoutPage(props: {
@@ -53,10 +56,15 @@ export default async function CheckoutPage(props: {
     if (!currentAccount) redirect(`/login?returnTo=${encodeURIComponent(checkoutHref)}`);
 
     const separator = checkoutHref.includes("?") ? "&" : "?";
-    const agencyNameValue = formData.get("agencyName");
-    const agencyName = typeof agencyNameValue === "string" ? agencyNameValue.trim() : "";
+    const agencyName = readFormText(formData, "agencyName");
+    const payerType = readFormText(formData, "payerType") === "individual" ? "individual" : "business";
+    const buyerInn = readFormText(formData, "buyerInn").replace(/\D/g, "");
+
     if (!agencyName || agencyName.length > 160) {
       redirect(`${checkoutHref}${separator}error=agency`);
+    }
+    if (payerType === "business" && !/^(?:\d{10}|\d{12})$/.test(buyerInn)) {
+      redirect(`${checkoutHref}${separator}error=inn`);
     }
     if (formData.get("acceptTerms") !== "on" || formData.get("acceptPersonalData") !== "on") {
       redirect(`${checkoutHref}${separator}error=legal`);
@@ -74,8 +82,12 @@ export default async function CheckoutPage(props: {
       excludeKeywords: input.excludeKeywords || null,
       dailyDigestLimit: input.dailyDigestLimit,
       comment: JSON.stringify({
-        schema: "checkout-legal-acceptance-v1",
+        schema: "checkout-details-v2",
         legalAcceptance,
+        payer: {
+          type: payerType,
+          buyerInn: payerType === "business" ? buyerInn : null,
+        },
       }),
       siteUrl: process.env.PAYMENTS_SITE_URL ?? "http://localhost:3000",
     });
@@ -87,33 +99,34 @@ export default async function CheckoutPage(props: {
       <LandingCheckoutAnalytics submitEvent={LANDING_ANALYTICS_EVENT.paymentStarted} />
       <InternalPageHeader
         title="Оплата доступа"
-        subtitle="Один раз оплачиваете выбранный период. Автопродления и скрытых списаний нет."
+        subtitle="Проверьте заказ и оплатите выбранный период один раз. Автопродления и скрытых списаний нет."
       />
 
       <div className={ipStyles.narrowLayout}>
         <ContentCard>
-          <div style={{ display: "grid", gap: 18 }}>
-            <div>
+          <div className={s.checkoutGrid}>
+            <div className={s.planHeader}>
               <ContentCardTitle>{plan.name}</ContentCardTitle>
-              <p className={ipStyles.bodyText} style={{ marginTop: 8 }}>{plan.description}</p>
+              <p className={ipStyles.bodyText}>{plan.description}</p>
             </div>
 
-            <div style={{ display: "grid", gap: 10, padding: 16, border: "1px solid rgba(15,23,42,.1)", borderRadius: 14 }}>
-              <div className={ipStyles.fieldRow}>Период: <strong className={ipStyles.fieldRowStrong}>{plan.cadence}</strong></div>
-              <div className={ipStyles.fieldRow}>К оплате: <strong className={ipStyles.fieldRowStrong} style={{ fontSize: "1.2rem" }}>{plan.price}</strong></div>
-              <div className={ipStyles.fieldRow}>Продление: <strong className={ipStyles.fieldRowStrong}>только вручную</strong></div>
-              {input.specialization ? <div className={ipStyles.fieldRow}>Специализация: <strong className={ipStyles.fieldRowStrong}>{input.specialization}</strong></div> : null}
-              {input.targetCity ? <div className={ipStyles.fieldRow}>География: <strong className={ipStyles.fieldRowStrong}>{input.targetCity}</strong></div> : null}
+            <div className={s.orderSummary} aria-label="Состав заказа">
+              <div className={s.summaryRow}><span>Услуга</span><strong>Доступ к Recruiter Radar</strong></div>
+              <div className={s.summaryRow}><span>Период</span><strong>{plan.cadence}</strong></div>
+              <div className={s.summaryRow}><span>Продление</span><strong>только новым заказом</strong></div>
+              {input.specialization ? <div className={s.summaryRow}><span>Специализация</span><strong>{input.specialization}</strong></div> : null}
+              {input.targetCity ? <div className={s.summaryRow}><span>География</span><strong>{input.targetCity}</strong></div> : null}
+              <div className={`${s.summaryRow} ${s.priceRow}`}><span>Итого</span><strong>{plan.price}</strong></div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
-              <TrustItem title="Безопасная оплата" text="Платёжная форма Robokassa" />
-              <TrustItem title="Разовый платёж" text="Карта не сохраняется" />
-              <TrustItem title="Чек НПД" text="Придёт на e-mail" />
+            <div className={s.trustGrid}>
+              <TrustItem title="Robokassa" text="Карта и CVC вводятся только на защищённой платёжной странице" />
+              <TrustItem title="Разовая оплата" text="Карта не сохраняется, автоматических списаний нет" />
+              <TrustItem title="Чек НПД" text="Электронный чек будет направлен на e-mail аккаунта" />
             </div>
 
             {account ? (
-              <form action={startCheckoutAction} style={{ display: "grid", gap: 14 }} data-checkout-form>
+              <form action={startCheckoutAction} className={s.form} data-checkout-form>
                 <label className={ppStyles.field}>
                   <span className={ppStyles.fieldLabel}>Название агентства или команды</span>
                   <input
@@ -126,42 +139,87 @@ export default async function CheckoutPage(props: {
                   />
                 </label>
 
+                <fieldset className={s.payerFieldset}>
+                  <legend className={s.fieldsetLegend}>Кто оплачивает</legend>
+                  <div className={s.payerOptions}>
+                    <label className={s.radioOption}>
+                      <input type="radio" name="payerType" value="business" defaultChecked />
+                      <span><strong>ООО или ИП</strong><small>ИНН попадёт в данные для чека НПД</small></span>
+                    </label>
+                    <label className={s.radioOption}>
+                      <input type="radio" name="payerType" value="individual" />
+                      <span><strong>Физическое лицо</strong><small>Чек оформляется на e-mail покупателя</small></span>
+                    </label>
+                  </div>
+                  <label className={ppStyles.field}>
+                    <span className={ppStyles.fieldLabel}>ИНН покупателя — для ООО или ИП</span>
+                    <input
+                      className={ppStyles.input}
+                      name="buyerInn"
+                      inputMode="numeric"
+                      autoComplete="off"
+                      maxLength={12}
+                      pattern="(?:\d{10}|\d{12})"
+                      placeholder="10 цифр для ООО или 12 цифр для ИП"
+                      aria-describedby="buyer-inn-hint"
+                    />
+                  </label>
+                  <p id="buyer-inn-hint" className={s.hint}>
+                    ИНН нужен для корректного чека при оплате от организации или ИП. Для оплаты как физическое лицо поле можно оставить пустым.
+                  </p>
+                </fieldset>
+
                 <p className={ipStyles.bodyTextMutedBlock}>
-                  Аккаунт: {account.email}. Сюда придут статус заказа, чек и ссылка для продолжения настройки.
+                  Аккаунт: <strong>{account.email}</strong>. На этот адрес придут статус заказа, чек и ссылка для продолжения настройки.
                 </p>
 
-                <label style={{ display: "grid", gridTemplateColumns: "22px 1fr", gap: 10, alignItems: "start", fontSize: ".88rem", lineHeight: 1.5 }}>
-                  <input type="checkbox" name="acceptTerms" required style={{ width: 18, height: 18, marginTop: 2 }} />
-                  <span>
-                    Я принимаю <Link href="/terms" target="_blank">публичную оферту</Link> и подтверждаю выбранные срок и стоимость.
-                  </span>
-                </label>
+                <fieldset className={s.legalFieldset}>
+                  <legend className={s.fieldsetLegend}>Подтверждение условий</legend>
+                  <label className={s.checkOption}>
+                    <input type="checkbox" name="acceptTerms" required />
+                    <span>
+                      Я принимаю <Link href="/terms" target="_blank" rel="noreferrer">публичную оферту</Link>, ознакомлен с <Link href="/payment-and-refund" target="_blank" rel="noreferrer">порядком оплаты и возврата</Link> и подтверждаю выбранные срок и стоимость.
+                    </span>
+                  </label>
 
-                <label style={{ display: "grid", gridTemplateColumns: "22px 1fr", gap: 10, alignItems: "start", fontSize: ".88rem", lineHeight: 1.5 }}>
-                  <input type="checkbox" name="acceptPersonalData" required style={{ width: 18, height: 18, marginTop: 2 }} />
-                  <span>
-                    Я отдельно даю <Link href="/personal-data-consent" target="_blank">согласие на обработку персональных данных</Link> и ознакомлен с <Link href="/privacy" target="_blank">политикой</Link>.
-                  </span>
-                </label>
+                  <label className={s.checkOption}>
+                    <input type="checkbox" name="acceptPersonalData" required />
+                    <span>
+                      Я отдельно даю <Link href="/personal-data-consent" target="_blank" rel="noreferrer">согласие на обработку персональных данных</Link> и ознакомлен с <Link href="/privacy" target="_blank" rel="noreferrer">политикой</Link>.
+                    </span>
+                  </label>
+                </fieldset>
 
-                {error === "agency" ? <p role="alert" style={{ margin: 0 }}>Укажите корректное название агентства или команды.</p> : null}
-                {error === "legal" ? <p role="alert" style={{ margin: 0 }}>Для оплаты нужно отдельно подтвердить оферту и согласие на обработку данных.</p> : null}
+                {error === "agency" ? <p role="alert" className={s.error}>Укажите корректное название агентства или команды.</p> : null}
+                {error === "inn" ? <p role="alert" className={s.error}>Для ООО укажите ИНН из 10 цифр, для ИП — из 12 цифр.</p> : null}
+                {error === "legal" ? <p role="alert" className={s.error}>Для оплаты отдельно подтвердите оферту и согласие на обработку данных.</p> : null}
 
                 <button type="submit" className={ppStyles.primaryAction}>
-                  Оплатить {plan.price} через Robokassa
+                  Перейти к оплате {plan.price}
                 </button>
-                <p className={ipStyles.bodyTextMutedBlock} style={{ textAlign: "center", margin: 0 }}>
-                  После нажатия откроется защищённая платёжная страница Robokassa. Доступ включится только после серверного подтверждения оплаты.
+                <p className={s.actionHint}>
+                  Откроется платёжная страница Robokassa. Доступ включится только после серверного подтверждения успешной операции.
                 </p>
               </form>
             ) : (
-              <div style={{ display: "grid", gap: 12 }}>
+              <div className={s.form}>
                 <p className={ipStyles.bodyTextMutedBlock}>
                   Сначала подтвердите рабочий e-mail. Заказ будет привязан к аккаунту, поэтому статус оплаты и настройки не потеряются.
                 </p>
                 <Link href={loginHref} className={ppStyles.primaryAction}>Войти или создать аккаунт</Link>
               </div>
             )}
+
+            <nav className={s.documentLinks} aria-label="Документы покупки">
+              <Link href="/legal">Реквизиты продавца</Link>
+              <Link href="/terms">Оферта</Link>
+              <Link href="/payment-and-refund">Оплата и возврат</Link>
+              <Link href="/privacy">Персональные данные</Link>
+            </nav>
+
+            <p className={s.actionHint}>
+              Продавец: самозанятый {OPERATOR_REQUISITES.fullName}, ИНН {OPERATOR_REQUISITES.inn}, {OPERATOR_REQUISITES.city}. Поддержка: <a href={`mailto:${OPERATOR_REQUISITES.email}`}>{OPERATOR_REQUISITES.email}</a>.
+            </p>
           </div>
         </ContentCard>
 
@@ -173,9 +231,14 @@ export default async function CheckoutPage(props: {
 
 function TrustItem({ title, text }: { title: string; text: string }) {
   return (
-    <div style={{ padding: 13, border: "1px solid rgba(15,23,42,.08)", borderRadius: 12 }}>
-      <strong style={{ display: "block", fontSize: ".83rem" }}>{title}</strong>
-      <span style={{ display: "block", marginTop: 4, color: "#667085", fontSize: ".76rem" }}>{text}</span>
+    <div className={s.trustItem}>
+      <strong>{title}</strong>
+      <span>{text}</span>
     </div>
   );
+}
+
+function readFormText(formData: FormData, key: string): string {
+  const value = formData.get(key);
+  return typeof value === "string" ? value.trim() : "";
 }
