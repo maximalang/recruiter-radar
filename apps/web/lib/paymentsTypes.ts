@@ -36,9 +36,23 @@ export const CHECKOUT_ORDER_ONBOARDING_STEPS = [
 type CheckoutOrderOnboardingStepTuple = typeof CHECKOUT_ORDER_ONBOARDING_STEPS;
 export type CheckoutOrderOnboardingStep = CheckoutOrderOnboardingStepTuple[number];
 
+export const CHECKOUT_PAYER_TYPES = ["individual", "business"] as const;
+export type CheckoutPayerType = (typeof CHECKOUT_PAYER_TYPES)[number];
+
+export type CheckoutLegalAcceptance = {
+  acceptedAt: string;
+  termsRevision: string;
+  paymentAndRefundRevision: string;
+  privacyRevision: string;
+  personalDataConsentRevision: string;
+};
+
 export type CheckoutOrderPayload = {
   planName: string;
   planCadence: string;
+  payerType: CheckoutPayerType;
+  buyerInn: string | null;
+  legalAcceptance: CheckoutLegalAcceptance | null;
   specialization: string | null;
   city: string | null;
   includeKeywords: string[];
@@ -187,6 +201,9 @@ export type StartCheckoutOrderInput = {
   productCode: PublicPlan["code"];
   customerName: string;
   customerContact: string;
+  payerType: CheckoutPayerType;
+  buyerInn?: string | null;
+  legalAcceptance: CheckoutLegalAcceptance;
   specialization?: string | null;
   city?: string | null;
   includeKeywords?: string | null;
