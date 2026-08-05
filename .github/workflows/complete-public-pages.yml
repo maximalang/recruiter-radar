@@ -1,3 +1,4 @@
+# trigger: complete public pages patch
 name: Complete public pages patch
 
 on:
@@ -52,140 +53,140 @@ jobs:
                 },
               }),''',
               '''      payerType,
-              buyerInn: payerType === "business" ? buyerInn : null,
-              legalAcceptance,
-              comment: null,''',
+      buyerInn: payerType === "business" ? buyerInn : null,
+      legalAcceptance,
+      comment: null,''',
           )
 
           payments = 'apps/web/lib/payments.ts'
           replace(
               payments,
               '''  normalizeCheckoutOrderUserId,
-              normalizeDailyDigestLimit,'''.replace('              ', ''),
+  normalizeDailyDigestLimit,''',
               '''  normalizeBuyerInn,
-              normalizeCheckoutOrderUserId,
-              normalizeCheckoutPayerType,
-              normalizeDailyDigestLimit,
-              normalizeLegalAcceptance,'''.replace('              ', ''),
+  normalizeCheckoutOrderUserId,
+  normalizeCheckoutPayerType,
+  normalizeDailyDigestLimit,
+  normalizeLegalAcceptance,''',
           )
           replace(
               payments,
               '''  const checkoutOwnerId = normalizeCheckoutOrderUserId(input.userId);
-              const plan = getPublicPlanByCode(input.productCode);
-              let order = await createCheckoutOrder({'''.replace('              ', ''),
+  const plan = getPublicPlanByCode(input.productCode);
+  let order = await createCheckoutOrder({''',
               '''  const checkoutOwnerId = normalizeCheckoutOrderUserId(input.userId);
-              const plan = getPublicPlanByCode(input.productCode);
-              const payerType = normalizeCheckoutPayerType(input.payerType);
-              const buyerInn = normalizeBuyerInn(input.buyerInn, payerType);
-              const legalAcceptance = normalizeLegalAcceptance(input.legalAcceptance);
+  const plan = getPublicPlanByCode(input.productCode);
+  const payerType = normalizeCheckoutPayerType(input.payerType);
+  const buyerInn = normalizeBuyerInn(input.buyerInn, payerType);
+  const legalAcceptance = normalizeLegalAcceptance(input.legalAcceptance);
 
-              if (payerType === "business" && !buyerInn) {
-                throw new Error("A valid 10- or 12-digit buyer INN is required for a business payment.");
-              }
-              if (!legalAcceptance) {
-                throw new Error("Legal acceptance evidence is required before checkout.");
-              }
+  if (payerType === "business" && !buyerInn) {
+    throw new Error("A valid 10- or 12-digit buyer INN is required for a business payment.");
+  }
+  if (!legalAcceptance) {
+    throw new Error("Legal acceptance evidence is required before checkout.");
+  }
 
-              let order = await createCheckoutOrder({'''.replace('              ', ''),
+  let order = await createCheckoutOrder({''',
           )
           replace(
               payments,
               '''      planName: plan.name,
-              planCadence: plan.cadence,
-              specialization:'''.replace('              ', ''),
+      planCadence: plan.cadence,
+      specialization:''',
               '''      planName: plan.name,
-              planCadence: plan.cadence,
-              payerType,
-              buyerInn,
-              legalAcceptance,
-              specialization:'''.replace('              ', ''),
+      planCadence: plan.cadence,
+      payerType,
+      buyerInn,
+      legalAcceptance,
+      specialization:''',
           )
 
           normalize = 'apps/web/lib/paymentsNormalize.ts'
           replace(
               normalize,
               '''  CHECKOUT_ORDER_ONBOARDING_STATUSES,
-              CHECKOUT_ORDER_ONBOARDING_STEPS,
-              CHECKOUT_ORDER_STATUSES,'''.replace('              ', ''),
+  CHECKOUT_ORDER_ONBOARDING_STEPS,
+  CHECKOUT_ORDER_STATUSES,''',
               '''  CHECKOUT_ORDER_ONBOARDING_STATUSES,
-              CHECKOUT_ORDER_ONBOARDING_STEPS,
-              CHECKOUT_ORDER_STATUSES,
-              CHECKOUT_PAYER_TYPES,'''.replace('              ', ''),
+  CHECKOUT_ORDER_ONBOARDING_STEPS,
+  CHECKOUT_ORDER_STATUSES,
+  CHECKOUT_PAYER_TYPES,''',
           )
           replace(
               normalize,
               '''  type CheckoutOrder,
-              type CheckoutOrderOnboardingStatus,'''.replace('              ', ''),
+  type CheckoutOrderOnboardingStatus,''',
               '''  type CheckoutLegalAcceptance,
-              type CheckoutOrder,
-              type CheckoutOrderOnboardingStatus,'''.replace('              ', ''),
+  type CheckoutOrder,
+  type CheckoutOrderOnboardingStatus,''',
           )
           replace(
               normalize,
               '''  type CheckoutOrderStatus,
-              type PublicPlanCode'''.replace('              ', ''),
+  type PublicPlanCode''',
               '''  type CheckoutOrderStatus,
-              type CheckoutPayerType,
-              type PublicPlanCode'''.replace('              ', ''),
+  type CheckoutPayerType,
+  type PublicPlanCode''',
           )
           replace(
               normalize,
               '''  const payload = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
 
-              return {
-                planName: normalizeOptionalText(readString(payload.planName)) ?? plan.name,
-                planCadence: normalizeOptionalText(readString(payload.planCadence)) ?? plan.cadence,'''.replace('              ', ''),
+  return {
+    planName: normalizeOptionalText(readString(payload.planName)) ?? plan.name,
+    planCadence: normalizeOptionalText(readString(payload.planCadence)) ?? plan.cadence,''',
               '''  const payload = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
-              const payerType = normalizeCheckoutPayerType(readString(payload.payerType));
+  const payerType = normalizeCheckoutPayerType(readString(payload.payerType));
 
-              return {
-                planName: normalizeOptionalText(readString(payload.planName)) ?? plan.name,
-                planCadence: normalizeOptionalText(readString(payload.planCadence)) ?? plan.cadence,
-                payerType,
-                buyerInn: normalizeBuyerInn(readString(payload.buyerInn), payerType),
-                legalAcceptance: normalizeLegalAcceptance(payload.legalAcceptance),'''.replace('              ', ''),
+  return {
+    planName: normalizeOptionalText(readString(payload.planName)) ?? plan.name,
+    planCadence: normalizeOptionalText(readString(payload.planCadence)) ?? plan.cadence,
+    payerType,
+    buyerInn: normalizeBuyerInn(readString(payload.buyerInn), payerType),
+    legalAcceptance: normalizeLegalAcceptance(payload.legalAcceptance),''',
           )
           replace(
               normalize,
               '''export function normalizeCheckoutOrderId(value: string | number): number {''',
               '''export function normalizeCheckoutPayerType(value: unknown): CheckoutPayerType {
-                const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
-                return (CHECKOUT_PAYER_TYPES as readonly string[]).includes(normalized)
-                  ? normalized as CheckoutPayerType
-                  : "individual";
-              }
+  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
+  return (CHECKOUT_PAYER_TYPES as readonly string[]).includes(normalized)
+    ? normalized as CheckoutPayerType
+    : "individual";
+}
 
-              export function normalizeBuyerInn(
-                value: string | null | undefined,
-                payerType: CheckoutPayerType
-              ): string | null {
-                if (payerType !== "business") return null;
-                const normalized = typeof value === "string" ? value.replace(/\\D/g, "") : "";
-                return /^(?:\\d{10}|\\d{12})$/.test(normalized) ? normalized : null;
-              }
+export function normalizeBuyerInn(
+  value: string | null | undefined,
+  payerType: CheckoutPayerType
+): string | null {
+  if (payerType !== "business") return null;
+  const normalized = typeof value === "string" ? value.replace(/\D/g, "") : "";
+  return /^(?:\d{10}|\d{12})$/.test(normalized) ? normalized : null;
+}
 
-              export function normalizeLegalAcceptance(value: unknown): CheckoutLegalAcceptance | null {
-                if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-                const source = value as Record<string, unknown>;
-                const acceptedAt = normalizeOptionalText(readString(source.acceptedAt));
-                const termsRevision = normalizeOptionalText(readString(source.termsRevision));
-                const paymentAndRefundRevision = normalizeOptionalText(readString(source.paymentAndRefundRevision));
-                const privacyRevision = normalizeOptionalText(readString(source.privacyRevision));
-                const personalDataConsentRevision = normalizeOptionalText(readString(source.personalDataConsentRevision));
-                if (
-                  !acceptedAt || Number.isNaN(new Date(acceptedAt).getTime()) ||
-                  !termsRevision || !paymentAndRefundRevision || !privacyRevision || !personalDataConsentRevision
-                ) return null;
-                return {
-                  acceptedAt: new Date(acceptedAt).toISOString(),
-                  termsRevision,
-                  paymentAndRefundRevision,
-                  privacyRevision,
-                  personalDataConsentRevision
-                };
-              }
+export function normalizeLegalAcceptance(value: unknown): CheckoutLegalAcceptance | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const source = value as Record<string, unknown>;
+  const acceptedAt = normalizeOptionalText(readString(source.acceptedAt));
+  const termsRevision = normalizeOptionalText(readString(source.termsRevision));
+  const paymentAndRefundRevision = normalizeOptionalText(readString(source.paymentAndRefundRevision));
+  const privacyRevision = normalizeOptionalText(readString(source.privacyRevision));
+  const personalDataConsentRevision = normalizeOptionalText(readString(source.personalDataConsentRevision));
+  if (
+    !acceptedAt || Number.isNaN(new Date(acceptedAt).getTime()) ||
+    !termsRevision || !paymentAndRefundRevision || !privacyRevision || !personalDataConsentRevision
+  ) return null;
+  return {
+    acceptedAt: new Date(acceptedAt).toISOString(),
+    termsRevision,
+    paymentAndRefundRevision,
+    privacyRevision,
+    personalDataConsentRevision
+  };
+}
 
-              export function normalizeCheckoutOrderId(value: string | number): number {'''.replace('              ', ''),
+export function normalizeCheckoutOrderId(value: string | number): number {''',
           )
 
           terms = 'apps/web/app/terms/page.tsx'
@@ -224,10 +225,10 @@ jobs:
           replace(terms,
               'function TermsSection({ n, title, children }: { n: string; title: string; children: React.ReactNode }) {',
               '''function Summary({ label, value }: { label: string; value: string }) {
-                return <div className={s.docSummaryItem}><span className={s.docSummaryLabel}>{label}</span><span className={s.docSummaryValue}>{value}</span></div>;
-              }
+  return <div className={s.docSummaryItem}><span className={s.docSummaryLabel}>{label}</span><span className={s.docSummaryValue}>{value}</span></div>;
+}
 
-              function TermsSection({ n, title, children }: { n: string; title: string; children: React.ReactNode }) {'''.replace('              ', ''))
+function TermsSection({ n, title, children }: { n: string; title: string; children: React.ReactNode }) {''')
 
           privacy = 'apps/web/app/privacy/page.tsx'
           replace(privacy,
@@ -262,10 +263,10 @@ jobs:
           replace(privacy,
               'function PolicySection({ n, title, children }: { n: string; title: string; children: React.ReactNode }) {',
               '''function Summary({ label, value }: { label: string; value: string }) {
-                return <div className={s.docSummaryItem}><span className={s.docSummaryLabel}>{label}</span><span className={s.docSummaryValue}>{value}</span></div>;
-              }
+  return <div className={s.docSummaryItem}><span className={s.docSummaryLabel}>{label}</span><span className={s.docSummaryValue}>{value}</span></div>;
+}
 
-              function PolicySection({ n, title, children }: { n: string; title: string; children: React.ReactNode }) {'''.replace('              ', ''))
+function PolicySection({ n, title, children }: { n: string; title: string; children: React.ReactNode }) {''')
 
           criteria = 'apps/web/scripts/verify-robokassa-site-criteria.mjs'
           replace(criteria, '  "metrika",\n].map', '  "metrika",\n  "legalDocuments",\n].map')
