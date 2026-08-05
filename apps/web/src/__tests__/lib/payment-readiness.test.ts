@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 import { buildPaymentReadinessReport } from '@/lib/payment-readiness'
+import { OPERATOR_REQUISITES } from '@/lib/operatorRequisites'
 import { PUBLIC_PLANS } from '@/lib/pricingCatalog'
 
 describe('payment readiness', () => {
@@ -12,7 +13,6 @@ describe('payment readiness', () => {
     for (const key of [
       'ROBOKASSA_PASSWORD_3',
       'ROBOKASSA_SMZ_RECEIPTS_ENABLED',
-      'OPERATOR_PUBLIC_CITY',
       'OPERATOR_PUBLIC_POSTAL_ADDRESS',
       'ROBOKASSA_SITE_CRITERIA_VERIFIED_AT',
       'ROBOKASSA_TEST_FLOW_VERIFIED_AT',
@@ -74,8 +74,8 @@ describe('payment readiness', () => {
     })
   })
 
-  test('accepts a public city instead of a full home address for moderation', () => {
-    process.env.OPERATOR_PUBLIC_CITY = 'г. Тестовый'
+  test('uses the confirmed Ryazan seller location for moderation', () => {
+    expect(OPERATOR_REQUISITES.city).toBe('Рязань')
     const report = buildPaymentReadinessReport({
       provider: 'robokassa',
       configured: true,
@@ -85,12 +85,11 @@ describe('payment readiness', () => {
     })
     expect(report.merchantModerationReady).toBe(true)
     expect(report.launch.blockers).not.toContain(
-      'OPERATOR_PUBLIC_CITY (or an actual postal address) is required before Robokassa moderation.',
+      'A confirmed seller city or actual correspondence address is required before Robokassa moderation.',
     )
   })
 
   test('requires cross-border verification when Telegram delivery is configured', () => {
-    process.env.OPERATOR_PUBLIC_CITY = 'г. Тестовый'
     process.env.TELEGRAM_BOT_TOKEN = '123456:test-token'
     const report = buildPaymentReadinessReport({
       provider: 'robokassa',
@@ -105,7 +104,6 @@ describe('payment readiness', () => {
   })
 
   test('requires all external evidence before reporting live-ready', () => {
-    process.env.OPERATOR_PUBLIC_CITY = 'г. Тестовый'
     process.env.ROBOKASSA_MODE = 'live'
     process.env.ROBOKASSA_PASSWORD_3 = 'refund-password-three'
     process.env.ROBOKASSA_SMZ_RECEIPTS_ENABLED = 'true'
