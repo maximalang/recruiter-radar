@@ -28,10 +28,15 @@ const SOURCE_ROWS = [
 
 export default function EvidenceScene() {
   return (
-    <section id="scene-evidence" className={`${styles.scene} ${styles.darkScene} ${styles.evidenceScene}`} aria-labelledby="evidence-title">
+    <section
+      id="scene-evidence"
+      className={`${styles.scene} ${styles.darkScene} ${styles.evidenceScene}`}
+      aria-labelledby="evidence-title"
+      data-landing-scene="evidence"
+    >
       <div className={styles.evidenceLayout}>
         <div className={styles.evidenceIntro}>
-          <p className={styles.sceneLabel}>03 — Доказательство</p>
+          <p className={styles.sceneLabel} data-system-label>03 — Доказательство</p>
           <h2 id="evidence-title" className={styles.sceneHeading}>
             Радар не просит верить оценке. <em>Он показывает, из чего она собрана.</em>
           </h2>
@@ -39,7 +44,7 @@ export default function EvidenceScene() {
 
         <div className={styles.scoreAssembly}>
           <div className={styles.scoreIdentity}>
-            <span>RADAR SCORE</span>
+            <span data-system-label>RADAR SCORE</span>
             <strong>{DEMO_COMPANY.score}</strong>
             <small>/100 · подтверждено</small>
           </div>
@@ -49,7 +54,7 @@ export default function EvidenceScene() {
           <ol className={styles.scoreFacts} aria-label="Из чего сложилась оценка">
             {DEMO_EVIDENCE.map((item) => (
               <li key={item.label}>
-                <span>{item.label}</span>
+                <span data-system-label>{item.label}</span>
                 <strong>{item.points}</strong>
                 <p>{item.fact}</p>
               </li>
@@ -59,12 +64,12 @@ export default function EvidenceScene() {
 
         <div className={styles.evidenceLedger}>
           <div className={styles.ledgerHeading}>
-            <span>EVIDENCE STACK / 03</span>
+            <span data-evidence-ledger-label>Доказательная база / 03</span>
             <strong>{DEMO_COMPANY.name}</strong>
             <p>Источники, даты обнаружения и сами события остаются рядом с оценкой.</p>
           </div>
           <div className={styles.ledgerHeader} aria-hidden="true">
-            <span>Источник / факт</span><span>Найдено</span><span>Событие</span><span>Уверенность</span>
+            <span>Источник / факт</span><span>Найдено</span><span>Событие</span><span>Достоверность</span>
           </div>
           <ul className={styles.evidenceStack}>
             {SOURCE_ROWS.map((row, index) => (
