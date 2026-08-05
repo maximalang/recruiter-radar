@@ -144,6 +144,8 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
     </a>
   );
 
+  const logoTone = tone === "light" && !scrolled && !menuOpen ? "light" : "dark";
+
   return (
     <header
       className={headerStyles.header}
@@ -158,7 +160,7 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
           className={`${styles.headerBrand} ${headerStyles.brand}`}
           aria-label="Recruiter Radar — на главную"
         >
-          <BrandLogo joined tone="dark" />
+          <BrandLogo joined tone={logoTone} />
         </Link>
 
         <nav className={headerStyles.desktopNav} aria-label="Разделы лендинга">
