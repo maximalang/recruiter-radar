@@ -88,6 +88,7 @@ try {
             && style.opacity !== '0'
             && rect.width > 0
             && rect.height > 0
+            && rect.bottom > 0
             && !element.closest('[hidden], [inert], [aria-hidden="true"]')
           );
         };
@@ -106,12 +107,18 @@ try {
                 .join(' ')
                 .trim()
             : '';
+          const imageAlt = element.querySelector?.('img[alt]')?.getAttribute('alt')?.trim() ?? '';
+          const controlValue = 'value' in element && typeof element.value === 'string'
+            ? element.value.trim()
+            : '';
           return (
             element.getAttribute('aria-label')?.trim()
             || labelledByText
             || associatedLabel
             || element.getAttribute('title')?.trim()
             || element.textContent?.trim()
+            || imageAlt
+            || controlValue
             || ''
           );
         };
@@ -131,9 +138,21 @@ try {
           const className = typeof element.className === 'string' ? element.className : '';
           return (
             ['flex', 'inline-flex', 'grid', 'inline-grid', 'block'].includes(style.display)
-            || /nav|button|action|cta|back|brand/i.test(className)
+            || /nav|button|action|cta|back|brand|footer/i.test(className)
             || element.getAttribute('role') === 'button'
           );
+        };
+        const insideHorizontalScroller = (element) => {
+          let ancestor = element.parentElement;
+          while (ancestor && ancestor !== document.body) {
+            const style = window.getComputedStyle(ancestor);
+            const canScrollHorizontally = ['auto', 'scroll'].includes(style.overflowX);
+            if (canScrollHorizontally && ancestor.scrollWidth > ancestor.clientWidth + 1) {
+              return true;
+            }
+            ancestor = ancestor.parentElement;
+          }
+          return false;
         };
 
         const interactive = Array.from(document.querySelectorAll(
@@ -191,6 +210,7 @@ try {
           .map(([id, count]) => ({ id, count }));
 
         const clippedControls = interactive
+          .filter((element) => !insideHorizontalScroller(element))
           .map((element) => {
             const rect = element.getBoundingClientRect();
             return {
@@ -198,6 +218,7 @@ try {
               label: accessibleName(element).slice(0, 80),
               left: Math.round(rect.left),
               right: Math.round(rect.right),
+              className: typeof element.className === 'string' ? element.className.slice(0, 120) : '',
             };
           })
           .filter((item) => item.left < -1 || item.right > window.innerWidth + 1);
