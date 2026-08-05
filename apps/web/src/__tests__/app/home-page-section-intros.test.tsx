@@ -249,7 +249,7 @@ describe("final unified evidence-first landing contract", () => {
     expect(html).toContain('id="faq"');
     expect(html).toContain("Соберите радар под свою специализацию");
     expect(html).toContain('href="/legal"');
-    expect(html).toContain('href="/terms"');
+    expect(html).toContain('href="/offer"');
     expect(html).toContain('href="/privacy"');
     expect(html).toContain("Реквизиты");
     expect(html).toContain("Оферта");
