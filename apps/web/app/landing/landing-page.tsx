@@ -4,6 +4,7 @@ import type { PublicPreviewInput } from "../../lib/publicProduct";
 import { SiteFooter } from "../ui/site-footer";
 import DetectionScene from "./detection-scene";
 import EvidenceScene from "./evidence-scene";
+import LandingHashNavigation from "./landing-hash-navigation";
 import LandingHeader from "./landing-header";
 import OutreachScene from "./outreach-scene";
 import correctionStyles from "./landing-corrections.module.css";
@@ -25,6 +26,7 @@ export default function LandingPage(props: {
       data-landing-experience="signal-lock"
     >
       <a href="#main-content" className={styles.skipLink}>Перейти к содержанию</a>
+      <LandingHashNavigation />
       <LandingHeader previewHref="#preview-configurator" />
       <main id="main-content">
         <DetectionScene previewHref="#preview-configurator" />
