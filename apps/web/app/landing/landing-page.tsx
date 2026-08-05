@@ -7,6 +7,7 @@ import EvidenceScene from "./evidence-scene";
 import LandingHeader from "./landing-header";
 import OutreachScene from "./outreach-scene";
 import correctionStyles from "./landing-corrections.module.css";
+import frameStyles from "./landing-frame.module.css";
 import styles from "./landing.module.css";
 import SignalTimelineScene from "./signal-timeline-scene";
 import WorkspaceScene, { WorkspaceSkeleton } from "./workspace-scene";
@@ -19,7 +20,10 @@ export default function LandingPage(props: {
   faqItems: ReadonlyArray<{ question: string; answer: string }>;
 }) {
   return (
-    <div className={`${styles.landingPage} ${correctionStyles.root}`} data-landing-experience="signal-lock">
+    <div
+      className={`${styles.landingPage} ${correctionStyles.root} ${frameStyles.frame}`}
+      data-landing-experience="signal-lock"
+    >
       <a href="#main-content" className={styles.skipLink}>Перейти к содержанию</a>
       <LandingHeader previewHref="#preview-configurator" />
       <main id="main-content">
