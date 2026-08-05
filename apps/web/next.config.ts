@@ -15,14 +15,16 @@ const tsconfigPath = (
   ? requestedE2eTsconfig
   : "tsconfig.json";
 
+const metrikaOrigins = "https://mc.yandex.ru https://mc.yandex.com";
+
 export function buildContentSecurityPolicy(environment: string | undefined): string {
   const isDevelopment = environment !== 'production';
   const scriptPolicy = isDevelopment
-    ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://mc.yandex.ru"
-    : "script-src 'self' 'unsafe-inline' https://mc.yandex.ru";
+    ? `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${metrikaOrigins}`
+    : `script-src 'self' 'unsafe-inline' ${metrikaOrigins}`;
   const connectPolicy = isDevelopment
-    ? "connect-src 'self' ws: https://telegram.org https://mc.yandex.ru"
-    : "connect-src 'self' https://telegram.org https://mc.yandex.ru";
+    ? `connect-src 'self' ws: https://telegram.org ${metrikaOrigins}`
+    : `connect-src 'self' https://telegram.org ${metrikaOrigins}`;
 
   return `default-src 'self'; ${scriptPolicy}; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; ${connectPolicy}; frame-ancestors 'none'`;
 }
