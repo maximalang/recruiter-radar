@@ -6,29 +6,36 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { LANDING_ANALYTICS_CONTEXT, LANDING_ANALYTICS_EVENT } from "../../lib/landing-analytics-contract";
 import { BrandLogo } from "../ui/brand-logo";
 import { ArrowGlyph } from "./brand-glyphs";
+import headerStyles from "./landing-header.module.css";
 import { LANDING_NAV_ITEMS } from "./landing-copy";
 import styles from "./landing.module.css";
 
 type HeaderTone = "dark" | "light";
+
+const FOCUSABLE_SELECTOR = [
+  "a[href]",
+  "button:not([disabled])",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  "[tabindex]:not([tabindex='-1'])",
+].join(",");
 
 export default function LandingHeader({ previewHref }: { previewHref: string }) {
   const [activeId, setActiveId] = useState("");
   const [scrolled, setScrolled] = useState(false);
   const [tone, setTone] = useState<HeaderTone>("dark");
   const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDetailsElement>(null);
-  const summaryRef = useRef<HTMLElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const menuPanelRef = useRef<HTMLDivElement>(null);
 
-  const closeMenu = useCallback((restoreFocus = false) => {
-    const menu = menuRef.current;
-    if (!menu?.open) return;
-    menu.open = false;
+  const closeMenu = useCallback((restoreFocus = true) => {
     setMenuOpen(false);
-    if (restoreFocus) window.requestAnimationFrame(() => summaryRef.current?.focus());
+    if (restoreFocus) window.requestAnimationFrame(() => menuButtonRef.current?.focus({ preventScroll: true }));
   }, []);
 
   useEffect(() => {
-    const updateScrolled = () => setScrolled(window.scrollY > 20);
+    const updateScrolled = () => setScrolled(window.scrollY > 12);
     updateScrolled();
     window.addEventListener("scroll", updateScrolled, { passive: true });
     return () => window.removeEventListener("scroll", updateScrolled);
@@ -46,7 +53,7 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
         .sort((left, right) => Math.abs(left.boundingClientRect.top) - Math.abs(right.boundingClientRect.top));
       const nearest = visible[0]?.target as HTMLElement | undefined;
       if (nearest?.id) setActiveId(nearest.id);
-    }, { rootMargin: "-24% 0px -62% 0px", threshold: [0, 0.01, 0.25] });
+    }, { rootMargin: "-20% 0px -66% 0px", threshold: [0, 0.01, 0.25] });
 
     const toneObserver = new IntersectionObserver((entries) => {
       const visible = entries
@@ -67,101 +74,144 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
   }, []);
 
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && menuRef.current?.open) closeMenu(true);
-    };
-    const onPointerDown = (event: PointerEvent) => {
-      const target = event.target as Node | null;
-      if (menuRef.current?.open && target && !menuRef.current.contains(target)) closeMenu(false);
+    if (!menuOpen) return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    const previousPaddingRight = document.body.style.paddingRight;
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    document.body.style.overflow = "hidden";
+    if (scrollbarWidth > 0) document.body.style.paddingRight = `${scrollbarWidth}px`;
+
+    const panel = menuPanelRef.current;
+    const focusable = () => Array.from(panel?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR) ?? [])
+      .filter((element) => !element.hasAttribute("hidden") && element.getAttribute("aria-hidden") !== "true");
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeMenu(true);
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const items = focusable();
+      if (items.length === 0) {
+        event.preventDefault();
+        menuButtonRef.current?.focus({ preventScroll: true });
+        return;
+      }
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
 
-    document.addEventListener("keydown", onKeyDown);
-    document.addEventListener("pointerdown", onPointerDown);
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (panel?.contains(target) || menuButtonRef.current?.contains(target)) return;
+      closeMenu(true);
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("pointerdown", handlePointerDown);
+    window.requestAnimationFrame(() => focusable()[0]?.focus({ preventScroll: true }));
+
     return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.removeEventListener("pointerdown", onPointerDown);
+      document.body.style.overflow = previousOverflow;
+      document.body.style.paddingRight = previousPaddingRight;
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("pointerdown", handlePointerDown);
     };
-  }, [closeMenu]);
+  }, [closeMenu, menuOpen]);
 
-  const navLinks = LANDING_NAV_ITEMS.map((item) => (
+  const renderNavLink = (item: (typeof LANDING_NAV_ITEMS)[number]) => (
     <a
       key={item.id}
       href={`#${item.id}`}
-      className={styles.sceneNavLink}
+      className={headerStyles.navLink}
       aria-current={activeId === item.id ? "location" : undefined}
       data-active={activeId === item.id || undefined}
-      style={{ minWidth: 44, justifyContent: "center" }}
       onClick={() => closeMenu(false)}
     >
       {item.label}
     </a>
-  ));
+  );
 
   return (
     <header
-      className={styles.header}
+      className={headerStyles.header}
       data-brand-header="signal-lock"
       data-scrolled={scrolled || undefined}
       data-tone={tone}
+      data-menu-open={menuOpen || undefined}
     >
-      <div className={styles.headerInner}>
+      <div className={headerStyles.inner}>
         <Link
           href="/"
-          className={styles.headerBrand}
+          className={`${styles.headerBrand} ${headerStyles.brand}`}
           aria-label="Recruiter Radar — на главную"
-          style={{ paddingInline: 1 }}
         >
           <BrandLogo joined tone="dark" />
         </Link>
 
-        <nav className={styles.sceneNav} aria-label="Разделы лендинга">
-          {navLinks}
+        <nav className={headerStyles.desktopNav} aria-label="Разделы лендинга">
+          {LANDING_NAV_ITEMS.map(renderNavLink)}
         </nav>
 
-        <div className={styles.headerActions}>
-          <Link
-            href="/dashboard"
-            className={styles.headerLogin}
-            style={{ minWidth: 44, justifyContent: "center" }}
-          >
-            Войти
-          </Link>
+        <div className={headerStyles.actions}>
+          <Link href="/dashboard" className={headerStyles.login}>Войти</Link>
           <a
             href={previewHref}
-            className={styles.headerCta}
+            className={headerStyles.cta}
             data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.header}
           >
-            Настроить радар <ArrowGlyph />
+            Получить пример <ArrowGlyph />
           </a>
+          <button
+            ref={menuButtonRef}
+            type="button"
+            className={headerStyles.menuButton}
+            aria-label={menuOpen ? "Закрыть меню" : "Открыть меню"}
+            aria-expanded={menuOpen}
+            aria-controls="landing-mobile-menu"
+            data-open={menuOpen || undefined}
+            onClick={() => setMenuOpen((current) => !current)}
+          />
+        </div>
+      </div>
 
-          <details
-            ref={menuRef}
-            className={styles.mobileMenu}
-            onToggle={(event) => setMenuOpen(event.currentTarget.open)}
+      <div className={headerStyles.backdrop} hidden={!menuOpen} aria-hidden="true" />
+      <div
+        ref={menuPanelRef}
+        id="landing-mobile-menu"
+        className={headerStyles.panel}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="landing-mobile-menu-title"
+        hidden={!menuOpen}
+      >
+        <div id="landing-mobile-menu-title" className={headerStyles.panelIntro}>Навигация по продукту</div>
+        <nav className={headerStyles.mobileNav} aria-label="Мобильная навигация">
+          {LANDING_NAV_ITEMS.map(renderNavLink)}
+        </nav>
+        <div className={headerStyles.mobileActions}>
+          <Link href="/dashboard" onClick={() => closeMenu(false)}>Личный кабинет</Link>
+          <a
+            href={previewHref}
+            onClick={() => closeMenu(false)}
+            data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
+            data-analytics-context={LANDING_ANALYTICS_CONTEXT.header}
           >
-            <summary
-              ref={summaryRef}
-              aria-label={menuOpen ? "Закрыть меню" : "Открыть меню"}
-              aria-expanded={menuOpen}
-              style={{ minWidth: 44 }}
-            >
-              <span aria-hidden="true" /><span aria-hidden="true" />
-            </summary>
-            <div className={styles.mobileMenuPanel}>
-              <nav aria-label="Мобильная навигация">{navLinks}</nav>
-              <Link href="/dashboard" onClick={() => closeMenu(false)}>Личный кабинет</Link>
-              <a
-                href={previewHref}
-                className={styles.mobileMenuCta}
-                onClick={() => closeMenu(false)}
-                data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
-                data-analytics-context={LANDING_ANALYTICS_CONTEXT.header}
-              >
-                Настроить preview <ArrowGlyph />
-              </a>
-            </div>
-          </details>
+            Получить пример <ArrowGlyph />
+          </a>
         </div>
       </div>
     </header>
