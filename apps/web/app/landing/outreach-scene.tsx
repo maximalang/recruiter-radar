@@ -12,12 +12,12 @@ export default function OutreachScene() {
     >
       <div className={styles.outreachLayout}>
         <div className={styles.outreachIntro}>
-          <p className={styles.sceneLabel}>06 — Действие</p>
+          <p className={styles.sceneLabel}>06 — Обращение</p>
           <h2 id="outreach-title" className={styles.sceneHeading}>
             Сначала причина для контакта. <em>Потом сообщение.</em>
           </h2>
           <p className={styles.sceneLead}>
-            Радар собирает opportunity brief, рекомендуемый угол разговора и официальный маршрут. Решение об обращении и отправка всегда остаются за человеком.
+            Радар собирает краткое описание возможности, рекомендуемый угол разговора и официальный маршрут. Решение об обращении и отправка всегда остаются за человеком.
           </p>
         </div>
 
@@ -25,7 +25,7 @@ export default function OutreachScene() {
           <div className={styles.opportunityBrief}>
             <div className={styles.briefCoordinate}>
               <ActionGlyph size={58} />
-              <div><span>Opportunity brief / сегодня</span><strong>{DEMO_COMPANY.name}</strong></div>
+              <div><span>Краткая карточка / сегодня</span><strong>{DEMO_COMPANY.name}</strong></div>
             </div>
             <dl className={styles.briefFacts}>
               <div><dt>Ситуация</dt><dd>{DEMO_COMPANY.change}</dd></div>
@@ -39,18 +39,18 @@ export default function OutreachScene() {
                   <li key={path}><span>{String(index + 1).padStart(2, "0")}</span><RouteGlyph size={15} />{path}</li>
                 ))}
               </ul>
-              <small>Только корпоративные каналы · без частных телефонов и личных email</small>
+              <small>Только корпоративные каналы · без частных телефонов и личных адресов электронной почты</small>
             </div>
           </div>
 
           <div className={styles.messageDraft}>
             <div className={styles.draftHeader}>
-              <span>DRAFT / НЕ ОТПРАВЛЕНО</span>
+              <span>ЧЕРНОВИК / НЕ ОТПРАВЛЕНО</span>
               <strong>Пример первого сообщения, основанного на факте</strong>
             </div>
             <blockquote>{DEMO_OUTREACH_COPY}</blockquote>
             <div className={styles.actionBoundary}>
-              <div><span>Система обнаружила</span><strong>связанный hiring signal</strong></div>
+              <div><span>Система обнаружила</span><strong>связанный сигнал найма</strong></div>
               <div><span>Система рекомендует</span><strong>точку входа и угол разговора</strong></div>
               <div><span>Пользователь делает</span><strong>проверяет и отправляет вручную</strong></div>
             </div>
