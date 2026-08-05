@@ -211,7 +211,12 @@ function WorkspaceResultsFailure({ checkoutHref }: { checkoutHref: string }) {
         <span>Временная ошибка загрузки</span>
         <strong>Измените профиль или повторите запрос. Тарифы, FAQ и следующий шаг доступны ниже.</strong>
       </div>
-      <Link href={checkoutHref} className={`${styles.workspaceCheckout} ${sceneStyles.checkout}`}>
+      <Link
+        href={checkoutHref}
+        className={`${styles.workspaceCheckout} ${sceneStyles.checkout}`}
+        data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
+        data-analytics-context={LANDING_ANALYTICS_CONTEXT.preview}
+      >
         Оставить заявку на неделю <ArrowGlyph />
       </Link>
     </div>
