@@ -10,7 +10,7 @@ import {
 import { buildFaqItems } from "./home-page-components";
 import LandingAnalytics from "./landing-analytics";
 import LandingPage from "./landing/landing-page";
-import WorkspaceScene, { WorkspaceSkeleton } from "./landing/workspace-scene";
+import WorkspaceScene, { WorkspaceResultsSkeleton } from "./landing/workspace-scene";
 import { PageFrame } from "./ui/page-primitives";
 import YandexMetrika from "./yandex-metrika";
 
@@ -50,8 +50,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   );
 }
 
-/** Compatibility export for tests and server callers that render preview in isolation. */
-export async function PreviewSection(props: {
+/** Compatibility export for tests and server callers that render the workspace shell in isolation. */
+export function PreviewSection(props: {
   previewInput: PublicPreviewInput;
   hasPreview: boolean;
   checkoutHref: string;
@@ -60,5 +60,5 @@ export async function PreviewSection(props: {
 }
 
 export function PreviewSkeleton() {
-  return <WorkspaceSkeleton />;
+  return <WorkspaceResultsSkeleton />;
 }
