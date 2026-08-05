@@ -4,22 +4,27 @@ import styles from "./landing.module.css";
 
 export default function SignalTimelineScene() {
   return (
-    <section id="scene-timeline" className={`${styles.scene} ${styles.lightScene} ${styles.timelineScene}`} aria-labelledby="timeline-title">
+    <section
+      id="scene-timeline"
+      className={`${styles.scene} ${styles.lightScene} ${styles.timelineScene}`}
+      aria-labelledby="timeline-title"
+      data-header-tone="light"
+    >
       <div className={styles.timelineLayout}>
         <div className={styles.timelineIntro}>
-          <p className={styles.sceneLabel}>02 — Сигнал</p>
+          <p className={styles.sceneLabel}>02 — Паттерн сигнала</p>
           <h2 id="timeline-title" className={styles.sceneHeading}>
             Одна вакансия ничего не доказывает. <em>Последовательность — доказывает.</em>
           </h2>
           <p className={styles.sceneLead}>
-            Радар не реагирует на отдельный заголовок. Он собирает изменения одной компании в единую временную линию.
+            Радар связывает события одной компании, сохраняет источники и даты, а затем объясняет, когда набор превращается в клиентскую возможность.
           </p>
         </div>
 
         <div className={styles.companyCoordinate} aria-label="Сквозная демонстрационная компания">
-          <SignalGlyph size={64} />
+          <SignalGlyph size={52} />
           <div>
-            <span>Объект наблюдения</span>
+            <span>Одна компания на всём лендинге</span>
             <strong>{DEMO_COMPANY.name}</strong>
             <small>{DEMO_COMPANY.location} · {DEMO_COMPANY.industry}</small>
           </div>
@@ -27,24 +32,24 @@ export default function SignalTimelineScene() {
 
         <ol className={styles.timelineEvents}>
           {DEMO_TIMELINE.map((event, index) => (
-            <li key={event.date} className={styles.timelineEvent}>
+            <li key={`${event.date}-${event.title}`} className={styles.timelineEvent}>
               <time>{event.date}</time>
               <span className={styles.timelineNode} aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
               <div>
                 <strong>{event.title}</strong>
-                <span>{event.source}</span>
+                <span>Источник: {event.source}</span>
               </div>
             </li>
           ))}
         </ol>
 
         <div className={styles.timelineConclusion}>
-          <EvidenceGlyph size={72} />
+          <EvidenceGlyph size={58} />
           <p>
-            Это уже не отдельные вакансии.
-            <strong>Это окно для выхода на клиента.</strong>
+            Четыре изменения складываются в один вывод:
+            <strong>компания расширяет инженерную функцию — сейчас есть обоснованный повод для разговора.</strong>
           </p>
-          <span>4 события · 3 типа подтверждения · сегодня</span>
+          <span>4 события · 3 типа источников · последнее изменение сегодня</span>
         </div>
       </div>
     </section>
