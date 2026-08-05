@@ -1,12 +1,6 @@
-/* Legal-document layout — shared by /terms and /privacy.
- *
- * A legal document should read as a document, not as a stack of cards. The
- * old layout wrapped every numbered clause in a SurfaceCard, which added card
- * chrome (border, padding, shadow) around each paragraph — "UX" where the
- * content (the law) should carry the page. This replaces it with a continuous
- * prose flow: one intro, one operator line, then section headings + paragraphs
- * separated by whitespace. Typography tokens from page-primitives :root keep
- * the hierarchy intentional. Tokens only — no color/card noise. */
+/* Shared public-document layout. Legal pages read as one coherent document,
+ * while a compact navigation and summary make the important terms easy to
+ * verify before checkout and during payment-provider moderation. */
 
 .docSection {
   display: grid;
@@ -14,7 +8,44 @@
   padding: 28px 0 8px;
 }
 
-/* Operator intro line — a single quiet sentence, not a card. */
+.docNav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid color-mix(in srgb, currentColor 9%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, currentColor 2%, transparent);
+}
+
+.docNavLink {
+  padding: 8px 11px;
+  border-radius: 9px;
+  color: var(--c-text-secondary, #475569);
+  font-size: 0.78rem;
+  font-weight: 650;
+  line-height: 1.2;
+  text-decoration: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.docNavLink:hover {
+  color: var(--c-text-primary, #0f172a);
+  background: color-mix(in srgb, currentColor 5%, transparent);
+}
+
+.docNavLink[aria-current="page"] {
+  color: var(--c-text-primary, #0f172a);
+  background: var(--c-surface, #fff);
+  box-shadow: 0 1px 3px rgb(15 23 42 / 8%);
+}
+
+.docNavLink:focus-visible,
+.docLink:focus-visible {
+  outline: 2px solid var(--c-brand, #1d4ed8);
+  outline-offset: 2px;
+}
+
 .docOperator {
   margin: 0;
   color: var(--c-text-secondary, #475569);
@@ -27,16 +58,61 @@
   font-weight: 700;
 }
 
-/* The document body — clauses flow vertically with generous spacing. */
+.docSummary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.docSummaryItem {
+  min-height: 82px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, currentColor 8%, transparent);
+  border-radius: 13px;
+}
+
+.docSummaryLabel {
+  display: block;
+  color: var(--c-text-secondary, #64748b);
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.docSummaryValue {
+  display: block;
+  margin-top: 6px;
+  color: var(--c-text-primary, #0f172a);
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.docCallout {
+  margin: 0;
+  padding: 14px 16px;
+  border-left: 3px solid var(--c-brand, #1d4ed8);
+  border-radius: 0 11px 11px 0;
+  background: color-mix(in srgb, var(--c-brand, #1d4ed8) 5%, transparent);
+  color: var(--c-text-secondary, #475569);
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+
+.docCallout strong {
+  color: var(--c-text-primary, #0f172a);
+}
+
 .docBody {
   display: grid;
   gap: 26px;
 }
 
-/* A clause: a numbered heading + its text. No card, just type + whitespace. */
 .docClause {
   display: grid;
   gap: 10px;
+  scroll-margin-top: 90px;
 }
 
 .docClauseTitle {
@@ -62,7 +138,6 @@
   margin-bottom: 0;
 }
 
-/* Lists inside clauses — tight, readable, no oversized markers. */
 .docList {
   margin: 8px 0;
   padding-left: 20px;
@@ -74,7 +149,6 @@
   line-height: 1.6;
 }
 
-/* Inline document link — quiet underline, brand on hover. */
 .docLink {
   color: inherit;
   text-decoration: underline;
@@ -86,17 +160,63 @@
   color: var(--c-brand, #1d4ed8);
 }
 
-.docLink:focus-visible {
-  outline: 2px solid var(--c-brand, #1d4ed8);
-  outline-offset: 2px;
-  border-radius: 3px;
+.docTableWrap {
+  overflow-x: auto;
+  margin: 10px 0;
+  border: 1px solid color-mix(in srgb, currentColor 9%, transparent);
+  border-radius: 12px;
 }
 
-/* Mobile — slightly tighter spacing, nothing else changes. */
+.docTable {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 560px;
+  font-size: 0.87rem;
+}
+
+.docTable th,
+.docTable td {
+  padding: 11px 13px;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 8%, transparent);
+  text-align: left;
+  vertical-align: top;
+}
+
+.docTable th {
+  color: var(--c-text-primary, #0f172a);
+  background: color-mix(in srgb, currentColor 3%, transparent);
+  font-size: 0.76rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.docTable tr:last-child td {
+  border-bottom: 0;
+}
+
+@media (max-width: 720px) {
+  .docSummary {
+    grid-template-columns: 1fr;
+  }
+
+  .docSummaryItem {
+    min-height: auto;
+  }
+}
+
 @media (max-width: 640px) {
   .docSection {
     gap: 18px;
     padding: 22px 0 4px;
+  }
+
+  .docNav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .docNavLink {
+    text-align: center;
   }
 
   .docBody {
