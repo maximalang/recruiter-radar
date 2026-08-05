@@ -117,8 +117,9 @@ describe("signal lock landing contract", () => {
 
     expect(markup).toContain("Кому написать сегодня");
     expect(markup).toContain("видно по сигналам");
-    expect(markup).toContain("Клиентский радар для рекрутинговых агентств");
-    expect(markup).toContain("Собрать мой радар");
+    expect(markup).toContain("Для рекрутинговых агентств");
+    expect(markup).toContain("Получить пример");
+    expect(markup).toContain('data-landing-scene="detection"');
     expect(markup).toContain(`data-analytics-event="${LANDING_ANALYTICS_EVENT.previewStarted}"`);
     expect(markup).toContain(`data-analytics-context="${LANDING_ANALYTICS_CONTEXT.heroPrimary}"`);
     expect(markup).not.toContain("data-hero-tilt");
@@ -134,8 +135,9 @@ describe("signal lock landing contract", () => {
     }
     expect(timeline).toContain("Последовательность");
     expect(evidence).toContain("RADAR SCORE");
-    expect(evidence).toContain("EVIDENCE STACK");
-    expect(outreach).toContain("DRAFT / НЕ ОТПРАВЛЕНО");
+    expect(evidence).toContain("Доказательная база");
+    expect(outreach).toContain("Черновик · не отправлено");
+    expect(outreach).toContain("сигнал найма");
     expect(outreach).toContain("не отправляет сообщения компаниям автоматически");
     expect(outreach).not.toContain("частный email");
   });
@@ -188,7 +190,7 @@ describe("signal lock landing contract", () => {
     expect(inputs.find((input) => input.props.name === "targetCity")?.props.maxLength).toBe(120);
   });
 
-  it("renders an evidence-backed lead list with one expanded recommendation", async () => {
+  it("renders an evidence-backed lead list with one emphasized recommendation", async () => {
     mockGetPublicSampleDigestState.mockResolvedValueOnce({
       isLive: false,
       isPersonalized: false,
@@ -205,9 +207,12 @@ describe("signal lock landing contract", () => {
     expect(markup.match(/data-lead-card="true"/g)).toHaveLength(2);
     expect(markup.match(/name="preview-leads"/g)).toHaveLength(2);
     expect(markup.match(/<details(?=[^>]*data-lead-card="true")(?=[^>]*open="")[^>]*>/g)).toHaveLength(1);
+    expect(markup.match(/data-primary-lead="true"/g)).toHaveLength(1);
     expect(markup).toContain("Почему сейчас");
     expect(markup).toContain("Факты и источники");
     expect(markup).toContain("Без автоматической отправки");
+    expect(markup).toContain("Совпадение");
+    expect(markup).toContain("Срочность");
   });
 
   it("keeps payment-state copy and checkout analytics in the conversion panel", () => {
@@ -222,6 +227,7 @@ describe("signal lock landing contract", () => {
 
     expect(text).toContain("Сейчас пилот оформляется как заявка без списания");
     expect(text).toContain("Оставить заявку на неделю");
+    expect(text).toContain("Вернуться к настройке выдачи");
     expect(text).not.toContain("Оплата через ЮKassa");
     expect(links.some((link) => link.props["data-analytics-event"] === LANDING_ANALYTICS_EVENT.checkoutStarted)).toBe(true);
     expect(links.some((link) => link.props["data-analytics-event"] === LANDING_ANALYTICS_EVENT.continuationCtaClicked)).toBe(true);
@@ -229,10 +235,14 @@ describe("signal lock landing contract", () => {
 
   it("keeps motion CSS-only, reduced-motion complete and detached from legacy landing styles", () => {
     const css = readFileSync(resolve(process.cwd(), "app/landing/landing.module.css"), "utf8");
+    const corrections = readFileSync(resolve(process.cwd(), "app/landing/landing-corrections.module.css"), "utf8");
     const page = readFileSync(resolve(process.cwd(), "app/home-page-content.tsx"), "utf8");
     const layout = readFileSync(resolve(process.cwd(), "app/layout.tsx"), "utf8");
 
     expect(css).toContain("@media (prefers-reduced-motion: reduce)");
+    expect(corrections).toContain("--landing-header-height");
+    expect(corrections).toContain("scroll-margin-top");
+    expect(corrections).toContain("@media (prefers-reduced-transparency: reduce)");
     expect(css).not.toContain("requestAnimationFrame");
     expect(page).not.toContain("home-page-components.module.css");
     expect(layout).not.toContain("landing-cinematic.css");
