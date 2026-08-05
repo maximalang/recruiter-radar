@@ -128,3 +128,16 @@
     display: none;
   }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .section *,
+  .section *::before,
+  .section *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .field {
+    opacity: .58;
+  }
+}
