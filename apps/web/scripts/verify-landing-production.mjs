@@ -158,7 +158,9 @@ async function captureSpec(spec) {
     assert.ok(await trigger.evaluate((element) => element === document.activeElement), `${spec.name}: focus did not return to trigger`);
     assert.equal(await page.evaluate(() => document.body.style.overflow), "", `${spec.name}: body scroll remained locked`);
   } else if (spec.target) {
-    await page.locator(spec.target).screenshot({
+    await page.locator(spec.target).evaluate((target) => target.scrollIntoView({ block: "start", behavior: "auto" }));
+    await page.waitForTimeout(100);
+    await page.screenshot({
       path: path.join(screenshotDirectory, `${spec.name}.png`),
       animations: "disabled",
     });
@@ -177,7 +179,7 @@ async function captureSpec(spec) {
 async function captureHashSpec(spec) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const { page, assertCleanConsole } = await preparePage(context, spec.name, `${baseUrl}/#${spec.hash}`);
-  await page.waitForTimeout(100);
+  await page.waitForTimeout(320);
   const placement = await page.locator(spec.target).evaluate((target) => {
     const header = document.querySelector('[data-brand-header="signal-lock"]');
     const targetRect = target.getBoundingClientRect();
