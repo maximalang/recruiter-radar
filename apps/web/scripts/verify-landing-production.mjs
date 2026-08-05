@@ -10,12 +10,12 @@ const screenshotDirectory = process.env.LANDING_SCREENSHOT_DIR
   ?? path.join(os.tmpdir(), "recruiter-radar-signal-lock");
 
 const viewportMatrix = [
-  { width: 320, height: 720, name: "mobile-320x720" },
+  { width: 320, height: 700, name: "mobile-320x700" },
   { width: 390, height: 844, name: "mobile-390x844" },
   { width: 768, height: 1024, name: "tablet-768x1024" },
   { width: 1024, height: 768, name: "desktop-1024x768" },
   { width: 1280, height: 800, name: "desktop-1280x800" },
-  { width: 1440, height: 1000, name: "desktop-1440x1000" },
+  { width: 1440, height: 900, name: "desktop-1440x900" },
 ];
 
 await mkdir(screenshotDirectory, { recursive: true });
@@ -30,6 +30,16 @@ async function assertNoHorizontalOverflow(page, label) {
     dimensions.scrollWidth <= dimensions.clientWidth + 1,
     `${label}: horizontal overflow ${dimensions.scrollWidth}px > ${dimensions.clientWidth}px`,
   );
+}
+
+async function assertHashTargets(page, label) {
+  const missingTargets = await page.locator('a[href^="#"]').evaluateAll((links) => links.flatMap((link) => {
+    const href = link.getAttribute("href");
+    if (!href || href === "#") return [];
+    const id = decodeURIComponent(href.slice(1));
+    return document.getElementById(id) ? [] : [href];
+  }));
+  assert.deepEqual(missingTargets, [], `${label}: missing hash targets ${missingTargets.join(", ")}`);
 }
 
 function waitForLandingEvent(page, name, context) {
@@ -59,13 +69,23 @@ async function openLanding(context, label) {
 
   assert.equal(await page.locator("h1").count(), 1, `${label}: expected exactly one h1`);
   await page.getByRole("heading", { name: /Кому написать сегодня/ }).waitFor();
-  for (const id of ["scene-detection", "scene-timeline", "scene-evidence", "scene-outreach", "scene-workspace"]) {
+  for (const id of [
+    "scene-detection",
+    "scene-timeline",
+    "scene-workspace",
+    "scene-evidence",
+    "scene-delivery",
+    "scene-outreach",
+    "pricing",
+    "faq",
+  ]) {
     assert.equal(await page.locator(`#${id}`).count(), 1, `${label}: missing ${id}`);
   }
 
   assert.equal(await page.locator("canvas").count(), 0, `${label}: legacy canvas still mounted`);
   assert.equal(await page.locator("[data-hero-tilt]").count(), 0, `${label}: legacy hero tilt still mounted`);
   assert.equal(await page.locator("[data-scroll-progress]").count(), 0, `${label}: legacy scroll progress still mounted`);
+  assert.equal(await page.getByText(/NORTH|EAST|SOUTH|WEST/).count(), 0, `${label}: compass labels remain`);
 
   const heroCta = page.getByRole("link", { name: /Собрать мой радар/ });
   assert.equal(await heroCta.getAttribute("href"), "#preview-configurator");
@@ -80,6 +100,7 @@ async function openLanding(context, label) {
   await details.locator("summary").click();
   assert.ok(await details.evaluate((element) => element.open), `${label}: FAQ did not open`);
 
+  await assertHashTargets(page, label);
   await assertNoHorizontalOverflow(page, label);
   await page.evaluate(() => {
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
@@ -117,7 +138,44 @@ try {
           }),
       );
       const tooSmall = touchTargets.filter((target) => target.height < 44 || target.width < 44);
-      assert.deepEqual(tooSmall, [], `mobile touch targets below 44px: ${JSON.stringify(tooSmall)}`);
+      assert.deepEqual(tooSmall, [], `${viewport.name}: mobile touch targets below 44px: ${JSON.stringify(tooSmall)}`);
+    }
+
+    if (viewport.name === "desktop-1440x900") {
+      await page.locator("#scene-detection").screenshot({
+        path: path.join(screenshotDirectory, "hero-desktop-1440x900.png"),
+        animations: "disabled",
+      });
+      await page.locator("#scene-workspace").screenshot({
+        path: path.join(screenshotDirectory, "preview-desktop-1440x900.png"),
+        animations: "disabled",
+      });
+
+      const header = page.locator('header[data-brand-header="signal-lock"]');
+      assert.equal(await header.evaluate((element) => getComputedStyle(element).position), "fixed", "desktop: header is not fixed");
+      await page.locator("#scene-evidence").scrollIntoViewIfNeeded();
+      await page.waitForFunction(() => document.querySelector('header[data-brand-header="signal-lock"]')?.hasAttribute("data-scrolled"));
+      await page.locator('nav[aria-label="Разделы лендинга"] a[href="#scene-evidence"][aria-current="location"]').waitFor();
+    }
+
+    if (viewport.name === "mobile-390x844") {
+      const mobileMenu = page.locator("details").filter({ has: page.locator('summary[aria-label*="меню"]') }).first();
+      const menuSummary = mobileMenu.locator("summary");
+      await menuSummary.click();
+      assert.ok(await mobileMenu.evaluate((element) => element.open), "mobile: menu did not open");
+      await page.screenshot({
+        path: path.join(screenshotDirectory, "mobile-menu-390x844.png"),
+        animations: "disabled",
+      });
+      await page.keyboard.press("Escape");
+      assert.equal(await mobileMenu.evaluate((element) => element.open), false, "mobile: Escape did not close menu");
+      await page.waitForFunction((element) => document.activeElement === element, await menuSummary.elementHandle());
+
+      await page.locator("#pricing").scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: path.join(screenshotDirectory, "pricing-mobile-390x844.png"),
+        animations: "disabled",
+      });
     }
 
     await context.close();
@@ -144,8 +202,7 @@ try {
     try {
       analyticsEvents.push(route.request().postDataJSON());
     } catch {
-      // Malformed analytics is asserted by the API route's unit tests; the
-      // browser contract only records valid client events.
+      // API route tests cover malformed analytics; this audit records valid client events.
     }
     return route.fulfill({ status: 204 });
   });
@@ -197,14 +254,14 @@ try {
   await interactionContext.close();
 
   const reducedContext = await browser.newContext({
-    viewport: { width: 1440, height: 1000 },
+    viewport: { width: 1440, height: 900 },
     reducedMotion: "reduce",
   });
-  const reducedPage = await openLanding(reducedContext, "reduced-motion-1440x1000");
+  const reducedPage = await openLanding(reducedContext, "reduced-motion-1440x900");
   const reducedMotionViolations = await reducedPage.locator('[data-landing-experience="signal-lock"] *').evaluateAll((elements) => {
     const exceedsOneMicrosecond = (duration) => duration.split(",").some((value) => Number.parseFloat(value) > 0.000001);
 
-    return elements.slice(0, 80).flatMap((element) => {
+    return elements.slice(0, 100).flatMap((element) => {
       const style = getComputedStyle(element);
       if (!exceedsOneMicrosecond(style.animationDuration) && !exceedsOneMicrosecond(style.transitionDuration)) return [];
       return [{
@@ -225,6 +282,7 @@ try {
   await noJsPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await noJsPage.getByRole("heading", { name: /Кому написать сегодня/ }).waitFor();
   assert.equal(await noJsPage.locator("h1").count(), 1);
+  await assertNoHorizontalOverflow(noJsPage, "no-js-mobile-390x844");
   await noJsPage.screenshot({ path: path.join(screenshotDirectory, "no-js-mobile-390x844.png"), fullPage: true });
   await noJsContext.close();
 
@@ -233,6 +291,18 @@ try {
     baseUrl,
     screenshotDirectory,
     viewports: viewportMatrix.map(({ name }) => name),
+    namedScreenshots: [
+      "desktop-1440x900-full.png",
+      "hero-desktop-1440x900.png",
+      "preview-desktop-1440x900.png",
+      "mobile-390x844-full.png",
+      "mobile-menu-390x844.png",
+      "pricing-mobile-390x844.png",
+      "no-js-mobile-390x844.png",
+    ],
+    stickyHeader: true,
+    activeNavigation: true,
+    mobileMenu: true,
     reducedMotion: true,
     noJavaScript: true,
   }, null, 2)}\n`);
