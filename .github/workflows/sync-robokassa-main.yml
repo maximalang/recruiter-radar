@@ -1,0 +1,59 @@
+name: Sync Robokassa branch with main
+
+on:
+  push:
+    branches:
+      - feat/robokassa-primary-billing
+    paths:
+      - .github/workflows/sync-robokassa-main.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-robokassa-main
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: feat/robokassa-primary-billing
+      - name: Merge current main without touching billing work
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+
+          set +e
+          git merge --no-ff --no-commit origin/main
+          merge_status=$?
+          set -e
+
+          if [ "$merge_status" -ne 0 ]; then
+            git checkout --theirs -- package.json package-lock.json .github/workflows/test.yml scripts/verify-responsive-surfaces.mjs
+            git add package.json package-lock.json .github/workflows/test.yml scripts/verify-responsive-surfaces.mjs
+          fi
+
+          unresolved="$(git diff --name-only --diff-filter=U)"
+          if [ -n "$unresolved" ]; then
+            echo "Unresolved merge conflicts:"
+            echo "$unresolved"
+            exit 1
+          fi
+
+          git rm .github/workflows/sync-robokassa-main.yml
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "Branch already synchronized."
+            exit 0
+          fi
+
+          git commit -m "merge: synchronize Robokassa billing with current main"
+          git push origin HEAD:feat/robokassa-primary-billing
