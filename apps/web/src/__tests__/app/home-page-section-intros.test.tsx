@@ -6,6 +6,7 @@ import { resolve } from "node:path";
 
 import HomePage, { PreviewSection, PreviewSkeleton } from "@/app/home-page-content";
 import ConversionPanel from "@/app/landing/conversion-panel";
+import DeliveryScene from "@/app/landing/delivery-scene";
 import DetectionScene from "@/app/landing/detection-scene";
 import EvidenceScene from "@/app/landing/evidence-scene";
 import LandingHeader from "@/app/landing/landing-header";
@@ -90,7 +91,7 @@ function makePreviewItem(overrides: Partial<PreviewItem> = {}): PreviewItem {
   };
 }
 
-describe("signal lock landing contract", () => {
+describe("unified evidence-first landing contract", () => {
   beforeEach(() => {
     mockGetPublicSampleDigestState.mockResolvedValue({
       isLive: true,
@@ -100,15 +101,17 @@ describe("signal lock landing contract", () => {
     });
   });
 
-  it("composes five connected scenes without the legacy marketing-section stack", async () => {
+  it("composes the connected product story without the legacy marketing-section stack", async () => {
     const page = await HomePage({ searchParams: Promise.resolve({}) });
 
     expect(collectElements(page, LandingHeader)).toHaveLength(1);
     expect(collectElements(page, DetectionScene)).toHaveLength(1);
     expect(collectElements(page, SignalTimelineScene)).toHaveLength(1);
-    expect(collectElements(page, EvidenceScene)).toHaveLength(1);
-    expect(collectElements(page, OutreachScene)).toHaveLength(1);
     expect(collectElements(page, WorkspaceScene)).toHaveLength(1);
+    expect(collectElements(page, EvidenceScene)).toHaveLength(1);
+    expect(collectElements(page, DeliveryScene)).toHaveLength(1);
+    expect(collectElements(page, OutreachScene)).toHaveLength(1);
+    expect(collectElements(page, ConversionPanel)).toHaveLength(1);
     expect(collectElements(page, "main").find((main) => main.props.id === "main-content")).toBeDefined();
   });
 
@@ -119,22 +122,27 @@ describe("signal lock landing contract", () => {
     expect(markup).toContain("видно по сигналам");
     expect(markup).toContain("Клиентский радар для рекрутинговых агентств");
     expect(markup).toContain("Собрать мой радар");
+    expect(markup).toContain("Почему сейчас");
     expect(markup).toContain(`data-analytics-event="${LANDING_ANALYTICS_EVENT.previewStarted}"`);
     expect(markup).toContain(`data-analytics-context="${LANDING_ANALYTICS_CONTEXT.heroPrimary}"`);
     expect(markup).not.toContain("data-hero-tilt");
   });
 
-  it("uses one opportunity across signal, evidence and manual outreach scenes", () => {
+  it("uses one opportunity across signal, evidence, delivery and manual outreach scenes", () => {
     const timeline = renderToStaticMarkup(<SignalTimelineScene />);
     const evidence = renderToStaticMarkup(<EvidenceScene />);
+    const delivery = renderToStaticMarkup(<DeliveryScene />);
     const outreach = renderToStaticMarkup(<OutreachScene />);
 
-    for (const markup of [timeline, evidence, outreach]) {
+    for (const markup of [timeline, evidence, delivery, outreach]) {
       expect(markup).toContain("Производственная компания");
     }
     expect(timeline).toContain("Последовательность");
     expect(evidence).toContain("RADAR SCORE");
     expect(evidence).toContain("EVIDENCE STACK");
+    expect(evidence).toContain("Сами по себе лид не создают");
+    expect(delivery).toContain("Граница автоматизации");
+    expect(delivery).toContain("Не сообщение компании");
     expect(outreach).toContain("DRAFT / НЕ ОТПРАВЛЕНО");
     expect(outreach).toContain("не отправляет сообщения компаниям автоматически");
     expect(outreach).not.toContain("частный email");
@@ -225,6 +233,20 @@ describe("signal lock landing contract", () => {
     expect(text).not.toContain("Оплата через ЮKassa");
     expect(links.some((link) => link.props["data-analytics-event"] === LANDING_ANALYTICS_EVENT.checkoutStarted)).toBe(true);
     expect(links.some((link) => link.props["data-analytics-event"] === LANDING_ANALYTICS_EVENT.continuationCtaClicked)).toBe(true);
+  });
+
+  it("keeps the header accessible and the hero visualization replaceable", () => {
+    const header = readFileSync(resolve(process.cwd(), "app/landing/landing-header.tsx"), "utf8");
+    const glyphs = readFileSync(resolve(process.cwd(), "app/landing/brand-glyphs.tsx"), "utf8");
+    const detection = readFileSync(resolve(process.cwd(), "app/landing/detection-scene.tsx"), "utf8");
+
+    expect(header).toContain("IntersectionObserver");
+    expect(header).toContain('event.key === "Escape"');
+    expect(header).toContain("aria-current");
+    expect(header).toContain("summaryRef.current?.focus");
+    expect(detection).toContain("HeroInstrument");
+    expect(glyphs).not.toMatch(/NORTH|EAST|SOUTH|WEST/);
+    expect(glyphs).not.toContain("radarSweep");
   });
 
   it("keeps motion CSS-only, reduced-motion complete and detached from legacy landing styles", () => {
