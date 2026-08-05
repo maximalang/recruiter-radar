@@ -8,13 +8,13 @@ import {
   saveClientProfile,
   type ClientProfile
 } from "./clientProfiles";
+import { buildPilotApplicationComment } from "./publicProduct";
 import {
-  buildPilotApplicationComment,
+  PLAN_ENTITLEMENT_DAYS,
   type PublicPlan
-} from "./publicProduct";
+} from "./pricingCatalog";
 import { CUSTOMER_CHECKOUT_COPY } from "./copy/customer";
 import {
-  PILOT_ENTITLEMENT_DAYS,
   type CheckoutOrder,
   type CheckoutOrderPayload,
   type CheckoutOrderRow,
@@ -157,7 +157,6 @@ export async function createCheckoutOrder(input: {
     JSON.stringify(input.payload)
   ]);
 
-
   if (result.rowCount !== 1) {
     throw new Error("Failed to create checkout order.");
   }
@@ -271,11 +270,15 @@ export async function getCheckoutOrderByProviderPaymentId(
   return result.rowCount === 1 ? mapCheckoutOrderRow(result.rows[0]) : null;
 }
 
+/**
+ * Legacy name retained for callers. The implementation grants the paid period
+ * for every one-off plan (7/30/90 days), not only the original pilot.
+ */
 export async function ensurePilotEntitlementForPaidOrder(
   order: CheckoutOrder,
   db?: PaymentsDbClient
 ): Promise<void> {
-  if (order.productCode !== "pilot" || order.status !== "paid") {
+  if (order.status !== "paid") {
     return;
   }
 
@@ -285,29 +288,48 @@ export async function ensurePilotEntitlementForPaidOrder(
     throw new Error("DATABASE_URL is not set.");
   }
 
+  const durationDays = PLAN_ENTITLEMENT_DAYS[order.productCode];
   const paidAtIso = order.paidAt ?? new Date().toISOString();
-  const ownerResult = await pool.query<{ userId: string }>(
-    `SELECT user_id::TEXT AS "userId" FROM checkout_orders WHERE id = $1 LIMIT 1`,
-    [normalizeCheckoutOrderId(order.id)]
-  );
-
-  if (ownerResult.rowCount !== 1) {
-    throw new Error("Checkout order owner not found.");
-  }
-
-  const userId = normalizeCheckoutOrderUserId(ownerResult.rows[0].userId);
-  const enrollmentNote = `checkout_order:${order.id}`;
-
-  const existing = await pool.query<{ id: number }>(
-    `SELECT id FROM pilot_enrollments WHERE user_id = $1 AND notes = $2 LIMIT 1`,
-    [userId, enrollmentNote]
-  );
-
-  if (existing.rowCount === 1) {
-    return;
-  }
 
   await pool.query(`
+    WITH order_owner AS (
+      SELECT user_id
+      FROM checkout_orders
+      WHERE id = $1
+      LIMIT 1
+    ),
+    access_start AS (
+      SELECT GREATEST(
+        $2::timestamptz,
+        COALESCE(
+          MAX(pe.ends_at) FILTER (WHERE pe.status = 'active'),
+          $2::timestamptz
+        )
+      ) AS starts_at
+      FROM order_owner oo
+      LEFT JOIN pilot_enrollments pe ON pe.user_id = oo.user_id
+    ),
+    inserted AS (
+      INSERT INTO checkout_order_entitlements (
+        order_id,
+        user_id,
+        plan_code,
+        duration_days,
+        starts_at,
+        ends_at
+      )
+      SELECT
+        $1,
+        oo.user_id,
+        $3,
+        $4,
+        ast.starts_at,
+        ast.starts_at + ($4::int * INTERVAL '1 day')
+      FROM order_owner oo
+      CROSS JOIN access_start ast
+      ON CONFLICT (order_id) DO NOTHING
+      RETURNING user_id, starts_at, ends_at
+    )
     INSERT INTO pilot_enrollments (
       user_id,
       status,
@@ -316,25 +338,29 @@ export async function ensurePilotEntitlementForPaidOrder(
       activated_by,
       notes
     )
-    VALUES ($1, 'active', $2::timestamptz, ($2::timestamptz + ($3::int * INTERVAL '1 day')), 'payment_webhook', $4)
+    SELECT
+      inserted.user_id,
+      'active',
+      inserted.starts_at,
+      inserted.ends_at,
+      'payment_webhook',
+      'checkout_order:' || $1::text
+    FROM inserted
     ON CONFLICT (user_id) WHERE status = 'active'
     DO UPDATE SET
       starts_at = LEAST(pilot_enrollments.starts_at, EXCLUDED.starts_at),
-      ends_at = GREATEST(
-        COALESCE(pilot_enrollments.ends_at, '-infinity'::timestamptz),
-        EXCLUDED.ends_at
-      ),
+      ends_at = GREATEST(pilot_enrollments.ends_at, EXCLUDED.ends_at),
       updated_at = NOW(),
       activated_by = EXCLUDED.activated_by,
       notes = EXCLUDED.notes
-  `, [userId, paidAtIso, PILOT_ENTITLEMENT_DAYS, enrollmentNote]);
+  `, [normalizeCheckoutOrderId(order.id), paidAtIso, order.productCode, durationDays]);
 }
 
 export async function ensurePilotApplicationForOrder(
   order: CheckoutOrder,
   db?: PaymentsDbClient
 ): Promise<CheckoutOrder> {
-  if (order.payload.pilotApplicationId) {
+  if (order.productCode !== "pilot" || order.payload.pilotApplicationId) {
     return order;
   }
 
@@ -358,11 +384,15 @@ export async function ensurePilotApplicationForOrder(
   }, db);
 }
 
+/**
+ * Legacy name retained for the current onboarding URLs. Any paid plan receives
+ * its entitlement and linked profile through the same verified payment flow.
+ */
 export async function ensurePaidPilotOrderReady(
   order: CheckoutOrder,
   db?: PaymentsDbClient
 ): Promise<CheckoutOrder> {
-  if (order.productCode !== "pilot" || order.status !== "paid") {
+  if (order.status !== "paid") {
     return order;
   }
 
@@ -381,7 +411,7 @@ export async function ensurePaidPilotOrderReady(
           ? "preview"
           : order.payload.onboardingStep === "telegram" && profile.telegramChatId
             ? "preview"
-          : order.payload.onboardingStep;
+            : order.payload.onboardingStep;
   const nextActivatedAt = order.payload.onboardingActivatedAt ?? new Date().toISOString();
   const nextCompletedAt =
     nextOnboardingStatus === "completed"
@@ -469,11 +499,6 @@ export async function getRequiredOrderClientProfile(
     throw new Error("Client profile is not linked to this order yet.");
   }
 
-  // Trusted billing context: the order already authorizes access, so read by id
-  // alone (ownerId=null skips the owner predicate). Use the shared helper so the
-  // row is mapped snake_case → camelCase — a raw SELECT * would return snake_case
-  // columns typed as ClientProfile, silently nulling camelCase reads downstream
-  // (e.g. profile.telegramChatId at payments.ts:289).
   const profile = await getClientProfileById(clientProfileId, null, db);
 
   if (!profile) {

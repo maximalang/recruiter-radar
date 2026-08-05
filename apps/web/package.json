@@ -13,6 +13,8 @@
     "test": "jest",
     "test:types": "tsc -p tsconfig.test.json --noEmit",
     "test:landing:e2e": "node scripts/run-landing-production-audit.mjs",
+    "payments:robokassa:site-criteria": "node scripts/verify-robokassa-site-criteria.mjs",
+    "payments:robokassa:site-criteria:network": "node scripts/verify-robokassa-site-criteria.mjs --network",
     "sync:digest-evidence": "node scripts/sync-digest-evidence-query.mjs",
     "sync:digest-evidence:check": "node scripts/sync-digest-evidence-query.mjs --check",
     "quality:evaluate": "node scripts/evaluate-fiur.mjs",

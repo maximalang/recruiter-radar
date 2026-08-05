@@ -1,0 +1,36 @@
+export const LEGAL_DOCUMENTS = {
+  terms: {
+    revision: "2026-08-05",
+    displayDate: "5 августа 2026 года",
+  },
+  paymentAndRefund: {
+    revision: "2026-08-05",
+    displayDate: "5 августа 2026 года",
+  },
+  privacy: {
+    revision: "2026-08-05",
+    displayDate: "5 августа 2026 года",
+  },
+  personalDataConsent: {
+    revision: "2026-08-05",
+    displayDate: "5 августа 2026 года",
+  },
+} as const;
+
+export type LegalAcceptanceAudit = {
+  acceptedAt: string;
+  termsRevision: string;
+  paymentAndRefundRevision: string;
+  privacyRevision: string;
+  personalDataConsentRevision: string;
+};
+
+export function buildLegalAcceptanceAudit(acceptedAt = new Date().toISOString()): LegalAcceptanceAudit {
+  return {
+    acceptedAt: new Date(acceptedAt).toISOString(),
+    termsRevision: LEGAL_DOCUMENTS.terms.revision,
+    paymentAndRefundRevision: LEGAL_DOCUMENTS.paymentAndRefund.revision,
+    privacyRevision: LEGAL_DOCUMENTS.privacy.revision,
+    personalDataConsentRevision: LEGAL_DOCUMENTS.personalDataConsent.revision,
+  };
+}
