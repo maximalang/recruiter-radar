@@ -37,6 +37,10 @@ const mockGetPublicSampleDigestState = getPublicSampleDigestState as jest.Mocked
   typeof getPublicSampleDigestState
 >;
 
+const WEB_ROOT = existsSync(resolve(process.cwd(), "app"))
+  ? process.cwd()
+  : resolve(process.cwd(), "apps/web");
+
 type PreviewItem = Awaited<ReturnType<typeof getPublicSampleDigestState>>["items"][number];
 
 function collectElements(node: ReactNode, type: unknown): ReactElement<Record<string, any>>[] {
@@ -92,7 +96,7 @@ function makePreviewItem(overrides: Partial<PreviewItem> = {}): PreviewItem {
 }
 
 function source(path: string) {
-  return readFileSync(resolve(process.cwd(), path), "utf8");
+  return readFileSync(resolve(WEB_ROOT, path), "utf8");
 }
 
 describe("final unified evidence-first landing contract", () => {
@@ -237,13 +241,17 @@ describe("final unified evidence-first landing contract", () => {
 
   it("prevents regression to corrective layers, compass labels and sweep", () => {
     const heroInstrument = source("app/landing/hero-instrument.tsx");
-    const landingCss = source("app/landing/landing.module.css");
-    const correctivePath = resolve(process.cwd(), "app/landing/landing-corrections.module.css");
+    const reducedMotionCss = [
+      source("app/landing/landing.module.css"),
+      source("app/landing/landing-header.module.css"),
+      source("app/landing/detection-scene.module.css"),
+    ].join("\n");
+    const correctivePath = resolve(WEB_ROOT, "app/landing/landing-corrections.module.css");
 
     expect(existsSync(correctivePath)).toBe(false);
     expect(heroInstrument).not.toMatch(/NORTH|EAST|SOUTH|WEST/);
     expect(heroInstrument).not.toMatch(/radarSweep|sweep/i);
-    expect(landingCss).toContain("@media (prefers-reduced-motion: reduce)");
+    expect(reducedMotionCss).toContain("@media (prefers-reduced-motion: reduce)");
   });
 
   it("keeps active navigation, tone switching and a trapped mobile dialog", () => {
