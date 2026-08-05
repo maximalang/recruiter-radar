@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { BrandLogo } from "./brand-logo";
 import s from "./legal-document.module.css";
 
 const DOCUMENTS = [
@@ -13,16 +14,30 @@ const DOCUMENTS = [
 export function LegalDocumentNav({ current }: { current: string }) {
   return (
     <nav className={s.docNav} aria-label="Юридические документы">
-      {DOCUMENTS.map((document) => (
-        <Link
-          key={document.href}
-          href={document.href}
-          className={s.docNavLink}
-          aria-current={document.href === current ? "page" : undefined}
-        >
-          {document.label}
+      <div className={s.docNavBrand}>
+        <Link href="/" className={s.docBrandLink} aria-label="Recruiter Radar — на главную">
+          <BrandLogo size="small" joined />
         </Link>
-      ))}
+        <span className={s.docNavLabel}>Документы</span>
+      </div>
+
+      <div className={s.docNavLinks}>
+        {DOCUMENTS.map((document) => (
+          <Link
+            key={document.href}
+            href={document.href}
+            className={s.docNavLink}
+            aria-current={document.href === current ? "page" : undefined}
+          >
+            {document.label}
+          </Link>
+        ))}
+      </div>
+
+      <Link href="/" className={s.docNavAction}>
+        На сайт
+        <span aria-hidden="true">↗</span>
+      </Link>
     </nav>
   );
 }
