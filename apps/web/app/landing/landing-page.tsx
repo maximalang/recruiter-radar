@@ -2,6 +2,8 @@ import { Suspense } from "react";
 
 import type { PublicPreviewInput } from "../../lib/publicProduct";
 import { SiteFooter } from "../ui/site-footer";
+import ConversionPanel from "./conversion-panel";
+import DeliveryScene from "./delivery-scene";
 import DetectionScene from "./detection-scene";
 import EvidenceScene from "./evidence-scene";
 import LandingHeader from "./landing-header";
@@ -24,11 +26,21 @@ export default function LandingPage(props: {
       <main id="main-content">
         <DetectionScene previewHref="#preview-configurator" />
         <SignalTimelineScene />
-        <EvidenceScene />
-        <OutreachScene />
         <Suspense fallback={<WorkspaceSkeleton />}>
-          <WorkspaceScene {...props} />
+          <WorkspaceScene
+            previewInput={props.previewInput}
+            hasPreview={props.hasPreview}
+            checkoutHref={props.checkoutHref}
+          />
         </Suspense>
+        <EvidenceScene />
+        <DeliveryScene />
+        <OutreachScene />
+        <ConversionPanel
+          previewInput={props.previewInput}
+          paymentConfigured={props.paymentConfigured}
+          faqItems={props.faqItems}
+        />
       </main>
       <SiteFooter tone="dark" />
     </div>
