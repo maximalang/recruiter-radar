@@ -20,6 +20,7 @@ export const LEGAL_DOCUMENTS = {
 export type LegalAcceptanceAudit = {
   acceptedAt: string;
   termsRevision: string;
+  paymentAndRefundRevision: string;
   privacyRevision: string;
   personalDataConsentRevision: string;
 };
@@ -28,6 +29,7 @@ export function buildLegalAcceptanceAudit(acceptedAt = new Date().toISOString())
   return {
     acceptedAt: new Date(acceptedAt).toISOString(),
     termsRevision: LEGAL_DOCUMENTS.terms.revision,
+    paymentAndRefundRevision: LEGAL_DOCUMENTS.paymentAndRefund.revision,
     privacyRevision: LEGAL_DOCUMENTS.privacy.revision,
     personalDataConsentRevision: LEGAL_DOCUMENTS.personalDataConsent.revision,
   };
