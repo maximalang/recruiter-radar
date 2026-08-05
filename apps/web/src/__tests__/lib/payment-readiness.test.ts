@@ -140,7 +140,10 @@ describe('payment readiness', () => {
     const checkoutPage = fs.readFileSync(path.resolve(process.cwd(), 'app/checkout/page.tsx'), 'utf8')
 
     expect(checkoutPage).toContain('Автопродления и скрытых списаний нет')
-    expect(checkoutPage).toContain('Оплатить {plan.price} через Robokassa')
+    expect(checkoutPage).toContain('Перейти к оплате {plan.price}')
+    expect(checkoutPage).toContain('Откроется платёжная страница Robokassa')
+    expect(checkoutPage).toContain('name="payerType"')
+    expect(checkoutPage).toContain('name="buyerInn"')
     expect(PUBLIC_PLANS).toHaveLength(3)
     expect(PUBLIC_PLANS.every((plan) => plan.isRecurring === false)).toBe(true)
   })
