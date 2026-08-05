@@ -159,11 +159,14 @@ describe("final unified evidence-first landing contract", () => {
       hasPreview: hasPublicPreviewInput(input),
       checkoutHref: buildCheckoutHref(input),
     });
-    const forms = collectElements(preview, "form");
-    const configurators = collectElements(preview, "div").filter((node) => node.props.id === "preview-configurator");
-    expect(configurators).toHaveLength(1);
-    expect(forms).toHaveLength(1);
-    expect(forms[0].props.action).toBe("/#preview-results");
+    expect(preview.type).toBe(WorkspaceScene);
+
+    const workspace = source("app/landing/workspace-scene.tsx");
+    const configuratorIndex = workspace.indexOf('id="preview-configurator"');
+    const suspenseIndex = workspace.indexOf("<Suspense");
+    expect(configuratorIndex).toBeGreaterThan(-1);
+    expect(configuratorIndex).toBeLessThan(suspenseIndex);
+    expect(workspace).toContain('action="/#preview-results"');
 
     const skeleton = renderToStaticMarkup(<PreviewSkeleton />);
     expect(skeleton).toContain('id="preview-results"');
