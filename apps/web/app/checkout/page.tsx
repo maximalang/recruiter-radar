@@ -76,19 +76,15 @@ export default async function CheckoutPage(props: {
       productCode: planCode,
       customerName: agencyName,
       customerContact: currentAccount.email,
+      payerType,
+      buyerInn: payerType === "business" ? buyerInn : null,
+      legalAcceptance,
       specialization: input.specialization || null,
       city: input.targetCity || null,
       includeKeywords: input.includeKeywords || null,
       excludeKeywords: input.excludeKeywords || null,
       dailyDigestLimit: input.dailyDigestLimit,
-      comment: JSON.stringify({
-        schema: "checkout-details-v2",
-        legalAcceptance,
-        payer: {
-          type: payerType,
-          buyerInn: payerType === "business" ? buyerInn : null,
-        },
-      }),
+      comment: null,
       siteUrl: process.env.PAYMENTS_SITE_URL ?? "http://localhost:3000",
     });
     redirect(result.redirectUrl);
