@@ -137,6 +137,7 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
               ref={summaryRef}
               aria-label={menuOpen ? "Закрыть меню" : "Открыть меню"}
               aria-expanded={menuOpen}
+              style={{ minWidth: 44 }}
             >
               <span aria-hidden="true" /><span aria-hidden="true" />
             </summary>
