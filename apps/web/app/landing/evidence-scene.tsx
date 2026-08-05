@@ -28,7 +28,7 @@ const SOURCE_ROWS = [
 
 const SOURCE_ROLES = [
   {
-    title: "Создают hiring signal",
+    title: "Создают сигнал найма",
     summary: "hh.ru, Работа России и прямые карьерные страницы.",
     detail: "Именно здесь радар фиксирует новые роли, повторные публикации, расширение географии и изменение темпа найма.",
   },
@@ -40,7 +40,7 @@ const SOURCE_ROLES = [
   {
     title: "Добавляют контекст",
     summary: "Корпоративные новости и отраслевые публикации.",
-    detail: "Контекст объясняет расширение, запуск направления или изменение команды, но не заменяет проверяемый hiring signal.",
+    detail: "Контекст объясняет расширение, запуск направления или изменение команды, но не заменяет проверяемый сигнал найма.",
   },
   {
     title: "Сами по себе лид не создают",
@@ -70,9 +70,9 @@ export default function EvidenceScene() {
 
         <div className={styles.scoreAssembly}>
           <div className={styles.scoreIdentity}>
-            <span>RADAR SCORE</span>
+            <span>ОЦЕНКА РАДАРА</span>
             <strong>{DEMO_COMPANY.score}</strong>
-            <small>/100 · confidence {DEMO_COMPANY.confidence}</small>
+            <small>/100 · уровень уверенности {DEMO_COMPANY.confidence}</small>
           </div>
           <div className={styles.scoreOrbit} aria-hidden="true">
             <EvidenceGlyph size={210} />
@@ -90,12 +90,12 @@ export default function EvidenceScene() {
 
         <div className={styles.evidenceLedger}>
           <div className={styles.ledgerHeading}>
-            <span>EVIDENCE STACK / 03</span>
+            <span>ДОКАЗАТЕЛЬНАЯ БАЗА / 03</span>
             <strong>{DEMO_COMPANY.name}</strong>
-            <p>Источники, даты обнаружения и даты самих событий не растворяются внутри score.</p>
+            <p>Источники, даты обнаружения и даты самих событий не растворяются внутри оценки.</p>
           </div>
           <div className={styles.ledgerHeader} aria-hidden="true">
-            <span>Источник / факт</span><span>Найдено</span><span>Событие</span><span>Уверенность</span>
+            <span>Источник / факт</span><span>Найдено</span><span>Событие</span><span>Достоверность</span>
           </div>
           <ul className={styles.evidenceStack}>
             {SOURCE_ROWS.map((row, index) => (
