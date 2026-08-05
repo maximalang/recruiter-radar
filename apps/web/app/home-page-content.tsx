@@ -42,7 +42,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   });
 
   return (
-    <PageFrame maxWidth="none" dataDeployAnchor="recruiter-radar-signal-lock">
+    <PageFrame maxWidth="none" dataDeployAnchor="recruiter-radar-landing-v3">
       <YandexMetrika />
       <LandingAnalytics />
       {landing}
