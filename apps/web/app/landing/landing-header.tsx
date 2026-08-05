@@ -22,10 +22,8 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
   const menuPanelRef = useRef<HTMLDivElement>(null);
 
   const closeMenu = useCallback((restoreFocus = true) => {
+    if (restoreFocus) menuButtonRef.current?.focus({ preventScroll: true });
     setMenuOpen(false);
-    if (restoreFocus) {
-      window.requestAnimationFrame(() => menuButtonRef.current?.focus());
-    }
   }, []);
 
   useEffect(() => {
@@ -45,7 +43,10 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
     if (scrollbarWidth > 0) document.body.style.paddingRight = `${scrollbarWidth}px`;
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closeMenu();
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeMenu();
+      }
     };
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target;
@@ -57,7 +58,7 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
     document.addEventListener("keydown", handleKeyDown);
     document.addEventListener("pointerdown", handlePointerDown);
     window.requestAnimationFrame(() => {
-      menuPanelRef.current?.querySelector<HTMLElement>("a, button")?.focus();
+      menuPanelRef.current?.querySelector<HTMLElement>("a, button")?.focus({ preventScroll: true });
     });
 
     return () => {
