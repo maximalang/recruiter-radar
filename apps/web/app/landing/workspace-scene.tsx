@@ -167,10 +167,10 @@ export default async function WorkspaceScene(props: {
 export function WorkspaceSkeleton() {
   return (
     <section
-      id="scene-workspace"
       className={`${styles.scene} ${styles.lightScene} ${styles.workspaceScene}`}
       aria-labelledby="workspace-loading-title"
       data-header-tone="light"
+      data-workspace-skeleton
     >
       <div className={styles.workspaceLayout} data-preview-section-content aria-busy="true">
         <div className={styles.workspaceIntro}>
@@ -178,8 +178,8 @@ export function WorkspaceSkeleton() {
           <h2 id="workspace-loading-title" className={styles.sceneHeading}>Рабочий preview под вашу специализацию.</h2>
         </div>
         <div className={styles.workspaceProductFrame}>
-          <div id="preview-configurator" className={styles.workspaceSkeletonLine} />
-          <div id="preview-results" className={styles.workspaceSkeleton}>
+          <div className={styles.workspaceSkeletonLine} data-preview-configurator-skeleton />
+          <div className={styles.workspaceSkeleton} data-preview-results-skeleton>
             <span /><span /><span />
           </div>
         </div>
