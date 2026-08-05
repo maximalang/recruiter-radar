@@ -25,13 +25,17 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - name: Update secure dependency overrides
+      - name: Update secure dependency versions
         shell: bash
         run: |
           node <<'NODE'
           const fs = require('node:fs');
           const packagePath = 'package.json';
           const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+          packageJson.dependencies = {
+            ...(packageJson.dependencies || {}),
+            'brace-expansion': '5.0.9',
+          };
           packageJson.overrides = {
             ...(packageJson.overrides || {}),
             'brace-expansion': '5.0.9',
