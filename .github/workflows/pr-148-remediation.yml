@@ -44,7 +44,9 @@ jobs:
           fs.writeFileSync(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`);
           NODE
       - name: Refresh lockfile
-        run: npm install --package-lock-only --ignore-scripts
+        run: |
+          npm install --package-lock-only --ignore-scripts
+          npm update ip-address --package-lock-only --ignore-scripts
       - name: Verify production dependency audit
         run: npm audit --omit=dev --audit-level=high
       - name: Commit dependency remediation
