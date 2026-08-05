@@ -64,7 +64,6 @@ jobs:
           bash -n scripts/test/docker-entrypoint-reconciliation.sh
           bash -n scripts/test/landing-events-caddy-smoke.sh
           bash -n scripts/test/landing-events-caddy-smoke-contract.sh
-          bash -n scripts/test/wait-for-landing-server.sh
       - name: Verify deployment rollback and runtime preflights
         run: |
           bash scripts/test/deploy-rollback-guard.sh
@@ -153,7 +152,7 @@ jobs:
   landing-playwright:
     needs: web-build
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 20
     env:
       DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
       LANDING_BASE_URL: http://127.0.0.1:3000
@@ -206,15 +205,17 @@ jobs:
           CRON_API_KEY: test-cron-api-key-at-least-32-chars
           NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
         run: |
-          set -euo pipefail
           node apps/web/.next/standalone/apps/web/server.js > /tmp/landing-server.log 2>&1 &
-          server_pid="$!"
-          echo "$server_pid" > /tmp/landing-server.pid
-          bash scripts/test/wait-for-landing-server.sh \
-            http://127.0.0.1:3000 \
-            "$server_pid" \
-            /tmp/landing-server.log \
-            /tmp/landing-ready.html
+          echo "$!" > /tmp/landing-server.pid
+          for i in $(seq 1 75); do
+            if curl -fsS -o /tmp/landing-ready.html http://127.0.0.1:3000/ \
+              && grep -q 'data-deploy-anchor="recruiter-radar-landing-v3"' /tmp/landing-ready.html; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/landing-server.log
+          exit 1
       - name: Landing production audit
         run: npm run test:landing:e2e
       - name: Responsive surface audit
