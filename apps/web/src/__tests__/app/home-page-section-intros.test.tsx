@@ -148,12 +148,15 @@ describe("unified evidence-first landing contract", () => {
     expect(outreach).not.toContain("частный email");
   });
 
-  it("keeps preview anchors in the Suspense fallback", () => {
+  it("keeps the Suspense fallback busy without duplicating public hash targets", () => {
     const markup = renderToStaticMarkup(<PreviewSkeleton />);
-    expect(markup).toContain('id="scene-workspace"');
-    expect(markup).toContain('id="preview-configurator"');
-    expect(markup).toContain('id="preview-results"');
+    expect(markup).toContain("data-workspace-skeleton");
+    expect(markup).toContain("data-preview-configurator-skeleton");
+    expect(markup).toContain("data-preview-results-skeleton");
     expect(markup).toContain('aria-busy="true"');
+    expect(markup).not.toContain('id="scene-workspace"');
+    expect(markup).not.toContain('id="preview-configurator"');
+    expect(markup).not.toContain('id="preview-results"');
   });
 
   it("labels resilient preview data honestly and keeps checkout available", async () => {
