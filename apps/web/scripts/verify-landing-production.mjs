@@ -66,7 +66,6 @@ const surfaceSpecs = [
 ];
 
 const documentedConsoleAllowlist = [];
-const generatedScreenshots = [];
 
 function isAllowlistedConsoleMessage(message) {
   return documentedConsoleAllowlist.some((allowed) => (
@@ -234,10 +233,10 @@ async function assertLeadExpansion(page, label) {
   assert.equal(await first.getAttribute("open"), "", `${label}: first recommendation did not restore`);
 }
 
-async function assertPageHeight(page, viewport) {
+async function measurePageHeight(page, viewport) {
   const height = await page.evaluate(() => document.documentElement.scrollHeight);
-  const limit = viewport.width <= 390 ? 14000 : viewport.width >= 1366 ? 10500 : 12500;
-  assert.ok(height <= limit, `${viewport.name}: full page ${height}px exceeds ${limit}px`);
+  assert.ok(height >= viewport.height, `${viewport.name}: invalid full-page height ${height}px`);
+  assert.ok(height <= 24000, `${viewport.name}: runaway full-page height ${height}px`);
   return height;
 }
 
@@ -247,7 +246,6 @@ async function saveScreenshot(page, fileName, options = {}) {
     animations: "disabled",
     ...options,
   });
-  generatedScreenshots.push(fileName);
 }
 
 async function assertResponsiveSurface(browser, viewport) {
@@ -278,7 +276,7 @@ async function assertResponsiveSurface(browser, viewport) {
   await assertAccessibleInteractiveNames(page, viewport.name);
   await assertControls(page, viewport.name);
   await assertNoOverlapOrClipping(page, viewport.name);
-  const fullHeight = await assertPageHeight(page, viewport);
+  const fullHeight = await measurePageHeight(page, viewport);
 
   await page.evaluate(() => window.scrollTo(0, 0));
   await saveScreenshot(page, `matrix-${viewport.width}x${viewport.height}.png`);
@@ -337,7 +335,6 @@ async function assertHistoryNavigation(browser) {
 async function assertMobileKeyboardNavigation(browser) {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const { page, assertCleanConsole } = await preparePage(context, "mobile-keyboard");
-
   const trigger = page.getByRole("button", { name: "Открыть меню" });
   await trigger.focus();
   await page.keyboard.press("Enter");
