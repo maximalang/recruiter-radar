@@ -1,0 +1,243 @@
+name: Finalize checkout billing details
+
+on:
+  push:
+    branches: [feat/robokassa-primary-billing]
+    paths:
+      - '.github/workflows/finalize-checkout-billing-details.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/robokassa-primary-billing
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Store payer and legal details as structured order data
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+
+          checkout = Path('apps/web/app/checkout/page.tsx')
+          text = checkout.read_text()
+          old = '''      comment: JSON.stringify({
+                  schema: "checkout-details-v2",
+                  legalAcceptance,
+                  payer: {
+                    type: payerType,
+                    buyerInn: payerType === "business" ? buyerInn : null,
+                  },
+                }),'''.replace('                ', '')
+          new = '''      payerType,
+                buyerInn: payerType === "business" ? buyerInn : null,
+                legalAcceptance,
+                comment: null,'''.replace('                ', '')
+          if old not in text:
+              raise SystemExit('checkout legacy comment payload block not found')
+          checkout.write_text(text.replace(old, new, 1))
+
+          payments = Path('apps/web/lib/payments.ts')
+          text = payments.read_text()
+          old_import = '''  getErrorMessage,
+            normalizeCheckoutOrderUserId,'''.replace('            ', '')
+          new_import = '''  getErrorMessage,
+            normalizeCheckoutBuyerInn,
+            normalizeCheckoutLegalAcceptance,
+            normalizeCheckoutOrderUserId,
+            normalizeCheckoutPayerType,'''.replace('            ', '')
+          if old_import not in text:
+              raise SystemExit('payments normalize import anchor not found')
+          text = text.replace(old_import, new_import, 1)
+
+          old_start = '''  const checkoutOwnerId = normalizeCheckoutOrderUserId(input.userId);
+            const plan = getPublicPlanByCode(input.productCode);
+            let order = await createCheckoutOrder({'''.replace('            ', '')
+          new_start = '''  const checkoutOwnerId = normalizeCheckoutOrderUserId(input.userId);
+            const plan = getPublicPlanByCode(input.productCode);
+            const payerType = normalizeCheckoutPayerType(input.payerType);
+            const buyerInn = normalizeCheckoutBuyerInn(input.buyerInn, payerType);
+            const legalAcceptance = normalizeCheckoutLegalAcceptance(input.legalAcceptance);
+
+            if (payerType === "business" && !buyerInn) {
+              throw new Error("Для оплаты от ООО или ИП требуется корректный ИНН покупателя.");
+            }
+            if (input.legalAcceptance && !legalAcceptance) {
+              throw new Error("Некорректные данные принятия юридических документов.");
+            }
+
+            let order = await createCheckoutOrder({'''.replace('            ', '')
+          if old_start not in text:
+              raise SystemExit('payments start anchor not found')
+          text = text.replace(old_start, new_start, 1)
+
+          old_payload = '''      planName: plan.name,
+                  planCadence: plan.cadence,
+                  specialization:'''.replace('                ', '')
+          new_payload = '''      planName: plan.name,
+                  planCadence: plan.cadence,
+                  payerType,
+                  buyerInn,
+                  legalAcceptance,
+                  specialization:'''.replace('                ', '')
+          if old_payload not in text:
+              raise SystemExit('payments payload anchor not found')
+          payments.write_text(text.replace(old_payload, new_payload, 1))
+
+          normalize = Path('apps/web/lib/paymentsNormalize.ts')
+          text = normalize.read_text()
+          old_types = '''  CHECKOUT_ORDER_ONBOARDING_STATUSES,
+            CHECKOUT_ORDER_ONBOARDING_STEPS,
+            CHECKOUT_ORDER_STATUSES,
+            type CheckoutOrder,'''.replace('            ', '')
+          new_types = '''  CHECKOUT_ORDER_ONBOARDING_STATUSES,
+            CHECKOUT_ORDER_ONBOARDING_STEPS,
+            CHECKOUT_ORDER_STATUSES,
+            type CheckoutLegalAcceptance,
+            type CheckoutOrder,
+            type CheckoutPayerType,'''.replace('            ', '')
+          if old_types not in text:
+              raise SystemExit('paymentsNormalize type import anchor not found')
+          text = text.replace(old_types, new_types, 1)
+
+          old_normalized_payload = '''    planName: normalizeOptionalText(readString(payload.planName)) ?? plan.name,
+                planCadence: normalizeOptionalText(readString(payload.planCadence)) ?? plan.cadence,
+                specialization:'''.replace('                ', '')
+          new_normalized_payload = '''    planName: normalizeOptionalText(readString(payload.planName)) ?? plan.name,
+                planCadence: normalizeOptionalText(readString(payload.planCadence)) ?? plan.cadence,
+                payerType: normalizeCheckoutPayerType(payload.payerType),
+                buyerInn: normalizeCheckoutBuyerInn(
+                  payload.buyerInn,
+                  normalizeCheckoutPayerType(payload.payerType)
+                ),
+                legalAcceptance: normalizeCheckoutLegalAcceptance(payload.legalAcceptance),
+                specialization:'''.replace('                ', '')
+          if old_normalized_payload not in text:
+              raise SystemExit('paymentsNormalize payload anchor not found')
+          text = text.replace(old_normalized_payload, new_normalized_payload, 1)
+
+          functions_anchor = '''export function normalizeSiteUrl(value: string): string {'''
+          functions = '''export function normalizeCheckoutPayerType(value: unknown): CheckoutPayerType {
+            return value === "business" ? "business" : "individual";
+          }
+
+          export function normalizeCheckoutBuyerInn(
+            value: unknown,
+            payerType: CheckoutPayerType
+          ): string | null {
+            if (payerType === "individual") {
+              return null;
+            }
+
+            const digits = typeof value === "string" ? value.replace(/\\D/g, "") : "";
+            return /^(?:\\d{10}|\\d{12})$/.test(digits) ? digits : null;
+          }
+
+          export function normalizeCheckoutLegalAcceptance(
+            value: unknown
+          ): CheckoutLegalAcceptance | null {
+            if (!value || typeof value !== "object" || Array.isArray(value)) {
+              return null;
+            }
+
+            const record = value as Record<string, unknown>;
+            const acceptedAt = readString(record.acceptedAt);
+            const termsRevision = normalizeOptionalText(readString(record.termsRevision));
+            const paymentAndRefundRevision = normalizeOptionalText(readString(record.paymentAndRefundRevision));
+            const privacyRevision = normalizeOptionalText(readString(record.privacyRevision));
+            const personalDataConsentRevision = normalizeOptionalText(readString(record.personalDataConsentRevision));
+            const parsedAt = acceptedAt ? new Date(acceptedAt) : null;
+
+            if (
+              !parsedAt ||
+              Number.isNaN(parsedAt.getTime()) ||
+              parsedAt.toISOString() !== acceptedAt ||
+              !termsRevision ||
+              !paymentAndRefundRevision ||
+              !privacyRevision ||
+              !personalDataConsentRevision
+            ) {
+              return null;
+            }
+
+            return {
+              acceptedAt,
+              termsRevision,
+              paymentAndRefundRevision,
+              privacyRevision,
+              personalDataConsentRevision
+            };
+          }
+
+          export function normalizeSiteUrl(value: string): string {'''.replace('          ', '')
+          if functions_anchor not in text:
+              raise SystemExit('paymentsNormalize function anchor not found')
+          normalize.write_text(text.replace(functions_anchor, functions, 1))
+
+          test = Path('apps/web/src/__tests__/lib/checkout-billing-details.test.ts')
+          test.write_text('''import fs from "node:fs";
+          import path from "node:path";
+
+          import {
+            normalizeCheckoutBuyerInn,
+            normalizeCheckoutLegalAcceptance,
+            normalizeCheckoutPayerType,
+          } from "../../../lib/paymentsNormalize";
+
+          describe("checkout billing details", () => {
+            test("normalizes payer type and B2B buyer INN", () => {
+              expect(normalizeCheckoutPayerType("business")).toBe("business");
+              expect(normalizeCheckoutPayerType("unexpected")).toBe("individual");
+              expect(normalizeCheckoutBuyerInn("50 470 639 29", "business")).toBe("5047063929");
+              expect(normalizeCheckoutBuyerInn("123456789012", "business")).toBe("123456789012");
+              expect(normalizeCheckoutBuyerInn("123", "business")).toBeNull();
+              expect(normalizeCheckoutBuyerInn("5047063929", "individual")).toBeNull();
+            });
+
+            test("keeps only complete versioned legal acceptance evidence", () => {
+              const acceptance = {
+                acceptedAt: "2026-08-05T12:00:00.000Z",
+                termsRevision: "2026-08-05",
+                paymentAndRefundRevision: "2026-08-05",
+                privacyRevision: "2026-08-05",
+                personalDataConsentRevision: "2026-08-05",
+              };
+              expect(normalizeCheckoutLegalAcceptance(acceptance)).toEqual(acceptance);
+              expect(normalizeCheckoutLegalAcceptance({ ...acceptance, acceptedAt: "not-a-date" })).toBeNull();
+              expect(normalizeCheckoutLegalAcceptance({ ...acceptance, privacyRevision: "" })).toBeNull();
+            });
+
+            test("checkout and order creation use structured fields instead of a comment blob", () => {
+              const checkout = fs.readFileSync(path.resolve(process.cwd(), "app/checkout/page.tsx"), "utf8");
+              const payments = fs.readFileSync(path.resolve(process.cwd(), "lib/payments.ts"), "utf8");
+
+              expect(checkout).toContain("payerType,");
+              expect(checkout).toContain("buyerInn: payerType === \\\"business\\\" ? buyerInn : null");
+              expect(checkout).toContain("legalAcceptance,");
+              expect(checkout).not.toContain("schema: \\\"checkout-details-v2\\\"");
+              expect(payments).toContain("payerType,");
+              expect(payments).toContain("buyerInn,");
+              expect(payments).toContain("legalAcceptance,");
+            });
+          });
+          '''.replace('          ', ''))
+          PY
+          npm ci
+          npm run web:check
+          npm run test:types --workspace @recruiter-radar/web
+          npm test --workspace @recruiter-radar/web -- --runInBand --testPathPattern='checkout-billing-details|payment-readiness|paymentsRobokassa'
+          rm -f .github/workflows/finalize-checkout-billing-details.yml
+          git add apps/web/app/checkout/page.tsx apps/web/lib/payments.ts apps/web/lib/paymentsNormalize.ts apps/web/src/__tests__/lib/checkout-billing-details.test.ts .github/workflows/finalize-checkout-billing-details.yml
+          git config user.name 'Recruiter Radar CI'
+          git config user.email 'support@recruiter-radar.ru'
+          git commit -m 'fix: persist checkout payer and legal details'
+          git push origin HEAD:feat/robokassa-primary-billing
