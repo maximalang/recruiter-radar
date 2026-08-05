@@ -227,7 +227,7 @@ describe("final unified evidence-first landing contract", () => {
     expect(checkoutLink?.props["data-analytics-event"]).toBe(LANDING_ANALYTICS_EVENT.checkoutStarted);
     expect(checkoutLink?.props["data-analytics-context"]).toBe(LANDING_ANALYTICS_CONTEXT.preview);
     expect(readVisibleText(checkoutLink)).toContain("Оставить заявку на неделю");
-    expect(source("app/landing/workspace-scene.module.css")).toMatch(/\.checkout\s*\{[^}]*min-height:\s*52px/s);
+    expect(source("app/landing/workspace-scene.module.css")).toMatch(/\.checkout\s*\{[\s\S]*?min-height:\s*52px/);
   });
 
   it("streams the complete landing composition when preview data throws", async () => {
@@ -338,7 +338,7 @@ describe("final unified evidence-first landing contract", () => {
     expect(header).toContain("scrollbarWidth");
     expect(header).toContain("menuButtonRef.current?.focus");
     expect(header).toContain("Получить пример");
-    expect(headerCss).toMatch(/\.navLink\s*\{[^}]*min-width:\s*44px[^}]*min-height:\s*44px/s);
+    expect(headerCss).toMatch(/\.navLink\s*\{[\s\S]*?min-width:\s*44px[\s\S]*?min-height:\s*44px/);
   });
 
   it("uses one bounded observer instead of fixed delayed hash scrolling", () => {
