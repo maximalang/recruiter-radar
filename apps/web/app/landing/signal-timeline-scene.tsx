@@ -4,10 +4,15 @@ import styles from "./landing.module.css";
 
 export default function SignalTimelineScene() {
   return (
-    <section id="scene-timeline" className={`${styles.scene} ${styles.lightScene} ${styles.timelineScene}`} aria-labelledby="timeline-title">
+    <section
+      id="scene-timeline"
+      className={`${styles.scene} ${styles.lightScene} ${styles.timelineScene}`}
+      aria-labelledby="timeline-title"
+      data-landing-scene="timeline"
+    >
       <div className={styles.timelineLayout}>
         <div className={styles.timelineIntro}>
-          <p className={styles.sceneLabel}>02 — Сигнал</p>
+          <p className={styles.sceneLabel} data-system-label>02 — Сигнал</p>
           <h2 id="timeline-title" className={styles.sceneHeading}>
             Одна вакансия ничего не доказывает. <em>Последовательность — доказывает.</em>
           </h2>
@@ -19,7 +24,7 @@ export default function SignalTimelineScene() {
         <div className={styles.companyCoordinate} aria-label="Сквозная демонстрационная компания">
           <SignalGlyph size={64} />
           <div>
-            <span>Объект наблюдения</span>
+            <span data-system-label>Объект наблюдения</span>
             <strong>{DEMO_COMPANY.name}</strong>
             <small>{DEMO_COMPANY.location} · {DEMO_COMPANY.industry}</small>
           </div>
@@ -32,7 +37,7 @@ export default function SignalTimelineScene() {
               <span className={styles.timelineNode} aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
               <div>
                 <strong>{event.title}</strong>
-                <span>{event.source}</span>
+                <span data-system-label>{event.source}</span>
               </div>
             </li>
           ))}
@@ -44,7 +49,7 @@ export default function SignalTimelineScene() {
             Это уже не отдельные вакансии.
             <strong>Это окно для выхода на клиента.</strong>
           </p>
-          <span>4 события · 3 типа подтверждения · сегодня</span>
+          <span data-system-label>4 события · 3 типа подтверждения · сегодня</span>
         </div>
       </div>
     </section>
