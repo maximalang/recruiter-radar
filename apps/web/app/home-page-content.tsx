@@ -56,7 +56,7 @@ export function PreviewSection(props: {
   hasPreview: boolean;
   checkoutHref: string;
 }) {
-  return WorkspaceScene(props);
+  return <WorkspaceScene {...props} />;
 }
 
 export function PreviewSkeleton() {
