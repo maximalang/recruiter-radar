@@ -21,10 +21,10 @@ export default function ConversionPanel(props: {
   const secondaryPlans = PUBLIC_PLANS.filter((plan) => plan.code !== "pilot");
 
   return (
-    <div className={styles.conversionPanel}>
+    <section className={styles.conversionPanel} aria-label="Тарифы и ответы" data-header-tone="dark">
       <div id="pricing" className={styles.pricingStage}>
         <div className={styles.pricingIntro}>
-          <span>После preview / следующий шаг</span>
+          <span>07 — Тарифы</span>
           <h2>Начните с недели. Продолжайте, только если радар полезен.</h2>
           <p>
             {props.paymentConfigured
@@ -35,7 +35,7 @@ export default function ConversionPanel(props: {
 
         <div className={styles.pilotOffer}>
           <div className={styles.pilotMeta}>
-            <span>Рекомендуем начать</span>
+            <span>Главное предложение</span>
             <strong>{pilotPlan.name}</strong>
           </div>
           <div className={styles.pilotPrice}>
@@ -56,7 +56,7 @@ export default function ConversionPanel(props: {
           <small>{props.paymentConfigured ? "Разовая оплата · без автопродления" : "Заявка без списания · профиль сохранится"}</small>
         </div>
 
-        <div className={styles.secondaryOffers}>
+        <div className={styles.secondaryOffers} aria-label="Вторичные тарифы">
           {secondaryPlans.map((plan) => {
             const quarterly = plan.code === "quarterly";
             return (
@@ -81,6 +81,7 @@ export default function ConversionPanel(props: {
         <div className={styles.faqHeading}>
           <span>FAQ / перед запуском</span>
           <h2>Коротко о данных, доставке и контроле.</h2>
+          <p>Ответы раскрываются без перехода на отдельную страницу.</p>
         </div>
         <div className={styles.faqList}>
           {props.faqItems.map((item, index) => (
@@ -93,7 +94,7 @@ export default function ConversionPanel(props: {
       </div>
 
       <div className={styles.finalCall}>
-        <span>SIGNAL LOCK / 07 DAYS</span>
+        <span>EVIDENCE INSTRUMENT / 07 DAYS</span>
         <h2>Соберите радар под свою специализацию.</h2>
         <p>Получите первый короткий список компаний и решите на фактах, стоит ли продолжать.</p>
         <div>
@@ -107,6 +108,6 @@ export default function ConversionPanel(props: {
           <a href="#preview-configurator">Вернуться к preview <ArrowGlyph /></a>
         </div>
       </div>
-    </div>
+    </section>
   );
 }
