@@ -104,7 +104,12 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
       data-tone={tone}
     >
       <div className={styles.headerInner}>
-        <Link href="/" className={styles.headerBrand} aria-label="Recruiter Radar — на главную">
+        <Link
+          href="/"
+          className={styles.headerBrand}
+          aria-label="Recruiter Radar — на главную"
+          style={{ paddingInline: 1 }}
+        >
           <BrandLogo joined tone="dark" />
         </Link>
 
