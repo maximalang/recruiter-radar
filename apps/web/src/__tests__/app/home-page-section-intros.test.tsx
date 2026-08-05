@@ -14,6 +14,7 @@ import LandingHeader from "@/app/landing/landing-header";
 import OutreachScene from "@/app/landing/outreach-scene";
 import SignalTimelineScene from "@/app/landing/signal-timeline-scene";
 import WorkspaceScene, { WorkspaceResults } from "@/app/landing/workspace-scene";
+import SiteFooter from "@/app/ui/site-footer";
 import {
   LANDING_ANALYTICS_CONTEXT,
   LANDING_ANALYTICS_EVENT,
@@ -155,6 +156,7 @@ describe("final unified evidence-first landing contract", () => {
     expect(collectElements(page, DeliveryScene)).toHaveLength(1);
     expect(collectElements(page, OutreachScene)).toHaveLength(1);
     expect(collectElements(page, ConversionPanel)).toHaveLength(1);
+    expect(collectElements(page, SiteFooter)).toHaveLength(1);
 
     const landing = source("app/landing/landing-page.tsx");
     const expectedOrder = [
@@ -235,7 +237,10 @@ describe("final unified evidence-first landing contract", () => {
     const page = await HomePage({
       searchParams: Promise.resolve({ specialization: "инженерный подбор", targetCity: "Москва" }),
     });
+    expect(collectElements(page, SiteFooter)).toHaveLength(1);
+
     const html = await renderServerHtml(page);
+    const footerMarkup = renderToStaticMarkup(<SiteFooter />);
 
     expect(html).toContain('id="scene-workspace"');
     expect(html).toContain("Не обещание продукта");
@@ -248,13 +253,13 @@ describe("final unified evidence-first landing contract", () => {
     expect(html).toContain('id="pricing"');
     expect(html).toContain('id="faq"');
     expect(html).toContain("Соберите радар под свою специализацию");
-    expect(html).toContain('href="/legal"');
-    expect(html).toContain('href="/offer"');
-    expect(html).toContain('href="/privacy"');
-    expect(html).toContain("Реквизиты");
-    expect(html).toContain("Оферта");
-    expect(html).toContain("Конфиденциальность");
-    expect(html).toContain("Recruiter Radar");
+    expect(footerMarkup).toContain('href="/legal"');
+    expect(footerMarkup).toContain('href="/offer"');
+    expect(footerMarkup).toContain('href="/privacy"');
+    expect(footerMarkup).toContain("Реквизиты");
+    expect(footerMarkup).toContain("Оферта");
+    expect(footerMarkup).toContain("Конфиденциальность");
+    expect(footerMarkup).toContain("Recruiter Radar");
   });
 
   it("renders an evidence-backed lead list with one expanded recommendation", async () => {
