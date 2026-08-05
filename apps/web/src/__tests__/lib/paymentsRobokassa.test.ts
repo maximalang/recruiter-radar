@@ -85,25 +85,65 @@ describe("Robokassa payment adapter", () => {
     });
   });
 
-  it("builds a signed one-time payment redirect", async () => {
+  it("builds a signed fiscalized one-time payment redirect", async () => {
+    const successUrl = "https://recruiter-radar.ru/checkout/order/42/success";
+    const failUrl = "https://recruiter-radar.ru/checkout/order/42/cancel";
     const result = await createRobokassaPaymentAdapter().createCheckoutSession({
       order: order(),
-      successUrl: "https://recruiter-radar.ru/checkout/order/42/success",
-      cancelUrl: "https://recruiter-radar.ru/checkout/order/42/cancel",
+      successUrl,
+      cancelUrl: failUrl,
     });
 
     expect(result.kind).toBe("redirect");
     if (result.kind !== "redirect") return;
 
     const url = new URL(result.redirectUrl);
-    expect(url.origin + url.pathname).toBe("https://auth.robokassa.ru/Merchant/Index.aspx");
+    expect(url.origin + url.pathname).toBe(
+      "https://auth.robokassa.ru/Merchant/Index.aspx",
+    );
     expect(url.searchParams.get("OutSum")).toBe("2990.00");
     expect(url.searchParams.get("InvId")).toBe("42");
     expect(url.searchParams.get("IsTest")).toBe("1");
     expect(url.searchParams.get("Shp_order_id")).toBe("42");
     expect(url.searchParams.get("Shp_plan")).toBe("pilot");
     expect(url.searchParams.get("Email")).toBe("buyer@example.com");
-    expect(url.searchParams.get("SignatureValue")).toMatch(/^[a-f0-9]{64}$/);
+    expect(url.searchParams.get("SuccessUrl2")).toBe(successUrl);
+    expect(url.searchParams.get("SuccessUrl2Method")).toBe("GET");
+    expect(url.searchParams.get("FailUrl2")).toBe(failUrl);
+    expect(url.searchParams.get("FailUrl2Method")).toBe("GET");
+
+    const encodedReceipt = url.searchParams.get("Receipt");
+    expect(encodedReceipt).not.toBeNull();
+    const receipt = JSON.parse(decodeURIComponent(encodedReceipt ?? ""));
+    expect(receipt).toEqual({
+      items: [
+        {
+          name: "Recruiter Radar — Неделя, 7 дней",
+          quantity: 1,
+          sum: 2990,
+          payment_method: "full_payment",
+          payment_object: "service",
+          tax: "none",
+        },
+      ],
+    });
+
+    const expectedSignatureBase = [
+      "recruiter-radar-test",
+      "2990.00",
+      "42",
+      encodedReceipt,
+      encodeURIComponent(successUrl),
+      "GET",
+      encodeURIComponent(failUrl),
+      "GET",
+      "password-one",
+      "Shp_order_id=42",
+      "Shp_plan=pilot",
+    ].join(":");
+    expect(url.searchParams.get("SignatureValue")).toBe(
+      signature(expectedSignatureBase),
+    );
   });
 
   it("accepts a correctly signed ResultURL and returns Robokassa acknowledgement", async () => {
