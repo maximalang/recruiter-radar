@@ -21,8 +21,8 @@ export const OPERATOR_REQUISITES = {
   email: "support@recruiter-radar.ru",
   /** Подтверждённый публичный телефон. */
   phone: "+7 900 966-60-92",
-  /** Для самозанятого Robokassa допускает указание города вместо полного адреса. */
-  city: readPublicValue(process.env.OPERATOR_PUBLIC_CITY),
+  /** Подтверждённый публичный город самозанятого продавца. */
+  city: "Рязань",
   /** Необязательный фактический адрес для корреспонденции, если продавец решит его раскрывать. */
   postalAddress: readPublicValue(process.env.OPERATOR_PUBLIC_POSTAL_ADDRESS),
 } as const;
