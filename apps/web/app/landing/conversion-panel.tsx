@@ -10,6 +10,7 @@ import {
   type PublicPreviewInput,
 } from "../../lib/publicProduct";
 import { ArrowGlyph, PlusGlyph } from "./brand-glyphs";
+import panelStyles from "./conversion-panel.module.css";
 import styles from "./landing.module.css";
 
 export default function ConversionPanel(props: {
@@ -22,7 +23,7 @@ export default function ConversionPanel(props: {
 
   return (
     <section className={styles.conversionPanel} aria-label="Тарифы и ответы" data-header-tone="dark">
-      <div id="pricing" className={styles.pricingStage}>
+      <div id="pricing" className={`${styles.pricingStage} ${panelStyles.anchor} ${panelStyles.pricing}`}>
         <div className={styles.pricingIntro}>
           <span>07 — Тарифы</span>
           <h2>Начните с недели. Продолжайте, только если радар полезен.</h2>
@@ -56,7 +57,7 @@ export default function ConversionPanel(props: {
           <small>{props.paymentConfigured ? "Разовая оплата · без автопродления" : "Заявка без списания · профиль сохранится"}</small>
         </div>
 
-        <div className={styles.secondaryOffers} aria-label="Вторичные тарифы">
+        <div className={styles.secondaryOffers} aria-label="Дополнительные тарифы">
           {secondaryPlans.map((plan) => {
             const quarterly = plan.code === "quarterly";
             return (
@@ -77,9 +78,9 @@ export default function ConversionPanel(props: {
         </div>
       </div>
 
-      <div id="faq" className={styles.faqStage}>
+      <div id="faq" className={`${styles.faqStage} ${panelStyles.anchor} ${panelStyles.faq}`}>
         <div className={styles.faqHeading}>
-          <span>FAQ / перед запуском</span>
+          <span>Перед запуском</span>
           <h2>Коротко о данных, доставке и контроле.</h2>
           <p>Ответы раскрываются без перехода на отдельную страницу.</p>
         </div>
@@ -93,8 +94,8 @@ export default function ConversionPanel(props: {
         </div>
       </div>
 
-      <div className={styles.finalCall}>
-        <span>EVIDENCE INSTRUMENT / 07 DAYS</span>
+      <div className={`${styles.finalCall} ${panelStyles.final}`}>
+        <span>РАДАР / 7 ДНЕЙ</span>
         <h2>Соберите радар под свою специализацию.</h2>
         <p>Получите первый короткий список компаний и решите на фактах, стоит ли продолжать.</p>
         <div>
@@ -105,7 +106,7 @@ export default function ConversionPanel(props: {
           >
             {props.paymentConfigured ? `Активировать неделю — ${pilotPlan.price}` : "Оставить заявку на неделю"} <ArrowGlyph />
           </Link>
-          <a href="#preview-configurator">Вернуться к preview <ArrowGlyph /></a>
+          <a href="#preview-configurator">Вернуться к настройке выдачи <ArrowGlyph /></a>
         </div>
       </div>
     </section>
