@@ -74,25 +74,24 @@ export function createRobokassaPaymentAdapter(): PaymentProviderAdapter {
 
       const invId = normalizeInvoiceId(input.order.id);
       const outSum = formatMinorAmount(input.order.amountMinor);
+      const description = buildDescription(input.order);
       const successUrl = normalizeReturnUrl(input.successUrl);
       const failUrl = normalizeReturnUrl(input.cancelUrl);
+      const receipt = buildReceipt(description, input.order.amountMinor);
+      const encodedReceipt = encodeURIComponent(receipt);
       const shp = {
         Shp_order_id: input.order.id,
         Shp_plan: input.order.productCode,
       };
 
       /*
-       * Robokassa requires modifier slots in this exact order even when the
-       * first three are empty:
-       * Receipt:StepByStep:ResultUrl2:SuccessUrl2:SuccessUrl2Method:
-       * FailUrl2:FailUrl2Method.
-       * URL modifier values participate in the signature URL-encoded, while
-       * URLSearchParams below performs the actual transport encoding.
+       * Robokassa adds only modifiers that are actually present, preserving
+       * their documented order. Receipt and ReturnURL values participate in
+       * the signature URL-encoded. URLSearchParams then performs transport
+       * encoding, so Receipt is intentionally encoded a second time on wire.
        */
       const modifierValues = [
-        "", // Receipt — not used for NPD; receipt is issued via My Tax/operator.
-        "", // StepByStep
-        "", // ResultUrl2 — ResultURL is configured in the merchant cabinet.
+        encodedReceipt,
         encodeURIComponent(successUrl),
         "GET",
         encodeURIComponent(failUrl),
@@ -111,7 +110,8 @@ export function createRobokassaPaymentAdapter(): PaymentProviderAdapter {
         MerchantLogin: config.merchantLogin,
         OutSum: outSum,
         InvId: invId,
-        Description: buildDescription(input.order),
+        Description: description,
+        Receipt: encodedReceipt,
         SignatureValue: digest(signatureBase, config.hashAlgorithm),
         Culture: "ru",
         Encoding: "utf-8",
@@ -177,7 +177,10 @@ export function createRobokassaPaymentAdapter(): PaymentProviderAdapter {
 
       return {
         status: "paid",
-        providerPaymentId: operation.opKey ?? input.providerPaymentId ?? `robokassa:live:${input.order.id}`,
+        providerPaymentId:
+          operation.opKey ??
+          input.providerPaymentId ??
+          `robokassa:live:${input.order.id}`,
         paidAt: normalizeDate(operation.stateDate) ?? new Date().toISOString(),
         payload: buildOperationPayload(config, operation),
         message: null,
@@ -279,20 +282,28 @@ function readMode(): RobokassaMode | null {
 
 function readConfig(mode: RobokassaMode): RobokassaConfig | null {
   const merchantLogin = process.env.ROBOKASSA_MERCHANT_LOGIN?.trim() ?? "";
-  const password1 = (
-    mode === "test"
-      ? process.env.ROBOKASSA_TEST_PASSWORD_1 ?? process.env.ROBOKASSA_PASSWORD_1
-      : process.env.ROBOKASSA_PASSWORD_1
-  )?.trim() ?? "";
-  const password2 = (
-    mode === "test"
-      ? process.env.ROBOKASSA_TEST_PASSWORD_2 ?? process.env.ROBOKASSA_PASSWORD_2
-      : process.env.ROBOKASSA_PASSWORD_2
-  )?.trim() ?? "";
+  const password1 =
+    (
+      mode === "test"
+        ? process.env.ROBOKASSA_TEST_PASSWORD_1 ?? process.env.ROBOKASSA_PASSWORD_1
+        : process.env.ROBOKASSA_PASSWORD_1
+    )?.trim() ?? "";
+  const password2 =
+    (
+      mode === "test"
+        ? process.env.ROBOKASSA_TEST_PASSWORD_2 ?? process.env.ROBOKASSA_PASSWORD_2
+        : process.env.ROBOKASSA_PASSWORD_2
+    )?.trim() ?? "";
   const algorithm = process.env.ROBOKASSA_HASH_ALGORITHM?.trim().toLowerCase() ?? "sha256";
   const resultUrl = process.env.ROBOKASSA_RESULT_URL?.trim() ?? "";
 
-  if (!merchantLogin || !password1 || !password2 || !resultUrl || !SUPPORTED_HASHES.has(algorithm)) {
+  if (
+    !merchantLogin ||
+    !password1 ||
+    !password2 ||
+    !resultUrl ||
+    !SUPPORTED_HASHES.has(algorithm)
+  ) {
     return null;
   }
   try {
@@ -317,7 +328,10 @@ async function readRequestParams(request: Request): Promise<URLSearchParams> {
   return new URLSearchParams(await request.text());
 }
 
-async function fetchOperationState(config: RobokassaConfig, invIdValue: string): Promise<OperationState> {
+async function fetchOperationState(
+  config: RobokassaConfig,
+  invIdValue: string,
+): Promise<OperationState> {
   const invId = normalizeInvoiceId(invIdValue);
   const url = new URL(OP_STATE_URL);
   url.searchParams.set("MerchantLogin", config.merchantLogin);
@@ -347,9 +361,13 @@ async function fetchOperationState(config: RobokassaConfig, invIdValue: string):
 }
 
 function readXmlValue(xml: string, parent: string, child: string): string | null {
-  const parentMatch = xml.match(new RegExp(`<${parent}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${parent}>`, "i"));
+  const parentMatch = xml.match(
+    new RegExp(`<${parent}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${parent}>`, "i"),
+  );
   if (!parentMatch) return null;
-  const childMatch = parentMatch[1].match(new RegExp(`<${child}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${child}>`, "i"));
+  const childMatch = parentMatch[1].match(
+    new RegExp(`<${child}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${child}>`, "i"),
+  );
   return childMatch ? decodeXml(childMatch[1].trim()) : null;
 }
 
@@ -379,6 +397,21 @@ function buildOperationPayload(
 
 function buildDescription(order: CheckoutOrder): string {
   return `Recruiter Radar — ${order.payload.planName}, ${order.payload.planCadence}`.slice(0, 100);
+}
+
+function buildReceipt(description: string, amountMinor: number): string {
+  return JSON.stringify({
+    items: [
+      {
+        name: description,
+        quantity: 1,
+        sum: amountMinor / 100,
+        payment_method: "full_payment",
+        payment_object: "service",
+        tax: "none",
+      },
+    ],
+  });
 }
 
 function serializeShp(shp: Record<string, string>): string[] {
@@ -411,7 +444,9 @@ function parseAmountMinor(value: string): number {
     throw new Error("Robokassa amount has sub-kopeck precision.");
   }
   const minor = Number(match[1]) * 100 + Number(fractional.slice(0, 2));
-  if (!Number.isSafeInteger(minor) || minor <= 0) throw new Error("Invalid Robokassa amount.");
+  if (!Number.isSafeInteger(minor) || minor <= 0) {
+    throw new Error("Invalid Robokassa amount.");
+  }
   return minor;
 }
 
@@ -450,6 +485,9 @@ function readSearchParam(value: string | string[] | undefined): string | null {
   return value?.trim() || null;
 }
 
-function rejectWebhook(responseStatus: number, responseBody: string): PaymentWebhookParseResult {
+function rejectWebhook(
+  responseStatus: number,
+  responseBody: string,
+): PaymentWebhookParseResult {
   return { ok: false, responseStatus, responseBody };
 }
