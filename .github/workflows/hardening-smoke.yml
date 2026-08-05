@@ -81,6 +81,7 @@ jobs:
           fs.writeFileSync('package.json', `${JSON.stringify(packageJson, null, 2)}\n`);
           NODE
           npm install --package-lock-only --ignore-scripts
+          npm update ip-address --package-lock-only --ignore-scripts
           npm audit --omit=dev --audit-level=high
           mkdir -p /tmp/pr-148-remediation
           cp package.json package-lock.json /tmp/pr-148-remediation/
