@@ -148,7 +148,7 @@ describe("final unified evidence-first landing contract", () => {
     expect(workspace).toContain("function PreviewConfigurator");
     expect(workspace).toContain("export async function WorkspaceResults");
     expect(workspace).toContain("<Suspense fallback={<WorkspaceResultsSkeleton />}");
-    expect(workspace.indexOf("id=\"preview-configurator\"")).toBeLessThan(workspace.indexOf("<Suspense"));
+    expect(workspace.indexOf("<PreviewConfigurator")).toBeLessThan(workspace.indexOf("<Suspense"));
     expect(workspace.match(/getPublicSampleDigestState\(/g)).toHaveLength(1);
   });
 
@@ -162,10 +162,11 @@ describe("final unified evidence-first landing contract", () => {
     expect(preview.type).toBe(WorkspaceScene);
 
     const workspace = source("app/landing/workspace-scene.tsx");
-    const configuratorIndex = workspace.indexOf('id="preview-configurator"');
+    const configuratorCallIndex = workspace.indexOf("<PreviewConfigurator");
     const suspenseIndex = workspace.indexOf("<Suspense");
-    expect(configuratorIndex).toBeGreaterThan(-1);
-    expect(configuratorIndex).toBeLessThan(suspenseIndex);
+    expect(configuratorCallIndex).toBeGreaterThan(-1);
+    expect(configuratorCallIndex).toBeLessThan(suspenseIndex);
+    expect(workspace).toContain('id="preview-configurator"');
     expect(workspace).toContain('action="/#preview-results"');
 
     const skeleton = renderToStaticMarkup(<PreviewSkeleton />);
