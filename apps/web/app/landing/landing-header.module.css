@@ -25,7 +25,7 @@
   display: grid;
   grid-template-columns: minmax(10.5rem, auto) 1fr auto;
   align-items: center;
-  gap: clamp(1rem, 2vw, 2rem);
+  gap: clamp(.8rem, 1.6vw, 1.7rem);
   width: 100%;
   max-width: calc(var(--content) + (var(--scene-pad) * 2));
   min-height: 72px;
@@ -42,15 +42,18 @@
   min-width: 0;
   align-items: center;
   justify-content: center;
-  gap: clamp(.75rem, 1.35vw, 1.4rem);
+  gap: clamp(.3rem, .7vw, .75rem);
 }
 
 .navLink {
   position: relative;
   display: inline-flex;
+  box-sizing: border-box;
+  min-width: 44px;
   min-height: 44px;
   align-items: center;
   justify-content: center;
+  padding-inline: .55rem;
   color: color-mix(in srgb, currentColor 66%, transparent);
   font-size: clamp(.76rem, .72vw, .86rem);
   font-weight: 560;
@@ -60,9 +63,9 @@
 
 .navLink::after {
   position: absolute;
-  right: .15rem;
+  right: .55rem;
   bottom: .35rem;
-  left: .15rem;
+  left: .55rem;
   height: 1px;
   background: var(--signal);
   content: "";
@@ -85,13 +88,15 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: .75rem;
+  gap: .65rem;
   white-space: nowrap;
 }
 
 .login,
 .cta {
   display: inline-flex;
+  box-sizing: border-box;
+  min-width: 44px;
   min-height: 44px;
   align-items: center;
   justify-content: center;
@@ -99,7 +104,7 @@
 }
 
 .login {
-  padding-inline: .25rem;
+  padding-inline: .45rem;
   color: color-mix(in srgb, currentColor 74%, transparent);
   font-size: .8rem;
 }
