@@ -14,6 +14,26 @@
   );
 }
 
+@media (min-width: 1181px) and (max-width: 1440px) and (max-height: 820px) {
+  .frame.frame :global([data-hero-copy]) {
+    margin-top: clamp(1rem, 4vh, 2.5rem);
+  }
+
+  .frame.frame :global([data-hero-title]) {
+    font-size: clamp(5rem, 6.8vw, 5.8rem);
+  }
+
+  .frame.frame :global([data-hero-description]) {
+    margin-top: 1.25rem;
+    font-size: 1rem;
+    line-height: 1.45;
+  }
+
+  .frame.frame :global([data-hero-actions]) {
+    margin-top: 1.25rem;
+  }
+}
+
 @media (max-width: 1024px) {
   .frame.frame {
     margin-top: -24px;
