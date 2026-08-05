@@ -14,7 +14,7 @@ import LandingHeader from "@/app/landing/landing-header";
 import OutreachScene from "@/app/landing/outreach-scene";
 import SignalTimelineScene from "@/app/landing/signal-timeline-scene";
 import WorkspaceScene, { WorkspaceResults } from "@/app/landing/workspace-scene";
-import SiteFooter from "@/app/ui/site-footer";
+import { SiteFooter } from "@/app/ui/site-footer";
 import {
   LANDING_ANALYTICS_CONTEXT,
   LANDING_ANALYTICS_EVENT,
