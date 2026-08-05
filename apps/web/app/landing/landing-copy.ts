@@ -1,23 +1,30 @@
-export const LANDING_SCENES = [
-  { id: "scene-detection", index: "01", label: "Обнаружение" },
-  { id: "scene-timeline", index: "02", label: "Сигнал" },
-  { id: "scene-evidence", index: "03", label: "Доказательство" },
-  { id: "scene-outreach", index: "04", label: "Контакт" },
-  { id: "scene-workspace", index: "05", label: "Рабочий радар" },
+export const LANDING_NAV_ITEMS = [
+  { id: "scene-workspace", label: "Пример" },
+  { id: "scene-evidence", label: "Доказательства" },
+  { id: "scene-delivery", label: "Как работает" },
+  { id: "pricing", label: "Тарифы" },
+  { id: "faq", label: "FAQ" },
 ] as const;
+
+/** Compatibility export for older imports and analytics fixtures. */
+export const LANDING_SCENES = LANDING_NAV_ITEMS;
 
 export const DEMO_COMPANY = {
   name: "Производственная компания",
   location: "Москва и область",
   industry: "Промышленность",
-  signal: "Инженерный найм",
+  signal: "Инженерный найм ускоряется",
+  change: "8 инженерных позиций и новая роль руководителя направления",
+  freshness: "2 часа назад",
+  confidence: "A / высокая",
+  whyNow: "Четыре связанных события за семь дней показывают расширение команды, а не разовую замену.",
   score: 87,
 } as const;
 
 export const DEMO_TIMELINE = [
   {
     date: "12 августа",
-    title: "Открыто 4 инженерные вакансии",
+    title: "Открыты четыре инженерные вакансии",
     source: "карьерная страница",
   },
   {
@@ -27,13 +34,13 @@ export const DEMO_TIMELINE = [
   },
   {
     date: "18 августа",
-    title: "Набор расширен на новый регион",
+    title: "Набор расширен на Московскую область",
     source: "карьерная страница",
   },
   {
     date: "Сегодня",
-    title: "3 вакансии обновлены повторно",
-    source: "изменение публикации",
+    title: "Три роли обновлены повторно",
+    source: "изменение публикаций",
   },
 ] as const;
 
@@ -41,12 +48,12 @@ export const DEMO_EVIDENCE = [
   {
     label: "Сила сигнала",
     points: "+24",
-    fact: "8 релевантных позиций открыты за последние 7 дней.",
+    fact: "Восемь релевантных позиций открыты за последние семь дней.",
   },
   {
     label: "Динамика",
     points: "+18",
-    fact: "Темп публикации вакансий выше предыдущего периода.",
+    fact: "Темп публикаций выше предыдущего периода и затрагивает несколько функций.",
   },
   {
     label: "Свежесть",
@@ -54,9 +61,9 @@ export const DEMO_EVIDENCE = [
     fact: "Последнее подтверждённое изменение обнаружено сегодня.",
   },
   {
-    label: "Релевантность",
+    label: "Соответствие профилю",
     points: "+21",
-    fact: "Большинство ролей совпадает со специализацией агентства.",
+    fact: "Большинство ролей совпадает со специализацией инженерного агентства.",
   },
 ] as const;
 
