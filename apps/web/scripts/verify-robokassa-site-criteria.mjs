@@ -3,6 +3,7 @@ import path from "node:path";
 
 const workspaceRoot = process.cwd();
 const expectedEmail = "support@recruiter-radar.ru";
+const expectedCity = "Рязань";
 const forbiddenEmails = ["6uunn9@gmail.com", "2.dkv@recruiter-radar.ru"];
 const failures = [];
 
@@ -21,7 +22,7 @@ const sources = Object.fromEntries([
 
 requireText("operator", expectedEmail, "confirmed public support mailbox");
 requireText("operator", 'phone: "+7 900 966-60-92"', "confirmed public phone");
-requireText("operator", "OPERATOR_PUBLIC_CITY", "public seller city setting");
+requireText("operator", `city: "${expectedCity}"`, "confirmed public seller city");
 
 for (const runtimeFile of collectRuntimeFiles()) {
   const source = fs.readFileSync(runtimeFile, "utf8");
@@ -183,7 +184,7 @@ async function verifyDeployedOrigin() {
   }
 
   const home = await fetch(new URL("/", base)).then((response) => response.text()).catch(() => "");
-  for (const token of [expectedEmail, "+7 900 966-60-92", "622809740837", "Самозанятый"]) {
+  for (const token of [expectedEmail, expectedCity, "+7 900 966-60-92", "622809740837", "Самозанятый"]) {
     if (!home.includes(token)) fail(`network: footer does not expose ${token}`);
   }
 }
