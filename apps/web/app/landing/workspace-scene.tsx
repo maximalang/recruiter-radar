@@ -34,7 +34,12 @@ export default async function WorkspaceScene(props: {
   const appliedProfile = [props.previewInput.specialization, props.previewInput.targetCity].filter(Boolean);
 
   return (
-    <section id="scene-workspace" className={`${styles.scene} ${styles.darkScene} ${styles.workspaceScene}`} aria-labelledby="workspace-title">
+    <section
+      id="scene-workspace"
+      className={`${styles.scene} ${styles.darkScene} ${styles.workspaceScene}`}
+      aria-labelledby="workspace-title"
+      data-landing-scene="workspace"
+    >
       <div className={styles.workspaceLayout} data-preview-section-content>
         <PreviewGeneratedEvent
           generated={previewState.isLive && previewState.isPersonalized}
@@ -42,18 +47,18 @@ export default async function WorkspaceScene(props: {
         />
         <LandingPreviewInteractions />
         <div className={styles.workspaceIntro}>
-          <p className={styles.sceneLabel}>05 — Рабочий радар</p>
+          <p className={styles.sceneLabel} data-system-label>05 — Рабочий радар</p>
           <h2 id="workspace-title" className={styles.sceneHeading}>
             Один сигнал становится <em>частью рабочего приоритета.</em>
           </h2>
           <p className={styles.sceneLead}>
-            Настройте специализацию и географию. Существующая логика preview пересчитает порядок компаний и покажет доказательства.
+            Настройте специализацию и географию. Существующая логика выдачи пересчитает порядок компаний и покажет доказательства.
           </p>
         </div>
 
         <div id="preview-configurator" className={styles.workspaceControls}>
           <div className={styles.presetStrip} aria-label="Готовые профили радара">
-            <span>Профиль / быстрый старт</span>
+            <span data-system-label>Профиль / быстрый старт</span>
             {PREVIEW_PRESETS.map((preset) => {
               const selected = props.previewInput.specialization === preset.specialization
                 && props.previewInput.targetCity === preset.targetCity;
@@ -103,9 +108,9 @@ export default async function WorkspaceScene(props: {
         </div>
 
         <div id="preview-results" className={styles.workspaceResults} data-preview-results>
-          <div className={styles.workspaceResultsHeader}>
+          <div className={styles.workspaceResultsHeader} data-preview-results-header>
             <div>
-              <span>LIVE PREVIEW / {String(previewState.items.length).padStart(2, "0")}</span>
+              <span data-preview-status>Рабочий пример / {String(previewState.items.length).padStart(2, "0")}</span>
               <strong>{previewState.isPersonalized ? "Радар для вашего профиля" : "Утренняя выдача"}</strong>
             </div>
             <span data-live={previewState.isLive || undefined}>
@@ -118,7 +123,7 @@ export default async function WorkspaceScene(props: {
               <strong>Обезличенный набор.</strong>{" "}
               {previewState.isPersonalized
                 ? "Приоритеты реально пересчитаны по профилю; названия и факты остаются примерными."
-                : "Выберите профиль: порядок и оценка изменятся по тем же правилам, что в live-выдаче."}
+                : "Выберите профиль: порядок и оценка изменятся по тем же правилам, что в рабочей выдаче."}
             </p>
           ) : null}
 
@@ -147,6 +152,7 @@ export default async function WorkspaceScene(props: {
           <Link
             href={props.checkoutHref}
             className={styles.workspaceCheckout}
+            data-preview-primary-cta
             data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.preview}
           >
@@ -166,10 +172,15 @@ export default async function WorkspaceScene(props: {
 
 export function WorkspaceSkeleton() {
   return (
-    <section id="scene-workspace" className={`${styles.scene} ${styles.darkScene} ${styles.workspaceScene}`} aria-labelledby="workspace-loading-title">
+    <section
+      id="scene-workspace"
+      className={`${styles.scene} ${styles.darkScene} ${styles.workspaceScene}`}
+      aria-labelledby="workspace-loading-title"
+      data-landing-scene="workspace"
+    >
       <div className={styles.workspaceLayout} data-preview-section-content aria-busy="true">
         <div className={styles.workspaceIntro}>
-          <p className={styles.sceneLabel}>05 — Рабочий радар</p>
+          <p className={styles.sceneLabel} data-system-label>05 — Рабочий радар</p>
           <h2 id="workspace-loading-title" className={styles.sceneHeading}>Один сигнал становится частью рабочего приоритета.</h2>
         </div>
         <div id="preview-configurator" className={styles.workspaceSkeletonLine} />
