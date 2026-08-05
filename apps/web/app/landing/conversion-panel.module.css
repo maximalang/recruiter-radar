@@ -1,0 +1,42 @@
+.anchor {
+  scroll-margin-top: calc(72px + 20px);
+}
+
+.pricing,
+.faq {
+  padding-block: clamp(4.5rem, 7vw, 7rem);
+}
+
+.final {
+  border-top: 1px solid rgba(169, 215, 200, .28);
+  background:
+    radial-gradient(circle at 82% 18%, rgba(120, 183, 165, .2), transparent 34%),
+    #0d151c;
+  color: #fbfaf6;
+}
+
+.final > span {
+  color: #a9d7c8;
+}
+
+.final h2,
+.final p {
+  color: #fbfaf6;
+}
+
+.final a:first-child {
+  border-color: #a9d7c8;
+  background: #a9d7c8;
+  color: #111a22;
+}
+
+.final a:last-child {
+  color: rgba(251, 250, 246, .82);
+}
+
+@media (max-width: 768px) {
+  .pricing,
+  .faq {
+    padding-block: 4.25rem;
+  }
+}
