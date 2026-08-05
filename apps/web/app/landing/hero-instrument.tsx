@@ -27,7 +27,7 @@ export default function HeroInstrument({
         viewBox="0 0 760 760"
         preserveAspectRatio="xMidYMid meet"
         role="img"
-        aria-label={`${signalLabel}. Оценка ${score} из 100, уверенность ${confidence}.`}
+        aria-label={`${signalLabel}. Оценка ${score} из 100, уровень уверенности ${confidence}.`}
       >
         <defs>
           <radialGradient id="instrument-wash" cx="52%" cy="48%" r="58%">
@@ -70,10 +70,10 @@ export default function HeroInstrument({
       </svg>
 
       <figcaption className={styles.instrumentCaption}>
-        <span>Evidence instrument / временная композиция</span>
+        <span>Инструмент доказательств / временная композиция</span>
         <div>
           <strong>{signalLabel}</strong>
-          <small>{freshness} · confidence {confidence}</small>
+          <small>{freshness} · уверенность {confidence}</small>
         </div>
         <b>{score}<small>/100</small></b>
       </figcaption>
