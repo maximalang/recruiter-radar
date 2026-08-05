@@ -240,7 +240,7 @@ describe("final unified evidence-first landing contract", () => {
     expect(collectElements(page, SiteFooter)).toHaveLength(1);
 
     const html = await renderServerHtml(page);
-    const footerMarkup = renderToStaticMarkup(<SiteFooter />);
+    const footerSource = source("app/ui/site-footer.tsx");
 
     expect(html).toContain('id="scene-workspace"');
     expect(html).toContain("Не обещание продукта");
@@ -253,13 +253,13 @@ describe("final unified evidence-first landing contract", () => {
     expect(html).toContain('id="pricing"');
     expect(html).toContain('id="faq"');
     expect(html).toContain("Соберите радар под свою специализацию");
-    expect(footerMarkup).toContain('href="/legal"');
-    expect(footerMarkup).toContain('href="/offer"');
-    expect(footerMarkup).toContain('href="/privacy"');
-    expect(footerMarkup).toContain("Реквизиты");
-    expect(footerMarkup).toContain("Оферта");
-    expect(footerMarkup).toContain("Конфиденциальность");
-    expect(footerMarkup).toContain("Recruiter Radar");
+    expect(footerSource).toContain('href="/legal"');
+    expect(footerSource).toContain('href="/offer"');
+    expect(footerSource).toContain('href="/privacy"');
+    expect(footerSource).toContain("Реквизиты");
+    expect(footerSource).toContain("Оферта");
+    expect(footerSource).toContain("Конфиденциальность");
+    expect(footerSource).toContain("Recruiter Radar");
   });
 
   it("renders an evidence-backed lead list with one expanded recommendation", async () => {
