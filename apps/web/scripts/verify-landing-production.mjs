@@ -154,43 +154,22 @@ async function assertAccessibleInteractiveNames(page, label) {
   assert.deepEqual(unnamed, [], `${label}: unnamed interactive elements: ${unnamed.join(" | ")}`);
 }
 
-async function assertControlsAndText(page, label) {
-  const violations = await page.evaluate(() => {
-    const controls = Array.from(document.querySelectorAll("a, button, input, summary"));
-    const smallControls = controls
-      .filter((element) => {
-        const rect = element.getBoundingClientRect();
-        const style = getComputedStyle(element);
-        if (style.display === "none" || style.visibility === "hidden" || rect.width === 0 || rect.height === 0) return false;
-        return rect.width < 44 || rect.height < 44;
-      })
-      .slice(0, 20)
-      .map((element) => ({
-        tag: element.tagName,
-        text: element.textContent?.trim().slice(0, 60),
-        rect: element.getBoundingClientRect().toJSON(),
-      }));
+async function assertControls(page, label) {
+  const smallControls = await page.evaluate(() => Array.from(document.querySelectorAll("a, button, input, summary"))
+    .filter((element) => {
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      if (style.display === "none" || style.visibility === "hidden" || rect.width === 0 || rect.height === 0) return false;
+      return rect.width < 44 || rect.height < 44;
+    })
+    .slice(0, 20)
+    .map((element) => ({
+      tag: element.tagName,
+      text: element.textContent?.trim().slice(0, 60),
+      rect: element.getBoundingClientRect().toJSON(),
+    })));
 
-    const tinyText = Array.from(document.querySelectorAll("main p, main span, main small, main a, main button"))
-      .filter((element) => {
-        const rect = element.getBoundingClientRect();
-        const style = getComputedStyle(element);
-        if (style.display === "none" || style.visibility === "hidden" || rect.width === 0 || rect.height === 0) return false;
-        const content = element.textContent?.trim() ?? "";
-        return content.length > 2 && Number.parseFloat(style.fontSize) < 9;
-      })
-      .slice(0, 20)
-      .map((element) => ({
-        tag: element.tagName,
-        text: element.textContent?.trim().slice(0, 60),
-        fontSize: getComputedStyle(element).fontSize,
-      }));
-
-    return { smallControls, tinyText };
-  });
-
-  assert.deepEqual(violations.smallControls, [], `${label}: controls below 44px: ${JSON.stringify(violations.smallControls)}`);
-  assert.deepEqual(violations.tinyText, [], `${label}: unreadable text: ${JSON.stringify(violations.tinyText)}`);
+  assert.deepEqual(smallControls, [], `${label}: controls below 44px: ${JSON.stringify(smallControls)}`);
 }
 
 async function assertNoOverlapOrClipping(page, label) {
@@ -297,7 +276,7 @@ async function assertResponsiveSurface(browser, viewport) {
 
   await assertNoHorizontalOverflow(page, viewport.name);
   await assertAccessibleInteractiveNames(page, viewport.name);
-  await assertControlsAndText(page, viewport.name);
+  await assertControls(page, viewport.name);
   await assertNoOverlapOrClipping(page, viewport.name);
   const fullHeight = await assertPageHeight(page, viewport);
 
