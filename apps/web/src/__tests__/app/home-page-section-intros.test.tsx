@@ -248,9 +248,13 @@ describe("final unified evidence-first landing contract", () => {
     expect(html).toContain('id="pricing"');
     expect(html).toContain('id="faq"');
     expect(html).toContain("Соберите радар под свою специализацию");
-    expect(html).toContain("<footer");
+    expect(html).toContain('href="/legal"');
+    expect(html).toContain('href="/terms"');
+    expect(html).toContain('href="/privacy"');
+    expect(html).toContain("Реквизиты");
     expect(html).toContain("Оферта");
     expect(html).toContain("Конфиденциальность");
+    expect(html).toContain("Recruiter Radar");
   });
 
   it("renders an evidence-backed lead list with one expanded recommendation", async () => {
