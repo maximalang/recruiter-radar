@@ -1,9 +1,9 @@
 export const LANDING_SCENES = [
-  { id: "scene-detection", index: "01", label: "Обнаружение" },
+  { id: "scene-detection", index: "01", label: "Возможность" },
   { id: "scene-timeline", index: "02", label: "Сигнал" },
-  { id: "scene-evidence", index: "03", label: "Доказательство" },
-  { id: "scene-outreach", index: "04", label: "Контакт" },
-  { id: "scene-workspace", index: "05", label: "Рабочий радар" },
+  { id: "scene-evidence", index: "03", label: "Доказательства" },
+  { id: "scene-outreach", index: "04", label: "Обращение" },
+  { id: "scene-workspace", index: "05", label: "Пример" },
 ] as const;
 
 export const DEMO_COMPANY = {
