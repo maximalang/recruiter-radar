@@ -90,6 +90,7 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
       className={styles.sceneNavLink}
       aria-current={activeId === item.id ? "location" : undefined}
       data-active={activeId === item.id || undefined}
+      style={{ minWidth: 44, justifyContent: "center" }}
       onClick={() => closeMenu(false)}
     >
       {item.label}
@@ -118,7 +119,13 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
         </nav>
 
         <div className={styles.headerActions}>
-          <Link href="/dashboard" className={styles.headerLogin}>Войти</Link>
+          <Link
+            href="/dashboard"
+            className={styles.headerLogin}
+            style={{ minWidth: 44, justifyContent: "center" }}
+          >
+            Войти
+          </Link>
           <a
             href={previewHref}
             className={styles.headerCta}
