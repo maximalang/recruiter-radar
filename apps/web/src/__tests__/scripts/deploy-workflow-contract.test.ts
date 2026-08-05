@@ -299,7 +299,7 @@ describe('production deploy workflow contract', () => {
   })
 
   it('uses stable server-rendered deploy markers rather than mutable landing copy', () => {
-    expect(workflow).toContain('data-deploy-anchor="recruiter-radar-signal-lock"')
+    expect(workflow).toContain('data-deploy-anchor="recruiter-radar-landing-v3"')
     expect(workflow).toContain('data-brand-header="recruiter-radar-v3"')
     expect(workflow).not.toContain('Каждый день Recruiter Radar находит лучшие компании')
     expect(workflow).not.toContain("grep -q 'data-mark=\"false\"'")
