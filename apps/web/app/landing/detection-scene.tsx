@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { LANDING_ANALYTICS_CONTEXT, LANDING_ANALYTICS_EVENT } from "../../lib/landing-analytics-contract";
 import { ArrowGlyph, SignalGlyph } from "./brand-glyphs";
+import sceneStyles from "./detection-scene.module.css";
 import HeroInstrument from "./hero-instrument";
 import { DEMO_COMPANY } from "./landing-copy";
 import styles from "./landing.module.css";
@@ -10,11 +11,11 @@ export default function DetectionScene({ previewHref }: { previewHref: string })
   return (
     <section
       id="scene-detection"
-      className={`${styles.scene} ${styles.detectionScene}`}
+      className={`${styles.scene} ${styles.detectionScene} ${sceneStyles.section}`}
       aria-labelledby="detection-title"
       data-header-tone="dark"
     >
-      <div className={styles.detectionField}>
+      <div className={`${styles.detectionField} ${sceneStyles.field}`}>
         <HeroInstrument
           companyName={DEMO_COMPANY.name}
           signalLabel={DEMO_COMPANY.signal}
@@ -26,17 +27,17 @@ export default function DetectionScene({ previewHref }: { previewHref: string })
 
       <div className={styles.sceneKicker}>
         <span className={styles.kickerRule} aria-hidden="true" />
-        <span>Recruiter Radar / evidence-first</span>
+        <span>Радар клиентских возможностей</span>
         <span className={styles.kickerMeta}>01 — Обнаружение</span>
       </div>
 
-      <div className={styles.detectionCopy}>
-        <p className={styles.serviceLabel}>Клиентский радар для рекрутинговых агентств</p>
-        <h1 id="detection-title" className={styles.displayTitle}>
-          Кому написать сегодня — <em>видно по сигналам.</em>
+      <div className={`${styles.detectionCopy} ${sceneStyles.copy}`}>
+        <p className={styles.serviceLabel}>Для рекрутинговых агентств</p>
+        <h1 id="detection-title" className={`${styles.displayTitle} ${sceneStyles.title}`}>
+          <span>Кому написать сегодня —</span> <em>видно по сигналам.</em>
         </h1>
         <p className={styles.heroDescription}>
-          Recruiter Radar отслеживает hiring signals российских компаний и собирает короткий список: кому написать, почему сейчас и на какие факты сослаться.
+          Recruiter Radar отслеживает сигналы найма российских компаний и собирает короткий список: кому написать, почему сейчас и на какие факты сослаться.
         </p>
         <div className={styles.heroActions}>
           <a
@@ -45,7 +46,7 @@ export default function DetectionScene({ previewHref }: { previewHref: string })
             data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroPrimary}
           >
-            Собрать мой радар <ArrowGlyph />
+            Получить пример <ArrowGlyph />
           </a>
           <a
             href="#scene-timeline"
@@ -56,10 +57,10 @@ export default function DetectionScene({ previewHref }: { previewHref: string })
             Разобрать один сигнал <ArrowGlyph className={styles.downArrow} />
           </a>
         </div>
-        <p className={styles.microcopy}>Пилот на 7 дней · без автопродления · решение об outreach остаётся за вами</p>
+        <p className={styles.microcopy}>Пилот на 7 дней · без автопродления · решение об обращении остаётся за вами</p>
       </div>
 
-      <article className={styles.detectionLock} aria-label={`Новый сигнал: ${DEMO_COMPANY.signal}`}>
+      <article className={`${styles.detectionLock} ${sceneStyles.lock}`} aria-label={`Новый сигнал: ${DEMO_COMPANY.signal}`}>
         <div className={styles.lockMarker}><SignalGlyph size={54} /></div>
         <div className={styles.lockCopy}>
           <span className={styles.signalStatus}><i aria-hidden="true" /> новый сигнал · {DEMO_COMPANY.freshness}</span>
@@ -67,7 +68,7 @@ export default function DetectionScene({ previewHref }: { previewHref: string })
           <p>{DEMO_COMPANY.change}</p>
           <dl className={styles.lockMetrics}>
             <div><dt>Свежесть</dt><dd>{DEMO_COMPANY.freshness}</dd></div>
-            <div><dt>Confidence</dt><dd>{DEMO_COMPANY.confidence}</dd></div>
+            <div><dt>Достоверность</dt><dd>{DEMO_COMPANY.confidence}</dd></div>
           </dl>
           <small><b>Почему сейчас:</b> {DEMO_COMPANY.whyNow}</small>
         </div>
@@ -76,9 +77,9 @@ export default function DetectionScene({ previewHref }: { previewHref: string })
         </Link>
       </article>
 
-      <div className={styles.detectionFooter}>
-        <span>Сигнал → Доказательство → Рабочий приоритет</span>
-        <a href="#scene-workspace">Сразу открыть продукт <ArrowGlyph className={styles.downArrow} /></a>
+      <div className={`${styles.detectionFooter} ${sceneStyles.footer}`}>
+        <span>Сигнал → Доказательства → Рабочий приоритет</span>
+        <a href="#scene-workspace">Сразу открыть пример <ArrowGlyph className={styles.downArrow} /></a>
       </div>
     </section>
   );
