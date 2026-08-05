@@ -1,0 +1,22 @@
+.frame.frame {
+  width: 100vw;
+  max-width: none;
+  margin-top: -32px;
+  margin-right: calc(50% - 50vw);
+  margin-bottom: -72px;
+  margin-left: calc(50% - 50vw);
+}
+
+.frame.frame :global([data-landing-scene]) {
+  padding-inline: max(
+    var(--landing-gutter),
+    calc((100vw - var(--landing-container)) / 2)
+  );
+}
+
+@media (max-width: 1024px) {
+  .frame.frame {
+    margin-top: -24px;
+    margin-bottom: -60px;
+  }
+}
