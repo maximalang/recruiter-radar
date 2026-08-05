@@ -13,6 +13,20 @@
   cursor: not-allowed;
 }
 
+/* Text links that behave as product controls need a real, forgiving hit area. */
+:where(
+  a[class*="footerBrand"],
+  a[class*="footerLink"],
+  a[class*="footerOperatorEmail"],
+  a[class*="emptyStateAction"],
+  a[class*="skipLink"],
+  a[class*="pending-auth-action"][class*="brand"]
+) {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+}
+
 [data-product-workspace="true"] :is(
   nav a,
   header a[class*="Action"],
@@ -27,6 +41,15 @@
 main[data-ui-system][class*="shell"] :is(a[class*="Action"], button),
 [data-landing-experience] :is(nav a, header a, a[class*="button"], a[class*="Button"], a[class*="action"], a[class*="Action"], button) {
   min-height: 44px;
+}
+
+[data-product-workspace="true"] :is(
+  [class*="sidebarBrand"],
+  [class*="mobileTopbar"]
+) > a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
 }
 
 [data-product-workspace="true"] :is(summary, [role="button"]) {
@@ -68,6 +91,12 @@ main[data-ui-system] :where([id]) {
   main[data-ui-system][class*="shell"] :is(a[class*="Action"], button),
   [data-landing-experience] :is(nav a, header a, a[class*="Action"], button) {
     min-height: 46px;
+  }
+
+  /* Avoid the one-pixel overshoot created by nested full-width details borders. */
+  [data-landing-experience] summary {
+    box-sizing: border-box;
+    max-width: calc(100% - 2px);
   }
 }
 
