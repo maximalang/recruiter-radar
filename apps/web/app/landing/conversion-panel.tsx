@@ -24,7 +24,7 @@ export default function ConversionPanel(props: {
     <div className={styles.conversionPanel}>
       <div id="pricing" className={styles.pricingStage}>
         <div className={styles.pricingIntro}>
-          <span>После preview / следующий шаг</span>
+          <span data-system-label>После примера / следующий шаг</span>
           <h2>Начните с недели. Продолжайте, только если радар полезен.</h2>
           <p>
             {props.paymentConfigured
@@ -79,7 +79,7 @@ export default function ConversionPanel(props: {
 
       <div id="faq" className={styles.faqStage}>
         <div className={styles.faqHeading}>
-          <span>FAQ / перед запуском</span>
+          <span data-system-label>Перед запуском</span>
           <h2>Коротко о данных, доставке и контроле.</h2>
         </div>
         <div className={styles.faqList}>
@@ -92,8 +92,8 @@ export default function ConversionPanel(props: {
         </div>
       </div>
 
-      <div className={styles.finalCall}>
-        <span>SIGNAL LOCK / 07 DAYS</span>
+      <div className={styles.finalCall} data-final-cta>
+        <span data-final-status>Радар / 7 дней</span>
         <h2>Соберите радар под свою специализацию.</h2>
         <p>Получите первый короткий список компаний и решите на фактах, стоит ли продолжать.</p>
         <div>
@@ -104,7 +104,7 @@ export default function ConversionPanel(props: {
           >
             {props.paymentConfigured ? `Активировать неделю — ${pilotPlan.price}` : "Оставить заявку на неделю"} <ArrowGlyph />
           </Link>
-          <a href="#preview-configurator">Вернуться к preview <ArrowGlyph /></a>
+          <a href="#preview-configurator">Вернуться к настройке выдачи <ArrowGlyph /></a>
         </div>
       </div>
     </div>
