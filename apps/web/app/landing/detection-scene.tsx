@@ -22,7 +22,7 @@ export default function DetectionScene({ previewHref }: { previewHref: string })
           Кому написать сегодня — <em>видно по сигналам.</em>
         </h1>
         <p className={styles.heroDescription}>
-          Recruiter Radar каждый день находит компании с актуальной потребностью в найме, объясняет их приоритет и показывает доказательства.
+          Recruiter Radar отслеживает сигналы найма российских компаний и собирает короткий список: кому написать, почему сейчас и на какие факты сослаться.
         </p>
         <div className={styles.heroActions}>
           <a

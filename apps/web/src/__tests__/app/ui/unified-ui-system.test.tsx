@@ -10,7 +10,7 @@ import { ProductWorkspaceFrame } from "@/app/ui/product-workspace";
 const NAVIGATION = [{ href: "/dashboard", label: "Дашборд", active: true }];
 
 describe("Recruiter Radar unified UI system", () => {
-  it("marks public, auth and product surfaces with one visual-system contract", () => {
+  it("marks every surface with its active visual-system contract", () => {
     const publicView = render(<PageFrame>Public</PageFrame>);
     expect(publicView.container.firstElementChild).toHaveAttribute(
       "data-ui-system",
@@ -30,7 +30,7 @@ describe("Recruiter Radar unified UI system", () => {
     );
     expect(workspaceView.container.firstElementChild).toHaveAttribute(
       "data-ui-system",
-      "recruiter-radar-v6",
+      "recruiter-radar-v7",
     );
   });
 
