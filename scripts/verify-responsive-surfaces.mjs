@@ -9,7 +9,14 @@ const outputDir = path.resolve(process.env.RESPONSIVE_ARTIFACT_DIR ?? '/tmp/recr
 const routes = [
   '/',
   '/login',
-  '/checkout',
+  '/checkout?plan=pilot',
+  '/checkout?plan=monthly',
+  '/checkout?plan=quarterly',
+  '/legal',
+  '/terms',
+  '/payment-and-refund',
+  '/privacy',
+  '/personal-data-consent',
   '/dashboard',
   '/leads',
   '/review',
@@ -23,7 +30,9 @@ const viewports = [
 ];
 
 function slug(route) {
-  return route === '/' ? 'landing' : route.replace(/^\//, '').replace(/[^a-z0-9]+/gi, '-');
+  return route === '/'
+    ? 'landing'
+    : route.replace(/^\//, '').replace(/[^a-z0-9]+/gi, '-').replace(/-+$/, '');
 }
 
 await fs.mkdir(outputDir, { recursive: true });
