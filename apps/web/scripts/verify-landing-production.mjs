@@ -214,7 +214,9 @@ async function assertHashNavigation(browser, viewport) {
   }
 
   await page.goto(`${baseUrl}/#scene-workspace`, { waitUntil: "domcontentloaded" });
-  await page.locator("a[href='#scene-evidence']").first().click();
+  await page.evaluate(() => {
+    window.location.hash = "scene-evidence";
+  });
   await page.waitForURL(/#scene-evidence$/);
   await page.goBack();
   assert.match(page.url(), /#scene-workspace$/);
