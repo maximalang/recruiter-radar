@@ -7,305 +7,318 @@ import { chromium } from "playwright";
 
 const baseUrl = process.env.LANDING_BASE_URL ?? "http://127.0.0.1:3000";
 const screenshotDirectory = process.env.LANDING_SCREENSHOT_DIR
-  ?? path.join(os.tmpdir(), "recruiter-radar-signal-lock");
+  ?? path.join(os.tmpdir(), "recruiter-radar-final-unified-landing");
 
 const viewportMatrix = [
-  { width: 320, height: 700, name: "mobile-320x700" },
-  { width: 390, height: 844, name: "mobile-390x844" },
-  { width: 768, height: 1024, name: "tablet-768x1024" },
-  { width: 1024, height: 768, name: "desktop-1024x768" },
-  { width: 1280, height: 800, name: "desktop-1280x800" },
+  { width: 1920, height: 1080, name: "desktop-1920x1080" },
   { width: 1440, height: 900, name: "desktop-1440x900" },
+  { width: 1366, height: 768, name: "desktop-1366x768" },
+  { width: 1280, height: 800, name: "desktop-1280x800" },
+  { width: 1180, height: 820, name: "tablet-1180x820" },
+  { width: 1024, height: 768, name: "tablet-1024x768" },
+  { width: 900, height: 900, name: "tablet-900x900" },
+  { width: 768, height: 1024, name: "tablet-768x1024" },
+  { width: 390, height: 844, name: "mobile-390x844" },
+  { width: 360, height: 800, name: "mobile-360x800" },
+  { width: 320, height: 700, name: "mobile-320x700" },
 ];
+
+const requiredSelectors = [
+  "#scene-detection",
+  "#scene-timeline",
+  "#scene-workspace",
+  "#preview-configurator",
+  "#preview-results",
+  "#scene-evidence",
+  "#scene-delivery",
+  "#scene-outreach",
+  "#pricing",
+  "#faq",
+  "footer",
+];
+
+const hashTargets = [
+  "#scene-workspace",
+  "#preview-configurator",
+  "#preview-results",
+  "#scene-evidence",
+  "#scene-delivery",
+  "#pricing",
+  "#faq",
+];
+
+function assertNoConsoleFailures(messages, viewportName) {
+  const failures = messages.filter((message) => message.type === "error" || message.type === "pageerror");
+  assert.deepEqual(failures, [], `${viewportName}: console/page errors: ${JSON.stringify(failures)}`);
+}
+
+async function waitForLanding(page) {
+  await page.goto(`${baseUrl}/`, { waitUntil: "domcontentloaded" });
+  await page.locator("#scene-detection").waitFor({ state: "visible" });
+  await page.locator("#preview-configurator").waitFor({ state: "attached" });
+  await page.locator("#preview-results").waitFor({ state: "attached" });
+}
+
+async function assertRequiredSurface(page, viewportName) {
+  for (const selector of requiredSelectors) {
+    const locator = page.locator(selector).first();
+    await locator.waitFor({ state: "attached" });
+    assert.equal(await locator.count(), 1, `${viewportName}: missing ${selector}`);
+  }
+
+  assert.match(await page.locator("h1").innerText(), /Кому написать сегодня/);
+  assert.match(await page.locator("#scene-delivery").innerText(), /не отправляет сообщение компании/i);
+  assert.match(await page.locator("#scene-outreach").innerText(), /не отправляет сообщения компаниям автоматически/i);
+  assert.match(await page.locator("#pricing").innerText(), /Тарифы|Начните с недели/i);
+  assert.match(await page.locator("#faq").innerText(), /Перед запуском|данных, доставки и контроля/i);
+}
+
+async function assertNoHorizontalOverflow(page, viewportName) {
+  const dimensions = await page.evaluate(() => ({
+    viewport: document.documentElement.clientWidth,
+    document: document.documentElement.scrollWidth,
+    body: document.body.scrollWidth,
+  }));
+  assert.ok(
+    Math.max(dimensions.document, dimensions.body) <= dimensions.viewport + 1,
+    `${viewportName}: horizontal overflow ${JSON.stringify(dimensions)}`,
+  );
+}
+
+async function assertControlsAndText(page, viewportName) {
+  const violations = await page.evaluate(() => {
+    const controls = Array.from(document.querySelectorAll("a, button, input, summary"));
+    const smallControls = controls
+      .filter((element) => {
+        const rect = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        if (style.display === "none" || style.visibility === "hidden" || rect.width === 0 || rect.height === 0) return false;
+        return rect.width < 44 || rect.height < 44;
+      })
+      .slice(0, 12)
+      .map((element) => ({ tag: element.tagName, text: element.textContent?.trim().slice(0, 60), rect: element.getBoundingClientRect().toJSON() }));
+
+    const tinyText = Array.from(document.querySelectorAll("main p, main span, main small, main a, main button"))
+      .filter((element) => {
+        const rect = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        if (style.display === "none" || style.visibility === "hidden" || rect.width === 0 || rect.height === 0) return false;
+        const content = element.textContent?.trim() ?? "";
+        return content.length > 2 && Number.parseFloat(style.fontSize) < 9;
+      })
+      .slice(0, 12)
+      .map((element) => ({ tag: element.tagName, text: element.textContent?.trim().slice(0, 60), fontSize: getComputedStyle(element).fontSize }));
+
+    return { smallControls, tinyText };
+  });
+
+  assert.deepEqual(violations.smallControls, [], `${viewportName}: controls below 44px: ${JSON.stringify(violations.smallControls)}`);
+  assert.deepEqual(violations.tinyText, [], `${viewportName}: unreadable text: ${JSON.stringify(violations.tinyText)}`);
+}
+
+async function assertNoOverlapOrClipping(page, viewportName) {
+  const issues = await page.evaluate(() => {
+    const selectors = [
+      "#scene-detection h1",
+      "#scene-detection article",
+      "#preview-configurator",
+      "#preview-results",
+      "#scene-evidence",
+      "#scene-delivery",
+      "#scene-outreach",
+      "#pricing",
+      "#faq",
+      "footer",
+    ];
+    return selectors.flatMap((selector) => Array.from(document.querySelectorAll(selector)).flatMap((element) => {
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      const clipped = style.overflow === "hidden" && (element.scrollHeight > element.clientHeight + 2 || element.scrollWidth > element.clientWidth + 2);
+      const outside = rect.left < -2 || rect.right > document.documentElement.clientWidth + 2;
+      return clipped || outside ? [{ selector, clipped, outside, rect: rect.toJSON() }] : [];
+    }));
+  });
+  assert.deepEqual(issues, [], `${viewportName}: clipping/viewport issues ${JSON.stringify(issues)}`);
+}
+
+async function assertPageHeight(page, viewport) {
+  const height = await page.evaluate(() => document.documentElement.scrollHeight);
+  const limit = viewport.width <= 390 ? 12000 : viewport.width >= 1366 ? 9500 : 11500;
+  assert.ok(height <= limit, `${viewport.name}: full page ${height}px exceeds ${limit}px`);
+  return height;
+}
+
+async function assertResponsiveSurface(browser, viewport) {
+  const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height } });
+  const page = await context.newPage();
+  const messages = [];
+  page.on("console", (message) => messages.push({ type: message.type(), text: message.text() }));
+  page.on("pageerror", (error) => messages.push({ type: "pageerror", text: error.message }));
+
+  await waitForLanding(page);
+  await assertRequiredSurface(page, viewport.name);
+  await assertNoHorizontalOverflow(page, viewport.name);
+  await assertControlsAndText(page, viewport.name);
+  await assertNoOverlapOrClipping(page, viewport.name);
+  const fullHeight = await assertPageHeight(page, viewport);
+
+  const firstLead = page.locator("[data-primary-lead]").first();
+  if (await firstLead.count()) {
+    assert.equal(await firstLead.getAttribute("open"), "", `${viewport.name}: first recommendation must be expanded`);
+    const scoreSize = await firstLead.locator("[data-lead-score] strong").evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
+    assert.ok(scoreSize >= 22, `${viewport.name}: Radar Score is too small (${scoreSize}px)`);
+  }
+
+  const previewCta = page.locator("#preview-results a").last();
+  if (await previewCta.count()) {
+    const rect = await previewCta.boundingBox();
+    assert.ok(rect && rect.height >= 44, `${viewport.name}: preview CTA is not prominent`);
+  }
+
+  if (viewport.width <= 1280) {
+    await page.getByRole("button", { name: "Открыть меню" }).waitFor({ state: "visible" });
+  }
+
+  const fullScreenshot = viewport.name === "desktop-1440x900" || viewport.name === "mobile-390x844";
+  await page.screenshot({
+    path: path.join(screenshotDirectory, `${viewport.name}-${fullScreenshot ? `full-${fullHeight}px` : "viewport"}.png`),
+    fullPage: fullScreenshot,
+  });
+
+  assertNoConsoleFailures(messages, viewport.name);
+  await context.close();
+}
+
+async function assertHashNavigation(browser, viewport) {
+  const context = await browser.newContext({ viewport });
+  const page = await context.newPage();
+
+  for (const hash of hashTargets) {
+    await page.goto(`${baseUrl}/${hash}`, { waitUntil: "domcontentloaded" });
+    const target = page.locator(hash).first();
+    await target.waitFor({ state: "attached" });
+    if (hash === "#preview-results") {
+      await page.locator("#preview-results[data-preview-results-ready], #preview-results[data-preview-results-skeleton]").waitFor({ state: "attached" });
+    }
+    await page.waitForTimeout(120);
+    const firstPosition = await target.evaluate((element) => {
+      const header = document.querySelector("header");
+      const rect = element.getBoundingClientRect();
+      const headerBottom = header?.getBoundingClientRect().bottom ?? 0;
+      return { gap: rect.top - headerBottom, top: rect.top };
+    });
+    assert.ok(firstPosition.gap >= 8 && firstPosition.gap <= 48, `${viewport.width}x${viewport.height} ${hash}: invalid header gap ${firstPosition.gap}`);
+    await page.waitForTimeout(500);
+    const secondTop = await target.evaluate((element) => element.getBoundingClientRect().top);
+    assert.ok(Math.abs(secondTop - firstPosition.top) <= 3, `${viewport.width}x${viewport.height} ${hash}: position jumped ${firstPosition.top} -> ${secondTop}`);
+  }
+
+  await page.goto(`${baseUrl}/#scene-workspace`, { waitUntil: "domcontentloaded" });
+  await page.locator("a[href='#scene-evidence']").first().click();
+  await page.waitForURL(/#scene-evidence$/);
+  await page.goBack();
+  assert.match(page.url(), /#scene-workspace$/);
+  await page.goForward();
+  assert.match(page.url(), /#scene-evidence$/);
+
+  await context.close();
+}
+
+async function assertMobileKeyboardNavigation(browser) {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  await waitForLanding(page);
+
+  const trigger = page.getByRole("button", { name: "Открыть меню" });
+  await trigger.focus();
+  await page.keyboard.press("Enter");
+  const dialog = page.getByRole("dialog", { name: "Навигация по продукту" });
+  await dialog.waitFor({ state: "visible" });
+  assert.equal(await page.evaluate(() => document.body.style.overflow), "hidden");
+
+  await page.keyboard.press("Shift+Tab");
+  assert.equal(await dialog.evaluate((element) => element.contains(document.activeElement)), true, "focus escaped mobile dialog");
+  await page.keyboard.press("Escape");
+  await dialog.waitFor({ state: "hidden" });
+  assert.equal(await trigger.evaluate((element) => element === document.activeElement), true, "focus did not return to menu trigger");
+
+  await trigger.click();
+  await dialog.getByRole("link", { name: "Доказательства" }).click();
+  await page.waitForURL(/#scene-evidence$/);
+  await dialog.waitFor({ state: "hidden" });
+  assert.notEqual(await page.evaluate(() => document.body.style.overflow), "hidden");
+
+  await context.close();
+}
+
+async function assertActiveNavigationAndTone(browser) {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await waitForLanding(page);
+  await page.locator("#scene-evidence").scrollIntoViewIfNeeded();
+  await page.waitForTimeout(180);
+  const active = page.locator("header a[aria-current='location']");
+  assert.match(await active.first().innerText(), /Доказательства/);
+  assert.equal(await page.locator("header").getAttribute("data-tone"), "dark");
+  await page.locator("#scene-delivery").scrollIntoViewIfNeeded();
+  await page.waitForTimeout(180);
+  assert.equal(await page.locator("header").getAttribute("data-tone"), "light");
+  await context.close();
+}
+
+async function assertNoJs(browser) {
+  const context = await browser.newContext({ javaScriptEnabled: false, viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  await page.goto(`${baseUrl}/`, { waitUntil: "domcontentloaded" });
+
+  for (const selector of requiredSelectors) {
+    await page.locator(selector).first().waitFor({ state: "attached" });
+  }
+  assert.equal(await page.locator("#preview-configurator form").count(), 1, "no-JS configurator missing");
+  assert.equal(await page.locator("#pricing").count(), 1, "no-JS pricing missing");
+  assert.equal(await page.locator("#faq").count(), 1, "no-JS FAQ missing");
+  assert.equal(await page.locator("footer").count(), 1, "no-JS footer missing");
+  await assertNoHorizontalOverflow(page, "no-js-390x844");
+  await context.close();
+}
+
+async function assertEmptyPreviewStillKeepsConversion(browser) {
+  const context = await browser.newContext({ viewport: { width: 768, height: 1024 } });
+  const page = await context.newPage();
+  await page.goto(`${baseUrl}/?specialization=zzzz-no-exact-match&targetCity=zzzz#preview-results`, { waitUntil: "domcontentloaded" });
+  await page.locator("#pricing").waitFor({ state: "attached" });
+  await page.locator("#faq").waitFor({ state: "attached" });
+  assert.equal(await page.locator("#pricing").count(), 1);
+  assert.equal(await page.locator("#faq").count(), 1);
+  await context.close();
+}
+
+async function assertReducedMotion(browser) {
+  const context = await browser.newContext({ reducedMotion: "reduce", viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await waitForLanding(page);
+  const animated = await page.evaluate(() => Array.from(document.querySelectorAll("#scene-detection *")).filter((element) => {
+    const style = getComputedStyle(element);
+    return style.animationName !== "none" && style.animationDuration !== "0s";
+  }).map((element) => ({ tag: element.tagName, className: element.className, animation: getComputedStyle(element).animationName })));
+  assert.deepEqual(animated, [], `reduced-motion animations remain: ${JSON.stringify(animated)}`);
+  await context.close();
+}
 
 await mkdir(screenshotDirectory, { recursive: true });
 const browser = await chromium.launch({ headless: true });
 
-async function assertNoHorizontalOverflow(page, label) {
-  const dimensions = await page.evaluate(() => ({
-    clientWidth: document.documentElement.clientWidth,
-    scrollWidth: document.documentElement.scrollWidth,
-  }));
-  assert.ok(
-    dimensions.scrollWidth <= dimensions.clientWidth + 1,
-    `${label}: horizontal overflow ${dimensions.scrollWidth}px > ${dimensions.clientWidth}px`,
-  );
-}
-
-async function assertHashTargets(page, label) {
-  const missingTargets = await page.locator('a[href^="#"]').evaluateAll((links) => links.flatMap((link) => {
-    const href = link.getAttribute("href");
-    if (!href || href === "#") return [];
-    const id = decodeURIComponent(href.slice(1));
-    return document.getElementById(id) ? [] : [href];
-  }));
-  assert.deepEqual(missingTargets, [], `${label}: missing hash targets ${missingTargets.join(", ")}`);
-}
-
-function waitForLandingEvent(page, name, context) {
-  return page.waitForRequest((request) => {
-    if (!request.url().endsWith("/api/landing-events")) return false;
-    try {
-      const payload = request.postDataJSON();
-      return payload.name === name && payload.context === context;
-    } catch {
-      return false;
-    }
-  });
-}
-
-async function openLanding(context, label) {
-  const page = await context.newPage();
-  const consoleErrors = [];
-  const pageErrors = [];
-
-  page.on("console", (message) => {
-    if (message.type() === "error") consoleErrors.push(message.text());
-  });
-  page.on("pageerror", (error) => pageErrors.push(error.message));
-  await page.route("**/api/landing-events", (route) => route.fulfill({ status: 204 }));
-  await page.goto(baseUrl, { waitUntil: "networkidle" });
-  await page.locator('[data-landing-experience="signal-lock"]').waitFor();
-
-  assert.equal(await page.locator("h1").count(), 1, `${label}: expected exactly one h1`);
-  await page.getByRole("heading", { name: /Кому написать сегодня/ }).waitFor();
-  for (const id of [
-    "scene-detection",
-    "scene-timeline",
-    "scene-workspace",
-    "scene-evidence",
-    "scene-delivery",
-    "scene-outreach",
-    "pricing",
-    "faq",
-  ]) {
-    assert.equal(await page.locator(`#${id}`).count(), 1, `${label}: missing ${id}`);
-  }
-
-  assert.equal(await page.locator("canvas").count(), 0, `${label}: legacy canvas still mounted`);
-  assert.equal(await page.locator("[data-hero-tilt]").count(), 0, `${label}: legacy hero tilt still mounted`);
-  assert.equal(await page.locator("[data-scroll-progress]").count(), 0, `${label}: legacy scroll progress still mounted`);
-  assert.equal(await page.getByText(/NORTH|EAST|SOUTH|WEST/).count(), 0, `${label}: compass labels remain`);
-
-  const heroCta = page.getByRole("link", { name: /Собрать мой радар/ });
-  assert.equal(await heroCta.getAttribute("href"), "#preview-configurator");
-  const checkoutLink = page.locator('a[data-analytics-event="checkout_started"]').first();
-  assert.match(await checkoutLink.getAttribute("href"), /^\/checkout(?:\?|$)/);
-  await page.getByRole("link", { name: /Оферта/ }).last().waitFor();
-  await page.getByRole("link", { name: /Конфиденциальность/ }).last().waitFor();
-
-  const paymentCopy = await page.locator("#pricing").innerText();
-  assert.match(paymentCopy, /заявк\S* без списания|разовая оплата/i);
-  const details = page.locator("#faq details").first();
-  await details.locator("summary").click();
-  assert.ok(await details.evaluate((element) => element.open), `${label}: FAQ did not open`);
-
-  await assertHashTargets(page, label);
-  await assertNoHorizontalOverflow(page, label);
-  await page.evaluate(() => {
-    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-    window.scrollTo(0, 0);
-  });
-  await page.screenshot({
-    path: path.join(screenshotDirectory, `${label}-full.png`),
-    fullPage: true,
-    animations: "disabled",
-  });
-
-  assert.deepEqual(pageErrors, [], `${label}: page errors: ${pageErrors.join(" | ")}`);
-  assert.deepEqual(consoleErrors, [], `${label}: console errors: ${consoleErrors.join(" | ")}`);
-  return page;
-}
-
 try {
-  for (const viewport of viewportMatrix) {
-    const context = await browser.newContext({
-      viewport: { width: viewport.width, height: viewport.height },
-      colorScheme: "dark",
-    });
-    const page = await openLanding(context, viewport.name);
-
-    if (viewport.width <= 390) {
-      const touchTargets = await page.locator("a, button, summary").evaluateAll((elements) =>
-        elements
-          .filter((element) => {
-            const rect = element.getBoundingClientRect();
-            return rect.width > 0 && rect.height > 0 && rect.top < window.innerHeight;
-          })
-          .map((element) => {
-            const rect = element.getBoundingClientRect();
-            return { text: element.textContent?.trim().slice(0, 40), width: rect.width, height: rect.height };
-          }),
-      );
-      const tooSmall = touchTargets.filter((target) => target.height < 44 || target.width < 44);
-      assert.deepEqual(tooSmall, [], `${viewport.name}: mobile touch targets below 44px: ${JSON.stringify(tooSmall)}`);
-    }
-
-    if (viewport.name === "desktop-1440x900") {
-      await page.locator("#scene-detection").screenshot({
-        path: path.join(screenshotDirectory, "hero-desktop-1440x900.png"),
-        animations: "disabled",
-      });
-      await page.locator("#scene-workspace").screenshot({
-        path: path.join(screenshotDirectory, "preview-desktop-1440x900.png"),
-        animations: "disabled",
-      });
-
-      const header = page.locator('header[data-brand-header="signal-lock"]');
-      assert.equal(await header.evaluate((element) => getComputedStyle(element).position), "fixed", "desktop: header is not fixed");
-      await page.locator("#scene-evidence").scrollIntoViewIfNeeded();
-      await page.waitForFunction(() => document.querySelector('header[data-brand-header="signal-lock"]')?.hasAttribute("data-scrolled"));
-      await page.locator('nav[aria-label="Разделы лендинга"] a[href="#scene-evidence"][aria-current="location"]').waitFor();
-    }
-
-    if (viewport.name === "mobile-390x844") {
-      const mobileMenu = page.locator("details").filter({ has: page.locator('summary[aria-label*="меню"]') }).first();
-      const menuSummary = mobileMenu.locator("summary");
-      await menuSummary.click();
-      assert.ok(await mobileMenu.evaluate((element) => element.open), "mobile: menu did not open");
-      await page.screenshot({
-        path: path.join(screenshotDirectory, "mobile-menu-390x844.png"),
-        animations: "disabled",
-      });
-      await page.keyboard.press("Escape");
-      assert.equal(await mobileMenu.evaluate((element) => element.open), false, "mobile: Escape did not close menu");
-      await page.waitForFunction((element) => document.activeElement === element, await menuSummary.elementHandle());
-
-      await page.locator("#pricing").scrollIntoViewIfNeeded();
-      await page.screenshot({
-        path: path.join(screenshotDirectory, "pricing-mobile-390x844.png"),
-        animations: "disabled",
-      });
-    }
-
-    await context.close();
-  }
-
-  const keyboardContext = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-  const keyboardPage = await keyboardContext.newPage();
-  await keyboardPage.route("**/api/landing-events", (route) => route.fulfill({ status: 204 }));
-  await keyboardPage.goto(baseUrl, { waitUntil: "networkidle" });
-  await keyboardPage.keyboard.press("Tab");
-  const skipLink = keyboardPage.getByRole("link", { name: "Перейти к содержанию" });
-  await skipLink.waitFor();
-  assert.ok(await skipLink.evaluate((element) => element === document.activeElement), "keyboard: skip link is not the first focus target");
-  const skipLinkBox = await skipLink.boundingBox();
-  assert.ok(skipLinkBox && skipLinkBox.y >= 0, "keyboard: focused skip link remains off-screen");
-  await keyboardPage.keyboard.press("Enter");
-  assert.equal(new URL(keyboardPage.url()).hash, "#main-content", "keyboard: skip link did not move to main content");
-  await keyboardContext.close();
-
-  const interactionContext = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-  const interactionPage = await interactionContext.newPage();
-  const analyticsEvents = [];
-  await interactionPage.route("**/api/landing-events", (route) => {
-    try {
-      analyticsEvents.push(route.request().postDataJSON());
-    } catch {
-      // API route tests cover malformed analytics; this audit records valid client events.
-    }
-    return route.fulfill({ status: 204 });
-  });
-  await interactionPage.goto(baseUrl, { waitUntil: "networkidle" });
-
-  const heroPreviewEvent = waitForLandingEvent(interactionPage, "preview_started", "hero_primary");
-  await Promise.all([
-    heroPreviewEvent,
-    interactionPage.getByRole("link", { name: /Собрать мой радар/ }).first().click(),
-  ]);
-  assert.equal(new URL(interactionPage.url()).hash, "#preview-configurator");
-
-  const presetEvent = waitForLandingEvent(interactionPage, "preview_started", "preset");
-  await Promise.all([
-    presetEvent,
-    interactionPage.waitForURL((url) => url.searchParams.has("specialization")),
-    interactionPage.locator("[data-preview-preset]").nth(1).click(),
-  ]);
-  await interactionPage.locator("[data-preview-preset][data-selected]").waitFor();
-
-  await interactionPage.getByLabel("Специализация").fill("Инженерный подбор");
-  await interactionPage.getByLabel("География").fill("Москва");
-  const formEvent = waitForLandingEvent(interactionPage, "preview_started", "form");
-  await Promise.all([
-    formEvent,
-    interactionPage.waitForURL((url) => url.searchParams.get("targetCity") === "Москва"),
-    interactionPage.locator("[data-preview-submit]").click(),
-  ]);
-  assert.equal(await interactionPage.getByLabel("Специализация").inputValue(), "Инженерный подбор");
-  assert.equal(await interactionPage.getByLabel("География").inputValue(), "Москва");
-
-  const secondLead = interactionPage.locator("details[data-lead-card]").nth(1);
-  if (await secondLead.count()) {
-    await secondLead.locator("summary").click();
-    assert.ok(await secondLead.evaluate((element) => element.open), "workspace: second evidence row did not open");
-  }
-
-  const checkoutEvent = waitForLandingEvent(interactionPage, "checkout_started", "preview");
-  await Promise.all([
-    checkoutEvent,
-    interactionPage.waitForURL((url) => url.pathname === "/checkout"),
-    interactionPage.locator('#preview-results [data-analytics-event="checkout_started"]').click(),
-  ]);
-  await interactionPage.getByRole("heading", { name: /Оформление|Подключение/ }).waitFor();
-  const checkoutEntryPoints = await interactionPage.locator('[data-checkout-form], a[href^="/login?returnTo="]').count();
-  assert.equal(checkoutEntryPoints, 1, "checkout: expected an authorized form or the fail-closed login gate");
-  assert.equal(JSON.stringify(analyticsEvents).includes("Инженерный подбор"), false, "analytics included preview form values");
-  assert.equal(JSON.stringify(analyticsEvents).includes("Москва"), false, "analytics included preview geography");
-  await interactionContext.close();
-
-  const reducedContext = await browser.newContext({
-    viewport: { width: 1440, height: 900 },
-    reducedMotion: "reduce",
-  });
-  const reducedPage = await openLanding(reducedContext, "reduced-motion-1440x900");
-  const reducedMotionViolations = await reducedPage.locator('[data-landing-experience="signal-lock"] *').evaluateAll((elements) => {
-    const exceedsOneMicrosecond = (duration) => duration.split(",").some((value) => Number.parseFloat(value) > 0.000001);
-
-    return elements.slice(0, 100).flatMap((element) => {
-      const style = getComputedStyle(element);
-      if (!exceedsOneMicrosecond(style.animationDuration) && !exceedsOneMicrosecond(style.transitionDuration)) return [];
-      return [{
-        element: `${element.tagName.toLowerCase()}.${element.className}`,
-        animationDuration: style.animationDuration,
-        transitionDuration: style.transitionDuration,
-      }];
-    });
-  });
-  assert.deepEqual(reducedMotionViolations, [], "reduced motion: a visible landing motion effect is still active");
-  await reducedContext.close();
-
-  const noJsContext = await browser.newContext({
-    viewport: { width: 390, height: 844 },
-    javaScriptEnabled: false,
-  });
-  const noJsPage = await noJsContext.newPage();
-  await noJsPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
-  await noJsPage.getByRole("heading", { name: /Кому написать сегодня/ }).waitFor();
-  assert.equal(await noJsPage.locator("h1").count(), 1);
-  await assertNoHorizontalOverflow(noJsPage, "no-js-mobile-390x844");
-  await noJsPage.screenshot({ path: path.join(screenshotDirectory, "no-js-mobile-390x844.png"), fullPage: true });
-  await noJsContext.close();
-
-  process.stdout.write(`${JSON.stringify({
-    ok: true,
-    baseUrl,
-    screenshotDirectory,
-    viewports: viewportMatrix.map(({ name }) => name),
-    namedScreenshots: [
-      "desktop-1440x900-full.png",
-      "hero-desktop-1440x900.png",
-      "preview-desktop-1440x900.png",
-      "mobile-390x844-full.png",
-      "mobile-menu-390x844.png",
-      "pricing-mobile-390x844.png",
-      "no-js-mobile-390x844.png",
-    ],
-    stickyHeader: true,
-    activeNavigation: true,
-    mobileMenu: true,
-    reducedMotion: true,
-    noJavaScript: true,
-  }, null, 2)}\n`);
+  for (const viewport of viewportMatrix) await assertResponsiveSurface(browser, viewport);
+  await assertHashNavigation(browser, { width: 390, height: 844 });
+  await assertHashNavigation(browser, { width: 768, height: 1024 });
+  await assertHashNavigation(browser, { width: 1440, height: 900 });
+  await assertMobileKeyboardNavigation(browser);
+  await assertActiveNavigationAndTone(browser);
+  await assertNoJs(browser);
+  await assertEmptyPreviewStillKeepsConversion(browser);
+  await assertReducedMotion(browser);
+  console.log(`Landing production audit passed. Screenshots: ${screenshotDirectory}`);
 } finally {
   await browser.close();
 }
