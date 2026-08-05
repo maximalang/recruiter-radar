@@ -31,24 +31,30 @@ export default function WorkspaceLead({ item, defaultOpen }: { item: PreviewItem
     limit: 3,
   });
   const scoreParts = [
-    ["Fit", item.relevanceSignals.fit],
-    ["Intent", item.relevanceSignals.intent],
-    ["Urgency", item.relevanceSignals.urgency],
-    ["Reachability", item.relevanceSignals.reachability],
+    ["Совпадение", item.relevanceSignals.fit],
+    ["Намерение", item.relevanceSignals.intent],
+    ["Срочность", item.relevanceSignals.urgency],
+    ["Контакт", item.relevanceSignals.reachability],
   ] as const;
 
   return (
-    <details className={styles.workspaceLead} open={defaultOpen} name="preview-leads" data-lead-card="true">
+    <details
+      className={styles.workspaceLead}
+      open={defaultOpen}
+      name="preview-leads"
+      data-lead-card="true"
+      data-primary-lead={defaultOpen || undefined}
+    >
       <summary>
         <span className={styles.workspaceRank}>{String(item.rank).padStart(2, "0")}</span>
-        <span className={styles.workspaceCompany}><strong>{employerName}</strong><small>{[location, vacanciesCaption].filter(Boolean).join(" · ")}</small></span>
+        <span className={styles.workspaceCompany} data-lead-company><strong>{employerName}</strong><small>{[location, vacanciesCaption].filter(Boolean).join(" · ")}</small></span>
         <span className={styles.workspaceSignal}>{whyNow}</span>
-        <span className={styles.workspaceScore}><strong>{points}</strong><small>/100</small></span>
+        <span className={styles.workspaceScore} data-lead-score><strong>{points}</strong><small>/100</small></span>
         <span className={styles.leadChevron} aria-hidden="true"><ArrowGlyph size={16} /></span>
       </summary>
       <div className={styles.workspaceLeadBody}>
         <div className={styles.workspaceProof}>
-          <div><span>Почему сейчас</span><p>{freshness ? `${whyNow} Последнее изменение — ${freshness}.` : whyNow}</p></div>
+          <div data-primary-proof><span>Почему сейчас</span><p>{freshness ? `${whyNow} Последнее изменение — ${freshness}.` : whyNow}</p></div>
           <div><span>Корпоративный контакт</span><p>{contactPath}</p></div>
           <div><span>Следующий шаг</span><p>{item.opener?.trim() || "Проверить факты и выбрать безопасный путь обращения"}</p></div>
         </div>
