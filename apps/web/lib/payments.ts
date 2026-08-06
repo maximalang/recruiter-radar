@@ -122,18 +122,12 @@ export async function startCheckoutOrder(input: StartCheckoutOrderInput): Promis
   const provider = getConfiguredPaymentProvider();
   const successUrl = `${normalizeSiteUrl(input.siteUrl)}/checkout/order/${order.id}/success`;
   const cancelUrl = `${normalizeSiteUrl(input.siteUrl)}/checkout/order/${order.id}/cancel`;
-  // Recurring plans (monthly, quarterly) have no self-serve subscription flow — we
-  // capture them as a sales request, never as a pilot and never as a payment.
   const isRecurringPlan = plan.isRecurring;
   const unavailableReason = isRecurringPlan ? "request-received" : "payment-unavailable";
   const unavailablePaymentMessage = isRecurringPlan
     ? "Заявка получена. Мы свяжемся, чтобы подключить тариф и согласовать оплату."
     : "Оплата пока недоступна. Заявка сохранена, и к ней можно вернуться позже.";
 
-  // Recurring plans must NEVER reach the payment provider: there is no
-  // subscription flow, so createCheckoutSession would attempt a one-off charge
-  // for the full monthly amount. Short-circuit to a saved sales request,
-  // regardless of whether a provider is configured.
   if (isRecurringPlan || !provider || !provider.isConfigured()) {
     order = await updateCheckoutOrder(order.id, {
       status: "unavailable",
@@ -141,8 +135,6 @@ export async function startCheckoutOrder(input: StartCheckoutOrderInput): Promis
         paymentMessage: unavailablePaymentMessage
       }
     });
-    // Pilot funnel (application + onboarding) is pilot-only. Recurring sales
-    // requests stay as a saved order without a pilot application.
     if (order.productCode === "pilot") {
       order = await ensurePilotApplicationForOrder(order);
     }
@@ -235,7 +227,7 @@ export async function getPilotActivationReadiness(
 ): Promise<PilotActivationReadiness | null> {
   const order = await ensurePilotOrderOnboardingReady(orderId, { ownerId: options.ownerId });
 
-  if (!order || order.productCode !== "pilot") {
+  if (!order) {
     return null;
   }
 
@@ -277,10 +269,6 @@ export async function confirmPilotOrderProfile(input: {
 
   if (!order) {
     throw new Error(CUSTOMER_CHECKOUT_COPY.orderNotFound);
-  }
-
-  if (order.productCode !== "pilot") {
-    throw new Error(CUSTOMER_CHECKOUT_COPY.pilotOnly);
   }
 
   if (order.status !== "paid") {
@@ -345,10 +333,6 @@ export async function savePilotOrderTelegramChat(input: {
 
   order = await ensurePaidPilotOrderReady(order, input.db);
 
-  if (order.productCode !== "pilot") {
-    throw new Error(CUSTOMER_CHECKOUT_COPY.pilotOnly);
-  }
-
   if (order.status !== "paid") {
     throw new Error(CUSTOMER_CHECKOUT_COPY.paidOnly);
   }
@@ -404,10 +388,6 @@ export async function sendPilotOrderTestDigest(
     throw new Error(CUSTOMER_CHECKOUT_COPY.orderNotFound);
   }
 
-  if (order.productCode !== "pilot") {
-    throw new Error(CUSTOMER_CHECKOUT_COPY.pilotOnly);
-  }
-
   if (order.status !== "paid") {
     throw new Error(CUSTOMER_CHECKOUT_COPY.paidOnly);
   }
@@ -460,12 +440,6 @@ export async function sendPilotOrderTestDigest(
     throw new Error(telegramConfigMessage);
   }
 
-  // First-impression parity: the pilot's onboarding test digest must read exactly
-  // like a real daily digest — the same premium batch card, not the legacy
-  // debug-style buildHhDigestText ("HH digest" / "score 332.0"). Map the digest
-  // items to the same BatchLead shape the daily delivery uses. The resolved
-  // hiring mode is threaded through so the test digest is mode-aware too — the
-  // first impression an agency gets matches the daily radar's framing.
   const resolvedHiringMode = resolveHiringMode(profile);
   const batchLeads: BatchLead[] = items.map((item) => {
     const foreign = detectForeignEmployer({
@@ -571,10 +545,6 @@ export async function completePilotOrderOnboarding(
 
   if (!order) {
     throw new Error(CUSTOMER_CHECKOUT_COPY.orderNotFound);
-  }
-
-  if (order.productCode !== "pilot") {
-    throw new Error(CUSTOMER_CHECKOUT_COPY.pilotOnly);
   }
 
   if (order.status !== "paid") {
@@ -757,7 +727,6 @@ export function buildCheckoutRetryHref(order: CheckoutOrder): string {
   });
 }
 
-
 function mapDigestItemToTelegramDigestItem(item: DigestItemInput): HhDigestItem {
   return {
     rank: item.rank,
@@ -776,4 +745,3 @@ function mapDigestItemToTelegramDigestItem(item: DigestItemInput): HhDigestItem 
     location_names: item.location_names
   };
 }
-

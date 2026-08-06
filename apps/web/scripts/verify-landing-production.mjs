@@ -189,7 +189,7 @@ try {
     interactionPage.waitForURL((url) => url.pathname === "/checkout"),
     interactionPage.locator('#preview-results [data-analytics-event="checkout_started"]').click(),
   ]);
-  await interactionPage.getByRole("heading", { name: /Оформление|Подключение/ }).waitFor();
+  await interactionPage.getByRole("heading", { name: "Оплата доступа", exact: true }).waitFor();
   const checkoutEntryPoints = await interactionPage.locator('[data-checkout-form], a[href^="/login?returnTo="]').count();
   assert.equal(checkoutEntryPoints, 1, "checkout: expected an authorized form or the fail-closed login gate");
   assert.equal(JSON.stringify(analyticsEvents).includes("Инженерный подбор"), false, "analytics included preview form values");
