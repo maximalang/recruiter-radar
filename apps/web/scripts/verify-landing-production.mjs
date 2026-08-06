@@ -113,7 +113,7 @@ async function assertRequiredSurface(page, label) {
   }
 
   assert.equal(await page.locator("h1").count(), 1, `${label}: expected exactly one h1`);
-  assert.match(await page.locator("h1").innerText(), /Кому написать сегодня/);
+  assert.match(await page.locator("h1").innerText(), /Компании подают сигнал\.\s*Радар показывает, кому писать\./);
   assert.match(await page.locator("#scene-timeline").innerText(), /сигнал|ваканс|событ/i);
   assert.match(await page.locator("#scene-workspace").innerText(), /рабочий пример/i);
   assert.match(await page.locator("#scene-evidence").innerText(), /доказатель/i);
@@ -505,7 +505,7 @@ async function assertNoJs(browser) {
   for (const selector of requiredSelectors) {
     await page.locator(selector).first().waitFor({ state: "attached" });
   }
-  assert.match(await page.locator("h1").innerText(), /Кому написать сегодня/);
+  assert.match(await page.locator("h1").innerText(), /Компании подают сигнал\.\s*Радар показывает, кому писать\./);
   assert.match(await page.locator("#scene-timeline").innerText(), /сигнал|ваканс|событ/i);
   assert.match(await page.locator("#scene-workspace").innerText(), /рабочий пример/i);
   assert.equal(await page.locator("#preview-configurator form").count(), 1, "no-JS configurator missing");
