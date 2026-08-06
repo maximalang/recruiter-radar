@@ -3,6 +3,8 @@ name: Apply Evidence Radar Patch
 on:
   push:
     branches: [ codex/evidence-radar-system ]
+  pull_request:
+    branches: [ codex/commercial-signal-engine-phase-11 ]
 
 permissions:
   contents: write
