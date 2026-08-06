@@ -60,5 +60,9 @@ export function PreviewSection(props: {
 }
 
 export function PreviewSkeleton() {
-  return <WorkspaceResultsSkeleton />;
+  return (
+    <div id="preview-results" data-preview-results data-preview-results-skeleton aria-busy="true">
+      <WorkspaceResultsSkeleton />
+    </div>
+  );
 }

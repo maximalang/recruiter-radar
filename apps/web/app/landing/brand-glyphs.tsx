@@ -89,7 +89,7 @@ export function PlusGlyph({ size = 16, className }: GlyphProps) {
   );
 }
 
-/** Compatibility visualization without compass labels or a rotating sweep. */
+/** Compatibility visualization without compass labels, a center point, or a rotating sweep. */
 export function RadarField() {
   return (
     <svg
@@ -121,15 +121,13 @@ export function RadarField() {
         <circle cx="548" cy="344" r="4" />
         <circle cx="236" cy="504" r="4" />
         <circle cx="478" cy="548" r="4" />
+        <circle cx="324" cy="208" r="3" />
+        <circle cx="590" cy="474" r="3" />
       </g>
       <g className={styles.instrumentActiveNode}>
         <circle cx="508" cy="238" r="5" />
         <circle cx="508" cy="238" r="30" />
         <circle cx="508" cy="238" r="58" />
-      </g>
-      <g className={styles.instrumentCore}>
-        <circle cx="380" cy="380" r="7" />
-        <circle cx="380" cy="380" r="24" />
       </g>
     </svg>
   );

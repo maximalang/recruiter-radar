@@ -22,8 +22,12 @@ export default function ConversionPanel(props: {
   const secondaryPlans = PUBLIC_PLANS.filter((plan) => plan.code !== "pilot");
 
   return (
-    <section className={styles.conversionPanel} aria-label="Тарифы и ответы" data-header-tone="dark">
-      <div id="pricing" className={`${styles.pricingStage} ${panelStyles.anchor} ${panelStyles.pricing}`}>
+    <section className={styles.conversionPanel} aria-label="Тарифы и ответы">
+      <div
+        id="pricing"
+        className={`${styles.pricingStage} ${panelStyles.anchor} ${panelStyles.pricing}`}
+        data-header-tone="light"
+      >
         <div className={styles.pricingIntro}>
           <span>07 — Тарифы</span>
           <h2>Начните с недели. Продолжайте, только если радар полезен.</h2>
@@ -78,7 +82,11 @@ export default function ConversionPanel(props: {
         </div>
       </div>
 
-      <div id="faq" className={`${styles.faqStage} ${panelStyles.anchor} ${panelStyles.faq}`}>
+      <div
+        id="faq"
+        className={`${styles.faqStage} ${panelStyles.anchor} ${panelStyles.faq}`}
+        data-header-tone="light"
+      >
         <div className={styles.faqHeading}>
           <span>Перед запуском</span>
           <h2>Коротко о данных, доставке и контроле.</h2>
@@ -94,7 +102,11 @@ export default function ConversionPanel(props: {
         </div>
       </div>
 
-      <div className={`${styles.finalCall} ${panelStyles.final}`}>
+      <div
+        id="conversion-final"
+        className={`${styles.finalCall} ${panelStyles.final}`}
+        data-header-tone="dark"
+      >
         <span>РАДАР / 7 ДНЕЙ</span>
         <h2>Соберите радар под свою специализацию.</h2>
         <p>Получите первый короткий список компаний и решите на фактах, стоит ли продолжать.</p>

@@ -91,19 +91,14 @@ describe('protected readiness endpoints', () => {
     expect(mockedFreshness).toHaveBeenCalledTimes(1)
   })
 
-  test('returns honest payment readiness without credentials or customer data', async () => {
+  test('returns honest sales-assisted state without payment configuration', async () => {
     process.env.CRON_API_KEY = 'correct-key-with-enough-entropy'
-    mockedPayment.mockReturnValue({
-      provider: null,
-      mode: null,
-      checkoutConfigured: false,
-      webhookConfigured: false,
-      siteUrlConfigured: true,
+    mockedPayment.mockReturnValue(paymentReport({
+      selfServeCheckoutReady: false,
       selfServePilotReady: false,
-      recurringBillingReady: false,
-      rfProvider: { status: 'blocked', provider: null, blockers: ['credentials absent'] },
-      customerFlow: { pilot: 'saved_request', monthly: 'sales_request', quarterly: 'sales_request' },
-    })
+      integrationStatus: 'blocked',
+      customerFlow: 'saved_request',
+    }))
 
     const response = await getPaymentReadiness(
       request('/api/health/payment-readiness', 'correct-key-with-enough-entropy'),
@@ -111,6 +106,55 @@ describe('protected readiness endpoints', () => {
     const body = await response.json()
     expect(response.status).toBe(200)
     expect(body).toMatchObject({ ok: true, status: 'sales-assisted' })
-    expect(JSON.stringify(body)).not.toMatch(/customerContact|providerPaymentId|secret/i)
+    expect(JSON.stringify(body)).not.toMatch(/customerContact|providerPaymentId|password|secret/i)
+  })
+
+  test('returns integration-ready before external live verification', async () => {
+    process.env.CRON_API_KEY = 'correct-key-with-enough-entropy'
+    mockedPayment.mockReturnValue(paymentReport({
+      selfServeCheckoutReady: true,
+      selfServePilotReady: true,
+      integrationStatus: 'ready',
+      customerFlow: 'self_service_payment',
+    }))
+
+    const response = await getPaymentReadiness(
+      request('/api/health/payment-readiness', 'correct-key-with-enough-entropy'),
+    )
+    expect(await response.json()).toMatchObject({ ok: true, status: 'integration-ready' })
   })
 })
+
+function paymentReport(input: {
+  selfServeCheckoutReady: boolean
+  selfServePilotReady: boolean
+  integrationStatus: 'ready' | 'blocked'
+  customerFlow: 'self_service_payment' | 'saved_request'
+}) {
+  return {
+    provider: input.selfServeCheckoutReady ? 'robokassa' as const : null,
+    mode: input.selfServeCheckoutReady ? 'test' as const : null,
+    checkoutConfigured: input.selfServeCheckoutReady,
+    webhookConfigured: input.selfServeCheckoutReady,
+    siteUrlConfigured: true,
+    selfServeCheckoutReady: input.selfServeCheckoutReady,
+    selfServePilotReady: input.selfServePilotReady,
+    recurringBillingReady: false as const,
+    refundsConfigured: false,
+    npdReceiptsConfigured: false,
+    merchantModerationReady: false,
+    liveLaunchReady: false,
+    integration: { status: input.integrationStatus, blockers: input.integrationStatus === 'ready' ? [] : ['credentials absent'] },
+    launch: { status: 'blocked' as const, blockers: ['external verification required'] },
+    rfProvider: {
+      status: input.integrationStatus,
+      provider: input.selfServeCheckoutReady ? 'robokassa' as const : null,
+      blockers: input.integrationStatus === 'ready' ? [] : ['credentials absent'],
+    },
+    customerFlow: {
+      pilot: input.customerFlow,
+      monthly: input.customerFlow,
+      quarterly: input.customerFlow,
+    },
+  }
+}

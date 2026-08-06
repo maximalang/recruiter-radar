@@ -43,9 +43,20 @@ export default function WorkspaceScene(props: WorkspaceProps) {
         <WorkspaceIntro />
         <div className={styles.workspaceProductFrame}>
           <PreviewConfigurator previewInput={props.previewInput} hasPreview={props.hasPreview} />
-          <Suspense fallback={<WorkspaceResultsSkeleton />}>
-            <WorkspaceResults previewInput={props.previewInput} checkoutHref={props.checkoutHref} />
-          </Suspense>
+          <div
+            id="preview-results"
+            className={`${styles.workspaceResults} ${sceneStyles.anchor} ${sceneStyles.results}`}
+            data-preview-results
+            data-preview-results-skeleton
+          >
+            <Suspense fallback={<WorkspaceResultsSkeleton />}>
+              <WorkspaceResults
+                previewInput={props.previewInput}
+                checkoutHref={props.checkoutHref}
+                embedded
+              />
+            </Suspense>
+          </div>
         </div>
       </div>
     </section>
@@ -122,16 +133,16 @@ function PreviewConfigurator(props: Pick<WorkspaceProps, "previewInput" | "hasPr
   );
 }
 
-export async function WorkspaceResults(props: Pick<WorkspaceProps, "previewInput" | "checkoutHref">) {
+export async function WorkspaceResults(props: Pick<WorkspaceProps, "previewInput" | "checkoutHref"> & { embedded?: boolean }) {
   try {
     const previewState = await getPublicSampleDigestState(props.previewInput);
     const appliedProfile = [props.previewInput.specialization, props.previewInput.targetCity].filter(Boolean);
 
     return (
       <div
-        id="preview-results"
-        className={`${styles.workspaceResults} ${sceneStyles.anchor} ${sceneStyles.results}`}
-        data-preview-results
+        id={props.embedded ? undefined : "preview-results"}
+        className={props.embedded ? undefined : `${styles.workspaceResults} ${sceneStyles.anchor} ${sceneStyles.results}`}
+        data-preview-results={props.embedded ? undefined : true}
         data-preview-results-ready
       >
         <PreviewGeneratedEvent
@@ -190,16 +201,16 @@ export async function WorkspaceResults(props: Pick<WorkspaceProps, "previewInput
       </div>
     );
   } catch {
-    return <WorkspaceResultsFailure checkoutHref={props.checkoutHref} />;
+    return <WorkspaceResultsFailure checkoutHref={props.checkoutHref} embedded={props.embedded} />;
   }
 }
 
-function WorkspaceResultsFailure({ checkoutHref }: { checkoutHref: string }) {
+function WorkspaceResultsFailure({ checkoutHref, embedded }: { checkoutHref: string; embedded?: boolean }) {
   return (
     <div
-      id="preview-results"
-      className={`${styles.workspaceResults} ${sceneStyles.anchor} ${sceneStyles.results}`}
-      data-preview-results
+      id={embedded ? undefined : "preview-results"}
+      className={embedded ? undefined : `${styles.workspaceResults} ${sceneStyles.anchor} ${sceneStyles.results}`}
+      data-preview-results={embedded ? undefined : true}
       data-preview-results-ready
       role="status"
     >
@@ -225,13 +236,7 @@ function WorkspaceResultsFailure({ checkoutHref }: { checkoutHref: string }) {
 
 export function WorkspaceResultsSkeleton() {
   return (
-    <div
-      id="preview-results"
-      className={`${styles.workspaceResults} ${sceneStyles.anchor} ${sceneStyles.results}`}
-      data-preview-results-skeleton
-      aria-busy="true"
-      aria-label="Результаты примера загружаются"
-    >
+    <div data-preview-results-skeleton aria-busy="true" aria-label="Результаты примера загружаются">
       <div className={styles.workspaceSkeleton}>
         <span /><span /><span />
       </div>
