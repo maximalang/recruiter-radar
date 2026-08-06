@@ -37,7 +37,7 @@ export default function DetectionScene({ previewHref }: { previewHref: string })
           <span>Компании подают сигнал.</span> <em>Радар показывает, кому писать.</em>
         </h1>
         <p className={styles.heroDescription}>
-          Recruiter Radar превращает вакансии, изменения карьерных страниц и динамику найма в короткий список клиентских возможностей — с причиной, доказательствами и безопасным следующим шагом.
+          Recruiter Radar превращает вакансии, изменения карьерных страниц и динамику найма в короткий список клиентских возможностей — чтобы сразу понимать, кому написать сегодня, почему именно сейчас и на какие факты сослаться.
         </p>
         <div className={styles.heroActions}>
           <a
@@ -46,7 +46,7 @@ export default function DetectionScene({ previewHref }: { previewHref: string })
             data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroPrimary}
           >
-            Открыть живой пример <ArrowGlyph />
+            Получить пример радара <ArrowGlyph />
           </a>
           <a
             href="#scene-timeline"
