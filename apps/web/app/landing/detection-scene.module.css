@@ -116,10 +116,10 @@
     max-width: 10ch;
   }
 
-  .field {
-    width: 112%;
+  .section .field {
+    width: 100%;
     height: 21rem;
-    margin: -1rem -6% 0;
+    margin: -1rem 0 0;
   }
 
   .field :global(figcaption) {
@@ -148,9 +148,9 @@
     padding-inline: 1rem;
   }
 
-  .field {
-    width: 120%;
-    margin-inline: -10%;
+  .section .field {
+    width: 100%;
+    margin-inline: 0;
   }
 
   .field :global(figcaption) {
