@@ -1,28 +1,47 @@
 .section {
-  min-height: max(44rem, 100svh);
+  min-height: max(46rem, 100svh);
 }
 
 .copy {
   isolation: isolate;
 }
 
-.title > span {
+.title > span,
+.title > em {
   display: block;
-  color: #f7f4ed;
-  text-shadow: 0 1px 28px rgba(0, 0, 0, .22);
+}
+
+.title > span {
+  color: #f4f3ee;
+  text-shadow: none;
 }
 
 .title > em {
-  display: block;
-  color: #a9d7c8;
+  max-width: 8.7ch;
+  color: #dcff8a;
 }
 
 .field {
-  opacity: .82;
+  opacity: .74;
+  filter: saturate(.82) contrast(1.04);
+}
+
+.field::after {
+  position: absolute;
+  inset: 12% 8% 10% 16%;
+  border: 1px solid rgba(220, 255, 138, .08);
+  border-radius: 50%;
+  content: "";
+  pointer-events: none;
 }
 
 .lock {
   max-width: 29rem;
+  border-color: rgba(244, 243, 238, .12);
+  border-left-color: #c8f36a;
+  background: rgba(7, 10, 9, .82);
+  box-shadow: 0 1.8rem 5rem rgba(0, 0, 0, .22);
+  backdrop-filter: blur(18px);
 }
 
 @media (max-width: 1180px) {
@@ -85,6 +104,10 @@
     max-width: 12ch;
     font-size: clamp(2.9rem, 15vw, 4.7rem);
     letter-spacing: -.065em;
+  }
+
+  .title > em {
+    max-width: 10ch;
   }
 
   .field {
