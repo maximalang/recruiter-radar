@@ -46,7 +46,7 @@ export async function SiteFooter(props: { tone?: "light" | "dark" }) {
           </Link>
           <nav className={s.footerLinks} aria-label="Подвал">
             <Link href="/legal" className={s.footerLink}>Реквизиты</Link>
-            <Link href="/terms" className={s.footerLink}>Оферта</Link>
+            <Link href="/offer" className={s.footerLink}>Оферта</Link>
             <Link href="/privacy" className={s.footerLink}>Конфиденциальность</Link>
             {isOperator ? (
               <Link href="/admin" className={s.footerLink}>Панель оператора</Link>
