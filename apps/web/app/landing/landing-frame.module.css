@@ -1,0 +1,8 @@
+/* PageFrame switches from 20px to 16px inline padding at 1024px.
+   Keep the full-bleed landing aligned with that breakpoint without changing
+   the shared PageFrame contract or introducing document-level overflow. */
+@media (min-width: 821px) and (max-width: 1024px) {
+  .frame {
+    margin: -24px -16px -60px;
+  }
+}

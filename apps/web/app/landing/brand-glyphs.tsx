@@ -89,51 +89,45 @@ export function PlusGlyph({ size = 16, className }: GlyphProps) {
   );
 }
 
+/** Compatibility visualization without compass labels, a center point, or a rotating sweep. */
 export function RadarField() {
   return (
     <svg
-      className={styles.radarField}
+      className={styles.instrumentField}
       viewBox="0 0 760 760"
       preserveAspectRatio="xMidYMid slice"
       role="img"
-      aria-label="Поле сигналов: одна компания получила новый сигнал найма"
+      aria-label="Поле сигналов: одна компания получила новый подтверждённый сигнал найма"
     >
       <defs>
-        <radialGradient id="radar-field-wash" cx="50%" cy="50%" r="58%">
-          <stop offset="0" stopColor="#18324a" stopOpacity=".68" />
-          <stop offset="1" stopColor="#0a121b" stopOpacity="0" />
+        <radialGradient id="compat-instrument-wash" cx="52%" cy="48%" r="58%">
+          <stop offset="0" stopColor="#6fae9c" stopOpacity=".16" />
+          <stop offset="1" stopColor="#17232d" stopOpacity="0" />
         </radialGradient>
       </defs>
-      <rect width="760" height="760" fill="url(#radar-field-wash)" />
-      <g className={styles.radarRings} fill="none" stroke="currentColor">
+      <rect width="760" height="760" fill="url(#compat-instrument-wash)" />
+      <g className={styles.instrumentRings} fill="none">
         <circle cx="380" cy="380" r="112" />
-        <circle cx="380" cy="380" r="212" />
-        <circle cx="380" cy="380" r="316" />
+        <circle cx="380" cy="380" r="214" />
+        <circle cx="380" cy="380" r="314" />
       </g>
-      <path className={styles.radarSweep} d="M380 380 684 218A380 380 0 0 0 534 682Z" />
-      <path className={styles.radarAxis} d="M64 380h632M380 64v632" />
-      <path className={styles.radarAxis} d="M116 116 644 644M644 116 116 644" opacity=".25" />
-      <g className={styles.radarTicks}>
-        <path d="M380 62v14M698 380h-14M380 698v-14M62 380h14" />
+      <g className={styles.instrumentGuides} fill="none">
+        <path d="M120 380h520" />
+        <path d="M380 120v520" />
+        <path d="M198 562 562 198" />
       </g>
-      <g className={styles.radarCoordinates} aria-hidden="true">
-        <text x="380" y="50" textAnchor="middle">NORTH / 01</text>
-        <text x="706" y="384">EAST / 02</text>
-        <text x="380" y="716" textAnchor="middle">SOUTH / 03</text>
-        <text x="54" y="384" textAnchor="end">WEST / 04</text>
+      <g className={styles.instrumentQuietNodes}>
+        <circle cx="246" cy="278" r="4" />
+        <circle cx="548" cy="344" r="4" />
+        <circle cx="236" cy="504" r="4" />
+        <circle cx="478" cy="548" r="4" />
+        <circle cx="324" cy="208" r="3" />
+        <circle cx="590" cy="474" r="3" />
       </g>
-      <g className={styles.radarQuietSignals}>
-        <circle cx="246" cy="270" r="3" />
-        <circle cx="562" cy="318" r="3" />
-        <circle cx="208" cy="492" r="3" />
-        <circle cx="516" cy="544" r="3" />
-        <circle cx="438" cy="198" r="3" />
-      </g>
-      <g className={styles.radarActiveSignal}>
-        <circle cx="492" cy="232" r="4" />
-        <circle cx="492" cy="232" r="34" />
-        <circle cx="492" cy="232" r="68" />
-        <path d="M492 232 380 380" />
+      <g className={styles.instrumentActiveNode}>
+        <circle cx="508" cy="238" r="5" />
+        <circle cx="508" cy="238" r="30" />
+        <circle cx="508" cy="238" r="58" />
       </g>
     </svg>
   );

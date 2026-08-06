@@ -7,14 +7,14 @@ const SOURCE_ROWS = [
     source: "Карьерная страница",
     fact: "8 инженерных позиций",
     discovered: "сегодня · 08:42",
-    eventDate: "18 августа",
+    eventDate: "4 августа",
     confidence: "прямой источник",
   },
   {
     source: "Публичные вакансии",
     fact: "руководитель направления",
     discovered: "сегодня · 08:45",
-    eventDate: "15 августа",
+    eventDate: "1 августа",
     confidence: "подтверждено",
   },
   {
@@ -26,25 +26,56 @@ const SOURCE_ROWS = [
   },
 ] as const;
 
+const SOURCE_ROLES = [
+  {
+    title: "Создают сигнал найма",
+    summary: "hh.ru, Работа России и прямые карьерные страницы.",
+    detail: "Здесь радар фиксирует новые роли, повторные публикации, расширение географии и изменение темпа найма.",
+  },
+  {
+    title: "Подтверждают компанию",
+    summary: "Сайт компании, ЕГРЮЛ и данные ФНС.",
+    detail: "Эти источники связывают событие с корректным юрлицом, доменом и официальным корпоративным маршрутом контакта.",
+  },
+  {
+    title: "Объясняют контекст",
+    summary: "Корпоративные новости и отраслевые публикации.",
+    detail: "Контекст помогает понять расширение или запуск направления, но не заменяет проверяемый hiring signal.",
+  },
+  {
+    title: "Не создают лид отдельно",
+    summary: "Реестры, каталоги и единичные упоминания без найма.",
+    detail: "Они могут дополнить картину, но не поднимают компанию в выдаче без основного сигнала найма.",
+  },
+] as const;
+
 export default function EvidenceScene() {
   return (
-    <section id="scene-evidence" className={`${styles.scene} ${styles.darkScene} ${styles.evidenceScene}`} aria-labelledby="evidence-title">
+    <section
+      id="scene-evidence"
+      className={`${styles.scene} ${styles.darkScene} ${styles.evidenceScene}`}
+      aria-labelledby="evidence-title"
+      data-header-tone="dark"
+    >
       <div className={styles.evidenceLayout}>
         <div className={styles.evidenceIntro}>
-          <p className={styles.sceneLabel}>03 — Доказательство</p>
+          <p className={styles.sceneLabel}>04 — Доказательства</p>
           <h2 id="evidence-title" className={styles.sceneHeading}>
-            Радар не просит верить оценке. <em>Он показывает, из чего она собрана.</em>
+            Оценка — не чёрный ящик. <em>Каждый балл связан с фактом.</em>
           </h2>
+          <p className={styles.sceneLead}>
+            До обращения видно, какие события повлияли на приоритет, когда они произошли и какой источник подтверждает вывод.
+          </p>
         </div>
 
         <div className={styles.scoreAssembly}>
           <div className={styles.scoreIdentity}>
-            <span>RADAR SCORE</span>
+            <span>ОЦЕНКА РАДАРА</span>
             <strong>{DEMO_COMPANY.score}</strong>
-            <small>/100 · подтверждено</small>
+            <small>/100 · уровень уверенности {DEMO_COMPANY.confidence}</small>
           </div>
           <div className={styles.scoreOrbit} aria-hidden="true">
-            <EvidenceGlyph size={220} />
+            <EvidenceGlyph size={210} />
           </div>
           <ol className={styles.scoreFacts} aria-label="Из чего сложилась оценка">
             {DEMO_EVIDENCE.map((item) => (
@@ -59,12 +90,12 @@ export default function EvidenceScene() {
 
         <div className={styles.evidenceLedger}>
           <div className={styles.ledgerHeading}>
-            <span>EVIDENCE STACK / 03</span>
+            <span>ДОКАЗАТЕЛЬНАЯ БАЗА / 03</span>
             <strong>{DEMO_COMPANY.name}</strong>
-            <p>Источники, даты обнаружения и сами события остаются рядом с оценкой.</p>
+            <p>Факт, источник, дата обнаружения и дата события остаются рядом — вывод можно перепроверить за минуту.</p>
           </div>
           <div className={styles.ledgerHeader} aria-hidden="true">
-            <span>Источник / факт</span><span>Найдено</span><span>Событие</span><span>Уверенность</span>
+            <span>Источник / факт</span><span>Найдено</span><span>Событие</span><span>Достоверность</span>
           </div>
           <ul className={styles.evidenceStack}>
             {SOURCE_ROWS.map((row, index) => (
@@ -81,6 +112,26 @@ export default function EvidenceScene() {
               </li>
             ))}
           </ul>
+        </div>
+
+        <div className={styles.sourceRoles}>
+          <div className={styles.sourceRolesIntro}>
+            <span>Роли источников</span>
+            <strong>Не все данные имеют одинаковый вес.</strong>
+          </div>
+          <div className={styles.sourceRoleList}>
+            {SOURCE_ROLES.map((role, index) => (
+              <details key={role.title} open={index === 0}>
+                <summary>
+                  <span>{String(index + 1).padStart(2, "0")}</span>
+                  <strong>{role.title}</strong>
+                  <small>{role.summary}</small>
+                  <i aria-hidden="true">+</i>
+                </summary>
+                <p>{role.detail}</p>
+              </details>
+            ))}
+          </div>
         </div>
       </div>
     </section>

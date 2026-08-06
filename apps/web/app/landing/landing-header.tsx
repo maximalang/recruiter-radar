@@ -1,35 +1,220 @@
+"use client";
+
 import Link from "next/link";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { LANDING_ANALYTICS_CONTEXT, LANDING_ANALYTICS_EVENT } from "../../lib/landing-analytics-contract";
 import { BrandLogo } from "../ui/brand-logo";
 import { ArrowGlyph } from "./brand-glyphs";
-import { LANDING_SCENES } from "./landing-copy";
+import headerStyles from "./landing-header.module.css";
+import { LANDING_NAV_ITEMS } from "./landing-copy";
 import styles from "./landing.module.css";
 
+type HeaderTone = "dark" | "light";
+
+const FOCUSABLE_SELECTOR = [
+  "a[href]",
+  "button:not([disabled])",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  "[tabindex]:not([tabindex='-1'])",
+].join(",");
+
 export default function LandingHeader({ previewHref }: { previewHref: string }) {
+  const [activeId, setActiveId] = useState("");
+  const [scrolled, setScrolled] = useState(false);
+  const [tone, setTone] = useState<HeaderTone>("dark");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const menuPanelRef = useRef<HTMLDivElement>(null);
+
+  const closeMenu = useCallback((restoreFocus = true) => {
+    setMenuOpen(false);
+    if (restoreFocus) window.requestAnimationFrame(() => menuButtonRef.current?.focus({ preventScroll: true }));
+  }, []);
+
+  useEffect(() => {
+    const updateScrolled = () => setScrolled(window.scrollY > 12);
+    updateScrolled();
+    window.addEventListener("scroll", updateScrolled, { passive: true });
+    return () => window.removeEventListener("scroll", updateScrolled);
+  }, []);
+
+  useEffect(() => {
+    const sectionElements = LANDING_NAV_ITEMS
+      .map((item) => document.getElementById(item.id))
+      .filter((element): element is HTMLElement => Boolean(element));
+    const toneElements = Array.from(document.querySelectorAll<HTMLElement>("[data-header-tone]"));
+
+    const activeObserver = new IntersectionObserver((entries) => {
+      const visible = entries
+        .filter((entry) => entry.isIntersecting)
+        .sort((left, right) => Math.abs(left.boundingClientRect.top) - Math.abs(right.boundingClientRect.top));
+      const nearest = visible[0]?.target as HTMLElement | undefined;
+      if (nearest?.id) setActiveId(nearest.id);
+    }, { rootMargin: "-20% 0px -66% 0px", threshold: [0, 0.01, 0.25] });
+
+    const toneObserver = new IntersectionObserver((entries) => {
+      const visible = entries
+        .filter((entry) => entry.isIntersecting)
+        .sort((left, right) => Math.abs(left.boundingClientRect.top) - Math.abs(right.boundingClientRect.top));
+      const nearest = visible[0]?.target as HTMLElement | undefined;
+      const nextTone = nearest?.dataset.headerTone;
+      if (nextTone === "dark" || nextTone === "light") setTone(nextTone);
+    }, { rootMargin: "-4% 0px -88% 0px", threshold: [0, 0.01] });
+
+    sectionElements.forEach((element) => activeObserver.observe(element));
+    toneElements.forEach((element) => toneObserver.observe(element));
+
+    return () => {
+      activeObserver.disconnect();
+      toneObserver.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    const previousPaddingRight = document.body.style.paddingRight;
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    document.body.style.overflow = "hidden";
+    if (scrollbarWidth > 0) document.body.style.paddingRight = `${scrollbarWidth}px`;
+
+    const panel = menuPanelRef.current;
+    const focusable = () => Array.from(panel?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR) ?? [])
+      .filter((element) => !element.hasAttribute("hidden") && element.getAttribute("aria-hidden") !== "true");
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeMenu(true);
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const items = focusable();
+      if (items.length === 0) {
+        event.preventDefault();
+        menuButtonRef.current?.focus({ preventScroll: true });
+        return;
+      }
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (panel?.contains(target) || menuButtonRef.current?.contains(target)) return;
+      closeMenu(true);
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("pointerdown", handlePointerDown);
+    window.requestAnimationFrame(() => focusable()[0]?.focus({ preventScroll: true }));
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.body.style.paddingRight = previousPaddingRight;
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, [closeMenu, menuOpen]);
+
+  const renderNavLink = (item: (typeof LANDING_NAV_ITEMS)[number]) => (
+    <a
+      key={item.id}
+      href={`#${item.id}`}
+      className={headerStyles.navLink}
+      aria-current={activeId === item.id ? "location" : undefined}
+      data-active={activeId === item.id || undefined}
+      onClick={() => closeMenu(false)}
+    >
+      {item.label}
+    </a>
+  );
+
+  const logoTone = tone === "light" && !scrolled && !menuOpen ? "light" : "dark";
+
   return (
-    <header className={styles.header} data-brand-header="signal-lock">
-      <Link href="/" className={styles.headerBrand} aria-label="Recruiter Radar — на главную">
-        <BrandLogo joined tone="dark" />
-      </Link>
-      <nav className={styles.sceneNav} aria-label="Сцены лендинга">
-        {LANDING_SCENES.map((scene) => (
-          <a key={scene.id} href={`#${scene.id}`} className={styles.sceneNavLink}>
-            <span>{scene.index}</span>
-            {scene.label}
-          </a>
-        ))}
-      </nav>
-      <div className={styles.headerActions}>
-        <Link href="/dashboard" className={styles.headerLogin}>Личный кабинет</Link>
-        <a
-          href={previewHref}
-          className={styles.headerCta}
-          data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
-          data-analytics-context={LANDING_ANALYTICS_CONTEXT.header}
+    <header
+      className={headerStyles.header}
+      data-brand-header="signal-lock"
+      data-scrolled={scrolled || undefined}
+      data-tone={tone}
+      data-menu-open={menuOpen || undefined}
+    >
+      <div className={headerStyles.inner}>
+        <Link
+          href="/"
+          className={`${styles.headerBrand} ${headerStyles.brand}`}
+          aria-label="Recruiter Radar — на главную"
         >
-          Собрать радар <ArrowGlyph />
-        </a>
+          <BrandLogo joined tone={logoTone} />
+        </Link>
+
+        <nav className={headerStyles.desktopNav} aria-label="Разделы лендинга">
+          {LANDING_NAV_ITEMS.map(renderNavLink)}
+        </nav>
+
+        <div className={headerStyles.actions}>
+          <Link href="/dashboard" className={headerStyles.login}>Войти</Link>
+          <a
+            href={previewHref}
+            className={headerStyles.cta}
+            data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
+            data-analytics-context={LANDING_ANALYTICS_CONTEXT.header}
+          >
+            Получить пример <ArrowGlyph />
+          </a>
+          <button
+            ref={menuButtonRef}
+            type="button"
+            className={headerStyles.menuButton}
+            aria-label={menuOpen ? "Закрыть меню" : "Открыть меню"}
+            aria-expanded={menuOpen}
+            aria-controls="landing-mobile-menu"
+            data-open={menuOpen || undefined}
+            onClick={() => setMenuOpen((current) => !current)}
+          />
+        </div>
+      </div>
+
+      <div className={headerStyles.backdrop} hidden={!menuOpen} aria-hidden="true" />
+      <div
+        ref={menuPanelRef}
+        id="landing-mobile-menu"
+        className={headerStyles.panel}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="landing-mobile-menu-title"
+        hidden={!menuOpen}
+      >
+        <div id="landing-mobile-menu-title" className={headerStyles.panelIntro}>Навигация по продукту</div>
+        <nav className={headerStyles.mobileNav} aria-label="Мобильная навигация">
+          {LANDING_NAV_ITEMS.map(renderNavLink)}
+        </nav>
+        <div className={headerStyles.mobileActions}>
+          <Link href="/dashboard" onClick={() => closeMenu(false)}>Личный кабинет</Link>
+          <a
+            href={previewHref}
+            onClick={() => closeMenu(false)}
+            data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
+            data-analytics-context={LANDING_ANALYTICS_CONTEXT.header}
+          >
+            Получить пример <ArrowGlyph />
+          </a>
+        </div>
       </div>
     </header>
   );

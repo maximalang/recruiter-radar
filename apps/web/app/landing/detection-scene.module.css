@@ -1,0 +1,172 @@
+.section {
+  min-height: max(46rem, 100svh);
+}
+
+.copy {
+  isolation: isolate;
+}
+
+.title > span,
+.title > em {
+  display: block;
+}
+
+.title > span {
+  color: #f4f3ee;
+  text-shadow: none;
+}
+
+.title > em {
+  max-width: 8.7ch;
+  color: #dcff8a;
+}
+
+.field {
+  opacity: .74;
+  filter: saturate(.82) contrast(1.04);
+}
+
+.field::after {
+  position: absolute;
+  inset: 12% 8% 10% 16%;
+  border: 1px solid rgba(220, 255, 138, .08);
+  border-radius: 50%;
+  content: "";
+  pointer-events: none;
+}
+
+.lock {
+  max-width: 29rem;
+  border-color: rgba(244, 243, 238, .12);
+  border-left-color: #c8f36a;
+  background: rgba(7, 10, 9, .82);
+  box-shadow: 0 1.8rem 5rem rgba(0, 0, 0, .22);
+  backdrop-filter: blur(18px);
+}
+
+@media (min-width: 1181px) {
+  .section .field {
+    right: 0;
+  }
+}
+
+@media (max-width: 1180px) {
+  .section {
+    display: grid;
+    min-height: auto;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.5rem;
+    padding-top: 7rem;
+    padding-bottom: 2rem;
+  }
+
+  .copy {
+    order: 2;
+    width: min(46rem, 100%);
+    margin-top: 3.5rem;
+  }
+
+  .field {
+    position: relative;
+    z-index: 0;
+    top: auto;
+    right: auto;
+    order: 3;
+    width: min(46rem, 100%);
+    height: clamp(22rem, 48vw, 34rem);
+    margin: -3rem 0 0 auto;
+  }
+
+  .lock {
+    position: relative;
+    right: auto;
+    bottom: auto;
+    order: 4;
+    width: min(34rem, 100%);
+    margin: -7rem 0 0 auto;
+  }
+
+  .footer {
+    position: relative;
+    right: auto;
+    bottom: auto;
+    left: auto;
+    order: 5;
+    margin-top: 1rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .section {
+    gap: 1rem;
+    padding: 6.5rem 1.1rem 1.5rem;
+  }
+
+  .copy {
+    margin-top: 3rem;
+  }
+
+  .title {
+    max-width: 12ch;
+    font-size: clamp(2.9rem, 15vw, 4.7rem);
+    letter-spacing: -.065em;
+  }
+
+  .title > em {
+    max-width: 10ch;
+  }
+
+  .section .field {
+    width: 100%;
+    height: 21rem;
+    margin: -1rem 0 0;
+  }
+
+  .field :global(figcaption) {
+    right: 3%;
+    bottom: 3%;
+    width: min(22rem, 88%);
+  }
+
+  .lock {
+    grid-template-columns: auto minmax(0, 1fr);
+    margin-top: 0;
+  }
+
+  .lock > a {
+    grid-column: 2;
+  }
+
+  .footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 390px) {
+  .section {
+    padding-inline: 1rem;
+  }
+
+  .section .field {
+    width: 100%;
+    margin-inline: 0;
+  }
+
+  .field :global(figcaption) {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .section *,
+  .section *::before,
+  .section *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .field {
+    opacity: .58;
+  }
+}

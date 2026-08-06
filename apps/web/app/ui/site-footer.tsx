@@ -7,8 +7,10 @@ import { BrandLogo } from "./brand-logo";
 
 /**
  * Robokassa moderation requires the self-employed seller's full name and INN
- * in the footer. Public support contacts are kept here as a quiet, consistent
- * line; expanded information lives on /legal.
+ * in the footer. Public support contacts stay visible while the visual layer
+ * keeps the footer quiet and consistent with the product shell.
+ * The short public alias remains available at href="/offer"; legal navigation
+ * uses /terms because that is the accepted checkout and moderation contract.
  */
 export async function SiteFooter(props: { tone?: "light" | "dark" }) {
   const tone = props.tone ?? "light";
