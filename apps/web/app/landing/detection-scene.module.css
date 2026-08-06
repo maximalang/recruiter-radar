@@ -44,6 +44,12 @@
   backdrop-filter: blur(18px);
 }
 
+@media (min-width: 1181px) {
+  .section .field {
+    right: 0;
+  }
+}
+
 @media (max-width: 1180px) {
   .section {
     display: grid;
