@@ -96,12 +96,22 @@ async function waitForLanding(page) {
     .waitFor({ state: "attached" });
 }
 
+async function resolveAnalyticsConsent(page) {
+  const dialog = page.locator("[data-analytics-consent]");
+  if (!await dialog.isVisible()) return;
+
+  await dialog.getByRole("button", { name: "Только необходимые" }).click();
+  await dialog.waitFor({ state: "hidden" });
+  await page.getByRole("button", { name: "Изменить настройки cookies" }).waitFor({ state: "visible" });
+}
+
 async function preparePage(context, label, url = baseUrl) {
   const page = await context.newPage();
   const assertCleanConsole = attachConsoleGate(page, label);
   await page.route("**/api/landing-events", (route) => route.fulfill({ status: 204 }));
   await page.goto(url, { waitUntil: "networkidle" });
   await waitForLanding(page);
+  await resolveAnalyticsConsent(page);
   return { page, assertCleanConsole };
 }
 
@@ -411,6 +421,7 @@ async function assertInteractionContracts(browser) {
   });
   await page.goto(baseUrl, { waitUntil: "networkidle" });
   await waitForLanding(page);
+  await resolveAnalyticsConsent(page);
 
   const heroEvent = waitForLandingEvent(page, "preview_started", "hero_primary");
   await Promise.all([
