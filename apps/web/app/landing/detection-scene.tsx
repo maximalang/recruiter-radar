@@ -27,17 +27,17 @@ export default function DetectionScene({ previewHref }: { previewHref: string })
 
       <div className={styles.sceneKicker}>
         <span className={styles.kickerRule} aria-hidden="true" />
-        <span>Радар клиентских возможностей</span>
-        <span className={styles.kickerMeta}>01 — Обнаружение</span>
+        <span>Evidence-first клиентский радар</span>
+        <span className={styles.kickerMeta}>01 — Сигнал</span>
       </div>
 
       <div className={`${styles.detectionCopy} ${sceneStyles.copy}`}>
-        <p className={styles.serviceLabel}>Для рекрутинговых агентств</p>
+        <p className={styles.serviceLabel}>Для рекрутинговых агентств в России</p>
         <h1 id="detection-title" className={`${styles.displayTitle} ${sceneStyles.title}`}>
-          <span>Кому написать сегодня —</span> <em>видно по сигналам.</em>
+          <span>Компании подают сигнал.</span> <em>Радар показывает, кому писать.</em>
         </h1>
         <p className={styles.heroDescription}>
-          Recruiter Radar отслеживает сигналы найма российских компаний и собирает короткий список: кому написать, почему сейчас и на какие факты сослаться.
+          Recruiter Radar превращает вакансии, изменения карьерных страниц и динамику найма в короткий список клиентских возможностей — с причиной, доказательствами и безопасным следующим шагом.
         </p>
         <div className={styles.heroActions}>
           <a
@@ -46,7 +46,7 @@ export default function DetectionScene({ previewHref }: { previewHref: string })
             data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroPrimary}
           >
-            Получить пример <ArrowGlyph />
+            Открыть живой пример <ArrowGlyph />
           </a>
           <a
             href="#scene-timeline"
@@ -54,21 +54,21 @@ export default function DetectionScene({ previewHref }: { previewHref: string })
             data-analytics-event={LANDING_ANALYTICS_EVENT.previewResultsClicked}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroSecondary}
           >
-            Разобрать один сигнал <ArrowGlyph className={styles.downArrow} />
+            Как радар делает вывод <ArrowGlyph className={styles.downArrow} />
           </a>
         </div>
-        <p className={styles.microcopy}>Пилот на 7 дней · без автопродления · решение об обращении остаётся за вами</p>
+        <p className={styles.microcopy}>7 дней пилота · без автопродления · без автоматической рассылки компаниям</p>
       </div>
 
       <article className={`${styles.detectionLock} ${sceneStyles.lock}`} aria-label={`Новый сигнал: ${DEMO_COMPANY.signal}`}>
         <div className={styles.lockMarker}><SignalGlyph size={54} /></div>
         <div className={styles.lockCopy}>
-          <span className={styles.signalStatus}><i aria-hidden="true" /> новый сигнал · {DEMO_COMPANY.freshness}</span>
+          <span className={styles.signalStatus}><i aria-hidden="true" /> приоритет обновлён · {DEMO_COMPANY.freshness}</span>
           <strong>{DEMO_COMPANY.name}</strong>
           <p>{DEMO_COMPANY.change}</p>
           <dl className={styles.lockMetrics}>
             <div><dt>Свежесть</dt><dd>{DEMO_COMPANY.freshness}</dd></div>
-            <div><dt>Достоверность</dt><dd>{DEMO_COMPANY.confidence}</dd></div>
+            <div><dt>Уверенность</dt><dd>{DEMO_COMPANY.confidence}</dd></div>
           </dl>
           <small><b>Почему сейчас:</b> {DEMO_COMPANY.whyNow}</small>
         </div>
@@ -78,8 +78,8 @@ export default function DetectionScene({ previewHref }: { previewHref: string })
       </article>
 
       <div className={`${styles.detectionFooter} ${sceneStyles.footer}`}>
-        <span>Сигнал → Доказательства → Рабочий приоритет</span>
-        <a href="#scene-workspace">Сразу открыть пример <ArrowGlyph className={styles.downArrow} /></a>
+        <span>Сигнал → Проверка → Приоритет → Обращение</span>
+        <a href="#scene-workspace">Сразу открыть продукт <ArrowGlyph className={styles.downArrow} /></a>
       </div>
     </section>
   );
