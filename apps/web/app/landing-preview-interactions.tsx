@@ -70,7 +70,7 @@ function installPreviewAnchorRestoration() {
     return () => window.cancelAnimationFrame(animationFrame);
   }
 
-  // Keep direct hash navigation stable after streamed preview content reaches its final height.
+  // Re-align direct hash navigation after streamed preview content settles at its final page height.
   const observer = new MutationObserver(() => {
     if (!hasReadyResults()) return;
     observer.disconnect();
