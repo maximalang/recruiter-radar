@@ -14,17 +14,17 @@ export default function SignalTimelineScene() {
         <div className={styles.timelineIntro}>
           <p className={styles.sceneLabel}>02 — Паттерн сигнала</p>
           <h2 id="timeline-title" className={styles.sceneHeading}>
-            Одна вакансия ничего не доказывает. <em>Последовательность — доказывает.</em>
+            Не список вакансий. <em>История, объясняющая момент для контакта.</em>
           </h2>
           <p className={styles.sceneLead}>
-            Радар связывает события одной компании, сохраняет источники и даты, а затем объясняет, когда набор превращается в клиентскую возможность.
+            Радар связывает события одной компании, проверяет их свежесть и показывает переход от обычного найма к коммерчески значимой ситуации.
           </p>
         </div>
 
         <div className={styles.companyCoordinate} aria-label="Сквозная демонстрационная компания">
           <SignalGlyph size={52} />
           <div>
-            <span>Одна компания на всём лендинге</span>
+            <span>Одна компания · один сквозной разбор</span>
             <strong>{DEMO_COMPANY.name}</strong>
             <small>{DEMO_COMPANY.location} · {DEMO_COMPANY.industry}</small>
           </div>
@@ -46,8 +46,8 @@ export default function SignalTimelineScene() {
         <div className={styles.timelineConclusion}>
           <EvidenceGlyph size={58} />
           <p>
-            Четыре изменения складываются в один вывод:
-            <strong>компания расширяет инженерную функцию — сейчас есть обоснованный повод для разговора.</strong>
+            Четыре события меняют смысл ситуации:
+            <strong>компания системно расширяет инженерную функцию — у агентства появился проверяемый повод начать разговор.</strong>
           </p>
           <span>4 события · 3 типа источников · последнее изменение сегодня</span>
         </div>
