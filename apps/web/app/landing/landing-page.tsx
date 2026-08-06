@@ -8,6 +8,7 @@ import frameStyles from "./landing-frame.module.css";
 import LandingHashNavigation from "./landing-hash-navigation";
 import LandingHeader from "./landing-header";
 import styles from "./landing.module.css";
+import visualStyles from "./landing-visual-system.module.css";
 import OutreachScene from "./outreach-scene";
 import SignalTimelineScene from "./signal-timeline-scene";
 import WorkspaceScene from "./workspace-scene";
@@ -20,7 +21,10 @@ export default function LandingPage(props: {
   faqItems: ReadonlyArray<{ question: string; answer: string }>;
 }) {
   return (
-    <div className={`${styles.landingPage} ${frameStyles.frame}`} data-landing-experience="signal-lock">
+    <div
+      className={`${styles.landingPage} ${frameStyles.frame} ${visualStyles.visualSystem}`}
+      data-landing-experience="signal-lock"
+    >
       <a href="#main-content" className={styles.skipLink}>Перейти к содержанию</a>
       <LandingHashNavigation />
       <LandingHeader previewHref="#preview-configurator" />
