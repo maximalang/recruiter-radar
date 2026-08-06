@@ -43,11 +43,15 @@ describe("polished unified landing visual contract", () => {
     expect(conversion).toMatch(/id="conversion-final"[\s\S]*?data-header-tone="dark"/);
   });
 
-  it("preserves the Robokassa-ready public footer while using the canonical offer route", () => {
+  it("preserves the Robokassa-ready public footer and the offer alias", () => {
     const footer = source("app/ui/site-footer.tsx");
+    const offerAlias = source("app/offer/page.tsx");
 
-    expect(footer).toContain('href="/offer"');
+    expect(footer).toContain('href="/legal"');
+    expect(footer).toContain('href="/terms"');
     expect(footer).toContain('href="/payment-and-refund"');
+    expect(footer).toContain('href="/privacy"');
+    expect(offerAlias.trim()).toBe('export { default, metadata } from "../terms/page";');
     expect(footer).toContain("OPERATOR_REQUISITES.phone");
     expect(footer).toContain("OPERATOR_REQUISITES.city");
     expect(footer).toContain('href="/admin/payments"');
