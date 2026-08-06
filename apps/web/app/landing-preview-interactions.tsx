@@ -70,7 +70,7 @@ function installPreviewAnchorRestoration() {
     return () => window.cancelAnimationFrame(animationFrame);
   }
 
-  // Server-streamed preview content can change page height after the browser's initial hash scroll.
+  // Restore the hash target after streamed preview content reaches its final page height.
   const observer = new MutationObserver(() => {
     if (!hasReadyResults()) return;
     observer.disconnect();
