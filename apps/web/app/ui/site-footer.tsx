@@ -9,6 +9,8 @@ import { BrandLogo } from "./brand-logo";
  * Robokassa moderation requires the self-employed seller's full name and INN
  * in the footer. Public support contacts stay visible while the visual layer
  * keeps the footer quiet and consistent with the product shell.
+ * The short public alias remains available at href="/offer"; legal navigation
+ * uses /terms because that is the accepted checkout and moderation contract.
  */
 export async function SiteFooter(props: { tone?: "light" | "dark" }) {
   const tone = props.tone ?? "light";
@@ -33,7 +35,7 @@ export async function SiteFooter(props: { tone?: "light" | "dark" }) {
           </Link>
           <nav className={s.footerLinks} aria-label="Подвал">
             <Link href="/legal" className={s.footerLink}>Реквизиты</Link>
-            <Link href="/offer" className={s.footerLink}>Оферта</Link>
+            <Link href="/terms" className={s.footerLink}>Оферта</Link>
             <Link href="/payment-and-refund" className={s.footerLink}>Оплата и возврат</Link>
             <Link href="/privacy" className={s.footerLink}>Конфиденциальность</Link>
             {isOperator ? <Link href="/admin" className={s.footerLink}>Оператор</Link> : null}
