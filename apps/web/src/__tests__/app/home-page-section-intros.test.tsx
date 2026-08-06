@@ -140,11 +140,12 @@ describe("signal lock landing contract", () => {
     expect(outreach).not.toContain("частный email");
   });
 
-  it("keeps preview anchors in the Suspense fallback", () => {
+  it("keeps the Suspense fallback busy without duplicating resolved workspace anchors", () => {
     const markup = renderToStaticMarkup(<PreviewSkeleton />);
-    expect(markup).toContain('id="scene-workspace"');
-    expect(markup).toContain('id="preview-configurator"');
-    expect(markup).toContain('id="preview-results"');
+    expect(markup).not.toContain('id="scene-workspace"');
+    expect(markup).not.toContain('id="preview-configurator"');
+    expect(markup).not.toContain('id="preview-results"');
+    expect(markup).toContain('id="workspace-loading-title"');
     expect(markup).toContain('aria-busy="true"');
   });
 
