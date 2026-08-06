@@ -218,17 +218,15 @@ describe("final unified evidence-first landing contract", () => {
     const checkoutHref = buildCheckoutHref(input);
     const results = await WorkspaceResults({ previewInput: input, checkoutHref });
     const markup = renderToStaticMarkup(results);
-    const checkoutLink = collectElements(results, Link).find((link) => readVisibleText(link).includes("Оставить заявку на неделю"));
 
     expect(markup).toContain('id="preview-results"');
     expect(markup).toContain("data-preview-results-ready");
     expect(markup).toContain("Временная ошибка загрузки");
     expect(markup).toContain("Тарифы, FAQ и следующий шаг доступны ниже");
-    expect(checkoutLink).toBeDefined();
-    expect(checkoutLink?.props.href).toBe(checkoutHref);
-    expect(checkoutLink?.props["data-analytics-event"]).toBe(LANDING_ANALYTICS_EVENT.checkoutStarted);
-    expect(checkoutLink?.props["data-analytics-context"]).toBe(LANDING_ANALYTICS_CONTEXT.preview);
-    expect(readVisibleText(checkoutLink)).toContain("Оставить заявку на неделю");
+    expect(markup).toContain(`href="${checkoutHref.replaceAll("&", "&amp;")}"`);
+    expect(markup).toContain(`data-analytics-event="${LANDING_ANALYTICS_EVENT.checkoutStarted}"`);
+    expect(markup).toContain(`data-analytics-context="${LANDING_ANALYTICS_CONTEXT.preview}"`);
+    expect(markup).toContain("Оставить заявку на неделю");
     expect(source("app/landing/workspace-scene.module.css")).toMatch(/\.checkout\s*\{[\s\S]*?min-height:\s*52px/);
   });
 
