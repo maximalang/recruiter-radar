@@ -11,6 +11,7 @@ import "./premium-ui.css";
 import "./premium-ui-refinements.css";
 import "./site-finish.css";
 import "./site-interactions.css";
+import "./product-visual-system.css";
 
 const inter = Inter({
   subsets: ["cyrillic", "latin"],
