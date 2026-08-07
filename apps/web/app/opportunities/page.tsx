@@ -14,6 +14,9 @@ import {
   listOpportunities,
   type OpportunityView,
 } from '@/lib/opportunities/repository'
+import {
+  isCommercialSignalAuthoritativeForWorkspace,
+} from '@/lib/opportunities/commercial-signal-rollout'
 import type { OpportunityStatus } from '@/lib/opportunities/opportunity-scoring'
 import {
   listOpportunityWorkflowAssignees,
@@ -101,6 +104,8 @@ export default async function OpportunitiesPage(props: {
     isOpportunityWorkflowV1EnabledForContext(authorization)
   const commercialSignalUiEnabled =
     isOpportunityCommercialSignalUiEnabledForContext(authorization)
+  const commercialSignalAuthoritative =
+    isCommercialSignalAuthoritativeForWorkspace(access.workspaceId)
   const trackingCycleId = outcomesUiEnabled
     ? `${workflowEnabled ? 'today' : 'morning-brief'}:${new Date().toISOString().slice(0, 10)}`
     : null
@@ -131,7 +136,7 @@ export default async function OpportunitiesPage(props: {
         confidenceGate: confidenceGate || null,
         query: query || null,
         commercialSignalOnly:
-          commercialSignalUiEnabled && !researchModeActive,
+          commercialSignalAuthoritative && !researchModeActive,
         pageSize: 50,
       }),
       outcomesUiEnabled
