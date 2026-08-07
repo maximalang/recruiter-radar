@@ -1,5 +1,7 @@
 .layout {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: none;
   gap: clamp(3.4rem, 6vw, 5.8rem);
 }
 
@@ -8,6 +10,11 @@
   grid-template-columns: minmax(19rem, .94fr) minmax(10.5rem, .42fr) minmax(21rem, .94fr);
   gap: clamp(1.4rem, 2.7vw, 2.8rem);
   align-items: start;
+}
+
+.top > .intro {
+  grid-area: auto;
+  min-width: 0;
 }
 
 .intro :global(h2) {
