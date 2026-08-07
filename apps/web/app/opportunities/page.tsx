@@ -17,6 +17,9 @@ import {
 import {
   isCommercialSignalAuthoritativeForWorkspace,
 } from '@/lib/opportunities/commercial-signal-rollout'
+import {
+  filterActionableCommercialSignalToday,
+} from '@/lib/opportunities/commercial-signal-today'
 import type { OpportunityStatus } from '@/lib/opportunities/opportunity-scoring'
 import {
   listOpportunityWorkflowAssignees,
@@ -176,7 +179,7 @@ export default async function OpportunitiesPage(props: {
       }).catch(() => null)
     : null
   const visibleOpportunities = commercialSignalAuthoritative && !researchModeActive
-    ? result.opportunities.filter(isQualifiedActionableCommercialSignal)
+    ? filterActionableCommercialSignalToday(result.opportunities)
     : result.opportunities
 
   return (
@@ -288,16 +291,6 @@ function parseView(
 
 function normalizeSearchQuery(value: string | undefined): string {
   return value?.trim().slice(0, 80) ?? ''
-}
-
-function isQualifiedActionableCommercialSignal(opportunity: {
-  metadata: Record<string, unknown>
-}): boolean {
-  const card = opportunity.metadata.commercialSignalCard
-  if (!card || typeof card !== 'object' || Array.isArray(card)) return false
-  const snapshot = card as Record<string, unknown>
-  return snapshot.version === 'commercial-signal-card-v1' &&
-    snapshot.status === 'qualified_actionable'
 }
 
 function isNarrowedResult(
