@@ -70,9 +70,9 @@ export default function EvidenceScene() {
       aria-labelledby="evidence-title"
       data-header-tone="dark"
     >
-      <div className={`${styles.evidenceLayout} ${sceneStyles.layout}`}>
+      <div className={sceneStyles.layout}>
         <div className={sceneStyles.top}>
-          <div className={`${styles.evidenceIntro} ${sceneStyles.intro}`}>
+          <div className={sceneStyles.intro}>
             <p className={styles.sceneLabel}>04 — На чём основан вывод</p>
             <h2 id="evidence-title" className={styles.sceneHeading}>
               Почему этому приоритету <em>можно доверять.</em>
