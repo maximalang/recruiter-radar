@@ -105,6 +105,7 @@ describe('Evidence Radar v1 contracts', () => {
       expect.objectContaining({ ruleId: 'funding-hiring-recruiter' }),
     ])
     expect(CORRELATION_RULES.every((rule) => rule.minimumSourceFamilies >= 2)).toBe(true)
+    expect(CORRELATION_RULES.find((rule) => rule.id === 'first-party-external-hiring')).toBeUndefined()
   })
 
   it('calculates a transparent multiplicative score minus risk', () => {
@@ -135,9 +136,13 @@ describe('Evidence Radar v1 contracts', () => {
     ], new Date('2026-08-05T00:00:00Z'))).toEqual(['expired'])
   })
 
-  it('forecasts bounded staffing demand from supported patterns', () => {
+  it('forecasts bounded staffing demand from supported patterns and rejects mixed organizations', () => {
     expect(forecastStaffing([signal('plant', 'production_expansion', 'official-news')]))
       .toMatchObject({ mode: 'mass', minHeadcount: 20, maxHeadcount: 200, basisSignalIds: ['plant'] })
+    expect(() => forecastStaffing([
+      signal('plant', 'production_expansion', 'official-news'),
+      { ...signal('other', 'urgent_hiring', 'career-page'), organizationId: '2' },
+    ])).toThrow('forecastStaffing requires signals for one organization')
   })
 
   it('renders geography only from verified Russian coordinates', () => {
