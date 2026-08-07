@@ -37,14 +37,20 @@ for (const runtimeFile of collectRuntimeFiles()) {
 for (const token of [
   "OPERATOR_REQUISITES.fullName",
   "OPERATOR_REQUISITES.inn",
-  "OPERATOR_REQUISITES.city",
-  "OPERATOR_REQUISITES.phone",
   "OPERATOR_REQUISITES.email",
-  'href="/legal"',
-  'href="/terms"',
-  'href="/payment-and-refund"',
-  'href="/privacy"',
 ]) requireText("footer", token, `footer token ${token}`);
+
+for (const route of [
+  "/legal",
+  "/terms",
+  "/payment-and-refund",
+  "/privacy",
+  "/personal-data-consent",
+]) requireFooterRoute(route);
+
+for (const forbidden of ["OPERATOR_REQUISITES.city", "OPERATOR_REQUISITES.phone", "tel:"]) {
+  if (sources.footer.includes(forbidden)) fail(`footer: forbidden public contact token ${forbidden}`);
+}
 
 for (const token of [
   "LegalDocumentNav",
@@ -214,8 +220,11 @@ async function verifyDeployedOrigin() {
   }
 
   const home = await fetch(new URL("/", base)).then((response) => response.text()).catch(() => "");
-  for (const token of [expectedEmail, expectedCity, "+7 900 966-60-92", "622809740837", "Самозанятый"]) {
+  for (const token of [expectedEmail, "622809740837", "Самозанятый"]) {
     if (!home.includes(token)) fail(`network: footer does not expose ${token}`);
+  }
+  for (const token of [expectedCity, "+7 900 966-60-92", "tel:+79009666092"]) {
+    if (home.includes(token)) fail(`network: footer exposes forbidden phone/location token ${token}`);
   }
 
   const checkout = await fetch(new URL("/checkout?plan=monthly", base)).then((response) => response.text()).catch(() => "");
@@ -267,6 +276,15 @@ function read(relativePath) {
 
 function requireText(sourceName, token, label) {
   if (!sources[sourceName].includes(token)) fail(`${sourceName}: missing ${label}`);
+}
+
+function requireFooterRoute(route) {
+  const pattern = new RegExp(`href\\s*[:=]\\s*["']${escapeRegExp(route)}["']`);
+  if (!pattern.test(sources.footer)) fail(`footer: missing public route ${route}`);
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function fail(message) {
