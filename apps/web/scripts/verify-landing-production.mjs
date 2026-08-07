@@ -472,7 +472,7 @@ async function assertInteractionContracts(browser) {
     page.waitForURL((url) => url.searchParams.get("targetCity") === geography),
     page.locator("[data-preview-submit]").click(),
   ]);
-  await page.locator("#preview-results[data-preview-results-ready]").waitFor({ state: "attached" });
+  await page.locator("#preview-results [data-preview-results-ready]").waitFor({ state: "attached" });
   assert.equal(await page.getByLabel("Специализация").inputValue(), specialization);
   assert.equal(await page.getByLabel("География").inputValue(), geography);
   assert.equal(new URL(page.url()).searchParams.get("includeKeywords"), privateInclude);
