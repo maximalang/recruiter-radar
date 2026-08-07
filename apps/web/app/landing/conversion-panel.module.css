@@ -21,20 +21,48 @@
 }
 
 .pricing [data-pricing-primary="true"] {
+  align-self: stretch;
   border-color: rgba(141, 217, 193, .3);
   background: rgba(255, 255, 255, .025);
 }
 
+.pricing [data-pricing-primary="true"] > :global(a) {
+  margin-top: auto;
+}
+
 .pricing [data-pricing-secondary="true"] {
+  display: grid;
   min-width: 0;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+}
+
+.pricing [data-pricing-secondary="true"] :global(article) {
+  align-content: start;
+  min-height: 0;
+}
+
+.pricing [data-pricing-secondary="true"] :global(article) > :global(a) {
+  margin-top: auto;
 }
 
 .faq :global(details) {
   border-color: rgba(221, 233, 227, .14);
 }
 
+.faq :global(details[open]) {
+  background: rgba(255, 255, 255, .018);
+}
+
 .faq :global(summary) {
   min-height: 56px;
+}
+
+.faq :global(details[open] summary) {
+  color: rgba(242, 239, 231, .96);
+}
+
+.faq :global(details p) {
+  max-width: 58rem;
 }
 
 .final {
@@ -74,9 +102,48 @@
   color: rgba(242, 239, 231, .72);
 }
 
+@media (min-width: 1180px) {
+  .pricing > :first-child {
+    padding-top: .35rem;
+  }
+
+  .pricing > :first-child :global(h2) {
+    max-width: 11ch;
+    font-size: clamp(2.35rem, 3.2vw, 3.15rem);
+  }
+}
+
+@media (max-width: 1024px) {
+  .pricing [data-pricing-primary="true"] > :global(a) {
+    margin-top: 0;
+  }
+}
+
 @media (max-width: 768px) {
   .pricing,
   .faq {
     padding-block: 4.25rem;
+  }
+
+  .pricing [data-pricing-secondary="true"] {
+    grid-template-rows: none;
+  }
+
+  .pricing [data-pricing-secondary="true"] :global(article) > :global(a) {
+    margin-top: .35rem;
+  }
+
+  .faq :global(summary) {
+    min-height: 64px;
+  }
+
+  .faq :global(details p) {
+    max-width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .faq :global(summary i) {
+    transition: none !important;
   }
 }
