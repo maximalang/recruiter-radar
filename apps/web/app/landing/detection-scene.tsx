@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { LANDING_ANALYTICS_CONTEXT, LANDING_ANALYTICS_EVENT } from "../../lib/landing-analytics-contract";
 import { ArrowGlyph, SignalGlyph } from "./brand-glyphs";
+import responsiveStyles from "./detection-responsive.module.css";
 import sceneStyles from "./detection-scene.module.css";
 import HeroInstrument from "./hero-instrument";
 import { DEMO_COMPANY } from "./landing-copy";
@@ -22,7 +23,7 @@ export default function DetectionScene({
       data-header-tone="dark"
       data-hero-layout="balanced-grid"
     >
-      <div className={`${styles.detectionField} ${sceneStyles.field}`}>
+      <div className={`${styles.detectionField} ${sceneStyles.field} ${responsiveStyles.viewportSafeField}`}>
         <HeroInstrument
           companyName={DEMO_COMPANY.name}
           signalLabel={DEMO_COMPANY.signal}
