@@ -1,4 +1,4 @@
-name: Evidence Radar Contracts
+name: Commercial Signal + Evidence Radar Contracts
 
 on:
   push:
@@ -6,7 +6,8 @@ on:
       - 'codex/evidence-radar-system'
       - 'codex/commercial-signal-evidence-integration'
   pull_request:
-    branches: [ main, 'codex/**' ]
+    branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -16,9 +17,9 @@ permissions:
   contents: read
 
 jobs:
-  evidence-radar:
+  commercial-signal-evidence-radar:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
     services:
       postgres:
         image: postgres:16-alpine
@@ -42,6 +43,8 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
       - name: Type check application
         run: npm run web:check
       - name: Type check tests
@@ -50,6 +53,22 @@ jobs:
         run: node packages/db/scripts/migrate.mjs
       - name: Validate database schema
         run: npm run db:validate
+      - name: Verify Commercial Signal PostgreSQL runtime chain
+        run: |
+          set -euo pipefail
+          npm run test:company-events-v1:db
+          npm run test:company-state-v1:db
+          npm run test:signal-episodes-v2:db
+          npm run test:commercial-theses-v1:db
+          npm run test:external-agency-propensity-v1:db
+          npm run test:agency-dna-match-v2:db
+          npm run test:opportunity-scoring-v3:db
+          npm run test:query-planner-v2:db
+      - name: Verify Commercial Signal evaluation and contract matrix
+        run: |
+          set -euo pipefail
+          npm run test:commercial-signal:evaluation:db
+          npm run test:commercial-signal:contracts
       - name: Run Evidence Radar unit and surface contracts
         run: >-
           npm test --workspace @recruiter-radar/web -- --runInBand --runTestsByPath
@@ -60,6 +79,8 @@ jobs:
           src/__tests__/app/evidence-radar-surface-contract.test.ts
       - name: Verify isolated Evidence Radar PostgreSQL runtime
         run: node packages/db/scripts/run-evidence-radar-v1-db-tests.mjs
+      - name: Verify rollback safety
+        run: npm run test:opportunity-engine:down
       - name: Build production web application
         env:
           NEXT_PUBLIC_YANDEX_METRIKA_ID: '12345678'
