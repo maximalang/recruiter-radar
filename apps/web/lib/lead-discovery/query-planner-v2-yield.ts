@@ -1,0 +1,221 @@
+import { hashCanonicalJson } from '@/lib/opportunities/canonical-hash'
+
+import type {
+  ProfileScopedQueryPlanV2,
+  QueryPlanHistoricalYield,
+  QueryPlannerV2Source,
+} from './query-planner-v2'
+
+export type QueryPlanOperationalYield = QueryPlanHistoricalYield & {
+  executionCount: number | null
+  zeroResultExecutions: number | null
+  newCompanyEvents: number | null
+  actionableOpportunities: number | null
+  won: number | null
+}
+
+export type QueryPlanYieldMap = Readonly<Record<string, QueryPlanOperationalYield>>
+
+const PAGE_ENV_KEY: Readonly<Record<QueryPlannerV2Source, string>> = {
+  hh: 'HH_PAGES',
+  superjob: 'SUPERJOB_PAGES',
+  'habr-career': 'HABR_CAREER_PAGES',
+  'rabota-rossii': 'RABOTA_ROSSII_PAGES',
+}
+
+const MAX_PAGE_BUDGET = 50
+const MIN_SAMPLE_FETCHED = 50
+const MIN_SAMPLE_EPISODES = 10
+
+export function queryPlanYieldKey(input: Pick<
+  ProfileScopedQueryPlanV2,
+  'source' | 'roleFamily' | 'region'
+>): string {
+  return [
+    input.source,
+    normalizeKeyPart(input.roleFamily),
+    normalizeKeyPart(input.region.canonicalRegion ?? ''),
+    normalizeKeyPart(input.region.requestedRegion ?? ''),
+  ].join('|')
+}
+
+/**
+ * Applies the latest metric snapshot for the same source/role/geography plan.
+ * Budget changes are deliberately small and bounded. Raw fetched volume never
+ * increases a budget by itself; positive downstream commercial yield is
+ * required to expand it.
+ */
+export function applyHistoricalYieldToQueryPlan(
+  plan: ProfileScopedQueryPlanV2,
+  yieldSnapshot: QueryPlanOperationalYield | null | undefined,
+): ProfileScopedQueryPlanV2 {
+  if (!yieldSnapshot) return plan
+
+  const normalizedYield = normalizeOperationalYield(yieldSnapshot)
+  const budgetAdjustment = resolveBudgetAdjustment(
+    plan.pageBudget,
+    normalizedYield,
+  )
+  const queryEnv = { ...plan.queryEnv }
+  queryEnv[PAGE_ENV_KEY[plan.source]] = String(budgetAdjustment.pageBudget)
+  const reasonCodes = uniqueStrings([
+    ...plan.reasonCodes,
+    ...(budgetAdjustment.reasonCode ? [budgetAdjustment.reasonCode] : []),
+  ])
+  const sharedRequestHash = hashCanonicalJson({
+    source: plan.source,
+    queryEnv,
+    pageBudget: budgetAdjustment.pageBudget,
+    frequency: plan.frequency,
+  })
+  const historicalYield: QueryPlanHistoricalYield = {
+    fetchedRecords: normalizedYield.fetchedRecords,
+    uniqueEvents: normalizedYield.uniqueEvents,
+    uniqueCompanies: normalizedYield.uniqueCompanies,
+    episodes: normalizedYield.episodes,
+    qualifiedOpportunities: normalizedYield.qualifiedOpportunities,
+    accepted: normalizedYield.accepted,
+    contacted: normalizedYield.contacted,
+    replied: normalizedYield.replied,
+    meetings: normalizedYield.meetings,
+  }
+  const { inputHash: _previousInputHash, ...previousSnapshot } = plan
+  const snapshot = {
+    ...previousSnapshot,
+    pageBudget: budgetAdjustment.pageBudget,
+    historicalYield,
+    queryEnv,
+    reasonCodes,
+    sharedRequestHash,
+  }
+  return {
+    ...snapshot,
+    inputHash: hashCanonicalJson(snapshot),
+  }
+}
+
+export function resolveYieldAdjustedPageBudget(
+  currentBudget: number,
+  rawYield: QueryPlanOperationalYield,
+): { pageBudget: number; reasonCode: string | null } {
+  const yieldSnapshot = normalizeOperationalYield(rawYield)
+  const sampleReady =
+    (yieldSnapshot.fetchedRecords ?? 0) >= MIN_SAMPLE_FETCHED ||
+    (yieldSnapshot.episodes ?? 0) >= MIN_SAMPLE_EPISODES ||
+    (yieldSnapshot.executionCount ?? 0) >= 5
+  if (!sampleReady) {
+    return { pageBudget: currentBudget, reasonCode: 'YIELD_SAMPLE_INSUFFICIENT' }
+  }
+
+  const fetchedRecords = yieldSnapshot.fetchedRecords ?? 0
+  const uniqueEvents = yieldSnapshot.uniqueEvents ?? 0
+  const episodes = yieldSnapshot.episodes ?? 0
+  const qualified = yieldSnapshot.qualifiedOpportunities ?? 0
+  const actionable = yieldSnapshot.actionableOpportunities ?? 0
+  const accepted = yieldSnapshot.accepted ?? 0
+  const contacted = yieldSnapshot.contacted ?? 0
+  const replied = yieldSnapshot.replied ?? 0
+  const meetings = yieldSnapshot.meetings ?? 0
+  const won = yieldSnapshot.won ?? 0
+  const executionCount = yieldSnapshot.executionCount ?? 0
+  const zeroResultExecutions = yieldSnapshot.zeroResultExecutions ?? 0
+
+  const duplicateYield = fetchedRecords > 0 ? uniqueEvents / fetchedRecords : 1
+  const zeroResultRate = executionCount > 0
+    ? zeroResultExecutions / executionCount
+    : 0
+
+  if (
+    (fetchedRecords >= MIN_SAMPLE_FETCHED && duplicateYield < 0.3) ||
+    (episodes >= MIN_SAMPLE_EPISODES && qualified === 0) ||
+    (executionCount >= 5 && zeroResultRate >= 0.6)
+  ) {
+    return {
+      pageBudget: clampBudget(currentBudget - 2),
+      reasonCode: 'YIELD_BUDGET_REDUCED_WEAK_DOWNSTREAM',
+    }
+  }
+
+  if (qualified >= 5 && actionable === 0) {
+    return {
+      pageBudget: clampBudget(currentBudget - 1),
+      reasonCode: 'YIELD_BUDGET_REDUCED_LOW_ACTIONABILITY',
+    }
+  }
+
+  // Expansion requires downstream evidence. Fetched volume or company count
+  // alone is intentionally insufficient.
+  if (won > 0 || meetings >= 2 || replied >= 3) {
+    return {
+      pageBudget: clampBudget(currentBudget + 2),
+      reasonCode: 'YIELD_BUDGET_EXPANDED_COMMERCIAL_OUTCOME',
+    }
+  }
+  if (
+    actionable >= 3 &&
+    (accepted >= 2 || contacted >= 3 || replied >= 1 || meetings >= 1)
+  ) {
+    return {
+      pageBudget: clampBudget(currentBudget + 1),
+      reasonCode: 'YIELD_BUDGET_EXPANDED_ACTIONABLE_CONVERSION',
+    }
+  }
+
+  return { pageBudget: currentBudget, reasonCode: 'YIELD_BUDGET_UNCHANGED' }
+}
+
+export function parseQueryPlanYieldMap(value: unknown): QueryPlanYieldMap {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+  const result: Record<string, QueryPlanOperationalYield> = {}
+  for (const [key, raw] of Object.entries(value)) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue
+    result[key] = normalizeOperationalYield(raw as Record<string, unknown>)
+  }
+  return result
+}
+
+function normalizeOperationalYield(
+  raw: QueryPlanOperationalYield | Record<string, unknown>,
+): QueryPlanOperationalYield {
+  return {
+    executionCount: nullableCount(raw.executionCount),
+    zeroResultExecutions: nullableCount(raw.zeroResultExecutions),
+    fetchedRecords: nullableCount(raw.fetchedRecords),
+    uniqueEvents: nullableCount(raw.uniqueEvents),
+    uniqueCompanies: nullableCount(raw.uniqueCompanies),
+    newCompanyEvents: nullableCount(raw.newCompanyEvents),
+    episodes: nullableCount(raw.episodes),
+    qualifiedOpportunities: nullableCount(raw.qualifiedOpportunities),
+    actionableOpportunities: nullableCount(raw.actionableOpportunities),
+    accepted: nullableCount(raw.accepted),
+    contacted: nullableCount(raw.contacted),
+    replied: nullableCount(raw.replied),
+    meetings: nullableCount(raw.meetings),
+    won: nullableCount(raw.won),
+  }
+}
+
+function resolveBudgetAdjustment(
+  currentBudget: number,
+  yieldSnapshot: QueryPlanOperationalYield,
+) {
+  return resolveYieldAdjustedPageBudget(currentBudget, yieldSnapshot)
+}
+
+function nullableCount(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null
+  const parsed = Number(value)
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : null
+}
+
+function clampBudget(value: number): number {
+  return Math.min(Math.max(Math.trunc(value), 1), MAX_PAGE_BUDGET)
+}
+
+function normalizeKeyPart(value: string): string {
+  return value.trim().toLocaleLowerCase('ru-RU').replace(/\|/g, ' ')
+}
+
+function uniqueStrings(values: readonly string[]): string[] {
+  return [...new Set(values.filter(Boolean))]
+}
