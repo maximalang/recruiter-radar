@@ -43,6 +43,17 @@ describe("polished unified landing visual contract", () => {
     expect(conversion).toMatch(/id="conversion-final"[\s\S]*?data-header-tone="dark"/);
   });
 
+  it("keeps footer styling local and removes the obsolete global override layer", () => {
+    const layout = source("app/layout.tsx");
+    const footerModule = source("app/ui/site-footer.module.css");
+    const legacyFooterCss = resolve(WEB_ROOT, "app/footer-visual-system.css");
+
+    expect(layout).not.toContain('import "./footer-visual-system.css"');
+    expect(existsSync(legacyFooterCss)).toBe(false);
+    expect(footerModule).toContain('.siteFooter[data-tone="dark"]');
+    expect(footerModule).not.toContain('[class*="footer');
+  });
+
   it("preserves the Robokassa-ready public footer and the offer alias", () => {
     const footer = source("app/ui/site-footer.tsx");
     const offerAlias = source("app/offer/page.tsx");
