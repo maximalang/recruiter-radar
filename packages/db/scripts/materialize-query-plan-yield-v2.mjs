@@ -98,16 +98,16 @@ export async function materializeQueryPlanYield({
              execution_count, zero_result_executions, fetched_records,
              unique_events, unique_companies, new_company_events, episodes,
              qualified_episodes, qualified_opportunities, actionable_opportunities,
-             accepted, contacted, replied, meetings, won_opportunities,
-             duplicate_rate, stale_rate, zero_result_rate, qualified_rate,
-             accepted_rate, contacted_rate, reply_rate, meeting_rate,
-             input_hash
+             stale_opportunities, accepted, contacted, replied, meetings,
+             won_opportunities, duplicate_rate, stale_rate, zero_result_rate,
+             qualified_rate, accepted_rate, contacted_rate, reply_rate,
+             meeting_rate, input_hash
            )
            VALUES (
              $1, $2, $3, $4, $5::TIMESTAMPTZ, $6::TIMESTAMPTZ,
              $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
-             $17, $18, $19, $20, $21, $22, $23, $24, $25,
-             $26, $27, $28, $29, $30
+             $17, $18, $19, $20, $21, $22, $23, $24, $25, $26,
+             $27, $28, $29, $30, $31
            )
            ON CONFLICT (plan_snapshot_id, metric_version, input_hash) DO NOTHING`,
           [
@@ -127,6 +127,7 @@ export async function materializeQueryPlanYield({
             counts.qualifiedEpisodes,
             counts.qualifiedOpportunities,
             counts.actionableOpportunities,
+            counts.staleOpportunities,
             counts.accepted,
             counts.contacted,
             counts.replied,
