@@ -5,60 +5,60 @@ import styles from "./landing.module.css";
 
 const SOURCE_ROWS = [
   {
-    source: "CAREER PAGE",
+    source: "Карьерная страница",
     fact: "8 инженерных позиций",
-    discovered: "today 08:42",
-    eventDate: "4 aug",
-    confidence: "DIRECT SOURCE",
+    discovered: "сегодня 08:42",
+    eventDate: "4 авг",
+    confidence: "Прямой источник",
   },
   {
-    source: "PUBLIC VACANCIES",
+    source: "Публичные вакансии",
     fact: "руководитель направления",
-    discovered: "today 08:45",
-    eventDate: "1 aug",
-    confidence: "VERIFIED",
+    discovered: "сегодня 08:45",
+    eventDate: "1 авг",
+    confidence: "Подтверждено",
   },
   {
-    source: "PUBLISHING CHANGE",
+    source: "Повторная публикация",
     fact: "3 роли обновлены повторно",
-    discovered: "today 08:47",
-    eventDate: "today",
-    confidence: "FRESH SIGNAL",
+    discovered: "сегодня 08:47",
+    eventDate: "сегодня",
+    confidence: "Свежий сигнал",
   },
 ] as const;
 
 const SOURCE_ROLES = [
   {
-    title: "PRIMARY EVIDENCE",
+    title: "Основные сигналы",
     summary: "Свежий найм может вывести компанию в приоритет.",
     detail: "hh.ru, Работа России и прямые карьерные страницы дают основной сигнал найма. Перед попаданием компании в выдачу Radar проверяет свежесть, надёжность сигнала и корректность связи с организацией.",
     state: "live",
-    stateText: "влияет на score",
-    sources: ["hh.ru", "Работа России", "Career pages"],
+    stateText: "влияет на приоритет",
+    sources: ["hh.ru", "Работа России", "Карьерные страницы"],
   },
   {
-    title: "VERIFICATION",
+    title: "Подтверждение",
     summary: "Проверяет юрлицо, домен и официальный маршрут связи.",
     detail: "Сайт компании и реестры ФНС помогают связать сигнал с правильной организацией и найти официальный корпоративный канал. Они подтверждают возможность, но не заменяют сам сигнал найма.",
     state: "support",
     stateText: "подтверждает организацию",
-    sources: ["Company site", "ЕГРЮЛ", "ФНС"],
+    sources: ["Сайт компании", "ЕГРЮЛ", "ФНС"],
   },
   {
-    title: "GATED COVERAGE",
-    summary: "Расширяет покрытие только после quality и legal checks.",
+    title: "Дополнительные источники",
+    summary: "Расширяют покрытие после проверки качества и доступности.",
     detail: "Для дополнительных площадок уже есть адаптеры. Они начинают влиять на клиентскую выдачу только после проверок качества, правовой доступности и стабильности источника.",
     state: "gated",
-    stateText: "подключено, проходит проверки",
-    sources: ["Хабр Карьера", "SuperJob", "ATS", "Tech job boards"],
+    stateText: "проходит проверку",
+    sources: ["Хабр Карьера", "SuperJob", "ATS", "Профильные площадки"],
   },
   {
-    title: "CONTEXT",
-    summary: "Объясняет изменение компании, но не заменяет hiring evidence.",
+    title: "Контекст компании",
+    summary: "Помогает понять изменение бизнеса, не подменяя сигнал найма.",
     detail: "Корпоративные новости, реестровые события и отраслевые публикации помогают понять расширение, инвестиции или изменения бизнеса. Такой контекст дополняет, но не заменяет подтверждённый найм.",
     state: "context",
-    stateText: "контекст для объяснения",
-    sources: ["Newsroom", "Федресурс", "GDELT", "Industry media"],
+    stateText: "добавляет контекст",
+    sources: ["Новости компании", "Федресурс", "GDELT", "Отраслевые медиа"],
   },
 ] as const;
 
@@ -73,32 +73,32 @@ export default function EvidenceScene() {
       <div className={`${styles.evidenceLayout} ${sceneStyles.layout}`}>
         <div className={sceneStyles.top}>
           <div className={`${styles.evidenceIntro} ${sceneStyles.intro}`}>
-            <p className={styles.sceneLabel}>04 — Evidence</p>
+            <p className={styles.sceneLabel}>04 — На чём основан вывод</p>
             <h2 id="evidence-title" className={styles.sceneHeading}>
-              Почему этому score <em>можно доверять.</em>
+              Почему этому приоритету <em>можно доверять.</em>
             </h2>
             <p className={styles.sceneLead}>
-              Оценка не отделена от доказательств: вклад факторов, события, даты и роль источника остаются рядом с приоритетом компании.
+              Приоритет не отделён от фактов: рядом остаются вклад каждого сигнала, сами события, даты и роль источника.
             </p>
           </div>
 
-          <div className={sceneStyles.score} aria-label={`Оценка радара ${DEMO_COMPANY.score} из 100`}>
-            <span>ОЦЕНКА РАДАРА / RADAR SCORE</span>
+          <div className={sceneStyles.score} aria-label={`Приоритет компании ${DEMO_COMPANY.score} из 100`}>
+            <span>Приоритет компании</span>
             <div className={sceneStyles.scoreValue}>
               <strong>{DEMO_COMPANY.score}</strong>
               <small>/100</small>
             </div>
             <div className={sceneStyles.scoreMeta}>
-              <strong>HIGH CONFIDENCE</strong>
-              <span>4 FACTORS</span>
+              <strong>Высокая уверенность</strong>
+              <span>4 фактора</span>
             </div>
             <div className={sceneStyles.scale} aria-label="Шкала уверенности">
-              <span>weak</span><span>supported</span><span>strong</span>
+              <span>низкая</span><span>подтверждённая</span><span>высокая</span>
               <i className={sceneStyles.scaleTrack} aria-hidden="true" />
             </div>
           </div>
 
-          <ol className={sceneStyles.factors} aria-label="Из чего сложилась демонстрационная оценка">
+          <ol className={sceneStyles.factors} aria-label="Из чего сложился демонстрационный приоритет">
             {DEMO_EVIDENCE.map((item) => (
               <li key={item.label} className={sceneStyles.factor}>
                 <EvidenceGlyph size={18} />
@@ -113,10 +113,10 @@ export default function EvidenceScene() {
         <div className={sceneStyles.ledger}>
           <div className={sceneStyles.ledgerHeading}>
             <div>
-              <span>ДОКАЗАТЕЛЬНАЯ БАЗА / EVIDENCE RECORDS / 03</span>
+              <span>Факты и источники / 03</span>
               <strong>{DEMO_COMPANY.name}</strong>
             </div>
-            <p>Три записи показывают не «объяснение модели», а реальные основания: что найдено, когда найдено, когда произошло событие и насколько прямой источник.</p>
+            <p>Три записи показывают основание приоритета: что найдено, когда событие произошло, когда оно было обнаружено и насколько прямой источник.</p>
           </div>
 
           <ul className={sceneStyles.records}>
@@ -128,13 +128,13 @@ export default function EvidenceScene() {
                   <strong>{row.fact}</strong>
                 </div>
                 <dl className={sceneStyles.recordMeta}>
-                  <div><dt>found</dt><dd>{row.discovered}</dd></div>
-                  <div><dt>event</dt><dd>{row.eventDate}</dd></div>
+                  <div><dt>найдено</dt><dd>{row.discovered}</dd></div>
+                  <div><dt>событие</dt><dd>{row.eventDate}</dd></div>
                 </dl>
                 <span className={sceneStyles.recordStatus}>{row.confidence}</span>
-                <a className={sceneStyles.recordLink} href="#scene-workspace" aria-label={`Открыть ${row.source} в рабочем радаре`}>
+                <a className={sceneStyles.recordLink} href="#scene-workspace" aria-label={`Открыть подтверждение: ${row.source}`}>
                   <DocumentGlyph size={16} />
-                  open evidence <ArrowGlyph size={13} />
+                  открыть факт <ArrowGlyph size={13} />
                 </a>
               </li>
             ))}
@@ -143,9 +143,9 @@ export default function EvidenceScene() {
 
         <div className={sceneStyles.registry}>
           <div className={sceneStyles.registryIntro}>
-            <span>SOURCE REGISTRY</span>
-            <strong>Не каждый подключённый источник влияет на score.</strong>
-            <p>Primary evidence создаёт приоритет. Verification подтверждает организацию. Gated и context расширяют покрытие только в своей роли.</p>
+            <span>Роль источников</span>
+            <strong>Каждый источник выполняет свою задачу.</strong>
+            <p>Основные сигналы создают приоритет. Подтверждение связывает событие с компанией. Дополнительные источники и контекст расширяют картину только в своей роли.</p>
           </div>
           <div className={sceneStyles.roleList}>
             {SOURCE_ROLES.map((role, index) => (
