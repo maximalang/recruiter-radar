@@ -2,10 +2,9 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
+import { listEvidenceSourceGovernance } from '@/lib/intelligence/evidence-source-governance-repository'
 import {
-  SOURCE_REGISTRY,
   SOURCE_ROLES,
-  canAutomateSource,
   type SourceRole,
 } from '@/lib/intelligence/source-registry'
 import {
@@ -18,6 +17,7 @@ import {
 import {
   ContentCard,
   EmptyState,
+  ErrorState,
   InternalPageFrame,
   InternalPageHeader,
 } from '../../ui/internal-page'
@@ -69,10 +69,27 @@ export default async function EvidenceSourceRegistryPage() {
   }
 
   if (!isOpportunityCommercialSignalUiEnabledForContext(authorization)) notFound()
+  const sources = await listEvidenceSourceGovernance().catch(() => null)
 
-  const connected = SOURCE_REGISTRY.filter((source) => source.status === 'connected').length
-  const automatable = SOURCE_REGISTRY.filter(canAutomateSource).length
-  const pending = SOURCE_REGISTRY.filter((source) => source.legalReviewStatus === 'pending').length
+  if (!sources) {
+    return (
+      <InternalPageFrame navItems={NAVIGATION} footer={<SiteFooter />}>
+        <InternalPageHeader
+          title="Источники"
+          subtitle="Source Registry и текущие legal review решения."
+        />
+        <ErrorState
+          title="Source Registry временно не загрузился"
+          description="Статический policy-файл не используется как подмена operational review ledger. Проверьте миграции и подключение к БД."
+          action={{ href: '/opportunities/sources', label: 'Обновить' }}
+        />
+      </InternalPageFrame>
+    )
+  }
+
+  const connected = sources.filter((source) => source.operational.integrationStatus === 'connected').length
+  const automatable = sources.filter((source) => source.operational.automationAllowed).length
+  const pending = sources.filter((source) => source.operational.reviewStatus === 'pending').length
 
   return (
     <InternalPageFrame navItems={NAVIGATION} footer={<SiteFooter />}>
@@ -84,7 +101,7 @@ export default async function EvidenceSourceRegistryPage() {
 
       <div className={styles.stack}>
         <section className={styles.summary} aria-label="Состояние Source Registry">
-          <div><span>Источники</span><strong>{SOURCE_REGISTRY.length}</strong></div>
+          <div><span>Источники</span><strong>{sources.length}</strong></div>
           <div><span>Роли</span><strong>{SOURCE_ROLES.length}</strong></div>
           <div><span>Технически connected</span><strong>{connected}</strong></div>
           <div><span>Разрешены automation gate</span><strong>{automatable}</strong></div>
@@ -92,44 +109,52 @@ export default async function EvidenceSourceRegistryPage() {
 
         <ContentCard>
           <p className={styles.notice}>
-            На текущем контуре {pending} источников остаются в legal review. До зафиксированного
-            решения, условий хранения и source-specific dry-run их автоматический ingest в Evidence Radar запрещён.
-            CAPTCHA, закрытые API, private groups и персональный contact enrichment не используются.
+            На текущем контуре {pending} источников остаются без зафиксированного legal review.
+            Таблица ниже читает последнюю запись review ledger из PostgreSQL, поэтому обновление статического
+            TypeScript policy не может само открыть ingest. CAPTCHA, закрытые API, private groups и персональный
+            contact enrichment не используются.
           </p>
         </ContentCard>
 
         {SOURCE_ROLES.map((role) => {
-          const sources = SOURCE_REGISTRY.filter((source) => source.role === role)
+          const roleSources = sources.filter((source) => source.role === role)
           return (
             <ContentCard key={role}>
               <section className={styles.roleCard} aria-labelledby={`source-role-${role}`}>
                 <div className={styles.roleHeader}>
                   <h2 id={`source-role-${role}`}>{ROLE_LABELS[role]}</h2>
-                  <span>{sources.length} источников</span>
+                  <span>{roleSources.length} источников</span>
                 </div>
                 <div className={styles.tableWrap}>
                   <table className={styles.table}>
                     <thead>
                       <tr>
-                        <th>Источник</th><th>Доступ</th><th>Статус</th><th>Legal</th>
+                        <th>Источник</th><th>Runtime</th><th>Доступ</th><th>Статус</th><th>Legal</th>
                         <th>Cadence</th><th>Надёжность</th><th>Match</th><th>План</th><th>Условия</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {sources.map((source) => (
+                      {roleSources.map((source) => (
                         <tr key={source.id}>
                           <td>{source.name}<small>{source.category}</small></td>
+                          <td>
+                            {source.runtimeSourceIds.length > 0 ? source.runtimeSourceIds.join(', ') : 'нет adapter binding'}
+                            <small>{source.operational.automationAllowed ? 'automation allowed' : 'fail-closed'}</small>
+                          </td>
                           <td>{source.accessMethod}<small>{source.authorization} · {source.requestLimits}</small></td>
-                          <td><span className={styles.badge} data-state={source.status}>{source.status}</span></td>
-                          <td><span className={styles.badge} data-review={source.legalReviewStatus}>{source.legalReviewStatus}</span><small>{source.automationPolicy}</small></td>
+                          <td><span className={styles.badge} data-state={source.operational.integrationStatus}>{source.operational.integrationStatus}</span></td>
+                          <td>
+                            <span className={styles.badge} data-review={source.operational.reviewStatus}>{source.operational.reviewStatus}</span>
+                            <small>{source.operational.automationPolicy}{source.operational.reviewedAt ? ` · ${formatReviewDate(source.operational.reviewedAt)}` : ''}</small>
+                          </td>
                           <td>{source.refreshCadence}<small>{source.historicalDepth}</small></td>
                           <td>{source.reliability}<small>{source.primaryEvidence ? 'primary evidence eligible' : 'supporting evidence'}</small></td>
                           <td>{source.entityMatchQuality}<small>{source.geography}</small></td>
                           <td>{source.phase} · P{source.priority}<small>{source.costClass} · {source.complexity}</small></td>
                           <td>
-                            {source.termsReference?.startsWith('https://') ? (
-                              <a className={styles.link} href={source.termsReference} target="_blank" rel="noreferrer">reference</a>
-                            ) : source.termsReference ?? 'не зафиксированы'}
+                            {source.operational.termsReference?.startsWith('https://') ? (
+                              <a className={styles.link} href={source.operational.termsReference} target="_blank" rel="noreferrer">review reference</a>
+                            ) : source.operational.termsReference ?? 'не зафиксированы'}
                             <small>{source.retentionPolicy}</small>
                           </td>
                         </tr>
@@ -144,4 +169,15 @@ export default async function EvidenceSourceRegistryPage() {
       </div>
     </InternalPageFrame>
   )
+}
+
+function formatReviewDate(value: string): string {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime())
+    ? 'invalid review time'
+    : new Intl.DateTimeFormat('ru-RU', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      }).format(date)
 }
