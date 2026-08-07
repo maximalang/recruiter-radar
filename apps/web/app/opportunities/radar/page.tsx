@@ -2,15 +2,16 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
-import {
-  isOpportunityCommercialSignalUiEnabledForContext,
-  isOpportunityEngineV1EnabledForContext,
-} from '@/lib/opportunities/config'
+import { listEvidenceRadarRegionBoundaries } from '@/lib/intelligence/evidence-radar-boundaries'
+import { listEvidenceRadarLeads } from '@/lib/intelligence/evidence-radar-repository'
 import {
   getOpportunityAuthorizationContext,
   getOpportunityDataAccessContext,
 } from '@/lib/opportunities/authorization'
-import { listEvidenceRadarLeads } from '@/lib/intelligence/evidence-radar-repository'
+import {
+  isOpportunityCommercialSignalUiEnabledForContext,
+  isOpportunityEngineV1EnabledForContext,
+} from '@/lib/opportunities/config'
 import {
   ContentCard,
   EmptyState,
@@ -58,10 +59,13 @@ export default async function EvidenceRadarPage() {
   const access = getOpportunityDataAccessContext(authorization)
   if (!access?.workspaceId) notFound()
 
-  const leads = await listEvidenceRadarLeads({
-    workspaceId: access.workspaceId,
-    limit: 100,
-  }).catch(() => null)
+  const [leads, boundaries] = await Promise.all([
+    listEvidenceRadarLeads({
+      workspaceId: access.workspaceId,
+      limit: 100,
+    }).catch(() => null),
+    listEvidenceRadarRegionBoundaries().catch(() => []),
+  ])
 
   return (
     <InternalPageFrame navItems={NAVIGATION} footer={<SiteFooter />}>
@@ -71,7 +75,7 @@ export default async function EvidenceRadarPage() {
         nav={<Link href="/opportunities/sources">Реестр источников</Link>}
       />
       {leads ? (
-        <EvidenceRadarMap leads={leads} />
+        <EvidenceRadarMap leads={leads} boundaries={boundaries} />
       ) : (
         <ErrorState
           title="Evidence Radar временно не загрузился"
