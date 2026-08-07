@@ -53,17 +53,22 @@ jobs:
         run: node packages/db/scripts/migrate.mjs
       - name: Validate database schema
         run: npm run db:validate
-      - name: Verify Commercial Signal PostgreSQL runtime chain
-        run: |
-          set -euo pipefail
-          npm run test:company-events-v1:db
-          npm run test:company-state-v1:db
-          npm run test:signal-episodes-v2:db
-          npm run test:commercial-theses-v1:db
-          npm run test:external-agency-propensity-v1:db
-          npm run test:agency-dna-match-v2:db
-          npm run test:opportunity-scoring-v3:db
-          npm run test:query-planner-v2:db
+      - name: Verify Company Events PostgreSQL runtime
+        run: npm run test:company-events-v1:db
+      - name: Verify Company State PostgreSQL runtime
+        run: npm run test:company-state-v1:db
+      - name: Verify Signal Episodes PostgreSQL runtime
+        run: npm run test:signal-episodes-v2:db
+      - name: Verify Commercial Theses PostgreSQL runtime
+        run: npm run test:commercial-theses-v1:db
+      - name: Verify External Agency Propensity PostgreSQL runtime
+        run: npm run test:external-agency-propensity-v1:db
+      - name: Verify Agency DNA PostgreSQL runtime
+        run: npm run test:agency-dna-match-v2:db
+      - name: Verify Opportunity Scoring v3 PostgreSQL runtime
+        run: npm run test:opportunity-scoring-v3:db
+      - name: Verify Query Planner v2 PostgreSQL runtime
+        run: npm run test:query-planner-v2:db
       - name: Verify Commercial Signal evaluation and contract matrix
         run: |
           set -euo pipefail
