@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
+import { isEvidenceRadarV1EnabledForContext } from '@/lib/intelligence/evidence-radar-config'
 import { listEvidenceSourceGovernance } from '@/lib/intelligence/evidence-source-governance-repository'
 import {
   SOURCE_ROLES,
@@ -10,10 +11,7 @@ import {
 import {
   getOpportunityAuthorizationContext,
 } from '@/lib/opportunities/authorization'
-import {
-  isOpportunityCommercialSignalUiEnabledForContext,
-  isOpportunityEngineV1EnabledForContext,
-} from '@/lib/opportunities/config'
+import { isOpportunityEngineV1EnabledForContext } from '@/lib/opportunities/config'
 import {
   ContentCard,
   EmptyState,
@@ -68,7 +66,7 @@ export default async function EvidenceSourceRegistryPage() {
     )
   }
 
-  if (!isOpportunityCommercialSignalUiEnabledForContext(authorization)) notFound()
+  if (!isEvidenceRadarV1EnabledForContext(authorization)) notFound()
   const sources = await listEvidenceSourceGovernance().catch(() => null)
 
   if (!sources) {
