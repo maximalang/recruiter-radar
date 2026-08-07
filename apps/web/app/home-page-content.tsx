@@ -9,7 +9,7 @@ import {
 } from "../lib/publicProduct";
 import { buildFaqItems } from "./home-page-components";
 import LandingAnalytics from "./landing-analytics";
-import LandingPage from "./landing/landing-page";
+import LandingPage, { LandingSkipLink } from "./landing/landing-page";
 import WorkspaceScene, { WorkspaceResultsSkeleton } from "./landing/workspace-scene";
 import { PageFrame } from "./ui/page-primitives";
 import YandexMetrika from "./yandex-metrika";
@@ -42,7 +42,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   });
 
   return (
-    <PageFrame maxWidth="none" dataDeployAnchor="recruiter-radar-landing-v3">
+    <PageFrame as="div" maxWidth="none" dataDeployAnchor="recruiter-radar-landing-v3">
+      <LandingSkipLink />
       <LandingAnalytics />
       {landing}
       <YandexMetrika />
