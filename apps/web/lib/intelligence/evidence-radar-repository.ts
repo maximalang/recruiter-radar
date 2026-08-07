@@ -169,6 +169,8 @@ export async function listEvidenceRadarLeads(
        WHERE event.workspace_id = card.workspace_id
          AND event.organization_id = card.organization_id
          AND event.id = ANY(card.evidence_event_ids)
+         AND event.verification_status = 'verified'
+         AND event.valid_until >= NOW()
      ) AS evidence ON TRUE
      LEFT JOIN LATERAL (
        SELECT JSONB_AGG(
@@ -183,10 +185,14 @@ export async function listEvidenceRadarLeads(
        WHERE contact.workspace_id = card.workspace_id
          AND contact.organization_id = card.organization_id
          AND contact.id = ANY(card.contact_path_ids)
+         AND contact.verification_status = 'verified'
      ) AS contacts ON TRUE
      WHERE card.workspace_id = $1
-       AND card.status IN ('qualified', 'review')
+       AND card.status = 'qualified'
        AND card.valid_until >= NOW()
+       AND score.valid_until >= NOW()
+       AND identity.resolution_status = 'verified'
+       AND location.verification_status = 'verified'
        AND location.latitude IS NOT NULL
        AND location.longitude IS NOT NULL
      ORDER BY score.lead_score DESC, card.generated_at DESC, card.id DESC
