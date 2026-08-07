@@ -18,11 +18,11 @@ const SERVICE_LINKS = [
 ] as const;
 
 const DOCUMENT_LINKS = [
-  { href: "/legal", label: "Правовая информация" },
-  { href: "/privacy", label: "Конфиденциальность" },
-  { href: "/terms", label: "Условия использования" },
-  { href: "/personal-data-consent", label: "Обработка данных" },
-  { href: "/payment-and-refund", label: "Оплата и возврат" },
+  { href: "/legal", label: "Правовая информация", ariaLabel: "Правовая информация — Реквизиты" },
+  { href: "/privacy", label: "Конфиденциальность", ariaLabel: "Политика конфиденциальности" },
+  { href: "/terms", label: "Условия использования", ariaLabel: "Условия использования — Оферта" },
+  { href: "/personal-data-consent", label: "Обработка данных", ariaLabel: "Согласие на обработку персональных данных" },
+  { href: "/payment-and-refund", label: "Оплата и возврат", ariaLabel: "Информация об оплате и возврате" },
 ] as const;
 
 export async function SiteFooter(props: { tone?: "light" | "dark" }) {
@@ -62,7 +62,7 @@ export async function SiteFooter(props: { tone?: "light" | "dark" }) {
             </nav>
             <nav aria-label="Документы">
               <strong>Документы</strong>
-              {DOCUMENT_LINKS.map((item) => <Link key={item.href} href={item.href} className={s.footerLink}>{item.label}</Link>)}
+              {DOCUMENT_LINKS.map((item) => <Link key={item.href} href={item.href} aria-label={item.ariaLabel} className={s.footerLink}>{item.label}</Link>)}
             </nav>
           </div>
         </div>
