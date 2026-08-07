@@ -1,0 +1,87 @@
+name: One-shot skip-link style patch
+
+on:
+  push:
+    branches:
+      - codex/post-merge-design-polish
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  patch-skip-link:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/post-merge-design-polish
+          fetch-depth: 0
+      - name: Patch only the detached skip-link style block
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('apps/web/app/landing/landing.module.css')
+          css = path.read_text()
+          old = '''.skipLink {
+            position: fixed;
+            z-index: 120;
+            top: -5rem;
+            left: 1rem;
+            min-height: 44px;
+            padding: .8rem 1rem;
+            background: var(--signal-strong);
+            color: var(--slate-950);
+            font-family: var(--mono);
+            font-size: .72rem;
+            text-decoration: none;
+          }
+
+          .skipLink:focus { top: 1rem; }
+          '''
+          new = '''.skipLink {
+            position: fixed;
+            z-index: 120;
+            top: -5rem;
+            left: 1rem;
+            min-height: 44px;
+            padding: .8rem 1rem;
+            background: var(--signal-strong, #c8f36a);
+            color: var(--slate-950, #070a09);
+            font-family: var(--mono, "IBM Plex Mono", "SFMono-Regular", Consolas, monospace);
+            font-size: .72rem;
+            text-decoration: none;
+          }
+
+          .skipLink:focus {
+            top: 1rem;
+          }
+
+          .skipLink:focus-visible {
+            outline: 2px solid var(--signal, #c8f36a);
+            outline-offset: 4px;
+          }
+          '''
+          if old not in css:
+              raise SystemExit('expected skip-link block not found')
+          updated = css.replace(old, new, 1)
+          if updated.count('.skipLink {') != css.count('.skipLink {'):
+              raise SystemExit('unexpected skip-link selector count change')
+          path.write_text(updated)
+          PY
+          git diff --check
+      - name: Commit focused style fix
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/web/app/landing/landing.module.css
+          git commit -m "fix(a11y): make detached skip-link styling self-contained"
+          git fetch origin codex/post-merge-design-polish
+          git rebase origin/codex/post-merge-design-polish
+          git push origin HEAD:codex/post-merge-design-polish
