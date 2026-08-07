@@ -56,7 +56,7 @@ export default function WorkspaceLead({ item, defaultOpen }: { item: PreviewItem
         <span className={styles.workspaceScore} data-lead-score>
           <strong>{points}</strong>
           <small>/100</small>
-          {defaultOpen ? <b className={sceneStyles.confidence}>high confidence</b> : null}
+          {defaultOpen ? <b className={sceneStyles.confidence}>высокая уверенность</b> : null}
         </span>
         <span className={styles.leadChevron} aria-hidden="true"><ArrowGlyph size={16} /></span>
       </summary>
@@ -67,7 +67,7 @@ export default function WorkspaceLead({ item, defaultOpen }: { item: PreviewItem
             <p>{freshness ? `${whyNow} Последнее изменение — ${freshness}.` : whyNow}</p>
           </div>
           <div className={sceneStyles.proofBlock}>
-            <span>Suggested angle</span>
+            <span>Как начать разговор</span>
             <p>{item.opener?.trim() || "Проверить факты и выбрать безопасный путь обращения"}</p>
           </div>
           <div className={sceneStyles.proofBlock}>
@@ -77,8 +77,8 @@ export default function WorkspaceLead({ item, defaultOpen }: { item: PreviewItem
         </div>
 
         <div className={sceneStyles.sideProof}>
-          <div className={sceneStyles.factors} aria-label="Состав оценки рекомендации">
-            <span>Score factors</span>
+          <div className={sceneStyles.factors} aria-label="Что влияет на приоритет рекомендации">
+            <span>Что влияет на приоритет</span>
             <div className={`${styles.workspaceFiur} ${sceneStyles.factorsList}`}>
               {scoreParts.map(([label, value]) => (
                 <div key={label}>
