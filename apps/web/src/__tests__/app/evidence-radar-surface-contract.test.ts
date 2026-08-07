@@ -8,6 +8,7 @@ describe('Evidence Radar production surface contract', () => {
   const radarPage = readFileSync(resolve(opportunitiesRoot, 'radar', 'page.tsx'), 'utf8')
   const sourcePage = readFileSync(resolve(opportunitiesRoot, 'sources', 'page.tsx'), 'utf8')
   const repository = readFileSync(resolve(intelligenceRoot, 'evidence-radar-repository.ts'), 'utf8')
+  const boundaries = readFileSync(resolve(intelligenceRoot, 'evidence-radar-boundaries.ts'), 'utf8')
   const navigation = readFileSync(resolve(opportunitiesRoot, 'navigation.ts'), 'utf8')
 
   it('never fabricates organization placement or signal density', () => {
@@ -26,6 +27,17 @@ describe('Evidence Radar production surface contract', () => {
     expect(map).toContain('lead.score.contributions')
     expect(map).toContain('lead.contactPaths')
     expect(map).toContain('riskReasons')
+  })
+
+  it('renders administrative boundaries only from verified persisted GeoJSON', () => {
+    expect(radarPage).toContain('listEvidenceRadarRegionBoundaries')
+    expect(radarPage).toContain('boundaries={boundaries}')
+    expect(boundaries).toContain("WHERE verification_status = 'verified'")
+    expect(boundaries).toContain('geometry_geojson AS geometry')
+    expect(map).toContain('geometryPaths')
+    expect(map).toContain("type === 'Polygon'")
+    expect(map).toContain("type === 'MultiPolygon'")
+    expect(map).toContain('Границы субъектов ещё не загружены из верифицированного источника')
   })
 
   it('keeps both routes behind Opportunity authorization and Commercial Signal feature gates', () => {
