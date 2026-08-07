@@ -98,12 +98,18 @@ export function resolveAgencyDnaOpportunityContext(
 ): AgencyDnaOpportunityContext {
   const seniority = inferSeniority(input.episodeTitle)
   const serviceTypes = input.serviceTypes.filter((serviceType) => {
-    if (serviceType === 'permanent') return true
+    // Permanent and project describe delivery capabilities declared by the
+    // agency. They do not need a vacancy-volume proxy to remain valid matches.
+    if (serviceType === 'permanent' || serviceType === 'project') return true
     if (serviceType === 'executive') {
       return seniority === 'executive' ||
         input.matchedRoleFamilies.includes('executive')
     }
-    if (serviceType === 'volume') return input.vacancyCount >= 5
+    if (serviceType === 'volume') {
+      // A low-capacity agency should not be presented as ready for a volume
+      // opportunity even when the vacancy count crosses the volume threshold.
+      return input.vacancyCount >= 5 && input.currentCapacity !== 'low'
+    }
     return false
   })
   const evidencedEngagementTypes = input.evidencedEngagementTypes ?? []
