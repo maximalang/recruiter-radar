@@ -73,12 +73,12 @@ export default function WorkspaceScene(props: WorkspaceProps) {
 function WorkspaceIntro() {
   return (
     <div className={`${styles.workspaceIntro} ${sceneStyles.intro}`}>
-      <p className={styles.sceneLabel}>03 / PRODUCT PROOF</p>
+      <p className={styles.sceneLabel}>03 — Рабочая выдача / PRODUCT PROOF</p>
       <h2 id="workspace-title" className={styles.sceneHeading}>
         Это не мокап. <em>Пересчитайте радар сами.</em>
       </h2>
       <p className={styles.sceneLead}>
-        Укажите специализацию и географию. Сервер пересчитает порядок компаний по тем же правилам, что рабочую выдачу.
+        Как выглядит рабочая выдача: укажите специализацию и географию. Сервер пересчитает порядок компаний по тем же правилам, что рабочую выдачу.
       </p>
     </div>
   );
