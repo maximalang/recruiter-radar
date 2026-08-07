@@ -97,16 +97,17 @@ export async function materializeQueryPlanYield({
              metric_version, measurement_window_start, measurement_window_end,
              execution_count, zero_result_executions, fetched_records,
              unique_events, unique_companies, new_company_events, episodes,
-             qualified_opportunities, actionable_opportunities,
+             qualified_episodes, qualified_opportunities, actionable_opportunities,
              accepted, contacted, replied, meetings, won_opportunities,
-             duplicate_rate, zero_result_rate, qualified_rate,
+             duplicate_rate, stale_rate, zero_result_rate, qualified_rate,
              accepted_rate, contacted_rate, reply_rate, meeting_rate,
              input_hash
            )
            VALUES (
              $1, $2, $3, $4, $5::TIMESTAMPTZ, $6::TIMESTAMPTZ,
-             $7, $8, $9, $10, $11, $12, $13, $14, $15,
-             $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28
+             $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
+             $17, $18, $19, $20, $21, $22, $23, $24, $25,
+             $26, $27, $28, $29, $30
            )
            ON CONFLICT (plan_snapshot_id, metric_version, input_hash) DO NOTHING`,
           [
@@ -123,6 +124,7 @@ export async function materializeQueryPlanYield({
             counts.uniqueCompanies,
             counts.newCompanyEvents,
             counts.episodes,
+            counts.qualifiedEpisodes,
             counts.qualifiedOpportunities,
             counts.actionableOpportunities,
             counts.accepted,
@@ -131,6 +133,7 @@ export async function materializeQueryPlanYield({
             counts.meetings,
             counts.won,
             rates.duplicateRate,
+            rates.staleRate,
             rates.zeroResultRate,
             rates.qualifiedRate,
             rates.acceptedRate,
@@ -228,7 +231,8 @@ async function computePlanCounts(client, plan, start, end) {
        SELECT DISTINCT
          lineage.id AS lineage_id,
          lineage.opportunity_id,
-         lineage.candidate_id
+         lineage.candidate_id,
+         lineage.signal_episode_id
        FROM commercial_signal_opportunity_query_plans query_link
        JOIN commercial_signal_opportunity_lineage lineage
          ON lineage.id = query_link.lineage_id
@@ -267,12 +271,19 @@ async function computePlanCounts(client, plan, start, end) {
          AS "newCompanyEvents",
        (SELECT COUNT(DISTINCT signal_episode_id) FROM episodes)::BIGINT
          AS "episodes",
+       (SELECT COUNT(DISTINCT signal_episode_id) FROM lineages)::BIGINT
+         AS "qualifiedEpisodes",
        (SELECT COUNT(*) FROM lineages)::BIGINT AS "qualifiedOpportunities",
        (SELECT COUNT(*)
         FROM lineages lineage
         JOIN opportunity_candidates candidate ON candidate.id = lineage.candidate_id
         WHERE candidate.status = 'qualified_actionable')::BIGINT
          AS "actionableOpportunities",
+       (SELECT COUNT(*)
+        FROM lineages lineage
+        JOIN signal_episodes episode ON episode.id = lineage.signal_episode_id
+        WHERE episode.valid_until <= $5::TIMESTAMPTZ)::BIGINT
+         AS "staleOpportunities",
        (SELECT COUNT(*) FROM outcome_flags WHERE accepted)::BIGINT AS accepted,
        (SELECT COUNT(*) FROM outcome_flags WHERE contacted)::BIGINT AS contacted,
        (SELECT COUNT(*) FROM outcome_flags WHERE replied)::BIGINT AS replied,
@@ -295,8 +306,10 @@ async function computePlanCounts(client, plan, start, end) {
     uniqueCompanies: count(row.uniqueCompanies),
     newCompanyEvents: count(row.newCompanyEvents),
     episodes: count(row.episodes),
+    qualifiedEpisodes: count(row.qualifiedEpisodes),
     qualifiedOpportunities: count(row.qualifiedOpportunities),
     actionableOpportunities: count(row.actionableOpportunities),
+    staleOpportunities: count(row.staleOpportunities),
     accepted: count(row.accepted),
     contacted: count(row.contacted),
     replied: count(row.replied),
@@ -311,6 +324,7 @@ function computeRates(counts) {
       Math.max(0, counts.fetchedRecords - counts.uniqueEvents),
       counts.fetchedRecords,
     ),
+    staleRate: rate(counts.staleOpportunities, counts.qualifiedOpportunities),
     zeroResultRate: rate(counts.zeroResultExecutions, counts.executionCount),
     qualifiedRate: rate(counts.qualifiedOpportunities, counts.episodes),
     acceptedRate: rate(counts.accepted, counts.qualifiedOpportunities),
