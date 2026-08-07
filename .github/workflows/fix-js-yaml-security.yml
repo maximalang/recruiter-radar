@@ -1,0 +1,41 @@
+name: Fix js-yaml security lock
+
+on:
+  push:
+    branches: [ codex/evidence-radar-system ]
+
+permissions:
+  contents: write
+
+jobs:
+  fix-lock:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/evidence-radar-system
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Generate patched lockfile
+        run: npm install js-yaml@3.15.1 --save --package-lock-only --ignore-scripts
+      - name: Verify production dependency audit
+        run: npm audit --omit=dev --audit-level=high
+      - name: Commit only dependency metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check -- package.json package-lock.json
+          git diff --exit-code -- . ':(exclude)package.json' ':(exclude)package-lock.json'
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          if git diff --cached --quiet; then
+            echo "Dependency files already current."
+            exit 0
+          fi
+          git commit -m "fix(security): patch js-yaml advisory"
+          git push origin HEAD:codex/evidence-radar-system
