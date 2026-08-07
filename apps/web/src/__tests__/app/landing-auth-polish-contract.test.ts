@@ -41,7 +41,8 @@ describe("landing visual and login reliability polish", () => {
     expect(heroScene).not.toContain("#dcff8a");
     expect(heroScene).not.toContain("#c8f36a");
     expect(visual).toContain("@keyframes clusterDrift");
-    expect(visual).toContain("@keyframes signalBreath");
+    expect(visual).not.toContain("@keyframes signalBreath");
+    expect(visual).not.toContain("animation: signalBreath");
     expect(visual).toContain("@media (prefers-reduced-motion: reduce)");
     expect(visual).toMatch(/data-signal-cluster[\s\S]*animation: none;/);
   });
