@@ -24,6 +24,8 @@ const routes = [
   '/legal',
   '/privacy',
   '/terms',
+  '/offer',
+  '/payment-and-refund',
   '/auth/verify',
   '/auth/confirm',
   '/auth/invite',
@@ -31,9 +33,11 @@ const routes = [
 ];
 const viewports = [
   { name: 'mobile-320', width: 320, height: 720 },
+  { name: 'mobile-360', width: 360, height: 800 },
   { name: 'mobile-390', width: 390, height: 844 },
   { name: 'tablet-768', width: 768, height: 1024 },
-  { name: 'desktop-1440', width: 1440, height: 1000 },
+  { name: 'tablet-1024', width: 1024, height: 768 },
+  { name: 'desktop-1440', width: 1440, height: 900 },
 ];
 
 function slug(route) {
