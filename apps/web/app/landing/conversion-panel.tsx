@@ -22,27 +22,28 @@ export default function ConversionPanel(props: {
   const secondaryPlans = PUBLIC_PLANS.filter((plan) => plan.code !== "pilot");
 
   return (
-    <section className={styles.conversionPanel} aria-label="Тарифы и ответы">
+    <section className={styles.conversionPanel} aria-label="Тарифы и ответы" data-conversion-scenes="continuous">
       <div
         id="pricing"
         className={`${styles.pricingStage} ${panelStyles.anchor} ${panelStyles.pricing}`}
         data-header-tone="light"
         data-pricing-surface="true"
+        data-pricing-layout="unified-grid"
       >
         <div className={styles.pricingIntro}>
           <span>07 — Тарифы</span>
-          <h2>Начните с недели. Продолжайте, только если радар полезен.</h2>
+          <h2>Проверьте радар на своих нишах за 7 дней.</h2>
           <p>
             {props.paymentConfigured
-              ? "Пилот — разовая оплата без продления. Месяц и квартал подключаются по заявке после проверки качества."
-              : "Сейчас пилот оформляется как заявка без списания. Профиль сохранится, а к запуску можно будет вернуться после подключения оплаты."}
+              ? "Неделя — короткий платный пилот без автопродления. Если выдача полезна, можно перейти на месяц или квартал."
+              : "Оставьте заявку на пилот. Профиль сохранится — продолжить можно после подключения оплаты."}
           </p>
         </div>
 
         <div className={styles.pilotOffer} data-pricing-primary="true">
           <div className={styles.pilotMeta}>
-            <span>Главное предложение</span>
-            <strong>{pilotPlan.name}</strong>
+            <span>Пилот</span>
+            <strong>7 дней</strong>
           </div>
           <div className={styles.pilotPrice}>
             <strong>{pilotPlan.price}</strong>
@@ -57,25 +58,28 @@ export default function ConversionPanel(props: {
             data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.pricingPilot}
           >
-            {props.paymentConfigured ? pilotPlan.ctaLabel : "Оставить заявку на неделю"} <ArrowGlyph />
+            {props.paymentConfigured ? "Запустить пилот на 7 дней" : "Оставить заявку на пилот"} <ArrowGlyph />
           </Link>
           <small>{props.paymentConfigured ? "Разовая оплата · без автопродления" : "Заявка без списания · профиль сохранится"}</small>
         </div>
 
-        <div className={styles.secondaryOffers} aria-label="Дополнительные тарифы" data-pricing-secondary="true">
+        <div className={styles.secondaryOffers} aria-label="Продолжение после пилота" data-pricing-secondary="true">
           {secondaryPlans.map((plan) => {
             const quarterly = plan.code === "quarterly";
             return (
-              <article key={plan.code}>
-                <span>{plan.name}</span>
+              <article key={plan.code} data-plan-code={plan.code}>
+                <span>{quarterly ? "Квартал" : "Месяц"}</span>
                 <strong>{plan.price}</strong>
                 <p>{plan.description}</p>
+                <ul>
+                  {plan.bullets.slice(0, 2).map((bullet) => <li key={bullet}><ArrowGlyph size={13} />{bullet}</li>)}
+                </ul>
                 <Link
                   href={buildCheckoutHref({ ...props.previewInput, planCode: plan.code })}
                   data-analytics-event={LANDING_ANALYTICS_EVENT.continuationCtaClicked}
                   data-analytics-context={quarterly ? LANDING_ANALYTICS_CONTEXT.quarterly : LANDING_ANALYTICS_CONTEXT.monthly}
                 >
-                  {plan.ctaLabel} <ArrowGlyph />
+                  {quarterly ? "Подключить квартал" : "Продолжить на месяц"} <ArrowGlyph />
                 </Link>
               </article>
             );
@@ -88,15 +92,17 @@ export default function ConversionPanel(props: {
         className={`${styles.faqStage} ${panelStyles.anchor} ${panelStyles.faq}`}
         data-header-tone="light"
         data-faq-surface="true"
+        data-faq-layout="editorial"
       >
         <div className={styles.faqHeading}>
-          <span>Перед запуском</span>
-          <h2>Коротко о данных, доставке и контроле.</h2>
-          <p>Ответы раскрываются без перехода на отдельную страницу.</p>
+          <span>08 — Перед запуском</span>
+          <h2>Перед запуском — короткие ответы.</h2>
+          <p>Откуда берутся сигналы, как формируется приоритет, куда приходит выдача и что остаётся под вашим контролем.</p>
+          <small data-faq-trust>Интерактивный пример доступен без регистрации. Публичные данные в нём обезличены.</small>
         </div>
         <div className={styles.faqList}>
           {props.faqItems.map((item, index) => (
-            <details key={item.question} data-analytics-event={LANDING_ANALYTICS_EVENT.faqOpened}>
+            <details key={item.question} data-analytics-event={LANDING_ANALYTICS_EVENT.faqOpened} data-faq-item>
               <summary><span>{String(index + 1).padStart(2, "0")}</span>{item.question}<i aria-hidden="true"><PlusGlyph /></i></summary>
               <p>{item.answer}</p>
             </details>
@@ -109,8 +115,8 @@ export default function ConversionPanel(props: {
         className={`${styles.finalCall} ${panelStyles.final}`}
         data-header-tone="dark"
       >
-        <span>РАДАР / 7 ДНЕЙ</span>
-        <h2>Соберите радар под свою специализацию.</h2>
+        <span>ПИЛОТ / 7 ДНЕЙ</span>
+        <h2>Соберите радар под специализацию агентства.</h2>
         <p>Получите первый короткий список компаний и решите на фактах, стоит ли продолжать.</p>
         <div>
           <Link
@@ -118,7 +124,7 @@ export default function ConversionPanel(props: {
             data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.closing}
           >
-            {props.paymentConfigured ? `Активировать неделю — ${pilotPlan.price}` : "Оставить заявку на неделю"} <ArrowGlyph />
+            {props.paymentConfigured ? `Запустить пилот — ${pilotPlan.price}` : "Оставить заявку на пилот"} <ArrowGlyph />
           </Link>
           <a href="#preview-configurator">Вернуться к настройке выдачи <ArrowGlyph /></a>
         </div>
