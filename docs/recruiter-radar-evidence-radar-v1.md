@@ -111,7 +111,7 @@ First-party interest не создаёт лид без внешнего hiring e
 
 `Lead Score = Hiring Intent × Confidence × Freshness × Urgency × Commercial Fit × Contactability − Risk Penalty`.
 
-Каждый компонент ограничен `[0,1]`. UI отдельно показывает Opportunity, Confidence, Urgency, Contactability и Risk. `evidence_lead_score_snapshots_v1` хранит component object, event contribution ledger, input hash, source events, independent source families, version and validity.
+Каждый компонент ограничен `[0,1]`. UI отдельно показывает Opportunity, Confidence, Urgency, Contactability и Risk. `evidence_lead_score_snapshots_v1` хранит component object, event contribution ledger, input hash, source events, source signals, source correlations, independent source families, version and validity. PostgreSQL повторно вычисляет score из сохранённых компонентов и отклоняет несогласованный snapshot.
 
 Это отдельный Evidence Radar score и не меняет additive FIUR contract существующего Opportunity Engine.
 
@@ -153,7 +153,16 @@ Personal contacts are outside this model. DB rejects `is_personal = true` and no
 
 ## Regional radar
 
-`/opportunities/radar` is protected by existing `opportunities:read`, Opportunity Engine and Commercial Signal feature gates. The read model always filters by `workspace_id` and only returns cards with non-null verified coordinates.
+`/opportunities/radar` и `/opportunities/sources` защищены `opportunities:read`, базовым Opportunity Engine gate и отдельным Evidence Radar rollout gate. `isEvidenceRadarV1EnabledForContext()` дополнительно требует все prerequisites существующего Commercial Signal UI, поэтому Evidence Radar нельзя включить поверх неполного upstream intelligence stack.
+
+Evidence Radar остаётся dark-by-default. Доступ разрешается только одним из двух способов:
+
+- `EVIDENCE_RADAR_V1_ENABLED=true` — явное глобальное включение после выполнения upstream prerequisites;
+- `EVIDENCE_RADAR_V1_CANARY_WORKSPACE_IDS=<workspace ids>` — ограниченный workspace canary при выключенном global flag.
+
+Malformed, zero и negative workspace IDs игнорируются; контекст без workspace остаётся выключенным. Сам Evidence Radar flag не включает автоматически внешние source adapters и не заменяет source-specific legal/contract review.
+
+Read model всегда фильтрует по `workspace_id` и показывает только карточки с non-null verified coordinates.
 
 Visual contract:
 
@@ -167,7 +176,7 @@ Visual contract:
 
 Marker orbit is deterministic. `Math.random` is forbidden. Missing verified geometry does not produce invented subject borders.
 
-`/opportunities/sources` exposes the Source Registry and current legal/automation state.
+`/opportunities/sources` exposes the Source Registry and current legal/automation state from PostgreSQL review history rather than treating the static TypeScript registry as operational approval.
 
 ## PostgreSQL safety
 
@@ -184,6 +193,7 @@ Safety properties:
 - evidence IDs validated against the same organization;
 - source-policy DB trigger;
 - append-only event/signal/correlation/score/card history;
+- source-policy updates require an audited change ledger; source identity/deletion remain blocked;
 - identity update audit log;
 - company-level contact constraint;
 - unique fingerprints;
@@ -198,11 +208,11 @@ Dedicated `Evidence Radar Contracts` workflow runs:
 - test typecheck;
 - full migration chain;
 - DB schema validation;
-- targeted unit/migration/surface Jest contracts;
+- Evidence Radar unit, rollout-config, migration and surface Jest contracts;
 - isolated PostgreSQL runtime contract;
 - production web build.
 
-The isolated runtime specifically verifies pending-source rejection, legal review transition, cross-organization evidence rejection, cross-tenant lineage, append-only history, personal-contact rejection and non-empty rollback refusal.
+The isolated runtime specifically verifies pending-source rejection, legal review transition, audited source-policy changes, cross-organization evidence rejection, cross-tenant lineage, append-only history, correlation provenance, reproducible score snapshots, personal-contact rejection and non-empty rollback refusal.
 
 ## Rollout
 
@@ -229,7 +239,7 @@ Before reader switch or source enablement:
 5. entity-match false-positive review;
 6. map coordinate/boundary provenance review;
 7. no secret/personal-data regression;
-8. explicit rollout flag/canary;
+8. explicit Evidence Radar rollout flag/canary;
 9. monitoring for source failures, dedupe rate, zero-result rate, lead acceptance/contact/reply/meeting outcomes.
 
-This PR is additive/dark by design: it creates the trustworthy substrate first and does not silently switch existing production readers.
+This PR is additive/dark by design: it creates the trustworthy substrate first and does not silently switch existing production readers or enable external source automation.
