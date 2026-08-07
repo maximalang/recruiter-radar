@@ -9,6 +9,7 @@ import {
   evaluateCommercialSignalDatasets,
 } from './lib/commercial-signal-evaluation.mjs'
 import {
+  DEFAULT_REPLY_MATURITY_HOURS,
   anonymizeEvaluationRow,
   mapFalsePositiveReason,
 } from './lib/commercial-signal-evaluation-export.mjs'
@@ -110,6 +111,7 @@ const rawRow = {
   opportunityV3: null,
   accepted: false,
   contacted: false,
+  contactedAt: null,
   replied: false,
   meeting: false,
   dismissReasonCode: null,
@@ -148,11 +150,36 @@ const progressedLoss = anonymizeEvaluationRow({
   hasOutcome: true,
   accepted: true,
   contacted: true,
+  contactedAt: '2026-07-20T00:00:00.000Z',
   lostReasonCode: 'price',
 }, 'anonymized_labeled', exportKey)
 assert.equal(progressedLoss.labels.qualified, true)
 assert.equal(progressedLoss.labels.falsePositiveCategory, null)
 assert.equal(mapFalsePositiveReason('other'), null)
+
+const immatureNoReply = anonymizeEvaluationRow({
+  ...rawRow,
+  hasOutcome: true,
+  accepted: true,
+  contacted: true,
+  contactedAt: '2026-07-20T00:00:00.000Z',
+}, 'anonymized_labeled', exportKey, {
+  evaluatedAt: '2026-07-22T00:00:00.000Z',
+})
+assert.equal(immatureNoReply.labels.replied, null)
+const matureNoReply = anonymizeEvaluationRow({
+  ...rawRow,
+  hasOutcome: true,
+  accepted: true,
+  contacted: true,
+  contactedAt: '2026-07-20T00:00:00.000Z',
+}, 'anonymized_labeled', exportKey, {
+  evaluatedAt: new Date(
+    Date.parse('2026-07-20T00:00:00.000Z') +
+      DEFAULT_REPLY_MATURITY_HOURS * 60 * 60 * 1000,
+  ).toISOString(),
+})
+assert.equal(matureNoReply.labels.replied, false)
 
 process.stdout.write(`${JSON.stringify({
   ok: true,
@@ -168,6 +195,8 @@ process.stdout.write(`${JSON.stringify({
     'no_false_calibration_claim',
     'unavailable_is_null_not_zero',
     'observational_outcomes_remain_unlabeled',
+    'immature_no_reply_remains_unlabeled',
+    'mature_no_reply_becomes_evaluable',
     'terminal_false_positive_mapping',
     'progressed_losses_are_not_false_positives',
   ],
