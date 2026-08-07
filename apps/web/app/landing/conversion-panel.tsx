@@ -102,7 +102,7 @@ export default function ConversionPanel(props: {
         </div>
         <div className={styles.faqList}>
           {props.faqItems.map((item, index) => (
-            <details key={item.question} data-analytics-event={LANDING_ANALYTICS_EVENT.faqOpened} data-faq-item>
+            <details key={item.question} open={index === 0} data-analytics-event={LANDING_ANALYTICS_EVENT.faqOpened} data-faq-item>
               <summary><span>{String(index + 1).padStart(2, "0")}</span>{item.question}<i aria-hidden="true"><PlusGlyph /></i></summary>
               <p>{item.answer}</p>
             </details>

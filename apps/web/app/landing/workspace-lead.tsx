@@ -11,6 +11,7 @@ import {
 } from "../home-page-components";
 import { ArrowGlyph, RouteGlyph } from "./brand-glyphs";
 import styles from "./landing.module.css";
+import sceneStyles from "./workspace-scene.module.css";
 
 type PreviewItem = Awaited<ReturnType<typeof getPublicSampleDigestState>>["items"][number];
 
@@ -39,7 +40,7 @@ export default function WorkspaceLead({ item, defaultOpen }: { item: PreviewItem
 
   return (
     <details
-      className={styles.workspaceLead}
+      className={`${styles.workspaceLead} ${sceneStyles.lead} ${defaultOpen ? sceneStyles.leadPrimary : ""}`}
       open={defaultOpen}
       name="preview-leads"
       data-lead-card="true"
@@ -47,31 +48,54 @@ export default function WorkspaceLead({ item, defaultOpen }: { item: PreviewItem
     >
       <summary>
         <span className={styles.workspaceRank}>{String(item.rank).padStart(2, "0")}</span>
-        <span className={styles.workspaceCompany} data-lead-company><strong>{employerName}</strong><small>{[location, vacanciesCaption].filter(Boolean).join(" · ")}</small></span>
-        <span className={styles.workspaceSignal}>{whyNow}</span>
-        <span className={styles.workspaceScore} data-lead-score><strong>{points}</strong><small>/100</small></span>
+        <span className={styles.workspaceCompany} data-lead-company>
+          <strong>{employerName}</strong>
+          <small>{[location, vacanciesCaption].filter(Boolean).join(" · ")}</small>
+        </span>
+        <span className={`${styles.workspaceSignal} ${sceneStyles.leadSignal}`}>{whyNow}</span>
+        <span className={styles.workspaceScore} data-lead-score>
+          <strong>{points}</strong>
+          <small>/100</small>
+          {defaultOpen ? <b className={sceneStyles.confidence}>высокая уверенность</b> : null}
+        </span>
         <span className={styles.leadChevron} aria-hidden="true"><ArrowGlyph size={16} /></span>
       </summary>
-      <div className={styles.workspaceLeadBody}>
-        <div className={styles.workspaceProof}>
-          <div data-primary-proof><span>Почему сейчас</span><p>{freshness ? `${whyNow} Последнее изменение — ${freshness}.` : whyNow}</p></div>
-          <div><span>Корпоративный контакт</span><p>{contactPath}</p></div>
-          <div><span>Следующий шаг</span><p>{item.opener?.trim() || "Проверить факты и выбрать безопасный путь обращения"}</p></div>
+      <div className={`${styles.workspaceLeadBody} ${sceneStyles.leadBody}`}>
+        <div className={sceneStyles.proofStack}>
+          <div className={sceneStyles.proofBlock} data-primary-proof>
+            <span>Почему сейчас</span>
+            <p>{freshness ? `${whyNow} Последнее изменение — ${freshness}.` : whyNow}</p>
+          </div>
+          <div className={sceneStyles.proofBlock}>
+            <span>Как начать разговор</span>
+            <p>{item.opener?.trim() || "Проверить факты и выбрать безопасный путь обращения"}</p>
+          </div>
+          <div className={sceneStyles.proofBlock}>
+            <span>Корпоративный контакт</span>
+            <p>{contactPath}</p>
+          </div>
         </div>
-        <div className={styles.workspaceFiur} aria-label="Состав оценки рекомендации">
-          {scoreParts.map(([label, value]) => (
-            <div key={label}>
-              <span>{label}</span>
-              <i aria-hidden="true"><b style={{ width: `${Math.round(value * 100)}%` }} /></i>
-              <strong>{Math.round(value * 100)}</strong>
+
+        <div className={sceneStyles.sideProof}>
+          <div className={sceneStyles.factors} aria-label="Что влияет на приоритет рекомендации">
+            <span>Что влияет на приоритет</span>
+            <div className={`${styles.workspaceFiur} ${sceneStyles.factorsList}`}>
+              {scoreParts.map(([label, value]) => (
+                <div key={label}>
+                  <span>{label}</span>
+                  <i aria-hidden="true"><b style={{ width: `${Math.round(value * 100)}%` }} /></i>
+                  <strong>{Math.round(value * 100)}</strong>
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
+          <div className={`${styles.workspaceEvidence} ${sceneStyles.evidenceBlock}`}>
+            <span>Факты и источники</span>
+            <ul>{evidence.map((fact) => <li key={fact}><RouteGlyph size={14} />{fact}</li>)}</ul>
+          </div>
         </div>
-        <div className={styles.workspaceEvidence}>
-          <span>Факты и источники</span>
-          <ul>{evidence.map((fact) => <li key={fact}><RouteGlyph size={14} />{fact}</li>)}</ul>
-        </div>
-        <div className={styles.workspaceLeadFooter}>
+
+        <div className={`${styles.workspaceLeadFooter} ${sceneStyles.leadFooter}`}>
           <span>Сила сигнала {score}/100 · уровень уверенности {item.confidence_gate ?? "требует проверки"}</span>
           <strong>Без автоматической отправки</strong>
         </div>

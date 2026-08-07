@@ -41,7 +41,14 @@ export default function WorkspaceScene(props: WorkspaceProps) {
       <div className={styles.workspaceLayout} data-preview-section-content>
         <LandingPreviewInteractions />
         <WorkspaceIntro />
-        <div className={styles.workspaceProductFrame}>
+        <div className={`${styles.workspaceProductFrame} ${sceneStyles.productFrame}`}>
+          <div className={sceneStyles.productRail} aria-label="Состояние предпросмотра выдачи">
+            <div className={sceneStyles.railIdentity}>
+              <strong>RECRUITER RADAR</strong>
+              <span>/ ПРЕДПРОСМОТР</span>
+            </div>
+            <span className={sceneStyles.railStatus}>готов к пересчёту</span>
+          </div>
           <PreviewConfigurator previewInput={props.previewInput} hasPreview={props.hasPreview} />
           <div
             id="preview-results"
@@ -65,13 +72,13 @@ export default function WorkspaceScene(props: WorkspaceProps) {
 
 function WorkspaceIntro() {
   return (
-    <div className={styles.workspaceIntro}>
+    <div className={`${styles.workspaceIntro} ${sceneStyles.intro}`}>
       <p className={styles.sceneLabel}>03 — Рабочая выдача</p>
       <h2 id="workspace-title" className={styles.sceneHeading}>
-        Как выглядит <em>рабочая выдача.</em>
+        Посмотрите, как выглядит <em>рабочая выдача.</em>
       </h2>
       <p className={styles.sceneLead}>
-        Укажите специализацию и географию. Интерактивный пример пересчитает порядок компаний и покажет факты, оценку и следующий безопасный шаг.
+        Выберите специализацию и географию: радар пересчитает приоритет компаний и покажет, какие факты стоят за каждой рекомендацией.
       </p>
     </div>
   );
@@ -79,9 +86,9 @@ function WorkspaceIntro() {
 
 function PreviewConfigurator(props: Pick<WorkspaceProps, "previewInput" | "hasPreview">) {
   return (
-    <div id="preview-configurator" className={`${styles.workspaceControls} ${sceneStyles.anchor}`}>
-      <div className={styles.presetStrip} aria-label="Готовые профили радара">
-        <span>Быстрый старт</span>
+    <div id="preview-configurator" className={`${styles.workspaceControls} ${sceneStyles.anchor} ${sceneStyles.controls}`}>
+      <div className={`${styles.presetStrip} ${sceneStyles.presets}`} aria-label="Готовые профили радара">
+        <span>Профили</span>
         {PREVIEW_PRESETS.map((preset) => {
           const selected = props.previewInput.specialization === preset.specialization
             && props.previewInput.targetCity === preset.targetCity;
@@ -99,7 +106,7 @@ function PreviewConfigurator(props: Pick<WorkspaceProps, "previewInput" | "hasPr
         })}
       </div>
 
-      <form method="GET" action="/#preview-results" className={styles.workspaceForm} data-preview-form aria-busy="false">
+      <form method="GET" action="/#preview-results" className={`${styles.workspaceForm} ${sceneStyles.commandForm}`} data-preview-form aria-busy="false">
         <label htmlFor="specialization">
           <span>Специализация</span>
           <input
@@ -124,8 +131,8 @@ function PreviewConfigurator(props: Pick<WorkspaceProps, "previewInput" | "hasPr
         {props.previewInput.excludeKeywords ? <input type="hidden" name="excludeKeywords" value={props.previewInput.excludeKeywords} /> : null}
         <input type="hidden" name="dailyDigestLimit" value={props.previewInput.dailyDigestLimit} />
         <button type="submit" data-preview-submit>
-          <span data-preview-submit-label>Пересчитать радар</span>
-          <span data-preview-submit-status hidden>Радар анализирует сигналы…</span>
+          <span data-preview-submit-label>Пересчитать →</span>
+          <span data-preview-submit-status hidden>Анализируем профиль…</span>
         </button>
         {props.hasPreview ? <Link href="/#scene-workspace">Сбросить</Link> : null}
       </form>
@@ -149,10 +156,10 @@ export async function WorkspaceResults(props: Pick<WorkspaceProps, "previewInput
           generated={previewState.isLive && previewState.isPersonalized}
           context={LANDING_ANALYTICS_CONTEXT.preview}
         />
-        <div className={styles.workspaceResultsHeader}>
+        <div className={`${styles.workspaceResultsHeader} ${sceneStyles.resultsHeader}`}>
           <div>
-            <span>ПРИМЕР / {String(previewState.items.length).padStart(2, "0")}</span>
-            <strong>{previewState.isPersonalized ? "Радар для вашего профиля" : "Пример утренней выдачи"}</strong>
+            <span>РАДАР / {String(previewState.items.length).padStart(2, "0")}</span>
+            <strong>{previewState.isPersonalized ? "Приоритет после пересчёта" : "Пример утренней выдачи"}</strong>
           </div>
           <span data-live={previewState.isLive || undefined}>
             {previewState.isLive ? "актуальные данные" : "примерные данные"}
@@ -164,7 +171,7 @@ export async function WorkspaceResults(props: Pick<WorkspaceProps, "previewInput
             <strong>Обезличенный набор.</strong>{" "}
             {previewState.isPersonalized
               ? "Приоритеты реально пересчитаны по профилю; названия и факты остаются примерными."
-              : "Выберите профиль: порядок и оценка изменятся по тем же правилам, что в рабочей выдаче."}
+              : "Выберите профиль: порядок и приоритет изменятся по тем же правилам, что в рабочей выдаче."}
           </p>
         ) : null}
 
@@ -190,14 +197,17 @@ export async function WorkspaceResults(props: Pick<WorkspaceProps, "previewInput
           </div>
         )}
 
-        <Link
-          href={props.checkoutHref}
-          className={`${styles.workspaceCheckout} ${sceneStyles.checkout}`}
-          data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
-          data-analytics-context={LANDING_ANALYTICS_CONTEXT.preview}
-        >
-          {previewState.items.length > 0 ? "Получать такой радар каждое утро" : "Попробовать неделю"} <ArrowGlyph />
-        </Link>
+        <div className={sceneStyles.footerRail}>
+          <Link
+            href={props.checkoutHref}
+            className={`${styles.workspaceCheckout} ${sceneStyles.checkout}`}
+            data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
+            data-analytics-context={LANDING_ANALYTICS_CONTEXT.preview}
+          >
+            {previewState.items.length > 0 ? "Получать такой радар каждое утро" : "Попробовать неделю"} <ArrowGlyph />
+          </Link>
+          <small>7 дней / без автопродления</small>
+        </div>
       </div>
     );
   } catch {
@@ -214,22 +224,25 @@ function WorkspaceResultsFailure({ checkoutHref, embedded }: { checkoutHref: str
       data-preview-results-ready
       role="status"
     >
-      <div className={styles.workspaceResultsHeader}>
-        <div><span>ПРИМЕР / НЕДОСТУПЕН</span><strong>Оболочка продукта работает независимо от данных.</strong></div>
+      <div className={`${styles.workspaceResultsHeader} ${sceneStyles.resultsHeader}`}>
+        <div><span>РАДАР / НЕДОСТУПЕН</span><strong>Не удалось обновить выдачу.</strong></div>
         <span>можно повторить</span>
       </div>
       <div className={styles.workspaceEmpty}>
         <span>Временная ошибка загрузки</span>
         <strong>Измените профиль или повторите запрос. Тарифы, FAQ и следующий шаг доступны ниже.</strong>
       </div>
-      <Link
-        href={checkoutHref}
-        className={`${styles.workspaceCheckout} ${sceneStyles.checkout}`}
-        data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
-        data-analytics-context={LANDING_ANALYTICS_CONTEXT.preview}
-      >
-        Оставить заявку на неделю <ArrowGlyph />
-      </Link>
+      <div className={sceneStyles.footerRail}>
+        <Link
+          href={checkoutHref}
+          className={`${styles.workspaceCheckout} ${sceneStyles.checkout}`}
+          data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}
+          data-analytics-context={LANDING_ANALYTICS_CONTEXT.preview}
+        >
+          Оставить заявку на неделю <ArrowGlyph />
+        </Link>
+        <small>7 дней / без автопродления</small>
+      </div>
     </div>
   );
 }

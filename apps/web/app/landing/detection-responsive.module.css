@@ -13,6 +13,7 @@
     right: auto !important;
     width: min(46rem, 100%) !important;
     max-width: 100%;
+    margin-right: 0 !important;
   }
 }
 

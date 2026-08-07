@@ -1,5 +1,6 @@
 .section {
   min-height: max(46rem, 100svh);
+  overflow: hidden;
 }
 
 .copy {
@@ -21,32 +22,29 @@
   color: #b5ead8;
 }
 
-.field {
-  opacity: .74;
-  filter: saturate(.82) contrast(1.04);
-}
-
-.field::after {
+.fieldFigure {
   position: absolute;
-  inset: 12% 8% 10% 16%;
-  border: 1px solid rgba(127, 216, 189, .09);
-  border-radius: 50%;
-  content: "";
-  pointer-events: none;
+  right: max(1rem, calc((100vw - min(100vw, 1440px)) / 2));
+  top: 8.2rem;
+  width: min(52vw, 49rem);
+  opacity: .92;
+  filter: saturate(.84) contrast(1.04);
 }
 
-.lock {
+.analysisFrame {
+  height: clamp(11rem, 16vw, 14rem);
   max-width: 29rem;
   border-color: rgba(244, 243, 238, .12);
   border-left-color: #7fd8bd;
-  background: rgba(7, 10, 9, .82);
-  box-shadow: 0 1.8rem 5rem rgba(0, 0, 0, .22);
+  border-radius: 8px;
+  background: rgba(12, 20, 25, .82);
+  box-shadow: 0 1.8rem 5rem rgba(0, 0, 0, .18);
   backdrop-filter: blur(18px);
 }
 
 @media (min-width: 1181px) {
-  .section .field {
-    right: 0;
+  .section .fieldFigure {
+    height: calc(100% - 10rem);
   }
 }
 
@@ -66,24 +64,25 @@
     margin-top: 3.5rem;
   }
 
-  .field {
+  .fieldFigure {
     position: relative;
     z-index: 0;
     top: auto;
     right: auto;
     order: 3;
-    width: min(46rem, 100%);
-    height: clamp(22rem, 48vw, 34rem);
-    margin: -3rem 0 0 auto;
+    width: min(45rem, 82vw);
+    height: clamp(22rem, 47vw, 32rem);
+    margin: -11rem -5rem 0 auto;
   }
 
-  .lock {
+  .analysisFrame {
     position: relative;
     right: auto;
     bottom: auto;
     order: 4;
     width: min(34rem, 100%);
-    margin: -7rem 0 0 auto;
+    height: auto;
+    margin: -5rem 0 0 auto;
   }
 
   .footer {
@@ -98,7 +97,7 @@
 
 @media (max-width: 768px) {
   .section {
-    gap: 1rem;
+    gap: .8rem;
     padding: 6.5rem 1.1rem 1.5rem;
   }
 
@@ -116,24 +115,26 @@
     max-width: 10ch;
   }
 
-  .section .field {
-    width: 100%;
-    height: 21rem;
-    margin: -1rem 0 0;
+  .section .fieldFigure {
+    width: 126%;
+    height: 22rem;
+    margin-top: -14rem;
+    margin-right: -8rem;
+    margin-bottom: 0;
   }
 
-  .field :global(figcaption) {
-    right: 3%;
-    bottom: 3%;
-    width: min(22rem, 88%);
+  .fieldFigure :global(figcaption) {
+    right: 25%;
+    bottom: 5%;
+    width: min(21rem, 66%);
   }
 
-  .lock {
+  .analysisFrame {
     grid-template-columns: auto minmax(0, 1fr);
-    margin-top: 0;
+    margin-top: -1.2rem;
   }
 
-  .lock > a {
+  .analysisFrame > a {
     grid-column: 2;
   }
 
@@ -148,14 +149,18 @@
     padding-inline: 1rem;
   }
 
-  .section .field {
-    width: 100%;
-    margin-inline: 0;
+  .section .fieldFigure {
+    width: 136%;
+    height: 20rem;
+    margin-top: -13rem;
+    margin-right: -7.5rem;
   }
 
-  .field :global(figcaption) {
+  .fieldFigure :global(figcaption) {
     display: none;
   }
+
+  .analysisFrame { margin-top: -1.6rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -166,7 +171,7 @@
     transition: none !important;
   }
 
-  .field {
-    opacity: .58;
+  .fieldFigure {
+    opacity: .9;
   }
 }

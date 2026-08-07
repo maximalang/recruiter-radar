@@ -1,6 +1,9 @@
-import { EvidenceGlyph, SignalGlyph } from "./brand-glyphs";
+import { DocumentGlyph, SignalGlyph } from "./brand-glyphs";
 import { DEMO_COMPANY, DEMO_TIMELINE } from "./landing-copy";
+import sceneStyles from "./signal-timeline-scene.module.css";
 import styles from "./landing.module.css";
+
+const EVENT_STATES = ["новое", "подтверждает", "усиливает", "подтверждает"] as const;
 
 export default function SignalTimelineScene() {
   return (
@@ -10,46 +13,49 @@ export default function SignalTimelineScene() {
       aria-labelledby="timeline-title"
       data-header-tone="light"
     >
-      <div className={styles.timelineLayout}>
-        <div className={styles.timelineIntro}>
+      <div className={`${styles.timelineLayout} ${sceneStyles.layout}`}>
+        <div className={`${styles.timelineIntro} ${sceneStyles.intro}`}>
           <p className={styles.sceneLabel}>02 — Почему сейчас</p>
           <h2 id="timeline-title" className={styles.sceneHeading}>
-            Почему компании <em>требуют внимания именно сейчас.</em>
+            События, которые объясняют, <em>почему компании стоит написать сейчас.</em>
           </h2>
           <p className={styles.sceneLead}>
-            Радар связывает события одной компании, проверяет их свежесть и показывает момент, когда обычный найм превращается в реальную клиентскую возможность.
+            Радар наблюдает компанию во времени: независимые события складываются в последовательность и показывают момент, когда повод для обращения становится проверяемым.
           </p>
         </div>
 
-        <div className={styles.companyCoordinate} aria-label="Сквозная демонстрационная компания">
-          <SignalGlyph size={52} />
-          <div>
-            <span>Одна компания · один сквозной разбор</span>
-            <strong>{DEMO_COMPANY.name}</strong>
-            <small>{DEMO_COMPANY.location} · {DEMO_COMPANY.industry}</small>
+        <div className={`${styles.companyCoordinate} ${sceneStyles.coordinate}`} aria-label="Сквозная демонстрационная компания">
+          <SignalGlyph size={36} />
+          <strong>{DEMO_COMPANY.name}</strong>
+          <div className={sceneStyles.coordinateMeta}>
+            <span>{DEMO_COMPANY.location}</span>
+            <span>{DEMO_COMPANY.industry}</span>
+            <span>один сквозной разбор</span>
           </div>
         </div>
 
-        <ol className={styles.timelineEvents}>
+        <ol className={`${styles.timelineEvents} ${sceneStyles.story}`}>
           {DEMO_TIMELINE.map((event, index) => (
-            <li key={`${event.date}-${event.title}`} className={styles.timelineEvent}>
+            <li key={`${event.date}-${event.title}`} className={`${styles.timelineEvent} ${sceneStyles.event}`}>
               <time>{event.date}</time>
-              <span className={styles.timelineNode} aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
-              <div>
+              <span className={`${styles.timelineNode} ${sceneStyles.node}`} aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
+              <div className={sceneStyles.eventBody}>
+                <DocumentGlyph size={18} />
                 <strong>{event.title}</strong>
-                <span>Источник: {event.source}</span>
+                <small>{event.source}</small>
               </div>
+              <span className={sceneStyles.status}>{EVENT_STATES[index] ?? "сигнал"}</span>
             </li>
           ))}
         </ol>
 
-        <div className={styles.timelineConclusion}>
-          <EvidenceGlyph size={58} />
-          <p>
-            Четыре события меняют смысл ситуации:
-            <strong>компания системно расширяет инженерную функцию — у агентства появился проверяемый повод начать разговор.</strong>
-          </p>
-          <span>4 события · 3 типа источников · последнее изменение сегодня</span>
+        <div className={sceneStyles.lock} data-opportunity-lock="true">
+          <div className={sceneStyles.lockHeader}>
+            <span>Сигналы подтверждают друг друга</span>
+            <small>4 события / 3 типа источников / сегодня</small>
+          </div>
+          <strong>Компания системно расширяет инженерную функцию.</strong>
+          <span>проверяемый повод для первого контакта</span>
         </div>
       </div>
     </section>

@@ -7,58 +7,58 @@ const SOURCE_ROWS = [
   {
     source: "Карьерная страница",
     fact: "8 инженерных позиций",
-    discovered: "сегодня · 08:42",
-    eventDate: "4 августа",
-    confidence: "прямой источник",
+    discovered: "сегодня 08:42",
+    eventDate: "4 авг",
+    confidence: "Прямой источник",
   },
   {
     source: "Публичные вакансии",
     fact: "руководитель направления",
-    discovered: "сегодня · 08:45",
-    eventDate: "1 августа",
-    confidence: "подтверждено",
+    discovered: "сегодня 08:45",
+    eventDate: "1 авг",
+    confidence: "Подтверждено",
   },
   {
-    source: "Изменение публикаций",
+    source: "Повторная публикация",
     fact: "3 роли обновлены повторно",
-    discovered: "сегодня · 08:47",
+    discovered: "сегодня 08:47",
     eventDate: "сегодня",
-    confidence: "свежий сигнал",
+    confidence: "Свежий сигнал",
   },
 ] as const;
 
 const SOURCE_ROLES = [
   {
-    title: "Дают основной сигнал найма",
-    summary: "Свежий сигнал может вывести компанию в приоритетную выдачу.",
-    detail: "hh.ru, Работа России и прямые карьерные страницы дают основной сигнал найма. Перед попаданием компании в выдачу Radar проверяет свежесть, надёжность сигнала и корректность связи с организацией.",
+    title: "Основные сигналы",
+    summary: "Дают основной сигнал найма.",
+    detail: "hh.ru, Работа России и прямые карьерные страницы показывают свежий найм. Перед попаданием компании в выдачу Radar проверяет свежесть сигнала и его связь с организацией.",
     state: "live",
     stateText: "Влияет на основную выдачу",
-    sources: ["hh.ru", "Работа России", "Прямые карьерные страницы"],
+    sources: ["hh.ru", "Работа России", "Карьерные страницы"],
   },
   {
-    title: "Подтверждают компанию",
-    summary: "Помогают проверить юрлицо, домен и официальный маршрут связи.",
+    title: "Подтверждение",
+    summary: "Подтверждают компанию и официальный канал связи.",
     detail: "Сайт компании и реестры ФНС помогают связать сигнал с правильной организацией и найти официальный корпоративный канал. Они подтверждают возможность, но не заменяют сам сигнал найма.",
     state: "support",
-    stateText: "Подтверждает компанию",
-    sources: ["Сайт компании", "ЕГРЮЛ / ФНС", "Прозрачный бизнес ФНС"],
+    stateText: "подтверждает организацию",
+    sources: ["Сайт компании", "ЕГРЮЛ", "ФНС"],
   },
   {
-    title: "Расширяют покрытие после проверки",
-    summary: "Адаптеры подключены, но пока не влияют на основную выдачу.",
-    detail: "Для дополнительных площадок уже есть адаптеры. Они начинают влиять на клиентскую выдачу только после проверок качества, правовой доступности и стабильности источника.",
+    title: "Дополнительные источники",
+    summary: "Расширяют покрытие после проверки.",
+    detail: "Дополнительные площадки начинают влиять на клиентскую выдачу только после проверок качества, правовой доступности и стабильности данных.",
     state: "gated",
     stateText: "Подключено, проходит проверки",
-    sources: ["Хабр Карьера", "SuperJob", "Публичные ATS / tech job boards", "LinkedIn company pages", "Региональные job boards"],
+    sources: ["Хабр Карьера", "SuperJob", "ATS", "Профильные площадки"],
   },
   {
-    title: "Добавляют бизнес-контекст",
-    summary: "Помогают объяснить изменение компании и усилить первый контакт.",
+    title: "Контекст компании",
+    summary: "Добавляют бизнес-контекст.",
     detail: "Корпоративные новости, реестровые события и отраслевые публикации помогают понять расширение, инвестиции или изменения бизнеса. Такой контекст дополняет, но не заменяет подтверждённый найм.",
     state: "context",
-    stateText: "Контекст для объяснения",
-    sources: ["Корпоративные newsroom-страницы", "GDELT / funding & business signals", "Федресурс", "Отраслевые медиа"],
+    stateText: "добавляет контекст",
+    sources: ["Новости компании", "Федресурс", "GDELT", "Отраслевые медиа"],
   },
 ] as const;
 
@@ -70,29 +70,38 @@ export default function EvidenceScene() {
       aria-labelledby="evidence-title"
       data-header-tone="dark"
     >
-      <div className={styles.evidenceLayout}>
-        <div className={styles.evidenceIntro}>
-          <p className={styles.sceneLabel}>04 — Основание приоритета</p>
-          <h2 id="evidence-title" className={styles.sceneHeading}>
-            На каких фактах <em>основан вывод.</em>
-          </h2>
-          <p className={styles.sceneLead}>
-            До обращения видно, какие события повлияли на приоритет, когда они произошли и какой источник подтверждает каждый факт.
-          </p>
-        </div>
+      <div className={sceneStyles.layout}>
+        <div className={sceneStyles.top}>
+          <div className={sceneStyles.intro}>
+            <p className={styles.sceneLabel}>04 — На чём основан вывод</p>
+            <h2 id="evidence-title" className={styles.sceneHeading}>
+              Почему этому приоритету <em>можно доверять.</em>
+            </h2>
+            <p className={styles.sceneLead}>
+              Как выглядит основание приоритета: сначала причина для контакта, затем подтверждающие сигналы, даты, источники и уровень уверенности.
+            </p>
+          </div>
 
-        <div className={styles.scoreAssembly}>
-          <div className={styles.scoreIdentity}>
+          <div className={sceneStyles.score} aria-label={`Приоритет компании ${DEMO_COMPANY.score} из 100`}>
             <span>ОЦЕНКА РАДАРА</span>
-            <strong>{DEMO_COMPANY.score}</strong>
-            <small>/100 · уровень уверенности {DEMO_COMPANY.confidence}</small>
+            <div className={sceneStyles.scoreValue}>
+              <strong>{DEMO_COMPANY.score}</strong>
+              <small>/100</small>
+            </div>
+            <div className={sceneStyles.scoreMeta}>
+              <strong>Высокая уверенность</strong>
+              <span>4 фактора</span>
+            </div>
+            <div className={sceneStyles.scale} aria-label="Шкала уверенности">
+              <span>низкая</span><span>подтверждённая</span><span>высокая</span>
+              <i className={sceneStyles.scaleTrack} aria-hidden="true" />
+            </div>
           </div>
-          <div className={styles.scoreOrbit} aria-hidden="true">
-            <EvidenceGlyph size={210} />
-          </div>
-          <ol className={styles.scoreFacts} aria-label="Из чего сложилась демонстрационная оценка">
+
+          <ol className={sceneStyles.factors} aria-label="Из чего сложился демонстрационный приоритет">
             {DEMO_EVIDENCE.map((item) => (
-              <li key={item.label}>
+              <li key={item.label} className={sceneStyles.factor}>
+                <EvidenceGlyph size={18} />
                 <span>{item.label}</span>
                 <strong>{item.points}</strong>
                 <p>{item.fact}</p>
@@ -101,54 +110,61 @@ export default function EvidenceScene() {
           </ol>
         </div>
 
-        <div className={styles.evidenceLedger}>
-          <div className={styles.ledgerHeading}>
-            <span>ДОКАЗАТЕЛЬНАЯ БАЗА / 03</span>
-            <strong>{DEMO_COMPANY.name}</strong>
-            <p>Факт, источник, дата обнаружения и дата события остаются рядом — вывод можно перепроверить за минуту.</p>
+        <div className={sceneStyles.ledger}>
+          <div className={sceneStyles.ledgerHeading}>
+            <div>
+              <span>ДОКАЗАТЕЛЬНАЯ БАЗА / 03</span>
+              <strong>{DEMO_COMPANY.name}</strong>
+            </div>
+            <p>Три записи показывают, что произошло, когда сигнал появился и насколько прямой источник его подтверждает.</p>
           </div>
-          <div className={styles.ledgerHeader} aria-hidden="true">
-            <span>Источник / факт</span><span>Найдено</span><span>Событие</span><span>Достоверность</span>
-          </div>
-          <ul className={styles.evidenceStack}>
+
+          <ul className={sceneStyles.records}>
             {SOURCE_ROWS.map((row, index) => (
-              <li key={row.source}>
-                <span className={styles.ledgerIndex}>{String(index + 1).padStart(2, "0")}</span>
-                <span className={styles.ledgerFact}><strong>{row.source}</strong><small>{row.fact}</small></span>
-                <span>{row.discovered}</span>
-                <span>{row.eventDate}</span>
-                <span className={styles.ledgerConfidence}>{row.confidence}</span>
-                <a href="#scene-workspace" aria-label={`Открыть ${row.source} в рабочем радаре`}>
+              <li key={row.source} className={sceneStyles.record}>
+                <span className={sceneStyles.recordIndex}>{String(index + 1).padStart(2, "0")}</span>
+                <div className={sceneStyles.recordFact}>
+                  <span>{row.source}</span>
+                  <strong>{row.fact}</strong>
+                </div>
+                <dl className={sceneStyles.recordMeta}>
+                  <div><dt>найдено</dt><dd>{row.discovered}</dd></div>
+                  <div><dt>событие</dt><dd>{row.eventDate}</dd></div>
+                </dl>
+                <span className={sceneStyles.recordStatus}>{row.confidence}</span>
+                <a className={sceneStyles.recordLink} href="#scene-workspace" aria-label={`Открыть подтверждение: ${row.source}`}>
                   <DocumentGlyph size={16} />
-                  <ArrowGlyph size={14} />
+                  открыть факт <ArrowGlyph size={13} />
                 </a>
               </li>
             ))}
           </ul>
         </div>
 
-        <div className={styles.sourceRoles}>
-          <div className={styles.sourceRolesIntro}>
-            <span>Как источники участвуют в выдаче</span>
-            <strong>У каждого источника своя роль в приоритизации.</strong>
-            <p className={sceneStyles.registryNote}><strong>Принцип:</strong> основной сигнал найма выводит компанию в радар, а остальные источники подтверждают организацию, расширяют покрытие или добавляют контекст.</p>
+        <div className={sceneStyles.registry}>
+          <div className={sceneStyles.registryIntro}>
+            <span>Роль источников</span>
+            <strong>Как источники участвуют в выдаче.</strong>
+            <p>Основные сигналы показывают найм. Подтверждение связывает событие с компанией. Дополнительные источники и бизнес-контекст расширяют картину только после своей проверки.</p>
           </div>
-          <div className={styles.sourceRoleList}>
+          <div className={sceneStyles.roleList}>
             {SOURCE_ROLES.map((role, index) => (
               <details key={role.title} open={index === 0} data-source-role={role.state}>
                 <summary>
-                  <span>{String(index + 1).padStart(2, "0")}</span>
+                  <span className={sceneStyles.roleIndex}>{String(index + 1).padStart(2, "0")}</span>
                   <strong>{role.title}</strong>
                   <small>{role.summary}</small>
-                  <i aria-hidden="true">+</i>
+                  <ArrowGlyph className={sceneStyles.registryArrow} size={15} />
                 </summary>
-                <p>{role.detail}</p>
-                <div className={sceneStyles.roleMeta}>
-                  <span className={sceneStyles.roleStatus} data-state={role.state}>{role.stateText}</span>
+                <div className={sceneStyles.roleBody}>
+                  <p>{role.detail}</p>
+                  <div className={sceneStyles.roleMeta}>
+                    <span className={sceneStyles.roleStatus} data-state={role.state}>{role.stateText}</span>
+                  </div>
+                  <ul className={sceneStyles.sourceTags} aria-label={`Источники: ${role.title}`}>
+                    {role.sources.map((source) => <li key={source}>{source}</li>)}
+                  </ul>
                 </div>
-                <ul className={sceneStyles.sourceTags} aria-label={`Источники: ${role.title}`}>
-                  {role.sources.map((source) => <li key={source}>{source}</li>)}
-                </ul>
               </details>
             ))}
           </div>

@@ -99,17 +99,26 @@ describe("polished unified landing visual contract", () => {
     expect(responsiveAudit).toContain("'/payment-and-refund'");
   });
 
-  it("preserves the Robokassa-ready public footer and the offer alias", () => {
+  it("keeps the public footer navigable without exposing phone or location", () => {
     const footer = source("app/ui/site-footer.tsx");
     const offerAlias = source("app/offer/page.tsx");
 
+    expect(footer).toContain('href: "/#scene-timeline"');
+    expect(footer).toContain('href: "/#scene-workspace"');
+    expect(footer).toContain('href: "/#scene-evidence"');
+    expect(footer).toContain('href: "/#pricing"');
+    expect(footer).toContain('href: "/#faq"');
     expect(footer).toContain('href="/legal"');
     expect(footer).toContain('href="/terms"');
     expect(footer).toContain('href="/payment-and-refund"');
     expect(footer).toContain('href="/privacy"');
+    expect(footer).toContain('href="/personal-data-consent"');
     expect(offerAlias.trim()).toBe('export { default, metadata } from "../terms/page";');
-    expect(footer).toContain("OPERATOR_REQUISITES.phone");
-    expect(footer).toContain("OPERATOR_REQUISITES.city");
-    expect(footer).toContain('href="/admin/payments"');
+    expect(footer).toContain("OPERATOR_REQUISITES.inn");
+    expect(footer).toContain("OPERATOR_REQUISITES.email");
+    expect(footer).not.toContain("OPERATOR_REQUISITES.phone");
+    expect(footer).not.toContain("OPERATOR_REQUISITES.city");
+    expect(footer).not.toContain("tel:");
+    expect(footer).not.toContain('href="/admin/payments"');
   });
 });

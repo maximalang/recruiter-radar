@@ -23,7 +23,7 @@ export default function DetectionScene({
       data-header-tone="dark"
       data-hero-layout="balanced-grid"
     >
-      <div className={`${styles.detectionField} ${sceneStyles.field} ${responsiveStyles.viewportSafeField}`}>
+      <div className={`${styles.detectionField} ${sceneStyles.fieldFigure} ${responsiveStyles.viewportSafeField}`}>
         <HeroInstrument
           companyName={DEMO_COMPANY.name}
           signalLabel={DEMO_COMPANY.signal}
@@ -72,7 +72,7 @@ export default function DetectionScene({
         </p>
       </div>
 
-      <article className={`${styles.detectionLock} ${sceneStyles.lock}`} aria-label={`Новый сигнал: ${DEMO_COMPANY.signal}`}>
+      <article className={`${styles.detectionLock} ${sceneStyles.analysisFrame}`} aria-label={`Новый сигнал: ${DEMO_COMPANY.signal}`}>
         <div className={styles.lockMarker}><SignalGlyph size={54} /></div>
         <div className={styles.lockCopy}>
           <span className={styles.signalStatus}><i aria-hidden="true" /> приоритет обновлён · {DEMO_COMPANY.freshness}</span>

@@ -1,0 +1,166 @@
+.compass {
+  position: relative;
+  isolation: isolate;
+}
+
+.field {
+  opacity: 1;
+  overflow: visible;
+}
+
+.outerRing {
+  fill: none;
+  stroke: rgba(181, 234, 216, .58);
+  stroke-width: .95;
+}
+
+.rings circle {
+  fill: none;
+  stroke: rgba(181, 234, 216, .48);
+  stroke-width: .9;
+}
+
+.rings circle:nth-child(1) { stroke-opacity: .62; stroke-dasharray: 86 28 24 18; }
+.rings circle:nth-child(2) { stroke-opacity: .78; stroke-dasharray: 154 38 44 26; }
+.rings circle:nth-child(3) { stroke-opacity: .54; stroke-dasharray: 212 52 64 31; }
+
+.brokenArcs path {
+  fill: none;
+  stroke: rgba(181, 234, 216, .58);
+  stroke-width: 1.1;
+  stroke-linecap: round;
+}
+
+.ticks line {
+  stroke: rgba(242, 239, 231, .48);
+  stroke-width: 1;
+  stroke-linecap: round;
+  transform-box: view-box;
+  transform-origin: 380px 380px;
+  animation: tickDrift 24s ease-in-out infinite alternate;
+}
+
+.ticks line:nth-child(3n) { animation-duration: 29s; animation-delay: -7s; }
+.ticks line:nth-child(4n) { opacity: .58; }
+
+.marks path {
+  fill: none;
+  stroke: rgba(181, 234, 216, .7);
+  stroke-width: 1.05;
+  stroke-linecap: round;
+}
+
+.labels text {
+  fill: rgba(242, 239, 231, .48);
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: .12em;
+}
+
+.ambient circle { fill: rgba(181, 234, 216, .42); }
+.ambient {
+  transform-box: view-box;
+  transform-origin: center;
+  animation: ambientDrift 27s ease-in-out infinite alternate;
+}
+
+.clusterPrimary,
+.clusterSecondary,
+.activeCluster {
+  transform-box: view-box;
+  transform-origin: center;
+}
+
+.clusterPrimary { animation: clusterDriftA 18s ease-in-out infinite alternate; }
+.clusterSecondary { animation: clusterDriftB 23s ease-in-out infinite alternate; }
+
+.clusterPrimary circle,
+.clusterSecondary circle { fill: #9ed7c4; }
+.clusterSecondary circle[data-tone="secondary"] { fill: #c18a67; }
+
+.clusterLinks path {
+  fill: none;
+  stroke: rgba(158, 215, 196, .46);
+  stroke-width: .8;
+  stroke-dasharray: 2 6;
+  stroke-linecap: round;
+}
+
+.activeIllumination { fill: url(#active-illumination); }
+
+.activeCluster {
+  animation: activeSettle 1.6s cubic-bezier(.2,.75,.2,1) both, activeDrift 20s 1.6s ease-in-out infinite alternate;
+}
+
+.activeCluster circle { fill: #b5ead8; }
+.activeCluster circle[data-tone="secondary"] { fill: #c18a67; }
+.activeCluster .dominant { fill: #d8f3ea; }
+
+.caption {
+  border-color: rgba(181, 234, 216, .2);
+  border-radius: 10px;
+  background: rgba(14, 23, 29, .72);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .12);
+}
+
+@keyframes ambientDrift {
+  from { transform: translate3d(-3px, 2px, 0); }
+  to { transform: translate3d(4px, -3px, 0); }
+}
+
+@keyframes clusterDriftA {
+  from { transform: translate3d(-4px, 2px, 0) rotate(-.25deg); }
+  to { transform: translate3d(5px, -4px, 0) rotate(.35deg); }
+}
+
+@keyframes clusterDriftB {
+  from { transform: translate3d(3px, -2px, 0); }
+  to { transform: translate3d(-4px, 4px, 0); }
+}
+
+@keyframes activeSettle {
+  0% { opacity: 0; transform: translate3d(9px, -6px, 0) scale(.92); }
+  65% { opacity: 1; }
+  100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes activeDrift {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(4px, -3px, 0); }
+}
+
+@keyframes tickDrift {
+  from { transform: rotate(-.18deg); }
+  to { transform: rotate(.22deg); }
+}
+
+@media (max-width: 820px) {
+  .field {
+    width: 132%;
+    max-width: none;
+    transform: translateX(18%);
+  }
+
+  .labels text:nth-child(n+4),
+  .clusterLinks path:nth-child(n+3) { display: none; }
+}
+
+@media (max-width: 480px) {
+  .field {
+    width: 148%;
+    transform: translateX(24%);
+  }
+
+  .caption { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ambient,
+  .clusterPrimary,
+  .clusterSecondary,
+  .activeCluster,
+  .ticks line {
+    animation: none !important;
+    transform: none !important;
+  }
+}

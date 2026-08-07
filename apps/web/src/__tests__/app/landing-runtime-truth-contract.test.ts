@@ -60,8 +60,8 @@ describe("landing runtime truth contract", () => {
     expect(evidence).toContain('state: "context"');
     expect(evidence).toContain("Хабр Карьера");
     expect(evidence).toContain("SuperJob");
-    expect(evidence).toContain("Публичные ATS / tech job boards");
-    expect(evidence).toContain("GDELT / funding & business signals");
+    expect(evidence).toContain("ATS");
+    expect(evidence).toContain("GDELT");
 
     expect(faq).toContain("не влияют на основную выдачу, пока не пройдут проверки");
     expect(evidence).not.toContain("adapter ready / digest gated");
