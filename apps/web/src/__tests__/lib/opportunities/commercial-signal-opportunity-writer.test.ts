@@ -71,7 +71,10 @@ describe('Commercial Signal exact-lineage writer', () => {
     expect(card.whatChanged.evidenceIds).toEqual(['11', '12'])
     expect(card.whyNotOrdinaryHiring.evidenceIds).toEqual([])
     expect(card.metrics.opportunityQuality.value).toBe(0.81)
-    expect(JSON.stringify(card)).not.toMatch(/\b\d{1,3}%\b|probability|вероятност/i)
+    const serialized = JSON.stringify(card)
+    expect(serialized).not.toMatch(/\b\d{1,3}%\b|dealProbability|winProbability/i)
+    expect(serialized).not.toMatch(/\b(?:high|medium|low)\s+probability\b/i)
+    expect(serialized).not.toMatch(/(?:высокая|средняя|низкая)\s+вероятност/i)
   })
 
   it('cannot materialize a card without evidence', () => {
