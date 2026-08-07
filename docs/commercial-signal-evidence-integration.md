@@ -8,6 +8,7 @@
 - Перед merge integration head обязан быть совместим с актуальным `main`, а CI должен выполняться на PR merge-ref.
 - Зелёный CI исходной верхней ветки не заменяет merge-ref validation после изменений `main`.
 - Security audit, полный Jest/DB contract suite, Auth gates, production Next.js build, landing Playwright, responsive audit и Docker/Caddy smoke остаются обязательными.
+- При синхронизации с текущим `main` сохраняются актуальные main-версии Next.js CSP/runtime config и CSP contract test; расширенные Commercial Signal checks остаются в общем `Tests` workflow, а lockfile пересобирается npm из объединённых workspace manifests и затем проходит production audit.
 
 ## Rollout boundary
 
