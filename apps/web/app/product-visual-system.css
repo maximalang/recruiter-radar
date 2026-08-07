@@ -7,8 +7,8 @@
   --rr-surface: #fffef9;
   --rr-text: #101412;
   --rr-muted: #657069;
-  --rr-line: rgba(16, 20, 18, .12);
-  --rr-line-strong: rgba(16, 20, 18, .2);
+  --rr-line: rgba(16, 20, 18, 0.12);
+  --rr-line-strong: rgba(16, 20, 18, 0.2);
   --rr-signal: #c8f36a;
   --rr-signal-strong: #dcff8a;
   --rr-signal-ink: #315315;
@@ -17,7 +17,7 @@
   --c-text-secondary: #4f5a54;
   --c-text-muted: var(--rr-muted);
   --c-bg-page: var(--rr-paper-soft);
-  --c-bg-card: rgba(255, 254, 249, .94);
+  --c-bg-card: rgba(255, 254, 249, 0.94);
   --c-border: var(--rr-line);
   --c-brand: #527a23;
   --c-accent: #315315;
@@ -30,243 +30,116 @@ body {
   color: var(--rr-text);
 }
 
-main[class*="internalPageFrame"] {
+[data-ui-system="recruiter-radar-v6"] {
   background:
-    linear-gradient(rgba(16, 20, 18, .025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(16, 20, 18, .025) 1px, transparent 1px),
+    linear-gradient(rgba(16, 20, 18, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(16, 20, 18, 0.025) 1px, transparent 1px),
     var(--rr-paper-soft);
   background-size: 72px 72px;
-}
-
-main[class*="internalPageFrame"] [class*="internalPageFrameInner"] {
-  padding-block: clamp(1.5rem, 3vw, 2.75rem);
-}
-
-main[class*="internalPageFrame"] [class*="internalPageTitle"] {
-  max-width: 16ch;
   color: var(--rr-text);
-  font-weight: 650;
-  letter-spacing: -.065em;
 }
 
-main[class*="internalPageFrame"] [class*="internalPageTitle"]::before {
-  width: 3rem;
-  background: var(--rr-signal-ink);
+[data-ui-system="recruiter-radar-v6"] [data-variant="hero"] {
+  border-color: rgba(82, 122, 35, 0.28);
+  border-left-color: var(--rr-signal);
+  background: linear-gradient(90deg, rgba(200, 243, 106, 0.09), rgba(255, 254, 249, 0.96) 34%);
 }
 
-main[class*="internalPageFrame"] [class*="internalPageSubtitle"] {
-  color: var(--rr-muted);
-}
-
-main[class*="internalPageFrame"] :is(
-  [class*="metricCard"],
-  [class*="contentCard"],
-  [class*="surfaceCard"],
-  [class*="filterPanel"],
-  [class*="summaryCard"],
-  [class*="settingsCard"],
-  [class*="profileCard"]
-) {
-  border: 1px solid var(--rr-line);
-  border-radius: 10px;
-  background: rgba(255, 254, 249, .94);
-  box-shadow: 0 1rem 2.8rem rgba(16, 20, 18, .055);
-}
-
-main[class*="internalPageFrame"] :is(
-  [class*="metricCard"],
-  [class*="contentCard"],
-  [class*="surfaceCard"]
-):hover {
+:is(
+  [data-ui-system="recruiter-radar-v6"],
+  [data-ui-system="recruiter-radar-v7"]
+) :where(input, select, textarea) {
   border-color: var(--rr-line-strong);
-  box-shadow: 0 1.3rem 3.4rem rgba(16, 20, 18, .075);
-  transform: translateY(-1px);
-}
-
-main[class*="internalPageFrame"] [data-variant="hero"] {
-  border-color: rgba(82, 122, 35, .28) !important;
-  border-left: 3px solid var(--rr-signal) !important;
-  background: linear-gradient(90deg, rgba(200, 243, 106, .09), rgba(255, 254, 249, .96) 34%) !important;
-}
-
-main[class*="internalPageFrame"] :is(input, select, textarea) {
-  border: 1px solid var(--rr-line-strong);
-  border-radius: 7px;
   background: var(--rr-surface);
-  box-shadow: none;
   color: var(--rr-text);
+  box-shadow: none;
 }
 
-main[class*="internalPageFrame"] :is(input, select, textarea):focus {
+:is(
+  [data-ui-system="recruiter-radar-v6"],
+  [data-ui-system="recruiter-radar-v7"]
+) :where(input, select, textarea):focus-visible {
   border-color: #739d3f;
-  outline: 3px solid rgba(200, 243, 106, .24);
-  outline-offset: 0;
+  outline: 3px solid rgba(200, 243, 106, 0.24);
+  outline-offset: 1px;
 }
 
-main[class*="internalPageFrame"] :is(
-  [class*="primaryAction"],
-  [class*="primaryButton"],
-  button[type="submit"]
-) {
+:is(
+  [data-ui-system="recruiter-radar-v6"],
+  [data-ui-system="recruiter-radar-v7"]
+) :where(a, button, summary):focus-visible {
+  outline: 2px solid #739d3f;
+  outline-offset: 3px;
+}
+
+:is(
+  [data-ui-system="recruiter-radar-v6"],
+  [data-ui-system="recruiter-radar-v7"]
+) :where(button[type="submit"], input[type="submit"]) {
   border-color: var(--rr-ink-900);
-  border-radius: 7px;
   background: var(--rr-ink-900);
   color: #fffef9;
   box-shadow: none;
 }
 
-main[class*="internalPageFrame"] :is(
-  [class*="primaryAction"],
-  [class*="primaryButton"],
-  button[type="submit"]
-):hover {
+:is(
+  [data-ui-system="recruiter-radar-v6"],
+  [data-ui-system="recruiter-radar-v7"]
+) :where(button[type="submit"], input[type="submit"]):hover {
   border-color: var(--rr-ink-950);
   background: var(--rr-ink-950);
-  box-shadow: 0 .75rem 1.8rem rgba(7, 10, 9, .16);
 }
 
-main[class*="internalPageFrame"] :is(
-  [class*="secondaryAction"],
-  [class*="secondaryButton"],
-  [class*="navLink"]
-) {
-  border-color: var(--rr-line-strong);
-  border-radius: 7px;
-  background: rgba(255, 254, 249, .76);
-  color: var(--rr-text);
-  box-shadow: none;
-}
-
-main[class*="internalPageFrame"] :is(
-  [class*="scoreBandChip"],
-  [class*="statusChip"],
-  [class*="badge"],
-  [class*="Badge"]
-) {
-  border-radius: 999px;
-}
-
-main[class*="internalPageFrame"] table {
+:is(
+  [data-ui-system="recruiter-radar-v6"],
+  [data-ui-system="recruiter-radar-v7"]
+) table {
   border-color: var(--rr-line);
   background: transparent;
 }
 
-main[class*="internalPageFrame"] thead {
+:is(
+  [data-ui-system="recruiter-radar-v6"],
+  [data-ui-system="recruiter-radar-v7"]
+) thead {
   color: var(--rr-muted);
 }
 
-main[class*="internalPageFrame"] tbody tr {
+:is(
+  [data-ui-system="recruiter-radar-v6"],
+  [data-ui-system="recruiter-radar-v7"]
+) tbody tr {
   border-color: var(--rr-line);
 }
 
-main[class*="internalPageFrame"] tbody tr:hover {
-  background: rgba(200, 243, 106, .055);
+:is(
+  [data-ui-system="recruiter-radar-v6"],
+  [data-ui-system="recruiter-radar-v7"]
+) tbody tr:hover {
+  background: rgba(200, 243, 106, 0.055);
 }
 
-main[class*="internalPageFrame"] [class*="topNav"] {
-  border-color: rgba(244, 243, 238, .12);
-  background: var(--rr-ink-900);
-  color: var(--rr-paper);
-}
-
-main[class*="internalPageFrame"] [class*="topNav"] a {
-  color: rgba(244, 243, 238, .68);
-}
-
-main[class*="internalPageFrame"] [class*="topNav"] a:hover,
-main[class*="internalPageFrame"] [class*="topNav"] a[data-active="true"] {
-  background: rgba(200, 243, 106, .09);
-  color: var(--rr-signal-strong);
-}
-
-main[class*="internalPageFrame"] [class*="topNavBrand"] {
-  color: var(--rr-paper);
-}
-
-main[class*="internalPageFrame"] [class*="topNavBrandAccent"] {
-  color: var(--rr-signal);
-}
-
-[data-product-workspace="true"] :is(
-  [class*="sidebar"],
-  [class*="Sidebar"],
-  aside[class*="navigation"]
-) {
-  border-color: rgba(244, 243, 238, .1);
-  background: var(--rr-ink-900);
-  color: var(--rr-paper);
-}
-
-[data-product-workspace="true"] :is(
-  [class*="sidebar"],
-  [class*="Sidebar"]
-) a {
-  color: rgba(244, 243, 238, .68);
-}
-
-[data-product-workspace="true"] :is(
-  [class*="sidebar"],
-  [class*="Sidebar"]
-) a:hover,
-[data-product-workspace="true"] :is(
-  [class*="sidebar"],
-  [class*="Sidebar"]
-) a[aria-current="page"] {
-  background: rgba(200, 243, 106, .09);
-  color: var(--rr-signal-strong);
-}
-
-main[class*="internalPageFrame"] div[class*="emptyState"]:not([class*="emptyStateIcon"]),
-main[class*="internalPageFrame"] div[class*="errorState"] {
-  border: 1px solid var(--rr-line);
-  border-radius: 10px;
-  background: rgba(255, 254, 249, .78);
-}
-
-main[class*="internalPageFrame"] div[class*="emptyState"]:not([class*="emptyStateIcon"])::before,
-main[class*="internalPageFrame"] div[class*="errorState"]::before {
-  border-color: rgba(82, 122, 35, .12);
-  box-shadow:
-    0 0 0 54px rgba(200, 243, 106, .035),
-    0 0 0 108px rgba(200, 243, 106, .018);
-}
-
-main[class*="internalPageFrame"] div[class*="emptyStateIcon"] {
-  border-color: rgba(82, 122, 35, .2);
-  border-radius: 8px;
-  background: rgba(200, 243, 106, .1);
-  color: var(--rr-signal-ink);
-  box-shadow: none;
-}
-
-main[class*="internalPageFrame"] a[class*="emptyStateAction"],
-main[class*="internalPageFrame"] a[class*="errorStateAction"] {
-  border-color: var(--rr-ink-900);
-  border-radius: 7px;
-  background: var(--rr-ink-900);
-  color: #fffef9;
-  box-shadow: none;
+[data-product-workspace="true"] {
+  --workspace-accent: var(--rr-signal);
+  --workspace-ink: var(--rr-paper);
+  --workspace-muted: rgba(244, 243, 238, 0.62);
 }
 
 @media (max-width: 720px) {
-  main[class*="internalPageFrame"] {
+  [data-ui-system="recruiter-radar-v6"] {
     background-size: 48px 48px;
-  }
-
-  main[class*="internalPageFrame"] :is(
-    [class*="metricCard"],
-    [class*="contentCard"],
-    [class*="surfaceCard"]
-  ) {
-    border-radius: 8px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  main[class*="internalPageFrame"] *,
-  main[class*="internalPageFrame"] *::before,
-  main[class*="internalPageFrame"] *::after {
-    transition-duration: .01ms !important;
-    animation-duration: .01ms !important;
+  :is(
+    [data-ui-system="recruiter-radar-v6"],
+    [data-ui-system="recruiter-radar-v7"]
+  ),
+  :is(
+    [data-ui-system="recruiter-radar-v6"],
+    [data-ui-system="recruiter-radar-v7"]
+  ) * {
+    scroll-behavior: auto;
   }
 }
