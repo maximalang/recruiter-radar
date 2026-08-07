@@ -1,3 +1,4 @@
+/* Keep the figure box inside the viewport; the SVG itself provides the partial radar composition. */
 @media (max-width: 1080px) and (min-width: 821px) {
   .viewportSafeField {
     position: absolute !important;
