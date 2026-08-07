@@ -54,6 +54,16 @@ describe("polished unified landing visual contract", () => {
     expect(footerModule).not.toContain('[class*="footer');
   });
 
+  it("scopes the product visual layer through stable data contracts", () => {
+    const productCss = source("app/product-visual-system.css");
+
+    expect(productCss).toContain('[data-ui-system="recruiter-radar-v6"]');
+    expect(productCss).toContain('[data-ui-system="recruiter-radar-v7"]');
+    expect(productCss).toContain('[data-product-workspace="true"]');
+    expect(productCss).not.toContain('[class*=');
+    expect(productCss).not.toContain("!important");
+  });
+
   it("preserves the Robokassa-ready public footer and the offer alias", () => {
     const footer = source("app/ui/site-footer.tsx");
     const offerAlias = source("app/offer/page.tsx");
