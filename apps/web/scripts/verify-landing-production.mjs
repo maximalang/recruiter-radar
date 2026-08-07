@@ -334,9 +334,15 @@ async function assertHistoryNavigation(browser) {
     window.location.hash = "scene-evidence";
   });
   await page.waitForURL(/#scene-evidence$/);
-  await page.goBack();
+  await Promise.all([
+    page.waitForURL(/#scene-workspace$/),
+    page.goBack(),
+  ]);
   assert.match(page.url(), /#scene-workspace$/);
-  await page.goForward();
+  await Promise.all([
+    page.waitForURL(/#scene-evidence$/),
+    page.goForward(),
+  ]);
   assert.match(page.url(), /#scene-evidence$/);
   assertCleanConsole();
   await context.close();
@@ -369,6 +375,13 @@ async function assertMobileKeyboardNavigation(browser) {
 async function assertKeyboardSkipLink(browser) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const { page, assertCleanConsole } = await preparePage(context, "keyboard-skip-link");
+
+  // preparePage may resolve first-visit analytics consent with a pointer click.
+  // Reload after the persisted choice so this contract starts from a neutral
+  // document focus state and verifies the true first keyboard target.
+  await page.reload({ waitUntil: "networkidle" });
+  await waitForLanding(page);
+
   await page.keyboard.press("Tab");
   const skipLink = page.getByRole("link", { name: "Перейти к содержанию" });
   assert.equal(await skipLink.evaluate((element) => element === document.activeElement), true, "skip link is not first focus target");
@@ -459,7 +472,7 @@ async function assertInteractionContracts(browser) {
     page.waitForURL((url) => url.searchParams.get("targetCity") === geography),
     page.locator("[data-preview-submit]").click(),
   ]);
-  await page.locator("#preview-results[data-preview-results-ready]").waitFor({ state: "attached" });
+  await page.locator("#preview-results [data-preview-results-ready]").waitFor({ state: "attached" });
   assert.equal(await page.getByLabel("Специализация").inputValue(), specialization);
   assert.equal(await page.getByLabel("География").inputValue(), geography);
   assert.equal(new URL(page.url()).searchParams.get("includeKeywords"), privateInclude);

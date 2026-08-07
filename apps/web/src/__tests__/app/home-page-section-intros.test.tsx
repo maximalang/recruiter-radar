@@ -239,6 +239,7 @@ describe("final unified evidence-first landing contract", () => {
 
     const html = await renderServerHtml(page);
     const footerSource = source("app/ui/site-footer.tsx");
+    const offerAliasSource = source("app/offer/page.tsx");
 
     expect(html).toContain('id="scene-workspace"');
     expect(html).toContain("Не обещание продукта");
@@ -252,8 +253,10 @@ describe("final unified evidence-first landing contract", () => {
     expect(html).toContain('id="faq"');
     expect(html).toContain("Соберите радар под свою специализацию");
     expect(footerSource).toContain('href="/legal"');
-    expect(footerSource).toContain('href="/offer"');
+    expect(footerSource).toContain('href="/terms"');
+    expect(footerSource).toContain('href="/payment-and-refund"');
     expect(footerSource).toContain('href="/privacy"');
+    expect(offerAliasSource.trim()).toBe('export { default, metadata } from "../terms/page";');
     expect(footerSource).toContain("Реквизиты");
     expect(footerSource).toContain("Оферта");
     expect(footerSource).toContain("Конфиденциальность");

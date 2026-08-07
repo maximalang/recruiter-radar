@@ -13,6 +13,10 @@ import OutreachScene from "./outreach-scene";
 import SignalTimelineScene from "./signal-timeline-scene";
 import WorkspaceScene from "./workspace-scene";
 
+export function LandingSkipLink() {
+  return <a href="#main-content" className={styles.skipLink}>Перейти к содержанию</a>;
+}
+
 export default function LandingPage(props: {
   previewInput: PublicPreviewInput;
   hasPreview: boolean;
@@ -25,7 +29,6 @@ export default function LandingPage(props: {
       className={`${styles.landingPage} ${frameStyles.frame} ${visualStyles.visualSystem}`}
       data-landing-experience="signal-lock"
     >
-      <a href="#main-content" className={styles.skipLink}>Перейти к содержанию</a>
       <LandingHashNavigation />
       <LandingHeader previewHref="#preview-configurator" />
       <main id="main-content">
