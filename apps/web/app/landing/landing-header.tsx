@@ -149,7 +149,7 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
   return (
     <header
       className={headerStyles.header}
-      data-brand-header="signal-lock"
+      data-brand-header="recruiter-radar-v3"
       data-scrolled={scrolled || undefined}
       data-tone={tone}
       data-menu-open={menuOpen || undefined}
