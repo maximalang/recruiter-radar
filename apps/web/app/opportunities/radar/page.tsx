@@ -3,15 +3,13 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 import { listEvidenceRadarRegionBoundaries } from '@/lib/intelligence/evidence-radar-boundaries'
+import { isEvidenceRadarV1EnabledForContext } from '@/lib/intelligence/evidence-radar-config'
 import { listEvidenceRadarLeads } from '@/lib/intelligence/evidence-radar-repository'
 import {
   getOpportunityAuthorizationContext,
   getOpportunityDataAccessContext,
 } from '@/lib/opportunities/authorization'
-import {
-  isOpportunityCommercialSignalUiEnabledForContext,
-  isOpportunityEngineV1EnabledForContext,
-} from '@/lib/opportunities/config'
+import { isOpportunityEngineV1EnabledForContext } from '@/lib/opportunities/config'
 import {
   ContentCard,
   EmptyState,
@@ -55,7 +53,7 @@ export default async function EvidenceRadarPage() {
     )
   }
 
-  if (!isOpportunityCommercialSignalUiEnabledForContext(authorization)) notFound()
+  if (!isEvidenceRadarV1EnabledForContext(authorization)) notFound()
   const access = getOpportunityDataAccessContext(authorization)
   if (!access?.workspaceId) notFound()
 
