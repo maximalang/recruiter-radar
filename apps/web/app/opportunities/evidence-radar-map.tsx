@@ -1,0 +1,345 @@
+'use client'
+
+import { useMemo, useState, type CSSProperties } from 'react'
+
+import { projectRussianCoordinates } from '@/lib/intelligence/evidence-radar'
+import type { EvidenceRadarLead } from '@/lib/intelligence/evidence-radar-repository'
+import styles from './evidence-radar-map.module.css'
+
+export function EvidenceRadarMap(props: { leads: readonly EvidenceRadarLead[] }) {
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(
+    props.leads[0]?.cardId ?? null,
+  )
+  const selected = props.leads.find((lead) => lead.cardId === selectedCardId) ?? props.leads[0] ?? null
+  const regions = useMemo(() => buildRegionSummaries(props.leads), [props.leads])
+
+  if (props.leads.length === 0) {
+    return (
+      <section className={styles.empty} data-evidence-radar-empty>
+        <strong>Нет лидов с подтверждённой географией</strong>
+        <p>
+          Evidence Radar не размещает случайные города. Маркер появляется только после
+          подтверждения организации, объекта присутствия, координат и доказательной цепочки.
+        </p>
+      </section>
+    )
+  }
+
+  return (
+    <div className={styles.layout}>
+      <section className={styles.radarPanel} aria-label="Карта подтверждённого кадрового спроса">
+        <div className={styles.legend} aria-label="Легенда карты">
+          <span><i className={styles.legendSource} /> независимый источник</span>
+          <span><i className={styles.legendOrganization} /> организация</span>
+          <span>яркость — свежесть</span>
+          <span>размер — hiring intent</span>
+          <span>прозрачность — confidence</span>
+        </div>
+
+        <div className={styles.map} data-evidence-radar-map>
+          <div className={styles.mapFrame} aria-hidden="true" />
+          {props.leads.map((lead) => (
+            <OrganizationCluster
+              key={lead.cardId}
+              lead={lead}
+              selected={lead.cardId === selected?.cardId}
+              onSelect={() => setSelectedCardId(lead.cardId)}
+            />
+          ))}
+        </div>
+
+        <div className={styles.regionGrid} aria-label="Региональное покрытие">
+          {regions.map((region) => (
+            <article key={region.code} className={styles.regionCard}>
+              <div>
+                <strong>{region.name}</strong>
+                <span>{region.cities.join(' · ')}</span>
+              </div>
+              <dl>
+                <div><dt>Организации</dt><dd>{region.organizations}</dd></div>
+                <div><dt>Источники</dt><dd>{region.sources}</dd></div>
+                <div><dt>Intent</dt><dd>{Math.round(region.hiringIntent * 100)}</dd></div>
+                <div><dt>Свежесть</dt><dd>{Math.round(region.freshness * 100)}</dd></div>
+              </dl>
+              <small>{region.specializations.join(', ')}</small>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <aside className={styles.detailPanel} aria-live="polite">
+        {selected ? <EvidenceLeadDetail lead={selected} /> : null}
+      </aside>
+    </div>
+  )
+}
+
+function OrganizationCluster(props: {
+  lead: EvidenceRadarLead
+  selected: boolean
+  onSelect: () => void
+}) {
+  const point = projectRussianCoordinates(
+    props.lead.location.latitude,
+    props.lead.location.longitude,
+  )
+  const freshness = componentValue(props.lead.score.components, 'freshness', .5)
+  const intent = componentValue(props.lead.score.components, 'hiringIntent',
+    componentValue(props.lead.score.components, 'hiring_intent', props.lead.score.opportunityScore / 100))
+  const style = {
+    left: `${point.x}%`,
+    top: `${point.y}%`,
+    '--intent': intent,
+    '--freshness': freshness,
+    '--confidence': clamp01(props.lead.location.confidence),
+    '--risk': clamp01(props.lead.score.riskScore / 100),
+  } as CSSProperties
+  const sourceCount = Math.min(12, Math.max(1, props.lead.independentSourceCount))
+
+  return (
+    <div className={styles.cluster} style={style} data-selected={props.selected ? 'true' : undefined}>
+      <div className={styles.sourceOrbit} aria-hidden="true">
+        {Array.from({ length: sourceCount }, (_, index) => {
+          const offset = deterministicOrbit(props.lead.organizationId, index, sourceCount)
+          return (
+            <i
+              key={`${props.lead.cardId}:source:${index}`}
+              className={styles.sourceDot}
+              style={{ transform: `translate(${offset.x}px, ${offset.y}px)` }}
+            />
+          )
+        })}
+      </div>
+      <button
+        type="button"
+        className={styles.organizationMarker}
+        onClick={props.onSelect}
+        aria-pressed={props.selected}
+        aria-label={`${props.lead.organizationName}, ${props.lead.location.city}`}
+      >
+        <span className={styles.organizationDiamond} aria-hidden="true" />
+        <span className={styles.markerLabel}>
+          <strong>{props.lead.organizationName}</strong>
+          <small>{props.lead.location.city} · {Math.round(props.lead.score.leadScore)}</small>
+        </span>
+      </button>
+    </div>
+  )
+}
+
+function EvidenceLeadDetail({ lead }: { lead: EvidenceRadarLead }) {
+  const staffing = lead.staffingNeed
+  const functions = stringList(staffing?.functions)
+  const professions = stringList(staffing?.professions)
+  const decisionMakers = stringList(staffing?.decisionMakerRoles)
+  const minHeadcount = numeric(staffing?.minHeadcount)
+  const maxHeadcount = numeric(staffing?.maxHeadcount)
+  const mode = typeof staffing?.mode === 'string' ? staffing.mode : null
+
+  return (
+    <article className={styles.leadCard} data-evidence-lead-card>
+      <header className={styles.leadHeader}>
+        <div>
+          <span className={styles.eyebrow}>Evidence lead</span>
+          <h2>{lead.organizationName}</h2>
+          {lead.legalName && lead.legalName !== lead.organizationName ? <p>{lead.legalName}</p> : null}
+        </div>
+        <strong className={styles.leadScore}>{Math.round(lead.score.leadScore)}</strong>
+      </header>
+
+      <div className={styles.locationLine}>
+        <span>{lead.location.city}</span>
+        <span>{lead.location.federalSubjectName}</span>
+        {lead.location.address ? <span>{lead.location.address}</span> : null}
+      </div>
+
+      <section className={styles.leadSection}>
+        <h3>Почему сейчас</h3>
+        <p>{lead.whyNow}</p>
+      </section>
+
+      <div className={styles.scoreGrid}>
+        <Score label="Opportunity" value={lead.score.opportunityScore} />
+        <Score label="Confidence" value={lead.score.confidenceScore} />
+        <Score label="Urgency" value={lead.score.urgencyScore} />
+        <Score label="Contactability" value={lead.score.contactabilityScore} />
+        <Score label="Risk" value={lead.score.riskScore} risk />
+      </div>
+
+      <section className={styles.leadSection}>
+        <h3>Предполагаемая кадровая потребность</h3>
+        {staffing ? (
+          <div className={styles.factStack}>
+            {functions.length > 0 ? <p><strong>Функции:</strong> {functions.join(', ')}</p> : null}
+            {professions.length > 0 ? <p><strong>Профессии:</strong> {professions.join(', ')}</p> : null}
+            {minHeadcount != null && maxHeadcount != null ? (
+              <p><strong>Объём:</strong> {minHeadcount}–{maxHeadcount} · {mode ?? 'режим не указан'}</p>
+            ) : null}
+            {decisionMakers.length > 0 ? <p><strong>Кому писать:</strong> {decisionMakers.join(', ')}</p> : null}
+          </div>
+        ) : (
+          <p className={styles.muted}>Недостаточно подтверждений для прогноза объёма. Значение не синтезируется.</p>
+        )}
+      </section>
+
+      <section className={styles.leadSection}>
+        <div className={styles.sectionHeading}>
+          <h3>Доказательства</h3>
+          <span>{lead.independentSourceCount} независимых источника</span>
+        </div>
+        <ol className={styles.timeline}>
+          {lead.evidence.map((event) => (
+            <li key={event.id}>
+              <span>{formatDate(event.occurredAt)}</span>
+              <div>
+                <strong>{event.eventType.replaceAll('_', ' ')}</strong>
+                <small>{event.sourceFamily} · confidence {Math.round(event.confidence * 100)}%</small>
+                {event.canonicalUrl ? (
+                  <a href={event.canonicalUrl} target="_blank" rel="noreferrer">
+                    {event.primarySource ? 'Открыть первичный источник' : 'Открыть источник'}
+                  </a>
+                ) : (
+                  <em>Прямая ссылка недоступна</em>
+                )}
+              </div>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <section className={styles.leadSection}>
+        <h3>Объяснение оценки</h3>
+        {lead.score.contributions.length > 0 ? (
+          <ul className={styles.contributions}>
+            {lead.score.contributions.map((item, index) => (
+              <li key={`${item.eventId}:${item.component}:${index}`}>
+                <span>{item.component.replaceAll('_', ' ')}</span>
+                <strong>{item.delta >= 0 ? '+' : ''}{item.delta}</strong>
+                <small>{item.reason}</small>
+              </li>
+            ))}
+          </ul>
+        ) : <p className={styles.muted}>Contribution ledger отсутствует — карточка требует проверки.</p>}
+      </section>
+
+      {lead.riskReasons.length > 0 ? (
+        <section className={styles.leadSection}>
+          <h3>Риски</h3>
+          <ul className={styles.riskList}>{lead.riskReasons.map((reason) => <li key={reason}>{reason}</li>)}</ul>
+        </section>
+      ) : null}
+
+      <section className={styles.leadSection}>
+        <h3>Безопасный путь контакта</h3>
+        {lead.contactPaths.length > 0 ? (
+          <div className={styles.contacts}>
+            {lead.contactPaths.map((contact) => contact.href ? (
+              <a key={contact.id} href={contact.href} target={contact.href.startsWith('https://') ? '_blank' : undefined} rel={contact.href.startsWith('https://') ? 'noreferrer' : undefined}>
+                {contact.label}
+              </a>
+            ) : <span key={contact.id}>{contact.label}</span>)}
+          </div>
+        ) : <p className={styles.muted}>Публичный company-level контакт ещё не подтверждён.</p>}
+      </section>
+
+      <footer className={styles.nextAction}>
+        <span>Следующий шаг</span>
+        <strong>{lead.recommendedAction}</strong>
+        {lead.recommendedContactAt ? <small>Рекомендуемое окно: {formatDate(lead.recommendedContactAt)}</small> : null}
+      </footer>
+    </article>
+  )
+}
+
+function Score(props: { label: string; value: number; risk?: boolean }) {
+  return (
+    <div className={styles.scoreItem} data-risk={props.risk ? 'true' : undefined}>
+      <span>{props.label}</span>
+      <strong>{Math.round(props.value)}</strong>
+    </div>
+  )
+}
+
+function buildRegionSummaries(leads: readonly EvidenceRadarLead[]) {
+  const regions = new Map<string, {
+    code: string
+    name: string
+    cities: Set<string>
+    organizations: Set<string>
+    sources: number
+    intent: number[]
+    freshness: number[]
+    specializations: Set<string>
+  }>()
+
+  for (const lead of leads) {
+    const key = lead.location.federalSubjectCode
+    const current = regions.get(key) ?? {
+      code: key,
+      name: lead.location.federalSubjectName,
+      cities: new Set<string>(),
+      organizations: new Set<string>(),
+      sources: 0,
+      intent: [],
+      freshness: [],
+      specializations: new Set<string>(),
+    }
+    current.cities.add(lead.location.city)
+    current.organizations.add(lead.organizationId)
+    current.sources += lead.independentSourceCount
+    current.intent.push(componentValue(lead.score.components, 'hiringIntent',
+      componentValue(lead.score.components, 'hiring_intent', lead.score.opportunityScore / 100)))
+    current.freshness.push(componentValue(lead.score.components, 'freshness', .5))
+    if (lead.specialization) current.specializations.add(lead.specialization)
+    regions.set(key, current)
+  }
+
+  return [...regions.values()]
+    .map((region) => ({
+      code: region.code,
+      name: region.name,
+      cities: [...region.cities].sort(),
+      organizations: region.organizations.size,
+      sources: region.sources,
+      hiringIntent: average(region.intent),
+      freshness: average(region.freshness),
+      specializations: [...region.specializations].sort(),
+    }))
+    .sort((a, b) => b.organizations - a.organizations || a.name.localeCompare(b.name, 'ru'))
+}
+
+function deterministicOrbit(seedValue: string, index: number, count: number) {
+  const seed = [...seedValue].reduce((total, char) => (total * 31 + char.charCodeAt(0)) % 3600, 17)
+  const angle = ((seed / 10) + (360 / count) * index) * Math.PI / 180
+  const radius = 18 + ((seed + index * 7) % 11)
+  return {
+    x: Math.round(Math.cos(angle) * radius * 10) / 10,
+    y: Math.round(Math.sin(angle) * radius * .68 * 10) / 10,
+  }
+}
+
+function stringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0) : []
+}
+
+function numeric(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+function average(values: readonly number[]): number {
+  return values.length > 0 ? values.reduce((sum, value) => sum + value, 0) / values.length : 0
+}
+
+function componentValue(values: Record<string, number>, key: string, fallback: number): number {
+  const value = values[key]
+  return typeof value === 'number' && Number.isFinite(value) ? clamp01(value) : clamp01(fallback)
+}
+
+function clamp01(value: number): number {
+  return Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0))
+}
+
+function formatDate(value: string): string {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? 'дата не подтверждена' : new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: 'short', year: 'numeric' }).format(date)
+}
