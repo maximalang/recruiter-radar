@@ -3,6 +3,9 @@ BEGIN;
 SET LOCAL lock_timeout = '5s';
 SET LOCAL statement_timeout = '5min';
 
+LOCK TABLE source_registry_reviews_v1, source_registry_entries_v1
+  IN ACCESS EXCLUSIVE MODE;
+
 DO $$
 BEGIN
   IF EXISTS (
