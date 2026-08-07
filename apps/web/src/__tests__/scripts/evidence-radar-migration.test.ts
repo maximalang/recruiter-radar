@@ -30,6 +30,8 @@ describe('Evidence Radar v1 migration contract', () => {
       expect(migration).toContain(`('${source.id}'`)
     }
     expect(migration).toContain('CREATE TABLE source_registry_reviews_v1')
+    expect(migration).toContain('authorization_method TEXT NOT NULL')
+    expect(migration).not.toContain('\n  authorization TEXT NOT NULL')
     expect(migration).toContain('evidence_radar_source_allowed_v1')
     expect(migration).toContain("'first-party-crm', 'not_applicable'")
     expect(migration).toContain('source_registry_entries_v1_immutable')
