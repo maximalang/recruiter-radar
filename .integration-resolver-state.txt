@@ -1,0 +1,7 @@
+stage=merge-main
+status=1
+conflicts=apps/web/next.config.ts
+apps/web/src/__tests__/app/content-security-policy.test.ts
+package-lock.json
+package.json
+merge_output=
