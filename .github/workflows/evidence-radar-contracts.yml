@@ -67,8 +67,16 @@ jobs:
       - name: Verify Commercial Signal evaluation and contract matrix
         run: |
           set -euo pipefail
+          npm run test:commercial-signal:evaluation
+          node --test packages/db/scripts/lib/commercial-signal-baseline-metrics.test.mjs
           npm run test:commercial-signal:evaluation:db
           npm run test:commercial-signal:contracts
+      - name: Verify authoritative Today, event support, and adaptive supply
+        run: >-
+          npm test --workspace @recruiter-radar/web -- --runInBand --runTestsByPath
+          src/__tests__/lib/opportunities/commercial-signal-today.test.ts
+          src/__tests__/lib/opportunities/company-event-support-registry.test.ts
+          src/__tests__/lib/lead-discovery/query-planner-v2-yield.test.ts
       - name: Run Evidence Radar unit and surface contracts
         run: >-
           npm test --workspace @recruiter-radar/web -- --runInBand --runTestsByPath
