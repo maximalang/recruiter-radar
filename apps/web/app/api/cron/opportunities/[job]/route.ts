@@ -64,6 +64,9 @@ import {
   writeCommercialSignalOpportunities,
 } from '@/lib/opportunities/commercial-signal-opportunity-writer'
 import {
+  runCommercialSignalCanary,
+} from '@/lib/opportunities/commercial-signal-canary-job'
+import {
   backfillOpportunitiesJob,
   buildOpportunitiesJob,
   detectHiringEpisodesJob,
@@ -90,6 +93,7 @@ const JOBS = new Set([
   'build-query-plans-v2',
   'execute-query-plans-v2',
   'write-commercial-signal-opportunities',
+  'run-commercial-signal-canary',
 ])
 
 const COMPANY_EVENTS_JOB = 'normalize-company-events'
@@ -102,6 +106,7 @@ const OPPORTUNITY_SCORING_V3_JOB = 'build-opportunity-candidates-v3'
 const QUERY_PLANNER_V2_JOB = 'build-query-plans-v2'
 const QUERY_PLANNER_V2_EXECUTION_JOB = 'execute-query-plans-v2'
 const COMMERCIAL_SIGNAL_WRITER_JOB = 'write-commercial-signal-opportunities'
+const COMMERCIAL_SIGNAL_CANARY_JOB = 'run-commercial-signal-canary'
 
 export async function GET(
   request: NextRequest,
@@ -161,7 +166,8 @@ export async function POST(
                 : job === QUERY_PLANNER_V2_JOB
                   ? QUERY_PLANNER_V2_LIMITS.maximumProfileBatchSize
                   : job === QUERY_PLANNER_V2_EXECUTION_JOB ||
-                      job === COMMERCIAL_SIGNAL_WRITER_JOB
+                      job === COMMERCIAL_SIGNAL_WRITER_JOB ||
+                      job === COMMERCIAL_SIGNAL_CANARY_JOB
                     ? 100
                     : OPPORTUNITY_ENGINE_LIMITS.maximumJobBatchSize
   if (
@@ -184,6 +190,24 @@ export async function POST(
   ) {
     return NextResponse.json(
       { error: 'workspace_and_profile_required_for_apply' },
+      { status: 400 },
+    )
+  }
+  if (
+    job === COMMERCIAL_SIGNAL_CANARY_JOB &&
+    (
+      applyValue !== 'true' ||
+      workspaceValue !== null ||
+      profileValue !== null ||
+      organizationValue !== null
+    )
+  ) {
+    return NextResponse.json(
+      {
+        error: applyValue !== 'true'
+          ? 'apply_true_required'
+          : 'canary_scope_is_environment_managed',
+      },
       { status: 400 },
     )
   }
@@ -282,47 +306,51 @@ export async function POST(
   }
 
   try {
-    const result = job === QUERY_PLANNER_V2_JOB
-      ? await buildQueryPlansV2Job(queryPlannerV2Options)
-      : job === QUERY_PLANNER_V2_EXECUTION_JOB
-        ? await executeQueryPlannerV2Sources({
-          workspaceId: workspaceId!,
-          clientProfileId,
-          limit: Math.min(batchSize ?? 20, 50),
-          dryRun: false,
-        })
-        : job === COMMERCIAL_SIGNAL_WRITER_JOB
-          ? await writeCommercialSignalOpportunities({
+    const result = job === COMMERCIAL_SIGNAL_CANARY_JOB
+      ? await runCommercialSignalCanary({
+        batchSize: batchSize ?? 25,
+      })
+      : job === QUERY_PLANNER_V2_JOB
+        ? await buildQueryPlansV2Job(queryPlannerV2Options)
+        : job === QUERY_PLANNER_V2_EXECUTION_JOB
+          ? await executeQueryPlannerV2Sources({
             workspaceId: workspaceId!,
             clientProfileId,
-            organizationId,
-            batchSize: Math.min(batchSize ?? 20, 100),
+            limit: Math.min(batchSize ?? 20, 50),
+            dryRun: false,
           })
-      : job === COMPANY_EVENTS_JOB
-      ? await normalizeCompanyEventsJob(companyEventOptions)
-      : job === COMPANY_STATE_JOB
-        ? await buildCompanyStateJob(companyStateOptions)
-        : job === SIGNAL_EPISODES_JOB
-          ? await buildSignalEpisodesJob(signalEpisodesOptions)
-          : job === COMMERCIAL_THESIS_JOB
-            ? await buildCommercialThesesJob(commercialThesisOptions)
-            : job === EXTERNAL_AGENCY_PROPENSITY_JOB
-              ? await buildExternalAgencyPropensityJob(
-                externalAgencyPropensityOptions,
-              )
-              : job === AGENCY_DNA_MATCH_JOB
-                ? await buildAgencyDnaMatchJob(agencyDnaMatchOptions)
-                : job === OPPORTUNITY_SCORING_V3_JOB
-                  ? await buildOpportunityScoringV3Job(
-                    opportunityScoringV3Options,
-                  )
-      : job === 'detect-hiring-episodes'
-      ? await detectHiringEpisodesJob(opportunityOptions)
-      : job === 'build-opportunities'
-        ? await buildOpportunitiesJob(opportunityOptions)
-        : job === 'expire-opportunities'
-          ? await expireOpportunitiesJob(opportunityOptions)
-          : await backfillOpportunitiesJob(opportunityOptions)
+          : job === COMMERCIAL_SIGNAL_WRITER_JOB
+            ? await writeCommercialSignalOpportunities({
+              workspaceId: workspaceId!,
+              clientProfileId,
+              organizationId,
+              batchSize: Math.min(batchSize ?? 20, 100),
+            })
+            : job === COMPANY_EVENTS_JOB
+              ? await normalizeCompanyEventsJob(companyEventOptions)
+              : job === COMPANY_STATE_JOB
+                ? await buildCompanyStateJob(companyStateOptions)
+                : job === SIGNAL_EPISODES_JOB
+                  ? await buildSignalEpisodesJob(signalEpisodesOptions)
+                  : job === COMMERCIAL_THESIS_JOB
+                    ? await buildCommercialThesesJob(commercialThesisOptions)
+                    : job === EXTERNAL_AGENCY_PROPENSITY_JOB
+                      ? await buildExternalAgencyPropensityJob(
+                        externalAgencyPropensityOptions,
+                      )
+                      : job === AGENCY_DNA_MATCH_JOB
+                        ? await buildAgencyDnaMatchJob(agencyDnaMatchOptions)
+                        : job === OPPORTUNITY_SCORING_V3_JOB
+                          ? await buildOpportunityScoringV3Job(
+                            opportunityScoringV3Options,
+                          )
+                          : job === 'detect-hiring-episodes'
+                            ? await detectHiringEpisodesJob(opportunityOptions)
+                            : job === 'build-opportunities'
+                              ? await buildOpportunitiesJob(opportunityOptions)
+                              : job === 'expire-opportunities'
+                                ? await expireOpportunitiesJob(opportunityOptions)
+                                : await backfillOpportunitiesJob(opportunityOptions)
     return NextResponse.json({ success: true, job, result })
   } catch (error) {
     logError('opportunity.cron.failed', error, { job })
@@ -334,25 +362,27 @@ export async function POST(
 }
 
 function isJobEnabled(job: string): boolean {
-  return job === QUERY_PLANNER_V2_JOB || job === QUERY_PLANNER_V2_EXECUTION_JOB
-    ? isQueryPlannerV2Enabled()
-    : job === COMMERCIAL_SIGNAL_WRITER_JOB
-      ? isOpportunityScoringV3Enabled()
-    : job === COMPANY_EVENTS_JOB
-    ? isCompanyEventsV1Enabled()
-    : job === COMPANY_STATE_JOB
-      ? isCompanyStateV1Enabled()
-      : job === SIGNAL_EPISODES_JOB
-        ? isSignalEpisodesV2Enabled()
-        : job === COMMERCIAL_THESIS_JOB
-          ? isCommercialThesisV1Enabled()
-          : job === EXTERNAL_AGENCY_PROPENSITY_JOB
-            ? isExternalAgencyPropensityV1Enabled()
-            : job === AGENCY_DNA_MATCH_JOB
-              ? isAgencyDnaMatchV2Enabled()
-              : job === OPPORTUNITY_SCORING_V3_JOB
-                ? isOpportunityScoringV3Enabled()
-    : isOpportunityEngineV1Enabled()
+  return job === COMMERCIAL_SIGNAL_CANARY_JOB
+    ? isQueryPlannerV2Enabled() && isOpportunityScoringV3Enabled()
+    : job === QUERY_PLANNER_V2_JOB || job === QUERY_PLANNER_V2_EXECUTION_JOB
+      ? isQueryPlannerV2Enabled()
+      : job === COMMERCIAL_SIGNAL_WRITER_JOB
+        ? isOpportunityScoringV3Enabled()
+        : job === COMPANY_EVENTS_JOB
+          ? isCompanyEventsV1Enabled()
+          : job === COMPANY_STATE_JOB
+            ? isCompanyStateV1Enabled()
+            : job === SIGNAL_EPISODES_JOB
+              ? isSignalEpisodesV2Enabled()
+              : job === COMMERCIAL_THESIS_JOB
+                ? isCommercialThesisV1Enabled()
+                : job === EXTERNAL_AGENCY_PROPENSITY_JOB
+                  ? isExternalAgencyPropensityV1Enabled()
+                  : job === AGENCY_DNA_MATCH_JOB
+                    ? isAgencyDnaMatchV2Enabled()
+                    : job === OPPORTUNITY_SCORING_V3_JOB
+                      ? isOpportunityScoringV3Enabled()
+                      : isOpportunityEngineV1Enabled()
 }
 
 function authorizeCron(request: NextRequest): NextResponse | null {
@@ -374,7 +404,9 @@ function authorizeCron(request: NextRequest): NextResponse | null {
 
 function positiveId(value: string | null): string | null {
   if (!value || !/^[1-9]\d{0,18}$/.test(value)) return null
-  return BigInt(value) <= BigInt('9223372036854775807') ? BigInt(value).toString() : null
+  return BigInt(value) <= BigInt('9223372036854775807')
+    ? BigInt(value).toString()
+    : null
 }
 
 function positiveInteger(value: string | null): number | null {
