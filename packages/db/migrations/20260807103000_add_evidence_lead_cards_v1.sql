@@ -16,6 +16,8 @@ CREATE TABLE evidence_lead_score_snapshots_v1 (
   components JSONB NOT NULL,
   contributions JSONB NOT NULL,
   source_event_ids BIGINT[] NOT NULL,
+  source_signal_ids BIGINT[] NOT NULL,
+  source_correlation_ids BIGINT[] NOT NULL DEFAULT ARRAY[]::BIGINT[],
   independent_source_families TEXT[] NOT NULL,
   score_version TEXT NOT NULL DEFAULT 'evidence-lead-score-v1',
   input_hash TEXT NOT NULL,
@@ -41,6 +43,8 @@ CREATE TABLE evidence_lead_score_snapshots_v1 (
     CHECK (JSONB_TYPEOF(contributions) = 'array' AND JSONB_ARRAY_LENGTH(contributions) > 0),
   CONSTRAINT evidence_lead_score_snapshots_v1_events_check
     CHECK (CARDINALITY(source_event_ids) > 0),
+  CONSTRAINT evidence_lead_score_snapshots_v1_signals_check
+    CHECK (CARDINALITY(source_signal_ids) > 0),
   CONSTRAINT evidence_lead_score_snapshots_v1_sources_check
     CHECK (CARDINALITY(independent_source_families) > 0),
   CONSTRAINT evidence_lead_score_snapshots_v1_input_hash_check
@@ -87,7 +91,7 @@ CREATE TABLE public_contact_paths_v1 (
     href IS NULL
     OR href ~ '^https://'
     OR href ~ '^tel:[+0-9() -]+$'
-    OR href ~* '^mailto:(info|hello|hr|jobs|career|careers|recruit|recruiting|talent|office|contact)@[^@[:space:]]+$'
+    OR href ~* '^mailto:(info|hello|hr|jobs|career|careers|recruit|recruiting|talent|office|contact)([._+-][a-z0-9-]+)?@[^@[:space:]]+$'
   ),
   CONSTRAINT public_contact_paths_v1_verification_check
     CHECK (verification_status IN ('verified', 'review', 'rejected')),
@@ -106,7 +110,7 @@ CREATE TABLE evidence_lead_cards_v1 (
   id BIGSERIAL PRIMARY KEY,
   workspace_id BIGINT NOT NULL,
   organization_id BIGINT NOT NULL,
-  location_id BIGINT NOT NULL,
+  location_id BIGINT,
   score_snapshot_id BIGINT NOT NULL,
   status TEXT NOT NULL,
   title TEXT NOT NULL,
@@ -169,6 +173,19 @@ AS $$
 DECLARE
   requested_count INTEGER;
   matched_count INTEGER;
+  provided_families TEXT[];
+  expected_families TEXT[];
+  invalid_contributions INTEGER;
+  component_key TEXT;
+  hiring_intent DOUBLE PRECISION;
+  component_confidence DOUBLE PRECISION;
+  freshness DOUBLE PRECISION;
+  component_urgency DOUBLE PRECISION;
+  commercial_fit DOUBLE PRECISION;
+  component_contactability DOUBLE PRECISION;
+  component_risk DOUBLE PRECISION;
+  expected_opportunity DOUBLE PRECISION;
+  expected_lead DOUBLE PRECISION;
 BEGIN
   SELECT COUNT(DISTINCT event_id)::INTEGER
   INTO requested_count
@@ -185,6 +202,129 @@ BEGIN
     AND event.organization_id = NEW.organization_id;
   IF matched_count <> CARDINALITY(NEW.source_event_ids) THEN
     RAISE EXCEPTION 'score evidence must belong to one workspace and organization';
+  END IF;
+
+  SELECT ARRAY_AGG(DISTINCT source_family ORDER BY source_family)
+  INTO expected_families
+  FROM evidence_events_v1 AS event
+  WHERE event.id = ANY(NEW.source_event_ids)
+    AND event.workspace_id = NEW.workspace_id
+    AND event.organization_id = NEW.organization_id;
+  SELECT ARRAY_AGG(DISTINCT family ORDER BY family)
+  INTO provided_families
+  FROM UNNEST(NEW.independent_source_families) AS supplied(family);
+  IF CARDINALITY(provided_families) <> CARDINALITY(NEW.independent_source_families)
+     OR expected_families IS DISTINCT FROM provided_families THEN
+    RAISE EXCEPTION 'score independent source families must equal evidence provenance';
+  END IF;
+
+  SELECT COUNT(DISTINCT signal_id)::INTEGER
+  INTO requested_count
+  FROM UNNEST(NEW.source_signal_ids) AS requested(signal_id);
+  IF requested_count <> CARDINALITY(NEW.source_signal_ids) THEN
+    RAISE EXCEPTION 'score source signal ids must be unique';
+  END IF;
+  SELECT COUNT(*)::INTEGER
+  INTO matched_count
+  FROM normalized_signals_v1 AS signal
+  WHERE signal.id = ANY(NEW.source_signal_ids)
+    AND signal.workspace_id = NEW.workspace_id
+    AND signal.organization_id = NEW.organization_id;
+  IF matched_count <> CARDINALITY(NEW.source_signal_ids) THEN
+    RAISE EXCEPTION 'score signals must belong to one workspace and organization';
+  END IF;
+  IF EXISTS (
+    SELECT 1
+    FROM normalized_signals_v1 AS signal
+    WHERE signal.id = ANY(NEW.source_signal_ids)
+      AND signal.workspace_id = NEW.workspace_id
+      AND signal.organization_id = NEW.organization_id
+      AND NOT EXISTS (
+        SELECT 1
+        FROM normalized_signal_event_links_v1 AS link
+        WHERE link.signal_id = signal.id
+          AND link.workspace_id = NEW.workspace_id
+          AND link.organization_id = NEW.organization_id
+          AND link.evidence_event_id = ANY(NEW.source_event_ids)
+      )
+  ) THEN
+    RAISE EXCEPTION 'every scored signal must be linked to scored evidence';
+  END IF;
+
+  SELECT COUNT(DISTINCT correlation_id)::INTEGER
+  INTO requested_count
+  FROM UNNEST(NEW.source_correlation_ids) AS requested(correlation_id);
+  IF requested_count <> CARDINALITY(NEW.source_correlation_ids) THEN
+    RAISE EXCEPTION 'score source correlation ids must be unique';
+  END IF;
+  SELECT COUNT(*)::INTEGER
+  INTO matched_count
+  FROM evidence_correlations_v1 AS correlation
+  WHERE correlation.id = ANY(NEW.source_correlation_ids)
+    AND correlation.workspace_id = NEW.workspace_id
+    AND correlation.organization_id = NEW.organization_id;
+  IF matched_count <> CARDINALITY(NEW.source_correlation_ids) THEN
+    RAISE EXCEPTION 'score correlations must belong to one workspace and organization';
+  END IF;
+  IF EXISTS (
+    SELECT 1
+    FROM evidence_correlations_v1 AS correlation
+    WHERE correlation.id = ANY(NEW.source_correlation_ids)
+      AND correlation.workspace_id = NEW.workspace_id
+      AND correlation.organization_id = NEW.organization_id
+      AND NOT correlation.signal_ids <@ NEW.source_signal_ids
+  ) THEN
+    RAISE EXCEPTION 'score correlations must be composed from scored signals';
+  END IF;
+
+  FOREACH component_key IN ARRAY ARRAY[
+    'hiringIntent', 'confidence', 'freshness', 'urgency',
+    'commercialFit', 'contactability', 'risk'
+  ]::TEXT[] LOOP
+    IF JSONB_TYPEOF(NEW.components->component_key) <> 'number'
+       OR (NEW.components->>component_key)::DOUBLE PRECISION NOT BETWEEN 0 AND 1 THEN
+      RAISE EXCEPTION 'score component % must be numeric within [0,1]', component_key;
+    END IF;
+  END LOOP;
+
+  hiring_intent := (NEW.components->>'hiringIntent')::DOUBLE PRECISION;
+  component_confidence := (NEW.components->>'confidence')::DOUBLE PRECISION;
+  freshness := (NEW.components->>'freshness')::DOUBLE PRECISION;
+  component_urgency := (NEW.components->>'urgency')::DOUBLE PRECISION;
+  commercial_fit := (NEW.components->>'commercialFit')::DOUBLE PRECISION;
+  component_contactability := (NEW.components->>'contactability')::DOUBLE PRECISION;
+  component_risk := (NEW.components->>'risk')::DOUBLE PRECISION;
+  expected_opportunity := hiring_intent * component_confidence * freshness
+    * component_urgency * commercial_fit * component_contactability * 100;
+  expected_lead := GREATEST(0, expected_opportunity - component_risk * 35);
+
+  IF ABS(NEW.opportunity_score - expected_opportunity) > .11
+     OR ABS(NEW.lead_score - expected_lead) > .11
+     OR ABS(NEW.confidence_score - component_confidence * 100) > .11
+     OR ABS(NEW.urgency_score - component_urgency * 100) > .11
+     OR ABS(NEW.contactability_score - component_contactability * 100) > .11
+     OR ABS(NEW.risk_score - component_risk * 100) > .11 THEN
+    RAISE EXCEPTION 'persisted Evidence Radar scores do not reproduce component formula';
+  END IF;
+
+  SELECT COUNT(*)::INTEGER
+  INTO invalid_contributions
+  FROM JSONB_ARRAY_ELEMENTS(NEW.contributions) AS contribution(item)
+  WHERE JSONB_TYPEOF(item) <> 'object'
+     OR COALESCE(item->>'eventId', '') !~ '^[1-9][0-9]*$'
+     OR CASE
+          WHEN COALESCE(item->>'eventId', '') ~ '^[1-9][0-9]*$'
+            THEN NOT ((item->>'eventId')::BIGINT = ANY(NEW.source_event_ids))
+          ELSE FALSE
+        END
+     OR COALESCE(item->>'component', '') NOT IN (
+       'hiring_intent', 'confidence', 'freshness', 'urgency',
+       'commercial_fit', 'contactability', 'risk'
+     )
+     OR JSONB_TYPEOF(item->'delta') <> 'number'
+     OR BTRIM(COALESCE(item->>'reason', '')) = '';
+  IF invalid_contributions > 0 THEN
+    RAISE EXCEPTION 'score contribution ledger contains invalid or unscoped entries';
   END IF;
   RETURN NEW;
 END;
@@ -211,6 +351,9 @@ DECLARE
   matched_events INTEGER;
   requested_contacts INTEGER;
   matched_contacts INTEGER;
+  score_events BIGINT[];
+  score_correlations BIGINT[];
+  score_families TEXT[];
 BEGIN
   SELECT COUNT(DISTINCT event_id)::INTEGER
   INTO requested_events
@@ -227,6 +370,20 @@ BEGIN
     AND event.organization_id = NEW.organization_id;
   IF matched_events <> CARDINALITY(NEW.evidence_event_ids) THEN
     RAISE EXCEPTION 'lead card evidence must belong to one workspace and organization';
+  END IF;
+
+  SELECT source_event_ids, source_correlation_ids, independent_source_families
+  INTO score_events, score_correlations, score_families
+  FROM evidence_lead_score_snapshots_v1 AS score
+  WHERE score.id = NEW.score_snapshot_id
+    AND score.workspace_id = NEW.workspace_id
+    AND score.organization_id = NEW.organization_id;
+  IF score_events IS NULL OR NOT score_events <@ NEW.evidence_event_ids THEN
+    RAISE EXCEPTION 'lead card must preserve every evidence event used by its score';
+  END IF;
+  IF NEW.status = 'qualified'
+     AND (CARDINALITY(score_correlations) < 1 OR CARDINALITY(score_families) < 2) THEN
+    RAISE EXCEPTION 'qualified lead requires correlation and two independent source families';
   END IF;
 
   SELECT COUNT(DISTINCT contact_id)::INTEGER
