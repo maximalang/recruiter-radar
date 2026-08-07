@@ -17,10 +17,10 @@ export default function SignalTimelineScene() {
         <div className={`${styles.timelineIntro} ${sceneStyles.intro}`}>
           <p className={styles.sceneLabel}>02 — Почему сейчас</p>
           <h2 id="timeline-title" className={styles.sceneHeading}>
-            Не список вакансий. История, объясняющая <em>момент для контакта.</em>
+            События, которые объясняют, <em>почему компании стоит написать сейчас.</em>
           </h2>
           <p className={styles.sceneLead}>
-            Радар наблюдает одну компанию во времени: независимые события складываются в pattern и фиксируют момент, когда повод для обращения становится проверяемым.
+            Радар наблюдает компанию во времени: независимые события складываются в последовательность и показывают момент, когда повод для обращения становится проверяемым.
           </p>
         </div>
 
@@ -51,7 +51,7 @@ export default function SignalTimelineScene() {
 
         <div className={sceneStyles.lock} data-opportunity-lock="true">
           <div className={sceneStyles.lockHeader}>
-            <span>PATTERN CONFIRMED</span>
+            <span>Сигналы подтверждают друг друга</span>
             <small>4 события / 3 типа источников / сегодня</small>
           </div>
           <strong>Компания системно расширяет инженерную функцию.</strong>
