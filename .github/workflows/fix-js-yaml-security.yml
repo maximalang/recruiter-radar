@@ -20,22 +20,36 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - name: Generate patched lockfile
-        run: npm install js-yaml@3.15.1 --save --package-lock-only --ignore-scripts
-      - name: Verify production dependency audit
-        run: npm audit --omit=dev --audit-level=high
-      - name: Commit only dependency metadata
+      - name: Restore dependency metadata and apply exact security patch
         shell: bash
         run: |
           set -euo pipefail
+          base=e356c95cc1e6d6afcbb4b1de5b7ca5b6e3ed38d0
+          git show "$base:package.json" > package.json
+          git show "$base:package-lock.json" > package-lock.json
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('package-lock.json')
+          text = path.read_text()
+          old = '''      "version": "3.15.0",\n      "resolved": "https://registry.npmjs.org/js-yaml/-/js-yaml-3.15.0.tgz",\n      "integrity": "sha512-ttBQIIQPDeLjpPOohtUdXuXUVoA2uIB6fEH9HyJ7234s5mBJ5wTx20njxplLZQgLaOfpmPQA7X2t5AX6tIPbog==",'''
+          new = '''      "version": "3.15.1",\n      "resolved": "https://registry.npmjs.org/js-yaml/-/js-yaml-3.15.1.tgz",\n      "integrity": "sha512-S99WuO3HlhO3XN41EtYUNl9zzXjoJx7QvmipxsJVxtCBT0YHEFy+iOJhjSvrmV12nYhWpZaM8lPHkJm0yUMbag==",'''
+          if text.count(old) != 1:
+              raise SystemExit(f'expected exactly one vulnerable js-yaml lock entry, found {text.count(old)}')
+          path.write_text(text.replace(old, new))
+          PY
           git diff --check -- package.json package-lock.json
-          git diff --exit-code -- . ':(exclude)package.json' ':(exclude)package-lock.json'
+          test -z "$(git diff -- package.json)"
+          test "$(git diff --numstat -- package-lock.json | awk '{print $1":"$2}')" = "3:3"
+      - name: Verify patched install and production dependency audit
+        run: |
+          npm ci --ignore-scripts
+          npm audit --omit=dev --audit-level=high
+      - name: Commit exact lockfile patch
+        shell: bash
+        run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json package-lock.json
-          if git diff --cached --quiet; then
-            echo "Dependency files already current."
-            exit 0
-          fi
-          git commit -m "fix(security): patch js-yaml advisory"
+          git add package-lock.json
+          git commit -m "fix(security): narrow js-yaml lock patch"
           git push origin HEAD:codex/evidence-radar-system
