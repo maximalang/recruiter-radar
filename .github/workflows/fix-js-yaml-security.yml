@@ -25,8 +25,10 @@ jobs:
         run: |
           set -euo pipefail
           base=e356c95cc1e6d6afcbb4b1de5b7ca5b6e3ed38d0
-          git show "$base:package.json" > package.json
-          git show "$base:package-lock.json" > package-lock.json
+          git show "$base:package.json" > /tmp/base-package.json
+          git show "$base:package-lock.json" > /tmp/base-package-lock.json
+          cp /tmp/base-package.json package.json
+          cp /tmp/base-package-lock.json package-lock.json
           python - <<'PY'
           from pathlib import Path
           path = Path('package-lock.json')
@@ -37,19 +39,19 @@ jobs:
               raise SystemExit(f'expected exactly one vulnerable js-yaml lock entry, found {text.count(old)}')
           path.write_text(text.replace(old, new))
           PY
+          cmp -s /tmp/base-package.json package.json
+          test "$(git diff --no-index --numstat /tmp/base-package-lock.json package-lock.json | awk '{print $1":"$2}')" = "3:3"
           git diff --check -- package.json package-lock.json
-          test -z "$(git diff -- package.json)"
-          test "$(git diff --numstat -- package-lock.json | awk '{print $1":"$2}')" = "3:3"
       - name: Verify patched install and production dependency audit
         run: |
           npm ci --ignore-scripts
           npm audit --omit=dev --audit-level=high
-      - name: Commit exact lockfile patch
+      - name: Commit exact cumulative dependency patch
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package-lock.json
+          git add package.json package-lock.json
           git commit -m "fix(security): narrow js-yaml lock patch"
           git push origin HEAD:codex/evidence-radar-system
