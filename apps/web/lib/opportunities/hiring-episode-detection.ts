@@ -105,7 +105,7 @@ interface CandidateFacts {
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
-interface CanonicalVacancy extends HiringSignalInput {
+export interface CanonicalVacancy extends HiringSignalInput {
   vacancyFingerprint: string
   publications: HiringSignalInput[]
 }
@@ -553,7 +553,9 @@ function uniqueCanonicalVacancies(vacancies: CanonicalVacancy[]): CanonicalVacan
   )
 }
 
-function canonicalizeVacancies(signals: HiringSignalInput[]): CanonicalVacancy[] {
+export function canonicalizeVacancies(
+  signals: HiringSignalInput[],
+): CanonicalVacancy[] {
   const parent = signals.map((_, index) => index)
   const explicitIdsByProvider = signals.map(explicitIdsForSignal)
   const find = (index: number): number => {

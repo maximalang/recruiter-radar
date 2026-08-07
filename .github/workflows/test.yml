@@ -90,6 +90,38 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
         run: npm run test:opportunity-engine:down
+      - name: Verify Company Events v1 PostgreSQL runtime
+        env:
+          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+        run: npm run test:company-events-v1:db
+      - name: Verify Company State v1 PostgreSQL runtime
+        env:
+          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+        run: npm run test:company-state-v1:db
+      - name: Verify Signal Episodes v2 PostgreSQL runtime
+        env:
+          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+        run: npm run test:signal-episodes-v2:db
+      - name: Verify Commercial Theses v1 PostgreSQL runtime
+        env:
+          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+        run: npm run test:commercial-theses-v1:db
+      - name: Verify External Agency Propensity v1 PostgreSQL runtime
+        env:
+          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+        run: npm run test:external-agency-propensity-v1:db
+      - name: Verify Agency DNA Match v2 PostgreSQL runtime
+        env:
+          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+        run: npm run test:agency-dna-match-v2:db
+      - name: Verify Opportunity Scoring v3 PostgreSQL runtime
+        env:
+          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+        run: npm run test:opportunity-scoring-v3:db
+      - name: Verify Query Planner v2 PostgreSQL runtime
+        env:
+          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+        run: npm run test:query-planner-v2:db
       - name: Run Jest
         shell: bash
         run: |

@@ -5,6 +5,7 @@ import {
 import type { OpportunityItem } from '@/lib/opportunities/repository'
 import type { WorkspaceRole } from '@/lib/auth-v2/workspaces'
 import type { OpportunityWorkflowAssignee } from '@/lib/opportunities/opportunity-workflow-repository'
+import { parseCommercialSignalCard } from '@/lib/opportunities/commercial-signal-card'
 import { OpportunityActions } from './opportunity-actions'
 import {
   OpportunityDecisionContext,
@@ -16,6 +17,9 @@ import {
   OpportunityOutcomePanel,
 } from './opportunity-outcome-panel'
 import { OpportunityWorkflowPanel } from './opportunity-workflow-panel'
+import {
+  OpportunityCommercialSignalCard,
+} from './opportunity-commercial-signal-card'
 import styles from './opportunities.module.css'
 
 const EPISODE_LABELS: Record<string, string> = {
@@ -50,13 +54,24 @@ export function OpportunityCard(props: {
   workflowAssignees?: OpportunityWorkflowAssignee[]
   actorUserId?: string
   actorRole?: WorkspaceRole | null
+  commercialSignalUiEnabled?: boolean
 }) {
   const opportunity = props.opportunity
   const score = Math.round(opportunity.opportunityScore * 100)
+  const commercialSignalCard = props.commercialSignalUiEnabled
+    ? parseCommercialSignalCard(
+        opportunity.metadata?.commercialSignalCard,
+        new Set(opportunity.evidenceTimeline
+          .filter((item) => item.kind === 'evidence')
+          .map((item) => item.id)),
+      )
+    : null
   const displayStatus = opportunity.workflowState === 'snoozed'
     ? 'snoozed'
     : opportunity.commercialStage
-  const contentState = opportunity.strategistBrief ? 'complete' : 'insufficient'
+  const contentState = props.commercialSignalUiEnabled
+    ? commercialSignalCard ? 'complete' : 'insufficient'
+    : opportunity.strategistBrief ? 'complete' : 'insufficient'
   const freshness = isStale(opportunity.validUntil) ? 'stale' : 'current'
 
   return (
@@ -65,6 +80,7 @@ export function OpportunityCard(props: {
       data-status={displayStatus}
       data-content-state={contentState}
       data-freshness={freshness}
+      data-semantic-mode={props.commercialSignalUiEnabled ? 'v3' : 'legacy'}
     >
       {props.outcomesUiEnabled && props.trackingCycleId ? (
         <OpportunityOutcomeImpression
@@ -87,14 +103,18 @@ export function OpportunityCard(props: {
               : ''}
           </p>
         </div>
-        <div className={styles.score} aria-label={`Оценка возможности: ${score} из 100`}>
-          <strong>{score}</strong>
-          <span>/ 100</span>
-        </div>
+        {!props.commercialSignalUiEnabled ? (
+          <div className={styles.score} aria-label={`Оценка возможности: ${score} из 100`}>
+            <strong>{score}</strong>
+            <span>/ 100</span>
+          </div>
+        ) : null}
       </div>
 
       <div className={styles.badges}>
-        <GateBadgeInline gate={opportunity.confidenceGate} />
+        {!props.commercialSignalUiEnabled ? (
+          <GateBadgeInline gate={opportunity.confidenceGate} />
+        ) : null}
         <EvidenceTag>
           {opportunity.factCount} фактов · {opportunity.sourceFamilyCount} источника ·{' '}
           {opportunity.directEvidenceCount} прямое подтверждение
@@ -104,7 +124,12 @@ export function OpportunityCard(props: {
         </EvidenceTag>
       </div>
 
-      {contentState === 'insufficient' ? (
+      {props.commercialSignalUiEnabled && !commercialSignalCard ? (
+        <p className={styles.cardState} data-state="insufficient" role="status">
+          Точный Commercial Signal snapshot недоступен. Legacy-score не используется
+          как замена новой семантики.
+        </p>
+      ) : contentState === 'insufficient' ? (
         <p className={styles.cardState} data-state="insufficient" role="status">
           Для части выводов пока недостаточно подтверждённых данных.
         </p>
@@ -116,9 +141,18 @@ export function OpportunityCard(props: {
         </p>
       ) : null}
 
-      <OpportunityDecisionContext opportunity={opportunity} />
+      {commercialSignalCard ? (
+        <OpportunityCommercialSignalCard
+          opportunityId={opportunity.id}
+          card={commercialSignalCard}
+        />
+      ) : !props.commercialSignalUiEnabled ? (
+        <OpportunityDecisionContext opportunity={opportunity} />
+      ) : null}
       <OpportunityEvidenceSection opportunity={opportunity} />
-      <OpportunityDecisionPlan opportunity={opportunity} />
+      {!props.commercialSignalUiEnabled ? (
+        <OpportunityDecisionPlan opportunity={opportunity} />
+      ) : null}
 
       {props.workflowEnabled && props.actorUserId ? (
         <OpportunityWorkflowPanel

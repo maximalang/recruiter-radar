@@ -359,6 +359,144 @@
   font-size: inherit;
 }
 
+.conclusionBasis a {
+  color: #1d4ed8;
+  font-size: inherit;
+  text-underline-offset: 3px;
+}
+
+.commercialSignalBrief {
+  margin-top: 22px;
+}
+
+.commercialSignalHeading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.commercialSignalHeading > div {
+  display: grid;
+  gap: 3px;
+}
+
+.commercialSignalHeading span,
+.commercialSignalHeading small {
+  color: #64748b;
+  font-size: 0.68rem;
+}
+
+.commercialSignalHeading span {
+  font-weight: 760;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.commercialSignalHeading strong {
+  color: #0f172a;
+  font-size: 0.94rem;
+}
+
+.commercialSignalContext {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.commercialSignalContext > :last-child {
+  grid-column: 1 / -1;
+}
+
+.signalMetricsSection {
+  margin-top: 22px;
+}
+
+.signalMetricsSection > h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 0.88rem;
+}
+
+.signalMetrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.signalMetric {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.signalMetric h3 {
+  margin: 0;
+  color: #475569;
+  font-size: 0.66rem;
+  font-weight: 760;
+  letter-spacing: 0.04em;
+}
+
+.signalMetric strong {
+  color: #1e293b;
+  font-size: 0.84rem;
+}
+
+.signalMetric small {
+  overflow-wrap: anywhere;
+  color: #64748b;
+  font-size: 0.64rem;
+  line-height: 1.45;
+}
+
+.signalMetricBar {
+  display: block;
+  overflow: hidden;
+  height: 4px;
+  border-radius: 999px;
+  background: #e2e8f0;
+}
+
+.signalMetricBar::after {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #64748b;
+  content: "";
+}
+
+.signalMetric[data-level="low"] .signalMetricBar::after {
+  width: 33%;
+}
+
+.signalMetric[data-level="medium"] .signalMetricBar::after {
+  width: 66%;
+  background: #b45309;
+}
+
+.signalMetric[data-level="high"] .signalMetricBar::after {
+  width: 100%;
+  background: #166534;
+}
+
+.signalConstraints {
+  display: grid;
+  gap: 12px;
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.signalConstraints p {
+  margin: 0;
+  color: #1e293b;
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
 .evidenceSection {
   margin-top: 24px;
 }
@@ -894,6 +1032,11 @@
   outline-offset: 2px;
 }
 
+.conclusionBasis a:focus-visible {
+  outline: 3px solid rgba(59, 130, 246, 0.34);
+  outline-offset: 2px;
+}
+
 .actionError {
   min-height: 18px;
   margin: 7px 0 0;
@@ -931,6 +1074,18 @@
   }
 
   .decisionGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .commercialSignalContext > :last-child {
+    grid-column: 1;
+  }
+
+  .commercialSignalHeading {
+    align-items: start;
+  }
+
+  .signalMetrics {
     grid-template-columns: 1fr;
   }
 
@@ -983,6 +1138,10 @@
 
   .researchActions {
     grid-column: 1 / -1;
+  }
+
+  .signalMetrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

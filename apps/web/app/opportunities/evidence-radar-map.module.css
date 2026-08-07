@@ -1,0 +1,114 @@
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(21rem, .75fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.radarPanel,
+.detailPanel,
+.empty {
+  border: 1px solid rgba(255, 255, 255, .09);
+  background: #080d0c;
+  color: #f4f6f2;
+}
+
+.radarPanel { padding: clamp(.85rem, 2vw, 1.25rem); }
+.legend { display: flex; flex-wrap: wrap; gap: .55rem 1rem; margin-bottom: .85rem; color: rgba(244, 246, 242, .55); font-size: .68rem; }
+.legend span { display: inline-flex; align-items: center; gap: .4rem; }
+.legendSource,
+.legendOrganization { display: inline-block; width: 7px; height: 7px; background: #c8f36a; }
+.legendSource { border-radius: 50%; }
+.legendOrganization { transform: rotate(45deg); background: #9ddbc6; }
+
+.map {
+  position: relative;
+  min-height: clamp(28rem, 58vw, 45rem);
+  overflow: hidden;
+  border: 1px solid rgba(157, 219, 198, .14);
+  background:
+    linear-gradient(rgba(255,255,255,.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.022) 1px, transparent 1px),
+    radial-gradient(ellipse at 54% 49%, rgba(157, 219, 198, .075), transparent 60%),
+    #070b0a;
+  background-size: 56px 56px, 56px 56px, auto, auto;
+}
+.regionBoundaries { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.boundaryPath { fill: rgba(157, 219, 198, .012); stroke: rgba(157, 219, 198, .16); stroke-width: .12; vector-effect: non-scaling-stroke; }
+.mapFrame { position: absolute; inset: 7% 4%; border: 1px solid rgba(157, 219, 198, .08); border-radius: 48% 42% 44% 50%; transform: rotate(-2deg); pointer-events: none; }
+
+.cluster { --intent: .5; --freshness: .5; --confidence: .5; --risk: 0; position: absolute; z-index: 2; width: 1px; height: 1px; opacity: calc(.35 + var(--confidence) * .65); }
+.cluster[data-selected="true"] { z-index: 8; }
+.sourceOrbit,
+.organizationMarker { position: absolute; left: 0; top: 0; }
+.sourceDot { position: absolute; left: -2px; top: -2px; width: 4px; height: 4px; border-radius: 50%; background: color-mix(in srgb, #c8f36a calc(72% + var(--freshness) * 28%), #5e7759); box-shadow: 0 0 calc(5px + var(--freshness) * 9px) rgba(200, 243, 106, calc(.18 + var(--freshness) * .52)); }
+.organizationMarker { display: block; width: 1px; height: 1px; padding: 0; border: 0; background: transparent; color: inherit; cursor: pointer; }
+.organizationDiamond { position: absolute; left: calc((11px + var(--intent) * 10px) / -2); top: calc((11px + var(--intent) * 10px) / -2); width: calc(11px + var(--intent) * 10px); height: calc(11px + var(--intent) * 10px); transform: rotate(45deg); border: 1px solid rgba(230, 255, 247, .9); background: color-mix(in srgb, #9ddbc6 calc(88% - var(--risk) * 55%), #d59a6d); box-shadow: 0 0 calc(10px + var(--freshness) * 18px) rgba(157, 219, 198, calc(.18 + var(--freshness) * .48)); }
+.cluster[data-selected="true"] .organizationDiamond { outline: 1px solid #c8f36a; outline-offset: 5px; }
+.markerLabel { position: absolute; left: 16px; top: -15px; display: grid; min-width: 9rem; max-width: 14rem; text-align: left; pointer-events: none; }
+.markerLabel strong { overflow: hidden; color: rgba(244, 246, 242, .94); font-size: .7rem; text-overflow: ellipsis; white-space: nowrap; }
+.markerLabel small { color: rgba(244, 246, 242, .48); font-size: .6rem; }
+
+.regionGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: .85rem; border-top: 1px solid rgba(255,255,255,.07); border-left: 1px solid rgba(255,255,255,.07); }
+.regionCard { display: grid; gap: .7rem; padding: .9rem; border-right: 1px solid rgba(255,255,255,.07); border-bottom: 1px solid rgba(255,255,255,.07); }
+.regionCard > div:first-child { display: grid; gap: .15rem; }
+.regionCard strong { font-size: .82rem; }
+.regionCard span,
+.regionCard small { color: rgba(244,246,242,.48); font-size: .65rem; }
+.regionCard dl { display: grid; grid-template-columns: repeat(4, 1fr); gap: .4rem; margin: 0; }
+.regionCard dl div { display: grid; gap: .12rem; }
+.regionCard dt { color: rgba(244,246,242,.38); font-size: .58rem; }
+.regionCard dd { margin: 0; font-size: .78rem; font-weight: 650; }
+
+.detailPanel { position: sticky; top: 5.25rem; max-height: calc(100vh - 6.5rem); overflow: auto; }
+.leadCard { display: grid; gap: 1rem; padding: 1rem; }
+.leadHeader { display: flex; justify-content: space-between; gap: 1rem; align-items: start; }
+.leadHeader h2 { margin: .15rem 0 0; font-size: 1.2rem; }
+.leadHeader p { margin: .25rem 0 0; color: rgba(244,246,242,.52); font-size: .72rem; }
+.eyebrow { color: #c8f36a; font: 600 .62rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em; text-transform: uppercase; }
+.leadScore { display: grid; place-items: center; width: 3.1rem; height: 3.1rem; border: 1px solid rgba(200,243,106,.34); font-size: 1.15rem; }
+.locationLine { display: flex; flex-wrap: wrap; gap: .35rem .6rem; color: rgba(244,246,242,.5); font-size: .68rem; }
+.locationLine span + span::before { content: '·'; margin-right: .6rem; }
+.leadSection { display: grid; gap: .55rem; padding-top: .85rem; border-top: 1px solid rgba(255,255,255,.07); }
+.leadSection h3 { margin: 0; font-size: .75rem; }
+.leadSection p { margin: 0; color: rgba(244,246,242,.68); font-size: .74rem; line-height: 1.55; }
+.sectionHeading { display: flex; justify-content: space-between; gap: 1rem; }
+.sectionHeading span { color: rgba(244,246,242,.42); font-size: .62rem; }
+.scoreGrid { display: grid; grid-template-columns: repeat(5, 1fr); border: 1px solid rgba(255,255,255,.07); }
+.scoreItem { display: grid; gap: .2rem; padding: .65rem .5rem; border-right: 1px solid rgba(255,255,255,.07); }
+.scoreItem:last-child { border-right: 0; }
+.scoreItem span { color: rgba(244,246,242,.38); font-size: .55rem; }
+.scoreItem strong { font-size: .88rem; }
+.scoreItem[data-risk="true"] strong { color: #d6a078; }
+.factStack { display: grid; gap: .25rem; }
+.timeline,
+.contributions,
+.riskList { display: grid; gap: .6rem; margin: 0; padding: 0; list-style: none; }
+.timeline li { display: grid; grid-template-columns: 4.5rem minmax(0,1fr); gap: .65rem; }
+.timeline li > span { color: rgba(244,246,242,.38); font-size: .6rem; }
+.timeline li > div { display: grid; gap: .16rem; }
+.timeline strong { font-size: .7rem; text-transform: capitalize; }
+.timeline small,
+.timeline em { color: rgba(244,246,242,.42); font-size: .6rem; font-style: normal; }
+.timeline a { width: fit-content; color: #c8f36a; font-size: .63rem; text-decoration: none; }
+.contributions li { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: .2rem .6rem; }
+.contributions li span { color: rgba(244,246,242,.7); font-size: .66rem; text-transform: capitalize; }
+.contributions li strong { font-size: .7rem; }
+.contributions li small { grid-column: 1 / -1; color: rgba(244,246,242,.4); font-size: .6rem; }
+.riskList li { color: #d6a078; font-size: .68rem; }
+.contacts { display: flex; flex-wrap: wrap; gap: .45rem; }
+.contacts a,
+.contacts span { padding: .45rem .55rem; border: 1px solid rgba(157,219,198,.18); color: rgba(244,246,242,.8); font-size: .65rem; text-decoration: none; }
+.contacts a:hover { border-color: rgba(200,243,106,.5); color: #c8f36a; }
+.muted { color: rgba(244,246,242,.42) !important; }
+.nextAction { display: grid; gap: .25rem; padding: .85rem; border: 1px solid rgba(200,243,106,.16); background: rgba(200,243,106,.035); }
+.nextAction span { color: #c8f36a; font-size: .6rem; text-transform: uppercase; letter-spacing: .08em; }
+.nextAction strong { font-size: .74rem; line-height: 1.45; }
+.nextAction small { color: rgba(244,246,242,.42); font-size: .62rem; }
+.empty { padding: clamp(3rem, 10vw, 7rem) 1rem; text-align: center; }
+.empty strong { font-size: 1.1rem; }
+.empty p { max-width: 44rem; margin: .7rem auto 0; color: rgba(244,246,242,.5); line-height: 1.6; }
+
+@media (max-width: 1080px) { .layout { grid-template-columns: 1fr; } .detailPanel { position: static; max-height: none; } }
+@media (max-width: 720px) { .map { min-height: 32rem; } .markerLabel { display: none; } .regionGrid { grid-template-columns: 1fr; } .scoreGrid { grid-template-columns: repeat(2, 1fr); } .scoreItem { border-bottom: 1px solid rgba(255,255,255,.07); } .timeline li { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .sourceDot, .organizationDiamond { transition: none; } }

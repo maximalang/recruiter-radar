@@ -1,7 +1,22 @@
 import {
   clampOpportunityJobBatchSize,
+  clampCompanyEventsJobBatchSize,
+  clampCompanyStateJobBatchSize,
+  clampSignalEpisodesJobBatchSize,
+  clampCommercialThesisJobBatchSize,
+  clampExternalAgencyPropensityJobBatchSize,
+  clampAgencyDnaMatchJobBatchSize,
+  clampOpportunityScoringV3JobBatchSize,
   clampOpportunityPageSize,
   clampOpportunitySnoozeDays,
+  isCompanyEventsV1Enabled,
+  isCompanyStateV1Enabled,
+  isSignalEpisodesV2Enabled,
+  isCommercialThesisV1Enabled,
+  isExternalAgencyPropensityV1Enabled,
+  isAgencyDnaMatchV2Enabled,
+  isOpportunityScoringV3Enabled,
+  isOpportunityCommercialSignalUiEnabledForContext,
   isAgencyDnaV1Enabled,
   isAgencyDnaV1EnabledForContext,
   isOpportunityEngineV1Enabled,
@@ -29,6 +44,141 @@ import {
 } from '@/lib/opportunities/config'
 
 describe('opportunity engine config', () => {
+  it('keeps Opportunity Scoring v3 independently dark and tightly bounded', () => {
+    expect(isOpportunityScoringV3Enabled({})).toBe(false)
+    expect(isOpportunityScoringV3Enabled({
+      OPPORTUNITY_SCORING_V3_ENABLED: '1',
+    })).toBe(false)
+    expect(isOpportunityScoringV3Enabled({
+      OPPORTUNITY_SCORING_V3_ENABLED: 'true',
+    })).toBe(true)
+    expect(isOpportunityScoringV3Enabled({
+      OPPORTUNITY_SCORING_V3_ENABLED: ' TRUE ',
+    })).toBe(false)
+    expect(clampOpportunityScoringV3JobBatchSize(Number.NaN)).toBe(10)
+    expect(clampOpportunityScoringV3JobBatchSize(0)).toBe(1)
+    expect(clampOpportunityScoringV3JobBatchSize(26)).toBe(25)
+  })
+
+  it('keeps Commercial Signal UI dark until every tenant-safe prerequisite is on', () => {
+    const context = { dataOwnerId: '7', workspaceId: '9' }
+    const enabled = {
+      OPPORTUNITY_ENGINE_V1_ENABLED: 'true',
+      OPPORTUNITY_OUTCOMES_ENABLED: 'true',
+      OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED: 'true',
+      COMPANY_EVENTS_V1_ENABLED: 'true',
+      COMPANY_STATE_V1_ENABLED: 'true',
+      SIGNAL_EPISODES_V2_ENABLED: 'true',
+      COMMERCIAL_THESIS_V1_ENABLED: 'true',
+      EXTERNAL_AGENCY_PROPENSITY_V1_ENABLED: 'true',
+      AGENCY_DNA_MATCH_V2_ENABLED: 'true',
+      OPPORTUNITY_SCORING_V3_ENABLED: 'true',
+      OPPORTUNITY_COMMERCIAL_SIGNAL_UI_ENABLED: 'true',
+    }
+
+    expect(isOpportunityCommercialSignalUiEnabledForContext(context, {}))
+      .toBe(false)
+    expect(isOpportunityCommercialSignalUiEnabledForContext(context, enabled))
+      .toBe(true)
+    expect(isOpportunityCommercialSignalUiEnabledForContext(
+      { dataOwnerId: '7', workspaceId: null },
+      enabled,
+    )).toBe(false)
+    for (const missing of Object.keys(enabled)) {
+      expect(isOpportunityCommercialSignalUiEnabledForContext(context, {
+        ...enabled,
+        [missing]: 'false',
+      })).toBe(false)
+    }
+  })
+
+  it('keeps Company Events v1 dark unless the flag is exactly true', () => {
+    expect(isCompanyEventsV1Enabled({})).toBe(false)
+    expect(isCompanyEventsV1Enabled({ COMPANY_EVENTS_V1_ENABLED: '1' }))
+      .toBe(false)
+    expect(isCompanyEventsV1Enabled({ COMPANY_EVENTS_V1_ENABLED: 'true' }))
+      .toBe(true)
+    expect(isCompanyEventsV1Enabled({ COMPANY_EVENTS_V1_ENABLED: ' TRUE ' }))
+      .toBe(false)
+  })
+
+  it('clamps Company Events cron batches to the smaller safe range', () => {
+    expect(clampCompanyEventsJobBatchSize(Number.NaN)).toBe(10)
+    expect(clampCompanyEventsJobBatchSize(0)).toBe(1)
+    expect(clampCompanyEventsJobBatchSize(26)).toBe(25)
+  })
+
+  it('keeps Company State v1 independently dark and tightly bounded', () => {
+    expect(isCompanyStateV1Enabled({})).toBe(false)
+    expect(isCompanyStateV1Enabled({ COMPANY_STATE_V1_ENABLED: '1' }))
+      .toBe(false)
+    expect(isCompanyStateV1Enabled({ COMPANY_STATE_V1_ENABLED: 'true' }))
+      .toBe(true)
+    expect(isCompanyStateV1Enabled({ COMPANY_STATE_V1_ENABLED: ' TRUE ' }))
+      .toBe(false)
+    expect(clampCompanyStateJobBatchSize(Number.NaN)).toBe(10)
+    expect(clampCompanyStateJobBatchSize(0)).toBe(1)
+    expect(clampCompanyStateJobBatchSize(26)).toBe(25)
+  })
+
+  it('keeps Signal Episodes v2 independently dark and tightly bounded', () => {
+    expect(isSignalEpisodesV2Enabled({})).toBe(false)
+    expect(isSignalEpisodesV2Enabled({ SIGNAL_EPISODES_V2_ENABLED: '1' }))
+      .toBe(false)
+    expect(isSignalEpisodesV2Enabled({ SIGNAL_EPISODES_V2_ENABLED: 'true' }))
+      .toBe(true)
+    expect(isSignalEpisodesV2Enabled({ SIGNAL_EPISODES_V2_ENABLED: ' TRUE ' }))
+      .toBe(false)
+    expect(clampSignalEpisodesJobBatchSize(Number.NaN)).toBe(10)
+    expect(clampSignalEpisodesJobBatchSize(0)).toBe(1)
+    expect(clampSignalEpisodesJobBatchSize(26)).toBe(25)
+  })
+
+  it('keeps Commercial Thesis v1 independently dark and tightly bounded', () => {
+    expect(isCommercialThesisV1Enabled({})).toBe(false)
+    expect(isCommercialThesisV1Enabled({ COMMERCIAL_THESIS_V1_ENABLED: '1' }))
+      .toBe(false)
+    expect(isCommercialThesisV1Enabled({
+      COMMERCIAL_THESIS_V1_ENABLED: 'true',
+    })).toBe(true)
+    expect(isCommercialThesisV1Enabled({
+      COMMERCIAL_THESIS_V1_ENABLED: ' TRUE ',
+    })).toBe(false)
+    expect(clampCommercialThesisJobBatchSize(Number.NaN)).toBe(10)
+    expect(clampCommercialThesisJobBatchSize(0)).toBe(1)
+    expect(clampCommercialThesisJobBatchSize(26)).toBe(25)
+  })
+
+  it('keeps External Agency Propensity v1 independently dark and bounded', () => {
+    expect(isExternalAgencyPropensityV1Enabled({})).toBe(false)
+    expect(isExternalAgencyPropensityV1Enabled({
+      EXTERNAL_AGENCY_PROPENSITY_V1_ENABLED: '1',
+    })).toBe(false)
+    expect(isExternalAgencyPropensityV1Enabled({
+      EXTERNAL_AGENCY_PROPENSITY_V1_ENABLED: 'true',
+    })).toBe(true)
+    expect(isExternalAgencyPropensityV1Enabled({
+      EXTERNAL_AGENCY_PROPENSITY_V1_ENABLED: ' TRUE ',
+    })).toBe(false)
+    expect(clampExternalAgencyPropensityJobBatchSize(Number.NaN)).toBe(10)
+    expect(clampExternalAgencyPropensityJobBatchSize(0)).toBe(1)
+    expect(clampExternalAgencyPropensityJobBatchSize(26)).toBe(25)
+  })
+
+  it('keeps Agency DNA Match v2 independently dark and bounded', () => {
+    expect(isAgencyDnaMatchV2Enabled({})).toBe(false)
+    expect(isAgencyDnaMatchV2Enabled({ AGENCY_DNA_MATCH_V2_ENABLED: '1' }))
+      .toBe(false)
+    expect(isAgencyDnaMatchV2Enabled({ AGENCY_DNA_MATCH_V2_ENABLED: 'true' }))
+      .toBe(true)
+    expect(isAgencyDnaMatchV2Enabled({
+      AGENCY_DNA_MATCH_V2_ENABLED: ' TRUE ',
+    })).toBe(false)
+    expect(clampAgencyDnaMatchJobBatchSize(Number.NaN)).toBe(10)
+    expect(clampAgencyDnaMatchJobBatchSize(0)).toBe(1)
+    expect(clampAgencyDnaMatchJobBatchSize(26)).toBe(25)
+  })
+
   it('is dark by default and only accepts an explicit true value', () => {
     expect(isOpportunityEngineV1Enabled({})).toBe(false)
     expect(isOpportunityEngineV1Enabled({ OPPORTUNITY_ENGINE_V1_ENABLED: '1' })).toBe(false)

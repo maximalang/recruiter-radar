@@ -1,0 +1,150 @@
+{
+  "schemaVersion": "commercial-signal-evaluation-dataset-v1",
+  "datasetId": "synthetic-contract-v1",
+  "datasetVersion": "2026-08-04-v1",
+  "kind": "synthetic_contract",
+  "status": "ready",
+  "provenance": "synthetic",
+  "splitGroup": "synthetic-contract",
+  "exclusionSplitGroups": [],
+  "minimumSample": 10,
+  "minimumLabeled": 10,
+  "limitations": [
+    "Synthetic contract fixture validates evaluator behavior only.",
+    "It is not evidence of production precision or calibration."
+  ],
+  "rows": [
+    {
+      "sampleKey": "0000000000000000000000000000000000000000000000000000000000000001",
+      "agencyProfileKey": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "episodeType": "vacancy_spike",
+      "sourceFamilies": ["hh", "company-site"],
+      "queryPlanKey": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "observedAt": "2026-07-20T10:00:00.000Z",
+      "vacancyCount": 8,
+      "scores": { "oldFiur": 0.72, "opportunityV2": 0.65, "opportunityV3": 0.98 },
+      "labels": { "qualified": true, "accepted": true, "contacted": true, "replied": true, "meeting": true, "falsePositiveCategory": null }
+    },
+    {
+      "sampleKey": "0000000000000000000000000000000000000000000000000000000000000002",
+      "agencyProfileKey": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "episodeType": "new_region",
+      "sourceFamilies": ["rabota-rossii"],
+      "queryPlanKey": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "observedAt": "2026-07-18T10:00:00.000Z",
+      "vacancyCount": 4,
+      "scores": { "oldFiur": 0.64, "opportunityV2": 0.55, "opportunityV3": 0.92 },
+      "labels": { "qualified": true, "accepted": true, "contacted": true, "replied": true, "meeting": false, "falsePositiveCategory": null }
+    },
+    {
+      "sampleKey": "0000000000000000000000000000000000000000000000000000000000000003",
+      "agencyProfileKey": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "episodeType": "role_cluster_growth",
+      "sourceFamilies": ["hh", "habr-career"],
+      "queryPlanKey": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "observedAt": "2026-07-16T10:00:00.000Z",
+      "vacancyCount": 5,
+      "scores": { "oldFiur": 0.58, "opportunityV2": 0.45, "opportunityV3": 0.85 },
+      "labels": { "qualified": true, "accepted": false, "contacted": false, "replied": false, "meeting": false, "falsePositiveCategory": null }
+    },
+    {
+      "sampleKey": "0000000000000000000000000000000000000000000000000000000000000004",
+      "agencyProfileKey": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "episodeType": "vacancy_spike",
+      "sourceFamilies": ["hh"],
+      "queryPlanKey": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "observedAt": "2026-07-25T10:00:00.000Z",
+      "vacancyCount": 20,
+      "scores": { "oldFiur": 0.91, "opportunityV2": 0.95, "opportunityV3": 0.2 },
+      "labels": { "qualified": false, "accepted": false, "contacted": false, "replied": false, "meeting": false, "falsePositiveCategory": "ordinary_hiring" }
+    },
+    {
+      "sampleKey": "0000000000000000000000000000000000000000000000000000000000000005",
+      "agencyProfileKey": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "episodeType": "replacement_hiring",
+      "sourceFamilies": ["superjob"],
+      "queryPlanKey": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "observedAt": "2026-07-24T10:00:00.000Z",
+      "vacancyCount": 12,
+      "scores": { "oldFiur": 0.86, "opportunityV2": 0.85, "opportunityV3": 0.1 },
+      "labels": { "qualified": false, "accepted": false, "contacted": false, "replied": false, "meeting": false, "falsePositiveCategory": "weak_agency_fit" }
+    },
+    {
+      "sampleKey": "0000000000000000000000000000000000000000000000000000000000000006",
+      "agencyProfileKey": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "episodeType": "vacancy_spike",
+      "sourceFamilies": ["hh"],
+      "queryPlanKey": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "observedAt": "2026-07-22T10:00:00.000Z",
+      "vacancyCount": 10,
+      "scores": { "oldFiur": 0.49, "opportunityV2": 0.35, "opportunityV3": 0.3 },
+      "labels": { "qualified": false, "accepted": false, "contacted": false, "replied": false, "meeting": false, "falsePositiveCategory": "internal_only" }
+    },
+    {
+      "sampleKey": "0000000000000000000000000000000000000000000000000000000000000007",
+      "agencyProfileKey": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "episodeType": "vacancy_spike",
+      "sourceFamilies": ["hh", "company-site"],
+      "queryPlanKey": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "observedAt": "2026-07-19T10:00:00.000Z",
+      "vacancyCount": 7,
+      "scores": { "oldFiur": 0.69, "opportunityV2": 0.62, "opportunityV3": 0.97 },
+      "labels": { "qualified": true, "accepted": true, "contacted": true, "replied": true, "meeting": true, "falsePositiveCategory": null }
+    },
+    {
+      "sampleKey": "0000000000000000000000000000000000000000000000000000000000000008",
+      "agencyProfileKey": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "episodeType": "new_region",
+      "sourceFamilies": ["rabota-rossii", "company-site"],
+      "queryPlanKey": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "observedAt": "2026-07-17T10:00:00.000Z",
+      "vacancyCount": 3,
+      "scores": { "oldFiur": 0.61, "opportunityV2": 0.52, "opportunityV3": 0.9 },
+      "labels": { "qualified": true, "accepted": true, "contacted": true, "replied": false, "meeting": false, "falsePositiveCategory": null }
+    },
+    {
+      "sampleKey": "0000000000000000000000000000000000000000000000000000000000000009",
+      "agencyProfileKey": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "episodeType": "role_cluster_growth",
+      "sourceFamilies": ["habr-career"],
+      "queryPlanKey": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "observedAt": "2026-07-15T10:00:00.000Z",
+      "vacancyCount": 6,
+      "scores": { "oldFiur": 0.55, "opportunityV2": 0.42, "opportunityV3": 0.82 },
+      "labels": { "qualified": true, "accepted": false, "contacted": false, "replied": false, "meeting": false, "falsePositiveCategory": null }
+    },
+    {
+      "sampleKey": "000000000000000000000000000000000000000000000000000000000000000a",
+      "agencyProfileKey": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "episodeType": "vacancy_spike",
+      "sourceFamilies": ["hh"],
+      "queryPlanKey": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "observedAt": "2026-07-26T10:00:00.000Z",
+      "vacancyCount": 18,
+      "scores": { "oldFiur": 0.88, "opportunityV2": 0.93, "opportunityV3": 0.18 },
+      "labels": { "qualified": false, "accepted": false, "contacted": false, "replied": false, "meeting": false, "falsePositiveCategory": "weak_external_need" }
+    },
+    {
+      "sampleKey": "000000000000000000000000000000000000000000000000000000000000000b",
+      "agencyProfileKey": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "episodeType": "replacement_hiring",
+      "sourceFamilies": ["superjob"],
+      "queryPlanKey": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "observedAt": "2026-07-23T10:00:00.000Z",
+      "vacancyCount": 11,
+      "scores": { "oldFiur": 0.82, "opportunityV2": 0.81, "opportunityV3": 0.12 },
+      "labels": { "qualified": false, "accepted": false, "contacted": false, "replied": false, "meeting": false, "falsePositiveCategory": "bad_economics" }
+    },
+    {
+      "sampleKey": "000000000000000000000000000000000000000000000000000000000000000c",
+      "agencyProfileKey": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "episodeType": "vacancy_spike",
+      "sourceFamilies": ["hh"],
+      "queryPlanKey": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "observedAt": "2026-07-21T10:00:00.000Z",
+      "vacancyCount": 9,
+      "scores": { "oldFiur": 0.46, "opportunityV2": 0.32, "opportunityV3": 0.28 },
+      "labels": { "qualified": false, "accepted": false, "contacted": false, "replied": false, "meeting": false, "falsePositiveCategory": "stale_signal" }
+    }
+  ]
+}
