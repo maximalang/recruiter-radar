@@ -14,8 +14,10 @@ const emptyYield: QueryPlanOperationalYield = {
   uniqueCompanies: null,
   newCompanyEvents: null,
   episodes: null,
+  qualifiedEpisodes: null,
   qualifiedOpportunities: null,
   actionableOpportunities: null,
+  staleOpportunities: null,
   accepted: null,
   contacted: null,
   replied: null,
@@ -53,6 +55,23 @@ describe('Query Planner v2 downstream yield tuning', () => {
     })).toEqual({
       pageBudget: 3,
       reasonCode: 'YIELD_BUDGET_REDUCED_WEAK_DOWNSTREAM',
+    })
+  })
+
+  it('reduces qualified plans that repeatedly expire before action', () => {
+    expect(resolveYieldAdjustedPageBudget(5, {
+      ...emptyYield,
+      executionCount: 8,
+      fetchedRecords: 100,
+      uniqueEvents: 80,
+      episodes: 15,
+      qualifiedEpisodes: 7,
+      qualifiedOpportunities: 10,
+      actionableOpportunities: 7,
+      staleOpportunities: 7,
+    })).toEqual({
+      pageBudget: 4,
+      reasonCode: 'YIELD_BUDGET_REDUCED_STALE_SUPPLY',
     })
   })
 
@@ -99,8 +118,10 @@ describe('Query Planner v2 downstream yield tuning', () => {
       fetchedRecords: 200,
       uniqueEvents: 140,
       episodes: 20,
+      qualifiedEpisodes: 6,
       qualifiedOpportunities: 8,
       actionableOpportunities: 4,
+      staleOpportunities: 1,
       accepted: 3,
       contacted: 3,
       replied: 1,
