@@ -29,6 +29,7 @@ describe("polished unified landing visual contract", () => {
   it("keeps the landing skip link first and exposes one main content landmark", () => {
     const home = source("app/home-page-content.tsx");
     const landingPage = source("app/landing/landing-page.tsx");
+    const landingPageBody = landingPage.slice(landingPage.indexOf("export default function LandingPage"));
     const skipLinkIndex = home.indexOf("<LandingSkipLink />");
     const analyticsIndex = home.indexOf("<LandingAnalytics />");
     const landingIndex = home.indexOf("{landing}");
@@ -39,8 +40,9 @@ describe("polished unified landing visual contract", () => {
     expect(analyticsIndex).toBeGreaterThan(skipLinkIndex);
     expect(landingIndex).toBeGreaterThan(analyticsIndex);
     expect(cookieSettingsIndex).toBeGreaterThan(landingIndex);
+    expect(landingPage).toContain('export function LandingSkipLink()');
     expect(landingPage).toContain('<main id="main-content">');
-    expect(landingPage).not.toContain('<a href="#main-content" className={styles.skipLink}>');
+    expect(landingPageBody).not.toContain('<a href="#main-content" className={styles.skipLink}>');
   });
 
   it("uses one stable preview anchor without duplicating it in the suspense fallback", () => {
