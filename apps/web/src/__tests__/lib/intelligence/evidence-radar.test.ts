@@ -13,11 +13,24 @@ import {
   type NormalizedSignal,
 } from '@/lib/intelligence/evidence-radar'
 import {
+  EVIDENCE_RUNTIME_SOURCE_BINDINGS,
+  listEvidenceRuntimeSourceBindings,
+  validateEvidenceRuntimeSourceBindings,
+} from '@/lib/intelligence/evidence-source-compatibility'
+import {
+  SIGNAL_CONTEXT_CALIBRATION,
+  calibratedSignalWeight,
+  dueSignalIdsForRecheck,
+  signalContextCoefficient,
+  signalRecheckDecision,
+} from '@/lib/intelligence/evidence-radar-policy'
+import {
   SOURCE_REGISTRY,
   SOURCE_ROLES,
   canAutomateSource,
   validateSourceRegistry,
 } from '@/lib/intelligence/source-registry'
+import { getAllSourceIds } from '@/lib/sources/source-registry'
 
 describe('Evidence Radar v1 contracts', () => {
   it('covers every source role and fails closed for external automation', () => {
@@ -26,11 +39,47 @@ describe('Evidence Radar v1 contracts', () => {
     expect(SOURCE_REGISTRY.filter(canAutomateSource).map((entry) => entry.id)).toEqual(['first-party-crm'])
   })
 
+  it('binds every existing runtime adapter to an explicit Evidence Radar policy', () => {
+    expect(validateEvidenceRuntimeSourceBindings()).toEqual([])
+    expect(Object.keys(EVIDENCE_RUNTIME_SOURCE_BINDINGS).sort()).toEqual(
+      [...getAllSourceIds()].sort(),
+    )
+    expect(listEvidenceRuntimeSourceBindings()).toHaveLength(getAllSourceIds().length)
+  })
+
   it('defines the complete 20-type signal taxonomy', () => {
     expect(SIGNAL_TAXONOMY).toHaveLength(20)
     expect(new Set(SIGNAL_TAXONOMY.map((item) => item.type)).size).toBe(20)
     expect(SIGNAL_TAXONOMY.find((item) => item.type === 'hiring_freeze'))
       .toMatchObject({ polarity: 'negative' })
+  })
+
+  it('keeps industry and region calibration neutral until labelled validation exists', () => {
+    expect(SIGNAL_CONTEXT_CALIBRATION).toHaveLength(20)
+    expect(SIGNAL_CONTEXT_CALIBRATION.every(
+      (item) => item.calibrationStatus === 'neutral_unlabeled',
+    )).toBe(true)
+    expect(signalContextCoefficient({
+      signalType: 'hiring_growth',
+      industry: 'manufacturing',
+      regionCode: '62',
+    })).toEqual({
+      total: 1,
+      industry: 1,
+      region: 1,
+      calibrationStatus: 'neutral_unlabeled',
+    })
+    expect(calibratedSignalWeight({
+      signalType: 'hiring_growth',
+      strength: .5,
+      industry: 'manufacturing',
+      regionCode: '62',
+    })).toMatchObject({
+      baseWeight: .82,
+      contextCoefficient: 1,
+      effectiveWeight: .41,
+      calibrationStatus: 'neutral_unlabeled',
+    })
   })
 
   it('uses exact legal identifiers before ambiguous brand matches', () => {
@@ -69,9 +118,24 @@ describe('Evidence Radar v1 contracts', () => {
     expect(score.contributions).toHaveLength(1)
   })
 
-  it('decays stale evidence and forecasts bounded staffing demand', () => {
+  it('decays stale evidence, schedules rechecks and expires stale signals', () => {
     expect(decaySignalStrength(1, '2026-07-01T00:00:00Z', 30, new Date('2026-07-31T00:00:00Z')))
       .toBeCloseTo(.5, 5)
+
+    const fresh = signal('fresh', 'hiring_growth', 'career-page')
+    expect(signalRecheckDecision(fresh, new Date('2026-08-05T00:00:00Z')))
+      .toMatchObject({ status: 'fresh', reason: 'within_recheck_window' })
+    expect(signalRecheckDecision(fresh, new Date('2026-08-20T00:00:00Z')))
+      .toMatchObject({ status: 'recheck_due' })
+    expect(signalRecheckDecision(fresh, new Date('2026-10-02T00:00:00Z')))
+      .toMatchObject({ status: 'expired', reason: 'validity_expired' })
+    expect(dueSignalIdsForRecheck([
+      fresh,
+      { ...fresh, id: 'expired', validUntil: '2026-08-04T00:00:00Z' },
+    ], new Date('2026-08-05T00:00:00Z'))).toEqual(['expired'])
+  })
+
+  it('forecasts bounded staffing demand from supported patterns', () => {
     expect(forecastStaffing([signal('plant', 'production_expansion', 'official-news')]))
       .toMatchObject({ mode: 'mass', minHeadcount: 20, maxHeadcount: 200, basisSignalIds: ['plant'] })
   })
