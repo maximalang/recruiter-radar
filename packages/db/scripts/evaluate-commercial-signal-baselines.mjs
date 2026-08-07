@@ -9,6 +9,9 @@ const LABEL_RELEVANCE = Object.freeze({
 });
 const DEFAULT_REVIEW_SET = 'holdout';
 const REVIEW_SETS = new Set(['training', 'holdout', 'production_shadow', 'canary']);
+const REPLY_MATURITY_HOURS = 168;
+const CALIBRATION_TARGET_REVIEWED = 300;
+const CALIBRATION_TARGET_HOLDOUT = 60;
 
 function parseArgs(argv) {
   const result = {
@@ -32,16 +35,24 @@ export async function evaluateCommercialSignalBaselines({
   connectionString,
   workspaceId,
   reviewSet = DEFAULT_REVIEW_SET,
+  evaluatedAt = new Date(),
 }) {
   const normalizedWorkspaceId = positiveId(workspaceId, 'workspace');
   if (!REVIEW_SETS.has(reviewSet)) throw new Error(`Invalid review set: ${reviewSet}`);
+  const evaluationTimestamp = validDate(evaluatedAt).toISOString();
 
   const client = new Client({ connectionString });
   await client.connect();
   try {
-    const sample = await loadEvaluationSample(client, normalizedWorkspaceId, reviewSet);
+    const sample = await loadEvaluationSample(
+      client,
+      normalizedWorkspaceId,
+      reviewSet,
+      evaluationTimestamp,
+    );
     const globalCounts = await loadGlobalReviewCounts(client, normalizedWorkspaceId);
     const validation = resolveValidationStatus(globalCounts);
+    const calibration = resolveCalibrationStatus(globalCounts);
     const baselines = [
       evaluateBaseline('vacancy_count', sample, (row) => row.vacancyCount),
       evaluateBaseline('freshness', sample, (row) => row.freshnessScore),
@@ -53,8 +64,18 @@ export async function evaluateCommercialSignalBaselines({
     return {
       workspaceId: normalizedWorkspaceId,
       reviewSet,
+      evaluatedAt: evaluationTimestamp,
       validationStatus: validation.status,
       validationReasonCodes: validation.reasonCodes,
+      calibrationStatus: calibration.status,
+      calibrationReasonCodes: calibration.reasonCodes,
+      calibrationTarget: {
+        reviewedOpportunities: CALIBRATION_TARGET_REVIEWED,
+        holdoutReviewed: CALIBRATION_TARGET_HOLDOUT,
+        replyMaturityHours: REPLY_MATURITY_HOURS,
+        diversityRequirement:
+          'multiple agency types, episode types, role families, and industries require explicit review before calibration',
+      },
       sample: {
         reviewedOpportunities: globalCounts.reviewedOpportunities,
         actionableReviewed: globalCounts.actionableReviewed,
@@ -65,16 +86,21 @@ export async function evaluateCommercialSignalBaselines({
       winner: validation.status === 'insufficient_sample'
         ? null
         : chooseWinner(baselines),
-      note: validation.status === 'insufficient_sample'
-        ? 'Ranking metrics are diagnostic only until the minimum real reviewed sample is satisfied.'
-        : 'Winner is selected by Precision@10, then NDCG@10, then Precision@5. Conversion rates are descriptive outcomes, not model probabilities.',
+      note: calibration.status === 'insufficient_data'
+        ? 'Baseline ranking metrics are diagnostic only. The real reviewed sample is below the calibration target and no probability calibration may be claimed.'
+        : 'Baseline ranking metrics are diagnostic only. Sample-size gates passed, but diversity/holdout review is still required before any calibration claim.',
     };
   } finally {
     await client.end();
   }
 }
 
-async function loadEvaluationSample(client, workspaceId, reviewSet) {
+async function loadEvaluationSample(
+  client,
+  workspaceId,
+  reviewSet,
+  evaluatedAt,
+) {
   const result = await client.query(
     `WITH latest_reviewer_annotations AS (
        SELECT DISTINCT ON (annotation.lineage_id, annotation.reviewer_user_id)
@@ -110,7 +136,10 @@ async function loadEvaluationSample(client, workspaceId, reviewSet) {
          BOOL_OR(event.event_type = 'accepted') AS accepted,
          BOOL_OR(event.event_type = 'contacted') AS contacted,
          BOOL_OR(event.event_type = 'replied') AS replied,
-         BOOL_OR(event.event_type = 'meeting') AS meeting
+         BOOL_OR(event.event_type = 'meeting') AS meeting,
+         MIN(event.occurred_at) FILTER (
+           WHERE event.event_type = 'contacted'
+         ) AS contacted_at
        FROM commercial_signal_opportunity_lineage lineage
        LEFT JOIN opportunity_outcome_events event
          ON event.opportunity_id = lineage.opportunity_id
@@ -123,7 +152,7 @@ async function loadEvaluationSample(client, workspaceId, reviewSet) {
        compatibility.vacancy_count::DOUBLE PRECISION AS "vacancyCount",
        GREATEST(
          0::DOUBLE PRECISION,
-         1 - EXTRACT(EPOCH FROM (NOW() - signal_episode.last_seen_at)) /
+         1 - EXTRACT(EPOCH FROM ($3::TIMESTAMPTZ - signal_episode.last_seen_at)) /
            (30 * 24 * 60 * 60)::DOUBLE PRECISION
        ) AS "freshnessScore",
        CASE
@@ -150,7 +179,13 @@ async function loadEvaluationSample(client, workspaceId, reviewSet) {
        COALESCE(outcomes.accepted, FALSE) AS accepted,
        COALESCE(outcomes.contacted, FALSE) AS contacted,
        COALESCE(outcomes.replied, FALSE) AS replied,
-       COALESCE(outcomes.meeting, FALSE) AS meeting
+       COALESCE(outcomes.meeting, FALSE) AS meeting,
+       CASE
+         WHEN COALESCE(outcomes.replied, FALSE) THEN TRUE
+         WHEN outcomes.contacted_at IS NULL THEN FALSE
+         ELSE outcomes.contacted_at <=
+           $3::TIMESTAMPTZ - ($4::TEXT || ' hours')::INTERVAL
+       END AS "replyMature"
      FROM adjudicated
      JOIN commercial_signal_opportunity_lineage lineage
        ON lineage.id = adjudicated.lineage_id
@@ -166,7 +201,7 @@ async function loadEvaluationSample(client, workspaceId, reviewSet) {
        ON opportunity.id = lineage.opportunity_id
      LEFT JOIN outcomes ON outcomes.opportunity_id = lineage.opportunity_id
      WHERE lineage.workspace_id = $1`,
-    [workspaceId, reviewSet],
+    [workspaceId, reviewSet, evaluatedAt, String(REPLY_MATURITY_HOURS)],
   );
 
   return result.rows.map((row) => ({
@@ -181,6 +216,7 @@ async function loadEvaluationSample(client, workspaceId, reviewSet) {
     accepted: row.accepted === true,
     contacted: row.contacted === true,
     replied: row.replied === true,
+    replyMature: row.replyMature === true,
     meeting: row.meeting === true,
   }));
 }
@@ -235,15 +271,18 @@ export function evaluateBaseline(name, sample, scoreFn) {
     .map((row) => ({ ...row, score: scoreFn(row) }))
     .filter((row) => Number.isFinite(row.score))
     .sort((left, right) => right.score - left.score || left.lineageId.localeCompare(right.lineageId));
+  const coverageRate = sample.length === 0 ? null : round(scored.length / sample.length);
   if (scored.length === 0) {
     return {
       name,
       status: 'unavailable',
       reasonCode: 'NO_COMPARABLE_PERSISTED_SCORE',
       sampleSize: 0,
+      coverageRate,
       precisionAt5: null,
       precisionAt10: null,
       ndcgAt10: null,
+      qualifiedRate: null,
       acceptedRate: null,
       contactedRate: null,
       replyRate: null,
@@ -255,12 +294,19 @@ export function evaluateBaseline(name, sample, scoreFn) {
     status: 'available',
     reasonCode: null,
     sampleSize: scored.length,
+    coverageRate,
     precisionAt5: precisionAt(scored, 5),
     precisionAt10: precisionAt(scored, 10),
     ndcgAt10: ndcgAt(scored, 10),
+    qualifiedRate: round(
+      scored.filter((row) => [
+        'qualified_actionable',
+        'qualified_needs_enrichment',
+      ].includes(row.candidateStatus)).length / scored.length,
+    ),
     acceptedRate: booleanRate(scored, 'accepted'),
     contactedRate: booleanRate(scored, 'contacted'),
-    replyRate: conditionalBooleanRate(scored, 'replied', 'contacted'),
+    replyRate: matureReplyRate(scored),
     meetingRate: conditionalBooleanRate(scored, 'meeting', 'contacted'),
   };
 }
@@ -299,6 +345,15 @@ function conditionalBooleanRate(rows, numeratorKey, denominatorKey) {
   );
 }
 
+function matureReplyRate(rows) {
+  const denominator = rows.filter((row) =>
+    row.contacted === true && row.replyMature === true);
+  if (denominator.length === 0) return null;
+  return round(
+    denominator.filter((row) => row.replied === true).length / denominator.length,
+  );
+}
+
 function resolveValidationStatus(counts) {
   const reasonCodes = [];
   if (counts.reviewedOpportunities < 100) reasonCodes.push('REVIEWED_LT_100');
@@ -307,6 +362,23 @@ function resolveValidationStatus(counts) {
   return reasonCodes.length > 0
     ? { status: 'insufficient_sample', reasonCodes }
     : { status: 'shadow_validated', reasonCodes: [] };
+}
+
+function resolveCalibrationStatus(counts) {
+  const reasonCodes = [];
+  if (counts.reviewedOpportunities < CALIBRATION_TARGET_REVIEWED) {
+    reasonCodes.push('CALIBRATION_REVIEWED_LT_300');
+  }
+  if (counts.holdoutReviewed < CALIBRATION_TARGET_HOLDOUT) {
+    reasonCodes.push('CALIBRATION_HOLDOUT_LT_60');
+  }
+  if (reasonCodes.length > 0) {
+    return { status: 'insufficient_data', reasonCodes };
+  }
+  return {
+    status: 'review_required',
+    reasonCodes: ['CALIBRATION_DIVERSITY_REVIEW_REQUIRED'],
+  };
 }
 
 function chooseWinner(baselines) {
@@ -347,6 +419,12 @@ function positiveId(value, label) {
     throw new Error(`Invalid ${label} identifier.`);
   }
   return BigInt(normalized).toString();
+}
+
+function validDate(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (!Number.isFinite(date.getTime())) throw new Error('Invalid evaluation timestamp.');
+  return date;
 }
 
 function round(value) {
