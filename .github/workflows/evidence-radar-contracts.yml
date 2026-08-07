@@ -52,6 +52,7 @@ jobs:
         run: >-
           npm test --workspace @recruiter-radar/web -- --runInBand --runTestsByPath
           src/__tests__/lib/intelligence/evidence-radar.test.ts
+          src/__tests__/lib/intelligence/evidence-radar-config.test.ts
           src/__tests__/scripts/evidence-radar-migration.test.ts
           src/__tests__/app/evidence-radar-surface-contract.test.ts
       - name: Verify isolated Evidence Radar PostgreSQL runtime
