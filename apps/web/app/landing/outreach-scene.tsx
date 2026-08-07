@@ -12,12 +12,12 @@ export default function OutreachScene() {
     >
       <div className={styles.outreachLayout}>
         <div className={styles.outreachIntro}>
-          <p className={styles.sceneLabel}>06 — Обращение</p>
+          <p className={styles.sceneLabel}>06 — Первое обращение</p>
           <h2 id="outreach-title" className={styles.sceneHeading}>
-            Сначала причина для контакта. <em>Потом сообщение.</em>
+            Как подготовить <em>первое обращение.</em>
           </h2>
           <p className={styles.sceneLead}>
-            Радар собирает краткое описание возможности, рекомендуемый угол разговора и официальный маршрут. Решение об обращении и отправка всегда остаются за человеком.
+            Радар собирает краткое описание возможности, рекомендуемый угол разговора и официальный корпоративный маршрут. Вы проверяете факты и сами решаете, отправлять ли сообщение.
           </p>
         </div>
 
@@ -43,18 +43,18 @@ export default function OutreachScene() {
             </div>
           </div>
 
-          <div className={styles.messageDraft}>
+          <div className={styles.messageDraft} data-manual-outreach-boundary="true">
             <div className={styles.draftHeader}>
               <span>ЧЕРНОВИК / НЕ ОТПРАВЛЕНО</span>
               <strong>Пример первого сообщения, основанного на факте</strong>
             </div>
             <blockquote>{DEMO_OUTREACH_COPY}</blockquote>
             <div className={styles.actionBoundary}>
-              <div><span>Система обнаружила</span><strong>связанный сигнал найма</strong></div>
-              <div><span>Система рекомендует</span><strong>точку входа и угол разговора</strong></div>
-              <div><span>Пользователь делает</span><strong>проверяет и отправляет вручную</strong></div>
+              <div><span>Радар обнаружил</span><strong>связанный сигнал найма</strong></div>
+              <div><span>Радар подготовил</span><strong>точку входа и угол разговора</strong></div>
+              <div><span>Вы решаете</span><strong>проверить и отправить вручную</strong></div>
             </div>
-            <p>Recruiter Radar не отправляет сообщения компаниям автоматически.</p>
+            <p>Отправка сообщения компании всегда требует действия пользователя.</p>
           </div>
         </div>
       </div>
