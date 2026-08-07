@@ -9,7 +9,7 @@ CREATE TABLE source_registry_entries_v1 (
   category TEXT NOT NULL,
   access_method TEXT NOT NULL,
   commercial_use TEXT NOT NULL,
-  authorization TEXT NOT NULL,
+  authorization_method TEXT NOT NULL,
   integration_status TEXT NOT NULL,
   automation_policy TEXT NOT NULL,
   retention_policy TEXT NOT NULL,
@@ -31,7 +31,7 @@ CREATE TABLE source_registry_entries_v1 (
     'published_allowance', 'contract_required', 'legal_review_required',
     'internal_first_party', 'prohibited'
   )),
-  CONSTRAINT source_registry_entries_v1_auth_check CHECK (authorization IN (
+  CONSTRAINT source_registry_entries_v1_auth_check CHECK (authorization_method IN (
     'none', 'api_key', 'oauth', 'account', 'contract'
   )),
   CONSTRAINT source_registry_entries_v1_status_check CHECK (integration_status IN (
@@ -123,7 +123,7 @@ AS $$
 $$;
 
 INSERT INTO source_registry_entries_v1 (
-  id, role, category, access_method, commercial_use, authorization,
+  id, role, category, access_method, commercial_use, authorization_method,
   integration_status, automation_policy, retention_policy, terms_reference
 ) VALUES
   ('company-career-pages', 'hiring', 'Employer career pages', 'lawful_public_fetch', 'legal_review_required', 'none', 'connected', 'review_required', 'Facts, canonical URL, timestamps and hashes', NULL),
