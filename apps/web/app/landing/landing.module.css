@@ -61,14 +61,21 @@
   left: 1rem;
   min-height: 44px;
   padding: .8rem 1rem;
-  background: var(--signal-strong);
-  color: var(--slate-950);
-  font-family: var(--mono);
+  background: var(--signal-strong, #c8f36a);
+  color: var(--slate-950, #070a09);
+  font-family: var(--mono, "IBM Plex Mono", "SFMono-Regular", Consolas, monospace);
   font-size: .72rem;
   text-decoration: none;
 }
 
-.skipLink:focus { top: 1rem; }
+.skipLink:focus {
+  top: 1rem;
+}
+
+.skipLink:focus-visible {
+  outline: 2px solid var(--signal, #c8f36a);
+  outline-offset: 4px;
+}
 
 /* Header */
 .header {
