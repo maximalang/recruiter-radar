@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - codex/post-merge-design-polish
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
@@ -25,20 +28,24 @@ jobs:
 
           audit_path = Path('apps/web/scripts/verify-landing-production.mjs')
           audit = audit_path.read_text()
-          old_history = '''  await page.goBack();
-            assert.match(page.url(), /#scene-workspace$/);
-            await page.goForward();
-            assert.match(page.url(), /#scene-evidence$/);'''
-          new_history = '''  await Promise.all([
-            page.waitForURL(/#scene-workspace$/),
-            page.goBack(),
-          ]);
-            assert.match(page.url(), /#scene-workspace$/);
-            await Promise.all([
-            page.waitForURL(/#scene-evidence$/),
-            page.goForward(),
-          ]);
-            assert.match(page.url(), /#scene-evidence$/);'''
+          old_history = (
+              '  await page.goBack();\n'
+              '  assert.match(page.url(), /#scene-workspace$/);\n'
+              '  await page.goForward();\n'
+              '  assert.match(page.url(), /#scene-evidence$/);'
+          )
+          new_history = (
+              '  await Promise.all([\n'
+              '    page.waitForURL(/#scene-workspace$/),\n'
+              '    page.goBack(),\n'
+              '  ]);\n'
+              '  assert.match(page.url(), /#scene-workspace$/);\n'
+              '  await Promise.all([\n'
+              '    page.waitForURL(/#scene-evidence$/),\n'
+              '    page.goForward(),\n'
+              '  ]);\n'
+              '  assert.match(page.url(), /#scene-evidence$/);'
+          )
           if old_history not in audit:
               raise SystemExit('history assertion block not found')
           audit_path.write_text(audit.replace(old_history, new_history, 1))
@@ -58,23 +65,27 @@ jobs:
 
           test_path = Path('apps/web/src/__tests__/app/landing-visual-polish.test.ts')
           test = test_path.read_text()
-          old_test = '''    const hero = source("app/landing/hero-instrument.tsx");
-            const compatibilityRadar = source("app/landing/brand-glyphs.tsx");
-
-            expect(hero).not.toContain("instrumentConnection");'''
-          new_test = '''    const hero = source("app/landing/hero-instrument.tsx");
-            const heroStyles = source("app/landing/landing.module.css");
-            const compatibilityRadar = source("app/landing/brand-glyphs.tsx");
-
-            expect(hero).not.toContain("instrumentConnection");'''
+          old_test = (
+              '    const hero = source("app/landing/hero-instrument.tsx");\n'
+              '    const compatibilityRadar = source("app/landing/brand-glyphs.tsx");\n\n'
+              '    expect(hero).not.toContain("instrumentConnection");'
+          )
+          new_test = (
+              '    const hero = source("app/landing/hero-instrument.tsx");\n'
+              '    const heroStyles = source("app/landing/landing.module.css");\n'
+              '    const compatibilityRadar = source("app/landing/brand-glyphs.tsx");\n\n'
+              '    expect(hero).not.toContain("instrumentConnection");'
+          )
           if old_test not in test:
               raise SystemExit('hero contract insertion point not found')
           test = test.replace(old_test, new_test, 1)
-          old_assert = '''    expect(compatibilityRadar).not.toContain("styles.instrumentCore");'''
-          new_assert = '''    expect(compatibilityRadar).not.toContain("styles.instrumentCore");
-            expect(heroStyles).not.toContain(".instrumentGuides");
-            expect(heroStyles).not.toContain(".instrumentConnection");
-            expect(heroStyles).not.toContain(".instrumentCore");'''
+          old_assert = '    expect(compatibilityRadar).not.toContain("styles.instrumentCore");'
+          new_assert = (
+              '    expect(compatibilityRadar).not.toContain("styles.instrumentCore");\n'
+              '    expect(heroStyles).not.toContain(".instrumentGuides");\n'
+              '    expect(heroStyles).not.toContain(".instrumentConnection");\n'
+              '    expect(heroStyles).not.toContain(".instrumentCore");'
+          )
           if old_assert not in test:
               raise SystemExit('hero CSS contract insertion point not found')
           test_path.write_text(test.replace(old_assert, new_assert, 1))
