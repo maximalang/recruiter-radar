@@ -1,5 +1,6 @@
 import {
   applyHistoricalYieldToQueryPlan,
+  diagnoseQueryPlanSupply,
   queryPlanYieldKey,
   resolveYieldAdjustedPageBudget,
   type QueryPlanOperationalYield,
@@ -110,6 +111,30 @@ describe('Query Planner v2 downstream yield tuning', () => {
     })
   })
 
+  it('explains under-supply using persisted role/region/source yield only', () => {
+    expect(diagnoseQueryPlanSupply({
+      ...emptyYield,
+      executionCount: 10,
+      zeroResultExecutions: 7,
+      fetchedRecords: 100,
+      uniqueEvents: 20,
+      episodes: 12,
+      qualifiedEpisodes: 0,
+      qualifiedOpportunities: 8,
+      actionableOpportunities: 1,
+      staleOpportunities: 6,
+      contacted: 5,
+      replied: 0,
+    })).toEqual([
+      'SUPPLY_ZERO_RESULT_HEAVY',
+      'SUPPLY_DUPLICATE_HEAVY',
+      'SUPPLY_NO_QUALIFIED_EPISODES',
+      'SUPPLY_STALE_HEAVY',
+      'SUPPLY_LOW_ACTIONABILITY',
+      'SUPPLY_NO_REPLY_CONVERSION',
+    ])
+  })
+
   it('recomputes shared request and plan input hashes after budget tuning', () => {
     const plan = basePlan()
     const tuned = applyHistoricalYieldToQueryPlan(plan, {
@@ -136,6 +161,7 @@ describe('Query Planner v2 downstream yield tuning', () => {
     expect(tuned.reasonCodes).toContain(
       'YIELD_BUDGET_EXPANDED_ACTIONABLE_CONVERSION',
     )
+    expect(tuned.reasonCodes).toContain('SUPPLY_HEALTHY')
   })
 })
 
