@@ -1,6 +1,8 @@
 import { createHmac } from 'node:crypto'
 
-export function anonymizeEvaluationRow(row, kind, key) {
+export const DEFAULT_REPLY_MATURITY_HOURS = 168
+
+export function anonymizeEvaluationRow(row, kind, key, options = {}) {
   const sampleKey = pseudonym(
     key,
     `profile:${row.profileId}:episode:${row.episodeId}:item:${row.opportunityId}`,
@@ -11,6 +13,7 @@ export function anonymizeEvaluationRow(row, kind, key) {
   const category = progressed ? null : mapFalsePositiveReason(
     row.dismissReasonCode ?? row.lostReasonCode,
   )
+  const replied = replyLabel(row, hasOutcome, options)
   return {
     sampleKey,
     agencyProfileKey: pseudonym(key, `profile:${row.profileId}`),
@@ -29,7 +32,7 @@ export function anonymizeEvaluationRow(row, kind, key) {
         : progressed ? true : category ? false : null,
       accepted: hasOutcome ? row.accepted === true : null,
       contacted: hasOutcome ? row.contacted === true : null,
-      replied: hasOutcome ? row.replied === true : null,
+      replied,
       meeting: hasOutcome ? row.meeting === true : null,
       falsePositiveCategory: category,
     },
@@ -45,12 +48,12 @@ export function mapFalsePositiveReason(reason) {
     company_too_small: 'weak_agency_fit',
     company_too_large: 'weak_agency_fit',
     low_commercial_value: 'bad_economics',
-    internal_recruitment_only: 'internal_only',
+    internal_recruitment_only: 'internal_recruiting_sufficient',
     no_external_need_signal: 'weak_external_need',
     weak_evidence: 'unverified_company',
     duplicate: 'duplicate_event',
     wrong_timing: 'stale_signal',
-    internal_team: 'internal_only',
+    internal_team: 'internal_recruiting_sufficient',
     price: 'bad_economics',
     no_budget: 'bad_economics',
     procurement_block: 'bad_economics',
@@ -86,10 +89,30 @@ export function datasetLimitations(kind) {
   ]
   return [
     ...common,
+    `No-reply remains unlabeled until ${DEFAULT_REPLY_MATURITY_HOURS} hours after first contact unless a terminal outcome makes it mature earlier.`,
     'Observational-only and immature outcomes remain unlabeled.',
     'Legacy outcome reasons are mapped only when they have an unambiguous taxonomy category.',
     'V3 remains null until a reviewed cross-version lineage contract exists.',
   ]
+}
+
+function replyLabel(row, hasOutcome, options) {
+  if (!hasOutcome) return null
+  if (row.replied === true) return true
+  if (row.contacted !== true) return false
+  if (row.dismissReasonCode || row.lostReasonCode) return false
+
+  const contactedAt = timestampOrNull(row.contactedAt)
+  if (!contactedAt) return null
+  const evaluatedAt = timestampOrNull(options.evaluatedAt) ?? new Date().toISOString()
+  const maturityHours = positiveNumberOrDefault(
+    options.replyMaturityHours,
+    DEFAULT_REPLY_MATURITY_HOURS,
+  )
+  return Date.parse(evaluatedAt) - Date.parse(contactedAt) >=
+    maturityHours * 60 * 60 * 1000
+    ? false
+    : null
 }
 
 function jsonStringArray(value) {
@@ -111,4 +134,15 @@ function finiteOrNull(value) {
   if (value == null) return null
   const number = Number(value)
   return Number.isFinite(number) ? number : null
+}
+
+function timestampOrNull(value) {
+  if (value == null || value === '') return null
+  const parsed = Date.parse(String(value))
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : null
+}
+
+function positiveNumberOrDefault(value, fallback) {
+  const number = Number(value)
+  return Number.isFinite(number) && number > 0 ? number : fallback
 }
