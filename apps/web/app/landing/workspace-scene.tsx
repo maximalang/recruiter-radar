@@ -66,12 +66,12 @@ export default function WorkspaceScene(props: WorkspaceProps) {
 function WorkspaceIntro() {
   return (
     <div className={styles.workspaceIntro}>
-      <p className={styles.sceneLabel}>03 — Интерактивный пример</p>
+      <p className={styles.sceneLabel}>03 — Рабочая выдача</p>
       <h2 id="workspace-title" className={styles.sceneHeading}>
-        Не обещание продукта, а <em>рабочий пример.</em>
+        Как выглядит <em>рабочая выдача.</em>
       </h2>
       <p className={styles.sceneLead}>
-        Укажите специализацию и географию. Серверный пример пересчитает порядок компаний и покажет факты, оценку и безопасный следующий шаг.
+        Укажите специализацию и географию. Интерактивный пример пересчитает порядок компаний и покажет факты, оценку и следующий безопасный шаг.
       </p>
     </div>
   );
