@@ -212,6 +212,8 @@ CREATE TABLE evidence_correlations_v1 (
     FOREIGN KEY (workspace_id, organization_id)
     REFERENCES organization_identity_profiles_v1(workspace_id, organization_id)
     ON DELETE RESTRICT,
+  CONSTRAINT evidence_correlations_v1_id_scope_unique
+    UNIQUE (id, workspace_id, organization_id),
   CONSTRAINT evidence_correlations_v1_rule_check
     CHECK (BTRIM(rule_id) <> ''),
   CONSTRAINT evidence_correlations_v1_signal_ids_check
@@ -241,6 +243,8 @@ AS $$
 DECLARE
   unique_requested INTEGER;
   matched INTEGER;
+  provided_families TEXT[];
+  expected_families TEXT[];
 BEGIN
   SELECT COUNT(DISTINCT signal_id)::INTEGER
   INTO unique_requested
@@ -259,6 +263,25 @@ BEGIN
 
   IF matched <> CARDINALITY(NEW.signal_ids) THEN
     RAISE EXCEPTION 'correlation signals must belong to one workspace and organization';
+  END IF;
+
+  SELECT ARRAY_AGG(DISTINCT family ORDER BY family)
+  INTO provided_families
+  FROM UNNEST(NEW.source_families) AS supplied(family);
+  IF CARDINALITY(provided_families) <> CARDINALITY(NEW.source_families) THEN
+    RAISE EXCEPTION 'correlation source families must be unique';
+  END IF;
+
+  SELECT ARRAY_AGG(DISTINCT family ORDER BY family)
+  INTO expected_families
+  FROM normalized_signals_v1 AS signal
+  CROSS JOIN LATERAL UNNEST(signal.source_families) AS expanded(family)
+  WHERE signal.id = ANY(NEW.signal_ids)
+    AND signal.workspace_id = NEW.workspace_id
+    AND signal.organization_id = NEW.organization_id;
+
+  IF expected_families IS DISTINCT FROM provided_families THEN
+    RAISE EXCEPTION 'correlation source families must equal referenced signal provenance';
   END IF;
   RETURN NEW;
 END;
