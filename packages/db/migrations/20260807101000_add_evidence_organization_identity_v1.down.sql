@@ -3,6 +3,14 @@ BEGIN;
 SET LOCAL lock_timeout = '5s';
 SET LOCAL statement_timeout = '5min';
 
+LOCK TABLE
+  federal_subject_geometries_v1,
+  organization_identity_changes_v1,
+  organization_relationships_v1,
+  organization_locations_v1,
+  organization_identity_profiles_v1
+  IN ACCESS EXCLUSIVE MODE;
+
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM federal_subject_geometries_v1 LIMIT 1)
