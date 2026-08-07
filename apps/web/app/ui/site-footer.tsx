@@ -17,14 +17,6 @@ const SERVICE_LINKS = [
   { href: "/dashboard", label: "Кабинет" },
 ] as const;
 
-const DOCUMENT_LINKS = [
-  { href: "/legal", label: "Правовая информация", ariaLabel: "Правовая информация — Реквизиты" },
-  { href: "/privacy", label: "Конфиденциальность", ariaLabel: "Политика конфиденциальности" },
-  { href: "/terms", label: "Условия использования", ariaLabel: "Условия использования — Оферта" },
-  { href: "/personal-data-consent", label: "Обработка данных", ariaLabel: "Согласие на обработку персональных данных" },
-  { href: "/payment-and-refund", label: "Оплата и возврат", ariaLabel: "Информация об оплате и возврате" },
-] as const;
-
 export async function SiteFooter(props: { tone?: "light" | "dark" }) {
   const tone = props.tone ?? "light";
   const year = new Date().getFullYear();
@@ -62,7 +54,11 @@ export async function SiteFooter(props: { tone?: "light" | "dark" }) {
             </nav>
             <nav aria-label="Документы">
               <strong>Документы</strong>
-              {DOCUMENT_LINKS.map((item) => <Link key={item.href} href={item.href} aria-label={item.ariaLabel} className={s.footerLink}>{item.label}</Link>)}
+              <Link href="/legal" aria-label="Правовая информация — Реквизиты" className={s.footerLink}>Правовая информация</Link>
+              <Link href="/privacy" aria-label="Конфиденциальность — Политика конфиденциальности" className={s.footerLink}>Политика конфиденциальности</Link>
+              <Link href="/terms" aria-label="Условия использования — Оферта" className={s.footerLink}>Условия использования</Link>
+              <Link href="/personal-data-consent" aria-label="Согласие на обработку персональных данных" className={s.footerLink}>Обработка данных</Link>
+              <Link href="/payment-and-refund" aria-label="Информация об оплате и возврате" className={s.footerLink}>Оплата и возврат</Link>
             </nav>
           </div>
         </div>
