@@ -2,7 +2,9 @@ name: Evidence Radar Contracts
 
 on:
   push:
-    branches: [ 'codex/evidence-radar-system' ]
+    branches:
+      - 'codex/evidence-radar-system'
+      - 'codex/commercial-signal-evidence-integration'
   pull_request:
     branches: [ main, 'codex/**' ]
 
@@ -53,6 +55,7 @@ jobs:
           npm test --workspace @recruiter-radar/web -- --runInBand --runTestsByPath
           src/__tests__/lib/intelligence/evidence-radar.test.ts
           src/__tests__/lib/intelligence/evidence-radar-config.test.ts
+          src/__tests__/lib/intelligence/evidence-radar-repository.test.ts
           src/__tests__/scripts/evidence-radar-migration.test.ts
           src/__tests__/app/evidence-radar-surface-contract.test.ts
       - name: Verify isolated Evidence Radar PostgreSQL runtime
