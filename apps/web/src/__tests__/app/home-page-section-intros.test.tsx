@@ -242,7 +242,8 @@ describe("final unified evidence-first landing contract", () => {
     const offerAliasSource = source("app/offer/page.tsx");
 
     expect(html).toContain('id="scene-workspace"');
-    expect(html).toContain("Не обещание продукта");
+    expect(html).toContain("Как выглядит");
+    expect(html).toContain("рабочая выдача");
     expect(html).toContain('id="preview-configurator"');
     expect(html).toContain('id="preview-results"');
     expect(html).toContain("Временная ошибка загрузки");
@@ -251,7 +252,7 @@ describe("final unified evidence-first landing contract", () => {
     expect(html).toContain('id="scene-outreach"');
     expect(html).toContain('id="pricing"');
     expect(html).toContain('id="faq"');
-    expect(html).toContain("Соберите радар под свою специализацию");
+    expect(html).toContain("Соберите радар под специализацию агентства");
     expect(footerSource).toContain('href="/legal"');
     expect(footerSource).toContain('href="/terms"');
     expect(footerSource).toContain('href="/payment-and-refund"');
@@ -286,20 +287,21 @@ describe("final unified evidence-first landing contract", () => {
   });
 
   it("keeps product copy, analytics and manual outreach boundary", () => {
-    const hero = renderToStaticMarkup(<DetectionScene previewHref="#preview-configurator" />);
+    const hero = renderToStaticMarkup(<DetectionScene previewHref="#preview-configurator" paymentConfigured={false} />);
     const evidence = renderToStaticMarkup(<EvidenceScene />);
     const delivery = renderToStaticMarkup(<DeliveryScene />);
     const outreach = renderToStaticMarkup(<OutreachScene />);
 
-    expect(hero).toContain("Кому написать сегодня");
-    expect(hero).toContain("Получить пример");
+    expect(hero).toContain("Компании, которым стоит написать сегодня");
+    expect(hero).toContain("Посмотреть пример радара");
+    expect(hero).toContain("заявка без списания");
     expect(hero).toContain(`data-analytics-event="${LANDING_ANALYTICS_EVENT.previewStarted}"`);
     expect(hero).toContain(`data-analytics-context="${LANDING_ANALYTICS_CONTEXT.heroPrimary}"`);
     expect(evidence).toContain("ОЦЕНКА РАДАРА");
     expect(evidence).toContain("ДОКАЗАТЕЛЬНАЯ БАЗА");
-    expect(delivery).toContain("Recruiter Radar доставляет рекомендацию, но не отправляет сообщение компании");
+    expect(delivery).toContain("Рекомендация приходит автоматически. Обращение отправляете вы.");
     expect(outreach).toContain("ЧЕРНОВИК / НЕ ОТПРАВЛЕНО");
-    expect(outreach).toContain("не отправляет сообщения компаниям автоматически");
+    expect(outreach).toContain("Отправка сообщения компании всегда требует действия пользователя");
   });
 
   it("keeps pricing data untouched and checkout analytics available", () => {
@@ -312,9 +314,9 @@ describe("final unified evidence-first landing contract", () => {
     const text = readVisibleText(panel);
     const links = collectElements(panel, Link);
 
-    expect(text).toContain("Сейчас пилот оформляется как заявка без списания");
-    expect(text).toContain("Оставить заявку на неделю");
-    expect(text).toContain("Перед запуском");
+    expect(text).toContain("Оставьте заявку на пилот");
+    expect(text).toContain("Оставить заявку на пилот");
+    expect(text).toContain("Перед запуском — короткие ответы");
     expect(links.some((link) => link.props["data-analytics-event"] === LANDING_ANALYTICS_EVENT.checkoutStarted)).toBe(true);
     expect(links.some((link) => link.props["data-analytics-event"] === LANDING_ANALYTICS_EVENT.continuationCtaClicked)).toBe(true);
   });
