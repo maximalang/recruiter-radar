@@ -6,22 +6,15 @@ export const CHECKOUT_ORDER_STATUSES = [
   "created",
   "pending",
   "paid",
+  "refunded",
   "canceled",
   "failed",
   "unavailable"
 ] as const;
 
 type CheckoutOrderStatusTuple = typeof CHECKOUT_ORDER_STATUSES;
-
 export type CheckoutOrderStatus = CheckoutOrderStatusTuple[number];
 
-/**
- * Pilot entitlement duration in days. MUST match the public "Неделя" plan
- * (PUBLIC_PLANS pilot cadence = "7 дней") and the offer §4 ("Тариф «Неделя»
- * действует 7 дней"). This is the real radar-access window granted after a
- * pilot payment — it sets pilot_enrollments.ends_at in paymentsRepo. Drift
- * here means a customer gets more or fewer days than they paid for.
- */
 export const PILOT_ENTITLEMENT_DAYS = 7;
 
 export const CHECKOUT_ORDER_ONBOARDING_STATUSES = [
@@ -31,7 +24,6 @@ export const CHECKOUT_ORDER_ONBOARDING_STATUSES = [
 ] as const;
 
 type CheckoutOrderOnboardingStatusTuple = typeof CHECKOUT_ORDER_ONBOARDING_STATUSES;
-
 export type CheckoutOrderOnboardingStatus = CheckoutOrderOnboardingStatusTuple[number];
 
 export const CHECKOUT_ORDER_ONBOARDING_STEPS = [
@@ -42,12 +34,26 @@ export const CHECKOUT_ORDER_ONBOARDING_STEPS = [
 ] as const;
 
 type CheckoutOrderOnboardingStepTuple = typeof CHECKOUT_ORDER_ONBOARDING_STEPS;
-
 export type CheckoutOrderOnboardingStep = CheckoutOrderOnboardingStepTuple[number];
+
+export const CHECKOUT_PAYER_TYPES = ["individual", "business"] as const;
+export type CheckoutPayerType = (typeof CHECKOUT_PAYER_TYPES)[number];
+
+export type CheckoutLegalAcceptance = {
+  acceptedAt: string;
+  termsRevision: string;
+  paymentAndRefundRevision: string;
+  privacyRevision: string;
+  personalDataConsentRevision: string;
+};
 
 export type CheckoutOrderPayload = {
   planName: string;
   planCadence: string;
+  /** Added for B2B receipts; optional while legacy orders are still readable. */
+  payerType?: CheckoutPayerType;
+  buyerInn?: string | null;
+  legalAcceptance?: CheckoutLegalAcceptance | null;
   specialization: string | null;
   city: string | null;
   includeKeywords: string[];
@@ -181,8 +187,10 @@ export type PaymentProviderAdapter = {
   parseWebhook?(request: Request): Promise<PaymentWebhookParseResult>;
 };
 
+export type PaymentProviderCode = "stripe" | "robokassa" | "yookassa";
+
 export type PaymentProviderSetupState = {
-  provider: "stripe" | null;
+  provider: PaymentProviderCode | null;
   configured: boolean;
   mode: "test" | "live" | null;
   webhookConfigured: boolean;
@@ -194,6 +202,10 @@ export type StartCheckoutOrderInput = {
   productCode: PublicPlan["code"];
   customerName: string;
   customerContact: string;
+  /** Optional for compatibility with non-UI callers; the public checkout records both fields. */
+  payerType?: CheckoutPayerType;
+  buyerInn?: string | null;
+  legalAcceptance?: CheckoutLegalAcceptance;
   specialization?: string | null;
   city?: string | null;
   includeKeywords?: string | null;
