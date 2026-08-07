@@ -4,6 +4,10 @@ on:
   push:
     branches: [ codex/evidence-radar-system ]
 
+concurrency:
+  group: fix-js-yaml-security
+  cancel-in-progress: true
+
 permissions:
   contents: write
 
@@ -40,7 +44,12 @@ jobs:
           path.write_text(text.replace(old, new))
           PY
           cmp -s /tmp/base-package.json package.json
-          test "$(git diff --no-index --numstat /tmp/base-package-lock.json package-lock.json | awk '{print $1":"$2}')" = "3:3"
+          set +e
+          git diff --no-index --numstat /tmp/base-package-lock.json package-lock.json > /tmp/js-yaml-numstat
+          diff_status=$?
+          set -e
+          test "$diff_status" -eq 1
+          test "$(awk '{print $1":"$2}' /tmp/js-yaml-numstat)" = "3:3"
           git diff --check -- package.json package-lock.json
       - name: Verify patched install and production dependency audit
         run: |
