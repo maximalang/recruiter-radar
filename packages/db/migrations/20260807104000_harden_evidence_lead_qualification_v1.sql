@@ -9,6 +9,7 @@ LANGUAGE plpgsql
 AS $$
 DECLARE
   reference_time TIMESTAMPTZ := GREATEST(NEW.created_at, NOW());
+  horizon_write_skew CONSTANT INTERVAL := INTERVAL '5 seconds';
   invalid_events INTEGER;
   invalid_signals INTEGER;
   invalid_correlations INTEGER;
@@ -75,7 +76,10 @@ BEGIN
     evidence_horizon := LEAST(evidence_horizon, correlation_horizon);
   END IF;
 
-  IF evidence_horizon IS NOT NULL AND NEW.valid_until > evidence_horizon THEN
+  -- Source/signal/correlation rows are written by separate statements. Bound only
+  -- sub-second/runner scheduling skew; never allow a score to materially outlive provenance.
+  IF evidence_horizon IS NOT NULL
+     AND NEW.valid_until > evidence_horizon + horizon_write_skew THEN
     RAISE EXCEPTION 'score validity cannot outlive its evidence, signal or correlation horizon';
   END IF;
 
@@ -92,6 +96,7 @@ RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
 DECLARE
+  horizon_write_skew CONSTANT INTERVAL := INTERVAL '5 seconds';
   score_created_at TIMESTAMPTZ;
   score_valid_until TIMESTAMPTZ;
   identity_status TEXT;
@@ -114,7 +119,7 @@ BEGIN
     IF NEW.generated_at < score_created_at THEN
       RAISE EXCEPTION 'lead card cannot predate its score snapshot';
     END IF;
-    IF NEW.valid_until > score_valid_until THEN
+    IF NEW.valid_until > score_valid_until + horizon_write_skew THEN
       RAISE EXCEPTION 'lead card validity cannot outlive its score snapshot';
     END IF;
   END IF;
@@ -176,7 +181,8 @@ BEGIN
   IF invalid_events > 0 THEN
     RAISE EXCEPTION 'qualified lead evidence must be verified and live';
   END IF;
-  IF card_evidence_horizon IS NOT NULL AND NEW.valid_until > card_evidence_horizon THEN
+  IF card_evidence_horizon IS NOT NULL
+     AND NEW.valid_until > card_evidence_horizon + horizon_write_skew THEN
     RAISE EXCEPTION 'qualified lead validity cannot outlive card evidence';
   END IF;
 
