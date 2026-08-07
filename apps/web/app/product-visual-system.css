@@ -1,51 +1,63 @@
 :root {
-  --rr-ink-950: #070a09;
-  --rr-ink-900: #0d1110;
-  --rr-ink-800: #18201d;
-  --rr-paper: #f4f3ee;
-  --rr-paper-soft: #ecebe5;
-  --rr-surface: #fffef9;
-  --rr-text: #101412;
-  --rr-muted: #657069;
-  --rr-line: rgba(16, 20, 18, 0.12);
-  --rr-line-strong: rgba(16, 20, 18, 0.2);
-  --rr-signal: #c8f36a;
-  --rr-signal-strong: #dcff8a;
-  --rr-signal-ink: #315315;
+  --rr-ink-950: #080b09;
+  --rr-ink-900: #0d120f;
+  --rr-ink-800: #18201b;
+  --rr-paper: #f4f1e8;
+  --rr-paper-soft: #ebe8df;
+  --rr-surface: #fffdf7;
+  --rr-surface-soft: rgba(255, 253, 247, 0.82);
+  --rr-text: #111612;
+  --rr-muted: #687168;
+  --rr-line: rgba(17, 22, 18, 0.11);
+  --rr-line-strong: rgba(17, 22, 18, 0.19);
+  --rr-signal: #9fca63;
+  --rr-signal-strong: #c9ec8b;
+  --rr-signal-ink: #345115;
+  --rr-signal-soft: rgba(159, 202, 99, 0.1);
+  --rr-copper: #a37c65;
+  --rr-ease: cubic-bezier(0.22, 1, 0.36, 1);
 
   --c-text-primary: var(--rr-text);
-  --c-text-secondary: #4f5a54;
+  --c-text-secondary: #505951;
   --c-text-muted: var(--rr-muted);
   --c-bg-page: var(--rr-paper-soft);
-  --c-bg-card: rgba(255, 254, 249, 0.94);
+  --c-bg-card: rgba(255, 253, 247, 0.94);
   --c-border: var(--rr-line);
-  --c-brand: #527a23;
-  --c-accent: #315315;
+  --c-brand: #587a29;
+  --c-accent: #355116;
   --radius-card: 12px;
   --radius-card-sm: 8px;
 }
 
+html,
 body {
   background: var(--rr-paper-soft);
+}
+
+body {
+  color: var(--rr-text);
+}
+
+[data-ui-system="recruiter-radar-v6"],
+[data-ui-system="recruiter-radar-v7"] {
+  --signal-strong: var(--rr-signal-strong);
+  --slate-950: var(--rr-ink-950);
+  --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
   color: var(--rr-text);
 }
 
 [data-ui-system="recruiter-radar-v6"] {
-  --signal-strong: var(--rr-signal-strong);
-  --slate-950: var(--rr-ink-950);
-  --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
   background:
-    linear-gradient(rgba(16, 20, 18, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(16, 20, 18, 0.025) 1px, transparent 1px),
+    linear-gradient(rgba(17, 22, 18, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(17, 22, 18, 0.018) 1px, transparent 1px),
     var(--rr-paper-soft);
-  background-size: 72px 72px;
-  color: var(--rr-text);
+  background-size: 88px 88px;
 }
 
 [data-ui-system="recruiter-radar-v6"] [data-variant="hero"] {
-  border-color: rgba(82, 122, 35, 0.28);
+  border-color: rgba(88, 122, 41, 0.2);
   border-left-color: var(--rr-signal);
-  background: linear-gradient(90deg, rgba(200, 243, 106, 0.09), rgba(255, 254, 249, 0.96) 34%);
+  background: linear-gradient(90deg, rgba(159, 202, 99, 0.075), rgba(255, 253, 247, 0.96) 38%);
 }
 
 :is(
@@ -53,17 +65,19 @@ body {
   [data-ui-system="recruiter-radar-v7"]
 ) :where(input, select, textarea) {
   border-color: var(--rr-line-strong);
+  border-radius: 9px;
   background: var(--rr-surface);
   color: var(--rr-text);
   box-shadow: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
 }
 
 :is(
   [data-ui-system="recruiter-radar-v6"],
   [data-ui-system="recruiter-radar-v7"]
 ) :where(input, select, textarea):focus-visible {
-  border-color: #739d3f;
-  outline: 3px solid rgba(200, 243, 106, 0.24);
+  border-color: #6f9538;
+  outline: 3px solid rgba(159, 202, 99, 0.2);
   outline-offset: 1px;
 }
 
@@ -71,7 +85,7 @@ body {
   [data-ui-system="recruiter-radar-v6"],
   [data-ui-system="recruiter-radar-v7"]
 ) :where(a, button, summary):focus-visible {
-  outline: 2px solid #739d3f;
+  outline: 2px solid #6f9538;
   outline-offset: 3px;
 }
 
@@ -80,8 +94,9 @@ body {
   [data-ui-system="recruiter-radar-v7"]
 ) :where(button[type="submit"], input[type="submit"]) {
   border-color: var(--rr-ink-900);
+  border-radius: 9px;
   background: var(--rr-ink-900);
-  color: #fffef9;
+  color: var(--rr-surface);
   box-shadow: none;
 }
 
@@ -113,24 +128,146 @@ body {
   [data-ui-system="recruiter-radar-v7"]
 ) tbody tr {
   border-color: var(--rr-line);
+  transition: background-color 140ms ease;
 }
 
 :is(
   [data-ui-system="recruiter-radar-v6"],
   [data-ui-system="recruiter-radar-v7"]
 ) tbody tr:hover {
-  background: rgba(200, 243, 106, 0.055);
+  background: rgba(159, 202, 99, 0.045);
 }
 
 [data-product-workspace="true"] {
   --workspace-accent: var(--rr-signal);
   --workspace-ink: var(--rr-paper);
-  --workspace-muted: rgba(244, 243, 238, 0.62);
+  --workspace-muted: rgba(244, 241, 232, 0.62);
+  --c-text-primary: var(--rr-text);
+  --c-text-secondary: #505951;
+  --c-text-muted: var(--rr-muted);
+  --c-bg-page: var(--rr-paper-soft);
+  --c-bg-card: var(--rr-surface-soft);
+  --c-border: var(--rr-line);
+  --c-brand: #587a29;
+  --c-accent: var(--rr-signal-ink);
+}
+
+[data-product-workspace="true"] :is(
+  section[class*="contentCard"],
+  div[class*="metricCard"],
+  article[class*="metricCard"],
+  div[class*="dataTableWrap"]
+) {
+  border-color: rgba(17, 22, 18, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 253, 247, 0.9);
+  box-shadow: 0 12px 34px rgba(8, 11, 9, 0.055);
+}
+
+[data-product-workspace="true"] :is(
+  section[class*="contentCard"],
+  div[class*="metricCard"],
+  article[class*="metricCard"]
+):hover {
+  border-color: rgba(88, 122, 41, 0.22);
+  box-shadow: 0 18px 44px rgba(8, 11, 9, 0.075);
+  transform: translateY(-1px);
+}
+
+[data-product-workspace="true"] section[class*="contentCard"][data-variant="hero"] {
+  border-color: rgba(88, 122, 41, 0.22);
+  border-left: 2px solid var(--rr-signal);
+  background:
+    linear-gradient(92deg, rgba(159, 202, 99, 0.075), transparent 38%),
+    rgba(255, 253, 247, 0.94);
+}
+
+[data-product-workspace="true"] h1[class*="internalPageTitle"] {
+  color: var(--rr-text);
+  font-weight: 590;
+  letter-spacing: -0.055em;
+}
+
+[data-product-workspace="true"] h2[class*="contentCardTitle"] {
+  color: #202820;
+  font-weight: 650;
+  letter-spacing: -0.018em;
+}
+
+[data-product-workspace="true"] div[class*="metricLabel"] {
+  color: #747d73;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+}
+
+[data-product-workspace="true"] div[class*="metricValue"] {
+  color: var(--rr-text);
+  font-weight: 620;
+  letter-spacing: -0.045em;
+}
+
+[data-product-workspace="true"] th[class*="dataTableTh"] {
+  border-bottom-color: var(--rr-line);
+  background: rgba(235, 232, 223, 0.94);
+  color: #6c756c;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+}
+
+[data-product-workspace="true"] td[class*="dataTableTd"] {
+  background: rgba(255, 253, 247, 0.78);
+}
+
+[data-product-workspace="true"] tr[class*="dataTableTr"]:hover td {
+  background: rgba(159, 202, 99, 0.05);
+}
+
+[data-product-workspace="true"] :is(
+  [class*="status"],
+  [class*="Status"],
+  [class*="chip"],
+  [class*="Chip"]
+) {
+  box-shadow: none;
+}
+
+[data-product-workspace="true"] :is(
+  a[class*="navLink"],
+  a[class*="internalPageBackLink"]
+) {
+  border-color: var(--rr-line);
+  border-radius: 9px;
+  background: rgba(255, 253, 247, 0.64);
+  box-shadow: none;
+  font-weight: 620;
+}
+
+[data-product-workspace="true"] :is(
+  a[class*="navLink"],
+  a[class*="internalPageBackLink"]
+):hover {
+  border-color: rgba(88, 122, 41, 0.22);
+  background: rgba(255, 253, 247, 0.94);
+  color: #355116;
 }
 
 @media (max-width: 720px) {
   [data-ui-system="recruiter-radar-v6"] {
-    background-size: 48px 48px;
+    background-size: 56px 56px;
+  }
+
+  [data-product-workspace="true"] h1[class*="internalPageTitle"] {
+    font-size: clamp(2rem, 11vw, 3.1rem);
+    line-height: 0.98;
+  }
+
+  [data-product-workspace="true"] :is(
+    section[class*="contentCard"],
+    div[class*="metricCard"],
+    article[class*="metricCard"],
+    div[class*="dataTableWrap"]
+  ) {
+    border-radius: 10px;
   }
 }
 
@@ -144,5 +281,8 @@ body {
     [data-ui-system="recruiter-radar-v7"]
   ) * {
     scroll-behavior: auto;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 }
