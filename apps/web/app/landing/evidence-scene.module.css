@@ -5,14 +5,14 @@
 
 .top {
   display: grid;
-  grid-template-columns: minmax(20rem, 1.02fr) minmax(10rem, .5fr) minmax(24rem, 1fr);
-  gap: clamp(2rem, 4.5vw, 4.8rem);
+  grid-template-columns: minmax(19rem, .94fr) minmax(10.5rem, .42fr) minmax(21rem, .94fr);
+  gap: clamp(1.4rem, 2.7vw, 2.8rem);
   align-items: start;
 }
 
 .intro :global(h2) {
-  max-width: 10ch;
-  font-size: clamp(2.7rem, 4.5vw, 4.5rem);
+  max-width: 11.5ch;
+  font-size: clamp(2.55rem, 3.7vw, 3.9rem);
 }
 
 .intro :global(h2 em) {
@@ -25,6 +25,7 @@
   display: grid;
   align-content: start;
   gap: .6rem;
+  min-width: 0;
   padding-top: .2rem;
 }
 
@@ -43,14 +44,14 @@
 }
 
 .scoreValue strong {
-  font-size: clamp(5.4rem, 8.5vw, 8rem);
+  font-size: clamp(4.8rem, 7vw, 6.8rem);
   font-weight: 440;
   letter-spacing: -.09em;
-  line-height: .8;
+  line-height: .82;
 }
 
 .scoreValue small {
-  padding-bottom: .6rem;
+  padding-bottom: .5rem;
   color: rgba(242, 239, 231, .45);
   font-family: var(--mono);
   font-size: .54rem;
@@ -104,6 +105,7 @@
 
 .factors {
   display: grid;
+  min-width: 0;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -462,6 +464,7 @@
 }
 
 @media (max-width: 520px) {
+  .intro :global(h2) { max-width: 12ch; font-size: clamp(2.35rem, 12vw, 3.3rem); }
   .roleList summary { gap: .55rem; }
   .roleBody { padding-left: 0; }
   .recordMeta div { grid-template-columns: 3rem 1fr; }
