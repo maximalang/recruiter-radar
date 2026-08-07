@@ -1,14 +1,14 @@
 .workspace {
   background:
-    radial-gradient(circle at 82% 8%, rgba(126, 216, 197, 0.12), transparent 28rem),
-    linear-gradient(135deg, #eef0ec 0%, #e6eae5 58%, #edf0eb 100%);
+    radial-gradient(circle at 82% 8%, rgba(200, 243, 106, 0.075), transparent 28rem),
+    linear-gradient(135deg, #f0efea 0%, #e9e8e2 58%, #efeee9 100%);
 }
 
 .sidebar {
   background:
-    linear-gradient(180deg, rgba(126, 216, 197, 0.03), transparent 34%),
-    #091310;
-  box-shadow: 18px 0 54px rgba(15, 27, 23, 0.1);
+    linear-gradient(180deg, rgba(200, 243, 106, 0.025), transparent 34%),
+    #0d1110;
+  box-shadow: 18px 0 54px rgba(7, 10, 9, 0.12);
 }
 
 .sidebarBrand {
@@ -21,7 +21,7 @@
   bottom: -1px;
   width: 38px;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(126, 216, 197, 0.66));
+  background: linear-gradient(90deg, transparent, rgba(200, 243, 106, 0.58));
   content: "";
 }
 
@@ -31,7 +31,7 @@
 
 .navItem[data-active="true"] {
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.045),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
     0 12px 28px rgba(0, 0, 0, 0.1);
 }
 
@@ -52,10 +52,10 @@
   z-index: -1;
   inset: 0;
   background-image:
-    linear-gradient(rgba(24, 35, 31, 0.022) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(24, 35, 31, 0.022) 1px, transparent 1px);
+    linear-gradient(rgba(16, 20, 18, 0.021) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(16, 20, 18, 0.021) 1px, transparent 1px);
   background-size: 42px 42px;
-  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.65), transparent 44rem);
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.55), transparent 44rem);
   content: "";
   pointer-events: none;
 }
@@ -66,12 +66,12 @@
 
 .pageHeader {
   padding-bottom: clamp(24px, 3vw, 38px);
-  border-bottom: 1px solid rgba(24, 35, 31, 0.09);
+  border-bottom: 1px solid rgba(16, 20, 18, 0.09);
 }
 
 @media (max-width: 940px) {
   .sidebar {
-    box-shadow: 0 14px 34px rgba(15, 27, 23, 0.12);
+    box-shadow: 0 14px 34px rgba(7, 10, 9, 0.12);
   }
 
   .sidebarBrand::after {
