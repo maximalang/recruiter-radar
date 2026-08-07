@@ -26,6 +26,15 @@ describe("polished unified landing visual contract", () => {
     expect(heroStyles).not.toContain(".instrumentCore");
   });
 
+  it("keeps the landing skip link ahead of the persistent cookie settings control", () => {
+    const home = source("app/home-page-content.tsx");
+    const landingIndex = home.indexOf("{landing}");
+    const cookieSettingsIndex = home.indexOf("<YandexMetrika />");
+
+    expect(landingIndex).toBeGreaterThan(-1);
+    expect(cookieSettingsIndex).toBeGreaterThan(landingIndex);
+  });
+
   it("uses one stable preview anchor without duplicating it in the suspense fallback", () => {
     const workspace = source("app/landing/workspace-scene.tsx");
     const skeletonStart = workspace.indexOf("export function WorkspaceResultsSkeleton");
