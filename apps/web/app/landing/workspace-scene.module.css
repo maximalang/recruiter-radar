@@ -93,8 +93,8 @@
 }
 
 .presets::-webkit-scrollbar { display: none; }
-.presets :global(> span) { margin-right: .15rem; }
-.presets :global(a) {
+.presets > span { margin-right: .15rem; }
+.presets a {
   min-height: 36px;
   padding: .42rem .58rem;
   border: 0;
@@ -103,7 +103,7 @@
   font-size: .66rem;
 }
 
-.presets :global(a[data-selected]) {
+.presets a[data-selected] {
   border-bottom-color: #4e8e7c;
   background: transparent;
 }
@@ -115,8 +115,8 @@
   gap: .55rem;
 }
 
-.commandForm :global(label) { gap: .34rem; }
-.commandForm :global(input) {
+.commandForm label { gap: .34rem; }
+.commandForm input {
   height: 2.75rem;
   border-color: rgba(23, 35, 45, .14);
   border-radius: 6px;
@@ -124,7 +124,7 @@
   font-size: .82rem;
 }
 
-.commandForm :global(button) {
+.commandForm button {
   position: relative;
   min-height: 2.75rem;
   overflow: hidden;
@@ -133,7 +133,7 @@
   color: #f7f4ed;
 }
 
-.commandForm :global(button)::after {
+.commandForm button::after {
   position: absolute;
   right: 0;
   bottom: 0;
@@ -145,7 +145,7 @@
   transform: translateX(-90%);
 }
 
-.commandForm:global([data-submitting]) :global(button)::after {
+.commandForm:global([data-submitting]) button::after {
   opacity: 1;
   animation: signalScan .72s ease-in-out infinite;
 }
@@ -168,7 +168,7 @@
   padding: .95rem 0 .8rem;
 }
 
-.resultsHeader :global(strong) {
+.resultsHeader strong {
   font-size: 1.08rem;
   letter-spacing: -.02em;
 }
@@ -221,6 +221,8 @@
   letter-spacing: .06em;
   text-transform: uppercase;
 }
+
+.leadSignal { color: rgba(23, 35, 45, .74); }
 
 .leadBody {
   display: grid;
@@ -291,16 +293,20 @@
   gap: .5rem;
 }
 
-.evidenceBlock :global(ul) {
+.evidenceBlock ul {
   display: grid;
   gap: .3rem;
 }
 
-.evidenceBlock :global(li) {
+.evidenceBlock li {
   padding: .38rem 0;
   border: 0;
   border-bottom: 1px solid rgba(23, 35, 45, .1);
   font-size: .63rem;
+}
+
+.leadFooter {
+  grid-column: 1 / -1;
 }
 
 .footerRail {
@@ -316,7 +322,7 @@
 }
 
 .checkout {
-  min-height: 44px;
+  min-height: 52px;
   margin: 0;
   padding: .55rem 0;
   border: 0;
@@ -369,8 +375,7 @@
   .lead summary {
     grid-template-columns: 1.6rem 1fr 4.6rem 1rem;
   }
-  .leadPrimary :global(.workspaceSignal),
-  .lead :global(.workspaceSignal) { grid-column: 2 / 5; }
+  .leadSignal { grid-column: 2 / 5; grid-row: 2; }
   .leadBody { padding-left: 0; }
   .footerRail {
     align-items: flex-start;
@@ -381,11 +386,11 @@
 }
 
 @media (max-width: 480px) {
-  .presets :global(a) { min-height: 34px; white-space: nowrap; }
+  .presets a { min-height: 34px; white-space: nowrap; }
   .footerRail small { max-width: 18rem; line-height: 1.4; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .commandForm :global(button)::after { animation: none !important; opacity: 0 !important; }
+  .commandForm button::after { animation: none !important; opacity: 0 !important; }
   .results { transition: none; }
 }
