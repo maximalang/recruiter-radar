@@ -32,7 +32,11 @@ const report = evaluateCommercialSignalDatasets(fixtures)
 
 assert.deepEqual(report.missingDatasetKinds, [])
 assert.equal(report.datasets.length, DATASET_KINDS.length)
-assert.equal(report.calibrationStatus, 'uncalibrated_insufficient_real_outcomes')
+assert.equal(report.calibrationStatus, 'insufficient_data')
+assert.deepEqual(report.calibrationReasonCodes, [
+  'CALIBRATION_REVIEWED_LT_300',
+  'CALIBRATION_HOLDOUT_LT_60',
+])
 assert.equal(report.comparison.status, 'contract_only')
 assert.ok(report.comparison.deltas.precisionAt5 >= 0)
 assert.ok(report.comparison.deltas.ndcgAt10 > 0)
@@ -46,6 +50,7 @@ assert.ok(synthetic.coveragePerEpisodeType.length >= 3)
 assert.ok(synthetic.sourceYield.length >= 4)
 assert.ok(synthetic.queryPlanYield.length >= 4)
 assert.equal(synthetic.falsePositiveTaxonomy.length, FALSE_POSITIVE_CATEGORIES.length)
+assert.ok(FALSE_POSITIVE_CATEGORIES.includes('internal_recruiting_sufficient'))
 for (const model of MODEL_KEYS) {
   assert.equal(synthetic.models[model].status, 'sufficient_data')
   assert.equal(typeof synthetic.models[model].precisionAt5.value, 'number')
@@ -155,6 +160,7 @@ const progressedLoss = anonymizeEvaluationRow({
 }, 'anonymized_labeled', exportKey)
 assert.equal(progressedLoss.labels.qualified, true)
 assert.equal(progressedLoss.labels.falsePositiveCategory, null)
+assert.equal(mapFalsePositiveReason('internal_team'), 'internal_recruiting_sufficient')
 assert.equal(mapFalsePositiveReason('other'), null)
 
 const immatureNoReply = anonymizeEvaluationRow({
@@ -192,7 +198,7 @@ process.stdout.write(`${JSON.stringify({
     'profile_episode_source_query_coverage',
     'deterministic_ties_and_content_hash',
     'holdout_isolation',
-    'no_false_calibration_claim',
+    'calibration_requires_300_reviewed_and_holdout',
     'unavailable_is_null_not_zero',
     'observational_outcomes_remain_unlabeled',
     'immature_no_reply_remains_unlabeled',
