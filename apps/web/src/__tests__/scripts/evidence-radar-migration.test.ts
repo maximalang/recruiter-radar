@@ -65,7 +65,7 @@ describe('Evidence Radar v1 migration contract', () => {
     expect(migration).toContain('validate_federal_subject_geometry_source_v1')
   })
 
-  it('persists all 20 normalized signal types and evidence/correlation provenance', () => {
+  it('persists all 20 normalized signal types and binds correlations to real signal provenance', () => {
     const migration = up[names[2]]
     for (const signalType of NORMALIZED_SIGNAL_TYPES) {
       expect(migration).toContain(`'${signalType}'`)
@@ -76,10 +76,11 @@ describe('Evidence Radar v1 migration contract', () => {
     expect(migration).toContain('CREATE TABLE evidence_correlations_v1')
     expect(migration).toContain('evidence_radar_source_allowed_v1(NEW.source_registry_id)')
     expect(migration).toContain('correlation signals must belong to one workspace and organization')
+    expect(migration).toContain('correlation source families must equal referenced signal provenance')
     expect(migration).toContain('CARDINALITY(source_families) >= 2')
   })
 
-  it('stores explainable scores, company-level contacts and verifiable lead cards', () => {
+  it('stores reproducible scores, company-level contacts and verifiable lead cards', () => {
     const migration = compact(up[names[3]])
     for (const table of [
       'evidence_lead_score_snapshots_v1',
@@ -89,14 +90,25 @@ describe('Evidence Radar v1 migration contract', () => {
       expect(migration).toContain(`CREATE TABLE ${table}`)
     }
     expect(migration).toContain("JSONB_TYPEOF(contributions) = 'array'")
+    expect(migration).toContain('source_signal_ids BIGINT[] NOT NULL')
+    expect(migration).toContain('source_correlation_ids BIGINT[] NOT NULL')
     expect(migration).toContain('independent_source_families TEXT[] NOT NULL')
+    expect(migration).toContain('score independent source families must equal evidence provenance')
+    expect(migration).toContain('every scored signal must be linked to scored evidence')
+    expect(migration).toContain('score correlations must be composed from scored signals')
+    expect(migration).toContain('persisted Evidence Radar scores do not reproduce component formula')
+    expect(migration).toContain('score contribution ledger contains invalid or unscoped entries')
     expect(migration).toContain('CHECK (is_personal = FALSE)')
     expect(migration).toContain("'company_form', 'corporate_email', 'generic_hr_email', 'switchboard', 'official_channel'")
     expect(migration).toContain('lead card evidence must belong to one workspace and organization')
+    expect(migration).toContain('lead card must preserve every evidence event used by its score')
+    expect(migration).toContain('qualified lead requires correlation and two independent source families')
     expect(migration).toContain('lead card contacts must belong to one workspace and organization')
+    expect(migration).toContain('location_id BIGINT,')
+    expect(migration).not.toContain('location_id BIGINT NOT NULL')
   })
 
-  it('keeps every evidence history table append-only', () => {
+  it('keeps historical evidence tables append-only and operational source changes audited', () => {
     const migration = Object.values(up).join('\n')
     for (const table of [
       'source_registry_reviews_v1',
@@ -114,6 +126,8 @@ describe('Evidence Radar v1 migration contract', () => {
     ]) {
       expect(compact(migration)).toContain(`BEFORE UPDATE OR DELETE ON ${table}`)
     }
+    expect(migration).toContain('audit_source_registry_entry_update_v1')
+    expect(migration).toContain('audit_organization_identity_update_v1')
   })
 
   it('takes exclusive locks before every data-loss rollback check', () => {
