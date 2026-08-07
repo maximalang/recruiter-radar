@@ -4,7 +4,7 @@
  * Railway runs this as a scheduled one-off container. The trigger first runs
  * the established daily-radar pipeline for non-canary workspaces. When the
  * runtime mode is explicitly `canary`, it then invokes the single configured
- * Commercial Signal canary pipeline through its own authenticated route.
+ * Commercial Signal canary pipeline and its corporate-only enrichment queue.
  *
  * Required env:
  *   RR_CRON_URL   — full URL of /api/cron/daily-radar
@@ -12,7 +12,7 @@
  *
  * Optional env:
  *   RR_CRON_TIMEOUT_MS — per-request timeout (default 600000)
- *   COMMERCIAL_SIGNAL_RUNTIME_MODE — `canary` enables the canary stage
+ *   COMMERCIAL_SIGNAL_RUNTIME_MODE — `canary` enables canary stages
  *
  * Exit codes:
  *   0 — every required stage ran
@@ -98,6 +98,12 @@ try {
       url,
     ).toString()
     await postStage(canaryUrl, 'Commercial Signal canary', [200])
+
+    const enrichmentUrl = new URL(
+      '/api/cron/opportunities/commercial-signal-enrichment?apply=true',
+      url,
+    ).toString()
+    await postStage(enrichmentUrl, 'Commercial Signal corporate enrichment', [200])
   } else {
     log('INFO', 'Commercial Signal canary not scheduled; runtime mode is not canary.')
   }
