@@ -34,7 +34,16 @@ describe('Evidence Radar v1 migration contract', () => {
     expect(migration).not.toContain('\n  authorization TEXT NOT NULL')
     expect(migration).toContain('evidence_radar_source_allowed_v1')
     expect(migration).toContain("'first-party-crm', 'not_applicable'")
-    expect(migration).toContain('source_registry_entries_v1_immutable')
+  })
+
+  it('allows governed source-policy updates only through an audited history boundary', () => {
+    const migration = up[names[0]]
+    expect(migration).toContain('CREATE TABLE source_registry_entry_changes_v1')
+    expect(migration).toContain('audit_source_registry_entry_update_v1')
+    expect(migration).toContain('source_registry_entries_v1_audit_update')
+    expect(migration).toContain('source_registry_entry_changes_v1_append_only')
+    expect(migration).toContain('source registry entry deletion is not allowed')
+    expect(migration).toContain('source registry identity is immutable')
   })
 
   it('stores canonical identity, evidenced locations and authoritative geometry without synthetic coordinates', () => {
@@ -91,6 +100,7 @@ describe('Evidence Radar v1 migration contract', () => {
     const migration = Object.values(up).join('\n')
     for (const table of [
       'source_registry_reviews_v1',
+      'source_registry_entry_changes_v1',
       'organization_identity_changes_v1',
       'organization_locations_v1',
       'organization_relationships_v1',
