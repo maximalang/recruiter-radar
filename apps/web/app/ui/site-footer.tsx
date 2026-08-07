@@ -13,7 +13,7 @@ const PRODUCT_LINKS = [
 ] as const;
 
 const SERVICE_LINKS = [
-  { href: "/login?returnTo=%2Fdashboard", label: "Войти" },
+  { href: "/login", label: "Войти" },
   { href: "/dashboard", label: "Кабинет" },
 ] as const;
 
