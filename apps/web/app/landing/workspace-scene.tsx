@@ -75,7 +75,7 @@ function WorkspaceIntro() {
     <div className={`${styles.workspaceIntro} ${sceneStyles.intro}`}>
       <p className={styles.sceneLabel}>03 — Рабочая выдача / PRODUCT PROOF</p>
       <h2 id="workspace-title" className={styles.sceneHeading}>
-        Это не мокап. <em>Пересчитайте радар сами.</em>
+        Рабочая выдача — не мокап. <em>Пересчитайте радар сами.</em>
       </h2>
       <p className={styles.sceneLead}>
         Как выглядит рабочая выдача: укажите специализацию и географию. Сервер пересчитает порядок компаний по тем же правилам, что рабочую выдачу.
