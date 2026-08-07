@@ -10,7 +10,9 @@ export type QueryPlanOperationalYield = QueryPlanHistoricalYield & {
   executionCount: number | null
   zeroResultExecutions: number | null
   newCompanyEvents: number | null
+  qualifiedEpisodes: number | null
   actionableOpportunities: number | null
+  staleOpportunities: number | null
   won: number | null
 }
 
@@ -112,6 +114,7 @@ export function resolveYieldAdjustedPageBudget(
   const episodes = yieldSnapshot.episodes ?? 0
   const qualified = yieldSnapshot.qualifiedOpportunities ?? 0
   const actionable = yieldSnapshot.actionableOpportunities ?? 0
+  const stale = yieldSnapshot.staleOpportunities ?? 0
   const accepted = yieldSnapshot.accepted ?? 0
   const contacted = yieldSnapshot.contacted ?? 0
   const replied = yieldSnapshot.replied ?? 0
@@ -124,6 +127,7 @@ export function resolveYieldAdjustedPageBudget(
   const zeroResultRate = executionCount > 0
     ? zeroResultExecutions / executionCount
     : 0
+  const staleRate = qualified > 0 ? stale / qualified : 0
 
   if (
     (fetchedRecords >= MIN_SAMPLE_FETCHED && duplicateYield < 0.3) ||
@@ -133,6 +137,13 @@ export function resolveYieldAdjustedPageBudget(
     return {
       pageBudget: clampBudget(currentBudget - 2),
       reasonCode: 'YIELD_BUDGET_REDUCED_WEAK_DOWNSTREAM',
+    }
+  }
+
+  if (qualified >= 5 && staleRate >= 0.6) {
+    return {
+      pageBudget: clampBudget(currentBudget - 1),
+      reasonCode: 'YIELD_BUDGET_REDUCED_STALE_SUPPLY',
     }
   }
 
@@ -185,8 +196,10 @@ function normalizeOperationalYield(
     uniqueCompanies: nullableCount(raw.uniqueCompanies),
     newCompanyEvents: nullableCount(raw.newCompanyEvents),
     episodes: nullableCount(raw.episodes),
+    qualifiedEpisodes: nullableCount(raw.qualifiedEpisodes),
     qualifiedOpportunities: nullableCount(raw.qualifiedOpportunities),
     actionableOpportunities: nullableCount(raw.actionableOpportunities),
+    staleOpportunities: nullableCount(raw.staleOpportunities),
     accepted: nullableCount(raw.accepted),
     contacted: nullableCount(raw.contacted),
     replied: nullableCount(raw.replied),
