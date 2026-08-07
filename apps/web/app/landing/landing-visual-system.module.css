@@ -100,7 +100,7 @@
   border-left-color: var(--signal);
 }
 
-/* Header: restrained glass, lower visual weight, stronger active state. */
+/* Header and mobile navigation share the same restrained dark surface. */
 .visualSystem :global(header[data-scrolled]) {
   border-bottom-color: rgba(244, 241, 232, .11);
   background: rgba(8, 12, 10, .86);
@@ -110,6 +110,23 @@
 
 .visualSystem :global(header a) {
   letter-spacing: -.005em;
+}
+
+.visualSystem :global([class*="mobileMenuPanel"]) {
+  border: 1px solid rgba(244, 241, 232, .12);
+  background: rgba(8, 12, 10, .96);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, .26);
+  backdrop-filter: blur(22px) saturate(108%);
+}
+
+.visualSystem :global([class*="mobileMenuPanel"] a) {
+  border-color: rgba(244, 241, 232, .1);
+  color: rgba(244, 241, 232, .78);
+}
+
+.visualSystem :global([class*="mobileMenuPanel"] a:hover),
+.visualSystem :global([class*="mobileMenuPanel"] a:focus-visible) {
+  color: var(--signal-strong);
 }
 
 /* Product-as-proof surfaces stay flatter and more editorial than SaaS cards. */
@@ -156,6 +173,13 @@
   max-width: 34rem;
   color: rgba(244, 241, 232, .7);
   line-height: 1.62;
+}
+
+.visualSystem :global([class*="instrumentCaption"]) {
+  border-color: rgba(244, 241, 232, .12);
+  background: rgba(8, 12, 10, .64);
+  box-shadow: 0 16px 44px rgba(0, 0, 0, .1);
+  backdrop-filter: blur(14px) saturate(108%);
 }
 
 .visualSystem :global([class*="primaryButton"]) {
@@ -297,6 +321,12 @@
   .visualSystem :global([class*="displayTitle"]) {
     max-width: 10.5ch;
     letter-spacing: -.058em;
+  }
+
+  .visualSystem :global([class*="instrumentCaption"]) {
+    background: rgba(8, 12, 10, .78);
+    box-shadow: none;
+    backdrop-filter: blur(10px);
   }
 
   .visualSystem :global([data-hero-instrument] [data-signal-cluster="secondary"]) {
