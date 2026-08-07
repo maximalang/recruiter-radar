@@ -210,6 +210,57 @@ async function persistCompanyEvent(
     for (const publication of event.publications) {
       const publicationEvidenceIds = publication.evidenceIds.map((evidenceId) =>
         positiveBigintId(evidenceId, 'publicationEvidenceId'))
+      const signalId = positiveBigintId(
+        publication.sourceRecordId,
+        'sourceRecordId',
+      )
+
+      // A signal is one physical source observation. If a later crawl sees the
+      // same observation with fresher timestamps/evidence we refresh that exact
+      // publication in place instead of appending a second row for the same
+      // event+signal pair. This preserves stable provenance and still records
+      // the changed observation.
+      const refreshed = await db.query(
+        `UPDATE company_event_publications
+         SET
+           source_family = $4,
+           source_record_id = $5,
+           source_url = $6,
+           external_id = $7,
+           occurred_at = LEAST(occurred_at, $8::TIMESTAMPTZ),
+           first_seen_at = LEAST(first_seen_at, $9::TIMESTAMPTZ),
+           last_seen_at = GREATEST(last_seen_at, $10::TIMESTAMPTZ),
+           evidence_ids = ARRAY(
+             SELECT DISTINCT evidence_id
+             FROM UNNEST(evidence_ids || $11::BIGINT[]) AS evidence_id
+             ORDER BY evidence_id
+           ),
+           publication_fingerprint = $12,
+           source_snapshot = $13::JSONB
+         WHERE company_event_id = $1
+           AND organization_id = $2
+           AND signal_id = $3`,
+        [
+          companyEventId,
+          organizationId,
+          signalId,
+          publication.sourceFamily,
+          publication.sourceRecordId,
+          publication.sourceUrl,
+          publication.externalId,
+          publication.occurredAt,
+          publication.firstSeenAt,
+          publication.lastSeenAt,
+          publicationEvidenceIds,
+          publication.publicationFingerprint,
+          JSON.stringify(publication.sourceSnapshot),
+        ],
+      )
+      if ((refreshed.rowCount ?? 0) > 0) {
+        publicationsAttached += refreshed.rowCount ?? 0
+        continue
+      }
+
       const stored = await db.query(
         `INSERT INTO company_event_publications (
            company_event_id, organization_id, signal_id, source_family,
@@ -227,7 +278,7 @@ async function persistCompanyEvent(
         [
           companyEventId,
           organizationId,
-          positiveBigintId(publication.sourceRecordId, 'sourceRecordId'),
+          signalId,
           publication.sourceFamily,
           publication.sourceRecordId,
           publication.sourceUrl,
