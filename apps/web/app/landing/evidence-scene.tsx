@@ -1,5 +1,6 @@
 import { DEMO_COMPANY, DEMO_EVIDENCE } from "./landing-copy";
 import { ArrowGlyph, DocumentGlyph, EvidenceGlyph } from "./brand-glyphs";
+import sceneStyles from "./evidence-scene.module.css";
 import styles from "./landing.module.css";
 
 const SOURCE_ROWS = [
@@ -28,24 +29,36 @@ const SOURCE_ROWS = [
 
 const SOURCE_ROLES = [
   {
-    title: "Создают сигнал найма",
-    summary: "hh.ru, Работа России и прямые карьерные страницы.",
-    detail: "Здесь радар фиксирует новые роли, повторные публикации, расширение географии и изменение темпа найма.",
+    title: "Создают lead evidence сейчас",
+    summary: "Только источники, прошедшие promotion gate.",
+    detail: "Эти источники могут дать основной hiring signal, из которого компания попадает в клиентскую выдачу. Даже здесь применяются freshness, confidence и entity-resolution проверки.",
+    state: "live",
+    stateText: "digest-allowed",
+    sources: ["hh.ru", "Работа России", "Прямые карьерные страницы"],
   },
   {
     title: "Подтверждают компанию",
-    summary: "Сайт компании, ЕГРЮЛ и данные ФНС.",
-    detail: "Эти источники связывают событие с корректным юрлицом, доменом и официальным корпоративным маршрутом контакта.",
+    summary: "Юрлицо, домен и корпоративный маршрут.",
+    detail: "Supporting и enrichment-источники связывают сигнал с корректной организацией и помогают найти официальный корпоративный путь контакта. Они не должны создавать лид без hiring evidence.",
+    state: "support",
+    stateText: "support / enrichment",
+    sources: ["Сайт компании", "ЕГРЮЛ / ФНС", "Прозрачный бизнес ФНС"],
   },
   {
-    title: "Объясняют контекст",
-    summary: "Корпоративные новости и отраслевые публикации.",
-    detail: "Контекст помогает понять расширение или запуск направления, но не заменяет проверяемый hiring signal.",
+    title: "Расширяют покрытие после gates",
+    summary: "Адаптеры есть, digest-допуск не обещается заранее.",
+    detail: "Для secondary hiring sources код уже предусматривает ingestion, но production digest остаётся закрыт до необходимых confidence, legal, robots или provider-проверок. Лендинг показывает эту границу явно, а не выдаёт наличие адаптера за готовый источник лидов.",
+    state: "gated",
+    stateText: "adapter ready / digest gated",
+    sources: ["Хабр Карьера", "SuperJob", "Публичные ATS / tech job boards", "LinkedIn company pages", "Региональные job boards"],
   },
   {
-    title: "Не создают лид отдельно",
-    summary: "Реестры, каталоги и единичные упоминания без найма.",
-    detail: "Они могут дополнить картину, но не поднимают компанию в выдаче без основного сигнала найма.",
+    title: "Добавляют бизнес-контекст",
+    summary: "Контекст усиливает объяснение, но не создаёт лид.",
+    detail: "Новости, корпоративные события, реестровые и business-сигналы помогают объяснить расширение, инвестиции или изменение компании. Они остаются supporting context и не заменяют прямое подтверждение найма.",
+    state: "context",
+    stateText: "context only",
+    sources: ["Корпоративные newsroom-страницы", "GDELT / funding & business signals", "Федресурс", "Отраслевые медиа"],
   },
 ] as const;
 
@@ -61,7 +74,7 @@ export default function EvidenceScene() {
         <div className={styles.evidenceIntro}>
           <p className={styles.sceneLabel}>04 — Доказательства</p>
           <h2 id="evidence-title" className={styles.sceneHeading}>
-            Оценка — не чёрный ящик. <em>Каждый балл связан с фактом.</em>
+            Оценка — не чёрный ящик. <em>Каждый вывод остаётся рядом с evidence.</em>
           </h2>
           <p className={styles.sceneLead}>
             До обращения видно, какие события повлияли на приоритет, когда они произошли и какой источник подтверждает вывод.
@@ -77,7 +90,7 @@ export default function EvidenceScene() {
           <div className={styles.scoreOrbit} aria-hidden="true">
             <EvidenceGlyph size={210} />
           </div>
-          <ol className={styles.scoreFacts} aria-label="Из чего сложилась оценка">
+          <ol className={styles.scoreFacts} aria-label="Из чего сложилась демонстрационная оценка">
             {DEMO_EVIDENCE.map((item) => (
               <li key={item.label}>
                 <span>{item.label}</span>
@@ -116,8 +129,9 @@ export default function EvidenceScene() {
 
         <div className={styles.sourceRoles}>
           <div className={styles.sourceRolesIntro}>
-            <span>Роли источников</span>
-            <strong>Не все данные имеют одинаковый вес.</strong>
+            <span>Source registry / фактические роли</span>
+            <strong>Не все подключённые источники имеют право поднять компанию в выдачу.</strong>
+            <p className={sceneStyles.registryNote}><strong>Принцип:</strong> наличие адаптера ≠ production-ready. Lead-originating, supporting, gated и context-only источники показаны отдельно.</p>
           </div>
           <div className={styles.sourceRoleList}>
             {SOURCE_ROLES.map((role, index) => (
@@ -129,6 +143,12 @@ export default function EvidenceScene() {
                   <i aria-hidden="true">+</i>
                 </summary>
                 <p>{role.detail}</p>
+                <div className={sceneStyles.roleMeta}>
+                  <span className={sceneStyles.roleStatus} data-state={role.state}>{role.stateText}</span>
+                </div>
+                <ul className={sceneStyles.sourceTags} aria-label={`Источники: ${role.title}`}>
+                  {role.sources.map((source) => <li key={source}>{source}</li>)}
+                </ul>
               </details>
             ))}
           </div>
