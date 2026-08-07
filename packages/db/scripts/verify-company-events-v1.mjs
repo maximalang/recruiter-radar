@@ -284,6 +284,7 @@ try {
       `UPDATE company_events
        SET payload = '{"publicationCount":999}'
        WHERE id = $1`,
+      [companyEventId],
     ),
     (error) => error?.code === 'P0001',
   )
