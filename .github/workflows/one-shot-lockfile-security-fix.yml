@@ -1,0 +1,41 @@
+name: One-shot lockfile security fix
+
+on:
+  push:
+    branches:
+      - codex/post-merge-design-polish
+
+permissions:
+  contents: write
+
+jobs:
+  update-lockfile:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/post-merge-design-polish
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Update only the vulnerable js-yaml lock entry
+        run: npm install --package-lock-only --ignore-scripts --no-save js-yaml@3.15.1
+      - name: Verify production dependency audit
+        run: npm audit --omit=dev --audit-level=high
+      - name: Guard manifest from unintended changes
+        run: git diff --exit-code -- package.json
+      - name: Commit generated lockfile
+        shell: bash
+        run: |
+          if git diff --quiet -- package-lock.json; then
+            echo "package-lock.json already secure"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "fix(deps): patch js-yaml security advisory"
+          git push origin HEAD:codex/post-merge-design-polish
