@@ -9,6 +9,7 @@ describe('Evidence Radar production surface contract', () => {
   const sourcePage = readFileSync(resolve(opportunitiesRoot, 'sources', 'page.tsx'), 'utf8')
   const repository = readFileSync(resolve(intelligenceRoot, 'evidence-radar-repository.ts'), 'utf8')
   const boundaries = readFileSync(resolve(intelligenceRoot, 'evidence-radar-boundaries.ts'), 'utf8')
+  const governance = readFileSync(resolve(intelligenceRoot, 'evidence-source-governance-repository.ts'), 'utf8')
   const navigation = readFileSync(resolve(opportunitiesRoot, 'navigation.ts'), 'utf8')
 
   it('never fabricates organization placement or signal density', () => {
@@ -63,10 +64,13 @@ describe('Evidence Radar production surface contract', () => {
     expect(navigation).toContain("href: '/opportunities/sources'")
   })
 
-  it('makes source automation status explicit instead of inferring legal permission', () => {
-    expect(sourcePage).toContain('canAutomateSource')
-    expect(sourcePage).toContain('legalReviewStatus')
-    expect(sourcePage).toContain('automationPolicy')
+  it('reads source automation state from the live append-only review ledger', () => {
+    expect(sourcePage).toContain('listEvidenceSourceGovernance')
+    expect(sourcePage).toContain('source.operational.reviewStatus')
+    expect(sourcePage).toContain('source.operational.automationAllowed')
     expect(sourcePage).toContain('fail-closed')
+    expect(governance).toContain('source_registry_reviews_v1')
+    expect(governance).toContain('evidence_radar_source_allowed_v1(source.id)')
+    expect(governance).toContain('ORDER BY item.reviewed_at DESC, item.id DESC')
   })
 })
