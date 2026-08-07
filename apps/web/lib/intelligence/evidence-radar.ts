@@ -284,7 +284,6 @@ export const CORRELATION_RULES: readonly CorrelationRule[] = [
   { id: 'product-tech-hiring', label: 'Product launch → technology expansion', requiredTypes: ['product_launch', 'technology_expansion'], optionalTypes: ['hiring_growth', 'team_growth'], windowDays: 60, minimumSourceFamilies: 2, intentBoost: .10, explanation: 'Product activity is corroborated by technology/team expansion.' },
   { id: 'production-mass-hiring', label: 'Production expansion → hiring', requiredTypes: ['production_expansion', 'hiring_growth'], optionalTypes: ['mass_hiring', 'urgent_hiring'], windowDays: 120, minimumSourceFamilies: 2, intentBoost: .18, explanation: 'Physical production growth is corroborated by workforce demand.' },
   { id: 'customer-demand-support', label: 'Commercial demand → support growth', requiredTypes: ['major_contract', 'team_growth'], optionalTypes: ['new_department', 'urgent_hiring'], windowDays: 60, minimumSourceFamilies: 2, intentBoost: .10, explanation: 'New demand is corroborated by team expansion.' },
-  { id: 'first-party-external-hiring', label: 'First-party interest + external hiring', requiredTypes: ['hiring_growth'], optionalTypes: ['urgent_hiring', 'recruiter_hiring'], windowDays: 30, minimumSourceFamilies: 2, intentBoost: .08, explanation: 'First-party interest may improve timing only when external evidence also exists.' },
 ]
 
 export type CorrelationMatch = {
@@ -469,6 +468,10 @@ export function forecastStaffing(
   signals: readonly NormalizedSignal[],
   now = new Date(),
 ): StaffingForecast | null {
+  const organizationIds = uniqueSorted(signals.map((signal) => signal.organizationId))
+  if (organizationIds.length > 1) {
+    throw new Error('forecastStaffing requires signals for one organization')
+  }
   const applicable = signals
     .map((signal) => ({ signal, rule: STAFFING_RULES[signal.type] }))
     .filter((item): item is { signal: NormalizedSignal; rule: StaffingRule } => Boolean(item.rule))
