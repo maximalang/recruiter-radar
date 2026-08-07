@@ -232,7 +232,8 @@ async function computePlanCounts(client, plan, start, end) {
          lineage.id AS lineage_id,
          lineage.opportunity_id,
          lineage.candidate_id,
-         lineage.signal_episode_id
+         lineage.signal_episode_id,
+         lineage.organization_id
        FROM commercial_signal_opportunity_query_plans query_link
        JOIN commercial_signal_opportunity_lineage lineage
          ON lineage.id = query_link.lineage_id
@@ -277,11 +278,17 @@ async function computePlanCounts(client, plan, start, end) {
        (SELECT COUNT(*)
         FROM lineages lineage
         JOIN opportunity_candidates candidate ON candidate.id = lineage.candidate_id
-        WHERE candidate.status = 'qualified_actionable')::BIGINT
+        JOIN signal_episodes episode
+          ON episode.id = lineage.signal_episode_id
+         AND episode.organization_id = lineage.organization_id
+        WHERE candidate.status = 'qualified_actionable'
+          AND episode.valid_until > $5::TIMESTAMPTZ)::BIGINT
          AS "actionableOpportunities",
        (SELECT COUNT(*)
         FROM lineages lineage
-        JOIN signal_episodes episode ON episode.id = lineage.signal_episode_id
+        JOIN signal_episodes episode
+          ON episode.id = lineage.signal_episode_id
+         AND episode.organization_id = lineage.organization_id
         WHERE episode.valid_until <= $5::TIMESTAMPTZ)::BIGINT
          AS "staleOpportunities",
        (SELECT COUNT(*) FROM outcome_flags WHERE accepted)::BIGINT AS accepted,
