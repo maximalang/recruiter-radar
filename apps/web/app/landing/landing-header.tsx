@@ -31,8 +31,8 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
   const menuPanelRef = useRef<HTMLDivElement>(null);
 
   const closeMenu = useCallback((restoreFocus = true) => {
+    if (restoreFocus) menuButtonRef.current?.focus({ preventScroll: true });
     setMenuOpen(false);
-    if (restoreFocus) window.requestAnimationFrame(() => menuButtonRef.current?.focus({ preventScroll: true }));
   }, []);
 
   useEffect(() => {
