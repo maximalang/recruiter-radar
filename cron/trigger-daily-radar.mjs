@@ -3,8 +3,9 @@
  *
  * Railway runs this as a scheduled one-off container. The trigger first runs
  * the established daily-radar pipeline for non-canary workspaces. When the
- * runtime mode is explicitly `canary`, it then invokes the single configured
- * Commercial Signal canary pipeline and its corporate-only enrichment queue.
+ * runtime mode is explicitly `canary`, it refreshes plan-level commercial
+ * yield, invokes the single configured Commercial Signal canary pipeline, then
+ * processes its corporate-only enrichment queue.
  *
  * Required env:
  *   RR_CRON_URL   — full URL of /api/cron/daily-radar
@@ -93,6 +94,12 @@ try {
   await postStage(url, 'legacy daily radar', [200, 207])
 
   if (commercialSignalMode === 'canary') {
+    const yieldUrl = new URL(
+      '/api/cron/opportunities/query-plan-yield?apply=true',
+      url,
+    ).toString()
+    await postStage(yieldUrl, 'Query Planner downstream yield', [200])
+
     const canaryUrl = new URL(
       '/api/cron/opportunities/run-commercial-signal-canary?apply=true',
       url,
