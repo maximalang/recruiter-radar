@@ -25,7 +25,7 @@ export default function ConversionPanel(props: {
     <section className={styles.conversionPanel} aria-label="Тарифы и ответы" data-conversion-scenes="continuous">
       <div
         id="pricing"
-        className={`${styles.pricingStage} ${panelStyles.anchor} ${panelStyles.pricing}`}
+        className={`${styles.pricingStage} ${panelStyles.anchor} ${panelStyles.pricing} ${panelStyles.viewportSurface}`}
         data-header-tone="light"
         data-pricing-surface="true"
         data-pricing-layout="unified-grid"
@@ -89,7 +89,7 @@ export default function ConversionPanel(props: {
 
       <div
         id="faq"
-        className={`${styles.faqStage} ${panelStyles.anchor} ${panelStyles.faq}`}
+        className={`${styles.faqStage} ${panelStyles.anchor} ${panelStyles.faq} ${panelStyles.viewportSurface}`}
         data-header-tone="light"
         data-faq-surface="true"
         data-faq-layout="editorial"
