@@ -3,10 +3,14 @@
 import { useMemo, useState, type CSSProperties } from 'react'
 
 import { projectRussianCoordinates } from '@/lib/intelligence/evidence-radar'
+import type { EvidenceRadarRegionBoundary } from '@/lib/intelligence/evidence-radar-boundaries'
 import type { EvidenceRadarLead } from '@/lib/intelligence/evidence-radar-repository'
 import styles from './evidence-radar-map.module.css'
 
-export function EvidenceRadarMap(props: { leads: readonly EvidenceRadarLead[] }) {
+export function EvidenceRadarMap(props: {
+  leads: readonly EvidenceRadarLead[]
+  boundaries?: readonly EvidenceRadarRegionBoundary[]
+}) {
   const [selectedCardId, setSelectedCardId] = useState<string | null>(
     props.leads[0]?.cardId ?? null,
   )
@@ -37,7 +41,28 @@ export function EvidenceRadarMap(props: { leads: readonly EvidenceRadarLead[] })
         </div>
 
         <div className={styles.map} data-evidence-radar-map>
-          <div className={styles.mapFrame} aria-hidden="true" />
+          {props.boundaries && props.boundaries.length > 0 ? (
+            <svg
+              className={styles.regionBoundaries}
+              viewBox="0 0 100 100"
+              preserveAspectRatio="none"
+              aria-label="Верифицированные границы субъектов Российской Федерации"
+            >
+              {props.boundaries.flatMap((boundary) =>
+                geometryPaths(boundary.geometry).map((path, index) => (
+                  <path
+                    key={`${boundary.code}:${index}`}
+                    d={path}
+                    className={styles.boundaryPath}
+                    data-region-code={boundary.code}
+                    aria-label={boundary.name}
+                  />
+                )),
+              )}
+            </svg>
+          ) : (
+            <div className={styles.mapFrame} aria-label="Границы субъектов ещё не загружены из верифицированного источника" />
+          )}
           {props.leads.map((lead) => (
             <OrganizationCluster
               key={lead.cardId}
@@ -342,4 +367,34 @@ function clamp01(value: number): number {
 function formatDate(value: string): string {
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? 'дата не подтверждена' : new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: 'short', year: 'numeric' }).format(date)
+}
+
+function geometryPaths(geometry: Readonly<Record<string, unknown>>): string[] {
+  const type = geometry.type
+  const coordinates = geometry.coordinates
+  if (!Array.isArray(coordinates)) return []
+  if (type === 'Polygon') return polygonPaths(coordinates)
+  if (type === 'MultiPolygon') {
+    return coordinates.flatMap((polygon) => Array.isArray(polygon) ? polygonPaths(polygon) : [])
+  }
+  return []
+}
+
+function polygonPaths(rings: unknown[]): string[] {
+  return rings.flatMap((ring) => {
+    if (!Array.isArray(ring)) return []
+    const points = ring.flatMap((pair) => {
+      if (!Array.isArray(pair) || pair.length < 2) return []
+      const longitude = pair[0]
+      const latitude = pair[1]
+      if (typeof longitude !== 'number' || typeof latitude !== 'number') return []
+      try {
+        return [projectRussianCoordinates(latitude, longitude)]
+      } catch {
+        return []
+      }
+    })
+    if (points.length < 3) return []
+    return [`M ${points.map((point) => `${point.x} ${point.y}`).join(' L ')} Z`]
+  })
 }
