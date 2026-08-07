@@ -31,6 +31,9 @@ body {
 }
 
 [data-ui-system="recruiter-radar-v6"] {
+  --signal-strong: var(--rr-signal-strong);
+  --slate-950: var(--rr-ink-950);
+  --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
   background:
     linear-gradient(rgba(16, 20, 18, 0.025) 1px, transparent 1px),
     linear-gradient(90deg, rgba(16, 20, 18, 0.025) 1px, transparent 1px),
