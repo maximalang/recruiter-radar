@@ -26,13 +26,21 @@ describe("polished unified landing visual contract", () => {
     expect(heroStyles).not.toContain(".instrumentCore");
   });
 
-  it("keeps the landing skip link ahead of the persistent cookie settings control", () => {
+  it("keeps the landing skip link first and exposes one main content landmark", () => {
     const home = source("app/home-page-content.tsx");
+    const landingPage = source("app/landing/landing-page.tsx");
+    const skipLinkIndex = home.indexOf("<LandingSkipLink />");
+    const analyticsIndex = home.indexOf("<LandingAnalytics />");
     const landingIndex = home.indexOf("{landing}");
     const cookieSettingsIndex = home.indexOf("<YandexMetrika />");
 
-    expect(landingIndex).toBeGreaterThan(-1);
+    expect(home).toContain('<PageFrame as="div"');
+    expect(skipLinkIndex).toBeGreaterThan(-1);
+    expect(analyticsIndex).toBeGreaterThan(skipLinkIndex);
+    expect(landingIndex).toBeGreaterThan(analyticsIndex);
     expect(cookieSettingsIndex).toBeGreaterThan(landingIndex);
+    expect(landingPage).toContain('<main id="main-content">');
+    expect(landingPage).not.toContain('<a href="#main-content" className={styles.skipLink}>');
   });
 
   it("uses one stable preview anchor without duplicating it in the suspense fallback", () => {
