@@ -1,95 +1,18 @@
 name: Hardening smoke
 
 on:
-  push:
-    branches: [codex/commercial-signal-evidence-integration]
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
-  integration-resolver:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/codex/commercial-signal-evidence-integration'
-    permissions:
-      contents: write
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: codex/commercial-signal-evidence-integration
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-      - name: Merge exact current main
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git fetch origin main
-          MAIN_SHA="$(git rev-parse FETCH_HEAD)"
-          echo "Merging main $MAIN_SHA"
-
-          set +e
-          git merge --no-ff --no-commit "$MAIN_SHA"
-          merge_status=$?
-          set -e
-
-          if [ "$merge_status" -ne 0 ]; then
-            unmerged="$(git ls-files -u | cut -f2 | sort -u)"
-            printf 'Unmerged paths:\n%s\n' "$unmerged"
-            while IFS= read -r path; do
-              [ -z "$path" ] && continue
-              case "$path" in
-                .github/workflows/hardening-smoke.yml|package.json|package-lock.json) ;;
-                *) echo "Unexpected merge conflict: $path"; exit 1 ;;
-              esac
-            done <<< "$unmerged"
-          fi
-
-          if git ls-files -u -- package.json | grep -q .; then
-            git checkout --ours package.json
-            sed -i 's/"ip-address": "10.4.0"/"ip-address": "10.3.1"/' package.json
-            sed -i 's/"js-yaml": "\^5.2.2"/"js-yaml": "^3.14.2"/' package.json
-            git add package.json
-          fi
-          if git ls-files -u -- package-lock.json | grep -q .; then
-            git checkout --theirs package-lock.json
-            git add package-lock.json
-          fi
-
-          # The temporary transport workflow must not survive the merge.
-          git checkout "$MAIN_SHA" -- .github/workflows/hardening-smoke.yml
-          rm -f .github/workflows/resolve-commercial-signal-evidence-main-v5.yml
-          rm -f .integration-resolver-state.txt
-
-          # Preserve the latest production readiness contract even if test.yml auto-merged.
-          sed -i 's/for i in $(seq 1 30); do/for i in $(seq 1 75); do/' .github/workflows/test.yml
-          sed -i 's/data-deploy-anchor="recruiter-radar-signal-lock"/data-deploy-anchor="recruiter-radar-landing-v3"/' .github/workflows/test.yml
-          git add -A
-
-          if [ -n "$(git ls-files -u)" ]; then
-            echo 'Unresolved merge entries remain:'
-            git ls-files -u
-            exit 1
-          fi
-
-          npm ci
-          npm audit --omit=dev --audit-level=high
-          git diff --cached --check
-          git commit -m "merge: integrate main ${MAIN_SHA} into Commercial Signal and Evidence Radar"
-          git merge-base --is-ancestor "$MAIN_SHA" HEAD
-          parents="$(git show -s --format=%P HEAD)"
-          echo "Parents: $parents"
-          [ "$(wc -w <<< "$parents")" -ge 2 ]
-          git push origin HEAD:codex/commercial-signal-evidence-integration
-
   smoke:
-    if: github.event_name == 'pull_request'
-    permissions:
-      contents: read
     runs-on: ubuntu-latest
     services:
       postgres:
