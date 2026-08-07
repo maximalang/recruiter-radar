@@ -57,7 +57,7 @@ export function StatusBadge(props: {
 }) {
   return (
     <div
-      className={`${styles.badge}${props.className ? ` ${styles.badge}${props.className ? ` ${props.className}` : ""}` : ""}`}
+      className={`${styles.badge}${props.className ? ` ${props.className}` : ""}`}
       data-tone={props.tone ?? "neutral"}
       style={props.style}
     >
