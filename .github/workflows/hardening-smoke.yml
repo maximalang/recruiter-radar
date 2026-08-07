@@ -1,6 +1,8 @@
 name: Hardening smoke
 
 on:
+  push:
+    branches: [codex/commercial-signal-evidence-integration]
   pull_request:
     branches: [main]
 
@@ -8,11 +10,188 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-permissions:
-  contents: read
-
 jobs:
+  integration-resolver:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/codex/commercial-signal-evidence-integration'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    env:
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/commercial-signal-evidence-integration
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Harden semantic contracts and merge current main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source = Path('apps/web/lib/intelligence/evidence-radar.ts')
+          text = source.read_text()
+          misleading = "  { id: 'first-party-external-hiring', label: 'First-party interest + external hiring', requiredTypes: ['hiring_growth'], optionalTypes: ['urgent_hiring', 'recruiter_hiring'], windowDays: 30, minimumSourceFamilies: 2, intentBoost: .08, explanation: 'First-party interest may improve timing only when external evidence also exists.' },\n"
+          if text.count(misleading) != 1:
+              raise SystemExit('Expected exactly one misleading first-party correlation rule')
+          text = text.replace(misleading, '')
+          forecast_anchor = "export function forecastStaffing(\n  signals: readonly NormalizedSignal[],\n  now = new Date(),\n): StaffingForecast | null {\n  const applicable = signals\n"
+          forecast_replacement = "export function forecastStaffing(\n  signals: readonly NormalizedSignal[],\n  now = new Date(),\n): StaffingForecast | null {\n  const organizationIds = uniqueSorted(signals.map((signal) => signal.organizationId))\n  if (organizationIds.length > 1) {\n    throw new Error('forecastStaffing requires signals for one organization')\n  }\n  const applicable = signals\n"
+          if text.count(forecast_anchor) != 1:
+              raise SystemExit('forecastStaffing anchor changed unexpectedly')
+          source.write_text(text.replace(forecast_anchor, forecast_replacement))
+
+          test = Path('apps/web/src/__tests__/lib/intelligence/evidence-radar.test.ts')
+          text = test.read_text()
+          correlation_anchor = "    expect(CORRELATION_RULES.every((rule) => rule.minimumSourceFamilies >= 2)).toBe(true)\n"
+          correlation_replacement = correlation_anchor + "    expect(CORRELATION_RULES.find((rule) => rule.id === 'first-party-external-hiring')).toBeUndefined()\n"
+          if text.count(correlation_anchor) != 1:
+              raise SystemExit('correlation test anchor changed unexpectedly')
+          text = text.replace(correlation_anchor, correlation_replacement)
+          staffing_anchor = "    expect(forecastStaffing([signal('plant', 'production_expansion', 'official-news')]))\n      .toMatchObject({ mode: 'mass', minHeadcount: 20, maxHeadcount: 200, basisSignalIds: ['plant'] })\n"
+          staffing_replacement = staffing_anchor + "    expect(() => forecastStaffing([\n      signal('plant', 'production_expansion', 'official-news'),\n      { ...signal('other', 'urgent_hiring', 'career-page'), organizationId: '2' },\n    ])).toThrow('forecastStaffing requires signals for one organization')\n"
+          if text.count(staffing_anchor) != 1:
+              raise SystemExit('staffing test anchor changed unexpectedly')
+          test.write_text(text.replace(staffing_anchor, staffing_replacement))
+          PY
+
+          git add apps/web/lib/intelligence/evidence-radar.ts apps/web/src/__tests__/lib/intelligence/evidence-radar.test.ts
+          git commit -m 'fix: fail closed on ambiguous Evidence Radar correlations'
+
+          git fetch origin main
+          MAIN_SHA="$(git rev-parse FETCH_HEAD)"
+          MERGE_BASE="$(git merge-base HEAD "$MAIN_SHA")"
+          git show HEAD:package.json > /tmp/package-ours.json
+          git show "$MAIN_SHA":package.json > /tmp/package-main.json
+          git show "$MERGE_BASE":package.json > /tmp/package-base.json
+
+          set +e
+          git merge --no-ff --no-commit "$MAIN_SHA"
+          merge_status=$?
+          set -e
+
+          if [ "$merge_status" -ne 0 ]; then
+            unmerged="$(git ls-files -u | cut -f2 | sort -u)"
+            printf 'Unmerged paths:\n%s\n' "$unmerged"
+            while IFS= read -r path; do
+              [ -z "$path" ] && continue
+              case "$path" in
+                .github/workflows/hardening-smoke.yml|package.json|package-lock.json|apps/web/next.config.ts|apps/web/src/__tests__/app/content-security-policy.test.ts) ;;
+                *) echo "Unexpected merge conflict: $path"; exit 1 ;;
+              esac
+            done <<< "$unmerged"
+          fi
+
+          if git ls-files -u -- apps/web/next.config.ts | grep -q .; then
+            git checkout --theirs apps/web/next.config.ts
+            git add apps/web/next.config.ts
+          fi
+          if git ls-files -u -- apps/web/src/__tests__/app/content-security-policy.test.ts | grep -q .; then
+            git checkout --theirs apps/web/src/__tests__/app/content-security-policy.test.ts
+            git add apps/web/src/__tests__/app/content-security-policy.test.ts
+          fi
+
+          if git ls-files -u -- package.json | grep -q .; then
+            python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          base = json.loads(Path('/tmp/package-base.json').read_text())
+          main = json.loads(Path('/tmp/package-main.json').read_text())
+          ours = json.loads(Path('/tmp/package-ours.json').read_text())
+          merged = main
+
+          for section in ('scripts', 'dependencies', 'devDependencies', 'overrides'):
+              b = base.get(section, {})
+              m = dict(main.get(section, {}))
+              o = ours.get(section, {})
+              for key, ours_value in o.items():
+                  base_has = key in b
+                  main_has = key in m
+                  base_value = b.get(key)
+                  main_value = m.get(key)
+                  ours_changed = (not base_has) or ours_value != base_value
+                  main_changed = (not base_has and main_has) or (base_has and main_value != base_value)
+                  if ours_changed and not main_changed:
+                      m[key] = ours_value
+                  elif ours_changed and main_changed and ours_value != main_value:
+                      if section == 'dependencies' and key == 'js-yaml':
+                          continue
+                      if section == 'overrides' and key == 'ip-address':
+                          continue
+                      raise SystemExit(f'Unresolved package.json conflict: {section}.{key}')
+              merged[section] = m
+
+          merged.setdefault('dependencies', {})['js-yaml'] = main['dependencies']['js-yaml']
+          merged.setdefault('overrides', {})['ip-address'] = main['overrides']['ip-address']
+          Path('package.json').write_text(json.dumps(merged, ensure_ascii=False, indent=2) + '\n')
+          PY
+            git add package.json
+          fi
+
+          if git ls-files -u -- package-lock.json | grep -q .; then
+            git checkout --theirs package-lock.json
+            git add package-lock.json
+          fi
+
+          git checkout "$MAIN_SHA" -- .github/workflows/hardening-smoke.yml
+          git add .github/workflows/hardening-smoke.yml
+
+          if [ -n "$(git ls-files -u)" ]; then
+            echo 'Unresolved merge entries remain:'
+            git ls-files -u
+            exit 1
+          fi
+
+          npm install --package-lock-only --ignore-scripts
+          npm ci
+          npm audit --omit=dev --audit-level=high
+          npm run web:check
+          npm run test:types --workspace @recruiter-radar/web
+          node packages/db/scripts/migrate.mjs
+          npm run db:validate
+          npm test --workspace @recruiter-radar/web -- --runInBand --runTestsByPath \
+            src/__tests__/lib/intelligence/evidence-radar.test.ts \
+            src/__tests__/lib/intelligence/evidence-radar-config.test.ts \
+            src/__tests__/lib/intelligence/evidence-radar-repository.test.ts \
+            src/__tests__/scripts/evidence-radar-migration.test.ts \
+            src/__tests__/app/evidence-radar-surface-contract.test.ts
+          node packages/db/scripts/run-evidence-radar-v1-db-tests.mjs
+          git add package-lock.json
+          git diff --cached --check
+          git commit -m "merge: integrate main ${MAIN_SHA} into Commercial Signal and Evidence Radar"
+          git merge-base --is-ancestor "$MAIN_SHA" HEAD
+          parents="$(git show -s --format=%P HEAD)"
+          echo "Parents: $parents"
+          [ "$(wc -w <<< "$parents")" -ge 2 ]
+          git push origin HEAD:codex/commercial-signal-evidence-integration
+
   smoke:
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -27,7 +206,6 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
-
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
