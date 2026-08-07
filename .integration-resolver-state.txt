@@ -1,7 +1,17 @@
 stage=merge-main
 status=1
-conflicts=apps/web/next.config.ts
-apps/web/src/__tests__/app/content-security-policy.test.ts
-package-lock.json
-package.json
-merge_output=
+conflicts=
+merge_output=Auto-merging .github/workflows/test.yml
+Auto-merging apps/web/next.config.ts
+CONFLICT (content): Merge conflict in apps/web/next.config.ts
+Auto-merging apps/web/src/__tests__/app/content-security-policy.test.ts
+CONFLICT (content): Merge conflict in apps/web/src/__tests__/app/content-security-policy.test.ts
+Auto-merging package-lock.json
+CONFLICT (content): Merge conflict in package-lock.json
+Auto-merging package.json
+CONFLICT (content): Merge conflict in package.json
+Automatic merge failed; fix conflicts and then commit the result.
+[codex/commercial-signal-evidence-integration 04ef08e0] chore: record integration resolver failure at merge-main
+ 2 files changed, 7 insertions(+), 118 deletions(-)
+ delete mode 100644 .github/workflows/resolve-commercial-signal-evidence-main-v3.yml
+ create mode 100644 .integration-resolver-state.txt
