@@ -1,0 +1,208 @@
+.capabilityPanel {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(1.25rem, 2.4vw, 2rem);
+  border: 1px solid rgba(18, 35, 31, .12);
+  background:
+    radial-gradient(circle at 86% 12%, rgba(127, 216, 189, .11), transparent 26%),
+    rgba(255, 255, 255, .52);
+}
+
+.capabilityPanel::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(77, 139, 120, .5), transparent);
+  content: "";
+  transform: translateX(-58%);
+  animation: routeScan 8s ease-in-out infinite;
+}
+
+.capabilityHeader {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.capabilityHeader > div {
+  display: grid;
+  gap: .35rem;
+}
+
+.capabilityHeader span,
+.channelStatus {
+  font-family: var(--mono);
+  font-size: .58rem;
+  font-weight: 650;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.capabilityHeader span {
+  color: rgba(23, 35, 45, .52);
+}
+
+.capabilityHeader strong {
+  max-width: 33rem;
+  color: var(--ink);
+  font-size: clamp(1.2rem, 1.7vw, 1.65rem);
+  font-weight: 620;
+  letter-spacing: -.035em;
+}
+
+.capabilityHeader p {
+  max-width: 32rem;
+  margin: 0;
+  color: rgba(23, 35, 45, .62);
+  font-size: .78rem;
+  line-height: 1.55;
+}
+
+.channelGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid rgba(18, 35, 31, .1);
+  background: rgba(18, 35, 31, .1);
+}
+
+.channelCard {
+  position: relative;
+  min-height: 11.25rem;
+  padding: 1.05rem;
+  background: rgba(250, 248, 241, .97);
+  transition: background .25s ease, transform .25s ease;
+}
+
+.channelCard:hover {
+  z-index: 1;
+  background: #fffefa;
+  transform: translateY(-1px);
+}
+
+.channelTopline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  margin-bottom: 1.35rem;
+}
+
+.channelIcon {
+  display: grid;
+  width: 2.8rem;
+  height: 2.8rem;
+  place-items: center;
+  border: 1px solid rgba(39, 108, 88, .19);
+  border-radius: 50%;
+  background: rgba(127, 216, 189, .08);
+  color: #397966;
+}
+
+.channelIcon svg {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+.channelStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  color: #397966;
+}
+
+.channelStatus::before {
+  width: .35rem;
+  height: .35rem;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 0 rgba(57, 121, 102, .18);
+  content: "";
+  animation: statusBreath 4.5s ease-in-out infinite;
+}
+
+.channelCard h3 {
+  margin: 0 0 .42rem;
+  color: var(--ink);
+  font-size: .96rem;
+  font-weight: 650;
+  letter-spacing: -.025em;
+}
+
+.channelCard p {
+  margin: 0;
+  color: rgba(23, 35, 45, .64);
+  font-size: .72rem;
+  line-height: 1.55;
+}
+
+.channelCard small {
+  position: absolute;
+  right: 1.05rem;
+  bottom: .9rem;
+  left: 1.05rem;
+  padding-top: .7rem;
+  border-top: 1px solid rgba(18, 35, 31, .08);
+  color: rgba(23, 35, 45, .48);
+  font-family: var(--mono);
+  font-size: .54rem;
+  line-height: 1.35;
+}
+
+.channelCard[data-channel="webhook"] .channelIcon,
+.channelCard[data-channel="vk"] .channelIcon {
+  border-style: dashed;
+}
+
+@keyframes routeScan {
+  0%, 18% { transform: translateX(-58%); opacity: 0; }
+  36%, 64% { opacity: 1; }
+  82%, 100% { transform: translateX(58%); opacity: 0; }
+}
+
+@keyframes statusBreath {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(57, 121, 102, .16); }
+  50% { box-shadow: 0 0 0 .32rem rgba(57, 121, 102, 0); }
+}
+
+@media (max-width: 960px) {
+  .channelGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .capabilityPanel {
+    padding: 1rem;
+  }
+
+  .capabilityHeader {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: .55rem;
+  }
+
+  .channelGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .channelCard {
+    min-height: 9.8rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .capabilityPanel::before,
+  .channelStatus::before {
+    animation: none;
+  }
+
+  .channelCard {
+    transition: none;
+  }
+}
