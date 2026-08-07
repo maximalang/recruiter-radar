@@ -30,7 +30,11 @@ describe('Commercial Signal Engine evaluation contract', () => {
     expect(report).toMatchObject({
       schemaVersion: 'commercial-signal-evaluation-report-v1',
       missingDatasetKinds: [],
-      calibrationStatus: 'uncalibrated_insufficient_real_outcomes',
+      calibrationStatus: 'insufficient_data',
+      calibrationReasonCodes: [
+        'CALIBRATION_REVIEWED_LT_300',
+        'CALIBRATION_HOLDOUT_LT_60',
+      ],
       comparison: { status: 'contract_only' },
     })
     expect(report.datasets.map((dataset: { kind: string }) => dataset.kind))
@@ -65,6 +69,8 @@ describe('Commercial Signal Engine evaluation contract', () => {
       'sourceYield',
       'queryPlanYield',
       'FALSE_POSITIVE_CATEGORIES',
+      'internal_recruiting_sufficient',
+      'CALIBRATION_MINIMUM_REVIEWED = 300',
     ]) {
       expect(evaluator).toContain(contract)
     }
