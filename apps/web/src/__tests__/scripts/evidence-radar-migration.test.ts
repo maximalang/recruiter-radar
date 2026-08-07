@@ -10,7 +10,9 @@ const names = [
   '20260807101000_add_evidence_organization_identity_v1',
   '20260807102000_add_evidence_events_signals_v1',
   '20260807103000_add_evidence_lead_cards_v1',
+  '20260807104000_harden_evidence_lead_qualification_v1',
 ] as const
+const destructiveDataMigrationNames = names.slice(0, 4)
 
 const up = Object.fromEntries(names.map((name) => [
   name,
@@ -108,6 +110,19 @@ describe('Evidence Radar v1 migration contract', () => {
     expect(migration).not.toContain('location_id BIGINT NOT NULL')
   })
 
+  it('rejects stale or unverified provenance before it can become an actionable lead', () => {
+    const migration = compact(up[names[4]])
+    expect(migration).toContain('score evidence must be verified, live and observed by snapshot time')
+    expect(migration).toContain('score signals must be live, positive-strength and observed by snapshot time')
+    expect(migration).toContain('score correlations must be live and available by snapshot time')
+    expect(migration).toContain('score validity cannot outlive its evidence, signal or correlation horizon')
+    expect(migration).toContain('qualified lead requires verified organization identity')
+    expect(migration).toContain('qualified Evidence Radar lead requires a verified location')
+    expect(migration).toContain('qualified lead evidence must be verified and live')
+    expect(migration).toContain('qualified lead cannot expose unverified or rejected contact paths')
+    expect(migration).toContain('recommended contact time must be inside the lead card validity window')
+  })
+
   it('keeps historical evidence tables append-only and operational source changes audited', () => {
     const migration = Object.values(up).join('\n')
     for (const table of [
@@ -130,13 +145,21 @@ describe('Evidence Radar v1 migration contract', () => {
     expect(migration).toContain('audit_organization_identity_update_v1')
   })
 
-  it('takes exclusive locks before every data-loss rollback check', () => {
-    for (const name of names) {
+  it('takes exclusive locks before every rollback that can remove Evidence Radar data', () => {
+    for (const name of destructiveDataMigrationNames) {
       const rollback = down[name]
       expect(rollback).toContain('IN ACCESS EXCLUSIVE MODE')
       expect(rollback.indexOf('LOCK TABLE')).toBeLessThan(rollback.indexOf('DO $$'))
       expect(rollback).toContain('refusing to remove')
     }
+  })
+
+  it('rolls back qualification hardening without dropping Evidence Radar data', () => {
+    const rollback = compact(down[names[4]])
+    expect(rollback).toContain('DROP TRIGGER IF EXISTS evidence_lead_cards_v1_validate_qualification_trust')
+    expect(rollback).toContain('DROP FUNCTION IF EXISTS validate_evidence_lead_qualification_trust_v1()')
+    expect(rollback).toContain('DROP TRIGGER IF EXISTS evidence_lead_score_snapshots_v1_validate_temporal_trust')
+    expect(rollback).not.toContain('DROP TABLE')
   })
 
   it('is additive and does not switch or mutate existing Opportunity readers', () => {
