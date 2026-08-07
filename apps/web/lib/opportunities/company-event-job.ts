@@ -118,6 +118,10 @@ async function executeCompanyEventsJob(
        AND NOT EXISTS (
          SELECT 1
          FROM company_event_publications publication
+         JOIN company_events existing_event
+           ON existing_event.id = publication.company_event_id
+          AND existing_event.organization_id = publication.organization_id
+          AND existing_event.event_type = 'job_posting'
          WHERE publication.organization_id = signal.org_id
            AND publication.signal_id = signal.id
            AND publication.last_seen_at >= signal.updated_at
@@ -143,6 +147,10 @@ async function executeCompanyEventsJob(
   for (const organization of organizations.rows) {
     stats.scanned += 1
     try {
+      // Derived events such as repost/restart/salary-change need bounded
+      // company history, not only the one newly changed source row. The
+      // organization selector above still guarantees we do no work until a
+      // fresh/evidence-changed observation arrives.
       const sourceRecords = await loadJobPostingSourceRecords(
         organization.organizationId,
         database,
@@ -199,12 +207,15 @@ async function loadJobPostingSourceRecords(
        signal.signal_type::TEXT AS "signalType",
        COALESCE(
          NULLIF(signal.payload->>'vacancy_name', ''),
+         NULLIF(signal.payload->>'job_title', ''),
          NULLIF(signal.payload->>'title', ''),
          signal.headline
        ) AS title,
        COALESCE(
+         NULLIF(signal.payload->>'region_canonical', ''),
          NULLIF(signal.payload->>'area_name', ''),
-         NULLIF(signal.payload->>'location', '')
+         NULLIF(signal.payload->>'location', ''),
+         NULLIF(signal.payload->>'region_raw', '')
        ) AS region,
        signal.source,
        signal.source_url AS "sourceUrl",
@@ -224,22 +235,6 @@ async function loadJobPostingSourceRecords(
       AND evidence.url = signal.source_url
      WHERE signal.org_id = $1
        AND signal.signal_type = 'job_posting'
-       AND NOT EXISTS (
-         SELECT 1
-         FROM company_event_publications publication
-         WHERE publication.organization_id = signal.org_id
-           AND publication.signal_id = signal.id
-           AND publication.last_seen_at >= signal.updated_at
-           AND NOT EXISTS (
-             SELECT 1
-             FROM evidence_items missing_evidence
-             WHERE missing_evidence.org_id = signal.org_id
-               AND missing_evidence.url = signal.source_url
-               AND NOT (
-                 missing_evidence.id = ANY(publication.evidence_ids)
-               )
-           )
-       )
      GROUP BY signal.id
      ORDER BY signal.occurred_at ASC, signal.id ASC
      LIMIT $2`,
