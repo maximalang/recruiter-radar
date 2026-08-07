@@ -249,8 +249,8 @@ async function computePlanCounts(client, plan, start, end) {
        FROM lineages lineage
        LEFT JOIN opportunity_outcome_events outcome
          ON outcome.opportunity_id = lineage.opportunity_id
-        AND outcome.created_at >= $4::TIMESTAMPTZ
-        AND outcome.created_at < $5::TIMESTAMPTZ
+        AND outcome.occurred_at >= $4::TIMESTAMPTZ
+        AND outcome.occurred_at < $5::TIMESTAMPTZ
        GROUP BY lineage.opportunity_id
      )
      SELECT
