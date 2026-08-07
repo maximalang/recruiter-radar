@@ -334,9 +334,15 @@ async function assertHistoryNavigation(browser) {
     window.location.hash = "scene-evidence";
   });
   await page.waitForURL(/#scene-evidence$/);
-  await page.goBack();
+  await Promise.all([
+    page.waitForURL(/#scene-workspace$/),
+    page.goBack(),
+  ]);
   assert.match(page.url(), /#scene-workspace$/);
-  await page.goForward();
+  await Promise.all([
+    page.waitForURL(/#scene-evidence$/),
+    page.goForward(),
+  ]);
   assert.match(page.url(), /#scene-evidence$/);
   assertCleanConsole();
   await context.close();

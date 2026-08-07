@@ -12,6 +12,7 @@ function source(path: string) {
 describe("polished unified landing visual contract", () => {
   it("keeps the hero radar centerless and free of a connecting beam", () => {
     const hero = source("app/landing/hero-instrument.tsx");
+    const heroStyles = source("app/landing/landing.module.css");
     const compatibilityRadar = source("app/landing/brand-glyphs.tsx");
 
     expect(hero).not.toContain("instrumentConnection");
@@ -20,6 +21,9 @@ describe("polished unified landing visual contract", () => {
     expect(hero).not.toContain("temporary signal field");
     expect(hero).toContain("Подтверждённый сигнал / текущий приоритет");
     expect(compatibilityRadar).not.toContain("styles.instrumentCore");
+    expect(heroStyles).not.toContain(".instrumentGuides");
+    expect(heroStyles).not.toContain(".instrumentConnection");
+    expect(heroStyles).not.toContain(".instrumentCore");
   });
 
   it("uses one stable preview anchor without duplicating it in the suspense fallback", () => {

@@ -308,8 +308,6 @@
 .heroInstrument { position: relative; width: 100%; height: 100%; margin: 0; }
 .instrumentField { display: block; width: 100%; height: 100%; color: var(--signal); opacity: .76; }
 .instrumentRings circle { stroke: rgba(155, 203, 187, .42); stroke-width: 1; stroke-dasharray: 2 12; }
-.instrumentGuides path { stroke: rgba(155, 203, 187, .16); stroke-width: 1; stroke-dasharray: 2 16; }
-.instrumentConnection { fill: none; stroke: url(#instrument-link); stroke-width: 1.2; stroke-dasharray: 4 9; }
 .instrumentQuietNodes circle { fill: rgba(155, 203, 187, .35); }
 .instrumentActiveNode circle:first-child { fill: var(--signal-strong); }
 .instrumentActiveNode circle:not(:first-child) {
@@ -321,8 +319,6 @@
   animation: instrumentPulse 5.6s cubic-bezier(.2, .7, .2, 1) infinite;
 }
 .instrumentActiveNode circle:last-child { animation-delay: .9s; }
-.instrumentCore circle:first-child { fill: rgba(169, 215, 200, .82); }
-.instrumentCore circle:last-child { fill: none; stroke: rgba(169, 215, 200, .35); }
 
 .instrumentCaption {
   position: absolute;
