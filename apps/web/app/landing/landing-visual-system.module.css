@@ -1,22 +1,22 @@
 .visualSystem {
-  --slate-950: #09100f;
-  --slate-900: #101817;
-  --slate-850: #15201e;
-  --slate-800: #1c2926;
-  --paper: #f5f2ea;
-  --paper-soft: #ece9e0;
+  --slate-950: #080c0a;
+  --slate-900: #0e1410;
+  --slate-850: #151d18;
+  --slate-800: #1c2820;
+  --paper: #f4f1e8;
+  --paper-soft: #ebe8df;
   --paper-strong: #fffdf7;
-  --ink: #121a18;
-  --muted-dark: rgba(245, 242, 234, .72);
-  --muted-light: rgba(18, 26, 24, .68);
-  --line-dark: rgba(245, 242, 234, .16);
-  --line-light: rgba(18, 26, 24, .15);
-  --signal: #7fd8bd;
-  --signal-strong: #b5ead8;
-  --signal-deep: #286d5d;
-  --signal-soft: rgba(127, 216, 189, .12);
-  --copper: #bd8968;
-  --warning: #d5a663;
+  --ink: #111612;
+  --muted-dark: rgba(244, 241, 232, .7);
+  --muted-light: rgba(17, 22, 18, .64);
+  --line-dark: rgba(244, 241, 232, .14);
+  --line-light: rgba(17, 22, 18, .13);
+  --signal: #9fca63;
+  --signal-strong: #c9ec8b;
+  --signal-deep: #55772b;
+  --signal-soft: rgba(159, 202, 99, .1);
+  --copper: #a37c65;
+  --warning: #c99d62;
   --content: 82rem;
   background: var(--paper);
 }
@@ -31,9 +31,9 @@
 
 .visualSystem :global(#scene-detection) {
   background:
-    linear-gradient(90deg, rgba(9, 16, 15, .985) 0%, rgba(9, 16, 15, .92) 44%, rgba(9, 16, 15, .36) 76%, rgba(9, 16, 15, .7) 100%),
-    radial-gradient(circle at 74% 42%, rgba(127, 216, 189, .1), transparent 35%),
-    #09100f;
+    linear-gradient(90deg, rgba(8, 12, 10, .99) 0%, rgba(8, 12, 10, .95) 42%, rgba(8, 12, 10, .42) 75%, rgba(8, 12, 10, .76) 100%),
+    radial-gradient(circle at 76% 43%, rgba(159, 202, 99, .075), transparent 34%),
+    #080c0a;
 }
 
 .visualSystem :global(#scene-detection)::before {
@@ -41,10 +41,10 @@
   z-index: -1;
   inset: 0;
   background-image:
-    linear-gradient(rgba(255, 255, 255, .025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, .025) 1px, transparent 1px);
-  background-size: 64px 64px;
-  mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, .16) 35%, #000 100%);
+    linear-gradient(rgba(255, 255, 255, .018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, .018) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, .12) 37%, #000 100%);
   content: "";
   pointer-events: none;
 }
@@ -68,6 +68,7 @@
 .visualSystem :global(h2),
 .visualSystem :global(h3) {
   text-wrap: balance;
+  font-kerning: normal;
 }
 
 .visualSystem :global(p) {
@@ -85,8 +86,8 @@
 .visualSystem :global(input),
 .visualSystem :global(select),
 .visualSystem :global(textarea) {
-  border-color: rgba(18, 26, 24, .18);
-  background: rgba(255, 253, 247, .96);
+  border-color: rgba(17, 22, 18, .17);
+  background: rgba(255, 253, 247, .97);
   box-shadow: none;
 }
 
@@ -99,10 +100,23 @@
   border-left-color: var(--signal);
 }
 
+/* Header: restrained glass, lower visual weight, stronger active state. */
+.visualSystem :global(header[data-scrolled]) {
+  border-bottom-color: rgba(244, 241, 232, .11);
+  background: rgba(8, 12, 10, .86);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .12);
+  backdrop-filter: blur(20px) saturate(112%);
+}
+
+.visualSystem :global(header a) {
+  letter-spacing: -.005em;
+}
+
+/* Product-as-proof surfaces stay flatter and more editorial than SaaS cards. */
 .visualSystem :global([data-primary-lead]) {
-  border-color: rgba(18, 26, 24, .24) !important;
+  border-color: rgba(17, 22, 18, .19) !important;
   background: #fffdf7 !important;
-  box-shadow: 0 1.5rem 4rem rgba(18, 26, 24, .08) !important;
+  box-shadow: 0 1.35rem 3.8rem rgba(8, 12, 10, .065) !important;
 }
 
 .visualSystem :global([data-primary-lead] [data-lead-score]) {
@@ -113,8 +127,48 @@
   border-left-color: var(--signal) !important;
 }
 
-/* Pricing and FAQ live inside a dark conversion wrapper in the base layer.
-   These surfaces are intentionally light, so their text/borders must switch too. */
+.visualSystem :global([class*="workspace"] article),
+.visualSystem :global([class*="Workspace"] article),
+.visualSystem :global([class*="mockup"]),
+.visualSystem :global([class*="Mockup"]) {
+  box-shadow: none;
+}
+
+.visualSystem :global([class*="sceneHeading"]) {
+  max-width: 15ch;
+  font-weight: 520;
+  letter-spacing: -.055em;
+}
+
+.visualSystem :global([class*="sceneLead"]) {
+  max-width: 38rem;
+  line-height: 1.65;
+}
+
+.visualSystem :global([class*="displayTitle"]) {
+  max-width: 9.6ch;
+  font-weight: 520;
+  letter-spacing: -.068em;
+  line-height: .91;
+}
+
+.visualSystem :global([class*="heroDescription"]) {
+  max-width: 34rem;
+  color: rgba(244, 241, 232, .7);
+  line-height: 1.62;
+}
+
+.visualSystem :global([class*="primaryButton"]) {
+  background: var(--signal-strong);
+  color: var(--slate-950);
+  box-shadow: none;
+}
+
+.visualSystem :global([class*="primaryButton"]:hover) {
+  background: #d2f09d;
+}
+
+/* Pricing and FAQ intentionally return to warm paper to avoid one long dark wall. */
 .visualSystem :global(#pricing),
 .visualSystem :global(#faq) {
   background: var(--paper);
@@ -122,10 +176,10 @@
 }
 
 .visualSystem :global(#pricing [data-pricing-primary]) {
-  border-color: rgba(127, 216, 189, .46);
+  border-color: rgba(159, 202, 99, .33);
   background: var(--slate-900);
   color: var(--paper);
-  box-shadow: 0 1.4rem 3.8rem rgba(18, 26, 24, .1);
+  box-shadow: 0 1.35rem 3.5rem rgba(8, 12, 10, .085);
 }
 
 .visualSystem :global(#pricing [data-pricing-primary] > a) {
@@ -140,7 +194,7 @@
 .visualSystem :global(#pricing [data-pricing-secondary] article) {
   padding: 1.05rem 1.1rem;
   border: 1px solid var(--line-light);
-  background: rgba(255, 253, 247, .62);
+  background: rgba(255, 253, 247, .58);
 }
 
 .visualSystem :global(#pricing [data-pricing-secondary] article:last-child) {
@@ -163,7 +217,7 @@
 
 .visualSystem :global(#faq details) {
   border-color: var(--line-light);
-  background: rgba(255, 253, 247, .38);
+  background: rgba(255, 253, 247, .34);
 }
 
 .visualSystem :global(#faq summary) {
@@ -172,50 +226,90 @@
 
 .visualSystem :global(#pricing article),
 .visualSystem :global(#faq details) {
-  border-color: rgba(18, 26, 24, .14);
+  border-color: rgba(17, 22, 18, .13);
   box-shadow: none;
 }
 
-/* The radar moves like a live instrument rather than a decorative spinner. */
+/* Radar: slow field motion, no pulse rings and no decorative breathing. */
+.visualSystem :global([data-hero-instrument] [data-radar-rings] circle) {
+  stroke: rgba(201, 236, 139, .24);
+  stroke-width: .7;
+  stroke-dasharray: 1 13;
+}
+
 .visualSystem :global([data-hero-instrument] [data-signal-cluster]) {
   transform-box: fill-box;
   transform-origin: center;
-  animation: clusterDrift 8s cubic-bezier(.45, 0, .25, 1) infinite alternate;
+  animation: clusterDrift 12s cubic-bezier(.45, 0, .25, 1) infinite alternate;
 }
 
 .visualSystem :global([data-hero-instrument] [data-signal-cluster="secondary"]) {
-  animation-delay: -3.2s;
-  animation-duration: 10.5s;
+  animation-delay: -4.8s;
+  animation-duration: 15s;
+  opacity: .74;
 }
 
 .visualSystem :global([data-hero-instrument] [data-signal-speck]) {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: signalBreath 5.8s ease-in-out infinite;
-}
-
-.visualSystem :global([data-hero-instrument] [data-signal-speck="late"]) {
-  animation-delay: -2.6s;
+  animation: none;
 }
 
 .visualSystem :global([data-hero-instrument] [data-active-signal]) {
-  filter: drop-shadow(0 0 12px rgba(127, 216, 189, .16));
+  filter: none;
+}
+
+.visualSystem :global([data-hero-instrument] [data-active-signal] circle) {
+  fill: var(--signal-strong);
+}
+
+.visualSystem :global([data-hero-instrument] [data-active-signal] circle[data-tone="secondary"]) {
+  fill: var(--copper);
+}
+
+.visualSystem :global([data-hero-instrument] [data-signal-links]) {
+  opacity: .24;
+}
+
+/* Footer belongs to the same dark system and should read as a quiet terminal surface. */
+.visualSystem :global(footer) {
+  border-top: 1px solid rgba(244, 241, 232, .1);
+  background: #080c0a;
+}
+
+.visualSystem :global(footer a) {
+  color: rgba(244, 241, 232, .68);
+}
+
+.visualSystem :global(footer a:hover) {
+  color: var(--signal-strong);
 }
 
 @keyframes clusterDrift {
-  0% { transform: translate3d(-2px, 1px, 0) rotate(-.6deg); }
-  100% { transform: translate3d(4px, -3px, 0) rotate(.8deg); }
-}
-
-@keyframes signalBreath {
-  0%, 100% { opacity: .36; transform: scale(.86); }
-  48% { opacity: .78; transform: scale(1.08); }
+  0% { transform: translate3d(-1px, 1px, 0) rotate(-.35deg); }
+  100% { transform: translate3d(3px, -2px, 0) rotate(.45deg); }
 }
 
 @media (max-width: 768px) {
   .visualSystem :global(#scene-detection)::before {
-    background-size: 44px 44px;
-    opacity: .68;
+    background-size: 48px 48px;
+    opacity: .48;
+  }
+
+  .visualSystem :global([class*="displayTitle"]) {
+    max-width: 10.5ch;
+    letter-spacing: -.058em;
+  }
+
+  .visualSystem :global([data-hero-instrument] [data-signal-cluster="secondary"]) {
+    opacity: .46;
+  }
+
+  .visualSystem :global([data-hero-instrument] [data-signal-links]) {
+    display: none;
+  }
+
+  .visualSystem :global([data-hero-instrument] [data-radar-rings] circle) {
+    stroke-dasharray: 1 16;
+    opacity: .72;
   }
 
   .visualSystem :global(#pricing [data-pricing-secondary] article) {
@@ -230,8 +324,7 @@
     scroll-behavior: auto !important;
   }
 
-  .visualSystem :global([data-hero-instrument] [data-signal-cluster]),
-  .visualSystem :global([data-hero-instrument] [data-signal-speck]) {
+  .visualSystem :global([data-hero-instrument] [data-signal-cluster]) {
     animation: none;
   }
 }
