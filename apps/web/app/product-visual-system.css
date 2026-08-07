@@ -17,13 +17,25 @@
   --rr-copper: #a37c65;
   --rr-ease: cubic-bezier(0.22, 1, 0.36, 1);
 
+  /* Compatibility aliases consumed by site-finish.css and legacy product modules. */
+  --rr-ink: var(--rr-text);
+  --rr-page: var(--rr-paper-soft);
+  --rr-surface-strong: var(--rr-surface);
+  --rr-brand: #587a29;
+  --rr-brand-dark: #304718;
+  --rr-shadow-sm: 0 12px 34px rgba(8, 11, 9, 0.055);
+  --rr-shadow-md: 0 22px 56px rgba(8, 11, 9, 0.08);
+  --rr-radius-sm: 9px;
+  --rr-radius-md: 12px;
+  --rr-radius-lg: 18px;
+
   --c-text-primary: var(--rr-text);
   --c-text-secondary: #505951;
   --c-text-muted: var(--rr-muted);
   --c-bg-page: var(--rr-paper-soft);
   --c-bg-card: rgba(255, 253, 247, 0.94);
   --c-border: var(--rr-line);
-  --c-brand: #587a29;
+  --c-brand: var(--rr-brand);
   --c-accent: #355116;
   --radius-card: 12px;
   --radius-card-sm: 8px;
@@ -148,7 +160,7 @@ body {
   --c-bg-page: var(--rr-paper-soft);
   --c-bg-card: var(--rr-surface-soft);
   --c-border: var(--rr-line);
-  --c-brand: #587a29;
+  --c-brand: var(--rr-brand);
   --c-accent: var(--rr-signal-ink);
 }
 
@@ -161,7 +173,7 @@ body {
   border-color: rgba(17, 22, 18, 0.12);
   border-radius: 12px;
   background: rgba(255, 253, 247, 0.9);
-  box-shadow: 0 12px 34px rgba(8, 11, 9, 0.055);
+  box-shadow: var(--rr-shadow-sm);
 }
 
 [data-product-workspace="true"] :is(
