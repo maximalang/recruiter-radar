@@ -87,6 +87,8 @@ jobs:
           src/__tests__/app/evidence-radar-surface-contract.test.ts
       - name: Verify isolated Evidence Radar PostgreSQL runtime
         run: node packages/db/scripts/run-evidence-radar-v1-db-tests.mjs
+      - name: Verify Commercial Signal migration round-trip
+        run: node packages/db/scripts/verify-commercial-signal-migration-roundtrip.mjs
       - name: Verify rollback safety
         run: npm run test:opportunity-engine:down
       - name: Build production web application
