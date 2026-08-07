@@ -10,29 +10,29 @@
 
 .outerRing {
   fill: none;
-  stroke: rgba(181, 234, 216, .48);
-  stroke-width: .9;
+  stroke: rgba(181, 234, 216, .58);
+  stroke-width: .95;
 }
 
 .rings circle {
   fill: none;
-  stroke: rgba(181, 234, 216, .2);
-  stroke-width: .85;
+  stroke: rgba(181, 234, 216, .48);
+  stroke-width: .9;
 }
 
-.rings circle:nth-child(1) { stroke-opacity: .42; stroke-dasharray: 86 28 24 18; }
-.rings circle:nth-child(2) { stroke-opacity: .56; stroke-dasharray: 154 38 44 26; }
-.rings circle:nth-child(3) { stroke-opacity: .34; stroke-dasharray: 212 52 64 31; }
+.rings circle:nth-child(1) { stroke-opacity: .62; stroke-dasharray: 86 28 24 18; }
+.rings circle:nth-child(2) { stroke-opacity: .78; stroke-dasharray: 154 38 44 26; }
+.rings circle:nth-child(3) { stroke-opacity: .54; stroke-dasharray: 212 52 64 31; }
 
 .brokenArcs path {
   fill: none;
-  stroke: rgba(181, 234, 216, .5);
+  stroke: rgba(181, 234, 216, .58);
   stroke-width: 1.1;
   stroke-linecap: round;
 }
 
 .ticks line {
-  stroke: rgba(242, 239, 231, .4);
+  stroke: rgba(242, 239, 231, .48);
   stroke-width: 1;
   stroke-linecap: round;
   transform-box: view-box;
@@ -41,23 +41,23 @@
 }
 
 .ticks line:nth-child(3n) { animation-duration: 29s; animation-delay: -7s; }
-.ticks line:nth-child(4n) { opacity: .45; }
+.ticks line:nth-child(4n) { opacity: .58; }
 
 .marks path {
   fill: none;
-  stroke: rgba(181, 234, 216, .6);
+  stroke: rgba(181, 234, 216, .7);
   stroke-width: 1.05;
   stroke-linecap: round;
 }
 
 .labels text {
-  fill: rgba(242, 239, 231, .38);
+  fill: rgba(242, 239, 231, .48);
   font-family: var(--mono);
   font-size: 8px;
   letter-spacing: .12em;
 }
 
-.ambient circle { fill: rgba(181, 234, 216, .34); }
+.ambient circle { fill: rgba(181, 234, 216, .42); }
 .ambient {
   transform-box: view-box;
   transform-origin: center;
@@ -80,8 +80,8 @@
 
 .clusterLinks path {
   fill: none;
-  stroke: rgba(158, 215, 196, .34);
-  stroke-width: .75;
+  stroke: rgba(158, 215, 196, .46);
+  stroke-width: .8;
   stroke-dasharray: 2 6;
   stroke-linecap: round;
 }
