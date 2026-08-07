@@ -15,15 +15,15 @@ export const DATASET_KINDS = [
 export const FALSE_POSITIVE_CATEGORIES = [
   'ordinary_hiring',
   'weak_agency_fit',
-  'internal_only',
+  'weak_external_need',
   'bad_economics',
   'stale_signal',
   'duplicate_event',
   'unverified_company',
-  'weak_external_need',
-  'no_actual_change',
   'wrong_role',
   'wrong_region',
+  'internal_recruiting_sufficient',
+  'no_actual_change',
 ]
 
 export const MODEL_KEYS = [
@@ -36,6 +36,8 @@ export const MODEL_KEYS = [
 
 const DEFAULT_MINIMUM_SAMPLE = 30
 const DEFAULT_MINIMUM_LABELED = 10
+const CALIBRATION_MINIMUM_REVIEWED = 300
+const CALIBRATION_MINIMUM_HOLDOUT = 60
 
 export function evaluateCommercialSignalDatasets(inputDatasets, options = {}) {
   if (!Array.isArray(inputDatasets) || inputDatasets.length === 0) {
@@ -47,17 +49,21 @@ export function evaluateCommercialSignalDatasets(inputDatasets, options = {}) {
   const reports = datasets.map((dataset) => evaluateDataset(dataset, options))
   const kindsPresent = new Set(datasets.map((dataset) => dataset.kind))
   const missingDatasetKinds = DATASET_KINDS.filter((kind) => !kindsPresent.has(kind))
-  const realReports = reports.filter((report) =>
-    report.provenance === 'anonymized_real' && report.dataStatus === 'sufficient_data')
+  const calibration = calibrationReadiness(reports)
 
   return {
     schemaVersion: COMMERCIAL_SIGNAL_REPORT_SCHEMA,
     datasetSchemaVersion: COMMERCIAL_SIGNAL_DATASET_SCHEMA,
     requiredDatasetKinds: DATASET_KINDS,
     missingDatasetKinds,
-    calibrationStatus: realReports.length > 0
-      ? 'uncalibrated_pending_outcome_review'
-      : 'uncalibrated_insufficient_real_outcomes',
+    calibrationStatus: calibration.status,
+    calibrationReasonCodes: calibration.reasonCodes,
+    calibrationTarget: {
+      reviewedOpportunities: CALIBRATION_MINIMUM_REVIEWED,
+      holdoutReviewed: CALIBRATION_MINIMUM_HOLDOUT,
+      diversityRequirement:
+        'multiple agency types, episode types, role families, and industries require explicit review',
+    },
     datasets: reports,
     comparison: compareV2V3(reports),
     methodology: {
@@ -242,6 +248,30 @@ function taxonomyDistribution(rows) {
   return [...counts.entries()].map(([key, count]) => ({ key, count }))
 }
 
+function calibrationReadiness(reports) {
+  const labeledReal = reports.find((report) =>
+    report.kind === 'anonymized_labeled' && report.provenance === 'anonymized_real')
+  const holdout = reports.find((report) =>
+    report.kind === 'holdout' && report.provenance === 'anonymized_real')
+  const reviewed = (labeledReal?.absoluteCounts?.labeled ?? 0) +
+    (holdout?.absoluteCounts?.labeled ?? 0)
+  const holdoutReviewed = holdout?.absoluteCounts?.labeled ?? 0
+  const reasonCodes = []
+  if (reviewed < CALIBRATION_MINIMUM_REVIEWED) {
+    reasonCodes.push('CALIBRATION_REVIEWED_LT_300')
+  }
+  if (holdoutReviewed < CALIBRATION_MINIMUM_HOLDOUT) {
+    reasonCodes.push('CALIBRATION_HOLDOUT_LT_60')
+  }
+  if (reasonCodes.length > 0) {
+    return { status: 'insufficient_data', reasonCodes }
+  }
+  return {
+    status: 'review_required',
+    reasonCodes: ['CALIBRATION_DIVERSITY_REVIEW_REQUIRED'],
+  }
+}
+
 function compareV2V3(reports) {
   const comparable = reports.filter((report) =>
     report.status === 'ready' &&
@@ -358,8 +388,9 @@ function normalizeRow(row) {
       contacted: optionalBoolean(labels.contacted),
       replied: optionalBoolean(labels.replied),
       meeting: optionalBoolean(labels.meeting),
-      falsePositiveCategory: labels.falsePositiveCategory == null ? null
-        : identifier(labels.falsePositiveCategory, 'falsePositiveCategory'),
+      falsePositiveCategory: normalizeFalsePositiveCategory(
+        labels.falsePositiveCategory,
+      ),
     },
   }
   if (normalized.labels.falsePositiveCategory &&
@@ -372,6 +403,14 @@ function normalizeRow(row) {
     throw new TypeError('A relevant row cannot be labeled as a false positive.')
   }
   return normalized
+}
+
+function normalizeFalsePositiveCategory(value) {
+  if (value == null) return null
+  const normalized = identifier(value, 'falsePositiveCategory')
+  return normalized === 'internal_only'
+    ? 'internal_recruiting_sufficient'
+    : normalized
 }
 
 function assertOutcomeOrder(labels) {
