@@ -41,11 +41,11 @@ describe('Evidence Radar production surface contract', () => {
     expect(map).toContain('Границы субъектов ещё не загружены из верифицированного источника')
   })
 
-  it('keeps both routes behind Opportunity authorization and Commercial Signal feature gates', () => {
+  it('keeps both Evidence Radar routes behind authorization and the dedicated dark rollout gate', () => {
     for (const route of [radarPage, sourcePage]) {
       expect(route).toContain("getOpportunityAuthorizationContext('opportunities:read')")
       expect(route).toContain('isOpportunityEngineV1EnabledForContext')
-      expect(route).toContain('isOpportunityCommercialSignalUiEnabledForContext')
+      expect(route).toContain('isEvidenceRadarV1EnabledForContext')
       expect(route).not.toContain('demo=1')
     }
   })
