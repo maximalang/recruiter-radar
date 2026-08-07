@@ -3,6 +3,13 @@ BEGIN;
 SET LOCAL lock_timeout = '5s';
 SET LOCAL statement_timeout = '5min';
 
+LOCK TABLE
+  evidence_correlations_v1,
+  normalized_signal_event_links_v1,
+  normalized_signals_v1,
+  evidence_events_v1
+  IN ACCESS EXCLUSIVE MODE;
+
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM evidence_correlations_v1 LIMIT 1)
