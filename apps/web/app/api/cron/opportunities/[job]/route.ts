@@ -55,6 +55,15 @@ import {
   type QueryPlannerV2JobOptions,
 } from '@/lib/lead-discovery/query-planner-v2-job'
 import {
+  executeQueryPlannerV2Sources,
+} from '@/lib/lead-discovery/query-planner-v2-executor'
+import {
+  commercialSignalCandidateRolloutMode,
+} from '@/lib/opportunities/commercial-signal-rollout'
+import {
+  writeCommercialSignalOpportunities,
+} from '@/lib/opportunities/commercial-signal-opportunity-writer'
+import {
   backfillOpportunitiesJob,
   buildOpportunitiesJob,
   detectHiringEpisodesJob,
@@ -79,6 +88,8 @@ const JOBS = new Set([
   'build-agency-dna-matches',
   'build-opportunity-candidates-v3',
   'build-query-plans-v2',
+  'execute-query-plans-v2',
+  'write-commercial-signal-opportunities',
 ])
 
 const COMPANY_EVENTS_JOB = 'normalize-company-events'
@@ -89,6 +100,8 @@ const EXTERNAL_AGENCY_PROPENSITY_JOB = 'build-external-agency-propensity'
 const AGENCY_DNA_MATCH_JOB = 'build-agency-dna-matches'
 const OPPORTUNITY_SCORING_V3_JOB = 'build-opportunity-candidates-v3'
 const QUERY_PLANNER_V2_JOB = 'build-query-plans-v2'
+const QUERY_PLANNER_V2_EXECUTION_JOB = 'execute-query-plans-v2'
+const COMMERCIAL_SIGNAL_WRITER_JOB = 'write-commercial-signal-opportunities'
 
 export async function GET(
   request: NextRequest,
@@ -147,7 +160,10 @@ export async function POST(
                 ? OPPORTUNITY_SCORING_V3_LIMITS.maximumJobBatchSize
                 : job === QUERY_PLANNER_V2_JOB
                   ? QUERY_PLANNER_V2_LIMITS.maximumProfileBatchSize
-      : OPPORTUNITY_ENGINE_LIMITS.maximumJobBatchSize
+                  : job === QUERY_PLANNER_V2_EXECUTION_JOB ||
+                      job === COMMERCIAL_SIGNAL_WRITER_JOB
+                    ? 100
+                    : OPPORTUNITY_ENGINE_LIMITS.maximumJobBatchSize
   if (
     (organizationValue !== null && organizationId === null) ||
     (workspaceValue !== null && workspaceId === null) ||
@@ -168,6 +184,20 @@ export async function POST(
   ) {
     return NextResponse.json(
       { error: 'workspace_and_profile_required_for_apply' },
+      { status: 400 },
+    )
+  }
+  if (
+    (job === QUERY_PLANNER_V2_EXECUTION_JOB ||
+      job === COMMERCIAL_SIGNAL_WRITER_JOB) &&
+    (workspaceId === null || applyValue !== 'true')
+  ) {
+    return NextResponse.json(
+      {
+        error: workspaceId === null
+          ? 'workspace_required_for_apply'
+          : 'apply_true_required',
+      },
       { status: 400 },
     )
   }
@@ -241,7 +271,7 @@ export async function POST(
     ...commonOptions,
     workspaceId,
     dryRun: applyValue !== 'true',
-    rolloutMode: 'shadow',
+    rolloutMode: commercialSignalCandidateRolloutMode(workspaceId),
   }
   const queryPlannerV2Options: QueryPlannerV2JobOptions = {
     enabled: true,
@@ -254,6 +284,20 @@ export async function POST(
   try {
     const result = job === QUERY_PLANNER_V2_JOB
       ? await buildQueryPlansV2Job(queryPlannerV2Options)
+      : job === QUERY_PLANNER_V2_EXECUTION_JOB
+        ? await executeQueryPlannerV2Sources({
+          workspaceId: workspaceId!,
+          clientProfileId,
+          limit: Math.min(batchSize ?? 20, 50),
+          dryRun: false,
+        })
+        : job === COMMERCIAL_SIGNAL_WRITER_JOB
+          ? await writeCommercialSignalOpportunities({
+            workspaceId: workspaceId!,
+            clientProfileId,
+            organizationId,
+            batchSize: Math.min(batchSize ?? 20, 100),
+          })
       : job === COMPANY_EVENTS_JOB
       ? await normalizeCompanyEventsJob(companyEventOptions)
       : job === COMPANY_STATE_JOB
@@ -290,8 +334,10 @@ export async function POST(
 }
 
 function isJobEnabled(job: string): boolean {
-  return job === QUERY_PLANNER_V2_JOB
+  return job === QUERY_PLANNER_V2_JOB || job === QUERY_PLANNER_V2_EXECUTION_JOB
     ? isQueryPlannerV2Enabled()
+    : job === COMMERCIAL_SIGNAL_WRITER_JOB
+      ? isOpportunityScoringV3Enabled()
     : job === COMPANY_EVENTS_JOB
     ? isCompanyEventsV1Enabled()
     : job === COMPANY_STATE_JOB
@@ -327,7 +373,8 @@ function authorizeCron(request: NextRequest): NextResponse | null {
 }
 
 function positiveId(value: string | null): string | null {
-  return value && /^[1-9]\d*$/.test(value) ? value : null
+  if (!value || !/^[1-9]\d{0,18}$/.test(value)) return null
+  return BigInt(value) <= BigInt('9223372036854775807') ? BigInt(value).toString() : null
 }
 
 function positiveInteger(value: string | null): number | null {
