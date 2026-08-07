@@ -1,18 +1,25 @@
-/* Keep the figure box inside the viewport; the SVG itself provides the partial radar composition. */
-@media (max-width: 1080px) and (min-width: 821px) {
+.viewportSafeField {
+  max-width: 100%;
+}
+
+/* Below the desktop composition the hero becomes normal grid flow.
+   Keeping the instrument relative to the padded scene prevents the figure
+   from inheriting the landing shell's negative outer margins and escaping
+   the physical viewport at tablet widths. */
+@media (max-width: 1180px) {
   .viewportSafeField {
-    position: absolute !important;
-    right: 0 !important;
-    width: min(58vw, 40rem) !important;
+    position: relative !important;
+    top: auto !important;
+    right: auto !important;
+    width: min(46rem, 100%) !important;
+    max-width: 100%;
   }
 }
 
-@media (max-width: 820px) {
+@media (max-width: 768px) {
   .viewportSafeField {
-    position: absolute !important;
-    right: 0 !important;
-    width: min(92vw, 32rem) !important;
-    height: min(92vw, 32rem) !important;
-    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100%;
+    margin-inline: 0 !important;
   }
 }
