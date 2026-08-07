@@ -7,13 +7,20 @@ import HeroInstrument from "./hero-instrument";
 import { DEMO_COMPANY } from "./landing-copy";
 import styles from "./landing.module.css";
 
-export default function DetectionScene({ previewHref }: { previewHref: string }) {
+export default function DetectionScene({
+  previewHref,
+  paymentConfigured,
+}: {
+  previewHref: string;
+  paymentConfigured: boolean;
+}) {
   return (
     <section
       id="scene-detection"
       className={`${styles.scene} ${styles.detectionScene} ${sceneStyles.section}`}
       aria-labelledby="detection-title"
       data-header-tone="dark"
+      data-hero-layout="balanced-grid"
     >
       <div className={`${styles.detectionField} ${sceneStyles.field}`}>
         <HeroInstrument
@@ -32,12 +39,12 @@ export default function DetectionScene({ previewHref }: { previewHref: string })
       </div>
 
       <div className={`${styles.detectionCopy} ${sceneStyles.copy}`}>
-        <p className={styles.serviceLabel}>Для рекрутинговых агентств в России</p>
+        <p className={styles.serviceLabel}>Клиентские возможности для рекрутинговых агентств</p>
         <h1 id="detection-title" className={`${styles.displayTitle} ${sceneStyles.title}`}>
-          <span>Компании подают сигнал.</span> <em>Радар показывает, кому писать.</em>
+          Компании, которым стоит написать сегодня.
         </h1>
         <p className={styles.heroDescription}>
-          Recruiter Radar связывает hiring signals из вакансий и карьерных страниц с корпоративными и реестровыми подтверждениями, а затем собирает короткий список клиентских возможностей. Кому написать сегодня, почему именно сейчас и на какие факты сослаться — видно сразу.
+          Recruiter Radar собирает сигналы найма, связывает их с конкретными компаниями и показывает короткий приоритетный список: что изменилось, насколько сигнал надёжен и на какие факты можно сослаться в первом контакте.
         </p>
         <div className={styles.heroActions}>
           <a
@@ -46,7 +53,7 @@ export default function DetectionScene({ previewHref }: { previewHref: string })
             data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroPrimary}
           >
-            Получить пример радара <ArrowGlyph />
+            Посмотреть пример радара <ArrowGlyph />
           </a>
           <a
             href="#scene-timeline"
@@ -54,10 +61,14 @@ export default function DetectionScene({ previewHref }: { previewHref: string })
             data-analytics-event={LANDING_ANALYTICS_EVENT.previewResultsClicked}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroSecondary}
           >
-            Как радар делает вывод <ArrowGlyph className={styles.downArrow} />
+            Как формируется приоритет <ArrowGlyph className={styles.downArrow} />
           </a>
         </div>
-        <p className={styles.microcopy}>7 дней пилота · без автопродления · без автоматической рассылки компаниям</p>
+        <p className={styles.microcopy} data-hero-trust-line>
+          {paymentConfigured
+            ? "7 дней · разовая оплата · обращения компаниям отправляете только вы"
+            : "7 дней · заявка без списания · обращения компаниям отправляете только вы"}
+        </p>
       </div>
 
       <article className={`${styles.detectionLock} ${sceneStyles.lock}`} aria-label={`Новый сигнал: ${DEMO_COMPANY.signal}`}>
