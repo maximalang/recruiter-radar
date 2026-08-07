@@ -52,7 +52,7 @@ export default function WorkspaceLead({ item, defaultOpen }: { item: PreviewItem
           <strong>{employerName}</strong>
           <small>{[location, vacanciesCaption].filter(Boolean).join(" · ")}</small>
         </span>
-        <span className={styles.workspaceSignal}>{whyNow}</span>
+        <span className={`${styles.workspaceSignal} ${sceneStyles.leadSignal}`}>{whyNow}</span>
         <span className={styles.workspaceScore} data-lead-score>
           <strong>{points}</strong>
           <small>/100</small>
@@ -95,7 +95,7 @@ export default function WorkspaceLead({ item, defaultOpen }: { item: PreviewItem
           </div>
         </div>
 
-        <div className={styles.workspaceLeadFooter}>
+        <div className={`${styles.workspaceLeadFooter} ${sceneStyles.leadFooter}`}>
           <span>Сила сигнала {score}/100 · уровень уверенности {item.confidence_gate ?? "требует проверки"}</span>
           <strong>Без автоматической отправки</strong>
         </div>
