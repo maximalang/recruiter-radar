@@ -95,7 +95,7 @@
 .presets::-webkit-scrollbar { display: none; }
 .presets > span { margin-right: .15rem; }
 .presets a {
-  min-height: 36px;
+  min-height: 44px;
   padding: .42rem .58rem;
   border: 0;
   border-bottom: 1px solid transparent;
@@ -386,7 +386,7 @@
 }
 
 @media (max-width: 480px) {
-  .presets a { min-height: 34px; white-space: nowrap; }
+  .presets a { min-height: 44px; white-space: nowrap; }
   .footerRail small { max-width: 18rem; line-height: 1.4; }
 }
 
