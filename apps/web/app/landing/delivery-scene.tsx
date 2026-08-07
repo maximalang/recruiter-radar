@@ -5,10 +5,10 @@ import styles from "./landing.module.css";
 
 const DELIVERY_STEPS = [
   { title: "Профиль агентства", text: "Специализация, география, ключевые слова, исключения и ограничения задают профиль поиска." },
-  { title: "Сбор evidence", text: "Hiring-сигналы и supporting-источники связываются с одной компанией и сохраняют provenance." },
-  { title: "Проверка и оценка", text: "Радар проверяет свежесть, силу сигнала, соответствие профилю и достижимость корпоративного контакта." },
-  { title: "Короткая выдача", text: "Вместо потока вакансий — приоритетные компании с «почему сейчас», evidence и следующим безопасным шагом." },
-  { title: "Маршруты доставки", text: "Выдача остаётся в веб-кабинете и может дублироваться в настроенные Telegram, VK, email, browser push или signed webhook." },
+  { title: "Сигналы и подтверждения", text: "Сигналы найма связываются с конкретной компанией и дополняются фактами, которые можно перепроверить." },
+  { title: "Проверка и оценка", text: "Радар учитывает свежесть и силу сигнала, соответствие профилю и доступность официального корпоративного канала." },
+  { title: "Короткая выдача", text: "В приоритет попадают компании с понятным «почему сейчас», доказательствами и следующим безопасным шагом." },
+  { title: "Маршруты доставки", text: "Выдача остаётся в веб-кабинете и при необходимости дублируется в Telegram, VK, email, browser push или подписанный HTTPS webhook." },
   { title: "Решение пользователя", text: "Вы перепроверяете факты, выбираете компанию и сами решаете, обращаться ли к ней." },
 ] as const;
 
@@ -25,21 +25,21 @@ const DELIVERY_CHANNELS: ReadonlyArray<{
     key: "cabinet",
     title: "Веб-кабинет",
     status: "базовый",
-    text: "Карточки возможностей, evidence, приоритет и обратная связь остаются внутри продукта.",
+    text: "Карточки возможностей, доказательства, приоритет и обратная связь остаются внутри продукта.",
     note: "рабочая поверхность продукта",
   },
   {
     key: "telegram",
     title: "Telegram",
     status: "подключаемый",
-    text: "Клиентский bot может доставлять digest и hot-lead события в личный чат, группу или канал.",
+    text: "Ваш Telegram-бот может доставлять ежедневную выдачу и события по сильным возможностям в личный чат, группу или канал.",
     note: "customer-managed bot / endpoint",
   },
   {
     key: "vk",
     title: "VK",
     status: "подключаемый",
-    text: "Notification platform умеет доставлять события через подключённое VK-сообщество.",
+    text: "События радара можно доставлять через подключённое VK-сообщество.",
     note: "community token / verified peer",
   },
   {
@@ -53,14 +53,14 @@ const DELIVERY_CHANNELS: ReadonlyArray<{
     key: "push",
     title: "Browser push",
     status: "по подписке",
-    text: "Браузерные уведомления используются для новых сильных лидов при активной push-подписке.",
+    text: "Браузерные уведомления помогают не пропустить новую сильную возможность при активной push-подписке.",
     note: "VAPID / active subscription",
   },
   {
     key: "webhook",
     title: "Signed webhook",
     status: "интеграция",
-    text: "Подписанный HTTPS webhook позволяет передавать события в собственный n8n, CRM или внутренний workflow.",
+    text: "Подписанный HTTPS webhook передаёт события радара в ваш n8n, CRM или внутренний процесс.",
     note: "HMAC / customer endpoint",
   },
 ] as const;
@@ -94,12 +94,12 @@ export default function DeliveryScene() {
     >
       <div className={styles.deliveryLayout}>
         <div className={styles.deliveryIntro}>
-          <p className={styles.sceneLabel}>05 — Как работает доставка</p>
+          <p className={styles.sceneLabel}>05 — Рабочий процесс</p>
           <h2 id="delivery-title" className={styles.sceneHeading}>
-            От профиля агентства до <em>короткой выдачи в нужном канале.</em>
+            Как радар попадает <em>в ваш рабочий процесс.</em>
           </h2>
           <p className={styles.sceneLead}>
-            Система автоматизирует исследование, приоритизацию и доставку рекомендации. Она не подменяет решение пользователя и не рассылает обращения компаниям.
+            Recruiter Radar автоматизирует исследование, приоритизацию и доставку рекомендации. Финальная проверка компании и решение об обращении остаются у пользователя.
           </p>
         </div>
 
@@ -116,10 +116,10 @@ export default function DeliveryScene() {
         <div className={sceneStyles.capabilityPanel} aria-label="Поддерживаемые способы доставки">
           <div className={sceneStyles.capabilityHeader}>
             <div>
-              <span>Delivery platform / 06 surfaces</span>
-              <strong>Не один мессенджер. Один радар — несколько маршрутов доставки.</strong>
+              <span>Доставка / 6 каналов</span>
+              <strong>Один радар — несколько рабочих каналов.</strong>
             </div>
-            <p>Каналы активируются только после настройки соответствующего endpoint. Наличие адаптера не подменяет проверку credentials и доступности провайдера.</p>
+            <p>Веб-кабинет доступен всегда. Остальные каналы включаются после настройки и проверки соответствующего подключения.</p>
           </div>
           <div className={sceneStyles.channelGrid}>
             {DELIVERY_CHANNELS.map((channel) => (
@@ -149,7 +149,7 @@ export default function DeliveryScene() {
           </div>
           <aside className={styles.deliveryBoundary}>
             <span>Граница автоматизации</span>
-            <strong>Recruiter Radar доставляет рекомендацию, но не отправляет сообщение компании.</strong>
+            <strong>Рекомендация приходит автоматически. Обращение отправляете вы.</strong>
             <p>Черновик, финальная проверка и отправка остаются в руках пользователя.</p>
           </aside>
         </div>

@@ -12,12 +12,12 @@ export default function SignalTimelineScene() {
     >
       <div className={styles.timelineLayout}>
         <div className={styles.timelineIntro}>
-          <p className={styles.sceneLabel}>02 — Паттерн сигнала</p>
+          <p className={styles.sceneLabel}>02 — Почему сейчас</p>
           <h2 id="timeline-title" className={styles.sceneHeading}>
-            Не список вакансий. <em>История, объясняющая момент для контакта.</em>
+            Почему компании <em>требуют внимания именно сейчас.</em>
           </h2>
           <p className={styles.sceneLead}>
-            Радар связывает события одной компании, проверяет их свежесть и показывает переход от обычного найма к коммерчески значимой ситуации.
+            Радар связывает события одной компании, проверяет их свежесть и показывает момент, когда обычный найм превращается в реальную клиентскую возможность.
           </p>
         </div>
 

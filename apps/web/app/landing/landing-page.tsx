@@ -32,7 +32,7 @@ export default function LandingPage(props: {
       <LandingHashNavigation />
       <LandingHeader previewHref="#preview-configurator" />
       <main id="main-content">
-        <DetectionScene previewHref="#preview-configurator" />
+        <DetectionScene previewHref="#preview-configurator" paymentConfigured={props.paymentConfigured} />
         <SignalTimelineScene />
         <WorkspaceScene
           previewInput={props.previewInput}

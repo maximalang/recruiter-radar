@@ -52,8 +52,10 @@ const surfaceSpecs = [
   { name: "hero-1440x900", width: 1440, height: 900, mode: "top" },
   { name: "hero-1180x820", width: 1180, height: 820, mode: "top" },
   { name: "hero-1024x768", width: 1024, height: 768, mode: "top" },
+  { name: "hero-768x1024", width: 768, height: 1024, mode: "top" },
   { name: "hero-390x844", width: 390, height: 844, mode: "top" },
   { name: "mobile-menu-390x844", width: 390, height: 844, mode: "menu" },
+  { name: "timeline-1440x900", width: 1440, height: 900, target: "#scene-timeline" },
   { name: "preview-1440x900", width: 1440, height: 900, target: "#scene-workspace" },
   { name: "preview-768x1024", width: 768, height: 1024, target: "#scene-workspace" },
   { name: "preview-390x844", width: 390, height: 844, target: "#scene-workspace" },
@@ -62,7 +64,10 @@ const surfaceSpecs = [
   { name: "outreach-1440x900", width: 1440, height: 900, target: "#scene-outreach" },
   { name: "pricing-1440x900", width: 1440, height: 900, target: "#pricing" },
   { name: "pricing-390x844", width: 390, height: 844, target: "#pricing" },
+  { name: "faq-1440x900", width: 1440, height: 900, target: "#faq" },
   { name: "faq-390x844", width: 390, height: 844, target: "#faq" },
+  { name: "final-cta-1440x900", width: 1440, height: 900, target: "#conversion-final" },
+  { name: "footer-1440x900", width: 1440, height: 900, target: "footer" },
 ];
 
 const documentedConsoleAllowlist = [];
@@ -123,15 +128,15 @@ async function assertRequiredSurface(page, label) {
   }
 
   assert.equal(await page.locator("h1").count(), 1, `${label}: expected exactly one h1`);
-  assert.match(await page.locator("h1").innerText(), /Компании подают сигнал\.\s*Радар показывает, кому писать\./);
-  assert.match(await page.locator("#scene-timeline").innerText(), /сигнал|ваканс|событ/i);
-  assert.match(await page.locator("#scene-workspace").innerText(), /рабочий пример/i);
-  assert.match(await page.locator("#scene-evidence").innerText(), /доказатель/i);
-  assert.match(await page.locator("#scene-delivery").innerText(), /не отправляет сообщение компании/i);
-  assert.match(await page.locator("#scene-outreach").innerText(), /не отправляет сообщения компаниям автоматически/i);
-  assert.match(await page.locator("#pricing").innerText(), /Начните с недели/i);
-  assert.match(await page.locator("#faq").innerText(), /Перед запуском|данных, доставки и контроля/i);
-  await page.getByRole("heading", { name: /Соберите радар под свою специализацию/ }).waitFor();
+  assert.match(await page.locator("h1").innerText(), /Компании, которым стоит написать сегодня\./);
+  assert.match(await page.locator("#scene-timeline").innerText(), /Почему компании|событ|приоритет/i);
+  assert.match(await page.locator("#scene-workspace").innerText(), /рабочая выдача|пример утренней выдачи/i);
+  assert.match(await page.locator("#scene-evidence").innerText(), /доказатель|факт/i);
+  assert.match(await page.locator("#scene-delivery").innerText(), /Обращение отправляете вы|Решение пользователя/i);
+  assert.match(await page.locator("#scene-outreach").innerText(), /Отправка сообщения компании всегда требует действия пользователя/i);
+  assert.match(await page.locator("#pricing").innerText(), /Проверьте радар на своих нишах за 7 дней/i);
+  assert.match(await page.locator("#faq").innerText(), /Перед запуском — короткие ответы/i);
+  await page.getByRole("heading", { name: /Соберите радар под специализацию агентства/ }).waitFor();
   await page.getByRole("link", { name: /Оферта/ }).last().waitFor();
   await page.getByRole("link", { name: /Конфиденциальность/ }).last().waitFor();
 }
@@ -225,6 +230,19 @@ async function assertHeroGeometry(page, label) {
   for (const selector of ["#scene-detection h1", "#scene-detection figure", "#scene-detection article"]) {
     const box = await page.locator(selector).first().boundingBox();
     assert.ok(box && box.width >= 44 && box.height >= 44, `${label}: invalid hero surface ${selector}`);
+  }
+
+  if (label === "desktop-1440x900" || label === "desktop-1920x1080") {
+    const viewport = page.viewportSize();
+    const primary = await page.locator('#scene-detection [data-analytics-context="hero_primary"]').boundingBox();
+    const secondary = await page.locator('#scene-detection [data-analytics-context="hero_secondary"]').boundingBox();
+    const trust = await page.locator("#scene-detection [data-hero-trust-line]").boundingBox();
+    const radar = await page.locator("#scene-detection figure").first().boundingBox();
+    assert.ok(viewport && primary && secondary && trust && radar, `${label}: missing hero fold surfaces`);
+    assert.ok(primary.y + primary.height <= viewport.height, `${label}: primary CTA is below fold`);
+    assert.ok(secondary.y + secondary.height <= viewport.height, `${label}: secondary CTA is below fold`);
+    assert.ok(trust.y + trust.height <= viewport.height, `${label}: trust line is below fold`);
+    assert.ok(radar.x < viewport.width && radar.x + radar.width > viewport.width * .5, `${label}: radar is not visibly participating in hero`);
   }
 }
 
@@ -529,9 +547,9 @@ async function assertNoJs(browser) {
   for (const selector of requiredSelectors) {
     await page.locator(selector).first().waitFor({ state: "attached" });
   }
-  assert.match(await page.locator("h1").innerText(), /Компании подают сигнал\.\s*Радар показывает, кому писать\./);
-  assert.match(await page.locator("#scene-timeline").innerText(), /сигнал|ваканс|событ/i);
-  assert.match(await page.locator("#scene-workspace").innerText(), /рабочий пример/i);
+  assert.match(await page.locator("h1").innerText(), /Компании, которым стоит написать сегодня\./);
+  assert.match(await page.locator("#scene-timeline").innerText(), /Почему компании|событ|приоритет/i);
+  assert.match(await page.locator("#scene-workspace").innerText(), /рабочая выдача|пример утренней выдачи/i);
   assert.equal(await page.locator("#preview-configurator form").count(), 1, "no-JS configurator missing");
   await page.getByLabel("Специализация").waitFor({ state: "attached" });
   await page.getByLabel("География").waitFor({ state: "attached" });
@@ -539,12 +557,12 @@ async function assertNoJs(browser) {
   const skeleton = page.locator("#preview-results[data-preview-results-skeleton]").first();
   await skeleton.waitFor({ state: "attached" });
   assert.equal(await skeleton.evaluate((element) => element.closest("#preview-results") === element), true, "no-JS skeleton escaped results boundary");
-  assert.match(await page.locator("#scene-evidence").innerText(), /доказатель/i);
-  assert.match(await page.locator("#scene-delivery").innerText(), /не отправляет сообщение компании/i);
-  assert.match(await page.locator("#scene-outreach").innerText(), /не отправляет сообщения компаниям автоматически/i);
-  assert.match(await page.locator("#pricing").innerText(), /Начните с недели/i);
+  assert.match(await page.locator("#scene-evidence").innerText(), /доказатель|факт/i);
+  assert.match(await page.locator("#scene-delivery").innerText(), /Обращение отправляете вы|Решение пользователя/i);
+  assert.match(await page.locator("#scene-outreach").innerText(), /Отправка сообщения компании всегда требует действия пользователя/i);
+  assert.match(await page.locator("#pricing").innerText(), /Проверьте радар на своих нишах за 7 дней/i);
   assert.ok(await page.locator("#faq summary").count() >= 1, "no-JS FAQ question missing");
-  await page.getByRole("heading", { name: /Соберите радар под свою специализацию/ }).waitFor({ state: "attached" });
+  await page.getByRole("heading", { name: /Соберите радар под специализацию агентства/ }).waitFor({ state: "attached" });
   await page.getByRole("link", { name: /Оферта/ }).last().waitFor({ state: "attached" });
   await page.getByRole("link", { name: /Конфиденциальность/ }).last().waitFor({ state: "attached" });
   const followsResults = await page.evaluate(() => {
@@ -657,6 +675,7 @@ try {
       touchTargets: true,
       horizontalOverflow: true,
       clipping: true,
+      heroFold: true,
     },
   }, null, 2)}\n`);
 } finally {

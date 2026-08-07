@@ -30,15 +30,14 @@ describe("landing runtime truth contract", () => {
       expect(delivery).toContain(label);
     }
 
-    expect(faq).toContain("клиентский Telegram-бот");
-    expect(faq).toContain("VK-сообщество");
-    expect(faq).toContain("browser push");
-    expect(faq).toContain("signed HTTPS webhook");
+    for (const label of ["Telegram", "VK", "email digest", "browser push", "signed HTTPS webhook"]) {
+      expect(faq).toContain(label);
+    }
     expect(faq).not.toContain("остальные способы доставки не входят");
     expect(pricing).toContain("Telegram / VK / email / browser push / signed webhook");
   });
 
-  test("source copy distinguishes promoted lead evidence from supporting, gated and context-only sources", () => {
+  test("source copy preserves runtime roles while presenting them in customer language", () => {
     const evidence = webSource("app/landing/evidence-scene.tsx");
     const faq = webSource("app/landing/landing-faq.ts");
     const registry = repoSource("packages/db/scripts/source-registry.mjs");
@@ -51,15 +50,23 @@ describe("landing runtime truth contract", () => {
     expect(registry).toContain("supporting-evidence-only");
     expect(registry).toContain("never-lead-originating");
 
-    expect(evidence).toContain("Создают lead evidence сейчас");
-    expect(evidence).toContain("adapter ready / digest gated");
-    expect(evidence).toContain("context only");
+    expect(evidence).toContain("Дают основной сигнал найма");
+    expect(evidence).toContain("Подтверждают компанию");
+    expect(evidence).toContain("Расширяют покрытие после проверки");
+    expect(evidence).toContain("Добавляют бизнес-контекст");
+    expect(evidence).toContain('state: "live"');
+    expect(evidence).toContain('state: "support"');
+    expect(evidence).toContain('state: "gated"');
+    expect(evidence).toContain('state: "context"');
     expect(evidence).toContain("Хабр Карьера");
     expect(evidence).toContain("SuperJob");
     expect(evidence).toContain("Публичные ATS / tech job boards");
     expect(evidence).toContain("GDELT / funding & business signals");
 
-    expect(faq).toContain("не попадают в digest до прохождения соответствующих проверок");
+    expect(faq).toContain("не влияют на основную выдачу, пока не пройдут проверки");
+    expect(evidence).not.toContain("adapter ready / digest gated");
+    expect(evidence).not.toContain("promotion gate");
+    expect(faq).not.toContain("lead-originate");
   });
 
   test("public homepage uses the runtime-grounded FAQ instead of the legacy two-channel copy", () => {

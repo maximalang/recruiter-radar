@@ -29,35 +29,35 @@ const SOURCE_ROWS = [
 
 const SOURCE_ROLES = [
   {
-    title: "Создают lead evidence сейчас",
-    summary: "Только источники, прошедшие promotion gate.",
-    detail: "Эти источники могут дать основной hiring signal, из которого компания попадает в клиентскую выдачу. Даже здесь применяются freshness, confidence и entity-resolution проверки.",
+    title: "Дают основной сигнал найма",
+    summary: "Свежий сигнал может вывести компанию в приоритетную выдачу.",
+    detail: "hh.ru, Работа России и прямые карьерные страницы дают основной сигнал найма. Перед попаданием компании в выдачу Radar проверяет свежесть, надёжность сигнала и корректность связи с организацией.",
     state: "live",
-    stateText: "digest-allowed",
+    stateText: "Влияет на основную выдачу",
     sources: ["hh.ru", "Работа России", "Прямые карьерные страницы"],
   },
   {
     title: "Подтверждают компанию",
-    summary: "Юрлицо, домен и корпоративный маршрут.",
-    detail: "Supporting и enrichment-источники связывают сигнал с корректной организацией и помогают найти официальный корпоративный путь контакта. Они не должны создавать лид без hiring evidence.",
+    summary: "Помогают проверить юрлицо, домен и официальный маршрут связи.",
+    detail: "Сайт компании и реестры ФНС помогают связать сигнал с правильной организацией и найти официальный корпоративный канал. Они подтверждают возможность, но не заменяют сам сигнал найма.",
     state: "support",
-    stateText: "support / enrichment",
+    stateText: "Подтверждает компанию",
     sources: ["Сайт компании", "ЕГРЮЛ / ФНС", "Прозрачный бизнес ФНС"],
   },
   {
-    title: "Расширяют покрытие после gates",
-    summary: "Адаптеры есть, digest-допуск не обещается заранее.",
-    detail: "Для secondary hiring sources код уже предусматривает ingestion, но production digest остаётся закрыт до необходимых confidence, legal, robots или provider-проверок. Лендинг показывает эту границу явно, а не выдаёт наличие адаптера за готовый источник лидов.",
+    title: "Расширяют покрытие после проверки",
+    summary: "Адаптеры подключены, но пока не влияют на основную выдачу.",
+    detail: "Для дополнительных площадок уже есть адаптеры. Они начинают влиять на клиентскую выдачу только после проверок качества, правовой доступности и стабильности источника.",
     state: "gated",
-    stateText: "adapter ready / digest gated",
+    stateText: "Подключено, проходит проверки",
     sources: ["Хабр Карьера", "SuperJob", "Публичные ATS / tech job boards", "LinkedIn company pages", "Региональные job boards"],
   },
   {
     title: "Добавляют бизнес-контекст",
-    summary: "Контекст усиливает объяснение, но не создаёт лид.",
-    detail: "Новости, корпоративные события, реестровые и business-сигналы помогают объяснить расширение, инвестиции или изменение компании. Они остаются supporting context и не заменяют прямое подтверждение найма.",
+    summary: "Помогают объяснить изменение компании и усилить первый контакт.",
+    detail: "Корпоративные новости, реестровые события и отраслевые публикации помогают понять расширение, инвестиции или изменения бизнеса. Такой контекст дополняет, но не заменяет подтверждённый найм.",
     state: "context",
-    stateText: "context only",
+    stateText: "Контекст для объяснения",
     sources: ["Корпоративные newsroom-страницы", "GDELT / funding & business signals", "Федресурс", "Отраслевые медиа"],
   },
 ] as const;
@@ -72,12 +72,12 @@ export default function EvidenceScene() {
     >
       <div className={styles.evidenceLayout}>
         <div className={styles.evidenceIntro}>
-          <p className={styles.sceneLabel}>04 — Доказательства</p>
+          <p className={styles.sceneLabel}>04 — Основание приоритета</p>
           <h2 id="evidence-title" className={styles.sceneHeading}>
-            Оценка — не чёрный ящик. <em>Каждый вывод остаётся рядом с evidence.</em>
+            На каких фактах <em>основан вывод.</em>
           </h2>
           <p className={styles.sceneLead}>
-            До обращения видно, какие события повлияли на приоритет, когда они произошли и какой источник подтверждает вывод.
+            До обращения видно, какие события повлияли на приоритет, когда они произошли и какой источник подтверждает каждый факт.
           </p>
         </div>
 
@@ -129,13 +129,13 @@ export default function EvidenceScene() {
 
         <div className={styles.sourceRoles}>
           <div className={styles.sourceRolesIntro}>
-            <span>Source registry / фактические роли</span>
-            <strong>Не все подключённые источники имеют право поднять компанию в выдачу.</strong>
-            <p className={sceneStyles.registryNote}><strong>Принцип:</strong> наличие адаптера ≠ production-ready. Lead-originating, supporting, gated и context-only источники показаны отдельно.</p>
+            <span>Как источники участвуют в выдаче</span>
+            <strong>У каждого источника своя роль в приоритизации.</strong>
+            <p className={sceneStyles.registryNote}><strong>Принцип:</strong> основной сигнал найма выводит компанию в радар, а остальные источники подтверждают организацию, расширяют покрытие или добавляют контекст.</p>
           </div>
           <div className={styles.sourceRoleList}>
             {SOURCE_ROLES.map((role, index) => (
-              <details key={role.title} open={index === 0}>
+              <details key={role.title} open={index === 0} data-source-role={role.state}>
                 <summary>
                   <span>{String(index + 1).padStart(2, "0")}</span>
                   <strong>{role.title}</strong>
