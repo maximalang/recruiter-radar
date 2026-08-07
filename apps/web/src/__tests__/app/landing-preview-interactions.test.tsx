@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import LandingPreviewInteractions from "@/app/landing-preview-interactions";
 
@@ -100,5 +100,54 @@ describe("LandingPreviewInteractions", () => {
 
     expect(replacementForm).toHaveAttribute("aria-busy", "true");
     expect(replacementForm.querySelector("[data-preview-submit]")).toBeDisabled();
+  });
+
+  it("restores a deep-link anchor after streamed preview results become ready", async () => {
+    window.history.replaceState({}, "", "/#scene-evidence");
+    const scrollIntoView = jest.fn();
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+    const originalRequestAnimationFrame = window.requestAnimationFrame;
+    const originalCancelAnimationFrame = window.cancelAnimationFrame;
+
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoView,
+    });
+    window.requestAnimationFrame = (callback) => {
+      callback(0);
+      return 1;
+    };
+    window.cancelAnimationFrame = jest.fn();
+
+    const { container, unmount } = render(
+      <div>
+        <div data-preview-results><div data-preview-results-skeleton /></div>
+        <section id="scene-evidence">Evidence</section>
+        <LandingPreviewInteractions />
+      </div>,
+    );
+
+    expect(scrollIntoView).not.toHaveBeenCalled();
+    const readyResults = document.createElement("div");
+    readyResults.setAttribute("data-preview-results-ready", "");
+    act(() => {
+      container.querySelector("[data-preview-results]")?.appendChild(readyResults);
+    });
+
+    await waitFor(() => {
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: "start" });
+    });
+
+    unmount();
+    if (originalScrollIntoView) {
+      Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+        configurable: true,
+        value: originalScrollIntoView,
+      });
+    } else {
+      delete (HTMLElement.prototype as Partial<HTMLElement>).scrollIntoView;
+    }
+    window.requestAnimationFrame = originalRequestAnimationFrame;
+    window.cancelAnimationFrame = originalCancelAnimationFrame;
   });
 });

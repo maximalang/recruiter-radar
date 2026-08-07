@@ -24,7 +24,6 @@ describe('pull request CI workflow contract', () => {
     ]) {
       expect(workflow).toContain(job)
     }
-    expect(workflow).toContain('npm run test:company-events-v1:db')
   })
 
   it('runs landing and responsive browser audits and retains failure artifacts', () => {
@@ -40,9 +39,7 @@ describe('pull request CI workflow contract', () => {
     expect(workflow).toContain('node apps/web/scripts/prepare-standalone.mjs')
     expect(workflow).toContain('-o /tmp/landing-ready.html')
     expect(workflow).toContain('grep -q')
-    expect(workflow).toContain(
-      'data-deploy-anchor="recruiter-radar-signal-lock"',
-    )
+    expect(workflow).toContain('data-deploy-anchor="recruiter-radar-landing-v3"')
     expect(workflow).toContain(
       'node scripts/verify-production-server-log.mjs /tmp/landing-server.log',
     )

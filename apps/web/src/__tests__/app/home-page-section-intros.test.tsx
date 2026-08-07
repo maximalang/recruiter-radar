@@ -1,17 +1,20 @@
 import { Children, isValidElement, type ReactElement, type ReactNode } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToPipeableStream, renderToStaticMarkup } from "react-dom/server";
 import Link from "next/link";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { PassThrough } from "node:stream";
 import { resolve } from "node:path";
 
 import HomePage, { PreviewSection, PreviewSkeleton } from "@/app/home-page-content";
 import ConversionPanel from "@/app/landing/conversion-panel";
+import DeliveryScene from "@/app/landing/delivery-scene";
 import DetectionScene from "@/app/landing/detection-scene";
 import EvidenceScene from "@/app/landing/evidence-scene";
 import LandingHeader from "@/app/landing/landing-header";
 import OutreachScene from "@/app/landing/outreach-scene";
 import SignalTimelineScene from "@/app/landing/signal-timeline-scene";
-import WorkspaceScene from "@/app/landing/workspace-scene";
+import WorkspaceScene, { WorkspaceResults } from "@/app/landing/workspace-scene";
+import { SiteFooter } from "@/app/ui/site-footer";
 import {
   LANDING_ANALYTICS_CONTEXT,
   LANDING_ANALYTICS_EVENT,
@@ -36,6 +39,10 @@ const mockGetPublicSampleDigestState = getPublicSampleDigestState as jest.Mocked
   typeof getPublicSampleDigestState
 >;
 
+const WEB_ROOT = existsSync(resolve(process.cwd(), "app"))
+  ? process.cwd()
+  : resolve(process.cwd(), "apps/web");
+
 type PreviewItem = Awaited<ReturnType<typeof getPublicSampleDigestState>>["items"][number];
 
 function collectElements(node: ReactNode, type: unknown): ReactElement<Record<string, any>>[] {
@@ -59,6 +66,40 @@ function readVisibleText(node: ReactNode): string {
     }
   });
   return parts.join(" ").replace(/\s+/g, " ").trim();
+}
+
+function renderServerHtml(node: ReactNode): Promise<string> {
+  return new Promise((resolveHtml, reject) => {
+    const output = new PassThrough();
+    let html = "";
+    let settled = false;
+
+    output.setEncoding("utf8");
+    output.on("data", (chunk) => {
+      html += chunk;
+    });
+    output.on("end", () => {
+      if (settled) return;
+      settled = true;
+      resolveHtml(html);
+    });
+    output.on("error", (error) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    });
+
+    const stream = renderToPipeableStream(node, {
+      onAllReady() {
+        stream.pipe(output);
+      },
+      onShellError(error) {
+        if (settled) return;
+        settled = true;
+        reject(error);
+      },
+    });
+  });
 }
 
 function makePreviewItem(overrides: Partial<PreviewItem> = {}): PreviewItem {
@@ -90,8 +131,13 @@ function makePreviewItem(overrides: Partial<PreviewItem> = {}): PreviewItem {
   };
 }
 
-describe("signal lock landing contract", () => {
+function source(path: string) {
+  return readFileSync(resolve(WEB_ROOT, path), "utf8");
+}
+
+describe("final unified evidence-first landing contract", () => {
   beforeEach(() => {
+    mockGetPublicSampleDigestState.mockReset();
     mockGetPublicSampleDigestState.mockResolvedValue({
       isLive: true,
       isPersonalized: false,
@@ -100,92 +146,121 @@ describe("signal lock landing contract", () => {
     });
   });
 
-  it("composes five connected scenes without the legacy marketing-section stack", async () => {
+  it("keeps the required scene order and conversion outside workspace suspense", async () => {
     const page = await HomePage({ searchParams: Promise.resolve({}) });
-
     expect(collectElements(page, LandingHeader)).toHaveLength(1);
     expect(collectElements(page, DetectionScene)).toHaveLength(1);
     expect(collectElements(page, SignalTimelineScene)).toHaveLength(1);
-    expect(collectElements(page, EvidenceScene)).toHaveLength(1);
-    expect(collectElements(page, OutreachScene)).toHaveLength(1);
     expect(collectElements(page, WorkspaceScene)).toHaveLength(1);
-    expect(collectElements(page, "main").find((main) => main.props.id === "main-content")).toBeDefined();
-  });
+    expect(collectElements(page, EvidenceScene)).toHaveLength(1);
+    expect(collectElements(page, DeliveryScene)).toHaveLength(1);
+    expect(collectElements(page, OutreachScene)).toHaveLength(1);
+    expect(collectElements(page, ConversionPanel)).toHaveLength(1);
+    expect(collectElements(page, SiteFooter)).toHaveLength(1);
 
-  it("explains the product in the first scene and preserves hero analytics", () => {
-    const markup = renderToStaticMarkup(<DetectionScene previewHref="#preview-configurator" />);
-
-    expect(markup).toContain("Кому написать сегодня");
-    expect(markup).toContain("видно по сигналам");
-    expect(markup).toContain("Клиентский радар для рекрутинговых агентств");
-    expect(markup).toContain("Собрать мой радар");
-    expect(markup).toContain(`data-analytics-event="${LANDING_ANALYTICS_EVENT.previewStarted}"`);
-    expect(markup).toContain(`data-analytics-context="${LANDING_ANALYTICS_CONTEXT.heroPrimary}"`);
-    expect(markup).not.toContain("data-hero-tilt");
-  });
-
-  it("uses one opportunity across signal, evidence and manual outreach scenes", () => {
-    const timeline = renderToStaticMarkup(<SignalTimelineScene />);
-    const evidence = renderToStaticMarkup(<EvidenceScene />);
-    const outreach = renderToStaticMarkup(<OutreachScene />);
-
-    for (const markup of [timeline, evidence, outreach]) {
-      expect(markup).toContain("Производственная компания");
+    const landing = source("app/landing/landing-page.tsx");
+    const expectedOrder = [
+      "<DetectionScene",
+      "<SignalTimelineScene",
+      "<WorkspaceScene",
+      "<EvidenceScene",
+      "<DeliveryScene",
+      "<OutreachScene",
+      "<ConversionPanel",
+      "<SiteFooter",
+    ];
+    let cursor = -1;
+    for (const token of expectedOrder) {
+      const next = landing.indexOf(token);
+      expect(next).toBeGreaterThan(cursor);
+      cursor = next;
     }
-    expect(timeline).toContain("Последовательность");
-    expect(evidence).toContain("RADAR SCORE");
-    expect(evidence).toContain("EVIDENCE STACK");
-    expect(outreach).toContain("DRAFT / НЕ ОТПРАВЛЕНО");
-    expect(outreach).toContain("не отправляет сообщения компаниям автоматически");
-    expect(outreach).not.toContain("частный email");
+    expect(landing).not.toContain("<Suspense");
   });
 
-  it("keeps preview anchors in the Suspense fallback", () => {
-    const markup = renderToStaticMarkup(<PreviewSkeleton />);
-    expect(markup).toContain('id="scene-workspace"');
-    expect(markup).toContain('id="preview-configurator"');
-    expect(markup).toContain('id="preview-results"');
-    expect(markup).toContain('aria-busy="true"');
+  it("keeps the workspace shell synchronous and only results asynchronous", () => {
+    const workspace = source("app/landing/workspace-scene.tsx");
+    expect(workspace).toContain("export default function WorkspaceScene");
+    expect(workspace).toContain("function WorkspaceIntro");
+    expect(workspace).toContain("function PreviewConfigurator");
+    expect(workspace).toContain("export async function WorkspaceResults");
+    expect(workspace).toContain("<Suspense fallback={<WorkspaceResultsSkeleton />}");
+    expect(workspace.indexOf("<PreviewConfigurator")).toBeLessThan(workspace.indexOf("<Suspense"));
+    expect(workspace.match(/getPublicSampleDigestState\(/g)).toHaveLength(1);
   });
 
-  it("labels resilient preview data honestly and keeps checkout available", async () => {
-    mockGetPublicSampleDigestState.mockResolvedValueOnce({
-      isLive: false,
-      isPersonalized: true,
-      hasExactMatches: true,
-      items: [],
-    });
+  it("renders the static configurator and stable results target before data resolves", () => {
     const input = readPublicPreviewInput({ specialization: "инженерный подбор" });
-    const preview = await PreviewSection({
+    const preview = PreviewSection({
       previewInput: input,
       hasPreview: hasPublicPreviewInput(input),
       checkoutHref: buildCheckoutHref(input),
     });
-    const text = readVisibleText(preview);
+    expect(preview.type).toBe(WorkspaceScene);
 
-    expect(text).toContain("Обезличенный набор");
-    expect(text).toContain("Радар для вашего профиля");
-    expect(text).toContain("примерные данные");
-    expect(text).toContain("Попробовать неделю");
-    expect(text).not.toContain("восстановления источника");
+    const workspace = source("app/landing/workspace-scene.tsx");
+    const configuratorCallIndex = workspace.indexOf("<PreviewConfigurator");
+    const suspenseIndex = workspace.indexOf("<Suspense");
+    expect(configuratorCallIndex).toBeGreaterThan(-1);
+    expect(configuratorCallIndex).toBeLessThan(suspenseIndex);
+    expect(workspace).toContain('id="preview-configurator"');
+    expect(workspace).toContain('action="/#preview-results"');
+
+    const skeleton = renderToStaticMarkup(<PreviewSkeleton />);
+    expect(skeleton).toContain('id="preview-results"');
+    expect(skeleton).toContain("data-preview-results-skeleton");
+    expect(skeleton).toContain('aria-busy="true"');
   });
 
-  it("keeps filter, reset and public input limits wired", async () => {
-    const input = readPublicPreviewInput({ specialization: "инженерный подбор" });
-    const preview = await PreviewSection({
-      previewInput: input,
-      hasPreview: true,
-      checkoutHref: buildCheckoutHref(input),
-    });
-    const forms = collectElements(preview, "form");
-    const links = collectElements(preview, Link);
-    const inputs = collectElements(preview, "input");
+  it("fails open when preview data throws and preserves checkout analytics", async () => {
+    mockGetPublicSampleDigestState.mockRejectedValueOnce(new Error("database unavailable"));
+    const input = readPublicPreviewInput({ specialization: "инженерный подбор", targetCity: "Москва" });
+    const checkoutHref = buildCheckoutHref(input);
+    const results = await WorkspaceResults({ previewInput: input, checkoutHref });
+    const markup = renderToStaticMarkup(results);
 
-    expect(forms).toHaveLength(1);
-    expect(forms[0].props.action).toBe("/#preview-results");
-    expect(links.find((link) => readVisibleText(link) === "Сбросить")?.props.href).toBe("/#scene-workspace");
-    expect(inputs.find((input) => input.props.name === "specialization")?.props.maxLength).toBe(160);
-    expect(inputs.find((input) => input.props.name === "targetCity")?.props.maxLength).toBe(120);
+    expect(markup).toContain('id="preview-results"');
+    expect(markup).toContain("data-preview-results-ready");
+    expect(markup).toContain("Временная ошибка загрузки");
+    expect(markup).toContain("Тарифы, FAQ и следующий шаг доступны ниже");
+    expect(markup).toContain(`href="${checkoutHref.replaceAll("&", "&amp;")}"`);
+    expect(markup).toContain(`data-analytics-event="${LANDING_ANALYTICS_EVENT.checkoutStarted}"`);
+    expect(markup).toContain(`data-analytics-context="${LANDING_ANALYTICS_CONTEXT.preview}"`);
+    expect(markup).toContain("Оставить заявку на неделю");
+    expect(source("app/landing/workspace-scene.module.css")).toMatch(/\.checkout\s*\{[\s\S]*?min-height:\s*52px/);
+  });
+
+  it("streams the complete landing composition when preview data throws", async () => {
+    mockGetPublicSampleDigestState.mockRejectedValueOnce(new Error("database unavailable"));
+    const page = await HomePage({
+      searchParams: Promise.resolve({ specialization: "инженерный подбор", targetCity: "Москва" }),
+    });
+    expect(collectElements(page, SiteFooter)).toHaveLength(1);
+
+    const html = await renderServerHtml(page);
+    const footerSource = source("app/ui/site-footer.tsx");
+    const offerAliasSource = source("app/offer/page.tsx");
+
+    expect(html).toContain('id="scene-workspace"');
+    expect(html).toContain("Не обещание продукта");
+    expect(html).toContain('id="preview-configurator"');
+    expect(html).toContain('id="preview-results"');
+    expect(html).toContain("Временная ошибка загрузки");
+    expect(html).toContain('id="scene-evidence"');
+    expect(html).toContain('id="scene-delivery"');
+    expect(html).toContain('id="scene-outreach"');
+    expect(html).toContain('id="pricing"');
+    expect(html).toContain('id="faq"');
+    expect(html).toContain("Соберите радар под свою специализацию");
+    expect(footerSource).toContain('href="/legal"');
+    expect(footerSource).toContain('href="/terms"');
+    expect(footerSource).toContain('href="/payment-and-refund"');
+    expect(footerSource).toContain('href="/privacy"');
+    expect(offerAliasSource.trim()).toBe('export { default, metadata } from "../terms/page";');
+    expect(footerSource).toContain("Реквизиты");
+    expect(footerSource).toContain("Оферта");
+    expect(footerSource).toContain("Конфиденциальность");
+    expect(footerSource).toContain("Recruiter Radar");
   });
 
   it("renders an evidence-backed lead list with one expanded recommendation", async () => {
@@ -199,18 +274,35 @@ describe("signal lock landing contract", () => {
       ],
     });
     const input = readPublicPreviewInput({});
-    const preview = await PreviewSection({ previewInput: input, hasPreview: false, checkoutHref: buildCheckoutHref(input) });
-    const markup = renderToStaticMarkup(preview);
+    const results = await WorkspaceResults({ previewInput: input, checkoutHref: buildCheckoutHref(input) });
+    const markup = renderToStaticMarkup(results);
 
     expect(markup.match(/data-lead-card="true"/g)).toHaveLength(2);
+    expect(markup.match(/data-primary-lead="true"/g)).toHaveLength(1);
     expect(markup.match(/name="preview-leads"/g)).toHaveLength(2);
-    expect(markup.match(/<details(?=[^>]*data-lead-card="true")(?=[^>]*open="")[^>]*>/g)).toHaveLength(1);
     expect(markup).toContain("Почему сейчас");
     expect(markup).toContain("Факты и источники");
     expect(markup).toContain("Без автоматической отправки");
   });
 
-  it("keeps payment-state copy and checkout analytics in the conversion panel", () => {
+  it("keeps product copy, analytics and manual outreach boundary", () => {
+    const hero = renderToStaticMarkup(<DetectionScene previewHref="#preview-configurator" />);
+    const evidence = renderToStaticMarkup(<EvidenceScene />);
+    const delivery = renderToStaticMarkup(<DeliveryScene />);
+    const outreach = renderToStaticMarkup(<OutreachScene />);
+
+    expect(hero).toContain("Кому написать сегодня");
+    expect(hero).toContain("Получить пример");
+    expect(hero).toContain(`data-analytics-event="${LANDING_ANALYTICS_EVENT.previewStarted}"`);
+    expect(hero).toContain(`data-analytics-context="${LANDING_ANALYTICS_CONTEXT.heroPrimary}"`);
+    expect(evidence).toContain("ОЦЕНКА РАДАРА");
+    expect(evidence).toContain("ДОКАЗАТЕЛЬНАЯ БАЗА");
+    expect(delivery).toContain("Recruiter Radar доставляет рекомендацию, но не отправляет сообщение компании");
+    expect(outreach).toContain("ЧЕРНОВИК / НЕ ОТПРАВЛЕНО");
+    expect(outreach).toContain("не отправляет сообщения компаниям автоматически");
+  });
+
+  it("keeps pricing data untouched and checkout analytics available", () => {
     const input = readPublicPreviewInput({});
     const panel = ConversionPanel({
       previewInput: input,
@@ -222,20 +314,48 @@ describe("signal lock landing contract", () => {
 
     expect(text).toContain("Сейчас пилот оформляется как заявка без списания");
     expect(text).toContain("Оставить заявку на неделю");
-    expect(text).not.toContain("Оплата через ЮKassa");
+    expect(text).toContain("Перед запуском");
     expect(links.some((link) => link.props["data-analytics-event"] === LANDING_ANALYTICS_EVENT.checkoutStarted)).toBe(true);
     expect(links.some((link) => link.props["data-analytics-event"] === LANDING_ANALYTICS_EVENT.continuationCtaClicked)).toBe(true);
   });
 
-  it("keeps motion CSS-only, reduced-motion complete and detached from legacy landing styles", () => {
-    const css = readFileSync(resolve(process.cwd(), "app/landing/landing.module.css"), "utf8");
-    const page = readFileSync(resolve(process.cwd(), "app/home-page-content.tsx"), "utf8");
-    const layout = readFileSync(resolve(process.cwd(), "app/layout.tsx"), "utf8");
+  it("prevents regression to corrective layers, compass labels and sweep", () => {
+    const heroInstrument = source("app/landing/hero-instrument.tsx");
+    const reducedMotionCss = [
+      source("app/landing/landing.module.css"),
+      source("app/landing/landing-header.module.css"),
+      source("app/landing/detection-scene.module.css"),
+    ].join("\n");
+    const correctivePath = resolve(WEB_ROOT, "app/landing/landing-corrections.module.css");
 
-    expect(css).toContain("@media (prefers-reduced-motion: reduce)");
-    expect(css).not.toContain("requestAnimationFrame");
-    expect(page).not.toContain("home-page-components.module.css");
-    expect(layout).not.toContain("landing-cinematic.css");
-    expect(layout).not.toContain("landing-cinematic-refinements.css");
+    expect(existsSync(correctivePath)).toBe(false);
+    expect(heroInstrument).not.toMatch(/NORTH|EAST|SOUTH|WEST/);
+    expect(heroInstrument).not.toMatch(/radarSweep|sweep/i);
+    expect(reducedMotionCss).toContain("@media (prefers-reduced-motion: reduce)");
+  });
+
+  it("keeps active navigation, tone switching and a trapped mobile dialog", () => {
+    const header = source("app/landing/landing-header.tsx");
+    const headerCss = source("app/landing/landing-header.module.css");
+    expect(header).toContain("IntersectionObserver");
+    expect(header).toContain("aria-current");
+    expect(header).toContain("data-tone={tone}");
+    expect(header).toContain('role="dialog"');
+    expect(header).toContain('aria-modal="true"');
+    expect(header).toContain('event.key !== "Tab"');
+    expect(header).toContain('event.key === "Escape"');
+    expect(header).toContain('document.body.style.overflow = "hidden"');
+    expect(header).toContain("scrollbarWidth");
+    expect(header).toContain("menuButtonRef.current?.focus");
+    expect(header).toContain("Получить пример");
+    expect(headerCss).toMatch(/\.navLink\s*\{[\s\S]*?min-width:\s*44px[\s\S]*?min-height:\s*44px/);
+  });
+
+  it("uses one bounded observer instead of fixed delayed hash scrolling", () => {
+    const hashNavigation = source("app/landing/landing-hash-navigation.tsx");
+    expect(hashNavigation).toContain("MutationObserver");
+    expect(hashNavigation).toContain("OBSERVER_TIMEOUT_MS");
+    expect(hashNavigation).toContain("aligned = true");
+    expect(hashNavigation).not.toMatch(/setTimeout\([^,]+,\s*(0|80|240|640)\)/);
   });
 });
