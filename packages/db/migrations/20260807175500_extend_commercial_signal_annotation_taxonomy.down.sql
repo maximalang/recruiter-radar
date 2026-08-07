@@ -6,6 +6,13 @@ SET LOCAL statement_timeout = '5min';
 ALTER TABLE commercial_signal_annotations
   DROP CONSTRAINT IF EXISTS commercial_signal_annotations_reason_check;
 
+-- commercial_signal_annotations is append-only in normal runtime. The down
+-- migration is the one controlled maintenance path that must be allowed to
+-- translate newly introduced reason codes back into the pre-extension
+-- vocabulary. Restore the append-only guard before committing this rollback.
+DROP TRIGGER IF EXISTS commercial_signal_annotations_append_only
+  ON commercial_signal_annotations;
+
 -- Preserve the canonical reason in operator notes before translating reasons
 -- that did not exist in the pre-extension schema. This keeps rollback
 -- operational even after reviewers have already used the expanded taxonomy.
@@ -52,5 +59,9 @@ ALTER TABLE commercial_signal_annotations
       'other'
     )
   );
+
+CREATE TRIGGER commercial_signal_annotations_append_only
+BEFORE UPDATE OR DELETE ON commercial_signal_annotations
+FOR EACH ROW EXECUTE FUNCTION reject_commercial_signal_lineage_mutation();
 
 COMMIT;
