@@ -46,13 +46,15 @@ describe("landing visual and login reliability polish", () => {
     expect(visual).toMatch(/data-signal-cluster[\s\S]*animation: none;/);
   });
 
-  test("sends the landing login CTA directly to the login flow", () => {
+  test("sends the landing login CTA directly to the login flow and restores mobile-menu focus synchronously", () => {
     const header = source("app/landing/landing-header.tsx");
 
     expect(header).toContain('const LOGIN_HREF = "/login?returnTo=%2Fdashboard";');
     expect(header).toContain("href={LOGIN_HREF}");
     expect(header).not.toContain('<Link href="/dashboard" className={headerStyles.login}>');
     expect(header).toContain('data-brand-header="recruiter-radar-v3"');
+    expect(header).toContain('if (restoreFocus) menuButtonRef.current?.focus({ preventScroll: true });\n    setMenuOpen(false);');
+    expect(header).not.toContain("if (restoreFocus) window.requestAnimationFrame");
   });
 
   test("retries verification with the in-memory one-time token instead of reloading a tokenless URL", () => {
