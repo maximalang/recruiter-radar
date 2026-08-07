@@ -214,6 +214,8 @@ Dedicated `Evidence Radar Contracts` workflow runs:
 
 The isolated runtime specifically verifies pending-source rejection, legal review transition, audited source-policy changes, cross-organization evidence rejection, cross-tenant lineage, append-only history, correlation provenance, reproducible score snapshots, personal-contact rejection and non-empty rollback refusal.
 
+Для stacked-релиза дополнительно обязателен финальный PR merge-ref CI после синхронизации с актуальным `main`; зелёный CI дочерней ветки не заменяет эту проверку интеграции.
+
 ## Rollout
 
 ### MVP
