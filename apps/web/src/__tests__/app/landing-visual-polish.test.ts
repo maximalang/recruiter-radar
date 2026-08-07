@@ -64,6 +64,18 @@ describe("polished unified landing visual contract", () => {
     expect(productCss).not.toContain("!important");
   });
 
+  it("locks the required responsive viewport and legal surface audit", () => {
+    const responsiveAudit = source("../../scripts/verify-responsive-surfaces.mjs");
+
+    expect(responsiveAudit).toContain("{ name: 'mobile-360', width: 360, height: 800 }");
+    expect(responsiveAudit).toContain("{ name: 'mobile-390', width: 390, height: 844 }");
+    expect(responsiveAudit).toContain("{ name: 'tablet-768', width: 768, height: 1024 }");
+    expect(responsiveAudit).toContain("{ name: 'tablet-1024', width: 1024, height: 768 }");
+    expect(responsiveAudit).toContain("{ name: 'desktop-1440', width: 1440, height: 900 }");
+    expect(responsiveAudit).toContain("'/offer'");
+    expect(responsiveAudit).toContain("'/payment-and-refund'");
+  });
+
   it("preserves the Robokassa-ready public footer and the offer alias", () => {
     const footer = source("app/ui/site-footer.tsx");
     const offerAlias = source("app/offer/page.tsx");
