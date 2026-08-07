@@ -10,6 +10,8 @@ Evidence Radar v1 — additive evidence-first контур поверх Commerci
 
 Отсутствующее значение остаётся `unavailable/review`, а не генерируется синтетически.
 
+`review` и `qualified` — разные операционные состояния. `review` означает очередь проверки и не должен отображаться на Radar как готовый повод для outreach. Actionable read model публикует только `qualified` карточки с живым verified provenance.
+
 ## Data model
 
 ### Canonical organization
@@ -100,10 +102,9 @@ v1 содержит детерминированные цепочки с window 
 - New Region → Hiring Growth → optional New Office/Leadership;
 - Product Launch → Technology Expansion → optional Hiring/Team Growth;
 - Production Expansion → Hiring Growth → optional Mass/Urgent Hiring;
-- Commercial Demand → Team Growth → optional Department/Urgent Hiring;
-- First-party interest + external hiring context.
+- Commercial Demand → Team Growth → optional Department/Urgent Hiring.
 
-First-party interest не создаёт лид без внешнего hiring evidence.
+First-party intent пока не имеет отдельного normalized signal type, поэтому v1 **не даёт ему отдельный correlation boost**. CRM/first-party evidence можно хранить только в governed source layer; коммерческий boost допустим после появления явного typed first-party signal и теста, который требует одновременно first-party и external evidence. Это исключает ложный boost от двух обычных hiring-source families.
 
 ## Explainable score
 
@@ -112,6 +113,8 @@ First-party interest не создаёт лид без внешнего hiring e
 `Lead Score = Hiring Intent × Confidence × Freshness × Urgency × Commercial Fit × Contactability − Risk Penalty`.
 
 Каждый компонент ограничен `[0,1]`. UI отдельно показывает Opportunity, Confidence, Urgency, Contactability и Risk. `evidence_lead_score_snapshots_v1` хранит component object, event contribution ledger, input hash, source events, source signals, source correlations, independent source families, version and validity. PostgreSQL повторно вычисляет score из сохранённых компонентов и отклоняет несогласованный snapshot.
+
+Score snapshot дополнительно требует, чтобы все referenced events были `verified` и live, сигналы имели положительную confidence/strength и не были просрочены, а correlations существовали и были live к моменту snapshot. `valid_until` score не может материально переживать самый ранний event/signal/correlation horizon; допускается только bounded 5-second write skew между отдельными SQL statements.
 
 Это отдельный Evidence Radar score и не меняет additive FIUR contract существующего Opportunity Engine.
 
@@ -131,6 +134,8 @@ Rule-based forecast выдаётся только для поддержанны�
 - basis signal ids;
 - confidence.
 
+Forecast работает только на signals одной организации. Mixed-organization input считается нарушением scope и должен fail closed, а не молча отбрасывать часть входа.
+
 Если оснований мало, UI явно показывает, что прогноз недоступен.
 
 ## Evidence lead card
@@ -149,6 +154,8 @@ Rule-based forecast выдаётся только для поддержанны�
 - generic/corporate contact path;
 - recommended next action/contact window.
 
+`qualified` card требует verified identity, verified geocoded location, live verified evidence и не может переживать score/evidence horizon. `recommended_contact_at` должен попадать внутрь validity window. Unverified/rejected contact path не может попасть в qualified lead.
+
 Personal contacts are outside this model. DB rejects `is_personal = true` and non-generic `mailto:` local parts.
 
 ## Regional radar
@@ -162,7 +169,16 @@ Evidence Radar остаётся dark-by-default. Доступ разрешает
 
 Malformed, zero и negative workspace IDs игнорируются; контекст без workspace остаётся выключенным. Сам Evidence Radar flag не включает автоматически внешние source adapters и не заменяет source-specific legal/contract review.
 
-Read model всегда фильтрует по `workspace_id` и показывает только карточки с non-null verified coordinates.
+Actionable Radar read model всегда фильтрует по `workspace_id` и возвращает только:
+
+- `card.status = qualified`;
+- live card и live score;
+- verified organization identity;
+- verified geocoded location;
+- live verified evidence events;
+- verified company-level contact paths.
+
+Карточки `review` остаются в PostgreSQL для операционной проверки, но не выглядят в UI как готовый лид «пиши сейчас».
 
 Visual contract:
 
@@ -180,12 +196,13 @@ Marker orbit is deterministic. `Math.random` is forbidden. Missing verified geom
 
 ## PostgreSQL safety
 
-Four migrations are deliberately separated:
+Пять migrations разделяют responsibility:
 
 1. source governance;
 2. identity/geography/relationships;
 3. evidence/signals/correlations;
-4. scores/contacts/cards.
+4. scores/contacts/cards;
+5. temporal/qualification trust hardening.
 
 Safety properties:
 
@@ -197,7 +214,10 @@ Safety properties:
 - identity update audit log;
 - company-level contact constraint;
 - unique fingerprints;
-- every down migration takes `ACCESS EXCLUSIVE` locks before checking for data and refuses destructive rollback when non-empty.
+- reproducible score formula plus live/verified provenance checks;
+- qualified-card identity/location/evidence/contact trust boundary;
+- destructive down migrations take `ACCESS EXCLUSIVE` locks before checking for data and refuse rollback when non-empty;
+- the additive hardening down migration removes only its triggers/functions and never drops Evidence Radar data.
 
 ## Validation
 
@@ -208,7 +228,7 @@ Dedicated `Evidence Radar Contracts` workflow runs:
 - test typecheck;
 - full migration chain;
 - DB schema validation;
-- Evidence Radar unit, rollout-config, migration and surface Jest contracts;
+- Evidence Radar unit, rollout-config, repository, migration and surface Jest contracts;
 - isolated PostgreSQL runtime contract;
 - production web build.
 
