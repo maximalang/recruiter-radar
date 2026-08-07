@@ -1,37 +1,59 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AuthShell } from "../../login/auth-shell";
 import styles from "../../login/login.module.css";
 
+const LOGIN_TOKEN_PATTERN = /^[a-f0-9]{64}$/;
+
 export default function VerifyLoginClient() {
+  const tokenRef = useRef("");
   const [networkFailed, setNetworkFailed] = useState(false);
+  const [verifying, setVerifying] = useState(true);
+
+  const verifyToken = useCallback(async (token: string) => {
+    setNetworkFailed(false);
+    setVerifying(true);
+    try {
+      const response = await fetch("/api/auth/login/verify", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+      const result = await response.json() as { next?: string };
+      const next = result.next === "/auth/confirm"
+        || result.next === "/auth/confirm?status=invalid"
+          ? result.next
+          : "/auth/confirm?status=invalid";
+      window.location.replace(next);
+    } catch {
+      setNetworkFailed(true);
+      setVerifying(false);
+    }
+  }, []);
 
   useEffect(() => {
     const token = window.location.hash.slice(1).trim();
     window.history.replaceState(null, "", "/auth/verify");
-    if (!/^[a-f0-9]{64}$/.test(token)) {
+    if (!LOGIN_TOKEN_PATTERN.test(token)) {
       window.location.replace("/auth/confirm?status=invalid");
       return;
     }
-    void fetch("/api/auth/login/verify", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token }),
-    })
-      .then(async (response) => response.json() as Promise<{ next?: string }>)
-      .then((result) => {
-        const next = result.next === "/auth/confirm"
-          || result.next === "/auth/confirm?status=invalid"
-          ? result.next
-          : "/auth/confirm?status=invalid";
-        window.location.replace(next);
-      })
-      .catch(() => setNetworkFailed(true));
-  }, []);
+    tokenRef.current = token;
+    void verifyToken(token);
+  }, [verifyToken]);
+
+  const retry = () => {
+    const token = tokenRef.current;
+    if (!LOGIN_TOKEN_PATTERN.test(token)) {
+      window.location.replace("/login?error=invalid-link");
+      return;
+    }
+    void verifyToken(token);
+  };
 
   return (
     <AuthShell>
@@ -41,7 +63,7 @@ export default function VerifyLoginClient() {
       </h1>
       <p className={styles.lead} aria-live="polite">
         {networkFailed
-          ? "Проверьте подключение к интернету и повторите попытку. Ссылка не была использована."
+          ? "Проверьте подключение к интернету и повторите проверку. Одноразовый код сохранён в этой вкладке и ещё не был отправлен повторно."
           : "Это займёт несколько секунд. Одноразовый код уже удалён из адресной строки."}
       </p>
       {networkFailed ? (
@@ -49,9 +71,10 @@ export default function VerifyLoginClient() {
           <button
             className={styles.submit}
             type="button"
-            onClick={() => window.location.reload()}
+            onClick={retry}
+            disabled={verifying}
           >
-            Повторить проверку
+            {verifying ? "Проверяем…" : "Повторить проверку"}
           </button>
           <Link className={styles.back} href="/login">
             Получить новую ссылку →
