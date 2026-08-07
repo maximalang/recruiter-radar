@@ -1,0 +1,17 @@
+@media (max-width: 1080px) and (min-width: 821px) {
+  .viewportSafeField {
+    position: absolute !important;
+    right: 0 !important;
+    width: min(58vw, 40rem) !important;
+  }
+}
+
+@media (max-width: 820px) {
+  .viewportSafeField {
+    position: absolute !important;
+    right: 0 !important;
+    width: min(92vw, 32rem) !important;
+    height: min(92vw, 32rem) !important;
+    margin: 0 !important;
+  }
+}
