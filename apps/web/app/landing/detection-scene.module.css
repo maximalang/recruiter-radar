@@ -118,7 +118,8 @@
   .section .fieldFigure {
     width: 132%;
     height: 22rem;
-    margin: -.5rem -34% 0 auto;
+    margin-top: -8rem;
+    margin-bottom: 0;
   }
 
   .fieldFigure :global(figcaption) {
@@ -150,7 +151,7 @@
   .section .fieldFigure {
     width: 145%;
     height: 20rem;
-    margin-right: -45%;
+    margin-top: -7.5rem;
   }
 
   .fieldFigure :global(figcaption) {
