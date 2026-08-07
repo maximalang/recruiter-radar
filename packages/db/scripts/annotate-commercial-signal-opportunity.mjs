@@ -4,13 +4,20 @@ const { Client } = pg;
 const LABELS = new Set(['strong', 'acceptable', 'weak', 'not_a_lead']);
 const REASONS = new Set([
   'ordinary_hiring',
+  'weak_agency_fit',
+  'weak_external_need',
+  'bad_economics',
+  'stale_signal',
+  'duplicate_event',
+  'unverified_company',
   'wrong_role',
   'wrong_region',
+  'internal_recruiting_sufficient',
+  'no_actual_change',
+  // Backward-compatible operational reasons.
   'wrong_company_size',
-  'weak_external_need',
   'internal_only',
   'bad_timing',
-  'bad_economics',
   'duplicate',
   'stale',
   'wrong_persona',
