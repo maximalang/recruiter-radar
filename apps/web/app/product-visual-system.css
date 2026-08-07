@@ -77,7 +77,7 @@ body {
   [data-ui-system="recruiter-radar-v7"]
 ) :where(input, select, textarea) {
   border-color: var(--rr-line-strong);
-  border-radius: 9px;
+  border-radius: var(--rr-radius-sm);
   background: var(--rr-surface);
   color: var(--rr-text);
   box-shadow: none;
@@ -106,7 +106,7 @@ body {
   [data-ui-system="recruiter-radar-v7"]
 ) :where(button[type="submit"], input[type="submit"]) {
   border-color: var(--rr-ink-900);
-  border-radius: 9px;
+  border-radius: var(--rr-radius-sm);
   background: var(--rr-ink-900);
   color: var(--rr-surface);
   box-shadow: none;
@@ -164,103 +164,44 @@ body {
   --c-accent: var(--rr-signal-ink);
 }
 
-[data-product-workspace="true"] :is(
-  section[class*="contentCard"],
-  div[class*="metricCard"],
-  article[class*="metricCard"],
-  div[class*="dataTableWrap"]
-) {
-  border-color: rgba(17, 22, 18, 0.12);
-  border-radius: 12px;
-  background: rgba(255, 253, 247, 0.9);
-  box-shadow: var(--rr-shadow-sm);
+[data-product-workspace="true"] main :where(section, article) {
+  border-color: var(--rr-line);
 }
 
-[data-product-workspace="true"] :is(
-  section[class*="contentCard"],
-  div[class*="metricCard"],
-  article[class*="metricCard"]
-):hover {
-  border-color: rgba(88, 122, 41, 0.22);
-  box-shadow: 0 18px 44px rgba(8, 11, 9, 0.075);
-  transform: translateY(-1px);
-}
-
-[data-product-workspace="true"] section[class*="contentCard"][data-variant="hero"] {
-  border-color: rgba(88, 122, 41, 0.22);
-  border-left: 2px solid var(--rr-signal);
-  background:
-    linear-gradient(92deg, rgba(159, 202, 99, 0.075), transparent 38%),
-    rgba(255, 253, 247, 0.94);
-}
-
-[data-product-workspace="true"] h1[class*="internalPageTitle"] {
+[data-product-workspace="true"] main :where(h1, h2) {
   color: var(--rr-text);
+}
+
+[data-product-workspace="true"] main h1 {
   font-weight: 590;
   letter-spacing: -0.055em;
 }
 
-[data-product-workspace="true"] h2[class*="contentCardTitle"] {
-  color: #202820;
+[data-product-workspace="true"] main h2 {
   font-weight: 650;
   letter-spacing: -0.018em;
 }
 
-[data-product-workspace="true"] div[class*="metricLabel"] {
-  color: #747d73;
-  font-weight: 650;
-  letter-spacing: 0.08em;
+[data-product-workspace="true"] main :where(th, td) {
+  border-color: var(--rr-line);
 }
 
-[data-product-workspace="true"] div[class*="metricValue"] {
-  color: var(--rr-text);
-  font-weight: 620;
-  letter-spacing: -0.045em;
-}
-
-[data-product-workspace="true"] th[class*="dataTableTh"] {
-  border-bottom-color: var(--rr-line);
-  background: rgba(235, 232, 223, 0.94);
+[data-product-workspace="true"] main th {
   color: #6c756c;
   font-weight: 650;
   letter-spacing: 0.08em;
 }
 
-[data-product-workspace="true"] td[class*="dataTableTd"] {
-  background: rgba(255, 253, 247, 0.78);
-}
-
-[data-product-workspace="true"] tr[class*="dataTableTr"]:hover td {
+[data-product-workspace="true"] main tbody tr:hover {
   background: rgba(159, 202, 99, 0.05);
 }
 
-[data-product-workspace="true"] :is(
-  [class*="status"],
-  [class*="Status"],
-  [class*="chip"],
-  [class*="Chip"]
-) {
-  box-shadow: none;
+[data-product-workspace="true"] nav a {
+  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease;
 }
 
-[data-product-workspace="true"] :is(
-  a[class*="navLink"],
-  a[class*="internalPageBackLink"]
-) {
-  border-color: var(--rr-line);
-  border-radius: 9px;
-  background: rgba(255, 253, 247, 0.64);
-  box-shadow: none;
-  font-weight: 620;
-}
-
-[data-product-workspace="true"] :is(
-  a[class*="navLink"],
-  a[class*="internalPageBackLink"]
-):hover {
-  border-color: rgba(88, 122, 41, 0.22);
-  background: rgba(255, 253, 247, 0.94);
-  color: #355116;
+[data-product-workspace="true"] nav a:hover {
+  color: var(--rr-signal-ink);
 }
 
 @media (max-width: 720px) {
@@ -268,18 +209,9 @@ body {
     background-size: 56px 56px;
   }
 
-  [data-product-workspace="true"] h1[class*="internalPageTitle"] {
+  [data-product-workspace="true"] main h1 {
     font-size: clamp(2rem, 11vw, 3.1rem);
     line-height: 0.98;
-  }
-
-  [data-product-workspace="true"] :is(
-    section[class*="contentCard"],
-    div[class*="metricCard"],
-    article[class*="metricCard"],
-    div[class*="dataTableWrap"]
-  ) {
-    border-radius: 10px;
   }
 }
 
@@ -293,8 +225,7 @@ body {
     [data-ui-system="recruiter-radar-v7"]
   ) * {
     scroll-behavior: auto;
-    transition-duration: 0.01ms !important;
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
+    transition: none;
+    animation: none;
   }
 }
