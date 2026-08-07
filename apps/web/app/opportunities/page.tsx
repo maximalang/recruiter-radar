@@ -175,6 +175,9 @@ export default async function OpportunitiesPage(props: {
         to: funnelTo.toISOString(),
       }).catch(() => null)
     : null
+  const visibleOpportunities = commercialSignalAuthoritative && !researchModeActive
+    ? result.opportunities.filter(isQualifiedActionableCommercialSignal)
+    : result.opportunities
 
   return (
     <InternalPageFrame navItems={NAVIGATION} footer={<SiteFooter />}>
@@ -228,9 +231,9 @@ export default async function OpportunitiesPage(props: {
           {funnel ? <OpportunityFunnel summary={funnel} /> : null}
         </OpportunityResearchMode>
 
-        {result.opportunities.length > 0 ? (
+        {visibleOpportunities.length > 0 ? (
           <div className={styles.cardList}>
-            {result.opportunities.map((opportunity) => (
+            {visibleOpportunities.map((opportunity) => (
               <OpportunityCard
                 key={opportunity.id}
                 opportunity={opportunity}
@@ -285,6 +288,16 @@ function parseView(
 
 function normalizeSearchQuery(value: string | undefined): string {
   return value?.trim().slice(0, 80) ?? ''
+}
+
+function isQualifiedActionableCommercialSignal(opportunity: {
+  metadata: Record<string, unknown>
+}): boolean {
+  const card = opportunity.metadata.commercialSignalCard
+  if (!card || typeof card !== 'object' || Array.isArray(card)) return false
+  const snapshot = card as Record<string, unknown>
+  return snapshot.version === 'commercial-signal-card-v1' &&
+    snapshot.status === 'qualified_actionable'
 }
 
 function isNarrowedResult(
