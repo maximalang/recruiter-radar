@@ -1,0 +1,67 @@
+name: One-shot restore strict landing audit
+
+on:
+  push:
+    branches:
+      - codex/post-merge-design-polish
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  restore-strict-audit:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/post-merge-design-polish
+          fetch-depth: 0
+      - name: Restore full strict audit and patch only focus reset
+        shell: bash
+        run: |
+          git checkout af2dc1ac937fe444f7af6e9abbec2fa68e9968ec -- apps/web/scripts/verify-landing-production.mjs
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('apps/web/scripts/verify-landing-production.mjs')
+          source = path.read_text()
+          old = '''async function assertKeyboardSkipLink(browser) {
+            const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+            const { page, assertCleanConsole } = await preparePage(context, "keyboard-skip-link");
+            await page.keyboard.press("Tab");
+          '''
+          new = '''async function assertKeyboardSkipLink(browser) {
+            const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+            const { page, assertCleanConsole } = await preparePage(context, "keyboard-skip-link");
+
+            // preparePage may resolve first-visit analytics consent with a pointer click.
+            // Reload after the persisted choice so this contract starts from a neutral
+            // document focus state and verifies the true first keyboard target.
+            await page.reload({ waitUntil: "networkidle" });
+            await waitForLanding(page);
+
+            await page.keyboard.press("Tab");
+          '''
+          if old not in source:
+              raise SystemExit('keyboard skip-link block not found in strict audit')
+          updated = source.replace(old, new, 1)
+          if updated.count('async function assertKeyboardSkipLink') != 1:
+              raise SystemExit('unexpected skip-link audit function count')
+          path.write_text(updated)
+          PY
+          git diff --check
+          git diff --stat
+      - name: Commit restored strict audit
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/web/scripts/verify-landing-production.mjs
+          git commit -m "test(landing): preserve strict audit while resetting focus state"
+          git fetch origin codex/post-merge-design-polish
+          git rebase origin/codex/post-merge-design-polish
+          git push origin HEAD:codex/post-merge-design-polish
