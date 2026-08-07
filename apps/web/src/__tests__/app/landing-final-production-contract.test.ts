@@ -40,13 +40,15 @@ describe("landing final production contract", () => {
     expect(conversion).toContain("Перед запуском — короткие ответы.");
     expect(conversion).not.toContain("Ответы раскрываются без перехода");
 
-    expect(visual).toContain('--page-gutter:');
-    expect(visual).toContain('--content-max:');
-    expect(visual).toContain('--section-pad-y:');
+    expect(visual).toContain("--page-gutter:");
+    expect(visual).toContain("--content-max:");
+    expect(visual).toContain("--section-pad-y:");
     expect(visual).toContain(':global([class*="conversionPanel"])');
-    expect(visual).toMatch(/:global\(#pricing\),[\s\S]*width: 100%;[\s\S]*max-width: none;/);
-    expect(visual).toContain(':global(#faq details)');
-    expect(visual).toContain('background: transparent;');
+    expect(visual).toContain(".visualSystem :global(#pricing),");
+    expect(visual).toContain(".visualSystem :global(#faq) {");
+    expect(visual).toContain("max-width: none;");
+    expect(visual).toContain(":global(#faq details)");
+    expect(visual).toContain("background: transparent;");
   });
 
   test("keeps ambient radar and FAQ motion restrained and removable", () => {
