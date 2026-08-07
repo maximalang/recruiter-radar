@@ -7,8 +7,8 @@ import {
   readPublicPreviewInput,
   type PublicPreviewInput,
 } from "../lib/publicProduct";
-import { buildFaqItems } from "./home-page-components";
 import LandingAnalytics from "./landing-analytics";
+import { buildLandingFaqItems } from "./landing/landing-faq";
 import LandingPage, { LandingSkipLink } from "./landing/landing-page";
 import WorkspaceScene, { WorkspaceResultsSkeleton } from "./landing/workspace-scene";
 import { PageFrame } from "./ui/page-primitives";
@@ -32,7 +32,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const hasPreview = hasPublicPreviewInput(previewInput);
   const checkoutHref = buildCheckoutHref(previewInput);
   const paymentSetup = getPaymentProviderSetupState();
-  const faqItems = buildFaqItems(paymentSetup.configured);
+  const faqItems = buildLandingFaqItems(paymentSetup.configured);
   const landing = LandingPage({
     previewInput,
     hasPreview,
