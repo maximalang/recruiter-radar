@@ -16,6 +16,7 @@ CREATE TABLE source_registry_entries_v1 (
   terms_reference TEXT,
   registry_version TEXT NOT NULL DEFAULT 'source-registry-v1-2026-08-07',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT source_registry_entries_v1_id_check
     CHECK (id ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'),
   CONSTRAINT source_registry_entries_v1_role_check CHECK (role IN (
@@ -42,7 +43,9 @@ CREATE TABLE source_registry_entries_v1 (
   )),
   CONSTRAINT source_registry_entries_v1_text_check CHECK (
     BTRIM(category) <> '' AND BTRIM(retention_policy) <> ''
-  )
+  ),
+  CONSTRAINT source_registry_entries_v1_timestamp_check
+    CHECK (updated_at >= created_at)
 );
 
 CREATE TABLE source_registry_reviews_v1 (
@@ -80,9 +83,57 @@ BEGIN
 END;
 $$;
 
-CREATE TRIGGER source_registry_entries_v1_immutable
-BEFORE UPDATE OR DELETE ON source_registry_entries_v1
+CREATE TABLE source_registry_entry_changes_v1 (
+  id BIGSERIAL PRIMARY KEY,
+  source_registry_id TEXT NOT NULL
+    REFERENCES source_registry_entries_v1(id) ON DELETE RESTRICT,
+  old_value JSONB NOT NULL,
+  new_value JSONB NOT NULL,
+  change_reason TEXT NOT NULL,
+  changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT source_registry_entry_changes_v1_json_check CHECK (
+    JSONB_TYPEOF(old_value) = 'object' AND JSONB_TYPEOF(new_value) = 'object'
+  ),
+  CONSTRAINT source_registry_entry_changes_v1_reason_check
+    CHECK (BTRIM(change_reason) <> '')
+);
+
+CREATE TRIGGER source_registry_entry_changes_v1_append_only
+BEFORE UPDATE OR DELETE ON source_registry_entry_changes_v1
 FOR EACH ROW EXECUTE FUNCTION reject_evidence_radar_history_mutation();
+
+CREATE OR REPLACE FUNCTION audit_source_registry_entry_update_v1()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    RAISE EXCEPTION 'source registry entry deletion is not allowed';
+  END IF;
+  IF NEW.id IS DISTINCT FROM OLD.id
+     OR NEW.created_at IS DISTINCT FROM OLD.created_at THEN
+    RAISE EXCEPTION 'source registry identity is immutable';
+  END IF;
+  NEW.updated_at := GREATEST(CLOCK_TIMESTAMP(), OLD.updated_at);
+  INSERT INTO source_registry_entry_changes_v1 (
+    source_registry_id, old_value, new_value, change_reason, changed_at
+  ) VALUES (
+    OLD.id,
+    TO_JSONB(OLD),
+    TO_JSONB(NEW),
+    COALESCE(
+      NULLIF(current_setting('recruiter_radar.source_change_reason', TRUE), ''),
+      'manual_or_system_policy_update'
+    ),
+    CLOCK_TIMESTAMP()
+  );
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER source_registry_entries_v1_audit_update
+BEFORE UPDATE OR DELETE ON source_registry_entries_v1
+FOR EACH ROW EXECUTE FUNCTION audit_source_registry_entry_update_v1();
 
 CREATE TRIGGER source_registry_reviews_v1_append_only
 BEFORE UPDATE OR DELETE ON source_registry_reviews_v1
