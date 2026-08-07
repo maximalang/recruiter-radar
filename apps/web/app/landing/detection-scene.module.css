@@ -22,12 +22,17 @@
   color: #b5ead8;
 }
 
-.field {
+.fieldFigure {
+  position: absolute;
+  right: max(1rem, calc((100vw - min(100vw, 1440px)) / 2));
+  top: 8.2rem;
+  width: min(52vw, 49rem);
   opacity: .92;
   filter: saturate(.84) contrast(1.04);
 }
 
-.lock {
+.analysisFrame {
+  height: clamp(11rem, 16vw, 14rem);
   max-width: 29rem;
   border-color: rgba(244, 243, 238, .12);
   border-left-color: #7fd8bd;
@@ -38,11 +43,8 @@
 }
 
 @media (min-width: 1181px) {
-  .section .field {
-    top: 6rem;
-    right: 1.5vw;
-    width: min(56vw, 50rem);
-    height: calc(100% - 8rem);
+  .section .fieldFigure {
+    height: calc(100% - 10rem);
   }
 }
 
@@ -62,7 +64,7 @@
     margin-top: 3.5rem;
   }
 
-  .field {
+  .fieldFigure {
     position: relative;
     z-index: 0;
     top: auto;
@@ -73,12 +75,13 @@
     margin: -2.2rem -4rem 0 auto;
   }
 
-  .lock {
+  .analysisFrame {
     position: relative;
     right: auto;
     bottom: auto;
     order: 4;
     width: min(34rem, 100%);
+    height: auto;
     margin: -5rem 0 0 auto;
   }
 
@@ -112,24 +115,24 @@
     max-width: 10ch;
   }
 
-  .section .field {
+  .section .fieldFigure {
     width: 132%;
     height: 22rem;
     margin: -.5rem -34% 0 auto;
   }
 
-  .field :global(figcaption) {
+  .fieldFigure :global(figcaption) {
     right: 25%;
     bottom: 5%;
     width: min(21rem, 66%);
   }
 
-  .lock {
+  .analysisFrame {
     grid-template-columns: auto minmax(0, 1fr);
     margin-top: -1.2rem;
   }
 
-  .lock > a {
+  .analysisFrame > a {
     grid-column: 2;
   }
 
@@ -144,17 +147,17 @@
     padding-inline: 1rem;
   }
 
-  .section .field {
+  .section .fieldFigure {
     width: 145%;
     height: 20rem;
     margin-right: -45%;
   }
 
-  .field :global(figcaption) {
+  .fieldFigure :global(figcaption) {
     display: none;
   }
 
-  .lock { margin-top: -1.6rem; }
+  .analysisFrame { margin-top: -1.6rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -165,7 +168,7 @@
     transition: none !important;
   }
 
-  .field {
+  .fieldFigure {
     opacity: .9;
   }
 }
