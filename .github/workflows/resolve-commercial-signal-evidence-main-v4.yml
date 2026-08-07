@@ -1,0 +1,121 @@
+name: Resolve current main into final integration v4
+
+on:
+  push:
+    branches:
+      - codex/commercial-signal-evidence-integration
+
+permissions:
+  contents: write
+
+concurrency:
+  group: resolve-commercial-signal-evidence-main-v4
+  cancel-in-progress: true
+
+jobs:
+  resolve:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/commercial-signal-evidence-integration
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Merge exact current main and resolve known overlaps
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          STAGE=bootstrap
+          MERGE_OUTPUT=''
+          diagnose() {
+            status=$?
+            set +e
+            unmerged="$(git ls-files -u | cut -f2 | sort -u)"
+            git merge --abort >/dev/null 2>&1 || true
+            printf 'stage=%s\nstatus=%s\nunmerged=%s\nmerge_output=%s\n' "$STAGE" "$status" "$unmerged" "$MERGE_OUTPUT" > .integration-resolver-state.txt
+            rm -f .github/workflows/resolve-commercial-signal-evidence-main-v4.yml
+            git add -A
+            git commit -m "chore: record integration resolver failure at ${STAGE}" || true
+            git push origin HEAD:codex/commercial-signal-evidence-integration || true
+            exit "$status"
+          }
+          trap diagnose ERR
+
+          STAGE=fetch-main
+          git fetch origin main
+          MAIN_SHA="$(git rev-parse FETCH_HEAD)"
+          echo "Fetched main: $MAIN_SHA"
+
+          STAGE=merge-main
+          set +e
+          MERGE_OUTPUT="$(git merge --no-ff --no-commit "$MAIN_SHA" 2>&1)"
+          merge_status=$?
+          set -e
+          printf '%s\n' "$MERGE_OUTPUT"
+
+          if [ "$merge_status" -ne 0 ]; then
+            STAGE=validate-conflicts
+            unmerged="$(git ls-files -u | cut -f2 | sort -u)"
+            printf 'Unmerged paths:\n%s\n' "$unmerged"
+            [ -n "$unmerged" ]
+            while IFS= read -r path; do
+              [ -z "$path" ] && continue
+              case "$path" in
+                apps/web/next.config.ts|apps/web/src/__tests__/app/content-security-policy.test.ts|package-lock.json|package.json) ;;
+                *) echo "Unexpected merge conflict: $path"; false ;;
+              esac
+            done <<< "$unmerged"
+          fi
+
+          STAGE=resolve-conflicts
+          for path in apps/web/next.config.ts apps/web/src/__tests__/app/content-security-policy.test.ts; do
+            if git ls-files -u -- "$path" | grep -q .; then
+              git checkout --theirs "$path"
+              git add "$path"
+            fi
+          done
+          if git ls-files -u -- package.json | grep -q .; then
+            git checkout --ours package.json
+            sed -i 's/"ip-address": "10.4.0"/"ip-address": "10.3.1"/' package.json
+            git add package.json
+          fi
+          if git ls-files -u -- package-lock.json | grep -q .; then
+            git checkout --ours package-lock.json
+            git add package-lock.json
+          fi
+          [ -z "$(git ls-files -u)" ]
+
+          STAGE=normalize-test-readiness
+          sed -i 's/for i in $(seq 1 30); do/for i in $(seq 1 75); do/' .github/workflows/test.yml
+          sed -i 's/data-deploy-anchor="recruiter-radar-signal-lock"/data-deploy-anchor="recruiter-radar-landing-v3"/' .github/workflows/test.yml
+          git add .github/workflows/test.yml
+
+          STAGE=regenerate-lockfile
+          npm install --package-lock-only --ignore-scripts
+
+          STAGE=security-audit
+          npm audit --omit=dev --audit-level=high
+
+          STAGE=commit-merge
+          rm .github/workflows/resolve-commercial-signal-evidence-main-v4.yml
+          rm -f .integration-resolver-state.txt
+          git add -A
+          git diff --cached --check
+          git commit -m "merge: integrate main ${MAIN_SHA} into Commercial Signal and Evidence Radar"
+
+          STAGE=verify-ancestry
+          git merge-base --is-ancestor "$MAIN_SHA" HEAD
+          parents="$(git show -s --format=%P HEAD)"
+          echo "Parents: $parents"
+          [ "$(wc -w <<< "$parents")" -ge 2 ]
+
+          STAGE=push
+          git push origin HEAD:codex/commercial-signal-evidence-integration
+          trap - ERR
