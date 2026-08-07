@@ -72,7 +72,7 @@
     order: 3;
     width: min(45rem, 82vw);
     height: clamp(22rem, 47vw, 32rem);
-    margin: -2.2rem -4rem 0 auto;
+    margin: -8rem -4rem 0 auto;
   }
 
   .analysisFrame {
