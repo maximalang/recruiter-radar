@@ -83,7 +83,7 @@ export default function EvidenceScene() {
           </div>
 
           <div className={sceneStyles.score} aria-label={`Оценка радара ${DEMO_COMPANY.score} из 100`}>
-            <span>RADAR SCORE</span>
+            <span>ОЦЕНКА РАДАРА / RADAR SCORE</span>
             <div className={sceneStyles.scoreValue}>
               <strong>{DEMO_COMPANY.score}</strong>
               <small>/100</small>
@@ -113,7 +113,7 @@ export default function EvidenceScene() {
         <div className={sceneStyles.ledger}>
           <div className={sceneStyles.ledgerHeading}>
             <div>
-              <span>EVIDENCE RECORDS / 03</span>
+              <span>ДОКАЗАТЕЛЬНАЯ БАЗА / EVIDENCE RECORDS / 03</span>
               <strong>{DEMO_COMPANY.name}</strong>
             </div>
             <p>Три записи показывают не «объяснение модели», а реальные основания: что найдено, когда найдено, когда произошло событие и насколько прямой источник.</p>
