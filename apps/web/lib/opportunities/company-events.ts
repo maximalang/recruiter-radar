@@ -5,6 +5,7 @@ import {
   normalizeJobPostingCompanyEvents,
   type CompanyEventDraft,
   type CompanyEventSourceRecord,
+  type CompanyEventType,
 } from './company-event-normalization'
 
 export type CompanyEventDb = {
@@ -96,8 +97,8 @@ async function persistCompanyEvent(
   db: CompanyEventDb,
 ): Promise<PersistCompanyEventResult> {
   const organizationId = positiveBigintId(event.organizationId, 'organizationId')
-  const signalIds = event.publications.map((publication) =>
-    positiveBigintId(publication.sourceRecordId, 'sourceRecordId'))
+  const signalIds = uniqueSorted(event.publications.map((publication) =>
+    positiveBigintId(publication.sourceRecordId, 'sourceRecordId')))
   const evidenceIds = event.evidenceIds.map((evidenceId) =>
     positiveBigintId(evidenceId, 'evidenceId'))
 
@@ -108,13 +109,21 @@ async function persistCompanyEvent(
       [`company-events:v1:organization:${organizationId}`],
     )
 
+    // One physical source observation may legitimately prove more than one
+    // semantic event (for example job_posting + recruiter_vacancy). Overlap is
+    // therefore constrained inside the SAME event type, never globally by
+    // signal id.
     const overlap = await db.query<{ companyEventId: string }>(
       `SELECT publication.company_event_id::TEXT AS "companyEventId"
        FROM company_event_publications publication
+       JOIN company_events existing_event
+         ON existing_event.id = publication.company_event_id
+        AND existing_event.organization_id = publication.organization_id
        WHERE publication.organization_id = $1
          AND publication.signal_id = ANY($2::BIGINT[])
-       FOR UPDATE`,
-      [organizationId, signalIds],
+         AND existing_event.event_type = $3
+       FOR UPDATE OF existing_event`,
+      [organizationId, signalIds, event.eventType],
     )
     const overlappingEventIds = uniqueSorted(
       overlap.rows.map((row) => row.companyEventId),
@@ -261,6 +270,7 @@ async function persistCompanyEvent(
 
 type StoredPublicationIdentity = {
   companyEventId: string
+  eventType: CompanyEventType
   signalId: string | null
   sourceFamily: string | null
   externalId: string | null
@@ -270,32 +280,44 @@ async function assertNoExistingEventSplits(
   events: readonly CompanyEventDraft[],
   db: CompanyEventDb,
 ): Promise<void> {
-  const draftBySignalId = new Map<string, number>()
+  const draftByTypedSignal = new Map<string, number>()
   events.forEach((event, draftIndex) => {
     event.publications.forEach((publication) => {
-      draftBySignalId.set(
-        positiveBigintId(publication.sourceRecordId, 'sourceRecordId'),
+      draftByTypedSignal.set(
+        typedSignalKey(
+          event.eventType,
+          positiveBigintId(publication.sourceRecordId, 'sourceRecordId'),
+        ),
         draftIndex,
       )
     })
   })
-  const signalIds = [...draftBySignalId.keys()]
+  const signalIds = uniqueSorted(events.flatMap((event) =>
+    event.publications.map((publication) =>
+      positiveBigintId(publication.sourceRecordId, 'sourceRecordId'))))
   if (signalIds.length === 0) return
 
   const mapped = await db.query<{
     companyEventId: string
+    eventType: CompanyEventType
     signalId: string
   }>(
     `SELECT DISTINCT
        publication.company_event_id::TEXT AS "companyEventId",
+       event.event_type AS "eventType",
        publication.signal_id::TEXT AS "signalId"
      FROM company_event_publications publication
+     JOIN company_events event
+       ON event.id = publication.company_event_id
+      AND event.organization_id = publication.organization_id
      WHERE publication.signal_id = ANY($1::BIGINT[])`,
     [signalIds],
   )
   const draftsByEvent = new Map<string, Set<number>>()
   for (const row of mapped.rows) {
-    const draftIndex = draftBySignalId.get(row.signalId)
+    const draftIndex = draftByTypedSignal.get(
+      typedSignalKey(row.eventType, row.signalId),
+    )
     if (draftIndex === undefined) continue
     const draftIndexes = draftsByEvent.get(row.companyEventId) ?? new Set()
     draftIndexes.add(draftIndex)
@@ -357,6 +379,7 @@ async function loadStoredPublicationIdentities(
   const result = await db.query<StoredPublicationIdentity>(
     `SELECT
        event.id::TEXT AS "companyEventId",
+       event.event_type AS "eventType",
        publication.signal_id::TEXT AS "signalId",
        publication.source_family AS "sourceFamily",
        publication.external_id AS "externalId"
@@ -376,6 +399,7 @@ function publicationsCompatible(
   stored: readonly StoredPublicationIdentity[],
 ): boolean {
   return event.publications.every((incoming) => stored.every((existing) => {
+    if (existing.eventType !== event.eventType) return true
     if (existing.signalId === incoming.sourceRecordId) return true
     if (!existing.sourceFamily || !existing.externalId || !incoming.externalId) {
       return true
@@ -384,6 +408,10 @@ function publicationsCompatible(
       normalizeIdentity(incoming.sourceFamily) ||
       existing.externalId.trim() === incoming.externalId.trim()
   }))
+}
+
+function typedSignalKey(eventType: CompanyEventType, signalId: string): string {
+  return `${eventType}:${signalId}`
 }
 
 function normalizeIdentity(value: string): string {
