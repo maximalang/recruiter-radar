@@ -10,6 +10,7 @@ import {
   type PublicPreviewInput,
 } from "../../lib/publicProduct";
 import { ArrowGlyph, PlusGlyph } from "./brand-glyphs";
+import panelStyles from "./conversion-panel.module.css";
 import styles from "./landing.module.css";
 
 export default function ConversionPanel(props: {
@@ -21,10 +22,15 @@ export default function ConversionPanel(props: {
   const secondaryPlans = PUBLIC_PLANS.filter((plan) => plan.code !== "pilot");
 
   return (
-    <div className={styles.conversionPanel}>
-      <div id="pricing" className={styles.pricingStage}>
+    <section className={styles.conversionPanel} aria-label="Тарифы и ответы">
+      <div
+        id="pricing"
+        className={`${styles.pricingStage} ${panelStyles.anchor} ${panelStyles.pricing}`}
+        data-header-tone="light"
+        data-pricing-surface="true"
+      >
         <div className={styles.pricingIntro}>
-          <span>После preview / следующий шаг</span>
+          <span>07 — Тарифы</span>
           <h2>Начните с недели. Продолжайте, только если радар полезен.</h2>
           <p>
             {props.paymentConfigured
@@ -33,9 +39,9 @@ export default function ConversionPanel(props: {
           </p>
         </div>
 
-        <div className={styles.pilotOffer}>
+        <div className={styles.pilotOffer} data-pricing-primary="true">
           <div className={styles.pilotMeta}>
-            <span>Рекомендуем начать</span>
+            <span>Главное предложение</span>
             <strong>{pilotPlan.name}</strong>
           </div>
           <div className={styles.pilotPrice}>
@@ -56,7 +62,7 @@ export default function ConversionPanel(props: {
           <small>{props.paymentConfigured ? "Разовая оплата · без автопродления" : "Заявка без списания · профиль сохранится"}</small>
         </div>
 
-        <div className={styles.secondaryOffers}>
+        <div className={styles.secondaryOffers} aria-label="Дополнительные тарифы" data-pricing-secondary="true">
           {secondaryPlans.map((plan) => {
             const quarterly = plan.code === "quarterly";
             return (
@@ -77,10 +83,16 @@ export default function ConversionPanel(props: {
         </div>
       </div>
 
-      <div id="faq" className={styles.faqStage}>
+      <div
+        id="faq"
+        className={`${styles.faqStage} ${panelStyles.anchor} ${panelStyles.faq}`}
+        data-header-tone="light"
+        data-faq-surface="true"
+      >
         <div className={styles.faqHeading}>
-          <span>FAQ / перед запуском</span>
+          <span>Перед запуском</span>
           <h2>Коротко о данных, доставке и контроле.</h2>
+          <p>Ответы раскрываются без перехода на отдельную страницу.</p>
         </div>
         <div className={styles.faqList}>
           {props.faqItems.map((item, index) => (
@@ -92,8 +104,12 @@ export default function ConversionPanel(props: {
         </div>
       </div>
 
-      <div className={styles.finalCall}>
-        <span>SIGNAL LOCK / 07 DAYS</span>
+      <div
+        id="conversion-final"
+        className={`${styles.finalCall} ${panelStyles.final}`}
+        data-header-tone="dark"
+      >
+        <span>РАДАР / 7 ДНЕЙ</span>
         <h2>Соберите радар под свою специализацию.</h2>
         <p>Получите первый короткий список компаний и решите на фактах, стоит ли продолжать.</p>
         <div>
@@ -104,9 +120,9 @@ export default function ConversionPanel(props: {
           >
             {props.paymentConfigured ? `Активировать неделю — ${pilotPlan.price}` : "Оставить заявку на неделю"} <ArrowGlyph />
           </Link>
-          <a href="#preview-configurator">Вернуться к preview <ArrowGlyph /></a>
+          <a href="#preview-configurator">Вернуться к настройке выдачи <ArrowGlyph /></a>
         </div>
       </div>
-    </div>
+    </section>
   );
 }

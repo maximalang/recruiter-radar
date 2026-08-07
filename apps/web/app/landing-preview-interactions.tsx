@@ -34,6 +34,56 @@ function resetSubmittingState(form: HTMLFormElement) {
   controls.busyLabel.hidden = true;
 }
 
+function installPreviewAnchorRestoration() {
+  const hash = decodeURIComponent(window.location.hash.slice(1));
+  if (!hash) return () => {};
+
+  const target = document.getElementById(hash);
+  const previewResults = document.querySelector<HTMLElement>("[data-preview-results]");
+  if (!target || !previewResults || target === previewResults || previewResults.contains(target)) {
+    return () => {};
+  }
+
+  const targetFollowsPreview = Boolean(
+    previewResults.compareDocumentPosition(target) & Node.DOCUMENT_POSITION_FOLLOWING,
+  );
+  if (!targetFollowsPreview) return () => {};
+
+  let animationFrame = 0;
+  const restoreAnchor = () => {
+    window.cancelAnimationFrame(animationFrame);
+    animationFrame = window.requestAnimationFrame(() => {
+      const root = document.documentElement;
+      const previousScrollBehavior = root.style.scrollBehavior;
+      root.style.scrollBehavior = "auto";
+      target.scrollIntoView({ block: "start" });
+      root.style.scrollBehavior = previousScrollBehavior;
+    });
+  };
+
+  const hasReadyResults = () => Boolean(
+    previewResults.querySelector("[data-preview-results-ready]"),
+  );
+
+  if (hasReadyResults()) {
+    restoreAnchor();
+    return () => window.cancelAnimationFrame(animationFrame);
+  }
+
+  // Re-align direct hash navigation after streamed preview content settles at its final page height.
+  const observer = new MutationObserver(() => {
+    if (!hasReadyResults()) return;
+    observer.disconnect();
+    restoreAnchor();
+  });
+  observer.observe(previewResults, { childList: true, subtree: true });
+
+  return () => {
+    observer.disconnect();
+    window.cancelAnimationFrame(animationFrame);
+  };
+}
+
 export default function LandingPreviewInteractions() {
   useEffect(() => {
     const handleSubmit = (event: Event) => {
@@ -74,10 +124,12 @@ export default function LandingPreviewInteractions() {
         .forEach(resetSubmittingState);
     };
 
+    const removeAnchorRestoration = installPreviewAnchorRestoration();
     document.addEventListener("submit", handleSubmit, true);
     document.addEventListener("click", handlePresetClick);
     window.addEventListener("pageshow", handlePageShow);
     return () => {
+      removeAnchorRestoration();
       document.removeEventListener("submit", handleSubmit, true);
       document.removeEventListener("click", handlePresetClick);
       window.removeEventListener("pageshow", handlePageShow);

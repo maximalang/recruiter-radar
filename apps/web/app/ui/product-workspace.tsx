@@ -11,6 +11,7 @@ import {
 } from "./icons";
 import { BrandLogo } from "./brand-logo";
 import type { NavItem } from "./internal-page";
+import polish from "./product-workspace-polish.module.css";
 import styles from "./product-workspace.module.css";
 
 type WorkspaceIcon = (props: SVGProps<SVGSVGElement>) => ReactElement;
@@ -30,18 +31,17 @@ export function ProductWorkspaceFrame(props: {
 }) {
   return (
     <div
-      className={styles.workspace}
+      className={`${styles.workspace} ${polish.workspace}`}
       data-product-workspace="true"
-      data-ui-system="recruiter-radar-v6"
+      data-ui-system="recruiter-radar-v7"
     >
       <a href="#main-content" className={styles.skipLink}>Перейти к содержимому</a>
 
-      <aside className={styles.sidebar} aria-label="Рабочее пространство Recruiter Radar">
-        <div className={styles.sidebarBrand}>
+      <aside className={`${styles.sidebar} ${polish.sidebar}`} aria-label="Рабочее пространство Recruiter Radar">
+        <div className={`${styles.sidebarBrand} ${polish.sidebarBrand}`}>
           <Link href="/" aria-label="Recruiter Radar — на главную">
             <BrandLogo tone="dark" joined />
           </Link>
-          <span className={styles.workspaceLabel}>Opportunity workspace</span>
         </div>
 
         <nav className={styles.sidebarNav} aria-label="Разделы кабинета">
@@ -51,7 +51,7 @@ export function ProductWorkspaceFrame(props: {
               <Link
                 key={item.href}
                 href={item.href}
-                className={styles.navItem}
+                className={`${styles.navItem} ${polish.navItem}`}
                 data-active={item.active ? "true" : undefined}
                 aria-current={item.active ? "page" : undefined}
               >
@@ -62,35 +62,20 @@ export function ProductWorkspaceFrame(props: {
           })}
         </nav>
 
-        <div className={styles.sidebarStatus}>
+        <div className={`${styles.sidebarStatus} ${polish.sidebarStatus}`}>
           <span className={styles.statusDot} aria-hidden="true" />
-          <div>
-            <strong>Радар активен</strong>
-            <span>Сигналы ранжируются по доказательствам</span>
-          </div>
+          <strong>Радар активен</strong>
         </div>
       </aside>
 
-      <div className={styles.workspaceBody}>
+      <div className={`${styles.workspaceBody} ${polish.workspaceBody}`}>
         <div className={styles.mobileTopbar}>
           <Link href="/" aria-label="Recruiter Radar — на главную">
             <BrandLogo joined />
           </Link>
-          <span>Workspace</span>
         </div>
 
-        <div className={styles.contextBar} aria-label="Контекст рабочего пространства">
-          <div>
-            <span className={styles.contextKicker}>Recruiter Radar</span>
-            <strong>Клиентские возможности</strong>
-          </div>
-          <div className={styles.contextMeta}>
-            <span>Evidence-first</span>
-            <span>Россия</span>
-          </div>
-        </div>
-
-        <main id="main-content" className={styles.content} tabIndex={-1}>
+        <main id="main-content" className={`${styles.content} ${polish.content}`} tabIndex={-1}>
           {props.children}
         </main>
 
@@ -108,7 +93,7 @@ export function ProductWorkspaceHeader(props: {
   status?: ReactNode;
 }) {
   return (
-    <header className={styles.pageHeader}>
+    <header className={`${styles.pageHeader} ${polish.pageHeader}`}>
       <div className={styles.pageHeaderCopy}>
         {props.eyebrow ? <span className={styles.pageEyebrow}>{props.eyebrow}</span> : null}
         <h1>{props.title}</h1>

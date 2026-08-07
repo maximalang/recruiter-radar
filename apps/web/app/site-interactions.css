@@ -1,0 +1,128 @@
+/* Recruiter Radar — interaction hardening loaded after the visual finish layer. */
+
+:where(a, button, input, select, textarea, summary) {
+  -webkit-tap-highlight-color: rgba(35, 128, 111, 0.14);
+}
+
+:where(button, input, select, textarea) {
+  font: inherit;
+}
+
+:where(button:disabled, input:disabled, select:disabled, textarea:disabled),
+:where([aria-disabled="true"]) {
+  cursor: not-allowed;
+}
+
+/* Text links that behave as product controls need a real, forgiving hit area. */
+:where(
+  a[class*="footerBrand"],
+  a[class*="footerLink"],
+  a[class*="footerOperatorEmail"],
+  a[class*="emptyStateAction"],
+  a[class*="skipLink"],
+  a[class*="pending-auth-action"][class*="brand"]
+) {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+}
+
+[data-product-workspace="true"] :is(
+  nav a,
+  header a[class*="Action"],
+  header a[class*="Cta"],
+  a[class*="navLink"],
+  a[class*="internalPageBackLink"],
+  a[class*="primaryAction"],
+  a[class*="secondaryAction"],
+  a[class*="accountPrimaryAction"],
+  a[class*="accountSecondaryAction"]
+),
+main[data-ui-system][class*="shell"] :is(a[class*="Action"], button),
+[data-landing-experience] :is(nav a, header a, a[class*="button"], a[class*="Button"], a[class*="action"], a[class*="Action"], button) {
+  min-height: 44px;
+}
+
+[data-product-workspace="true"] :is(
+  [class*="sidebarBrand"],
+  [class*="mobileTopbar"]
+) > a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+}
+
+[data-product-workspace="true"] :is(summary, [role="button"]) {
+  min-height: 44px;
+}
+
+[data-product-workspace="true"] :is(
+  h1,
+  h2,
+  h3,
+  p,
+  li,
+  label,
+  a,
+  button,
+  [role="status"],
+  [role="alert"]
+),
+main[data-ui-system] :is(h1, h2, h3, p, li, label, a, button) {
+  overflow-wrap: anywhere;
+}
+
+[data-product-workspace="true"] :is(button, [role="button"]):disabled:hover,
+[data-product-workspace="true"] [aria-disabled="true"]:hover {
+  transform: none;
+}
+
+[data-product-workspace="true"] :where([id]),
+main[data-ui-system] :where([id]) {
+  scroll-margin-top: 104px;
+}
+
+@media (max-width: 640px) {
+  :where(input, select, textarea) {
+    font-size: 16px;
+  }
+
+  [data-product-workspace="true"] :is(nav a, a[class*="Action"], button),
+  main[data-ui-system][class*="shell"] :is(a[class*="Action"], button),
+  [data-landing-experience] :is(nav a, header a, a[class*="Action"], button) {
+    min-height: 46px;
+  }
+
+  /* Avoid the one-pixel overshoot created by nested full-width details borders. */
+  [data-landing-experience] summary {
+    box-sizing: border-box;
+    max-width: calc(100% - 2px);
+  }
+}
+
+@media (hover: none) {
+  [data-product-workspace="true"] :is(
+    section[class*="contentCard"],
+    div[class*="metricCard"],
+    article[class*="metricCard"],
+    button,
+    a
+  ):hover {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:focus-within {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

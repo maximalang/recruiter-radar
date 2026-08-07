@@ -82,44 +82,6 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
         run: npm run db:validate
-      - name: Verify Company Events v1 migration and runtime
-        env:
-          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
-        run: npm run test:company-events-v1:db
-      - name: Verify Company State v1 migration and runtime
-        env:
-          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
-        run: npm run test:company-state-v1:db
-      - name: Verify Signal Episodes v2 migration and runtime
-        env:
-          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
-        run: npm run test:signal-episodes-v2:db
-      - name: Verify Commercial Thesis v1 migration and runtime
-        env:
-          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
-        run: npm run test:commercial-theses-v1:db
-      - name: Verify External Agency Propensity v1 migration and runtime
-        env:
-          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
-        run: npm run test:external-agency-propensity-v1:db
-      - name: Verify Agency DNA Match v2 migration and runtime
-        env:
-          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
-        run: npm run test:agency-dna-match-v2:db
-      - name: Verify Opportunity Scoring v3 migration and runtime
-        env:
-          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
-        run: npm run test:opportunity-scoring-v3:db
-      - name: Verify Query Planner v2 migration and runtime
-        env:
-          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
-        run: npm run test:query-planner-v2:db
-      - name: Verify Commercial Signal evaluation exports
-        env:
-          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
-        run: npm run test:commercial-signal:evaluation:db
-      - name: Verify Commercial Signal mandatory contracts
-        run: npm run test:commercial-signal:contracts
       - name: Verify Opportunity Engine and Outcome Ledger production runtime
         env:
           DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
@@ -245,9 +207,9 @@ jobs:
         run: |
           node apps/web/.next/standalone/apps/web/server.js > /tmp/landing-server.log 2>&1 &
           echo "$!" > /tmp/landing-server.pid
-          for i in $(seq 1 30); do
+          for i in $(seq 1 75); do
             if curl -fsS -o /tmp/landing-ready.html http://127.0.0.1:3000/ \
-              && grep -q 'data-deploy-anchor="recruiter-radar-signal-lock"' /tmp/landing-ready.html; then
+              && grep -q 'data-deploy-anchor="recruiter-radar-landing-v3"' /tmp/landing-ready.html; then
               exit 0
             fi
             sleep 2

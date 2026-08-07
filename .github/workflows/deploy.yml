@@ -282,7 +282,7 @@ jobs:
               landing_html=$(curl -fsS https://recruiter-radar.ru/ --max-time 30 || true)
 
               if printf '%s' "$landing_html" \
-                | grep -q 'data-deploy-anchor="recruiter-radar-signal-lock"'; then
+                | grep -q 'data-deploy-anchor="recruiter-radar-landing-v3"'; then
                 landing_ok=true
               fi
 

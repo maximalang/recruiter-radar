@@ -1,0 +1,148 @@
+:root {
+  --rr-ink-950: #070a09;
+  --rr-ink-900: #0d1110;
+  --rr-ink-800: #18201d;
+  --rr-paper: #f4f3ee;
+  --rr-paper-soft: #ecebe5;
+  --rr-surface: #fffef9;
+  --rr-text: #101412;
+  --rr-muted: #657069;
+  --rr-line: rgba(16, 20, 18, 0.12);
+  --rr-line-strong: rgba(16, 20, 18, 0.2);
+  --rr-signal: #c8f36a;
+  --rr-signal-strong: #dcff8a;
+  --rr-signal-ink: #315315;
+
+  --c-text-primary: var(--rr-text);
+  --c-text-secondary: #4f5a54;
+  --c-text-muted: var(--rr-muted);
+  --c-bg-page: var(--rr-paper-soft);
+  --c-bg-card: rgba(255, 254, 249, 0.94);
+  --c-border: var(--rr-line);
+  --c-brand: #527a23;
+  --c-accent: #315315;
+  --radius-card: 12px;
+  --radius-card-sm: 8px;
+}
+
+body {
+  background: var(--rr-paper-soft);
+  color: var(--rr-text);
+}
+
+[data-ui-system="recruiter-radar-v6"] {
+  --signal-strong: var(--rr-signal-strong);
+  --slate-950: var(--rr-ink-950);
+  --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  background:
+    linear-gradient(rgba(16, 20, 18, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(16, 20, 18, 0.025) 1px, transparent 1px),
+    var(--rr-paper-soft);
+  background-size: 72px 72px;
+  color: var(--rr-text);
+}
+
+[data-ui-system="recruiter-radar-v6"] [data-variant="hero"] {
+  border-color: rgba(82, 122, 35, 0.28);
+  border-left-color: var(--rr-signal);
+  background: linear-gradient(90deg, rgba(200, 243, 106, 0.09), rgba(255, 254, 249, 0.96) 34%);
+}
+
+:is(
+  [data-ui-system="recruiter-radar-v6"],
+  [data-ui-system="recruiter-radar-v7"]
+) :where(input, select, textarea) {
+  border-color: var(--rr-line-strong);
+  background: var(--rr-surface);
+  color: var(--rr-text);
+  box-shadow: none;
+}
+
+:is(
+  [data-ui-system="recruiter-radar-v6"],
+  [data-ui-system="recruiter-radar-v7"]
+) :where(input, select, textarea):focus-visible {
+  border-color: #739d3f;
+  outline: 3px solid rgba(200, 243, 106, 0.24);
+  outline-offset: 1px;
+}
+
+:is(
+  [data-ui-system="recruiter-radar-v6"],
+  [data-ui-system="recruiter-radar-v7"]
+) :where(a, button, summary):focus-visible {
+  outline: 2px solid #739d3f;
+  outline-offset: 3px;
+}
+
+:is(
+  [data-ui-system="recruiter-radar-v6"],
+  [data-ui-system="recruiter-radar-v7"]
+) :where(button[type="submit"], input[type="submit"]) {
+  border-color: var(--rr-ink-900);
+  background: var(--rr-ink-900);
+  color: #fffef9;
+  box-shadow: none;
+}
+
+:is(
+  [data-ui-system="recruiter-radar-v6"],
+  [data-ui-system="recruiter-radar-v7"]
+) :where(button[type="submit"], input[type="submit"]):hover {
+  border-color: var(--rr-ink-950);
+  background: var(--rr-ink-950);
+}
+
+:is(
+  [data-ui-system="recruiter-radar-v6"],
+  [data-ui-system="recruiter-radar-v7"]
+) table {
+  border-color: var(--rr-line);
+  background: transparent;
+}
+
+:is(
+  [data-ui-system="recruiter-radar-v6"],
+  [data-ui-system="recruiter-radar-v7"]
+) thead {
+  color: var(--rr-muted);
+}
+
+:is(
+  [data-ui-system="recruiter-radar-v6"],
+  [data-ui-system="recruiter-radar-v7"]
+) tbody tr {
+  border-color: var(--rr-line);
+}
+
+:is(
+  [data-ui-system="recruiter-radar-v6"],
+  [data-ui-system="recruiter-radar-v7"]
+) tbody tr:hover {
+  background: rgba(200, 243, 106, 0.055);
+}
+
+[data-product-workspace="true"] {
+  --workspace-accent: var(--rr-signal);
+  --workspace-ink: var(--rr-paper);
+  --workspace-muted: rgba(244, 243, 238, 0.62);
+}
+
+@media (max-width: 720px) {
+  [data-ui-system="recruiter-radar-v6"] {
+    background-size: 48px 48px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(
+    [data-ui-system="recruiter-radar-v6"],
+    [data-ui-system="recruiter-radar-v7"]
+  ),
+  :is(
+    [data-ui-system="recruiter-radar-v6"],
+    [data-ui-system="recruiter-radar-v7"]
+  ) * {
+    scroll-behavior: auto;
+  }
+}

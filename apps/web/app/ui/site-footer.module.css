@@ -8,15 +8,16 @@
   border-top: 1px solid var(--c-border, rgba(15, 23, 42, 0.08));
 }
 
-/* Light tone (internal + legal pages) — quiet on the page background. */
 .siteFooter[data-tone="light"] {
   color: var(--c-text-secondary, #475569);
 }
 
-/* Dark tone (landing hero backdrop) — light type on the dark hero gradient. */
 .siteFooter[data-tone="dark"] {
-  color: rgba(203, 213, 225, 0.78);
-  border-top-color: rgba(148, 163, 184, 0.18);
+  margin-top: 0;
+  padding: clamp(2rem, 4vw, 3.5rem) 0 1.75rem;
+  border-top-color: rgba(244, 243, 238, 0.1);
+  background: #070a09;
+  color: rgba(244, 243, 238, 0.62);
 }
 
 .footerInner {
@@ -27,13 +28,27 @@
   gap: 16px;
 }
 
-/* Top row — brand on the left, nav links on the right. */
+.siteFooter[data-tone="dark"] .footerInner {
+  max-width: 1312px;
+  padding-inline: clamp(1rem, 4vw, 3.5rem);
+  gap: 1.35rem;
+}
+
 .footerTop {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 20px;
   flex-wrap: wrap;
+}
+
+.siteFooter[data-tone="dark"] .footerTop {
+  display: grid;
+  grid-template-columns: minmax(14rem, 1fr) auto;
+  align-items: center;
+  gap: 2rem;
+  padding-bottom: 1.35rem;
+  border-bottom: 1px solid rgba(244, 243, 238, 0.1);
 }
 
 .footerBrand {
@@ -58,7 +73,16 @@
 }
 
 .siteFooter[data-tone="dark"] .footerBrand {
-  color: #f8fafc;
+  width: fit-content;
+  color: #f4f3ee;
+  font-weight: 680;
+  letter-spacing: -0.02em;
+}
+
+.siteFooter[data-tone="dark"] .footerMark {
+  width: 24px;
+  height: 24px;
+  flex-basis: 24px;
 }
 
 .footerBrand:hover {
@@ -66,7 +90,7 @@
 }
 
 .siteFooter[data-tone="dark"] .footerBrand:hover {
-  color: #cfe0ff;
+  color: #c8f36a;
 }
 
 .footerLinks {
@@ -75,7 +99,15 @@
   flex-wrap: wrap;
 }
 
+.siteFooter[data-tone="dark"] .footerLinks {
+  justify-content: flex-end;
+  gap: clamp(0.8rem, 2vw, 1.75rem);
+}
+
 .footerLink {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
   font-size: var(--fs-sm, 0.875rem);
   color: var(--c-text-secondary, #475569);
   text-decoration: none;
@@ -83,7 +115,9 @@
 }
 
 .siteFooter[data-tone="dark"] .footerLink {
-  color: rgba(203, 213, 225, 0.78);
+  color: rgba(244, 243, 238, 0.58);
+  font-size: 0.76rem;
+  font-weight: 560;
 }
 
 .footerLink:hover {
@@ -92,16 +126,22 @@
 }
 
 .siteFooter[data-tone="dark"] .footerLink:hover {
-  color: #cfe0ff;
+  color: #c8f36a;
+  text-decoration: none;
 }
 
-.footerLink:focus-visible {
+.footerLink:focus-visible,
+.footerBrand:focus-visible,
+.footerOperatorEmail:focus-visible {
   outline: 2px solid var(--c-brand, #1d4ed8);
-  outline-offset: 2px;
+  outline-offset: 3px;
   border-radius: 3px;
 }
 
-/* Operator line — one quiet row with the legally-required requisites. */
+.siteFooter[data-tone="dark"] :is(.footerLink, .footerBrand, .footerOperatorEmail):focus-visible {
+  outline-color: #c8f36a;
+}
+
 .footerOperator {
   display: flex;
   gap: 8px;
@@ -113,7 +153,10 @@
 }
 
 .siteFooter[data-tone="dark"] .footerOperator {
-  color: rgba(148, 163, 184, 0.7);
+  color: rgba(244, 243, 238, 0.38);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.67rem;
+  letter-spacing: 0.01em;
 }
 
 .footerOperatorName {
@@ -122,7 +165,9 @@
 }
 
 .siteFooter[data-tone="dark"] .footerOperatorName {
-  color: rgba(226, 232, 240, 0.9);
+  color: rgba(244, 243, 238, 0.72);
+  font-family: var(--font-sans, Inter, sans-serif);
+  font-weight: 600;
 }
 
 .footerOperatorSep {
@@ -146,10 +191,9 @@
 }
 
 .siteFooter[data-tone="dark"] .footerOperatorEmail:hover {
-  color: #cfe0ff;
+  color: #c8f36a;
 }
 
-/* Copyright — the smallest, most muted line. */
 .footerCopy {
   font-size: 0.76rem;
   color: var(--c-text-muted, #94a3b8);
@@ -157,25 +201,40 @@
 }
 
 .siteFooter[data-tone="dark"] .footerCopy {
-  color: rgba(148, 163, 184, 0.55);
+  color: rgba(244, 243, 238, 0.3);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.64rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
-/* ── Mobile ── */
-@media (max-width: 640px) {
+@media (max-width: 720px) {
   .siteFooter {
     margin-top: 36px;
     padding-top: 20px;
   }
 
-  .footerInner {
-    padding: 0 12px;
+  .siteFooter[data-tone="dark"] {
+    margin-top: 0;
+  }
+
+  .footerInner,
+  .siteFooter[data-tone="dark"] .footerInner {
+    padding-inline: 1rem;
     gap: 14px;
   }
 
-  .footerTop {
+  .footerTop,
+  .siteFooter[data-tone="dark"] .footerTop {
+    display: flex;
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
+  }
+
+  .siteFooter[data-tone="dark"] .footerLinks {
+    justify-content: flex-start;
+    gap: 0.35rem 1rem;
   }
 
   .footerMark {
