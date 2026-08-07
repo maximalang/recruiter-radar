@@ -18,7 +18,7 @@
 
 .title > em {
   max-width: 8.7ch;
-  color: #dcff8a;
+  color: #b5ead8;
 }
 
 .field {
@@ -29,7 +29,7 @@
 .field::after {
   position: absolute;
   inset: 12% 8% 10% 16%;
-  border: 1px solid rgba(220, 255, 138, .08);
+  border: 1px solid rgba(127, 216, 189, .09);
   border-radius: 50%;
   content: "";
   pointer-events: none;
@@ -38,7 +38,7 @@
 .lock {
   max-width: 29rem;
   border-color: rgba(244, 243, 238, .12);
-  border-left-color: #c8f36a;
+  border-left-color: #7fd8bd;
   background: rgba(7, 10, 9, .82);
   box-shadow: 0 1.8rem 5rem rgba(0, 0, 0, .22);
   backdrop-filter: blur(18px);

@@ -12,6 +12,7 @@ import styles from "./landing.module.css";
 
 type HeaderTone = "dark" | "light";
 
+const LOGIN_HREF = "/login?returnTo=%2Fdashboard";
 const FOCUSABLE_SELECTOR = [
   "a[href]",
   "button:not([disabled])",
@@ -30,8 +31,8 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
   const menuPanelRef = useRef<HTMLDivElement>(null);
 
   const closeMenu = useCallback((restoreFocus = true) => {
+    if (restoreFocus) menuButtonRef.current?.focus({ preventScroll: true });
     setMenuOpen(false);
-    if (restoreFocus) window.requestAnimationFrame(() => menuButtonRef.current?.focus({ preventScroll: true }));
   }, []);
 
   useEffect(() => {
@@ -168,7 +169,7 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
         </nav>
 
         <div className={headerStyles.actions}>
-          <Link href="/dashboard" className={headerStyles.login}>Войти</Link>
+          <Link href={LOGIN_HREF} className={headerStyles.login}>Войти</Link>
           <a
             href={previewHref}
             className={headerStyles.cta}
@@ -205,7 +206,7 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
           {LANDING_NAV_ITEMS.map(renderNavLink)}
         </nav>
         <div className={headerStyles.mobileActions}>
-          <Link href="/dashboard" onClick={() => closeMenu(false)}>Личный кабинет</Link>
+          <Link href={LOGIN_HREF} onClick={() => closeMenu(false)}>Личный кабинет</Link>
           <a
             href={previewHref}
             onClick={() => closeMenu(false)}

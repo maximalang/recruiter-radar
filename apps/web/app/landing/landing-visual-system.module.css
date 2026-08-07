@@ -1,21 +1,22 @@
 .visualSystem {
-  --slate-950: #070a09;
-  --slate-900: #0d1110;
-  --slate-850: #121715;
-  --slate-800: #18201d;
-  --paper: #f4f3ee;
-  --paper-soft: #ecebe5;
-  --paper-strong: #fffef9;
-  --ink: #101412;
-  --muted-dark: rgba(244, 243, 238, .58);
-  --muted-light: rgba(16, 20, 18, .58);
-  --line-dark: rgba(244, 243, 238, .12);
-  --line-light: rgba(16, 20, 18, .12);
-  --signal: #c8f36a;
-  --signal-strong: #dcff8a;
-  --signal-soft: rgba(200, 243, 106, .12);
-  --copper: #a58b78;
-  --warning: #ddb56f;
+  --slate-950: #09100f;
+  --slate-900: #101817;
+  --slate-850: #15201e;
+  --slate-800: #1c2926;
+  --paper: #f5f2ea;
+  --paper-soft: #ece9e0;
+  --paper-strong: #fffdf7;
+  --ink: #121a18;
+  --muted-dark: rgba(245, 242, 234, .72);
+  --muted-light: rgba(18, 26, 24, .68);
+  --line-dark: rgba(245, 242, 234, .16);
+  --line-light: rgba(18, 26, 24, .15);
+  --signal: #7fd8bd;
+  --signal-strong: #b5ead8;
+  --signal-deep: #286d5d;
+  --signal-soft: rgba(127, 216, 189, .12);
+  --copper: #bd8968;
+  --warning: #d5a663;
   --content: 82rem;
   background: var(--paper);
 }
@@ -30,9 +31,9 @@
 
 .visualSystem :global(#scene-detection) {
   background:
-    linear-gradient(90deg, rgba(7, 10, 9, .98) 0%, rgba(7, 10, 9, .9) 45%, rgba(7, 10, 9, .3) 76%, rgba(7, 10, 9, .64) 100%),
-    radial-gradient(circle at 74% 42%, rgba(200, 243, 106, .11), transparent 34%),
-    #070a09;
+    linear-gradient(90deg, rgba(9, 16, 15, .985) 0%, rgba(9, 16, 15, .92) 44%, rgba(9, 16, 15, .36) 76%, rgba(9, 16, 15, .7) 100%),
+    radial-gradient(circle at 74% 42%, rgba(127, 216, 189, .1), transparent 35%),
+    #09100f;
 }
 
 .visualSystem :global(#scene-detection)::before {
@@ -43,7 +44,7 @@
     linear-gradient(rgba(255, 255, 255, .025) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, .025) 1px, transparent 1px);
   background-size: 64px 64px;
-  mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, .18) 34%, #000 100%);
+  mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, .16) 35%, #000 100%);
   content: "";
   pointer-events: none;
 }
@@ -84,8 +85,8 @@
 .visualSystem :global(input),
 .visualSystem :global(select),
 .visualSystem :global(textarea) {
-  border-color: rgba(16, 20, 18, .16);
-  background: rgba(255, 254, 249, .92);
+  border-color: rgba(18, 26, 24, .18);
+  background: rgba(255, 253, 247, .96);
   box-shadow: none;
 }
 
@@ -99,35 +100,126 @@
 }
 
 .visualSystem :global([data-primary-lead]) {
-  border-color: rgba(16, 20, 18, .22) !important;
-  background: #fffef9 !important;
-  box-shadow: 0 1.5rem 4rem rgba(16, 20, 18, .08) !important;
+  border-color: rgba(18, 26, 24, .24) !important;
+  background: #fffdf7 !important;
+  box-shadow: 0 1.5rem 4rem rgba(18, 26, 24, .08) !important;
 }
 
 .visualSystem :global([data-primary-lead] [data-lead-score]) {
-  color: #315315;
+  color: var(--signal-deep);
 }
 
 .visualSystem :global([data-primary-proof]) {
   border-left-color: var(--signal) !important;
 }
 
+/* Pricing and FAQ live inside a dark conversion wrapper in the base layer.
+   These surfaces are intentionally light, so their text/borders must switch too. */
 .visualSystem :global(#pricing),
 .visualSystem :global(#faq) {
   background: var(--paper);
+  color: var(--ink);
+}
+
+.visualSystem :global(#pricing [data-pricing-primary]) {
+  border-color: rgba(127, 216, 189, .46);
+  background: var(--slate-900);
+  color: var(--paper);
+  box-shadow: 0 1.4rem 3.8rem rgba(18, 26, 24, .1);
+}
+
+.visualSystem :global(#pricing [data-pricing-primary] > a) {
+  background: var(--signal-strong);
+  color: var(--slate-950);
+}
+
+.visualSystem :global(#pricing [data-pricing-secondary]) {
+  gap: .75rem;
+}
+
+.visualSystem :global(#pricing [data-pricing-secondary] article) {
+  padding: 1.05rem 1.1rem;
+  border: 1px solid var(--line-light);
+  background: rgba(255, 253, 247, .62);
+}
+
+.visualSystem :global(#pricing [data-pricing-secondary] article:last-child) {
+  border-bottom: 1px solid var(--line-light);
+}
+
+.visualSystem :global(#pricing [data-pricing-secondary] article > strong) {
+  color: var(--ink);
+}
+
+.visualSystem :global(#pricing [data-pricing-secondary] p),
+.visualSystem :global(#faq p) {
+  color: var(--muted-light);
+}
+
+.visualSystem :global(#pricing [data-pricing-secondary] a),
+.visualSystem :global(#faq summary i) {
+  color: var(--signal-deep);
+}
+
+.visualSystem :global(#faq details) {
+  border-color: var(--line-light);
+  background: rgba(255, 253, 247, .38);
+}
+
+.visualSystem :global(#faq summary) {
+  color: var(--ink);
 }
 
 .visualSystem :global(#pricing article),
 .visualSystem :global(#faq details) {
-  border-color: rgba(16, 20, 18, .13);
-  background: rgba(255, 254, 249, .72);
+  border-color: rgba(18, 26, 24, .14);
   box-shadow: none;
+}
+
+/* The radar moves like a live instrument rather than a decorative spinner. */
+.visualSystem :global([data-hero-instrument] [data-signal-cluster]) {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: clusterDrift 8s cubic-bezier(.45, 0, .25, 1) infinite alternate;
+}
+
+.visualSystem :global([data-hero-instrument] [data-signal-cluster="secondary"]) {
+  animation-delay: -3.2s;
+  animation-duration: 10.5s;
+}
+
+.visualSystem :global([data-hero-instrument] [data-signal-speck]) {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: signalBreath 5.8s ease-in-out infinite;
+}
+
+.visualSystem :global([data-hero-instrument] [data-signal-speck="late"]) {
+  animation-delay: -2.6s;
+}
+
+.visualSystem :global([data-hero-instrument] [data-active-signal]) {
+  filter: drop-shadow(0 0 12px rgba(127, 216, 189, .16));
+}
+
+@keyframes clusterDrift {
+  0% { transform: translate3d(-2px, 1px, 0) rotate(-.6deg); }
+  100% { transform: translate3d(4px, -3px, 0) rotate(.8deg); }
+}
+
+@keyframes signalBreath {
+  0%, 100% { opacity: .36; transform: scale(.86); }
+  48% { opacity: .78; transform: scale(1.08); }
 }
 
 @media (max-width: 768px) {
   .visualSystem :global(#scene-detection)::before {
     background-size: 44px 44px;
-    opacity: .72;
+    opacity: .68;
+  }
+
+  .visualSystem :global(#pricing [data-pricing-secondary] article) {
+    padding: 1rem;
   }
 }
 
@@ -136,5 +228,10 @@
   .visualSystem *::before,
   .visualSystem *::after {
     scroll-behavior: auto !important;
+  }
+
+  .visualSystem :global([data-hero-instrument] [data-signal-cluster]),
+  .visualSystem :global([data-hero-instrument] [data-signal-speck]) {
+    animation: none;
   }
 }

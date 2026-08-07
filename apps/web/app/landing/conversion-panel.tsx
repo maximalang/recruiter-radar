@@ -27,6 +27,7 @@ export default function ConversionPanel(props: {
         id="pricing"
         className={`${styles.pricingStage} ${panelStyles.anchor} ${panelStyles.pricing}`}
         data-header-tone="light"
+        data-pricing-surface="true"
       >
         <div className={styles.pricingIntro}>
           <span>07 — Тарифы</span>
@@ -38,7 +39,7 @@ export default function ConversionPanel(props: {
           </p>
         </div>
 
-        <div className={styles.pilotOffer}>
+        <div className={styles.pilotOffer} data-pricing-primary="true">
           <div className={styles.pilotMeta}>
             <span>Главное предложение</span>
             <strong>{pilotPlan.name}</strong>
@@ -61,7 +62,7 @@ export default function ConversionPanel(props: {
           <small>{props.paymentConfigured ? "Разовая оплата · без автопродления" : "Заявка без списания · профиль сохранится"}</small>
         </div>
 
-        <div className={styles.secondaryOffers} aria-label="Дополнительные тарифы">
+        <div className={styles.secondaryOffers} aria-label="Дополнительные тарифы" data-pricing-secondary="true">
           {secondaryPlans.map((plan) => {
             const quarterly = plan.code === "quarterly";
             return (
@@ -86,6 +87,7 @@ export default function ConversionPanel(props: {
         id="faq"
         className={`${styles.faqStage} ${panelStyles.anchor} ${panelStyles.faq}`}
         data-header-tone="light"
+        data-faq-surface="true"
       >
         <div className={styles.faqHeading}>
           <span>Перед запуском</span>
