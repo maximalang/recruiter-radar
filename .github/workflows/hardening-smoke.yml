@@ -41,45 +41,12 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - name: Harden semantic contracts and merge current main
+      - name: Merge current main and prove Evidence Radar contracts
         shell: bash
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-
-          python3 - <<'PY'
-          from pathlib import Path
-
-          source = Path('apps/web/lib/intelligence/evidence-radar.ts')
-          text = source.read_text()
-          misleading = "  { id: 'first-party-external-hiring', label: 'First-party interest + external hiring', requiredTypes: ['hiring_growth'], optionalTypes: ['urgent_hiring', 'recruiter_hiring'], windowDays: 30, minimumSourceFamilies: 2, intentBoost: .08, explanation: 'First-party interest may improve timing only when external evidence also exists.' },\n"
-          if text.count(misleading) != 1:
-              raise SystemExit('Expected exactly one misleading first-party correlation rule')
-          text = text.replace(misleading, '')
-          forecast_anchor = "export function forecastStaffing(\n  signals: readonly NormalizedSignal[],\n  now = new Date(),\n): StaffingForecast | null {\n  const applicable = signals\n"
-          forecast_replacement = "export function forecastStaffing(\n  signals: readonly NormalizedSignal[],\n  now = new Date(),\n): StaffingForecast | null {\n  const organizationIds = uniqueSorted(signals.map((signal) => signal.organizationId))\n  if (organizationIds.length > 1) {\n    throw new Error('forecastStaffing requires signals for one organization')\n  }\n  const applicable = signals\n"
-          if text.count(forecast_anchor) != 1:
-              raise SystemExit('forecastStaffing anchor changed unexpectedly')
-          source.write_text(text.replace(forecast_anchor, forecast_replacement))
-
-          test = Path('apps/web/src/__tests__/lib/intelligence/evidence-radar.test.ts')
-          text = test.read_text()
-          correlation_anchor = "    expect(CORRELATION_RULES.every((rule) => rule.minimumSourceFamilies >= 2)).toBe(true)\n"
-          correlation_replacement = correlation_anchor + "    expect(CORRELATION_RULES.find((rule) => rule.id === 'first-party-external-hiring')).toBeUndefined()\n"
-          if text.count(correlation_anchor) != 1:
-              raise SystemExit('correlation test anchor changed unexpectedly')
-          text = text.replace(correlation_anchor, correlation_replacement)
-          staffing_anchor = "    expect(forecastStaffing([signal('plant', 'production_expansion', 'official-news')]))\n      .toMatchObject({ mode: 'mass', minHeadcount: 20, maxHeadcount: 200, basisSignalIds: ['plant'] })\n"
-          staffing_replacement = staffing_anchor + "    expect(() => forecastStaffing([\n      signal('plant', 'production_expansion', 'official-news'),\n      { ...signal('other', 'urgent_hiring', 'career-page'), organizationId: '2' },\n    ])).toThrow('forecastStaffing requires signals for one organization')\n"
-          if text.count(staffing_anchor) != 1:
-              raise SystemExit('staffing test anchor changed unexpectedly')
-          test.write_text(text.replace(staffing_anchor, staffing_replacement))
-          PY
-
-          git add apps/web/lib/intelligence/evidence-radar.ts apps/web/src/__tests__/lib/intelligence/evidence-radar.test.ts
-          git commit -m 'fix: fail closed on ambiguous Evidence Radar correlations'
-
           git fetch origin main
           MAIN_SHA="$(git rev-parse FETCH_HEAD)"
           MERGE_BASE="$(git merge-base HEAD "$MAIN_SHA")"
@@ -121,7 +88,7 @@ jobs:
           base = json.loads(Path('/tmp/package-base.json').read_text())
           main = json.loads(Path('/tmp/package-main.json').read_text())
           ours = json.loads(Path('/tmp/package-ours.json').read_text())
-          merged = main
+          merged = dict(main)
 
           for section in ('scripts', 'dependencies', 'devDependencies', 'overrides'):
               b = base.get(section, {})
