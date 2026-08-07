@@ -42,12 +42,12 @@ export default function WorkspaceScene(props: WorkspaceProps) {
         <LandingPreviewInteractions />
         <WorkspaceIntro />
         <div className={`${styles.workspaceProductFrame} ${sceneStyles.productFrame}`}>
-          <div className={sceneStyles.productRail} aria-label="Состояние live preview">
+          <div className={sceneStyles.productRail} aria-label="Состояние предпросмотра выдачи">
             <div className={sceneStyles.railIdentity}>
               <strong>RECRUITER RADAR</strong>
-              <span>/ LIVE PREVIEW</span>
+              <span>/ ПРЕДПРОСМОТР</span>
             </div>
-            <span className={sceneStyles.railStatus}>evidence pipeline ready</span>
+            <span className={sceneStyles.railStatus}>готов к пересчёту</span>
           </div>
           <PreviewConfigurator previewInput={props.previewInput} hasPreview={props.hasPreview} />
           <div
@@ -73,12 +73,12 @@ export default function WorkspaceScene(props: WorkspaceProps) {
 function WorkspaceIntro() {
   return (
     <div className={`${styles.workspaceIntro} ${sceneStyles.intro}`}>
-      <p className={styles.sceneLabel}>03 — Рабочая выдача / PRODUCT PROOF</p>
+      <p className={styles.sceneLabel}>03 — Рабочая выдача</p>
       <h2 id="workspace-title" className={styles.sceneHeading}>
-        Рабочая выдача — не мокап. <em>Пересчитайте радар сами.</em>
+        Посмотрите, как выглядит <em>рабочая выдача.</em>
       </h2>
       <p className={styles.sceneLead}>
-        Как выглядит рабочая выдача: укажите специализацию и географию. Сервер пересчитает порядок компаний по тем же правилам, что рабочую выдачу.
+        Выберите специализацию и географию: радар пересчитает приоритет компаний и покажет, какие факты стоят за каждой рекомендацией.
       </p>
     </div>
   );
@@ -158,7 +158,7 @@ export async function WorkspaceResults(props: Pick<WorkspaceProps, "previewInput
         />
         <div className={`${styles.workspaceResultsHeader} ${sceneStyles.resultsHeader}`}>
           <div>
-            <span>RADAR / {String(previewState.items.length).padStart(2, "0")}</span>
+            <span>РАДАР / {String(previewState.items.length).padStart(2, "0")}</span>
             <strong>{previewState.isPersonalized ? "Приоритет после пересчёта" : "Пример утренней выдачи"}</strong>
           </div>
           <span data-live={previewState.isLive || undefined}>
@@ -171,7 +171,7 @@ export async function WorkspaceResults(props: Pick<WorkspaceProps, "previewInput
             <strong>Обезличенный набор.</strong>{" "}
             {previewState.isPersonalized
               ? "Приоритеты реально пересчитаны по профилю; названия и факты остаются примерными."
-              : "Выберите профиль: порядок и оценка изменятся по тем же правилам, что в рабочей выдаче."}
+              : "Выберите профиль: порядок и приоритет изменятся по тем же правилам, что в рабочей выдаче."}
           </p>
         ) : null}
 
@@ -225,7 +225,7 @@ function WorkspaceResultsFailure({ checkoutHref, embedded }: { checkoutHref: str
       role="status"
     >
       <div className={`${styles.workspaceResultsHeader} ${sceneStyles.resultsHeader}`}>
-        <div><span>RADAR / НЕДОСТУПЕН</span><strong>Оболочка продукта работает независимо от данных.</strong></div>
+        <div><span>РАДАР / НЕДОСТУПЕН</span><strong>Не удалось обновить выдачу.</strong></div>
         <span>можно повторить</span>
       </div>
       <div className={styles.workspaceEmpty}>
