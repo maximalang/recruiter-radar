@@ -89,6 +89,7 @@ describe('Company Events v1 normalization', () => {
     )
 
     expect(result.rejections).toEqual([])
+    expect(result.events.filter((event) => event.eventType === 'job_posting')).toHaveLength(1)
     expect(jobPosting).toMatchObject({
       organizationId: '10',
       eventType: 'job_posting',
@@ -107,7 +108,7 @@ describe('Company Events v1 normalization', () => {
     expect(jobPosting?.eventFingerprint).toMatch(/^[a-f0-9]{64}$/)
     expect(reversedJobPosting?.eventFingerprint)
       .toBe(jobPosting?.eventFingerprint)
-    expect(result.events.some((event) => event.eventType === 'new_region')).toBe(true)
+    expect(result.events.some((event) => event.eventType === 'new_region')).toBe(false)
   })
 
   it('keeps same-source vacancies with conflicting external ids separate', () => {
@@ -121,9 +122,13 @@ describe('Company Events v1 normalization', () => {
         externalVacancyId: 'second',
       }),
     ], NOW)
+    const jobPostingEvents = result.events.filter(
+      (event) => event.eventType === 'job_posting',
+    )
 
-    expect(result.events).toHaveLength(2)
-    expect(new Set(result.events.map((event) => event.eventFingerprint)).size)
+    expect(result.rejections).toEqual([])
+    expect(jobPostingEvents).toHaveLength(2)
+    expect(new Set(jobPostingEvents.map((event) => event.eventFingerprint)).size)
       .toBe(2)
   })
 
