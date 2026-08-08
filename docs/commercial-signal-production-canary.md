@@ -344,6 +344,29 @@ until the original host process has exited, the deployment lock can be acquired,
 the receipt is archived and the runtime is dark. A second session must never
 recreate the web container while a source execution is still active.
 
+Use the deploy-installed host entrypoint instead of composing the mutation
+window interactively. It keeps the lock for the full operation, emits
+`canary_runner=active` every 30 seconds so an idle operator transport does not
+terminate a long source request, archives a completed or failed receipt before
+restoring `.env`, and does not abort the child runner merely because the SSH
+operator receives `HUP`, `INT`, `TERM`, or a closed-output `SIGPIPE`:
+
+```bash
+RR_CANARY_EXPECTED_SHA=<exact-tested-production-sha> \
+RR_CANARY_WORKSPACE_ID=<approved-internal-workspace-id> \
+RR_CANARY_RUN_ID=canary-2026-08-08-01 \
+RR_CANARY_CONFIRMATION=RUN_ONE_WORKSPACE_CANARY \
+  /opt/recruiter-radar/run-commercial-signal-production-canary.sh
+```
+
+The terminal result must include `receipt_archived=true` for a mutating run and
+`rollback_dark=true`. Receipts and restricted operator logs are stored under
+`/opt/recruiter-radar/canary-evidence` with directory mode `0700` and file mode
+`0600`. Do not start a second canary after an interrupted run. First establish
+that the original host runner exited, its lock is free, its receipt (if any) was
+archived, the exact `.env` backup was restored, and the web runtime is healthy
+and dark. An interrupted or failed run cannot satisfy the quality gate.
+
 The operator runner performs authenticated read-only preflight for all required
 cron surfaces before any mutation. It then runs, in order:
 

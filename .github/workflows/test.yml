@@ -57,10 +57,12 @@ jobs:
           bash -n scripts/deploy/configure-caddy-real-ip.sh
           bash -n scripts/deploy/rollback-guard.sh
           bash -n scripts/deploy/recover-deployment.sh
+          bash -n scripts/deploy/run-commercial-signal-production-canary.sh
           sh -n scripts/deploy/validate-metrika-id.sh
           bash -n scripts/test/configure-caddy-production.sh
           bash -n scripts/test/deploy-rollback-guard.sh
           bash -n scripts/test/configure-notification-encryption.sh
+          bash -n scripts/test/commercial-signal-canary-host-runner.sh
           bash -n scripts/test/docker-entrypoint-reconciliation.sh
           bash -n scripts/test/landing-events-caddy-smoke.sh
           bash -n scripts/test/landing-events-caddy-smoke-contract.sh
@@ -68,6 +70,7 @@ jobs:
         run: |
           bash scripts/test/deploy-rollback-guard.sh
           bash scripts/test/configure-notification-encryption.sh
+          bash scripts/test/commercial-signal-canary-host-runner.sh
           bash scripts/test/configure-caddy-production.sh
           bash scripts/test/docker-entrypoint-reconciliation.sh
           bash scripts/test/landing-events-caddy-smoke-contract.sh
