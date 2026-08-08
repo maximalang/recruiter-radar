@@ -1,0 +1,261 @@
+import type {
+  EconomicsFitResult,
+  MarketDifficultyResult,
+} from './commercial-fit-v2'
+import {
+  buildEvidenceIndependence,
+  buildOpportunityQuality,
+  COMMERCIAL_SIGNAL_QUALITY_VERSION,
+  type CommercialSignalEvidenceProvenance,
+  type EvidenceIndependenceResult,
+  type OpportunityQualityComponent,
+  type OpportunityQualityResult,
+} from './commercial-signal-quality-v2'
+import type {
+  ExternalAgencyPropensityResult,
+} from './external-agency-propensity-v2'
+import type { HiringFrictionResult } from './hiring-friction-v1'
+import {
+  applyNegativeEvidence,
+  type NegativeEvidenceResult,
+} from './negative-evidence-v1'
+import type { SignalConvergenceResult } from './signal-convergence-v1'
+
+export const COMMERCIAL_SIGNAL_QUALITY_ENGINE_VERSION =
+  'commercial-signal-quality-engine-v2' as const
+
+export type CommercialSignalQualityStatus =
+  | 'qualified_actionable'
+  | 'qualified_needs_enrichment'
+  | 'review'
+  | 'blocked'
+  | 'expired'
+  | 'dismissed'
+
+export type CommercialSignalQualityEngineV2Input = {
+  decisionSource: 'deterministic' | 'llm'
+  currentHiringEvidence: boolean
+  hiringNeed: OpportunityQualityComponent
+  hiringFriction: HiringFrictionResult
+  agencyFit: OpportunityQualityComponent
+  propensity: ExternalAgencyPropensityResult
+  convergence: SignalConvergenceResult
+  economics: EconomicsFitResult
+  marketDifficulty: MarketDifficultyResult
+  negativeEvidence: NegativeEvidenceResult
+  contact: {
+    corporateContactPathAvailable: boolean
+    doNotContact: boolean
+    conflict: boolean
+    evidenceIds: string[]
+  }
+  evidence: CommercialSignalEvidenceProvenance[]
+}
+
+export type CommercialSignalQualityEngineV2Result = {
+  engineVersion: typeof COMMERCIAL_SIGNAL_QUALITY_ENGINE_VERSION
+  featureVersions: {
+    quality: typeof COMMERCIAL_SIGNAL_QUALITY_VERSION
+    friction: HiringFrictionResult['featureVersion']
+    propensity: ExternalAgencyPropensityResult['featureVersion']
+    convergence: SignalConvergenceResult['featureVersion']
+    economics: EconomicsFitResult['featureVersion']
+    negativeEvidence: NegativeEvidenceResult['featureVersion']
+  }
+  quality: OpportunityQualityResult
+  status: CommercialSignalQualityStatus
+  actionability: 'actionable' | 'needs_enrichment' | 'review' | 'blocked'
+  reasonCodes: string[]
+  evidenceIds: string[]
+  independence: EvidenceIndependenceResult
+  components: Record<string, OpportunityQualityComponent>
+  modelType: 'heuristic'
+  calibrationStatus: 'uncalibrated'
+}
+
+const QUALITY_COMPONENTS = {
+  hiring_need: { critical: true, weight: 1.3 },
+  hiring_friction: { critical: true, weight: 1 },
+  agency_fit: { critical: true, weight: 1.2 },
+  external_agency_propensity: { critical: true, weight: 1.2 },
+  signal_convergence: { critical: true, weight: 0.8 },
+  economics_fit: { critical: false, weight: 0.5 },
+  market_difficulty: { critical: false, weight: 0.3 },
+} as const
+
+export function buildCommercialSignalQualityEngineV2(
+  input: CommercialSignalQualityEngineV2Input,
+): CommercialSignalQualityEngineV2Result {
+  if (input.decisionSource === 'llm') {
+    throw new Error('LLM cannot determine score, archetype, or eligibility')
+  }
+  const provenanceIds = new Set(input.evidence.map((item) => item.evidenceId))
+  const components = buildComponents(input)
+  const contactEvidenceIds = ids(input.contact.evidenceIds)
+  const usedEvidenceIds = ids([
+    ...Object.values(components).flatMap((item) => item.evidenceIds),
+    ...input.negativeEvidence.evidenceIds,
+    ...contactEvidenceIds,
+  ])
+  const missingLineage = usedEvidenceIds.filter((value) => !provenanceIds.has(value))
+  if (missingLineage.length > 0) {
+    throw new Error(`exact evidence lineage missing: ${missingLineage.join(',')}`)
+  }
+  if (new Set(input.evidence.map((item) => item.evidenceId)).size !==
+    input.evidence.length) {
+    throw new Error('exact evidence lineage contains duplicate evidence ids')
+  }
+
+  const independence = buildEvidenceIndependence(input.evidence)
+  const baseQuality = buildOpportunityQuality({
+    components: Object.entries(components).map(([key, component]) => ({
+      key,
+      ...QUALITY_COMPONENTS[key as keyof typeof QUALITY_COMPONENTS],
+      component,
+    })),
+    minimumCriticalCoverage: 0.8,
+    minimumQualityCoverage: 0.7,
+    minimumQualityScore: 0.68,
+  })
+  const baseStatus: CommercialSignalQualityStatus = baseQuality.actionable
+    ? input.contact.corporateContactPathAvailable
+      ? 'qualified_actionable'
+      : 'qualified_needs_enrichment'
+    : 'review'
+  const negative = applyNegativeEvidence({
+    qualityScore: baseQuality.qualityScore,
+    status: baseStatus,
+    negativeEvidence: input.negativeEvidence,
+  })
+  const policyBlocked = input.contact.doNotContact || input.contact.conflict ||
+    input.propensity.actionability === 'blocked'
+  const currentHiringMissing = !input.currentHiringEvidence
+  const status: CommercialSignalQualityStatus = policyBlocked
+    ? 'blocked'
+    : currentHiringMissing
+      ? 'review'
+      : negative.status
+  const actionable = baseQuality.actionable && !currentHiringMissing &&
+    negative.qualityScore >= 0.68 &&
+    status !== 'blocked' && status !== 'expired' && status !== 'dismissed' &&
+    status !== 'review'
+  const quality: OpportunityQualityResult = {
+    ...baseQuality,
+    qualityScore: negative.qualityScore,
+    actionable,
+  }
+  const reasonCodes = [
+    ...baseQuality.reasonCodes,
+    ...negative.reasonCodes,
+    ...input.propensity.reasonCodes,
+  ]
+  if (!input.contact.corporateContactPathAvailable) {
+    reasonCodes.push('CORPORATE_CONTACT_PATH_MISSING')
+  }
+  if (input.contact.doNotContact) reasonCodes.push('DO_NOT_CONTACT')
+  if (input.contact.conflict) reasonCodes.push('CONFLICT_BLOCK')
+  if (currentHiringMissing) reasonCodes.push('CURRENT_HIRING_EVIDENCE_MISSING')
+
+  return {
+    engineVersion: COMMERCIAL_SIGNAL_QUALITY_ENGINE_VERSION,
+    featureVersions: {
+      quality: COMMERCIAL_SIGNAL_QUALITY_VERSION,
+      friction: input.hiringFriction.featureVersion,
+      propensity: input.propensity.featureVersion,
+      convergence: input.convergence.featureVersion,
+      economics: input.economics.featureVersion,
+      negativeEvidence: input.negativeEvidence.featureVersion,
+    },
+    quality,
+    status,
+    actionability: resolveActionability(status),
+    reasonCodes: uniqueText(reasonCodes),
+    evidenceIds: usedEvidenceIds,
+    independence,
+    components,
+    modelType: 'heuristic',
+    calibrationStatus: 'uncalibrated',
+  }
+}
+
+function buildComponents(
+  input: CommercialSignalQualityEngineV2Input,
+): Record<keyof typeof QUALITY_COMPONENTS, OpportunityQualityComponent> {
+  return {
+    hiring_need: input.hiringNeed,
+    hiring_friction: {
+      value: input.hiringFriction.frictionLevel === 'unknown'
+        ? null
+        : input.hiringFriction.frictionScore,
+      confidence: input.hiringFriction.frictionLevel === 'unknown'
+        ? 0
+        : input.hiringFriction.coverage,
+      coverage: input.hiringFriction.coverage,
+      reasonCodes: [
+        ...input.hiringFriction.positiveReasons.map((item) => item.code),
+        ...input.hiringFriction.negativeReasons.map((item) => item.code),
+      ],
+      evidenceIds: input.hiringFriction.evidenceIds,
+    },
+    agency_fit: input.agencyFit,
+    external_agency_propensity: {
+      value: input.propensity.propensityScore,
+      confidence: input.propensity.confidence,
+      coverage: input.propensity.coverage,
+      reasonCodes: input.propensity.reasonCodes,
+      evidenceIds: input.propensity.evidenceIds,
+    },
+    signal_convergence: {
+      value: input.convergence.convergenceScore,
+      confidence: input.convergence.confidence,
+      coverage: input.convergence.coverage,
+      reasonCodes: [
+        ...input.convergence.positiveReasons,
+        ...input.convergence.negativeReasons,
+      ],
+      evidenceIds: input.convergence.evidenceIds,
+    },
+    economics_fit: {
+      value: input.economics.componentValue,
+      confidence: input.economics.componentConfidence,
+      coverage: input.economics.coverage,
+      reasonCodes: input.economics.reasons,
+      evidenceIds: input.economics.evidenceIds,
+    },
+    market_difficulty: {
+      value: input.marketDifficulty.componentValue,
+      confidence: input.marketDifficulty.componentConfidence,
+      coverage: input.marketDifficulty.componentValue === null ? 0 : 1,
+      reasonCodes: [input.marketDifficulty.componentValue === null
+        ? 'MARKET_DIFFICULTY_UNKNOWN'
+        : `MARKET_DIFFICULTY_${input.marketDifficulty.marketDifficulty.toUpperCase()}`],
+      evidenceIds: input.marketDifficulty.evidenceIds,
+    },
+  }
+}
+
+function resolveActionability(
+  status: CommercialSignalQualityStatus,
+): CommercialSignalQualityEngineV2Result['actionability'] {
+  if (status === 'qualified_actionable') return 'actionable'
+  if (status === 'qualified_needs_enrichment') return 'needs_enrichment'
+  if (status === 'blocked' || status === 'expired' || status === 'dismissed') {
+    return 'blocked'
+  }
+  return 'review'
+}
+
+function ids(values: readonly string[]): string[] {
+  return [...new Set(values.map((value) => {
+    if (!/^[1-9]\d*$/.test(value)) throw new Error('evidence id must be positive')
+    return value
+  }))].sort(compareIds)
+}
+
+function compareIds(left: string, right: string): number {
+  return left.length - right.length || left.localeCompare(right, 'en')
+}
+
+function uniqueText(values: readonly string[]): string[] {
+  return [...new Set(values)].sort((left, right) => left.localeCompare(right, 'en'))
+}
