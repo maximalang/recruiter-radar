@@ -23,6 +23,21 @@ const supplyMetricsDown = readFileSync(resolve(
   migrationsRoot,
   '20260807180500_complete_query_plan_supply_metrics.down.sql',
 ), 'utf8')
+const isolatedCleanup = readFileSync(resolve(
+  repositoryRoot,
+  'packages',
+  'db',
+  'scripts',
+  'lib',
+  'commercial-signal-isolated-test-cleanup.mjs',
+), 'utf8')
+const isolatedCleanupRunner = readFileSync(resolve(
+  repositoryRoot,
+  'packages',
+  'db',
+  'scripts',
+  'rollback-commercial-signal-test-dependents.mjs',
+), 'utf8')
 
 describe('Commercial Signal rollback data preservation', () => {
   it('keeps new dismissal reasons valid without rewriting outcome history', () => {
@@ -82,5 +97,15 @@ describe('Commercial Signal rollback data preservation', () => {
     for (const down of [yieldMetricsDown, supplyMetricsDown]) {
       expect(down).not.toMatch(/DROP\s+COLUMN/i)
     }
+  })
+
+  it('confines destructive cleanup to explicitly acknowledged test databases', () => {
+    expect(isolatedCleanup).toMatch(/DROP\s+TABLE/i)
+    expect(isolatedCleanupRunner).toContain(
+      `COMMERCIAL_SIGNAL_TEST_ROLLBACK_ACK !== 'isolated'`,
+    )
+    expect(isolatedCleanupRunner).toContain(
+      'COMMERCIAL_SIGNAL_ISOLATED_TEST_CLEANUP_SQL',
+    )
   })
 })

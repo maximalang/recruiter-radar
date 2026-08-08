@@ -3,6 +3,10 @@ import { resolve } from 'node:path'
 
 import pg from 'pg'
 
+import {
+  COMMERCIAL_SIGNAL_ISOLATED_TEST_CLEANUP_SQL,
+} from './lib/commercial-signal-isolated-test-cleanup.mjs'
+
 const { Client } = pg
 
 const databaseUrl = process.env.DATABASE_URL?.trim()
@@ -34,6 +38,8 @@ try {
     await database.query(downSql[index])
     process.stdout.write(`Rolled back test dependency: ${filenames[index]}\n`)
   }
+  await database.query(COMMERCIAL_SIGNAL_ISOLATED_TEST_CLEANUP_SQL)
+  process.stdout.write('Removed retained Commercial Signal test schema.\n')
 } finally {
   await database.end()
 }

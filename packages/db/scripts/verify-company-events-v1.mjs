@@ -4,6 +4,10 @@ import { resolve } from 'node:path'
 
 import pg from 'pg'
 
+import {
+  COMMERCIAL_SIGNAL_ISOLATED_TEST_CLEANUP_SQL,
+} from './lib/commercial-signal-isolated-test-cleanup.mjs'
+
 const { Pool } = pg
 
 if (!process.env.DATABASE_URL) {
@@ -315,6 +319,7 @@ try {
   for (const dependentDownSql of commercialSignalDependentDownSql) {
     await database.query(dependentDownSql)
   }
+  await database.query(COMMERCIAL_SIGNAL_ISOLATED_TEST_CLEANUP_SQL)
   await database.query(queryPlannerV2DownSql)
   await database.query(opportunityScoringV3DownSql)
   await database.query(agencyDnaMatchDownSql)
