@@ -380,6 +380,7 @@ function emptySourceExecution(
     requestsExecuted: 0,
     requestsBlocked: 0,
     requestsFailed: 0,
+    staleExecutionsReconciled: 0,
     fetchedRecords: 0,
     uniqueCompanies: 0,
     signalUpserts: 0,
