@@ -231,6 +231,9 @@ function summarizeCanary(result) {
     sourceRequests: safeCount(result.sourceExecution?.requestsExecuted),
     sourceRequestsBlocked: safeCount(result.sourceExecution?.requestsBlocked),
     sourceRequestsFailed: safeCount(result.sourceExecution?.requestsFailed),
+    staleSourceExecutionsReconciled: safeCount(
+      result.sourceExecution?.staleExecutionsReconciled,
+    ),
     fetchedRecords: safeCount(result.sourceExecution?.fetchedRecords),
     uniqueCompanies: safeCount(result.sourceExecution?.uniqueCompanies),
     touchedOrganizations: Array.isArray(result.touchedOrganizationIds)

@@ -23,6 +23,7 @@ export type QueryPlannerV2ExecutionStats = {
   requestsExecuted: number
   requestsBlocked: number
   requestsFailed: number
+  staleExecutionsReconciled: number
   fetchedRecords: number
   uniqueCompanies: number
   signalUpserts: number
@@ -164,6 +165,7 @@ function parseExecutionStats(stdout: string): QueryPlannerV2ExecutionStats | nul
         requestsExecuted: count(row.requestsExecuted),
         requestsBlocked: count(row.requestsBlocked),
         requestsFailed: count(row.requestsFailed),
+        staleExecutionsReconciled: count(row.staleExecutionsReconciled),
         fetchedRecords: count(row.fetchedRecords),
         uniqueCompanies: count(row.uniqueCompanies),
         signalUpserts: count(row.signalUpserts),
@@ -221,6 +223,7 @@ function emptyStats(
     requestsExecuted: 0,
     requestsBlocked: 0,
     requestsFailed: 0,
+    staleExecutionsReconciled: 0,
     fetchedRecords: 0,
     uniqueCompanies: 0,
     signalUpserts: 0,

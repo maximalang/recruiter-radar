@@ -33,6 +33,10 @@ const plannerDocs = fs.readFileSync(path.join(
   root,
   'docs/query-planner-v2.md',
 ), 'utf8')
+const canaryRunbook = fs.readFileSync(path.join(
+  root,
+  'docs/commercial-signal-production-canary.md',
+), 'utf8')
 const downVerifier = fs.readFileSync(path.join(
   root,
   'packages/db/scripts/verify-opportunity-engine-down.mjs',
@@ -183,6 +187,13 @@ describe('Query Planner v2 migration', () => {
         `/app/node_modules/${dependency} ./node_modules/${dependency}`,
       )
     }
+  })
+
+  it('serializes production canary mutation with the deployment lock', () => {
+    expect(canaryRunbook).toContain('/tmp/recruiter-radar-deployment.lock')
+    expect(canaryRunbook).toContain('flock -n 9')
+    expect(canaryRunbook).toContain('do not start another canary')
+    expect(canaryRunbook).toContain('receipt is archived and the runtime is dark')
   })
 
   it('rolls the child schema down before every ancestor', () => {
