@@ -1,10 +1,6 @@
 import { createHash } from 'node:crypto';
 import pg from 'pg';
 
-import {
-  fetchHhVacancyPages,
-  resolveHhVacancySearchConfig,
-} from './adapters/hh.mjs';
 import { normalizeJobPostingRecord } from './adapters/rf-source-normalizers.mjs';
 import { resolveRabotaRossiiConfiguredInput } from './source-rabota-rossii.mjs';
 import { resolveSuperjobConfiguredInput } from './source-superjob.mjs';
@@ -332,6 +328,13 @@ async function resolveSourceInput(source, env) {
 }
 
 async function resolveHhInput(env) {
+  // HH is operator-gated and is not part of the default production allowlist.
+  // Load its proxy-only dependencies only after that policy gate has passed so
+  // an unavailable HH runtime cannot prevent Rabota Rossii from starting.
+  const {
+    fetchHhVacancyPages,
+    resolveHhVacancySearchConfig,
+  } = await import('./adapters/hh.mjs');
   const userAgent = env.HH_USER_AGENT?.trim();
   if (!userAgent) throw new Error('HH_USER_AGENT_REQUIRED');
   const fetchedAt = new Date().toISOString();

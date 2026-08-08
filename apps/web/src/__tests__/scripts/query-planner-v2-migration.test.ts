@@ -21,6 +21,14 @@ const plannerJob = fs.readFileSync(path.join(
   root,
   'apps/web/lib/lead-discovery/query-planner-v2-job.ts',
 ), 'utf8')
+const sourceExecutor = fs.readFileSync(path.join(
+  root,
+  'packages/db/scripts/execute-query-planner-v2.mjs',
+), 'utf8')
+const productionDockerfile = fs.readFileSync(path.join(
+  root,
+  'apps/web/Dockerfile',
+), 'utf8')
 const plannerDocs = fs.readFileSync(path.join(
   root,
   'docs/query-planner-v2.md',
@@ -157,6 +165,24 @@ describe('Query Planner v2 migration', () => {
     expect(plannerJob).toContain('preference.user_id = profile.owner_id')
     expect(plannerDocs).toContain('does not switch the')
     expect(plannerDocs).toContain('apply=true')
+  })
+
+  it('keeps unapproved source dependencies out of the canary startup path', () => {
+    expect(sourceExecutor).not.toMatch(
+      /^import[\s\S]*?from ['"]\.\/adapters\/hh\.mjs['"];?$/m,
+    )
+    expect(sourceExecutor).toContain("await import('./adapters/hh.mjs')")
+    expect(productionDockerfile).toContain(
+      "await import('./packages/db/scripts/execute-query-planner-v2.mjs')",
+    )
+    expect(productionDockerfile).toContain(
+      "await import('./packages/db/scripts/adapters/hh.mjs')",
+    )
+    for (const dependency of ['socks', 'ip-address', 'smart-buffer', 'undici']) {
+      expect(productionDockerfile).toContain(
+        `/app/node_modules/${dependency} ./node_modules/${dependency}`,
+      )
+    }
   })
 
   it('rolls the child schema down before every ancestor', () => {
