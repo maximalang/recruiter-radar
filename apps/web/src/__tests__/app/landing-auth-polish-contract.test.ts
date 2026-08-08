@@ -28,6 +28,7 @@ describe("landing visual and login reliability polish", () => {
   test("uses restrained signal constellations and disables their motion for reduced-motion users", () => {
     const hero = source("app/landing/hero-instrument.tsx");
     const heroScene = source("app/landing/detection-scene.module.css");
+    const heroInstrument = source("app/landing/hero-instrument.module.css");
     const visual = source("app/landing/landing-visual-system.module.css");
 
     expect(hero).toContain('data-hero-instrument="true"');
@@ -36,7 +37,7 @@ describe("landing visual and login reliability polish", () => {
     expect(hero).toContain('data-active-signal="true"');
     expect(hero).not.toContain("instrumentConnection");
     expect(hero).not.toContain("instrumentCore");
-    expect(heroScene).toContain("#b5ead8");
+    expect(heroInstrument).toContain("#b5ead8");
     expect(heroScene).toContain("#7fd8bd");
     expect(heroScene).not.toContain("#dcff8a");
     expect(heroScene).not.toContain("#c8f36a");
@@ -54,7 +55,7 @@ describe("landing visual and login reliability polish", () => {
     expect(header).toContain("href={LOGIN_HREF}");
     expect(header).not.toContain('<Link href="/dashboard" className={headerStyles.login}>');
     expect(header).toContain('data-brand-header="recruiter-radar-v3"');
-    expect(header).toContain('if (restoreFocus) menuButtonRef.current?.focus({ preventScroll: true });\n    setMenuOpen(false);');
+    expect(header).toMatch(/if \(restoreFocus\) menuButtonRef\.current\?\.focus\(\{ preventScroll: true \}\);\s+setMenuOpen\(false\);/);
     expect(header).not.toContain("if (restoreFocus) window.requestAnimationFrame");
   });
 

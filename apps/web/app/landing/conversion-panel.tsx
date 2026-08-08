@@ -22,7 +22,7 @@ export default function ConversionPanel(props: {
   const secondaryPlans = PUBLIC_PLANS.filter((plan) => plan.code !== "pilot");
 
   return (
-    <section className={styles.conversionPanel} aria-label="Тарифы и ответы" data-conversion-scenes="continuous">
+    <section className={styles.conversionPanel} aria-label="Тарифы и ответы" data-conversion-scenes="continuous" data-conversion-panel>
       <div
         id="pricing"
         className={`${styles.pricingStage} ${panelStyles.anchor} ${panelStyles.pricing} ${panelStyles.viewportSurface}`}
@@ -30,7 +30,7 @@ export default function ConversionPanel(props: {
         data-pricing-surface="true"
         data-pricing-layout="unified-grid"
       >
-        <div className={styles.pricingIntro}>
+        <div className={styles.pricingIntro} data-pricing-intro>
           <span>07 — Тарифы</span>
           <h2>Проверьте радар на своих нишах за 7 дней.</h2>
           <p>
@@ -47,9 +47,8 @@ export default function ConversionPanel(props: {
           </div>
           <div className={styles.pilotPrice}>
             <strong>{pilotPlan.price}</strong>
-            <span>{pilotPlan.cadence}</span>
           </div>
-          <p>{pilotPlan.description}</p>
+          <p>7 дней, чтобы проверить качество компаний, доказательств и поводов для контакта. Без автопродления.</p>
           <ul>
             {pilotPlan.bullets.slice(0, 4).map((bullet) => <li key={bullet}><ArrowGlyph size={14} />{bullet}</li>)}
           </ul>
@@ -60,17 +59,22 @@ export default function ConversionPanel(props: {
           >
             {props.paymentConfigured ? "Запустить пилот на 7 дней" : "Оставить заявку на пилот"} <ArrowGlyph />
           </Link>
-          <small>{props.paymentConfigured ? "Разовая оплата · без автопродления" : "Заявка без списания · профиль сохранится"}</small>
+          <small data-consent-safe-copy>{props.paymentConfigured
+            ? "Разовая оплата · без автопродления · далее месяц или квартал"
+            : "Заявка без списания · профиль сохранится · далее месяц или квартал"}</small>
         </div>
 
         <div className={styles.secondaryOffers} aria-label="Продолжение после пилота" data-pricing-secondary="true">
+          <span className={styles.secondaryOfferLabel}>После пилота — месяц или квартал</span>
           {secondaryPlans.map((plan) => {
             const quarterly = plan.code === "quarterly";
             return (
               <article key={plan.code} data-plan-code={plan.code}>
                 <span>{quarterly ? "Квартал" : "Месяц"}</span>
                 <strong>{plan.price}</strong>
-                <p>{plan.description}</p>
+                <p>{quarterly
+                  ? "90 дней регулярной работы с радаром. Разовая оплата без автопродления."
+                  : "30 дней для одного клиентского направления. Разовая оплата без автопродления."}</p>
                 <ul>
                   {plan.bullets.slice(0, 2).map((bullet) => <li key={bullet}><ArrowGlyph size={13} />{bullet}</li>)}
                 </ul>
@@ -94,13 +98,13 @@ export default function ConversionPanel(props: {
         data-faq-surface="true"
         data-faq-layout="editorial"
       >
-        <div className={styles.faqHeading}>
+        <div className={styles.faqHeading} data-faq-heading>
           <span>08 — Перед запуском</span>
           <h2>Перед запуском — короткие ответы.</h2>
           <p>Откуда берутся сигналы, как формируется приоритет, куда приходит выдача и что остаётся под вашим контролем.</p>
           <small data-faq-trust>Интерактивный пример доступен без регистрации. Публичные данные в нём обезличены.</small>
         </div>
-        <div className={styles.faqList}>
+        <div className={styles.faqList} data-faq-list>
           {props.faqItems.map((item, index) => (
             <details key={item.question} open={index === 0} data-analytics-event={LANDING_ANALYTICS_EVENT.faqOpened} data-faq-item>
               <summary><span>{String(index + 1).padStart(2, "0")}</span>{item.question}<i aria-hidden="true"><PlusGlyph /></i></summary>

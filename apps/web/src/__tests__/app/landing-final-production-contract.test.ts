@@ -28,6 +28,7 @@ describe("landing final production contract", () => {
 
   test("renders pricing and FAQ as continuous editorial scenes with explicit structure", () => {
     const conversion = source("app/landing/conversion-panel.tsx");
+    const landing = source("app/landing/landing.module.css");
     const visual = source("app/landing/landing-visual-system.module.css");
 
     expect(conversion).toContain('data-conversion-scenes="continuous"');
@@ -35,18 +36,27 @@ describe("landing final production contract", () => {
     expect(conversion).toContain('data-faq-layout="editorial"');
     expect(conversion).toContain("Проверьте радар на своих нишах за 7 дней.");
     expect(conversion).toContain("Запустить пилот на 7 дней");
+    expect(conversion).toContain("После пилота — месяц или квартал");
+    expect(conversion).toContain("Без автопродления.");
     expect(conversion).toContain("Продолжить на месяц");
     expect(conversion).toContain("Подключить квартал");
+    expect(conversion).not.toContain("<span>{pilotPlan.cadence}</span>");
     expect(conversion).toContain("Перед запуском — короткие ответы.");
     expect(conversion).not.toContain("Ответы раскрываются без перехода");
 
     expect(visual).toContain("--page-gutter:");
     expect(visual).toContain("--content-max:");
     expect(visual).toContain("--section-pad-y:");
-    expect(visual).toContain(':global([class*="conversionPanel"])');
+    expect(conversion).toContain("data-conversion-panel");
+    expect(conversion).toContain("data-pricing-intro");
+    expect(conversion).toContain("data-faq-heading");
+    expect(conversion).toContain("data-faq-list");
+    expect(visual).toContain(":global([data-conversion-panel])");
+    expect(visual).not.toContain("[class*=");
     expect(visual).toContain(".visualSystem :global(#pricing),");
     expect(visual).toContain(".visualSystem :global(#faq) {");
     expect(visual).toContain("max-width: none;");
+    expect(landing).toContain("font-size: clamp(2.35rem, 12vw, 3.25rem);");
     expect(visual).toContain(":global(#faq details)");
     expect(visual).toContain("background: transparent;");
   });
@@ -72,5 +82,18 @@ describe("landing final production contract", () => {
     expect(evidence).toContain("Влияет на основную выдачу");
     expect(evidence).toContain("Подключено, проходит проверки");
     expect(evidence).not.toContain("Source registry / фактические роли");
+  });
+
+  test("keeps FAQ copy professional and free of internal delivery terminology", () => {
+    const faq = source("app/landing/landing-faq.ts");
+
+    expect(faq).toContain("Recruiter Radar отправляет сообщения компаниям?");
+    expect(faq).toContain("Где я получаю результаты?");
+    expect(faq).toContain("защищённый HTTPS-webhook");
+    expect(faq).not.toContain("Радар сам пишет компаниям?");
+    expect(faq).not.toContain("Куда приходит выдача?");
+    expect(faq).not.toContain("email digest");
+    expect(faq).not.toContain("browser push");
+    expect(faq).not.toContain("signed HTTPS webhook");
   });
 });

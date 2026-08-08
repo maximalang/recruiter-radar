@@ -68,7 +68,9 @@ describe("YandexMetrika", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Только необходимые" }));
     expect(container.querySelector("#yandex-metrika-loader")).toBeNull();
-    expect(screen.getByRole("button", { name: "Изменить настройки cookies" })).toBeInTheDocument();
+    const settingsButton = screen.getByRole("button", { name: "Изменить настройки cookies" });
+    expect(settingsButton).toHaveAttribute("title", "Cookies");
+    expect(settingsButton).not.toHaveAttribute("style");
     expect(window.localStorage.getItem("rr_analytics_consent_v1")).toContain('"value":"denied"');
   });
 

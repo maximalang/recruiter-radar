@@ -349,7 +349,7 @@ describe("final unified evidence-first landing contract", () => {
     expect(header).toContain('document.body.style.overflow = "hidden"');
     expect(header).toContain("scrollbarWidth");
     expect(header).toContain("menuButtonRef.current?.focus");
-    expect(header).toContain("Получить пример");
+    expect(header).toContain("Посмотреть пример");
     expect(headerCss).toMatch(/\.navLink\s*\{[\s\S]*?min-width:\s*44px[\s\S]*?min-height:\s*44px/);
   });
 

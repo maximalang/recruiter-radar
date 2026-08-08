@@ -6,7 +6,7 @@
   border-bottom: 1px solid transparent;
   background: transparent;
   color: var(--paper);
-  transition: color .2s ease, background-color .2s ease, border-color .2s ease, backdrop-filter .2s ease;
+  transition: color .18s ease, background-color .18s ease, border-color .18s ease, backdrop-filter .18s ease;
 }
 
 .header[data-tone="light"]:not([data-scrolled]) {
@@ -54,11 +54,12 @@
   align-items: center;
   justify-content: center;
   padding-inline: .55rem;
-  color: color-mix(in srgb, currentColor 62%, transparent);
-  font-size: clamp(.75rem, .7vw, .84rem);
+  color: color-mix(in srgb, currentColor 68%, transparent);
+  font-size: clamp(.77rem, .7vw, .84rem);
   font-weight: 560;
   text-decoration: none;
   white-space: nowrap;
+  transition: color .16s ease;
 }
 
 .navLink::after {
@@ -67,10 +68,10 @@
   bottom: .32rem;
   left: .55rem;
   height: 1px;
-  background: #c8f36a;
+  background: #bfdc91;
   content: "";
   opacity: 0;
-  transform: scaleX(.35);
+  transform: scaleX(.2);
   transform-origin: left;
   transition: opacity .18s ease, transform .18s ease;
 }
@@ -106,28 +107,41 @@
 
 .login {
   padding-inline: .45rem;
-  color: color-mix(in srgb, currentColor 72%, transparent);
+  color: color-mix(in srgb, currentColor 76%, transparent);
   font-size: .8rem;
+  transition: color .16s ease;
 }
 
+.login:hover { color: currentColor; }
+
 .cta {
-  gap: .65rem;
-  padding: .7rem .95rem;
-  border: 1px solid color-mix(in srgb, currentColor 24%, transparent);
+  gap: .55rem;
+  padding: .66rem .88rem;
+  border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
   border-radius: 0;
-  background: transparent;
+  background: color-mix(in srgb, currentColor 3%, transparent);
   color: currentColor;
-  font-family: var(--mono);
-  font-size: .65rem;
-  font-weight: 650;
-  letter-spacing: .02em;
-  text-transform: uppercase;
+  font-family: var(--font-sans);
+  font-size: .78rem;
+  font-weight: 590;
+  letter-spacing: -.01em;
+  text-transform: none;
+  transition: border-color .16s ease, background-color .16s ease, color .16s ease;
 }
 
 .cta:hover {
-  border-color: #c8f36a;
-  background: rgba(200, 243, 106, .09);
+  border-color: rgba(191, 220, 145, .55);
+  background: rgba(191, 220, 145, .075);
   color: currentColor;
+}
+
+.navLink:focus-visible,
+.login:focus-visible,
+.cta:focus-visible,
+.menuButton:focus-visible,
+.mobileActions a:focus-visible {
+  outline: 2px solid #bfdc91;
+  outline-offset: 3px;
 }
 
 .menuButton {
@@ -188,7 +202,7 @@
 
 .panelIntro {
   padding: 1.25rem 1.25rem .75rem;
-  color: rgba(244, 243, 238, .48);
+  color: rgba(244, 243, 238, .58);
   font-family: var(--mono);
   font-size: .66rem;
   letter-spacing: .08em;
@@ -232,10 +246,15 @@
 }
 
 .mobileActions a:last-child {
-  border-color: #c8f36a;
-  background: #c8f36a;
-  color: #070a09;
-  font-weight: 700;
+  border-color: rgba(191, 220, 145, .48);
+  background: rgba(191, 220, 145, .09);
+  color: #f4f3ee;
+  font-weight: 650;
+}
+
+.mobileActions a:last-child:hover {
+  background: rgba(191, 220, 145, .14);
+  color: #bfdc91;
 }
 
 @media (max-width: 1320px) {
@@ -267,7 +286,10 @@
 
 @media (prefers-reduced-motion: reduce) {
   .header,
+  .navLink,
   .navLink::after,
+  .login,
+  .cta,
   .menuButton::before,
   .menuButton::after {
     transition: none;

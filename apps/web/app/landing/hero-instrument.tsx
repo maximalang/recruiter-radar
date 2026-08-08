@@ -1,12 +1,10 @@
 import instrumentStyles from "./hero-instrument.module.css";
-import styles from "./landing.module.css";
 
 type HeroInstrumentProps = {
   companyName: string;
   signalLabel: string;
   score: number;
   confidence: string;
-  freshness: string;
 };
 
 /** Replaceable hero visualization boundary fed only by product facts. */
@@ -15,16 +13,15 @@ export default function HeroInstrument({
   signalLabel,
   score,
   confidence,
-  freshness,
 }: HeroInstrumentProps) {
   return (
     <figure
-      className={`${styles.heroInstrument} ${instrumentStyles.compass}`}
+      className={instrumentStyles.compass}
       aria-label={`Инструмент доказательств для ${companyName}`}
       data-hero-instrument="true"
     >
       <svg
-        className={`${styles.instrumentField} ${instrumentStyles.field}`}
+        className={instrumentStyles.field}
         viewBox="0 0 760 760"
         preserveAspectRatio="xMidYMid meet"
         role="img"
@@ -140,15 +137,6 @@ export default function HeroInstrument({
           <circle cx="525" cy="248" r="1.2" opacity=".38" />
         </g>
       </svg>
-
-      <figcaption className={`${styles.instrumentCaption} ${instrumentStyles.caption}`}>
-        <span>Подтверждённый сигнал / текущий приоритет</span>
-        <div>
-          <strong>{signalLabel}</strong>
-          <small>{freshness} · уверенность {confidence}</small>
-        </div>
-        <b>{score}<small>/100</small></b>
-      </figcaption>
     </figure>
   );
 }
