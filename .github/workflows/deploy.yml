@@ -38,6 +38,7 @@ jobs:
           bash -n scripts/deploy/configure-caddy-real-ip.sh
           bash -n scripts/deploy/rollback-guard.sh
           bash -n scripts/deploy/recover-deployment.sh
+          bash -n scripts/deploy/run-commercial-signal-production-canary.sh
           sh -n scripts/deploy/validate-metrika-id.sh
 
       - name: Setup SSH
@@ -105,6 +106,9 @@ jobs:
           scp -P ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
             scripts/deploy/configure-caddy-real-ip.sh \
             ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}:/opt/recruiter-radar/configure-caddy-real-ip.${DEPLOY_SHA}.sh
+          scp -P ${{ secrets.RR_SSH_PORT }} -o LogLevel=ERROR \
+            scripts/deploy/run-commercial-signal-production-canary.sh \
+            ${{ secrets.RR_SSH_USER }}@${{ secrets.RR_SSH_HOST }}:/opt/recruiter-radar/run-commercial-signal-production-canary.${DEPLOY_SHA}.sh
 
       - name: Deploy image with local rollback
         id: deploy
@@ -121,6 +125,7 @@ jobs:
           staged_rollback_guard="/opt/recruiter-radar/rollback-guard.${DEPLOY_SHA}.sh"
           staged_recovery="/opt/recruiter-radar/recover-deployment.${DEPLOY_SHA}.sh"
           staged_caddy="/opt/recruiter-radar/configure-caddy-real-ip.${DEPLOY_SHA}.sh"
+          staged_canary_runner="/opt/recruiter-radar/run-commercial-signal-production-canary.${DEPLOY_SHA}.sh"
 
           cleanup_staged() {
             rm -f \
@@ -128,7 +133,8 @@ jobs:
               "$staged_notification" \
               "$staged_rollback_guard" \
               "$staged_recovery" \
-              "$staged_caddy"
+              "$staged_caddy" \
+              "$staged_canary_runner"
           }
           trap cleanup_staged EXIT
 
@@ -145,11 +151,13 @@ jobs:
           mv "$staged_rollback_guard" /opt/recruiter-radar/rollback-guard.sh
           mv "$staged_recovery" /opt/recruiter-radar/recover-deployment.sh
           mv "$staged_caddy" /opt/recruiter-radar/configure-caddy-real-ip.sh
+          mv "$staged_canary_runner" /opt/recruiter-radar/run-commercial-signal-production-canary.sh
           chmod 700 /opt/recruiter-radar/configure-caddy-real-ip.sh
           /opt/recruiter-radar/configure-caddy-real-ip.sh
           chmod 700 /opt/recruiter-radar/configure-notification-encryption.sh
           chmod 700 /opt/recruiter-radar/rollback-guard.sh
           chmod 700 /opt/recruiter-radar/recover-deployment.sh
+          chmod 700 /opt/recruiter-radar/run-commercial-signal-production-canary.sh
           source /opt/recruiter-radar/rollback-guard.sh
 
           wait_for_health() {
@@ -372,9 +380,11 @@ jobs:
             "DEPLOY_SHA='${DEPLOY_SHA}' bash -s" << 'SSH_EOF'
           set -euo pipefail
           staged_configurator="/opt/recruiter-radar/configure-notification-encryption.${DEPLOY_SHA}.sh"
+          staged_canary_runner="/opt/recruiter-radar/run-commercial-signal-production-canary.${DEPLOY_SHA}.sh"
           deployment_marker="/opt/recruiter-radar/.deployment-switched"
           if [ ! -e "$deployment_marker" ] && [ ! -L "$deployment_marker" ]; then
             rm -f -- "$staged_configurator"
+            rm -f -- "$staged_canary_runner"
           else
             echo "Deployment recovery is pending; preserving the staged preflight configurator."
           fi
