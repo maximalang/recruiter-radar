@@ -48,6 +48,7 @@
     "test:opportunity-scoring-v2:db": "node packages/db/scripts/verify-opportunity-scoring-v2.mjs",
     "test:opportunity-scoring-v2:evaluation": "node packages/db/scripts/verify-opportunity-scoring-evaluation.mjs",
     "test:commercial-signal:evaluation": "node packages/db/scripts/verify-commercial-signal-evaluation.mjs",
+    "test:commercial-signal:evaluation-v2": "node packages/db/scripts/verify-commercial-signal-evaluation-v2.mjs",
     "test:commercial-signal:evaluation:db": "node packages/db/scripts/run-commercial-signal-evaluation-db-tests.mjs",
     "test:commercial-signal:contracts": "node packages/db/scripts/run-commercial-signal-contract-tests.mjs",
     "test:opportunity-engine:down": "node packages/db/scripts/verify-opportunity-engine-down.mjs",

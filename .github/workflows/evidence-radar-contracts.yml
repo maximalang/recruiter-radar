@@ -73,6 +73,7 @@ jobs:
         run: |
           set -euo pipefail
           npm run test:commercial-signal:evaluation
+          npm run test:commercial-signal:evaluation-v2
           node --test packages/db/scripts/lib/commercial-signal-baseline-metrics.test.mjs
           npm run test:commercial-signal:canary
           npm run test:commercial-signal:evaluation:db
