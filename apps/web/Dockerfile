@@ -39,11 +39,23 @@ COPY --from=builder /app/apps/web/.next/standalone ./
 COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder /app/apps/web/public ./apps/web/public
 
+# Query Planner keeps HH outside the default allowlist, but an explicitly
+# approved HH run still needs its proxy stack in the standalone image.
+COPY --from=builder /app/node_modules/socks ./node_modules/socks
+COPY --from=builder /app/node_modules/ip-address ./node_modules/ip-address
+COPY --from=builder /app/node_modules/smart-buffer ./node_modules/smart-buffer
+COPY --from=builder /app/node_modules/undici ./node_modules/undici
+
 # Copy migration tooling for startup migrations
 COPY --from=builder /app/packages/db/scripts/migrate.mjs ./packages/db/scripts/migrate.mjs
 COPY --from=builder /app/packages/db/scripts/reconcile-payment-success-telemetry.mjs ./packages/db/scripts/reconcile-payment-success-telemetry.mjs
 COPY --from=builder /app/packages/db/schema ./packages/db/schema
 COPY --from=builder /app/packages/db/migrations ./packages/db/migrations
+
+# The Commercial Signal route launches this script as a child process. Import
+# both its default path and the operator-gated HH adapter in the final image so
+# missing standalone dependencies fail the build rather than a production run.
+RUN node --input-type=module -e "await import('./packages/db/scripts/execute-query-planner-v2.mjs'); await import('./packages/db/scripts/adapters/hh.mjs')"
 
 # Startup script: run migrations, then start server
 COPY --from=builder /app/apps/web/docker-entrypoint.sh ./docker-entrypoint.sh
