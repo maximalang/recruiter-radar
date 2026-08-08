@@ -1,17 +1,31 @@
 .layout {
-  grid-template-columns: minmax(18rem, .68fr) minmax(34rem, 1.12fr);
-  grid-template-areas: "intro company" "intro story" "lock story";
-  gap: 2.2rem clamp(3rem, 6.4vw, 6.5rem);
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "intro" "company" "story" "lock";
+  gap: clamp(1.75rem, 3vw, 2.75rem);
 }
 
 .intro {
-  max-width: 31rem;
+  display: grid;
+  max-width: none;
+  grid-template-columns: minmax(18rem, .82fr) minmax(22rem, 1fr);
+  align-items: end;
+  gap: .8rem clamp(3rem, 8vw, 8rem);
+}
+
+.intro > :first-child {
+  grid-column: 1 / -1;
 }
 
 .intro :global(h2) {
-  max-width: 9ch;
-  font-size: clamp(2.6rem, 4.25vw, 4.25rem);
+  max-width: 14ch;
+  grid-column: 1;
+  font-size: clamp(2.6rem, 3.8vw, 3.85rem);
   line-height: .98;
+}
+
+.intro > :last-child {
+  grid-column: 2;
+  margin-bottom: .25rem;
 }
 
 .intro :global(h2 em) {
@@ -71,32 +85,38 @@
 .story {
   position: relative;
   display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0;
 }
 
 .story::before {
   position: absolute;
-  top: 1.5rem;
-  bottom: 1.4rem;
-  left: 7.6rem;
-  width: 1px;
-  background: linear-gradient(to bottom, rgba(180, 124, 92, .1), rgba(180, 124, 92, .65) 22%, rgba(78, 142, 124, .58) 72%, rgba(78, 142, 124, .08));
+  top: 2.35rem;
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: linear-gradient(to right, rgba(180, 124, 92, .1), rgba(180, 124, 92, .65) 24%, rgba(78, 142, 124, .58) 74%, rgba(78, 142, 124, .08));
   content: "";
-  transform-origin: top;
+  transform-origin: left;
   animation: pathReveal 2.2s .2s cubic-bezier(.2,.75,.2,1) both;
 }
 
 .event {
   position: relative;
   display: grid;
-  grid-template-columns: 6rem 2.4rem minmax(0, 1fr) auto;
-  align-items: center;
-  gap: .8rem;
-  min-height: 6rem;
-  border-bottom: 1px solid rgba(23, 35, 45, .12);
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto 2.4rem minmax(6rem, auto) auto;
+  align-items: start;
+  gap: .55rem;
+  min-height: 14rem;
+  padding-right: clamp(1rem, 2.4vw, 2.5rem);
   opacity: 0;
   transform: translateY(6px);
   animation: eventReveal .7s cubic-bezier(.2,.75,.2,1) forwards;
+}
+
+.event:not(:first-child) {
+  padding-left: clamp(1rem, 2.4vw, 2.5rem);
 }
 
 .event:nth-child(1) { animation-delay: .15s; }
@@ -109,7 +129,7 @@
   font-family: var(--mono);
   font-size: .56rem;
   letter-spacing: .04em;
-  text-align: right;
+  text-align: left;
   text-transform: uppercase;
 }
 
@@ -131,6 +151,7 @@
 .eventBody {
   display: grid;
   grid-template-columns: auto 1fr;
+  align-content: start;
   gap: .35rem .65rem;
   min-width: 0;
 }
@@ -155,7 +176,7 @@
 }
 
 .status {
-  justify-self: end;
+  justify-self: start;
   padding: .32rem .45rem;
   border: 1px solid rgba(78, 142, 124, .2);
   color: #397966;
@@ -168,6 +189,8 @@
 .lock {
   display: grid;
   align-self: end;
+  grid-template-columns: minmax(14rem, .65fr) minmax(18rem, 1fr) auto;
+  align-items: end;
   gap: .6rem;
   padding: 1rem 0 0;
   border-top: 1px solid rgba(23, 35, 45, .16);
@@ -176,10 +199,8 @@
 }
 
 .lockHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+  display: grid;
+  gap: .35rem;
 }
 
 .lockHeader span {
@@ -204,6 +225,7 @@
 }
 
 .lock > span {
+  justify-self: end;
   color: rgba(23, 35, 45, .5);
   font-family: var(--mono);
   font-size: .54rem;
@@ -211,6 +233,11 @@
 }
 
 @keyframes pathReveal {
+  from { opacity: 0; transform: scaleX(0); }
+  to { opacity: 1; transform: scaleX(1); }
+}
+
+@keyframes pathRevealVertical {
   from { opacity: 0; transform: scaleY(0); }
   to { opacity: 1; transform: scaleY(1); }
 }
@@ -224,24 +251,43 @@
 }
 
 @media (max-width: 1080px) {
-  .layout {
+  .intro {
     grid-template-columns: 1fr;
-    grid-template-areas: "intro" "company" "story" "lock";
-    gap: 2rem;
+    max-width: 46rem;
   }
 
-  .intro { max-width: 44rem; }
+  .intro :global(h2),
+  .intro > :last-child { grid-column: 1; }
+
+  .lock { grid-template-columns: 1fr 1fr; }
+  .lock > span { grid-column: 1 / -1; justify-self: start; }
 }
 
 @media (max-width: 700px) {
-  .story::before { left: .95rem; }
+  .story { grid-template-columns: 1fr; }
+
+  .story::before {
+    top: 1.5rem;
+    right: auto;
+    bottom: 1.4rem;
+    left: .95rem;
+    width: 1px;
+    height: auto;
+    background: linear-gradient(to bottom, rgba(180, 124, 92, .1), rgba(180, 124, 92, .65) 22%, rgba(78, 142, 124, .58) 72%, rgba(78, 142, 124, .08));
+    transform-origin: top;
+    animation-name: pathRevealVertical;
+  }
 
   .event {
     grid-template-columns: 1.9rem minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
     gap: .55rem .75rem;
     min-height: 6.6rem;
     padding: .7rem 0;
+    border-bottom: 1px solid rgba(23, 35, 45, .12);
   }
+
+  .event:not(:first-child) { padding-left: 0; }
 
   .event time {
     grid-column: 2;
@@ -265,6 +311,7 @@
   }
 
   .coordinate { grid-template-columns: auto 1fr; }
+  .lock { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {

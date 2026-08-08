@@ -41,6 +41,28 @@ describe("polished unified landing visual contract", () => {
     expect(landingStyles).not.toContain(".instrumentCore");
   });
 
+  it("keeps the radar present in the first mobile viewport without inserting the desktop field into document flow", () => {
+    const sceneStyles = source("app/landing/detection-scene.module.css");
+
+    expect(sceneStyles).toMatch(
+      /@media \(max-width: 480px\)[\s\S]*?\.fieldFigure\s*\{[\s\S]*?position:\s*absolute;/,
+    );
+    expect(sceneStyles).toMatch(
+      /@media \(max-width: 480px\)[\s\S]*?\.section\s*\{[\s\S]*?min-height:\s*100svh;/,
+    );
+  });
+
+  it("renders the desktop signal history as one temporal axis with a mobile vertical fallback", () => {
+    const timeline = source("app/landing/signal-timeline-scene.tsx");
+    const timelineStyles = source("app/landing/signal-timeline-scene.module.css");
+
+    expect(timeline).toContain('data-temporal-axis="signal-story"');
+    expect(timelineStyles).toContain("grid-template-columns: repeat(4, minmax(0, 1fr));");
+    expect(timelineStyles).toMatch(
+      /@media \(max-width: 700px\)[\s\S]*?\.story\s*\{[\s\S]*?grid-template-columns:\s*1fr;/,
+    );
+  });
+
   it("keeps the landing skip link first and exposes one main content landmark", () => {
     const home = source("app/home-page-content.tsx");
     const landingPage = source("app/landing/landing-page.tsx");
