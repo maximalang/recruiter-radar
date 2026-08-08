@@ -16,6 +16,9 @@ import {
   buildQueryPlansV2Job,
   type QueryPlannerV2JobDb,
 } from '@/lib/lead-discovery/query-planner-v2-job'
+import {
+  loadCommercialSignalCanaryTouchedOrganizationIds,
+} from '@/lib/opportunities/commercial-signal-canary-job'
 
 const databaseUrl = process.env.DATABASE_URL
 const isolated = process.env.QUERY_PLANNER_V2_DB_TEST_ACK === 'isolated'
@@ -132,6 +135,43 @@ describeIfDatabase('Query Planner v2 PostgreSQL runtime', () => {
         sharedRequestsInserted: 0,
         consumersLinked: 0,
       })
+  })
+
+  it('loads an empty touched-organization set for a completed execution', async () => {
+    const sharedRequest = await database.query<{
+      id: string
+      source: string
+      sharedRequestHash: string
+    }>(
+      `SELECT id::TEXT AS id, source,
+              shared_request_hash AS "sharedRequestHash"
+       FROM query_plan_shared_requests
+       ORDER BY id
+       LIMIT 1`,
+    )
+    const shared = sharedRequest.rows[0]
+    if (!shared) throw new Error('Query planner shared request is missing.')
+    const execution = await database.query<{ id: string }>(
+      `INSERT INTO query_plan_source_executions (
+         shared_request_id, source, shared_request_hash,
+         execution_identity, execution_generation, request_snapshot,
+         status, started_at, completed_at
+       )
+       VALUES ($1, $2, $3, $4, 1, '{}'::JSONB,
+               'succeeded', NOW(), NOW())
+       RETURNING id::TEXT AS id`,
+      [
+        shared.id,
+        shared.source,
+        shared.sharedRequestHash,
+        'a'.repeat(64),
+      ],
+    )
+
+    await expect(loadCommercialSignalCanaryTouchedOrganizationIds(
+      [execution.rows[0].id],
+      database,
+    )).resolves.toEqual([])
   })
 
   it('rejects cross-tenant provenance and append-only mutation', async () => {

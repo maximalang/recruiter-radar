@@ -177,10 +177,11 @@ export async function runCommercialSignalCanary(
       })
     }
 
-    stats.touchedOrganizationIds = await loadTouchedOrganizationIds(
-      stats.sourceExecution.executionIds,
-      database,
-    )
+    stats.touchedOrganizationIds =
+      await loadCommercialSignalCanaryTouchedOrganizationIds(
+        stats.sourceExecution.executionIds,
+        database,
+      )
 
     for (const organizationId of stats.touchedOrganizationIds) {
       const result = emptyOrganizationResult(organizationId)
@@ -326,13 +327,13 @@ async function loadActiveProfileIds(
   return result.rows.map((row) => positiveId(row.clientProfileId, 'client profile'))
 }
 
-async function loadTouchedOrganizationIds(
+export async function loadCommercialSignalCanaryTouchedOrganizationIds(
   executionIds: readonly string[],
   db: CommercialSignalCanaryDb,
 ): Promise<string[]> {
   if (executionIds.length === 0) return []
   const result = await db.query<{ organizationId: string }>(
-    `SELECT DISTINCT execution_signal.organization_id::TEXT AS "organizationId"
+    `SELECT DISTINCT execution_signal.organization_id AS "organizationId"
      FROM query_plan_source_execution_signals execution_signal
      WHERE execution_signal.execution_id = ANY($1::BIGINT[])
      ORDER BY execution_signal.organization_id`,
