@@ -249,60 +249,47 @@
 /* ── Metric card ── */
 .metricGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
-  margin-bottom: 32px;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+  margin-bottom: 24px;
 }
 
 .metricCard {
-  background-color: var(--c-bg-card);
-  border-radius: var(--radius-card-sm);
-  padding: 16px;
-  border: 1px solid var(--c-border);
-  /* Shared default elevation with dashboard.module.css .metricCard so the two
-     surfaces (overview metric cards + lead-detail MetricCard primitive) speak
-     one visual language — same radius/border/shadow/padding, no component merge. */
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-  transition: box-shadow 0.2s ease, transform 0.15s ease;
-}
-
-.metricCard:hover {
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
-  transform: translateY(-1px);
+  background-color: var(--surface-panel);
+  border-radius: 10px;
+  padding: 13px 14px;
+  border: 1px solid var(--border-subtle);
 }
 
 .metricLabel {
-  font-size: 0.75rem;
-  color: var(--c-text-muted);
-  font-weight: 500;
+  font-size: 0.7rem;
+  line-height: 1.3;
+  color: var(--ink-muted);
+  font-weight: 600;
 }
 
 .metricValue {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--c-text-primary);
-  margin-top: 4px;
+  font-size: 1.35rem;
+  line-height: 1.1;
+  font-weight: 720;
+  color: var(--ink-primary);
+  margin-top: 5px;
 }
 
 .metricValue[data-tone="success"] {
-  color: #10b981;
+  color: var(--status-success);
 }
 
 .metricValue[data-tone="info"] {
-  color: var(--c-brand);
+  color: var(--signal-primary);
 }
 
 /* ── Content card (detail sections, sidebar blocks) ── */
 .contentCard {
-  background-color: rgba(255, 255, 252, 0.88);
-  border-radius: 12px;
-  padding: 20px;
-  border: 1px solid rgba(24, 35, 31, 0.12);
-  transition: box-shadow 0.2s ease;
-}
-
-.contentCard:hover {
-  box-shadow: 0 12px 28px rgba(20, 32, 28, 0.07);
+  background-color: var(--surface-panel);
+  border-radius: 10px;
+  padding: 18px;
+  border: 1px solid var(--border-subtle);
 }
 
 .contentCard[data-tone="danger"] {
@@ -314,12 +301,12 @@
    evidence/action cards without shouting. */
 .contentCard[data-variant="hero"] {
   border-color: rgba(35, 128, 111, 0.24);
-  border-left: 3px solid #23806f;
+  border-left: 3px solid var(--signal-primary);
   background-color: rgba(35, 128, 111, 0.035);
 }
 
 .contentCard[data-variant="hero"] .contentCardTitle {
-  color: #1a6f60;
+  color: var(--action-primary);
 }
 
 /* Muted: advisory blocks (AI hint) recede — they inform but never drive the
@@ -930,16 +917,16 @@
 
 /* ── Empty / not-found states ── */
 .emptyState {
-  min-height: 260px;
+  min-height: 190px;
   box-sizing: border-box;
   display: grid;
   place-content: center;
   text-align: center;
-  padding: clamp(42px, 7vw, 76px) 24px;
+  padding: clamp(30px, 5vw, 48px) 24px;
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: #65706a;
+  color: var(--ink-secondary);
 }
 
 .emptyStateIcon {
@@ -948,7 +935,7 @@
   display: flex;
   justify-content: center;
   margin-bottom: 12px;
-  color: #23806f;
+  color: var(--signal-primary);
 }
 
 .emptyStateIcon svg {
@@ -957,7 +944,7 @@
 }
 
 .emptyStateTitle {
-  color: #14201c;
+  color: var(--ink-primary);
   font-size: 1.02rem;
   font-weight: 720;
   margin-bottom: 7px;
@@ -974,11 +961,12 @@
   align-items: center;
   justify-content: center;
   justify-self: center;
-  min-width: 240px;
+  min-width: min(240px, 100%);
+  min-height: 44px;
   margin-top: 16px;
   padding: 9px 18px;
   border-radius: 10px;
-  background-color: #183d34;
+  background-color: var(--action-primary);
   color: #fff;
   font-size: 0.85rem;
   font-weight: 600;
@@ -1133,7 +1121,7 @@
 .signalCardList {
   gap: 12px;
   padding: 12px;
-  background: #f5f7fb;
+  background: var(--surface-panel);
 }
 
 .leadCard {
@@ -1627,7 +1615,28 @@
 /* ── Responsive: mobile ── */
 @media (max-width: 640px) {
   .metricGrid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    margin-bottom: 20px;
+  }
+
+  .metricCard {
+    min-width: 0;
+    padding: 10px 8px;
+  }
+
+  .metricLabel {
+    font-size: 0.63rem;
+    overflow-wrap: anywhere;
+  }
+
+  .metricValue {
+    font-size: 1.2rem;
+  }
+
+  .emptyState {
+    min-height: 168px;
+    padding: 28px 16px;
   }
 
   /* Tap-target floor: interactive controls must be ≥44px tall for comfortable

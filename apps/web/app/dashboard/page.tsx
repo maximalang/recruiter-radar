@@ -11,7 +11,6 @@ import DashboardAccountOverview from "./dashboard-account-overview";
 import DashboardTodayRadar from "./dashboard-today-radar";
 import { buildAccountNavigation } from "../ui/account-navigation";
 import {
-  ContentCard,
   EmptyState,
   ErrorState,
 } from "../ui/internal-page";
@@ -50,13 +49,11 @@ export default async function DashboardPage() {
           title="Личный кабинет"
           subtitle="Войдите, чтобы видеть только свой профиль, лиды и историю работы."
         />
-        <ContentCard variant="hero">
-          <EmptyState
-            title="Нужен вход в аккаунт"
-            text="Сессия этого браузера не связана с аккаунтом. Восстановите доступ по данным заказа или активируйте новый радар."
-            action={{ href: "/login", label: "Войти в аккаунт" }}
-          />
-        </ContentCard>
+        <EmptyState
+          title="Нужен вход в аккаунт"
+          text="Сессия этого браузера не связана с аккаунтом. Восстановите доступ по данным заказа или активируйте новый радар."
+          action={{ href: "/login", label: "Войти в аккаунт" }}
+        />
       </ProductWorkspaceFrame>
     );
   }
@@ -75,13 +72,11 @@ export default async function DashboardPage() {
           title="Завершите настройку радара"
           subtitle="Аккаунт найден, но рабочий профиль ещё не создан."
         />
-        <ContentCard variant="hero">
-          <EmptyState
-            title="Радар ещё не настроен"
-            text="Активируйте тариф и укажите специализацию агентства — после этого здесь появятся компании и очередь работы."
-            action={{ href: "/checkout", label: "Активировать радар" }}
-          />
-        </ContentCard>
+        <EmptyState
+          title="Радар ещё не настроен"
+          text="Активируйте тариф и укажите специализацию агентства — после этого здесь появятся компании и очередь работы."
+          action={{ href: "/checkout", label: "Активировать радар" }}
+        />
       </ProductWorkspaceFrame>
     );
   }

@@ -6,8 +6,8 @@
   align-items: center;
   flex-wrap: wrap;
   padding: 12px 16px;
-  background-color: var(--c-bg-page);
-  border-bottom: 1px solid var(--c-border);
+  background-color: var(--surface-app);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .filterGroup {
@@ -22,8 +22,8 @@
 .filterGroup[data-kind="profile"] {
   padding: 4px 10px;
   border-radius: 8px;
-  background-color: var(--c-bg-card);
-  border: 1px solid var(--c-border);
+  background-color: var(--surface-panel);
+  border: 1px solid var(--border-subtle);
 }
 
 .filterGroupLabel {
@@ -31,29 +31,29 @@
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--c-text-muted);
+  color: var(--ink-muted);
 }
 
 .filterDivider {
   width: 1px;
   align-self: stretch;
   margin: 4px 0;
-  background-color: var(--c-border);
+  background-color: var(--border-subtle);
 }
 
 .filterLabel {
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--c-text-muted);
+  color: var(--ink-muted);
 }
 
 .filterSelect {
   padding: 8px 10px;
   font-size: 0.8rem;
   border-radius: 8px;
-  border: 1px solid var(--c-border);
-  background-color: var(--c-bg-card);
-  color: var(--c-text-secondary);
+  border: 1px solid var(--border-subtle);
+  background-color: var(--surface-panel);
+  color: var(--ink-secondary);
   cursor: pointer;
   min-height: 44px;
   transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
@@ -62,14 +62,14 @@
 /* Active select — brand-tinted border + surface so the active filter is visible
    at a glance on mobile without reading the selected option text. */
 .filterSelect[data-active="true"] {
-  border-color: var(--c-brand);
-  background-color: rgba(59, 130, 246, 0.08);
-  color: var(--c-brand);
+  border-color: var(--signal-primary);
+  background-color: rgba(35, 128, 111, 0.08);
+  color: var(--action-primary);
   font-weight: 600;
 }
 
 .filterSelect:focus-visible {
-  outline: 2px solid var(--c-brand);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -84,10 +84,10 @@
   padding: 8px 12px;
   font-size: 0.78rem;
   font-weight: 600;
-  border-radius: 999px;
-  border: 1px solid var(--c-border);
-  background-color: var(--c-bg-card);
-  color: var(--c-text-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  background-color: var(--surface-panel);
+  color: var(--ink-secondary);
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -99,13 +99,13 @@
 }
 
 .todayToggle[data-active="true"] {
-  border-color: var(--c-brand);
-  background-color: rgba(59, 130, 246, 0.12);
-  color: var(--c-brand);
+  border-color: var(--signal-primary);
+  background-color: rgba(35, 128, 111, 0.12);
+  color: var(--action-primary);
 }
 
 .todayToggle:focus-visible {
-  outline: 2px solid var(--c-brand);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -118,9 +118,9 @@
   padding: 8px 10px;
   font-size: 0.75rem;
   border-radius: 6px;
-  border: 1px solid var(--c-border);
-  background-color: var(--c-bg-card);
-  color: var(--c-text-muted);
+  border: 1px solid var(--border-subtle);
+  background-color: var(--surface-panel);
+  color: var(--ink-muted);
   cursor: pointer;
 }
 
@@ -131,7 +131,7 @@
 }
 
 .filterReset:focus-visible {
-  outline: 2px solid var(--c-brand);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 

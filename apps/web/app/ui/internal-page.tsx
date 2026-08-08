@@ -207,7 +207,7 @@ export function MetricCard(props: {
   tone?: "success" | "info" | "neutral";
 }) {
   return (
-    <div className={s.metricCard}>
+    <div className={s.metricCard} role="listitem">
       <div className={s.metricLabel}>{props.label}</div>
       <div
         className={s.metricValue}
@@ -222,7 +222,11 @@ export function MetricCard(props: {
 /* ── Metric grid ── */
 
 export function MetricGrid(props: { children: ReactNode }) {
-  return <div className={s.metricGrid}>{props.children}</div>;
+  return (
+    <div className={s.metricGrid} role="list">
+      {props.children}
+    </div>
+  );
 }
 
 /* ── Content card ── */
@@ -634,7 +638,7 @@ export function EmptyState(props: {
 }) {
   const Icon = props.icon;
   return (
-    <div className={s.emptyState}>
+    <div className={s.emptyState} role="status">
       {Icon ? (
         <div className={s.emptyStateIcon}>
           <Icon />

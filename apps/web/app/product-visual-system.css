@@ -17,7 +17,7 @@
   --rr-copper: #a37c65;
   --rr-ease: cubic-bezier(0.22, 1, 0.36, 1);
 
-  /* Compatibility aliases consumed by site-finish.css and legacy product modules. */
+  /* Compatibility aliases for product modules that are migrated incrementally. */
   --rr-ink: var(--rr-text);
   --rr-page: var(--rr-paper-soft);
   --rr-surface-strong: var(--rr-surface);

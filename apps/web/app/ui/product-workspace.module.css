@@ -12,13 +12,15 @@
 .skipLink {
   position: fixed;
   top: 8px;
-  left: 280px;
+  right: 18px;
+  left: auto;
   z-index: 100;
-  transform: translateY(-150%);
-  padding: 10px 14px;
+  transform: translateY(calc(-100% - 12px));
+  padding: 6px 10px;
   border-radius: 8px;
   background: var(--ink-primary);
   color: var(--surface-raised);
+  font-size: 0.78rem;
   font-weight: 700;
   text-decoration: none;
 }
@@ -285,7 +287,7 @@
 
 @media (max-width: 940px) {
   .skipLink {
-    top: 60px;
+    top: 8px;
     right: 14px;
     left: auto;
   }
