@@ -73,7 +73,7 @@ FOR EACH ROW EXECUTE FUNCTION require_company_history_for_new_region_event();
 -- Exact corporate-enrichment evidence is attached to the same immutable
 -- lineage that requested enrichment. This is supporting/contact evidence only;
 -- it cannot originate a hiring episode or opportunity.
-CREATE TABLE commercial_signal_enrichment_evidence (
+CREATE TABLE IF NOT EXISTS commercial_signal_enrichment_evidence (
   lineage_id BIGINT NOT NULL
     REFERENCES commercial_signal_opportunity_lineage(id) ON DELETE CASCADE,
   evidence_id BIGINT NOT NULL REFERENCES evidence_items(id) ON DELETE RESTRICT,
@@ -96,7 +96,7 @@ CREATE TABLE commercial_signal_enrichment_evidence (
   )
 );
 
-CREATE INDEX commercial_signal_enrichment_evidence_scope_idx
+CREATE INDEX IF NOT EXISTS commercial_signal_enrichment_evidence_scope_idx
   ON commercial_signal_enrichment_evidence (
     workspace_id, client_profile_id, organization_id, lineage_id
   );
@@ -134,9 +134,13 @@ BEGIN
 END;
 $$;
 
+DROP TRIGGER IF EXISTS commercial_signal_enrichment_evidence_validate
+  ON commercial_signal_enrichment_evidence;
 CREATE TRIGGER commercial_signal_enrichment_evidence_validate
 BEFORE INSERT ON commercial_signal_enrichment_evidence
 FOR EACH ROW EXECUTE FUNCTION validate_commercial_signal_enrichment_evidence();
+DROP TRIGGER IF EXISTS commercial_signal_enrichment_evidence_append_only
+  ON commercial_signal_enrichment_evidence;
 CREATE TRIGGER commercial_signal_enrichment_evidence_append_only
 BEFORE UPDATE OR DELETE ON commercial_signal_enrichment_evidence
 FOR EACH ROW EXECUTE FUNCTION reject_commercial_signal_lineage_mutation();

@@ -7,7 +7,7 @@ SET LOCAL statement_timeout = '5min';
 -- Query Planner v2 source execution provenance.
 -- A physical request may be shared, but every consumer remains profile scoped.
 -- ---------------------------------------------------------------------------
-CREATE TABLE query_plan_source_executions (
+CREATE TABLE IF NOT EXISTS query_plan_source_executions (
   id BIGSERIAL PRIMARY KEY,
   shared_request_id BIGINT NOT NULL
     REFERENCES query_plan_shared_requests(id) ON DELETE RESTRICT,
@@ -56,7 +56,7 @@ CREATE TABLE query_plan_source_executions (
   )
 );
 
-CREATE TABLE query_plan_source_execution_consumers (
+CREATE TABLE IF NOT EXISTS query_plan_source_execution_consumers (
   execution_id BIGINT NOT NULL
     REFERENCES query_plan_source_executions(id) ON DELETE CASCADE,
   plan_snapshot_id BIGINT NOT NULL,
@@ -71,7 +71,7 @@ CREATE TABLE query_plan_source_execution_consumers (
     UNIQUE (execution_id, plan_snapshot_id, workspace_id, client_profile_id)
 );
 
-CREATE TABLE query_plan_source_execution_signals (
+CREATE TABLE IF NOT EXISTS query_plan_source_execution_signals (
   execution_id BIGINT NOT NULL
     REFERENCES query_plan_source_executions(id) ON DELETE CASCADE,
   signal_id BIGINT NOT NULL,
@@ -93,11 +93,11 @@ CREATE TABLE query_plan_source_execution_signals (
     UNIQUE (execution_id, source, external_id)
 );
 
-CREATE INDEX query_plan_source_execution_consumers_profile_idx
+CREATE INDEX IF NOT EXISTS query_plan_source_execution_consumers_profile_idx
   ON query_plan_source_execution_consumers (
     workspace_id, client_profile_id, plan_snapshot_id, execution_id
   );
-CREATE INDEX query_plan_source_execution_signals_signal_idx
+CREATE INDEX IF NOT EXISTS query_plan_source_execution_signals_signal_idx
   ON query_plan_source_execution_signals (signal_id, organization_id, execution_id);
 
 -- ---------------------------------------------------------------------------
@@ -105,7 +105,7 @@ CREATE INDEX query_plan_source_execution_signals_signal_idx
 -- The compatibility episode exists only so the established workflow/outcome
 -- surface can be reused during canary. It is never rediscovered by similarity.
 -- ---------------------------------------------------------------------------
-CREATE TABLE commercial_signal_opportunity_lineage (
+CREATE TABLE IF NOT EXISTS commercial_signal_opportunity_lineage (
   id BIGSERIAL PRIMARY KEY,
   lineage_key TEXT NOT NULL,
   opportunity_id BIGINT NOT NULL,
@@ -180,7 +180,7 @@ CREATE TABLE commercial_signal_opportunity_lineage (
     )
 );
 
-CREATE TABLE commercial_signal_opportunity_query_plans (
+CREATE TABLE IF NOT EXISTS commercial_signal_opportunity_query_plans (
   lineage_id BIGINT NOT NULL
     REFERENCES commercial_signal_opportunity_lineage(id) ON DELETE CASCADE,
   execution_id BIGINT NOT NULL
@@ -197,11 +197,11 @@ CREATE TABLE commercial_signal_opportunity_query_plans (
     UNIQUE (lineage_id, execution_id, plan_snapshot_id)
 );
 
-CREATE INDEX commercial_signal_opportunity_lineage_scope_idx
+CREATE INDEX IF NOT EXISTS commercial_signal_opportunity_lineage_scope_idx
   ON commercial_signal_opportunity_lineage (
     workspace_id, client_profile_id, organization_id, created_at DESC
   );
-CREATE INDEX commercial_signal_opportunity_query_plans_plan_idx
+CREATE INDEX IF NOT EXISTS commercial_signal_opportunity_query_plans_plan_idx
   ON commercial_signal_opportunity_query_plans (
     workspace_id, client_profile_id, plan_snapshot_id, lineage_id
   );
@@ -338,21 +338,33 @@ BEGIN
 END;
 $$;
 
+DROP TRIGGER IF EXISTS commercial_signal_opportunity_lineage_validate
+  ON commercial_signal_opportunity_lineage;
 CREATE TRIGGER commercial_signal_opportunity_lineage_validate
 BEFORE INSERT ON commercial_signal_opportunity_lineage
 FOR EACH ROW EXECUTE FUNCTION validate_commercial_signal_lineage();
+DROP TRIGGER IF EXISTS commercial_signal_opportunity_lineage_append_only
+  ON commercial_signal_opportunity_lineage;
 CREATE TRIGGER commercial_signal_opportunity_lineage_append_only
 BEFORE UPDATE OR DELETE ON commercial_signal_opportunity_lineage
 FOR EACH ROW EXECUTE FUNCTION reject_commercial_signal_lineage_mutation();
+DROP TRIGGER IF EXISTS commercial_signal_opportunity_query_plans_validate
+  ON commercial_signal_opportunity_query_plans;
 CREATE TRIGGER commercial_signal_opportunity_query_plans_validate
 BEFORE INSERT ON commercial_signal_opportunity_query_plans
 FOR EACH ROW EXECUTE FUNCTION validate_commercial_signal_query_plan_lineage();
+DROP TRIGGER IF EXISTS commercial_signal_opportunity_query_plans_append_only
+  ON commercial_signal_opportunity_query_plans;
 CREATE TRIGGER commercial_signal_opportunity_query_plans_append_only
 BEFORE UPDATE OR DELETE ON commercial_signal_opportunity_query_plans
 FOR EACH ROW EXECUTE FUNCTION reject_commercial_signal_lineage_mutation();
+DROP TRIGGER IF EXISTS query_plan_source_execution_consumers_append_only
+  ON query_plan_source_execution_consumers;
 CREATE TRIGGER query_plan_source_execution_consumers_append_only
 BEFORE UPDATE OR DELETE ON query_plan_source_execution_consumers
 FOR EACH ROW EXECUTE FUNCTION reject_commercial_signal_lineage_mutation();
+DROP TRIGGER IF EXISTS query_plan_source_execution_signals_append_only
+  ON query_plan_source_execution_signals;
 CREATE TRIGGER query_plan_source_execution_signals_append_only
 BEFORE UPDATE OR DELETE ON query_plan_source_execution_signals
 FOR EACH ROW EXECUTE FUNCTION reject_commercial_signal_lineage_mutation();
@@ -361,7 +373,7 @@ FOR EACH ROW EXECUTE FUNCTION reject_commercial_signal_lineage_mutation();
 -- Safe enrichment queue. It stores corporate-surface categories, never scraped
 -- personal contact values.
 -- ---------------------------------------------------------------------------
-CREATE TABLE commercial_signal_enrichment_queue (
+CREATE TABLE IF NOT EXISTS commercial_signal_enrichment_queue (
   id BIGSERIAL PRIMARY KEY,
   lineage_id BIGINT NOT NULL UNIQUE
     REFERENCES commercial_signal_opportunity_lineage(id) ON DELETE CASCADE,
@@ -405,7 +417,7 @@ CREATE TABLE commercial_signal_enrichment_queue (
   )
 );
 
-CREATE INDEX commercial_signal_enrichment_queue_ready_idx
+CREATE INDEX IF NOT EXISTS commercial_signal_enrichment_queue_ready_idx
   ON commercial_signal_enrichment_queue (
     status, next_attempt_at, workspace_id, client_profile_id
   )
@@ -444,6 +456,8 @@ BEGIN
 END;
 $$;
 
+DROP TRIGGER IF EXISTS commercial_signal_enrichment_queue_validate
+  ON commercial_signal_enrichment_queue;
 CREATE TRIGGER commercial_signal_enrichment_queue_validate
 BEFORE INSERT OR UPDATE OF lineage_id, workspace_id, client_profile_id, organization_id
 ON commercial_signal_enrichment_queue
@@ -452,7 +466,7 @@ FOR EACH ROW EXECUTE FUNCTION validate_commercial_signal_enrichment_queue();
 -- ---------------------------------------------------------------------------
 -- Operator annotations and explicit validation state.
 -- ---------------------------------------------------------------------------
-CREATE TABLE commercial_signal_annotations (
+CREATE TABLE IF NOT EXISTS commercial_signal_annotations (
   id BIGSERIAL PRIMARY KEY,
   lineage_id BIGINT NOT NULL
     REFERENCES commercial_signal_opportunity_lineage(id) ON DELETE RESTRICT,
@@ -486,7 +500,7 @@ CREATE TABLE commercial_signal_annotations (
   )
 );
 
-CREATE INDEX commercial_signal_annotations_evaluation_idx
+CREATE INDEX IF NOT EXISTS commercial_signal_annotations_evaluation_idx
   ON commercial_signal_annotations (
     workspace_id, review_set, label, created_at DESC
   );
@@ -524,14 +538,18 @@ BEGIN
 END;
 $$;
 
+DROP TRIGGER IF EXISTS commercial_signal_annotations_validate
+  ON commercial_signal_annotations;
 CREATE TRIGGER commercial_signal_annotations_validate
 BEFORE INSERT ON commercial_signal_annotations
 FOR EACH ROW EXECUTE FUNCTION validate_commercial_signal_annotation_scope();
+DROP TRIGGER IF EXISTS commercial_signal_annotations_append_only
+  ON commercial_signal_annotations;
 CREATE TRIGGER commercial_signal_annotations_append_only
 BEFORE UPDATE OR DELETE ON commercial_signal_annotations
 FOR EACH ROW EXECUTE FUNCTION reject_commercial_signal_lineage_mutation();
 
-CREATE TABLE commercial_signal_validation_states (
+CREATE TABLE IF NOT EXISTS commercial_signal_validation_states (
   workspace_id BIGINT PRIMARY KEY REFERENCES workspaces(id) ON DELETE CASCADE,
   validation_status TEXT NOT NULL DEFAULT 'uncalibrated',
   changed_by_user_id BIGINT REFERENCES users(id) ON DELETE RESTRICT,
@@ -596,6 +614,8 @@ BEGIN
 END;
 $$;
 
+DROP TRIGGER IF EXISTS commercial_signal_validation_states_guard
+  ON commercial_signal_validation_states;
 CREATE TRIGGER commercial_signal_validation_states_guard
 BEFORE INSERT OR UPDATE ON commercial_signal_validation_states
 FOR EACH ROW EXECUTE FUNCTION guard_commercial_signal_validation_state();
@@ -604,15 +624,18 @@ FOR EACH ROW EXECUTE FUNCTION guard_commercial_signal_validation_state();
 -- Outcome Ledger: freeze exact Commercial Signal lineage on every future event.
 -- ---------------------------------------------------------------------------
 ALTER TABLE opportunity_outcome_events
-  ADD COLUMN commercial_signal_lineage_id BIGINT
+  ADD COLUMN IF NOT EXISTS commercial_signal_lineage_id BIGINT
     REFERENCES commercial_signal_opportunity_lineage(id) ON DELETE RESTRICT,
-  ADD COLUMN commercial_signal_candidate_id BIGINT,
-  ADD COLUMN commercial_signal_candidate_generation INTEGER,
-  ADD COLUMN commercial_signal_episode_id BIGINT,
-  ADD COLUMN commercial_signal_episode_generation INTEGER,
-  ADD COLUMN commercial_signal_query_plan_snapshot_ids BIGINT[],
-  ADD COLUMN commercial_signal_score_snapshot JSONB;
+  ADD COLUMN IF NOT EXISTS commercial_signal_candidate_id BIGINT,
+  ADD COLUMN IF NOT EXISTS commercial_signal_candidate_generation INTEGER,
+  ADD COLUMN IF NOT EXISTS commercial_signal_episode_id BIGINT,
+  ADD COLUMN IF NOT EXISTS commercial_signal_episode_generation INTEGER,
+  ADD COLUMN IF NOT EXISTS commercial_signal_query_plan_snapshot_ids BIGINT[],
+  ADD COLUMN IF NOT EXISTS commercial_signal_score_snapshot JSONB;
 
+ALTER TABLE opportunity_outcome_events
+  DROP CONSTRAINT IF EXISTS
+    opportunity_outcome_events_commercial_signal_generation_check;
 ALTER TABLE opportunity_outcome_events
   ADD CONSTRAINT opportunity_outcome_events_commercial_signal_generation_check CHECK (
     (commercial_signal_lineage_id IS NULL
@@ -666,6 +689,8 @@ BEGIN
 END;
 $$;
 
+DROP TRIGGER IF EXISTS opportunity_outcome_events_snapshot_commercial_signal_lineage
+  ON opportunity_outcome_events;
 CREATE TRIGGER opportunity_outcome_events_snapshot_commercial_signal_lineage
 BEFORE INSERT ON opportunity_outcome_events
 FOR EACH ROW EXECUTE FUNCTION snapshot_commercial_signal_outcome_lineage();

@@ -3,12 +3,9 @@ BEGIN;
 SET LOCAL lock_timeout = '5s';
 SET LOCAL statement_timeout = '5min';
 
-DROP TRIGGER IF EXISTS commercial_signal_enrichment_evidence_append_only
-  ON commercial_signal_enrichment_evidence;
-DROP TRIGGER IF EXISTS commercial_signal_enrichment_evidence_validate
-  ON commercial_signal_enrichment_evidence;
-DROP FUNCTION IF EXISTS validate_commercial_signal_enrichment_evidence();
-DROP TABLE IF EXISTS commercial_signal_enrichment_evidence;
+-- Corporate enrichment evidence is append-only audit history. Keep the table,
+-- validation function, and mutation guards during an application rollback.
+-- The forward migration is re-entrant for a later redeploy.
 
 DROP TRIGGER IF EXISTS company_events_new_region_baseline_guard ON company_events;
 DROP FUNCTION IF EXISTS require_company_history_for_new_region_event();

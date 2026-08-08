@@ -53,10 +53,35 @@ try {
           rollbackFixture.annotationId,
         )
       }
+      if (version === '20260807174500_extend_query_plan_yield_metrics' ||
+          version === '20260807180500_complete_query_plan_supply_metrics') {
+        await assertQueryPlanMetricRollbackPreserved(
+          database,
+          rollbackFixture.queryPlanMetricId,
+        )
+      }
+      if (version === '20260807173000_harden_company_event_and_enrichment_lineage') {
+        await assertEnrichmentEvidenceRollbackPreserved(
+          database,
+          rollbackFixture.enrichmentEvidenceId,
+        )
+        await assertQueryPlanMetricRollbackPreserved(
+          database,
+          rollbackFixture.queryPlanMetricId,
+        )
+      }
       if (version === '20260807170000_add_commercial_signal_canary_runtime') {
+        await assertAnnotationRollbackPreserved(
+          database,
+          rollbackFixture.annotationId,
+        )
         await assertOutcomeRollbackPreserved(
           database,
           rollbackFixture.outcomeEventId,
+        )
+        await assertEnrichmentEvidenceRollbackPreserved(
+          database,
+          rollbackFixture.enrichmentEvidenceId,
         )
       }
       const deleted = await database.query(
@@ -108,8 +133,10 @@ try {
       'publication_delete_is_rejected',
       'canonical_annotation_taxonomy_restored',
       'annotation_history_is_not_rewritten_on_taxonomy_down',
-      'new_outcome_reasons_survive_runtime_down',
-      'query_plan_supply_metrics_restored',
+      'annotation_history_survives_runtime_down',
+      'enrichment_evidence_survives_down_chain',
+      'outcome_lineage_snapshot_survives_runtime_down',
+      'query_plan_supply_metrics_survive_down_chain',
     ],
   })}\n`)
 } finally {
@@ -171,19 +198,56 @@ async function seedRollbackCompatibilityFixtures(database) {
          owner_id, client_profile_id, opportunity_id, hiring_episode_id,
          organization_id, event_type, previous_stage, new_stage, reason_code,
          occurred_at, actor_type, metadata, analytics_snapshot,
-         idempotency_key, payload_hash
+         idempotency_key, payload_hash,
+         commercial_signal_lineage_id, commercial_signal_candidate_id,
+         commercial_signal_candidate_generation, commercial_signal_episode_id,
+         commercial_signal_episode_generation,
+         commercial_signal_query_plan_snapshot_ids,
+         commercial_signal_score_snapshot
        )
        VALUES (
          9000001, 9000003, 9000005, 9000006,
          9000007, 'dismissed', 'new', 'dismissed', 'ordinary_hiring',
          NOW(), 'system', '{}'::JSONB, '{}'::JSONB,
-         'commercial-signal-roundtrip-outcome', REPEAT('a', 64)
+         'commercial-signal-roundtrip-outcome', REPEAT('a', 64),
+         9000001, 9000008, 3, 9000009, 2,
+         ARRAY[9000010, 9000011]::BIGINT[],
+         '{"qualityScore":0.82,"scoreVersion":"opportunity-v3"}'::JSONB
+       )
+       RETURNING id::TEXT AS id`,
+    )
+    const enrichmentEvidence = await database.query(
+      `INSERT INTO commercial_signal_enrichment_evidence (
+         lineage_id, evidence_id, workspace_id, client_profile_id,
+         organization_id, surface_type
+       )
+       VALUES (
+         9000001, 9000012, 9000002, 9000003,
+         9000007, 'corporate_contact_page'
+       )
+       RETURNING evidence_id::TEXT AS id`,
+    )
+    const queryPlanMetric = await database.query(
+      `INSERT INTO query_plan_metric_snapshots (
+         plan_snapshot_id, workspace_id, client_profile_id, metric_version,
+         measurement_window_start, measurement_window_end,
+         execution_count, zero_result_executions, input_hash,
+         new_company_events, actionable_opportunities, won_opportunities,
+         qualified_episodes, stale_opportunities, stale_rate
+       )
+       VALUES (
+         9000013, 9000002, 9000003, 'query-plan-yield-v2',
+         NOW() - INTERVAL '1 day', NOW(),
+         1, 0, REPEAT('b', 64),
+         11, 7, 2, 9, 3, 0.3333333
        )
        RETURNING id::TEXT AS id`,
     )
     return {
       annotationId: annotation.rows[0].id,
       outcomeEventId: outcome.rows[0].id,
+      enrichmentEvidenceId: enrichmentEvidence.rows[0].id,
+      queryPlanMetricId: queryPlanMetric.rows[0].id,
     }
   } finally {
     await database.query('SET session_replication_role = origin')
@@ -204,15 +268,68 @@ async function assertAnnotationRollbackPreserved(database, annotationId) {
   }
 }
 
+async function assertEnrichmentEvidenceRollbackPreserved(
+  database,
+  evidenceId,
+) {
+  const result = await database.query(
+    `SELECT surface_type
+     FROM commercial_signal_enrichment_evidence
+     WHERE evidence_id = $1`,
+    [evidenceId],
+  )
+  if (result.rows[0]?.surface_type !== 'corporate_contact_page') {
+    throw new Error('Enrichment evidence changed during rollback.')
+  }
+}
+
 async function assertOutcomeRollbackPreserved(database, outcomeEventId) {
   const result = await database.query(
-    `SELECT reason_code
+    `SELECT
+       reason_code,
+       commercial_signal_lineage_id::TEXT AS lineage_id,
+       commercial_signal_candidate_id::TEXT AS candidate_id,
+       commercial_signal_candidate_generation AS candidate_generation,
+       commercial_signal_episode_id::TEXT AS episode_id,
+       commercial_signal_episode_generation AS episode_generation,
+       commercial_signal_query_plan_snapshot_ids AS query_plan_snapshot_ids,
+       commercial_signal_score_snapshot AS score_snapshot
      FROM opportunity_outcome_events
      WHERE id = $1`,
     [outcomeEventId],
   )
-  if (result.rows[0]?.reason_code !== 'ordinary_hiring') {
-    throw new Error('Outcome history changed during Commercial Signal rollback.')
+  const row = result.rows[0]
+  if (row?.reason_code !== 'ordinary_hiring' ||
+      row?.lineage_id !== '9000001' || row?.candidate_id !== '9000008' ||
+      row?.candidate_generation !== 3 || row?.episode_id !== '9000009' ||
+      row?.episode_generation !== 2 ||
+      row?.query_plan_snapshot_ids?.map(String).join(',') !==
+        '9000010,9000011' ||
+      row?.score_snapshot?.qualityScore !== 0.82 ||
+      row?.score_snapshot?.scoreVersion !== 'opportunity-v3') {
+    throw new Error('Outcome lineage snapshot changed during Commercial Signal rollback.')
+  }
+}
+
+async function assertQueryPlanMetricRollbackPreserved(database, metricId) {
+  const result = await database.query(
+    `SELECT
+       new_company_events::TEXT AS new_company_events,
+       actionable_opportunities::TEXT AS actionable_opportunities,
+       won_opportunities::TEXT AS won_opportunities,
+       qualified_episodes::TEXT AS qualified_episodes,
+       stale_opportunities::TEXT AS stale_opportunities,
+       stale_rate::TEXT AS stale_rate
+     FROM query_plan_metric_snapshots
+     WHERE id = $1`,
+    [metricId],
+  )
+  const row = result.rows[0]
+  if (row?.new_company_events !== '11' ||
+      row?.actionable_opportunities !== '7' ||
+      row?.won_opportunities !== '2' || row?.qualified_episodes !== '9' ||
+      row?.stale_opportunities !== '3' || row?.stale_rate !== '0.3333333') {
+    throw new Error('Query-plan metric snapshot changed during rollback.')
   }
 }
 

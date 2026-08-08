@@ -4,10 +4,12 @@ SET LOCAL lock_timeout = '5s';
 SET LOCAL statement_timeout = '5min';
 
 ALTER TABLE query_plan_metric_snapshots
-  ADD COLUMN new_company_events BIGINT,
-  ADD COLUMN actionable_opportunities BIGINT,
-  ADD COLUMN won_opportunities BIGINT;
+  ADD COLUMN IF NOT EXISTS new_company_events BIGINT,
+  ADD COLUMN IF NOT EXISTS actionable_opportunities BIGINT,
+  ADD COLUMN IF NOT EXISTS won_opportunities BIGINT;
 
+ALTER TABLE query_plan_metric_snapshots
+  DROP CONSTRAINT IF EXISTS query_plan_metric_snapshots_downstream_counts_check;
 ALTER TABLE query_plan_metric_snapshots
   ADD CONSTRAINT query_plan_metric_snapshots_downstream_counts_check CHECK (
     (new_company_events IS NULL OR new_company_events >= 0)
