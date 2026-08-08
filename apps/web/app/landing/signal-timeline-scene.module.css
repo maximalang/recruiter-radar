@@ -1,10 +1,14 @@
 .layout {
+  display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-template-areas: "intro" "company" "story" "lock";
   gap: clamp(1.75rem, 3vw, 2.75rem);
+  width: min(var(--content), 100%);
+  margin: auto;
 }
 
 .intro {
+  grid-area: intro;
   display: grid;
   max-width: none;
   grid-template-columns: minmax(18rem, .82fr) minmax(22rem, 1fr);
@@ -35,6 +39,7 @@
 }
 
 .coordinate {
+  grid-area: company;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
@@ -85,6 +90,7 @@
 .story {
   position: relative;
   display: grid;
+  grid-area: story;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0;
 }
@@ -188,6 +194,7 @@
 
 .lock {
   display: grid;
+  grid-area: lock;
   align-self: end;
   grid-template-columns: minmax(14rem, .65fr) minmax(18rem, 1fr) auto;
   align-items: end;

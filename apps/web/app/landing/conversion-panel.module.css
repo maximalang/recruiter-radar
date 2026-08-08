@@ -69,7 +69,7 @@
   border-top: 1px solid rgba(141, 217, 193, .22);
   background:
     radial-gradient(circle at 82% 18%, rgba(141, 217, 193, .1), transparent 32%),
-    #111a22;
+    var(--slate-900);
   color: #f2efe7;
 }
 
@@ -89,7 +89,7 @@
 .final a:first-child {
   border-color: #8dd9c1;
   background: #8dd9c1;
-  color: #111a22;
+  color: var(--slate-900);
   box-shadow: none;
 }
 
@@ -101,6 +101,79 @@
 .final a:last-child {
   color: rgba(242, 239, 231, .72);
 }
+
+.finalSignal {
+  position: absolute;
+  z-index: 0;
+  top: 50%;
+  right: clamp(1.5rem, 5vw, 5rem);
+  width: clamp(15rem, 24vw, 23rem);
+  height: clamp(10rem, 16vw, 15rem);
+  margin: 0;
+  color: var(--signal-strong);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.finalSignal::before,
+.finalSignal::after {
+  position: absolute;
+  border: 1px solid rgba(191, 220, 145, .18);
+  border-radius: 50%;
+  content: "";
+}
+
+.finalSignal::before { inset: 8% 2% -32% 24%; }
+.finalSignal::after { inset: 28% 18% -12% 40%; border-style: dashed; }
+
+.profileNode,
+.signalField {
+  position: absolute;
+  z-index: 1;
+  padding: .35rem .45rem;
+  border: 1px solid rgba(191, 220, 145, .22);
+  background: rgba(8, 12, 10, .76);
+  font-family: var(--mono);
+  font-size: .54rem;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.profileNode { top: 22%; left: 0; }
+.signalField { right: 2%; bottom: 18%; color: var(--paper); }
+
+.signalRoute {
+  position: absolute;
+  top: 45%;
+  right: 22%;
+  left: 28%;
+  height: 1px;
+  background: linear-gradient(90deg, var(--signal-strong), rgba(191, 220, 145, .08));
+  transform: rotate(18deg);
+  transform-origin: left;
+}
+
+.constellation {
+  position: absolute;
+  right: 12%;
+  bottom: 27%;
+  width: 7rem;
+  height: 5rem;
+}
+
+.constellation i {
+  position: absolute;
+  width: .35rem;
+  height: .35rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.constellation i:nth-child(1) { top: 8%; left: 12%; }
+.constellation i:nth-child(2) { top: 42%; left: 34%; }
+.constellation i:nth-child(3) { top: 18%; left: 58%; }
+.constellation i:nth-child(4) { top: 68%; left: 74%; }
+.constellation i:nth-child(5) { top: 48%; left: 92%; }
 
 @media (min-width: 1180px) {
   .pricing > :first-child {
@@ -144,6 +217,20 @@
 
   .faq :global(details p) {
     max-width: 100%;
+  }
+
+  .final {
+    padding-bottom: 10rem;
+  }
+
+  .finalSignal {
+    top: auto;
+    right: -3rem;
+    bottom: -2rem;
+    width: 20rem;
+    height: 12rem;
+    opacity: .62;
+    transform: none;
   }
 }
 

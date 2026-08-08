@@ -2,6 +2,15 @@ import { ActionGlyph, RouteGlyph } from "./brand-glyphs";
 import { DEMO_COMPANY, DEMO_CONTACT_PATHS, DEMO_OUTREACH_COPY } from "./landing-copy";
 import styles from "./landing.module.css";
 
+const COMPOSER_STEPS = [
+  { key: "why", label: "Почему в Radar" },
+  { key: "fact", label: "Опорный факт" },
+  { key: "angle", label: "Угол разговора" },
+  { key: "draft", label: "Черновик" },
+  { key: "review", label: "Проверка" },
+  { key: "use", label: "Использовать" },
+] as const;
+
 export default function OutreachScene() {
   return (
     <section
@@ -48,6 +57,14 @@ export default function OutreachScene() {
               <span>ЧЕРНОВИК / НЕ ОТПРАВЛЕНО</span>
               <strong>Пример первого сообщения, основанного на факте</strong>
             </div>
+            <ol className={styles.composerSteps} data-composer-steps="human-controlled" aria-label="Этапы подготовки первого обращения">
+              {COMPOSER_STEPS.map((step, index) => (
+                <li key={step.key} data-composer-step={step.key} data-active={step.key === "draft" || undefined}>
+                  <span>{String(index + 1).padStart(2, "0")}</span>
+                  <strong>{step.label}</strong>
+                </li>
+              ))}
+            </ol>
             <blockquote>{DEMO_OUTREACH_COPY}</blockquote>
             <div className={styles.actionBoundary}>
               <div><span>Радар обнаружил</span><strong>связанный сигнал найма</strong></div>

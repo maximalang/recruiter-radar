@@ -61,27 +61,88 @@
   line-height: 1.55;
 }
 
-.channelGrid {
+.channelHierarchy {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1px;
-  overflow: hidden;
-  border: 1px solid rgba(18, 35, 31, .1);
-  background: rgba(18, 35, 31, .1);
+  grid-template-columns: minmax(16rem, .72fr) minmax(28rem, 1.28fr);
+  gap: 1rem;
 }
 
-.channelCard {
+.coreChannel {
   position: relative;
-  min-height: 11rem;
-  padding: 1.05rem;
-  background: rgba(250, 248, 241, .97);
-  transition: background .2s ease, transform .2s ease;
+  display: grid;
+  align-content: start;
+  min-height: 100%;
+  padding: 1.25rem;
+  border: 1px solid rgba(191, 220, 145, .16);
+  background: var(--slate-900);
+  color: var(--paper);
 }
 
-.channelCard:hover {
-  z-index: 1;
-  background: #fffefa;
-  transform: translateY(-1px);
+.groupLabel {
+  color: #397966;
+  font-family: var(--mono);
+  font-size: .58rem;
+  font-weight: 650;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.coreChannel .groupLabel {
+  margin-top: 1.4rem;
+  color: var(--signal-strong);
+}
+
+.coreChannel h3 {
+  margin: .55rem 0 .7rem;
+  color: var(--paper);
+  font-size: clamp(1.45rem, 2.5vw, 2.15rem);
+  font-weight: 590;
+  letter-spacing: -.045em;
+}
+
+.coreChannel > p {
+  margin: 0;
+  color: var(--muted-dark);
+  font-size: .82rem;
+  line-height: 1.6;
+}
+
+.coreChannel > small {
+  align-self: end;
+  margin-top: 2.5rem;
+  padding-top: .75rem;
+  border-top: 1px solid var(--line-dark);
+  color: var(--muted-dark);
+  font-family: var(--mono);
+  font-size: .56rem;
+}
+
+.deliveryRoutes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  border-top: 1px solid var(--line-light);
+}
+
+.deliveryRoutes > .groupLabel {
+  grid-column: 1 / -1;
+  padding: .75rem 0;
+  border-bottom: 1px solid var(--line-light);
+}
+
+.channelRoute {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-content: start;
+  gap: .7rem .8rem;
+  padding: 1rem 1rem 1rem 0;
+  border-bottom: 1px solid var(--line-light);
+}
+
+.channelRoute:nth-of-type(even) {
+  padding-right: 0;
+  padding-left: 1rem;
+  border-left: 1px solid var(--line-light);
 }
 
 .channelTopline {
@@ -126,43 +187,48 @@
   content: "";
 }
 
-.channelCard h3 {
-  margin: 0 0 .42rem;
+.routeHeading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: .7rem;
+}
+
+.channelRoute h3 {
+  margin: 0;
   color: var(--ink);
   font-size: .98rem;
   font-weight: 650;
   letter-spacing: -.025em;
 }
 
-.channelCard p {
-  margin: 0;
+.channelRoute p {
+  grid-column: 2;
+  margin: .35rem 0 0;
   color: rgba(23, 35, 45, .69);
   font-size: .74rem;
   line-height: 1.52;
 }
 
-.channelCard small {
-  position: absolute;
-  right: 1.05rem;
-  bottom: .9rem;
-  left: 1.05rem;
-  padding-top: .65rem;
-  border-top: 1px solid rgba(18, 35, 31, .08);
+.channelRoute > small {
+  grid-column: 2;
   color: rgba(23, 35, 45, .58);
   font-family: var(--mono);
   font-size: .56rem;
   line-height: 1.35;
 }
 
-.channelCard[data-channel="webhook"] .channelIcon,
-.channelCard[data-channel="vk"] .channelIcon {
+.channelRoute[data-channel="webhook"] .channelIcon,
+.channelRoute[data-channel="vk"] .channelIcon {
   border-style: dashed;
 }
 
 @media (max-width: 960px) {
-  .channelGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .channelHierarchy {
+    grid-template-columns: 1fr;
   }
+
+  .coreChannel { min-height: 17rem; }
 }
 
 @media (max-width: 620px) {
@@ -177,13 +243,14 @@
     margin-bottom: 1rem;
   }
 
-  .channelGrid {
+  .deliveryRoutes {
     grid-template-columns: 1fr;
   }
 
-  .channelCard {
-    min-height: auto;
-    padding: .9rem;
+  .channelRoute,
+  .channelRoute:nth-of-type(even) {
+    padding: .9rem 0;
+    border-left: 0;
   }
 
   .channelTopline { margin-bottom: .7rem; }
@@ -199,18 +266,11 @@
     height: 1.18rem;
   }
 
-  .channelCard p { padding-bottom: .75rem; }
-
-  .channelCard small {
-    position: static;
-    display: block;
-    margin-top: .1rem;
-    padding-top: .55rem;
-  }
+  .channelRoute p { padding-bottom: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .channelCard {
+  .channelRoute {
     transition: none;
   }
 }

@@ -55,12 +55,35 @@ describe("polished unified landing visual contract", () => {
   it("renders the desktop signal history as one temporal axis with a mobile vertical fallback", () => {
     const timeline = source("app/landing/signal-timeline-scene.tsx");
     const timelineStyles = source("app/landing/signal-timeline-scene.module.css");
+    const landingStyles = source("app/landing/landing.module.css");
 
     expect(timeline).toContain('data-temporal-axis="signal-story"');
+    expect(timelineStyles).toContain('grid-template-areas: "intro" "company" "story" "lock";');
     expect(timelineStyles).toContain("grid-template-columns: repeat(4, minmax(0, 1fr));");
     expect(timelineStyles).toMatch(
       /@media \(max-width: 700px\)[\s\S]*?\.story\s*\{[\s\S]*?grid-template-columns:\s*1fr;/,
     );
+    expect(landingStyles).not.toContain("grid-template-areas: \"intro company\" \"intro timeline\"");
+    expect(landingStyles).not.toContain(".timelineEvents::before");
+    expect(landingStyles).not.toContain(".timelineEvent {");
+  });
+
+  it("separates the core workspace from connected delivery routes", () => {
+    const delivery = source("app/landing/delivery-scene.tsx");
+
+    expect(delivery).toContain('data-delivery-core="workspace"');
+    expect(delivery).toContain('data-delivery-routes="connected"');
+    expect(delivery).toContain("DELIVERY_CHANNELS.slice(1).map");
+  });
+
+  it("shows a human-controlled outreach composer and a branded closing signal", () => {
+    const outreach = source("app/landing/outreach-scene.tsx");
+    const conversion = source("app/landing/conversion-panel.tsx");
+
+    expect(outreach).toContain("COMPOSER_STEPS.map");
+    expect(outreach).toContain('data-composer-steps="human-controlled"');
+    expect(outreach).toContain('data-composer-step={step.key}');
+    expect(conversion).toContain('data-final-signal-composition="agency-profile"');
   });
 
   it("keeps the landing skip link first and exposes one main content landmark", () => {
