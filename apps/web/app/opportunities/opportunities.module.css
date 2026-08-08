@@ -43,8 +43,8 @@
 }
 
 .todayLane[data-active="true"] {
-  border-color: #1d4ed8;
-  background: #eff6ff;
+  border-color: var(--action-primary);
+  background: rgba(35, 128, 111, 0.08);
 }
 
 .researchMode {
@@ -128,8 +128,8 @@
 }
 
 .researchActions button {
-  border-color: #1d4ed8;
-  background: #1d4ed8;
+  border-color: var(--action-primary);
+  background: var(--action-primary);
   color: #fff;
 }
 
@@ -138,9 +138,9 @@
   min-height: 44px;
   align-items: center;
   padding: 0 14px;
-  border: 1px solid rgba(29, 78, 216, 0.2);
+  border: 1px solid rgba(35, 128, 111, 0.2);
   border-radius: 11px;
-  color: #1d4ed8;
+  color: var(--action-primary);
   font-size: 0.82rem;
   font-weight: 720;
   text-decoration: none;
@@ -167,9 +167,9 @@
 }
 
 .filterLink[data-active="true"] {
-  border-color: #1d4ed8;
+  border-color: var(--action-primary);
   background: #eaf2ff;
-  color: #1d4ed8;
+  color: var(--action-primary);
 }
 
 .cardList {
@@ -183,7 +183,7 @@
   border: 1px solid rgba(148, 163, 184, 0.26);
   border-radius: 20px;
   background:
-    radial-gradient(circle at 96% 0, rgba(59, 130, 246, 0.09), transparent 30%),
+    radial-gradient(circle at 96% 0, rgba(35, 128, 111, 0.09), transparent 30%),
     #fff;
   box-shadow: 0 14px 36px rgba(15, 23, 42, 0.07);
 }
@@ -360,7 +360,7 @@
 }
 
 .conclusionBasis a {
-  color: #1d4ed8;
+  color: var(--action-primary);
   font-size: inherit;
   text-underline-offset: 3px;
 }
@@ -541,7 +541,7 @@
   bottom: -3px;
   left: 4px;
   width: 1px;
-  background: #dbeafe;
+  background: rgba(35, 128, 111, 0.12);
   content: "";
 }
 
@@ -555,7 +555,7 @@
   width: 9px;
   height: 9px;
   margin-top: 4px;
-  border: 2px solid #bfdbfe;
+  border: 2px solid rgba(35, 128, 111, 0.24);
   border-radius: 50%;
   background: #2563eb;
 }
@@ -693,7 +693,7 @@
   min-height: 44px;
   align-items: center;
   width: fit-content;
-  color: #1d4ed8;
+  color: var(--action-primary);
   cursor: pointer;
   font-size: 0.76rem;
   font-weight: 720;
@@ -859,9 +859,9 @@
   gap: 12px;
   margin-top: 14px;
   padding: 14px;
-  border: 1px solid #bfdbfe;
+  border: 1px solid rgba(35, 128, 111, 0.24);
   border-radius: 12px;
-  background: #eff6ff;
+  background: rgba(35, 128, 111, 0.08);
 }
 
 .outcomeForm label {
@@ -1004,8 +1004,8 @@
 }
 
 .actionButton[data-tone="primary"] {
-  border-color: #1d4ed8;
-  background: #1d4ed8;
+  border-color: var(--action-primary);
+  background: var(--action-primary);
   color: #fff;
 }
 
@@ -1028,12 +1028,12 @@
 .workflowForm input:focus-visible,
 .workflowForm textarea:focus-visible,
 .timelineItem a:focus-visible {
-  outline: 3px solid rgba(59, 130, 246, 0.34);
+  outline: 3px solid rgba(35, 128, 111, 0.34);
   outline-offset: 2px;
 }
 
 .conclusionBasis a:focus-visible {
-  outline: 3px solid rgba(59, 130, 246, 0.34);
+  outline: 3px solid rgba(35, 128, 111, 0.34);
   outline-offset: 2px;
 }
 
@@ -1157,7 +1157,7 @@
   }
 
   .card:hover {
-    border-color: rgba(59, 130, 246, 0.28);
+    border-color: rgba(35, 128, 111, 0.28);
     box-shadow: 0 18px 44px rgba(15, 23, 42, 0.1);
     transform: translateY(-1px);
   }

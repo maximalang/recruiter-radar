@@ -77,7 +77,7 @@
 }
 
 .topNavBrandAccent {
-  color: #315fc8;
+  color: var(--action-primary);
 }
 
 .topNavLinks {
@@ -107,7 +107,7 @@
 
 .topNavLink[data-active="true"] {
   color: var(--c-brand);
-  background-color: rgba(29, 78, 216, 0.06);
+  background-color: rgba(35, 128, 111, 0.06);
   font-weight: 600;
 }
 
@@ -564,9 +564,9 @@
 }
 
 .scoreBandChip[data-tone="danger"] {
-  background-color: #eff6ff;
-  color: #1d4ed8;
-  border: 1px solid #bfdbfe;
+  background-color: rgba(35, 128, 111, 0.08);
+  color: var(--action-primary);
+  border: 1px solid rgba(35, 128, 111, 0.24);
 }
 
 /* ── Signal freshness chip ── */
@@ -637,9 +637,9 @@
 }
 
 .reviewBadge[data-tone="info"] {
-  background-color: rgba(59, 130, 246, 0.1);
-  color: #1d4ed8;
-  border-color: rgba(59, 130, 246, 0.3);
+  background-color: rgba(35, 128, 111, 0.1);
+  color: var(--action-primary);
+  border-color: rgba(35, 128, 111, 0.3);
 }
 
 .reviewBadge[data-tone="success"] {
@@ -691,9 +691,9 @@
 }
 
 .urgencyCueChip[data-tone="info"] {
-  background-color: #eff6ff;
-  color: #1d4ed8;
-  border: 1px solid #bfdbfe;
+  background-color: rgba(35, 128, 111, 0.08);
+  color: var(--action-primary);
+  border: 1px solid rgba(35, 128, 111, 0.24);
 }
 
 .urgencyCueChip[data-tone="danger"] {
@@ -723,8 +723,8 @@
 }
 
 .gateBadgeInline[data-gate="B"] {
-  background: var(--gate-b-bg, #dbeafe);
-  color: var(--gate-b-color, #1e40af);
+  background: var(--gate-b-bg, rgba(35, 128, 111, 0.12));
+  color: var(--gate-b-color, var(--action-primary));
 }
 
 .gateBadgeInline[data-gate="C"] {
@@ -754,9 +754,9 @@
   padding: 4px 10px;
   border-radius: 6px;
   font-size: 0.8rem;
-  background-color: #f0f9ff;
-  color: #1e40af;
-  border: 1px solid #bfdbfe;
+  background-color: rgba(35, 128, 111, 0.06);
+  color: var(--action-primary);
+  border: 1px solid rgba(35, 128, 111, 0.24);
   display: inline-block;
 }
 
@@ -1007,7 +1007,7 @@
   margin-top: 16px;
   padding: 9px 18px;
   border-radius: 10px;
-  background-color: var(--c-brand);
+  background-color: var(--action-primary);
   color: #fff;
   font-size: 0.85rem;
   font-weight: 600;
@@ -1020,7 +1020,7 @@
 }
 
 .emptyStateAction:focus-visible {
-  outline: 2px solid var(--c-brand);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -1159,7 +1159,7 @@
   gap: 16px;
   overflow: hidden;
   padding: 20px 22px;
-  border: 1px solid #dbe3ef;
+  border: 1px solid var(--border-subtle);
   border-radius: 16px;
   background: linear-gradient(145deg, #ffffff 0%, #fbfcff 100%);
   box-shadow: 0 10px 28px rgba(15, 35, 68, 0.06);
@@ -1178,7 +1178,7 @@
 .signalLeadCard[data-tone="danger"]::before { background: #64748b; }
 
 .signalLeadCard:last-child {
-  border-bottom: 1px solid #dbe3ef;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .signalLeadCard:hover {
@@ -1253,7 +1253,7 @@
   height: 4px;
   overflow: hidden;
   border-radius: 999px;
-  background: #e8edf4;
+  background: var(--border-subtle);
 }
 
 .signalLeadScoreTrack > span {
@@ -1284,8 +1284,8 @@
 }
 
 .signalLeadSectionPrimary {
-  border-color: #d6e2f5;
-  background: #f3f7fd;
+  border-color: var(--border-subtle);
+  background: var(--surface-panel);
 }
 
 .signalLeadSection strong {
@@ -1518,7 +1518,7 @@
   font-size: 0.8rem;
   font-weight: 600;
   color: var(--c-brand);
-  background-color: rgba(29, 78, 216, 0.06);
+  background-color: rgba(35, 128, 111, 0.06);
   border: 1px solid transparent;
   text-decoration: none;
   white-space: nowrap;
@@ -1526,8 +1526,8 @@
 }
 
 .leadOpenBtn:hover {
-  background-color: rgba(29, 78, 216, 0.1);
-  border-color: rgba(29, 78, 216, 0.2);
+  background-color: rgba(35, 128, 111, 0.1);
+  border-color: rgba(35, 128, 111, 0.2);
 }
 
 .leadOpenBtn:focus-visible {
@@ -1882,7 +1882,7 @@
 
 .contactValue {
   font-weight: 500;
-  color: var(--c-brand, #1d4ed8);
+  color: var(--c-brand, var(--action-primary));
   word-break: break-all;
 }
 
@@ -1992,7 +1992,7 @@
   flex-direction: column;
   gap: 8px;
   padding-top: 14px;
-  border-top: 1px solid rgba(29, 78, 216, 0.12);
+  border-top: 1px solid rgba(35, 128, 111, 0.12);
 }
 
 .leadVerdictRolesLabel {

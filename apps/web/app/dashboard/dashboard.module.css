@@ -4,7 +4,7 @@
   grid-template-columns: minmax(0, 1.2fr) minmax(360px, 0.8fr);
   gap: 18px;
   padding: clamp(22px, 4vw, 38px);
-  border: 1px solid rgba(29, 78, 216, 0.14);
+  border: 1px solid rgba(35, 128, 111, 0.14);
   border-radius: 22px;
   background:
     radial-gradient(circle at 92% 4%, rgba(96, 165, 250, 0.18), transparent 35%),
@@ -296,8 +296,8 @@
 }
 
 .summaryCardPrimary {
-  background: linear-gradient(135deg, rgba(29, 78, 216, 0.04) 0%, rgba(29, 78, 216, 0.01) 100%);
-  border-color: rgba(29, 78, 216, 0.12);
+  background: linear-gradient(135deg, rgba(35, 128, 111, 0.04) 0%, rgba(35, 128, 111, 0.01) 100%);
+  border-color: rgba(35, 128, 111, 0.12);
 }
 
 .summaryCardReady {
@@ -325,7 +325,7 @@
 }
 
 .summaryCardValuePrimary {
-  color: #1d4ed8;
+  color: var(--action-primary);
 }
 
 .summaryCardValueReady {
@@ -732,8 +732,8 @@
 }
 
 .alertInfo {
-  border-color: #bfdbfe;
-  background-color: #eff6ff;
+  border-color: rgba(35, 128, 111, 0.24);
+  background-color: rgba(35, 128, 111, 0.08);
 }
 
 /* Alerts empty state */
@@ -1056,7 +1056,7 @@
   font-size: 0.875rem;
   font-weight: 500;
   color: white;
-  background-color: #3b82f6;
+  background-color: var(--signal-support);
   border: none;
   border-radius: 6px;
   cursor: pointer;

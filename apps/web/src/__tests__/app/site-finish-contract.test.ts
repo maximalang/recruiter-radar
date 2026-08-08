@@ -29,6 +29,26 @@ describe("cross-route visual layer contract", () => {
     }
   });
 
+  it("keeps product controls free of the retired blue action palette", () => {
+    const productStyles = [
+      "ui/internal-page.module.css",
+      "ui/page-primitives.module.css",
+      "dashboard/dashboard.module.css",
+      "opportunities/opportunities.module.css",
+      "auth/pending-auth-action.module.css",
+      "leads/[id]/next-steps-block.module.css",
+      "leads/[id]/feedback-buttons.module.css",
+      "settings/settings-overview.module.css",
+      "settings/security/security-settings.module.css",
+      "settings/team/team-settings.module.css",
+    ];
+    const legacyBlue = /#(?:1d4ed8|1e3a8a|1e40af|3b82f6|bfdbfe|dbeafe|eff6ff)|rgba\(59,\s*130,\s*246/gi;
+
+    for (const path of productStyles) {
+      expect(readAppFile(path).match(legacyBlue)).toBeNull();
+    }
+  });
+
   it("keeps the authenticated shell addressable after the frame migration", () => {
     const workspace = readAppFile("ui/product-workspace.tsx");
     const internalPage = readAppFile("ui/internal-page.tsx");
