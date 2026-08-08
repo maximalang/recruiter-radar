@@ -289,21 +289,22 @@
   }
   .fieldFigure {
     position: absolute;
-    right: -11rem;
-    bottom: -11rem;
-    width: 30rem;
-    height: 30rem;
+    right: 1rem;
+    bottom: -12rem;
+    width: calc(100% - 1rem);
+    height: auto;
+    aspect-ratio: 1;
     margin: 0;
     opacity: .5;
     pointer-events: none;
   }
   .analysisFrame {
     right: auto;
-    bottom: 13rem;
+    bottom: 10rem;
     left: 1rem;
     grid-template-columns: minmax(0, 1fr) auto;
     gap: .55rem;
-    width: 18rem;
+    width: min(18rem, calc(100% - 2rem));
     padding: .75rem .8rem;
     border-radius: 6px;
   }

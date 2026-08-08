@@ -48,6 +48,15 @@ describe("polished unified landing visual contract", () => {
       /@media \(max-width: 480px\)[\s\S]*?\.fieldFigure\s*\{[\s\S]*?position:\s*absolute;/,
     );
     expect(sceneStyles).toMatch(
+      /@media \(max-width: 480px\)[\s\S]*?\.fieldFigure\s*\{[\s\S]*?right:\s*1rem;[\s\S]*?width:\s*calc\(100% - 1rem\);/,
+    );
+    expect(sceneStyles).toMatch(
+      /@media \(max-width: 480px\)[\s\S]*?\.analysisFrame\s*\{[\s\S]*?bottom:\s*10rem;/,
+    );
+    expect(sceneStyles).toMatch(
+      /@media \(max-width: 480px\)[\s\S]*?\.analysisFrame\s*\{[\s\S]*?width:\s*min\(18rem, calc\(100% - 2rem\)\);/,
+    );
+    expect(sceneStyles).toMatch(
       /@media \(max-width: 480px\)[\s\S]*?\.section\s*\{[\s\S]*?min-height:\s*100svh;/,
     );
   });
