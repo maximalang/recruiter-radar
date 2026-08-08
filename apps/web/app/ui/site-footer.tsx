@@ -8,6 +8,8 @@ const PRODUCT_LINKS = [
   { href: "/#scene-timeline", label: "Почему сейчас" },
   { href: "/#scene-workspace", label: "Рабочая выдача" },
   { href: "/#scene-evidence", label: "Факты и источники" },
+  { href: "/#scene-delivery", label: "Доставка" },
+  { href: "/#scene-outreach", label: "Первый контакт" },
   { href: "/#pricing", label: "Тарифы" },
   { href: "/#faq", label: "FAQ" },
 ] as const;

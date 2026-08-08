@@ -106,6 +106,8 @@ describe("polished unified landing visual contract", () => {
     expect(footer).toContain('href: "/#scene-timeline"');
     expect(footer).toContain('href: "/#scene-workspace"');
     expect(footer).toContain('href: "/#scene-evidence"');
+    expect(footer).toContain('href: "/#scene-delivery"');
+    expect(footer).toContain('href: "/#scene-outreach"');
     expect(footer).toContain('href: "/#pricing"');
     expect(footer).toContain('href: "/#faq"');
     expect(footer).toContain('href="/legal"');

@@ -67,7 +67,10 @@ const surfaceSpecs = [
   { name: "faq-1440x900", width: 1440, height: 900, target: "#faq" },
   { name: "faq-390x844", width: 390, height: 844, target: "#faq" },
   { name: "final-cta-1440x900", width: 1440, height: 900, target: "#conversion-final" },
+  { name: "final-cta-390x844", width: 390, height: 844, target: "#conversion-final" },
+  { name: "final-cta-320x700", width: 320, height: 700, target: "#conversion-final" },
   { name: "footer-1440x900", width: 1440, height: 900, target: "footer" },
+  { name: "footer-390x844", width: 390, height: 844, target: "footer" },
 ];
 
 const documentedConsoleAllowlist = [];
@@ -214,6 +217,68 @@ async function assertNoOverlapOrClipping(page, label) {
   assert.deepEqual(issues, [], `${label}: clipping/viewport issues ${JSON.stringify(issues)}`);
 }
 
+async function assertKeyHeadingBounds(page, label) {
+  const issues = await page.evaluate(() => {
+    const selectors = [
+      "#scene-detection h1",
+      "#scene-timeline h2",
+      "#scene-workspace h2",
+      "#scene-evidence h2",
+      "#scene-delivery h2",
+      "#scene-outreach h2",
+      "#pricing h2",
+      "#faq h2",
+      "#conversion-final h2",
+    ];
+    const viewportWidth = document.documentElement.clientWidth;
+
+    return selectors.flatMap((selector) => Array.from(document.querySelectorAll(selector)).flatMap((heading) => {
+      const rect = heading.getBoundingClientRect();
+      const section = heading.closest("section, [id]");
+      const canvas = section?.getBoundingClientRect();
+      const style = getComputedStyle(heading);
+      const clipsOwnText = ["hidden", "clip"].includes(style.overflow)
+        && (heading.scrollWidth > heading.clientWidth + 1 || heading.scrollHeight > heading.clientHeight + 1);
+      const outsideViewport = rect.left < -1 || rect.right > viewportWidth + 1;
+      const outsideCanvas = Boolean(canvas && (rect.left < canvas.left - 1 || rect.right > canvas.right + 1));
+      return clipsOwnText || outsideViewport || outsideCanvas
+        ? [{ selector, clipsOwnText, outsideViewport, outsideCanvas, rect: rect.toJSON(), canvas: canvas?.toJSON() }]
+        : [];
+    }));
+  });
+
+  assert.deepEqual(issues, [], `${label}: key heading bounds failed ${JSON.stringify(issues)}`);
+}
+
+async function assertConsentControlCollisions(page, label) {
+  const consentControl = page.locator('[aria-label="Изменить настройки cookies"]');
+  if (!await consentControl.isVisible()) return;
+
+  for (const selector of [
+    '[data-pricing-primary="true"] > a',
+    "#faq details[open]",
+    "#conversion-final a:first-of-type",
+  ]) {
+    const target = page.locator(selector).first();
+    await target.scrollIntoViewIfNeeded();
+    await target.evaluate((element) => element.scrollIntoView({ block: "center", behavior: "auto" }));
+    const collision = await page.evaluate(({ controlSelector, targetSelector }) => {
+      const control = document.querySelector(controlSelector);
+      const targetElement = document.querySelector(targetSelector);
+      if (!control || !targetElement) return null;
+      const controlRect = control.getBoundingClientRect();
+      const targetRect = targetElement.getBoundingClientRect();
+      return !(
+        controlRect.right <= targetRect.left
+        || controlRect.left >= targetRect.right
+        || controlRect.bottom <= targetRect.top
+        || controlRect.top >= targetRect.bottom
+      ) ? { control: controlRect.toJSON(), target: targetRect.toJSON() } : null;
+    }, { controlSelector: '[aria-label="Изменить настройки cookies"]', targetSelector: selector });
+    assert.equal(collision, null, `${label}: consent control overlaps ${selector}: ${JSON.stringify(collision)}`);
+  }
+}
+
 async function assertHeaderLayout(page, viewport) {
   const desktopNav = page.getByRole("navigation", { name: "Разделы лендинга" });
   const menuButton = page.getByRole("button", { name: "Открыть меню" });
@@ -304,6 +369,8 @@ async function assertResponsiveSurface(browser, viewport) {
   await assertAccessibleInteractiveNames(page, viewport.name);
   await assertControls(page, viewport.name);
   await assertNoOverlapOrClipping(page, viewport.name);
+  await assertKeyHeadingBounds(page, viewport.name);
+  await assertConsentControlCollisions(page, viewport.name);
   const fullHeight = await measurePageHeight(page, viewport);
 
   await page.evaluate(() => window.scrollTo(0, 0));
@@ -675,6 +742,8 @@ try {
       touchTargets: true,
       horizontalOverflow: true,
       clipping: true,
+      headingBounds: true,
+      consentControlCollisions: true,
       heroFold: true,
     },
   }, null, 2)}\n`);

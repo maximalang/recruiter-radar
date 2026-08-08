@@ -73,4 +73,17 @@ describe("landing final production contract", () => {
     expect(evidence).toContain("Подключено, проходит проверки");
     expect(evidence).not.toContain("Source registry / фактические роли");
   });
+
+  test("audits heading bounds and consent collisions across the mobile conversion surfaces", () => {
+    const audit = source("scripts/verify-landing-production.mjs");
+
+    expect(audit).toContain('{ name: "final-cta-320x700", width: 320, height: 700, target: "#conversion-final" }');
+    expect(audit).toContain('{ name: "final-cta-390x844", width: 390, height: 844, target: "#conversion-final" }');
+    expect(audit).toContain("assertKeyHeadingBounds");
+    expect(audit).toContain('"#conversion-final h2"');
+    expect(audit).toContain("assertConsentControlCollisions");
+    expect(audit).toContain('[aria-label="Изменить настройки cookies"]');
+    expect(audit).toContain('[data-pricing-primary="true"] > a');
+    expect(audit).toContain("#faq details[open]");
+  });
 });
