@@ -31,10 +31,15 @@ describe("cross-route visual layer contract", () => {
 
   it("keeps product controls free of the retired blue action palette", () => {
     const productStyles = [
+      "ui/brand-logo.module.css",
       "ui/internal-page.module.css",
       "ui/page-primitives.module.css",
       "dashboard/dashboard.module.css",
+      "dashboard/dashboard-analytics.tsx",
+      "dashboard/dashboard-quality.tsx",
       "opportunities/opportunities.module.css",
+      "profile/agency-dna-form.module.css",
+      "profile/profile-form.module.css",
       "auth/pending-auth-action.module.css",
       "leads/[id]/next-steps-block.module.css",
       "leads/[id]/feedback-buttons.module.css",
@@ -42,7 +47,7 @@ describe("cross-route visual layer contract", () => {
       "settings/security/security-settings.module.css",
       "settings/team/team-settings.module.css",
     ];
-    const legacyBlue = /#(?:1d4ed8|1e3a8a|1e40af|3b82f6|bfdbfe|dbeafe|eff6ff)|rgba\(59,\s*130,\s*246/gi;
+    const legacyBlue = /#(?:0ea5e9|1d4ed8|1e3a8a|1e40af|2563eb|3b82f6|5b21b6|67e8f9|7c3aed|8b5cf6|8dbbff|c4b5fd|bfdbfe|dbeafe|e9d5ff|ede9fe|eff6ff|faf5ff)|rgba\((?:29,\s*78,\s*216|59,\s*130,\s*246)/gi;
 
     for (const path of productStyles) {
       expect(readAppFile(path).match(legacyBlue)).toBeNull();

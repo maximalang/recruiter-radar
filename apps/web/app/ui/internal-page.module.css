@@ -600,9 +600,9 @@
   border-radius: var(--radius-pill);
   font-size: 0.72rem;
   font-weight: 600;
-  background-color: #faf5ff;
-  color: #7c3aed;
-  border: 1px solid #e9d5ff;
+  background-color: var(--gate-b-bg);
+  color: var(--gate-b-color);
+  border: 1px solid rgba(35, 128, 111, 0.2);
   white-space: nowrap;
 }
 

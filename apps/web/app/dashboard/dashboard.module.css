@@ -1064,7 +1064,7 @@
 }
 
 .errorStateRetry:hover {
-  background-color: #2563eb;
+  background-color: var(--action-primary);
 }
 
 .errorStateRetry:focus-visible {

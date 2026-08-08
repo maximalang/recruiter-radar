@@ -78,8 +78,8 @@
 }
 
 .chip:has(input:checked) {
-  border-color: var(--c-brand, #1d4ed8);
-  background: rgba(29, 78, 216, 0.06);
+  border-color: var(--c-brand, #153f35);
+  background: rgba(35, 128, 111, 0.08);
 }
 
 .radioCards {
@@ -106,8 +106,8 @@
 }
 
 .radioCard:has(input:checked) {
-  border-color: var(--c-brand, #1d4ed8);
-  background: rgba(29, 78, 216, 0.06);
+  border-color: var(--c-brand, #153f35);
+  background: rgba(35, 128, 111, 0.08);
 }
 
 .radioCard > input {

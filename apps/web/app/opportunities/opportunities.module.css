@@ -201,7 +201,7 @@
 
 .eyebrow {
   margin-bottom: 7px;
-  color: #2563eb;
+  color: var(--signal-support);
   font-size: 0.68rem;
   font-weight: 780;
   letter-spacing: 0.08em;
@@ -557,7 +557,7 @@
   margin-top: 4px;
   border: 2px solid rgba(35, 128, 111, 0.24);
   border-radius: 50%;
-  background: #2563eb;
+  background: var(--signal-support);
 }
 
 .timelineItem > div {
@@ -786,7 +786,7 @@
 }
 
 .outcomeToggle > span:last-child {
-  color: #2563eb;
+  color: var(--signal-support);
   font-size: 0.74rem;
   font-weight: 720;
 }
@@ -902,7 +902,7 @@
 }
 
 .funnelHeading span {
-  color: #2563eb;
+  color: var(--signal-support);
   font-size: 0.66rem;
   font-weight: 760;
   letter-spacing: 0.08em;

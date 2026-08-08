@@ -13,7 +13,7 @@
 
 .eyebrow {
   margin: 0 0 4px;
-  color: var(--c-brand, #1d4ed8);
+  color: var(--c-brand, #153f35);
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -47,7 +47,7 @@
 
 .progress progress {
   width: 100%;
-  accent-color: var(--c-brand, #1d4ed8);
+  accent-color: var(--c-brand, #153f35);
 }
 
 .form,
@@ -117,13 +117,13 @@
 }
 
 .chips input:focus-visible + span {
-  outline: 2px solid var(--c-brand, #1d4ed8);
+  outline: 2px solid var(--c-brand, #153f35);
   outline-offset: 2px;
 }
 
 .chips input:checked + span {
-  border-color: var(--c-brand, #1d4ed8);
-  background: rgba(29, 78, 216, 0.06);
+  border-color: var(--c-brand, #153f35);
+  background: rgba(35, 128, 111, 0.08);
 }
 
 .scopeNote,
@@ -184,7 +184,7 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
-  border-left-color: var(--c-brand, #1d4ed8);
+  border-left-color: var(--c-brand, #153f35);
 }
 
 .submitRow {
