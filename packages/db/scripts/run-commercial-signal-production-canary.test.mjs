@@ -38,6 +38,7 @@ test('runs preflight, yield, canary, enrichment, and captures a signed TOP revie
             requestsExecuted: 2,
             requestsBlocked: 0,
             requestsFailed: 0,
+            staleExecutionsReconciled: 1,
             fetchedRecords: 12,
             uniqueCompanies: 3,
           },
@@ -87,6 +88,11 @@ test('runs preflight, yield, canary, enrichment, and captures a signed TOP revie
   assert.equal(receipt.topRanked[0].hasExactEvidenceLineage, true)
   assert.equal(receipt.topRanked[0].hasWhyNow, true)
   assert.equal(receipt.topRanked[0].hasAgencyDnaLineage, true)
+  assert.equal(
+    receipt.stages.find((stage) => stage.name === 'commercial_signal_canary')
+      ?.summary.staleSourceExecutionsReconciled,
+    1,
+  )
   assert.equal(JSON.stringify(receipt).includes('test-secret-never-returned'), false)
   assert.equal(verifyCommercialSignalCanaryReceipt(receipt).ok, true)
   assert.equal(calls.filter((call) => call.method === 'GET').length, 3)
