@@ -94,6 +94,7 @@ export default function YandexMetrika() {
           style={styles.settingsButton}
           onClick={() => setSettingsOpen(true)}
           aria-label="Изменить настройки cookies"
+          title="Cookies"
         >
           Cookies
         </button>
@@ -195,15 +196,16 @@ const styles = {
   settingsButton: {
     position: "fixed",
     zIndex: 900,
-    right: "max(12px, env(safe-area-inset-right))",
-    bottom: "max(12px, env(safe-area-inset-bottom))",
+    right: "max(8px, env(safe-area-inset-right))",
+    bottom: "max(8px, env(safe-area-inset-bottom))",
+    width: 58,
     minHeight: 44,
-    padding: "0 13px",
+    padding: "0 7px",
     border: "1px solid rgba(15,23,42,.14)",
     borderRadius: 999,
     background: "rgba(255,255,255,.92)",
     color: "#475467",
-    fontSize: ".72rem",
+    fontSize: ".62rem",
     cursor: "pointer",
     boxShadow: "0 8px 24px rgba(15,23,42,.1)",
   },

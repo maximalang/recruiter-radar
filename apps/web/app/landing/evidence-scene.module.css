@@ -139,7 +139,7 @@
   border-top: 1px solid rgba(221, 233, 227, .13);
   opacity: 0;
   transform: translateY(5px);
-  animation: factorReveal .65s ease forwards;
+  animation: factorReveal .55s ease forwards;
 }
 
 .factor:nth-child(even) {
@@ -175,8 +175,8 @@
 .factor p {
   grid-column: 2 / 4;
   margin: 0;
-  color: rgba(242, 239, 231, .5);
-  font-size: .7rem;
+  color: rgba(242, 239, 231, .62);
+  font-size: .72rem;
   line-height: 1.45;
 }
 
@@ -211,8 +211,8 @@
 
 .ledgerHeading p {
   margin: 0;
-  color: rgba(242, 239, 231, .5);
-  font-size: .78rem;
+  color: rgba(242, 239, 231, .64);
+  font-size: .8rem;
   line-height: 1.5;
 }
 
@@ -252,9 +252,9 @@
 }
 
 .recordFact span {
-  color: rgba(242, 239, 231, .44);
+  color: rgba(242, 239, 231, .62);
   font-family: var(--mono);
-  font-size: .5rem;
+  font-size: .58rem;
   letter-spacing: .06em;
   text-transform: uppercase;
 }
@@ -275,12 +275,12 @@
   display: grid;
   grid-template-columns: 4.2rem minmax(0, 1fr);
   gap: .6rem;
-  color: rgba(242, 239, 231, .62);
+  color: rgba(242, 239, 231, .72);
   font-family: var(--mono);
-  font-size: .51rem;
+  font-size: .57rem;
 }
 
-.recordMeta dt { color: rgba(242, 239, 231, .34); text-transform: uppercase; }
+.recordMeta dt { color: rgba(242, 239, 231, .52); text-transform: uppercase; }
 .recordMeta dd { margin: 0; }
 
 .recordStatus {
@@ -291,7 +291,7 @@
   gap: .4rem;
   color: #8dd9c1;
   font-family: var(--mono);
-  font-size: .5rem;
+  font-size: .55rem;
   font-weight: 650;
   letter-spacing: .06em;
   text-transform: uppercase;
@@ -384,8 +384,8 @@
 }
 
 .roleList summary small {
-  color: rgba(242, 239, 231, .48);
-  font-size: .68rem;
+  color: rgba(242, 239, 231, .64);
+  font-size: .72rem;
 }
 
 .registryArrow {
@@ -405,8 +405,8 @@
 .roleBody p {
   max-width: 48rem;
   margin: 0;
-  color: rgba(242, 239, 231, .54);
-  font-size: .74rem;
+  color: rgba(242, 239, 231, .66);
+  font-size: .76rem;
   line-height: 1.52;
 }
 

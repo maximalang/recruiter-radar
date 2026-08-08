@@ -726,6 +726,12 @@
 .pilotOffer > a { display: inline-flex; min-height: 48px; align-items: center; justify-content: space-between; gap: .7rem; padding: .8rem .9rem; background: var(--signal-strong); color: var(--slate-950); font-family: var(--mono); font-size: .6rem; font-weight: 700; text-decoration: none; text-transform: uppercase; }
 .pilotOffer > small { color: var(--muted-dark); font-family: var(--mono); font-size: .52rem; }
 .secondaryOffers { display: grid; align-content: start; }
+.secondaryOfferLabel {
+  padding-bottom: .7rem;
+  color: rgba(242, 239, 231, .7);
+  font-size: .72rem;
+  font-weight: 600;
+}
 .secondaryOffers article { display: grid; gap: .6rem; padding: 1.1rem 0; border-top: 1px solid var(--line-dark); }
 .secondaryOffers article:last-child { border-bottom: 1px solid var(--line-dark); }
 .secondaryOffers article > span { color: var(--copper); font-family: var(--mono); font-size: .55rem; text-transform: uppercase; }
@@ -918,7 +924,12 @@
   .sourceRoleList summary { gap: .55rem; }
   .deliveryDemo { min-width: 0; }
   .pilotOffer { padding: 1rem; }
-  .finalCall h2 { font-size: clamp(2.8rem, 15vw, 4.5rem); }
+  .finalCall h2 {
+    max-width: 100%;
+    font-size: clamp(2.4rem, 12vw, 3.35rem);
+    letter-spacing: -.055em;
+    line-height: .96;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

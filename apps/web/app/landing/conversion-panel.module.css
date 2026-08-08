@@ -21,7 +21,7 @@
 }
 
 .pricing [data-pricing-primary="true"] {
-  align-self: stretch;
+  align-self: start;
   border-color: rgba(141, 217, 193, .3);
   background: rgba(255, 255, 255, .025);
 }
@@ -33,7 +33,7 @@
 .pricing [data-pricing-secondary="true"] {
   display: grid;
   min-width: 0;
-  grid-template-rows: repeat(2, minmax(0, 1fr));
+  grid-template-rows: auto repeat(2, minmax(0, 1fr));
 }
 
 .pricing [data-pricing-secondary="true"] :global(article) {

@@ -561,14 +561,14 @@
   }
 
   .visualSystem :global(#scene-detection [class*="detectionField"]) {
-    position: absolute;
+    position: relative;
     z-index: 0;
-    top: 8.2rem;
-    right: -12.5rem;
-    width: 34rem;
-    height: 34rem;
-    margin: 0;
-    opacity: .34;
+    top: auto;
+    right: auto;
+    width: 100%;
+    height: 27rem;
+    margin: -9rem 0 0 !important;
+    opacity: .48;
   }
 
   .visualSystem :global([class*="displayTitle"]) {
@@ -664,10 +664,11 @@
 
 @media (max-width: 480px) {
   .visualSystem :global(#scene-detection [class*="detectionField"]) {
-    top: 8.8rem;
-    right: -14rem;
-    width: 32rem;
-    height: 32rem;
+    top: auto;
+    right: auto;
+    width: 100%;
+    height: 24rem;
+    margin-top: -10rem !important;
   }
 
   .visualSystem :global([class*="displayTitle"]) {
@@ -680,6 +681,12 @@
 
   .visualSystem :global(#pricing [data-pricing-primary]) {
     padding: 1rem;
+  }
+}
+
+@media (max-width: 340px) {
+  .visualSystem :global(#scene-detection [class*="detectionField"]) {
+    margin-top: -16rem !important;
   }
 }
 

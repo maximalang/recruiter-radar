@@ -136,9 +136,9 @@
 
 @media (max-width: 820px) {
   .field {
-    width: 132%;
+    width: 112%;
     max-width: none;
-    transform: translateX(18%);
+    transform: translateX(2%);
   }
 
   .labels text:nth-child(n+4),
@@ -147,8 +147,8 @@
 
 @media (max-width: 480px) {
   .field {
-    width: 148%;
-    transform: translateX(24%);
+    width: 118%;
+    transform: translateX(1%);
   }
 
   .caption { display: none; }

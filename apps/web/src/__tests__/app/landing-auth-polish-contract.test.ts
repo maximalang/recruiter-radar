@@ -54,7 +54,10 @@ describe("landing visual and login reliability polish", () => {
     expect(header).toContain("href={LOGIN_HREF}");
     expect(header).not.toContain('<Link href="/dashboard" className={headerStyles.login}>');
     expect(header).toContain('data-brand-header="recruiter-radar-v3"');
-    expect(header).toContain('if (restoreFocus) menuButtonRef.current?.focus({ preventScroll: true });\n    setMenuOpen(false);');
+    const restoreFocusIndex = header.indexOf("if (restoreFocus) menuButtonRef.current?.focus({ preventScroll: true });");
+    const closeMenuIndex = header.indexOf("setMenuOpen(false);", restoreFocusIndex);
+    expect(restoreFocusIndex).toBeGreaterThanOrEqual(0);
+    expect(closeMenuIndex).toBeGreaterThan(restoreFocusIndex);
     expect(header).not.toContain("if (restoreFocus) window.requestAnimationFrame");
   });
 

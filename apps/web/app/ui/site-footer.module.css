@@ -55,7 +55,7 @@
 .footerLine {
   margin: 0;
   max-width: 34ch;
-  color: rgba(242, 239, 231, .56);
+  color: rgba(242, 239, 231, .68);
   font-size: .92rem;
   line-height: 1.65;
 }
@@ -91,7 +91,7 @@
   min-height: 44px;
   align-items: center;
   overflow-wrap: anywhere;
-  color: rgba(242, 239, 231, .56);
+  color: rgba(242, 239, 231, .68);
   font-size: .82rem;
   line-height: 1.35;
   text-decoration: none;
@@ -126,7 +126,7 @@
   flex-wrap: wrap;
   align-items: baseline;
   gap: .38rem .55rem;
-  color: rgba(242, 239, 231, .4);
+  color: rgba(242, 239, 231, .56);
   font-size: .7rem;
   line-height: 1.55;
 }
@@ -155,7 +155,7 @@
 
 .footerCopy {
   flex: 0 0 auto;
-  color: rgba(242, 239, 231, .32);
+  color: rgba(242, 239, 231, .5);
   font-size: .66rem;
   letter-spacing: .045em;
   text-transform: uppercase;
@@ -208,18 +208,13 @@
   }
 
   .footerNav {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 2rem 1.25rem;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, .8fr) minmax(0, 1.35fr);
+    gap: 1.5rem .8rem;
   }
 
   .footerNav nav:last-child {
-    grid-column: 1 / -1;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    column-gap: 1.25rem;
-  }
-
-  .footerNav nav:last-child strong {
-    grid-column: 1 / -1;
+    grid-column: auto;
+    grid-template-columns: 1fr;
   }
 
   .footerBottom {
@@ -238,8 +233,24 @@
 }
 
 @media (max-width: 390px) {
+  .footerLink {
+    font-size: .76rem;
+  }
+}
+
+@media (max-width: 340px) {
+  .footerNav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .footerNav nav:last-child {
-    grid-template-columns: 1fr;
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: .8rem;
+  }
+
+  .footerNav nav:last-child strong {
+    grid-column: 1 / -1;
   }
 }
 

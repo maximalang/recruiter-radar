@@ -35,8 +35,11 @@ describe("landing final production contract", () => {
     expect(conversion).toContain('data-faq-layout="editorial"');
     expect(conversion).toContain("Проверьте радар на своих нишах за 7 дней.");
     expect(conversion).toContain("Запустить пилот на 7 дней");
+    expect(conversion).toContain("После пилота — месяц или квартал");
+    expect(conversion).toContain("Без автопродления.");
     expect(conversion).toContain("Продолжить на месяц");
     expect(conversion).toContain("Подключить квартал");
+    expect(conversion).not.toContain("<span>{pilotPlan.cadence}</span>");
     expect(conversion).toContain("Перед запуском — короткие ответы.");
     expect(conversion).not.toContain("Ответы раскрываются без перехода");
 
@@ -72,6 +75,19 @@ describe("landing final production contract", () => {
     expect(evidence).toContain("Влияет на основную выдачу");
     expect(evidence).toContain("Подключено, проходит проверки");
     expect(evidence).not.toContain("Source registry / фактические роли");
+  });
+
+  test("keeps FAQ copy professional and free of internal delivery terminology", () => {
+    const faq = source("app/landing/landing-faq.ts");
+
+    expect(faq).toContain("Recruiter Radar отправляет сообщения компаниям?");
+    expect(faq).toContain("Где я получаю результаты?");
+    expect(faq).toContain("защищённый HTTPS-webhook");
+    expect(faq).not.toContain("Радар сам пишет компаниям?");
+    expect(faq).not.toContain("Куда приходит выдача?");
+    expect(faq).not.toContain("email digest");
+    expect(faq).not.toContain("browser push");
+    expect(faq).not.toContain("signed HTTPS webhook");
   });
 
   test("audits heading bounds and consent collisions across the mobile conversion surfaces", () => {

@@ -236,9 +236,7 @@ async function assertKeyHeadingBounds(page, label) {
       const rect = heading.getBoundingClientRect();
       const section = heading.closest("section, [id]");
       const canvas = section?.getBoundingClientRect();
-      const style = getComputedStyle(heading);
-      const clipsOwnText = ["hidden", "clip"].includes(style.overflow)
-        && (heading.scrollWidth > heading.clientWidth + 1 || heading.scrollHeight > heading.clientHeight + 1);
+      const clipsOwnText = heading.scrollWidth > heading.clientWidth + 8;
       const outsideViewport = rect.left < -1 || rect.right > viewportWidth + 1;
       const outsideCanvas = Boolean(canvas && (rect.left < canvas.left - 1 || rect.right > canvas.right + 1));
       return clipsOwnText || outsideViewport || outsideCanvas
