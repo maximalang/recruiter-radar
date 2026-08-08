@@ -39,6 +39,7 @@ try {
   await database.connect()
   try {
     await assertAllApplied(database)
+    const rollbackFixture = await seedRollbackCompatibilityFixtures(database)
 
     for (const version of [...ROUNDTRIP_MIGRATIONS].reverse()) {
       const sql = await readFile(
@@ -46,6 +47,18 @@ try {
         'utf8',
       )
       await database.query(sql)
+      if (version === '20260807175500_extend_commercial_signal_annotation_taxonomy') {
+        await assertAnnotationRollbackPreserved(
+          database,
+          rollbackFixture.annotationId,
+        )
+      }
+      if (version === '20260807170000_add_commercial_signal_canary_runtime') {
+        await assertOutcomeRollbackPreserved(
+          database,
+          rollbackFixture.outcomeEventId,
+        )
+      }
       const deleted = await database.query(
         'DELETE FROM schema_migrations WHERE version = $1',
         [version],
@@ -94,6 +107,8 @@ try {
       'publication_update_is_append_through',
       'publication_delete_is_rejected',
       'canonical_annotation_taxonomy_restored',
+      'annotation_history_is_not_rewritten_on_taxonomy_down',
+      'new_outcome_reasons_survive_runtime_down',
       'query_plan_supply_metrics_restored',
     ],
   })}\n`)
@@ -133,6 +148,71 @@ async function assertAllApplied(database) {
     throw new Error(
       `Commercial Signal migration chain incomplete: ${actual.join(', ')}`,
     )
+  }
+}
+
+async function seedRollbackCompatibilityFixtures(database) {
+  await database.query('SET session_replication_role = replica')
+  try {
+    const annotation = await database.query(
+      `INSERT INTO commercial_signal_annotations (
+         lineage_id, workspace_id, client_profile_id, reviewer_user_id,
+         annotation_generation, label, reason_code, review_set, note
+       )
+       VALUES (
+         9000001, 9000002, 9000003, 9000004,
+         1, 'not_a_lead', 'weak_agency_fit', 'canary',
+         'rollback preservation fixture'
+       )
+       RETURNING id::TEXT AS id`,
+    )
+    const outcome = await database.query(
+      `INSERT INTO opportunity_outcome_events (
+         owner_id, client_profile_id, opportunity_id, hiring_episode_id,
+         organization_id, event_type, previous_stage, new_stage, reason_code,
+         occurred_at, actor_type, metadata, analytics_snapshot,
+         idempotency_key, payload_hash
+       )
+       VALUES (
+         9000001, 9000003, 9000005, 9000006,
+         9000007, 'dismissed', 'new', 'dismissed', 'ordinary_hiring',
+         NOW(), 'system', '{}'::JSONB, '{}'::JSONB,
+         'commercial-signal-roundtrip-outcome', REPEAT('a', 64)
+       )
+       RETURNING id::TEXT AS id`,
+    )
+    return {
+      annotationId: annotation.rows[0].id,
+      outcomeEventId: outcome.rows[0].id,
+    }
+  } finally {
+    await database.query('SET session_replication_role = origin')
+  }
+}
+
+async function assertAnnotationRollbackPreserved(database, annotationId) {
+  const result = await database.query(
+    `SELECT reason_code, note
+     FROM commercial_signal_annotations
+     WHERE id = $1`,
+    [annotationId],
+  )
+  const row = result.rows[0]
+  if (row?.reason_code !== 'weak_agency_fit' ||
+      row?.note !== 'rollback preservation fixture') {
+    throw new Error('Annotation history changed during taxonomy rollback.')
+  }
+}
+
+async function assertOutcomeRollbackPreserved(database, outcomeEventId) {
+  const result = await database.query(
+    `SELECT reason_code
+     FROM opportunity_outcome_events
+     WHERE id = $1`,
+    [outcomeEventId],
+  )
+  if (result.rows[0]?.reason_code !== 'ordinary_hiring') {
+    throw new Error('Outcome history changed during Commercial Signal rollback.')
   }
 }
 

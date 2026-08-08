@@ -20,7 +20,13 @@ ALTER TABLE opportunity_outcome_events
           'company_too_small', 'company_too_large', 'low_commercial_value',
           'internal_recruitment_only', 'no_external_need_signal',
           'weak_evidence', 'duplicate', 'existing_client', 'do_not_contact',
-          'wrong_timing', 'other'
+          'wrong_timing',
+          -- Compatibility vocabulary is intentionally retained on rollback.
+          -- Outcome events are append-only and must never be rewritten merely
+          -- to make an older constraint fit historical Commercial Signal data.
+          'ordinary_hiring', 'wrong_role', 'wrong_company_size',
+          'weak_external_need', 'internal_only', 'bad_timing', 'bad_economics',
+          'stale', 'wrong_persona', 'no_safe_contact', 'other'
         )
       )
       OR (

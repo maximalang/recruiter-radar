@@ -82,6 +82,7 @@ jobs:
           src/__tests__/lib/opportunities/commercial-signal-today.test.ts
           src/__tests__/lib/opportunities/company-event-support-registry.test.ts
           src/__tests__/lib/lead-discovery/query-planner-v2-yield.test.ts
+          src/__tests__/scripts/commercial-signal-runtime-migration.test.ts
       - name: Run Evidence Radar unit and surface contracts
         run: >-
           npm test --workspace @recruiter-radar/web -- --runInBand --runTestsByPath
