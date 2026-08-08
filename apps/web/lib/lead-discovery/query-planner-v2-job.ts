@@ -12,6 +12,12 @@ import {
   type QueryPlannerV2Source,
 } from './query-planner-v2'
 import {
+  applyHistoricalYieldToQueryPlan,
+  parseQueryPlanYieldMap,
+  queryPlanYieldKey,
+  type QueryPlanYieldMap,
+} from './query-planner-v2-yield'
+import {
   clampQueryPlannerV2ProfileBatchSize,
   isQueryPlannerV2Enabled,
   QUERY_PLANNER_V2_LIMITS,
@@ -108,10 +114,14 @@ async function executeJob(
   for (const row of rows) {
     stats.profilesScanned += 1
     try {
+      const historicalYieldByPlan = historicalYieldMap(row.historicalYieldRows)
       const plans = buildProfileScopedQueryPlans({
         profiles: [profileFromRow(row)],
         sources,
-      })
+      }).map((plan) => applyHistoricalYieldToQueryPlan(
+        plan,
+        historicalYieldByPlan[queryPlanYieldKey(plan)],
+      ))
       plansByProfile.push(plans)
       stats.plansBuilt += plans.length
       for (const plan of plans) stats[plan.status] += 1
@@ -219,7 +229,75 @@ async function loadProfiles(
          FROM user_search_preferences preference
          WHERE preference.user_id = profile.owner_id
            AND preference.source = ANY($3::TEXT[])
-       ), '{}'::JSONB) AS "operatorSearchParams"
+       ), '{}'::JSONB) AS "operatorSearchParams",
+       COALESCE((
+         SELECT JSONB_AGG(
+           JSONB_BUILD_OBJECT(
+             'key', latest.metric_key,
+             'executionCount', latest.execution_count,
+             'zeroResultExecutions', latest.zero_result_executions,
+             'fetchedRecords', latest.fetched_records,
+             'uniqueEvents', latest.unique_events,
+             'uniqueCompanies', latest.unique_companies,
+             'newCompanyEvents', latest.new_company_events,
+             'episodes', latest.episodes,
+             'qualifiedEpisodes', latest.qualified_episodes,
+             'qualifiedOpportunities', latest.qualified_opportunities,
+             'actionableOpportunities', latest.actionable_opportunities,
+             'staleOpportunities', latest.stale_opportunities,
+             'accepted', latest.accepted,
+             'contacted', latest.contacted,
+             'replied', latest.replied,
+             'meetings', latest.meetings,
+             'won', latest.won_opportunities
+           )
+           ORDER BY latest.metric_key
+         )
+         FROM (
+           SELECT DISTINCT ON (
+             plan.source,
+             plan.role_family,
+             COALESCE(plan.region_snapshot->>'canonicalRegion', ''),
+             COALESCE(plan.region_snapshot->>'requestedRegion', '')
+           )
+             LOWER(plan.source) || '|' ||
+             LOWER(BTRIM(plan.role_family)) || '|' ||
+             LOWER(BTRIM(COALESCE(plan.region_snapshot->>'canonicalRegion', ''))) || '|' ||
+             LOWER(BTRIM(COALESCE(plan.region_snapshot->>'requestedRegion', '')))
+               AS metric_key,
+             metric.execution_count,
+             metric.zero_result_executions,
+             metric.fetched_records,
+             metric.unique_events,
+             metric.unique_companies,
+             metric.new_company_events,
+             metric.episodes,
+             metric.qualified_episodes,
+             metric.qualified_opportunities,
+             metric.actionable_opportunities,
+             metric.stale_opportunities,
+             metric.accepted,
+             metric.contacted,
+             metric.replied,
+             metric.meetings,
+             metric.won_opportunities
+           FROM query_plan_snapshots plan
+           JOIN query_plan_metric_snapshots metric
+             ON metric.plan_snapshot_id = plan.id
+            AND metric.workspace_id = plan.workspace_id
+            AND metric.client_profile_id = plan.client_profile_id
+            AND metric.metric_version = 'query-plan-yield-v2'
+           WHERE plan.workspace_id = profile.workspace_id
+             AND plan.client_profile_id = profile.id
+           ORDER BY
+             plan.source,
+             plan.role_family,
+             COALESCE(plan.region_snapshot->>'canonicalRegion', ''),
+             COALESCE(plan.region_snapshot->>'requestedRegion', ''),
+             metric.measurement_window_end DESC,
+             metric.id DESC
+         ) latest
+       ), '[]'::JSONB) AS "historicalYieldRows"
      FROM client_profiles profile
      WHERE profile.is_active = TRUE
        AND ($1::BIGINT IS NULL OR profile.workspace_id = $1)
@@ -268,6 +346,36 @@ function profileFromRow(row: ProfileRow): QueryPlannerV2ProfileInput {
     },
     operatorSearchParams: operatorSearchParams(row.operatorSearchParams),
   }
+}
+
+function historicalYieldMap(value: unknown): QueryPlanYieldMap {
+  if (!Array.isArray(value)) return {}
+  const raw: Record<string, unknown> = {}
+  for (const item of value) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue
+    const row = item as Record<string, unknown>
+    const key = nullableText(row.key)
+    if (!key) continue
+    raw[key] = {
+      executionCount: row.executionCount,
+      zeroResultExecutions: row.zeroResultExecutions,
+      fetchedRecords: row.fetchedRecords,
+      uniqueEvents: row.uniqueEvents,
+      uniqueCompanies: row.uniqueCompanies,
+      newCompanyEvents: row.newCompanyEvents,
+      episodes: row.episodes,
+      qualifiedEpisodes: row.qualifiedEpisodes,
+      qualifiedOpportunities: row.qualifiedOpportunities,
+      actionableOpportunities: row.actionableOpportunities,
+      staleOpportunities: row.staleOpportunities,
+      accepted: row.accepted,
+      contacted: row.contacted,
+      replied: row.replied,
+      meetings: row.meetings,
+      won: row.won,
+    }
+  }
+  return parseQueryPlanYieldMap(raw)
 }
 
 function normalizeSources(

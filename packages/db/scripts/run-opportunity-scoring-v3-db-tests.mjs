@@ -11,6 +11,13 @@ if (!databaseUrl) throw new Error('DATABASE_URL is required.')
 
 const root = resolve(import.meta.dirname, '..', '..', '..')
 const migrateScript = resolve(root, 'packages', 'db', 'scripts', 'migrate.mjs')
+const rollbackCommercialSignalScript = resolve(
+  root,
+  'packages',
+  'db',
+  'scripts',
+  'rollback-commercial-signal-test-dependents.mjs',
+)
 const verifierScript = resolve(
   root,
   'packages',
@@ -29,6 +36,7 @@ const testEnvironment = {
   DATABASE_URL: temporaryUrl.toString(),
   AGENCY_DNA_MATCH_V2_DB_TEST_ACK: 'isolated',
   OPPORTUNITY_SCORING_V3_DB_TEST_ACK: 'isolated',
+  COMMERCIAL_SIGNAL_TEST_ROLLBACK_ACK: 'isolated',
 }
 
 function quoteIdentifier(value) {
@@ -55,6 +63,7 @@ try {
     '--runTestsByPath',
     'src/__tests__/lib/opportunities/agency-dna-match-runtime-db.test.ts',
   ], webRoot)
+  await run(process.execPath, [rollbackCommercialSignalScript])
   await run(process.execPath, [verifierScript])
 } finally {
   await admin.query(

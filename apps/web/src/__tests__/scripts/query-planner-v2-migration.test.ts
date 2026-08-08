@@ -179,6 +179,6 @@ describe('Query Planner v2 migration', () => {
     )
     expect(childDown).toBeGreaterThan(-1)
     expect(parentDown).toBeGreaterThan(childDown)
-    expect(downVerifier).toContain('PRE_FIXTURE_DOWN_MIGRATIONS = 18')
+    expect(downVerifier).toContain('PRE_FIXTURE_DOWN_MIGRATIONS = 25')
   })
 })

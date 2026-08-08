@@ -137,7 +137,7 @@ describe('opportunity repository tenant scope', () => {
     expect(calls[1].params?.slice(-2)).toEqual([2, 2])
   })
 
-  it('keeps Today fail-closed to versioned strong Commercial Signal snapshots', async () => {
+  it('keeps Today fail-closed to exact actionable Commercial Signal lineage', async () => {
     const { db, calls } = createDb([[{ count: '0' }], []])
 
     await listOpportunities({
@@ -148,11 +148,16 @@ describe('opportunity repository tenant scope', () => {
     }, db)
 
     for (const call of calls.slice(0, 2)) {
-      expect(call.sql).toContain(
-        `o.metadata->'commercialSignalCard'->>'version' = `,
+      expect(call.sql).toContain('commercial_signal_opportunity_lineage')
+      expect(call.sql).toContain('opportunity_candidates')
+      expect(call.sql).toContain('lineage.opportunity_id = o.id')
+      expect(call.sql).toContain('lineage.workspace_id = o.workspace_id')
+      expect(call.sql).toMatch(
+        /lineage\.commercial_signal_card =\s+o\.metadata->'commercialSignalCard'/,
       )
+      expect(call.sql).toContain(`candidate.rollout_mode = 'canary'`)
       expect(call.sql).toContain('qualified_actionable')
-      expect(call.sql).toContain('qualified_needs_enrichment')
+      expect(call.sql).not.toContain('qualified_needs_enrichment')
     }
   })
 

@@ -2,22 +2,26 @@
  * Cron: Daily Radar Pipeline
  *
  * Triggered by the production cron (cron/trigger-daily-radar.mjs) to run
- * the complete daily cycle:
- *   1. Ingest all primary sources (see getPrimarySourceIds in the source registry)
- *   2. Generate digest for each active client profile
+ * the legacy daily cycle for non-canary workspaces:
+ *   1. Ingest all primary sources
+ *   2. Generate digest for each active non-canary client profile
  *   3. Deliver the digest to every enabled channel
  *
- * Auth: CRON_API_KEY (separate from ingestion/digest keys)
- * Runtime: nodejs (requires child_process for ingestion scripts)
+ * A Commercial Signal canary is executed by its separate exact-lineage cron
+ * stage and is deliberately excluded from legacy digest delivery here.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { ingestAllPrimarySources, isNoActiveProfiles, type IngestResult } from '@/lib/lead-discovery/source-ingest'
+import { ingestAllPrimarySources, isNoActiveProfiles } from '@/lib/lead-discovery/source-ingest'
 import { runDigestForClientProfile } from '@/lib/digest'
-import { deliverCandidatesForRun, type DeliverRunResult } from '@/lib/digest/deliver-candidates'
+import { deliverCandidatesForRun } from '@/lib/digest/deliver-candidates'
 import { enrichRunCandidates } from '@/lib/ai/enrichment/enrichRunCandidates'
 import { shouldDeliverOnRun } from '@/lib/delivery/nextDeliveryHint'
 import { getPool } from '@/lib/db'
+import {
+  getCommercialSignalCanaryWorkspaceId,
+  resolveCommercialSignalRollout,
+} from '@/lib/opportunities/commercial-signal-rollout'
 import { logEvent, logError } from '@/lib/runtime'
 
 export const runtime = 'nodejs'
@@ -32,7 +36,6 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  // Auth — CRON_API_KEY only, no fallback to other keys
   const apiKey = process.env.CRON_API_KEY
   if (!apiKey) {
     return NextResponse.json(
@@ -51,7 +54,6 @@ export async function POST(request: NextRequest) {
   const startMs = Date.now()
 
   try {
-    // Step 1: Ingest all primary sources
     const ingestResults = await ingestAllPrimarySources()
     if (isNoActiveProfiles(ingestResults)) {
       return NextResponse.json(
@@ -68,7 +70,6 @@ export async function POST(request: NextRequest) {
       upsertedTotal: ingestResults.reduce((sum, r) => sum + (r.upsertedCount ?? 0), 0),
     }
 
-    // Step 2: Generate and deliver digests for active client profiles
     const digestResults = await generateAndDeliverDigests()
     const digestOk = digestResults.every(r => r.ok)
     const digestSummary = {
@@ -78,7 +79,6 @@ export async function POST(request: NextRequest) {
       totalSent: digestResults.reduce((sum, r) => sum + r.sent, 0),
     }
 
-    // Step 3: Log summary
     const allOk = ingestOk && digestOk
     const durationMs = Date.now() - startMs
 
@@ -111,7 +111,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-/** Per-profile digest generation result */
 interface DigestDeliveryResult {
   clientProfileId: string
   ok: boolean
@@ -121,28 +120,24 @@ interface DigestDeliveryResult {
   error?: string
 }
 
-/**
- * Generate and deliver digests for all active client profiles.
- *
- * Calls the digest + delivery logic directly (no self-fetch).
- * Processes profiles sequentially to avoid overloading the
- * Telegram Bot API rate limits.
- */
 async function generateAndDeliverDigests(): Promise<DigestDeliveryResult[]> {
   const pool = getPool()
   if (!pool) {
     return [{ clientProfileId: 'none', ok: false, sent: 0, failed: 0, skipped: 0, error: 'DATABASE_URL not set' }]
   }
 
-  // Load active profiles that have at least one usable delivery channel.
-  // delivery_enabled is the master toggle (Block 3): when false the profile gets
-  // no digest, regardless of channel config. weekly frequency is honored at run
-  // time below — the row still loads, but is skipped on non-target days.
+  const configuredCanaryWorkspaceId = getCommercialSignalCanaryWorkspaceId()
+  const canaryWorkspaceId = configuredCanaryWorkspaceId &&
+    resolveCommercialSignalRollout(configuredCanaryWorkspaceId).effectiveMode === 'canary'
+    ? configuredCanaryWorkspaceId
+    : null
+
   const profiles = await pool.query<{ id: string; delivery_frequency: string }>(`
     SELECT id::TEXT AS id, delivery_frequency
     FROM client_profiles
     WHERE is_active = true
       AND delivery_enabled = true
+      AND ($1::BIGINT IS NULL OR workspace_id IS DISTINCT FROM $1::BIGINT)
       AND (
         telegram_chat_id IS NOT NULL
         OR (email_digest_enabled = true AND digest_email IS NOT NULL)
@@ -169,20 +164,16 @@ async function generateAndDeliverDigests(): Promise<DigestDeliveryResult[]> {
         )
       )
     ORDER BY id
-  `)
+  `, [canaryWorkspaceId])
 
   if (profiles.rows.length === 0) {
     return []
   }
 
-  // The cron boundary "now" — used for the weekly day-of-week gate. Captured
-  // once so all profiles in this run share the same decision instant.
   const runUtc = new Date()
-
   const results: DigestDeliveryResult[] = []
 
   for (const profile of profiles.rows) {
-    // weekly frequency: skip on non-target days (Monday). daily: always run.
     if (!shouldDeliverOnRun(
       profile.delivery_frequency === "weekly" ? "weekly" : "daily",
       runUtc,
@@ -198,22 +189,15 @@ async function generateAndDeliverDigests(): Promise<DigestDeliveryResult[]> {
     }
 
     try {
-      // Run digest generation directly
       const { run } = await runDigestForClientProfile({ clientProfileId: profile.id })
       const runId = run.id
 
-      // AI enrichment (best-effort, provider-gated, quota-bounded). Runs AFTER
-      // the deterministic candidates are committed and BEFORE delivery so a
-      // recovered hiring hint can ride along in the Telegram/email card. It only
-      // ever writes the separate ai_enrichment column — never score/gate/evidence
-      // — and a failure here must never affect delivery, so it is fully isolated.
       try {
         await enrichRunCandidates(runId)
       } catch (error) {
         logError('daily_radar.enrichment_failed', error, { runId: String(runId) })
       }
 
-      // Deliver candidates using shared logic
       const delivery = await deliverCandidatesForRun(runId)
 
       results.push({

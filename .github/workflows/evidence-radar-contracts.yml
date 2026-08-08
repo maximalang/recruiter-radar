@@ -53,22 +53,36 @@ jobs:
         run: node packages/db/scripts/migrate.mjs
       - name: Validate database schema
         run: npm run db:validate
-      - name: Verify Commercial Signal PostgreSQL runtime chain
-        run: |
-          set -euo pipefail
-          npm run test:company-events-v1:db
-          npm run test:company-state-v1:db
-          npm run test:signal-episodes-v2:db
-          npm run test:commercial-theses-v1:db
-          npm run test:external-agency-propensity-v1:db
-          npm run test:agency-dna-match-v2:db
-          npm run test:opportunity-scoring-v3:db
-          npm run test:query-planner-v2:db
+      - name: Verify Company Events PostgreSQL runtime
+        run: npm run test:company-events-v1:db
+      - name: Verify Company State PostgreSQL runtime
+        run: npm run test:company-state-v1:db
+      - name: Verify Signal Episodes PostgreSQL runtime
+        run: npm run test:signal-episodes-v2:db
+      - name: Verify Commercial Theses PostgreSQL runtime
+        run: npm run test:commercial-theses-v1:db
+      - name: Verify External Agency Propensity PostgreSQL runtime
+        run: npm run test:external-agency-propensity-v1:db
+      - name: Verify Agency DNA PostgreSQL runtime
+        run: npm run test:agency-dna-match-v2:db
+      - name: Verify Opportunity Scoring v3 PostgreSQL runtime
+        run: npm run test:opportunity-scoring-v3:db
+      - name: Verify Query Planner v2 PostgreSQL runtime
+        run: npm run test:query-planner-v2:db
       - name: Verify Commercial Signal evaluation and contract matrix
         run: |
           set -euo pipefail
+          npm run test:commercial-signal:evaluation
+          node --test packages/db/scripts/lib/commercial-signal-baseline-metrics.test.mjs
           npm run test:commercial-signal:evaluation:db
           npm run test:commercial-signal:contracts
+      - name: Verify authoritative Today, event support, and adaptive supply
+        run: >-
+          npm test --workspace @recruiter-radar/web -- --runInBand --runTestsByPath
+          src/__tests__/lib/opportunities/commercial-signal-today.test.ts
+          src/__tests__/lib/opportunities/company-event-support-registry.test.ts
+          src/__tests__/lib/lead-discovery/query-planner-v2-yield.test.ts
+          src/__tests__/scripts/commercial-signal-runtime-migration.test.ts
       - name: Run Evidence Radar unit and surface contracts
         run: >-
           npm test --workspace @recruiter-radar/web -- --runInBand --runTestsByPath
@@ -79,6 +93,8 @@ jobs:
           src/__tests__/app/evidence-radar-surface-contract.test.ts
       - name: Verify isolated Evidence Radar PostgreSQL runtime
         run: node packages/db/scripts/run-evidence-radar-v1-db-tests.mjs
+      - name: Verify Commercial Signal migration round-trip
+        run: node packages/db/scripts/verify-commercial-signal-migration-roundtrip.mjs
       - name: Verify rollback safety
         run: npm run test:opportunity-engine:down
       - name: Build production web application

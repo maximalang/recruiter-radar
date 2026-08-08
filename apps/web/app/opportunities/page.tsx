@@ -14,6 +14,12 @@ import {
   listOpportunities,
   type OpportunityView,
 } from '@/lib/opportunities/repository'
+import {
+  isCommercialSignalAuthoritativeForWorkspace,
+} from '@/lib/opportunities/commercial-signal-rollout'
+import {
+  filterActionableCommercialSignalToday,
+} from '@/lib/opportunities/commercial-signal-today'
 import type { OpportunityStatus } from '@/lib/opportunities/opportunity-scoring'
 import {
   listOpportunityWorkflowAssignees,
@@ -101,6 +107,8 @@ export default async function OpportunitiesPage(props: {
     isOpportunityWorkflowV1EnabledForContext(authorization)
   const commercialSignalUiEnabled =
     isOpportunityCommercialSignalUiEnabledForContext(authorization)
+  const commercialSignalAuthoritative =
+    isCommercialSignalAuthoritativeForWorkspace(access.workspaceId)
   const trackingCycleId = outcomesUiEnabled
     ? `${workflowEnabled ? 'today' : 'morning-brief'}:${new Date().toISOString().slice(0, 10)}`
     : null
@@ -131,7 +139,7 @@ export default async function OpportunitiesPage(props: {
         confidenceGate: confidenceGate || null,
         query: query || null,
         commercialSignalOnly:
-          commercialSignalUiEnabled && !researchModeActive,
+          commercialSignalAuthoritative && !researchModeActive,
         pageSize: 50,
       }),
       outcomesUiEnabled
@@ -170,6 +178,9 @@ export default async function OpportunitiesPage(props: {
         to: funnelTo.toISOString(),
       }).catch(() => null)
     : null
+  const visibleOpportunities = commercialSignalAuthoritative && !researchModeActive
+    ? filterActionableCommercialSignalToday(result.opportunities)
+    : result.opportunities
 
   return (
     <InternalPageFrame navItems={NAVIGATION} footer={<SiteFooter />}>
@@ -223,9 +234,9 @@ export default async function OpportunitiesPage(props: {
           {funnel ? <OpportunityFunnel summary={funnel} /> : null}
         </OpportunityResearchMode>
 
-        {result.opportunities.length > 0 ? (
+        {visibleOpportunities.length > 0 ? (
           <div className={styles.cardList}>
-            {result.opportunities.map((opportunity) => (
+            {visibleOpportunities.map((opportunity) => (
               <OpportunityCard
                 key={opportunity.id}
                 opportunity={opportunity}

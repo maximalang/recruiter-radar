@@ -43,7 +43,7 @@ try {
     throw new Error('Evaluation export exceeds the 5,000-row safety limit.')
   }
   const transformed = rawRows.map((row) =>
-    anonymizeEvaluationRow(row, kind, anonymizationKey))
+    anonymizeEvaluationRow(row, kind, anonymizationKey, { evaluatedAt: to }))
   const rows = kind === 'holdout'
     ? transformed.filter((row) => splitBucket(row.sampleKey) === 0)
     : kind === 'anonymized_labeled'
@@ -134,6 +134,7 @@ async function labeledOpportunityRows(client, workspaceId, from, to) {
       END AS "sourceFamilies",
       outcome.accepted_at IS NOT NULL AS accepted,
       outcome.contacted_at IS NOT NULL AS contacted,
+      outcome.contacted_at::TEXT AS "contactedAt",
       outcome.replied_at IS NOT NULL AS replied,
       outcome.meeting_at IS NOT NULL AS meeting,
       outcome.dismiss_reason_code AS "dismissReasonCode",
@@ -178,6 +179,7 @@ async function productionShadowRows(client, workspaceId, from, to) {
         AS "sourceFamilies",
       NULL::BOOLEAN AS accepted,
       NULL::BOOLEAN AS contacted,
+      NULL::TEXT AS "contactedAt",
       NULL::BOOLEAN AS replied,
       NULL::BOOLEAN AS meeting,
       NULL::TEXT AS "dismissReasonCode",

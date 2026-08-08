@@ -9,6 +9,7 @@ import {
   evaluateCommercialSignalDatasets,
 } from './lib/commercial-signal-evaluation.mjs'
 import {
+  DEFAULT_REPLY_MATURITY_HOURS,
   anonymizeEvaluationRow,
   mapFalsePositiveReason,
 } from './lib/commercial-signal-evaluation-export.mjs'
@@ -31,7 +32,11 @@ const report = evaluateCommercialSignalDatasets(fixtures)
 
 assert.deepEqual(report.missingDatasetKinds, [])
 assert.equal(report.datasets.length, DATASET_KINDS.length)
-assert.equal(report.calibrationStatus, 'uncalibrated_insufficient_real_outcomes')
+assert.equal(report.calibrationStatus, 'insufficient_data')
+assert.deepEqual(report.calibrationReasonCodes, [
+  'CALIBRATION_REVIEWED_LT_300',
+  'CALIBRATION_HOLDOUT_LT_60',
+])
 assert.equal(report.comparison.status, 'contract_only')
 assert.ok(report.comparison.deltas.precisionAt5 >= 0)
 assert.ok(report.comparison.deltas.ndcgAt10 > 0)
@@ -45,6 +50,7 @@ assert.ok(synthetic.coveragePerEpisodeType.length >= 3)
 assert.ok(synthetic.sourceYield.length >= 4)
 assert.ok(synthetic.queryPlanYield.length >= 4)
 assert.equal(synthetic.falsePositiveTaxonomy.length, FALSE_POSITIVE_CATEGORIES.length)
+assert.ok(FALSE_POSITIVE_CATEGORIES.includes('internal_recruiting_sufficient'))
 for (const model of MODEL_KEYS) {
   assert.equal(synthetic.models[model].status, 'sufficient_data')
   assert.equal(typeof synthetic.models[model].precisionAt5.value, 'number')
@@ -110,6 +116,7 @@ const rawRow = {
   opportunityV3: null,
   accepted: false,
   contacted: false,
+  contactedAt: null,
   replied: false,
   meeting: false,
   dismissReasonCode: null,
@@ -148,11 +155,37 @@ const progressedLoss = anonymizeEvaluationRow({
   hasOutcome: true,
   accepted: true,
   contacted: true,
+  contactedAt: '2026-07-20T00:00:00.000Z',
   lostReasonCode: 'price',
 }, 'anonymized_labeled', exportKey)
 assert.equal(progressedLoss.labels.qualified, true)
 assert.equal(progressedLoss.labels.falsePositiveCategory, null)
+assert.equal(mapFalsePositiveReason('internal_team'), 'internal_recruiting_sufficient')
 assert.equal(mapFalsePositiveReason('other'), null)
+
+const immatureNoReply = anonymizeEvaluationRow({
+  ...rawRow,
+  hasOutcome: true,
+  accepted: true,
+  contacted: true,
+  contactedAt: '2026-07-20T00:00:00.000Z',
+}, 'anonymized_labeled', exportKey, {
+  evaluatedAt: '2026-07-22T00:00:00.000Z',
+})
+assert.equal(immatureNoReply.labels.replied, null)
+const matureNoReply = anonymizeEvaluationRow({
+  ...rawRow,
+  hasOutcome: true,
+  accepted: true,
+  contacted: true,
+  contactedAt: '2026-07-20T00:00:00.000Z',
+}, 'anonymized_labeled', exportKey, {
+  evaluatedAt: new Date(
+    Date.parse('2026-07-20T00:00:00.000Z') +
+      DEFAULT_REPLY_MATURITY_HOURS * 60 * 60 * 1000,
+  ).toISOString(),
+})
+assert.equal(matureNoReply.labels.replied, false)
 
 process.stdout.write(`${JSON.stringify({
   ok: true,
@@ -165,9 +198,11 @@ process.stdout.write(`${JSON.stringify({
     'profile_episode_source_query_coverage',
     'deterministic_ties_and_content_hash',
     'holdout_isolation',
-    'no_false_calibration_claim',
+    'calibration_requires_300_reviewed_and_holdout',
     'unavailable_is_null_not_zero',
     'observational_outcomes_remain_unlabeled',
+    'immature_no_reply_remains_unlabeled',
+    'mature_no_reply_becomes_evaluable',
     'terminal_false_positive_mapping',
     'progressed_losses_are_not_false_positives',
   ],

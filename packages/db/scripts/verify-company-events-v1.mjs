@@ -4,6 +4,10 @@ import { resolve } from 'node:path'
 
 import pg from 'pg'
 
+import {
+  COMMERCIAL_SIGNAL_ISOLATED_TEST_CLEANUP_SQL,
+} from './lib/commercial-signal-isolated-test-cleanup.mjs'
+
 const { Pool } = pg
 
 if (!process.env.DATABASE_URL) {
@@ -52,6 +56,15 @@ const queryPlannerV2DownSql = await readFile(
   resolve(migrations, '20260804160000_add_query_planner_v2.down.sql'),
   'utf8',
 )
+const commercialSignalDependentDownSql = await Promise.all([
+  '20260807180500_complete_query_plan_supply_metrics.down.sql',
+  '20260807175500_extend_commercial_signal_annotation_taxonomy.down.sql',
+  '20260807174500_extend_query_plan_yield_metrics.down.sql',
+  '20260807173600_enforce_company_event_publication_append_only.down.sql',
+  '20260807173500_restore_immutable_company_event_publications.down.sql',
+  '20260807173000_harden_company_event_and_enrichment_lineage.down.sql',
+  '20260807170000_add_commercial_signal_canary_runtime.down.sql',
+].map((filename) => readFile(resolve(migrations, filename), 'utf8')))
 assert.ok(
   downSql.indexOf('LOCK TABLE company_events IN ACCESS EXCLUSIVE MODE') > -1 &&
   downSql.indexOf('LOCK TABLE company_events IN ACCESS EXCLUSIVE MODE') <
@@ -303,6 +316,10 @@ try {
   )
   await database.query('ROLLBACK')
   await database.query('TRUNCATE TABLE company_events CASCADE')
+  for (const dependentDownSql of commercialSignalDependentDownSql) {
+    await database.query(dependentDownSql)
+  }
+  await database.query(COMMERCIAL_SIGNAL_ISOLATED_TEST_CLEANUP_SQL)
   await database.query(queryPlannerV2DownSql)
   await database.query(opportunityScoringV3DownSql)
   await database.query(agencyDnaMatchDownSql)
@@ -343,6 +360,7 @@ try {
       'event_evidence_monotonic',
       'publication_append_only',
       'rollback_refuses_data_loss',
+      'commercial_signal_dependents_roll_back_before_query_planner',
       'dependent_company_state_rolls_back_first',
       'rollback_locks_before_empty_check',
       'rollback_removes_schema_when_empty',

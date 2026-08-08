@@ -83,10 +83,14 @@ describe('Company Events v1 normalization', () => {
 
     const result = normalizeJobPostingCompanyEvents(records, NOW)
     const reversed = normalizeJobPostingCompanyEvents([...records].reverse(), NOW)
+    const jobPosting = result.events.find((event) => event.eventType === 'job_posting')
+    const reversedJobPosting = reversed.events.find(
+      (event) => event.eventType === 'job_posting',
+    )
 
     expect(result.rejections).toEqual([])
-    expect(result.events).toHaveLength(1)
-    expect(result.events[0]).toMatchObject({
+    expect(result.events.filter((event) => event.eventType === 'job_posting')).toHaveLength(1)
+    expect(jobPosting).toMatchObject({
       organizationId: '10',
       eventType: 'job_posting',
       sourceRecordId: 'hh-101',
@@ -99,11 +103,12 @@ describe('Company Events v1 normalization', () => {
         matchKey: expect.stringMatching(/^[a-f0-9]{64}$/),
       },
     })
-    expect(result.events[0].publications.map((item) => item.sourceRecordId))
+    expect(jobPosting?.publications.map((item) => item.sourceRecordId))
       .toEqual(['career-77', 'hh-101'])
-    expect(result.events[0].eventFingerprint).toMatch(/^[a-f0-9]{64}$/)
-    expect(reversed.events[0].eventFingerprint)
-      .toBe(result.events[0].eventFingerprint)
+    expect(jobPosting?.eventFingerprint).toMatch(/^[a-f0-9]{64}$/)
+    expect(reversedJobPosting?.eventFingerprint)
+      .toBe(jobPosting?.eventFingerprint)
+    expect(result.events.some((event) => event.eventType === 'new_region')).toBe(false)
   })
 
   it('keeps same-source vacancies with conflicting external ids separate', () => {
@@ -117,9 +122,13 @@ describe('Company Events v1 normalization', () => {
         externalVacancyId: 'second',
       }),
     ], NOW)
+    const jobPostingEvents = result.events.filter(
+      (event) => event.eventType === 'job_posting',
+    )
 
-    expect(result.events).toHaveLength(2)
-    expect(new Set(result.events.map((event) => event.eventFingerprint)).size)
+    expect(result.rejections).toEqual([])
+    expect(jobPostingEvents).toHaveLength(2)
+    expect(new Set(jobPostingEvents.map((event) => event.eventFingerprint)).size)
       .toBe(2)
   })
 

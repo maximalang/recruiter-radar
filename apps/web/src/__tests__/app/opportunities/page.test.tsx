@@ -48,11 +48,15 @@ describe('opportunities page', () => {
     'EXTERNAL_AGENCY_PROPENSITY_V1_ENABLED',
     'AGENCY_DNA_MATCH_V2_ENABLED',
     'OPPORTUNITY_SCORING_V3_ENABLED',
+    'QUERY_PLANNER_V2_ENABLED',
     'OPPORTUNITY_COMMERCIAL_SIGNAL_UI_ENABLED',
   ] as const
   const originalCommercialSignalFlags = Object.fromEntries(
     commercialSignalFlags.map((name) => [name, process.env[name]]),
   )
+  const originalRuntimeMode = process.env.COMMERCIAL_SIGNAL_RUNTIME_MODE
+  const originalCanaryWorkspaces =
+    process.env.COMMERCIAL_SIGNAL_CANARY_WORKSPACE_IDS
   const originalFlag = process.env.OPPORTUNITY_ENGINE_V1_ENABLED
   const originalOutcomesUiFlag =
     process.env.OPPORTUNITY_OUTCOMES_UI_ENABLED
@@ -69,6 +73,8 @@ describe('opportunities page', () => {
     delete process.env.OPPORTUNITY_CANARY_OWNER_IDS
     delete process.env.OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED
     delete process.env.OPPORTUNITY_WORKFLOW_V1_ENABLED
+    delete process.env.COMMERCIAL_SIGNAL_RUNTIME_MODE
+    delete process.env.COMMERCIAL_SIGNAL_CANARY_WORKSPACE_IDS
     for (const name of commercialSignalFlags) delete process.env[name]
     jest.mocked(getAuthorizedOwnerId).mockResolvedValue('7')
     jest.mocked(listOpportunities).mockResolvedValue({
@@ -113,6 +119,11 @@ describe('opportunities page', () => {
     }
     restore('OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED', originalWorkspace)
     restore('OPPORTUNITY_WORKFLOW_V1_ENABLED', originalWorkflow)
+    restore('COMMERCIAL_SIGNAL_RUNTIME_MODE', originalRuntimeMode)
+    restore(
+      'COMMERCIAL_SIGNAL_CANARY_WORKSPACE_IDS',
+      originalCanaryWorkspaces,
+    )
     for (const name of commercialSignalFlags) {
       restore(name, originalCommercialSignalFlags[name])
     }
@@ -255,9 +266,9 @@ describe('opportunities page', () => {
     }))
   })
 
-  it('limits Today to strong versioned snapshots only when Commercial Signal UI is ready', async () => {
+  it('limits Today to Commercial Signal lineage only for the configured canary workspace', async () => {
     enableWorkflowSession()
-    enableCommercialSignalUi(commercialSignalFlags)
+    enableCommercialSignalCanary(commercialSignalFlags, '9')
 
     render(await OpportunitiesPage({ searchParams: Promise.resolve({}) }))
 
@@ -269,9 +280,34 @@ describe('opportunities page', () => {
     }))
   })
 
+  it('instantly restores the legacy reader when the runtime feature flag is off', async () => {
+    enableWorkflowSession()
+    enableCommercialSignalCanary(commercialSignalFlags, '9')
+    process.env.COMMERCIAL_SIGNAL_RUNTIME_MODE = 'legacy'
+
+    render(await OpportunitiesPage({ searchParams: Promise.resolve({}) }))
+
+    expect(listOpportunities).toHaveBeenCalledWith(expect.objectContaining({
+      workspaceId: '9',
+      commercialSignalOnly: false,
+    }))
+  })
+
+  it('does not switch a different workspace to the canary reader', async () => {
+    enableWorkflowSession()
+    enableCommercialSignalCanary(commercialSignalFlags, '10')
+
+    render(await OpportunitiesPage({ searchParams: Promise.resolve({}) }))
+
+    expect(listOpportunities).toHaveBeenCalledWith(expect.objectContaining({
+      workspaceId: '9',
+      commercialSignalOnly: false,
+    }))
+  })
+
   it('keeps weak and legacy candidates available in an active Research Mode', async () => {
     enableWorkflowSession()
-    enableCommercialSignalUi(commercialSignalFlags)
+    enableCommercialSignalCanary(commercialSignalFlags, '9')
 
     render(await OpportunitiesPage({
       searchParams: Promise.resolve({ q: 'Север' }),
@@ -328,7 +364,12 @@ function restore(name: string, value: string | undefined) {
   else process.env[name] = value
 }
 
-function enableCommercialSignalUi(flags: readonly string[]) {
+function enableCommercialSignalCanary(
+  flags: readonly string[],
+  workspaceId: string,
+) {
   process.env.OPPORTUNITY_WORKSPACE_CONTEXT_ENABLED = 'true'
+  process.env.COMMERCIAL_SIGNAL_RUNTIME_MODE = 'canary'
+  process.env.COMMERCIAL_SIGNAL_CANARY_WORKSPACE_IDS = workspaceId
   for (const name of flags) process.env[name] = 'true'
 }

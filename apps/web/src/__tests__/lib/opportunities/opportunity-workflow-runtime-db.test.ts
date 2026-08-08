@@ -559,7 +559,7 @@ describeWithDatabase('Opportunity workflow PostgreSQL runtime', () => {
     }
   })
 
-  it('executes the strong Commercial Signal JSONB filter inside the workspace fence', async () => {
+  it('rejects forged Commercial Signal metadata without exact lineage', async () => {
     try {
       await database.query(
         `UPDATE opportunities
@@ -570,6 +570,7 @@ describeWithDatabase('Opportunity workflow PostgreSQL runtime', () => {
           JSON.stringify({
             commercialSignalCard: {
               version: 'commercial-signal-card-v1',
+              scoreVersion: 'opportunity-v3',
               status: 'qualified_needs_enrichment',
             },
           }),
@@ -578,35 +579,14 @@ describeWithDatabase('Opportunity workflow PostgreSQL runtime', () => {
         ],
       )
 
-      const strong = await listOpportunities({
+      const forged = await listOpportunities({
         ownerId,
         workspaceId,
         view: 'all',
         commercialSignalOnly: true,
         pageSize: 20,
       })
-      expect(strong.opportunities.map((item) => item.id))
-        .toContain(opportunityId)
-
-      await database.query(
-        `UPDATE opportunities
-         SET metadata = jsonb_set(
-           metadata,
-           '{commercialSignalCard,status}',
-           '"review"'::JSONB
-         )
-         WHERE id = $1
-           AND owner_id = $2`,
-        [opportunityId, ownerId],
-      )
-      const weak = await listOpportunities({
-        ownerId,
-        workspaceId,
-        view: 'all',
-        commercialSignalOnly: true,
-        pageSize: 20,
-      })
-      expect(weak.opportunities.map((item) => item.id))
+      expect(forged.opportunities.map((item) => item.id))
         .not.toContain(opportunityId)
 
       const otherWorkspace = await listOpportunities({
