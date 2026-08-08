@@ -236,7 +236,21 @@ async function assertKeyHeadingBounds(page, label) {
       const rect = heading.getBoundingClientRect();
       const section = heading.closest("section, [id]");
       const canvas = section?.getBoundingClientRect();
-      const clipsOwnText = heading.scrollWidth > heading.clientWidth + 8;
+      const headingTextRects = [];
+      const walker = document.createTreeWalker(heading, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        headingTextRects.push(...range.getClientRects());
+      }
+      // Display glyphs can optically overhang their CSS line box by a few pixels.
+      // The original mobile CTA regression escaped by ~49px, so this keeps that
+      // defect detectable without treating OS-specific font bearings as clipping.
+      const maxGlyphOverhangPx = 12;
+      const clipsOwnText = headingTextRects.some((textRect) => (
+        textRect.left < rect.left - maxGlyphOverhangPx
+        || textRect.right > rect.right + maxGlyphOverhangPx
+      ));
       const outsideViewport = rect.left < -1 || rect.right > viewportWidth + 1;
       const outsideCanvas = Boolean(canvas && (rect.left < canvas.left - 1 || rect.right > canvas.right + 1));
       return clipsOwnText || outsideViewport || outsideCanvas

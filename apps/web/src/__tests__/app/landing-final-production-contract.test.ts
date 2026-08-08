@@ -96,6 +96,9 @@ describe("landing final production contract", () => {
     expect(audit).toContain('{ name: "final-cta-320x700", width: 320, height: 700, target: "#conversion-final" }');
     expect(audit).toContain('{ name: "final-cta-390x844", width: 390, height: 844, target: "#conversion-final" }');
     expect(audit).toContain("assertKeyHeadingBounds");
+    expect(audit).toContain("headingTextRects");
+    expect(audit).toContain("range.getClientRects()");
+    expect(audit).toContain("const maxGlyphOverhangPx = 12");
     expect(audit).toContain('"#conversion-final h2"');
     expect(audit).toContain("assertConsentControlCollisions");
     expect(audit).toContain('[aria-label="Изменить настройки cookies"]');
