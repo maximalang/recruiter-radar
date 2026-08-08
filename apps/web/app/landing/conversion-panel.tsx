@@ -59,7 +59,7 @@ export default function ConversionPanel(props: {
           >
             {props.paymentConfigured ? "Запустить пилот на 7 дней" : "Оставить заявку на пилот"} <ArrowGlyph />
           </Link>
-          <small>{props.paymentConfigured
+          <small data-consent-safe-copy>{props.paymentConfigured
             ? "Разовая оплата · без автопродления · далее месяц или квартал"
             : "Заявка без списания · профиль сохранится · далее месяц или квартал"}</small>
         </div>

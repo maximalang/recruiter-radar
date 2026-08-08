@@ -133,6 +133,11 @@
     margin-top: .35rem;
   }
 
+  .pricing [data-consent-safe-copy] {
+    display: block;
+    padding-right: 4.25rem;
+  }
+
   .faq :global(summary) {
     min-height: 64px;
   }

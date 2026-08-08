@@ -252,27 +252,41 @@ async function assertConsentControlCollisions(page, label) {
   const consentControl = page.locator('[aria-label="Изменить настройки cookies"]');
   if (!await consentControl.isVisible()) return;
 
-  for (const selector of [
-    '[data-pricing-primary="true"] > a',
-    "#faq details[open]",
-    "#conversion-final a:first-of-type",
+  for (const { selector, textOnly = false } of [
+    { selector: '[data-pricing-primary="true"] > a' },
+    { selector: "#faq details[open]" },
+    { selector: "#conversion-final a:first-of-type" },
+    { selector: '[data-pricing-primary="true"] [data-consent-safe-copy]', textOnly: true },
+    { selector: 'footer [data-consent-safe-copy]', textOnly: true },
   ]) {
     const target = page.locator(selector).first();
     await target.scrollIntoViewIfNeeded();
     await target.evaluate((element) => element.scrollIntoView({ block: "center", behavior: "auto" }));
-    const collision = await page.evaluate(({ controlSelector, targetSelector }) => {
+    const collision = await page.evaluate(({ controlSelector, targetSelector, textOnly: compareTextOnly }) => {
       const control = document.querySelector(controlSelector);
       const targetElement = document.querySelector(targetSelector);
       if (!control || !targetElement) return null;
       const controlRect = control.getBoundingClientRect();
-      const targetRect = targetElement.getBoundingClientRect();
-      return !(
-        controlRect.right <= targetRect.left
-        || controlRect.left >= targetRect.right
-        || controlRect.bottom <= targetRect.top
-        || controlRect.top >= targetRect.bottom
-      ) ? { control: controlRect.toJSON(), target: targetRect.toJSON() } : null;
-    }, { controlSelector: '[aria-label="Изменить настройки cookies"]', targetSelector: selector });
+      const targetRects = compareTextOnly
+        ? (() => {
+          const rects = [];
+          const walker = document.createTreeWalker(targetElement, NodeFilter.SHOW_TEXT);
+          for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+            const range = document.createRange();
+            range.selectNodeContents(node);
+            rects.push(...range.getClientRects());
+          }
+          return rects;
+        })()
+        : [targetElement.getBoundingClientRect()];
+      const targetRect = targetRects.find((rect) => !(
+        controlRect.right <= rect.left
+        || controlRect.left >= rect.right
+        || controlRect.bottom <= rect.top
+        || controlRect.top >= rect.bottom
+      ));
+      return targetRect ? { control: controlRect.toJSON(), target: targetRect.toJSON() } : null;
+    }, { controlSelector: '[aria-label="Изменить настройки cookies"]', targetSelector: selector, textOnly });
     assert.equal(collision, null, `${label}: consent control overlaps ${selector}: ${JSON.stringify(collision)}`);
   }
 }

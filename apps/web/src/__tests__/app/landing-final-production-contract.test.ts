@@ -101,5 +101,7 @@ describe("landing final production contract", () => {
     expect(audit).toContain('[aria-label="Изменить настройки cookies"]');
     expect(audit).toContain('[data-pricing-primary="true"] > a');
     expect(audit).toContain("#faq details[open]");
+    expect(audit).toContain('[data-pricing-primary="true"] [data-consent-safe-copy]');
+    expect(audit).toContain("textOnly: true");
   });
 });

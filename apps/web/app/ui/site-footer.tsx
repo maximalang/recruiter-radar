@@ -40,7 +40,7 @@ export async function SiteFooter(props: { tone?: "light" | "dark" }) {
               />
               <BrandLogo size="small" tone={tone} joined={false} />
             </Link>
-            <p className={s.footerLine}>
+            <p className={s.footerLine} data-consent-safe-copy>
               Проверяемые сигналы найма — чтобы понимать, какой компании стоит написать сейчас и почему.
             </p>
           </div>

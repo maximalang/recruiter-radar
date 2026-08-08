@@ -230,6 +230,10 @@
     display: grid;
     gap: .25rem;
   }
+
+  .footerLine[data-consent-safe-copy] {
+    padding-right: 4.25rem;
+  }
 }
 
 @media (max-width: 390px) {
