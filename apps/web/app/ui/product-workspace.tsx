@@ -11,7 +11,6 @@ import {
 } from "./icons";
 import { BrandLogo } from "./brand-logo";
 import type { NavItem } from "./internal-page";
-import polish from "./product-workspace-polish.module.css";
 import styles from "./product-workspace.module.css";
 
 type WorkspaceIcon = (props: SVGProps<SVGSVGElement>) => ReactElement;
@@ -24,6 +23,13 @@ const NAV_ICONS: Record<string, WorkspaceIcon> = {
   "/settings": LayersIcon,
 };
 
+const MOBILE_MORE_LINKS = [
+  { href: "/profile", label: "Профиль" },
+  { href: "/settings", label: "Настройки" },
+  { href: "/settings/team", label: "Команда" },
+  { href: "/settings/security", label: "Безопасность" },
+] as const;
+
 export function ProductWorkspaceFrame(props: {
   navItems: NavItem[];
   children: ReactNode;
@@ -31,14 +37,14 @@ export function ProductWorkspaceFrame(props: {
 }) {
   return (
     <div
-      className={`${styles.workspace} ${polish.workspace}`}
+      className={styles.workspace}
       data-product-workspace="true"
       data-ui-system="recruiter-radar-v7"
     >
-      <a href="#main-content" className={styles.skipLink}>Перейти к содержимому</a>
+      <a href="#main-content" className={styles.skipLink}>К содержанию</a>
 
-      <aside className={`${styles.sidebar} ${polish.sidebar}`} aria-label="Рабочее пространство Recruiter Radar">
-        <div className={`${styles.sidebarBrand} ${polish.sidebarBrand}`}>
+      <aside className={styles.sidebar} aria-label="Рабочее пространство Recruiter Radar">
+        <div className={styles.sidebarBrand}>
           <Link href="/" aria-label="Recruiter Radar — на главную">
             <BrandLogo tone="dark" joined />
           </Link>
@@ -51,7 +57,7 @@ export function ProductWorkspaceFrame(props: {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`${styles.navItem} ${polish.navItem}`}
+                className={styles.navItem}
                 data-active={item.active ? "true" : undefined}
                 aria-current={item.active ? "page" : undefined}
               >
@@ -62,24 +68,21 @@ export function ProductWorkspaceFrame(props: {
           })}
         </nav>
 
-        <div className={`${styles.sidebarStatus} ${polish.sidebarStatus}`}>
-          <span className={styles.statusDot} aria-hidden="true" />
-          <strong>Радар активен</strong>
-        </div>
       </aside>
 
-      <div className={`${styles.workspaceBody} ${polish.workspaceBody}`}>
+      <div className={styles.workspaceBody}>
         <div className={styles.mobileTopbar}>
           <Link href="/" aria-label="Recruiter Radar — на главную">
             <BrandLogo joined />
           </Link>
         </div>
 
-        <main id="main-content" className={`${styles.content} ${polish.content}`} tabIndex={-1}>
+        <main id="main-content" className={styles.content} tabIndex={-1}>
           {props.children}
         </main>
 
-        {props.footer ? <div className={styles.footer}>{props.footer}</div> : null}
+        <ProductFooter />
+        <MobileNavigation items={props.navItems} />
       </div>
     </div>
   );
@@ -93,7 +96,7 @@ export function ProductWorkspaceHeader(props: {
   status?: ReactNode;
 }) {
   return (
-    <header className={`${styles.pageHeader} ${polish.pageHeader}`}>
+    <header className={styles.pageHeader}>
       <div className={styles.pageHeaderCopy}>
         {props.eyebrow ? <span className={styles.pageEyebrow}>{props.eyebrow}</span> : null}
         <h1>{props.title}</h1>
@@ -104,5 +107,62 @@ export function ProductWorkspaceHeader(props: {
         {props.actions ? <div className={styles.pageActions}>{props.actions}</div> : null}
       </div>
     </header>
+  );
+}
+
+function MobileNavigation(props: { items: NavItem[] }) {
+  const activeOpportunity = props.items.find((item) => item.href === "/opportunities" && item.active);
+  const dashboard = props.items.find((item) => item.href === "/dashboard");
+  const primaryItems = [
+    activeOpportunity ?? dashboard,
+    props.items.find((item) => item.href === "/leads"),
+    props.items.find((item) => item.href === "/review"),
+  ].filter((item): item is NavItem => Boolean(item));
+  const moreActive = props.items.some((item) => (
+    item.active && (item.href === "/profile" || item.href === "/settings")
+  ));
+
+  return (
+    <nav className={styles.mobileNav} aria-label="Мобильная навигация">
+      {primaryItems.map((item) => {
+        const Icon = NAV_ICONS[item.href] ?? BriefcaseIcon;
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={styles.mobileNavItem}
+            data-active={item.active ? "true" : undefined}
+            aria-current={item.active ? "page" : undefined}
+          >
+            <Icon aria-hidden="true" />
+            <span>{item.href === "/review" ? "Проверка" : item.label}</span>
+          </Link>
+        );
+      })}
+      <details className={styles.mobileMore} data-active={moreActive ? "true" : undefined}>
+        <summary>
+          <LayersIcon aria-hidden="true" />
+          <span>Ещё</span>
+        </summary>
+        <div className={styles.mobileMoreMenu}>
+          {MOBILE_MORE_LINKS.map((item) => (
+            <Link key={item.href} href={item.href}>{item.label}</Link>
+          ))}
+        </div>
+      </details>
+    </nav>
+  );
+}
+
+function ProductFooter() {
+  return (
+    <footer className={styles.productFooter} aria-label="Служебные ссылки">
+      <Link href="/" className={styles.productFooterBrand}>Recruiter Radar</Link>
+      <nav aria-label="Справка и документы">
+        <a href="mailto:support@recruiter-radar.ru">Поддержка</a>
+        <Link href="/legal">Документы</Link>
+        <Link href="/privacy">Конфиденциальность</Link>
+      </nav>
+    </footer>
   );
 }

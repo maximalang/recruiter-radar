@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 
 import { AuthShell } from "@/app/login/auth-shell";
 import { InternalPageFrame } from "@/app/ui/internal-page";
@@ -41,5 +41,35 @@ describe("Recruiter Radar unified UI system", () => {
 
     expect(container.firstElementChild).toHaveAttribute("data-product-workspace", "true");
     expect(container.querySelectorAll('[aria-label="Разделы кабинета"]')).toHaveLength(1);
+  });
+
+  it("keeps product navigation and legal access compact without claiming unknown runtime status", () => {
+    render(
+      <ProductWorkspaceFrame
+        navItems={[
+          { href: "/dashboard", label: "Дашборд", active: true },
+          { href: "/leads", label: "Лиды" },
+          { href: "/review", label: "Проверка" },
+          { href: "/profile", label: "Профиль" },
+          { href: "/settings", label: "Настройки" },
+        ]}
+      >
+        Workspace
+      </ProductWorkspaceFrame>,
+    );
+
+    expect(screen.queryByText("Радар активен")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "К содержанию" })).toHaveAttribute(
+      "href",
+      "#main-content",
+    );
+    expect(screen.getByRole("navigation", { name: "Мобильная навигация" })).toBeInTheDocument();
+    expect(screen.getByText("Ещё")).toBeInTheDocument();
+    expect(screen.getByRole("contentinfo", { name: "Служебные ссылки" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Поддержка" })).toHaveAttribute(
+      "href",
+      "mailto:support@recruiter-radar.ru",
+    );
+    expect(screen.queryByRole("navigation", { name: "Продукт" })).not.toBeInTheDocument();
   });
 });

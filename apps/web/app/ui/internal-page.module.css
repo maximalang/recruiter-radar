@@ -177,11 +177,11 @@
 
 .internalPageTitle {
   max-width: 760px;
-  font-size: clamp(2.2rem, 4.1vw, 4.35rem);
+  font-size: clamp(2.35rem, 3.4vw, 3.25rem);
   font-weight: 735;
   color: #14201c;
   letter-spacing: -0.058em;
-  line-height: 0.96;
+  line-height: 1.02;
   margin: 0;
 }
 
