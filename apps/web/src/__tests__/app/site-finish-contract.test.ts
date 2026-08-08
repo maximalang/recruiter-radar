@@ -56,4 +56,12 @@ describe("cross-route visual layer contract", () => {
     expect(workspace).toContain('data-product-workspace="true"');
     expect(internalPage).toContain("<ProductWorkspaceFrame");
   });
+
+  it("switches portrait tablets to the intentional bottom navigation", () => {
+    const workspaceStyles = readAppFile("ui/product-workspace.module.css");
+
+    expect(workspaceStyles).toContain("@media (max-width: 800px)");
+    expect(workspaceStyles).toContain(".mobileNav {");
+    expect(workspaceStyles).toContain("grid-template-columns: repeat(4, minmax(0, 1fr))");
+  });
 });

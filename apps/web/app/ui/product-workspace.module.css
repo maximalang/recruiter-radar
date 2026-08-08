@@ -360,7 +360,7 @@
   }
 }
 
-@media (max-width: 620px) {
+@media (max-width: 800px) {
   .workspace {
     display: flex;
     flex-direction: column;
