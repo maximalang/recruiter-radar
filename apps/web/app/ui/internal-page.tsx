@@ -111,17 +111,10 @@ export function InternalPageFrame(props: {
   children: ReactNode;
   className?: string;
   navItems?: NavItem[];
-  /** Optional footer rendered at the bottom of the frame. The site footer is
-   *  an async server component (reads the operator session), so the PAGE — a
-   *  server component — passes it in as `<SiteFooter />`. InternalPageFrame
-   *  itself must not import the footer module, because this file is also
-   *  imported by client components (ScoreBar, GATE_LABELS, etc.) and a
-   *  next/headers dependency would leak into the client bundle. */
-  footer?: ReactNode;
 }) {
   if (props.navItems) {
     return (
-      <ProductWorkspaceFrame navItems={props.navItems} footer={props.footer}>
+      <ProductWorkspaceFrame navItems={props.navItems}>
         <div className={`${s.internalPageFrameInner}${props.className ? ` ${props.className}` : ""}`}>
           {props.children}
         </div>
@@ -137,7 +130,6 @@ export function InternalPageFrame(props: {
       <a href="#main-content" className={s.skipLink}>Перейти к содержанию</a>
       {props.navItems ? <TopNav items={props.navItems} /> : null}
       <div className={s.internalPageFrameInner} id="main-content">{props.children}</div>
-      {props.footer}
     </main>
   );
 }

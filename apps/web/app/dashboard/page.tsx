@@ -18,7 +18,6 @@ import {
   ProductWorkspaceFrame,
   ProductWorkspaceHeader,
 } from "../ui/product-workspace";
-import { SiteFooter } from "../ui/site-footer";
 import dashStyles from "./dashboard-workspace.module.css";
 
 export const metadata: Metadata = {
@@ -43,7 +42,7 @@ export default async function DashboardPage() {
 
   if (!authorization || !account) {
     return (
-      <ProductWorkspaceFrame navItems={DASHBOARD_NAV} footer={<SiteFooter />}>
+      <ProductWorkspaceFrame navItems={DASHBOARD_NAV}>
         <ProductWorkspaceHeader
           eyebrow="Защищённое рабочее пространство"
           title="Личный кабинет"
@@ -66,7 +65,7 @@ export default async function DashboardPage() {
 
   if (!profile) {
     return (
-      <ProductWorkspaceFrame navItems={DASHBOARD_NAV} footer={<SiteFooter />}>
+      <ProductWorkspaceFrame navItems={DASHBOARD_NAV}>
         <ProductWorkspaceHeader
           eyebrow="Активация"
           title="Завершите настройку радара"
@@ -86,7 +85,7 @@ export default async function DashboardPage() {
   const completionPercent = Math.round(completion.ratio * 100);
 
   return (
-    <ProductWorkspaceFrame navItems={DASHBOARD_NAV} footer={<SiteFooter />}>
+    <ProductWorkspaceFrame navItems={DASHBOARD_NAV}>
       <ProductWorkspaceHeader
         eyebrow="Утренний обзор"
         title="Командный центр"

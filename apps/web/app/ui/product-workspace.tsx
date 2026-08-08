@@ -33,7 +33,6 @@ const MOBILE_MORE_LINKS = [
 export function ProductWorkspaceFrame(props: {
   navItems: NavItem[];
   children: ReactNode;
-  footer?: ReactNode;
 }) {
   return (
     <div

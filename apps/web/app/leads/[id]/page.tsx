@@ -37,7 +37,6 @@ import {
   FEEDBACK_LABELS,
 } from '../../ui/internal-page';
 import { buildAccountNavigation } from '../../ui/account-navigation';
-import { SiteFooter } from '../../ui/site-footer';
 import { BriefcaseIcon, LayersIcon, CalendarIcon, HelpIcon, SearchIcon } from '../../ui/icons';
 
 export const dynamic = 'force-dynamic';
@@ -182,7 +181,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   const singleExportHref = `/api/leads/${lead.id}/export`;
 
   return (
-    <InternalPageFrame navItems={LEAD_DETAIL_NAV} footer={<SiteFooter />}>
+    <InternalPageFrame navItems={LEAD_DETAIL_NAV}>
       <div className={ipStyles.leadDetailContainer}>
         <InternalPageHeader
           title={lead.orgName}

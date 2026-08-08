@@ -23,7 +23,6 @@ import {
   ContentCardTitle,
   internalPageClasses as ipStyles,
 } from "../ui/internal-page";
-import { SiteFooter } from "../ui/site-footer";
 import ppStyles from "../ui/page-primitives.module.css";
 import LandingCheckoutAnalytics from "../landing-checkout-analytics";
 import { LANDING_ANALYTICS_EVENT } from "../../lib/landing-analytics-contract";
@@ -98,7 +97,7 @@ export default async function CheckoutPage(props: {
   }
 
   return (
-    <InternalPageFrame navItems={buildAccountNavigation("dashboard")} footer={<SiteFooter />}>
+    <InternalPageFrame navItems={buildAccountNavigation("dashboard")}>
       <LandingCheckoutAnalytics submitEvent={LANDING_ANALYTICS_EVENT.paymentStarted} />
       <InternalPageHeader
         title="Оплата доступа"

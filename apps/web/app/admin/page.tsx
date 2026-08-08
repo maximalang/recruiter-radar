@@ -27,7 +27,6 @@ import {
   internalPageClasses,
   type NavItem,
 } from "../ui/internal-page";
-import { SiteFooter } from "../ui/site-footer";
 import AdminIngestForm from "./admin-ingest-form";
 import AdminLlmConfigForm from "./admin-llm-config-form";
 import AdminLoginForm from "./admin-login-form";
@@ -83,7 +82,7 @@ export default async function AdminPage() {
   // State 1: panel not configured (no ADMIN_OPERATOR_PASSWORD on server)
   if (!configured) {
     return (
-      <InternalPageFrame navItems={ADMIN_NAV} footer={<SiteFooter />}>
+      <InternalPageFrame navItems={ADMIN_NAV}>
         <InternalPageHeader title="Панель оператора" />
         <div className={internalPageClasses.narrowLayout}>
           <ContentCard>
@@ -105,7 +104,7 @@ export default async function AdminPage() {
   // State 2: configured but not logged in (no session cookie)
   if (!access.ok) {
     return (
-      <InternalPageFrame navItems={ADMIN_NAV} footer={<SiteFooter />}>
+      <InternalPageFrame navItems={ADMIN_NAV}>
         <InternalPageHeader title="Панель оператора" />
         <div className={internalPageClasses.narrowLayout}>
           <ContentCard>
@@ -161,7 +160,7 @@ export default async function AdminPage() {
   });
 
   return (
-    <InternalPageFrame navItems={ADMIN_NAV} footer={<SiteFooter />}>
+    <InternalPageFrame navItems={ADMIN_NAV}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
         <InternalPageHeader title="Панель оператора" />
         <AdminLogoutButton />

@@ -60,6 +60,9 @@ describe("cross-route visual layer contract", () => {
 
     expect(workspace).toContain('data-product-workspace="true"');
     expect(internalPage).toContain("<ProductWorkspaceFrame");
+    expect(workspace).not.toContain("footer?: ReactNode");
+    expect(internalPage).not.toContain("footer?: ReactNode");
+    expect(internalPage).not.toContain("footer={props.footer}");
   });
 
   it("switches portrait tablets to the intentional bottom navigation", () => {
