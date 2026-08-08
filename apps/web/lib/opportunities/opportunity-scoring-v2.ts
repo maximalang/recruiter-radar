@@ -171,12 +171,14 @@ export class OpportunityScoringV2Service {
     const rankingScore = geometricMean(
       Object.values(components).map((component) => component.score),
     )
-    const status = resolveStatus(
+    const status = resolveStatus({
       input,
       failedGates,
-      evidenceConfidence.score,
-      this.config.minimumEvidenceConfidence,
-    )
+      evidenceConfidenceScore: evidenceConfidence.score,
+      agencyFitScore: agencyFit.score,
+      externalSupportNeedScore: externalSupportNeed.score,
+      config: this.config,
+    })
     const isActionQueueEligible =
       failedGates.length === 0 &&
       (input.confidenceGate === 'A' || input.confidenceGate === 'B') &&
@@ -309,12 +311,22 @@ function scoreCommercialValueSignal(input: {
   }
 }
 
-function resolveStatus(
-  input: OpportunityScoringV2Input,
-  failedGates: OpportunityScoringV2HardGate[],
-  evidenceConfidenceScore: number,
-  minimumEvidenceConfidence: number,
-): OpportunityStatus {
+function resolveStatus(params: {
+  input: OpportunityScoringV2Input
+  failedGates: OpportunityScoringV2HardGate[]
+  evidenceConfidenceScore: number
+  agencyFitScore: number
+  externalSupportNeedScore: number
+  config: Readonly<OpportunityScoringV2Config>
+}): OpportunityStatus {
+  const {
+    input,
+    failedGates,
+    evidenceConfidenceScore,
+    agencyFitScore,
+    externalSupportNeedScore,
+    config,
+  } = params
   if (input.episodeStatus === 'closed') return 'expired'
   if (failedGates.some((gate) =>
     gate.code === 'PROFILE_EXCLUSION' ||
@@ -326,7 +338,9 @@ function resolveStatus(
     failedGates.length > 0 ||
     input.confidenceGate === 'C' ||
     input.confidenceGate === 'D' ||
-    evidenceConfidenceScore < minimumEvidenceConfidence
+    evidenceConfidenceScore < config.minimumEvidenceConfidence ||
+    agencyFitScore < config.minimumAgencyFit ||
+    externalSupportNeedScore < config.minimumExternalSupportNeed
   ) {
     return 'review'
   }
