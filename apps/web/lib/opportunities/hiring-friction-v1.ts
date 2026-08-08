@@ -1,0 +1,388 @@
+export const HIRING_FRICTION_VERSION = 'hiring-friction-v1' as const
+
+export const HIRING_FRICTION_LEVELS = [
+  'high',
+  'medium',
+  'low',
+  'unknown',
+] as const
+
+export type HiringFrictionLevel = typeof HIRING_FRICTION_LEVELS[number]
+
+export type EvidencedMetric = {
+  value: number | null
+  evidenceIds: string[]
+}
+
+export type EvidencedFlag = {
+  value: boolean | null
+  evidenceIds: string[]
+}
+
+export type HiringFrictionRepostCycle = {
+  intervalDays: number
+  automated: boolean
+  salaryChanged: boolean
+  requirementsChanged: boolean
+  evidenceIds: string[]
+}
+
+export type HiringFrictionInput = {
+  vacancyAgeDays: EvidencedMetric
+  repostCycles: HiringFrictionRepostCycle[]
+  salaryChange: EvidencedMetric
+  requirementsChange: EvidencedMetric
+  closeReopenCycles: EvidencedMetric
+  roleScarcity: EvidencedMetric
+  seniorityComplexity: EvidencedMetric
+  multiRoleComplexity: EvidencedMetric
+  regionalDifficulty: EvidencedMetric
+  internalRecruitingCapacity: EvidencedMetric
+  hiringVelocityVsCapacity: EvidencedMetric
+  timeToFillHistory: EvidencedMetric
+  evergreenRole: EvidencedFlag
+  massHiring: EvidencedFlag
+}
+
+export type HiringFrictionReason = {
+  code: string
+  evidenceIds: string[]
+}
+
+export type HiringFrictionResult = {
+  featureVersion: typeof HIRING_FRICTION_VERSION
+  frictionLevel: HiringFrictionLevel
+  frictionScore: number
+  coverage: number
+  positiveReasons: HiringFrictionReason[]
+  negativeReasons: HiringFrictionReason[]
+  evidenceIds: string[]
+  componentValues: Record<string, number | null>
+}
+
+const WEIGHTS = {
+  vacancyAge: 0.08,
+  repostCycles: 0.18,
+  salaryChange: 0.1,
+  requirementsChange: 0.08,
+  closeReopenCycles: 0.08,
+  roleScarcity: 0.1,
+  seniorityComplexity: 0.08,
+  multiRoleComplexity: 0.06,
+  regionalDifficulty: 0.06,
+  internalRecruitingCapacity: 0.08,
+  hiringVelocityVsCapacity: 0.1,
+  timeToFillHistory: 0.06,
+  evergreenRole: 0.04,
+  massHiring: 0.04,
+} as const
+
+const TOTAL_WEIGHT = Object.values(WEIGHTS)
+  .reduce((total, value) => total + value, 0)
+
+export function buildHiringFriction(
+  rawInput: HiringFrictionInput,
+): HiringFrictionResult {
+  const input = normalizeInput(rawInput)
+  const meaningfulCycles = input.repostCycles.filter(isMeaningfulRepost)
+  const standardCycles = input.repostCycles.filter((cycle) =>
+    !isMeaningfulRepost(cycle),
+  )
+  const componentValues: Record<string, number | null> = {
+    vacancy_age: input.vacancyAgeDays.value === null
+      ? null
+      : clamp01((input.vacancyAgeDays.value - 30) / 90),
+    repost_cycles: clamp01(meaningfulCycles.length / 2),
+    salary_change: input.salaryChange.value,
+    requirements_change: input.requirementsChange.value,
+    close_reopen_cycle: input.closeReopenCycles.value,
+    role_scarcity: input.roleScarcity.value,
+    seniority_complexity: input.seniorityComplexity.value,
+    multi_role_complexity: input.multiRoleComplexity.value,
+    regional_difficulty: input.regionalDifficulty.value,
+    internal_recruiting_capacity: input.internalRecruitingCapacity.value,
+    hiring_velocity_vs_capacity: input.hiringVelocityVsCapacity.value,
+    time_to_fill_history: input.timeToFillHistory.value,
+  }
+  const positiveReasons: HiringFrictionReason[] = []
+  const negativeReasons: HiringFrictionReason[] = []
+  let score = 0
+
+  score += contribution(componentValues.vacancy_age, WEIGHTS.vacancyAge)
+  score += contribution(componentValues.repost_cycles, WEIGHTS.repostCycles)
+  score += contribution(componentValues.salary_change, WEIGHTS.salaryChange)
+  score += contribution(
+    componentValues.requirements_change,
+    WEIGHTS.requirementsChange,
+  )
+  score += contribution(
+    componentValues.close_reopen_cycle,
+    WEIGHTS.closeReopenCycles,
+  )
+  score += contribution(componentValues.role_scarcity, WEIGHTS.roleScarcity)
+  score += contribution(
+    componentValues.seniority_complexity,
+    WEIGHTS.seniorityComplexity,
+  )
+  score += contribution(
+    componentValues.multi_role_complexity,
+    WEIGHTS.multiRoleComplexity,
+  )
+  score += contribution(
+    componentValues.regional_difficulty,
+    WEIGHTS.regionalDifficulty,
+  )
+  score += contribution(
+    componentValues.hiring_velocity_vs_capacity,
+    WEIGHTS.hiringVelocityVsCapacity,
+  )
+  score += contribution(
+    componentValues.time_to_fill_history,
+    WEIGHTS.timeToFillHistory,
+  )
+  score -= contribution(
+    componentValues.internal_recruiting_capacity,
+    WEIGHTS.internalRecruitingCapacity,
+  )
+
+  if (standardCycles.length > 0) {
+    negativeReasons.push(reason(
+      'STANDARD_HH_REPUBLICATION',
+      standardCycles.flatMap((cycle) => cycle.evidenceIds),
+    ))
+  }
+  if (meaningfulCycles.length > 0) {
+    positiveReasons.push(reason(
+      'MEANINGFUL_REPOST_CYCLES',
+      meaningfulCycles.flatMap((cycle) => cycle.evidenceIds),
+    ))
+  }
+  if ((input.salaryChange.value ?? 0) > 0) {
+    positiveReasons.push(reason('SALARY_CHANGED', input.salaryChange.evidenceIds))
+  }
+  if ((input.requirementsChange.value ?? 0) > 0) {
+    positiveReasons.push(reason(
+      'REQUIREMENTS_CHANGED',
+      input.requirementsChange.evidenceIds,
+    ))
+  }
+  if ((input.closeReopenCycles.value ?? 0) > 0) {
+    positiveReasons.push(reason(
+      'CLOSE_REOPEN_CYCLE',
+      input.closeReopenCycles.evidenceIds,
+    ))
+  }
+  if ((input.roleScarcity.value ?? 0) >= 0.6) {
+    positiveReasons.push(reason('ROLE_SCARCITY_EVIDENCED', input.roleScarcity.evidenceIds))
+  }
+  if ((input.hiringVelocityVsCapacity.value ?? 0) >= 0.6) {
+    positiveReasons.push(reason(
+      'HIRING_VELOCITY_EXCEEDS_CAPACITY',
+      input.hiringVelocityVsCapacity.evidenceIds,
+    ))
+  }
+  if ((input.internalRecruitingCapacity.value ?? 0) >= 0.7) {
+    negativeReasons.push(reason(
+      'LARGE_INTERNAL_RECRUITING_CAPACITY',
+      input.internalRecruitingCapacity.evidenceIds,
+    ))
+  }
+
+  const hasPersistentCombination =
+    meaningfulCycles.length >= 2 &&
+    ((input.salaryChange.value ?? 0) > 0 ||
+      (input.requirementsChange.value ?? 0) > 0) &&
+    (input.vacancyAgeDays.value ?? 0) > 60
+  if (hasPersistentCombination) {
+    score += 0.18
+    positiveReasons.push(reason('PERSISTENT_DEMAND_COMBINATION', [
+      ...input.vacancyAgeDays.evidenceIds,
+      ...meaningfulCycles.flatMap((cycle) => cycle.evidenceIds),
+      ...input.salaryChange.evidenceIds,
+      ...input.requirementsChange.evidenceIds,
+    ]))
+  }
+
+  if (input.evergreenRole.value === true) {
+    score = Math.min(score, 0.2)
+    negativeReasons.push(reason('EVERGREEN_ROLE', input.evergreenRole.evidenceIds))
+  }
+  if (input.massHiring.value === true) {
+    score = Math.min(score, 0.49)
+    negativeReasons.push(reason(
+      'MASS_HIRING_SEPARATE_ARCHETYPE',
+      input.massHiring.evidenceIds,
+    ))
+  }
+
+  const coverage = calculateCoverage(input)
+  const frictionScore = coverage < 0.25 ? 0 : round(clamp01(score))
+  const frictionLevel: HiringFrictionLevel = coverage < 0.25
+    ? 'unknown'
+    : frictionScore >= 0.68
+      ? 'high'
+      : frictionScore >= 0.35
+        ? 'medium'
+        : 'low'
+
+  return {
+    featureVersion: HIRING_FRICTION_VERSION,
+    frictionLevel,
+    frictionScore,
+    coverage,
+    positiveReasons: sortReasons(positiveReasons),
+    negativeReasons: sortReasons(negativeReasons),
+    evidenceIds: uniqueIds(allEvidenceIds(input)),
+    componentValues,
+  }
+}
+
+function normalizeInput(input: HiringFrictionInput): HiringFrictionInput {
+  return {
+    vacancyAgeDays: metric(input.vacancyAgeDays, 'vacancy age', false),
+    repostCycles: input.repostCycles.map((cycle) => ({
+      intervalDays: nonNegative(cycle.intervalDays, 'repost interval'),
+      automated: cycle.automated,
+      salaryChanged: cycle.salaryChanged,
+      requirementsChanged: cycle.requirementsChanged,
+      evidenceIds: requiredIds(cycle.evidenceIds, 'repost evidence'),
+    })),
+    salaryChange: metric(input.salaryChange, 'salary change'),
+    requirementsChange: metric(input.requirementsChange, 'requirements change'),
+    closeReopenCycles: metric(input.closeReopenCycles, 'close reopen cycles'),
+    roleScarcity: metric(input.roleScarcity, 'role scarcity'),
+    seniorityComplexity: metric(input.seniorityComplexity, 'seniority complexity'),
+    multiRoleComplexity: metric(input.multiRoleComplexity, 'multi role complexity'),
+    regionalDifficulty: metric(input.regionalDifficulty, 'regional difficulty'),
+    internalRecruitingCapacity: metric(
+      input.internalRecruitingCapacity,
+      'internal recruiting capacity',
+    ),
+    hiringVelocityVsCapacity: metric(
+      input.hiringVelocityVsCapacity,
+      'hiring velocity vs capacity',
+    ),
+    timeToFillHistory: metric(input.timeToFillHistory, 'time to fill history'),
+    evergreenRole: flag(input.evergreenRole, 'evergreen role'),
+    massHiring: flag(input.massHiring, 'mass hiring'),
+  }
+}
+
+function calculateCoverage(input: HiringFrictionInput): number {
+  let covered = WEIGHTS.repostCycles
+  const metrics: Array<[EvidencedMetric, number]> = [
+    [input.vacancyAgeDays, WEIGHTS.vacancyAge],
+    [input.salaryChange, WEIGHTS.salaryChange],
+    [input.requirementsChange, WEIGHTS.requirementsChange],
+    [input.closeReopenCycles, WEIGHTS.closeReopenCycles],
+    [input.roleScarcity, WEIGHTS.roleScarcity],
+    [input.seniorityComplexity, WEIGHTS.seniorityComplexity],
+    [input.multiRoleComplexity, WEIGHTS.multiRoleComplexity],
+    [input.regionalDifficulty, WEIGHTS.regionalDifficulty],
+    [input.internalRecruitingCapacity, WEIGHTS.internalRecruitingCapacity],
+    [input.hiringVelocityVsCapacity, WEIGHTS.hiringVelocityVsCapacity],
+    [input.timeToFillHistory, WEIGHTS.timeToFillHistory],
+  ]
+  for (const [item, weight] of metrics) {
+    if (item.value !== null) covered += weight
+  }
+  if (input.evergreenRole.value !== null) covered += WEIGHTS.evergreenRole
+  if (input.massHiring.value !== null) covered += WEIGHTS.massHiring
+  return round(covered / TOTAL_WEIGHT)
+}
+
+function allEvidenceIds(input: HiringFrictionInput): string[] {
+  return [
+    ...input.vacancyAgeDays.evidenceIds,
+    ...input.repostCycles.flatMap((cycle) => cycle.evidenceIds),
+    ...input.salaryChange.evidenceIds,
+    ...input.requirementsChange.evidenceIds,
+    ...input.closeReopenCycles.evidenceIds,
+    ...input.roleScarcity.evidenceIds,
+    ...input.seniorityComplexity.evidenceIds,
+    ...input.multiRoleComplexity.evidenceIds,
+    ...input.regionalDifficulty.evidenceIds,
+    ...input.internalRecruitingCapacity.evidenceIds,
+    ...input.hiringVelocityVsCapacity.evidenceIds,
+    ...input.timeToFillHistory.evidenceIds,
+    ...input.evergreenRole.evidenceIds,
+    ...input.massHiring.evidenceIds,
+  ]
+}
+
+function isMeaningfulRepost(cycle: HiringFrictionRepostCycle): boolean {
+  const standardLifecycle = cycle.intervalDays >= 25 && cycle.intervalDays <= 35
+  return cycle.salaryChanged || cycle.requirementsChanged ||
+    !cycle.automated || !standardLifecycle
+}
+
+function metric(
+  input: EvidencedMetric,
+  label: string,
+  unit = true,
+): EvidencedMetric {
+  if (input.value === null) return { value: null, evidenceIds: [] }
+  const value = unit
+    ? unitInterval(input.value, label)
+    : nonNegative(input.value, label)
+  return { value, evidenceIds: requiredIds(input.evidenceIds, `${label} evidence`) }
+}
+
+function flag(input: EvidencedFlag, label: string): EvidencedFlag {
+  if (input.value === null) return { value: null, evidenceIds: [] }
+  return {
+    value: input.value,
+    evidenceIds: requiredIds(input.evidenceIds, `${label} evidence`),
+  }
+}
+
+function reason(code: string, evidenceIds: readonly string[]): HiringFrictionReason {
+  return { code, evidenceIds: requiredIds(evidenceIds, `${code} evidence`) }
+}
+
+function sortReasons(reasons: readonly HiringFrictionReason[]): HiringFrictionReason[] {
+  return [...reasons].sort((left, right) => left.code.localeCompare(right.code, 'en'))
+}
+
+function requiredIds(values: readonly string[], label: string): string[] {
+  const ids = uniqueIds(values)
+  if (ids.length === 0) throw new Error(`${label} is required`)
+  return ids
+}
+
+function uniqueIds(values: readonly string[]): string[] {
+  return [...new Set(values.map((value) => {
+    if (!/^[1-9]\d*$/.test(value)) throw new Error('evidence id must be positive')
+    return value
+  }))].sort(compareIds)
+}
+
+function compareIds(left: string, right: string): number {
+  return left.length - right.length || left.localeCompare(right, 'en')
+}
+
+function contribution(value: number | null, weight: number): number {
+  return value === null ? 0 : value * weight
+}
+
+function unitInterval(value: number, label: string): number {
+  if (!Number.isFinite(value) || value < 0 || value > 1) {
+    throw new Error(`${label} must be between 0 and 1`)
+  }
+  return value
+}
+
+function nonNegative(value: number, label: string): number {
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error(`${label} must be non-negative`)
+  }
+  return value
+}
+
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value))
+}
+
+function round(value: number): number {
+  return Math.round(value * 100_000) / 100_000
+}
