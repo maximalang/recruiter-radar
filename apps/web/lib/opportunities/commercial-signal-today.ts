@@ -1,5 +1,8 @@
+import { parseCommercialSignalCard } from './commercial-signal-card'
+
 export type CommercialSignalTodayCandidate = {
   metadata: Record<string, unknown>
+  evidenceTimeline: readonly { id: string }[]
 }
 
 /**
@@ -12,11 +15,11 @@ export function isActionableCommercialSignalTodayCandidate(
   opportunity: CommercialSignalTodayCandidate,
 ): boolean {
   const card = opportunity.metadata.commercialSignalCard
-  if (!card || typeof card !== 'object' || Array.isArray(card)) return false
-  const snapshot = card as Record<string, unknown>
-  return snapshot.version === 'commercial-signal-card-v1' &&
-    snapshot.scoreVersion === 'opportunity-v3' &&
-    snapshot.status === 'qualified_actionable'
+  const allowedEvidenceIds = new Set(
+    opportunity.evidenceTimeline.map((evidence) => evidence.id),
+  )
+  const snapshot = parseCommercialSignalCard(card, allowedEvidenceIds)
+  return snapshot?.status === 'qualified_actionable'
 }
 
 export function filterActionableCommercialSignalToday<T extends CommercialSignalTodayCandidate>(

@@ -346,14 +346,34 @@ export async function listOpportunities(
     clauses.push(`o.organization_id = $${params.length}`)
   }
   if (input.commercialSignalOnly) {
-    clauses.push(
-      `o.metadata->'commercialSignalCard'->>'version' = ` +
-      `'commercial-signal-card-v1'`,
-    )
-    clauses.push(
-      `o.metadata->'commercialSignalCard'->>'status' IN (` +
-      `'qualified_actionable', 'qualified_needs_enrichment')`,
-    )
+    clauses.push(`EXISTS (
+      SELECT 1
+      FROM commercial_signal_opportunity_lineage lineage
+      JOIN opportunity_candidates candidate
+        ON candidate.id = lineage.candidate_id
+       AND candidate.owner_id = lineage.owner_id
+       AND candidate.workspace_id = lineage.workspace_id
+       AND candidate.client_profile_id = lineage.client_profile_id
+       AND candidate.organization_id = lineage.organization_id
+       AND candidate.candidate_identity = lineage.candidate_identity
+       AND candidate.candidate_generation = lineage.candidate_generation
+       AND candidate.signal_episode_id = lineage.signal_episode_id
+       AND candidate.signal_episode_generation =
+         lineage.signal_episode_generation
+       AND candidate.score_version = lineage.score_version
+       AND candidate.evidence_hash = lineage.evidence_hash
+      WHERE lineage.opportunity_id = o.id
+        AND lineage.owner_id = o.owner_id
+        AND lineage.workspace_id = o.workspace_id
+        AND lineage.client_profile_id = o.client_profile_id
+        AND lineage.organization_id = o.organization_id
+        AND lineage.compatibility_hiring_episode_id = o.hiring_episode_id
+        AND lineage.score_version = 'opportunity-v3'
+        AND lineage.commercial_signal_card =
+          o.metadata->'commercialSignalCard'
+        AND candidate.rollout_mode = 'canary'
+        AND candidate.status = 'qualified_actionable'
+    )`)
   }
   const query = normalizeOpportunityQuery(input.query)
   if (query) {
