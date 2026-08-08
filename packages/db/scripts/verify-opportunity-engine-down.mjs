@@ -5,6 +5,10 @@ import { promisify } from 'node:util'
 
 import pg from 'pg'
 
+import {
+  COMMERCIAL_SIGNAL_ISOLATED_TEST_CLEANUP_SQL,
+} from './lib/commercial-signal-isolated-test-cleanup.mjs'
+
 const { Client } = pg
 const execFileAsync = promisify(execFile)
 
@@ -316,6 +320,10 @@ try {
   try {
     for (const migration of downMigrations.slice(0, PRE_FIXTURE_DOWN_MIGRATIONS)) {
       await database.query(await readFile(resolve(migrationsDir, migration), 'utf8'))
+      if (migration ===
+          '20260807170000_add_commercial_signal_canary_runtime.down.sql') {
+        await database.query(COMMERCIAL_SIGNAL_ISOLATED_TEST_CLEANUP_SQL)
+      }
     }
     const fixture = await seedSupersessionRollbackFixture(database)
     await verifyHardenedOutcomeRollbackGuards(database, fixture)

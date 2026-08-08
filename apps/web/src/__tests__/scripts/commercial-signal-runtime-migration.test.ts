@@ -38,6 +38,13 @@ const isolatedCleanupRunner = readFileSync(resolve(
   'scripts',
   'rollback-commercial-signal-test-dependents.mjs',
 ), 'utf8')
+const opportunityDownVerifier = readFileSync(resolve(
+  repositoryRoot,
+  'packages',
+  'db',
+  'scripts',
+  'verify-opportunity-engine-down.mjs',
+), 'utf8')
 
 describe('Commercial Signal rollback data preservation', () => {
   it('keeps new dismissal reasons valid without rewriting outcome history', () => {
@@ -105,6 +112,9 @@ describe('Commercial Signal rollback data preservation', () => {
       `COMMERCIAL_SIGNAL_TEST_ROLLBACK_ACK !== 'isolated'`,
     )
     expect(isolatedCleanupRunner).toContain(
+      'COMMERCIAL_SIGNAL_ISOLATED_TEST_CLEANUP_SQL',
+    )
+    expect(opportunityDownVerifier).toContain(
       'COMMERCIAL_SIGNAL_ISOLATED_TEST_CLEANUP_SQL',
     )
   })
