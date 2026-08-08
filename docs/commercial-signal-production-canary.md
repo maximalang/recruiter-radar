@@ -36,7 +36,10 @@ A vacancy is only a source observation. It is never sufficient by itself to beco
 - `legacy` — legacy reader/writer remain authoritative. Commercial Signal data can remain stored but is not authoritative.
 - `shadow` — Commercial Signal may be computed for evaluation; it cannot replace Today.
 - `canary` — exactly one configured workspace may use the full Commercial Signal writer/reader.
-- `commercial_signal` — final global-capable mode. Do not enable during canary validation.
+
+There is intentionally no executable global Commercial Signal mode. Wider
+rollout requires a separate reviewed change after the real canary quality gate
+passes.
 
 Invalid or missing values resolve to `legacy`.
 
@@ -317,6 +320,88 @@ For each opportunity verify:
 15. Is the Commercial Signal Card faithful to the underlying evidence?
 
 The TOP-20 review is not complete until every decision can be traced back through exact lineage.
+
+## 12.1 One-workspace operated run and immutable receipt
+
+The operator runner performs authenticated read-only preflight for all required
+cron surfaces before any mutation. It then runs, in order:
+
+```text
+Query Plan downstream-yield materialization
+→ one environment-scoped Commercial Signal canary
+→ corporate-only enrichment
+→ TOP-ranked lineage snapshot
+```
+
+It never accepts a workspace in an HTTP query. The expected workspace id is
+used only to verify that the environment-managed canary returned the one
+approved workspace. The command requires an explicit confirmation token and
+writes a new receipt with `wx`; an existing receipt can never be overwritten.
+
+PowerShell example:
+
+```powershell
+$env:CRON_API_KEY = '<production cron key>'
+$env:DATABASE_URL = '<production read/write database URL>'
+$env:COMMERCIAL_SIGNAL_CANARY_ALLOWED_HOST = '<production-host>'
+npm.cmd run commercial-signal:canary:run -- `
+  --base-url https://<production-host> `
+  --workspace-id <approved-internal-workspace-id> `
+  --run-id canary-2026-08-08-01 `
+  --output C:\secure-canary-evidence\canary-2026-08-08-01.json `
+  --confirm RUN_ONE_WORKSPACE_CANARY
+```
+
+Keep receipts outside the repository. They contain production lineage ids and
+are operational evidence even though the receipt deliberately excludes API
+keys, personal contacts, company names, evidence text, and source URLs.
+The SHA-256 value detects accidental or post-run content changes; it is not an
+operator signature. Store receipts in access-controlled, append-only evidence
+storage and retain the printed hash independently.
+
+An unsuccessful mutating stage produces a signed failed receipt and stops the
+remaining stages. It is not a completed canary run and cannot satisfy the
+quality gate. A failed read-only preflight produces no receipt because no
+production mutation occurred.
+
+After each completed run, inspect the full evidence bundle with
+`review-commercial-signal-top20.mjs`, then append one `canary` annotation for
+every reviewed lineage with `annotate-commercial-signal-opportunity.mjs`.
+
+## 12.2 Executable canary quality gate
+
+After several consecutive receipts and their manual annotations, evaluate the
+gate against the production database:
+
+```powershell
+npm.cmd run commercial-signal:canary:quality -- `
+  --workspace-id <approved-internal-workspace-id> `
+  --receipt C:\secure-canary-evidence\canary-2026-08-08-01.json `
+  --receipt C:\secure-canary-evidence\canary-2026-08-09-01.json `
+  --receipt C:\secure-canary-evidence\canary-2026-08-10-01.json `
+  --format markdown `
+  --require-pass
+```
+
+The gate is fail-closed and requires all of the following:
+
+- at least 3 distinct, integrity-verified completed runs;
+- at least 50 distinct annotated TOP-ranked lineages;
+- every TOP-5 item reviewed and Precision@5 at least `0.80` on every run;
+- zero `not_a_lead` annotations among authoritative Today rows;
+- 100% authoritative Today lineage, evidence-backed why-now, and Agency DNA
+  lineage coverage;
+- no raw-vacancy-only Today row;
+- no duplicate Signal Episode situation inside one Today snapshot.
+
+Exit code `2` with `--require-pass` means the evidence is insufficient or the
+quality gate failed. It is a rollout stop, not permission to lower thresholds.
+The report never tunes weights and never describes the heuristic score as a
+deal probability.
+
+Zero strong opportunities is a valid run result. The receipt remains valid,
+but the wider-rollout gate stays `insufficient_sample`; discovery/supply must be
+improved without weakening the quality floor.
 
 ## 13. Rollback
 

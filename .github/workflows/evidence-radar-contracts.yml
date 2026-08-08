@@ -74,6 +74,7 @@ jobs:
           set -euo pipefail
           npm run test:commercial-signal:evaluation
           node --test packages/db/scripts/lib/commercial-signal-baseline-metrics.test.mjs
+          npm run test:commercial-signal:canary
           npm run test:commercial-signal:evaluation:db
           npm run test:commercial-signal:contracts
       - name: Verify authoritative Today, event support, and adaptive supply
