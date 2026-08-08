@@ -1,3 +1,8 @@
+import { execFile } from 'node:child_process'
+import { resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
+import { promisify } from 'node:util'
+
 jest.mock('@/lib/lead-discovery/node-exec', () => ({
   getExecFile: jest.fn(),
 }))
@@ -21,6 +26,7 @@ const readyEnv = {
   COMMERCIAL_SIGNAL_RUNTIME_MODE: 'canary',
   COMMERCIAL_SIGNAL_CANARY_WORKSPACE_IDS: '9',
 } as const
+const execFileAsync = promisify(execFile)
 
 describe('Query Planner v2 source executor bridge', () => {
   beforeEach(() => jest.clearAllMocks())
@@ -64,6 +70,7 @@ describe('Query Planner v2 source executor bridge', () => {
         requestsExecuted: 1,
         requestsBlocked: 1,
         requestsFailed: 0,
+        staleExecutionsReconciled: 1,
         fetchedRecords: 14,
         uniqueCompanies: 6,
         signalUpserts: 12,
@@ -92,6 +99,7 @@ describe('Query Planner v2 source executor bridge', () => {
       requestsExecuted: 1,
       requestsBlocked: 1,
       requestsFailed: 0,
+      staleExecutionsReconciled: 1,
       executionIds: ['101'],
     })
   })
@@ -130,5 +138,50 @@ describe('Query Planner v2 source executor bridge', () => {
       name: QueryPlannerV2SourceExecutionError.name,
       stats: expect.objectContaining({ requestsFailed: 1 }),
     })
+  })
+
+  it('reconciles only tenant-scoped source executions past the stale cutoff', async () => {
+    const moduleUrl = pathToFileURL(resolve(
+      process.cwd(),
+      '..',
+      '..',
+      'packages',
+      'db',
+      'scripts',
+      'execute-query-planner-v2.mjs',
+    )).href
+    const script = `
+      const module = await import(process.argv[2]);
+      const calls = [];
+      const db = { query: async (sql, params) => {
+        calls.push({ sql, params });
+        return { rowCount: 2 };
+      } };
+      const result = await module.reconcileStaleQueryPlannerSourceExecutions({
+        workspaceId: '9',
+        clientProfileId: '17',
+        now: new Date('2026-08-08T16:00:00.000Z'),
+      }, db);
+      process.stdout.write(JSON.stringify({ result, calls }));
+    `
+    const { stdout } = await execFileAsync(process.execPath, [
+      '--input-type=module',
+      '-e',
+      script,
+      'query-planner-recovery-test',
+      moduleUrl,
+    ])
+    const output = JSON.parse(stdout)
+
+    expect(output.result).toEqual({ reconciled: 2 })
+    expect(output.calls).toEqual([{
+      sql: expect.stringContaining("status = 'running'"),
+      params: [
+        '9',
+        '17',
+        '2026-08-08T16:00:00.000Z',
+        '2026-08-08T15:40:00.000Z',
+      ],
+    }])
   })
 })

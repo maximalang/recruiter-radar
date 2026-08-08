@@ -10,6 +10,8 @@ const { Client } = pg;
 const PLANNER_VERSION = 'query-planner-v2';
 const DEFAULT_ALLOWED_SOURCES = Object.freeze(['rabota-rossii']);
 const MAX_REQUESTS_PER_RUN = 50;
+const STALE_SOURCE_EXECUTION_AFTER_MS = 20 * 60 * 1000;
+const INTERRUPTED_EXECUTION_REASON = 'EXECUTION_INTERRUPTED_STALE';
 
 const SEARCH_ENV_KEYS = Object.freeze({
   hh: [
@@ -114,6 +116,7 @@ export async function runQueryPlannerSourceExecutions({
     requestsExecuted: 0,
     requestsBlocked: 0,
     requestsFailed: 0,
+    staleExecutionsReconciled: 0,
     fetchedRecords: 0,
     uniqueCompanies: 0,
     signalUpserts: 0,
@@ -124,6 +127,14 @@ export async function runQueryPlannerSourceExecutions({
   };
 
   try {
+    if (!stats.dryRun) {
+      const recovery = await reconcileStaleQueryPlannerSourceExecutions({
+        workspaceId: stats.workspaceId,
+        clientProfileId: stats.clientProfileId,
+        now: new Date(),
+      }, client);
+      stats.staleExecutionsReconciled = recovery.reconciled;
+    }
     const requests = await loadCurrentRequests(
       client,
       stats.workspaceId,
@@ -184,6 +195,43 @@ export async function runQueryPlannerSourceExecutions({
   } finally {
     await client.end();
   }
+}
+
+export async function reconcileStaleQueryPlannerSourceExecutions({
+  workspaceId,
+  clientProfileId = null,
+  now = new Date(),
+}, client) {
+  const normalizedWorkspaceId = positiveId(workspaceId, 'workspace');
+  const normalizedClientProfileId = clientProfileId == null
+    ? null
+    : positiveId(clientProfileId, 'client profile');
+  const completedAt = validDate(now);
+  const staleBefore = new Date(
+    completedAt.getTime() - STALE_SOURCE_EXECUTION_AFTER_MS,
+  );
+  const result = await client.query(
+    `UPDATE query_plan_source_executions AS execution
+     SET status = 'failed',
+         completed_at = $3,
+         error_code = '${INTERRUPTED_EXECUTION_REASON}'
+     WHERE execution.status = 'running'
+       AND execution.started_at < $4
+       AND EXISTS (
+         SELECT 1
+         FROM query_plan_source_execution_consumers AS consumer
+         WHERE consumer.execution_id = execution.id
+           AND consumer.workspace_id = $1
+           AND ($2::BIGINT IS NULL OR consumer.client_profile_id = $2)
+       )`,
+    [
+      normalizedWorkspaceId,
+      normalizedClientProfileId,
+      completedAt,
+      staleBefore,
+    ],
+  );
+  return { reconciled: Math.max(0, Number(result.rowCount ?? 0)) };
 }
 
 async function loadCurrentRequests(client, workspaceId, clientProfileId, limit) {
@@ -688,6 +736,12 @@ function positiveId(value, label) {
     throw new Error(`Invalid ${label} identifier.`);
   }
   return BigInt(normalized).toString();
+}
+
+function validDate(value) {
+  const date = value instanceof Date ? new Date(value.getTime()) : new Date(value);
+  if (!Number.isFinite(date.getTime())) throw new TypeError('Invalid timestamp.');
+  return date;
 }
 
 function hash(value, label) {

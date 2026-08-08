@@ -1,4 +1,8 @@
+import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
+import { pathToFileURL } from 'node:url'
+import { resolve } from 'node:path'
+import { promisify } from 'node:util'
 
 import { Pool } from 'pg'
 
@@ -23,6 +27,7 @@ import {
 const databaseUrl = process.env.DATABASE_URL
 const isolated = process.env.QUERY_PLANNER_V2_DB_TEST_ACK === 'isolated'
 const describeIfDatabase = databaseUrl && isolated ? describe : describe.skip
+const execFileAsync = promisify(execFile)
 
 describeIfDatabase('Query Planner v2 PostgreSQL runtime', () => {
   const database = new Pool({ connectionString: databaseUrl })
@@ -172,6 +177,137 @@ describeIfDatabase('Query Planner v2 PostgreSQL runtime', () => {
       [execution.rows[0].id],
       database,
     )).resolves.toEqual([])
+  })
+
+  it('fails only stale running source executions in the requested tenant scope', async () => {
+    const persisted = await persistProfileScopedQueryPlans(
+      buildPlans({ includeKeywords: ['execution-recovery'] }),
+      plannerDb,
+    )
+    const sharedRequest = await database.query<{
+      id: string
+      source: string
+      sharedRequestHash: string
+      generation: number
+    }>(
+      `SELECT shared.id::TEXT AS id, shared.source,
+              shared.shared_request_hash AS "sharedRequestHash",
+              COALESCE(MAX(execution.execution_generation), 0)::INTEGER
+                AS generation
+       FROM query_plan_request_consumers AS consumer
+       JOIN query_plan_shared_requests AS shared
+         ON shared.id = consumer.shared_request_id
+       LEFT JOIN query_plan_source_executions AS execution
+         ON execution.shared_request_id = shared.id
+       WHERE consumer.plan_snapshot_id = $1
+       GROUP BY shared.id, shared.source, shared.shared_request_hash`,
+      [persisted.plans[0].planSnapshotId],
+    )
+    const shared = sharedRequest.rows[0]
+    if (!shared) throw new Error('Recovery shared request is missing.')
+    const now = new Date('2026-08-08T16:00:00.000Z')
+    const executions = await database.query<{ id: string; status: string }>(
+      `INSERT INTO query_plan_source_executions (
+         shared_request_id, source, shared_request_hash,
+         execution_identity, execution_generation, request_snapshot,
+         status, started_at
+       ) VALUES
+         ($1, $2, $3, $4, $5, '{}'::JSONB, 'running', $7::TIMESTAMPTZ - INTERVAL '21 minutes'),
+         ($1, $2, $3, $4, $6, '{}'::JSONB, 'running', $7::TIMESTAMPTZ - INTERVAL '5 minutes')
+       RETURNING id::TEXT AS id, status`,
+      [
+        shared.id,
+        shared.source,
+        shared.sharedRequestHash,
+        'b'.repeat(64),
+        shared.generation + 1,
+        shared.generation + 2,
+        now.toISOString(),
+      ],
+    )
+    await database.query(
+      `INSERT INTO query_plan_source_execution_consumers (
+         execution_id, plan_snapshot_id, workspace_id, client_profile_id
+       ) VALUES ($1, $3, $4, $5), ($2, $3, $4, $5)`,
+      [
+        executions.rows[0].id,
+        executions.rows[1].id,
+        persisted.plans[0].planSnapshotId,
+        workspaceId,
+        profileId,
+      ],
+    )
+
+    const moduleUrl = pathToFileURL(resolve(
+      process.cwd(),
+      '..',
+      '..',
+      'packages',
+      'db',
+      'scripts',
+      'execute-query-planner-v2.mjs',
+    )).href
+    const script = `
+      import pg from 'pg';
+      const module = await import(process.argv[2]);
+      const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
+      await client.connect();
+      try {
+        const result = await module.reconcileStaleQueryPlannerSourceExecutions({
+          workspaceId: process.env.TEST_WORKSPACE_ID,
+          clientProfileId: process.env.TEST_PROFILE_ID,
+          now: new Date(process.env.TEST_NOW),
+        }, client);
+        process.stdout.write(JSON.stringify(result));
+      } finally {
+        await client.end();
+      }
+    `
+    const { stdout } = await execFileAsync(process.execPath, [
+      '--input-type=module',
+      '-e',
+      script,
+      'query-planner-recovery-db-test',
+      moduleUrl,
+    ], {
+      cwd: resolve(process.cwd(), '..', '..'),
+      env: {
+        ...process.env,
+        DATABASE_URL: databaseUrl,
+        TEST_WORKSPACE_ID: workspaceId,
+        TEST_PROFILE_ID: profileId,
+        TEST_NOW: now.toISOString(),
+      },
+    })
+    expect(JSON.parse(stdout)).toEqual({ reconciled: 1 })
+
+    const stored = await database.query<{
+      id: string
+      status: string
+      errorCode: string | null
+      completed: boolean
+    }>(
+      `SELECT id::TEXT AS id, status, error_code AS "errorCode",
+              completed_at IS NOT NULL AS completed
+       FROM query_plan_source_executions
+       WHERE id = ANY($1::BIGINT[])
+       ORDER BY id`,
+      [executions.rows.map((row) => row.id)],
+    )
+    expect(stored.rows).toEqual([
+      {
+        id: executions.rows[0].id,
+        status: 'failed',
+        errorCode: 'EXECUTION_INTERRUPTED_STALE',
+        completed: true,
+      },
+      {
+        id: executions.rows[1].id,
+        status: 'running',
+        errorCode: null,
+        completed: false,
+      },
+    ])
   })
 
   it('rejects cross-tenant provenance and append-only mutation', async () => {

@@ -323,6 +323,27 @@ The TOP-20 review is not complete until every decision can be traced back throug
 
 ## 12.1 One-workspace operated run and immutable receipt
 
+The complete host-side mutation window must hold the same lock as production
+deployments. Acquire it before changing `.env`, and keep file descriptor `9`
+open through container restart, the operated run, receipt archival, and the
+final dark-runtime restart:
+
+```bash
+deployment_lock=/tmp/recruiter-radar-deployment.lock
+exec 9> "$deployment_lock"
+if ! flock -n 9; then
+  echo "Another production mutation is active; refusing the canary." >&2
+  exit 1
+fi
+```
+
+Do not release the lock between enable and rollback. Do not use a local SSH
+timeout shorter than the runner's 15-minute request timeout plus both runtime
+restarts. If the operator connection is interrupted, do not start another canary
+until the original host process has exited, the deployment lock can be acquired,
+the receipt is archived and the runtime is dark. A second session must never
+recreate the web container while a source execution is still active.
+
 The operator runner performs authenticated read-only preflight for all required
 cron surfaces before any mutation. It then runs, in order:
 
