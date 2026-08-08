@@ -8,6 +8,7 @@ import { chromium } from "playwright";
 const baseUrl = process.env.LANDING_BASE_URL ?? "http://127.0.0.1:3000";
 const screenshotDirectory = process.env.LANDING_SCREENSHOT_DIR
   ?? path.join(os.tmpdir(), "recruiter-radar-final-unified-landing");
+const requireAnalyticsConsent = process.env.LANDING_REQUIRE_ANALYTICS_CONSENT === "true";
 
 const viewportMatrix = [
   { width: 1920, height: 1080, name: "desktop-1920x1080" },
@@ -50,10 +51,15 @@ const hashSpecs = [
 const surfaceSpecs = [
   { name: "hero-1920x1080", width: 1920, height: 1080, mode: "top" },
   { name: "hero-1440x900", width: 1440, height: 900, mode: "top" },
+  { name: "hero-1366x768", width: 1366, height: 768, mode: "top" },
+  { name: "hero-1280x800", width: 1280, height: 800, mode: "top" },
   { name: "hero-1180x820", width: 1180, height: 820, mode: "top" },
   { name: "hero-1024x768", width: 1024, height: 768, mode: "top" },
+  { name: "hero-900x900", width: 900, height: 900, mode: "top" },
   { name: "hero-768x1024", width: 768, height: 1024, mode: "top" },
   { name: "hero-390x844", width: 390, height: 844, mode: "top" },
+  { name: "hero-360x800", width: 360, height: 800, mode: "top" },
+  { name: "hero-320x700", width: 320, height: 700, mode: "top" },
   { name: "mobile-menu-390x844", width: 390, height: 844, mode: "menu" },
   { name: "timeline-1440x900", width: 1440, height: 900, target: "#scene-timeline" },
   { name: "preview-1440x900", width: 1440, height: 900, target: "#scene-workspace" },
@@ -67,7 +73,10 @@ const surfaceSpecs = [
   { name: "faq-1440x900", width: 1440, height: 900, target: "#faq" },
   { name: "faq-390x844", width: 390, height: 844, target: "#faq" },
   { name: "final-cta-1440x900", width: 1440, height: 900, target: "#conversion-final" },
+  { name: "final-cta-390x844", width: 390, height: 844, target: "#conversion-final" },
+  { name: "final-cta-320x700", width: 320, height: 700, target: "#conversion-final" },
   { name: "footer-1440x900", width: 1440, height: 900, target: "footer" },
+  { name: "footer-390x844", width: 390, height: 844, target: "footer" },
 ];
 
 const documentedConsoleAllowlist = [];
@@ -103,7 +112,10 @@ async function waitForLanding(page) {
 
 async function resolveAnalyticsConsent(page) {
   const dialog = page.locator("[data-analytics-consent]");
-  if (!await dialog.isVisible()) return;
+  if (!await dialog.isVisible()) {
+    assert.equal(requireAnalyticsConsent, false, "analytics consent dialog is required for this audit");
+    return;
+  }
 
   await dialog.getByRole("button", { name: "Только необходимые" }).click();
   await dialog.waitFor({ state: "hidden" });
@@ -214,6 +226,93 @@ async function assertNoOverlapOrClipping(page, label) {
   assert.deepEqual(issues, [], `${label}: clipping/viewport issues ${JSON.stringify(issues)}`);
 }
 
+async function assertKeyHeadingBounds(page, label) {
+  const issues = await page.evaluate(() => {
+    const selectors = [
+      "#scene-detection h1",
+      "#scene-timeline h2",
+      "#scene-workspace h2",
+      "#scene-evidence h2",
+      "#scene-delivery h2",
+      "#scene-outreach h2",
+      "#pricing h2",
+      "#faq h2",
+      "#conversion-final h2",
+    ];
+    const viewportWidth = document.documentElement.clientWidth;
+
+    return selectors.flatMap((selector) => Array.from(document.querySelectorAll(selector)).flatMap((heading) => {
+      const rect = heading.getBoundingClientRect();
+      const canvas = heading.closest("section, [id]")?.getBoundingClientRect();
+      const textRects = [];
+      const walker = document.createTreeWalker(heading, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        textRects.push(...range.getClientRects());
+      }
+      const maxGlyphOverhangPx = 12;
+      const clipsOwnText = textRects.some((textRect) => (
+        textRect.left < rect.left - maxGlyphOverhangPx
+        || textRect.right > rect.right + maxGlyphOverhangPx
+      ));
+      const outsideViewport = rect.left < -1 || rect.right > viewportWidth + 1;
+      const outsideCanvas = Boolean(canvas && (rect.left < canvas.left - 1 || rect.right > canvas.right + 1));
+      return clipsOwnText || outsideViewport || outsideCanvas
+        ? [{ selector, clipsOwnText, outsideViewport, outsideCanvas, rect: rect.toJSON(), canvas: canvas?.toJSON() }]
+        : [];
+    }));
+  });
+
+  assert.deepEqual(issues, [], `${label}: key heading bounds failed ${JSON.stringify(issues)}`);
+}
+
+async function assertConsentControlCollisions(page, label) {
+  const consentControl = page.locator('[aria-label="Изменить настройки cookies"]');
+  if (!await consentControl.isVisible()) {
+    assert.equal(requireAnalyticsConsent, false, `${label}: analytics consent control is required for this audit`);
+    return;
+  }
+
+  for (const { selector, textOnly = false } of [
+    { selector: '[data-pricing-primary="true"] > a' },
+    { selector: "#faq details[open]" },
+    { selector: "#conversion-final a:first-of-type" },
+    { selector: '[data-pricing-primary="true"] [data-consent-safe-copy]', textOnly: true },
+    { selector: 'footer [data-consent-safe-copy]', textOnly: true },
+  ]) {
+    const target = page.locator(selector).first();
+    await target.scrollIntoViewIfNeeded();
+    await target.evaluate((element) => element.scrollIntoView({ block: "center", behavior: "auto" }));
+    const collision = await page.evaluate(({ targetSelector, compareTextOnly }) => {
+      const control = document.querySelector('[aria-label="Изменить настройки cookies"]');
+      const targetElement = document.querySelector(targetSelector);
+      if (!control || !targetElement) return null;
+      const controlRect = control.getBoundingClientRect();
+      const targetRects = compareTextOnly
+        ? (() => {
+          const rects = [];
+          const walker = document.createTreeWalker(targetElement, NodeFilter.SHOW_TEXT);
+          for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+            const range = document.createRange();
+            range.selectNodeContents(node);
+            rects.push(...range.getClientRects());
+          }
+          return rects;
+        })()
+        : [targetElement.getBoundingClientRect()];
+      const targetRect = targetRects.find((rect) => !(
+        controlRect.right <= rect.left
+        || controlRect.left >= rect.right
+        || controlRect.bottom <= rect.top
+        || controlRect.top >= rect.bottom
+      ));
+      return targetRect ? { control: controlRect.toJSON(), target: targetRect.toJSON() } : null;
+    }, { targetSelector: selector, compareTextOnly: textOnly });
+    assert.equal(collision, null, `${label}: consent control overlaps ${selector}: ${JSON.stringify(collision)}`);
+  }
+}
+
 async function assertHeaderLayout(page, viewport) {
   const desktopNav = page.getByRole("navigation", { name: "Разделы лендинга" });
   const menuButton = page.getByRole("button", { name: "Открыть меню" });
@@ -227,22 +326,36 @@ async function assertHeaderLayout(page, viewport) {
 }
 
 async function assertHeroGeometry(page, label) {
-  for (const selector of ["#scene-detection h1", "#scene-detection figure", "#scene-detection article"]) {
+  for (const selector of ["[data-hero-title]", "[data-hero-visual]", "[data-hero-signal-card]"]) {
     const box = await page.locator(selector).first().boundingBox();
     assert.ok(box && box.width >= 44 && box.height >= 44, `${label}: invalid hero surface ${selector}`);
   }
 
-  if (label === "desktop-1440x900" || label === "desktop-1920x1080") {
-    const viewport = page.viewportSize();
+  const viewport = page.viewportSize();
+  const visual = await page.locator("[data-hero-visual]").boundingBox();
+  const card = await page.locator("[data-hero-signal-card]").boundingBox();
+  assert.ok(viewport && visual && card, `${label}: missing hero visual composition`);
+  assert.ok(visual.width >= Math.min(280, viewport.width - 32), `${label}: radar width is not meaningful`);
+  assert.ok(visual.height >= 192, `${label}: radar height is not meaningful`);
+  assert.ok(card.x >= visual.x - 1 && card.x + card.width <= visual.x + visual.width + 1, `${label}: signal card escapes radar horizontally`);
+  assert.ok(card.y >= visual.y - 1 && card.y + card.height <= visual.y + visual.height + 1, `${label}: signal card escapes radar vertically`);
+
+  if (viewport.width >= 1024) {
     const primary = await page.locator('#scene-detection [data-analytics-context="hero_primary"]').boundingBox();
     const secondary = await page.locator('#scene-detection [data-analytics-context="hero_secondary"]').boundingBox();
     const trust = await page.locator("#scene-detection [data-hero-trust-line]").boundingBox();
-    const radar = await page.locator("#scene-detection figure").first().boundingBox();
-    assert.ok(viewport && primary && secondary && trust && radar, `${label}: missing hero fold surfaces`);
+    assert.ok(primary && secondary && trust, `${label}: missing hero fold surfaces`);
     assert.ok(primary.y + primary.height <= viewport.height, `${label}: primary CTA is below fold`);
     assert.ok(secondary.y + secondary.height <= viewport.height, `${label}: secondary CTA is below fold`);
     assert.ok(trust.y + trust.height <= viewport.height, `${label}: trust line is below fold`);
-    assert.ok(radar.x < viewport.width && radar.x + radar.width > viewport.width * .5, `${label}: radar is not visibly participating in hero`);
+    assert.ok(visual.y < viewport.height && visual.x + visual.width > viewport.width * .5, `${label}: radar is not visibly participating in hero`);
+    assert.ok(card.y < viewport.height, `${label}: signal card is below fold`);
+  } else if (viewport.width <= 480) {
+    const actions = await page.locator("[data-hero-actions]").boundingBox();
+    const trust = await page.locator("#scene-detection [data-hero-trust-line]").boundingBox();
+    assert.ok(actions && trust, `${label}: missing compact hero controls`);
+    assert.ok(actions.y + actions.height <= visual.y + 1, `${label}: radar overlaps hero actions`);
+    assert.ok(trust.y + trust.height <= visual.y + 1, `${label}: radar overlaps trust line`);
   }
 }
 
@@ -304,6 +417,8 @@ async function assertResponsiveSurface(browser, viewport) {
   await assertAccessibleInteractiveNames(page, viewport.name);
   await assertControls(page, viewport.name);
   await assertNoOverlapOrClipping(page, viewport.name);
+  await assertKeyHeadingBounds(page, viewport.name);
+  await assertConsentControlCollisions(page, viewport.name);
   const fullHeight = await measurePageHeight(page, viewport);
 
   await page.evaluate(() => window.scrollTo(0, 0));
@@ -658,6 +773,7 @@ try {
   process.stdout.write(`${JSON.stringify({
     ok: true,
     baseUrl,
+    analyticsConsentRequired: requireAnalyticsConsent,
     screenshotDirectory,
     matrix: viewportMatrix.map(({ width, height }) => `${width}x${height}`),
     screenshots: artifact.screenshots,
@@ -675,6 +791,8 @@ try {
       touchTargets: true,
       horizontalOverflow: true,
       clipping: true,
+      headingBounds: true,
+      consentControlCollisions: true,
       heroFold: true,
     },
   }, null, 2)}\n`);

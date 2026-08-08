@@ -7,9 +7,9 @@
 
 .siteFooter[data-tone="dark"] {
   margin-top: 0;
-  border-top-color: rgba(221, 233, 227, .12);
-  background: #111a22;
-  color: rgba(242, 239, 231, .62);
+  border-top-color: rgba(242, 241, 235, .1);
+  background: #080c0a;
+  color: rgba(242, 241, 235, .66);
 }
 
 .footerInner {
@@ -49,13 +49,15 @@
   height: 24px;
   flex: 0 0 24px;
   object-fit: contain;
+  filter: grayscale(.85) saturate(.45) brightness(1.08);
+  opacity: .88;
   user-select: none;
 }
 
 .footerLine {
   margin: 0;
   max-width: 34ch;
-  color: rgba(242, 239, 231, .56);
+  color: rgba(242, 241, 235, .68);
   font-size: .92rem;
   line-height: 1.65;
 }
@@ -76,7 +78,7 @@
 
 .footerNav strong {
   margin-bottom: .72rem;
-  color: rgba(242, 239, 231, .92);
+  color: rgba(242, 241, 235, .92);
   font-size: .7rem;
   font-weight: 650;
   letter-spacing: .09em;
@@ -91,7 +93,7 @@
   min-height: 44px;
   align-items: center;
   overflow-wrap: anywhere;
-  color: rgba(242, 239, 231, .56);
+  color: rgba(242, 241, 235, .68);
   font-size: .82rem;
   line-height: 1.35;
   text-decoration: none;
@@ -101,13 +103,13 @@
 .footerBrand:hover,
 .footerLink:hover,
 .footerOperatorEmail:hover {
-  color: #b5ead8;
+  color: #bfdc91;
 }
 
 .footerBrand:focus-visible,
 .footerLink:focus-visible,
 .footerOperatorEmail:focus-visible {
-  outline: 2px solid #8dd9c1;
+  outline: 2px solid #bfdc91;
   outline-offset: 4px;
   border-radius: 3px;
 }
@@ -118,7 +120,7 @@
   align-items: baseline;
   gap: 1.5rem;
   padding-top: 1.25rem;
-  border-top: 1px solid rgba(221, 233, 227, .1);
+  border-top: 1px solid rgba(242, 241, 235, .09);
 }
 
 .footerOperator {
@@ -126,13 +128,13 @@
   flex-wrap: wrap;
   align-items: baseline;
   gap: .38rem .55rem;
-  color: rgba(242, 239, 231, .4);
+  color: rgba(242, 241, 235, .56);
   font-size: .7rem;
   line-height: 1.55;
 }
 
 .footerOperatorName {
-  color: rgba(242, 239, 231, .62);
+  color: rgba(242, 241, 235, .7);
   font-weight: 600;
 }
 
@@ -155,7 +157,7 @@
 
 .footerCopy {
   flex: 0 0 auto;
-  color: rgba(242, 239, 231, .32);
+  color: rgba(242, 241, 235, .5);
   font-size: .66rem;
   letter-spacing: .045em;
   text-transform: uppercase;
@@ -175,6 +177,11 @@
 
 .siteFooter[data-tone="light"] .footerCopy {
   color: var(--c-text-muted, #667085);
+}
+
+.siteFooter[data-tone="light"] .footerMark {
+  filter: none;
+  opacity: 1;
 }
 
 /* The footer also lives inside the product workspace next to a persistent
@@ -208,18 +215,17 @@
   }
 
   .footerNav {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 2rem 1.25rem;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, .8fr) minmax(0, 1.35fr);
+    gap: 1.5rem .8rem;
   }
 
   .footerNav nav:last-child {
-    grid-column: 1 / -1;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    column-gap: 1.25rem;
+    grid-column: auto;
+    grid-template-columns: 1fr;
   }
 
   .footerNav nav:last-child strong {
-    grid-column: 1 / -1;
+    grid-column: auto;
   }
 
   .footerBottom {
@@ -235,11 +241,31 @@
     display: grid;
     gap: .25rem;
   }
+
+  .footerLine[data-consent-safe-copy] {
+    padding-right: 4.25rem;
+  }
 }
 
 @media (max-width: 390px) {
+  .footerLink {
+    font-size: .76rem;
+  }
+}
+
+@media (max-width: 340px) {
+  .footerNav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .footerNav nav:last-child {
-    grid-template-columns: 1fr;
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: .8rem;
+  }
+
+  .footerNav nav:last-child strong {
+    grid-column: 1 / -1;
   }
 }
 

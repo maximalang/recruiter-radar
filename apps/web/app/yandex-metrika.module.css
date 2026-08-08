@@ -1,0 +1,142 @@
+.dialog {
+  position: fixed;
+  z-index: 1000;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  left: max(16px, env(safe-area-inset-left));
+  display: flex;
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 18px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border: 1px solid rgba(242, 241, 235, .14);
+  border-radius: 18px;
+  background: rgba(8, 12, 10, .97);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, .34);
+  color: #f2f1eb;
+  backdrop-filter: blur(16px);
+}
+
+.copy {
+  display: grid;
+  flex: 1 1 480px;
+  gap: 6px;
+}
+
+.title {
+  font-size: .95rem;
+}
+
+.text {
+  color: rgba(242, 241, 235, .72);
+  font-size: .82rem;
+  line-height: 1.55;
+}
+
+.link {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  vertical-align: middle;
+}
+
+.actions {
+  display: flex;
+  flex: 1 1 280px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.primaryButton,
+.secondaryButton {
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 11px;
+  font: inherit;
+  font-size: .82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.primaryButton {
+  border: 1px solid #bfdc91;
+  background: #bfdc91;
+  color: #10150e;
+}
+
+.secondaryButton {
+  border: 1px solid rgba(242, 241, 235, .2);
+  background: rgba(242, 241, 235, .06);
+  color: #f2f1eb;
+}
+
+.settingsButton {
+  position: fixed;
+  z-index: 900;
+  right: max(8px, env(safe-area-inset-right));
+  bottom: max(8px, env(safe-area-inset-bottom));
+  width: 58px;
+  min-height: 44px;
+  padding: 0 7px;
+  border: 1px solid rgba(242, 241, 235, .16);
+  border-radius: 999px;
+  background: rgba(8, 12, 10, .92);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .22);
+  color: rgba(242, 241, 235, .72);
+  font: inherit;
+  font-size: .62rem;
+  cursor: pointer;
+}
+
+.primaryButton:hover,
+.primaryButton:focus-visible {
+  background: #d0e7ad;
+}
+
+.secondaryButton:hover,
+.secondaryButton:focus-visible,
+.settingsButton:hover,
+.settingsButton:focus-visible {
+  border-color: rgba(191, 220, 145, .62);
+  color: #f2f1eb;
+}
+
+.primaryButton:focus-visible,
+.secondaryButton:focus-visible,
+.settingsButton:focus-visible,
+.link:focus-visible {
+  outline: 2px solid #bfdc91;
+  outline-offset: 3px;
+}
+
+@media (max-width: 620px) {
+  .dialog {
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .actions {
+    justify-content: stretch;
+  }
+
+  .primaryButton,
+  .secondaryButton {
+    flex: 1 1 12rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .primaryButton,
+  .secondaryButton,
+  .settingsButton,
+  .link {
+    transition: none;
+  }
+}

@@ -26,11 +26,11 @@ describe("landing runtime truth contract", () => {
     expect(aggregateChannels).toContain("web_push_enabled");
     expect(aggregateChannels).toContain("email_digest_enabled");
 
-    for (const label of ["Веб-кабинет", "Telegram", "VK", "Email digest", "Browser push", "Signed webhook"]) {
+    for (const label of ["Веб-кабинет", "Telegram", "VK", "Email", "Push в браузере", "HTTPS webhook"]) {
       expect(delivery).toContain(label);
     }
 
-    for (const label of ["Telegram", "VK", "email digest", "browser push", "signed HTTPS webhook"]) {
+    for (const label of ["Telegram", "VK", "email-дайджесте", "браузерных уведомлениях", "защищённый HTTPS-webhook"]) {
       expect(faq).toContain(label);
     }
     expect(faq).not.toContain("остальные способы доставки не входят");
@@ -63,7 +63,7 @@ describe("landing runtime truth contract", () => {
     expect(evidence).toContain("ATS");
     expect(evidence).toContain("GDELT");
 
-    expect(faq).toContain("не влияют на основную выдачу, пока не пройдут проверки");
+    expect(faq).toContain("влияют на выдачу только после проверки качества и стабильности данных");
     expect(evidence).not.toContain("adapter ready / digest gated");
     expect(evidence).not.toContain("promotion gate");
     expect(faq).not.toContain("lead-originate");

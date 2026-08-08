@@ -176,7 +176,7 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
             data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.header}
           >
-            Получить пример <ArrowGlyph />
+            Посмотреть пример <ArrowGlyph />
           </a>
           <button
             ref={menuButtonRef}
@@ -213,7 +213,7 @@ export default function LandingHeader({ previewHref }: { previewHref: string }) 
             data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.header}
           >
-            Получить пример <ArrowGlyph />
+            Посмотреть пример <ArrowGlyph />
           </a>
         </div>
       </div>

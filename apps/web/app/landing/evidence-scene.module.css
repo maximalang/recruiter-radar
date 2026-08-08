@@ -37,7 +37,7 @@
   grid-template-columns: minmax(8rem, auto) minmax(0, 1fr);
   align-content: start;
   align-items: end;
-  gap: .5rem 1.25rem;
+  gap: .55rem 1.25rem;
   min-width: 0;
   padding: .15rem 0 1rem;
   border-bottom: 1px solid rgba(221, 233, 227, .15);
@@ -47,8 +47,8 @@
   grid-column: 1 / -1;
   color: #8dd9c1;
   font-family: var(--mono);
-  font-size: .58rem;
-  letter-spacing: .08em;
+  font-size: .6rem;
+  letter-spacing: .07em;
   text-transform: uppercase;
 }
 
@@ -67,9 +67,9 @@
 
 .scoreValue small {
   padding-bottom: .5rem;
-  color: rgba(242, 239, 231, .45);
+  color: rgba(242, 239, 231, .62);
   font-family: var(--mono);
-  font-size: .54rem;
+  font-size: .58rem;
   text-transform: uppercase;
 }
 
@@ -78,10 +78,10 @@
   flex-wrap: wrap;
   align-self: center;
   gap: .45rem .8rem;
-  color: rgba(242, 239, 231, .52);
+  color: rgba(242, 239, 231, .68);
   font-family: var(--mono);
-  font-size: .52rem;
-  letter-spacing: .05em;
+  font-size: .58rem;
+  letter-spacing: .045em;
   text-transform: uppercase;
 }
 
@@ -91,9 +91,9 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: .3rem;
   margin-top: .15rem;
-  color: rgba(242, 239, 231, .34);
+  color: rgba(242, 239, 231, .52);
   font-family: var(--mono);
-  font-size: .47rem;
+  font-size: .54rem;
   text-transform: uppercase;
 }
 
@@ -105,7 +105,7 @@
   grid-column: 1 / -1;
   height: 2px;
   margin-top: .15rem;
-  background: rgba(242, 239, 231, .1);
+  background: rgba(242, 239, 231, .16);
 }
 
 .scaleTrack::after {
@@ -135,11 +135,11 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: .35rem .7rem;
   min-width: 0;
-  padding: .8rem 1rem .8rem 0;
+  padding: .85rem 1rem .85rem 0;
   border-top: 1px solid rgba(221, 233, 227, .13);
   opacity: 0;
   transform: translateY(5px);
-  animation: factorReveal .65s ease forwards;
+  animation: factorReveal .5s ease forwards;
 }
 
 .factor:nth-child(even) {
@@ -148,10 +148,10 @@
   border-left: 1px solid rgba(221, 233, 227, .1);
 }
 
-.factor:nth-child(1) { animation-delay: .15s; }
-.factor:nth-child(2) { animation-delay: .32s; }
-.factor:nth-child(3) { animation-delay: .49s; }
-.factor:nth-child(4) { animation-delay: .66s; }
+.factor:nth-child(1) { animation-delay: .1s; }
+.factor:nth-child(2) { animation-delay: .2s; }
+.factor:nth-child(3) { animation-delay: .3s; }
+.factor:nth-child(4) { animation-delay: .4s; }
 
 .factor :global(svg) {
   grid-row: 1 / 3;
@@ -161,23 +161,23 @@
 
 .factor span {
   min-width: 0;
-  color: rgba(242, 239, 231, .88);
-  font-size: .82rem;
+  color: rgba(242, 239, 231, .9);
+  font-size: .84rem;
   font-weight: 580;
 }
 
 .factor strong {
   color: #b5ead8;
   font-family: var(--mono);
-  font-size: .68rem;
+  font-size: .7rem;
 }
 
 .factor p {
   grid-column: 2 / 4;
   margin: 0;
-  color: rgba(242, 239, 231, .5);
-  font-size: .7rem;
-  line-height: 1.45;
+  color: rgba(242, 239, 231, .64);
+  font-size: .72rem;
+  line-height: 1.48;
 }
 
 .ledger {
@@ -199,8 +199,8 @@
 .registryIntro > span {
   color: #8dd9c1;
   font-family: var(--mono);
-  font-size: .56rem;
-  letter-spacing: .07em;
+  font-size: .58rem;
+  letter-spacing: .065em;
   text-transform: uppercase;
 }
 
@@ -211,7 +211,7 @@
 
 .ledgerHeading p {
   margin: 0;
-  color: rgba(242, 239, 231, .5);
+  color: rgba(242, 239, 231, .64);
   font-size: .78rem;
   line-height: 1.5;
 }
@@ -240,9 +240,9 @@
 .record:last-child { border-right: 0; padding-right: 0; }
 
 .recordIndex {
-  color: #b47c5c;
+  color: #c68f70;
   font-family: var(--mono);
-  font-size: .54rem;
+  font-size: .56rem;
 }
 
 .recordFact {
@@ -252,10 +252,10 @@
 }
 
 .recordFact span {
-  color: rgba(242, 239, 231, .44);
+  color: rgba(242, 239, 231, .62);
   font-family: var(--mono);
-  font-size: .5rem;
-  letter-spacing: .06em;
+  font-size: .56rem;
+  letter-spacing: .05em;
   text-transform: uppercase;
 }
 
@@ -275,12 +275,12 @@
   display: grid;
   grid-template-columns: 4.2rem minmax(0, 1fr);
   gap: .6rem;
-  color: rgba(242, 239, 231, .62);
+  color: rgba(242, 239, 231, .7);
   font-family: var(--mono);
-  font-size: .51rem;
+  font-size: .56rem;
 }
 
-.recordMeta dt { color: rgba(242, 239, 231, .34); text-transform: uppercase; }
+.recordMeta dt { color: rgba(242, 239, 231, .54); text-transform: uppercase; }
 .recordMeta dd { margin: 0; }
 
 .recordStatus {
@@ -291,7 +291,7 @@
   gap: .4rem;
   color: #8dd9c1;
   font-family: var(--mono);
-  font-size: .5rem;
+  font-size: .56rem;
   font-weight: 650;
   letter-spacing: .06em;
   text-transform: uppercase;
@@ -312,9 +312,9 @@
   min-height: 44px;
   align-items: center;
   gap: .45rem;
-  color: rgba(242, 239, 231, .72);
+  color: rgba(242, 239, 231, .78);
   font-family: var(--mono);
-  font-size: .52rem;
+  font-size: .58rem;
   text-decoration: none;
   text-transform: uppercase;
 }
@@ -346,9 +346,9 @@
 
 .registryIntro p {
   margin: 0;
-  color: rgba(242, 239, 231, .5);
-  font-size: .74rem;
-  line-height: 1.52;
+  color: rgba(242, 239, 231, .64);
+  font-size: .78rem;
+  line-height: 1.54;
 }
 
 .roleList {
@@ -373,9 +373,9 @@
 .roleList summary::-webkit-details-marker { display: none; }
 
 .roleIndex {
-  color: #b47c5c;
+  color: #c68f70;
   font-family: var(--mono);
-  font-size: .53rem;
+  font-size: .56rem;
 }
 
 .roleList summary strong {
@@ -384,12 +384,12 @@
 }
 
 .roleList summary small {
-  color: rgba(242, 239, 231, .48);
-  font-size: .68rem;
+  color: rgba(242, 239, 231, .64);
+  font-size: .7rem;
 }
 
 .registryArrow {
-  color: rgba(242, 239, 231, .5);
+  color: rgba(242, 239, 231, .62);
   transform: rotate(90deg);
   transition: transform .18s ease;
 }
@@ -405,9 +405,9 @@
 .roleBody p {
   max-width: 48rem;
   margin: 0;
-  color: rgba(242, 239, 231, .54);
-  font-size: .74rem;
-  line-height: 1.52;
+  color: rgba(242, 239, 231, .66);
+  font-size: .78rem;
+  line-height: 1.54;
 }
 
 .roleMeta {
@@ -421,11 +421,11 @@
   display: inline-flex;
   align-items: center;
   gap: .42rem;
-  color: rgba(235, 244, 239, .72);
+  color: rgba(235, 244, 239, .76);
   font-family: var(--mono);
-  font-size: .53rem;
+  font-size: .56rem;
   font-weight: 650;
-  letter-spacing: .07em;
+  letter-spacing: .06em;
   text-transform: uppercase;
 }
 
@@ -440,7 +440,7 @@
 .roleStatus[data-state="live"] { color: #8dd9c1; }
 .roleStatus[data-state="support"] { color: #b6cbc3; }
 .roleStatus[data-state="gated"] { color: #d7b89f; }
-.roleStatus[data-state="context"] { color: #94aaa3; }
+.roleStatus[data-state="context"] { color: #a8bbb5; }
 
 .sourceTags {
   display: flex;
@@ -456,11 +456,11 @@
   min-height: 1.7rem;
   align-items: center;
   padding: .3rem .45rem;
-  border: 1px solid rgba(230, 239, 234, .1);
-  color: rgba(239, 244, 241, .7);
+  border: 1px solid rgba(230, 239, 234, .12);
+  color: rgba(239, 244, 241, .76);
   font-family: var(--mono);
-  font-size: .52rem;
-  line-height: 1.2;
+  font-size: .56rem;
+  line-height: 1.25;
 }
 
 @keyframes factorReveal {
@@ -487,18 +487,21 @@
 }
 
 @media (max-width: 820px) {
-  .top { grid-template-columns: 1fr; }
+  .top { grid-template-columns: 1fr; gap: 1.35rem; }
   .top > .intro,
   .factors,
   .score { grid-column: 1; grid-row: auto; }
-  .score { grid-template-columns: minmax(8rem, auto) minmax(0, 1fr); }
+  .score {
+    grid-template-columns: minmax(8rem, auto) minmax(0, 1fr);
+    padding-bottom: 1.15rem;
+  }
   .score > span,
   .scale { grid-column: 1 / -1; }
   .scoreValue strong { font-size: 6rem; }
   .factors { grid-template-columns: 1fr; }
   .factor,
   .factor:nth-child(even) {
-    padding: .8rem 0;
+    padding: .85rem 0;
     border-left: 0;
   }
   .records { grid-template-columns: 1fr; }
@@ -525,9 +528,11 @@
   .score > span,
   .scale { grid-column: 1; }
   .scoreValue strong { font-size: 5.4rem; }
+  .scoreMeta { font-size: .6rem; }
+  .scale { font-size: .56rem; }
   .roleList summary { gap: .55rem; }
   .roleBody { padding-left: 0; }
-  .recordMeta div { grid-template-columns: 4rem minmax(0, 1fr); }
+  .recordMeta div { grid-template-columns: 4rem minmax(0, 1fr); font-size: .58rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
