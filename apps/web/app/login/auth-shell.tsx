@@ -12,20 +12,22 @@ export function AuthShell(props: { children: ReactNode }) {
           <Link href="/" className={styles.brand}>
             <BrandLogo size="small" tone="dark" />
           </Link>
-          <div className={styles.radar} aria-hidden="true">
-            <span className={styles.radarCore} />
-            <span className={styles.radarSweep} />
+          <div
+            className={styles.compass}
+            data-auth-compass="true"
+            aria-hidden="true"
+          >
+            <span className={styles.compassRing} />
+            <span className={styles.compassRing} />
+            <span className={styles.compassRing} />
+            <span className={styles.signalCluster} data-signal-cluster="primary" />
+            <span className={styles.signalCluster} data-signal-cluster="secondary" />
           </div>
           <div className={styles.storyCopy}>
-            <p className={styles.storyEyebrow}>Сигналы найма для агентств</p>
-            <h2 className={styles.storyTitle}>
-              От наблюдения
-              <br />
-              к разговору вовремя
-            </h2>
+            <p className={styles.storyEyebrow}>Рабочий контекст агентства</p>
+            <h2 className={styles.storyTitle}>Рабочее пространство Recruiter Radar</h2>
             <p className={styles.storyLead}>
-              Recruiter Radar собирает проверяемые сигналы компаний и помогает
-              команде видеть, где потребность в найме возникает прямо сейчас.
+              Сигналы, доказательства и история работы агентства в одном месте.
             </p>
             <ul className={styles.valueList}>
               <li>Доказательства рядом с каждой рекомендацией</li>
