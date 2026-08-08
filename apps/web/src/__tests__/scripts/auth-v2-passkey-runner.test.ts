@@ -54,4 +54,12 @@ describe("auth v2 passkey E2E isolation", () => {
       );
     }
   });
+
+  test("waits for client session hydration before starting WebAuthn registration", () => {
+    const runner = readFileSync(runnerPath, "utf8");
+
+    expect(runner).toContain("const clientSessionReady = page.waitForResponse");
+    expect(runner).toContain("/api/auth/session/refresh");
+    expect(runner).toContain("await clientSessionReady");
+  });
 });
