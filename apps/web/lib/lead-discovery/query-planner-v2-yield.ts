@@ -10,8 +10,11 @@ export type QueryPlanOperationalYield = QueryPlanHistoricalYield & {
   executionCount: number | null
   zeroResultExecutions: number | null
   newCompanyEvents: number | null
+  independentEvents: number | null
   qualifiedEpisodes: number | null
   actionableOpportunities: number | null
+  strongReviewedOpportunities: number | null
+  ordinaryHiringOpportunities: number | null
   staleOpportunities: number | null
   won: number | null
 }
@@ -22,6 +25,7 @@ export type QueryPlanSupplyDiagnosticCode =
   | 'SUPPLY_SAMPLE_INSUFFICIENT'
   | 'SUPPLY_ZERO_RESULT_HEAVY'
   | 'SUPPLY_DUPLICATE_HEAVY'
+  | 'SUPPLY_ORDINARY_HIRING_HEAVY'
   | 'SUPPLY_NO_EPISODES'
   | 'SUPPLY_NO_QUALIFIED_EPISODES'
   | 'SUPPLY_STALE_HEAVY'
@@ -124,6 +128,8 @@ export function diagnoseQueryPlanSupply(
   const qualifiedEpisodes = value.qualifiedEpisodes ?? 0
   const qualified = value.qualifiedOpportunities ?? 0
   const actionable = value.actionableOpportunities ?? 0
+  const strongReviewed = value.strongReviewedOpportunities ?? 0
+  const ordinaryHiring = value.ordinaryHiringOpportunities ?? 0
   const stale = value.staleOpportunities ?? 0
   const executionCount = value.executionCount ?? 0
   const zeroResults = value.zeroResultExecutions ?? 0
@@ -131,7 +137,8 @@ export function diagnoseQueryPlanSupply(
   const replied = value.replied ?? 0
 
   const sampleReady = fetched >= MIN_SAMPLE_FETCHED ||
-    episodes >= MIN_SAMPLE_EPISODES || executionCount >= 5
+    episodes >= MIN_SAMPLE_EPISODES || executionCount >= 5 ||
+    strongReviewed >= 2 || replied >= 1 || (value.meetings ?? 0) >= 1
   if (!sampleReady) return ['SUPPLY_SAMPLE_INSUFFICIENT']
 
   const diagnostics: QueryPlanSupplyDiagnosticCode[] = []
@@ -145,6 +152,10 @@ export function diagnoseQueryPlanSupply(
   if (zeroResultRate >= 0.6) diagnostics.push('SUPPLY_ZERO_RESULT_HEAVY')
   if (fetched >= MIN_SAMPLE_FETCHED && duplicateRate >= 0.7) {
     diagnostics.push('SUPPLY_DUPLICATE_HEAVY')
+  }
+  if (strongReviewed + ordinaryHiring >= 5 &&
+    ordinaryHiring / (strongReviewed + ordinaryHiring) >= 0.7) {
+    diagnostics.push('SUPPLY_ORDINARY_HIRING_HEAVY')
   }
   if (episodes === 0) diagnostics.push('SUPPLY_NO_EPISODES')
   if (episodes >= MIN_SAMPLE_EPISODES && qualifiedEpisodes === 0) {
@@ -164,10 +175,13 @@ export function resolveYieldAdjustedPageBudget(
   rawYield: QueryPlanOperationalYield,
 ): { pageBudget: number; reasonCode: string | null } {
   const yieldSnapshot = normalizeOperationalYield(rawYield)
+  const strongReviewed = yieldSnapshot.strongReviewedOpportunities ?? 0
+  const ordinaryHiring = yieldSnapshot.ordinaryHiringOpportunities ?? 0
   const sampleReady =
     (yieldSnapshot.fetchedRecords ?? 0) >= MIN_SAMPLE_FETCHED ||
     (yieldSnapshot.episodes ?? 0) >= MIN_SAMPLE_EPISODES ||
-    (yieldSnapshot.executionCount ?? 0) >= 5
+    (yieldSnapshot.executionCount ?? 0) >= 5 || strongReviewed >= 2 ||
+    (yieldSnapshot.replied ?? 0) >= 1 || (yieldSnapshot.meetings ?? 0) >= 1
   if (!sampleReady) {
     return { pageBudget: currentBudget, reasonCode: 'YIELD_SAMPLE_INSUFFICIENT' }
   }
@@ -217,12 +231,26 @@ export function resolveYieldAdjustedPageBudget(
     }
   }
 
+  const reviewedCount = strongReviewed + ordinaryHiring
+  if (reviewedCount >= 5 && ordinaryHiring / reviewedCount >= 0.7) {
+    return {
+      pageBudget: clampBudget(currentBudget - 1),
+      reasonCode: 'YIELD_BUDGET_REDUCED_ORDINARY_HIRING',
+    }
+  }
+
   // Expansion requires downstream evidence. Fetched volume or company count
   // alone is intentionally insufficient.
   if (won > 0 || meetings >= 2 || replied >= 3) {
     return {
       pageBudget: clampBudget(currentBudget + 2),
       reasonCode: 'YIELD_BUDGET_EXPANDED_COMMERCIAL_OUTCOME',
+    }
+  }
+  if (strongReviewed >= 2 && (replied >= 1 || meetings >= 1)) {
+    return {
+      pageBudget: clampBudget(currentBudget + 1),
+      reasonCode: 'YIELD_BUDGET_EXPANDED_REVIEWED_COMMERCIAL_YIELD',
     }
   }
   if (
@@ -258,10 +286,13 @@ function normalizeOperationalYield(
     uniqueEvents: nullableCount(raw.uniqueEvents),
     uniqueCompanies: nullableCount(raw.uniqueCompanies),
     newCompanyEvents: nullableCount(raw.newCompanyEvents),
+    independentEvents: nullableCount(raw.independentEvents),
     episodes: nullableCount(raw.episodes),
     qualifiedEpisodes: nullableCount(raw.qualifiedEpisodes),
     qualifiedOpportunities: nullableCount(raw.qualifiedOpportunities),
     actionableOpportunities: nullableCount(raw.actionableOpportunities),
+    strongReviewedOpportunities: nullableCount(raw.strongReviewedOpportunities),
+    ordinaryHiringOpportunities: nullableCount(raw.ordinaryHiringOpportunities),
     staleOpportunities: nullableCount(raw.staleOpportunities),
     accepted: nullableCount(raw.accepted),
     contacted: nullableCount(raw.contacted),

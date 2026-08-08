@@ -14,9 +14,12 @@ const emptyYield: QueryPlanOperationalYield = {
   uniqueEvents: null,
   uniqueCompanies: null,
   newCompanyEvents: null,
+  independentEvents: null,
   episodes: null,
   qualifiedEpisodes: null,
   qualifiedOpportunities: null,
+  strongReviewedOpportunities: null,
+  ordinaryHiringOpportunities: null,
   actionableOpportunities: null,
   staleOpportunities: null,
   accepted: null,
@@ -108,6 +111,43 @@ describe('Query Planner v2 downstream yield tuning', () => {
     })).toEqual({
       pageBudget: 7,
       reasonCode: 'YIELD_BUDGET_EXPANDED_COMMERCIAL_OUTCOME',
+    })
+  })
+
+  it('preserves a small plan with high reviewed commercial yield', () => {
+    expect(resolveYieldAdjustedPageBudget(3, {
+      ...emptyYield,
+      executionCount: 3,
+      fetchedRecords: 18,
+      uniqueEvents: 8,
+      independentEvents: 5,
+      episodes: 4,
+      qualifiedOpportunities: 3,
+      actionableOpportunities: 2,
+      strongReviewedOpportunities: 2,
+      replied: 1,
+      meetings: 1,
+    })).toEqual({
+      pageBudget: 4,
+      reasonCode: 'YIELD_BUDGET_EXPANDED_REVIEWED_COMMERCIAL_YIELD',
+    })
+  })
+
+  it('reduces plans dominated by reviewed ordinary hiring', () => {
+    expect(resolveYieldAdjustedPageBudget(5, {
+      ...emptyYield,
+      executionCount: 8,
+      fetchedRecords: 80,
+      uniqueEvents: 55,
+      independentEvents: 20,
+      episodes: 15,
+      qualifiedOpportunities: 10,
+      actionableOpportunities: 4,
+      strongReviewedOpportunities: 1,
+      ordinaryHiringOpportunities: 8,
+    })).toEqual({
+      pageBudget: 4,
+      reasonCode: 'YIELD_BUDGET_REDUCED_ORDINARY_HIRING',
     })
   })
 

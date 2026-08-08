@@ -96,18 +96,22 @@ export async function materializeQueryPlanYield({
              plan_snapshot_id, workspace_id, client_profile_id,
              metric_version, measurement_window_start, measurement_window_end,
              execution_count, zero_result_executions, fetched_records,
-             unique_events, unique_companies, new_company_events, episodes,
-             qualified_episodes, qualified_opportunities, actionable_opportunities,
+             unique_events, unique_companies, new_company_events,
+             independent_events, episodes, qualified_episodes,
+             qualified_opportunities, actionable_opportunities,
+             strong_reviewed_opportunities, ordinary_hiring_opportunities,
              stale_opportunities, accepted, contacted, replied, meetings,
              won_opportunities, duplicate_rate, stale_rate, zero_result_rate,
              qualified_rate, accepted_rate, contacted_rate, reply_rate,
-             meeting_rate, input_hash
+             meeting_rate, independent_event_fetch_rate, episode_fetch_rate,
+             qualified_fetch_rate, strong_reviewed_fetch_rate, input_hash
            )
            VALUES (
              $1, $2, $3, $4, $5::TIMESTAMPTZ, $6::TIMESTAMPTZ,
              $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
              $17, $18, $19, $20, $21, $22, $23, $24, $25, $26,
-             $27, $28, $29, $30, $31
+             $27, $28, $29, $30, $31, $32, $33, $34, $35, $36,
+             $37, $38
            )
            ON CONFLICT (plan_snapshot_id, metric_version, input_hash) DO NOTHING`,
           [
@@ -123,10 +127,13 @@ export async function materializeQueryPlanYield({
             counts.uniqueEvents,
             counts.uniqueCompanies,
             counts.newCompanyEvents,
+            counts.independentEvents,
             counts.episodes,
             counts.qualifiedEpisodes,
             counts.qualifiedOpportunities,
             counts.actionableOpportunities,
+            counts.strongReviewedOpportunities,
+            counts.ordinaryHiringOpportunities,
             counts.staleOpportunities,
             counts.accepted,
             counts.contacted,
@@ -141,6 +148,10 @@ export async function materializeQueryPlanYield({
             rates.contactedRate,
             rates.replyRate,
             rates.meetingRate,
+            rates.independentEventFetchRate,
+            rates.episodeFetchRate,
+            rates.qualifiedFetchRate,
+            rates.strongReviewedFetchRate,
             inputHash,
           ],
         );
@@ -258,6 +269,31 @@ async function computePlanCounts(client, plan, start, end) {
         AND outcome.occurred_at >= $4::TIMESTAMPTZ
         AND outcome.occurred_at < $5::TIMESTAMPTZ
        GROUP BY lineage.opportunity_id
+     ),
+     quality_groups AS (
+       SELECT DISTINCT evidence.evidence_independence_group
+       FROM lineages lineage
+       JOIN commercial_signal_quality_snapshots quality
+         ON quality.candidate_id = lineage.candidate_id
+        AND quality.workspace_id = $2
+        AND quality.client_profile_id = $3
+       JOIN commercial_signal_quality_evidence evidence
+         ON evidence.quality_snapshot_id = quality.id
+        AND evidence.candidate_id = lineage.candidate_id
+        AND evidence.workspace_id = $2
+        AND evidence.client_profile_id = $3
+     ),
+     review_flags AS (
+       SELECT
+         lineage.lineage_id,
+         BOOL_OR(annotation.label IN ('strong', 'acceptable')) AS strong_reviewed,
+         BOOL_OR(annotation.reason_code = 'ordinary_hiring') AS ordinary_hiring
+       FROM lineages lineage
+       JOIN commercial_signal_annotations annotation
+         ON annotation.lineage_id = lineage.lineage_id
+        AND annotation.workspace_id = $2
+        AND annotation.client_profile_id = $3
+       GROUP BY lineage.lineage_id
      )
      SELECT
        (SELECT COUNT(*) FROM executions)::BIGINT AS "executionCount",
@@ -271,6 +307,7 @@ async function computePlanCounts(client, plan, start, end) {
          AS "uniqueCompanies",
        (SELECT COUNT(DISTINCT company_event_id) FROM company_events)::BIGINT
          AS "newCompanyEvents",
+       (SELECT COUNT(*) FROM quality_groups)::BIGINT AS "independentEvents",
        (SELECT COUNT(DISTINCT signal_episode_id) FROM episodes)::BIGINT
          AS "episodes",
        (SELECT COUNT(DISTINCT signal_episode_id) FROM lineages)::BIGINT
@@ -282,9 +319,13 @@ async function computePlanCounts(client, plan, start, end) {
         JOIN signal_episodes episode
           ON episode.id = lineage.signal_episode_id
          AND episode.organization_id = lineage.organization_id
-        WHERE candidate.status = 'qualified_actionable'
+       WHERE candidate.status = 'qualified_actionable'
           AND episode.valid_until > $5::TIMESTAMPTZ)::BIGINT
          AS "actionableOpportunities",
+       (SELECT COUNT(*) FROM review_flags WHERE strong_reviewed)::BIGINT
+         AS "strongReviewedOpportunities",
+       (SELECT COUNT(*) FROM review_flags WHERE ordinary_hiring)::BIGINT
+         AS "ordinaryHiringOpportunities",
        (SELECT COUNT(*)
         FROM lineages lineage
         JOIN signal_episodes episode
@@ -313,10 +354,13 @@ async function computePlanCounts(client, plan, start, end) {
     uniqueEvents: count(row.uniqueEvents),
     uniqueCompanies: count(row.uniqueCompanies),
     newCompanyEvents: count(row.newCompanyEvents),
+    independentEvents: count(row.independentEvents),
     episodes: count(row.episodes),
     qualifiedEpisodes: count(row.qualifiedEpisodes),
     qualifiedOpportunities: count(row.qualifiedOpportunities),
     actionableOpportunities: count(row.actionableOpportunities),
+    strongReviewedOpportunities: count(row.strongReviewedOpportunities),
+    ordinaryHiringOpportunities: count(row.ordinaryHiringOpportunities),
     staleOpportunities: count(row.staleOpportunities),
     accepted: count(row.accepted),
     contacted: count(row.contacted),
@@ -339,6 +383,19 @@ function computeRates(counts) {
     contactedRate: rate(counts.contacted, counts.qualifiedOpportunities),
     replyRate: rate(counts.replied, counts.contacted),
     meetingRate: rate(counts.meetings, counts.contacted),
+    independentEventFetchRate: rate(
+      counts.independentEvents,
+      counts.fetchedRecords,
+    ),
+    episodeFetchRate: rate(counts.episodes, counts.fetchedRecords),
+    qualifiedFetchRate: rate(
+      counts.qualifiedOpportunities,
+      counts.fetchedRecords,
+    ),
+    strongReviewedFetchRate: rate(
+      counts.strongReviewedOpportunities,
+      counts.fetchedRecords,
+    ),
   };
 }
 
