@@ -2,7 +2,6 @@ export const COMMERCIAL_SIGNAL_RUNTIME_MODES = [
   'legacy',
   'shadow',
   'canary',
-  'commercial_signal',
 ] as const
 
 export type CommercialSignalRuntimeMode =
@@ -35,14 +34,13 @@ export type CommercialSignalRolloutDecision = {
     | 'canary_workspace_mismatch'
     | 'canary_scope_invalid'
     | 'prerequisite_flag_off'
-    | 'commercial_signal_enabled'
 }
 
 /**
  * Resolve the serving/runtime mode for one workspace.
  *
  * Safety contract:
- * - absent/invalid mode is legacy;
+ * - absent/invalid/global mode is legacy;
  * - canary accepts exactly one positive workspace id;
  * - all Commercial Signal pipeline flags must be explicitly true before a
  *   canary workspace can become authoritative;
@@ -99,48 +97,36 @@ export function resolveCommercialSignalRollout(
     })
   }
 
-  if (requestedMode === 'canary') {
-    if (!canaryScope.valid || !canaryScope.workspaceId) {
-      return decision({
-        requestedMode,
-        effectiveMode: 'legacy',
-        workspaceId: normalizedWorkspaceId,
-        canaryWorkspaceId: null,
-        prerequisitesReady,
-        missingFlags,
-        reasonCode: 'canary_scope_invalid',
-      })
-    }
-    if (normalizedWorkspaceId !== canaryScope.workspaceId) {
-      return decision({
-        requestedMode,
-        effectiveMode: 'legacy',
-        workspaceId: normalizedWorkspaceId,
-        canaryWorkspaceId: canaryScope.workspaceId,
-        prerequisitesReady,
-        missingFlags,
-        reasonCode: 'canary_workspace_mismatch',
-      })
-    }
+  if (!canaryScope.valid || !canaryScope.workspaceId) {
     return decision({
       requestedMode,
-      effectiveMode: 'canary',
+      effectiveMode: 'legacy',
+      workspaceId: normalizedWorkspaceId,
+      canaryWorkspaceId: null,
+      prerequisitesReady,
+      missingFlags,
+      reasonCode: 'canary_scope_invalid',
+    })
+  }
+  if (normalizedWorkspaceId !== canaryScope.workspaceId) {
+    return decision({
+      requestedMode,
+      effectiveMode: 'legacy',
       workspaceId: normalizedWorkspaceId,
       canaryWorkspaceId: canaryScope.workspaceId,
       prerequisitesReady,
       missingFlags,
-      reasonCode: 'canary_workspace_match',
+      reasonCode: 'canary_workspace_mismatch',
     })
   }
-
   return decision({
     requestedMode,
-    effectiveMode: 'commercial_signal',
+    effectiveMode: 'canary',
     workspaceId: normalizedWorkspaceId,
     canaryWorkspaceId: canaryScope.workspaceId,
     prerequisitesReady,
     missingFlags,
-    reasonCode: 'commercial_signal_enabled',
+    reasonCode: 'canary_workspace_match',
   })
 }
 
@@ -149,7 +135,7 @@ export function isCommercialSignalAuthoritativeForWorkspace(
   env: RuntimeEnv = process.env,
 ): boolean {
   const mode = resolveCommercialSignalRollout(workspaceId, env).effectiveMode
-  return mode === 'canary' || mode === 'commercial_signal'
+  return mode === 'canary'
 }
 
 export function commercialSignalCandidateRolloutMode(

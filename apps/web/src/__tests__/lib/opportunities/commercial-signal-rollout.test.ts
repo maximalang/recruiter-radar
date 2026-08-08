@@ -95,15 +95,17 @@ describe('Commercial Signal production rollout', () => {
     })
   })
 
-  it('requires an explicit final commercial_signal mode before global authority', () => {
+  it('fails closed when global commercial_signal rollout is requested', () => {
     const env = {
       ...readyFlags,
       COMMERCIAL_SIGNAL_RUNTIME_MODE: 'commercial_signal',
     }
     expect(resolveCommercialSignalRollout('20', env)).toMatchObject({
-      effectiveMode: 'commercial_signal',
-      reasonCode: 'commercial_signal_enabled',
+      requestedMode: 'legacy',
+      effectiveMode: 'legacy',
+      reasonCode: 'legacy_default',
     })
-    expect(isCommercialSignalAuthoritativeForWorkspace('20', env)).toBe(true)
+    expect(isCommercialSignalAuthoritativeForWorkspace('20', env)).toBe(false)
+    expect(commercialSignalCandidateRolloutMode('20', env)).toBe('shadow')
   })
 })
