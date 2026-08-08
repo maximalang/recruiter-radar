@@ -35,8 +35,11 @@ test('precision treats strong/acceptable as relevant', () => {
 });
 
 test('NDCG rewards correct top ordering', () => {
-  assert.equal(ndcgAt(sample, 4), 1);
-  assert.ok(ndcgAt([...sample].reverse(), 4) < 1);
+  const correctlyRanked = [...sample]
+    .sort((left, right) => right.relevance - left.relevance);
+
+  assert.equal(ndcgAt(correctlyRanked, 4), 1);
+  assert.ok(ndcgAt([...correctlyRanked].reverse(), 4) < 1);
 });
 
 test('baseline evaluation exposes mature downstream descriptive rates', () => {
