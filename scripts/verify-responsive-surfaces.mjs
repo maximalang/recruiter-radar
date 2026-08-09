@@ -78,7 +78,7 @@ try {
         waitUntil: 'domcontentloaded',
         timeout: 30_000,
       });
-      await page.waitForTimeout(250);
+      await page.waitForLoadState('networkidle', { timeout: 30_000 });
 
       const status = response?.status() ?? 0;
       const result = await page.evaluate(() => {
@@ -252,8 +252,23 @@ try {
         });
       }
 
-      const screenshot = path.join(outputDir, `${viewport.name}-${slug(route)}.png`);
-      await page.screenshot({ path: screenshot, fullPage: true });
+      const entryFailed = (
+        status >= 500
+        || result.horizontalOverflow
+        || result.undersized.length > 0
+        || result.unlabeledControls.length > 0
+        || result.unlabeledFormControls.length > 0
+        || result.formButtonsWithoutType.length > 0
+        || result.invalidLinks.length > 0
+        || result.duplicateIds.length > 0
+        || result.clippedControls.length > 0
+        || !keyboardFocus
+        || consoleErrors.length > 0
+      );
+      const screenshot = entryFailed
+        ? path.join(outputDir, `${viewport.name}-${slug(route)}.png`)
+        : null;
+      if (screenshot) await page.screenshot({ path: screenshot, fullPage: true });
 
       const entry = {
         viewport: viewport.name,
@@ -267,21 +282,7 @@ try {
       };
       report.push(entry);
 
-      if (
-        status >= 500
-        || result.horizontalOverflow
-        || result.undersized.length > 0
-        || result.unlabeledControls.length > 0
-        || result.unlabeledFormControls.length > 0
-        || result.formButtonsWithoutType.length > 0
-        || result.invalidLinks.length > 0
-        || result.duplicateIds.length > 0
-        || result.clippedControls.length > 0
-        || !keyboardFocus
-        || consoleErrors.length > 0
-      ) {
-        failed = true;
-      }
+      if (entryFailed) failed = true;
       await page.close();
     }
     await context.close();

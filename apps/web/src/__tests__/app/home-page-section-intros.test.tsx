@@ -11,8 +11,6 @@ import DeliveryScene from "@/app/landing/delivery-scene";
 import DetectionScene from "@/app/landing/detection-scene";
 import EvidenceScene from "@/app/landing/evidence-scene";
 import LandingHeader from "@/app/landing/landing-header";
-import OutreachScene from "@/app/landing/outreach-scene";
-import SignalTimelineScene from "@/app/landing/signal-timeline-scene";
 import WorkspaceScene, { WorkspaceResults } from "@/app/landing/workspace-scene";
 import { SiteFooter } from "@/app/ui/site-footer";
 import {
@@ -150,22 +148,18 @@ describe("final unified evidence-first landing contract", () => {
     const page = await HomePage({ searchParams: Promise.resolve({}) });
     expect(collectElements(page, LandingHeader)).toHaveLength(1);
     expect(collectElements(page, DetectionScene)).toHaveLength(1);
-    expect(collectElements(page, SignalTimelineScene)).toHaveLength(1);
     expect(collectElements(page, WorkspaceScene)).toHaveLength(1);
     expect(collectElements(page, EvidenceScene)).toHaveLength(1);
     expect(collectElements(page, DeliveryScene)).toHaveLength(1);
-    expect(collectElements(page, OutreachScene)).toHaveLength(1);
     expect(collectElements(page, ConversionPanel)).toHaveLength(1);
     expect(collectElements(page, SiteFooter)).toHaveLength(1);
 
     const landing = source("app/landing/landing-page.tsx");
     const expectedOrder = [
       "<DetectionScene",
-      "<SignalTimelineScene",
       "<WorkspaceScene",
       "<EvidenceScene",
       "<DeliveryScene",
-      "<OutreachScene",
       "<ConversionPanel",
       "<SiteFooter",
     ];
@@ -242,14 +236,15 @@ describe("final unified evidence-first landing contract", () => {
     const offerAliasSource = source("app/offer/page.tsx");
 
     expect(html).toContain('id="scene-workspace"');
-    expect(html).toContain("Как выглядит");
+    expect(html).toContain("рабочая выдача");
     expect(html).toContain("рабочая выдача");
     expect(html).toContain('id="preview-configurator"');
     expect(html).toContain('id="preview-results"');
     expect(html).toContain("Временная ошибка загрузки");
     expect(html).toContain('id="scene-evidence"');
     expect(html).toContain('id="scene-delivery"');
-    expect(html).toContain('id="scene-outreach"');
+    expect(html).not.toContain('id="scene-outreach"');
+    expect(html).not.toContain('id="scene-timeline"');
     expect(html).toContain('id="pricing"');
     expect(html).toContain('id="faq"');
     expect(html).toContain("Соберите радар под специализацию агентства");
@@ -290,18 +285,19 @@ describe("final unified evidence-first landing contract", () => {
     const hero = renderToStaticMarkup(<DetectionScene previewHref="#preview-configurator" paymentConfigured={false} />);
     const evidence = renderToStaticMarkup(<EvidenceScene />);
     const delivery = renderToStaticMarkup(<DeliveryScene />);
-    const outreach = renderToStaticMarkup(<OutreachScene />);
 
     expect(hero).toContain("Компании, которым стоит написать сегодня");
-    expect(hero).toContain("Посмотреть пример радара");
+    expect(hero).toContain("Посмотреть возможности");
+    expect(hero).toContain("Уже есть доступ? Войти");
     expect(hero).toContain("заявка без списания");
     expect(hero).toContain(`data-analytics-event="${LANDING_ANALYTICS_EVENT.previewStarted}"`);
     expect(hero).toContain(`data-analytics-context="${LANDING_ANALYTICS_CONTEXT.heroPrimary}"`);
     expect(evidence).toContain("ОЦЕНКА РАДАРА");
     expect(evidence).toContain("ДОКАЗАТЕЛЬНАЯ БАЗА");
-    expect(delivery).toContain("Рекомендация приходит автоматически. Обращение отправляете вы.");
-    expect(outreach).toContain("ЧЕРНОВИК / НЕ ОТПРАВЛЕНО");
-    expect(outreach).toContain("Отправка сообщения компании всегда требует действия пользователя");
+    expect(evidence).toContain("Сигнал найма");
+    expect(evidence).not.toContain("открыть факт");
+    expect(delivery).toContain("Radar следит");
+    expect(delivery).toContain("Обращение компаниям всегда отправляете вы.");
   });
 
   it("keeps pricing data untouched and checkout analytics available", () => {
@@ -322,7 +318,7 @@ describe("final unified evidence-first landing contract", () => {
   });
 
   it("prevents regression to corrective layers, compass labels and sweep", () => {
-    const heroInstrument = source("app/landing/hero-instrument.tsx");
+    const hero = source("app/landing/detection-scene.tsx");
     const reducedMotionCss = [
       source("app/landing/landing.module.css"),
       source("app/landing/landing-header.module.css"),
@@ -331,8 +327,8 @@ describe("final unified evidence-first landing contract", () => {
     const correctivePath = resolve(WEB_ROOT, "app/landing/landing-corrections.module.css");
 
     expect(existsSync(correctivePath)).toBe(false);
-    expect(heroInstrument).not.toMatch(/NORTH|EAST|SOUTH|WEST/);
-    expect(heroInstrument).not.toMatch(/radarSweep|sweep/i);
+    expect(hero).not.toMatch(/NORTH|EAST|SOUTH|WEST/);
+    expect(hero).not.toMatch(/radarSweep|sweep/i);
     expect(reducedMotionCss).toContain("@media (prefers-reduced-motion: reduce)");
   });
 
@@ -349,7 +345,8 @@ describe("final unified evidence-first landing contract", () => {
     expect(header).toContain('document.body.style.overflow = "hidden"');
     expect(header).toContain("scrollbarWidth");
     expect(header).toContain("menuButtonRef.current?.focus");
-    expect(header).toContain("Посмотреть пример");
+    expect(header).toContain("Посмотреть возможности");
+    expect(header).not.toContain("Посмотреть пример");
     expect(headerCss).toMatch(/\.navLink\s*\{[\s\S]*?min-width:\s*44px[\s\S]*?min-height:\s*44px/);
   });
 

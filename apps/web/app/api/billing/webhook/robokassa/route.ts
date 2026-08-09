@@ -1,5 +1,6 @@
 import { getPool } from "@/lib/db";
 import { processPaymentWebhook } from "@/lib/payments";
+import { logError, logEvent, logWarn } from "@/lib/runtime";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -43,6 +44,7 @@ async function handle(request: Request): Promise<Response> {
   const pool = getPool();
 
   if (!pool) {
+    logWarn("payments.webhook_unavailable", { provider, reasonCode: "database_not_configured" });
     return text("Temporary processing error.", 503);
   }
 
@@ -120,6 +122,9 @@ async function handle(request: Request): Promise<Response> {
       ],
     );
 
+    if (succeeded) logEvent("payments.webhook_processed", { provider });
+    else logWarn("payments.webhook_failed", { provider, status: result.status });
+
     return text(result.body, result.status);
   } catch (error) {
     const message = error instanceof Error ? error.message.slice(0, 500) : "reconciliation_error";
@@ -135,6 +140,8 @@ async function handle(request: Request): Promise<Response> {
          AND claim_token = $4`,
       [provider, idempotencyKey, message, claimToken],
     );
+
+    logError("payments.webhook_failed", error, { provider });
 
     return text("Temporary processing error.", 503);
   }

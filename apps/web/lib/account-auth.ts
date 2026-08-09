@@ -13,6 +13,8 @@ import {
 const ACCOUNT_PATHS = ["/dashboard", "/checkout", "/settings", "/profile", "/leads", "/review"];
 const TOKEN_PATTERN = /^[a-f0-9]{64}$/;
 const LOGIN_TTL_MINUTES = 15;
+const LOGIN_TEMPORARILY_UNAVAILABLE =
+  "Вход временно недоступен. Попробуйте ещё раз немного позже.";
 
 export type AccountIdentity = {
   id: string;
@@ -79,7 +81,9 @@ async function rollbackQuietly(client: PoolClient): Promise<void> {
   await client.query("ROLLBACK").catch(() => undefined);
 }
 
-export type LoginRequestResult = { ok: true } | { ok: false; error: string };
+export type LoginRequestResult =
+  | { ok: true; delivery: "sent" | "suppressed" }
+  | { ok: false; error: string };
 
 export async function requestAccountLogin(input: {
   email: unknown;
@@ -90,15 +94,15 @@ export async function requestAccountLogin(input: {
   if (!email) return { ok: false, error: "Укажите один корректный email." };
 
   const returnTo = sanitizeAccountReturnTo(input.returnTo);
-  const sourceHash = hashLoginSource(input.sourceKey || "unknown");
-  const client = await getClient();
-  if (!client) {
-    logWarn("account.login_unavailable", { reason: "database_not_configured" });
-    return { ok: true };
-  }
-
+  let client: PoolClient | null = null;
   let token: string | null = null;
   try {
+    const sourceHash = hashLoginSource(input.sourceKey || "unknown");
+    client = await getClient();
+    if (!client) {
+      logWarn("account.login_unavailable", { reason: "database_not_configured" });
+      return { ok: false, error: LOGIN_TEMPORARILY_UNAVAILABLE };
+    }
     await client.query("BEGIN");
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", ["account-login-global"]);
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`account-login-source:${sourceHash}`]);
@@ -115,7 +119,7 @@ export async function requestAccountLogin(input: {
     if (Number(rate.rows[0]?.global_count ?? 0) >= 100 || Number(rate.rows[0]?.source_count ?? 0) >= 10) {
       await client.query("COMMIT");
       logWarn("account.login_rate_limited", { source: sourceHash.slice(0, 10) });
-      return { ok: true };
+      return { ok: true, delivery: "suppressed" };
     }
 
     const user = await client.query<{ id: string }>(
@@ -160,7 +164,7 @@ export async function requestAccountLogin(input: {
     );
     if (Number(perUser.rows[0]?.count ?? 0) >= 3) {
       await client.query("COMMIT");
-      return { ok: true };
+      return { ok: true, delivery: "suppressed" };
     }
 
     token = randomBytes(32).toString("hex");
@@ -176,14 +180,15 @@ export async function requestAccountLogin(input: {
     );
     await client.query("COMMIT");
   } catch (error) {
-    await rollbackQuietly(client);
+    if (client) await rollbackQuietly(client);
     logError("account.login_request_failed", error);
-    return { ok: true };
+    return { ok: false, error: LOGIN_TEMPORARILY_UNAVAILABLE };
   } finally {
-    client.release();
+    client?.release();
   }
 
-  if (!token) return { ok: true };
+  if (!token) return { ok: true, delivery: "suppressed" };
+  let sent: Awaited<ReturnType<typeof sendEmail>>;
   try {
     const verifyUrl = buildAccountLoginUrl(token);
     const message = renderAuthEmail({
@@ -191,19 +196,29 @@ export async function requestAccountLogin(input: {
       actionUrl: verifyUrl,
       expiresInMinutes: LOGIN_TTL_MINUTES,
     });
-    const sent = await sendEmail({
+    sent = await sendEmail({
       ...message,
       to: email,
     });
+  } catch (error) {
+    logError("account.login_email_failed", error);
+    return { ok: false, error: LOGIN_TEMPORARILY_UNAVAILABLE };
+  }
+
+  try {
     await getPool()?.query(
       "UPDATE account_login_challenges SET send_status = $2 WHERE token_hash = $1",
       [hashToken(token), sent.ok ? "sent" : "failed"],
     );
-    if (!sent.ok) logWarn("account.login_email_not_sent", { reason: sent.reason });
   } catch (error) {
-    logError("account.login_email_failed", error);
+    logError("account.login_delivery_status_failed", error);
   }
-  return { ok: true };
+
+  if (!sent.ok) {
+    logWarn("account.login_email_not_sent", { reason: sent.reason });
+    return { ok: false, error: LOGIN_TEMPORARILY_UNAVAILABLE };
+  }
+  return { ok: true, delivery: "sent" };
 }
 
 export async function isLoginChallengeActive(token: string): Promise<boolean> {

@@ -5,7 +5,7 @@ import {
   ensurePilotOrderOnboardingReady,
   syncCheckoutOrderAfterSuccessReturn
 } from "../../../../../lib/payments";
-import { getAuthorizedUserId } from "../../../../../lib/auth-v2/authorization";
+import { getSession } from "../../../../../lib/auth-v2/authorization";
 import {
   NoticeBox,
   PageFrame,
@@ -28,13 +28,17 @@ type CheckoutSuccessPageProps = {
 export default async function CheckoutSuccessPage({ params, searchParams }: CheckoutSuccessPageProps) {
   const resolvedParams = await params;
   const resolvedSearchParams = (await searchParams) ?? {};
-  const ownerId = await getAuthorizedUserId("billing:read");
+  const session = await getSession({ permission: "billing:read" });
 
-  if (!ownerId) {
+  if (!session?.workspaceId) {
     notFound();
   }
+  const access = {
+    workspaceId: session.workspaceId,
+    entitlementOwnerId: session.dataOwnerId,
+  };
 
-  const ownedOrder = await ensurePilotOrderOnboardingReady(resolvedParams.orderId, { ownerId });
+  const ownedOrder = await ensurePilotOrderOnboardingReady(resolvedParams.orderId, access);
 
   if (!ownedOrder) {
     notFound();
@@ -45,7 +49,7 @@ export default async function CheckoutSuccessPage({ params, searchParams }: Chec
       ? ownedOrder
       : (await syncCheckoutOrderAfterSuccessReturn({
           orderId: ownedOrder.id,
-          ownerId,
+          ...access,
           searchParams: resolvedSearchParams
         })) ?? ownedOrder;
 

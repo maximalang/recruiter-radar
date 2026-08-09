@@ -58,8 +58,8 @@ describe("auth v2 login action rollout", () => {
       "x-forwarded-for": "198.51.100.9, 10.0.0.1",
       "x-real-ip": "192.0.2.10",
     }) as never);
-    mockLegacyRequest.mockResolvedValue({ ok: true });
-    mockV2Request.mockResolvedValue({ ok: true });
+    mockLegacyRequest.mockResolvedValue({ ok: true, delivery: "sent" });
+    mockV2Request.mockResolvedValue({ ok: true, delivery: "sent" });
     mockShouldUseV2.mockResolvedValue(false);
     mockClearOwnerSession.mockResolvedValue(true);
   });

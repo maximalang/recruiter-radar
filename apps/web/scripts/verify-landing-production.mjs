@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, readdir, stat } from "node:fs/promises";
+import { mkdir, readdir, stat, unlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -7,7 +7,7 @@ import { chromium } from "playwright";
 
 const baseUrl = process.env.LANDING_BASE_URL ?? "http://127.0.0.1:3000";
 const screenshotDirectory = process.env.LANDING_SCREENSHOT_DIR
-  ?? path.join(os.tmpdir(), "recruiter-radar-final-unified-landing");
+  ?? path.join(os.tmpdir(), `recruiter-radar-final-unified-landing-${process.pid}`);
 const requireAnalyticsConsent = process.env.LANDING_REQUIRE_ANALYTICS_CONSENT === "true";
 
 const viewportMatrix = [
@@ -16,6 +16,7 @@ const viewportMatrix = [
   { width: 1366, height: 768, name: "desktop-1366x768" },
   { width: 1280, height: 800, name: "desktop-1280x800" },
   { width: 1180, height: 820, name: "tablet-1180x820" },
+  { width: 1152, height: 800, name: "tablet-1152x800" },
   { width: 1024, height: 768, name: "tablet-1024x768" },
   { width: 900, height: 900, name: "tablet-900x900" },
   { width: 768, height: 1024, name: "tablet-768x1024" },
@@ -26,13 +27,11 @@ const viewportMatrix = [
 
 const requiredSelectors = [
   "#scene-detection",
-  "#scene-timeline",
   "#scene-workspace",
   "#preview-configurator",
   "#preview-results",
   "#scene-evidence",
   "#scene-delivery",
-  "#scene-outreach",
   "#pricing",
   "#faq",
   "footer",
@@ -48,37 +47,6 @@ const hashSpecs = [
   { name: "hash-faq-1440x900", hash: "faq", target: "#faq" },
 ];
 
-const surfaceSpecs = [
-  { name: "hero-1920x1080", width: 1920, height: 1080, mode: "top" },
-  { name: "hero-1440x900", width: 1440, height: 900, mode: "top" },
-  { name: "hero-1366x768", width: 1366, height: 768, mode: "top" },
-  { name: "hero-1280x800", width: 1280, height: 800, mode: "top" },
-  { name: "hero-1180x820", width: 1180, height: 820, mode: "top" },
-  { name: "hero-1024x768", width: 1024, height: 768, mode: "top" },
-  { name: "hero-900x900", width: 900, height: 900, mode: "top" },
-  { name: "hero-768x1024", width: 768, height: 1024, mode: "top" },
-  { name: "hero-390x844", width: 390, height: 844, mode: "top" },
-  { name: "hero-360x800", width: 360, height: 800, mode: "top" },
-  { name: "hero-320x700", width: 320, height: 700, mode: "top" },
-  { name: "mobile-menu-390x844", width: 390, height: 844, mode: "menu" },
-  { name: "timeline-1440x900", width: 1440, height: 900, target: "#scene-timeline" },
-  { name: "preview-1440x900", width: 1440, height: 900, target: "#scene-workspace" },
-  { name: "preview-768x1024", width: 768, height: 1024, target: "#scene-workspace" },
-  { name: "preview-390x844", width: 390, height: 844, target: "#scene-workspace" },
-  { name: "evidence-1440x900", width: 1440, height: 900, target: "#scene-evidence" },
-  { name: "delivery-1440x900", width: 1440, height: 900, target: "#scene-delivery" },
-  { name: "outreach-1440x900", width: 1440, height: 900, target: "#scene-outreach" },
-  { name: "pricing-1440x900", width: 1440, height: 900, target: "#pricing" },
-  { name: "pricing-390x844", width: 390, height: 844, target: "#pricing" },
-  { name: "faq-1440x900", width: 1440, height: 900, target: "#faq" },
-  { name: "faq-390x844", width: 390, height: 844, target: "#faq" },
-  { name: "final-cta-1440x900", width: 1440, height: 900, target: "#conversion-final" },
-  { name: "final-cta-390x844", width: 390, height: 844, target: "#conversion-final" },
-  { name: "final-cta-320x700", width: 320, height: 700, target: "#conversion-final" },
-  { name: "footer-1440x900", width: 1440, height: 900, target: "footer" },
-  { name: "footer-390x844", width: 390, height: 844, target: "footer" },
-];
-
 const documentedConsoleAllowlist = [];
 
 function isAllowlistedConsoleMessage(message) {
@@ -91,7 +59,12 @@ function attachConsoleGate(page, label) {
   const messages = [];
   page.on("console", (message) => {
     if (message.type() === "error" || message.type() === "warning") {
-      messages.push({ type: message.type(), text: message.text() });
+      const location = message.location();
+      messages.push({
+        type: message.type(),
+        text: message.text(),
+        url: location.url || null,
+      });
     }
   });
   page.on("pageerror", (error) => messages.push({ type: "pageerror", text: error.message }));
@@ -117,15 +90,20 @@ async function resolveAnalyticsConsent(page) {
     return;
   }
 
-  await dialog.getByRole("button", { name: "Только необходимые" }).click();
+  await dialog.getByRole("button", { name: "Разрешить", exact: true }).click();
   await dialog.waitFor({ state: "hidden" });
-  await page.getByRole("button", { name: "Изменить настройки cookies" }).waitFor({ state: "visible" });
+  await page.getByRole("button", { name: "Настройки cookies" }).waitFor({ state: "visible" });
 }
 
 async function preparePage(context, label, url = baseUrl) {
   const page = await context.newPage();
   const assertCleanConsole = attachConsoleGate(page, label);
   await page.route("**/api/landing-events", (route) => route.fulfill({ status: 204 }));
+  await page.route("https://mc.yandex.ru/metrika/tag.js", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/javascript",
+    body: "/* deterministic analytics loader stub for local browser audit */",
+  }));
   await page.goto(url, { waitUntil: "networkidle" });
   await waitForLanding(page);
   await resolveAnalyticsConsent(page);
@@ -141,11 +119,9 @@ async function assertRequiredSurface(page, label) {
 
   assert.equal(await page.locator("h1").count(), 1, `${label}: expected exactly one h1`);
   assert.match(await page.locator("h1").innerText(), /Компании, которым стоит написать сегодня\./);
-  assert.match(await page.locator("#scene-timeline").innerText(), /Почему компании|событ|приоритет/i);
   assert.match(await page.locator("#scene-workspace").innerText(), /рабочая выдача|пример утренней выдачи/i);
   assert.match(await page.locator("#scene-evidence").innerText(), /доказатель|факт/i);
-  assert.match(await page.locator("#scene-delivery").innerText(), /Обращение отправляете вы|Решение пользователя/i);
-  assert.match(await page.locator("#scene-outreach").innerText(), /Отправка сообщения компании всегда требует действия пользователя/i);
+  assert.match(await page.locator("#scene-delivery").innerText(), /Обращение компаниям всегда отправляете вы/i);
   assert.match(await page.locator("#pricing").innerText(), /Проверьте радар на своих нишах за 7 дней/i);
   assert.match(await page.locator("#faq").innerText(), /Перед запуском — короткие ответы/i);
   await page.getByRole("heading", { name: /Соберите радар под специализацию агентства/ }).waitFor();
@@ -209,7 +185,6 @@ async function assertNoOverlapOrClipping(page, label) {
       "#preview-results",
       "#scene-evidence",
       "#scene-delivery",
-      "#scene-outreach",
       "#pricing",
       "#faq",
       "footer",
@@ -230,11 +205,9 @@ async function assertKeyHeadingBounds(page, label) {
   const issues = await page.evaluate(() => {
     const selectors = [
       "#scene-detection h1",
-      "#scene-timeline h2",
       "#scene-workspace h2",
       "#scene-evidence h2",
       "#scene-delivery h2",
-      "#scene-outreach h2",
       "#pricing h2",
       "#faq h2",
       "#conversion-final h2",
@@ -267,56 +240,25 @@ async function assertKeyHeadingBounds(page, label) {
   assert.deepEqual(issues, [], `${label}: key heading bounds failed ${JSON.stringify(issues)}`);
 }
 
-async function assertConsentControlCollisions(page, label) {
-  const consentControl = page.locator('[aria-label="Изменить настройки cookies"]');
-  if (!await consentControl.isVisible()) {
+async function assertConsentControlPlacement(page, label) {
+  const consentControl = page.getByRole("button", { name: "Настройки cookies", exact: true });
+  const consentControlCount = await consentControl.count();
+  if (consentControlCount === 0) {
     assert.equal(requireAnalyticsConsent, false, `${label}: analytics consent control is required for this audit`);
     return;
   }
-
-  for (const { selector, textOnly = false } of [
-    { selector: '[data-pricing-primary="true"] > a' },
-    { selector: "#faq details[open]" },
-    { selector: "#conversion-final a:first-of-type" },
-    { selector: '[data-pricing-primary="true"] [data-consent-safe-copy]', textOnly: true },
-    { selector: 'footer [data-consent-safe-copy]', textOnly: true },
-  ]) {
-    const target = page.locator(selector).first();
-    await target.scrollIntoViewIfNeeded();
-    await target.evaluate((element) => element.scrollIntoView({ block: "center", behavior: "auto" }));
-    const collision = await page.evaluate(({ targetSelector, compareTextOnly }) => {
-      const control = document.querySelector('[aria-label="Изменить настройки cookies"]');
-      const targetElement = document.querySelector(targetSelector);
-      if (!control || !targetElement) return null;
-      const controlRect = control.getBoundingClientRect();
-      const targetRects = compareTextOnly
-        ? (() => {
-          const rects = [];
-          const walker = document.createTreeWalker(targetElement, NodeFilter.SHOW_TEXT);
-          for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-            const range = document.createRange();
-            range.selectNodeContents(node);
-            rects.push(...range.getClientRects());
-          }
-          return rects;
-        })()
-        : [targetElement.getBoundingClientRect()];
-      const targetRect = targetRects.find((rect) => !(
-        controlRect.right <= rect.left
-        || controlRect.left >= rect.right
-        || controlRect.bottom <= rect.top
-        || controlRect.top >= rect.bottom
-      ));
-      return targetRect ? { control: controlRect.toJSON(), target: targetRect.toJSON() } : null;
-    }, { targetSelector: selector, compareTextOnly: textOnly });
-    assert.equal(collision, null, `${label}: consent control overlaps ${selector}: ${JSON.stringify(collision)}`);
-  }
+  assert.equal(consentControlCount, 1, `${label}: expected exactly one analytics consent control`);
+  assert.equal(
+    await consentControl.evaluate((element) => Boolean(element.closest("footer"))),
+    true,
+    `${label}: analytics consent control must remain in the footer flow`,
+  );
 }
 
 async function assertHeaderLayout(page, viewport) {
   const desktopNav = page.getByRole("navigation", { name: "Разделы лендинга" });
   const menuButton = page.getByRole("button", { name: "Открыть меню" });
-  if (viewport.width > 1320) {
+  if (viewport.width >= 960) {
     await desktopNav.waitFor({ state: "visible" });
     assert.equal(await menuButton.isVisible(), false, `${viewport.name}: menu button should be hidden`);
   } else {
@@ -326,36 +268,38 @@ async function assertHeaderLayout(page, viewport) {
 }
 
 async function assertHeroGeometry(page, label) {
-  for (const selector of ["[data-hero-title]", "[data-hero-visual]", "[data-hero-signal-card]"]) {
+  const viewport = page.viewportSize();
+  assert.ok(viewport, `${label}: missing viewport`);
+  const visualSelector = viewport.width <= 600
+    ? "[data-mobile-hero-signal]"
+    : "[data-hero-visual]";
+  for (const selector of ["[data-hero-title]", visualSelector, "[data-hero-actions]"]) {
     const box = await page.locator(selector).first().boundingBox();
     assert.ok(box && box.width >= 44 && box.height >= 44, `${label}: invalid hero surface ${selector}`);
   }
 
-  const viewport = page.viewportSize();
-  const visual = await page.locator("[data-hero-visual]").boundingBox();
-  const card = await page.locator("[data-hero-signal-card]").boundingBox();
-  assert.ok(viewport && visual && card, `${label}: missing hero visual composition`);
-  assert.ok(visual.width >= Math.min(280, viewport.width - 32), `${label}: radar width is not meaningful`);
-  assert.ok(visual.height >= 192, `${label}: radar height is not meaningful`);
-  assert.ok(card.x >= visual.x - 1 && card.x + card.width <= visual.x + visual.width + 1, `${label}: signal card escapes radar horizontally`);
-  assert.ok(card.y >= visual.y - 1 && card.y + card.height <= visual.y + visual.height + 1, `${label}: signal card escapes radar vertically`);
+  const visual = await page.locator(visualSelector).boundingBox();
+  assert.ok(visual, `${label}: missing ambient hero visual`);
+  const minimumVisualWidth = viewport.width <= 600 ? 180 : 280;
+  const minimumVisualHeight = viewport.width <= 600 ? 160 : 192;
+  assert.ok(visual.width >= Math.min(minimumVisualWidth, viewport.width - 32), `${label}: radar width is not meaningful`);
+  assert.ok(visual.height >= minimumVisualHeight, `${label}: radar height is not meaningful`);
 
   if (viewport.width >= 1024) {
     const primary = await page.locator('#scene-detection [data-analytics-context="hero_primary"]').boundingBox();
-    const secondary = await page.locator('#scene-detection [data-analytics-context="hero_secondary"]').boundingBox();
+    const login = await page.getByRole("link", { name: "Уже есть доступ? Войти" }).boundingBox();
     const trust = await page.locator("#scene-detection [data-hero-trust-line]").boundingBox();
-    assert.ok(primary && secondary && trust, `${label}: missing hero fold surfaces`);
+    assert.ok(primary && login && trust, `${label}: missing hero fold surfaces`);
     assert.ok(primary.y + primary.height <= viewport.height, `${label}: primary CTA is below fold`);
-    assert.ok(secondary.y + secondary.height <= viewport.height, `${label}: secondary CTA is below fold`);
+    assert.ok(login.y + login.height <= viewport.height, `${label}: login link is below fold`);
     assert.ok(trust.y + trust.height <= viewport.height, `${label}: trust line is below fold`);
     assert.ok(visual.y < viewport.height && visual.x + visual.width > viewport.width * .5, `${label}: radar is not visibly participating in hero`);
-    assert.ok(card.y < viewport.height, `${label}: signal card is below fold`);
   } else if (viewport.width <= 480) {
     const actions = await page.locator("[data-hero-actions]").boundingBox();
     const trust = await page.locator("#scene-detection [data-hero-trust-line]").boundingBox();
     assert.ok(actions && trust, `${label}: missing compact hero controls`);
-    assert.ok(actions.y + actions.height <= visual.y + 1, `${label}: radar overlaps hero actions`);
-    assert.ok(trust.y + trust.height <= visual.y + 1, `${label}: radar overlaps trust line`);
+    assert.ok(actions.x >= -1 && actions.x + actions.width <= viewport.width + 1, `${label}: hero actions escape viewport`);
+    assert.ok(trust.x >= -1 && trust.x + trust.width <= viewport.width + 1, `${label}: trust line escapes viewport`);
   }
 }
 
@@ -400,11 +344,9 @@ async function assertResponsiveSurface(browser, viewport) {
 
   for (const selector of [
     "#scene-detection",
-    "#scene-timeline",
     "#scene-workspace",
     "#scene-evidence",
     "#scene-delivery",
-    "#scene-outreach",
     "#pricing",
     "#faq",
     "footer",
@@ -418,11 +360,10 @@ async function assertResponsiveSurface(browser, viewport) {
   await assertControls(page, viewport.name);
   await assertNoOverlapOrClipping(page, viewport.name);
   await assertKeyHeadingBounds(page, viewport.name);
-  await assertConsentControlCollisions(page, viewport.name);
+  await assertConsentControlPlacement(page, viewport.name);
   const fullHeight = await measurePageHeight(page, viewport);
 
   await page.evaluate(() => window.scrollTo(0, 0));
-  await saveScreenshot(page, `matrix-${viewport.width}x${viewport.height}.png`);
   if (viewport.name === "desktop-1440x900") {
     await saveScreenshot(page, `desktop-1440x900-full-${fullHeight}px.png`, { fullPage: true });
   }
@@ -455,7 +396,6 @@ async function assertHashNavigation(browser, spec) {
   await page.waitForTimeout(500);
   const secondTop = await target.evaluate((element) => element.getBoundingClientRect().top);
   assert.ok(Math.abs(secondTop - firstPosition.top) <= 3, `${spec.name}: position jumped ${firstPosition.top} -> ${secondTop}`);
-  await saveScreenshot(page, `${spec.name}.png`);
   assertCleanConsole();
   await context.close();
 }
@@ -497,7 +437,7 @@ async function assertMobileKeyboardNavigation(browser) {
   assert.equal(await trigger.evaluate((element) => element === document.activeElement), true, "focus did not return to menu trigger");
 
   await trigger.click();
-  await dialog.getByRole("link", { name: "Доказательства" }).click();
+  await dialog.getByRole("link", { name: "Как работает" }).click();
   await page.waitForURL(/#scene-evidence$/);
   await dialog.waitFor({ state: "hidden" });
   assert.notEqual(await page.evaluate(() => document.body.style.overflow), "hidden");
@@ -531,7 +471,7 @@ async function assertActiveNavigationAndTone(browser) {
   const { page, assertCleanConsole } = await preparePage(context, "active-navigation-tone");
   await page.locator("#scene-evidence").scrollIntoViewIfNeeded();
   await page.waitForTimeout(180);
-  assert.match(await page.locator("header a[aria-current='location']").first().innerText(), /Доказательства/);
+  assert.match(await page.locator("header a[aria-current='location']").first().innerText(), /Как работает/);
   assert.equal(await page.locator("header").getAttribute("data-tone"), "dark");
   await page.locator("#scene-delivery").scrollIntoViewIfNeeded();
   await page.waitForTimeout(180);
@@ -557,6 +497,11 @@ async function assertInteractionContracts(browser) {
   const page = await context.newPage();
   const assertCleanConsole = attachConsoleGate(page, "interaction-contracts");
   const analyticsEvents = [];
+  await page.route("https://mc.yandex.ru/metrika/tag.js", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/javascript",
+    body: "/* deterministic analytics loader stub for local browser audit */",
+  }));
   await page.route("**/api/landing-events", (route) => {
     try {
       analyticsEvents.push(route.request().postDataJSON());
@@ -663,7 +608,6 @@ async function assertNoJs(browser) {
     await page.locator(selector).first().waitFor({ state: "attached" });
   }
   assert.match(await page.locator("h1").innerText(), /Компании, которым стоит написать сегодня\./);
-  assert.match(await page.locator("#scene-timeline").innerText(), /Почему компании|событ|приоритет/i);
   assert.match(await page.locator("#scene-workspace").innerText(), /рабочая выдача|пример утренней выдачи/i);
   assert.equal(await page.locator("#preview-configurator form").count(), 1, "no-JS configurator missing");
   await page.getByLabel("Специализация").waitFor({ state: "attached" });
@@ -673,8 +617,7 @@ async function assertNoJs(browser) {
   await skeleton.waitFor({ state: "attached" });
   assert.equal(await skeleton.evaluate((element) => element.closest("#preview-results") === element), true, "no-JS skeleton escaped results boundary");
   assert.match(await page.locator("#scene-evidence").innerText(), /доказатель|факт/i);
-  assert.match(await page.locator("#scene-delivery").innerText(), /Обращение отправляете вы|Решение пользователя/i);
-  assert.match(await page.locator("#scene-outreach").innerText(), /Отправка сообщения компании всегда требует действия пользователя/i);
+  assert.match(await page.locator("#scene-delivery").innerText(), /Обращение компаниям всегда отправляете вы/i);
   assert.match(await page.locator("#pricing").innerText(), /Проверьте радар на своих нишах за 7 дней/i);
   assert.ok(await page.locator("#faq summary").count() >= 1, "no-JS FAQ question missing");
   await page.getByRole("heading", { name: /Соберите радар под специализацию агентства/ }).waitFor({ state: "attached" });
@@ -687,7 +630,6 @@ async function assertNoJs(browser) {
   });
   assert.equal(followsResults, true, "no-JS page ended at the preview skeleton");
   await assertNoHorizontalOverflow(page, "no-js-mobile-390x844");
-  await saveScreenshot(page, "no-js-mobile-390x844.png", { fullPage: true });
   assertCleanConsole();
   await context.close();
 }
@@ -708,43 +650,17 @@ async function assertReducedMotion(browser) {
     });
   });
   assert.deepEqual(violations, [], `reduced-motion effects remain: ${JSON.stringify(violations)}`);
-  await saveScreenshot(page, "reduced-motion-1440x900.png", { fullPage: true });
-  assertCleanConsole();
-  await context.close();
-}
-
-async function captureSurface(browser, spec) {
-  const context = await browser.newContext({ viewport: { width: spec.width, height: spec.height } });
-  const { page, assertCleanConsole } = await preparePage(context, spec.name);
-  if (spec.mode === "menu") {
-    await page.getByRole("button", { name: "Открыть меню" }).click();
-    await page.getByRole("dialog", { name: "Навигация по продукту" }).waitFor({ state: "visible" });
-  } else if (spec.target) {
-    await page.locator(spec.target).first().evaluate((element) => element.scrollIntoView({ block: "start", behavior: "auto" }));
-    await page.waitForTimeout(120);
-  } else {
-    await page.evaluate(() => window.scrollTo(0, 0));
-  }
-  await saveScreenshot(page, `${spec.name}.png`);
   assertCleanConsole();
   await context.close();
 }
 
 async function verifyScreenshotArtifact() {
   const files = await readdir(screenshotDirectory);
-  const requiredStatic = [
-    ...surfaceSpecs.map((spec) => `${spec.name}.png`),
-    ...hashSpecs.map((spec) => `${spec.name}.png`),
-    "no-js-mobile-390x844.png",
-    "reduced-motion-1440x900.png",
-  ];
-  for (const fileName of requiredStatic) {
-    assert.ok(files.includes(fileName), `missing screenshot artifact: ${fileName}`);
-  }
   assert.ok(files.some((fileName) => /^desktop-1440x900-full-\d+px\.png$/.test(fileName)), "missing desktop full-page screenshot with actual height");
   assert.ok(files.some((fileName) => /^mobile-390x844-full-\d+px\.png$/.test(fileName)), "missing mobile full-page screenshot with actual height");
 
   const screenshots = files.filter((fileName) => fileName.endsWith(".png")).sort();
+  assert.equal(screenshots.length, 2, `expected exactly two landing screenshots, received ${screenshots.length}`);
   const sizes = {};
   for (const fileName of screenshots) {
     const fileStat = await stat(path.join(screenshotDirectory, fileName));
@@ -755,6 +671,11 @@ async function verifyScreenshotArtifact() {
 }
 
 await mkdir(screenshotDirectory, { recursive: true });
+for (const fileName of await readdir(screenshotDirectory)) {
+  if (/^(desktop-1440x900|mobile-390x844)-full-\d+px\.png$/.test(fileName)) {
+    await unlink(path.join(screenshotDirectory, fileName));
+  }
+}
 const browser = await chromium.launch({ headless: true });
 
 try {
@@ -767,7 +688,6 @@ try {
   await assertInteractionContracts(browser);
   await assertNoJs(browser);
   await assertReducedMotion(browser);
-  for (const spec of surfaceSpecs) await captureSurface(browser, spec);
 
   const artifact = await verifyScreenshotArtifact();
   process.stdout.write(`${JSON.stringify({
@@ -792,7 +712,7 @@ try {
       horizontalOverflow: true,
       clipping: true,
       headingBounds: true,
-      consentControlCollisions: true,
+      consentControlPlacement: true,
       heroFold: true,
     },
   }, null, 2)}\n`);

@@ -83,6 +83,9 @@ export type CheckoutOrderPayload = {
 
 export type CheckoutOrderRow = {
   id: string;
+  purchasedByUserId: string;
+  workspaceId: string;
+  entitlementOwnerId: string;
   productCode: string;
   amountMinor: number;
   currency: string;
@@ -99,6 +102,9 @@ export type CheckoutOrderRow = {
 
 export type CheckoutOrder = {
   id: string;
+  purchasedByUserId: string;
+  workspaceId: string;
+  entitlementOwnerId: string;
   productCode: PublicPlan["code"];
   amountMinor: number;
   currency: string;
@@ -198,7 +204,9 @@ export type PaymentProviderSetupState = {
 };
 
 export type StartCheckoutOrderInput = {
-  userId: string | number;
+  purchasedByUserId: string | number;
+  workspaceId: string | number;
+  entitlementOwnerId: string | number;
   productCode: PublicPlan["code"];
   customerName: string;
   customerContact: string;
@@ -213,6 +221,8 @@ export type StartCheckoutOrderInput = {
   dailyDigestLimit?: number | null;
   comment?: string | null;
   siteUrl: string;
+  /** Server-authoritative readiness gate; false records a request without charging. */
+  providerCheckoutAllowed?: boolean;
 };
 
 export type UpdateCheckoutOrderInput = {

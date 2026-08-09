@@ -1,10 +1,13 @@
 import {
   OnboardingValidationError,
   normalizeOnboardingAgencyInput,
+  normalizeOnboardingMarketInput,
   normalizeOnboardingProfileInput,
+  normalizeOnboardingDeliveryInput,
   saveOnboardingProgress,
   type OnboardingContext,
   type OnboardingDbClient,
+  type OnboardingSubmission,
 } from "@/lib/auth-v2/onboarding";
 
 const ownerContext: OnboardingContext = {
@@ -39,6 +42,7 @@ describe("auth v2 onboarding input boundaries", () => {
     expect(normalizeOnboardingAgencyInput({
       fullName: "  Анна   Смирнова ",
       agencyName: "  North Star  ",
+      agencyWebsite: null,
       teamRole: "leader",
     })).toEqual({
       fullName: "Анна Смирнова",
@@ -51,48 +55,50 @@ describe("auth v2 onboarding input boundaries", () => {
     expect(() => normalizeOnboardingAgencyInput({
       fullName: "Анна\nСмирнова",
       agencyName: "North Star",
+      agencyWebsite: null,
       teamRole: "owner",
     })).toThrow(OnboardingValidationError);
 
     expect(() => normalizeOnboardingProfileInput({
       specialization: "Product и Data",
       roles: ["data", "forged-role"],
-      industries: ["it"],
-      geography: "Москва",
-      hiringMode: "specialist",
     })).toThrow(OnboardingValidationError);
   });
 
-  test("deduplicates bounded geography and canonical option lists", () => {
+  test("normalizes specialization and role choices", () => {
     expect(normalizeOnboardingProfileInput({
       specialization: "  Product   и Data ",
       roles: ["data", "product", "data"],
-      industries: ["it", "finance", "it"],
-      geography: " Москва, Санкт-Петербург\nМосква ",
-      hiringMode: "specialist",
     })).toEqual({
       specialization: "Product и Data",
       roles: ["data", "product"],
-      industries: ["it", "finance"],
-      geography: ["Москва", "Санкт-Петербург"],
-      hiringMode: "specialist",
     });
   });
 
-  test("accepts omitted optional profile text and geography", () => {
+  test("accepts omitted optional specialization", () => {
     expect(normalizeOnboardingProfileInput({
       specialization: null,
       roles: [],
-      industries: [],
-      geography: null,
-      hiringMode: "auto",
     })).toEqual({
       specialization: "",
       roles: [],
-      industries: [],
-      geography: [],
-      hiringMode: "auto",
     });
+  });
+
+  test("deduplicates bounded market choices and geography", () => {
+    expect(normalizeOnboardingMarketInput({
+      industries: ["it", "finance", "it"], companySizes: ["small", "small"],
+      geography: " Москва, Санкт-Петербург\nМосква ", hiringMode: "specialist",
+    })).toEqual({ industries: ["it", "finance"], companySizes: ["small"], geography: ["Москва", "Санкт-Петербург"], hiringMode: "specialist" });
+  });
+
+  test("requires a valid destination only for email delivery", () => {
+    expect(normalizeOnboardingDeliveryInput({ deliveryChoice: "email", deliveryEmail: " Team@Agency.ru " })).toEqual({
+      deliveryChoice: "email",
+      deliveryEmail: "team@agency.ru",
+    });
+    expect(() => normalizeOnboardingDeliveryInput({ deliveryChoice: "email", deliveryEmail: "not-an-email" })).toThrow(OnboardingValidationError);
+    expect(normalizeOnboardingDeliveryInput({ deliveryChoice: "later", deliveryEmail: null })).toEqual({ deliveryChoice: "later" });
   });
 });
 
@@ -107,10 +113,10 @@ describe("auth v2 onboarding persistence", () => {
     });
 
     await expect(saveOnboardingProgress(ownerContext, {
-      step: "complete",
+      step: "market",
       intent: "finish",
       values: {},
-    }, db)).rejects.toBeInstanceOf(OnboardingValidationError);
+    } as unknown as OnboardingSubmission, db)).rejects.toBeInstanceOf(OnboardingValidationError);
 
     expect(query.mock.calls.some(([sql]) =>
       String(sql).includes("onboarding_completed"))).toBe(false);
@@ -134,6 +140,7 @@ describe("auth v2 onboarding persistence", () => {
       values: {
         fullName: "Анна Смирнова",
         agencyName: "North Star",
+        agencyWebsite: null,
         teamRole: "leader",
       },
     }, db)).resolves.toMatchObject({
@@ -149,7 +156,7 @@ describe("auth v2 onboarding persistence", () => {
   test("locks and scopes an owner save to the authenticated user and workspace", async () => {
     const { db, query } = createDb({
       onboardingStatus: "in_progress",
-      onboardingStep: "profile",
+      onboardingStep: "market",
       onboardingData: {
         fullName: "Анна Смирнова",
         agencyName: "North Star",
@@ -160,18 +167,17 @@ describe("auth v2 onboarding persistence", () => {
     });
 
     await expect(saveOnboardingProgress(ownerContext, {
-      step: "profile",
+      step: "market",
       intent: "next",
       values: {
-        specialization: "Product и Data",
-        roles: ["data"],
         industries: ["it"],
+        companySizes: ["small"],
         geography: "Москва",
         hiringMode: "specialist",
       },
     }, db)).resolves.toMatchObject({
       status: "in_progress",
-      step: "complete",
+      step: "delivery",
     });
 
     expect(query.mock.calls[0]?.[0]).toBe("BEGIN");
@@ -194,10 +200,10 @@ describe("auth v2 onboarding persistence", () => {
     expect(query.mock.calls.at(-1)?.[0]).toBe("COMMIT");
   });
 
-  test("profile skip creates missing owner profile without erasing canonical optional fields", async () => {
+  test("market skip creates missing owner profile without erasing canonical optional fields", async () => {
     const { db, query } = createDb({
       onboardingStatus: "in_progress",
-      onboardingStep: "profile",
+      onboardingStep: "market",
       onboardingData: {
         fullName: "Анна Смирнова",
         agencyName: "North Star",
@@ -208,23 +214,36 @@ describe("auth v2 onboarding persistence", () => {
     });
 
     await saveOnboardingProgress(ownerContext, {
-      step: "profile",
+      step: "market",
       intent: "skip",
-      values: {
-        specialization: null,
-        roles: [],
-        industries: [],
-        geography: null,
-        hiringMode: "auto",
-      },
+      values: { industries: [], companySizes: [], geography: null, hiringMode: "auto" },
     }, db);
 
     const profileCall = query.mock.calls.find(([sql]) =>
       String(sql).includes("INSERT INTO client_profiles"));
     expect(String(profileCall?.[0])).toContain(
-      "CASE WHEN $9 THEN client_profiles.specialization",
+      "CASE WHEN $10 THEN client_profiles.specialization",
     );
     expect(profileCall?.[1]?.at(-1)).toBe(true);
+  });
+
+  test("persists an explicit delivery choice before completion", async () => {
+    const { db, query } = createDb({
+      onboardingStatus: "in_progress",
+      onboardingStep: "delivery",
+      onboardingData: { fullName: "Анна Смирнова", agencyName: "North Star", teamRole: "leader" },
+      workspaceRole: "owner",
+      workspaceName: "North Star",
+    });
+
+    await expect(saveOnboardingProgress(ownerContext, {
+      step: "delivery",
+      intent: "next",
+      values: { deliveryChoice: "email", deliveryEmail: "team@agency.ru" },
+    }, db)).resolves.toMatchObject({ step: "complete", data: { deliveryChoice: "email", deliveryEmail: "team@agency.ru" } });
+
+    const deliveryCall = query.mock.calls.find(([sql]) => String(sql).includes("SET delivery_enabled"));
+    expect(deliveryCall?.[1]).toEqual(["42", "9", true, true, "team@agency.ru"]);
   });
 
   test("never mutates a team profile for a non-owner member", async () => {
@@ -250,9 +269,6 @@ describe("auth v2 onboarding persistence", () => {
       values: {
         specialization: "",
         roles: [],
-        industries: [],
-        geography: "",
-        hiringMode: "auto",
       },
     }, db);
 
@@ -305,6 +321,7 @@ describe("auth v2 onboarding persistence", () => {
       values: {
         fullName: "Stale Name",
         agencyName: "Stale Agency",
+        agencyWebsite: null,
         teamRole: "other",
       },
     }, db)).resolves.toMatchObject({

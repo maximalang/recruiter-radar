@@ -212,21 +212,21 @@ describe('DashboardAnalytics — T5.3 analytics skeleton export', () => {
 describe('DashboardTodayRadar — T5.3 empty-state icon', () => {
   it('renders a semantic SVG icon in the empty state (no flat text-only block)', () => {
     const { container } = render(
-      <DashboardTodayRadar topLeads={[]} pendingReview={0} />,
+      <DashboardTodayRadar topLeads={[]} pendingReview={0} lastRunAt={null} />,
     );
     // The empty state must carry an inline-SVG glyph from the icon system,
     // not be text-only.
     const emptySvg = container.querySelector('svg');
     expect(emptySvg).not.toBeNull();
     // Honest copy is preserved.
-    expect(screen.getByText(/пока нет компаний для контакта/i)).toBeTruthy();
+    expect(screen.getByText(/первый запуск Radar ещё не завершён/i)).toBeTruthy();
   });
 
-  it('preserves the "проверить настройки профиля" next-step link', () => {
-    render(<DashboardTodayRadar topLeads={[]} pendingReview={0} />);
-    const link = screen.getByText(/проверить настройки профиля/i).closest('a');
+  it('links the first-run state to unified Radar settings', () => {
+    render(<DashboardTodayRadar topLeads={[]} pendingReview={0} lastRunAt={null} />);
+    const link = screen.getByText(/проверить настройки Radar/i).closest('a');
     expect(link).not.toBeNull();
-    expect(link?.getAttribute('href')).toBe('/profile');
+    expect(link?.getAttribute('href')).toBe('/settings/radar');
   });
 });
 

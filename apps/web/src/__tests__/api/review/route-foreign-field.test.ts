@@ -18,7 +18,10 @@ jest.mock('@/lib/digestFeedback', () => ({
   DEFAULT_BADFIT_SUPPRESSION_DAYS: 30,
   buildDigestFeedbackActionPlan: jest.fn(),
 }));
-jest.mock('@/lib/auth-v2/authorization', () => ({ getAuthorizedOwnerId: jest.fn(async () => 'owner-1') }));
+jest.mock('@/lib/auth-v2/authorization', () => ({
+  getSession: jest.fn(async () => ({ dataOwnerId: 'owner-1', workspaceId: 'workspace-9' })),
+}));
+jest.mock('@/lib/entitlements', () => ({ hasFeatureAccess: jest.fn(async () => true) }));
 
 const mockQuery = jest.fn();
 const mockGetPool = getPool as jest.MockedFunction<typeof getPool>;

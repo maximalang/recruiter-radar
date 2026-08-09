@@ -20,7 +20,7 @@ const baseSnapshot: OnboardingViewSnapshot = {
 };
 
 describe("auth v2 onboarding view", () => {
-  test("renders a semantic three-step progress indicator and labeled agency form", () => {
+  test("renders a semantic four-step progress indicator and labeled agency form", () => {
     render(<OnboardingView snapshot={baseSnapshot} />);
 
     expect(screen.getByRole("heading", {
@@ -28,7 +28,7 @@ describe("auth v2 onboarding view", () => {
       name: "Настроим радар под вашу практику",
     })).toBeInTheDocument();
     expect(screen.getByLabelText("Прогресс настройки")).toBeInTheDocument();
-    expect(screen.getAllByRole("listitem")).toHaveLength(3);
+    expect(screen.getAllByRole("listitem")).toHaveLength(4);
     expect(screen.getByLabelText("Ваше имя")).toHaveAttribute(
       "autocomplete",
       "name",
@@ -37,6 +37,19 @@ describe("auth v2 onboarding view", () => {
       .toBeRequired();
     expect(screen.getByRole("button", { name: "Продолжить" }))
       .toBeInTheDocument();
+  });
+
+  test("offers an explicit delivery setup step without pretending Telegram is connected", () => {
+    render(<OnboardingView snapshot={{
+      ...baseSnapshot,
+      step: "delivery",
+      data: { fullName: "Анна", agencyName: "North Star", teamRole: "leader" },
+    }} />);
+
+    expect(screen.getByRole("heading", { level: 2, name: "Как получать новые возможности" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /Telegram/ })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Email для дайджеста/)).toHaveAttribute("type", "email");
+    expect(screen.getByText(/доставка останется выключенной/i)).toBeInTheDocument();
   });
 
   test("renders only minimal profile choices and a back action on step two", () => {
@@ -56,13 +69,18 @@ describe("auth v2 onboarding view", () => {
     })).toBeInTheDocument();
     expect(screen.getByLabelText("Специализация")).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Роли" })).toBeInTheDocument();
-    expect(screen.getByRole("group", { name: "Отрасли" })).toBeInTheDocument();
-    expect(screen.getByLabelText("География")).toBeInTheDocument();
-    expect(screen.getByLabelText("Тип подбора")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Назад" })).toHaveAttribute(
       "value",
       "back",
     );
+  });
+
+  test("keeps market targeting in a separate third step", () => {
+    render(<OnboardingView snapshot={{ ...baseSnapshot, step: "market", data: { fullName: "Анна", agencyName: "North Star", teamRole: "leader" } }} />);
+    expect(screen.getByRole("heading", { level: 2, name: "Где искать клиентов" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Отрасли" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Размер компаний" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Россия и регионы")).toBeInTheDocument();
   });
 
   test("summarizes readiness without promising immediate delivery", () => {
@@ -85,7 +103,7 @@ describe("auth v2 onboarding view", () => {
       level: 2,
       name: "Основа радара готова",
     })).toBeInTheDocument();
-    expect(screen.getByText(/доставка включается отдельно/i)).toBeInTheDocument();
+    expect(screen.getByText(/Доставка работает только при активном доступе/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Перейти в кабинет" }))
       .toBeInTheDocument();
   });

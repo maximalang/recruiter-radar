@@ -3,13 +3,12 @@ import Link from "next/link";
 import { OPERATOR_REQUISITES } from "../../lib/operatorRequisites";
 import s from "./site-footer.module.css";
 import { BrandLogo } from "./brand-logo";
+import { CookieSettingsButton } from "./cookie-settings-button";
 
 const PRODUCT_LINKS = [
-  { href: "/#scene-timeline", label: "Почему сейчас" },
   { href: "/#scene-workspace", label: "Рабочая выдача" },
-  { href: "/#scene-evidence", label: "Факты и источники" },
+  { href: "/#scene-evidence", label: "Как работает" },
   { href: "/#scene-delivery", label: "Доставка" },
-  { href: "/#scene-outreach", label: "Первый контакт" },
   { href: "/#pricing", label: "Тарифы" },
   { href: "/#faq", label: "FAQ" },
 ] as const;
@@ -19,7 +18,7 @@ const SERVICE_LINKS = [
   { href: "/dashboard", label: "Кабинет" },
 ] as const;
 
-export async function SiteFooter(props: { tone?: "light" | "dark" }) {
+export async function SiteFooter(props: { tone?: "light" | "dark"; showCookieSettings?: boolean }) {
   const tone = props.tone ?? "light";
   const year = new Date().getFullYear();
 
@@ -61,6 +60,7 @@ export async function SiteFooter(props: { tone?: "light" | "dark" }) {
               <Link href="/terms" aria-label="Условия использования — Оферта" className={s.footerLink}>Условия использования</Link>
               <Link href="/personal-data-consent" aria-label="Согласие на обработку персональных данных" className={s.footerLink}>Обработка данных</Link>
               <Link href="/payment-and-refund" aria-label="Информация об оплате и возврате" className={s.footerLink}>Оплата и возврат</Link>
+              {props.showCookieSettings ? <CookieSettingsButton /> : null}
             </nav>
           </div>
         </div>

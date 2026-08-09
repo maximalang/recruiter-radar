@@ -11,6 +11,9 @@ const ORIGINAL_ENV = process.env;
 function order(): CheckoutOrder {
   return {
     id: "42",
+    purchasedByUserId: "7",
+    workspaceId: "8",
+    entitlementOwnerId: "7",
     productCode: "pilot",
     amountMinor: 299000,
     currency: "RUB",

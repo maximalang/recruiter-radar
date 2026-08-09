@@ -13,6 +13,7 @@ import { createHash, createHmac } from "node:crypto";
 import nodemailer, { type Transporter } from "nodemailer";
 
 import { logError, logEvent } from "../runtime";
+import { recordSuccessfulEmailDelivery } from "./delivery-health";
 
 export type EmailMessage = {
   to: string;
@@ -172,6 +173,7 @@ export async function sendEmail(message: EmailMessage): Promise<SendEmailResult>
   if (postboxConfig) {
     try {
       await sendViaPostbox(postboxConfig, message);
+      await recordSuccessfulEmailDelivery("postbox");
       logEvent("email.sent", { provider: "postbox" });
       return { ok: true };
     } catch (error) {
@@ -199,6 +201,7 @@ export async function sendEmail(message: EmailMessage): Promise<SendEmailResult>
       html: message.html,
       text: message.text,
     });
+    await recordSuccessfulEmailDelivery("smtp");
     logEvent("email.sent", {});
     return { ok: true };
   } catch (error) {

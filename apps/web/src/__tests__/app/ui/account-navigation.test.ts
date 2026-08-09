@@ -1,7 +1,7 @@
 import { buildAccountNavigation } from "@/app/ui/account-navigation";
 
 describe("buildAccountNavigation", () => {
-  it("keeps one active item and includes settings", () => {
+  it("keeps one active item and uses the unified Radar settings route", () => {
     const items = buildAccountNavigation("settings");
 
     expect(items.filter((item) => item.active)).toEqual([
@@ -11,8 +11,14 @@ describe("buildAccountNavigation", () => {
       "/dashboard",
       "/leads",
       "/review",
-      "/profile",
+      "/settings/radar",
       "/settings",
     ]);
+    expect(items).toContainEqual(
+      expect.objectContaining({ href: "/leads", label: "Возможности" }),
+    );
+    expect(items).toContainEqual(
+      expect.objectContaining({ href: "/settings/radar", label: "Радар" }),
+    );
   });
 });

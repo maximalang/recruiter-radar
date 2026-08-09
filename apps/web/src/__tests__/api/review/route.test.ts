@@ -8,6 +8,7 @@
 import { GET, POST } from '@/app/api/review/route';
 import { getPool } from '@/lib/db';
 import { updateDigestOrgStateFeedback } from '@/lib/digestFeedback';
+import { hasFeatureAccess } from '@/lib/entitlements';
 
 jest.mock('@/lib/db', () => ({
   getPool: jest.fn(),
@@ -25,11 +26,13 @@ jest.mock('@/lib/digestFeedback', () => ({
 // the DB. Outside a Next request scope cookies() throws, so mock the session to a
 // fixed owner — the route's owner-scoped SQL still runs against the mock pool.
 jest.mock('@/lib/auth-v2/authorization', () => ({
-  getAuthorizedOwnerId: jest.fn(async () => 'owner-1'),
+  getSession: jest.fn(async () => ({ dataOwnerId: 'owner-1', workspaceId: 'workspace-9' })),
 }));
+jest.mock('@/lib/entitlements', () => ({ hasFeatureAccess: jest.fn(async () => true) }));
 
 const mockQuery = jest.fn();
 const mockGetPool = getPool as jest.MockedFunction<typeof getPool>;
+const mockFeatureAccess = hasFeatureAccess as jest.MockedFunction<typeof hasFeatureAccess>;
 
 function makeMockPool() {
   mockGetPool.mockReturnValue({ query: mockQuery } as never);
@@ -53,6 +56,13 @@ describe('GET /api/review', () => {
     mockGetPool.mockReturnValue(null);
     const res = await makeRequest('1');
     expect(res.status).toBe(503);
+  });
+
+  it('returns 403 before touching the database when API entitlement is missing', async () => {
+    mockFeatureAccess.mockResolvedValueOnce(false);
+    const res = await makeRequest('1');
+    expect(res.status).toBe(403);
+    expect(mockGetPool).not.toHaveBeenCalled();
   });
 
   it('formats ScoringReason[] objects as Russian strings', async () => {
@@ -122,6 +132,7 @@ describe('GET /api/review', () => {
 
     const body = await res.json();
     expect(body.items[0].reasons).toEqual(['Вакансия в IT', 'Свежий сигнал']);
+    expect(mockQuery.mock.calls.every(([sql]) => !String(sql).includes('owner_id IS NULL'))).toBe(true);
   });
 
   it('returns empty array for null reasons', async () => {
@@ -197,6 +208,8 @@ describe('POST /api/review', () => {
     expect(mockSuppress).not.toHaveBeenCalled();
     // The UPDATE wrote 'approved' into review_status.
     expect(mockQuery.mock.calls[0][1]).toContain('approved');
+    expect(String(mockQuery.mock.calls[0][0])).toContain('cp.owner_id = $4');
+    expect(String(mockQuery.mock.calls[0][0])).not.toContain('owner_id IS NULL');
   });
 
   it('reject sets review_status=rejected AND suppresses the org (badfit, 30d)', async () => {

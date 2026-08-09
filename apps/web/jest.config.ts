@@ -7,14 +7,18 @@ const createJestConfig = nextJest({
 })
 
 // Add any custom config to be passed to Jest
+const workspaceBillingDbTest = process.env.WORKSPACE_BILLING_DB_TEST === 'true'
+
 const config: Config = {
   coverageProvider: 'v8',
   testEnvironment: 'node',
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
-  testMatch: [
-    '<rootDir>/src/**/__tests__/**/*.{js,jsx,ts,tsx}',
-    '<rootDir>/src/**/*.{test,spec}.{js,jsx,ts,tsx}',
-  ],
+  testMatch: workspaceBillingDbTest
+    ? ['<rootDir>/src/__tests__/db-integration/workspace-billing-entitlement-db.test.ts']
+    : [
+        '<rootDir>/src/**/__tests__/**/*.{js,jsx,ts,tsx}',
+        '<rootDir>/src/**/*.{test,spec}.{js,jsx,ts,tsx}',
+      ],
   testPathIgnorePatterns: [
     // requires @testing-library/react + @tanstack/react-query (not installed)
     '<rootDir>/src/__tests__/components/DashboardOverview.test.tsx',
@@ -22,6 +26,9 @@ const config: Config = {
     '<rootDir>/src/__tests__/middleware/validation-middleware.test.ts',
     // mock fixture imported by hh-pattern-detection.test.ts, not a test
     '<rootDir>/src/__tests__/lib/lead-discovery/hh-mock.ts',
+    ...(workspaceBillingDbTest
+      ? []
+      : ['<rootDir>/src/__tests__/db-integration/workspace-billing-entitlement-db.test.ts']),
   ],
   moduleNameMapper: {
     // test-utils moved to src/test-utils/ to avoid being picked as test file

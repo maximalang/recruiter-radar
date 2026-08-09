@@ -157,6 +157,42 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
+  production-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+      AUTH_V2_DISPOSABLE_DB_CONFIRMED: 'true'
+      ENTITLEMENT_DISPOSABLE_DB_CONFIRMED: 'true'
+      WORKSPACE_BILLING_DISPOSABLE_DB_CONFIRMED: 'true'
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Install acceptance browser
+        run: npx playwright install --with-deps chromium
+      - name: Verify entitlement migration lifecycle
+        run: npm run test:entitlements:migration:db
+      - name: Run production acceptance scenarios
+        run: npm run test:production:acceptance
+
   web-build:
     needs: lint-and-types
     runs-on: ubuntu-latest
@@ -191,6 +227,7 @@ jobs:
     env:
       DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
       LANDING_BASE_URL: http://127.0.0.1:3000
+      LANDING_REQUIRE_ANALYTICS_CONSENT: 'true'
       LANDING_E2E_ALLOW_DB_FIXTURES: 'true'
       LANDING_SCREENSHOT_DIR: /tmp/recruiter-radar-landing/screenshots
       LANDING_TRACE_DIR: /tmp/recruiter-radar-landing/traces
@@ -274,7 +311,7 @@ jobs:
         if: always()
         run: node scripts/verify-production-server-log.mjs /tmp/landing-server.log
       - name: Upload Playwright screenshots and traces
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: landing-playwright-artifacts
@@ -400,7 +437,7 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
 
   docker-build:
-    needs: [unit-tests, web-build]
+    needs: [unit-tests, web-build, production-acceptance]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

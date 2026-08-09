@@ -388,12 +388,13 @@ export default async function AdminPage() {
             <div style={{ display: "grid", gap: "8px" }}>
               {users.map((u) => (
                 <AdminUserCard
-                  key={u.id}
+                  key={`${u.id}:${u.workspace?.id ?? "none"}`}
                   user={{
                     id: u.id,
                     email: u.email,
                     fullName: u.fullName,
                     createdAt: u.createdAt,
+                    workspace: u.workspace,
                     profile: u.profile
                       ? {
                           id: u.profile.id,
@@ -403,9 +404,15 @@ export default async function AdminPage() {
                           telegramChatId: u.profile.telegramChatId,
                         }
                       : null,
-                    pilot: u.pilot
-                      ? { status: u.pilot.status, endsAt: u.pilot.endsAt }
-                      : null,
+                    access: u.access.status === "active"
+                      ? {
+                          status: "active",
+                          source: u.access.source,
+                          plan: u.access.plan,
+                          expiresAt: u.access.expiresAt,
+                          activeSources: u.access.activeSources,
+                        }
+                      : { status: "inactive" },
                     hasPaidOrder: u.hasPaidOrder,
                     paidOrderCount: u.paidOrderCount,
                   }}

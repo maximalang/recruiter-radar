@@ -117,7 +117,6 @@ function getPool(): Pool | null {
 
 /**
  * List client profiles owned by the given ownerId.
- * Pilot mode: also returns profiles with owner_id IS NULL (anonymous/pilot profiles).
  *
  * @param ownerId - Session owner ID from getOwnerIdFromSession()
  * @returns Array of client profiles accessible by this owner
@@ -154,7 +153,7 @@ export async function listClientProfiles(ownerId: string | number): Promise<Clie
       min_open_roles AS "minOpenRoles",
       hiring_mode AS "hiringMode"
     FROM client_profiles
-    WHERE owner_id = $1 OR owner_id IS NULL
+    WHERE owner_id = $1
     ORDER BY is_active DESC, updated_at DESC, id DESC
   `, [ownerId]);
 
@@ -166,8 +165,8 @@ export async function listClientProfiles(ownerId: string | number): Promise<Clie
  *
  * @param clientProfileId - Profile ID
  * @param ownerId - Session owner ID from getOwnerIdFromSession() for user-facing
- *   reads (anti-IDOR): the profile is returned only if owner_id matches OR the
- *   profile is pilot/anonymous (owner_id IS NULL). Pass `null` ONLY from trusted
+ *   reads (anti-IDOR): the profile is returned only if owner_id matches.
+ *   Pass `null` ONLY from trusted
  *   server contexts that have already authorized access (digest pipeline,
  *   payments) — this skips the owner predicate. Never pass `null` from a path
  *   that takes a profileId straight off an HTTP request.
@@ -189,7 +188,7 @@ export async function getClientProfileById(
   // Owner predicate only when a session owner is supplied. Trusted server
   // contexts pass ownerId=null to read by id alone (they authorize elsewhere).
   const ownerScoped = ownerId !== null && ownerId !== undefined;
-  const ownerClause = ownerScoped ? "AND (owner_id = $2 OR owner_id IS NULL)" : "";
+  const ownerClause = ownerScoped ? "AND owner_id = $2" : "";
   const params: (string | number)[] = ownerScoped
     ? [normalizedClientProfileId, ownerId]
     : [normalizedClientProfileId];

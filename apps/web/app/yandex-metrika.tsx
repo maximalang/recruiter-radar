@@ -5,24 +5,20 @@ import Script from "next/script";
 import { useEffect, useMemo, useState } from "react";
 
 import styles from "./yandex-metrika.module.css";
+import {
+  ANALYTICS_SETTINGS_OPEN_EVENT,
+  clearAnalyticsConsent,
+  readAnalyticsConsent,
+  storeAnalyticsConsent,
+} from "../lib/analytics-consent";
+import { getYandexMetrikaCounterId } from "../lib/analytics-config";
 
-const CONSENT_STORAGE_KEY = "rr_analytics_consent_v1";
 const CONSENT_TTL_MS = 426 * 24 * 60 * 60 * 1000;
 
 type AnalyticsConsent = "granted" | "denied" | null;
 
-type StoredConsent = {
-  value: Exclude<AnalyticsConsent, null>;
-  decidedAt: string;
-};
-
-function readCounterId(): string | null {
-  const value = process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID?.trim() ?? "";
-  return /^\d{5,12}$/.test(value) ? value : null;
-}
-
 export default function YandexMetrika() {
-  const counterId = readCounterId();
+  const counterId = getYandexMetrikaCounterId();
   const [consent, setConsent] = useState<AnalyticsConsent>(null);
   const [choiceLoaded, setChoiceLoaded] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -31,6 +27,12 @@ export default function YandexMetrika() {
   useEffect(() => {
     setConsent(readStoredConsent());
     setChoiceLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    const openSettings = () => setSettingsOpen(true);
+    window.addEventListener(ANALYTICS_SETTINGS_OPEN_EVENT, openSettings);
+    return () => window.removeEventListener(ANALYTICS_SETTINGS_OPEN_EVENT, openSettings);
   }, []);
 
   const initialization = useMemo(() => `
@@ -55,7 +57,7 @@ export default function YandexMetrika() {
     window.ym(Number(counterId), "hit", "/", { title: document.title });
   }, [consent, counterId, scriptReady]);
 
-  if (!counterId || !choiceLoaded) return null;
+  if (!choiceLoaded || !counterId) return null;
 
   const showDialog = consent === null || settingsOpen;
 
@@ -86,32 +88,18 @@ export default function YandexMetrika() {
             </span>
           </div>
           <div className={styles.actions}>
-            <button type="button" className={styles.secondaryButton} onClick={() => saveChoice("denied")}>Только необходимые</button>
-            <button type="button" className={styles.primaryButton} onClick={() => saveChoice("granted")}>Разрешить аналитику</button>
+            <button type="button" className={styles.secondaryButton} onClick={() => saveChoice("denied")}>Отклонить</button>
+            <button type="button" className={styles.primaryButton} onClick={() => saveChoice("granted")}>Разрешить</button>
           </div>
         </div>
-      ) : (
-        <button
-          type="button"
-          className={styles.settingsButton}
-          onClick={() => setSettingsOpen(true)}
-          aria-label="Изменить настройки cookies"
-          title="Cookies"
-        >
-          Cookies
-        </button>
-      )}
+      ) : null}
     </>
   );
 
   function saveChoice(value: Exclude<AnalyticsConsent, null>) {
-    const record: StoredConsent = { value, decidedAt: new Date().toISOString() };
-    try {
-      window.localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify(record));
-    } catch {
-      // Consent still applies for the current page even when storage is unavailable.
-    }
-    if (value === "denied") clearYandexCookies();
+    storeAnalyticsConsent(value === "granted");
+    if (value === "denied" && counterId) disableYandexCounter(counterId);
+    else if (counterId) delete (window as unknown as Record<string, unknown>)[`disableYaCounter${counterId}`];
     setConsent(value);
     setSettingsOpen(false);
     setScriptReady(false);
@@ -119,24 +107,50 @@ export default function YandexMetrika() {
 }
 
 function readStoredConsent(): AnalyticsConsent {
+  const consent = readAnalyticsConsent();
+  if (consent === null) return null;
   try {
-    const raw = window.localStorage.getItem(CONSENT_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<StoredConsent>;
-    if (parsed.value !== "granted" && parsed.value !== "denied") return null;
-    const decidedAt = typeof parsed.decidedAt === "string" ? new Date(parsed.decidedAt).getTime() : Number.NaN;
-    if (!Number.isFinite(decidedAt) || Date.now() - decidedAt > CONSENT_TTL_MS) {
-      window.localStorage.removeItem(CONSENT_STORAGE_KEY);
+    const raw = window.localStorage.getItem("rr_analytics_consent");
+    const updatedAt = raw ? (JSON.parse(raw) as { updatedAt?: string }).updatedAt : undefined;
+    const timestamp = typeof updatedAt === "string" ? new Date(updatedAt).getTime() : Number.NaN;
+    if (!Number.isFinite(timestamp) || Date.now() - timestamp > CONSENT_TTL_MS) {
+      clearAnalyticsConsent();
       return null;
     }
-    return parsed.value;
   } catch {
-    return null;
+    // Volatile consent remains valid for the current page.
   }
+  return consent ? "granted" : "denied";
+}
+
+function disableYandexCounter(counterId: string) {
+  if (typeof window.ym === "function") {
+    try {
+      window.ym(Number(counterId), "destruct");
+    } catch {
+      // Continue fail-closed cleanup even if the provider API is unavailable.
+    }
+  }
+  (window as unknown as Record<string, unknown>)[`disableYaCounter${counterId}`] = true;
+  document.querySelector<HTMLScriptElement>('script[src^="https://mc.yandex.ru/metrika/"]')?.remove();
+  clearYandexCookies();
 }
 
 function clearYandexCookies() {
+  const domainAttributes = getYandexCookieDomainAttributes(window.location.hostname);
   for (const name of ["_ym_uid", "_ym_d", "_ym_isad", "_ym_visorc"]) {
     document.cookie = `${name}=; Max-Age=0; Path=/; SameSite=Lax`;
+    for (const domain of domainAttributes) {
+      document.cookie = `${name}=; Max-Age=0; Path=/${domain}; SameSite=Lax`;
+    }
   }
+}
+
+export function getYandexCookieDomainAttributes(rawHostname: string): string[] {
+  const hostname = rawHostname.toLowerCase().replace(/^\.+|\.+$/g, "");
+  const labels = hostname.split(".").filter(Boolean);
+  return labels.length >= 2 && !/^\d+(?:\.\d+){3}$/.test(hostname)
+    ? labels.slice(0, -1).map((_, index) => labels.slice(index).join("."))
+        .flatMap((domain) => [`; Domain=${domain}`, `; Domain=.${domain}`])
+    : [];
 }

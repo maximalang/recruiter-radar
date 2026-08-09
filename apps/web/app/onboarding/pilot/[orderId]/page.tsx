@@ -39,7 +39,7 @@ import {
 import { getTelegramBotToken } from "../../../../lib/telegram";
 import { getTelegramConnectLinkState } from "../../../../lib/telegramConnect";
 import { getWebPushConnectLinkState } from "../../../../lib/webPushConnect";
-import { getAuthorizedUserId } from "../../../../lib/auth-v2/authorization";
+import { getSession } from "../../../../lib/auth-v2/authorization";
 import {
   completePilotOnboardingAction,
   confirmPilotProfileAction,
@@ -102,13 +102,18 @@ export default async function PilotOnboardingPage({
   const resolvedSearchParams = (await searchParams) ?? {};
   const errorMessage = getSearchParamValue(resolvedSearchParams, "error");
   const notice = getSearchParamValue(resolvedSearchParams, "notice");
-  const ownerId = await getAuthorizedUserId("billing:manage");
+  const session = await getSession({ permission: "billing:manage" });
 
-  if (!ownerId) {
+  if (!session?.workspaceId) {
     notFound();
   }
+  const ownerId = session.dataOwnerId;
+  const access = {
+    workspaceId: session.workspaceId,
+    entitlementOwnerId: ownerId,
+  };
 
-  const order = await ensurePilotOrderOnboardingReady(resolvedParams.orderId, { ownerId });
+  const order = await ensurePilotOrderOnboardingReady(resolvedParams.orderId, access);
 
   if (!order) {
     notFound();
@@ -117,7 +122,7 @@ export default async function PilotOnboardingPage({
   const profile = order.payload.clientProfileId
     ? await getClientProfileById(order.payload.clientProfileId, ownerId).catch(() => null)
     : null;
-  const readiness = await getPilotActivationReadiness(order.id, { ownerId });
+  const readiness = await getPilotActivationReadiness(order.id, access);
   const normalizedTelegramBotToken = getTelegramBotToken().botToken?.trim() ?? "";
   const deliveryPrerequisitesReady = Boolean(profile?.telegramChatId) && normalizedTelegramBotToken.length > 0;
   const currentStep = getCurrentStep(order, getRequestedStep(resolvedSearchParams, order));

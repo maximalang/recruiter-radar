@@ -25,6 +25,9 @@ export function mapCheckoutOrderRow(row: CheckoutOrderRow): CheckoutOrder {
 
   return {
     id: row.id,
+    purchasedByUserId: row.purchasedByUserId,
+    workspaceId: row.workspaceId,
+    entitlementOwnerId: row.entitlementOwnerId,
     productCode: plan.code,
     amountMinor: row.amountMinor,
     currency: normalizeCurrency(row.currency),

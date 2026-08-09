@@ -5,9 +5,10 @@ import {
   VALID_FEEDBACK_STATUSES,
 } from '@/lib/leads-data';
 import { listClientProfiles } from '@/lib/clientProfiles';
-import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization';
+import { getSession } from '@/lib/auth-v2/authorization';
 import { buildWhyMatch, type WhyMatchProfile } from '@/lib/leads/why-match';
 import { scoreBand, formatSignalStrength } from '@/lib/scoring/score-display';
+import { hasFeatureAccess } from '@/lib/entitlements';
 
 /**
  * GET /api/leads — owner-scoped, paginated lead list for the current session.
@@ -49,9 +50,17 @@ type ApiLead = {
 };
 
 export async function GET(request: Request) {
-  const ownerId = await getAuthorizedOwnerId('leads:read');
-  if (!ownerId) {
+  const authorization = await getSession({ permission: 'leads:read' });
+  if (!authorization?.workspaceId) {
     return NextResponse.json({ leads: [], total: 0, page: 1, pageSize: DEFAULT_PAGE_SIZE });
+  }
+  const ownerId = authorization.dataOwnerId;
+  try {
+    if (!(await hasFeatureAccess(ownerId, 'api', { workspaceId: authorization.workspaceId }))) {
+      return NextResponse.json({ error: 'entitlement_required' }, { status: 403 });
+    }
+  } catch {
+    return NextResponse.json({ error: 'entitlement_check_unavailable' }, { status: 503 });
   }
 
   const { searchParams } = new URL(request.url);
@@ -76,7 +85,7 @@ export async function GET(request: Request) {
   try {
     profiles = await listClientProfiles(ownerId);
   } catch {
-    return NextResponse.json({ leads: [], total: 0, page, pageSize });
+    return NextResponse.json({ error: 'profile_data_unavailable' }, { status: 503 });
   }
 
   const activeProfiles = profiles.filter((p) => p.isActive);
@@ -105,7 +114,7 @@ export async function GET(request: Request) {
       offset: (page - 1) * pageSize,
     });
   } catch {
-    return NextResponse.json({ leads: [], total: 0, page, pageSize });
+    return NextResponse.json({ error: 'lead_data_unavailable' }, { status: 503 });
   }
 
   // Per-profile filter fields for the why-match rationale, keyed by profile id.

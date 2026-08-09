@@ -5,7 +5,16 @@ import { setTimeout as delay } from "node:timers/promises";
 import { promisify } from "node:util";
 
 import { getPool } from "@/lib/db-pool";
+import { getOperatorUsers } from "@/lib/dashboard-data";
+import { resolveAdminDataOwnerId } from "@/lib/admin/adminUsers";
 import { readTestEmailOutbox } from "@/lib/email/transport";
+import {
+  getEffectiveEntitlement,
+  grantEntitlement,
+  grantEntitlementUntil,
+  hasFeatureAccess,
+  revokeEntitlement,
+} from "@/lib/entitlements";
 import {
   ACCOUNT_DELETION_CONFIRMATION,
   confirmAccountEmailChange,
@@ -33,7 +42,7 @@ import {
   transferWorkspaceOwnership,
 } from "@/lib/auth-v2/workspace-team";
 
-const { hasPremiumEntitlement } =
+const { assertDigestEntitlementByClientProfileId, hasPremiumEntitlement } =
   jest.requireActual<typeof import("@/lib/db")>("@/lib/db");
 const execFileAsync = promisify(execFile);
 const describeDatabase =
@@ -503,7 +512,8 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
     expect(switchedInvited).not.toBeNull();
     invited.session = switchedInvited!.session;
     invited.token = switchedInvited!.token;
-
+    await expect(resolveAdminDataOwnerId(invited.userId, owner.workspaceId))
+      .resolves.toBe(owner.userId);
     await pool!.query(
       `INSERT INTO workspace_members (
          workspace_id, user_id, role, status, joined_at, updated_at
@@ -716,12 +726,12 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
 
     await pool!.query(
       `INSERT INTO subscriptions (
-         user_id, plan_code, status, started_at, created_at, updated_at
+         user_id, workspace_id, plan_code, status, started_at, created_at, updated_at
        )
-       VALUES ($1, 'auth-purge-test', 'active', NOW(), NOW(), NOW())`,
-      [due.userId],
+       VALUES ($1, $2, 'auth-purge-test', 'active', NOW(), NOW(), NOW())`,
+      [due.userId, due.workspaceId],
     );
-    await expect(hasPremiumEntitlement(Number(due.userId))).resolves.toEqual({
+    await expect(hasPremiumEntitlement(Number(due.userId), { workspaceId: due.workspaceId })).resolves.toEqual({
       allowed: true,
       reason: null,
     });
@@ -734,7 +744,7 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
         AUTH_ACCOUNT_PURGE_AFTER_DAYS: "7",
       },
     })).resolves.toEqual({ ok: true });
-    await expect(hasPremiumEntitlement(Number(due.userId))).resolves.toEqual({
+    await expect(hasPremiumEntitlement(Number(due.userId), { workspaceId: due.workspaceId })).resolves.toEqual({
       allowed: false,
       reason: "No active subscription or pilot.",
     });
@@ -891,6 +901,238 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
     await expect(securityEventCount(due.userId)).resolves.toBe(beforeAudit);
   });
 
+  test("admin grant enables profile delivery without a paid checkout order", async () => {
+    const account = await createFixture("admin-entitlement");
+    const delivery = await createDeliveryFixture(account);
+    await expect(grantEntitlement({
+      userId: account.userId,
+      workspaceId: account.workspaceId,
+      source: "admin",
+      plan: "radar-30",
+      durationDays: 30,
+      features: ["dashboard", "digest", "delivery"],
+    })).resolves.toMatchObject({ changed: true });
+
+    const paidOrders = await pool!.query<{ count: number }>(
+      `SELECT COUNT(*)::INTEGER AS count
+       FROM checkout_orders
+       WHERE user_id = $1
+         AND status = 'paid'`,
+      [account.userId],
+    );
+    expect(paidOrders.rows[0]?.count).toBe(0);
+
+    const eligibility = await pool!.query<{
+      accountActive: boolean;
+      grantActive: boolean;
+    }>(
+      `SELECT
+         EXISTS (
+           SELECT 1 FROM users
+           WHERE id = $1 AND status = 'active'
+         ) AS "accountActive",
+         EXISTS (
+           SELECT 1 FROM entitlement_grants
+           WHERE user_id = $1
+             AND status = 'active'
+             AND starts_at <= CURRENT_TIMESTAMP
+             AND (ends_at IS NULL OR ends_at > CURRENT_TIMESTAMP)
+         ) AS "grantActive"`,
+      [account.userId],
+    );
+    expect(eligibility.rows[0]).toEqual({
+      accountActive: true,
+      grantActive: true,
+    });
+
+    await expect(assertDigestEntitlementByClientProfileId(delivery.profileId))
+      .resolves.toBeUndefined();
+    await expect(getEffectiveEntitlement(account.userId, { workspaceId: account.workspaceId })).resolves.toMatchObject({
+      status: "active",
+      source: "admin",
+      plan: "radar-30",
+      features: expect.arrayContaining(["dashboard", "digest", "delivery"]),
+    });
+    await expect(getOperatorUsers()).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: account.userId,
+          access: expect.objectContaining({ status: "active", source: "admin" }),
+        }),
+      ]),
+    );
+  });
+
+  test("concurrent admin activation keeps one active canonical grant", async () => {
+    const account = await createFixture("admin-entitlement-race");
+
+    await Promise.all([
+      grantEntitlement({
+        userId: account.userId,
+        workspaceId: account.workspaceId,
+        source: "admin",
+        plan: "radar-admin-7",
+        durationDays: 7,
+      }),
+      grantEntitlement({
+        userId: account.userId,
+        workspaceId: account.workspaceId,
+        source: "admin",
+        plan: "radar-admin-7",
+        durationDays: 7,
+      }),
+    ]);
+
+    const active = await pool!.query<{ count: number; days: number }>(
+      `SELECT
+         COUNT(*)::INTEGER AS count,
+         EXTRACT(EPOCH FROM (MAX(ends_at) - MIN(starts_at))) / 86400 AS days
+       FROM entitlement_grants
+       WHERE user_id = $1
+         AND source = 'admin'
+         AND status = 'active'`,
+      [account.userId],
+    );
+    expect(active.rows[0]?.count).toBe(1);
+    expect(Number(active.rows[0]?.days)).toBeGreaterThanOrEqual(6.99);
+    expect(Number(active.rows[0]?.days)).toBeLessThan(7.01);
+  });
+
+  test("an operator-selected expiry replaces a later active admin expiry exactly", async () => {
+    const account = await createFixture("admin-entitlement-exact-expiry");
+    await grantEntitlement({
+      userId: account.userId,
+      workspaceId: account.workspaceId,
+      source: "admin",
+      plan: "radar-admin-30",
+      durationDays: 30,
+    });
+    const selectedExpiry = new Date(Date.now() + 7 * 86_400_000);
+
+    await grantEntitlementUntil({
+      userId: account.userId,
+      workspaceId: account.workspaceId,
+      source: "admin",
+      plan: "radar-admin-custom",
+      expiresAt: selectedExpiry,
+    });
+
+    const active = await pool!.query<{ endsAt: Date }>(
+      `SELECT ends_at AS "endsAt"
+       FROM entitlement_grants
+       WHERE user_id = $1 AND source = 'admin' AND status = 'active'`,
+      [account.userId],
+    );
+    expect(active.rows[0]?.endsAt.toISOString()).toBe(selectedExpiry.toISOString());
+  });
+
+  test("effective access unions features from overlapping active grants", async () => {
+    const account = await createFixture("entitlement-feature-union");
+    await grantEntitlement({
+      userId: account.userId,
+      workspaceId: account.workspaceId,
+      source: "admin",
+      plan: "digest-only-longer",
+      durationDays: 30,
+      features: ["digest"],
+    });
+    await grantEntitlement({
+      userId: account.userId,
+      workspaceId: account.workspaceId,
+      source: "promo",
+      plan: "delivery-shorter",
+      durationDays: 7,
+      features: ["delivery"],
+    });
+
+    await expect(getEffectiveEntitlement(account.userId, { workspaceId: account.workspaceId })).resolves.toMatchObject({
+      status: "active",
+      source: "admin",
+      plan: "digest-only-longer",
+      features: ["delivery", "digest"],
+      activeSources: ["admin", "promo"],
+    });
+    await expect(hasFeatureAccess(account.userId, "delivery", { workspaceId: account.workspaceId })).resolves.toBe(true);
+    await expect(hasFeatureAccess(account.userId, "api", { workspaceId: account.workspaceId })).resolves.toBe(false);
+  });
+
+  test("admin access expires, revokes, and can be reactivated without losing history", async () => {
+    const account = await createFixture("entitlement-lifecycle");
+    await grantEntitlement({
+      userId: account.userId,
+      workspaceId: account.workspaceId,
+      source: "admin",
+      plan: "one-day",
+      durationDays: 1,
+    });
+    await pool!.query(
+      `UPDATE entitlement_grants
+       SET starts_at = CURRENT_TIMESTAMP - INTERVAL '2 days',
+           ends_at = CURRENT_TIMESTAMP - INTERVAL '1 day'
+       WHERE user_id = $1 AND source = 'admin' AND status = 'active'`,
+      [account.userId],
+    );
+    await expect(getEffectiveEntitlement(account.userId, { workspaceId: account.workspaceId }))
+      .resolves.toMatchObject({ status: "inactive" });
+    await expect(grantEntitlement({
+      userId: account.userId,
+      workspaceId: account.workspaceId,
+      source: "admin",
+      plan: "reactivated",
+      durationDays: 7,
+    })).resolves.toMatchObject({ changed: true });
+    await expect(getEffectiveEntitlement(account.userId, { workspaceId: account.workspaceId }))
+      .resolves.toMatchObject({ status: "active", source: "admin", plan: "reactivated" });
+
+    await expect(revokeEntitlement({ userId: account.userId, workspaceId: account.workspaceId, source: "admin" }))
+      .resolves.toMatchObject({ changed: true, count: 1 });
+    await expect(grantEntitlement({
+      userId: account.userId,
+      workspaceId: account.workspaceId,
+      source: "admin",
+      plan: "after-revoke",
+      durationDays: 7,
+    })).resolves.toMatchObject({ changed: true });
+
+    const history = await pool!.query<{ status: string }>(
+      `SELECT status FROM entitlement_grants
+       WHERE user_id = $1 AND source = 'admin'
+       ORDER BY id`,
+      [account.userId],
+    );
+    expect(history.rows.map((row) => row.status)).toEqual(["revoked", "revoked", "active"]);
+  });
+
+  test("paid-order access disappears after a full refund", async () => {
+    const account = await createFixture("entitlement-payment-refund");
+    const order = await pool!.query<{ id: string }>(
+      `INSERT INTO checkout_orders (
+         user_id, purchased_by_user_id, workspace_id, entitlement_owner_id,
+         plan_code, amount_rub, currency, status, paid_at, payload
+       ) VALUES ($1, $1, $2, $1, 'pilot', 2990, 'RUB', 'paid', CURRENT_TIMESTAMP, '{}'::JSONB)
+       RETURNING id::TEXT AS id`,
+      [account.userId, account.workspaceId],
+    );
+    await pool!.query(
+      `INSERT INTO checkout_order_entitlements (
+         order_id, user_id, workspace_id, entitlement_owner_id,
+         plan_code, duration_days, starts_at, ends_at
+       ) VALUES ($1, $2, $3, $2, 'pilot', 7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '7 days')`,
+      [order.rows[0]!.id, account.userId, account.workspaceId],
+    );
+    await expect(getEffectiveEntitlement(account.userId, { workspaceId: account.workspaceId })).resolves.toMatchObject({
+      status: "active",
+      source: "payment",
+    });
+
+    await pool!.query(
+      `UPDATE checkout_orders SET status = 'refunded' WHERE id = $1`,
+      [order.rows[0]!.id],
+    );
+    await expect(getEffectiveEntitlement(account.userId, { workspaceId: account.workspaceId }))
+      .resolves.toMatchObject({ status: "inactive" });
+  });
+
   test("an in-flight owner write serializes before deletion and cannot reactivate delivery afterward", async () => {
     const account = await createFixture("delete-write-race");
     const delivery = await createDeliveryFixture(account);
@@ -1021,7 +1263,7 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
     await pool!.query(
       `UPDATE users
        SET onboarding_status = 'in_progress',
-           onboarding_step = 'profile',
+           onboarding_step = 'market',
            onboarding_data = $2::JSONB,
            updated_at = NOW()
        WHERE id = $1`,
@@ -1031,6 +1273,8 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
           fullName: "Owner",
           agencyName: "Deletion race workspace",
           teamRole: "leader",
+          specialization: "Product",
+          roles: ["product"],
         }),
       ],
     );
@@ -1063,12 +1307,11 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
         workspaceRole: "owner",
         sessionId: account.session.id,
       }, {
-        step: "profile",
+        step: "market",
         intent: "next",
         values: {
-          specialization: "Product",
-          roles: ["product"],
           industries: ["it"],
+          companySizes: ["medium"],
           geography: "Москва",
           hiringMode: "specialist",
         },
@@ -1090,7 +1333,7 @@ describeDatabase("auth v2 account and team PostgreSQL integration", () => {
       releaseProfileWrite();
       await expect(onboarding).resolves.toMatchObject({
         status: "in_progress",
-        step: "complete",
+        step: "delivery",
       });
       await expect(deletion).resolves.toEqual({ ok: true });
     } finally {

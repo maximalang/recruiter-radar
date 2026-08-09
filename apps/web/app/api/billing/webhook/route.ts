@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getPool } from "../../../../lib/db";
 import { processPaymentWebhook } from "../../../../lib/payments";
-import { requireServerEnv } from "../../../../lib/runtime";
+import { logError, logEvent, logWarn, requireServerEnv } from "../../../../lib/runtime";
 
 export const runtime = "nodejs";
 
@@ -85,6 +85,9 @@ export async function POST(request: Request) {
       [provider, idempotencyKey, nextStatus, errorMessage, claimToken]
     );
 
+    if (nextStatus === "processed") logEvent("payments.webhook_processed", { provider });
+    else logWarn("payments.webhook_failed", { provider, status: event.status });
+
     return NextResponse.json({ ok: event.status >= 200 && event.status < 300, reconciled: event.status >= 200 && event.status < 300, status: nextStatus }, { status: event.status });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message.slice(0, 500) : "reconciliation_error";
@@ -95,6 +98,8 @@ export async function POST(request: Request) {
        WHERE provider = $1 AND idempotency_key = $2 AND claim_token = $4`,
       [provider, idempotencyKey, errorMessage, claimToken]
     );
+
+    logError("payments.webhook_failed", error, { provider });
 
     return NextResponse.json({ ok: false, reconciled: false, status: "failed", error: "reconciliation_error" }, { status: 500 });
   }

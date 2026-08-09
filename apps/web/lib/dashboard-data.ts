@@ -6,6 +6,8 @@
  */
 
 import { getPool } from "./db";
+import { getPool as getSharedPool } from "./db-pool";
+import { getEffectiveEntitlement, type EffectiveEntitlement } from "./entitlements";
 import { getSourceRegistry, type SourceId } from "./sources/source-registry";
 import { getLeadsForAllProfiles, getPendingReviewCount, type LeadItem } from "./leads-data";
 import { listClientProfiles, resolveHiringMode } from "./clientProfiles";
@@ -607,6 +609,7 @@ export interface TodayRadar {
    * so the card never has to handle it.
    */
   hiringModeByProfileId: Record<string, 'specialist' | 'executive' | 'volume'>;
+  lastRunAt: string | null;
 }
 
 /**
@@ -615,26 +618,35 @@ export interface TodayRadar {
  *
  * Resolves active profiles internally (the dashboard has no profileIds to hand),
  * then reuses the same data layer as /leads so ranking and review-count semantics
- * stay identical between the two surfaces. Returns empty/zero on any failure.
+ * stay identical between the two surfaces. Infrastructure failures throw so
+ * the route can render an honest error state instead of a false empty result.
  *
- * Owner-scoped: only returns leads for profiles owned by `ownerId` (or pilot/anonymous
- * profiles with owner_id IS NULL).
+ * Owner-scoped: only returns leads for profiles explicitly owned by `ownerId`.
  */
 export async function getDashboardTodayRadar(
   ownerId: string | number,
   limit = 5
 ): Promise<TodayRadar> {
-  try {
     const profiles = await listClientProfiles(ownerId);
     const activeProfiles = profiles.filter((p) => p.isActive);
     const profileIds = activeProfiles.map((p) => p.id);
     if (profileIds.length === 0) {
-      return { topLeads: [], pendingReview: 0, hiringModeByProfileId: {} };
+      return { topLeads: [], pendingReview: 0, hiringModeByProfileId: {}, lastRunAt: null };
     }
 
-    const [leadsResult, pendingReview] = await Promise.all([
+    const pool = getSharedPool();
+    if (!pool) throw new Error("DATABASE_URL is not set.");
+    const [leadsResult, pendingReview, lastRun] = await Promise.all([
       getLeadsForAllProfiles({ profileIds, ownerId, limit }),
       getPendingReviewCount({ profileIds, ownerId }),
+      pool.query<{ lastRunAt: string | null }>(
+        `SELECT MAX(run.created_at)::TEXT AS "lastRunAt"
+         FROM digest_runs AS run
+         JOIN client_profiles AS profile ON profile.id = run.client_profile_id
+         WHERE run.client_profile_id = ANY($1::BIGINT[])
+           AND profile.owner_id = $2`,
+        [profileIds, String(ownerId)],
+      ),
     ]);
 
     const hiringModeByProfileId: Record<string, 'specialist' | 'executive' | 'volume'> = {};
@@ -642,10 +654,7 @@ export async function getDashboardTodayRadar(
       hiringModeByProfileId[p.id] = resolveHiringMode(p);
     }
 
-    return { topLeads: leadsResult.leads, pendingReview, hiringModeByProfileId };
-  } catch {
-    return { topLeads: [], pendingReview: 0, hiringModeByProfileId: {} };
-  }
+    return { topLeads: leadsResult.leads, pendingReview, hiringModeByProfileId, lastRunAt: lastRun.rows[0]?.lastRunAt ?? null };
 }
 
 // ─── Operator: user management overview ──────────────────────────
@@ -663,6 +672,12 @@ export interface OperatorUserRow {
   telegramUsername: string | null;
   telegramChatId: string | null;
   createdAt: string;
+  workspace: {
+    id: string;
+    name: string;
+    role: string;
+    dataOwnerId: string;
+  } | null;
   /** Client profile (null when the user has no profile yet). */
   profile: {
     id: string;
@@ -673,12 +688,8 @@ export interface OperatorUserRow {
     deliveryEnabled: boolean | null;
     telegramChatId: string | null;
   } | null;
-  /** Most recent / active pilot enrollment, if any. */
-  pilot: {
-    status: string;
-    startsAt: string;
-    endsAt: string | null;
-  } | null;
+  /** Canonical access state shared with runtime authorization. */
+  access: EffectiveEntitlement;
   /** Whether the user has at least one PAID checkout order. */
   hasPaidOrder: boolean;
   /** Count of paid orders (for the "paid N×" signal). */
@@ -686,7 +697,7 @@ export interface OperatorUserRow {
 }
 
 export async function getOperatorUsers(): Promise<OperatorUserRow[]> {
-  const pool = getPool();
+  const pool = getSharedPool();
   if (!pool) return [];
 
   try {
@@ -709,10 +720,11 @@ export async function getOperatorUsers(): Promise<OperatorUserRow[]> {
       target_city: string | null;
       delivery_enabled: boolean | null;
       profile_telegram_chat_id: string | null;
-      pilot_status: string | null;
-      pilot_starts_at: string | null;
-      pilot_ends_at: string | null;
       paid_order_count: string;
+      workspace_id: string | null;
+      workspace_name: string | null;
+      workspace_role: string | null;
+      data_owner_id: string;
     }>(`
       SELECT
         u.id::TEXT            AS id,
@@ -721,6 +733,10 @@ export async function getOperatorUsers(): Promise<OperatorUserRow[]> {
         u.telegram_username   AS telegram_username,
         u.telegram_chat_id::TEXT AS telegram_chat_id,
         u.created_at::TEXT    AS created_at,
+        ws.id::TEXT           AS workspace_id,
+        ws.name               AS workspace_name,
+        member.role           AS workspace_role,
+        COALESCE(ws.bootstrap_user_id, u.id)::TEXT AS data_owner_id,
         p.id::TEXT            AS profile_id,
         p.agency_name         AS agency_name,
         p.is_active           AS is_active,
@@ -728,34 +744,48 @@ export async function getOperatorUsers(): Promise<OperatorUserRow[]> {
         p.target_city         AS target_city,
         p.delivery_enabled    AS delivery_enabled,
         p.telegram_chat_id::TEXT AS profile_telegram_chat_id,
-        pe.status::TEXT       AS pilot_status,
-        pe.starts_at::TEXT    AS pilot_starts_at,
-        pe.ends_at::TEXT      AS pilot_ends_at,
         COALESCE(po.paid_count, 0)::TEXT AS paid_order_count
       FROM users u
+      JOIN workspace_members member
+        ON member.user_id = u.id AND member.status = 'active'
+      JOIN workspaces ws
+        ON ws.id = member.workspace_id AND ws.status = 'active'
       LEFT JOIN LATERAL (
-        SELECT * FROM client_profiles cp WHERE cp.owner_id = u.id LIMIT 1
+        SELECT * FROM client_profiles cp
+        WHERE cp.owner_id = COALESCE(ws.bootstrap_user_id, u.id)
+          AND cp.workspace_id = ws.id
+        LIMIT 1
       ) p ON true
-      LEFT JOIN LATERAL (
-        SELECT * FROM pilot_enrollments pe2
-        WHERE pe2.user_id = u.id
-        ORDER BY created_at DESC LIMIT 1
-      ) pe ON true
       LEFT JOIN LATERAL (
         SELECT COUNT(*)::INT AS paid_count
         FROM checkout_orders co
-        WHERE co.user_id = u.id AND co.status = 'paid'
+        WHERE co.entitlement_owner_id = COALESCE(ws.bootstrap_user_id, u.id)
+          AND co.workspace_id = ws.id
+          AND co.status = 'paid'
       ) po ON true
       ORDER BY u.created_at DESC
     `);
 
-    return result.rows.map((r) => ({
+    const accessRows = await Promise.all(result.rows.map((row) => (
+      getEffectiveEntitlement(row.data_owner_id, {
+        workspaceId: row.workspace_id!,
+      })
+    )));
+    return result.rows.map((r, index) => ({
       id: r.id,
       email: r.email,
       fullName: r.full_name,
       telegramUsername: r.telegram_username,
       telegramChatId: r.telegram_chat_id,
       createdAt: r.created_at,
+      workspace: r.workspace_id && r.workspace_name && r.workspace_role
+        ? {
+            id: r.workspace_id,
+            name: r.workspace_name,
+            role: r.workspace_role,
+            dataOwnerId: r.data_owner_id,
+          }
+        : null,
       profile: r.profile_id
         ? {
             id: r.profile_id,
@@ -767,13 +797,24 @@ export async function getOperatorUsers(): Promise<OperatorUserRow[]> {
             telegramChatId: r.profile_telegram_chat_id,
           }
         : null,
-      pilot: r.pilot_status
-        ? { status: r.pilot_status, startsAt: r.pilot_starts_at ?? "", endsAt: r.pilot_ends_at }
-        : null,
+      access: accessRows[index] ?? {
+        status: "inactive",
+        source: null,
+        plan: null,
+        startsAt: null,
+        expiresAt: null,
+        features: [],
+        activeSources: [],
+        reason: "no_active_entitlement",
+      },
       hasPaidOrder: parseInt(r.paid_order_count, 10) > 0,
       paidOrderCount: parseInt(r.paid_order_count, 10),
     }));
-  } catch {
+  } catch (error) {
+    console.error(
+      "[admin] user overview query failed",
+      error instanceof Error ? error.message : String(error),
+    );
     return [];
   }
 }

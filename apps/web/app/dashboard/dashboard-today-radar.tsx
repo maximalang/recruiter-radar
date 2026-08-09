@@ -20,12 +20,14 @@ interface DashboardTodayRadarProps {
   pendingReview: number;
   /** Resolved hiring mode per active client profile id. */
   hiringModeByProfileId?: Record<string, "specialist" | "executive" | "volume">;
+  lastRunAt: string | null;
 }
 
 export default function DashboardTodayRadar({
   topLeads,
   pendingReview,
   hiringModeByProfileId,
+  lastRunAt,
 }: DashboardTodayRadarProps) {
   return (
     <section className={styles.todayRadarSection} aria-labelledby="today-radar-heading">
@@ -41,9 +43,9 @@ export default function DashboardTodayRadar({
       {topLeads.length === 0 ? (
         <EmptyState
           icon={SearchIcon}
-          title="Пока нет компаний для контакта"
-          text="Радар подберёт их по вашему профилю: роли, отрасли, регионы."
-          action={{ href: "/profile", label: "Проверить настройки профиля" }}
+          title={lastRunAt ? "Подходящих компаний пока нет" : "Первый запуск Radar ещё не завершён"}
+          text={lastRunAt ? "Последний запуск завершён, но компании не прошли ваши текущие фильтры. Можно расширить рынок или дождаться свежих сигналов." : "Профиль сохранён. После первого сканирования здесь появятся компании с evidence и рекомендуемым действием."}
+          action={{ href: "/settings/radar", label: "Проверить настройки Radar" }}
         />
       ) : (
         <div className={styles.todayRadarList}>
@@ -85,6 +87,20 @@ export default function DashboardTodayRadar({
                   <div className={styles.todayRadarLine}>
                     <span className={styles.todayRadarLineLabel}>Почему сейчас</span>
                     <span className={styles.todayRadarLineText}>{lead.whyNow}</span>
+                  </div>
+                ) : null}
+
+                {lead.evidenceTitles.length > 0 ? (
+                  <div className={styles.todayRadarLine}>
+                    <span className={styles.todayRadarLineLabel}>Evidence</span>
+                    <span className={styles.todayRadarLineText}>{lead.evidenceTitles.slice(0, 2).join(" · ")}</span>
+                  </div>
+                ) : null}
+
+                {lead.opener ? (
+                  <div className={styles.todayRadarLine}>
+                    <span className={styles.todayRadarLineLabel}>Следующий шаг</span>
+                    <span className={styles.todayRadarLineText}>{lead.opener}</span>
                   </div>
                 ) : null}
 

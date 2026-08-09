@@ -41,6 +41,7 @@ describeDatabase("auth v2 onboarding PostgreSQL integration", () => {
       values: {
         fullName: "Анна Смирнова",
         agencyName: "North Star",
+        agencyWebsite: null,
         teamRole: "leader",
       },
     });
@@ -60,9 +61,6 @@ describeDatabase("auth v2 onboarding PostgreSQL integration", () => {
         values: {
           specialization: "Product и Data",
           roles: ["data", "product"],
-          industries: ["it"],
-          geography: "Москва, Санкт-Петербург",
-          hiringMode: "specialist",
         },
       }),
       saveOnboardingProgress(owner, {
@@ -71,12 +69,14 @@ describeDatabase("auth v2 onboarding PostgreSQL integration", () => {
         values: {
           specialization: "Product и Data",
           roles: ["data", "product"],
-          industries: ["it"],
-          geography: "Москва, Санкт-Петербург",
-          hiringMode: "specialist",
         },
       }),
     ]);
+    await saveOnboardingProgress(owner, {
+      step: "market",
+      intent: "next",
+      values: { industries: ["it"], companySizes: ["small"], geography: "Москва, Санкт-Петербург", hiringMode: "specialist" },
+    });
 
     const profile = await pool!.query<{
       count: number;
@@ -96,6 +96,18 @@ describeDatabase("auth v2 onboarding PostgreSQL integration", () => {
       workspaceId: owner.workspaceId,
       contactPolicy: "corporate_only",
     });
+
+    await saveOnboardingProgress(owner, {
+      step: "delivery",
+      intent: "next",
+      values: { deliveryChoice: "email", deliveryEmail: "digest@north-star.test" },
+    });
+    const delivery = await pool!.query<{ enabled: boolean; emailEnabled: boolean; email: string | null }>(
+      `SELECT delivery_enabled AS enabled, email_digest_enabled AS "emailEnabled", digest_email AS email
+       FROM client_profiles WHERE owner_id = $1`,
+      [owner.userId],
+    );
+    expect(delivery.rows[0]).toEqual({ enabled: true, emailEnabled: true, email: "digest@north-star.test" });
 
     await Promise.all([
       saveOnboardingProgress(owner, {
@@ -135,6 +147,7 @@ describeDatabase("auth v2 onboarding PostgreSQL integration", () => {
       values: {
         fullName: "Иван Петров",
         agencyName: "Forged Agency",
+        agencyWebsite: null,
         teamRole: "recruiter",
       },
     });
@@ -144,10 +157,12 @@ describeDatabase("auth v2 onboarding PostgreSQL integration", () => {
       values: {
         specialization: "Forged",
         roles: ["sales"],
-        industries: ["retail"],
-        geography: "Казань",
-        hiringMode: "volume",
       },
+    });
+    await saveOnboardingProgress(recruiter, {
+      step: "market",
+      intent: "next",
+      values: { industries: ["retail"], companySizes: ["small"], geography: "Казань", hiringMode: "volume" },
     });
 
     const profile = await pool!.query<{ count: number }>(
@@ -198,7 +213,7 @@ describeDatabase("auth v2 onboarding PostgreSQL integration", () => {
     });
   });
 
-  test("profile skip still creates the missing minimal owner profile", async () => {
+  test("market skip still creates the missing minimal owner profile", async () => {
     const freshOwner = await createFixture("owner");
     await saveOnboardingProgress(freshOwner, {
       step: "agency",
@@ -206,6 +221,7 @@ describeDatabase("auth v2 onboarding PostgreSQL integration", () => {
       values: {
         fullName: "Мария Соколова",
         agencyName: "Signal Bureau",
+        agencyWebsite: null,
         teamRole: "founder",
       },
     });
@@ -215,10 +231,11 @@ describeDatabase("auth v2 onboarding PostgreSQL integration", () => {
       values: {
         specialization: null,
         roles: [],
-        industries: [],
-        geography: null,
-        hiringMode: "auto",
       },
+    });
+    await saveOnboardingProgress(freshOwner, {
+      step: "market", intent: "skip",
+      values: { industries: [], companySizes: [], geography: null, hiringMode: "auto" },
     });
 
     const profile = await pool!.query<{
@@ -277,6 +294,7 @@ describeDatabase("auth v2 onboarding PostgreSQL integration", () => {
       values: {
         fullName: "Ольга Иванова",
         agencyName: "North Star",
+        agencyWebsite: null,
         teamRole: "founder",
       },
     })).resolves.toMatchObject({
@@ -289,10 +307,11 @@ describeDatabase("auth v2 onboarding PostgreSQL integration", () => {
       values: {
         specialization: null,
         roles: [],
-        industries: [],
-        geography: null,
-        hiringMode: "auto",
       },
+    });
+    await saveOnboardingProgress(existingOwner, {
+      step: "market", intent: "skip",
+      values: { industries: [], companySizes: [], geography: null, hiringMode: "auto" },
     });
 
     const persisted = await pool!.query<{

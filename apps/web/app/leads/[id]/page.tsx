@@ -3,7 +3,8 @@ import type { ReactElement, SVGProps } from 'react';
 import Link from 'next/link';
 import { getLeadDetail, formatLawfulContactPath } from '@/lib/leads-data';
 import { getClientProfileById, resolveHiringMode } from '@/lib/clientProfiles';
-import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization';
+import { getSession } from '@/lib/auth-v2/authorization';
+import { getEffectiveEntitlement } from '@/lib/entitlements';
 import { buildFitExplanation, FIT_DIMENSION_ICON } from '@/lib/leads/fit-explanation';
 import { buildCompanySummary } from '@/lib/leads/company-summary';
 import { deriveRoleNames, splitRolesForDisplay, deriveUrgencyCue } from '@/lib/leads/lead-quality';
@@ -31,6 +32,8 @@ import {
   EvidenceTag,
   SourceChip,
   NotFoundState,
+  EmptyState,
+  ErrorState,
   FitIcon,
   internalPageClasses as ipStyles,
   GATE_DESC,
@@ -51,10 +54,67 @@ function FeedbackStatusIcon({ icon: Icon }: { icon: (p: SVGProps<SVGSVGElement>)
 export default async function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  // Owner-scoped reads: without a session the lead lookup returns null,
-  // rendering NotFoundState (correct: no access).
-  const ownerId = await getAuthorizedOwnerId('leads:read');
-  const lead = ownerId ? await getLeadDetail({ candidateId: id, ownerId }) : null;
+  // Authentication and canonical access are resolved before the owner-scoped
+  // lead query. This avoids both probing a lead without access and presenting
+  // an expired session as a misleading 404.
+  const authorization = await getSession({ permission: 'leads:read' });
+  if (!authorization) {
+    return (
+      <InternalPageFrame navItems={LEAD_DETAIL_NAV}>
+        <InternalPageHeader title="Возможность" subtitle="Защищённое рабочее пространство" />
+        <EmptyState
+          title="Нужен вход в аккаунт"
+          text="Войдите, чтобы открыть эту возможность в своём workspace."
+          action={{ href: `/login?returnTo=/leads/${encodeURIComponent(id)}`, label: 'Войти' }}
+        />
+      </InternalPageFrame>
+    );
+  }
+
+  const ownerId = authorization.dataOwnerId;
+  const entitlement = authorization.workspaceId
+    ? await getEffectiveEntitlement(ownerId, { workspaceId: authorization.workspaceId }).catch(() => null)
+    : null;
+  if (!entitlement) {
+    return (
+      <InternalPageFrame navItems={LEAD_DETAIL_NAV}>
+        <InternalPageHeader title="Возможность" subtitle="Проверка доступа" />
+        <ErrorState
+          title="Не удалось проверить доступ"
+          description="Мы не показываем данные, пока сервер не подтвердит права аккаунта. Обновите страницу немного позже."
+          action={{ href: '/settings/access', label: 'Доступ и оплата' }}
+        />
+      </InternalPageFrame>
+    );
+  }
+  if (entitlement.status !== 'active' || !entitlement.features.includes('dashboard')) {
+    return (
+      <InternalPageFrame navItems={LEAD_DETAIL_NAV}>
+        <InternalPageHeader title="Возможность" subtitle="Доступ не активен" />
+        <EmptyState
+          title="Нужен активный доступ"
+          text="Профиль и история сохранены. После активации возможность снова станет доступна."
+          action={{ href: '/settings/access', label: 'Проверить доступ' }}
+        />
+      </InternalPageFrame>
+    );
+  }
+
+  let lead;
+  try {
+    lead = await getLeadDetail({ candidateId: id, ownerId });
+  } catch {
+    return (
+      <InternalPageFrame navItems={LEAD_DETAIL_NAV}>
+        <InternalPageHeader title="Возможность" subtitle="Radar" />
+        <ErrorState
+          title="Не удалось загрузить возможность"
+          description="Это временная ошибка данных, а не признак того, что возможность удалена. Обновите страницу немного позже."
+          action={{ href: '/leads', label: 'Вернуться к возможностям' }}
+        />
+      </InternalPageFrame>
+    );
+  }
 
   if (!lead) {
     return (
@@ -76,9 +136,11 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   // Deterministic Stage 1 AI-assist: fit explanation needs the agency profile to
   // match against. Degrade gracefully if the profile can't be loaded — the rest
   // of the page (evidence-first) stands on its own.
-  const profile = ownerId
-    ? await getClientProfileById(lead.clientProfileId, ownerId).catch(() => null)
-    : null;
+  const profileResult = await Promise.allSettled([
+    getClientProfileById(lead.clientProfileId, ownerId),
+  ]);
+  const profile = profileResult[0].status === 'fulfilled' ? profileResult[0].value : null;
+  const profileUnavailable = profileResult[0].status === 'rejected';
   const fit = profile
     ? buildFitExplanation(
         {
@@ -190,8 +252,16 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               ? lead.locationNames.join(', ')
               : 'Регион не указан'
           }
-          nav={<InternalBackLink href="/leads">Лиды</InternalBackLink>}
+          nav={<InternalBackLink href="/leads">Возможности</InternalBackLink>}
         />
+
+        {profileUnavailable ? (
+          <ErrorState
+            title="Не удалось загрузить настройки Radar"
+            description="Доказательства возможности доступны, но персональное объяснение соответствия профилю временно не рассчитано."
+            action={{ href: '/settings/radar', label: 'Открыть настройки Radar' }}
+          />
+        ) : null}
 
         <DetailLayout
           main={

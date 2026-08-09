@@ -100,6 +100,14 @@
   transition: color .16s ease;
 }
 
+.footerButton {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
 .footerBrand:hover,
 .footerLink:hover,
 .footerOperatorEmail:hover {

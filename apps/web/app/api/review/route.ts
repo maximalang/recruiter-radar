@@ -3,7 +3,8 @@ import { getPool } from "../../../lib/db";
 import { formatReason, type ScoringReason } from "../../../lib/scoring/scoring-reasons";
 import { extractPayloadFields } from "../../../lib/leads-data";
 import { updateDigestOrgStateFeedback } from "../../../lib/digestFeedback";
-import { getAuthorizedOwnerId } from "../../../lib/auth-v2/authorization";
+import { getSession } from "../../../lib/auth-v2/authorization";
+import { hasFeatureAccess } from "../../../lib/entitlements";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -56,9 +57,17 @@ export async function GET(request: Request) {
 
   // Owner-scope: reject reads of another tenant's review queue. The JOIN +
   // owner predicate below also defends against a forged clientProfileId.
-  const ownerId = await getAuthorizedOwnerId("leads:read");
-  if (!ownerId) {
+  const authorization = await getSession({ permission: "leads:read" });
+  if (!authorization?.workspaceId) {
     return NextResponse.json({ error: "Access denied: no active session." }, { status: 401 });
+  }
+  const ownerId = authorization.dataOwnerId;
+  try {
+    if (!(await hasFeatureAccess(ownerId, "api", { workspaceId: authorization.workspaceId }))) {
+      return NextResponse.json({ error: "entitlement_required" }, { status: 403 });
+    }
+  } catch {
+    return NextResponse.json({ error: "entitlement_check_unavailable" }, { status: 503 });
   }
 
   const pool = getPool();
@@ -73,7 +82,7 @@ export async function GET(request: Request) {
       JOIN client_profiles cp
         ON cp.id = dc.client_profile_id
       WHERE dc.client_profile_id = $1
-        AND (cp.owner_id = $2 OR cp.owner_id IS NULL)
+        AND cp.owner_id = $2
         AND dc.review_status = 'pending_review'
     `, [clientProfileId, ownerId]);
 
@@ -108,7 +117,7 @@ export async function GET(request: Request) {
       JOIN client_profiles cp
         ON cp.id = dc.client_profile_id
       WHERE dc.client_profile_id = $1
-        AND (cp.owner_id = $2 OR cp.owner_id IS NULL)
+        AND cp.owner_id = $2
         AND dc.review_status = 'pending_review'
       ORDER BY dc.total_score DESC, dc.created_at DESC
       LIMIT $3 OFFSET $4
@@ -201,12 +210,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "clientProfileId is required." }, { status: 400 });
   }
 
-  // Owner-scope: only the profile's owner (or a pilot/anonymous profile) may
+  // Owner-scope: only the profile's explicit owner may
   // approve/reject its candidates. The owner predicate is enforced inside the
   // UPDATE so a forged clientProfileId simply matches no rows → 404.
-  const ownerId = await getAuthorizedOwnerId("leads:write");
-  if (!ownerId) {
+  const authorization = await getSession({ permission: "leads:write" });
+  if (!authorization?.workspaceId) {
     return NextResponse.json({ error: "Access denied: no active session." }, { status: 401 });
+  }
+  const ownerId = authorization.dataOwnerId;
+  try {
+    if (!(await hasFeatureAccess(ownerId, "api", { workspaceId: authorization.workspaceId }))) {
+      return NextResponse.json({ error: "entitlement_required" }, { status: 403 });
+    }
+  } catch {
+    return NextResponse.json({ error: "entitlement_check_unavailable" }, { status: 503 });
   }
 
   const pool = getPool();
@@ -228,7 +245,7 @@ export async function POST(request: Request) {
       WHERE dc.id = $2
         AND dc.client_profile_id = $3
         AND cp.id = dc.client_profile_id
-        AND (cp.owner_id = $4 OR cp.owner_id IS NULL)
+        AND cp.owner_id = $4
         AND dc.review_status = 'pending_review'
       RETURNING dc.id::TEXT AS id, dc.org_id::TEXT AS org_id, dc.review_status
     `, [reviewStatus, payload.candidateId, payload.clientProfileId, ownerId]);

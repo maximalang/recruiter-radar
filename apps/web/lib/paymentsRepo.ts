@@ -10,7 +10,6 @@ import {
 } from "./clientProfiles";
 import { buildPilotApplicationComment } from "./publicProduct";
 import {
-  PLAN_ENTITLEMENT_DAYS,
   type PublicPlan
 } from "./pricingCatalog";
 import { CUSTOMER_CHECKOUT_COPY } from "./copy/customer";
@@ -51,6 +50,9 @@ export async function getCheckoutOrderById(
   const result = await pool.query<CheckoutOrderRow>(`
     SELECT
       id::TEXT AS id,
+      purchased_by_user_id::TEXT AS "purchasedByUserId",
+      workspace_id::TEXT AS "workspaceId",
+      entitlement_owner_id::TEXT AS "entitlementOwnerId",
       plan_code AS "productCode",
       (amount_rub * 100) AS "amountMinor",
       currency,
@@ -72,9 +74,11 @@ export async function getCheckoutOrderById(
 
 export async function getCheckoutOrderByIdForOwner(
   orderId: string | number,
-  ownerId: string | number
+  input: { workspaceId: string | number; entitlementOwnerId: string | number },
 ): Promise<CheckoutOrder | null> {
   const normalizedOrderId = normalizeCheckoutOrderId(orderId);
+  const workspaceId = normalizeCheckoutOrderUserId(input.workspaceId);
+  const entitlementOwnerId = normalizeCheckoutOrderUserId(input.entitlementOwnerId);
   const pool = getPool();
 
   if (!pool) {
@@ -84,6 +88,9 @@ export async function getCheckoutOrderByIdForOwner(
   const result = await pool.query<CheckoutOrderRow>(`
     SELECT
       id::TEXT AS id,
+      purchased_by_user_id::TEXT AS "purchasedByUserId",
+      workspace_id::TEXT AS "workspaceId",
+      entitlement_owner_id::TEXT AS "entitlementOwnerId",
       plan_code AS "productCode",
       (amount_rub * 100) AS "amountMinor",
       currency,
@@ -97,15 +104,102 @@ export async function getCheckoutOrderByIdForOwner(
       updated_at::TEXT AS "updatedAt",
       paid_at::TEXT AS "paidAt"
     FROM checkout_orders
-    WHERE id = $1 AND user_id::TEXT = $2
+    WHERE id = $1
+      AND workspace_id = $2
+      AND entitlement_owner_id = $3
     LIMIT 1
-  `, [normalizedOrderId, String(ownerId)]);
+  `, [normalizedOrderId, workspaceId, entitlementOwnerId]);
 
   return result.rowCount === 1 ? mapCheckoutOrderRow(result.rows[0]) : null;
 }
 
+export async function listCheckoutOrdersForOwner(
+  input: {
+    workspaceId: string | number;
+    entitlementOwnerId: string | number;
+    limit?: number;
+  },
+): Promise<CheckoutOrder[]> {
+  const workspaceId = normalizeCheckoutOrderUserId(input.workspaceId);
+  const entitlementOwnerId = normalizeCheckoutOrderUserId(input.entitlementOwnerId);
+  const normalizedLimit = Number.isInteger(input.limit) && input.limit! > 0 && input.limit! <= 100
+    ? input.limit!
+    : 20;
+  const pool = getPool();
+  if (!pool) throw new Error("DATABASE_URL is not set.");
+
+  const result = await pool.query<CheckoutOrderRow>(`
+    SELECT
+      id::TEXT AS id,
+      purchased_by_user_id::TEXT AS "purchasedByUserId",
+      workspace_id::TEXT AS "workspaceId",
+      entitlement_owner_id::TEXT AS "entitlementOwnerId",
+      plan_code AS "productCode",
+      (amount_rub * 100) AS "amountMinor",
+      currency,
+      status,
+      customer_name AS "customerName",
+      customer_contact AS "customerContact",
+      payload,
+      provider,
+      provider_payment_id AS "providerPaymentId",
+      created_at::TEXT AS "createdAt",
+      updated_at::TEXT AS "updatedAt",
+      paid_at::TEXT AS "paidAt"
+    FROM checkout_orders
+    WHERE workspace_id = $1
+      AND entitlement_owner_id = $2
+    ORDER BY created_at DESC, id DESC
+    LIMIT $3
+  `, [workspaceId, entitlementOwnerId, normalizedLimit]);
+
+  return result.rows.map(mapCheckoutOrderRow);
+}
+
+export async function listCheckoutOrdersForAccess(input: {
+  workspaceId: string | number;
+  entitlementOwnerId: string | number;
+  limit?: number;
+}): Promise<CheckoutOrder[]> {
+  const workspaceId = normalizeCheckoutOrderUserId(input.workspaceId);
+  const entitlementOwnerId = normalizeCheckoutOrderUserId(input.entitlementOwnerId);
+  const limit = Number.isInteger(input.limit) && input.limit! > 0 && input.limit! <= 100
+    ? input.limit!
+    : 20;
+  const pool = getPool();
+  if (!pool) throw new Error("DATABASE_URL is not set.");
+
+  const result = await pool.query<CheckoutOrderRow>(`
+    SELECT
+      id::TEXT AS id,
+      purchased_by_user_id::TEXT AS "purchasedByUserId",
+      workspace_id::TEXT AS "workspaceId",
+      entitlement_owner_id::TEXT AS "entitlementOwnerId",
+      plan_code AS "productCode",
+      (amount_rub * 100) AS "amountMinor",
+      currency,
+      status,
+      customer_name AS "customerName",
+      customer_contact AS "customerContact",
+      payload,
+      provider,
+      provider_payment_id AS "providerPaymentId",
+      created_at::TEXT AS "createdAt",
+      updated_at::TEXT AS "updatedAt",
+      paid_at::TEXT AS "paidAt"
+    FROM checkout_orders
+    WHERE workspace_id = $1 AND entitlement_owner_id = $2
+    ORDER BY created_at DESC, id DESC
+    LIMIT $3
+  `, [workspaceId, entitlementOwnerId, limit]);
+
+  return result.rows.map(mapCheckoutOrderRow);
+}
+
 export async function createCheckoutOrder(input: {
-  userId: string | number;
+  purchasedByUserId: string | number;
+  workspaceId: string | number;
+  entitlementOwnerId: string | number;
   productCode: PublicPlan["code"];
   amountMinor: number;
   currency: string;
@@ -124,6 +218,9 @@ export async function createCheckoutOrder(input: {
   const result = await pool.query<CheckoutOrderRow>(`
     INSERT INTO checkout_orders (
       user_id,
+      purchased_by_user_id,
+      workspace_id,
+      entitlement_owner_id,
       plan_code,
       amount_rub,
       currency,
@@ -132,9 +229,12 @@ export async function createCheckoutOrder(input: {
       customer_contact,
       payload
     )
-    VALUES ($1, $2, ($3 / 100), $4, 'created', $5, $6, $7::jsonb)
+    VALUES ($3, $1, $2, $3, $4, ($5 / 100), $6, 'created', $7, $8, $9::jsonb)
     RETURNING
       id::TEXT AS id,
+      purchased_by_user_id::TEXT AS "purchasedByUserId",
+      workspace_id::TEXT AS "workspaceId",
+      entitlement_owner_id::TEXT AS "entitlementOwnerId",
       plan_code AS "productCode",
       (amount_rub * 100) AS "amountMinor",
       currency,
@@ -148,7 +248,9 @@ export async function createCheckoutOrder(input: {
       updated_at::TEXT AS "updatedAt",
       paid_at::TEXT AS "paidAt"
   `, [
-    normalizeCheckoutOrderUserId(input.userId),
+    normalizeCheckoutOrderUserId(input.purchasedByUserId),
+    normalizeCheckoutOrderUserId(input.workspaceId),
+    normalizeCheckoutOrderUserId(input.entitlementOwnerId),
     input.productCode,
     input.amountMinor,
     normalizeCurrency(input.currency),
@@ -205,6 +307,9 @@ export async function updateCheckoutOrder(
     WHERE id = $1
     RETURNING
       id::TEXT AS id,
+      purchased_by_user_id::TEXT AS "purchasedByUserId",
+      workspace_id::TEXT AS "workspaceId",
+      entitlement_owner_id::TEXT AS "entitlementOwnerId",
       plan_code AS "productCode",
       (amount_rub * 100) AS "amountMinor",
       currency,
@@ -251,6 +356,9 @@ export async function getCheckoutOrderByProviderPaymentId(
   const result = await pool.query<CheckoutOrderRow>(`
     SELECT
       id::TEXT AS id,
+      purchased_by_user_id::TEXT AS "purchasedByUserId",
+      workspace_id::TEXT AS "workspaceId",
+      entitlement_owner_id::TEXT AS "entitlementOwnerId",
       plan_code AS "productCode",
       (amount_rub * 100) AS "amountMinor",
       currency,
@@ -270,11 +378,7 @@ export async function getCheckoutOrderByProviderPaymentId(
   return result.rowCount === 1 ? mapCheckoutOrderRow(result.rows[0]) : null;
 }
 
-/**
- * Legacy name retained for callers. The implementation grants the paid period
- * for every one-off plan (7/30/90 days), not only the original pilot.
- */
-export async function ensurePilotEntitlementForPaidOrder(
+export async function ensurePaidOrderEntitlement(
   order: CheckoutOrder,
   db?: PaymentsDbClient
 ): Promise<void> {
@@ -288,72 +392,80 @@ export async function ensurePilotEntitlementForPaidOrder(
     throw new Error("DATABASE_URL is not set.");
   }
 
-  const durationDays = PLAN_ENTITLEMENT_DAYS[order.productCode];
-  const paidAtIso = order.paidAt ?? new Date().toISOString();
-
   await pool.query(`
-    WITH order_owner AS (
-      SELECT user_id
+    WITH paid_order AS MATERIALIZED (
+      SELECT
+        id,
+        workspace_id,
+        entitlement_owner_id,
+        plan_code,
+        paid_at,
+        CASE plan_code
+          WHEN 'pilot' THEN 7
+          WHEN 'monthly' THEN 30
+          WHEN 'quarterly' THEN 90
+          ELSE NULL
+        END AS duration_days
       FROM checkout_orders
       WHERE id = $1
+        AND status = 'paid'
+        AND paid_at IS NOT NULL
       LIMIT 1
+    ),
+    locked_order AS MATERIALIZED (
+      SELECT
+        paid_order.*,
+        pg_advisory_xact_lock(
+          hashtextextended(
+            'checkout-entitlement:' || paid_order.workspace_id::TEXT || ':'
+              || paid_order.entitlement_owner_id::TEXT,
+            0::BIGINT
+          )
+        ) AS owner_lock
+      FROM paid_order
+      WHERE duration_days IS NOT NULL
     ),
     access_start AS (
       SELECT GREATEST(
-        $2::timestamptz,
+        locked_order.paid_at,
         COALESCE(
-          MAX(pe.ends_at) FILTER (WHERE pe.status = 'active'),
-          $2::timestamptz
+          MAX(entitlement.ends_at) FILTER (
+            WHERE entitlement.revoked_at IS NULL
+              AND checkout.status = 'paid'
+          ),
+          locked_order.paid_at
         )
       ) AS starts_at
-      FROM order_owner oo
-      LEFT JOIN pilot_enrollments pe ON pe.user_id = oo.user_id
-    ),
-    inserted AS (
-      INSERT INTO checkout_order_entitlements (
-        order_id,
-        user_id,
-        plan_code,
-        duration_days,
-        starts_at,
-        ends_at
-      )
-      SELECT
-        $1,
-        oo.user_id,
-        $3,
-        $4,
-        ast.starts_at,
-        ast.starts_at + ($4::int * INTERVAL '1 day')
-      FROM order_owner oo
-      CROSS JOIN access_start ast
-      ON CONFLICT (order_id) DO NOTHING
-      RETURNING user_id, starts_at, ends_at
+      FROM locked_order
+      LEFT JOIN checkout_order_entitlements entitlement
+        ON entitlement.workspace_id = locked_order.workspace_id
+       AND entitlement.entitlement_owner_id = locked_order.entitlement_owner_id
+      LEFT JOIN checkout_orders checkout ON checkout.id = entitlement.order_id
+      GROUP BY locked_order.paid_at
     )
-    INSERT INTO pilot_enrollments (
+    INSERT INTO checkout_order_entitlements (
+      order_id,
       user_id,
-      status,
+      workspace_id,
+      entitlement_owner_id,
+      plan_code,
+      duration_days,
       starts_at,
-      ends_at,
-      activated_by,
-      notes
+      ends_at
     )
     SELECT
-      inserted.user_id,
-      'active',
-      inserted.starts_at,
-      inserted.ends_at,
-      'payment_webhook',
-      'checkout_order:' || $1::text
-    FROM inserted
-    ON CONFLICT (user_id) WHERE status = 'active'
-    DO UPDATE SET
-      starts_at = LEAST(pilot_enrollments.starts_at, EXCLUDED.starts_at),
-      ends_at = GREATEST(pilot_enrollments.ends_at, EXCLUDED.ends_at),
-      updated_at = NOW(),
-      activated_by = EXCLUDED.activated_by,
-      notes = EXCLUDED.notes
-  `, [normalizeCheckoutOrderId(order.id), paidAtIso, order.productCode, durationDays]);
+      locked_order.id,
+      locked_order.entitlement_owner_id,
+      locked_order.workspace_id,
+      locked_order.entitlement_owner_id,
+      locked_order.plan_code,
+      locked_order.duration_days,
+      ast.starts_at,
+      ast.starts_at + (locked_order.duration_days * INTERVAL '1 day')
+    FROM locked_order
+    CROSS JOIN access_start ast
+    ON CONFLICT (order_id) DO NOTHING
+  `, [normalizeCheckoutOrderId(order.id)]);
 }
 
 export async function ensurePilotApplicationForOrder(
@@ -396,7 +508,7 @@ export async function ensurePaidPilotOrderReady(
     return order;
   }
 
-  await ensurePilotEntitlementForPaidOrder(order, db);
+  await ensurePaidOrderEntitlement(order, db);
   order = await ensurePilotApplicationForOrder(order, db);
 
   const profile = await ensureClientProfileForPaidOrder(order, db);

@@ -24,7 +24,7 @@ import { getTelegramBotToken, sendTelegramTextMessage } from "./telegram";
 import { buildTelegramDigestFeedbackReplyMarkup } from "./telegramDigestFeedback";
 import { recordClientProfileDigestShownOutcomes } from "./clientProfileSignalOutcomes";
 import { isDigestEligibleGate } from "./scoring/gate-pipeline";
-import { logError } from "./runtime";
+import { logError, logEvent, logWarn } from "./runtime";
 import {
   type CheckoutOrder,
   type PaymentsDbClient,
@@ -79,10 +79,14 @@ export type {
 } from "./paymentsTypes";
 
 export async function startCheckoutOrder(input: StartCheckoutOrderInput): Promise<StartCheckoutOrderResult> {
-  const checkoutOwnerId = normalizeCheckoutOrderUserId(input.userId);
+  const purchasedByUserId = normalizeCheckoutOrderUserId(input.purchasedByUserId);
+  const workspaceId = normalizeCheckoutOrderUserId(input.workspaceId);
+  const entitlementOwnerId = normalizeCheckoutOrderUserId(input.entitlementOwnerId);
   const plan = getPublicPlanByCode(input.productCode);
   let order = await createCheckoutOrder({
-    userId: checkoutOwnerId,
+    purchasedByUserId,
+    workspaceId,
+    entitlementOwnerId,
     productCode: input.productCode,
     amountMinor: plan.amountMinor,
     currency: plan.currency,
@@ -118,6 +122,11 @@ export async function startCheckoutOrder(input: StartCheckoutOrderInput): Promis
       paymentProviderPayload: null
     }
   });
+  logEvent("payments.checkout_created", {
+    orderId: String(order.id),
+    productCode: order.productCode,
+    providerCheckoutAllowed: input.providerCheckoutAllowed !== false,
+  });
 
   const provider = getConfiguredPaymentProvider();
   const successUrl = `${normalizeSiteUrl(input.siteUrl)}/checkout/order/${order.id}/success`;
@@ -128,7 +137,16 @@ export async function startCheckoutOrder(input: StartCheckoutOrderInput): Promis
     ? "Заявка получена. Мы свяжемся, чтобы подключить тариф и согласовать оплату."
     : "Оплата пока недоступна. Заявка сохранена, и к ней можно вернуться позже.";
 
-  if (isRecurringPlan || !provider || !provider.isConfigured()) {
+  if (
+    isRecurringPlan
+    || input.providerCheckoutAllowed === false
+    || !provider
+    || !provider.isConfigured()
+  ) {
+    logWarn("payments.checkout_unavailable", {
+      orderId: String(order.id),
+      reasonCode: unavailableReason,
+    });
     order = await updateCheckoutOrder(order.id, {
       status: "unavailable",
       payloadPatch: {
@@ -155,6 +173,10 @@ export async function startCheckoutOrder(input: StartCheckoutOrderInput): Promis
     });
 
     if (checkoutSession.kind === "unavailable") {
+      logWarn("payments.checkout_unavailable", {
+        orderId: String(order.id),
+        reasonCode: "provider_unavailable",
+      });
       order = await updateCheckoutOrder(order.id, {
         status: "unavailable",
         payloadPatch: {
@@ -182,6 +204,10 @@ export async function startCheckoutOrder(input: StartCheckoutOrderInput): Promis
         paymentProviderPayload: checkoutSession.payload ?? null
       }
     });
+    logEvent("payments.checkout_redirect_created", {
+      orderId: String(order.id),
+      provider: checkoutSession.provider,
+    });
 
     return {
       kind: "redirect",
@@ -189,6 +215,10 @@ export async function startCheckoutOrder(input: StartCheckoutOrderInput): Promis
       redirectUrl: checkoutSession.redirectUrl
     };
   } catch (error) {
+    logError("payments.checkout_provider_failed", error, {
+      orderId: String(order.id),
+      productCode: order.productCode,
+    });
     order = await updateCheckoutOrder(order.id, {
       status: "failed",
       payloadPatch: {
@@ -207,12 +237,9 @@ export async function startCheckoutOrder(input: StartCheckoutOrderInput): Promis
 
 export async function ensurePilotOrderOnboardingReady(
   orderId: string | number,
-  options?: { ownerId?: string | number | null }
+  options: { workspaceId: string | number; entitlementOwnerId: string | number },
 ): Promise<CheckoutOrder | null> {
-  const normalizedOwnerId = options?.ownerId == null ? null : normalizeCheckoutOrderUserId(options.ownerId);
-  const order = normalizedOwnerId
-    ? await getCheckoutOrderByIdForOwner(orderId, normalizedOwnerId)
-    : await getCheckoutOrderById(orderId);
+  const order = await getCheckoutOrderByIdForOwner(orderId, options);
 
   if (!order) {
     return null;
@@ -223,16 +250,16 @@ export async function ensurePilotOrderOnboardingReady(
 
 export async function getPilotActivationReadiness(
   orderId: string | number,
-  options: { ownerId: string | number }
+  options: { workspaceId: string | number; entitlementOwnerId: string | number },
 ): Promise<PilotActivationReadiness | null> {
-  const order = await ensurePilotOrderOnboardingReady(orderId, { ownerId: options.ownerId });
+  const order = await ensurePilotOrderOnboardingReady(orderId, options);
 
   if (!order) {
     return null;
   }
 
   const profile = order.payload.clientProfileId
-    ? await getClientProfileById(order.payload.clientProfileId, options.ownerId).catch(() => null)
+    ? await getClientProfileById(order.payload.clientProfileId, options.entitlementOwnerId).catch(() => null)
     : null;
   const profileExists = profile !== null;
   const profileActive = profile?.isActive === true;
@@ -263,9 +290,10 @@ export async function confirmPilotOrderProfile(input: {
   excludedIndustries?: readonly string[] | null;
   excludedLocations?: readonly string[] | null;
   remoteFriendly?: boolean | null;
-  ownerId: string | number;
+  workspaceId: string | number;
+  entitlementOwnerId: string | number;
 }): Promise<CheckoutOrder> {
-  let order = await ensurePilotOrderOnboardingReady(input.orderId, { ownerId: input.ownerId });
+  let order = await ensurePilotOrderOnboardingReady(input.orderId, input);
 
   if (!order) {
     throw new Error(CUSTOMER_CHECKOUT_COPY.orderNotFound);
@@ -380,9 +408,9 @@ export async function savePilotOrderTelegramChat(input: {
 
 export async function sendPilotOrderTestDigest(
   orderId: string | number,
-  options: { ownerId: string | number }
+  options: { workspaceId: string | number; entitlementOwnerId: string | number },
 ): Promise<PilotOrderTestDigestResult> {
-  let order = await ensurePilotOrderOnboardingReady(orderId, { ownerId: options.ownerId });
+  let order = await ensurePilotOrderOnboardingReady(orderId, options);
 
   if (!order) {
     throw new Error(CUSTOMER_CHECKOUT_COPY.orderNotFound);
@@ -539,9 +567,9 @@ export async function sendPilotOrderTestDigest(
 
 export async function completePilotOrderOnboarding(
   orderId: string | number,
-  options: { ownerId: string | number }
+  options: { workspaceId: string | number; entitlementOwnerId: string | number },
 ): Promise<CheckoutOrder> {
-  let order = await ensurePilotOrderOnboardingReady(orderId, { ownerId: options.ownerId });
+  let order = await ensurePilotOrderOnboardingReady(orderId, options);
 
   if (!order) {
     throw new Error(CUSTOMER_CHECKOUT_COPY.orderNotFound);
@@ -572,10 +600,11 @@ export async function completePilotOrderOnboarding(
 
 export async function syncCheckoutOrderAfterSuccessReturn(input: {
   orderId: string | number;
-  ownerId: string | number;
+  workspaceId: string | number;
+  entitlementOwnerId: string | number;
   searchParams?: Record<string, string | string[] | undefined>;
 }): Promise<CheckoutOrder | null> {
-  let order = await getCheckoutOrderByIdForOwner(input.orderId, input.ownerId);
+  let order = await getCheckoutOrderByIdForOwner(input.orderId, input);
 
   if (!order) {
     return null;
@@ -621,10 +650,9 @@ export async function syncCheckoutOrderAfterSuccessReturn(input: {
 export async function markCheckoutOrderCanceled(
   orderId: string | number,
   reason: string | null = null,
-  options: { ownerId: string | number }
+  options: { workspaceId: string | number; entitlementOwnerId: string | number },
 ): Promise<CheckoutOrder | null> {
-  const normalizedOwnerId = normalizeCheckoutOrderUserId(options.ownerId);
-  const order = await getCheckoutOrderByIdForOwner(orderId, normalizedOwnerId);
+  const order = await getCheckoutOrderByIdForOwner(orderId, options);
 
   if (!order || order.status === "paid") {
     return order;
@@ -656,6 +684,7 @@ export async function processPaymentWebhook(
   const parsedWebhook = await provider.parseWebhook(request);
 
   if (!parsedWebhook.ok) {
+    logWarn("payments.webhook_rejected", { provider: providerCode });
     return {
       status: parsedWebhook.responseStatus,
       body: parsedWebhook.responseBody
@@ -667,6 +696,7 @@ export async function processPaymentWebhook(
     : await getCheckoutOrderByProviderPaymentId(parsedWebhook.providerPaymentId ?? null);
 
   if (!order) {
+    logWarn("payments.webhook_order_not_found", { provider: providerCode });
     return {
       status: parsedWebhook.responseStatus,
       body: parsedWebhook.responseBody
@@ -676,6 +706,7 @@ export async function processPaymentWebhook(
   const pool = getPool();
 
   if (!pool) {
+    logWarn("payments.webhook_unavailable", { provider: providerCode, reasonCode: "database_not_configured" });
     return { status: 500, body: "DATABASE_URL is not set." };
   }
 
@@ -700,11 +731,19 @@ export async function processPaymentWebhook(
 
     if (order.status === "paid") {
       await ensurePaidPilotOrderReady(order, client);
+      logEvent("payments.paid_entitlement_reconciled", {
+        orderId: String(order.id),
+        provider: provider.code,
+      });
     }
 
     await client.query("COMMIT");
   } catch (err) {
     await client.query("ROLLBACK");
+    logError("payments.webhook_reconciliation_failed", err, {
+      orderId: String(order.id),
+      provider: provider.code,
+    });
     throw err;
   } finally {
     client.release();

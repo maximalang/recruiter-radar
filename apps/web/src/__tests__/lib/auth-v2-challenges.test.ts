@@ -160,7 +160,7 @@ describe("auth v2 login challenge service", () => {
       returnTo: "/checkout?plan=pilot-week",
       clientAddress: "192.0.2.10",
       userAgent: "test-browser",
-    })).resolves.toEqual({ ok: true });
+    })).resolves.toEqual({ ok: true, delivery: "sent" });
 
     const issueCall = client.query.mock.calls.find(([sql]) =>
       String(sql).includes("issue_auth_login_challenge"),
@@ -196,7 +196,7 @@ describe("auth v2 login challenge service", () => {
       returnTo: "/dashboard",
       clientAddress: "unknown",
       userAgent: null,
-    })).resolves.toEqual({ ok: true });
+    })).resolves.toEqual({ ok: true, delivery: "sent" });
 
     expect(mockSendEmail).toHaveBeenCalledWith(expect.objectContaining({
       to: "Alice@example.com",
@@ -216,13 +216,13 @@ describe("auth v2 login challenge service", () => {
       returnTo: "/dashboard",
       clientAddress: "192.0.2.10",
       userAgent: null,
-    })).resolves.toEqual({ ok: true });
+    })).resolves.toEqual({ ok: true, delivery: "suppressed" });
 
     expect(mockSendEmail).not.toHaveBeenCalled();
     expect(client.release).toHaveBeenCalled();
   });
 
-  test("keeps database and SMTP failures enumeration-safe", async () => {
+  test("reports infrastructure failures without exposing identity state", async () => {
     const client = fakeClient(
       { issued: true, challengeId: "19" },
       "second@example.com",
@@ -238,12 +238,18 @@ describe("auth v2 login challenge service", () => {
       email: "first@example.com",
       clientAddress: "unknown",
       userAgent: null,
-    })).resolves.toEqual({ ok: true });
+    })).resolves.toEqual({
+      ok: false,
+      error: "Вход временно недоступен. Попробуйте ещё раз немного позже.",
+    });
     await expect(requestAuthV2Login({
       email: "second@example.com",
       clientAddress: "unknown",
       userAgent: null,
-    })).resolves.toEqual({ ok: true });
+    })).resolves.toEqual({
+      ok: false,
+      error: "Вход временно недоступен. Попробуйте ещё раз немного позже.",
+    });
 
     expect(update).toHaveBeenCalledWith(
       expect.stringContaining("UPDATE auth_challenges"),

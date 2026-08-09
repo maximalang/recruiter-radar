@@ -44,7 +44,7 @@ export default function DashboardAccountOverview(props: {
           <TargetIcon className={styles.accountStatusIcon} aria-hidden="true" />
           <span className={styles.accountStatusLabel}>Профиль поиска</span>
           <strong>{props.completionPercent}% готово</strong>
-          <Link href="/profile">Уточнить ICP</Link>
+          <Link href="/settings/radar">Уточнить ICP</Link>
         </article>
 
         <article className={styles.accountStatusCard} data-ready={props.deliveryReady ? "true" : "false"}>
@@ -55,7 +55,7 @@ export default function DashboardAccountOverview(props: {
           )}
           <span className={styles.accountStatusLabel}>Доставка радара</span>
           <strong>{props.deliveryReady ? "Подключена" : "Нужно настроить"}</strong>
-          <Link href="/profile#delivery">
+          <Link href="/settings/delivery">
             {props.deliveryReady ? "Проверить расписание" : "Настроить доставку"}
           </Link>
         </article>

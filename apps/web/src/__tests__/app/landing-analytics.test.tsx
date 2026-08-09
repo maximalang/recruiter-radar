@@ -3,7 +3,7 @@
 import { fireEvent, render } from "@testing-library/react";
 
 import LandingAnalytics, { sendLandingEvent } from "@/app/landing-analytics";
-import LandingCheckoutAnalytics from "@/app/landing-checkout-analytics";
+import { storeAnalyticsConsent } from "@/lib/analytics-consent";
 
 describe("landing funnel analytics", () => {
   const fetchMock = jest.fn().mockResolvedValue({ status: 204 });
@@ -12,7 +12,24 @@ describe("landing funnel analytics", () => {
     fetchMock.mockClear();
     global.fetch = fetchMock as typeof fetch;
     sessionStorage.clear();
+    localStorage.clear();
+    storeAnalyticsConsent(true);
     delete window.ym;
+  });
+
+  it("stops first-party analytics before consent and after withdrawal", () => {
+    localStorage.clear();
+    storeAnalyticsConsent(false);
+    sendLandingEvent({ name: "checkout_started", context: "pricing_pilot" });
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    storeAnalyticsConsent(true);
+    sendLandingEvent({ name: "checkout_started", context: "pricing_pilot" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    storeAnalyticsConsent(false);
+    sendLandingEvent({ name: "checkout_started", context: "pricing_pilot" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("keeps conversion events in first-party telemetry", () => {
@@ -35,34 +52,6 @@ describe("landing funnel analytics", () => {
     } else {
       process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID = previousCounterId;
     }
-  });
-
-  it("tracks checkout view and uses submit semantics for payment and continuation", () => {
-    const { unmount } = render(
-      <>
-        <form data-checkout-form />
-        <LandingCheckoutAnalytics submitEvent="payment_started" />
-      </>,
-    );
-
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    fireEvent.submit(document.querySelector("[data-checkout-form]")!);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(fetchMock.mock.calls[1][1]?.body).toContain('"name":"payment_started"');
-    unmount();
-
-    fetchMock.mockClear();
-    render(
-      <>
-        <form data-checkout-form />
-        <LandingCheckoutAnalytics submitEvent="continuation_requested" />
-      </>,
-    );
-    fireEvent.submit(document.querySelector("[data-checkout-form]")!);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(fetchMock.mock.calls[0][1]?.body).toContain('"name":"checkout_viewed"');
-    expect(fetchMock.mock.calls[1][1]?.body).toContain('"name":"continuation_requested"');
-    expect(fetchMock.mock.calls[1][1]?.body).not.toContain('"name":"payment_started"');
   });
 
   it("tracks FAQ only on each closed-to-open transition without click duplication", () => {

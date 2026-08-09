@@ -2,8 +2,10 @@ import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import type { ReactElement, SVGProps } from 'react';
 import Link from 'next/link';
+import { headers } from 'next/headers';
 import { listClientProfiles, type ClientProfile } from '@/lib/clientProfiles';
-import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization';
+import { getSession } from '@/lib/auth-v2/authorization';
+import { getEffectiveEntitlement } from '@/lib/entitlements';
 import {
   InternalPageFrame,
   InternalPageHeader,
@@ -64,6 +66,7 @@ async function getReviewCandidates(
   clientProfileId: string,
   limit: number,
   offset: number,
+  cookieHeader: string | null,
 ): Promise<{ items: ReviewCandidate[]; total: number; error?: boolean }> {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
   const url = new URL('/api/review', baseUrl);
@@ -74,7 +77,10 @@ async function getReviewCandidates(
   try {
     const res = await fetch(url.toString(), {
       cache: 'no-store',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(cookieHeader ? { cookie: cookieHeader } : {}),
+      },
     });
     if (!res.ok) return { items: [], total: 0, error: true };
     const data = await res.json();
@@ -210,19 +216,67 @@ export default async function ReviewPage({
   }>;
 }) {
   const params = await searchParams;
-  // Owner-scope the profile list: without a session, show no profiles (and thus
-  // no review queue) rather than another tenant's candidates.
-  const ownerId = await getAuthorizedOwnerId('leads:read');
-  const profiles = ownerId ? await listClientProfiles(ownerId) : [];
+  // Keep authentication, canonical entitlement, and data failures distinct.
+  // A missing session must never look like an account with zero profiles.
+  const authorization = await getSession({ permission: 'leads:read' });
+  if (!authorization) {
+    return (
+      <InternalPageFrame navItems={REVIEW_NAV}>
+        <InternalPageHeader title="Очередь проверки" subtitle="Защищённое рабочее пространство" />
+        <EmptyState title="Нужен вход в аккаунт" text="Войдите, чтобы открыть очередь проверки своего workspace." action={{ href: '/login?returnTo=/review', label: 'Войти' }} />
+      </InternalPageFrame>
+    );
+  }
+
+  const ownerId = authorization.dataOwnerId;
+  const entitlement = authorization.workspaceId
+    ? await getEffectiveEntitlement(ownerId, { workspaceId: authorization.workspaceId }).catch(() => null)
+    : null;
+  if (!entitlement) {
+    return (
+      <InternalPageFrame navItems={REVIEW_NAV}>
+        <InternalPageHeader title="Очередь проверки" subtitle="Проверка доступа" />
+        <ErrorState title="Не удалось проверить доступ" description="Мы не загружаем очередь, пока сервер не подтвердит права аккаунта." action={{ href: '/settings/access', label: 'Доступ и оплата' }} />
+      </InternalPageFrame>
+    );
+  }
+  if (
+    entitlement.status !== 'active'
+    || !entitlement.features.includes('dashboard')
+    || !entitlement.features.includes('api')
+  ) {
+    return (
+      <InternalPageFrame navItems={REVIEW_NAV}>
+        <InternalPageHeader title="Очередь проверки" subtitle="Доступ не активен" />
+        <EmptyState title="Нужен активный доступ" text="Очередь и история сохранены. После активации проверка снова станет доступна." action={{ href: '/settings/access', label: 'Проверить доступ' }} />
+      </InternalPageFrame>
+    );
+  }
+
+  let allProfiles: ClientProfile[];
+  try {
+    allProfiles = await listClientProfiles(ownerId);
+  } catch {
+    return (
+      <InternalPageFrame navItems={REVIEW_NAV}>
+        <InternalPageHeader title="Очередь проверки" subtitle="Radar" />
+        <ErrorState title="Не удалось загрузить профили Radar" description="Это временная ошибка данных, а не пустая очередь." action={{ href: '/settings/radar', label: 'Открыть настройки Radar' }} />
+      </InternalPageFrame>
+    );
+  }
+  const profiles = allProfiles.filter((profile) => profile.isActive);
 
   const activeProfileId =
-    params.clientProfileId ?? profiles[0]?.id?.toString() ?? '';
+    profiles.some((profile) => profile.id.toString() === params.clientProfileId)
+      ? params.clientProfileId ?? ''
+      : profiles[0]?.id?.toString() ?? '';
 
   const limit = Math.min(Number(params.limit ?? 50), 200);
   const offset = Math.max(Number(params.offset ?? 0), 0);
 
+  const cookieHeader = activeProfileId ? (await headers()).get('cookie') : null;
   const reviewData = activeProfileId
-    ? await getReviewCandidates(activeProfileId, limit, offset)
+    ? await getReviewCandidates(activeProfileId, limit, offset, cookieHeader)
     : { items: [], total: 0 };
 
   return (
@@ -232,11 +286,19 @@ export default async function ReviewPage({
         subtitle="Кандидаты с уверенностью C, иностранные работодатели и одиночный источник — проверьте доказательства перед доставкой как лид"
       />
 
-      {profiles.length === 0 ? (
+      {profiles.length === 0 && allProfiles.length > 0 ? (
+        <EmptyState
+          icon={TargetIcon}
+          title="Профиль Radar приостановлен"
+          text="Настройки и решения сохранены, но очередь не обновляется. Включите профиль, чтобы продолжить проверку новых кандидатов."
+          action={{ href: '/settings/radar', label: 'Включить профиль Radar' }}
+        />
+      ) : profiles.length === 0 ? (
         <EmptyState
           icon={TargetIcon}
           title="Нет клиентских профилей"
           text="Создайте профиль в онбординге, чтобы увидеть очередь проверки."
+          action={{ href: '/onboarding', label: 'Настроить Radar' }}
         />
       ) : (
         <>

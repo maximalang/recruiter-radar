@@ -18,6 +18,7 @@ const sourceKeys = [
   "operator",
   "pricing",
   "metrika",
+  "analyticsConsent",
   "legalDocuments",
 ];
 const sources = Object.fromEntries(sourceKeys.map((key) => [key, read(relativePathFor(key))]));
@@ -142,12 +143,15 @@ for (const token of ["299000", "999000", "2499000", "durationDays: 7", "duration
 }
 
 for (const token of [
-  "rr_analytics_consent_v1",
-  'consent === "granted"',
-  "Только необходимые",
-  "Разрешить аналитику",
+  "Отклонить",
+  "Разрешить",
   "CONSENT_TTL_MS = 426",
 ]) requireText("metrika", token, `analytics consent requirement ${token}`);
+
+for (const token of [
+  'ANALYTICS_CONSENT_STORAGE_KEY = "rr_analytics_consent"',
+  "ANALYTICS_CONSENT_POLICY_VERSION = 2",
+]) requireText("analyticsConsent", token, `versioned analytics consent requirement ${token}`);
 
 if (process.argv.includes("--network")) await verifyDeployedOrigin();
 
@@ -260,6 +264,7 @@ function relativePathFor(key) {
     operator: "lib/operatorRequisites.ts",
     pricing: "lib/pricingCatalog.ts",
     metrika: "app/yandex-metrika.tsx",
+    analyticsConsent: "lib/analytics-consent.ts",
     legalDocuments: "lib/legalDocuments.ts",
   }[key];
 }

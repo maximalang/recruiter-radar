@@ -47,9 +47,7 @@ type ProfileEmailPrefs = {
   agencyName: string;
   /**
    * Profile owner. Used to owner-scope the lead read below. May be null for
-   * legacy profiles created before owner attribution; getLeadsForAllProfiles
-   * treats a null owner as "match owner_id = $ OR owner_id IS NULL", so a null
-   * here would over-broaden the scope — we bail on null instead (see caller).
+   * legacy profiles created before owner attribution; null always fails closed.
    */
   ownerId: string | null;
   /** Filter fields for the per-lead "Почему вам" block (mirrors the Telegram card). */
@@ -162,8 +160,7 @@ export async function sendDigestEmailForProfile(input: {
     return { delivered: false, reason: "no_email" };
   }
   if (!prefs.ownerId) {
-    // Legacy profile created before owner attribution. Bail to avoid over-broad
-    // owner_id = $ OR owner_id IS NULL scope — fix the profile first.
+    // Legacy profile created before owner attribution. Bail and fix the profile first.
     logError("email.digest_no_owner", new Error("Profile has no owner."), {
       clientProfileId: input.clientProfileId,
     });

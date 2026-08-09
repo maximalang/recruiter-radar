@@ -138,8 +138,12 @@ describe('payment readiness', () => {
     const checkoutPage = fs.readFileSync(path.resolve(process.cwd(), 'app/checkout/page.tsx'), 'utf8')
 
     expect(checkoutPage).toContain('Автопродления и скрытых списаний нет')
-    expect(checkoutPage).toContain('Перейти к оплате {plan.price}')
+    expect(checkoutPage).toContain('paymentReady ? `Перейти к оплате ${plan.price}` : "Отправить заявку"')
     expect(checkoutPage).toContain('Откроется платёжная страница Robokassa')
+    expect(checkoutPage).toContain('Онлайн-оплата пока недоступна')
+    expect(checkoutPage).toContain('providerCheckoutAllowed')
+    const paymentsService = fs.readFileSync(path.resolve(process.cwd(), 'lib/payments.ts'), 'utf8')
+    expect(paymentsService).toContain('input.providerCheckoutAllowed === false')
     expect(checkoutPage).toContain('name="payerType"')
     expect(checkoutPage).toContain('name="buyerInn"')
     expect(PUBLIC_PLANS).toHaveLength(3)

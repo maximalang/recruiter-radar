@@ -941,12 +941,31 @@ async function runCoreAuthFlows(fixtures) {
       'input[name="roles"][value="it-engineering"]',
     ).check()
     await signupPage.locator(
+      'button[name="intent"][value="next"]',
+    ).click()
+    await signupPage.locator(
       'input[name="industries"][value="it"]',
+    ).waitFor({ state: 'visible' })
+    await signupPage.locator(
+      'input[name="industries"][value="it"]',
+    ).check()
+    await signupPage.locator(
+      'input[name="companySizes"][value="medium"]',
     ).check()
     await signupPage.locator('textarea[name="geography"]').fill(
       'Москва, удалённо',
     )
     await signupPage.locator('select[name="hiringMode"]').selectOption('auto')
+    await signupPage.locator(
+      'button[name="intent"][value="next"]',
+    ).click()
+    await signupPage.locator(
+      'input[name="deliveryChoice"][value="email"]',
+    ).waitFor({ state: 'visible' })
+    await signupPage.locator(
+      'input[name="deliveryChoice"][value="email"]',
+    ).check()
+    await signupPage.locator('input[name="deliveryEmail"]').fill(signupEmail)
     await signupPage.locator(
       'button[name="intent"][value="next"]',
     ).click()

@@ -6,12 +6,13 @@
  */
 
 import { GET } from '@/app/api/leads/[id]/route';
-import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization';
+import { getSession } from '@/lib/auth-v2/authorization';
 import { getLeadDetail, type LeadDetail } from '@/lib/leads-data';
 import { getClientProfileById } from '@/lib/clientProfiles';
+import { hasFeatureAccess } from '@/lib/entitlements';
 
 jest.mock('@/lib/auth-v2/authorization', () => ({
-  getAuthorizedOwnerId: jest.fn(),
+  getSession: jest.fn(),
 }));
 jest.mock('@/lib/clientProfiles', () => ({
   getClientProfileById: jest.fn(),
@@ -20,10 +21,12 @@ jest.mock('@/lib/leads-data', () => ({
   getLeadDetail: jest.fn(),
   formatLawfulContactPath: (v: string | null) => v,
 }));
+jest.mock('@/lib/entitlements', () => ({ hasFeatureAccess: jest.fn() }));
 
-const mockOwner = getAuthorizedOwnerId as jest.MockedFunction<typeof getAuthorizedOwnerId>;
+const mockOwner = getSession as jest.MockedFunction<typeof getSession>;
 const mockDetail = getLeadDetail as jest.MockedFunction<typeof getLeadDetail>;
 const mockProfile = getClientProfileById as jest.MockedFunction<typeof getClientProfileById>;
+const mockFeatureAccess = hasFeatureAccess as jest.MockedFunction<typeof hasFeatureAccess>;
 
 function makeDetail(overrides: Partial<LeadDetail> = {}): LeadDetail {
   return {
@@ -79,6 +82,10 @@ function makeDetail(overrides: Partial<LeadDetail> = {}): LeadDetail {
   };
 }
 
+function ownerSession() {
+  return { dataOwnerId: 'owner-1', workspaceId: 'workspace-9' } as never;
+}
+
 function call(id = 'lead-1') {
   return GET(new Request(`http://localhost/api/leads/${id}`) as never, {
     params: Promise.resolve({ id }),
@@ -86,7 +93,10 @@ function call(id = 'lead-1') {
 }
 
 describe('GET /api/leads/:id', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockFeatureAccess.mockResolvedValue(true);
+  });
 
   it('404s without a session (never leaks existence)', async () => {
     mockOwner.mockResolvedValue(null);
@@ -95,8 +105,16 @@ describe('GET /api/leads/:id', () => {
     expect(mockDetail).not.toHaveBeenCalled();
   });
 
+  it('denies a signed-in workspace without API entitlement before probing the lead', async () => {
+    mockOwner.mockResolvedValue(ownerSession());
+    mockFeatureAccess.mockResolvedValue(false);
+    const res = await call();
+    expect(res.status).toBe(403);
+    expect(mockDetail).not.toHaveBeenCalled();
+  });
+
   it('404s when the owner-scoped lookup returns null', async () => {
-    mockOwner.mockResolvedValue('owner-1');
+    mockOwner.mockResolvedValue(ownerSession());
     mockDetail.mockResolvedValue(null);
     const res = await call();
     expect(res.status).toBe(404);
@@ -104,7 +122,7 @@ describe('GET /api/leads/:id', () => {
   });
 
   it('separates deterministic evidence from the AI layer and hides raw fields', async () => {
-    mockOwner.mockResolvedValue('owner-1');
+    mockOwner.mockResolvedValue(ownerSession());
     mockDetail.mockResolvedValue(makeDetail());
     mockProfile.mockResolvedValue(null);
 
@@ -129,7 +147,7 @@ describe('GET /api/leads/:id', () => {
   });
 
   it('returns aiEnrichment: null when none was persisted', async () => {
-    mockOwner.mockResolvedValue('owner-1');
+    mockOwner.mockResolvedValue(ownerSession());
     mockDetail.mockResolvedValue(makeDetail({ aiEnrichment: null }));
     mockProfile.mockResolvedValue(null);
 

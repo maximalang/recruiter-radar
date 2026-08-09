@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getLeadDetail, formatLawfulContactPath } from '@/lib/leads-data';
 import { getClientProfileById } from '@/lib/clientProfiles';
-import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization';
+import { getSession } from '@/lib/auth-v2/authorization';
 import { buildFitExplanation } from '@/lib/leads/fit-explanation';
 import { buildCompanySummary } from '@/lib/leads/company-summary';
 import { scoreBand, formatSignalStrength } from '@/lib/scoring/score-display';
+import { hasFeatureAccess } from '@/lib/entitlements';
 
 /**
  * GET /api/leads/:id — owner-scoped lead detail.
@@ -28,8 +29,20 @@ export async function GET(
 ) {
   const { id } = await context.params;
 
-  const ownerId = await getAuthorizedOwnerId('leads:read');
-  const lead = ownerId ? await getLeadDetail({ candidateId: id, ownerId }) : null;
+  const authorization = await getSession({ permission: 'leads:read' });
+  if (!authorization?.workspaceId) {
+    return NextResponse.json({ error: 'not_found' }, { status: 404 });
+  }
+  const ownerId = authorization.dataOwnerId;
+  try {
+    if (!(await hasFeatureAccess(ownerId, 'api', { workspaceId: authorization.workspaceId }))) {
+      return NextResponse.json({ error: 'entitlement_required' }, { status: 403 });
+    }
+  } catch {
+    return NextResponse.json({ error: 'entitlement_check_unavailable' }, { status: 503 });
+  }
+
+  const lead = await getLeadDetail({ candidateId: id, ownerId });
 
   if (!lead) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 });

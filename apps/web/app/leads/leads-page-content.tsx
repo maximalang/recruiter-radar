@@ -1,9 +1,10 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { getLeadsForAllProfiles, getPendingReviewCount, type LeadItem, VALID_FEEDBACK_STATUSES } from '@/lib/leads-data';
+import { getLastRadarRunAt, getLeadsForAllProfiles, getPendingReviewCount, type LeadItem, VALID_FEEDBACK_STATUSES } from '@/lib/leads-data';
 import { listClientProfiles, resolveHiringMode, type ClientProfile } from '@/lib/clientProfiles';
-import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization';
+import { getSession } from '@/lib/auth-v2/authorization';
+import { getEffectiveEntitlement } from '@/lib/entitlements';
 import { buildFitExplanation, FIT_DIMENSION_ICON } from '@/lib/leads/fit-explanation';
 import { deriveRoleNames, splitRolesForDisplay, deriveUrgencyCue } from '@/lib/leads/lead-quality';
 import { formatVacanciesCount } from '@/lib/format/plural';
@@ -186,11 +187,13 @@ export function LeadsListLegend() {
   );
 }
 
-function LeadsList({
+export function LeadsList({
   leads,
   fitPreviewFor,
   hiringModeFor,
   hasActiveProfile,
+  hasAnyProfile,
+  lastRunAt,
   narrowProfile,
   workingSet,
 }: {
@@ -202,6 +205,8 @@ function LeadsList({
    */
   hiringModeFor: (lead: LeadItem) => 'specialist' | 'executive' | 'volume';
   hasActiveProfile: boolean;
+  hasAnyProfile: boolean;
+  lastRunAt: string | null;
   /**
    * True when an active profile has a narrow ICP (specialization or include
    * keywords set). Used to give an honest, distinct empty state: a specialized
@@ -235,12 +240,32 @@ function LeadsList({
       );
     }
     if (!hasActiveProfile) {
+      if (hasAnyProfile) {
+        return (
+          <EmptyState
+            icon={TargetIcon}
+            title="Профиль Radar приостановлен"
+            text="Настройки сохранены, но новые возможности не формируются. Включите профиль, чтобы следующий запуск снова учитывал вашу практику."
+            action={{ href: '/settings/radar', label: 'Включить профиль Radar' }}
+          />
+        );
+      }
       return (
         <EmptyState
           icon={TargetIcon}
           title="Настройте профиль идеального клиента"
           text="Радар начнёт подбирать компании, как только вы опишете, кого ищете: роли, отрасли, регионы."
-          action={{ href: '/profile', label: 'Настроить профиль' }}
+          action={{ href: '/settings/radar', label: 'Настроить профиль' }}
+        />
+      );
+    }
+    if (!lastRunAt) {
+      return (
+        <EmptyState
+          icon={ClockIcon}
+          title="Первый запуск Radar ещё не завершён"
+          text="Профиль сохранён. После первого сканирования здесь появятся компании с доказательствами и рекомендуемым действием."
+          action={{ href: '/settings/radar', label: 'Проверить настройки Radar' }}
         />
       );
     }
@@ -250,16 +275,16 @@ function LeadsList({
           icon={SearchIcon}
           title="По вашей специализации пока мало сигналов"
           text="С узкой специализацией радар находит реже — это нормально. Расширьте ключевые фразы в профиле (например, смежные роли или отрасли) или дождитесь следующего запуска: новые карьерные страницы и платформенные сигналы появляются ежедневно."
-          action={{ href: '/profile#fine-tuning', label: 'Расширить ключевые фразы' }}
+          action={{ href: '/settings/radar#fine-tuning', label: 'Расширить ключевые фразы' }}
         />
       );
     }
     return (
       <EmptyState
         icon={BriefcaseIcon}
-        title="Лидов пока нет"
-        text="Профиль настроен — первая подборка придёт со следующим запуском радара. Можно уточнить фильтры, чтобы повысить релевантность."
-        action={{ href: '/profile#fine-tuning', label: 'Уточнить профиль' }}
+        title="Подходящих компаний пока нет"
+        text="Последний запуск завершён, но компании не прошли текущие фильтры. Можно уточнить профиль или дождаться свежих сигналов."
+        action={{ href: '/settings/radar#fine-tuning', label: 'Уточнить профиль' }}
       />
     );
   }
@@ -308,13 +333,46 @@ export default async function LeadsPage({
 
   // Owner-scope every read: without a session there are no accessible profiles,
   // so the page renders empty rather than leaking another tenant's leads.
-  const ownerId = await getAuthorizedOwnerId('leads:read');
+  const authorization = await getSession({ permission: 'leads:read' });
+  if (!authorization) {
+    return (
+      <InternalPageFrame navItems={LEADS_NAV}>
+        <InternalPageHeader title="Возможности" subtitle="Защищённое рабочее пространство" />
+        <EmptyState title="Нужен вход в аккаунт" text="Войдите, чтобы открыть возможности только вашего workspace." action={{ href: '/login?returnTo=/leads', label: 'Войти' }} />
+      </InternalPageFrame>
+    );
+  }
+  const ownerId = authorization.dataOwnerId;
+  const entitlement = authorization.workspaceId
+    ? await getEffectiveEntitlement(ownerId, { workspaceId: authorization.workspaceId }).catch(() => null)
+    : null;
+  if (!entitlement) {
+    return (
+      <InternalPageFrame navItems={LEADS_NAV}>
+        <InternalPageHeader title="Возможности" subtitle="Проверка доступа" />
+        <ErrorState title="Не удалось проверить доступ" description="Обновите страницу немного позже. Мы не показываем данные, пока сервер не подтвердит права аккаунта." action={{ href: '/settings/access', label: 'Доступ и оплата' }} />
+      </InternalPageFrame>
+    );
+  }
+  if (entitlement.status !== 'active' || !entitlement.features.includes('dashboard')) {
+    return (
+      <InternalPageFrame navItems={LEADS_NAV}>
+        <InternalPageHeader title="Возможности" subtitle="Доступ не активен" />
+        <EmptyState title="Нужен активный доступ" text="Профиль и история сохранены. После активации возможности снова станут доступны." action={{ href: '/settings/access', label: 'Проверить доступ' }} />
+      </InternalPageFrame>
+    );
+  }
 
   let profiles: ClientProfile[];
   try {
-    profiles = ownerId ? await listClientProfiles(ownerId) : [];
+    profiles = await listClientProfiles(ownerId);
   } catch {
-    profiles = [];
+    return (
+      <InternalPageFrame navItems={LEADS_NAV}>
+        <InternalPageHeader title="Возможности" subtitle="Radar" />
+        <ErrorState title="Не удалось загрузить профиль" description="Это временная ошибка данных, а не пустой результат Radar." action={{ href: '/settings/radar', label: 'Открыть настройки Radar' }} />
+      </InternalPageFrame>
+    );
   }
 
   const activeProfiles = profiles.filter((p) => p.isActive);
@@ -335,14 +393,14 @@ export default async function LeadsPage({
   let allLeads: LeadItem[] = [];
   let totalLeads = 0;
   let pendingReview = 0;
+  let lastRunAt: string | null = null;
   // leadsFetchError — surfaced as an ErrorState when the leads/review fetch
   // genuinely fails. A missing session is NOT an error (it's the legitimate
   // "no profiles → empty" path), so only a real fetch failure sets the flag.
   let leadsFetchError = false;
 
   try {
-    if (!ownerId) throw new Error('no-session');
-    const [result, reviewCount] = await Promise.all([
+    const [result, reviewCount, latestRun] = await Promise.all([
       getLeadsForAllProfiles({
         profileIds,
         ownerId,
@@ -351,22 +409,14 @@ export default async function LeadsPage({
         workingSet,
       }),
       getPendingReviewCount({ profileIds, ownerId }),
+      getLastRadarRunAt({ profileIds, ownerId }),
     ]);
     allLeads = result.leads;
     totalLeads = result.total;
     pendingReview = reviewCount;
-  } catch (err) {
-    // 'no-session' is a control-flow signal for the empty (no-profiles) path,
-    // not a real failure — keep the calm empty state. Anything else is a genuine
-    // fetch error → surface an ErrorState instead of a silent empty list that
-    // would read as "radar found nothing".
-    if (err instanceof Error && err.message === 'no-session') {
-      allLeads = [];
-      totalLeads = 0;
-      pendingReview = 0;
-    } else {
-      leadsFetchError = true;
-    }
+    lastRunAt = latestRun;
+  } catch {
+    leadsFetchError = true;
   }
 
   // Compact per-lead fit preview: the single strongest "почему подходит этому агентству"
@@ -516,7 +566,7 @@ export default async function LeadsPage({
           <ErrorState
             title="Не удалось загрузить лиды"
             description="Радар подбирает компании по вашему профилю. Повторите через минуту — если лиды не появятся, проверьте настройки профиля или напишите поддержку."
-            action={{ href: '/profile', label: 'Проверить профиль' }}
+            action={{ href: '/settings/radar', label: 'Проверить профиль' }}
           />
         ) : (
           <Suspense fallback={<LoadingState variant="skeleton" />}>
@@ -525,6 +575,8 @@ export default async function LeadsPage({
               fitPreviewFor={fitPreviewFor}
               hiringModeFor={(lead) => hiringModeByProfileId.get(lead.clientProfileId) ?? 'specialist'}
               hasActiveProfile={activeProfiles.length > 0}
+              hasAnyProfile={profiles.length > 0}
+              lastRunAt={lastRunAt}
               narrowProfile={narrowProfile}
               workingSet={workingSet}
             />

@@ -10,6 +10,12 @@ import {
   pausePilotForUser,
   setProfileActive,
   clearProfileTelegram,
+  extendAccessForUser,
+  grantAccessForUser,
+  revokeUserSessions,
+  sendUserLoginLink,
+  updateClientSettingsForUser,
+  resolveAdminDataOwnerId,
 } from "@/lib/admin/adminUsers";
 
 /**
@@ -214,6 +220,7 @@ async function withOperatorSession<T extends UserActionState>(
   try {
     const result = await run(userId);
     revalidatePath("/admin");
+    revalidatePath(`/admin/users/${userId}`);
     return result;
   } catch (err) {
     return { ok: false, message: err instanceof Error ? err.message : "Действие не выполнено." } as T;
@@ -221,22 +228,93 @@ async function withOperatorSession<T extends UserActionState>(
 }
 
 export async function adminActivatePilot(_prev: UserActionState, formData: FormData): Promise<UserActionState> {
-  return withOperatorSession(formData, (userId) => activatePilotForUser(userId));
+  return withOperatorDataOwnerSession(formData, (userId, workspaceId) => activatePilotForUser(userId, workspaceId));
 }
 
 export async function adminPausePilot(_prev: UserActionState, formData: FormData): Promise<UserActionState> {
-  return withOperatorSession(formData, (userId) => pausePilotForUser(userId));
+  return withOperatorDataOwnerSession(formData, (userId, workspaceId) => pausePilotForUser(userId, workspaceId));
 }
 
 export async function adminPauseProfile(_prev: UserActionState, formData: FormData): Promise<UserActionState> {
-  return withOperatorSession(formData, (userId) => setProfileActive(userId, false));
+  return withOperatorDataOwnerSession(formData, (userId, workspaceId) => setProfileActive(userId, workspaceId, false));
 }
 
 export async function adminResumeProfile(_prev: UserActionState, formData: FormData): Promise<UserActionState> {
-  return withOperatorSession(formData, (userId) => setProfileActive(userId, true));
+  return withOperatorDataOwnerSession(formData, (userId, workspaceId) => setProfileActive(userId, workspaceId, true));
 }
 
 export async function adminClearTelegram(_prev: UserActionState, formData: FormData): Promise<UserActionState> {
-  return withOperatorSession(formData, (userId) => clearProfileTelegram(userId));
+  return withOperatorDataOwnerSession(formData, (userId, workspaceId) => clearProfileTelegram(userId, workspaceId));
+}
+
+async function withOperatorDataOwnerSession<T extends UserActionState>(
+  formData: FormData,
+  run: (dataOwnerId: string, workspaceId: string) => Promise<T>,
+): Promise<T> {
+  return withOperatorSession(formData, async (userId) => {
+    const workspaceIdValue = String(formData.get("workspaceId") ?? "").trim();
+    if (!/^\d+$/.test(workspaceIdValue) || workspaceIdValue === "0") {
+      return { ok: false, message: "Workspace РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ РІС‹Р±СЂР°РЅ СЏРІРЅРѕ." } as T;
+    }
+    const dataOwnerId = await resolveAdminDataOwnerId(userId, workspaceIdValue);
+    if (!dataOwnerId) {
+      return { ok: false, message: "Активный workspace пользователя не найден." } as T;
+    }
+    return run(dataOwnerId, workspaceIdValue);
+  });
+}
+
+export async function adminGrantAccess(_prev: UserActionState, formData: FormData): Promise<UserActionState> {
+  return withOperatorDataOwnerSession(formData, (userId, workspaceId) => {
+    const customExpiry = String(formData.get("expiresAt") ?? "").trim();
+    if (customExpiry) {
+      const expiresAt = new Date(`${customExpiry}T23:59:59.999+03:00`);
+      if (!Number.isFinite(expiresAt.getTime())) return Promise.resolve({ ok: false, message: "Некорректная дата окончания." });
+      return grantAccessForUser(userId, workspaceId, { expiresAt });
+    }
+    const durationDays = Number(formData.get("durationDays") ?? 7);
+    if (![7, 14, 30, 90, 365].includes(durationDays)) return Promise.resolve({ ok: false, message: "Недопустимая длительность доступа." });
+    if (String(formData.get("mode") ?? "") === "extend") {
+      return extendAccessForUser(userId, workspaceId, durationDays);
+    }
+    return grantAccessForUser(userId, workspaceId, { durationDays });
+  });
+}
+
+export async function adminRevokeSessions(_prev: UserActionState, formData: FormData): Promise<UserActionState> {
+  return withOperatorSession(formData, revokeUserSessions);
+}
+
+export async function adminResendLogin(_prev: UserActionState, formData: FormData): Promise<UserActionState> {
+  return withOperatorSession(formData, (userId) => sendUserLoginLink(userId, '/dashboard'));
+}
+
+export async function adminResendOnboarding(_prev: UserActionState, formData: FormData): Promise<UserActionState> {
+  return withOperatorSession(formData, (userId) => sendUserLoginLink(userId, '/onboarding'));
+}
+
+export async function adminUpdateClientProfile(_prev: UserActionState, formData: FormData): Promise<UserActionState> {
+  return withOperatorDataOwnerSession(formData, (userId, workspaceId) => updateClientSettingsForUser(userId, workspaceId, {
+    agencyName: String(formData.get('agencyName') ?? ''),
+    specialization: optionalFormText(formData, 'specialization'),
+    targetCity: optionalFormText(formData, 'targetCity'),
+    roles: formData.getAll('roles').map(String),
+    industries: formData.getAll('industries').map(String),
+    companySizes: formData.getAll('companySizes').map(String),
+    dailyDigestLimit: Number(formData.get('dailyDigestLimit')),
+    hiringIntentMin: optionalFormNumber(formData, 'hiringIntentMin'),
+    signalFreshnessDays: optionalFormNumber(formData, 'signalFreshnessDays'),
+    minOpenRoles: optionalFormNumber(formData, 'minOpenRoles'),
+  }));
+}
+
+function optionalFormText(formData: FormData, name: string): string | null {
+  const value = String(formData.get(name) ?? '').trim();
+  return value || null;
+}
+
+function optionalFormNumber(formData: FormData, name: string): number | null {
+  const value = String(formData.get(name) ?? '').trim();
+  return value === '' ? null : Number(value);
 }
 

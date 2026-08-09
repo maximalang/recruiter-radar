@@ -1,6 +1,7 @@
 import type { PoolClient } from "pg";
 
 import {
+  COMPANY_SIZE_OPTIONS,
   HIRING_MODE_OPTIONS,
   INDUSTRY_OPTIONS,
   ROLE_OPTIONS,
@@ -16,7 +17,7 @@ import {
   type WorkspaceRole,
 } from "./workspaces";
 
-export const ONBOARDING_STEPS = ["agency", "profile", "complete"] as const;
+export const ONBOARDING_STEPS = ["agency", "profile", "market", "delivery", "complete"] as const;
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 export type OnboardingStatus = "not_started" | "in_progress" | "completed";
 
@@ -36,12 +37,16 @@ export type OnboardingHiringMode =
 export type OnboardingData = {
   fullName?: string;
   agencyName?: string;
+  agencyWebsite?: string;
   teamRole?: OnboardingTeamRole;
   specialization?: string;
   roles?: string[];
   industries?: string[];
+  companySizes?: string[];
   geography?: string[];
   hiringMode?: OnboardingHiringMode;
+  deliveryChoice?: "telegram" | "email" | "later";
+  deliveryEmail?: string;
 };
 
 export type OnboardingContext = {
@@ -65,15 +70,25 @@ export type OnboardingDbClient = Pick<PoolClient, "query">;
 export type OnboardingAgencyInput = {
   fullName: unknown;
   agencyName: unknown;
+  agencyWebsite: unknown;
   teamRole: unknown;
 };
 
 export type OnboardingProfileInput = {
   specialization: unknown;
   roles: readonly unknown[];
+};
+
+export type OnboardingMarketInput = {
   industries: readonly unknown[];
+  companySizes: readonly unknown[];
   geography: unknown;
   hiringMode: unknown;
+};
+
+export type OnboardingDeliveryInput = {
+  deliveryChoice: unknown;
+  deliveryEmail: unknown;
 };
 
 export type OnboardingSubmission =
@@ -86,6 +101,16 @@ export type OnboardingSubmission =
       step: "profile";
       intent: "next" | "back" | "skip";
       values: OnboardingProfileInput;
+    }
+  | {
+      step: "market";
+      intent: "next" | "back" | "skip";
+      values: OnboardingMarketInput;
+    }
+  | {
+      step: "delivery";
+      intent: "next" | "back" | "skip";
+      values: OnboardingDeliveryInput;
     }
   | {
       step: "complete";
@@ -108,8 +133,13 @@ type SnapshotRow = LockedOnboardingRow & {
   profileSpecialization: string | null;
   profileRoles: unknown;
   profileIndustries: unknown;
+  profileCompanySizes: unknown;
   profileTargetCity: string | null;
   profileHiringMode: string | null;
+  profileDeliveryEnabled: boolean | null;
+  profileTelegramChatId: string | null;
+  profileEmailDigestEnabled: boolean | null;
+  profileDigestEmail: string | null;
 };
 
 const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/u;
@@ -119,9 +149,12 @@ const TEAM_ROLE_KEYS = new Set<string>(
 );
 const ROLE_KEYS = new Set(ROLE_OPTIONS.map((option) => option.key));
 const INDUSTRY_KEYS = new Set(INDUSTRY_OPTIONS.map((option) => option.key));
+const COMPANY_SIZE_KEYS = new Set(COMPANY_SIZE_OPTIONS.map((option) => option.key));
 const HIRING_MODE_KEYS = new Set<string>(
   HIRING_MODE_OPTIONS.map((option) => option.key),
 );
+const DELIVERY_CHOICES = new Set(["telegram", "email", "later"]);
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
 const WORKSPACE_ROLES = new Set<WorkspaceRole>([
   "owner",
   "admin",
@@ -219,7 +252,18 @@ function normalizeGeography(value: unknown): string[] {
 
 export function normalizeOnboardingAgencyInput(
   input: OnboardingAgencyInput,
-): Required<Pick<OnboardingData, "fullName" | "agencyName" | "teamRole">> {
+): Required<Pick<OnboardingData, "fullName" | "agencyName" | "teamRole">> & Pick<OnboardingData, "agencyWebsite"> {
+  const rawWebsite = normalizeSingleLine(input.agencyWebsite, { required: false, maxBytes: 500 });
+  let agencyWebsite: string | undefined;
+  if (rawWebsite) {
+    try {
+      const url = new URL(rawWebsite.includes("://") ? rawWebsite : `https://${rawWebsite}`);
+      if (!['http:', 'https:'].includes(url.protocol) || !url.hostname.includes('.')) throw new Error();
+      agencyWebsite = url.toString().replace(/\/$/u, '');
+    } catch {
+      throw new OnboardingValidationError();
+    }
+  }
   return {
     fullName: normalizeSingleLine(input.fullName, {
       required: true,
@@ -229,6 +273,7 @@ export function normalizeOnboardingAgencyInput(
       required: true,
       maxBytes: 160,
     })!,
+    ...(agencyWebsite ? { agencyWebsite } : {}),
     teamRole: normalizeKnownKey<OnboardingTeamRole>(
       input.teamRole,
       TEAM_ROLE_KEYS,
@@ -238,29 +283,40 @@ export function normalizeOnboardingAgencyInput(
 
 export function normalizeOnboardingProfileInput(
   input: OnboardingProfileInput,
-): Required<
-  Pick<
-    OnboardingData,
-    "specialization" | "roles" | "industries" | "geography" | "hiringMode"
-  >
-> {
+): Required<Pick<OnboardingData, "specialization" | "roles">> {
   return {
     specialization: normalizeSingleLine(input.specialization, {
       required: false,
       maxBytes: 240,
     }) ?? "",
     roles: normalizeKnownList(input.roles, ROLE_KEYS, ROLE_OPTIONS.length),
-    industries: normalizeKnownList(
-      input.industries,
-      INDUSTRY_KEYS,
-      INDUSTRY_OPTIONS.length,
-    ),
-    geography: normalizeGeography(input.geography),
-    hiringMode: normalizeKnownKey<OnboardingHiringMode>(
-      input.hiringMode,
-      HIRING_MODE_KEYS,
-    ),
   };
+}
+
+export function normalizeOnboardingMarketInput(
+  input: OnboardingMarketInput,
+): Required<Pick<OnboardingData, "industries" | "companySizes" | "geography" | "hiringMode">> {
+  return {
+    industries: normalizeKnownList(input.industries, INDUSTRY_KEYS, INDUSTRY_OPTIONS.length),
+    companySizes: normalizeKnownList(input.companySizes, COMPANY_SIZE_KEYS, COMPANY_SIZE_OPTIONS.length),
+    geography: normalizeGeography(input.geography),
+    hiringMode: normalizeKnownKey<OnboardingHiringMode>(input.hiringMode, HIRING_MODE_KEYS),
+  };
+}
+
+export function normalizeOnboardingDeliveryInput(input: OnboardingDeliveryInput): {
+  deliveryChoice: "telegram" | "email" | "later";
+  deliveryEmail?: string;
+} {
+  const deliveryChoice = normalizeKnownKey<"telegram" | "email" | "later">(
+    input.deliveryChoice,
+    DELIVERY_CHOICES,
+  );
+  const deliveryEmail = normalizeSingleLine(input.deliveryEmail, { required: false, maxBytes: 320 });
+  if (deliveryChoice === "email" && (!deliveryEmail || !EMAIL_PATTERN.test(deliveryEmail))) {
+    throw new OnboardingValidationError();
+  }
+  return { deliveryChoice, ...(deliveryEmail ? { deliveryEmail: deliveryEmail.toLocaleLowerCase("ru-RU") } : {}) };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -295,12 +351,18 @@ function normalizePersistedData(value: unknown): OnboardingData {
   if (!isRecord(value)) return {};
   const fullName = safeSingleLine(value.fullName, 120);
   const agencyName = safeSingleLine(value.agencyName, 160);
+  const agencyWebsite = safeSingleLine(value.agencyWebsite, 500);
   const specialization = safeSingleLine(value.specialization, 240);
   const roles = safeKnownList(value.roles, ROLE_KEYS, ROLE_OPTIONS.length);
   const industries = safeKnownList(
     value.industries,
     INDUSTRY_KEYS,
     INDUSTRY_OPTIONS.length,
+  );
+  const companySizes = safeKnownList(
+    value.companySizes,
+    COMPANY_SIZE_KEYS,
+    COMPANY_SIZE_OPTIONS.length,
   );
   const geography = Array.isArray(value.geography)
     ? value.geography.flatMap((entry) => {
@@ -317,16 +379,24 @@ function normalizePersistedData(value: unknown): OnboardingData {
       && HIRING_MODE_KEYS.has(value.hiringMode)
       ? value.hiringMode as OnboardingHiringMode
       : undefined;
+  const deliveryChoice = typeof value.deliveryChoice === "string" && DELIVERY_CHOICES.has(value.deliveryChoice)
+    ? value.deliveryChoice as "telegram" | "email" | "later"
+    : undefined;
+  const deliveryEmail = safeSingleLine(value.deliveryEmail, 320);
 
   return {
     ...(fullName ? { fullName } : {}),
     ...(agencyName ? { agencyName } : {}),
+    ...(agencyWebsite ? { agencyWebsite } : {}),
     ...(teamRole ? { teamRole } : {}),
     ...(specialization ? { specialization } : {}),
     ...(roles ? { roles } : {}),
     ...(industries ? { industries } : {}),
+    ...(companySizes ? { companySizes } : {}),
     ...(geography ? { geography } : {}),
     ...(hiringMode ? { hiringMode } : {}),
+    ...(deliveryChoice ? { deliveryChoice } : {}),
+    ...(deliveryEmail && EMAIL_PATTERN.test(deliveryEmail) ? { deliveryEmail: deliveryEmail.toLocaleLowerCase("ru-RU") } : {}),
   };
 }
 
@@ -411,8 +481,13 @@ export async function loadOnboardingSnapshot(
          profile.specialization AS "profileSpecialization",
          profile.roles AS "profileRoles",
          profile.industries AS "profileIndustries",
+         profile.company_sizes AS "profileCompanySizes",
          profile.target_city AS "profileTargetCity",
          profile.hiring_mode AS "profileHiringMode"
+         ,profile.delivery_enabled AS "profileDeliveryEnabled"
+         ,profile.telegram_chat_id::TEXT AS "profileTelegramChatId"
+         ,profile.email_digest_enabled AS "profileEmailDigestEnabled"
+         ,profile.digest_email AS "profileDigestEmail"
        FROM users AS account
        JOIN workspace_members AS membership
          ON membership.user_id = account.id
@@ -448,10 +523,22 @@ export async function loadOnboardingSnapshot(
       INDUSTRY_KEYS,
       INDUSTRY_OPTIONS.length,
     );
+    const fallbackCompanySizes = safeKnownList(
+      row.profileCompanySizes,
+      COMPANY_SIZE_KEYS,
+      COMPANY_SIZE_OPTIONS.length,
+    );
     const fallbackHiringMode =
       row.profileHiringMode && HIRING_MODE_KEYS.has(row.profileHiringMode)
         ? row.profileHiringMode as OnboardingHiringMode
         : undefined;
+    const fallbackDeliveryChoice = row.profileEmailDigestEnabled && row.profileDigestEmail
+      ? "email" as const
+      : row.profileTelegramChatId
+        ? "telegram" as const
+        : row.profileDeliveryEnabled === false
+          ? "later" as const
+          : undefined;
     let fallbackGeography: string[] | undefined;
     try {
       fallbackGeography = row.profileTargetCity
@@ -488,8 +575,11 @@ export async function loadOnboardingSnapshot(
           : {}),
         ...(fallbackRoles ? { roles: fallbackRoles } : {}),
         ...(fallbackIndustries ? { industries: fallbackIndustries } : {}),
+        ...(fallbackCompanySizes ? { companySizes: fallbackCompanySizes } : {}),
         ...(fallbackGeography ? { geography: fallbackGeography } : {}),
         ...(fallbackHiringMode ? { hiringMode: fallbackHiringMode } : {}),
+        ...(fallbackDeliveryChoice ? { deliveryChoice: fallbackDeliveryChoice } : {}),
+        ...(row.profileDigestEmail && EMAIL_PATTERN.test(row.profileDigestEmail) ? { deliveryEmail: row.profileDigestEmail } : {}),
         ...persisted,
       },
     };
@@ -509,6 +599,7 @@ function mergeSubmission(
   status: OnboardingStatus;
   step: OnboardingStep;
   syncProfile: boolean;
+  syncDelivery: boolean;
   preserveOptionalProfile: boolean;
   recordCompletion: boolean;
 } {
@@ -522,6 +613,7 @@ function mergeSubmission(
       status: "in_progress",
       step: "profile",
       syncProfile: false,
+      syncDelivery: false,
       preserveOptionalProfile: false,
       recordCompletion: false,
     };
@@ -532,9 +624,10 @@ function mergeSubmission(
       return {
         data: existing,
         status: "in_progress",
-        step: "complete",
-        syncProfile: true,
-        preserveOptionalProfile: true,
+        step: "market",
+        syncProfile: false,
+        syncDelivery: false,
+        preserveOptionalProfile: false,
         recordCompletion: false,
       };
     }
@@ -544,13 +637,53 @@ function mergeSubmission(
         ...existing,
         specialization: profile.specialization || undefined,
         roles: profile.roles,
-        industries: profile.industries,
-        geography: profile.geography,
-        hiringMode: profile.hiringMode,
       },
       status: "in_progress",
-      step: submission.intent === "back" ? "agency" : "complete",
-      syncProfile: submission.intent === "next",
+      step: submission.intent === "back" ? "agency" : "market",
+      syncProfile: false,
+      syncDelivery: false,
+      preserveOptionalProfile: false,
+      recordCompletion: false,
+    };
+  }
+
+  if (submission.step === "market") {
+    if (submission.intent === "back") {
+      return { data: existing, status: "in_progress", step: "profile", syncProfile: false, syncDelivery: false, preserveOptionalProfile: false, recordCompletion: false };
+    }
+    const market = submission.intent === "skip"
+      ? {
+          industries: existing.industries ?? [],
+          companySizes: existing.companySizes ?? [],
+          geography: existing.geography ?? [],
+          hiringMode: existing.hiringMode ?? "auto" as OnboardingHiringMode,
+        }
+      : normalizeOnboardingMarketInput(submission.values);
+    return {
+      data: { ...existing, ...market },
+      status: "in_progress",
+      step: "delivery",
+      syncProfile: true,
+      syncDelivery: false,
+      preserveOptionalProfile: submission.intent === "skip",
+      recordCompletion: false,
+    };
+  }
+
+
+  if (submission.step === "delivery") {
+    if (submission.intent === "back") {
+      return { data: existing, status: "in_progress", step: "market", syncProfile: false, syncDelivery: false, preserveOptionalProfile: false, recordCompletion: false };
+    }
+    const delivery = submission.intent === "skip"
+      ? { deliveryChoice: "later" as const }
+      : normalizeOnboardingDeliveryInput(submission.values);
+    return {
+      data: { ...existing, ...delivery },
+      status: "in_progress",
+      step: "complete",
+      syncProfile: false,
+      syncDelivery: true,
       preserveOptionalProfile: false,
       recordCompletion: false,
     };
@@ -560,8 +693,9 @@ function mergeSubmission(
     return {
       data: existing,
       status: "in_progress",
-      step: "profile",
+      step: "delivery",
       syncProfile: false,
+      syncDelivery: false,
       preserveOptionalProfile: false,
       recordCompletion: false,
     };
@@ -572,9 +706,31 @@ function mergeSubmission(
     status: "completed",
     step: "complete",
     syncProfile: false,
+    syncDelivery: false,
     preserveOptionalProfile: false,
     recordCompletion: true,
   };
+}
+
+async function syncOwnerDelivery(db: OnboardingDbClient, context: OnboardingContext, data: OnboardingData): Promise<void> {
+  const choice = data.deliveryChoice ?? "later";
+  const result = await db.query(
+    `UPDATE client_profiles
+     SET delivery_enabled = $3,
+         email_digest_enabled = $4,
+         digest_email = CASE WHEN $4 THEN $5 ELSE digest_email END,
+         updated_at = NOW()
+     WHERE owner_id = $1
+       AND (workspace_id = $2 OR workspace_id IS NULL)`,
+    [
+      context.userId,
+      context.workspaceId,
+      choice !== "later",
+      choice === "email",
+      choice === "email" ? data.deliveryEmail ?? null : null,
+    ],
+  );
+  if ((result.rowCount ?? 0) !== 1) throw new OnboardingAccessError();
 }
 
 async function syncOwnerProfile(
@@ -593,6 +749,7 @@ async function syncOwnerProfile(
        target_city,
        specialization,
        industries,
+       company_sizes,
        roles,
        contact_policy,
        hiring_mode,
@@ -605,9 +762,10 @@ async function syncOwnerProfile(
        $4,
        $5,
        $6::JSONB,
-       $7::TEXT[],
+       $7::JSONB,
+       $8::TEXT[],
        'corporate_only',
-       $8,
+       $9,
        NOW()
      )
      ON CONFLICT (owner_id) WHERE owner_id IS NOT NULL
@@ -615,23 +773,27 @@ async function syncOwnerProfile(
        workspace_id = EXCLUDED.workspace_id,
        agency_name = EXCLUDED.agency_name,
        target_city = CASE
-         WHEN $9 THEN client_profiles.target_city
+         WHEN $10 THEN client_profiles.target_city
          ELSE EXCLUDED.target_city
        END,
-       specialization = CASE WHEN $9 THEN client_profiles.specialization
+       specialization = CASE WHEN $10 THEN client_profiles.specialization
          ELSE EXCLUDED.specialization
        END,
        industries = CASE
-         WHEN $9 THEN client_profiles.industries
+         WHEN $10 THEN client_profiles.industries
          ELSE EXCLUDED.industries
        END,
+       company_sizes = CASE
+         WHEN $10 THEN client_profiles.company_sizes
+         ELSE EXCLUDED.company_sizes
+       END,
        roles = CASE
-         WHEN $9 THEN client_profiles.roles
+         WHEN $10 THEN client_profiles.roles
          ELSE EXCLUDED.roles
        END,
        contact_policy = 'corporate_only',
        hiring_mode = CASE
-         WHEN $9 THEN client_profiles.hiring_mode
+         WHEN $10 THEN client_profiles.hiring_mode
          ELSE EXCLUDED.hiring_mode
        END,
        updated_at = NOW()
@@ -645,6 +807,7 @@ async function syncOwnerProfile(
       data.geography?.join(", ") || null,
       data.specialization || null,
       JSON.stringify(data.industries ?? []),
+      JSON.stringify(data.companySizes ?? []),
       data.roles ?? [],
       data.hiringMode ?? "auto",
       preserveOptionalProfile,
@@ -728,6 +891,7 @@ export async function saveOnboardingProgress(
           status: currentStatus,
           step: currentStep,
           syncProfile: false,
+          syncDelivery: false,
           preserveOptionalProfile: false,
           recordCompletion: false,
         }
@@ -781,6 +945,10 @@ export async function saveOnboardingProgress(
         merged.data,
         merged.preserveOptionalProfile,
       );
+    }
+
+    if (merged.syncDelivery && currentRole === "owner") {
+      await syncOwnerDelivery(db, context, merged.data);
     }
 
     if (merged.recordCompletion) {

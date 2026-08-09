@@ -2,6 +2,8 @@ import { getPool } from "./paymentsRepo";
 
 export type RefundableRobokassaOrder = {
   id: string;
+  workspaceId: string;
+  entitlementOwnerId: string;
   productCode: string;
   planName: string;
   amountMinor: number;
@@ -17,6 +19,8 @@ export type RefundableRobokassaOrder = {
 
 type RefundableOrderRow = {
   id: string;
+  workspaceId: string;
+  entitlementOwnerId: string;
   productCode: string;
   planName: string | null;
   amountMinor: string | number;
@@ -37,6 +41,8 @@ export async function listRefundableRobokassaOrders(limit = 100): Promise<Refund
   const result = await pool.query<RefundableOrderRow>(
     `SELECT
        checkout.id::TEXT AS id,
+       checkout.workspace_id::TEXT AS "workspaceId",
+       checkout.entitlement_owner_id::TEXT AS "entitlementOwnerId",
        checkout.plan_code AS "productCode",
        checkout.payload->>'planName' AS "planName",
        (checkout.amount_rub::BIGINT * 100) AS "amountMinor",
@@ -67,6 +73,8 @@ export async function listRefundableRobokassaOrders(limit = 100): Promise<Refund
     const succeededMinor = toSafeMinor(row.succeededMinor);
     return {
       id: row.id,
+      workspaceId: row.workspaceId,
+      entitlementOwnerId: row.entitlementOwnerId,
       productCode: row.productCode,
       planName: row.planName?.trim() || row.productCode,
       amountMinor,

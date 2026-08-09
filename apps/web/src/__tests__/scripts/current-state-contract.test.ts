@@ -8,7 +8,7 @@ function read(relativePath: string): string {
 }
 
 describe('runtime documentation contract', () => {
-  const currentState = read('docs/current-state.md')
+  const currentState = read('docs/CURRENT_STATE.md')
   const architecture = read('docs/architecture.md')
   const selfServe = read('docs/self-serve-mvp.md')
   const sourceRegistry = read('packages/db/scripts/source-registry.mjs')
@@ -44,7 +44,7 @@ describe('runtime documentation contract', () => {
 
   test('external readiness blockers remain explicit', () => {
     expect(currentState).toContain('External blockers')
-    expect(currentState).toContain('реальные production secrets')
+    expect(currentState).toContain('production secrets')
     expect(currentState).toContain('RF payment provider')
     expect(currentState).toContain('gold set')
   })

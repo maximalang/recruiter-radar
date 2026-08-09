@@ -10,28 +10,24 @@ function source(path: string) {
 }
 
 describe("polished unified landing visual contract", () => {
-  it("keeps one hero layout owner with the signal card inside the radar composition", () => {
-    const hero = source("app/landing/hero-instrument.tsx");
+  it("keeps one hero layout owner with a lightweight ambient radar", () => {
     const heroScene = source("app/landing/detection-scene.tsx");
     const sceneStyles = source("app/landing/detection-scene.module.css");
-    const instrumentStyles = source("app/landing/hero-instrument.module.css");
     const landingStyles = source("app/landing/landing.module.css");
     const visualStyles = source("app/landing/landing-visual-system.module.css");
     const obsoleteResponsiveStyles = resolve(WEB_ROOT, "app/landing/detection-responsive.module.css");
     const compatibilityRadar = source("app/landing/brand-glyphs.tsx");
 
-    expect(heroScene).toMatch(/data-hero-visual[\s\S]*data-hero-signal-card/);
+    expect(heroScene).toContain('data-hero-layout="ambient-radar"');
+    expect(heroScene).toContain("ambientRing");
+    expect(heroScene).not.toContain("HeroInstrument");
+    expect(heroScene).not.toContain("data-hero-signal-card");
     expect(heroScene).not.toContain("detectionFooter");
-    expect(hero).not.toContain("<figcaption");
-    expect(hero).not.toContain("instrumentConnection");
-    expect(hero).not.toContain("instrumentCore");
-    expect(hero).not.toContain("instrument-link");
-    expect(hero).not.toContain("temporary signal field");
-    expect(sceneStyles).toContain("grid-template-columns: minmax(0, 47%) minmax(0, 53%);");
-    expect(sceneStyles).toContain("grid-template-columns: minmax(0, 56%) minmax(0, 44%);");
+    expect(sceneStyles).toContain("grid-template-columns: minmax(0, 1fr);");
+    expect(sceneStyles).toMatch(/\.fieldFigure\s*\{[\s\S]*?position:\s*absolute;/);
+    expect(sceneStyles).not.toContain("grid-template-columns: minmax(0, 47%) minmax(0, 53%);");
     expect(sceneStyles).toContain("@media (max-width: 959px)");
     expect(sceneStyles).toContain("@media (max-width: 480px)");
-    expect(instrumentStyles).not.toContain("position: absolute");
     expect(landingStyles).not.toMatch(/\.(detectionScene|detectionField|detectionCopy|detectionLock|detectionFooter|instrumentCaption)\b/);
     expect(visualStyles).not.toContain('#scene-detection [class*=');
     expect(existsSync(obsoleteResponsiveStyles)).toBe(false);
@@ -41,31 +37,23 @@ describe("polished unified landing visual contract", () => {
     expect(landingStyles).not.toContain(".instrumentCore");
   });
 
-  it("uses a dedicated mobile signal fragment and keeps the full radar below the hero copy", () => {
+  it("uses a dedicated mobile signal fragment and keeps the radar out of document flow", () => {
     const heroScene = source("app/landing/detection-scene.tsx");
     const sceneStyles = source("app/landing/detection-scene.module.css");
 
     expect(heroScene).toContain('data-mobile-hero-signal="true"');
     expect(sceneStyles).toMatch(/@media \(max-width: 600px\)[\s\S]*?\.mobileSignal\s*\{[\s\S]*?display:\s*block;/);
-    expect(sceneStyles).toMatch(/@media \(max-width: 480px\)[\s\S]*?\.fieldFigure > figure\s*\{[\s\S]*?display:\s*none;/);
-    expect(sceneStyles).toMatch(/@media \(max-width: 480px\)[\s\S]*?\.analysisFrame\s*\{[\s\S]*?position:\s*relative;/);
+    expect(sceneStyles).toMatch(/@media \(max-width: 600px\)[\s\S]*?\.fieldFigure\s*\{\s*display:\s*none;/);
+    expect(sceneStyles).toMatch(/\.ambientRing\s*\{/);
     expect(sceneStyles).not.toMatch(/@media \(max-width: 480px\)[\s\S]*?\.fieldFigure\s*\{[\s\S]*?bottom:\s*-12rem;/);
   });
 
-  it("renders the desktop signal history as one temporal axis with a mobile vertical fallback", () => {
-    const timeline = source("app/landing/signal-timeline-scene.tsx");
-    const timelineStyles = source("app/landing/signal-timeline-scene.module.css");
-    const landingStyles = source("app/landing/landing.module.css");
+  it("keeps the retired timeline out of the reduced landing composition", () => {
+    const page = source("app/landing/landing-page.tsx");
 
-    expect(timeline).toContain('data-temporal-axis="signal-story"');
-    expect(timelineStyles).toContain('grid-template-areas: "intro" "company" "story" "lock";');
-    expect(timelineStyles).toContain("grid-template-columns: repeat(4, minmax(0, 1fr));");
-    expect(timelineStyles).toMatch(
-      /@media \(max-width: 700px\)[\s\S]*?\.story\s*\{[\s\S]*?grid-template-columns:\s*1fr;/,
-    );
-    expect(landingStyles).not.toContain("grid-template-areas: \"intro company\" \"intro timeline\"");
-    expect(landingStyles).not.toContain(".timelineEvents::before");
-    expect(landingStyles).not.toContain(".timelineEvent {");
+    expect(page).not.toContain("SignalTimelineScene");
+    expect(existsSync(resolve(WEB_ROOT, "app/landing/signal-timeline-scene.tsx"))).toBe(false);
+    expect(existsSync(resolve(WEB_ROOT, "app/landing/signal-timeline-scene.module.css"))).toBe(false);
   });
 
   it("separates the core workspace from connected delivery routes", () => {
@@ -76,13 +64,14 @@ describe("polished unified landing visual contract", () => {
     expect(delivery).toContain("DELIVERY_CHANNELS.slice(1).map");
   });
 
-  it("shows a human-controlled outreach composer and a branded closing signal", () => {
-    const outreach = source("app/landing/outreach-scene.tsx");
+  it("preserves the manual outreach boundary without a standalone composer scene", () => {
+    const page = source("app/landing/landing-page.tsx");
+    const delivery = source("app/landing/delivery-scene.tsx");
     const conversion = source("app/landing/conversion-panel.tsx");
 
-    expect(outreach).toContain("COMPOSER_STEPS.map");
-    expect(outreach).toContain('data-composer-steps="human-controlled"');
-    expect(outreach).toContain('data-composer-step={step.key}');
+    expect(page).not.toContain("OutreachScene");
+    expect(existsSync(resolve(WEB_ROOT, "app/landing/outreach-scene.tsx"))).toBe(false);
+    expect(delivery).toContain("Обращение компаниям всегда отправляете вы");
     expect(conversion).toContain('data-final-signal-composition="agency-profile"');
     expect(source("app/landing/conversion-panel.module.css")).not.toContain("right: -3rem");
   });
@@ -106,12 +95,13 @@ describe("polished unified landing visual contract", () => {
     expect(landingPageBody).not.toContain('<a href="#main-content" className={styles.skipLink}>');
   });
 
-  it("keeps the mobile cookies utility out of conversion content", () => {
+  it("keeps cookie settings in the footer instead of a floating utility", () => {
     const consentStyles = source("app/yandex-metrika.module.css");
+    const footerControl = source("app/ui/cookie-settings-button.tsx");
 
-    expect(consentStyles).toMatch(
-      /@media \(max-width: 620px\)[\s\S]*?\.settingsButton\s*\{[\s\S]*?position:\s*absolute;/,
-    );
+    expect(consentStyles).not.toContain(".settingsButton");
+    expect(footerControl).toContain("ANALYTICS_SETTINGS_OPEN_EVENT");
+    expect(footerControl).toContain("window.dispatchEvent");
   });
 
   it("uses one stable preview anchor without duplicating it in the suspense fallback", () => {
@@ -171,18 +161,20 @@ describe("polished unified landing visual contract", () => {
     expect(responsiveAudit).toContain("'/payment-and-refund'");
     expect(productionAudit).toContain('LANDING_REQUIRE_ANALYTICS_CONSENT === "true"');
     expect(productionAudit).toContain("analytics consent control is required for this audit");
-    expect(productionAudit).toContain('name: "hero-320x700"');
+    expect(productionAudit).toContain('name: "mobile-320x700"');
+    expect(productionAudit).not.toContain("surfaceSpecs");
   });
 
   it("keeps the public footer navigable without exposing phone or location", () => {
     const footer = source("app/ui/site-footer.tsx");
     const offerAlias = source("app/offer/page.tsx");
 
-    expect(footer).toContain('href: "/#scene-timeline"');
+    expect(footer).not.toContain('href: "/#scene-timeline"');
     expect(footer).toContain('href: "/#scene-workspace"');
     expect(footer).toContain('href: "/#scene-evidence"');
     expect(footer).toContain('href: "/#scene-delivery"');
-    expect(footer).toContain('href: "/#scene-outreach"');
+    expect(footer).not.toContain('href: "/#scene-outreach"');
+    expect(footer).toContain("CookieSettingsButton");
     expect(footer).toContain('href: "/#pricing"');
     expect(footer).toContain('href: "/#faq"');
     expect(footer).toContain('href="/legal"');
