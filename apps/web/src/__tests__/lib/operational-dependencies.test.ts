@@ -44,7 +44,7 @@ describe("operational dependency report", () => {
   });
 
   it("keeps production readiness degraded when email is only configured", async () => {
-    process.env.NODE_ENV = "production";
+    process.env = { ...process.env, NODE_ENV: "production" };
     delete process.env.AUTH_EMAIL_TRANSPORT;
     process.env.SMTP_HOST = "smtp.example.invalid";
     process.env.SMTP_PORT = "465";
