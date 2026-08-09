@@ -1,6 +1,10 @@
 ﻿import { Pool } from "pg";
 
 import { getPool as getSharedPool } from "./db-pool";
+import {
+  getEffectiveEntitlement,
+  type EntitlementFeature,
+} from "./entitlements";
 import { updateDigestOrgStateFeedback, type DigestFeedbackAction } from "./digestFeedback";
 import type { HhDigestItem } from "./hhDigest";
 import { getTelegramBotToken, sendTelegramTextMessage } from "./telegram";
@@ -353,32 +357,33 @@ export async function sendBatchDigestForRun(input: {
 }
 
 
-export async function assertDigestEntitlementByClientProfileId(clientProfileId: string | number): Promise<void> {
+export async function assertDigestEntitlementByClientProfileId(
+  clientProfileId: string | number,
+  requiredFeature: EntitlementFeature = "digest",
+): Promise<void> {
   const pool = getPool();
   if (!pool) throw new Error("DATABASE_URL is not set.");
 
-  const profile = await pool.query<{ isActive: boolean }>(
-    `SELECT is_active AS "isActive" FROM client_profiles WHERE id = $1 LIMIT 1`,
+  const profile = await pool.query<{ isActive: boolean; ownerId: string | null }>(
+    `SELECT
+       is_active AS "isActive",
+       owner_id::TEXT AS "ownerId"
+     FROM client_profiles
+     WHERE id = $1
+     LIMIT 1`,
     [clientProfileId]
   );
   if (profile.rowCount !== 1) throw new Error("Client profile not found.");
   if (!profile.rows[0].isActive) throw new Error("Client profile is inactive.");
-
-  // Resolve owner via paid checkout order only — canceled/unpaid orders are excluded.
-  const ownerResult = await pool.query<{ userId: string }>(`
-    SELECT user_id::TEXT AS "userId"
-    FROM checkout_orders
-    WHERE payload ->> 'clientProfileId' = $1
-      AND status = 'paid'
-    ORDER BY paid_at DESC
-    LIMIT 1
-  `, [String(clientProfileId)]);
-
-  if (ownerResult.rowCount !== 1) throw new Error("Client profile entitlement owner not found.");
-  const userId = Number(ownerResult.rows[0].userId);
-
-  const entitlement = await hasPremiumEntitlement(userId);
-  if (!entitlement.allowed) throw new Error(entitlement.reason ?? "No active subscription or pilot.");
+  const ownerId = profile.rows[0].ownerId;
+  if (!ownerId) throw new Error("Client profile entitlement owner not found.");
+  const entitlement = await getEffectiveEntitlement(ownerId);
+  if (
+    entitlement.status !== "active"
+    || !entitlement.features.includes(requiredFeature)
+  ) {
+    throw new Error("No active subscription or pilot.");
+  }
 }
 
 
@@ -402,33 +407,9 @@ export async function checkTelegramChatOwnsClientProfile(telegramChatId: string,
   return result.rowCount === 1;
 }
 
-export async function hasPremiumEntitlement(userId: number): Promise<EntitlementResult> {
-  const pool = getPool();
-  if (!pool) throw new Error("DATABASE_URL is not set.");
-  const activeSubscription = await pool.query<{ ok: boolean }>(
-    `SELECT TRUE AS ok
-     FROM subscriptions AS subscription
-     JOIN users AS account
-       ON account.id = subscription.user_id
-      AND account.status = 'active'
-     WHERE subscription.user_id = $1
-       AND subscription.status IN ('trial', 'active', 'past_due')
-     LIMIT 1`,
-    [userId],
-  );
-  if (activeSubscription.rowCount === 1) return { allowed: true, reason: null };
-  const activePilot = await pool.query<{ ok: boolean }>(
-    `SELECT TRUE AS ok
-     FROM pilot_enrollments AS pilot
-     JOIN users AS account
-       ON account.id = pilot.user_id
-      AND account.status = 'active'
-     WHERE pilot.user_id = $1
-       AND pilot.status = 'active'
-       AND (pilot.ends_at IS NULL OR pilot.ends_at > NOW())
-     LIMIT 1`,
-    [userId],
-  );
-  if (activePilot.rowCount === 1) return { allowed: true, reason: null };
-  return { allowed: false, reason: "No active subscription or pilot." };
+export async function hasPremiumEntitlement(userId: string | number): Promise<EntitlementResult> {
+  const entitlement = await getEffectiveEntitlement(userId);
+  return entitlement.status === "active"
+    ? { allowed: true, reason: null }
+    : { allowed: false, reason: "No active subscription or pilot." };
 }

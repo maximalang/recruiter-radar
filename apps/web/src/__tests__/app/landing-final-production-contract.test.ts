@@ -15,10 +15,11 @@ describe("landing final production contract", () => {
     const page = source("app/landing/landing-page.tsx");
 
     expect(page).toContain("paymentConfigured={props.paymentConfigured}");
-    expect(hero).toContain('data-hero-layout="balanced-grid"');
+    expect(hero).toContain('data-hero-layout="ambient-radar"');
     expect(hero).toContain("Компании, которым стоит написать сегодня.");
-    expect(hero).toContain("Посмотреть пример радара");
-    expect(hero).toContain("Как формируется приоритет");
+    expect(hero).toContain("Посмотреть возможности");
+    expect(hero).toContain("Уже есть доступ? Войти");
+    expect(hero).not.toContain("HeroInstrument");
     expect(hero).toContain("data-hero-trust-line");
     expect(hero).toContain("заявка без списания");
     expect(hero).toContain("разовая оплата");
@@ -61,27 +62,26 @@ describe("landing final production contract", () => {
     expect(visual).toContain("background: transparent;");
   });
 
-  test("keeps ambient radar and FAQ motion restrained and removable", () => {
+  test("keeps FAQ motion restrained and removable", () => {
     const visual = source("app/landing/landing-visual-system.module.css");
 
-    expect(visual).toContain("@keyframes clusterDrift");
     expect(visual).toContain("@keyframes faqReveal");
     expect(visual).not.toContain("@keyframes signalBreath");
     expect(visual).toContain("@media (prefers-reduced-motion: reduce)");
-    expect(visual).toMatch(/data-signal-cluster[\s\S]*animation: none;/);
     expect(visual).toMatch(/#faq details\[open\] p[\s\S]*animation: none;/);
   });
 
-  test("preserves manual outreach boundary and customer-readable source roles", () => {
-    const outreach = source("app/landing/outreach-scene.tsx");
+  test("preserves the manual outreach boundary inside the reduced composition", () => {
+    const page = source("app/landing/landing-page.tsx");
+    const delivery = source("app/landing/delivery-scene.tsx");
     const evidence = source("app/landing/evidence-scene.tsx");
 
-    expect(outreach).toContain('data-manual-outreach-boundary="true"');
-    expect(outreach).toContain("Отправка сообщения компании всегда требует действия пользователя.");
-    expect(evidence).toContain("Как источники участвуют в выдаче");
-    expect(evidence).toContain("Влияет на основную выдачу");
-    expect(evidence).toContain("Подключено, проходит проверки");
-    expect(evidence).not.toContain("Source registry / фактические роли");
+    expect(page).not.toContain("<OutreachScene");
+    expect(page).not.toContain("<SignalTimelineScene");
+    expect(delivery).toContain("Рекомендация приходит автоматически. Обращение отправляете вы.");
+    expect(delivery).toContain("Черновик, финальная проверка и отправка остаются в руках пользователя.");
+    expect(evidence).toContain("Сигнал найма → доказательство");
+    expect(evidence).not.toContain("SOURCE_ROLES");
   });
 
   test("keeps FAQ copy professional and free of internal delivery terminology", () => {

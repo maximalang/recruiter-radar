@@ -5,7 +5,7 @@
  * evidence, reasons, opener, feedback state, and org info.
  */
 
-import { getLeadDetail } from '@/lib/leads-data';
+import { getLastRadarRunAt, getLeadDetail } from '@/lib/leads-data';
 import { getPool } from '@/lib/db';
 
 // Mock the DB pool
@@ -27,10 +27,11 @@ describe('getLeadDetail', () => {
     jest.clearAllMocks();
   });
 
-  it('returns null when pool is not available', async () => {
+  it('throws when the database is not available instead of returning a false not-found result', async () => {
     mockGetPool.mockReturnValue(null);
-    const result = await getLeadDetail({ candidateId: '1', ownerId: 'owner-1' });
-    expect(result).toBeNull();
+    await expect(getLeadDetail({ candidateId: '1', ownerId: 'owner-1' })).rejects.toThrow(
+      'DATABASE_URL is not set.',
+    );
   });
 
   it('returns null when candidate not found', async () => {
@@ -206,5 +207,37 @@ describe('getLeadDetail', () => {
     const result = await getLeadDetail({ candidateId: '1', ownerId: 'owner-1' });
     expect(result).not.toBeNull();
     expect(result!.orgWebsite).toBeNull();
+  });
+});
+
+describe('getLastRadarRunAt', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('returns no run without touching the database when there are no profiles', async () => {
+    const result = await getLastRadarRunAt({ profileIds: [], ownerId: 'owner-1' });
+    expect(result).toBeNull();
+    expect(mockGetPool).not.toHaveBeenCalled();
+  });
+
+  it('fails explicitly when run history cannot be read', async () => {
+    mockGetPool.mockReturnValue(null);
+    await expect(getLastRadarRunAt({ profileIds: ['7'], ownerId: 'owner-1' })).rejects.toThrow(
+      'DATABASE_URL is not set.',
+    );
+  });
+
+  it('owner-scopes the latest run query', async () => {
+    makeMockPool();
+    mockQuery.mockResolvedValueOnce({ rows: [{ lastRunAt: '2026-08-09T08:00:00.000Z' }] });
+
+    await expect(getLastRadarRunAt({ profileIds: ['7', '8'], ownerId: 'owner-1' })).resolves.toBe(
+      '2026-08-09T08:00:00.000Z',
+    );
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining('profile.owner_id = $2'),
+      [['7', '8'], 'owner-1'],
+    );
   });
 });

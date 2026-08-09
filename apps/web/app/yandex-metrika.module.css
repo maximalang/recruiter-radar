@@ -5,19 +5,19 @@
   bottom: max(16px, env(safe-area-inset-bottom));
   left: max(16px, env(safe-area-inset-left));
   display: flex;
-  max-width: 920px;
+  max-width: 760px;
   margin: 0 auto;
-  padding: 18px;
+  padding: 12px 14px;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 18px;
   border: 1px solid rgba(242, 241, 235, .14);
-  border-radius: 18px;
+  border-radius: 8px;
   background: rgba(8, 12, 10, .97);
   box-shadow: 0 18px 60px rgba(0, 0, 0, .34);
   color: #f2f1eb;
-  backdrop-filter: blur(16px);
+  backdrop-filter: blur(10px);
 }
 
 .copy {
@@ -77,35 +77,13 @@
   color: #f2f1eb;
 }
 
-.settingsButton {
-  position: fixed;
-  z-index: 900;
-  right: max(12px, env(safe-area-inset-right));
-  bottom: max(14px, env(safe-area-inset-bottom));
-  width: 50px;
-  min-height: 44px;
-  padding: 0 5px;
-  border: 1px solid rgba(242, 241, 235, .16);
-  border-radius: 10px;
-  background: rgba(8, 12, 10, .84);
-  box-shadow: none;
-  color: rgba(242, 241, 235, .62);
-  font: inherit;
-  font-size: .53rem;
-  letter-spacing: .01em;
-  opacity: .84;
-  cursor: pointer;
-}
-
 .primaryButton:hover,
 .primaryButton:focus-visible {
   background: #d0e7ad;
 }
 
 .secondaryButton:hover,
-.secondaryButton:focus-visible,
-.settingsButton:hover,
-.settingsButton:focus-visible {
+.secondaryButton:focus-visible {
   border-color: rgba(191, 220, 145, .62);
   color: #f2f1eb;
   opacity: 1;
@@ -113,7 +91,6 @@
 
 .primaryButton:focus-visible,
 .secondaryButton:focus-visible,
-.settingsButton:focus-visible,
 .link:focus-visible {
   outline: 2px solid #bfdc91;
   outline-offset: 3px;
@@ -134,17 +111,11 @@
     flex: 1 1 12rem;
   }
 
-  .settingsButton {
-    position: absolute;
-    right: max(4px, env(safe-area-inset-right));
-    bottom: max(4px, env(safe-area-inset-bottom));
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .primaryButton,
   .secondaryButton,
-  .settingsButton,
   .link {
     transition: none;
   }

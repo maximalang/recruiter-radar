@@ -3,6 +3,7 @@ import { getLeadDetail } from '@/lib/leads-data';
 import { getClientProfileById } from '@/lib/clientProfiles';
 import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization';
 import { singleLeadToCsv } from '@/lib/leads-csv';
+import { hasFeatureAccess } from '@/lib/entitlements';
 
 /**
  * GET /api/leads/:id/export — single-lead CSV handoff.
@@ -31,7 +32,18 @@ export async function GET(
   const { id } = await context.params;
 
   const ownerId = await getAuthorizedOwnerId('exports:create');
-  const lead = ownerId ? await getLeadDetail({ candidateId: id, ownerId }) : null;
+  if (!ownerId) {
+    return new NextResponse('not_found', { status: 404 });
+  }
+  try {
+    if (!(await hasFeatureAccess(ownerId, 'api'))) {
+      return new NextResponse('entitlement_required', { status: 403 });
+    }
+  } catch {
+    return new NextResponse('entitlement_check_unavailable', { status: 503 });
+  }
+
+  const lead = await getLeadDetail({ candidateId: id, ownerId });
 
   if (!lead) {
     return new NextResponse('not_found', { status: 404 });

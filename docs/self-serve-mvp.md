@@ -1,6 +1,6 @@
 # Self-serve MVP launch note
 
-> **Статус:** historical rollout note. Актуальные runtime-контракты находятся в `SPEC.md`, `docs/current-state.md`, `docs/architecture.md` и `docs/notification-delivery.md`.
+> **Статус:** historical rollout note. Актуальные runtime-контракты находятся в `SPEC.md`, `docs/CURRENT_STATE.md`, `docs/architecture.md` и `docs/notification-delivery.md`.
 
 ## Historical flow
 
@@ -72,4 +72,4 @@ Production не использует n8n как обязательный orchest
 
 ## Verification
 
-См. обязательную матрицу в `docs/current-state.md` и root-level `AGENTS.md` / `CLAUDE.md`.
+См. обязательную матрицу в `docs/CURRENT_STATE.md` и root-level `AGENTS.md` / `CLAUDE.md`.

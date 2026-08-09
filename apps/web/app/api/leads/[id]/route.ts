@@ -5,6 +5,7 @@ import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization';
 import { buildFitExplanation } from '@/lib/leads/fit-explanation';
 import { buildCompanySummary } from '@/lib/leads/company-summary';
 import { scoreBand, formatSignalStrength } from '@/lib/scoring/score-display';
+import { hasFeatureAccess } from '@/lib/entitlements';
 
 /**
  * GET /api/leads/:id — owner-scoped lead detail.
@@ -29,7 +30,18 @@ export async function GET(
   const { id } = await context.params;
 
   const ownerId = await getAuthorizedOwnerId('leads:read');
-  const lead = ownerId ? await getLeadDetail({ candidateId: id, ownerId }) : null;
+  if (!ownerId) {
+    return NextResponse.json({ error: 'not_found' }, { status: 404 });
+  }
+  try {
+    if (!(await hasFeatureAccess(ownerId, 'api'))) {
+      return NextResponse.json({ error: 'entitlement_required' }, { status: 403 });
+    }
+  } catch {
+    return NextResponse.json({ error: 'entitlement_check_unavailable' }, { status: 503 });
+  }
+
+  const lead = await getLeadDetail({ candidateId: id, ownerId });
 
   if (!lead) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 });

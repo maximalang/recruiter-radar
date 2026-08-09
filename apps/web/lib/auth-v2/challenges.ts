@@ -7,7 +7,7 @@ import {
 } from "../account-auth";
 import { getClient, getPool } from "../db-pool";
 import { sendEmail } from "../email/transport";
-import { logError, logWarn } from "../runtime";
+import { logError, logEvent, logWarn } from "../runtime";
 import { renderAuthEmail } from "./email-templates";
 import {
   getAuthV2Flags,
@@ -26,10 +26,12 @@ import {
 } from "./session-environment";
 
 const LOGIN_TTL_MINUTES = 15;
+const LOGIN_TEMPORARILY_UNAVAILABLE =
+  "Вход временно недоступен. Попробуйте ещё раз немного позже.";
 const TOKEN_PATTERN = /^[a-f0-9]{64}$/;
 
 export type AuthV2LoginRequestResult =
-  | { ok: true }
+  | { ok: true; delivery: "sent" | "suppressed" }
   | { ok: false; error: string };
 
 export type AuthV2LoginConsumeResult = {
@@ -103,6 +105,7 @@ export async function requestAuthV2Login(input: {
   if (!email) {
     return { ok: false, error: "Укажите один корректный email." };
   }
+  logEvent("auth_v2.login_requested", {});
 
   const returnTo = sanitizeAuthReturnTo(input.returnTo);
   let client: PoolClient | null = null;
@@ -122,7 +125,7 @@ export async function requestAuthV2Login(input: {
     client = await getClient();
     if (!client) {
       logWarn("auth_v2.login_unavailable", { reasonCode: "database_not_configured" });
-      return { ok: true };
+      return { ok: false, error: LOGIN_TEMPORARILY_UNAVAILABLE };
     }
 
     token = randomBytes(32).toString("hex");
@@ -147,7 +150,8 @@ export async function requestAuthV2Login(input: {
     );
     if (!issued.rows[0]?.issued) {
       await client.query("COMMIT");
-      return { ok: true };
+      logEvent("auth_v2.login_request_suppressed", {});
+      return { ok: true, delivery: "suppressed" };
     }
     challengeId = issued.rows[0].challengeId;
     if (!challengeId) throw new Error("Challenge issuance returned no identifier.");
@@ -175,12 +179,12 @@ export async function requestAuthV2Login(input: {
   } catch (error) {
     if (client) await rollbackQuietly(client);
     logError("auth_v2.login_request_failed", error);
-    return { ok: true };
+    return { ok: false, error: LOGIN_TEMPORARILY_UNAVAILABLE };
   } finally {
     client?.release();
   }
 
-  if (!token || !challengeId || !deliveryEmail) return { ok: true };
+  if (!token || !challengeId || !deliveryEmail) return { ok: true, delivery: "suppressed" };
   let sendStatus: "sent" | "failed" = "failed";
   try {
     const verifyUrl = buildAccountLoginUrl(token);
@@ -194,6 +198,7 @@ export async function requestAuthV2Login(input: {
       to: deliveryEmail,
     });
     sendStatus = sent.ok ? "sent" : "failed";
+    if (sent.ok) logEvent("auth_v2.login_email_sent", {});
     if (!sent.ok) {
       logWarn("auth_v2.login_email_not_sent", { reasonCode: sent.reason });
     }
@@ -212,7 +217,9 @@ export async function requestAuthV2Login(input: {
     logError("auth_v2.login_delivery_status_failed", error);
   }
 
-  return { ok: true };
+  return sendStatus === "sent"
+    ? { ok: true, delivery: "sent" }
+    : { ok: false, error: LOGIN_TEMPORARILY_UNAVAILABLE };
 }
 
 export async function consumeAuthV2Login(input: {
@@ -318,6 +325,7 @@ export async function consumeAuthV2Login(input: {
     }
 
     await client.query("COMMIT");
+    logEvent("auth_v2.session_created", { onboardingRequired: row.onboardingStatus !== "completed" });
     return {
       account: {
         id: row.userId,

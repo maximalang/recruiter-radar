@@ -6,7 +6,7 @@ Recruiter Radar каждый день находит компании с док�
 
 Система остаётся client-intelligence radar для рекрутинговых агентств, а не ATS, CRM, generic parser, mass outreach tool или candidate sourcing product.
 
-Актуальный operational snapshot находится в [`docs/current-state.md`](current-state.md). Фиксированные числа источников и исторические rollout-планы не являются runtime-контрактом.
+Актуальный operational snapshot находится в [`docs/CURRENT_STATE.md`](CURRENT_STATE.md). Фиксированные числа источников и исторические rollout-планы не являются runtime-контрактом.
 
 ## Architecture principles
 
@@ -192,4 +192,4 @@ Total Score = Fit + Intent + Urgency + Reachability
 
 ## Runtime verification
 
-Перед readiness-заявлением обязательны tests, build, migrations, source verifiers, Docker smoke и dependency audit. Полный список приведён в `docs/current-state.md`.
+Перед readiness-заявлением обязательны tests, build, migrations, source verifiers, Docker smoke и dependency audit. Полный список приведён в `docs/CURRENT_STATE.md`.

@@ -46,7 +46,7 @@ describe("auth v2 onboarding server action", () => {
     mockReadContext.mockResolvedValue(context);
     mockSave.mockResolvedValue({
       status: "in_progress",
-      step: "complete",
+      step: "delivery",
       data: {},
       workspaceName: "North Star",
       workspaceRole: "owner",
@@ -77,9 +77,6 @@ describe("auth v2 onboarding server action", () => {
       values: {
         specialization: "Product и Data",
         roles: ["data"],
-        industries: ["it"],
-        geography: "Москва",
-        hiringMode: "specialist",
       },
     });
     expect(mockRedirect).toHaveBeenLastCalledWith("/onboarding");
@@ -99,6 +96,32 @@ describe("auth v2 onboarding server action", () => {
     expect(mockRedirect).toHaveBeenCalledWith("/onboarding?error=request");
     expect(mockReadContext).not.toHaveBeenCalled();
     expect(mockSave).not.toHaveBeenCalled();
+  });
+
+  test("separates market targeting from specialization fields", async () => {
+    const formData = new FormData();
+    formData.set("step", "market"); formData.set("intent", "next");
+    formData.append("industries", "it"); formData.append("companySizes", "small");
+    formData.set("geography", "Москва"); formData.set("hiringMode", "specialist");
+    await saveOnboardingAction(formData);
+    expect(mockSave).toHaveBeenCalledWith(context, { step: "market", intent: "next", values: { industries: ["it"], companySizes: ["small"], geography: "Москва", hiringMode: "specialist" } });
+  });
+
+  test("accepts only the delivery channel fields", async () => {
+    const formData = new FormData();
+    formData.set("step", "delivery");
+    formData.set("intent", "next");
+    formData.set("deliveryChoice", "email");
+    formData.set("deliveryEmail", "team@agency.ru");
+    formData.set("telegramChatId", "forged");
+
+    await saveOnboardingAction(formData);
+
+    expect(mockSave).toHaveBeenCalledWith(context, {
+      step: "delivery",
+      intent: "next",
+      values: { deliveryChoice: "email", deliveryEmail: "team@agency.ru" },
+    });
   });
 
   test("fails closed for a forged step or intent", async () => {

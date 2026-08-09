@@ -27,6 +27,7 @@ function parseSubmission(formData: FormData): OnboardingSubmission {
       values: {
         fullName: formValue(formData, "fullName"),
         agencyName: formValue(formData, "agencyName"),
+        agencyWebsite: formValue(formData, "agencyWebsite"),
         teamRole: formValue(formData, "teamRole"),
       },
     };
@@ -41,9 +42,34 @@ function parseSubmission(formData: FormData): OnboardingSubmission {
       values: {
         specialization: formValue(formData, "specialization"),
         roles: formData.getAll("roles"),
+      },
+    };
+  }
+  if (
+    step === "market"
+    && (intent === "next" || intent === "back" || intent === "skip")
+  ) {
+    return {
+      step,
+      intent,
+      values: {
         industries: formData.getAll("industries"),
+        companySizes: formData.getAll("companySizes"),
         geography: formValue(formData, "geography"),
         hiringMode: formValue(formData, "hiringMode"),
+      },
+    };
+  }
+  if (
+    step === "delivery"
+    && (intent === "next" || intent === "back" || intent === "skip")
+  ) {
+    return {
+      step,
+      intent,
+      values: {
+        deliveryChoice: formValue(formData, "deliveryChoice"),
+        deliveryEmail: formValue(formData, "deliveryEmail"),
       },
     };
   }

@@ -1,14 +1,8 @@
 export const LANDING_NAV_ITEMS = [
-  { id: "scene-workspace", label: "Пример" },
-  { id: "scene-evidence", label: "Доказательства" },
-  { id: "scene-delivery", label: "Как работает" },
+  { id: "scene-evidence", label: "Как работает" },
+  { id: "scene-workspace", label: "Возможности" },
   { id: "pricing", label: "Тарифы" },
-  { id: "faq", label: "FAQ" },
 ] as const;
-
-/** Compatibility export for older imports and analytics fixtures. */
-export const LANDING_SCENES = LANDING_NAV_ITEMS;
-
 export const DEMO_COMPANY = {
   name: "Промышленная группа",
   location: "Москва и область",
@@ -20,29 +14,6 @@ export const DEMO_COMPANY = {
   whyNow: "Четыре связанных изменения за семь дней указывают на расширение функции, а не на единичную замену сотрудника.",
   score: 87,
 } as const;
-
-export const DEMO_TIMELINE = [
-  {
-    date: "28 июля",
-    title: "Открыты четыре инженерные вакансии",
-    source: "карьерная страница",
-  },
-  {
-    date: "1 августа",
-    title: "Появилась позиция руководителя направления",
-    source: "публичная вакансия",
-  },
-  {
-    date: "4 августа",
-    title: "Набор расширен на Московскую область",
-    source: "карьерная страница",
-  },
-  {
-    date: "Сегодня",
-    title: "Три роли обновлены повторно",
-    source: "изменение публикаций",
-  },
-] as const;
 
 export const DEMO_EVIDENCE = [
   {
@@ -66,12 +37,3 @@ export const DEMO_EVIDENCE = [
     fact: "Роли и география совпадают с профилем инженерного рекрутингового агентства.",
   },
 ] as const;
-
-export const DEMO_CONTACT_PATHS = [
-  "Корпоративная форма",
-  "Карьерная страница",
-  "Общий HR-канал",
-] as const;
-
-export const DEMO_OUTREACH_COPY =
-  "Заметили, что вы одновременно расширяете несколько инженерных направлений и открыли роль руководителя функции. Мы специализируемся на таких командах и можем подключиться к точечному поиску по наиболее сложным позициям.";

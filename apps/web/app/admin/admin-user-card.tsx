@@ -1,23 +1,11 @@
-"use client";
-
-import { useActionState } from "react";
-import {
-  adminActivatePilot,
-  adminPausePilot,
-  adminPauseProfile,
-  adminResumeProfile,
-  adminClearTelegram,
-} from "./admin-actions";
+import Link from "next/link";
 
 /**
- * One user row in the admin Users card, WITH functional write-actions.
+ * One user row in the admin Users list.
  *
- * Each action is a small form bound to its server action via useActionState, so
- * the operator can act on a user without leaving the panel. The actions live
- * behind the operator-session gate (re-checked server-side in admin-actions).
- *
- * The row degrades gracefully: a user with no profile shows only the pilot
- * actions; a user with no Telegram shows no "отвязать Telegram" button.
+ * Mutations deliberately live on the workspace-aware User Control Center.
+ * A user can belong to several workspaces, so acting from this actor-level
+ * summary would make the mutation target ambiguous.
  */
 
 export interface AdminUserCardData {
@@ -32,83 +20,20 @@ export interface AdminUserCardData {
     specialization: string | null;
     telegramChatId: string | null;
   } | null;
-  pilot: { status: string; endsAt: string | null } | null;
+  access:
+    | {
+        status: "active";
+        source: string;
+        plan: string;
+        expiresAt: string | null;
+        activeSources: string[];
+      }
+    | { status: "inactive" };
   hasPaidOrder: boolean;
   paidOrderCount: number;
 }
 
-function ActionButton({
-  formAction,
-  pending,
-  label,
-  tone,
-}: {
-  formAction: (payload: FormData) => void;
-  pending: boolean;
-  label: string;
-  tone: "primary" | "danger" | "neutral";
-}) {
-  const bg =
-    tone === "primary" ? "#1d4ed8" : tone === "danger" ? "#b42318" : "#475569";
-  return (
-    <button
-      type="submit"
-      disabled={pending}
-      style={{
-        background: bg,
-        color: "#fff",
-        padding: "6px 12px",
-        borderRadius: "8px",
-        fontWeight: 600,
-        fontSize: "0.76rem",
-        border: "none",
-        cursor: pending ? "wait" : "pointer",
-        opacity: pending ? 0.7 : 1,
-        whiteSpace: "nowrap",
-      }}
-    >
-      {pending ? "…" : label}
-    </button>
-  );
-}
-
-/** A single action form with its own useActionState + inline result message. */
-function UserActionForm({
-  userId,
-  action,
-  label,
-  tone,
-}: {
-  userId: string;
-  action: (prev: { ok: boolean; message: string }, formData: FormData) => Promise<{ ok: boolean; message: string }>;
-  label: string;
-  tone: "primary" | "danger" | "neutral";
-}) {
-  const [state, formAction, pending] = useActionState(action, { ok: false, message: "" });
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "2px", alignItems: "stretch" }}>
-      <form action={formAction}>
-        <input type="hidden" name="userId" value={userId} />
-        <ActionButton formAction={formAction} pending={pending} label={label} tone={tone} />
-      </form>
-      {state.message ? (
-        <span
-          style={{
-            fontSize: "0.7rem",
-            color: state.ok ? "#065f46" : "#b42318",
-            maxWidth: "180px",
-            lineHeight: 1.2,
-          }}
-        >
-          {state.message}
-        </span>
-      ) : null}
-    </div>
-  );
-}
-
 export default function AdminUserCard({ user }: { user: AdminUserCardData }) {
-  const pilotActive = user.pilot?.status === "active";
   const profileActive = user.profile?.isActive ?? false;
   const hasTelegram = Boolean(user.profile?.telegramChatId);
 
@@ -146,11 +71,11 @@ export default function AdminUserCard({ user }: { user: AdminUserCardData }) {
               : "Telegram не подключён"}
           </span>
           <span>
-            Пилот:{" "}
-            {user.pilot
-              ? `${user.pilot.status}${
-                  user.pilot.endsAt
-                    ? ` до ${new Date(user.pilot.endsAt).toLocaleDateString("ru-RU")}`
+            Доступ:{" "}
+            {user.access.status === "active"
+              ? `${user.access.source} · ${user.access.plan}${
+                  user.access.expiresAt
+                    ? ` до ${new Date(user.access.expiresAt).toLocaleDateString("ru-RU")}`
                     : ""
                 }`
               : "нет"}
@@ -160,25 +85,9 @@ export default function AdminUserCard({ user }: { user: AdminUserCardData }) {
           </span>
         </div>
         <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "8px" }}>
-          <UserActionForm
-            userId={user.id}
-            action={adminActivatePilot}
-            label={pilotActive ? "Продлить пилот" : "Активировать пилот"}
-            tone="primary"
-          />
-          {pilotActive ? (
-            <UserActionForm userId={user.id} action={adminPausePilot} label="Остановить пилот" tone="danger" />
-          ) : null}
-          {user.profile ? (
-            profileActive ? (
-              <UserActionForm userId={user.id} action={adminPauseProfile} label="Приостановить профиль" tone="neutral" />
-            ) : (
-              <UserActionForm userId={user.id} action={adminResumeProfile} label="Включить профиль" tone="primary" />
-            )
-          ) : null}
-          {hasTelegram ? (
-            <UserActionForm userId={user.id} action={adminClearTelegram} label="Отвязать Telegram" tone="danger" />
-          ) : null}
+          <Link href={`/admin/users/${user.id}`} style={{ padding: "6px 12px", borderRadius: "8px", fontWeight: 600, fontSize: "0.76rem", border: "1px solid #cbd5e1", color: "#334155", textDecoration: "none" }}>
+            Открыть User Control Center
+          </Link>
         </div>
       </div>
       <div
@@ -193,7 +102,9 @@ export default function AdminUserCard({ user }: { user: AdminUserCardData }) {
         {user.hasPaidOrder ? (
           <span style={tagStyle("#047857", "#d1fae5")}>оплачен</span>
         ) : null}
-        {pilotActive ? <span style={tagStyle("#1d4ed8", "#dbeafe")}>пилот</span> : null}
+        {user.access.status === "active" ? (
+          <span style={tagStyle("#1d4ed8", "#dbeafe")}>доступ: {user.access.source}</span>
+        ) : null}
         {profileActive && hasTelegram ? (
           <span style={tagStyle("#7c3aed", "#ede9fe")}>доставка</span>
         ) : null}

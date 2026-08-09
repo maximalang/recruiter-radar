@@ -22,8 +22,10 @@ describe("SettingsOverview", () => {
     expect(screen.getAllByText("86% готово")).toHaveLength(2);
     expect(screen.getByText("Каждый день, 09:00")).toBeInTheDocument();
     expect(screen.getByText("Telegram не подключён")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Изменить профиль/ })).toHaveAttribute("href", "/profile#agency");
-    expect(screen.getByRole("link", { name: /Настроить каналы/ })).toHaveAttribute("href", "/profile#delivery");
+    expect(screen.getByRole("link", { name: /Изменить профиль/ })).toHaveAttribute("href", "/settings/radar#agency");
+    expect(screen.getByRole("link", { name: /Настроить каналы/ })).toHaveAttribute("href", "/settings/delivery");
+    expect(screen.getByRole("link", { name: /^Доступ и оплата/ })).toHaveAttribute("href", "/settings/access");
+    expect(screen.getByRole("link", { name: /^Аккаунт/ })).toHaveAttribute("href", "/settings/account");
     expect(screen.getByRole("link", { name: /^Безопасность/ })).toHaveAttribute(
       "href",
       "/settings/security",

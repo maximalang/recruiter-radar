@@ -1,11 +1,8 @@
 import Link from "next/link";
 
 import { LANDING_ANALYTICS_CONTEXT, LANDING_ANALYTICS_EVENT } from "../../lib/landing-analytics-contract";
-import { ArrowGlyph, SignalGlyph } from "./brand-glyphs";
+import { ArrowGlyph } from "./brand-glyphs";
 import sceneStyles from "./detection-scene.module.css";
-import HeroInstrument from "./hero-instrument";
-import { DEMO_COMPANY } from "./landing-copy";
-import styles from "./landing.module.css";
 
 export default function DetectionScene({
   previewHref,
@@ -17,10 +14,10 @@ export default function DetectionScene({
   return (
     <section
       id="scene-detection"
-      className={`${styles.scene} ${sceneStyles.section}`}
+      className={sceneStyles.section}
       aria-labelledby="detection-title"
       data-header-tone="dark"
-      data-hero-layout="balanced-grid"
+      data-hero-layout="ambient-radar"
     >
       <div className={sceneStyles.mobileSignal} data-mobile-hero-signal="true" aria-hidden="true">
         <span className={sceneStyles.mobileRing} />
@@ -28,30 +25,12 @@ export default function DetectionScene({
         <span className={sceneStyles.mobileConstellation}><i /><i /><i /><i /><i /></span>
       </div>
 
-      <div className={sceneStyles.fieldFigure} data-hero-visual>
-        <HeroInstrument
-          companyName={DEMO_COMPANY.name}
-          signalLabel={DEMO_COMPANY.signal}
-          score={DEMO_COMPANY.score}
-          confidence={DEMO_COMPANY.confidence}
-        />
-
-        <article className={sceneStyles.analysisFrame} aria-label={`Новый сигнал: ${DEMO_COMPANY.signal}`} data-hero-signal-card>
-          <div className={sceneStyles.lockMarker}><SignalGlyph size={54} /></div>
-          <div className={sceneStyles.lockCopy}>
-            <span className={sceneStyles.signalStatus}><i aria-hidden="true" /> приоритет обновлён · {DEMO_COMPANY.freshness}</span>
-            <strong>{DEMO_COMPANY.name}</strong>
-            <p>{DEMO_COMPANY.change}</p>
-            <dl className={sceneStyles.lockMetrics}>
-              <div><dt>Свежесть</dt><dd>{DEMO_COMPANY.freshness}</dd></div>
-              <div><dt>Уверенность</dt><dd>{DEMO_COMPANY.confidence}</dd></div>
-            </dl>
-            <small><b>Почему сейчас:</b> {DEMO_COMPANY.whyNow}</small>
-          </div>
-          <Link href="#scene-timeline" className={sceneStyles.lockArrow} aria-label="Разобрать сигнал компании">
-            <ArrowGlyph className={styles.diagonalArrow} size={20} />
-          </Link>
-        </article>
+      <div className={sceneStyles.fieldFigure} data-hero-visual aria-hidden="true">
+        <span className={sceneStyles.ambientRing} />
+        <span className={sceneStyles.ambientRing} />
+        <span className={sceneStyles.ambientRing} />
+        <span className={sceneStyles.ambientAxis} />
+        <span className={sceneStyles.ambientNode} />
       </div>
 
       <div className={sceneStyles.kicker}>
@@ -75,17 +54,10 @@ export default function DetectionScene({
             data-analytics-event={LANDING_ANALYTICS_EVENT.previewStarted}
             data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroPrimary}
           >
-            Посмотреть пример радара <ArrowGlyph />
-          </a>
-          <a
-            href="#scene-timeline"
-            className={sceneStyles.textButton}
-            data-analytics-event={LANDING_ANALYTICS_EVENT.previewResultsClicked}
-            data-analytics-context={LANDING_ANALYTICS_CONTEXT.heroSecondary}
-          >
-            Как формируется приоритет <ArrowGlyph className={styles.downArrow} />
+            Посмотреть возможности <ArrowGlyph />
           </a>
         </div>
+        <Link href="/login?returnTo=%2Fdashboard" className={sceneStyles.loginLink}>Уже есть доступ? Войти</Link>
         <p className={sceneStyles.microcopy} data-hero-trust-line>
           {paymentConfigured
             ? "7 дней · разовая оплата · обращения компаниям отправляете только вы"

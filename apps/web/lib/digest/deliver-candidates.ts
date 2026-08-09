@@ -17,7 +17,7 @@ import {
   hasActiveNotificationEndpoint,
 } from '@/lib/notification-dispatch'
 import { tryRecordProductEvent } from '@/lib/telemetry'
-import { logError } from '@/lib/runtime'
+import { logError, logEvent, logWarn } from '@/lib/runtime'
 import { randomUUID } from 'node:crypto'
 
 const DELIVERY_STALE_SECONDS = 120
@@ -124,6 +124,11 @@ export async function deliverCandidatesForRun(runId: string): Promise<DeliverRun
     const claimToken = randomUUID()
     const idempotencyKey = `digest:${runId}:profile:${clientProfileId}:telegram-batch`
     const anchorCandidateId = row.anchor_candidate_id
+    logEvent('digest.delivery_attempted', {
+      runId,
+      clientProfileId,
+      candidateCount: row.candidate_count,
+    })
 
     const claim = await pool.query<{ id: number; status: string; ownsClaim: boolean }>(`
       INSERT INTO digest_delivery_attempts (
@@ -197,6 +202,10 @@ export async function deliverCandidatesForRun(runId: string): Promise<DeliverRun
         )
         if (telegramSkipped) counters.skipped += 1
         else counters.sent += 1
+        logEvent(telegramSkipped ? 'digest.telegram_skipped' : 'digest.telegram_sent', {
+          runId,
+          clientProfileId,
+        })
       } else {
         const error = telegramError ?? 'Telegram delivery failed.'
         await pool.query(
@@ -205,6 +214,7 @@ export async function deliverCandidatesForRun(runId: string): Promise<DeliverRun
         )
         counters.failed += 1
         counters.failures.push({ digestCandidateId: 0, error: `${clientProfileId}: ${error}` })
+        logWarn('digest.telegram_failed', { runId, clientProfileId, reasonCode: 'send_failed' })
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Delivery exception.'
@@ -214,6 +224,7 @@ export async function deliverCandidatesForRun(runId: string): Promise<DeliverRun
       )
       counters.failed += 1
       counters.failures.push({ digestCandidateId: 0, error: `${clientProfileId}: ${message}` })
+      logError('digest.telegram_failed', error, { runId, clientProfileId })
     }
 
     try {

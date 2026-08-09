@@ -57,9 +57,7 @@
   pointer-events: none;
 }
 
-.visualSystem :global(#scene-timeline),
-.visualSystem :global(#scene-delivery),
-.visualSystem :global(#scene-outreach) {
+.visualSystem :global(#scene-delivery) {
   background: var(--paper);
 }
 
@@ -287,45 +285,6 @@
   text-transform: none;
 }
 
-/* Radar: slow field motion, no pulse rings and no decorative breathing. */
-.visualSystem :global([data-hero-instrument] [data-radar-rings] circle) {
-  stroke: rgba(191, 220, 145, .2);
-  stroke-width: .65;
-  stroke-dasharray: 1 14;
-}
-
-.visualSystem :global([data-hero-instrument] [data-signal-cluster]) {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: clusterDrift 15s cubic-bezier(.45, 0, .25, 1) infinite alternate;
-}
-
-.visualSystem :global([data-hero-instrument] [data-signal-cluster="secondary"]) {
-  animation-delay: -5.2s;
-  animation-duration: 19s;
-  opacity: .66;
-}
-
-.visualSystem :global([data-hero-instrument] [data-signal-speck]) {
-  animation: none;
-}
-
-.visualSystem :global([data-hero-instrument] [data-active-signal]) {
-  filter: none;
-}
-
-.visualSystem :global([data-hero-instrument] [data-active-signal] circle) {
-  fill: var(--signal-strong);
-}
-
-.visualSystem :global([data-hero-instrument] [data-active-signal] circle[data-tone="secondary"]) {
-  fill: var(--copper);
-}
-
-.visualSystem :global([data-hero-instrument] [data-signal-links]) {
-  opacity: .18;
-}
-
 /* Footer belongs to the same dark system and should read as a quiet terminal surface. */
 .visualSystem :global(footer) {
   border-top: 1px solid rgba(242, 241, 235, .1);
@@ -338,11 +297,6 @@
 
 .visualSystem :global(footer a:hover) {
   color: var(--signal-strong);
-}
-
-@keyframes clusterDrift {
-  0% { transform: translate3d(-1px, 1px, 0) rotate(-.28deg); }
-  100% { transform: translate3d(2px, -2px, 0) rotate(.36deg); }
 }
 
 @keyframes faqReveal {
@@ -358,19 +312,6 @@
 }
 
 @media (max-width: 820px) {
-  .visualSystem :global([data-hero-instrument] [data-signal-cluster="secondary"]) {
-    opacity: .42;
-  }
-
-  .visualSystem :global([data-hero-instrument] [data-signal-links]) {
-    display: none;
-  }
-
-  .visualSystem :global([data-hero-instrument] [data-radar-rings] circle) {
-    stroke-dasharray: 1 17;
-    opacity: .62;
-  }
-
   .visualSystem :global(#pricing),
   .visualSystem :global(#faq) {
     padding-block: 4.5rem;
@@ -422,10 +363,6 @@
   .visualSystem *::before,
   .visualSystem *::after {
     scroll-behavior: auto !important;
-  }
-
-  .visualSystem :global([data-hero-instrument] [data-signal-cluster]) {
-    animation: none;
   }
 
   .visualSystem :global(#faq details[open] p) {

@@ -6,6 +6,7 @@ import { getAccountById } from "@/lib/account-auth";
 import { getAuthorizedUserId } from "@/lib/auth-v2/authorization";
 import { buildLegalAcceptanceAudit } from "@/lib/legalDocuments";
 import { OPERATOR_REQUISITES } from "@/lib/operatorRequisites";
+import { buildPaymentReadinessReport } from "@/lib/payment-readiness";
 import { startCheckoutOrder } from "@/lib/payments";
 import {
   buildCheckoutHref,
@@ -23,15 +24,13 @@ import {
   internalPageClasses as ipStyles,
 } from "../ui/internal-page";
 import ppStyles from "../ui/page-primitives.module.css";
-import LandingCheckoutAnalytics from "../landing-checkout-analytics";
-import { LANDING_ANALYTICS_EVENT } from "../../lib/landing-analytics-contract";
 import s from "./checkout.module.css";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Оплата доступа — Recruiter Radar",
-  description: "Разовая безопасная оплата доступа к Recruiter Radar через Robokassa.",
+  description: "Разовая покупка доступа к Recruiter Radar без автопродления.",
   robots: { index: false, follow: false },
 };
 
@@ -47,11 +46,13 @@ export default async function CheckoutPage(props: {
   const loginHref = `/login?returnTo=${encodeURIComponent(checkoutHref)}`;
   const account = await getAccountById(await getAuthorizedUserId("billing:manage")).catch(() => null);
   const error = typeof searchParams.error === "string" ? searchParams.error : "";
+  const paymentReady = buildPaymentReadinessReport().selfServeCheckoutReady;
 
   async function startCheckoutAction(formData: FormData) {
     "use server";
     const currentAccount = await getAccountById(await getAuthorizedUserId("billing:manage"));
     if (!currentAccount) redirect(`/login?returnTo=${encodeURIComponent(checkoutHref)}`);
+    const providerCheckoutAllowed = buildPaymentReadinessReport().selfServeCheckoutReady;
 
     const separator = checkoutHref.includes("?") ? "&" : "?";
     const agencyName = readFormText(formData, "agencyName");
@@ -91,13 +92,13 @@ export default async function CheckoutPage(props: {
         },
       }),
       siteUrl: process.env.PAYMENTS_SITE_URL ?? "http://localhost:3000",
+      providerCheckoutAllowed,
     });
     redirect(result.redirectUrl);
   }
 
   return (
     <InternalPageFrame>
-      <LandingCheckoutAnalytics submitEvent={LANDING_ANALYTICS_EVENT.paymentStarted} />
       <InternalPageHeader
         title="Оплата доступа"
         subtitle="Проверьте заказ и оплатите выбранный период один раз. Автопродления и скрытых списаний нет."
@@ -121,9 +122,18 @@ export default async function CheckoutPage(props: {
             </div>
 
             <div className={s.trustGrid}>
-              <TrustItem title="Robokassa" text="Карта и CVC вводятся только на защищённой платёжной странице" />
-              <TrustItem title="Разовая оплата" text="Карта не сохраняется, автоматических списаний нет" />
-              <TrustItem title="Чек НПД" text="Электронный чек будет направлен на e-mail аккаунта" />
+              {paymentReady ? (
+                <>
+                  <TrustItem title="Robokassa" text="Карта и CVC вводятся только на защищённой платёжной странице" />
+                  <TrustItem title="Разовая оплата" text="Карта не сохраняется, автоматических списаний нет" />
+                  <TrustItem title="Чек НПД" text="Электронный чек будет направлен на e-mail аккаунта" />
+                </>
+              ) : (
+                <TrustItem
+                  title="Заявка на доступ"
+                  text="Онлайн-оплата пока недоступна. Мы сохраним запрос без списания и свяжемся для подключения."
+                />
+              )}
             </div>
 
             {account ? (
@@ -196,10 +206,12 @@ export default async function CheckoutPage(props: {
                 {error === "legal" ? <p role="alert" className={s.error}>Для оплаты отдельно подтвердите оферту и согласие на обработку данных.</p> : null}
 
                 <button type="submit" className={ppStyles.primaryAction}>
-                  Перейти к оплате {plan.price}
+                  {paymentReady ? `Перейти к оплате ${plan.price}` : "Отправить заявку"}
                 </button>
                 <p className={s.actionHint}>
-                  Откроется платёжная страница Robokassa. Доступ включится только после серверного подтверждения успешной операции.
+                  {paymentReady
+                    ? "Откроется платёжная страница Robokassa. Доступ включится только после серверного подтверждения успешной операции."
+                    : "Списания не будет. Статус заявки сохранится в аккаунте."}
                 </p>
               </form>
             ) : (

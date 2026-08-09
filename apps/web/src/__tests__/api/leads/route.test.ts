@@ -9,6 +9,7 @@ import { GET } from '@/app/api/leads/route';
 import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization';
 import { getLeadsForAllProfiles, type LeadItem } from '@/lib/leads-data';
 import { listClientProfiles } from '@/lib/clientProfiles';
+import { hasFeatureAccess } from '@/lib/entitlements';
 
 jest.mock('@/lib/auth-v2/authorization', () => ({
   getAuthorizedOwnerId: jest.fn(),
@@ -26,10 +27,12 @@ jest.mock('@/lib/leads-data', () => ({
   getLeadsForAllProfiles: jest.fn(),
   VALID_FEEDBACK_STATUSES: new Set(['none', 'contacted', 'replied', 'won', 'badfit', 'snooze', 'dismissed']),
 }));
+jest.mock('@/lib/entitlements', () => ({ hasFeatureAccess: jest.fn() }));
 
 const mockOwner = getAuthorizedOwnerId as jest.MockedFunction<typeof getAuthorizedOwnerId>;
 const mockList = listClientProfiles as jest.MockedFunction<typeof listClientProfiles>;
 const mockLeads = getLeadsForAllProfiles as jest.MockedFunction<typeof getLeadsForAllProfiles>;
+const mockFeatureAccess = hasFeatureAccess as jest.MockedFunction<typeof hasFeatureAccess>;
 
 function makeProfile(id: string) {
   return {
@@ -96,7 +99,10 @@ function req(qs = '') {
 }
 
 describe('GET /api/leads', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockFeatureAccess.mockResolvedValue(true);
+  });
 
   it('returns an empty list without a session (no leak, no 401)', async () => {
     mockOwner.mockResolvedValue(null);
@@ -105,6 +111,23 @@ describe('GET /api/leads', () => {
     const body = await res.json();
     expect(body.leads).toEqual([]);
     expect(body.total).toBe(0);
+    expect(mockList).not.toHaveBeenCalled();
+  });
+
+  it('denies a signed-in workspace without API entitlement before reading profiles', async () => {
+    mockOwner.mockResolvedValue('owner-42');
+    mockFeatureAccess.mockResolvedValue(false);
+    const res = await req();
+    expect(res.status).toBe(403);
+    expect(mockFeatureAccess).toHaveBeenCalledWith('owner-42', 'api');
+    expect(mockList).not.toHaveBeenCalled();
+  });
+
+  it('reports an unavailable entitlement check without returning a false empty list', async () => {
+    mockOwner.mockResolvedValue('owner-42');
+    mockFeatureAccess.mockRejectedValue(new Error('database unavailable'));
+    const res = await req();
+    expect(res.status).toBe(503);
     expect(mockList).not.toHaveBeenCalled();
   });
 

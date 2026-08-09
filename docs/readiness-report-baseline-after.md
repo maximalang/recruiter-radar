@@ -62,7 +62,7 @@ DB-derived inputs, upstream of scoring, with operator override always winning).
 Genuinely operator-credentials-only sources (superjob, linkedin-company-pages,
 industry-media, fedresurs, transparent-business-fns, regional-job-boards,
 tech-job-boards) plus `hh` USER_AGENT and payment-live remain external blockers —
-reported honestly, not stubbed. See `docs/current-state.md` for the live
+reported honestly, not stubbed. See `docs/CURRENT_STATE.md` for the live
 post-automatism registry table.
 
 ## Final verification results (after)
@@ -102,7 +102,7 @@ post-automatism registry table.
 
 | Phase | Status |
 | --- | --- |
-| 0 — Baseline + current-state map | ✅ `docs/current-state.md`, drift contract test, before/after readiness reports. |
+| 0 — Baseline + current-state map | ✅ `docs/CURRENT_STATE.md`, drift contract test, before/after readiness reports. |
 | 1 — P0 deploy safety | ✅ Tests-gated, verified-SHA, rollback, Docker-in-CI, dep audit 0, brand-gate anchored on hero copy + single footer mark. |
 | 2 — End-to-end daily delivery | ✅ Daily radar delivers across enabled channels (Telegram legacy + BYOB, VK, email, web push, signed webhook); channel contract test locks it; email/push delivery outcomes recorded. |
 | 3 — UX hardening 7–8 | ✅ Responsive Playwright audit + phase-7 glyph/loading-state tests; audit execution deferred to CI. |

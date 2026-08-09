@@ -13,6 +13,10 @@ jest.mock("@/lib/payments", () => ({
   startCheckoutOrder: jest.fn(),
 }));
 
+jest.mock("@/lib/payment-readiness", () => ({
+  buildPaymentReadinessReport: jest.fn(() => ({ selfServeCheckoutReady: false })),
+}));
+
 jest.mock("@/lib/auth-v2/authorization", () => ({
   getAuthorizedUserId: jest.fn().mockResolvedValue(null),
 }));
@@ -27,6 +31,14 @@ function collectElements(node: ReactNode, type: unknown): ReactElement<Record<st
   });
 
   return matches;
+}
+
+function collectText(node: ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (!isValidElement<Record<string, any>>(node)) return "";
+  return [node.props.title, node.props.text, ...Children.toArray(node.props.children)]
+    .map(collectText)
+    .join(" ");
 }
 
 describe("checkout navigation", () => {
@@ -48,6 +60,16 @@ describe("checkout navigation", () => {
 
     expect(page.type).toBe(InternalPageFrame);
     expect(page.props.navItems).toBeUndefined();
+  });
+
+  it("does not promise a working payment provider when checkout is not ready", async () => {
+    const page = await CheckoutPage({
+      searchParams: Promise.resolve({ plan: "weekly" }),
+    });
+
+    const text = collectText(page);
+    expect(text).toContain("Онлайн-оплата пока недоступна");
+    expect(text).not.toContain("Карта и CVC вводятся");
   });
 
   it("returns to the landing preview when the user edits radar parameters", async () => {

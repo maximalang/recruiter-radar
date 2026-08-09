@@ -104,6 +104,39 @@ export async function getCheckoutOrderByIdForOwner(
   return result.rowCount === 1 ? mapCheckoutOrderRow(result.rows[0]) : null;
 }
 
+export async function listCheckoutOrdersForOwner(
+  ownerId: string | number,
+  limit = 20,
+): Promise<CheckoutOrder[]> {
+  const normalizedOwnerId = normalizeCheckoutOrderUserId(ownerId);
+  const normalizedLimit = Number.isInteger(limit) && limit > 0 && limit <= 100 ? limit : 20;
+  const pool = getPool();
+  if (!pool) throw new Error("DATABASE_URL is not set.");
+
+  const result = await pool.query<CheckoutOrderRow>(`
+    SELECT
+      id::TEXT AS id,
+      plan_code AS "productCode",
+      (amount_rub * 100) AS "amountMinor",
+      currency,
+      status,
+      customer_name AS "customerName",
+      customer_contact AS "customerContact",
+      payload,
+      provider,
+      provider_payment_id AS "providerPaymentId",
+      created_at::TEXT AS "createdAt",
+      updated_at::TEXT AS "updatedAt",
+      paid_at::TEXT AS "paidAt"
+    FROM checkout_orders
+    WHERE user_id = $1
+    ORDER BY created_at DESC, id DESC
+    LIMIT $2
+  `, [normalizedOwnerId, normalizedLimit]);
+
+  return result.rows.map(mapCheckoutOrderRow);
+}
+
 export async function createCheckoutOrder(input: {
   userId: string | number;
   productCode: PublicPlan["code"];

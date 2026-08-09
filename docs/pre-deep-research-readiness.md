@@ -14,7 +14,7 @@
 | Production dependencies | Crawlee fingerprint dependency chain produced high production advisories | Vulnerable chain removed; direct Playwright path retained | dependency contract + npm audit |
 | Daily delivery eligibility | Cron selection had Telegram-only assumptions | Email, push, BYOB Telegram, VK and webhook profiles are eligible | channel contract + delivery tests |
 | Source readiness | Active/runnable could be reported as launch-ready despite blockers | Live readiness requires HH + career-pages and reports blocker state | verifier + current-state contract |
-| Runtime documentation | n8n/source-count/payment claims conflicted across documents | `docs/current-state.md` defines runtime snapshot; historical notes are marked; drift test added | current-state contract |
+| Runtime documentation | n8n/source-count/payment claims conflicted across documents | `docs/CURRENT_STATE.md` defines runtime snapshot; historical notes are marked; drift test added | current-state contract |
 | UX verification | Phase 7 implementation existed, but task status and final browser evidence were incomplete | Shared state contracts documented; PR CI runs 375/1280 browser audit and uploads screenshots | Jest contracts + Playwright artifact |
 | Product telemetry | Runtime logs and provider ledgers existed without one typed activation/reliability vocabulary | Privacy-safe append-only event ledger, authoritative DB transitions and source action events | migration + telemetry tests |
 | Missed-delivery diagnosis | No single answer to “who did not get the radar and why?” | Protected readiness endpoint reports eligible/delivered/missed and reason categories | handler + readiness tests |

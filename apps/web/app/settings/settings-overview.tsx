@@ -36,7 +36,7 @@ export default function SettingsOverview(props: {
           <div className={styles.cardMeta}>
             <span>Роли, отрасли, география, размер компаний и порог сигнала.</span>
           </div>
-          <Link href="/profile#agency">Изменить профиль</Link>
+          <Link href="/settings/radar#agency">Изменить профиль</Link>
         </article>
 
         <article className={styles.card}>
@@ -52,7 +52,7 @@ export default function SettingsOverview(props: {
           <div className={styles.cardMeta}>
             <span>{deliveryReady ? props.deliverySchedule : "Подключите хотя бы один канал доставки."}</span>
           </div>
-          <Link href="/profile#delivery">Настроить расписание</Link>
+          <Link href="/settings/delivery">Настроить расписание</Link>
         </article>
 
         <article className={styles.card}>
@@ -63,11 +63,19 @@ export default function SettingsOverview(props: {
             <span>Email: {props.emailEnabled ? "включён" : "выключен"}</span>
             <span>Web push: {props.webPushEnabled ? "включён" : "выключен"}</span>
           </div>
-          <Link href="/profile#delivery">Настроить каналы</Link>
+          <Link href="/settings/delivery">Настроить каналы</Link>
         </article>
       </div>
       {props.authSecurityEnabled ? (
         <nav className={styles.accountLinks} aria-label="Доступ к аккаунту">
+          <Link href="/settings/access">
+            <strong>Доступ и оплата</strong>
+            <span>Текущий тариф, срок доступа и история разовых заказов</span>
+          </Link>
+          <Link href="/settings/account">
+            <strong>Аккаунт</strong>
+            <span>Email, профиль аккаунта и управление входом</span>
+          </Link>
           <Link href="/settings/security">
             <strong>Безопасность</strong>
             <span>Профиль, email, активные сессии и удаление аккаунта</span>

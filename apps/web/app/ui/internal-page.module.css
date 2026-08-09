@@ -1014,6 +1014,9 @@
   font-size: 0.85rem;
   font-weight: 600;
   text-decoration: none;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
   transition: opacity 0.15s ease;
 }
 
@@ -1021,7 +1024,8 @@
   opacity: 0.9;
 }
 
-.emptyStateAction:focus-visible {
+.emptyStateAction:focus-visible,
+.errorStateAction:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }

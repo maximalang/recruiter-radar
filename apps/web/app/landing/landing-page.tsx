@@ -9,8 +9,6 @@ import LandingHashNavigation from "./landing-hash-navigation";
 import LandingHeader from "./landing-header";
 import styles from "./landing.module.css";
 import visualStyles from "./landing-visual-system.module.css";
-import OutreachScene from "./outreach-scene";
-import SignalTimelineScene from "./signal-timeline-scene";
 import WorkspaceScene from "./workspace-scene";
 
 export function LandingSkipLink() {
@@ -33,7 +31,6 @@ export default function LandingPage(props: {
       <LandingHeader previewHref="#preview-configurator" />
       <main id="main-content">
         <DetectionScene previewHref="#preview-configurator" paymentConfigured={props.paymentConfigured} />
-        <SignalTimelineScene />
         <WorkspaceScene
           previewInput={props.previewInput}
           hasPreview={props.hasPreview}
@@ -41,14 +38,13 @@ export default function LandingPage(props: {
         />
         <EvidenceScene />
         <DeliveryScene />
-        <OutreachScene />
         <ConversionPanel
           previewInput={props.previewInput}
           paymentConfigured={props.paymentConfigured}
           faqItems={props.faqItems}
         />
       </main>
-      <SiteFooter tone="dark" />
+      <SiteFooter tone="dark" showCookieSettings />
     </div>
   );
 }

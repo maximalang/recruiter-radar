@@ -1,4 +1,4 @@
-import { DEMO_COMPANY, DEMO_EVIDENCE } from "./landing-copy";
+import { DEMO_COMPANY } from "./landing-copy";
 import { ArrowGlyph, DocumentGlyph, EvidenceGlyph } from "./brand-glyphs";
 import sceneStyles from "./evidence-scene.module.css";
 import styles from "./landing.module.css";
@@ -27,39 +27,10 @@ const SOURCE_ROWS = [
   },
 ] as const;
 
-const SOURCE_ROLES = [
-  {
-    title: "Основные сигналы",
-    summary: "Дают основной сигнал найма.",
-    detail: "hh.ru, Работа России и прямые карьерные страницы показывают свежий найм. Перед попаданием компании в выдачу Radar проверяет свежесть сигнала и его связь с организацией.",
-    state: "live",
-    stateText: "Влияет на основную выдачу",
-    sources: ["hh.ru", "Работа России", "Карьерные страницы"],
-  },
-  {
-    title: "Подтверждение",
-    summary: "Подтверждают компанию и официальный канал связи.",
-    detail: "Сайт компании и реестры ФНС помогают связать сигнал с правильной организацией и найти официальный корпоративный канал. Они подтверждают возможность, но не заменяют сам сигнал найма.",
-    state: "support",
-    stateText: "подтверждает организацию",
-    sources: ["Сайт компании", "ЕГРЮЛ", "ФНС"],
-  },
-  {
-    title: "Дополнительные источники",
-    summary: "Расширяют покрытие после проверки.",
-    detail: "Дополнительные площадки начинают влиять на клиентскую выдачу только после проверок качества, правовой доступности и стабильности данных.",
-    state: "gated",
-    stateText: "Подключено, проходит проверки",
-    sources: ["Хабр Карьера", "SuperJob", "ATS", "Профильные площадки"],
-  },
-  {
-    title: "Контекст компании",
-    summary: "Добавляют бизнес-контекст.",
-    detail: "Корпоративные новости, реестровые события и отраслевые публикации помогают понять расширение, инвестиции или изменения бизнеса. Такой контекст дополняет, но не заменяет подтверждённый найм.",
-    state: "context",
-    stateText: "добавляет контекст",
-    sources: ["Новости компании", "Федресурс", "GDELT", "Отраслевые медиа"],
-  },
+const WORKFLOW_STEPS = [
+  { title: "Настройте профиль", text: "Укажите специализацию, географию и исключения агентства." },
+  { title: "Радар работает ежедневно", text: "Собирает сигналы найма, связывает их с компанией и проверяет источники." },
+  { title: "Получайте возможности", text: "Короткая выдача объясняет, кому стоит написать сейчас и почему." },
 ] as const;
 
 export default function EvidenceScene() {
@@ -73,12 +44,12 @@ export default function EvidenceScene() {
       <div className={sceneStyles.layout}>
         <div className={sceneStyles.top}>
           <div className={sceneStyles.intro}>
-            <p className={styles.sceneLabel}>04 — На чём основан вывод</p>
+            <p className={styles.sceneLabel}>03 — От сигнала к возможности</p>
             <h2 id="evidence-title" className={styles.sceneHeading}>
-              Почему этому приоритету <em>можно доверять.</em>
+              Сигнал найма → доказательство → <em>коммерческая возможность.</em>
             </h2>
             <p className={styles.sceneLead}>
-              Как выглядит основание приоритета: сначала причина для контакта, затем подтверждающие сигналы, даты, источники и уровень уверенности.
+              Радар не выдаёт список вакансий. Он показывает компании, которым стоит написать сейчас, и факты, на которые можно опереться.
             </p>
           </div>
 
@@ -98,13 +69,13 @@ export default function EvidenceScene() {
             </div>
           </div>
 
-          <ol className={sceneStyles.factors} aria-label="Из чего сложился демонстрационный приоритет">
-            {DEMO_EVIDENCE.map((item) => (
-              <li key={item.label} className={sceneStyles.factor}>
+          <ol className={sceneStyles.factors} aria-label="Как работает Recruiter Radar">
+            {WORKFLOW_STEPS.map((item, index) => (
+              <li key={item.title} className={sceneStyles.factor}>
                 <EvidenceGlyph size={18} />
-                <span>{item.label}</span>
-                <strong>{item.points}</strong>
-                <p>{item.fact}</p>
+                <span>{String(index + 1).padStart(2, "0")}</span>
+                <strong>{item.title}</strong>
+                <p>{item.text}</p>
               </li>
             ))}
           </ol>
@@ -141,34 +112,6 @@ export default function EvidenceScene() {
           </ul>
         </div>
 
-        <div className={sceneStyles.registry}>
-          <div className={sceneStyles.registryIntro}>
-            <span>Роль источников</span>
-            <strong>Как источники участвуют в выдаче.</strong>
-            <p>Основные сигналы показывают найм. Подтверждение связывает событие с компанией. Дополнительные источники и бизнес-контекст расширяют картину только после своей проверки.</p>
-          </div>
-          <div className={sceneStyles.roleList}>
-            {SOURCE_ROLES.map((role, index) => (
-              <details key={role.title} open={index === 0} data-source-role={role.state}>
-                <summary>
-                  <span className={sceneStyles.roleIndex}>{String(index + 1).padStart(2, "0")}</span>
-                  <strong>{role.title}</strong>
-                  <small>{role.summary}</small>
-                  <ArrowGlyph className={sceneStyles.registryArrow} size={15} />
-                </summary>
-                <div className={sceneStyles.roleBody}>
-                  <p>{role.detail}</p>
-                  <div className={sceneStyles.roleMeta}>
-                    <span className={sceneStyles.roleStatus} data-state={role.state}>{role.stateText}</span>
-                  </div>
-                  <ul className={sceneStyles.sourceTags} aria-label={`Источники: ${role.title}`}>
-                    {role.sources.map((source) => <li key={source}>{source}</li>)}
-                  </ul>
-                </div>
-              </details>
-            ))}
-          </div>
-        </div>
       </div>
     </section>
   );

@@ -213,6 +213,8 @@ export type StartCheckoutOrderInput = {
   dailyDigestLimit?: number | null;
   comment?: string | null;
   siteUrl: string;
+  /** Server-authoritative readiness gate; false records a request without charging. */
+  providerCheckoutAllowed?: boolean;
 };
 
 export type UpdateCheckoutOrderInput = {

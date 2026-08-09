@@ -3,10 +3,12 @@
 import { Children, isValidElement, type ComponentProps, type ReactNode } from "react";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import RootLayout from "@/app/layout";
 import YandexMetrika from "@/app/yandex-metrika";
+import { sendLandingEvent } from "@/app/landing-analytics";
+import { ANALYTICS_SETTINGS_OPEN_EVENT } from "@/lib/analytics-consent";
 
 jest.mock("next/script", () => {
   const React = jest.requireActual<typeof import("react")>("react");
@@ -39,6 +41,7 @@ describe("YandexMetrika", () => {
 
   beforeEach(() => {
     window.localStorage.clear();
+    global.fetch = jest.fn().mockResolvedValue({ status: 204 }) as typeof fetch;
   });
 
   afterEach(() => {
@@ -48,11 +51,11 @@ describe("YandexMetrika", () => {
     else process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID = originalId;
   });
 
-  it("renders nothing when the public counter id is missing or invalid", async () => {
+  it("keeps first-party consent available without mounting an invalid counter", async () => {
     delete process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID;
     const { container, rerender } = render(<YandexMetrika />);
     expect(container.querySelector("#yandex-metrika-loader")).toBeNull();
-    expect(container.querySelector("[data-analytics-consent]")).toBeNull();
+    await screen.findByRole("dialog", { name: "Необязательная аналитика" });
 
     process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID = "not-a-counter";
     rerender(<YandexMetrika />);
@@ -66,12 +69,22 @@ describe("YandexMetrika", () => {
     await screen.findByRole("dialog", { name: "Необязательная аналитика" });
     expect(container.querySelector("#yandex-metrika-loader")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Только необходимые" }));
+    fireEvent.click(screen.getByRole("button", { name: "Отклонить" }));
     expect(container.querySelector("#yandex-metrika-loader")).toBeNull();
-    const settingsButton = screen.getByRole("button", { name: "Изменить настройки cookies" });
-    expect(settingsButton).toHaveAttribute("title", "Cookies");
-    expect(settingsButton).not.toHaveAttribute("style");
-    expect(window.localStorage.getItem("rr_analytics_consent_v1")).toContain('"value":"denied"');
+    expect(screen.queryByRole("button", { name: "Изменить настройки cookies" })).toBeNull();
+    expect(window.localStorage.getItem("rr_analytics_consent")).toContain('"analytics":false');
+    expect(window.localStorage.getItem("rr_analytics_consent")).toContain('"policyVersion":2');
+  });
+
+  it("reopens settings from the footer event without a floating control", async () => {
+    process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID = "12345678";
+    render(<YandexMetrika />);
+    await screen.findByRole("dialog", { name: "Необязательная аналитика" });
+    fireEvent.click(screen.getByRole("button", { name: "Отклонить" }));
+    expect(screen.queryByRole("dialog", { name: "Необязательная аналитика" })).toBeNull();
+
+    act(() => window.dispatchEvent(new Event(ANALYTICS_SETTINGS_OPEN_EVENT)));
+    await screen.findByRole("dialog", { name: "Необязательная аналитика" });
   });
 
   it("loads the official tag and emits one query-free pageview after consent", async () => {
@@ -81,7 +94,7 @@ describe("YandexMetrika", () => {
     const { container } = render(<YandexMetrika />);
 
     await screen.findByRole("dialog", { name: "Необязательная аналитика" });
-    fireEvent.click(screen.getByRole("button", { name: "Разрешить аналитику" }));
+    fireEvent.click(screen.getByRole("button", { name: "Разрешить" }));
 
     const loader = await waitFor(() => {
       const node = container.querySelector("#yandex-metrika-loader");
@@ -106,20 +119,23 @@ describe("YandexMetrika", () => {
       expect.objectContaining({ title: expect.any(String) }),
     ));
     expect(ym.mock.calls.filter((call) => call[1] === "hit")).toHaveLength(1);
-    expect(window.localStorage.getItem("rr_analytics_consent_v1")).toContain('"value":"granted"');
+    expect(window.localStorage.getItem("rr_analytics_consent")).toContain('"analytics":true');
   });
 
   it("asks again when a stored choice is older than fourteen months", async () => {
     process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID = "12345678";
-    window.localStorage.setItem("rr_analytics_consent_v1", JSON.stringify({
-      value: "granted",
-      decidedAt: "2024-01-01T00:00:00.000Z",
+    window.localStorage.setItem("rr_analytics_consent", JSON.stringify({
+      analytics: true,
+      policyVersion: 2,
+      updatedAt: "2024-01-01T00:00:00.000Z",
     }));
 
     const { container } = render(<YandexMetrika />);
     await screen.findByRole("dialog", { name: "Необязательная аналитика" });
     expect(container.querySelector("#yandex-metrika-loader")).toBeNull();
-    expect(window.localStorage.getItem("rr_analytics_consent_v1")).toBeNull();
+    expect(window.localStorage.getItem("rr_analytics_consent")).toBeNull();
+    sendLandingEvent({ name: "landing_viewed" });
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 
   it("does not mount Metrika globally or on routes with customer data", () => {

@@ -24,7 +24,7 @@ import { getTelegramBotToken, sendTelegramTextMessage } from "./telegram";
 import { buildTelegramDigestFeedbackReplyMarkup } from "./telegramDigestFeedback";
 import { recordClientProfileDigestShownOutcomes } from "./clientProfileSignalOutcomes";
 import { isDigestEligibleGate } from "./scoring/gate-pipeline";
-import { logError } from "./runtime";
+import { logError, logEvent, logWarn } from "./runtime";
 import {
   type CheckoutOrder,
   type PaymentsDbClient,
@@ -118,6 +118,11 @@ export async function startCheckoutOrder(input: StartCheckoutOrderInput): Promis
       paymentProviderPayload: null
     }
   });
+  logEvent("payments.checkout_created", {
+    orderId: String(order.id),
+    productCode: order.productCode,
+    providerCheckoutAllowed: input.providerCheckoutAllowed !== false,
+  });
 
   const provider = getConfiguredPaymentProvider();
   const successUrl = `${normalizeSiteUrl(input.siteUrl)}/checkout/order/${order.id}/success`;
@@ -128,7 +133,16 @@ export async function startCheckoutOrder(input: StartCheckoutOrderInput): Promis
     ? "Заявка получена. Мы свяжемся, чтобы подключить тариф и согласовать оплату."
     : "Оплата пока недоступна. Заявка сохранена, и к ней можно вернуться позже.";
 
-  if (isRecurringPlan || !provider || !provider.isConfigured()) {
+  if (
+    isRecurringPlan
+    || input.providerCheckoutAllowed === false
+    || !provider
+    || !provider.isConfigured()
+  ) {
+    logWarn("payments.checkout_unavailable", {
+      orderId: String(order.id),
+      reasonCode: unavailableReason,
+    });
     order = await updateCheckoutOrder(order.id, {
       status: "unavailable",
       payloadPatch: {
@@ -155,6 +169,10 @@ export async function startCheckoutOrder(input: StartCheckoutOrderInput): Promis
     });
 
     if (checkoutSession.kind === "unavailable") {
+      logWarn("payments.checkout_unavailable", {
+        orderId: String(order.id),
+        reasonCode: "provider_unavailable",
+      });
       order = await updateCheckoutOrder(order.id, {
         status: "unavailable",
         payloadPatch: {
@@ -182,6 +200,10 @@ export async function startCheckoutOrder(input: StartCheckoutOrderInput): Promis
         paymentProviderPayload: checkoutSession.payload ?? null
       }
     });
+    logEvent("payments.checkout_redirect_created", {
+      orderId: String(order.id),
+      provider: checkoutSession.provider,
+    });
 
     return {
       kind: "redirect",
@@ -189,6 +211,10 @@ export async function startCheckoutOrder(input: StartCheckoutOrderInput): Promis
       redirectUrl: checkoutSession.redirectUrl
     };
   } catch (error) {
+    logError("payments.checkout_provider_failed", error, {
+      orderId: String(order.id),
+      productCode: order.productCode,
+    });
     order = await updateCheckoutOrder(order.id, {
       status: "failed",
       payloadPatch: {
@@ -656,6 +682,7 @@ export async function processPaymentWebhook(
   const parsedWebhook = await provider.parseWebhook(request);
 
   if (!parsedWebhook.ok) {
+    logWarn("payments.webhook_rejected", { provider: providerCode });
     return {
       status: parsedWebhook.responseStatus,
       body: parsedWebhook.responseBody
@@ -667,6 +694,7 @@ export async function processPaymentWebhook(
     : await getCheckoutOrderByProviderPaymentId(parsedWebhook.providerPaymentId ?? null);
 
   if (!order) {
+    logWarn("payments.webhook_order_not_found", { provider: providerCode });
     return {
       status: parsedWebhook.responseStatus,
       body: parsedWebhook.responseBody
@@ -676,6 +704,7 @@ export async function processPaymentWebhook(
   const pool = getPool();
 
   if (!pool) {
+    logWarn("payments.webhook_unavailable", { provider: providerCode, reasonCode: "database_not_configured" });
     return { status: 500, body: "DATABASE_URL is not set." };
   }
 
@@ -700,11 +729,19 @@ export async function processPaymentWebhook(
 
     if (order.status === "paid") {
       await ensurePaidPilotOrderReady(order, client);
+      logEvent("payments.paid_entitlement_reconciled", {
+        orderId: String(order.id),
+        provider: provider.code,
+      });
     }
 
     await client.query("COMMIT");
   } catch (err) {
     await client.query("ROLLBACK");
+    logError("payments.webhook_reconciliation_failed", err, {
+      orderId: String(order.id),
+      provider: provider.code,
+    });
     throw err;
   } finally {
     client.release();

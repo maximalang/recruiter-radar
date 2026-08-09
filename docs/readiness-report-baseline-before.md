@@ -28,7 +28,7 @@
 
 ## What PR #78 already delivered (already on the branch at baseline)
 
-- **Phase 0** — `docs/current-state.md` (runtime-grounded, 115 lines);
+- **Phase 0** — `docs/CURRENT_STATE.md` (runtime-grounded snapshot);
   `docs/architecture.md` and `docs/self-serve-mvp.md` realigned with runtime and
   marked historical where superseded; `current-state-contract.test.ts`,
   `source-live-readiness-contract.test.ts` (drift-prevention contract tests).
@@ -84,7 +84,7 @@
 
 | Phase | Status at baseline |
 | --- | --- |
-| 0 — Baseline + current-state map | **Done on branch** (current-state.md, drift contract tests). This session adds the before/after readiness report. |
+| 0 — Baseline + current-state map | **Done on branch** (`CURRENT_STATE.md`, drift contract tests). This session adds the before/after readiness report. |
 | 1 — P0 deploy safety | **Done on branch** (deploy-gate, rollback, Docker-in-CI, dep audit). Needs rebase to stay green against latest `main`. |
 | 2 — End-to-end daily delivery | **Partially done on branch** (multi-channel daily radar). Full per-channel success/retry/permanent-failure test matrix not yet confirmed. |
 | 3 — UX hardening 7–8 | **Not started** (landing polish already landed on `main` via PR #68; remaining surfaces not audited this session). |

@@ -3,6 +3,7 @@ import { getLeadsForAllProfiles, VALID_FEEDBACK_STATUSES, type LeadItem } from '
 import { listClientProfiles, type ClientProfile } from '@/lib/clientProfiles';
 import { leadsToCsv } from '@/lib/leads-csv';
 import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization';
+import { hasFeatureAccess } from '@/lib/entitlements';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,12 +50,19 @@ export async function GET(request: Request) {
       },
     });
   }
+  try {
+    if (!(await hasFeatureAccess(ownerId, 'api'))) {
+      return new NextResponse('entitlement_required', { status: 403 });
+    }
+  } catch {
+    return new NextResponse('entitlement_check_unavailable', { status: 503 });
+  }
 
   let profiles: ClientProfile[];
   try {
     profiles = await listClientProfiles(ownerId);
   } catch {
-    profiles = [];
+    return new NextResponse('profile_data_unavailable', { status: 503 });
   }
   const activeProfiles = profiles.filter((p) => p.isActive);
 
@@ -84,7 +92,7 @@ export async function GET(request: Request) {
     });
     leads = result.leads;
   } catch {
-    leads = [];
+    return new NextResponse('lead_data_unavailable', { status: 503 });
   }
 
   const csv = leadsToCsv(leads);

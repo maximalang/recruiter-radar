@@ -206,7 +206,7 @@ Migration `20260521010000_add_rbac_tables.sql` создавала глобаль
 
 - `docs/SECURITY.md` заявляет wired RBAC, хотя runtime RBAC удалена;
 - `docs/DEPLOYMENT.md` всё ещё описывает Railway как current deploy flow;
-- `docs/current-state.md` датирован 2026-07-21 и не отражает последние
+- На момент этого исторического аудита предыдущий current-state snapshot был датирован 2026-07-21 и не отражал последние
   Opportunity migrations;
 - указанный во входной Goal файл owner migration имеет timestamp
   `20260521010000`, но фактический файл — `20260521000000`.

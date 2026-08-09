@@ -37,7 +37,7 @@ describe("landing runtime truth contract", () => {
     expect(pricing).toContain("Telegram / VK / email / browser push / signed webhook");
   });
 
-  test("source copy preserves runtime roles while presenting them in customer language", () => {
+  test("compact source copy stays truthful while the FAQ explains runtime roles", () => {
     const evidence = webSource("app/landing/evidence-scene.tsx");
     const faq = webSource("app/landing/landing-faq.ts");
     const registry = repoSource("packages/db/scripts/source-registry.mjs");
@@ -50,19 +50,14 @@ describe("landing runtime truth contract", () => {
     expect(registry).toContain("supporting-evidence-only");
     expect(registry).toContain("never-lead-originating");
 
-    expect(evidence).toContain("Дают основной сигнал найма");
-    expect(evidence).toContain("Подтверждают компанию");
-    expect(evidence).toContain("Расширяют покрытие после проверки");
-    expect(evidence).toContain("Добавляют бизнес-контекст");
-    expect(evidence).toContain('state: "live"');
-    expect(evidence).toContain('state: "support"');
-    expect(evidence).toContain('state: "gated"');
-    expect(evidence).toContain('state: "context"');
-    expect(evidence).toContain("Хабр Карьера");
-    expect(evidence).toContain("SuperJob");
-    expect(evidence).toContain("ATS");
-    expect(evidence).toContain("GDELT");
+    expect(evidence).toContain("Сигнал найма → доказательство");
+    expect(evidence).toContain("Карьерная страница");
+    expect(evidence).toContain("Публичные вакансии");
+    expect(evidence).toContain("Прямой источник");
+    expect(evidence).not.toContain("SOURCE_ROLES");
 
+    expect(faq).toContain("основные сигналы приходят из hh.ru, Работы России и карьерных страниц");
+    expect(faq).toContain("Сайт компании и реестры ФНС подтверждают организацию");
     expect(faq).toContain("влияют на выдачу только после проверки качества и стабильности данных");
     expect(evidence).not.toContain("adapter ready / digest gated");
     expect(evidence).not.toContain("promotion gate");

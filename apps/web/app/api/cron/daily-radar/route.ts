@@ -22,7 +22,7 @@ import {
   getCommercialSignalCanaryWorkspaceId,
   resolveCommercialSignalRollout,
 } from '@/lib/opportunities/commercial-signal-rollout'
-import { logEvent, logError } from '@/lib/runtime'
+import { logEvent, logError, logWarn } from '@/lib/runtime'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -77,6 +77,7 @@ export async function POST(request: NextRequest) {
       succeeded: digestResults.filter(r => r.ok).length,
       failed: digestResults.filter(r => !r.ok).length,
       totalSent: digestResults.reduce((sum, r) => sum + r.sent, 0),
+      totalSkipped: digestResults.reduce((sum, r) => sum + r.skipped, 0),
     }
 
     const allOk = ingestOk && digestOk
@@ -91,6 +92,16 @@ export async function POST(request: NextRequest) {
       sent: digestSummary.totalSent,
       durationMs,
     })
+    if (
+      digestSummary.total > 0
+      && digestSummary.totalSent === 0
+      && digestSummary.totalSkipped < digestSummary.total
+    ) {
+      logWarn('daily_radar.zero_opportunity_anomaly', {
+        profileCount: digestSummary.total,
+        completedCount: digestSummary.succeeded,
+      })
+    }
 
     return NextResponse.json({
       success: allOk,

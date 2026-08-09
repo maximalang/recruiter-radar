@@ -11,16 +11,21 @@ jest.mock('@/lib/source-freshness', () => ({
 jest.mock('@/lib/payment-readiness', () => ({
   buildPaymentReadinessReport: jest.fn(),
 }))
+jest.mock('@/lib/operational-dependencies', () => ({
+  getOperationalDependencyReport: jest.fn(),
+}))
 
 import { getOperationalReadinessReport } from '@/lib/operational-readiness'
 import { getSourceFreshnessReport } from '@/lib/source-freshness'
 import { buildPaymentReadinessReport } from '@/lib/payment-readiness'
+import { getOperationalDependencyReport } from '@/lib/operational-dependencies'
 import { GET as getOperationalReadiness } from '@/app/api/health/readiness/route'
 import { GET as getPaymentReadiness } from '@/app/api/health/payment-readiness/route'
 
 const mockedOperational = jest.mocked(getOperationalReadinessReport)
 const mockedFreshness = jest.mocked(getSourceFreshnessReport)
 const mockedPayment = jest.mocked(buildPaymentReadinessReport)
+const mockedDependencies = jest.mocked(getOperationalDependencyReport)
 
 function request(path: string, apiKey?: string): NextRequest {
   return new NextRequest(`https://recruiter-radar.ru${path}`, {
@@ -37,6 +42,21 @@ describe('protected readiness endpoints', () => {
     else process.env.CRON_API_KEY = originalKey
   })
 
+  beforeEach(() => {
+    mockedDependencies.mockResolvedValue({
+      generatedAt: '2026-08-09T10:00:00.000Z',
+      criticalReady: true,
+      database: { state: 'ok', latencyMs: 2 },
+      email: { state: 'configured_unverified', provider: 'postbox' },
+      workflow: { state: 'ok', queue: 'database' },
+      providers: {
+        payment: { state: 'optional_unavailable', provider: null },
+        telegram: { state: 'optional_unavailable' },
+        webPush: { state: 'optional_unavailable' },
+      },
+    })
+  })
+
   test('fails closed when the operator key is not configured', async () => {
     delete process.env.CRON_API_KEY
     expect((await getOperationalReadiness(request('/api/health/readiness'))).status).toBe(503)
@@ -44,6 +64,7 @@ describe('protected readiness endpoints', () => {
     expect(mockedOperational).not.toHaveBeenCalled()
     expect(mockedFreshness).not.toHaveBeenCalled()
     expect(mockedPayment).not.toHaveBeenCalled()
+    expect(mockedDependencies).not.toHaveBeenCalled()
   })
 
   test('rejects missing and wrong keys', async () => {
@@ -53,6 +74,7 @@ describe('protected readiness endpoints', () => {
     expect(mockedOperational).not.toHaveBeenCalled()
     expect(mockedFreshness).not.toHaveBeenCalled()
     expect(mockedPayment).not.toHaveBeenCalled()
+    expect(mockedDependencies).not.toHaveBeenCalled()
   })
 
   test('returns aggregate operational and source freshness state to an authorized operator', async () => {
@@ -85,10 +107,12 @@ describe('protected readiness endpoints', () => {
       status: 'degraded',
       report: {
         sourceFreshness: [{ source: 'hh', lagHours: 1, signalCount: 42 }],
+        dependencies: { criticalReady: true, database: { state: 'ok' } },
       },
     })
     expect(mockedOperational).toHaveBeenCalledWith(48)
     expect(mockedFreshness).toHaveBeenCalledTimes(1)
+    expect(mockedDependencies).toHaveBeenCalledTimes(1)
   })
 
   test('returns honest sales-assisted state without payment configuration', async () => {

@@ -15,10 +15,29 @@ import {
   pausePilotForUser,
   setProfileActive,
   clearProfileTelegram,
+  updateClientSettingsForUser,
+  resolveAdminDataOwnerId,
+  sendUserLoginLink,
 } from '@/lib/admin/adminUsers';
 import { getPool } from '@/lib/db-pool';
+import {
+  grantEntitlement,
+  revokeEntitlement,
+} from '@/lib/entitlements';
+import { requestAuthV2Login, shouldRequestAuthV2Login } from '@/lib/auth-v2/challenges';
+import { requestAccountLogin } from '@/lib/account-auth';
 
 jest.mock('@/lib/db-pool', () => ({ getPool: jest.fn() }));
+jest.mock('@/lib/entitlements', () => ({
+  grantEntitlement: jest.fn(),
+  grantEntitlementUntil: jest.fn(),
+  revokeEntitlement: jest.fn(),
+}));
+jest.mock('@/lib/auth-v2/challenges', () => ({
+  requestAuthV2Login: jest.fn(),
+  shouldRequestAuthV2Login: jest.fn(),
+}));
+jest.mock('@/lib/account-auth', () => ({ requestAccountLogin: jest.fn() }));
 jest.mock('@/lib/runtime', () => ({
   logEvent: jest.fn(),
   logError: jest.fn(),
@@ -26,6 +45,8 @@ jest.mock('@/lib/runtime', () => ({
 }));
 
 const mockGetPool = jest.mocked(getPool);
+const mockGrantEntitlement = jest.mocked(grantEntitlement);
+const mockRevokeEntitlement = jest.mocked(revokeEntitlement);
 const mockQuery = jest.fn();
 
 beforeEach(() => {
@@ -63,56 +84,114 @@ describe('adminUsers — no pool', () => {
 });
 
 describe('adminUsers — activate pilot', () => {
-  it('extends an existing active enrollment rather than inserting', async () => {
-    mockQuery.mockResolvedValueOnce({ rowCount: 1 }); // UPDATE extends
+  it('atomically ensures a canonical admin grant', async () => {
+    mockGrantEntitlement.mockResolvedValueOnce({ changed: true, grantId: '10' });
     const r = await activatePilotForUser('5');
     expect(r.ok).toBe(true);
-    expect(r.message).toContain('продлён');
-    // only the extend UPDATE ran — no insert
-    expect(mockQuery).toHaveBeenCalledTimes(1);
-    const sql = String(mockQuery.mock.calls[0][0]);
-    expect(sql).toContain('UPDATE pilot_enrollments');
-    expect(sql).toContain('ends_at');
-    // parameterized — no interpolated id
-    expect(mockQuery.mock.calls[0][1]).toEqual(['7', '5']);
+    expect(r.message).toContain('активирован');
+    expect(mockGrantEntitlement).toHaveBeenCalledWith({
+      userId: '5',
+      source: 'admin',
+      plan: 'radar-admin-7',
+      durationDays: 7,
+      features: ['dashboard', 'api', 'digest', 'delivery'],
+    });
   });
 
-  it('claims an existing requested enrollment when no active one to extend', async () => {
-    mockQuery
-      .mockResolvedValueOnce({ rowCount: 0 }) // extend: nothing active
-      .mockResolvedValueOnce({ rowCount: 1 }); // claim requested → active
-    const r = await activatePilotForUser('6');
-    expect(r.ok).toBe(true);
-    expect(r.message).toContain('по заявке');
-    const claimSql = String(mockQuery.mock.calls[1][0]);
-    expect(claimSql).toContain("status = 'active'");
-    expect(claimSql).toContain("activated_by = 'admin'");
-  });
-
-  it('inserts a fresh active enrollment when none exists', async () => {
-    mockQuery
-      .mockResolvedValueOnce({ rowCount: 0 }) // extend: nothing
-      .mockResolvedValueOnce({ rowCount: 0 }); // claim: nothing requested
+  it('creates a canonical admin grant when none exists', async () => {
+    mockGrantEntitlement.mockResolvedValueOnce({ changed: true, grantId: '11' });
     const r = await activatePilotForUser('7');
     expect(r.ok).toBe(true);
-    const insertSql = String(mockQuery.mock.calls[2][0]);
-    expect(insertSql).toContain('INSERT INTO pilot_enrollments');
-    expect(insertSql).toContain("'active'");
-    expect(insertSql).toContain("'admin'");
+    expect(mockGrantEntitlement).toHaveBeenCalledWith({
+      userId: '7',
+      source: 'admin',
+      plan: 'radar-admin-7',
+      durationDays: 7,
+      features: ['dashboard', 'api', 'digest', 'delivery'],
+    });
+  });
+});
+
+describe('adminUsers — canonical data owner', () => {
+  it('resolves a team member inside the workspace selected by the operator', async () => {
+    mockQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ dataOwnerId: '7', workspaceId: '9', lastSessionAt: null }] });
+
+    await expect(resolveAdminDataOwnerId('42', '9')).resolves.toBe('7');
+
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('workspace_members'), ['42', '9']);
+    expect(String(mockQuery.mock.calls[0]?.[0])).toContain('bootstrap_user_id');
+  });
+
+  it('uses the most recently active session workspace when a list action has no workspace id', async () => {
+    mockQuery.mockResolvedValueOnce({ rowCount: 2, rows: [
+      { dataOwnerId: '7', workspaceId: '9', lastSessionAt: '2026-08-09T10:00:00.000Z' },
+      { dataOwnerId: '42', workspaceId: '10', lastSessionAt: null },
+    ] });
+
+    await expect(resolveAdminDataOwnerId('42')).resolves.toBe('7');
+  });
+
+  it('fails closed for multiple workspaces without an active-session signal', async () => {
+    mockQuery.mockResolvedValueOnce({ rowCount: 2, rows: [
+      { dataOwnerId: '7', workspaceId: '9', lastSessionAt: null },
+      { dataOwnerId: '42', workspaceId: '10', lastSessionAt: null },
+    ] });
+
+    await expect(resolveAdminDataOwnerId('42')).resolves.toBeNull();
+  });
+});
+
+describe('adminUsers — operator login link', () => {
+  it('does not claim a link was sent when duplicate protection suppresses delivery', async () => {
+    mockQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ email: 'member@example.test' }] });
+    jest.mocked(shouldRequestAuthV2Login).mockResolvedValue(false);
+    jest.mocked(requestAccountLogin).mockResolvedValue({ ok: true, delivery: 'suppressed' });
+
+    await expect(sendUserLoginLink('42', '/dashboard')).resolves.toMatchObject({
+      ok: false,
+      message: expect.stringContaining('подавлен'),
+    });
+    expect(requestAuthV2Login).not.toHaveBeenCalled();
+  });
+});
+
+describe('adminUsers — client settings', () => {
+  it('updates only the exact owner profile with validated canonical options', async () => {
+    mockQuery.mockResolvedValue({ rowCount: 1, rows: [] });
+    await expect(updateClientSettingsForUser('42', {
+      agencyName: 'North Star', specialization: 'Data', targetCity: 'Москва',
+      roles: ['data'], industries: ['it'], companySizes: ['small'], dailyDigestLimit: 7,
+      hiringIntentMin: 2.5, signalFreshnessDays: 14, minOpenRoles: 2,
+    })).resolves.toMatchObject({ ok: true });
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining('WHERE owner_id = $1'),
+      ['42', 'North Star', 'Data', 'Москва', ['data'], '["it"]', '["small"]', 7, 2.5, 14, 2],
+    );
+  });
+
+  it('rejects forged option values before querying', async () => {
+    await expect(updateClientSettingsForUser('42', {
+      agencyName: 'North Star', specialization: null, targetCity: null,
+      roles: ['forged'], industries: [], companySizes: [], dailyDigestLimit: 5,
+      hiringIntentMin: null, signalFreshnessDays: null, minOpenRoles: null,
+    })).resolves.toMatchObject({ ok: false });
+    expect(mockQuery).not.toHaveBeenCalled();
   });
 });
 
 describe('adminUsers — pause pilot', () => {
-  it('marks an active enrollment canceled', async () => {
-    mockQuery.mockResolvedValueOnce({ rowCount: 1 });
+  it('revokes active canonical admin grants', async () => {
+    mockRevokeEntitlement.mockResolvedValueOnce({ changed: true, count: 1 });
     const r = await pausePilotForUser('5');
     expect(r.ok).toBe(true);
-    const sql = String(mockQuery.mock.calls[0][0]);
-    expect(sql).toContain("status = 'canceled'");
+    expect(mockRevokeEntitlement).toHaveBeenCalledWith({
+      userId: '5',
+      source: 'admin',
+    });
   });
 
   it('reports not-ok when there is no active pilot to pause', async () => {
-    mockQuery.mockResolvedValueOnce({ rowCount: 0 });
+    mockRevokeEntitlement.mockResolvedValueOnce({ changed: false, count: 0 });
     const r = await pausePilotForUser('5');
     expect(r.ok).toBe(false);
     expect(r.message).toContain('нечего');
@@ -161,7 +240,7 @@ describe('adminUsers — clear telegram', () => {
 
 describe('adminUsers — error resilience', () => {
   it('returns ok:false with the error message on a DB error (never throws)', async () => {
-    mockQuery.mockRejectedValueOnce(new Error('connection refused'));
+    mockGrantEntitlement.mockRejectedValueOnce(new Error('connection refused'));
     const r = await activatePilotForUser('5');
     expect(r.ok).toBe(false);
     expect(r.message).toContain('connection refused');

@@ -725,6 +725,7 @@ export function ErrorState(props: {
   title: string;
   description?: ReactNode;
   action?: { href: string; label: string };
+  retryAction?: { label: string; onClick: () => void };
 }) {
   return (
     <div className={s.errorState} role="alert" aria-live="assertive">
@@ -736,6 +737,11 @@ export function ErrorState(props: {
         <a className={s.errorStateAction} href={props.action.href}>
           {repairVisibleNode(props.action.label)}
         </a>
+      ) : null}
+      {props.retryAction ? (
+        <button type="button" className={s.errorStateAction} onClick={props.retryAction.onClick}>
+          {repairVisibleNode(props.retryAction.label)}
+        </button>
       ) : null}
     </div>
   );

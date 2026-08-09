@@ -19,6 +19,7 @@ jest.mock('@/lib/digestFeedback', () => ({
   buildDigestFeedbackActionPlan: jest.fn(),
 }));
 jest.mock('@/lib/auth-v2/authorization', () => ({ getAuthorizedOwnerId: jest.fn(async () => 'owner-1') }));
+jest.mock('@/lib/entitlements', () => ({ hasFeatureAccess: jest.fn(async () => true) }));
 
 const mockQuery = jest.fn();
 const mockGetPool = getPool as jest.MockedFunction<typeof getPool>;

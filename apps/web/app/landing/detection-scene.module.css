@@ -152,8 +152,50 @@
   width: min(100%, 50rem);
   aspect-ratio: 1;
   overflow: visible;
-  opacity: .96;
-  filter: saturate(.88) contrast(1.06);
+  opacity: .42;
+  filter: saturate(.72);
+  pointer-events: none;
+}
+
+.ambientRing {
+  position: absolute;
+  inset: 12%;
+  border: 1px solid rgba(191, 220, 145, .24);
+  border-radius: 50%;
+}
+
+.ambientRing:nth-child(2) { inset: 27%; border-style: dashed; opacity: .76; }
+.ambientRing:nth-child(3) { inset: 42%; opacity: .64; }
+
+.ambientAxis {
+  position: absolute;
+  top: 50%;
+  right: 6%;
+  left: 6%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(191, 220, 145, .34), transparent);
+  transform: rotate(-24deg);
+}
+
+.ambientNode {
+  position: absolute;
+  top: 29%;
+  right: 24%;
+  width: .62rem;
+  height: .62rem;
+  border-radius: 50%;
+  background: var(--signal-strong);
+  box-shadow: 0 0 0 8px rgba(191, 220, 145, .08), 0 0 40px rgba(191, 220, 145, .3);
+}
+
+.loginLink {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  margin-top: .35rem;
+  color: rgba(242, 239, 231, .62);
+  font-size: .72rem;
+  text-underline-offset: 3px;
 }
 
 .analysisFrame {
