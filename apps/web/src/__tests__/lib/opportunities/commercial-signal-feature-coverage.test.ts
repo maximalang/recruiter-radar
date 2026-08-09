@@ -4,7 +4,7 @@ import {
   emptyCommercialSignalFeatureCoverageReport,
 } from '@/lib/opportunities/commercial-signal-feature-coverage'
 
-function built() {
+function built(): Parameters<typeof buildCommercialSignalFeatureCoverageSample>[0] {
   return {
     clientProfileId: '402',
     organizationIndustry: 'fintech',
@@ -40,7 +40,7 @@ function built() {
       marketDifficulty: { componentValue: null },
       contact: { corporateContactPathAvailable: true },
     },
-  } as never
+  }
 }
 
 describe('Commercial Signal feature coverage diagnostics', () => {
@@ -102,7 +102,7 @@ describe('Commercial Signal feature coverage diagnostics', () => {
           },
         },
       },
-    } as never)
+    })
 
     expect(sample.features.salary_change).toBe('unknown')
   })

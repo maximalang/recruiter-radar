@@ -58,6 +58,7 @@ import { buildExternalAgencyPropensityJob } from '@/lib/opportunities/external-a
 import { buildAgencyDnaMatchJob } from '@/lib/opportunities/agency-dna-match-job'
 import { buildOpportunityScoringV3Job } from '@/lib/opportunities/opportunity-scoring-v3-job'
 import { runCommercialSignalQualityV2ShadowPipeline } from '@/lib/opportunities/commercial-signal-quality-v2-job'
+import { emptyCommercialSignalFeatureCoverageReport } from '@/lib/opportunities/commercial-signal-feature-coverage'
 import { buildQueryPlansV2Job } from '@/lib/lead-discovery/query-planner-v2-job'
 import { GET, POST } from '@/app/api/cron/opportunities/[job]/route'
 
@@ -642,6 +643,7 @@ describe('opportunity cron API', () => {
         missingCriticalDimensions: {}, frictionLevels: {}, archetypes: {},
         convergenceStatuses: {}, negativeActions: {},
         independentOriginRatio: { low: 0, medium: 0, high: 0 },
+        featureCoverage: emptyCommercialSignalFeatureCoverageReport(),
       },
     })
     const response = await POST(
