@@ -95,12 +95,12 @@ try {
   )
 
   await run(
-    'Scenario E: billing member purchases access for the workspace owner',
+    'Scenarios E/F: billing member purchases for owner A and first paid profile is workspace-scoped',
     process.execPath,
     [resolve(root, 'packages', 'db', 'scripts', 'run-workspace-billing-db-tests.mjs')],
   )
 
-  process.stdout.write('\n[production-acceptance] Scenarios A-E passed.\n')
+  process.stdout.write('\n[production-acceptance] Scenarios A-F passed.\n')
 } finally {
   if (acceptanceDatabaseCreated) {
     await admin.query(

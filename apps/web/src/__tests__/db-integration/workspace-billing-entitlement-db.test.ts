@@ -4,6 +4,7 @@ import { getEffectiveEntitlement } from "@/lib/entitlements";
 import { getPool as getSharedPool } from "@/lib/db-pool";
 import {
   createCheckoutOrder,
+  ensurePaidPilotOrderReady,
   ensurePaidOrderEntitlement,
   getCheckoutOrderById,
   listCheckoutOrdersForAccess,
@@ -25,7 +26,7 @@ describe("workspace billing entitlement ownership", () => {
     await database.end();
   });
 
-  it("records billing actor B but grants and revokes access for owner A's workspace", async () => {
+  it("Scenario F: creates the first paid profile for owner A's workspace, not billing member B", async () => {
     const ownerId = await createUser("owner-a");
     const billingActorId = await createUser("billing-b");
     const recruiterId = await createUser("recruiter-c");
@@ -78,6 +79,11 @@ describe("workspace billing entitlement ownership", () => {
       workspaceId,
       entitlementOwnerId: ownerId,
     });
+    const profilesBeforePayment = await database.query(
+      `SELECT 1 FROM client_profiles WHERE owner_id = $1`,
+      [ownerId],
+    );
+    expect(profilesBeforePayment.rowCount).toBe(0);
 
     await database.query(
       `UPDATE checkout_orders
@@ -87,7 +93,17 @@ describe("workspace billing entitlement ownership", () => {
     );
     const paidOrder = await getCheckoutOrderById(order.id);
     expect(paidOrder?.status).toBe("paid");
-    await ensurePaidOrderEntitlement(paidOrder!);
+    const reconciledOrder = await ensurePaidPilotOrderReady(paidOrder!);
+    expect(reconciledOrder.payload.clientProfileId).toBeTruthy();
+    expect(reconciledOrder.payload.onboardingStatus).toBe("in_progress");
+    expect(reconciledOrder.payload.onboardingStep).toBe("confirm-profile");
+
+    const createdProfile = await database.query<{ ownerId: string; workspaceId: string }>(
+      `SELECT owner_id::TEXT AS "ownerId", workspace_id::TEXT AS "workspaceId"
+       FROM client_profiles WHERE id = $1`,
+      [reconciledOrder.payload.clientProfileId],
+    );
+    expect(createdProfile.rows).toEqual([{ ownerId, workspaceId }]);
 
     const ownerAccess = await getEffectiveEntitlement(ownerId, { workspaceId });
     const secondaryWorkspaceAccess = await getEffectiveEntitlement(ownerId, {
