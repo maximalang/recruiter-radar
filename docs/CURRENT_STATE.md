@@ -78,9 +78,9 @@ Promotion разрешается только registry policy и live verifier. 
 
 ## Current production status
 
-- Этот branch содержит production-readiness изменения; локальный production acceptance A–E прошёл на disposable PostgreSQL, но полный pre-merge suite, remote CI и merge ещё не завершены.
+- Production-readiness изменения объединены в `main` через PR #174: merge SHA `9e1231521c80a78687d17d49278a9d15a78fb6ad`. Полный pre-merge suite и remote CI прошли на exact head `87d4f575679a074558160a22356d0afdca794467`, включая production acceptance A–E, PostgreSQL lifecycle, Auth v2, landing/responsive, security и build gates.
 - Текущий deployed SHA, production env flags, credentials, provider availability, migrations и live health в рамках этого snapshot не проверены.
-- Поэтому статус: **code verification in progress; production rollout not authorized and not claimed**.
+- Поэтому статус: **code verified and merged; production rollout not authorized and live production readiness not claimed**.
 
 ## External blockers
 
