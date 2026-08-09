@@ -47,7 +47,15 @@ describe('protected readiness endpoints', () => {
       generatedAt: '2026-08-09T10:00:00.000Z',
       criticalReady: true,
       database: { state: 'ok', latencyMs: 2 },
-      email: { state: 'configured_unverified', provider: 'postbox' },
+      email: {
+        state: 'configured_unverified',
+        provider: 'postbox',
+        configurationState: 'ready',
+        runtimeState: 'unverified',
+        verificationState: 'unverified',
+        lastVerifiedAt: null,
+        lastSuccessfulDeliveryAt: null,
+      },
       workflow: { state: 'ok', queue: 'database' },
       providers: {
         payment: { state: 'optional_unavailable', provider: null },

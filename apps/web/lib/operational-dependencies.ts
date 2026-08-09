@@ -1,13 +1,30 @@
 import { getPool } from "./db-pool";
 import { getPaymentProviderSetupState } from "./paymentsProvider";
+import {
+  getConfiguredEmailIdentity,
+  isFreshEmailDelivery,
+} from "./email/delivery-health";
 
 export type DependencyState = "ok" | "configured_unverified" | "optional_unavailable" | "error";
+type ConfigurationState = "ready" | "missing";
+type RuntimeState = "healthy" | "unverified" | "error";
+type VerificationState = "successful_delivery" | "test_transport" | "unverified";
+
+type EmailDependency = {
+  state: DependencyState;
+  provider: "postbox" | "smtp" | "test" | null;
+  configurationState: ConfigurationState;
+  runtimeState: RuntimeState;
+  verificationState: VerificationState;
+  lastVerifiedAt: string | null;
+  lastSuccessfulDeliveryAt: string | null;
+};
 
 export type OperationalDependencyReport = {
   generatedAt: string;
   criticalReady: boolean;
   database: { state: DependencyState; latencyMs: number | null };
-  email: { state: DependencyState; provider: "postbox" | "smtp" | "test" | null };
+  email: EmailDependency;
   workflow: { state: DependencyState; queue: "database" };
   providers: {
     payment: { state: DependencyState; provider: string | null };
@@ -33,7 +50,7 @@ export async function getOperationalDependencyReport(): Promise<OperationalDepen
     }
   }
 
-  const email = resolveEmailDependency();
+  const email = await resolveEmailDependency(database.state === "ok");
   const workflow: OperationalDependencyReport["workflow"] = {
     state: process.env.CRON_API_KEY?.trim() && database.state === "ok" ? "ok" : "error",
     queue: "database",
@@ -63,15 +80,79 @@ export async function getOperationalDependencyReport(): Promise<OperationalDepen
   };
 }
 
-function resolveEmailDependency(): OperationalDependencyReport["email"] {
+async function resolveEmailDependency(databaseReady: boolean): Promise<EmailDependency> {
   if (process.env.AUTH_EMAIL_TRANSPORT === "test" && process.env.NODE_ENV !== "production") {
-    return { state: "ok", provider: "test" };
+    return {
+      state: "ok",
+      provider: "test",
+      configurationState: "ready",
+      runtimeState: "healthy",
+      verificationState: "test_transport",
+      lastVerifiedAt: null,
+      lastSuccessfulDeliveryAt: null,
+    };
   }
-  if (allConfigured(["POSTBOX_ACCESS_KEY_ID", "POSTBOX_SECRET_ACCESS_KEY", "POSTBOX_FROM"])) {
-    return { state: "configured_unverified", provider: "postbox" };
+  const configured = getConfiguredEmailIdentity();
+  if (!configured) {
+    return {
+      state: "error",
+      provider: null,
+      configurationState: "missing",
+      runtimeState: "error",
+      verificationState: "unverified",
+      lastVerifiedAt: null,
+      lastSuccessfulDeliveryAt: null,
+    };
   }
-  if (allConfigured(["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "SMTP_FROM"])) {
-    return { state: "configured_unverified", provider: "smtp" };
+  if (!databaseReady) {
+    return unverifiedEmail(configured.provider, "error");
   }
-  return { state: "error", provider: null };
+
+  const pool = getPool();
+  if (!pool) return unverifiedEmail(configured.provider, "error");
+  try {
+    const verification = await pool.query<{
+      lastVerifiedAt: string | null;
+      lastSuccessfulDeliveryAt: string | null;
+    }>(
+      `SELECT
+         MAX(delivered_at)::TEXT AS "lastVerifiedAt",
+         MAX(delivered_at)::TEXT AS "lastSuccessfulDeliveryAt"
+       FROM email_delivery_health_events
+       WHERE provider = $1
+         AND configuration_fingerprint = $2`,
+      [configured.provider, configured.fingerprint],
+    );
+    const lastVerifiedAt = verification.rows[0]?.lastVerifiedAt ?? null;
+    const lastSuccessfulDeliveryAt = verification.rows[0]?.lastSuccessfulDeliveryAt ?? null;
+    if (!lastSuccessfulDeliveryAt || !isFreshEmailDelivery(lastSuccessfulDeliveryAt)) {
+      return unverifiedEmail(configured.provider, "unverified");
+    }
+    return {
+      state: "ok",
+      provider: configured.provider,
+      configurationState: "ready",
+      runtimeState: "healthy",
+      verificationState: "successful_delivery",
+      lastVerifiedAt,
+      lastSuccessfulDeliveryAt,
+    };
+  } catch {
+    return unverifiedEmail(configured.provider, "error");
+  }
+}
+
+function unverifiedEmail(
+  provider: "postbox" | "smtp",
+  runtimeState: "unverified" | "error",
+): EmailDependency {
+  return {
+    state: runtimeState === "error" ? "error" : "configured_unverified",
+    provider,
+    configurationState: "ready",
+    runtimeState,
+    verificationState: "unverified",
+    lastVerifiedAt: null,
+    lastSuccessfulDeliveryAt: null,
+  };
 }
