@@ -5,6 +5,10 @@ import {
   CommercialSignalQualityV2LineageError,
   type CommercialSignalQualityV2InputBuilderDb,
 } from '@/lib/opportunities/commercial-signal-quality-v2-input-builder'
+import {
+  normalizeJobPostingCompanyEvents,
+  type CompanyEventSourceRecord,
+} from '@/lib/opportunities/company-event-normalization'
 
 function result(rows: Record<string, unknown>[]): QueryResult<Record<string, unknown>> {
   return {
@@ -227,6 +231,52 @@ describe('Commercial Signal Quality v2 exact-lineage input builder', () => {
     expect(built.input.hiringFriction.componentValues.repost_cycles).toBeNull()
     expect(built.input.hiringFriction.observationStates.repost_cycles)
       .toBe('unknown')
+  })
+
+  it('preserves the real producer repost contract as observed friction', async () => {
+    const source = (
+      id: string,
+      occurredAt: string,
+      evidenceId: string,
+    ): CompanyEventSourceRecord => ({
+      id,
+      organizationId: '11',
+      signalType: 'job_posting',
+      title: 'Senior Java developer',
+      region: 'Moscow',
+      source: 'hh',
+      sourceUrl: `https://example.test/vacancies/${id}`,
+      externalVacancyId: id,
+      occurredAt,
+      firstSeenAt: occurredAt,
+      lastSeenAt: occurredAt,
+      evidenceIds: [evidenceId],
+      payload: { vacancy_name: 'Senior Java developer' },
+    })
+    const produced = normalizeJobPostingCompanyEvents([
+      source('old-101', '2026-07-10T09:00:00.000Z', '101'),
+      source('new-101', '2026-08-02T09:00:00.000Z', '102'),
+    ], new Date('2026-08-09T10:00:00.000Z'))
+    const repost = produced.events.find((item) => item.eventType === 'vacancy_repost')
+    expect(repost).toBeDefined()
+
+    const { db } = dbWith({
+      events: [event({
+        eventId: '202',
+        eventType: 'vacancy_repost',
+        payload: repost?.payload,
+        evidenceIds: ['101'],
+      })],
+    })
+    const built = await buildCommercialSignalQualityV2Input('41', {
+      workspaceId: '21', clientProfileId: '22', organizationId: '11',
+    }, db)
+
+    expect(built.input.hiringFriction.observationStates.repost_cycles)
+      .toBe('observed')
+    expect(built.input.hiringFriction.componentValues.repost_cycles).toBe(0.5)
+    expect(built.input.hiringFriction.positiveReasons.map((item) => item.code))
+      .toContain('MEANINGFUL_REPOST_CYCLES')
   })
 
   it('keeps an insufficient upstream propensity unavailable', async () => {

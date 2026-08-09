@@ -153,6 +153,53 @@ describe('Company Events v1 normalization', () => {
     expect(updatedFingerprint).not.toBe(originalFingerprint)
   })
 
+  it('emits the versioned vacancy repost contract without inventing observations', () => {
+    const result = normalizeJobPostingCompanyEvents([
+      sourceRecord('hh-old', {
+        externalVacancyId: 'old-101',
+        occurredAt: '2026-07-10T09:00:00.000Z',
+        firstSeenAt: '2026-07-10T09:05:00.000Z',
+        lastSeenAt: '2026-07-10T10:00:00.000Z',
+        evidenceIds: ['evidence-old'],
+      }),
+      sourceRecord('hh-new', {
+        externalVacancyId: 'new-101',
+        occurredAt: '2026-08-02T09:00:00.000Z',
+        evidenceIds: ['evidence-new'],
+      }),
+    ], NOW)
+
+    const repost = result.events.find((event) => event.eventType === 'vacancy_repost')
+    expect(repost?.payload).toMatchObject({
+      payloadVersion: 'vacancy-repost-v2',
+      intervalDays: 23,
+      lifecycleClassification: 'meaningful',
+      salaryChanged: null,
+      requirementsChanged: null,
+      sourcePublicationChanged: true,
+      reasonCodes: ['SAME_ROLE_REAPPEARED_WITH_NEW_SOURCE_ID'],
+    })
+    expect(repost?.payload).not.toHaveProperty('automated')
+  })
+
+  it('classifies a standard 30-day repost as routine republication', () => {
+    const result = normalizeJobPostingCompanyEvents([
+      sourceRecord('hh-old', {
+        externalVacancyId: 'old-101',
+        occurredAt: '2026-07-03T09:00:00.000Z',
+        firstSeenAt: '2026-07-03T09:05:00.000Z',
+        lastSeenAt: '2026-07-03T10:00:00.000Z',
+      }),
+      sourceRecord('hh-new', { externalVacancyId: 'new-101' }),
+    ], NOW)
+
+    const repost = result.events.find((event) => event.eventType === 'vacancy_repost')
+    expect(repost?.payload).toMatchObject({
+      intervalDays: 30,
+      lifecycleClassification: 'routine_republication',
+    })
+  })
+
   it('preserves headline-derived title and region in immutable provenance', () => {
     const event = normalizeJobPostingCompanyEvents([
       sourceRecord('headline-source', {

@@ -616,24 +616,30 @@ function buildFrictionInput(
   const salaryIds = ids(salaries.flatMap(directIds))
   const restartIds = ids(restarts.flatMap(directIds))
   const observedReposts = reposts.flatMap((event) => {
+    const payloadVersion = textPayload(event.payload, ['payloadVersion'])
     const intervalDays = numberPayload(event.payload, ['intervalDays', 'interval_days'])
-    const automated = booleanPayload(event.payload, ['automated'])
+    const lifecycleClassification = repostLifecycle(event.payload)
     const salaryChanged = booleanPayload(event.payload, [
       'salaryChanged', 'salary_changed',
     ])
     const requirementsChanged = booleanPayload(event.payload, [
       'requirementsChanged', 'requirements_changed',
     ])
+    const sourcePublicationChanged = booleanPayload(event.payload, [
+      'sourcePublicationChanged', 'source_publication_changed',
+    ])
     const evidenceIds = directIds(event)
-    return intervalDays === null || automated === null ||
-      salaryChanged === null || requirementsChanged === null ||
+    return payloadVersion !== 'vacancy-repost-v2' || intervalDays === null ||
+      lifecycleClassification === null ||
       evidenceIds.length === 0
       ? []
       : [{
           intervalDays,
-          automated,
+          automated: null,
+          lifecycleClassification,
           salaryChanged,
           requirementsChanged,
+          sourcePublicationChanged,
           evidenceIds,
         }]
   })
@@ -674,6 +680,15 @@ function buildFrictionInput(
     evergreenRole: evergreen,
     massHiring,
   }
+}
+
+function repostLifecycle(
+  payload: unknown,
+): 'meaningful' | 'routine_republication' | 'unknown' | null {
+  const value = textPayload(payload, ['lifecycleClassification'])
+  return value === 'meaningful' || value === 'routine_republication' || value === 'unknown'
+    ? value
+    : null
 }
 
 function buildNegativeEvidence(
@@ -949,6 +964,15 @@ function booleanPayload(value: unknown, keys: string[]): boolean | null {
   const payload = object(value)
   for (const key of keys) {
     if (typeof payload[key] === 'boolean') return payload[key] as boolean
+  }
+  return null
+}
+
+function textPayload(value: unknown, keys: string[]): string | null {
+  const payload = object(value)
+  for (const key of keys) {
+    const parsed = optionalText(payload[key])
+    if (parsed !== null) return parsed
   }
   return null
 }

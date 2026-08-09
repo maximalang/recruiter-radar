@@ -29,9 +29,11 @@ export type EvidencedFlag = {
 
 export type HiringFrictionRepostCycle = {
   intervalDays: number
-  automated: boolean
-  salaryChanged: boolean
-  requirementsChanged: boolean
+  automated: boolean | null
+  salaryChanged: boolean | null
+  requirementsChanged: boolean | null
+  lifecycleClassification?: 'meaningful' | 'routine_republication' | 'unknown'
+  sourcePublicationChanged?: boolean | null
   evidenceIds: string[]
 }
 
@@ -348,9 +350,13 @@ function observationStates(
 }
 
 function isMeaningfulRepost(cycle: HiringFrictionRepostCycle): boolean {
+  if (cycle.lifecycleClassification) {
+    return cycle.lifecycleClassification === 'meaningful' ||
+      cycle.salaryChanged === true || cycle.requirementsChanged === true
+  }
   const standardLifecycle = cycle.intervalDays >= 25 && cycle.intervalDays <= 35
   return cycle.salaryChanged || cycle.requirementsChanged ||
-    !cycle.automated || !standardLifecycle
+    cycle.automated === false || !standardLifecycle
 }
 
 function metric(
