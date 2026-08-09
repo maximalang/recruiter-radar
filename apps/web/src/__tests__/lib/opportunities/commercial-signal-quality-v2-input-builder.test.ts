@@ -104,6 +104,7 @@ function lineage(overrides: Record<string, unknown> = {}) {
     stateHasFutureEvidence: false,
     stateHasFutureChange: false,
     accountRestriction: null,
+    organizationIndustry: 'fintech',
     ...overrides,
   }
 }
@@ -423,6 +424,25 @@ describe('Commercial Signal Quality v2 exact-lineage input builder', () => {
     expect(built.input.hiringFriction.componentValues.repost_rate).toBeNull()
     expect(built.archetypes).not.toContain('expansion')
     expect(built.archetypes).not.toContain('freeze_or_slowdown')
+  })
+
+  it('does not observe a feature from an unregistered source capability', async () => {
+    const { db } = dbWith({
+      events: [event({
+        eventType: 'vacancy_salary_change',
+        payload: { salaryChanged: true },
+      })],
+      evidence: [evidence({ source: 'mystery-feed' })],
+      stateEvidence: [evidence({ source: 'mystery-feed' })],
+    })
+
+    const built = await buildCommercialSignalQualityV2Input('41', {
+      workspaceId: '21', clientProfileId: '22', organizationId: '11',
+    }, db)
+
+    expect(built.input.hiringFriction.observationStates.salary_change)
+      .toBe('unknown')
+    expect(built.input.hiringFriction.componentValues.salary_change).toBeNull()
   })
 
   it('uses repeated normalized roles only after the minimum sample', async () => {

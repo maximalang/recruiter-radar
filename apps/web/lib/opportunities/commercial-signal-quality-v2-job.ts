@@ -16,6 +16,12 @@ import {
   buildCommercialSignalQualityV2Input,
   type CommercialSignalQualityV2InputBuilderDb,
 } from './commercial-signal-quality-v2-input-builder'
+import {
+  addCommercialSignalFeatureCoverageSample,
+  buildCommercialSignalFeatureCoverageSample,
+  emptyCommercialSignalFeatureCoverageReport,
+  type CommercialSignalFeatureCoverageReport,
+} from './commercial-signal-feature-coverage'
 
 export const COMMERCIAL_SIGNAL_QUALITY_V2_SHADOW_LIMITS = {
   defaultBatchSize: 25,
@@ -61,6 +67,7 @@ export type CommercialSignalQualityV2ShadowTelemetry = {
   convergenceStatuses: Record<string, number>
   negativeActions: Record<string, number>
   independentOriginRatio: DistributionBuckets
+  featureCoverage: CommercialSignalFeatureCoverageReport
 }
 
 type DistributionBuckets = { low: number; medium: number; high: number }
@@ -282,6 +289,7 @@ function emptyStats(
       convergenceStatuses: {},
       negativeActions: {},
       independentOriginRatio: emptyDistribution(),
+      featureCoverage: emptyCommercialSignalFeatureCoverageReport(),
     },
   }
 }
@@ -318,6 +326,10 @@ function countTelemetry(
   for (const archetype of built.archetypes) increment(telemetry.archetypes, archetype)
   increment(telemetry.convergenceStatuses, built.input.convergence.status)
   increment(telemetry.negativeActions, built.input.negativeEvidence.action)
+  addCommercialSignalFeatureCoverageSample(
+    telemetry.featureCoverage,
+    buildCommercialSignalFeatureCoverageSample(built),
+  )
 }
 
 function statusRank(status: CommercialSignalQualityStatus): number {

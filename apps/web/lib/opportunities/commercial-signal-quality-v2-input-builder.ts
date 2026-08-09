@@ -25,6 +25,10 @@ import {
 } from './hiring-friction-v1'
 import { buildHiringProblemArchetypes } from './hiring-problem-archetypes-v1'
 import {
+  getSourceFeatureCapability,
+  type SourceFeature,
+} from './source-feature-capabilities'
+import {
   evaluateNegativeEvidence,
   type NegativeEvidenceInput,
 } from './negative-evidence-v1'
@@ -57,6 +61,7 @@ export type CommercialSignalQualityV2BuiltInput = {
   organizationId: string
   workspaceId: string
   clientProfileId: string
+  organizationIndustry: string | null
   validUntil: string
   input: CommercialSignalQualityEngineV2Input
 }
@@ -143,6 +148,7 @@ type LineageRow = {
   stateHasFutureEvidence: boolean
   stateHasFutureChange: boolean
   accountRestriction: string | null
+  organizationIndustry: string | null
 }
 
 type EventRow = {
@@ -263,7 +269,9 @@ const LINEAGE_SQL = `SELECT
       AND state_change.created_at > lineage.created_at
   ) AS "stateHasFutureChange",
   match.feature_snapshot #>> '{agency,accountRestriction}'
-    AS "accountRestriction"
+    AS "accountRestriction",
+  match.feature_snapshot #>> '{company,organizationIndustry}'
+    AS "organizationIndustry"
 FROM commercial_signal_opportunity_lineage lineage
 LEFT JOIN opportunity_candidates candidate
   ON candidate.id = lineage.candidate_id
@@ -520,6 +528,7 @@ export async function buildCommercialSignalQualityV2Input(
     organizationId: row.organizationId,
     workspaceId: row.workspaceId,
     clientProfileId: row.clientProfileId,
+    organizationIndustry: assembled.organizationIndustry,
     validUntil: earliestTimestamp([
       row.candidateValidUntil as string,
       row.episodeValidUntil as string,
@@ -742,7 +751,11 @@ function assembleInput(
   evidenceRows: EvidenceRow[],
   stateChanges: StateChangeRow[],
   decisionAt: Date,
-): { input: CommercialSignalQualityEngineV2Input; archetypes: string[] } {
+): {
+  input: CommercialSignalQualityEngineV2Input
+  archetypes: string[]
+  organizationIndustry: string | null
+} {
   const directIds = (event: EventRow): string[] => event.evidenceIds.filter((id) => {
     const source = evidenceById.get(id)?.sourceKind
     return source === 'direct' || source === 'official'
@@ -783,6 +796,7 @@ function assembleInput(
     directIds,
     decisionAt,
     stateLineage,
+    evidenceById,
   )
   const friction = buildHiringFriction(frictionInput)
   const negatives = buildNegativeEvidence(
@@ -897,6 +911,7 @@ function assembleInput(
 
   return {
     archetypes: archetypes.map((item) => item.archetype),
+    organizationIndustry: optionalText(row.organizationIndustry),
     input: {
     decisionAt: decisionAt.toISOString(),
     decisionSource: 'deterministic',
@@ -946,15 +961,30 @@ function buildFrictionInput(
   directIds: (event: EventRow) => string[],
   decisionAt: Date,
   stateLineage: CommercialSignalCompanyStateLineage,
+  evidenceById: ReadonlyMap<string, CommercialSignalEvidenceProvenance>,
 ) {
   const jobs = events.filter((event) => event.eventType === 'job_posting')
   const reposts = events.filter((event) => event.eventType === 'vacancy_repost')
   const salaries = events.filter((event) => event.eventType === 'vacancy_salary_change')
   const restarts = events.filter((event) => event.eventType === 'hiring_restart')
-  const allJobIds = ids(jobs.flatMap(directIds))
-  const repostIds = ids(reposts.flatMap(directIds))
-  const salaryIds = ids(salaries.flatMap(directIds))
-  const restartIds = ids(restarts.flatMap(directIds))
+  const capableIds = (
+    rawIds: string[],
+    feature: SourceFeature,
+  ): string[] => ids(rawIds.filter((id) => {
+    const source = evidenceById.get(id)?.sourceFamily
+    return source !== undefined &&
+      getSourceFeatureCapability(source, feature).status !== 'unsupported'
+  }))
+  const eventFeatureIds = (event: EventRow, feature: SourceFeature): string[] =>
+    capableIds(directIds(event), feature)
+  const allJobIds = ids(jobs.flatMap((event) =>
+    eventFeatureIds(event, 'vacancy')))
+  const repostIds = ids(reposts.flatMap((event) =>
+    eventFeatureIds(event, 'stable_publication_identity')))
+  const salaryIds = ids(salaries.flatMap((event) =>
+    eventFeatureIds(event, 'salary_snapshot')))
+  const restartIds = ids(restarts.flatMap((event) =>
+    eventFeatureIds(event, 'vacancy')))
   const observedReposts = reposts.flatMap((event) => {
     const payloadVersion = textPayload(event.payload, ['payloadVersion'])
     const intervalDays = numberPayload(event.payload, ['intervalDays', 'interval_days'])
@@ -968,7 +998,7 @@ function buildFrictionInput(
     const sourcePublicationChanged = booleanPayload(event.payload, [
       'sourcePublicationChanged', 'source_publication_changed',
     ])
-    const evidenceIds = directIds(event)
+    const evidenceIds = eventFeatureIds(event, 'stable_publication_identity')
     return payloadVersion !== 'vacancy-repost-v2' || intervalDays === null ||
       lifecycleClassification === null ||
       evidenceIds.length === 0
@@ -987,40 +1017,50 @@ function buildFrictionInput(
     .filter(Number.isFinite).sort((left, right) => left - right)[0]
   const requirements = events.filter((event) =>
     booleanPayload(event.payload, ['requirementsChanged', 'requirements_changed']) === true)
-  const requirementIds = ids(requirements.flatMap(directIds))
-  const evergreen = explicitBooleanObservation(events, directIds, [
+  const requirementIds = ids(requirements.flatMap((event) =>
+    eventFeatureIds(event, 'requirements_snapshot')))
+  const vacancyDirectIds = (event: EventRow): string[] =>
+    eventFeatureIds(event, 'vacancy')
+  const evergreen = explicitBooleanObservation(events, vacancyDirectIds, [
     'evergreen', 'evergreenRole', 'evergreen_role',
   ])
-  const massHiring = explicitBooleanObservation(events, directIds, [
+  const massHiring = explicitBooleanObservation(events, vacancyDirectIds, [
     'massHiring', 'mass_hiring',
   ])
   const snapshot = stateLineage.snapshot
   const stateEvidenceIds = stateLineage.evidenceIds
+  const lifetimeEvidenceIds = capableIds(
+    stateEvidenceIds,
+    'stable_publication_identity',
+  )
+  const roleEvidenceIds = capableIds(stateEvidenceIds, 'normalized_role')
+  const seniorityEvidenceIds = capableIds(stateEvidenceIds, 'seniority')
+  const vacancyEvidenceIds = capableIds(stateEvidenceIds, 'vacancy')
   const vacancyLifetime = snapshot.vacancyLifetime.observedCount > 0 &&
-      snapshot.vacancyLifetime.medianDays !== null
+      snapshot.vacancyLifetime.medianDays !== null && lifetimeEvidenceIds.length > 0
     ? observedMetric(
         clamp01((snapshot.vacancyLifetime.medianDays - 30) / 90),
-        stateEvidenceIds,
+        lifetimeEvidenceIds,
       )
     : unknownMetric()
   const repostRate = snapshot.repostRate.supported &&
-      snapshot.repostRate.rate !== null
-    ? observedMetric(snapshot.repostRate.rate, stateEvidenceIds)
+      snapshot.repostRate.rate !== null && lifetimeEvidenceIds.length > 0
+    ? observedMetric(snapshot.repostRate.rate, lifetimeEvidenceIds)
     : unknownMetric()
   const seniorityComplexity = distributionSeniorityComplexity(
     snapshot.seniorityDistribution.current,
-    stateEvidenceIds,
+    seniorityEvidenceIds,
   )
   const multiRoleComplexity = distributionComplexity(
     snapshot.roleDistribution.current,
-    stateEvidenceIds,
+    roleEvidenceIds,
   )
   const deviation = snapshot.currentHiringVelocity.baselineDeviation14d
   const recruiterVacancies =
     snapshot.recruitingCapacitySignals.currentRecruiterVacancies
   const recruiterPressure = snapshot.hiringBaseline.sufficientHistory &&
-      deviation !== null && recruiterVacancies > 0
-    ? observedMetric(clamp01(Math.max(0, deviation)), stateEvidenceIds)
+      deviation !== null && recruiterVacancies > 0 && vacancyEvidenceIds.length > 0
+    ? observedMetric(clamp01(Math.max(0, deviation)), vacancyEvidenceIds)
     : unknownMetric()
   return {
     vacancyAgeDays: earliestJob === undefined || allJobIds.length === 0
@@ -1336,7 +1376,7 @@ function distributionComplexity(
 ): EvidencedMetric {
   const known = knownDistribution(distribution)
   const sampleSize = known.reduce((total, [, count]) => total + count, 0)
-  if (sampleSize < 3) return unknownMetric()
+  if (sampleSize < 3 || evidenceIds.length === 0) return unknownMetric()
   return observedMetric(clamp01((known.length - 1) / 3), evidenceIds)
 }
 
@@ -1348,7 +1388,10 @@ function distributionSeniorityComplexity(
   const total = entries.reduce((sum, [, count]) => sum + count, 0)
   const known = knownDistribution(distribution)
   const knownCount = known.reduce((sum, [, count]) => sum + count, 0)
-  if (knownCount < 3 || total === 0 || knownCount / total < 0.6) {
+  if (
+    knownCount < 3 || total === 0 || knownCount / total < 0.6 ||
+    evidenceIds.length === 0
+  ) {
     return unknownMetric()
   }
   const seniorKeys = new Set(['lead', 'head', 'principal', 'senior', 'executive'])

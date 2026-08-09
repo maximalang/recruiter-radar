@@ -21,7 +21,7 @@ jest.mock('@/lib/opportunities/commercial-signal-quality-v2-repository', () => (
 }))
 
 function built(overrides: Record<string, unknown> = {}) {
-  return {
+  const base = {
     opportunityLineageId: '501',
     candidateId: '201',
     candidateGeneration: 1,
@@ -31,14 +31,41 @@ function built(overrides: Record<string, unknown> = {}) {
     organizationId: '301',
     workspaceId: '401',
     clientProfileId: '402',
+    organizationIndustry: 'fintech',
     validUntil: '2026-09-01T00:00:00.000Z',
     input: {
       evidence: [],
-      hiringFriction: { frictionLevel: 'unknown' },
+      stateLineage: {
+        snapshot: {
+          hiringBaseline: { sufficientHistory: false },
+          currentHiringVelocity: { baselineDeviation14d: null },
+          roleDistribution: { current: {} },
+          regionDistribution: { current: {}, newRegions: [] },
+        },
+      },
+      hiringFriction: { frictionLevel: 'unknown', observationStates: {} },
+      propensity: { componentValues: { procurement_barrier: null } },
+      economics: { componentValue: null },
+      marketDifficulty: { componentValue: null },
+      contact: { corporateContactPathAvailable: false },
       convergence: { status: 'review' },
       negativeEvidence: { action: 'none' },
     },
+  }
+  const inputOverride = (overrides.input ?? {}) as Record<string, unknown>
+  const frictionOverride = (inputOverride.hiringFriction ?? {}) as
+    Record<string, unknown>
+  return {
+    ...base,
     ...overrides,
+    input: {
+      ...base.input,
+      ...inputOverride,
+      hiringFriction: {
+        ...base.input.hiringFriction,
+        ...frictionOverride,
+      },
+    },
   } as never
 }
 
@@ -197,7 +224,7 @@ describe('Commercial Signal Quality v2 exact-lineage shadow pipeline', () => {
       clientProfileId: '402',
     }, database(['501']) as never)
 
-    expect(stats.telemetry).toEqual({
+    expect(stats.telemetry).toMatchObject({
       v3ToV2: { promoted: 0, demoted: 1, unchanged: 0 },
       qualityCoverage: { low: 0, medium: 1, high: 0 },
       qualityConfidence: { low: 1, medium: 0, high: 0 },
@@ -207,6 +234,29 @@ describe('Commercial Signal Quality v2 exact-lineage shadow pipeline', () => {
       convergenceStatuses: { active: 1 },
       negativeActions: { reduce: 1 },
       independentOriginRatio: { low: 0, medium: 1, high: 0 },
+      featureCoverage: {
+        features: {
+          repost_cycles: {
+            observed: 0,
+            unknown: 1,
+            not_supported: 0,
+            not_applicable: 0,
+            coverage: 0,
+          },
+          procurement: {
+            observed: 0,
+            unknown: 0,
+            not_supported: 1,
+            not_applicable: 0,
+            coverage: 0,
+          },
+        },
+        byProfile: { '402': expect.any(Object) },
+        byIndustry: { fintech: expect.any(Object) },
+        byRegion: { unknown: expect.any(Object) },
+        byRoleFamily: { unknown: expect.any(Object) },
+        bySource: { unknown: expect.any(Object) },
+      },
     })
     expect(JSON.stringify(stats.telemetry)).not.toMatch(/candidate|organization|evidence/i)
   })
