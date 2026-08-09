@@ -24,6 +24,9 @@ The aggregate exposes `qualityScore`, `qualityCoverage`, `qualityConfidence`,
 and `criticalCoverage`. A score cannot become actionable unless critical and
 overall coverage gates pass. A missing non-critical component is reported but
 does not automatically destroy a strong, well-covered opportunity.
+Unknown component values contribute zero effective coverage. Actionability also
+requires at least two known, independent provenance groups; unknown-origin
+groups never satisfy this gate.
 
 Quality and actionability remain separate. A strong opportunity without a
 corporate contact path becomes `qualified_needs_enrichment`; DNC or conflict
@@ -62,7 +65,8 @@ Correlation reason codes:
 - `EVIDENCE_ORIGIN_UNKNOWN`
 
 The repository refuses persistence if any evidence used by a component is
-missing from the exact provenance set. Database foreign keys bind every quality
+missing from the exact provenance set, if the set contains unused rows, or if
+any row is later than the decision clock. Database foreign keys bind every quality
 snapshot to one v3 candidate and every evidence row to that candidate's exact
 evidence lineage.
 
@@ -73,6 +77,7 @@ Quality and policy:
 - `QUALITY_CRITICAL_COVERAGE_LOW`
 - `QUALITY_COVERAGE_LOW`
 - `QUALITY_NONCRITICAL_DATA_MISSING`
+- `QUALITY_INDEPENDENT_ORIGINS_LOW`
 - `CURRENT_HIRING_EVIDENCE_MISSING`
 - `CORPORATE_CONTACT_PATH_MISSING`
 - `DO_NOT_CONTACT`
@@ -97,6 +102,11 @@ Query Planner feedback:
 - `YIELD_BUDGET_EXPANDED_REVIEWED_COMMERCIAL_YIELD`
 - `YIELD_BUDGET_EXPANDED_COMMERCIAL_OUTCOME`
 
+The Quality v2-specific reviewed/ordinary-hiring budget rules remain inactive
+unless `COMMERCIAL_SIGNAL_QUALITY_V2_ENABLED` is exactly `true`. Their metrics
+use exact plan/candidate lineage, an exact Quality v2 identity and generation,
+and effective outcome projections rather than raw events that may be reverted.
+
 ## Persistence schema
 
 - `commercial_signal_quality_snapshots`: append-only aggregate, components,
@@ -118,8 +128,11 @@ profile/week, a deterministic missed-opportunity sample, and a closed
 false-negative taxonomy. Required baselines are freshness, vacancy volume,
 FIUR, Opportunity v2, Opportunity v3, and Quality Engine v2.
 
-Temporal evaluation uses ordered train/validation/holdout periods. Evidence
-observed after the decision timestamp is excluded. Automatic production weight
+Temporal evaluation uses ordered train/validation/holdout periods. A scored row
+containing evidence observed after its decision timestamp is rejected; the
+evaluator never keeps its precomputed score after merely filtering timestamps.
+Outcome learning similarly excludes corrected events, candidates not yet shown,
+and outcomes after the fixed clock. Automatic production weight
 updates and production ML rollout are explicitly disabled.
 
 ## Verification commands
