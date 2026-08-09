@@ -45,6 +45,7 @@ export type ExternalAgencyPropensityResult = {
   actionability: 'eligible' | 'review' | 'blocked'
   reasonCodes: string[]
   evidenceIds: string[]
+  affirmativeEvidenceIds: string[]
   componentValues: Record<string, number | null>
 }
 
@@ -86,6 +87,15 @@ export function buildExternalAgencyPropensity(
     ...Object.values(components).flatMap((item) => item.evidenceIds),
     ...input.doNotContact.evidenceIds,
     ...input.conflict.evidenceIds,
+  ])
+  const affirmativeEvidenceIds = ids([
+    ...affirmativeComponentEvidence(input.hiringNeed, 0.65),
+    ...affirmativeComponentEvidence(input.hiringFriction, 0.6),
+    ...affirmativeComponentEvidence(input.externalSupportPlausibility, 0.6),
+    ...affirmativeComponentEvidence(input.timing, 0.6),
+    ...affirmativeComponentEvidence(input.agencyDna, 0.6),
+    ...affirmativeComponentEvidence(input.previousAgencyRelationship, 0.6),
+    ...affirmativeComponentEvidence(input.timeToFillPressure, 0.6),
   ])
   const reasonCodes: string[] = []
 
@@ -143,6 +153,7 @@ export function buildExternalAgencyPropensity(
       actionability: 'blocked',
       reasonCodes,
       evidenceIds,
+      affirmativeEvidenceIds,
       componentValues,
     })
   }
@@ -162,6 +173,7 @@ export function buildExternalAgencyPropensity(
       actionability: 'review',
       reasonCodes: [...reasonCodes, 'INSUFFICIENT_COMPLEMENTARY_EVIDENCE'],
       evidenceIds,
+      affirmativeEvidenceIds,
       componentValues,
     })
   }
@@ -192,8 +204,17 @@ export function buildExternalAgencyPropensity(
       ? reasonCodes
       : [...reasonCodes, 'HIGH_GATE_NOT_SATISFIED'],
     evidenceIds,
+    affirmativeEvidenceIds,
     componentValues,
   })
+}
+
+function affirmativeComponentEvidence(
+  componentValue: PropensityComponent,
+  threshold: number,
+): string[] {
+  return componentValue.value !== null && componentValue.value >= threshold
+    ? componentValue.evidenceIds : []
 }
 
 function propensityScore(

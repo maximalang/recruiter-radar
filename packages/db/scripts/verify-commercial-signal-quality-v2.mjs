@@ -31,11 +31,14 @@ try {
          AS snapshots,
        TO_REGCLASS('public.commercial_signal_quality_evidence')::TEXT
          AS evidence,
+       TO_REGCLASS('public.commercial_signal_quality_opportunity_lineage')::TEXT
+         AS quality_lineage,
        TO_REGCLASS('public.opportunity_candidates')::TEXT AS candidates`,
   )
   assert.deepEqual(relations.rows[0], {
     snapshots: 'commercial_signal_quality_snapshots',
     evidence: 'commercial_signal_quality_evidence',
+    quality_lineage: 'commercial_signal_quality_opportunity_lineage',
     candidates: 'opportunity_candidates',
   })
 
@@ -44,7 +47,8 @@ try {
      FROM pg_constraint
      WHERE conrelid IN (
        'commercial_signal_quality_snapshots'::REGCLASS,
-       'commercial_signal_quality_evidence'::REGCLASS
+       'commercial_signal_quality_evidence'::REGCLASS,
+       'commercial_signal_quality_opportunity_lineage'::REGCLASS
      )`,
   )
   const constraintNames = new Set(constraints.rows.map((row) => row.conname))
@@ -58,6 +62,11 @@ try {
     'commercial_signal_quality_evidence_candidate_lineage_fkey',
     'commercial_signal_quality_evidence_item_fkey',
     'commercial_signal_quality_evidence_reason_check',
+    'commercial_signal_quality_evidence_source_kind_check',
+    'commercial_signal_quality_evidence_decision_role_check',
+    'commercial_signal_quality_opportunity_lineage_pkey',
+    'cs_quality_opp_lineage_snapshot_fkey',
+    'cs_quality_opp_lineage_opportunity_fkey',
   ]) {
     assert.ok(constraintNames.has(name), `missing constraint ${name}`)
   }
@@ -67,13 +76,17 @@ try {
      FROM pg_trigger
      WHERE tgrelid IN (
        'commercial_signal_quality_snapshots'::REGCLASS,
-       'commercial_signal_quality_evidence'::REGCLASS
+       'commercial_signal_quality_evidence'::REGCLASS,
+       'commercial_signal_quality_opportunity_lineage'::REGCLASS,
+       'commercial_signal_opportunity_lineage'::REGCLASS
      ) AND NOT tgisinternal`,
   )
   const triggerNames = new Set(triggers.rows.map((row) => row.tgname))
   for (const name of [
     'commercial_signal_quality_snapshots_immutable',
     'commercial_signal_quality_evidence_immutable',
+    'commercial_signal_quality_opportunity_lineage_immutable',
+    'commercial_signal_quality_opportunity_lineage_validate',
   ]) {
     assert.ok(triggerNames.has(name), `missing trigger ${name}`)
   }
@@ -83,11 +96,14 @@ try {
     `SELECT
        TO_REGCLASS('public.commercial_signal_quality_snapshots') AS snapshots,
        TO_REGCLASS('public.commercial_signal_quality_evidence') AS evidence,
+       TO_REGCLASS('public.commercial_signal_quality_opportunity_lineage')
+         AS quality_lineage,
        TO_REGCLASS('public.opportunity_candidates')::TEXT AS candidates`,
   )
   assert.deepEqual(removed.rows[0], {
     snapshots: null,
     evidence: null,
+    quality_lineage: null,
     candidates: 'opportunity_candidates',
   })
 

@@ -35,9 +35,16 @@ const DEFAULT_MINIMUM_SAMPLE = 30
 const DEFAULT_MINIMUM_LABELED = 10
 
 export function evaluateCommercialSignalV2(inputRows, options = {}) {
-  const rows = inputRows.map(normalizeRow)
+  const evaluationAt = isoTimestamp(options.evaluationAt, 'evaluation at')
+  const rows = inputRows.map((row) => normalizeRow(row, evaluationAt))
     .sort((left, right) => compareText(left.sampleKey, right.sampleKey))
   assertUnique(rows.map((row) => row.sampleKey), 'sample key')
+  assertUnique(rows.flatMap((row) => row.outcomeProjection === null
+    ? [] : [row.outcomeProjection.lastEventId]), 'outcome projection event id')
+  for (const field of ['candidateId', 'opportunityId', 'lineageId']) {
+    assertUnique(rows.flatMap((row) => row.outcomeProjection === null
+      ? [] : [row.outcomeProjection[field]]), `outcome ${field}`)
+  }
   const minimumSample = positiveInteger(
     options.minimumSample ?? DEFAULT_MINIMUM_SAMPLE,
     'minimum sample',
@@ -141,7 +148,7 @@ export function buildTemporalEvaluationSplits(inputRows, boundaries) {
   if (!(trainBefore < validationBefore && validationBefore < holdoutBefore)) {
     throw new TypeError('temporal split boundaries must be strictly increasing')
   }
-  const rows = inputRows.map(normalizeRow)
+  const rows = inputRows.map((row) => normalizeRow(row, holdoutBefore))
   const result = { train: [], validation: [], holdout: [] }
   for (const row of rows) {
     const decisionAt = Date.parse(row.decisionAt)
@@ -235,14 +242,22 @@ function buildMissedOpportunityAudit(rows, options) {
   }
 }
 
-function normalizeRow(input) {
+function normalizeRow(input, evaluationAt) {
   const decisionAt = isoTimestamp(input.decisionAt, 'decision at')
+  if (decisionAt > evaluationAt) {
+    throw new TypeError('future decision cannot enter evaluation')
+  }
   const evidenceObservedAt = stringArray(input.evidenceObservedAt)
     .map((value) => isoTimestamp(value, 'evidence observed at'))
   const futureEvidence = evidenceObservedAt.filter((value) => value > decisionAt)
   if (futureEvidence.length > 0) {
     throw new TypeError('future evidence cannot enter an evaluated score row')
   }
+  const outcomeProjection = normalizeOutcomeProjection(
+    input.outcomeProjection,
+    decisionAt,
+    evaluationAt,
+  )
   return {
     sampleKey: hash(input.sampleKey, 'sample key'),
     agencyProfileKey: hash(input.agencyProfileKey, 'agency profile key'),
@@ -265,9 +280,10 @@ function normalizeRow(input) {
     friction: unitInterval(input.friction, 'friction'),
     agencyFit: unitInterval(input.agencyFit, 'agency fit'),
     propensity: unitInterval(input.propensity, 'propensity'),
-    replied: optionalBoolean(input.replied),
-    meeting: optionalBoolean(input.meeting),
-    won: optionalBoolean(input.won),
+    replied: outcomeProjection === null ? null : outcomeProjection.repliedAt !== null,
+    meeting: outcomeProjection === null ? null : outcomeProjection.meetingAt !== null,
+    won: outcomeProjection === null ? null : outcomeProjection.wonAt !== null,
+    outcomeProjection,
     falseNegativeCategory: input.falseNegativeCategory == null ? null
       : enumValue(
         input.falseNegativeCategory,
@@ -277,6 +293,38 @@ function normalizeRow(input) {
     evidenceObservedAt,
     excludedFutureEvidenceCount: 0,
   }
+}
+
+function normalizeOutcomeProjection(input, decisionAt, evaluationAt) {
+  if (input == null) return null
+  if (input.version !== 'opportunity-outcome-state-v1') {
+    throw new TypeError('outcome projection version is invalid')
+  }
+  const lastEventAt = isoTimestamp(input.lastEventAt, 'outcome last event at')
+  if (lastEventAt > evaluationAt) {
+    throw new TypeError('future outcome projection cannot enter evaluation')
+  }
+  const result = {
+    version: input.version,
+    candidateId: positiveIdText(input.candidateId, 'outcome candidate id'),
+    opportunityId: positiveIdText(input.opportunityId, 'outcome opportunity id'),
+    lineageId: positiveIdText(input.lineageId, 'outcome lineage id'),
+    lastEventId: positiveIdText(input.lastEventId, 'outcome last event id'),
+    lastEventAt,
+    repliedAt: optionalOutcomeTimestamp(input.repliedAt, decisionAt, lastEventAt),
+    meetingAt: optionalOutcomeTimestamp(input.meetingAt, decisionAt, lastEventAt),
+    wonAt: optionalOutcomeTimestamp(input.wonAt, decisionAt, lastEventAt),
+  }
+  return result
+}
+
+function optionalOutcomeTimestamp(value, decisionAt, lastEventAt) {
+  if (value == null) return null
+  const timestampValue = isoTimestamp(value, 'outcome timestamp')
+  if (timestampValue < decisionAt || timestampValue > lastEventAt) {
+    throw new TypeError('outcome timestamp is outside its causal evaluation window')
+  }
+  return timestampValue
 }
 
 function groupRows(rows) {
@@ -366,6 +414,12 @@ function optionalBoolean(value) {
   if (value == null) return null
   if (typeof value !== 'boolean') throw new TypeError('outcome must be boolean or null')
   return value
+}
+
+function positiveIdText(value, label) {
+  const normalized = String(value ?? '')
+  if (!/^[1-9]\d*$/.test(normalized)) throw new TypeError(`${label} is invalid`)
+  return normalized
 }
 
 function enumValue(value, allowed, label) {

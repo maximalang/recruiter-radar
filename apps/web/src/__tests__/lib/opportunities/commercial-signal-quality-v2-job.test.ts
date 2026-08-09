@@ -26,6 +26,7 @@ function item(): CommercialSignalQualityV2ShadowItem {
 function engineInput(): CommercialSignalQualityEngineV2Input {
   const evidence = [{
     evidenceId: '101',
+    sourceKind: 'direct' as const,
     sourceFamily: 'career-pages',
     sourceDomain: 'example.ru',
     upstreamOrigin: 'origin:101',
@@ -35,15 +36,32 @@ function engineInput(): CommercialSignalQualityEngineV2Input {
     organizationDomain: 'example.ru',
     contentFingerprint: 'a'.repeat(64),
     observedAt: '2026-08-08T09:00:00.000Z',
+  }, {
+    evidenceId: '102',
+    sourceKind: 'official' as const,
+    sourceFamily: 'corporate-contacts',
+    sourceDomain: 'example.ru',
+    upstreamOrigin: 'origin:contact',
+    canonicalUrl: 'https://example.ru/contact',
+    vacancyFingerprint: null,
+    publicationFingerprint: null,
+    organizationDomain: 'example.ru',
+    contentFingerprint: 'b'.repeat(64),
+    observedAt: '2026-08-08T09:00:00.000Z',
   }]
   return {
     decisionAt: '2026-08-08T10:00:00.000Z',
     decisionSource: 'deterministic',
     componentSources: {
       hiringNeed: 'direct',
+      hiringFriction: 'derived_deterministic',
       agencyFit: 'derived_deterministic',
+      propensity: 'derived_deterministic',
+      convergence: 'derived_deterministic',
+      economics: 'derived_deterministic',
+      marketDifficulty: 'derived_deterministic',
     },
-    currentHiringEvidence: true,
+    currentHiringEvidence: { present: true, evidenceIds: ['101'] },
     hiringNeed: component(0.9),
     hiringFriction: {
       featureVersion: 'hiring-friction-v1',
@@ -65,6 +83,7 @@ function engineInput(): CommercialSignalQualityEngineV2Input {
       actionability: 'eligible',
       reasonCodes: ['PROPENSITY'],
       evidenceIds: ['101'],
+      affirmativeEvidenceIds: ['101'],
       componentValues: {},
     },
     convergence: {
@@ -85,6 +104,7 @@ function engineInput(): CommercialSignalQualityEngineV2Input {
       negativeReasons: [],
       eventIds: ['501'],
       evidenceIds: ['101'],
+      affirmativeEvidenceIds: ['101'],
       excludedFutureEventIds: [],
     },
     economics: {
@@ -122,7 +142,7 @@ function engineInput(): CommercialSignalQualityEngineV2Input {
       corporateContactPathAvailable: true,
       doNotContact: false,
       conflict: false,
-      evidenceIds: ['101'],
+      evidenceIds: ['102'],
     },
     evidence,
   }

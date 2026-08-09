@@ -27,9 +27,18 @@ const row = (index, overrides = {}) => ({
   friction: index % 3 === 0 ? 0.85 : 0.3,
   agencyFit: index % 4 === 0 ? 0.9 : 0.5,
   propensity: index % 4 === 0 ? 0.3 : 0.7,
-  replied: index <= 8,
-  meeting: index <= 5,
-  won: index <= 2,
+  outcomeProjection: {
+    version: 'opportunity-outcome-state-v1',
+    candidateId: String(2000 + index),
+    opportunityId: String(3000 + index),
+    lineageId: String(4000 + index),
+    lastEventId: String(1000 + index),
+    lastEventAt: `2026-${index <= 9 ? '06' : index <= 19 ? '07' : '08'}-05T00:00:00.000Z`,
+    repliedAt: index <= 8
+      ? `2026-${index <= 9 ? '06' : '07'}-02T00:00:00.000Z` : null,
+    meetingAt: index <= 5 ? '2026-06-03T00:00:00.000Z' : null,
+    wonAt: index <= 2 ? '2026-06-04T00:00:00.000Z' : null,
+  },
   falseNegativeCategory: index === 20 ? 'coverage_gap' : null,
   evidenceObservedAt: [
     '2026-05-01T00:00:00.000Z',
@@ -38,7 +47,9 @@ const row = (index, overrides = {}) => ({
 })
 
 const rows = Array.from({ length: 30 }, (_, index) => row(index + 1))
-const report = evaluateCommercialSignalV2(rows)
+const report = evaluateCommercialSignalV2(rows, {
+  evaluationAt: '2026-09-01T00:00:00.000Z',
+})
 
 assert.equal(report.dataStatus, 'sufficient_data')
 assert.equal(report.calibrationStatus, 'uncalibrated')
@@ -57,9 +68,29 @@ assert.equal(report.falseNegativeTaxonomy.length, FALSE_NEGATIVE_CATEGORIES.leng
 assert.equal(report.excludedFutureEvidenceCount, 0)
 assert.throws(() => evaluateCommercialSignalV2([
   row(1, { evidenceObservedAt: ['2026-08-01T00:00:00.000Z'] }),
-]), /future evidence/)
+], { evaluationAt: '2026-09-01T00:00:00.000Z' }), /future evidence/)
+assert.throws(() => evaluateCommercialSignalV2([
+  row(1, { decisionAt: '2026-09-02T00:00:00.000Z' }),
+], { evaluationAt: '2026-09-01T00:00:00.000Z' }), /future decision/)
+assert.throws(() => evaluateCommercialSignalV2([
+  row(1, {
+    outcomeProjection: {
+      version: 'opportunity-outcome-state-v1',
+      candidateId: '9001',
+      opportunityId: '9002',
+      lineageId: '9003',
+      lastEventId: '9999',
+      lastEventAt: '2026-09-02T00:00:00.000Z',
+      repliedAt: null,
+      meetingAt: null,
+      wonAt: '2026-09-02T00:00:00.000Z',
+    },
+  }),
+], { evaluationAt: '2026-09-01T00:00:00.000Z' }), /future outcome projection/)
 
-const reversed = evaluateCommercialSignalV2([...rows].reverse())
+const reversed = evaluateCommercialSignalV2([...rows].reverse(), {
+  evaluationAt: '2026-09-01T00:00:00.000Z',
+})
 assert.deepEqual(reversed.models, report.models)
 assert.deepEqual(reversed.missedOpportunityAudit, report.missedOpportunityAudit)
 
@@ -86,6 +117,7 @@ process.stdout.write(`${JSON.stringify({
     'missed_opportunity_shadow_sample',
     'false_negative_taxonomy',
     'future_evidence_excluded',
+    'future_decisions_excluded',
     'temporal_split_only',
     'deterministic_results',
     'no_automatic_weight_updates',

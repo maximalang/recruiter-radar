@@ -274,36 +274,62 @@ async function computePlanCounts(client, plan, start, end) {
          ON outcome.opportunity_id = lineage.opportunity_id
         AND outcome.owner_id = lineage.owner_id
      ),
+     quality_links AS (
+       SELECT
+         lineage.lineage_id,
+         link.quality_snapshot_id
+       FROM lineages lineage
+       JOIN commercial_signal_quality_opportunity_lineage link
+         ON link.opportunity_lineage_id = lineage.lineage_id
+        AND link.candidate_id = lineage.candidate_id
+        AND link.workspace_id = $2
+        AND link.client_profile_id = $3
+       JOIN commercial_signal_quality_snapshots quality
+        ON quality.id = link.quality_snapshot_id
+        AND quality.candidate_id = lineage.candidate_id
+        AND quality.decision_at <= lineage.created_at
+        AND lineage.created_at <= quality.valid_until
+     ),
      quality_groups AS (
        SELECT DISTINCT evidence.evidence_independence_group
        FROM lineages lineage
-       JOIN commercial_signal_quality_snapshots quality
-         ON quality.candidate_id = lineage.candidate_id
-        AND quality.workspace_id = $2
-        AND quality.client_profile_id = $3
-        AND quality.feature_version = 'commercial-signal-quality-v2'
-        AND quality.quality_identity =
-          lineage.score_snapshot->'commercialSignalQualityV2'->>'qualityIdentity'
-        AND quality.quality_generation::TEXT =
-          lineage.score_snapshot->'commercialSignalQualityV2'->>'qualityGeneration'
-        AND quality.created_at <= lineage.created_at
+       JOIN quality_links quality_link
+         ON quality_link.lineage_id = lineage.lineage_id
        JOIN commercial_signal_quality_evidence evidence
-         ON evidence.quality_snapshot_id = quality.id
+         ON evidence.quality_snapshot_id = quality_link.quality_snapshot_id
         AND evidence.candidate_id = lineage.candidate_id
         AND evidence.workspace_id = $2
         AND evidence.client_profile_id = $3
         AND evidence.observed_at <= lineage.created_at
+        AND evidence.decision_role = 'positive'
+     ),
+     latest_annotations AS (
+       SELECT DISTINCT ON (annotation.lineage_id, annotation.reviewer_user_id)
+         annotation.lineage_id,
+         annotation.reviewer_user_id,
+         annotation.label,
+         annotation.reason_code
+       FROM commercial_signal_annotations annotation
+       JOIN lineages lineage ON lineage.lineage_id = annotation.lineage_id
+       WHERE annotation.workspace_id = $2
+         AND annotation.client_profile_id = $3
+         AND annotation.created_at >= $4::TIMESTAMPTZ
+         AND annotation.created_at < $5::TIMESTAMPTZ
+       ORDER BY annotation.lineage_id, annotation.reviewer_user_id,
+         annotation.annotation_generation DESC, annotation.id DESC
      ),
      review_flags AS (
        SELECT
          lineage.lineage_id,
-         BOOL_OR(annotation.label IN ('strong', 'acceptable')) AS strong_reviewed,
-         BOOL_OR(annotation.reason_code = 'ordinary_hiring') AS ordinary_hiring
+         BOOL_AND(annotation.label IN ('strong', 'acceptable'))
+           AND NOT BOOL_OR(annotation.reason_code = 'ordinary_hiring')
+           AS strong_reviewed,
+         BOOL_AND(annotation.reason_code = 'ordinary_hiring')
+           AND NOT BOOL_OR(annotation.label IN ('strong', 'acceptable'))
+           AS ordinary_hiring
        FROM lineages lineage
-       JOIN commercial_signal_annotations annotation
+       JOIN latest_annotations annotation
          ON annotation.lineage_id = lineage.lineage_id
-        AND annotation.workspace_id = $2
-        AND annotation.client_profile_id = $3
        GROUP BY lineage.lineage_id
      )
      SELECT

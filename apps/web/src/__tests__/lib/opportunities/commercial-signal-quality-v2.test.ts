@@ -12,6 +12,7 @@ function evidence(
 ): CommercialSignalEvidenceProvenance {
   return {
     evidenceId: '101',
+    sourceKind: 'direct',
     sourceFamily: 'career-pages',
     sourceDomain: 'example.ru',
     upstreamOrigin: 'ats:example:vacancy-42',
@@ -26,6 +27,11 @@ function evidence(
 }
 
 describe('Commercial Signal Quality Engine v2 contracts', () => {
+  it('rejects LLM evidence at the provenance boundary', () => {
+    expect(() => buildEvidenceIndependence([
+      evidence({ sourceKind: 'llm' as never }),
+    ], new Date('2026-08-09T00:00:00.000Z'))).toThrow(/source kind/i)
+  })
   it('counts one upstream vacancy republished on three surfaces as one independent group', () => {
     const result = buildEvidenceIndependence([
       evidence(),

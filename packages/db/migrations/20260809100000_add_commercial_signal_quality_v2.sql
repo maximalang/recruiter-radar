@@ -23,6 +23,7 @@ CREATE TABLE commercial_signal_quality_snapshots (
   feature_version TEXT NOT NULL,
   model_type TEXT NOT NULL,
   calibration_status TEXT NOT NULL,
+  decision_at TIMESTAMPTZ NOT NULL,
   valid_until TIMESTAMPTZ NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT commercial_signal_quality_snapshots_id_scope_unique
@@ -97,7 +98,7 @@ CREATE TABLE commercial_signal_quality_snapshots (
     AND calibration_status = 'uncalibrated'
   ),
   CONSTRAINT commercial_signal_quality_snapshots_validity_check
-    CHECK (valid_until >= created_at)
+    CHECK (valid_until >= decision_at)
 );
 
 CREATE TABLE commercial_signal_quality_evidence (
@@ -107,6 +108,8 @@ CREATE TABLE commercial_signal_quality_evidence (
   workspace_id BIGINT NOT NULL,
   client_profile_id BIGINT NOT NULL,
   evidence_id BIGINT NOT NULL,
+  decision_role TEXT NOT NULL,
+  source_kind TEXT NOT NULL,
   source_family TEXT NOT NULL,
   source_domain TEXT NOT NULL,
   upstream_origin TEXT,
@@ -147,6 +150,14 @@ CREATE TABLE commercial_signal_quality_evidence (
     UNIQUE (quality_snapshot_id, evidence_id),
   CONSTRAINT commercial_signal_quality_evidence_source_family_check
     CHECK (BTRIM(source_family) <> ''),
+  CONSTRAINT commercial_signal_quality_evidence_source_kind_check CHECK (
+    source_kind IN (
+      'direct', 'official', 'approved_context', 'derived_deterministic'
+    )
+  ),
+  CONSTRAINT commercial_signal_quality_evidence_decision_role_check CHECK (
+    decision_role IN ('positive', 'negative', 'contact_policy')
+  ),
   CONSTRAINT commercial_signal_quality_evidence_source_domain_check
     CHECK (BTRIM(source_domain) <> ''),
   CONSTRAINT commercial_signal_quality_evidence_optional_text_check CHECK (
@@ -172,6 +183,57 @@ CREATE TABLE commercial_signal_quality_evidence (
     )
   )
 );
+
+CREATE TABLE commercial_signal_quality_opportunity_lineage (
+  quality_snapshot_id BIGINT NOT NULL,
+  opportunity_lineage_id BIGINT NOT NULL,
+  candidate_id BIGINT NOT NULL,
+  organization_id BIGINT NOT NULL,
+  workspace_id BIGINT NOT NULL,
+  client_profile_id BIGINT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT commercial_signal_quality_opportunity_lineage_pkey
+    PRIMARY KEY (opportunity_lineage_id),
+  CONSTRAINT cs_quality_opp_lineage_snapshot_fkey
+    FOREIGN KEY (quality_snapshot_id)
+    REFERENCES commercial_signal_quality_snapshots(id) ON DELETE RESTRICT,
+  CONSTRAINT cs_quality_opp_lineage_opportunity_fkey
+    FOREIGN KEY (opportunity_lineage_id)
+    REFERENCES commercial_signal_opportunity_lineage(id) ON DELETE RESTRICT
+);
+
+CREATE OR REPLACE FUNCTION validate_commercial_signal_quality_lineage()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM commercial_signal_quality_snapshots quality
+    JOIN commercial_signal_opportunity_lineage lineage
+      ON lineage.id = NEW.opportunity_lineage_id
+    WHERE quality.id = NEW.quality_snapshot_id
+      AND quality.candidate_id = NEW.candidate_id
+      AND lineage.candidate_id = NEW.candidate_id
+      AND quality.organization_id = NEW.organization_id
+      AND lineage.organization_id = NEW.organization_id
+      AND quality.workspace_id = NEW.workspace_id
+      AND lineage.workspace_id = NEW.workspace_id
+      AND quality.client_profile_id = NEW.client_profile_id
+      AND lineage.client_profile_id = NEW.client_profile_id
+      AND quality.decision_at <= lineage.created_at
+      AND lineage.created_at <= quality.valid_until
+  ) THEN
+    RAISE EXCEPTION 'quality opportunity lineage scope mismatch'
+      USING ERRCODE = '23514';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER commercial_signal_quality_opportunity_lineage_validate
+BEFORE INSERT ON commercial_signal_quality_opportunity_lineage
+FOR EACH ROW EXECUTE FUNCTION validate_commercial_signal_quality_lineage();
 
 CREATE INDEX commercial_signal_quality_snapshots_current_idx
   ON commercial_signal_quality_snapshots (
@@ -215,10 +277,18 @@ BEFORE UPDATE OR DELETE ON commercial_signal_quality_evidence
 FOR EACH ROW
 EXECUTE FUNCTION reject_opportunity_candidate_mutation();
 
+CREATE TRIGGER commercial_signal_quality_opportunity_lineage_immutable
+BEFORE UPDATE OR DELETE ON commercial_signal_quality_opportunity_lineage
+FOR EACH ROW
+EXECUTE FUNCTION reject_opportunity_candidate_mutation();
+
 COMMENT ON TABLE commercial_signal_quality_snapshots IS
   'Append-only shadow evaluations for Commercial Signal Quality Engine v2. Does not change v3 readers or production weights.';
 
 COMMENT ON TABLE commercial_signal_quality_evidence IS
   'Exact candidate evidence provenance and deterministic independence groups for Commercial Signal Quality Engine v2.';
+
+COMMENT ON TABLE commercial_signal_quality_opportunity_lineage IS
+  'Immutable exact link between a Quality v2 generation and the v3 opportunity lineage created for the same candidate and tenant.';
 
 COMMIT;

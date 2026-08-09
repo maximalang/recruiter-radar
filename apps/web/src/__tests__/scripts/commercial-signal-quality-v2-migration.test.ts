@@ -15,6 +15,9 @@ describe('Commercial Signal Quality Engine v2 migration', () => {
   it('adds an append-only shadow layer without rewriting v3 candidates', () => {
     expect(migration).toMatch(/CREATE TABLE commercial_signal_quality_snapshots\b/)
     expect(migration).toMatch(/CREATE TABLE commercial_signal_quality_evidence\b/)
+    expect(migration).toMatch(
+      /CREATE TABLE commercial_signal_quality_opportunity_lineage\b/,
+    )
     expect(migration).not.toMatch(/ALTER TABLE opportunity_candidates\b/)
     expect(migration).not.toMatch(/UPDATE opportunity_candidates\b/)
     expect(migration).toContain(
@@ -35,6 +38,7 @@ describe('Commercial Signal Quality Engine v2 migration', () => {
       'reason_codes TEXT[] NOT NULL',
       'feature_snapshot JSONB NOT NULL',
       'input_hash TEXT NOT NULL',
+      'decision_at TIMESTAMPTZ NOT NULL',
     ]) {
       expect(migration).toContain(field)
     }
@@ -51,11 +55,17 @@ describe('Commercial Signal Quality Engine v2 migration', () => {
     expect(migration).toContain('REFERENCES opportunity_candidates(')
     expect(migration).toContain('REFERENCES opportunity_candidate_evidence(')
     expect(migration).toContain('REFERENCES evidence_items(id, org_id)')
+    expect(migration).toContain('PRIMARY KEY (opportunity_lineage_id)')
+    expect(migration).not.toContain('link_commercial_signal_quality_lineage')
+    expect(migration).toContain('quality.decision_at <= lineage.created_at')
+    expect(migration).toContain('lineage.created_at <= quality.valid_until')
   })
 
   it('persists provenance and correlation reasons for every evidence item', () => {
     for (const field of [
       'source_family TEXT NOT NULL',
+      'source_kind TEXT NOT NULL',
+      'decision_role TEXT NOT NULL',
       'source_domain TEXT NOT NULL',
       'upstream_origin TEXT',
       'canonical_url TEXT',
@@ -85,7 +95,10 @@ describe('Commercial Signal Quality Engine v2 migration', () => {
       'LOCK TABLE commercial_signal_quality_snapshots IN ACCESS EXCLUSIVE MODE',
     )
     expect(rollback).toContain(
-      'IF EXISTS (SELECT 1 FROM commercial_signal_quality_snapshots)',
+      'OR EXISTS (SELECT 1 FROM commercial_signal_quality_snapshots)',
+    )
+    expect(rollback).toContain(
+      'LOCK TABLE commercial_signal_quality_opportunity_lineage',
     )
     expect(rollback).toContain('commercial signal quality v2 rollback refused')
     expect(rollback.indexOf('DROP TABLE commercial_signal_quality_evidence'))

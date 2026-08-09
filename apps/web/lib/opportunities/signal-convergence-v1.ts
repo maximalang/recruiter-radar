@@ -51,6 +51,7 @@ export type SignalConvergenceResult = {
   negativeReasons: string[]
   eventIds: string[]
   evidenceIds: string[]
+  affirmativeEvidenceIds: string[]
   excludedFutureEventIds: string[]
 }
 
@@ -151,6 +152,8 @@ export function buildSignalConvergence(
     negativeReasons: uniqueText(negativeReasons),
     eventIds: ids(events.map((item) => item.eventId), 'event id'),
     evidenceIds: ids(events.flatMap((item) => item.evidenceIds)),
+    affirmativeEvidenceIds: convergenceScore > 0
+      ? ids(events.flatMap((item) => item.evidenceIds)) : [],
     excludedFutureEventIds: ids(future.map((item) => item.eventId), 'event id'),
   }
 }

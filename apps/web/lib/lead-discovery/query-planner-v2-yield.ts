@@ -75,7 +75,7 @@ export function applyHistoricalYieldToQueryPlan(
     normalizedYield,
     options,
   )
-  const supplyDiagnostics = diagnoseQueryPlanSupply(normalizedYield)
+  const supplyDiagnostics = diagnoseQueryPlanSupply(normalizedYield, options)
   const queryEnv = { ...plan.queryEnv }
   queryEnv[PAGE_ENV_KEY[plan.source]] = String(budgetAdjustment.pageBudget)
   const reasonCodes = uniqueStrings([
@@ -122,6 +122,7 @@ export function applyHistoricalYieldToQueryPlan(
  */
 export function diagnoseQueryPlanSupply(
   rawYield: QueryPlanOperationalYield,
+  options: { qualityFeedbackEnabled?: boolean } = {},
 ): QueryPlanSupplyDiagnosticCode[] {
   const value = normalizeOperationalYield(rawYield)
   const fetched = value.fetchedRecords ?? 0
@@ -139,8 +140,9 @@ export function diagnoseQueryPlanSupply(
   const replied = value.replied ?? 0
 
   const sampleReady = fetched >= MIN_SAMPLE_FETCHED ||
-    episodes >= MIN_SAMPLE_EPISODES || executionCount >= 5 ||
-    strongReviewed >= 2 || replied >= 1 || (value.meetings ?? 0) >= 1
+    episodes >= MIN_SAMPLE_EPISODES || executionCount >= 5 || replied >= 1 ||
+    (value.meetings ?? 0) >= 1 ||
+    (options.qualityFeedbackEnabled === true && strongReviewed >= 2)
   if (!sampleReady) return ['SUPPLY_SAMPLE_INSUFFICIENT']
 
   const diagnostics: QueryPlanSupplyDiagnosticCode[] = []
@@ -155,7 +157,8 @@ export function diagnoseQueryPlanSupply(
   if (fetched >= MIN_SAMPLE_FETCHED && duplicateRate >= 0.7) {
     diagnostics.push('SUPPLY_DUPLICATE_HEAVY')
   }
-  if (strongReviewed + ordinaryHiring >= 5 &&
+  if (options.qualityFeedbackEnabled === true &&
+    strongReviewed + ordinaryHiring >= 5 &&
     ordinaryHiring / (strongReviewed + ordinaryHiring) >= 0.7) {
     diagnostics.push('SUPPLY_ORDINARY_HIRING_HEAVY')
   }
@@ -184,8 +187,9 @@ export function resolveYieldAdjustedPageBudget(
     (yieldSnapshot.fetchedRecords ?? 0) >= MIN_SAMPLE_FETCHED ||
     (yieldSnapshot.episodes ?? 0) >= MIN_SAMPLE_EPISODES ||
     (yieldSnapshot.executionCount ?? 0) >= 5 ||
-    (options.qualityFeedbackEnabled === true && strongReviewed >= 2) ||
-    (yieldSnapshot.replied ?? 0) >= 1 || (yieldSnapshot.meetings ?? 0) >= 1
+    (yieldSnapshot.replied ?? 0) >= 1 ||
+    (yieldSnapshot.meetings ?? 0) >= 1 ||
+    (options.qualityFeedbackEnabled === true && strongReviewed >= 2)
   if (!sampleReady) {
     return { pageBudget: currentBudget, reasonCode: 'YIELD_SAMPLE_INSUFFICIENT' }
   }

@@ -1,10 +1,13 @@
 import type { QueryResult } from 'pg'
 
 import { hashCanonicalJson } from './canonical-hash'
-import type {
-  CommercialSignalQualityEngineV2Result,
+import {
+  buildCommercialSignalQualityEngineV2,
+  type CommercialSignalQualityEngineV2Input,
+  type CommercialSignalQualityEngineV2Result,
 } from './commercial-signal-quality-engine-v2'
 import {
+  buildEvidenceIndependence,
   COMMERCIAL_SIGNAL_QUALITY_VERSION,
   type CommercialSignalEvidenceProvenance,
   type EvidenceIndependenceReasonCode,
@@ -24,6 +27,7 @@ export type CommercialSignalQualityV2PersistenceInput = {
   workspaceId: string
   clientProfileId: string
   validUntil: string
+  engineInput: CommercialSignalQualityEngineV2Input
   result: CommercialSignalQualityEngineV2Result
   evidence: CommercialSignalEvidenceProvenance[]
 }
@@ -35,10 +39,20 @@ export type CommercialSignalQualityV2PersistenceResult = {
   evidenceAttached: number
 }
 
+export type CommercialSignalQualityV2OpportunityLink = {
+  qualitySnapshotId: string
+  opportunityLineageId: string
+  candidateId: string
+  organizationId: string
+  workspaceId: string
+  clientProfileId: string
+}
+
 type NormalizedInput = CommercialSignalQualityV2PersistenceInput & {
   qualityIdentity: string
   inputHash: string
   evidenceRows: Array<CommercialSignalEvidenceProvenance & {
+    decisionRole: 'positive' | 'negative' | 'contact_policy'
     evidenceIndependenceGroup: string
     correlationReasonCode: EvidenceIndependenceReasonCode
   }>
@@ -65,6 +79,60 @@ export async function persistCommercialSignalQualityV2(
     if (ownsClient && 'release' in client && typeof client.release === 'function') {
       client.release()
     }
+  }
+}
+
+export async function linkCommercialSignalQualityV2Opportunity(
+  raw: CommercialSignalQualityV2OpportunityLink,
+  db: CommercialSignalQualityV2Db,
+): Promise<void> {
+  const input = {
+    qualitySnapshotId: positiveId(raw.qualitySnapshotId, 'quality snapshot id'),
+    opportunityLineageId: positiveId(raw.opportunityLineageId, 'opportunity lineage id'),
+    candidateId: positiveId(raw.candidateId, 'candidate id'),
+    organizationId: positiveId(raw.organizationId, 'organization id'),
+    workspaceId: positiveId(raw.workspaceId, 'workspace id'),
+    clientProfileId: positiveId(raw.clientProfileId, 'client profile id'),
+  }
+  const inserted = await db.query(
+    `INSERT INTO commercial_signal_quality_opportunity_lineage (
+       quality_snapshot_id, opportunity_lineage_id, candidate_id,
+       organization_id, workspace_id, client_profile_id
+     ) VALUES ($1, $2, $3, $4, $5, $6)
+     ON CONFLICT (opportunity_lineage_id) DO NOTHING
+     RETURNING opportunity_lineage_id`,
+    [
+      input.qualitySnapshotId, input.opportunityLineageId, input.candidateId,
+      input.organizationId, input.workspaceId, input.clientProfileId,
+    ],
+  )
+  if (inserted.rowCount === 1) return
+  const existing = await db.query<{
+    qualitySnapshotId: string
+    candidateId: string
+    organizationId: string
+    workspaceId: string
+    clientProfileId: string
+  }>(
+    `SELECT
+       quality_snapshot_id::TEXT AS "qualitySnapshotId",
+       candidate_id::TEXT AS "candidateId",
+       organization_id::TEXT AS "organizationId",
+       workspace_id::TEXT AS "workspaceId",
+       client_profile_id::TEXT AS "clientProfileId"
+     FROM commercial_signal_quality_opportunity_lineage
+     WHERE opportunity_lineage_id = $1`,
+    [input.opportunityLineageId],
+  )
+  const replay = existing.rows[0]
+  if (!replay || Object.entries({
+    qualitySnapshotId: input.qualitySnapshotId,
+    candidateId: input.candidateId,
+    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
+    clientProfileId: input.clientProfileId,
+  }).some(([key, value]) => replay[key as keyof typeof replay] !== value)) {
+    throw new Error('opportunity lineage link idempotency conflict')
   }
 }
 
@@ -111,11 +179,11 @@ async function persistTransaction(
          quality_identity, quality_generation, quality_score,
          quality_coverage, quality_confidence, critical_coverage, actionable,
          components, reason_codes, feature_snapshot, input_hash,
-         feature_version, model_type, calibration_status, valid_until
+         feature_version, model_type, calibration_status, decision_at, valid_until
        ) VALUES (
          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
          $12::JSONB, $13::TEXT[], $14::JSONB, $15, $16, $17, $18,
-         $19::TIMESTAMPTZ
+         $19::TIMESTAMPTZ, $20::TIMESTAMPTZ
        )
        ON CONFLICT (candidate_id, feature_version, input_hash) DO NOTHING
        RETURNING id::TEXT AS id, quality_generation AS "qualityGeneration"`,
@@ -139,12 +207,18 @@ async function persistTransaction(
           status: input.result.status,
           actionability: input.result.actionability,
           independence: input.result.independence,
+          actionabilityIndependence: input.result.actionabilityIndependence,
+          decisionEvidence: input.result.decisionEvidence,
+          componentSources: input.result.componentSources,
+          affirmativeEvidenceByComponent:
+            input.result.affirmativeEvidenceByComponent,
           evidenceIds: input.result.evidenceIds,
         }),
         input.inputHash,
         COMMERCIAL_SIGNAL_QUALITY_VERSION,
         input.result.modelType,
         input.result.calibrationStatus,
+        input.result.decisionAt,
         input.validUntil,
       ],
     )
@@ -188,24 +262,27 @@ async function persistEvidence(
   return db.query(
     `INSERT INTO commercial_signal_quality_evidence (
        quality_snapshot_id, candidate_id, organization_id, workspace_id,
-       client_profile_id, evidence_id, source_family, source_domain,
+       client_profile_id, evidence_id, decision_role, source_kind,
+       source_family, source_domain,
        upstream_origin, canonical_url, vacancy_fingerprint,
        publication_fingerprint, organization_domain, content_fingerprint,
        observed_at, evidence_independence_group, correlation_reason_code
      )
      SELECT
        $1, $2, $3, $4, $5,
-       input.evidence_id, input.source_family, input.source_domain,
+       input.evidence_id, input.decision_role, input.source_kind,
+       input.source_family, input.source_domain,
        input.upstream_origin, input.canonical_url, input.vacancy_fingerprint,
        input.publication_fingerprint, input.organization_domain,
        input.content_fingerprint, input.observed_at,
        input.evidence_independence_group, input.correlation_reason_code
      FROM UNNEST(
-       $6::BIGINT[], $7::TEXT[], $8::TEXT[], $9::TEXT[], $10::TEXT[],
-       $11::TEXT[], $12::TEXT[], $13::TEXT[], $14::TEXT[],
-       $15::TIMESTAMPTZ[], $16::TEXT[], $17::TEXT[]
+       $6::BIGINT[], $7::TEXT[], $8::TEXT[], $9::TEXT[], $10::TEXT[], $11::TEXT[],
+       $12::TEXT[], $13::TEXT[], $14::TEXT[], $15::TEXT[], $16::TEXT[],
+       $17::TIMESTAMPTZ[], $18::TEXT[], $19::TEXT[]
      ) AS input(
-       evidence_id, source_family, source_domain, upstream_origin,
+       evidence_id, decision_role, source_kind, source_family, source_domain,
+       upstream_origin,
        canonical_url, vacancy_fingerprint, publication_fingerprint,
        organization_domain, content_fingerprint, observed_at,
        evidence_independence_group, correlation_reason_code
@@ -218,6 +295,8 @@ async function persistEvidence(
       input.workspaceId,
       input.clientProfileId,
       rows.map((item) => item.evidenceId),
+      rows.map((item) => item.decisionRole),
+      rows.map((item) => item.sourceKind),
       rows.map((item) => item.sourceFamily),
       rows.map((item) => item.sourceDomain),
       rows.map((item) => item.upstreamOrigin),
@@ -268,6 +347,13 @@ async function findReplay(
 function normalizeInput(
   input: CommercialSignalQualityV2PersistenceInput,
 ): NormalizedInput {
+  const canonicalResult = buildCommercialSignalQualityEngineV2(input.engineInput)
+  if (hashCanonicalJson(canonicalResult) !== hashCanonicalJson(input.result)) {
+    throw new Error('quality result does not match canonical engine input')
+  }
+  if (hashCanonicalJson(input.engineInput.evidence) !== hashCanonicalJson(input.evidence)) {
+    throw new Error('quality evidence does not match canonical engine input')
+  }
   if (input.result.featureVersions.quality !== COMMERCIAL_SIGNAL_QUALITY_VERSION) {
     throw new Error('quality feature version is invalid')
   }
@@ -280,6 +366,10 @@ function normalizeInput(
   const workspaceId = positiveId(input.workspaceId, 'workspace id')
   const clientProfileId = positiveId(input.clientProfileId, 'client profile id')
   const validUntil = timestamp(input.validUntil, 'valid until')
+  const decisionAt = timestamp(input.result.decisionAt, 'decision at')
+  if (decisionAt > validUntil) {
+    throw new Error('quality validity cannot precede its decision')
+  }
   const provenance = new Map(input.evidence.map((item) => [item.evidenceId, item]))
   if (provenance.size !== input.evidence.length) {
     throw new Error('quality evidence lineage contains duplicates')
@@ -290,8 +380,27 @@ function normalizeInput(
       !sameIds(providedIds, resultIds)) {
     throw new Error('quality evidence lineage must exactly match the result')
   }
+  validateComponentEvidence(input.result, provenance)
   if (input.result.independence.excludedFutureEvidenceIds.length > 0) {
     throw new Error('future evidence cannot be persisted as decision lineage')
+  }
+  const expectedIndependence = buildEvidenceIndependence(
+    input.evidence,
+    new Date(decisionAt),
+  )
+  const positiveEvidence = input.evidence.filter((item) =>
+    input.result.decisionEvidence.positiveEvidenceIds.includes(item.evidenceId))
+  const expectedActionabilityIndependence = buildEvidenceIndependence(
+    positiveEvidence,
+    new Date(decisionAt),
+  )
+  if (
+    hashCanonicalJson(expectedIndependence) !==
+      hashCanonicalJson(input.result.independence) ||
+    hashCanonicalJson(expectedActionabilityIndependence) !==
+      hashCanonicalJson(input.result.actionabilityIndependence)
+  ) {
+    throw new Error('quality evidence independence does not match provenance')
   }
   const groupByEvidence = new Map<string, {
     group: string
@@ -317,8 +426,15 @@ function normalizeInput(
     if (!item || !grouping) {
       throw new Error(`exact quality evidence lineage missing for ${evidenceId}`)
     }
+    const decisionRole: NormalizedInput['evidenceRows'][number]['decisionRole'] =
+      input.result.decisionEvidence.positiveEvidenceIds.includes(evidenceId)
+        ? 'positive'
+        : input.result.decisionEvidence.negativeEvidenceIds.includes(evidenceId)
+          ? 'negative'
+          : 'contact_policy'
     return {
       ...item,
+      decisionRole,
       evidenceIndependenceGroup: grouping.group,
       correlationReasonCode: grouping.reason,
     }
@@ -347,6 +463,60 @@ function normalizeInput(
     qualityIdentity,
     inputHash,
     evidenceRows,
+  }
+}
+
+function validateComponentEvidence(
+  result: CommercialSignalQualityEngineV2Result,
+  provenance: ReadonlyMap<string, CommercialSignalEvidenceProvenance>,
+): void {
+  const declarations = [
+    ['hiringNeed', 'hiring_need'],
+    ['hiringFriction', 'hiring_friction'],
+    ['agencyFit', 'agency_fit'],
+    ['propensity', 'external_agency_propensity'],
+    ['convergence', 'signal_convergence'],
+    ['economics', 'economics_fit'],
+    ['marketDifficulty', 'market_difficulty'],
+  ] as const
+  const affirmative: string[] = []
+  for (const [sourceKey, componentKey] of declarations) {
+    const component = result.components[componentKey]
+    if (!component) throw new Error(`quality component ${componentKey} is missing`)
+    const affirmativeIds = result.affirmativeEvidenceByComponent[componentKey]
+    if (!Array.isArray(affirmativeIds) ||
+      affirmativeIds.some((id) => !component.evidenceIds.includes(id))) {
+      throw new Error(`${componentKey} affirmative evidence is inconsistent`)
+    }
+    if ((component.value ?? 0) === 0 && affirmativeIds.length > 0) {
+      throw new Error(`${componentKey} non-positive value claims affirmative evidence`)
+    }
+    affirmative.push(...affirmativeIds)
+    const declared = result.componentSources[sourceKey]
+    const allowedKinds = declared === 'derived_deterministic'
+      ? ['direct', 'official', 'derived_deterministic']
+      : [declared]
+    if (component.evidenceIds.some((id) => {
+      const kind = provenance.get(id)?.sourceKind
+      return kind === undefined || !allowedKinds.includes(kind as never)
+    })) {
+      throw new Error(`${componentKey} evidence does not match its declared source`)
+    }
+  }
+  const expectedPositive = [...new Set([
+    ...affirmative,
+    ...result.decisionEvidence.currentHiringEvidenceIds,
+  ])].sort(compareIds)
+  const actualPositive = [...new Set(result.decisionEvidence.positiveEvidenceIds)]
+    .sort(compareIds)
+  if (!sameIds(expectedPositive, actualPositive)) {
+    throw new Error('positive decision evidence does not match affirmative lineage')
+  }
+  if (result.decisionEvidence.currentHiringEvidenceIds.some((id) => {
+    const kind = provenance.get(id)?.sourceKind
+    return kind !== 'direct' && kind !== 'official'
+  })) {
+    throw new Error('current hiring evidence requires direct or official provenance')
   }
 }
 
@@ -384,6 +554,11 @@ function timestamp(value: string, label: string): string {
 }
 
 function assertConsistentResult(result: CommercialSignalQualityEngineV2Result): void {
+  const componentSources = Object.values(result.componentSources)
+  if (componentSources.length !== 7 || componentSources.some((source) =>
+    !['direct', 'official', 'derived_deterministic'].includes(source))) {
+    throw new Error('quality component source lineage is inconsistent')
+  }
   const expectedActionability = result.status === 'qualified_actionable'
     ? 'actionable'
     : result.status === 'qualified_needs_enrichment'
@@ -393,10 +568,43 @@ function assertConsistentResult(result: CommercialSignalQualityEngineV2Result): 
         : 'blocked'
   const qualified = result.status === 'qualified_actionable' ||
     result.status === 'qualified_needs_enrichment'
+  const blockedReasons = new Set([
+    'DO_NOT_CONTACT', 'CONFLICT_BLOCK', 'CURRENT_HIRING_EVIDENCE_MISSING',
+    'QUALITY_INDEPENDENT_ORIGINS_LOW', 'QUALITY_CRITICAL_COVERAGE_LOW',
+    'QUALITY_COVERAGE_LOW',
+  ])
+  const currentIds = [...new Set(result.decisionEvidence.currentHiringEvidenceIds)]
+    .sort(compareIds)
+  const positiveIds = [...new Set(result.decisionEvidence.positiveEvidenceIds)]
+    .sort(compareIds)
+  const negativeIds = [...new Set(result.decisionEvidence.negativeEvidenceIds)]
+    .sort(compareIds)
+  const contactIds = [...new Set(result.decisionEvidence.contactEvidenceIds)]
+    .sort(compareIds)
+  const partitionIds = [...new Set([...positiveIds, ...negativeIds, ...contactIds])]
+    .sort(compareIds)
+  const resultIds = [...new Set(result.evidenceIds)].sort(compareIds)
+  const actionabilityIds = [...new Set(
+    result.actionabilityIndependence.groups.flatMap((group) => group.evidenceIds),
+  )].sort(compareIds)
   if (
     result.actionability !== expectedActionability ||
     result.quality.actionable !== qualified ||
-    (qualified && result.quality.qualityScore < 0.68)
+    (qualified && (
+      result.quality.qualityScore < 0.68 ||
+      result.quality.qualityCoverage < 0.7 ||
+      result.quality.criticalCoverage < 0.8 ||
+      result.actionabilityIndependence.independentGroupCount < 2 ||
+      !result.decisionEvidence.currentHiringEvidence ||
+      currentIds.length === 0 ||
+      result.reasonCodes.some((reason) => blockedReasons.has(reason))
+    )) ||
+    !currentIds.every((id) => positiveIds.includes(id)) ||
+    !sameIds(actionabilityIds, positiveIds) ||
+    !sameIds(partitionIds, resultIds) ||
+    positiveIds.some((id) => negativeIds.includes(id)) ||
+    positiveIds.some((id) => contactIds.includes(id)) ||
+    negativeIds.some((id) => contactIds.includes(id))
   ) {
     throw new Error('quality result status and actionability are inconsistent')
   }

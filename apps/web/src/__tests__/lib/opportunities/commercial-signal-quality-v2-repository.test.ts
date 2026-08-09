@@ -1,64 +1,105 @@
 import {
+  linkCommercialSignalQualityV2Opportunity,
   persistCommercialSignalQualityV2,
   type CommercialSignalQualityV2Db,
 } from '@/lib/opportunities/commercial-signal-quality-v2-repository'
-import type { CommercialSignalQualityEngineV2Result } from
-  '@/lib/opportunities/commercial-signal-quality-engine-v2'
+import {
+  buildCommercialSignalQualityEngineV2,
+  type CommercialSignalQualityEngineV2Input,
+} from '@/lib/opportunities/commercial-signal-quality-engine-v2'
+import { buildEvidenceIndependence } from
+  '@/lib/opportunities/commercial-signal-quality-v2'
 
-function result(): CommercialSignalQualityEngineV2Result {
+function engineInput(): CommercialSignalQualityEngineV2Input {
   return {
-    engineVersion: 'commercial-signal-quality-engine-v2',
-    featureVersions: {
-      quality: 'commercial-signal-quality-v2',
-      friction: 'hiring-friction-v1',
-      propensity: 'external-agency-propensity-v2',
-      convergence: 'signal-convergence-v1',
-      economics: 'commercial-fit-v2',
-      negativeEvidence: 'negative-evidence-v1',
+    decisionAt: '2026-08-08T10:00:00.000Z',
+    decisionSource: 'deterministic',
+    componentSources: {
+      hiringNeed: 'direct',
+      hiringFriction: 'derived_deterministic',
+      agencyFit: 'derived_deterministic',
+      propensity: 'derived_deterministic',
+      convergence: 'derived_deterministic',
+      economics: 'derived_deterministic',
+      marketDifficulty: 'derived_deterministic',
     },
-    quality: {
-      qualityScore: 0.82,
-      qualityCoverage: 0.9,
-      qualityConfidence: 0.85,
-      criticalCoverage: 0.9,
-      actionable: true,
-      reasonCodes: ['QUALITY_EVIDENCED'],
-      evidenceIds: ['101'],
-    },
-    status: 'qualified_actionable',
-    actionability: 'actionable',
-    reasonCodes: ['QUALITY_EVIDENCED'],
-    evidenceIds: ['101'],
-    independence: {
-      groups: [{
-        evidenceIndependenceGroup: 'a'.repeat(64),
-        evidenceIds: ['101'],
-        sourceFamilies: ['career-pages'],
-        sourceDomains: ['example.ru'],
-        reasonCodes: ['EVIDENCE_INDEPENDENT'],
-      }],
-      independentGroupCount: 1,
+    currentHiringEvidence: { present: true, evidenceIds: ['101'] },
+    hiringNeed: positiveComponent(),
+    hiringFriction: {
+      featureVersion: 'hiring-friction-v1',
+      frictionLevel: 'high',
+      frictionScore: 0.8,
       coverage: 1,
-      confidence: 0.5,
-      reasonCodes: ['EVIDENCE_INDEPENDENT'],
-      excludedFutureEvidenceIds: [],
+      positiveReasons: [{ code: 'FRICTION', evidenceIds: ['101'] }],
+      negativeReasons: [],
+      evidenceIds: ['101'],
+      componentValues: {},
     },
-    components: {
-      hiring_need: {
-        value: 0.9,
-        confidence: 0.9,
-        coverage: 1,
-        reasonCodes: ['HIRING_NEED_EVIDENCED'],
-        evidenceIds: ['101'],
-      },
-    } as never,
-    modelType: 'heuristic',
-    calibrationStatus: 'uncalibrated',
+    agencyFit: positiveComponent(),
+    propensity: {
+      featureVersion: 'external-agency-propensity-v2',
+      propensityLevel: 'high',
+      propensityScore: 0.8,
+      confidence: 0.9,
+      coverage: 1,
+      actionability: 'eligible',
+      reasonCodes: ['PROPENSITY'],
+      evidenceIds: ['101'],
+      affirmativeEvidenceIds: ['101'],
+      componentValues: {},
+    },
+    convergence: {
+      featureVersion: 'signal-convergence-v1',
+      convergenceScore: 0.8,
+      coverage: 1,
+      confidence: 0.9,
+      independentGroupCount: 1,
+      status: 'active',
+      components: { coOccurrence: 0, sequence: 0, velocity: 0.8, recency: 1, contradiction: 0 },
+      positiveReasons: ['CONVERGENCE'],
+      negativeReasons: [],
+      eventIds: ['501'],
+      evidenceIds: ['101'],
+      affirmativeEvidenceIds: ['101'],
+      excludedFutureEventIds: [],
+    },
+    economics: {
+      featureVersion: 'commercial-fit-v2', economicsFit: 'unknown',
+      componentValue: null, componentConfidence: 0, coverage: 0,
+      reasons: ['ECONOMICS_SCOPE_UNKNOWN'], evidenceIds: [],
+    },
+    marketDifficulty: {
+      marketDifficulty: 'unknown', componentValue: null, componentConfidence: 0,
+      roleFamily: 'backend', seniority: 'senior', region: 'moscow',
+      evidenceDate: null, source: null, evidenceIds: [],
+    },
+    negativeEvidence: {
+      featureVersion: 'negative-evidence-v1', action: 'none', scoreMultiplier: 1,
+      confirmedReasons: [], heuristicReasons: [], unknownReasons: [], evidenceIds: [],
+      expiredEvidenceIds: [], excludedFutureEvidenceIds: [],
+    },
+    contact: { corporateContactPathAvailable: false, doNotContact: false, conflict: false, evidenceIds: [] },
+    evidence,
+  }
+}
+
+function result() {
+  return buildCommercialSignalQualityEngineV2(engineInput())
+}
+
+function positiveComponent() {
+  return {
+    value: 0.8,
+    confidence: 0.9,
+    coverage: 1,
+    reasonCodes: ['EVIDENCED'],
+    evidenceIds: ['101'],
   }
 }
 
 const evidence = [{
   evidenceId: '101',
+  sourceKind: 'direct' as const,
   sourceFamily: 'career-pages',
   sourceDomain: 'example.ru',
   upstreamOrigin: 'ats:example:101',
@@ -71,6 +112,22 @@ const evidence = [{
 }]
 
 describe('Commercial Signal Quality v2 repository', () => {
+  it('links an opportunity to one explicit quality snapshot without inference', async () => {
+    const query = jest.fn().mockResolvedValue({
+      rows: [{ opportunity_lineage_id: '601' }], rowCount: 1,
+    })
+    await expect(linkCommercialSignalQualityV2Opportunity({
+      qualitySnapshotId: '501', opportunityLineageId: '601', candidateId: '201',
+      organizationId: '301', workspaceId: '401', clientProfileId: '402',
+    }, { query } as never)).resolves.toBeUndefined()
+    expect(query.mock.calls[0]?.[0]).toContain(
+      'ON CONFLICT (opportunity_lineage_id) DO NOTHING',
+    )
+    expect(query.mock.calls[0]?.[1]).toEqual([
+      '501', '601', '201', '301', '401', '402',
+    ])
+  })
+
   it('persists one append-only generation with exact candidate and evidence lineage', async () => {
     const calls: Array<{ sql: string; values?: unknown[] }> = []
     const db: CommercialSignalQualityV2Db = {
@@ -99,6 +156,7 @@ describe('Commercial Signal Quality v2 repository', () => {
       workspaceId: '401',
       clientProfileId: '402',
       validUntil: '2026-09-01T00:00:00.000Z',
+      engineInput: engineInput(),
       result: result(),
       evidence,
     }, db)).resolves.toEqual({
@@ -113,12 +171,14 @@ describe('Commercial Signal Quality v2 repository', () => {
     const evidenceInsert = calls.find((call) =>
       call.sql.includes('INSERT INTO commercial_signal_quality_evidence'))
     expect(snapshotInsert?.values).toEqual(expect.arrayContaining([
-      '201', '301', '401', '402', 0.82, 0.9, 0.85,
+      '201', '301', '401', '402',
       'commercial-signal-quality-v2', 'heuristic', 'uncalibrated',
     ]))
     expect(evidenceInsert?.values).toEqual(expect.arrayContaining([
       '501', '201', '301', '401', '402', ['101'],
-      ['a'.repeat(64)], ['EVIDENCE_INDEPENDENT'],
+      ['positive'],
+      ['direct'],
+      [independenceGroup()], ['EVIDENCE_INDEPENDENT'],
     ]))
     expect(calls.map((call) => call.sql)).not.toEqual(expect.arrayContaining([
       expect.stringMatching(/UPDATE commercial_signal_quality/i),
@@ -148,6 +208,7 @@ describe('Commercial Signal Quality v2 repository', () => {
       workspaceId: '401',
       clientProfileId: '402',
       validUntil: '2026-09-01T00:00:00.000Z',
+      engineInput: engineInput(),
       result: result(),
       evidence,
     }, db)
@@ -169,9 +230,10 @@ describe('Commercial Signal Quality v2 repository', () => {
       workspaceId: '401',
       clientProfileId: '402',
       validUntil: '2026-09-01T00:00:00.000Z',
+      engineInput: engineInput(),
       result: result(),
       evidence: [],
-    }, { query: jest.fn() } as never)).rejects.toThrow(/lineage/i)
+    }, { query: jest.fn() } as never)).rejects.toThrow(/canonical engine input/i)
   })
 
   it('rejects contradictory status and actionability before opening a transaction', async () => {
@@ -184,8 +246,35 @@ describe('Commercial Signal Quality v2 repository', () => {
       workspaceId: '401',
       clientProfileId: '402',
       validUntil: '2026-09-01T00:00:00.000Z',
+      engineInput: engineInput(),
       result: contradictory,
       evidence,
-    }, { query: jest.fn() } as never)).rejects.toThrow(/inconsistent/i)
+    }, { query: jest.fn() } as never)).rejects.toThrow(/canonical engine input/i)
+  })
+
+  it('rejects a forged actionable snapshot that bypasses canonical gates', async () => {
+    const forged = result()
+    forged.status = 'qualified_actionable'
+    forged.actionability = 'actionable'
+    forged.quality.actionable = true
+    forged.quality.criticalCoverage = 0.1
+
+    await expect(persistCommercialSignalQualityV2({
+      candidateId: '201',
+      organizationId: '301',
+      workspaceId: '401',
+      clientProfileId: '402',
+      validUntil: '2026-09-01T00:00:00.000Z',
+      engineInput: engineInput(),
+      result: forged,
+      evidence,
+    }, { query: jest.fn() } as never)).rejects.toThrow(/canonical engine input/i)
   })
 })
+
+function independenceGroup(): string {
+  return buildEvidenceIndependence(
+    evidence,
+    new Date('2026-08-08T10:00:00.000Z'),
+  ).groups[0]!.evidenceIndependenceGroup
+}

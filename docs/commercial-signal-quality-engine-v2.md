@@ -12,6 +12,10 @@ The runtime flag is `COMMERCIAL_SIGNAL_QUALITY_V2_ENABLED`. It accepts only the
 exact string `true` and defaults to dark. The repository persists append-only
 shadow snapshots; no cron route or UI reader is enabled by this change.
 
+Planner feedback is isolated behind its own exact-`true`, default-dark flag,
+`COMMERCIAL_SIGNAL_QUALITY_V2_PLANNER_FEEDBACK_ENABLED`. Enabling shadow quality
+collection alone cannot alter query budgets or diagnostics.
+
 ## Quality contract
 
 Every quality component has three independent fields:
@@ -54,7 +58,19 @@ Each evidence row stores:
 
 `source_family`, `source_domain`, `upstream_origin`, `canonical_url`,
 `vacancy_fingerprint`, `publication_fingerprint`, `organization_domain`,
-`content_fingerprint`, and `observed_at`.
+`content_fingerprint`, `observed_at`, `source_kind`, and `decision_role`.
+`source_kind` is limited to direct, official, approved context, or deterministic
+derivation; LLM provenance is rejected. `decision_role` separates positive
+hiring/fit evidence from negative and contact/policy evidence. Only positive
+evidence can satisfy the actionability independence gate. Each component
+derives an explicit affirmative subset from its typed positive lineage;
+negative/context evidence cannot become positive merely because it contributed
+to a component. A low-but-known component may have no threshold-qualified
+affirmative evidence and remains reviewable without contributing independence.
+Positive, negative/context, and contact/policy roles are pairwise
+disjoint. Direct and official component declarations must match every linked
+evidence row; deterministic derivations remain limited to approved non-LLM
+provenance.
 
 Correlation reason codes:
 
@@ -103,9 +119,13 @@ Query Planner feedback:
 - `YIELD_BUDGET_EXPANDED_COMMERCIAL_OUTCOME`
 
 The Quality v2-specific reviewed/ordinary-hiring budget rules remain inactive
-unless `COMMERCIAL_SIGNAL_QUALITY_V2_ENABLED` is exactly `true`. Their metrics
+unless `COMMERCIAL_SIGNAL_QUALITY_V2_PLANNER_FEEDBACK_ENABLED` is exactly
+`true`. Their metrics
 use exact plan/candidate lineage, an exact Quality v2 identity and generation,
 and effective outcome projections rather than raw events that may be reverted.
+Annotations use the latest generation per reviewer and a fail-closed consensus;
+historical labels cannot remain active after correction. Only annotations
+created inside the exact metric window are eligible for that materialization.
 
 ## Persistence schema
 
@@ -113,6 +133,10 @@ and effective outcome projections rather than raw events that may be reverted.
   reason codes, feature versions, model/calibration status and candidate scope.
 - `commercial_signal_quality_evidence`: exact evidence provenance,
   independence group, and correlation reason.
+- `commercial_signal_quality_opportunity_lineage`: immutable one-to-one link
+  from an opportunity lineage to the exact Quality v2 snapshot used by its
+  writer. It must be inserted explicitly in the same transaction; automatic
+  candidate/time inference and backfill triggers are forbidden.
 - `query_plan_metric_snapshots`: additive independent-event, strong-reviewed,
   ordinary-hiring, and downstream fetch-rate dimensions.
 
@@ -131,8 +155,16 @@ FIUR, Opportunity v2, Opportunity v3, and Quality Engine v2.
 Temporal evaluation uses ordered train/validation/holdout periods. A scored row
 containing evidence observed after its decision timestamp is rejected; the
 evaluator never keeps its precomputed score after merely filtering timestamps.
-Outcome learning similarly excludes corrected events, candidates not yet shown,
-and outcomes after the fixed clock. Automatic production weight
+Outcome learning accepts only canonical milestone timestamps from the effective
+`opportunity-outcome-state-v1` projection, excludes candidates not yet shown,
+and excludes milestones after the fixed clock. Callers cannot submit arbitrary
+event arrays as effective outcomes. Projection lineage is globally unique.
+Projection candidate, opportunity, lineage, and workspace keys must exactly
+match the analyzed candidate. A projection whose last effective event is after
+the fixed learning clock is rejected rather than partially rewound.
+Evaluation requires the same projection plus a fixed `evaluationAt` cutoff and
+rejects both evidence and decision rows later than that cutoff;
+untimestamped outcome booleans are not accepted. Automatic production weight
 updates and production ML rollout are explicitly disabled.
 
 ## Verification commands

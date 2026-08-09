@@ -89,6 +89,7 @@ export async function runCommercialSignalQualityV2Shadow(
         workspaceId: item.workspaceId,
         clientProfileId: item.clientProfileId,
         validUntil: item.validUntil,
+        engineInput: item.input,
         result,
         evidence: item.input.evidence,
       }, db as CommercialSignalQualityV2Db)

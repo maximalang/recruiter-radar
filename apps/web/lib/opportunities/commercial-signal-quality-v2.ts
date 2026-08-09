@@ -16,6 +16,7 @@ export type EvidenceIndependenceReasonCode =
 
 export type CommercialSignalEvidenceProvenance = {
   evidenceId: string
+  sourceKind: 'direct' | 'official' | 'approved_context' | 'derived_deterministic'
   sourceFamily: string
   sourceDomain: string
   upstreamOrigin: string | null
@@ -226,6 +227,9 @@ function normalizeEvidence(
   input: CommercialSignalEvidenceProvenance,
 ): NormalizedEvidence {
   const evidenceId = positiveBigintText(input.evidenceId, 'evidence id')
+  const sourceKind = enumValue(input.sourceKind, [
+    'direct', 'official', 'approved_context', 'derived_deterministic',
+  ], 'evidence source kind')
   const sourceFamily = requiredText(input.sourceFamily, 'source family')
   const sourceDomain = requiredText(input.sourceDomain, 'source domain')
   const upstreamOrigin = optionalText(input.upstreamOrigin)
@@ -252,6 +256,7 @@ function normalizeEvidence(
 
   return {
     evidenceId,
+    sourceKind,
     sourceFamily,
     sourceDomain,
     upstreamOrigin,
@@ -417,6 +422,15 @@ function unitInterval(value: number, label: string): number {
 
 function positiveNumber(value: number, label: string): number {
   if (!Number.isFinite(value) || value <= 0) throw new Error(`${label} must be positive`)
+  return value
+}
+
+function enumValue<T extends string>(
+  value: T,
+  allowed: readonly T[],
+  label: string,
+): T {
+  if (!allowed.includes(value)) throw new Error(`${label} is invalid`)
   return value
 }
 

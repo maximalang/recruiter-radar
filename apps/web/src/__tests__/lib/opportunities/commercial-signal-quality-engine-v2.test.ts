@@ -14,9 +14,14 @@ function input(
     decisionSource: 'deterministic',
     componentSources: {
       hiringNeed: 'direct',
+      hiringFriction: 'derived_deterministic',
       agencyFit: 'derived_deterministic',
+      propensity: 'derived_deterministic',
+      convergence: 'derived_deterministic',
+      economics: 'derived_deterministic',
+      marketDifficulty: 'derived_deterministic',
     },
-    currentHiringEvidence: true,
+    currentHiringEvidence: { present: true, evidenceIds: ['101'] },
     hiringNeed: {
       value: 0.9,
       confidence: 0.9,
@@ -50,6 +55,7 @@ function input(
       actionability: 'eligible',
       reasonCodes: ['EXTERNAL_SUPPORT_PLAUSIBLE'],
       evidenceIds: ['104'],
+      affirmativeEvidenceIds: ['104'],
       componentValues: {},
     },
     convergence: {
@@ -70,6 +76,7 @@ function input(
       negativeReasons: [],
       eventIds: ['201', '202'],
       evidenceIds: ['101', '102'],
+      affirmativeEvidenceIds: ['101', '102'],
       excludedFutureEventIds: [],
     },
     economics: {
@@ -123,6 +130,7 @@ function input(
 function evidence(evidenceId: string, fingerprint: string) {
   return {
     evidenceId,
+    sourceKind: 'direct' as const,
     sourceFamily: 'career-pages',
     sourceDomain: 'example.ru',
     upstreamOrigin: `origin:${evidenceId}`,
@@ -176,7 +184,7 @@ describe('Commercial Signal Quality Engine v2 integration', () => {
 
   it('keeps context-only business events out of actionable supply', () => {
     const result = buildCommercialSignalQualityEngineV2(input({
-      currentHiringEvidence: false,
+      currentHiringEvidence: { present: false, evidenceIds: [] },
     }))
 
     expect(result.status).toBe('review')
@@ -194,6 +202,90 @@ describe('Commercial Signal Quality Engine v2 integration', () => {
     expect(result.quality.actionable).toBe(false)
     expect(result.status).toBe('review')
     expect(result.reasonCodes).toContain('QUALITY_INDEPENDENT_ORIGINS_LOW')
+  })
+
+  it('does not count contact or policy evidence toward positive independence', () => {
+    const result = buildCommercialSignalQualityEngineV2(input({
+      evidence: [
+        evidence('101', GROUP_A), evidence('102', GROUP_A),
+        evidence('103', GROUP_A), evidence('104', GROUP_A),
+        evidence('105', GROUP_B),
+      ],
+    }))
+
+    expect(result.independence.independentGroupCount).toBe(2)
+    expect(result.actionabilityIndependence.independentGroupCount).toBe(1)
+    expect(result.status).toBe('review')
+  })
+
+  it('keeps low market difficulty out of affirmative independence', () => {
+    const result = buildCommercialSignalQualityEngineV2(input({
+      marketDifficulty: {
+        marketDifficulty: 'low',
+        componentValue: 0.2,
+        componentConfidence: 0.85,
+        roleFamily: 'backend',
+        seniority: 'senior',
+        region: 'moscow',
+        evidenceDate: '2026-08-08',
+        source: 'official_salary_observation',
+        evidenceIds: ['106'],
+      },
+      evidence: [...input().evidence, evidence('106', 'c'.repeat(64))],
+    }))
+    expect(result.decisionEvidence.positiveEvidenceIds).not.toContain('106')
+    expect(result.decisionEvidence.negativeEvidenceIds).toContain('106')
+  })
+
+  it('rejects contact evidence reused as positive evidence', () => {
+    expect(() => buildCommercialSignalQualityEngineV2(input({
+      contact: {
+        corporateContactPathAvailable: true,
+        doNotContact: false,
+        conflict: false,
+        evidenceIds: ['104'],
+      },
+      evidence: input().evidence.filter((item) => item.evidenceId !== '105'),
+    }))).toThrow(/positive and contact/i)
+  })
+
+  it('derives affirmative evidence from positive reasons and validates sources', () => {
+    const withoutPositiveFriction = buildCommercialSignalQualityEngineV2(input({
+      hiringFriction: {
+        ...input().hiringFriction,
+        positiveReasons: [],
+        negativeReasons: [{ code: 'ONLY_NEGATIVE', evidenceIds: ['102'] }],
+      },
+      convergence: {
+        ...input().convergence,
+        affirmativeEvidenceIds: ['101'],
+      },
+    }))
+    expect(withoutPositiveFriction.decisionEvidence.positiveEvidenceIds)
+      .not.toContain('102')
+    expect(withoutPositiveFriction.decisionEvidence.negativeEvidenceIds)
+      .toContain('102')
+
+    expect(() => buildCommercialSignalQualityEngineV2(input({
+      componentSources: {
+        ...input().componentSources,
+        hiringNeed: 'official',
+      },
+    }))).toThrow(/declared source/i)
+  })
+
+  it('requires direct or official provenance for current hiring evidence', () => {
+    expect(() => buildCommercialSignalQualityEngineV2(input({
+      componentSources: {
+        ...input().componentSources,
+        hiringNeed: 'derived_deterministic',
+      },
+      evidence: [
+        { ...evidence('101', GROUP_A), sourceKind: 'approved_context' },
+        evidence('102', GROUP_B), evidence('103', GROUP_A),
+        evidence('104', GROUP_B), evidence('105', GROUP_A),
+      ],
+    }))).toThrow(/current hiring evidence|declared source/i)
   })
 
   it('rejects unused or future evidence from exact decision lineage', () => {

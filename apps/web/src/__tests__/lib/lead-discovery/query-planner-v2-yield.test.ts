@@ -164,6 +164,28 @@ describe('Query Planner v2 downstream yield tuning', () => {
     })
   })
 
+  it('keeps quality-specific diagnostics dark with the flag disabled', () => {
+    const snapshot = {
+      ...emptyYield,
+      executionCount: 8,
+      fetchedRecords: 80,
+      uniqueEvents: 55,
+      episodes: 15,
+      qualifiedEpisodes: 8,
+      qualifiedOpportunities: 10,
+      actionableOpportunities: 4,
+      strongReviewedOpportunities: 1,
+      ordinaryHiringOpportunities: 8,
+    }
+
+    expect(diagnoseQueryPlanSupply(snapshot)).not.toContain(
+      'SUPPLY_ORDINARY_HIRING_HEAVY',
+    )
+    expect(diagnoseQueryPlanSupply(snapshot, {
+      qualityFeedbackEnabled: true,
+    })).toContain('SUPPLY_ORDINARY_HIRING_HEAVY')
+  })
+
   it('explains under-supply using persisted role/region/source yield only', () => {
     expect(diagnoseQueryPlanSupply({
       ...emptyYield,

@@ -33,11 +33,17 @@ describe('Query Planner quality feedback v2 migration', () => {
   it('materializes metrics through exact query-plan, candidate and review lineage', () => {
     expect(materializer).toContain('commercial_signal_opportunity_query_plans')
     expect(materializer).toContain('commercial_signal_quality_snapshots')
+    expect(materializer).toContain('commercial_signal_quality_opportunity_lineage')
+    expect(materializer).toContain('quality.decision_at <= lineage.created_at')
+    expect(materializer).toContain('lineage.created_at <= quality.valid_until')
     expect(materializer).toContain('commercial_signal_quality_evidence')
     expect(materializer).toContain('evidence_independence_group')
     expect(materializer).toContain('commercial_signal_annotations')
     expect(materializer).toContain("annotation.label IN ('strong', 'acceptable')")
     expect(materializer).toContain("annotation.reason_code = 'ordinary_hiring'")
+    expect(materializer).toContain('annotation.created_at >= $4::TIMESTAMPTZ')
+    expect(materializer).toContain('annotation.created_at < $5::TIMESTAMPTZ')
+    expect(materializer).toContain('annotation.annotation_generation DESC')
   })
 
   it('keeps reply and meeting counts per exact query plan', () => {

@@ -27,7 +27,7 @@ import {
   type QueryPlannerV2Db,
 } from './query-planner-v2-repository'
 import type { FeedbackPatternEvent } from './query-feedback-tuning'
-import { isCommercialSignalQualityV2Enabled } from '@/lib/opportunities/config'
+import { isCommercialSignalQualityV2PlannerFeedbackEnabled } from '@/lib/opportunities/config'
 
 export type QueryPlannerV2JobDb = Pick<Pool, 'query' | 'connect'> |
   Pick<PoolClient, 'query' | 'release'>
@@ -122,7 +122,8 @@ async function executeJob(
       }).map((plan) => applyHistoricalYieldToQueryPlan(
         plan,
         historicalYieldByPlan[queryPlanYieldKey(plan)],
-        { qualityFeedbackEnabled: isCommercialSignalQualityV2Enabled(options.env) },
+        { qualityFeedbackEnabled:
+          isCommercialSignalQualityV2PlannerFeedbackEnabled(options.env) },
       ))
       plansByProfile.push(plans)
       stats.plansBuilt += plans.length
