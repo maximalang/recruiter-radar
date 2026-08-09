@@ -34,6 +34,7 @@ describe('pull request CI workflow contract', () => {
   it('runs migration and production acceptance against a disposable database', () => {
     expect(workflow).toContain('npm run test:entitlements:migration:db')
     expect(workflow).toContain('npm run test:production:acceptance')
+    expect(workflow).toContain('npx playwright install --with-deps chromium')
     expect(productionAcceptance).toContain('run-workspace-billing-db-tests.mjs')
     expect(workflow).toContain("ENTITLEMENT_DISPOSABLE_DB_CONFIRMED: 'true'")
     expect(workflow).toContain("WORKSPACE_BILLING_DISPOSABLE_DB_CONFIRMED: 'true'")

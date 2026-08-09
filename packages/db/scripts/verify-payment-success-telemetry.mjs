@@ -50,6 +50,8 @@ try {
     const orderResult = await client.query(
       `INSERT INTO checkout_orders (
          user_id,
+         purchased_by_user_id,
+         entitlement_owner_id,
          plan_code,
          amount_rub,
          currency,
@@ -59,7 +61,7 @@ try {
          payload,
          provider
        )
-       VALUES ($1, 'pilot', 1000, 'RUB', $2, $3, $4, $5::jsonb, 'test-provider')
+       VALUES ($1, $1, $1, 'pilot', 1000, 'RUB', $2, $3, $4, $5::jsonb, 'test-provider')
        RETURNING id`,
       [
         userId,
@@ -149,6 +151,8 @@ try {
   const failureOrderResult = await client.query(
     `INSERT INTO checkout_orders (
        user_id,
+       purchased_by_user_id,
+       entitlement_owner_id,
        plan_code,
        amount_rub,
        currency,
@@ -158,7 +162,7 @@ try {
        payload,
        provider
      )
-     VALUES ($1, 'pilot', 1000, 'RUB', 'pending', $2, $3, '{}'::jsonb, 'test-provider')
+     VALUES ($1, $1, $1, 'pilot', 1000, 'RUB', 'pending', $2, $3, '{}'::jsonb, 'test-provider')
      RETURNING id`,
     [
       userId,
