@@ -7,7 +7,7 @@
 
 import { getPool } from "./db";
 import { getPool as getSharedPool } from "./db-pool";
-import { getEffectiveEntitlements, type EffectiveEntitlement } from "./entitlements";
+import { getEffectiveEntitlement, type EffectiveEntitlement } from "./entitlements";
 import { getSourceRegistry, type SourceId } from "./sources/source-registry";
 import { getLeadsForAllProfiles, getPendingReviewCount, type LeadItem } from "./leads-data";
 import { listClientProfiles, resolveHiringMode } from "./clientProfiles";
@@ -672,6 +672,12 @@ export interface OperatorUserRow {
   telegramUsername: string | null;
   telegramChatId: string | null;
   createdAt: string;
+  workspace: {
+    id: string;
+    name: string;
+    role: string;
+    dataOwnerId: string;
+  } | null;
   /** Client profile (null when the user has no profile yet). */
   profile: {
     id: string;
@@ -715,6 +721,10 @@ export async function getOperatorUsers(): Promise<OperatorUserRow[]> {
       delivery_enabled: boolean | null;
       profile_telegram_chat_id: string | null;
       paid_order_count: string;
+      workspace_id: string | null;
+      workspace_name: string | null;
+      workspace_role: string | null;
+      data_owner_id: string;
     }>(`
       SELECT
         u.id::TEXT            AS id,
@@ -723,6 +733,10 @@ export async function getOperatorUsers(): Promise<OperatorUserRow[]> {
         u.telegram_username   AS telegram_username,
         u.telegram_chat_id::TEXT AS telegram_chat_id,
         u.created_at::TEXT    AS created_at,
+        ws.id::TEXT           AS workspace_id,
+        ws.name               AS workspace_name,
+        member.role           AS workspace_role,
+        COALESCE(ws.bootstrap_user_id, u.id)::TEXT AS data_owner_id,
         p.id::TEXT            AS profile_id,
         p.agency_name         AS agency_name,
         p.is_active           AS is_active,
@@ -732,25 +746,46 @@ export async function getOperatorUsers(): Promise<OperatorUserRow[]> {
         p.telegram_chat_id::TEXT AS profile_telegram_chat_id,
         COALESCE(po.paid_count, 0)::TEXT AS paid_order_count
       FROM users u
+      JOIN workspace_members member
+        ON member.user_id = u.id AND member.status = 'active'
+      JOIN workspaces ws
+        ON ws.id = member.workspace_id AND ws.status = 'active'
       LEFT JOIN LATERAL (
-        SELECT * FROM client_profiles cp WHERE cp.owner_id = u.id LIMIT 1
+        SELECT * FROM client_profiles cp
+        WHERE cp.owner_id = COALESCE(ws.bootstrap_user_id, u.id)
+          AND cp.workspace_id = ws.id
+        LIMIT 1
       ) p ON true
       LEFT JOIN LATERAL (
         SELECT COUNT(*)::INT AS paid_count
         FROM checkout_orders co
-        WHERE co.user_id = u.id AND co.status = 'paid'
+        WHERE co.entitlement_owner_id = COALESCE(ws.bootstrap_user_id, u.id)
+          AND co.workspace_id = ws.id
+          AND co.status = 'paid'
       ) po ON true
       ORDER BY u.created_at DESC
     `);
 
-    const accessByUserId = await getEffectiveEntitlements(result.rows.map((row) => row.id));
-    return result.rows.map((r) => ({
+    const accessRows = await Promise.all(result.rows.map((row) => (
+      getEffectiveEntitlement(row.data_owner_id, {
+        workspaceId: row.workspace_id!,
+      })
+    )));
+    return result.rows.map((r, index) => ({
       id: r.id,
       email: r.email,
       fullName: r.full_name,
       telegramUsername: r.telegram_username,
       telegramChatId: r.telegram_chat_id,
       createdAt: r.created_at,
+      workspace: r.workspace_id && r.workspace_name && r.workspace_role
+        ? {
+            id: r.workspace_id,
+            name: r.workspace_name,
+            role: r.workspace_role,
+            dataOwnerId: r.data_owner_id,
+          }
+        : null,
       profile: r.profile_id
         ? {
             id: r.profile_id,
@@ -762,7 +797,7 @@ export async function getOperatorUsers(): Promise<OperatorUserRow[]> {
             telegramChatId: r.profile_telegram_chat_id,
           }
         : null,
-      access: accessByUserId.get(r.id) ?? {
+      access: accessRows[index] ?? {
         status: "inactive",
         source: null,
         plan: null,

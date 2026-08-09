@@ -79,10 +79,14 @@ export type {
 } from "./paymentsTypes";
 
 export async function startCheckoutOrder(input: StartCheckoutOrderInput): Promise<StartCheckoutOrderResult> {
-  const checkoutOwnerId = normalizeCheckoutOrderUserId(input.userId);
+  const purchasedByUserId = normalizeCheckoutOrderUserId(input.purchasedByUserId);
+  const workspaceId = normalizeCheckoutOrderUserId(input.workspaceId);
+  const entitlementOwnerId = normalizeCheckoutOrderUserId(input.entitlementOwnerId);
   const plan = getPublicPlanByCode(input.productCode);
   let order = await createCheckoutOrder({
-    userId: checkoutOwnerId,
+    purchasedByUserId,
+    workspaceId,
+    entitlementOwnerId,
     productCode: input.productCode,
     amountMinor: plan.amountMinor,
     currency: plan.currency,
@@ -233,12 +237,9 @@ export async function startCheckoutOrder(input: StartCheckoutOrderInput): Promis
 
 export async function ensurePilotOrderOnboardingReady(
   orderId: string | number,
-  options?: { ownerId?: string | number | null }
+  options: { workspaceId: string | number; entitlementOwnerId: string | number },
 ): Promise<CheckoutOrder | null> {
-  const normalizedOwnerId = options?.ownerId == null ? null : normalizeCheckoutOrderUserId(options.ownerId);
-  const order = normalizedOwnerId
-    ? await getCheckoutOrderByIdForOwner(orderId, normalizedOwnerId)
-    : await getCheckoutOrderById(orderId);
+  const order = await getCheckoutOrderByIdForOwner(orderId, options);
 
   if (!order) {
     return null;
@@ -249,16 +250,16 @@ export async function ensurePilotOrderOnboardingReady(
 
 export async function getPilotActivationReadiness(
   orderId: string | number,
-  options: { ownerId: string | number }
+  options: { workspaceId: string | number; entitlementOwnerId: string | number },
 ): Promise<PilotActivationReadiness | null> {
-  const order = await ensurePilotOrderOnboardingReady(orderId, { ownerId: options.ownerId });
+  const order = await ensurePilotOrderOnboardingReady(orderId, options);
 
   if (!order) {
     return null;
   }
 
   const profile = order.payload.clientProfileId
-    ? await getClientProfileById(order.payload.clientProfileId, options.ownerId).catch(() => null)
+    ? await getClientProfileById(order.payload.clientProfileId, options.entitlementOwnerId).catch(() => null)
     : null;
   const profileExists = profile !== null;
   const profileActive = profile?.isActive === true;
@@ -289,9 +290,10 @@ export async function confirmPilotOrderProfile(input: {
   excludedIndustries?: readonly string[] | null;
   excludedLocations?: readonly string[] | null;
   remoteFriendly?: boolean | null;
-  ownerId: string | number;
+  workspaceId: string | number;
+  entitlementOwnerId: string | number;
 }): Promise<CheckoutOrder> {
-  let order = await ensurePilotOrderOnboardingReady(input.orderId, { ownerId: input.ownerId });
+  let order = await ensurePilotOrderOnboardingReady(input.orderId, input);
 
   if (!order) {
     throw new Error(CUSTOMER_CHECKOUT_COPY.orderNotFound);
@@ -406,9 +408,9 @@ export async function savePilotOrderTelegramChat(input: {
 
 export async function sendPilotOrderTestDigest(
   orderId: string | number,
-  options: { ownerId: string | number }
+  options: { workspaceId: string | number; entitlementOwnerId: string | number },
 ): Promise<PilotOrderTestDigestResult> {
-  let order = await ensurePilotOrderOnboardingReady(orderId, { ownerId: options.ownerId });
+  let order = await ensurePilotOrderOnboardingReady(orderId, options);
 
   if (!order) {
     throw new Error(CUSTOMER_CHECKOUT_COPY.orderNotFound);
@@ -565,9 +567,9 @@ export async function sendPilotOrderTestDigest(
 
 export async function completePilotOrderOnboarding(
   orderId: string | number,
-  options: { ownerId: string | number }
+  options: { workspaceId: string | number; entitlementOwnerId: string | number },
 ): Promise<CheckoutOrder> {
-  let order = await ensurePilotOrderOnboardingReady(orderId, { ownerId: options.ownerId });
+  let order = await ensurePilotOrderOnboardingReady(orderId, options);
 
   if (!order) {
     throw new Error(CUSTOMER_CHECKOUT_COPY.orderNotFound);
@@ -598,10 +600,11 @@ export async function completePilotOrderOnboarding(
 
 export async function syncCheckoutOrderAfterSuccessReturn(input: {
   orderId: string | number;
-  ownerId: string | number;
+  workspaceId: string | number;
+  entitlementOwnerId: string | number;
   searchParams?: Record<string, string | string[] | undefined>;
 }): Promise<CheckoutOrder | null> {
-  let order = await getCheckoutOrderByIdForOwner(input.orderId, input.ownerId);
+  let order = await getCheckoutOrderByIdForOwner(input.orderId, input);
 
   if (!order) {
     return null;
@@ -647,10 +650,9 @@ export async function syncCheckoutOrderAfterSuccessReturn(input: {
 export async function markCheckoutOrderCanceled(
   orderId: string | number,
   reason: string | null = null,
-  options: { ownerId: string | number }
+  options: { workspaceId: string | number; entitlementOwnerId: string | number },
 ): Promise<CheckoutOrder | null> {
-  const normalizedOwnerId = normalizeCheckoutOrderUserId(options.ownerId);
-  const order = await getCheckoutOrderByIdForOwner(orderId, normalizedOwnerId);
+  const order = await getCheckoutOrderByIdForOwner(orderId, options);
 
   if (!order || order.status === "paid") {
     return order;

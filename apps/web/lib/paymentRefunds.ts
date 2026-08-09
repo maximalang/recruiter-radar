@@ -2,7 +2,7 @@ import {
   createRobokassaRefund,
   getRobokassaRefundState,
 } from "./paymentsRobokassaRefunds";
-import { getCheckoutOrderById, getPool } from "./paymentsRepo";
+import { getCheckoutOrderByIdForOwner, getPool } from "./paymentsRepo";
 
 export type PaymentRefundStatus =
   | "creating"
@@ -72,6 +72,8 @@ export async function listPaymentRefunds(limit = 100): Promise<PaymentRefund[]> 
 
 export async function requestRobokassaRefund(input: {
   orderId: string | number;
+  workspaceId: string | number;
+  entitlementOwnerId: string | number;
   amountMinor?: number | null;
   requestedBy: string;
 }): Promise<PaymentRefund> {
@@ -103,8 +105,10 @@ export async function requestRobokassaRefund(input: {
          payload->'paymentProviderPayload' AS "providerPayload"
        FROM checkout_orders
        WHERE id = $1
+         AND workspace_id = $2
+         AND entitlement_owner_id = $3
        FOR UPDATE`,
-      [String(input.orderId)],
+      [String(input.orderId), String(input.workspaceId), String(input.entitlementOwnerId)],
     );
 
     if (orderResult.rowCount !== 1) throw new Error("Заказ не найден.");
@@ -338,6 +342,10 @@ function normalizePositiveMinor(value: number): number {
   return value;
 }
 
-export async function getRefundableOrder(orderId: string | number) {
-  return getCheckoutOrderById(orderId);
+export async function getRefundableOrder(input: {
+  orderId: string | number;
+  workspaceId: string | number;
+  entitlementOwnerId: string | number;
+}) {
+  return getCheckoutOrderByIdForOwner(input.orderId, input);
 }

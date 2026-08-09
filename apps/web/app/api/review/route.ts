@@ -3,7 +3,7 @@ import { getPool } from "../../../lib/db";
 import { formatReason, type ScoringReason } from "../../../lib/scoring/scoring-reasons";
 import { extractPayloadFields } from "../../../lib/leads-data";
 import { updateDigestOrgStateFeedback } from "../../../lib/digestFeedback";
-import { getAuthorizedOwnerId } from "../../../lib/auth-v2/authorization";
+import { getSession } from "../../../lib/auth-v2/authorization";
 import { hasFeatureAccess } from "../../../lib/entitlements";
 
 export const dynamic = "force-dynamic";
@@ -57,12 +57,13 @@ export async function GET(request: Request) {
 
   // Owner-scope: reject reads of another tenant's review queue. The JOIN +
   // owner predicate below also defends against a forged clientProfileId.
-  const ownerId = await getAuthorizedOwnerId("leads:read");
-  if (!ownerId) {
+  const authorization = await getSession({ permission: "leads:read" });
+  if (!authorization?.workspaceId) {
     return NextResponse.json({ error: "Access denied: no active session." }, { status: 401 });
   }
+  const ownerId = authorization.dataOwnerId;
   try {
-    if (!(await hasFeatureAccess(ownerId, "api"))) {
+    if (!(await hasFeatureAccess(ownerId, "api", { workspaceId: authorization.workspaceId }))) {
       return NextResponse.json({ error: "entitlement_required" }, { status: 403 });
     }
   } catch {
@@ -212,12 +213,13 @@ export async function POST(request: Request) {
   // Owner-scope: only the profile's explicit owner may
   // approve/reject its candidates. The owner predicate is enforced inside the
   // UPDATE so a forged clientProfileId simply matches no rows → 404.
-  const ownerId = await getAuthorizedOwnerId("leads:write");
-  if (!ownerId) {
+  const authorization = await getSession({ permission: "leads:write" });
+  if (!authorization?.workspaceId) {
     return NextResponse.json({ error: "Access denied: no active session." }, { status: 401 });
   }
+  const ownerId = authorization.dataOwnerId;
   try {
-    if (!(await hasFeatureAccess(ownerId, "api"))) {
+    if (!(await hasFeatureAccess(ownerId, "api", { workspaceId: authorization.workspaceId }))) {
       return NextResponse.json({ error: "entitlement_required" }, { status: 403 });
     }
   } catch {

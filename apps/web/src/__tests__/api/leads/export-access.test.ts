@@ -1,11 +1,11 @@
 import { GET as exportLeads } from "@/app/api/leads/export/route";
 import { GET as exportLead } from "@/app/api/leads/[id]/export/route";
-import { getAuthorizedOwnerId } from "@/lib/auth-v2/authorization";
+import { getSession } from "@/lib/auth-v2/authorization";
 import { hasFeatureAccess } from "@/lib/entitlements";
 import { getLeadDetail, getLeadsForAllProfiles } from "@/lib/leads-data";
 import { listClientProfiles } from "@/lib/clientProfiles";
 
-jest.mock("@/lib/auth-v2/authorization", () => ({ getAuthorizedOwnerId: jest.fn() }));
+jest.mock("@/lib/auth-v2/authorization", () => ({ getSession: jest.fn() }));
 jest.mock("@/lib/entitlements", () => ({ hasFeatureAccess: jest.fn() }));
 jest.mock("@/lib/clientProfiles", () => ({
   getClientProfileById: jest.fn(),
@@ -24,14 +24,17 @@ jest.mock("@/lib/leads-csv", () => ({
 describe("lead export entitlement gates", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.mocked(getAuthorizedOwnerId).mockResolvedValue("owner-42");
+    jest.mocked(getSession).mockResolvedValue({
+      dataOwnerId: "owner-42",
+      workspaceId: "workspace-9",
+    } as never);
     jest.mocked(hasFeatureAccess).mockResolvedValue(false);
   });
 
   test("bulk export denies access before reading profiles or leads", async () => {
     const response = await exportLeads(new Request("http://localhost/api/leads/export"));
     expect(response.status).toBe(403);
-    expect(hasFeatureAccess).toHaveBeenCalledWith("owner-42", "api");
+    expect(hasFeatureAccess).toHaveBeenCalledWith("owner-42", "api", { workspaceId: "workspace-9" });
     expect(listClientProfiles).not.toHaveBeenCalled();
     expect(getLeadsForAllProfiles).not.toHaveBeenCalled();
   });

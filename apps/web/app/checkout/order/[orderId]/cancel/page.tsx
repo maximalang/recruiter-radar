@@ -6,7 +6,7 @@ import {
   ensurePilotOrderOnboardingReady,
   markCheckoutOrderCanceled
 } from "../../../../../lib/payments";
-import { getAuthorizedUserId } from "../../../../../lib/auth-v2/authorization";
+import { getSession } from "../../../../../lib/auth-v2/authorization";
 import {
   NoticeBox,
   PageFrame,
@@ -49,13 +49,17 @@ function describeReason(reason: string | null): string {
 export default async function CheckoutCancelPage({ params, searchParams }: CheckoutCancelPageProps) {
   const resolvedParams = await params;
   const resolvedSearchParams = (await searchParams) ?? {};
-  const ownerId = await getAuthorizedUserId("billing:read");
+  const session = await getSession({ permission: "billing:read" });
 
-  if (!ownerId) {
+  if (!session?.workspaceId) {
     notFound();
   }
+  const access = {
+    workspaceId: session.workspaceId,
+    entitlementOwnerId: session.dataOwnerId,
+  };
 
-  const order = await ensurePilotOrderOnboardingReady(resolvedParams.orderId, { ownerId });
+  const order = await ensurePilotOrderOnboardingReady(resolvedParams.orderId, access);
 
   if (!order) {
     notFound();
@@ -64,7 +68,7 @@ export default async function CheckoutCancelPage({ params, searchParams }: Check
   const reason = readReason(resolvedSearchParams);
 
   if (order.status !== "paid") {
-    await markCheckoutOrderCanceled(order.id, reason, { ownerId }).catch(() => null);
+    await markCheckoutOrderCanceled(order.id, reason, access).catch(() => null);
   }
 
   // Recurring plans land here as a captured sales request, not a failed payment.

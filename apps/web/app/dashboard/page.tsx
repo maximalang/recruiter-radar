@@ -78,7 +78,11 @@ export default async function DashboardPage() {
     );
   }
 
-  const entitlement = await getEffectiveEntitlement(authorization.dataOwnerId).catch(() => null);
+  const entitlement = authorization.workspaceId
+    ? await getEffectiveEntitlement(authorization.dataOwnerId, {
+        workspaceId: authorization.workspaceId,
+      }).catch(() => null)
+    : null;
   if (!entitlement) {
     return <ProductWorkspaceFrame navItems={DASHBOARD_NAV}><ProductWorkspaceHeader eyebrow="Доступ" title="Не удалось проверить доступ" subtitle="Мы не показываем Radar, пока сервер не подтвердит права аккаунта." /><ErrorState title="Проверка доступа временно недоступна" description="Обновите страницу немного позже. Настройки аккаунта остаются доступны." action={{ href: "/settings/access", label: "Открыть доступ и оплату" }} /></ProductWorkspaceFrame>;
   }

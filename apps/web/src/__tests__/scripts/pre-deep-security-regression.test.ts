@@ -51,8 +51,9 @@ describe('tenant and entitlement boundaries', () => {
   test('bulk and single CSV exports derive owner scope from the session', () => {
     for (const file of ['app/api/leads/export/route.ts', 'app/api/leads/[id]/export/route.ts']) {
       const source = read(file)
-      expect(source).toContain('getAuthorizedOwnerId')
+      expect(source).toContain('getSession')
       expect(source).toContain("'exports:create'")
+      expect(source).toContain('workspaceId')
       expect(source).toMatch(/ownerId/)
       expect(source).toContain("'Cache-Control': 'no-store'")
     }

@@ -388,12 +388,13 @@ export default async function AdminPage() {
             <div style={{ display: "grid", gap: "8px" }}>
               {users.map((u) => (
                 <AdminUserCard
-                  key={u.id}
+                  key={`${u.id}:${u.workspace?.id ?? "none"}`}
                   user={{
                     id: u.id,
                     email: u.email,
                     fullName: u.fullName,
                     createdAt: u.createdAt,
+                    workspace: u.workspace,
                     profile: u.profile
                       ? {
                           id: u.profile.id,

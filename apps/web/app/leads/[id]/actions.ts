@@ -2,7 +2,7 @@
 
 import { updateLeadFeedback } from "@/lib/leads-data";
 import { getPool } from "@/lib/db";
-import { getAuthorizedOwnerId } from "@/lib/auth-v2/authorization";
+import { getSession } from "@/lib/auth-v2/authorization";
 import { hasFeatureAccess } from "@/lib/entitlements";
 
 /**
@@ -14,7 +14,11 @@ import { hasFeatureAccess } from "@/lib/entitlements";
  *
  * Returns true if access is granted, false otherwise.
  */
-async function verifyProfileOwnership(clientProfileId: string, ownerId: string): Promise<boolean> {
+async function verifyProfileOwnership(
+  clientProfileId: string,
+  ownerId: string,
+  workspaceId: string,
+): Promise<boolean> {
   const pool = getPool();
   if (!pool) return false;
 
@@ -22,9 +26,10 @@ async function verifyProfileOwnership(clientProfileId: string, ownerId: string):
     `SELECT 1 AS ok FROM client_profiles
      WHERE id = $1
        AND owner_id = $2
+       AND workspace_id = $3
        AND is_active = true
      LIMIT 1`,
-    [clientProfileId, ownerId],
+    [clientProfileId, ownerId, workspaceId],
   );
   return result.rowCount === 1;
 }
@@ -35,17 +40,20 @@ export async function updateLeadFeedbackAction(
   feedbackStatus: string,
   feedbackNote?: string | null,
 ) {
-  const ownerId = await getAuthorizedOwnerId("leads:write");
-  if (!ownerId) {
+  const authorization = await getSession({ permission: "leads:write" });
+  if (!authorization?.workspaceId) {
     throw new Error("Access denied: active session required.");
   }
+  const ownerId = authorization.dataOwnerId;
 
-  const hasDashboardAccess = await hasFeatureAccess(ownerId, "dashboard").catch(() => false);
+  const hasDashboardAccess = await hasFeatureAccess(ownerId, "dashboard", {
+    workspaceId: authorization.workspaceId,
+  }).catch(() => false);
   if (!hasDashboardAccess) {
     throw new Error("Access denied: active dashboard entitlement required.");
   }
 
-  const isOwner = await verifyProfileOwnership(clientProfileId, ownerId);
+  const isOwner = await verifyProfileOwnership(clientProfileId, ownerId, authorization.workspaceId);
   if (!isOwner) {
     throw new Error("Access denied: ownership check failed for this client profile.");
   }

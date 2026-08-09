@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getLastRadarRunAt, getLeadsForAllProfiles, getPendingReviewCount, type LeadItem, VALID_FEEDBACK_STATUSES } from '@/lib/leads-data';
 import { listClientProfiles, resolveHiringMode, type ClientProfile } from '@/lib/clientProfiles';
-import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization';
+import { getSession } from '@/lib/auth-v2/authorization';
 import { getEffectiveEntitlement } from '@/lib/entitlements';
 import { buildFitExplanation, FIT_DIMENSION_ICON } from '@/lib/leads/fit-explanation';
 import { deriveRoleNames, splitRolesForDisplay, deriveUrgencyCue } from '@/lib/leads/lead-quality';
@@ -333,8 +333,8 @@ export default async function LeadsPage({
 
   // Owner-scope every read: without a session there are no accessible profiles,
   // so the page renders empty rather than leaking another tenant's leads.
-  const ownerId = await getAuthorizedOwnerId('leads:read');
-  if (!ownerId) {
+  const authorization = await getSession({ permission: 'leads:read' });
+  if (!authorization) {
     return (
       <InternalPageFrame navItems={LEADS_NAV}>
         <InternalPageHeader title="Возможности" subtitle="Защищённое рабочее пространство" />
@@ -342,7 +342,10 @@ export default async function LeadsPage({
       </InternalPageFrame>
     );
   }
-  const entitlement = await getEffectiveEntitlement(ownerId).catch(() => null);
+  const ownerId = authorization.dataOwnerId;
+  const entitlement = authorization.workspaceId
+    ? await getEffectiveEntitlement(ownerId, { workspaceId: authorization.workspaceId }).catch(() => null)
+    : null;
   if (!entitlement) {
     return (
       <InternalPageFrame navItems={LEADS_NAV}>

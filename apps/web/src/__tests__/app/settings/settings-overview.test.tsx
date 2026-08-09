@@ -25,11 +25,8 @@ describe("SettingsOverview", () => {
     expect(screen.getByRole("link", { name: /Изменить профиль/ })).toHaveAttribute("href", "/settings/radar#agency");
     expect(screen.getByRole("link", { name: /Настроить каналы/ })).toHaveAttribute("href", "/settings/delivery");
     expect(screen.getByRole("link", { name: /^Доступ и оплата/ })).toHaveAttribute("href", "/settings/access");
-    expect(screen.getByRole("link", { name: /^Аккаунт/ })).toHaveAttribute("href", "/settings/account");
-    expect(screen.getByRole("link", { name: /^Безопасность/ })).toHaveAttribute(
-      "href",
-      "/settings/security",
-    );
+    expect(screen.queryByRole("link", { name: /^Аккаунт$/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /^Аккаунт и безопасность/ })).toHaveAttribute("href", "/settings/security");
     expect(screen.getByRole("link", { name: /^Команда/ })).toHaveAttribute(
       "href",
       "/settings/team",
@@ -50,7 +47,7 @@ describe("SettingsOverview", () => {
     );
 
     expect(screen.getByText("Доставка ожидает канал")).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /^Безопасность/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: /^Аккаунт и безопасность/ })).toBeNull();
     expect(screen.queryByRole("link", { name: /^Команда/ })).toBeNull();
   });
 });

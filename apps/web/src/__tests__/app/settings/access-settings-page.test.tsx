@@ -2,16 +2,21 @@ import { Children, isValidElement, type ReactNode } from "react";
 
 jest.mock("@/lib/auth-v2/authorization", () => ({ getSession: jest.fn() }));
 jest.mock("@/lib/entitlements", () => ({ getEffectiveEntitlement: jest.fn() }));
-jest.mock("@/lib/paymentsRepo", () => ({ listCheckoutOrdersForOwner: jest.fn() }));
+jest.mock("@/lib/paymentsRepo", () => ({
+  listCheckoutOrdersForAccess: jest.fn(),
+  listCheckoutOrdersForOwner: jest.fn(),
+}));
 
 import AccessSettingsPage from "@/app/settings/access/page";
 import { getSession } from "@/lib/auth-v2/authorization";
 import { getEffectiveEntitlement } from "@/lib/entitlements";
-import { listCheckoutOrdersForOwner } from "@/lib/paymentsRepo";
+import { listCheckoutOrdersForAccess, listCheckoutOrdersForOwner } from "@/lib/paymentsRepo";
 
 describe("access settings page", () => {
   test("loads canonical access and only the signed-in user's orders", async () => {
-    jest.mocked(getSession).mockResolvedValue({ userId: "84", dataOwnerId: "42" } as never);
+    jest.mocked(getSession).mockResolvedValue({
+      userId: "84", dataOwnerId: "42", workspaceId: "9",
+    } as never);
     jest.mocked(getEffectiveEntitlement).mockResolvedValue({
       status: "active",
       source: "admin",
@@ -21,26 +26,35 @@ describe("access settings page", () => {
       features: ["dashboard", "digest"],
       activeSources: ["admin"],
     });
-    jest.mocked(listCheckoutOrdersForOwner).mockResolvedValue([]);
+    jest.mocked(listCheckoutOrdersForAccess).mockResolvedValue([]);
 
     const page = await AccessSettingsPage();
     const text = collectText(page);
     expect(text).toContain("Текущий доступ");
     expect(text).toContain("radar-admin-7");
-    expect(getEffectiveEntitlement).toHaveBeenCalledWith("42");
-    expect(listCheckoutOrdersForOwner).toHaveBeenCalledWith("42");
+    expect(text).toContain("Выдан оператором");
+    expect(text).toContain("Кабинет");
+    expect(text).not.toContain("dashboard");
+    expect(getEffectiveEntitlement).toHaveBeenCalledWith("42", { workspaceId: "9" });
+    expect(listCheckoutOrdersForAccess).toHaveBeenCalledWith({
+      workspaceId: "9",
+      entitlementOwnerId: "42",
+    });
+    expect(listCheckoutOrdersForOwner).not.toHaveBeenCalled();
     expect(getSession).toHaveBeenCalledWith({
       permissions: ["workspace:read", "billing:read"],
     });
   });
 
   test("shows an explicit unavailable state when order history cannot be loaded", async () => {
-    jest.mocked(getSession).mockResolvedValue({ userId: "84", dataOwnerId: "42" } as never);
+    jest.mocked(getSession).mockResolvedValue({
+      userId: "84", dataOwnerId: "42", workspaceId: "9",
+    } as never);
     jest.mocked(getEffectiveEntitlement).mockResolvedValue({
       status: "inactive", source: null, plan: null, startsAt: null, expiresAt: null,
       features: [], activeSources: [], reason: "no_active_entitlement",
     });
-    jest.mocked(listCheckoutOrdersForOwner).mockRejectedValue(new Error("database unavailable"));
+    jest.mocked(listCheckoutOrdersForAccess).mockRejectedValue(new Error("database unavailable"));
 
     const page = await AccessSettingsPage();
 

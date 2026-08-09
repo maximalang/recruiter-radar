@@ -1,16 +1,22 @@
 import { Children, isValidElement, type ReactNode } from "react";
 
 jest.mock("@/lib/operator-auth", () => ({ checkOperatorAccess: jest.fn() }));
-jest.mock("@/lib/admin/adminUserDetail", () => ({ getAdminUserDetail: jest.fn() }));
+jest.mock("@/lib/admin/adminUserDetail", () => ({
+  getAdminUserDetail: jest.fn(),
+  listAdminUserWorkspaces: jest.fn(),
+}));
 jest.mock("next/navigation", () => ({ redirect: jest.fn(), notFound: jest.fn() }));
 
 import AdminUserPage from "@/app/admin/users/[id]/page";
-import { getAdminUserDetail } from "@/lib/admin/adminUserDetail";
+import { getAdminUserDetail, listAdminUserWorkspaces } from "@/lib/admin/adminUserDetail";
 import { checkOperatorAccess } from "@/lib/operator-auth";
 
 describe("admin user control center", () => {
   test("renders diagnostic chain and operational sections", async () => {
     jest.mocked(checkOperatorAccess).mockResolvedValue({ ok: true } as never);
+    jest.mocked(listAdminUserWorkspaces).mockResolvedValue([
+      { id: "9", name: "Agency", status: "active", role: "owner", dataOwnerId: "42" },
+    ]);
     jest.mocked(getAdminUserDetail).mockResolvedValue({
       dataOwnerId: "42",
       account: { id: "42", email: "owner@example.test", fullName: "Owner", status: "active", createdAt: "2026-08-01T00:00:00.000Z", emailVerifiedAt: null, lastLoginAt: null, activeSessionCount: 1 },
@@ -26,12 +32,30 @@ describe("admin user control center", () => {
       ],
     } as never);
 
-    const page = await AdminUserPage({ params: Promise.resolve({ id: "42" }) });
+    const page = await AdminUserPage({ params: Promise.resolve({ id: "42" }), searchParams: Promise.resolve({}) });
     const text = collectText(page);
     expect(text).toContain("Диагностика готовности");
     expect(text).toContain("Digest eligible");
     expect(text).toContain("Платежи и заказы");
-    expect(getAdminUserDetail).toHaveBeenCalledWith("42");
+    expect(getAdminUserDetail).toHaveBeenCalledWith("42", "9");
+  });
+
+  test("requires an explicit workspace when the account has several memberships", async () => {
+    jest.clearAllMocks();
+    jest.mocked(checkOperatorAccess).mockResolvedValue({ ok: true } as never);
+    jest.mocked(listAdminUserWorkspaces).mockResolvedValue([
+      { id: "9", name: "Agency A", status: "active", role: "billing", dataOwnerId: "7" },
+      { id: "10", name: "Agency B", status: "active", role: "recruiter", dataOwnerId: "8" },
+    ]);
+
+    const page = await AdminUserPage({
+      params: Promise.resolve({ id: "42" }),
+      searchParams: Promise.resolve({}),
+    });
+    const text = collectText(page);
+
+    expect(text).toContain("workspace");
+    expect(getAdminUserDetail).not.toHaveBeenCalled();
   });
 });
 

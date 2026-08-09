@@ -1,3 +1,5 @@
+BEGIN;
+
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM entitlement_grants LIMIT 1) THEN
@@ -8,3 +10,5 @@ END;
 $$;
 
 DROP TABLE IF EXISTS entitlement_grants;
+
+COMMIT;

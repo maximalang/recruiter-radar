@@ -106,6 +106,8 @@ export default async function AdminPaymentsPage() {
             {order.status === "paid" && order.availableMinor > 0 ? (
               <form action={requestRefundAction} style={{ display: "grid", gap: 10, marginTop: 16 }}>
                 <input type="hidden" name="orderId" value={order.id} />
+                <input type="hidden" name="workspaceId" value={order.workspaceId} />
+                <input type="hidden" name="entitlementOwnerId" value={order.entitlementOwnerId} />
                 <label className={ppStyles.field}>
                   <span className={ppStyles.fieldLabel}>Сумма возврата, ₽</span>
                   <input
@@ -178,6 +180,8 @@ async function requestRefundAction(formData: FormData) {
   if (!access.ok) throw new Error("operator_access_required");
   await requestRobokassaRefund({
     orderId: String(formData.get("orderId") ?? ""),
+    workspaceId: String(formData.get("workspaceId") ?? ""),
+    entitlementOwnerId: String(formData.get("entitlementOwnerId") ?? ""),
     amountMinor: parseRublesToMinor(String(formData.get("amountRub") ?? "")),
     requestedBy: `operator:${access.via}`,
   });

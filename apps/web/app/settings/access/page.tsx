@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 
 import { getSession } from "@/lib/auth-v2/authorization";
 import { getEffectiveEntitlement } from "@/lib/entitlements";
-import { listCheckoutOrdersForOwner } from "@/lib/paymentsRepo";
+import { listCheckoutOrdersForAccess } from "@/lib/paymentsRepo";
 import { buildAccountNavigation } from "../../ui/account-navigation";
 import {
   ContentCard,
@@ -28,10 +28,16 @@ export default async function AccessSettingsPage() {
     permissions: ["workspace:read", "billing:read"],
   });
   if (!session) redirect("/login?returnTo=/settings/access");
+  if (!session.workspaceId) redirect("/settings?notice=workspace-required");
 
   const [accessResult, ordersResult] = await Promise.allSettled([
-    getEffectiveEntitlement(session.dataOwnerId),
-    listCheckoutOrdersForOwner(session.dataOwnerId),
+    getEffectiveEntitlement(session.dataOwnerId, {
+      workspaceId: session.workspaceId,
+    }),
+    listCheckoutOrdersForAccess({
+      workspaceId: session.workspaceId,
+      entitlementOwnerId: session.dataOwnerId,
+    }),
   ]);
   if (accessResult.status === "rejected") throw accessResult.reason;
   const access = accessResult.value;
@@ -53,11 +59,11 @@ export default async function AccessSettingsPage() {
             <dl>
               <div><dt>Статус</dt><dd>Активен</dd></div>
               <div><dt>Тариф</dt><dd>{access.plan}</dd></div>
-              <div><dt>Источник</dt><dd>{access.source}</dd></div>
+              <div><dt>Источник</dt><dd>{accessSourceLabel(access.source)}</dd></div>
               <div><dt>Начало</dt><dd>{formatDate(access.startsAt)}</dd></div>
               <div><dt>Доступ до</dt><dd>{access.expiresAt ? formatDate(access.expiresAt) : "Без даты окончания"}</dd></div>
               {remainingDays !== null ? <div><dt>Осталось</dt><dd>{remainingDays} дн.</dd></div> : null}
-              <div><dt>Возможности</dt><dd>{access.features.join(", ")}</dd></div>
+              <div><dt>Возможности</dt><dd>{access.features.map(featureLabel).join(", ")}</dd></div>
             </dl>
           ) : (
             <p className={internalPageClasses.bodyTextMutedBlock}>
@@ -98,4 +104,28 @@ export default async function AccessSettingsPage() {
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat("ru-RU", { dateStyle: "long", timeStyle: "short" })
     .format(new Date(value));
+}
+
+const ACCESS_SOURCE_LABELS = {
+  subscription: "Подписка",
+  payment: "Оплаченный доступ",
+  admin: "Выдан оператором",
+  trial: "Пробный период",
+  pilot: "Пилотный доступ",
+  promo: "Промо-доступ",
+} as const;
+
+const FEATURE_LABELS = {
+  dashboard: "Кабинет",
+  api: "API",
+  digest: "Дайджест",
+  delivery: "Каналы доставки",
+} as const;
+
+function accessSourceLabel(source: keyof typeof ACCESS_SOURCE_LABELS): string {
+  return ACCESS_SOURCE_LABELS[source];
+}
+
+function featureLabel(feature: keyof typeof FEATURE_LABELS): string {
+  return FEATURE_LABELS[feature];
 }

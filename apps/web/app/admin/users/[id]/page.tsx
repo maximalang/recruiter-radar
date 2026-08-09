@@ -3,7 +3,12 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { getAdminUserDetail, type DiagnosticStatus } from "@/lib/admin/adminUserDetail";
+import {
+  getAdminUserDetail,
+  listAdminUserWorkspaces,
+  type AdminWorkspaceMembership,
+  type DiagnosticStatus,
+} from "@/lib/admin/adminUserDetail";
 import { checkOperatorAccess } from "@/lib/operator-auth";
 import {
   ContentCard,
@@ -27,12 +32,39 @@ const NAV: NavItem[] = [
   { href: "/admin", label: "Оператор", active: true },
 ];
 
-export default async function AdminUserPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function AdminUserPage({ params, searchParams }: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ workspaceId?: string }>;
+}) {
   const access = await checkOperatorAccess();
   if (!access.ok) redirect("/admin");
   const { id } = await params;
   if (!/^\d+$/.test(id)) notFound();
-  const user = await getAdminUserDetail(id);
+  const requestedWorkspaceId = (await searchParams).workspaceId?.trim() || null;
+  const memberships = await listAdminUserWorkspaces(id);
+  if (requestedWorkspaceId && !memberships.some((item) => item.id === requestedWorkspaceId)) {
+    notFound();
+  }
+  const selectedWorkspaceId = requestedWorkspaceId
+    ?? (memberships.length === 1 ? memberships[0].id : null);
+
+  if (memberships.length > 1 && !selectedWorkspaceId) {
+    return (
+      <InternalPageFrame navItems={NAV}>
+        <InternalPageHeader
+          title="Р’С‹Р±РµСЂРёС‚Рµ workspace"
+          subtitle={`User Control Center В· #${id}`}
+        />
+        <p className={internalPageClasses.bodyTextMutedBlock}>
+          РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ СЃРѕСЃС‚РѕРёС‚ РІ РЅРµСЃРєРѕР»СЊРєРёС… workspace. Р”РёР°РіРЅРѕСЃС‚РёРєР° Рё РѕРїРµСЂР°С†РёРё С‚СЂРµР±СѓСЋС‚ СЏРІРЅРѕРіРѕ РІС‹Р±РѕСЂР°.
+        </p>
+        <WorkspaceSelector userId={id} memberships={memberships} selectedId={null} />
+      </InternalPageFrame>
+    );
+  }
+  if (!selectedWorkspaceId) notFound();
+
+  const user = await getAdminUserDetail(id, selectedWorkspaceId);
   if (!user) notFound();
 
   return (
@@ -44,6 +76,14 @@ export default async function AdminUserPage({ params }: { params: Promise<{ id: 
       <p className={internalPageClasses.bodyTextMutedBlock}>
         <Link href="/admin">← Все пользователи</Link>
       </p>
+
+      {memberships.length > 0 ? (
+        <WorkspaceSelector
+          userId={id}
+          memberships={memberships}
+          selectedId={selectedWorkspaceId}
+        />
+      ) : null}
 
       <div style={{ display: "grid", gap: 16 }}>
         <ContentCard>
@@ -178,6 +218,35 @@ export default async function AdminUserPage({ params }: { params: Promise<{ id: 
         </ContentCard>
       </div>
     </InternalPageFrame>
+  );
+}
+
+function WorkspaceSelector({ userId, memberships, selectedId }: {
+  userId: string;
+  memberships: AdminWorkspaceMembership[];
+  selectedId: string | null;
+}) {
+  return (
+    <ContentCard>
+      <ContentCardTitle>Workspace</ContentCardTitle>
+      <nav aria-label="Workspace пользователя" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {memberships.map((membership) => (
+          <Link
+            key={membership.id}
+            href={`/admin/users/${userId}?workspaceId=${membership.id}`}
+            aria-current={membership.id === selectedId ? "page" : undefined}
+            style={{
+              border: "1px solid #cbd5e1",
+              borderRadius: 8,
+              padding: "8px 10px",
+              background: membership.id === selectedId ? "#e0e7ff" : "#fff",
+            }}
+          >
+            {membership.name} В· {membership.role}
+          </Link>
+        ))}
+      </nav>
+    </ContentCard>
   );
 }
 

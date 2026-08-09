@@ -36,6 +36,7 @@ export default function AdminUserActions({ userId, workspaceId, profileActive, t
       <form action={grantAction} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "end" }}>
         <input type="hidden" name="userId" value={userId} />
         {workspaceId ? <input type="hidden" name="workspaceId" value={workspaceId} /> : null}
+        <input type="hidden" name="mode" value={adminGrantActive ? "extend" : "grant"} />
         <label style={labelStyle}>Срок
           <select name="durationDays" defaultValue="7" style={controlStyle}>
             <option value="7">7 дней</option><option value="14">14 дней</option><option value="30">30 дней</option>

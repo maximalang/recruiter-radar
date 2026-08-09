@@ -6,7 +6,7 @@ import {
   sendPilotOrderTestDigest
 } from "../../../../lib/payments";
 import { VALID_INDUSTRIES, VALID_COMPANY_SIZES, VALID_ROLES } from "../../../../lib/clientProfiles";
-import { getAuthorizedUserId } from "../../../../lib/auth-v2/authorization";
+import { getSession } from "../../../../lib/auth-v2/authorization";
 
 function readRequiredText(formData: FormData, key: string): string {
   const value = formData.get(key);
@@ -56,10 +56,16 @@ function readOptionalNumber(formData: FormData, key: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-async function requireOwnerId(): Promise<string> {
-  const ownerId = await getAuthorizedUserId("billing:manage");
-  if (!ownerId) throw new Error("Owner identification is required.");
-  return ownerId;
+async function requireBillingAccess(): Promise<{
+  workspaceId: string;
+  entitlementOwnerId: string;
+}> {
+  const session = await getSession({ permission: "billing:manage" });
+  if (!session?.workspaceId) throw new Error("Workspace billing access is required.");
+  return {
+    workspaceId: session.workspaceId,
+    entitlementOwnerId: session.dataOwnerId,
+  };
 }
 
 export async function confirmPilotProfileAction(expectedOrderId: string, formData: FormData) {
@@ -69,7 +75,7 @@ export async function confirmPilotProfileAction(expectedOrderId: string, formDat
     throw new Error("Order mismatch.");
   }
 
-  const ownerId = await requireOwnerId();
+  const access = await requireBillingAccess();
 
   await confirmPilotOrderProfile({
     orderId: expectedOrderId,
@@ -86,7 +92,7 @@ export async function confirmPilotProfileAction(expectedOrderId: string, formDat
     excludedIndustries: readCheckboxGroup(formData, "excludedIndustries", VALID_INDUSTRIES),
     excludedLocations: readOptionalStringList(formData, "excludedLocations"),
     remoteFriendly: formData.get("remoteFriendly") === "on",
-    ownerId
+    ...access,
   });
 }
 
@@ -97,9 +103,9 @@ export async function sendPilotTestDigestAction(expectedOrderId: string, formDat
     throw new Error("Order mismatch.");
   }
 
-  const ownerId = await requireOwnerId();
+  const access = await requireBillingAccess();
 
-  await sendPilotOrderTestDigest(expectedOrderId, { ownerId });
+  await sendPilotOrderTestDigest(expectedOrderId, access);
 }
 
 export async function completePilotOnboardingAction(expectedOrderId: string, formData: FormData) {
@@ -109,7 +115,7 @@ export async function completePilotOnboardingAction(expectedOrderId: string, for
     throw new Error("Order mismatch.");
   }
 
-  const ownerId = await requireOwnerId();
+  const access = await requireBillingAccess();
 
-  await completePilotOrderOnboarding(expectedOrderId, { ownerId });
+  await completePilotOrderOnboarding(expectedOrderId, access);
 }

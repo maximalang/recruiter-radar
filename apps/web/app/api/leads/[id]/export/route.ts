@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getLeadDetail } from '@/lib/leads-data';
 import { getClientProfileById } from '@/lib/clientProfiles';
-import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization';
+import { getSession } from '@/lib/auth-v2/authorization';
 import { singleLeadToCsv } from '@/lib/leads-csv';
 import { hasFeatureAccess } from '@/lib/entitlements';
 
@@ -31,12 +31,13 @@ export async function GET(
 ) {
   const { id } = await context.params;
 
-  const ownerId = await getAuthorizedOwnerId('exports:create');
-  if (!ownerId) {
+  const authorization = await getSession({ permission: 'exports:create' });
+  if (!authorization?.workspaceId) {
     return new NextResponse('not_found', { status: 404 });
   }
+  const ownerId = authorization.dataOwnerId;
   try {
-    if (!(await hasFeatureAccess(ownerId, 'api'))) {
+    if (!(await hasFeatureAccess(ownerId, 'api', { workspaceId: authorization.workspaceId }))) {
       return new NextResponse('entitlement_required', { status: 403 });
     }
   } catch {

@@ -39,7 +39,7 @@ describe("canonical entitlement service", () => {
     });
 
     const fixedNow = new Date("2026-08-10T10:00:00.000Z");
-    await expect(getEffectiveEntitlement("42", { now: fixedNow })).resolves.toEqual({
+    await expect(getEffectiveEntitlement("42", { now: fixedNow, workspaceId: "9" })).resolves.toEqual({
       status: "active",
       source: "admin",
       plan: "admin",
@@ -50,14 +50,14 @@ describe("canonical entitlement service", () => {
     });
     expect(mockQuery).toHaveBeenCalledWith(
       expect.stringContaining("CURRENT_TIMESTAMP"),
-      [["42"], fixedNow],
+      [["42"], fixedNow, "9"],
     );
   });
 
   test("fails closed when no active source exists", async () => {
     mockQuery.mockResolvedValue({ rows: [], rowCount: 0 });
 
-    await expect(getEffectiveEntitlement(42)).resolves.toEqual({
+    await expect(getEffectiveEntitlement(42, { workspaceId: "9" })).resolves.toEqual({
       status: "inactive",
       source: null,
       plan: null,
@@ -70,13 +70,13 @@ describe("canonical entitlement service", () => {
     expect(mockQuery).toHaveBeenNthCalledWith(
       1,
       expect.stringContaining("COALESCE($2::TIMESTAMPTZ, CURRENT_TIMESTAMP)"),
-      [["42"], null],
+      [["42"], null, "9"],
     );
-    await expect(hasFeatureAccess(42, "digest")).resolves.toBe(false);
+    await expect(hasFeatureAccess(42, "digest", { workspaceId: "9" })).resolves.toBe(false);
   });
 
   test("rejects invalid account identifiers before querying", async () => {
-    await expect(getEffectiveEntitlement("not-an-id")).rejects.toThrow(
+    await expect(getEffectiveEntitlement("not-an-id", { workspaceId: "9" })).rejects.toThrow(
       "Invalid entitlement user id.",
     );
     expect(mockQuery).not.toHaveBeenCalled();
@@ -87,6 +87,7 @@ describe("canonical entitlement service", () => {
 
     await expect(grantEntitlement({
       userId: "42",
+      workspaceId: "9",
       source: "admin",
       plan: "radar-30",
       durationDays: 30,
@@ -95,7 +96,7 @@ describe("canonical entitlement service", () => {
 
     expect(mockQuery).toHaveBeenCalledWith(
       expect.stringContaining("INSERT INTO entitlement_grants"),
-      ["42", "admin", "radar-30", 30, ["dashboard", "digest", "delivery"]],
+      ["42", "admin", "radar-30", 30, ["dashboard", "digest", "delivery"], "9"],
     );
   });
 
@@ -104,13 +105,13 @@ describe("canonical entitlement service", () => {
     const expiresAt = new Date(Date.now() + 30 * 86_400_000);
 
     await expect(grantEntitlementUntil({
-      userId: "42", source: "admin", plan: "radar-admin", expiresAt,
+      userId: "42", workspaceId: "9", source: "admin", plan: "radar-admin", expiresAt,
       features: ["dashboard", "digest", "delivery"],
     })).resolves.toEqual({ changed: true, grantId: "92" });
 
     expect(mockQuery).toHaveBeenCalledWith(
       expect.stringMatching(/\$4::TIMESTAMPTZ[\s\S]*ends_at = EXCLUDED\.ends_at/),
-      ["42", "admin", "radar-admin", expiresAt.toISOString(), ["dashboard", "digest", "delivery"]],
+      ["42", "admin", "radar-admin", expiresAt.toISOString(), ["dashboard", "digest", "delivery"], "9"],
     );
   });
 
@@ -121,17 +122,19 @@ describe("canonical entitlement service", () => {
 
     await expect(revokeEntitlement({
       userId: 42,
+      workspaceId: 9,
       source: "admin",
     })).resolves.toEqual({ changed: true, count: 2 });
     await expect(extendEntitlement({
       userId: 42,
+      workspaceId: 9,
       source: "admin",
       durationDays: 7,
     })).resolves.toEqual({ changed: true, grantId: "93" });
 
     expect(String(mockQuery.mock.calls[0][0])).toContain("status = 'revoked'");
-    expect(mockQuery.mock.calls[0][1]).toEqual(["42", "admin"]);
+    expect(mockQuery.mock.calls[0][1]).toEqual(["42", "admin", "9"]);
     expect(String(mockQuery.mock.calls[1][0])).toContain("INTERVAL '1 day'");
-    expect(mockQuery.mock.calls[1][1]).toEqual(["42", "admin", 7]);
+    expect(mockQuery.mock.calls[1][1]).toEqual(["42", "admin", 7, "9"]);
   });
 });

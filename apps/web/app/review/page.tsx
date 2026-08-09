@@ -4,7 +4,7 @@ import type { ReactElement, SVGProps } from 'react';
 import Link from 'next/link';
 import { headers } from 'next/headers';
 import { listClientProfiles, type ClientProfile } from '@/lib/clientProfiles';
-import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization';
+import { getSession } from '@/lib/auth-v2/authorization';
 import { getEffectiveEntitlement } from '@/lib/entitlements';
 import {
   InternalPageFrame,
@@ -218,8 +218,8 @@ export default async function ReviewPage({
   const params = await searchParams;
   // Keep authentication, canonical entitlement, and data failures distinct.
   // A missing session must never look like an account with zero profiles.
-  const ownerId = await getAuthorizedOwnerId('leads:read');
-  if (!ownerId) {
+  const authorization = await getSession({ permission: 'leads:read' });
+  if (!authorization) {
     return (
       <InternalPageFrame navItems={REVIEW_NAV}>
         <InternalPageHeader title="Очередь проверки" subtitle="Защищённое рабочее пространство" />
@@ -228,7 +228,10 @@ export default async function ReviewPage({
     );
   }
 
-  const entitlement = await getEffectiveEntitlement(ownerId).catch(() => null);
+  const ownerId = authorization.dataOwnerId;
+  const entitlement = authorization.workspaceId
+    ? await getEffectiveEntitlement(ownerId, { workspaceId: authorization.workspaceId }).catch(() => null)
+    : null;
   if (!entitlement) {
     return (
       <InternalPageFrame navItems={REVIEW_NAV}>

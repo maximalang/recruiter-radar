@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { getAccountById } from "@/lib/account-auth";
-import { getAuthorizedUserId } from "@/lib/auth-v2/authorization";
+import { getSession } from "@/lib/auth-v2/authorization";
 import { buildLegalAcceptanceAudit } from "@/lib/legalDocuments";
 import { OPERATOR_REQUISITES } from "@/lib/operatorRequisites";
 import { buildPaymentReadinessReport } from "@/lib/payment-readiness";
@@ -44,14 +44,22 @@ export default async function CheckoutPage(props: {
   const checkoutHref = buildCheckoutHref({ ...input, planCode });
   const previewHref = buildPublicPreviewHref(input);
   const loginHref = `/login?returnTo=${encodeURIComponent(checkoutHref)}`;
-  const account = await getAccountById(await getAuthorizedUserId("billing:manage")).catch(() => null);
+  const authorization = await getSession({ permission: "billing:manage" }).catch(() => null);
+  const account = authorization
+    ? await getAccountById(authorization.userId).catch(() => null)
+    : null;
   const error = typeof searchParams.error === "string" ? searchParams.error : "";
   const paymentReady = buildPaymentReadinessReport().selfServeCheckoutReady;
 
   async function startCheckoutAction(formData: FormData) {
     "use server";
-    const currentAccount = await getAccountById(await getAuthorizedUserId("billing:manage"));
-    if (!currentAccount) redirect(`/login?returnTo=${encodeURIComponent(checkoutHref)}`);
+    const currentAuthorization = await getSession({ permission: "billing:manage" });
+    const currentAccount = currentAuthorization
+      ? await getAccountById(currentAuthorization.userId)
+      : null;
+    if (!currentAuthorization || !currentAuthorization.workspaceId || !currentAccount) {
+      redirect(`/login?returnTo=${encodeURIComponent(checkoutHref)}`);
+    }
     const providerCheckoutAllowed = buildPaymentReadinessReport().selfServeCheckoutReady;
 
     const separator = checkoutHref.includes("?") ? "&" : "?";
@@ -71,7 +79,9 @@ export default async function CheckoutPage(props: {
 
     const legalAcceptance = buildLegalAcceptanceAudit();
     const result = await startCheckoutOrder({
-      userId: currentAccount.id,
+      purchasedByUserId: currentAuthorization.userId,
+      workspaceId: currentAuthorization.workspaceId,
+      entitlementOwnerId: currentAuthorization.dataOwnerId,
       productCode: planCode,
       customerName: agencyName,
       customerContact: currentAccount.email,

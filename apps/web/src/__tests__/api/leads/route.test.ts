@@ -6,13 +6,13 @@
  */
 
 import { GET } from '@/app/api/leads/route';
-import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization';
+import { getSession } from '@/lib/auth-v2/authorization';
 import { getLeadsForAllProfiles, type LeadItem } from '@/lib/leads-data';
 import { listClientProfiles } from '@/lib/clientProfiles';
 import { hasFeatureAccess } from '@/lib/entitlements';
 
 jest.mock('@/lib/auth-v2/authorization', () => ({
-  getAuthorizedOwnerId: jest.fn(),
+  getSession: jest.fn(),
 }));
 jest.mock('@/lib/clientProfiles', () => ({
   listClientProfiles: jest.fn(),
@@ -29,7 +29,7 @@ jest.mock('@/lib/leads-data', () => ({
 }));
 jest.mock('@/lib/entitlements', () => ({ hasFeatureAccess: jest.fn() }));
 
-const mockOwner = getAuthorizedOwnerId as jest.MockedFunction<typeof getAuthorizedOwnerId>;
+const mockOwner = getSession as jest.MockedFunction<typeof getSession>;
 const mockList = listClientProfiles as jest.MockedFunction<typeof listClientProfiles>;
 const mockLeads = getLeadsForAllProfiles as jest.MockedFunction<typeof getLeadsForAllProfiles>;
 const mockFeatureAccess = hasFeatureAccess as jest.MockedFunction<typeof hasFeatureAccess>;
@@ -98,6 +98,10 @@ function req(qs = '') {
   return GET(new Request(`http://localhost/api/leads${qs}`) as never);
 }
 
+function sessionFor(dataOwnerId: string) {
+  return { dataOwnerId, workspaceId: 'workspace-9' } as never;
+}
+
 describe('GET /api/leads', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -115,16 +119,16 @@ describe('GET /api/leads', () => {
   });
 
   it('denies a signed-in workspace without API entitlement before reading profiles', async () => {
-    mockOwner.mockResolvedValue('owner-42');
+    mockOwner.mockResolvedValue(sessionFor('owner-42'));
     mockFeatureAccess.mockResolvedValue(false);
     const res = await req();
     expect(res.status).toBe(403);
-    expect(mockFeatureAccess).toHaveBeenCalledWith('owner-42', 'api');
+    expect(mockFeatureAccess).toHaveBeenCalledWith('owner-42', 'api', { workspaceId: 'workspace-9' });
     expect(mockList).not.toHaveBeenCalled();
   });
 
   it('reports an unavailable entitlement check without returning a false empty list', async () => {
-    mockOwner.mockResolvedValue('owner-42');
+    mockOwner.mockResolvedValue(sessionFor('owner-42'));
     mockFeatureAccess.mockRejectedValue(new Error('database unavailable'));
     const res = await req();
     expect(res.status).toBe(503);
@@ -132,7 +136,7 @@ describe('GET /api/leads', () => {
   });
 
   it('scopes the read to the session owner', async () => {
-    mockOwner.mockResolvedValue('owner-42');
+    mockOwner.mockResolvedValue(sessionFor('owner-42'));
     mockList.mockResolvedValue([makeProfile('p1')]);
     mockLeads.mockResolvedValue({ leads: [makeLead()], total: 1 });
 
@@ -145,7 +149,7 @@ describe('GET /api/leads', () => {
   });
 
   it('returns a clean projection without raw internal fields', async () => {
-    mockOwner.mockResolvedValue('owner-42');
+    mockOwner.mockResolvedValue(sessionFor('owner-42'));
     mockList.mockResolvedValue([makeProfile('p1')]);
     mockLeads.mockResolvedValue({ leads: [makeLead()], total: 1 });
 
@@ -169,7 +173,7 @@ describe('GET /api/leads', () => {
   });
 
   it('computes whyMatch from the owning profile filters', async () => {
-    mockOwner.mockResolvedValue('owner-42');
+    mockOwner.mockResolvedValue(sessionFor('owner-42'));
     mockList.mockResolvedValue([makeProfile('p1')]);
     mockLeads.mockResolvedValue({ leads: [makeLead()], total: 1 });
 
@@ -182,7 +186,7 @@ describe('GET /api/leads', () => {
   });
 
   it('clamps pageSize and passes limit/offset', async () => {
-    mockOwner.mockResolvedValue('owner-42');
+    mockOwner.mockResolvedValue(sessionFor('owner-42'));
     mockList.mockResolvedValue([makeProfile('p1')]);
     mockLeads.mockResolvedValue({ leads: [], total: 0 });
 
@@ -194,7 +198,7 @@ describe('GET /api/leads', () => {
   });
 
   it('ignores a ?profile= that the owner does not own', async () => {
-    mockOwner.mockResolvedValue('owner-42');
+    mockOwner.mockResolvedValue(sessionFor('owner-42'));
     mockList.mockResolvedValue([makeProfile('p1')]);
     mockLeads.mockResolvedValue({ leads: [], total: 0 });
 

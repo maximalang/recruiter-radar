@@ -23,7 +23,7 @@ describe("profile ownership entitlement boundary", () => {
     const ownerId = "9007199254740993";
     mockGetPool.mockReturnValue({
       query: jest.fn().mockResolvedValue({
-        rows: [{ isActive: true, ownerId }],
+        rows: [{ isActive: true, ownerId, workspaceId: "9" }],
         rowCount: 1,
       }),
     } as never);
@@ -39,13 +39,13 @@ describe("profile ownership entitlement boundary", () => {
 
     await expect(assertDigestEntitlementByClientProfileId("7"))
       .resolves.toBeUndefined();
-    expect(mockGetEffectiveEntitlement).toHaveBeenCalledWith(ownerId);
+    expect(mockGetEffectiveEntitlement).toHaveBeenCalledWith(ownerId, { workspaceId: "9" });
   });
 
   test("requires the delivery feature on notification delivery paths", async () => {
     mockGetPool.mockReturnValue({
       query: jest.fn().mockResolvedValue({
-        rows: [{ isActive: true, ownerId: "42" }],
+        rows: [{ isActive: true, ownerId: "42", workspaceId: "9" }],
         rowCount: 1,
       }),
     } as never);

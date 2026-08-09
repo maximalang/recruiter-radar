@@ -37,7 +37,7 @@ import { getDeliveryPreferencesByOwnerId } from "@/lib/deliveryPreferences";
 describe("dashboard canonical access states", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.mocked(getSession).mockResolvedValue({ userId: "84", dataOwnerId: "42" } as never);
+    jest.mocked(getSession).mockResolvedValue({ userId: "84", dataOwnerId: "42", workspaceId: "ws-1" } as never);
     jest.mocked(getAccountById).mockResolvedValue({ id: "84" } as never);
     jest.mocked(getDashboardTodayRadar).mockResolvedValue({ topLeads: [], pendingReview: 0, hiringModeByProfileId: {}, lastRunAt: null });
     jest.mocked(getDeliveryPreferencesByOwnerId).mockResolvedValue(null);
@@ -48,7 +48,7 @@ describe("dashboard canonical access states", () => {
     const page = await DashboardPage();
     render(page);
     expect(screen.getByText(/Нужен активный доступ/)).toBeInTheDocument();
-    expect(getEffectiveEntitlement).toHaveBeenCalledWith("42");
+    expect(getEffectiveEntitlement).toHaveBeenCalledWith("42", { workspaceId: "ws-1" });
     expect(getClientProfileByOwnerId).not.toHaveBeenCalled();
   });
 

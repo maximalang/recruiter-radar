@@ -10,6 +10,7 @@ import {
   pausePilotForUser,
   setProfileActive,
   clearProfileTelegram,
+  extendAccessForUser,
   grantAccessForUser,
   revokeUserSessions,
   sendUserLoginLink,
@@ -227,50 +228,56 @@ async function withOperatorSession<T extends UserActionState>(
 }
 
 export async function adminActivatePilot(_prev: UserActionState, formData: FormData): Promise<UserActionState> {
-  return withOperatorDataOwnerSession(formData, (userId) => activatePilotForUser(userId));
+  return withOperatorDataOwnerSession(formData, (userId, workspaceId) => activatePilotForUser(userId, workspaceId));
 }
 
 export async function adminPausePilot(_prev: UserActionState, formData: FormData): Promise<UserActionState> {
-  return withOperatorDataOwnerSession(formData, (userId) => pausePilotForUser(userId));
+  return withOperatorDataOwnerSession(formData, (userId, workspaceId) => pausePilotForUser(userId, workspaceId));
 }
 
 export async function adminPauseProfile(_prev: UserActionState, formData: FormData): Promise<UserActionState> {
-  return withOperatorDataOwnerSession(formData, (userId) => setProfileActive(userId, false));
+  return withOperatorDataOwnerSession(formData, (userId, workspaceId) => setProfileActive(userId, workspaceId, false));
 }
 
 export async function adminResumeProfile(_prev: UserActionState, formData: FormData): Promise<UserActionState> {
-  return withOperatorDataOwnerSession(formData, (userId) => setProfileActive(userId, true));
+  return withOperatorDataOwnerSession(formData, (userId, workspaceId) => setProfileActive(userId, workspaceId, true));
 }
 
 export async function adminClearTelegram(_prev: UserActionState, formData: FormData): Promise<UserActionState> {
-  return withOperatorDataOwnerSession(formData, (userId) => clearProfileTelegram(userId));
+  return withOperatorDataOwnerSession(formData, (userId, workspaceId) => clearProfileTelegram(userId, workspaceId));
 }
 
 async function withOperatorDataOwnerSession<T extends UserActionState>(
   formData: FormData,
-  run: (dataOwnerId: string) => Promise<T>,
+  run: (dataOwnerId: string, workspaceId: string) => Promise<T>,
 ): Promise<T> {
   return withOperatorSession(formData, async (userId) => {
     const workspaceIdValue = String(formData.get("workspaceId") ?? "").trim();
-    const dataOwnerId = await resolveAdminDataOwnerId(userId, workspaceIdValue || undefined);
+    if (!/^\d+$/.test(workspaceIdValue) || workspaceIdValue === "0") {
+      return { ok: false, message: "Workspace РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ РІС‹Р±СЂР°РЅ СЏРІРЅРѕ." } as T;
+    }
+    const dataOwnerId = await resolveAdminDataOwnerId(userId, workspaceIdValue);
     if (!dataOwnerId) {
       return { ok: false, message: "Активный workspace пользователя не найден." } as T;
     }
-    return run(dataOwnerId);
+    return run(dataOwnerId, workspaceIdValue);
   });
 }
 
 export async function adminGrantAccess(_prev: UserActionState, formData: FormData): Promise<UserActionState> {
-  return withOperatorDataOwnerSession(formData, (userId) => {
+  return withOperatorDataOwnerSession(formData, (userId, workspaceId) => {
     const customExpiry = String(formData.get("expiresAt") ?? "").trim();
     if (customExpiry) {
       const expiresAt = new Date(`${customExpiry}T23:59:59.999+03:00`);
       if (!Number.isFinite(expiresAt.getTime())) return Promise.resolve({ ok: false, message: "Некорректная дата окончания." });
-      return grantAccessForUser(userId, { expiresAt });
+      return grantAccessForUser(userId, workspaceId, { expiresAt });
     }
     const durationDays = Number(formData.get("durationDays") ?? 7);
     if (![7, 14, 30, 90, 365].includes(durationDays)) return Promise.resolve({ ok: false, message: "Недопустимая длительность доступа." });
-    return grantAccessForUser(userId, { durationDays });
+    if (String(formData.get("mode") ?? "") === "extend") {
+      return extendAccessForUser(userId, workspaceId, durationDays);
+    }
+    return grantAccessForUser(userId, workspaceId, { durationDays });
   });
 }
 
@@ -287,7 +294,7 @@ export async function adminResendOnboarding(_prev: UserActionState, formData: Fo
 }
 
 export async function adminUpdateClientProfile(_prev: UserActionState, formData: FormData): Promise<UserActionState> {
-  return withOperatorDataOwnerSession(formData, (userId) => updateClientSettingsForUser(userId, {
+  return withOperatorDataOwnerSession(formData, (userId, workspaceId) => updateClientSettingsForUser(userId, workspaceId, {
     agencyName: String(formData.get('agencyName') ?? ''),
     specialization: optionalFormText(formData, 'specialization'),
     targetCity: optionalFormText(formData, 'targetCity'),

@@ -13,6 +13,7 @@ export interface AdminUserCardData {
   email: string;
   fullName: string | null;
   createdAt: string;
+  workspace: { id: string; name: string; role: string } | null;
   profile: {
     id: string;
     agencyName: string;
@@ -58,6 +59,9 @@ export default function AdminUserCard({ user }: { user: AdminUserCardData }) {
         </div>
         <div style={{ fontSize: "0.76rem", color: "var(--c-text-muted, #667085)", display: "grid", gap: "2px", marginTop: "4px" }}>
           <span>
+            Workspace: {user.workspace ? `${user.workspace.name} В· ${user.workspace.role}` : "РЅРµС‚"}
+          </span>
+          <span>
             Профиль:{" "}
             {user.profile
               ? `${user.profile.agencyName}${user.profile.isActive ? "" : " (приостановлен)"}`
@@ -85,7 +89,7 @@ export default function AdminUserCard({ user }: { user: AdminUserCardData }) {
           </span>
         </div>
         <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "8px" }}>
-          <Link href={`/admin/users/${user.id}`} style={{ padding: "6px 12px", borderRadius: "8px", fontWeight: 600, fontSize: "0.76rem", border: "1px solid #cbd5e1", color: "#334155", textDecoration: "none" }}>
+          <Link href={`/admin/users/${user.id}${user.workspace ? `?workspaceId=${user.workspace.id}` : ""}`} style={{ padding: "6px 12px", borderRadius: "8px", fontWeight: 600, fontSize: "0.76rem", border: "1px solid #cbd5e1", color: "#334155", textDecoration: "none" }}>
             Открыть User Control Center
           </Link>
         </div>

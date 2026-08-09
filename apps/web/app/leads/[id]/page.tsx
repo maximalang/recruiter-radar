@@ -3,7 +3,7 @@ import type { ReactElement, SVGProps } from 'react';
 import Link from 'next/link';
 import { getLeadDetail, formatLawfulContactPath } from '@/lib/leads-data';
 import { getClientProfileById, resolveHiringMode } from '@/lib/clientProfiles';
-import { getAuthorizedOwnerId } from '@/lib/auth-v2/authorization';
+import { getSession } from '@/lib/auth-v2/authorization';
 import { getEffectiveEntitlement } from '@/lib/entitlements';
 import { buildFitExplanation, FIT_DIMENSION_ICON } from '@/lib/leads/fit-explanation';
 import { buildCompanySummary } from '@/lib/leads/company-summary';
@@ -57,8 +57,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   // Authentication and canonical access are resolved before the owner-scoped
   // lead query. This avoids both probing a lead without access and presenting
   // an expired session as a misleading 404.
-  const ownerId = await getAuthorizedOwnerId('leads:read');
-  if (!ownerId) {
+  const authorization = await getSession({ permission: 'leads:read' });
+  if (!authorization) {
     return (
       <InternalPageFrame navItems={LEAD_DETAIL_NAV}>
         <InternalPageHeader title="Возможность" subtitle="Защищённое рабочее пространство" />
@@ -71,7 +71,10 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     );
   }
 
-  const entitlement = await getEffectiveEntitlement(ownerId).catch(() => null);
+  const ownerId = authorization.dataOwnerId;
+  const entitlement = authorization.workspaceId
+    ? await getEffectiveEntitlement(ownerId, { workspaceId: authorization.workspaceId }).catch(() => null)
+    : null;
   if (!entitlement) {
     return (
       <InternalPageFrame navItems={LEAD_DETAIL_NAV}>

@@ -26,7 +26,7 @@
  */
 
 import { getPool } from '../db-pool';
-import { grantEntitlement, grantEntitlementUntil, revokeEntitlement } from '../entitlements';
+import { extendEntitlement, getEffectiveEntitlement, grantEntitlement, grantEntitlementUntil, revokeEntitlement } from '../entitlements';
 import { revokeAllAuthSessions } from '../auth-v2/sessions';
 import { requestAuthV2Login, shouldRequestAuthV2Login } from '../auth-v2/challenges';
 import { requestAccountLogin } from '../account-auth';
@@ -46,47 +46,28 @@ function isValidId(value: string): boolean {
   return /^\d+$/.test(value) && Number(value) > 0;
 }
 
-/** Resolve the canonical data owner for the account's deterministic active workspace. */
-export async function resolveAdminDataOwnerId(userId: string, workspaceId?: string): Promise<string | null> {
-  if (!isValidId(userId) || (workspaceId !== undefined && !isValidId(workspaceId))) return null;
+/** Resolve the canonical data owner inside the workspace explicitly selected by the operator. */
+export async function resolveAdminDataOwnerId(userId: string, workspaceId: string): Promise<string | null> {
+  if (!isValidId(userId) || !isValidId(workspaceId)) return null;
   const pool = getPool();
   if (!pool) return null;
-  const result = await pool.query<{ dataOwnerId: string; workspaceId: string | null; lastSessionAt: string | null }>(
-    `SELECT
-       COALESCE(workspace.bootstrap_user_id, account.id)::TEXT AS "dataOwnerId",
-       workspace.id::TEXT AS "workspaceId",
-       workspace."lastSessionAt"
+  const result = await pool.query<{ dataOwnerId: string }>(
+    `SELECT COALESCE(workspace.bootstrap_user_id, account.id)::TEXT AS "dataOwnerId"
      FROM users AS account
-     LEFT JOIN LATERAL (
-       SELECT ws.id, ws.bootstrap_user_id, session."lastSessionAt"
-       FROM workspace_members AS member
-       JOIN workspaces AS ws ON ws.id = member.workspace_id
-       LEFT JOIN LATERAL (
-         SELECT MAX(last_seen_at)::TEXT AS "lastSessionAt"
-         FROM auth_sessions
-         WHERE user_id = account.id
-           AND workspace_id = ws.id
-           AND revoked_at IS NULL
-           AND idle_expires_at > NOW()
-           AND absolute_expires_at > NOW()
-       ) AS session ON TRUE
-       WHERE member.user_id = account.id
-         AND member.status = 'active'
-         AND ws.status = 'active'
-         AND ($2::BIGINT IS NULL OR ws.id = $2::BIGINT)
-       ORDER BY session."lastSessionAt" DESC NULLS LAST, ws.id
-       LIMIT 2
-     ) AS workspace ON TRUE
+     JOIN workspace_members AS membership
+       ON membership.user_id = account.id
+      AND membership.workspace_id = $2
+      AND membership.status = 'active'
+     JOIN workspaces AS workspace
+       ON workspace.id = membership.workspace_id
+      AND workspace.status = 'active'
+      AND workspace.deleted_at IS NULL
      WHERE account.id = $1
        AND account.status = 'active'
-     ORDER BY workspace."lastSessionAt" DESC NULLS LAST, workspace.id
-     LIMIT 2`,
-    [userId, workspaceId ?? null],
+     LIMIT 1`,
+    [userId, workspaceId],
   );
-  const first = result.rows[0];
-  if (!first || (workspaceId && !first.workspaceId)) return null;
-  if (workspaceId || first.lastSessionAt || result.rows.length === 1) return first.dataOwnerId;
-  return null;
+  return result.rows[0]?.dataOwnerId ?? null;
 }
 
 /**
@@ -97,7 +78,7 @@ export async function resolveAdminDataOwnerId(userId: string, workspaceId?: stri
  * index). Otherwise insert a new 'active' enrollment. `activated_by='admin'` so
  * the audit trail distinguishes operator grants from self-service/system.
  */
-export async function activatePilotForUser(userId: string): Promise<AdminActionResult> {
+export async function activatePilotForUser(userId: string, workspaceId: string): Promise<AdminActionResult> {
   if (!isValidId(userId)) return { ok: false, message: 'Некорректный id пользователя.' };
   const pool = getPool();
   if (!pool) return { ok: false, message: 'База данных недоступна.' };
@@ -105,6 +86,7 @@ export async function activatePilotForUser(userId: string): Promise<AdminActionR
   try {
     const granted = await grantEntitlement({
       userId,
+      workspaceId,
       source: 'admin',
       plan: 'radar-admin-7',
       durationDays: ADMIN_PILOT_DAYS,
@@ -123,20 +105,47 @@ export async function activatePilotForUser(userId: string): Promise<AdminActionR
 
 export async function grantAccessForUser(
   userId: string,
+  workspaceId: string,
   input: { durationDays?: number; expiresAt?: Date },
 ): Promise<AdminActionResult> {
   if (!isValidId(userId)) return { ok: false, message: 'Некорректный id пользователя.' };
   try {
     const features = ['dashboard', 'api', 'digest', 'delivery'] as const;
     const result = input.expiresAt
-      ? await grantEntitlementUntil({ userId, source: 'admin', plan: 'radar-admin', expiresAt: input.expiresAt, features: [...features] })
-      : await grantEntitlement({ userId, source: 'admin', plan: 'radar-admin', durationDays: input.durationDays ?? ADMIN_PILOT_DAYS, features: [...features] });
+      ? await grantEntitlementUntil({ userId, workspaceId, source: 'admin', plan: 'radar-admin', expiresAt: input.expiresAt, features: [...features] })
+      : await grantEntitlement({ userId, workspaceId, source: 'admin', plan: 'radar-admin', durationDays: input.durationDays ?? ADMIN_PILOT_DAYS, features: [...features] });
     if (!result.changed) return { ok: false, message: 'Активный аккаунт пользователя не найден.' };
     logEvent('admin.access_granted', { userId, durationDays: input.durationDays, expiresAt: input.expiresAt?.toISOString() });
     return { ok: true, message: 'Доступ выдан или продлён. Изменение сохранено в журнале.' };
   } catch (err) {
     logError('admin.access_grant_failed', err, { userId });
     return { ok: false, message: err instanceof Error ? err.message : 'Не удалось изменить доступ.' };
+  }
+}
+
+export async function extendAccessForUser(
+  userId: string,
+  workspaceId: string,
+  durationDays: number,
+): Promise<AdminActionResult> {
+  if (!isValidId(userId) || !isValidId(workspaceId)) {
+    return { ok: false, message: 'Invalid user or workspace id.' };
+  }
+  try {
+    const result = await extendEntitlement({
+      userId,
+      workspaceId,
+      source: 'admin',
+      durationDays,
+    });
+    if (!result.changed) {
+      return { ok: false, message: 'Active admin access was not found.' };
+    }
+    logEvent('admin.access_extended', { userId, workspaceId, durationDays });
+    return { ok: true, message: `Admin access extended by ${durationDays} days.` };
+  } catch (err) {
+    logError('admin.access_extend_failed', err, { userId, workspaceId, durationDays });
+    return { ok: false, message: err instanceof Error ? err.message : 'Failed to extend access.' };
   }
 }
 
@@ -192,6 +201,7 @@ export type AdminClientProfileInput = {
 
 export async function updateClientSettingsForUser(
   userId: string,
+  workspaceId: string,
   input: AdminClientProfileInput,
 ): Promise<AdminActionResult> {
   if (!isValidId(userId)) return { ok: false, message: 'Некорректный id пользователя.' };
@@ -217,8 +227,8 @@ export async function updateClientSettingsForUser(
            roles = $5::TEXT[], industries = $6::JSONB, company_sizes = $7::JSONB,
            daily_digest_limit = $8, hiring_intent_min = $9,
            signal_freshness_days = $10, min_open_roles = $11, updated_at = NOW()
-       WHERE owner_id = $1`,
-      [userId, agencyName, specialization, targetCity, roles, JSON.stringify(industries), JSON.stringify(companySizes), input.dailyDigestLimit, input.hiringIntentMin, input.signalFreshnessDays, input.minOpenRoles],
+       WHERE owner_id = $1 AND workspace_id = $12`,
+      [userId, agencyName, specialization, targetCity, roles, JSON.stringify(industries), JSON.stringify(companySizes), input.dailyDigestLimit, input.hiringIntentMin, input.signalFreshnessDays, input.minOpenRoles, workspaceId],
     );
     if ((result.rowCount ?? 0) !== 1) return { ok: false, message: 'Профиль пользователя не найден.' };
     logEvent('admin.client_profile_updated', { userId });
@@ -250,18 +260,22 @@ function validNullableRange(value: number | null, min: number, max: number): boo
  * Revoke a user's active admin grant. Does NOT delete history; the grant remains
  * in the audit ledger. Re-activating creates a new active grant.
  */
-export async function pausePilotForUser(userId: string): Promise<AdminActionResult> {
+export async function pausePilotForUser(userId: string, workspaceId: string): Promise<AdminActionResult> {
   if (!isValidId(userId)) return { ok: false, message: 'Некорректный id пользователя.' };
   const pool = getPool();
   if (!pool) return { ok: false, message: 'База данных недоступна.' };
 
   try {
-    const result = await revokeEntitlement({ userId, source: 'admin' });
+    const result = await revokeEntitlement({ userId, workspaceId, source: 'admin' });
     if (!result.changed) {
       return { ok: false, message: 'Активного пилота нет — нечего приостановить.' };
     }
-    logEvent('admin.pilot_paused', { userId });
-    return { ok: true, message: 'Пилот приостановлен. Доставка выключена.' };
+    const effective = await getEffectiveEntitlement(userId, { workspaceId });
+    logEvent('admin.access_revoked', { userId, workspaceId, effectiveStatus: effective.status });
+    if (effective.status === 'active') {
+      return { ok: true, message: `Admin access revoked. Effective access remains active via ${effective.source} until ${effective.expiresAt ?? 'no expiry'}.` };
+    }
+    return { ok: true, message: 'Admin access revoked. Effective access is now inactive.' };
   } catch (err) {
     logError('admin.pilot_pause_failed', err, { userId });
     return { ok: false, message: err instanceof Error ? err.message : 'Не удалось приостановить пилот.' };
@@ -275,6 +289,7 @@ export async function pausePilotForUser(userId: string): Promise<AdminActionResu
  */
 export async function setProfileActive(
   userId: string,
+  workspaceId: string,
   active: boolean,
 ): Promise<AdminActionResult> {
   if (!isValidId(userId)) return { ok: false, message: 'Некорректный id пользователя.' };
@@ -286,8 +301,8 @@ export async function setProfileActive(
       `UPDATE client_profiles
           SET is_active = $1,
               updated_at = NOW()
-        WHERE owner_id = $2`,
-      [active, userId],
+        WHERE owner_id = $2 AND workspace_id = $3`,
+      [active, userId, workspaceId],
     );
     if ((result.rowCount ?? 0) === 0) {
       return { ok: false, message: 'У пользователя нет профиля.' };
@@ -307,7 +322,7 @@ export async function setProfileActive(
  * Unlink a profile's Telegram chat — clears telegram_chat_id so delivery stops
  * going to that chat. Resolves the profile by owner_id = userId.
  */
-export async function clearProfileTelegram(userId: string): Promise<AdminActionResult> {
+export async function clearProfileTelegram(userId: string, workspaceId: string): Promise<AdminActionResult> {
   if (!isValidId(userId)) return { ok: false, message: 'Некорректный id пользователя.' };
   const pool = getPool();
   if (!pool) return { ok: false, message: 'База данных недоступна.' };
@@ -318,8 +333,9 @@ export async function clearProfileTelegram(userId: string): Promise<AdminActionR
           SET telegram_chat_id = NULL,
               updated_at = NOW()
         WHERE owner_id = $1
+          AND workspace_id = $2
           AND telegram_chat_id IS NOT NULL`,
-      [userId],
+      [userId, workspaceId],
     );
     if ((result.rowCount ?? 0) === 0) {
       return { ok: false, message: 'Telegram не привязан к профилю.' };

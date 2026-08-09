@@ -28,9 +28,15 @@ try {
     ["robokassa-billing-test@example.invalid", "Robokassa Billing Test"],
   );
   const userId = userResult.rows[0].id;
+  const workspaceResult = await client.query(
+    `SELECT ensure_auth_user_workspace($1) AS workspace_id`,
+    [userId],
+  );
+  const workspaceId = workspaceResult.rows[0].workspace_id;
 
   const weekOrder = await createVerifiedOrder({
     userId,
+    workspaceId,
     planCode: "pilot",
     amountRub: 2990,
     paidAt,
@@ -54,6 +60,7 @@ try {
 
   const monthOrder = await createVerifiedOrder({
     userId,
+    workspaceId,
     planCode: "monthly",
     amountRub: 9990,
     paidAt: new Date("2026-08-05T12:00:00.000Z"),
@@ -62,6 +69,7 @@ try {
 
   const quarterOrder = await createVerifiedOrder({
     userId,
+    workspaceId,
     planCode: "quarterly",
     amountRub: 24990,
     paidAt: new Date("2026-08-06T12:00:00.000Z"),
@@ -141,12 +149,16 @@ try {
     async () => {
       const badOrder = await client.query(
         `INSERT INTO checkout_orders (
-           user_id, plan_code, amount_rub, currency, status,
+           user_id, purchased_by_user_id, workspace_id, entitlement_owner_id,
+           plan_code, amount_rub, currency, status,
            customer_name, customer_contact, payload, provider
          )
-         VALUES ($1, 'pilot', 2990, 'RUB', 'pending', 'Bad Plan', 'bad@example.invalid', '{}'::jsonb, 'robokassa')
+         VALUES (
+           $1, $1, $2, $1, 'pilot', 2990, 'RUB', 'pending',
+           'Bad Plan', 'bad@example.invalid', '{}'::jsonb, 'robokassa'
+         )
          RETURNING id`,
-        [userId],
+        [userId, workspaceId],
       );
       await client.query(
         `UPDATE checkout_orders
@@ -175,15 +187,32 @@ try {
   await client.end().catch(() => undefined);
 }
 
-async function createVerifiedOrder({ userId, planCode, amountRub, paidAt: paidDate }) {
+async function createVerifiedOrder({
+  userId,
+  workspaceId,
+  planCode,
+  amountRub,
+  paidAt: paidDate,
+}) {
   const inserted = await client.query(
     `INSERT INTO checkout_orders (
-       user_id, plan_code, amount_rub, currency, status,
+       user_id, purchased_by_user_id, workspace_id, entitlement_owner_id,
+       plan_code, amount_rub, currency, status,
        customer_name, customer_contact, payload, provider
      )
-     VALUES ($1, $2, $3, 'RUB', 'pending', $4, $5, '{}'::jsonb, 'robokassa')
+     VALUES (
+       $1, $1, $2, $1, $3, $4, 'RUB', 'pending',
+       $5, $6, '{}'::jsonb, 'robokassa'
+     )
      RETURNING id`,
-    [userId, planCode, amountRub, `Test ${planCode}`, `${planCode}@example.invalid`],
+    [
+      userId,
+      workspaceId,
+      planCode,
+      amountRub,
+      `Test ${planCode}`,
+      `${planCode}@example.invalid`,
+    ],
   );
   const orderId = inserted.rows[0].id;
   await client.query(
@@ -217,10 +246,17 @@ function verifiedPayload({ amountRub, planCode }) {
 
 async function grantEntitlement(orderId, durationDays, paidDate) {
   const order = await client.query(
-    `SELECT user_id, plan_code FROM checkout_orders WHERE id = $1`,
+    `SELECT user_id, workspace_id, entitlement_owner_id, plan_code
+     FROM checkout_orders
+     WHERE id = $1`,
     [orderId],
   );
-  const { user_id: userId, plan_code: planCode } = order.rows[0];
+  const {
+    user_id: userId,
+    workspace_id: workspaceId,
+    entitlement_owner_id: entitlementOwnerId,
+    plan_code: planCode,
+  } = order.rows[0];
 
   await client.query(
     `WITH access_start AS (
@@ -236,11 +272,12 @@ async function grantEntitlement(orderId, durationDays, paidDate) {
      ),
      inserted AS (
        INSERT INTO checkout_order_entitlements (
-         order_id, user_id, plan_code, duration_days, starts_at, ends_at
+         order_id, user_id, workspace_id, entitlement_owner_id,
+         plan_code, duration_days, starts_at, ends_at
        )
        SELECT
-         $1, $3, $4, $5, ast.starts_at,
-         ast.starts_at + ($5::int * INTERVAL '1 day')
+         $1, $3, $4, $5, $6, $7, ast.starts_at,
+         ast.starts_at + ($7::int * INTERVAL '1 day')
        FROM access_start ast
        ON CONFLICT (order_id) DO NOTHING
        RETURNING user_id, starts_at, ends_at
@@ -259,7 +296,15 @@ async function grantEntitlement(orderId, durationDays, paidDate) {
        updated_at = NOW(),
        activated_by = EXCLUDED.activated_by,
        notes = EXCLUDED.notes`,
-    [orderId, paidDate.toISOString(), userId, planCode, durationDays],
+    [
+      orderId,
+      paidDate.toISOString(),
+      userId,
+      workspaceId,
+      entitlementOwnerId,
+      planCode,
+      durationDays,
+    ],
   );
 }
 

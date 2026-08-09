@@ -72,12 +72,8 @@ export default function SettingsOverview(props: {
             <strong>Доступ и оплата</strong>
             <span>Текущий тариф, срок доступа и история разовых заказов</span>
           </Link>
-          <Link href="/settings/account">
-            <strong>Аккаунт</strong>
-            <span>Email, профиль аккаунта и управление входом</span>
-          </Link>
           <Link href="/settings/security">
-            <strong>Безопасность</strong>
+            <strong>Аккаунт и безопасность</strong>
             <span>Профиль, email, активные сессии и удаление аккаунта</span>
           </Link>
           <Link href="/settings/team">

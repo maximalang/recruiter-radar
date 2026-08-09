@@ -9,6 +9,7 @@ const { Client } = pg
 const execFileAsync = promisify(execFile)
 const databaseUrl = process.env.DATABASE_URL
 const migrationVersion = '20260809100000_add_canonical_entitlement_grants'
+const dependentWorkspaceMigration = '20260809110000_add_workspace_checkout_ownership'
 
 if (!databaseUrl) throw new Error('DATABASE_URL is required.')
 if (process.env.ENTITLEMENT_DISPOSABLE_DB_CONFIRMED !== 'true') {
@@ -60,8 +61,8 @@ try {
   `)
   // Hold back the migration under test while the authoritative prior chain runs.
   await fixture.query(
-    'INSERT INTO schema_migrations (version) VALUES ($1)',
-    [migrationVersion],
+    'INSERT INTO schema_migrations (version) VALUES ($1), ($2)',
+    [migrationVersion, dependentWorkspaceMigration],
   )
   await fixture.end()
   fixture = undefined
@@ -116,7 +117,8 @@ try {
   const downSql = await readFile(downMigrationPath, 'utf8')
   await fixture.query(downSql).then(
     () => { throw new Error('Down migration unexpectedly dropped entitlement audit history.') },
-    (error) => {
+    async (error) => {
+      await fixture.query('ROLLBACK')
       if (!String(error?.message).includes('audit history must be retained')) throw error
     },
   )

@@ -364,10 +364,15 @@ export async function assertDigestEntitlementByClientProfileId(
   const pool = getPool();
   if (!pool) throw new Error("DATABASE_URL is not set.");
 
-  const profile = await pool.query<{ isActive: boolean; ownerId: string | null }>(
+  const profile = await pool.query<{
+    isActive: boolean;
+    ownerId: string | null;
+    workspaceId: string | null;
+  }>(
     `SELECT
        is_active AS "isActive",
-       owner_id::TEXT AS "ownerId"
+       owner_id::TEXT AS "ownerId",
+       workspace_id::TEXT AS "workspaceId"
      FROM client_profiles
      WHERE id = $1
      LIMIT 1`,
@@ -377,7 +382,11 @@ export async function assertDigestEntitlementByClientProfileId(
   if (!profile.rows[0].isActive) throw new Error("Client profile is inactive.");
   const ownerId = profile.rows[0].ownerId;
   if (!ownerId) throw new Error("Client profile entitlement owner not found.");
-  const entitlement = await getEffectiveEntitlement(ownerId);
+  const workspaceId = profile.rows[0].workspaceId;
+  if (!workspaceId) throw new Error("Client profile workspace not found.");
+  const entitlement = await getEffectiveEntitlement(ownerId, {
+    workspaceId,
+  });
   if (
     entitlement.status !== "active"
     || !entitlement.features.includes(requiredFeature)
@@ -407,8 +416,11 @@ export async function checkTelegramChatOwnsClientProfile(telegramChatId: string,
   return result.rowCount === 1;
 }
 
-export async function hasPremiumEntitlement(userId: string | number): Promise<EntitlementResult> {
-  const entitlement = await getEffectiveEntitlement(userId);
+export async function hasPremiumEntitlement(
+  userId: string | number,
+  options: { workspaceId: string | number },
+): Promise<EntitlementResult> {
+  const entitlement = await getEffectiveEntitlement(userId, options);
   return entitlement.status === "active"
     ? { allowed: true, reason: null }
     : { allowed: false, reason: "No active subscription or pilot." };

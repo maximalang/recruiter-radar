@@ -48,9 +48,13 @@ export async function POST(request: NextRequest) {
   try {
     if (action === "request") {
       const orderId = readId(payload.orderId);
+      const workspaceId = readId(payload.workspaceId);
+      const entitlementOwnerId = readId(payload.entitlementOwnerId);
       const amountMinor = payload.amountMinor == null ? null : readPositiveInteger(payload.amountMinor);
       const refund = await requestRobokassaRefund({
         orderId,
+        workspaceId,
+        entitlementOwnerId,
         amountMinor,
         requestedBy: `operator:${access.via}`,
       });

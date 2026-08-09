@@ -1,11 +1,11 @@
 jest.mock("@/lib/db-pool", () => ({ getPool: jest.fn() }));
 jest.mock("@/lib/entitlements", () => ({ getEffectiveEntitlement: jest.fn() }));
-jest.mock("@/lib/paymentsRepo", () => ({ listCheckoutOrdersForOwner: jest.fn() }));
+jest.mock("@/lib/paymentsRepo", () => ({ listCheckoutOrdersForAccess: jest.fn() }));
 
 import { buildAdminUserDiagnostics, getAdminUserDetail } from "@/lib/admin/adminUserDetail";
 import { getPool } from "@/lib/db-pool";
 import { getEffectiveEntitlement } from "@/lib/entitlements";
-import { listCheckoutOrdersForOwner } from "@/lib/paymentsRepo";
+import { listCheckoutOrdersForAccess } from "@/lib/paymentsRepo";
 
 const activeAccess = {
   status: "active" as const,
@@ -35,13 +35,13 @@ describe("admin user detail", () => {
     }] });
     jest.mocked(getPool).mockReturnValue({ query } as never);
     jest.mocked(getEffectiveEntitlement).mockResolvedValue(activeAccess as never);
-    jest.mocked(listCheckoutOrdersForOwner).mockResolvedValue([]);
+    jest.mocked(listCheckoutOrdersForAccess).mockResolvedValue([]);
 
-    const detail = await getAdminUserDetail("42");
+    const detail = await getAdminUserDetail("42", "9");
 
-    expect(query).toHaveBeenCalledWith(expect.stringContaining("WHERE account.id = $1"), ["42"]);
-    expect(getEffectiveEntitlement).toHaveBeenCalledWith("7");
-    expect(listCheckoutOrdersForOwner).toHaveBeenCalledWith("7", 50);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("ws.id = $2::BIGINT"), ["42", "9"]);
+    expect(getEffectiveEntitlement).toHaveBeenCalledWith("7", { workspaceId: "9" });
+    expect(listCheckoutOrdersForAccess).toHaveBeenCalledWith({ workspaceId: "9", entitlementOwnerId: "7", limit: 50 });
     expect(detail?.account.id).toBe("42");
     expect(detail?.dataOwnerId).toBe("7");
     expect(detail?.diagnostics.at(-1)).toMatchObject({ key: "digest", status: "PASS" });

@@ -1,6 +1,6 @@
 import { getPool } from "../db-pool";
 import { getEffectiveEntitlement, type EffectiveEntitlement } from "../entitlements";
-import { listCheckoutOrdersForOwner } from "../paymentsRepo";
+import { listCheckoutOrdersForAccess } from "../paymentsRepo";
 import type { CheckoutOrder } from "../paymentsTypes";
 
 export type DiagnosticStatus = "PASS" | "WARNING" | "FAIL";
@@ -117,18 +117,60 @@ export type AdminUserDetail = {
   diagnostics: AdminUserDiagnostic[];
 };
 
-export async function getAdminUserDetail(userId: string): Promise<AdminUserDetail | null> {
-  if (!/^\d+$/.test(userId) || userId === "0") return null;
+export type AdminWorkspaceMembership = {
+  id: string;
+  name: string;
+  status: string;
+  role: string;
+  dataOwnerId: string;
+};
+
+export async function listAdminUserWorkspaces(
+  userId: string,
+): Promise<AdminWorkspaceMembership[]> {
+  if (!/^\d+$/.test(userId) || userId === "0") return [];
+  const pool = getPool();
+  if (!pool) throw new Error("DATABASE_URL is not set.");
+  const result = await pool.query<AdminWorkspaceMembership>(`
+    SELECT workspace.id::TEXT AS id,
+           workspace.name,
+           workspace.status,
+           member.role,
+           COALESCE(workspace.bootstrap_user_id, account.id)::TEXT AS "dataOwnerId"
+    FROM users AS account
+    JOIN workspace_members AS member ON member.user_id = account.id
+    JOIN workspaces AS workspace ON workspace.id = member.workspace_id
+    WHERE account.id = $1
+      AND member.status = 'active'
+      AND workspace.status = 'active'
+    ORDER BY workspace.name, workspace.id
+  `, [userId]);
+  return result.rows;
+}
+
+export async function getAdminUserDetail(
+  userId: string,
+  workspaceId: string,
+): Promise<AdminUserDetail | null> {
+  if (!/^\d+$/.test(userId) || userId === "0"
+    || !/^\d+$/.test(workspaceId) || workspaceId === "0") return null;
   const pool = getPool();
   if (!pool) throw new Error("DATABASE_URL is not set.");
 
-  const result = await pool.query<AdminUserDetailRow>(ADMIN_USER_DETAIL_SQL, [userId]);
+  const result = await pool.query<AdminUserDetailRow>(ADMIN_USER_DETAIL_SQL, [userId, workspaceId]);
   if (result.rowCount !== 1) return null;
 
   const row = result.rows[0];
+  if (row.workspaceId !== workspaceId) return null;
   const [access, payments] = await Promise.all([
-    getEffectiveEntitlement(row.dataOwnerId),
-    listCheckoutOrdersForOwner(row.dataOwnerId, 50),
+    getEffectiveEntitlement(row.dataOwnerId, {
+      workspaceId,
+    }),
+    listCheckoutOrdersForAccess({
+      workspaceId,
+      entitlementOwnerId: row.dataOwnerId,
+      limit: 50,
+    }),
   ]);
   const detail: Omit<AdminUserDetail, "diagnostics"> = {
     dataOwnerId: row.dataOwnerId,
@@ -310,21 +352,16 @@ const ADMIN_USER_DETAIL_SQL = `
     SELECT ws.id, ws.name, ws.status, member.role, ws.bootstrap_user_id AS "dataOwnerId"
     FROM workspace_members AS member
     JOIN workspaces AS ws ON ws.id = member.workspace_id
-    WHERE member.user_id = account.id AND member.status = 'active' AND ws.status = 'active'
-    ORDER BY (
-      SELECT MAX(last_seen_at)
-      FROM auth_sessions
-      WHERE user_id = account.id
-        AND workspace_id = ws.id
-        AND revoked_at IS NULL
-        AND idle_expires_at > NOW()
-        AND absolute_expires_at > NOW()
-    ) DESC NULLS LAST, (member.role = 'owner') DESC, ws.id
+    WHERE member.user_id = account.id
+      AND member.status = 'active'
+      AND ws.status = 'active'
+      AND ws.id = $2::BIGINT
     LIMIT 1
   ) AS workspace ON TRUE
   LEFT JOIN LATERAL (
     SELECT * FROM client_profiles
     WHERE owner_id = COALESCE(workspace."dataOwnerId", account.id)
+      AND workspace_id = workspace.id
     ORDER BY is_active DESC, updated_at DESC, id DESC
     LIMIT 1
   ) AS profile ON TRUE
@@ -365,6 +402,7 @@ const ADMIN_USER_DETAIL_SQL = `
       LIMIT 1
     ) AS latest_digest ON TRUE
     WHERE opportunity.owner_id = COALESCE(workspace."dataOwnerId", account.id)
+      AND opportunity.workspace_id = workspace.id
   ) AS radar ON TRUE
   WHERE account.id = $1
   LIMIT 1

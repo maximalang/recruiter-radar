@@ -3,7 +3,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 
 jest.mock("@/lib/auth-v2/authorization", () => ({
-  getAuthorizedOwnerId: jest.fn(),
+  getSession: jest.fn(),
 }));
 jest.mock("@/lib/entitlements", () => ({
   getEffectiveEntitlement: jest.fn(),
@@ -24,7 +24,7 @@ import ReviewPage from "@/app/review/page";
 import DashboardError from "@/app/dashboard/error";
 import LeadsError from "@/app/leads/error";
 import ReviewError from "@/app/review/error";
-import { getAuthorizedOwnerId } from "@/lib/auth-v2/authorization";
+import { getSession } from "@/lib/auth-v2/authorization";
 import { getEffectiveEntitlement } from "@/lib/entitlements";
 import { getLeadDetail } from "@/lib/leads-data";
 import { listClientProfiles } from "@/lib/clientProfiles";
@@ -43,12 +43,15 @@ const activeEntitlement: EffectiveEntitlement = {
 describe("premium product route access states", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.mocked(getAuthorizedOwnerId).mockResolvedValue("42");
+    jest.mocked(getSession).mockResolvedValue({
+      dataOwnerId: "42",
+      workspaceId: "9",
+    } as never);
     jest.mocked(getEffectiveEntitlement).mockResolvedValue(activeEntitlement);
   });
 
   test("lead detail asks an unauthenticated visitor to sign in without probing the lead", async () => {
-    jest.mocked(getAuthorizedOwnerId).mockResolvedValue(null);
+    jest.mocked(getSession).mockResolvedValue(null);
 
     render(await LeadDetailPage({ params: Promise.resolve({ id: "99" }) }));
 
@@ -85,7 +88,7 @@ describe("premium product route access states", () => {
   });
 
   test("review asks an unauthenticated visitor to sign in instead of showing no profiles", async () => {
-    jest.mocked(getAuthorizedOwnerId).mockResolvedValue(null);
+    jest.mocked(getSession).mockResolvedValue(null);
 
     render(await ReviewPage({ searchParams: Promise.resolve({}) }));
 

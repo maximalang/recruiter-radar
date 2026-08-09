@@ -18,7 +18,7 @@ jest.mock("@/lib/payment-readiness", () => ({
 }));
 
 jest.mock("@/lib/auth-v2/authorization", () => ({
-  getAuthorizedUserId: jest.fn().mockResolvedValue(null),
+  getSession: jest.fn().mockResolvedValue(null),
 }));
 
 function collectElements(node: ReactNode, type: unknown): ReactElement<Record<string, any>>[] {

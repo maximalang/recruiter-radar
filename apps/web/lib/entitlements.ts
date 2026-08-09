@@ -60,7 +60,7 @@ export type EntitlementMutationResult = {
 
 export async function getEffectiveEntitlement(
   userId: string | number,
-  options: { now?: Date } = {},
+  options: { workspaceId: string | number; now?: Date },
 ): Promise<EffectiveEntitlement> {
   const normalizedUserId = normalizeUserId(userId);
   const entitlements = await getEffectiveEntitlements([normalizedUserId], options);
@@ -70,7 +70,7 @@ export async function getEffectiveEntitlement(
 /** Resolves access for an operator list without duplicating entitlement SQL. */
 export async function getEffectiveEntitlements(
   userIds: ReadonlyArray<string | number>,
-  options: { now?: Date } = {},
+  options: { workspaceId: string | number; now?: Date },
 ): Promise<Map<string, EffectiveEntitlement>> {
   const normalizedUserIds = [...new Set(userIds.map(normalizeUserId))];
   const entitlements = new Map<string, EffectiveEntitlement>(
@@ -81,6 +81,7 @@ export async function getEffectiveEntitlements(
   const pool = getPool();
   if (!pool) throw new Error("DATABASE_URL is not set.");
   const now = options.now ?? null;
+  const workspaceId = normalizeWorkspaceId(options.workspaceId);
   const result = await pool.query<EntitlementRow>(
     `WITH entitlement_clock AS (
        SELECT COALESCE($2::TIMESTAMPTZ, CURRENT_TIMESTAMP) AS at
@@ -106,6 +107,7 @@ export async function getEffectiveEntitlements(
        FROM subscriptions AS subscription
        JOIN active_account AS account ON account.id = subscription.user_id
        WHERE subscription.status IN ('trial', 'active', 'past_due')
+         AND subscription.workspace_id = $3::BIGINT
          AND subscription.started_at <= (SELECT at FROM entitlement_clock)
          AND (
            subscription.current_period_end IS NULL
@@ -128,6 +130,7 @@ export async function getEffectiveEntitlements(
          ON checkout.id = entitlement.order_id
         AND checkout.status = 'paid'
        WHERE entitlement.revoked_at IS NULL
+         AND entitlement.workspace_id = $3::BIGINT
          AND entitlement.starts_at <= (SELECT at FROM entitlement_clock)
          AND entitlement.ends_at > (SELECT at FROM entitlement_clock)
 
@@ -161,6 +164,7 @@ export async function getEffectiveEntitlements(
        FROM pilot_enrollments AS pilot
        JOIN active_account AS account ON account.id = pilot.user_id
        WHERE pilot.status = 'active'
+         AND pilot.workspace_id = $3::BIGINT
          AND pilot.activated_by <> 'admin'
          AND pilot.starts_at <= (SELECT at FROM entitlement_clock)
          AND (
@@ -181,6 +185,7 @@ export async function getEffectiveEntitlements(
        FROM entitlement_grants AS entitlement_grant
        JOIN active_account AS account ON account.id = entitlement_grant.user_id
        WHERE entitlement_grant.status = 'active'
+         AND entitlement_grant.workspace_id = $3::BIGINT
          AND entitlement_grant.revoked_at IS NULL
          AND entitlement_grant.starts_at <= (SELECT at FROM entitlement_clock)
          AND (
@@ -217,7 +222,7 @@ export async function getEffectiveEntitlements(
      FROM ranked
      JOIN effective_features USING ("userId")
      WHERE ranked.rank = 1`,
-    [normalizedUserIds, now],
+    [normalizedUserIds, now, workspaceId],
   );
 
   for (const row of result.rows) {
@@ -236,12 +241,14 @@ export async function getEffectiveEntitlements(
 
 export async function grantEntitlement(input: {
   userId: string | number;
+  workspaceId: string | number;
   source: GrantableEntitlementSource;
   plan: string;
   durationDays: number;
   features?: EntitlementFeature[];
 }): Promise<EntitlementMutationResult> {
   const userId = normalizeUserId(input.userId);
+  const workspaceId = normalizeWorkspaceId(input.workspaceId);
   const source = normalizeGrantSource(input.source);
   const plan = normalizePlan(input.plan);
   const durationDays = normalizeDurationDays(input.durationDays);
@@ -266,20 +273,23 @@ export async function grantEntitlement(input: {
            revoked_at = CURRENT_TIMESTAMP,
            updated_at = CURRENT_TIMESTAMP
        WHERE user_id = $1
+         AND workspace_id = auth_workspace_resolve_user($1, $3::BIGINT)
          AND source = $2
          AND status = 'active'
          AND revoked_at IS NULL
          AND ends_at IS NOT NULL
          AND ends_at <= CURRENT_TIMESTAMP`,
-      [userId, source],
+      [userId, source, workspaceId],
     );
     const result = await client.query<{ id: string }>(
       `INSERT INTO entitlement_grants (
-       user_id, source, plan_code, features, starts_at, ends_at
+       user_id, workspace_id, entitlement_owner_id,
+       source, plan_code, features, starts_at, ends_at
      )
-     VALUES ($1, $2, $3, $5::TEXT[], CURRENT_TIMESTAMP,
+     VALUES ($1, auth_workspace_resolve_user($1, $6::BIGINT), $1,
+       $2, $3, $5::TEXT[], CURRENT_TIMESTAMP,
        CURRENT_TIMESTAMP + ($4 * INTERVAL '1 day'))
-     ON CONFLICT (user_id, source) WHERE status = 'active'
+     ON CONFLICT (workspace_id, entitlement_owner_id, source) WHERE status = 'active'
      DO UPDATE SET
        plan_code = EXCLUDED.plan_code,
        features = EXCLUDED.features,
@@ -295,7 +305,7 @@ export async function grantEntitlement(input: {
        END,
        updated_at = CURRENT_TIMESTAMP
      RETURNING id::TEXT AS id`,
-      [userId, source, plan, durationDays, features],
+      [userId, source, plan, durationDays, features, workspaceId],
     );
     await client.query("COMMIT");
     return {
@@ -313,12 +323,14 @@ export async function grantEntitlement(input: {
 /** Issues an auditable grant with an exact operator-selected expiry. */
 export async function grantEntitlementUntil(input: {
   userId: string | number;
+  workspaceId: string | number;
   source: GrantableEntitlementSource;
   plan: string;
   expiresAt: Date;
   features?: EntitlementFeature[];
 }): Promise<EntitlementMutationResult> {
   const userId = normalizeUserId(input.userId);
+  const workspaceId = normalizeWorkspaceId(input.workspaceId);
   const source = normalizeGrantSource(input.source);
   const plan = normalizePlan(input.plan);
   const features = normalizeRequestedFeatures(input.features);
@@ -342,22 +354,26 @@ export async function grantEntitlementUntil(input: {
     await client.query(
       `UPDATE entitlement_grants
        SET status = 'revoked', revoked_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-       WHERE user_id = $1 AND source = $2 AND status = 'active'
+       WHERE user_id = $1
+         AND workspace_id = auth_workspace_resolve_user($1, $3::BIGINT)
+         AND source = $2 AND status = 'active'
          AND revoked_at IS NULL AND ends_at IS NOT NULL AND ends_at <= CURRENT_TIMESTAMP`,
-      [userId, source],
+      [userId, source, workspaceId],
     );
     const result = await client.query<{ id: string }>(
       `INSERT INTO entitlement_grants (
-         user_id, source, plan_code, features, starts_at, ends_at
-       ) VALUES ($1, $2, $3, $5::TEXT[], CURRENT_TIMESTAMP, $4::TIMESTAMPTZ)
-       ON CONFLICT (user_id, source) WHERE status = 'active'
+         user_id, workspace_id, entitlement_owner_id,
+         source, plan_code, features, starts_at, ends_at
+       ) VALUES ($1, auth_workspace_resolve_user($1, $6::BIGINT), $1,
+         $2, $3, $5::TEXT[], CURRENT_TIMESTAMP, $4::TIMESTAMPTZ)
+       ON CONFLICT (workspace_id, entitlement_owner_id, source) WHERE status = 'active'
        DO UPDATE SET
          plan_code = EXCLUDED.plan_code,
          features = EXCLUDED.features,
          ends_at = EXCLUDED.ends_at,
          updated_at = CURRENT_TIMESTAMP
        RETURNING id::TEXT AS id`,
-      [userId, source, plan, expiresAt.toISOString(), features],
+      [userId, source, plan, expiresAt.toISOString(), features, workspaceId],
     );
     await client.query("COMMIT");
     return { changed: result.rowCount === 1, grantId: result.rows[0]?.id ?? null };
@@ -371,9 +387,11 @@ export async function grantEntitlementUntil(input: {
 
 export async function revokeEntitlement(input: {
   userId: string | number;
+  workspaceId: string | number;
   source: GrantableEntitlementSource;
 }): Promise<{ changed: boolean; count: number }> {
   const userId = normalizeUserId(input.userId);
+  const workspaceId = normalizeWorkspaceId(input.workspaceId);
   const source = normalizeGrantSource(input.source);
   const pool = requirePool();
   const result = await pool.query(
@@ -382,10 +400,11 @@ export async function revokeEntitlement(input: {
          revoked_at = CURRENT_TIMESTAMP,
          updated_at = CURRENT_TIMESTAMP
      WHERE user_id = $1
+       AND workspace_id = auth_workspace_resolve_user($1, $3::BIGINT)
        AND source = $2
        AND status = 'active'
        AND revoked_at IS NULL`,
-    [userId, source],
+    [userId, source, workspaceId],
   );
   const count = result.rowCount ?? 0;
   return { changed: count > 0, count };
@@ -393,10 +412,12 @@ export async function revokeEntitlement(input: {
 
 export async function extendEntitlement(input: {
   userId: string | number;
+  workspaceId: string | number;
   source: GrantableEntitlementSource;
   durationDays: number;
 }): Promise<EntitlementMutationResult> {
   const userId = normalizeUserId(input.userId);
+  const workspaceId = normalizeWorkspaceId(input.workspaceId);
   const source = normalizeGrantSource(input.source);
   const durationDays = normalizeDurationDays(input.durationDays);
   const pool = requirePool();
@@ -405,6 +426,7 @@ export async function extendEntitlement(input: {
        SELECT id
        FROM entitlement_grants
        WHERE user_id = $1
+         AND workspace_id = auth_workspace_resolve_user($1, $4::BIGINT)
          AND source = $2
          AND status = 'active'
          AND revoked_at IS NULL
@@ -422,7 +444,7 @@ export async function extendEntitlement(input: {
      FROM selected
      WHERE entitlement_grant.id = selected.id
      RETURNING entitlement_grant.id::TEXT AS id`,
-    [userId, source, durationDays],
+    [userId, source, durationDays, workspaceId],
   );
   return {
     changed: result.rowCount === 1,
@@ -433,8 +455,9 @@ export async function extendEntitlement(input: {
 export async function hasFeatureAccess(
   userId: string | number,
   feature: EntitlementFeature,
+  options: { workspaceId: string | number },
 ): Promise<boolean> {
-  const entitlement = await getEffectiveEntitlement(userId);
+  const entitlement = await getEffectiveEntitlement(userId, options);
   return entitlement.status === "active"
     && entitlement.features.includes(feature);
 }
@@ -470,6 +493,14 @@ function normalizeUserId(userId: string | number): string {
   const normalized = String(userId);
   if (!/^[1-9]\d*$/.test(normalized)) {
     throw new Error("Invalid entitlement user id.");
+  }
+  return normalized;
+}
+
+function normalizeWorkspaceId(workspaceId: string | number): string {
+  const normalized = String(workspaceId);
+  if (!/^[1-9]\d*$/.test(normalized)) {
+    throw new Error("Invalid entitlement workspace id.");
   }
   return normalized;
 }
