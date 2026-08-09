@@ -80,18 +80,20 @@
 .settingsButton {
   position: fixed;
   z-index: 900;
-  right: max(8px, env(safe-area-inset-right));
-  bottom: max(8px, env(safe-area-inset-bottom));
-  width: 58px;
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(14px, env(safe-area-inset-bottom));
+  width: 50px;
   min-height: 44px;
-  padding: 0 7px;
+  padding: 0 5px;
   border: 1px solid rgba(242, 241, 235, .16);
-  border-radius: 999px;
-  background: rgba(8, 12, 10, .92);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, .22);
-  color: rgba(242, 241, 235, .72);
+  border-radius: 10px;
+  background: rgba(8, 12, 10, .84);
+  box-shadow: none;
+  color: rgba(242, 241, 235, .62);
   font: inherit;
-  font-size: .62rem;
+  font-size: .53rem;
+  letter-spacing: .01em;
+  opacity: .84;
   cursor: pointer;
 }
 
@@ -106,6 +108,7 @@
 .settingsButton:focus-visible {
   border-color: rgba(191, 220, 145, .62);
   color: #f2f1eb;
+  opacity: 1;
 }
 
 .primaryButton:focus-visible,
@@ -129,6 +132,12 @@
   .primaryButton,
   .secondaryButton {
     flex: 1 1 12rem;
+  }
+
+  .settingsButton {
+    position: absolute;
+    right: max(4px, env(safe-area-inset-right));
+    bottom: max(4px, env(safe-area-inset-bottom));
   }
 }
 

@@ -83,6 +83,7 @@ describe("landing visual and login reliability polish", () => {
     expect(authStyles).not.toContain(".radarCore");
     expect(authStyles).not.toContain(".radarSweep");
     expect(authStyles).not.toContain("@keyframes");
+    expect(authStyles).toMatch(/@media \(max-width: 820px\)[\s\S]*?\.compass\s*\{[\s\S]*?display:\s*block;/);
   });
 
   test("keeps onboarding in the current product system without serif or copper branding", () => {

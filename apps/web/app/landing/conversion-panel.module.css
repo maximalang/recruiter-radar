@@ -220,18 +220,22 @@
   }
 
   .final {
-    padding-bottom: 10rem;
+    padding-bottom: 9.5rem;
   }
 
   .finalSignal {
     top: auto;
-    right: -3rem;
-    bottom: -2rem;
-    width: 20rem;
-    height: 12rem;
-    opacity: .62;
+    right: .75rem;
+    bottom: .75rem;
+    width: min(18rem, calc(100% - 1.5rem));
+    height: 8.5rem;
+    opacity: .54;
     transform: none;
   }
+
+  .profileNode { top: 18%; left: .25rem; }
+  .signalField { right: .25rem; bottom: 12%; }
+  .constellation { right: 8%; bottom: 18%; }
 }
 
 @media (prefers-reduced-motion: reduce) {

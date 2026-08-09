@@ -22,6 +22,12 @@ export default function DetectionScene({
       data-header-tone="dark"
       data-hero-layout="balanced-grid"
     >
+      <div className={sceneStyles.mobileSignal} data-mobile-hero-signal="true" aria-hidden="true">
+        <span className={sceneStyles.mobileRing} />
+        <span className={sceneStyles.mobileRing} />
+        <span className={sceneStyles.mobileConstellation}><i /><i /><i /><i /><i /></span>
+      </div>
+
       <div className={sceneStyles.fieldFigure} data-hero-visual>
         <HeroInstrument
           companyName={DEMO_COMPANY.name}

@@ -225,7 +225,7 @@
 
 .passkeyMessage {
   margin: 0;
-  color: #5c6675;
+  color: #59645f;
   font-size: 0.84rem;
   line-height: 1.5;
 }
@@ -330,7 +330,7 @@
 }
 
 .legal a {
-  color: #465b76;
+  color: #245b4e;
   text-underline-offset: 2px;
 }
 
@@ -359,9 +359,9 @@
 
 .notice {
   margin: 0 0 20px;
-  border: 1px solid #c9d5e4;
-  background: #f1f5f9;
-  color: #304b6d;
+  border: 1px solid #bfd8cc;
+  background: #f0f6f2;
+  color: #274c42;
 }
 
 .back {
@@ -370,7 +370,7 @@
   min-height: 44px;
   align-items: center;
   margin-top: 22px;
-  color: #3b5678;
+  color: #245b4e;
   font-size: 0.86rem;
   font-weight: 750;
   text-decoration: none;
@@ -405,7 +405,7 @@
 
 .sentLead {
   margin: 16px 0 0;
-  color: #4f5d6e;
+  color: #4f5d57;
   line-height: 1.65;
   overflow-wrap: anywhere;
 }
@@ -431,14 +431,14 @@
 .tertiaryAction {
   border: 1px solid #cfc8bd;
   background: #fff;
-  color: #263a58;
+  color: #28473e;
   cursor: pointer;
 }
 
 .tertiaryAction {
   border-color: transparent;
   background: transparent;
-  color: #485d78;
+  color: #365f54;
 }
 
 .supportAction {
@@ -455,7 +455,7 @@
   padding: 13px 14px;
   border: 1px solid #d9d1c3;
   border-radius: 11px;
-  color: #5c6675;
+  color: #59645f;
   font-size: 0.86rem;
   line-height: 1.5;
 }
@@ -505,13 +505,21 @@
   }
 
   .story {
-    min-height: auto;
+    min-height: 96px;
     padding: 18px clamp(20px, 6vw, 44px);
+    border-bottom: 1px solid rgba(126, 216, 197, .14);
   }
 
-  .storyCopy,
-  .compass {
+  .storyCopy {
     display: none;
+  }
+
+  .compass {
+    top: -3.6rem;
+    right: -2.8rem;
+    display: block;
+    width: 11.5rem;
+    opacity: .62;
   }
 
   .card {

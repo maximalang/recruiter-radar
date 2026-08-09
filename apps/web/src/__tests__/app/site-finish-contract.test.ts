@@ -41,13 +41,14 @@ describe("cross-route visual layer contract", () => {
       "profile/agency-dna-form.module.css",
       "profile/profile-form.module.css",
       "auth/pending-auth-action.module.css",
+      "login/login.module.css",
       "leads/[id]/next-steps-block.module.css",
       "leads/[id]/feedback-buttons.module.css",
       "settings/settings-overview.module.css",
       "settings/security/security-settings.module.css",
       "settings/team/team-settings.module.css",
     ];
-    const legacyBlue = /#(?:0ea5e9|1d4ed8|1e3a8a|1e40af|2563eb|3b82f6|5b21b6|67e8f9|7c3aed|8b5cf6|8dbbff|c4b5fd|bfdbfe|dbeafe|e9d5ff|ede9fe|eff6ff|faf5ff)|rgba\((?:29,\s*78,\s*216|59,\s*130,\s*246)/gi;
+    const legacyBlue = /#(?:0ea5e9|1d4ed8|1e3a8a|1e40af|2563eb|263a58|304b6d|3b5678|3b82f6|465b76|485d78|4f5d6e|5b21b6|5c6675|67e8f9|7c3aed|8b5cf6|8dbbff|c4b5fd|bfdbfe|dbeafe|e9d5ff|ede9fe|eff6ff|faf5ff)|rgba\((?:29,\s*78,\s*216|59,\s*130,\s*246)/gi;
 
     for (const path of productStyles) {
       expect(readAppFile(path).match(legacyBlue)).toBeNull();
@@ -69,7 +70,8 @@ describe("cross-route visual layer contract", () => {
     const workspaceStyles = readAppFile("ui/product-workspace.module.css");
 
     expect(workspaceStyles).toContain("@media (max-width: 800px)");
-    expect(workspaceStyles).toContain(".mobileNav {");
+    expect(workspaceStyles).toMatch(/\.mobileNav \{[\s\S]*?position: fixed/);
     expect(workspaceStyles).toContain("grid-template-columns: repeat(4, minmax(0, 1fr))");
+    expect(workspaceStyles).toContain("padding-bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom))");
   });
 });

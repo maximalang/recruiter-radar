@@ -41,24 +41,15 @@ describe("polished unified landing visual contract", () => {
     expect(landingStyles).not.toContain(".instrumentCore");
   });
 
-  it("keeps the radar present in the first mobile viewport without inserting the desktop field into document flow", () => {
+  it("uses a dedicated mobile signal fragment and keeps the full radar below the hero copy", () => {
+    const heroScene = source("app/landing/detection-scene.tsx");
     const sceneStyles = source("app/landing/detection-scene.module.css");
 
-    expect(sceneStyles).toMatch(
-      /@media \(max-width: 480px\)[\s\S]*?\.fieldFigure\s*\{[\s\S]*?position:\s*absolute;/,
-    );
-    expect(sceneStyles).toMatch(
-      /@media \(max-width: 480px\)[\s\S]*?\.fieldFigure\s*\{[\s\S]*?right:\s*1rem;[\s\S]*?width:\s*calc\(100% - 1rem\);/,
-    );
-    expect(sceneStyles).toMatch(
-      /@media \(max-width: 480px\)[\s\S]*?\.analysisFrame\s*\{[\s\S]*?bottom:\s*10rem;/,
-    );
-    expect(sceneStyles).toMatch(
-      /@media \(max-width: 480px\)[\s\S]*?\.analysisFrame\s*\{[\s\S]*?width:\s*min\(18rem, calc\(100% - 2rem\)\);/,
-    );
-    expect(sceneStyles).toMatch(
-      /@media \(max-width: 480px\)[\s\S]*?\.section\s*\{[\s\S]*?min-height:\s*100svh;/,
-    );
+    expect(heroScene).toContain('data-mobile-hero-signal="true"');
+    expect(sceneStyles).toMatch(/@media \(max-width: 600px\)[\s\S]*?\.mobileSignal\s*\{[\s\S]*?display:\s*block;/);
+    expect(sceneStyles).toMatch(/@media \(max-width: 480px\)[\s\S]*?\.fieldFigure > figure\s*\{[\s\S]*?display:\s*none;/);
+    expect(sceneStyles).toMatch(/@media \(max-width: 480px\)[\s\S]*?\.analysisFrame\s*\{[\s\S]*?position:\s*relative;/);
+    expect(sceneStyles).not.toMatch(/@media \(max-width: 480px\)[\s\S]*?\.fieldFigure\s*\{[\s\S]*?bottom:\s*-12rem;/);
   });
 
   it("renders the desktop signal history as one temporal axis with a mobile vertical fallback", () => {
@@ -93,6 +84,7 @@ describe("polished unified landing visual contract", () => {
     expect(outreach).toContain('data-composer-steps="human-controlled"');
     expect(outreach).toContain('data-composer-step={step.key}');
     expect(conversion).toContain('data-final-signal-composition="agency-profile"');
+    expect(source("app/landing/conversion-panel.module.css")).not.toContain("right: -3rem");
   });
 
   it("keeps the landing skip link first and exposes one main content landmark", () => {
@@ -112,6 +104,14 @@ describe("polished unified landing visual contract", () => {
     expect(landingPage).toContain('export function LandingSkipLink()');
     expect(landingPage).toContain('<main id="main-content">');
     expect(landingPageBody).not.toContain('<a href="#main-content" className={styles.skipLink}>');
+  });
+
+  it("keeps the mobile cookies utility out of conversion content", () => {
+    const consentStyles = source("app/yandex-metrika.module.css");
+
+    expect(consentStyles).toMatch(
+      /@media \(max-width: 620px\)[\s\S]*?\.settingsButton\s*\{[\s\S]*?position:\s*absolute;/,
+    );
   });
 
   it("uses one stable preview anchor without duplicating it in the suspense fallback", () => {
