@@ -46,6 +46,7 @@ export type EvidencedRepostCycles = {
 export type HiringFrictionInput = {
   vacancyAgeDays: EvidencedMetric
   repostCycles: EvidencedRepostCycles
+  repostRate: EvidencedMetric
   salaryChange: EvidencedMetric
   requirementsChange: EvidencedMetric
   closeReopenCycles: EvidencedMetric
@@ -55,7 +56,7 @@ export type HiringFrictionInput = {
   regionalDifficulty: EvidencedMetric
   internalRecruitingCapacity: EvidencedMetric
   hiringVelocityVsCapacity: EvidencedMetric
-  timeToFillHistory: EvidencedMetric
+  observedVacancyLifetime: EvidencedMetric
   evergreenRole: EvidencedFlag
   massHiring: EvidencedFlag
 }
@@ -89,7 +90,7 @@ const WEIGHTS = {
   regionalDifficulty: 0.06,
   internalRecruitingCapacity: 0.08,
   hiringVelocityVsCapacity: 0.1,
-  timeToFillHistory: 0.06,
+  vacancyLifetime: 0.06,
   evergreenRole: 0.04,
   massHiring: 0.04,
 } as const
@@ -106,13 +107,18 @@ export function buildHiringFriction(
   const standardCycles = repostCycles.filter((cycle) =>
     !isMeaningfulRepost(cycle),
   )
+  const repostRateValue = input.repostRate.value
+  const repostValue = input.repostCycles.state === 'observed'
+    ? clamp01(meaningfulCycles.length / 2)
+    : null
   const componentValues: Record<string, number | null> = {
     vacancy_age: input.vacancyAgeDays.value === null
       ? null
       : clamp01((input.vacancyAgeDays.value - 30) / 90),
-    repost_cycles: input.repostCycles.state === 'observed'
-      ? clamp01(meaningfulCycles.length / 2)
-      : null,
+    repost_cycles: repostValue === null
+      ? repostRateValue
+      : repostRateValue === null ? repostValue : Math.max(repostValue, repostRateValue),
+    repost_rate: repostRateValue,
     salary_change: input.salaryChange.value,
     requirements_change: input.requirementsChange.value,
     close_reopen_cycle: input.closeReopenCycles.value,
@@ -122,7 +128,7 @@ export function buildHiringFriction(
     regional_difficulty: input.regionalDifficulty.value,
     internal_recruiting_capacity: input.internalRecruitingCapacity.value,
     hiring_velocity_vs_capacity: input.hiringVelocityVsCapacity.value,
-    time_to_fill_history: input.timeToFillHistory.value,
+    vacancy_lifetime: input.observedVacancyLifetime.value,
   }
   const positiveReasons: HiringFrictionReason[] = []
   const negativeReasons: HiringFrictionReason[] = []
@@ -157,8 +163,8 @@ export function buildHiringFriction(
     WEIGHTS.hiringVelocityVsCapacity,
   )
   score += contribution(
-    componentValues.time_to_fill_history,
-    WEIGHTS.timeToFillHistory,
+    componentValues.vacancy_lifetime,
+    WEIGHTS.vacancyLifetime,
   )
   score -= contribution(
     componentValues.internal_recruiting_capacity,
@@ -176,6 +182,9 @@ export function buildHiringFriction(
       'MEANINGFUL_REPOST_CYCLES',
       meaningfulCycles.flatMap((cycle) => cycle.evidenceIds),
     ))
+  }
+  if ((input.repostRate.value ?? 0) > 0) {
+    positiveReasons.push(reason('REPOST_RATE_EVIDENCED', input.repostRate.evidenceIds))
   }
   if ((input.salaryChange.value ?? 0) > 0) {
     positiveReasons.push(reason('SALARY_CHANGED', input.salaryChange.evidenceIds))
@@ -262,6 +271,7 @@ function normalizeInput(input: HiringFrictionInput): HiringFrictionInput {
   return {
     vacancyAgeDays: metric(input.vacancyAgeDays, 'vacancy age', false),
     repostCycles: repostObservation(input.repostCycles),
+    repostRate: metric(input.repostRate, 'repost rate'),
     salaryChange: metric(input.salaryChange, 'salary change'),
     requirementsChange: metric(input.requirementsChange, 'requirements change'),
     closeReopenCycles: metric(input.closeReopenCycles, 'close reopen cycles'),
@@ -277,14 +287,18 @@ function normalizeInput(input: HiringFrictionInput): HiringFrictionInput {
       input.hiringVelocityVsCapacity,
       'hiring velocity vs capacity',
     ),
-    timeToFillHistory: metric(input.timeToFillHistory, 'time to fill history'),
+    observedVacancyLifetime: metric(
+      input.observedVacancyLifetime,
+      'observed vacancy lifetime',
+    ),
     evergreenRole: flag(input.evergreenRole, 'evergreen role'),
     massHiring: flag(input.massHiring, 'mass hiring'),
   }
 }
 
 function calculateCoverage(input: HiringFrictionInput): number {
-  let covered = input.repostCycles.state === 'observed'
+  let covered = input.repostCycles.state === 'observed' ||
+      input.repostRate.state === 'observed'
     ? WEIGHTS.repostCycles
     : 0
   const metrics: Array<[EvidencedMetric, number]> = [
@@ -298,7 +312,7 @@ function calculateCoverage(input: HiringFrictionInput): number {
     [input.regionalDifficulty, WEIGHTS.regionalDifficulty],
     [input.internalRecruitingCapacity, WEIGHTS.internalRecruitingCapacity],
     [input.hiringVelocityVsCapacity, WEIGHTS.hiringVelocityVsCapacity],
-    [input.timeToFillHistory, WEIGHTS.timeToFillHistory],
+    [input.observedVacancyLifetime, WEIGHTS.vacancyLifetime],
   ]
   for (const [item, weight] of metrics) {
     if (item.state === 'observed') covered += weight
@@ -313,6 +327,7 @@ function allEvidenceIds(input: HiringFrictionInput): string[] {
     ...input.vacancyAgeDays.evidenceIds,
     ...input.repostCycles.evidenceIds,
     ...(input.repostCycles.value ?? []).flatMap((cycle) => cycle.evidenceIds),
+    ...input.repostRate.evidenceIds,
     ...input.salaryChange.evidenceIds,
     ...input.requirementsChange.evidenceIds,
     ...input.closeReopenCycles.evidenceIds,
@@ -322,7 +337,7 @@ function allEvidenceIds(input: HiringFrictionInput): string[] {
     ...input.regionalDifficulty.evidenceIds,
     ...input.internalRecruitingCapacity.evidenceIds,
     ...input.hiringVelocityVsCapacity.evidenceIds,
-    ...input.timeToFillHistory.evidenceIds,
+    ...input.observedVacancyLifetime.evidenceIds,
     ...input.evergreenRole.evidenceIds,
     ...input.massHiring.evidenceIds,
   ]
@@ -334,6 +349,7 @@ function observationStates(
   return {
     vacancy_age: input.vacancyAgeDays.state,
     repost_cycles: input.repostCycles.state,
+    repost_rate: input.repostRate.state,
     salary_change: input.salaryChange.state,
     requirements_change: input.requirementsChange.state,
     close_reopen_cycle: input.closeReopenCycles.state,
@@ -343,7 +359,7 @@ function observationStates(
     regional_difficulty: input.regionalDifficulty.state,
     internal_recruiting_capacity: input.internalRecruitingCapacity.state,
     hiring_velocity_vs_capacity: input.hiringVelocityVsCapacity.state,
-    time_to_fill_history: input.timeToFillHistory.state,
+    vacancy_lifetime: input.observedVacancyLifetime.state,
     evergreen_role: input.evergreenRole.state,
     mass_hiring: input.massHiring.state,
   }

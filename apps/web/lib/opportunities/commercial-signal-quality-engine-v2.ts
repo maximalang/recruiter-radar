@@ -39,6 +39,82 @@ export type CommercialSignalAffirmativeEvidence = Record<
   string[]
 >
 
+export type CommercialSignalCompanyStateChangeLineage = {
+  changeId: string
+  changeType: string
+  direction: 'up' | 'down' | 'new' | 'changed'
+  magnitude: number
+  baselineDeviation: number | null
+  confidence: number
+  eventIds: string[]
+  evidenceIds: string[]
+  observedAt: string
+  featureVersion: string
+}
+
+export type CommercialSignalCompanyStateSnapshot = {
+  hiringBaseline: {
+    vacancies7d: number
+    vacancies14d: number
+    vacancies30d: number
+    medianHiringVelocityPer7d: number
+    historyEventCount: number
+    historyCoverageDays: number
+    historicalPeriodCount: number
+    sufficientHistory: boolean
+    fallbackReason: 'insufficient_history' | null
+  }
+  currentHiringVelocity: {
+    vacancies7d: number
+    vacancies14d: number
+    vacancies30d: number
+    baselineDeviation14d: number | null
+    direction: 'up' | 'steady' | 'down' | 'unknown'
+  }
+  roleDistribution: {
+    current: Record<string, number>
+    baseline: Record<string, number>
+  }
+  seniorityDistribution: {
+    current: Record<string, number>
+    baseline: Record<string, number>
+  }
+  regionDistribution: {
+    current: Record<string, number>
+    baseline: Record<string, number>
+    newRegions: string[]
+  }
+  vacancyLifetime: {
+    observedCount: number
+    medianDays: number | null
+  }
+  repostRate: {
+    supported: boolean
+    observedCount: number
+    repostCount: number
+    rate: number | null
+  }
+  recruitingCapacitySignals: {
+    currentRecruiterVacancies: number
+    baselineRecruiterVacancies: number
+  }
+  businessChangeSignals: {
+    current30d: Record<string, number>
+  }
+}
+
+export type CommercialSignalCompanyStateLineage = {
+  snapshotId: string
+  snapshotAt: string
+  featureVersion: string
+  stateClassification: 'insufficient_history' | 'accelerating' | 'steady' | 'slowing'
+  stateConfidence: number
+  eventIds: string[]
+  evidenceIds: string[]
+  snapshot: CommercialSignalCompanyStateSnapshot
+  changes: CommercialSignalCompanyStateChangeLineage[]
+}
+
 export type CommercialSignalQualityEngineV2Input = {
   decisionAt: string
   decisionSource: 'deterministic' | 'llm'
@@ -55,6 +131,7 @@ export type CommercialSignalQualityEngineV2Input = {
     present: boolean
     evidenceIds: string[]
   }
+  stateLineage?: CommercialSignalCompanyStateLineage
   hiringNeed: OpportunityQualityComponent
   hiringFriction: HiringFrictionResult
   agencyFit: OpportunityQualityComponent

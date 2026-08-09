@@ -5,6 +5,9 @@ import {
   buildMarketDifficulty,
 } from './commercial-fit-v2'
 import type {
+  CommercialSignalCompanyStateChangeLineage,
+  CommercialSignalCompanyStateLineage,
+  CommercialSignalCompanyStateSnapshot,
   CommercialSignalQualityEngineV2Input,
   CommercialSignalQualityStatus,
 } from './commercial-signal-quality-engine-v2'
@@ -66,6 +69,8 @@ export const COMMERCIAL_SIGNAL_QUALITY_V2_LINEAGE_ERROR_CODES = [
   'QUALITY_LINEAGE_PROPENSITY_STALE',
   'QUALITY_LINEAGE_THESIS_STALE',
   'QUALITY_LINEAGE_STATE_MISSING',
+  'QUALITY_LINEAGE_STATE_FUTURE',
+  'QUALITY_LINEAGE_STATE_INVALID',
   'QUALITY_LINEAGE_EVIDENCE_MISSING',
 ] as const
 
@@ -119,6 +124,24 @@ type LineageRow = {
   thesisGeneration: number | null
   candidateThesisGeneration: number | null
   stateSnapshotId: string | null
+  stateSnapshotAt: string | null
+  stateHiringBaseline: unknown
+  stateCurrentHiringVelocity: unknown
+  stateRoleDistribution: unknown
+  stateSeniorityDistribution: unknown
+  stateRegionDistribution: unknown
+  stateVacancyLifetime: unknown
+  stateRepostRate: unknown
+  stateRecruitingCapacitySignals: unknown
+  stateBusinessChangeSignals: unknown
+  stateClassification: string | null
+  stateConfidence: number | null
+  stateFeatureVersion: string | null
+  stateEventIds: string[]
+  stateEvidenceIds: string[]
+  stateHasFutureEvent: boolean
+  stateHasFutureEvidence: boolean
+  stateHasFutureChange: boolean
   accountRestriction: string | null
 }
 
@@ -145,6 +168,8 @@ type EvidenceRow = {
   thesisEvidence: boolean
   episodeEvidence: boolean
 }
+
+type StateChangeRow = CommercialSignalCompanyStateChangeLineage
 
 const LINEAGE_SQL = `SELECT
   lineage.id::TEXT AS "opportunityLineageId",
@@ -183,6 +208,60 @@ const LINEAGE_SQL = `SELECT
   thesis.thesis_generation AS "thesisGeneration",
   candidate.commercial_thesis_generation AS "candidateThesisGeneration",
   state_snapshot.id::TEXT AS "stateSnapshotId",
+  state_snapshot.snapshot_at AS "stateSnapshotAt",
+  state_snapshot.hiring_baseline AS "stateHiringBaseline",
+  state_snapshot.current_hiring_velocity AS "stateCurrentHiringVelocity",
+  state_snapshot.role_distribution AS "stateRoleDistribution",
+  state_snapshot.seniority_distribution AS "stateSeniorityDistribution",
+  state_snapshot.region_distribution AS "stateRegionDistribution",
+  state_snapshot.vacancy_lifetime AS "stateVacancyLifetime",
+  state_snapshot.repost_rate AS "stateRepostRate",
+  state_snapshot.recruiting_capacity_signals AS "stateRecruitingCapacitySignals",
+  state_snapshot.business_change_signals AS "stateBusinessChangeSignals",
+  state_snapshot.state_classification AS "stateClassification",
+  state_snapshot.state_confidence AS "stateConfidence",
+  state_snapshot.feature_version AS "stateFeatureVersion",
+  COALESCE(ARRAY(
+    SELECT snapshot_event.company_event_id::TEXT
+    FROM company_state_snapshot_events snapshot_event
+    WHERE snapshot_event.snapshot_id = state_snapshot.id
+      AND snapshot_event.organization_id = lineage.organization_id
+    ORDER BY snapshot_event.company_event_id
+  ), ARRAY[]::TEXT[]) AS "stateEventIds",
+  COALESCE(ARRAY(
+    SELECT snapshot_evidence.evidence_id::TEXT
+    FROM company_state_snapshot_evidence snapshot_evidence
+    WHERE snapshot_evidence.snapshot_id = state_snapshot.id
+      AND snapshot_evidence.organization_id = lineage.organization_id
+    ORDER BY snapshot_evidence.evidence_id
+  ), ARRAY[]::TEXT[]) AS "stateEvidenceIds",
+  EXISTS (
+    SELECT 1
+    FROM company_state_snapshot_events snapshot_event
+    JOIN company_events state_event
+      ON state_event.id = snapshot_event.company_event_id
+     AND state_event.organization_id = snapshot_event.organization_id
+    WHERE snapshot_event.snapshot_id = state_snapshot.id
+      AND snapshot_event.organization_id = lineage.organization_id
+      AND state_event.occurred_at > lineage.created_at
+  ) AS "stateHasFutureEvent",
+  EXISTS (
+    SELECT 1
+    FROM company_state_snapshot_evidence snapshot_evidence
+    JOIN evidence_items state_evidence
+      ON state_evidence.id = snapshot_evidence.evidence_id
+     AND state_evidence.org_id = snapshot_evidence.organization_id
+    WHERE snapshot_evidence.snapshot_id = state_snapshot.id
+      AND snapshot_evidence.organization_id = lineage.organization_id
+      AND state_evidence.fetched_at > lineage.created_at
+  ) AS "stateHasFutureEvidence",
+  EXISTS (
+    SELECT 1
+    FROM company_state_changes state_change
+    WHERE state_change.snapshot_id = state_snapshot.id
+      AND state_change.organization_id = lineage.organization_id
+      AND state_change.created_at > lineage.created_at
+  ) AS "stateHasFutureChange",
   match.feature_snapshot #>> '{agency,accountRestriction}'
     AS "accountRestriction"
 FROM commercial_signal_opportunity_lineage lineage
@@ -235,6 +314,60 @@ WHERE episode_event.signal_episode_id = $1
   AND episode_event.organization_id = $2
   AND event.occurred_at <= $3::TIMESTAMPTZ
 ORDER BY event.occurred_at, event.id`
+
+const STATE_CHANGES_SQL = `SELECT
+  state_change.id::TEXT AS "changeId",
+  state_change.change_type AS "changeType",
+  state_change.direction,
+  state_change.magnitude,
+  state_change.baseline_deviation AS "baselineDeviation",
+  state_change.confidence,
+  ARRAY(
+    SELECT change_event.company_event_id::TEXT
+    FROM company_state_change_events change_event
+    WHERE change_event.change_id = state_change.id
+      AND change_event.organization_id = state_change.organization_id
+    ORDER BY change_event.company_event_id
+  ) AS "eventIds",
+  ARRAY(
+    SELECT change_evidence.evidence_id::TEXT
+    FROM company_state_change_evidence change_evidence
+    WHERE change_evidence.change_id = state_change.id
+      AND change_evidence.organization_id = state_change.organization_id
+    ORDER BY change_evidence.evidence_id
+  ) AS "evidenceIds",
+  state_snapshot.snapshot_at AS "observedAt",
+  state_change.feature_version AS "featureVersion"
+FROM company_state_changes state_change
+JOIN company_state_snapshots state_snapshot
+  ON state_snapshot.id = state_change.snapshot_id
+ AND state_snapshot.organization_id = state_change.organization_id
+WHERE state_change.snapshot_id = $1
+  AND state_change.organization_id = $2
+  AND state_snapshot.snapshot_at <= $3::TIMESTAMPTZ
+  AND state_change.created_at <= $3::TIMESTAMPTZ
+ORDER BY state_change.id`
+
+const STATE_EVIDENCE_SQL = `SELECT
+  evidence.id::TEXT AS "evidenceId",
+  evidence.source,
+  evidence.url,
+  evidence.fetched_at AS "fetchedAt",
+  evidence.content_hash AS "contentHash",
+  evidence.tier,
+  evidence.payload_ref AS "payloadRef",
+  FALSE AS "matchEvidence",
+  FALSE AS "propensityEvidence",
+  FALSE AS "thesisEvidence",
+  FALSE AS "episodeEvidence"
+FROM company_state_snapshot_evidence snapshot_evidence
+JOIN evidence_items evidence
+  ON evidence.id = snapshot_evidence.evidence_id
+ AND evidence.org_id = snapshot_evidence.organization_id
+WHERE snapshot_evidence.snapshot_id = $1
+  AND snapshot_evidence.organization_id = $2
+  AND evidence.fetched_at <= $3::TIMESTAMPTZ
+ORDER BY evidence.id`
 
 const EVIDENCE_SQL = `SELECT
   evidence.id::TEXT AS "evidenceId",
@@ -307,7 +440,7 @@ export async function buildCommercialSignalQualityV2Input(
   validateExactLineage(row)
 
   const decisionAt = timestamp(row.lineageCreatedAt, 'lineage decision at')
-  const [eventResult, evidenceResult] = await Promise.all([
+  const [eventResult, evidenceResult, stateChangeResult, stateEvidenceResult] = await Promise.all([
     db.query<EventRow>(EVENTS_SQL, [
       row.signalEpisodeId,
       row.organizationId,
@@ -324,10 +457,24 @@ export async function buildCommercialSignalQualityV2Input(
       row.thesisId,
       row.signalEpisodeId,
     ]),
+    db.query<StateChangeRow>(STATE_CHANGES_SQL, [
+      row.stateSnapshotId,
+      row.organizationId,
+      decisionAt,
+    ]),
+    db.query<EvidenceRow>(STATE_EVIDENCE_SQL, [
+      row.stateSnapshotId,
+      row.organizationId,
+      decisionAt,
+    ]),
   ])
-  if (evidenceResult.rows.length === 0) fail('QUALITY_LINEAGE_EVIDENCE_MISSING')
+  const allEvidenceRows = dedupeEvidenceRows([
+    ...evidenceResult.rows,
+    ...stateEvidenceResult.rows,
+  ])
+  if (allEvidenceRows.length === 0) fail('QUALITY_LINEAGE_EVIDENCE_MISSING')
 
-  const provenance = evidenceResult.rows.map(toProvenance)
+  const provenance = allEvidenceRows.map(toProvenance)
   const evidenceById = new Map(provenance.map((item) => [item.evidenceId, item]))
   const allowedEvidenceIds = new Set(provenance.map((item) => item.evidenceId))
   const events = eventResult.rows.map((event) => ({
@@ -338,11 +485,14 @@ export async function buildCommercialSignalQualityV2Input(
     row,
     events,
     evidenceById,
-    evidenceResult.rows,
+    allEvidenceRows,
+    stateChangeResult.rows,
     new Date(decisionAt),
   )
   const input = assembled.input
   const usedIds = ids([
+    ...(input.stateLineage?.evidenceIds ?? []),
+    ...(input.stateLineage?.changes.flatMap((item) => item.evidenceIds) ?? []),
     ...input.currentHiringEvidence.evidenceIds,
     ...input.hiringNeed.evidenceIds,
     ...input.hiringFriction.evidenceIds,
@@ -402,8 +552,187 @@ function validateExactLineage(row: LineageRow): void {
     row.thesisGeneration !== row.candidateThesisGeneration
   ) fail('QUALITY_LINEAGE_THESIS_STALE')
   if (row.stateSnapshotId === null) fail('QUALITY_LINEAGE_STATE_MISSING')
+  if (row.stateSnapshotAt === null) fail('QUALITY_LINEAGE_STATE_MISSING')
+  const decisionAt = timestamp(row.lineageCreatedAt, 'lineage decision at')
+  const snapshotAt = timestamp(row.stateSnapshotAt, 'state snapshot at')
+  if (
+    snapshotAt > decisionAt ||
+    row.stateHasFutureEvent ||
+    row.stateHasFutureEvidence ||
+    row.stateHasFutureChange
+  ) fail('QUALITY_LINEAGE_STATE_FUTURE')
   timestamp(row.candidateValidUntil as string, 'candidate valid until')
   timestamp(row.episodeValidUntil as string, 'episode valid until')
+}
+
+function buildStateLineage(
+  row: LineageRow,
+  rawChanges: StateChangeRow[],
+): CommercialSignalCompanyStateLineage {
+  if (
+    row.stateSnapshotId === null ||
+    row.stateSnapshotAt === null ||
+    row.stateFeatureVersion === null ||
+    row.stateClassification === null ||
+    row.stateConfidence === null
+  ) fail('QUALITY_LINEAGE_STATE_MISSING')
+  if (![
+    'insufficient_history', 'accelerating', 'steady', 'slowing',
+  ].includes(row.stateClassification)) fail('QUALITY_LINEAGE_STATE_INVALID')
+  const snapshotAt = timestamp(row.stateSnapshotAt, 'state snapshot at')
+  const featureVersion = requiredText(row.stateFeatureVersion, 'state feature version')
+  const eventIds = ids(row.stateEventIds)
+  const evidenceIds = ids(row.stateEvidenceIds)
+  const snapshot = stateSnapshot(row)
+  if (eventIds.length === 0 || evidenceIds.length === 0) {
+    fail('QUALITY_LINEAGE_STATE_INVALID')
+  }
+  const changes = rawChanges.map((raw) => {
+    const direction = raw.direction
+    if (!['up', 'down', 'new', 'changed'].includes(direction)) {
+      fail('QUALITY_LINEAGE_STATE_INVALID')
+    }
+    const change: CommercialSignalCompanyStateChangeLineage = {
+      changeId: positiveId(raw.changeId, 'state change id'),
+      changeType: requiredText(raw.changeType, 'state change type'),
+      direction,
+      magnitude: nonNegative(raw.magnitude, 'state change magnitude'),
+      baselineDeviation: nullableFinite(
+        raw.baselineDeviation,
+        'state change baseline deviation',
+      ),
+      confidence: unitInterval(raw.confidence, 'state change confidence'),
+      eventIds: ids(raw.eventIds),
+      evidenceIds: ids(raw.evidenceIds),
+      observedAt: timestamp(raw.observedAt, 'state change observed at'),
+      featureVersion: requiredText(raw.featureVersion, 'state change feature version'),
+    }
+    if (
+      change.observedAt !== snapshotAt ||
+      change.featureVersion !== featureVersion ||
+      change.eventIds.length === 0 ||
+      change.evidenceIds.length === 0 ||
+      change.eventIds.some((id) => !eventIds.includes(id)) ||
+      change.evidenceIds.some((id) => !evidenceIds.includes(id))
+    ) fail('QUALITY_LINEAGE_STATE_INVALID')
+    return change
+  }).sort((left, right) =>
+    left.changeId.length - right.changeId.length ||
+    left.changeId.localeCompare(right.changeId, 'en'))
+  return {
+    snapshotId: positiveId(row.stateSnapshotId, 'state snapshot id'),
+    snapshotAt,
+    featureVersion,
+    stateClassification: row.stateClassification as
+      CommercialSignalCompanyStateLineage['stateClassification'],
+    stateConfidence: unitInterval(row.stateConfidence, 'state confidence'),
+    eventIds,
+    evidenceIds,
+    snapshot,
+    changes,
+  }
+}
+
+function stateSnapshot(row: LineageRow): CommercialSignalCompanyStateSnapshot {
+  const baseline = object(row.stateHiringBaseline)
+  const velocity = object(row.stateCurrentHiringVelocity)
+  const roles = object(row.stateRoleDistribution)
+  const seniorities = object(row.stateSeniorityDistribution)
+  const regions = object(row.stateRegionDistribution)
+  const lifetime = object(row.stateVacancyLifetime)
+  const repost = object(row.stateRepostRate)
+  const capacity = object(row.stateRecruitingCapacitySignals)
+  const business = object(row.stateBusinessChangeSignals)
+  const direction = velocity.direction
+  if (!['up', 'steady', 'down', 'unknown'].includes(String(direction))) {
+    fail('QUALITY_LINEAGE_STATE_INVALID')
+  }
+  if (typeof baseline.sufficientHistory !== 'boolean' ||
+      typeof repost.supported !== 'boolean') {
+    fail('QUALITY_LINEAGE_STATE_INVALID')
+  }
+  const fallbackReason = baseline.fallbackReason
+  if (fallbackReason !== null && fallbackReason !== 'insufficient_history') {
+    fail('QUALITY_LINEAGE_STATE_INVALID')
+  }
+  return {
+    hiringBaseline: {
+      vacancies7d: count(baseline.vacancies7d, 'baseline vacancies 7d'),
+      vacancies14d: count(baseline.vacancies14d, 'baseline vacancies 14d'),
+      vacancies30d: count(baseline.vacancies30d, 'baseline vacancies 30d'),
+      medianHiringVelocityPer7d: nonNegative(
+        baseline.medianHiringVelocityPer7d,
+        'median hiring velocity',
+      ),
+      historyEventCount: count(baseline.historyEventCount, 'history event count'),
+      historyCoverageDays: nonNegative(
+        baseline.historyCoverageDays,
+        'history coverage days',
+      ),
+      historicalPeriodCount: count(
+        baseline.historicalPeriodCount,
+        'historical period count',
+      ),
+      sufficientHistory: baseline.sufficientHistory,
+      fallbackReason,
+    },
+    currentHiringVelocity: {
+      vacancies7d: count(velocity.vacancies7d, 'current vacancies 7d'),
+      vacancies14d: count(velocity.vacancies14d, 'current vacancies 14d'),
+      vacancies30d: count(velocity.vacancies30d, 'current vacancies 30d'),
+      baselineDeviation14d: nullableFinite(
+        velocity.baselineDeviation14d,
+        'baseline deviation 14d',
+      ),
+      direction: direction as
+        CommercialSignalCompanyStateSnapshot['currentHiringVelocity']['direction'],
+    },
+    roleDistribution: {
+      current: nonNegativeRecord(roles.current, 'current role distribution'),
+      baseline: nonNegativeRecord(roles.baseline, 'baseline role distribution'),
+    },
+    seniorityDistribution: {
+      current: nonNegativeRecord(
+        seniorities.current,
+        'current seniority distribution',
+      ),
+      baseline: nonNegativeRecord(
+        seniorities.baseline,
+        'baseline seniority distribution',
+      ),
+    },
+    regionDistribution: {
+      current: nonNegativeRecord(regions.current, 'current region distribution'),
+      baseline: nonNegativeRecord(regions.baseline, 'baseline region distribution'),
+      newRegions: textArray(regions.newRegions),
+    },
+    vacancyLifetime: {
+      observedCount: count(lifetime.observedCount, 'vacancy lifetime count'),
+      medianDays: nullableNonNegative(lifetime.medianDays, 'vacancy lifetime median'),
+    },
+    repostRate: {
+      supported: repost.supported,
+      observedCount: count(repost.observedCount, 'repost observed count'),
+      repostCount: count(repost.repostCount, 'repost count'),
+      rate: nullableUnit(repost.rate, 'repost rate'),
+    },
+    recruitingCapacitySignals: {
+      currentRecruiterVacancies: count(
+        capacity.currentRecruiterVacancies,
+        'current recruiter vacancies',
+      ),
+      baselineRecruiterVacancies: count(
+        capacity.baselineRecruiterVacancies,
+        'baseline recruiter vacancies',
+      ),
+    },
+    businessChangeSignals: {
+      current30d: nonNegativeRecord(
+        business.current30d,
+        'business change signals',
+      ),
+    },
+  }
 }
 
 function assembleInput(
@@ -411,6 +740,7 @@ function assembleInput(
   events: EventRow[],
   evidenceById: ReadonlyMap<string, CommercialSignalEvidenceProvenance>,
   evidenceRows: EvidenceRow[],
+  stateChanges: StateChangeRow[],
   decisionAt: Date,
 ): { input: CommercialSignalQualityEngineV2Input; archetypes: string[] } {
   const directIds = (event: EventRow): string[] => event.evidenceIds.filter((id) => {
@@ -435,6 +765,7 @@ function assembleInput(
   const candidateFeatures = object(row.candidateFeatures)
   const qualityFeatures = object(candidateFeatures.quality)
   const actionabilityFeatures = object(candidateFeatures.actionability)
+  const stateLineage = buildStateLineage(row, stateChanges)
   const hiringNeed = componentFromPersisted(
     qualityComponents.timing,
     hiringEvidenceIds,
@@ -447,11 +778,15 @@ function assembleInput(
     row.matchFitScore,
     row.matchCoverage,
   )
-  const frictionInput = buildFrictionInput(events, directIds, decisionAt)
-  const friction = buildHiringFriction(frictionInput)
-  const negatives = buildNegativeEvidence(
+  const frictionInput = buildFrictionInput(
     events,
     directIds,
+    decisionAt,
+    stateLineage,
+  )
+  const friction = buildHiringFriction(frictionInput)
+  const negatives = buildNegativeEvidence(
+    stateLineage.changes,
     evidenceById,
     decisionAt,
   )
@@ -476,6 +811,7 @@ function assembleInput(
     events,
     directIds,
     friction,
+    stateLineage,
   ))
   const accountRestriction = row.accountRestriction
   const previousRelationship = accountRestriction === 'existing_client' ||
@@ -508,8 +844,8 @@ function assembleInput(
         ? friction.evidenceIds : [],
     ),
     timeToFillPressure: propensityComponent(
-      friction.componentValues.time_to_fill_history,
-      friction.observationStates.time_to_fill_history === 'observed'
+      friction.componentValues.vacancy_lifetime,
+      friction.observationStates.vacancy_lifetime === 'observed'
         ? friction.evidenceIds : [],
     ),
     procurementBarrier: propensityComponent(null, []),
@@ -577,6 +913,7 @@ function assembleInput(
       present: hiringEvidenceIds.length > 0,
       evidenceIds: hiringEvidenceIds,
     },
+    stateLineage,
     hiringNeed,
     hiringFriction: friction,
     agencyFit,
@@ -585,9 +922,11 @@ function assembleInput(
     economics,
     marketDifficulty: buildMarketDifficulty({
       decisionDate: decisionAt.toISOString().slice(0, 10),
-      roleFamily: 'unknown',
-      seniority: 'unknown',
-      region: 'unknown',
+      roleFamily: dominantKnownKey(stateLineage.snapshot.roleDistribution.current),
+      seniority: dominantKnownKey(
+        stateLineage.snapshot.seniorityDistribution.current,
+      ),
+      region: dominantKnownKey(stateLineage.snapshot.regionDistribution.current),
       observation: null,
     }),
     negativeEvidence,
@@ -606,6 +945,7 @@ function buildFrictionInput(
   events: EventRow[],
   directIds: (event: EventRow) => string[],
   decisionAt: Date,
+  stateLineage: CommercialSignalCompanyStateLineage,
 ) {
   const jobs = events.filter((event) => event.eventType === 'job_posting')
   const reposts = events.filter((event) => event.eventType === 'vacancy_repost')
@@ -654,6 +994,34 @@ function buildFrictionInput(
   const massHiring = explicitBooleanObservation(events, directIds, [
     'massHiring', 'mass_hiring',
   ])
+  const snapshot = stateLineage.snapshot
+  const stateEvidenceIds = stateLineage.evidenceIds
+  const vacancyLifetime = snapshot.vacancyLifetime.observedCount > 0 &&
+      snapshot.vacancyLifetime.medianDays !== null
+    ? observedMetric(
+        clamp01((snapshot.vacancyLifetime.medianDays - 30) / 90),
+        stateEvidenceIds,
+      )
+    : unknownMetric()
+  const repostRate = snapshot.repostRate.supported &&
+      snapshot.repostRate.rate !== null
+    ? observedMetric(snapshot.repostRate.rate, stateEvidenceIds)
+    : unknownMetric()
+  const seniorityComplexity = distributionSeniorityComplexity(
+    snapshot.seniorityDistribution.current,
+    stateEvidenceIds,
+  )
+  const multiRoleComplexity = distributionComplexity(
+    snapshot.roleDistribution.current,
+    stateEvidenceIds,
+  )
+  const deviation = snapshot.currentHiringVelocity.baselineDeviation14d
+  const recruiterVacancies =
+    snapshot.recruitingCapacitySignals.currentRecruiterVacancies
+  const recruiterPressure = snapshot.hiringBaseline.sufficientHistory &&
+      deviation !== null && recruiterVacancies > 0
+    ? observedMetric(clamp01(Math.max(0, deviation)), stateEvidenceIds)
+    : unknownMetric()
   return {
     vacancyAgeDays: earliestJob === undefined || allJobIds.length === 0
       ? unknownMetric()
@@ -665,18 +1033,19 @@ function buildFrictionInput(
           value: observedReposts,
           evidenceIds: repostIds,
         },
+    repostRate,
     salaryChange: salaryIds.length === 0 ? unknownMetric() : observedMetric(1, salaryIds),
     requirementsChange: requirementIds.length === 0
       ? unknownMetric() : observedMetric(1, requirementIds),
     closeReopenCycles: restartIds.length === 0
       ? unknownMetric() : observedMetric(1, restartIds),
     roleScarcity: unknownMetric(),
-    seniorityComplexity: unknownMetric(),
-    multiRoleComplexity: unknownMetric(),
+    seniorityComplexity,
+    multiRoleComplexity,
     regionalDifficulty: unknownMetric(),
     internalRecruitingCapacity: unknownMetric(),
-    hiringVelocityVsCapacity: unknownMetric(),
-    timeToFillHistory: unknownMetric(),
+    hiringVelocityVsCapacity: recruiterPressure,
+    observedVacancyLifetime: vacancyLifetime,
     evergreenRole: evergreen,
     massHiring,
   }
@@ -692,26 +1061,26 @@ function repostLifecycle(
 }
 
 function buildNegativeEvidence(
-  events: EventRow[],
-  directIds: (event: EventRow) => string[],
+  stateChanges: CommercialSignalCompanyStateChangeLineage[],
   evidenceById: ReadonlyMap<string, CommercialSignalEvidenceProvenance>,
   decisionAt: Date,
 ): NegativeEvidenceInput[] {
-  return events.filter((event) => event.eventType === 'hiring_slowdown')
-    .map((event) => ({
+  return stateChanges.filter((change) =>
+    change.changeType === 'hiring_slowdown' && change.direction === 'down')
+    .map((change) => ({
       type: 'hiring_slowdown' as const,
       classification: 'confirmed_negative' as const,
-      sourceKind: directIds(event).some((id) =>
+      sourceKind: change.evidenceIds.some((id) =>
         evidenceById.get(id)?.sourceKind === 'direct')
         ? 'direct' as const
         : 'official' as const,
-      severity: event.confidence ?? 0.8,
-      eventIds: [event.eventId],
-      evidenceIds: directIds(event),
-      observedAt: event.occurredAt,
+      severity: change.confidence,
+      eventIds: change.eventIds,
+      evidenceIds: change.evidenceIds,
+      observedAt: change.observedAt,
       validUntil: new Date(Math.max(
         decisionAt.getTime(),
-        Date.parse(event.lastSeenAt) + (45 * 86_400_000),
+        Date.parse(change.observedAt) + (45 * 86_400_000),
       )).toISOString(),
     })).filter((item) => item.evidenceIds.length > 0)
 }
@@ -751,6 +1120,7 @@ function buildArchetypeInput(
   events: EventRow[],
   directIds: (event: EventRow) => string[],
   friction: ReturnType<typeof buildHiringFriction>,
+  stateLineage: CommercialSignalCompanyStateLineage,
 ) {
   const signal = <T>(value: T, matching: EventRow[]) => ({
     value,
@@ -758,13 +1128,49 @@ function buildArchetypeInput(
     evidenceIds: ids(matching.flatMap(directIds)),
   })
   const byType = (type: string) => events.filter((event) => event.eventType === type)
+  const stateSignal = <T>(
+    value: T,
+    changes: CommercialSignalCompanyStateChangeLineage[],
+  ) => ({
+    value,
+    eventIds: ids(changes.flatMap((item) => item.eventIds)),
+    evidenceIds: ids(changes.flatMap((item) => item.evidenceIds)),
+  })
   const newUnit = byType('new_business_unit')
-  const newRegion = byType('new_region')
   const leadership = byType('leadership_change')
   const recruiters = byType('recruiter_vacancy')
   const restarts = byType('hiring_restart')
-  const slowdown = byType('hiring_slowdown')
+  const accelerations = stateLineage.changes.filter((item) =>
+    item.changeType === 'hiring_acceleration' && item.direction === 'up')
+  const slowdowns = stateLineage.changes.filter((item) =>
+    item.changeType === 'hiring_slowdown' && item.direction === 'down')
   const reposts = byType('vacancy_repost')
+  const meaningfulReposts = reposts.filter((event) =>
+    repostLifecycle(event.payload) === 'meaningful')
+  const newRegions = stateLineage.changes.filter((item) =>
+    item.changeType === 'new_region' && item.direction === 'new')
+  const snapshot = stateLineage.snapshot
+  const deviation = snapshot.currentHiringVelocity.baselineDeviation14d
+  const stateObserved = <T>(value: T) => ({
+    value,
+    eventIds: stateLineage.eventIds,
+    evidenceIds: stateLineage.evidenceIds,
+  })
+  const growthVsBaseline = snapshot.hiringBaseline.sufficientHistory &&
+      deviation !== null
+    ? stateObserved<number | null>(clamp01(0.5 + (deviation / 2)))
+    : stateObserved<number | null>(null)
+  const roleEntries = knownDistribution(snapshot.roleDistribution.current)
+  const roleCount = roleEntries.reduce((sum, [, count]) => sum + count, 0)
+  const repeatedRoleShare = roleCount >= 3
+    ? stateObserved<number | null>(
+        Math.max(...roleEntries.map(([, count]) => count)) / roleCount,
+      )
+    : stateObserved<number | null>(null)
+  const roleComplexity = distributionComplexity(
+    snapshot.roleDistribution.current,
+    stateLineage.evidenceIds,
+  )
   const evergreen = events.filter((event) => booleanPayload(event.payload, [
     'evergreen', 'evergreenRole', 'evergreen_role',
   ]) !== null)
@@ -777,17 +1183,28 @@ function buildArchetypeInput(
       score: friction.frictionScore,
       evidenceIds: friction.evidenceIds,
     },
-    hiringAcceleration: signal(restarts.length > 0 ? 0.8 : null, restarts),
-    growthVsBaseline: signal<number | null>(null, []),
-    repeatedRoleShare: signal<number | null>(null, []),
-    meaningfulRepostCycles: signal(reposts.length || null, reposts),
-    roleComplexity: signal<number | null>(null, []),
+    hiringAcceleration: accelerations.length > 0
+      ? stateSignal<number | null>(stateLineage.stateConfidence, accelerations)
+      : signal(restarts.length > 0 ? 0.8 : null, restarts),
+    growthVsBaseline,
+    repeatedRoleShare,
+    meaningfulRepostCycles: signal(
+      meaningfulReposts.length || null,
+      meaningfulReposts,
+    ),
+    roleComplexity: stateObserved<number | null>(roleComplexity.value),
     salaryOrRequirementsChanged: signal<boolean | null>(
-      events.some((event) => event.eventType === 'vacancy_salary_change') || null,
-      events.filter((event) => event.eventType === 'vacancy_salary_change'),
+      events.some((event) =>
+        event.eventType === 'vacancy_salary_change' ||
+        booleanPayload(event.payload, ['salaryChanged', 'requirementsChanged']) === true
+      ) || null,
+      events.filter((event) =>
+        event.eventType === 'vacancy_salary_change' ||
+        booleanPayload(event.payload, ['salaryChanged', 'requirementsChanged']) === true
+      ),
     ),
     newUnit: signal<boolean | null>(newUnit.length > 0 || null, newUnit),
-    newRegion: signal<boolean | null>(newRegion.length > 0 || null, newRegion),
+    newRegion: stateSignal<boolean | null>(newRegions.length > 0 || null, newRegions),
     leadershipChange: signal<boolean | null>(leadership.length > 0 || null, leadership),
     recruiterVacancy: signal<boolean | null>(recruiters.length > 0 || null, recruiters),
     massHiring: signal<boolean | null>(massHiring.length === 0
@@ -801,7 +1218,10 @@ function buildArchetypeInput(
         'evergreen', 'evergreenRole', 'evergreen_role',
       ]) === true), evergreen),
     reactivation: signal<boolean | null>(restarts.length > 0 || null, restarts),
-    freezeOrSlowdown: signal<boolean | null>(slowdown.length > 0 || null, slowdown),
+    freezeOrSlowdown: stateSignal<boolean | null>(
+      slowdowns.length > 0 || null,
+      slowdowns,
+    ),
   }
 }
 
@@ -910,6 +1330,51 @@ function unknownMetric(): EvidencedMetric {
   return { state: 'unknown', value: null, evidenceIds: [] }
 }
 
+function distributionComplexity(
+  distribution: Record<string, number>,
+  evidenceIds: string[],
+): EvidencedMetric {
+  const known = knownDistribution(distribution)
+  const sampleSize = known.reduce((total, [, count]) => total + count, 0)
+  if (sampleSize < 3) return unknownMetric()
+  return observedMetric(clamp01((known.length - 1) / 3), evidenceIds)
+}
+
+function distributionSeniorityComplexity(
+  distribution: Record<string, number>,
+  evidenceIds: string[],
+): EvidencedMetric {
+  const entries = Object.entries(distribution)
+  const total = entries.reduce((sum, [, count]) => sum + count, 0)
+  const known = knownDistribution(distribution)
+  const knownCount = known.reduce((sum, [, count]) => sum + count, 0)
+  if (knownCount < 3 || total === 0 || knownCount / total < 0.6) {
+    return unknownMetric()
+  }
+  const seniorKeys = new Set(['lead', 'head', 'principal', 'senior', 'executive'])
+  const seniorCount = known.reduce((sum, [key, count]) =>
+    sum + (seniorKeys.has(key.toLowerCase()) ? count : 0), 0)
+  return observedMetric(clamp01(seniorCount / knownCount), evidenceIds)
+}
+
+function knownDistribution(
+  distribution: Record<string, number>,
+): Array<[string, number]> {
+  return Object.entries(distribution)
+    .filter(([key, count]) => key.trim().toLowerCase() !== 'unknown' && count > 0)
+    .sort(([left], [right]) => left.localeCompare(right))
+}
+
+function dominantKnownKey(distribution: Record<string, number>): string {
+  return knownDistribution(distribution)
+    .sort(([leftKey, leftCount], [rightKey, rightCount]) =>
+      rightCount - leftCount || leftKey.localeCompare(rightKey))[0]?.[0] ?? 'unknown'
+}
+
+function clamp01(value: number): number {
+  return Math.min(1, Math.max(0, value))
+}
+
 function unknownReposts(): EvidencedRepostCycles {
   return { state: 'unknown', value: null, evidenceIds: [] }
 }
@@ -984,6 +1449,76 @@ function numberPayload(value: unknown, keys: string[]): number | null {
     if (Number.isFinite(parsed) && parsed >= 0) return parsed
   }
   return null
+}
+
+function dedupeEvidenceRows(rows: EvidenceRow[]): EvidenceRow[] {
+  const byId = new Map<string, EvidenceRow>()
+  for (const row of rows) {
+    const existing = byId.get(row.evidenceId)
+    byId.set(row.evidenceId, existing
+      ? {
+          ...existing,
+          matchEvidence: existing.matchEvidence || row.matchEvidence,
+          propensityEvidence: existing.propensityEvidence || row.propensityEvidence,
+          thesisEvidence: existing.thesisEvidence || row.thesisEvidence,
+          episodeEvidence: existing.episodeEvidence || row.episodeEvidence,
+        }
+      : row)
+  }
+  return [...byId.values()].sort((left, right) =>
+    left.evidenceId.length - right.evidenceId.length ||
+    left.evidenceId.localeCompare(right.evidenceId, 'en'))
+}
+
+function nonNegative(value: unknown, label: string): number {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new Error(`${label} must be non-negative`)
+  }
+  return parsed
+}
+
+function nullableFinite(value: unknown, label: string): number | null {
+  if (value === null || value === undefined || value === '') return null
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) throw new Error(`${label} must be finite`)
+  return parsed
+}
+
+function count(value: unknown, label: string): number {
+  const parsed = nonNegative(value, label)
+  if (!Number.isSafeInteger(parsed)) throw new Error(label + ' must be an integer')
+  return parsed
+}
+
+function nullableNonNegative(value: unknown, label: string): number | null {
+  const parsed = nullableFinite(value, label)
+  if (parsed !== null && parsed < 0) throw new Error(label + ' must be non-negative')
+  return parsed
+}
+
+function nullableUnit(value: unknown, label: string): number | null {
+  const parsed = nullableFinite(value, label)
+  if (parsed !== null && (parsed < 0 || parsed > 1)) {
+    throw new Error(label + ' must be between 0 and 1')
+  }
+  return parsed
+}
+
+function nonNegativeRecord(value: unknown, label: string): Record<string, number> {
+  const raw = object(value)
+  const entries = Object.entries(raw).map(([key, item]) => [
+    requiredText(key, label + ' key'),
+    nonNegative(item, label + ' value'),
+  ] as const)
+  return Object.fromEntries(entries.sort(([left], [right]) =>
+    left.localeCompare(right)))
+}
+
+function textArray(value: unknown): string[] {
+  if (!Array.isArray(value)) fail('QUALITY_LINEAGE_STATE_INVALID')
+  return [...new Set(value.map((item) => requiredText(item, 'state text')))]
+    .sort((left, right) => left.localeCompare(right))
 }
 
 function finiteUnit(value: unknown): number | null {

@@ -18,6 +18,7 @@ function input(
   return {
     vacancyAgeDays: observed(20),
     repostCycles: observed([]),
+    repostRate: unavailable(),
     salaryChange: observed(0),
     requirementsChange: observed(0),
     closeReopenCycles: observed(0),
@@ -27,7 +28,7 @@ function input(
     regionalDifficulty: unavailable(),
     internalRecruitingCapacity: unavailable(),
     hiringVelocityVsCapacity: unavailable(),
-    timeToFillHistory: unavailable(),
+    observedVacancyLifetime: unavailable(),
     evergreenRole: observed(false),
     massHiring: observed(false),
     ...overrides,
@@ -80,7 +81,7 @@ describe('Hiring Friction Index v1', () => {
       roleScarcity: observed(0.8, ['104']),
       seniorityComplexity: observed(0.9),
       hiringVelocityVsCapacity: observed(0.8, ['105']),
-      timeToFillHistory: observed(0.75, ['106']),
+      observedVacancyLifetime: observed(0.75, ['106']),
     }))
 
     expect(result.frictionLevel).toBe('high')
@@ -161,7 +162,7 @@ describe('Hiring Friction Index v1', () => {
       regionalDifficulty: unavailable(),
       internalRecruitingCapacity: unavailable(),
       hiringVelocityVsCapacity: unavailable(),
-      timeToFillHistory: unavailable(),
+      observedVacancyLifetime: unavailable(),
       evergreenRole: unavailable(),
       massHiring: unavailable(),
     }))
@@ -177,7 +178,7 @@ describe('Hiring Friction Index v1', () => {
       regionalDifficulty: unavailable(),
       internalRecruitingCapacity: unavailable(),
       hiringVelocityVsCapacity: unavailable(),
-      timeToFillHistory: unavailable(),
+      observedVacancyLifetime: unavailable(),
       evergreenRole: unavailable(),
       massHiring: unavailable(),
     }))

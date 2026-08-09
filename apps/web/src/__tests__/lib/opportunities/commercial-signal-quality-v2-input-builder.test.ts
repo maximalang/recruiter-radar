@@ -69,6 +69,40 @@ function lineage(overrides: Record<string, unknown> = {}) {
     thesisGeneration: 7,
     candidateThesisGeneration: 7,
     stateSnapshotId: '91',
+    stateSnapshotAt: '2026-08-09T08:00:00.000Z',
+    stateHiringBaseline: {
+      vacancies7d: 2,
+      vacancies14d: 4,
+      vacancies30d: 8,
+      medianHiringVelocityPer7d: 2,
+      historyEventCount: 12,
+      historyCoverageDays: 90,
+      historicalPeriodCount: 5,
+      sufficientHistory: true,
+      fallbackReason: null,
+    },
+    stateCurrentHiringVelocity: {
+      vacancies7d: 4,
+      vacancies14d: 7,
+      vacancies30d: 12,
+      baselineDeviation14d: 0.75,
+      direction: 'up',
+    },
+    stateRoleDistribution: { current: { engineering: 7 }, baseline: { engineering: 4 } },
+    stateSeniorityDistribution: { current: { senior: 5 }, baseline: { senior: 2 } },
+    stateRegionDistribution: { current: { Moscow: 7 }, baseline: { Moscow: 4 }, newRegions: [] },
+    stateVacancyLifetime: { observedCount: 7, medianDays: 45 },
+    stateRepostRate: { supported: true, observedCount: 7, repostCount: 2, rate: 2 / 7 },
+    stateRecruitingCapacitySignals: { currentRecruiterVacancies: 1, baselineRecruiterVacancies: 0 },
+    stateBusinessChangeSignals: { current30d: {} },
+    stateClassification: 'accelerating',
+    stateConfidence: 0.88,
+    stateFeatureVersion: 'company-state-v1',
+    stateEventIds: ['201'],
+    stateEvidenceIds: ['101'],
+    stateHasFutureEvent: false,
+    stateHasFutureEvidence: false,
+    stateHasFutureChange: false,
     accountRestriction: null,
     ...overrides,
   }
@@ -107,10 +141,28 @@ function evidence(overrides: Record<string, unknown> = {}) {
   }
 }
 
+function stateChange(overrides: Record<string, unknown> = {}) {
+  return {
+    changeId: '301',
+    changeType: 'hiring_acceleration',
+    direction: 'up',
+    magnitude: 3,
+    baselineDeviation: 0.75,
+    confidence: 0.88,
+    eventIds: ['201'],
+    evidenceIds: ['101'],
+    observedAt: '2026-08-09T08:00:00.000Z',
+    featureVersion: 'company-state-v1',
+    ...overrides,
+  }
+}
+
 function dbWith(rows: {
   lineage?: Record<string, unknown>[]
   events?: Record<string, unknown>[]
   evidence?: Record<string, unknown>[]
+  stateChanges?: Record<string, unknown>[]
+  stateEvidence?: Record<string, unknown>[]
 }) {
   const calls: Array<{ text: string; values?: unknown[] }> = []
   const db: CommercialSignalQualityV2InputBuilderDb = {
@@ -121,6 +173,12 @@ function dbWith(rows: {
       }
       if (text.includes('FROM signal_episode_events')) {
         return result(rows.events ?? [event()])
+      }
+      if (text.includes('FROM company_state_changes')) {
+        return result(rows.stateChanges ?? [])
+      }
+      if (text.includes('FROM company_state_snapshot_evidence')) {
+        return result(rows.stateEvidence ?? [evidence()])
       }
       return result(rows.evidence ?? [evidence()])
     }) as CommercialSignalQualityV2InputBuilderDb['query'],
@@ -228,9 +286,246 @@ describe('Commercial Signal Quality v2 exact-lineage input builder', () => {
       clientProfileId: '22',
     }, db)
 
-    expect(built.input.hiringFriction.componentValues.repost_cycles).toBeNull()
+    expect(built.input.hiringFriction.componentValues.repost_cycles)
+      .toBeCloseTo(2 / 7, 5)
     expect(built.input.hiringFriction.observationStates.repost_cycles)
       .toBe('unknown')
+    expect(built.input.hiringFriction.observationStates.repost_rate)
+      .toBe('observed')
+  })
+
+  it('loads and preserves the exact persisted Company State lineage', async () => {
+    const { db, calls } = dbWith({ stateChanges: [stateChange()] })
+
+    const built = await buildCommercialSignalQualityV2Input('41', {
+      workspaceId: '21', clientProfileId: '22', organizationId: '11',
+    }, db)
+
+    expect(built.input.stateLineage).toEqual({
+      snapshotId: '91',
+      snapshotAt: '2026-08-09T08:00:00.000Z',
+      featureVersion: 'company-state-v1',
+      stateClassification: 'accelerating',
+      stateConfidence: 0.88,
+      eventIds: ['201'],
+      evidenceIds: ['101'],
+      snapshot: {
+        hiringBaseline: lineage().stateHiringBaseline,
+        currentHiringVelocity: lineage().stateCurrentHiringVelocity,
+        roleDistribution: lineage().stateRoleDistribution,
+        seniorityDistribution: lineage().stateSeniorityDistribution,
+        regionDistribution: lineage().stateRegionDistribution,
+        vacancyLifetime: lineage().stateVacancyLifetime,
+        repostRate: lineage().stateRepostRate,
+        recruitingCapacitySignals: lineage().stateRecruitingCapacitySignals,
+        businessChangeSignals: lineage().stateBusinessChangeSignals,
+      },
+      changes: [stateChange()],
+    })
+    const stateQuery = calls.find((call) =>
+      call.text.includes('state_change.id::TEXT AS "changeId"'))
+    expect(stateQuery?.values).toEqual([
+      '91', '11', '2026-08-09T10:00:00.000Z',
+    ])
+    expect(stateQuery?.text).toContain('state_change.snapshot_id = $1')
+    expect(stateQuery?.text).not.toMatch(/latest|nearest|freshest|DISTINCT ON/i)
+  })
+
+  it('turns exact persisted slowdown into confirmed negative evidence', async () => {
+    const slowdown = stateChange({
+      changeType: 'hiring_slowdown',
+      direction: 'down',
+      magnitude: 2,
+      baselineDeviation: -0.5,
+    })
+    const { db } = dbWith({
+      lineage: [lineage({
+        stateClassification: 'slowing',
+        stateCurrentHiringVelocity: {
+          vacancies7d: 1,
+          vacancies14d: 2,
+          vacancies30d: 4,
+          baselineDeviation14d: -0.5,
+          direction: 'down',
+        },
+      })],
+      stateChanges: [slowdown],
+    })
+
+    const built = await buildCommercialSignalQualityV2Input('41', {
+      workspaceId: '21', clientProfileId: '22', organizationId: '11',
+    }, db)
+
+    expect(built.input.negativeEvidence.confirmedReasons).toEqual([
+      expect.objectContaining({
+        code: 'HIRING_SLOWDOWN_CONFIRMED',
+        eventIds: ['201'],
+        evidenceIds: ['101'],
+      }),
+    ])
+    expect(built.archetypes).toEqual(['freeze_or_slowdown'])
+  })
+
+  it('threads persisted Company State observations into Quality features', async () => {
+    const { db } = dbWith({ stateChanges: [stateChange()] })
+
+    const built = await buildCommercialSignalQualityV2Input('41', {
+      workspaceId: '21', clientProfileId: '22', organizationId: '11',
+    }, db)
+
+    expect(built.input.hiringFriction.observationStates).toMatchObject({
+      vacancy_lifetime: 'observed',
+      repost_rate: 'observed',
+      seniority_complexity: 'observed',
+      multi_role_complexity: 'observed',
+      hiring_velocity_vs_capacity: 'observed',
+      internal_recruiting_capacity: 'unknown',
+      regional_difficulty: 'unknown',
+    })
+    expect(built.input.hiringFriction.componentValues.vacancy_lifetime)
+      .toBeCloseTo(1 / 6, 5)
+    expect(built.input.hiringFriction.componentValues.repost_rate)
+      .toBeCloseTo(2 / 7, 5)
+    expect(built.input.hiringFriction.componentValues.seniority_complexity).toBe(1)
+    expect(built.input.marketDifficulty).toMatchObject({
+      roleFamily: 'engineering',
+      seniority: 'senior',
+      region: 'moscow',
+      marketDifficulty: 'unknown',
+    })
+  })
+
+  it('keeps unsupported repost rate and insufficient baseline history unknown', async () => {
+    const { db } = dbWith({
+      lineage: [lineage({
+        stateHiringBaseline: {
+          ...lineage().stateHiringBaseline,
+          sufficientHistory: false,
+          fallbackReason: 'insufficient_history',
+        },
+        stateCurrentHiringVelocity: {
+          ...lineage().stateCurrentHiringVelocity,
+          baselineDeviation14d: null,
+          direction: 'unknown',
+        },
+        stateRepostRate: {
+          supported: false, observedCount: 0, repostCount: 0, rate: 0,
+        },
+        stateClassification: 'insufficient_history',
+      })],
+    })
+
+    const built = await buildCommercialSignalQualityV2Input('41', {
+      workspaceId: '21', clientProfileId: '22', organizationId: '11',
+    }, db)
+
+    expect(built.input.hiringFriction.observationStates.repost_rate).toBe('unknown')
+    expect(built.input.hiringFriction.componentValues.repost_rate).toBeNull()
+    expect(built.archetypes).not.toContain('expansion')
+    expect(built.archetypes).not.toContain('freeze_or_slowdown')
+  })
+
+  it('uses repeated normalized roles only after the minimum sample', async () => {
+    const { db } = dbWith({
+      lineage: [lineage({
+        stateClassification: 'steady',
+        stateCurrentHiringVelocity: {
+          vacancies7d: 2,
+          vacancies14d: 4,
+          vacancies30d: 8,
+          baselineDeviation14d: 0,
+          direction: 'steady',
+        },
+        stateRoleDistribution: {
+          current: { engineering: 4, unknown: 2 },
+          baseline: { engineering: 4 },
+        },
+      })],
+    })
+
+    const built = await buildCommercialSignalQualityV2Input('41', {
+      workspaceId: '21', clientProfileId: '22', organizationId: '11',
+    }, db)
+
+    expect(built.archetypes).toContain('replacement_turnover')
+  })
+
+  it('derives regional expansion from exact state changes without claiming difficulty', async () => {
+    const regionalChange = stateChange({
+      changeId: '302',
+      changeType: 'new_region',
+      direction: 'new',
+      magnitude: 2,
+    })
+    const { db } = dbWith({
+      lineage: [lineage({
+        stateRegionDistribution: {
+          current: { Moscow: 5, Kazan: 2 },
+          baseline: { Moscow: 4 },
+          newRegions: ['Kazan'],
+        },
+      })],
+      stateChanges: [stateChange(), regionalChange],
+    })
+
+    const built = await buildCommercialSignalQualityV2Input('41', {
+      workspaceId: '21', clientProfileId: '22', organizationId: '11',
+    }, db)
+
+    expect(built.archetypes).toContain('regional_expansion')
+    expect(built.input.hiringFriction.observationStates.regional_difficulty)
+      .toBe('unknown')
+    expect(built.input.marketDifficulty.marketDifficulty).toBe('unknown')
+  })
+
+  it('requires acceleration context before recruiter vacancy implies pressure', async () => {
+    const recruiterEvent = event({
+      eventType: 'recruiter_vacancy',
+      payload: { title: 'Recruiter' },
+    })
+    const accelerated = dbWith({
+      events: [recruiterEvent],
+      stateChanges: [stateChange()],
+    })
+    const noBaseline = dbWith({
+      events: [recruiterEvent],
+      lineage: [lineage({
+        stateClassification: 'insufficient_history',
+        stateHiringBaseline: {
+          ...lineage().stateHiringBaseline,
+          sufficientHistory: false,
+          fallbackReason: 'insufficient_history',
+        },
+        stateCurrentHiringVelocity: {
+          ...lineage().stateCurrentHiringVelocity,
+          baselineDeviation14d: null,
+          direction: 'unknown',
+        },
+      })],
+    })
+
+    const withPressure = await buildCommercialSignalQualityV2Input('41', {
+      workspaceId: '21', clientProfileId: '22', organizationId: '11',
+    }, accelerated.db)
+    const contextOnly = await buildCommercialSignalQualityV2Input('41', {
+      workspaceId: '21', clientProfileId: '22', organizationId: '11',
+    }, noBaseline.db)
+
+    expect(withPressure.archetypes).toContain('recruiting_capacity_gap')
+    expect(contextOnly.archetypes).not.toContain('recruiting_capacity_gap')
+    expect(contextOnly.input.hiringFriction.observationStates
+      .internal_recruiting_capacity).toBe('unknown')
+  })
+
+  it('fails closed when exact Company State contains future data', async () => {
+    const { db, calls } = dbWith({
+      lineage: [lineage({ stateHasFutureEvidence: true })],
+    })
+
+    await expect(buildCommercialSignalQualityV2Input('41', {
+      workspaceId: '21', clientProfileId: '22', organizationId: '11',
+    }, db)).rejects.toMatchObject({ code: 'QUALITY_LINEAGE_STATE_FUTURE' })
+    expect(calls).toHaveLength(1)
   })
 
   it('preserves the real producer repost contract as observed friction', async () => {
