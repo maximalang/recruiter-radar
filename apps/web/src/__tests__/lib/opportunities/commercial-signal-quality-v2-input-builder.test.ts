@@ -8,10 +8,7 @@ import {
 
 function result(rows: Record<string, unknown>[]): QueryResult<Record<string, unknown>> {
   return {
-    command: 'SELECT',
     rowCount: rows.length,
-    oid: 0,
-    fields: [],
     rows,
   }
 }

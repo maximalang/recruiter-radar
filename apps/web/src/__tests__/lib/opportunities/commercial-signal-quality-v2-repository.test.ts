@@ -48,6 +48,7 @@ function engineInput(): CommercialSignalQualityEngineV2Input {
       evidenceIds: ['101'],
       affirmativeEvidenceIds: ['101'],
       componentValues: {},
+      contributionProvenance: [],
     },
     convergence: {
       featureVersion: 'signal-convergence-v1',

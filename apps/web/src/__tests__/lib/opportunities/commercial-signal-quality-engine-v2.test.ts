@@ -38,6 +38,7 @@ function input(
       negativeReasons: [],
       evidenceIds: ['102'],
       componentValues: {},
+      observationStates: { repost_cycles: 'observed' },
     },
     agencyFit: {
       value: 0.88,
@@ -57,6 +58,7 @@ function input(
       evidenceIds: ['104'],
       affirmativeEvidenceIds: ['104'],
       componentValues: {},
+      contributionProvenance: [],
     },
     convergence: {
       featureVersion: 'signal-convergence-v1',
