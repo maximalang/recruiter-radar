@@ -299,7 +299,7 @@
 .documentLinks a {
   display: inline-flex;
   align-items: center;
-  min-height: 32px;
+  min-height: 44px;
   padding: 6px 10px;
   border: 1px solid rgba(24, 35, 31, 0.08);
   border-radius: 999px;
@@ -403,7 +403,7 @@
 
   .documentLinks a {
     justify-content: center;
-    min-height: 36px;
+    min-height: 44px;
     padding: 5px 8px;
     text-align: center;
   }

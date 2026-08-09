@@ -22,7 +22,7 @@
 /* ── Skip link (a11y) ── */
 .skipLink {
   position: absolute;
-  left: -9999px;
+  left: 0;
   top: 0;
   z-index: 100;
   padding: 8px 16px;
@@ -32,10 +32,11 @@
   font-weight: 600;
   text-decoration: none;
   border-radius: 0 0 6px 0;
+  transform: translateY(-100%);
 }
 
 .skipLink:focus {
-  left: 0;
+  transform: translateY(0);
   outline: 2px solid #ffffff;
   outline-offset: 2px;
 }
@@ -204,6 +205,7 @@
 
 /* ── Back / nav link ── */
 .internalPageBackLink {
+  min-height: 44px;
   font-size: 0.875rem;
   color: var(--c-text-muted);
   text-decoration: none;

@@ -14,7 +14,6 @@ import {
   readCheckoutPlanCode,
   readPublicPreviewInput,
 } from "@/lib/publicProduct";
-import { buildAccountNavigation } from "../ui/account-navigation";
 import {
   InternalPageFrame,
   InternalPageHeader,
@@ -97,7 +96,7 @@ export default async function CheckoutPage(props: {
   }
 
   return (
-    <InternalPageFrame navItems={buildAccountNavigation("dashboard")}>
+    <InternalPageFrame>
       <LandingCheckoutAnalytics submitEvent={LANDING_ANALYTICS_EVENT.paymentStarted} />
       <InternalPageHeader
         title="Оплата доступа"

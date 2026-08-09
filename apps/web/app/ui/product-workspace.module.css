@@ -362,8 +362,13 @@
 
 @media (max-width: 800px) {
   .workspace {
+    --mobile-nav-height: 60px;
     display: flex;
     flex-direction: column;
+  }
+
+  .workspaceBody {
+    padding-bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom));
   }
 
   .sidebar {
@@ -404,9 +409,11 @@
   }
 
   .mobileNav {
-    position: sticky;
+    position: fixed;
     z-index: 7;
+    right: 0;
     bottom: 0;
+    left: 0;
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     padding: 6px max(8px, env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
