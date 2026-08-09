@@ -43,5 +43,6 @@ describe('cross-route interaction hardening', () => {
     expect(responsiveAudit).toContain('formButtonsWithoutType');
     expect(responsiveAudit).toContain('duplicateIds');
     expect(responsiveAudit).toContain('keyboardFocus');
+    expect(responsiveAudit).toContain("waitForLoadState('networkidle'");
   });
 });

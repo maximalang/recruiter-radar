@@ -78,7 +78,7 @@ try {
         waitUntil: 'domcontentloaded',
         timeout: 30_000,
       });
-      await page.waitForTimeout(250);
+      await page.waitForLoadState('networkidle', { timeout: 30_000 });
 
       const status = response?.status() ?? 0;
       const result = await page.evaluate(() => {
