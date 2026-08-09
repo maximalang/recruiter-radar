@@ -14,6 +14,7 @@ import {
   adminUpdateClientProfile,
 } from "../../admin-actions";
 import { COMPANY_SIZE_OPTIONS, INDUSTRY_OPTIONS, ROLE_OPTIONS } from "@/lib/clientProfileOptions";
+import styles from "./admin-user-actions.module.css";
 
 type State = { ok: boolean; message: string };
 const initial: State = { ok: false, message: "" };
@@ -32,8 +33,10 @@ export default function AdminUserActions({ userId, workspaceId, profileActive, t
 }) {
   const [grant, grantAction, grantPending] = useActionState(adminGrantAccess, initial);
   return (
-    <div style={{ display: "grid", gap: 12 }}>
-      <form action={grantAction} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "end" }}>
+    <div className={styles.root}>
+      <section className={styles.group}>
+        <h3 className={styles.groupTitle}>{"\u0414\u043e\u0441\u0442\u0443\u043f"}</h3>
+      <form action={grantAction} className={styles.grantForm}>
         <input type="hidden" name="userId" value={userId} />
         {workspaceId ? <input type="hidden" name="workspaceId" value={workspaceId} /> : null}
         <input type="hidden" name="mode" value={adminGrantActive ? "extend" : "grant"} />
@@ -48,12 +51,19 @@ export default function AdminUserActions({ userId, workspaceId, profileActive, t
         </label>
         <button disabled={grantPending} style={buttonStyle("#1d4ed8")}>{grantPending ? "Сохраняем…" : adminGrantActive ? "Продлить доступ" : "Выдать доступ"}</button>
       </form>
+      </section>
+      <section className={`${styles.group} ${styles.dangerZone}`}>
+        <h3 className={styles.groupTitle}>{"\u041e\u043f\u0430\u0441\u043d\u044b\u0435 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044f"}</h3>
       <ActionForm userId={userId} workspaceId={workspaceId} action={adminPausePilot} label="Отозвать admin-доступ" danger />
       <ActionForm userId={userId} workspaceId={workspaceId} action={profileActive ? adminPauseProfile : adminResumeProfile} label={profileActive ? "Приостановить профиль" : "Включить профиль"} danger={profileActive} />
       {telegramConfigured ? <ActionForm userId={userId} workspaceId={workspaceId} action={adminClearTelegram} label="Отвязать Telegram" danger /> : null}
       <ActionForm userId={userId} action={adminRevokeSessions} label="Отозвать все сессии" danger />
+      </section>
+      <section className={styles.group}>
+        <h3 className={styles.groupTitle}>{"\u041f\u043e\u0434\u0434\u0435\u0440\u0436\u043a\u0430"}</h3>
       <ActionForm userId={userId} action={adminResendLogin} label="Отправить ссылку для входа" />
       <ActionForm userId={userId} action={adminResendOnboarding} label="Отправить ссылку на onboarding" />
+      </section>
       {profile ? <ProfileEditForm userId={userId} workspaceId={workspaceId} profile={profile} /> : null}
       {grant.message ? <Result state={grant} /> : null}
     </div>
@@ -107,5 +117,5 @@ function ActionForm({ userId, workspaceId, action, label, danger = false }: { us
 
 function Result({ state }: { state: State }) { return <span role="status" style={{ color: state.ok ? "#065f46" : "#b42318", fontSize: "0.8rem" }}>{state.message}</span>; }
 const labelStyle = { display: "grid", gap: 4, fontSize: "0.78rem", color: "#475569" };
-const controlStyle = { minHeight: 40, border: "1px solid #cbd5e1", borderRadius: 8, padding: "6px 8px", background: "#fff" };
-const buttonStyle = (background: string) => ({ minHeight: 40, border: 0, borderRadius: 8, padding: "8px 12px", background, color: "#fff", fontWeight: 700, cursor: "pointer" });
+const controlStyle = { minHeight: 44, border: "1px solid #cbd5e1", borderRadius: 8, padding: "6px 8px", background: "#fff" };
+const buttonStyle = (background: string) => ({ minHeight: 44, border: 0, borderRadius: 8, padding: "8px 12px", background, color: "#fff", fontWeight: 700, cursor: "pointer" });
