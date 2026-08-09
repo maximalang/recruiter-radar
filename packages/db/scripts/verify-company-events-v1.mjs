@@ -57,6 +57,8 @@ const queryPlannerV2DownSql = await readFile(
   'utf8',
 )
 const commercialSignalDependentDownSql = await Promise.all([
+  '20260809110000_add_query_plan_quality_feedback_v2.down.sql',
+  '20260809100000_add_commercial_signal_quality_v2.down.sql',
   '20260807180500_complete_query_plan_supply_metrics.down.sql',
   '20260807175500_extend_commercial_signal_annotation_taxonomy.down.sql',
   '20260807174500_extend_query_plan_yield_metrics.down.sql',

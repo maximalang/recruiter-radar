@@ -10,6 +10,14 @@ const rollback = fs.readFileSync(path.join(
   root,
   'packages/db/migrations/20260809100000_add_commercial_signal_quality_v2.down.sql',
 ), 'utf8')
+const companyEventsVerifier = fs.readFileSync(path.join(
+  root,
+  'packages/db/scripts/verify-company-events-v1.mjs',
+), 'utf8')
+const opportunityEngineDownVerifier = fs.readFileSync(path.join(
+  root,
+  'packages/db/scripts/verify-opportunity-engine-down.mjs',
+), 'utf8')
 
 describe('Commercial Signal Quality Engine v2 migration', () => {
   it('adds an append-only shadow layer without rewriting v3 candidates', () => {
@@ -103,5 +111,23 @@ describe('Commercial Signal Quality Engine v2 migration', () => {
     expect(rollback).toContain('commercial signal quality v2 rollback refused')
     expect(rollback.indexOf('DROP TABLE commercial_signal_quality_evidence'))
       .toBeLessThan(rollback.indexOf('DROP TABLE commercial_signal_quality_snapshots'))
+  })
+
+  it('registers Quality v2 before every ancestor rollback', () => {
+    const qualityFeedbackDown =
+      '20260809110000_add_query_plan_quality_feedback_v2.down.sql'
+    const qualityDown =
+      '20260809100000_add_commercial_signal_quality_v2.down.sql'
+    const commercialSignalDown =
+      '20260807170000_add_commercial_signal_canary_runtime.down.sql'
+
+    for (const verifier of [companyEventsVerifier, opportunityEngineDownVerifier]) {
+      expect(verifier).toContain(qualityFeedbackDown)
+      expect(verifier).toContain(qualityDown)
+      expect(verifier.indexOf(qualityFeedbackDown))
+        .toBeLessThan(verifier.indexOf(qualityDown))
+      expect(verifier.indexOf(qualityDown))
+        .toBeLessThan(verifier.indexOf(commercialSignalDown))
+    }
   })
 })
