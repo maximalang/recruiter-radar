@@ -9,12 +9,20 @@ export const HIRING_FRICTION_LEVELS = [
 
 export type HiringFrictionLevel = typeof HIRING_FRICTION_LEVELS[number]
 
+export type ObservationState =
+  | 'observed'
+  | 'unknown'
+  | 'not_applicable'
+  | 'not_configured'
+
 export type EvidencedMetric = {
+  state: ObservationState
   value: number | null
   evidenceIds: string[]
 }
 
 export type EvidencedFlag = {
+  state: ObservationState
   value: boolean | null
   evidenceIds: string[]
 }
@@ -27,9 +35,15 @@ export type HiringFrictionRepostCycle = {
   evidenceIds: string[]
 }
 
+export type EvidencedRepostCycles = {
+  state: ObservationState
+  value: HiringFrictionRepostCycle[] | null
+  evidenceIds: string[]
+}
+
 export type HiringFrictionInput = {
   vacancyAgeDays: EvidencedMetric
-  repostCycles: HiringFrictionRepostCycle[]
+  repostCycles: EvidencedRepostCycles
   salaryChange: EvidencedMetric
   requirementsChange: EvidencedMetric
   closeReopenCycles: EvidencedMetric
@@ -58,6 +72,7 @@ export type HiringFrictionResult = {
   negativeReasons: HiringFrictionReason[]
   evidenceIds: string[]
   componentValues: Record<string, number | null>
+  observationStates: Record<string, ObservationState>
 }
 
 const WEIGHTS = {
@@ -84,15 +99,18 @@ export function buildHiringFriction(
   rawInput: HiringFrictionInput,
 ): HiringFrictionResult {
   const input = normalizeInput(rawInput)
-  const meaningfulCycles = input.repostCycles.filter(isMeaningfulRepost)
-  const standardCycles = input.repostCycles.filter((cycle) =>
+  const repostCycles = input.repostCycles.value ?? []
+  const meaningfulCycles = repostCycles.filter(isMeaningfulRepost)
+  const standardCycles = repostCycles.filter((cycle) =>
     !isMeaningfulRepost(cycle),
   )
   const componentValues: Record<string, number | null> = {
     vacancy_age: input.vacancyAgeDays.value === null
       ? null
       : clamp01((input.vacancyAgeDays.value - 30) / 90),
-    repost_cycles: clamp01(meaningfulCycles.length / 2),
+    repost_cycles: input.repostCycles.state === 'observed'
+      ? clamp01(meaningfulCycles.length / 2)
+      : null,
     salary_change: input.salaryChange.value,
     requirements_change: input.requirementsChange.value,
     close_reopen_cycle: input.closeReopenCycles.value,
@@ -234,19 +252,14 @@ export function buildHiringFriction(
     negativeReasons: sortReasons(negativeReasons),
     evidenceIds: uniqueIds(allEvidenceIds(input)),
     componentValues,
+    observationStates: observationStates(input),
   }
 }
 
 function normalizeInput(input: HiringFrictionInput): HiringFrictionInput {
   return {
     vacancyAgeDays: metric(input.vacancyAgeDays, 'vacancy age', false),
-    repostCycles: input.repostCycles.map((cycle) => ({
-      intervalDays: nonNegative(cycle.intervalDays, 'repost interval'),
-      automated: cycle.automated,
-      salaryChanged: cycle.salaryChanged,
-      requirementsChanged: cycle.requirementsChanged,
-      evidenceIds: requiredIds(cycle.evidenceIds, 'repost evidence'),
-    })),
+    repostCycles: repostObservation(input.repostCycles),
     salaryChange: metric(input.salaryChange, 'salary change'),
     requirementsChange: metric(input.requirementsChange, 'requirements change'),
     closeReopenCycles: metric(input.closeReopenCycles, 'close reopen cycles'),
@@ -269,7 +282,9 @@ function normalizeInput(input: HiringFrictionInput): HiringFrictionInput {
 }
 
 function calculateCoverage(input: HiringFrictionInput): number {
-  let covered = WEIGHTS.repostCycles
+  let covered = input.repostCycles.state === 'observed'
+    ? WEIGHTS.repostCycles
+    : 0
   const metrics: Array<[EvidencedMetric, number]> = [
     [input.vacancyAgeDays, WEIGHTS.vacancyAge],
     [input.salaryChange, WEIGHTS.salaryChange],
@@ -284,17 +299,18 @@ function calculateCoverage(input: HiringFrictionInput): number {
     [input.timeToFillHistory, WEIGHTS.timeToFillHistory],
   ]
   for (const [item, weight] of metrics) {
-    if (item.value !== null) covered += weight
+    if (item.state === 'observed') covered += weight
   }
-  if (input.evergreenRole.value !== null) covered += WEIGHTS.evergreenRole
-  if (input.massHiring.value !== null) covered += WEIGHTS.massHiring
+  if (input.evergreenRole.state === 'observed') covered += WEIGHTS.evergreenRole
+  if (input.massHiring.state === 'observed') covered += WEIGHTS.massHiring
   return round(covered / TOTAL_WEIGHT)
 }
 
 function allEvidenceIds(input: HiringFrictionInput): string[] {
   return [
     ...input.vacancyAgeDays.evidenceIds,
-    ...input.repostCycles.flatMap((cycle) => cycle.evidenceIds),
+    ...input.repostCycles.evidenceIds,
+    ...(input.repostCycles.value ?? []).flatMap((cycle) => cycle.evidenceIds),
     ...input.salaryChange.evidenceIds,
     ...input.requirementsChange.evidenceIds,
     ...input.closeReopenCycles.evidenceIds,
@@ -310,6 +326,27 @@ function allEvidenceIds(input: HiringFrictionInput): string[] {
   ]
 }
 
+function observationStates(
+  input: HiringFrictionInput,
+): Record<string, ObservationState> {
+  return {
+    vacancy_age: input.vacancyAgeDays.state,
+    repost_cycles: input.repostCycles.state,
+    salary_change: input.salaryChange.state,
+    requirements_change: input.requirementsChange.state,
+    close_reopen_cycle: input.closeReopenCycles.state,
+    role_scarcity: input.roleScarcity.state,
+    seniority_complexity: input.seniorityComplexity.state,
+    multi_role_complexity: input.multiRoleComplexity.state,
+    regional_difficulty: input.regionalDifficulty.state,
+    internal_recruiting_capacity: input.internalRecruitingCapacity.state,
+    hiring_velocity_vs_capacity: input.hiringVelocityVsCapacity.state,
+    time_to_fill_history: input.timeToFillHistory.state,
+    evergreen_role: input.evergreenRole.state,
+    mass_hiring: input.massHiring.state,
+  }
+}
+
 function isMeaningfulRepost(cycle: HiringFrictionRepostCycle): boolean {
   const standardLifecycle = cycle.intervalDays >= 25 && cycle.intervalDays <= 35
   return cycle.salaryChanged || cycle.requirementsChanged ||
@@ -321,18 +358,63 @@ function metric(
   label: string,
   unit = true,
 ): EvidencedMetric {
-  if (input.value === null) return { value: null, evidenceIds: [] }
+  assertObservation(input, label)
+  if (input.state !== 'observed') {
+    return { state: input.state, value: null, evidenceIds: [] }
+  }
   const value = unit
-    ? unitInterval(input.value, label)
-    : nonNegative(input.value, label)
-  return { value, evidenceIds: requiredIds(input.evidenceIds, `${label} evidence`) }
+    ? unitInterval(input.value as number, label)
+    : nonNegative(input.value as number, label)
+  return {
+    state: 'observed',
+    value,
+    evidenceIds: requiredIds(input.evidenceIds, `${label} evidence`),
+  }
 }
 
 function flag(input: EvidencedFlag, label: string): EvidencedFlag {
-  if (input.value === null) return { value: null, evidenceIds: [] }
+  assertObservation(input, label)
+  if (input.state !== 'observed') {
+    return { state: input.state, value: null, evidenceIds: [] }
+  }
   return {
-    value: input.value,
+    state: 'observed',
+    value: input.value as boolean,
     evidenceIds: requiredIds(input.evidenceIds, `${label} evidence`),
+  }
+}
+
+function repostObservation(input: EvidencedRepostCycles): EvidencedRepostCycles {
+  assertObservation(input, 'repost cycles')
+  if (input.state !== 'observed') {
+    return { state: input.state, value: null, evidenceIds: [] }
+  }
+  return {
+    state: 'observed',
+    evidenceIds: requiredIds(input.evidenceIds, 'repost observation evidence'),
+    value: (input.value as HiringFrictionRepostCycle[]).map((cycle) => ({
+      intervalDays: nonNegative(cycle.intervalDays, 'repost interval'),
+      automated: cycle.automated,
+      salaryChanged: cycle.salaryChanged,
+      requirementsChanged: cycle.requirementsChanged,
+      evidenceIds: requiredIds(cycle.evidenceIds, 'repost evidence'),
+    })),
+  }
+}
+
+function assertObservation(
+  input: { state: ObservationState; value: unknown; evidenceIds: string[] },
+  label: string,
+): void {
+  const observed = input.state === 'observed'
+  if (observed && input.value === null) {
+    throw new Error(`${label} observed value is required`)
+  }
+  if (!observed && input.value !== null) {
+    throw new Error(`${label} unavailable value must be null`)
+  }
+  if (!observed && input.evidenceIds.length > 0) {
+    throw new Error(`${label} unavailable evidence must be empty`)
   }
 }
 
