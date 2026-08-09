@@ -239,7 +239,10 @@ function normalizeRow(input) {
   const decisionAt = isoTimestamp(input.decisionAt, 'decision at')
   const evidenceObservedAt = stringArray(input.evidenceObservedAt)
     .map((value) => isoTimestamp(value, 'evidence observed at'))
-  const historicalEvidence = evidenceObservedAt.filter((value) => value <= decisionAt)
+  const futureEvidence = evidenceObservedAt.filter((value) => value > decisionAt)
+  if (futureEvidence.length > 0) {
+    throw new TypeError('future evidence cannot enter an evaluated score row')
+  }
   return {
     sampleKey: hash(input.sampleKey, 'sample key'),
     agencyProfileKey: hash(input.agencyProfileKey, 'agency profile key'),
@@ -271,8 +274,8 @@ function normalizeRow(input) {
         FALSE_NEGATIVE_CATEGORIES,
         'false negative category',
       ),
-    evidenceObservedAt: historicalEvidence,
-    excludedFutureEvidenceCount: evidenceObservedAt.length - historicalEvidence.length,
+    evidenceObservedAt,
+    excludedFutureEvidenceCount: 0,
   }
 }
 

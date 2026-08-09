@@ -43,7 +43,7 @@ describe('Commercial Signal Quality Engine v2 contracts', () => {
         canonicalUrl: 'https://jobs.example/vacancy/42',
         publicationFingerprint: 'publication-aggregator-42',
       }),
-    ])
+    ], new Date('2026-08-09T00:00:00.000Z'))
 
     expect(result.independentGroupCount).toBe(1)
     expect(result.groups).toHaveLength(1)
@@ -67,7 +67,7 @@ describe('Commercial Signal Quality Engine v2 contracts', () => {
         publicationFingerprint: 'publication-news-7',
         contentFingerprint: 'b'.repeat(64),
       }),
-    ])
+    ], new Date('2026-08-09T00:00:00.000Z'))
 
     expect(result.independentGroupCount).toBe(2)
     expect(result.coverage).toBe(1)
@@ -122,6 +122,79 @@ describe('Commercial Signal Quality Engine v2 contracts', () => {
     expect(result.qualityConfidence).toBeLessThan(0.4)
     expect(result.actionable).toBe(false)
     expect(result.reasonCodes).toContain('QUALITY_CRITICAL_COVERAGE_LOW')
+  })
+
+  it('does not let unknown critical values satisfy coverage', () => {
+    const result = buildOpportunityQuality({
+      components: [{
+        key: 'hiring_need',
+        critical: true,
+        weight: 1,
+        component: {
+          value: null,
+          confidence: 0,
+          coverage: 1,
+          reasonCodes: ['HIRING_NEED_UNKNOWN'],
+          evidenceIds: ['101'],
+        },
+      }, {
+        key: 'agency_fit',
+        critical: true,
+        weight: 1,
+        component: {
+          value: 0.95,
+          confidence: 0.95,
+          coverage: 1,
+          reasonCodes: ['AGENCY_FIT_EVIDENCED'],
+          evidenceIds: ['102'],
+        },
+      }],
+      minimumCriticalCoverage: 1,
+      minimumQualityCoverage: 0.5,
+    })
+
+    expect(result.criticalCoverage).toBe(0.5)
+    expect(result.actionable).toBe(false)
+    expect(result.qualityScore).toBe(0)
+  })
+
+  it('does not count unknown-origin groups as independent evidence', () => {
+    const result = buildEvidenceIndependence([
+      evidence({
+        upstreamOrigin: null,
+        canonicalUrl: null,
+        vacancyFingerprint: null,
+        publicationFingerprint: null,
+        contentFingerprint: null,
+      }),
+      evidence({
+        evidenceId: '102',
+        sourceFamily: 'job-boards',
+        sourceDomain: 'hh.ru',
+        upstreamOrigin: null,
+        canonicalUrl: null,
+        vacancyFingerprint: null,
+        publicationFingerprint: null,
+        contentFingerprint: null,
+      }),
+    ], new Date('2026-08-09T00:00:00.000Z'))
+
+    expect(result.groups).toHaveLength(2)
+    expect(result.independentGroupCount).toBe(0)
+    expect(result.reasonCodes).not.toContain('EVIDENCE_INDEPENDENT')
+  })
+
+  it('excludes evidence observed after the decision clock', () => {
+    const result = buildEvidenceIndependence([
+      evidence(),
+      evidence({
+        evidenceId: '102',
+        observedAt: '2026-08-10T00:00:00.000Z',
+      }),
+    ], new Date('2026-08-09T00:00:00.000Z'))
+
+    expect(result.groups.flatMap((group) => group.evidenceIds)).toEqual(['101'])
+    expect(result.excludedFutureEvidenceIds).toEqual(['102'])
   })
 
   it('does not let a missing non-critical component destroy strong covered quality', () => {

@@ -33,7 +33,6 @@ const row = (index, overrides = {}) => ({
   falseNegativeCategory: index === 20 ? 'coverage_gap' : null,
   evidenceObservedAt: [
     '2026-05-01T00:00:00.000Z',
-    ...(index === 1 ? ['2026-08-01T00:00:00.000Z'] : []),
   ],
   ...overrides,
 })
@@ -55,7 +54,10 @@ assert.deepEqual(report.missedOpportunityAudit.requiredTypes,
   MISSED_OPPORTUNITY_SAMPLE_TYPES)
 assert.equal(report.missedOpportunityAudit.manualReviewRequired, true)
 assert.equal(report.falseNegativeTaxonomy.length, FALSE_NEGATIVE_CATEGORIES.length)
-assert.equal(report.excludedFutureEvidenceCount, 1)
+assert.equal(report.excludedFutureEvidenceCount, 0)
+assert.throws(() => evaluateCommercialSignalV2([
+  row(1, { evidenceObservedAt: ['2026-08-01T00:00:00.000Z'] }),
+]), /future evidence/)
 
 const reversed = evaluateCommercialSignalV2([...rows].reverse())
 assert.deepEqual(reversed.models, report.models)

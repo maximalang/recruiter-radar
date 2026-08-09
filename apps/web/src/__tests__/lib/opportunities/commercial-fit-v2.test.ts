@@ -126,6 +126,7 @@ describe('Commercial Fit v2', () => {
 
   it('returns unknown market difficulty when approved data is absent', () => {
     expect(buildMarketDifficulty({
+      decisionDate: '2026-08-09',
       roleFamily: 'backend',
       seniority: 'senior',
       region: 'moscow',
@@ -139,6 +140,7 @@ describe('Commercial Fit v2', () => {
 
   it('rejects LLM and non-reproducible market difficulty sources', () => {
     expect(() => buildMarketDifficulty({
+      decisionDate: '2026-08-09',
       roleFamily: 'backend',
       seniority: 'senior',
       region: 'moscow',
@@ -152,6 +154,7 @@ describe('Commercial Fit v2', () => {
       },
     })).toThrow(/LLM/i)
     expect(() => buildMarketDifficulty({
+      decisionDate: '2026-08-09',
       roleFamily: 'backend',
       seniority: 'senior',
       region: 'moscow',
@@ -164,5 +167,22 @@ describe('Commercial Fit v2', () => {
         evidenceIds: ['101'],
       },
     })).toThrow(/reproducible/i)
+  })
+
+  it('rejects market evidence from after the decision date', () => {
+    expect(() => buildMarketDifficulty({
+      decisionDate: '2026-08-09',
+      roleFamily: 'backend',
+      seniority: 'senior',
+      region: 'moscow',
+      observation: {
+        level: 'high',
+        evidenceDate: '2026-08-10',
+        source: 'official-labor-data',
+        approved: true,
+        reproducible: true,
+        evidenceIds: ['101'],
+      },
+    })).toThrow(/future market evidence/i)
   })
 })

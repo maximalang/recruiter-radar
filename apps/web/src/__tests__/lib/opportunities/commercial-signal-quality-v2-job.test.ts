@@ -37,7 +37,12 @@ function engineInput(): CommercialSignalQualityEngineV2Input {
     observedAt: '2026-08-08T09:00:00.000Z',
   }]
   return {
+    decisionAt: '2026-08-08T10:00:00.000Z',
     decisionSource: 'deterministic',
+    componentSources: {
+      hiringNeed: 'direct',
+      agencyFit: 'derived_deterministic',
+    },
     currentHiringEvidence: true,
     hiringNeed: component(0.9),
     hiringFriction: {
@@ -111,6 +116,7 @@ function engineInput(): CommercialSignalQualityEngineV2Input {
       unknownReasons: [],
       evidenceIds: [],
       expiredEvidenceIds: [],
+      excludedFutureEvidenceIds: [],
     },
     contact: {
       corporateContactPathAvailable: true,

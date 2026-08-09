@@ -274,6 +274,7 @@ function normalizeInput(
   if (input.result.reasonCodes.length === 0) {
     throw new Error('quality reason codes are required')
   }
+  assertConsistentResult(input.result)
   const candidateId = positiveId(input.candidateId, 'candidate id')
   const organizationId = positiveId(input.organizationId, 'organization id')
   const workspaceId = positiveId(input.workspaceId, 'workspace id')
@@ -282,6 +283,15 @@ function normalizeInput(
   const provenance = new Map(input.evidence.map((item) => [item.evidenceId, item]))
   if (provenance.size !== input.evidence.length) {
     throw new Error('quality evidence lineage contains duplicates')
+  }
+  const providedIds = [...provenance.keys()].sort(compareIds)
+  const resultIds = [...new Set(input.result.evidenceIds)].sort(compareIds)
+  if (resultIds.length !== input.result.evidenceIds.length ||
+      !sameIds(providedIds, resultIds)) {
+    throw new Error('quality evidence lineage must exactly match the result')
+  }
+  if (input.result.independence.excludedFutureEvidenceIds.length > 0) {
+    throw new Error('future evidence cannot be persisted as decision lineage')
   }
   const groupByEvidence = new Map<string, {
     group: string
@@ -297,6 +307,9 @@ function normalizeInput(
         reason,
       })
     }
+  }
+  if (!sameIds([...groupByEvidence.keys()].sort(compareIds), resultIds)) {
+    throw new Error('quality evidence groups must exactly match the result')
   }
   const evidenceRows = input.result.evidenceIds.map((evidenceId) => {
     const item = provenance.get(evidenceId)
@@ -368,4 +381,31 @@ function timestamp(value: string, label: string): string {
   const parsed = new Date(value)
   if (!Number.isFinite(parsed.getTime())) throw new Error(`${label} is invalid`)
   return parsed.toISOString()
+}
+
+function assertConsistentResult(result: CommercialSignalQualityEngineV2Result): void {
+  const expectedActionability = result.status === 'qualified_actionable'
+    ? 'actionable'
+    : result.status === 'qualified_needs_enrichment'
+      ? 'needs_enrichment'
+      : result.status === 'review'
+        ? 'review'
+        : 'blocked'
+  const qualified = result.status === 'qualified_actionable' ||
+    result.status === 'qualified_needs_enrichment'
+  if (
+    result.actionability !== expectedActionability ||
+    result.quality.actionable !== qualified ||
+    (qualified && result.quality.qualityScore < 0.68)
+  ) {
+    throw new Error('quality result status and actionability are inconsistent')
+  }
+}
+
+function compareIds(left: string, right: string): number {
+  return left.length - right.length || left.localeCompare(right, 'en')
+}
+
+function sameIds(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index])
 }

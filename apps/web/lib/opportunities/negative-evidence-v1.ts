@@ -59,6 +59,7 @@ export type NegativeEvidenceResult = {
   unknownReasons: NegativeEvidenceReason[]
   evidenceIds: string[]
   expiredEvidenceIds: string[]
+  excludedFutureEvidenceIds: string[]
 }
 
 export type NegativeEvidenceApplication = {
@@ -88,9 +89,14 @@ export function evaluateNegativeEvidence(
   const evaluatedAt = validDate(now)
   const input = rawInput.map(normalizeInput)
   const active = input.filter((item) =>
+    new Date(item.observedAt).getTime() <= evaluatedAt.getTime() &&
     new Date(item.validUntil).getTime() >= evaluatedAt.getTime(),
   )
+  const future = input.filter((item) =>
+    new Date(item.observedAt).getTime() > evaluatedAt.getTime(),
+  )
   const expired = input.filter((item) =>
+    new Date(item.observedAt).getTime() <= evaluatedAt.getTime() &&
     new Date(item.validUntil).getTime() < evaluatedAt.getTime(),
   )
   const confirmedReasons: NegativeEvidenceReason[] = []
@@ -130,6 +136,7 @@ export function evaluateNegativeEvidence(
     unknownReasons: sortReasons(unknownReasons),
     evidenceIds: ids(active.flatMap((item) => item.evidenceIds)),
     expiredEvidenceIds: ids(expired.flatMap((item) => item.evidenceIds)),
+    excludedFutureEvidenceIds: ids(future.flatMap((item) => item.evidenceIds)),
   }
 }
 

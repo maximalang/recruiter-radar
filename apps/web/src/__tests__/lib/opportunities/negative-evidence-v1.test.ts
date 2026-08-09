@@ -108,4 +108,18 @@ describe('Negative Evidence Engine v1', () => {
     expect(result.scoreMultiplier).toBe(1)
     expect(result.expiredEvidenceIds).toEqual(['101'])
   })
+
+  it('excludes negative evidence observed after the decision clock', () => {
+    const result = evaluateNegativeEvidence([
+      negative({
+        type: 'hiring_freeze',
+        severity: 1,
+        observedAt: '2026-08-10T09:00:00.000Z',
+      }),
+    ], new Date('2026-08-09T09:00:00.000Z'))
+
+    expect(result.action).toBe('none')
+    expect(result.scoreMultiplier).toBe(1)
+    expect(result.excludedFutureEvidenceIds).toEqual(['101'])
+  })
 })

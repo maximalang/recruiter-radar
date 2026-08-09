@@ -10,7 +10,12 @@ function input(
   overrides: Partial<CommercialSignalQualityEngineV2Input> = {},
 ): CommercialSignalQualityEngineV2Input {
   return {
+    decisionAt: '2026-08-08T10:00:00.000Z',
     decisionSource: 'deterministic',
+    componentSources: {
+      hiringNeed: 'direct',
+      agencyFit: 'derived_deterministic',
+    },
     currentHiringEvidence: true,
     hiringNeed: {
       value: 0.9,
@@ -96,6 +101,7 @@ function input(
       unknownReasons: [],
       evidenceIds: [],
       expiredEvidenceIds: [],
+      excludedFutureEvidenceIds: [],
     },
     contact: {
       corporateContactPathAvailable: true,
@@ -178,6 +184,36 @@ describe('Commercial Signal Quality Engine v2 integration', () => {
     expect(result.reasonCodes).toContain('CURRENT_HIRING_EVIDENCE_MISSING')
   })
 
+  it('keeps a high score in review without two known independent origins', () => {
+    const result = buildCommercialSignalQualityEngineV2(input({
+      evidence: ['101', '102', '103', '104', '105'].map((id) =>
+        evidence(id, GROUP_A)),
+    }))
+
+    expect(result.quality.qualityScore).toBeGreaterThan(0.68)
+    expect(result.quality.actionable).toBe(false)
+    expect(result.status).toBe('review')
+    expect(result.reasonCodes).toContain('QUALITY_INDEPENDENT_ORIGINS_LOW')
+  })
+
+  it('rejects unused or future evidence from exact decision lineage', () => {
+    expect(() => buildCommercialSignalQualityEngineV2(input({
+      evidence: [
+        evidence('101', GROUP_A), evidence('102', GROUP_B),
+        evidence('103', GROUP_A), evidence('104', GROUP_B),
+        evidence('105', GROUP_A), evidence('106', GROUP_B),
+      ],
+    }))).toThrow(/exact evidence lineage/i)
+
+    expect(() => buildCommercialSignalQualityEngineV2(input({
+      evidence: [
+        { ...evidence('101', GROUP_A), observedAt: '2026-08-09T09:00:00.000Z' },
+        evidence('102', GROUP_B), evidence('103', GROUP_A),
+        evidence('104', GROUP_B), evidence('105', GROUP_A),
+      ],
+    }))).toThrow(/future evidence/i)
+  })
+
   it('preserves exact evidence and independence lineage across every layer', () => {
     const result = buildCommercialSignalQualityEngineV2(input())
 
@@ -227,6 +263,7 @@ describe('Commercial Signal Quality Engine v2 integration', () => {
         unknownReasons: [],
         evidenceIds: ['106'],
         expiredEvidenceIds: [],
+        excludedFutureEvidenceIds: [],
       },
       evidence: [...input().evidence, evidence('106', 'c'.repeat(64))],
     }))

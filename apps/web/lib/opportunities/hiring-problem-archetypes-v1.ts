@@ -239,11 +239,15 @@ function normalizeInput(
   input: HiringProblemArchetypeInput,
 ): HiringProblemArchetypeInput {
   const frictionScore = unitInterval(input.friction.score, 'friction score')
+  const frictionEvidenceIds = ids(input.friction.evidenceIds)
+  if (input.friction.level !== 'unknown' && frictionEvidenceIds.length === 0) {
+    throw new Error('known friction requires evidence lineage')
+  }
   return {
     friction: {
       level: input.friction.level,
       score: frictionScore,
-      evidenceIds: ids(input.friction.evidenceIds),
+      evidenceIds: frictionEvidenceIds,
     },
     hiringAcceleration: unitSignal(input.hiringAcceleration, 'hiring acceleration'),
     growthVsBaseline: unitSignal(input.growthVsBaseline, 'growth vs baseline'),
@@ -337,10 +341,15 @@ function normalizeSignal<T>(
   normalize: (value: T) => T,
 ): HiringProblemSignal<T | null> {
   if (input.value === null) return { value: null, eventIds: [], evidenceIds: [] }
+  const eventIds = ids(input.eventIds, 'event id')
+  const evidenceIds = ids(input.evidenceIds)
+  if (eventIds.length === 0 || evidenceIds.length === 0) {
+    throw new Error('known hiring problem signal requires event and evidence lineage')
+  }
   return {
     value: normalize(input.value),
-    eventIds: ids(input.eventIds, 'event id'),
-    evidenceIds: ids(input.evidenceIds),
+    eventIds,
+    evidenceIds,
   }
 }
 

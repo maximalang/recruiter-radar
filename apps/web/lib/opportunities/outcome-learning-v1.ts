@@ -14,13 +14,17 @@ export const OUTCOME_LEARNING_TYPES = [
 export type OutcomeLearningType = typeof OUTCOME_LEARNING_TYPES[number]
 
 export type OutcomeLearningEvent = {
+  eventId: string
   type: OutcomeLearningType
   occurredAt: string
   reasonCode: string | null
+  effective: boolean
 }
 
 export type OutcomeLearningCandidate = {
   candidateId: string
+  opportunityId: string
+  lineageId: string
   workspaceId: string
   agencyProfileKey: string
   episodeType: string
@@ -53,6 +57,8 @@ export type OutcomeLearningResult = {
   sampleCount: number
   candidateIds: string[]
   excludedFutureOutcomeCount: number
+  excludedCorrectedOutcomeCount: number
+  excludedFutureCandidateCount: number
   funnel: Record<OutcomeLearningType, OutcomeLearningMetric> & {
     noReplyMatured: OutcomeLearningMetric
   }
@@ -97,16 +103,20 @@ export function buildOutcomeLearningV1(input: {
     'reply maturity days',
   )
   const all = input.candidates.map(normalizeCandidate)
-  const scoped = all.filter((item) => item.workspaceId === workspaceId)
+  const workspaceScoped = all.filter((item) => item.workspaceId === workspaceId)
+  const scoped = workspaceScoped.filter((item) => item.shownAtMs <= now.getTime())
     .sort((left, right) => compareIds(left.candidateId, right.candidateId))
   if (new Set(scoped.map((item) => item.candidateId)).size !== scoped.length) {
     throw new Error('duplicate candidate outcome lineage')
   }
   const futureCount = scoped.reduce((total, item) => total +
     item.outcomes.filter((event) => event.occurredAtMs > now.getTime()).length, 0)
+  const correctedCount = scoped.reduce((total, item) => total +
+    item.outcomes.filter((event) => !event.effective).length, 0)
   const historical = scoped.map((item) => ({
     ...item,
-    outcomes: item.outcomes.filter((event) => event.occurredAtMs <= now.getTime()),
+    outcomes: item.outcomes.filter((event) =>
+      event.effective && event.occurredAtMs <= now.getTime()),
   }))
   const funnel = Object.fromEntries(OUTCOME_LEARNING_TYPES.map((type) => [
     type,
@@ -163,6 +173,8 @@ export function buildOutcomeLearningV1(input: {
     sampleCount: historical.length,
     candidateIds: historical.map((item) => item.candidateId),
     excludedFutureOutcomeCount: futureCount,
+    excludedCorrectedOutcomeCount: correctedCount,
+    excludedFutureCandidateCount: workspaceScoped.length - scoped.length,
     funnel: { ...funnel, noReplyMatured },
     lostReasons,
     slices,
@@ -185,19 +197,29 @@ function normalizeCandidate(input: OutcomeLearningCandidate): NormalizedCandidat
       throw new Error('lost outcome reason code is required')
     }
     return {
+      eventId: positiveId(event.eventId, 'outcome event id'),
       type: event.type,
       occurredAt: timestamp(event.occurredAt, 'outcome occurred at'),
       occurredAtMs: Date.parse(event.occurredAt),
       reasonCode: event.reasonCode === null
         ? null
         : identifier(event.reasonCode, 'outcome reason code'),
+      effective: event.effective === true,
     }
   }).sort((left, right) =>
     left.occurredAtMs - right.occurredAtMs ||
     left.type.localeCompare(right.type, 'en'),
   )
+  if (new Set(outcomes.map((event) => event.eventId)).size !== outcomes.length) {
+    throw new Error('duplicate outcome event lineage')
+  }
+  if (outcomes.some((event) => event.occurredAtMs < Date.parse(shownAt))) {
+    throw new Error('outcome cannot precede shown lineage')
+  }
   return {
     candidateId: positiveId(input.candidateId, 'candidate id'),
+    opportunityId: positiveId(input.opportunityId, 'opportunity id'),
+    lineageId: positiveId(input.lineageId, 'lineage id'),
     workspaceId: positiveId(input.workspaceId, 'workspace id'),
     agencyProfileKey: identifier(input.agencyProfileKey, 'agency profile key'),
     episodeType: identifier(input.episodeType, 'episode type'),

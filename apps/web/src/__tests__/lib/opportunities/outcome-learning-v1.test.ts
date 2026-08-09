@@ -10,6 +10,8 @@ function candidate(
 ): OutcomeLearningCandidate {
   return {
     candidateId: '101',
+    opportunityId: '301',
+    lineageId: '401',
     workspaceId: '10',
     agencyProfileKey: 'agency-a',
     episodeType: 'persistent_hiring',
@@ -19,11 +21,11 @@ function candidate(
     score: 0.85,
     shownAt: '2026-07-01T09:00:00.000Z',
     outcomes: [
-      { type: 'shown', occurredAt: '2026-07-01T09:00:00.000Z', reasonCode: null },
-      { type: 'accepted', occurredAt: '2026-07-02T09:00:00.000Z', reasonCode: null },
-      { type: 'contacted', occurredAt: '2026-07-03T09:00:00.000Z', reasonCode: null },
-      { type: 'replied', occurredAt: '2026-07-05T09:00:00.000Z', reasonCode: null },
-      { type: 'meeting', occurredAt: '2026-07-08T09:00:00.000Z', reasonCode: null },
+      event('501', 'shown', '2026-07-01T09:00:00.000Z'),
+      event('502', 'accepted', '2026-07-02T09:00:00.000Z'),
+      event('503', 'contacted', '2026-07-03T09:00:00.000Z'),
+      event('504', 'replied', '2026-07-05T09:00:00.000Z'),
+      event('505', 'meeting', '2026-07-08T09:00:00.000Z'),
     ],
     ...overrides,
   }
@@ -50,8 +52,8 @@ describe('Outcome Learning v1', () => {
       candidates: [candidate({
         shownAt: '2026-08-01T09:00:00.000Z',
         outcomes: [
-          { type: 'shown', occurredAt: '2026-08-01T09:00:00.000Z', reasonCode: null },
-          { type: 'contacted', occurredAt: '2026-08-05T09:00:00.000Z', reasonCode: null },
+          event('501', 'shown', '2026-08-01T09:00:00.000Z'),
+          event('502', 'contacted', '2026-08-05T09:00:00.000Z'),
         ],
       })],
       now: NOW,
@@ -67,8 +69,8 @@ describe('Outcome Learning v1', () => {
       workspaceId: '10',
       candidates: [candidate({
         outcomes: [
-          { type: 'shown', occurredAt: '2026-07-01T09:00:00.000Z', reasonCode: null },
-          { type: 'contacted', occurredAt: '2026-07-03T09:00:00.000Z', reasonCode: null },
+          event('501', 'shown', '2026-07-01T09:00:00.000Z'),
+          event('502', 'contacted', '2026-07-03T09:00:00.000Z'),
         ],
       })],
       now: NOW,
@@ -87,8 +89,8 @@ describe('Outcome Learning v1', () => {
       workspaceId: '10',
       candidates: [candidate({
         outcomes: [
-          { type: 'shown', occurredAt: '2026-07-01T09:00:00.000Z', reasonCode: null },
-          { type: 'won', occurredAt: '2026-08-10T09:00:00.000Z', reasonCode: null },
+          event('501', 'shown', '2026-07-01T09:00:00.000Z'),
+          event('502', 'won', '2026-08-10T09:00:00.000Z'),
         ],
       })],
       now: NOW,
@@ -98,13 +100,50 @@ describe('Outcome Learning v1', () => {
     expect(result.excludedFutureOutcomeCount).toBe(1)
   })
 
+  it('excludes corrected outcomes and candidates not yet shown', () => {
+    const result = buildOutcomeLearningV1({
+      workspaceId: '10',
+      candidates: [
+        candidate({
+          outcomes: [
+            event('501', 'shown', '2026-07-01T09:00:00.000Z'),
+            event('502', 'won', '2026-07-20T09:00:00.000Z', null, false),
+          ],
+        }),
+        candidate({
+          candidateId: '102',
+          opportunityId: '302',
+          lineageId: '402',
+          shownAt: '2026-08-10T09:00:00.000Z',
+          outcomes: [event('503', 'shown', '2026-08-10T09:00:00.000Z')],
+        }),
+      ],
+      now: NOW,
+    })
+
+    expect(result.sampleCount).toBe(1)
+    expect(result.funnel.won.numerator).toBe(0)
+    expect(result.excludedCorrectedOutcomeCount).toBe(1)
+    expect(result.excludedFutureCandidateCount).toBe(1)
+  })
+
+  it('rejects an outcome that precedes the shown lineage', () => {
+    expect(() => buildOutcomeLearningV1({
+      workspaceId: '10',
+      candidates: [candidate({
+        outcomes: [event('501', 'accepted', '2026-06-30T09:00:00.000Z')],
+      })],
+      now: NOW,
+    })).toThrow(/precede shown/i)
+  })
+
   it('retains controlled lost and bad-fit reason codes', () => {
     const result = buildOutcomeLearningV1({
       workspaceId: '10',
       candidates: [candidate({
         outcomes: [
-          { type: 'shown', occurredAt: '2026-07-01T09:00:00.000Z', reasonCode: null },
-          { type: 'lost', occurredAt: '2026-07-20T09:00:00.000Z', reasonCode: 'bad_economics' },
+          event('501', 'shown', '2026-07-01T09:00:00.000Z'),
+          event('502', 'lost', '2026-07-20T09:00:00.000Z', 'bad_economics'),
         ],
       })],
       now: NOW,
@@ -130,3 +169,13 @@ describe('Outcome Learning v1', () => {
     expect(result.automaticWeightUpdates).toBe(false)
   })
 })
+
+function event(
+  eventId: string,
+  type: OutcomeLearningCandidate['outcomes'][number]['type'],
+  occurredAt: string,
+  reasonCode: string | null = null,
+  effective = true,
+): OutcomeLearningCandidate['outcomes'][number] {
+  return { eventId, type, occurredAt, reasonCode, effective }
+}

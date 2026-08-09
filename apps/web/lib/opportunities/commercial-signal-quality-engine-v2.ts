@@ -33,7 +33,12 @@ export type CommercialSignalQualityStatus =
   | 'dismissed'
 
 export type CommercialSignalQualityEngineV2Input = {
+  decisionAt: string
   decisionSource: 'deterministic' | 'llm'
+  componentSources: {
+    hiringNeed: 'direct' | 'official' | 'derived_deterministic'
+    agencyFit: 'direct' | 'official' | 'derived_deterministic'
+  }
   currentHiringEvidence: boolean
   hiringNeed: OpportunityQualityComponent
   hiringFriction: HiringFrictionResult
@@ -89,6 +94,15 @@ export function buildCommercialSignalQualityEngineV2(
   if (input.decisionSource === 'llm') {
     throw new Error('LLM cannot determine score, archetype, or eligibility')
   }
+  for (const source of Object.values(input.componentSources)) {
+    if (!['direct', 'official', 'derived_deterministic'].includes(source)) {
+      throw new Error('quality components require a non-LLM evidence source')
+    }
+  }
+  const decisionAt = new Date(input.decisionAt)
+  if (!Number.isFinite(decisionAt.getTime())) {
+    throw new Error('quality decision clock is invalid')
+  }
   const provenanceIds = new Set(input.evidence.map((item) => item.evidenceId))
   const components = buildComponents(input)
   const contactEvidenceIds = ids(input.contact.evidenceIds)
@@ -97,16 +111,23 @@ export function buildCommercialSignalQualityEngineV2(
     ...input.negativeEvidence.evidenceIds,
     ...contactEvidenceIds,
   ])
-  const missingLineage = usedEvidenceIds.filter((value) => !provenanceIds.has(value))
-  if (missingLineage.length > 0) {
-    throw new Error(`exact evidence lineage missing: ${missingLineage.join(',')}`)
-  }
   if (new Set(input.evidence.map((item) => item.evidenceId)).size !==
     input.evidence.length) {
     throw new Error('exact evidence lineage contains duplicate evidence ids')
   }
 
-  const independence = buildEvidenceIndependence(input.evidence)
+  const providedEvidenceIds = ids([...provenanceIds])
+  if (!sameIds(providedEvidenceIds, usedEvidenceIds)) {
+    throw new Error('exact evidence lineage must equal the decision evidence set')
+  }
+  const independence = buildEvidenceIndependence(input.evidence, decisionAt)
+  const groupedEvidenceIds = ids(independence.groups.flatMap((group) => group.evidenceIds))
+  if (
+    independence.excludedFutureEvidenceIds.length > 0 ||
+    !sameIds(groupedEvidenceIds, usedEvidenceIds)
+  ) {
+    throw new Error('future evidence cannot enter the decision evidence set')
+  }
   const baseQuality = buildOpportunityQuality({
     components: Object.entries(components).map(([key, component]) => ({
       key,
@@ -117,7 +138,9 @@ export function buildCommercialSignalQualityEngineV2(
     minimumQualityCoverage: 0.7,
     minimumQualityScore: 0.68,
   })
-  const baseStatus: CommercialSignalQualityStatus = baseQuality.actionable
+  const independencePassed = independence.independentGroupCount >= 2
+  const baseActionable = baseQuality.actionable && independencePassed
+  const baseStatus: CommercialSignalQualityStatus = baseActionable
     ? input.contact.corporateContactPathAvailable
       ? 'qualified_actionable'
       : 'qualified_needs_enrichment'
@@ -135,7 +158,7 @@ export function buildCommercialSignalQualityEngineV2(
     : currentHiringMissing
       ? 'review'
       : negative.status
-  const actionable = baseQuality.actionable && !currentHiringMissing &&
+  const actionable = baseActionable && !currentHiringMissing &&
     negative.qualityScore >= 0.68 &&
     status !== 'blocked' && status !== 'expired' && status !== 'dismissed' &&
     status !== 'review'
@@ -155,6 +178,7 @@ export function buildCommercialSignalQualityEngineV2(
   if (input.contact.doNotContact) reasonCodes.push('DO_NOT_CONTACT')
   if (input.contact.conflict) reasonCodes.push('CONFLICT_BLOCK')
   if (currentHiringMissing) reasonCodes.push('CURRENT_HIRING_EVIDENCE_MISSING')
+  if (!independencePassed) reasonCodes.push('QUALITY_INDEPENDENT_ORIGINS_LOW')
 
   return {
     engineVersion: COMMERCIAL_SIGNAL_QUALITY_ENGINE_VERSION,
@@ -258,4 +282,8 @@ function compareIds(left: string, right: string): number {
 
 function uniqueText(values: readonly string[]): string[] {
   return [...new Set(values)].sort((left, right) => left.localeCompare(right, 'en'))
+}
+
+function sameIds(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index])
 }

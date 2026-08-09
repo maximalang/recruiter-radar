@@ -41,6 +41,7 @@ function result(): CommercialSignalQualityEngineV2Result {
       coverage: 1,
       confidence: 0.5,
       reasonCodes: ['EVIDENCE_INDEPENDENT'],
+      excludedFutureEvidenceIds: [],
     },
     components: {
       hiring_need: {
@@ -171,5 +172,20 @@ describe('Commercial Signal Quality v2 repository', () => {
       result: result(),
       evidence: [],
     }, { query: jest.fn() } as never)).rejects.toThrow(/lineage/i)
+  })
+
+  it('rejects contradictory status and actionability before opening a transaction', async () => {
+    const contradictory = result()
+    contradictory.status = 'blocked'
+
+    await expect(persistCommercialSignalQualityV2({
+      candidateId: '201',
+      organizationId: '301',
+      workspaceId: '401',
+      clientProfileId: '402',
+      validUntil: '2026-09-01T00:00:00.000Z',
+      result: contradictory,
+      evidence,
+    }, { query: jest.fn() } as never)).rejects.toThrow(/inconsistent/i)
   })
 })

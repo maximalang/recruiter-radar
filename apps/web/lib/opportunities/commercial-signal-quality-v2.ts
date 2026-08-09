@@ -41,6 +41,7 @@ export type EvidenceIndependenceResult = {
   coverage: number
   confidence: number
   reasonCodes: EvidenceIndependenceReasonCode[]
+  excludedFutureEvidenceIds: string[]
 }
 
 export type OpportunityQualityComponent = {
@@ -92,9 +93,15 @@ export function unknownQualityComponent(
 
 export function buildEvidenceIndependence(
   input: readonly CommercialSignalEvidenceProvenance[],
+  asOf: Date,
 ): EvidenceIndependenceResult {
-  const evidence = input.map(normalizeEvidence)
+  const decisionAt = validDate(asOf, 'evidence decision clock')
+  const normalized = input.map(normalizeEvidence)
     .sort((left, right) => compareBigintText(left.evidenceId, right.evidenceId))
+  const evidence = normalized.filter((item) =>
+    Date.parse(item.observedAt) <= decisionAt.getTime())
+  const future = normalized.filter((item) =>
+    Date.parse(item.observedAt) > decisionAt.getTime())
   const parents = evidence.map((_, index) => index)
 
   for (let left = 0; left < evidence.length; left += 1) {
@@ -119,18 +126,21 @@ export function buildEvidenceIndependence(
       ),
     )
   const knownCount = evidence.filter((item) => item.originKnown).length
+  const knownGroups = groups.filter((group) =>
+    !group.reasonCodes.includes('EVIDENCE_ORIGIN_UNKNOWN'))
   const coverage = ratio(knownCount, evidence.length)
-  const confidence = round(coverage * Math.min(1, groups.length / 2))
+  const confidence = round(coverage * Math.min(1, knownGroups.length / 2))
   const reasonCodes = uniqueSorted(groups.flatMap((group) => group.reasonCodes))
 
-  if (groups.length >= 2) reasonCodes.push('EVIDENCE_INDEPENDENT')
+  if (knownGroups.length >= 2) reasonCodes.push('EVIDENCE_INDEPENDENT')
 
   return {
     groups,
-    independentGroupCount: groups.length,
+    independentGroupCount: knownGroups.length,
     coverage,
     confidence,
     reasonCodes: uniqueSorted(reasonCodes),
+    excludedFutureEvidenceIds: uniqueBigintIds(future.map((item) => item.evidenceId)),
   }
 }
 
@@ -159,7 +169,7 @@ export function buildOpportunityQuality(
   )
   const totalWeight = sum(components.map((item) => item.weight))
   const coveredWeight = sum(components.map((item) =>
-    item.weight * item.component.coverage,
+    item.weight * effectiveCoverage(item.component),
   ))
   const qualityCoverage = round(coveredWeight / totalWeight)
   const qualityConfidence = round(sum(components.map((item) =>
@@ -170,7 +180,7 @@ export function buildOpportunityQuality(
   const criticalCoverage = criticalWeight === 0
     ? 1
     : round(sum(critical.map((item) =>
-      item.weight * item.component.coverage,
+      item.weight * effectiveCoverage(item.component),
     )) / criticalWeight)
   const knownValues = components
     .filter((item) => item.component.value !== null)
@@ -298,15 +308,28 @@ function buildGroup(items: readonly NormalizedEvidence[]): EvidenceIndependenceG
 function normalizeComponent(
   input: OpportunityQualityComponent,
 ): OpportunityQualityComponent {
+  const value = input.value === null ? null : unitInterval(input.value, 'component value')
+  const confidence = unitInterval(input.confidence, 'component confidence')
+  const evidenceIds = uniqueBigintIds(input.evidenceIds)
+  if (value === null && confidence !== 0) {
+    throw new Error('unknown component requires zero confidence')
+  }
+  if (value !== null && evidenceIds.length === 0) {
+    throw new Error('known component requires evidence')
+  }
   return {
-    value: input.value === null ? null : unitInterval(input.value, 'component value'),
-    confidence: unitInterval(input.confidence, 'component confidence'),
+    value,
+    confidence,
     coverage: unitInterval(input.coverage, 'component coverage'),
     reasonCodes: uniqueSorted(input.reasonCodes.map((value) =>
       requiredText(value, 'reason code'),
     )),
-    evidenceIds: uniqueBigintIds(input.evidenceIds),
+    evidenceIds,
   }
+}
+
+function effectiveCoverage(component: OpportunityQualityComponent): number {
+  return component.value === null ? 0 : component.coverage
 }
 
 function commonTokens(items: readonly NormalizedEvidence[]): string[] {
@@ -352,6 +375,11 @@ function validTimestamp(value: string, label: string): string {
   const parsed = new Date(value)
   if (!Number.isFinite(parsed.getTime())) throw new Error(`${label} must be a timestamp`)
   return parsed.toISOString()
+}
+
+function validDate(value: Date, label: string): Date {
+  if (!Number.isFinite(value.getTime())) throw new Error(`${label} is invalid`)
+  return value
 }
 
 function positiveBigintText(value: string, label: string): string {

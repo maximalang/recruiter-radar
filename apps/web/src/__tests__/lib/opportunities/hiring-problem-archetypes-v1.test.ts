@@ -142,4 +142,10 @@ describe('Hiring Problem Archetype Engine v1', () => {
       evidenceIds: ['101', '102', '108', '114'],
     })
   })
+
+  it('rejects a known archetype fact without exact event and evidence lineage', () => {
+    expect(() => buildHiringProblemArchetypes(input({
+      newUnit: { value: true, eventIds: [], evidenceIds: [] },
+    }))).toThrow(/lineage/i)
+  })
 })

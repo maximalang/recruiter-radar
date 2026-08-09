@@ -70,6 +70,7 @@ export type CaseSimilarityResult = {
 export type MarketDifficultyLevel = 'high' | 'medium' | 'low' | 'unknown'
 
 export type MarketDifficultyInput = {
+  decisionDate: string
   roleFamily: string
   seniority: string
   region: string
@@ -202,6 +203,7 @@ export function buildCaseSimilarity(
 export function buildMarketDifficulty(
   input: MarketDifficultyInput,
 ): MarketDifficultyResult {
+  const decisionDate = validDateOnly(input.decisionDate)
   const roleFamily = requiredText(input.roleFamily, 'role family')
   const seniority = requiredText(input.seniority, 'seniority')
   const region = requiredText(input.region, 'region')
@@ -230,6 +232,9 @@ export function buildMarketDifficulty(
     throw new Error('market difficulty source must be reproducible')
   }
   const evidenceDate = validDateOnly(input.observation.evidenceDate)
+  if (evidenceDate > decisionDate) {
+    throw new Error('future market evidence cannot enter the decision')
+  }
   const componentValues = { high: 0.9, medium: 0.6, low: 0.2 } as const
 
   return {
