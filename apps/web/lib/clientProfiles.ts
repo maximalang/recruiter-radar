@@ -277,6 +277,8 @@ export async function getClientProfileByOwnerId(
 
 export async function findMatchingClientProfileForCheckoutOrder(input: {
   checkoutOrderId?: string | number | null;
+  ownerId: string | number;
+  workspaceId: string | number;
   agencyName: string;
   telegramChatId?: string | null;
   targetCity?: string | null;
@@ -294,6 +296,8 @@ export async function findMatchingClientProfileForCheckoutOrder(input: {
   const agencyName = normalizeRequiredText(input.agencyName, "Agency name is required.");
   const checkoutOrderId =
     input.checkoutOrderId == null ? null : normalizeCheckoutOrderId(input.checkoutOrderId);
+  const ownerId = normalizeClientProfileId(input.ownerId);
+  const workspaceId = normalizeClientProfileId(input.workspaceId);
   const telegramChatId = normalizeTelegramChatId(input.telegramChatId);
   const targetCity = normalizeOptionalText(input.targetCity);
   const specialization = normalizeOptionalText(input.specialization);
@@ -301,28 +305,9 @@ export async function findMatchingClientProfileForCheckoutOrder(input: {
   const excludeKeywords = normalizeKeywordList(input.excludeKeywords);
   const dailyDigestLimit = normalizeDailyDigestLimit(input.dailyDigestLimit);
 
-  // Restrict to profiles already linked to this specific order, or to profiles
-  // owned by the same user via any of their orders. The primary guard is the
-  // direct link (payload->>'clientProfileId'); the user-scoped fallback allows
-  // find-or-create to reuse an existing profile on the first order that created
-  // it, but only when that order belongs to the same user.
-  const ownershipClause = checkoutOrderId
-    ? `
-      AND (
-        EXISTS (
-          SELECT 1 FROM checkout_orders co
-          WHERE co.id = $2
-            AND co.payload ->> 'clientProfileId' = client_profiles.id::TEXT
-        )
-        OR EXISTS (
-          SELECT 1 FROM checkout_orders co
-          JOIN checkout_orders current_order ON current_order.id = $2
-          WHERE co.user_id = current_order.user_id
-            AND co.payload ->> 'clientProfileId' = client_profiles.id::TEXT
-        )
-      )
-    `
-    : "";
+  // Checkout metadata is not tenant authority. A profile is reusable only in
+  // the persisted order scope: entitlement owner + selected workspace.
+  const ownershipClause = "AND owner_id = $2 AND workspace_id = $3";
 
   if (telegramChatId) {
     const directMatchResult = await pool.query<ClientProfileRow>(`
@@ -354,7 +339,7 @@ export async function findMatchingClientProfileForCheckoutOrder(input: {
       ${ownershipClause}
       ORDER BY updated_at DESC, id DESC
       LIMIT 2
-    `, checkoutOrderId ? [telegramChatId, checkoutOrderId] : [telegramChatId]);
+    `, [telegramChatId, ownerId, workspaceId]);
 
     if (directMatchResult.rowCount === 1) {
       return mapClientProfileRow(directMatchResult.rows[0]);
@@ -390,7 +375,7 @@ export async function findMatchingClientProfileForCheckoutOrder(input: {
     ${ownershipClause}
     ORDER BY updated_at DESC, id DESC
     LIMIT 20
-  `, checkoutOrderId ? [agencyName, checkoutOrderId] : [agencyName]);
+  `, [agencyName, ownerId, workspaceId]);
 
   const candidates = candidateResult.rows.map(mapClientProfileRow);
   const exactMatches = candidates.filter((candidate) =>
@@ -424,6 +409,10 @@ export async function findMatchingClientProfileForCheckoutOrder(input: {
 
 export async function saveClientProfile(input: {
   id?: string | number | null;
+  /** Required for CREATE. Tenant authority must be explicit, never inferred. */
+  ownerId?: string | number | null;
+  /** Required for CREATE. Tenant authority must be explicit, never inferred. */
+  workspaceId?: string | number | null;
   agencyName: string;
   telegramChatId?: string | null;
   targetCity?: string | null;
@@ -451,6 +440,11 @@ export async function saveClientProfile(input: {
   }
 
   const normalizedId = input.id == null ? null : normalizeClientProfileId(input.id);
+  const ownerId = input.ownerId == null ? null : normalizeClientProfileId(input.ownerId);
+  const workspaceId = input.workspaceId == null ? null : normalizeClientProfileId(input.workspaceId);
+  if (!normalizedId && (ownerId == null || workspaceId == null)) {
+    throw new Error("ownerId and workspaceId are required when creating a client profile.");
+  }
   const agencyName = normalizeRequiredText(input.agencyName, "Agency name is required.");
   const telegramChatId = normalizeTelegramChatId(input.telegramChatId);
   const targetCity = normalizeOptionalText(input.targetCity);
@@ -548,6 +542,8 @@ export async function saveClientProfile(input: {
         ])
       : await pool.query<ClientProfileRow>(`
           INSERT INTO client_profiles (
+            owner_id,
+            workspace_id,
             agency_name,
             telegram_chat_id,
             target_city,
@@ -568,9 +564,11 @@ export async function saveClientProfile(input: {
             min_open_roles,
             hiring_mode
           )
-          VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8::jsonb, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+          VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, $9::jsonb, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
           RETURNING ${returningClause}
         `, [
+          ownerId,
+          workspaceId,
           agencyName,
           telegramChatId,
           targetCity,

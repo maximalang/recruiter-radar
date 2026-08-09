@@ -556,13 +556,12 @@ export async function ensureClientProfileForPaidOrder(
   db?: PaymentsDbClient
 ): Promise<ClientProfile> {
   const profileSeed = buildPaidOrderProfileSeed(order);
-  const linkedProfile = order.payload.clientProfileId
-    ? await getClientProfileById(order.payload.clientProfileId, null, db).catch(() => null)
-    : null;
-  const matchedProfile =
-    linkedProfile ??
-    (await findMatchingClientProfileForCheckoutOrder({
+  // A payload profile id is only a link, never tenant authority. Resolve it
+  // through the order's persisted owner/workspace scope instead.
+  const matchedProfile = await findMatchingClientProfileForCheckoutOrder({
       checkoutOrderId: order.id,
+      ownerId: order.entitlementOwnerId,
+      workspaceId: order.workspaceId,
       agencyName: profileSeed.agencyName,
       telegramChatId: profileSeed.telegramChatId,
       targetCity: profileSeed.targetCity,
@@ -570,7 +569,7 @@ export async function ensureClientProfileForPaidOrder(
       includeKeywords: profileSeed.includeKeywords,
       excludeKeywords: profileSeed.excludeKeywords,
       dailyDigestLimit: profileSeed.dailyDigestLimit
-    }, db));
+    }, db);
   const nextTelegramChatId = matchedProfile?.telegramChatId ?? profileSeed.telegramChatId;
 
   if (
@@ -590,6 +589,8 @@ export async function ensureClientProfileForPaidOrder(
 
   return saveClientProfile({
     id: matchedProfile?.id ?? null,
+    ownerId: order.entitlementOwnerId,
+    workspaceId: order.workspaceId,
     agencyName: profileSeed.agencyName,
     telegramChatId: nextTelegramChatId,
     targetCity: profileSeed.targetCity,
