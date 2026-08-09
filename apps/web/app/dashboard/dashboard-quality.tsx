@@ -71,7 +71,7 @@ function QualitySkeleton() {
 
 const GATE_COLORS: Record<string, string> = {
   A: '#10b981',
-  B: '#3b82f6',
+  B: '#23806f',
   C: '#f59e0b',
   D: '#6b7280',
 };

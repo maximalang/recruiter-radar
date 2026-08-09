@@ -18,7 +18,6 @@ import {
   internalPageClasses,
   type NavItem,
 } from "../../ui/internal-page";
-import { SiteFooter } from "../../ui/site-footer";
 import ppStyles from "../../ui/page-primitives.module.css";
 
 export const dynamic = "force-dynamic";
@@ -39,7 +38,7 @@ export default async function AdminPaymentsPage() {
   const access = await checkOperatorAccess();
   if (!access.ok) {
     return (
-      <InternalPageFrame navItems={NAV} footer={<SiteFooter />}>
+      <InternalPageFrame navItems={NAV}>
         <InternalPageHeader title="Платежи Robokassa" />
         <div className={internalPageClasses.narrowLayout}>
           <ContentCard>
@@ -60,7 +59,7 @@ export default async function AdminPaymentsPage() {
   ]);
 
   return (
-    <InternalPageFrame navItems={NAV} footer={<SiteFooter />}>
+    <InternalPageFrame navItems={NAV}>
       <InternalPageHeader
         title="Платежи Robokassa"
         subtitle="Оплаченные заказы, безопасные возвраты и честный статус готовности запуска."

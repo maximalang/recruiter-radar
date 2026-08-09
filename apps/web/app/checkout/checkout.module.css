@@ -299,7 +299,7 @@
 .documentLinks a {
   display: inline-flex;
   align-items: center;
-  min-height: 32px;
+  min-height: 44px;
   padding: 6px 10px;
   border: 1px solid rgba(24, 35, 31, 0.08);
   border-radius: 999px;
@@ -335,6 +335,17 @@
 
   .trustItem {
     min-height: auto;
+    padding: 11px 8px 11px 30px;
+    border: 0;
+    border-top: 1px solid var(--border-subtle);
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .trustItem::before {
+    top: 15px;
+    left: 8px;
   }
 
   .summaryRow {
@@ -347,9 +358,18 @@
 }
 
 @media (max-width: 460px) {
+  .checkoutGrid {
+    gap: 16px;
+  }
+
+  .planHeader {
+    padding-bottom: 14px;
+  }
+
   .orderSummary {
-    padding: 17px;
-    border-radius: 16px;
+    gap: 9px;
+    padding: 15px;
+    border-radius: 13px;
   }
 
   .summaryRow {
@@ -383,6 +403,8 @@
 
   .documentLinks a {
     justify-content: center;
+    min-height: 44px;
+    padding: 5px 8px;
     text-align: center;
   }
 }

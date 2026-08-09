@@ -10,7 +10,6 @@ import {
   InternalPageFrame,
   InternalPageHeader,
 } from "../../ui/internal-page";
-import { SiteFooter } from "../../ui/site-footer";
 import {
   TeamSettingsView,
   type TeamSettingsStatus,
@@ -47,7 +46,6 @@ export default async function TeamSettingsPage(props: {
     return (
       <InternalPageFrame
         navItems={buildAccountNavigation("settings")}
-        footer={<SiteFooter />}
       >
         <InternalPageHeader
           title="Команда"
@@ -74,7 +72,6 @@ export default async function TeamSettingsPage(props: {
   return (
     <InternalPageFrame
       navItems={buildAccountNavigation("settings")}
-      footer={<SiteFooter />}
     >
       <InternalPageHeader
         title="Команда"

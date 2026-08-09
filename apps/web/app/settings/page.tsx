@@ -12,7 +12,6 @@ import { computeProfileCompletion } from "@/lib/profileCompletion";
 import { buildAccountNavigation } from "../ui/account-navigation";
 import { logoutAction } from "../login/actions";
 import { ContentCard, ContentCardTitle, EmptyState, InternalPageFrame, InternalPageHeader } from "../ui/internal-page";
-import { SiteFooter } from "../ui/site-footer";
 import ppStyles from "../ui/page-primitives.module.css";
 import SettingsOverview from "./settings-overview";
 
@@ -35,7 +34,7 @@ export default async function SettingsIndexPage() {
 
   if (!authorization || !account) {
     return (
-      <InternalPageFrame navItems={buildAccountNavigation("settings")} footer={<SiteFooter />}>
+      <InternalPageFrame navItems={buildAccountNavigation("settings")}>
         <InternalPageHeader title="Настройки аккаунта" subtitle="Для доступа к настройкам нужен вход." />
         <ContentCard variant="hero">
           <EmptyState
@@ -55,7 +54,7 @@ export default async function SettingsIndexPage() {
 
   if (!profile) {
     return (
-      <InternalPageFrame navItems={buildAccountNavigation("settings")} footer={<SiteFooter />}>
+      <InternalPageFrame navItems={buildAccountNavigation("settings")}>
         <InternalPageHeader title="Настройки аккаунта" />
         <ContentCard variant="hero">
           <EmptyState
@@ -81,7 +80,7 @@ export default async function SettingsIndexPage() {
     : "Включите доставку, выберите частоту и местное время";
 
   return (
-    <InternalPageFrame navItems={buildAccountNavigation("settings")} footer={<SiteFooter />}>
+    <InternalPageFrame navItems={buildAccountNavigation("settings")}>
       <InternalPageHeader
         title="Настройки"
         subtitle="Проверьте готовность профиля и каналов. Изменения сохраняются в соответствующем разделе редактора."

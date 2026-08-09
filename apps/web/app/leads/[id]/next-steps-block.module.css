@@ -78,7 +78,7 @@
 
 .nextStepsBtn[data-variant="primary"] {
   border-color: var(--c-brand);
-  background-color: rgba(59, 130, 246, 0.08);
+  background-color: rgba(35, 128, 111, 0.08);
   color: var(--c-brand);
 }
 

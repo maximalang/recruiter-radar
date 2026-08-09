@@ -74,14 +74,14 @@
   display: grid;
   min-width: 104px;
   padding: 16px;
-  border: 1px solid rgba(29, 78, 216, 0.12);
+  border: 1px solid rgba(35, 128, 111, 0.12);
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.8);
   text-align: center;
 }
 
 .heroMetric strong {
-  color: #1d4ed8;
+  color: var(--action-primary);
   font-size: 2rem;
   line-height: 1;
 }
@@ -140,8 +140,8 @@
   min-width: 28px;
   padding: 5px 9px;
   border-radius: 999px;
-  background: #eef4ff;
-  color: #1d4ed8;
+  background: rgba(35, 128, 111, 0.08);
+  color: var(--action-primary);
   font-size: 0.74rem;
   font-weight: 800;
   text-align: center;
@@ -199,10 +199,10 @@
 }
 
 .primaryButton {
-  border: 1px solid #1d4ed8;
-  background: linear-gradient(135deg, #1d4ed8, #1e3a8a);
+  border: 1px solid var(--action-primary);
+  background: var(--action-primary);
   color: #fff;
-  box-shadow: 0 12px 24px rgba(29, 78, 216, 0.2);
+  box-shadow: 0 12px 24px rgba(35, 128, 111, 0.2);
 }
 
 .quietButton {
@@ -245,8 +245,8 @@
   width: 40px;
   height: 40px;
   border-radius: 13px;
-  background: linear-gradient(145deg, #dbeafe, #eef2ff);
-  color: #1e3a8a;
+  background: linear-gradient(145deg, rgba(35, 128, 111, 0.12), var(--surface-panel));
+  color: var(--action-primary);
   font-weight: 850;
 }
 
@@ -296,8 +296,8 @@
 }
 
 .roleBadge[data-role="owner"] {
-  background: #eef4ff;
-  color: #1d4ed8;
+  background: rgba(35, 128, 111, 0.08);
+  color: var(--action-primary);
 }
 
 .roleBadge[data-role="admin"] {

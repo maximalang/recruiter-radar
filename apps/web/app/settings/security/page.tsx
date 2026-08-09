@@ -12,7 +12,6 @@ import {
   InternalPageFrame,
   InternalPageHeader,
 } from "../../ui/internal-page";
-import { SiteFooter } from "../../ui/site-footer";
 import {
   SecuritySettingsView,
   type SecuritySettingsStatus,
@@ -55,7 +54,6 @@ export default async function SecuritySettingsPage(props: {
     return (
       <InternalPageFrame
         navItems={buildAccountNavigation("settings")}
-        footer={<SiteFooter />}
       >
         <InternalPageHeader
           title="Безопасность аккаунта"
@@ -80,7 +78,6 @@ export default async function SecuritySettingsPage(props: {
   return (
     <InternalPageFrame
       navItems={buildAccountNavigation("settings")}
-      footer={<SiteFooter />}
     >
       <InternalPageHeader
         title="Безопасность аккаунта"

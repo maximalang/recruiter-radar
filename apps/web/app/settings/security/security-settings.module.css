@@ -145,10 +145,10 @@
   gap: 12px;
   margin: 12px 0 18px;
   padding: 12px 14px;
-  border: 1px solid rgba(29, 78, 216, 0.12);
+  border: 1px solid rgba(35, 128, 111, 0.12);
   border-radius: 14px;
-  background: #f4f8ff;
-  color: #1e3a8a;
+  background: rgba(35, 128, 111, 0.06);
+  color: var(--action-primary);
   line-height: 1.5;
 }
 
@@ -223,10 +223,10 @@
 }
 
 .primaryButton {
-  border: 1px solid #1d4ed8;
-  background: linear-gradient(135deg, #1d4ed8, #1e3a8a);
+  border: 1px solid var(--action-primary);
+  background: var(--action-primary);
   color: #fff;
-  box-shadow: 0 12px 24px rgba(29, 78, 216, 0.2);
+  box-shadow: 0 12px 24px rgba(35, 128, 111, 0.2);
 }
 
 .secondaryButton,

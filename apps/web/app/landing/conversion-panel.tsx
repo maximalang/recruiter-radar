@@ -122,7 +122,13 @@ export default function ConversionPanel(props: {
         <span>ПИЛОТ / 7 ДНЕЙ</span>
         <h2>Соберите радар под специализацию агентства.</h2>
         <p>Получите первый короткий список компаний и решите на фактах, стоит ли продолжать.</p>
-        <div>
+        <div className={panelStyles.finalSignal} data-final-signal-composition="agency-profile" aria-hidden="true">
+          <span className={panelStyles.profileNode}>Agency Profile</span>
+          <i className={panelStyles.signalRoute} />
+          <span className={panelStyles.signalField}>Signal field</span>
+          <span className={panelStyles.constellation}><i /><i /><i /><i /><i /></span>
+        </div>
+        <div className={styles.finalActions}>
           <Link
             href={buildCheckoutHref({ ...props.previewInput, planCode: pilotPlan.code })}
             data-analytics-event={LANDING_ANALYTICS_EVENT.checkoutStarted}

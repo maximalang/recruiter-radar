@@ -41,7 +41,7 @@ export default function WorkspaceScene(props: WorkspaceProps) {
       <div className={styles.workspaceLayout} data-preview-section-content>
         <LandingPreviewInteractions />
         <WorkspaceIntro />
-        <div className={`${styles.workspaceProductFrame} ${sceneStyles.productFrame}`}>
+        <div className={`${styles.workspaceProductFrame} ${sceneStyles.productFrame}`} data-product-preview="live-radar">
           <div className={sceneStyles.productRail} aria-label="Состояние предпросмотра выдачи">
             <div className={sceneStyles.railIdentity}>
               <strong>RECRUITER RADAR</strong>

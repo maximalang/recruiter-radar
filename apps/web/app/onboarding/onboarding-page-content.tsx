@@ -305,7 +305,7 @@ export function OnboardingView(props: {
   );
 
   return (
-    <main className={styles.shell}>
+    <main className={styles.shell} data-ui-system="recruiter-radar-v7">
       <header className={styles.header}>
         <Link href="/" className={styles.brand} aria-label="Recruiter Radar">
           <BrandLogo size="small" tone="dark" />

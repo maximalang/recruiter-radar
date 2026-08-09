@@ -34,7 +34,7 @@ export default function SignalTimelineScene() {
           </div>
         </div>
 
-        <ol className={`${styles.timelineEvents} ${sceneStyles.story}`}>
+        <ol className={`${styles.timelineEvents} ${sceneStyles.story}`} data-temporal-axis="signal-story">
           {DEMO_TIMELINE.map((event, index) => (
             <li key={`${event.date}-${event.title}`} className={`${styles.timelineEvent} ${sceneStyles.event}`}>
               <time>{event.date}</time>

@@ -48,12 +48,12 @@ describe('GateDistribution', () => {
   it('gate A has correct color mapping', () => {
     const GATE_COLORS: Record<string, string> = {
       A: '#10b981',
-      B: '#3b82f6',
+      B: '#23806f',
       C: '#f59e0b',
       D: '#6b7280',
     };
     expect(GATE_COLORS['A']).toBe('#10b981');
-    expect(GATE_COLORS['B']).toBe('#3b82f6');
+    expect(GATE_COLORS['B']).toBe('#23806f');
     expect(GATE_COLORS['C']).toBe('#f59e0b');
     expect(GATE_COLORS['D']).toBe('#6b7280');
   });

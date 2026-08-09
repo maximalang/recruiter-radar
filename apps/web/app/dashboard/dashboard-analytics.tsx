@@ -87,8 +87,8 @@ function formatAgeDays(avgAgeDays: number | null): string {
  * `internal-page.tsx` — display tolerance, not a writer contract.
  */
 const FUNNEL_COLORS: Record<string, string> = {
-  contacted: '#3b82f6',
-  replied: '#8b5cf6',
+  contacted: '#23806f',
+  replied: '#9b7762',
   won: '#10b981',
   badfit: '#ef4444',
   snooze: '#f59e0b',

@@ -38,7 +38,6 @@ import {
   MetricCard,
   MetricGrid,
 } from '../ui/internal-page'
-import { SiteFooter } from '../ui/site-footer'
 import { OpportunityCard } from './opportunity-card'
 import { OpportunityFunnel } from './opportunity-funnel'
 import { OpportunityResearchMode } from './opportunity-research-mode'
@@ -76,7 +75,7 @@ export default async function OpportunitiesPage(props: {
 
   if (!authorization) {
     return (
-      <InternalPageFrame navItems={NAVIGATION} footer={<SiteFooter />}>
+      <InternalPageFrame navItems={NAVIGATION}>
         <InternalPageHeader
           title="Сегодня"
           subtitle="Подтверждённые возможности и следующие действия вашего агентства."
@@ -159,7 +158,7 @@ export default async function OpportunitiesPage(props: {
 
   if (!result) {
     return (
-      <InternalPageFrame navItems={NAVIGATION} footer={<SiteFooter />}>
+      <InternalPageFrame navItems={NAVIGATION}>
         <InternalPageHeader title="Сегодня" />
         <ErrorState
           title="Возможности временно не загрузились"
@@ -183,7 +182,7 @@ export default async function OpportunitiesPage(props: {
     : result.opportunities
 
   return (
-    <InternalPageFrame navItems={NAVIGATION} footer={<SiteFooter />}>
+    <InternalPageFrame navItems={NAVIGATION}>
       <InternalPageHeader
         title="Сегодня"
         subtitle="Сначала действия: новые возможности, контакт, follow-up и активный pipeline."

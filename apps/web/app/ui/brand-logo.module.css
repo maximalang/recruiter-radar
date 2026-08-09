@@ -3,7 +3,7 @@
   align-items: center;
   gap: 0.62rem;
   min-width: 0;
-  color: #0b1730;
+  color: var(--ink-primary, #101412);
   line-height: 1;
 }
 
@@ -20,7 +20,7 @@
   align-items: baseline;
   gap: 0.3em;
   white-space: nowrap;
-  color: #0b1730;
+  color: inherit;
   font-size: 1.06rem;
   font-weight: 790;
   letter-spacing: -0.038em;
@@ -28,23 +28,11 @@
 }
 
 .wordmarkAccent {
-  color: #2563eb;
-  background: linear-gradient(96deg, #5b21b6 0%, #2563eb 58%, #0ea5e9 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: inherit;
 }
 
 .logo[data-tone="dark"] .wordmark {
-  color: #f8fafc;
-}
-
-.logo[data-tone="dark"] .wordmarkAccent {
-  color: #8dc8ff;
-  background: linear-gradient(96deg, #c4b5fd 0%, #8dbbff 55%, #67e8f9 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: var(--rr-paper, #f4f1e8);
 }
 
 .logo[data-size="small"] {
