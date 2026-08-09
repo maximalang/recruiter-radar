@@ -1,6 +1,6 @@
 export const LANDING_NAV_ITEMS = [
-  { id: "scene-evidence", label: "Как работает" },
   { id: "scene-workspace", label: "Возможности" },
+  { id: "scene-evidence", label: "Как работает" },
   { id: "pricing", label: "Тарифы" },
 ] as const;
 export const DEMO_COMPANY = {

@@ -4,12 +4,12 @@ import { DEMO_COMPANY } from "./landing-copy";
 import styles from "./landing.module.css";
 
 const DELIVERY_STEPS = [
-  { title: "Профиль агентства", text: "Специализация, география, ключевые слова, исключения и ограничения задают профиль поиска." },
-  { title: "Ежедневный радар", text: "Сигналы связываются с компанией, проверяются и превращаются в короткую приоритетную выдачу." },
-  { title: "Решение пользователя", text: "Вы перепроверяете факты, выбираете компанию и сами решаете, обращаться ли к ней." },
+  { title: "Настроили профиль", text: "Специализация и рынок задают границы поиска." },
+  { title: "Radar следит", text: "Сигналы связываются с компаниями и проверяемыми источниками." },
+  { title: "Получили возможности", text: "Короткая выдача объясняет, кому стоит написать и почему." },
 ] as const;
 
-type DeliveryChannelKey = "cabinet" | "telegram" | "vk" | "email" | "push" | "webhook";
+type DeliveryChannelKey = "cabinet" | "telegram" | "email" | "integration";
 
 const DELIVERY_CHANNELS: ReadonlyArray<{
   key: DeliveryChannelKey;
@@ -20,45 +20,31 @@ const DELIVERY_CHANNELS: ReadonlyArray<{
 }> = [
   {
     key: "cabinet",
-    title: "Веб-кабинет",
+    title: "Web",
     status: "базовый",
-    text: "Карточки возможностей, доказательства, приоритет и обратная связь остаются внутри продукта.",
-    note: "основная рабочая поверхность",
+    text: "Карточки возможностей и доказательства остаются в рабочем кабинете.",
+    note: "основная поверхность",
   },
   {
     key: "telegram",
     title: "Telegram",
     status: "подключаемый",
-    text: "Ваш Telegram-бот может доставлять ежедневную выдачу и события по сильным возможностям в личный чат, группу или канал.",
-    note: "бот клиента / endpoint",
-  },
-  {
-    key: "vk",
-    title: "VK",
-    status: "подключаемый",
-    text: "События радара можно доставлять через подключённое VK-сообщество.",
-    note: "токен сообщества / проверенный получатель",
+    text: "Ежедневная выдача приходит через подключённого бота.",
+    note: "после проверки подключения",
   },
   {
     key: "email",
     title: "Email",
     status: "подключаемый",
-    text: "Ежедневная агрегированная выдача может приходить на рабочий email профиля.",
-    note: "SMTP / согласие в профиле",
+    text: "Агрегированная выдача приходит на рабочий адрес профиля.",
+    note: "после согласия в профиле",
   },
   {
-    key: "push",
-    title: "Push в браузере",
-    status: "по подписке",
-    text: "Браузерные уведомления помогают не пропустить новую сильную возможность при активной push-подписке.",
-    note: "VAPID / активная подписка",
-  },
-  {
-    key: "webhook",
-    title: "HTTPS webhook",
+    key: "integration",
+    title: "+ интеграции",
     status: "интеграция",
-    text: "Подписанный HTTPS webhook передаёт события радара в ваш n8n, CRM или внутренний процесс.",
-    note: "HMAC / endpoint клиента",
+    text: "Подключаемые маршруты передают события в ваш рабочий процесс.",
+    note: "настраиваются отдельно",
   },
 ] as const;
 
@@ -69,14 +55,8 @@ function DeliveryChannelGlyph({ channel }: { channel: DeliveryChannelKey }) {
   if (channel === "telegram") {
     return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m4 11 15.5-6-3.1 14-4.8-4.1-2.8 2.4.5-4.1L17 7.5 7.8 12" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" /></svg>;
   }
-  if (channel === "vk") {
-    return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 7.5c.4 5.9 3.4 9 8.2 9h.7v-3.4c2.2.2 3.8 1.8 4.4 3.4H21c-.8-2.4-2.9-4.1-4.2-4.8 1.3-.8 3.2-2.8 3.7-4.2h-2.5c-.7 1.7-2.4 3.6-4.1 3.8V7.5h-2.5v6.6c-1.8-.5-4-2.6-4.1-6.6z" stroke="currentColor" strokeWidth="1.25" strokeLinejoin="round" /></svg>;
-  }
   if (channel === "email") {
     return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3.5" y="6" width="17" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.35" /><path d="m5 8 7 5 7-5" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" /></svg>;
-  }
-  if (channel === "push") {
-    return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7.5 16.5h9l-1.1-1.8v-4a3.4 3.4 0 0 0-6.8 0v4z" stroke="currentColor" strokeWidth="1.35" strokeLinejoin="round" /><path d="M10 18.5a2.2 2.2 0 0 0 4 0M18.5 7.5c.7.8 1 1.7 1 2.7M5.5 7.5c-.7.8-1 1.7-1 2.7" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" /></svg>;
   }
   return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8.5 7.5 4 12l4.5 4.5M15.5 7.5 20 12l-4.5 4.5M13.5 5l-3 14" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 }
@@ -93,12 +73,12 @@ export default function DeliveryScene() {
     >
       <div className={styles.deliveryLayout}>
         <div className={styles.deliveryIntro}>
-          <p className={styles.sceneLabel}>05 — Рабочий процесс</p>
+          <p className={styles.sceneLabel}>Рабочий процесс</p>
           <h2 id="delivery-title" className={styles.sceneHeading}>
             Как радар попадает <em>в ваш рабочий процесс.</em>
           </h2>
           <p className={styles.sceneLead}>
-            Recruiter Radar автоматизирует исследование, приоритизацию и доставку рекомендации. Финальная проверка компании и решение об обращении остаются у пользователя.
+            Настройте профиль один раз: Radar следит за изменениями и приносит короткую выдачу с доказательствами.
           </p>
         </div>
 
@@ -115,10 +95,10 @@ export default function DeliveryScene() {
         <div className={sceneStyles.capabilityPanel} aria-label="Поддерживаемые способы доставки">
           <div className={sceneStyles.capabilityHeader}>
             <div>
-              <span>Доставка / 6 каналов</span>
+              <span>Доставка</span>
               <strong>Возможности приходят туда, где вы работаете.</strong>
             </div>
-            <p>Веб-кабинет доступен всегда. Остальные каналы включаются после настройки и проверки соответствующего подключения.</p>
+            <p>Web доступен всегда. Остальные каналы включаются после настройки и проверки подключения.</p>
           </div>
           <div className={sceneStyles.channelHierarchy}>
             <article className={sceneStyles.coreChannel} data-channel={coreChannel.key} data-delivery-core="workspace">
@@ -163,8 +143,7 @@ export default function DeliveryScene() {
           </div>
           <aside className={styles.deliveryBoundary}>
             <span>Граница автоматизации</span>
-            <strong>Рекомендация приходит автоматически. Обращение отправляете вы.</strong>
-            <p>Черновик, финальная проверка и отправка остаются в руках пользователя.</p>
+            <strong>Обращение компаниям всегда отправляете вы.</strong>
           </aside>
         </div>
       </div>

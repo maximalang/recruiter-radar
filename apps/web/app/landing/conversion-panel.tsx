@@ -31,7 +31,7 @@ export default function ConversionPanel(props: {
         data-pricing-layout="unified-grid"
       >
         <div className={styles.pricingIntro} data-pricing-intro>
-          <span>07 — Тарифы</span>
+          <span>Тарифы</span>
           <h2>Проверьте радар на своих нишах за 7 дней.</h2>
           <p>
             {props.paymentConfigured
@@ -99,7 +99,7 @@ export default function ConversionPanel(props: {
         data-faq-layout="editorial"
       >
         <div className={styles.faqHeading} data-faq-heading>
-          <span>08 — Перед запуском</span>
+          <span>Перед запуском</span>
           <h2>Перед запуском — короткие ответы.</h2>
           <p>Откуда берутся сигналы, как формируется приоритет, куда приходит выдача и что остаётся под вашим контролем.</p>
           <small data-faq-trust>Интерактивный пример доступен без регистрации. Публичные данные в нём обезличены.</small>

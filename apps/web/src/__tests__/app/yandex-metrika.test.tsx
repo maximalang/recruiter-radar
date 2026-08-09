@@ -6,7 +6,7 @@ import { resolve } from "node:path";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import RootLayout from "@/app/layout";
-import YandexMetrika from "@/app/yandex-metrika";
+import YandexMetrika, { getYandexCookieDomainAttributes } from "@/app/yandex-metrika";
 import { sendLandingEvent } from "@/app/landing-analytics";
 import { ANALYTICS_SETTINGS_OPEN_EVENT } from "@/lib/analytics-consent";
 
@@ -47,19 +47,21 @@ describe("YandexMetrika", () => {
   afterEach(() => {
     cleanup();
     delete window.ym;
+    delete (window as unknown as Record<string, unknown>).disableYaCounter12345678;
     if (originalId === undefined) delete process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID;
     else process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID = originalId;
   });
 
-  it("keeps first-party consent available without mounting an invalid counter", async () => {
+  it("renders no analytics controls without a valid counter", () => {
     delete process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID;
     const { container, rerender } = render(<YandexMetrika />);
     expect(container.querySelector("#yandex-metrika-loader")).toBeNull();
-    await screen.findByRole("dialog", { name: "Необязательная аналитика" });
+    expect(screen.queryByRole("dialog", { name: "Необязательная аналитика" })).toBeNull();
 
     process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID = "not-a-counter";
     rerender(<YandexMetrika />);
     expect(container.querySelector("#yandex-metrika-loader")).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "Необязательная аналитика" })).toBeNull();
   });
 
   it("does not load Metrika until the user grants analytics consent", async () => {
@@ -120,6 +122,35 @@ describe("YandexMetrika", () => {
     ));
     expect(ym.mock.calls.filter((call) => call[1] === "hit")).toHaveLength(1);
     expect(window.localStorage.getItem("rr_analytics_consent")).toContain('"analytics":true');
+  });
+
+  it("destructs and disables an initialized counter when consent is revoked", async () => {
+    process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID = "12345678";
+    const ym = jest.fn();
+    window.ym = ym;
+    document.cookie = "_ym_uid=test; Path=/";
+    const { container } = render(<YandexMetrika />);
+
+    await screen.findByRole("dialog", { name: "Необязательная аналитика" });
+    fireEvent.click(screen.getByRole("button", { name: "Разрешить" }));
+    await waitFor(() => expect(container.querySelector("#yandex-metrika-loader")).not.toBeNull());
+    act(() => window.dispatchEvent(new Event(ANALYTICS_SETTINGS_OPEN_EVENT)));
+    fireEvent.click(await screen.findByRole("button", { name: "Отклонить" }));
+
+    expect(ym).toHaveBeenCalledWith(12345678, "destruct");
+    expect((window as unknown as Record<string, unknown>).disableYaCounter12345678).toBe(true);
+    expect(container.querySelector("#yandex-metrika-loader")).toBeNull();
+    expect(document.cookie).not.toContain("_ym_uid=");
+  });
+
+  it("expires both host and parent-domain Yandex identifiers", () => {
+    expect(getYandexCookieDomainAttributes("www.recruiter-radar.ru")).toEqual([
+      "; Domain=www.recruiter-radar.ru",
+      "; Domain=.www.recruiter-radar.ru",
+      "; Domain=recruiter-radar.ru",
+      "; Domain=.recruiter-radar.ru",
+    ]);
+    expect(getYandexCookieDomainAttributes("127.0.0.1")).toEqual([]);
   });
 
   it("asks again when a stored choice is older than fourteen months", async () => {

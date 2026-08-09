@@ -23,8 +23,9 @@ describe("polished unified landing visual contract", () => {
     expect(heroScene).not.toContain("HeroInstrument");
     expect(heroScene).not.toContain("data-hero-signal-card");
     expect(heroScene).not.toContain("detectionFooter");
-    expect(sceneStyles).toContain("grid-template-columns: minmax(0, 47%) minmax(0, 53%);");
-    expect(sceneStyles).toContain("grid-template-columns: minmax(0, 56%) minmax(0, 44%);");
+    expect(sceneStyles).toContain("grid-template-columns: minmax(0, 1fr);");
+    expect(sceneStyles).toMatch(/\.fieldFigure\s*\{[\s\S]*?position:\s*absolute;/);
+    expect(sceneStyles).not.toContain("grid-template-columns: minmax(0, 47%) minmax(0, 53%);");
     expect(sceneStyles).toContain("@media (max-width: 959px)");
     expect(sceneStyles).toContain("@media (max-width: 480px)");
     expect(landingStyles).not.toMatch(/\.(detectionScene|detectionField|detectionCopy|detectionLock|detectionFooter|instrumentCaption)\b/);
@@ -36,13 +37,13 @@ describe("polished unified landing visual contract", () => {
     expect(landingStyles).not.toContain(".instrumentCore");
   });
 
-  it("uses a dedicated mobile signal fragment and keeps the full radar below the hero copy", () => {
+  it("uses a dedicated mobile signal fragment and keeps the radar out of document flow", () => {
     const heroScene = source("app/landing/detection-scene.tsx");
     const sceneStyles = source("app/landing/detection-scene.module.css");
 
     expect(heroScene).toContain('data-mobile-hero-signal="true"');
     expect(sceneStyles).toMatch(/@media \(max-width: 600px\)[\s\S]*?\.mobileSignal\s*\{[\s\S]*?display:\s*block;/);
-    expect(sceneStyles).toMatch(/@media \(max-width: 480px\)[\s\S]*?\.fieldFigure > figure\s*\{[\s\S]*?display:\s*none;/);
+    expect(sceneStyles).toMatch(/@media \(max-width: 600px\)[\s\S]*?\.fieldFigure\s*\{\s*display:\s*none;/);
     expect(sceneStyles).toMatch(/\.ambientRing\s*\{/);
     expect(sceneStyles).not.toMatch(/@media \(max-width: 480px\)[\s\S]*?\.fieldFigure\s*\{[\s\S]*?bottom:\s*-12rem;/);
   });
@@ -70,7 +71,7 @@ describe("polished unified landing visual contract", () => {
 
     expect(page).not.toContain("OutreachScene");
     expect(existsSync(resolve(WEB_ROOT, "app/landing/outreach-scene.tsx"))).toBe(false);
-    expect(delivery).toContain("Обращение отправляете вы");
+    expect(delivery).toContain("Обращение компаниям всегда отправляете вы");
     expect(conversion).toContain('data-final-signal-composition="agency-profile"');
     expect(source("app/landing/conversion-panel.module.css")).not.toContain("right: -3rem");
   });
@@ -160,7 +161,8 @@ describe("polished unified landing visual contract", () => {
     expect(responsiveAudit).toContain("'/payment-and-refund'");
     expect(productionAudit).toContain('LANDING_REQUIRE_ANALYTICS_CONSENT === "true"');
     expect(productionAudit).toContain("analytics consent control is required for this audit");
-    expect(productionAudit).toContain('name: "hero-320x700"');
+    expect(productionAudit).toContain('name: "mobile-320x700"');
+    expect(productionAudit).not.toContain("surfaceSpecs");
   });
 
   it("keeps the public footer navigable without exposing phone or location", () => {

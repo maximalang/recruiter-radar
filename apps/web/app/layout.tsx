@@ -16,10 +16,10 @@ const inter = Inter({
 });
 
 const brandVersion = "brand-34";
-const tabIcon16 = "/tab-favicon-brand34-16";
-const tabIcon32 = "/tab-favicon-brand34-32";
-const tabIcon48 = "/tab-favicon-brand34-48";
-const appleIcon = `/apple-icon-180?v=${brandVersion}`;
+const tabIcon16 = `/tab-icons/tab-icon-16.png?v=${brandVersion}`;
+const tabIcon32 = `/tab-icons/tab-icon-32.png?v=${brandVersion}`;
+const tabIcon48 = `/tab-icons/tab-icon-48.png?v=${brandVersion}`;
+const appleIcon = `/app-icons/app-icon-180.png?v=${brandVersion}`;
 
 export const metadata: Metadata = {
   title: "Recruiter Radar",

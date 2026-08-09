@@ -1,5 +1,6 @@
 import type { PublicPreviewInput } from "../../lib/publicProduct";
 import { SiteFooter } from "../ui/site-footer";
+import { isYandexMetrikaConfigured } from "../../lib/analytics-config";
 import ConversionPanel from "./conversion-panel";
 import DeliveryScene from "./delivery-scene";
 import DetectionScene from "./detection-scene";
@@ -44,7 +45,7 @@ export default function LandingPage(props: {
           faqItems={props.faqItems}
         />
       </main>
-      <SiteFooter tone="dark" showCookieSettings />
+      <SiteFooter tone="dark" showCookieSettings={isYandexMetrikaConfigured()} />
     </div>
   );
 }

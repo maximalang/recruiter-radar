@@ -26,9 +26,12 @@ describe("landing runtime truth contract", () => {
     expect(aggregateChannels).toContain("web_push_enabled");
     expect(aggregateChannels).toContain("email_digest_enabled");
 
-    for (const label of ["Веб-кабинет", "Telegram", "VK", "Email", "Push в браузере", "HTTPS webhook"]) {
+    for (const label of ['title: "Web"', 'title: "Telegram"', 'title: "Email"', 'title: "+ интеграции"']) {
       expect(delivery).toContain(label);
     }
+    expect(delivery).not.toContain('title: "VK"');
+    expect(delivery).not.toContain('title: "Push в браузере"');
+    expect(delivery).not.toContain('title: "HTTPS webhook"');
 
     for (const label of ["Telegram", "VK", "email-дайджесте", "браузерных уведомлениях", "защищённый HTTPS-webhook"]) {
       expect(faq).toContain(label);

@@ -78,9 +78,10 @@ describe("landing final production contract", () => {
 
     expect(page).not.toContain("<OutreachScene");
     expect(page).not.toContain("<SignalTimelineScene");
-    expect(delivery).toContain("Рекомендация приходит автоматически. Обращение отправляете вы.");
-    expect(delivery).toContain("Черновик, финальная проверка и отправка остаются в руках пользователя.");
+    expect(delivery).toContain("Обращение компаниям всегда отправляете вы.");
+    expect(delivery).toContain('title: "+ интеграции"');
     expect(evidence).toContain("Сигнал найма → доказательство");
+    expect(evidence).not.toContain("открыть факт");
     expect(evidence).not.toContain("SOURCE_ROLES");
   });
 

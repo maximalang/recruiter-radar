@@ -33,7 +33,8 @@ describe("landing visual and login reliability polish", () => {
     expect(hero).toContain('data-hero-layout="ambient-radar"');
     expect(hero).toContain("sceneStyles.ambientRing");
     expect(hero).not.toContain("HeroInstrument");
-    expect(heroScene).toContain("#7fd8bd");
+    expect(heroScene).toContain("var(--signal-strong)");
+    expect(heroScene).not.toContain("#7fd8bd");
     expect(heroScene).not.toContain("#dcff8a");
     expect(heroScene).not.toContain("#c8f36a");
     expect(visual).not.toContain("data-hero-instrument");

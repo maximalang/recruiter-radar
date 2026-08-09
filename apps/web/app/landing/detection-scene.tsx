@@ -36,7 +36,7 @@ export default function DetectionScene({
       <div className={sceneStyles.kicker}>
         <span className={sceneStyles.kickerRule} aria-hidden="true" />
         <span>Evidence-first клиентский радар</span>
-        <span className={sceneStyles.kickerMeta}>01 — Сигнал</span>
+        <span className={sceneStyles.kickerMeta}>Сигнал → компания → возможность</span>
       </div>
 
       <div className={sceneStyles.copy} data-hero-copy>

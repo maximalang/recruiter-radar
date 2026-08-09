@@ -11,18 +11,14 @@ import {
   readAnalyticsConsent,
   storeAnalyticsConsent,
 } from "../lib/analytics-consent";
+import { getYandexMetrikaCounterId } from "../lib/analytics-config";
 
 const CONSENT_TTL_MS = 426 * 24 * 60 * 60 * 1000;
 
 type AnalyticsConsent = "granted" | "denied" | null;
 
-function readCounterId(): string | null {
-  const value = process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID?.trim() ?? "";
-  return /^\d{5,12}$/.test(value) ? value : null;
-}
-
 export default function YandexMetrika() {
-  const counterId = readCounterId();
+  const counterId = getYandexMetrikaCounterId();
   const [consent, setConsent] = useState<AnalyticsConsent>(null);
   const [choiceLoaded, setChoiceLoaded] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -61,7 +57,7 @@ export default function YandexMetrika() {
     window.ym(Number(counterId), "hit", "/", { title: document.title });
   }, [consent, counterId, scriptReady]);
 
-  if (!choiceLoaded) return null;
+  if (!choiceLoaded || !counterId) return null;
 
   const showDialog = consent === null || settingsOpen;
 
@@ -128,14 +124,33 @@ function readStoredConsent(): AnalyticsConsent {
 }
 
 function disableYandexCounter(counterId: string) {
+  if (typeof window.ym === "function") {
+    try {
+      window.ym(Number(counterId), "destruct");
+    } catch {
+      // Continue fail-closed cleanup even if the provider API is unavailable.
+    }
+  }
   (window as unknown as Record<string, unknown>)[`disableYaCounter${counterId}`] = true;
-  document.getElementById("yandex-metrika-loader")?.remove();
   document.querySelector<HTMLScriptElement>('script[src^="https://mc.yandex.ru/metrika/"]')?.remove();
   clearYandexCookies();
 }
 
 function clearYandexCookies() {
+  const domainAttributes = getYandexCookieDomainAttributes(window.location.hostname);
   for (const name of ["_ym_uid", "_ym_d", "_ym_isad", "_ym_visorc"]) {
     document.cookie = `${name}=; Max-Age=0; Path=/; SameSite=Lax`;
+    for (const domain of domainAttributes) {
+      document.cookie = `${name}=; Max-Age=0; Path=/${domain}; SameSite=Lax`;
+    }
   }
+}
+
+export function getYandexCookieDomainAttributes(rawHostname: string): string[] {
+  const hostname = rawHostname.toLowerCase().replace(/^\.+|\.+$/g, "");
+  const labels = hostname.split(".").filter(Boolean);
+  return labels.length >= 2 && !/^\d+(?:\.\d+){3}$/.test(hostname)
+    ? labels.slice(0, -1).map((_, index) => labels.slice(index).join("."))
+        .flatMap((domain) => [`; Domain=${domain}`, `; Domain=.${domain}`])
+    : [];
 }

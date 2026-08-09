@@ -73,7 +73,7 @@ export default function WorkspaceScene(props: WorkspaceProps) {
 function WorkspaceIntro() {
   return (
     <div className={`${styles.workspaceIntro} ${sceneStyles.intro}`}>
-      <p className={styles.sceneLabel}>03 — Рабочая выдача</p>
+      <p className={styles.sceneLabel}>Рабочая выдача</p>
       <h2 id="workspace-title" className={styles.sceneHeading}>
         Посмотрите, как выглядит <em>рабочая выдача.</em>
       </h2>

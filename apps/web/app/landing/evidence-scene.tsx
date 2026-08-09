@@ -1,5 +1,4 @@
 import { DEMO_COMPANY } from "./landing-copy";
-import { ArrowGlyph, DocumentGlyph, EvidenceGlyph } from "./brand-glyphs";
 import sceneStyles from "./evidence-scene.module.css";
 import styles from "./landing.module.css";
 
@@ -27,12 +26,6 @@ const SOURCE_ROWS = [
   },
 ] as const;
 
-const WORKFLOW_STEPS = [
-  { title: "Настройте профиль", text: "Укажите специализацию, географию и исключения агентства." },
-  { title: "Радар работает ежедневно", text: "Собирает сигналы найма, связывает их с компанией и проверяет источники." },
-  { title: "Получайте возможности", text: "Короткая выдача объясняет, кому стоит написать сейчас и почему." },
-] as const;
-
 export default function EvidenceScene() {
   return (
     <section
@@ -44,7 +37,7 @@ export default function EvidenceScene() {
       <div className={sceneStyles.layout}>
         <div className={sceneStyles.top}>
           <div className={sceneStyles.intro}>
-            <p className={styles.sceneLabel}>03 — От сигнала к возможности</p>
+            <p className={styles.sceneLabel}>От сигнала к возможности</p>
             <h2 id="evidence-title" className={styles.sceneHeading}>
               Сигнал найма → доказательство → <em>коммерческая возможность.</em>
             </h2>
@@ -69,22 +62,12 @@ export default function EvidenceScene() {
             </div>
           </div>
 
-          <ol className={sceneStyles.factors} aria-label="Как работает Recruiter Radar">
-            {WORKFLOW_STEPS.map((item, index) => (
-              <li key={item.title} className={sceneStyles.factor}>
-                <EvidenceGlyph size={18} />
-                <span>{String(index + 1).padStart(2, "0")}</span>
-                <strong>{item.title}</strong>
-                <p>{item.text}</p>
-              </li>
-            ))}
-          </ol>
         </div>
 
         <div className={sceneStyles.ledger}>
           <div className={sceneStyles.ledgerHeading}>
             <div>
-              <span>ДОКАЗАТЕЛЬНАЯ БАЗА / 03</span>
+              <span>ДОКАЗАТЕЛЬНАЯ БАЗА</span>
               <strong>{DEMO_COMPANY.name}</strong>
             </div>
             <p>Три записи показывают, что произошло, когда сигнал появился и насколько прямой источник его подтверждает.</p>
@@ -103,10 +86,6 @@ export default function EvidenceScene() {
                   <div><dt>событие</dt><dd>{row.eventDate}</dd></div>
                 </dl>
                 <span className={sceneStyles.recordStatus}>{row.confidence}</span>
-                <a className={sceneStyles.recordLink} href="#scene-workspace" aria-label={`Открыть подтверждение: ${row.source}`}>
-                  <DocumentGlyph size={16} />
-                  открыть факт <ArrowGlyph size={13} />
-                </a>
               </li>
             ))}
           </ul>

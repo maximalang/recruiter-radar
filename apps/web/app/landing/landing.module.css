@@ -281,7 +281,6 @@
 .finalActions a:first-child:hover :global(svg) { transform: translateX(2px); }
 
 /* Timeline */
-.timelineScene { min-height: auto; border-bottom: 1px solid var(--line-light); }
 
 /* Workspace */
 .workspaceScene { min-height: auto; background: var(--paper-soft); }

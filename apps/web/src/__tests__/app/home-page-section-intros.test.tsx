@@ -295,8 +295,9 @@ describe("final unified evidence-first landing contract", () => {
     expect(evidence).toContain("ОЦЕНКА РАДАРА");
     expect(evidence).toContain("ДОКАЗАТЕЛЬНАЯ БАЗА");
     expect(evidence).toContain("Сигнал найма");
-    expect(evidence).toContain("Радар работает ежедневно");
-    expect(delivery).toContain("Рекомендация приходит автоматически. Обращение отправляете вы.");
+    expect(evidence).not.toContain("открыть факт");
+    expect(delivery).toContain("Radar следит");
+    expect(delivery).toContain("Обращение компаниям всегда отправляете вы.");
   });
 
   it("keeps pricing data untouched and checkout analytics available", () => {
@@ -344,7 +345,8 @@ describe("final unified evidence-first landing contract", () => {
     expect(header).toContain('document.body.style.overflow = "hidden"');
     expect(header).toContain("scrollbarWidth");
     expect(header).toContain("menuButtonRef.current?.focus");
-    expect(header).toContain("Посмотреть пример");
+    expect(header).toContain("Посмотреть возможности");
+    expect(header).not.toContain("Посмотреть пример");
     expect(headerCss).toMatch(/\.navLink\s*\{[\s\S]*?min-width:\s*44px[\s\S]*?min-height:\s*44px/);
   });
 

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, readdir, stat } from "node:fs/promises";
+import { mkdir, readdir, stat, unlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -7,7 +7,7 @@ import { chromium } from "playwright";
 
 const baseUrl = process.env.LANDING_BASE_URL ?? "http://127.0.0.1:3000";
 const screenshotDirectory = process.env.LANDING_SCREENSHOT_DIR
-  ?? path.join(os.tmpdir(), "recruiter-radar-final-unified-landing");
+  ?? path.join(os.tmpdir(), `recruiter-radar-final-unified-landing-${process.pid}`);
 const requireAnalyticsConsent = process.env.LANDING_REQUIRE_ANALYTICS_CONSENT === "true";
 
 const viewportMatrix = [
@@ -45,35 +45,6 @@ const hashSpecs = [
   { name: "hash-delivery-1440x900", hash: "scene-delivery", target: "#scene-delivery" },
   { name: "hash-pricing-1440x900", hash: "pricing", target: "#pricing" },
   { name: "hash-faq-1440x900", hash: "faq", target: "#faq" },
-];
-
-const surfaceSpecs = [
-  { name: "hero-1920x1080", width: 1920, height: 1080, mode: "top" },
-  { name: "hero-1440x900", width: 1440, height: 900, mode: "top" },
-  { name: "hero-1366x768", width: 1366, height: 768, mode: "top" },
-  { name: "hero-1280x800", width: 1280, height: 800, mode: "top" },
-  { name: "hero-1180x820", width: 1180, height: 820, mode: "top" },
-  { name: "hero-1024x768", width: 1024, height: 768, mode: "top" },
-  { name: "hero-900x900", width: 900, height: 900, mode: "top" },
-  { name: "hero-768x1024", width: 768, height: 1024, mode: "top" },
-  { name: "hero-390x844", width: 390, height: 844, mode: "top" },
-  { name: "hero-360x800", width: 360, height: 800, mode: "top" },
-  { name: "hero-320x700", width: 320, height: 700, mode: "top" },
-  { name: "mobile-menu-390x844", width: 390, height: 844, mode: "menu" },
-  { name: "preview-1440x900", width: 1440, height: 900, target: "#scene-workspace" },
-  { name: "preview-768x1024", width: 768, height: 1024, target: "#scene-workspace" },
-  { name: "preview-390x844", width: 390, height: 844, target: "#scene-workspace" },
-  { name: "evidence-1440x900", width: 1440, height: 900, target: "#scene-evidence" },
-  { name: "delivery-1440x900", width: 1440, height: 900, target: "#scene-delivery" },
-  { name: "pricing-1440x900", width: 1440, height: 900, target: "#pricing" },
-  { name: "pricing-390x844", width: 390, height: 844, target: "#pricing" },
-  { name: "faq-1440x900", width: 1440, height: 900, target: "#faq" },
-  { name: "faq-390x844", width: 390, height: 844, target: "#faq" },
-  { name: "final-cta-1440x900", width: 1440, height: 900, target: "#conversion-final" },
-  { name: "final-cta-390x844", width: 390, height: 844, target: "#conversion-final" },
-  { name: "final-cta-320x700", width: 320, height: 700, target: "#conversion-final" },
-  { name: "footer-1440x900", width: 1440, height: 900, target: "footer" },
-  { name: "footer-390x844", width: 390, height: 844, target: "footer" },
 ];
 
 const documentedConsoleAllowlist = [];
@@ -150,7 +121,7 @@ async function assertRequiredSurface(page, label) {
   assert.match(await page.locator("h1").innerText(), /Компании, которым стоит написать сегодня\./);
   assert.match(await page.locator("#scene-workspace").innerText(), /рабочая выдача|пример утренней выдачи/i);
   assert.match(await page.locator("#scene-evidence").innerText(), /доказатель|факт/i);
-  assert.match(await page.locator("#scene-delivery").innerText(), /Обращение отправляете вы|Решение пользователя/i);
+  assert.match(await page.locator("#scene-delivery").innerText(), /Обращение компаниям всегда отправляете вы/i);
   assert.match(await page.locator("#pricing").innerText(), /Проверьте радар на своих нишах за 7 дней/i);
   assert.match(await page.locator("#faq").innerText(), /Перед запуском — короткие ответы/i);
   await page.getByRole("heading", { name: /Соберите радар под специализацию агентства/ }).waitFor();
@@ -269,50 +240,19 @@ async function assertKeyHeadingBounds(page, label) {
   assert.deepEqual(issues, [], `${label}: key heading bounds failed ${JSON.stringify(issues)}`);
 }
 
-async function assertConsentControlCollisions(page, label) {
-  const consentControl = page.locator('[aria-label="Изменить настройки cookies"]');
-  if (!await consentControl.isVisible()) {
+async function assertConsentControlPlacement(page, label) {
+  const consentControl = page.getByRole("button", { name: "Настройки cookies", exact: true });
+  const consentControlCount = await consentControl.count();
+  if (consentControlCount === 0) {
     assert.equal(requireAnalyticsConsent, false, `${label}: analytics consent control is required for this audit`);
     return;
   }
-
-  for (const { selector, textOnly = false } of [
-    { selector: '[data-pricing-primary="true"] > a' },
-    { selector: "#faq details[open]" },
-    { selector: "#conversion-final a:first-of-type" },
-    { selector: '[data-pricing-primary="true"] [data-consent-safe-copy]', textOnly: true },
-    { selector: 'footer [data-consent-safe-copy]', textOnly: true },
-  ]) {
-    const target = page.locator(selector).first();
-    await target.scrollIntoViewIfNeeded();
-    await target.evaluate((element) => element.scrollIntoView({ block: "center", behavior: "auto" }));
-    const collision = await page.evaluate(({ targetSelector, compareTextOnly }) => {
-      const control = document.querySelector('[aria-label="Изменить настройки cookies"]');
-      const targetElement = document.querySelector(targetSelector);
-      if (!control || !targetElement) return null;
-      const controlRect = control.getBoundingClientRect();
-      const targetRects = compareTextOnly
-        ? (() => {
-          const rects = [];
-          const walker = document.createTreeWalker(targetElement, NodeFilter.SHOW_TEXT);
-          for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-            const range = document.createRange();
-            range.selectNodeContents(node);
-            rects.push(...range.getClientRects());
-          }
-          return rects;
-        })()
-        : [targetElement.getBoundingClientRect()];
-      const targetRect = targetRects.find((rect) => !(
-        controlRect.right <= rect.left
-        || controlRect.left >= rect.right
-        || controlRect.bottom <= rect.top
-        || controlRect.top >= rect.bottom
-      ));
-      return targetRect ? { control: controlRect.toJSON(), target: targetRect.toJSON() } : null;
-    }, { targetSelector: selector, compareTextOnly: textOnly });
-    assert.equal(collision, null, `${label}: consent control overlaps ${selector}: ${JSON.stringify(collision)}`);
-  }
+  assert.equal(consentControlCount, 1, `${label}: expected exactly one analytics consent control`);
+  assert.equal(
+    await consentControl.evaluate((element) => Boolean(element.closest("footer"))),
+    true,
+    `${label}: analytics consent control must remain in the footer flow`,
+  );
 }
 
 async function assertHeaderLayout(page, viewport) {
@@ -328,16 +268,22 @@ async function assertHeaderLayout(page, viewport) {
 }
 
 async function assertHeroGeometry(page, label) {
-  for (const selector of ["[data-hero-title]", "[data-hero-visual]", "[data-hero-actions]"]) {
+  const viewport = page.viewportSize();
+  assert.ok(viewport, `${label}: missing viewport`);
+  const visualSelector = viewport.width <= 600
+    ? "[data-mobile-hero-signal]"
+    : "[data-hero-visual]";
+  for (const selector of ["[data-hero-title]", visualSelector, "[data-hero-actions]"]) {
     const box = await page.locator(selector).first().boundingBox();
     assert.ok(box && box.width >= 44 && box.height >= 44, `${label}: invalid hero surface ${selector}`);
   }
 
-  const viewport = page.viewportSize();
-  const visual = await page.locator("[data-hero-visual]").boundingBox();
-  assert.ok(viewport && visual, `${label}: missing ambient hero visual`);
-  assert.ok(visual.width >= Math.min(280, viewport.width - 32), `${label}: radar width is not meaningful`);
-  assert.ok(visual.height >= 192, `${label}: radar height is not meaningful`);
+  const visual = await page.locator(visualSelector).boundingBox();
+  assert.ok(visual, `${label}: missing ambient hero visual`);
+  const minimumVisualWidth = viewport.width <= 600 ? 180 : 280;
+  const minimumVisualHeight = viewport.width <= 600 ? 160 : 192;
+  assert.ok(visual.width >= Math.min(minimumVisualWidth, viewport.width - 32), `${label}: radar width is not meaningful`);
+  assert.ok(visual.height >= minimumVisualHeight, `${label}: radar height is not meaningful`);
 
   if (viewport.width >= 1024) {
     const primary = await page.locator('#scene-detection [data-analytics-context="hero_primary"]').boundingBox();
@@ -414,11 +360,10 @@ async function assertResponsiveSurface(browser, viewport) {
   await assertControls(page, viewport.name);
   await assertNoOverlapOrClipping(page, viewport.name);
   await assertKeyHeadingBounds(page, viewport.name);
-  await assertConsentControlCollisions(page, viewport.name);
+  await assertConsentControlPlacement(page, viewport.name);
   const fullHeight = await measurePageHeight(page, viewport);
 
   await page.evaluate(() => window.scrollTo(0, 0));
-  await saveScreenshot(page, `matrix-${viewport.width}x${viewport.height}.png`);
   if (viewport.name === "desktop-1440x900") {
     await saveScreenshot(page, `desktop-1440x900-full-${fullHeight}px.png`, { fullPage: true });
   }
@@ -451,7 +396,6 @@ async function assertHashNavigation(browser, spec) {
   await page.waitForTimeout(500);
   const secondTop = await target.evaluate((element) => element.getBoundingClientRect().top);
   assert.ok(Math.abs(secondTop - firstPosition.top) <= 3, `${spec.name}: position jumped ${firstPosition.top} -> ${secondTop}`);
-  await saveScreenshot(page, `${spec.name}.png`);
   assertCleanConsole();
   await context.close();
 }
@@ -673,7 +617,7 @@ async function assertNoJs(browser) {
   await skeleton.waitFor({ state: "attached" });
   assert.equal(await skeleton.evaluate((element) => element.closest("#preview-results") === element), true, "no-JS skeleton escaped results boundary");
   assert.match(await page.locator("#scene-evidence").innerText(), /доказатель|факт/i);
-  assert.match(await page.locator("#scene-delivery").innerText(), /Обращение отправляете вы|Решение пользователя/i);
+  assert.match(await page.locator("#scene-delivery").innerText(), /Обращение компаниям всегда отправляете вы/i);
   assert.match(await page.locator("#pricing").innerText(), /Проверьте радар на своих нишах за 7 дней/i);
   assert.ok(await page.locator("#faq summary").count() >= 1, "no-JS FAQ question missing");
   await page.getByRole("heading", { name: /Соберите радар под специализацию агентства/ }).waitFor({ state: "attached" });
@@ -686,7 +630,6 @@ async function assertNoJs(browser) {
   });
   assert.equal(followsResults, true, "no-JS page ended at the preview skeleton");
   await assertNoHorizontalOverflow(page, "no-js-mobile-390x844");
-  await saveScreenshot(page, "no-js-mobile-390x844.png", { fullPage: true });
   assertCleanConsole();
   await context.close();
 }
@@ -707,43 +650,17 @@ async function assertReducedMotion(browser) {
     });
   });
   assert.deepEqual(violations, [], `reduced-motion effects remain: ${JSON.stringify(violations)}`);
-  await saveScreenshot(page, "reduced-motion-1440x900.png", { fullPage: true });
-  assertCleanConsole();
-  await context.close();
-}
-
-async function captureSurface(browser, spec) {
-  const context = await browser.newContext({ viewport: { width: spec.width, height: spec.height } });
-  const { page, assertCleanConsole } = await preparePage(context, spec.name);
-  if (spec.mode === "menu") {
-    await page.getByRole("button", { name: "Открыть меню" }).click();
-    await page.getByRole("dialog", { name: "Навигация по продукту" }).waitFor({ state: "visible" });
-  } else if (spec.target) {
-    await page.locator(spec.target).first().evaluate((element) => element.scrollIntoView({ block: "start", behavior: "auto" }));
-    await page.waitForTimeout(120);
-  } else {
-    await page.evaluate(() => window.scrollTo(0, 0));
-  }
-  await saveScreenshot(page, `${spec.name}.png`);
   assertCleanConsole();
   await context.close();
 }
 
 async function verifyScreenshotArtifact() {
   const files = await readdir(screenshotDirectory);
-  const requiredStatic = [
-    ...surfaceSpecs.map((spec) => `${spec.name}.png`),
-    ...hashSpecs.map((spec) => `${spec.name}.png`),
-    "no-js-mobile-390x844.png",
-    "reduced-motion-1440x900.png",
-  ];
-  for (const fileName of requiredStatic) {
-    assert.ok(files.includes(fileName), `missing screenshot artifact: ${fileName}`);
-  }
   assert.ok(files.some((fileName) => /^desktop-1440x900-full-\d+px\.png$/.test(fileName)), "missing desktop full-page screenshot with actual height");
   assert.ok(files.some((fileName) => /^mobile-390x844-full-\d+px\.png$/.test(fileName)), "missing mobile full-page screenshot with actual height");
 
   const screenshots = files.filter((fileName) => fileName.endsWith(".png")).sort();
+  assert.equal(screenshots.length, 2, `expected exactly two landing screenshots, received ${screenshots.length}`);
   const sizes = {};
   for (const fileName of screenshots) {
     const fileStat = await stat(path.join(screenshotDirectory, fileName));
@@ -754,6 +671,11 @@ async function verifyScreenshotArtifact() {
 }
 
 await mkdir(screenshotDirectory, { recursive: true });
+for (const fileName of await readdir(screenshotDirectory)) {
+  if (/^(desktop-1440x900|mobile-390x844)-full-\d+px\.png$/.test(fileName)) {
+    await unlink(path.join(screenshotDirectory, fileName));
+  }
+}
 const browser = await chromium.launch({ headless: true });
 
 try {
@@ -766,7 +688,6 @@ try {
   await assertInteractionContracts(browser);
   await assertNoJs(browser);
   await assertReducedMotion(browser);
-  for (const spec of surfaceSpecs) await captureSurface(browser, spec);
 
   const artifact = await verifyScreenshotArtifact();
   process.stdout.write(`${JSON.stringify({
@@ -791,7 +712,7 @@ try {
       horizontalOverflow: true,
       clipping: true,
       headingBounds: true,
-      consentControlCollisions: true,
+      consentControlPlacement: true,
       heroFold: true,
     },
   }, null, 2)}\n`);
