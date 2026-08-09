@@ -17,6 +17,17 @@ export const MISSED_OPPORTUNITY_SAMPLE_TYPES = [
   'random_review_candidate',
   'high_friction_low_rank',
   'high_fit_low_propensity',
+  'high_convergence_low_rank',
+]
+
+export const FALSE_POSITIVE_CATEGORIES = [
+  'ordinary_hiring',
+  'evergreen_hiring',
+  'correlated_republication',
+  'stale_signal',
+  'commercial_mismatch',
+  'policy_blocked',
+  'unknown',
 ]
 
 export const FALSE_NEGATIVE_CATEGORIES = [
@@ -85,6 +96,7 @@ export function evaluateCommercialSignalV2(inputRows, options = {}) {
       rows.length === 0 ? null : average(rows.map((row) => row.qualityCoverage)),
       { samples: rows.length },
     ),
+    qualityConfidence: nullableUnitMetric(rows, 'qualityConfidence', dataStatus),
     strongAcceptableRate: booleanMetric(
       labeled,
       (row) => row.reviewLabel === 'strong' || row.reviewLabel === 'acceptable',
@@ -104,6 +116,10 @@ export function evaluateCommercialSignalV2(inputRows, options = {}) {
     falseNegativeTaxonomy: FALSE_NEGATIVE_CATEGORIES.map((category) => ({
       category,
       count: rows.filter((row) => row.falseNegativeCategory === category).length,
+    })),
+    falsePositiveTaxonomy: FALSE_POSITIVE_CATEGORIES.map((category) => ({
+      category,
+      count: rows.filter((row) => row.falsePositiveCategory === category).length,
     })),
     excludedFutureEvidenceCount: rows.reduce((total, row) =>
       total + row.excludedFutureEvidenceCount, 0),
@@ -232,6 +248,11 @@ function buildMissedOpportunityAudit(rows, options) {
     .filter((row) => row.agencyFit >= 0.75 && row.propensity < 0.5)
     .sort((left, right) => right.agencyFit - left.agencyFit ||
       compareText(left.sampleKey, right.sampleKey)))
+  add('high_convergence_low_rank', rows
+    .filter((row) => (row.convergence ?? 0) >= 0.7 &&
+      (row.scores.quality_engine_v2 ?? 0) < threshold)
+    .sort((left, right) => right.convergence - left.convergence ||
+      compareText(left.sampleKey, right.sampleKey)))
   return {
     requiredTypes: MISSED_OPPORTUNITY_SAMPLE_TYPES,
     samples: selected.sort((left, right) =>
@@ -267,6 +288,10 @@ function normalizeRow(input, evaluationAt) {
       optionalFinite(input.scores?.[key]),
     ])),
     qualityCoverage: unitInterval(input.qualityCoverage, 'quality coverage'),
+    qualityConfidence: optionalUnitInterval(
+      input.qualityConfidence,
+      'quality confidence',
+    ),
     reviewLabel: input.reviewLabel == null ? null
       : enumValue(input.reviewLabel, ['strong', 'acceptable', 'weak'], 'review label'),
     status: enumValue(input.status, [
@@ -280,6 +305,7 @@ function normalizeRow(input, evaluationAt) {
     friction: unitInterval(input.friction, 'friction'),
     agencyFit: unitInterval(input.agencyFit, 'agency fit'),
     propensity: unitInterval(input.propensity, 'propensity'),
+    convergence: optionalUnitInterval(input.convergence, 'convergence'),
     replied: outcomeProjection === null ? null : outcomeProjection.repliedAt !== null,
     meeting: outcomeProjection === null ? null : outcomeProjection.meetingAt !== null,
     won: outcomeProjection === null ? null : outcomeProjection.wonAt !== null,
@@ -290,9 +316,28 @@ function normalizeRow(input, evaluationAt) {
         FALSE_NEGATIVE_CATEGORIES,
         'false negative category',
       ),
+    falsePositiveCategory: input.falsePositiveCategory == null ? null
+      : enumValue(
+        input.falsePositiveCategory,
+        FALSE_POSITIVE_CATEGORIES,
+        'false positive category',
+      ),
     evidenceObservedAt,
     excludedFutureEvidenceCount: 0,
   }
+}
+
+function nullableUnitMetric(rows, key, status) {
+  const values = rows.map((row) => row[key]).filter((value) => value !== null)
+  return values.length !== rows.length
+    ? metric('unavailable', null, { samples: values.length })
+    : metric(status, values.length === 0 ? null : average(values), {
+      samples: values.length,
+    })
+}
+
+function optionalUnitInterval(value, label) {
+  return value == null ? null : unitInterval(value, label)
 }
 
 function normalizeOutcomeProjection(input, decisionAt, evaluationAt) {

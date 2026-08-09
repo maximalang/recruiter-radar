@@ -22,6 +22,7 @@ export type CommercialSignalQualityV2Db = {
 }
 
 export type CommercialSignalQualityV2PersistenceInput = {
+  opportunityLineageId?: string
   candidateId: string
   organizationId: string
   workspaceId: string
@@ -148,6 +149,7 @@ async function persistTransaction(
     ])
     const replay = await findReplay(input, db)
     if (replay) {
+      await linkOpportunityIfProvided(input, replay.id, db)
       await db.query('COMMIT')
       return persistenceResult(replay.id, replay.qualityGeneration, false, 0)
     }
@@ -212,6 +214,10 @@ async function persistTransaction(
           componentSources: input.result.componentSources,
           affirmativeEvidenceByComponent:
             input.result.affirmativeEvidenceByComponent,
+          contributionProvenance: input.result.contributionProvenance,
+          observationStates: {
+            hiringFriction: input.engineInput.hiringFriction.observationStates,
+          },
           evidenceIds: input.result.evidenceIds,
         }),
         input.inputHash,
@@ -240,6 +246,7 @@ async function persistTransaction(
       input,
       db,
     )
+    await linkOpportunityIfProvided(input, qualitySnapshotId, db)
     await db.query('COMMIT')
     return persistenceResult(
       qualitySnapshotId,
@@ -362,6 +369,9 @@ function normalizeInput(
   }
   assertConsistentResult(input.result)
   const candidateId = positiveId(input.candidateId, 'candidate id')
+  const opportunityLineageId = input.opportunityLineageId === undefined
+    ? undefined
+    : positiveId(input.opportunityLineageId, 'opportunity lineage id')
   const organizationId = positiveId(input.organizationId, 'organization id')
   const workspaceId = positiveId(input.workspaceId, 'workspace id')
   const clientProfileId = positiveId(input.clientProfileId, 'client profile id')
@@ -449,12 +459,13 @@ function normalizeInput(
   })
   const inputHash = hashCanonicalJson({
     qualityIdentity,
-    result: input.result,
+    engineInput: input.engineInput,
     evidence: evidenceRows,
     validUntil,
   })
   return {
     ...input,
+    opportunityLineageId,
     candidateId,
     organizationId,
     workspaceId,
@@ -464,6 +475,22 @@ function normalizeInput(
     inputHash,
     evidenceRows,
   }
+}
+
+async function linkOpportunityIfProvided(
+  input: NormalizedInput,
+  qualitySnapshotId: string,
+  db: CommercialSignalQualityV2Db,
+): Promise<void> {
+  if (input.opportunityLineageId === undefined) return
+  await linkCommercialSignalQualityV2Opportunity({
+    qualitySnapshotId,
+    opportunityLineageId: input.opportunityLineageId,
+    candidateId: input.candidateId,
+    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
+    clientProfileId: input.clientProfileId,
+  }, db)
 }
 
 function validateComponentEvidence(

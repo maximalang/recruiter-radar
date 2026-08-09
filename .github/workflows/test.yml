@@ -129,6 +129,10 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
         run: npm run test:commercial-signal-quality-v2:db
+      - name: Verify Commercial Signal Quality v2 descendant-first rollback
+        env:
+          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test
+        run: npm run test:commercial-signal-quality-v2:down
       - name: Run Jest
         shell: bash
         run: |

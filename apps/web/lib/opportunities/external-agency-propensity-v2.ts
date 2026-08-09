@@ -20,6 +20,21 @@ export type PropensityPolicyFlag = {
   evidenceIds: string[]
 }
 
+export type PropensityArchetype = {
+  archetype: string
+  confidence: number
+  evidenceIds: string[]
+  eventIds: string[]
+}
+
+export type ContributionProvenance = {
+  semanticFeatureFamily: string
+  evidenceOriginGroup: string
+  reasonCode: string
+  contribution: number
+  derivedFrom: string[]
+}
+
 export type ExternalAgencyPropensityInput = {
   hiringNeed: PropensityComponent
   hiringFriction: PropensityComponent
@@ -32,7 +47,8 @@ export type ExternalAgencyPropensityInput = {
   procurementBarrier: PropensityComponent
   doNotContact: PropensityPolicyFlag
   conflict: PropensityPolicyFlag
-  archetypes: string[]
+  archetypes: PropensityArchetype[]
+  evidenceOriginGroups: Record<string, string>
   convergenceIndependentGroupCount: number
 }
 
@@ -47,6 +63,7 @@ export type ExternalAgencyPropensityResult = {
   evidenceIds: string[]
   affirmativeEvidenceIds: string[]
   componentValues: Record<string, number | null>
+  contributionProvenance: ContributionProvenance[]
 }
 
 const COMPONENT_WEIGHTS = {
@@ -81,12 +98,14 @@ export function buildExternalAgencyPropensity(
   const componentValues = Object.fromEntries(
     Object.entries(components).map(([key, component]) => [key, component.value]),
   )
+  const contribution = buildContributions(components, input)
   const coverage = weightedCoverage(components)
   const confidence = weightedConfidence(components)
   const evidenceIds = ids([
     ...Object.values(components).flatMap((item) => item.evidenceIds),
     ...input.doNotContact.evidenceIds,
     ...input.conflict.evidenceIds,
+    ...input.archetypes.flatMap((item) => item.evidenceIds),
   ])
   const affirmativeEvidenceIds = ids([
     ...affirmativeComponentEvidence(input.hiringNeed, 0.65),
@@ -96,6 +115,9 @@ export function buildExternalAgencyPropensity(
     ...affirmativeComponentEvidence(input.agencyDna, 0.6),
     ...affirmativeComponentEvidence(input.previousAgencyRelationship, 0.6),
     ...affirmativeComponentEvidence(input.timeToFillPressure, 0.6),
+    ...input.archetypes.filter((item) =>
+      positiveArchetypePolicy(item.archetype) !== null &&
+      item.confidence >= 0.6).flatMap((item) => item.evidenceIds),
   ])
   const reasonCodes: string[] = []
 
@@ -141,6 +163,7 @@ export function buildExternalAgencyPropensity(
   if (input.convergenceIndependentGroupCount >= 2) {
     reasonCodes.push('INDEPENDENT_SIGNAL_CONVERGENCE')
   }
+  reasonCodes.push(...contribution.reasonCodes)
 
   const blocked = explicitNoAgencies || procurementBlocked ||
     input.doNotContact.value === true || input.conflict.value === true
@@ -155,6 +178,7 @@ export function buildExternalAgencyPropensity(
       evidenceIds,
       affirmativeEvidenceIds,
       componentValues,
+      contributionProvenance: contribution.provenance,
     })
   }
 
@@ -175,10 +199,16 @@ export function buildExternalAgencyPropensity(
       evidenceIds,
       affirmativeEvidenceIds,
       componentValues,
+      contributionProvenance: contribution.provenance,
     })
   }
 
-  const score = propensityScore(components)
+  const score = round(clamp01(
+    contribution.baseScore + contribution.archetypeDelta,
+  ))
+  const archetypeCapsHigh = input.archetypes.some((item) =>
+    item.confidence >= 0.6 &&
+    ['evergreen_hiring', 'freeze_or_slowdown'].includes(item.archetype))
   const highGate =
     (input.hiringNeed.value ?? 0) >= 0.65 &&
     (input.externalSupportPlausibility.value ?? 0) >= 0.6 &&
@@ -187,7 +217,8 @@ export function buildExternalAgencyPropensity(
     (input.timing.value ?? 0) >= 0.6 &&
     input.convergenceIndependentGroupCount >= 2 &&
     coverage >= 0.65 &&
-    confidence >= 0.55
+    confidence >= 0.55 &&
+    !archetypeCapsHigh
   const propensityLevel: ExternalAgencyPropensityLevel = highGate
     ? 'high'
     : score >= 0.5
@@ -206,6 +237,7 @@ export function buildExternalAgencyPropensity(
     evidenceIds,
     affirmativeEvidenceIds,
     componentValues,
+    contributionProvenance: contribution.provenance,
   })
 }
 
@@ -217,10 +249,16 @@ function affirmativeComponentEvidence(
     ? componentValue.evidenceIds : []
 }
 
-function propensityScore(
+function buildContributions(
   components: Record<ComponentKey, PropensityComponent>,
-): number {
-  let weighted = 0
+  input: ExternalAgencyPropensityInput,
+): {
+  baseScore: number
+  archetypeDelta: number
+  provenance: ContributionProvenance[]
+  reasonCodes: string[]
+} {
+  const raw: ContributionProvenance[] = []
   let availableWeight = 0
   for (const [key, component] of Object.entries(components) as Array<
     [ComponentKey, PropensityComponent]
@@ -231,10 +269,133 @@ function propensityScore(
       key === 'procurement_barrier'
       ? 1 - component.value
       : component.value
-    weighted += value * weight
     availableWeight += weight
+    const groups = uniqueText(component.evidenceIds.map((id) =>
+      input.evidenceOriginGroups[id] ?? 'origin:unknown'))
+    const effectiveGroups = groups.length > 0 ? groups : ['origin:unknown']
+    for (const group of effectiveGroups) {
+      const idsForGroup = component.evidenceIds.filter((id) =>
+        (input.evidenceOriginGroups[id] ?? 'origin:unknown') === group)
+      raw.push({
+        semanticFeatureFamily: semanticFamily(key),
+        evidenceOriginGroup: group,
+        reasonCode: `EAP_COMPONENT_${key.toUpperCase()}`,
+        contribution: round((value * weight) / effectiveGroups.length),
+        derivedFrom: idsForGroup.map((id) => `evidence:${id}`),
+      })
+    }
   }
-  return round(availableWeight === 0 ? 0 : weighted / availableWeight)
+  const provenance = diminishSharedOrigins(raw)
+  const reasonCodes: string[] = []
+  let archetypeDelta = 0
+  for (const archetype of input.archetypes) {
+    const positive = positiveArchetypePolicy(archetype.archetype)
+    const negative = negativeArchetypePolicy(archetype.archetype)
+    const reasonCode = archetypeReason(archetype.archetype)
+    if (reasonCode) reasonCodes.push(reasonCode)
+    if (archetype.confidence < 0.6 || archetype.evidenceIds.length === 0) continue
+    const rawDelta = positive !== null
+      ? positive * archetype.confidence
+      : negative !== null
+        ? negative * archetype.confidence
+        : 0
+    if (rawDelta === 0) continue
+    const groups = uniqueText(archetype.evidenceIds.map((id) =>
+      input.evidenceOriginGroups[id] ?? 'origin:unknown'))
+    for (const group of groups) {
+      const sharesPositiveOrigin = rawDelta > 0 && provenance.some((item) =>
+        item.evidenceOriginGroup === group && item.contribution > 0)
+      const delta = round(
+        rawDelta / groups.length * (sharesPositiveOrigin ? 0.25 : 1),
+      )
+      archetypeDelta += delta
+      provenance.push({
+        semanticFeatureFamily: 'hiring_problem_archetype',
+        evidenceOriginGroup: group,
+        reasonCode: reasonCode ?? 'ARCHETYPE_NO_SCORE_EFFECT',
+        contribution: delta,
+        derivedFrom: archetype.evidenceIds
+          .filter((id) =>
+            (input.evidenceOriginGroups[id] ?? 'origin:unknown') === group)
+          .map((id) => `evidence:${id}`),
+      })
+    }
+  }
+  return {
+    baseScore: availableWeight === 0
+      ? 0
+      : round(provenance.filter((item) =>
+        item.semanticFeatureFamily !== 'hiring_problem_archetype')
+        .reduce((sum, item) => sum + item.contribution, 0) / availableWeight),
+    archetypeDelta: round(archetypeDelta),
+    provenance: sortProvenance(provenance),
+    reasonCodes: uniqueText(reasonCodes),
+  }
+}
+
+function diminishSharedOrigins(
+  input: ContributionProvenance[],
+): ContributionProvenance[] {
+  const byGroup = new Map<string, ContributionProvenance[]>()
+  for (const item of input) {
+    byGroup.set(item.evidenceOriginGroup, [
+      ...(byGroup.get(item.evidenceOriginGroup) ?? []),
+      item,
+    ])
+  }
+  return [...byGroup.values()].flatMap((items) => items
+    .sort((left, right) =>
+      right.contribution - left.contribution ||
+      left.reasonCode.localeCompare(right.reasonCode, 'en'))
+    .map((item, index) => ({
+      ...item,
+      contribution: round(item.contribution * (index === 0 ? 1 : 0.25)),
+    })))
+}
+
+function semanticFamily(key: ComponentKey): string {
+  if (key === 'hiring_need') return 'real_hiring_need'
+  if (key === 'hiring_friction' || key === 'time_to_fill_pressure') {
+    return 'hiring_friction'
+  }
+  if (key === 'agency_dna') return 'agency_fit'
+  if (key === 'internal_recruiting_capacity') return 'recruiting_capacity'
+  return key
+}
+
+function positiveArchetypePolicy(archetype: string): number | null {
+  if (['hard_to_fill', 'recruiting_capacity_gap'].includes(archetype)) return 0.06
+  if (['new_unit_buildout', 'regional_expansion'].includes(archetype)) return 0.04
+  return null
+}
+
+function negativeArchetypePolicy(archetype: string): number | null {
+  if (archetype === 'evergreen_hiring') return -0.1
+  if (archetype === 'freeze_or_slowdown') return -0.3
+  return null
+}
+
+function archetypeReason(archetype: string): string | null {
+  const reasons: Record<string, string> = {
+    hard_to_fill: 'ARCHETYPE_HARD_TO_FILL_SUPPORT',
+    recruiting_capacity_gap: 'ARCHETYPE_CAPACITY_GAP_SUPPORT',
+    new_unit_buildout: 'ARCHETYPE_NEW_UNIT_SUPPORT',
+    regional_expansion: 'ARCHETYPE_REGIONAL_EXPANSION_SUPPORT',
+    evergreen_hiring: 'ARCHETYPE_EVERGREEN_DEMOTION',
+    freeze_or_slowdown: 'ARCHETYPE_FREEZE_SLOWDOWN_DEMOTION',
+    replacement_turnover: 'ARCHETYPE_REPLACEMENT_TURNOVER_DISTINCT',
+    unknown: 'ARCHETYPE_UNKNOWN_NO_BONUS',
+  }
+  return reasons[archetype] ?? null
+}
+
+function sortProvenance(
+  input: ContributionProvenance[],
+): ContributionProvenance[] {
+  return [...input].sort((left, right) =>
+    left.evidenceOriginGroup.localeCompare(right.evidenceOriginGroup, 'en') ||
+    left.semanticFeatureFamily.localeCompare(right.semanticFeatureFamily, 'en') ||
+    left.reasonCode.localeCompare(right.reasonCode, 'en'))
 }
 
 function weightedCoverage(
@@ -291,8 +452,24 @@ function normalizeInput(
     procurementBarrier: component(input.procurementBarrier, 'procurement barrier'),
     doNotContact: flag(input.doNotContact, 'do not contact'),
     conflict: flag(input.conflict, 'conflict'),
-    archetypes: uniqueText(input.archetypes),
+    archetypes: normalizeArchetypes(input.archetypes),
+    evidenceOriginGroups: Object.fromEntries(Object.entries(
+      input.evidenceOriginGroups,
+    ).sort(([left], [right]) => compareIds(left, right))),
   }
+}
+
+function normalizeArchetypes(input: PropensityArchetype[]): PropensityArchetype[] {
+  return input.map((item) => ({
+    archetype: item.archetype.trim(),
+    confidence: unitInterval(item.confidence, 'archetype confidence'),
+    evidenceIds: item.archetype === 'unknown'
+      ? ids(item.evidenceIds)
+      : requiredIds(item.evidenceIds, 'archetype evidence'),
+    eventIds: ids(item.eventIds),
+  })).sort((left, right) =>
+    left.archetype.localeCompare(right.archetype, 'en') ||
+    left.evidenceIds.join(',').localeCompare(right.evidenceIds.join(','), 'en'))
 }
 
 function component(input: PropensityComponent, label: string): PropensityComponent {
@@ -365,4 +542,8 @@ function unitInterval(value: number, label: string): number {
 
 function round(value: number): number {
   return Math.round(value * 100_000) / 100_000
+}
+
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value))
 }

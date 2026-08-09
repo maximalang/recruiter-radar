@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {
   EVALUATION_V2_MODEL_KEYS,
   FALSE_NEGATIVE_CATEGORIES,
+  FALSE_POSITIVE_CATEGORIES,
   MISSED_OPPORTUNITY_SAMPLE_TYPES,
   buildTemporalEvaluationSplits,
   evaluateCommercialSignalV2,
@@ -22,11 +23,13 @@ const row = (index, overrides = {}) => ({
     quality_engine_v2: index <= 12 ? 0.95 : 0.15,
   },
   qualityCoverage: 0.9,
+  qualityConfidence: 0.85,
   reviewLabel: index <= 12 ? 'strong' : 'weak',
   status: index <= 12 ? 'qualified_actionable' : 'review',
   friction: index % 3 === 0 ? 0.85 : 0.3,
   agencyFit: index % 4 === 0 ? 0.9 : 0.5,
   propensity: index % 4 === 0 ? 0.3 : 0.7,
+  convergence: index % 5 === 0 ? 0.8 : 0.4,
   outcomeProjection: {
     version: 'opportunity-outcome-state-v1',
     candidateId: String(2000 + index),
@@ -40,6 +43,7 @@ const row = (index, overrides = {}) => ({
     wonAt: index <= 2 ? '2026-06-04T00:00:00.000Z' : null,
   },
   falseNegativeCategory: index === 20 ? 'coverage_gap' : null,
+  falsePositiveCategory: index === 21 ? 'ordinary_hiring' : null,
   evidenceObservedAt: [
     '2026-05-01T00:00:00.000Z',
   ],
@@ -65,6 +69,8 @@ assert.deepEqual(report.missedOpportunityAudit.requiredTypes,
   MISSED_OPPORTUNITY_SAMPLE_TYPES)
 assert.equal(report.missedOpportunityAudit.manualReviewRequired, true)
 assert.equal(report.falseNegativeTaxonomy.length, FALSE_NEGATIVE_CATEGORIES.length)
+assert.equal(report.falsePositiveTaxonomy.length, FALSE_POSITIVE_CATEGORIES.length)
+assert.equal(report.qualityConfidence.status, 'sufficient_data')
 assert.equal(report.excludedFutureEvidenceCount, 0)
 assert.throws(() => evaluateCommercialSignalV2([
   row(1, { evidenceObservedAt: ['2026-08-01T00:00:00.000Z'] }),
@@ -113,9 +119,11 @@ process.stdout.write(`${JSON.stringify({
   checks: [
     'six_required_baselines',
     'precision_5_10_and_ndcg_10',
-    'coverage_and_commercial_yield',
-    'missed_opportunity_shadow_sample',
-    'false_negative_taxonomy',
+  'coverage_and_commercial_yield',
+  'coverage_and_confidence',
+  'missed_opportunity_shadow_sample',
+  'false_negative_taxonomy',
+  'false_positive_taxonomy',
     'future_evidence_excluded',
     'future_decisions_excluded',
     'temporal_split_only',

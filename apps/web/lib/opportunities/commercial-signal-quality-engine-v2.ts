@@ -100,6 +100,7 @@ export type CommercialSignalQualityEngineV2Result = {
     contactEvidenceIds: string[]
   }
   components: Record<string, OpportunityQualityComponent>
+  contributionProvenance: ExternalAgencyPropensityResult['contributionProvenance']
   modelType: 'heuristic'
   calibrationStatus: 'uncalibrated'
 }
@@ -277,6 +278,7 @@ export function buildCommercialSignalQualityEngineV2(
       contactEvidenceIds,
     },
     components,
+    contributionProvenance: input.propensity.contributionProvenance,
     modelType: 'heuristic',
     calibrationStatus: 'uncalibrated',
   }

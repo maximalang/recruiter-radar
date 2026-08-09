@@ -31,7 +31,8 @@ function input(
     procurementBarrier: component(0.1, '109'),
     doNotContact: { value: false, evidenceIds: ['110'] },
     conflict: { value: false, evidenceIds: ['111'] },
-    archetypes: ['hard_to_fill'],
+    archetypes: [archetype('hard_to_fill', '102')],
+    evidenceOriginGroups: originGroups(),
     convergenceIndependentGroupCount: 3,
     ...overrides,
   }
@@ -65,7 +66,7 @@ describe('External Agency Propensity v2', () => {
       internalRecruitingCapacity: component(null, '206'),
       timeToFillPressure: component(null, '207'),
       procurementBarrier: component(null, '208'),
-      archetypes: ['expansion'],
+      archetypes: [archetype('expansion', '209')],
       convergenceIndependentGroupCount: 0,
     }))
 
@@ -141,14 +142,20 @@ describe('External Agency Propensity v2', () => {
 
   it('is deterministic for reordered archetypes and evidence ids', () => {
     const left = buildExternalAgencyPropensity(input({
-      archetypes: ['hard_to_fill', 'recruiting_capacity_gap'],
+      archetypes: [
+        archetype('hard_to_fill', '102'),
+        archetype('recruiting_capacity_gap', '103'),
+      ],
       hiringNeed: {
         ...component(0.9, '101'),
         evidenceIds: ['301', '101'],
       },
     }))
     const right = buildExternalAgencyPropensity(input({
-      archetypes: ['recruiting_capacity_gap', 'hard_to_fill'],
+      archetypes: [
+        archetype('recruiting_capacity_gap', '103'),
+        archetype('hard_to_fill', '102'),
+      ],
       hiringNeed: {
         ...component(0.9, '101'),
         evidenceIds: ['101', '301'],
@@ -157,4 +164,88 @@ describe('External Agency Propensity v2', () => {
 
     expect(right).toEqual(left)
   })
+
+  it('uses an evidenced hard-to-fill archetype as bounded commercial support', () => {
+    const without = buildExternalAgencyPropensity(input({ archetypes: [] }))
+    const withArchetype = buildExternalAgencyPropensity(input({
+      archetypes: [archetype('hard_to_fill', '112')],
+    }))
+
+    expect(withArchetype.propensityScore).toBeGreaterThan(
+      without.propensityScore ?? 0,
+    )
+    expect(withArchetype.reasonCodes).toContain('ARCHETYPE_HARD_TO_FILL_SUPPORT')
+    expect(withArchetype.contributionProvenance).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        semanticFeatureFamily: 'hiring_problem_archetype',
+        reasonCode: 'ARCHETYPE_HARD_TO_FILL_SUPPORT',
+        derivedFrom: ['evidence:112'],
+      }),
+    ]))
+  })
+
+  it.each(['evergreen_hiring', 'freeze_or_slowdown'])(
+    'lets %s demote rather than promote propensity',
+    (archetypeName) => {
+      const baseline = buildExternalAgencyPropensity(input({ archetypes: [] }))
+      const demoted = buildExternalAgencyPropensity(input({
+        archetypes: [archetype(archetypeName, '112')],
+      }))
+
+      expect(demoted.propensityScore).toBeLessThan(
+        baseline.propensityScore ?? 1,
+      )
+      expect(demoted.propensityLevel).not.toBe('high')
+    },
+  )
+
+  it('does not interpret replacement turnover as expansion', () => {
+    const result = buildExternalAgencyPropensity(input({
+      archetypes: [archetype('replacement_turnover', '112')],
+    }))
+
+    expect(result.reasonCodes).toContain('ARCHETYPE_REPLACEMENT_TURNOVER_DISTINCT')
+    expect(result.reasonCodes).not.toContain('ARCHETYPE_EXPANSION_SUPPORT')
+  })
+
+  it('diminishes repeated derived contributions from one evidence origin', () => {
+    const sameOrigin = buildExternalAgencyPropensity(input({
+      archetypes: [archetype('hard_to_fill', '102')],
+      evidenceOriginGroups: {
+        ...originGroups(),
+        '101': 'origin-a',
+        '102': 'origin-a',
+        '103': 'origin-a',
+        '104': 'origin-a',
+      },
+      convergenceIndependentGroupCount: 1,
+    }))
+    const independent = buildExternalAgencyPropensity(input({
+      archetypes: [archetype('hard_to_fill', '112')],
+      evidenceOriginGroups: originGroups(),
+    }))
+
+    const sameOriginSupport = sameOrigin.contributionProvenance
+      .filter((item) => item.evidenceOriginGroup === 'origin-a')
+      .reduce((sum, item) => sum + Math.max(0, item.contribution), 0)
+    const independentSupport = independent.contributionProvenance
+      .reduce((sum, item) => sum + Math.max(0, item.contribution), 0)
+    expect(sameOriginSupport).toBeLessThan(independentSupport)
+  })
 })
+
+function archetype(archetype: string, evidenceId: string) {
+  return {
+    archetype,
+    confidence: 0.9,
+    evidenceIds: [evidenceId],
+    eventIds: ['501'],
+  }
+}
+
+function originGroups(): Record<string, string> {
+  return Object.fromEntries(Array.from({ length: 20 }, (_, index) => {
+    const id = String(101 + index)
+    return [id, `origin-${id}`]
+  }))
+}

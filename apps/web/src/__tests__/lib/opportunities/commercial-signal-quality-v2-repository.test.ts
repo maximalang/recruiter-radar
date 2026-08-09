@@ -34,6 +34,7 @@ function engineInput(): CommercialSignalQualityEngineV2Input {
       negativeReasons: [],
       evidenceIds: ['101'],
       componentValues: {},
+      observationStates: { repost_cycles: 'observed' },
     },
     agencyFit: positiveComponent(),
     propensity: {
@@ -146,11 +147,15 @@ describe('Commercial Signal Quality v2 repository', () => {
         if (sql.includes('INSERT INTO commercial_signal_quality_evidence')) {
           return { rows: [], rowCount: 1 } as never
         }
+        if (sql.includes('INSERT INTO commercial_signal_quality_opportunity_lineage')) {
+          return { rows: [{ opportunity_lineage_id: '601' }], rowCount: 1 } as never
+        }
         return { rows: [], rowCount: 0 } as never
       },
     }
 
     await expect(persistCommercialSignalQualityV2({
+      opportunityLineageId: '601',
       candidateId: '201',
       organizationId: '301',
       workspaceId: '401',
@@ -180,10 +185,52 @@ describe('Commercial Signal Quality v2 repository', () => {
       ['direct'],
       [independenceGroup()], ['EVIDENCE_INDEPENDENT'],
     ]))
+    expect(calls.some((call) =>
+      call.sql.includes('commercial_signal_quality_opportunity_lineage'))).toBe(true)
     expect(calls.map((call) => call.sql)).not.toEqual(expect.arrayContaining([
       expect.stringMatching(/UPDATE commercial_signal_quality/i),
       expect.stringMatching(/DELETE FROM commercial_signal_quality/i),
     ]))
+  })
+
+  it('keeps distinct unavailable observation states in the replay hash', async () => {
+    const hashes: string[] = []
+    const db: CommercialSignalQualityV2Db = {
+      async query(sql, values) {
+        if (sql.includes('SELECT id::TEXT AS id') &&
+          sql.includes('commercial_signal_quality_snapshots')) {
+          return { rows: [], rowCount: 0 } as never
+        }
+        if (sql.includes('MAX(quality_generation)')) {
+          return { rows: [{ nextGeneration: 1 }], rowCount: 1 } as never
+        }
+        if (sql.includes('INSERT INTO commercial_signal_quality_snapshots')) {
+          hashes.push(String(values?.[14]))
+          return { rows: [{ id: '501', qualityGeneration: 1 }], rowCount: 1 } as never
+        }
+        if (sql.includes('INSERT INTO commercial_signal_quality_evidence')) {
+          return { rows: [], rowCount: 1 } as never
+        }
+        return { rows: [], rowCount: 0 } as never
+      },
+    }
+    const unknown = engineInput()
+    unknown.hiringFriction.observationStates.repost_cycles = 'unknown'
+    const notConfigured = engineInput()
+    notConfigured.hiringFriction.observationStates.repost_cycles = 'not_configured'
+
+    for (const input of [unknown, notConfigured]) {
+      await persistCommercialSignalQualityV2({
+        candidateId: '201', organizationId: '301', workspaceId: '401',
+        clientProfileId: '402', validUntil: '2026-09-01T00:00:00.000Z',
+        engineInput: input,
+        result: buildCommercialSignalQualityEngineV2(input),
+        evidence,
+      }, db)
+    }
+
+    expect(hashes).toHaveLength(2)
+    expect(hashes[0]).not.toBe(hashes[1])
   })
 
   it('returns an exact replay without creating another generation', async () => {

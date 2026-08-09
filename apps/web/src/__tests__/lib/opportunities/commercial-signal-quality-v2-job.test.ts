@@ -1,6 +1,8 @@
 import {
   CommercialSignalQualityV2ApplyScopeRequiredError,
+  CommercialSignalQualityV2ShadowScopeRequiredError,
   runCommercialSignalQualityV2Shadow,
+  runCommercialSignalQualityV2ShadowPipeline,
   type CommercialSignalQualityV2ShadowItem,
 } from '@/lib/opportunities/commercial-signal-quality-v2-job'
 import * as repository from
@@ -72,6 +74,7 @@ function engineInput(): CommercialSignalQualityEngineV2Input {
       negativeReasons: [],
       evidenceIds: ['101'],
       componentValues: {},
+      observationStates: {},
     },
     agencyFit: component(0.9),
     propensity: {
@@ -211,5 +214,46 @@ describe('Commercial Signal Quality v2 shadow coordinator', () => {
 
     expect(stats).toMatchObject({ scanned: 1, built: 1, persisted: 1 })
     expect(repository.persistCommercialSignalQualityV2).toHaveBeenCalledTimes(1)
+  })
+
+  it('requires tenant and profile scope for automatic persisted-lineage runs', async () => {
+    await expect(runCommercialSignalQualityV2ShadowPipeline({
+      env: { COMMERCIAL_SIGNAL_QUALITY_V2_ENABLED: 'true' },
+      workspaceId: '401',
+    }, { query: jest.fn() } as never)).rejects.toBeInstanceOf(
+      CommercialSignalQualityV2ShadowScopeRequiredError,
+    )
+  })
+
+  it('bounds persisted-lineage dry runs and applies a statement timeout', async () => {
+    const query = jest.fn(async (text: string) => {
+      if (text.includes('commercial_signal_opportunity_lineage')) {
+        return { rows: [], rowCount: 0 }
+      }
+      return { rows: [], rowCount: 0 }
+    })
+
+    const stats = await runCommercialSignalQualityV2ShadowPipeline({
+      env: { COMMERCIAL_SIGNAL_QUALITY_V2_ENABLED: 'true' },
+      workspaceId: '401',
+      clientProfileId: '402',
+      batchSize: 1_000,
+    }, { query } as never)
+
+    expect(stats).toMatchObject({
+      enabled: true,
+      dryRun: true,
+      scanned: 0,
+      persisted: 0,
+    })
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("set_config('statement_timeout'"),
+      ['5000ms'],
+    )
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining('LIMIT $4'),
+      ['401', '402', null, 100],
+    )
+    expect(query).toHaveBeenCalledWith('RESET statement_timeout')
   })
 })
