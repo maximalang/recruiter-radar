@@ -164,13 +164,21 @@ export function buildTemporalEvaluationSplits(inputRows, boundaries) {
   if (!(trainBefore < validationBefore && validationBefore < holdoutBefore)) {
     throw new TypeError('temporal split boundaries must be strictly increasing')
   }
-  const rows = inputRows.map((row) => normalizeRow(row, holdoutBefore))
   const result = { train: [], validation: [], holdout: [] }
-  for (const row of rows) {
-    const decisionAt = Date.parse(row.decisionAt)
-    if (decisionAt < trainBefore) result.train.push(row)
-    else if (decisionAt < validationBefore) result.validation.push(row)
-    else if (decisionAt < holdoutBefore) result.holdout.push(row)
+  for (const inputRow of inputRows) {
+    const decisionAt = timestamp(inputRow.decisionAt, 'decision timestamp')
+    const split = decisionAt < trainBefore
+      ? 'train'
+      : decisionAt < validationBefore
+        ? 'validation'
+        : decisionAt < holdoutBefore
+          ? 'holdout'
+          : null
+    if (split === null) continue
+    const cutoff = split === 'train'
+      ? trainBefore
+      : split === 'validation' ? validationBefore : holdoutBefore
+    result[split].push(normalizeRow(inputRow, new Date(cutoff).toISOString()))
   }
   return result
 }
@@ -274,15 +282,23 @@ function normalizeRow(input, evaluationAt) {
   if (futureEvidence.length > 0) {
     throw new TypeError('future evidence cannot enter an evaluated score row')
   }
+  const modelLineage = normalizeModelLineage(input.modelLineage)
   const outcomeProjection = normalizeOutcomeProjection(
     input.outcomeProjection,
     decisionAt,
     evaluationAt,
   )
+  if (outcomeProjection !== null && (
+    outcomeProjection.candidateId !== modelLineage.candidateId ||
+    outcomeProjection.lineageId !== modelLineage.opportunityLineageId
+  )) {
+    throw new TypeError('outcome projection does not match evaluation lineage')
+  }
   return {
     sampleKey: hash(input.sampleKey, 'sample key'),
     agencyProfileKey: hash(input.agencyProfileKey, 'agency profile key'),
     decisionAt,
+    modelLineage,
     scores: Object.fromEntries(EVALUATION_V2_MODEL_KEYS.map((key) => [
       key,
       optionalFinite(input.scores?.[key]),
@@ -324,6 +340,38 @@ function normalizeRow(input, evaluationAt) {
       ),
     evidenceObservedAt,
     excludedFutureEvidenceCount: 0,
+  }
+}
+
+function normalizeModelLineage(input) {
+  const v3 = input?.opportunity_v3
+  const quality = input?.quality_engine_v2
+  const normalize = (value, label) => ({
+    candidateId: positiveIdText(value?.candidateId, `${label} candidate id`),
+    candidateGeneration: positiveInteger(
+      value?.candidateGeneration,
+      `${label} candidate generation`,
+    ),
+    opportunityLineageId: positiveIdText(
+      value?.opportunityLineageId,
+      `${label} opportunity lineage id`,
+    ),
+  })
+  const normalizedV3 = normalize(v3, 'opportunity v3 lineage')
+  const normalizedQuality = normalize(quality, 'quality v2 lineage')
+  if (
+    normalizedV3.candidateId !== normalizedQuality.candidateId ||
+    normalizedV3.candidateGeneration !== normalizedQuality.candidateGeneration ||
+    normalizedV3.opportunityLineageId !== normalizedQuality.opportunityLineageId
+  ) {
+    throw new TypeError('v3 and Quality v2 must share exact candidate lineage')
+  }
+  return {
+    candidateId: normalizedV3.candidateId,
+    candidateGeneration: normalizedV3.candidateGeneration,
+    opportunityLineageId: normalizedV3.opportunityLineageId,
+    opportunity_v3: normalizedV3,
+    quality_engine_v2: normalizedQuality,
   }
 }
 

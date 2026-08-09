@@ -6,6 +6,7 @@ import {
 } from './commercial-fit-v2'
 import type {
   CommercialSignalQualityEngineV2Input,
+  CommercialSignalQualityStatus,
 } from './commercial-signal-quality-engine-v2'
 import {
   buildEvidenceIndependence,
@@ -47,6 +48,9 @@ export type CommercialSignalQualityV2BuiltInput = {
   opportunityLineageId: string
   candidateId: string
   candidateGeneration: number
+  v3Status: CommercialSignalQualityStatus
+  v3QualityScore: number
+  archetypes: string[]
   organizationId: string
   workspaceId: string
   clientProfileId: string
@@ -99,6 +103,8 @@ type LineageRow = {
   qualityComponents: unknown
   actionabilityComponents: unknown
   candidateFeatures: unknown
+  v3Status: string
+  v3QualityScore: number
   matchId: string | null
   matchGeneration: number | null
   candidateMatchGeneration: number | null
@@ -108,6 +114,7 @@ type LineageRow = {
   propensityGeneration: number | null
   candidatePropensityGeneration: number | null
   propensityScore: number | null
+  propensityLevel: string | null
   thesisId: string | null
   thesisGeneration: number | null
   candidateThesisGeneration: number | null
@@ -133,6 +140,10 @@ type EvidenceRow = {
   contentHash: string
   tier: string
   payloadRef: unknown
+  matchEvidence: boolean
+  propensityEvidence: boolean
+  thesisEvidence: boolean
+  episodeEvidence: boolean
 }
 
 const LINEAGE_SQL = `SELECT
@@ -156,6 +167,8 @@ const LINEAGE_SQL = `SELECT
   candidate.quality_components AS "qualityComponents",
   candidate.actionability_components AS "actionabilityComponents",
   candidate.feature_snapshot AS "candidateFeatures",
+  candidate.status AS "v3Status",
+  candidate.quality_score AS "v3QualityScore",
   match.id::TEXT AS "matchId",
   match.match_generation AS "matchGeneration",
   candidate.agency_dna_match_generation AS "candidateMatchGeneration",
@@ -165,6 +178,7 @@ const LINEAGE_SQL = `SELECT
   propensity.propensity_generation AS "propensityGeneration",
   candidate.propensity_generation AS "candidatePropensityGeneration",
   propensity.score AS "propensityScore",
+  propensity.level AS "propensityLevel",
   thesis.id::TEXT AS "thesisId",
   thesis.thesis_generation AS "thesisGeneration",
   candidate.commercial_thesis_generation AS "candidateThesisGeneration",
@@ -229,7 +243,35 @@ const EVIDENCE_SQL = `SELECT
   evidence.fetched_at AS "fetchedAt",
   evidence.content_hash AS "contentHash",
   evidence.tier,
-  evidence.payload_ref AS "payloadRef"
+  evidence.payload_ref AS "payloadRef",
+  EXISTS (
+    SELECT 1 FROM agency_dna_match_evidence match_evidence
+    WHERE match_evidence.match_snapshot_id = $6
+      AND match_evidence.evidence_id = evidence.id
+      AND match_evidence.organization_id = candidate_evidence.organization_id
+      AND match_evidence.workspace_id = candidate_evidence.workspace_id
+      AND match_evidence.client_profile_id = candidate_evidence.client_profile_id
+  ) AS "matchEvidence",
+  EXISTS (
+    SELECT 1 FROM external_agency_propensity_evidence propensity_evidence
+    WHERE propensity_evidence.propensity_snapshot_id = $7
+      AND propensity_evidence.evidence_id = evidence.id
+      AND propensity_evidence.organization_id = candidate_evidence.organization_id
+      AND propensity_evidence.workspace_id = candidate_evidence.workspace_id
+      AND propensity_evidence.client_profile_id = candidate_evidence.client_profile_id
+  ) AS "propensityEvidence",
+  EXISTS (
+    SELECT 1 FROM commercial_thesis_evidence thesis_evidence
+    WHERE thesis_evidence.commercial_thesis_id = $8
+      AND thesis_evidence.evidence_id = evidence.id
+      AND thesis_evidence.organization_id = candidate_evidence.organization_id
+  ) AS "thesisEvidence",
+  EXISTS (
+    SELECT 1 FROM signal_episode_evidence episode_evidence
+    WHERE episode_evidence.signal_episode_id = $9
+      AND episode_evidence.evidence_id = evidence.id
+      AND episode_evidence.organization_id = candidate_evidence.organization_id
+  ) AS "episodeEvidence"
 FROM opportunity_candidate_evidence candidate_evidence
 JOIN evidence_items evidence
   ON evidence.id = candidate_evidence.evidence_id
@@ -277,6 +319,10 @@ export async function buildCommercialSignalQualityV2Input(
       row.workspaceId,
       row.clientProfileId,
       decisionAt,
+      row.matchId,
+      row.propensityId,
+      row.thesisId,
+      row.signalEpisodeId,
     ]),
   ])
   if (evidenceResult.rows.length === 0) fail('QUALITY_LINEAGE_EVIDENCE_MISSING')
@@ -288,7 +334,14 @@ export async function buildCommercialSignalQualityV2Input(
     ...event,
     evidenceIds: ids(event.evidenceIds.filter((id) => allowedEvidenceIds.has(id))),
   })).filter((event) => event.evidenceIds.length > 0)
-  const input = assembleInput(row, events, evidenceById, new Date(decisionAt))
+  const assembled = assembleInput(
+    row,
+    events,
+    evidenceById,
+    evidenceResult.rows,
+    new Date(decisionAt),
+  )
+  const input = assembled.input
   const usedIds = ids([
     ...input.currentHiringEvidence.evidenceIds,
     ...input.hiringNeed.evidenceIds,
@@ -311,6 +364,9 @@ export async function buildCommercialSignalQualityV2Input(
     opportunityLineageId: row.opportunityLineageId,
     candidateId: row.candidateId,
     candidateGeneration: row.candidateGeneration as number,
+    v3Status: qualityStatus(row.v3Status),
+    v3QualityScore: unitInterval(row.v3QualityScore, 'v3 quality score'),
+    archetypes: assembled.archetypes,
     organizationId: row.organizationId,
     workspaceId: row.workspaceId,
     clientProfileId: row.clientProfileId,
@@ -354,8 +410,9 @@ function assembleInput(
   row: LineageRow,
   events: EventRow[],
   evidenceById: ReadonlyMap<string, CommercialSignalEvidenceProvenance>,
+  evidenceRows: EvidenceRow[],
   decisionAt: Date,
-): CommercialSignalQualityEngineV2Input {
+): { input: CommercialSignalQualityEngineV2Input; archetypes: string[] } {
   const directIds = (event: EventRow): string[] => event.evidenceIds.filter((id) => {
     const source = evidenceById.get(id)?.sourceKind
     return source === 'direct' || source === 'official'
@@ -367,6 +424,12 @@ function assembleInput(
     'job_posting', 'vacancy_repost', 'vacancy_salary_change',
     'vacancy_cluster', 'recruiter_vacancy', 'hiring_restart',
   ])
+  const matchEvidenceIds = ids(evidenceRows
+    .filter((item) => item.matchEvidence)
+    .map((item) => item.evidenceId))
+  const propensityEvidenceIds = ids(evidenceRows
+    .filter((item) => item.propensityEvidence)
+    .map((item) => item.evidenceId))
   const qualityComponents = object(row.qualityComponents)
   const actionabilityComponents = object(row.actionabilityComponents)
   const candidateFeatures = object(row.candidateFeatures)
@@ -379,23 +442,31 @@ function assembleInput(
   )
   const agencyFit = componentFromPersisted(
     qualityComponents.agencyFit,
-    hiringEvidenceIds,
+    matchEvidenceIds,
     'AGENCY_FIT_UNKNOWN',
     row.matchFitScore,
     row.matchCoverage,
   )
-  const friction = buildHiringFriction(buildFrictionInput(events, directIds, decisionAt))
-  const negatives = buildNegativeEvidence(events, directIds, decisionAt)
+  const frictionInput = buildFrictionInput(events, directIds, decisionAt)
+  const friction = buildHiringFriction(frictionInput)
+  const negatives = buildNegativeEvidence(
+    events,
+    directIds,
+    evidenceById,
+    decisionAt,
+  )
   const negativeEvidence = evaluateNegativeEvidence(negatives, decisionAt)
   const independence = buildEvidenceIndependence(
     [...evidenceById.values()],
     decisionAt,
   )
   const groupByEvidence = new Map(independence.groups.flatMap((group) =>
-    group.evidenceIds.map((evidenceId) => [
-      evidenceId,
-      group.evidenceIndependenceGroup,
-    ] as const)))
+    group.reasonCodes.includes('EVIDENCE_ORIGIN_UNKNOWN')
+      ? []
+      : group.evidenceIds.map((evidenceId) => [
+          evidenceId,
+          group.evidenceIndependenceGroup,
+        ] as const)))
   const convergence = buildSignalConvergence({
     events: buildConvergenceEvents(events, directIds, groupByEvidence),
     negativeEvidence,
@@ -409,7 +480,7 @@ function assembleInput(
   const accountRestriction = row.accountRestriction
   const previousRelationship = accountRestriction === 'existing_client' ||
     accountRestriction === 'former_client'
-    ? propensityComponent(0.9, hiringEvidenceIds)
+    ? propensityComponent(0.9, matchEvidenceIds, row.matchCoverage)
     : propensityComponent(null, [])
   const propensity = buildExternalAgencyPropensity({
     hiringNeed: toPropensity(hiringNeed),
@@ -420,8 +491,9 @@ function assembleInput(
       evidenceIds: friction.frictionLevel === 'unknown' ? [] : friction.evidenceIds,
     },
     externalSupportPlausibility: propensityComponent(
-      row.propensityScore,
-      hiringEvidenceIds,
+      row.propensityLevel === 'insufficient_evidence' ? null : row.propensityScore,
+      propensityEvidenceIds,
+      evidenceCoverage(propensityEvidenceIds),
     ),
     timing: toPropensity(componentFromPersisted(
       qualityComponents.timing,
@@ -444,12 +516,12 @@ function assembleInput(
     doNotContact: {
       value: accountRestriction === 'do_not_contact' ? true : null,
       evidenceIds: accountRestriction === 'do_not_contact'
-        ? agencyFit.evidenceIds : [],
+        ? matchEvidenceIds : [],
     },
     conflict: {
       value: accountRestriction === 'conflict' ? true : null,
       evidenceIds: accountRestriction === 'conflict'
-        ? agencyFit.evidenceIds : [],
+        ? matchEvidenceIds : [],
     },
     archetypes: archetypes.map((item) => ({
       archetype: item.archetype,
@@ -460,16 +532,19 @@ function assembleInput(
     evidenceOriginGroups: Object.fromEntries([...groupByEvidence.entries()]),
     convergenceIndependentGroupCount: convergence.independentGroupCount,
   })
-  const economicsComponent = componentFromPersisted(
-    qualityComponents.economics,
-    hiringEvidenceIds,
-    'ECONOMICS_UNKNOWN',
-  )
-  const economics = economicsComponent.value === null
+  const persistedEconomicsOutcome = economicsOutcome(qualityFeatures.economicsOutcome)
+  const economicsComponent = persistedEconomicsOutcome === 'unknown'
+    ? null
+    : componentFromPersisted(
+      qualityComponents.economics,
+      matchEvidenceIds,
+      'ECONOMICS_UNKNOWN',
+    )
+  const economics = economicsComponent === null || economicsComponent.value === null
     ? buildEconomicsFit(unknownEconomicsInput())
     : {
         featureVersion: 'commercial-fit-v2' as const,
-        economicsFit: economicsOutcome(qualityFeatures.economicsOutcome),
+        economicsFit: persistedEconomicsOutcome,
         componentValue: economicsComponent.value,
         componentConfidence: economicsComponent.confidence,
         coverage: economicsComponent.coverage,
@@ -485,6 +560,8 @@ function assembleInput(
   ) && actionabilityFeatures.corporateContactPathCategories.length > 0
 
   return {
+    archetypes: archetypes.map((item) => item.archetype),
+    input: {
     decisionAt: decisionAt.toISOString(),
     decisionSource: 'deterministic',
     componentSources: {
@@ -520,7 +597,8 @@ function assembleInput(
       conflict: accountRestriction === 'conflict',
       evidenceIds: contactIds,
     },
-    evidence: [],
+      evidence: [],
+    },
   }
 }
 
@@ -533,12 +611,32 @@ function buildFrictionInput(
   const reposts = events.filter((event) => event.eventType === 'vacancy_repost')
   const salaries = events.filter((event) => event.eventType === 'vacancy_salary_change')
   const restarts = events.filter((event) => event.eventType === 'hiring_restart')
-  const recruiters = events.filter((event) => event.eventType === 'recruiter_vacancy')
   const allJobIds = ids(jobs.flatMap(directIds))
   const repostIds = ids(reposts.flatMap(directIds))
   const salaryIds = ids(salaries.flatMap(directIds))
   const restartIds = ids(restarts.flatMap(directIds))
-  const recruiterIds = ids(recruiters.flatMap(directIds))
+  const observedReposts = reposts.flatMap((event) => {
+    const intervalDays = numberPayload(event.payload, ['intervalDays', 'interval_days'])
+    const automated = booleanPayload(event.payload, ['automated'])
+    const salaryChanged = booleanPayload(event.payload, [
+      'salaryChanged', 'salary_changed',
+    ])
+    const requirementsChanged = booleanPayload(event.payload, [
+      'requirementsChanged', 'requirements_changed',
+    ])
+    const evidenceIds = directIds(event)
+    return intervalDays === null || automated === null ||
+      salaryChanged === null || requirementsChanged === null ||
+      evidenceIds.length === 0
+      ? []
+      : [{
+          intervalDays,
+          automated,
+          salaryChanged,
+          requirementsChanged,
+          evidenceIds,
+        }]
+  })
   const earliestJob = jobs.map((item) => Date.parse(item.occurredAt))
     .filter(Number.isFinite).sort((left, right) => left - right)[0]
   const requirements = events.filter((event) =>
@@ -554,21 +652,11 @@ function buildFrictionInput(
     vacancyAgeDays: earliestJob === undefined || allJobIds.length === 0
       ? unknownMetric()
       : observedMetric(Math.max(0, (decisionAt.getTime() - earliestJob) / 86_400_000), allJobIds),
-    repostCycles: repostIds.length === 0
+    repostCycles: repostIds.length === 0 || observedReposts.length !== reposts.length
       ? unknownReposts()
       : {
           state: 'observed' as const,
-          value: reposts.map((event) => ({
-            intervalDays: numberPayload(event.payload, ['intervalDays', 'interval_days']) ?? 0,
-            automated: booleanPayload(event.payload, ['automated']) ?? false,
-            salaryChanged: booleanPayload(event.payload, [
-              'salaryChanged', 'salary_changed',
-            ]) ?? false,
-            requirementsChanged: booleanPayload(event.payload, [
-              'requirementsChanged', 'requirements_changed',
-            ]) ?? false,
-            evidenceIds: directIds(event),
-          })),
+          value: observedReposts,
           evidenceIds: repostIds,
         },
     salaryChange: salaryIds.length === 0 ? unknownMetric() : observedMetric(1, salaryIds),
@@ -580,8 +668,7 @@ function buildFrictionInput(
     seniorityComplexity: unknownMetric(),
     multiRoleComplexity: unknownMetric(),
     regionalDifficulty: unknownMetric(),
-    internalRecruitingCapacity: recruiters.length === 0
-      ? unknownMetric() : observedMetric(0, recruiterIds),
+    internalRecruitingCapacity: unknownMetric(),
     hiringVelocityVsCapacity: unknownMetric(),
     timeToFillHistory: unknownMetric(),
     evergreenRole: evergreen,
@@ -592,13 +679,17 @@ function buildFrictionInput(
 function buildNegativeEvidence(
   events: EventRow[],
   directIds: (event: EventRow) => string[],
+  evidenceById: ReadonlyMap<string, CommercialSignalEvidenceProvenance>,
   decisionAt: Date,
 ): NegativeEvidenceInput[] {
   return events.filter((event) => event.eventType === 'hiring_slowdown')
     .map((event) => ({
       type: 'hiring_slowdown' as const,
       classification: 'confirmed_negative' as const,
-      sourceKind: 'official' as const,
+      sourceKind: directIds(event).some((id) =>
+        evidenceById.get(id)?.sourceKind === 'direct')
+        ? 'direct' as const
+        : 'official' as const,
       severity: event.confidence ?? 0.8,
       eventIds: [event.eventId],
       evidenceIds: directIds(event),
@@ -659,6 +750,12 @@ function buildArchetypeInput(
   const restarts = byType('hiring_restart')
   const slowdown = byType('hiring_slowdown')
   const reposts = byType('vacancy_repost')
+  const evergreen = events.filter((event) => booleanPayload(event.payload, [
+    'evergreen', 'evergreenRole', 'evergreen_role',
+  ]) !== null)
+  const massHiring = events.filter((event) => booleanPayload(event.payload, [
+    'massHiring', 'mass_hiring',
+  ]) !== null)
   return {
     friction: {
       level: friction.frictionLevel,
@@ -678,8 +775,16 @@ function buildArchetypeInput(
     newRegion: signal<boolean | null>(newRegion.length > 0 || null, newRegion),
     leadershipChange: signal<boolean | null>(leadership.length > 0 || null, leadership),
     recruiterVacancy: signal<boolean | null>(recruiters.length > 0 || null, recruiters),
-    massHiring: signal<boolean | null>(null, []),
-    evergreen: signal<boolean | null>(null, []),
+    massHiring: signal<boolean | null>(massHiring.length === 0
+      ? null
+      : massHiring.some((event) => booleanPayload(event.payload, [
+        'massHiring', 'mass_hiring',
+      ]) === true), massHiring),
+    evergreen: signal<boolean | null>(evergreen.length === 0
+      ? null
+      : evergreen.some((event) => booleanPayload(event.payload, [
+        'evergreen', 'evergreenRole', 'evergreen_role',
+      ]) === true), evergreen),
     reactivation: signal<boolean | null>(restarts.length > 0 || null, restarts),
     freezeOrSlowdown: signal<boolean | null>(slowdown.length > 0 || null, slowdown),
   }
@@ -742,14 +847,23 @@ function toPropensity(component: OpportunityQualityComponent) {
   }
 }
 
-function propensityComponent(value: number | null, evidenceIds: string[]) {
+function propensityComponent(
+  value: number | null,
+  evidenceIds: string[],
+  rawCoverage: number | null = null,
+) {
   const normalized = finiteUnit(value)
+  const coverage = finiteUnit(rawCoverage) ?? evidenceCoverage(evidenceIds)
   return {
     value: normalized,
-    confidence: normalized === null ? 0 : (evidenceIds.length > 0 ? 1 : 0),
-    coverage: normalized === null ? 0 : (evidenceIds.length > 0 ? 1 : 0),
+    confidence: normalized === null ? 0 : coverage,
+    coverage: normalized === null ? 0 : coverage,
     evidenceIds: normalized === null ? [] : evidenceIds,
   }
+}
+
+function evidenceCoverage(evidenceIds: string[]): number {
+  return Math.min(1, evidenceIds.length / 2)
 }
 
 function unknownEconomicsInput() {
@@ -809,7 +923,7 @@ function toProvenance(row: EvidenceRow): CommercialSignalEvidenceProvenance {
     sourceKind: row.tier === 'direct'
       ? 'direct'
       : row.tier === 'corroboration'
-        ? 'official'
+        ? 'derived_deterministic'
         : 'approved_context',
     sourceFamily: requiredText(row.source, 'evidence source'),
     sourceDomain: sourceDomain(row.url, row.source),
@@ -892,6 +1006,24 @@ function timestamp(value: string, label: string): string {
 function positiveId(value: string, label: string): string {
   if (!/^[1-9]\d*$/.test(value)) throw new Error(`${label} must be positive`)
   return value
+}
+
+function qualityStatus(value: string): CommercialSignalQualityStatus {
+  if (![
+    'qualified_actionable',
+    'qualified_needs_enrichment',
+    'review',
+    'blocked',
+    'expired',
+    'dismissed',
+  ].includes(value)) throw new Error('v3 status is invalid')
+  return value as CommercialSignalQualityStatus
+}
+
+function unitInterval(value: number, label: string): number {
+  const normalized = finiteUnit(value)
+  if (normalized === null) throw new Error(`${label} must be between 0 and 1`)
+  return normalized
 }
 
 function ids(values: readonly string[], validate = true): string[] {

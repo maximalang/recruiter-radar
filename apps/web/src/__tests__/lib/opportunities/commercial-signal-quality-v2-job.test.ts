@@ -1,259 +1,228 @@
 import {
   CommercialSignalQualityV2ApplyScopeRequiredError,
   CommercialSignalQualityV2ShadowScopeRequiredError,
-  runCommercialSignalQualityV2Shadow,
   runCommercialSignalQualityV2ShadowPipeline,
-  type CommercialSignalQualityV2ShadowItem,
 } from '@/lib/opportunities/commercial-signal-quality-v2-job'
+import * as builder from
+  '@/lib/opportunities/commercial-signal-quality-v2-input-builder'
+import * as engine from
+  '@/lib/opportunities/commercial-signal-quality-engine-v2'
 import * as repository from
   '@/lib/opportunities/commercial-signal-quality-v2-repository'
-import type { CommercialSignalQualityEngineV2Input } from
-  '@/lib/opportunities/commercial-signal-quality-engine-v2'
 
+jest.mock('@/lib/opportunities/commercial-signal-quality-v2-input-builder', () => ({
+  buildCommercialSignalQualityV2Input: jest.fn(),
+}))
+jest.mock('@/lib/opportunities/commercial-signal-quality-engine-v2', () => ({
+  buildCommercialSignalQualityEngineV2: jest.fn(),
+}))
 jest.mock('@/lib/opportunities/commercial-signal-quality-v2-repository', () => ({
   persistCommercialSignalQualityV2: jest.fn(),
 }))
 
-function item(): CommercialSignalQualityV2ShadowItem {
+function built(overrides: Record<string, unknown> = {}) {
   return {
+    opportunityLineageId: '501',
     candidateId: '201',
+    candidateGeneration: 1,
+    v3Status: 'qualified_actionable',
+    v3QualityScore: 0.8,
+    archetypes: ['hard_to_fill'],
     organizationId: '301',
     workspaceId: '401',
     clientProfileId: '402',
     validUntil: '2026-09-01T00:00:00.000Z',
-    input: engineInput(),
-  }
+    input: {
+      evidence: [],
+      hiringFriction: { frictionLevel: 'unknown' },
+      convergence: { status: 'review' },
+      negativeEvidence: { action: 'none' },
+    },
+    ...overrides,
+  } as never
 }
 
-function engineInput(): CommercialSignalQualityEngineV2Input {
-  const evidence = [{
-    evidenceId: '101',
-    sourceKind: 'direct' as const,
-    sourceFamily: 'career-pages',
-    sourceDomain: 'example.ru',
-    upstreamOrigin: 'origin:101',
-    canonicalUrl: 'https://example.ru/101',
-    vacancyFingerprint: 'a'.repeat(64),
-    publicationFingerprint: 'p-101',
-    organizationDomain: 'example.ru',
-    contentFingerprint: 'a'.repeat(64),
-    observedAt: '2026-08-08T09:00:00.000Z',
-  }, {
-    evidenceId: '102',
-    sourceKind: 'official' as const,
-    sourceFamily: 'corporate-contacts',
-    sourceDomain: 'example.ru',
-    upstreamOrigin: 'origin:contact',
-    canonicalUrl: 'https://example.ru/contact',
-    vacancyFingerprint: null,
-    publicationFingerprint: null,
-    organizationDomain: 'example.ru',
-    contentFingerprint: 'b'.repeat(64),
-    observedAt: '2026-08-08T09:00:00.000Z',
-  }]
-  return {
-    decisionAt: '2026-08-08T10:00:00.000Z',
-    decisionSource: 'deterministic',
-    componentSources: {
-      hiringNeed: 'direct',
-      hiringFriction: 'derived_deterministic',
-      agencyFit: 'derived_deterministic',
-      propensity: 'derived_deterministic',
-      convergence: 'derived_deterministic',
-      economics: 'derived_deterministic',
-      marketDifficulty: 'derived_deterministic',
-    },
-    currentHiringEvidence: { present: true, evidenceIds: ['101'] },
-    hiringNeed: component(0.9),
-    hiringFriction: {
-      featureVersion: 'hiring-friction-v1',
-      frictionLevel: 'high',
-      frictionScore: 0.85,
-      coverage: 1,
-      positiveReasons: [{ code: 'FRICTION', evidenceIds: ['101'] }],
-      negativeReasons: [],
-      evidenceIds: ['101'],
-      componentValues: {},
-      observationStates: {},
-    },
-    agencyFit: component(0.9),
-    propensity: {
-      featureVersion: 'external-agency-propensity-v2',
-      propensityLevel: 'high',
-      propensityScore: 0.9,
-      confidence: 0.9,
-      coverage: 1,
-      actionability: 'eligible',
-      reasonCodes: ['PROPENSITY'],
-      evidenceIds: ['101'],
-      affirmativeEvidenceIds: ['101'],
-      componentValues: {},
-    },
-    convergence: {
-      featureVersion: 'signal-convergence-v1',
-      convergenceScore: 0.85,
-      coverage: 1,
-      confidence: 0.9,
-      independentGroupCount: 1,
-      status: 'active',
-      components: {
-        coOccurrence: 0,
-        sequence: 0,
-        velocity: 0.8,
-        recency: 1,
-        contradiction: 0,
-      },
-      positiveReasons: ['CONVERGENCE'],
-      negativeReasons: [],
-      eventIds: ['501'],
-      evidenceIds: ['101'],
-      affirmativeEvidenceIds: ['101'],
-      excludedFutureEventIds: [],
-    },
-    economics: {
-      featureVersion: 'commercial-fit-v2',
-      economicsFit: 'unknown',
-      componentValue: null,
-      componentConfidence: 0,
-      coverage: 0,
-      reasons: ['ECONOMICS_SCOPE_UNKNOWN'],
-      evidenceIds: [],
-    },
-    marketDifficulty: {
-      marketDifficulty: 'unknown',
-      componentValue: null,
-      componentConfidence: 0,
-      roleFamily: 'backend',
-      seniority: 'senior',
-      region: 'moscow',
-      evidenceDate: null,
-      source: null,
-      evidenceIds: [],
-    },
-    negativeEvidence: {
-      featureVersion: 'negative-evidence-v1',
-      action: 'none',
-      scoreMultiplier: 1,
-      confirmedReasons: [],
-      heuristicReasons: [],
-      unknownReasons: [],
-      evidenceIds: [],
-      expiredEvidenceIds: [],
-      excludedFutureEvidenceIds: [],
-    },
-    contact: {
-      corporateContactPathAvailable: true,
-      doNotContact: false,
-      conflict: false,
-      evidenceIds: ['102'],
-    },
-    evidence,
-  }
+function database(lineages: string[] = []) {
+  const query = jest.fn(async (text: string) => {
+    if (text.includes('FROM commercial_signal_opportunity_lineage')) {
+      return {
+        rows: lineages.map((opportunityLineageId) => ({ opportunityLineageId })),
+        rowCount: lineages.length,
+      }
+    }
+    return { rows: [], rowCount: 0 }
+  })
+  return { query }
 }
 
-function component(value: number) {
-  return {
-    value,
-    confidence: 0.9,
-    coverage: 1,
-    reasonCodes: ['EVIDENCED'],
-    evidenceIds: ['101'],
-  }
-}
-
-describe('Commercial Signal Quality v2 shadow coordinator', () => {
-  beforeEach(() => jest.clearAllMocks())
-
-  it('stays dark unless the exact feature flag is true', async () => {
-    await expect(runCommercialSignalQualityV2Shadow([item()], {
-      env: {},
-    })).resolves.toMatchObject({ enabled: false, scanned: 0, built: 0 })
-  })
-
-  it('builds in dry-run without persistence by default', async () => {
-    const stats = await runCommercialSignalQualityV2Shadow([item()], {
-      env: { COMMERCIAL_SIGNAL_QUALITY_V2_ENABLED: 'true' },
-    })
-
-    expect(stats).toMatchObject({
-      enabled: true,
-      dryRun: true,
-      scanned: 1,
-      built: 1,
-      persisted: 0,
-      failed: 0,
-    })
-    expect(repository.persistCommercialSignalQualityV2).not.toHaveBeenCalled()
-  })
-
-  it('requires exact workspace and organization scope before apply', async () => {
-    await expect(runCommercialSignalQualityV2Shadow([item()], {
-      env: { COMMERCIAL_SIGNAL_QUALITY_V2_ENABLED: 'true' },
-      dryRun: false,
-    }, { query: jest.fn() } as never)).rejects.toBeInstanceOf(
-      CommercialSignalQualityV2ApplyScopeRequiredError,
-    )
-  })
-
-  it('persists only matching scoped items', async () => {
+describe('Commercial Signal Quality v2 exact-lineage shadow pipeline', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    jest.mocked(builder.buildCommercialSignalQualityV2Input)
+      .mockResolvedValue(built())
+    jest.mocked(engine.buildCommercialSignalQualityEngineV2)
+      .mockReturnValue({
+        status: 'review',
+        quality: { qualityCoverage: 0, qualityConfidence: 0 },
+        components: {},
+        actionabilityIndependence: { coverage: 0 },
+      } as never)
     jest.mocked(repository.persistCommercialSignalQualityV2).mockResolvedValue({
       qualitySnapshotId: '601',
       qualityGeneration: 1,
       inserted: true,
-      evidenceAttached: 1,
+      evidenceAttached: 0,
     })
-    const stats = await runCommercialSignalQualityV2Shadow([
-      item(),
-      { ...item(), candidateId: '202', organizationId: '999' },
-    ], {
-      env: { COMMERCIAL_SIGNAL_QUALITY_V2_ENABLED: 'true' },
-      dryRun: false,
-      workspaceId: '401',
-      organizationId: '301',
-    }, { query: jest.fn() } as never)
-
-    expect(stats).toMatchObject({ scanned: 1, built: 1, persisted: 1 })
-    expect(repository.persistCommercialSignalQualityV2).toHaveBeenCalledTimes(1)
   })
 
-  it('requires tenant and profile scope for automatic persisted-lineage runs', async () => {
+  it('stays dark unless the exact feature flag is true', async () => {
+    await expect(runCommercialSignalQualityV2ShadowPipeline({ env: {} }))
+      .resolves.toMatchObject({ enabled: false, scanned: 0, built: 0 })
+  })
+
+  it('requires tenant and profile scope for persisted-lineage runs', async () => {
     await expect(runCommercialSignalQualityV2ShadowPipeline({
       env: { COMMERCIAL_SIGNAL_QUALITY_V2_ENABLED: 'true' },
       workspaceId: '401',
-    }, { query: jest.fn() } as never)).rejects.toBeInstanceOf(
+    }, database() as never)).rejects.toBeInstanceOf(
       CommercialSignalQualityV2ShadowScopeRequiredError,
     )
   })
 
-  it('bounds persisted-lineage dry runs and applies a statement timeout', async () => {
-    const query = jest.fn(async (text: string) => {
-      if (text.includes('commercial_signal_opportunity_lineage')) {
-        return { rows: [], rowCount: 0 }
-      }
-      return { rows: [], rowCount: 0 }
-    })
+  it('requires organization scope before apply', async () => {
+    await expect(runCommercialSignalQualityV2ShadowPipeline({
+      env: { COMMERCIAL_SIGNAL_QUALITY_V2_ENABLED: 'true' },
+      dryRun: false,
+      workspaceId: '401',
+      clientProfileId: '402',
+    }, database() as never)).rejects.toBeInstanceOf(
+      CommercialSignalQualityV2ApplyScopeRequiredError,
+    )
+  })
 
+  it('bounds dry runs, sets a timeout, and skips already-linked lineages', async () => {
+    const db = database()
     const stats = await runCommercialSignalQualityV2ShadowPipeline({
       env: { COMMERCIAL_SIGNAL_QUALITY_V2_ENABLED: 'true' },
       workspaceId: '401',
       clientProfileId: '402',
       batchSize: 1_000,
-    }, { query } as never)
+    }, db as never)
 
-    expect(stats).toMatchObject({
-      enabled: true,
-      dryRun: true,
-      scanned: 0,
-      persisted: 0,
-    })
-    expect(query).toHaveBeenCalledWith(
+    expect(stats).toMatchObject({ enabled: true, dryRun: true, scanned: 0 })
+    expect(db.query).toHaveBeenCalledWith(
       expect.stringContaining("set_config('statement_timeout'"),
       ['5000ms'],
     )
-    expect(query).toHaveBeenCalledWith(
-      expect.stringContaining('LIMIT $4'),
-      ['401', '402', null, 100],
+    expect(db.query).toHaveBeenCalledWith(
+      expect.stringMatching(/NOT EXISTS[\s\S]+quality_lineage\.opportunity_lineage_id/),
+      ['401', '402', null, null, 100],
     )
-    expect(query).toHaveBeenCalledWith('RESET statement_timeout')
+    expect(db.query).toHaveBeenCalledWith('RESET statement_timeout')
+  })
+
+  it('returns a non-mutating cursor so dry-run can inspect later batches', async () => {
+    const db = database(['501'])
+    const stats = await runCommercialSignalQualityV2ShadowPipeline({
+      env: { COMMERCIAL_SIGNAL_QUALITY_V2_ENABLED: 'true' },
+      workspaceId: '401',
+      clientProfileId: '402',
+      afterLineageId: '500',
+    }, db as never)
+
+    expect(stats.nextCursor).toBe('501')
+    expect(db.query).toHaveBeenCalledWith(
+      expect.stringMatching(/lineage\.id > COALESCE\(\$4::BIGINT, 0\)/),
+      ['401', '402', null, '500', 25],
+    )
+    expect(repository.persistCommercialSignalQualityV2).not.toHaveBeenCalled()
+  })
+
+  it('builds and persists only the exact scoped lineage', async () => {
+    const db = database(['501'])
+    const stats = await runCommercialSignalQualityV2ShadowPipeline({
+      env: { COMMERCIAL_SIGNAL_QUALITY_V2_ENABLED: 'true' },
+      dryRun: false,
+      workspaceId: '401',
+      clientProfileId: '402',
+      organizationId: '301',
+    }, db as never)
+
+    expect(stats).toMatchObject({ scanned: 1, built: 1, persisted: 1, failed: 0 })
+    expect(builder.buildCommercialSignalQualityV2Input).toHaveBeenCalledWith(
+      '501',
+      { workspaceId: '401', clientProfileId: '402', organizationId: '301' },
+      expect.anything(),
+    )
+    expect(repository.persistCommercialSignalQualityV2).toHaveBeenCalledWith(
+      expect.objectContaining({
+        opportunityLineageId: '501',
+        workspaceId: '401',
+        clientProfileId: '402',
+        organizationId: '301',
+      }),
+      expect.anything(),
+    )
+  })
+
+  it('exposes only aggregate, PII-free quality telemetry', async () => {
+    jest.mocked(engine.buildCommercialSignalQualityEngineV2).mockReturnValue({
+      status: 'review',
+      quality: {
+        qualityCoverage: 0.6,
+        qualityConfidence: 0.4,
+      },
+      components: {
+        hiring_need: { value: 0.7, coverage: 1 },
+        hiring_friction: { value: null, coverage: 0 },
+        agency_fit: { value: 0.8, coverage: 1 },
+        external_agency_propensity: { value: 0.5, coverage: 0.5 },
+        signal_convergence: { value: 0.4, coverage: 0.5 },
+      },
+      actionabilityIndependence: { coverage: 0.5 },
+    } as never)
+    jest.mocked(builder.buildCommercialSignalQualityV2Input)
+      .mockResolvedValue(built({
+        input: {
+          evidence: [],
+          hiringFriction: { frictionLevel: 'medium' },
+          convergence: { status: 'active' },
+          negativeEvidence: { action: 'reduce' },
+        },
+      }))
+
+    const stats = await runCommercialSignalQualityV2ShadowPipeline({
+      env: { COMMERCIAL_SIGNAL_QUALITY_V2_ENABLED: 'true' },
+      workspaceId: '401',
+      clientProfileId: '402',
+    }, database(['501']) as never)
+
+    expect(stats.telemetry).toEqual({
+      v3ToV2: { promoted: 0, demoted: 1, unchanged: 0 },
+      qualityCoverage: { low: 0, medium: 1, high: 0 },
+      qualityConfidence: { low: 1, medium: 0, high: 0 },
+      missingCriticalDimensions: { hiring_friction: 1 },
+      frictionLevels: { medium: 1 },
+      archetypes: { hard_to_fill: 1 },
+      convergenceStatuses: { active: 1 },
+      negativeActions: { reduce: 1 },
+      independentOriginRatio: { low: 0, medium: 1, high: 0 },
+    })
+    expect(JSON.stringify(stats.telemetry)).not.toMatch(/candidate|organization|evidence/i)
+  })
+
+  it('rejects a builder result from another profile before persistence', async () => {
+    jest.mocked(builder.buildCommercialSignalQualityV2Input)
+      .mockResolvedValue(built({ clientProfileId: '999' }))
+    const stats = await runCommercialSignalQualityV2ShadowPipeline({
+      env: { COMMERCIAL_SIGNAL_QUALITY_V2_ENABLED: 'true' },
+      dryRun: false,
+      workspaceId: '401',
+      clientProfileId: '402',
+      organizationId: '301',
+    }, database(['501']) as never)
+
+    expect(stats).toMatchObject({ scanned: 1, built: 0, failed: 1 })
+    expect(repository.persistCommercialSignalQualityV2).not.toHaveBeenCalled()
   })
 })

@@ -38,6 +38,8 @@ function candidate(overrides: Partial<OutcomeLearningCandidate> = {}): OutcomeLe
     agencyProfileKey: 'agency-a',
     episodeType: 'persistent_hiring',
     archetypes: ['hard_to_fill'],
+    frictionScore: 0.7,
+    convergencePatterns: ['multi_origin_active'],
     queryPlanKeys: ['plan-a'],
     caseSimilarity: 0.8,
     score: 0.85,
@@ -153,10 +155,48 @@ describe('Outcome Learning v1', () => {
     const result = buildOutcomeLearningV1({ workspaceId: '10', candidates: [candidate()], now: NOW })
     expect(result.slices.episodeType).toHaveLength(1)
     expect(result.slices.archetype).toHaveLength(1)
+    expect(result.slices.archetypeByProfile[0]?.key)
+      .toBe('agency-a|hard_to_fill')
+    expect(result.slices.frictionBandByProfile[0]?.key)
+      .toBe('agency-a|high')
+    expect(result.slices.convergencePattern[0]?.key)
+      .toBe('multi_origin_active')
     expect(result.slices.queryPlan).toHaveLength(1)
     expect(result.learningStatus).toBe('insufficient_data')
     expect(result.shadowRecommendations).toEqual([])
     expect(result.automaticWeightUpdates).toBe(false)
+  })
+
+  it('requires mature outcomes inside each slice before recommending it', () => {
+    const candidates = Array.from({ length: 30 }, (_, offset) => {
+      const index = offset + 1
+      const mature = index <= 10
+      return candidate({
+        candidateId: String(100 + index),
+        opportunityId: String(300 + index),
+        lineageId: String(400 + index),
+        queryPlanKeys: [mature ? 'plan-mature' : 'plan-immature'],
+        outcomeProjection: projection({
+          candidateId: String(100 + index),
+          opportunityId: String(300 + index),
+          lineageId: String(400 + index),
+          lastEventId: String(500 + index),
+          lastEventAt: '2026-07-08T09:00:00.000Z',
+          repliedAt: mature ? '2026-07-05T09:00:00.000Z' : null,
+          meetingAt: mature ? '2026-07-08T09:00:00.000Z' : null,
+        }),
+      })
+    })
+    const result = buildOutcomeLearningV1({ workspaceId: '10', candidates, now: NOW })
+    const queryPlanRecommendations = result.shadowRecommendations
+      .filter((item) => item.dimension === 'queryPlan')
+
+    expect(result.learningStatus).toBe('shadow_review_ready')
+    expect(queryPlanRecommendations).toEqual([
+      expect.objectContaining({ key: 'plan-mature' }),
+    ])
+    expect(result.slices.queryPlan.find((item) => item.key === 'plan-immature'))
+      .toMatchObject({ sampleCount: 20, matureOutcomes: 0 })
   })
 
   it('rejects one canonical projection attached to multiple lineages', () => {

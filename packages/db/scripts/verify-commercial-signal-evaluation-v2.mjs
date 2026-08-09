@@ -14,6 +14,18 @@ const row = (index, overrides = {}) => ({
   sampleKey: index.toString(16).padStart(64, '0'),
   agencyProfileKey: index % 2 === 0 ? hash('a') : hash('b'),
   decisionAt: `2026-${index <= 9 ? '06' : index <= 19 ? '07' : '08'}-01T00:00:00.000Z`,
+  modelLineage: {
+    opportunity_v3: {
+      candidateId: String(2000 + index),
+      candidateGeneration: 1,
+      opportunityLineageId: String(4000 + index),
+    },
+    quality_engine_v2: {
+      candidateId: String(2000 + index),
+      candidateGeneration: 1,
+      opportunityLineageId: String(4000 + index),
+    },
+  },
   scores: {
     freshness: 1 - index / 40,
     vacancy_volume: index,
@@ -80,6 +92,20 @@ assert.throws(() => evaluateCommercialSignalV2([
 ], { evaluationAt: '2026-09-01T00:00:00.000Z' }), /future decision/)
 assert.throws(() => evaluateCommercialSignalV2([
   row(1, {
+    modelLineage: {
+      opportunity_v3: {
+        candidateId: '2001', candidateGeneration: 1,
+        opportunityLineageId: '4001',
+      },
+      quality_engine_v2: {
+        candidateId: '9999', candidateGeneration: 1,
+        opportunityLineageId: '4001',
+      },
+    },
+  }),
+], { evaluationAt: '2026-09-01T00:00:00.000Z' }), /share exact candidate lineage/)
+assert.throws(() => evaluateCommercialSignalV2([
+  row(1, {
     outcomeProjection: {
       version: 'opportunity-outcome-state-v1',
       candidateId: '9001',
@@ -108,6 +134,21 @@ const splits = buildTemporalEvaluationSplits(rows, {
 assert.ok(splits.train.length > 0)
 assert.ok(splits.validation.length > 0)
 assert.ok(splits.holdout.length > 0)
+assert.throws(() => buildTemporalEvaluationSplits([
+  row(1, {
+    outcomeProjection: {
+      ...row(1).outcomeProjection,
+      lastEventAt: '2026-06-20T00:00:00.000Z',
+      repliedAt: '2026-06-20T00:00:00.000Z',
+      meetingAt: null,
+      wonAt: null,
+    },
+  }),
+], {
+  trainBefore: '2026-06-15T00:00:00.000Z',
+  validationBefore: '2026-07-15T00:00:00.000Z',
+  holdoutBefore: '2026-09-01T00:00:00.000Z',
+}), /future outcome projection/)
 assert.throws(() => buildTemporalEvaluationSplits(rows, {
   trainBefore: '2026-07-15T00:00:00.000Z',
   validationBefore: '2026-06-15T00:00:00.000Z',
@@ -126,7 +167,8 @@ process.stdout.write(`${JSON.stringify({
   'false_positive_taxonomy',
     'future_evidence_excluded',
     'future_decisions_excluded',
-    'temporal_split_only',
+  'temporal_split_specific_outcome_cutoffs',
+  'same_exact_lineage_universe',
     'deterministic_results',
     'no_automatic_weight_updates',
     'v3_quality_v2_contract_only_comparison',

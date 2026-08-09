@@ -27,6 +27,8 @@ function lineage(overrides: Record<string, unknown> = {}) {
     candidateIdentity: 'a'.repeat(64),
     lineageCandidateGeneration: 3,
     candidateGeneration: 3,
+    v3Status: 'qualified_actionable',
+    v3QualityScore: 0.8,
     signalEpisodeId: '51',
     signalEpisodeIdentity: 'b'.repeat(64),
     lineageEpisodeGeneration: 4,
@@ -60,6 +62,8 @@ function lineage(overrides: Record<string, unknown> = {}) {
     propensityGeneration: 6,
     candidatePropensityGeneration: 6,
     propensityScore: 0.7,
+    propensityLevel: 'medium',
+    propensityFeatures: {},
     thesisId: '81',
     thesisGeneration: 7,
     candidateThesisGeneration: 7,
@@ -94,6 +98,10 @@ function evidence(overrides: Record<string, unknown> = {}) {
       upstreamOrigin: 'career:vacancy:1',
       vacancyFingerprint: 'vacancy:1',
     },
+    matchEvidence: true,
+    propensityEvidence: true,
+    thesisEvidence: true,
+    episodeEvidence: true,
     ...overrides,
   }
 }
@@ -133,6 +141,8 @@ describe('Commercial Signal Quality v2 exact-lineage input builder', () => {
       opportunityLineageId: '41',
       candidateId: '31',
       candidateGeneration: 3,
+      v3Status: 'qualified_actionable',
+      v3QualityScore: 0.8,
       workspaceId: '21',
       clientProfileId: '22',
       organizationId: '11',
@@ -144,6 +154,9 @@ describe('Commercial Signal Quality v2 exact-lineage input builder', () => {
     })
     expect(built.input.hiringFriction.observationStates.repost_cycles)
       .toBe('unknown')
+    expect(built.input.economics).toMatchObject({
+      economicsFit: 'unknown', componentValue: null, coverage: 0,
+    })
     expect(built.input.evidence.map((item) => item.evidenceId)).toEqual(['101'])
 
     const lineageQuery = calls[0]!
@@ -151,6 +164,12 @@ describe('Commercial Signal Quality v2 exact-lineage input builder', () => {
     expect(lineageQuery.text).toContain('lineage.id = $1')
     expect(lineageQuery.text).toContain('candidate.id = lineage.candidate_id')
     expect(lineageQuery.text).not.toMatch(/DISTINCT ON|\bMAX\s*\(|nearest|freshest/i)
+    const evidenceQuery = calls.find((call) =>
+      call.text.includes('FROM opportunity_candidate_evidence'))
+    expect(evidenceQuery?.values).toEqual([
+      '31', '11', '21', '22', '2026-08-09T10:00:00.000Z',
+      '61', '71', '81', '51',
+    ])
   })
 
   it('fails closed when exact lineage is absent or belongs to another scope', async () => {
@@ -211,5 +230,47 @@ describe('Commercial Signal Quality v2 exact-lineage input builder', () => {
     expect(built.input.hiringFriction.componentValues.repost_cycles).toBeNull()
     expect(built.input.hiringFriction.observationStates.repost_cycles)
       .toBe('unknown')
+  })
+
+  it('keeps an insufficient upstream propensity unavailable', async () => {
+    const { db } = dbWith({
+      lineage: [lineage({ propensityLevel: 'insufficient_evidence' })],
+    })
+
+    const built = await buildCommercialSignalQualityV2Input('41', {
+      workspaceId: '21', clientProfileId: '22',
+    }, db)
+
+    expect(built.input.propensity.componentValues.external_support_plausibility)
+      .toBeNull()
+  })
+
+  it('does not launder corroboration tier into current official hiring evidence', async () => {
+    const { db } = dbWith({ evidence: [evidence({ tier: 'corroboration' })] })
+
+    const built = await buildCommercialSignalQualityV2Input('41', {
+      workspaceId: '21', clientProfileId: '22',
+    }, db)
+
+    expect(built.input.currentHiringEvidence).toEqual({
+      present: false, evidenceIds: [],
+    })
+    expect(built.input.evidence.every((item) =>
+      item.sourceKind !== 'official')).toBe(true)
+  })
+
+  it('threads observed evergreen evidence into propensity demotion', async () => {
+    const { db } = dbWith({
+      events: [event({ payload: { evergreen: true } })],
+    })
+
+    const built = await buildCommercialSignalQualityV2Input('41', {
+      workspaceId: '21', clientProfileId: '22',
+    }, db)
+
+    expect(built.input.hiringFriction.observationStates.evergreen_role)
+      .toBe('observed')
+    expect(built.input.propensity.reasonCodes)
+      .toContain('ARCHETYPE_EVERGREEN_DEMOTION')
   })
 })

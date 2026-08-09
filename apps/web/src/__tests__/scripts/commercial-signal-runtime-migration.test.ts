@@ -114,6 +114,18 @@ describe('Commercial Signal rollback data preservation', () => {
     expect(isolatedCleanupRunner).toContain(
       'COMMERCIAL_SIGNAL_ISOLATED_TEST_CLEANUP_SQL',
     )
+    const qualityFeedbackDown = isolatedCleanupRunner.indexOf(
+      '20260809110000_add_query_plan_quality_feedback_v2.down.sql',
+    )
+    const qualityDown = isolatedCleanupRunner.indexOf(
+      '20260809100000_add_commercial_signal_quality_v2.down.sql',
+    )
+    const runtimeDown = isolatedCleanupRunner.indexOf(
+      '20260807170000_add_commercial_signal_canary_runtime.down.sql',
+    )
+    expect(qualityFeedbackDown).toBeGreaterThan(-1)
+    expect(qualityDown).toBeGreaterThan(qualityFeedbackDown)
+    expect(runtimeDown).toBeGreaterThan(qualityDown)
     expect(opportunityDownVerifier).toContain(
       'COMMERCIAL_SIGNAL_ISOLATED_TEST_CLEANUP_SQL',
     )

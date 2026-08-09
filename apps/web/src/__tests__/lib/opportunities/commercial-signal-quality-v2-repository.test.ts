@@ -211,6 +211,9 @@ describe('Commercial Signal Quality v2 repository', () => {
         if (sql.includes('INSERT INTO commercial_signal_quality_evidence')) {
           return { rows: [], rowCount: 1 } as never
         }
+        if (sql.includes('INSERT INTO commercial_signal_quality_opportunity_lineage')) {
+          return { rows: [{ opportunity_lineage_id: '601' }], rowCount: 1 } as never
+        }
         return { rows: [], rowCount: 0 } as never
       },
     }
@@ -221,6 +224,7 @@ describe('Commercial Signal Quality v2 repository', () => {
 
     for (const input of [unknown, notConfigured]) {
       await persistCommercialSignalQualityV2({
+        opportunityLineageId: '601',
         candidateId: '201', organizationId: '301', workspaceId: '401',
         clientProfileId: '402', validUntil: '2026-09-01T00:00:00.000Z',
         engineInput: input,
@@ -245,11 +249,15 @@ describe('Commercial Signal Quality v2 repository', () => {
             rowCount: 1,
           } as never
         }
+        if (sql.includes('INSERT INTO commercial_signal_quality_opportunity_lineage')) {
+          return { rows: [{ opportunity_lineage_id: '601' }], rowCount: 1 } as never
+        }
         return { rows: [], rowCount: 0 } as never
       },
     }
 
     const persisted = await persistCommercialSignalQualityV2({
+      opportunityLineageId: '601',
       candidateId: '201',
       organizationId: '301',
       workspaceId: '401',
@@ -272,6 +280,7 @@ describe('Commercial Signal Quality v2 repository', () => {
 
   it('rejects persistence when exact evidence provenance is incomplete', async () => {
     await expect(persistCommercialSignalQualityV2({
+      opportunityLineageId: '601',
       candidateId: '201',
       organizationId: '301',
       workspaceId: '401',
@@ -288,6 +297,7 @@ describe('Commercial Signal Quality v2 repository', () => {
     contradictory.status = 'blocked'
 
     await expect(persistCommercialSignalQualityV2({
+      opportunityLineageId: '601',
       candidateId: '201',
       organizationId: '301',
       workspaceId: '401',
@@ -307,6 +317,7 @@ describe('Commercial Signal Quality v2 repository', () => {
     forged.quality.criticalCoverage = 0.1
 
     await expect(persistCommercialSignalQualityV2({
+      opportunityLineageId: '601',
       candidateId: '201',
       organizationId: '301',
       workspaceId: '401',

@@ -29,6 +29,9 @@ readiness blocker, not permission to weaken P@5 or other quality thresholds.
 
 - exact-`true`, dark-by-default `COMMERCIAL_SIGNAL_QUALITY_V2_ENABLED`;
 - append-only tenant/candidate/evidence lineage;
+- exact persisted-lineage input builder and bounded shadow orchestrator;
+- protected dry-run-default operator endpoint with exact apply scope;
+- aggregate PII-free shadow telemetry and tenant-scoped outcome slices;
 - heuristic and uncalibrated model labels;
 - deterministic evidence independence and future-evidence exclusion;
 - DNC/conflict and confirmed-negative blocking;
@@ -49,8 +52,7 @@ The following are genuinely missing or not yet proven at production scale:
 - reviewed company agency-use history and previous agency relationship;
 - explicit procurement constraints and confirmed no-agency policy evidence;
 - approved, reproducible role/region market-difficulty observations;
-- a production producer that assembles all Quality v2 component inputs before
-  calling the append-only repository;
+- production-scale observation coverage for the persisted-lineage producer;
 - a tenant-approved Quality v2 shadow sample with TOP and missed-opportunity
   manual annotations;
 - sufficient mature reply/meeting/proposal/won/lost outcomes;
@@ -60,9 +62,9 @@ The following are genuinely missing or not yet proven at production scale:
 ## Required rollout sequence
 
 1. Keep the flag dark and merge only after CI/PostgreSQL contracts pass.
-2. Add the reviewed component-input producer and run shadow only for one
-   explicitly approved internal workspace.
-3. Review TOP and the four missed-opportunity sample types manually.
+2. Run the implemented exact-lineage producer in dry-run mode, then shadow only
+   for one explicitly approved internal workspace.
+3. Review TOP and the five missed-opportunity sample types manually.
 4. Produce a signed quality report without lowering the existing P@5 gate.
 5. Only then request separate authorization for an internal workspace canary.
 
@@ -71,9 +73,9 @@ zero coverage in a critical dimension, unreviewed negative evidence, missing
 credentials, unsafe runtime state, or absent operator approval. A zero-lead run
 is a supply finding and does not authorize threshold reduction.
 
-## Local verification limitation
+## Local verification boundary
 
-The TypeScript, unit, static migration, evaluator, and JavaScript syntax gates
-run locally. PostgreSQL runtime verification could not be executed because no
-isolated `DATABASE_URL` was available and Docker Desktop's engine was not
-running. Production data was not used as a substitute.
+Local verification uses an isolated disposable PostgreSQL database and never
+production or user data. It proves schema, rollback, lineage, TypeScript, unit,
+build, and evaluator contracts; it does not prove production precision or
+authorize a production canary.

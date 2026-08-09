@@ -10,6 +10,16 @@ const rows = Array.from({ length: 30 }, (_, offset) => {
     sampleKey: index.toString(16).padStart(64, '0'),
     agencyProfileKey: index % 2 === 0 ? hash('a') : hash('b'),
     decisionAt: `2026-${month}-01T00:00:00.000Z`,
+    modelLineage: {
+      opportunity_v3: {
+        candidateId: String(2000 + index), candidateGeneration: 1,
+        opportunityLineageId: String(4000 + index),
+      },
+      quality_engine_v2: {
+        candidateId: String(2000 + index), candidateGeneration: 1,
+        opportunityLineageId: String(4000 + index),
+      },
+    },
     scores: {
       freshness: 1 - index / 40,
       vacancy_volume: index,
@@ -19,11 +29,13 @@ const rows = Array.from({ length: 30 }, (_, offset) => {
       quality_engine_v2: relevant ? 0.98 - index / 200 : 0.16 + index / 2000,
     },
     qualityCoverage: 0.9,
+    qualityConfidence: 0.85,
     reviewLabel: relevant ? 'strong' : 'weak',
     status: relevant ? 'qualified_actionable' : 'review',
     friction: index % 3 === 0 ? 0.85 : 0.3,
     agencyFit: index % 4 === 0 ? 0.9 : 0.5,
     propensity: index % 4 === 0 ? 0.3 : 0.7,
+    convergence: index % 5 === 0 ? 0.8 : 0.4,
     outcomeProjection: {
       version: 'opportunity-outcome-state-v1',
       candidateId: String(2000 + index),
@@ -36,6 +48,7 @@ const rows = Array.from({ length: 30 }, (_, offset) => {
       wonAt: index <= 2 ? `2026-${month}-04T00:00:00.000Z` : null,
     },
     falseNegativeCategory: index === 20 ? 'coverage_gap' : null,
+    falsePositiveCategory: index === 21 ? 'ordinary_hiring' : null,
     evidenceObservedAt: ['2026-05-01T00:00:00.000Z'],
   }
 })

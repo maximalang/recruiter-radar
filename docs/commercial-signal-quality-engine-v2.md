@@ -10,7 +10,13 @@ facts with an LLM, or represent a probability of winning a deal.
 
 The runtime flag is `COMMERCIAL_SIGNAL_QUALITY_V2_ENABLED`. It accepts only the
 exact string `true` and defaults to dark. The repository persists append-only
-shadow snapshots; no cron route or UI reader is enabled by this change.
+shadow snapshots. A protected operator endpoint exists at
+`/api/cron/opportunities/build-commercial-signal-quality-v2`; it is dry-run by
+default, requires exact workspace and profile scope, and requires
+`apply=true` plus exact workspace, profile, and organization scope before it
+can append. Dry-runs return a non-mutating lineage cursor accepted as the
+`after` query parameter, so an operator can inspect later bounded batches. No
+UI reader or automatic reader switch is enabled by this change.
 
 Planner feedback is isolated behind its own exact-`true`, default-dark flag,
 `COMMERCIAL_SIGNAL_QUALITY_V2_PLANNER_FEEDBACK_ENABLED`. Enabling shadow quality
@@ -155,6 +161,8 @@ FIUR, Opportunity v2, Opportunity v3, and Quality Engine v2.
 Temporal evaluation uses ordered train/validation/holdout periods. A scored row
 containing evidence observed after its decision timestamp is rejected; the
 evaluator never keeps its precomputed score after merely filtering timestamps.
+Each split applies its own closing boundary to effective outcomes; train data
+cannot observe validation outcomes and validation cannot observe holdout.
 Outcome learning accepts only canonical milestone timestamps from the effective
 `opportunity-outcome-state-v1` projection, excludes candidates not yet shown,
 and excludes milestones after the fixed clock. Callers cannot submit arbitrary
@@ -167,12 +175,32 @@ rejects both evidence and decision rows later than that cutoff;
 untimestamped outcome booleans are not accepted. Automatic production weight
 updates and production ML rollout are explicitly disabled.
 
+The input builder starts from one persisted
+`commercial_signal_opportunity_lineage` row and verifies the exact candidate,
+episode, Agency DNA match, propensity, thesis, company-state, event, and
+evidence generations. Missing, stale, or cross-tenant lineage fails closed with
+a controlled `QUALITY_LINEAGE_*` code; latest/freshest/nearest fallbacks are not
+used. Evaluation separately requires Opportunity v3 and Quality v2 model
+lineage to name the same candidate id, candidate generation, and opportunity
+lineage id.
+
+The shadow job emits aggregate-only telemetry for v3-to-v2 promotion/demotion,
+coverage and confidence bands, missing critical dimensions, friction,
+archetype, convergence, negative action, and independent-origin coverage. It
+contains no candidate, organization, evidence text, URL, email, or phone.
+Outcome Learning remains tenant-scoped and analytics-only; its slices include
+archetype by profile, friction band by profile, convergence pattern, query
+plan, case similarity, and quality decile. Reply/meeting/won rates use mature
+effective outcome projections only.
+
 ## Verification commands
 
 ```powershell
 npm.cmd run web:check
 npm.cmd run db:validate
 npm.cmd run test:commercial-signal-quality-v2:db
+npm.cmd run test:commercial-signal-quality-v2:down
+npm.cmd run test:opportunity-engine:down
 npm.cmd run test:commercial-signal:evaluation-v2
 npm.cmd run commercial-signal:evaluate-v2
 ```

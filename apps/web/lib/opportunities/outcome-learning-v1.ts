@@ -34,6 +34,8 @@ export type OutcomeLearningCandidate = {
   agencyProfileKey: string
   episodeType: string
   archetypes: string[]
+  frictionScore: number | null
+  convergencePatterns: string[]
   queryPlanKeys: string[]
   caseSimilarity: number | null
   score: number
@@ -50,6 +52,7 @@ export type OutcomeLearningMetric = {
 export type OutcomeLearningSlice = {
   key: string
   sampleCount: number
+  matureOutcomes: number
   accepted: number
   replied: number
   meetings: number
@@ -70,6 +73,9 @@ export type OutcomeLearningResult = {
   slices: {
     episodeType: OutcomeLearningSlice[]
     archetype: OutcomeLearningSlice[]
+    archetypeByProfile: OutcomeLearningSlice[]
+    frictionBandByProfile: OutcomeLearningSlice[]
+    convergencePattern: OutcomeLearningSlice[]
     queryPlan: OutcomeLearningSlice[]
     caseSimilarityBand: OutcomeLearningSlice[]
     scoreDecile: OutcomeLearningSlice[]
@@ -164,6 +170,17 @@ export function buildOutcomeLearningV1(input: {
     episodeType: buildSlices(historical.map((item) => ({ key: item.episodeType, item }))),
     archetype: buildSlices(historical.flatMap((item) =>
       item.archetypes.map((key) => ({ key, item })))),
+    archetypeByProfile: buildSlices(historical.flatMap((item) =>
+      item.archetypes.map((archetype) => ({
+        key: `${item.agencyProfileKey}|${archetype}`,
+        item,
+      })))),
+    frictionBandByProfile: buildSlices(historical.map((item) => ({
+      key: `${item.agencyProfileKey}|${frictionBand(item.frictionScore)}`,
+      item,
+    }))),
+    convergencePattern: buildSlices(historical.flatMap((item) =>
+      item.convergencePatterns.map((key) => ({ key, item })))),
     queryPlan: buildSlices(historical.flatMap((item) =>
       item.queryPlanKeys.map((key) => ({ key, item })))),
     caseSimilarityBand: buildSlices(historical.map((item) => ({
@@ -244,6 +261,10 @@ function normalizeCandidate(input: OutcomeLearningCandidate): NormalizedCandidat
     agencyProfileKey: identifier(input.agencyProfileKey, 'agency profile key'),
     episodeType: identifier(input.episodeType, 'episode type'),
     archetypes: uniqueText(input.archetypes.map((item) => identifier(item, 'archetype'))),
+    frictionScore: input.frictionScore === null
+      ? null : unitInterval(input.frictionScore, 'friction score'),
+    convergencePatterns: uniqueText(input.convergencePatterns.map((item) =>
+      identifier(item, 'convergence pattern'))),
     queryPlanKeys: uniqueText(input.queryPlanKeys.map((item) => identifier(item, 'query plan key'))),
     caseSimilarity: input.caseSimilarity === null
       ? null : unitInterval(input.caseSimilarity, 'case similarity'),
@@ -272,6 +293,7 @@ function buildSlices(entries: Array<{ key: string; item: NormalizedCandidate }>)
     .map(([key, items]) => ({
       key,
       sampleCount: items.length,
+      matureOutcomes: items.filter(hasMatureOutcome).length,
       accepted: items.filter((item) => hasOutcome(item, 'accepted')).length,
       replied: items.filter((item) => hasOutcome(item, 'replied')).length,
       meetings: items.filter((item) => hasOutcome(item, 'meeting')).length,
@@ -281,11 +303,11 @@ function buildSlices(entries: Array<{ key: string; item: NormalizedCandidate }>)
 
 function buildShadowRecommendations(slices: OutcomeLearningResult['slices']): OutcomeLearningResult['shadowRecommendations'] {
   return Object.entries(slices).flatMap(([dimension, values]) => values
-    .filter((item) => item.sampleCount >= MINIMUM_MATURE_OUTCOMES)
+    .filter((item) => item.matureOutcomes >= MINIMUM_MATURE_OUTCOMES)
     .map((item) => ({
       dimension,
       key: item.key,
-      reasonCode: item.won > 0 || item.meetings / item.sampleCount >= 0.2
+      reasonCode: item.won > 0 || item.meetings / item.matureOutcomes >= 0.2
         ? 'SHADOW_REVIEW_POSSIBLE_POSITIVE_YIELD'
         : 'SHADOW_REVIEW_POSSIBLE_LOW_YIELD',
     }))).sort((left, right) => left.dimension.localeCompare(right.dimension, 'en') ||
@@ -295,6 +317,10 @@ function buildShadowRecommendations(slices: OutcomeLearningResult['slices']): Ou
 function hasOutcome(input: NormalizedCandidate, type: OutcomeLearningType): boolean {
   return type === 'shown' || input.outcomeProjection.milestones[type] !== null
 }
+function hasMatureOutcome(input: NormalizedCandidate): boolean {
+  return ['replied', 'meeting', 'proposal', 'won', 'lost'].some((type) =>
+    hasOutcome(input, type as OutcomeLearningType))
+}
 function firstOutcomeAt(input: NormalizedCandidate, type: MilestoneType): number | null {
   return input.outcomeProjection.milestones[type]
 }
@@ -302,6 +328,12 @@ function caseSimilarityBand(value: number | null): string {
   if (value === null) return 'unknown'
   if (value >= 0.75) return 'high'
   if (value >= 0.5) return 'medium'
+  return 'low'
+}
+function frictionBand(value: number | null): string {
+  if (value === null) return 'unknown'
+  if (value >= 0.67) return 'high'
+  if (value >= 0.34) return 'medium'
   return 'low'
 }
 function rate(numerator: number, denominator: number): OutcomeLearningMetric {

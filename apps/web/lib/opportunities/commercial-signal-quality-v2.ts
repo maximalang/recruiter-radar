@@ -246,7 +246,9 @@ function normalizeEvidence(
     token('content', contentFingerprint),
     token('canonical', canonicalUrl),
   ].filter((value): value is string => value !== null))
-  const originKnown = correlationTokens.length > 0
+  const originKnown = upstreamOrigin !== null || vacancyFingerprint !== null ||
+    publicationFingerprint !== null ||
+    ((sourceKind === 'direct' || sourceKind === 'official') && canonicalUrl !== null)
 
   if (!originKnown) {
     correlationTokens.push(

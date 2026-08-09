@@ -190,6 +190,20 @@ describe('Commercial Signal Quality Engine v2 contracts', () => {
     expect(result.reasonCodes).not.toContain('EVIDENCE_INDEPENDENT')
   })
 
+  it('does not treat a derived URL and content hash as proven origin', () => {
+    const result = buildEvidenceIndependence([evidence({
+      sourceKind: 'derived_deterministic',
+      upstreamOrigin: null,
+      vacancyFingerprint: null,
+      publicationFingerprint: null,
+      canonicalUrl: 'https://aggregator.example/vacancy/42',
+      contentFingerprint: 'f'.repeat(64),
+    })], new Date('2026-08-09T00:00:00.000Z'))
+
+    expect(result.independentGroupCount).toBe(0)
+    expect(result.reasonCodes).toContain('EVIDENCE_ORIGIN_UNKNOWN')
+  })
+
   it('excludes evidence observed after the decision clock', () => {
     const result = buildEvidenceIndependence([
       evidence(),

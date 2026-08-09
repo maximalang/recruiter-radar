@@ -5,7 +5,8 @@ import { getPool } from '@/lib/db-pool'
 import { logError, logEvent } from '@/lib/runtime'
 import {
   buildCommercialSignalQualityEngineV2,
-  type CommercialSignalQualityEngineV2Input,
+  type CommercialSignalQualityEngineV2Result,
+  type CommercialSignalQualityStatus,
 } from './commercial-signal-quality-engine-v2'
 import {
   persistCommercialSignalQualityV2,
@@ -22,19 +23,11 @@ export const COMMERCIAL_SIGNAL_QUALITY_V2_SHADOW_LIMITS = {
   statementTimeoutMs: 5_000,
 } as const
 
-export type CommercialSignalQualityV2ShadowItem = {
-  candidateId: string
-  organizationId: string
-  workspaceId: string
-  clientProfileId: string
-  validUntil: string
-  input: CommercialSignalQualityEngineV2Input
-}
-
 export type CommercialSignalQualityV2ShadowOptions = {
   workspaceId?: string | number | null
   clientProfileId?: string | number | null
   organizationId?: string | number | null
+  afterLineageId?: string | number | null
   batchSize?: number
   dryRun?: boolean
   env?: Readonly<Record<string, string | undefined>>
@@ -54,7 +47,23 @@ export type CommercialSignalQualityV2ShadowStats = {
   persisted: number
   replayed: number
   failed: number
+  nextCursor: string | null
+  telemetry: CommercialSignalQualityV2ShadowTelemetry
 }
+
+export type CommercialSignalQualityV2ShadowTelemetry = {
+  v3ToV2: { promoted: number; demoted: number; unchanged: number }
+  qualityCoverage: DistributionBuckets
+  qualityConfidence: DistributionBuckets
+  missingCriticalDimensions: Record<string, number>
+  frictionLevels: Record<string, number>
+  archetypes: Record<string, number>
+  convergenceStatuses: Record<string, number>
+  negativeActions: Record<string, number>
+  independentOriginRatio: DistributionBuckets
+}
+
+type DistributionBuckets = { low: number; medium: number; high: number }
 
 export class CommercialSignalQualityV2ApplyScopeRequiredError extends Error {
   constructor() {
@@ -94,6 +103,9 @@ export async function runCommercialSignalQualityV2ShadowPipeline(
   const organizationId = options.organizationId == null
     ? null
     : positiveId(String(options.organizationId), 'organization id')
+  const afterLineageId = options.afterLineageId == null
+    ? null
+    : positiveId(String(options.afterLineageId), 'after lineage id')
   const batchSize = boundedBatchSize(options.batchSize)
   const database = (providedDb ?? getPool()) as CommercialSignalQualityV2Db | null
   if (!database) throw new Error('DATABASE_URL is not set.')
@@ -109,19 +121,29 @@ export async function runCommercialSignalQualityV2ShadowPipeline(
       workspaceId,
       clientProfileId,
       organizationId,
+      afterLineageId,
       batchSize,
     }, db)
     for (const lineage of lineages) {
       stats.scanned += 1
+      stats.nextCursor = lineage.opportunityLineageId
       try {
         const built = await buildCommercialSignalQualityV2Input(
           lineage.opportunityLineageId,
           { workspaceId, clientProfileId, organizationId },
           db as CommercialSignalQualityV2InputBuilderDb,
         )
+        if (
+          built.workspaceId !== workspaceId ||
+          built.clientProfileId !== clientProfileId ||
+          (organizationId !== null && built.organizationId !== organizationId)
+        ) {
+          throw new Error('QUALITY_LINEAGE_BUILDER_SCOPE_MISMATCH')
+        }
         const result = buildCommercialSignalQualityEngineV2(built.input)
         stats.built += 1
         countStatus(stats, result.status)
+        countTelemetry(stats.telemetry, built, result)
         if (dryRun) continue
         const persisted = await persistCommercialSignalQualityV2({
           opportunityLineageId: built.opportunityLineageId,
@@ -160,64 +182,12 @@ export async function runCommercialSignalQualityV2ShadowPipeline(
   }
 }
 
-export async function runCommercialSignalQualityV2Shadow(
-  rawItems: readonly CommercialSignalQualityV2ShadowItem[],
-  options: CommercialSignalQualityV2ShadowOptions = {},
-  db: CommercialSignalQualityV2Db | null = null,
-): Promise<CommercialSignalQualityV2ShadowStats> {
-  const enabled = isCommercialSignalQualityV2Enabled(options.env)
-  const dryRun = options.dryRun !== false
-  const stats = emptyStats(enabled, dryRun)
-  if (!enabled) return stats
-  if (!dryRun &&
-    (options.workspaceId == null || options.organizationId == null)) {
-    throw new CommercialSignalQualityV2ApplyScopeRequiredError()
-  }
-  if (!dryRun && db === null) throw new Error('quality persistence database is required')
-
-  const workspaceId = options.workspaceId == null
-    ? null
-    : positiveId(String(options.workspaceId), 'workspace id')
-  const organizationId = options.organizationId == null
-    ? null
-    : positiveId(String(options.organizationId), 'organization id')
-  const items = rawItems.map(normalizeItem)
-    .filter((item) => workspaceId === null || item.workspaceId === workspaceId)
-    .filter((item) => organizationId === null ||
-      item.organizationId === organizationId)
-    .sort((left, right) => compareIds(left.candidateId, right.candidateId))
-
-  for (const item of items) {
-    stats.scanned += 1
-    try {
-      const result = buildCommercialSignalQualityEngineV2(item.input)
-      stats.built += 1
-      countStatus(stats, result.status)
-      if (dryRun) continue
-      const persisted = await persistCommercialSignalQualityV2({
-        candidateId: item.candidateId,
-        organizationId: item.organizationId,
-        workspaceId: item.workspaceId,
-        clientProfileId: item.clientProfileId,
-        validUntil: item.validUntil,
-        engineInput: item.input,
-        result,
-        evidence: item.input.evidence,
-      }, db as CommercialSignalQualityV2Db)
-      if (persisted.inserted) stats.persisted += 1
-      else stats.replayed += 1
-    } catch {
-      stats.failed += 1
-    }
-  }
-  return stats
-}
-
 async function loadEligibleLineages(
   input: {
     workspaceId: string
     clientProfileId: string
     organizationId: string | null
+    afterLineageId: string | null
     batchSize: number
   },
   db: CommercialSignalQualityV2Db,
@@ -237,9 +207,21 @@ async function loadEligibleLineages(
        AND ($3::BIGINT IS NULL OR lineage.organization_id = $3)
        AND lineage.score_version = 'opportunity-v3'
        AND candidate.valid_until >= lineage.created_at
+       AND lineage.id > COALESCE($4::BIGINT, 0)
+       AND NOT EXISTS (
+         SELECT 1
+         FROM commercial_signal_quality_opportunity_lineage quality_lineage
+         WHERE quality_lineage.opportunity_lineage_id = lineage.id
+       )
      ORDER BY lineage.id
-     LIMIT $4`,
-    [input.workspaceId, input.clientProfileId, input.organizationId, input.batchSize],
+     LIMIT $5`,
+    [
+      input.workspaceId,
+      input.clientProfileId,
+      input.organizationId,
+      input.afterLineageId,
+      input.batchSize,
+    ],
   )
   return result.rows.map((row) => ({
     opportunityLineageId: positiveId(
@@ -259,19 +241,6 @@ function boundedBatchSize(value: number | undefined): number {
     normalized,
     COMMERCIAL_SIGNAL_QUALITY_V2_SHADOW_LIMITS.maximumBatchSize,
   )
-}
-
-function normalizeItem(
-  input: CommercialSignalQualityV2ShadowItem,
-): CommercialSignalQualityV2ShadowItem {
-  return {
-    ...input,
-    candidateId: positiveId(input.candidateId, 'candidate id'),
-    organizationId: positiveId(input.organizationId, 'organization id'),
-    workspaceId: positiveId(input.workspaceId, 'workspace id'),
-    clientProfileId: positiveId(input.clientProfileId, 'client profile id'),
-    validUntil: timestamp(input.validUntil, 'valid until'),
-  }
 }
 
 function countStatus(
@@ -302,20 +271,79 @@ function emptyStats(
     persisted: 0,
     replayed: 0,
     failed: 0,
+    nextCursor: null,
+    telemetry: {
+      v3ToV2: { promoted: 0, demoted: 0, unchanged: 0 },
+      qualityCoverage: emptyDistribution(),
+      qualityConfidence: emptyDistribution(),
+      missingCriticalDimensions: {},
+      frictionLevels: {},
+      archetypes: {},
+      convergenceStatuses: {},
+      negativeActions: {},
+      independentOriginRatio: emptyDistribution(),
+    },
   }
+}
+
+const CRITICAL_COMPONENTS = [
+  'hiring_need',
+  'hiring_friction',
+  'agency_fit',
+  'external_agency_propensity',
+  'signal_convergence',
+] as const
+
+function countTelemetry(
+  telemetry: CommercialSignalQualityV2ShadowTelemetry,
+  built: Awaited<ReturnType<typeof buildCommercialSignalQualityV2Input>>,
+  result: CommercialSignalQualityEngineV2Result,
+): void {
+  const comparison = statusRank(result.status) - statusRank(built.v3Status)
+  telemetry.v3ToV2[comparison > 0
+    ? 'promoted' : comparison < 0 ? 'demoted' : 'unchanged'] += 1
+  countDistribution(telemetry.qualityCoverage, result.quality.qualityCoverage)
+  countDistribution(telemetry.qualityConfidence, result.quality.qualityConfidence)
+  countDistribution(
+    telemetry.independentOriginRatio,
+    result.actionabilityIndependence.coverage,
+  )
+  for (const key of CRITICAL_COMPONENTS) {
+    const component = result.components[key]
+    if (!component || component.value === null || component.coverage === 0) {
+      increment(telemetry.missingCriticalDimensions, key)
+    }
+  }
+  increment(telemetry.frictionLevels, built.input.hiringFriction.frictionLevel)
+  for (const archetype of built.archetypes) increment(telemetry.archetypes, archetype)
+  increment(telemetry.convergenceStatuses, built.input.convergence.status)
+  increment(telemetry.negativeActions, built.input.negativeEvidence.action)
+}
+
+function statusRank(status: CommercialSignalQualityStatus): number {
+  return {
+    qualified_actionable: 5,
+    qualified_needs_enrichment: 4,
+    review: 3,
+    blocked: 2,
+    expired: 1,
+    dismissed: 0,
+  }[status]
+}
+
+function emptyDistribution(): DistributionBuckets {
+  return { low: 0, medium: 0, high: 0 }
+}
+
+function countDistribution(target: DistributionBuckets, value: number): void {
+  target[value >= 0.75 ? 'high' : value >= 0.5 ? 'medium' : 'low'] += 1
+}
+
+function increment(target: Record<string, number>, key: string): void {
+  target[key] = (target[key] ?? 0) + 1
 }
 
 function positiveId(value: string, label: string): string {
   if (!/^[1-9]\d*$/.test(value)) throw new Error(`${label} must be positive`)
   return value
-}
-
-function timestamp(value: string, label: string): string {
-  const parsed = new Date(value)
-  if (!Number.isFinite(parsed.getTime())) throw new Error(`${label} is invalid`)
-  return parsed.toISOString()
-}
-
-function compareIds(left: string, right: string): number {
-  return left.length - right.length || left.localeCompare(right, 'en')
 }
