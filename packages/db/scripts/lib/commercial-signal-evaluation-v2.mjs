@@ -54,6 +54,9 @@ export function evaluateCommercialSignalV2(inputRows, options = {}) {
     model,
     evaluateModel(labeled, model, dataStatus),
   ]))
+  const provenance = options.provenance === 'anonymized_real'
+    ? 'anonymized_real'
+    : 'synthetic_contract'
   const qualifiedWeeks = new Set(rows
     .filter((row) => row.status.startsWith('qualified_'))
     .map((row) => `${row.agencyProfileKey}:${isoWeek(row.decisionAt)}`))
@@ -63,11 +66,13 @@ export function evaluateCommercialSignalV2(inputRows, options = {}) {
   return {
     schemaVersion: COMMERCIAL_SIGNAL_EVALUATION_V2_SCHEMA,
     dataStatus,
+    provenance,
     sampleCount: rows.length,
     labeledCount: labeled.length,
     modelType: 'heuristic',
     calibrationStatus: 'uncalibrated',
     models,
+    comparison: compareV3Quality(models, provenance, dataStatus),
     qualityCoverage: metric(
       dataStatus,
       rows.length === 0 ? null : average(rows.map((row) => row.qualityCoverage)),
@@ -98,6 +103,31 @@ export function evaluateCommercialSignalV2(inputRows, options = {}) {
     automaticWeightTuning: false,
     productionWrites: false,
     scoreMeaning: 'heuristic_rank_not_deal_probability',
+  }
+}
+
+function compareV3Quality(models, provenance, dataStatus) {
+  const v3 = models.opportunity_v3
+  const quality = models.quality_engine_v2
+  const values = ['precisionAt5', 'precisionAt10', 'ndcgAt10']
+  const comparable = values.every((key) =>
+    v3[key].value !== null && quality[key].value !== null)
+  if (!comparable) {
+    return {
+      status: 'unavailable',
+      population: provenance,
+      deltas: { precisionAt5: null, precisionAt10: null, ndcgAt10: null },
+    }
+  }
+  return {
+    status: provenance === 'anonymized_real' && dataStatus === 'sufficient_data'
+      ? 'evaluation_only'
+      : 'contract_only',
+    population: provenance,
+    deltas: Object.fromEntries(values.map((key) => [
+      key,
+      round(quality[key].value - v3[key].value),
+    ])),
   }
 }
 

@@ -45,6 +45,9 @@ assert.equal(report.dataStatus, 'sufficient_data')
 assert.equal(report.calibrationStatus, 'uncalibrated')
 assert.equal(report.automaticWeightTuning, false)
 assert.equal(report.productionWrites, false)
+assert.equal(report.comparison.status, 'contract_only')
+assert.equal(report.comparison.population, 'synthetic_contract')
+assert.equal(typeof report.comparison.deltas.precisionAt5, 'number')
 assert.equal(report.models.opportunity_v3.precisionAt5.status, 'sufficient_data')
 assert.equal(report.models.quality_engine_v2.ndcgAt10.status, 'sufficient_data')
 assert.deepEqual(Object.keys(report.models), EVALUATION_V2_MODEL_KEYS)
@@ -84,5 +87,6 @@ process.stdout.write(`${JSON.stringify({
     'temporal_split_only',
     'deterministic_results',
     'no_automatic_weight_updates',
+    'v3_quality_v2_contract_only_comparison',
   ],
 })}\n`)
