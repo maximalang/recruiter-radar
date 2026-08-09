@@ -42,6 +42,16 @@ export const FALSE_NEGATIVE_CATEGORIES = [
   'unknown',
 ]
 
+export const RANKING_CHANGE_REASONS = [
+  'baseline',
+  'repost',
+  'lifetime',
+  'role_mix',
+  'seniority',
+  'slowdown',
+  'recruiter_pressure',
+]
+
 const DEFAULT_MINIMUM_SAMPLE = 30
 const DEFAULT_MINIMUM_LABELED = 10
 
@@ -80,6 +90,10 @@ export function evaluateCommercialSignalV2(inputRows, options = {}) {
     .map((row) => `${row.agencyProfileKey}:${isoWeek(row.decisionAt)}`))
   const profileCount = new Set(rows.map((row) => row.agencyProfileKey)).size
   const weekCount = new Set(rows.map((row) => isoWeek(row.decisionAt))).size
+  const diagnosticStatus = provenance === 'anonymized_real' &&
+      dataStatus === 'sufficient_data'
+    ? 'evaluation_only'
+    : 'contract_only'
 
   return {
     schemaVersion: COMMERCIAL_SIGNAL_EVALUATION_V2_SCHEMA,
@@ -91,6 +105,12 @@ export function evaluateCommercialSignalV2(inputRows, options = {}) {
     calibrationStatus: 'uncalibrated',
     models,
     comparison: compareV3Quality(models, provenance, dataStatus),
+    featureCoverageComparison: buildFeatureCoverageComparison(
+      rows,
+      dataStatus,
+      diagnosticStatus,
+    ),
+    rankingChanges: buildRankingChangeDiagnostics(rows, diagnosticStatus),
     qualityCoverage: metric(
       dataStatus,
       rows.length === 0 ? null : average(rows.map((row) => row.qualityCoverage)),
@@ -304,6 +324,18 @@ function normalizeRow(input, evaluationAt) {
       optionalFinite(input.scores?.[key]),
     ])),
     qualityCoverage: unitInterval(input.qualityCoverage, 'quality coverage'),
+    previousQualityCoverage: unitInterval(
+      input.previousQualityCoverage,
+      'previous quality coverage',
+    ),
+    unknownFeatureCount: nonNegativeInteger(
+      input.unknownFeatureCount,
+      'unknown feature count',
+    ),
+    previousUnknownFeatureCount: nonNegativeInteger(
+      input.previousUnknownFeatureCount,
+      'previous unknown feature count',
+    ),
     qualityConfidence: optionalUnitInterval(
       input.qualityConfidence,
       'quality confidence',
@@ -318,6 +350,23 @@ function normalizeRow(input, evaluationAt) {
       'expired',
       'dismissed',
     ], 'status'),
+    previousStatus: enumValue(input.previousStatus, [
+      'qualified_actionable',
+      'qualified_needs_enrichment',
+      'review',
+      'blocked',
+      'expired',
+      'dismissed',
+    ], 'previous status'),
+    rankingChangeReasons: enumArray(
+      input.rankingChangeReasons,
+      RANKING_CHANGE_REASONS,
+      'ranking change reason',
+    ),
+    blockedByNegativeState: requiredBoolean(
+      input.blockedByNegativeState,
+      'blocked by negative state',
+    ),
     friction: unitInterval(input.friction, 'friction'),
     agencyFit: unitInterval(input.agencyFit, 'agency fit'),
     propensity: unitInterval(input.propensity, 'propensity'),
@@ -341,6 +390,65 @@ function normalizeRow(input, evaluationAt) {
     evidenceObservedAt,
     excludedFutureEvidenceCount: 0,
   }
+}
+
+function buildFeatureCoverageComparison(rows, dataStatus, status) {
+  const before = rows.map((row) => row.previousQualityCoverage)
+  const after = rows.map((row) => row.qualityCoverage)
+  const unknownBefore = rows.map((row) => row.previousUnknownFeatureCount)
+  const unknownAfter = rows.map((row) => row.unknownFeatureCount)
+  return {
+    status,
+    coverageBefore: metric(
+      rows.length === 0 ? 'unavailable' : dataStatus,
+      rows.length === 0 ? null : average(before),
+      { samples: rows.length },
+    ),
+    coverageAfter: metric(
+      rows.length === 0 ? 'unavailable' : dataStatus,
+      rows.length === 0 ? null : average(after),
+      { samples: rows.length },
+    ),
+    coverageDelta: rows.length === 0 ? null : round(average(after) - average(before)),
+    unknownFeaturesBefore: {
+      total: sum(unknownBefore),
+      average: rows.length === 0 ? null : round(average(unknownBefore)),
+    },
+    unknownFeaturesAfter: {
+      total: sum(unknownAfter),
+      average: rows.length === 0 ? null : round(average(unknownAfter)),
+    },
+  }
+}
+
+function buildRankingChangeDiagnostics(rows, status) {
+  const changes = { promoted: 0, demoted: 0, unchanged: 0 }
+  const byReason = Object.fromEntries(RANKING_CHANGE_REASONS.map((reason) => [
+    reason,
+    0,
+  ]))
+  let blockedByNegativeState = 0
+  for (const row of rows) {
+    const delta = statusRank(row.status) - statusRank(row.previousStatus)
+    changes[delta > 0 ? 'promoted' : delta < 0 ? 'demoted' : 'unchanged'] += 1
+    if (delta !== 0 && row.rankingChangeReasons.length === 0) {
+      throw new TypeError('changed status requires a ranking change reason')
+    }
+    for (const reason of row.rankingChangeReasons) byReason[reason] += 1
+    if (row.blockedByNegativeState) blockedByNegativeState += 1
+  }
+  return { status, ...changes, byReason, blockedByNegativeState }
+}
+
+function statusRank(status) {
+  return {
+    qualified_actionable: 5,
+    qualified_needs_enrichment: 4,
+    review: 3,
+    blocked: 2,
+    expired: 1,
+    dismissed: 0,
+  }[status]
 }
 
 function normalizeModelLineage(input) {
@@ -525,6 +633,12 @@ function stringArray(value) {
   return [...new Set(value.map(String))].sort(compareText)
 }
 
+function enumArray(value, allowed, label) {
+  const values = stringArray(value)
+  for (const item of values) enumValue(item, allowed, label)
+  return values
+}
+
 function unitInterval(value, label) {
   const number = Number(value)
   if (!Number.isFinite(number) || number < 0 || number > 1) {
@@ -539,6 +653,23 @@ function positiveInteger(value, label) {
     throw new TypeError(`${label} must be a positive integer`)
   }
   return number
+}
+
+function nonNegativeInteger(value, label) {
+  const number = Number(value)
+  if (!Number.isSafeInteger(number) || number < 0) {
+    throw new TypeError(`${label} must be a non-negative integer`)
+  }
+  return number
+}
+
+function requiredBoolean(value, label) {
+  if (typeof value !== 'boolean') throw new TypeError(`${label} must be boolean`)
+  return value
+}
+
+function sum(values) {
+  return values.reduce((total, value) => total + value, 0)
 }
 
 function assertUnique(values, label) {

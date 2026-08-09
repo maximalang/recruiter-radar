@@ -58,6 +58,31 @@ always blocks action. A context event without current hiring evidence remains
 | Market Difficulty | approved reproducible observation or unknown | LLM and non-reproducible sources are rejected |
 | Outcome Learning v1 | tenant-scoped analytics and shadow recommendations | No-reply is not negative before maturity; small samples cannot update weights |
 
+## Exact Company State and feature semantics
+
+The input builder loads only `candidate.company_state_snapshot_id`. It rejects
+a snapshot, state change, event, or evidence item later than `decisionAt`; it
+never substitutes latest, nearest, or freshest organization state. The exact
+lineage includes the snapshot feature version, classification/confidence,
+event/evidence ids, and every attached state change with its own provenance.
+
+Persisted state now supplies growth versus baseline, confirmed slowdown,
+observed vacancy lifetime, supported repost rate, normalized role mix,
+seniority complexity, regional expansion, and the narrow recruiter-pressure
+signal. Minimum sample and known-share gates keep sparse role/seniority data
+unknown. A recruiter vacancy alone remains context; actual internal TA
+headcount/capacity remains unknown without an explicit source.
+
+`source-feature-capabilities.ts` is the deterministic source-to-feature gate.
+Conditional support still requires a real normalized observation. Missing
+fields are not negative signals, and an unregistered source cannot turn salary,
+repost, or state-derived friction into an observed component.
+
+The shadow report includes per-feature `observed`, `unknown`, `not_supported`,
+`not_applicable`, and coverage counts, sliced by source, profile, industry,
+region, and role family. The report is aggregate-only and does not expose a
+candidate or organization identity.
+
 ## Evidence provenance
 
 Each evidence row stores:
@@ -158,6 +183,13 @@ profile/week, a deterministic missed-opportunity sample, and a closed
 false-negative taxonomy. Required baselines are freshness, vacancy volume,
 FIUR, Opportunity v2, Opportunity v3, and Quality Engine v2.
 
+It also reports feature coverage before/after, unknown feature counts
+before/after, promoted/demoted/unchanged status counts, ranking-change reasons
+for baseline, repost, lifetime, role mix, seniority, slowdown and recruiter
+pressure, plus decisions blocked by exact negative state. Synthetic fixtures
+remain contract tests: without a sufficient anonymized real labeled sample the
+diagnostics stay `contract_only` and cannot support a precision claim.
+
 Temporal evaluation uses ordered train/validation/holdout periods. A scored row
 containing evidence observed after its decision timestamp is rejected; the
 evaluator never keeps its precomputed score after merely filtering timestamps.
@@ -186,7 +218,8 @@ lineage id.
 
 The shadow job emits aggregate-only telemetry for v3-to-v2 promotion/demotion,
 coverage and confidence bands, missing critical dimensions, friction,
-archetype, convergence, negative action, and independent-origin coverage. It
+archetype, convergence, negative action, independent-origin coverage, and the
+feature-coverage slices described above. It
 contains no candidate, organization, evidence text, URL, email, or phone.
 Outcome Learning remains tenant-scoped and analytics-only; its slices include
 archetype by profile, friction band by profile, convergence pattern, query

@@ -5,6 +5,7 @@ import {
   FALSE_NEGATIVE_CATEGORIES,
   FALSE_POSITIVE_CATEGORIES,
   MISSED_OPPORTUNITY_SAMPLE_TYPES,
+  RANKING_CHANGE_REASONS,
   buildTemporalEvaluationSplits,
   evaluateCommercialSignalV2,
 } from './lib/commercial-signal-evaluation-v2.mjs'
@@ -35,9 +36,16 @@ const row = (index, overrides = {}) => ({
     quality_engine_v2: index <= 12 ? 0.95 : 0.15,
   },
   qualityCoverage: 0.9,
+  previousQualityCoverage: 0.6,
+  previousUnknownFeatureCount: 8,
+  unknownFeatureCount: 3,
   qualityConfidence: 0.85,
   reviewLabel: index <= 12 ? 'strong' : 'weak',
   status: index <= 12 ? 'qualified_actionable' : 'review',
+  previousStatus: index <= 10 ? 'qualified_actionable' : 'review',
+  rankingChangeReasons: index === 11 || index === 12
+    ? ['baseline', 'repost'] : [],
+  blockedByNegativeState: index === 21,
   friction: index % 3 === 0 ? 0.85 : 0.3,
   agencyFit: index % 4 === 0 ? 0.9 : 0.5,
   propensity: index % 4 === 0 ? 0.3 : 0.7,
@@ -73,6 +81,20 @@ assert.equal(report.automaticWeightTuning, false)
 assert.equal(report.productionWrites, false)
 assert.equal(report.comparison.status, 'contract_only')
 assert.equal(report.comparison.population, 'synthetic_contract')
+assert.equal(report.featureCoverageComparison.status, 'contract_only')
+assert.equal(report.featureCoverageComparison.coverageBefore.value, 0.6)
+assert.equal(report.featureCoverageComparison.coverageAfter.value, 0.9)
+assert.equal(report.featureCoverageComparison.coverageDelta, 0.3)
+assert.equal(report.featureCoverageComparison.unknownFeaturesBefore.total, 240)
+assert.equal(report.featureCoverageComparison.unknownFeaturesAfter.total, 90)
+assert.equal(report.rankingChanges.status, 'contract_only')
+assert.equal(report.rankingChanges.promoted, 2)
+assert.equal(report.rankingChanges.demoted, 0)
+assert.equal(report.rankingChanges.unchanged, 28)
+assert.equal(report.rankingChanges.byReason.baseline, 2)
+assert.equal(report.rankingChanges.byReason.repost, 2)
+assert.equal(report.rankingChanges.blockedByNegativeState, 1)
+assert.deepEqual(Object.keys(report.rankingChanges.byReason), RANKING_CHANGE_REASONS)
 assert.equal(typeof report.comparison.deltas.precisionAt5, 'number')
 assert.equal(report.models.opportunity_v3.precisionAt5.status, 'sufficient_data')
 assert.equal(report.models.quality_engine_v2.ndcgAt10.status, 'sufficient_data')
@@ -90,6 +112,9 @@ assert.throws(() => evaluateCommercialSignalV2([
 assert.throws(() => evaluateCommercialSignalV2([
   row(1, { decisionAt: '2026-09-02T00:00:00.000Z' }),
 ], { evaluationAt: '2026-09-01T00:00:00.000Z' }), /future decision/)
+assert.throws(() => evaluateCommercialSignalV2([
+  row(11, { rankingChangeReasons: [] }),
+], { evaluationAt: '2026-09-01T00:00:00.000Z' }), /ranking change reason/)
 assert.throws(() => evaluateCommercialSignalV2([
   row(1, {
     modelLineage: {
@@ -125,6 +150,9 @@ const reversed = evaluateCommercialSignalV2([...rows].reverse(), {
 })
 assert.deepEqual(reversed.models, report.models)
 assert.deepEqual(reversed.missedOpportunityAudit, report.missedOpportunityAudit)
+assert.deepEqual(reversed.featureCoverageComparison,
+  report.featureCoverageComparison)
+assert.deepEqual(reversed.rankingChanges, report.rankingChanges)
 
 const splits = buildTemporalEvaluationSplits(rows, {
   trainBefore: '2026-06-15T00:00:00.000Z',
@@ -160,15 +188,19 @@ process.stdout.write(`${JSON.stringify({
   checks: [
     'six_required_baselines',
     'precision_5_10_and_ndcg_10',
-  'coverage_and_commercial_yield',
-  'coverage_and_confidence',
-  'missed_opportunity_shadow_sample',
-  'false_negative_taxonomy',
-  'false_positive_taxonomy',
+    'coverage_and_commercial_yield',
+    'coverage_and_confidence',
+    'feature_coverage_before_after',
+    'unknown_feature_counts_before_after',
+    'ranking_change_reasons',
+    'promoted_demoted_and_negative_state_blocks',
+    'missed_opportunity_shadow_sample',
+    'false_negative_taxonomy',
+    'false_positive_taxonomy',
     'future_evidence_excluded',
     'future_decisions_excluded',
-  'temporal_split_specific_outcome_cutoffs',
-  'same_exact_lineage_universe',
+    'temporal_split_specific_outcome_cutoffs',
+    'same_exact_lineage_universe',
     'deterministic_results',
     'no_automatic_weight_updates',
     'v3_quality_v2_contract_only_comparison',

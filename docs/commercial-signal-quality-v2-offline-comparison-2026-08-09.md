@@ -17,7 +17,8 @@ production ranking.
 | Precision@5 | 1.0000 | 1.0000 | 0.0000 |
 | Precision@10 | 0.6000 | 0.6000 | 0.0000 |
 | NDCG@10 | 1.0000 | 1.0000 | 0.0000 |
-| Quality coverage | n/a | 0.9000 | n/a |
+| Feature coverage | 0.6000 | 0.9000 | +0.3000 |
+| Unknown features/sample | 8.0000 | 3.0000 | -5.0000 |
 
 The equal synthetic result is intentional: the fixture proves that the
 evaluator compares the same profile-scoped population without claiming a
@@ -33,6 +34,14 @@ Additional synthetic diagnostics:
 - calibration: `uncalibrated`;
 - automatic weight tuning: disabled;
 - production writes: disabled.
+- status changes: `2 promoted`, `0 demoted`, `28 unchanged`;
+- ranking-change causes: `baseline=2`, `repost=2`, all other declared causes
+  `0` in the fixture;
+- blocked by negative state: `1` fixture row;
+- feature diagnostics status: `contract_only`.
+
+These before/after values are fixture inputs that exercise the diagnostic
+contract. They do not estimate real feature coverage or production lift.
 
 Command:
 

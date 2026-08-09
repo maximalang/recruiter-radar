@@ -44,11 +44,11 @@ readiness blocker, not permission to weaken P@5 or other quality thresholds.
 
 The following are genuinely missing or not yet proven at production scale:
 
-- normalized meaningful repost cycles distinct from routine HH lifecycle
-  republication;
-- salary and job-description change history;
-- close/reopen cycles and role-level time-to-fill history;
-- evidenced internal recruiting capacity and hiring velocity/capacity ratio;
+- production-scale coverage of the new versioned meaningful-repost contract;
+- production-scale salary-change and observed-vacancy-lifetime coverage;
+- requirements snapshot and full close/reopen lifecycle observations;
+- evidenced actual internal recruiting capacity (the current implementation
+  exposes only a narrower recruiter-pressure signal);
 - reviewed company agency-use history and previous agency relationship;
 - explicit procurement constraints and confirmed no-agency policy evidence;
 - approved, reproducible role/region market-difficulty observations;
