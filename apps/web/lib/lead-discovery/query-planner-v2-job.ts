@@ -27,6 +27,7 @@ import {
   type QueryPlannerV2Db,
 } from './query-planner-v2-repository'
 import type { FeedbackPatternEvent } from './query-feedback-tuning'
+import { isCommercialSignalQualityV2Enabled } from '@/lib/opportunities/config'
 
 export type QueryPlannerV2JobDb = Pick<Pool, 'query' | 'connect'> |
   Pick<PoolClient, 'query' | 'release'>
@@ -121,6 +122,7 @@ async function executeJob(
       }).map((plan) => applyHistoricalYieldToQueryPlan(
         plan,
         historicalYieldByPlan[queryPlanYieldKey(plan)],
+        { qualityFeedbackEnabled: isCommercialSignalQualityV2Enabled(options.env) },
       ))
       plansByProfile.push(plans)
       stats.plansBuilt += plans.length
@@ -240,10 +242,13 @@ async function loadProfiles(
              'uniqueEvents', latest.unique_events,
              'uniqueCompanies', latest.unique_companies,
              'newCompanyEvents', latest.new_company_events,
+             'independentEvents', latest.independent_events,
              'episodes', latest.episodes,
              'qualifiedEpisodes', latest.qualified_episodes,
              'qualifiedOpportunities', latest.qualified_opportunities,
              'actionableOpportunities', latest.actionable_opportunities,
+             'strongReviewedOpportunities', latest.strong_reviewed_opportunities,
+             'ordinaryHiringOpportunities', latest.ordinary_hiring_opportunities,
              'staleOpportunities', latest.stale_opportunities,
              'accepted', latest.accepted,
              'contacted', latest.contacted,
@@ -271,10 +276,13 @@ async function loadProfiles(
              metric.unique_events,
              metric.unique_companies,
              metric.new_company_events,
+             metric.independent_events,
              metric.episodes,
              metric.qualified_episodes,
              metric.qualified_opportunities,
              metric.actionable_opportunities,
+             metric.strong_reviewed_opportunities,
+             metric.ordinary_hiring_opportunities,
              metric.stale_opportunities,
              metric.accepted,
              metric.contacted,
@@ -363,10 +371,13 @@ function historicalYieldMap(value: unknown): QueryPlanYieldMap {
       uniqueEvents: row.uniqueEvents,
       uniqueCompanies: row.uniqueCompanies,
       newCompanyEvents: row.newCompanyEvents,
+      independentEvents: row.independentEvents,
       episodes: row.episodes,
       qualifiedEpisodes: row.qualifiedEpisodes,
       qualifiedOpportunities: row.qualifiedOpportunities,
       actionableOpportunities: row.actionableOpportunities,
+      strongReviewedOpportunities: row.strongReviewedOpportunities,
+      ordinaryHiringOpportunities: row.ordinaryHiringOpportunities,
       staleOpportunities: row.staleOpportunities,
       accepted: row.accepted,
       contacted: row.contacted,

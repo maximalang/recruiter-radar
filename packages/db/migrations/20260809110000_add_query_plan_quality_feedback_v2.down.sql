@@ -11,6 +11,10 @@ BEGIN
     WHERE independent_events IS NOT NULL
        OR strong_reviewed_opportunities IS NOT NULL
        OR ordinary_hiring_opportunities IS NOT NULL
+       OR independent_event_fetch_rate IS NOT NULL
+       OR episode_fetch_rate IS NOT NULL
+       OR qualified_fetch_rate IS NOT NULL
+       OR strong_reviewed_fetch_rate IS NOT NULL
   ) THEN
     RAISE EXCEPTION
       'query plan quality feedback rollback refused: metric history exists';

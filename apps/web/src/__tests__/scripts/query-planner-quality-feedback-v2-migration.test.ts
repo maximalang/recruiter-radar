@@ -41,8 +41,9 @@ describe('Query Planner quality feedback v2 migration', () => {
   })
 
   it('keeps reply and meeting counts per exact query plan', () => {
-    expect(materializer).toContain("BOOL_OR(outcome.event_type = 'replied')")
-    expect(materializer).toContain("BOOL_OR(outcome.event_type = 'meeting')")
+    expect(materializer).toContain('opportunity_outcome_state')
+    expect(materializer).toContain('outcome.replied_at >= lineage.created_at')
+    expect(materializer).toContain('outcome.meeting_at >= lineage.created_at')
     expect(materializer).toContain('counts.replied')
     expect(materializer).toContain('counts.meetings')
   })
@@ -50,6 +51,7 @@ describe('Query Planner quality feedback v2 migration', () => {
   it('refuses to discard materialized quality feedback history', () => {
     expect(rollback).toContain('query plan quality feedback rollback refused')
     expect(rollback).toContain('independent_events IS NOT NULL')
+    expect(rollback).toContain('strong_reviewed_fetch_rate IS NOT NULL')
     expect(rollback).toContain('DROP COLUMN independent_events')
   })
 })

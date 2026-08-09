@@ -26,11 +26,11 @@ ALTER TABLE query_plan_metric_snapshots
   ),
   ADD CONSTRAINT query_plan_metric_snapshots_quality_rates_check CHECK (
     (independent_event_fetch_rate IS NULL
-      OR independent_event_fetch_rate BETWEEN 0 AND 1)
-    AND (episode_fetch_rate IS NULL OR episode_fetch_rate BETWEEN 0 AND 1)
-    AND (qualified_fetch_rate IS NULL OR qualified_fetch_rate BETWEEN 0 AND 1)
+      OR independent_event_fetch_rate >= 0)
+    AND (episode_fetch_rate IS NULL OR episode_fetch_rate >= 0)
+    AND (qualified_fetch_rate IS NULL OR qualified_fetch_rate >= 0)
     AND (strong_reviewed_fetch_rate IS NULL
-      OR strong_reviewed_fetch_rate BETWEEN 0 AND 1)
+      OR strong_reviewed_fetch_rate >= 0)
   );
 
 COMMENT ON COLUMN query_plan_metric_snapshots.independent_events IS

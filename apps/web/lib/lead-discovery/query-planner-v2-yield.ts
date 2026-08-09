@@ -65,6 +65,7 @@ export function queryPlanYieldKey(input: Pick<
 export function applyHistoricalYieldToQueryPlan(
   plan: ProfileScopedQueryPlanV2,
   yieldSnapshot: QueryPlanOperationalYield | null | undefined,
+  options: { qualityFeedbackEnabled?: boolean } = {},
 ): ProfileScopedQueryPlanV2 {
   if (!yieldSnapshot) return plan
 
@@ -72,6 +73,7 @@ export function applyHistoricalYieldToQueryPlan(
   const budgetAdjustment = resolveBudgetAdjustment(
     plan.pageBudget,
     normalizedYield,
+    options,
   )
   const supplyDiagnostics = diagnoseQueryPlanSupply(normalizedYield)
   const queryEnv = { ...plan.queryEnv }
@@ -173,6 +175,7 @@ export function diagnoseQueryPlanSupply(
 export function resolveYieldAdjustedPageBudget(
   currentBudget: number,
   rawYield: QueryPlanOperationalYield,
+  options: { qualityFeedbackEnabled?: boolean } = {},
 ): { pageBudget: number; reasonCode: string | null } {
   const yieldSnapshot = normalizeOperationalYield(rawYield)
   const strongReviewed = yieldSnapshot.strongReviewedOpportunities ?? 0
@@ -180,7 +183,8 @@ export function resolveYieldAdjustedPageBudget(
   const sampleReady =
     (yieldSnapshot.fetchedRecords ?? 0) >= MIN_SAMPLE_FETCHED ||
     (yieldSnapshot.episodes ?? 0) >= MIN_SAMPLE_EPISODES ||
-    (yieldSnapshot.executionCount ?? 0) >= 5 || strongReviewed >= 2 ||
+    (yieldSnapshot.executionCount ?? 0) >= 5 ||
+    (options.qualityFeedbackEnabled === true && strongReviewed >= 2) ||
     (yieldSnapshot.replied ?? 0) >= 1 || (yieldSnapshot.meetings ?? 0) >= 1
   if (!sampleReady) {
     return { pageBudget: currentBudget, reasonCode: 'YIELD_SAMPLE_INSUFFICIENT' }
@@ -232,7 +236,8 @@ export function resolveYieldAdjustedPageBudget(
   }
 
   const reviewedCount = strongReviewed + ordinaryHiring
-  if (reviewedCount >= 5 && ordinaryHiring / reviewedCount >= 0.7) {
+  if (options.qualityFeedbackEnabled === true && reviewedCount >= 5 &&
+    ordinaryHiring / reviewedCount >= 0.7) {
     return {
       pageBudget: clampBudget(currentBudget - 1),
       reasonCode: 'YIELD_BUDGET_REDUCED_ORDINARY_HIRING',
@@ -247,7 +252,8 @@ export function resolveYieldAdjustedPageBudget(
       reasonCode: 'YIELD_BUDGET_EXPANDED_COMMERCIAL_OUTCOME',
     }
   }
-  if (strongReviewed >= 2 && (replied >= 1 || meetings >= 1)) {
+  if (options.qualityFeedbackEnabled === true && strongReviewed >= 2 &&
+    (replied >= 1 || meetings >= 1)) {
     return {
       pageBudget: clampBudget(currentBudget + 1),
       reasonCode: 'YIELD_BUDGET_EXPANDED_REVIEWED_COMMERCIAL_YIELD',
@@ -305,8 +311,9 @@ function normalizeOperationalYield(
 function resolveBudgetAdjustment(
   currentBudget: number,
   yieldSnapshot: QueryPlanOperationalYield,
+  options: { qualityFeedbackEnabled?: boolean },
 ) {
-  return resolveYieldAdjustedPageBudget(currentBudget, yieldSnapshot)
+  return resolveYieldAdjustedPageBudget(currentBudget, yieldSnapshot, options)
 }
 
 function nullableCount(value: unknown): number | null {

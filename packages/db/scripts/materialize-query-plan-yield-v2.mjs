@@ -245,7 +245,8 @@ async function computePlanCounts(client, plan, start, end) {
          lineage.opportunity_id,
          lineage.candidate_id,
          lineage.signal_episode_id,
-         lineage.organization_id
+         lineage.organization_id,
+         lineage.owner_id
        FROM commercial_signal_opportunity_query_plans query_link
        JOIN commercial_signal_opportunity_lineage lineage
          ON lineage.id = query_link.lineage_id
@@ -258,17 +259,20 @@ async function computePlanCounts(client, plan, start, end) {
      outcome_flags AS (
        SELECT
          lineage.opportunity_id,
-         BOOL_OR(outcome.event_type = 'accepted') AS accepted,
-         BOOL_OR(outcome.event_type = 'contacted') AS contacted,
-         BOOL_OR(outcome.event_type = 'replied') AS replied,
-         BOOL_OR(outcome.event_type = 'meeting') AS meeting,
-         BOOL_OR(outcome.event_type = 'won') AS won
+         outcome.accepted_at >= lineage.created_at
+           AND outcome.accepted_at < $5::TIMESTAMPTZ AS accepted,
+         outcome.contacted_at >= lineage.created_at
+           AND outcome.contacted_at < $5::TIMESTAMPTZ AS contacted,
+         outcome.replied_at >= lineage.created_at
+           AND outcome.replied_at < $5::TIMESTAMPTZ AS replied,
+         outcome.meeting_at >= lineage.created_at
+           AND outcome.meeting_at < $5::TIMESTAMPTZ AS meeting,
+         outcome.won_at >= lineage.created_at
+           AND outcome.won_at < $5::TIMESTAMPTZ AS won
        FROM lineages lineage
-       LEFT JOIN opportunity_outcome_events outcome
+       LEFT JOIN opportunity_outcome_state outcome
          ON outcome.opportunity_id = lineage.opportunity_id
-        AND outcome.occurred_at >= $4::TIMESTAMPTZ
-        AND outcome.occurred_at < $5::TIMESTAMPTZ
-       GROUP BY lineage.opportunity_id
+        AND outcome.owner_id = lineage.owner_id
      ),
      quality_groups AS (
        SELECT DISTINCT evidence.evidence_independence_group
@@ -277,11 +281,18 @@ async function computePlanCounts(client, plan, start, end) {
          ON quality.candidate_id = lineage.candidate_id
         AND quality.workspace_id = $2
         AND quality.client_profile_id = $3
+        AND quality.feature_version = 'commercial-signal-quality-v2'
+        AND quality.quality_identity =
+          lineage.score_snapshot->'commercialSignalQualityV2'->>'qualityIdentity'
+        AND quality.quality_generation::TEXT =
+          lineage.score_snapshot->'commercialSignalQualityV2'->>'qualityGeneration'
+        AND quality.created_at <= lineage.created_at
        JOIN commercial_signal_quality_evidence evidence
          ON evidence.quality_snapshot_id = quality.id
         AND evidence.candidate_id = lineage.candidate_id
         AND evidence.workspace_id = $2
         AND evidence.client_profile_id = $3
+        AND evidence.observed_at <= lineage.created_at
      ),
      review_flags AS (
        SELECT

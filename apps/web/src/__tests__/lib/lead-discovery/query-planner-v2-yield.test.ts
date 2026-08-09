@@ -127,9 +127,22 @@ describe('Query Planner v2 downstream yield tuning', () => {
       strongReviewedOpportunities: 2,
       replied: 1,
       meetings: 1,
-    })).toEqual({
+    }, { qualityFeedbackEnabled: true })).toEqual({
       pageBudget: 4,
       reasonCode: 'YIELD_BUDGET_EXPANDED_REVIEWED_COMMERCIAL_YIELD',
+    })
+  })
+
+  it('keeps quality-v2 feedback dark unless its exact flag is enabled', () => {
+    expect(resolveYieldAdjustedPageBudget(3, {
+      ...emptyYield,
+      executionCount: 3,
+      fetchedRecords: 18,
+      strongReviewedOpportunities: 2,
+      replied: 1,
+    })).toEqual({
+      pageBudget: 3,
+      reasonCode: 'YIELD_BUDGET_UNCHANGED',
     })
   })
 
@@ -145,7 +158,7 @@ describe('Query Planner v2 downstream yield tuning', () => {
       actionableOpportunities: 4,
       strongReviewedOpportunities: 1,
       ordinaryHiringOpportunities: 8,
-    })).toEqual({
+    }, { qualityFeedbackEnabled: true })).toEqual({
       pageBudget: 4,
       reasonCode: 'YIELD_BUDGET_REDUCED_ORDINARY_HIRING',
     })
