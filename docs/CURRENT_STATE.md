@@ -27,6 +27,7 @@
 - Источники доступа: admin grant, payment, trial и pilot. Результат объединяет активные источники и server-side feature access.
 - Dashboard, leads, review, API, feedback mutation и digest/delivery проверяют canonical entitlement до premium read/write.
 - Admin grant не требует fake checkout order; payment entitlement связан с существующим workspace/data owner и не создаёт ownership.
+- Checkout хранит отдельно paying actor (`purchased_by_user_id`), выбранный `workspace_id` и получателя entitlement (`entitlement_owner_id`); доступ и refund reconciliation ограничены этой workspace/owner парой.
 - Истёкший или отозванный доступ закрывает premium actions fail-closed и оставляет понятный путь к восстановлению доступа.
 
 ## Payments
@@ -51,8 +52,9 @@
 ## Observability и health
 
 - Structured events покрывают login request/email/session outcomes, checkout/webhook/entitlement reconciliation, radar runs/source failures/zero-opportunity anomaly и digest/channel outcomes.
-- `/api/health/readiness` возвращает только защищённый dependency report: DB probe, email configuration, workflow prerequisites и configuration-only статусы payment/Telegram/webpush.
-- Статусы providers не содержат credentials, tokens, email, signature или webhook payload. `configured_unverified` не означает live success.
+- `/api/health/readiness` возвращает только защищённый dependency report: DB probe, workflow prerequisites, отдельные email configuration/runtime/verification states и configuration-only статусы payment/Telegram/webpush.
+- Любая успешная доставка через центральный SMTP/Postbox transport записывает PII-free provider/configuration fingerprint evidence и переводит только эту актуальную конфигурацию в `runtimeState: healthy`; report показывает только `lastVerifiedAt` и `lastSuccessfulDeliveryAt`. Одна конфигурация остаётся `configured_unverified` и не считается live success.
+- Статусы providers не содержат credentials, tokens, email, signature или webhook payload.
 - Внешний metrics/SLO/alert-routing backend и retention policy должны быть подтверждены отдельно в production.
 
 ## Source registry
@@ -76,7 +78,7 @@ Promotion разрешается только registry policy и live verifier. 
 
 ## Current production status
 
-- Этот branch содержит production-readiness изменения, но ещё не commit/push/PR/deploy.
+- Этот branch содержит production-readiness изменения; локальный production acceptance A–E прошёл на disposable PostgreSQL, но полный pre-merge suite, remote CI и merge ещё не завершены.
 - Текущий deployed SHA, production env flags, credentials, provider availability, migrations и live health в рамках этого snapshot не проверены.
 - Поэтому статус: **code verification in progress; production rollout not authorized and not claimed**.
 
@@ -98,6 +100,7 @@ npm run test:types --workspace @recruiter-radar/web
 npm test --workspace @recruiter-radar/web -- --runInBand
 npm run db:validate
 npm run test:production:acceptance
+npm run test:workspace-billing:db
 npm run test:landing:e2e
 npm run test:responsive-surfaces
 npm run web:build

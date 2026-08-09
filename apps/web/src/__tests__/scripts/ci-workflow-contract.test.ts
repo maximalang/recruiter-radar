@@ -5,6 +5,10 @@ const workflow = readFileSync(
   resolve(process.cwd(), '..', '..', '.github', 'workflows', 'test.yml'),
   'utf8',
 )
+const productionAcceptance = readFileSync(
+  resolve(process.cwd(), '..', '..', 'scripts', 'run-production-acceptance.mjs'),
+  'utf8',
+)
 
 describe('pull request CI workflow contract', () => {
   it('runs the complete release gate for codex pushes and integration pull requests', () => {
@@ -19,6 +23,7 @@ describe('pull request CI workflow contract', () => {
       'unit-tests:',
       'web-build:',
       'landing-playwright:',
+      'production-acceptance:',
       'security-audit:',
       'docker-build:',
     ]) {
@@ -26,10 +31,19 @@ describe('pull request CI workflow contract', () => {
     }
   })
 
+  it('runs migration and production acceptance against a disposable database', () => {
+    expect(workflow).toContain('npm run test:entitlements:migration:db')
+    expect(workflow).toContain('npm run test:production:acceptance')
+    expect(productionAcceptance).toContain('run-workspace-billing-db-tests.mjs')
+    expect(workflow).toContain("ENTITLEMENT_DISPOSABLE_DB_CONFIRMED: 'true'")
+    expect(workflow).toContain("WORKSPACE_BILLING_DISPOSABLE_DB_CONFIRMED: 'true'")
+  })
+
   it('runs landing and responsive browser audits and retains failure artifacts', () => {
     expect(workflow).toContain('npm run test:types --workspace @recruiter-radar/web')
     expect(workflow).toContain('npm run test:landing:e2e')
     expect(workflow).toContain('npm run test:responsive-surfaces')
+    expect(workflow).toContain("LANDING_REQUIRE_ANALYTICS_CONSENT: 'true'")
     expect(workflow).toContain(
       'LANDING_ANALYTICS_RATE_LIMIT_SALT: test-landing-rate-limit-salt-at-least-32-characters',
     )
@@ -50,6 +64,7 @@ describe('pull request CI workflow contract', () => {
       workflow.indexOf('- name: Upload Playwright screenshots and traces'),
     )
     expect(workflow).toContain('if: always()')
+    expect(workflow).toMatch(/Upload Playwright screenshots and traces\s+if: failure\(\)/)
     expect(workflow).toContain('playwright-report')
     expect(workflow).toContain('test-results')
   })

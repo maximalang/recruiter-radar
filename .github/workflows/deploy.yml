@@ -304,31 +304,31 @@ jobs:
               tab48_link_ok=false
               apple_icon_ok=false
               if printf '%s' "$landing_html" \
-                | grep -qE '<link[^>]*rel="icon"[^>]*href="/tab-favicon-brand34-16"[^>]*>' \
+                | grep -qE '<link[^>]*rel="icon"[^>]*href="/tab-icons/tab-icon-16.png\?v='"${BRAND_VERSION}"'"[^>]*>' \
                 && printf '%s' "$landing_html" | grep -q 'sizes="16x16"'; then
                 tab16_link_ok=true
               fi
               if printf '%s' "$landing_html" \
-                | grep -qE '<link[^>]*rel="icon"[^>]*href="/tab-favicon-brand34-32"[^>]*>' \
+                | grep -qE '<link[^>]*rel="icon"[^>]*href="/tab-icons/tab-icon-32.png\?v='"${BRAND_VERSION}"'"[^>]*>' \
                 && printf '%s' "$landing_html" | grep -q 'sizes="32x32"'; then
                 tab32_link_ok=true
               fi
               if printf '%s' "$landing_html" \
-                | grep -qE '<link[^>]*rel="icon"[^>]*href="/tab-favicon-brand34-48"[^>]*>' \
+                | grep -qE '<link[^>]*rel="icon"[^>]*href="/tab-icons/tab-icon-48.png\?v='"${BRAND_VERSION}"'"[^>]*>' \
                 && printf '%s' "$landing_html" | grep -q 'sizes="48x48"'; then
                 tab48_link_ok=true
               fi
               if printf '%s' "$landing_html" \
-                | grep -qE '<link[^>]*rel="apple-touch-icon"[^>]*href="/apple-icon-180\?v='"${BRAND_VERSION}"'"[^>]*>' \
+                | grep -qE '<link[^>]*rel="apple-touch-icon"[^>]*href="/app-icons/app-icon-180.png\?v='"${BRAND_VERSION}"'"[^>]*>' \
                 && printf '%s' "$landing_html" | grep -q 'sizes="180x180"'; then
                 apple_icon_ok=true
               fi
 
-              tab16_code=$(curl -s -o /dev/null -w '%{http_code}' "https://recruiter-radar.ru/tab-favicon-brand34-16" --max-time 30)
-              tab32_code=$(curl -s -o /dev/null -w '%{http_code}' "https://recruiter-radar.ru/tab-favicon-brand34-32" --max-time 30)
-              tab48_code=$(curl -s -o /dev/null -w '%{http_code}' "https://recruiter-radar.ru/tab-favicon-brand34-48" --max-time 30)
-              root_favicon_code=$(curl -s -o /dev/null -w '%{http_code}' "https://recruiter-radar.ru/favicon.ico" --max-time 30)
-              apple_asset_code=$(curl -s -o /dev/null -w '%{http_code}' "https://recruiter-radar.ru/apple-icon-180?v=${BRAND_VERSION}" --max-time 30)
+              tab16_code=$(curl -s -o /dev/null -w '%{http_code}' "https://recruiter-radar.ru/tab-icons/tab-icon-16.png?v=${BRAND_VERSION}" --max-time 30)
+              tab32_code=$(curl -s -o /dev/null -w '%{http_code}' "https://recruiter-radar.ru/tab-icons/tab-icon-32.png?v=${BRAND_VERSION}" --max-time 30)
+              tab48_code=$(curl -s -o /dev/null -w '%{http_code}' "https://recruiter-radar.ru/tab-icons/tab-icon-48.png?v=${BRAND_VERSION}" --max-time 30)
+              root_favicon_code=$(curl -L -s -o /dev/null -w '%{http_code}' "https://recruiter-radar.ru/favicon.ico" --max-time 30)
+              apple_asset_code=$(curl -s -o /dev/null -w '%{http_code}' "https://recruiter-radar.ru/app-icons/app-icon-180.png?v=${BRAND_VERSION}" --max-time 30)
               echo "favicon assets: 16=$tab16_code 32=$tab32_code 48=$tab48_code root=$root_favicon_code apple=$apple_asset_code"
 
               if [ "$tab16_link_ok" = "true" ] && [ "$tab32_link_ok" = "true" ] \

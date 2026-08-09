@@ -18,6 +18,11 @@ if (process.env.AUTH_V2_DISPOSABLE_DB_CONFIRMED !== 'true') {
     'AUTH_V2_DISPOSABLE_DB_CONFIRMED=true is required; this gate creates and drops disposable databases.',
   )
 }
+if (process.env.WORKSPACE_BILLING_DISPOSABLE_DB_CONFIRMED !== 'true') {
+  throw new Error(
+    'WORKSPACE_BILLING_DISPOSABLE_DB_CONFIRMED=true is required for workspace billing acceptance.',
+  )
+}
 
 const acceptanceDatabaseName = `production_acceptance_${process.pid}_${Date.now()}`
 const acceptanceUrl = new URL(databaseUrl)
@@ -89,7 +94,13 @@ try {
     { env: paymentEnvironment },
   )
 
-  process.stdout.write('\n[production-acceptance] Scenarios A-D passed.\n')
+  await run(
+    'Scenario E: billing member purchases access for the workspace owner',
+    process.execPath,
+    [resolve(root, 'packages', 'db', 'scripts', 'run-workspace-billing-db-tests.mjs')],
+  )
+
+  process.stdout.write('\n[production-acceptance] Scenarios A-E passed.\n')
 } finally {
   if (acceptanceDatabaseCreated) {
     await admin.query(
