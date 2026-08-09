@@ -594,6 +594,59 @@ describe('Commercial Signal Quality v2 exact-lineage input builder', () => {
       .toContain('MEANINGFUL_REPOST_CYCLES')
   })
 
+  it('preserves the real producer salary-change contract as observed friction', async () => {
+    const source = (
+      id: string,
+      occurredAt: string,
+      salaryMin: number,
+      salaryMax: number,
+    ): CompanyEventSourceRecord => ({
+      id,
+      organizationId: '11',
+      signalType: 'job_posting',
+      title: 'Senior Java developer',
+      region: 'Moscow',
+      source: 'hh',
+      sourceUrl: `https://example.test/vacancies/${id}`,
+      externalVacancyId: id,
+      occurredAt,
+      firstSeenAt: occurredAt,
+      lastSeenAt: occurredAt,
+      evidenceIds: ['101'],
+      payload: {
+        vacancy_name: 'Senior Java developer',
+        salary_rub_min: salaryMin,
+        salary_rub_max: salaryMax,
+        salary_currency: 'RUB',
+      },
+    })
+    const produced = normalizeJobPostingCompanyEvents([
+      source('old-101', '2026-07-10T09:00:00.000Z', 100_000, 120_000),
+      source('new-101', '2026-08-02T09:00:00.000Z', 150_000, 170_000),
+    ], new Date('2026-08-09T10:00:00.000Z'))
+    const salaryChange = produced.events.find(
+      (item) => item.eventType === 'vacancy_salary_change',
+    )
+    expect(salaryChange).toBeDefined()
+
+    const { db } = dbWith({
+      events: [event({
+        eventId: '203',
+        eventType: 'vacancy_salary_change',
+        payload: salaryChange?.payload,
+      })],
+      evidence: [evidence({ source: 'hh' })],
+      stateEvidence: [evidence({ source: 'hh' })],
+    })
+    const built = await buildCommercialSignalQualityV2Input('41', {
+      workspaceId: '21', clientProfileId: '22', organizationId: '11',
+    }, db)
+
+    expect(built.input.hiringFriction.observationStates.salary_change)
+      .toBe('observed')
+    expect(built.input.hiringFriction.componentValues.salary_change).toBe(1)
+  })
+
   it('keeps an insufficient upstream propensity unavailable', async () => {
     const { db } = dbWith({
       lineage: [lineage({ propensityLevel: 'insufficient_evidence' })],
@@ -605,6 +658,7 @@ describe('Commercial Signal Quality v2 exact-lineage input builder', () => {
 
     expect(built.input.propensity.componentValues.external_support_plausibility)
       .toBeNull()
+    expect(built.input.propensity.componentValues.procurement_barrier).toBeNull()
   })
 
   it('does not launder corroboration tier into current official hiring evidence', async () => {
